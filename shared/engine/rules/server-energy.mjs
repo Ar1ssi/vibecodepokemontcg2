@@ -20,6 +20,14 @@ export function serverEnergyDescriptor(card, options = {}) {
   const { stadiumCard = null, hostPokemon = null } = options || {};
   if (!card) return { type: 'Colorless', family: 'basic' };
   if (typeof card === 'string') return { type: card, family: 'basic' };
+  // A Pokémon attached as Special Energy by its own Ability (Buzzap, Battery).
+  if (card.asEnergy && card.attachedTo != null) {
+    const provides = [...(card.asEnergy.provides || [])];
+    return rewriteEnergyDescriptor(
+      { type: provides[0] || 'Colorless', family: 'attach-type', provides },
+      { stadiumCard }
+    );
+  }
   const descriptor = {
     type: resolveAttachedEnergyType(card),
     family: classifyEnergyEffect(card),

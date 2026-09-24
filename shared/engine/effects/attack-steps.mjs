@@ -46,6 +46,7 @@ import {
   attachTo,
   attachedCards,
   benchRootsOf,
+  damageCounterMoveLocked,
   discardCard,
   isBasicEnergy,
   isSpecialEnergy,
@@ -872,7 +873,7 @@ function atkOppHandRandomToDeck(ctx) {
 
 const revealedCard = (card) => ({ instanceId: card.instanceId, name: card.name });
 
-const REVEAL_ACTION_ZONE = { deckBottom: 'deck', prize: 'prizes' };
+const REVEAL_ACTION_ZONE = { deckBottom: 'deck', deckShuffle: 'deck', prize: 'prizes', bench: 'bench' };
 
 function applyRevealAction(ctx, cards) {
   const { opponent, step } = ctx;
@@ -883,28 +884,52 @@ function applyRevealAction(ctx, cards) {
   }
   // Deck index 0 is the top, so a push puts the card on the bottom.
   for (const card of cards) moveToZone(opponent, card, zone, 'hand', ctx.events);
+  if (step.then.action === 'deckShuffle' && cards.length > 0) shuffleOwnDeck(opponent, ctx);
+  if (step.then.action === 'bench' && step.then.counters) {
+    for (const card of cards) {
+      card.damage = (card.damage || 0) + step.then.counters * 10;
+      ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage });
+    }
+  }
   return null;
 }
 
+// How many revealed cards the follow-up takes: "any number" is the player's call (none
+// included), and a Bench placement is capped by the room on the opponent's Bench.
+function revealPickRange(ctx, matching) {
+  const { opponent, step } = ctx;
+  const room = step.then.action === 'bench' ? benchSpace(opponent) : Infinity;
+  if (step.then.count === 'any') return { min: 0, max: Math.min(matching.length, room) };
+  if (step.then.count === 'all') return { min: Math.min(matching.length, room), max: Math.min(matching.length, room) };
+  const n = Math.min(step.then.count, matching.length, room);
+  return { min: n, max: n };
+}
+
 // "Your opponent reveals their hand." plus an optional follow-up on the revealed cards
-// (discard / bottom of deck / face-down Prize). Damage that counts the revealed cards is
-// the damage parser's, read from the same hand.
+// (discard / bottom of deck / shuffle into deck / face-down Prize / onto their Bench). Damage
+// that counts the revealed cards is the damage parser's, read from the same hand.
 function atkRevealOppHand(ctx) {
   const { opponent, step } = ctx;
   const hand = opponent?.zones?.hand;
   if (!hand) return skip(ctx, 'no_opponent');
   const matching = step.then?.filter ? hand.filter((c) => matchesSearch(c, step.then.filter)) : [...hand];
-  if (ctx.selection && step.then) return applyRevealAction(ctx, pickById(matching, ctx.selection).slice(0, step.then.count));
+  if (ctx.selection && step.then) {
+    const { max } = revealPickRange(ctx, matching);
+    return applyRevealAction(ctx, pickById(matching, ctx.selection).slice(0, max));
+  }
   ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, cards: hand.map(revealedCard) });
   if (!step.then) return null;
   if (matching.length === 0) return skip(ctx, 'no_matching_card');
-  if (step.then.count === 'all' || matching.length <= step.then.count) return applyRevealAction(ctx, matching);
+  const { min, max } = revealPickRange(ctx, matching);
+  if (max === 0) return skip(ctx, 'bench_full');
+  if (min === max && max === matching.length) return applyRevealAction(ctx, matching);
   const kind = step.then.filter ? `${step.then.filter[0].toUpperCase()}${step.then.filter.slice(1)} ` : '';
+  const amount = step.then.count === 'any' ? 'any number of' : String(max);
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose ${step.then.count} ${kind}card(s) from your opponent's hand`,
+    prompt: `${attackName(ctx)}: Choose ${amount} ${kind}card(s) from your opponent's hand`,
     options: matching,
-    min: step.then.count,
-    max: step.then.count,
+    min,
+    max,
   });
 }
 
@@ -1247,6 +1272,7 @@ function atkHpCap(ctx) {
 
 function atkMoveAllCounters(ctx) {
   const { player, opponent } = ctx;
+  if (damageCounterMoveLocked(ctx)) return skip(ctx, 'damage_counter_move_locked');
   const target = activeOf(opponent);
   const sources = benchRootsOf(player).filter((c) => (c.damage || 0) > 0);
   const move = (from) => {
@@ -1274,6 +1300,7 @@ function atkMoveAllCounters(ctx) {
 // "Move 1 damage counter from 1 of your Pokémon to another of your Pokémon" (Reuniclus).
 function atkMoveCounterBetween(ctx) {
   const { player, step } = ctx;
+  if (damageCounterMoveLocked(ctx)) return skip(ctx, 'damage_counter_move_locked');
   const roots = rootsOf(player);
   // "from 1 of your Team Rocket's Pokémon": the source's name starts with the printed qualifier.
   const fromName = String(step.fromName || '').toLowerCase();
@@ -1337,21 +1364,22 @@ function atkHandDeckTopSwap(ctx) {
 }
 
 // Galarian Mr. Rime Shuffle Dance: a face-down Prize trades places with the deck's top card.
+// `step.own` (Mr. Mime Pantomime, Rattata Trickery) swaps the user's own Prize instead.
 function atkOpponentPrizeDeckSwap(ctx) {
-  const { opponent } = ctx;
-  const prizes = opponent?.zones?.prizes || [];
-  const deck = opponent?.zones?.deck || [];
+  const owner = ctx.step.own ? ctx.player : ctx.opponent;
+  const prizes = owner?.zones?.prizes || [];
+  const deck = owner?.zones?.deck || [];
   if (ctx.selection) {
     const at = prizes.findIndex((c) => c.instanceId === ctx.selection[0]);
     if (at < 0 || deck.length === 0) return skip(ctx, 'target_not_found');
     const [prize] = prizes.splice(at, 1, deck.shift());
     deck.unshift(prize);
-    ctx.events.push({ type: 'prizeSwapped', playerId: opponent.playerId });
+    ctx.events.push({ type: 'prizeSwapped', playerId: owner.playerId });
     return null;
   }
   if (prizes.length === 0 || deck.length === 0) return skip(ctx, 'nothing_to_swap');
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose 1 of your opponent's face-down Prize cards`,
+    prompt: `${attackName(ctx)}: Choose 1 of ${ctx.step.own ? 'your' : "your opponent's"} face-down Prize cards`,
     // Identity only: Prize cards stay face down.
     options: prizes.map((c) => ({ instanceId: c.instanceId })),
     min: 1,

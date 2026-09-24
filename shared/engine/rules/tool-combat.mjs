@@ -5,6 +5,7 @@
 import {
   isPokemonToolCard,
   attachedTools,
+  cardAbilityText,
   parseDamagePrevention,
   parseDamageReduction,
   parseDamageBonus,
@@ -36,12 +37,7 @@ import {
 const lower = (v) =>
   String(v ?? '')
     .toLowerCase()
-    .replace(/[\u2018\u2019]/g, "'");
-
-const textOf = (card) =>
-  lower(
-    card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
-  );
+    .replace(/[‘’]/g, "'");
 
 export const TYPE_LETTER = {
   g: 'grass',
@@ -138,37 +134,44 @@ function toolBlocked(blockTools, stadium = null) {
 }
 
 export function preventionForCard(card, attacker, ctx = {}) {
-  if (!card) return { preventAll: false, reduce: 0 };
-  const t = textOf(card);
+  if (!card) return { preventAll: false, reduce: 0, reduceHp: 0 };
+  const t = cardAbilityText(card);
   const base = parseDamagePrevention(card);
-  if (!base.preventAll && !base.reduce) return base;
+  if (!base.preventAll && !base.reduce && !base.reduceHp) return base;
   if (!toolConditionMet(parseToolCondition(card), { ...ctx, attacker })) {
-    return { preventAll: false, reduce: 0 };
+    return { preventAll: false, reduce: 0, reduceHp: 0 };
   }
 
-  if (base.preventAll) {
-    if (/pokémon ex\b|pokemon ex\b/i.test(t)) {
-      if (!isExCard(attacker)) return { preventAll: false, reduce: 0 };
+  // The attacker conditions gate every prevention/reduction wording, not just
+  // "prevent all damage" (a conditional "damage is reduced by N" must not
+  // apply to an unlisted attacker). Legacy printings spell "Pokémon-EX" with a
+  // hyphen, so the space-only pattern never matched them.
+  if (/pok[eé]mon[-\s]?ex\b|pokemon[-\s]?ex\b/i.test(t)) {
+    if (!isExCard(attacker)) {
+      return { preventAll: false, reduce: 0, reduceHp: 0 };
     }
-    if (/pokémon v\b|pokemon v\b/i.test(t)) {
-      if (!isVCard(attacker)) return { preventAll: false, reduce: 0 };
-    }
-    if (/have an ability|has an ability|that have an ability/i.test(t)) {
-      if (!cardHasAbility(attacker)) return { preventAll: false, reduce: 0 };
-    }
-    if (/evolution pokémon|evolution pokemon/i.test(t)) {
-      if (!isEvolutionCard(attacker)) return { preventAll: false, reduce: 0 };
-    }
-    if (/basic pokémon|basic pokemon/i.test(t)) {
-      if (!isBasicCard(attacker)) return { preventAll: false, reduce: 0 };
-    }
+  }
+  if (/pokémon v\b|pokemon v\b/i.test(t)) {
+    if (!isVCard(attacker)) return { preventAll: false, reduce: 0, reduceHp: 0 };
+  }
+  if (/have an ability|has an ability|that have an ability/i.test(t)) {
+    if (!cardHasAbility(attacker))
+      return { preventAll: false, reduce: 0, reduceHp: 0 };
+  }
+  if (/evolution pokémon|evolution pokemon/i.test(t)) {
+    if (!isEvolutionCard(attacker))
+      return { preventAll: false, reduce: 0, reduceHp: 0 };
+  }
+  if (/basic pokémon|basic pokemon/i.test(t)) {
+    if (!isBasicCard(attacker))
+      return { preventAll: false, reduce: 0, reduceHp: 0 };
   }
   return base;
 }
 
-export function reductionForCard(card, defender, attacker, ctx = {}) {
+export function reductionForCard(card, defender, attacker, { skipSymbolFilter = false, ...ctx } = {}) {
   if (!card) return 0;
-  const t = textOf(card);
+  const t = cardAbilityText(card);
   const red = parseDamageReduction(card).reduce;
   if (!red) return 0;
   if (!toolConditionMet(parseToolCondition(card), { ...ctx, defender, attacker })) {
@@ -193,7 +196,7 @@ export function reductionForCard(card, defender, attacker, ctx = {}) {
   if (/pokémon ex\b|pokemon ex\b/i.test(t) && !isExCard(attacker)) {
     return 0;
   }
-  if (/\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
+  if (!skipSymbolFilter && /\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
     const letters = [...t.matchAll(/\{([a-z])\}/gi)]
       .map((m) => TYPE_LETTER[m[1].toLowerCase()])
       .filter(Boolean);
@@ -235,7 +238,7 @@ function bonusForTool(
     ctx = null,
   }
 ) {
-  const t = textOf(tool);
+  const t = cardAbilityText(tool);
   const bonus = parseDamageBonus(tool).bonus;
   if (!bonus) return 0;
   if (ctx && !toolConditionMet(parseToolCondition(tool), ctx)) return 0;
@@ -291,7 +294,7 @@ export function combinedToolDamagePrevention(
   defender,
   zoneCards,
   attacker,
-  { blockTools = false, stadium = null, flags = {} } = {}
+  { blockTools = false, stadium = null, flags = {}, abilities = true } = {}
 ) {
   const ctx = {
     holder: holderView(defender, zoneCards),
@@ -300,7 +303,9 @@ export function combinedToolDamagePrevention(
     zoneCards,
     flags,
   };
-  let out = preventionForCard(defender, attacker, ctx);
+  let out = abilities
+    ? preventionForCard(defender, attacker, ctx)
+    : { preventAll: false, reduce: 0, reduceHp: 0 };
   if (toolBlocked(blockTools, stadium)) return out;
   for (const tool of attachedTools(defender, zoneCards)) {
     out = mergeDamagePrevention(out, preventionForCard(tool, attacker, ctx));
@@ -314,7 +319,7 @@ export function applyToolDamageReduction(
   defender,
   zoneCards,
   attacker,
-  { blockTools = false, stadium = null, inPlayCards = [], flags = {} } = {}
+  { blockTools = false, stadium = null, inPlayCards = [], flags = {}, abilities = true } = {}
 ) {
   let total = incoming;
   if (total <= 0) return 0;
@@ -326,20 +331,22 @@ export function applyToolDamageReduction(
     flags,
   };
 
-  // 1. Defender's own ability reduction
-  const selfRed = reductionForCard(defender, defender, attacker, ctx);
-  if (selfRed > 0) total = Math.max(0, total - selfRed);
+  if (abilities) {
+    // 1. Defender's own ability reduction
+    const selfRed = reductionForCard(defender, defender, attacker, ctx);
+    if (selfRed > 0) total = Math.max(0, total - selfRed);
 
-  // 2. Team-wide bench/in-play passive ability reductions (e.g. Radiant Gardevoir)
-  for (const card of inPlayCards) {
-    if (card === defender || card.attachedTo) continue;
-    const t = textOf(card);
-    if (/your pokémon take|your pokemon take/i.test(t)) {
-      const red = reductionForCard(card, defender, attacker, {
-        ...ctx,
-        holder: card,
-      });
-      if (red > 0) total = Math.max(0, total - red);
+    // 2. Team-wide bench/in-play passive ability reductions (e.g. Radiant Gardevoir)
+    for (const card of inPlayCards) {
+      if (card === defender || card.attachedTo) continue;
+      const t = cardAbilityText(card);
+      if (/your pokémon take|your pokemon take/i.test(t)) {
+        const red = reductionForCard(card, defender, attacker, {
+          ...ctx,
+          holder: card,
+        });
+        if (red > 0) total = Math.max(0, total - red);
+      }
     }
   }
 
@@ -419,7 +426,7 @@ export function combinedToolRetreatCost(
 ) {
   let cost = baseRetreat || 0;
   const holder = holderView(pokemon, zoneCards);
-  const mod = parseRetreatCostModifier(holder);
+  const mod = parseRetreatCostModifier(holder, { zoneCards, stadium });
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
   if (toolBlocked(blockTools, stadium)) return cost;
   for (const tool of attachedTools(pokemon, zoneCards)) {
@@ -427,7 +434,7 @@ export function combinedToolRetreatCost(
       cost,
       toolRetreatDeltaFor(tool, { holder, zoneCards })
     );
-    const t = textOf(tool);
+    const t = cardAbilityText(tool);
     if (/remaining hp is 30 or less/i.test(t)) {
       const dmg =
         typeof pokemon?.damage === 'number'
@@ -509,7 +516,7 @@ export function evaluateToolKoPrevention(
       0,
       Math.ceil(hp / 10) - Math.ceil(surviveHp / 10)
     );
-    const discardOnUse = /discard this card|then, discard [a-z]/i.test(textOf(source));
+    const discardOnUse = /discard this card|then, discard [a-z]/i.test(cardAbilityText(source));
 
     return {
       prevented: true,
@@ -574,7 +581,7 @@ export function toolPrizeCountAdjust(
  * "is Knocked Out by damage", which resolves only on the Knock Out.
  */
 export function parseToolOnDamageEffect(tool) {
-  const t = textOf(tool);
+  const t = cardAbilityText(tool);
   if (
     !t.includes('damaged by an attack') &&
     !t.includes('knocked out by damage')

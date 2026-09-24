@@ -4,6 +4,7 @@
 // damage the attack dealt. The gate (oracle-gate.mjs) decides whether that counts as executed.
 import { splitCard } from './split-card-text.mjs';
 import { parseAbility } from '../../shared/engine/rules/abilities.mjs';
+import { isHandActivatedAbility } from '../../shared/engine/rules/ability-executors.mjs';
 import { classifyAbility } from '../../shared/engine/rules/ability-effects.mjs';
 import { classifyAttackEffect } from '../../shared/engine/rules/attack-effects.mjs';
 import {
@@ -191,6 +192,8 @@ export function buildState(holder, holderZone) {
       tool('Disc Tool')
     );
     for (let i = 0; i < 6; i++) z.prizes.push(mon(`${pid}Prize${i}`));
+    // A hand-activated Ability (Luxray Swelling Flash) is used from the hand.
+    if (own && holderZone === 'hand') z.hand.unshift(holder());
   }
   return state;
 }
@@ -231,6 +234,9 @@ export function snapshot(state) {
   return {
     cards,
     activeIds: [activeId('p1'), activeId('p2')],
+    deckOrders: ['p1', 'p2'].map((pid) =>
+      (state.players[pid]?.zones?.deck || []).map((c) => c.instanceId).join(',')
+    ),
     winner: state.winner,
   };
 }
@@ -263,10 +269,32 @@ export function diffTags(before, after, events) {
   for (const e of events) {
     if (/coin|flip/i.test(e.type)) tags.add('coin');
     if (/shuffle/i.test(e.type)) tags.add('shuffle');
+    // A hand reveal changes no zone but is the whole effect of "reveal their hand" cards.
+    // Only cards still in the opponent's hand count: a search's own reveal proves nothing.
+    if (
+      e.type === 'cardsRevealed' &&
+      e.playerId === 'p2' &&
+      (e.cards || []).length > 0 &&
+      e.cards.every((c) => after.cards.get(c.instanceId)?.zone === 'hand')
+    ) {
+      tags.add('opp:hand-revealed');
+    }
     if (/knock|KO/i.test(e.type)) tags.add('ko');
     if (e.type === 'effectStepSkipped') tags.add(`skipped:${e.reason}`);
     if (e.type === 'abilityUsed') tags.add('ability-used');
+    // A turn-scoped damage boost lives on the turn flags, not on any card.
+    if (e.type === 'turnDamageBonus') tags.add(`${role(e.playerId)}:turn-bonus`);
   }
+  // A top-to-bottom move (Aipom Scampering Tail) changes only the deck's order; a shuffle is
+  // already tagged by its event.
+  ['p1', 'p2'].forEach((pid, i) => {
+    const shuffled = events.some((e) => /shuffle/i.test(e.type) && e.playerId === pid);
+    const [was, now] = [before.deckOrders?.[i] ?? '', after.deckOrders?.[i] ?? ''];
+    const sameCards = was.split(',').sort().join(',') === now.split(',').sort().join(',');
+    if (!shuffled && sameCards && was !== now) {
+      tags.add(`${role(pid)}:deck-reordered`);
+    }
+  });
   if (after.winner && !before.winner) tags.add('game-won');
   return tags;
 }
@@ -364,8 +392,15 @@ function safe(fn, fallback) {
   }
 }
 
-/** One row per printed attack / ability in the corpus (pkmncards shape, see split-card-text.mjs). */
-export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
+/**
+ * One row per printed attack / ability in the corpus (pkmncards shape, see split-card-text.mjs).
+ * `kinds` limits the rows to 'attack' and/or 'ability' (the ability-behaviour audit runs only
+ * abilities).
+ */
+export function oracleCorpus(
+  corpus,
+  { seeds = DEFAULT_SEEDS, onCard, kinds = ['attack', 'ability'] } = {}
+) {
   const rows = [];
   for (const card of corpus) {
     onCard?.(card);
@@ -387,6 +422,7 @@ export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
     for (const entry of items) {
       if (entry.kind === 'attack') {
         const idx = attackIndex++;
+        if (!kinds.includes('attack')) continue;
         const attackCmd = () => ({
           type: 'attack',
           playerId: 'p1',
@@ -403,6 +439,7 @@ export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
         });
         continue;
       }
+      if (!kinds.includes('ability')) continue;
       const aIdx = abilities.findIndex((a) => a.name === entry.name);
       const useFrom = (zone) => (state) => ({
         type: 'useAbility',
@@ -412,8 +449,13 @@ export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
           abilityIndex: aIdx,
         },
       });
-      const fromActive = runAll(useFrom('active'), holder, 'active', seeds);
-      const fromBench = runAll(useFrom('bench'), holder, 'bench', seeds);
+      // The ability is used from wherever it is legal: the hand for a hand-activated one,
+      // else the Active Spot and the Bench.
+      const fromHand = isHandActivatedAbility({ abilities: [abilities[aIdx]] });
+      const fromActive = runAll(useFrom(fromHand ? 'hand' : 'active'), holder, fromHand ? 'hand' : 'active', seeds);
+      const fromBench = fromHand
+        ? { tags: [], errors: [], eventTypes: [] }
+        : runAll(useFrom('bench'), holder, 'bench', seeds);
       rows.push({
         kind: 'ability',
         ...where,

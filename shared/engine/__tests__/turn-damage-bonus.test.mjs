@@ -122,6 +122,14 @@ test('turnDamageBonusTotal filters by attacker type, defender ex, and bench targ
   assert.equal(turnDamageBonusTotal(undefined, fighter, ex), 0);
 });
 
+test('turnDamageBonusTotal: attackerInstanceId scopes a this-Pokémon boost', () => {
+  const bonus = { amount: 120, type: null, attackerNoRuleBox: false, defenderFilter: null, attackerInstanceId: 70 };
+  const holder = { name: 'Feraligatr', instanceId: 70 };
+  const other = { name: 'Other', instanceId: 71 };
+  assert.equal(turnDamageBonusTotal([bonus], holder, { name: 'Defender' }), 120);
+  assert.equal(turnDamageBonusTotal([bonus], other, { name: 'Defender' }), 0);
+});
+
 test('computeAttackDamage adds the turn bonus before Weakness', () => {
   const result = computeAttackDamage(
     { types: ['Fighting'] },

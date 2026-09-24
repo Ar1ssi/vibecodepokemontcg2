@@ -193,14 +193,21 @@ export function shouldNitroReturnToHand(energyCard, hostPokemon, attackExecuting
   return pokemonMatchesEnergyType(hostPokemon, def.requiredPokemonType);
 }
 
+// "Basic {X} Pokémon" search filter. Cards can arrive with the Pokémon marker
+// on `type`, `supertype`, or only an `hp` field (deck rows / oracle harness),
+// and `stage` casing varies, so all three markers and a case-folded stage are
+// accepted.
 export function matchesBasicPokemonType(card, typeName) {
+  const marker = lower(card?.type || card?.supertype);
   const isPokemon =
-    String(card?.type || '').toLowerCase().includes('pokémon') ||
-    String(card?.type || '').toLowerCase().includes('pokemon') ||
+    marker.includes('pokémon') ||
+    marker.includes('pokemon') ||
+    (card?.hp != null && Number.isFinite(Number(card.hp))) ||
     (Array.isArray(card?.subtypes) &&
-      card.subtypes.some((s) => lower(s) === 'pokémon' || lower(s) === 'pokemon'));
+      card.subtypes.some(
+        (s) => lower(s) === 'pokémon' || lower(s) === 'pokemon'
+      ));
   if (!isPokemon) return false;
-  const stage = card?.stage || 'Basic';
-  if (stage !== 'Basic') return false;
+  if (lower(card?.stage || 'basic') !== 'basic') return false;
   return pokemonMatchesEnergyType(card, typeName);
 }

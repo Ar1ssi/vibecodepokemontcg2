@@ -12,7 +12,7 @@ import test from 'node:test';
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
-    const { passiveCostDiscount, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot, isEvolvePlayedTrigger } = await import('../ability-executors.mjs');
+    const { passiveCostDiscount, costDiscountRead, applyCostDiscount, parseWhenPlayedEffect, parseEndOfTurnEffect, parseDamagePrevention, applyDamagePrevention, isHandProtected, parseOpponentDiscard, parseEnergyRedirect, parseDamageReduction, parseDamageBonus, applyDamageBonus, parseHpBonus, applyHpBonus, parseRetreatCostModifier, applyRetreatCostModifier, parsePrizeModify, applyPrizeModify, parseKoPrevention, parseThorns, parseCheckupEffect, parseEnergyMultiplier, parseToolCap, parseAttackInheritance, parseOnOpponentEvolve, parseStatusInflict, parseMoveDamage, parseLookAtTop, parseRecursionFromDiscard, parseEffectPrevent, parseSetupFaceDown, combinedDamagePrevention, isPokemonToolCard, attachedTools, requiresActiveSpot, isEvolvePlayedTrigger, cardAbilityText } = await import('../ability-executors.mjs');
     const { listAttacks, listAbilities, listUsableActions, statusAttackBlock } = await import('../attack-window.mjs');
     const {
       isUsableAbilityCard,
@@ -2883,6 +2883,83 @@ import test from 'node:test';
         passiveCostDiscount({ ability: { text: 'Your attacks cost 3 fewer Energy.' } }),
         3,
       );
+      assert.equal(
+        passiveCostDiscount({ ability: { text: 'This Pokémon’s attacks cost {C}{C}{C} less.' } }),
+        3,
+      );
+    });
+
+    // I136: a damage reduction is not a cost reduction. "less" + "attack" used to read as a
+    // discount of 30, so every damage-reduction Pokémon attacked for free.
+    test('passiveCostDiscount: "takes N less damage from attacks" is not a discount', () => {
+      assert.equal(
+        passiveCostDiscount({
+          ability: { text: 'This Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance).' },
+        }),
+        0,
+      );
+      assert.equal(
+        passiveCostDiscount({
+          ability: { text: 'Attacks used by your opponent’s Active Pokémon do 20 less damage.' },
+        }),
+        0,
+      );
+      // Whole-card text (no ability): an attack's "takes 50 less damage" must not discount it.
+      assert.equal(
+        passiveCostDiscount({
+          text: '{G}{C} → Leaf Guard : 140\n\nDuring your opponent’s next turn, this Pokémon takes 50 less damage from attacks.',
+        }),
+        0,
+      );
+    });
+
+    test('passiveCostDiscount: a Retreat Cost reduction on a card with attacks is not a discount', () => {
+      assert.equal(
+        passiveCostDiscount({
+          text: 'Ability ⇢ Retreat Aid\n\nAs long as this Pokémon is on your Bench, your Active Pokémon’s Retreat Cost is {C}{C} less.\n\n{C}{C} → Peck : 20\n\nThis attack does 10 damage.',
+        }),
+        0,
+      );
+    });
+
+    // I139: a discount's printed condition, scope and "for each" count are read against the board.
+    test('costDiscountRead: conditions, scope, scaling and typed symbols (I139)', () => {
+      const card = (name, text, extra = {}) => ({ name, supertype: 'Pokémon', abilities: [{ text }], ...extra });
+      const vmax = { name: 'Opp VMAX', supertype: 'Pokémon', subtypes: ['VMAX'] };
+      const plain = { name: 'Opp', supertype: 'Pokémon', subtypes: ['Basic'] };
+
+      const mightyena = card('Mightyena', "If your opponent has any Pokémon VMAX in play, this Pokémon's attacks cost {C}{C}{C} less.");
+      assert.equal(costDiscountRead(mightyena, { opponentSideCards: [plain] }), null);
+      assert.deepEqual(costDiscountRead(mightyena, { opponentSideCards: [plain, vmax] }), { count: 3, symbol: null });
+
+      const medicham = card('Medicham', "If you have exactly 4 cards in your hand, this Pokémon's attacks cost {C}{C}{C} less.");
+      assert.equal(costDiscountRead(medicham, { ownHandCount: 3 }), null);
+      assert.equal(costDiscountRead(medicham, {}), null, 'unknown hand size fails closed');
+      assert.equal(passiveCostDiscount(medicham, { ownHandCount: 4 }), 3);
+
+      const incineroar = card('Incineroar ex', "Attacks used by this Pokémon cost {C} less for each of your opponent's Benched Pokémon.");
+      const oppActive = { ...plain, name: 'Active' };
+      const ctx = { opponentSideCards: [oppActive, plain, plain], opponentActive: [oppActive] };
+      assert.equal(passiveCostDiscount(incineroar, ctx), 2);
+      assert.equal(passiveCostDiscount(incineroar, { opponentSideCards: [oppActive], opponentActive: [oppActive] }), 0);
+
+      const charizard = card('Radiant Charizard', "This Pokémon's attacks cost {C} less for each Prize card your opponent has taken.");
+      assert.equal(passiveCostDiscount(charizard, { opponentPrizesLeft: 2 }), 4);
+      assert.equal(passiveCostDiscount(charizard, {}), 0);
+
+      const florges = card('Florges', "Each of your Pokémon's attacks costs {Y} less.");
+      assert.deepEqual(costDiscountRead(florges, {}), { count: 1, symbol: 'Fairy' });
+      assert.deepEqual(applyCostDiscount(['Fairy', 'Colorless'], [{ count: 1, symbol: 'Fairy' }]), ['Colorless']);
+      assert.deepEqual(applyCostDiscount(['Fire', 'Colorless'], [{ count: 1, symbol: 'Fairy' }]), ['Fire', 'Colorless'], 'no {Y} to remove');
+
+      const regigigas = card('Regigigas', "If you have Regirock, Regice, and Registeel in play, the attack cost of Regigigas's attacks is {C} less.");
+      const mon = (name) => ({ name, supertype: 'Pokémon' });
+      assert.equal(passiveCostDiscount(regigigas, { ownSideCards: [regigigas, mon('Regirock'), mon('Regice')] }), 0);
+      assert.equal(passiveCostDiscount(regigigas, { ownSideCards: [regigigas, mon('Regirock'), mon('Regice'), mon('Registeel')] }), 1);
+
+      const band = { name: "Hop's Choice Band", supertype: 'Trainer', text: "Attacks used by the Hop's Pokémon this card is attached to cost {C} less and do 30 more damage to your opponent's Active Pokémon." };
+      assert.equal(passiveCostDiscount(band, { attacker: { name: "Hop's Snorlax" } }), 1);
+      assert.equal(passiveCostDiscount(band, { attacker: { name: 'Snorlax' } }), 0);
     });
 
     test('parseWhenPlayedEffect', () => {
@@ -2899,13 +2976,115 @@ import test from 'node:test';
 
     test('parseDamagePrevention / applyDamagePrevention', () => {
       const gardevoir = { ability: { text: 'Prevent all damage done to this Pokémon by attacks.' } };
-      assert.deepEqual(parseDamagePrevention(gardevoir), { preventAll: true, reduce: 0 });
+      assert.deepEqual(parseDamagePrevention(gardevoir), { preventAll: true, reduce: 0, reduceHp: 0 });
       assert.equal(applyDamagePrevention(5, parseDamagePrevention(gardevoir)), 0);
       const zacian = { ability: { text: 'Damage done to this Pokémon is reduced by 2.' } };
-      assert.deepEqual(parseDamagePrevention(zacian), { preventAll: false, reduce: 2 });
+      assert.deepEqual(parseDamagePrevention(zacian), { preventAll: false, reduce: 0, reduceHp: 2 });
       assert.equal(applyDamagePrevention(5, parseDamagePrevention(zacian)), 3);
       assert.equal(applyDamagePrevention(1, parseDamagePrevention(zacian)), 0);
       assert.equal(applyDamagePrevention(3, parseDamagePrevention({ name: 'Pikachu' })), 3);
+      // A retreat-cost reduction is not damage prevention.
+      assert.deepEqual(
+        parseDamagePrevention({ ability: { text: 'The Retreat Cost of this Pokémon is reduced by 2.' } }),
+        { preventAll: false, reduce: 0, reduceHp: 0 },
+      );
+    });
+
+    // I128: server-hydrated cards carry abilities as a plural array only, so
+    // every text reader must go through cardAbilityText or it reads ''.
+    test('cardAbilityText: reads plural abilities[] and is neutral when empty', () => {
+      assert.equal(
+        cardAbilityText({
+          abilities: [{ name: 'Shell Armor', text: 'Any damage done to this Pokémon is reduced by 20.' }],
+        }),
+        'any damage done to this pokémon is reduced by 20.',
+      );
+      assert.equal(cardAbilityText({ ability: { text: 'Draw a card.' } }), 'draw a card.');
+      assert.equal(cardAbilityText({ abilities: ['Draw a card.'] }), 'draw a card.');
+      assert.equal(cardAbilityText({ name: 'Pikachu' }), '');
+      assert.equal(cardAbilityText(null), '');
+    });
+
+    // I130: "damage … is reduced by N" is printed in HP, not counters.
+    // Reading it as counters and multiplying by 10 turned a 20-damage
+    // reduction into full prevention.
+    test('computeAttackDamage: legacy "reduced by 20" subtracts 20 HP', () => {
+      const shellArmor = {
+        name: 'Samurott',
+        type: 'Pokémon',
+        stage: 'Basic',
+        hp: 140,
+        abilities: [{
+          name: 'Shell Armor',
+          text: 'Any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).',
+        }],
+      };
+      const attacker = { name: 'Attacker', types: ['Fire'] };
+      const plain = computeAttackDamage(attacker, { ...shellArmor, abilities: [] }, { damage: '50' }, {});
+      assert.equal(plain.total, 50);
+      const reduced = computeAttackDamage(attacker, shellArmor, { damage: '50' }, {});
+      assert.equal(reduced.total, 30);
+      const weak = computeAttackDamage(
+        attacker,
+        { ...shellArmor, weakness: { type: 'Fire', value: 2 } },
+        { damage: '50' },
+        {},
+      );
+      assert.equal(weak.total, 80);
+    });
+
+    // I128: the conditional filters gate prevention now that tool-combat reads
+    // the plural abilities[] text; legacy "Pokémon-EX" spelling must match.
+    test('computeAttackDamage: plural ability attacker filters still gate prevention', () => {
+      const safeguard = {
+        name: 'Sigilyph',
+        type: 'Pokémon',
+        stage: 'Basic',
+        hp: 90,
+        abilities: [{
+          name: 'Safeguard',
+          text: 'Prevent all effects of attacks, including damage, done to this Pokémon by Pokémon-EX.',
+        }],
+      };
+      const normal = computeAttackDamage({ name: 'Attacker', types: ['Fire'] }, safeguard, { damage: '50' }, {});
+      assert.equal(normal.total, 50);
+      assert.equal(normal.prevented, false);
+      const ex = computeAttackDamage({ name: 'Charizard ex', types: ['Fire'] }, safeguard, { damage: '50' }, {});
+      assert.equal(ex.total, 0);
+      assert.equal(ex.prevented, true);
+    });
+
+    test('parseThorns: legacy "on that Pokémon" wording and Active-Spot zone', () => {
+      const roughSkin = {
+        abilities: [{
+          name: 'Rough Skin',
+          text: "If this Pokémon is your Active Pokémon and is damaged by an opponent's attack (even if this Pokémon is Knocked Out), put 2 damage counters on that Pokémon.",
+        }],
+      };
+      assert.deepEqual(parseThorns(roughSkin), { count: 2, zone: 'active' });
+      const anywhere = {
+        abilities: [{
+          name: 'Rough Skin',
+          text: 'If this Pokémon is damaged by an attack, put 3 damage counters on that Pokémon.',
+        }],
+      };
+      assert.deepEqual(parseThorns(anywhere), { count: 3, zone: 'any' });
+      const modern = {
+        abilities: [{
+          name: 'Counterattack Quills',
+          text: "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), put 3 damage counters on the Attacking Pokémon.",
+        }],
+      };
+      assert.deepEqual(parseThorns(modern), { count: 3, zone: 'active' });
+      // Energy-attach costs print the same "on that Pokémon" clause without the
+      // attack-damage context; they must not be read as thorns.
+      const attachCost = {
+        abilities: [{
+          name: 'Hunting Gloves',
+          text: 'Once during your turn, you may attach a Basic {D} Energy card from your discard pile to 1 of your Benched {D} Pokémon. If you attached Energy to a Pokémon in this way, place 2 damage counters on that Pokémon.',
+        }],
+      };
+      assert.deepEqual(parseThorns(attachCost), { count: 0, zone: 'any' });
     });
 
     test('isHandProtected', () => {
@@ -2988,6 +3167,34 @@ import test from 'node:test';
       assert.equal(applyHpBonus(0, 20), 0);
     });
 
+    test('parseRetreatCostModifier: a Pokémon reads only its own Retreat Cost, behind its condition (I138)', () => {
+      const mon = (name, text) => ({ instanceId: 1, name, supertype: 'Pokémon', abilities: [{ text }] });
+      const energy = { instanceId: 2, name: 'Basic Water Energy', supertype: 'Energy', energyType: 'Water', attachedTo: 1 };
+      const magcargo = mon("Ethan's Magcargo", 'If this Pokémon has no Energy attached, it has no Retreat Cost.');
+      assert.deepEqual(parseRetreatCostModifier(magcargo, { zoneCards: [magcargo] }), { delta: -Infinity });
+      assert.deepEqual(parseRetreatCostModifier(magcargo, { zoneCards: [magcargo, energy] }), { delta: 0 }, 'Energy attached');
+      const lotad = mon('Lotad', "If Lotad has any {W} Energy attached to it, Lotad's Retreat Cost is 0.");
+      assert.deepEqual(parseRetreatCostModifier(lotad, { zoneCards: [lotad, energy] }), { delta: -Infinity });
+      assert.deepEqual(parseRetreatCostModifier(lotad, { zoneCards: [lotad] }), { delta: 0 });
+      const thwackey = mon('Thwackey', 'If you have a Stadium in play, this Pokémon has no Retreat Cost.');
+      assert.deepEqual(parseRetreatCostModifier(thwackey, {}), { delta: 0 });
+      assert.deepEqual(parseRetreatCostModifier(thwackey, { stadium: { name: 'Stadium' } }), { delta: -Infinity });
+      // Changes aimed at other Pokémon never touch the holder's own cost.
+      for (const text of [
+        "Your opponent's Active Pokémon's Retreat Cost is {C} more.",
+        "As long as this Pokémon is on your Bench, your Active Pokémon's Retreat Cost is {C}{C} less.",
+        'Any damage done to this Pokémon by an opponent\'s attack is reduced by 10 for each {C} in your opponent\'s Active Pokémon\'s Retreat Cost.',
+        "Magnemite's Retreat Cost is {C} less for each Magnemite on your Bench.",
+      ]) {
+        assert.deepEqual(parseRetreatCostModifier(mon('Holder', text), {}), { delta: 0 }, text);
+      }
+      // An unrecognised condition fails closed.
+      assert.deepEqual(
+        parseRetreatCostModifier(mon('Volbeat', "As long as Illumise is in play, Volbeat's Retreat Cost is 0."), {}),
+        { delta: 0 }
+      );
+    });
+
     test('parseRetreatCostModifier / applyRetreatCostModifier', () => {
       assert.deepEqual(
         parseRetreatCostModifier({ ability: { text: 'This Pokémon\'s Retreat Cost is 1 less.' } }),
@@ -3057,9 +3264,9 @@ import test from 'node:test';
     test('parseThorns: damage counters on attacker', () => {
       assert.deepEqual(
         parseThorns({ ability: { text: 'When this Pokémon is damaged by an attack, put 2 damage counters on the Attacking Pokémon.' } }),
-        { count: 2 }
+        { count: 2, zone: 'any' }
       );
-      assert.deepEqual(parseThorns({ ability: { text: 'Draw a card.' } }), { count: 0 });
+      assert.deepEqual(parseThorns({ ability: { text: 'Draw a card.' } }), { count: 0, zone: 'any' });
     });
 
     test('parseCheckupEffect: checkup damage + filter', () => {
@@ -3978,6 +4185,23 @@ import test from 'node:test';
     test('listAbilities: no ability → empty list', () => {
       assert.deepEqual(listAbilities({ name: 'T' }), []);
       assert.deepEqual(listAbilities({ name: 'T', ability: undefined }), []);
+      assert.deepEqual(listAbilities({ name: 'T', abilities: [] }), []);
+    });
+
+    test('listAbilities: reads plural abilities[] (server shape)', () => {
+      const card = {
+        name: 'Server Card',
+        abilities: [{
+          name: 'Dynamotor',
+          text: 'Once during your turn, you may attach a Basic {L} Energy card from your discard pile to 1 of your Benched Pokémon.',
+        }],
+      };
+      const list = listAbilities(card, { abilityUsed: false });
+      assert.equal(list.length, 1);
+      assert.equal(list[0].name, 'Dynamotor');
+      assert.equal(list[0].oncePerTurn, true);
+      assert.equal(list[0].usable, true);
+      assert.equal(listAbilities(card, { abilityUsed: true })[0].usable, false);
     });
 
     // ── zone-aware ability activation (design 015) ──
@@ -4991,6 +5215,46 @@ import test from 'node:test';
         "Each of your Pokémon that has any {M} Energy attached to it can't be affected by any Special Conditions. Remove any Special Conditions affecting those Pokémon."
       );
       assert.ok(steps.some((s) => s.type === 'statusImmunityAbility'));
+    });
+
+    test('parseAbility: named-condition immunity is statusImmunityAbility, not a statusAbility (report E)', () => {
+      const cases = [
+        ["This Pokémon can't be Asleep.", 'Asleep'],
+        ["This Pokémon can't be Paralyzed.", 'Paralyzed'],
+        ["This Pokémon can't be Confused.", 'Confused'],
+        ["This Pokémon can't be Burned.", 'Burned'],
+      ];
+      for (const [text, condition] of cases) {
+        const steps = parseAbility(text);
+        assert.equal(steps[0].type, 'statusImmunityAbility', text);
+        assert.equal(steps[0].condition, condition, text);
+        assert.equal(
+          steps.some((s) => s.type === 'statusAbility'),
+          false,
+          'the immunity must not parse as a status the card applies'
+        );
+      }
+      const all = parseAbility("This Pokémon can't be affected by any Special Conditions.");
+      assert.equal(all[0].type, 'statusImmunityAbility');
+      assert.equal(all[0].condition, null);
+    });
+
+    test('parseAbility: a draw effect is never a playLockAbility (Chandelure TWM)', () => {
+      const steps = parseAbility('Each player draws a card.');
+      assert.deepEqual(steps.map((s) => s.type), ['drawAbility']);
+      assert.equal(steps.some((s) => s.type === 'playLockAbility'), false);
+    });
+
+    test('parseAbility: an evolve lock is not also an activated evolveAbility (Primal Law)', () => {
+      const steps = parseAbility(
+        "As long as this Pokémon is in the Active Spot, your opponent can't play any Pokémon from their hand to evolve their Pokémon."
+      );
+      assert.equal(steps.some((s) => s.type === 'evolveLockAbility'), true);
+      assert.equal(
+        steps.some((s) => s.type === 'evolveAbility'),
+        false,
+        'a passive lock must not offer an evolve button'
+      );
     });
 
     test('parseAbility: ability-suppression wording ("have no Abilities")', () => {

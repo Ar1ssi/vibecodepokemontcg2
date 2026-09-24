@@ -7,7 +7,7 @@
 // Modern printings use the possessive wording instead ("your {L} Pokémon's attacks
 // do 30 more damage…", "each of your Active Pokémon's attacks does 40 more…") and
 // some scale per Prize card the opponent has taken (Iris, Karen's Conviction).
-import { TYPE_LETTER, attackerTypes } from './tool-combat.mjs';
+import { TYPE_LETTER, attackerTypes, isBasicCard } from './tool-combat.mjs';
 import { isExCard, isVCard, isRuleBoxPokemon } from './card-classify.mjs';
 
 // Groups: 1 type letter ({F}), 2 no-Rule-Box attacker, 3 amount, 4 ex defender, 5 ex-or-V defender.
@@ -88,9 +88,17 @@ export function turnDamageBonusTotal(
   let total = 0;
   for (const bonus of bonuses) {
     if (!bonus || !(bonus.amount > 0)) continue;
+    // "attacks used by this Pokémon": scoped to the granting card's instance.
+    if (
+      bonus.attackerInstanceId != null &&
+      bonus.attackerInstanceId !== attacker?.instanceId
+    ) {
+      continue;
+    }
     if (bonus.type && !types.includes(bonus.type)) continue;
     if (bonus.attackerNoRuleBox && isRuleBoxPokemon(attacker)) continue;
     if (bonus.attackerStyle && !matchesBattleStyle(attacker, bonus.attackerStyle)) continue;
+    if (bonus.attackerBasic && !isBasicCard(attacker)) continue;
     if (!defenderMatches(bonus.defenderFilter, defender)) continue;
     total += bonus.perPrizeTaken ? bonus.amount * prizesTaken : bonus.amount;
   }

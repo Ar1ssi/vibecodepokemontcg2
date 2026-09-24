@@ -90,6 +90,7 @@ const providesTypedEnergy = (card) => {
 
 const isEnergyCard = (card) => {
   if (!card) return false;
+  if (card.asEnergy && card.attachedTo != null) return true;
   const subs = subtypesOf(card);
   if (
     subs.includes('basic') ||

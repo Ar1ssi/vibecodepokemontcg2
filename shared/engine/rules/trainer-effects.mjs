@@ -828,6 +828,15 @@ function parsePlayCondition(lower) {
   return null;
 }
 
+/**
+ * "… Your turn ends." as the card's closing sentence (Café Master, Kiawe, Rotom Bike, …).
+ * Coin-conditional endings ("If tails, your turn ends immediately") are not this.
+ */
+export function trainerEndsTurn(card) {
+  const text = String(card?.text || card?.effect || card?.cardText || '').trim();
+  return /(?:^|[.!)]\s+)your turn ends\.$/i.test(text);
+}
+
 export function parseTrainerEffect(text = '') {
   const lower = normalizeText(text);
   const playCondition = parsePlayCondition(lower);

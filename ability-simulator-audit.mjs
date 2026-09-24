@@ -194,7 +194,7 @@ const BROWSER_AUDIT_FN = async (entry) => {
 
   const dp = parseDamagePrevention(card);
   const passiveChecks = {
-    damagePrevention: !!(dp?.preventAll || dp?.reduce > 0),
+    damagePrevention: !!(dp?.preventAll || dp?.reduce > 0 || dp?.reduceHp > 0),
     damageReduction: (parseDamageReduction(card)?.reduce || 0) > 0,
     damageBonus: (parseDamageBonus(card)?.bonus || 0) > 0,
     hpBonus: (parseHpBonus(card)?.bonus || 0) > 0,

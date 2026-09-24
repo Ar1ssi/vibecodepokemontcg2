@@ -187,6 +187,7 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     state.players[pid].flags = {
       energyAttached: false,
       attackerAttacked: false,
+      attacksThisTurn: 0,
       retreatedThisTurn: false,
       supporterPlayed: false,
       stadiumPlayedThisTurn: false,

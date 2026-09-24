@@ -261,6 +261,11 @@ const TEMPLATES = [
     /^switch 1 of your opponent's face-down prize cards with the top card of their deck$/,
     () => ({ type: 'atkOpponentPrizeDeckSwap' }),
   ],
+  // Mr. Mime Pantomime / Rattata Trickery: the same swap on your own Prizes.
+  [
+    /^switch 1 of your (?:face-down )?prize(?: card)?s? with the top card of your deck$/,
+    () => ({ type: 'atkOpponentPrizeDeckSwap', own: true }),
+  ],
   [
     new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: card)? from your opponent's active pokémon to 1 of their benched pokémon$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'opponentBench', count: 1, ...energyFilter(m[1], s) }),
@@ -869,10 +874,24 @@ const BLOCKS = [
     /look at the top (\d+) cards of your opponent's deck and put them back in any order\./g,
     (m) => ({ type: 'atkLookOppDeck', count: Number(m[1]), reorder: true }),
   ],
+  // "…reveals their hand. Put a Basic Pokémon (with 70 HP or less) you find there onto their
+  // Bench(, and put 3 damage counters on that Pokémon)." (Mandibuzz, Mawile-GX, Dusknoir).
+  [
+    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand\. put (a|any number of) (basic pokémon(?: with \d+ hp or less)?) (?:that )?you find there onto their bench(?:, and put (\d+) damage counters on that pokémon)?\./g,
+    (m) => ({
+      type: 'atkRevealOppHand',
+      then: {
+        action: 'bench',
+        count: m[1] === 'a' ? 1 : 'any',
+        filter: m[2],
+        ...(m[3] ? { counters: Number(m[3]) } : {}),
+      },
+    }),
+  ],
   // Only at a sentence start (behind a coin gate at most), so "if you do, your opponent
   // reveals …" stays unparsed instead of losing its condition.
   [
-    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down))?)?\./g,
+    /(?<=(?:^|\. )(?:(?:if heads|if tails|for each heads), )?)your opponent reveals their hand(?:, and you discard (a) card you find there|\. (discard|choose|add) (a|\d+|all) (trainer |supporter |energy )?cards? (?:you find there|from it)(?: (and put it on the bottom of their deck|to their prize cards face down|and shuffle them into their deck))?)?\./g,
     (m) => revealHandStep(m[1] ? 'discard' : m[2], m[1] || m[3], m[4], m[5]),
   ],
 ];
@@ -916,8 +935,9 @@ function revealHandStep(verb, countWord, kindWord, destination) {
   if (!verb) return { type: 'atkRevealOppHand' };
   let action = 'discard';
   if (verb === 'choose') {
-    if (!/bottom of their deck/.test(destination || '')) return null;
-    action = 'deckBottom';
+    if (/shuffle them into their deck/.test(destination || '')) action = 'deckShuffle';
+    else if (/bottom of their deck/.test(destination || '')) action = 'deckBottom';
+    else return null;
   } else if (verb === 'add') {
     if (!/prize cards/.test(destination || '')) return null;
     action = 'prize';
@@ -953,7 +973,8 @@ function searchAttachStep(clause, gate, optional) {
   const { guidance, ...step } = search;
   return {
     ...step,
-    ...(clauseParams.what ? { what: clauseParams.what } : {}),
+    // A Tool search keeps the ability parser's filter; the attack one reads it as a Pokémon.
+    ...(clauseParams.what && step.what !== 'Pokémon Tool' ? { what: clauseParams.what } : {}),
     ...(clauseParams.count ? { count: clauseParams.count } : {}),
     ...(clauseParams.upTo ? { upTo: true } : {}),
     // "You may search": finding nothing is the way to decline.
@@ -967,7 +988,7 @@ function searchAttachStep(clause, gate, optional) {
 // follows. A preamble with its own condition ("if this Pokémon is on your Bench, …") is not
 // stripped, so the effect is not read without it.
 const ABILITY_PREAMBLE =
-  /^(?:(?:once during your turn|as often as you like during your turn|during your turn|when you play this pokémon from your hand to evolve 1 of your pokémon during your turn), (?:you may use this (?:ability|power)\. )?(?:you may )?)/;
+  /^(?:(?:once during your turn|as often as you like during your turn|during your turn|when you play this pokémon from your hand (?:to evolve 1 of your pokémon|(?:on)?to your bench) during your turn), (?:you may use this (?:ability|power)\. )?(?:you may |you must )?)/;
 
 /**
  * An activated Ability's effect read with the attack templates (I89, I95): the effect half
@@ -991,8 +1012,19 @@ export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
     effect = effect.slice(position[0].length);
   }
   if (/^if /.test(effect)) return { steps: [], holderZone: null };
-  const parsed = parseAttackSteps(effect);
+  const parsed = parseAttackSteps(abilityRevealVoice(effect));
   return { steps: [...parsed.before, ...parsed.after], holderZone };
+}
+
+// Abilities print a reveal in the player's voice ("have your opponent reveal their hand, and
+// then you choose …"); the attack templates read the attack voice ("your opponent reveals
+// their hand. choose …").
+function abilityRevealVoice(effect) {
+  return effect
+    .replace(/^have your opponent reveal their hand/, 'your opponent reveals their hand')
+    .replace(/^(your opponent reveals their hand),? and (?:then )?(?:you )?/, '$1. ')
+    .replace(/^(your opponent reveals their hand\.) then, /, '$1 ')
+    .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2');
 }
 
 const HOLDER_POSITION =

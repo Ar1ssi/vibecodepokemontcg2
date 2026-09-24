@@ -99,6 +99,15 @@ export function describeCard(card) {
 /**
  * Card type predicates.
  */
+/**
+ * A Pokémon card attached as a Special Energy by its own Ability (Electrode Buzzap, Charjabug
+ * Battery): `asEnergy.provides` lists the Energy it provides. It is Energy only while attached;
+ * anywhere else it is the Pokémon card again, so the marker needs no cleanup.
+ */
+export function isAttachedAsEnergy(card) {
+  return Boolean(card?.asEnergy && card.attachedTo != null);
+}
+
 export function isPokemon(card) {
   if (!card) return false;
   if (isTrainer(card) || isEnergy(card)) return false;
@@ -119,6 +128,7 @@ export function isPokemon(card) {
 
 export function isEnergy(card) {
   if (!card) return false;
+  if (isAttachedAsEnergy(card)) return true;
   return (
     card.supertype === 'Energy' ||
     card.type === 'Energy' ||

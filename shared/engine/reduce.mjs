@@ -22,7 +22,7 @@ import {
 } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { setupGame } from './setup.mjs';
-import { createRng, shuffleInPlace } from './rng.mjs';
+import { createRng, shuffleInPlace, flipCoin, withForcedCoin } from './rng.mjs';
 import {
   computeAttackDamage,
   expandEnergyEntries,
@@ -62,18 +62,13 @@ import {
   isTeraCard,
 } from './rules/tool-combat.mjs';
 import {
-  parseThorns,
   parseToolCap,
   parseUnlimitedHandEnergyAcceleration,
-  requiresActiveSpot,
-  requiresKoOnOpponentTurn,
-  isEvolvePlayedTrigger,
-  isBenchPlayedTrigger,
-  isActivatedAbility,
-  passiveCostDiscount,
+  costDiscountRead,
   applyCostDiscount,
   teamNoRetreatCostForActive,
   parsePrizeModify,
+  isHandActivatedAbility,
 } from './rules/ability-executors.mjs';
 import { parseToolCondition, toolConditionMet } from './rules/tool-conditions.mjs';
 import {
@@ -90,6 +85,45 @@ import {
   applyStadiumSwitchTriggers,
 } from './effects/stadium-trigger-apply.mjs';
 import { classifyEnergyEffect } from './rules/energy-effects.mjs';
+import {
+  abilityDamageBonus,
+  abilityDamageReduction,
+  abilityDamagePrevention,
+  abilityWeaknessOverride,
+  abilityHpBonus,
+  abilityPrizeModify,
+  abilityRetreatCost,
+  abilityAttackCostDiscount,
+  abilityIgnoresDefenderEffects,
+  abilityExtraTypes,
+  applyEnergyMultiplier,
+  abilityActivationBlockReason,
+  isAbilitySuppressed,
+  abilitySupporterLimit,
+  abilityTurnNotEnd,
+  abilityForcesOpponentTails,
+  abilityAttackFlipGate,
+  abilityVictoryStar,
+  abilitySetupActive,
+  abilityPrizeToBench,
+  abilityPlayLocks,
+  abilityEvolvePermission,
+  abilityEvolveLock,
+  abilityRetreatLock,
+  abilitySummonRestricted,
+  abilityFirstTurnAttack,
+  extraAttackAvailable,
+} from './rules/ability-combat.mjs';
+import {
+  inPlayEntries,
+  parseCheckupAbilities,
+  parseOnOpponentEvolveAbilities,
+  parseEndOfTurnAbilities,
+  parseOnDamageAbilities,
+  parseOnDamageStatus,
+  parseOnEnergyAttachAbilities,
+  parseOnKoAbilities,
+} from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
@@ -98,7 +132,12 @@ import { pokemonHasType } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
 import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
-import { parseCopyAttack, inCopyGroup, copiedAttackFor } from './rules/attack-copy.mjs';
+import {
+  parseCopyAttack,
+  inCopyGroup,
+  copiedAttackFor,
+  parseAttackBorrowAbility,
+} from './rules/attack-copy.mjs';
 import {
   attackerMatchesFilter,
   clearAttackMarkers,
@@ -145,6 +184,7 @@ import {
   isBasicEnergy,
 } from './rules/card-classify.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
+import { trainerEndsTurn } from './rules/trainer-effects.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import {
   evolvedView,
@@ -178,7 +218,7 @@ import { matchesSearch } from './rules/search-match.mjs';
  */
 function flipAttackCoins(attack, rng) {
   const text = String(attack?.text || '').toLowerCase();
-  const flip = () => ((rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails');
+  const flip = () => flipCoin(rng);
 
   const multi = text.match(/flip (\d+) coins?/);
   if (multi) {
@@ -501,9 +541,16 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
   );
   if (!attacker) return clause.amount;
   const defenderPlayer = draft.players[ref.playerId];
+  const defenderView = inPlayView(draft, ref.card);
+  const abilityReads = attackAbilityReads(draft, {
+    attacker: inPlayView(draft, attacker),
+    defender: defenderView,
+    playerId: attackerPlayerId,
+    defenderPlayerId: ref.playerId,
+  });
   const result = computeAttackDamage(
-    inPlayView(draft, attacker),
-    inPlayView(draft, ref.card),
+    abilityReads.attacker,
+    defenderView,
     { name: attackName, damage: clause.amount },
     {
       attackerZoneCards: draft.players[attackerPlayerId]?.zones?.active || [],
@@ -518,6 +565,14 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       ...prizeFlags(draft, attackerPlayerId, ref.playerId),
       turnDamageBonuses: draft.players[attackerPlayerId]?.flags?.turnDamageBonuses || [],
       ...clause.immunity,
+      ignoreDefenderEffects:
+        clause.immunity?.ignoreDefenderEffects ||
+        abilityReads.ignoreDefenderEffects,
+      abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+      abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
+      abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
+      abilityPrevention: abilityReads.abilityPrevention,
+      weaknessOverride: abilityReads.weaknessOverride,
       defenderMarkers: activeAttackMarkers(draft, ref.playerId, ref.card),
       attackerMarkers: activeAttackMarkers(draft, attackerPlayerId, attacker),
     }
@@ -566,6 +621,75 @@ function attachLockReason(state, card, targetInstanceId) {
     return "An attack stops that Pokémon evolving this turn.";
   }
   return null;
+}
+
+/**
+ * Ability-side combat reads for one attack (design 034 slice 2): the
+ * attacker's bonus and extra types plus the defender's reduction, prevention
+ * and Weakness override, in the option shape computeAttackDamage consumes.
+ * `attacker`/`defender` are in-play views.
+ */
+function attackAbilityReads(
+  draft,
+  { attacker, defender, playerId, defenderPlayerId, defenderIsActive = true }
+) {
+  const attackerZones = draft.players[playerId]?.zones || {};
+  const defenderZones = draft.players[defenderPlayerId]?.zones || {};
+  const attackerSide = [
+    ...(attackerZones.active || []),
+    ...(attackerZones.bench || []),
+  ];
+  const defenderSide = [
+    ...(defenderZones.active || []),
+    ...(defenderZones.bench || []),
+  ];
+  const attackerCtx = {
+    sideCards: attackerSide,
+    opponentSideCards: defenderSide,
+    sideActive: attackerZones.active || [],
+    sideBench: attackerZones.bench || [],
+    zone: 'active',
+    isActive: true,
+    attackerIsActive: true,
+    turnNumber: draft.turn?.number,
+    opponentHandCount: (defenderZones.hand || []).length,
+    ownHandCount: (attackerZones.hand || []).length,
+    ownPrizesLeft: (attackerZones.prizes || []).length,
+    opponentPrizesLeft: (defenderZones.prizes || []).length,
+  };
+  const defenderCtx = {
+    sideCards: defenderSide,
+    opponentSideCards: attackerSide,
+    sideActive: defenderZones.active || [],
+    sideBench: defenderZones.bench || [],
+    zone: 'active',
+    isActive: defenderIsActive,
+    attackerIsActive: true,
+    attackerIsEx: isExCard(attacker),
+    turnNumber: draft.turn?.number,
+  };
+  const extraTypes = abilityExtraTypes(attacker, attackerCtx);
+  const attackerView = extraTypes.length
+    ? { ...attacker, types: [...(attacker.types || []), ...extraTypes] }
+    : attacker;
+  const reduction = abilityDamageReduction(defender, attackerView, defenderCtx);
+  return {
+    attacker: attackerView,
+    abilityBonusBeforeWR: abilityDamageBonus(
+      attackerView,
+      defender,
+      attackerCtx
+    ),
+    abilityReductionBeforeWR: reduction.beforeWR,
+    abilityReductionAfterWR: reduction.afterWR,
+    abilityPrevention: abilityDamagePrevention(
+      defender,
+      attackerView,
+      defenderCtx
+    ),
+    weaknessOverride: abilityWeaknessOverride(defender, defenderCtx),
+    ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
+  };
 }
 
 /** The defending player's flip for a surviveKnockOutCoin marker: true on heads. */
@@ -660,9 +784,16 @@ function applyRetaliation(
 function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId }) {
   const strikerZone = draft.players[strikerPlayerId]?.zones?.active || [];
   const targetPlayer = draft.players[attackerPlayerId];
+  const targetView = inPlayView(draft, target);
+  const abilityReads = attackAbilityReads(draft, {
+    attacker: strikerView,
+    defender: targetView,
+    playerId: strikerPlayerId,
+    defenderPlayerId: attackerPlayerId,
+  });
   const result = computeAttackDamage(
-    strikerView,
-    inPlayView(draft, target),
+    abilityReads.attacker,
+    targetView,
     { name: marker.sourceAttack, damage: marker.amount },
     {
       attackerZoneCards: strikerZone.some((c) => c.instanceId === striker.instanceId) ? strikerZone : [],
@@ -672,6 +803,12 @@ function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerP
       defenderIsActive: true,
       baseDamage: marker.amount,
       ...prizeFlags(draft, strikerPlayerId, attackerPlayerId),
+      ignoreDefenderEffects: abilityReads.ignoreDefenderEffects,
+      abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+      abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
+      abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
+      abilityPrevention: abilityReads.abilityPrevention,
+      weaknessOverride: abilityReads.weaknessOverride,
       defenderMarkers: activeAttackMarkers(draft, attackerPlayerId, target),
     }
   );
@@ -758,18 +895,70 @@ function toolGrantedAttacksFor(state, card) {
   return out;
 }
 
-// `inPlayView` with Stadium extras merged into its attacks list.
+function borrowSourceMatches(card, borrow) {
+  if (!isPokemon(card)) return false;
+  const name = String(card.name || '').toLowerCase();
+  if (borrow.basic && (normalizeStage(card.stage) || 'Basic') !== 'Basic') return false;
+  if (borrow.noRuleBox && isRuleBoxPokemon(card)) return false;
+  if (borrow.gxOrEx && !/-(?:gx|ex)$/.test(name)) return false;
+  if (borrow.evolvesFrom && String(card.evolvesFrom || '').toLowerCase() !== borrow.evolvesFrom) {
+    return false;
+  }
+  if (borrow.names && !borrow.names.includes(name)) return false;
+  return true;
+}
+
+/**
+ * Attacks an Ability lets `card` use as its own (Mew ex Memory Helix, Ditto Sudden
+ * Transformation, Mewtwo & Mew-GX Perfection, Mew-EX Versatile, …; design 034 slice 6).
+ * In-play sources are read through their top evolution; the copier itself never counts.
+ * Each attack keeps its own cost, and its text names the copier (copiedAttackFor).
+ */
+function abilityBorrowedAttacks(state, card) {
+  const ref = findCard(state, card?.instanceId);
+  if (!ref || !['active', 'bench'].includes(ref.zoneId)) return [];
+  const view = inPlayView(state, card);
+  const texts = (view?.abilities || []).map((a) => (typeof a === 'string' ? a : a?.text));
+  const borrow = texts.map(parseAttackBorrowAbility).find(Boolean);
+  if (!borrow) return [];
+  if (borrow.requiresActive && ref.zoneId !== 'active') return [];
+  if (isAbilitySuppressed(view, abilitySideContext(state, ref.playerId))) return [];
+  const own = state.players?.[ref.playerId];
+  const opp = Object.values(state.players || {}).find((p) => p.playerId !== ref.playerId);
+  const inPlay = (p, zones) =>
+    zones.flatMap((z) => rootsIn(p?.zones?.[z])).map((root) => inPlayView(state, root));
+  const bySource = {
+    ownBench: () => inPlay(own, ['bench']),
+    ownInPlay: () => inPlay(own, ['active', 'bench']),
+    oppInPlay: () => inPlay(opp, ['active', 'bench']),
+    oppActive: () => inPlay(opp, ['active']),
+    ownDiscard: () => own?.zones?.discard || [],
+    ownLostZone: () => own?.zones?.lostZone || [],
+    oppLostZone: () => opp?.zones?.lostZone || [],
+  };
+  const borrowed = [];
+  for (const source of borrow.scopes.flatMap((scope) => bySource[scope]?.() || [])) {
+    if (source.instanceId === card.instanceId || !borrowSourceMatches(source, borrow)) continue;
+    for (const attack of source.attacks || []) {
+      if (!attack?.name) continue;
+      borrowed.push(copiedAttackFor(attack, { sourceName: source.name, copierName: view.name }));
+    }
+  }
+  return borrowed;
+}
+
+// `inPlayView` with Stadium extras and Ability-borrowed attacks merged into its attacks list.
 function attackViewFor(state, card, { isActive = true } = {}) {
   const view = inPlayView(state, card);
   const extras = mergeAttacks(
-    stadiumExtraAttacksFor(state, card, { isActive }),
-    toolGrantedAttacksFor(state, card)
+    mergeAttacks(stadiumExtraAttacksFor(state, card, { isActive }), toolGrantedAttacksFor(state, card)),
+    abilityBorrowedAttacks(state, card)
   );
   if (extras.length === 0) return view;
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
 }
 
-// Effective HP including printed base stats, top evolution, attached Tools, and Stadium modifiers.
+// Effective HP including printed base stats, top evolution, attached Tools, Stadium modifiers, and ability HP bonuses.
 function cardEffectiveHp(state, card, playerId) {
   if (!card) return 0;
   const view = inPlayView(state, card);
@@ -777,7 +966,9 @@ function cardEffectiveHp(state, card, playerId) {
   if (!baseHp) return 0;
   const ref = findCard(state, card.instanceId);
   const zoneCards = ref?.player?.zones?.[ref.zoneId] || [];
-  return effectiveHp(baseHp, playerId, card, zoneCards, state.stadium);
+  const zones = state.players?.[playerId]?.zones || {};
+  const sideCards = [...(zones.active || []), ...(zones.bench || [])];
+  return effectiveHp(baseHp, playerId, card, zoneCards, state.stadium, sideCards);
 }
 
 function markerCount(markers, kind, field) {
@@ -810,22 +1001,22 @@ function computeEffectiveRetreatCost(state, card, playerId) {
     stadium,
   });
 
-  // 2. Team bench abilities (e.g. "your Active Pokémon's Retreat Cost is 1 less")
-  for (const b of player?.zones?.bench || []) {
-    if (b.attachedTo) continue;
-    const t = String(
-      b.ability?.text ?? b.abilityText ?? b.text ?? b.effect ?? ''
-    ).toLowerCase();
-    if (
-      /active pok[ée]mon's retreat cost is (\d+) less|active pokemon's retreat cost is (\d+) less/i.test(
-        t
-      )
-    ) {
-      const m = t.match(/retreat cost is (\d+) less/i);
-      const n = m ? parseInt(m[1], 10) : 1;
-      cost = Math.max(0, cost - n);
-    }
-  }
+  // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat
+  // Cost is N less" wording and the opponent-side increases (A10).
+  const opponent = state.players?.[
+    Object.keys(state.players || {}).find((id) => id !== playerId)
+  ];
+  const sideCards = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
+  const opponentSideCards = [
+    ...(opponent?.zones?.active || []),
+    ...(opponent?.zones?.bench || []),
+  ];
+  cost += abilityRetreatCost(inPlayView(state, card), {
+    sideCards,
+    opponentSideCards,
+    zone: 'active',
+    isActive: true,
+  });
 
   // 3. Stadium retreat modifier (e.g. Beach Court)
   cost = getStadiumRetreatCost(cost, card, playerId, stadium);
@@ -1141,6 +1332,20 @@ function handleKnockout(
       },
     }
   );
+  // Ability prize modifiers on the victim's side (Mega Gengar ex "that player
+  // takes 1 fewer Prize card"), read from the whole side so a Benched holder
+  // covers an Active victim.
+  const attackerCard = (draft.players[attackerPlayerId]?.zones?.active || []).find(
+    (c) => !c.attachedTo
+  );
+  prizeCount = Math.max(
+    0,
+    prizeCount +
+      abilityPrizeModify(inPlayView(draft, victim), {
+        sideCards: [...victimActive, ...victimBench],
+        attackerIsEx: isExCard(attackerCard),
+      })
+  );
   if (legacyEnergyAttached && !legacyUsed) {
     if (!victimPlayer.flags) victimPlayer.flags = {};
     victimPlayer.flags.legacyPrizeReductionUsed = true;
@@ -1212,6 +1417,10 @@ function handleKnockout(
   // of the discard pile — attached cards are still discarded (card text).
   const lostCity = isStadiumLostCity(draft.stadium?.card || draft.stadium);
   const attackLostZone = draft.__attackLostZoneKnockouts === victimPlayerId;
+
+  // Ability energy-move-on-KO: record the victim's Energy an Ability may move
+  // before the stack below is discarded (target chosen/executed at the tail).
+  captureOnKoEnergyMoves(draft, { victimPlayerId, victim, events });
 
   // Special-energy on-knockout triggers (Splash/Rescue return the Pokémon to
   // hand; Gift draws until 7). Attached cards still go to the discard pile.
@@ -1415,6 +1624,187 @@ function settlePromotionChoices(draft, { events }) {
 }
 
 /**
+ * Stamps `movedToActiveTurn` on every card that entered a player's Active Spot
+ * during this command, and clears it from every card that left (design 034
+ * slice 4b on-promotion window). Diffing the pre/post Active zones here covers
+ * every bench→active site — manual move, KO promotion, Switch/Boss's Orders
+ * attack and trainer steps — without threading a stamp through each effect
+ * module. The whole stack (root plus attached Evolutions/Tools) is stamped so
+ * the activation gate reads the stamp off whichever card the client addresses.
+ */
+function stampActivePromotions(prev, next) {
+  const turnNumber = next.turn?.number;
+  if (turnNumber == null) return;
+  for (const playerId of Object.keys(next.players || {})) {
+    const prevActive = prev.players?.[playerId]?.zones?.active || [];
+    const nextActive = next.players?.[playerId]?.zones?.active || [];
+    const prevIds = new Set(prevActive.map((c) => c.instanceId));
+    const nextIds = new Set(nextActive.map((c) => c.instanceId));
+    for (const card of nextActive) {
+      if (!prevIds.has(card.instanceId)) card.movedToActiveTurn = turnNumber;
+    }
+    for (const card of prevActive) {
+      if (nextIds.has(card.instanceId)) continue;
+      const moved = findCard(next, card.instanceId)?.card;
+      if (moved) delete moved.movedToActiveTurn;
+    }
+  }
+}
+
+/**
+ * Energy-move-on-KO abilities (Miraidon Photon Cord, Raichu Electrical Grounding,
+ * Veluza Fillet Memento; design 034 slice 4b). The victim's Energy is discarded
+ * with the rest of its stack, so this records which cards an Ability may pull
+ * back out of the discard once a target is known; `settleKoEnergyMoves` runs at
+ * the command tail. Obligations live on the draft (not player flags) so
+ * `advanceTurn`'s wholesale flag rebuild cannot drop them, and they ride the
+ * `pendingChoice` resume token when a target must be chosen.
+ */
+function captureOnKoEnergyMoves(draft, { victimPlayerId, victim, events }) {
+  const player = draft.players?.[victimPlayerId];
+  if (!player) return;
+  const entries = inPlayEntries(draft).filter(
+    (e) => e.playerId === victimPlayerId
+  );
+  const abilities = parseOnKoAbilities(
+    entries,
+    abilitySideContext(draft, victimPlayerId)
+  );
+  const zoneCards = [
+    ...(player.zones?.active || []),
+    ...(player.zones?.bench || []),
+  ];
+  const obligations = [];
+  for (const ab of abilities) {
+    // "If this Pokémon … is Knocked Out" only fires for the victim itself;
+    // "move … to this Pokémon" can't target a holder that just left play.
+    if (ab.selfSource) {
+      if (ab.holder !== victim) continue;
+    } else if (ab.holder === victim) {
+      continue;
+    }
+    let energy = zoneCards.filter(
+      (c) => c.attachedTo === victim.instanceId && isEnergy(c)
+    );
+    if (ab.basic) energy = energy.filter((c) => isBasicEnergy(c));
+    if (ab.energyType) {
+      energy = energy.filter((c) => energyMatchesType(c, ab.energyType));
+    }
+    if (energy.length === 0) continue;
+    obligations.push({
+      playerId: victimPlayerId,
+      holderInstanceId: ab.holder.instanceId,
+      targetKind: ab.targetKind,
+      energyIds: energy.map((c) => c.instanceId),
+      upTo: ab.upTo || 1,
+      source: ab.source,
+    });
+    events.push({
+      type: 'koEnergyMoveRequested',
+      playerId: victimPlayerId,
+      source: ab.source,
+      holderInstanceId: ab.holder.instanceId,
+    });
+  }
+  if (obligations.length > 0) {
+    draft.__koEnergyMoves = [...(draft.__koEnergyMoves || []), ...obligations];
+  }
+}
+
+function energyMatchesType(card, typeName) {
+  const want = String(typeName || '').toLowerCase();
+  const types = [card.energyType, ...(Array.isArray(card.types) ? card.types : [])]
+    .filter(Boolean)
+    .map((t) => String(t).toLowerCase());
+  if (types.some((t) => t === want || (want === 'darkness' && t === 'dark'))) {
+    return true;
+  }
+  // Basic Energy rows sometimes carry no `types`; the printed name is then the
+  // only signal ("Water Energy").
+  return (
+    typeof card.name === 'string' &&
+    new RegExp(`\\b${want}\\b`, 'i').test(card.name)
+  );
+}
+
+function koEnergyTargets(player, obligation) {
+  const bench = (player.zones?.bench || []).filter(
+    (c) => !c.attachedTo && isPokemon(c)
+  );
+  if (obligation.targetKind === 'holder') {
+    const holder = [
+      ...(player.zones?.active || []),
+      ...bench,
+    ].find(
+      (c) => !c.attachedTo && c.instanceId === obligation.holderInstanceId
+    );
+    return holder ? [holder] : [];
+  }
+  return bench.filter((c) => c.instanceId !== obligation.holderInstanceId);
+}
+
+function moveKoEnergy(player, target, obligation, events) {
+  const discard = player.zones?.discard || [];
+  let moved = 0;
+  for (const id of obligation.energyIds) {
+    if (moved >= obligation.upTo) break;
+    const card = discard.find((c) => c.instanceId === id);
+    if (!card) continue;
+    attachToRoot(player, card, target, events);
+    moved += 1;
+  }
+  return moved;
+}
+
+function settleKoEnergyMoves(draft, { events }) {
+  if (draft.pendingChoice) return;
+  const pending = draft.__koEnergyMoves;
+  if (!Array.isArray(pending) || pending.length === 0) {
+    delete draft.__koEnergyMoves;
+    return;
+  }
+  const remaining = [...pending];
+  while (remaining.length > 0) {
+    const obligation = remaining[0];
+    const player = draft.players?.[obligation.playerId];
+    const energyLeft = (player?.zones?.discard || []).some((c) =>
+      obligation.energyIds.includes(c.instanceId)
+    );
+    if (!player || !energyLeft) {
+      remaining.shift();
+      continue;
+    }
+    const targets = koEnergyTargets(player, obligation);
+    if (targets.length === 0) {
+      remaining.shift();
+      continue;
+    }
+    if (targets.length > 1) {
+      delete draft.__koEnergyMoves;
+      draft.pendingChoice = createPendingChoice({
+        player: obligation.playerId,
+        source: obligation.source,
+        prompt: `${obligation.source}: choose a Benched Pokémon to move the Energy to`,
+        options: targets,
+        min: 1,
+        max: 1,
+        cancellable: false,
+        stateVersion: draft.stateVersion,
+        resumeToken: {
+          effectType: 'koEnergy',
+          initiatorPlayerId: obligation.playerId,
+          obligations: remaining,
+        },
+      });
+      return;
+    }
+    moveKoEnergy(player, targets[0], obligation, events);
+    remaining.shift();
+  }
+  delete draft.__koEnergyMoves;
+}
+
+/**
  * Resolves Pokémon Checkup between turns, applying every condition the Active holds
  * in this order, then checking for a Knockout once:
  * - Poison: 10 damage
@@ -1514,11 +1904,115 @@ function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
   }
 }
 
+/**
+ * Pokémon Checkup damage from abilities (design 034 slice 4): Froslass, Magmortar,
+ * Pecharunt, Team Rocket's Tyranitar, Trevenant. Applied after the per-condition
+ * Checkup damage and before between-turns Stadium damage, with a Knockout sweep.
+ */
+function applyCheckupAbilities(draft, { events, ctx }) {
+  const effects = parseCheckupAbilities(inPlayEntries(draft), ctx);
+  const affected = [];
+  for (const effect of effects) {
+    for (const target of effect.targets) {
+      const damage = effect.count * 10;
+      target.card.damage = (target.card.damage || 0) + damage;
+      events.push({
+        type: 'checkupAbilityDamage',
+        source: effect.source,
+        instanceId: target.card.instanceId,
+        playerId: target.playerId,
+        damage,
+      });
+      affected.push(target);
+    }
+  }
+  for (const { card, playerId } of affected) {
+    if (isGameConcluded(draft)) break;
+    const hp = cardEffectiveHp(draft, card, playerId);
+    if (hp > 0 && (card.damage || 0) >= hp) {
+      handleKnockout(draft, {
+        victimPlayerId: playerId,
+        attackerPlayerId: Object.keys(draft.players || {}).find(
+          (id) => id !== playerId
+        ),
+        victim: card,
+        events,
+      });
+    }
+  }
+}
+
+/**
+ * Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition:
+ * discard the top 5 cards of your deck while it is in the Active Spot). Optional
+ * end-of-turn abilities are activated through useAbility instead.
+ */
+function applyEndOfTurnAbilities(draft, { events, ctx, endingPlayerId }) {
+  if (!endingPlayerId) return;
+  const entries = inPlayEntries(draft).filter(
+    (entry) => entry.playerId === endingPlayerId
+  );
+  const effects = parseEndOfTurnAbilities(entries, ctx);
+  for (const effect of effects) {
+    if (effect.kind !== 'discardTop' || !(effect.n > 0)) continue;
+    const player = draft.players[effect.playerId];
+    const deck = player?.zones?.deck || [];
+    const count = Math.min(effect.n, deck.length);
+    const discarded = deck.splice(0, count);
+    for (const card of discarded) discardCardToPlayerZone(player, card);
+    events.push({
+      type: 'cardsDiscarded',
+      playerId: effect.playerId,
+      count,
+      source: effect.source,
+      cards: discarded.map((c) => c.instanceId),
+    });
+  }
+}
+
+/**
+ * "Whenever your opponent plays a Pokémon from their hand to evolve 1 of their
+ * Pokémon, put N damage counters on that Pokémon" (Team Rocket's Ampharos Darkest
+ * Impulse). Fires after the evolve lands, before any turn-end check.
+ */
+function applyOnOpponentEvolve(draft, { evolvedCard, evolvingPlayerId, events }) {
+  const entries = inPlayEntries(draft).filter(
+    (entry) => entry.playerId !== evolvingPlayerId
+  );
+  const ctx = abilitySideContext(draft, evolvingPlayerId);
+  const effects = parseOnOpponentEvolveAbilities(entries, ctx);
+  if (effects.length === 0) return;
+  for (const effect of effects) {
+    const damage = effect.count * 10;
+    evolvedCard.damage = (evolvedCard.damage || 0) + damage;
+    events.push({
+      type: 'damageUpdated',
+      instanceId: evolvedCard.instanceId,
+      damage: evolvedCard.damage,
+      dealt: damage,
+      reason: 'onOpponentEvolve',
+      source: effect.source,
+    });
+  }
+  const hp = cardEffectiveHp(draft, evolvedCard, evolvingPlayerId);
+  if (hp > 0 && (evolvedCard.damage || 0) >= hp) {
+    handleKnockout(draft, {
+      victimPlayerId: evolvingPlayerId,
+      attackerPlayerId: Object.keys(draft.players || {}).find(
+        (id) => id !== evolvingPlayerId
+      ),
+      victim: evolvedCard,
+      events,
+    });
+  }
+}
+
 function resolveCheckup(
   draft,
   { rng, events, endingPlayerId = draft.turn?.player }
 ) {
   resolveDeferredKnockouts(draft, { events });
+  const triggerCtx = abilitySideContext(draft, endingPlayerId);
 
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
@@ -1588,6 +2082,10 @@ function resolveCheckup(
     }
   }
 
+  // Pokémon Checkup abilities resolve after the conditions and before the
+  // between-turns Stadium damage (design 034 slice 4).
+  applyCheckupAbilities(draft, { events, ctx: triggerCtx });
+
   // Between-turns Stadium damage resolves after Pokémon Checkup.
   applyBetweenTurnsStadiumDamage(draft, { events });
 
@@ -1597,6 +2095,9 @@ function resolveCheckup(
 
   // "At the end of your turn, discard …" Tools (TM/Cube Items).
   discardEndOfTurnTools(draft, { endingPlayerId, events });
+
+  // Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition).
+  applyEndOfTurnAbilities(draft, { events, ctx: triggerCtx, endingPlayerId });
 }
 
 /**
@@ -1630,6 +2131,31 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
     count: actualCount,
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
   });
+  if (prizes.length > 0) offerPrizeToBench(draft, { playerId, taken });
+}
+
+/** Runs the Ability triggers of an Energy attached from the hand (`parseOnEnergyAttachAbilities`). */
+function applyEnergyAttachTriggers(draft, { host, energy, playerId, events }) {
+  const effects = parseOnEnergyAttachAbilities(host, energy, abilitySideContext(draft, playerId));
+  for (const { target, recover, heal, source } of effects) {
+    if (recover) {
+      for (const condition of listConditions(target)) {
+        removeCondition(target, condition);
+        events.push({ type: 'statusCleared', condition, instanceId: target.instanceId, playerId, source });
+      }
+    }
+    const before = target.damage || 0;
+    if (heal > 0 && before > 0) {
+      target.damage = Math.max(0, before - heal);
+      events.push({
+        type: 'damageUpdated',
+        instanceId: target.instanceId,
+        damage: target.damage,
+        healed: before - target.damage,
+        source,
+      });
+    }
+  }
 }
 
 function conditionsUpdatedEvent(card, condition) {
@@ -1813,6 +2339,60 @@ function resolvePrizeChoice(draft, { playerId, selection, events }) {
       reason: 'all prize cards taken',
       events,
     });
+    return;
+  }
+  offerPrizeToBench(draft, { playerId, taken });
+}
+
+const PRIZE_BENCH_EFFECT = 'prizeBench';
+
+/**
+ * Jirachi Prism Star / Chansey Lucky Bonus (design 034 slice 6): a Prize just taken during
+ * its owner's turn may go onto the Bench instead of the hand. Raises a yes/no choice for the
+ * first such card; `resumePrizeToBench` applies it.
+ */
+function offerPrizeToBench(draft, { playerId, taken }) {
+  if (draft.pendingChoice || draft.turn?.player !== playerId || isGameConcluded(draft)) return;
+  const player = draft.players[playerId];
+  if (rootsIn(player.zones.bench).length >= 5) return;
+  const card = taken.find(
+    (c) => player.zones.hand.includes(c) && isPokemon(c) && abilityPrizeToBench(c)
+  );
+  if (!card) return;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: card.name || 'Ability',
+    prompt: `${card.name}: put it onto your Bench instead of into your hand?`,
+    options: [
+      { instanceId: 1, name: 'Put it onto your Bench', type: 'option' },
+      { instanceId: 2, name: 'Keep it in your hand', type: 'option' },
+    ],
+    min: 1,
+    max: 1,
+    resumeToken: { effectType: PRIZE_BENCH_EFFECT, initiatorPlayerId: playerId, cardId: card.instanceId },
+  });
+}
+
+function resumePrizeToBench(draft, { token, selection, activeRng, events }) {
+  draft.pendingChoice = null;
+  if (Number((selection || [])[0]) !== 1) return;
+  const player = draft.players[token.initiatorPlayerId];
+  const card = player?.zones?.hand?.find((c) => c.instanceId === token.cardId);
+  if (!card || rootsIn(player.zones.bench).length >= 5) return;
+  player.zones.hand.splice(player.zones.hand.indexOf(card), 1);
+  card.enteredPlayTurn = draft.turn?.number ?? null;
+  player.zones.bench.push(card);
+  events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'bench', playerId: player.playerId });
+  const { extraPrize } = abilityPrizeToBench(card) || {};
+  let extra = extraPrize === 'always';
+  if (extraPrize === 'coin') {
+    const coin = flipCoin(activeRng);
+    events.push({ type: 'coinFlipped', playerId: player.playerId, face: coin });
+    extra = coin === 'heads';
+  }
+  if (extra && player.zones.prizes.length > 0) {
+    if (!player.flags) player.flags = {};
+    player.flags.prizesOwed = (player.flags.prizesOwed || 0) + 1;
   }
 }
 
@@ -1963,6 +2543,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
   draft.players[nextPlayerId].flags = {
     energyAttached: false,
     attackerAttacked: false,
+    attacksThisTurn: 0,
     retreatedThisTurn: false,
     supporterPlayed: false,
     stadiumPlayedThisTurn: false,
@@ -2015,6 +2596,20 @@ function advanceTurn(draft, { nextPlayerId, events }) {
 }
 
 /**
+ * "… Your turn ends." Trainers end the turn once their effect has fully resolved (no choice
+ * pending), unless an Ability exempts that card (Alcremie Additional Order, design 034 slice 6).
+ */
+function endTurnAfterTrainer(draft, { card, playerId, activeRng, events }) {
+  if (!card || draft.pendingChoice || !trainerEndsTurn(card)) return;
+  if (draft.turn?.player !== playerId) return;
+  if (abilityTurnNotEnd(card, abilitySideContext(draft, playerId))) {
+    events.push({ type: 'turnEndPrevented', playerId, instanceId: card.instanceId });
+    return;
+  }
+  endTurnFromEffect(draft, { playerId, activeRng, events });
+}
+
+/**
  * Ends the acting player's turn from inside a card effect (Lumiose City: "If a
  * player searches their deck in this way, their turn ends."). Mirrors the `pass`
  * path — Checkup first, then advance only while the game is still live.
@@ -2026,6 +2621,41 @@ function endTurnFromEffect(draft, { playerId, activeRng, events }) {
   resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
   if (!isGameConcluded(draft)) {
     advanceTurn(draft, { nextPlayerId: oppId, events });
+  }
+}
+
+/**
+ * Ability outcomes the effect executor can't apply itself, because the KO and game-end flow
+ * lives here (design 034 slice 6), announced as events:
+ * - `abilitySelfKnockOut` (Electrode Buzzap): Knock Out the holder — the opponent takes
+ *   Prizes as usual — then attach the card to the chosen Pokémon as a Special Energy.
+ * - `abilityWinsGame` (Unown MISSING / HAND / DAMAGE).
+ */
+function settleAbilityOutcomes(draft, { events }) {
+  for (const outcome of events.filter((e) => e.type === 'abilitySelfKnockOut')) {
+    const player = draft.players[outcome.playerId];
+    const oppId = Object.keys(draft.players || {}).find((id) => id !== outcome.playerId);
+    const root = findCard(draft, outcome.rootId)?.card;
+    const target = findCard(draft, outcome.targetId);
+    if (!player || !root || !target || isGameConcluded(draft)) continue;
+    handleKnockout(draft, { victimPlayerId: outcome.playerId, attackerPlayerId: oppId, victim: root, events });
+    const ref = findCard(draft, outcome.cardId);
+    if (!ref || !['discard', 'lostZone'].includes(ref.zoneId)) continue;
+    const pile = player.zones[ref.zoneId];
+    pile.splice(pile.indexOf(ref.card), 1);
+    ref.card.asEnergy = { provides: outcome.provides };
+    ref.card.attachedTo = outcome.targetId;
+    player.zones[target.zoneId].push(ref.card);
+    events.push({
+      type: 'cardAttached',
+      instanceId: ref.card.instanceId,
+      targetInstanceId: outcome.targetId,
+      playerId: outcome.playerId,
+    });
+  }
+  const win = events.find((e) => e.type === 'abilityWinsGame');
+  if (win && !isGameConcluded(draft)) {
+    setGameEnded(draft, { winner: win.playerId, reason: win.reason, events });
   }
 }
 
@@ -2292,9 +2922,13 @@ function validateReferences(state, command) {
 
     case 'useAbility': {
       const cardRef = findCard(state, payload?.instanceId);
+      // Luxray Swelling Flash / Charjabug Battery are activated from the hand.
+      const legalZones = isHandActivatedAbility(cardRef?.card)
+        ? ['hand']
+        : ['active', 'bench'];
       if (
         !cardRef ||
-        !['active', 'bench'].includes(cardRef.zoneId) ||
+        !legalZones.includes(cardRef.zoneId) ||
         cardRef.playerId !== playerId
       ) {
         return { valid: false, error: 'stale_view' };
@@ -2401,26 +3035,61 @@ function attackCostPayable(state, playerId, active, attack) {
     stadiumCard,
     hostPokemon: inPlayView(state, active),
   };
+  const sideCards = [
+    ...(player.zones?.active || []),
+    ...(player.zones?.bench || []),
+  ];
+  const opponent = state.players?.[
+    Object.keys(state.players || {}).find((id) => id !== playerId)
+  ];
   const energyEntries = expandEnergyEntries(
-    attached.map((c) => serverEnergyDescriptor(c, energyContext))
+    applyEnergyMultiplier(
+      attached.map((c) => serverEnergyDescriptor(c, energyContext)),
+      sideCards
+    )
   );
   // Cost modifiers must be priced exactly as the client and the attack
   // preview price them: passive ability/Tool discounts plus a Stadium
-  // cost modifier, then Nighttime Mine-style increases. Checking the raw
-  // printed cost rejected legally payable attacks.
+  // cost modifier, then ability cost ignores, then Nighttime Mine-style
+  // increases. Checking the raw printed cost rejected legally payable attacks.
   const activeView = inPlayView(state, active);
   const blockTools = isStadiumToolNegation(stadiumCard);
-  let discount = passiveCostDiscount(activeView);
+  // The board facts a printed discount condition or "for each" count reads (I139).
+  const discountCtx = {
+    attacker: activeView,
+    ownHandCount: (player.zones?.hand || []).length,
+    ownPrizesLeft: (player.zones?.prizes || []).length,
+    opponentPrizesLeft: (opponent?.zones?.prizes || []).length,
+    ownSideCards: sideCards,
+    opponentSideCards: [...(opponent?.zones?.active || []), ...(opponent?.zones?.bench || [])],
+    opponentActive: opponent?.zones?.active || [],
+    ownDiscard: player.zones?.discard || [],
+  };
+  const discounts = [costDiscountRead(activeView, discountCtx)];
   if (!blockTools) {
-    discount += attachedTools(active, activeZoneCards).reduce(
-      (sum, tool) => sum + passiveCostDiscount(tool),
-      0
-    );
+    for (const tool of attachedTools(active, activeZoneCards)) {
+      discounts.push(costDiscountRead(tool, discountCtx));
+    }
   }
-  if (stadiumCard) discount += parseStadiumCostModifier(stadiumCard);
+  if (stadiumCard) discounts.push({ count: parseStadiumCostModifier(stadiumCard), symbol: null });
   let effectiveCost = attack?.cost || [];
-  if (discount > 0 && effectiveCost.length > 0) {
-    effectiveCost = applyCostDiscount(effectiveCost, discount);
+  if (effectiveCost.length > 0) {
+    effectiveCost = applyCostDiscount(effectiveCost, discounts.filter(Boolean));
+  }
+  const abilityCost = abilityAttackCostDiscount(activeView, {
+    sideCards,
+    opponentSideCards: [
+      ...(opponent?.zones?.active || []),
+      ...(opponent?.zones?.bench || []),
+    ],
+    zone: 'active',
+    isActive: true,
+    opponentHandCount: (opponent?.zones?.hand || []).length,
+  });
+  if (abilityCost.ignoreAll) {
+    effectiveCost = [];
+  } else if (abilityCost.ignoreColorless) {
+    effectiveCost = effectiveCost.filter((symbol) => symbol !== 'Colorless');
   }
   const increase =
     getStadiumAttackCostIncreaseFor(activeView, playerId, stadiumCard, stadiumUser) + markerIncrease;
@@ -2431,6 +3100,29 @@ function attackCostPayable(state, playerId, active, attack) {
     ];
   }
   return canPayAttackCost(energyEntries, effectiveCost);
+}
+
+/**
+ * Ability-combat context for the player whose turn/command this is: their
+ * in-play cards on `side*` and the other player's on `opponent*`, so the
+ * slice-3 readers can scope suppression and locks to the right side.
+ */
+function abilitySideContext(state, playerId) {
+  const player = state.players?.[playerId];
+  const opponent = Object.values(state.players || {}).find(
+    (p) => p.playerId !== playerId
+  );
+  const zones = (p) => p?.zones || {};
+  const own = zones(player);
+  const other = zones(opponent);
+  return {
+    sideCards: [...(own.active || []), ...(own.bench || [])],
+    opponentSideCards: [...(other.active || []), ...(other.bench || [])],
+    sideActive: own.active || [],
+    sideBench: own.bench || [],
+    opponentActive: other.active || [],
+    opponentBench: other.bench || [],
+  };
 }
 
 /**
@@ -2618,10 +3310,29 @@ export function validateLegality(state, command) {
               'Only Pokémon can be played to the Bench or Active Spot. Items, Supporters, and Tools are played elsewhere.',
           };
         }
-        if (cardRef && isPokemon(cardRef.card) && !isBasicPokemon(cardRef.card)) {
+        // Explosiveness (design 034 slice 6): the opening Active may be this non-Basic.
+        const openingActive =
+          payload.to === 'active' &&
+          (state.turn?.number ?? 0) <= 1 &&
+          rootsIn([...(player.zones?.active || []), ...(player.zones?.bench || [])]).length === 0;
+        const goingSecond = state.turn?.number === 1 && state.turn.player !== playerId;
+        if (
+          cardRef &&
+          isPokemon(cardRef.card) &&
+          !isBasicPokemon(cardRef.card) &&
+          !(openingActive && abilitySetupActive(cardRef.card, { goingSecond }))
+        ) {
           return {
             allowed: false,
             reason: 'Only Basic Pokémon can be played from your hand.',
+          };
+        }
+        // Palafin ex Zero to Hero: this Pokémon may only enter play through its
+        // own Ability's effect, never as a hand play.
+        if (cardRef && isPokemon(cardRef.card) && abilitySummonRestricted(cardRef.card)) {
+          return {
+            allowed: false,
+            reason: `${cardRef.card.name} can only be put into play by its Ability's effect.`,
           };
         }
       }
@@ -2734,7 +3445,30 @@ export function validateLegality(state, command) {
             reason: 'Can only evolve a Pokémon in play.',
           };
         }
-        if ((state.turn?.number || 1) <= 2) {
+        const evolveCtx = {
+          ...abilitySideContext(state, playerId),
+          zone: targetRef.zoneId,
+          isActive: targetRef.zoneId === 'active',
+          turnNumber: state.turn?.number,
+          opponentActiveIsEx: isExCard(
+            Object.values(state.players || {})
+              .find((p) => p.playerId !== playerId)
+              ?.zones?.active?.find((c) => !c.attachedTo)
+          ),
+        };
+        // Primal Law-class locks ("your opponent can't play any Pokémon from
+        // their hand to evolve their Pokémon") forbid the evolution outright.
+        if (abilityEvolveLock(cardRef.card, evolveCtx)) {
+          return {
+            allowed: false,
+            reason: 'An Ability prevents evolving your Pokémon.',
+          };
+        }
+        // "This Pokémon can evolve during your first turn or the turn you play
+        // it" (Scatterbug/Eevee/Luxio/Spearow/Shelmet/Karrablast) relaxes the
+        // first-turn and just-played gates for that Pokémon.
+        const evolvePermission = abilityEvolvePermission(targetRef.card, evolveCtx);
+        if (!evolvePermission && (state.turn?.number || 1) <= 2) {
           return { allowed: false, reason: "Can't evolve on the first turn." };
         }
         const targetZoneCards =
@@ -2747,7 +3481,11 @@ export function validateLegality(state, command) {
           pokemon: topTarget,
           evolution: cardRef.card,
         });
-        if (!stadiumRelaxes && targetRef.card.enteredPlayTurn === state.turn?.number) {
+        if (
+          !evolvePermission &&
+          !stadiumRelaxes &&
+          targetRef.card.enteredPlayTurn === state.turn?.number
+        ) {
           return {
             allowed: false,
             reason:
@@ -2807,15 +3545,39 @@ export function validateLegality(state, command) {
 
     case 'attack': {
       if (state.turn?.number === 1) {
-        return {
-          allowed: false,
-          reason: "The player going first can't attack on turn 1.",
-        };
-      }
-      if (player.flags?.attackerAttacked) {
-        return { allowed: false, reason: 'Already attacked this turn.' };
+        const goingFirstActive = player.zones?.active?.find((c) => !c.attachedTo);
+        // Meloetta ex: "If you go first, this Pokémon can use attacks during
+        // your first turn." Turn 1 is always the going-first player's turn.
+        if (
+          !goingFirstActive ||
+          !abilityFirstTurnAttack(goingFirstActive, {
+            ...abilitySideContext(state, playerId),
+            turnNumber: state.turn.number,
+          })
+        ) {
+          return {
+            allowed: false,
+            reason: "The player going first can't attack on turn 1.",
+          };
+        }
       }
       const active = player.zones?.active?.find((c) => !c.attachedTo);
+      if (player.flags?.attackerAttacked) {
+        // An extra-attack Ability (Dipplin Festival Lead, Ω Barrage) allows a
+        // second attack in the same turn while its condition holds.
+        const extra = active
+          ? extraAttackAvailable(active, {
+              stadium: state.stadium,
+              attacksThisTurn: player.flags?.attacksThisTurn || 1,
+            })
+          : { allowed: false };
+        if (!extra.allowed) {
+          return {
+            allowed: false,
+            reason: extra.reason || 'Already attacked this turn.',
+          };
+        }
+      }
       if (!active) {
         return { allowed: false, reason: 'No active Pokémon to attack with.' };
       }
@@ -2933,6 +3695,15 @@ export function validateLegality(state, command) {
           reason: "The Defending Pokémon can't retreat.",
         };
       }
+      // Omastar 151: the opponent's Active can't retreat while the holder is
+      // in the Active Spot. The Snorlax wording stops working when its holder
+      // is affected by a Special Condition (handled inside the reader).
+      if (abilityRetreatLock(active, abilitySideContext(state, playerId))) {
+        return {
+          allowed: false,
+          reason: "The Defending Pokémon can't retreat.",
+        };
+      }
       if (isStadiumRetreatPrevention(state.stadium?.card || state.stadium)) {
         const stadiumUser = state.stadium?.user ?? state.stadium?.playedBy;
         if (playerId !== stadiumUser) {
@@ -3045,7 +3816,12 @@ export function validateLegality(state, command) {
           `${cardRef.card.subtypes || ''} ${cardRef.card.trainerType || ''}`.toLowerCase();
         const isSupporter =
           typeStr.includes('supporter') || subStr.includes('supporter');
-        if (isSupporter && player.flags?.supporterPlayed) {
+        const supportersPlayed =
+          player.flags?.supportersPlayedCount ?? (player.flags?.supporterPlayed ? 1 : 0);
+        if (
+          isSupporter &&
+          supportersPlayed >= abilitySupporterLimit(abilitySideContext(state, playerId))
+        ) {
           return {
             allowed: false,
             reason: 'Supporter already played this turn.',
@@ -3080,6 +3856,14 @@ export function validateLegality(state, command) {
           ),
         });
         if (blockReason) return { allowed: false, reason: blockReason };
+        // Ability play locks (Gothitelle/Trevenant Items, Copperajah Stadiums,
+        // Genesect ACE SPEC, Team Rocket's Arbok Pokémon): the opponent's
+        // in-play Abilities, or an "each player" lock, forbid the play.
+        const playLock = abilityPlayLocks(
+          cardRef.card,
+          abilitySideContext(state, playerId)
+        );
+        if (playLock) return { allowed: false, reason: playLock.reason };
       }
       return { allowed: true };
     }
@@ -3087,18 +3871,32 @@ export function validateLegality(state, command) {
     case 'useAbility': {
       const cardRef = findCard(state, payload.instanceId);
       if (cardRef) {
-        if (
-          cardRef.card.abilityUsed ||
-          player.flags?.abilitiesUsed?.[cardRef.card.name] ||
-          player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
-        ) {
-          return { allowed: false, reason: 'Ability already used this turn.' };
-        }
-        // Passives and automatic triggers resolve through their own hooks; running them from
-        // the ability button placed thorns counters or searched KO-trigger decks at will (I94).
-        if (!isActivatedAbility(cardRef.card, payload?.abilityIndex ?? 0)) {
-          return { allowed: false, reason: "This Ability can't be activated; it works on its own." };
-        }
+        // One gate for the server and the picker (design 034 slice 3): the
+        // once-per-turn flag, activation wording, Pokémon-source suppression,
+        // KO window, Active-Spot requirement and the evolve/bench-played
+        // windows all live in abilityActivationBlockReason.
+        const blockReason = abilityActivationBlockReason(cardRef.card, {
+          ...abilitySideContext(state, cardRef.playerId || playerId),
+          used: Boolean(
+            cardRef.card.abilityUsed ||
+              player.flags?.abilitiesUsed?.[cardRef.card.name] ||
+              player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
+          ),
+          abilityIndex: payload?.abilityIndex ?? 0,
+          zone: cardRef.zoneId,
+          turnNumber: state.turn?.number,
+          koedLastOppTurn: Boolean(player.flags?.koedLastOppTurn),
+          enteredPlayTurn: cardRef.card.enteredPlayTurn ?? null,
+          playedToBenchTurn: cardRef.card.playedToBenchTurn ?? null,
+          movedToActiveTurn: cardRef.card.movedToActiveTurn ?? null,
+          // Conditions live on the root; the clicked card may be its evolution.
+          holderConditions: listConditions(
+            cardRef.card.attachedTo != null
+              ? findCard(state, cardRef.card.attachedTo)?.card
+              : cardRef.card
+          ),
+        });
+        if (blockReason) return { allowed: false, reason: blockReason };
         // "Have no Abilities" Stadiums (Team Rocket's Watchtower, Space Center,
         // Battle Frontier) suppress abilities server-side too; previously the
         // block existed only in the legacy client executors.
@@ -3111,45 +3909,6 @@ export function validateLegality(state, command) {
           return {
             allowed: false,
             reason: "This Pokémon's Ability is blocked by the Stadium in play.",
-          };
-        }
-        // An ability printed as a conditional on this Pokémon's position cannot be activated from
-        // the Bench. The inspector already greys the panel, so this catches a stale or crafted
-        // click that never went through it.
-        if (requiresKoOnOpponentTurn(cardRef.card) && !player.flags?.koedLastOppTurn) {
-          return {
-            allowed: false,
-            reason:
-              "None of your Pokémon were Knocked Out during your opponent's last turn.",
-          };
-        }
-        if (cardRef.zoneId !== 'active' && requiresActiveSpot(cardRef.card)) {
-          return {
-            allowed: false,
-            reason: 'This ability can only be used from the Active Spot.',
-          };
-        }
-        // "When you play this Pokémon from your hand to evolve" (Primarina
-        // Enriching Melody) is a one-shot trigger, legal only on the turn that
-        // Pokémon evolved. enteredPlayTurn is stamped on evolve.
-        if (
-          isEvolvePlayedTrigger(cardRef.card) &&
-          cardRef.card.enteredPlayTurn !== state.turn?.number
-        ) {
-          return {
-            allowed: false,
-            reason: 'This ability can only be used the turn it evolved.',
-          };
-        }
-        if (
-          isBenchPlayedTrigger(cardRef.card) &&
-          (cardRef.zoneId !== 'bench' ||
-            cardRef.card.playedToBenchTurn !== state.turn?.number)
-        ) {
-          return {
-            allowed: false,
-            reason:
-              "This ability only works the turn it's played from hand to the Bench.",
           };
         }
       }
@@ -3848,15 +4607,20 @@ function flipAndResolveAttack(draft, ctx) {
   // Glimwood Tangle: after any coins are flipped for an attack, the player
   // may ignore the results and re-flip. The choice is offered before any
   // effect resolves, so a re-flip never has to undo damage or a KO.
-  if (
-    flips.length > 0 &&
+  // Victini Victory Star (design 034 slice 6) offers the same keep-or-re-flip choice, at
+  // most once per turn.
+  const glimwood =
     isStadiumGlimwoodReFlip(draft.stadium?.card || draft.stadium) &&
-    !attackerPlayer?.flags?.glimwoodUsedThisTurn
-  ) {
+    !attackerPlayer?.flags?.glimwoodUsedThisTurn;
+  const victoryStar =
+    !glimwood &&
+    !attackerPlayer?.flags?.victoryStarUsedThisTurn &&
+    abilityVictoryStar(abilitySideContext(draft, playerId));
+  if (flips.length > 0 && (glimwood || victoryStar)) {
     draft.pendingChoice = createPendingChoice({
       player: playerId,
-      source: 'stadium',
-      prompt: `${attack.name}: keep the coin results or re-flip them (Glimwood Tangle)?`,
+      source: glimwood ? 'stadium' : 'ability',
+      prompt: `${attack.name}: keep the coin results or re-flip them (${glimwood ? 'Glimwood Tangle' : 'Victory Star'})?`,
       // Numeric sentinels: the choice validator only accepts integer
       // instanceIds. 1 = keep, 2 = re-flip.
       options: [
@@ -3867,6 +4631,7 @@ function flipAndResolveAttack(draft, ctx) {
       max: 1,
       resumeToken: {
         effectType: 'glimwood',
+        reflipSource: glimwood ? 'glimwood' : 'victoryStar',
         initiatorPlayerId: playerId,
         attackIndex: atkIdx,
         targetInstanceId,
@@ -4416,8 +5181,15 @@ function resolveAttackEffectPhase(draft, ctx) {
         ];
         const defenderPoisoned = hasCondition(defender, 'Poisoned');
 
+        const immunity = parseDamageImmunity(effectiveAttack?.text) || {};
+        const abilityReads = attackAbilityReads(draft, {
+          attacker: attackerView,
+          defender: defenderView,
+          playerId,
+          defenderPlayerId,
+        });
         const dmgResult = computeAttackDamage(
-          attackerView,
+          abilityReads.attacker,
           defenderView,
           effectiveAttack,
           {
@@ -4430,7 +5202,14 @@ function resolveAttackEffectPhase(draft, ctx) {
             defenderPoisoned,
             baseDamage: parseInt(effectiveAttack?.damage, 10) || 0,
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
-            ...parseDamageImmunity(effectiveAttack?.text),
+            ...immunity,
+            ignoreDefenderEffects:
+              immunity.ignoreDefenderEffects || abilityReads.ignoreDefenderEffects,
+            abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+            abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
+            abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
+            abilityPrevention: abilityReads.abilityPrevention,
+            weaknessOverride: abilityReads.weaknessOverride,
             defenderMarkers: activeAttackMarkers(draft, defenderPlayerId, defender),
             attackerMarkers: activeAttackMarkers(draft, playerId, attacker),
           }
@@ -4676,7 +5455,13 @@ function resolveAttackEffectPhase(draft, ctx) {
             }
           }
 
-          const thorns = parseThorns(defender);
+          // Thorns via the trigger reader: a suppressed holder contributes
+          // nothing, and an Active-Spot-only wording is inert off the Active
+          // (the defender here is the opponent's Active, so isActive: true).
+          const thorns = parseOnDamageAbilities(defender, {
+            ...abilitySideContext(draft, defenderPlayerId),
+            isActive: true,
+          });
           if (thorns?.count > 0) {
             thornsDamage += thorns.count * 10;
           }
@@ -4700,6 +5485,25 @@ function resolveAttackEffectPhase(draft, ctx) {
                 byAttack: true,
                 activeRng,
               });
+            }
+          }
+
+          // "… the Attacking Pokémon is now Poisoned" (Qwilfish, Numel, …): after thorns, so
+          // an Attacker the thorns Knocked Out is no longer in the Active Spot to receive it.
+          const onDamageStatus = parseOnDamageStatus(defender, {
+            ...abilitySideContext(draft, defenderPlayerId),
+            isActive: true,
+          });
+          const atkRef = onDamageStatus ? findCard(draft, attacker.instanceId) : null;
+          if (atkRef?.zoneId === 'active') {
+            let lands = true;
+            if (onDamageStatus.coin) {
+              const face = flipCoin(activeRng);
+              events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face, source: onDamageStatus.source });
+              lands = face === 'heads';
+            }
+            for (const cond of lands ? onDamageStatus.conditions : []) {
+              if (addCondition(atkRef.card, cond)) events.push(conditionsUpdatedEvent(atkRef.card, cond));
             }
           }
 
@@ -5287,9 +6091,22 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
 
       if (!attackerPlayer.flags) attackerPlayer.flags = {};
       attackerPlayer.flags.attackerAttacked = true;
+      attackerPlayer.flags.attacksThisTurn =
+        (attackerPlayer.flags.attacksThisTurn || 0) + 1;
+
+      // Extra-attack Ability (Dipplin Festival Lead, Ω Barrage): while a second
+      // attack is still legal the turn does not end, so the opponent promotes a
+      // new Active and the same Pokémon attacks again.
+      const extraRemains =
+        attacker &&
+        attackerPlayer.flags.attacksThisTurn < 2 &&
+        extraAttackAvailable(attacker, {
+          stadium: draft.stadium,
+          attacksThisTurn: attackerPlayer.flags.attacksThisTurn,
+        }).allowed;
 
       // Auto-end turn after attacking (unless paused by pendingChoice)
-      if (!searchTriggered && !isGameConcluded(draft)) {
+      if (!searchTriggered && !extraRemains && !isGameConcluded(draft)) {
         resolveCheckup(draft, {
           rng: activeRng,
           events,
@@ -5439,11 +6256,21 @@ export function applyCommand(state, command, rng = null) {
 
   // Step 5: Apply to cloned draft
   const draft = cloneGameState(state);
-  const activeRng = rng || createRng(state.seed || 0);
+  let activeRng = rng || createRng(state.seed || 0);
   if (state.rngCursor && !rng) {
     while (activeRng.cursor < state.rngCursor) {
       activeRng.next();
     }
+  }
+  // Malamar Contrary / Shiftry Unlucky Wind: the turn player's coin flips are tails. Flips by
+  // the other player (surviveKnockOutCoin) and Checkup draw raw RNG, so they are unaffected.
+  const turnOpponentId = Object.keys(state.players || {}).find((id) => id !== state.turn?.player);
+  if (
+    state.turn?.player &&
+    turnOpponentId &&
+    abilityForcesOpponentTails(abilitySideContext(state, turnOpponentId))
+  ) {
+    activeRng = withForcedCoin(activeRng, 'tails');
   }
   const events = [];
 
@@ -5688,6 +6515,16 @@ export function applyCommand(state, command, rng = null) {
               playerId,
             });
           }
+
+          // Energy-attach Ability triggers (Blissey V, Vaporeon, Magearna, …; design 034 I141).
+          if (cardRef.zoneId === 'hand' && hostRef.playerId === playerId) {
+            applyEnergyAttachTriggers(draft, {
+              host: hostRef.card,
+              energy: cardRef.card,
+              playerId,
+              events,
+            });
+          }
         } else if (isPokemon(cardRef.card)) {
           if (!draft.players[playerId].flags) {
             draft.players[playerId].flags = {};
@@ -5735,6 +6572,13 @@ export function applyCommand(state, command, rng = null) {
               events,
             });
           }
+
+          // Opponent-evolves ability trigger (design 034 slice 4).
+          applyOnOpponentEvolve(draft, {
+            evolvedCard: hostRef.card,
+            evolvingPlayerId: hostRef.playerId,
+            events,
+          });
 
           // Gen 6 Mega Evolution / Primal Reversion: the evolve ends the turn
           // immediately unless the matching Spirit Link is already attached
@@ -5992,7 +6836,7 @@ export function applyCommand(state, command, rng = null) {
 
       // Check confused condition
       if (attacker && attacker.specialCondition === 'Confused') {
-        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        const coin = flipCoin(activeRng);
         if (coin === 'tails') {
           attacker.damage = (attacker.damage || 0) + 30;
           events.push({
@@ -6026,8 +6870,20 @@ export function applyCommand(state, command, rng = null) {
       // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle (design 032): the marked Pokémon's
       // owner flips when it tries to attack; tails, the attack doesn't happen.
       if (attacker && activeAttackMarkers(draft, playerId, attacker).some((m) => m.kind === 'attackFlipOrFail')) {
-        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        const coin = flipCoin(activeRng);
         events.push({ type: 'attackMarkerCoinFlipped', kind: 'attackFlipOrFail', playerId, coin });
+        if (coin === 'tails') {
+          events.push({ type: 'attackPrevented', playerId, attackerId: attacker.instanceId, attackName: attack.name });
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
+      }
+
+      // Spinda Pattern Distraction (design 034 slice 6): a Basic attacker flips; tails, the
+      // attack does nothing.
+      if (attacker && abilityAttackFlipGate(attackerView, abilitySideContext(draft, oppId))) {
+        const coin = flipCoin(activeRng);
+        events.push({ type: 'attackFlipGateCoinFlipped', playerId, coin });
         if (coin === 'tails') {
           events.push({ type: 'attackPrevented', playerId, attackerId: attacker.instanceId, attackName: attack.name });
           endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
@@ -6040,7 +6896,7 @@ export function applyCommand(state, command, rng = null) {
       const copy = parseCopyAttack(attack?.text);
       // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
       if (copy?.coinGate) {
-        const coin = activeRng.next() < 0.5 ? 'heads' : 'tails';
+        const coin = flipCoin(activeRng);
         events.push({
           type: 'attackCoinFlipped',
           playerId,
@@ -6257,6 +7113,7 @@ export function applyCommand(state, command, rng = null) {
           events,
           targetInstanceId: payload.targetInstanceId,
         });
+        endTurnAfterTrainer(draft, { card: cardRef.card, playerId, activeRng, events });
       }
       break;
     }
@@ -6271,6 +7128,8 @@ export function applyCommand(state, command, rng = null) {
           activeRng,
           events,
         });
+        settleAbilityOutcomes(draft, { events });
+        if (isGameConcluded(draft)) break;
         // An ability that shuffles the Active Pokémon into the deck leaves the spot empty.
         if (cardRef.zoneId === 'active' && findCard(draft, payload.instanceId)?.zoneId !== 'active') {
           const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
@@ -6344,6 +7203,7 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection,
           resumeToken: token,
         });
+        endTurnAfterTrainer(draft, { card: resumeCard, playerId: initiatorPlayerId, activeRng, events });
       } else if (token.effectType === 'ability') {
         executeAbility(draft, {
           card: resumeCard,
@@ -6353,6 +7213,9 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection,
           resumeToken: token,
         });
+        settleAbilityOutcomes(draft, { events });
+      } else if (token.effectType === PRIZE_BENCH_EFFECT) {
+        resumePrizeToBench(draft, { token, selection: payload.selection, activeRng, events });
       } else if (token.effectType === PRIZE_CHOICE_EFFECT) {
         resolvePrizeChoice(draft, {
           playerId: initiatorPlayerId,
@@ -6371,9 +7234,14 @@ export function applyCommand(state, command, rng = null) {
         // deliberately skipped — it already resolved before the coins.
         const resumer = draft.players[initiatorPlayerId];
         if (!resumer.flags) resumer.flags = {};
-        resumer.flags.glimwoodUsedThisTurn = true;
         const pick = (payload.selection || [])[0];
         const wantsReflip = Number(pick) === 2;
+        // Victory Star is spent only by a re-flip ("you may"); Glimwood by the offer.
+        if (token.reflipSource === 'victoryStar') {
+          if (wantsReflip) resumer.flags.victoryStarUsedThisTurn = true;
+        } else {
+          resumer.flags.glimwoodUsedThisTurn = true;
+        }
         const attackIdx = token.attackIndex ?? 0;
         const attacker = resumer?.zones?.active?.find((c) => !c.attachedTo);
         const attackerView = attackViewFor(draft, attacker);
@@ -6638,6 +7506,22 @@ export function applyCommand(state, command, rng = null) {
           events,
         });
         draft.pendingChoice = null;
+      } else if (token.effectType === 'koEnergy') {
+        // Energy-move-on-KO: the player picked the target for the first pending
+        // obligation. Queue the rest so the tail (or the next picker) runs them.
+        draft.pendingChoice = null;
+        const player = draft.players[initiatorPlayerId];
+        const pending = Array.isArray(token.obligations)
+          ? [...token.obligations]
+          : [];
+        const obligation = pending.shift();
+        if (player && obligation) {
+          const target = koEnergyTargets(player, obligation).find(
+            (c) => c.instanceId === (payload.selection || [])[0]
+          );
+          if (target) moveKoEnergy(player, target, obligation, events);
+        }
+        draft.__koEnergyMoves = pending;
       } else if (token.effectType === 'stadium') {
         const result = executeStadium(draft, {
           playerId: initiatorPlayerId,
@@ -7386,7 +8270,9 @@ export function applyCommand(state, command, rng = null) {
 
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
+  settleKoEnergyMoves(draft, { events });
   settlePrizeEntitlements(draft, { events });
+  stampActivePromotions(state, draft);
   clearFaceDownOffBoard(draft);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;

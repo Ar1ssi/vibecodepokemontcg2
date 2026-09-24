@@ -177,3 +177,22 @@ export function shuffleInPlace(rng, array) {
   array.splice(0, array.length, ...shuffled);
   return array;
 }
+
+/**
+ * One coin flip. The RNG is always consumed, so a forced face (Malamar Contrary: "treat it as
+ * tails", design 034 slice 6) never shifts the randomness that follows.
+ *
+ * @param {{ next: () => number, forcedCoin?: 'heads'|'tails' }|null|undefined} rng
+ * @returns {'heads'|'tails'}
+ */
+export function flipCoin(rng) {
+  const face = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+  return rng?.forcedCoin || face;
+}
+
+/** `rng` with every `flipCoin` result forced to `face`; other draws are unchanged. */
+export function withForcedCoin(rng, face) {
+  const forced = Object.create(rng);
+  forced.forcedCoin = face;
+  return forced;
+}

@@ -10,6 +10,8 @@
 // Older state can still hold 'Poisoned'/'Burned' in `specialCondition`; readers
 // treat that as the marker and every write here moves it into the marker key.
 
+import { abilityStatusImmune } from './ability-combat.mjs';
+
 export const MARKER_KEYS = { Poisoned: 'poisoned', Burned: 'burned' };
 export const ROTATION_CONDITIONS = ['Asleep', 'Confused', 'Paralyzed'];
 
@@ -47,6 +49,10 @@ export function hasAnyCondition(card) {
 /** Adds a condition. A rotation condition replaces the previous one; markers are kept. */
 export function addCondition(card, condition) {
   if (!card) return false;
+  // "This Pokémon can't be affected by any Special Conditions" (Garganacl ex,
+  // Hoothoot, Pachirisu, Slowpoke, Dachsbun) refuses the write here, the one
+  // place every effect path goes through (design 034 slice 3).
+  if (abilityStatusImmune(card, condition)) return false;
   if (isMarker(condition)) {
     normalizeLegacyMarker(card);
     card[MARKER_KEYS[condition]] = true;

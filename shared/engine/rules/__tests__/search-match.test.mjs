@@ -103,3 +103,33 @@ test('matchesDiscardCost: untyped Energy-only cost matches any Energy', () => {
   assert.equal(matchesDiscardCost(water, step), true);
   assert.equal(matchesDiscardCost(trainer, step), false);
 });
+
+// A typed Basic search still has to honour its HP cap (Fan Call: "up to 3 {C}
+// Pokémon with 100 HP or less"). The type-symbol branch used to return before
+// the HP-cap branch, so every over-cap Colorless Pokémon matched.
+test('typed Basic search applies the HP cap', () => {
+  const underCap = { name: 'Fan Rotom', type: 'Pokémon', stage: 'Basic', types: ['Colorless'], hp: 70 };
+  const overCap = { name: 'Snorlax', type: 'Pokémon', stage: 'Basic', types: ['Colorless'], hp: 150 };
+  const wrongType = { name: 'Charmander', type: 'Pokémon', stage: 'Basic', types: ['Fire'], hp: 70 };
+  const what = 'Basic {C} Pokémon ≤100 HP';
+
+  assert.equal(matchesSearch(underCap, what), true);
+  assert.equal(matchesSearch(overCap, what), false);
+  assert.equal(matchesSearch(wrongType, what), false);
+
+  const overCapWord = { name: 'Snorlax', type: 'Pokémon', stage: 'Basic', types: ['Colorless'], hp: 150 };
+  assert.equal(matchesSearch(overCapWord, 'Basic {C} Pokémon with 100 HP or less'), false);
+  assert.equal(matchesSearch(underCap, 'Basic {C} Pokémon with 100 HP or less'), true);
+});
+
+// Deck rows / oracle-harness cards can carry the Pokémon marker on `supertype`
+// (or only `hp`) rather than `type`, which used to make typed Basic searches
+// miss every real card.
+test('typed Basic search accepts supertype/hp Pokémon markers and stage casing', () => {
+  const row = { name: 'Fan Rotom', supertype: 'Pokémon', stage: 'basic', types: ['Colorless'], hp: 70 };
+  assert.equal(matchesSearch(row, 'Basic {C} Pokémon ≤100 HP'), true);
+  const hpOnly = { name: 'Fan Rotom', stage: 'Basic', types: ['Colorless'], hp: 70 };
+  assert.equal(matchesSearch(hpOnly, 'Basic {C} Pokémon ≤100 HP'), true);
+  const energy = { name: 'Basic Water Energy', supertype: 'Energy', type: 'Energy' };
+  assert.equal(matchesSearch(energy, 'Basic {C} Pokémon ≤100 HP'), false);
+});
