@@ -26,6 +26,7 @@ import {
 import { discardCurrentStadium } from './trainer.mjs';
 import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 import { abilityCounterMoveLock } from '../rules/ability-combat.mjs';
+import { TYPE_LETTER } from '../rules/tool-combat.mjs';
 import { isSupporterTrainer } from '../rules/trainer-play-conditions.mjs';
 
 export const BENCH_LIMIT = 5;
@@ -1897,10 +1898,11 @@ function turnDamageBonusAbility(ctx) {
     ...(player.flags.turnDamageBonuses || []),
     {
       amount: step.amount,
-      type: null,
+      type: step.attackerTypeLetter ? TYPE_LETTER[step.attackerTypeLetter] || null : null,
       attackerNoRuleBox: false,
+      attackerBasic: step.attackerBasic === true,
       defenderFilter: null,
-      attackerInstanceId: ctx.sourceCard?.instanceId ?? null,
+      attackerInstanceId: step.team ? null : ctx.sourceCard?.instanceId ?? null,
     },
   ];
   ctx.events.push({

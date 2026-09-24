@@ -131,7 +131,7 @@
     },
     "ability:move-damage": {
       "n": 294,
-      "observed": 148
+      "observed": 293
     },
     "ability:on-opponent-evolve": {
       "n": 30,
@@ -139,7 +139,7 @@
     },
     "ability:opponent-disrupt": {
       "n": 223,
-      "observed": 125
+      "observed": 127
     },
     "ability:passive": {
       "n": 167,
@@ -175,7 +175,7 @@
     },
     "ability:status": {
       "n": 507,
-      "observed": 360
+      "observed": 363
     },
     "ability:status-recover": {
       "n": 38,
@@ -199,7 +199,7 @@
     },
     "ability:when-played": {
       "n": 39,
-      "observed": 36
+      "observed": 38
     },
     "attack:bench-damage": {
       "n": 850,
@@ -223,7 +223,7 @@
     },
     "attack:damage-prevention": {
       "n": 174,
-      "observed": 4
+      "observed": 7
     },
     "attack:deferred-damage": {
       "n": 3,
@@ -243,7 +243,7 @@
     },
     "attack:discard-opponent": {
       "n": 151,
-      "observed": 98
+      "observed": 99
     },
     "attack:draw-attach": {
       "n": 321,
@@ -275,7 +275,7 @@
     },
     "attack:immunity": {
       "n": 243,
-      "observed": 12
+      "observed": 14
     },
     "attack:look-any-deck": {
       "n": 5,
@@ -399,7 +399,7 @@
     },
     "attack:unknown": {
       "n": 1437,
-      "observed": 0
+      "observed": 27
     }
   }
 }

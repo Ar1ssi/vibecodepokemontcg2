@@ -1202,6 +1202,28 @@ test('ability: Torrential Heart self-damages then grants a this-Pokémon damage 
   assert.equal(bonus?.attackerInstanceId, 70);
 });
 
+test("ability: Enthusiastic Dance boosts the team's Basic attackers, not the holder", async () => {
+  const { executeSteps } = await import('../effects/executor.mjs');
+  const { turnDamageBonusTotal } = await import('../rules/turn-damage-bonus.mjs');
+  const { state } = setupGame();
+  const ludicolo = createCard({ instanceId: 70, name: 'Ludicolo', supertype: 'Pokémon', subtypes: ['Stage 2'] });
+  const steps = parseAbility(
+    "When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may use this Ability. During this turn, your Basic Pokémon's attacks do 100 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance)."
+  ).filter((step) => step.type === 'turnDamageBonusAbility');
+  executeSteps(state, {
+    steps,
+    playerId: 'p1',
+    effectType: 'ability',
+    sourceCard: ludicolo,
+    activeRng: createRng(1),
+    events: [],
+  });
+  const bonuses = state.players.p1.flags.turnDamageBonuses;
+  const basic = { instanceId: 71, name: 'Lotad', subtypes: ['Basic'] };
+  assert.equal(turnDamageBonusTotal(bonuses, basic, { name: 'Defender' }), 100);
+  assert.equal(turnDamageBonusTotal(bonuses, ludicolo, { name: 'Defender' }), 0);
+});
+
 test('ability: Swelling Flash puts a hand copy onto the Bench only with more Prizes', async () => {
   const { executeSteps } = await import('../effects/executor.mjs');
   const { state } = setupGame();

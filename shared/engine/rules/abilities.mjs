@@ -623,7 +623,8 @@ export function parseAbility(text = '') {
   }
 
   // ── 5. Attach energy (FIXED: verb only, not "attached" describing state) ──
-  if (hasVerbAttach(lower) && !(
+  // "Your opponent can't attach any Energy cards …" (Empoleon Emperor Aura) is a lock, not an attach.
+  if (hasVerbAttach(lower) && !/can(?:'|’|no)t attach/.test(lower) && !(
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     (lower.includes('to 1 of your') || lower.includes('to another') || lower.includes('to your active'))
@@ -856,9 +857,15 @@ export function parseAbility(text = '') {
       lower.match(/(\d+)\s+more\s+damage/)?.[1] ||
       lower.match(/do\s+(\d+)\s+more/)?.[1] ||
       null;
+    // "your [Basic] [{R}] Pokémon's attacks" / "attacks used by your … Pokémon" boost the team;
+    // only "attacks used by this Pokémon" is scoped to the holder.
+    const team =
+      lower.match(/your (basic )?(?:\{([a-z])\} )?pok[eé]mon['’]s attacks/) ||
+      lower.match(/attacks used by your (basic )?(?:\{([a-z])\} )?pok[eé]mon/);
     steps.push({
       type: 'turnDamageBonusAbility',
       amount: amount ? Number(amount) : null,
+      ...(team ? { team: true, attackerBasic: !!team[1], attackerTypeLetter: team[2] || null } : {}),
       guidance: amount
         ? `During this turn, this Pokémon's attacks do ${amount} more damage to your opponent's Active Pokémon.`
         : 'During this turn, this Pokémon\'s attacks do more damage (as described).',

@@ -282,6 +282,8 @@ export function diffTags(before, after, events) {
     if (/knock|KO/i.test(e.type)) tags.add('ko');
     if (e.type === 'effectStepSkipped') tags.add(`skipped:${e.reason}`);
     if (e.type === 'abilityUsed') tags.add('ability-used');
+    // A turn-scoped damage boost lives on the turn flags, not on any card.
+    if (e.type === 'turnDamageBonus') tags.add(`${role(e.playerId)}:turn-bonus`);
   }
   // A top-to-bottom move (Aipom Scampering Tail) changes only the deck's order; a shuffle is
   // already tagged by its event.

@@ -42,6 +42,13 @@ test('a non-base state change counts as executed', () => {
   );
 });
 
+test("an ability's damage on the opponent's Active is its own effect, not attack fallout", () => {
+  assert.equal(
+    rowObserved({ kind: 'ability', family: 'on-opponent-evolve', tags: ['ability-used', 'opp:active+dmg'] }),
+    true
+  );
+});
+
 test('damage that differs from the printed base in any seed counts as executed', () => {
   assert.equal(
     rowObserved(attack('per-energy', { printedBase: 10, dealt: [10, 90] })),

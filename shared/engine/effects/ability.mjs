@@ -181,7 +181,16 @@ export function resolveAbilitySteps(text, { selfName } = {}) {
   if (parserFallsShort && templateSteps.length > 0) {
     return { source: 'template', steps: templateSteps, holderZone, parsedSteps: steps };
   }
-  return { source: 'parser', steps: actionable, holderZone: null, parsedSteps: steps };
+  // "When you play this Pokémon …" is the trigger, not an effect — abilityActivationBlockReason
+  // enforces its window. Dropped only beside other steps, so a marker-only read still reports
+  // the effect as unexecutable instead of running as nothing.
+  const effects = actionable.filter((step) => step.type !== 'whenPlayedAbility');
+  return {
+    source: 'parser',
+    steps: effects.length > 0 ? effects : actionable,
+    holderZone: null,
+    parsedSteps: steps,
+  };
 }
 
 // A single "flip a coin. If heads, …" gate on the whole effect. Texts with their own tails

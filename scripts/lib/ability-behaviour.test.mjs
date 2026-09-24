@@ -52,6 +52,17 @@ test('abilityPlan reads the step plan useAbility runs', () => {
   assert.ok(plan.unexecutable.includes('discardOpponentDeckAbility'));
 });
 
+test('abilityPlan: the when-played trigger is not an unexecutable step beside a real effect', () => {
+  const meowth =
+    'When you play this Pokémon from your hand onto your Bench during your turn, you may use this Ability. Search your deck for a Supporter card, reveal it, and put it into your hand. Then, shuffle your deck.';
+  assert.deepEqual(abilityPlan(meowth, 'Meowth ex'), { activated: true, unexecutable: [] });
+});
+
+test("abilityPlan: a can't-attach lock is passive, not an attach button", () => {
+  const water = "You can't attach {W} Energy cards from your hand to Articuno.";
+  assert.deepEqual(abilityPlan(water, 'Articuno'), { activated: false, reason: 'passive' });
+});
+
 test('behaviourClass: runs, partial and dead need an observed state change', () => {
   assert.equal(
     behaviourClass(row(SWITCH, ['ability-used', 'own:active-changed'])),

@@ -3,7 +3,7 @@
 // do 30 more damage to your opponent's Active Pokémon [ex]." The card is
 // discarded on play, so the boost lives on the player's turn flags until the
 // turn ends.
-import { TYPE_LETTER, attackerTypes } from './tool-combat.mjs';
+import { TYPE_LETTER, attackerTypes, isBasicCard } from './tool-combat.mjs';
 import { isExCard, isVCard, isRuleBoxPokemon } from './card-classify.mjs';
 
 // Groups: 1 type letter ({F}), 2 no-Rule-Box attacker, 3 amount, 4 ex defender, 5 ex-or-V defender.
@@ -55,6 +55,7 @@ export function turnDamageBonusTotal(
     }
     if (bonus.type && !types.includes(bonus.type)) continue;
     if (bonus.attackerNoRuleBox && isRuleBoxPokemon(attacker)) continue;
+    if (bonus.attackerBasic && !isBasicCard(attacker)) continue;
     if (!defenderMatches(bonus.defenderFilter, defender)) continue;
     total += bonus.amount;
   }

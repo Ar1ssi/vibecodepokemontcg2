@@ -87,6 +87,7 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'ko-prevention',
   'look-at-top',
   'move-damage',
+  'on-opponent-evolve',
   'passive',
   'search',
   'self-attach-energy',
@@ -97,6 +98,7 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'switch',
   'tool-cap',
   'weakness',
+  'when-played',
 ]);
 
 /** Executed families the oracle cannot observe (key 'attack:<f>' / 'ability:<f>' → why). */

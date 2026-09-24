@@ -2,21 +2,21 @@
   "corpusRows": 4228,
   "totals": {
     "n": 4228,
-    "runs": 1811,
-    "partial": 584,
-    "dead": 148,
+    "runs": 2022,
+    "partial": 373,
+    "dead": 137,
     "consumed": 965,
-    "unconsumed": 719,
+    "unconsumed": 730,
     "unparsed": 1
   },
   "families": {
     "attach": {
       "n": 211,
-      "runs": 120,
-      "partial": 14,
-      "dead": 77,
+      "runs": 132,
+      "partial": 2,
+      "dead": 71,
       "consumed": 0,
-      "unconsumed": 0,
+      "unconsumed": 6,
       "unparsed": 0
     },
     "attach-permission": {
@@ -32,9 +32,9 @@
       "n": 10,
       "runs": 0,
       "partial": 0,
-      "dead": 10,
+      "dead": 9,
       "consumed": 0,
-      "unconsumed": 0,
+      "unconsumed": 1,
       "unparsed": 0
     },
     "attack-cost": {
@@ -156,8 +156,8 @@
     },
     "draw": {
       "n": 219,
-      "runs": 185,
-      "partial": 12,
+      "runs": 191,
+      "partial": 6,
       "dead": 22,
       "consumed": 0,
       "unconsumed": 0,
@@ -201,8 +201,8 @@
     },
     "energy-redirect": {
       "n": 95,
-      "runs": 77,
-      "partial": 10,
+      "runs": 78,
+      "partial": 9,
       "dead": 0,
       "consumed": 7,
       "unconsumed": 1,
@@ -246,8 +246,8 @@
     },
     "heal": {
       "n": 211,
-      "runs": 185,
-      "partial": 26,
+      "runs": 206,
+      "partial": 5,
       "dead": 0,
       "consumed": 0,
       "unconsumed": 0,
@@ -282,8 +282,8 @@
     },
     "look-at-top": {
       "n": 67,
-      "runs": 55,
-      "partial": 12,
+      "runs": 67,
+      "partial": 0,
       "dead": 0,
       "consumed": 0,
       "unconsumed": 0,
@@ -300,8 +300,8 @@
     },
     "move-damage": {
       "n": 294,
-      "runs": 258,
-      "partial": 35,
+      "runs": 265,
+      "partial": 28,
       "dead": 1,
       "consumed": 0,
       "unconsumed": 0,
@@ -309,8 +309,8 @@
     },
     "on-opponent-evolve": {
       "n": 30,
-      "runs": 0,
-      "partial": 27,
+      "runs": 23,
+      "partial": 4,
       "dead": 0,
       "consumed": 3,
       "unconsumed": 0,
@@ -320,9 +320,9 @@
       "n": 223,
       "runs": 41,
       "partial": 86,
-      "dead": 4,
+      "dead": 0,
       "consumed": 55,
-      "unconsumed": 37,
+      "unconsumed": 41,
       "unparsed": 0
     },
     "passive": {
@@ -345,8 +345,8 @@
     },
     "recursion": {
       "n": 119,
-      "runs": 37,
-      "partial": 77,
+      "runs": 47,
+      "partial": 67,
       "dead": 0,
       "consumed": 1,
       "unconsumed": 4,
@@ -363,8 +363,8 @@
     },
     "search": {
       "n": 295,
-      "runs": 181,
-      "partial": 111,
+      "runs": 240,
+      "partial": 52,
       "dead": 3,
       "consumed": 0,
       "unconsumed": 0,
@@ -399,8 +399,8 @@
     },
     "status": {
       "n": 507,
-      "runs": 303,
-      "partial": 53,
+      "runs": 327,
+      "partial": 29,
       "dead": 24,
       "consumed": 60,
       "unconsumed": 67,
@@ -417,8 +417,8 @@
     },
     "switch": {
       "n": 256,
-      "runs": 211,
-      "partial": 34,
+      "runs": 239,
+      "partial": 6,
       "dead": 1,
       "consumed": 0,
       "unconsumed": 10,
@@ -444,8 +444,8 @@
     },
     "weakness": {
       "n": 322,
-      "runs": 0,
-      "partial": 4,
+      "runs": 1,
+      "partial": 3,
       "dead": 0,
       "consumed": 207,
       "unconsumed": 111,
@@ -453,8 +453,8 @@
     },
     "when-played": {
       "n": 39,
-      "runs": 16,
-      "partial": 22,
+      "runs": 23,
+      "partial": 15,
       "dead": 1,
       "consumed": 0,
       "unconsumed": 0,
