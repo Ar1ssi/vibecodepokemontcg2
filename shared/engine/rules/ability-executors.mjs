@@ -45,10 +45,17 @@ const textOf = cardAbilityText;
 // on the move and stays legal from the Bench, and "As long as this Pokémon is in the Active Spot …"
 // is a passive with nothing to activate. Matching either of those would disable a legal ability,
 // which costs more than the over-permissive behavior this replaces.
-const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active)\b/;
+const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active|your active pok[eé]mon)\b/;
 
 export function requiresActiveSpot(card) {
   return ACTIVE_SPOT_CLAUSE.test(textOf(card));
+}
+
+// Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".
+const BENCH_SPOT_CLAUSE = /if this pok[eé]mon is on your bench\b/;
+
+export function requiresBenchSpot(card) {
+  return BENCH_SPOT_CLAUSE.test(textOf(card));
 }
 
 // "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn"

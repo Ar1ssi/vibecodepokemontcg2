@@ -5987,6 +5987,13 @@ export function applyCommand(state, command, rng = null) {
           activeRng,
           events,
         });
+        // Unown MISSING / HAND / DAMAGE (design 034 slice 6): the executor can't reach
+        // setGameEnded, so the win arrives as an event.
+        const win = events.find((e) => e.type === 'abilityWinsGame');
+        if (win && !isGameConcluded(draft)) {
+          setGameEnded(draft, { winner: win.playerId, reason: win.reason, events });
+          break;
+        }
         // An ability that shuffles the Active Pokémon into the deck leaves the spot empty.
         if (cardRef.zoneId === 'active' && findCard(draft, payload.instanceId)?.zoneId !== 'active') {
           const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);

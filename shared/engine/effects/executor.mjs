@@ -224,6 +224,12 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // "Discard any Stadium card in play. If you do, …" (Haxorus Grind Up).
+    if (events.some((e) => e.type === 'abilityStadiumDiscarded')) context.stadiumDiscarded = true;
+    if (step.requiresStadiumDiscard && !context.stadiumDiscarded) {
+      events.push({ type: 'effectStepSkipped', reason: 'no_stadium_discarded', step: step.type });
+      continue;
+    }
 
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;

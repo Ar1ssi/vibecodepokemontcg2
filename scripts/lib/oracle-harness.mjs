@@ -231,6 +231,9 @@ export function snapshot(state) {
   return {
     cards,
     activeIds: [activeId('p1'), activeId('p2')],
+    deckOrders: ['p1', 'p2'].map((pid) =>
+      (state.players[pid]?.zones?.deck || []).map((c) => c.instanceId).join(',')
+    ),
     winner: state.winner,
   };
 }
@@ -277,6 +280,16 @@ export function diffTags(before, after, events) {
     if (e.type === 'effectStepSkipped') tags.add(`skipped:${e.reason}`);
     if (e.type === 'abilityUsed') tags.add('ability-used');
   }
+  // A top-to-bottom move (Aipom Scampering Tail) changes only the deck's order; a shuffle is
+  // already tagged by its event.
+  ['p1', 'p2'].forEach((pid, i) => {
+    const shuffled = events.some((e) => /shuffle/i.test(e.type) && e.playerId === pid);
+    const [was, now] = [before.deckOrders?.[i] ?? '', after.deckOrders?.[i] ?? ''];
+    const sameCards = was.split(',').sort().join(',') === now.split(',').sort().join(',');
+    if (!shuffled && sameCards && was !== now) {
+      tags.add(`${role(pid)}:deck-reordered`);
+    }
+  });
   if (after.winner && !before.winner) tags.add('game-won');
   return tags;
 }

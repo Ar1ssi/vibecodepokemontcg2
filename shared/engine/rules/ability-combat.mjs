@@ -38,6 +38,7 @@ import {
   attachedTools,
   isActivatedAbility,
   requiresActiveSpot,
+  requiresBenchSpot,
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
   isBenchPlayedTrigger,
@@ -808,6 +809,9 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   }
   if (rulesEnabled && zone !== 'active' && requiresActiveSpot(card)) {
     return 'This ability can only be used from the Active Spot.';
+  }
+  if (rulesEnabled && zone !== 'bench' && requiresBenchSpot(card)) {
+    return 'This ability can only be used from the Bench.';
   }
   // The window checks only fire when the caller supplies the stamps: a caller
   // without the board history (presence-only pickers) must not turn "unknown"

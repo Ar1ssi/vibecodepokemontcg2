@@ -26,6 +26,7 @@ import {
 import { discardCurrentStadium } from './trainer.mjs';
 import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 import { abilityCounterMoveLock } from '../rules/ability-combat.mjs';
+import { isSupporterTrainer } from '../rules/trainer-play-conditions.mjs';
 
 export const BENCH_LIMIT = 5;
 
@@ -319,7 +320,7 @@ function attachFromHand(ctx) {
   if (ctx.selection) {
     let picked = energies().filter((c) => ctx.selection.includes(c.instanceId));
     // "a Basic {R} Energy card, a Basic {F} Energy card, or 1 of each": at most one per type.
-    if ((step.handEnergy?.types || []).length > 1) {
+    if ((step.handEnergy?.types || []).length > 1 && !step.handEnergy.anyCombination) {
       picked = step.handEnergy.types
         .map((type) => picked.find((c) => handEnergyMatches(c, { types: [type] })))
         .filter(Boolean);
@@ -1959,6 +1960,244 @@ function returnSelfToHandAbility(ctx) {
   });
 }
 
+// ── design 034 slice 6: one-off ability executables ─────────────────────
+
+/** The in-play root of the Pokémon using the Ability (its evolution card may be the source). */
+function sourceRoot(ctx) {
+  const id = ctx.sourceCard?.attachedTo ?? ctx.sourceCard?.instanceId;
+  return rootsOf(ctx.player).find((c) => c.instanceId === id) || null;
+}
+
+/** Discards an in-play Pokémon with everything attached; counters and conditions leave with it. */
+function discardInPlayPokemon(player, root, events) {
+  const cards = [root, ...attachedCards(player, root.instanceId)];
+  for (const card of cards) {
+    removeFromZones(player, card);
+    card.attachedTo = null;
+    discardCardToPlayerZone(player, card);
+  }
+  root.damage = 0;
+  clearConditions(root);
+  events.push({
+    type: 'cardsDiscarded',
+    playerId: player.playerId,
+    cards: cards.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+  });
+}
+
+function winConditionMet(ctx, condition) {
+  const { player, opponent } = ctx;
+  if (condition.kind === 'opponentLostZoneSupporters') {
+    const lost = opponent?.zones?.lostZone || [];
+    return lost.filter(isSupporterTrainer).length >= condition.count;
+  }
+  if (condition.kind === 'handSize') return (player.zones.hand || []).length >= condition.count;
+  if (condition.kind === 'benchDamageCounters') {
+    const counters = benchRootsOf(player).reduce((sum, root) => sum + Math.floor((root.damage || 0) / 10), 0);
+    return counters >= condition.count;
+  }
+  return false;
+}
+
+/**
+ * Unown MISSING / HAND / DAMAGE: "If you do, you win this game." The reducer ends the game
+ * on the `abilityWinsGame` event (setGameEnded lives there); an unmet threshold is not spent.
+ */
+function winGameAbility(ctx) {
+  const { step, player } = ctx;
+  if (!step.condition) return skip(ctx, 'unknown_condition');
+  if (!winConditionMet(ctx, step.condition)) return skip(ctx, 'condition_unmet');
+  ctx.events.push({
+    type: 'abilityWinsGame',
+    playerId: player.playerId,
+    reason: `${sourceName(ctx, 'Ability')} Ability`,
+  });
+  return null;
+}
+
+/** Genesect V Fusion Strike System: draw until the hand matches the tagged Pokémon in play. */
+function drawVariableAbility(ctx) {
+  const { player, step } = ctx;
+  if (!step.countTag) return skip(ctx, 'unknown_count');
+  const target = rootsOf(player).filter((root) => rootHasTag(player, root, step.countTag)).length;
+  const toDraw = Math.min(target - player.zones.hand.length, player.zones.deck.length);
+  if (toDraw <= 0) return skip(ctx, 'nothing_to_draw');
+  drawCards(player, toDraw, ctx.events);
+  return null;
+}
+
+/** Rotom VSTAR Conversion Star: discard any number of cards from your hand, then draw that many. */
+function discardForDrawAbility(ctx) {
+  const { player } = ctx;
+  if (ctx.selection) {
+    const picked = pickById(player.zones.hand, ctx.selection);
+    if (picked.length === 0) return skip(ctx, 'nothing_discarded');
+    for (const card of picked) {
+      removeFromZones(player, card);
+      discardCardToPlayerZone(player, card);
+    }
+    ctx.events.push({
+      type: 'cardsDiscarded',
+      playerId: player.playerId,
+      cards: picked.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+    drawCards(player, picked.length, ctx.events);
+    return null;
+  }
+  if (player.zones.hand.length === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose cards to discard, then draw that many`,
+    options: player.zones.hand,
+    min: 1,
+    max: player.zones.hand.length,
+  });
+}
+
+/** Aipom Scampering Tail: the top card of the opponent's deck goes to the bottom, unseen. */
+function deckPlaceAbility(ctx) {
+  const deck = ctx.opponent?.zones?.deck || [];
+  if (deck.length < 2) return skip(ctx, 'deck_too_small');
+  deck.push(deck.shift());
+  ctx.events.push({ type: 'cardsMovedToDeckBottom', count: 1, playerId: ctx.opponent.playerId });
+  return null;
+}
+
+/** Hydreigon Weed Out: keep the chosen Benched Pokémon, discard the others. */
+function discardBenchAbility(ctx) {
+  const { player, step } = ctx;
+  const bench = benchRootsOf(player);
+  const keep = step.keep || 0;
+  if (!(keep > 0)) return skip(ctx, 'unknown_keep_count');
+  if (bench.length <= keep) return skip(ctx, 'nothing_to_discard');
+  if (ctx.selection) {
+    const kept = new Set(ctx.selection);
+    if (kept.size !== keep) return skip(ctx, 'wrong_keep_count');
+    for (const root of bench.filter((c) => !kept.has(c.instanceId))) {
+      discardInPlayPokemon(player, root, ctx.events);
+    }
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose ${keep} Benched Pokémon to keep (the rest are discarded)`,
+    options: bench,
+    min: keep,
+    max: keep,
+  });
+}
+
+function basicEnergyKind(card) {
+  const type = card.energyType || (Array.isArray(card.types) ? card.types[0] : null) || card.name || '';
+  return String(type).toLowerCase().replace(/\s*energy$/, '');
+}
+
+/**
+ * Smeargle Second Coat: switch a basic Energy attached to your Active Pokémon with a different
+ * type of basic Energy card from your discard pile. Two picks: the attached Energy, then the
+ * replacement.
+ */
+function energySwapAbility(ctx) {
+  const { player } = ctx;
+  const active = activeOf(player);
+  if (!active) return skip(ctx, 'no_active');
+  const attached = attachedCards(player, active.instanceId).filter(isBasicEnergy);
+  const replacements = (outgoing) =>
+    player.zones.discard.filter(
+      (c) => isBasicEnergy(c) && basicEnergyKind(c) !== basicEnergyKind(outgoing)
+    );
+
+  if (ctx.memo?.phase === 'replacement') {
+    const outgoing = attached.find((c) => c.instanceId === ctx.memo.outgoingId);
+    const incoming = outgoing && replacements(outgoing).find((c) => c.instanceId === ctx.selection?.[0]);
+    if (!incoming) return skip(ctx, 'target_not_found');
+    removeFromZones(player, incoming);
+    attachTo(player, incoming, active, ctx.events);
+    removeFromZones(player, outgoing);
+    outgoing.attachedTo = null;
+    discardCardToPlayerZone(player, outgoing);
+    ctx.events.push({
+      type: 'cardMoved',
+      instanceId: outgoing.instanceId,
+      from: 'active',
+      to: 'discard',
+      playerId: player.playerId,
+    });
+    return null;
+  }
+
+  const swappable = attached.filter((c) => replacements(c).length > 0);
+  if (ctx.selection) {
+    const outgoing = swappable.find((c) => c.instanceId === ctx.selection[0]);
+    if (!outgoing) return skip(ctx, 'target_not_found');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose a basic Energy from your discard pile to attach instead of ${outgoing.name}`,
+      options: replacements(outgoing),
+      min: 1,
+      max: 1,
+      memo: { phase: 'replacement', outgoingId: outgoing.instanceId },
+    });
+  }
+  if (swappable.length === 0) return skip(ctx, 'no_swap_candidates');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose a basic Energy attached to your Active Pokémon to switch`,
+    options: swappable,
+    min: 1,
+    max: 1,
+  });
+}
+
+function putStadiumIntoPlay(ctx, card) {
+  const { draft, player } = ctx;
+  removeFromZones(player, card);
+  card.attachedTo = null;
+  card.ownerId = card.ownerId || player.playerId;
+  draft.stadium = card;
+  for (const p of Object.values(draft.players || {})) {
+    if (p.flags) p.flags.stadiumUsedThisTurn = false;
+  }
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: card.instanceId,
+    from: 'discard',
+    to: 'stadium',
+    playerId: player.playerId,
+  });
+}
+
+/**
+ * "Discard any Stadium card in play" (Haxorus Grind Up, Marshadow Resetting Hole, Gothitelle
+ * Teleport Room). `replace` then puts a differently named Stadium from your discard pile into
+ * play; `discardSelf` discards this Benched Pokémon. The `abilityStadiumDiscarded` event gates
+ * any "If you do, …" steps parsed after this one (`requiresStadiumDiscard`).
+ */
+function stadiumManipAbility(ctx) {
+  const { draft, player, step } = ctx;
+  if (ctx.memo?.phase === 'replace') {
+    const incoming = player.zones.discard.find(
+      (c) => c.instanceId === ctx.selection?.[0] && isStadiumCard(c) && c.name !== ctx.memo.discardedName
+    );
+    if (incoming) putStadiumIntoPlay(ctx, incoming);
+    return null;
+  }
+  if (!draft.stadium) return skip(ctx, 'no_stadium');
+  const self = step.discardSelf ? sourceRoot(ctx) : null;
+  if (step.discardSelf && (!self || zoneIdOf(player, self) !== 'bench')) {
+    return skip(ctx, 'source_not_on_bench');
+  }
+  const discarded = discardCurrentStadium(draft, ctx.events, player.playerId);
+  ctx.events.push({ type: 'abilityStadiumDiscarded', playerId: player.playerId, instanceId: discarded?.instanceId });
+  if (self) discardInPlayPokemon(player, self, ctx.events);
+  if (!step.replace) return null;
+  const options = player.zones.discard.filter((c) => isStadiumCard(c) && c.name !== discarded?.name);
+  if (options.length === 0) return null;
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose a Stadium from your discard pile to put into play`,
+    options,
+    min: 1,
+    max: 1,
+    memo: { phase: 'replace', discardedName: discarded?.name ?? null },
+  });
+}
+
 export const EXTRA_STEP_HANDLERS = {
   attachTool,
   searchEvolve,
@@ -2010,6 +2249,14 @@ export const EXTRA_STEP_HANDLERS = {
   selfBenchPlacementAbility,
   turnDamageBonusAbility,
   returnSelfToHandAbility,
+  // Design 034 slice 6 one-offs.
+  winGameAbility,
+  drawVariableAbility,
+  discardForDrawAbility,
+  deckPlaceAbility,
+  discardBenchAbility,
+  energySwapAbility,
+  stadiumManipAbility,
   fossilItem,
   returnPokemonToHand,
   swapWithDiscard,

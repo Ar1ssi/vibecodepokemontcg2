@@ -378,7 +378,7 @@ function parseHandAttach(lower) {
   // (parseUnlimitedHandEnergyAcceleration), not a one-shot ability use.
   if (/as often as you like/.test(lower)) return null;
   // The player's own attach action only: not "Whenever you attach…" / "To attach…" rules text.
-  const clause = lower.match(/(?:^|\. |you may )attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
+  const clause = lower.match(/(?:^|\. |you may |if you do, )attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
   if (!clause || /^this card\b/.test(clause[1])) return null;
   const [, what, rawTarget] = clause;
   const types = [...what.matchAll(/\{([a-z])\}/g)]
@@ -395,9 +395,22 @@ function parseHandAttach(lower) {
       basic: /\bbasic\b/.test(what),
       special: named === 'special',
       name: named && !/^(?:basic|special)\b/.test(named) && types.length === 0 ? named : null,
+      // "up to 3 in any combination of {R} and {M}": several of one type are fine.
+      anyCombination: /in any combination/.test(what),
     },
     handAttachEach: /in any way you like/.test(rawTarget),
   };
+}
+
+// Unown MISSING / HAND / DAMAGE: the printed threshold that wins the game.
+function parseWinCondition(lower) {
+  const lostZone = lower.match(/opponent has (\d+) or more supporter cards in the lost zone/);
+  if (lostZone) return { kind: 'opponentLostZoneSupporters', count: Number(lostZone[1]) };
+  const hand = lower.match(/you have (\d+) or more cards in your hand/);
+  if (hand) return { kind: 'handSize', count: Number(hand[1]) };
+  const counters = lower.match(/(\d+) or more damage counters on your benched pok[eé]mon/);
+  if (counters) return { kind: 'benchDamageCounters', count: Number(counters[1]) };
+  return null;
 }
 
 export function parseAbility(text = '') {
@@ -633,6 +646,8 @@ export function parseAbility(text = '') {
     lower.includes('discard') &&
     lower.includes('from your hand') &&
     lower.includes('energy') &&
+    // Haxorus Grind Up: the discarded card is the Stadium in play, not a hand cost.
+    !/discard (?:any|a) stadium card in play/.test(lower) &&
     !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower)
   ) {
     const countMatch = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+/);
@@ -1049,7 +1064,8 @@ export function parseAbility(text = '') {
   }
 
   // ── 22. Damage bonus ────────────────────────────────────────────────────
-  if (lower.includes('more damage') && (lower.includes('attack') || lower.includes('this pokémon'))) {
+  // "66 or more damage counters" (Unown DAMAGE) is a count, not a damage bonus.
+  if (/more damage(?! counters?)/.test(lower) && (lower.includes('attack') || lower.includes('this pokémon'))) {
     const amount = lower.match(/(\d+)\s+more\s+damage/)?.[1] || null;
     steps.push({
       type: 'damageBonusAbility',
@@ -1370,6 +1386,8 @@ export function parseAbility(text = '') {
   if (lower.includes('draw cards until you have as many')) {
     steps.push({
       type: 'drawVariableAbility',
+      // Genesect V: "… as many cards in your hand as you have Fusion Strike Pokémon in play."
+      countTag: lower.match(/as you have ([a-z' -]+?) pok[eé]mon in play/)?.[1]?.trim() || null,
       guidance: 'Once during your turn: draw until your hand has as many cards as described (see card text).',
     });
   }
@@ -1559,6 +1577,7 @@ export function parseAbility(text = '') {
   if (/you win this game/.test(lower)) {
     steps.push({
       type: 'winGameAbility',
+      condition: parseWinCondition(lower),
       guidance: 'Once during your turn: if the stated condition holds, you win this game (as described).',
     });
   }
@@ -1763,6 +1782,7 @@ export function parseAbility(text = '') {
   if (/discard your other benched pok[eé]mon/.test(lower)) {
     steps.push({
       type: 'discardBenchAbility',
+      keep: Number(lower.match(/choose (\d+) of your benched/)?.[1] || 0),
       guidance: 'Once during your turn: keep the chosen Benched Pokémon and discard your other Benched Pokémon (as described).',
     });
   }
@@ -1842,6 +1862,15 @@ export function parseAbility(text = '') {
       step.requiresAttach = true;
       if (step.type === 'healAbility' && /from that pok/.test(attachBonus)) step.target = 'attached Pokémon';
     }
+  }
+
+  // "Discard any Stadium card in play. If you do, <effect>" (Haxorus Grind Up): the Stadium
+  // discard runs first and the rest only follows a real discard.
+  const stadiumIndex = steps.findIndex((step) => step.type === 'stadiumManipAbility');
+  if (stadiumIndex >= 0 && /stadium card in play\. if you do\b/.test(lower)) {
+    const [stadiumStep] = steps.splice(stadiumIndex, 1);
+    for (const step of steps) step.requiresStadiumDiscard = true;
+    steps.unshift(stadiumStep);
   }
 
   // ── Passive fallback (only if NO other step matched) ────────────────────
