@@ -399,14 +399,16 @@ function parseEffects(lower) {
   if (/if this card is discarded from play, put it into your hand instead of the discard pile/.test(lower)) {
     push({ type: 'onDiscardReturnToHand' });
   }
-  if (/if this card is discarded by an effect of an attack used by the \{?([a-z])\}? ?pokémon this card is attached to, put this card into your hand/.test(lower)) {
-    push({ type: 'onDiscardReturnToHand', condition: 'attackEffect', hostType: 'Fire' });
+  const discardToHand = lower.match(/if this card is discarded by an effect of an attack used by the \{?([a-z])\}? ?pokémon this card is attached to, put this card into your hand/);
+  if (discardToHand) {
+    push({ type: 'onDiscardReturnToHand', condition: 'attackEffect', hostType: SYMBOL_TYPES[discardToHand[1]] });
   }
   if (/if this card is discarded by an effect of an attack used by the pokémon this card is attached to, attach this card from your discard pile/.test(lower)) {
     push({ type: 'onDiscardReattach', condition: 'attackEffect' });
   }
-  if (/if this card is discarded by an attack of the \{([a-z])\} pokémon this card is attached to, attach this card from your discard pile/.test(lower)) {
-    push({ type: 'onDiscardReattach', condition: 'attack', hostType: 'Fire' });
+  const discardReattach = lower.match(/if this card is discarded by an attack of the \{([a-z])\} pokémon this card is attached to, attach this card from your discard pile/);
+  if (discardReattach) {
+    push({ type: 'onDiscardReattach', condition: 'attack', hostType: SYMBOL_TYPES[discardReattach[1]] });
   }
   if (/if (?:the|that) (?:[a-z{}]* )?pokémon this card is attached to is knocked out by damage from (?:an opponent's|an) attack, put (?:that|this) pokémon (?:back )?into your hand/.test(lower)
     || /is knocked out by damage from an opponent's attack, put that pokémon into your hand/.test(lower)) {
@@ -488,19 +490,19 @@ function parseEffects(lower) {
     push({ type: 'onAttachDamageCounter', count: 1 });
   }
   if (/when you attach this card from your hand to 1 of your benched pokémon, switch that pokémon with your active pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'self', target: 'benchedToActive' });
+    push({ type: 'onAttachSwitch', side: 'self', target: 'benchedToActive', hostZone: 'bench' });
   }
   if (/when you attach this card from your hand to your active pokémon, switch that pokémon with 1 of your benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench' });
+    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench', hostZone: 'active' });
   }
   if (/when you attach this card from your hand to your active pokémon, switch 1 of the defending pokémon with 1 of your opponent's benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'opponent' });
+    push({ type: 'onAttachSwitch', side: 'opponent', hostZone: 'active' });
   }
   if (/attach it to your active pokémon, your opponent switches (?:his or her|their) active pokémon with 1 of (?:his or her|their) benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'opponent' });
+    push({ type: 'onAttachSwitch', side: 'opponent', hostZone: 'active', chooser: 'opponent' });
   }
   if (/attach warp energy from your hand to your active pokémon, switch your active pokémon with 1 of your benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench' });
+    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench', hostZone: 'active' });
   }
   if (/when you play this card from your hand and attach it to 1 of your pokémon, return a basic energy card attached to that pokémon to your hand/.test(lower)) {
     push({ type: 'onAttachReturnBasicEnergy' });
@@ -618,8 +620,9 @@ function parseEffects(lower) {
   if (/the pokémon boost energy is attached to can't retreat/.test(lower)) {
     push({ type: 'cannotRetreat' });
   }
-  if (/the \{([a-z])\} pokémon this card is attached to recovers from all special conditions and can't be affected by any special conditions/.test(lower)) {
-    push({ type: 'statusImmunity', conditions: ALL_STATUS });
+  const typedImmunity = lower.match(/the \{([a-z])\} pokémon this card is attached to recovers from all special conditions and can't be affected by any special conditions/);
+  if (typedImmunity) {
+    push({ type: 'statusImmunity', conditions: ALL_STATUS, hostType: SYMBOL_TYPES[typedImmunity[1]] });
   } else if (/the pokémon this card is attached to recovers from being asleep, confused, or paralyzed and can't be affected by those special conditions/.test(lower)) {
     push({ type: 'statusImmunity', conditions: ['Asleep', 'Confused', 'Paralyzed'] });
   }
@@ -845,13 +848,16 @@ export function describeSpecialEnergyEffects(card) {
 //   { action: 'prizeReduction', count }
 export function planSpecialEnergyTriggers(
   card,
-  { trigger, host = null, zoneArray = [], fromZone = null, attackExecuting = false } = {}
+  { trigger, host = null, zoneArray = [], fromZone = null, attackExecuting = false, hostZoneId = null, evolvedFrom = null } = {}
 ) {
   const parsed = parseSpecialEnergyEffects(card);
   if (!parsed || !trigger) return [];
   const plans = [];
-  const hostCond = (step) => step.condition ?? (step.hostType ? `host:${step.hostType}` : null);
-  const ready = (step) => conditionMet(hostCond(step), host, zoneArray);
+  // Both gates apply: Nitro is "discarded by an effect of an attack used by the {R}
+  // Pokémon", so its attack condition and its host type must each hold (audit SE11a).
+  const ready = (step) =>
+    conditionMet(step.condition ?? null, host, zoneArray) &&
+    (!step.hostType || conditionMet(`host:${step.hostType}`, host, zoneArray));
   const attackCondition = (step) => step.condition === 'attack' || step.condition === 'attackEffect';
 
   for (const step of parsed.steps) {
@@ -885,7 +891,10 @@ export function planSpecialEnergyTriggers(
         if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'clearStatus' });
         break;
       case 'onAttachSwitch':
-        if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'switch', side: step.side, target: step.target });
+        // "…to your Active Pokémon" / "…to 1 of your Benched Pokémon" (audit SE11d).
+        if (trigger === 'attach' && fromZone === 'hand' && (!step.hostZone || !hostZoneId || step.hostZone === hostZoneId)) {
+          plans.push({ action: 'switch', side: step.side, target: step.target, chooser: step.chooser ?? 'self' });
+        }
         break;
       case 'onAttachReturnBasicEnergy':
         if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'returnBasicEnergy' });
@@ -899,7 +908,7 @@ export function planSpecialEnergyTriggers(
         }
         break;
       case 'onDiscardReattach':
-        if (trigger === 'discard' && (!attackCondition(step) || attackExecuting)) {
+        if (trigger === 'discard' && ready(step) && (!attackCondition(step) || attackExecuting)) {
           plans.push({ action: 'reattach' });
         }
         break;
@@ -913,10 +922,11 @@ export function planSpecialEnergyTriggers(
         if (trigger === 'knockout') plans.push({ action: 'prizeReduction', count: step.count });
         break;
       case 'onEvolveHeal':
-        // hostType is the card class the energy targets (e.g. Pokémon V), not a
-        // type gate; the effect only exists on such hosts, so it fires whenever
-        // the host evolves.
-        if (trigger === 'evolve') plans.push({ action: 'heal', amount: step.amount });
+        // hostType names the card class evolved from ("evolve the Pokémon V this card
+        // is attached to"), so gate on the Pokémon before it evolved (audit SE11b).
+        if (trigger === 'evolve' && (step.hostType !== 'Pokémon V' || isVCard(evolvedFrom))) {
+          plans.push({ action: 'heal', amount: step.amount });
+        }
         break;
       case 'onDamagedDamageCounters':
         if (trigger === 'damaged') {
@@ -1062,19 +1072,37 @@ export function getSpecialEnergyAttackPenalty(attacker, zoneArray = []) {
  */
 export function getSpecialEnergyDamageReduction(defender, zoneArray = [], { attacker = null, afterWR = true } = {}) {
   let total = 0;
+  // "…can't be applied more than once at a time" (V Guard): one copy per name counts.
+  const onceApplied = new Set();
   for (const energy of getAttachedSpecialEnergies(defender, zoneArray)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
+    const onceKey = parsed.steps.some((s) => s.type === 'onceAtATime') ? parsed.name.toLowerCase() : null;
+    if (onceKey && onceApplied.has(onceKey)) continue;
+    let applied = false;
     for (const step of parsed.steps) {
       if (step.type !== 'damageReduction') continue;
       if ((step.afterWR ?? false) !== afterWR) continue;
-      if (step.source === 'opponentPokemonEx' && !/ex/i.test(String(attacker?.name ?? ''))) continue;
-      if (step.source === 'opponentPokemonV' && !/\bv\b/i.test(String(attacker?.name ?? ''))) continue;
+      if (step.source === 'opponentPokemonEx' && !isExCard(attacker ?? {})) continue;
+      if (step.source === 'opponentPokemonV' && !isVCard(attacker ?? {})) continue;
       if (!conditionMet(step.condition ?? (step.hostType ? `host:${step.hostType}` : null), defender, zoneArray)) continue;
       total += step.amount;
+      applied = true;
     }
+    if (applied && onceKey) onceApplied.add(onceKey);
   }
   return total;
+}
+
+/** True when the attacker's special Energy makes its attacks ignore Resistance (Holon FF). */
+export function hasSpecialEnergyIgnoresResistance(attacker, zoneArray = []) {
+  for (const energy of getAttachedSpecialEnergies(attacker, zoneArray)) {
+    const parsed = parseSpecialEnergyEffects(energy);
+    for (const step of parsed?.steps || []) {
+      if (step.type === 'ignoresResistance' && conditionMet(step.condition ?? null, attacker, zoneArray)) return true;
+    }
+  }
+  return false;
 }
 
 /** True when an attached special energy grants a free retreat. */
@@ -1089,6 +1117,13 @@ export function hasSpecialEnergyFreeRetreat(pokemonCard, zoneArray = []) {
     }
   }
   return false;
+}
+
+/** True when an attached special Energy stops the host retreating (Boost Energy). */
+export function hasSpecialEnergyCannotRetreat(pokemonCard, zoneArray = []) {
+  return getAttachedSpecialEnergies(pokemonCard, zoneArray).some((energy) =>
+    parseSpecialEnergyEffects(energy)?.steps.some((step) => step.type === 'cannotRetreat')
+  );
 }
 
 /** Retreat-cost reduction from attached special energies. */
@@ -1176,6 +1211,74 @@ export function blocksSpecialEnergyBenchDamage(pokemonCard, zoneId, zoneArray = 
   return false;
 }
 
+const plainName = (card) => String(card?.name ?? '').replace(/[‘’]/g, "'");
+
+const subtypeListHas = (pokemon, re) => (pokemon?.subtypes || []).some((s) => re.test(String(s)));
+
+// Attach-restriction kinds → does this host qualify? `null` = the host's data cannot say
+// (server Pokémon carry no subtypes), so the restriction is not enforced.
+const knownStage = (host) => Boolean(host?.stage) || Boolean(host?.subtypes?.length);
+const RESTRICTION_HOSTS = {
+  type: (host, step) => (host?.types?.length ? hostIsType(host, step.hostType) : null),
+  teamRocket: (host) => /^team rocket'?s\b/i.test(plainName(host)),
+  darkOrRocket: (host) => /\bdark\b|\brocket'?s\b/i.test(plainName(host)),
+  teamMagma: (host) => /\bteam magma\b/i.test(plainName(host)),
+  teamAqua: (host) => /\bteam aqua\b/i.test(plainName(host)),
+  evolution: (host) => (knownStage(host) ? stageKey(host) !== 'basic' : null),
+  evolvedExcludingEx: (host) => (knownStage(host) ? stageKey(host) !== 'basic' && !isExCard(host) : null),
+  shiningOrLight: (host) => /^(shining|light)\s/i.test(plainName(host)),
+  fusionStrike: (host) => (host?.subtypes?.length ? subtypeListHas(host, /fusion strike/i) : null),
+  singleStrike: (host) => (host?.subtypes?.length ? subtypeListHas(host, /single strike/i) : null),
+  rapidStrike: (host) => (host?.subtypes?.length ? subtypeListHas(host, /rapid strike/i) : null),
+};
+
+/**
+ * The first attach restriction `host` fails for this Energy ("This card can only be
+ * attached to …"), or null when it may stay attached. `atAttach` also checks the
+ * attach-time-only prerequisites (Bounce Energy's basic-Energy bearer).
+ *
+ * @returns {{kind:string, discardIfNot:boolean}|null}
+ */
+export function failedSpecialEnergyRestriction(energy, host, zoneArray = [], { atAttach = false } = {}) {
+  if (!energy || !host) return null;
+  const parsed = parseSpecialEnergyEffects(energy);
+  for (const step of parsed?.steps || []) {
+    if (step.type === 'attachRestriction') {
+      if (step.kind === 'basicEnergyBearer') {
+        if (atAttach && !hostHasAnyBasicEnergy(zoneArray, host)) return { kind: step.kind, discardIfNot: false };
+        continue;
+      }
+      const check = RESTRICTION_HOSTS[step.kind];
+      if (check && check(host, step) === false) return { kind: step.kind, discardIfNot: !!step.discardIfNot };
+    }
+    if (
+      step.type === 'discardWhenConditionLost' &&
+      !atAttach &&
+      knownStage(host) &&
+      !conditionMet(step.condition, host, zoneArray)
+    ) {
+      return { kind: step.condition, discardIfNot: true };
+    }
+  }
+  return null;
+}
+
+function hostHasAnyBasicEnergy(zoneArray, host) {
+  return (zoneArray || []).some(
+    (c) =>
+      c &&
+      c.type === 'Energy' &&
+      c.attachedTo != null &&
+      c.attachedTo === host.instanceId &&
+      !isSpecialEnergyCard(c)
+  );
+}
+
+/** True when this Energy discards itself at the end of its owner's turn (Ignition, Boost). */
+export function discardsAtEndOfTurn(energy) {
+  return !!parseSpecialEnergyEffects(energy)?.steps.some((s) => s.type === 'discardAtEndOfTurn');
+}
+
 // Pool tokens use the cost-symbol spelling (TCGdex writes {D} costs "Darkness").
 const POOL_TYPE = { Dark: 'Darkness' };
 const poolType = (type) => POOL_TYPE[type] ?? type;
@@ -1252,9 +1355,9 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
     case 'ultraBeast':
       return isUltraBeast(host);
     case 'teamMagma':
-      return /^team magma'?s/i.test(String(host.name ?? '').replace(/’/g, "'"));
+      return /^team magma'?s\b/i.test(String(host.name ?? '').replace(/’/g, "'"));
     case 'teamAqua':
-      return /^team aqua'?s/i.test(String(host.name ?? '').replace(/’/g, "'"));
+      return /^team aqua'?s\b/i.test(String(host.name ?? '').replace(/’/g, "'"));
     case 'isVOrGx':
       return isVOrGx(host);
     case 'notVOrGx':

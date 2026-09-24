@@ -326,7 +326,7 @@ export function isDeltaSpecies(card) {
 }
 
 // Prism / Stellar have no parsed provision without text but genuinely provide any type.
-const ANY_TYPE_NAME = /(^|)(prism|stellar) energy/;
+const ANY_TYPE_NAME = /(^|\b)(prism|stellar) energy/;
 
 /**
  * Rewrite an attached-Energy descriptor for its host and the Stadium in play.

@@ -23,6 +23,8 @@ import {
   getSpecialEnergyAttackBonus,
   getSpecialEnergyAttackPenalty,
   getSpecialEnergyDamageReduction,
+  hasSpecialEnergyNoWeakness,
+  hasSpecialEnergyIgnoresResistance,
 } from './special-energy-parse.mjs';
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
@@ -150,10 +152,16 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const incomingBonusBeforeWR =
     base > 0 ? markerSum(defenderEffects, (m) => m.kind === 'incomingBonus' && !m.afterWR) : 0;
 
+  // Step 2e: Defender special-energy reduction applied BEFORE W/R (Shield Energy, Holon GL).
+  const specialEnergyReductionBeforeWR = ignoreDefenderEffects
+    ? 0
+    : getSpecialEnergyDamageReduction(defender, defenderZoneCards, { attacker, afterWR: false });
+
   const damageBeforeWR = Math.max(
     0,
     base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus + incomingBonusBeforeWR +
       abilityBonusBeforeWR - specialEnergyPenalty - markerReductionBeforeWR -
+      specialEnergyReductionBeforeWR -
       (ignoreDefenderEffects ? 0 : abilityReductionBeforeWR || 0)
   );
 
@@ -178,7 +186,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     !ignoreWeakness &&
     !weaknessNullified &&
     !weaknessOverride?.none &&
-    !hasMarker(defenderEffects, 'noWeakness');
+    !hasMarker(defenderEffects, 'noWeakness') &&
+    // Coating Metal / Weakness Guard / Flash / Holon FF Energy (audit SE7).
+    !(!ignoreDefenderEffects && hasSpecialEnergyNoWeakness(defender, defenderZoneCards));
   if (attacker?.types?.length && defender?.weakness && weaknessType && weaknessApplies) {
     // Any of a dual-typed attacker's types triggers Weakness (audit A-5). A
     // weaknessOverride marker (Oranguru) swaps the type and keeps the amount.
@@ -207,6 +217,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   if (
     !ignoreResistance &&
     !resistanceOverride?.ignore &&
+    // Holon FF Energy with a basic {F} Energy beside it (audit SE7).
+    !hasSpecialEnergyIgnoresResistance(attacker, attackerZoneCards) &&
     attacker?.types?.length &&
     defender?.resistance &&
     !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
@@ -322,7 +334,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     flat,
     resistance,
     stadiumReduction,
-    specialEnergyReduction,
+    specialEnergyReduction: specialEnergyReduction + specialEnergyReductionBeforeWR,
     reduced,
     prevented,
   };

@@ -145,10 +145,22 @@ import {
   markersBlockCondition,
   parseDamageImmunity,
 } from './rules/attack-markers.mjs';
-import { isSpecialEnergyCard, hasOncePerGameSpecialEnergyEffect } from './rules/special-energy-parse.mjs';
+import {
+  isSpecialEnergyCard,
+  hasOncePerGameSpecialEnergyEffect,
+  failedSpecialEnergyRestriction,
+  hasSpecialEnergyEffectShield,
+  blocksSpecialEnergyBenchDamage,
+  hasSpecialEnergyFreeRetreat,
+  getSpecialEnergyRetreatReduction,
+  hasSpecialEnergyCannotRetreat,
+} from './rules/special-energy-parse.mjs';
 import {
   runSpecialEnergyTriggers,
   runEndOfTurnSpecialEnergies,
+  applySpecialEnergyStatusImmunity,
+  settleSpecialEnergyPassives,
+  discardEndOfTurnSpecialEnergies,
   resolveSpecialEnergyDiscard,
   resolveSpecialEnergyKnockout,
   resumeSpecialEnergyTrigger,
@@ -308,6 +320,16 @@ function damageBenchedPokemon(
   const victimBench = draft.players[victimPlayerId]?.zones?.bench || [];
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
   const allVictimCards = [...victimActive, ...victimBench];
+  // Shadowy Darkness Energy (audit SE5): its benched {D} host takes no attack damage.
+  if (!ownAttack && blocksSpecialEnergyBenchDamage(inPlayView(draft, victim), 'bench', victimBench)) {
+    events.push({
+      type: 'damagePrevented',
+      instanceId: victim.instanceId,
+      attackName,
+      reason: 'special-energy-bench',
+    });
+    return;
+  }
   // Bench shields stop the opponent's attacks, not the attacker's own recoil.
   const benchProtected = !ownAttack && allVictimCards.some((c) => {
     if (c.attachedTo) return false;
@@ -994,7 +1016,9 @@ function cardEffectiveHp(state, card, playerId) {
   const zoneCards = ref?.player?.zones?.[ref.zoneId] || [];
   const zones = state.players?.[playerId]?.zones || {};
   const sideCards = [...(zones.active || []), ...(zones.bench || [])];
-  return effectiveHp(baseHp, playerId, card, zoneCards, state.stadium, sideCards);
+  // The view, not the root: +HP gates read the Pokémon in play (Growing Grass on an evolved
+  // {G} Pokémon whose Basic is another type, audit SE13e).
+  return effectiveHp(baseHp, playerId, view, zoneCards, state.stadium, sideCards);
 }
 
 function markerCount(markers, kind, field) {
@@ -1019,6 +1043,8 @@ function computeEffectiveRetreatCost(state, card, playerId) {
     inPlayView(state, b)
   );
   if (teamNoRetreatCostForActive(inPlayView(state, card), benchViews)) return 0;
+  // Magnetic Metal / Hiding Darkness / Holon WP Energy (audit SE6): "has no Retreat Cost".
+  if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone)) return 0;
 
   // 1. Tool retreat cost modifier + self ability modifier
   const blockTools = isStadiumToolNegation(stadium?.card || stadium);
@@ -1049,6 +1075,9 @@ function computeEffectiveRetreatCost(state, card, playerId) {
 
   // 4. "Its Retreat Cost is {C} more" attack markers (Mawile, Grimer).
   cost += markerCount(activeAttackMarkers(state, playerId, card), 'retreatDelta', 'amount');
+
+  // 5. Mystery Energy: "Retreat Cost is {C}{C} less".
+  cost -= getSpecialEnergyRetreatReduction(inPlayView(state, card), activeZone);
 
   return Math.max(0, cost);
 }
@@ -2038,6 +2067,9 @@ function resolveCheckup(
   { rng, events, endingPlayerId = draft.turn?.player }
 ) {
   resolveDeferredKnockouts(draft, { events });
+  // A condition landed this command (the attack that ended the turn) on a Pokémon whose
+  // special Energy makes it immune never reaches Checkup.
+  applySpecialEnergyStatusImmunity(draft, { events });
   const triggerCtx = abilitySideContext(draft, endingPlayerId);
 
   for (const pid of Object.keys(draft.players || {})) {
@@ -2118,6 +2150,7 @@ function resolveCheckup(
   // End-of-turn special-energy effects (legacy Darkness Energy): "at the end of
   // every turn" applies to both players' in-play Pokémon.
   runEndOfTurnSpecialEnergies(draft, { events });
+  discardEndOfTurnSpecialEnergies(draft, { endingPlayerId, events });
 
   // "At the end of your turn, discard …" Tools (TM/Cube Items).
   discardEndOfTurnTools(draft, { endingPlayerId, events });
@@ -3374,6 +3407,20 @@ export function validateLegality(state, command) {
         const lockReason = attachLockReason(state, cardRef.card, payload.targetInstanceId);
         if (lockReason) return { allowed: false, reason: lockReason };
       }
+      // "This card can only be attached to …" (Team Rocket's Energy, Shield Energy, …).
+      if (cardRef?.zoneId === 'hand' && isEnergy(cardRef.card) && isSpecialEnergyCard(cardRef.card)) {
+        const targetRef = findCard(state, payload.targetInstanceId);
+        const targetZone = targetRef?.player?.zones?.[targetRef.zoneId] || [];
+        if (
+          targetRef?.card &&
+          isPokemon(targetRef.card) &&
+          failedSpecialEnergyRestriction(cardRef.card, inPlayView(state, targetRef.card), targetZone, {
+            atAttach: true,
+          })
+        ) {
+          return { allowed: false, reason: `${cardRef.card.name} can't be attached to that Pokémon.` };
+        }
+      }
       if (cardRef && isEnergy(cardRef.card)) {
         if (player.flags?.energyAttached) {
           // Check for unlimited energy acceleration abilities (Phase 4)
@@ -3720,6 +3767,10 @@ export function validateLegality(state, command) {
           allowed: false,
           reason: "The Defending Pokémon can't retreat.",
         };
+      }
+      // Boost Energy: "The Pokémon this card is attached to can't retreat."
+      if (hasSpecialEnergyCannotRetreat(inPlayView(state, active), player.zones?.active || [])) {
+        return { allowed: false, reason: "This Pokémon's Energy says it can't retreat." };
       }
       // Omastar 151: the opponent's Active can't retreat while the holder is
       // in the Active Spot. The Snorlax wording stops working when its holder
@@ -5613,7 +5664,10 @@ function resolveAttackEffectPhase(draft, ctx) {
       if (defenderConditions.length > 0 && defender) {
         // Only apply condition if defender survived the attack (not KO'd)
         const defRef = findCard(draft, defender.instanceId);
-        if (defRef && defRef.zoneId === 'active') {
+        const defZone = defRef?.player?.zones?.active || [];
+        const shielded =
+          defRef && hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone);
+        if (defRef && defRef.zoneId === 'active' && !shielded) {
           const defMarkers = activeAttackMarkers(draft, defRef.playerId, defRef.card);
           for (const cond of defenderConditions) {
             if (markersBlockCondition(defMarkers, cond)) continue;
@@ -6577,10 +6631,16 @@ export function applyCommand(state, command, rng = null) {
             targetInstanceId: payload.targetInstanceId,
           });
 
-          // Special-energy on-evolve triggers (e.g. Regenerative Energy heal).
+          // Special-energy on-evolve triggers (e.g. Regenerative Energy heal). The
+          // planner gates on the Pokémon as it was before this card (audit SE11b).
+          const evolveZone = draft.players[hostRef.playerId]?.zones?.[hostRef.zoneId] || [];
           runSpecialEnergyTriggers(draft, {
             trigger: 'evolve',
             host: hostRef.card,
+            evolvedFrom: topPokemonCard(
+              evolveZone.filter((c) => c !== cardRef.card),
+              hostRef.card
+            ),
             hostPlayerId: hostRef.playerId,
             hostZoneId: hostRef.zoneId,
             events,
@@ -6659,6 +6719,7 @@ export function applyCommand(state, command, rng = null) {
         // command on a PendingChoice, resumed via resolveChoice.
         if (isEnergy(cardRef.card) && isSpecialEnergyCard(cardRef.card)) {
           runSpecialEnergyTriggers(draft, {
+            rng: activeRng,
             trigger: 'attach',
             host: hostRef.card,
             hostTop: inPlayView(draft, hostRef.card),
@@ -7250,6 +7311,7 @@ export function applyCommand(state, command, rng = null) {
         });
       } else if (token.effectType === SPECIAL_ENERGY_EFFECT) {
         resumeSpecialEnergyTrigger(draft, {
+          rng: activeRng,
           selection: payload.selection || [],
           events,
           resumeToken: token,
@@ -8294,6 +8356,7 @@ export function applyCommand(state, command, rng = null) {
       break;
   }
 
+  if (draft.rulesEnabled) settleSpecialEnergyPassives(draft, { events });
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
   settleKoEnergyMoves(draft, { events });

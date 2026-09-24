@@ -427,3 +427,104 @@ test('authoritative special energy: type-gated triggers read the top evolution, 
   assert.equal(res.error, null);
   assert.ok(res.pendingChoice, 'the {P} host gate matched the Psychic evolution on a Colorless Basic');
 });
+
+test('SE10: on-attach search caps at the open Bench slots and shuffles the deck', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Mew', types: ['Psychic'] }));
+  for (let i = 0; i < 4; i += 1) {
+    state.players.p1.zones.bench.push(pokemon({ instanceId: 60 + i, name: `Bench ${i}` }));
+  }
+  state.players.p1.zones.hand.push(
+    specialEnergy({
+      instanceId: 2,
+      name: 'Telepathic Psychic Energy',
+      text: 'As long as this card is attached to a Pokémon, it provides {P} Energy. When you attach this card from your hand to a {P} Pokémon, search your deck for up to 2 Basic {P} Pokémon and put them onto your Bench. Then, shuffle your deck.',
+    })
+  );
+  state.players.p1.zones.deck.push(
+    pokemon({ instanceId: 50, name: 'Ralts', types: ['Psychic'] }),
+    pokemon({ instanceId: 51, name: 'Ralts', types: ['Psychic'] })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice.max, 1, 'one Bench slot left');
+
+  const done = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [50] },
+    playerId: 'p1',
+  });
+  assert.equal(done.error, null);
+  assert.equal(done.state.players.p1.zones.bench.filter((c) => !c.attachedTo).length, 5);
+  assert.ok(done.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p1'));
+});
+
+test('SE11d: Warp Energy attached to a Benched Pokémon does not switch', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.bench.push(pokemon({ instanceId: 3, name: 'Raichu' }), pokemon({ instanceId: 4, name: 'Eevee' }));
+  state.players.p1.zones.hand.push(
+    specialEnergy({
+      instanceId: 2,
+      name: 'Warp Energy',
+      text: 'Warp Energy provides {C} Energy. When you attach Warp Energy from your hand to your Active Pokémon, switch your Active Pokémon with 1 of your Benched Pokémon.',
+    })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 3 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice ?? null, null);
+  assert.equal(res.state.players.p1.zones.active.find((c) => !c.attachedTo).instanceId, 1);
+});
+
+test('SE11f: Cyclone Energy lets the opponent choose their new Active', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.hand.push(
+    specialEnergy({
+      instanceId: 2,
+      name: 'Cyclone Energy',
+      text: 'Cyclone Energy provides {C} Energy. When you play Cyclone Energy from your hand and attach it to your Active Pokémon, your opponent switches his or her Active Pokémon with 1 of his or her Benched Pokémon.',
+    })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 10, name: 'Roselia' }), pokemon({ instanceId: 11, name: 'Roserade' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice.player, 'p2');
+
+  const done = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [11] },
+    playerId: 'p2',
+  });
+  assert.equal(done.error, null);
+  assert.equal(done.state.players.p2.zones.active.find((c) => !c.attachedTo).instanceId, 11);
+});
+
+test('SE11b: Regenerative Energy does not heal when a non-V Pokémon evolves', () => {
+  const state = game();
+  const base = pokemon({ instanceId: 10, name: 'Charmander', hp: 70, types: ['Fire'] });
+  base.damage = 50;
+  state.players.p1.zones.active.push(
+    base,
+    specialEnergy({
+      instanceId: 12,
+      name: 'Regenerative Energy',
+      attachedTo: 10,
+      text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. Whenever you play a Pokémon from your hand to evolve the Pokémon V this card is attached to, heal 100 damage from that Pokémon.',
+    })
+  );
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 11, name: 'Charmeleon', supertype: 'Pokémon', stage: 'Stage 1', evolvesFrom: 'Charmander', hp: 100, types: ['Fire'] })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 11, targetInstanceId: 10 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 10).card.damage, 50);
+});

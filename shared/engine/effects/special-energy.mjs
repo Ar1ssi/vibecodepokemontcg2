@@ -17,15 +17,21 @@
 import {
   planSpecialEnergyTriggers,
   isSpecialEnergyCard,
+  failedSpecialEnergyRestriction,
+  discardsAtEndOfTurn,
+  getSpecialEnergyStatusImmunity,
 } from '../rules/special-energy-parse.mjs';
-import { clearConditions } from '../rules/special-conditions.mjs';
-import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
+import { clearConditions, hasCondition, removeCondition } from '../rules/special-conditions.mjs';
+import { evolvedView, topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isEnergy } from '../cards.mjs';
-import { findCard } from '../state.mjs';
+import { discardCardToPlayerZone, findCard } from '../state.mjs';
+import { shuffleInPlace } from '../rng.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 const SPECIAL_ENERGY_EFFECT = 'specialEnergy';
+// Same value as trainer-steps BENCH_LIMIT; importing it would close an import cycle.
+const BENCH_LIMIT = 5;
 
 /** Deterministic PendingChoice (Invariant 6) — inlined to avoid an effects cycle. */
 function makeChoice({ player, prompt, options, min, max, resumeToken, stateVersion = 0, stepIndex = 0 }) {
@@ -124,6 +130,17 @@ function swapActiveBench(draft, playerId, benchRoot, events, { duringOwnersTurn 
     duringOwnersTurn,
     events,
   });
+}
+
+function benchSpace(draft, playerId) {
+  const roots = zoneOf(draft, playerId, 'bench').filter((c) => c && !c.attachedTo);
+  return Math.max(0, BENCH_LIMIT - roots.length);
+}
+
+/** "Then, shuffle your deck." — every on-attach search ends with it (audit SE10). */
+function shuffleSearchedDeck(draft, ctx) {
+  if (ctx.rng) shuffleInPlace(ctx.rng, zoneOf(draft, ctx.hostPlayerId, 'deck'));
+  ctx.events.push({ type: 'deckShuffled', playerId: ctx.hostPlayerId });
 }
 
 function ctxFor(token, host, attacker) {
@@ -240,7 +257,7 @@ function applyPlan(draft, plan, ctx, selection = null) {
     }
     case 'search': {
       const deck = zoneOf(draft, ctx.hostPlayerId, 'deck');
-      const chosen = selection || [];
+      const chosen = (selection || []).slice(0, benchSpace(draft, ctx.hostPlayerId));
       for (const id of chosen) {
         const idx = deck.findIndex((c) => c.instanceId === id);
         if (idx < 0) continue;
@@ -255,6 +272,7 @@ function applyPlan(draft, plan, ctx, selection = null) {
           playerId: ctx.hostPlayerId,
         });
       }
+      shuffleSearchedDeck(draft, ctx);
       break;
     }
     case 'switch': {
@@ -288,8 +306,11 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
   if (plan.action === 'search') {
     const deck = zoneOf(draft, ctx.hostPlayerId, 'deck');
     const matches = deck.filter((c) => matchesSearch(c, plan.what));
-    if (matches.length === 0) return 'done';
-    const max = Math.min(plan.count, matches.length);
+    const max = Math.min(plan.count, matches.length, benchSpace(draft, ctx.hostPlayerId));
+    if (max === 0) {
+      shuffleSearchedDeck(draft, ctx);
+      return 'done';
+    }
     return makeChoice({
       player: ctx.hostPlayerId,
       prompt: `Search your deck for up to ${max} ${plan.what}`,
@@ -328,9 +349,11 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
     });
     return 'done';
   }
+  // Cyclone: "your opponent switches …" — the switching player picks (audit SE11f).
+  const chooserId = plan.chooser === 'opponent' ? playerId : ctx.hostPlayerId;
   return makeChoice({
-    player: ctx.hostPlayerId,
-    prompt: `${plan.side === 'self' ? 'Switch your Active Pokémon' : "Switch your opponent's Active Pokémon"} — choose a Benched Pokémon`,
+    player: chooserId,
+    prompt: `${plan.side === 'self' || chooserId !== ctx.hostPlayerId ? 'Switch your Active Pokémon' : "Switch your opponent's Active Pokémon"} — choose a Benched Pokémon`,
     options: bench,
     min: 1,
     max: 1,
@@ -383,6 +406,8 @@ export function runSpecialEnergyTriggers(draft, {
   fromZone = null,
   attacker = null,
   attackerPlayerId = null,
+  evolvedFrom = null,
+  rng = null,
   events,
 } = {}) {
   if (!draft || !host || !trigger) return null;
@@ -400,10 +425,13 @@ export function runSpecialEnergyTriggers(draft, {
       zoneArray: zone,
       fromZone,
       attackExecuting: !!draft.__attackEffectPhase,
+      hostZoneId,
+      evolvedFrom,
     });
     for (const plan of plans) queue.push({ energyInstanceId: e.instanceId, plan });
   }
   const ctx = {
+    rng,
     hostInstanceId: host.instanceId,
     hostPlayerId,
     hostZoneId,
@@ -417,7 +445,7 @@ export function runSpecialEnergyTriggers(draft, {
 }
 
 /** Resumes a suspended special-energy trigger after a player's choice. */
-export function resumeSpecialEnergyTrigger(draft, { selection, events, resumeToken }) {
+export function resumeSpecialEnergyTrigger(draft, { selection, events, resumeToken, rng = null }) {
   const token = resumeToken || {};
   const queue = Array.isArray(token.queue) ? token.queue : [];
   const index = token.index ?? 0;
@@ -428,7 +456,7 @@ export function resumeSpecialEnergyTrigger(draft, { selection, events, resumeTok
   }
   const attacker =
     token.attackerInstanceId != null ? findCard(draft, token.attackerInstanceId)?.card : null;
-  const ctx = { ...ctxFor(token, host, attacker), events };
+  const ctx = { ...ctxFor(token, host, attacker), events, rng };
   const pending = queue[index];
   if (pending) applyPlan(draft, pending.plan, ctx, selection || []);
   draft.pendingChoice = null;
@@ -499,6 +527,92 @@ export function resolveSpecialEnergyKnockout(draft, { host, hostTop = null, host
     }
   }
   return out;
+}
+
+/** Every in-play root Pokémon with its zone, owner, and in-play view (top card's stats). */
+function inPlayHosts(draft, playerIds = Object.keys(draft?.players || {})) {
+  const hosts = [];
+  for (const pid of playerIds) {
+    for (const zoneId of ['active', 'bench']) {
+      const zone = zoneOf(draft, pid, zoneId);
+      for (const root of zone) {
+        if (!root || root.attachedTo || isEnergy(root)) continue;
+        hosts.push({ pid, zoneId, zone, root, view: evolvedView(zone, root) });
+      }
+    }
+  }
+  return hosts;
+}
+
+function attachedSpecialEnergies(zone, root) {
+  return zone.filter((c) => c && c.attachedTo === root.instanceId && isEnergy(c) && isSpecialEnergyCard(c));
+}
+
+/** Moves an attached Energy to its owner's discard pile (a rule, not an effect). */
+function discardAttachedEnergy(draft, { energy, zone, zoneId, hostPlayerId, reason, events }) {
+  const i = zone.indexOf(energy);
+  if (i < 0) return;
+  zone.splice(i, 1);
+  energy.attachedTo = null;
+  const ownerId = draft.players[energy.ownerId] ? energy.ownerId : hostPlayerId;
+  const to = discardCardToPlayerZone(draft.players[ownerId], energy);
+  events.push({
+    type: 'cardMoved',
+    instanceId: energy.instanceId,
+    from: zoneId,
+    to,
+    playerId: ownerId,
+    reason,
+  });
+}
+
+/**
+ * "…recovers from … and can't be affected by …" (Bubbly Water, Therapeutic, Aromatic
+ * Grass, Holon GL): strips the conditions an attached special Energy makes its host
+ * immune to. Runs after every command and before Pokémon Checkup (audit SE4).
+ */
+export function applySpecialEnergyStatusImmunity(draft, { events = [] } = {}) {
+  for (const { pid, zone, root, view } of inPlayHosts(draft)) {
+    if (!attachedSpecialEnergies(zone, root).length) continue;
+    for (const condition of getSpecialEnergyStatusImmunity(view, zone)) {
+      if (!hasCondition(root, condition)) continue;
+      removeCondition(root, condition);
+      events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId: pid, reason: 'specialEnergy' });
+    }
+  }
+}
+
+/**
+ * Standing special-Energy rules, applied after every command (audit SE4/SE8):
+ * - "If this card is attached to anything other than …, discard this card" and
+ *   "discard it if … is no longer an Evolution" — the restriction is re-read against
+ *   the host as it is now (after evolving, devolving or a Stadium change).
+ * - Status immunity (applySpecialEnergyStatusImmunity).
+ */
+export function settleSpecialEnergyPassives(draft, { events = [] } = {}) {
+  if (!draft?.players) return;
+  for (const { pid, zoneId, zone, root, view } of inPlayHosts(draft)) {
+    for (const energy of attachedSpecialEnergies(zone, root)) {
+      const failed = failedSpecialEnergyRestriction(energy, view, zone);
+      if (!failed?.discardIfNot) continue;
+      discardAttachedEnergy(draft, { energy, zone, zoneId, hostPlayerId: pid, reason: 'specialEnergyRestriction', events });
+    }
+  }
+  applySpecialEnergyStatusImmunity(draft, { events });
+}
+
+/**
+ * "…discard it at the end of your turn" (Ignition, Triple Acceleration, Boost, Double
+ * Magma/Aqua, Magma/Aqua, Miracle): discards the ending player's attached copies (SE8).
+ */
+export function discardEndOfTurnSpecialEnergies(draft, { endingPlayerId, events = [] } = {}) {
+  if (!draft?.players?.[endingPlayerId]) return;
+  for (const { pid, zoneId, zone, root } of inPlayHosts(draft, [endingPlayerId])) {
+    for (const energy of attachedSpecialEnergies(zone, root)) {
+      if (!discardsAtEndOfTurn(energy)) continue;
+      discardAttachedEnergy(draft, { energy, zone, zoneId, hostPlayerId: pid, reason: 'specialEnergyEndOfTurn', events });
+    }
+  }
 }
 
 export { SPECIAL_ENERGY_EFFECT };

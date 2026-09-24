@@ -14,7 +14,8 @@ import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace, flipCoin } from '../rng.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
-import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
+import { evolvedView, topPokemonCard } from '../rules/evolved-pokemon.mjs';
+import { hasSpecialEnergyEffectShield } from '../rules/special-energy-parse.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -40,6 +41,33 @@ export const EXECUTOR_STEP_TYPES = new Set([
   'fossilBench', 'applyStatus', 'statusAbility', 'recoverEnergy', 'recoverFromDiscard',
   'attachAbility', 'attachFromDiscard',
 ]);
+
+// Attack steps whose only target is the opponent's Active Pokémon (or, with the listed
+// scope/target, can be): what an effect-shield special Energy prevents.
+const OPPONENT_ACTIVE_STEPS = new Set([
+  'atkLostZoneOppActive',
+  'atkShuffleOppActive',
+  'atkShuffleOppActiveEnergy',
+  'atkBounceOppActive',
+  'atkChooseCondition',
+]);
+const OPPONENT_ACTIVE_SCOPED_STEPS = new Set(['atkDiscardOppEnergy', 'atkDiscardOppTools', 'atkDevolve']);
+const OPPONENT_ACTIVE_TARGETED_STEPS = new Set(['atkAddMarker', 'atkHpCap']);
+
+function targetsOpponentActiveOnly(step) {
+  if (OPPONENT_ACTIVE_STEPS.has(step.type)) return true;
+  if (OPPONENT_ACTIVE_SCOPED_STEPS.has(step.type)) return step.scope === 'active';
+  if (OPPONENT_ACTIVE_TARGETED_STEPS.has(step.type)) return step.target === 'opponentActive';
+  return false;
+}
+
+// Rocky Fighting / Mist / Wash Water / Wonder Energy (audit SE5): "Prevent all effects of
+// attacks used by your opponent's Pokémon done to the Pokémon this card is attached to."
+function opponentActiveEffectShielded(opponent) {
+  const zone = opponent?.zones?.active || [];
+  const active = zone.find((c) => !c.attachedTo);
+  return Boolean(active) && hasSpecialEnergyEffectShield(evolvedView(zone, active), zone);
+}
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
 export function isExecutableStepType(type) {
@@ -269,6 +297,14 @@ export function executeSteps(draft, {
     }
     if (step.requiresAttach && !context.attachedEnergy) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
+      continue;
+    }
+    if (
+      effectType === 'attackSteps' &&
+      targetsOpponentActiveOnly(step) &&
+      opponentActiveEffectShielded(opponent)
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type });
       continue;
     }
     // "Discard a card from your hand. If you do, …" (design 036 A11): the hand cost was paid.
