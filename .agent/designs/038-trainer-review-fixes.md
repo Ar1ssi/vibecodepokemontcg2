@@ -1,5 +1,5 @@
 # 038: Design 035 review fixes (I138–I150)
-Status: approved (user, S289: option A for all 5) — building; slice 1 done S289
+Status: approved (user, S289: option A for all 5) — building; slices 1-2 done (S289, S290)
 Date: 2026-09-24 · Session: S288
 
 ## Problem
@@ -159,8 +159,8 @@ Contract (stable surface):
 | 5 | Lucky Egg holder damaged but survives | no draw | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "Lucky Egg does nothing when its holder is damaged but survives" |
 | 6 | Handheld Fan holder KO'd; attacker has 0 / 1 / 2 Energy | 0 / 1 / 1 moved, exactly once | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "Handheld Fan on a Knocked Out holder moves at most one Energy, once" |
 | 7 | Tool text with both damage and KO clauses | phase from the governing trigger sentence; test the corpus rows that match both | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "parseToolOnDamageEffect: phase follows the governing trigger" (Time Shard, Rocky Helmet, Hypnotizer …) |
-| 8 | Blind Prize pick resumes after a disconnect | ids re-validated against live Prizes; names never in options | [ ] |
-| 9 | Heavy Ball: 0 / 1 / 2 matching Basics; player declines | skip + discard / choice / choice; decline → discard, Prizes unchanged | [ ] |
+| 8 | Blind Prize pick resumes after a disconnect | ids re-validated against live Prizes; names never in options | [x] covered: shared/engine/__tests__/trainer-steps-missing.test.mjs "prizeToHand: a resumed blind pick rejects unknown ids …" + "Peonia offers its blind Prize pick face down …" |
+| 9 | Heavy Ball: 0 / 1 / 2 matching Basics; player declines | skip + discard / choice / choice; decline → discard, Prizes unchanged | [x] covered: trainer-steps-missing.test.mjs "Heavy Ball with no matching Basic …", "… chooses between two Basics, or declines", "Hisuian Heavy Ball trades itself …" |
 | 10 | Mr. Fuji with an empty Bench | `no_pokemon` skip (Active never offered) | [ ] |
 | 11 | Card shuffled into deck, later drawn and benched | enters with 0 damage, no conditions, no markers | [ ] |
 | 12 | Chaos Gym + Tool via attachCard, tails | Tool discarded, not attached, `trainerPlayBlocked` event | [ ] |
@@ -213,6 +213,13 @@ Slice 1 (S289):
   `phase:'ko'` so its Amulet of Hope path keeps working (one line, not a parity change).
 - Pre-existing crash fixed in passing: the damage-site Rugged Helmet path read `attacker.zones.hand` on the
   attacking card (TypeError on every hit); it now uses the attacking player's hand.
+
+Slice 2 (S290):
+- `buildChoicePickerRequest(choice, onResolve, {cardBackSrc})`: the card back is a third arg (default '')
+  instead of a `systemState` default, since importing state.js breaks `node --test`; the adapter passes it.
+- Stale ids are checked twice: the resolver rejects ids outside the options (`invalid_selection`), and
+  the step's `pickById` against the live Prizes drops ids that left the zone.
+- Manual live Peonia check skipped at the user's request (S290).
 
 ---
 Self-approval checklist (only when the user is unreachable):

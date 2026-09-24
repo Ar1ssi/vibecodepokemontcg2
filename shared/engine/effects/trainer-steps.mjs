@@ -2090,9 +2090,10 @@ function prizeToHand(ctx) {
 
   if (prizes.length === 0) return skip(ctx, 'no_prizes');
   const count = Math.min(step.count || 1, prizes.length);
+  // Prizes stay face down: the pick is blind, so the options carry no names (I141).
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${count} Prize card(s) to put into your hand`,
-    options: prizes,
+    options: prizes.map((c) => ({ ...c, faceDown: true })),
     min: 0,
     max: count,
   });
@@ -2108,18 +2109,28 @@ function lookAtFaceDownPrize(ctx) {
     what.includes('ultra beast')
       ? /ultra beast/i.test(String(card.name || ''))
       : isPokemon(card) && stageOf(card) === 'Basic';
-  const found = prizes.find(matches);
   const take = step.take !== false;
 
-  if (!take) {
-    ctx.events.push({
-      type: 'cardsRevealed',
-      playerId: player.playerId,
-      cards: prizes.map((c) => ({ instanceId: c.instanceId, name: c.name })),
-    });
-    return null;
+  // Only the owner looks, so the public event carries the count, never names (I141).
+  if (!ctx.selection) {
+    ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count: prizes.length, zone: 'prizes' });
   }
-  if (!found) return skip(ctx, 'no_matching_prize');
+  if (!take) return null;
+
+  const candidates = prizes.filter(matches);
+  if (!ctx.selection) {
+    if (candidates.length === 0) return skip(ctx, 'no_matching_prize');
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Item')}: You may reveal a matching Prize card and put it into your hand`,
+      options: candidates,
+      min: 0,
+      max: 1,
+    });
+  }
+
+  // Re-validate against the live Prizes; an empty pick declines ("you may").
+  const [found] = pickById(candidates, ctx.selection);
+  if (!found) return skip(ctx, 'declined');
 
   removeFromZones(player, found);
   player.zones.hand.push(found);

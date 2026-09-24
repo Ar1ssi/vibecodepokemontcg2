@@ -96,12 +96,17 @@ export function createPendingChoice({
     player,
     prompt,
     source,
-    options: options.map((opt) => ({
-      instanceId: opt.instanceId,
-      name: opt.name || '',
-      src: opt.src || '',
-      type: opt.type || '',
-    })),
+    // Blind picks (face-down Prizes) reach the chooser without name or image (I141).
+    options: options.map((opt) =>
+      opt.faceDown
+        ? { instanceId: opt.instanceId, faceDown: true }
+        : {
+            instanceId: opt.instanceId,
+            name: opt.name || '',
+            src: opt.src || '',
+            type: opt.type || '',
+          }
+    ),
     min,
     max,
     cancellable: Boolean(cancellable),

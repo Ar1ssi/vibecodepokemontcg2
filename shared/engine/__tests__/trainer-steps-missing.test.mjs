@@ -503,6 +503,38 @@ test('prizeToHand: Peonia takes Prizes and refills them from hand', () => {
   assert.ok(zone(done, 'p1', 'prizes').some((c) => c.instanceId === handCards[0].instanceId));
 });
 
+test('prizeToHand: Peonia offers its blind Prize pick face down, to the chooser and the opponent', () => {
+  const game = setup();
+  const { res } = play(
+    game,
+    'Put up to 3 Prize cards into your hand. Then, for each Prize card you put into your hand in this way, put a card from your hand face down as a Prize card.',
+    { name: 'Peonia', trainerType: 'Supporter' }
+  );
+  assert.equal(res.error, null);
+  for (const opt of res.pendingChoice.options) {
+    assert.deepEqual(Object.keys(opt).sort(), ['faceDown', 'instanceId']);
+    assert.equal(opt.faceDown, true);
+  }
+  const ownView = JSON.stringify(viewFor(res.state, 'p1'));
+  assert.ok(!ownView.includes('P1 Prize'), 'the chooser view names no Prize card');
+});
+
+test('prizeToHand: a resumed blind pick rejects unknown ids and re-checks the live Prizes', () => {
+  const game = setup();
+  const prizes = [...game.p1.zones.prizes];
+  const { res } = play(game, 'Put up to 3 Prize cards into your hand.', { name: 'Peonia', trainerType: 'Supporter' });
+  assert.equal(resolve(game, res, [99999]).error, 'invalid_selection');
+
+  // A Prize that left the zone while the choice was pending (e.g. across a reconnect) is not taken.
+  const [gone] = res.state.players.p1.zones.prizes.splice(0, 1);
+  res.state.players.p1.zones.discard.push(gone);
+  const done = resolve(game, res, [prizes[0].instanceId, prizes[1].instanceId]);
+  assert.equal(done.error, null);
+  assert.equal(zone(done, 'p1', 'prizes').length, 4, 'only the live Prize is taken');
+  assert.ok(zone(done, 'p1', 'discard').some((c) => c.instanceId === prizes[0].instanceId));
+  assert.ok(zone(done, 'p1', 'hand').some((c) => c.instanceId === prizes[1].instanceId));
+});
+
 test("lookAtFaceDownPrize: Hisuian Heavy Ball trades itself for a Basic; Daisy's Help only looks", () => {
   const game = setup();
   const prizedBasic = pokemon('Prized Basic');
@@ -514,10 +546,15 @@ test("lookAtFaceDownPrize: Hisuian Heavy Ball trades itself for a Basic; Daisy's
     { name: 'Hisuian Heavy Ball' }
   );
   assert.equal(res.error, null);
-  assert.equal(res.pendingChoice, null, 'the only matching Prize resolves without a choice');
-  assert.ok(zone(res, 'p1', 'hand').some((c) => c.instanceId === prizedBasic.instanceId));
-  assert.ok(zone(res, 'p1', 'prizes').some((c) => c.instanceId === trainer.instanceId));
-  assert.equal(zone(res, 'p1', 'prizes').length, 6);
+  assert.deepEqual(ids(res.pendingChoice.options), [prizedBasic.instanceId], 'the "you may" is always asked');
+  assert.equal(res.pendingChoice.min, 0);
+  const taken = resolve(game, res, [prizedBasic.instanceId]);
+  assert.equal(taken.error, null);
+  assert.ok(zone(taken, 'p1', 'hand').some((c) => c.instanceId === prizedBasic.instanceId));
+  assert.ok(zone(taken, 'p1', 'prizes').some((c) => c.instanceId === trainer.instanceId));
+  assert.equal(zone(taken, 'p1', 'prizes').length, 6);
+  const revealed = taken.events.filter((e) => e.type === 'cardsRevealed');
+  assert.deepEqual(revealed.map((e) => ids(e.cards)), [[prizedBasic.instanceId]], 'only the taken card is revealed');
 
   const game2 = setup();
   const daisy = play(game2, 'Draw 2 cards. Look at your face-down Prize cards.', {
@@ -527,7 +564,45 @@ test("lookAtFaceDownPrize: Hisuian Heavy Ball trades itself for a Basic; Daisy's
   assert.equal(daisy.error, null);
   assert.equal(daisy.pendingChoice, null);
   assert.equal(zone(daisy, 'p1', 'prizes').length, 6, 'no Prize is taken');
-  assert.ok(daisy.events.some((e) => e.type === 'cardsRevealed'));
+  const look = daisy.events.find((e) => e.type === 'cardsLookedAt');
+  assert.deepEqual(look, { type: 'cardsLookedAt', playerId: 'p1', count: 6, zone: 'prizes' });
+  assert.ok(!JSON.stringify(daisy.events).includes('P1 Prize'), 'no Prize name reaches the broadcast events');
+});
+
+const HEAVY_BALL_TEXT =
+  "Look at your face-down Prize cards. You may reveal a Basic Pokémon you find there, put it into your hand, and put this Hisuian Heavy Ball in its place as a face-down Prize card. (If you don't reveal a Basic Pokémon, put this card in the discard pile.)";
+
+test('lookAtFaceDownPrize: Heavy Ball with no matching Basic skips and discards itself', () => {
+  const game = setup();
+  const { res, trainer } = play(game, HEAVY_BALL_TEXT, { name: 'Hisuian Heavy Ball' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.ok(res.events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'no_matching_prize'));
+  assert.ok(zone(res, 'p1', 'discard').some((c) => c.instanceId === trainer.instanceId));
+  assert.equal(zone(res, 'p1', 'prizes').length, 6);
+});
+
+test('lookAtFaceDownPrize: Heavy Ball chooses between two Basics, or declines', () => {
+  const game = setup();
+  const basicA = pokemon('Basic A');
+  const basicB = pokemon('Basic B');
+  game.p1.zones.prizes[1] = basicA;
+  game.p1.zones.prizes[4] = basicB;
+  const { res } = play(game, HEAVY_BALL_TEXT, { name: 'Hisuian Heavy Ball' });
+  assert.deepEqual(ids(res.pendingChoice.options), [basicA.instanceId, basicB.instanceId]);
+  const picked = resolve(game, res, [basicB.instanceId]);
+  assert.ok(zone(picked, 'p1', 'hand').some((c) => c.instanceId === basicB.instanceId));
+  assert.ok(zone(picked, 'p1', 'prizes').some((c) => c.instanceId === basicA.instanceId));
+
+  const game2 = setup();
+  game2.p1.zones.prizes[1] = pokemon('Basic C');
+  const prizesBefore = ids(game2.p1.zones.prizes);
+  const second = play(game2, HEAVY_BALL_TEXT, { name: 'Hisuian Heavy Ball' });
+  const declined = resolve(game2, second.res, []);
+  assert.equal(declined.error, null);
+  assert.deepEqual(ids(zone(declined, 'p1', 'prizes')), prizesBefore, 'Prizes unchanged');
+  assert.ok(zone(declined, 'p1', 'discard').some((c) => c.instanceId === second.trainer.instanceId));
+  assert.ok(!declined.events.some((e) => e.type === 'cardsRevealed'));
 });
 
 test("opponentHandToBenchBasic: Captivating Poké Puff benches opponent Basics; Erika's Invitation switches one in", () => {

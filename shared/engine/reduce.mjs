@@ -895,11 +895,8 @@ function applyToolOnKoEffects(
       victimPlayer.zones.hand.push(...taken);
       if (activeRng) shuffleInPlace(activeRng, deck);
       if (taken.length) {
-        events.push({
-          type: 'cardsRevealed',
-          playerId: victimPlayerId,
-          cards: taken.map((c) => ({ instanceId: c.instanceId, name: c.name })),
-        });
+        // A private search: the public event carries the count only (I141).
+        events.push({ type: 'cardsLookedAt', playerId: victimPlayerId, count: taken.length, zone: 'deck' });
       }
     }
 

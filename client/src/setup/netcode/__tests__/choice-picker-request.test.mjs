@@ -50,3 +50,11 @@ test('missing or invalid counts default to one; no options means no request', ()
   assert.equal(buildChoicePickerRequest({ options: [] }, () => {}), null);
   assert.equal(buildChoicePickerRequest(null, () => {}), null);
 });
+
+test('face-down options show the card back and no name', () => {
+  const choice = { options: [{ instanceId: 7, faceDown: true }, options[0]], min: 0, max: 1 };
+  const req = buildChoicePickerRequest(choice, () => {}, { cardBackSrc: 'back.png' });
+
+  assert.deepEqual(req.candidates[0], { instanceId: 7, name: 'Face-down card', type: '', image: { src: 'back.png' } });
+  assert.equal(req.candidates[1].name, 'Pikachu');
+});

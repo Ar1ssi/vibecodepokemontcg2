@@ -194,6 +194,12 @@ test('Amulet of Hope searches up to 3 cards on Knock Out', () => {
   assert.equal(res.error, null);
   assert.equal(res.state.players.p2.zones.hand.length, 3);
   assert.equal(res.state.players.p2.zones.deck.length, 3);
+  const searched = res.events.find((e) => e.type === 'cardsLookedAt');
+  assert.deepEqual(searched, { type: 'cardsLookedAt', playerId: 'p2', count: 3, zone: 'deck' });
+  assert.ok(
+    !res.events.some((e) => e.type === 'cardsRevealed' && e.playerId === 'p2'),
+    'the private search names no card in the broadcast events'
+  );
 });
 
 test("Beast Bringer (attacker-side) takes 1 more Prize when the Ultra Beast KOs a GX", () => {
