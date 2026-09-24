@@ -242,3 +242,9 @@ Self-approval checklist (only when the user is unreachable):
   for the 5 families those 36 misparsed rows inflated. `attackCopyAbility` reuses
   `copiedAttackFor` via `attackViewFor` rather than the copy-attack prompt: borrowed attacks are
   listed as the copier's own (legality, cost and execution all read the same view).
+- Slice 7 built the gate fresh: the scratch seeds (`.agent/scratch/ability-series-audit/`) were
+  not in the S284 container. Classes are measured, not claimed: `resolveAbilitySteps` (now
+  exported from effects/ability.mjs, the plan executeAbility itself runs) decides activated vs
+  passive/unparsed and which steps lack an executor; the oracle run decides runs vs dead. Ability
+  rows count `opp:active+dmg`/KO as observed (the oracle's attack BASE_TAGS would call 146
+  move-damage abilities dead). Passive-reader "behave" probes are slice 7 piece 2.

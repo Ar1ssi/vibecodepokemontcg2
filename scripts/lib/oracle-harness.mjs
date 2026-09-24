@@ -390,8 +390,15 @@ function safe(fn, fallback) {
   }
 }
 
-/** One row per printed attack / ability in the corpus (pkmncards shape, see split-card-text.mjs). */
-export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
+/**
+ * One row per printed attack / ability in the corpus (pkmncards shape, see split-card-text.mjs).
+ * `kinds` limits the rows to 'attack' and/or 'ability' (the ability-behaviour audit runs only
+ * abilities).
+ */
+export function oracleCorpus(
+  corpus,
+  { seeds = DEFAULT_SEEDS, onCard, kinds = ['attack', 'ability'] } = {}
+) {
   const rows = [];
   for (const card of corpus) {
     onCard?.(card);
@@ -413,6 +420,7 @@ export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
     for (const entry of items) {
       if (entry.kind === 'attack') {
         const idx = attackIndex++;
+        if (!kinds.includes('attack')) continue;
         const attackCmd = () => ({
           type: 'attack',
           playerId: 'p1',
@@ -429,6 +437,7 @@ export function oracleCorpus(corpus, { seeds = DEFAULT_SEEDS, onCard } = {}) {
         });
         continue;
       }
+      if (!kinds.includes('ability')) continue;
       const aIdx = abilities.findIndex((a) => a.name === entry.name);
       const useFrom = (zone) => (state) => ({
         type: 'useAbility',

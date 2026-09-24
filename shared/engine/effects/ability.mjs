@@ -88,24 +88,15 @@ export function executeAbility(draft, {
     });
   };
 
-  // Parse and plan ability steps
   const ability = card.abilities?.[abilityIndex];
   const text = typeof ability === 'string'
     ? ability
     : ability?.text || card.abilityText || card.text || card.effect || '';
-  const parsedSteps = parseAbility(text);
-  const steps = Array.isArray(parsedSteps) ? parsedSteps : (parsedSteps?.steps || []);
-  const planned = planAbilitySteps(steps, { mode: 'interactive' });
-  let actionableSteps = planned
-    .filter((p) => p.action !== 'skip')
-    .map((p) => p.step);
+  const plan = resolveAbilitySteps(text, { selfName: card.name });
+  let actionableSteps = plan.steps;
+  const holderZone = plan.holderZone;
 
-  // An activated effect the ability parser leaves without an executor (I89) or reads as
-  // passive only (I95) runs through the shared effect templates when they read it.
-  const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName: card.name });
-  const parserFallsShort =
-    actionableSteps.length === 0 || actionableSteps.some((step) => !isExecutableStepType(step.type));
-  if (parserFallsShort && templateSteps.length > 0) {
+  if (plan.source === 'template') {
     const zone = findCard(draft, card.instanceId)?.zoneId;
     if (holderZone && zone !== holderZone) {
       events.push({ type: 'effectStepSkipped', reason: `holder_not_${holderZone}`, step: 'ability' });
@@ -113,12 +104,12 @@ export function executeAbility(draft, {
       return { pendingChoice: null, completed: true };
     }
     let flip = { coin: null, headsCount: 0 };
-    if (templateSteps.some((step) => step.gate || step.perHeads)) {
+    if (actionableSteps.some((step) => step.gate || step.perHeads)) {
       const face = flipCoin(activeRng);
       events.push({ type: 'coinFlipped', playerId, face });
       flip = { coin: face, headsCount: face === 'heads' ? 1 : 0 };
     }
-    actionableSteps = resolveCoinGates(templateSteps, flip);
+    actionableSteps = resolveCoinGates(actionableSteps, flip);
     if (actionableSteps.length === 0) {
       // Tails on a heads-only effect: the flip was the Ability's use.
       markUsed();
@@ -170,6 +161,27 @@ export function executeAbility(draft, {
 
   draft.pendingChoice = null;
   return { pendingChoice: null, completed: true };
+}
+
+/**
+ * The steps an activated ability runs: the parser's actionable (non-passive) steps, or the
+ * shared effect templates when the parser reads none or leaves one without an executor (I89)
+ * or reads the effect as passive only (I95). `source` is 'parser' | 'template'; `holderZone`
+ * is the template's position clause. Pure — the ability-behaviour audit reads the same plan.
+ */
+export function resolveAbilitySteps(text, { selfName } = {}) {
+  const parsedSteps = parseAbility(text);
+  const steps = Array.isArray(parsedSteps) ? parsedSteps : (parsedSteps?.steps || []);
+  const actionable = planAbilitySteps(steps, { mode: 'interactive' })
+    .filter((p) => p.action !== 'skip')
+    .map((p) => p.step);
+  const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName });
+  const parserFallsShort =
+    actionable.length === 0 || actionable.some((step) => !isExecutableStepType(step.type));
+  if (parserFallsShort && templateSteps.length > 0) {
+    return { source: 'template', steps: templateSteps, holderZone, parsedSteps: steps };
+  }
+  return { source: 'parser', steps: actionable, holderZone: null, parsedSteps: steps };
 }
 
 // A single "flip a coin. If heads, …" gate on the whole effect. Texts with their own tails

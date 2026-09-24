@@ -1,0 +1,413 @@
+{
+  "corpusRows": 4228,
+  "totals": {
+    "n": 4228,
+    "runs": 1811,
+    "partial": 584,
+    "dead": 148,
+    "passive": 1684,
+    "unparsed": 1
+  },
+  "families": {
+    "attach": {
+      "n": 211,
+      "runs": 120,
+      "partial": 14,
+      "dead": 77,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "attach-permission": {
+      "n": 3,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 3,
+      "unparsed": 0
+    },
+    "attach-restriction": {
+      "n": 10,
+      "runs": 0,
+      "partial": 0,
+      "dead": 10,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "attack-cost": {
+      "n": 6,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 6,
+      "unparsed": 0
+    },
+    "attack-inheritance": {
+      "n": 5,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 5,
+      "unparsed": 0
+    },
+    "bench-guard": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 1,
+      "unparsed": 0
+    },
+    "checkup": {
+      "n": 13,
+      "runs": 8,
+      "partial": 0,
+      "dead": 0,
+      "passive": 5,
+      "unparsed": 0
+    },
+    "coin-control": {
+      "n": 8,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 8,
+      "unparsed": 0
+    },
+    "copy-attack": {
+      "n": 30,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 30,
+      "unparsed": 0
+    },
+    "cost-discount": {
+      "n": 91,
+      "runs": 7,
+      "partial": 0,
+      "dead": 0,
+      "passive": 84,
+      "unparsed": 0
+    },
+    "damage-bonus": {
+      "n": 9,
+      "runs": 1,
+      "partial": 0,
+      "dead": 0,
+      "passive": 8,
+      "unparsed": 0
+    },
+    "damage-prevent": {
+      "n": 305,
+      "runs": 23,
+      "partial": 13,
+      "dead": 0,
+      "passive": 269,
+      "unparsed": 0
+    },
+    "damage-reduce": {
+      "n": 3,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 3,
+      "unparsed": 0
+    },
+    "deck-peek": {
+      "n": 3,
+      "runs": 1,
+      "partial": 2,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "discard-bench": {
+      "n": 2,
+      "runs": 2,
+      "partial": 0,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "discard-cost": {
+      "n": 2,
+      "runs": 1,
+      "partial": 1,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "draw": {
+      "n": 219,
+      "runs": 185,
+      "partial": 12,
+      "dead": 22,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "effect-prevent": {
+      "n": 151,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 151,
+      "unparsed": 0
+    },
+    "end-of-turn": {
+      "n": 17,
+      "runs": 2,
+      "partial": 0,
+      "dead": 3,
+      "passive": 12,
+      "unparsed": 0
+    },
+    "energy-multiplier": {
+      "n": 19,
+      "runs": 0,
+      "partial": 0,
+      "dead": 1,
+      "passive": 18,
+      "unparsed": 0
+    },
+    "energy-on-ko": {
+      "n": 9,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 9,
+      "unparsed": 0
+    },
+    "energy-redirect": {
+      "n": 95,
+      "runs": 77,
+      "partial": 10,
+      "dead": 0,
+      "passive": 8,
+      "unparsed": 0
+    },
+    "energy-type": {
+      "n": 3,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 3,
+      "unparsed": 0
+    },
+    "evolve": {
+      "n": 42,
+      "runs": 0,
+      "partial": 26,
+      "dead": 0,
+      "passive": 16,
+      "unparsed": 0
+    },
+    "extra-supporter": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 1,
+      "unparsed": 0
+    },
+    "go-first": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 1,
+      "unparsed": 0
+    },
+    "heal": {
+      "n": 211,
+      "runs": 185,
+      "partial": 26,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "hp-bonus": {
+      "n": 22,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 22,
+      "unparsed": 0
+    },
+    "joke": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 1,
+      "unparsed": 0
+    },
+    "ko-prevention": {
+      "n": 63,
+      "runs": 19,
+      "partial": 8,
+      "dead": 0,
+      "passive": 36,
+      "unparsed": 0
+    },
+    "look-at-top": {
+      "n": 67,
+      "runs": 55,
+      "partial": 12,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "lost-zone": {
+      "n": 2,
+      "runs": 0,
+      "partial": 2,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "move-damage": {
+      "n": 294,
+      "runs": 258,
+      "partial": 35,
+      "dead": 1,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "on-opponent-evolve": {
+      "n": 30,
+      "runs": 0,
+      "partial": 27,
+      "dead": 0,
+      "passive": 3,
+      "unparsed": 0
+    },
+    "opponent-disrupt": {
+      "n": 223,
+      "runs": 41,
+      "partial": 86,
+      "dead": 4,
+      "passive": 92,
+      "unparsed": 0
+    },
+    "passive": {
+      "n": 167,
+      "runs": 24,
+      "partial": 6,
+      "dead": 0,
+      "passive": 136,
+      "unparsed": 1
+    },
+    "prize-modify": {
+      "n": 52,
+      "runs": 2,
+      "partial": 0,
+      "dead": 0,
+      "passive": 50,
+      "unparsed": 0
+    },
+    "recursion": {
+      "n": 119,
+      "runs": 37,
+      "partial": 77,
+      "dead": 0,
+      "passive": 5,
+      "unparsed": 0
+    },
+    "retreat-cost": {
+      "n": 172,
+      "runs": 0,
+      "partial": 0,
+      "dead": 1,
+      "passive": 171,
+      "unparsed": 0
+    },
+    "search": {
+      "n": 295,
+      "runs": 181,
+      "partial": 111,
+      "dead": 3,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "self-attach-energy": {
+      "n": 2,
+      "runs": 2,
+      "partial": 0,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "self-return": {
+      "n": 12,
+      "runs": 12,
+      "partial": 0,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "setup": {
+      "n": 9,
+      "runs": 1,
+      "partial": 0,
+      "dead": 0,
+      "passive": 8,
+      "unparsed": 0
+    },
+    "status": {
+      "n": 507,
+      "runs": 303,
+      "partial": 53,
+      "dead": 24,
+      "passive": 127,
+      "unparsed": 0
+    },
+    "status-recover": {
+      "n": 38,
+      "runs": 37,
+      "partial": 1,
+      "dead": 0,
+      "passive": 0,
+      "unparsed": 0
+    },
+    "switch": {
+      "n": 256,
+      "runs": 211,
+      "partial": 34,
+      "dead": 1,
+      "passive": 10,
+      "unparsed": 0
+    },
+    "tool-cap": {
+      "n": 48,
+      "runs": 0,
+      "partial": 2,
+      "dead": 0,
+      "passive": 46,
+      "unparsed": 0
+    },
+    "type-change": {
+      "n": 18,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "passive": 18,
+      "unparsed": 0
+    },
+    "weakness": {
+      "n": 322,
+      "runs": 0,
+      "partial": 4,
+      "dead": 0,
+      "passive": 318,
+      "unparsed": 0
+    },
+    "when-played": {
+      "n": 39,
+      "runs": 16,
+      "partial": 22,
+      "dead": 1,
+      "passive": 0,
+      "unparsed": 0
+    }
+  }
+}
