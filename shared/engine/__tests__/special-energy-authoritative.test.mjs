@@ -528,3 +528,35 @@ test('SE11b: Regenerative Energy does not heal when a non-V Pokémon evolves', (
   assert.equal(res.error, null);
   assert.equal(findCard(res.state, 10).card.damage, 50);
 });
+
+test('SE12: a Poison Knock Out does not trigger Rescue Energy or Gift Energy', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.bench.push(pokemon({ instanceId: 3, name: 'Raichu' }));
+  const victim = pokemon({ instanceId: 20, name: 'Budew', hp: 30 });
+  victim.damage = 20;
+  victim.specialCondition = 'Poisoned';
+  victim.poisoned = true;
+  state.players.p2.zones.active.push(
+    victim,
+    specialEnergy({
+      instanceId: 21,
+      name: 'Rescue Energy',
+      attachedTo: 20,
+      text: 'Rescue Energy provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon back into your hand.',
+    }),
+    specialEnergy({
+      instanceId: 22,
+      name: 'Gift Energy',
+      attachedTo: 20,
+      text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.',
+    })
+  );
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 23, name: 'Roselia' }));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === 20), 'Budew is discarded, not returned');
+  assert.ok(!res.state.players.p2.zones.hand.some((c) => c.instanceId === 20));
+  assert.ok(res.state.players.p2.zones.hand.length < 7, 'Gift does not draw');
+});

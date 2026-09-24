@@ -1371,13 +1371,16 @@ function handleKnockout(
       hasOncePerGameSpecialEnergyEffect(c)
   );
   const legacyUsed = !!victimPlayer?.flags?.legacyPrizeReductionUsed;
+  // Gift / Legacy / Rescue / Splash read "Knocked Out by damage from an attack from your
+  // opponent's Pokémon": Poison, Burn, Ability counters and recoil don't count (audit SE12).
+  const koByOpponentAttack = byAttack && draft.turn?.player !== victimPlayerId;
   let prizeCount = toolPrizeCountAdjust(
     victim,
     victimZoneCards,
     basePrizeCount,
     {
       stadium: draft.stadium,
-      skipSpecialEnergy: legacyUsed,
+      skipSpecialEnergy: legacyUsed || !koByOpponentAttack,
       holder: inPlayView(draft, victim),
       flags: {
         prizesRemaining: (victimPlayer?.zones?.prizes || []).length,
@@ -1401,7 +1404,7 @@ function handleKnockout(
         attackerIsEx: isExCard(attackerCard),
       })
   );
-  if (legacyEnergyAttached && !legacyUsed) {
+  if (legacyEnergyAttached && !legacyUsed && koByOpponentAttack) {
     if (!victimPlayer.flags) victimPlayer.flags = {};
     victimPlayer.flags.legacyPrizeReductionUsed = true;
   }
@@ -1481,6 +1484,7 @@ function handleKnockout(
   // hand; Gift draws until 7). Attached cards still go to the discard pile.
   const koZoneRef = findCard(draft, victim.instanceId);
   const koSpecial = resolveSpecialEnergyKnockout(draft, {
+    byOpponentAttack: koByOpponentAttack,
     host: victim,
     hostTop: inPlayView(draft, victim),
     hostPlayerId: victimPlayerId,

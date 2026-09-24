@@ -198,13 +198,13 @@ test('SE6: Magnetic Metal gives its {M} host no Retreat Cost; Boost Energy forbi
 
 test('SE6: Coating Metal removes Weakness; Shield Energy reduces damage by 10', () => {
   const attacker = { name: 'Charmander', types: ['Fire'], instanceId: 1 };
-  const steelix = { name: 'Steelix', types: ['Metal'], hp: 200, weaknesses: [{ type: 'Fire', value: '×2' }], instanceId: 20 };
+  const steelix = { name: 'Steelix', types: ['Metal'], hp: 200, weakness: { type: 'Fire', value: 2 }, instanceId: 20 };
   const coated = computeAttackDamage(attacker, steelix, { name: 'Ember', damage: 30 }, {
     defenderZoneCards: [steelix, { name: 'Coating Metal Energy', type: 'Energy', subtypes: ['Special'], text: COATING, attachedTo: 20 }],
   });
   assert.equal(coated.total, 30);
 
-  const shielded = computeAttackDamage({ name: 'Pikachu', types: ['Lightning'], instanceId: 1 }, { ...steelix, weaknesses: [] }, { name: 'Zap', damage: 30 }, {
+  const shielded = computeAttackDamage({ name: 'Pikachu', types: ['Lightning'], instanceId: 1 }, { ...steelix, weakness: null }, { name: 'Zap', damage: 30 }, {
     defenderZoneCards: [steelix, { name: 'Shield Energy', type: 'Energy', subtypes: ['Special'], text: SHIELD, attachedTo: 20 }],
   });
   assert.equal(shielded.total, 20);

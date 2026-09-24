@@ -211,7 +211,8 @@ function applyPlan(draft, plan, ctx, selection = null) {
       break;
     }
     case 'clearStatus':
-      clearConditions(host);
+      if (plan.conditions) for (const condition of plan.conditions) removeCondition(host, condition);
+      else clearConditions(host);
       break;
     case 'returnBasicEnergy': {
       const basic = zone.find(
@@ -513,9 +514,10 @@ export function resolveSpecialEnergyDiscard(draft, { energy, host, hostTop = nul
  * On-knockout resolution for the KO'd Pokémon's attached special energies.
  * Returns `{ returnToHand, drawUntil }`.
  */
-export function resolveSpecialEnergyKnockout(draft, { host, hostTop = null, hostPlayerId, hostZoneId }) {
+export function resolveSpecialEnergyKnockout(draft, { host, hostTop = null, hostPlayerId, hostZoneId, byOpponentAttack = true }) {
   const out = { returnToHand: false, drawUntil: 0 };
-  if (!host) return out;
+  // Every on-knockout special Energy requires a KO by damage from an opponent's attack.
+  if (!host || !byOpponentAttack) return out;
   const zone = zoneOf(draft, hostPlayerId, hostZoneId);
   for (const energy of zone.filter(
     (c) => c && isSpecialEnergyCard(c) && c.attachedTo === host.instanceId
