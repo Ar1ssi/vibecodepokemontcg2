@@ -2918,6 +2918,58 @@ function buildAttackSearchChoice(
  * }}
  */
 /**
+ * Candidate groups for a discard-to-scale attack: one per printed "… or …" group
+ * (Dragon Burst: all basic {R} or all basic {L}), else the single clause. Only groups
+ * with Energy to discard are returned; `max` is capped at the group's card count.
+ *
+ * @returns {{ cards: object[], max: number, all: boolean, energyType: string|null }[]}
+ */
+function discardScalingGroups(draft, { playerId, attacker, scaling }) {
+  const specs = Array.isArray(scaling.groups) ? scaling.groups : [scaling];
+  return specs
+    .map((spec) => {
+      const cards = discardScalingCandidates(draft, {
+        playerId,
+        attacker,
+        scaling: { ...scaling, ...spec },
+      });
+      return {
+        cards,
+        max: Math.min(spec.max, cards.length),
+        all: Boolean(spec.all),
+        energyType: spec.energyType || null,
+      };
+    })
+    .filter((group) => group.cards.length > 0);
+}
+
+// Resume-token form of a discard group: ids and a finite cap (tokens must stay serialisable).
+const discardGroupToken = (group) => ({
+  ids: group.cards.map((c) => c.instanceId),
+  max: group.max,
+});
+
+/**
+ * Narrows a discard-to-scale selection to ONE printed group ("… or …" forms): the
+ * picked group for Dragon Burst's type choice, else the group of the first chosen card,
+ * capped at that group's max. Tokens without groups pass the selection through.
+ */
+function discardScaleSelection(token, selection) {
+  const groups = Array.isArray(token.groups) ? token.groups : null;
+  if (!groups) return { selection, allowedIds: token.allowedIds || [] };
+  if (token.pickGroup) {
+    const group = groups[Number((selection || [])[0]) - 1];
+    return { selection: group?.ids || [], allowedIds: group?.ids || [] };
+  }
+  const chosen = selection || [];
+  const firstId = chosen.find((id) => groups.some((g) => g.ids.includes(id)));
+  const group = groups.find((g) => g.ids.includes(firstId));
+  if (!group) return { selection: [], allowedIds: [] };
+  const inGroup = [...new Set(chosen)].filter((id) => group.ids.includes(id));
+  return { selection: inGroup.slice(0, group.max), allowedIds: group.ids };
+}
+
+/**
  * Energy a discard-to-scale attack may discard (Inferno X, Garland Ray,
  * Gholdengo ex): the attached Energy on the Pokémon the printed text names, or
  * the Energy cards in hand, filtered by printed type ({R}) and "basic".
@@ -3679,13 +3731,45 @@ function resolveAttackEffectPhase(draft, ctx) {
   let energyDiscarded = ctx.energyDiscarded;
   const discardScaling = discardEnergyScaling(attack?.text);
   if (discardScaling && energyDiscarded === undefined) {
-    const candidates = discardScalingCandidates(draft, {
-      playerId,
-      attacker,
-      scaling: discardScaling,
-    });
-    const max = Math.min(discardScaling.max, candidates.length);
-    if (max > 0) {
+    const groups = discardScalingGroups(draft, { playerId, attacker, scaling: discardScaling });
+    const candidates = groups.flatMap((group) => group.cards);
+    const max = Math.max(0, ...groups.map((group) => group.max));
+    // "Discard all …" leaves nothing to choose once only one group has Energy to discard.
+    if (groups.length === 0) {
+      energyDiscarded = 0;
+    } else if (groups.length === 1 && groups[0].all) {
+      const ids = groups[0].cards.map((c) => c.instanceId);
+      energyDiscarded = discardScalingEnergy(draft, {
+        playerId,
+        selection: ids,
+        allowedIds: ids,
+        activeRng,
+        events,
+      });
+    } else if (groups.every((group) => group.all)) {
+      // Dragon Burst: the player picks which Energy type to discard in full.
+      draft.pendingChoice = createPendingChoice({
+        player: playerId,
+        source: 'attack',
+        prompt: `${attack.name}: choose which Energy to discard.`,
+        // Numeric sentinels: the choice validator only accepts integer instanceIds.
+        options: groups.map((group, index) => ({
+          instanceId: index + 1,
+          name: `Discard all ${group.cards.length} ${group.energyType || ''} Energy`.replace(/\s+/g, ' '),
+          type: 'option',
+        })),
+        min: 1,
+        max: 1,
+        resumeToken: {
+          ...resumeBase,
+          effectType: 'attackDiscardScale',
+          pickGroup: true,
+          groups: groups.map(discardGroupToken),
+          milledMatches,
+        },
+      });
+      return;
+    } else if (max > 0) {
       draft.pendingChoice = createPendingChoice({
         player: playerId,
         source: 'attack',
@@ -3705,13 +3789,15 @@ function resolveAttackEffectPhase(draft, ctx) {
           ...resumeBase,
           effectType: 'attackDiscardScale',
           allowedIds: candidates.map((c) => c.instanceId),
+          ...(groups.length > 1 ? { groups: groups.map(discardGroupToken) } : {}),
           milledMatches,
           ...(discardScaling.destination ? { destination: discardScaling.destination } : {}),
         },
       });
       return;
+    } else {
+      energyDiscarded = 0;
     }
-    energyDiscarded = 0;
   }
 
   // Optional return-energy-for-damage (Mega Greninja ex — Ninja Spinner): ask
@@ -5701,10 +5787,11 @@ export function applyCommand(state, command, rng = null) {
         draft.pendingChoice = null;
         const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
         if (resumeCtx) {
+          const { selection, allowedIds } = discardScaleSelection(token, payload.selection);
           const energyDiscarded = discardScalingEnergy(draft, {
             playerId: initiatorPlayerId,
-            selection: payload.selection,
-            allowedIds: token.allowedIds || [],
+            selection,
+            allowedIds,
             destination: token.destination,
             activeRng,
             events,

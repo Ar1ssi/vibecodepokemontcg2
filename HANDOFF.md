@@ -4,6 +4,10 @@ Written 2026-09-24 (S284) when the user stopped the session mid-verification. Th
 the work; read this file first, then the design. The harness in the primary checkout was updated
 for this stop, so nothing here is unrecorded.
 
+**Update S287 (2026-09-24):** the PENDING re-review below is DONE (no blocker; two pre-existing
+follow-ups recorded in the design Deviations) and slice 7 (A5 discard-scaling "or" groups) is
+committed. Next: slice 8 (A6 heal wordings) per the design work plan.
+
 ## Where you are
 
 - Branch `feature/attack-behaviour` (this branch), base `main` `7baf0c9e`. Worktree used:

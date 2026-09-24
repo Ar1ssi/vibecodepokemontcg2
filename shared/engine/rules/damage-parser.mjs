@@ -1154,12 +1154,70 @@ const discardSourceOf = (from) => {
   return 'self';
 };
 
+// One typed group of a discard clause: "all basic {R} Energy", "up to 2 basic {L} Energy",
+// "any amount of basic {R} Energy", "2 basic {W} Energy cards".
+const DISCARD_GROUP = String.raw`(?:(all)|up\s+to\s+(\d+)|(any\s+(?:amount|number)\s+of)|(\d+))\s+(basic\s+)?\{([A-Z])\}\s+Energy(?:\s+cards?)?`;
+const discardGroupOf = ([all, upTo, anyAmount, exact, basic, symbol]) => {
+  let max = 1;
+  if (all || anyAmount) max = Infinity;
+  else if (upTo || exact) max = Math.max(0, parseInt(upTo || exact, 10));
+  return {
+    energyType: energyTypeOf(symbol),
+    basicOnly: Boolean(basic),
+    max,
+    ...(all ? { all: true } : {}),
+  };
+};
+
+// Rayquaza-EX / Rayquaza ex / Rayquaza V / VMAX: "Discard [either] <group> or <group>
+// attached to / from this Pokémon" — the player discards from ONE group only; `all`
+// groups discard every matching card. Pikachu-EX Overspark / Raichu / Infernape: a lone
+// "Discard all {L} Energy attached to …" discards every match, no choice.
+// Returns the scaling shape (with `groups` for the "or" form, `all` for the lone form) or null.
+function discardEnergyGroups(text) {
+  const pair = new RegExp(
+    String.raw`discard\s+(?:either\s+)?${DISCARD_GROUP}\s+or\s+${DISCARD_GROUP}\s+(?:attached\s+to|from)\s+(this\s+Pok[ée]mon|[^.,]+?)[.,]`,
+    'i'
+  ).exec(text);
+  if (pair) {
+    const groups = [discardGroupOf(pair.slice(1, 7)), discardGroupOf(pair.slice(7, 13))];
+    return {
+      max: Math.max(...groups.map((g) => g.max)),
+      source: discardSourceOf(pair[13]),
+      energyType: null,
+      basicOnly: groups.every((g) => g.basicOnly),
+      groups,
+    };
+  }
+  const all =
+    /discard\s+all\s+(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+attached\s+to\s+([^.,]+?)[.,]/i.exec(
+      text
+    );
+  if (!all) return null;
+  return {
+    max: Infinity,
+    source: discardSourceOf(all[3]),
+    energyType: energyTypeOf(all[2]),
+    basicOnly: Boolean(all[1]),
+    all: true,
+  };
+}
+
 export function discardEnergyScaling(attackText) {
   const text = String(attackText || '');
   // Blastoise-GX Rocket Splash shuffles the Energy into the deck instead ("for each card
   // you shuffled into your deck in this way"): destination 'deck'.
   const shuffled = /for each (?:energy )?card you shuffled into your deck/i.test(text);
-  if (!shuffled && !/for each (?:energy )?card you discard(ed)?/i.test(text)) return null;
+  // Older prints scale with "… damage times the number (amount) of Energy you discarded".
+  const discardedScaling =
+    /for each (?:energy )?card you discard(ed)?/i.test(text) ||
+    /times the (?:number|amount) of [^.]*?Energy[^.]*?discarded/i.test(text);
+  if (!shuffled && !discardedScaling) return null;
+
+  if (!shuffled) {
+    const grouped = discardEnergyGroups(text);
+    if (grouped) return grouped;
+  }
 
   const counted = new RegExp(
     String.raw`${shuffled ? 'shuffle' : 'discard'}\s+(?:up\s+to\s+(\d+)|(\d+)|(any\s+(?:amount|number)\s+of))?\s*(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+from\s+(this\s+Pok[ée]mon|(?:among\s+)?your\s+Benched\s+Pok[ée]mon|(?:among\s+)?your\s+Pok[ée]mon|your\s+hand)`,
