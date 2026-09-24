@@ -289,6 +289,10 @@ const CLAUSES = [
     () => ({ desc: { kind: 'attackerDamageCounters', op: 'gte', n: 1 }, printedNegated: true }),
   ],
   [
+    /^this pokémon has any damage counters on it$/,
+    () => ({ desc: { kind: 'attackerDamageCounters', op: 'gte', n: 1 }, printedNegated: false }),
+  ],
+  [
     /^this pokémon has (\d+) or more damage counters on it$/,
     (m) => ({ desc: { kind: 'attackerDamageCounters', op: 'gte', n: Number(m[1]) }, printedNegated: false }),
   ],
@@ -426,6 +430,11 @@ function parseClause(raw) {
 }
 
 const DOES_NOTHING = /^(?:if )?(.+?),?\s*this attack does nothing\.?$/;
+// "You can use this attack only if <clause>." Unlike a "does nothing" gate the printed
+// polarity is already the state the attack proceeds in, so `negated` keeps it as parsed.
+// Only clauses the CLAUSES table knows produce a gate (Beedrill Destiny Stinger's damage
+// counters today); the other 28 use-only-if wordings stay ungated until added there.
+const USE_ONLY_IF = /^you can use this attack only if (.+)$/;
 // "Discard a Stadium in play. If you can't, this attack does nothing." — the printed cost the
 // attack's condition names. Read as one gate: the attack proceeds only with a Stadium to discard.
 const DISCARD_STADIUM_GATE = /discard a stadium in play\. if you can't, this attack does nothing/;
@@ -442,7 +451,14 @@ export function parseAttackCondition(text, { selfName = '' } = {}) {
     return { kind: 'noStadium', negated: true };
   }
   for (const sentence of normalized.split(/(?<=\.)\s+/)) {
-    const m = DOES_NOTHING.exec(sentence.trim());
+    const trimmed = sentence.trim();
+    const useOnly = USE_ONLY_IF.exec(trimmed);
+    if (useOnly) {
+      const printed = parseClause(useOnly[1]);
+      if (!printed) continue;
+      return { ...printed.desc, negated: printed.printedNegated };
+    }
+    const m = DOES_NOTHING.exec(trimmed);
     if (!m) continue;
     const printed = parseClause(m[1]);
     if (!printed) continue;

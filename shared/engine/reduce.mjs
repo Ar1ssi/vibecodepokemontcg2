@@ -700,17 +700,70 @@ function computeEffectiveRetreatCost(state, card, playerId) {
 }
 
 /**
+ * Win condition checks (rulebook 30c 1.3a / p.21 "both players win at the same time").
+ * Counts how many ways each player currently wins, then compares: the side with more ways
+ * wins outright, and only an equal non-zero count is a genuine tie. A player's ways are
+ * taking every remaining Prize and the opponent having no Pokémon in play. Called once per
+ * Knock Out, or once per batch when several were marked together (`deferWin`).
+ */
+function settleKnockOutWins(draft, { events }) {
+  const playerIds = Object.keys(draft.players || {});
+  if (playerIds.length !== 2) return;
+  const [a, b] = playerIds;
+  const stateOf = (pid) => {
+    const player = draft.players[pid];
+    const prizes = player?.zones?.prizes || [];
+    const owed = player?.flags?.prizesOwed || 0;
+    const inPlay = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])].filter(
+      (c) => !c.attachedTo
+    );
+    return {
+      // An entitlement must exist: a zero-prize board with nothing owed is not a win.
+      byPrizes: owed > 0 && prizes.length <= owed,
+      wiped: inPlay.length === 0,
+    };
+  };
+  const stateA = stateOf(a);
+  const stateB = stateOf(b);
+  const ways = {
+    [a]: [
+      ...(stateA.byPrizes ? ['all prize cards taken'] : []),
+      ...(stateB.wiped ? ['no Pokémon in play'] : []),
+    ],
+    [b]: [
+      ...(stateB.byPrizes ? ['all prize cards taken'] : []),
+      ...(stateA.wiped ? ['no Pokémon in play'] : []),
+    ],
+  };
+  if (ways[a].length > ways[b].length) {
+    setGameEnded(draft, {
+      winner: a,
+      reason: stateA.byPrizes ? 'all prize cards taken' : 'no Pokémon in play',
+      events,
+    });
+  } else if (ways[b].length > ways[a].length) {
+    setGameEnded(draft, {
+      winner: b,
+      reason: stateB.byPrizes ? 'all prize cards taken' : 'no Pokémon in play',
+      events,
+    });
+  } else if (ways[a].length > 0) {
+    setGameEnded(draft, { simultaneous: [a, b], ways, events });
+  }
+}
+
+/**
  * Handles Knockout resolution for a Pokemon:
  * - Grants the attacker a prize entitlement, settled by collectPrizeEntitlement
  *   when the command finishes (audit finding B-1: the grant, not a client-supplied
  *   count, is what authorises a prize card changing hands)
  * - Discards victim and its attached cards
  * - Auto-promotes first benched Pokemon to active (if any)
- * - Checks win conditions
+ * - Checks win conditions (deferred to the batch when `deferWin`)
  */
 function handleKnockout(
   draft,
-  { victimPlayerId, attackerPlayerId, victim, events }
+  { victimPlayerId, attackerPlayerId, victim, events, deferWin = false }
 ) {
   // Discard victim and attached cards from its zone (active or bench)
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
@@ -773,7 +826,6 @@ function handleKnockout(
     .reduce((sum, marker) => sum + (marker.count || 0), 0);
   prizeCount += markerBonus;
 
-  const attackerPrizes = attacker?.zones?.prizes || [];
   if (attacker) {
     if (!attacker.flags) attacker.flags = {};
     attacker.flags.prizesOwed = (attacker.flags.prizesOwed || 0) + prizeCount;
@@ -896,55 +948,9 @@ function handleKnockout(
   // the command tail keeps the promotion from being overwritten by the attack's own
   // search/snipe choice, which also uses `state.pendingChoice`.
 
-  // Win condition checks (rulebook 30c 1.3a / p.21 "both players win at the same
-  // time"). Count how many ways each player wins on this Knockout, then compare:
-  // the side with more ways wins outright, and only an equal non-zero count is a
-  // genuine tie. Taking the last prize *and* emptying the victim's board is two
-  // ways for the attacker, not a draw; and a self-KO that empties the attacker's
-  // own board is a way for the victim.
-  const attackerWinsByPrizes =
-    attackerPrizes.length <= (attacker?.flags?.prizesOwed || 0);
-  const remainingActive = victimActive.filter((c) => !c.attachedTo);
-  const remainingBench = victimBench.filter((c) => !c.attachedTo);
-  const victimWiped =
-    remainingActive.length === 0 && remainingBench.length === 0;
-
-  const attackerOwnActive = attacker?.zones?.active || [];
-  const attackerOwnBench = attacker?.zones?.bench || [];
-  const attackerWiped =
-    attackerOwnActive.filter((c) => !c.attachedTo).length === 0 &&
-    attackerOwnBench.filter((c) => !c.attachedTo).length === 0;
-
-  const attackerWays = (attackerWinsByPrizes ? 1 : 0) + (victimWiped ? 1 : 0);
-  const victimWays = attackerWiped ? 1 : 0;
-
-  if (attackerWays > victimWays) {
-    setGameEnded(draft, {
-      winner: attackerPlayerId,
-      reason: attackerWinsByPrizes
-        ? 'all prize cards taken'
-        : 'no Pokémon in play',
-      events,
-    });
-  } else if (victimWays > attackerWays) {
-    setGameEnded(draft, {
-      winner: victimPlayerId,
-      reason: 'no Pokémon in play',
-      events,
-    });
-  } else if (attackerWays > 0) {
-    setGameEnded(draft, {
-      simultaneous: [attackerPlayerId, victimPlayerId],
-      ways: {
-        [attackerPlayerId]: [
-          ...(attackerWinsByPrizes ? ['all prize cards taken'] : []),
-          ...(victimWiped ? ['no Pokémon in play'] : []),
-        ],
-        [victimPlayerId]: attackerWiped ? ['no Pokémon in play'] : [],
-      },
-      events,
-    });
-  }
+  // A batch of Knock Outs (the sweep below) defers the win check so one evaluation
+  // sees every KO of the batch; a lone Knock Out settles here.
+  if (!deferWin) settleKnockOutWins(draft, { events });
 
   // A Knockout of the Active leaves the Active Spot empty; `settlePromotionChoices`
   // promotes at the command tail (auto for one Benched Pokémon, mat-pick choice for 2+).
@@ -1339,6 +1345,7 @@ function resolveDamageCounterKnockouts(draft, { events }) {
   if (placed.length === 0) return;
 
   const koed = new Set();
+  let knockedOut = false;
   for (const e of placed) {
     if (koed.has(e.instanceId)) continue;
     const ref = findCard(draft, e.instanceId);
@@ -1348,6 +1355,7 @@ function resolveDamageCounterKnockouts(draft, { events }) {
     // "… is Knocked Out." (attack-steps atkKnockOut) knocks out regardless of HP.
     if (e.type === 'knockOutMarked' || (koHp > 0 && (victim.damage || 0) >= koHp)) {
       koed.add(e.instanceId);
+      knockedOut = true;
       handleKnockout(draft, {
         victimPlayerId: ref.playerId,
         // A marker without an explicit beneficiary (self-inflicted damage)
@@ -1357,9 +1365,14 @@ function resolveDamageCounterKnockouts(draft, { events }) {
           Object.keys(draft.players || {}).find((id) => id !== ref.playerId),
         victim,
         events,
+        // Both Active Pokémon can be Knocked Out at once (Destined Fight): the win check
+        // runs once for the whole batch so a two-KO tiebreak is not overwritten by the
+        // second KO's lone comparison.
+        deferWin: true,
       });
     }
   }
+  if (knockedOut && !isGameConcluded(draft)) settleKnockOutWins(draft, { events });
 
   // Internal marker events are not part of the client-facing stream.
   for (let i = events.length - 1; i >= 0; i--) {

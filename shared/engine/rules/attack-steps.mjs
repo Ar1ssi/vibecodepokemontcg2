@@ -342,6 +342,24 @@ const TEMPLATES = [
       ...(m[1] ? { exactCounters: Number(m[1]) } : { maxRemainingHp: Number(m[2]) }),
     }),
   ],
+  // A4 (design 036): least remaining HP among every Pokémon in play except the attacker
+  // (Inteleon/Greninja Bring Down, Gardevoir LV.X Bring Down), and Noivern Radiant Hunt.
+  [
+    /^choose a pokémon in play that has the least hp remaining, except for this pokémon, and it is knocked out$/,
+    () => ({ type: 'atkKnockOutChoose', leastHp: true }),
+  ],
+  [
+    /^the pokémon that has the least hp remaining, except for this pokémon, is knocked out$/,
+    () => ({ type: 'atkKnockOutChoose', leastHp: true }),
+  ],
+  [
+    /^choose 1 pokémon with the fewest remaining hp and that pokémon is now knocked out$/,
+    () => ({ type: 'atkKnockOutChoose', leastHp: true }),
+  ],
+  [
+    /^knock out 1 of your opponent's radiant pokémon$/,
+    () => ({ type: 'atkKnockOutChoose', ruleBox: 'radiant' }),
+  ],
 
   [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
 
@@ -410,6 +428,22 @@ const TEMPLATES = [
   // Prizes / Knock Out
   [/^(?:discard all energy from this pokémon, and )?take (a|\d+) prize cards?$/, (m) => ({ type: 'atkTakePrize', count: countOf(m[1]) })],
   [/^your opponent's active pokémon is knocked out$/, () => ({ type: 'atkKnockOut', condition: null })],
+  // A4 (design 036): the Active is Knocked Out when its printed condition holds
+  // (Haxorus Axe Blast, Haxorus Bring Down the Axe, Armaldo Reaping Claw), and the
+  // "Both Active Pokémon are Knocked Out" wording (Annihilape, Forretress, Beedrill).
+  [
+    /^if your opponent's active pokémon is a basic pokémon, (?:it|that pokémon) is knocked out$/,
+    () => ({ type: 'atkKnockOut', condition: 'basic' }),
+  ],
+  [
+    /^if your opponent's active pokémon has any special energy attached, (?:it|that pokémon) is knocked out$/,
+    () => ({ type: 'atkKnockOut', condition: 'specialEnergy' }),
+  ],
+  [
+    /^if your opponent's active pokémon has (\d+) hp or less remaining, (?:it|that pokémon) is knocked out$/,
+    (m) => ({ type: 'atkKnockOut', condition: 'maxRemainingHp', maxRemainingHp: Number(m[1]) }),
+  ],
+  [/^both active pokémon are knocked out$/, () => ({ type: 'atkKnockOut', scope: 'both' })],
   [
     /^if your opponent's active pokémon is affected by a special condition, (?:it|that pokémon) is knocked out$/,
     () => ({ type: 'atkKnockOut', condition: 'specialCondition' }),

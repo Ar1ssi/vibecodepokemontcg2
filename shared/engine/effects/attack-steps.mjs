@@ -11,7 +11,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { isEnergy, isPokemon } from '../cards.mjs';
+import { isBasicPokemon, isEnergy, isPokemon } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import {
   addCondition,
@@ -20,7 +20,13 @@ import {
   hasCondition,
   listConditions,
 } from '../rules/special-conditions.mjs';
-import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
+import { effectiveHp, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
+import {
+  isExCard,
+  isMegaCard,
+  isRadiantCard,
+  isTeraCard,
+} from '../rules/card-classify.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import {
   addAttackMarker,
@@ -1175,15 +1181,41 @@ function atkOpponentPrizeDeckSwap(ctx) {
   });
 }
 
-function knockOutConditionMet(card, step, owner) {
+// The `ruleBox` filter on the Knock Out steps (design 036 A4), matching the
+// `defenderRuleBox` vocabulary of attack-conditions.
+const RULE_BOX_MATCHES = {
+  basic: (card) => isBasicPokemon(card),
+  ex: (card) => isExCard(card),
+  tera: (card) => isTeraCard(card),
+  radiant: (card) => isRadiantCard(card),
+  mega: (card) => isMegaCard(card),
+};
+
+/** Remaining HP of an in-play Pokémon, counting Tools, Special Energy and Stadium bonuses. */
+function remainingHp(ctx, owner, root) {
+  const base = Number(topPokemonCard(owner, root)?.hp) || 0;
+  if (!base) return 0;
+  const ref = findCard(ctx.draft, root.instanceId);
+  const zoneCards = ref?.player?.zones?.[ref.zoneId] || [];
+  const hp = effectiveHp(base, owner.playerId, root, zoneCards, ctx.draft.stadium);
+  return Math.max(0, hp - (root.damage || 0));
+}
+
+function knockOutConditionMet(ctx, owner, card, step) {
   switch (step.condition) {
     case null:
     case undefined:
       return true;
     case 'basic':
-      return stageOf(topPokemonCard(owner, card)) === 'Basic';
+      return RULE_BOX_MATCHES.basic(topPokemonCard(owner, card));
     case 'specialCondition':
       return hasAnyCondition(card);
+    case 'specialEnergy':
+      return attachedCards(owner, card.instanceId).some(isSpecialEnergy);
+    case 'maxRemainingHp': {
+      const left = remainingHp(ctx, owner, card);
+      return left > 0 && left <= step.maxRemainingHp;
+    }
     case 'exactCounters':
       return (card.damage || 0) === step.counters * 10;
     default:
@@ -1191,52 +1223,80 @@ function knockOutConditionMet(card, step, owner) {
   }
 }
 
+/** Marks a Knock Out for the reducer's sweep; a self-Knock Out credits the opponent. */
+function markKnockOut(ctx, owner, card) {
+  ctx.events.push({
+    type: 'knockOutMarked',
+    instanceId: card.instanceId,
+    victimPlayerId: owner.playerId,
+    attackerPlayerId: owner.playerId === ctx.playerId ? ctx.opponent.playerId : ctx.playerId,
+  });
+}
+
 function atkKnockOut(ctx) {
   const { opponent, step } = ctx;
   const target = activeOf(opponent);
+  if (step.scope === 'both') {
+    // Annihilape Destined Fight / Forretress Double KO: both Active Pokémon go at once.
+    const self = activeOf(ctx.player);
+    if (!target || !self) return skip(ctx, 'no_active');
+    markKnockOut(ctx, opponent, target);
+    markKnockOut(ctx, ctx.player, self);
+    return null;
+  }
   if (!target) return skip(ctx, 'no_opponent_active');
-  if (!knockOutConditionMet(target, step, opponent)) return skip(ctx, 'condition_unmet');
-  ctx.events.push({
-    type: 'knockOutMarked',
-    instanceId: target.instanceId,
-    victimPlayerId: opponent.playerId,
-    attackerPlayerId: ctx.playerId,
-  });
+  if (!knockOutConditionMet(ctx, opponent, target, step)) return skip(ctx, 'condition_unmet');
+  markKnockOut(ctx, opponent, target);
   return null;
 }
 
 // Glaceon ex Euclase / Lycanroc VMAX Hunting Claw: Knock Out 1 matching opponent's Pokémon.
 // Alolan Exeggutor ex Swinging Sphene: 1 Benched Basic Pokémon (`scope: 'bench', basicOnly`).
+// Inteleon/Greninja/Gardevoir LV.X Bring Down (`leastHp`): the lowest remaining HP among
+// every Pokémon in play except the attacker. Noivern Radiant Hunt (`ruleBox: 'radiant'`).
 function atkKnockOutChoose(ctx) {
   const { opponent, step } = ctx;
-  const matches = (root) => {
-    const damage = root.damage || 0;
-    if (step.basicOnly && stageOf(topPokemonCard(opponent, root)) !== 'Basic') return false;
-    if (step.exactCounters != null) return damage === step.exactCounters * 10;
-    if (step.maxRemainingHp == null) return true;
-    const hp = Number(topPokemonCard(opponent, root)?.hp) || 0;
-    return hp > 0 && hp - damage <= step.maxRemainingHp;
-  };
-  const roots = step.scope === 'bench' ? benchRootsOf(opponent) : rootsOf(opponent);
-  const candidates = roots.filter(matches);
-  const knockOut = (root) => {
-    ctx.events.push({
-      type: 'knockOutMarked',
-      instanceId: root.instanceId,
-      victimPlayerId: opponent.playerId,
-      attackerPlayerId: ctx.playerId,
-    });
+  const self = attackerRef(ctx)?.card || null;
+  const candidates = [];
+  for (const owner of step.leastHp ? [ctx.player, opponent] : [opponent]) {
+    const roots = step.scope === 'bench' && !step.leastHp ? benchRootsOf(owner) : rootsOf(owner);
+    for (const root of roots) {
+      if (step.leastHp && self && root.instanceId === self.instanceId) continue;
+      if (step.ruleBox && !RULE_BOX_MATCHES[step.ruleBox]?.(topPokemonCard(owner, root))) continue;
+      if (step.basicOnly && !RULE_BOX_MATCHES.basic(topPokemonCard(owner, root))) continue;
+      if (step.exactCounters != null && (root.damage || 0) !== step.exactCounters * 10) continue;
+      if (step.maxRemainingHp != null) {
+        const left = remainingHp(ctx, owner, root);
+        if (left === 0 || left > step.maxRemainingHp) continue;
+      }
+      candidates.push({ owner, root });
+    }
+  }
+  if (candidates.length === 0) return skip(ctx, 'condition_unmet');
+
+  let pool = candidates;
+  if (step.leastHp) {
+    const remaining = (entry) => remainingHp(ctx, entry.owner, entry.root);
+    const living = candidates.filter((entry) => remaining(entry) > 0);
+    if (living.length === 0) return skip(ctx, 'no_target');
+    const least = Math.min(...living.map(remaining));
+    pool = living.filter((entry) => remaining(entry) === least);
+  }
+
+  const knockOut = ({ owner, root }) => {
+    markKnockOut(ctx, owner, root);
     return null;
   };
   if (ctx.selection) {
-    const root = candidates.find((c) => c.instanceId === ctx.selection[0]);
-    return root ? knockOut(root) : skip(ctx, 'target_not_found');
+    const picked = pool.find((entry) => entry.root.instanceId === ctx.selection[0]);
+    return picked ? knockOut(picked) : skip(ctx, 'target_not_found');
   }
-  if (candidates.length === 0) return skip(ctx, 'condition_unmet');
-  if (candidates.length === 1) return knockOut(candidates[0]);
+  if (pool.length === 1) return knockOut(pool[0]);
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to Knock Out`,
-    options: candidates,
+    prompt: step.leastHp
+      ? `${attackName(ctx)}: Choose the Pokémon with the least remaining HP to Knock Out`
+      : `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to Knock Out`,
+    options: pool.map((entry) => entry.root),
     min: 1,
     max: 1,
   });
