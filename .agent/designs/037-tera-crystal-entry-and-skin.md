@@ -1,5 +1,5 @@
 # 037: Terastallization entry (canvas) and persistent Tera crystal skin
-Status: shipped S280 (approved (self): the user sent a Scarlet/Violet clip, "study the terastilize animation, and at the end look at the filter it puts on the pokemon"; skin lifetime chosen by the user: "Persist while in play")
+Status: shipped S280, amended S281 (typed palette, below) (approved (self): the user sent a Scarlet/Violet clip, "study the terastilize animation, and at the end look at the filter it puts on the pokemon"; skin lifetime chosen by the user: "Persist while in play")
 Date: 2026-09-23 · Session: S280 · Replaces the Tera part of design 034 (and D117's mint colour)
 
 ## Problem
@@ -54,3 +54,16 @@ from the advisory loop are already set). `playSignatureEntry(kind, rect, instanc
 
 ## Migration / rollout
 n/a: cosmetic. Revert = `git revert` of the S280 commit. Limitation: skins need an authoritative view (rules mode).
+
+## Amendment S281: the crystal takes the card's type colour (D122)
+User: "Tera animation color should change based on card energy type"; asked whether the lasting skin follows too,
+they chose both. `TERA_TYPE_RGB` (tera-crystal.mjs) holds a vivid crystal colour per type (not card-glow's TYPE_GLOW,
+whose Darkness/Metal read grey). `teraPaletteFor(type)` (via `normalizeEnergyType`, so 'Fire', 'R', 'Dark' resolve)
+returns `TERA_PALETTE` with deep/ice/cyan mixed from it; `teraPaletteForCard(card)` uses `card.types[0]`. Colorless,
+unknown or missing type keeps the icy default. `drawTeraEntry(..., { palette })` threads it through every draw (`g.palette`):
+prisms, glitter floor, silhouette glow, glints, burst disc and shard fringes take the type; orb, lime/teal flash, jewel,
+violet/pink/red accents and rainbow rings stay universal. `playSignatureEntry(kind, rect, instanceId, card)` passes the
+entering card (entry.js `enter`, lifecycle.js `evolve`). Skin: `teraSkinFacets(seed, palette)` colours the coloured
+planes; `teraSkinColors(palette)` gives `--fx-tera-ice/cyan/deep` (`r, g, b`), set inline by tera-skin.js on the
+skinned node and removed with the skin; mat-ambient.css reads them with the icy default as fallback.
+Tests: tera-crystal +4 (palette per type, name/symbol/default, per card, draw uses the palette), tera-skin +2.

@@ -5,10 +5,10 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 280
-Focus: S280 feature: Mega brush vortex (036), S/V Tera entry + persistent Tera crystal skin (037) from the user's clip.
+Session: 281
+Focus: S281 feature: Tera entry + crystal skin take the card's type colour (D122, design 037 amendment).
 Active: none.
-Next: maintenance due (S270 and S280, still not run). User visual check of the Tera entry, Tera skin and Mega vortex
+Next: maintenance due (S270 and S280, still not run). User visual check of typed Tera entry/skin, Mega vortex
   in a real rules-mode game.
   I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
   leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
@@ -22,7 +22,7 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   rate changes → `--update-baseline`, commit scripts/oracle-baseline.json. Later-turn markers are ORACLE_BLIND_FAMILIES.
 - Editing via bash heredoc eats `\` → write edit scripts with the Write tool / String.raw.
   Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins (D110).
-- Mat FX: see D103, D117-D121. Canvas FX go through entry.js `playCanvasStage` (WAAPI clock). Board cards live in the
+- Mat FX: see D103, D117-D122. Canvas FX go through entry.js `playCanvasStage` (WAAPI clock). Board cards live in the
   playmat iframes (css/mat-ambient.css); `.card` is preserve-3d, so layer order inside a holo wrapper needs translateZ,
   not z-index. Holo wrappers need TCGdex (unreachable in the sandbox): emulate with buildHoloCard + `holo-wrapper-changed`.
   To eyeball an effect: Playwright on /?e2e=1, pause `document.getAnimations()`, step `currentTime`, wait 2 rAFs, screenshot.
@@ -30,7 +30,8 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   ESLint runs after `pnpm install` (`npx eslint <files>`); the repo carries many prettier warnings, so lint touched files only.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S281 Tera crystal (entry prisms/floor/burst + lasting skin tint/facets/rim/glints) is the card's type colour;
+  Colorless/unknown stays icy; orb, flash, jewel, rainbow universal.
 - S280 Mega vortex = 3D brush strokes behind/in front of the card; Tera entry = S/V canvas Terastallization; Tera Pokémon
-  keep a crystal skin (tint, facets, sheen, rim, glints) while in play.
+  keep a crystal skin while in play.
 - S279 Mega orb is a 3D canvas shell (mega-orb.mjs): white-hot sphere → faceted cracked shell → perspective shatter.
-- S278 Tera/Mega entry FX replicate TCG Live (design 034): mint crystal + jewel + smoke burst; mat-wide hex field + slash vortex.

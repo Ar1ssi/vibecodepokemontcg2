@@ -44,6 +44,7 @@ import {
   TERA_REVEAL_AT,
   buildTeraScene,
   drawTeraEntry,
+  teraPaletteForCard,
 } from './tera-crystal.mjs';
 import { holdTeraSkin } from './tera-skin.js';
 
@@ -115,12 +116,16 @@ function playCanvasStage(
 // The Tera stage spans the rainbow fan and the burst's outer ring.
 const TERA_STAGE = 7;
 
-/** The Tera entry (tera-crystal.mjs): one canvas centred on the card. */
-function playTeraEntry(rect) {
+/**
+ * The Tera entry (tera-crystal.mjs): one canvas centred on the card, its
+ * crystal in the colour of the card's type.
+ */
+function playTeraEntry(rect, card) {
   const W = rect.width;
   const H = rect.height;
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-tera-entry' });
   const scene = buildTeraScene(randomSeed());
+  const palette = teraPaletteForCard(card);
   const size = H * TERA_STAGE;
   const done = playCanvasStage(host, {
     className: 'fx-tera-entry__stage',
@@ -135,6 +140,7 @@ function playTeraEntry(rect) {
         unit: H,
         card: { width: W, height: H },
         scene,
+        palette,
       }),
   });
   removeWhen(host, [done], TERA_ENTRY_MS + BACKSTOP_PAD_MS);
@@ -340,13 +346,14 @@ function playMegaEntry(rect) {
 /**
  * Play the signature entry for `kind` over the card at `rect`. Returns false
  * for other kinds. A Tera entry keeps `instanceId`'s crystal skin off until the
- * cluster bursts open, so the card is revealed already wearing it.
+ * cluster bursts open, so the card is revealed already wearing it; `card`
+ * (the entering card) picks the crystal's type colour.
  */
-export function playSignatureEntry(kind, rect, instanceId) {
+export function playSignatureEntry(kind, rect, instanceId, card) {
   if (!rect) return false;
   if (kind === 'tera') {
     holdTeraSkin(instanceId, TERA_ENTRY_MS * TERA_REVEAL_AT);
-    playTeraEntry(rect);
+    playTeraEntry(rect, card);
     return true;
   }
   if (kind === 'mega') {
@@ -365,6 +372,7 @@ export const enter = (plan) => {
   playSignatureEntry(
     kind,
     rectForInstance(plan.instanceId, registry),
-    plan.instanceId
+    plan.instanceId,
+    card
   );
 };

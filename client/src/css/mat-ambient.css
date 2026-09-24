@@ -51,7 +51,8 @@
    the rotator (they tilt and clip with the card) and an aura (rim glow and
    glints) on the wrapper, outside the rotator's clip. A bare <img> can hold no
    layers and gets only the zero-specificity rim glow, so hover and the
-   selection filters still win. */
+   selection filters still win. Colours come from the card's type: tera-skin.js
+   sets --fx-tera-ice/cyan/deep (`r, g, b`); the fallbacks are the icy default. */
 @keyframes fx-tera-skin-in {
   from { opacity: 0; }
 }
@@ -76,12 +77,12 @@
 .fx-tera-crystal__tint {
   background: linear-gradient(
     160deg,
-    rgba(200, 245, 255, 0.9) 0%,
-    rgba(90, 200, 255, 0.75) 38%,
-    rgba(70, 110, 255, 0.8) 70%,
-    rgba(150, 110, 255, 0.85) 100%
+    rgba(var(--fx-tera-ice, 150, 222, 255), 0.9) 0%,
+    rgba(var(--fx-tera-cyan, 90, 230, 255), 0.75) 38%,
+    rgba(var(--fx-tera-deep, 52, 96, 220), 0.8) 70%,
+    rgba(var(--fx-tera-deep, 52, 96, 220), 0.85) 100%
   );
-  /* Hue/saturation only: the art turns to blue glass, dark ink stays dark. */
+  /* Hue/saturation only: the art turns to coloured glass, dark ink stays dark. */
   mix-blend-mode: color;
   opacity: 0.55;
 }
@@ -96,7 +97,7 @@
     115deg,
     transparent 38%,
     rgba(255, 255, 255, 0.4) 47%,
-    rgba(190, 240, 255, 0.65) 50%,
+    rgba(var(--fx-tera-ice, 150, 222, 255), 0.65) 50%,
     rgba(255, 255, 255, 0.4) 53%,
     transparent 62%
   );
@@ -120,10 +121,10 @@
   inset: 0;
   border-radius: inherit;
   box-shadow:
-    0 0 0 1.5px rgba(200, 245, 255, 0.95),
-    0 0 6px 2px rgba(110, 215, 255, 0.85),
-    0 0 18px 5px rgba(60, 120, 255, 0.55),
-    inset 0 0 8px 1px rgba(170, 235, 255, 0.8);
+    0 0 0 1.5px rgba(var(--fx-tera-ice, 150, 222, 255), 0.95),
+    0 0 6px 2px rgba(var(--fx-tera-cyan, 90, 230, 255), 0.85),
+    0 0 18px 5px rgba(var(--fx-tera-deep, 52, 96, 220), 0.55),
+    inset 0 0 8px 1px rgba(var(--fx-tera-ice, 150, 222, 255), 0.8);
   animation: fx-tera-rim 3.2s ease-in-out infinite;
 }
 .fx-tera-crystal__glint {
@@ -133,11 +134,11 @@
   background: radial-gradient(
     circle,
     #fff 0 9%,
-    rgba(200, 245, 255, 0.85) 16%,
-    rgba(110, 200, 255, 0.35) 30%,
+    rgba(var(--fx-tera-ice, 150, 222, 255), 0.85) 16%,
+    rgba(var(--fx-tera-cyan, 90, 230, 255), 0.35) 30%,
     transparent 48%
   );
-  filter: drop-shadow(0 0 2px rgba(150, 230, 255, 0.95));
+  filter: drop-shadow(0 0 2px rgba(var(--fx-tera-ice, 150, 222, 255), 0.95));
   transform: translate(-50%, -50%) scale(0);
   opacity: 0;
   animation: fx-tera-glint 3.3s ease-in-out infinite;
@@ -150,9 +151,9 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(210, 245, 255, 0.9) 30%,
+    rgba(var(--fx-tera-ice, 150, 222, 255), 0.9) 30%,
     #fff 50%,
-    rgba(210, 245, 255, 0.9) 70%,
+    rgba(var(--fx-tera-ice, 150, 222, 255), 0.9) 70%,
     transparent
   );
   clip-path: polygon(0 50%, 50% 44%, 100% 50%, 50% 56%);
@@ -161,8 +162,8 @@
   rotate: 90deg;
 }
 :where(img.fx-tera-crystal) {
-  filter: drop-shadow(0 0 3px rgba(120, 220, 255, 0.9))
-    drop-shadow(0 0 10px rgba(60, 120, 255, 0.6)) brightness(1.05) saturate(1.1);
+  filter: drop-shadow(0 0 3px rgba(var(--fx-tera-cyan, 90, 230, 255), 0.9))
+    drop-shadow(0 0 10px rgba(var(--fx-tera-deep, 52, 96, 220), 0.6)) brightness(1.05) saturate(1.1);
 }
 
 @media (prefers-reduced-motion: reduce) {

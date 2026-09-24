@@ -1,6 +1,6 @@
 // Design 037: the persistent Tera crystal skin. Every Tera Pokémon in play wears
-// a crystal overlay (blue tint, facet mesh, drifting sheen, rim glow, glints)
-// until it leaves play. Reconciled from the last applied view on
+// a crystal overlay (tint, facet mesh, drifting sheen, rim glow, glints) in its
+// type's colour until it leaves play. Reconciled from the last applied view on
 // `board-view-applied` (apply-view.js) and `holo-wrapper-changed`
 // (hydrate-holo.js); a Tera entry holds the skin back until its reveal so the
 // card comes out of the burst already crystal. A card without a holo wrapper
@@ -13,8 +13,10 @@ import {
   hasAuthoritativeView,
 } from '../apply-view.js';
 import { svgDataUrl } from './entry-art.mjs';
+import { teraPaletteForCard } from './tera-crystal.mjs';
 import {
   createSkinReconciler,
+  teraSkinColors,
   teraSkinFacets,
   teraSkinGlints,
   teraSkinTargets,
@@ -36,12 +38,14 @@ function layer(doc, name) {
   return el;
 }
 
-function addWrapperLayers(wrapper, instanceId) {
+function addWrapperLayers(wrapper, instanceId, palette) {
   const doc = wrapper.ownerDocument;
   const rotator = wrapper.querySelector('.card__rotator');
   if (rotator) {
     const facets = layer(doc, 'facets');
-    facets.style.backgroundImage = svgDataUrl(teraSkinFacets(instanceId).svg);
+    facets.style.backgroundImage = svgDataUrl(
+      teraSkinFacets(instanceId, palette).svg
+    );
     rotator.append(layer(doc, 'tint'), facets, layer(doc, 'sheen'));
   }
   const aura = layer(doc, 'aura');
@@ -58,11 +62,17 @@ function addWrapperLayers(wrapper, instanceId) {
 }
 
 function applySkin(node, instanceId) {
+  const palette = teraPaletteForCard(getCardRegistry().get(instanceId)?.card);
+  for (const [name, value] of Object.entries(teraSkinColors(palette)))
+    node.style.setProperty(name, value);
   node.classList.add(SKIN_CLASS);
-  if (node.classList.contains('mat-holo')) addWrapperLayers(node, instanceId);
+  if (node.classList.contains('mat-holo'))
+    addWrapperLayers(node, instanceId, palette);
 }
 
 function removeSkin(node) {
+  for (const name of Object.keys(teraSkinColors()))
+    node.style?.removeProperty(name);
   node.classList.remove(SKIN_CLASS);
   node.querySelectorAll?.(`.${LAYER_CLASS}`).forEach((el) => el.remove());
 }

@@ -7,6 +7,7 @@
 // of chromatic shards under two expanding rainbow rings, revealing the card.
 // DOM-free: the timeline and scene are pure; `drawTeraEntry` only uses the 2D
 // context passed in, so the whole module runs under `node --test`.
+import { normalizeEnergyType } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
 import { seededRandom } from './flow-pose.mjs';
 
 export const TERA_ENTRY_MS = 3000;
@@ -25,6 +26,46 @@ export const TERA_PALETTE = {
   cyan: [90, 230, 255],
   red: [255, 80, 120],
 };
+
+// The crystal colour of each Tera type, as in Scarlet/Violet. Brighter and
+// more saturated than the card-glow palette so Darkness and Metal crystals
+// don't read as grey. Colorless (and an unknown type) keeps the icy default.
+export const TERA_TYPE_RGB = {
+  fire: [255, 105, 55],
+  water: [55, 135, 255],
+  grass: [85, 205, 90],
+  lightning: [255, 205, 45],
+  psychic: [235, 85, 205],
+  fighting: [225, 125, 60],
+  darkness: [120, 70, 170],
+  metal: [165, 185, 210],
+  dragon: [105, 95, 240],
+  fairy: [255, 135, 200],
+};
+
+const INK = [8, 10, 30];
+
+/**
+ * The Tera palette for a Pokémon's type: its crystal tones (deep, ice, cyan)
+ * come from the type's colour; flash, orb and rainbow accents stay the same.
+ *
+ * @param {unknown} type a printed type ('Fire', 'Darkness', 'R', …)
+ * @returns {typeof TERA_PALETTE}
+ */
+export function teraPaletteFor(type) {
+  const rgb = TERA_TYPE_RGB[normalizeEnergyType(type)];
+  if (!rgb) return TERA_PALETTE;
+  return {
+    ...TERA_PALETTE,
+    deep: mixRgb(rgb, INK, 0.35),
+    ice: mixRgb(rgb, TERA_PALETTE.white, 0.2),
+    cyan: mixRgb(rgb, TERA_PALETTE.white, 0.1),
+  };
+}
+
+/** The Tera palette for a card, from its first printed type. */
+export const teraPaletteForCard = (card) =>
+  teraPaletteFor(Array.isArray(card?.types) ? card.types[0] : null);
 
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
@@ -405,9 +446,14 @@ function faceNormal(points, inside) {
 /**
  * Draw one frame of the Tera entry at t in [0, 1]. `ctx` is a 2D context in
  * CSS pixels, (cx, cy) the card centre, `unit` the card height in the same
- * pixels, `card` its size and `scene` from `buildTeraScene`.
+ * pixels, `card` its size, `scene` from `buildTeraScene` and `palette` from
+ * `teraPaletteFor` (the Pokémon's type).
  */
-export function drawTeraEntry(ctx, t, { cx, cy, unit, card, scene }) {
+export function drawTeraEntry(
+  ctx,
+  t,
+  { cx, cy, unit, card, scene, palette = TERA_PALETTE }
+) {
   if (!(unit > 0) || !scene) return;
   const pose = teraEntryPose(t);
   const g = {
@@ -416,6 +462,7 @@ export function drawTeraEntry(ctx, t, { cx, cy, unit, card, scene }) {
     unit,
     cardW: card?.width > 0 ? card.width : unit * CARD_ASPECT,
     cardH: card?.height > 0 ? card.height : unit,
+    palette,
   };
   ctx.save();
   drawRainbow(ctx, pose, g);
@@ -469,15 +516,15 @@ function traceDiamond(ctx, length, width) {
 }
 
 /** A four-point star glint with long rays and a soft core. */
-function drawStarGlint(ctx, x, y, size, alpha, turn = 0) {
+function drawStarGlint(ctx, pal, x, y, size, alpha, turn = 0) {
   if (!(alpha > 0) || !(size > 0)) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(turn);
   ctx.globalAlpha *= alpha;
   ctx.globalCompositeOperation = 'lighter';
-  glow(ctx, 0, 0, size * 0.4, TERA_PALETTE.ice, 0.9);
-  ctx.fillStyle = rgba(TERA_PALETTE.white, 1);
+  glow(ctx, 0, 0, size * 0.4, pal.ice, 0.9);
+  ctx.fillStyle = rgba(pal.white, 1);
   traceDiamond(ctx, size, size * 0.04);
   ctx.fill();
   ctx.rotate(Math.PI / 2);
@@ -512,6 +559,7 @@ const polar = (x, y, angle, radius) => [
 
 /** The Tera Orb falling onto the Pokémon in a blue, violet and red starburst. */
 function drawOrb(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.orb > 0)) return;
   const { cx, cy, unit } = g;
   const startY = cy - unit * 2.6;
@@ -523,7 +571,7 @@ function drawOrb(ctx, pose, scene, g) {
   ctx.globalCompositeOperation = 'lighter';
 
   const trail = Math.min(unit * 1.6, y - startY);
-  ctx.fillStyle = rgba(TERA_PALETTE.white, 0.9);
+  ctx.fillStyle = rgba(pal.white, 0.9);
   for (const s of scene.trail) {
     const twinkle = 0.5 + 0.5 * Math.sin(time * 20 + s.phase);
     const size = unit * 0.014 * s.size * twinkle * (1 - s.along);
@@ -537,7 +585,7 @@ function drawOrb(ctx, pose, scene, g) {
   }
 
   glow(ctx, cx, y, r * 4.5, [70, 90, 255], 0.75);
-  const spikeColours = [[70, 110, 255], TERA_PALETTE.violet, TERA_PALETTE.red];
+  const spikeColours = [[70, 110, 255], pal.violet, pal.red];
   for (let i = 0; i < 18; i += 1) {
     const a = (i / 18) * TAU + time * 0.8;
     const down = Math.max(0, Math.sin(a));
@@ -546,7 +594,7 @@ function drawOrb(ctx, pose, scene, g) {
     const [lx, ly] = polar(cx, y, a + Math.PI / 2, r * 0.16);
     const [rx, ry] = polar(cx, y, a - Math.PI / 2, r * 0.16);
     const grad = ctx.createLinearGradient(cx, y, tx, ty);
-    grad.addColorStop(0, rgba(TERA_PALETTE.white, 0.9));
+    grad.addColorStop(0, rgba(pal.white, 0.9));
     grad.addColorStop(0.4, rgba(spikeColours[i % 3], 0.8));
     grad.addColorStop(1, rgba(spikeColours[i % 3], 0));
     ctx.fillStyle = grad;
@@ -564,27 +612,28 @@ function drawOrb(ctx, pose, scene, g) {
   body.addColorStop(1, rgba([12, 14, 50], 1));
   fillCircle(ctx, cx, y, r, body);
   ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = rgba(TERA_PALETTE.cyan, 0.95);
+  ctx.strokeStyle = rgba(pal.cyan, 0.95);
   ctx.lineWidth = r * 0.2;
   ctx.beginPath();
   ctx.ellipse(cx, y, r * 0.92, r * 0.32, 0, 0, TAU);
   ctx.stroke();
-  glow(ctx, cx - r * 0.35, y - r * 0.4, r * 0.35, TERA_PALETTE.white, 0.9);
+  glow(ctx, cx - r * 0.35, y - r * 0.4, r * 0.35, pal.white, 0.9);
   ctx.restore();
 }
 
 /** The screen-wide flash: lime to teal, with white rays and speed dashes. */
 function drawFlash(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.flash > 0)) return;
   const { cx, unit } = g;
   const fy = g.cy - unit * 0.35;
   const reach = unit * 3.4;
   ctx.save();
   ctx.globalAlpha *= pose.flash;
-  const edge = mixRgb(TERA_PALETTE.lime, TERA_PALETTE.teal, pose.flashTeal);
+  const edge = mixRgb(pal.lime, pal.teal, pose.flashTeal);
   const wash = ctx.createRadialGradient(cx, fy, 0, cx, fy, reach);
   wash.addColorStop(0, rgba([255, 255, 240], 0.95));
-  wash.addColorStop(0.18, rgba(mixRgb(edge, TERA_PALETTE.white, 0.5), 0.9));
+  wash.addColorStop(0.18, rgba(mixRgb(edge, pal.white, 0.5), 0.9));
   wash.addColorStop(0.6, rgba(edge, 0.82));
   wash.addColorStop(1, rgba(edge, 0));
   fillCircle(ctx, cx, fy, reach, wash);
@@ -596,8 +645,8 @@ function drawFlash(ctx, pose, scene, g) {
     const length = unit * ray.length;
     const [tx, ty] = polar(cx, fy, a, length);
     const grad = ctx.createLinearGradient(cx, fy, tx, ty);
-    grad.addColorStop(0, rgba(TERA_PALETTE.white, 0.9));
-    grad.addColorStop(1, rgba(TERA_PALETTE.white, 0));
+    grad.addColorStop(0, rgba(pal.white, 0.9));
+    grad.addColorStop(1, rgba(pal.white, 0));
     ctx.fillStyle = grad;
     tracePolygon(ctx, [
       [cx, fy],
@@ -619,12 +668,7 @@ function drawFlash(ctx, pose, scene, g) {
           ...polar(cx, fy, d.angle, outer),
         ];
       });
-    strokeSegments(
-      ctx,
-      segments,
-      rgba(TERA_PALETTE[colour], 0.9),
-      unit * 0.018
-    );
+    strokeSegments(ctx, segments, rgba(pal[colour], 0.9), unit * 0.018);
   }
   ctx.restore();
 }
@@ -656,6 +700,7 @@ function traceJewel(ctx, x, y, R) {
 
 /** The Tera Jewel over the Pokémon: white-hot, then teal, then dark as it fades. */
 function drawJewel(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.jewel > 0)) return;
   const R = g.unit * 0.72 * pose.jewelScale;
   if (!(R > 0)) return;
@@ -671,7 +716,7 @@ function drawJewel(ctx, pose, scene, g) {
       ...polar(cx, y, line.angle, R * line.inner),
       ...polar(cx, y, line.angle, R * line.outer),
     ]),
-    rgba(TERA_PALETTE.white, 0.2 + 0.6 * heat),
+    rgba(pal.white, 0.2 + 0.6 * heat),
     Math.max(1, unit * 0.006)
   );
   if (pose.streaks > 0) {
@@ -685,25 +730,25 @@ function drawJewel(ctx, pose, scene, g) {
       const sy = y + dy * unit;
       const half = length * unit;
       const grad = ctx.createLinearGradient(cx - half, sy, cx + half, sy);
-      grad.addColorStop(0, rgba(TERA_PALETTE.cyan, 0));
-      grad.addColorStop(0.5, rgba(TERA_PALETTE.white, 0.95 * pose.streaks));
-      grad.addColorStop(1, rgba(TERA_PALETTE.cyan, 0));
+      grad.addColorStop(0, rgba(pal.cyan, 0));
+      grad.addColorStop(0.5, rgba(pal.white, 0.95 * pose.streaks));
+      grad.addColorStop(1, rgba(pal.cyan, 0));
       ctx.fillStyle = grad;
       ctx.fillRect(cx - half, sy - (width * unit) / 2, half * 2, width * unit);
     }
   }
 
   ctx.globalCompositeOperation = 'source-over';
-  const hot = mixRgb(TERA_PALETTE.teal, TERA_PALETTE.white, 0.85);
+  const hot = mixRgb(pal.teal, pal.white, 0.85);
   const fill =
     heat > 0.5
-      ? mixRgb(TERA_PALETTE.teal, hot, (heat - 0.5) * 2)
-      : mixRgb([34, 58, 96], TERA_PALETTE.teal, heat * 2);
-  const halo = heat > 0.5 ? TERA_PALETTE.lime : TERA_PALETTE.teal;
+      ? mixRgb(pal.teal, hot, (heat - 0.5) * 2)
+      : mixRgb([34, 58, 96], pal.teal, heat * 2);
+  const halo = heat > 0.5 ? pal.lime : pal.teal;
   ctx.shadowColor = rgba(halo, 0.9 * heat);
   ctx.shadowBlur = unit * 0.25 * heat;
   const body = ctx.createLinearGradient(cx, y - R, cx, y + R);
-  body.addColorStop(0, rgba(mixRgb(fill, TERA_PALETTE.white, 0.35), 1));
+  body.addColorStop(0, rgba(mixRgb(fill, pal.white, 0.35), 1));
   body.addColorStop(1, rgba(mixRgb(fill, [20, 40, 70], 0.3), 1));
   ctx.fillStyle = body;
   traceJewel(ctx, cx, y, R);
@@ -718,13 +763,8 @@ function drawJewel(ctx, pose, scene, g) {
       ...polar(cx, y, a, i % 2 ? R * 0.5 : R),
     ]);
   }
-  strokeSegments(
-    ctx,
-    creases,
-    rgba(TERA_PALETTE.white, 0.45),
-    Math.max(1, R * 0.015)
-  );
-  ctx.strokeStyle = rgba(mixRgb(halo, TERA_PALETTE.white, 0.5), 0.9);
+  strokeSegments(ctx, creases, rgba(pal.white, 0.45), Math.max(1, R * 0.015));
+  ctx.strokeStyle = rgba(mixRgb(halo, pal.white, 0.5), 0.9);
   ctx.lineWidth = Math.max(1, R * 0.025);
   traceJewel(ctx, cx, y, R);
   ctx.stroke();
@@ -733,6 +773,7 @@ function drawJewel(ctx, pose, scene, g) {
 
 /** The glitter floor the crystal grows from. */
 function drawFloor(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.floor > 0)) return;
   const [fx, fy] = projectPoint(viewPoint([0, BASE_Y, 0], 0), g);
   const rx = g.unit * 1.7;
@@ -743,9 +784,9 @@ function drawFloor(ctx, pose, scene, g) {
   ctx.save();
   ctx.translate(fx, fy);
   ctx.scale(1, ry / rx);
-  glow(ctx, 0, 0, rx, TERA_PALETTE.ice, 0.75);
+  glow(ctx, 0, 0, rx, pal.ice, 0.75);
   ctx.restore();
-  ctx.fillStyle = rgba(TERA_PALETTE.white, 0.95);
+  ctx.fillStyle = rgba(pal.white, 0.95);
   for (const s of scene.floor) {
     const twinkle = 0.5 + 0.5 * Math.sin(pose.time * 9 + s.phase);
     const size = g.unit * 0.02 * s.size * twinkle;
@@ -762,6 +803,7 @@ function drawFloor(ctx, pose, scene, g) {
 
 /** Teal light beams rising from the floor round the white silhouette. */
 function drawBeams(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.beams > 0)) return;
   const [, fy] = projectPoint(viewPoint([0, BASE_Y, 0], 0), g);
   const { cx, unit } = g;
@@ -776,8 +818,8 @@ function drawBeams(ctx, pose, scene, g) {
     const across = a + Math.PI / 2;
     const base = beam.width * unit * 0.5;
     const grad = ctx.createLinearGradient(bx, fy, tx, ty);
-    grad.addColorStop(0, rgba(TERA_PALETTE.teal, 0.6));
-    grad.addColorStop(1, rgba(TERA_PALETTE.teal, 0));
+    grad.addColorStop(0, rgba(pal.teal, 0.6));
+    grad.addColorStop(1, rgba(pal.teal, 0));
     ctx.fillStyle = grad;
     tracePolygon(ctx, [
       polar(bx, fy, across, base),
@@ -802,12 +844,13 @@ function traceRoundRect(ctx, x, y, w, h, r) {
 
 /** The card turned to glowing white light, before the crystal closes over it. */
 function drawSilhouette(ctx, pose, g) {
+  const pal = g.palette;
   if (!(pose.silhouette > 0)) return;
   ctx.save();
   ctx.globalAlpha *= pose.silhouette;
-  ctx.shadowColor = rgba(TERA_PALETTE.ice, 0.95);
+  ctx.shadowColor = rgba(pal.ice, 0.95);
   ctx.shadowBlur = g.unit * 0.3;
-  ctx.fillStyle = rgba(TERA_PALETTE.white, 1);
+  ctx.fillStyle = rgba(pal.white, 1);
   traceRoundRect(
     ctx,
     g.cx - g.cardW / 2,
@@ -820,8 +863,8 @@ function drawSilhouette(ctx, pose, g) {
   ctx.restore();
 }
 
-function crystalShade(normal, tone, shine) {
-  const { deep, ice, white } = TERA_PALETTE;
+function crystalShade(pal, normal, tone, shine) {
+  const { deep, ice, white } = pal;
   const lambert = Math.max(0, dot(normal, LIGHT_DIR));
   const facing = Math.max(0, normal[2]);
   const ramp = clamp01(
@@ -834,7 +877,7 @@ function crystalShade(normal, tone, shine) {
   return mixRgb(base, white, 0.85 * shine);
 }
 
-function fillFace(ctx, poly, rgb) {
+function fillFace(ctx, pal, poly, rgb) {
   let top = poly[0];
   let bottom = poly[0];
   for (const p of poly) {
@@ -842,37 +885,38 @@ function fillFace(ctx, poly, rgb) {
     if (p[1] > bottom[1]) bottom = p;
   }
   const grad = ctx.createLinearGradient(top[0], top[1], bottom[0], bottom[1]);
-  grad.addColorStop(0, rgba(mixRgb(rgb, TERA_PALETTE.white, 0.4), 0.93));
-  grad.addColorStop(1, rgba(mixRgb(rgb, TERA_PALETTE.deep, 0.2), 0.87));
+  grad.addColorStop(0, rgba(mixRgb(rgb, pal.white, 0.4), 0.93));
+  grad.addColorStop(1, rgba(mixRgb(rgb, pal.deep, 0.2), 0.87));
   ctx.fillStyle = grad;
   tracePolygon(ctx, poly);
   ctx.fill();
 }
 
 /** White edges with pink and cyan fringes either side, like cut glass. */
-function strokeFaceEdges(ctx, poly, unit, shine) {
+function strokeFaceEdges(ctx, pal, poly, unit, shine) {
   const fringe = unit * 0.006;
   ctx.lineWidth = Math.max(1, unit * 0.007);
   ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = rgba(TERA_PALETTE.pink, 0.35);
+  ctx.strokeStyle = rgba(pal.pink, 0.35);
   tracePolygon(
     ctx,
     poly.map(([x, y]) => [x + fringe, y])
   );
   ctx.stroke();
-  ctx.strokeStyle = rgba(TERA_PALETTE.cyan, 0.35);
+  ctx.strokeStyle = rgba(pal.cyan, 0.35);
   tracePolygon(
     ctx,
     poly.map(([x, y]) => [x - fringe, y])
   );
   ctx.stroke();
   ctx.globalCompositeOperation = 'source-over';
-  ctx.strokeStyle = rgba(TERA_PALETTE.white, 0.7 * (1 - 0.5 * shine));
+  ctx.strokeStyle = rgba(pal.white, 0.7 * (1 - 0.5 * shine));
   tracePolygon(ctx, poly);
   ctx.stroke();
 }
 
 function drawPrism(ctx, placed, pose, g) {
+  const pal = g.palette;
   const { prism, view, centre } = placed;
   const screen = view.map((p) => projectPoint(p, g));
   const specks = { white: [], ice: [], pink: [], deep: [] };
@@ -881,8 +925,13 @@ function drawPrism(ctx, placed, pose, g) {
     const normal = faceNormal(points, centre);
     if (dot(normal, sub(CAMERA_POS, centroid(points))) <= 0) continue;
     const poly = face.idx.map((i) => screen[i]);
-    fillFace(ctx, poly, crystalShade(normal, face.tone, pose.shine));
-    strokeFaceEdges(ctx, poly, g.unit, pose.shine);
+    fillFace(
+      ctx,
+      g.palette,
+      poly,
+      crystalShade(g.palette, normal, face.tone, pose.shine)
+    );
+    strokeFaceEdges(ctx, g.palette, poly, g.unit, pose.shine);
     for (const s of face.glitter) {
       const [a, b, c] = [poly[0], poly[s.tri], poly[s.tri + 1]];
       const w = 1 - s.u - s.v;
@@ -897,7 +946,7 @@ function drawPrism(ctx, placed, pose, g) {
   }
   for (const [colour, list] of Object.entries(specks)) {
     if (!list.length) continue;
-    ctx.fillStyle = rgba(TERA_PALETTE[colour], colour === 'deep' ? 0.7 : 0.9);
+    ctx.fillStyle = rgba(pal[colour], colour === 'deep' ? 0.7 : 0.9);
     ctx.beginPath();
     for (const [x, y, size] of list) {
       ctx.moveTo(x - size, y);
@@ -912,6 +961,7 @@ function drawPrism(ctx, placed, pose, g) {
 
 /** The crystal cluster: blocks grow from the floor, back to front, and brighten. */
 function drawCluster(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.cluster > 0)) return;
   const yaw = pose.yaw * DEG;
   const placed = scene.prisms
@@ -922,13 +972,13 @@ function drawCluster(ctx, pose, scene, g) {
   ctx.save();
   ctx.globalAlpha *= pose.cluster;
   ctx.globalCompositeOperation = 'lighter';
-  glow(ctx, g.cx, g.cy, g.unit * 1.5, TERA_PALETTE.ice, 0.45);
+  glow(ctx, g.cx, g.cy, g.unit * 1.5, pal.ice, 0.45);
   ctx.globalCompositeOperation = 'source-over';
   ctx.lineJoin = 'round';
   for (const prism of placed) drawPrism(ctx, prism, pose, g);
   if (pose.shine > 0) {
     ctx.globalCompositeOperation = 'lighter';
-    glow(ctx, g.cx, g.cy, g.unit * 1.4, TERA_PALETTE.white, 0.7 * pose.shine);
+    glow(ctx, g.cx, g.cy, g.unit * 1.4, pal.white, 0.7 * pose.shine);
   }
   ctx.restore();
 }
@@ -939,6 +989,7 @@ function drawClusterGlints(ctx, pose, scene, g) {
     const twinkle = Math.max(0, Math.sin(pose.time * 5 + glint.phase));
     drawStarGlint(
       ctx,
+      g.palette,
       g.cx + glint.x * g.unit,
       g.cy - glint.y * g.unit,
       g.unit * glint.size * twinkle,
@@ -949,6 +1000,7 @@ function drawClusterGlints(ctx, pose, scene, g) {
 
 /** Glitter sprayed up and out as the crystal forms. */
 function drawSpray(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.spray > 0)) return;
   const { cx, unit } = g;
   const oy = g.cy - unit * 0.05;
@@ -969,12 +1021,7 @@ function drawSpray(ctx, pose, scene, g) {
         ...polar(cx, oy, d.angle, outer),
       ]);
     }
-    strokeSegments(
-      ctx,
-      segments,
-      rgba(TERA_PALETTE[colour], 0.85),
-      unit * 0.016
-    );
+    strokeSegments(ctx, segments, rgba(pal[colour], 0.85), unit * 0.016);
   }
   ctx.restore();
 }
@@ -993,21 +1040,22 @@ const RAINBOW_BEAMS = [
 
 /** Pastel light beams fanning out behind the cluster, in a violet haze. */
 function drawRainbow(ctx, pose, g) {
+  const pal = g.palette;
   if (!(pose.rainbow > 0)) return;
   const { cx, unit } = g;
   const oy = g.cy + unit * 0.25;
   const reach = unit * 3.4;
   ctx.save();
   ctx.globalAlpha *= pose.rainbow;
-  glow(ctx, cx, oy, unit * 2.8, TERA_PALETTE.violet, 0.4);
+  glow(ctx, cx, oy, unit * 2.8, pal.violet, 0.4);
   ctx.globalCompositeOperation = 'lighter';
   RAINBOW_BEAMS.forEach(([angle, colour], i) => {
     const a = -Math.PI / 2 + (angle + 4 * Math.sin(pose.time * 1.5 + i)) * DEG;
     const half = (7 + (i % 3)) * DEG;
     const grad = ctx.createRadialGradient(cx, oy, 0, cx, oy, reach);
-    grad.addColorStop(0.1, rgba(TERA_PALETTE[colour], 0));
-    grad.addColorStop(0.3, rgba(TERA_PALETTE[colour], 0.75));
-    grad.addColorStop(1, rgba(TERA_PALETTE[colour], 0));
+    grad.addColorStop(0.1, rgba(pal[colour], 0));
+    grad.addColorStop(0.3, rgba(pal[colour], 0.75));
+    grad.addColorStop(1, rgba(pal[colour], 0));
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(cx, oy);
@@ -1019,12 +1067,13 @@ function drawRainbow(ctx, pose, g) {
 }
 
 function drawWhiteout(ctx, pose, g) {
+  const pal = g.palette;
   if (!(pose.whiteout > 0)) return;
   const radius = g.unit * (1.2 + 2.2 * pose.whiteout);
   const grad = ctx.createRadialGradient(g.cx, g.cy, 0, g.cx, g.cy, radius);
-  grad.addColorStop(0, rgba(TERA_PALETTE.white, pose.whiteout));
-  grad.addColorStop(0.5, rgba(TERA_PALETTE.white, 0.95 * pose.whiteout));
-  grad.addColorStop(1, rgba(TERA_PALETTE.white, 0));
+  grad.addColorStop(0, rgba(pal.white, pose.whiteout));
+  grad.addColorStop(0.5, rgba(pal.white, 0.95 * pose.whiteout));
+  grad.addColorStop(1, rgba(pal.white, 0));
   fillCircle(ctx, g.cx, g.cy, radius, grad);
 }
 
@@ -1066,8 +1115,9 @@ function traceSliver(ctx, x, y, angle, length, width) {
   ctx.closePath();
 }
 
-/** The burst: a blue glow, shards flying out with colour fringes, rainbow rings. */
+/** The burst: a crystal-coloured glow, shards flying out with colour fringes, rainbow rings. */
 function drawBurst(ctx, pose, scene, g) {
+  const pal = g.palette;
   if (!(pose.burst > 0)) return;
   const { cx, cy, unit } = g;
   const travel = pose.burstTravel;
@@ -1075,10 +1125,10 @@ function drawBurst(ctx, pose, scene, g) {
   ctx.globalAlpha *= pose.burst;
   const radius = unit * (1 + 1.3 * travel);
   const disc = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-  disc.addColorStop(0, rgba([170, 230, 255], 0.3));
-  disc.addColorStop(0.55, rgba([50, 140, 255], 0.75));
-  disc.addColorStop(0.85, rgba([30, 90, 240], 0.45));
-  disc.addColorStop(1, rgba([30, 90, 240], 0));
+  disc.addColorStop(0, rgba(pal.ice, 0.3));
+  disc.addColorStop(0.55, rgba(mixRgb(pal.cyan, pal.deep, 0.5), 0.75));
+  disc.addColorStop(0.85, rgba(pal.deep, 0.45));
+  disc.addColorStop(1, rgba(pal.deep, 0));
   fillCircle(ctx, cx, cy, radius, disc);
 
   ctx.globalCompositeOperation = 'lighter';
@@ -1108,13 +1158,13 @@ function drawBurst(ctx, pose, scene, g) {
     const length = unit * shard.length;
     const width = unit * shard.width;
     const fringe = unit * 0.012;
-    ctx.fillStyle = rgba(TERA_PALETTE.pink, 0.55 * fade);
+    ctx.fillStyle = rgba(pal.pink, 0.55 * fade);
     traceSliver(ctx, x + fringe, y, turn, length, width);
     ctx.fill();
-    ctx.fillStyle = rgba(TERA_PALETTE.cyan, 0.55 * fade);
+    ctx.fillStyle = rgba(pal.cyan, 0.55 * fade);
     traceSliver(ctx, x - fringe, y, turn, length, width);
     ctx.fill();
-    ctx.fillStyle = rgba(TERA_PALETTE[shard.colour], 0.9 * fade);
+    ctx.fillStyle = rgba(pal[shard.colour], 0.9 * fade);
     traceSliver(ctx, x, y, turn, length, width);
     ctx.fill();
   }
@@ -1140,6 +1190,7 @@ function drawReveal(ctx, pose, g) {
     const pop = Math.sin(Math.PI * local);
     drawStarGlint(
       ctx,
+      g.palette,
       left + g.cardW * fx,
       top + g.cardH * fy,
       g.cardW * 0.32 * pop,

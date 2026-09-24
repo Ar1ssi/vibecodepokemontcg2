@@ -3,12 +3,16 @@ import assert from 'node:assert/strict';
 import {
   TERA_BURST_AT,
   TERA_ENTRY_MS,
+  TERA_PALETTE,
   TERA_REVEAL_AT,
+  TERA_TYPE_RGB,
   buildTeraScene,
   drawTeraEntry,
   prismGrowth,
   projectPoint,
   teraEntryPose,
+  teraPaletteFor,
+  teraPaletteForCard,
 } from '../tera-crystal.mjs';
 
 const BEATS = [
@@ -28,10 +32,14 @@ const BEATS = [
   'reveal',
 ];
 
-/** A 2D-context stand-in that records every drawing call. */
+/**
+ * A 2D-context stand-in that records every drawing call, and every colour
+ * used (fill/stroke/shadow styles and gradient stops).
+ */
 const recordingContext = () => {
   const calls = [];
-  const gradient = { addColorStop: () => {} };
+  const colours = [];
+  const gradient = { addColorStop: (_at, colour) => colours.push(colour) };
   const ctx = new Proxy(
     { globalAlpha: 1 },
     {
@@ -42,12 +50,14 @@ const recordingContext = () => {
         return (...args) => calls.push([key, args]);
       },
       set(target, key, value) {
+        if (typeof value === 'string' && /Style$|Color$/.test(key))
+          colours.push(value);
         target[key] = value;
         return true;
       },
     }
   );
-  return { ctx, calls };
+  return { ctx, calls, colours };
 };
 
 const count = (calls, name) => calls.filter(([n]) => n === name).length;
@@ -203,4 +213,56 @@ test('drawTeraEntry: the crystal cluster fills many faces once grown', () => {
   const noCard = recordingContext();
   drawTeraEntry(noCard.ctx, 0.7, { ...opts(scene), card: undefined });
   assert.ok(count(noCard.calls, 'fill') > 0, 'card size falls back to unit');
+});
+
+test('teraPaletteFor: each type gets its own crystal tones, accents stay', () => {
+  const tones = new Set();
+  for (const type of Object.keys(TERA_TYPE_RGB)) {
+    const palette = teraPaletteFor(type);
+    for (const key of ['lime', 'teal', 'violet', 'pink', 'red', 'white'])
+      assert.deepEqual(palette[key], TERA_PALETTE[key], `${type} ${key}`);
+    for (const key of ['deep', 'ice', 'cyan']) {
+      assert.equal(palette[key].length, 3);
+      for (const v of palette[key])
+        assert.ok(Number.isInteger(v) && v >= 0 && v <= 255, `${type} ${key}`);
+    }
+    tones.add(palette.deep.join());
+  }
+  assert.equal(tones.size, Object.keys(TERA_TYPE_RGB).length, 'all distinct');
+  assert.ok(!tones.has(TERA_PALETTE.deep.join()), 'none is the icy default');
+});
+
+test('teraPaletteFor: printed names and symbols resolve; Colorless and unknown keep the default', () => {
+  assert.deepEqual(teraPaletteFor('Fire'), teraPaletteFor('R'));
+  assert.deepEqual(teraPaletteFor('Darkness'), teraPaletteFor('Dark'));
+  const fire = teraPaletteFor('Fire').deep;
+  assert.ok(fire[0] > fire[2], 'fire crystal is warm');
+  for (const type of ['Colorless', 'Stellar', '', null, undefined, 42, {}])
+    assert.equal(teraPaletteFor(type), TERA_PALETTE, String(type));
+});
+
+test('teraPaletteForCard: the first printed type picks the palette', () => {
+  assert.deepEqual(
+    teraPaletteForCard({ types: ['Water', 'Fire'] }),
+    teraPaletteFor('Water')
+  );
+  for (const card of [null, undefined, {}, { types: 'Fire' }, { types: [] }])
+    assert.equal(teraPaletteForCard(card), TERA_PALETTE);
+});
+
+test('drawTeraEntry: the crystal is drawn in the palette passed in', () => {
+  const scene = buildTeraScene(4);
+  const fire = teraPaletteFor('Fire');
+  const has = (colours, rgb) =>
+    colours.some((c) => c.includes(`(${rgb.join(', ')}`));
+  for (const t of [0.7, 0.85]) {
+    const typed = recordingContext();
+    drawTeraEntry(typed.ctx, t, { ...opts(scene), palette: fire });
+    const plain = recordingContext();
+    drawTeraEntry(plain.ctx, t, opts(scene));
+    assert.ok(has(typed.colours, fire.ice), `fire ice at ${t}`);
+    assert.ok(has(typed.colours, fire.deep), `fire deep at ${t}`);
+    assert.ok(!has(typed.colours, TERA_PALETTE.ice), `no icy default at ${t}`);
+    assert.ok(has(plain.colours, TERA_PALETTE.ice), `default ice at ${t}`);
+  }
 });

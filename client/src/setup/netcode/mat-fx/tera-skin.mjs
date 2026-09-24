@@ -6,6 +6,7 @@ import { isPokemon } from '../../../../../shared/engine/cards.mjs';
 import { topPokemonCard } from '../../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { signatureEntryKind } from './entry-kind.mjs';
 import { seededRandom } from './flow-pose.mjs';
+import { TERA_PALETTE } from './tera-crystal.mjs';
 
 export const TERA_SKIN_SIDES = ['you', 'them'];
 export const TERA_SKIN_ZONES = ['active', 'bench'];
@@ -114,14 +115,19 @@ export function skinSeed(id) {
 
 export const FACET_VIEW = { width: 100, height: 140, cols: 4, rows: 6 };
 const FACET_JITTER = 0.32; // of a cell, interior points only
-// Mostly clear glass with bright and deep planes, like the clip's crystal skin.
-const FACET_FILLS = [
+const hex = (rgb) =>
+  `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+const darken = (rgb, t) => rgb.map((v) => Math.round(v * (1 - t)));
+
+// Mostly clear glass with bright and deep planes, like the clip's crystal
+// skin; the coloured planes take the palette's (type's) crystal tones.
+const facetFills = (palette) => [
   ['#ffffff', 0.34],
   ['#ffffff', 0.18],
-  ['#bfefff', 0.28],
-  ['#6fd6ff', 0.22],
-  ['#3a6cff', 0.2],
-  ['#1b2f8f', 0.26],
+  [hex(palette.ice), 0.28],
+  [hex(palette.cyan), 0.22],
+  [hex(palette.deep), 0.2],
+  [hex(darken(palette.deep, 0.45)), 0.26],
 ];
 
 /** Grid points for the facet mesh; the border stays on the card edge. */
@@ -151,10 +157,12 @@ const f1 = (n) => Math.round(n * 10) / 10;
  * viewBox 0 0 100 140, attributes single-quoted for svgDataUrl.
  *
  * @param {unknown} seed instanceId or number
+ * @param {typeof TERA_PALETTE} [palette] from `teraPaletteFor` (the card's type)
  * @returns {{ svg: string, triangles: number[][][] }}
  */
-export function teraSkinFacets(seed) {
+export function teraSkinFacets(seed, palette = TERA_PALETTE) {
   const rand = seededRandom(skinSeed(seed));
+  const fills = facetFills(palette);
   const { width, height, cols, rows } = FACET_VIEW;
   const p = facetPoints(rand);
   const triangles = [];
@@ -178,8 +186,7 @@ export function teraSkinFacets(seed) {
               [b, cc, d],
             ];
       for (const tri of pair) {
-        const [fill, opacity] =
-          FACET_FILLS[Math.floor(rand() * FACET_FILLS.length)];
+        const [fill, opacity] = fills[Math.floor(rand() * fills.length)];
         triangles.push(tri);
         const pts = tri.map(([x, y]) => `${f1(x)},${f1(y)}`).join(' ');
         polys.push(
@@ -211,4 +218,19 @@ export function teraSkinGlints(seed) {
     size: f1((0.28 + rand() * 0.16) * 100) / 100,
     delay: f1(i * 1.1 + rand() * 0.6),
   }));
+}
+
+/**
+ * The CSS custom properties that colour the skin's tint, rim and glints
+ * (css/mat-ambient.css), as `r, g, b` triplets for `rgba(var(--x), a)`.
+ *
+ * @param {typeof TERA_PALETTE} [palette] from `teraPaletteFor` (the card's type)
+ * @returns {Record<string, string>}
+ */
+export function teraSkinColors(palette = TERA_PALETTE) {
+  return {
+    '--fx-tera-deep': palette.deep.join(', '),
+    '--fx-tera-ice': palette.ice.join(', '),
+    '--fx-tera-cyan': palette.cyan.join(', '),
+  };
 }

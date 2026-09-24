@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { TERA_PALETTE, teraPaletteFor } from '../tera-crystal.mjs';
 import {
   FACET_VIEW,
   TERA_SKIN_GLINTS,
   createSkinReconciler,
   skinSeed,
+  teraSkinColors,
   teraSkinFacets,
   teraSkinGlints,
   teraSkinTargets,
@@ -122,6 +124,37 @@ test('teraSkinFacets: the mesh covers the whole card (areas sum to the box)', ()
     return sum + Math.abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay)) / 2;
   }, 0);
   assert.ok(Math.abs(area - FACET_VIEW.width * FACET_VIEW.height) < 1e-6);
+});
+
+test("teraSkinFacets: the coloured planes take the palette's crystal tones", () => {
+  const hex = (rgb) =>
+    `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  const fillsOf = (svg) => new Set(svg.match(/fill='#[0-9a-f]{6}'/g));
+  const fire = teraPaletteFor('Fire');
+  const typed = teraSkinFacets(5, fire);
+  const plain = teraSkinFacets(5);
+  assert.deepEqual(
+    typed.triangles,
+    plain.triangles,
+    'same mesh, other colours'
+  );
+  assert.ok(fillsOf(typed.svg).has(`fill='${hex(fire.ice)}'`));
+  assert.ok(!fillsOf(typed.svg).has(`fill='${hex(TERA_PALETTE.ice)}'`));
+  assert.ok(fillsOf(plain.svg).has(`fill='${hex(TERA_PALETTE.ice)}'`));
+  assert.ok(
+    fillsOf(typed.svg).has(`fill='#ffffff'`),
+    'clear glass stays white'
+  );
+});
+
+test('teraSkinColors: rgb triplets of the crystal tones for the CSS', () => {
+  const water = teraPaletteFor('Water');
+  assert.deepEqual(teraSkinColors(water), {
+    '--fx-tera-deep': water.deep.join(', '),
+    '--fx-tera-ice': water.ice.join(', '),
+    '--fx-tera-cyan': water.cyan.join(', '),
+  });
+  assert.equal(teraSkinColors()['--fx-tera-ice'], '150, 222, 255');
 });
 
 test('teraSkinGlints: a few staggered glints inside the card', () => {
