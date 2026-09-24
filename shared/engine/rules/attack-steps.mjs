@@ -85,6 +85,17 @@ function stripGates(sentence) {
 
 const ENERGY_TYPE = String.raw`(?:basic )?(?:\{([a-z])\} )?(?:basic )?`;
 
+// "heal 30 damage" / "heal all damage" / "remove 3 damage counters" / "remove a damage counter".
+const HEAL = String.raw`(?:heal (\d+|all) damage|remove (\d+|an?|all) damage counters?)`;
+
+// The two HEAL captures → a step amount in damage counters, or `all`.
+function healAmount(healWord, removeWord) {
+  const word = healWord ?? removeWord;
+  if (word === 'all') return { all: true };
+  if (healWord != null) return { count: Math.floor(Number(healWord) / 10) };
+  return { count: countOf(removeWord) };
+}
+
 // ── single-sentence templates ───────────────────────────────────────────────
 // Each entry: [regex, (match, sentence) => step | null]. The regex is anchored on the
 // sentence with its gate removed and its final period stripped.
@@ -457,10 +468,73 @@ const TEMPLATES = [
     (m) => ({ type: 'atkKnockOut', condition: 'exactCounters', counters: Number(m[1]) }),
   ],
 
-  // Heal your side
+  // Heal (design 036 A6). Amounts are damage counters (`count`, so "For each heads" scales
+  // them) or `all`; "heal 30 damage" is 3 counters.
   [
-    /^heal (\d+|all) damage from (?:each|all) of your (benched )?pokémon$/,
-    (m) => ({ type: 'atkHealEach', ...(m[1] === 'all' ? { all: true } : { amount: Number(m[1]) }), scope: m[2] ? 'bench' : 'all' }),
+    new RegExp(String.raw`^${HEAL} from (?:each|all) of your (benched )?(basic )?(?:\{([a-z])\} )?pokémon(?: that has any (?:\{([a-z])\} )?(energy) attached to it)?$`),
+    (m) => ({
+      type: 'atkHealEach',
+      ...healAmount(m[1], m[2]),
+      scope: m[3] ? 'bench' : 'all',
+      ...(m[4] ? { basicOnly: true } : {}),
+      ...(m[5] ? { pokemonType: m[5] } : {}),
+      ...(m[7] ? { hasEnergy: true, ...(m[6] ? { energyType: m[6].toUpperCase() } : {}) } : {}),
+    }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from each pokémon$`),
+    (m) => ({ type: 'atkHealEach', ...healAmount(m[1], m[2]), scope: 'all', side: 'both' }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from both active pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'bothActive' }),
+  ],
+  [
+    new RegExp(String.raw`^(?:discard (?:an?|\d+) (?:\{[a-z]\} )?energy(?: cards?)? (?:attached to|from) this pokémon and )?${HEAL} from this pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self' }),
+  ],
+  [
+    new RegExp(String.raw`^discard (?:an?|\d+) (?:\{[a-z]\} )?energy(?: cards?)? (?:attached to|from) this pokémon and ${HEAL} from it$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self' }),
+  ],
+  [
+    /^remove all special conditions and (\d+|an?|all) damage counters? from this pokémon$/,
+    (m) => ({ type: 'atkHealCounted', ...healAmount(undefined, m[1]), target: 'self', cure: true }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} (?:and remove all special conditions from this pokémon|from this pokémon, and it recovers from all special conditions)$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self', cure: true }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from your opponent's active pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'opponentActive' }),
+  ],
+  [
+    new RegExp(String.raw`^${HEAL} from (\d+) of your (benched )?(?:\{([a-z])\} )?pokémon$`),
+    (m) => ({
+      type: 'atkHealCounted',
+      ...healAmount(m[1], m[2]),
+      target: 'chosen',
+      scope: m[4] ? 'bench' : 'all',
+      ...(Number(m[3]) > 1 ? { targets: Number(m[3]) } : {}),
+      ...(m[5] ? { pokemonType: m[5] } : {}),
+    }),
+  ],
+  // "If heads, this attack does 20 more damage and heal 20 damage from this Pokémon": the
+  // damage half is the damage parser's; the heal follows the same coin.
+  [
+    new RegExp(String.raw`^this attack does \d+ (?:more )?damage(?: plus \d+ more damage)?,? and ${HEAL} from this pokémon$`),
+    (m) => ({ type: 'atkHealCounted', ...healAmount(m[1], m[2]), target: 'self' }),
+  ],
+  // Mr. Mime E4 Magic Heal / Lopunny Healing Wish: one counter per heads.
+  [
+    /^remove a number of damage counters equal to the number of heads from (your pokémon in any way you like|1 of your pokémon)$/,
+    (m) => ({ type: 'atkHealCounted', count: 1, perHeads: true, target: /any way/.test(m[1]) ? 'distribute' : 'chosen', scope: 'all' }),
+  ],
+  // The drain wordings: as many counters as the damage this attack did.
+  [
+    /^(?:remove from this pokémon the number of damage counters equal to the damage you did to your opponent's active pokémon|remove a number of damage counters from this pokémon equal to the damage done to your opponent's active pokémon)$/,
+    () => ({ type: 'atkMirrorHeal' }),
   ],
 
   // Timed effects on later turns (design 031)

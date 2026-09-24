@@ -537,12 +537,13 @@ export function parseAttackDamage(
     if (bench > 0) components.push('bench');
   }
   let heal = 0;
-  // Heal family (audit B): "Heal N damage from …" and "remove N damage
-  // counter(s)" both remove N damage counters. The target (attacker /
-  // defender / all) is resolved separately by healTarget().
-  const healRe = /(?:heal|remove) (?:up to )?(\d+) damage/;
-  if (text && healRe.test(text)) {
-    heal = amount(text, healRe);
+  // Heal family (audit B): "Heal N damage from …" removes N damage; "remove N damage
+  // counter(s)" removes N × 10. The target (attacker / defender / all) is resolved
+  // separately by healTarget().
+  const healRe = /(?:heal|remove) (?:up to )?(\d+) damage( counters?)?/;
+  const healMatch = text ? healRe.exec(text) : null;
+  if (healMatch) {
+    heal = amount(text, healRe) * (healMatch[2] ? 10 : 1);
     if (heal > 0) components.push('heal');
   }
 

@@ -203,7 +203,7 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 578
+      "observed": 584
     },
     "attack:coin-flip": {
       "n": 429,
@@ -271,7 +271,7 @@
     },
     "attack:heal": {
       "n": 148,
-      "observed": 138
+      "observed": 142
     },
     "attack:hp-cap-damage": {
       "n": 9,
@@ -319,7 +319,7 @@
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 439
+      "observed": 456
     },
     "attack:once-per-turn": {
       "n": 5,

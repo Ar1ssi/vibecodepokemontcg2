@@ -1435,20 +1435,121 @@ function atkBounceOppActive(ctx) {
   return null;
 }
 
+// Damage a heal step removes: `all`, `amount` (damage, older steps) or `count` counters.
+function healLimit(step) {
+  if (step.all) return Infinity;
+  if (step.amount != null) return step.amount;
+  return (step.count || 0) * 10;
+}
+
+/** Heals one Pokémon (and cures it for `cure`); returns whether anything changed. */
+function healPokemon(ctx, card, limit, { cure = false } = {}) {
+  let changed = false;
+  const damage = card.damage || 0;
+  const healed = Math.min(damage, limit);
+  if (healed > 0) {
+    card.damage = damage - healed;
+    ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage, healed });
+    changed = true;
+  }
+  if (cure && hasAnyCondition(card)) {
+    clearConditions(card);
+    ctx.events.push({ type: 'specialConditionUpdated', instanceId: card.instanceId, condition: null, conditions: [] });
+    changed = true;
+  }
+  return changed;
+}
+
+// The printed filter on "each of your … Pokémon" / "1 of your … Pokémon".
+function healFilterMatches(owner, root, step) {
+  const top = topPokemonCard(owner, root) || root;
+  if (step.basicOnly && !isBasicPokemon(top)) return false;
+  if (step.pokemonType && !pokemonHasType(top, step.pokemonType)) return false;
+  if (step.hasEnergy) {
+    const energy = attachedCards(owner, root.instanceId).filter((c) =>
+      energyMatches(c, { energyType: step.energyType })
+    );
+    if (energy.length === 0) return false;
+  }
+  return true;
+}
+
 function atkHealEach(ctx) {
   const { player, step } = ctx;
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
-  const roots = step.scope === 'bench' ? benchRootsOf(player) : rootsOf(player);
+  const owners = step.side === 'both' ? [player, ctx.opponent] : [player];
   let healedAny = false;
-  for (const card of roots) {
-    const damage = card.damage || 0;
-    if (damage === 0) continue;
-    const healed = step.all ? damage : Math.min(damage, step.amount || 0);
-    card.damage = damage - healed;
-    healedAny = true;
-    ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage, healed });
+  for (const owner of owners) {
+    const roots = step.scope === 'bench' ? benchRootsOf(owner) : rootsOf(owner);
+    for (const card of roots) {
+      if (!healFilterMatches(owner, card, step)) continue;
+      if (healPokemon(ctx, card, healLimit(step))) healedAny = true;
+    }
   }
   return healedAny ? null : skip(ctx, 'nothing_to_heal');
+}
+
+// "Remove N damage counters from this Pokémon / 1 of your Pokémon / your opponent's Active
+// Pokémon" and the heads-counted forms (design 036 A6). A chosen target is offered only
+// among damaged Pokémon; `distribute` heals one counter per pick until the count is spent.
+function atkHealCounted(ctx) {
+  const { player, opponent, step } = ctx;
+  if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
+  const limit = healLimit(step);
+
+  if (step.target === 'self' || step.target === 'opponentActive' || step.target === 'bothActive') {
+    const targets = {
+      self: [attackerRef(ctx)?.card],
+      opponentActive: [activeOf(opponent)],
+      bothActive: [activeOf(player), activeOf(opponent)],
+    }[step.target].filter(Boolean);
+    if (targets.length === 0) return skip(ctx, 'no_target');
+    let changed = false;
+    for (const card of targets) {
+      if (healPokemon(ctx, card, limit, { cure: step.cure })) changed = true;
+    }
+    return changed ? null : skip(ctx, 'nothing_to_heal');
+  }
+
+  // `distribute` repeats one-counter picks; `targets` (default 1) picks distinct Pokémon.
+  const distribute = step.target === 'distribute';
+  const healedIds = ctx.memo?.healedIds || [];
+  const damaged = (step.scope === 'bench' ? benchRootsOf(player) : rootsOf(player)).filter(
+    (root) =>
+      (root.damage || 0) > 0 &&
+      healFilterMatches(player, root, step) &&
+      (distribute || !healedIds.includes(root.instanceId))
+  );
+  const left = ctx.memo?.left ?? (distribute ? step.count || 0 : step.targets || 1);
+  const perPick = distribute ? 10 : limit;
+  const started = ctx.memo?.left != null;
+
+  if (ctx.selection) {
+    const picked = damaged.find((root) => root.instanceId === ctx.selection[0]);
+    if (!picked) return skip(ctx, 'target_not_found');
+    healPokemon(ctx, picked, perPick);
+    if (left - 1 <= 0) return null;
+    return atkHealCounted({
+      ...ctx,
+      selection: null,
+      memo: { left: left - 1, healedIds: [...healedIds, picked.instanceId] },
+    });
+  }
+  if (left <= 0 || damaged.length === 0) return started ? null : skip(ctx, 'nothing_to_heal');
+  // No choice left: every remaining damaged Pokémon gets healed.
+  if (!distribute && damaged.length <= left) {
+    for (const root of damaged) healPokemon(ctx, root, perPick);
+    return null;
+  }
+  return ctx.ask({
+    prompt: distribute
+      ? `${attackName(ctx)}: Choose a Pokémon to remove 1 damage counter from (${left} left)`
+      : `${attackName(ctx)}: Choose 1 of your Pokémon to heal`,
+    options: damaged,
+    min: 1,
+    max: 1,
+    memo: { left, healedIds },
+  });
 }
 
 const whatOf = (step) => energyLabel(step);
@@ -1691,6 +1792,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkDevolve,
   atkBounceOppActive,
   atkHealEach,
+  atkHealCounted,
   atkAddMarker,
   atkDiscardSelfTool,
   atkDiscardStadium,

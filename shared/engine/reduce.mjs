@@ -3309,6 +3309,9 @@ function returnAttackerToHand(draft, { playerId, attacker, oppId, events }) {
   }
 }
 
+// Step kinds that own an attack's heal sentence; the generic self-heal stands down for them.
+const HEAL_STEP_TYPES = ['atkHealEach', 'atkHealCounted', 'atkMirrorHeal'];
+
 /**
  * The attack's printed clauses that run as executor steps (design 030), with the attack's
  * own coin result applied: "If heads/tails" steps are dropped on the other face and
@@ -4164,11 +4167,11 @@ function resolveAttackEffectPhase(draft, ctx) {
 
       // Healing from attack effect (e.g. "Heal 30 damage from this Pokémon").
       // Dyna Tree Hill suppresses all healing while it is in play.
-      // "Heal N damage from each of your (Benched) Pokémon" is the atkHealEach step's.
+      // Heal sentences the step templates read (design 036 A6) are the steps' own.
       if (
         parsed.heal > 0 &&
         attacker &&
-        !attackSteps.printed.has('atkHealEach') &&
+        !HEAL_STEP_TYPES.some((type) => attackSteps.printed.has(type)) &&
         !stadiumBlocksHealing(draft.stadium)
       ) {
         const atkRef = findCard(draft, attacker.instanceId);
