@@ -9,8 +9,7 @@ Session: 282
 Focus: S282 feature: dragged card swings with the pointer like TCG Live (design 038, D123), no resize.
 Active: none.
 Next: maintenance due (S270, S280, still not run; MAP.md is 150/120 lines, needs area-doc collapse). User visual
-  check of the drag swing on a real deck (sandbox has no card art); Firefox/Safari drag untested.
-  User visual check of typed Tera entry/skin, Mega vortex in a real rules-mode game.
+  check of the drag swing on a real deck (no card art in sandbox; Firefox/Safari untested), typed Tera, Mega vortex.
   I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
   leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
   Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
