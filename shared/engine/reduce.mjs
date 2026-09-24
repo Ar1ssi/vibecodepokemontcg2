@@ -99,6 +99,7 @@ import {
   parseEndOfTurnAbilities,
   parseOnDamageAbilities,
   parseOnDamageStatus,
+  parseOnEnergyAttachAbilities,
   parseOnKoAbilities,
 } from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
@@ -1750,6 +1751,30 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
   });
   if (prizes.length > 0) offerPrizeToBench(draft, { playerId, taken });
+}
+
+/** Runs the Ability triggers of an Energy attached from the hand (`parseOnEnergyAttachAbilities`). */
+function applyEnergyAttachTriggers(draft, { host, energy, playerId, events }) {
+  const effects = parseOnEnergyAttachAbilities(host, energy, abilitySideContext(draft, playerId));
+  for (const { target, recover, heal, source } of effects) {
+    if (recover) {
+      for (const condition of listConditions(target)) {
+        removeCondition(target, condition);
+        events.push({ type: 'statusCleared', condition, instanceId: target.instanceId, playerId, source });
+      }
+    }
+    const before = target.damage || 0;
+    if (heal > 0 && before > 0) {
+      target.damage = Math.max(0, before - heal);
+      events.push({
+        type: 'damageUpdated',
+        instanceId: target.instanceId,
+        damage: target.damage,
+        healed: before - target.damage,
+        source,
+      });
+    }
+  }
 }
 
 function conditionsUpdatedEvent(card, condition) {
@@ -5693,6 +5718,16 @@ export function applyCommand(state, command, rng = null) {
               name: 'Pokémon Park',
               instanceId: parkStadium?.instanceId,
               playerId,
+            });
+          }
+
+          // Energy-attach Ability triggers (Blissey V, Vaporeon, Magearna, …; design 034 I141).
+          if (cardRef.zoneId === 'hand' && hostRef.playerId === playerId) {
+            applyEnergyAttachTriggers(draft, {
+              host: hostRef.card,
+              energy: cardRef.card,
+              playerId,
+              events,
             });
           }
         } else if (isPokemon(cardRef.card)) {

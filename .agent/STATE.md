@@ -7,10 +7,11 @@
 
 Session: 287
 Focus: I141 — the measured ability backlog after design 034 (complete S287). Current
-  runs/partial/dead/consumed/unconsumed/unparsed = 1635/257/102/1128/1105/1 (activation per the
+  runs/partial/dead/consumed/unconsumed/unparsed = 1635/257/102/1163/1070/1 (activation per the
   server gate, D130).
-Active: I141 when-played pass (D129), gate honesty (D130), on-damage status hook committed.
-Next: I141 clusters — trigger readers for attach/KO/other on-damage texts, then the
+Active: I141 when-played pass (D129), gate honesty (D130), on-damage status and
+  Energy-attach hooks committed.
+Next: I141 clusters — trigger readers for KO/checkup/other on-damage texts, then the
   activated partials (`--rows`, unexecutable). Issue-number collision with feature/trainer-behaviour (I131-I135) — renumber at
   merge. I140 retreat wordings. Slice-6 gaps: Manectric bench option, Unown S prize peek, Heat
   Metal/Overheater, I131. Move-energy gaps: Plasma filter; compound move+switch. Slice-4: extra
@@ -25,7 +26,7 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   delete it before merging and expect main's uncommitted S278 STATE/journal to conflict.
 - Two gates after engine ability changes: `pnpm audit:oracle` (~2 min, D108) and
   `pnpm audit:abilities` (~2 min, D126/D127); `--rows` writes per-row JSON under out/ for diffing.
-  Re-ratchet only legit improvements. `pnpm test` baseline: 3494, 1 pre-existing fail
+  Re-ratchet only legit improvements. `pnpm test` baseline: 3496, 1 pre-existing fail
   (card-inspector-model "retreat greys…").
 - Ability reads go through `cardAbilityText` (I128); D117 import direction: nothing
   ability-combat imports may reach special-conditions. Coin flips go through `flipCoin(rng)`.

@@ -12,6 +12,7 @@ import {
   parseOnOpponentEvolveAbilities,
   parseOnDamageAbilities,
   parseOnDamageStatus,
+  parseOnEnergyAttachAbilities,
   parseEndOfTurnAbilities,
   parseOnKoAbilities,
   parseOnPromotionAbilities,
@@ -347,6 +348,47 @@ test('on-damage status hook: a coin-gated condition lands only on heads', () => 
   const tails = attackIntoTrigger(DELCATTY, 'Delcatty', withForcedCoin(createRng(3), 'tails'));
   assert.equal(hasCondition(heads, 'Confused'), true);
   assert.equal(hasCondition(tails, 'Confused'), false);
+});
+
+const VAPOREON =
+  'Whenever you attach a {W} Energy card from your hand to Vaporeon, remove all Special Conditions affecting Vaporeon.';
+const MAGEARNA =
+  'As long as this Pokémon is in the Active Spot, whenever you attach an Energy card from your hand to 1 of your Pokémon, heal 90 damage from that Pokémon.';
+const energy = (instanceId, type) =>
+  createCard({ instanceId, name: `${type} Energy`, supertype: 'Energy', subtypes: ['Basic'] });
+
+test('parseOnEnergyAttachAbilities: typed self trigger, team heal from the Active only', () => {
+  const vaporeon = pokemon({ name: 'Vaporeon', abilities: [ability('Water Veil', VAPOREON)] });
+  const ctx = { sideActive: [vaporeon], sideBench: [] };
+  assert.deepEqual(
+    parseOnEnergyAttachAbilities(vaporeon, energy(1, 'Water'), ctx).map(({ recover, heal }) => ({ recover, heal })),
+    [{ recover: true, heal: 0 }]
+  );
+  assert.deepEqual(parseOnEnergyAttachAbilities(vaporeon, energy(2, 'Fire'), ctx), []);
+  const magearna = pokemon({ name: 'Magearna', abilities: [ability('Mystic Heart', MAGEARNA)] });
+  const benched = pokemon({ name: 'Benched' });
+  const fromActive = parseOnEnergyAttachAbilities(benched, energy(3, 'Fire'), { sideActive: [magearna], sideBench: [benched] });
+  assert.deepEqual(fromActive.map((e) => e.heal), [90]);
+  assert.deepEqual(parseOnEnergyAttachAbilities(benched, energy(4, 'Fire'), { sideActive: [benched], sideBench: [magearna] }), []);
+});
+
+test('energy-attach hook: attaching from the hand recovers Vaporeon and Magearna heals the target', () => {
+  const state = setupGame();
+  const vaporeon = pokemon({ instanceId: 10, name: 'Vaporeon', abilities: [ability('Water Veil', VAPOREON)] });
+  addCondition(vaporeon, 'Asleep');
+  state.players.p1.zones.active.push(vaporeon);
+  state.players.p1.zones.hand.push(energy(30, 'Water'));
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 30, targetInstanceId: 10 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(hasCondition(res.state.players.p1.zones.active[0], 'Asleep'), false);
+
+  const team = setupGame();
+  team.players.p1.zones.active.push(pokemon({ instanceId: 10, name: 'Magearna', abilities: [ability('Mystic Heart', MAGEARNA)] }));
+  team.players.p1.zones.bench.push(pokemon({ instanceId: 11, name: 'Benched', damage: 120 }));
+  team.players.p1.zones.hand.push(energy(31, 'Fire'));
+  const healed = applyCommand(team, { type: 'attachCard', payload: { instanceId: 31, targetInstanceId: 11 }, playerId: 'p1' });
+  assert.equal(healed.error, null);
+  assert.equal(healed.state.players.p1.zones.bench[0].damage, 30);
 });
 
 test('parseOnKoAbilities: reads Miraidon Photon Cord', () => {

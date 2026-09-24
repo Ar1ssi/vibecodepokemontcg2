@@ -28,6 +28,8 @@ import { isAbilitySuppressed, abilityPlayLocks, selfNamedText } from './ability-
 import { isAbilityCard } from './ability-effects.mjs';
 import { hasCondition } from './special-conditions.mjs';
 import { attackerTypes, TYPE_LETTER } from './tool-combat.mjs';
+import { resolveAttachedEnergyType } from './energy-effects.mjs';
+import { isBasicEnergy } from './card-classify.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -234,6 +236,67 @@ export function parseOnDamageStatus(holder, ctx = {}) {
     coin: Boolean(m[1]),
     source: holder.name,
   };
+}
+
+// Energy-attach triggers. Self: "when(ever) you attach a [Basic] [{W}] Energy card from your hand
+// to this Pokémon [during your turn], <effect>." Team: "as long as this Pokémon is in the Active
+// Spot / your Active Pokémon, whenever you attach an Energy card from your hand to 1 of your
+// Pokémon, <effect> from that Pokémon." Effects: recover from all Special Conditions, heal N,
+// remove N / all damage counters. Any other wording, or a Poké-Power with printed stop
+// conditions, fails closed.
+const ATTACH_SELF = new RegExp(
+  "(?:^|\\.\\s)when(?:ever)? you attach an? (basic )?(?:\\{([a-z])\\} )?(basic )?energy card from your hand " +
+    "to this pokémon(?: during your turn)?, ([^.]+)\\.(?:\\s|$)"
+);
+const ATTACH_TEAM = new RegExp(
+  "(?:^|\\.\\s)as long as this pokémon is (?:in the active spot|your active pokémon), whenever you attach " +
+    "an energy card from your hand to 1 of your pokémon, ([^.]+) from that pokémon\\.(?:\\s|$)"
+);
+const SELF_REF = "(?:it|this pokémon)";
+
+function attachEffect(clause, ref) {
+  const recover = new RegExp(
+    `^(?:${ref} recovers from all special conditions|remove all special conditions (?:from|affecting) ${ref})$`
+  );
+  if (recover.test(clause)) return { recover: true, heal: 0 };
+  const heal = clause.match(new RegExp(`^heal (\\d+) damage from ${ref}$`));
+  if (heal) return { recover: false, heal: Number(heal[1]) };
+  const counters = clause.match(
+    new RegExp(`^remove (all special conditions and )?(\\d+|a|an|all) damage counters? from ${ref}(?:, if it has any)?$`)
+  );
+  if (!counters) return null;
+  const n = counters[2] === 'all' ? Infinity : /^an?$/.test(counters[2]) ? 1 : Number(counters[2]);
+  return { recover: Boolean(counters[1]), heal: n * 10 };
+}
+
+/**
+ * The effects an Energy attached from the hand to `host` triggers (`ctx` is the attaching
+ * player's `abilitySideContext`): `[{ target, recover, heal, source }]`, `heal` in damage
+ * (Infinity = all). Self triggers come from the host; team triggers from the Active.
+ */
+export function parseOnEnergyAttachAbilities(host, energy, ctx = {}) {
+  const out = [];
+  if (!host || !energy) return out;
+  const energyType = lower(resolveAttachedEnergyType(energy));
+  const holders = [host, ...(ctx.sideActive || []).filter((c) => c && !c.attachedTo && c !== host)];
+  for (const holder of holders) {
+    if (!holderCanTrigger(holder, ctx)) continue;
+    const text = selfNamedText(holder).replace(/’/g, "'");
+    if (/this power (?:stops working|can't be used)/.test(text)) continue;
+    const self = holder === host ? text.match(ATTACH_SELF) : null;
+    if (self) {
+      const typeOk = !self[2] || TYPE_LETTER[self[2]] === energyType;
+      const basicOk = !(self[1] || self[3]) || isBasicEnergy(energy);
+      const effect = typeOk && basicOk ? attachEffect(self[4], SELF_REF) : null;
+      if (effect) out.push({ target: host, ...effect, source: holder.name });
+    }
+    const team = holderIsActive(holder, ctx) ? text.match(ATTACH_TEAM) : null;
+    if (team) {
+      const effect = attachEffect(`${team[1]} from that pokémon`, 'that pokémon');
+      if (effect) out.push({ target: host, ...effect, source: holder.name });
+    }
+  }
+  return out;
 }
 
 /**

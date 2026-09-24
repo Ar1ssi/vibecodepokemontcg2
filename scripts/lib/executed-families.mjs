@@ -94,6 +94,7 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'self-return',
   'setup',
   'status',
+  'status-recover',
   'switch',
   'tool-cap',
   'weakness',

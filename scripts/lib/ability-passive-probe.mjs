@@ -43,6 +43,7 @@ import {
   parseEndOfTurnAbilities,
   parseOnDamageAbilities,
   parseOnDamageStatus,
+  parseOnEnergyAttachAbilities,
   parseOnKoAbilities,
 } from '../../shared/engine/rules/ability-triggers.mjs';
 import {
@@ -56,6 +57,10 @@ import { parseAttackBorrowAbility } from '../../shared/engine/rules/attack-copy.
 import { combinedToolRetreatCost, evaluateToolKoPrevention } from '../../shared/engine/rules/tool-combat.mjs';
 import { buildState, mon } from './oracle-harness.mjs';
 
+// One of each basic Energy, attached from the hand to the holder (energy-attach triggers).
+const BASIC_ENERGY_NAMES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal'].map(
+  (type) => `${type} Energy`
+);
 const CONDITIONS = ['asleep', 'burned', 'confused', 'paralyzed', 'poisoned'];
 
 const roots = (cards) => (cards || []).filter((c) => !c.attachedTo);
@@ -236,6 +241,11 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     const ctx = at(p1, holderCard);
     ask('onDamage', () => parseOnDamageAbilities(holderCard, ctx));
     ask('onDamageStatus', () => parseOnDamageStatus(holderCard, ctx));
+    ask('onEnergyAttach', () =>
+      BASIC_ENERGY_NAMES.map((name) =>
+        parseOnEnergyAttachAbilities(holderCard, createCard({ name, supertype: 'Energy', subtypes: ['Basic'] }), p1)
+      )
+    );
     ask('ignoresDefenderEffects', () => abilityIgnoresDefenderEffects(holderCard));
     ask('setupActive', () => [abilitySetupActive(holderCard), abilitySetupActive(holderCard, { goingSecond: true })]);
     ask('prizeToBench', () => abilityPrizeToBench(holderCard));

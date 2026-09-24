@@ -5,8 +5,8 @@
     "runs": 1635,
     "partial": 257,
     "dead": 102,
-    "consumed": 1128,
-    "unconsumed": 1105,
+    "consumed": 1163,
+    "unconsumed": 1070,
     "unparsed": 1
   },
   "families": {
@@ -249,8 +249,8 @@
       "runs": 149,
       "partial": 5,
       "dead": 0,
-      "consumed": 1,
-      "unconsumed": 56,
+      "consumed": 13,
+      "unconsumed": 44,
       "unparsed": 0
     },
     "hp-bonus": {
@@ -402,8 +402,8 @@
       "runs": 194,
       "partial": 24,
       "dead": 24,
-      "consumed": 109,
-      "unconsumed": 156,
+      "consumed": 111,
+      "unconsumed": 154,
       "unparsed": 0
     },
     "status-recover": {
@@ -411,8 +411,8 @@
       "runs": 9,
       "partial": 1,
       "dead": 0,
-      "consumed": 7,
-      "unconsumed": 21,
+      "consumed": 28,
+      "unconsumed": 0,
       "unparsed": 0
     },
     "switch": {
