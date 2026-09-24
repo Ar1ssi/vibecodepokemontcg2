@@ -9,6 +9,7 @@ import { enter } from './entry.js';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
 import { attach, evolve, retreat, stadiumPlay, trainerPlay } from './lifecycle.js';
 import { status } from './status.js';
+import { installTeraSkins } from './tera-skin.js';
 
 const EFFECTS = {
   damage,
@@ -32,3 +33,6 @@ export const playFx = createFxDispatcher({
   isDisabled: fxDisabled,
   isMotionReduced: motionReduced,
 });
+
+// Design 037: Tera Pokémon keep their crystal skin while in play.
+installTeraSkins();

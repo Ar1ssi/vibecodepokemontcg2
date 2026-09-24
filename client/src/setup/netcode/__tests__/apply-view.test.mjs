@@ -1668,6 +1668,34 @@ test('3.12: applyView syncs turn state as part of a normal view apply', () => {
   assert.equal(local.phase, 'main');
 });
 
+test('037: applyView dispatches board-view-applied after the advisory events, view readable', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const order = [];
+  doc.addEventListener('board-view-applied', () => {
+    const active = getAuthoritativeZoneArray('you', 'active');
+    order.push(`applied:${active.map((c) => c.instanceId).join(',')}`);
+  });
+
+  applyView(
+    {
+      stateVersion: 1,
+      you: {
+        playerId: 'p1',
+        zones: { active: [{ instanceId: 7, name: 'Terapagos ex', src: 't.png' }], hand: [] },
+      },
+      them: { playerId: 'p2', zones: { active: [], hand: [] } },
+    },
+    [{ type: 'POKEMON_ENTERED' }],
+    {
+      document: doc,
+      getZone: mockGetZone,
+      onAdvisoryEvent: (ev) => order.push(`advisory:${ev.type}`),
+    }
+  );
+
+  assert.deepEqual(order, ['advisory:POKEMON_ENTERED', 'applied:7']);
+});
+
 // Stands in for hydrate-holo.js: wraps the <img> in a `.mat-holo` node the way
 // hydrateHolo does (synchronously here), and unwraps it back in place.
 function fakeHolo(doc) {

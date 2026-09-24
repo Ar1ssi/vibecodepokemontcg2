@@ -3,33 +3,20 @@ import assert from 'node:assert/strict';
 import {
   MEGA_BURST_AT,
   MEGA_ENTRY_MS,
-  TERA_ENTRY_MS,
-  TERA_GLINT_AT,
-  TERA_SHATTER_AT,
+  megaFieldPlacement,
+  megaFieldPose,
   megaFlashPose,
-  megaHexPose,
-  megaSpherePose,
-  megaSwirlPose,
-  teraArcPose,
-  teraCrownPose,
-  teraFlashPose,
-  teraRaysPose,
-  teraSlabPose,
-  teraSmokePose,
-  teraWhiteoutPose,
+  megaLensPose,
+  megaSilhouettePose,
+  megaStageRect,
+  megaWavePose,
 } from '../entry-pose.mjs';
 
 const ALL = {
-  teraFlashPose,
-  teraSlabPose,
-  teraCrownPose,
-  teraArcPose,
-  teraWhiteoutPose,
-  teraRaysPose,
-  teraSmokePose,
-  megaSpherePose,
-  megaHexPose,
-  megaSwirlPose,
+  megaFieldPose,
+  megaWavePose,
+  megaLensPose,
+  megaSilhouettePose,
   megaFlashPose,
 };
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -55,86 +42,98 @@ test('entry poses: opacity stays within [0, 1] and out-of-range t is clamped', (
   }
 });
 
-test('entry durations and beats are ordered', () => {
-  assert.ok(TERA_ENTRY_MS > 0 && MEGA_ENTRY_MS > 0);
+test('entry duration and burst beat are in range', () => {
+  assert.ok(MEGA_ENTRY_MS > 0);
+  assert.ok(MEGA_BURST_AT > 0 && MEGA_BURST_AT < 1);
+});
+
+// TCG Live's Mega beat: the hex field floods the mat from the card, the card
+// goes two-tone and rounds into the orb, which bursts into an orbiting vortex.
+test('mega: the field is revealed outward from the card and holds until the end', () => {
+  assert.equal(megaFieldPose(0).reveal, 0);
+  assert.ok(megaFieldPose(0.08).reveal > 0.5 && megaFieldPose(0.08).reveal < 1);
+  assert.ok(near(megaFieldPose(0.2).reveal, 1));
+  for (const t of [0.1, 0.5, 0.75])
+    assert.ok(megaFieldPose(t).opacity > 0.99, `field at ${t}`);
   assert.ok(
-    TERA_SHATTER_AT > 0 && TERA_SHATTER_AT < TERA_GLINT_AT && TERA_GLINT_AT < 1
+    megaWavePose(0.12).scale > megaWavePose(0.04).scale,
+    'wavefront rides the reveal'
   );
+  assert.equal(megaWavePose(0.3).opacity, 0);
 });
 
-test('tera: the flash peaks before the slab takes over', () => {
-  assert.equal(teraFlashPose(0.12).opacity, 1);
-  assert.equal(teraFlashPose(0.3).opacity, 0);
-  assert.equal(teraSlabPose(0.05).opacity, 0);
-  assert.ok(teraSlabPose(0.22).opacity > 0.99);
+test('mega: the lens pops in around the card and kicks at the burst', () => {
+  assert.ok(megaLensPose(0.5).opacity > 0.99);
+  assert.ok(megaLensPose(MEGA_BURST_AT + 0.05).scale > megaLensPose(0.3).scale);
 });
 
-test('tera: the slab holds opaque, then vanishes exactly under a full whiteout', () => {
-  for (const t of [0.25, 0.4, 0.55])
-    assert.ok(teraSlabPose(t).opacity > 0.99, `slab at ${t}`);
-  assert.equal(teraSlabPose(TERA_SHATTER_AT).opacity, 0);
-  assert.ok(teraWhiteoutPose(TERA_SHATTER_AT).opacity > 0.99);
-  assert.ok(teraWhiteoutPose(TERA_SHATTER_AT - 0.1).opacity < 0.5);
-  assert.ok(teraWhiteoutPose(0.85).opacity < 1e-9);
+test('mega: the card flashes white-hot and swells as the orb forms around it', () => {
+  assert.equal(megaSilhouettePose(0.01).opacity, 0);
+  assert.ok(megaSilhouettePose(0.08).opacity > 0.99);
+  assert.ok(megaSilhouettePose(0.12).scale > megaSilhouettePose(0.03).scale);
+  assert.equal(megaSilhouettePose(0.16).opacity, 0);
 });
 
-test('tera: the crown grows only after the slab lands and is gone by the shatter', () => {
-  assert.equal(teraCrownPose(0.2).scale, 0);
-  assert.equal(teraCrownPose(0.2).opacity, 0);
-  assert.ok(teraCrownPose(0.45).opacity > 0.99);
-  assert.ok(near(teraCrownPose(0.45).scale, 1));
-  assert.equal(teraCrownPose(TERA_SHATTER_AT).opacity, 0);
+test('mega: the white flash peaks at the burst', () => {
+  assert.equal(megaFlashPose(0.3).opacity, 0);
+  assert.equal(megaFlashPose(MEGA_BURST_AT + 0.01).opacity, 1);
+  assert.equal(megaFlashPose(0.7).opacity, 0);
 });
 
-test('tera: arcs orbit forward while charging', () => {
-  assert.ok(teraArcPose(0.5).rotate > teraArcPose(0.3).rotate);
-  assert.ok(teraArcPose(0.4).opacity > 0.99);
+test('megaStageRect: a stage around the card, clipped to the viewport', () => {
+  const card = { left: 100, top: 100, width: 70, height: 100 };
+  assert.deepEqual(megaStageRect(card, null), {
+    left: -115,
+    top: -20,
+    width: 500,
+    height: 340,
+  });
+  assert.deepEqual(
+    megaStageRect(card, { left: 0, top: 0, width: 300, height: 1000 }),
+    {
+      left: 0,
+      top: 0,
+      width: 300,
+      height: 320,
+    }
+  );
+  const off = megaStageRect(
+    { left: 5000, top: 0, width: 70, height: 100 },
+    { left: 0, top: 0, width: 800, height: 600 }
+  );
+  assert.equal(off.width, 0, 'a card off-screen leaves an empty stage');
 });
 
-test('tera: rays and smoke only appear after the shatter and grow outward', () => {
-  assert.equal(teraRaysPose(TERA_SHATTER_AT - 0.01).opacity, 0);
-  assert.equal(teraSmokePose(TERA_SHATTER_AT - 0.01).opacity, 0);
-  assert.ok(teraRaysPose(0.7).opacity > 0.99);
-  assert.ok(teraSmokePose(0.7).opacity > 0.7);
-  assert.ok(teraRaysPose(0.9).scale > teraRaysPose(0.66).scale);
-  assert.ok(teraSmokePose(0.9).scale > teraSmokePose(0.66).scale);
+test('megaFieldPlacement: maps the card centre into the (tilted) field box', () => {
+  const card = { left: 140, top: 90, width: 20, height: 20 };
+  const flat = megaFieldPlacement(
+    card,
+    { left: 100, top: 50, width: 200, height: 100 },
+    { width: 200, height: 100 }
+  );
+  assert.deepEqual(flat, {
+    x: 50,
+    y: 50,
+    unit: 20,
+    reach: Math.hypot(150, 50),
+  });
+  // Foreshortened on screen: 200x100 on screen, 400x300 in layout pixels.
+  const tilted = megaFieldPlacement(
+    card,
+    { left: 100, top: 50, width: 200, height: 100 },
+    { width: 400, height: 300 }
+  );
+  assert.equal(tilted.x, 100);
+  assert.equal(tilted.y, 150);
+  assert.equal(tilted.unit, 40);
 });
 
-// TCG Live's Mega beat: energy gathers INTO the card, a sphere encloses it and
-// strains, prismatic cracks flare, then the shell bursts in a white-out.
-test('mega: swooshes converge onto the card and are absorbed before the burst', () => {
-  assert.equal(megaSwirlPose(0, { phase: 90 }).rotate, 90);
-  assert.ok(megaSwirlPose(0.3, { phase: 0, spin: 1 }).rotate > 0);
-  assert.ok(megaSwirlPose(0.3, { phase: 0, spin: -1 }).rotate < 0);
-  assert.ok(megaSwirlPose(0.3).opacity > 0.99);
-  assert.ok(megaSwirlPose(0.1).scale > megaSwirlPose(0.45).scale, 'closes inward');
-  assert.equal(megaSwirlPose(MEGA_BURST_AT).opacity, 0, 'absorbed before the burst');
-  const early = megaSwirlPose(0.2).rotate - megaSwirlPose(0.1).rotate;
-  const late = megaSwirlPose(0.5).rotate - megaSwirlPose(0.4).rotate;
-  assert.ok(late > early, 'spin accelerates as it closes');
-});
-
-test('mega: the sphere encloses the card, strains, then bursts outward as it fades', () => {
-  assert.ok(megaSpherePose(0.1).scale < 0.6);
-  assert.equal(megaSpherePose(0.6).opacity, 1);
-  assert.ok(megaSpherePose(0.55).scale > 0.95);
-  const strain = [0.6, 0.63, 0.66, 0.69].map((t) => megaSpherePose(t).scale);
-  assert.ok(new Set(strain).size > 1, 'strains before bursting');
-  assert.ok(megaSpherePose(0.84).scale > 1.5);
-  assert.ok(megaSpherePose(0.9).opacity < 0.05);
-});
-
-test('mega: the prismatic cracks flare just before the burst', () => {
-  assert.equal(megaHexPose(0.3).opacity, 0);
-  assert.ok(megaHexPose(0.68).opacity > 0.99);
-  assert.ok(megaHexPose(0.68).opacity > megaHexPose(0.55).opacity);
-  assert.equal(megaHexPose(0.8).opacity, 0);
-});
-
-test('mega: the white-out peaks at the burst and the card pops back to size', () => {
-  assert.equal(megaFlashPose(0.5).opacity, 0);
-  assert.equal(megaFlashPose(MEGA_BURST_AT + 0.02).opacity, 1);
-  assert.equal(megaFlashPose(0.5).scale, 1);
-  assert.ok(near(megaFlashPose(1).scale, 1));
-  assert.ok(megaFlashPose(0.86).scale > 1.05);
+test('megaFieldPlacement: unusable boxes return null', () => {
+  const card = { left: 0, top: 0, width: 20, height: 20 };
+  const box = { left: 0, top: 0, width: 100, height: 100 };
+  assert.equal(megaFieldPlacement(null, box, box), null);
+  assert.equal(megaFieldPlacement(card, { ...box, width: 0 }, box), null);
+  assert.equal(megaFieldPlacement(card, box, { width: 0, height: 100 }), null);
+  assert.equal(megaFieldPlacement(card, box, null), null);
+  assert.equal(megaFieldPlacement({ ...card, left: NaN }, box, box), null);
 });
