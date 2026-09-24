@@ -7,11 +7,11 @@
 
 Session: 287
 Focus: I141 — the measured ability backlog after design 034 (complete S287). Current
-  runs/partial/dead/consumed/unconsumed/unparsed = 2022/373/137/965/730/1.
-Active: I141 when-played pass committed (D129, I132 closed): partial 584→373, dead 148→137.
-Next: I141 clusters — opponentDisruptAbility (199 partial), evolveAbility (47),
-  benchFromDiscardAbility (34), onPromotionAbility (26); unconsumed weakness/retreat-cost/
-  damage-prevent. Issue-number collision with feature/trainer-behaviour (I131-I135) — renumber at
+  runs/partial/dead/consumed/unconsumed/unparsed = 1635/257/102/1090/1143/1 (activation per the
+  server gate, D130).
+Active: I141 when-played pass (D129, I132 closed) and gate honesty (D130) committed.
+Next: I141 clusters — trigger readers for on-damage/attach/KO texts (largest unconsumed), then the
+  activated partials (`--rows`, unexecutable). Issue-number collision with feature/trainer-behaviour (I131-I135) — renumber at
   merge. I140 retreat wordings. Slice-6 gaps: Manectric bench option, Unown S prize peek, Heat
   Metal/Overheater, I131. Move-energy gaps: Plasma filter; compound move+switch. Slice-4: extra
   attack skips resolveCheckup. Slice-3 gaps: Special Energy play lock on attachCard; inspector
@@ -35,6 +35,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
   ability-series-audit seeds are gone — the repo gate is now the source of truth.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S287 design 034 slices 7c + I137/I138/I139 fixes; I141 when-played pass (D129), I132 closed.
+- S287 design 034 slice 7c + I137/I138/I139; I141 when-played pass (D129), gate honesty (D130).
 - S286 I136 fix: damage/retreat "less" wordings no longer discount attack costs (P1 free attacks).
 - S285 design 034 slice 7b: passive behaviour probes, consumed/unconsumed classes (D127); found I136-I138.

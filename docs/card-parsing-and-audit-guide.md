@@ -167,7 +167,9 @@ measure behaviour instead, and both ratchet against committed baselines:
   changed on the board (`scripts/oracle-baseline.json`).
 - `pnpm audit:abilities` classes every printed ability (`scripts/ability-behaviour-baseline.json`):
   `runs` / `partial` / `dead` for activated ones (the engine's own step plan plus the oracle run),
-  `consumed` / `unconsumed` for passive ones, and `unparsed`. Passive rows are probed
+  `consumed` / `unconsumed` for passive ones, and `unparsed`. "Activated" is the server's own gate
+  (`isActivatedAbility`): the oracle plays with rules off, so a Knock Out trigger or a lock would
+  otherwise "run" when clicked although no rules-mode player can click it. Passive rows are probed
   (`scripts/lib/ability-passive-probe.mjs`): every wired passive reader is asked the same questions
   with the text printed and stripped, on four boards. A changed answer means the text is read.
 
@@ -178,6 +180,9 @@ Two lessons from building them:
   whole team at full HP (I137), "no Energy → no Retreat Cost" applied with Energy attached, and
   opponent-targeted retreat increases applied to the holder (I138). When a probe lists a read, check
   that the answer is right, not just that there is one.
+- **A skip is not a run.** An `effectStepSkipped` tag counts as a board change, so a step the
+  executor skipped can pass a row as `runs`/`partial` (the when-played marker hid Ludicolo's and
+  Empoleon's mis-reads). Diff the tags, not only the class, when a row moves.
 - **Fail closed on conditions.** A passive reader that meets an "if / as long as" clause it cannot
   check skips the effect. A missed bonus shows up as `unconsumed` in the gate; a wrongly applied one
   silently changes games.

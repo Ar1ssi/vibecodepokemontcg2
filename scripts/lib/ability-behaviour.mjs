@@ -5,6 +5,7 @@
 // working, or stops being read, fails the audit instead of drifting back in silently.
 import { resolveAbilitySteps } from '../../shared/engine/effects/ability.mjs';
 import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
+import { isActivatedAbility } from '../../shared/engine/rules/ability-executors.mjs';
 import { passiveReads } from './ability-passive-probe.mjs';
 
 /**
@@ -28,7 +29,9 @@ export const BEHAVIOUR_CLASSES = [
 /**
  * What useAbility would run for `text`: `{ activated, unexecutable }`, or `{ activated: false,
  * reason }` with reason 'passive' | 'unparsed'. `unexecutable` lists planned step types with no
- * executor handler.
+ * executor handler. A text the server's activation gate rejects (`isActivatedAbility`: triggers,
+ * locks, "as long as") is passive whatever it plans — the oracle runs with rules off, so it would
+ * otherwise "run" effects no rules-mode player can activate.
  */
 export function abilityPlan(text, selfName) {
   const { steps, parsedSteps } = resolveAbilitySteps(text, { selfName });
@@ -37,6 +40,9 @@ export function abilityPlan(text, selfName) {
       activated: false,
       reason: parsedSteps.length ? 'passive' : 'unparsed',
     };
+  }
+  if (!isActivatedAbility({ abilities: [{ text }] }, 0)) {
+    return { activated: false, reason: 'passive' };
   }
   const unexecutable = [
     ...new Set(

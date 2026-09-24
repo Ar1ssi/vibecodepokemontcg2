@@ -58,6 +58,12 @@ test('abilityPlan: the when-played trigger is not an unexecutable step beside a 
   assert.deepEqual(abilityPlan(meowth, 'Meowth ex'), { activated: true, unexecutable: [] });
 });
 
+test('abilityPlan: a trigger the server will not activate is passive even when its steps run', () => {
+  const finalChain =
+    "If this Pokémon is Knocked Out by damage from an attack from your opponent's Pokémon, search your deck for a card and put it into your hand. Then, shuffle your deck.";
+  assert.deepEqual(abilityPlan(finalChain, 'Pecharunt'), { activated: false, reason: 'passive' });
+});
+
 test("abilityPlan: a can't-attach lock is passive, not an attach button", () => {
   const water = "You can't attach {W} Energy cards from your hand to Articuno.";
   assert.deepEqual(abilityPlan(water, 'Articuno'), { activated: false, reason: 'passive' });
