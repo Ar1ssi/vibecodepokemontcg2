@@ -1,6 +1,6 @@
 # 038: Dragged card swings with the pointer (TCG Live drag feel)
 Status: shipped
-Date: 2026-09-24 · Session: S282
+Date: 2026-09-24 · Session: S287 (built as S282 in parallel; decision D124)
 
 ## Problem
 The user sent TCG Live footage of dragging a card from hand onto the board and asked for "this effect",

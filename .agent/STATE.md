@@ -1,40 +1,35 @@
-# State — the single source of "now". Rewritten IN FULL at every session END. Cap: 40 lines.
-<!-- Keep exactly these sections. Prune, never accrete: this file is read by every session,
-     so every stale line here is a tax on all future work. History belongs to journal/.
-     Contradicts git log / the journal (a session died before END)? Trust git: rebuild this
-     file from the last journal entry + `git log -5`, note the crash in the journal. -->
+# State — the single source of "now". Rewritten IN FULL at every Full END. Cap: 40 lines.
+<!-- Keep exactly these sections. Prune, never accrete: every stale line here taxes every session.
+     History belongs to journal/. Contradicts git log / journal? Trust git: rebuild from
+     `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
-
-Session: 282
-Focus: S282 feature: dragged card swings with the pointer like TCG Live (design 038, D123), no resize.
+Session: 287
+Focus: S287 feature: dragged card swings with the pointer like TCG Live, no resize (design 038, D124);
+  built in parallel as "S282/D123" on claude/determined-gauss-4aymvd, renumbered at the merge with main.
 Active: none.
-Next: maintenance due (S270, S280, still not run; MAP.md is 150/120 lines, needs area-doc collapse). User visual
-  check of the drag swing on a real deck (no card art in sandbox; Firefox/Safari untested), typed Tera, Mega vortex.
-  I126/I127 (retreat-cost: energy-conditional variants + inspector tile), I121-I125 (design 032
-  leftovers); I113 oracle still cannot see damage amounts for immunity/prevention.
-  Design numbers collide: 032-oracle-execution-gate.md and 032-coin-gated-attack-sentences.md (code comments mean the latter).
-  Still pending: designs 028 (I85), 029 (I86), #5 description (I87), I84 legacy (untested by policy).
-  ISSUES Open still over cap.
+Next: 036 slice 6 review follow-up (HANDOFF.md on `feature/attack-behaviour`, `attack-behaviour-wt`): re-review
+  `settleKnockOutWins`, close slice 6, then slices 7–16 (kit .agent/scratch/036-slices-5-16-handoff.md).
+  035 slice 11 (play conditions) then 12 in `trainer-behaviour-wt` (ledger NEXTSTEPS.md).
+  Then I128, I130, I129, I126/I127, I121. User visual check of typed Tera entry/skin + Mega vortex in a real game,
+  and of the drag swing with real card art (Chromium-only so far).
+  Pending approval: designs 028 (I85), 029 (I86), 034 (I128).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
-## Watch-outs (≤5 — things the next session must know; prune ruthlessly)
-- Attack/ability execution gate: `pnpm audit:oracle` (~2 min, D108). Run after engine attack/ability changes; legit
-  rate changes → `--update-baseline`, commit scripts/oracle-baseline.json. Later-turn markers are ORACLE_BLIND_FAMILIES.
-- Editing via bash heredoc eats `\` → write edit scripts with the Write tool / String.raw.
-  Timed attack effects are `card.attackMarkers` (D109, attackLock D113); copy attacks resolve before coins (D110).
-- Mat FX: see D103, D117-D122. Canvas FX go through entry.js `playCanvasStage` (WAAPI clock). Board cards live in the
-  playmat iframes (css/mat-ambient.css); `.card` is preserve-3d, so layer order inside a holo wrapper needs translateZ,
-  not z-index. Holo wrappers need TCGdex (unreachable in the sandbox): emulate with buildHoloCard + `holo-wrapper-changed`.
-  To eyeball an effect: Playwright on /?e2e=1, pause `document.getAnimations()`, step `currentTime`, wait 2 rAFs, screenshot.
-- Sandbox Playwright: launch with executablePath /opt/pw-browsers/chromium; fulfill cdn.socket.io from the server's
-  /socket.io/socket.io.min.js (saved to a file); fixture deck loads flake, so retry. Real-mouse 2P drag harness: S282 journal.
-- Pre-existing `pnpm test` failure: card-inspector-model "retreat greys…".
-  ESLint runs after `pnpm install` (`npx eslint <files>`); the repo carries many prettier warnings, so lint touched files only.
+## Watch-outs (≤5)
+- Parallel programs share one harness: trainer (`trainer-behaviour-wt`) and attack (`attack-behaviour-wt`)
+  worktrees have stale .agent copies — the primary/main harness is live. Parallel sessions collided on
+  S278–S281 and D117–D120: cite D ids with scope (`D119[rules]`); take the next free id by grep.
+- Gate: `pnpm audit:oracle` (~2 min, D108) after attack/ability engine changes; legit rate changes →
+  `--update-baseline`, commit scripts/oracle-baseline.json. Known `pnpm test` failure: card-inspector-model.
+- Engine: `applyCommand` clones state — read results via `findCard(res.state, id).card`; attacking ends the
+  turn → assert events; rng stub `{next, shuffle}`. Trainer contracts: `effects/stadium-trigger-apply.mjs`
+  (call before `clearConditions`); Chaos Gym coin lives in the playTrainer apply path.
+- Mat FX: canvas FX go through entry.js `playCanvasStage` (WAAPI clock); board cards live in playmat iframes;
+  `.card` is preserve-3d → layer with translateZ. Holo wrappers need TCGdex (emulate via buildHoloCard).
+- Bash heredoc eats `\` → write edit scripts with the Write tool. Primary working copy is CRLF (repo LF).
 
-## Recently shipped (≤3 one-liners; anything older lives in the journal)
-- S282 Dragged card = opaque body-level avatar that rolls into horizontal motion (≤14°, springy settle), native DnD
+## Recently shipped (≤3 one-liners; older → journal)
+- S287 Dragged card = opaque body-level avatar rolling into horizontal motion (≤14°, springy settle); native DnD
   untouched; cancelled drags fly home; FX-off → native ghost.
-- S281 Tera crystal (entry prisms/floor/burst + lasting skin tint/facets/rim/glints) is the card's type colour;
-  Colorless/unknown stays icy; orb, flash, jewel, rainbow universal.
-- S280 Mega vortex = 3D brush strokes behind/in front of the card; Tera entry = S/V canvas Terastallization; Tera Pokémon
-  keep a crystal skin while in play.
+- S286 harness slim: hook + compaction; see journal.
+- S285 trainer 035 slice 10b: coin/condition Stadiums + shared switch hook; suite 3432/3433, oracle PASSED.

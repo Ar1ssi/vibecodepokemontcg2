@@ -5,88 +5,14 @@
 
 .agent/ — agent harness: state, workflows, designs, journal (human manual: .agent/README.md)
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
-server/ — backend server (Express HTTP server, Socket.IO multiplayer sync, SQLite DB); entry: server/server.js
+server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views)
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator)
 scripts/audit-oracle.mjs (`pnpm audit:oracle`, ~2 min) — execution gate: runs every corpus attack/ability through the engine (lib/oracle-harness.mjs), ratchets per-family observed rates vs scripts/oracle-baseline.json (lib/oracle-gate.mjs); family claim lists in lib/executed-families.mjs (I113)
 tools/ — internal dev tools, sync log comparison, asset mappings
-client/src/css/deck-builder-live.css — deck builder's PTCG Live theme (D: S252); ALL rules scoped
-  under `.db-live` (on #nativeDeckBuilderWorkspace) — that class is what overrides index.css on
-  specificity, so @import order never matters and nothing needs !important. `.db-light` re-tokenizes
-  to the pre-Live grey palette. Token block at the top is the only thing the two themes differ by.
-client/src/setup/deck-builder/core/builder-theme.mjs — theme resolve/persist (dark default)
-client/src/setup/deck-builder/core/deck-counter.mjs — "x / 60" counter model from a validateDeck result
-client/src/setup/deck-builder/core/card-filters.mjs — search filter pills (card class / energy type /
-  Trainer subtype); OR within a group, AND across groups; reuses energy-token-assets.mjs's type vocabulary
-client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):
-  up to 2 `{slug, shiny}` per deck (D99), catalog search and vendored-art URL building; catalog data in
-  pokemon-sprite-catalog.generated.mjs (905 gen-8 base forms), art in client/src/assets/pokemon/gen8/,
-  both refreshed by scripts/generate-pokemon-sprites.mjs; plus hand-kept pokemon-sprite-catalog-gen9.mjs
-  (fan art, regular only, D100) with art in client/src/assets/pokemon/gen9/regular/. UI: renderDeckSprites/renderSpritePicker in
-  native-deck-builder-renderers.js + native-deck-builder-sprite-picker.js (popover state only)
-client/src/setup/deck-builder/core/card-sprites.mjs — card → sprite (design 025, D98): cardSpriteFor
-  parses Pokémon names to species + Mega/Primal/Gmax/regional form, Item/Tool Trainers to pokesprite item
-  art (item-sprite-catalog.generated.mjs, art in client/src/assets/items/, via
-  scripts/generate-item-sprites.mjs); resolveDisplaySprites auto-fills the 2 deck sprites from the deck
-client/src/setup/deck-builder/core/box-wallpapers.mjs — 16 Gen V PC Box wallpapers (banner + body PNGs in
-  client/src/assets/box-wallpapers/), per-deck `wallpaperId`; PC Box look = css/deck-builder-pc-box.css
-  (scoped `.db-live:not(.db-light)`, Rodin woff2 in client/src/assets/fonts/)
-client/src/setup/deck-builder/core/coins.mjs — coin catalog (939, unique ids); normalize via
-  scripts/normalize-coin-catalog.mjs; filterCoins/groupCoinsByRelease/getCoinStats; scans fetched to
-  client/src/assets/coins/historical/ by scripts/download-coin-images.mjs (manifest only, no auto-link);
-  coin-effects.mjs + client/src/css/coin/ = material/finish resolver + shared fixed-light foil CSS for the
-  picker and mat token (D92; derived holofoil/mirror finish, luminance relief mask)
-
-<!-- Netcode/rules detail below verified S2 while designing 001. Deck-builder, image-logic,
-     sizing, and initialization subtrees remain unmapped at this depth. -->
-
-## Transport / netcode (client-authoritative today — design 001 replaces this)
-server/server.js — pure relay: `emitToRoom()` broadcasts to room; holds room membership only, NO game state
-client/src/initialization/socket-event-listeners/socket-event-listeners.js — all inbound socket handlers; sync orchestration
-client/src/setup/general/process-action.js — appends to action log, increments counter, emits pushAction/requestAction
-client/src/setup/general/accept-action.js — 59-entry action→function dispatch table; the command vocabulary
-client/src/initialization/global-variables/global-variables.js — `socket` + `systemState`; note `initiator` getter reads a CSS class
-
-## Reconciliation stack (design 001 slice 8 deleted catch-up-actions.js, resync-actions.js,
-## sync-replay.mjs, request/apply-board-snapshot.js without replacement; design 002 slice 1.1
-## restored reconnect recovery via a new, smaller mechanism)
-client/src/setup/netcode/mat-fx/ — mat cosmetic effects (design 022, D94; polish design 026, D103: WAAPI via sampleKeyframes, particles.mjs, fx-colors.mjs, impact queue in combat-pose): dispatcher.mjs (guards), index.js (registry), combat/status/lifecycle/flow(.js + *-pose.mjs), origins.mjs (pre-diff snapshots), entry.js + entry-kind/entry-pose/entry-art.mjs (Mega/Tera signature entries, design 027 → visuals 034, D104/D117; the Mega hex field is painted inside #battleMatSurface) + mega-orb.mjs (3D canvas keystone orb, design 035, D118) + mega-vortex.mjs (brush-stroke vortex on the orb canvas, design 036, D119) + tera-crystal.mjs (canvas Terastallization entry, design 037, D120; per-type palette D122) + tera-skin.mjs/.js (persistent Tera crystal skin, reconciled on `board-view-applied`, D121);
-  primitives in image-logic/mat-fx.mjs; css/mat-fx.css (parent overlays) + css/mat-ambient.css (iframe ambience) + status-marker.css idle keyframes; deck-constructor/mat-tilt.mjs
-client/src/setup/netcode/peer-log-catchup.js — DOM-free peer-log request/response/replay logic
-client/src/setup/netcode/request-action-queue.js — counter-ordered requestAction buffer (design 002
-slice 1.2); gap open past 2s falls through to peer-log-catchup instead of misapplying
-client/src/setup/general/sync-logger.mjs + sync-logger-bridge.js — desync diagnostics ring buffer
-client/src/setup/general/sync-action-args.mjs — normalize emit/hint/RNG args across local vs replay
-client/src/setup/netcode/sync-check.js + server/game/sync-check.mjs — desync detection (design 002
-slice 3.11): client heartbeat sends per-zone hashes, server names first divergent zone, recovery
-routes into peer-log-catchup.js above (no second recovery mechanism). `viewBackedGetZone`
-(client) and `excludeOwnerSecretZones` (server) added S64/I24: hashes read through
-`apply-view.js`'s view cache, not legacy `zoneArrays` (never populated), and `deck` is dropped
-from the comparison (owner-secret, O4-A/I5)
-client/src/setup/netcode/authoritative-dispatch.js — gated-action dispatch primitive (design 003
-slice 0): cardRegistry-sourced card hints + emitAuthoritativeCommand; processAction injected, not
-imported. Fails open to the legacy body when a command cannot be translated (D12)
-client/src/setup/netcode/prize-picker-adapter.js — injected `prizePicker`: shows a server prize pendingChoice as the fly-up prize fan (actions/zones/prize-take-prompt.js, D46)
-client/src/setup/netcode/mat-picker-adapter.js + mat-pick-request.mjs — injected `matPicker`:
-  routes a server pendingChoice whose options are all in-play Pokémon (single- OR multi-pick)
-  to the legacy click-the-card UI (`rules/mat-picker.js`) instead of the carousel (design 016/017,
-  D59/D60); covers retreat, Escape Rope, Boss's Orders/Switch, heals, and attack snipes
-client/src/setup/netcode/manual-card-commands.mjs — pure planner for the manual board tools
-  (damage/conditions/rotate/type/ability marker) from a registry card; manual-card-dispatch.js emits them
-client/src/setup/netcode/deck-peek.js + deck-peek-request.mjs — "look at top/bottom N cards":
-  `peekDeck` socket request (server/game/room.mjs `peekDeck`, shared/engine/view.mjs `deckPeekFor`),
-  shown in the card picker; picks leave the deck as moveCard commands (design 012, D49)
-client/src/setup/netcode/turn-order-call.js — transport for the server-owned opening coin call:
-turns `turnOrderCall`/`turnOrderResult`/`turnOrderCallRejected` into `rules-turn-order-*` DOM events and
-caches the resolved flip for a late reader; registered from socket-event-listeners.js, NOT the rules
-bridge, because the call arrives while setupPrizes() is still awaiting dealOrder (design 013, D50)
-client/src/setup/netcode/card-stats.js — sends printed card data (hp/attacks/types/weakness/
-resistance/retreatCost/stage) to the server as the `cardStats` command (D15, I26); without it the
-server cannot adjudicate a knockout. Sent from build-deck.js once ensureCardData settles
-client/src/setup/netcode/server-battle-log.mjs + server-battle-log.js — server advisory event →
-battle-log text under server authority (design 021/I71): pure mapper composes attack-announcements.mjs,
-the DOM caller appends; wired as `onAdvisoryEvent` in socket-event-listeners.js, both clients phrase
-from their own `playerId`. Needs the server's `trainerPlayed` event and non-Pokémon `cardAttached`
+client/src/setup/deck-builder/ — deck builder (themes, filters, counter, sprites, wallpapers, coins) → .agent/areas/deck-builder.md
+client/src/setup/netcode/ — client transport, authoritative view renderer (apply-view.js), pickers/adapters, battle log → .agent/areas/netcode.md
+client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]) → .agent/areas/netcode.md § Mat FX
 
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
 shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
@@ -95,15 +21,21 @@ shared/engine/rules/special-energy-parse.mjs — special-energy text → structu
 shared/engine/rules/special-conditions.mjs — server card conditions: rotation field + Poison/Burn marker keys (D45); every reducer/effect write goes through it
 shared/engine/rules/trainer-effects.mjs — text → structured trainer step parser
 shared/engine/rules/trainer-play-conditions.mjs — `trainerPlayBlockReason` (turn-1 Supporter, same Stadium, printed play conditions); used by reduce.mjs legality and the bot's e2e-options.mjs
+shared/engine/rules/tool-conditions.mjs — one pure condition layer for Tool modifiers (design 035/D117): `parseToolCondition`/`toolConditionMet` + gated `toolHpBonusFor`/`toolRetreatDeltaFor`; consumed by tool-combat (HP/retreat/bonus/prevention/reduction/prize) and stadium-effects.effectiveHp; holder conditions read the top evolution view
+shared/engine/rules/tool-attacks.mjs — attacks a Tool grants its holder (design 035 slice 7): `parseGrantedAttacks` reads `card.attacks[]` or the printed "→" line of TM/Cube Items; merged into `attackViewFor` in reduce.mjs
+shared/engine/rules/stadium-triggers.mjs — pure Stadium trigger descriptors (design 035 slice 10): `stadiumOnAttachTriggers`/`OnEvolve`/`OnBench`/`OnSwitch` + `stadiumCheckupCoinModifiers` (Wela/Slumbering), `stadiumRetreatCoin` (Mirage), `stadiumTrainerPlayCoin` (Chaos Gym), `stadiumAttackCoinModifier` (Vermilion), `stadiumWeaknessOverrides`/`stadiumResistanceOverrides`; hooks in reduce.mjs (attachCard, evolve, moveCard hand→bench, applyRetreatSwap, resolveCheckup, retreat/playTrainer apply, attack damage) and attack-engine's computeAttackDamage
+shared/engine/effects/stadium-trigger-apply.mjs — applies Stadium trigger descriptors to cards (damage/heal/cure/copyConditions) and `applyStadiumSwitchTriggers`, the one switch hook shared by reduce.mjs and every executor switch site (design 035 slice 10b)
 shared/engine/rules/evolved-pokemon.mjs — `evolvedView` (in-play Pokémon read as its top Evolution card), Rare Candy line tracing, Trainer target counts; used by reduce.mjs, trainer-steps.mjs, the bot
 shared/engine/rules/server-energy.mjs — `serverEnergyDescriptor`: how the server prices attached Energy; the bot uses it too
 shared/engine/effects/executor.mjs — resumable step runner; core step kinds inline, the rest delegated to trainer-steps.mjs
 shared/engine/effects/trainer-steps.mjs — server handlers for the other trainer step kinds; multi-choice progress lives in resumeToken.context
 shared/engine/rules/abilities.mjs + ability-step-plan.mjs - ability parse + ordered step plan (resume seam); Ancient Traits (`ancientTraitIn`: Δ/θ/Ω/α markers or spelled "Delta …") tag EVERY step `trait:'alpha'|'omega'|'delta'|'theta'` with `isAncientTraitAbility` so "no Abilities" gates skip them (App. 23/D72); audit `scripts/audit-all-ancient-traits.mjs` over `out/pkmn-ancient-trait-cards.json` (shared splitter `scripts/lib/split-card-text.mjs`)
 shared/engine/rules/stadium-effects.mjs - pure stadium classify/parse/apply (`applyStadiumEffect`) + `stadiumActivationStatus` (the inspector stadium Use gate, design 018); server executor in shared/engine/effects/stadium.mjs
-shared/engine/rules/damage-parser.mjs - attack text → damage math; `isGxAttack` name classifier
+shared/engine/rules/damage-parser.mjs - attack text → damage math; `isGxAttack` name classifier; `parsePrizeOnKo`/`prizeRuleBoxes`/`prizeFilterMatches` for the on-KO "take N more Prize cards" clauses (design 036 A3)
 shared/engine/rules/attack-steps.mjs + effects/attack-steps.mjs - attack text → ordered executor steps (`parseAttackSteps`, design 030/031) and their server handlers; reduce.mjs runs them before/after damage
-shared/engine/rules/attack-markers.mjs - timed attack markers on cards (`card.attackMarkers`: immunity, prevention/reduction, next-turn bonus, deferred KO, retaliate); read by computeAttackDamage, cleared on retreat/KO/evolve (design 031)
+shared/engine/rules/attack-markers.mjs - timed attack markers on cards (`card.attackMarkers`: immunity, prevention/reduction, next-turn bonus, deferred KO, retaliate, prizeBonus); read by computeAttackDamage and handleKnockout (prizeBonus, design 036 A3), cleared on retreat/KO/evolve (design 031)
+shared/engine/rules/attack-conditions.mjs - whole-attack state condition gates (design 036 A1): `parseAttackCondition`/`attackConditionMet`; reduce.mjs evaluates the gate once at the top of the attack effect phase (`conditionChecked` resume flag) against the extended `buildServerAttackContext` (stadium/bench/hand/prize/energy/damage-counter/rule-box reads)
+shared/engine/rules/attack-status.mjs - printed Special-Condition clauses → `{when,target,statuses}` branches (design 036 A2): dual-branch coins, multi-flip thresholds, `always`/self/both-sides; `statusesFromBranches` is reduce.mjs's status source
 shared/engine/rules/attack-copy.mjs - copy-attack parser (`parseCopyAttack`); reduce.mjs offers the copied attack before coins (`offerCopiedAttack`, design 031)
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
 shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)
@@ -130,10 +62,10 @@ client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary 
 client/src/actions/zones/ — deck/hand/prize/shuffle operations
 client/src/actions/counters/ — damage, special condition, ability counters (DOM overlays)
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
-client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native HTML5 card drag/drop; the dragged card is drawn as a swinging body-level avatar (design 038, D123; physics pure in drag-tilt.mjs)
+client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native HTML5 card drag/drop; the dragged card is drawn as a swinging body-level avatar (design 038, D124; physics pure in drag-tilt.mjs)
 
 ## Tests & tooling
-client/src/**/__tests__/*.mjs — plain `node --test`, no jsdom; `pnpm test` (1223 tests, S85)
+**/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~3400); run one file with `node --test <path>`
 two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
 flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)

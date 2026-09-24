@@ -1,0 +1,21 @@
+{
+  "enabledPlugins": {
+    "context-engineering@context-engineering-marketplace": false,
+    "render@claude-plugins-official": false
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/post-edit-check.mjs\"",
+            "timeout": 120,
+            "statusMessage": "Linting and testing the edited file..."
+          }
+        ]
+      }
+    ]
+  }
+}

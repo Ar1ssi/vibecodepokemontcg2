@@ -9,9 +9,10 @@ Builder — write it so a session with zero other context could build from it (o
 1. Restate the goal in ≤3 lines, plus an explicit out-of-scope list. User present → post both
    and fold in corrections before designing (CLAUDE.md § User sync): a wrong restatement is
    cheapest to fix here, before any design or code exists.
-2. Read: STATE watch-outs · PROJECT.md · scan DECISIONS.md + ISSUES.md Open (known issues in the
-   target area shape the design) · MAP.md → area docs for the target modules → targeted reads of
-   files you'll touch. List those files with one-line roles (feeds the design's Current state).
+2. Read: STATE watch-outs · PROJECT.md · GREP (never load) DECISIONS.md + ISSUES.md for the target
+   area's scope tags and module names (`grep -n "\[rules\]\|attack-steps" .agent/DECISIONS.md`) —
+   known issues in the area shape the design · MAP.md → area docs for the target modules → targeted
+   reads of files you'll touch. List those files with one-line roles (feeds the design's Current state).
    Exploration wider than ~3 reads → delegate it to a read-only subagent (CLAUDE.md § Delegation):
    it returns the file list, roles, and flow summary; you read only what you'll change.
 3. GATE: request conflicts with a Decision or a PROJECT constraint? Surface it to the user now —
