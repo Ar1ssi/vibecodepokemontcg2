@@ -9,7 +9,7 @@ slice on this branch; each commit leaves `pnpm test` + `pnpm audit:oracle` green
 | 2 | done | `ability-combat.mjs` readers + matrix tests; computeAttackDamage ability options (`abilityBonusBeforeWR`, `abilityReductionBeforeWR/AfterWR`, `abilityPrevention`, `weaknessOverride`); wired at all 3 reduce attack call sites, `effectiveHp` (sideCards), handleKnockout prizes, retreat, attack cost (ignore-Energy + Wild Growth multiplier) |
 | 3 | done | suppression (`isAbilitySuppressed`) wired into useAbility + every slice-2 reader + all locks; one `abilityActivationBlockReason` shared by reduce + picker (`collect-usable-abilities.mjs`); play locks (Item/Supporter/Stadium/Tool/ACE SPEC/Pokémon-with-Ability) in playTrainer; status immunity gated in `addCondition`; evolve permission/lock in attachCard; summon restriction in moveCard; retreat lock; Patrat counter lock in all 3 move-counter handlers; first-turn attack (Meloetta). Parser fixes: named-condition immunity → `statusImmunityAbility`, "each play" substring no longer a play lock, evolve-lock text no longer also an `evolveAbility`, Spearow first-turn permission. Oracle baseline surgically re-ratcheted for the 3 families the mis-parse fixes lowered (see D118) |
 | 4 | done | 4a: new `rules/ability-triggers.mjs` (checkup / on-opponent-evolve / on-damage / end-of-turn / between-turns / on-KO / on-promotion readers) + wired Checkup damage (Froslass/Magmortar/Pecharunt/TR Tyranitar/Trevenant), mandatory end-of-turn discard (Great Tusk ex), opponent-evolve counters (Team Rocket's Ampharos), thorns suppression + zone gate. 4b: on-promotion `movedToActiveTurn` window (D120), on-KO energy moves with target choice (D121), `abilityExtraAttack` Dipplin/Ω Barrage (D122). Oracle unchanged |
-| 5 | pending | executor batch A |
+| 5 | in progress (5a done) | 5a: executor handlers for `moveDamageBetweenAbility`, `recoverStatusAbility`, `selfDamageAbility`, `turnDamageBonusAbility` (+ `attackerInstanceId` scope in `turnDamageBonusTotal`), `selfBenchPlacementAbility`, `returnSelfToHandAbility`, all registered in `EXTRA_STEP_HANDLERS`. Remaining batch A: generic move-energy wording, when-played "must"/Bench templates, opponent-disrupt reveal wordings, tool-return parse fix |
 | 6 | pending | executor batch B (one-offs) |
 | 7 | pending | `scripts/audit-ability-behaviour.mjs` + baseline; close I128/I129/I130 |
 
@@ -30,6 +30,14 @@ Slice-4 gaps closed in 4b (D120/D121/D122). Remaining slice-4 note: optional end
 (Togekiss Precious Gift) are activated through useAbility, not the mandatory end-of-turn hook.
 4b-3 skips resolveCheckup between the two extra attacks (attack-again is mid-turn) — verify on a
 live game that conditions don't need to tick between them.
+
+Slice-5a gaps (new): (1) hand-activated placement abilities (Luxray Swelling Flash, Klinklang
+Emergency Rotation, Chansey Lucky Bonus) parse + execute but `validateReferences` for `useAbility`
+only allows active/bench cards, so the activation surface from hand is not wired — the handler is
+unit-tested directly via `executeSteps`; (2) `selfBenchPlacementAbility`'s `swapActive` variant
+("move your Active to the Bench and put this in the Active") is implemented but untested;
+(3) the when-played "must" mandatory wording (Gyarados Untamed One) and the opponent-disrupt
+reveal-hand wordings (Zubat/Mandibuzz/Thievul/Hawlucha) remain for 5b.
 
 # Active work — S264 12-item batch (branch `feature/batch-s264`, worktree `../vibe-batch-s264`)
 
