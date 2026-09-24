@@ -119,11 +119,23 @@ const CORPUS_TABLE = [
   },
 ];
 
-test('parsePrizeModify: corpus prize rows (I131)', () => {
+// Imperative "take N more Prize cards" clauses belong to the player who took the
+// Knock Out; every other clause names the victim's opponent ("that player takes").
+const ATTACKER_SIDE = new Set([
+  'Sky Seal Stone',
+  'Beast Bringer',
+  'Anthea & Concordia',
+  'Briar',
+  'Greedy Dice',
+]);
+const expectedSide = (name, delta) =>
+  !delta ? null : ATTACKER_SIDE.has(name) ? 'attacker' : 'victim';
+
+test('parsePrizeModify: corpus prize rows (I131) carry the clause side (I138)', () => {
   for (const { name, text, delta } of CORPUS_TABLE) {
     assert.deepEqual(
       parsePrizeModify(tool(name, text)),
-      { delta },
+      { delta, side: expectedSide(name, delta) },
       `${name} should parse delta ${delta}`
     );
   }
@@ -180,24 +192,35 @@ test('parsePrizeModify: clause-only, other wordings stay neutral', () => {
   for (const { name, text, delta } of cases) {
     assert.deepEqual(
       parsePrizeModify(tool(name, text)),
-      { delta },
+      { delta, side: expectedSide(name, delta) },
       `${name} should parse delta ${delta}`
     );
   }
 });
 
-test('parsePrizeModify: neutral on empty/malformed text (edge cases 1, 2)', () => {
-  assert.deepEqual(parsePrizeModify(null), { delta: 0 });
-  assert.deepEqual(parsePrizeModify({}), { delta: 0 });
-  assert.deepEqual(parsePrizeModify({ text: '' }), { delta: 0 });
-  assert.deepEqual(parsePrizeModify({ text: 'Draw 3 cards.' }), { delta: 0 });
-  assert.deepEqual(
-    parsePrizeModify({ text: 'Take a Prize card.' }),
-    { delta: 0 }
-  );
+test('parsePrizeModify: neutral on empty/malformed text (edge cases 1, 2; design 038 row 1)', () => {
+  const neutral = { delta: 0, side: null };
+  assert.deepEqual(parsePrizeModify(null), neutral);
+  assert.deepEqual(parsePrizeModify({}), neutral);
+  assert.deepEqual(parsePrizeModify({ text: '' }), neutral);
+  assert.deepEqual(parsePrizeModify({ text: 'Draw 3 cards.' }), neutral);
+  assert.deepEqual(parsePrizeModify({ text: 'Take a Prize card.' }), neutral);
   assert.deepEqual(
     parsePrizeModify({ text: 'Your opponent takes that many Prize cards.' }),
-    { delta: 0 }
+    neutral
+  );
+  assert.deepEqual(
+    parsePrizeModify({ text: 'Take 0 more Prize cards.' }),
+    neutral
+  );
+});
+
+test('parsePrizeModify: a clause with no subject the gate knows stays neutral (I138)', () => {
+  // "Each player takes 1 more Prize card" names neither side; guessing would put the
+  // delta on the wrong player's Knock Out.
+  assert.deepEqual(
+    parsePrizeModify({ text: 'Each player takes 1 more Prize card.' }),
+    { delta: 0, side: null }
   );
 });
 

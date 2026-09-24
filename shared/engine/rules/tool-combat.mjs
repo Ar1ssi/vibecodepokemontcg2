@@ -555,13 +555,20 @@ export function toolPrizeCountAdjust(
     // (generic) prize-modify text must be ignored.
     if (skipSpecialEnergy && isSpecialEnergyCard(card)) continue;
     if (!toolConditionMet(parseToolCondition(card), ctx)) continue;
-    const delta = parsePrizeModify(card).delta;
-    if (delta) count = Math.max(0, count + delta);
+    // Attacker-side clauses (Beast Bringer) change the holder owner's own Knock Outs.
+    const { delta, side } = parsePrizeModify(card);
+    if (side !== 'victim') continue;
+    count = Math.max(0, count + delta);
   }
   return count;
 }
 
-/** Parse reactive tool effects when the host is damaged by an attack or Knocked Out. */
+/**
+ * Parse reactive tool effects when the host is damaged by an attack or Knocked Out.
+ * `phase` is the governing trigger (I139, I140): 'damage' for "is damaged by an
+ * attack (even if … Knocked Out)", which resolves on every damaging hit; 'ko' for
+ * "is Knocked Out by damage", which resolves only on the Knock Out.
+ */
 export function parseToolOnDamageEffect(tool) {
   const t = textOf(tool);
   if (
@@ -571,6 +578,7 @@ export function parseToolOnDamageEffect(tool) {
     return null;
   }
   const out = {
+    phase: t.includes('damaged by an attack') ? 'damage' : 'ko',
     draw: 0,
     drawUntil: 0,
     damageAttacker: 0,
@@ -656,17 +664,10 @@ function hasToolOnDamageEffect(out) {
   );
 }
 
-// Whether an effect only matters when the holder is Knocked Out (the on-KO hook
-// applies these; the on-damage consumer applies status/draw/counters).
+// Whether an effect only resolves when the holder is Knocked Out (the on-KO hook
+// applies these; the on-damage consumer applies the 'damage' phase).
 function isOnKoEffect(parsed) {
-  return Boolean(
-    parsed.searchDeckOnKo ||
-      parsed.moveEnergyOnKo ||
-      parsed.discardPrizes ||
-      parsed.millOpponent ||
-      parsed.returnSelfToHand ||
-      parsed.drawUntil
-  );
+  return parsed.phase === 'ko';
 }
 
 /**
@@ -699,16 +700,17 @@ export function attachedToolOnKoEffects(
   return effects;
 }
 
+/** Reactive Tools on `defender` for one trigger phase ('damage' by default, or 'ko'). */
 export function attachedToolOnDamageEffects(
   defender,
   zoneCards,
-  { blockTools = false, stadium = null, isActive = true } = {}
+  { blockTools = false, stadium = null, isActive = true, phase = 'damage' } = {}
 ) {
   if (toolBlocked(blockTools, stadium) || !defender) return [];
   const effects = [];
   for (const tool of attachedTools(defender, zoneCards)) {
     const parsed = parseToolOnDamageEffect(tool);
-    if (!parsed) continue;
+    if (!parsed || parsed.phase !== phase) continue;
     if (parsed.requiresActive && !isActive) continue;
     effects.push({ tool, ...parsed });
   }

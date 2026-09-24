@@ -1,3 +1,16 @@
+# Active work — design 038: design 035 review fixes (I138–I150)
+
+Branch `claude/wizardly-brown-k61li3` (design 035 slices 1–12 + S288 reviews). Spec:
+`.agent/designs/038-trainer-review-fixes.md` (approved S289, option A ×5). One slice per commit, suite green between.
+- [x] 1 I138 prize-clause side + attack gate; I139/I140 Tool `phase` split (S289)
+- [ ] 2 I141 + I143: faceDown choice options (engine + picker), count-only look events, Heavy/Beast Ball choice
+- [ ] 3 I142 Mr. Fuji bench-only + `resetLeftPlay`; I147 single reveal; I146 Focus Band coin events + bench RNG
+- [ ] 4 I144 `prizeFlags` at all damage sites; I145 shared `chaosGymBlocks` gate
+- [ ] 5 I148 `onlyCopiesInHand`; I149 `turnOnePermission`; I150 gate steps/removed + baseline regen; file the
+      per-viewer event-filter follow-up; close I141–I150
+Verify each slice: node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"
+(known fail: card-inspector-model "retreat greys"; coin-flip-ceremony flaky) + oracle/audit:trainers per the plan.
+
 # Active work — S264 12-item batch (branch `feature/batch-s264`, worktree `../vibe-batch-s264`)
 
 Increment ledger (one cluster per commit, suite green between):

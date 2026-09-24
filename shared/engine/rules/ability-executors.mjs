@@ -470,14 +470,28 @@ export function teamNoRetreatCostForActive(activeCard, benchCards) {
 // number: the text's first number is usually HP/damage ("gets -100 HP, and if
 // it is Knocked Out … takes 1 fewer Prize card"), which made Hero's Medal take
 // 0 prizes and Luxurious Cape take 101.
+// `side` says whose Knock Outs the clause changes (I138): 'victim' when the
+// holder is Knocked Out ("that player / your opponent takes"), 'attacker' for
+// the imperative "take N more" when the holder's owner takes the Knock Out
+// (Beast Bringer, Briar). A clause naming neither side is left neutral.
+const VICTIM_PRIZE_CLAUSE =
+  /\b(?:that player|your opponent|the attacking player)\s+takes\s+(\d+)\s+(more|fewer|less)\s+prize/;
+const ATTACKER_PRIZE_CLAUSE = /(?:^|[.,]\s*)take\s+(\d+)\s+(more)\s+prize/;
+
 export function parsePrizeModify(card) {
+  const neutral = { delta: 0, side: null };
   const t = textOf(card);
-  if (!t || !t.includes('prize card')) return { delta: 0 };
-  const m = t.match(/\btakes?\s+(\d+)\s+(more|fewer|less)\s+prize/i);
-  if (!m) return { delta: 0 };
+  if (!t || !t.includes('prize card')) return neutral;
+  const victim = t.match(VICTIM_PRIZE_CLAUSE);
+  const attacker = victim ? null : t.match(ATTACKER_PRIZE_CLAUSE);
+  const m = victim || attacker;
+  if (!m) return neutral;
   const n = parseInt(m[1], 10);
-  if (!n) return { delta: 0 };
-  return { delta: /(fewer|less)/i.test(m[2]) ? -n : n };
+  if (!n) return neutral;
+  return {
+    delta: /(fewer|less)/.test(m[2]) ? -n : n,
+    side: victim ? 'victim' : 'attacker',
+  };
 }
 
 export function applyPrizeModify(basePrizes, delta) {

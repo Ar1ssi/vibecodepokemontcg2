@@ -1366,6 +1366,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             for (const eff of attachedToolOnDamageEffects(oppActive, oppActiveZoneForKo.array, {
               blockTools: blockToolsKo,
               isActive: true,
+              phase: 'ko',
             })) {
               if (eff.searchDeckOnKo > 0) {
                 if (!emit) continue;

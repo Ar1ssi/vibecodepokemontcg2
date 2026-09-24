@@ -3028,11 +3028,11 @@ import test from 'node:test';
     test('parsePrizeModify / applyPrizeModify', () => {
       assert.deepEqual(
         parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 1 fewer Prize card.' } }),
-        { delta: -1 }
+        { delta: -1, side: 'victim' }
       );
       assert.deepEqual(
         parsePrizeModify({ ability: { text: 'When this Pokémon is Knocked Out, your opponent takes 2 more Prize cards.' } }),
-        { delta: 2 }
+        { delta: 2, side: 'victim' }
       );
       assert.equal(applyPrizeModify(3, -1), 2);
       assert.equal(applyPrizeModify(1, -5), 0);

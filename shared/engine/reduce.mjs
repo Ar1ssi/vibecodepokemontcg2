@@ -1028,8 +1028,11 @@ function handleKnockout(
   if (koToolOutcome.discardPrizes) prizeCount = 0;
 
   // Attacker-side on-KO Prize clause (Beast Bringer): the Tool sits on the attacker,
-  // so the victim-side scan above never sees it.
-  if (attackerActive) {
+  // so the victim-side scan above never sees it. The printed clause needs the
+  // opponent's Active to be Knocked Out by the holder's own attack (I138).
+  const koByHolderAttack =
+    byAttack && wasActive && draft.turn?.player === attackerPlayerId;
+  if (attackerActive && koByHolderAttack) {
     const attackerZone = attacker.zones.active || [];
     const attackerCtx = {
       holder: inPlayView(draft, attackerActive),
@@ -1038,9 +1041,12 @@ function handleKnockout(
       flags: { prizesRemaining: (attacker.zones.prizes || []).length },
     };
     for (const tool of attachedTools(attackerActive, attackerZone)) {
+      const { delta, side } = parsePrizeModify(tool);
+      if (side !== 'attacker') continue;
+      // Sky Seal Stone's clause belongs to its Star Order VSTAR Power (I137).
+      if (/vstar power/i.test(trainerEffectText(tool))) continue;
       if (!toolConditionMet(parseToolCondition(tool), attackerCtx)) continue;
-      const delta = parsePrizeModify(tool).delta;
-      if (delta) prizeCount = Math.max(0, prizeCount + delta);
+      prizeCount = Math.max(0, prizeCount + delta);
     }
   }
 
@@ -4187,13 +4193,19 @@ function resolveAttackEffectPhase(draft, ctx) {
 
         // Snapshot the reactive Tools before a Knock Out discards them: the "even if
         // Knocked Out" wordings (Team Rocket's Hypnotizer, Handheld Fan) still resolve.
-        const reactiveToolEffects =
+        // On-KO counters on the Attacking Pokémon (Vengeful Punch) resolve here too, but
+        // only once the Knock Out happens; the rest of the KO phase is handleKnockout's.
+        const reactiveTools = (phase) =>
           dmgDealt > 0 && !dmgResult.prevented
             ? attachedToolOnDamageEffects(defender, defenderZoneCards, {
                 stadium: draft.stadium,
                 isActive: true,
+                phase,
               })
             : [];
+        const reactiveToolEffects = reactiveTools('damage');
+        const koCounterToolEffects = reactiveTools('ko').filter((eff) => eff.damageAttacker > 0);
+        let defenderKnockedOut = false;
 
         if (dmgDealt > 0) {
           // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
@@ -4275,6 +4287,7 @@ function resolveAttackEffectPhase(draft, ctx) {
                 dealt: dmgDealt,
                 ...(weaknessApplied && { weakness: true }),
               });
+              defenderKnockedOut = true;
               handleKnockout(draft, {
                 victimPlayerId: defenderPlayerId,
                 attackerPlayerId: playerId,
@@ -4299,7 +4312,9 @@ function resolveAttackEffectPhase(draft, ctx) {
         // Reactive tool effects & Thorns on damage (if damage > 0 and not prevented)
         if (dmgDealt > 0 && !dmgResult.prevented && attacker) {
           let thornsDamage = 0;
-          const toolEffects = reactiveToolEffects;
+          const toolEffects = defenderKnockedOut
+            ? [...reactiveToolEffects, ...koCounterToolEffects]
+            : reactiveToolEffects;
           for (const eff of toolEffects) {
             if (eff.damageAttacker > 0) {
               thornsDamage += eff.damageAttacker * 10;
@@ -4359,7 +4374,7 @@ function resolveAttackEffectPhase(draft, ctx) {
               const benchZone = firstBenchRootZone(draft, playerId);
               const benchRoot = benchZone?.find((c) => !c.attachedTo) || null;
               const toHand = eff.moveEnergyOnKo.to === 'opponentHand';
-              const dest = toHand ? attacker.zones.hand : benchZone;
+              const dest = toHand ? draft.players[playerId]?.zones?.hand : benchZone;
               if (energy && dest) {
                 attackerZone.splice(attackerZone.indexOf(energy), 1);
                 energy.attachedTo = toHand ? null : benchRoot?.instanceId ?? null;

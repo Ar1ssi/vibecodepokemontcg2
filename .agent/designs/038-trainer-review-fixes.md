@@ -1,5 +1,5 @@
 # 038: Design 035 review fixes (I138–I150)
-Status: draft — awaiting user approval
+Status: approved (user, S289: option A for all 5) — building; slice 1 done S289
 Date: 2026-09-24 · Session: S288
 
 ## Problem
@@ -152,13 +152,13 @@ Contract (stable surface):
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Tool with no prize clause / empty text | `{delta:0, side:null}`; no loop applies it | [ ] |
-| 2 | Victim holds Beast Bringer at exactly 6 Prizes | victim loop ignores it (attacker side); KO gives base Prizes | [ ] |
-| 3 | Attacker holds Sky Seal Stone (VSTAR Power) | attacker loop skips it until I137 | [ ] |
-| 4 | KO not caused by an attack (Poison, damage counters) | attacker-side clauses do not apply | [ ] |
-| 5 | Lucky Egg holder damaged but survives | no draw | [ ] |
-| 6 | Handheld Fan holder KO'd; attacker has 0 / 1 / 2 Energy | 0 / 1 / 1 moved, exactly once | [ ] |
-| 7 | Tool text with both damage and KO clauses | phase from the governing trigger sentence; test the corpus rows that match both | [ ] |
+| 1 | Tool with no prize clause / empty text | `{delta:0, side:null}`; no loop applies it | [x] covered: shared/engine/rules/__tests__/trainer-tool-modifiers.test.mjs "parsePrizeModify: neutral on empty/malformed text (… design 038 row 1)" + side table |
+| 2 | Victim holds Beast Bringer at exactly 6 Prizes | victim loop ignores it (attacker side); KO gives base Prizes | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "the victim holding Beast Bringer at exactly 6 Prizes …" |
+| 3 | Attacker holds Sky Seal Stone (VSTAR Power) | attacker loop skips it until I137 | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "an attacker holding Sky Seal Stone takes the base Prizes …" |
+| 4 | KO not caused by an attack (Poison, damage counters) | attacker-side clauses do not apply | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "attacker-side Prize clauses need a Knock Out by the holder’s attack" (Confusion self-KO) |
+| 5 | Lucky Egg holder damaged but survives | no draw | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "Lucky Egg does nothing when its holder is damaged but survives" |
+| 6 | Handheld Fan holder KO'd; attacker has 0 / 1 / 2 Energy | 0 / 1 / 1 moved, exactly once | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "Handheld Fan on a Knocked Out holder moves at most one Energy, once" |
+| 7 | Tool text with both damage and KO clauses | phase from the governing trigger sentence; test the corpus rows that match both | [x] covered: shared/engine/__tests__/tool-on-ko.test.mjs "parseToolOnDamageEffect: phase follows the governing trigger" (Time Shard, Rocky Helmet, Hypnotizer …) |
 | 8 | Blind Prize pick resumes after a disconnect | ids re-validated against live Prizes; names never in options | [ ] |
 | 9 | Heavy Ball: 0 / 1 / 2 matching Basics; player declines | skip + discard / choice / choice; decline → discard, Prizes unchanged | [ ] |
 | 10 | Mr. Fuji with an empty Bench | `no_pokemon` skip (Active never offered) | [ ] |
@@ -200,6 +200,19 @@ Revert = revert the slice commit.
 Each slice closes its issues in ISSUES.md. After slice 1, re-check I135's closure note (its on-KO scope was wrong).
 
 ## Deviations (Builder appends here during build)
+Slice 1 (S289):
+- Attacker loop gate is `byAttack && wasActive && turn player === attackerPlayerId`, not `byAttack` alone:
+  thorns/recoil/Confusion KOs pass `byAttack` or credit the non-attacking player, and every attacker
+  clause prints "your opponent's Active … Knocked Out by damage from an attack of <holder>". Row 4 is
+  tested with a Confusion self-KO (the reachable non-attack KO through `applyCommand`).
+- `parsePrizeModify` returns neutral for a clause naming neither subject ("each player takes 1 more").
+- KO-phase counter Tools (Vengeful Punch, Box of Disaster, Curse Powder) had the I139 bug too (counters on
+  any damage). `applyToolOnKoEffects` has no attacker-counter path, so the attack damage site snapshots them
+  with `attachedToolOnDamageEffects(…, {phase:'ko'})` and applies them only when that hit Knocks Out.
+- `attachedToolOnDamageEffects` takes `phase` (default 'damage'); legacy `chat-buttons.js` KO search passes
+  `phase:'ko'` so its Amulet of Hope path keeps working (one line, not a parity change).
+- Pre-existing crash fixed in passing: the damage-site Rugged Helmet path read `attacker.zones.hand` on the
+  attacking card (TypeError on every hit); it now uses the attacking player's hand.
 
 ---
 Self-approval checklist (only when the user is unreachable):

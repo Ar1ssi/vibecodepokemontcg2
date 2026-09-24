@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { parseToolOnDamageEffect } from '../rules/tool-combat.mjs';
 
 let nextId = 900;
 const card = (props) => createCard({ instanceId: nextId++, ...props });
@@ -263,4 +264,218 @@ test('Focus Band flips a coin and prevents the Knock Out on heads (F6)', () => {
   const tails = attack(state2, { next: () => 0.9, shuffle: (a) => [...a] });
   assert.equal(tails.error, null);
   assert.equal(tails.state.players.p2.zones.active.length, 0, 'tails is a Knock Out');
+});
+
+// ── Design 038 slice 1: prize-clause side (I138) and damage/KO phase split (I139, I140) ──
+
+const TEXT = {
+  luxuriousCape:
+    'If the Pokémon this card is attached to doesn’t have a Rule Box, it gets +100 HP, and if it is Knocked Out by damage from an attack from your opponent’s Pokémon, that player takes 1 more Prize card. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)',
+  expertBelt:
+    'The Pokémon this card is attached to gets +20 HP and that Pokémon’s attacks do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance). When the Pokémon this card is attached to is Knocked Out, your opponent takes 1 more Prize card.',
+  lifeDew:
+    'If the Pokémon this card is attached to is Knocked Out, your opponent takes 1 fewer Prize card.',
+  beastBringer:
+    'If you have exactly 6 Prize cards remaining, and if your opponent’s Active Pokémon-GX or Pokémon-EX is Knocked Out by damage from an attack of the Ultra Beast this card is attached to, take 1 more Prize card.',
+  skySealStone:
+    'VSTAR Power The Pokémon V this card is attached to can use the VSTAR Power on this card. Ability ⇢ Star Order During your turn, you may use this Ability. During this turn, if your opponent’s Active Pokémon VSTAR or Active Pokémon VMAX is Knocked Out by damage from an attack from your Basic Pokémon V, take 1 more Prize card. (You can’t use more than 1 VSTAR Power in a game.)',
+  luckyEgg:
+    'If the Pokémon this card is attached to is Knocked Out by damage from an opponent’s attack, draw cards until you have 7 cards in your hand.',
+  handheldFan:
+    'If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if this Pokémon is Knocked Out), move an Energy from the Attacking Pokémon to 1 of your opponent’s Benched Pokémon.',
+  ruggedHelmet:
+    'If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if it is Knocked Out), put an Energy attached to the Attacking Pokémon into your opponent’s hand.',
+  vengefulPunch:
+    'If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, put 4 damage counters on the Attacking Pokémon.',
+};
+
+const koPrizeCount = (res) =>
+  res.events.find((e) => e.type === 'pokemonKnockedOut')?.prizeCount;
+
+test('an attacker holding a victim-side prize Tool takes the base Prizes (I138)', () => {
+  for (const [name, text] of [
+    ['Luxurious Cape', TEXT.luxuriousCape],
+    ['Expert Belt', TEXT.expertBelt],
+    ['Life Dew', TEXT.lifeDew],
+  ]) {
+    const state = game({ p1Active: attacker(), p2Active: defender() });
+    attach(state, 'p1', tool(name, text), state.players.p1.zones.active[0]);
+    const res = attack(state);
+    assert.equal(res.error, null, name);
+    assert.equal(
+      koPrizeCount(res),
+      1,
+      `${name} on the attacker leaves a 1-Prize KO at 1`
+    );
+  }
+});
+
+test('the victim holding Beast Bringer at exactly 6 Prizes gives the base Prizes (design 038 row 2)', () => {
+  const victim = defender({
+    name: 'Buzzwole-GX',
+    subtypes: ['GX', 'Ultra Beast'],
+  });
+  const state = game({ p1Active: attacker(), p2Active: victim });
+  attach(state, 'p2', tool('Beast Bringer', TEXT.beastBringer), victim);
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.equal(
+    koPrizeCount(res),
+    2,
+    'GX base 2; the clause is the holder owner’s own Knock Outs'
+  );
+});
+
+test('an attacker holding Sky Seal Stone takes the base Prizes until Star Order exists (design 038 row 3)', () => {
+  const victim = defender({
+    name: 'Arceus VSTAR',
+    hp: 100,
+    subtypes: ['VSTAR'],
+  });
+  const striker = attacker({ name: 'Zeraora V', subtypes: ['Basic', 'V'] });
+  const state = game({ p1Active: striker, p2Active: victim });
+  attach(state, 'p1', tool('Sky Seal Stone', TEXT.skySealStone), striker);
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.equal(koPrizeCount(res), 2, 'VSTAR base 2, no Star Order bonus');
+});
+
+test('attacker-side Prize clauses need a Knock Out by the holder’s attack (design 038 row 4)', () => {
+  // p1's Confused GX hurts itself; p2's Ultra Beast holds Beast Bringer at 6 Prizes.
+  // p2 is credited the Knock Out, but no attack of the Ultra Beast caused it.
+  const confusedGx = attacker({
+    name: 'Charizard-GX',
+    hp: 30,
+    subtypes: ['GX'],
+  });
+  confusedGx.specialCondition = 'Confused';
+  const ultraBeast = defender({ name: 'Buzzwole', subtypes: ['Ultra Beast'] });
+  const state = game({ p1Active: confusedGx, p2Active: ultraBeast });
+  attach(state, 'p2', tool('Beast Bringer', TEXT.beastBringer), ultraBeast);
+  const res = attack(state, { next: () => 0.9, shuffle: (a) => [...a] });
+  assert.equal(res.error, null);
+  assert.ok(
+    res.events.some((e) => e.type === 'attackConfusedFizzle'),
+    'tails: confusion damage'
+  );
+  assert.equal(koPrizeCount(res), 2, 'GX base 2, no Beast Bringer bonus');
+});
+
+test('parseToolOnDamageEffect: phase follows the governing trigger (design 038 row 7)', () => {
+  const rows = [
+    ['Handheld Fan', TEXT.handheldFan, 'damage'],
+    ['Rugged Helmet', TEXT.ruggedHelmet, 'damage'],
+    [
+      'Rocky Helmet',
+      'If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if it is Knocked Out), put 2 damage counters on the Attacking Pokémon.',
+      'damage',
+    ],
+    [
+      "Team Rocket's Hypnotizer",
+      'If the Team Rocket’s Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if this Team Rocket’s Pokémon is Knocked Out), the Attacking Pokémon is now Asleep.',
+      'damage',
+    ],
+    ['Lucky Egg', TEXT.luckyEgg, 'ko'],
+    ['Vengeful Punch', TEXT.vengefulPunch, 'ko'],
+    [
+      'Exp. Share',
+      'When your Active Pokémon is Knocked Out by damage from an attack from your opponent’s Pokémon, you may move a Basic Energy from that Pokémon to the Pokémon this card is attached to.',
+      'ko',
+    ],
+    [
+      'Time Shard',
+      'Attach Time Shard to 1 of your Pokémon that doesn’t already have a Pokémon Tool card attached to it. If that Pokémon is Knocked Out, discard this card. If the Pokémon this card is attached to is Knocked Out by damage from the Defending Pokémon’s attack during your opponent’s turn, you may return up to 2 basic Energy cards attached to that Pokémon to your hand.',
+      'ko',
+    ],
+  ];
+  for (const [name, text, phase] of rows) {
+    assert.equal(parseToolOnDamageEffect(tool(name, text))?.phase, phase, name);
+  }
+});
+
+test('Lucky Egg does nothing when its holder is damaged but survives (I139, design 038 row 5)', () => {
+  const victim = defender({ name: 'Tank', hp: 300 });
+  const state = game({ p1Active: attacker(), p2Active: victim, decks: 9 });
+  attach(state, 'p2', tool('Lucky Egg', TEXT.luckyEgg), victim);
+  state.players.p2.zones.hand.push(card({ name: 'p2 h1' }));
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.equal(
+    res.state.players.p2.zones.active[0].damage,
+    200,
+    'the holder survives'
+  );
+  // The attack ends p1's turn, so p2's hand is the 1 card plus the turn-start draw.
+  assert.equal(res.state.players.p2.zones.hand.length, 2, 'no Lucky Egg draw');
+  assert.ok(
+    !res.events.some((e) => e.type === 'cardsDrawn' && e.source === 'Lucky Egg')
+  );
+});
+
+test('Handheld Fan on a Knocked Out holder moves at most one Energy, once (I140, design 038 row 6)', () => {
+  for (const [energyCount, expectedMoved] of [
+    [0, 0],
+    [1, 1],
+    [2, 1],
+  ]) {
+    const benchMon = defender({ name: 'p1 Bench' });
+    const victim = defender();
+    const state = game({
+      p1Active: attacker(),
+      p2Active: victim,
+      p1Bench: [benchMon],
+    });
+    attach(state, 'p2', tool('Handheld Fan', TEXT.handheldFan), victim);
+    for (let i = 0; i < energyCount; i++)
+      attach(state, 'p1', energy(), state.players.p1.zones.active[0]);
+    const res = attack(state);
+    assert.equal(res.error, null);
+    assert.ok(koPrizeCount(res) >= 1, 'the holder is Knocked Out');
+    const moved = res.state.players.p1.zones.bench.filter(
+      (c) => c.attachedTo === benchMon.instanceId
+    );
+    assert.equal(
+      moved.length,
+      expectedMoved,
+      `${energyCount} Energy on the attacker`
+    );
+  }
+});
+
+test('Rugged Helmet on a Knocked Out holder returns one Energy to the attacker hand (I140)', () => {
+  const victim = defender();
+  const state = game({ p1Active: attacker(), p2Active: victim });
+  attach(state, 'p2', tool('Rugged Helmet', TEXT.ruggedHelmet), victim);
+  attach(state, 'p1', energy(), state.players.p1.zones.active[0]);
+  attach(state, 'p1', energy(), state.players.p1.zones.active[0]);
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.equal(
+    res.state.players.p1.zones.hand.filter((c) => c.type === 'Energy').length,
+    1
+  );
+});
+
+test('Vengeful Punch retaliates only when its holder is Knocked Out', () => {
+  const tank = defender({ name: 'Tank', hp: 300 });
+  const survived = game({ p1Active: attacker(), p2Active: tank });
+  attach(survived, 'p2', tool('Vengeful Punch', TEXT.vengefulPunch), tank);
+  const hit = attack(survived);
+  assert.equal(hit.error, null);
+  assert.equal(
+    hit.state.players.p1.zones.active[0].damage || 0,
+    0,
+    'no counters on a non-KO hit'
+  );
+
+  const victim = defender();
+  const koed = game({ p1Active: attacker(), p2Active: victim });
+  attach(koed, 'p2', tool('Vengeful Punch', TEXT.vengefulPunch), victim);
+  const ko = attack(koed);
+  assert.equal(ko.error, null);
+  assert.equal(
+    ko.state.players.p1.zones.active[0].damage,
+    40,
+    '4 counters on the Attacking Pokémon'
+  );
 });
