@@ -4,8 +4,12 @@ import {
   systemState,
 } from '../../state.js';
 import {
+  DAMAGE_COUNTER_MOTIONS,
   DAMAGE_COUNTER_TIERS,
+  DAMAGE_DANGER_CLASS,
+  counterMotionFor,
   getDamageCounterTier,
+  isDangerDamage,
 } from '../../setup/counters/damage-counter-style.mjs';
 import { processAction } from '../../setup/general/process-action.js';
 import { splitEmitAndTail } from '../../setup/general/sync-action-args.mjs';
@@ -25,10 +29,35 @@ function resolveCounterTarget(user, zoneId, index, hint) {
   };
 }
 
-const applyDamageCounterStyle = (damageCounter, damageAmount) => {
+/**
+ * Design 024 slice 3: the single funnel for a counter's look. `motion` replays
+ * one of the keyframes in damage-counter.css — 'land' when the counter was
+ * just created, 'bump' when its value changed. Re-adding a class the element
+ * already carries does not restart a CSS animation, hence the forced reflow
+ * between the remove and the add.
+ *
+ * @param {Element} damageCounter
+ * @param {number|string} damageAmount
+ * @param {'land'|'bump'|null} [motion]
+ * @param {number|string|null} [hp] - printed HP, for the near-KO danger pulse
+ */
+const applyDamageCounterStyle = (damageCounter, damageAmount, motion = null, hp = null) => {
   damageCounter.classList.add('damage-counter');
   damageCounter.classList.remove(...DAMAGE_COUNTER_TIERS);
   damageCounter.classList.add(getDamageCounterTier(damageAmount));
+  damageCounter.classList.toggle(
+    DAMAGE_DANGER_CLASS,
+    isDangerDamage(damageAmount, hp)
+  );
+
+  damageCounter.classList.remove(...DAMAGE_COUNTER_MOTIONS);
+  if (!motion) return;
+  // Forces the removal to take effect before the re-add, so the keyframe
+  // replays on an element that already carried the class. On a not-yet-
+  // appended counter this is a no-op and none is needed: the animation starts
+  // when the node is inserted.
+  void damageCounter.offsetWidth;
+  damageCounter.classList.add(motion === 'land' ? 'fx-counter-land' : 'fx-counter-bump');
 };
 
 export const updateDamageCounter = (
@@ -61,10 +90,16 @@ export const updateDamageCounter = (
     card.damage = Math.max(0, parseInt(damageAmount, 10) || 0);
   }
   if (!damageCounter) return;
-  if (damageCounter.textContent != damageAmount) {
+  const changed = damageCounter.textContent != damageAmount;
+  if (changed) {
     damageCounter.textContent = damageAmount;
   }
-  applyDamageCounterStyle(damageCounter, damageAmount);
+  applyDamageCounterStyle(
+    damageCounter,
+    damageAmount,
+    counterMotionFor({ valueChanged: changed }),
+    card?.hp
+  );
 
   processAction(user, emit, 'updateDamageCounter', [
     zoneId,
@@ -167,6 +202,8 @@ export const addDamageCounter = (
   const zoneElementRect = zone.element.getBoundingClientRect();
 
   let damageCounter = targetCard.image.damageCounter;
+  // Only a counter that did not exist yet animates here — see counterMotionFor.
+  const isNewCounter = !damageCounter;
   //clean up existing event listeners
   if (damageCounter) {
     damageCounter.removeEventListener('input', damageCounter.handleInput);
@@ -189,13 +226,14 @@ export const addDamageCounter = (
     }
     damageCounter.contentEditable = 'true';
     damageCounter.textContent = damageAmount ? damageAmount : '10';
-    applyDamageCounterStyle(
-      damageCounter,
-      damageAmount ? damageAmount : '10'
-    );
   }
 
-  applyDamageCounterStyle(damageCounter, damageCounter.textContent);
+  applyDamageCounterStyle(
+    damageCounter,
+    damageCounter.textContent,
+    counterMotionFor({ isNew: isNewCounter }),
+    targetCard.hp
+  );
 
   damageCounter.style.display = 'inline-block';
   damageCounter.style.left = `${targetRect.left - zoneElementRect.left + targetRect.width / 1.5}px`;

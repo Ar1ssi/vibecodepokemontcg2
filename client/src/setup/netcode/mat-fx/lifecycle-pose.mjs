@@ -6,6 +6,8 @@ export const EVOLVE_BURST_MS = 1150;
 export const ENERGY_SNAP_MS = 560;
 export const RETREAT_SLIDE_MS = 520;
 export const CARD_PRESENT_MS = 1700;
+export const PROMOTE_MS = 560;
+export const DISCARD_PUFF_MS = 420;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -144,3 +146,51 @@ export function presentTargetRect(viewportWidth, viewportHeight, aspect = 0.716)
     height,
   };
 }
+
+/**
+ * Design 024 slice 4: a Pokemon promoted to Active rises into the slot behind
+ * a brightening glow — the beat after a Knockout that previously had none.
+ */
+export function promotePose(t) {
+  const c = clamp01(t);
+  const out = easeOutCubic(c);
+  return {
+    y: 26 * (1 - out),
+    scale: 0.92 + 0.08 * out,
+    glowOpacity: c < 0.3 ? c / 0.3 : Math.max(0, 1 - (c - 0.3) / 0.7),
+    glowScale: 0.9 + 0.5 * out,
+  };
+}
+
+/**
+ * Design 024 slice 4: cards leaving for the discard pile puff outward and fade,
+ * so a discard is visible without animating every individual card.
+ */
+export function discardPuffPose(t) {
+  const c = clamp01(t);
+  const out = easeOutCubic(c);
+  return {
+    y: -18 * out,
+    scale: 1 + 0.35 * out,
+    opacity: c < 0.2 ? c / 0.2 : Math.max(0, 1 - (c - 0.2) / 0.8),
+  };
+}
+
+/**
+ * Design 024 slice 4: devolution is the evolve burst run backwards — the ring
+ * collapses inward instead of expanding, so the two read as opposites.
+ */
+export function devolveBurstPose(t) {
+  const c = clamp01(t);
+  const bell = Math.sin(c * Math.PI);
+  return {
+    scale: 1 - 0.12 * bell,
+    opacity: bell,
+    ringScale: 1.7 - 0.9 * easeOutCubic(c),
+    ringOpacity: 1 - c,
+  };
+}
+
+/** The played card's face: the post-update element image beats the pre-diff
+ * snapshot, which for an opponent's hand card is still the sleeve. */
+export const presentSrcFor = (origin, element) => element?.currentSrc || element?.src || origin?.src;

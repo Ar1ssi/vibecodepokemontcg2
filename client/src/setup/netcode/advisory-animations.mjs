@@ -12,6 +12,9 @@
 //
 // Design 027: a `cardMoved` that puts a Pokémon into play becomes the `enter`
 // effect, which decides from the card itself whether a Mega/Tera entry plays.
+// Design 024: an event may now produce SEVERAL plans, returned as an array and
+// queued in order (fx-queue.mjs). `attackExecuted` is the reason: an attack
+// must read as its name, then its impact — one event, two beats.
 export const EVENT_FX = {
   damageUpdated: 'damage',
   attackExecuted: 'attack',
@@ -25,7 +28,18 @@ export const EVENT_FX = {
   stadiumEffectUsed: 'stadium-play',
   turnStarted: 'turn-banner',
   gameEnded: 'game-over',
+  // Design 024 slice 4: events the engine already emitted with no effect.
+  prizesTaken: 'prize-claim',
+  prizeTaken: 'prize-claim',
+  pokemonPromoted: 'promote',
+  pokemonDevolved: 'devolve',
+  statusCleared: 'status-clear',
+  cardsDiscarded: 'discard',
+  coinFlipped: 'coin-flip',
 };
+
+// An attack fans into a banner (+ target ring) and then the lunge itself.
+const MULTI_FX = { attackExecuted: ['attack-banner', 'attack'] };
 
 const sideOf = (playerId, selfPlayerId) =>
   playerId == null || selfPlayerId == null ? null : playerId === selfPlayerId ? 'self' : 'opp';
@@ -35,7 +49,10 @@ const sideOf = (playerId, selfPlayerId) =>
 const fxPlan = (event, selfPlayerId, effect = EVENT_FX[event.type]) => {
   const { type, playerId, ...fields } = event;
   const actor = type === 'gameEnded' ? event.winner : (playerId ?? event.player);
-  return { kind: 'fx', effect, user: sideOf(actor, selfPlayerId), ...fields };
+  const base = { kind: 'fx', user: sideOf(actor, selfPlayerId), ...fields };
+  const effects = MULTI_FX[type];
+  if (effects) return effects.map((effect) => ({ ...base, effect }));
+  return { ...base, effect };
 };
 
 // The engine's own "entered play" rule (reduce.mjs `enteredPlayTurn`): from a

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { advisoryAnimationPlan, EVENT_FX } from '../advisory-animations.mjs';
+import { HOLD_MS } from '../mat-fx/fx-holds.mjs';
 
 test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side', () => {
   const event = { type: 'zoneShuffled', zoneId: 'deck', playerId: 'p1' };
@@ -105,13 +106,27 @@ test('advisoryAnimationPlan: malformed input returns null without throwing', () 
 
 test('advisoryAnimationPlan: EVENT_FX maps every fx event type to a named effect', () => {
   for (const [type, effect] of Object.entries(EVENT_FX)) {
-    const plan = advisoryAnimationPlan({ type, playerId: 'p1', instanceId: 'c1' }, 'p1');
+    const planned = advisoryAnimationPlan({ type, playerId: 'p1', instanceId: 'c1' }, 'p1');
+    // A fanned-out event (attackExecuted) yields several plans; the mapped
+    // effect is the LAST beat, after whatever announces it.
+    const plans = Array.isArray(planned) ? planned : [planned];
+    const plan = plans.at(-1);
     assert.equal(plan.kind, 'fx');
     assert.equal(plan.effect, effect);
     // turnStarted/gameEnded name their side via `player`/`winner`; own tests below.
     if (type !== 'turnStarted' && type !== 'gameEnded') assert.equal(plan.user, 'self');
-    assert.equal(plan.instanceId, 'c1');
+    for (const p of plans) assert.equal(p.instanceId, 'c1');
   }
+});
+
+test('advisoryAnimationPlan: every mapped effect exists in the client registry', () => {
+  // EVENT_FX naming an effect the registry does not implement is a silent
+  // no-op in production, so the two tables are checked against each other.
+  const registered = new Set(Object.keys(HOLD_MS));
+  for (const effect of Object.values(EVENT_FX)) {
+    assert.ok(registered.has(effect), `${effect} has no hold/registry entry`);
+  }
+  assert.ok(registered.has('attack-banner'), 'the fanned-out banner is registered too');
 });
 
 test('advisoryAnimationPlan: fx plan passes payload through and resolves the opp side', () => {
@@ -145,19 +160,68 @@ test('advisoryAnimationPlan: pokemonKnockedOut stays a knockout plan, not fx', (
   assert.equal(plan.kind, 'knockout');
 });
 
-test('advisoryAnimationPlan: attackExecuted -> attack fx carrying attacker and defender ids', () => {
-  const plan = advisoryAnimationPlan(
-    { type: 'attackExecuted', playerId: 'p1', attackerId: 1, defenderId: 20, damage: 30 },
+test('advisoryAnimationPlan: attackExecuted fans into the banner then the lunge', () => {
+  const plans = advisoryAnimationPlan(
+    {
+      type: 'attackExecuted',
+      playerId: 'p1',
+      attackerId: 1,
+      defenderId: 20,
+      attackName: 'Thunderbolt',
+      damage: 30,
+    },
     'p1'
   );
-  assert.deepEqual(plan, {
+  const shared = {
     kind: 'fx',
-    effect: 'attack',
     user: 'self',
     attackerId: 1,
     defenderId: 20,
+    attackName: 'Thunderbolt',
     damage: 30,
-  });
+  };
+  assert.deepEqual(plans, [
+    { ...shared, effect: 'attack-banner' },
+    { ...shared, effect: 'attack' },
+  ]);
+});
+
+test('advisoryAnimationPlan: a bench-only attack still fans, with no defender', () => {
+  // Edge 9: nothing to ring or lunge at, but the name must still announce.
+  const plans = advisoryAnimationPlan(
+    { type: 'attackExecuted', playerId: 'p1', attackerId: 1, attackName: 'Spread', benchDealt: 20 },
+    'p1'
+  );
+  assert.equal(plans.length, 2);
+  assert.equal(plans[0].effect, 'attack-banner');
+  assert.equal(plans[0].defenderId, undefined);
+});
+
+test('advisoryAnimationPlan: the design-024 events each map to their own effect', () => {
+  const cases = [
+    [{ type: 'prizesTaken', playerId: 'p1', count: 2 }, 'prize-claim'],
+    [{ type: 'prizeTaken', playerId: 'p1', count: 1 }, 'prize-claim'],
+    [{ type: 'pokemonPromoted', playerId: 'p1', instanceId: 'c1' }, 'promote'],
+    [{ type: 'pokemonDevolved', playerId: 'p1', instanceId: 'c1' }, 'devolve'],
+    [{ type: 'statusCleared', playerId: 'p1', instanceId: 'c1', condition: 'Asleep' }, 'status-clear'],
+    [{ type: 'cardsDiscarded', playerId: 'p1' }, 'discard'],
+    [{ type: 'coinFlipped', playerId: 'p1', face: 'heads' }, 'coin-flip'],
+  ];
+  for (const [event, effect] of cases) {
+    const plan = advisoryAnimationPlan(event, 'p1');
+    assert.equal(plan.kind, 'fx', `${event.type} is not an fx plan`);
+    assert.equal(plan.effect, effect);
+    assert.equal(plan.user, 'self');
+  }
+});
+
+test('advisoryAnimationPlan: payload fields survive the fan-out and the new events', () => {
+  assert.equal(advisoryAnimationPlan({ type: 'coinFlipped', playerId: 'p2', face: 'tails' }, 'p1').face, 'tails');
+  assert.equal(
+    advisoryAnimationPlan({ type: 'statusCleared', playerId: 'p1', condition: 'Poisoned' }, 'p1').condition,
+    'Poisoned'
+  );
+  assert.equal(advisoryAnimationPlan({ type: 'prizesTaken', playerId: 'p1', count: 3 }, 'p1').count, 3);
 });
 
 test('advisoryAnimationPlan: turnStarted resolves the acting side from `player`', () => {

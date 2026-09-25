@@ -14,8 +14,11 @@ import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
 import { playDrawToHand } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
+import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
 import { afterImpact } from './mat-fx/combat.js';
+import { createFxQueue } from './mat-fx/fx-queue.mjs';
+import { holdFor } from './mat-fx/fx-holds.mjs';
 import { captureOrigins, discardOrigins } from './mat-fx/origins.mjs';
 
 // instanceId -> ghost, captured by handleBeforeApply (card still on board)
@@ -70,15 +73,69 @@ export function handleBeforeApply(events, selfPlayerId) {
 }
 
 /**
+ * Plays one plan and returns its choreography hold in ms (design 024). Every
+ * plan kind goes through here, not just `fx`, so a batch that mixes a lunge, a
+ * damage pop and a knockout still plays in the order the engine emitted it.
+ *
+ * @param {object} plan
+ * @returns {number}
+ */
+function runPlan(plan) {
+  if (plan.kind === 'shuffle') {
+    playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
+    return 0;
+  }
+  if (plan.kind === 'draw') {
+    playDrawPlan(plan);
+    return 0;
+  }
+  if (plan.kind === 'knockout') {
+    const ghost = pendingKnockoutGhosts.get(plan.instanceId);
+    pendingKnockoutGhosts.delete(plan.instanceId);
+    if (!ghost) return 0;
+    playKnockoutGhost(ghost, { deferStart: afterImpact });
+    return holdFor('knockout');
+  }
+  if (plan.kind === 'fx') return playFx(plan);
+  return 0;
+}
+
+// Cosmetic only: board state is already applied when plans arrive here, so the
+// queue never gates input or rendering. `setTimeout` is injected rather than
+// called inside fx-queue.mjs so the queue stays testable on a fake clock.
+const fxQueue = createFxQueue({
+  run: runPlan,
+  schedule: (fn, ms) => setTimeout(fn, ms),
+  cancel: (id) => clearTimeout(id),
+});
+
+// Two ways choreography must stop mid-chain (edge 11):
+// turning effects off — the dispatcher would skip each remaining plan anyway,
+// but the queue would keep ticking timers to do it — and a restart or a player
+// leaving, where the plans describe a board that no longer exists.
+onFxSettingsChanged((settings) => {
+  if (settings.fxOff) fxQueue.clear();
+});
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('game-restarted', () => fxQueue.clear());
+}
+
+/**
  * Handles one server advisory event: builds the plan (pure), then — unless
- * catch-up replay or a hidden tab (edge cases 5, 6) — plays the animation.
+ * catch-up replay or a hidden tab (edge cases 5, 6) — queues the animation.
+ * An event may produce several plans (an attack is a banner then a lunge);
+ * they are queued in order.
  *
  * @param {object} event
  * @param {string|null} selfPlayerId
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
-  const plan = advisoryAnimationPlan(event, selfPlayerId);
-  if (!plan) return;
+  const planned = advisoryAnimationPlan(event, selfPlayerId);
+  if (!planned) return;
+  const plans = Array.isArray(planned) ? planned : [planned];
+  if (plans.length === 0) return;
+
   if (
     !shouldAnimateMirror({
       syncReplaying: !!systemState.syncReplaying,
@@ -86,20 +143,14 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
       hidden: typeof document !== 'undefined' && !!document.hidden,
     })
   ) {
-    if (plan.kind === 'knockout') pendingKnockoutGhosts.delete(plan.instanceId);
-    if (plan.kind === 'fx') discardOrigins(event);
+    for (const plan of plans) {
+      if (plan.kind === 'knockout') pendingKnockoutGhosts.delete(plan.instanceId);
+    }
+    // Once per EVENT: a fanned-out event's plans all share the same origins.
+    if (plans.some((plan) => plan.kind === 'fx')) discardOrigins(event);
+    fxQueue.clear();
     return;
   }
 
-  if (plan.kind === 'shuffle') {
-    playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
-  } else if (plan.kind === 'draw') {
-    playDrawPlan(plan);
-  } else if (plan.kind === 'knockout') {
-    const ghost = pendingKnockoutGhosts.get(plan.instanceId);
-    pendingKnockoutGhosts.delete(plan.instanceId);
-    if (ghost) playKnockoutGhost(ghost, { deferStart: afterImpact });
-  } else if (plan.kind === 'fx') {
-    playFx(plan);
-  }
+  for (const plan of plans) fxQueue.push(plan);
 }

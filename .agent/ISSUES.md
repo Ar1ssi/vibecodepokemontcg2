@@ -6,12 +6,15 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I177). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I180). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I179 2026-09-22 P2 [rules-ui] Known suite failure card-inspector-model.test.mjs "retreat greys only when the cost is unpaid" fails on a clean tree; keeps every run N-1/N. Needs a debug pass. (refs: S251, S252) (PR #181 branch id I83)
+- I178 2026-09-22 P3 [board-ui] No remaining-HP readout (TCG Live shows HP depleting); design 024 O5 scoped it out as new persistent UI, not an effect. (refs: design 024) (PR #181 branch id I82)
+- I177 2026-09-22 P3 [board-ui] Legacy (non-authoritative) mode gets no mat effects or sound: every effect rides the advisory stream, which flows only under SERVER_AUTHORITATIVE. (refs: design 022/024) (PR #181 branch id I81)
 - I175 2026-09-25 P3 [rules] Holon Energy GL's Pokémon-ex reduction is applied before Weakness/Resistance; EX-era defender reductions apply after W/R — confirm the ruling and tag the step `afterWR` (refs: S295 review, attack-engine.mjs Step 4b)
 - I174 2026-09-25 P3 [legacy] move-card.js:670 fires `rules-energy-attached` whenever rules are on; no serverAuthoritative gate found on the rules-bridge.js handler, so authoritative games may run Telepathic/Jet/Enriching locally too — unverified (legacy untested) (refs: scratch special-energy-coverage-audit.md SE17, S295)
 - I173 2026-09-25 P3 [rules] Special-Energy "ignore on Pokémon-ex" gate unenforced: Heal Energy and Holon FF/GL/WP still apply on a Pokémon-ex host (parsed `ignoredOn` with `host`, no consumer; `node scripts/audit-all-special-energy.mjs` lists them as unenforced) (refs: S295)

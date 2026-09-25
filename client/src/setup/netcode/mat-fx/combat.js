@@ -3,15 +3,22 @@
 // moment; `damage` queues the hit — number, white flash, slash, type-coloured
 // sparks, table shake — to land on that moment. Every overlay is detached and
 // self-removing; both no-op when a card cannot be resolved (edge 1).
+//
+// Design 024 slice 2: `attackBanner` opens the sequence — the attack's name
+// sweeps across screen while a ring marks the defender, so an attack reads as
+// name -> target -> impact -> number rather than all at once (see fx-holds).
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
   rectForInstance,
   removeWhen,
+  runPose,
   sampleKeyframes,
   spawnOverlay,
   spawnParticles,
 } from '../../image-logic/mat-fx.mjs';
+import { playBanner } from './banner.js';
+import { classifyHitOnce } from './damage-hit.mjs';
 import {
   DAMAGE_POP_MS,
   HIT_FLASH_MS,
@@ -19,8 +26,9 @@ import {
   LUNGE_IMPACT,
   LUNGE_MS,
   SCREEN_SHAKE_MS,
+  TARGET_RING_MS,
   attackAngleDeg,
-  classifyDamagePlan,
+  attackBannerText,
   createImpactQueue,
   damagePopPose,
   hitFlashPose,
@@ -30,13 +38,13 @@ import {
   shakePose,
   slashPose,
   stackOffset,
+  targetRingPose,
 } from './combat-pose.mjs';
 import { brighten, fxRgbForCard, FX_NEUTRAL_RGB, rgbCss } from './fx-colors.mjs';
 import { peekCombatOrigin } from './origins.mjs';
 import { burstParticles } from './particles.mjs';
 
 const BACKSTOP_PAD_MS = 400;
-const lastSeenDamage = new Map();
 const floatingCount = new Map();
 const impacts = createImpactQueue({ setTimer: (fn, ms) => setTimeout(fn, ms) });
 // The tilt owns `transform` on these; WAAPI `translate` composes without clobbering it.
@@ -148,7 +156,7 @@ const strikeTarget = (rect, hit, ctx) => {
 
 const shakeTable = (amount) => {
   const amplitude = screenShakeAmplitude(amount);
-  if (amplitude === 0) return;
+  if (amplitude === 0) return 0;
   const frames = screenShakeOffsets(amplitude).map((translate) => ({ translate }));
   for (const id of SHAKE_TARGET_IDS) {
     document.getElementById(id)?.animate?.(frames, {
@@ -159,10 +167,10 @@ const shakeTable = (amount) => {
 };
 
 export const damage = (plan) => {
-  const hit = classifyDamagePlan(plan, lastSeenDamage);
-  if (!hit) return;
+  const hit = classifyHitOnce(plan);
+  if (!hit) return 0;
   const rect = combatRect(plan.instanceId, getCardRegistry());
-  if (!rect) return;
+  if (!rect) return 0;
   impacts.add((ctx) => {
     showDamageNumber(plan.instanceId, rect, hit);
     if (hit.kind !== 'hit') return;
@@ -215,9 +223,9 @@ export const attack = (plan) => {
   const from = combatRect(plan.attackerId, registry);
   const to = combatRect(plan.defenderId, registry);
   const src = combatSrc(plan.attackerId, registry);
-  if (!from || !to || !src) return;
+  if (!from || !to || !src) return 0;
   const pose = lungePoseFor(from, to);
-  if (!pose) return;
+  if (!pose) return 0;
   impacts.strikeIn(LUNGE_MS * LUNGE_IMPACT, {
     direction: attackAngleDeg(from, to),
     attackerCard: registry.get(plan.attackerId)?.card || null,
@@ -244,4 +252,28 @@ export const attack = (plan) => {
   const mainDone = animateFrames(main, mainFrames, { duration: LUNGE_MS });
   removeWhen(host, [mainDone, ...layers], LUNGE_MS + BACKSTOP_PAD_MS);
   hideDuring(registry.get(plan.attackerId)?.element, mainDone, LUNGE_MS + BACKSTOP_PAD_MS);
+};
+
+const showTargetRing = (rect) => {
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-target-ring' });
+  const ring = document.createElement('div');
+  ring.className = 'fx-target-ring__ring';
+  host.appendChild(ring);
+  runPose(host, TARGET_RING_MS, (t) => {
+    const pose = targetRingPose(t);
+    ring.style.transform = `scale(${pose.scale})`;
+    host.style.opacity = String(pose.opacity);
+  });
+};
+
+export const attackBanner = (plan) => {
+  const registry = getCardRegistry();
+  const attackerName = registry.get(plan.attackerId)?.card?.name;
+  const text = attackBannerText(plan.attackName, attackerName);
+  if (!text) return 0;
+  playBanner(text, plan.user, 'attack');
+  // A bench-wide or fizzled attack has no single defender; the banner still
+  // plays, there is just nothing to ring (edge 9).
+  const defenderRect = rectForInstance(plan.defenderId, registry);
+  if (defenderRect) showTargetRing(defenderRect);
 };

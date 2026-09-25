@@ -700,3 +700,180 @@ body.fx-off .fx-mega-field {
   inset: 0;
   opacity: 1;
 }
+
+/* ── Design 024 slice 2: attack choreography ──────────────────────────── */
+
+/* The attack banner sits on the same strip as the turn/ability banners but
+   reads hotter, so the name of an attack is never mistaken for a turn change. */
+.fx-banner--attack {
+  --fx-banner-color: #ffab70;
+  --fx-banner-deep: 38, 10, 10;
+}
+
+.fx-banner--attack .fx-banner__sub {
+  letter-spacing: 0.18em;
+}
+
+/* Targeting ring: marks the defender while the banner reads. The host is the
+   defender's rect; the inner element is what scales, so the overlay's own
+   position stays put. */
+.fx-target-ring {
+  z-index: 2455;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: opacity;
+}
+
+.fx-target-ring__ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 12%;
+  border: 0.16em solid rgba(255, 96, 96, 0.9);
+  box-shadow:
+    0 0 1.2em 0.2em rgba(255, 70, 70, 0.55),
+    inset 0 0 0.8em rgba(255, 120, 120, 0.4);
+  will-change: transform;
+}
+
+/* ── Design 024 slice 3: prize claim ──────────────────────────────────── */
+
+.fx-prize-claim {
+  z-index: 2470;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --fx-prize-color: 255, 214, 102;
+}
+
+.fx-prize-claim--opp {
+  --fx-prize-color: 255, 150, 150;
+}
+
+.fx-prize-claim__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(var(--fx-prize-color), 0.55) 0%,
+    rgba(var(--fx-prize-color), 0.18) 45%,
+    rgba(var(--fx-prize-color), 0) 70%
+  );
+  will-change: transform, opacity;
+}
+
+.fx-prize-claim i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.5em;
+  height: 0.5em;
+  margin: -0.25em 0 0 -0.25em;
+  font-size: inherit;
+  border-radius: 50%;
+  background: rgba(var(--fx-prize-color), 0.95);
+  box-shadow: 0 0 0.6em 0.1em rgba(var(--fx-prize-color), 0.8);
+  will-change: transform, opacity;
+}
+
+/* ── Design 024 slice 4: remaining lifecycle beats ────────────────────── */
+
+/* Devolution reuses the evolve burst's ring, tinted cooler so the two are
+   distinguishable at a glance (the ring's direction does the rest). */
+.fx-devolve-burst .fx-evolve-burst__ring {
+  border-color: rgba(150, 190, 255, 0.9);
+  box-shadow: 0 0 1.4em 0.2em rgba(120, 170, 255, 0.5);
+}
+
+/* A Tool attaching is real but minor: a soft ring, no token snap. */
+.fx-tool-attach {
+  z-index: 2452;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fx-tool-attach__ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 10%;
+  border: 0.1em solid rgba(190, 210, 235, 0.75);
+  box-shadow: 0 0 0.8em 0.05em rgba(190, 210, 235, 0.45);
+  will-change: transform;
+}
+
+.fx-status-clear {
+  z-index: 2460;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fx-promote {
+  z-index: 2456;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+
+.fx-promote__glow {
+  width: 118%;
+  height: 118%;
+  border-radius: 12%;
+  background: radial-gradient(
+    circle,
+    rgba(150, 220, 255, 0.45) 0%,
+    rgba(150, 220, 255, 0.12) 55%,
+    rgba(150, 220, 255, 0) 75%
+  );
+  will-change: transform, opacity;
+}
+
+.fx-discard-puff {
+  z-index: 2452;
+  border-radius: 6%;
+  background: radial-gradient(
+    circle,
+    rgba(220, 220, 230, 0.4) 0%,
+    rgba(200, 200, 215, 0.12) 55%,
+    rgba(200, 200, 215, 0) 76%
+  );
+  will-change: transform, opacity;
+}
+
+/* Coin chip: `scaleX` through zero reads as the coin turning edge-on. */
+.fx-coin-chip {
+  z-index: 2475;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --fx-coin-color: 255, 213, 110;
+}
+
+.fx-coin-chip--tails {
+  --fx-coin-color: 176, 190, 210;
+}
+
+.fx-coin-chip__face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  font: 900 1em system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  color: #2b2410;
+  background: radial-gradient(
+    circle at 34% 28%,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(var(--fx-coin-color), 1) 45%,
+    rgba(var(--fx-coin-color), 0.75) 100%
+  );
+  box-shadow:
+    inset 0 -0.18em 0.3em rgba(0, 0, 0, 0.25),
+    0 0.12em 0.35em rgba(0, 0, 0, 0.45);
+  will-change: transform;
+}

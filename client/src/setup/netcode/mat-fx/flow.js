@@ -1,8 +1,9 @@
 // Design 022 slice 6 / design 026: flow effects — turn banner (+ screen-edge
 // glow), the ability tag over the Pokémon that used it, and the game-over
-// celebration (confetti cannons on a win, dim on a loss). The game-over modal
-// itself is apply-view's `reconcileGameEnded`; these play on top of it and
-// never take pointer events.
+// celebration (confetti cannons on a win, dim on a loss). Design 024: the
+// banner/edge-glow overlays live in banner.js, shared with the attack-name
+// banner. The game-over modal itself is apply-view's `reconcileGameEnded`;
+// these play on top of it and never take pointer events.
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -11,33 +12,23 @@ import {
   sampleKeyframes,
   spawnOverlay,
 } from '../../image-logic/mat-fx.mjs';
+import { playBanner, playEdgeGlow, viewportRect } from './banner.js';
 import {
   ABILITY_TAG_MS,
-  BANNER_MS,
   CONFETTI_MS,
   DIM_MS,
-  EDGE_GLOW_MS,
   abilityBannerText,
   abilityTagPose,
   abilityTagRect,
   abilityTagText,
-  bannerPose,
   confettiPiecePose,
   confettiPieces,
   dimPose,
-  edgeGlowPose,
   sweepPose,
   turnBannerText,
 } from './flow-pose.mjs';
 
 const BACKSTOP_PAD_MS = 400;
-
-const viewportRect = () => ({
-  left: 0,
-  top: 0,
-  width: globalThis.innerWidth || 0,
-  height: globalThis.innerHeight || 0,
-});
 
 const textNode = (className, text) => {
   const el = document.createElement('div');
@@ -46,64 +37,9 @@ const textNode = (className, text) => {
   return el;
 };
 
-const playBanner = ({ title, sub }, side) => {
-  const rect = viewportRect();
-  if (rect.width < 2) return;
-  const strip = { left: 0, top: rect.height * 0.39, width: rect.width, height: rect.height * 0.18 };
-  const host = spawnOverlay({
-    rect: strip,
-    className: `fx-overlay fx-banner fx-banner--${side || 'neutral'}`,
-  });
-  const band = document.createElement('div');
-  band.className = 'fx-banner__band';
-  const sweep = document.createElement('div');
-  sweep.className = 'fx-banner__sweep';
-  band.appendChild(sweep);
-  const content = document.createElement('div');
-  content.className = 'fx-banner__content';
-  content.appendChild(textNode('fx-banner__title', title));
-  if (sub) content.appendChild(textNode('fx-banner__sub', sub));
-  host.append(band, content);
-
-  const bandFrames = sampleKeyframes(
-    bannerPose,
-    (p) => ({ transform: `translate3d(${p.x * 100}%, 0, 0) skewY(-3deg)`, opacity: p.opacity }),
-    24
-  );
-  // The text trails the band slightly on entry and leads it on exit.
-  const contentFrames = sampleKeyframes(
-    (t) => bannerPose(Math.max(0, t - 0.04)),
-    (p) => ({ transform: `translate3d(${p.x * 60}%, 0, 0)`, opacity: p.opacity }),
-    24
-  );
-  const sweepFrames = sampleKeyframes(
-    (t) => sweepPose(t, { start: 0.18, end: 0.6 }),
-    (p) => ({ transform: `translateX(${p.x * 120}%) skewX(-24deg)`, opacity: p.opacity }),
-    20
-  );
-  removeWhen(
-    host,
-    [
-      animateFrames(band, bandFrames, { duration: BANNER_MS }),
-      animateFrames(content, contentFrames, { duration: BANNER_MS }),
-      animateFrames(sweep, sweepFrames, { duration: BANNER_MS }),
-    ],
-    BANNER_MS + BACKSTOP_PAD_MS
-  );
-};
-
-const playEdgeGlow = (side) => {
-  const host = spawnOverlay({
-    rect: viewportRect(),
-    className: `fx-overlay fx-edge-glow fx-edge-glow--${side}`,
-  });
-  const frames = sampleKeyframes(edgeGlowPose, (p) => ({ opacity: p.opacity }), 16);
-  removeWhen(host, [animateFrames(host, frames, { duration: EDGE_GLOW_MS })], EDGE_GLOW_MS + BACKSTOP_PAD_MS);
-};
-
 export const turnBanner = (plan) => {
   const text = turnBannerText(plan.user, plan.number);
-  if (!text) return;
+  if (!text) return 0;
   playBanner(text, plan.user);
   playEdgeGlow(plan.user);
 };
@@ -148,16 +84,18 @@ export const abilityBanner = (plan) => {
   const cardRect = rectForInstance(plan.instanceId, registry);
   if (!cardRect) {
     const text = abilityBannerText(plan.name);
-    if (text) playBanner(text, plan.user);
+    if (!text) return 0;
+    playBanner(text, plan.user);
     return;
   }
   const text = abilityTagText(registry.get(plan.instanceId)?.card, plan.name);
-  if (text) playAbilityTag(text, cardRect, plan.user);
+  if (!text) return 0;
+  playAbilityTag(text, cardRect, plan.user);
 };
 
 const playConfetti = () => {
   const rect = viewportRect();
-  if (rect.width < 2) return;
+  if (rect.width < 2) return 0;
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-confetti' });
   const pieces = confettiPieces(undefined, Date.now() % 100000);
   const done = pieces.map((piece) => {

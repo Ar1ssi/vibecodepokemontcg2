@@ -1,6 +1,7 @@
 // Design 022 slice 3: presentation table for the `statusApplied` pop. Keys are
 // the engine's condition names (shared/engine/rules/special-conditions.mjs).
 export const STATUS_APPLY_MS = 1000;
+export const STATUS_CLEAR_MS = 520;
 
 // Design 026: each condition also names its particle look. `direction` /
 // `spread` are degrees (-90 = up); `gravity` < 0 floats, > 0 falls; distance
@@ -47,5 +48,19 @@ export function statusApplyPose(t) {
     labelY: -14 * out,
     labelScale: c < 0.12 ? 0.5 + 0.7 * (c / 0.12) : c < 0.24 ? 1.2 - 0.2 * ((c - 0.12) / 0.12) : 1,
     labelOpacity: c < 0.7 ? 1 : Math.max(0, 1 - (c - 0.7) / 0.3),
+  };
+}
+
+/**
+ * Design 024 slice 4: recovering from a condition. The apply pop throws a ring
+ * outward; clearing pulls one inward and takes no label — recovery should read
+ * as the inverse of the affliction, and quieter than it.
+ */
+export function statusClearPose(t) {
+  const c = Math.max(0, Math.min(1, t));
+  const out = 1 - (1 - c) ** 3;
+  return {
+    ringScale: 1.45 - 0.75 * out,
+    ringOpacity: c < 0.15 ? c / 0.15 : Math.max(0, 1 - (c - 0.15) / 0.85),
   };
 }
