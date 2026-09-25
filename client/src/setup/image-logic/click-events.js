@@ -34,6 +34,7 @@ import {
   stadiumEffect,
 } from '../../actions/chat-buttons/chat-buttons.js';
 import { resolvePreviewCard } from './preview-card.mjs';
+import { isDoubleClickZoomZone } from './double-click-zoom.mjs';
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -303,12 +304,14 @@ export const doubleClick = (event) => {
   }
   const targetImage = card.image;
   targetImage.classList.remove('highlight');
-  // 'stadium' belongs in this list, not in the raw #fullImage branch below:
-  // that overlay is appended to the main document with no z-index, so it paints
-  // UNDER the z-index-2 playmat iframes (and #stadium itself is z-index 3),
-  // burying the enlarged card and swallowing its own click-to-close. Same
-  // reason prizes was routed through a viewer above.
-  if (['active', 'bench', 'hand', 'stadium'].includes(mouseClick.zoneId)) {
+  // Zones routed to the dismissible zoom path. The raw #fullImage branch below
+  // is a trap: it appends the overlay to the top document with no z-index, so
+  // the z-index-2 playmat iframes bury the enlarged card and swallow its own
+  // click-to-close, and closePopups() never removes it — it sticks over the
+  // board. `board` (free-play mat area: played Trainers, manually moved cards)
+  // was missing from this list and hit exactly that. Prizes was pulled out to a
+  // viewer above for the same reason.
+  if (isDoubleClickZoomZone(mouseClick.zoneId)) {
     closeCardPreview(null, true);
     const host = fullViewHost(targetImage);
     if (!host?.classList.contains('full-view')) {
