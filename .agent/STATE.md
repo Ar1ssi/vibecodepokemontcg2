@@ -9,12 +9,12 @@ Focus: landed `claude/rules-engine-issues-e79707` on main (merge commit below) �
   the branch's S297 I155+ batch and S300 design 036 slice 16 (`pnpm audit:attacks` + baseline).
   Harness conflicts (journal/DECISIONS/ISSUES/STATE) resolved by union; ids needed no renumber
   (D146–148 + D149; I177–180 + the branch's closures), next D150 / I181.
-Active: merge resolved and green; pushing to main next.
-Next: maintenance due (ISSUES Open 51/40 over cap; Closed pruned to 26/30 by the branch's archive).
-  Remaining backlog, each its own session: I168 copy attacks, I167 attack markers, I166 attack
-  effects, I162 ability-audit backlog. Then I153 (needs a contract first), I137, I121, I126
-  (partial), I127, I44, I60. User visual check of typed Tera entry/skin + Mega vortex in a real
-  rules-mode game. Pending approval: designs 028 (I85), 029 (I86).
+Active: none — pushed to main (`5c8f09fa`); primary folder fast-forwarded to it; suite
+  4158/4159 (known inspector fail), all four behaviour gates PASSED on the merge.
+Next: maintenance due. Remaining backlog, each its own session: I168 copy attacks, I167 attack
+  markers, I166 attack effects, I162 ability-audit backlog. Then I153 (needs a contract first),
+  I137, I121, I126 (partial), I127, I44, I60. User visual check of typed Tera entry/skin + Mega
+  vortex in a real rules-mode game. Pending approval: designs 028 (I85), 029 (I86).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5)

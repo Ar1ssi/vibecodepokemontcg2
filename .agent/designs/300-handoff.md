@@ -1,5 +1,9 @@
 # S300 handoff — design 036 slice 16 shipped (`claude/rules-engine-issues-e79707`)
 
+**Landed (S301, 2026-09-25):** merged into `main` as `5c8f09fa`; main's S297–S300 were unioned in
+the same commit. The branch record below is kept for detail — treat "not pushed" and next-item 1
+as historical (both done). Merged tree: suite 4158/4159, all four gates PASSED.
+
 Branch is main + 19 commits, **not pushed** (user chose to keep it local, S300). HEAD `279fa3b1`
 before this handoff commit. Suite 4041/4042 — only the known `card-inspector-model` "retreat
 greys…" failure. `pnpm audit:attacks` PASSED. Revert = revert the branch (or the S300 commits).
