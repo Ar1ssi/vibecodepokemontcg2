@@ -31,12 +31,14 @@ export function getEffectiveRetreatCost(
   // Switching Energy (taxonomy §F, family 3): free switch
   if (pokemonHasRedirectEnergy(activeCard, cards)) return 0;
   // Team-wide "no Retreat Cost" ability on a Benched Pokémon (Latias ex "Skyliner").
-  if (teamNoRetreatCostForActive(activeCard, benchCards)) return 0;
+  if (teamNoRetreatCostForActive(activeCard, benchCards, cards)) return 0;
   let cost = activeCard?.retreatCost || 0;
   cost = getStadiumRetreatCost(cost, activeCard, player);
   cost = combinedToolRetreatCost(cost, activeCard, cards, {
     blockTools: stadiumBlocksToolEffects(),
     stadium: getStadium(),
+    benchCards,
+    sideCards: [...cards, ...(Array.isArray(benchCards) ? benchCards : [])],
   });
   cost += pendingRetreatCostDelta(rulesState, player);
   return Math.max(0, cost);

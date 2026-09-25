@@ -644,7 +644,68 @@ const SELF_RETREAT_CONDITIONS = [
     }
     return Boolean(b.stadium);
   },
+  // "As long as Illumise is in play" (Volbeat Uplifting Glow): a named partner.
+  (c, _card, b) => {
+    const m = c.match(/^(.+?) is in play$/);
+    if (!m || /your opponent|you have any|this pok[eé]mon/.test(c)) return undefined;
+    if (!Array.isArray(b.sideCards) || !Array.isArray(b.opponentSideCards)) return undefined;
+    const name = m[1].trim();
+    return [...b.sideCards, ...b.opponentSideCards].some(
+      (x) => !x?.attachedTo && isPokemon(x) && lower(x.name || '').includes(name)
+    );
+  },
+  // "As long as this Pokémon is your Active Pokémon" — a position gate on the
+  // holder's own cost (Magnemite Sparkling Induction). Callers price the Active.
+  (c, _card, b) => {
+    if (!/^this pok[eé]mon is (?:your active pok[eé]mon|in the active spot)$/.test(c)) return undefined;
+    return b.isActive !== false;
+  },
+  // Genesect Fast-Flight Configuration.
+  (c, _card, b) => {
+    if (!/your opponent has any pok[eé]mon-gx or pok[eé]mon-ex in play/.test(c)) return undefined;
+    if (!Array.isArray(b.opponentSideCards)) return undefined;
+    return b.opponentSideCards.some(
+      (x) => !x?.attachedTo && isPokemon(x) && (isGxCard(x) || isExCard(x))
+    );
+  },
+  // Alolan Vulpix Secret Alleyway / Wimpod V: a typed Pokémon of your own in play.
+  (c, _card, b) => {
+    const m =
+      c.match(/^you have any \{([a-z])\} pok[eé]mon in play$/) ||
+      c.match(/^you have any ([a-z]+) pok[eé]mon in play$/);
+    if (!m) return undefined;
+    if (!Array.isArray(b.sideCards)) return undefined;
+    return b.sideCards.some(
+      (x) =>
+        !x?.attachedTo &&
+        isPokemon(x) &&
+        (energyIsType({ types: x.types, name: x.name }, m[1]) ||
+          lower(x.name || '').includes(m[1]))
+    );
+  },
 ];
+
+// How many times a "for each <unit>" Retreat Cost clause applies, or null when the
+// board cannot answer it (fail closed). `selfFolded` has already replaced the
+// holder's printed name with "this Pokémon".
+function retreatPerEachCount(unit, card, board) {
+  const u = lower(unit);
+  const bench = Array.isArray(board.benchCards) ? board.benchCards : null;
+  const energy = holderEnergy(card, board.zoneCards);
+  const attachedMatch = u.match(/^(\{[a-z]\} )?energy attached to (?:this pok[eé]mon|it)\b/);
+  if (attachedMatch) {
+    return attachedMatch[1]
+      ? energy.filter((e) => energyIsType(e, attachedMatch[1].trim()[1])).length
+      : energy.length;
+  }
+  const benchMatch = u.match(/^this pok[eé]mon on your bench/);
+  if (benchMatch) {
+    if (!bench) return null;
+    const name = lower(card?.name);
+    return bench.filter((b) => lower(b?.name) === name).length;
+  }
+  return null;
+}
 
 /**
  * A Pokémon's printed change to its OWN Retreat Cost (I159): "this Pokémon has no Retreat
@@ -660,9 +721,19 @@ function selfRetreatModifier(card, board = {}) {
     const self =
       /(?:this pok[eé]mon|, it) has no retreat cost/.test(sentence) ||
       /(?:this pok[eé]mon's|its|the retreat cost of this pok[eé]mon) retreat cost is|the retreat cost of this pok[eé]mon is|you pay [^.]*? to retreat this pok[eé]mon/.test(sentence);
-    if (!self || /for each/.test(sentence)) continue;
-    if (/your opponent|each player|your active|of your pok|each of your/.test(sentence)) continue;
+    if (!self) continue;
     const clause = sentence.match(/^(?:if|as long as|during) ([^,]+),/)?.[1];
+    // The cost clause is what the holder's own modifier lives in; the leading
+    // condition may legitimately name the opponent ("If your opponent has any
+    // Pokémon-GX …") without aiming the modifier at another Pokémon.
+    const body = clause ? sentence.slice(sentence.indexOf(',') + 1).trim() : sentence;
+    if (
+      /your opponent|each player|each of your|your active pok[eé]mon's retreat cost|retreat cost of your active pok[eé]mon|of your pok[eé]mon/.test(
+        body
+      )
+    ) {
+      continue;
+    }
     if (clause) {
       if (/^your first turn/.test(clause)) {
         if (board.turnNumber == null || Number(board.turnNumber) > 2) return { delta: 0 };
@@ -673,11 +744,20 @@ function selfRetreatModifier(card, board = {}) {
         }
       }
     }
-    if (/no retreat cost|retreat cost is 0\b/.test(sentence)) return { delta: -Infinity };
-    const symbols = (sentence.match(/\{[a-z]\}/g) || []).length;
-    const n = Number(sentence.match(/(\d+)\s*(?:more|less)/)?.[1]) || symbols || 1;
-    if (/\bless\b|fewer/.test(sentence)) return { delta: -n };
-    if (/\bmore\b/.test(sentence)) return { delta: n };
+    // "… less for each Magnemite on your Bench" (I161): scale by the board count.
+    const perEach = body.match(/for each ([^.]*)/);
+    let multiplier = 1;
+    if (perEach) {
+      multiplier = retreatPerEachCount(perEach[1], card, board);
+      if (multiplier == null) continue;
+    }
+    if (/no retreat cost|retreat cost is 0\b/.test(body)) return { delta: -Infinity };
+    // Only symbols before "for each" are the modifier; the unit's symbol is not.
+    const costPart = body.split(' for each ')[0];
+    const symbols = (costPart.match(/\{[a-z]\}/g) || []).length;
+    const n = Number(body.match(/(\d+)\s*(?:more|less)/)?.[1]) || symbols || 1;
+    if (/\bless\b|fewer/.test(body)) return { delta: -n * multiplier };
+    if (/\bmore\b/.test(body)) return { delta: n * multiplier };
   }
   return { delta: 0 };
 }
@@ -727,16 +807,35 @@ export function applyRetreatCostModifier(baseCost, delta) {
 // parseRetreatCostModifier; this covers the ability holder sitting on the Bench.
 // Energy-conditional wordings ("Each of your Pokémon that has any {W} Energy
 // attached…") are not handled here.
-export function teamNoRetreatCostForActive(activeCard, benchCards) {
+export function teamNoRetreatCostForActive(activeCard, benchCards, activeZoneCards = []) {
   if (!activeCard) return false;
   const activeName = lower(activeCard?.name || '');
   const activeIsBasic = isBasicPokemon(activeCard);
   const activeIsExOrGx = isExCard(activeCard) || isGxCard(activeCard);
+  const activeEnergy = holderEnergy(activeCard, activeZoneCards);
   // The Active's own team wording ("Your Basic Pokémon in play have no Retreat Cost") counts too.
   for (const card of [activeCard, ...(Array.isArray(benchCards) ? benchCards : [])]) {
     if (!card || card.attachedTo || card.image?.attached) continue;
     const t = textOf(card);
-    if (!/no retreat cost/.test(t)) continue;
+    if (!/no retreat cost|retreat cost is 0/.test(t)) continue;
+    // "All of your Pokémon that have {M} Energy attached have no Retreat Cost."
+    // (Archaludon Metal Bridge, Zeraora-GX Thunderclap Zone)
+    const typed = t.match(
+      /all of your pok[eé]mon that have \{([a-z])\} energy attached have no retreat cost/
+    );
+    if (typed) {
+      if (activeEnergy.some((e) => energyIsType(e, typed[1]))) return true;
+      continue;
+    }
+    // "Each of your Pokémon that evolves from Eevee has no Weakness, and that
+    // Pokémon's Retreat Cost is 0." (Umbreon Moonlight Veil)
+    const evolves = t.match(
+      /each of your pok[eé]mon that evolves from ([a-z0-9 .'’-]+?) has no weakness/
+    );
+    if (evolves && /retreat cost is 0/.test(t)) {
+      if (lower(activeCard?.evolvesFrom || '').includes(evolves[1].trim())) return true;
+      continue;
+    }
     // "Your Pokémon in play have no Retreat Cost, except Pokémon-GX and Pokémon-EX."
     if (/except[^.]*pok[eé]mon-(?:gx|ex)/.test(t) && activeIsExOrGx) continue;
     if (/your basic pok[eé]mon in play have no retreat cost/.test(t)) {

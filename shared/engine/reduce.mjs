@@ -1065,27 +1065,31 @@ function computeEffectiveRetreatCost(state, card, playerId) {
   const benchViews = (player?.zones?.bench || []).map((b) =>
     inPlayView(state, b)
   );
-  if (teamNoRetreatCostForActive(inPlayView(state, card), benchViews)) return 0;
+  if (teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
   // Magnetic Metal / Hiding Darkness / Holon WP Energy (audit SE6): "has no Retreat Cost".
   if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone)) return 0;
 
   // 1. Tool retreat cost modifier + self ability modifier
   const blockTools = isStadiumToolNegation(stadium?.card || stadium);
-  let cost = combinedToolRetreatCost(baseRetreat, card, activeZone, {
-    blockTools,
-    stadium,
-  });
-
-  // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat
-  // Cost is N less" wording and the opponent-side increases (A10).
-  const opponent = state.players?.[
+  const opponentPlayer = state.players?.[
     Object.keys(state.players || {}).find((id) => id !== playerId)
   ];
   const sideCards = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
   const opponentSideCards = [
-    ...(opponent?.zones?.active || []),
-    ...(opponent?.zones?.bench || []),
+    ...(opponentPlayer?.zones?.active || []),
+    ...(opponentPlayer?.zones?.bench || []),
   ];
+  let cost = combinedToolRetreatCost(baseRetreat, card, activeZone, {
+    blockTools,
+    stadium,
+    benchCards: player?.zones?.bench || [],
+    sideCards,
+    opponentSideCards,
+  });
+
+  // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat
+  // Cost is N less" wording and the opponent-side increases (A10).
+  const opponent = opponentPlayer;
   cost += abilityRetreatCost(inPlayView(state, card), {
     sideCards,
     opponentSideCards,

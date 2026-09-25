@@ -422,11 +422,17 @@ export function combinedToolRetreatCost(
   baseRetreat,
   pokemon,
   zoneCards,
-  { blockTools = false, stadium = null } = {}
+  { blockTools = false, stadium = null, benchCards = null, sideCards = null, opponentSideCards = null } = {}
 ) {
   let cost = baseRetreat || 0;
   const holder = holderView(pokemon, zoneCards);
-  const mod = parseRetreatCostModifier(holder, { zoneCards, stadium });
+  const mod = parseRetreatCostModifier(holder, {
+    zoneCards,
+    stadium,
+    benchCards,
+    sideCards,
+    opponentSideCards,
+  });
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
   if (toolBlocked(blockTools, stadium)) return cost;
   for (const tool of attachedTools(pokemon, zoneCards)) {

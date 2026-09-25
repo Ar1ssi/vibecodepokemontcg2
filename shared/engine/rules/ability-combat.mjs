@@ -686,18 +686,38 @@ export function abilityPrizeModify(victim, ctx = {}) {
 export function abilityRetreatCost(target, ctx = {}) {
   if (!target) return 0;
   // "{C}{C} less" / "2 less": the number, or how many Energy symbols are printed.
-  const amount = (m) => (m[1] ? Number(m[1]) : (m[2].match(/\{c\}/g) || []).length);
+  const amount = (digits, symbols) =>
+    digits ? Number(digits) : ((symbols || '').match(/\{c\}/g) || []).length;
+  const hasTypedEnergy = (letter) => {
+    const want = lower(TYPE_LETTER[letter]);
+    return attachedEnergy(target, ctx.sideCards || []).some((e) =>
+      [e.energyType, ...(Array.isArray(e.types) ? e.types : []), e.name]
+        .map(lower)
+        .join(' ')
+        .includes(want)
+    );
+  };
   let delta = 0;
+  const seenTeamTexts = new Set();
   for (const card of dedupe(sideInPlay(ctx))) {
     const t = selfNamedText(card);
     if (isAbilitySuppressed(card, ctx)) continue;
     if (!holderPositionMet(t, card, ctx)) continue;
+    // "The Retreat Cost of each of your Pokémon that has any {R} Energy attached is
+    // {C}{C} less." (Ninetales Byway of the Nine-Tailed Fox, I161)
+    const teamLess = t.match(
+      /the retreat cost of each of your pok[eé]mon that has any \{([a-z])\} energy attached is (?:(\d+)|((?:\{c\})+)) less/
+    );
+    if (teamLess) {
+      if (hasTypedEnergy(teamLess[1])) delta -= amount(teamLess[2], teamLess[3]) || 2;
+      continue;
+    }
     const less =
       t.match(/your active pok[eé]mon's retreat cost is (?:(\d+)|((?:\{c\})+)) less/) ||
       t.match(/you pay (?:(\d+)|((?:\{c\})+)) less to retreat your active pok[eé]mon/);
     if (!less || ctx.isActive === false) continue;
     if (/excluding pok[eé]mon-ex/.test(t) && isExCard(target)) continue;
-    delta -= amount(less) || 1;
+    delta -= amount(less[1], less[2]) || 1;
   }
   for (const card of dedupe(opponentInPlay(ctx))) {
     const t = selfNamedText(card);
@@ -710,7 +730,36 @@ export function abilityRetreatCost(target, ctx = {}) {
     if (/active evolution pok[eé]mon/.test(t) && !isEvolutionCard(target)) continue;
     // A condition other than the holder's own position is not read here.
     if (/^(?:if|as long as) /.test(t) && !/^as long as this pok[eé]mon is (?:in the active spot|your active pok[eé]mon|on your bench)/.test(t)) continue;
-    delta += amount(more) || 1;
+    delta += amount(more[1], more[2]) || 1;
+  }
+  // Both-player / all-in-play increases (I161): Ariados Gluey Slime & Sticky, Team
+  // Aqua's Muk Sludge Festival, Jellicent Stickiness. The printed "can't make a
+  // player pay more than an additional {C}" cap means one contribution per text.
+  for (const card of dedupe([...sideInPlay(ctx), ...opponentInPlay(ctx)])) {
+    const t = selfNamedText(card);
+    if (isAbilitySuppressed(card, ctx)) continue;
+    if (!holderPositionMet(t, card, ctx)) continue;
+    const teamMore =
+      t.match(
+        /the retreat cost for each player's pok[eé]mon(?: \(excluding ([^)]+)\))? is (?:(\d+)|((?:\{c\})+)) more/
+      ) ||
+      t.match(
+        /the retreat cost of each pok[eé]mon in play(?: \(except for ([^)]+)\))? is (?:(\d+)|((?:\{c\})+)) more/
+      ) ||
+      t.match(/each player must pay an additional (?:(\d+)|((?:\{c\})+)) to retreat/) ||
+      t.match(
+        /the retreat cost of each of your opponent's pok[eé]mon in play is (?:(\d+)|((?:\{c\})+)) more/
+      );
+    if (!teamMore) continue;
+    const except = teamMore[1] ? lower(teamMore[1]).trim() : null;
+    if (except) {
+      if (except.includes('this pokémon') && card === target) continue;
+      if (lower(target?.name || '').includes(except)) continue;
+      if (except.includes('team aqua') && lower(target?.name || '').includes('team aqua')) continue;
+    }
+    if (seenTeamTexts.has(t)) continue;
+    seenTeamTexts.add(t);
+    delta += amount(teamMore[2], teamMore[3]) || 1;
   }
   return delta;
 }

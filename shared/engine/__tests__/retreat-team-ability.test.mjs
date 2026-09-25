@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { applyCommand } from '../reduce.mjs';
 import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
-import { teamNoRetreatCostForActive } from '../rules/ability-executors.mjs';
+import { teamNoRetreatCostForActive, parseRetreatCostModifier } from '../rules/ability-executors.mjs';
+import { abilityRetreatCost } from '../rules/ability-combat.mjs';
 import { rulesState } from '../rules/rules-state.mjs';
 import { getEffectiveRetreatCost, canRetreat } from '../rules/retreat.mjs';
 
@@ -249,5 +250,207 @@ describe('team-wide no Retreat Cost abilities', () => {
       assert.equal(canRetreat('self', active, [], [], bench).allowed, true);
       assert.equal(canRetreat('self', active, [], []).allowed, false);
     });
+  });
+});
+
+// ── I161: retreat wordings beyond the own/team basics ───────────────────
+
+const mon = (instanceId, name, extra = {}) =>
+  createCard({ instanceId, name, stage: 'Basic', supertype: 'Pokémon', ...extra });
+const abilityMon = (instanceId, name, abilityName, text, extra = {}) =>
+  mon(instanceId, name, { abilities: [{ name: abilityName, text }], ...extra });
+const energyCard = (instanceId, name, attachedTo, extra = {}) =>
+  createCard({ instanceId, name, supertype: 'Energy', types: ['Water'], attachedTo, ...extra });
+
+describe('I161 retreat wordings', () => {
+  it('energy-conditional team no-retreat (Archaludon Metal Bridge / Zeraora-GX)', () => {
+    const archaludon = abilityMon(
+      2,
+      'Archaludon',
+      'Metal Bridge',
+      'All of your Pokémon that have {M} Energy attached have no Retreat Cost.'
+    );
+    const active = mon(1, 'Pikachu', { retreatCost: 2 });
+    const metal = createCard({ instanceId: 9, name: 'Basic Metal Energy', supertype: 'Energy', types: ['Metal'], attachedTo: 1 });
+    assert.equal(teamNoRetreatCostForActive(active, [archaludon], [active, metal]), true);
+    assert.equal(teamNoRetreatCostForActive(active, [archaludon], [active]), false);
+  });
+
+  it('evolution-conditional team no-retreat (Umbreon Moonlight Veil)', () => {
+    const umbreon = abilityMon(
+      2,
+      'Umbreon',
+      'Moonlight Veil',
+      "Each of your Pokémon that evolves from Eevee has no Weakness, and that Pokémon's Retreat Cost is 0."
+    );
+    const eeveelution = mon(1, 'Espeon', { retreatCost: 1, evolvesFrom: 'Eevee' });
+    assert.equal(teamNoRetreatCostForActive(eeveelution, [umbreon], [eeveelution]), true);
+    assert.equal(teamNoRetreatCostForActive(mon(3, 'Pikachu', { retreatCost: 1 }), [umbreon], []), false);
+  });
+
+  it('typed team reduction (Ninetales Byway of the Nine-Tailed Fox)', () => {
+    const ninetales = abilityMon(
+      2,
+      'Ninetales',
+      'Byway of the Nine-Tailed Fox',
+      'The Retreat Cost of each of your Pokémon that has any {R} Energy attached is {C}{C} less.'
+    );
+    const active = mon(1, 'Pikachu', { retreatCost: 3 });
+    const fire = createCard({ instanceId: 9, name: 'Basic Fire Energy', supertype: 'Energy', types: ['Fire'], attachedTo: 1 });
+    const ctx = {
+      sideCards: [active, fire, ninetales],
+      opponentSideCards: [],
+      sideActive: [active],
+      sideBench: [ninetales],
+      opponentActive: [],
+      opponentBench: [],
+      zone: 'active',
+      isActive: true,
+    };
+    assert.equal(abilityRetreatCost(active, ctx), -2);
+    assert.equal(abilityRetreatCost(active, { ...ctx, sideCards: [active, ninetales] }), 0);
+  });
+
+  it('both-player increases stack once (Ariados Sticky) and Jellicent adds', () => {
+    const ariados = abilityMon(
+      2,
+      'Ariados',
+      'Sticky',
+      "The Retreat Cost for each player's Pokémon (excluding Ariados) is {C} more."
+    );
+    const ariados2 = abilityMon(3, 'Ariados', 'Sticky', ariados.abilities[0].text);
+    const active = mon(1, 'Pikachu', { retreatCost: 2 });
+    const base = {
+      sideCards: [active],
+      opponentSideCards: [ariados, ariados2],
+      sideActive: [active],
+      sideBench: [],
+      opponentActive: [ariados],
+      opponentBench: [ariados2],
+      zone: 'active',
+      isActive: true,
+    };
+    assert.equal(abilityRetreatCost(active, base), 1, 'the printed cap makes two Ariados +1');
+    assert.equal(
+      abilityRetreatCost(ariados, { ...base, sideCards: [ariados], opponentSideCards: [active] }),
+      0,
+      'excluded holder itself'
+    );
+
+    const jellicent = abilityMon(
+      4,
+      'Jellicent',
+      'Stickiness',
+      "The Retreat Cost of each of your opponent's Pokémon in play is {C} more."
+    );
+    assert.equal(
+      abilityRetreatCost(active, { ...base, opponentSideCards: [jellicent], opponentActive: [jellicent], opponentBench: [] }),
+      1
+    );
+  });
+
+  it('"for each" self scaling (Magnemite, Suicune, Arcanine)', () => {
+    const magnemite = abilityMon(
+      1,
+      'Magnemite',
+      'Sparkling Induction',
+      'As long as this Pokémon is your Active Pokémon, its Retreat Cost is {C} less for each Magnemite on your Bench.'
+    );
+    const bench = [mon(2, 'Magnemite'), mon(3, 'Magnemite'), mon(4, 'Pikachu')];
+    assert.deepEqual(
+      parseRetreatCostModifier(magnemite, { zoneCards: [magnemite], benchCards: bench }),
+      { delta: -2 }
+    );
+    assert.deepEqual(parseRetreatCostModifier(magnemite, { zoneCards: [magnemite] }), { delta: 0 }, 'no bench context');
+
+    const suicune = abilityMon(
+      5,
+      'Suicune',
+      'Extreme Speed',
+      "Suicune's Retreat Cost is {C} less for each {W} Energy attached to Suicune."
+    );
+    const energies = [
+      energyCard(6, 'Basic Water Energy', 5),
+      energyCard(7, 'Basic Water Energy', 5),
+      createCard({ instanceId: 8, name: 'Basic Fire Energy', supertype: 'Energy', types: ['Fire'], attachedTo: 5 }),
+    ];
+    assert.deepEqual(
+      parseRetreatCostModifier(suicune, { zoneCards: [suicune, ...energies] }),
+      { delta: -2 }
+    );
+
+    const arcanine = abilityMon(
+      9,
+      'Arcanine',
+      'Extreme Speed',
+      'You pay {C} less to retreat Arcanine for each Energy attached to it.'
+    );
+    const arcanineEnergies = [
+      energyCard(10, 'Basic Water Energy', 9),
+      energyCard(11, 'Basic Water Energy', 9),
+    ];
+    assert.deepEqual(
+      parseRetreatCostModifier(arcanine, { zoneCards: [arcanine, ...arcanineEnergies] }),
+      { delta: -2 }
+    );
+  });
+
+  it('named partner / opponent conditions (Volbeat, Genesect, Alolan Vulpix)', () => {
+    const volbeat = abilityMon(1, 'Volbeat', 'Uplifting Glow', "As long as Illumise is in play, Volbeat's Retreat Cost is 0.");
+    assert.deepEqual(
+      parseRetreatCostModifier(volbeat, { sideCards: [volbeat], opponentSideCards: [mon(2, 'Illumise')] }),
+      { delta: -Infinity }
+    );
+    assert.deepEqual(parseRetreatCostModifier(volbeat, { sideCards: [volbeat], opponentSideCards: [] }), { delta: 0 });
+
+    const genesect = abilityMon(
+      3,
+      'Genesect',
+      'Fast-Flight Configuration',
+      'If your opponent has any Pokémon-GX or Pokémon-EX in play, this Pokémon has no Retreat Cost.'
+    );
+    assert.deepEqual(
+      parseRetreatCostModifier(genesect, { sideCards: [genesect], opponentSideCards: [mon(4, 'Mewtwo ex')] }),
+      { delta: -Infinity }
+    );
+    assert.deepEqual(
+      parseRetreatCostModifier(genesect, { sideCards: [genesect], opponentSideCards: [mon(5, 'Pikachu')] }),
+      { delta: 0 }
+    );
+
+    const vulpix = abilityMon(
+      6,
+      'Alolan Vulpix',
+      'Secret Alleyway',
+      'If you have any {Y} Pokémon in play, this Pokémon has no Retreat Cost.'
+    );
+    const fairy = mon(7, 'Clefairy', { types: ['Fairy'] });
+    assert.deepEqual(
+      parseRetreatCostModifier(vulpix, { sideCards: [vulpix, fairy], opponentSideCards: [] }),
+      { delta: -Infinity }
+    );
+  });
+
+  it('server: Archaludon makes the Metal-energy Active retreat free', () => {
+    const state = makeState();
+    const active = createCard({ instanceId: 1, id: 'pikachu', name: 'Pikachu', stage: 'Basic', retreatCost: 2 });
+    const metal = createCard({ instanceId: 9, name: 'Basic Metal Energy', supertype: 'Energy', types: ['Metal'], attachedTo: 1 });
+    const archaludon = abilityMon(
+      2,
+      'Archaludon',
+      'Metal Bridge',
+      'All of your Pokémon that have {M} Energy attached have no Retreat Cost.'
+    );
+    const benchedEevee = createCard({ instanceId: 3, id: 'eevee', name: 'Eevee', stage: 'Basic' });
+    state.players.p1.zones.active = [active, metal];
+    state.players.p1.zones.bench = [archaludon, benchedEevee];
+
+    const res = applyCommand(state, {
+      type: 'retreat',
+      playerId: 'p1',
+      payload: { benchInstanceId: benchedEevee.instanceId },
+    });
+    assert.equal(res.error, null);
+    assert.equal(res.state.players.p1.zones.active[0].instanceId, benchedEevee.instanceId);
   });
 });
