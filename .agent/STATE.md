@@ -6,12 +6,12 @@
 Session: 306
 Focus: design 041 — Scarlet/Violet evolution scene for regular (non-Mega/Tera) evolutions, now
   light-blue nebula → beads/bokeh → 3D edge-on flip through white → 300 ms glow hover → gentle
-  settle, 3.5 s (v4, D154). Shipped to main in S306.
+  settle, 3.5 s (v4, D155). Shipped to main in S306.
 Active: none.
 Next: maintenance due (S302 handoff item 2): DECISIONS ~155 lines vs 90 cap, designs/ root
   ~50 shipped docs, ISSUES 39 open/30 closed (at cap); triage I180, I182; MAP spot-checks,
   scratch/worktrees (remove `evolve-sv` once confirmed merged). Backlog: I181, I167, I166, I162,
-  I153 (contract first), I137, I121, I126, I127, I44, I60. Worktrees `rules-engine-issues-e79707`
+  I153 (contract first); user visual check: sprite picker (kyurem/necrozma/arceus), I137, I121, I126, I127, I44, I60. Worktrees `rules-engine-issues-e79707`
   (orphan draft 039-transform-form-sprites → renumber + approval) and `i168-copy-attacks` are
   merged, safe to remove. Pending approval: designs 028 (I85), 029 (I86).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
@@ -29,6 +29,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - `opponentHandSetAside` (Tickling Machine heads) parses but has no executor — tracked in I137.
 
 ## Recently shipped (≤3 one-liners; older → journal)
-- S306: design 041 v4 tuning + S304/S305 scene committed and pushed to main (D152–D154).
-- S305: design 041 v3 — no whiteout/sky/god rays; reveal stays in the nebula.
-- S304: design 041 SV evolution scene (D152/D153) — built + captured.
+- S306: design 041 v4 tuning + evolve scene merged with main and pushed (D153–D155).
+- S304 (main): design 040 transform-form sprites (86 forms + 172 PNGs; D152[deck-builder]).
+- S304/S305 (branch): design 041 SV evolution scene built, v3 restyle.

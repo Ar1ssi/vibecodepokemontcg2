@@ -311,6 +311,42 @@ test('searching a form keyword collects that form across species', () => {
   assert.equal(results[0].slug, 'meganium');
 });
 
+test('transform forms are searchable under their species and carry art', () => {
+  assert.deepEqual(
+    searchPokemon('kyurem').map((entry) => entry.slug),
+    ['kyurem', 'kyurem-black', 'kyurem-white']
+  );
+  assert.deepEqual(
+    searchPokemon('necrozma').map((entry) => entry.slug),
+    ['necrozma', 'necrozma-dawn', 'necrozma-dusk', 'necrozma-ultra']
+  );
+  assert.deepEqual(
+    searchPokemon('rotom').map((entry) => entry.slug),
+    [
+      'rotom',
+      'rotom-heat',
+      'rotom-wash',
+      'rotom-frost',
+      'rotom-fan',
+      'rotom-mow',
+    ]
+  );
+  assert.ok(
+    searchPokemon('arceus').some((entry) => entry.slug === 'arceus-grass')
+  );
+  assert.equal(searchPokemon('arceus')[0].form, null);
+});
+
+test('a transform form can be pinned, labelled and shined', () => {
+  const sprites = addDeckSprite([], 'kyurem-black', true);
+  assert.deepEqual(sprites, [{ slug: 'kyurem-black', shiny: true }]);
+  assert.equal(deckSpriteLabel(sprites[0]), 'Shiny Black Kyurem');
+  assert.equal(
+    deckSpriteImageUrl(sprites[0]),
+    '/src/assets/pokemon/gen8/shiny/kyurem-black.png'
+  );
+});
+
 test('a form carries its own art, regular and shiny', () => {
   assert.equal(
     deckSpriteImageUrl({ slug: 'gengar-mega' }),

@@ -8,9 +8,12 @@
  * Usage: node scripts/generate-pokemon-sprites.mjs [--force]
  *   --force  re-download sprites that are already on disk.
  *
- * Only base forms (`$` in pokesprite's gen-8 form map) are vendored — mega,
- * gmax and regional forms would multiply the catalog for a decoration and
- * would force a two-level picker.
+ * Base species plus the battle-relevant alternate forms: Mega / Primal /
+ * Gigantamax / regional (generic), the transform formes in `SPECIES_FORMS`
+ * (Kyurem Black/White, Necrozma dawn/dusk/ultra, Rotom appliances, …), and the
+ * Arceus / Silvally type forms. Purely cosmetic variants (Unown letters,
+ * Vivillon patterns, Alcremie creams, Totem sizes) stay out: hundreds of
+ * near-identical rows would bury the species they belong to.
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -60,6 +63,120 @@ const FORMS = [
 ];
 
 /**
+ * Transform formes, keyed by species slug, in the order they should appear
+ * under the species. Labels are printed explicitly because the display name
+ * is not always `<form> <species>` ("Dawn Wings Necrozma", "Hoopa Unbound").
+ * pokesprite form keys are unique per species, but a per-species table keeps
+ * the label and the card-name wording reviewable side by side.
+ */
+const SPECIES_FORMS = {
+  castform: [
+    { key: 'sunny', label: 'Sunny Castform' },
+    { key: 'rainy', label: 'Rainy Castform' },
+    { key: 'snowy', label: 'Snowy Castform' },
+  ],
+  cherrim: [{ key: 'sunshine', label: 'Sunshine Cherrim' }],
+  deoxys: [
+    { key: 'attack', label: 'Attack Forme Deoxys' },
+    { key: 'defense', label: 'Defense Forme Deoxys' },
+    { key: 'speed', label: 'Speed Forme Deoxys' },
+  ],
+  dialga: [{ key: 'origin', label: 'Origin Forme Dialga' }],
+  palkia: [{ key: 'origin', label: 'Origin Forme Palkia' }],
+  giratina: [{ key: 'origin', label: 'Origin Forme Giratina' }],
+  shaymin: [{ key: 'sky', label: 'Sky Forme Shaymin' }],
+  rotom: [
+    { key: 'heat', label: 'Heat Rotom' },
+    { key: 'wash', label: 'Wash Rotom' },
+    { key: 'frost', label: 'Frost Rotom' },
+    { key: 'fan', label: 'Fan Rotom' },
+    { key: 'mow', label: 'Mow Rotom' },
+  ],
+  darmanitan: [
+    { key: 'zen', label: 'Zen Mode Darmanitan' },
+    { key: 'galar-zen', label: 'Galarian Zen Mode Darmanitan' },
+  ],
+  kyurem: [
+    { key: 'black', label: 'Black Kyurem' },
+    { key: 'white', label: 'White Kyurem' },
+  ],
+  keldeo: [{ key: 'resolute', label: 'Resolute Form Keldeo' }],
+  meloetta: [{ key: 'pirouette', label: 'Pirouette Form Meloetta' }],
+  aegislash: [{ key: 'blade', label: 'Blade Form Aegislash' }],
+  zygarde: [
+    { key: '10', label: 'Zygarde 10% Forme' },
+    { key: 'complete', label: 'Zygarde Complete Forme' },
+  ],
+  hoopa: [{ key: 'unbound', label: 'Hoopa Unbound' }],
+  oricorio: [
+    { key: 'pom-pom', label: 'Pom-Pom Style Oricorio' },
+    { key: 'pau', label: "Pa'u Style Oricorio" },
+    { key: 'sensu', label: 'Sensu Style Oricorio' },
+  ],
+  lycanroc: [
+    { key: 'dusk', label: 'Dusk Form Lycanroc' },
+    { key: 'midnight', label: 'Midnight Form Lycanroc' },
+  ],
+  wishiwashi: [{ key: 'school', label: 'School Form Wishiwashi' }],
+  necrozma: [
+    { key: 'dawn', label: 'Dawn Wings Necrozma' },
+    { key: 'dusk', label: 'Dusk Mane Necrozma' },
+    { key: 'ultra', label: 'Ultra Necrozma' },
+  ],
+  cramorant: [
+    { key: 'gulping', label: 'Gulping Cramorant' },
+    { key: 'gorging', label: 'Gorging Cramorant' },
+  ],
+  toxtricity: [{ key: 'low-key', label: 'Low Key Form Toxtricity' }],
+  eiscue: [{ key: 'noice', label: 'Noice Face Eiscue' }],
+  morpeko: [{ key: 'hangry', label: 'Hangry Mode Morpeko' }],
+  zacian: [{ key: 'crowned', label: 'Crowned Sword Zacian' }],
+  zamazenta: [{ key: 'crowned', label: 'Crowned Shield Zamazenta' }],
+  eternatus: [{ key: 'eternamax', label: 'Eternamax Eternatus' }],
+  urshifu: [
+    { key: 'rapid-strike-gmax', label: 'Gigantamax Rapid Strike Urshifu' },
+  ],
+  calyrex: [
+    { key: 'ice-rider', label: 'Ice Rider Calyrex' },
+    { key: 'shadow-rider', label: 'Shadow Rider Calyrex' },
+  ],
+  xerneas: [{ key: 'active', label: 'Active Mode Xerneas' }],
+  tornadus: [{ key: 'therian', label: 'Therian Forme Tornadus' }],
+  thundurus: [{ key: 'therian', label: 'Therian Forme Thundurus' }],
+  landorus: [{ key: 'therian', label: 'Therian Forme Landorus' }],
+  enamorus: [{ key: 'therian', label: 'Therian Forme Enamorus' }],
+  greninja: [{ key: 'ash', label: 'Ash Greninja' }],
+};
+
+// Multitype / RKS System type forms: one row per real type, labelled
+// `<Type> <Species>`. `normal` aliases the base sprite and Arceus's
+// "unknown" is an unofficial icon, so both stay out.
+const TYPE_FORM_SPECIES = new Set(['arceus', 'silvally']);
+const TYPE_FORM_KEYS = [
+  'bug',
+  'dark',
+  'dragon',
+  'electric',
+  'fairy',
+  'fighting',
+  'fire',
+  'flying',
+  'ghost',
+  'grass',
+  'ground',
+  'ice',
+  'poison',
+  'psychic',
+  'rock',
+  'steel',
+  'water',
+];
+
+function titleCase(key) {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/**
  * @returns {{idx: string, name: string, slug: string, species: string,
  *   form: string|null}[]} dex order, each species followed by its forms.
  */
@@ -76,16 +193,26 @@ function toCatalog(pokemonData) {
     const slug = entry?.slug?.eng;
     if (!name || !slug) continue;
 
-    entries.push({ idx, name, slug, species: name, form: null });
-    for (const form of FORMS) {
-      if (!forms[form.key]) continue;
+    // Alias forms point at another form's file; a row for one would only
+    // 404 in the download loop, so drop it here.
+    const pushForm = (key, label) => {
+      if (!forms[key] || forms[key].is_alias_of) return;
       entries.push({
         idx,
-        name: form.label(name),
-        slug: `${slug}-${form.key}`,
+        name: label,
+        slug: `${slug}-${key}`,
         species: name,
-        form: form.key,
+        form: key,
       });
+    };
+
+    entries.push({ idx, name, slug, species: name, form: null });
+    for (const form of FORMS) pushForm(form.key, form.label(name));
+    for (const form of SPECIES_FORMS[slug] || [])
+      pushForm(form.key, form.label);
+    if (TYPE_FORM_SPECIES.has(slug)) {
+      for (const key of TYPE_FORM_KEYS)
+        pushForm(key, `${titleCase(key)} ${name}`);
     }
   }
   return entries;
@@ -141,8 +268,9 @@ function renderCatalogModule(entries) {
   return `// GENERATED FILE — do not edit by hand.
 // Regenerate with: node scripts/generate-pokemon-sprites.mjs
 // Source: msikma/pokesprite \`data/pokemon.json\` + \`pokemon-gen8\`.
-// Each species is followed by its Mega / Primal / Gigantamax / regional forms;
-// \`species\` is what groups them under one name when searching.
+// Each species is followed by its battle-relevant forms (Mega / Primal /
+// Gigantamax / regional / transform / type); \`species\` is what groups them
+// under one name when searching.
 // Art for every slug below is vendored at client/src/assets/pokemon/gen8/{regular,shiny}/.
 
 export const POKEMON_SPRITE_CATALOG = [
