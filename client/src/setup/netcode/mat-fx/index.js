@@ -3,6 +3,8 @@
 // holds the reduced-motion variant of state-reflecting effects; a transient
 // effect has no entry there, which skips it under `prefers-reduced-motion`.
 import { fxDisabled, motionReduced, soundDisabled } from '../../image-logic/mat-fx.mjs';
+import { getCardRegistry } from '../apply-view.js';
+import { signatureEntryKind } from './entry-kind.mjs';
 import { playFxSound } from './fx-audio.js';
 import { holdFor } from './fx-holds.mjs';
 import { attack, attackBanner, damage } from './combat.js';
@@ -47,13 +49,22 @@ const EFFECTS = {
 };
 const STATIC_FALLBACKS = {};
 
+// Design 041: a Mega/Tera evolution keeps the short `evolve` arpeggio under its
+// signature entry; any other plays the evolution scene's score. The dispatcher
+// sounds before the effect runs, so the evolved card is read here.
+const soundPlanFor = (plan) => {
+  if (plan?.effect !== 'evolve') return plan;
+  const evolved = getCardRegistry().get(plan.instanceId)?.card;
+  return signatureEntryKind(evolved) ? plan : { ...plan, effect: 'evolve-scene' };
+};
+
 export const playFx = createFxDispatcher({
   effects: EFFECTS,
   staticFallbacks: STATIC_FALLBACKS,
   isDisabled: fxDisabled,
   isMotionReduced: motionReduced,
   isSoundDisabled: soundDisabled,
-  playSound: playFxSound,
+  playSound: (plan) => playFxSound(soundPlanFor(plan)),
   holdFor,
 });
 

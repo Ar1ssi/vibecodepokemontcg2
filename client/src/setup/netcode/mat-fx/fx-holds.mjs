@@ -15,6 +15,8 @@ export const HOLD_MS = {
   knockout: 520,
   'prize-claim': 320,
   evolve: 240,
+  // Design 041: the next effect lands as the evolved Pokémon emerges from the flare.
+  'evolve-scene': 2000,
   devolve: 240,
   attach: 140,
   'tool-attach': 120,

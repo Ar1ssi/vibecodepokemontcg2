@@ -6,9 +6,12 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D152).
+#   Next id = highest D number in this file and the archive + 1 (next: D154).
 
 ## Active
+- D154[mat-fx] 2026-09-25 Evolve scene timing = 3.2 s card clock + GLOW_HOLD_MS hover (cardClock warp); flying layers keep the unheld pace, so the score's flare stays at 2.05 s whatever the hover (design 041 v4). (S306)
+- D152[mat-fx] 2026-09-25 Non-Mega/Tera evolutions play the Scarlet/Violet scene (evolve-scene.mjs/.js): 2 canvases sandwich old/new card art, 3.2 s, hold 2000; old card snapshotted pre-diff under the NEW id (design 041). (S304)
+- D153[mat-fx] 2026-09-25 `playCanvasStage` lives in mat-fx/canvas-stage.js (shared, keeps D118's WAAPI clock); index.js `soundPlanFor` picks a plan's sound before the dispatcher plays it (design 041). (S304)
 - D150[rules] 2026-09-25 Copy-attack spec adds ownEvolutionStack/ownInPlay/ownDeckTop/oppDiscard/oppLastAttack sources, tera/darkName/excludeSelf/noRuleBox filters, inline `condition` and `auto` (wordings with no "choose"); unknown prefixes fail closed (design 039, I168). (S302)
 - D151[rules] 2026-09-25 `player.lastAttack` records the resolved attack (a copied attack wins) with its turn number; last-turn copy wordings read it only when `turnNumber === currentTurn - 1` (design 039). (S302)
 - D149[tooling] 2026-09-25 `pnpm audit:attacks` ratchets each unique corpus attack's verdict (ok/partial/ran-no-effect/engine-error) vs scripts/attack-behaviour-baseline.json; a regression fails by name (design 036 slice 16). (S300)

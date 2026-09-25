@@ -284,27 +284,6 @@ body.fx-off .fx-overlay {
   --fx-p-color: #bfe3ff;
 }
 
-.fx-evolve-burst__silhouette {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 0.3rem;
-  opacity: 0;
-  filter: brightness(0) invert(1) drop-shadow(0 0 10px rgba(180, 225, 255, 0.95)) drop-shadow(0 0 24px rgba(120, 190, 255, 0.8));
-  will-change: transform, opacity;
-}
-
-.fx-evolve-burst__glow {
-  position: absolute;
-  inset: -18%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 25%, rgba(150, 210, 255, 0.5) 52%, rgba(150, 210, 255, 0) 72%);
-  mix-blend-mode: screen;
-  opacity: 0;
-}
-
 .fx-evolve-burst__ring {
   position: absolute;
   inset: 0;
@@ -314,22 +293,74 @@ body.fx-off .fx-overlay {
   opacity: 0;
 }
 
-.fx-evolve-burst__pillar {
+/* Design 041: the Scarlet/Violet evolution scene. Two canvas stages (nebula,
+   halo and far beads behind; near beads, bokeh and glitter in front)
+   sandwich the old and new card images, over a screen dim. Every white is the
+   scene's blue-tinted white (EVOLVE_PALETTE in evolve-scene.mjs). */
+.fx-evolve-scene {
+  overflow: visible;
+  z-index: 2470;
+}
+
+.fx-evolve-scene__stage {
   position: absolute;
-  left: 18%;
-  right: 18%;
-  bottom: 30%;
-  height: 260%;
-  transform-origin: 50% 100%;
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.9), rgba(170, 220, 255, 0.55) 35%, rgba(170, 220, 255, 0) 100%);
-  filter: blur(6px);
+  display: block;
+}
+
+.fx-evolve-scene__card {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.35rem;
+  overflow: hidden;
+  opacity: 0;
+  will-change: transform, opacity;
+  /* A rim of frost light and a soft drop shadow lift the card off the board. */
+  box-shadow:
+    0 0 0.8rem rgba(150, 205, 255, 0.55),
+    0 0.7rem 1.4rem rgba(0, 8, 26, 0.6);
+}
+
+.fx-evolve-scene__card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+/* Pearly, not flat: a faint icy sheen over the blue-tinted white. */
+.fx-evolve-scene__white {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgb(238, 246, 255) 0%, rgb(226, 238, 255) 50%, rgb(214, 232, 255) 100%);
+  box-shadow: inset 0 0 0.6rem rgba(190, 216, 255, 0.9);
+  opacity: 0;
+}
+
+.fx-evolve-scene__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(8, 24, 64, 0) 20%, rgba(8, 24, 64, 0.85) 100%);
+  opacity: 0;
+}
+
+.fx-evolve-scene__sheen {
+  position: absolute;
+  inset: -20% 0;
+  background: linear-gradient(
+    105deg,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(236, 246, 255, 0.75) 48%,
+    rgba(200, 228, 255, 0.35) 55%,
+    rgba(255, 255, 255, 0) 70%
+  );
   mix-blend-mode: screen;
   opacity: 0;
 }
 
-.fx-evolve-burst__sparkles {
-  position: absolute;
-  inset: 0;
+.fx-evolve-scene__dim {
+  z-index: 2465;
+  opacity: 0;
+  background: radial-gradient(circle at var(--fx-cx, 50%) var(--fx-cy, 50%), rgba(4, 12, 30, 0.1) 0, rgba(4, 12, 30, 0.5) 45vmax);
 }
 
 .fx-energy-snap {

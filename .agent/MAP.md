@@ -15,7 +15,7 @@ scripts/audit-attack-behaviour.mjs (`pnpm audit:attacks`, ~2 min) — attack gat
 tools/ — internal dev tools, sync log comparison, asset mappings
 client/src/setup/deck-builder/ — deck builder (themes, filters, counter, sprites, wallpapers, coins) → .agent/areas/deck-builder.md
 client/src/setup/netcode/ — client transport, authoritative view renderer (apply-view.js), pickers/adapters, battle log → .agent/areas/netcode.md
-client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]) → .agent/areas/netcode.md § Mat FX
+client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]; evolution scene D152–D153) → .agent/areas/netcode.md § Mat FX
 
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
 shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)

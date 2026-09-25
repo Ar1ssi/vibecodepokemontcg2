@@ -1,4 +1,4 @@
-// Design 022 slice 4: lifecycle effects — evolve burst, energy attach snap,
+// Design 022 slice 4: lifecycle effects — evolution (design 041), energy attach snap,
 // retreat/switch slide, trainer/stadium card presentation. All are detached
 // overlays; every one no-ops when its card or rect cannot be resolved.
 import { getEnergyTokenFront, isEnergyCard } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
@@ -17,21 +17,19 @@ import {
 } from '../../image-logic/mat-fx.mjs';
 import { signatureEntryKind } from './entry-kind.mjs';
 import { playSignatureEntry } from './entry.js';
+import { frameTurnOf, playEvolveScene } from './evolve-scene.js';
 import { brighten, fxRgbForCard, rgbCss } from './fx-colors.mjs';
 import { burstParticles } from './particles.mjs';
 import {
   CARD_PRESENT_MS,
+  DEVOLVE_BURST_MS,
   DISCARD_PUFF_MS,
   ENERGY_SNAP_MS,
-  EVOLVE_BURST_MS,
   PROMOTE_MS,
   RETREAT_SLIDE_MS,
   devolveBurstPose,
   discardPuffPose,
   energySnapPose,
-  evolveBurstPose,
-  evolvePillarPose,
-  evolveSilhouettePose,
   moveIdsForEvent,
   presentDimPose,
   presentPoseFor,
@@ -59,72 +57,25 @@ const cardSrc = (element) => element?.currentSrc || element?.src || null;
 
 export const evolve = (plan) => {
   const registry = getCardRegistry();
+  // Taken first so a snapshot never outlives its evolution.
+  const origin = takeOrigin(plan.instanceId);
   const id = rectForInstance(plan.instanceId, registry) ? plan.instanceId : plan.targetInstanceId;
   const rect = rectForInstance(id, registry);
   if (!rect) return 0;
   // Design 027: a Mega or Tera evolution plays its signature entry instead.
   const evolved = registry.get(plan.instanceId)?.card;
   if (playSignatureEntry(signatureEntryKind(evolved), rect, plan.instanceId, evolved)) return;
-  const src = cardSrc(registry.get(id)?.element);
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-evolve-burst' });
-  const pillar = document.createElement('div');
-  pillar.className = 'fx-evolve-burst__pillar';
-  const glow = document.createElement('div');
-  glow.className = 'fx-evolve-burst__glow';
-  const ring = document.createElement('div');
-  ring.className = 'fx-evolve-burst__ring';
-  const sparkles = document.createElement('div');
-  sparkles.className = 'fx-evolve-burst__sparkles';
-  host.append(pillar, glow, ring);
-  const done = [];
-  if (src) {
-    const silhouette = buildImage(src, 'fx-evolve-burst__silhouette');
-    host.appendChild(silhouette);
-    const frames = sampleKeyframes(
-      evolveSilhouettePose,
-      (p) => ({ transform: `scale(${p.scale})`, opacity: p.opacity }),
-      24
-    );
-    done.push(animateFrames(silhouette, frames, { duration: EVOLVE_BURST_MS }));
-  }
-  host.appendChild(sparkles);
-  const glowFrames = sampleKeyframes(
-    evolveBurstPose,
-    (p) => ({ transform: `scale(${p.scale})`, opacity: p.opacity }),
-    16
-  );
-  // The ring starts after a delay (fill 'both'), so it must begin invisible.
-  const ringFrames = sampleKeyframes(
-    (t) => ({ ...evolveBurstPose(t), fadeIn: Math.min(1, t / 0.08) }),
-    (p) => ({ transform: `scale(${p.ringScale})`, opacity: p.ringOpacity * p.fadeIn }),
-    16
-  );
-  const pillarFrames = sampleKeyframes(
-    evolvePillarPose,
-    (p) => ({ transform: `scale(${p.scaleX}, ${p.scaleY})`, opacity: p.opacity }),
-    16
-  );
-  const rising = burstParticles({
-    count: 18,
-    distance: rect.height * 0.7,
-    direction: -90,
-    spread: 50,
-    size: [rect.width * 0.05, rect.width * 0.12],
-    gravity: -rect.height * 0.2,
-    maxDelay: 0.45,
-    seed: Math.floor(Math.random() * 1e6),
+  // Design 041: every other evolution plays the Scarlet/Violet scene.
+  playEvolveScene({
+    rect,
+    turn: frameTurnOf(registry.get(id)?.element),
+    fromSrc: origin?.src || null,
+    toSrc: cardSrc(registry.get(plan.instanceId)?.element),
   });
-  done.push(
-    animateFrames(glow, glowFrames, { duration: EVOLVE_BURST_MS * 0.8, delay: EVOLVE_BURST_MS * 0.2 }),
-    animateFrames(ring, ringFrames, { duration: EVOLVE_BURST_MS * 0.6, delay: EVOLVE_BURST_MS * 0.35 }),
-    animateFrames(pillar, pillarFrames, { duration: EVOLVE_BURST_MS }),
-    ...spawnParticles(sparkles, rising, { className: 'fx-particle--mote', duration: EVOLVE_BURST_MS })
-  );
-  removeWhen(host, done, EVOLVE_BURST_MS * 1.5 + BACKSTOP_PAD_MS);
+  return holdFor('evolve-scene');
 };
 
-// Devolving is the quieter mirror of the evolve burst: the ring collapses
-// inward and the card shrinks rather than swells.
+// Devolving: the ring collapses inward and the card shrinks.
 export const devolve = (plan) => {
   const registry = getCardRegistry();
   const rect = rectForInstance(plan.instanceId, registry) || rectForInstance(plan.targetInstanceId, registry);
@@ -133,7 +84,7 @@ export const devolve = (plan) => {
   const ring = document.createElement('div');
   ring.className = 'fx-evolve-burst__ring';
   host.appendChild(ring);
-  runPose(host, EVOLVE_BURST_MS, (t) => {
+  runPose(host, DEVOLVE_BURST_MS, (t) => {
     const pose = devolveBurstPose(t);
     host.style.transform = `scale(${pose.scale})`;
     host.style.opacity = String(pose.opacity);

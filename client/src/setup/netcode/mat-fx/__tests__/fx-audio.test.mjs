@@ -117,10 +117,46 @@ test('fx-audio: each special condition has its own motif, with a safe default', 
   assert.ok(voicesFor('status', { condition: 'Cursed' }).length > 0, 'unknown condition still pops');
 });
 
-test('fx-audio: evolve and devolve are mirror figures', () => {
+test('fx-audio: evolve (under a Mega/Tera entry) and devolve are mirror figures', () => {
   const up = voicesFor('evolve').map((v) => v.freq);
   const down = voicesFor('devolve').map((v) => v.freq);
   assert.deepEqual(down, [...up].reverse());
+});
+
+// Design 041: the evolution scene's score (3.2 s, flare peak at ~2.0 s).
+const sounding = (voices, at) => voices.filter((v) => (v.delay ?? 0) <= at && at < (v.delay ?? 0) + v.dur);
+
+test('fx-audio: the evolution score swells and rises into the flare', () => {
+  const score = voicesFor('evolve-scene');
+  const swells = score.filter((v) => v.attack >= 1);
+  assert.ok(swells.length >= 3, 'a pad and a riser swell in');
+  for (const v of swells) assert.ok(v.attack < v.dur, 'a swell still decays');
+  assert.ok(
+    score.some((v) => v.type === 'noise' && v.filter.freqTo > v.filter.freq),
+    'a noise riser sweeps upward'
+  );
+  assert.ok(score.some((v) => v.type === 'tone' && v.freqTo > v.freq), 'a rising tone');
+});
+
+test('fx-audio: the evolution score hits on the flare peak and ends with the scene', () => {
+  const score = voicesFor('evolve-scene');
+  const hit = score.filter((v) => v.delay === 2);
+  assert.ok(hit.length >= 5, 'a chord, a shimmer and a boom at 2.0 s');
+  assert.ok(hit.some((v) => v.type === 'tone' && v.freqTo < v.freq), 'the boom falls');
+  const end = Math.max(...score.map((v) => (v.delay ?? 0) + v.dur));
+  assert.ok(end > 2.8 && end <= 3.4, `score ends at ${end}s`);
+});
+
+test('fx-audio: the evolution score never stacks past the bus', () => {
+  const score = voicesFor('evolve-scene');
+  for (let at = 0; at <= 3.4; at += 0.02) {
+    const total = sounding(score, at).reduce((sum, v) => sum + v.gain, 0);
+    assert.ok(total <= 0.8, `${total.toFixed(2)} at ${at.toFixed(2)}s`);
+  }
+});
+
+test('fx-audio: evolve-scene differs from the signature arpeggio', () => {
+  assert.ok(voicesFor('evolve-scene').length > voicesFor('evolve').length * 4);
 });
 
 test('fx-audio: an arpeggio staggers its notes', () => {

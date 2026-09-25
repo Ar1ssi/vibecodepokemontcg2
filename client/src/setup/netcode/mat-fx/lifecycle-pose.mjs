@@ -1,8 +1,8 @@
 // Design 022 slice 4: pure math + id helpers for the lifecycle effects
-// (evolve burst, energy snap, retreat slide, trainer/stadium card present).
-// DOM-free; lifecycle.js drives the overlays.
+// (devolve burst, energy snap, retreat slide, trainer/stadium card present).
+// DOM-free; lifecycle.js drives the overlays. Evolution: evolve-scene.mjs.
 
-export const EVOLVE_BURST_MS = 1150;
+export const DEVOLVE_BURST_MS = 1150;
 export const ENERGY_SNAP_MS = 560;
 export const RETREAT_SLIDE_MS = 520;
 export const CARD_PRESENT_MS = 1700;
@@ -31,38 +31,6 @@ export function moveIdsForEvent(event) {
     return [event.instanceId, event.replacedInstanceId].filter(isId);
   }
   return [];
-}
-
-/** Flash + scale pop on the evolved card; peaks mid-way. */
-export function evolveBurstPose(t) {
-  const c = clamp01(t);
-  const bell = Math.sin(c * Math.PI);
-  return { scale: 1 + 0.16 * bell, opacity: bell, ringScale: 0.8 + 0.9 * easeOutCubic(c), ringOpacity: 1 - c };
-}
-
-/**
- * Design 026: the evolved card glows to a pure white silhouette, swells, then
- * the white drains away to reveal the new art (Pokémon-games evolution beat).
- */
-export function evolveSilhouettePose(t) {
-  const c = clamp01(t);
-  if (c < 0.4) {
-    const e = easeOutCubic(c / 0.4);
-    return { opacity: e, scale: 1 + 0.07 * e };
-  }
-  const out = easeInOutCubic((c - 0.4) / 0.6);
-  return { opacity: 1 - out, scale: 1.07 - 0.07 * out };
-}
-
-/** Light pillar above the card: shoots up, then thins and fades. */
-export function evolvePillarPose(t) {
-  const c = clamp01(t);
-  const up = easeOutCubic(Math.min(1, c / 0.35));
-  return {
-    scaleY: up,
-    scaleX: c < 0.35 ? 1 : 1 - 0.7 * ((c - 0.35) / 0.65),
-    opacity: c < 0.35 ? up : 1 - (c - 0.35) / 0.65,
-  };
 }
 
 /** Energy token drops in large and snaps to its size at the card center. */
@@ -177,8 +145,8 @@ export function discardPuffPose(t) {
 }
 
 /**
- * Design 024 slice 4: devolution is the evolve burst run backwards — the ring
- * collapses inward instead of expanding, so the two read as opposites.
+ * Design 024 slice 4: devolution — the ring collapses inward and the card
+ * shrinks, a burst run backwards.
  */
 export function devolveBurstPose(t) {
   const c = clamp01(t);

@@ -4,13 +4,16 @@
 // is SYNTHESIZED from a handful of voices (design 024 O1). A voice is a small
 // spec the driver (fx-audio.js) turns into one oscillator or noise burst:
 //
-//   { type, wave, freq, freqTo?, dur, gain, delay?, filter? }
+//   { type, wave, freq, freqTo?, dur, gain, delay?, attack?, filter? }
 //     type   'tone' (oscillator) | 'noise' (filtered white noise)
 //     wave   oscillator type: 'sine' | 'triangle' | 'square' | 'sawtooth'
 //     freq   start frequency in Hz; `freqTo` ramps to it over `dur`
 //     dur    seconds; gain is the peak of a short attack/decay envelope
 //     delay  seconds to wait before this voice starts (layering/arpeggios)
-//     filter { type, freq, q } biquad, mainly to shape noise into a thud/hiss
+//     attack seconds to reach the peak (default: a click-free few ms); a long
+//            attack makes a swell
+//     filter { type, freq, q, freqTo? } biquad, mainly to shape noise into a
+//            thud/hiss; `freqTo` sweeps its cutoff over `dur` (a riser)
 //
 // Keeping this DOM-free means the whole palette — including how a hit's pitch
 // tracks its damage — is unit-testable without an AudioContext.
@@ -36,8 +39,36 @@ const noise = (dur, gain, filter, over = {}) =>
   Object.freeze({ type: 'noise', dur, gain, filter: Object.freeze(filter), ...over });
 
 /** Notes of a rising/falling run, each delayed one step behind the last. */
-const arpeggio = (freqs, { step = 0.07, dur = 0.16, gain = 0.2, wave = 'triangle' } = {}) =>
-  Object.freeze(freqs.map((freq, i) => tone(freq, dur, gain, { wave, delay: i * step })));
+const arpeggio = (freqs, { step = 0.07, dur = 0.16, gain = 0.2, wave = 'triangle', at = 0 } = {}) =>
+  Object.freeze(freqs.map((freq, i) => tone(freq, dur, gain, { wave, delay: at + i * step })));
+
+// Design 041: the evolution scene's score, timed to its 3.5 s picture
+// (evolve-scene.mjs): a twinkling intro over a swelling pad, a riser and a
+// quickening run into the flare (~2.0 s), a bright chord and a boom at its
+// peak, then a short fanfare and sparkles as the evolved Pokémon appears.
+const FLARE_S = 2.0;
+const EVOLVE_SCORE = Object.freeze([
+  ...arpeggio([1047, 1319, 1568, 2093, 1568, 2093, 2637], { step: 0.11, dur: 0.34, gain: 0.05, wave: 'sine' }),
+  tone(196, 1.95, 0.1, { wave: 'sine', attack: 1.55 }),
+  tone(294, 1.95, 0.09, { wave: 'sine', attack: 1.6 }),
+  tone(392, 1.9, 0.05, { wave: 'triangle', attack: 1.7, delay: 0.05 }),
+  noise(1.4, 0.11, { type: 'bandpass', freq: 500, freqTo: 5200, q: 1.4 }, { attack: 1.25, delay: 0.6 }),
+  tone(220, 1.4, 0.06, { wave: 'triangle', freqTo: 880, attack: 1.2, delay: 0.6 }),
+  ...[523, 659, 784, 1047, 1319, 1568, 2093].map((freq, i) =>
+    tone(freq, 0.24, 0.07, { wave: 'sine', delay: [1.0, 1.2, 1.36, 1.5, 1.62, 1.72, 1.8][i] })
+  ),
+  ...[262, 523, 659, 784, 1047].map((freq, i) =>
+    tone(freq, 1.2 - i * 0.08, [0.08, 0.08, 0.06, 0.06, 0.04][i], {
+      wave: i === 0 ? 'triangle' : 'sine',
+      delay: FLARE_S,
+    })
+  ),
+  noise(0.9, 0.08, { type: 'highpass', freq: 3000, q: 0.7 }, { delay: FLARE_S }),
+  tone(110, 0.45, 0.18, { wave: 'sine', freqTo: 45, delay: FLARE_S }),
+  ...arpeggio([784, 1047, 1319], { step: 0.12, dur: 0.16, gain: 0.09, at: 2.22 }),
+  tone(1568, 0.6, 0.09, { wave: 'triangle', delay: 2.58 }),
+  ...arpeggio([2637, 3136, 2349, 3520, 2794], { step: 0.12, dur: 0.25, gain: 0.035, wave: 'sine', at: 2.45 }),
+]);
 
 // ── Static palette: effects whose sound never varies with the plan ──────────
 const STATIC_VOICES = Object.freeze({
@@ -55,7 +86,10 @@ const STATIC_VOICES = Object.freeze({
     tone(300, 0.3, 0.12, { wave: 'sawtooth', freqTo: 90, delay: 0.06 }),
   ],
   'prize-claim': arpeggio([784, 988, 1319], { step: 0.08, dur: 0.24, gain: 0.17, wave: 'sine' }),
+  // `evolve` sounds under a Mega/Tera signature entry; any other evolution
+  // plays `evolve-scene` (index.js picks which before the dispatcher sounds).
   evolve: arpeggio([440, 587, 784, 1047], { step: 0.06, dur: 0.2, gain: 0.16 }),
+  'evolve-scene': EVOLVE_SCORE,
   devolve: arpeggio([1047, 784, 587, 440], { step: 0.06, dur: 0.2, gain: 0.16 }),
   attach: [
     tone(880, 0.1, 0.18, { wave: 'sine', freqTo: 1320 }),

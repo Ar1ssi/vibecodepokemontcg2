@@ -4,9 +4,6 @@ import {
   devolveBurstPose,
   discardPuffPose,
   energySnapPose,
-  evolveBurstPose,
-  evolvePillarPose,
-  evolveSilhouettePose,
   moveIdsForEvent,
   presentDimPose,
   presentPoseFor,
@@ -26,13 +23,6 @@ test('moveIdsForEvent: retreat and swap name both cards, others none', () => {
   assert.deepEqual(moveIdsForEvent({ type: 'cardRetreated', activeId: 1 }), [1]);
   assert.deepEqual(moveIdsForEvent({ type: 'damageUpdated', instanceId: 1 }), []);
   assert.deepEqual(moveIdsForEvent(null), []);
-});
-
-test('evolveBurstPose: invisible at both ends, peaks mid-way', () => {
-  assert.ok(Math.abs(evolveBurstPose(0).opacity) < 1e-9);
-  assert.ok(Math.abs(evolveBurstPose(1).opacity) < 1e-9);
-  assert.ok(evolveBurstPose(0.5).opacity > 0.99);
-  assert.ok(evolveBurstPose(0.5).scale > 1);
 });
 
 test('energySnapPose: starts large, lands at scale 1 at the snap, then fades', () => {
@@ -135,20 +125,6 @@ test('presentSrcFor: prefers the freshly-set element src over a stale currentSrc
   assert.equal(presentSrcFor(null, null), undefined);
 });
 
-test('evolveSilhouettePose: white peaks at 0.4, drains to reveal the card', () => {
-  assert.equal(evolveSilhouettePose(0).opacity, 0);
-  assert.equal(evolveSilhouettePose(0.4).opacity, 1);
-  assert.ok(evolveSilhouettePose(0.4).scale > 1);
-  assert.equal(evolveSilhouettePose(1).opacity, 0);
-  assert.equal(evolveSilhouettePose(1).scale, 1);
-});
-
-test('evolvePillarPose: shoots up, then fades out', () => {
-  assert.equal(evolvePillarPose(0).scaleY, 0);
-  assert.equal(evolvePillarPose(0.35).scaleY, 1);
-  assert.equal(evolvePillarPose(1).opacity, 0);
-});
-
 test('presentDimPose: eases to the peak, holds, clears', () => {
   assert.equal(presentDimPose(0).opacity, 0);
   assert.equal(presentDimPose(0.5, 0.4).opacity, 0.4);
@@ -180,16 +156,14 @@ test('discardPuffPose: drifts up, swells and fades to nothing', () => {
   assert.ok(discardPuffPose(1).scale > discardPuffPose(0).scale);
 });
 
-test('devolveBurstPose: the ring collapses inward, the mirror of evolving', () => {
-  const evolveRing = [evolveBurstPose(0).ringScale, evolveBurstPose(1).ringScale];
-  const devolveRing = [devolveBurstPose(0).ringScale, devolveBurstPose(1).ringScale];
-  assert.ok(evolveRing[1] > evolveRing[0], 'evolve expands');
-  assert.ok(devolveRing[1] < devolveRing[0], 'devolve contracts');
+test('devolveBurstPose: the ring collapses inward', () => {
+  assert.ok(devolveBurstPose(1).ringScale < devolveBurstPose(0).ringScale);
 });
 
-test('devolveBurstPose: shrinks the card where evolving swells it', () => {
+test('devolveBurstPose: shrinks the card mid-way, invisible at both ends', () => {
   assert.ok(devolveBurstPose(0.5).scale < 1);
-  assert.ok(evolveBurstPose(0.5).scale > 1);
+  assert.ok(Math.abs(devolveBurstPose(0).opacity) < 1e-9);
+  assert.ok(Math.abs(devolveBurstPose(1).opacity) < 1e-9);
 });
 
 test('slice-4 poses stay finite and bounded outside [0,1]', () => {

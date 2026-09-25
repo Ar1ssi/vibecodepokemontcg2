@@ -81,19 +81,29 @@ const ensureContext = () => {
   }
 };
 
-const buildFilter = (ctx, spec) => {
+const buildFilter = (ctx, spec, start, duration) => {
   if (!spec?.type) return null;
   const filter = ctx.createBiquadFilter();
   filter.type = spec.type;
-  filter.frequency.value = spec.freq ?? 1000;
+  filter.frequency.setValueAtTime(spec.freq ?? 1000, start);
+  // Cutoffs are positive, so the sweep can be exponential — it sounds even.
+  if (spec.freqTo > 0 && spec.freq > 0) {
+    filter.frequency.exponentialRampToValueAtTime(spec.freqTo, start + duration);
+  }
   filter.Q.value = spec.q ?? 1;
   return filter;
 };
 
+// A swell must still leave some decay, or the voice would stop at its peak.
+const attackFor = (voice, duration) =>
+  Number.isFinite(voice.attack) && voice.attack > 0
+    ? Math.min(voice.attack, duration * 0.9)
+    : ATTACK_SECONDS;
+
 /**
  * One voice: source -> [filter] -> envelope gain -> master. The envelope is a
- * fast linear attack and an exponential decay to (near) zero — exponential
- * ramps cannot reach 0, hence the small floor.
+ * linear attack (fast unless the voice asks for a swell) and an exponential
+ * decay to (near) zero — exponential ramps cannot reach 0, hence the floor.
  */
 const playVoice = (ctx, voice) => {
   const start = ctx.currentTime + (voice.delay ?? 0);
@@ -120,10 +130,10 @@ const playVoice = (ctx, voice) => {
 
   const envelope = ctx.createGain();
   envelope.gain.setValueAtTime(0.0001, start);
-  envelope.gain.linearRampToValueAtTime(peak, start + ATTACK_SECONDS);
+  envelope.gain.linearRampToValueAtTime(peak, start + attackFor(voice, duration));
   envelope.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
-  const filter = buildFilter(ctx, voice.filter);
+  const filter = buildFilter(ctx, voice.filter, start, duration);
   if (filter) {
     source.connect(filter);
     filter.connect(envelope);
