@@ -420,6 +420,57 @@ body.fx-off .fx-overlay {
   opacity: 0;
 }
 
+/* Design 043: the opponent's Trainer — two faces under one rotateY flip. */
+.fx-opp-play {
+  z-index: 2480;
+  overflow: visible;
+}
+
+.fx-opp-play__card {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.fx-opp-play__back,
+.fx-opp-play__front {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.55rem;
+  backface-visibility: hidden;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+
+.fx-opp-play__back {
+  transform: rotateY(180deg);
+}
+
+/* The card wrapper keeps its 3D, so it cannot clip: this layer does. */
+.fx-opp-play__shine {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+
+.fx-opp-play__shine i {
+  position: absolute;
+  top: -8%;
+  bottom: -8%;
+  left: 20%;
+  width: 40%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0));
+  mix-blend-mode: soft-light;
+  opacity: 0;
+}
+
 .fx-banner {
   z-index: 2490;
   overflow: hidden;

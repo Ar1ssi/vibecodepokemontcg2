@@ -7,6 +7,7 @@ import { getCardRegistry } from '../apply-view.js';
 import { signatureEntryKind } from './entry-kind.mjs';
 import { playFxSound } from './fx-audio.js';
 import { holdFor } from './fx-holds.mjs';
+import { playsOppPreview } from './opp-play.mjs';
 import { attack, attackBanner, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
 import { enter } from './entry.js';
@@ -52,7 +53,9 @@ const STATIC_FALLBACKS = {};
 // Design 041: a Mega/Tera evolution keeps the short `evolve` arpeggio under its
 // signature entry; any other plays the evolution scene's score. The dispatcher
 // sounds before the effect runs, so the evolved card is read here.
+// Design 043: the opponent's Trainer sounds with its preview's timing.
 const soundPlanFor = (plan) => {
+  if (plan?.effect === 'trainer-play' && playsOppPreview(plan)) return { ...plan, effect: 'opp-trainer-play' };
   if (plan?.effect !== 'evolve') return plan;
   const evolved = getCardRegistry().get(plan.instanceId)?.card;
   return signatureEntryKind(evolved) ? plan : { ...plan, effect: 'evolve-scene' };

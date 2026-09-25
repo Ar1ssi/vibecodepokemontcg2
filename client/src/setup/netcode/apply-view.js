@@ -348,7 +348,7 @@ function resolveRenderTargets(options = {}) {
  * @param {object} options
  * @returns {string}
  */
-function resolveCardBackSrc(side, options = {}) {
+export function resolveCardBackSrc(side, options = {}) {
   const fallback = options.cardBackSrc || '/src/assets/cardback.png';
   const systemState = options.systemState || defaultNetcodeContext.systemState;
   if (!systemState) return fallback;

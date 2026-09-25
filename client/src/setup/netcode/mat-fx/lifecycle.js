@@ -41,6 +41,8 @@ import { holdFor } from './fx-holds.mjs';
 import { discardedIds, takeOrigin, takeZoneSweep } from './origins.mjs';
 import { cardShapedRect } from './card-flight.mjs';
 import { pileOf, playDiscardFlights } from './card-flight.js';
+import { playsOppPreview } from './opp-play.mjs';
+import { playOppTrainer } from './opp-play.js';
 
 const buildImage = (src, className) => {
   const img = document.createElement('img');
@@ -230,9 +232,19 @@ const presentCard = (src, fromRect) => {
   removeWhen(dim, [animateFrames(dim, dimFrames, { duration: CARD_PRESENT_MS })], CARD_PRESENT_MS + BACKSTOP_PAD_MS);
 };
 
+// Design 043: the opponent's play drops off their hand, previews over the mat
+// and lands in its spot; your own keeps the centred presentation.
 export const trainerPlay = (plan) => {
   const origin = takeOrigin(plan.instanceId);
-  const element = getCardRegistry().get(plan.instanceId)?.element;
+  const registry = getCardRegistry();
+  const element = registry.get(plan.instanceId)?.element;
+  if (playsOppPreview(plan)) {
+    // Their hand card was drawn as the sleeve, so only the played card's own
+    // element can give the face.
+    const face = element?.src || element?.currentSrc || null;
+    const played = playOppTrainer({ instanceId: plan.instanceId, user: plan.user, origin, src: face, registry });
+    return played ? holdFor('opp-trainer-play') : 0;
+  }
   presentCard(presentSrcFor(origin, element), origin?.rect || null);
 };
 

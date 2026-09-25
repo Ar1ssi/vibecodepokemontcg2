@@ -160,6 +160,28 @@ export const removeWhen = (host, promises, backstopMs) => {
 };
 
 /**
+ * Hide a real card (its `.mat-holo` wrapper when it has one) while an overlay
+ * stands in for it; restored when `promise` settles or after `backstopMs`.
+ */
+export const hideDuring = (element, promise, backstopMs) => {
+  const target = element?.closest?.('.mat-holo') || element;
+  if (!target?.style) return;
+  const previous = target.style.visibility;
+  target.style.visibility = 'hidden';
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    target.style.visibility = previous;
+  };
+  const timer = setTimeout(restore, backstopMs);
+  promise.then(() => {
+    clearTimeout(timer);
+    restore();
+  });
+};
+
+/**
  * Append one `<i>` per particle (from particles.mjs `burstParticles`) at the
  * host's center and fly each outward after `delay` ms. Returns the
  * animations' promises.

@@ -102,6 +102,12 @@ const STATIC_VOICES = Object.freeze({
     noise(0.16, 0.16, { type: 'highpass', freq: 1800, q: 0.7 }),
     ...arpeggio([523, 659], { step: 0.09, dur: 0.24, gain: 0.13, wave: 'sine' }),
   ],
+  // Design 043: a swoosh as the opponent's card drops off their hand, the
+  // trainer chime as it grows into the preview (opp-play.mjs, ~0.26 s).
+  'opp-trainer-play': [
+    noise(0.24, 0.14, { type: 'bandpass', freq: 1200, q: 0.6 }),
+    ...arpeggio([523, 659, 784], { step: 0.08, dur: 0.26, gain: 0.13, wave: 'sine', at: 0.26 }),
+  ],
   'stadium-play': [
     noise(0.2, 0.18, { type: 'lowpass', freq: 1400, q: 0.8 }),
     ...arpeggio([330, 440], { step: 0.1, dur: 0.3, gain: 0.14, wave: 'triangle' }),

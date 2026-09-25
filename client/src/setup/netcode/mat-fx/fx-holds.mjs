@@ -24,6 +24,8 @@ export const HOLD_MS = {
   retreat: 200,
   promote: 220,
   'trainer-play': 520,
+  // Design 043: what the opponent's Trainer does starts as its preview is placed.
+  'opp-trainer-play': 1700,
   'stadium-play': 520,
   'ability-banner': 480,
   'turn-banner': 260,

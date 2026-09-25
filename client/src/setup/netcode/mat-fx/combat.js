@@ -10,6 +10,7 @@
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
+  hideDuring,
   rectForInstance,
   removeWhen,
   runPose,
@@ -176,25 +177,6 @@ export const damage = (plan) => {
     if (hit.kind !== 'hit') return;
     strikeTarget(rect, hit, ctx);
     shakeTable(hit.amount);
-  });
-};
-
-/** Hide the real attacker while its ghost lunges; always restored. */
-const hideDuring = (element, promise, backstopMs) => {
-  const target = element?.closest?.('.mat-holo') || element;
-  if (!target?.style) return;
-  const previous = target.style.visibility;
-  target.style.visibility = 'hidden';
-  let restored = false;
-  const restore = () => {
-    if (restored) return;
-    restored = true;
-    target.style.visibility = previous;
-  };
-  const timer = setTimeout(restore, backstopMs);
-  promise.then(() => {
-    clearTimeout(timer);
-    restore();
   });
 };
 
