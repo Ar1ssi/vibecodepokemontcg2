@@ -57,7 +57,7 @@ import {
   getStatus,
   applyStatus,
 } from '/shared/engine/rules/status.mjs';
-import { isEnergy, isPokemon } from '/shared/engine/cards.mjs';
+import { isEnergy, isPokemon, isTrainer } from '/shared/engine/cards.mjs';
 import { isPokemonToolCard } from '/shared/engine/rules/ability-executors.mjs';
 import {
   describeStadiumEffect,
@@ -198,7 +198,8 @@ export const moveCard = async (
   if (activeOrBenchDest) {
     await ensureCardData(movingCard);
     const isPokemonCard = isPokemon(movingCard);
-    const isEnergyCard = isEnergy(movingCard);
+    // isEnergy matches on name, so Items like "Energy Search" need the trainer check.
+    const isEnergyCard = isEnergy(movingCard) && !isTrainer(movingCard);
     const isToolCard = isPokemonToolCard(movingCard);
     if (!targetCard && !isPokemonCard) {
       const reason = isEnergyCard
