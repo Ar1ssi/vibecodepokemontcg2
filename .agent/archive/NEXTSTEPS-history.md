@@ -1356,3 +1356,9 @@ unit-tested directly via `executeSteps`; (2) `selfBenchPlacementAbility`'s `swap
 ("move your Active to the Bench and put this in the Active") is implemented but untested;
 (3) the when-played "must" mandatory wording (Gyarados Untamed One) and the opponent-disrupt
 reveal-hand wordings (Zubat/Mandibuzz/Thievul/Hawlucha) remain for 5b.
+
+## design 036 — attack behaviour (slices 1–15 merged to main, PR #183; slice 16 done S300)
+- [x] 16 Regression gate: `pnpm audit:attacks` (`scripts/audit-attack-behaviour.mjs`,
+      `scripts/lib/attack-{harness,behaviour}.mjs`) + per-row `scripts/attack-behaviour-baseline.json`;
+      I136 closed. Baseline: 3,528 unique effect attacks — 3,247 ok / 152 partial / 129 ran-no-effect /
+      0 engine-error. Edge row 14 (stacking markers) stays untested (I167).

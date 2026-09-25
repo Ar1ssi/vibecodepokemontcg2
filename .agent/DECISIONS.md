@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D146).
+#   Next id = highest D number in this file and the archive + 1 (next: D150).
 
 ## Active
+- D149[tooling] 2026-09-25 `pnpm audit:attacks` ratchets each unique corpus attack's verdict (ok/partial/ran-no-effect/engine-error) vs scripts/attack-behaviour-baseline.json; a regression fails by name (design 036 slice 16). (S300)
 - D145[drag] 2026-09-24 Dragged card = body-level avatar that rolls into horizontal motion (design 038); native DnD still drops, ghost blanked via setDragImage, pointer from dragover in all frames; no resize (user). (S287) (PR #186 branch id D124)
 - D144[rules] 2026-09-25 Special-Energy KO effects need a KO by attack damage (not Poison/Burn/Ability or attack-placed counters); each step's `source` sets whether it must be the opponent's attack (Gift/Legacy/Splash) or any (Rescue). (S295)
 - D143[rules] 2026-09-25 Passive special-Energy effects with a lasting state (end-of-turn discard, attach refusal, discard-when-condition-lost) run in one `settleSpecialEnergyPassives` sweep in applyCommand's tail, not at each mutation site. (S295)

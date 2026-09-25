@@ -1,6 +1,6 @@
 # 036: Attack behaviour implementation (I136/I137)
 
-Status: in progress — slices 1–15 built on `feature/attack-behaviour` (S284, S287); slice 16 (regression gate, close I136/I137) next
+Status: complete — slices 1–15 merged to main (PR #183); slice 16 (regression gate) built on `claude/rules-engine-issues-e79707` (S300), pending merge
 Date: 2026-09-24 · Session: S280
 
 ## Problem
@@ -447,8 +447,22 @@ mechanic.
     Evolution copies (Incineroar, Charizard), last-turn copies (Mimikyu Copycat, Sudowoodo Watch and Learn), Slowking
     deck-top copy, old "copies that attack" prints (Clefable/Clefairy Metronome, Smeargle, Mew, Mew Star, Togetic Delta /
     Super Metronome, Dark Hypno, Shiftry ex, Alakazam Star, Misty's Psyduck). Supporter effects whose trainer steps need a
-    played-card context (e.g. "you can't play this card if…" play conditions) are not checked when used by an attack.
-    Stacking restOfGame + nextTurnBonus is summed by the existing marker sum but untested (edge row 14 stays open).
+     played-card context (e.g. "you can't play this card if…" play conditions) are not checked when used by an attack.
+     Stacking restOfGame + nextTurnBonus is summed by the existing marker sum but untested (edge row 14 stays open).
+- S300 slice 16 (regression gate) built on `claude/rules-engine-issues-e79707`: `pnpm audit:attacks`
+  (`scripts/audit-attack-behaviour.mjs` + `scripts/lib/attack-behaviour.mjs` +
+  `scripts/lib/attack-harness.mjs`, promoted from the S279 scratch probe/rich harness) with the
+  committed `scripts/attack-behaviour-baseline.json`; 12 unit tests in
+  `scripts/lib/attack-behaviour.test.mjs`. Deviations: (a) the gate covers
+  `out/pkmn-pokemon-cards.json` (the committed corpus the other gates use, 3,528 unique effect
+  attacks); the 10,966-attack full `type:pokemon` sweep stays scratch-only (§F), so this is a
+  ratchet over that corpus, not the S279 numbers; (b) the baseline is per unique attack (name+text
+  hash → `{name, attack, family, verdict}`), not per-family shares like the ability gate — new
+  attacks report as warnings, a vanished key is a corpus/text-edit warning, and each regression
+  names its card (what I166–I168 need); (c) the probe's unused `parseAttackDamage` field was
+  dropped (it threw on every row: `ATTACK_CTX` was read before its declaration). First baseline:
+  3,247 ok / 152 partial / 129 ran-no-effect / 0 engine-error. I136 closed; I137 was already
+  closed by slice 1. The gate's partial/no-effect rows are the I166–I168 ratchet.
 
 ---
 Self-approval checklist (only when the user is unreachable):
