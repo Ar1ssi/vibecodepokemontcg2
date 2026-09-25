@@ -7,7 +7,7 @@ Session: 297
 Focus: I155+ backlog fixes on `claude/rules-engine-issues-e79707` (12 commits, not pushed):
   S297a closed I164 I151 I165 I78 I173 I175 I172 I169; S297b closed I171 I155 I154 I163 I161.
 Active: none — branch green, ready to push / merge; nothing half-done.
-  Handoff: `.agent/scratch/297-i155-handoff.md` (branch state, decisions, next sessions).
+  Handoff: `.agent/designs/297-i155-handoff.md` (branch state, decisions, next sessions).
 Next: push `claude/rules-engine-issues-e79707` (or PR) — it is main + 12 commits, all gates green.
   I153 needs its own feature session: per-viewer event filtering (design 038 option 3B) has no
   contract yet — it touches the netcode contract and every event producer.
