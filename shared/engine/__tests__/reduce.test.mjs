@@ -726,3 +726,29 @@ test('Stadium drop: placing a Stadium from hand marks it as played this turn', (
   assert.equal(res.state.players.p1.flags.stadiumPlayedThisTurn, true);
 });
 
+
+// I78: a between-turns Stadium that Knocks Out both players' last Pokémon is a tiebreak,
+// not a win for whichever side the loop reached first.
+test('between-turns Stadium double KO enters tiebreak', () => {
+  const state = genuineTieState();
+  for (const pid of ['p1', 'p2']) state.players[pid].zones.active[0].specialConditions = [];
+  for (const card of [state.players.p1.zones.active[0], state.players.p2.zones.active[0]]) {
+    delete card.poisoned;
+    card.specialCondition = null;
+  }
+  state.stadium = {
+    card: createCard({
+      instanceId: 900,
+      name: 'Test Stadium',
+      supertype: 'Trainer',
+      subtypes: ['Stadium'],
+      text: 'Between turns, put 1 damage counter on each Pokémon (both yours and your opponent’s).',
+    }),
+    ownerId: 'p1',
+  };
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' }, TAILS);
+  assert.equal(res.error, null);
+  assert.ok(res.events.some((e) => e.type === 'stadiumBetweenTurnsDamage'));
+  assert.equal(res.state.turn.phase, 'tiebreak');
+  assert.equal(res.state.winner, null);
+});

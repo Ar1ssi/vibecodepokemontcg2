@@ -1284,6 +1284,13 @@ function settleKnockOutWins(draft, { events }) {
       ...(stateA.wiped ? ['no Pokémon in play'] : []),
     ],
   };
+  // Re-settling a game a direct Knock Out already ended this command (I165): keep an unchanged
+  // result, but a later KO in the same command can turn a lone win into a tiebreak.
+  if (isGameConcluded(draft)) {
+    const winner = ways[a].length > ways[b].length ? a : ways[b].length > ways[a].length ? b : null;
+    if (winner && draft.winner === winner) return;
+    if (!winner && (ways[a].length === 0 || draft.tiebreak)) return;
+  }
   if (ways[a].length > ways[b].length) {
     setGameEnded(draft, {
       winner: a,
@@ -1922,12 +1929,13 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
       }
     }
   }
+  // Every lethal Pokémon is Knocked Out first and the win is judged once (I78): a double KO
+  // is a tiebreak, not a win for whichever side the loop reached first.
+  let knockedOut = false;
   for (const pid of playerIds) {
-    if (isGameConcluded(draft)) break;
     const player = draft.players[pid];
     const oppId = playerIds.find((id) => id !== pid);
     for (const zone of [player.zones?.active, player.zones?.bench]) {
-      if (isGameConcluded(draft)) break;
       if (!Array.isArray(zone)) continue;
       for (const mon of [...zone]) {
         if (mon.attachedTo) continue;
@@ -1938,11 +1946,14 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
             attackerPlayerId: oppId,
             victim: mon,
             events,
+            deferWin: true,
           });
+          knockedOut = true;
         }
       }
     }
   }
+  if (knockedOut) settleKnockOutWins(draft, { events });
 }
 
 // "At the end of your opponent's next turn, the Defending Pokémon will be Knocked Out."
@@ -2391,7 +2402,7 @@ function resolveDamageCounterKnockouts(draft, { events }) {
       });
     }
   }
-  if (knockedOut && !isGameConcluded(draft)) settleKnockOutWins(draft, { events });
+  if (knockedOut) settleKnockOutWins(draft, { events });
 
   // Internal marker events are not part of the client-facing stream.
   for (let i = events.length - 1; i >= 0; i--) {
