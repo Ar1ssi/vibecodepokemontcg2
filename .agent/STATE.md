@@ -4,14 +4,14 @@
      `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
 Session: 300
-Focus: design 036 slice 16 shipped on `claude/rules-engine-issues-e79707` (18 commits, not pushed):
+Focus: design 036 slice 16 shipped on `claude/rules-engine-issues-e79707` (19 commits, not pushed):
   attack regression gate `pnpm audit:attacks` (`scripts/audit-attack-behaviour.mjs`,
   `scripts/lib/attack-behaviour.mjs`, `scripts/lib/attack-harness.mjs`) + per-row
   `scripts/attack-behaviour-baseline.json` (3,528 unique attacks: 3,247 ok / 152 partial /
   129 ran-no-effect / 0 engine-error); 12 tests; I136 closed.
 Active: none — branch green, ready to push / merge.
-  Handoff: `.agent/designs/297-i155-handoff.md` (branch state, decisions, next sessions).
-Next: push `claude/rules-engine-issues-e79707` (or PR) — it is main + 18 commits, all gates green.
+  Handoff: `.agent/designs/300-handoff.md` (branch state, decisions, next sessions).
+Next: push `claude/rules-engine-issues-e79707` (or PR) — it is main + 19 commits, all gates green.
   Maintenance due (S300). Remaining backlog, each its own session: I168 copy attacks, I167 attack
   markers, I166 attack effects, I162 ability-audit backlog. Then I153 (needs a contract first),
   I137, I121, I126 (partial), I127, I44, I60. User visual check of typed Tera entry/skin + Mega
