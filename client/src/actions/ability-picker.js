@@ -71,6 +71,11 @@ export async function collectUsableAbilities(user) {
     }
   }
 
+  const oppUser = user === 'self' ? 'opp' : 'self';
+  const zoneCards = (who) => [
+    ...(getZone(who, 'active').array || []),
+    ...(getZone(who, 'bench').array || []),
+  ];
   const usable = filterUsableAbilities(candidates, {
     rulesEnabled: rulesState.enabled,
     isUsed: (card) =>
@@ -82,6 +87,14 @@ export async function collectUsableAbilities(user) {
     // Fezandipiti ex-style KO-window abilities are refused by the server when
     // the flag is unset; do not offer them.
     koedLastOppTurn: !!rulesState.flags?.[user]?.koedLastOppTurn,
+    // Board context for the suppression gate (design 034 slice 3) — the server
+    // refuses a suppressed ability, so the picker must not offer it.
+    sideCards: zoneCards(user),
+    opponentSideCards: zoneCards(oppUser),
+    sideActive: getZone(user, 'active').array || [],
+    sideBench: getZone(user, 'bench').array || [],
+    opponentActive: getZone(oppUser, 'active').array || [],
+    opponentBench: getZone(oppUser, 'bench').array || [],
   });
   return usable.map((entry) =>
     isPlayedToBenchTrigger(entry.card) ? { ...entry, family: 'when-played' } : entry

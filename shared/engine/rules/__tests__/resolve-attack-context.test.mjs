@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const { resolveAttackContext } = await import('../resolve-attack-context.mjs');
+const { specialEnergyBoard } = await import('../special-energy-parse.mjs');
 
 const basicFireEnergy = { name: 'Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
 const basicWaterEnergy = { name: 'Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };
@@ -117,4 +118,65 @@ test('priorAttacks is always [] even when inheritance text is present (I43)', as
   });
   assert.deepEqual(result.priorAttacks, []);
   assert.equal(result.inheritsAttacks, true);
+});
+
+// I176: the preview must price conditional Special Energy with the same attached
+// cards and board facts the server's energyProvisionContext supplies.
+const reversalEnergy = {
+  name: 'Reversal Energy',
+  type: 'Energy',
+  subtypes: ['Special'],
+  text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to an Evolution Pokémon that doesn’t have a Rule Box (Pokémon ex, Pokémon V, etc. have Rule Boxes), this card provides every type of Energy but provides only 3 Energy at a time.',
+};
+const luminousEnergy = {
+  name: 'Luminous Energy',
+  type: 'Energy',
+  subtypes: ['Special'],
+  text: 'As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to has any other Special Energy attached, this card provides {C} Energy instead.',
+};
+const stageOneHost = { name: 'Raichu', type: 'Pokémon', stage: 'Stage 1', types: ['Lightning'] };
+
+const providesOf = async (energies, board) => {
+  const result = await resolveAttackContext({
+    activeCard: stageOneHost,
+    attachedEnergyCards: energies,
+    ensureCardData: async () => {},
+    stadiumCard: null,
+    abilityUsed: () => false,
+    board,
+  });
+  return result.energyTypes.map((e) => e.provides);
+};
+
+test('Reversal Energy provides 3 of any type when the board says the player trails (I176)', async () => {
+  const board = specialEnergyBoard({ ownPrizes: 5, opponentPrizes: 2 });
+  assert.deepEqual(await providesOf([reversalEnergy], board), [['Wildcard', 'Wildcard', 'Wildcard']]);
+  const even = specialEnergyBoard({ ownPrizes: 2, opponentPrizes: 2 });
+  assert.deepEqual(await providesOf([reversalEnergy], even), [['Colorless']]);
+});
+
+test('Luminous Energy beside another Special Energy provides only {C} (I176)', async () => {
+  const [, luminous] = await providesOf([reversalEnergy, luminousEnergy], {});
+  assert.deepEqual(luminous, ['Colorless']);
+  const [alone] = await providesOf([luminousEnergy], {});
+  assert.deepEqual(alone, ['Wildcard']);
+});
+
+test('Crystal Energy beside a basic Fire copies Fire even when cards carry no instanceId (I176)', async () => {
+  const crystal = { name: 'Crystal Energy', type: 'Energy', subtypes: ['Special'] };
+  const [, provided] = await providesOf([basicFireEnergy, crystal], {});
+  assert.deepEqual(provided, ['Fire']);
+});
+
+test('specialEnergyBoard counts Stage 2 Pokémon and leaves unknown prize counts undefined', () => {
+  const board = specialEnergyBoard({
+    ownPrizes: 3,
+    inPlayPokemon: [
+      { name: 'Gardevoir', stage: 'Stage 2' },
+      { name: 'Kirlia', subtypes: ['Stage 1'] },
+      { name: 'Gallade', subtypes: ['Stage 2'] },
+      null,
+    ],
+  });
+  assert.deepEqual(board, { ownPrizes: 3, opponentPrizes: undefined, ownStage2InPlay: 2 });
 });

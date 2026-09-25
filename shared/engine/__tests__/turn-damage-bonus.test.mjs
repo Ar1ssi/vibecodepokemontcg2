@@ -122,6 +122,14 @@ test('turnDamageBonusTotal filters by attacker type, defender ex, and bench targ
   assert.equal(turnDamageBonusTotal(undefined, fighter, ex), 0);
 });
 
+test('turnDamageBonusTotal: attackerInstanceId scopes a this-Pokémon boost', () => {
+  const bonus = { amount: 120, type: null, attackerNoRuleBox: false, defenderFilter: null, attackerInstanceId: 70 };
+  const holder = { name: 'Feraligatr', instanceId: 70 };
+  const other = { name: 'Other', instanceId: 71 };
+  assert.equal(turnDamageBonusTotal([bonus], holder, { name: 'Defender' }), 120);
+  assert.equal(turnDamageBonusTotal([bonus], other, { name: 'Defender' }), 0);
+});
+
 test('computeAttackDamage adds the turn bonus before Weakness', () => {
   const result = computeAttackDamage(
     { types: ['Fighting'] },
@@ -145,4 +153,91 @@ test('Premium Power Pro: non-Fighting attacker gets no bonus', () => {
 test('Premium Power Pro: bonus ends with the turn', () => {
   const state = playThenAttack(['Fighting']);
   assert.equal(state.players.p1.flags?.turnDamageBonuses, undefined);
+});
+
+test("parseTurnDamageBonus: the \"…'s attacks do\" wording (I135a)", () => {
+  const electropower = parseTurnDamageBonus(
+    "During this turn, your {L} Pokémon's attacks do 30 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.equal(electropower.amount, 30);
+  assert.equal(electropower.type, 'lightning');
+  assert.equal(electropower.attackerStyle, null);
+  assert.equal(electropower.perPrizeTaken, false);
+
+  const leon = parseTurnDamageBonus(
+    "During this turn, your Pokémon's attacks do 30 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.equal(leon.amount, 30);
+  assert.equal(leon.type, null);
+
+  const blackBelt = parseTurnDamageBonus(
+    "During this turn, each of your Active Pokémon's attacks does 40 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.equal(blackBelt.amount, 40);
+
+  const plusPower = parseTurnDamageBonus(
+    "During this turn, your Pokémon's attacks do 10 more damage to the Active Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.equal(plusPower.amount, 10);
+});
+
+test('parseTurnDamageBonus: Fusion Strike / Single Strike styles and per-Prize scaling (I135a)', () => {
+  const tablet = parseTurnDamageBonus(
+    "During this turn, your Fusion Strike Pokémon's attacks do 30 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.equal(tablet.attackerStyle, 'fusion strike');
+  assert.equal(tablet.perPrizeTaken, false);
+
+  const conviction = parseTurnDamageBonus(
+    "During this turn, your Single Strike Pokémon's attacks do 20 more damage to your opponent's Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."
+  );
+  assert.equal(conviction.attackerStyle, 'single strike');
+  assert.equal(conviction.perPrizeTaken, true);
+
+  const iris = parseTurnDamageBonus(
+    "During this turn, your Pokémon's attacks do 10 more damage to the Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."
+  );
+  assert.equal(iris.amount, 10);
+  assert.equal(iris.perPrizeTaken, true);
+});
+
+test('turnDamageBonusTotal: style filters and per-Prize scaling', () => {
+  const conviction = parseTurnDamageBonus(
+    "During this turn, your Single Strike Pokémon's attacks do 20 more damage to your opponent's Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."
+  );
+  const singleStrike = { name: 'Single Strike Urshifu V' };
+  const plain = { name: 'Lucario' };
+  const defender = { name: 'Snorlax' };
+  assert.equal(
+    turnDamageBonusTotal([conviction], singleStrike, defender, { defenderPrizesRemaining: 3 }),
+    60,
+    '3 Prizes taken x 20'
+  );
+  assert.equal(
+    turnDamageBonusTotal([conviction], plain, defender, { defenderPrizesRemaining: 3 }),
+    0
+  );
+  assert.equal(
+    turnDamageBonusTotal([conviction], singleStrike, defender, { defenderPrizesRemaining: 6 }),
+    0
+  );
+
+  const tablet = parseTurnDamageBonus(
+    "During this turn, your Fusion Strike Pokémon's attacks do 30 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.equal(turnDamageBonusTotal([tablet], { subtypes: ['Fusion Strike'] }, defender), 30);
+  assert.equal(turnDamageBonusTotal([tablet], plain, defender), 0);
+});
+
+test('computeAttackDamage applies the per-Prize bonus before Weakness', () => {
+  const iris = parseTurnDamageBonus(
+    "During this turn, your Pokémon's attacks do 10 more damage to the Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."
+  );
+  const result = computeAttackDamage(
+    { types: ['Fighting'] },
+    { name: 'Snorlax' },
+    { damage: '50' },
+    { turnDamageBonuses: [iris], defenderPrizesRemaining: 4 }
+  );
+  assert.equal(result.total, 70, '50 + 2 Prizes taken x 10');
 });

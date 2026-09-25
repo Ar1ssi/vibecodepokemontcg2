@@ -29,6 +29,7 @@ import {
   abilityUsed,
 } from '../../../../shared/engine/rules/rules-state.mjs';
 import { resolveAttackContext } from '../../../../shared/engine/rules/resolve-attack-context.mjs';
+import { specialEnergyBoard } from '../../../../shared/engine/rules/special-energy-parse.mjs';
 import {
   attachedEnergiesFor,
   stadiumCardFor,
@@ -633,6 +634,13 @@ async function resolveLiveContext(card, zone = 'active') {
     ensureCardData,
     stadiumCard,
     extraAttacks,
+    board: specialEnergyBoard({
+      ownPrizes: getZone('self', 'prizes').getCount(),
+      opponentPrizes: getZone('opp', 'prizes').getCount(),
+      inPlayPokemon: ['active', 'bench'].flatMap((id) =>
+        getZone('self', id).array.filter((c) => c?.type === 'Pokémon')
+      ),
+    }),
     abilityUsed: (c) =>
       abilityUsedFor(
         c,

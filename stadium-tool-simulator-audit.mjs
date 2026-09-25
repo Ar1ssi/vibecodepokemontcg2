@@ -98,7 +98,8 @@ const BROWSER_AUDIT_FN = async ({ stadiumMetas, toolMetas }) => {
 
   const executorProbe = (card) => {
     const hits = [];
-    if (executors.parseDamagePrevention(card).preventAll || executors.parseDamagePrevention(card).reduce) {
+    const dp = executors.parseDamagePrevention(card);
+    if (dp.preventAll || dp.reduce || dp.reduceHp) {
       hits.push('damage-prevent');
     }
     if (executors.parseDamageReduction(card).reduce) hits.push('damage-reduce');

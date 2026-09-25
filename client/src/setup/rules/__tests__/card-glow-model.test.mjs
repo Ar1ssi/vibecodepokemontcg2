@@ -264,6 +264,27 @@ test('activeCanAttack mirrors computeActionAffordances().attackAvailable', async
   assert.deepEqual(glows.activeColor, { tone: 'default', rgb: GLOW_RGB.default });
 });
 
+test('activeCanAttack prices Reversal Energy from the prize counts (I176)', async () => {
+  resetRules();
+  const active = pokemon('Raichu', {
+    stage: 'Stage 1',
+    types: ['Lightning'],
+    attacks: [{ name: 'Thunder', cost: ['Lightning', 'Lightning', 'Lightning'], damage: '120', text: '' }],
+  });
+  const reversal = {
+    name: 'Reversal Energy',
+    type: 'Energy',
+    supertype: 'Energy',
+    subtypes: ['Special'],
+    text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to an Evolution Pokémon that doesn’t have a Rule Box (Pokémon ex, Pokémon V, etc. have Rule Boxes), this card provides every type of Energy but provides only 3 Energy at a time.',
+  };
+  const board = { user: 'self', activeCard: active, attachedEnergyCards: [reversal], benchCards: [] };
+  const trailing = await computeCardGlows({ ...board, prizeCounts: { self: 5, opponent: 2 } });
+  assert.equal(trailing.activeCanAttack, true);
+  const leading = await computeCardGlows({ ...board, prizeCounts: { self: 2, opponent: 5 } });
+  assert.equal(leading.activeCanAttack, false);
+});
+
 test('abilityCards deep-equals computeActionAffordances().usableAbilities', async () => {
   resetRules();
   const active = pokemon('Pikachu', {

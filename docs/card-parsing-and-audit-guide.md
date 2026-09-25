@@ -150,8 +150,46 @@ npx eslint --rule "linebreak-style: off" --rule "prettier/prettier: off" \
 ## 7. Cheatsheet
 
 ```bash
+pnpm audit:oracle                         # attack/ability execution gate (~2 min, D108)
+pnpm audit:abilities                      # ability behaviour gate (~2 min, D126-D128); --rows for per-row JSON
 node scripts/audit-all-pokemon.mjs        # gap metric + reports
 node scripts/audit-all-ancient-traits.mjs # ancient-trait coverage (`unrecognized 0` gate)
 node --test shared/engine/rules/__tests__/rules-extended.test.mjs   # fast loop
 pnpm test                                 # full suite (2188+)
 ```
+
+## 8. Behaviour gates: parsed is not played (design 034)
+
+A clean classify/parse result (§5) says nothing about whether the engine plays the card. Two gates
+measure behaviour instead, and both ratchet against committed baselines:
+
+- `pnpm audit:oracle` runs every attack and activated ability through the reducer and records what
+  changed on the board (`scripts/oracle-baseline.json`).
+- `pnpm audit:abilities` classes every printed ability (`scripts/ability-behaviour-baseline.json`):
+  `runs` / `partial` / `dead` for activated ones (the engine's own step plan plus the oracle run),
+  `consumed` / `unconsumed` for passive ones, and `unparsed`. "Activated" is the server's own gate
+  (`isActivatedAbility`): the oracle plays with rules off, so a Knock Out trigger or a lock would
+  otherwise "run" when clicked although no rules-mode player can click it. Passive rows are probed
+  (`scripts/lib/ability-passive-probe.mjs`): every wired passive reader is asked the same questions
+  with the text printed and stripped, on four boards. A changed answer means the text is read.
+
+Two lessons from building them:
+
+- **A read can be a wrong read.** The probe found readers answering where the card says they should
+  not: "takes 30 less damage" discounting attack costs (I136), conditional self bonuses given to the
+  whole team at full HP (I137), "no Energy → no Retreat Cost" applied with Energy attached, and
+  opponent-targeted retreat increases applied to the holder (I138). When a probe lists a read, check
+  that the answer is right, not just that there is one.
+- **A skip is not a run.** An `effectStepSkipped` tag counts as a board change, so a step the
+  executor skipped can pass a row as `runs`/`partial` (the when-played marker hid Ludicolo's and
+  Empoleon's mis-reads). Diff the tags, not only the class, when a row moves.
+- **Fail closed on conditions.** A passive reader that meets an "if / as long as" clause it cannot
+  check skips the effect. A missed bonus shows up as `unconsumed` in the gate; a wrongly applied one
+  silently changes games.
+
+`EXECUTED_ABILITY_FAMILIES` (`scripts/lib/executed-families.mjs`) is derived from this evidence
+(D128): a family is claimed once half its printed rows run or are read, and `pnpm audit:abilities`
+fails a claim that falls under that share. `pnpm audit:abilities --rows` writes
+`out/ability-behaviour-rows.json` with each row's class, unexecuted step types and probe `reads`;
+the `partial`, `dead` and `unconsumed` rows are the enforcement backlog.
+

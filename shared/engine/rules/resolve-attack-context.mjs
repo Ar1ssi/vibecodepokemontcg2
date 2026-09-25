@@ -9,7 +9,9 @@ import { parseAttackInheritance } from './ability-executors.mjs';
 /**
  * Gathers attack context for the active Pokémon: energy types, stadium cost
  * modifier, ability-used flag, and prior-attack inheritance. DOM-free — the
- * caller supplies the already-filtered attached energy cards.
+ * caller supplies the already-filtered attached energy cards and the board facts
+ * (`specialEnergyBoard`) that conditional Special Energy (Reversal, Luminous,
+ * Super Boost) reads. The server prices with both, so the preview must too.
  */
 export async function resolveAttackContext({
   activeCard,
@@ -18,6 +20,7 @@ export async function resolveAttackContext({
   stadiumCard,
   abilityUsed,
   extraAttacks = [],
+  board = {},
 }) {
   const energyTypes = [];
   for (const energyCard of attachedEnergyCards || []) {
@@ -38,6 +41,8 @@ export async function resolveAttackContext({
           card: energyCard,
           stadiumCard,
           hostPokemon: activeCard,
+          attachedCards: attachedEnergyCards || [],
+          board,
         }
       )
     );

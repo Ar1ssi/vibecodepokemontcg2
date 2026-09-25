@@ -60,12 +60,24 @@ const attacksTwice = (t) =>
   /attack twice (?:a|each) turn/.test(t) ||
   /may use an attack it has twice/.test(t);
 
-// Special-Condition immunity that never names a specific condition.
-const specialConditionImmunity = (t) =>
-  !t.includes('retreat') &&
-  (/(?:can't|cannot|can not) be affected by (?:any )?special condition/.test(t) ||
-    /recover(?:s)? from all special condition/.test(t) ||
-    /remove any special condition/.test(t));
+// Special-Condition immunity: 'all' for the unnamed wording, else the named
+// condition. Report E: "This Pokémon can't be Asleep" (Hoothoot PRE and the
+// other named-condition immunities) used to fall into the statusAbility branch
+// and apply the condition to its own side.
+const statusImmunityCondition = (t) => {
+  if (
+    !t.includes('retreat') &&
+    (/(?:can't|cannot|can not) be affected by (?:any )?special condition/.test(t) ||
+      /recover(?:s)? from all special condition/.test(t) ||
+      /remove any special condition/.test(t))
+  ) {
+    return 'all';
+  }
+  const named = t.match(
+    /(?:can't|cannot|can not) be (?:affected by (?:any )?)?(asleep|burned|confused|paralyzed|poisoned)\b/
+  );
+  return named ? named[1] : null;
+};
 
 // Type-changing continuous text ("it is {F} and {P} type", "type is the same…",
 // "in addition to its existing types", "provides … Energy of every type").
@@ -168,6 +180,42 @@ const parseEnergyTypeHint = (t) => {
   }
   return null;
 };
+
+/**
+ * Where a move-Energy Ability takes Energy from and puts it (design 034 slice 5b). The
+ * printing fixes the destination: `self` ("to this Pokémon"), `active` ("to your Active
+ * Pokémon"), `bench` ("to your Benched Pokémon", from this one) or `between` ("from 1 of your
+ * Pokémon to another of your Pokémon", optionally a named kind: Rapid Strike, Deoxys).
+ */
+export function parseMoveEnergyShape(lower) {
+  const anyAmount = /any (?:amount|number) of|move all\b/.test(lower);
+  const count = lower.match(/move\s+(up to\s+)?(\d+|an?)\s+(?:basic\s+)?(?:\{[a-z]\}\s*)?(?:[a-z]+\s+)?energy/);
+  const upTo = anyAmount || !count ? null : count[2].startsWith('a') ? 1 : Number(count[2]);
+  const shape = {
+    target: 'self',
+    source: 'others',
+    targetTag: null,
+    upTo,
+    anyAmount,
+    exact: !anyAmount && Boolean(count) && !count[1],
+    special: /\bspecial energy\b/.test(lower),
+  };
+  if (/to your active pok[eé]mon/.test(lower)) {
+    shape.target = 'active';
+    shape.source = 'bench';
+  } else if (/to this pok[eé]mon/.test(lower)) {
+    shape.source = /from your active pok[eé]mon to this/.test(lower) ? 'active' : 'others';
+  } else if (/to your benched pok[eé]mon/.test(lower)) {
+    shape.target = 'bench';
+    shape.source = 'self';
+  } else {
+    shape.target = 'between';
+    shape.source = 'any';
+    const tag = lower.match(/to 1 of your ([^.]+?)(?: pok[eé]mon)?\./)?.[1];
+    if (tag && !/^(?:other|benched|active)\b/.test(tag)) shape.targetTag = tag;
+  }
+  return shape;
+}
 
 /** Ability deck-search parsing — separate from trainer parseSearchDeckParams(). */
 export function parseAbilitySearchParams(lower) {
@@ -279,6 +327,9 @@ export function parseAbilitySearchParams(lower) {
     upTo = true;
   } else if (scope.includes('basic energy')) {
     what = 'Basic Energy';
+  } else if (/pok[eé]mon tool/.test(scope)) {
+    // Farfetch'd Impromptu Carrier: a Tool, not a Pokémon.
+    what = 'Pokémon Tool';
   } else if (scope.includes('supporter')) {
     what = 'Supporter';
   } else if (scope.includes('item')) {
@@ -323,11 +374,11 @@ const ENERGY_SYMBOL_TYPES = {
 // Carnival, Golden Flame, …) → which hand Energy may go where. Null when the text is not a
 // hand attach. handTarget is the printed target phrase ("this pokémon", "1 of your pokémon").
 function parseHandAttach(lower) {
-  // "As often as you like" hand attaches are Energy accelerators on the normal attach
-  // (parseUnlimitedHandEnergyAcceleration), not a one-shot ability use.
-  if (/as often as you like/.test(lower)) return null;
+  // A repeatable attach behind a board condition the activation gate cannot check (Oricorio ex:
+  // "if you have any {R} Mega Evolution Pokémon ex in play") fails closed.
+  if (/^as often as you like[^.]*?, if you have [^.]*? in play/.test(lower)) return null;
   // The player's own attach action only: not "Whenever you attach…" / "To attach…" rules text.
-  const clause = lower.match(/(?:^|\. |you may )attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
+  const clause = lower.match(/(?:^|\. |you may |if you do, )attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
   if (!clause || /^this card\b/.test(clause[1])) return null;
   const [, what, rawTarget] = clause;
   const types = [...what.matchAll(/\{([a-z])\}/g)]
@@ -344,14 +395,91 @@ function parseHandAttach(lower) {
       basic: /\bbasic\b/.test(what),
       special: named === 'special',
       name: named && !/^(?:basic|special)\b/.test(named) && types.length === 0 ? named : null,
+      // "up to 3 in any combination of {R} and {M}": several of one type are fine.
+      anyCombination: /in any combination/.test(what),
     },
     handAttachEach: /in any way you like/.test(rawTarget),
   };
 }
 
+// Legacy Pokémon Power / Poké-Power use restriction: "This power can't be used if <this
+// Pokémon> is Asleep, Confused, or Paralyzed" / "is affected by a Special Condition".
+export const POWER_CONDITION_CLAUSE =
+  /(?:this )?(?:pok[eé]mon )?power can't be used if [\s\S]*?(asleep, confused, or paralyzed|affected by a special condition)[^.]*\.?/g;
+
+// "If Lanturn becomes Asleep, Confused, or Paralyzed after you have used this power, …" ends
+// the power's effect; it inflicts nothing either.
+const POWER_ENDS_CLAUSE = /if [^.]*? becomes asleep, confused, or paralyzed[^.]*\./g;
+
+function stripPowerConditionClause(lower) {
+  return lower.replace(POWER_CONDITION_CLAUSE, '').replace(POWER_ENDS_CLAUSE, '');
+}
+
+// Stance Change / Schooling (hand, by name), V Transformation / Phantom Transformation
+// (discard pile), Transformative Start (deck) and Ditto Transform (hand Basic on top).
+// `keepState`: attached cards, counters, conditions and effects stay on the new Pokémon;
+// otherwise this Pokémon and its attached cards are discarded first.
+function parseTransformShape(lower) {
+  const onTop = /put a basic pok[eé]mon from your hand on top of this pok[eé]mon/.test(lower);
+  const source = /search your deck/.test(lower)
+    ? 'deck'
+    : /discard pile/.test(lower)
+      ? 'discard'
+      : 'hand';
+  const what =
+    lower.match(/switch this pok[eé]mon with an? ([^.,]+?) in your hand/)?.[1] ||
+    lower.match(/choose an? ([^.,]+?)(?:, except any [^,]+,)? (?:from your discard pile|you find there)/)?.[1] ||
+    (onTop ? 'basic pokémon' : null);
+  return {
+    source,
+    what: what ? what.trim() : null,
+    except: lower.match(/except any ([a-z0-9é' -]+?)[,.]/)?.[1]?.trim() || null,
+    keepState: onTop || /remain on the new pok[eé]mon/.test(lower),
+    onTop,
+    shuffle: source === 'deck',
+  };
+}
+
+const PROVIDES_SYMBOL_TYPES = {
+  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
+  f: 'Fighting', d: 'Darkness', m: 'Metal', n: 'Dragon', y: 'Fairy', c: 'Colorless',
+};
+
+// Buzzap / Buzzap Thunder / Battery: what the card provides once attached as Energy and
+// which of your Pokémon may receive it.
+function parseSelfAttachEnergyShape(lower) {
+  const every = lower.match(/provides every type of energy but provides only (\d+) energy/);
+  const typed = lower.match(/provides (\d+) \{([a-z])\} energy/);
+  const provides = every
+    ? Array(Number(every[1])).fill('Wildcard')
+    : typed && PROVIDES_SYMBOL_TYPES[typed[2]]
+      ? Array(Number(typed[1])).fill(PROVIDES_SYMBOL_TYPES[typed[2]])
+      : null;
+  const target = lower.match(
+    /attach (?:this card|it) (?:from your hand )?to (?:1|one) of your (other )?([^.]*?) as a special energy/
+  );
+  return {
+    fromHand: /attach this card from your hand/.test(lower),
+    provides,
+    targetOther: Boolean(target?.[1]),
+    targetFilter: target?.[2]?.trim() || null,
+  };
+}
+
+// Unown MISSING / HAND / DAMAGE: the printed threshold that wins the game.
+function parseWinCondition(lower) {
+  const lostZone = lower.match(/opponent has (\d+) or more supporter cards in the lost zone/);
+  if (lostZone) return { kind: 'opponentLostZoneSupporters', count: Number(lostZone[1]) };
+  const hand = lower.match(/you have (\d+) or more cards in your hand/);
+  if (hand) return { kind: 'handSize', count: Number(hand[1]) };
+  const counters = lower.match(/(\d+) or more damage counters on your benched pok[eé]mon/);
+  if (counters) return { kind: 'benchDamageCounters', count: Number(counters[1]) };
+  return null;
+}
+
 export function parseAbility(text = '') {
   const lower = normalizeText(text);
-  const steps = [];
+  let steps = [];
 
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────
   if (
@@ -495,7 +623,8 @@ export function parseAbility(text = '') {
   }
 
   // ── 5. Attach energy (FIXED: verb only, not "attached" describing state) ──
-  if (hasVerbAttach(lower) && !(
+  // "Your opponent can't attach any Energy cards …" (Empoleon Emperor Aura) is a lock, not an attach.
+  if (hasVerbAttach(lower) && !/can(?:'|’|no)t attach/.test(lower) && !(
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     (lower.includes('to 1 of your') || lower.includes('to another') || lower.includes('to your active'))
@@ -558,13 +687,14 @@ export function parseAbility(text = '') {
       lower.includes('to this pokemon') ||
       lower.includes('to your benched'))
   ) {
-    const upTo = lower.match(/move\s+(?:up to\s+)?(\d+)\s+energy/)?.[1] || null;
+    const shape = parseMoveEnergyShape(lower);
+    const upTo = shape.upTo;
     const unlimited = lower.includes('as often as you like');
     const energyType = parseEnergyTypeHint(lower);
     const basic = lower.includes('basic');
     steps.push({
       type: 'moveEnergyAbility',
-      upTo: upTo ? Number(upTo) : null,
+      ...shape,
       unlimited,
       energyType,
       basic,
@@ -581,6 +711,8 @@ export function parseAbility(text = '') {
     lower.includes('discard') &&
     lower.includes('from your hand') &&
     lower.includes('energy') &&
+    // Haxorus Grind Up: the discarded card is the Stadium in play, not a hand cost.
+    !/discard (?:any|a) stadium card in play/.test(lower) &&
     !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower)
   ) {
     const countMatch = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+/);
@@ -669,10 +801,13 @@ export function parseAbility(text = '') {
 
     if (betweenOwn) {
       const unlimited = lower.includes('as often as you like');
+      const toSelf =
+        lower.includes('to this pokémon') || lower.includes('to this pokemon');
       steps.push({
         type: 'moveDamageBetweenAbility',
         count: count || 1,
         unlimited,
+        toSelf,
         guidance: unlimited
           ? 'As often as you like during your turn: move 1 damage counter from 1 of your Pokémon to another.'
           : 'Once during your turn: move damage counters between your Pokémon as described.',
@@ -722,9 +857,15 @@ export function parseAbility(text = '') {
       lower.match(/(\d+)\s+more\s+damage/)?.[1] ||
       lower.match(/do\s+(\d+)\s+more/)?.[1] ||
       null;
+    // "your [Basic] [{R}] Pokémon's attacks" / "attacks used by your … Pokémon" boost the team;
+    // only "attacks used by this Pokémon" is scoped to the holder.
+    const team =
+      lower.match(/your (basic )?(?:\{([a-z])\} )?pok[eé]mon['’]s attacks/) ||
+      lower.match(/attacks used by your (basic )?(?:\{([a-z])\} )?pok[eé]mon/);
     steps.push({
       type: 'turnDamageBonusAbility',
       amount: amount ? Number(amount) : null,
+      ...(team ? { team: true, attackerBasic: !!team[1], attackerTypeLetter: team[2] || null } : {}),
       guidance: amount
         ? `During this turn, this Pokémon's attacks do ${amount} more damage to your opponent's Active Pokémon.`
         : 'During this turn, this Pokémon\'s attacks do more damage (as described).',
@@ -790,10 +931,13 @@ export function parseAbility(text = '') {
   // Excludes the "when you play this Pokémon from your hand to evolve 1 of your
   // Pokémon" trigger wording: there "evolve" is the trigger condition, not an
   // activated ability that evolves this Pokémon (Primarina Enriching Melody).
+  // Also excludes the opponent-facing evolve-lock wording ("your opponent can't
+  // play any Pokémon from their hand to evolve their Pokémon", Primal Law):
+  // without it a passive lock parsed as an activated evolve ability too.
   if (
     lower.includes('evolve') &&
     (lower.includes('this pokémon') || lower.includes('onto this pokémon')) &&
-    !/from your hand to evolve/.test(lower)
+    !/from (?:your|his or her|their) hand to evolve/.test(lower)
   ) {
     steps.push({
       type: 'evolveAbility',
@@ -842,38 +986,34 @@ export function parseAbility(text = '') {
   }
 
   // ── 14. Status conditions (Confuse / Burn / Poison / Asleep) ────────────
+  // "This power can't be used if … is Asleep, Confused, or Paralyzed" is a use
+  // restriction (abilityConditionUseBlocked), not a condition the power inflicts.
+  const statusText = stripPowerConditionClause(lower);
   const namesStatus =
-    lower.includes('confused') ||
-    lower.includes('burned') ||
-    lower.includes('poisoned') ||
-    lower.includes('asleep') ||
-    lower.includes('paralyzed');
+    statusText.includes('confused') ||
+    statusText.includes('burned') ||
+    statusText.includes('poisoned') ||
+    statusText.includes('asleep') ||
+    statusText.includes('paralyzed');
   const conditionalPoisonOnSwitch =
-    isBenchActiveSwitchText(lower) &&
-    lower.includes('if you do') &&
-    lower.includes('poisoned');
-  const coinFlipStatus =
-    lower.includes('flip a coin') &&
-    (namesStatus || lower.includes('burned') || lower.includes('confused') || lower.includes('poisoned'));
+    isBenchActiveSwitchText(statusText) &&
+    statusText.includes('if you do') &&
+    statusText.includes('poisoned');
+  const coinFlipStatus = statusText.includes('flip a coin') && namesStatus;
   if (
     !conditionalPoisonOnSwitch &&
+    !statusImmunityCondition(statusText) &&
     (coinFlipStatus ||
       namesStatus ||
-      (lower.includes('make') &&
-        lower.includes('opponent') &&
-        (lower.includes('asleep') ||
-          lower.includes('burned') ||
-          lower.includes('confused') ||
-          lower.includes('poisoned'))) ||
-      (lower.includes('special condition') && namesStatus && !lower.includes('recover')))
+      (statusText.includes('special condition') && namesStatus && !statusText.includes('recover')))
   ) {
-    const target = lower.includes('opponent') ? 'opponent' : 'attacker';
+    const target = statusText.includes('opponent') ? 'opponent' : 'attacker';
     let status = null;
-    if (lower.includes('asleep')) status = 'asleep';
-    else if (lower.includes('burned')) status = 'burned';
-    else if (lower.includes('poisoned') || lower.includes('now poisoned')) status = 'poisoned';
-    else if (lower.includes('confused')) status = 'confused';
-    else if (lower.includes('paralyzed')) status = 'paralyzed';
+    if (statusText.includes('asleep')) status = 'asleep';
+    else if (statusText.includes('burned')) status = 'burned';
+    else if (statusText.includes('poisoned')) status = 'poisoned';
+    else if (statusText.includes('confused')) status = 'confused';
+    else if (statusText.includes('paralyzed')) status = 'paralyzed';
     steps.push({
       type: 'statusAbility',
       target,
@@ -990,7 +1130,8 @@ export function parseAbility(text = '') {
   }
 
   // ── 22. Damage bonus ────────────────────────────────────────────────────
-  if (lower.includes('more damage') && (lower.includes('attack') || lower.includes('this pokémon'))) {
+  // "66 or more damage counters" (Unown DAMAGE) is a count, not a damage bonus.
+  if (/more damage(?! counters?)/.test(lower) && (lower.includes('attack') || lower.includes('this pokémon'))) {
     const amount = lower.match(/(\d+)\s+more\s+damage/)?.[1] || null;
     steps.push({
       type: 'damageBonusAbility',
@@ -1228,9 +1369,14 @@ export function parseAbility(text = '') {
   }
 
   // ── 36. Special-Condition immunity ──────────────────────────────────────
-  if (specialConditionImmunity(lower)) {
+  const immuneCondition = statusImmunityCondition(lower);
+  if (immuneCondition) {
     steps.push({
       type: 'statusImmunityAbility',
+      condition:
+        immuneCondition === 'all'
+          ? null
+          : immuneCondition[0].toUpperCase() + immuneCondition.slice(1),
       guidance: 'Passive: this Pokémon can\'t be affected by Special Conditions (as described).',
     });
   }
@@ -1263,7 +1409,9 @@ export function parseAbility(text = '') {
   if (
     lower.includes('evolve') &&
     (/first turn or the turn you play/.test(lower) ||
-      /evolve during the turn you play/.test(lower))
+      /evolve during the turn you play/.test(lower) ||
+      // Spearow 151: "If you go second, this Pokémon can evolve during your first turn."
+      /evolve during your first turn/.test(lower))
   ) {
     steps.push({
       type: 'evolvePermissionAbility',
@@ -1304,6 +1452,8 @@ export function parseAbility(text = '') {
   if (lower.includes('draw cards until you have as many')) {
     steps.push({
       type: 'drawVariableAbility',
+      // Genesect V: "… as many cards in your hand as you have Fusion Strike Pokémon in play."
+      countTag: lower.match(/as you have ([a-z' -]+?) pok[eé]mon in play/)?.[1]?.trim() || null,
       guidance: 'Once during your turn: draw until your hand has as many cards as described (see card text).',
     });
   }
@@ -1334,8 +1484,12 @@ export function parseAbility(text = '') {
 
   // ── 47. Card-play / evolve locks (continuous) ───────────────────────────
   const canPlayLock = /can'?t play [^.]*from (?:his or her|their) hand/.test(lower);
-  const eachPlayerLock =
-    /(?:each player|neither player) can'?t play any/.test(lower) || lower.includes('each play');
+  // "each play" is the corpus typo for "each player"; it must not match the
+  // substring inside "each player's hand" (Chandelure TWM's draw text parsed as
+  // a play lock that would have blocked every card in hand).
+  const eachPlayerLock = /(?:each player|neither player|each play) can'?t play any/.test(
+    lower
+  );
   const neitherCanPlay = /neither player can play/.test(lower);
   if (canPlayLock || eachPlayerLock || neitherCanPlay) {
     const evolveLock = lower.includes('to evolve');
@@ -1412,26 +1566,33 @@ export function parseAbility(text = '') {
       steps.push({
         type: 'energyOnKoAbility',
         basic: lower.includes('basic'),
-        upTo: lower.match(/move\s+up to\s+(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
+        upTo:
+          lower.match(
+            /move\s+up to\s+(\d+)\s+(?:basic\s+)?(?:\{[a-z]\}\s*)?energy/
+          )?.[1] || null,
         guidance: lower.includes('benched')
           ? 'When this Pokémon is Knocked Out: move Energy from it to your Benched Pokémon (as described).'
           : 'When 1 of your Pokémon is Knocked Out: move Energy from it to this Pokémon (as described).',
       });
-    } else if (lower.includes('to this pokémon') || lower.includes('to this pokemon')) {
+    } else if (
+      lower.includes('to this pokémon') ||
+      lower.includes('to this pokemon') ||
+      /to (?:1 of )?your active/.test(lower) ||
+      lower.includes('to your benched')
+    ) {
+      const shape = parseMoveEnergyShape(lower);
       steps.push({
         type: 'moveEnergyAbility',
-        upTo: lower.match(/move\s+(?:up to\s+)?(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
-        unlimited: lower.includes('as often as you like') || lower.includes('any number'),
+        ...shape,
+        unlimited: lower.includes('as often as you like'),
         energyType: parseEnergyTypeHint(lower),
         basic: lower.includes('basic'),
-        guidance: 'Once during your turn: move Energy from your other Pokémon to this Pokémon (as described).',
-      });
-    } else if (lower.includes('to your benched')) {
-      steps.push({
-        type: 'moveEnergyAbility',
-        upTo: lower.match(/move\s+up to\s+(\d+)\s+(?:basic\s+)?energy/)?.[1] || null,
-        basic: lower.includes('basic'),
-        guidance: 'Move Energy from this Pokémon to your Benched Pokémon (as described).',
+        guidance:
+          shape.target === 'active'
+            ? 'Move Energy from your Benched Pokémon to your Active Pokémon (as described).'
+            : shape.target === 'bench'
+              ? 'Move Energy from this Pokémon to your Benched Pokémon (as described).'
+              : 'Move Energy from your other Pokémon to this Pokémon (as described).',
       });
     }
   }
@@ -1456,6 +1617,7 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'transformAbility',
       fromDiscard: lower.includes('discard pile'),
+      ...parseTransformShape(lower),
       guidance:
         'Once during your turn: replace this Pokémon with the named card (attached cards, counters and conditions remain, as described).',
     });
@@ -1482,6 +1644,7 @@ export function parseAbility(text = '') {
   if (/you win this game/.test(lower)) {
     steps.push({
       type: 'winGameAbility',
+      condition: parseWinCondition(lower),
       guidance: 'Once during your turn: if the stated condition holds, you win this game (as described).',
     });
   }
@@ -1540,6 +1703,7 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'selfAttachEnergyAbility',
       knockOutSelf: /knock out this pok[eé]mon/.test(lower),
+      ...parseSelfAttachEnergyShape(lower),
       guidance: /knock out this pok[eé]mon/.test(lower)
         ? 'Once during your turn: Knock Out this Pokémon and attach it to one of your Pokémon as a Special Energy card (as described).'
         : 'Once during your turn: attach this card from your hand as a Special Energy card (as described).',
@@ -1562,9 +1726,12 @@ export function parseAbility(text = '') {
       /play this pok[eé]mon as your new active pok[eé]mon/.test(lower)) &&
     !lower.includes('when you play')
   ) {
+    const morePrizes = /more prize cards? remaining than your opponent/.test(lower);
+    const opponentStage2 = /opponent has any stage 2/.test(lower);
     steps.push({
       type: 'selfBenchPlacementAbility',
       swapActive: /move your active pok[eé]mon to your bench/.test(lower),
+      condition: morePrizes ? 'morePrizes' : opponentStage2 ? 'opponentStage2' : null,
       guidance: /move your active pok[eé]mon to your bench/.test(lower)
         ? 'Once during your turn: move your Active Pokémon to the Bench and put this Pokémon in the Active Spot (as described).'
         : 'Once during your turn: put this Pokémon from your hand onto your Bench (as described).',
@@ -1683,6 +1850,7 @@ export function parseAbility(text = '') {
   if (/discard your other benched pok[eé]mon/.test(lower)) {
     steps.push({
       type: 'discardBenchAbility',
+      keep: Number(lower.match(/choose (\d+) of your benched/)?.[1] || 0),
       guidance: 'Once during your turn: keep the chosen Benched Pokémon and discard your other Benched Pokémon (as described).',
     });
   }
@@ -1762,6 +1930,23 @@ export function parseAbility(text = '') {
       step.requiresAttach = true;
       if (step.type === 'healAbility' && /from that pok/.test(attachBonus)) step.target = 'attached Pokémon';
     }
+  }
+
+  // "Discard any Stadium card in play. If you do, <effect>" (Haxorus Grind Up): the Stadium
+  // discard runs first and the rest only follows a real discard.
+  const stadiumIndex = steps.findIndex((step) => step.type === 'stadiumManipAbility');
+  if (stadiumIndex >= 0 && /stadium card in play\. if you do\b/.test(lower)) {
+    const [stadiumStep] = steps.splice(stadiumIndex, 1);
+    for (const step of steps) step.requiresStadiumDiscard = true;
+    steps.unshift(stadiumStep);
+  }
+
+  // Transformative Start searches the deck itself; Buzzap / Battery attach the card itself.
+  if (steps.some((step) => step.type === 'transformAbility' && step.source === 'deck')) {
+    steps = steps.filter((step) => step.type !== 'searchAbility');
+  }
+  if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
+    steps = steps.filter((step) => step.type !== 'attachAbility');
   }
 
   // ── Passive fallback (only if NO other step matched) ────────────────────

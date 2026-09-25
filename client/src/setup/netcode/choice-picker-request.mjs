@@ -11,18 +11,23 @@ const toCount = (value, fallback) =>
 /**
  * @param {object} choice PendingChoice from the authoritative view
  * @param {(selection: number[]) => unknown} onResolve receives chosen instanceIds
+ * @param {{cardBackSrc?: string}} [opts] image shown for blind (`faceDown`) options
  * @returns {object|null} openCardPicker options, or null for a choice with no card options
  */
-export function buildChoicePickerRequest(choice, onResolve) {
+export function buildChoicePickerRequest(choice, onResolve, { cardBackSrc = '' } = {}) {
   const options = Array.isArray(choice?.options) ? choice.options : [];
   if (options.length === 0) return null;
 
-  const candidates = options.map((opt) => ({
-    instanceId: opt.instanceId,
-    name: opt.name || '',
-    type: opt.type || '',
-    image: { src: opt.src || '' },
-  }));
+  const candidates = options.map((opt) =>
+    opt.faceDown
+      ? { instanceId: opt.instanceId, name: 'Face-down card', type: '', image: { src: cardBackSrc } }
+      : {
+          instanceId: opt.instanceId,
+          name: opt.name || '',
+          type: opt.type || '',
+          image: { src: opt.src || '' },
+        }
+  );
   const min = Math.min(toCount(choice.min, 1), candidates.length);
   const max = Math.max(1, Math.min(toCount(choice.max, 1), candidates.length));
   const multiSelect = max > 1;

@@ -427,3 +427,284 @@ test('authoritative special energy: type-gated triggers read the top evolution, 
   assert.equal(res.error, null);
   assert.ok(res.pendingChoice, 'the {P} host gate matched the Psychic evolution on a Colorless Basic');
 });
+
+test('SE10: on-attach search caps at the open Bench slots and shuffles the deck', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Mew', types: ['Psychic'] }));
+  for (let i = 0; i < 4; i += 1) {
+    state.players.p1.zones.bench.push(pokemon({ instanceId: 60 + i, name: `Bench ${i}` }));
+  }
+  state.players.p1.zones.hand.push(
+    specialEnergy({
+      instanceId: 2,
+      name: 'Telepathic Psychic Energy',
+      text: 'As long as this card is attached to a Pokémon, it provides {P} Energy. When you attach this card from your hand to a {P} Pokémon, search your deck for up to 2 Basic {P} Pokémon and put them onto your Bench. Then, shuffle your deck.',
+    })
+  );
+  state.players.p1.zones.deck.push(
+    pokemon({ instanceId: 50, name: 'Ralts', types: ['Psychic'] }),
+    pokemon({ instanceId: 51, name: 'Ralts', types: ['Psychic'] })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice.max, 1, 'one Bench slot left');
+
+  const done = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [50] },
+    playerId: 'p1',
+  });
+  assert.equal(done.error, null);
+  assert.equal(done.state.players.p1.zones.bench.filter((c) => !c.attachedTo).length, 5);
+  assert.ok(done.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p1'));
+});
+
+test('SE11d: Warp Energy attached to a Benched Pokémon does not switch', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.bench.push(pokemon({ instanceId: 3, name: 'Raichu' }), pokemon({ instanceId: 4, name: 'Eevee' }));
+  state.players.p1.zones.hand.push(
+    specialEnergy({
+      instanceId: 2,
+      name: 'Warp Energy',
+      text: 'Warp Energy provides {C} Energy. When you attach Warp Energy from your hand to your Active Pokémon, switch your Active Pokémon with 1 of your Benched Pokémon.',
+    })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 3 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice ?? null, null);
+  assert.equal(res.state.players.p1.zones.active.find((c) => !c.attachedTo).instanceId, 1);
+});
+
+test('SE11f: Cyclone Energy lets the opponent choose their new Active', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.hand.push(
+    specialEnergy({
+      instanceId: 2,
+      name: 'Cyclone Energy',
+      text: 'Cyclone Energy provides {C} Energy. When you play Cyclone Energy from your hand and attach it to your Active Pokémon, your opponent switches his or her Active Pokémon with 1 of his or her Benched Pokémon.',
+    })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 10, name: 'Roselia' }), pokemon({ instanceId: 11, name: 'Roserade' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice.player, 'p2');
+
+  const done = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [11] },
+    playerId: 'p2',
+  });
+  assert.equal(done.error, null);
+  assert.equal(done.state.players.p2.zones.active.find((c) => !c.attachedTo).instanceId, 11);
+});
+
+test('SE11b: Regenerative Energy does not heal when a non-V Pokémon evolves', () => {
+  const state = game();
+  const base = pokemon({ instanceId: 10, name: 'Charmander', hp: 70, types: ['Fire'] });
+  base.damage = 50;
+  state.players.p1.zones.active.push(
+    base,
+    specialEnergy({
+      instanceId: 12,
+      name: 'Regenerative Energy',
+      attachedTo: 10,
+      text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. Whenever you play a Pokémon from your hand to evolve the Pokémon V this card is attached to, heal 100 damage from that Pokémon.',
+    })
+  );
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 11, name: 'Charmeleon', supertype: 'Pokémon', stage: 'Stage 1', evolvesFrom: 'Charmander', hp: 100, types: ['Fire'] })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 11, targetInstanceId: 10 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 10).card.damage, 50);
+});
+
+test('SE12: a Poison Knock Out does not trigger Rescue Energy or Gift Energy', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.bench.push(pokemon({ instanceId: 3, name: 'Raichu' }));
+  const victim = pokemon({ instanceId: 20, name: 'Budew', hp: 30 });
+  victim.damage = 20;
+  victim.specialCondition = 'Poisoned';
+  victim.poisoned = true;
+  state.players.p2.zones.active.push(
+    victim,
+    specialEnergy({
+      instanceId: 21,
+      name: 'Rescue Energy',
+      attachedTo: 20,
+      text: 'Rescue Energy provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon back into your hand.',
+    }),
+    specialEnergy({
+      instanceId: 22,
+      name: 'Gift Energy',
+      attachedTo: 20,
+      text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.',
+    })
+  );
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 23, name: 'Roselia' }));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === 20), 'Budew is discarded, not returned');
+  assert.ok(!res.state.players.p2.zones.hand.some((c) => c.instanceId === 20));
+  assert.ok(res.state.players.p2.zones.hand.length < 7, 'Gift does not draw');
+});
+
+const AURORA_TEXT =
+  'You can attach this card to 1 of your Pokemon only if you discard another card from your hand. As long as this card is attached to a Pokemon, it provides every type of Energy but provides only 1 Energy at a time.';
+
+test('SE9: Aurora Energy cannot be attached without another card to discard', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.hand.push(specialEnergy({ instanceId: 2, name: 'Aurora Energy', text: AURORA_TEXT }));
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' });
+  assert.match(String(res.error), /discard 1 other card/);
+});
+
+test('SE9: attaching Aurora Energy makes you discard a chosen card from hand', () => {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Pikachu' }));
+  state.players.p1.zones.hand.push(
+    specialEnergy({ instanceId: 2, name: 'Aurora Energy', text: AURORA_TEXT }),
+    createCard({ instanceId: 70, name: 'Potion', supertype: 'Trainer' }),
+    createCard({ instanceId: 71, name: 'Switch', supertype: 'Trainer' })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
+
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice.min, 1);
+  assert.equal(res.pendingChoice.max, 1);
+
+  const done = applyCommand(res.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res.pendingChoice.choiceId, selection: [71] },
+    playerId: 'p1',
+  });
+  assert.equal(done.error, null);
+  assert.deepEqual(done.state.players.p1.zones.hand.map((c) => c.instanceId), [70]);
+  assert.ok(done.state.players.p1.zones.discard.some((c) => c.instanceId === 71));
+  assert.equal(findCard(done.state, 2).card.attachedTo, 1);
+});
+
+test('SE9: Memory Energy lets an evolved Pokémon use its Basic attack', () => {
+  const state = game();
+  const eevee = pokemon({
+    instanceId: 1,
+    name: 'Eevee',
+    hp: 60,
+    attacks: [{ name: 'Quick Tackle', damage: 30, cost: [] }],
+  });
+  const vaporeon = createCard({
+    instanceId: 2,
+    name: 'Vaporeon',
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    subtypes: ['Stage 1'],
+    hp: 120,
+    types: ['Water'],
+    attachedTo: 1,
+    attacks: [{ name: 'Big Wave', damage: 200, cost: ['Water', 'Water', 'Water'] }],
+  });
+  const memory = specialEnergy({
+    instanceId: 3,
+    name: 'Memory Energy',
+    type: 'Energy',
+    text: 'This card provides {C} Energy. The Pokémon this card is attached to can use any attack from its previous Evolutions. (You still need the necessary Energy to use each attack.)',
+    attachedTo: 1,
+  });
+  state.players.p1.zones.active.push(eevee, vaporeon, memory);
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew', hp: 100 }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 1 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 9).card.damage, 30);
+});
+
+test('review: Rescue Energy returns a Pokémon Knocked Out by its own attack', () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Voltorb',
+      hp: 50,
+      attacks: [{ name: 'Self Destruct', damage: 10, cost: [], text: 'This Pokémon also does 60 damage to itself.' }],
+    }),
+    specialEnergy({
+      instanceId: 2,
+      type: 'Energy',
+      name: 'Rescue Energy',
+      text: 'Rescue Energy provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon back into your hand. (Discard all cards attached to that Pokémon.)',
+      attachedTo: 1,
+    })
+  );
+  state.players.p1.zones.bench.push(pokemon({ instanceId: 3, name: 'Pikachu' }));
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Snorlax', hp: 200 }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 1).zoneId, 'hand');
+});
+
+const CURSE_ATTACK = [{ name: 'Curse', damage: 0, cost: [], text: "Put 10 damage counters on your opponent's Active Pokémon." }];
+
+test('review: a Knock Out by placed damage counters is not "by damage" for Legacy / Gift', () => {
+  for (const [name, text] of [
+    ['Legacy Energy', 'As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, that player takes 1 fewer Prize card. This effect of your Legacy Energy can’t be applied more than once per game.'],
+    ['Gift Energy', 'As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.'],
+  ]) {
+    const state = game();
+    state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Gengar', hp: 120, attacks: CURSE_ATTACK }));
+    state.players.p2.zones.active.push(
+      pokemon({ instanceId: 9, name: 'Snorlax', hp: 100 }),
+      specialEnergy({ instanceId: 10, type: 'Energy', name, text, attachedTo: 9 })
+    );
+    state.players.p2.zones.bench.push(pokemon({ instanceId: 11, name: 'Pikachu' }));
+
+    const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+    assert.equal(res.error, null);
+    assert.equal(findCard(res.state, 9).zoneId, 'discard', `${name}: host Knocked Out`);
+    assert.equal(res.state.players.p1.flags.prizesOwed, 1, `${name}: full Prize`);
+    // p2 draws only its turn-start card, not up to 7.
+    assert.equal(res.state.players.p2.zones.hand.length, 1, `${name}: no Gift draw`);
+  }
+});
+
+test('review: Mist Energy prevents damage counters placed by an opponent attack', () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Gengar',
+      hp: 120,
+      attacks: [{ name: 'Hex', damage: 0, cost: [], text: "Put 3 damage counters on your opponent's Active Pokémon." }],
+    })
+  );
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({
+      instanceId: 10,
+      type: 'Energy',
+      name: 'Mist Energy',
+      text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. Prevent all effects of attacks used by your opponent’s Pokémon done to the Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)',
+      attachedTo: 9,
+    })
+  );
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 9).card.damage || 0, 0);
+});

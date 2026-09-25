@@ -6,14 +6,13 @@
 // `ability-executors.mjs`.
 
 import { rulesState, getStadium } from './rules-state.mjs';
-import {
-  attachedTools,
-  parseHpBonus,
-  applyHpBonus,
-} from './ability-executors.mjs';
+import { attachedTools, applyHpBonus } from './ability-executors.mjs';
+import { toolHpBonusFor } from './tool-conditions.mjs';
+import { abilityHpBonus } from './ability-combat.mjs';
 import { pokemonNamesMatch, normalizeStage } from './evolution.mjs';
 import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
 import { isPokemon } from '../cards.mjs';
+import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special-energy-parse.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
 import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard } from './card-classify.mjs';
 import { isDeltaSpecies } from './energy-effects.mjs';
@@ -279,9 +278,26 @@ export function stadiumExtraAttacks(
   stadiumCard,
   { zoneCards = [], root = null, isActive = false } = {}
 ) {
-  const inherited = stadiumInheritedAttacks(stadiumCard, { zoneCards, root, isActive });
+  const inherited = mergeAttacks(
+    stadiumInheritedAttacks(stadiumCard, { zoneCards, root, isActive }),
+    energyInheritedAttacks({ zoneCards, root })
+  );
   const granted = stadiumGrantedAttacks(stadiumCard, root);
   return mergeAttacks(inherited, granted);
+}
+
+// Memory Energy (LOT 194): "The Pokémon this card is attached to can use any attack from
+// its previous Evolutions" — Shrine of Memories for one Pokémon (audit SE9).
+/** Attacks an attached Memory-style Energy lets `root` use from below its top stage. */
+export function energyInheritedAttacks({ zoneCards = [], root = null } = {}) {
+  if (!root || root.instanceId == null) return [];
+  const hasMemory = getAttachedSpecialEnergies(root, zoneCards).some((energy) =>
+    parseSpecialEnergyEffects(energy)?.steps.some((s) => s.type === 'canUseEvolutionAttacks')
+  );
+  if (!hasMemory) return [];
+  return priorEvolutionCards(zoneCards, root).flatMap((src) =>
+    (src.attacks || []).map((atk) => ({ ...atk, inherited: true }))
+  );
 }
 
 /**
@@ -349,7 +365,8 @@ export function stadiumExtraAttacksFromZone(
   stadiumCard,
   { zoneCards = [], card = null, isActive = true } = {}
 ) {
-  if (!stadiumCard || !card) return [];
+  // No Stadium still leaves Memory Energy inheritance (energyInheritedAttacks).
+  if (!card) return [];
   const members = stackMembersFor(zoneCards, card);
   if (members.length <= 1) {
     return stadiumExtraAttacks(stadiumCard, { zoneCards, root: card, isActive });
@@ -1545,6 +1562,9 @@ export function getStadiumHpBonus(
  * Compute effective HP for a Pokémon given a base HP and the target player.
  * Optional zoneCards includes attached Tools for HP bonuses (Hero's Cape, etc.).
  * Optional stadiumOverride provides the server draft.stadium without relying on rulesState.
+ * Optional sideCards is the whole in-play side, so ability HP bonuses can read
+ * the holder's own and team-scope modifiers (design 034); without it the
+ * zoneCards list still covers the holder's own ability.
  * Clamped to ≥ 1 so a −HP modifier can't make a Pokémon have 0 HP.
  */
 export function effectiveHp(
@@ -1552,7 +1572,8 @@ export function effectiveHp(
   targetPlayer,
   pokemon = null,
   zoneCards = null,
-  stadiumOverride = null
+  stadiumOverride = null,
+  sideCards = null
 ) {
   const base = baseHp || 0;
   if (!base) return 0;
@@ -1565,9 +1586,17 @@ export function effectiveHp(
     ? isStadiumToolNegation(stadiumOverride.card || stadiumOverride)
     : stadiumBlocksToolEffects();
   if (zoneCards?.length && pokemon && !blockTools) {
+    const holder = topPokemonCard(zoneCards, pokemon) || pokemon;
     for (const tool of attachedTools(pokemon, zoneCards)) {
-      total = applyHpBonus(total, parseHpBonus(tool).bonus);
+      total = applyHpBonus(total, toolHpBonusFor(tool, { holder, zoneCards }));
     }
+  }
+  if (pokemon) {
+    const abilityCards = sideCards || zoneCards || [];
+    total += abilityHpBonus(pokemon, {
+      sideCards: abilityCards,
+      inPlayCards: abilityCards,
+    });
   }
   return Math.max(1, total);
 }
@@ -1623,6 +1652,28 @@ export function parseStadiumEvolutionSpeed(card) {
     if (m) out.costReduce = parseInt(m[1], 10) || 1;
   }
   return out;
+}
+
+/**
+ * Whether the Stadium lets `pokemon` (the top card in play) evolve into `evolution` on a turn it
+ * was played or already evolved (Forest of Vitality: a {G} Basic played this turn can evolve to
+ * Stage 1 and then Stage 2). Both cards must match the Stadium's type filter when it has one.
+ * Pure: the server passes its own Stadium card (ownerId = the player who played it).
+ */
+export function stadiumAllowsSameTurnEvolution(stadiumCard, { playerId, pokemon, evolution } = {}) {
+  if (!stadiumCard) return false;
+  const parsed = parseStadiumEvolutionSpeed(stadiumCard);
+  if (!parsed.relaxTurnGate) return false;
+  if (parsed.typeFilter) {
+    const hasType = (card) => (card?.types || []).map(lower).includes(parsed.typeFilter);
+    if (!hasType(pokemon)) return false;
+    if (evolution && (evolution.types || []).length && !hasType(evolution)) return false;
+  }
+  const scope = stadiumTargetScope(stadiumCard);
+  const owner = stadiumCard.ownerId;
+  if (scope === 'opponent' && owner != null) return playerId !== owner;
+  if (scope === 'owner' && owner != null) return playerId === owner;
+  return true;
 }
 
 export function getStadiumEvolutionSpeed(targetPlayer, pokemon = null) {

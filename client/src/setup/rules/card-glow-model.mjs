@@ -20,6 +20,7 @@ import { computeActionAffordances } from './action-affordances.mjs';
 import { glowColorFor } from './card-glow-colors.mjs';
 import { stadiumActivationStatus } from '../../../../shared/engine/rules/stadium-effects.mjs';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
+import { specialEnergyBoard } from '../../../../shared/engine/rules/special-energy-parse.mjs';
 
 // Hand-move kinds that make a hand card glow. `moveCard` is NOT included:
 // `enumerateOptions` emits `playTrainer` (not `moveCard`) for every Trainer,
@@ -80,6 +81,11 @@ export async function computeCardGlows({
         benchCards,
         stadiumCard,
         extraAttacks,
+        board: specialEnergyBoard({
+          ownPrizes: prizeCounts?.self,
+          opponentPrizes: prizeCounts?.opponent,
+          inPlayPokemon: [activeCard, ...benchCards.filter((c) => c?.type === 'Pokémon')],
+        }),
         isAbilityUsed,
         ensureCardData,
         // The view's flag is authoritative when present; without it the

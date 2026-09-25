@@ -11,9 +11,11 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { shuffleInPlace } from '../rng.mjs';
-import { isPokemon } from '../cards.mjs';
+import { shuffleInPlace, flipCoin } from '../rng.mjs';
+import { isEnergy, isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
+import { evolvedView, topPokemonCard } from '../rules/evolved-pokemon.mjs';
+import { hasSpecialEnergyEffectShield } from '../rules/special-energy-parse.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -24,6 +26,7 @@ import {
 } from '../rules/stadium-effects.mjs';
 import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
 import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
+import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
 
@@ -38,6 +41,33 @@ export const EXECUTOR_STEP_TYPES = new Set([
   'fossilBench', 'applyStatus', 'statusAbility', 'recoverEnergy', 'recoverFromDiscard',
   'attachAbility', 'attachFromDiscard',
 ]);
+
+// Attack steps whose only target is the opponent's Active Pokémon (or, with the listed
+// scope/target, can be): what an effect-shield special Energy prevents.
+const OPPONENT_ACTIVE_STEPS = new Set([
+  'atkLostZoneOppActive',
+  'atkShuffleOppActive',
+  'atkShuffleOppActiveEnergy',
+  'atkBounceOppActive',
+  'atkChooseCondition',
+]);
+const OPPONENT_ACTIVE_SCOPED_STEPS = new Set(['atkDiscardOppEnergy', 'atkDiscardOppTools', 'atkDevolve']);
+const OPPONENT_ACTIVE_TARGETED_STEPS = new Set(['atkAddMarker', 'atkHpCap']);
+
+function targetsOpponentActiveOnly(step) {
+  if (OPPONENT_ACTIVE_STEPS.has(step.type)) return true;
+  if (OPPONENT_ACTIVE_SCOPED_STEPS.has(step.type)) return step.scope === 'active';
+  if (OPPONENT_ACTIVE_TARGETED_STEPS.has(step.type)) return step.target === 'opponentActive';
+  return false;
+}
+
+// Rocky Fighting / Mist / Wash Water / Wonder Energy (audit SE5): "Prevent all effects of
+// attacks used by your opponent's Pokémon done to the Pokémon this card is attached to."
+function opponentActiveEffectShielded(opponent) {
+  const zone = opponent?.zones?.active || [];
+  const active = zone.find((c) => !c.attachedTo);
+  return Boolean(active) && hasSpecialEnergyEffectShield(evolvedView(zone, active), zone);
+}
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
 export function isExecutableStepType(type) {
@@ -94,12 +124,17 @@ export function createPendingChoice({
     player,
     prompt,
     source,
-    options: options.map((opt) => ({
-      instanceId: opt.instanceId,
-      name: opt.name || '',
-      src: opt.src || '',
-      type: opt.type || '',
-    })),
+    // Blind picks (face-down Prizes) reach the chooser without name or image (I141).
+    options: options.map((opt) =>
+      opt.faceDown
+        ? { instanceId: opt.instanceId, faceDown: true }
+        : {
+            instanceId: opt.instanceId,
+            name: opt.name || '',
+            src: opt.src || '',
+            type: opt.type || '',
+          }
+    ),
     min,
     max,
     cancellable: Boolean(cancellable),
@@ -117,6 +152,46 @@ function opponentBenchIsEvolved(player, root) {
 
 function inPlayRoots(player) {
   return [...(player.zones.active || []), ...(player.zones.bench || [])].filter((c) => !c.attachedTo);
+}
+
+// A drawUntil target descriptor (design 035 slice 8), a numeric back-compat read,
+// or the 5-card default.
+function drawUntilTargetFor(target, opponent) {
+  if (target && typeof target === 'object') {
+    if (target.kind === 'opponentHand') return (opponent?.zones?.hand || []).length;
+    if (target.kind === 'opponentHandPlus') {
+      return (opponent?.zones?.hand || []).length + (target.n || 1);
+    }
+    if (target.kind === 'fixed') return target.n ?? 5;
+    return 5;
+  }
+  return typeof target === 'number' ? target : 5;
+}
+
+// Whether a drawUntil step's bonus target applies (Lillie, Grusha, Cynthia's
+// Ambition, Team Rocket's Ariana).
+function drawUntilBonusApplies(when, draft, player) {
+  switch (when) {
+    case 'firstTurn':
+      return (draft.turn?.number ?? 99) <= 2;
+    case 'noEnergyAttached':
+      return inPlayRoots(player).every(
+        (root) =>
+          ![...(player.zones.active || []), ...(player.zones.bench || [])].some(
+            (c) => c.attachedTo === root.instanceId && isEnergy(c)
+          )
+      );
+    case 'koedLastTurn':
+      return Boolean(player.flags?.koedLastOppTurn);
+    case 'teamRocketInPlay':
+      return inPlayRoots(player).every((root) => {
+        const zone = [...(player.zones.active || []), ...(player.zones.bench || [])];
+        const top = topPokemonCard(zone, root);
+        return /team rocket[’']s/i.test(String(top?.name || ''));
+      });
+    default:
+      return false;
+  }
 }
 
 export function attachToRoot(player, card, root, events) {
@@ -224,6 +299,26 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    if (
+      effectType === 'attackSteps' &&
+      targetsOpponentActiveOnly(step) &&
+      opponentActiveEffectShielded(opponent)
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type });
+      continue;
+    }
+    // "Discard a card from your hand. If you do, …" (design 036 A11): the hand cost was paid.
+    if (events.some((e) => e.handCost && e.playerId === playerId)) context.handCostPaid = true;
+    if (step.requiresHandCost && !context.handCostPaid) {
+      events.push({ type: 'effectStepSkipped', reason: 'hand_cost_unpaid', step: step.type });
+      continue;
+    }
+    // "Discard any Stadium card in play. If you do, …" (Haxorus Grind Up).
+    if (events.some((e) => e.type === 'abilityStadiumDiscarded')) context.stadiumDiscarded = true;
+    if (step.requiresStadiumDiscard && !context.stadiumDiscarded) {
+      events.push({ type: 'effectStepSkipped', reason: 'no_stadium_discarded', step: step.type });
+      continue;
+    }
 
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;
@@ -247,6 +342,11 @@ export function executeSteps(draft, {
         events,
         selection: stepSelection,
         memo: context[memoKey],
+        // Runs `more` right after this step (a Supporter's effect used as an attack's, design
+        // 036 E). The widened list rides on later resume tokens.
+        insertSteps: (more) => {
+          steps = [...steps.slice(0, idx + 1), ...more, ...steps.slice(idx + 1)];
+        },
         ask: ({ player: chooser = playerId, prompt, options, min, max, memo = {} }) => {
           context[memoKey] = memo;
           return createPendingChoice({
@@ -602,7 +702,10 @@ export function executeSteps(draft, {
       }
 
       case 'drawUntil': {
-        let target = step.target || 5;
+        // Design 035 slice 8: `target` may be a descriptor ({kind:'fixed'|
+        // 'opponentHand'|'opponentHandPlus'}), a numeric back-compat read, or
+        // overridden by `targetType` (Mystery Garden) / the bonus clause.
+        let target = drawUntilTargetFor(step.target, opponent);
         // Mystery Garden: target hand size is the live count of the player's
         // in-play Pokémon of a given type ("as many … as they have {P} Pokémon
         // in play"), not a printed number.
@@ -613,6 +716,8 @@ export function executeSteps(draft, {
               .map((v) => String(v).toLowerCase())
               .includes(want)
           ).length;
+        } else if (step.bonusTarget && drawUntilBonusApplies(step.bonusWhen, draft, player)) {
+          target = drawUntilTargetFor(step.bonusTarget, opponent);
         }
         const hand = player.zones.hand || [];
         const deck = player.zones.deck || [];
@@ -834,6 +939,7 @@ export function executeSteps(draft, {
           }
           const benchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
           if (benchCard) {
+            benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
             for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
               const c = opponent.zones.active[i];
               if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
@@ -848,6 +954,16 @@ export function executeSteps(draft, {
                 opponent.zones.active.push(c);
               }
             }
+            // Stadium on-switch triggers run before the outgoing conditions clear.
+            applyStadiumSwitchTriggers(draft, {
+              switchedOut: oppActive,
+              switchedIn: benchCard,
+              switchedOutPlayerId: opponent.playerId,
+              switchedInPlayerId: opponent.playerId,
+              viaTrainer: effectType === 'trainer',
+              duringOwnersTurn: false,
+              events,
+            });
             clearConditions(oppActive);
             events.push({
               type: 'cardSwitched',
@@ -900,6 +1016,7 @@ export function executeSteps(draft, {
         // Perform active-bench switch preserving attachments
         const benchCard = bench.find((c) => c.instanceId === chosenBenchId);
         if (benchCard) {
+          benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
           for (let i = player.zones.active.length - 1; i >= 0; i--) {
             const c = player.zones.active[i];
             if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
@@ -914,6 +1031,16 @@ export function executeSteps(draft, {
               player.zones.active.push(c);
             }
           }
+          // Stadium on-switch triggers run before the outgoing conditions clear.
+          applyStadiumSwitchTriggers(draft, {
+            switchedOut: active,
+            switchedIn: benchCard,
+            switchedOutPlayerId: playerId,
+            switchedInPlayerId: playerId,
+            viaTrainer: effectType === 'trainer',
+            duringOwnersTurn: true,
+            events,
+          });
           clearConditions(active);
           events.push({
             type: 'cardSwitched',
@@ -972,6 +1099,7 @@ export function executeSteps(draft, {
 
         const oppBenchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
         if (oppBenchCard) {
+          oppBenchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
           for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
             const c = opponent.zones.active[i];
             if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
@@ -986,6 +1114,16 @@ export function executeSteps(draft, {
               opponent.zones.active.push(c);
             }
           }
+          // Stadium on-switch triggers run before the outgoing conditions clear.
+          applyStadiumSwitchTriggers(draft, {
+            switchedOut: oppActive,
+            switchedIn: oppBenchCard,
+            switchedOutPlayerId: opponent.playerId,
+            switchedInPlayerId: opponent.playerId,
+            viaTrainer: effectType === 'trainer',
+            duringOwnersTurn: false,
+            events,
+          });
           clearConditions(oppActive);
           events.push({
             type: 'cardSwitched',
@@ -1174,7 +1312,7 @@ export function executeSteps(draft, {
         const coinKey = `${idx}:coinFlip`;
         let face = context[coinKey];
         if (!face) {
-          face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+          face = flipCoin(activeRng);
           context[coinKey] = face;
           events.push({ type: 'coinFlipped', playerId, face });
         }
@@ -1202,7 +1340,7 @@ export function executeSteps(draft, {
         // Speed Stadium: flip until tails, draw per heads.
         const perHeads = step.perHeads || 1;
         let heads = 0;
-        while (activeRng && activeRng.next() < 0.5) {
+        while (activeRng && flipCoin(activeRng) === 'heads') {
           heads++;
           if (heads > MAX_EFFECT_STEPS) break;
         }
@@ -1529,7 +1667,7 @@ export function executeSteps(draft, {
         if (abilityStatus?.coinFlip) {
           const coinKey = `${idx}:statusCoin`;
           if (!context[coinKey]) {
-            context[coinKey] = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+            context[coinKey] = flipCoin(activeRng);
             events.push({ type: 'coinFlipped', playerId, face: context[coinKey] });
           }
           if (context[coinKey] !== 'heads') break;

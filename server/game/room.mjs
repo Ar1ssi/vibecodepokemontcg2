@@ -695,7 +695,8 @@ export class GameRoom {
   }
 }
 
-// Printed card data the reducer reads for combat (see reduce.mjs 'cardStats').
+// Printed card data the reducer reads (see reduce.mjs 'cardStats'): everything cardStats
+// applies, since the client never resends it after a reset.
 const PRINTED_STAT_FIELDS = [
   'hp',
   'attacks',
@@ -704,6 +705,11 @@ const PRINTED_STAT_FIELDS = [
   'resistance',
   'retreatCost',
   'stage',
+  'evolvesFrom',
+  'abilities',
+  'text',
+  'trainerType',
+  'subtypes',
 ];
 
 // Printed stats are plain JSON (numbers, strings, arrays of plain objects).

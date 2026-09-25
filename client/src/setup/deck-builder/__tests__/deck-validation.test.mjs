@@ -389,3 +389,22 @@ test('one ACE SPEC and one Radiant are legal (gaps #9, #10)', () => {
   const result = validateDeck(deck, DECK_FORMATS.TCG);
   assert.equal(result.isValid, true, result.errors.join('; '));
 });
+
+test('a printed one-per-deck Special Energy cap beats the format copy limit', () => {
+  const deck = buildDeck([
+    makeGroup({ name: 'Pikachu', count: 4 }),
+    makeGroup({
+      name: 'Miracle Energy',
+      count: 2,
+      supertype: 'Energy',
+      extra: {
+        subtypes: ['Special'],
+        text: "You can't have more than 1 Miracle Energy in your deck. Attach Miracle Energy to 1 of your Shining or Light Pokemon.",
+      },
+    }),
+    makeGroup({ name: 'Lightning Energy', count: 54, supertype: 'Energy' }),
+  ]);
+
+  const result = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(result.errors.some((e) => e.includes('Miracle Energy has 2 copies (max 1).')));
+});

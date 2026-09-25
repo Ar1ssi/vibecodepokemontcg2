@@ -17,7 +17,7 @@
 //     pending user confirmation (taxonomy: do not silently build execution).
 
 import { describeTypedSpecialEnergy } from './special-energy-effects.mjs';
-import { hostConditionalProvision } from './special-energy-parse.mjs';
+import { specialEnergyProvision } from './special-energy-parse.mjs';
 
 // Effect families a special energy can be classified into.
 export const ENERGY_EFFECT_FAMILIES = [
@@ -90,6 +90,7 @@ const providesTypedEnergy = (card) => {
 
 const isEnergyCard = (card) => {
   if (!card) return false;
+  if (card.asEnergy && card.attachedTo != null) return true;
   const subs = subtypesOf(card);
   if (
     subs.includes('basic') ||
@@ -324,26 +325,44 @@ export function isDeltaSpecies(card) {
   return subtypesOf(card).includes('delta species');
 }
 
+// Prism / Stellar have no parsed provision without text but genuinely provide any type.
+const ANY_TYPE_NAME = /(^|\b)(prism|stellar) energy/;
+
 /**
  * Rewrite an attached-Energy descriptor for its host and the Stadium in play.
- * - Host: a host-conditional special (Neo Upper on a Stage 2) gains a
- *   `provides` token list (see hostConditionalProvision).
+ * - Special Energy: gains a `provides` token list read from its printed provisions
+ *   (see specialEnergyProvision) — counts, "any combination" pairs and every
+ *   condition. A {C}-only special without parsed text provides a plain Colorless,
+ *   never the any-type Wildcard (audit SE2).
  * - Temple of Sinnoh: all Special Energy provides 1 {C} and nothing else.
  * - Crystal Beach: Special Energy that provided ≥2 now provides 1 {C}.
  * - Holon Research Tower: Basic Energy on a Delta Species Pokémon also
  *   provides {M} but stays a single Energy (dualType).
  *
  * @param {{type:string, family:string}} descriptor
- * @param {{card?:object, stadiumCard?:object|null, hostPokemon?:object|null}} args
- * @returns {{type:string, family:string, dualType?:string}}
+ * @param {{card?:object, stadiumCard?:object|null, hostPokemon?:object|null,
+ *          attachedCards?:object[], board?:object}} args
+ *   `attachedCards`: every card attached to the host; `board`: `{ownPrizes,
+ *   opponentPrizes, ownStage2InPlay}` for prize- and board-conditional provisions.
+ * @returns {{type:string, family:string, dualType?:string, provides?:string[]}}
  */
 export function rewriteEnergyDescriptor(
   descriptor,
-  { card = null, stadiumCard = null, hostPokemon = null } = {}
+  { card = null, stadiumCard = null, hostPokemon = null, attachedCards = [], board = {} } = {}
 ) {
   if (!descriptor) return descriptor;
-  const hostTokens = descriptor.family === 'basic' ? null : hostConditionalProvision(card, hostPokemon);
-  if (hostTokens) descriptor = { ...descriptor, provides: hostTokens };
+  if (card && descriptor.family !== 'basic' && !descriptor.provides) {
+    const tokens = specialEnergyProvision(card, { host: hostPokemon, attached: attachedCards, board });
+    if (tokens) {
+      descriptor = { ...descriptor, provides: tokens };
+    } else if (
+      descriptor.family === 'attach-type' &&
+      descriptor.type === 'Colorless' &&
+      !ANY_TYPE_NAME.test(lower(card.name))
+    ) {
+      descriptor = { ...descriptor, provides: ['Colorless'] };
+    }
+  }
   if (!stadiumCard) return descriptor;
   const t = lower(stadiumCard?.text ?? stadiumCard?.effect ?? '');
   if (!t) return descriptor;

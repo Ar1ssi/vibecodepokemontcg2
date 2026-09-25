@@ -11,6 +11,10 @@ import {
   getStadiumTypeDamageReduction,
 } from './stadium-effects.mjs';
 import {
+  stadiumWeaknessOverrides,
+  stadiumResistanceOverrides,
+} from './stadium-triggers.mjs';
+import {
   combinedToolAttackBonus,
   applyToolDamageReduction,
   combinedToolDamagePrevention,
@@ -19,9 +23,30 @@ import {
   getSpecialEnergyAttackBonus,
   getSpecialEnergyAttackPenalty,
   getSpecialEnergyDamageReduction,
+  hasSpecialEnergyNoWeakness,
+  hasSpecialEnergyIgnoresResistance,
 } from './special-energy-parse.mjs';
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
+import { mergeDamagePrevention } from './ability-executors.mjs';
+
+/**
+ * "During your next turn, this Pokémon's X attack's base damage is N / is doubled" (design
+ * 036 A8b). Only the printed base changes: "30+" extras stay on top, a "10×" attack scales
+ * per unit, and an attack whose effect already zeroed its damage stays at 0.
+ */
+function overrideBaseDamage(rawBase, printedBase, attack, attackerMarkers, attackNameLower) {
+  if (rawBase <= 0 || printedBase <= 0) return rawBase;
+  const marker = attackerMarkers.findLast(
+    (m) =>
+      m.kind === 'nextTurnBaseDamage' &&
+      (m.attackName === attackNameLower || `${m.attackName} attack` === attackNameLower)
+  );
+  if (!marker) return rawBase;
+  const newBase = marker.doubled ? printedBase * 2 : marker.value;
+  if (/[×x]\s*$/i.test(String(attack?.damage || ''))) return Math.round((rawBase / printedBase) * newBase);
+  return rawBase - printedBase + newBase;
+}
 
 // Weakness in the modern era (Scarlet & Violet onward) is +2x, older is +2x
 // or +20/+30 flat; TCGdex gives us { type, value } where value is the
@@ -34,6 +59,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     stadium = null,
     defenderIsActive = true,
     attackerTrailingPrizes = false,
+    defenderTrailingPrizes = false,
+    attackerPrizesRemaining,
+    defenderPrizesRemaining,
     defenderPoisoned = false,
     baseDamage = null,
     blockTools = false,
@@ -48,7 +76,20 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defenderMarkers = [],
     // Live attack markers on the attacker (next-turn bonuses, "attacks do N less damage").
     attackerMarkers = [],
+    // Ability-side combat modifiers (ability-combat.mjs), built by the reduce
+    // callers. Passing the reduction/prevention options means the caller has
+    // already read abilities, so the internal ability reads are skipped to
+    // avoid double-counting; Tools and Special Energy still apply.
+    abilityBonusBeforeWR = 0,
+    abilityReductionBeforeWR,
+    abilityReductionAfterWR,
+    abilityPrevention,
+    weaknessOverride = null,
   } = options;
+  const abilityReadsExternal =
+    abilityReductionBeforeWR !== undefined ||
+    abilityReductionAfterWR !== undefined ||
+    abilityPrevention !== undefined;
   const defenderEffects = ignoreDefenderEffects ? [] : defenderMarkers;
   const markerSum = (markers, pick) =>
     markers.reduce((sum, marker) => sum + (pick(marker) ? marker.amount || 0 : 0), 0);
@@ -57,7 +98,18 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
-  const base = baseDamage != null ? baseDamage : (parseInt(attack?.damage, 10) || 0);
+  const printedBase = parseInt(attack?.damage, 10) || 0;
+  const rawBase = baseDamage != null ? baseDamage : printedBase;
+  const base = overrideBaseDamage(rawBase, printedBase, attack, attackerMarkers, attackNameLower);
+  // An attack that does no damage gets no modifiers: Tool/turn bonuses and Weakness only change
+  // damage that exists (I152 — Defiance Band must not turn a 0-damage attack into a 30 hit).
+  if (!(base > 0)) {
+    return {
+      total: 0, base: 0, attackerBonus: 0, specialEnergyBonus: 0, specialEnergyPenalty: 0,
+      abilityBonus: 0, abilityReduction: 0, multiplier: 1,
+      flat: 0, resistance: 0, stadiumReduction: 0, specialEnergyReduction: 0, reduced: 0, prevented: false,
+    };
+  }
 
   // Step 2: Attacker tool and ability damage bonuses (e.g. Choice Belt, Maximum Belt, Defiance Band)
   // Applied BEFORE Weakness and Resistance.
@@ -66,6 +118,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defenderIsActive,
     defenderPoisoned,
     attackerTrailingPrizes,
+    attackerPrizesRemaining,
     stadium,
   });
 
@@ -75,7 +128,10 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const specialEnergyPenalty = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards);
 
   // Step 2c: Trainer turn boosts (Premium Power Pro), also BEFORE Weakness/Resistance.
-  const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, { defenderIsActive });
+  const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, {
+    defenderIsActive,
+    defenderPrizesRemaining,
+  });
 
   // Step 2d: Attack markers placed on earlier turns. A next-turn bonus needs damage to add to.
   const markerBonus =
@@ -92,29 +148,59 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && m.afterWR) +
     markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && m.afterWR && incomingApplies(m));
 
+  // "This Pokémon takes N more damage from attacks": only when the attack does damage.
+  const incomingBonusBeforeWR =
+    base > 0 ? markerSum(defenderEffects, (m) => m.kind === 'incomingBonus' && !m.afterWR) : 0;
+
+  // Step 2e: Defender special-energy reduction applied BEFORE W/R (Shield Energy, Holon GL).
+  const specialEnergyReductionBeforeWR = ignoreDefenderEffects
+    ? 0
+    : getSpecialEnergyDamageReduction(defender, defenderZoneCards, { attacker, afterWR: false });
+
   const damageBeforeWR = Math.max(
     0,
-    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus - specialEnergyPenalty -
-      markerReductionBeforeWR
+    base + attackerBonus + specialEnergyBonus + turnBonus + markerBonus + incomingBonusBeforeWR +
+      abilityBonusBeforeWR - specialEnergyPenalty - markerReductionBeforeWR -
+      specialEnergyReductionBeforeWR -
+      (ignoreDefenderEffects ? 0 : abilityReductionBeforeWR || 0)
   );
 
   // Continuous Stadium modifiers to Weakness/Resistance (taxonomy §E): some
   // Stadiums nullify Weakness for a filtered set of Pokémon, force Weakness to
   // ×2, ignore Resistance, or reduce damage to a type after W/R.
   const stadiumCard = stadium?.card || stadium || null;
+  const stadiumWeakness = stadiumCard
+    ? stadiumWeaknessOverrides(stadiumCard, { attacker, defender })
+    : null;
   const weaknessNullified =
-    !!stadiumCard &&
-    stadiumNullifiesWeakness(stadiumCard, defender, { defenderZoneCards });
+    !!stadiumWeakness?.ignore ||
+    (!!stadiumCard &&
+      stadiumNullifiesWeakness(stadiumCard, defender, { defenderZoneCards }));
 
   let multiplier = 1;
   let flat = 0;
+  const weaknessType = weaknessOverride?.type || defender?.weakness?.type;
+  const weaknessValue =
+    weaknessOverride?.multiplier ?? defender?.weakness?.value;
   const weaknessApplies =
-    !ignoreWeakness && !weaknessNullified && !hasMarker(defenderEffects, 'noWeakness');
-  if (attacker?.types?.length && defender?.weakness && weaknessApplies) {
-    // Any of a dual-typed attacker's types triggers Weakness (audit A-5).
-    if (attacker.types.includes(defender.weakness.type)) {
-      const v = defender.weakness.value;
-      if (stadiumCard && isStadiumWeaknessTimesTwo(stadiumCard)) {
+    !ignoreWeakness &&
+    !weaknessNullified &&
+    !weaknessOverride?.none &&
+    !hasMarker(defenderEffects, 'noWeakness') &&
+    // Coating Metal / Weakness Guard / Flash / Holon FF Energy (audit SE7).
+    !(!ignoreDefenderEffects && hasSpecialEnergyNoWeakness(defender, defenderZoneCards));
+  if (attacker?.types?.length && defender?.weakness && weaknessType && weaknessApplies) {
+    // Any of a dual-typed attacker's types triggers Weakness (audit A-5). A
+    // weaknessOverride marker (Oranguru) swaps the type and keeps the amount.
+    const markerType = defenderEffects.findLast((m) => m.kind === 'weaknessOverride')?.type;
+    const hasWeakness = markerType
+      ? attacker.types.some((t) => String(t).toLowerCase() === markerType)
+      : attacker.types.includes(weaknessType);
+    if (hasWeakness) {
+      const v = weaknessValue;
+      if (weaknessOverride?.multiplier != null) {
+        multiplier = Math.max(1, weaknessOverride.multiplier);
+      } else if (stadiumCard && isStadiumWeaknessTimesTwo(stadiumCard)) {
         multiplier = 2;                   // Lake Boundary: Weakness is always ×2
       } else if (v <= 2) {
         multiplier = Math.max(1, v);      // modern weakness: ×2 (or ×1)
@@ -124,9 +210,15 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     }
   }
 
+  const resistanceOverride = stadiumCard
+    ? stadiumResistanceOverrides(stadiumCard, { attacker, defender })
+    : null;
   let resistance = 0;
   if (
     !ignoreResistance &&
+    !resistanceOverride?.ignore &&
+    // Holon FF Energy with a basic {F} Energy beside it (audit SE7).
+    !hasSpecialEnergyIgnoresResistance(attacker, attackerZoneCards) &&
     attacker?.types?.length &&
     defender?.resistance &&
     !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
@@ -134,6 +226,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     if (attacker.types.includes(defender.resistance.type)) {
       resistance = Math.abs(defender.resistance.value || 0);
     }
+  }
+  if (resistanceOverride?.reduce) {
+    resistance = Math.max(0, resistance - resistanceOverride.reduce);
   }
 
   const stadiumReduction = stadiumCard
@@ -151,37 +246,74 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         attacker,
         afterWR: true,
       });
-  damageAfterWR = Math.max(0, damageAfterWR - specialEnergyReduction - markerReductionAfterWR);
+  const incomingBonusAfterWR =
+    damageBeforeWR > 0 ? markerSum(defenderEffects, (m) => m.kind === 'incomingBonus' && m.afterWR) : 0;
+  const specialEnergyPenaltyAfterWR = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards, { afterWR: true });
+  // Darkness Energy AQ/EX: "+10 after applying Weakness and Resistance" only when it damages.
+  const specialEnergyBonusAfterWR =
+    damageAfterWR > 0 ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true }) : 0;
+  damageAfterWR = Math.max(
+    0,
+    damageAfterWR + incomingBonusAfterWR + specialEnergyBonusAfterWR - specialEnergyReduction -
+      markerReductionAfterWR - specialEnergyPenaltyAfterWR
+  );
 
-  // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance)
+  // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance).
+  // When the caller passes ability reductions, the ability half has already been read from
+  // ability-combat.mjs and only Tools apply here.
   let reduced = 0;
   let damageAfterReduction = damageAfterWR;
+  const defenderFlags = {
+    trailingPrizes: defenderTrailingPrizes,
+    prizesRemaining: defenderPrizesRemaining,
+  };
   if (damageAfterWR > 0 && !ignoreDefenderEffects) {
     damageAfterReduction = applyToolDamageReduction(
       damageAfterWR,
       defender,
       defenderZoneCards,
       attacker,
-      { blockTools, stadium, inPlayCards: defenderInPlayCards }
+      {
+        blockTools,
+        stadium,
+        inPlayCards: defenderInPlayCards,
+        flags: defenderFlags,
+        abilities: !abilityReadsExternal,
+      }
+    );
+    damageAfterReduction = Math.max(
+      0,
+      damageAfterReduction - (abilityReductionAfterWR || 0)
     );
     reduced = damageAfterWR - damageAfterReduction;
   }
 
   // Step 6: Damage prevention (tools + abilities)
-  const prevention = ignoreDefenderEffects
+  const toolPrevention = ignoreDefenderEffects
     ? null
     : combinedToolDamagePrevention(defender, defenderZoneCards, attacker, {
         blockTools,
         stadium,
+        flags: defenderFlags,
+        abilities: !abilityReadsExternal,
       });
+  const prevention = mergeDamagePrevention(
+    toolPrevention,
+    ignoreDefenderEffects ? null : abilityPrevention
+  );
 
   let prevented = false;
   let finalDamage = damageAfterReduction;
   if (prevention?.preventAll) {
     prevented = true;
     finalDamage = 0;
-  } else if (prevention?.reduce > 0) {
-    finalDamage = Math.max(0, finalDamage - prevention.reduce * 10);
+  } else if (prevention?.reduce > 0 || prevention?.reduceHp > 0) {
+    // `reduceHp` is already in HP units (the printed "damage is reduced by N",
+    // I130); the legacy `reduce` path is counters.
+    finalDamage = Math.max(
+      0,
+      finalDamage - (prevention.reduce || 0) * 10 - (prevention.reduceHp || 0)
+    );
   }
   const markerPrevents = defenderEffects.some(
     (m) =>
@@ -198,13 +330,16 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     total: finalDamage,
     base,
     attackerBonus,
-    specialEnergyBonus,
-    specialEnergyPenalty,
+    specialEnergyBonus: specialEnergyBonus + specialEnergyBonusAfterWR,
+    specialEnergyPenalty: specialEnergyPenalty + specialEnergyPenaltyAfterWR,
+    abilityBonus: abilityBonusBeforeWR || 0,
+    abilityReduction:
+      (abilityReductionBeforeWR || 0) + (abilityReductionAfterWR || 0),
     multiplier,
     flat,
     resistance,
     stadiumReduction,
-    specialEnergyReduction,
+    specialEnergyReduction: specialEnergyReduction + specialEnergyReductionBeforeWR,
     reduced,
     prevented,
   };
@@ -229,8 +364,9 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         const type = typeof entry === 'string' ? entry : entry?.type;
         const family = typeof entry === 'string' ? 'basic' : entry?.family || 'basic';
         if (!type) continue;
-        if (Array.isArray(entry?.provides) && entry.provides.length) {
-          // Host-conditional provision (Neo Upper on a Stage 2, …).
+        if (Array.isArray(entry?.provides)) {
+          // Parsed special-Energy provision (energy-effects rewriteEnergyDescriptor);
+          // empty when its condition fails (Shield Energy off a {M} Pokémon).
           pool.push(...entry.provides);
         } else if (family === 'double-colorless') {
           pool.push('Colorless', 'Colorless');

@@ -19,10 +19,14 @@ export const BASE_TAGS = new Set([
   'ability-used',
 ]);
 
-/** A row shows its family at work: a non-base state change, or damage dealt ≠ the printed base. */
+/**
+ * A row shows its family at work: a non-base state change, or damage dealt ≠ the printed base.
+ * An ability makes no attack, so damage and KO fallout are its own effect: only `ability-used`
+ * is base there.
+ */
 export function rowObserved(row) {
+  if (row.kind !== 'attack') return (row.tags || []).some((t) => t !== 'ability-used');
   if ((row.tags || []).some((t) => !BASE_TAGS.has(t))) return true;
-  if (row.kind !== 'attack') return false;
   return (row.dealt || []).some((d) => d != null && d !== row.printedBase);
 }
 

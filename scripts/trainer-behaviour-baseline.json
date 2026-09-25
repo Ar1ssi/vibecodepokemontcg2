@@ -1,0 +1,7934 @@
+{
+ "cards": 1348,
+ "entries": {
+  "Aaron’s Collection#71xvih": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Accompanying Flute#r0b6hj": {
+   "steps": [
+    "revealOpponentDeckBench"
+   ]
+  },
+  "Ace Trainer#14hjcoi": {
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "draw",
+    "ionoShuffle",
+    "opponentDraw"
+   ]
+  },
+  "Acerola’s Mischief#pkx1je": {
+   "gaps": [
+    "passive-only"
+   ],
+   "playCondition": "opponentPrizes<=2",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Acerola’s Premonition#d727sr": {
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Acerola#y485p1": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Acro Bike#sbi9yh": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Adaman#zw3xno": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Adventure Bag#tfl0wc": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Adventurer’s Discovery#5pxda0": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Adversity Policy#m4f5gc": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Aerodactyl Spirit Link#1xicjd4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Aether Foundation Employee#1uwzzjk": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Agatha#169ibko": {
+   "steps": [
+    "moveDamageCounters"
+   ]
+  },
+  "Aggron Spirit Link#1fwipue": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Air Balloon#rpn7g8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Alakazam Spirit Link#zfwvvk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Allister#3f8i93": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Alph Lithograph#1rwptd3": {
+   "steps": [
+    "lookAtOpponentHand"
+   ]
+  },
+  "Alph Lithograph#e9n2ie": {
+   "steps": [
+    "revealPrizes"
+   ]
+  },
+  "Alph Lithograph#wrzz0h": {
+   "gaps": [
+    "server-missing:returnStadiumToHand"
+   ],
+   "steps": [
+    "returnStadiumToHand"
+   ]
+  },
+  "Alph Lithograph#yg3w9e": {
+   "gaps": [
+    "server-missing:shuffleDeckOnly"
+   ],
+   "steps": [
+    "shuffleDeckOnly"
+   ]
+  },
+  "Altaria Spirit Link#1ab1vzc": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Amarys#1h9ct9t": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Ampharos Spirit Link#6z9t3z": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Amulet Coin#21vlts": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Amulet of Hope#1wyj8v6": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Ancient Booster Energy Capsule#169sg6f": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ancient Crystal#1qfyj2q": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ancient Technical Machine [Ice]#42lk8g": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Ancient Technical Machine [Rock]#e7o4dx": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Ancient Technical Machine [Steel]#o5q9rj": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Anthea & Concordia#17s1l2a": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Antique Armor Fossil#1h0pcv0": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Cover Fossil#1c5ieek": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Dome Fossil#gcvvwo": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Helix Fossil#17bltkn": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Jaw Fossil#hy3l0a": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Old Amber#1oqahkw": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Plume Fossil#7ei6gl": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Root Fossil#1rwxrf6": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Sail Fossil#1ajh4rn": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Antique Skull Fossil#ubqxbr": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Apricorn Maker#2m5q6s": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Apricorn Maker#irmkz0": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Aqua Diffuser#kd2kjx": {
+   "steps": [
+    "applyStatus"
+   ]
+  },
+  "Aqua Patch#1l8mdab": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Arc Phone#vjtgj": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Arcade Game#7qa6ew": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Archie’s Ace in the Hole#psp7uf": {
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Archie#17munw": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Arezu#1cvku5a": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Armor Fossil Shieldon#1fnmd37": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Armor Fossil#1lvipqm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Aroma Lady#q8ge6t": {
+   "steps": [
+    "draw",
+    "passive"
+   ]
+  },
+  "Arven’s Sandwich#cdpo0o": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Arven#13plb2z": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Assault Vest#ij23tg": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Atticus#1aunr45": {
+   "playCondition": "opponentActivePoisoned",
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Audino Spirit Link#1ho13kw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Avery#6td8xy": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Awakening Drum#ph82fj": {
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "AZ’s Tranquility#tx4hh4": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "AZ#10i3svx": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Babiri Berry#1gh5dpr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Backtrack Badge#j976hd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ball Guy#61824y": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Balloon Berry#1o16lc6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Balloon Berry#s6ufuf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Barry#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Battle Compressor Team Flare Gear#zx85qb": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Battle Reporter#1tvoatt": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Battle VIP Pass#1w2ooiq": {
+   "playCondition": "firstTurnOnly",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Bea#k5edpa": {
+   "steps": [
+    "millSelf"
+   ]
+  },
+  "Beast Ball#1kqqehy": {
+   "steps": [
+    "lookAtFaceDownPrize"
+   ]
+  },
+  "Beast Bringer#17ih7hp": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Beast Ring#ehmip7": {
+   "playCondition": "opponentPrizes==3|4",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Beastite#1u9xyxj": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Beauty#miffju": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Bebe’s Search#1p9v1wu": {
+   "playCondition": "handCount>=2",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Bede#160djqq": {
+   "steps": [
+    "attachFromHand"
+   ]
+  },
+  "Beedrill Spirit Link#1c8cz3z": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Beginning Door#1pur6fb": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Bellelba & Brycen-Man#uyqetp": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Bench Shield#5rekbj": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bent Spoon#1m1k9z8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Berry#1th7n4j": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bertha’s Warmth#17whfsm": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Bianca’s Devotion#pdhfw6": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Bianca#131rbje": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Bicycle#w23cq0": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Big Air Balloon#1jop174": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Big Charm#1wxa5rw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Big Malasada#16fauff": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Big Parasol#iv0ew9": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bill’s Analysis#1kyiz0a": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Bill’s Maintenance#1ewsw2u": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Bill’s Maintenance#wmt1hl": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Bill’s Teleporter#omdriy": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Bill’s Transfer#29g330": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Bill#1pqiplh": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Bill#48wj45": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Billowing Smoke#bdsik4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Billy & O’Nare#bggzz1": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Binding Mochi#1203xed": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bird Keeper#1uqxja6": {
+   "steps": [
+    "draw",
+    "switchOwn"
+   ]
+  },
+  "Black Belt’s Training#vlz4qs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Black Belt#orjs0e": {
+   "gaps": [
+    "passive-only"
+   ],
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Blacksmith#dct5a": {
+   "steps": [
+    "attachMultipleFromDiscard"
+   ]
+  },
+  "Blaine’s Gamble#1siar4y": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Blaine’s Last Resort#23arq": {
+   "playCondition": "onlyCopiesInHand",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Blaine’s Last Stand#zfovom": {
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Blaine’s Quiz #1#1k3jsn9": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Blaine’s Quiz #2#1052zeu": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Blaine’s Quiz #3#11lgc1h": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Blaine’s Quiz Show#g0txvl": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Blaine#330bvu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Blanche#iz8trj": {
+   "steps": [
+    "attachFromDiscard",
+    "draw"
+   ]
+  },
+  "Blastoise Spirit Link#ju00pm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Blowtorch#1477t3c": {
+   "steps": [
+    "discardFromOpponent"
+   ]
+  },
+  "Blue’s Tactics#1iw9xi9": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Blunder Policy#rbsl0x": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bodybuilding Dumbbells#179qfe2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bonnie#1k1dl98": {
+   "playCondition": "stadiumInPlay",
+   "steps": [
+    "discardStadium"
+   ]
+  },
+  "Boost Shake#1ovbwio": {
+   "steps": [
+    "searchEvolve"
+   ]
+  },
+  "Boss’s Orders#172liu5": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Boss’s Orders#azw3yd": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Boss’s Orders#z1ekp9": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Box of Disaster#nq1a8r": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Boxed Order#qz8eqe": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Brandon#1k3p57r": {
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Brassius#1en0z8y": {
+   "steps": [
+    "countShuffleDrawPlus"
+   ]
+  },
+  "Brave Bangle#agb74u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bravery Charm#1n90694": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Brawly#68m9us": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Briar#u16s61": {
+   "gaps": [
+    "passive-only"
+   ],
+   "playCondition": "opponentPrizes==2",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Brigette#2uhsge": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Brilliant Blender#70n9oq": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Brock’s Grit#ml0sya": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Brock’s Protection#hde4lb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Brock’s Scouting#ewe069": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Brock’s Training Method#wq8zib": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Brock’s Training#1kkni7b": {
+   "steps": [
+    "attachFromHand"
+   ]
+  },
+  "Brock#saocv9": {
+   "steps": [
+    "healEachActive"
+   ]
+  },
+  "Bruno#1uqu563": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Bubble Coat#dypsz3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Buck’s Training#t4mzan": {
+   "steps": [
+    "draw",
+    "passive"
+   ]
+  },
+  "Buddy-Buddy Poffin#1tfq7fw": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Buddy-Buddy Rescue#ye3ktc": {
+   "gaps": [
+    "server-missing:eachPlayerRecoverPokemon"
+   ],
+   "steps": [
+    "eachPlayerRecoverPokemon"
+   ]
+  },
+  "Buff Padding#6nxhpo": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Buffer Piece#7n01w8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Buffer Piece#hr22e8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bug Catcher#10ijf22": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Bug Catching Set#1kbixb4": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Burning Scarf#1n1yin7": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Bursting Balloon#u217ic": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Café Master#1tqc5lz": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Caitlin#1ewf2ds": {
+   "gaps": [
+    "server-missing:putHandBottomThenDraw"
+   ],
+   "steps": [
+    "putHandBottomThenDraw"
+   ]
+  },
+  "Caitlin#1uasgxx": {
+   "steps": [
+    "putHandOnBottom"
+   ]
+  },
+  "Call Bell#1jmjjvr": {
+   "playCondition": "secondPlayerFirstTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Camerupt Spirit Link#7dfk4j": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Camping Gear#fzbosh": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Canari#1mk6tg0": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Canceling Cologne#5jtgw8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Candela#1x9etbe": {
+   "steps": [
+    "attachFromDiscard",
+    "draw"
+   ]
+  },
+  "Candice#1ujjp6r": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Capacious Bucket#xkgdii": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cape of Toughness#g98fhu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Captivating Poké Puff#g5x8ar": {
+   "steps": [
+    "opponentHandToBenchBasic"
+   ]
+  },
+  "Capturing Aroma#9f6qdy": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Cara Liss#1fu61h7": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Card-Flip Game#xb5thp": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Caretaker#4l6geq": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Carmine#1900yjn": {
+   "steps": [
+    "discardHandThenDraw"
+   ]
+  },
+  "Cassiopeia#ifvgif": {
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cassius#16j64cc": {
+   "steps": [
+    "shufflePokemonIntoDeck"
+   ]
+  },
+  "Castaway#i9a3hd": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cedric Juniper#8qlq6r": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Celio’s Network#1836n7l": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cessation Crystal#1j3g599": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Challenge!#1slx71s": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Channeler#18pmt8c": {
+   "steps": [
+    "clearAttackEffects"
+   ]
+  },
+  "Charity#1w3zd3n": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Charizard Spirit Link#14ffyle": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Charon’s Choice#1bu0gjv": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cheerleader’s Cheer#v5s9wg": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Cheren’s Care#1o0q8gw": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Cheren#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Cherish Ball#arnmg2": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cheryl#137y06k": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Chili & Cilan & Cress#1eptxkg": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Chill Teaser Toy#mk8ush": {
+   "playCondition": "secondPlayerFirstTurn",
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Chip-Chip Ice Axe#11wcsrs": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Choice Band#18mxexr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Choice Belt#158doop": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Choice Helmet#1p7bvo0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Choy#1l38nn7": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Cilan#1b2lcmr": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Ciphermaniac’s Codebreaking#bejyg8": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Clavell#1wxd7kp": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Claw Fossil Anorith#1syr0c6": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Claw Fossil#19kwe37": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil#19my7c3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil#1cjn1c2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil#51weil": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Clay#134nfrs": {
+   "steps": [
+    "millSelf"
+   ]
+  },
+  "Cleansing Gloves#g4tpbb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Clefairy Doll#zed4wn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Clemont’s Quick Wit#nnss2r": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Clemont#26og2c": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Clive#1ihtidk": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Coach Trainer#1p9jbtd": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Colbur Berry#ht2q8o": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Colress Machine#v2u6ty": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Colress’s Experiment#14eznbi": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Colress’s Tenacity#1s6evm4": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Colress#1pibqr": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Computer Error#ylqrrd": {
+   "steps": [
+    "eachPlayerDraw"
+   ]
+  },
+  "Computer Search#1p5se2o": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Computer Search#pc13ww": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Computer Search#z5sgj8": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Cook#f271kw": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Copycat#1mf886h": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Copycat#1p94cbd": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Copycat#628gl5": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Core Memory#11tujaq": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Counter Catcher#1ii8doq": {
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Counter Catcher#71esv7": {
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Counter Gain#m1qu3y": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Counter Gain#spele": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Counterattack Claws#o5mj3c": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Cover Fossil#6eswz6": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Cram-o-matic#1iz93l6": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Crasher Wake#o4fz1l": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Crispin#1neg8tz": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cross Switcher#1p2gyb4": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Crossceiver#djznrq": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Crushing Gloves#14my8dg": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Crushing Hammer#1ijizak": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Crushing Hammer#tzzqjj": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Crystal Edge#1qfkjzn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Crystal Shard#18ktavv": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Crystal Shard#1fc51qc": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Crystal Shard#olg9w6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Crystal Wall#t4hqdf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Curse Powder#15vm3dr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Cursed Duster#kxluf2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Cursed Shovel#1m2waps": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Custom Catcher#ux11hl": {
+   "steps": [
+    "drawUntil",
+    "switchOpponent"
+   ]
+  },
+  "Cyllene#1c6pnv7": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Cynthia & Caitlin#pmxcgg": {
+   "steps": [
+    "draw",
+    "recursion"
+   ]
+  },
+  "Cynthia’s Ambition#14optdt": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Cynthia’s Feelings#1nye6cx": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Cynthia’s Guidance#nduld": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Cynthia’s Power Weight#1jaskja": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Cynthia#15bzw25": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Cyrano#13dyc0z": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cyrus Prism Star#v97jux": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Cyrus’s Conspiracy#1wcdixn": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Cyrus’s Initiative#bf6qcz": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Daisy’s Help#5va16l": {
+   "steps": [
+    "lookAtFaceDownPrize"
+   ]
+  },
+  "Damage Mover#6v83gf": {
+   "steps": [
+    "moveDamageCounters"
+   ]
+  },
+  "Damage Pump#r8t9c4": {
+   "steps": [
+    "moveDamageCounters"
+   ]
+  },
+  "Dan#go1efm": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Dana#1nzyafr": {
+   "playCondition": "opponentActiveStage=Stage 2",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Dancer#1ebzg1i": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Dangerous Drill#9hb1ev": {
+   "steps": [
+    "discardFromOpponent"
+   ]
+  },
+  "Dangerous Laser#13k9wwz": {
+   "steps": [
+    "applyStatus"
+   ]
+  },
+  "Dark Bell#glkagv": {
+   "steps": [
+    "applyStatus"
+   ]
+  },
+  "Dark Claw#fwloly": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Dark Patch#1xycssv": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Darkness Cube 01#1yahm7g": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Dashing Pouch#6q6es0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Dawn#1h2tcmu": {
+   "steps": [
+    "searchDeckSequence"
+   ]
+  },
+  "Deduction Kit#1maaonr": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Defender#q6gsrx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Defender#r46149": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Defiance Band#1dxy8hm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Defiance Vest#6o2bnw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Delinquent#if247p": {
+   "steps": [
+    "discardStadium"
+   ]
+  },
+  "Delivery Drone#1bc7njk": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Deluxe Bomb#4rqjkr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Dendra#11o2qnx": {
+   "playCondition": "handCount>=2",
+   "steps": [
+    "drawUntil",
+    "putHandOnBottom"
+   ]
+  },
+  "Department Store Girl#1c815sv": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Desert Shaman#14ncrgd": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Devolution Spray Z#vsed9l": {
+   "steps": [
+    "devolve"
+   ]
+  },
+  "Devolution Spray#78af5v": {
+   "steps": [
+    "devolve"
+   ]
+  },
+  "Devolution Spray#q0r3ko": {
+   "steps": [
+    "devolve"
+   ]
+  },
+  "Devolution Spray#u89248": {
+   "steps": [
+    "devolve"
+   ]
+  },
+  "Diantha#28mlre": {
+   "playCondition": "koedLastTurn:type=y",
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Digger#1ryl6uu": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Digging Duo#xsk712": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Digging Gloves#1egi3j1": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Dive Ball#11fbxgq": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Doctor#b4hxi5": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Dome Fossil Kabuto#1sempr3": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Dome Fossil#14uval6": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Double Full Heal#i8oyu": {
+   "steps": [
+    "clearStatus"
+   ]
+  },
+  "Double Gust#1m1hay4": {
+   "steps": [
+    "switchOpponentOut",
+    "switchOwn"
+   ]
+  },
+  "Dowsing Machine#1qmlbh6": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Dragon Elixir#yl64l1": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Dragon Talon#1qnmsyv": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Dragonium Z: Dragon Claw#jhxsnr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Drasna#1omcz2y": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Drayton#1l25sft": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Dream Ball#10pzmrl": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Drone Rotom#1bmiyjj": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Drops in the Ocean#1c2sijx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Dual Ball#1hdtbi0": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Dual Ball#3al3r": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Dual Ball#n4rr59": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Dusk Ball#1jgs3n5": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Dusk Ball#8ak2yb": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Dusk Stone#1vddd52": {
+   "steps": [
+    "searchEvolve"
+   ]
+  },
+  "Ear-Ringing Bell#2quwk5": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Earthen Seal Stone#1e8ooql": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Earthen Vessel#djqot8": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Echoing Horn#1vbfarh": {
+   "steps": [
+    "reviveFromDiscard"
+   ]
+  },
+  "Eco Arm#zi7z43": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Egg Incubator#1wfxhbr": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Electric Generator#o3a9k0": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Electric Memory#x9vclc": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Electrocharger#j7m0di": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Electromagnetic Radar#1ps3vaa": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Electropower#b55foc": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Elemental Badge#alg5aw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Elesa’s Sparkle#q5flsj": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Elesa#144r6n6": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Emcee’s Chatter#186002k": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Emcee’s Hype#13fbp4k": {
+   "steps": [
+    "draw",
+    "passive"
+   ]
+  },
+  "Emergency Jelly#55zeot": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Emma#1tzxcgf": {
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Eneporter#1omdtpc": {
+   "gaps": [
+    "server-missing:moveEnergyOpponent"
+   ],
+   "steps": [
+    "moveEnergyOpponent"
+   ]
+  },
+  "Energy Amplifier#1wxxadt": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Energy Ark#2jwr3b": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Charge#18hr4qq": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Energy Charge#zbn8cq": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Energy Coin#1ixqqel": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Exchanger#1lc0myi": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Flow#ismph9": {
+   "steps": [
+    "energyToHand"
+   ]
+  },
+  "Energy Link#8xweil": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Energy Loto#texnoo": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Energy Pickup#q0agqe": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Energy Pouch#1llz8ge": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Energy Recycle System#12itaex": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Energy Recycle System#vjgu9j": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Energy Recycler#1tmxpqs": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Energy Recycler#1y4ollg": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Energy Recycler#g3wm0k": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Energy Removal 2#16sl641": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Energy Removal#imxr3e": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Energy Reset#gluf4n": {
+   "steps": [
+    "energyToHand"
+   ]
+  },
+  "Energy Restore#1gczqt6": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Energy Restore#1jlgnu": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Energy Retrieval#1ezgb7l": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Energy Retrieval#1ffseu9": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Energy Retrieval#1uabybu": {
+   "steps": [
+    "discardCost",
+    "recursion"
+   ]
+  },
+  "Energy Retrieval#thdcyp": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Energy Returner#1mw2op5": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Energy Root#14p6q94": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Energy Search Pro#18xgc3q": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Search#1ow5kkw": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Search#ex5b3i": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Search#pu3poz": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Search#sgbn89": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Search#wntlrt": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Spinner#9khsm2": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Energy Sticker#1q59eam": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Energy Swatter#12afhrt": {
+   "steps": [
+    "opponentHandBottom"
+   ]
+  },
+  "Energy Switch#1qbg6hv": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Energy Switch#1xn1fp9": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Energy Switch#upc72b": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Energy Switch#z9hiw0": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Engineer’s Adjustments#y9y5fl": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Enhanced Hammer#1kg5x67": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Enhanced Hammer#1mxfdwc": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Eri#hau7p5": {
+   "steps": [
+    "revealOpponentHandDiscard"
+   ]
+  },
+  "Erika’s Hospitality#wyh0sv": {
+   "playCondition": "handCount<=5",
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Erika’s Invitation#1hbmdus": {
+   "steps": [
+    "opponentHandToBenchBasic"
+   ]
+  },
+  "Erika’s Kindness#1b290xa": {
+   "steps": [
+    "healEachActive"
+   ]
+  },
+  "Erika’s Maids#f8g5hv": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Erika’s Perfume#1vq244t": {
+   "steps": [
+    "opponentHandToBenchBasic"
+   ]
+  },
+  "Erika#twxpoq": {
+   "steps": [
+    "eachPlayerDraw"
+   ]
+  },
+  "Erika#wtw8sy": {
+   "steps": [
+    "eachPlayerDraw"
+   ]
+  },
+  "Escape Board#pr9mmx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Escape Rope#1van24x": {
+   "steps": [
+    "switchOpponentOut",
+    "switchOwn"
+   ]
+  },
+  "Escape Rope#1w44nmj": {
+   "steps": [
+    "switchOpponentOut",
+    "switchOwn"
+   ]
+  },
+  "Escape Rope#jx8vfx": {
+   "steps": [
+    "switchOpponentOut",
+    "switchOwn"
+   ]
+  },
+  "Ethan’s Adventure#11evlmh": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Ether#1pvyhld": {
+   "steps": [
+    "revealTopEnergy"
+   ]
+  },
+  "Evelyn#uuelvl": {
+   "playCondition": "opponentActiveStage=Stage 1",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Eviolite#i5ler0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Evolution Incense#1tegx0r": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Evosoda#1f2fpuq": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "searchEvolve"
+   ]
+  },
+  "Exp. Share#12i2zt7": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Exp. Share#1rtfys5": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Exp. Share#33qdgo": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Exp. Share#znynjp": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "EXP.ALL#9imsd8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "EXP.ALL#w36c89": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Expedition Uniform#10jxn2l": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Expert Belt#s9hbnd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Explorer’s Guidance#ti8p2b": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Faba#oae9tl": {
+   "steps": [
+    "discardFromOpponent"
+   ]
+  },
+  "Fairy Charm {#14bxq6u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Charm {#1m90z2u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Charm {#1mw9wnq": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Charm {#5505zq": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Charm {#ef6986": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Charm Ability#1dxv9ql": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Charm UB#ks6k8m": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Drop#1lu9rxc": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Falkner#1ta67ji": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Familiar Bell#1yrfbz8": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Fan of Waves#7id7i0": {
+   "gaps": [
+    "server-missing:sendEnergyToDeckBottom"
+   ],
+   "steps": [
+    "sendEnergyToDeckBottom"
+   ]
+  },
+  "Fantina#1bsbek2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "playCondition": "lostZone>=10",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Farewell Bell#4zweeo": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Fast Ball#1p3t37e": {
+   "steps": [
+    "revealUntilCard"
+   ]
+  },
+  "Feather Ball#7x3kfe": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Felicity’s Drawing#x2ctsg": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Fennel#1j7a71t": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Fervor#75asua": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Field Blower#1t91apb": {
+   "steps": [
+    "discardTools"
+   ]
+  },
+  "Fieldworker#xpala7": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Fiery Flint#14y7nsl": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Fiery Torch#z4eei9": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Fighting Au Lait#ny3r3m": {
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Fighting Cube 01#583x6q": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Fighting Fury Belt#a0qngy": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fighting Gong#163oxsu": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Fighting Memory#1xisnwa": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fire Crystal#1vecm2": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Fire Cube 01#pz77m8": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Fire Memory#1w2239i": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fire-Resistant Gloves#nh419l": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Firebreather#1sy8cnm": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "First Ticket#16xpuc4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fisherman#13j2ewj": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Fisherman#13jwahy": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Fisherman#1opm5k3": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Fisherman#dz30a5": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Flannery#10vxy0v": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Flint’s Willpower#1oq2g1q": {
+   "steps": [
+    "attachFromHand"
+   ]
+  },
+  "Float Stone#ciyo00": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Floral Crown#kxreix": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Flower Shop Lady#1njlrjh": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Fluffy Berry#1bryzn4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Flyinium Z: Air Slash#1wxtvig": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Focus Band#k4199": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Focus Sash#s2uw6e": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fog Crystal#shz37w": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Forest Guardian#a60wr9": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Forest Seal Stone#15dwt1n": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Fossil Egg#17bcb9d": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Fossil Excavation Kit#1j9cry5": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Fossil Excavation Map#1cd5doo": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Fossil Excavator#1cghara": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Fossil Researcher#meuy9a": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Fresh Water Set#1pq2uer": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Friend Ball#1h9hyv9": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Friend Ball#1loimmd": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Friends in Galar#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Friends in Hisui#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Friends in Paldea#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Friends in Sinnoh#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Full Face Guard#1nv0024": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Full Heal#16wqr0t": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Full Heal#hgv6xo": {
+   "steps": [
+    "clearStatus"
+   ]
+  },
+  "Full Heal#hoyl17": {
+   "steps": [
+    "clearStatus"
+   ]
+  },
+  "Furisode Girl#19y3hkn": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Future Booster Energy Capsule#f53mof": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "G Booster#10ff0re": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "G Scope#4y5k6j": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Galarian Chestplate#19xvl3c": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gallade Spirit Link#1u1nm2m": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gambler#125wxdq": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Garchomp Spirit Link#10tobkr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gardenia’s Vigor#e619yn": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Gardenia#3ba4h7": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Gardevoir Spirit Link#107dm9d": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Geeta#1v7ppxb": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Gengar Spirit Link#1iw7kj2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ghetsis#7h84y9": {
+   "gaps": [
+    "server-missing:opponentHandShuffleItemsDraw"
+   ],
+   "steps": [
+    "opponentHandShuffleItemsDraw"
+   ]
+  },
+  "Giacomo#fzrrt7": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Giant Bomb#1js2rvc": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Giant Cape#1wg8jdp": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Giovanni’s Charisma#17ya5qr": {
+   "steps": [
+    "attachFromHand"
+   ]
+  },
+  "Giovanni’s Exile#1ranlq7": {
+   "steps": [
+    "discardOwnBenchPokemon"
+   ]
+  },
+  "Giovanni’s Last Resort#mvb88z": {
+   "steps": [
+    "discardHandThenDraw",
+    "heal"
+   ]
+  },
+  "Giovanni’s Scheme#1i72ude": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Giovanni#huvou": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gladion’s Final Battle#18itm5u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gladion#1eukby5": {
+   "steps": [
+    "prizeToHand"
+   ]
+  },
+  "Glalie Spirit Link#195aple": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Glass Trumpet#1p2erbl": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Gloria#9uvu81": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Gold Berry#s828cn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gold Potion#13p2rm": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Good Manners#8nlge8": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Good Rod#1u3aejr": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Goop Gas Attack#1u88948": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gordie#lyv7ln": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Grabber#1qygveh": {
+   "steps": [
+    "opponentHandBottom"
+   ]
+  },
+  "Grant#33uxk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Grass Cube 01#1t0cd5j": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Grass Memory#13sxrcr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gravity Gemstone#1ycz6o5": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Great Ball#175fcbm": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Great Ball#1pva8p1": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Great Ball#ow2091": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Great Catcher#1ppnlcj": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Great Haul Net#7b1sxy": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Great Potion#1vshrls": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Greedy Dice#b6niy4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Green’s Exploration#1oh9r62": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Grimsley’s Move#am8fxd": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Grimsley#11gxvf5": {
+   "steps": [
+    "moveDamageCounters"
+   ]
+  },
+  "Groudon Spirit Link#hatrkm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Grusha#12sujn8": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Gust of Wind#nbr5qw": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Gutsy Pickaxe#1av6df3": {
+   "steps": [
+    "revealTopEnergy"
+   ]
+  },
+  "Guzma & Hala#qyqq6a": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Guzma#ju04ij": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Gwynn#vh6z4y": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Gyarados Spirit Link#1nvr2c0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Gym Badge#1dxgk99": {
+   "gaps": [
+    "server-missing:flipUntilTailsDraw"
+   ],
+   "steps": [
+    "flipUntilTailsDraw"
+   ]
+  },
+  "Gym Trainer#9q3x61": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Haban Berry#wngbny": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hala#13ttkzp": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Hand Scope#176213p": {
+   "steps": [
+    "lookAtOpponentHand"
+   ]
+  },
+  "Hand Trimmer#934s9e": {
+   "steps": [
+    "eachPlayerDiscardUntil"
+   ]
+  },
+  "Handheld Fan#12xzm1y": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hapu#ti8p2b": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Hard Charm#1nbgk6l": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Harlequin#1qjt1hg": {
+   "steps": [
+    "draw",
+    "ionoShuffle",
+    "opponentDraw"
+   ]
+  },
+  "Hassel#kikpu6": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Hau#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Head Ringer Team Flare Hyper Gear#1hyaq2p": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Heal Powder#1f0y2jo": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Healing Berry#zece82": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Healing Scarf#1m4d1u5": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Heavy Ball#llndw8": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Heavy Baton#ah59q5": {
+   "steps": [
+    "moveEnergyToActive"
+   ]
+  },
+  "Heavy Boots#147yjof": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Helix Fossil Omanyte#td1k2w": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Helix Fossil#11qaq43": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Here Comes Team Rocket!#1t6a3zu": {
+   "steps": [
+    "revealPrizes"
+   ]
+  },
+  "Here Comes Team Rocket!#nfk0rg": {
+   "steps": [
+    "revealPrizes"
+   ]
+  },
+  "Hero’s Cape#1bmru7y": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hero’s Medal#1cyzife": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hex Maniac#zp0rb4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hiker#1i5m7z7": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Hilda#9mzsg7": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Hisuian Heavy Ball#1sazb3a": {
+   "steps": [
+    "lookAtFaceDownPrize"
+   ]
+  },
+  "Hole-Digging Shovel#nrc2ca": {
+   "steps": [
+    "millSelf"
+   ]
+  },
+  "Holon Adventurer#uf1vg9": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Holon Farmer#kel2b9": {
+   "steps": [
+    "discardCost",
+    "shuffleFromDiscard"
+   ]
+  },
+  "Holon Fossil#b2a1d4": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Holon Lass#ulirrl": {
+   "steps": [
+    "discardCost",
+    "lookAtTop"
+   ]
+  },
+  "Holon Mentor#ij0bg4": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Holon Researcher#b3fa37": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Holon Scientist#1n2nyxz": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Holon Transceiver#z4s4s5": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Honey#1sdsv4c": {
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Hooligans Jim & Cas#zuea1a": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Hop’s Bag#1b4s7k8": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Hop’s Choice Band#1toyhce": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hop#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Houndoom Spirit Link#mbku9b": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hugh#noowl8": {
+   "gaps": [
+    "server-missing:eachPlayerHandToFive"
+   ],
+   "steps": [
+    "eachPlayerHandToFive"
+   ]
+  },
+  "Hunting Gloves#8sjdd1": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hustle Belt#12jr2fv": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hyper Aroma#o029u9": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Hyper Devolution Spray#up40ox": {
+   "steps": [
+    "devolve"
+   ]
+  },
+  "Hyper Potion#1k0wcof": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Hyper Potion#tj3sl4": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Hypnotoxic Laser#1c2miwl": {
+   "steps": [
+    "applyStatus",
+    "coinFlip"
+   ]
+  },
+  "Ilima#12k26xx": {
+   "steps": [
+    "draw",
+    "ionoShuffle"
+   ]
+  },
+  "Imakuni?#1bkmd6z": {
+   "steps": [
+    "applyStatus"
+   ]
+  },
+  "Imposter Oak’s Revenge#1r9jxxk": {
+   "steps": [
+    "opponentShuffleHandDraw"
+   ]
+  },
+  "Imposter Professor Oak#13zm0qy": {
+   "steps": [
+    "opponentShuffleHandDraw"
+   ]
+  },
+  "Impostor Professor Oak’s Invention#71zepj": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Impostor Professor Oak#13zm0qy": {
+   "steps": [
+    "opponentShuffleHandDraw"
+   ]
+  },
+  "Ingo & Emmet#1gokqxi": {
+   "steps": [
+    "discardHandThenDraw"
+   ]
+  },
+  "Interviewer’s Questions#1t2pdrd": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Iono#jfkqh2": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Irida#5yg07o": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Iris’s Fighting Spirit#1v9ifgp": {
+   "steps": [
+    "discardCost",
+    "drawUntil"
+   ]
+  },
+  "Iris#409vky": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Iron Defender#1keqhnk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Iscan#wvf53c": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Island Challenge Amulet#1qedcl3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Island Hermit#75176c": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Item Finder#qaalqt": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Jacinthe#xcktgb": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Jacq#6vb058": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Jamming Net Team Flare Hyper Gear#5h9grs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Janine’s Secret Art#df3aci": {
+   "steps": [
+    "searchAttachEach"
+   ]
+  },
+  "Janine#jesw9j": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Jasmine’s Gaze#2panl7": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Jasmine#1cju8e9": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Jaw Fossil#1tzye2x": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Jessie & James#1gtecto": {
+   "gaps": [
+    "server-missing:eachPlayerDiscardFromHand"
+   ],
+   "steps": [
+    "eachPlayerDiscardFromHand"
+   ]
+  },
+  "Jett#g3qqze": {
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Judge Whistle#1l49951": {
+   "steps": [
+    "draw",
+    "recursion"
+   ]
+  },
+  "Judge#1k329vr": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Judge#s7h6fl": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Juggler#lywxef": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Jumbo Ice Cream#1b0ae6x": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Junk Arm#r2wnvz": {
+   "steps": [
+    "discardCost",
+    "recursion"
+   ]
+  },
+  "Justified Gloves#1747rkr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Kabu#8mwxuw": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Kahili#1lgnyps": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Kamado#t7t9vb": {
+   "playCondition": "handCount>=2",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Karate Belt#11hi7bf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Karen’s Conviction#ird65o": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Karen#isfmc": {
+   "steps": [
+    "shuffleDiscardIntoDeck"
+   ]
+  },
+  "Katy#1ck78tn": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Kiawe#1jvzfy9": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Kieran#y8flte": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Kindler#8t4zqf": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Klara#83qh0a": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Kofu#xxhxs5": {
+   "steps": [
+    "draw",
+    "putHandOnBottom"
+   ]
+  },
+  "Koga’s Ninja Trick#qtp720": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Koga’s Trap#1a1sexc": {
+   "steps": [
+    "applyStatus"
+   ]
+  },
+  "Koga#1972i4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Korrina’s Focus#131rbje": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Korrina#1ljsu62": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Kyogre Spirit Link#emdl3l": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lacey#1y5wjsb": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Lady Outing#bn4tkv": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Lady#l2yufv": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Lana’s Aid#w3zvqh": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Lana’s Fishing Rod#lzu30b": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Lana#1jusj82": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Lance Prism Star#1v5uqjj": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Lance#1o1v9jg": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Lanette’s Net Search#w3dqfd": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Larry’s Skill#i56zmu": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Larry#n1lxmm": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Lass’s Special#xh1ndg": {
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Lass#gixxwt": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Last Chance Potion#1q0rp6s": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Latios Spirit Link#bztgs4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Leafy Camo Poncho#1lx3dma": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "League Staff#1uy7h": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Leftovers#1j90rbw": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Leftovers#nu8q90": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Legend Box#piue2u": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Leon#o0ae3s": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Letter of Encouragement#w2h92o": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Level Ball#1hcv7d4": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Level Ball#1plpyxd": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Level Max#1k3qjgp": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Life Dew#1qv6fqn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Life Herb#12ldi99": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Life Herb#1uobpz6": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Life Herb#a3dx7z": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Life Herb#kqi29d": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Light Ball#1dr2okl": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lightning Cube 01#lpbjgi": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Lillie’s Determination#df6njn": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Lillie’s Full Force#1h2kpts": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Lillie’s Pearl#wcy5rs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lillie’s Poké Doll#1w8pkz3": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Lillie#1n1m8lo": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Lisia’s Appeal#176sfbv": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Lisia#13uym91": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Looker Whistle#tl5dxs": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Looker’s Investigation#o67zbb": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Looker#zjqiz": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Lost Blender#odw37c": {
+   "steps": [
+    "draw",
+    "lostZoneCost"
+   ]
+  },
+  "Lost Remover#2uwa9": {
+   "gaps": [
+    "server-missing:sendEnergyToLostZone"
+   ],
+   "steps": [
+    "sendEnergyToLostZone"
+   ]
+  },
+  "Lost Vacuum#bau82z": {
+   "steps": [
+    "lostZoneCost",
+    "toolOrStadiumToLostZone"
+   ]
+  },
+  "Love Ball#1rdm8gm": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Lt. Surge’s Bargain#n92d8": {
+   "steps": [
+    "prizeBargain"
+   ]
+  },
+  "Lt. Surge’s Secret Plan#ql3lbd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lt. Surge’s Strategy#gpy1qj": {
+   "gaps": [
+    "passive-only"
+   ],
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lt. Surge’s Treaty#zmvhbx": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Lt. Surge#c4h37k": {
+   "gaps": [
+    "server-missing:putHandBasicAsActive"
+   ],
+   "steps": [
+    "putHandBasicAsActive"
+   ]
+  },
+  "Lucario Spirit Link#1kgzmo7": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lucian’s Assignment#28pjxn": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Lucian#1hypk5c": {
+   "steps": [
+    "draw",
+    "ionoShuffle"
+   ]
+  },
+  "Lucky Egg#4570wl": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Lucky Egg#yd3geq": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Lucky Helmet#1mgpwdq": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lucky Helmet#awyxh4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lucky Ice Pop#3hvixj": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Lum Berry#1ttsgen": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lum Berry#1u7tbdd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lum Berry#e3j097": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lumiose Galette#16fauff": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Lure Ball#1oefgdr": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Lure Ball#kkqw5e": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Lure Module#bxak6e": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Lusamine Prism Star#tg0f91": {
+   "gaps": [
+    "passive-only"
+   ],
+   "playCondition": "opponentPrizes==3",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lusamine#1b5hp9u": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Luxurious Cape#6h0i8f": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Luxury Ball#14dgisc": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Lysandre Prism Star#19ckp6q": {
+   "gaps": [
+    "server-missing:opponentDiscardToLostZonePerPokemon"
+   ],
+   "steps": [
+    "opponentDiscardToLostZonePerPokemon"
+   ]
+  },
+  "Lysandre’s Trump Card#4rrb79": {
+   "steps": [
+    "shuffleDiscardIntoDeck"
+   ]
+  },
+  "Lysandre#xbae5p": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Magma Pointer#12eis20": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Magnifier#lvogy8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mail from Bill#3o244v": {
+   "playCondition": "handCount<=4",
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Maintenance#1t04xr4": {
+   "steps": [
+    "shuffleHandCardsThenDraw"
+   ]
+  },
+  "Maintenance#5w3iyj": {
+   "steps": [
+    "shuffleHandCardsThenDraw"
+   ]
+  },
+  "Mallow & Lana#18kdf7o": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Mallow#1s1veob": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Mallow#bejyg8": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Manectric Spirit Link#qlebnq": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Marley’s Request#1j3doda": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Marnie’s Pride#b60znb": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Marnie#12li7bw": {
+   "steps": [
+    "draw",
+    "ionoShuffle",
+    "opponentDraw"
+   ]
+  },
+  "Mars#k5zo7t": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Mary’s Impulse#1f2p3u3": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Mary’s Request#1bnkgr6": {
+   "steps": [
+    "draw",
+    "passive"
+   ]
+  },
+  "Mary#1h1c34c": {
+   "steps": [
+    "shuffleHandCardsThenDraw"
+   ]
+  },
+  "Master Ball#1gtp8i2": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Master Ball#1m5ysjt": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Master Ball#1mu4ap1": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Master Ball#1nxbkia": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Master Ball#alanh": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Mawile Spirit Link#mjqvph": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Max Elixir#thexry": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Max Potion#13a0ctl": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Max Potion#6jmf6j": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Max Potion#vsf0fc": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Max Revive#1ejpvxl": {
+   "gaps": [
+    "server-missing:putDiscardOnTop"
+   ],
+   "steps": [
+    "putDiscardOnTop"
+   ]
+  },
+  "Max Revive#1gno7p7": {
+   "steps": [
+    "reviveFromDiscard"
+   ]
+  },
+  "Max Rod#ia6wjl": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Maxie’s Hidden Ball Trick#15n20dk": {
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Maxie#16o75u5": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Maximum Belt#1na93zw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Meddling Memo#1m0ugjz": {
+   "steps": [
+    "opponentCountShuffleDraw"
+   ]
+  },
+  "Mega Catcher#g0fm5s": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Mega Signal#12n2mvu": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Mega Turbo#9amb6z": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Megaton Blower#194wz7y": {
+   "steps": [
+    "massDiscardAttached"
+   ]
+  },
+  "Mela#2zi32r": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "attachFromDiscard",
+    "drawUntil"
+   ]
+  },
+  "Melony#6nob10": {
+   "steps": [
+    "attachFromDiscard",
+    "draw"
+   ]
+  },
+  "Memory Berry#1ujnl0u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Memory Berry#942e84": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Memory Berry#hs58g3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Memory Capsule#49o6pw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Metal Core Barrier#3i7x6e": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Metal Cube 01#1vr09m3": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Metal Frying Pan#1vutb1r": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Metal Goggles#fqau4v": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Metal Saucer#887hkf": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Mewtwo Spirit Link#1xsnp9v": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Milo#1y9pqo9": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Mina#169wpjh": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Minion of Team Rocket#1d5zz9d": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Miracle Berry#baxx8i": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Miracle Headset#p2fi65": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Miracle Sphere ⍺#fss8g6": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Miracle Sphere β#1vvmmsx": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Miracle Sphere 𝛾#1f2hmz0": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Mirage Gate#1lt5z3c": {
+   "playCondition": "lostZone>=7",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Miriam#h797hi": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Miss Fortune Sisters#nymjf9": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Missing Clover#1gi5u2g": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Misty & Lorelei#xs3g10": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Misty’s Determination#1qkrpxc": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Misty’s Duel#1nxgjlm": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Misty’s Favor#1i5o8mq": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Misty’s Tears#1a3s0gh": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Misty’s Vitality#a4mjii": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Misty’s Water Command#9i78og": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Misty’s Wish#icd80m": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Misty’s Wrath#12c1eda": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Misty#135vok6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mixed Herbs#195nbqb": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Molayne#8oqu7n": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Mom’s Kindness#1pqiplh": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Moo-Moo Milk#xpxd0a": {
+   "steps": [
+    "healPerHeads"
+   ]
+  },
+  "Moomoo Cheese#yp1cpw": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Moomoo Milk#7l2skj": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Moomoo Milk#jfimb0": {
+   "steps": [
+    "healPerHeads"
+   ]
+  },
+  "Moon & Sun Badge#h7h2ji": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Morgan#1v4hcb6": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Morty’s Conviction#r74fnn": {
+   "steps": [
+    "discardCost",
+    "variableDraw"
+   ]
+  },
+  "Morty#10f9yey": {
+   "playCondition": "koedLastTurn:type=p",
+   "steps": [
+    "opponentHandShuffleDeck"
+   ]
+  },
+  "Mr. Briney’s Compassion#tbyk0x": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Mr. Fuji#qz4vtj": {
+   "steps": [
+    "shufflePokemonIntoDeck"
+   ]
+  },
+  "Mr. Stone’s Project#n1cs91": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Multi Switch#vw9mi": {
+   "steps": [
+    "moveEnergyToActive"
+   ]
+  },
+  "Multi Technical Machine 01#3kpyyb": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Muscle Band#19a47ou": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mysterious Fossil#14qgz1q": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mysterious Fossil#173hz68": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mysterious Fossil#19y7j4h": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mysterious Fossil#1dt5623": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mysterious Shard#cb6u8k": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mysterious Treasure#11tkiob": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Mystery Plate ⍺#1grb0zu": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Mystery Plate β#1uax845": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Mystery Plate 𝛾#16wqma0": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Mystery Plate δ#gci5w3": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "N’s Plan#p0emcd": {
+   "steps": [
+    "moveEnergyToActive"
+   ]
+  },
+  "N’s PP Up#1eayjz": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "N’s Resolve#1kcde6s": {
+   "steps": [
+    "millSelf"
+   ]
+  },
+  "N#1jjpl33": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Nanu#1f4cyt6": {
+   "steps": [
+    "swapWithDiscard"
+   ]
+  },
+  "Naveen#9vwa9m": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Nemona’s Backpack#udxsi7": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Nemona#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Nessa#13wfk7o": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Nest Ball#17zikvf": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Net Ball#1ylh89u": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "New Pokédex#1pktu5v": {
+   "steps": [
+    "rearrangeTop"
+   ]
+  },
+  "Night Maintenance#1ne9s5t": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Night Pokémon Center#33tmqg": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Night Stretcher#ju4duq": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Night Teleporter#l3zp3t": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Nightly Garbage Run#14mjn5b": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Ninja Boy#7q30d6": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Nita#iucb42": {
+   "playCondition": "opponentActiveStage=Basic",
+   "steps": [
+    "opponentActiveEnergyToDeck"
+   ]
+  },
+  "Normalium Z: Tackle#15148y9": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Norman#c9buzm": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Nugget#1sedxoi": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Occa Berry#ods5fu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ogre’s Mask#1xq2i0p": {
+   "steps": [
+    "swapWithDiscard"
+   ]
+  },
+  "Old Amber Aerodactyl#1sb1w2p": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Old Amber#1rbxrsm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Old PC#qlej0x": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Old Rod#1bqbl4b": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Old Rod#1g1rflo": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Oleana#iihw5p": {
+   "steps": [
+    "opponentHandBottom"
+   ]
+  },
+  "Olivia#ry7jf3": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Olympia#ksiyyi": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Opal#bn1kxl": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Oracle#105uqrh": {
+   "gaps": [
+    "server-missing:searchToTop"
+   ],
+   "steps": [
+    "searchToTop"
+   ]
+  },
+  "Oran Berry#1izbdcu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Oran Berry#fl9vq2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Order Pad#u2ld9h": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Ordinary Rod#4g431i": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Ortega#1h6tp0c": {
+   "steps": [
+    "opponentHandBottom"
+   ]
+  },
+  "Paint Roller#nzbnha": {
+   "steps": [
+    "discardStadium",
+    "draw"
+   ]
+  },
+  "Pal Pad#1plw3a1": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Pal Pad#csrm55": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Paldean Student#n2hpdf": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Palmer’s Contribution#k9lftf": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Panic Mask#1y8p8u2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Parasol Lady#19x3k0a": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Passho Berry#1vbiz51": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Patrol Cap#1avma4h": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Payapa Berry#1s169jg": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Peeking Red Card#16kc05o": {
+   "steps": [
+    "opponentHandShuffleDeck"
+   ]
+  },
+  "Penny#1mqi6yw": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Peonia#1fviuo4": {
+   "steps": [
+    "prizeToHand"
+   ]
+  },
+  "Peony#1knu88p": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Perrin#2cpeqt": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Philippe#898m4": {
+   "steps": [
+    "attachMultipleFromDiscard"
+   ]
+  },
+  "Phoebe#1mt5ck": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Picnic Basket#10y2edl": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Picnicker#ax8i0r": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Pidgeot Spirit Link#2s5hz8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Piers#fdkl6q": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Plume Fossil#viv2da": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Plumeria#18utds4": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Plumeria#amcntz": {
+   "steps": [
+    "discardCost",
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "PlusPower#187f10z": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "PlusPower#1rk0mgo": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "PlusPower#b0f68p": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Poison Barb#192qo92": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Poké Ball#1bd75bf": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Ball#1lm6d0b": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Ball#1wwoa0b": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Ball#a7gfnl": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Ball#biop7m": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Ball#c2thlt": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Ball#fw1tb4": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Blower +#6v0q05": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Poké Drawer +#1cnk06n": {
+   "steps": [
+    "draw",
+    "searchDeck"
+   ]
+  },
+  "Poké Healer +#1bqvq3o": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Poké Kid#1nxbkia": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Poké Maniac#2rsn1x": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Poké Pad#1aaws9u": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Poké Radar#1bz6pew": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Poké Vital A#1kx1s85": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "PokéDex HANDY909#421anw": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Pokédex HANDY910is#1vtz2r6": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Pokédex#2v26qt": {
+   "steps": [
+    "rearrangeTop"
+   ]
+  },
+  "Pokédex#bbmf2s": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Pokédex#j913cr": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Pokégear 3.0#1dfhux6": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Pokégear 3.0#1mmtgqn": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "PokéGear#jhit7v": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Pokémon Breeder Fields#12hpwof": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Breeder’s Nurturing#1bh96or": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Breeder#1klnf2e": {
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Pokémon Breeder#b7gjf4": {
+   "steps": [
+    "draw",
+    "healAmount"
+   ]
+  },
+  "Pokémon Breeder#igh3ne": {
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Pokémon Catcher#122hnlg": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Pokémon Catcher#1ht1wyv": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Pokémon Catcher#5p67fi": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Pokémon Catcher#hwdj5i": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Pokémon Center Lady#1m1v8gm": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Pokémon Center Lady#vf88os": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Pokémon Center#farpss": {
+   "gaps": [
+    "server-missing:healAllOwnAndDiscardEnergy"
+   ],
+   "steps": [
+    "healAllOwnAndDiscardEnergy"
+   ]
+  },
+  "Pokémon Circulator#4jg0j5": {
+   "steps": [
+    "switchOpponentOut"
+   ]
+  },
+  "Pokémon Collector#1qzx4xm": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Communication#10rgdow": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Communication#1abwjhc": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Communication#1bapps9": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Fan Club#1uopyjq": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Fan Club#eb5aun": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Fan Club#vgmuov": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Fan Club#vmzx0p": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Fan Club#xs6q3m": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Flute#7z16c2": {
+   "steps": [
+    "reviveFromDiscard"
+   ]
+  },
+  "Pokémon March#uhfnws": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Pokémon Nurse#1y8o21v": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Pokémon Nurse#fcw4gx": {
+   "gaps": [
+    "server-missing:healOneDiscardEnergy"
+   ],
+   "steps": [
+    "healOneDiscardEnergy"
+   ]
+  },
+  "Pokémon Personality Test#f8immy": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Pokémon Ranger#dne510": {
+   "steps": [
+    "clearAttackEffects"
+   ]
+  },
+  "Pokémon Rescue#18102l4": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Pokémon Retriever#fappsp": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Pokémon Reversal#13suyha": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Pokémon Reversal#1mdoc13": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Pokémon Reversal#7qtt41": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Pokémon Reversal#m6z954": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Pokémon Trader#1u2qxv": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "PokéNav#1sh0jjn": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "PokéNav#llv3c7": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Poppy#1mrieg6": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Pot Helmet#1cy23wu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Potion#1cpwt2m": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Potion#bu45ly": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Potion#qttxl5": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Potion#saukzm": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Pow! Hand Extension#jb5rqm": {
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Power Charge#11g8mj5": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Power Memory#14hcahf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Power Tablet#i4qo56": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Powerglass#wbc74z": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Precious Trolley#stuywz": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Premier Ball#gbe2aw": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Premium Power Pro#s1xo74": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Prime Catcher#122nyib": {
+   "steps": [
+    "switchOpponent",
+    "switchOwn"
+   ]
+  },
+  "Prof. Oak’s Research#1sywf44": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Professor Birch’s Observations#177hlni": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Professor Birch#1dyf188": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Professor Burnet#iya3jh": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Professor Cozmo’s Discovery#ma1w9s": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Professor Elm’s Lecture#2vm13u": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Professor Elm’s Training Method#8v6bk2": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Professor Elm#1w67498": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Professor Juniper#hm5xfl": {
+   "steps": [
+    "discardHandThenDraw"
+   ]
+  },
+  "Professor Kukui#ddrxng": {
+   "steps": [
+    "draw",
+    "passive"
+   ]
+  },
+  "Professor Laventon#1b0xlpq": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Professor Oak’s Hint#16vefd7": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Professor Oak’s New Theory#15bzw25": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Professor Oak’s Research#1sywf44": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Professor Oak’s Setup#yp74un": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Professor Oak’s Visit#de68ie": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Professor Oak#1tzwmsb": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Professor Oak#ewm3w1": {
+   "steps": [
+    "discardHandThenDraw"
+   ]
+  },
+  "Professor Rowan#1yat67n": {
+   "playCondition": "handCount>=2",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Professor Sada’s Vitality#gbha0l": {
+   "steps": [
+    "attachFromDiscard",
+    "draw"
+   ]
+  },
+  "Professor Sycamore#hm5xfl": {
+   "steps": [
+    "discardHandThenDraw"
+   ]
+  },
+  "Professor Turo’s Scenario#3t0mwc": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Professor’s Letter#1bb2s44": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Professor’s Research#hm5xfl": {
+   "steps": [
+    "discardHandThenDraw"
+   ]
+  },
+  "Protection Cube#27xoaz": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Protective Goggles#hvash1": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Protective Orb#1rhlpem": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Psychic Cube 01#bsdffg": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Psychic Memory#1kgnudg": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Psychic’s Third Eye#17exrn3": {
+   "steps": [
+    "discardAnyThenDraw",
+    "lookAtOpponentHand"
+   ]
+  },
+  "Punk Helmet#dscdfr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Puzzle of Time#3kzoo7": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Quad Stone#1ocd8zn": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Quick Ball#1pz0re8": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Quick Ball#o11lm2": {
+   "steps": [
+    "revealUntilCard"
+   ]
+  },
+  "Raifort#1ss73gn": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Raihan#oi00wj": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Rainbow Brush#1w18grs": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Random Receiver#1jyns7m": {
+   "steps": [
+    "revealUntilCard"
+   ]
+  },
+  "Rapid Strike Scroll of Swirls#1lxhyyk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rapid Strike Scroll of the Flying Dragon#1bveavl": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rapid Strike Scroll of the Skies#1fhiaf0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rapid Strike Style Mustard#1yvd6f0": {
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "draw"
+   ]
+  },
+  "Rare Candy#127i8vc": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Rare Candy#15uijpd": {
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Rare Candy#16yzztp": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Rare Candy#1votw7v": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Rare Candy#7q4mgo": {
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Rare Candy#m20299": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "evolveStage2"
+   ]
+  },
+  "Rare Fossil#2bmm1t": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Rayquaza Spirit Link#7aqdb4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Reboot Pod#nvnvzh": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Recall#7mwicp": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Recycle#1ab05ns": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Recycle#w4srpf": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Red & Blue#17eykct": {
+   "playCondition": "notFirstTurn",
+   "steps": [
+    "searchEvolve"
+   ]
+  },
+  "Red Card#1hu1ikn": {
+   "steps": [
+    "opponentShuffleHandDraw"
+   ]
+  },
+  "Red’s Challenge#1g80jub": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Redeemable Ticket#1filplj": {
+   "steps": [
+    "reshufflePrizes"
+   ]
+  },
+  "Relic Hunter#e877xn": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Repeat Ball#4u6zuy": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Repel#1b7ceoy": {
+   "steps": [
+    "switchOpponentOut"
+   ]
+  },
+  "Repel#1hyginn": {
+   "steps": [
+    "switchOpponentOut"
+   ]
+  },
+  "Rescue Board#16k5n2n": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rescue Carrier#142k7qx": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Rescue Scarf#4jb4ip": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rescue Stretcher#1ememv0": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Research Record#1ahp8hw": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Reserved Ticket#a344pn": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Reset Stamp#ty6g39": {
+   "steps": [
+    "opponentShuffleHandDraw"
+   ]
+  },
+  "Return Label#w9rh05": {
+   "gaps": [
+    "server-missing:opponentDiscardToDeckBottom"
+   ],
+   "steps": [
+    "opponentDiscardToDeckBottom"
+   ]
+  },
+  "Reversal Trigger#udifj1": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Revitalizer#1272hy4": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Revive#1a10i07": {
+   "steps": [
+    "reviveFromDiscard"
+   ]
+  },
+  "Revive#1sxp1jt": {
+   "steps": [
+    "reviveFromDiscard"
+   ]
+  },
+  "Ribbon Badge#72ehpp": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rigid Band#1swuld3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rika#1brijre": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Riley#1nwfqen": {
+   "steps": [
+    "opponentChoosesFromTop"
+   ]
+  },
+  "Rival#1t9e0r2": {
+   "steps": [
+    "opponentChoosesFromTop"
+   ]
+  },
+  "Roark#dopgte": {
+   "steps": [
+    "draw",
+    "recursion"
+   ]
+  },
+  "Robo Substitute Team Flare Gear#f5bcgs": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Rock Chestplate#5pdmei": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rock Guard#1dyhh0g": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rocket’s Admin.#djaf6i": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Rocket’s Admin.#vyykfh": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Rocket’s Mission#bop0xe": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Rocket’s Poké Ball#buuiz0": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Rocket’s Secret Experiment#k7wqu4": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Rocket’s Sneak Attack#3x9d8x": {
+   "steps": [
+    "opponentHandShuffleDeck"
+   ]
+  },
+  "Rocky Helmet#35yg0k": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rocky Helmet#8lxx7g": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rocky Helmet#s97rkz": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Roller Skater#1geuajh": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Roller Skates#1utvcfv": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Root Fossil Lileep#7rnasc": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Root Fossil#1ebuuqs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil#1rgszlr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil#f228fa": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil#f511lx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rosa’s Encouragement#1ym480p": {
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "attachMultipleFromDiscard"
+   ]
+  },
+  "Rosa#eav4ji": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Rose#xki9h": {
+   "steps": [
+    "attachMultipleFromDiscard"
+   ]
+  },
+  "Roseanne’s Backup#11nxkot": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Roseanne’s Research#1iytoyg": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Roto-Stick#v6ilig": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Rotom Bike#11f2eh6": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Rotom Dex Poké Finder Mode#tfycga": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Rotom Dex#lgb8y5": {
+   "steps": [
+    "reshufflePrizes"
+   ]
+  },
+  "Rotom Phone#1g24p04": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Roxanne#7axcvn": {
+   "playCondition": "opponentPrizes<=3",
+   "steps": [
+    "draw",
+    "ionoShuffle",
+    "opponentDraw"
+   ]
+  },
+  "Roxie’s Performance#117d1y4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Roxie#1ls6nao": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Rubber Gloves#1g91er": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ruffian#cas0c2": {
+   "steps": [
+    "discardToolAndSpecialEnergy"
+   ]
+  },
+  "Rugged Helmet#1d7tw8z": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ruin Wall#1ei12x4": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Rust Syndicate Grunt#n5h9te": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Rusted Shield#1fydzx0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rusted Sword#ea3ek8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ryme#jz26nq": {
+   "steps": [
+    "switchOpponentOut"
+   ]
+  },
+  "Sabrina & Brycen#ukll92": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Sabrina’s ESP#df7o5q": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sabrina’s Gaze#p2a8t3": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Sabrina’s Psychic Control#1jrfwt6": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Sabrina’s Suggestion#10jiyti": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Sabrina#wdzj70": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Sacred Ash#15jjy5i": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Sacred Ash#1kvi7vq": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Sacred Charm#1nmc0b2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sage’s Training#glqda5": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Saguaro#1jfl2pt": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Sail Fossil#2hiwum": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Salamence Spirit Link#1mh04i3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Salvatore#cah4i2": {
+   "steps": [
+    "searchEvolve"
+   ]
+  },
+  "Samson Oak#ffnwk5": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Sceptile Spirit Link#1jvytan": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Schoolboy#gctzpp": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Schoolgirl#lj0je6": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Scizor Spirit Link#3z5l56": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Scoop Up Cyclone#5zpj8g": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Scoop Up Cyclone#jdcinq": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Scoop Up Net#19p676x": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Scoop Up#120ticq": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Scorching Charcoal#1rd7uzp": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Scott#4016nb": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Scramble Switch#djxw4b": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Scramble Switch#s5zycp": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Secret Box#1o6l2u4": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Secret Mission#1yh59vp": {
+   "steps": [
+    "discardAnyThenDraw",
+    "lookAtOpponentHand"
+   ]
+  },
+  "Seeker#18zspo2": {
+   "gaps": [
+    "server-missing:eachPlayerReturnBench"
+   ],
+   "steps": [
+    "eachPlayerReturnBench"
+   ]
+  },
+  "Seer#1r7vv3l": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Serena#ah3811": {
+   "steps": [
+    "drawUntil",
+    "switchOpponent"
+   ]
+  },
+  "Shadow Triad#1j2a0zm": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Sharpedo Spirit Link#1212bos": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Shauna#cidezy": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Shauntal#29t5o1": {
+   "steps": [
+    "switchOpponent",
+    "switchOwn"
+   ]
+  },
+  "Sidney#c95qi4": {
+   "steps": [
+    "revealOpponentHandDiscard"
+   ]
+  },
+  "Siebold#s6jbqk": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Sightseer#tuem8b": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Silver Bangle#9nd2gu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Silver Mirror#lb025z": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Single Strike Scroll of Piercing#3jhf7d": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Single Strike Scroll of Scorn#qi1lx9": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Single Strike Scroll of the Fanged Dragon#18nyiuo": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Single Strike Style Mustard#1wzqbl6": {
+   "playCondition": "lastCardInHand",
+   "steps": [
+    "draw",
+    "searchDeck"
+   ]
+  },
+  "Sitrus Berry#1y2zfv": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sitrus Berry#2q8063": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Skull Fossil#1687sdy": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sky Seal Stone#1rrpasr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Skyla#145v87i": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Skyla#1ft0vyd": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Sleep!#1qhex0l": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Slowbro Spirit Link#1sknbsk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Snorlax Doll#1is2mug": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Snow Leaf Badge#1jiz08n": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Solid Rage#9lhnve": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sonia#mz6jav": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Sophocles#yeeb11": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Sordward & Shielbert#1ihd0sl": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Spark#1mkhy04": {
+   "steps": [
+    "attachFromDiscard",
+    "draw"
+   ]
+  },
+  "Sparkling Crystal#n9qmfl": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sparkling Robe#6gn8v8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Special Charge#tgqpfg": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Special Red Card#1443nxd": {
+   "playCondition": "opponentPrizes<=3",
+   "steps": [
+    "opponentShuffleHandDraw"
+   ]
+  },
+  "Spell Tag#mx1y29": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Spicy Seasoned Curry#196ozu8": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Spirit Mask#dmvoai": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Spongy Gloves#6b9u5q": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Stadium Nav#1lsnxh0": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Star Piece#1xwv7we": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Startling Megaphone#1vsq2g1": {
+   "steps": [
+    "discardTools"
+   ]
+  },
+  "Stealthy Hood#1790viw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Steelix Spirit Link#wd5q9c": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Steven’s Advice#1lkq1py": {
+   "playCondition": "handCount<=7",
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Steven’s Advice#la3bv4": {
+   "playCondition": "handCount<=6",
+   "steps": [
+    "variableDraw"
+   ]
+  },
+  "Steven’s Resolve#1bqlrz9": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Steven#47g6ju": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Strange Timepiece#1yfnmog": {
+   "steps": [
+    "devolve"
+   ]
+  },
+  "Strength Charm#1kf3bz9": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Strength Charm#1rqy8yk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Strength Charm#3dgcxu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Strength Charm#673omv": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Struggle Gloves#mq2p0r": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sun Seed#7l25fi": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Super Energy Removal 2#mfqpef": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Super Energy Removal#1lfs1f4": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Super Energy Retrieval#uuc5pl": {
+   "steps": [
+    "discardCost",
+    "recursion"
+   ]
+  },
+  "Super Potion#hd02e8": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Super Potion#m0bxi2": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Super Potion#r4d80o": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Super Rod#14gubcp": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Super Rod#18i1ssv": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Super Rod#1o4xrdr": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Super Rod#1yvczuw": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Super Rod#pnp92n": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Super Scoop Up#1fullix": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Super Scoop Up#4i7v8r": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Super Scoop Up#5v7nnj": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Supereffective Glasses#1b7wxgx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Superior Energy Retrieval#1ferztr": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Superior Energy Retrieval#1woedmi": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Surfer#v0pf6b": {
+   "steps": [
+    "drawUntil",
+    "switchOwn"
+   ]
+  },
+  "Surprise Box#16fcp83": {
+   "gaps": [
+    "server-missing:opponentDiscardToHand"
+   ],
+   "steps": [
+    "opponentDiscardToHand"
+   ]
+  },
+  "Surprise! Time Machine#4mt505": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Survival Brace#1oy8f69": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Suspicious Food Tin#1rk2kq7": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Sweet Honey#14nq7xs": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Switch Cart#sklx60": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Switch Raft#13fmom3": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Switch#1d9d95d": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Switch#4ss8dv": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Switch#67z5e3": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Switch#kwmkkl": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Switch#pmo0mb": {
+   "steps": [
+    "switchOwn"
+   ]
+  },
+  "Switching Cups#l7hmq8": {
+   "gaps": [
+    "server-missing:switchHandWithTop"
+   ],
+   "steps": [
+    "switchHandWithTop"
+   ]
+  },
+  "Swoop! Teleporter#16rubv6": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Tag Call#16z65c6": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Tag Switch#wxko85": {
+   "steps": [
+    "moveEnergy"
+   ]
+  },
+  "Target Whistle Team Flare Gear#cr9zof": {
+   "steps": [
+    "reviveFromDiscard"
+   ]
+  },
+  "Tarragon#71fw4k": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Tate & Liza#4gxg0j": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Team Aqua Admin#bs1su9": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Team Aqua Ball#giyon8": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Team Aqua Belt#16uj5yo": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Aqua Conspirator#1b15wqp": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Aqua Grunt#1l9e8ui": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Team Aqua Schemer#1crj4is": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Team Aqua Technical Machine 01#14adaby": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Team Aqua’s Great Ball#wu70gz": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Flare Grunt#wrckdp": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Team Galactic’s Invention G-101 Energy Gain#15xgbvz": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Team Galactic’s Invention G-103 Power Spray#1ahr4e1": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Team Galactic’s Invention G-105 Poké Turn#1hmun3": {
+   "steps": [
+    "returnPokemonToHand"
+   ]
+  },
+  "Team Galactic’s Invention G-107 Technical Machine G#iwz518": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Team Galactic’s Invention G-109 SP Radar#4pkkpl": {
+   "playCondition": "handCount>=2",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Galactic’s Mars#nt10z0": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Team Galactic’s Wager#otyoyk": {
+   "steps": [
+    "ionoShuffle"
+   ]
+  },
+  "Team Magma Admin#y8p93g": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Team Magma Ball#19pe5am": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Team Magma Belt#10kew6m": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Magma Conspirator#11uj0l0": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Magma Grunt#d8pjbd": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Team Magma Schemer#1v4rerb": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Team Magma Technical Machine 01#o3h9f0": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Team Magma’s Great Ball#1iwpvhp": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Plasma Badge#em1vsu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Team Plasma Ball#izwwcu": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Plasma Grunt#k6temf": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Team Rocket’s Archer#1y57ma1": {
+   "playCondition": "koedLastTurn:name=team rocket's",
+   "steps": [
+    "draw",
+    "ionoShuffle",
+    "opponentDraw"
+   ]
+  },
+  "Team Rocket’s Ariana#1l9wu9f": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Team Rocket’s Bother-Bot#lni7jz": {
+   "steps": [
+    "opponentPrizeHandSwap"
+   ]
+  },
+  "Team Rocket’s Evil Deeds#1va1dub": {
+   "steps": [
+    "opponentHandShuffleDeck"
+   ]
+  },
+  "Team Rocket’s Giovanni#kfsn4j": {
+   "steps": [
+    "switchOpponent",
+    "switchOwn"
+   ]
+  },
+  "Team Rocket’s Great Ball#12gk4hk": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Team Rocket’s Handiwork#10fbzqp": {
+   "gaps": [
+    "server-missing:millPerHeads"
+   ],
+   "steps": [
+    "millPerHeads"
+   ]
+  },
+  "Team Rocket’s Hypnotizer#1qpgeyl": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Team Rocket’s Petrel#145v87i": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Rocket’s Proton#1l3rkrl": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Rocket’s Transceiver#1t8q9g0": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Team Rocket’s Trickery#1sdovr7": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Team Rocket’s Venture Bomb#1hy9u06": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Team Skull Grunt#1rw0svv": {
+   "steps": [
+    "revealOpponentHandDiscard"
+   ]
+  },
+  "Team Star Grunt#19lfpoy": {
+   "steps": [
+    "opponentActiveEnergyToDeck"
+   ]
+  },
+  "Team Yell Grunt#1bfjxgh": {
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Team Yell Towel#1c8gk24": {
+   "steps": [
+    "healAmount"
+   ]
+  },
+  "Team Yell’s Cheer#17f207f": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Teammates#16p71yj": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Technical Machine TS-1#apjvqm": {
+   "steps": [
+    "searchEvolve"
+   ]
+  },
+  "Technical Machine TS-2#nt41k1": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Technical Machine: Blindside#13aonv7": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Technical Machine: Crisis Punch#lop53y": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Technical Machine: Devolution#1ha6881": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Technical Machine: Evolution#t0dh0g": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Technical Machine: Fluorite#16021jo": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Technical Machine: Turbo Energize#4uoux3": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Techno Radar#ad2b0x": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Telescopic Sight#1bm3ehk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Tera Orb#aoqbvm": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "The Boss’s Way#mw1w8m": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "The Masked Royal#19n9srt": {
+   "steps": [
+    "attachFromHand"
+   ]
+  },
+  "The Rocket’s Trap#m7xkt": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Thick Scale#ai2dov": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Thorton#1hnugkx": {
+   "steps": [
+    "swapWithDiscard"
+   ]
+  },
+  "Thought Wave Machine#c7uysp": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Tickling Machine#1blksdo": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Tierno#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Time Capsule#1twymlj": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Time Shard#a5zxg4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Time-Space Distortion#1m7gmcr": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Timer Ball#owct09": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "TM Machine#h3pizx": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Tool Box#1yxrire": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Tool Jammer#111lfqf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Tool Retriever#1wiqti8": {
+   "gaps": [
+    "server-missing:toolsToHand"
+   ],
+   "steps": [
+    "toolsToHand"
+   ]
+  },
+  "Tool Scrapper#17s138p": {
+   "steps": [
+    "discardTools"
+   ]
+  },
+  "Tool Scrapper#1my4d3c": {
+   "steps": [
+    "discardTools"
+   ]
+  },
+  "Tormenting Spray#l7vu7j": {
+   "gaps": [
+    "server-missing:discardRandomOpponentHandIfSupporter"
+   ],
+   "steps": [
+    "discardRandomOpponentHandIfSupporter"
+   ]
+  },
+  "Town Map#1dh3ktq": {
+   "steps": [
+    "revealPrizes"
+   ]
+  },
+  "Town Volunteers#1mnnwlt": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Toy Catcher#1ndeo59": {
+   "steps": [
+    "switchOpponent"
+   ]
+  },
+  "Trainers’ Mail#1kyyry5": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Transformation Tome#11yfc3r": {
+   "steps": [
+    "swapWithDiscard"
+   ]
+  },
+  "Transparent Walls#8ogqqr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Trash Exchange#1ba6a7e": {
+   "gaps": [
+    "server-missing:shuffleDiscardThenMill"
+   ],
+   "steps": [
+    "shuffleDiscardThenMill"
+   ]
+  },
+  "Traveling Salesman#sig0wa": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Treasure Tracker#149tg15": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Trekking Shoes#1b102jy": {
+   "steps": [
+    "draw",
+    "lookAtTop"
+   ]
+  },
+  "Tremendous Bomb#l0ibcl": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Trevor#1m5ysjt": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Trick Coin#1rnxtke": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Trick Shovel#svjjnn": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Tropical Tidal Wave#1ftqi9i": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Tropical Tidal Wave#1sjp8lt": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Tropical Tidal Wave#pb8tji": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Tropical Wind#n6aqja": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Tulip#1drhxzk": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Turbo Patch#qbds7r": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "TV Reporter#138s5ut": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "TV Reporter#zu4bas": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Twins#fnzia4": {
+   "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Tyme#1ke7oei": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Tyranitar Spirit Link#s8c8i4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "U-Turn Board#1vlfwxp": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ultra Ball#143u6vj": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Ultra Ball#1h0zpzk": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Ultra Ball#1pzy9up": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Ultra Ball#k1d1bz": {
+   "steps": [
+    "discardCost",
+    "searchDeck"
+   ]
+  },
+  "Ultra Forest Kartenvoy#8yhrb8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ultra Recon Squad#17hjfi": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Underground Expedition#17lenpt": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Underground Expedition#1g5vfu4": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Underground Expedition#7ll498": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Unfair Stamp#1q43ljv": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "draw",
+    "ionoShuffle",
+    "opponentDraw"
+   ]
+  },
+  "Unidentified Fossil#1v37j2a": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Unidentified Fossil#yuoarh": {
+   "steps": [
+    "fossilItem"
+   ]
+  },
+  "Urbain#jj14ok": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Urn of Vitality#1sxyhf1": {
+   "steps": [
+    "shuffleFromDiscard"
+   ]
+  },
+  "Vengeful Punch#1ve8ghv": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Venture Bomb#12ta8f6": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Venusaur Spirit Link#11ikq13": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Victory Cup#biop7m": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Victory Medal#9zvcfw": {
+   "steps": [
+    "draw",
+    "searchDeck"
+   ]
+  },
+  "Victory Piece#8e81q6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Vitality Band#1pbsx0t": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Volkner’s Philosophy#72i15t": {
+   "steps": [
+    "drawUntil"
+   ]
+  },
+  "Volkner#foelgo": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Volo#xjyk66": {
+   "steps": [
+    "discardOwnBenchPokemon"
+   ]
+  },
+  "VS Seeker#1mnu6zt": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "VS Seeker#1nkk20p": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "VS Seeker#kr5rp3": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Wait and See Hammer#ys5msk": {
+   "playCondition": "secondPlayerFirstTurn",
+   "steps": [
+    "discardEnergyFromOpponent"
+   ]
+  },
+  "Wait and See Turbo#1dnzm1q": {
+   "playCondition": "secondPlayerFirstTurn",
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Waitress#xxzdi0": {
+   "steps": [
+    "lookAtTop"
+   ]
+  },
+  "Wallace#19w1tpm": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Wally’s Compassion#nrh2wb": {
+   "steps": [
+    "heal"
+   ]
+  },
+  "Wally’s Training#sm2lxv": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Wally#8muisi": {
+   "steps": [
+    "searchEvolve"
+   ]
+  },
+  "Warp Point#18zvwoo": {
+   "steps": [
+    "switchOpponentOut",
+    "switchOwn"
+   ]
+  },
+  "Warp Point#1vybw7n": {
+   "steps": [
+    "switchOpponentOut",
+    "switchOwn"
+   ]
+  },
+  "Warp Point#svhg5m": {
+   "steps": [
+    "switchOpponentOut",
+    "switchOwn"
+   ]
+  },
+  "Water Cube 01#nainu6": {
+   "steps": [
+    "attachAttackTool"
+   ]
+  },
+  "Water Memory#1pizoi3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Weakness Guard#1urpdve": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Weakness Policy#gzeqrb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Weeding Gloves#im38im": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Welcoming Lantern#iovyub": {
+   "steps": [
+    "recursion"
+   ]
+  },
+  "Welder#6upawy": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Whitney#1mbchv3": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Wicke#19y4l8e": {
+   "gaps": [
+    "server-missing:eachPlayerShuffleHandDraw"
+   ],
+   "steps": [
+    "eachPlayerShuffleHandDraw"
+   ]
+  },
+  "Wide Lens#rj72ky": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Will#1j1581z": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Windstorm#16h5tm": {
+   "steps": [
+    "discardTools"
+   ]
+  },
+  "Windup Arm#su27w": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Winona#isjqbh": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
+  "Wishful Baton#1mat3rn": {
+   "steps": [
+    "moveEnergyToActive"
+   ]
+  },
+  "Wondrous Patch#yltwjr": {
+   "steps": [
+    "attachFromDiscard"
+   ]
+  },
+  "Worker#25pjpr": {
+   "steps": [
+    "draw"
+   ]
+  },
+  "Xerosic’s Machinations#1jvhg0h": {
+   "steps": [
+    "opponentDiscardUntil"
+   ]
+  },
+  "Xerosic#1wauix5": {
+   "steps": [
+    "discardFromOpponent"
+   ]
+  },
+  "Xtransceiver#y6gw6d": {
+   "steps": [
+    "coinFlip"
+   ]
+  },
+  "Yell Horn#1ej17zf": {
+   "steps": [
+    "applyStatus"
+   ]
+  },
+  "Youngster#cidezy": {
+   "steps": [
+    "shuffleHandThenDraw"
+   ]
+  },
+  "Zinnia’s Resolve#azmqq8": {
+   "steps": [
+    "discardCost",
+    "variableDraw"
+   ]
+  },
+  "Zinnia#13he4d": {
+   "playCondition": "koedLastTurn",
+   "steps": [
+    "attachFromHand"
+   ]
+  },
+  "Zisu#10i6k2c": {
+   "steps": [
+    "drawUntil"
+   ]
+  }
+ }
+}

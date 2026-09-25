@@ -577,6 +577,94 @@ test('handleKnockout: attached Legacy Energy reduces prizes owed by 1', () => {
   assert.equal(resControl.state.players.p1.zones.prizes.length, 5);
 });
 
+// Design 034 slice 2: ability combat reads are wired through the reduce call
+// sites, so a plural-abilities[] attacker bonus and a defender reduction both
+// move the dealt damage.
+test('attack damage: attacker ability bonus and defender reduction apply', () => {
+  const state = setupGame();
+  const attacker = state.players.p1.zones.active[0];
+  attacker.abilities = [
+    {
+      name: 'Powerful a-Salt',
+      text: "Attacks used by this Pokémon do 30 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance).",
+    },
+  ];
+  attacker.attacks.push({ name: 'Bonus Shock', damage: 30, cost: ['Lightning'] });
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 60);
+
+  const reduced = setupGame();
+  reduced.players.p2.zones.active[0].abilities = [
+    {
+      name: 'Metal Fortress',
+      text: "All of your Pokémon take 20 less damage from attacks from your opponent's Pokémon (after applying Weakness and Resistance).",
+    },
+  ];
+  reduced.players.p1.zones.active[0].attacks.push({
+    name: 'Plain Shock',
+    damage: 50,
+    cost: ['Lightning'],
+  });
+  const resReduced = applyCommand(reduced, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(resReduced.error, null);
+  assert.equal(resReduced.state.players.p2.zones.active[0].damage, 30);
+});
+
+test('attack damage: defender ability prevention applies', () => {
+  const state = setupGame();
+  state.players.p2.zones.active[0].abilities = [
+    { name: 'Safeguard', text: 'Prevent all damage done to this Pokémon by attacks.' },
+  ];
+  state.players.p1.zones.active[0].attacks.push({
+    name: 'Shielded',
+    damage: 50,
+    cost: ['Lightning'],
+  });
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage ?? 0, 0);
+  assert.ok(res.events.some((e) => e.type === 'damagePrevented'));
+});
+
+test('handleKnockout: victim-side ability prize reduction applies', () => {
+  const state = setupGame();
+  state.players.p1.zones.prizes = Array.from({ length: 6 }, (_, i) =>
+    createCard({ instanceId: 200 + i, name: `Prize ${i + 1}` })
+  );
+  const victim = state.players.p2.zones.active[0];
+  victim.types = ['Darkness'];
+  victim.abilities = [
+    {
+      name: 'Shadowy Concealment',
+      text: "If 1 of your {D} Pokémon is Knocked Out by damage from an attack from your opponent's Pokémon ex, that player takes 1 fewer Prize card. The effect of Shadowy Concealment doesn't stack.",
+    },
+  ];
+  const attacker = state.players.p1.zones.active[0];
+  attacker.name = 'Pikachu ex';
+  attacker.attacks.push({ name: 'Big Shock', damage: 100, cost: ['Lightning'] });
+  const res = applyCommand(state, {
+    type: 'attack',
+    payload: { attackIndex: 4 },
+    playerId: 'p1',
+  });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.flags.prizesOwed, 0);
+  assert.equal(res.state.players.p1.zones.prizes.length, 6);
+});
+
 test('attack heal: heals damage from attacker and emits damageUpdated event', () => {
   const state = setupGame();
   const attacker = state.players.p1.zones.active[0];
@@ -788,6 +876,48 @@ test('evolution legality: enforces turn-1 ban, same-turn ban, stage order, and o
     secondEvoCheck.reason,
     /Already evolved that Pokémon this turn/i
   );
+});
+
+test('Forest of Vitality: a {G} Basic played this turn evolves to Stage 1 then Stage 2', () => {
+  const state = setupGame({ turn: { number: 3, player: 'p1', phase: 'turn' } });
+  state.stadium = createCard({
+    instanceId: 490,
+    name: 'Forest of Vitality',
+    type: 'Trainer',
+    trainerType: 'Stadium',
+    ownerId: 'p2',
+    text: "Each player's {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.",
+  });
+  const grass = (instanceId, name, stage, evolvesFrom) =>
+    createCard({ instanceId, name, supertype: 'Pokémon', stage, evolvesFrom, types: ['Grass'] });
+  const bulbasaur = grass(491, 'Bulbasaur', 'Basic');
+  bulbasaur.enteredPlayTurn = 3;
+  state.players.p1.zones.bench.push(bulbasaur);
+  state.players.p1.zones.hand.push(
+    grass(492, 'Ivysaur', 'Stage 1', 'Bulbasaur'),
+    grass(493, 'Venusaur', 'Stage 2', 'Ivysaur')
+  );
+  const evolve = (st, instanceId) =>
+    applyCommand(st, { type: 'attachCard', payload: { instanceId, targetInstanceId: 491 }, playerId: 'p1' });
+
+  const stage1 = evolve(state, 492);
+  assert.equal(stage1.error, null);
+  const stage2 = evolve(stage1.state, 493);
+  assert.equal(stage2.error, null);
+  assert.equal(stage2.events.filter((e) => e.type === 'pokemonEvolved').length, 1);
+
+  // A non-{G} line keeps both gates.
+  const fire = setupGame({ turn: { number: 3, player: 'p1', phase: 'turn' } });
+  fire.stadium = state.stadium;
+  const charmander = createCard({ instanceId: 494, name: 'Charmander', supertype: 'Pokémon', stage: 'Basic', types: ['Fire'] });
+  charmander.enteredPlayTurn = 3;
+  fire.players.p1.zones.bench.push(charmander);
+  fire.players.p1.zones.hand.push(
+    createCard({ instanceId: 495, name: 'Charmeleon', supertype: 'Pokémon', stage: 'Stage 1', evolvesFrom: 'Charmander', types: ['Fire'] })
+  );
+  const blocked = validateLegality(fire, { type: 'attachCard', payload: { instanceId: 495, targetInstanceId: 494 }, playerId: 'p1' });
+  assert.equal(blocked.allowed, false);
+  assert.match(blocked.reason, /just played this turn/i);
 });
 
 test('Rare Candy: blocked on turn 1/2 and blocked on same-turn Basics', () => {

@@ -1,0 +1,464 @@
+{
+  "corpusRows": 4228,
+  "totals": {
+    "n": 4228,
+    "runs": 1675,
+    "partial": 257,
+    "dead": 62,
+    "consumed": 1169,
+    "unconsumed": 1064,
+    "unparsed": 1
+  },
+  "families": {
+    "attach": {
+      "n": 211,
+      "runs": 169,
+      "partial": 2,
+      "dead": 12,
+      "consumed": 0,
+      "unconsumed": 28,
+      "unparsed": 0
+    },
+    "attach-permission": {
+      "n": 3,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 3,
+      "unparsed": 0
+    },
+    "attach-restriction": {
+      "n": 10,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 10,
+      "unparsed": 0
+    },
+    "attack-cost": {
+      "n": 6,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 6,
+      "unparsed": 0
+    },
+    "attack-inheritance": {
+      "n": 5,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 5,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "bench-guard": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 1,
+      "unparsed": 0
+    },
+    "checkup": {
+      "n": 13,
+      "runs": 2,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 11,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "coin-control": {
+      "n": 8,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 8,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "copy-attack": {
+      "n": 30,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 28,
+      "unconsumed": 2,
+      "unparsed": 0
+    },
+    "cost-discount": {
+      "n": 91,
+      "runs": 7,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 43,
+      "unconsumed": 41,
+      "unparsed": 0
+    },
+    "damage-bonus": {
+      "n": 9,
+      "runs": 1,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 8,
+      "unparsed": 0
+    },
+    "damage-prevent": {
+      "n": 305,
+      "runs": 1,
+      "partial": 13,
+      "dead": 0,
+      "consumed": 197,
+      "unconsumed": 94,
+      "unparsed": 0
+    },
+    "damage-reduce": {
+      "n": 3,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 3,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "deck-peek": {
+      "n": 3,
+      "runs": 1,
+      "partial": 2,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "discard-bench": {
+      "n": 2,
+      "runs": 2,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "discard-cost": {
+      "n": 2,
+      "runs": 1,
+      "partial": 1,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "draw": {
+      "n": 219,
+      "runs": 189,
+      "partial": 6,
+      "dead": 22,
+      "consumed": 0,
+      "unconsumed": 2,
+      "unparsed": 0
+    },
+    "effect-prevent": {
+      "n": 151,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 101,
+      "unconsumed": 50,
+      "unparsed": 0
+    },
+    "end-of-turn": {
+      "n": 17,
+      "runs": 2,
+      "partial": 0,
+      "dead": 1,
+      "consumed": 2,
+      "unconsumed": 12,
+      "unparsed": 0
+    },
+    "energy-multiplier": {
+      "n": 19,
+      "runs": 0,
+      "partial": 0,
+      "dead": 1,
+      "consumed": 3,
+      "unconsumed": 15,
+      "unparsed": 0
+    },
+    "energy-on-ko": {
+      "n": 9,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 9,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "energy-redirect": {
+      "n": 95,
+      "runs": 78,
+      "partial": 9,
+      "dead": 0,
+      "consumed": 7,
+      "unconsumed": 1,
+      "unparsed": 0
+    },
+    "energy-type": {
+      "n": 3,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 3,
+      "unparsed": 0
+    },
+    "evolve": {
+      "n": 42,
+      "runs": 0,
+      "partial": 1,
+      "dead": 0,
+      "consumed": 23,
+      "unconsumed": 18,
+      "unparsed": 0
+    },
+    "extra-supporter": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 1,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "go-first": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 1,
+      "unparsed": 0
+    },
+    "heal": {
+      "n": 211,
+      "runs": 149,
+      "partial": 5,
+      "dead": 0,
+      "consumed": 13,
+      "unconsumed": 44,
+      "unparsed": 0
+    },
+    "hp-bonus": {
+      "n": 22,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 4,
+      "unconsumed": 18,
+      "unparsed": 0
+    },
+    "joke": {
+      "n": 1,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 1,
+      "unparsed": 0
+    },
+    "ko-prevention": {
+      "n": 63,
+      "runs": 10,
+      "partial": 1,
+      "dead": 0,
+      "consumed": 14,
+      "unconsumed": 38,
+      "unparsed": 0
+    },
+    "look-at-top": {
+      "n": 67,
+      "runs": 67,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "lost-zone": {
+      "n": 2,
+      "runs": 0,
+      "partial": 2,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "move-damage": {
+      "n": 294,
+      "runs": 146,
+      "partial": 26,
+      "dead": 1,
+      "consumed": 56,
+      "unconsumed": 65,
+      "unparsed": 0
+    },
+    "on-opponent-evolve": {
+      "n": 30,
+      "runs": 23,
+      "partial": 4,
+      "dead": 0,
+      "consumed": 3,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "opponent-disrupt": {
+      "n": 223,
+      "runs": 41,
+      "partial": 38,
+      "dead": 0,
+      "consumed": 62,
+      "unconsumed": 82,
+      "unparsed": 0
+    },
+    "passive": {
+      "n": 167,
+      "runs": 24,
+      "partial": 5,
+      "dead": 0,
+      "consumed": 78,
+      "unconsumed": 59,
+      "unparsed": 1
+    },
+    "prize-modify": {
+      "n": 52,
+      "runs": 2,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 23,
+      "unconsumed": 27,
+      "unparsed": 0
+    },
+    "recursion": {
+      "n": 119,
+      "runs": 45,
+      "partial": 41,
+      "dead": 0,
+      "consumed": 2,
+      "unconsumed": 31,
+      "unparsed": 0
+    },
+    "retreat-cost": {
+      "n": 172,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 74,
+      "unconsumed": 98,
+      "unparsed": 0
+    },
+    "search": {
+      "n": 295,
+      "runs": 236,
+      "partial": 50,
+      "dead": 3,
+      "consumed": 0,
+      "unconsumed": 6,
+      "unparsed": 0
+    },
+    "self-attach-energy": {
+      "n": 2,
+      "runs": 2,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "self-return": {
+      "n": 12,
+      "runs": 12,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "setup": {
+      "n": 9,
+      "runs": 1,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 7,
+      "unconsumed": 1,
+      "unparsed": 0
+    },
+    "status": {
+      "n": 507,
+      "runs": 197,
+      "partial": 24,
+      "dead": 21,
+      "consumed": 111,
+      "unconsumed": 154,
+      "unparsed": 0
+    },
+    "status-recover": {
+      "n": 38,
+      "runs": 9,
+      "partial": 1,
+      "dead": 0,
+      "consumed": 28,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "switch": {
+      "n": 256,
+      "runs": 234,
+      "partial": 6,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 16,
+      "unparsed": 0
+    },
+    "tool-cap": {
+      "n": 48,
+      "runs": 0,
+      "partial": 2,
+      "dead": 0,
+      "consumed": 46,
+      "unconsumed": 0,
+      "unparsed": 0
+    },
+    "type-change": {
+      "n": 18,
+      "runs": 0,
+      "partial": 0,
+      "dead": 0,
+      "consumed": 0,
+      "unconsumed": 18,
+      "unparsed": 0
+    },
+    "weakness": {
+      "n": 322,
+      "runs": 1,
+      "partial": 3,
+      "dead": 0,
+      "consumed": 207,
+      "unconsumed": 111,
+      "unparsed": 0
+    },
+    "when-played": {
+      "n": 39,
+      "runs": 23,
+      "partial": 15,
+      "dead": 1,
+      "consumed": 0,
+      "unconsumed": 0,
+      "unparsed": 0
+    }
+  }
+}

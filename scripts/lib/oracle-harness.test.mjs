@@ -90,6 +90,20 @@ test('diffTags names moves, damage, heals and new cards from p1 point of view', 
     'own:heal',
   ]);
   assert.deepEqual([...diffTags(before, before, [])], []);
+  assert.deepEqual(
+    [...diffTags(before, before, [{ type: 'turnDamageBonus', playerId: 'p1', amount: 100 }])],
+    ['own:turn-bonus']
+  );
+});
+
+test('diffTags tags a reveal of cards still in the opponent\'s hand, not other reveals', () => {
+  const state = buildState(() => mon('X'), 'active');
+  const snap = snapshot(state);
+  const oppHandCard = state.players.p2.zones.hand[0];
+  const ownCard = state.players.p1.zones.hand[0];
+  const reveal = (playerId, card) => [{ type: 'cardsRevealed', playerId, cards: [{ instanceId: card.instanceId }] }];
+  assert.deepEqual([...diffTags(snap, snap, reveal('p2', oppHandCard))], ['opp:hand-revealed']);
+  assert.deepEqual([...diffTags(snap, snap, reveal('p1', ownCard))], []);
 });
 
 test('oracleCorpus emits one row per attack and ability with family and damage fields', () => {

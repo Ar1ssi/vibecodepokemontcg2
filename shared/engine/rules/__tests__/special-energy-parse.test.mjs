@@ -217,7 +217,7 @@ test('planSpecialEnergyTriggers: discard / knockout / evolve / endTurn', () => {
   const { host, zone } = hostWith(['Water'], []);
   assert.deepEqual(
     planSpecialEnergyTriggers(energy('Splash Energy', 'This card provides {W} Energy only while this card is attached to a {W} Pokémon. If the {W} Pokémon this card is attached to is Knocked Out by damage from an opponent’s attack, put that Pokémon into your hand.'), { trigger: 'knockout', host, zoneArray: zone }),
-    [{ action: 'returnToHand' }]
+    [{ action: 'returnToHand', source: 'opponentAttack' }]
   );
   // Wrong host type: gated trigger does not fire.
   const wrong = hostWith(['Fire'], []);
@@ -227,11 +227,14 @@ test('planSpecialEnergyTriggers: discard / knockout / evolve / endTurn', () => {
   );
   assert.deepEqual(
     planSpecialEnergyTriggers(energy('Gift Energy', 'provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.'), { trigger: 'knockout' }),
-    [{ action: 'drawUntil', until: 7 }]
+    [{ action: 'drawUntil', until: 7, source: 'opponentAttack' }]
   );
 
   assert.deepEqual(
-    planSpecialEnergyTriggers(energy('Regenerative Energy', 'provides {C} Energy. Whenever you play a Pokémon from your hand to evolve the Pokémon V this card is attached to, heal 100 damage from that Pokémon.'), { trigger: 'evolve' }),
+    planSpecialEnergyTriggers(energy('Regenerative Energy', 'provides {C} Energy. Whenever you play a Pokémon from your hand to evolve the Pokémon V this card is attached to, heal 100 damage from that Pokémon.'), {
+      trigger: 'evolve',
+      evolvedFrom: { name: 'Eternatus V', subtypes: ['Basic', 'V'] },
+    }),
     [{ action: 'heal', amount: 100 }]
   );
 
@@ -306,4 +309,30 @@ test('Neo Upper Energy provides only one Energy on a non-Stage 2 host', async ()
   const frogadier = { name: 'Frogadier', type: 'Pokémon', stage: 'Stage1', types: ['Water'] };
   const entry = serverEnergyDescriptor(neoUpper, { hostPokemon: frogadier });
   assert.equal(canPayAttackCost([entry], ['Colorless', 'Colorless']), false);
+});
+
+// Audit SE11: planner gates on host type, host zone, evolved-from class and chooser.
+test('SE11: Nitro, Regenerative, Bubbly, Warp and Cyclone respect their printed gates', () => {
+  const nitroText =
+    'As long as this card is attached to a Pokémon, it provides {R} Energy. If this card is discarded by an effect of an attack used by the {R} Pokémon this card is attached to, put this card into your hand instead of the discard pile.';
+  const nitro = energy('Nitro {', nitroText);
+  const onFire = { name: 'Charmander', types: ['Fire'] };
+  const onWater = { name: 'Squirtle', types: ['Water'] };
+  assert.deepEqual(planSpecialEnergyTriggers(nitro, { trigger: 'discard', host: onFire, attackExecuting: true }), [{ action: 'returnToHand' }]);
+  assert.deepEqual(planSpecialEnergyTriggers(nitro, { trigger: 'discard', host: onWater, attackExecuting: true }), []);
+
+  const regen = energy('Regenerative Energy', 'provides {C} Energy. Whenever you play a Pokémon from your hand to evolve the Pokémon V this card is attached to, heal 100 damage from that Pokémon.');
+  assert.deepEqual(planSpecialEnergyTriggers(regen, { trigger: 'evolve', evolvedFrom: { name: 'Charmander', subtypes: ['Basic'] } }), []);
+
+  const bubblyText = 'provides {W} Energy. The {W} Pokémon this card is attached to recovers from all Special Conditions and can’t be affected by any Special Conditions.';
+  const bubblyOnFire = hostWith(['Fire'], [energy('Bubbly {', bubblyText)]);
+  assert.deepEqual(getSpecialEnergyStatusImmunity(bubblyOnFire.host, bubblyOnFire.zone), []);
+
+  const warp = energy('Warp Energy', 'Warp Energy provides {C} Energy. When you attach Warp Energy from your hand to your Active Pokémon, switch your Active Pokémon with 1 of your Benched Pokémon.');
+  assert.equal(planSpecialEnergyTriggers(warp, { trigger: 'attach', fromZone: 'hand', hostZoneId: 'bench' }).length, 0);
+  assert.equal(planSpecialEnergyTriggers(warp, { trigger: 'attach', fromZone: 'hand', hostZoneId: 'active' }).length, 1);
+
+  const cyclone = energy('Cyclone Energy', 'Cyclone Energy provides {C} Energy. When you play Cyclone Energy from your hand and attach it to your Active Pokémon, your opponent switches his or her Active Pokémon with 1 of his or her Benched Pokémon.');
+  const [plan] = planSpecialEnergyTriggers(cyclone, { trigger: 'attach', fromZone: 'hand', hostZoneId: 'active' });
+  assert.equal(plan.chooser, 'opponent');
 });

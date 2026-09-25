@@ -164,6 +164,12 @@ import test from 'node:test';
       assert.equal(isBasicEnergy({ name: 'Water Energy' }), false);
     });
 
+    test('isBasicEnergy: TCGdex energyType "Normal" on a typed special is not Basic (SE15)', () => {
+      const telepathic = { supertype: 'Energy', energyType: 'Normal', name: 'Telepathic Psychic Energy' };
+      assert.equal(isBasicEnergy(telepathic), false);
+      assert.equal(isBasicEnergy({ supertype: 'Energy', energyType: 'Normal', name: 'Psychic Energy' }), true);
+    });
+
     // ── rule box ───────────────────────────────────────────────────────────
     test('isRuleBoxPokemon: true for every rule-box subtype, false otherwise', () => {
       assert.equal(isRuleBoxPokemon(card({ subtypes: ['ex'] })), true);

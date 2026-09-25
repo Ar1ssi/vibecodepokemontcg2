@@ -30,7 +30,8 @@
 //   { type: 'onDamagedDraw', count }
 //   { type: 'onEvolveHeal', amount, hostType? }
 //   { type: 'onAttachDraw', count, hostType? }
-//   { type: 'onAttachSearch', what, count, destination, hostType?, oncePerTurn?, endsTurn? }
+//   { type: 'onAttachSearch', what, count, destination, hostType? }
+//   { type: 'activatedSearch', what, count, destination, oncePerTurn, endsTurn, requiresActive }  (Call Energy; no consumer yet)
 //   { type: 'onAttachHeal', amount, hostType? }
 //   { type: 'onAttachRemoveDamage', count, alsoCure?, hostType? }
 //   { type: 'onAttachDamageCounter', count }
@@ -58,6 +59,7 @@
 //   { type: 'officialIllegal' }
 
 import { isEnergyCard } from './energy-effects.mjs';
+import { isExCard, isGxCard, isRuleBoxPokemon, isVCard } from './card-classify.mjs';
 
 const SYMBOL_TYPES = {
   c: 'Colorless',
@@ -137,7 +139,8 @@ function pickCount(segment, fallback = 1) {
   if (only) return Number(only[1]);
   const providesN = segment.match(/provides (\d+) energy/);
   if (providesN) return Number(providesN[1]);
-  const anyCombo = segment.match(/provides only (\d+) in any combination/);
+  // Rapid Strike Energy: "it provides 2 in any combination of {W} Energy and {F} Energy" (SE14).
+  const anyCombo = segment.match(/(?:^|provides (?:only )?)(\d+) in any combination/);
   if (anyCombo) return Number(anyCombo[1]);
   const atATime = segment.match(/provides? (\d+) energy at a time/);
   if (atATime) return Number(atATime[1]);
@@ -166,6 +169,14 @@ function parseProvideClause(segment) {
   const condition = provisionCondition(segment);
   if (condition) step.condition = condition;
   return step;
+}
+
+// Unit / Blend Energy share a name across printings with different types: read the
+// "{F}, {D}, and {Y} Energy but provides only 1" clause, falling back when text is absent.
+function printedComboTypes(lower, fallback) {
+  const clause = String(lower || '').match(/provides ((?:\{[a-z]\}[^.]*?)+)energy but provides only 1/);
+  const types = clause ? symbolTypes(clause[1]) : [];
+  return types.length > 1 ? types : fallback;
 }
 
 // Cards whose provision is conditional and cannot be inferred from a single
@@ -204,14 +215,15 @@ const CONDITIONAL_PROVISION = [
   [/^rainbow energy$/, () => [
     { type: 'provide', energyTypes: ['Any'], count: 1 },
   ]],
-  [/^unit energy/, () => [
-    { type: 'provide', energyTypes: ['Fighting', 'Dark', 'Fairy'], count: 1, combination: true },
+  [/^unit energy/, (lower) => [
+    { type: 'provide', energyTypes: printedComboTypes(lower, ['Fighting', 'Dark', 'Fairy']), count: 1, combination: true },
   ]],
   [/^beast energy prism star$/, () => [
     { type: 'provide', energyTypes: ['Colorless'], count: 1 },
     { type: 'provide', energyTypes: ['Any'], count: 1, condition: 'ultraBeast' },
   ]],
   [/^super boost energy prism star$/, () => [
+    { type: 'provide', energyTypes: ['Colorless'], count: 1 },
     { type: 'provide', energyTypes: ['Any'], count: 1, condition: 'stage2' },
     { type: 'provide', energyTypes: ['Any'], count: 4, condition: 'threeStage2' },
   ]],
@@ -255,8 +267,8 @@ const CONDITIONAL_PROVISION = [
   [/^herbal energy$/, () => [
     { type: 'provide', energyTypes: ['Grass'], count: 1, condition: 'host:Grass' },
   ]],
-  [/^blend energy/, () => [
-    { type: 'provide', energyTypes: ['Water', 'Lightning', 'Fighting', 'Metal'], count: 1, combination: true },
+  [/^blend energy/, (lower) => [
+    { type: 'provide', energyTypes: printedComboTypes(lower, ['Water', 'Lightning', 'Fighting', 'Metal']), count: 1, combination: true },
   ]],
   [/^metal energy$/, () => [{ type: 'provide', energyTypes: ['Metal'], count: 1 }]],
   [/^darkness energy$/, () => [{ type: 'provide', energyTypes: ['Dark'], count: 1 }]],
@@ -319,7 +331,7 @@ const CONDITIONAL_PROVISION = [
 
 function parseProvision(name, lower) {
   for (const [re, build] of CONDITIONAL_PROVISION) {
-    if (re.test(name)) return build();
+    if (re.test(name)) return build(lower);
   }
   const steps = [];
   for (const sentence of lower.split(/(?<=\.)\s+/)) {
@@ -352,6 +364,9 @@ function parseAttachRestriction(lower) {
     restrict('darkOrRocket');
   } else if (/can be attached to 1 of your shining or light pokémon/.test(lower)) {
     restrict('shiningOrLight');
+  } else if (/attach miracle energy to 1 of your shining or light pokémon/.test(lower)) {
+    // Neo Destiny Miracle Energy limits where it is attached, with no discard rule (SE14).
+    restrict('shiningOrLight', { discardIfNot: false });
   } else if (/can be attached only to an evolved pokémon \(excluding pokémon-ex\)/.test(lower)) {
     restrict('evolvedExcludingEx');
   } else if (/can be attached only to an evolved pokémon|can be attached only to evolution pokémon/.test(lower)) {
@@ -385,7 +400,7 @@ function parseEffects(lower) {
   const push = (step) => steps.push(step);
 
   // ── lifecycle / discard ────────────────────────────────────────────────
-  if (/discard (?:it|this card|boost energy|mirror|r energy|magma energy|aqua energy|miracle energy)\b[^.]*at the end of (?:your|the) turn|discard .* at the end of the turn it was attached|at the end of your turn, discard/.test(lower)) {
+  if (/discard (?:it|this card|boost energy|mirror|r energy|magma energy|aqua energy|miracle energy)\b[^.]*at the end of (?:your|the) turn|discard .* at the end of the turn it was attached|at the end of your turn, discard|when your turn ends, discard/.test(lower)) {
     push({ type: 'discardAtEndOfTurn' });
   }
   if (/at the end of every turn, put (\d+) damage counter on the pokémon darkness energy is attached to/.test(lower)) {
@@ -398,19 +413,28 @@ function parseEffects(lower) {
   if (/if this card is discarded from play, put it into your hand instead of the discard pile/.test(lower)) {
     push({ type: 'onDiscardReturnToHand' });
   }
-  if (/if this card is discarded by an effect of an attack used by the \{?([a-z])\}? ?pokémon this card is attached to, put this card into your hand/.test(lower)) {
-    push({ type: 'onDiscardReturnToHand', condition: 'attackEffect', hostType: 'Fire' });
+  const discardToHand = lower.match(/if this card is discarded by an effect of an attack used by the \{?([a-z])\}? ?pokémon this card is attached to, put this card into your hand/);
+  if (discardToHand) {
+    push({ type: 'onDiscardReturnToHand', condition: 'attackEffect', hostType: SYMBOL_TYPES[discardToHand[1]] });
   }
   if (/if this card is discarded by an effect of an attack used by the pokémon this card is attached to, attach this card from your discard pile/.test(lower)) {
     push({ type: 'onDiscardReattach', condition: 'attackEffect' });
   }
-  if (/if this card is discarded by an attack of the \{([a-z])\} pokémon this card is attached to, attach this card from your discard pile/.test(lower)) {
-    push({ type: 'onDiscardReattach', condition: 'attack', hostType: 'Fire' });
+  const discardReattach = lower.match(/if this card is discarded by an attack of the \{([a-z])\} pokémon this card is attached to, attach this card from your discard pile/);
+  if (discardReattach) {
+    push({ type: 'onDiscardReattach', condition: 'attack', hostType: SYMBOL_TYPES[discardReattach[1]] });
   }
   if (/if (?:the|that) (?:[a-z{}]* )?pokémon this card is attached to is knocked out by damage from (?:an opponent's|an) attack, put (?:that|this) pokémon (?:back )?into your hand/.test(lower)
     || /is knocked out by damage from an opponent's attack, put that pokémon into your hand/.test(lower)) {
     const host = lower.match(/the \{([a-z])\} pokémon this card is attached to is knocked out/);
-    push({ type: 'onKnockoutReturnToHand', hostType: host ? SYMBOL_TYPES[host[1]] : undefined });
+    // Rescue reads "by damage from an attack" (any attack, own recoil included);
+    // Splash reads "from an opponent's attack".
+    const anyAttack = /knocked out by damage from an attack, put/.test(lower);
+    push({
+      type: 'onKnockoutReturnToHand',
+      hostType: host ? SYMBOL_TYPES[host[1]] : undefined,
+      source: anyAttack ? 'attack' : 'opponentAttack',
+    });
   }
   if (/is knocked out by damage from an attack from your opponent's pokémon, draw cards until you have (\d+) cards in your hand/.test(lower)) {
     const m = lower.match(/until you have (\d+) cards in your hand/);
@@ -487,19 +511,21 @@ function parseEffects(lower) {
     push({ type: 'onAttachDamageCounter', count: 1 });
   }
   if (/when you attach this card from your hand to 1 of your benched pokémon, switch that pokémon with your active pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'self', target: 'benchedToActive' });
+    push({ type: 'onAttachSwitch', side: 'self', target: 'benchedToActive', hostZone: 'bench' });
   }
   if (/when you attach this card from your hand to your active pokémon, switch that pokémon with 1 of your benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench' });
+    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench', hostZone: 'active' });
   }
   if (/when you attach this card from your hand to your active pokémon, switch 1 of the defending pokémon with 1 of your opponent's benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'opponent' });
+    // Stormfront Cyclone: "Your opponent chooses the Benched Pokémon to switch."
+    const opponentChooses = /your opponent chooses the benched pokémon/.test(lower);
+    push({ type: 'onAttachSwitch', side: 'opponent', hostZone: 'active', ...(opponentChooses ? { chooser: 'opponent' } : {}) });
   }
   if (/attach it to your active pokémon, your opponent switches (?:his or her|their) active pokémon with 1 of (?:his or her|their) benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'opponent' });
+    push({ type: 'onAttachSwitch', side: 'opponent', hostZone: 'active', chooser: 'opponent' });
   }
   if (/attach warp energy from your hand to your active pokémon, switch your active pokémon with 1 of your benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench' });
+    push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench', hostZone: 'active' });
   }
   if (/when you play this card from your hand and attach it to 1 of your pokémon, return a basic energy card attached to that pokémon to your hand/.test(lower)) {
     push({ type: 'onAttachReturnBasicEnergy' });
@@ -513,9 +539,21 @@ function parseEffects(lower) {
   if (/if you play this card from your hand, the pokémon you attach it to is no longer affected by a special condition/.test(lower)) {
     push({ type: 'onAttachClearStatus', conditions: ['Special Condition'] });
   }
+  if (/if you play this card from your hand, the pokémon you attach it to is no longer asleep, confused, paralyzed, or poisoned/.test(lower)) {
+    push({ type: 'onAttachClearStatus', conditions: ['Asleep', 'Confused', 'Paralyzed', 'Poisoned'] });
+  }
+  // Team Rocket Rainbow Energy: "it does 10 damage to that Pokémon (Don't apply W/R)".
+  if (/when you attach this card from your hand to 1 of your pokémon, it does 10 damage to that pokémon/.test(lower)) {
+    push({ type: 'onAttachDamageCounter', count: 1 });
+  }
+  if (/if this card is put into your discard pile from play, return it to your hand/.test(lower)) {
+    push({ type: 'onDiscardReturnToHand' });
+  }
   const callSearch = lower.match(/once during your turn, if the pokémon call energy is attached to is your active pokémon, you may search your deck for up to (\d+) basic pokémon and put them onto your bench/);
   if (callSearch) {
-    push({ type: 'onAttachSearch', what: 'Basic Pokémon', count: Number(callSearch[1]), destination: 'bench', oncePerTurn: true, endsTurn: true, requiresActive: true });
+    // An activated once-per-turn action that ends the turn, not an attach trigger. No command
+    // runs it yet (I169), so it fails closed instead of granting a free search on attach.
+    push({ type: 'activatedSearch', what: 'Basic Pokémon', count: Number(callSearch[1]), destination: 'bench', oncePerTurn: true, endsTurn: true, requiresActive: true });
   }
   if (/if you took this card as a face-down prize card during your turn, before you put it into your hand, you may attach this card to 1 of your pokémon/.test(lower)) {
     push({ type: 'attachFromPrize' });
@@ -539,13 +577,16 @@ function parseEffects(lower) {
     const m2 = lower.match(/do (\d+) more damage/);
     push({ type: 'damageBonus', amount: Number(m2[1]), hostType, target: 'opponentActive' });
   }
-  if (/if the pokémon darkness energy is attached to attacks, the attack does (\d+) more damage/.test(lower)) {
+  // Unseen Forces prints "is attached to attack," (SE14).
+  if (/if the pokémon darkness energy is attached to attacks?, the attack does (\d+) more damage/.test(lower)) {
     const m = lower.match(/the attack does (\d+) more damage/);
     push({ type: 'damageBonus', amount: Number(m[1]), hostType: 'Dark', target: 'active', condition: 'host:Dark' });
   }
   if (/if the pokémon darkness energy is attached to (?:damages the defending pokémon|does damage with an attack)/.test(lower)) {
     const m = lower.match(/the attack does (\d+) more damage/);
-    if (m) push({ type: 'damageBonus', amount: Number(m[1]), hostType: 'Dark', target: 'active', condition: 'host:Dark' });
+    // Aquapolis / Expedition print this bonus for any host, after W/R and only when the
+    // attack does damage; only the end-of-turn damage counter spares {D} Pokémon (SE14).
+    if (m) push({ type: 'damageBonus', amount: Number(m[1]), target: 'active', afterWR: true });
   }
   if (/if the pokémon r energy is attached to attacks, the attack does (\d+) more damage/.test(lower)) {
     const m = lower.match(/the attack does (\d+) more damage/);
@@ -558,7 +599,12 @@ function parseEffects(lower) {
   }
   if (/damage done to your opponent's pokémon by the pokémon double rainbow energy is attached to is reduced by (\d+)/.test(lower)) {
     const m = lower.match(/is reduced by (\d+)/);
-    push({ type: 'attackDamagePenalty', amount: Number(m[1]), target: 'opponentPokemon' });
+    push({
+      type: 'attackDamagePenalty',
+      amount: Number(m[1]),
+      target: 'opponentPokemon',
+      afterWR: /reduced by \d+ \(after applying weakness and resistance\)/.test(lower),
+    });
   }
   // Damage reduction on the attached Pokémon.
   let red = lower.match(/the \{([a-z])\} pokémon this card is attached to takes (\d+) less damage from attacks from your opponent's pokémon/);
@@ -573,21 +619,40 @@ function parseEffects(lower) {
     const m = lower.match(/do (\d+) less damage to the \{([a-z])\} pokémon/);
     push({ type: 'damageReduction', amount: Number(m[1]), hostType: SYMBOL_TYPES[m[2]], source: 'opponentPokemon', afterWR: false });
   }
-  if (/damage done by attacks to the pokémon that metal energy is attached to is reduced by (\d+) \(after applying weakness and resistance\)/.test(lower)) {
-    const m = lower.match(/is reduced by (\d+)/);
-    push({ type: 'damageReduction', amount: Number(m[1]), hostType: 'Metal', source: 'opponentPokemon', afterWR: true, condition: 'host:Metal' });
+  // Metal Energy: Call of Legends gates the reduction on a {M} host ("Ignore this effect
+  // if … isn't {M}"); Aquapolis / Expedition print it for any host (SE14).
+  const metalIncoming = lower.match(/damage done (?:by attacks )?to the pokémon (?:that )?metal energy is attached to is reduced by (\d+) \(after applying weakness and resistance\)/);
+  if (metalIncoming) {
+    const gated = /ignore this effect if the pokémon that metal energy is attached to isn't \{m\}/.test(lower);
+    push({
+      type: 'damageReduction',
+      amount: Number(metalIncoming[1]),
+      source: 'opponentPokemon',
+      afterWR: true,
+      ...(gated && { condition: 'host:Metal' }),
+    });
   }
-  if (/damage done to the pokémon metal energy is attached to is reduced by (\d+) \(after applying weakness and resistance\)/.test(lower)) {
-    const m = lower.match(/is reduced by (\d+)/);
-    push({ type: 'damageReduction', amount: Number(m[1]), hostType: 'Metal', source: 'opponentPokemon', afterWR: true });
+  // "…isn't {M}, whenever it damages a Pokémon, reduce that damage by 10" is the host's
+  // own outgoing damage, not incoming (SE14).
+  const metalOutgoing = lower.match(/if the pokémon metal energy is attached to isn't \{m\}, whenever it damages a pokémon[^.]*reduce that damage by (\d+) \((before|after) applying/);
+  if (metalOutgoing) {
+    push({
+      type: 'attackDamagePenalty',
+      amount: Number(metalOutgoing[1]),
+      target: 'opponentPokemon',
+      afterWR: metalOutgoing[2] === 'after',
+      condition: 'not:Metal',
+    });
   }
-  if (/if the pokémon metal energy is attached to isn't \{m\}, whenever it damages a pokémon[^.]*reduce that damage by (\d+)/.test(lower)) {
-    const m = lower.match(/reduce that damage by (\d+)/);
-    push({ type: 'damageReduction', amount: Number(m[1]), source: 'opponentPokemon', afterWR: false, condition: 'not:M' });
-  }
-  if (/damage done to that pokémon by attacks from your opponent's pokémon-ex is reduced by (\d+)/.test(lower)) {
-    const m = lower.match(/is reduced by (\d+)/);
-    push({ type: 'damageReduction', amount: Number(m[1]), source: 'opponentPokemonEx', condition: 'hostHasBasic:Grass' });
+  // Holon Energy GL: the Pokémon-ex reduction needs a basic {L} Energy (DF 85 and DS 105 word it differently).
+  const holonGlEx = lower.match(/also has a basic \{([a-z])\} energy card attached to it, damage done (?:to that pokémon by attacks from|by) your opponent's pokémon-ex is reduced by (\d+)/);
+  if (holonGlEx) {
+    push({
+      type: 'damageReduction',
+      amount: Number(holonGlEx[2]),
+      source: 'opponentPokemonEx',
+      condition: `hostHasBasic:${SYMBOL_TYPES[holonGlEx[1]]}`,
+    });
   }
   if (/ignore (?:this|these) effects? if (?:the pokémon )?(?:that )?(?:darkness|metal|holon energy|heal energy)[^.]*isn't \{([a-z])\}/.test(lower)) {
     const m = lower.match(/isn't \{([a-z])\}/);
@@ -617,8 +682,9 @@ function parseEffects(lower) {
   if (/the pokémon boost energy is attached to can't retreat/.test(lower)) {
     push({ type: 'cannotRetreat' });
   }
-  if (/the \{([a-z])\} pokémon this card is attached to recovers from all special conditions and can't be affected by any special conditions/.test(lower)) {
-    push({ type: 'statusImmunity', conditions: ALL_STATUS });
+  const typedImmunity = lower.match(/the \{([a-z])\} pokémon this card is attached to recovers from all special conditions and can't be affected by any special conditions/);
+  if (typedImmunity) {
+    push({ type: 'statusImmunity', conditions: ALL_STATUS, hostType: SYMBOL_TYPES[typedImmunity[1]] });
   } else if (/the pokémon this card is attached to recovers from being asleep, confused, or paralyzed and can't be affected by those special conditions/.test(lower)) {
     push({ type: 'statusImmunity', conditions: ['Asleep', 'Confused', 'Paralyzed'] });
   }
@@ -643,7 +709,8 @@ function parseEffects(lower) {
     const m = lower.match(/done to the \{([a-z])\} pokémon/);
     push({ type: 'effectShield', hostType: SYMBOL_TYPES[m[1]], source: 'opponentPokemon', excludeDamage: true });
   }
-  if (/if the pokémon that holon energy wp is attached to also has a basic \{([a-z])\} energy card attached to it, prevent all effects of attacks, excluding damage/.test(lower)) {
+  // Dragon Frontiers: "all effects of attacks, excluding damage"; Delta Species: "all effects, excluding damage".
+  if (/if the pokémon that holon energy wp is attached to also has a basic \{([a-z])\} energy card attached to it, prevent all effects(?: of attacks)?, excluding damage/.test(lower)) {
     push({ type: 'effectShield', source: 'opponentPokemon', excludeDamage: true, condition: 'hostHasBasic:Water' });
   }
   if (/prevent all effects of your opponent's pokémon's abilities done to the pokémon this card is attached to/.test(lower)) {
@@ -706,6 +773,8 @@ const STEP_DESCRIPTIONS = {
   onDamagedDraw: (s) => `if host is damaged, draw ${s.count} card`,
   onEvolveHeal: (s) => `on evolving the host, heal ${s.amount} damage`,
   onAttachDraw: (s) => `on attach from hand: draw ${s.count}${s.hostType ? ` (${s.hostType})` : ''}`,
+  activatedSearch: (s) =>
+    `once per turn while Active: search ${s.count} ${s.what} → ${s.destination}, then the turn ends`,
   onAttachSearch: (s) =>
     `on attach from hand: search ${s.count} ${s.what} → ${s.destination}${s.oncePerTurn ? ' (once/turn)' : ''}${s.endsTurn ? ' (ends turn)' : ''}`,
   onAttachHeal: (s) => `on attach from hand: heal ${s.amount} damage${s.hostType ? ` (${s.hostType})` : ''}`,
@@ -803,6 +872,18 @@ export function parseSpecialEnergyEffects(card) {
   };
 }
 
+/** "You can't have more than 1 Miracle Energy in your deck": the copy cap, or null. */
+export function specialEnergyDeckLimit(card) {
+  const step = parseSpecialEnergyEffects(card)?.steps.find((s) => s.type === 'deckLimit');
+  return step ? step.max : null;
+}
+
+/** Cards from hand an attach from hand costs (Aurora Energy: 1), else 0. */
+export function specialEnergyAttachDiscardCost(card) {
+  const step = parseSpecialEnergyEffects(card)?.steps.find((s) => s.type === 'attachCost');
+  return step?.discardFromHand || 0;
+}
+
 /** True when a special energy's effect is limited to once per game (Legacy). */
 export function hasOncePerGameSpecialEnergyEffect(card) {
   const parsed = parseSpecialEnergyEffects(card);
@@ -844,17 +925,26 @@ export function describeSpecialEnergyEffects(card) {
 //   { action: 'prizeReduction', count }
 export function planSpecialEnergyTriggers(
   card,
-  { trigger, host = null, zoneArray = [], fromZone = null, attackExecuting = false } = {}
+  { trigger, host = null, zoneArray = [], fromZone = null, attackExecuting = false, hostZoneId = null, evolvedFrom = null } = {}
 ) {
   const parsed = parseSpecialEnergyEffects(card);
   if (!parsed || !trigger) return [];
   const plans = [];
-  const hostCond = (step) => step.condition ?? (step.hostType ? `host:${step.hostType}` : null);
-  const ready = (step) => conditionMet(hostCond(step), host, zoneArray);
+  // Both gates apply: Nitro is "discarded by an effect of an attack used by the {R}
+  // Pokémon", so its attack condition and its host type must each hold (audit SE11a).
+  const ready = (step) =>
+    conditionMet(step.condition ?? null, host, zoneArray) &&
+    (!step.hostType || conditionMet(`host:${step.hostType}`, host, zoneArray));
   const attackCondition = (step) => step.condition === 'attack' || step.condition === 'attackEffect';
 
   for (const step of parsed.steps) {
     switch (step.type) {
+      case 'attachCost':
+        // Aurora Energy's discard is paid as part of attaching; legality checked the hand size.
+        if (trigger === 'attach' && fromZone === 'hand' && step.discardFromHand) {
+          plans.push({ action: 'discardHand', count: step.discardFromHand });
+        }
+        break;
       case 'onAttachDraw':
         if (trigger === 'attach' && fromZone === 'hand' && ready(step)) plans.push({ action: 'draw', count: step.count });
         break;
@@ -881,10 +971,17 @@ export function planSpecialEnergyTriggers(
         if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'addDamage', count: step.count, target: 'host' });
         break;
       case 'onAttachClearStatus':
-        if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'clearStatus' });
+        if (trigger === 'attach' && fromZone === 'hand') {
+          // Team Rocket Full Heal names four conditions; the others clear everything.
+          const named = (step.conditions || []).filter((c) => ALL_STATUS.includes(c));
+          plans.push({ action: 'clearStatus', ...(named.length && named.length < ALL_STATUS.length && { conditions: named }) });
+        }
         break;
       case 'onAttachSwitch':
-        if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'switch', side: step.side, target: step.target });
+        // "…to your Active Pokémon" / "…to 1 of your Benched Pokémon" (audit SE11d).
+        if (trigger === 'attach' && fromZone === 'hand' && (!step.hostZone || !hostZoneId || step.hostZone === hostZoneId)) {
+          plans.push({ action: 'switch', side: step.side, target: step.target, chooser: step.chooser ?? 'self' });
+        }
         break;
       case 'onAttachReturnBasicEnergy':
         if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'returnBasicEnergy' });
@@ -898,24 +995,27 @@ export function planSpecialEnergyTriggers(
         }
         break;
       case 'onDiscardReattach':
-        if (trigger === 'discard' && (!attackCondition(step) || attackExecuting)) {
+        if (trigger === 'discard' && ready(step) && (!attackCondition(step) || attackExecuting)) {
           plans.push({ action: 'reattach' });
         }
         break;
       case 'onKnockoutReturnToHand':
-        if (trigger === 'knockout' && ready(step)) plans.push({ action: 'returnToHand' });
+        if (trigger === 'knockout' && ready(step)) {
+          plans.push({ action: 'returnToHand', source: step.source || 'opponentAttack' });
+        }
         break;
       case 'onKnockoutDraw':
-        if (trigger === 'knockout') plans.push({ action: 'drawUntil', until: step.until });
+        if (trigger === 'knockout') plans.push({ action: 'drawUntil', until: step.until, source: 'opponentAttack' });
         break;
       case 'prizeReduction':
         if (trigger === 'knockout') plans.push({ action: 'prizeReduction', count: step.count });
         break;
       case 'onEvolveHeal':
-        // hostType is the card class the energy targets (e.g. Pokémon V), not a
-        // type gate; the effect only exists on such hosts, so it fires whenever
-        // the host evolves.
-        if (trigger === 'evolve') plans.push({ action: 'heal', amount: step.amount });
+        // hostType names the card class evolved from ("evolve the Pokémon V this card
+        // is attached to"), so gate on the Pokémon before it evolved (audit SE11b).
+        if (trigger === 'evolve' && (step.hostType !== 'Pokémon V' || isVCard(evolvedFrom))) {
+          plans.push({ action: 'heal', amount: step.amount });
+        }
         break;
       case 'onDamagedDamageCounters':
         if (trigger === 'damaged') {
@@ -966,11 +1066,18 @@ function hostHasBasicEnergy(zoneArray, hostImage, typeName, hostId) {
   );
 }
 
+const normalizeTypeName = (name) => {
+  const lowered = String(name ?? '').toLowerCase();
+  return lowered === 'darkness' ? 'dark' : lowered;
+};
+
+// Every printed type counts (dual-type Pokémon). The name fallback is only for cards
+// whose types have not synced yet; with types present, "Dragonite" is not {N}.
 function hostIsType(pokemon, typeName) {
-  const want = String(typeName ?? '').toLowerCase();
-  const data = String(pokemon?.types?.[0] ?? '').toLowerCase();
-  if (data === want) return true;
-  if ((data === 'dark' || data === 'darkness') && (want === 'dark' || want === 'darkness')) return true;
+  const want = normalizeTypeName(typeName);
+  if (want === 'ultra beast') return isUltraBeast(pokemon);
+  const types = (pokemon?.types || []).map(normalizeTypeName).filter(Boolean);
+  if (types.length > 0) return types.includes(want);
   return String(pokemon?.name ?? '').toLowerCase().includes(want);
 }
 
@@ -989,7 +1096,7 @@ function conditionMet(condition, pokemon, zoneArray) {
   if (!condition) return true;
   const img = pokemon?.image;
   if (condition.startsWith('host:')) return hostIsType(pokemon, condition.slice(5));
-  if (condition.startsWith('hostHasBasic:')) return hostHasBasicEnergy(zoneArray, img, condition.slice(14), pokemon?.instanceId);
+  if (condition.startsWith('hostHasBasic:')) return hostHasBasicEnergy(zoneArray, img, condition.slice('hostHasBasic:'.length), pokemon?.instanceId);
   if (condition.startsWith('not:')) return !hostIsType(pokemon, condition.slice(4));
   switch (condition) {
     case 'hostBasic':
@@ -1025,13 +1132,13 @@ export function getSpecialEnergyHpBonus(pokemonCard, zoneArray = []) {
 }
 
 /** Attack-damage bonus from the attacker's attached special energies. */
-export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defenderIsActive = true } = {}) {
+export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defenderIsActive = true, afterWR = false } = {}) {
   let total = 0;
   for (const energy of getAttachedSpecialEnergies(attacker, zoneArray)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
-      if (step.type !== 'damageBonus') continue;
+      if (step.type !== 'damageBonus' || !!step.afterWR !== afterWR) continue;
       if (step.target === 'opponentActive' && !defenderIsActive) continue;
       if (!conditionMet(step.condition ?? (step.hostType ? `host:${step.hostType}` : null), attacker, zoneArray)) continue;
       total += step.amount;
@@ -1041,13 +1148,16 @@ export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defender
 }
 
 /** Penalty applied to the attacker's own attacks (Double Turbo, Double Rainbow). */
-export function getSpecialEnergyAttackPenalty(attacker, zoneArray = []) {
+export function getSpecialEnergyAttackPenalty(attacker, zoneArray = [], { afterWR = false } = {}) {
   let total = 0;
   for (const energy of getAttachedSpecialEnergies(attacker, zoneArray)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
-      if (step.type === 'attackDamagePenalty') total += step.amount;
+      // Double Rainbow MA 88 is printed "after applying Weakness and Resistance" (SE13d).
+      if (step.type !== 'attackDamagePenalty' || !!step.afterWR !== afterWR) continue;
+      if (!conditionMet(step.condition ?? null, attacker, zoneArray)) continue;
+      total += step.amount;
     }
   }
   return total;
@@ -1061,19 +1171,37 @@ export function getSpecialEnergyAttackPenalty(attacker, zoneArray = []) {
  */
 export function getSpecialEnergyDamageReduction(defender, zoneArray = [], { attacker = null, afterWR = true } = {}) {
   let total = 0;
+  // "…can't be applied more than once at a time" (V Guard): one copy per name counts.
+  const onceApplied = new Set();
   for (const energy of getAttachedSpecialEnergies(defender, zoneArray)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
+    const onceKey = parsed.steps.some((s) => s.type === 'onceAtATime') ? parsed.name.toLowerCase() : null;
+    if (onceKey && onceApplied.has(onceKey)) continue;
+    let applied = false;
     for (const step of parsed.steps) {
       if (step.type !== 'damageReduction') continue;
       if ((step.afterWR ?? false) !== afterWR) continue;
-      if (step.source === 'opponentPokemonEx' && !/ex/i.test(String(attacker?.name ?? ''))) continue;
-      if (step.source === 'opponentPokemonV' && !/\bv\b/i.test(String(attacker?.name ?? ''))) continue;
+      if (step.source === 'opponentPokemonEx' && !isExCard(attacker ?? {})) continue;
+      if (step.source === 'opponentPokemonV' && !isVCard(attacker ?? {})) continue;
       if (!conditionMet(step.condition ?? (step.hostType ? `host:${step.hostType}` : null), defender, zoneArray)) continue;
       total += step.amount;
+      applied = true;
     }
+    if (applied && onceKey) onceApplied.add(onceKey);
   }
   return total;
+}
+
+/** True when the attacker's special Energy makes its attacks ignore Resistance (Holon FF). */
+export function hasSpecialEnergyIgnoresResistance(attacker, zoneArray = []) {
+  for (const energy of getAttachedSpecialEnergies(attacker, zoneArray)) {
+    const parsed = parseSpecialEnergyEffects(energy);
+    for (const step of parsed?.steps || []) {
+      if (step.type === 'ignoresResistance' && conditionMet(step.condition ?? null, attacker, zoneArray)) return true;
+    }
+  }
+  return false;
 }
 
 /** True when an attached special energy grants a free retreat. */
@@ -1088,6 +1216,13 @@ export function hasSpecialEnergyFreeRetreat(pokemonCard, zoneArray = []) {
     }
   }
   return false;
+}
+
+/** True when an attached special Energy stops the host retreating (Boost Energy). */
+export function hasSpecialEnergyCannotRetreat(pokemonCard, zoneArray = []) {
+  return getAttachedSpecialEnergies(pokemonCard, zoneArray).some((energy) =>
+    parseSpecialEnergyEffects(energy)?.steps.some((step) => step.type === 'cannotRetreat')
+  );
 }
 
 /** Retreat-cost reduction from attached special energies. */
@@ -1175,27 +1310,241 @@ export function blocksSpecialEnergyBenchDamage(pokemonCard, zoneId, zoneArray = 
   return false;
 }
 
-// Host conditions a cost-payment path can check from the host card alone.
-// Other conditions (prize count, rule box, …) fall through conditionMet's
-// default `true`, which would over-grant Energy, so they are not applied here.
-const HOST_PROVISION_CONDITIONS = new Set(['stage2', 'hostBasic', 'evolution']);
+const plainName = (card) => String(card?.name ?? '').replace(/[‘’]/g, "'");
+
+const subtypeListHas = (pokemon, re) => (pokemon?.subtypes || []).some((s) => re.test(String(s)));
+
+// Attach-restriction kinds → does this host qualify? `null` = the host's data cannot say
+// (server Pokémon carry no subtypes), so the restriction is not enforced.
+const knownStage = (host) => Boolean(host?.stage) || Boolean(host?.subtypes?.length);
+const RESTRICTION_HOSTS = {
+  type: (host, step) => (host?.types?.length ? hostIsType(host, step.hostType) : null),
+  teamRocket: (host) => /^team rocket'?s\b/i.test(plainName(host)),
+  darkOrRocket: (host) => /\bdark\b|\brocket'?s\b/i.test(plainName(host)),
+  teamMagma: (host) => /\bteam magma\b/i.test(plainName(host)),
+  teamAqua: (host) => /\bteam aqua\b/i.test(plainName(host)),
+  evolution: (host) => (knownStage(host) ? stageKey(host) !== 'basic' : null),
+  evolvedExcludingEx: (host) => (knownStage(host) ? stageKey(host) !== 'basic' && !isExCard(host) : null),
+  shiningOrLight: (host) => /^(shining|light)\s/i.test(plainName(host)),
+  fusionStrike: (host) => (host?.subtypes?.length ? subtypeListHas(host, /fusion strike/i) : null),
+  singleStrike: (host) => (host?.subtypes?.length ? subtypeListHas(host, /single strike/i) : null),
+  rapidStrike: (host) => (host?.subtypes?.length ? subtypeListHas(host, /rapid strike/i) : null),
+};
 
 /**
- * Energy units a special Energy provides because of its host (Neo Upper on a
- * Stage 2 → two units of every type). Returns pool tokens for
- * expandEnergyEntries ('Wildcard' = any type), or null when no host
- * condition applies and the card's ordinary type should be used.
+ * The first attach restriction `host` fails for this Energy ("This card can only be
+ * attached to …"), or null when it may stay attached. `atAttach` also checks the
+ * attach-time-only prerequisites (Bounce Energy's basic-Energy bearer).
+ *
+ * @returns {{kind:string, discardIfNot:boolean}|null}
  */
-export function hostConditionalProvision(energyCard, hostPokemon) {
-  if (!energyCard || !hostPokemon) return null;
-  const provides = parseSpecialEnergyEffects(energyCard)?.provides ?? [];
-  const met = provides.filter(
-    (step) => HOST_PROVISION_CONDITIONS.has(step.condition) && conditionMet(step.condition, hostPokemon, []),
+export function failedSpecialEnergyRestriction(energy, host, zoneArray = [], { atAttach = false } = {}) {
+  if (!energy || !host) return null;
+  const parsed = parseSpecialEnergyEffects(energy);
+  for (const step of parsed?.steps || []) {
+    if (step.type === 'attachRestriction') {
+      if (step.kind === 'basicEnergyBearer') {
+        if (atAttach && !hostHasAnyBasicEnergy(zoneArray, host)) return { kind: step.kind, discardIfNot: false };
+        continue;
+      }
+      const check = RESTRICTION_HOSTS[step.kind];
+      if (check && check(host, step) === false) return { kind: step.kind, discardIfNot: !!step.discardIfNot };
+    }
+    if (
+      step.type === 'discardWhenConditionLost' &&
+      !atAttach &&
+      knownStage(host) &&
+      !conditionMet(step.condition, host, zoneArray)
+    ) {
+      return { kind: step.condition, discardIfNot: true };
+    }
+  }
+  return null;
+}
+
+function hostHasAnyBasicEnergy(zoneArray, host) {
+  return (zoneArray || []).some(
+    (c) =>
+      c &&
+      c.type === 'Energy' &&
+      c.attachedTo != null &&
+      c.attachedTo === host.instanceId &&
+      !isSpecialEnergyCard(c)
   );
-  if (!met.length) return null;
-  const step = met[met.length - 1];
+}
+
+/** True when this Energy discards itself at the end of its owner's turn (Ignition, Boost). */
+export function discardsAtEndOfTurn(energy) {
+  return !!parseSpecialEnergyEffects(energy)?.steps.some((s) => s.type === 'discardAtEndOfTurn');
+}
+
+// Pool tokens use the cost-symbol spelling (TCGdex writes {D} costs "Darkness").
+const POOL_TYPE = { Dark: 'Darkness' };
+const poolType = (type) => POOL_TYPE[type] ?? type;
+
+const isSpPokemon = (pokemon) =>
+  (pokemon?.subtypes || []).some((s) => /^sp$/i.test(String(s))) ||
+  /\s(?:G|GL|FB|C|E4|4)$/.test(String(pokemon?.name ?? ''));
+
+const isLvXPokemon = (pokemon) =>
+  /lv\.?\s*x$/i.test(String(pokemon?.name ?? '')) ||
+  (pokemon?.subtypes || []).some((s) => /lv\.?\s*x/i.test(String(s)));
+
+const isUltraBeast = (pokemon) =>
+  (pokemon?.subtypes || []).some((s) => /ultra beast/i.test(String(s)));
+
+const isVOrGx = (pokemon) => isVCard(pokemon) || isGxCard(pokemon);
+
+// Client zone cards often carry no instanceId; two undefined ids are not the same card.
+function isSameCard(card, self) {
+  if (!self) return false;
+  if (card === self) return true;
+  return card.instanceId != null && card.instanceId === self.instanceId;
+}
+
+function basicEnergyTypesOn(attached, self) {
+  const types = new Set();
+  for (const card of attached) {
+    if (!card || isSameCard(card, self)) continue;
+    if (isSpecialEnergyCard(card)) continue;
+    const m = String(card.name ?? '').match(TYPED_BASIC_NAME);
+    if (m) types.add(poolType(SYMBOL_NAME_TYPES[m[1].toLowerCase()]));
+  }
+  return [...types];
+}
+
+const TYPED_BASIC_NAME = /^(?:basic\s+)?(grass|fire|water|lightning|psychic|fighting|darkness|dark|metal|dragon|fairy) energy$/i;
+const SYMBOL_NAME_TYPES = {
+  grass: 'Grass',
+  fire: 'Fire',
+  water: 'Water',
+  lightning: 'Lightning',
+  psychic: 'Psychic',
+  fighting: 'Fighting',
+  darkness: 'Darkness',
+  dark: 'Darkness',
+  metal: 'Metal',
+  dragon: 'Dragon',
+  fairy: 'Fairy',
+};
+
+/**
+ * Board facts a provide condition reads (Reversal / Counter / Scramble prizes, Super
+ * Boost Stage 2 count), built from client zone reads so the preview prices Energy the
+ * way the server's `energyProvisionContext` does. A missing prize count stays
+ * undefined, which leaves the trailing condition unmet rather than guessed.
+ *
+ * @param {{ownPrizes?:number, opponentPrizes?:number, inPlayPokemon?:object[]}} facts
+ *   `inPlayPokemon` = the top card of each of the player's Active/Benched Pokémon
+ */
+export function specialEnergyBoard({ ownPrizes, opponentPrizes, inPlayPokemon = [] } = {}) {
+  return {
+    ownPrizes: Number.isFinite(ownPrizes) ? ownPrizes : undefined,
+    opponentPrizes: Number.isFinite(opponentPrizes) ? opponentPrizes : undefined,
+    ownStage2InPlay: (inPlayPokemon || []).filter((c) => c && stageKey(c) === 'stage2').length,
+  };
+}
+
+/**
+ * Whether a provide step's condition holds. Every condition the parser can emit is
+ * decided explicitly; an unknown one is not met, so a missing rule never over-grants
+ * Energy (the old default-true did).
+ *
+ * @param {string|undefined} condition
+ * @param {{host?:object|null, attached?:object[], self?:object|null,
+ *          board?:{ownPrizes?:number, opponentPrizes?:number, ownStage2InPlay?:number}}} ctx
+ */
+function provisionConditionMet(condition, { host = null, attached = [], self = null, board = {} } = {}) {
+  if (!condition) return true;
+  if (!host) return false;
+  if (condition.startsWith('host:')) return hostIsType(host, condition.slice(5));
+  const trailing =
+    Number.isFinite(board.ownPrizes) &&
+    Number.isFinite(board.opponentPrizes) &&
+    board.ownPrizes > board.opponentPrizes;
+  switch (condition) {
+    case 'hostBasic':
+      return stageKey(host) === 'basic';
+    case 'stage2':
+      return stageKey(host) === 'stage2';
+    case 'evolution':
+      return stageKey(host) !== 'basic';
+    case 'threeStage2':
+      // Super Boost: the 4-Energy mode extends the Stage 2 host mode (UPR ruling), so a
+      // Basic host provides only {C} however many Stage 2 are in play.
+      return stageKey(host) === 'stage2' && (board.ownStage2InPlay ?? 0) >= 3;
+    case 'delta':
+      return conditionMet('delta', host, []);
+    case 'hostSP':
+      return isSpPokemon(host);
+    case 'ultraBeast':
+      return isUltraBeast(host);
+    case 'teamMagma':
+      return /^team magma'?s\b/i.test(String(host.name ?? '').replace(/’/g, "'"));
+    case 'teamAqua':
+      return /^team aqua'?s\b/i.test(String(host.name ?? '').replace(/’/g, "'"));
+    case 'isVOrGx':
+      return isVOrGx(host);
+    case 'notVOrGx':
+      return !isVOrGx(host);
+    case 'otherSpecial':
+      return attached.some(
+        (card) => card && !isSameCard(card, self) && isSpecialEnergyCard(card)
+      );
+    case 'noBasicEnergy':
+      return basicEnergyTypesOn(attached, self).length === 0;
+    case 'trailingPrizes':
+      return trailing;
+    case 'trailingPrizesNotGxEx':
+      return trailing && !isGxCard(host) && !isExCard(host);
+    case 'trailingPrizesNotLvX':
+      return trailing && !isLvXPokemon(host);
+    case 'trailingPrizesEvolutionNoRuleBox':
+      return trailing && stageKey(host) !== 'basic' && !isRuleBoxPokemon(host);
+    default:
+      return false;
+  }
+}
+
+function provideTokens(step, ctx) {
+  const count = Math.max(1, step.count || 1);
   const types = step.energyTypes || [];
-  const token = types.includes('Any') ? 'Wildcard' : types.length === 1 ? types[0] : null;
-  if (!token) return null;
-  return new Array(Math.max(1, step.count || 1)).fill(token);
+  if (types.includes('Any')) return new Array(count).fill('Wildcard');
+  if (types.includes('CrystalBasic')) {
+    const basics = basicEnergyTypesOn(ctx.attached || [], ctx.self);
+    if (!basics.length) return null;
+    return new Array(count).fill(basics.join('|'));
+  }
+  if (!types.length) return null;
+  const token = types.map(poolType).join('|');
+  return new Array(count).fill(token);
+}
+
+/**
+ * What a special Energy provides where it is attached, as expandEnergyEntries pool
+ * tokens ('Wildcard' = any type, "A|B" = one unit of either type). The last provide
+ * step whose condition holds wins ("… provides {C}{C}{C} Energy instead"); with none
+ * holding, the Energy provides nothing (Shield Energy off a {M} Pokémon).
+ *
+ * @param {object} energyCard
+ * @param {{host?:object|null, attached?:object[],
+ *          board?:{ownPrizes?:number, opponentPrizes?:number, ownStage2InPlay?:number}}} [ctx]
+ *   `attached` is every card attached to the host (siblings of this Energy).
+ * @returns {string[]|null} null when the card's text names no provision at all, so the
+ *   caller keeps its type-based fallback.
+ */
+export function specialEnergyProvision(energyCard, { host = null, attached = [], board = {} } = {}) {
+  if (!energyCard) return null;
+  const provides = parseSpecialEnergyEffects(energyCard)?.provides ?? [];
+  if (!provides.length) return null;
+  const ctx = { host, attached: attached || [], self: energyCard, board: board || {} };
+  const met = provides.filter((step) => provisionConditionMet(step.condition, ctx));
+  if (!met.length) return [];
+  const conditional = met.filter((step) => step.condition);
+  const step = conditional.length ? conditional[conditional.length - 1] : met[met.length - 1];
+  const tokens = provideTokens(step, ctx);
+  if (tokens) return tokens;
+  // Crystal Energy with no basic Energy beside it falls back to its {C} step.
+  const fallback = met.filter((s) => s !== step);
+  return fallback.length ? provideTokens(fallback[fallback.length - 1], ctx) ?? [] : [];
 }

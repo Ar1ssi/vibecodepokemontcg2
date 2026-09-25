@@ -1272,3 +1272,87 @@ touching 002's 3.12 flip gate. No new test file (no new dispatch primitive — t
 `isAuthoritativeDispatchActive`, already covered by slice 0's tests; the call site itself is
 one 4-line `if`, same untestable-in-place limitation as every other gated call site in this
 design). Everything uncommitted, no branch, per standing instruction.
+
+# Archived 2026-09-24 (merge of PRs #182-#184): ledgers finished on their branches
+
+## Done — design 035: Trainer behaviour implementation (branch `feature/trainer-behaviour`)
+
+Worktree: `C:\Users\SMG26\AppData\Local\Temp\opencode\trainer-behaviour-wt` (S280). Full plan:
+`.agent/designs/035-trainer-behaviour-implementation.md`. One commit per slice; suite green between.
+
+| Slice | Status | Notes |
+|---|---|---|
+| 1 | done (S280) | I131 prize-clause parser (`parsePrizeModify`) + 16-row corpus table; `trainer-tool-modifiers.test.mjs` (10 cases) |
+| 2 | done (S280) | I132 `benchLookPick` vocabulary + `benchPickMatches`; fossils bench their own card; Grimsley unchanged |
+| 3 | done (S280) | I133a `tool-conditions.mjs` + gated HP/retreat; `-100 HP`; Heavy Boots/Rescue Board retreat fixes |
+| 4 | done (S280) | I133b gated bonus/prevention/reduction/prize; Hop's A3; Panic Mask/Full Face Guard/Defiance; flags threaded |
+| 5 | done (S283) | I134a auto/simple steps: 11 handlers + `trainer-steps-missing.test.mjs` (15 cases); Karen `what` field; "draw a card" trailing draw parsed |
+| 6 | done (S283) | I134b choice-driven steps: 16 handlers + 16 tests (31 in file); `take`/`restTo` parser fields; suite 3390/3391 |
+| 7 | done (S283) | I134c `tool-attacks.mjs` + `attackViewFor` grant; end-of-turn tool sweep; `prizeCards` view; oracle PASSED |
+| 8 | done (S283) | I135a possessive turn-bonus wording (+styles, per-Prize) + `drawUntil` descriptors/bonusWhen; 12 new tests; suite 3402/3403 |
+| 9 | done (S283) | I135b tool on-damage/on-KO (`attachedToolOnKoEffects`, Beast Bringer attacker-side, Focus Band coin); `tool-on-ko.test.mjs` (12); oracle PASSED |
+| 10 | done (S285) | I135c 10a (S283) + 10b (S285: Minefield coin counters, Wela/Slumbering checkup coins, Mirage retreat coin, Chaos Gym Trainer coin, Vermilion attack coin, shared switch hook `effects/stadium-trigger-apply.mjs` at executor/special-energy/Erika sites); `stadium-triggers.test.mjs` (18); suite 3432/3433; oracle PASSED. **11 next**: play conditions |
+| 11 | pending | I135d play conditions (lostZone, stadium, basic Active, KO'd last turn, last card, hand gate, exactly-N prizes) |
+| 12 | pending | Tooling: refresh corpus, server-coverage column, `audit-trainer-behaviour.mjs` gate, close I131–I135 |
+
+Known gaps left by slices 1–4 (not in the audit's A5): Counter Gain / Karate Belt's attack-cost
+discount is still ungated on trailing prizes; Beast Bringer's prize clause needs the slice 9
+attacker-side hook; legacy client (chat-buttons.js) passes no defender-trailing flags, so
+Defiance Vest/Band gate out there (server-authoritative path is correct).
+
+Resume kit for slices 5–12: `.agent/scratch/035-slices-5-12-handoff.md` (worktree + primary) —
+per-step legacy semantics, server handler contract, model gotchas, oracle/lint commands.
+
+## Done — design 038: design 035 review fixes (I138–I150)
+
+Branch `claude/wizardly-brown-k61li3` (design 035 slices 1–12 + S288 reviews). Spec:
+`.agent/designs/038-trainer-review-fixes.md` (approved S289, option A ×5). One slice per commit, suite green between.
+- [x] 1 I138 prize-clause side + attack gate; I139/I140 Tool `phase` split (S289)
+- [x] 2 I141 + I143: faceDown choice options (engine + picker), count-only look events, Heavy/Beast Ball choice (S290; live Peonia check skipped per user)
+- [x] 3 I142 Mr. Fuji bench-only + `resetLeftPlay`; I147 single reveal; I146 Focus Band coin events + bench RNG (S291)
+- [x] 4 I144 `prizeFlags` at all damage sites; I145 shared `chaosGymBlocks` gate (S292; I152 filed)
+- [x] 5 I148 `onlyCopiesInHand`; I149 `turnOnePermission`; I150 gate steps/removed + baseline regen; I153 filed;
+      I152 fixed too (S293). Design 038 complete — next: merge branch to main
+Verify each slice: node --test "shared/**/*.test.mjs" "client/**/*.test.mjs" "server/**/*.test.mjs" "bot/**/*.test.mjs"
+(known fail: card-inspector-model "retreat greys"; coin-flip-ceremony flaky) + oracle/audit:trainers per the plan.
+
+## Done — design 034: ability behaviour implementation (branch `feature/ability-behaviour`)
+
+Full plan: `.agent/designs/034-ability-behaviour-implementation.md` (approved S279). One commit per
+slice on this branch; each commit leaves `pnpm test` + `pnpm audit:oracle` green.
+
+| Slice | Status | Notes |
+|---|---|---|
+| 1 | done (ff74b498) | `cardAbilityText` accessor; I130 HP reduction (`reduceHp`); `parseThorns` legacy wording + zone; typed-basic HP cap; `matchesSearch` or-split fix |
+| 2 | done | `ability-combat.mjs` readers + matrix tests; computeAttackDamage ability options (`abilityBonusBeforeWR`, `abilityReductionBeforeWR/AfterWR`, `abilityPrevention`, `weaknessOverride`); wired at all 3 reduce attack call sites, `effectiveHp` (sideCards), handleKnockout prizes, retreat, attack cost (ignore-Energy + Wild Growth multiplier) |
+| 3 | done | suppression (`isAbilitySuppressed`) wired into useAbility + every slice-2 reader + all locks; one `abilityActivationBlockReason` shared by reduce + picker (`collect-usable-abilities.mjs`); play locks (Item/Supporter/Stadium/Tool/ACE SPEC/Pokémon-with-Ability) in playTrainer; status immunity gated in `addCondition`; evolve permission/lock in attachCard; summon restriction in moveCard; retreat lock; Patrat counter lock in all 3 move-counter handlers; first-turn attack (Meloetta). Parser fixes: named-condition immunity → `statusImmunityAbility`, "each play" substring no longer a play lock, evolve-lock text no longer also an `evolveAbility`, Spearow first-turn permission. Oracle baseline surgically re-ratcheted for the 3 families the mis-parse fixes lowered (see D118) |
+| 4 | done | 4a: new `rules/ability-triggers.mjs` (checkup / on-opponent-evolve / on-damage / end-of-turn / between-turns / on-KO / on-promotion readers) + wired Checkup damage (Froslass/Magmortar/Pecharunt/TR Tyranitar/Trevenant), mandatory end-of-turn discard (Great Tusk ex), opponent-evolve counters (Team Rocket's Ampharos), thorns suppression + zone gate. 4b: on-promotion `movedToActiveTurn` window (D120), on-KO energy moves with target choice (D121), `abilityExtraAttack` Dipplin/Ω Barrage (D122). Oracle unchanged |
+| 5 | done (5a, 5b-1, 5b-2) | 5a: executor handlers for `moveDamageBetweenAbility`, `recoverStatusAbility`, `selfDamageAbility`, `turnDamageBonusAbility` (+ `attackerInstanceId` scope in `turnDamageBonusTotal`), `selfBenchPlacementAbility`, `returnSelfToHandAbility`, all registered in `EXTRA_STEP_HANDLERS`. 5b-1: `parseMoveEnergyShape` (target self/active/bench/between + source + targetTag/anyAmount/exact) feeds both move-energy parse sites; `moveEnergyAbility` handler honours it and auto-moves a forced single Energy; when-played "you must"/onto-Bench preamble (Durant ex, Gyarados, Mawile); Tool search (`what: 'Pokémon Tool'`, Farfetch'd). 5b-2: ability reveal voice (`abilityRevealVoice`) → `atkRevealOppHand` with new `bench` (HP filter, any number, Bench room, counters) and `deckShuffle` actions (Zubat, Greninja V-UNION, Gumshoos-GX, Mandibuzz, Ribombee, Mawile-GX, Dusknoir, Thievul, Tsareena); oracle tags `opp:hand-revealed`. Not covered: Gloom (bench-not-full precondition), Hawlucha Flying Entry (not in corpus wording) |
+| 6 | done (6a 079ee977, 6b 2dcd7e86, 6c 8baeebb2, 6d 3c7266db) | 6a: win-game (Unown, `abilityWinsGame` event), draw-variable (Genesect V), discard-for-draw (Rotom VSTAR), deck-place (Aipom), discard-bench (Hydreigon), energy-swap (Smeargle), stadium-manip (Gothitelle/Marshadow/Haxorus + `requiresStadiumDiscard`). 6b: transform (Aegislash/Wishiwashi/Ditto V/Zoroark/Ditto ×2), self-attach-as-Energy (`asEnergy`, D124; Buzzap KO via `settleAbilityOutcomes`), hand-activated + first-turn gates, legacy power-condition clause (D125). 6c: Dual Brains (`abilitySupporterLimit`), trainer "Your turn ends." + Additional Order, attack-borrowing (`parseAttackBorrowAbility` → `attackViewFor`). 6d: `flipCoin`/`withForcedCoin` (Contrary/Unlucky Wind), Victory Star (Glimwood prompt), Pattern Distraction, Explosiveness, Jirachi/Chansey prize-to-Bench, own-Prize swap. Not covered: Manectric Electric Start bench option, Unown S prize peek, Heat Metal/Overheater (Burned checkup), coin-conditional trainer turn ends (I131) |
+| 7 | done (7a, 7b, 7c; I136-I138 fixed S286-S287) | 7a: `pnpm audit:abilities` (`scripts/audit-ability-behaviour.mjs`, `scripts/lib/ability-behaviour.mjs`, `scripts/ability-behaviour-baseline.json`) — every printed ability classed runs/partial/dead/passive/unparsed per family (4228 rows: 1811/584/148/1684/1), runs share ratchets up, dead/unparsed down; `resolveAbilitySteps` exported so the gate reads the engine's own plan. 7b: `scripts/lib/ability-passive-probe.mjs` — passive rows split consumed/unconsumed (1166/518) by asking every wired passive reader on 4 probe boards with the text printed vs stripped (D127); `unconsumed` ratchets down; `--rows` lists `reads`. Found I136 (P1 cost discount), I137, I138. 7c: update EXECUTED_ABILITY_FAMILIES from the gate; add+close I128/I129/I130; annotate reports 7c: `checkExecutedClaims` (D128) — EXECUTED_ABILITY_FAMILIES derived from gate evidence (≥50% runs+consumed); I128-I130 closed; guide §8 annotated. Design 034 complete; backlog I141 |
+
+Known gaps carried from slice 2 (not regressions): "for each" scaling abilities (Kingambit-class)
+return 0 rather than a flat guess; coin-gated reduction/prevention and on-damage triggers land in
+slice 4; client `listAttacks` does not yet receive the ability cost options (server
+`attackCostPayable` does), so the picker may still show a cost the server ignores.
+
+Slice-3 gaps (new, not regressions): (1) Honchkrow-GX's "Special Energy" play lock is not enforced
+on the `attachCard` path — only `playTrainer` categories are wired; (2) the card inspector's
+`listAbilities` (attack-window.mjs) still gates only used/Active-Spot, so a suppressed ability shows
+as usable there; the ability picker (`collectUsableAbilities`) does pass board context; (3)
+`abilityStatusImmune` inside `addCondition` cannot see the board, so a suppressed immunity source
+still protects its holder; (4) `abilityExtraAttack` is read but not wired (slice 4 owns the
+KO→promotion→attack-again flow).
+
+Slice-4 gaps closed in 4b (D120/D121/D122). Remaining slice-4 note: optional end-of-turn abilities
+(Togekiss Precious Gift) are activated through useAbility, not the mandatory end-of-turn hook.
+4b-3 skips resolveCheckup between the two extra attacks (attack-again is mid-turn) — verify on a
+live game that conditions don't need to tick between them.
+
+Slice-5a gaps (new): (1) hand-activated placement abilities (Luxray Swelling Flash, Klinklang
+Emergency Rotation, Chansey Lucky Bonus) parse + execute but `validateReferences` for `useAbility`
+only allows active/bench cards, so the activation surface from hand is not wired — the handler is
+unit-tested directly via `executeSteps`; (2) `selfBenchPlacementAbility`'s `swapActive` variant
+("move your Active to the Bench and put this in the Active") is implemented but untested;
+(3) the when-played "must" mandatory wording (Gyarados Untamed One) and the opponent-disrupt
+reveal-hand wordings (Zubat/Mandibuzz/Thievul/Hawlucha) remain for 5b.

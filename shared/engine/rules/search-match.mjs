@@ -74,7 +74,12 @@ const TRAINER_KIND_TYPES = new Set(['item', 'supporter', 'stadium', 'tool', 'pok
 /** Match a card against a parsed search-step `what` string. */
 export function matchesSearch(card, what = '') {
   const w = what.toLowerCase();
-  if (w.includes(' or ')) {
+  // "90 HP or less" is a range, not an or-clause: splitting it dropped the cap
+  // and matched every card (same class as the typed-Basic HP cap bug below).
+  if (
+    /\s+or\s+/.test(w) &&
+    !/(?:hp|prize cards?)\s+or\s+(?:less|fewer|more|higher)\b/.test(w)
+  ) {
     return w.split(/\s+or\s+/).some((seg) => matchesSearch(card, seg.trim()));
   }
   const isPokemon = isPokemonCard(card);
@@ -98,6 +103,10 @@ export function matchesSearch(card, what = '') {
   if (w === 'item' || (w.includes('item') && !w.includes('tool'))) {
     const tt = String(card.trainerType || card.type || '').toLowerCase();
     return tt.includes('item') || (isTrainer && tt.includes('item'));
+  }
+  if (/pok[eé]mon tool/.test(w)) {
+    const kind = `${card.trainerType || ''} ${card.type || ''} ${(card.subtypes || []).join(' ')}`;
+    return isTrainer && /tool/i.test(kind);
   }
   if (w.includes('supporter')) {
     const tt = String(card.trainerType || card.type || '').toLowerCase();
@@ -170,7 +179,9 @@ export function matchesSearch(card, what = '') {
     const typedBasic = what.match(/basic\s+\{([A-Za-z])\}\s+pokémon/i);
     if (typedBasic) {
       const typeName = SYMBOL_TO_TYPE[typedBasic[1].toLowerCase()];
-      if (typeName) return matchesBasicPokemonType(card, typeName);
+      // A type match is not enough: "Basic {C} Pokémon with 100 HP or less"
+      // must still fall through to the HP-cap checks below.
+      if (typeName && !matchesBasicPokemonType(card, typeName)) return false;
     }
     if (w.includes('basic') && effectiveStage !== 'Basic') return false;
     // Word-form type qualifier ("Water Pokémon", "Basic Psychic Pokémon");

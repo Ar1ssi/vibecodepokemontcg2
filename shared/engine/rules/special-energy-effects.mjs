@@ -1,5 +1,6 @@
 // Typed special energy cards (ME03 Perfect Order, ME04 Chaos Rising,
-// ME05 Pitch Black). Pure parsers + helpers — DOM-free (node:test friendly).
+// ME05 Pitch Black). Name catalog + type-match helpers — DOM-free. Their effects
+// run through special-energy-parse.mjs; this catalog only feeds descriptions.
 // UI wiring lives in rules-bridge.js, chat-buttons.js, and move-card.js.
 
 const lower = (v) => String(v ?? '').toLowerCase();
@@ -110,97 +111,21 @@ export function pokemonMatchesEnergyType(pokemon, energyType) {
   return name.includes(want);
 }
 
-export function getAttachedEnergies(pokemonCard, zoneArray = []) {
-  const target = pokemonCard?.image;
-  if (!target) return [];
-  return zoneArray.filter(
-    (e) => e && e.type === 'Energy' && e.image?.relative === target,
-  );
-}
-
-function typedEnergyOnPokemon(pokemonCard, zoneArray, predicate) {
-  for (const energy of getAttachedEnergies(pokemonCard, zoneArray)) {
-    const def = parseTypedSpecialEnergy(energy);
-    if (!def) continue;
-    if (!pokemonMatchesEnergyType(pokemonCard, def.requiredPokemonType)) continue;
-    if (predicate(def, energy)) return { def, energy };
-  }
-  return null;
-}
-
-export function getEnergyHpBonus(pokemonCard, zoneArray = []) {
-  const hit = typedEnergyOnPokemon(
-    pokemonCard,
-    zoneArray,
-    (def) => def.hpBonus > 0,
-  );
-  return hit?.def.hpBonus || 0;
-}
-
-export function hasRockyEffectShield(pokemonCard, zoneArray = []) {
-  return typedEnergyOnPokemon(
-    pokemonCard,
-    zoneArray,
-    (def) => def.blocksAttackEffects,
-  ) != null;
-}
-
-export function hasBubblyStatusImmunity(pokemonCard, zoneArray = []) {
-  return typedEnergyOnPokemon(
-    pokemonCard,
-    zoneArray,
-    (def) => def.statusImmune,
-  ) != null;
-}
-
-export function hasMagneticFreeRetreat(pokemonCard, zoneArray = []) {
-  return typedEnergyOnPokemon(
-    pokemonCard,
-    zoneArray,
-    (def) => def.freeRetreat,
-  ) != null;
-}
-
-export function blocksBenchAttackDamage(pokemonCard, zoneId, zoneArray = []) {
-  if (zoneId !== 'bench') return false;
-  return typedEnergyOnPokemon(
-    pokemonCard,
-    zoneArray,
-    (def) => def.benchDamageShield,
-  ) != null;
-}
-
-export function getVoltaicDamageBonus(pokemonCard, zoneArray = []) {
-  const hit = typedEnergyOnPokemon(
-    pokemonCard,
-    zoneArray,
-    (def) => def.activeDamageBonus > 0,
-  );
-  return hit?.def.activeDamageBonus || 0;
-}
-
-export function getTelepathicOnAttachSearch(energyCard) {
-  const def = parseTypedSpecialEnergy(energyCard);
-  if (!def?.onAttachFromHandSearch) return null;
-  return { ...def.onAttachFromHandSearch };
-}
-
-export function shouldNitroReturnToHand(energyCard, hostPokemon, attackExecuting = false) {
-  if (!attackExecuting) return false;
-  const def = parseTypedSpecialEnergy(energyCard);
-  if (!def?.nitroRecycle) return false;
-  if (!hostPokemon) return false;
-  return pokemonMatchesEnergyType(hostPokemon, def.requiredPokemonType);
-}
-
+// "Basic {X} Pokémon" search filter. Cards can arrive with the Pokémon marker
+// on `type`, `supertype`, or only an `hp` field (deck rows / oracle harness),
+// and `stage` casing varies, so all three markers and a case-folded stage are
+// accepted.
 export function matchesBasicPokemonType(card, typeName) {
+  const marker = lower(card?.type || card?.supertype);
   const isPokemon =
-    String(card?.type || '').toLowerCase().includes('pokémon') ||
-    String(card?.type || '').toLowerCase().includes('pokemon') ||
+    marker.includes('pokémon') ||
+    marker.includes('pokemon') ||
+    (card?.hp != null && Number.isFinite(Number(card.hp))) ||
     (Array.isArray(card?.subtypes) &&
-      card.subtypes.some((s) => lower(s) === 'pokémon' || lower(s) === 'pokemon'));
+      card.subtypes.some(
+        (s) => lower(s) === 'pokémon' || lower(s) === 'pokemon'
+      ));
   if (!isPokemon) return false;
-  const stage = card?.stage || 'Basic';
-  if (stage !== 'Basic') return false;
+  if (lower(card?.stage || 'basic') !== 'basic') return false;
   return pokemonMatchesEnergyType(card, typeName);
 }

@@ -255,6 +255,79 @@ test("notFirstTurn play condition blocks Grimsley's Move on turn 2", () => {
   assert.equal(res.error, "You can't use this card during your first turn.");
 });
 
+test('lookAtBottom (Claw Fossil Anorith): benches its own Pokémon, never a Darkness Basic (I132)', () => {
+  const game = setup();
+  const dark = pokemon('Zorua', { types: ['Darkness'] });
+  const anorith = pokemon('Anorith', { stage: 'Stage 1' });
+  game.p1.zones.deck.push(dark, anorith);
+  const { res } = play(
+    game,
+    'Look at the bottom 7 cards of your deck. You may reveal an Anorith you find there and put it onto your Bench. Shuffle the other cards back into your deck.'
+  );
+  assert.deepEqual(ids(res.pendingChoice.options), [anorith.instanceId]);
+  const done = resolve(game, res, [anorith.instanceId]);
+  assert.ok(
+    zone(done, 'p1', 'bench').some((c) => c.instanceId === anorith.instanceId),
+    'Anorith is benched'
+  );
+  assert.ok(
+    zone(done, 'p1', 'deck').some((c) => c.instanceId === dark.instanceId),
+    'the Darkness Basic stays in the deck'
+  );
+});
+
+test('lookAtBottom (fossil): a targetless window means no placement, no choice (I132)', () => {
+  const game = setup();
+  const dark = pokemon('Zorua', { types: ['Darkness'] });
+  game.p1.zones.deck.push(dark);
+  const { res } = play(
+    game,
+    'Look at the bottom 7 cards of your deck. You may reveal an Anorith you find there and put it onto your Bench. Shuffle the other cards back into your deck.'
+  );
+  assert.equal(res.pendingChoice, null);
+  assert.equal(zone(res, 'p1', 'bench').length, 0);
+  assert.ok(zone(res, 'p1', 'deck').some((c) => c.instanceId === dark.instanceId));
+});
+
+test('lookAtBottom (fossil): a full Bench skips the placement (edge case 7)', () => {
+  const game = setup();
+  for (let i = 0; i < 5; i++) game.p1.zones.bench.push(pokemon(`Bench ${i}`));
+  const anorith = pokemon('Anorith', { stage: 'Stage 1' });
+  game.p1.zones.deck.push(anorith);
+  const { res } = play(
+    game,
+    'Look at the bottom 7 cards of your deck. You may reveal an Anorith you find there and put it onto your Bench. Shuffle the other cards back into your deck.'
+  );
+  assert.equal(res.pendingChoice, null);
+  assert.equal(zone(res, 'p1', 'bench').length, 5);
+  assert.ok(zone(res, 'p1', 'deck').some((c) => c.instanceId === anorith.instanceId));
+});
+
+test('lookAtTop (generic bench wording): only Basic Pokémon are offered (I132)', () => {
+  const game = setup();
+  const basic = pokemon('Pidgey');
+  const stage1 = pokemon('Pidgeotto', { stage: 'Stage 1' });
+  game.p1.zones.deck.push(basic, stage1, energy());
+  const { res } = play(
+    game,
+    'Look at the top 5 cards of your deck. You may put a Pokémon you find there onto your Bench. Shuffle the other cards back into your deck.'
+  );
+  assert.deepEqual(ids(res.pendingChoice.options), [basic.instanceId]);
+});
+
+test('lookAtTop (typed bench wording): type + Basic filter (I132)', () => {
+  const game = setup();
+  const fighting = pokemon('Machop', { types: ['Fighting'] });
+  const water = pokemon('Psyduck', { types: ['Water'] });
+  const fightingStage1 = pokemon('Machoke', { stage: 'Stage 1', types: ['Fighting'] });
+  game.p1.zones.deck.push(fighting, water, fightingStage1);
+  const { res } = play(
+    game,
+    'Look at the top 5 cards of your deck and put a {F} Pokémon you find there onto your Bench. Shuffle the other cards back into your deck.'
+  );
+  assert.deepEqual(ids(res.pendingChoice.options), [fighting.instanceId]);
+});
+
 test('lookAtBottom (Dusk Ball): Pokémon from the bottom 7', () => {
   const game = setup();
   const mon = pokemon('Zubat');
@@ -845,4 +918,81 @@ test("variableDraw (Acerola's Premonition): Stadium, Item, Supporter and Tool in
   }).res;
   assert.equal(res.error, null);
   assert.equal(zone(res, 'p1', 'hand').length, 4);
+});
+
+test('drawUntil: Lillie draws to 6, or 8 on your first turn (I135a)', () => {
+  const text =
+    "Draw cards until you have 6 cards in your hand. If it's your first turn, draw cards until you have 8 cards in your hand.";
+  const game = setup();
+  for (let i = 0; i < 10; i++) game.p1.zones.deck.push(card({ name: `d${i}` }));
+  const later = play(game, text, { name: 'Lillie', trainerType: 'Supporter' }).res;
+  assert.equal(later.error, null);
+  assert.equal(zone(later, 'p1', 'hand').length, 6, 'turn 3 is not the first turn');
+
+  const first = setup();
+  // Turn 2 is the second player's first turn (the player going first may not play
+  // a Supporter on turn 1).
+  first.state.turn.number = 2;
+  for (let i = 0; i < 10; i++) first.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res = play(first, text, { name: 'Lillie', trainerType: 'Supporter' }).res;
+  assert.equal(res.error, null);
+  assert.equal(zone(res, 'p1', 'hand').length, 8);
+});
+
+test('drawUntil: Zisu / Battle Reporter target the opponent hand (I135a)', () => {
+  const game = setup();
+  game.p2.zones.hand.push(card({ name: 'oh1' }), card({ name: 'oh2' }), card({ name: 'oh3' }), card({ name: 'oh4' }));
+  for (let i = 0; i < 8; i++) game.p1.zones.deck.push(card({ name: `d${i}` }));
+  const zisu = play(game, 'Draw cards until you have 1 more card in your hand than your opponent.', {
+    name: 'Zisu',
+    trainerType: 'Supporter',
+  }).res;
+  assert.equal(zisu.error, null);
+  assert.equal(zone(zisu, 'p1', 'hand').length, 5, '4 opponent cards + 1');
+
+  const game2 = setup();
+  game2.p2.zones.hand.push(card({ name: 'oh1' }), card({ name: 'oh2' }), card({ name: 'oh3' }), card({ name: 'oh4' }));
+  for (let i = 0; i < 8; i++) game2.p1.zones.deck.push(card({ name: `d${i}` }));
+  const reporter = play(game2, 'Draw cards until you have the same number of cards in your hand as your opponent.', {
+    name: 'Battle Reporter',
+    trainerType: 'Supporter',
+  }).res;
+  assert.equal(reporter.error, null);
+  assert.equal(zone(reporter, 'p1', 'hand').length, 4);
+});
+
+test('drawUntil: Grusha draws to 7 with no Energy attached, 5 otherwise (I135a)', () => {
+  const text =
+    'Draw cards until you have 5 cards in your hand. If none of your Pokémon have any Energy attached, draw cards until you have 7 cards in your hand instead.';
+  const bare = setup();
+  for (let i = 0; i < 8; i++) bare.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res = play(bare, text, { name: 'Grusha', trainerType: 'Supporter' }).res;
+  assert.equal(res.error, null);
+  assert.equal(zone(res, 'p1', 'hand').length, 7);
+
+  const withEnergy = setup();
+  const attached = energy();
+  attached.attachedTo = withEnergy.p1.zones.active[0].instanceId;
+  withEnergy.p1.zones.active.push(attached);
+  for (let i = 0; i < 8; i++) withEnergy.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res2 = play(withEnergy, text, { name: 'Grusha', trainerType: 'Supporter' }).res;
+  assert.equal(res2.error, null);
+  assert.equal(zone(res2, 'p1', 'hand').length, 5);
+});
+
+test("drawUntil: Cynthia's Ambition draws to 8 after a KO during the opponent's last turn (I135a)", () => {
+  const text =
+    "Draw cards until you have 5 cards in your hand. If any of your Pokémon were Knocked Out during your opponent's last turn, draw cards until you have 8 cards in your hand instead.";
+  const koed = setup();
+  koed.state.players.p1.flags.koedLastOppTurn = true;
+  for (let i = 0; i < 9; i++) koed.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res = play(koed, text, { name: "Cynthia's Ambition", trainerType: 'Supporter' }).res;
+  assert.equal(res.error, null);
+  assert.equal(zone(res, 'p1', 'hand').length, 8);
+
+  const clean = setup();
+  for (let i = 0; i < 9; i++) clean.p1.zones.deck.push(card({ name: `d${i}` }));
+  const res2 = play(clean, text, { name: "Cynthia's Ambition", trainerType: 'Supporter' }).res;
+  assert.equal(res2.error, null);
+  assert.equal(zone(res2, 'p1', 'hand').length, 5);
 });

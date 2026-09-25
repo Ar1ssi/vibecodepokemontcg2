@@ -35,10 +35,28 @@ const TEMPLATES = [
     /^choose 1 of your benched (.+?) pokemon's attacks and use it as this attack\.$/,
     (m) => ({ source: 'ownBench', group: m[1] }),
   ],
+  // Liepard Assist: any Benched Pokémon, no group.
+  [/^choose 1 of your benched pokemon's attacks and use it as this attack\.$/, () => ({ source: 'ownBench' })],
   [
     /^choose 1 of your opponent's (active |benched |)pokemon's attacks and use it as this attack\.$/,
     (m) => ({ source: OPPONENT_SCOPE[m[1]] }),
   ],
+  // Marshadow Shadow Imitation.
+  [
+    /^choose 1 of your opponent's active pokemon's non-gx attacks and use it as this attack\.$/,
+    () => ({ source: 'oppActive', excludeGx: true }),
+  ],
+  // Ditto Copy Anything.
+  [
+    /^choose 1 of your opponent's pokemon's attacks and use it as this attack\. if this pokemon doesn't have the necessary energy to use that attack, this attack does nothing\.$/,
+    () => ({ source: 'oppInPlay', needsEnergy: true }),
+  ],
+  // Hypno Pendulum Influence (after its coin), Zoroark Foul Play.
+  [
+    /^choose an attack from 1 of your opponent's pokemon in play and use it as this attack\.$/,
+    () => ({ source: 'oppInPlay' }),
+  ],
+  [/^choose 1 of the defending pokemon's attacks and use it as this attack\.$/, () => ({ source: 'oppActive' })],
   [
     /^choose an attack from a \{(\w)\} pokemon in your discard pile and use it as this attack\.$/,
     (m) => (TYPE_LETTERS[m[1]] ? { source: 'ownDiscard', pokemonType: TYPE_LETTERS[m[1]] } : null),
@@ -78,11 +96,21 @@ const TEMPLATES = [
  * The copy source an attack's whole text asks for, or null when the text is not a copy
  * attack (or carries anything the templates don't cover).
  * @returns {{source: string, group?: string, pokemonType?: string, count?: number,
- *   optional?: boolean, needsEnergy?: boolean} | null}
+ *   optional?: boolean, needsEnergy?: boolean, excludeGx?: boolean, coinGate?: string} | null}
  */
 export function parseCopyAttack(text) {
   const t = normalize(text);
   if (!t) return null;
+  const whole = matchTemplates(t);
+  if (whole) return whole;
+  // "Flip a coin. If heads, <copy wording>" (Liepard Assist, Ethan's Sudowoodo, Hypno).
+  const coin = /^flip a coin\. if heads, (.+)$/.exec(t);
+  if (!coin) return null;
+  const rest = matchTemplates(coin[1]);
+  return rest ? { ...rest, coinGate: 'heads' } : null;
+}
+
+function matchTemplates(t) {
   for (const [pattern, build] of TEMPLATES) {
     const m = pattern.exec(t);
     if (m) return build(m);
@@ -106,4 +134,47 @@ export function copiedAttackFor(attack, { sourceName, copierName }) {
   const renamed =
     sourceName && copierName && sourceName !== copierName ? text.split(sourceName).join(copierName) : text;
   return { ...attack, text: renamed, copiedFrom: sourceName || '' };
+}
+
+/**
+ * Attack-borrowing Abilities (design 034 slice 6): "This Pokémon can use the attacks of …
+ * (You still need the necessary Energy …)". Returns where the attacks come from and which
+ * Pokémon qualify; reduce.mjs gathers them into the attacker's view. Null for other text.
+ * @returns {{ scopes: string[], basic: boolean, noRuleBox: boolean, gxOrEx: boolean,
+ *   evolvesFrom: string|null, names: string[]|null, requiresActive: boolean }|null}
+ */
+export function parseAttackBorrowAbility(text) {
+  if (!/you still need the necessary energy/i.test(String(text || ''))) return null;
+  const t = normalize(text);
+  const phrase = t.match(/can use the attacks of (.+?)(?: as its own)?\s*\./)?.[1]?.trim();
+  if (!phrase) return null;
+  let scopes;
+  if (/lost zone/.test(phrase)) scopes = ['ownLostZone', 'oppLostZone'];
+  else if (/opponent's active|^that pokemon/.test(phrase)) scopes = ['oppActive'];
+  else {
+    scopes = [];
+    if (/bench/.test(phrase)) scopes.push('ownBench');
+    if (/discard pile/.test(phrase)) scopes.push('ownDiscard');
+    if (/in play/.test(phrase)) {
+      scopes.push('ownInPlay');
+      if (!/\byour\b|you have/.test(phrase)) scopes.push('oppInPlay');
+    }
+  }
+  const named = phrase.match(/^all (.+?) you have in play/)?.[1];
+  const names =
+    named && !/pokemon/.test(named)
+      ? named
+          .split(/,\s*(?:or\s+)?|\s+or\s+/)
+          .map((n) => n.replace(/^other\s+/, '').trim())
+          .filter(Boolean)
+      : null;
+  return {
+    scopes,
+    basic: /basic pokemon/.test(phrase),
+    noRuleBox: /except for pokemon with a rule box/.test(phrase),
+    gxOrEx: /pokemon-gx or pokemon-ex/.test(phrase),
+    evolvesFrom: phrase.match(/evolve from (\w+)/)?.[1] || null,
+    names,
+    requiresActive: /if this pokemon is your active|as long as [^.]+ is your active/.test(t),
+  };
 }

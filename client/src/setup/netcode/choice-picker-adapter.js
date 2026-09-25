@@ -7,10 +7,13 @@
 
 import { openCardPicker, closeCardPicker } from '../image-logic/card-picker.js';
 import { buildChoicePickerRequest } from './choice-picker-request.mjs';
+import { systemState } from '../../state.js';
 
 export const CHOICE_PICKER = {
   open({ choice, onResolve }) {
-    const request = buildChoicePickerRequest(choice, onResolve);
+    const request = buildChoicePickerRequest(choice, onResolve, {
+      cardBackSrc: systemState.cardBackSrc,
+    });
     if (!request) throw new Error('pendingChoice has no card options');
     openCardPicker(request).catch((err) => {
       console.error('[choice-picker] failed to open:', err);

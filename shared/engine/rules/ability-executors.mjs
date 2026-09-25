@@ -6,8 +6,8 @@
 // the attack path; this module only extracts *what* a card does from its
 // printed ability text.
 
-import { isBasicPokemon } from '../cards.mjs';
-import { isExCard, isGxCard } from './card-classify.mjs';
+import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
+import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -21,17 +21,21 @@ const firstAbilityText = (card) => {
   return typeof first === 'string' ? first : first?.text || '';
 };
 
-const textOf = (card) =>
+// The single ability-text accessor for the engine, lowercased for matching.
+// Server-hydrated cards carry abilities as a plural array only; without the
+// `firstAbilityText` fallback every text-driven parser saw an empty string and
+// silently skipped the card's ability (I128), so passive consumers must read
+// text through here rather than off `card.ability` directly.
+export const cardAbilityText = (card) =>
   lower(
     card?.ability?.text ??
       card?.abilityText ??
       card?.text ??
       card?.effect ??
-      // Server-hydrated cards carry abilities as a plural array only; without
-      // this fallback every text-driven parser saw an empty string and silently
-      // skipped the card's ability (e.g. passive cost discounts).
       firstAbilityText(card)
   );
+
+const textOf = cardAbilityText;
 
 // --- position ----------------------------------------------------------
 
@@ -41,10 +45,41 @@ const textOf = (card) =>
 // on the move and stays legal from the Bench, and "As long as this Pokémon is in the Active Spot …"
 // is a passive with nothing to activate. Matching either of those would disable a legal ability,
 // which costs more than the over-permissive behavior this replaces.
-const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active)\b/;
+const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active|your active pok[eé]mon)\b/;
 
 export function requiresActiveSpot(card) {
   return ACTIVE_SPOT_CLAUSE.test(textOf(card));
+}
+
+// Legacy powers: "This power can't be used if <this Pokémon> is Asleep, Confused, or Paralyzed"
+// ('rotation') or "… is affected by a Special Condition" ('any'); null when unrestricted.
+export function powerConditionRestriction(card) {
+  const match = textOf(card).match(
+    /power can't be used if [\s\S]*?(asleep, confused, or paralyzed|affected by a special condition)/
+  );
+  if (!match) return null;
+  return match[1].startsWith('asleep') ? 'rotation' : 'any';
+}
+
+// Ditto Transformative Start, Fan Call, Abnormal Outbreak: "Once during your first turn, …".
+export function requiresFirstTurn(card) {
+  return /once during your first turn\b/.test(textOf(card));
+}
+
+// Luxray Swelling Flash / Klinklang Emergency Rotation ("if this Pokémon is in your hand"),
+// Charjabug Battery ("attach this card from your hand"): activated from the hand, not play.
+const HAND_ACTIVATION_CLAUSE =
+  /if this pok[eé]mon is in your hand(?! when you are setting up)|attach this card from your hand/;
+
+export function isHandActivatedAbility(card) {
+  return HAND_ACTIVATION_CLAUSE.test(textOf(card));
+}
+
+// Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".
+const BENCH_SPOT_CLAUSE = /if this pok[eé]mon is on your bench\b/;
+
+export function requiresBenchSpot(card) {
+  return BENCH_SPOT_CLAUSE.test(textOf(card));
 }
 
 // "Once during your turn, if any of your Pokémon were Knocked Out during your opponent's last turn"
@@ -102,32 +137,172 @@ export function isActivatedAbility(card, abilityIndex = 0) {
 // --- passive -----------------------------------------------------------
 
 // How many cost symbols a passive ability removes from attacks.
-// "reduce the cost … by 1" / "attacks cost 1 less" → 1; "cost less" → 1.
+// "reduce the cost … by 1" / "attacks cost 1 less" / "attacks cost {C}{C} less" → 1 / 1 / 2;
+// "cost less" → 1.
 //
-// The text has to actually describe a REDUCTION. This previously matched on /(cost|energy)/ and
-// then returned 1 whenever no number was found, so every ability that merely mentioned Energy
-// granted a free symbol off every attack: Charmander's Agile ("If this Pokémon has no Energy
-// attached, it has no Weakness") made its Live Coal payable with zero Energy attached. A
-// false positive here silently removes a cost from combat, which is far worse than missing an
-// exotic wording, so the reduction verb is now required rather than assumed.
-export function passiveCostDiscount(card) {
-  const t = textOf(card);
-  if (!t) return 0;
-  if (!/(less|fewer|reduc|decrease|lower)/.test(t)) return 0;
-  // …and it has to be an ATTACK cost. "The Retreat Cost of this Pokémon is 1 less" is a retreat
-  // modifier — parseRetreatCostModifier owns that — and reading it here would discount attacks.
-  if (/retreat/.test(t) && !/attack/.test(t)) return 0;
-  if (!/(cost|energy|attack)/.test(t)) return 0;
-  const by =
-    t.match(/(?:by|less|fewer)\s*(\d+)/) ||
-    t.match(/(\d+)\s+(?:less|fewer)/);
-  if (by) return parseInt(by[1], 10) || 1;
-  return 1;
+// A false positive here silently removes a cost from combat, which is far worse than missing an
+// exotic wording, so one sentence has to say that an ATTACK's COST goes DOWN. Earlier versions
+// matched loose keywords across the whole card text: mentioning Energy made Charmander's Live
+// Coal free, and "takes 30 less damage from attacks" (I157) — a reduction wording, printed on
+// abilities and on attack text alike — discounted every attack by 30, i.e. made them free.
+// Retreat Cost wordings are parseRetreatCostModifier's and never mention an attack's cost.
+const ATTACK_COST_REDUCTION = [
+  /\battacks?\b[^.]*?\bcosts?\b[^.]*?\b(?:less|fewer)\b/,
+  /\bcosts? of [^.]*?\battacks?\b[^.]*?\b(?:reduced|less|fewer|lower|decreased)\b/,
+  /\breduce the (?:energy )?cost of [^.]*?\battacks?\b/,
+];
+
+const COST_SYMBOL_TYPE = {
+  g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic',
+  f: 'Fighting', d: 'Darkness', m: 'Metal', y: 'Fairy', n: 'Dragon',
+};
+
+const rootsIn = (cards = []) => (cards || []).filter((c) => c && !c.attachedTo && isPokemon(c));
+
+// Whose attacks the discount covers, checked against the attacker (for a Tool, its host).
+function discountCoversAttacker(sentence, attacker) {
+  const name = lower(attacker?.name);
+  if (/hop's pok[eé]mon/.test(sentence) && !name.startsWith("hop's")) return false;
+  if (/tera pok[eé]mon/.test(sentence) && !isTeraCard(attacker)) return false;
+  if (/pok[eé]mon-gx[^.]*evolve from eevee/.test(sentence)) {
+    if (!isGxCard(attacker) || lower(attacker?.evolvesFrom) !== 'eevee') return false;
+  }
+  const named = sentence.match(/pok[eé]mon v this card is attached to has ([^.]*?) in its name/);
+  if (named) {
+    const names = [...named[1].matchAll(/["“]([a-z]+),?["”]/g)].map((m) => m[1]);
+    if (!isVCard(attacker) || !names.some((n) => name.includes(n))) return false;
+  }
+  return true;
 }
 
-// Apply a cost discount: drop `n` symbols from the front of the cost list.
+// "If …" clauses a discount is printed behind: true / false from ctx, undefined when the clause
+// is not this condition. Anything unrecognised fails closed.
+const DISCOUNT_CONDITIONS = [
+  (c, ctx) => {
+    const m = c.match(/you have exactly (\d+) cards? in your hand/);
+    if (!m) return undefined;
+    return ctx.ownHandCount != null && ctx.ownHandCount === Number(m[1]);
+  },
+  (c, ctx) => {
+    if (!/your opponent has any pok[eé]mon/.test(c)) return undefined;
+    const opp = rootsIn(ctx.opponentSideCards);
+    const wantVmax = /vmax/.test(c);
+    const wantGxEx = /pok[eé]mon-gx or pok[eé]mon-ex/.test(c);
+    if (!wantVmax && !wantGxEx) return undefined;
+    return opp.some((p) => (wantVmax && isVmaxCard(p)) || (wantGxEx && (isGxCard(p) || isExCard(p))));
+  },
+  (c, ctx) => {
+    if (!/you have more prize cards remaining than your opponent/.test(c)) return undefined;
+    if (ctx.ownPrizesLeft == null || ctx.opponentPrizesLeft == null) return false;
+    return ctx.ownPrizesLeft > ctx.opponentPrizesLeft;
+  },
+  (c, ctx) => {
+    // "If you have Regirock, Regice, and Registeel in play": each named Pokémon on your side.
+    const m = c.match(/^you have ([^,]+(?:, [^,]+)*?(?:,? and [^,]+)?) in play$/);
+    if (!m || /pok[eé]mon|\{/.test(m[1])) return undefined;
+    const names = m[1].split(/, and |, | and /).map((n) => n.trim()).filter(Boolean);
+    const own = rootsIn(ctx.ownSideCards).map((p) => lower(p.name));
+    return names.every((n) => own.some((o) => o.includes(n)));
+  },
+  // The Tool naming itself ("As long as <Tool> is attached to a Pokémon") always holds here.
+  (c) => (/is attached to a pok[eé]mon$/.test(c) ? true : undefined),
+  // A host filter, checked by discountCoversAttacker.
+  (c) => (/this card is attached to has/.test(c) ? true : undefined),
+];
+
+// "for each …" units the discount scales by, or null when the unit is not read.
+function discountUnits(sentence, ctx) {
+  const each = sentence.match(/for each ([^.]+)/)?.[1];
+  if (!each) return 1;
+  const opp = rootsIn(ctx.opponentSideCards);
+  if (/kofu card in your discard pile/.test(each)) {
+    return (ctx.ownDiscard || []).filter((c) => lower(c.name).includes('kofu')).length;
+  }
+  if (/your opponent's benched pok[eé]mon/.test(each)) {
+    return opp.filter((p) => !(ctx.opponentActive || []).includes(p)).length;
+  }
+  if (/prize card your opponent has taken/.test(each)) {
+    return ctx.opponentPrizesLeft == null ? null : Math.max(0, 6 - ctx.opponentPrizesLeft);
+  }
+  if (/your opponent's pok[eé]mon v in play/.test(each)) return opp.filter((p) => isVCard(p)).length;
+  if (/single strike, rapid strike, and fusion strike/.test(each)) {
+    return opp.filter((p) =>
+      (p.subtypes || []).some((t) => /single strike|rapid strike|fusion strike/i.test(t))
+    ).length;
+  }
+  if (/team plasma pok[eé]mon/.test(each)) {
+    return opp.filter((p) => /plasma/.test(`${lower(p.name)} ${lower((p.subtypes || []).join(' '))}`)).length;
+  }
+  return null;
+}
+
+/**
+ * What an attack-cost discount printed on `source` (the attacker's own Ability, or a Tool
+ * attached to it) takes off this attack: `{ count, symbol }` — `symbol` is the Energy type a
+ * typed discount ("{Y} less") removes, null for Colorless/any. Null when nothing applies.
+ * `ctx`: `{ attacker, ownHandCount, ownPrizesLeft, opponentPrizesLeft, ownSideCards,
+ * opponentSideCards, opponentActive, ownDiscard }`; a condition or "for each" unit it cannot check fails closed
+ * (I160). Only a sentence saying an attack's cost goes down is read (I157).
+ */
+export function costDiscountRead(source, ctx = {}) {
+  const t = textOf(source);
+  if (!t) return null;
+  const sentence = t
+    .split(/[.\n]/)
+    .find((s) => !/retreat cost/.test(s) && ATTACK_COST_REDUCTION.some((re) => re.test(s)));
+  if (!sentence) return null;
+  const attacker = ctx.attacker || source;
+  if (!discountCoversAttacker(sentence, attacker)) return null;
+  // A list of names has its own commas: "If you have Regirock, Regice, and Registeel in play, …".
+  const lead = sentence.trim();
+  const clause = (lead.match(/^(?:if|as long as) (.+? in play),/) || lead.match(/^(?:if|as long as) (.+?),/))?.[1];
+  if (clause) {
+    const verdicts = DISCOUNT_CONDITIONS.map((check) => check(clause, ctx));
+    if (verdicts.every((v) => v === undefined) || verdicts.some((v) => v === false)) return null;
+  }
+  const units = discountUnits(sentence, ctx);
+  if (!units) return null;
+  const symbols = sentence.match(/((?:\{[a-z]\})+)\s*(?:energy\s*)?(?:less|fewer)/);
+  let per = 1;
+  let symbol = null;
+  if (symbols) {
+    const letters = symbols[1].match(/[a-z]/g);
+    per = letters.length;
+    symbol = letters[0] === 'c' ? null : COST_SYMBOL_TYPE[letters[0]] || null;
+  } else {
+    const by = sentence.match(/\bby\s*(\d+)/) || sentence.match(/(\d+)\s+(?:energy\s+)?(?:less|fewer)/);
+    if (by) per = parseInt(by[1], 10) || 1;
+  }
+  return { count: per * units, symbol };
+}
+
+/** The discount `card` grants as a symbol count (see `costDiscountRead`); 0 when none applies. */
+export function passiveCostDiscount(card, ctx = {}) {
+  return costDiscountRead(card, ctx)?.count || 0;
+}
+
+/**
+ * Apply cost discounts: a typed one ("{Y} less") removes that many matching symbols; a
+ * Colorless one drops symbols from the end of the cost (where Colorless is printed).
+ * `discount` may be a count (Colorless) or a list of `costDiscountRead` results.
+ */
 export function applyCostDiscount(cost = [], discount = 0) {
-  return [...cost].slice(0, Math.max(0, cost.length - discount));
+  const reads = Array.isArray(discount) ? discount : [{ count: discount, symbol: null }];
+  let out = [...cost];
+  let generic = 0;
+  for (const read of reads) {
+    if (!read?.count) continue;
+    if (!read.symbol) {
+      generic += read.count;
+      continue;
+    }
+    for (let i = 0; i < read.count; i++) {
+      const at = out.lastIndexOf(read.symbol);
+      if (at < 0) break;
+      out.splice(at, 1);
+    }
+  }
+  return out.slice(0, Math.max(0, out.length - generic));
 }
 
 // --- when-played -------------------------------------------------------
@@ -168,11 +343,14 @@ export function parseEndOfTurnEffect(card) {
 
 // --- damage-prevent ----------------------------------------------------
 
-// { preventAll: bool, reduce: number } — reduce is in damage-counter
-// (10 HP) units, matching computeAttackDamage output.
+// { preventAll: bool, reduce: number, reduceHp: number } — `reduceHp` is in HP
+// units, which is what the printed "damage is reduced by N" actually means
+// (I130: reading it as counters and multiplying by 10 turned a 20-damage
+// reduction into full prevention). `reduce` stays the counter-unit field for
+// callers that feed counters.
 export function parseDamagePrevention(card) {
   const t = textOf(card);
-  const out = { preventAll: false, reduce: 0 };
+  const out = { preventAll: false, reduce: 0, reduceHp: 0 };
   if (!t) return out;
   if (
     /prevent (all )?(damage|effect)/.test(t) ||
@@ -181,26 +359,31 @@ export function parseDamagePrevention(card) {
     out.preventAll = true;
     return out;
   }
+  // "The Retreat Cost … is reduced by N" is a retreat modifier, not damage
+  // prevention (same guard as passiveCostDiscount).
+  if (/retreat/.test(t) && !/damage/.test(t)) return out;
   const m = t.match(/reduc(?:e|ed).*?(\d+)/);
-  if (m) out.reduce = parseInt(m[1], 10) || 0;
+  if (m) out.reduceHp = parseInt(m[1], 10) || 0;
   return out;
 }
 
-// Apply prevention to an incoming damage amount (in counters).
+// Apply prevention to an incoming damage amount (HP units).
 export function applyDamagePrevention(incoming, prevention) {
   if (prevention?.preventAll) return 0;
-  const reduced = incoming - (prevention?.reduce || 0);
+  const reduced =
+    incoming - (prevention?.reduce || 0) - (prevention?.reduceHp || 0);
   return reduced > 0 ? reduced : 0;
 }
 
 /** Merge two prevention structs (stack reductions; any preventAll wins). */
 export function mergeDamagePrevention(a, b) {
-  const out = { preventAll: false, reduce: 0 };
+  const out = { preventAll: false, reduce: 0, reduceHp: 0 };
   if (a?.preventAll || b?.preventAll) {
     out.preventAll = true;
     return out;
   }
   out.reduce = (a?.reduce || 0) + (b?.reduce || 0);
+  out.reduceHp = (a?.reduceHp || 0) + (b?.reduceHp || 0);
   return out;
 }
 
@@ -378,6 +561,9 @@ export function applyDamageBonus(baseDamage, bonus) {
 export function parseHpBonus(card) {
   const t = textOf(card);
   if (!t || !/hp/.test(t)) return { bonus: 0 };
+  // Negative printed modifiers (Hero's Medal, Island Challenge Amulet).
+  const neg = t.match(/gets\s+-(\d+)\s+hp/);
+  if (neg) return { bonus: -(parseInt(neg[1], 10) || 0) };
   if (!/(more|increase|treated as|gets \+|\+\d+\s+hp|for each)/.test(t)) {
     return { bonus: 0 };
   }
@@ -396,29 +582,135 @@ export function applyHpBonus(baseHp, bonus) {
   return Math.max(1, base + (bonus || 0));
 }
 
-// "+N more to retreat", "retreat cost is N less"
-export function parseRetreatCostModifier(card) {
+// A Pokémon's printed name read as "this pokémon": older cards say "Gligar's Retreat Cost is 0".
+function selfFolded(card) {
+  const t = textOf(card);
+  const name = lower(card?.name).trim();
+  if (!name || name.length < 3) return t;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return t.replace(new RegExp(`(?<![\\w'])${escaped}(?![\\w-])`, 'g'), 'this pokémon');
+}
+
+const SYMBOL_TYPE = {
+  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic',
+  f: 'fighting', d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon',
+};
+
+function holderEnergy(card, zoneCards = []) {
+  if (card?.instanceId == null) return [];
+  return (zoneCards || []).filter((c) => c?.attachedTo === card.instanceId && isEnergy(c));
+}
+
+function energyIsType(energy, letter) {
+  const want = SYMBOL_TYPE[letter];
+  const kinds = [energy.energyType, ...(Array.isArray(energy.types) ? energy.types : []), energy.name]
+    .map(lower)
+    .join(' ');
+  return Boolean(want) && kinds.includes(want);
+}
+
+// Leading conditions on a Pokémon's own Retreat Cost change: true / false when the board
+// answers it, undefined when the clause is not this condition.
+const SELF_RETREAT_CONDITIONS = [
+  (c, card, b) => {
+    if (!/this pok[eé]mon has no energy(?: cards?)? attached/.test(c)) return undefined;
+    return holderEnergy(card, b.zoneCards).length === 0;
+  },
+  (c, card, b) => {
+    const m = c.match(/this pok[eé]mon has any (?:\{([a-z])\} |basic )?energy(?: cards?)? attached/) ||
+      c.match(/there is an? \{([a-z])\} energy card attached to this pok[eé]mon/);
+    if (!m) return undefined;
+    const energy = holderEnergy(card, b.zoneCards);
+    return m[1] ? energy.some((e) => energyIsType(e, m[1])) : energy.length > 0;
+  },
+  (c, card, b) => {
+    const m = c.match(/this pok[eé]mon has (\d+) or fewer energy attached|this pok[eé]mon has (\d+) energy or less attached/);
+    if (!m) return undefined;
+    return holderEnergy(card, b.zoneCards).length <= Number(m[1] ?? m[2]);
+  },
+  (c, card) => {
+    if (!/this pok[eé]mon has any damage counters on it/.test(c)) return undefined;
+    return (card?.damage || 0) > 0;
+  },
+  (c, card, b) => {
+    if (!/this pok[eé]mon has a pok[eé]mon tool(?: card)? attached/.test(c)) return undefined;
+    return (b.zoneCards || []).some(
+      (x) => x?.attachedTo === card?.instanceId && /tool/.test(lower(`${x.type} ${x.trainerType} ${(x.subtypes || []).join(' ')}`))
+    );
+  },
+  (c, _card, b) => {
+    if (!/(?:you have )?(?:a|any) stadium(?: card)? (?:is )?in play|there is (?:a|any) stadium card (?:is )?in play/.test(c)) {
+      return undefined;
+    }
+    return Boolean(b.stadium);
+  },
+];
+
+/**
+ * A Pokémon's printed change to its OWN Retreat Cost (I159): "this Pokémon has no Retreat
+ * Cost", "its Retreat Cost is {C} less", "the Retreat Cost of this Pokémon is 0". Changes aimed
+ * at other Pokémon (your Active, your opponent's Active, a team) are `abilityRetreatCost` /
+ * `teamNoRetreatCostForActive`'s, "for each" scaling is not read, and a leading condition
+ * must hold on `board` (`zoneCards`, `stadium`) — an unrecognised one fails closed.
+ */
+function selfRetreatModifier(card, board = {}) {
+  const t = selfFolded(card);
+  if (!/retreat/.test(t)) return { delta: 0 };
+  for (const sentence of t.split(/(?<=\.)\s+/)) {
+    const self =
+      /(?:this pok[eé]mon|, it) has no retreat cost/.test(sentence) ||
+      /(?:this pok[eé]mon's|its|the retreat cost of this pok[eé]mon) retreat cost is|the retreat cost of this pok[eé]mon is|you pay [^.]*? to retreat this pok[eé]mon/.test(sentence);
+    if (!self || /for each/.test(sentence)) continue;
+    if (/your opponent|each player|your active|of your pok|each of your/.test(sentence)) continue;
+    const clause = sentence.match(/^(?:if|as long as|during) ([^,]+),/)?.[1];
+    if (clause) {
+      if (/^your first turn/.test(clause)) {
+        if (board.turnNumber == null || Number(board.turnNumber) > 2) return { delta: 0 };
+      } else {
+        const verdicts = SELF_RETREAT_CONDITIONS.map((check) => check(clause, card, board));
+        if (verdicts.every((v) => v === undefined) || verdicts.some((v) => v === false)) {
+          return { delta: 0 };
+        }
+      }
+    }
+    if (/no retreat cost|retreat cost is 0\b/.test(sentence)) return { delta: -Infinity };
+    const symbols = (sentence.match(/\{[a-z]\}/g) || []).length;
+    const n = Number(sentence.match(/(\d+)\s*(?:more|less)/)?.[1]) || symbols || 1;
+    if (/\bless\b|fewer/.test(sentence)) return { delta: -n };
+    if (/\bmore\b/.test(sentence)) return { delta: n };
+  }
+  return { delta: 0 };
+}
+
+// "+N more to retreat", "retreat cost is N less". A Pokémon reads only its own Retreat Cost
+// (selfRetreatModifier, I159); a Tool keeps the plain text read ("the Retreat Cost of the
+// Pokémon this card is attached to is {C}{C} less").
+export function parseRetreatCostModifier(card, board = {}) {
+  if (isPokemon(card)) return selfRetreatModifier(card, board);
   const t = textOf(card);
   if (!t || (!t.includes('retreat cost') && !/retreat/.test(t)))
     return { delta: 0 };
   if (
+    !/remaining hp is 30 or less/i.test(t) &&
     /has no retreat cost|no retreat cost|retreat cost is 0|retreat for free/i.test(
       t
     )
   ) {
+    // Rescue Board's zero is conditional on remaining HP; the "{C} less" half
+    // must still apply, and combinedToolRetreatCost zeroes the conditional case.
     return { delta: -Infinity };
   }
   const increased = /(more|increase)/.test(t);
   const decreased = /(less|fewer|reduc|decrease)/.test(t);
-  const m =
-    t.match(/(\d+)\s*(?:more|less)/) ||
-    t.match(/(?:by|is)\s+(\d+)/) ||
-    t.match(/(\d+)/);
-  // TCGdex prints retreat modifiers with energy symbols, not numerals: Air
-  // Balloon is "{C}{C} less" (two Colorless). The digit fallback below missed
-  // that, defaulting to 1, so a 2-retreat Pokémon stayed at 1 instead of 0.
+  if (!increased && !decreased) return { delta: 0 };
+  // The modifier numeral must sit next to more/less ("2 less", "is 3 or more"
+  // is a CONDITION, not a modifier — Heavy Boots, I133/A4). TCGdex prints
+  // retreat modifiers with energy symbols, not numerals: Air Balloon is
+  // "{C}{C} less" (two Colorless), counted by symbolCount below.
+  const m = t.match(/(\d+)\s*(?:more|less|fewer)/);
   const symbolCount = (t.match(/\{[a-z]\}/g) || []).length;
-  const n = m ? parseInt(m[1], 10) || 1 : symbolCount || 1;
+  const n = m ? parseInt(m[1], 10) || 1 : symbolCount;
+  if (!n) return { delta: 0 };
   if (decreased && !increased) return { delta: -n };
   if (increased) return { delta: n };
   return { delta: 0 };
@@ -440,7 +732,8 @@ export function teamNoRetreatCostForActive(activeCard, benchCards) {
   const activeName = lower(activeCard?.name || '');
   const activeIsBasic = isBasicPokemon(activeCard);
   const activeIsExOrGx = isExCard(activeCard) || isGxCard(activeCard);
-  for (const card of Array.isArray(benchCards) ? benchCards : []) {
+  // The Active's own team wording ("Your Basic Pokémon in play have no Retreat Cost") counts too.
+  for (const card of [activeCard, ...(Array.isArray(benchCards) ? benchCards : [])]) {
     if (!card || card.attachedTo || card.image?.attached) continue;
     const t = textOf(card);
     if (!/no retreat cost/.test(t)) continue;
@@ -460,16 +753,32 @@ export function teamNoRetreatCostForActive(activeCard, benchCards) {
   return false;
 }
 
-// "take N fewer/more Prize cards"
+// "take N fewer/more Prize cards" (I131). Only the prize clause may supply the
+// number: the text's first number is usually HP/damage ("gets -100 HP, and if
+// it is Knocked Out … takes 1 fewer Prize card"), which made Hero's Medal take
+// 0 prizes and Luxurious Cape take 101.
+// `side` says whose Knock Outs the clause changes (I138): 'victim' when the
+// holder is Knocked Out ("that player / your opponent takes"), 'attacker' for
+// the imperative "take N more" when the holder's owner takes the Knock Out
+// (Beast Bringer, Briar). A clause naming neither side is left neutral.
+const VICTIM_PRIZE_CLAUSE =
+  /\b(?:that player|your opponent|the attacking player)\s+takes\s+(\d+)\s+(more|fewer|less)\s+prize/;
+const ATTACKER_PRIZE_CLAUSE = /(?:^|[.,]\s*)take\s+(\d+)\s+(more)\s+prize/;
+
 export function parsePrizeModify(card) {
+  const neutral = { delta: 0, side: null };
   const t = textOf(card);
-  if (!t || !t.includes('prize card')) return { delta: 0 };
-  if (!/(less|fewer|more|extra)/.test(t)) return { delta: 0 };
-  const m = t.match(/(\d+)/);
-  const n = m ? parseInt(m[1], 10) || 1 : 1;
-  if (/(fewer|less)/.test(t)) return { delta: -n };
-  if (/(more|extra)/.test(t)) return { delta: n };
-  return { delta: 0 };
+  if (!t || !t.includes('prize card')) return neutral;
+  const victim = t.match(VICTIM_PRIZE_CLAUSE);
+  const attacker = victim ? null : t.match(ATTACKER_PRIZE_CLAUSE);
+  const m = victim || attacker;
+  if (!m) return neutral;
+  const n = parseInt(m[1], 10);
+  if (!n) return neutral;
+  return {
+    delta: /(fewer|less)/.test(m[2]) ? -n : n,
+    side: victim ? 'victim' : 'attacker',
+  };
 }
 
 export function applyPrizeModify(basePrizes, delta) {
@@ -478,7 +787,7 @@ export function applyPrizeModify(basePrizes, delta) {
 
 // Resolute Heart pattern: full HP survive, optional remaining HP
 export function parseKoPrevention(card) {
-  const out = { fullHpOnly: false, surviveHp: null };
+  const out = { fullHpOnly: false, surviveHp: null, coinFlip: false };
   const t = textOf(card);
   if (!t) return out;
   const matches =
@@ -492,25 +801,39 @@ export function parseKoPrevention(card) {
       t.includes('not knocked out'));
   if (!matches) return out;
   out.fullHpOnly = t.includes('full hp');
+  out.coinFlip = /flip a coin/.test(t);
   const survive =
-    t.match(/remaining hp becomes\s+(\d+)/) || t.match(/hp becomes\s+(\d+)/);
+    t.match(/remaining hp becomes?\s+(\d+)/) || t.match(/hp becomes?\s+(\d+)/);
   if (survive) out.surviveHp = parseInt(survive[1], 10);
   return out;
 }
 
-// Damage to attacker when this Pokémon is damaged
+// Damage to the attacker when this Pokémon is damaged.
+// Pre-Sun & Moon wording names "that Pokémon" (the Attacking Pokémon) instead
+// of "the Attacking Pokémon"; the attack-damage context is required so the
+// energy-attach costs that print the same "put N damage counters on that
+// Pokémon" clause stay out. `zone` reports whether the printed text restricts
+// the trigger to the Active Spot (callers gate on it; the parser does not).
 export function parseThorns(card) {
   const t = textOf(card);
   if (
     !t ||
     !t.includes('damage counter') ||
     !/(put|place)/.test(t) ||
-    !/(attacker|attacking pokémon)/.test(t)
+    !(
+      /(attacker|attacking pokémon)/.test(t) ||
+      (/on that pokémon/.test(t) &&
+        /damaged by (?:an? )?(?:opponent's )?attack/.test(t))
+    )
   ) {
-    return { count: 0 };
+    return { count: 0, zone: 'any' };
   }
   const m = t.match(/(\d+)\s+damage/);
-  return { count: m ? parseInt(m[1], 10) || 0 : 0 };
+  const count = m ? parseInt(m[1], 10) || 0 : 0;
+  const zone = /in the active spot|is your active pokémon/.test(t)
+    ? 'active'
+    : 'any';
+  return { count, zone };
 }
 
 // During Pokémon Checkup damage

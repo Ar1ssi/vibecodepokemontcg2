@@ -97,3 +97,24 @@ test('B-6: a numeric retreatCost is sent as that many Colorless symbols', () => 
   const { stats } = buildCardStatsPayload([{ syncInstance: 0, hp: 100, retreatCost: 2 }]);
   assert.deepEqual(stats[0].retreatCost, ['Colorless', 'Colorless']);
 });
+
+test('SE1: special Energy sends its effect text and subtypes; basic-shaped Energy sends none', () => {
+  const { stats } = buildCardStatsPayload([
+    {
+      syncInstance: 0,
+      name: 'Telepathic Psychic Energy',
+      type: 'Energy',
+      subtypes: ['Special'],
+      effect: 'As long as this card is attached to a Pokémon, it provides {P} Energy.',
+    },
+    { syncInstance: 1, name: 'Psychic Energy', type: 'Energy' },
+  ]);
+
+  assert.deepEqual(stats, [
+    {
+      syncInstance: 0,
+      text: 'As long as this card is attached to a Pokémon, it provides {P} Energy.',
+      subtypes: ['Special'],
+    },
+  ]);
+});

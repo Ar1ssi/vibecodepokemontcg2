@@ -451,6 +451,44 @@ test('takePrizes: rejected on the opponent turn even with a standing entitlement
   assert.equal(res.state.players.p1.zones.hand.length, 0);
 });
 
+test('take N Prize cards: a grant larger than the remaining Prizes is floored, not stranded', () => {
+  const state = createGameState({
+    players: {
+      p1: {
+        username: 'Ash',
+        zones: {
+          prizes: [createCard({ instanceId: 101, name: 'Last Prize' })],
+          deck: [createCard({ instanceId: 102, name: 'Deck' })],
+        },
+      },
+      p2: {
+        username: 'Gary',
+        zones: { deck: [createCard({ instanceId: 103, name: 'Deck' })] },
+      },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: 1,
+      name: 'Taker',
+      hp: 100,
+      attacks: [{ name: 'Grab', cost: [], damage: '0', text: 'Take 2 Prize cards.' }],
+    })
+  );
+  state.players.p2.zones.active.push(createCard({ instanceId: 2, name: 'Wall', hp: 400 }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.prizes.length, 0);
+  assert.equal(res.state.players.p1.zones.hand.length, 1);
+  assert.equal(res.state.players.p1.flags.prizesOwed, undefined, 'the surplus entitlement is dropped');
+  assert.equal(res.state.turn.phase, 'ended');
+  assert.equal(res.state.winner, 'p1');
+});
+
 test('attack & KO: bench knockout discards victim and attached cards, awards prizes, and does NOT auto-promote', () => {
   const state = createGameState({
     players: {

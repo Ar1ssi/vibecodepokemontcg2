@@ -8,6 +8,7 @@ import { parseAbility } from '../rules/abilities.mjs';
 import { planAbilitySteps } from '../rules/ability-step-plan.mjs';
 import { parseAbilityEffectSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { executeSteps, isExecutableStepType } from './executor.mjs';
+import { flipCoin } from '../rng.mjs';
 
 /**
  * Executes a Pokemon ability or resumes a suspended ability choice.
@@ -70,12 +71,8 @@ export function executeAbility(draft, {
   // precondition failed (no damaged Pokémon to heal, empty Bench to switch).
   // Marking up front consumed the ability with no effect and locked out a retry.
   const markUsed = () => {
-    card.abilityUsed = true;
-    if (!player.flags) player.flags = {};
-    if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
-    // instanceId first: two Pokémon sharing a name must not share one used-flag
-    // slot, or using one blocks the other's separate ability (I48).
-    player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
+    // "As often as you like during your turn" is never spent; it is still announced.
+    if (!isRepeatableAbility(text)) spendAbility();
     events.push({
       type: 'abilityUsed',
       instanceId: card.instanceId,
@@ -83,25 +80,27 @@ export function executeAbility(draft, {
       playerId,
     });
   };
+  const spendAbility = () => {
+    // A card the ability moved out of play (Stance Change's old Aegislash) keeps no marker;
+    // advanceTurn only resets in-play cards.
+    const zoneAfter = findCard(draft, card.instanceId)?.zoneId;
+    if (zoneAfter === 'active' || zoneAfter === 'bench') card.abilityUsed = true;
+    if (!player.flags) player.flags = {};
+    if (!player.flags.abilitiesUsed) player.flags.abilitiesUsed = {};
+    // instanceId first: two Pokémon sharing a name must not share one used-flag
+    // slot, or using one blocks the other's separate ability (I48).
+    player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
+  };
 
-  // Parse and plan ability steps
   const ability = card.abilities?.[abilityIndex];
   const text = typeof ability === 'string'
     ? ability
     : ability?.text || card.abilityText || card.text || card.effect || '';
-  const parsedSteps = parseAbility(text);
-  const steps = Array.isArray(parsedSteps) ? parsedSteps : (parsedSteps?.steps || []);
-  const planned = planAbilitySteps(steps, { mode: 'interactive' });
-  let actionableSteps = planned
-    .filter((p) => p.action !== 'skip')
-    .map((p) => p.step);
+  const plan = resolveAbilitySteps(text, { selfName: card.name });
+  let actionableSteps = plan.steps;
+  const holderZone = plan.holderZone;
 
-  // An activated effect the ability parser leaves without an executor (I89) or reads as
-  // passive only (I95) runs through the shared effect templates when they read it.
-  const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName: card.name });
-  const parserFallsShort =
-    actionableSteps.length === 0 || actionableSteps.some((step) => !isExecutableStepType(step.type));
-  if (parserFallsShort && templateSteps.length > 0) {
+  if (plan.source === 'template') {
     const zone = findCard(draft, card.instanceId)?.zoneId;
     if (holderZone && zone !== holderZone) {
       events.push({ type: 'effectStepSkipped', reason: `holder_not_${holderZone}`, step: 'ability' });
@@ -109,12 +108,12 @@ export function executeAbility(draft, {
       return { pendingChoice: null, completed: true };
     }
     let flip = { coin: null, headsCount: 0 };
-    if (templateSteps.some((step) => step.gate || step.perHeads)) {
-      const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+    if (actionableSteps.some((step) => step.gate || step.perHeads)) {
+      const face = flipCoin(activeRng);
       events.push({ type: 'coinFlipped', playerId, face });
       flip = { coin: face, headsCount: face === 'heads' ? 1 : 0 };
     }
-    actionableSteps = resolveCoinGates(templateSteps, flip);
+    actionableSteps = resolveCoinGates(actionableSteps, flip);
     if (actionableSteps.length === 0) {
       // Tails on a heads-only effect: the flip was the Ability's use.
       markUsed();
@@ -123,7 +122,7 @@ export function executeAbility(draft, {
     }
   } else if (isHeadsGatedAbility(text, actionableSteps)) {
     // "Flip a coin. If heads, …": the flip is the ability's use; tails spends it with no effect.
-    const face = (activeRng ? activeRng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+    const face = flipCoin(activeRng);
     events.push({ type: 'coinFlipped', playerId, face });
     if (face === 'tails') {
       markUsed();
@@ -166,6 +165,43 @@ export function executeAbility(draft, {
 
   draft.pendingChoice = null;
   return { pendingChoice: null, completed: true };
+}
+
+const REPEATABLE_ABILITY = /^as often as you like\b/;
+
+/** "As often as you like during your turn, …": usable any number of times, never marked used. */
+export function isRepeatableAbility(text) {
+  return REPEATABLE_ABILITY.test(String(text || '').trim().toLowerCase());
+}
+
+/**
+ * The steps an activated ability runs: the parser's actionable (non-passive) steps, or the
+ * shared effect templates when the parser reads none or leaves one without an executor (I89)
+ * or reads the effect as passive only (I95). `source` is 'parser' | 'template'; `holderZone`
+ * is the template's position clause. Pure — the ability-behaviour audit reads the same plan.
+ */
+export function resolveAbilitySteps(text, { selfName } = {}) {
+  const parsedSteps = parseAbility(text);
+  const steps = Array.isArray(parsedSteps) ? parsedSteps : (parsedSteps?.steps || []);
+  const actionable = planAbilitySteps(steps, { mode: 'interactive' })
+    .filter((p) => p.action !== 'skip')
+    .map((p) => p.step);
+  const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName });
+  const parserFallsShort =
+    actionable.length === 0 || actionable.some((step) => !isExecutableStepType(step.type));
+  if (parserFallsShort && templateSteps.length > 0) {
+    return { source: 'template', steps: templateSteps, holderZone, parsedSteps: steps };
+  }
+  // "When you play this Pokémon …" is the trigger, not an effect — abilityActivationBlockReason
+  // enforces its window. Dropped only beside other steps, so a marker-only read still reports
+  // the effect as unexecutable instead of running as nothing.
+  const effects = actionable.filter((step) => step.type !== 'whenPlayedAbility');
+  return {
+    source: 'parser',
+    steps: effects.length > 0 ? effects : actionable,
+    holderZone: null,
+    parsedSteps: steps,
+  };
 }
 
 // A single "flip a coin. If heads, …" gate on the whole effect. Texts with their own tails
