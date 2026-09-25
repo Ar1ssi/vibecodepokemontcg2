@@ -11,10 +11,12 @@ Focus: design 039 / I168 copy-attack residuals on `feature/i168-copy-attacks` (f
   shipped + archived; D150/D151; I168 closed; I181 tracks the 5 deferrals.
 Active: none — built, verified (suite 4178/4179 known inspector fail; four gates PASSED) and
   committed on `feature/i168-copy-attacks` (one commit, user choice). Not pushed/merged.
-Next: maintenance due (S300 cadence): DECISIONS 150+ lines vs 90 cap, designs/ root ~50 shipped
-  docs; triage I180. Backlog: I181 copy deferrals, I167 markers, I166 effects, I162 abilities,
-  then I153 (needs a contract first), I137, I121, I126 (partial), I127, I44, I60. User visual
-  check of typed Tera entry/skin + Mega vortex. Pending approval: designs 028 (I85), 029 (I86).
+Next: land `feature/i168-copy-attacks` (1 commit `6076be12`, not pushed); handoff
+  `.agent/designs/302-handoff.md`. Then maintenance due (S300 cadence): DECISIONS 150+ lines vs
+  90 cap, designs/ root ~50 shipped docs; triage I180. Backlog: I181 copy deferrals, I167 markers,
+  I166 effects, I162 abilities, then I153 (needs a contract first), I137, I121, I126 (partial),
+  I127, I44, I60. User visual check of typed Tera entry/skin + Mega vortex. Pending approval:
+  designs 028 (I85), 029 (I86).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5)
