@@ -359,7 +359,7 @@ export function rawAbilityOf(card) {
 export function finishFor(card) {
   const rarity = String(card?.rarity ?? '').toLowerCase();
   if (/secret|hyper|illustration|special|rainbow|gold|shiny ultra|black white/.test(rarity)) return 'secret';
-  if (/ultra|double rare|mega|ex|gx|vmax|vstar|amazing|radiant/.test(rarity)) return 'ultra';
+  if (/ultra|double rare|mega|ex\b|gx|vmax|vstar|amazing|radiant/.test(rarity)) return 'ultra';
   if (card && isRuleBoxPokemon(card)) return 'ultra';
   if (/holo|rare/.test(rarity)) return 'holo';
   return 'plain';

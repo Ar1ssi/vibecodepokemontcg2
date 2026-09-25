@@ -810,4 +810,5 @@ test('finishFor: rarity picks the animation tier', () => {
   assert.equal(finishFor({ rarity: 'Double Rare' }), 'ultra');
   assert.equal(finishFor({ name: 'Mega Lucario ex', rarity: 'Rare' }), 'ultra');
   assert.equal(finishFor({ rarity: 'Special Illustration Rare' }), 'secret');
+  assert.equal(finishFor({ rarity: 'Rare Holo ex' }), 'ultra');
 });
