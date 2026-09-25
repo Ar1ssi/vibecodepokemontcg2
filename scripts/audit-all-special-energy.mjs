@@ -8,6 +8,7 @@
  * Buckets:
  *   guided      parses to effect steps that imply a player choice / trigger
  *   passive     parses to continuous provision / modifier steps only
+ *   unenforced  parses, but to a step type no engine code reads yet
  *   unrecognized parser returns no steps, or leaves effect text unparsed
  *
  * Run: node scripts/audit-all-special-energy.mjs
@@ -57,6 +58,16 @@ const PASSIVE_STEP_TYPES = new Set([
   'officialIllegal',
 ]);
 
+// Parsed steps with no engine consumer. Counting them as guided/passive let
+// `unrecognized 0` hide effects that never run (audit SE16). Drop a case here
+// when its consumer lands. A conditional `ignoredOn` (Darkness/Metal CL) is
+// already enforced by the `condition` on its sibling steps; the Pokémon-ex
+// form (Heal Energy, Holon FF/GL/WP) is not.
+function isUnenforcedStep(step) {
+  if (step.type === 'attachFromPrize') return true;
+  return step.type === 'ignoredOn' && Boolean(step.host);
+}
+
 // Steps that a non-provision clause produced but do not require a choice.
 const STRUCTURAL_STEP_TYPES = new Set(['provide', 'attachRestriction', 'attachCost', 'deckLimit']);
 
@@ -65,7 +76,7 @@ const STRUCTURAL_STEP_TYPES = new Set(['provide', 'attachRestriction', 'attachCo
 const EFFECT_HINT_RE =
   /\+\d+ hp|do \d+ more damage|do \d+ less damage|reduced by \d+|no weakness|no retreat cost|retreat cost is|can't retreat|special condition|prevent all|knocked out|discard .*end of|discarded (from play|by)|draw (a card|\d+)|search your deck|heal \d+|damage counter|switch|fewer prize|face-down prize|previous evolutions|isn't affected by resistance|return a basic energy|put 1 damage counter/i;
 
-const buckets = { guided: [], passive: [], unrecognized: [] };
+const buckets = { guided: [], passive: [], unenforced: [], unrecognized: [] };
 
 for (const card of unique.values()) {
   const parsed = parseSpecialEnergyEffects(card);
@@ -76,6 +87,9 @@ for (const card of unique.values()) {
 
   if (!parsed || !parsed.steps.length || !hasProvide || (hintsEffect && effectSteps.length === 0)) {
     buckets.unrecognized.push({ card, stepTypes });
+  } else if (parsed.steps.some(isUnenforcedStep)) {
+    const unenforced = parsed.steps.filter(isUnenforcedStep).map((s) => s.type);
+    buckets.unenforced.push({ card, stepTypes: unenforced });
   } else if (effectSteps.some((t) => !PASSIVE_STEP_TYPES.has(t))) {
     buckets.guided.push({ card, stepTypes });
   } else {
@@ -88,7 +102,7 @@ lines.push('# Special-energy parse coverage');
 lines.push(`Corpus: ${cards.length} printings → ${unique.size} unique (name+text)`);
 lines.push('');
 lines.push(
-  `guided ${buckets.guided.length} / passive ${buckets.passive.length} / unrecognized ${buckets.unrecognized.length}`
+  `guided ${buckets.guided.length} / passive ${buckets.passive.length} / unenforced ${buckets.unenforced.length} / unrecognized ${buckets.unrecognized.length}`
 );
 lines.push('');
 
@@ -96,6 +110,12 @@ lines.push('## Unrecognized');
 for (const { card, stepTypes } of buckets.unrecognized) {
   lines.push(`- ${card.name} [${stepTypes.join(',') || 'none'}]`);
   lines.push(`    text: ${card.text}`);
+}
+
+lines.push('');
+lines.push('## Unenforced (parsed, no engine consumer)');
+for (const { card, stepTypes } of buckets.unenforced) {
+  lines.push(`- ${card.name}: ${stepTypes.join(', ')}`);
 }
 
 lines.push('');
@@ -122,7 +142,7 @@ fs.mkdirSync(path.dirname(REPORT), { recursive: true });
 fs.writeFileSync(REPORT, lines.join('\n'), 'utf8');
 
 process.stderr.write(
-  `special-energy: guided ${buckets.guided.length} / passive ${buckets.passive.length} / unrecognized ${buckets.unrecognized.length}\n`
+  `special-energy: guided ${buckets.guided.length} / passive ${buckets.passive.length} / unenforced ${buckets.unenforced.length} / unrecognized ${buckets.unrecognized.length}\n`
 );
 process.stderr.write(`Report -> ${REPORT}\n`);
 if (buckets.unrecognized.length) {

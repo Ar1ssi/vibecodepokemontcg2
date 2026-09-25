@@ -1,9 +1,18 @@
 # Special-energy parse coverage
 Corpus: 214 printings → 129 unique (name+text)
 
-guided 39 / passive 90 / unrecognized 0
+guided 40 / passive 82 / unenforced 7 / unrecognized 0
 
 ## Unrecognized
+
+## Unenforced (parsed, no engine consumer)
+- Treasure Energy: attachFromPrize
+- Holon Energy WP: ignoredOn
+- Holon Energy GL: ignoredOn
+- Holon Energy FF: ignoredOn
+- Heal Energy: ignoredOn
+- Holon Energy WP: ignoredOn
+- Holon Energy GL: ignoredOn
 
 ## Guided (effect steps)
 - Nitro {: provide, onDiscardReturnToHand
@@ -16,7 +25,6 @@ guided 39 / passive 90 / unrecognized 0
 - Medical Energy: provide, onAttachHeal
 - Regenerative Energy: provide, onEvolveHeal
 - Gift Energy: provide, onKnockoutDraw
-- Treasure Energy: provide, attachFromPrize
 - Lucky Energy: provide, onDamagedDraw
 - Capture Energy: provide, onAttachSearch
 - Speed {: provide, onAttachDraw
@@ -37,7 +45,6 @@ guided 39 / passive 90 / unrecognized 0
 - Recover Energy: provide, onAttachClearStatus
 - Health Energy: provide, onAttachRemoveDamage
 - Call Energy: provide, onAttachSearch
-- Heal Energy: provide, noExtraEffect, onAttachRemoveDamage, ignoredOn
 - Rainbow Energy: provide, onAttachDamageCounter
 - Retro Energy: provide, onAttachDevolve
 - Cyclone Energy: provide, onAttachSwitch
@@ -45,6 +52,9 @@ guided 39 / passive 90 / unrecognized 0
 - Warp Energy: provide, onAttachSwitch
 - Potion Energy: provide, onAttachRemoveDamage
 - Full Heal Energy: provide, onAttachClearStatus
+- Recycle Energy: provide, onDiscardReturnToHand
+- Full Heal Energy: provide, onAttachClearStatus
+- Rainbow Energy: provide, onAttachDamageCounter
 
 ## Passive
 - Voltaic {: provide, damageBonus
@@ -85,7 +95,7 @@ guided 39 / passive 90 / unrecognized 0
 - Beast Energy Prism Star: provide, provide, damageBonus
 - Unit Energy {: provide
 - Unit Energy {: provide
-- Super Boost Energy Prism Star: provide, provide
+- Super Boost Energy Prism Star: provide, provide, provide
 - Counter Energy: provide, provide
 - Double Colorless Energy: provide
 - Strong Energy: attachRestriction, provide, damageBonus
@@ -111,15 +121,10 @@ guided 39 / passive 90 / unrecognized 0
 - Double Rainbow Energy: attachRestriction, provide, discardWhenConditionLost, noExtraEffect, attackDamagePenalty
 - Darkness Energy: provide, damageBonus
 - Scramble Energy: attachRestriction, provide, provide, discardWhenConditionLost
-- Holon Energy WP: provide, effectShield, freeRetreat, ignoredOn
-- Holon Energy GL: provide, damageReduction, statusImmunity, ignoredOn
-- Holon Energy FF: provide, noWeakness, ignoresResistance, ignoredOn
 - Dark Metal Energy: provide, noExtraEffect
 - React Energy: provide
-- Holon Energy WP: provide, freeRetreat, ignoredOn
-- Holon Energy GL: provide, statusImmunity, ignoredOn
-- Darkness Energy: provide
-- R Energy: attachRestriction, provide, damageBonus
+- Darkness Energy: provide, damageBonus
+- R Energy: attachRestriction, provide, discardAtEndOfTurn, damageBonus
 - Dark Metal Energy: provide, noExtraEffect
 - Multi Energy: provide, provide
 - Double Rainbow Energy: attachRestriction, provide, discardWhenConditionLost, noExtraEffect, attackDamagePenalty
@@ -128,14 +133,11 @@ guided 39 / passive 90 / unrecognized 0
 - Multi Energy: provide, provide
 - Crystal Energy: provide, provide
 - Boost Energy: attachRestriction, provide, discardAtEndOfTurn, discardWhenConditionLost, cannotRetreat
-- Metal Energy: provide, damageReduction, damageReduction
+- Metal Energy: provide, damageReduction, attackDamagePenalty
 - Darkness Energy: provide, endOfTurnDamageCounter, damageBonus
-- Metal Energy: provide, damageReduction
+- Metal Energy: provide, damageReduction, attackDamagePenalty
 - Darkness Energy: provide, endOfTurnDamageCounter, damageBonus
-- Miracle Energy: deckLimit, provide, discardAtEndOfTurn
-- Recycle Energy: provide
-- Full Heal Energy: provide
-- Rainbow Energy: provide
+- Miracle Energy: attachRestriction, deckLimit, provide, discardAtEndOfTurn
 - Double Colorless Energy: provide
 
 ## Per-card description
@@ -246,7 +248,7 @@ guided 39 / passive 90 / unrecognized 0
   - host attacks do +20 damage
 ### Rapid Strike Energy
   - attach restricted to rapidStrike Pokémon
-  - provides 1 Water / Fighting Energy (any combination)
+  - provides 2 Water / Fighting Energy (any combination)
 ### Wash {
   - provides 1 Water Energy
   - prevents attack effects on host (Water)
@@ -310,10 +312,11 @@ guided 39 / passive 90 / unrecognized 0
   - provides 1 Energy of every type [ultraBeast]
   - host attacks do +30 damage (Ultra Beast)
 ### Unit Energy {
-  - provides 1 Fighting / Dark / Fairy Energy (any combination)
+  - provides 1 Lightning / Psychic / Metal Energy (any combination)
 ### Unit Energy {
-  - provides 1 Fighting / Dark / Fairy Energy (any combination)
+  - provides 1 Grass / Fire / Water Energy (any combination)
 ### Super Boost Energy Prism Star
+  - provides 1 Colorless Energy
   - provides 1 Energy of every type [stage2]
   - provides 4 Energy of every type [threeStage2]
 ### Warp Energy
@@ -376,7 +379,7 @@ guided 39 / passive 90 / unrecognized 0
 ### Blend Energy {
   - provides 1 Water / Lightning / Fighting / Metal Energy (any combination)
 ### Blend Energy {
-  - provides 1 Water / Lightning / Fighting / Metal Energy (any combination)
+  - provides 1 Grass / Fire / Psychic / Dark Energy (any combination)
 ### Prism Energy
   - provides 1 Colorless Energy
   - provides 1 Energy of every type [hostBasic]
@@ -479,17 +482,21 @@ guided 39 / passive 90 / unrecognized 0
   - provides 1 Colorless Energy
 ### Holon Energy WP
   - provides 1 Colorless Energy
+  - prevents attack effects on host
   - host has no Retreat Cost
   - ignored on pokemonEx
 ### Holon Energy GL
   - provides 1 Colorless Energy
+  - host takes -10 damage from Pokémon-EX
   - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
   - ignored on pokemonEx
 ### Darkness Energy
   - provides 1 Dark Energy
+  - host attacks do +10 damage (Dark)
 ### R Energy
   - attach restricted to darkOrRocket Pokémon
   - provides 2 Dark Energy
+  - discard at the end of the turn
   - host attacks do +10 damage
 ### Dark Metal Energy
   - provides 1 Dark / Metal Energy (any combination)
@@ -544,18 +551,19 @@ guided 39 / passive 90 / unrecognized 0
 ### Metal Energy
   - provides 1 Metal Energy
   - host takes -10 damage (after W/R)
-  - host takes -10 damage
+  - host attacks do -10 damage
 ### Darkness Energy
   - provides 1 Dark Energy
   - at end of every turn, put 1 damage counter on host (unless host:Dark)
-  - host attacks do +10 damage (Dark)
+  - host attacks do +10 damage
 ### Metal Energy
   - provides 1 Metal Energy
-  - host takes -10 damage
+  - host takes -10 damage (after W/R)
+  - host attacks do -10 damage
 ### Darkness Energy
   - provides 1 Dark Energy
   - at end of every turn, put 1 damage counter on host (unless host:Dark)
-  - host attacks do +10 damage (Dark)
+  - host attacks do +10 damage
 ### Potion Energy
   - provides 1 Colorless Energy
   - on attach from hand: remove 1 damage counter
@@ -563,14 +571,18 @@ guided 39 / passive 90 / unrecognized 0
   - provides 1 Colorless Energy
   - on attach from hand: clear Special Conditions
 ### Miracle Energy
+  - attach restricted to shiningOrLight Pokémon
   - at most 1 per deck
   - provides 2 Energy of every type
   - discard at the end of the turn
 ### Recycle Energy
   - provides 1 Colorless Energy
+  - if discarded by an effect, return to hand
 ### Full Heal Energy
   - provides 1 Colorless Energy
+  - on attach from hand: clear Special Conditions
 ### Rainbow Energy
   - provides 1 Energy of every type
+  - on attach from hand: put 1 damage counter
 ### Double Colorless Energy
   - provides 2 Colorless Energy
