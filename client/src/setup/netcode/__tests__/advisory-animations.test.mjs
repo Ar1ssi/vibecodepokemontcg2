@@ -321,3 +321,22 @@ test('supersededDeals: only each player\'s last deal survives a mulligan', () =>
   assert.deepEqual([...superseded], [firstDeal, redeal1]);
   assert.equal(supersededDeals(null).size, 0);
 });
+
+test('advisoryAnimationPlan: taken prizes naming cards burst, then fly into the hand (design 045)', () => {
+  const plans = advisoryAnimationPlan(
+    { type: 'prizesTaken', playerId: 'p2', count: 2, cards: [{ instanceId: 30 }, 31] },
+    'p1'
+  );
+  assert.equal(plans.length, 2);
+  assert.equal(plans[0].effect, 'prize-claim');
+  assert.equal(plans[0].user, 'opp');
+  assert.deepEqual(plans[1], {
+    kind: 'draw',
+    user: 'opp',
+    cards: [{ instanceId: 30 }, { instanceId: 31 }],
+    count: 2,
+    source: 'prizes',
+  });
+  const unknownSide = advisoryAnimationPlan({ type: 'prizesTaken', playerId: 'p2', cards: [{ instanceId: 30 }] }, null);
+  assert.equal(unknownSide.kind, 'fx');
+});

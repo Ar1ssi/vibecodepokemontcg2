@@ -3,7 +3,7 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
-import { advisoryAnimationPlan, supersededDeals } from './advisory-animations.mjs';
+import { advisoryAnimationPlan, drawnCards, supersededDeals } from './advisory-animations.mjs';
 import {
   getAuthoritativeDeckCount,
   getAuthoritativeZoneArray,
@@ -11,7 +11,7 @@ import {
 } from './apply-view.js';
 import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
-import { hideForFlight, playDrawBatch, showAfterFlight } from '../image-logic/draw-flight.js';
+import { hideForFlight, playDrawBatch, showAfterFlight, takePrizeHandoff } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
@@ -42,6 +42,28 @@ const shuffleZoneCount = (user, zoneId) => {
 let skippedDeals = new Set();
 // Revealed by this if their plan never runs (the queue was cleared).
 const HELD_DRAW_BACKSTOP_MS = 6000;
+// Design 045: where each taken prize sat before the diff moved it to the hand.
+let prizeSeats = new Map();
+
+const capturePrizeSeats = (events, registry, selfPlayerId) => {
+  prizeSeats = new Map();
+  for (const event of events) {
+    if (event?.type !== 'prizesTaken' && event?.type !== 'prizeTaken') continue;
+    const user = event.playerId === selfPlayerId ? 'self' : 'opp';
+    for (const { instanceId } of drawnCards(event.cards)) {
+      const element = registry.get(instanceId)?.element;
+      const ghost = element && captureKnockoutGhost(user, element);
+      if (ghost) prizeSeats.set(instanceId, { rect: ghost.rect, turn: ghost.turn || 0 });
+    }
+  }
+};
+
+// A taken prize starts at its fan sleeve, else where it sat on the mat.
+const prizeStartOf = (instanceId) => {
+  const seat = prizeSeats.get(instanceId) || null;
+  prizeSeats.delete(instanceId);
+  return takePrizeHandoff(instanceId) || seat;
+};
 
 /**
  * Design 044: the drawn cards are in the hand as soon as the view applies.
@@ -55,10 +77,20 @@ const holdDrawnCards = (plan) => {
   for (const { instanceId } of plan.cards) {
     const record = registry.get(instanceId);
     if (!record?.element?.isConnected || record.zone !== 'hand') continue;
-    drawn.push({ image: record.element, wrapper: record.holoCard?.wrapper, redacted: !!record.isRedacted });
+    drawn.push({
+      image: record.element,
+      wrapper: record.holoCard?.wrapper,
+      redacted: !!record.isRedacted,
+      from: plan.source === 'prizes' ? prizeStartOf(instanceId) : null,
+    });
   }
   drawn.forEach(hideForFlight);
-  const backstop = setTimeout(() => drawn.forEach(showAfterFlight), HELD_DRAW_BACKSTOP_MS);
+  const backstop = setTimeout(() => {
+    for (const card of drawn) {
+      card.from?.release?.();
+      showAfterFlight(card);
+    }
+  }, HELD_DRAW_BACKSTOP_MS);
   return { ...plan, drawn, backstop };
 };
 
@@ -82,6 +114,7 @@ export function handleBeforeApply(events, selfPlayerId) {
   skippedDeals = supersededDeals(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
+  capturePrizeSeats(events, registry, selfPlayerId);
   for (const event of events) {
     if (!event || event.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
     // Design 042: the card drawn on top (an evolution sits over its Basic),

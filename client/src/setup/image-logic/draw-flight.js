@@ -5,25 +5,10 @@ import {
 } from '../../state.js';
 import { shouldAnimateDrawFlight } from './draw-flight-predicate.mjs';
 export { shouldAnimateDrawFlight };
-import {
-  cardBackSrcForUser,
-  cardNode,
-  isCardHidden,
-} from '../deck-constructor/hydrate-holo.js';
-import { toHighResCardImageUrl } from './card-image-url.mjs';
-import { playDrawFlight, viewportRectOf } from './card-pop.mjs';
+import { cardNode, isCardHidden } from '../deck-constructor/hydrate-holo.js';
+import { viewportRectOf } from './card-pop.mjs';
 import { playDrawScene, playOppDrawFlights } from '../netcode/mat-fx/draw-scene.js';
-
-const pendingHandOrigins = new WeakMap();
-
-export const setHandFlightOrigin = (card, rect) => {
-  if (card && rect) pendingHandOrigins.set(card, rect);
-};
-
-const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
-const STAGGER_MS = 180;
-
-let nextStartAt = 0;
+import { frameTurnOf } from '../netcode/mat-fx/evolve-scene.js';
 
 export const hideForFlight = (card) => {
   card?.image?.classList.add('draw-flight-source');
@@ -41,38 +26,7 @@ const deckOriginEl = (user) => {
   return cover?.querySelector('img') || cover;
 };
 
-const buildDrawFlip = (faceSrc, sleeveSrc) => {
-  const flip = document.createElement('div');
-  flip.className = 'card-preview-flip';
-
-  const front = document.createElement('div');
-  front.className = 'card-preview-face card-preview-face--front';
-  const face = document.createElement('img');
-  face.className = 'card-preview-card';
-  face.src = faceSrc;
-  face.alt = '';
-  face.draggable = false;
-  front.appendChild(face);
-
-  const back = document.createElement('div');
-  back.className = 'card-preview-face card-preview-face--back';
-  const sleeve = document.createElement('img');
-  sleeve.className = 'card-preview-sleeve';
-  sleeve.src = sleeveSrc;
-  sleeve.alt = '';
-  sleeve.draggable = false;
-  back.appendChild(sleeve);
-
-  flip.append(front, back);
-  return flip;
-};
-
 export const originRectForHandFlight = (user, oZoneId, card) => {
-  const override = pendingHandOrigins.get(card);
-  if (override) {
-    pendingHandOrigins.delete(card);
-    return override;
-  }
   const el =
     oZoneId === 'deck'
       ? deckOriginEl(user)
@@ -82,54 +36,53 @@ export const originRectForHandFlight = (user, oZoneId, card) => {
   return el ? viewportRectOf(el) : null;
 };
 
-const startDrawToHand = (user, card, fromRect) => {
-  hideForFlight(card);
-  const toEl = cardNode(card) ?? card.image;
-  const origin = fromRect || (deckOriginEl(user) && viewportRectOf(deckOriginEl(user)));
-  if (!toEl?.isConnected || !origin) {
-    showAfterFlight(card);
-    return;
-  }
+// Design 045: a picked prize's fan sleeve stays on screen until the flight into
+// the hand takes over from it. Keyed by the card object (legacy mover) and its
+// instanceId (server path); the sleeve is released after PRIZE_HANDOFF_MS if
+// no flight ever claims it.
+const PRIZE_HANDOFF_MS = 4000;
+const prizeHandoffs = new Map();
 
-  const dest = viewportRectOf(toEl);
-  if (dest.width < 2 || dest.height < 2) {
-    showAfterFlight(card);
-    return;
-  }
-
-  const hidden = isCardHidden(card);
-  const sleeveSrc = cardBackSrcForUser(user) || DEFAULT_SLEEVE;
-  const faceSrc = hidden
-    ? sleeveSrc
-    : toHighResCardImageUrl(card.image.currentSrc || card.image.src);
-
-  const host = document.createElement('div');
-  host.className = 'card-draw-flight';
-  host.style.left = `${dest.left}px`;
-  host.style.top = `${dest.top}px`;
-  host.style.width = `${dest.width}px`;
-  host.style.height = `${dest.height}px`;
-  host.appendChild(buildDrawFlip(faceSrc, sleeveSrc));
-  document.body.appendChild(host);
-
-  const startTranslate = {
-    x: origin.left + origin.width / 2 - (dest.left + dest.width / 2),
-    y: origin.top + origin.height / 2 - (dest.top + dest.height / 2),
+const onceOnly = (fn) => {
+  let called = false;
+  return () => {
+    if (called) return;
+    called = true;
+    fn?.();
   };
-  const startScale = origin.width / Math.max(dest.width, 1);
-  const destCy = dest.top + dest.height / 2;
-  const arcSign = destCy > (globalThis.innerHeight || 0) / 2 ? 1 : -1;
+};
 
-  playDrawFlight(host, {
-    startTranslate,
-    startScale,
-    flip: !hidden,
-    arcSign,
-    onDone: () => {
-      host.remove();
-      showAfterFlight(card);
-    },
-  });
+/**
+ * @param {object} card - the prize card (`instanceId` optional)
+ * @param {{rect: object, release: () => void}} handoff - the sleeve's page rect and how to remove it
+ */
+export const registerPrizeHandoff = (card, { rect, release }) => {
+  const keys = [card, card?.instanceId].filter((key) => key != null);
+  if (keys.length === 0 || !rect) return;
+  const entry = { rect, turn: 0, release: onceOnly(release) };
+  entry.timer = globalThis.setTimeout(() => {
+    dropHandoff(entry);
+    entry.release();
+  }, PRIZE_HANDOFF_MS);
+  keys.forEach((key) => prizeHandoffs.set(key, entry));
+};
+
+const dropHandoff = (entry) => {
+  for (const [key, value] of prizeHandoffs) {
+    if (value === entry) prizeHandoffs.delete(key);
+  }
+};
+
+/**
+ * Claims a registered fan sleeve: the caller now owns `release`.
+ * @returns {{rect: object, turn: number, release: () => void} | null}
+ */
+export const takePrizeHandoff = (key) => {
+  const entry = key == null ? null : prizeHandoffs.get(key);
+  if (!entry) return null;
+  globalThis.clearTimeout(entry.timer);
+  dropHandoff(entry);
+  return { rect: entry.rect, turn: entry.turn, release: entry.release };
 };
 
 const drawFlightAllowed = () =>
@@ -139,6 +92,12 @@ const drawFlightAllowed = () =>
     hidden: !!document.hidden,
   });
 
+// A card that will not fly: its fan sleeve goes and the real card shows.
+const settle = (item) => {
+  item.from?.release?.();
+  showAfterFlight(item);
+};
+
 // Design 044: the legacy mover draws one card per call, so calls for a side
 // within BATCH_WINDOW_MS join one draw; a side's draws play one after another.
 const BATCH_WINDOW_MS = 90;
@@ -147,21 +106,21 @@ const sideBusyUntil = { self: 0, opp: 0 };
 
 const sideKey = (user) => (user === 'self' ? 'self' : 'opp');
 
-const runBatch = (user, cards) => {
-  const live = cards.filter((card) => card.image?.isConnected);
-  cards.filter((card) => !live.includes(card)).forEach(showAfterFlight);
-  const faceDown = live.filter((card) => user === 'opp' && (card.redacted || isCardHidden(card)));
-  const faceUp = live.filter((card) => !faceDown.includes(card));
-  const sceneMs = faceUp.length > 0 ? playDrawScene(user, faceUp, showAfterFlight) : 0;
-  const flightMs = faceDown.length > 0 ? playOppDrawFlights(user, faceDown, showAfterFlight) : 0;
+const runBatch = (user, items) => {
+  const live = items.filter((item) => item.image?.isConnected);
+  items.filter((item) => !live.includes(item)).forEach(settle);
+  const faceDown = live.filter((item) => user === 'opp' && (item.redacted || isCardHidden(item)));
+  const faceUp = live.filter((item) => !faceDown.includes(item));
+  const sceneMs = faceUp.length > 0 ? playDrawScene(user, faceUp, settle) : 0;
+  const flightMs = faceDown.length > 0 ? playOppDrawFlights(user, faceDown, settle) : 0;
   return Math.max(sceneMs, flightMs);
 };
 
-const queueBatch = (user, cards) => {
+const queueBatch = (user, items) => {
   const key = sideKey(user);
   const wait = Math.max(0, sideBusyUntil[key] - performance.now());
   const start = () => {
-    const ms = runBatch(user, cards);
+    const ms = runBatch(user, items);
     sideBusyUntil[key] = Math.max(sideBusyUntil[key], performance.now() + ms);
   };
   // Held back until the previous draw has landed, so two draws never share the mat.
@@ -173,16 +132,18 @@ const queueBatch = (user, cards) => {
 /**
  * Design 044: plays one whole draw at once (the authoritative advisory path,
  * where every drawn card arrives in one event). When draws may not animate
- * the cards are just shown.
+ * the cards are just shown. Design 045: `from` starts a card somewhere other
+ * than the deck (a prize), and its `release` removes what stood there.
  * @param {'self'|'opp'} user
- * @param {{image: HTMLImageElement, wrapper?: Element, redacted?: boolean}[]} cards
+ * @param {{image: HTMLImageElement, wrapper?: Element, redacted?: boolean,
+ *   from?: {rect: object, turn?: number, release?: () => void} | null}[]} cards
  * @returns {number} how many cards the draw plays
  */
 export const playDrawBatch = (user, cards) => {
   const valid = (cards || []).filter((card) => card?.image);
   if (valid.length === 0) return 0;
   if (!drawFlightAllowed()) {
-    valid.forEach(showAfterFlight);
+    valid.forEach(settle);
     return 0;
   }
   valid.forEach(hideForFlight);
@@ -190,27 +151,34 @@ export const playDrawBatch = (user, cards) => {
   return valid.length;
 };
 
-// Pokémon TCG Live draw / prize take: card lifts from the origin, arcs
-// into the hand, and flips sleeve → face. Deck draws (design 044) join the
-// side's batch for the draw scene; prize takes keep this spring flight.
+// Where a legacy prize take starts: its fan sleeve, else the prize card's seat.
+const prizeStartOf = (card, fromRect) =>
+  takePrizeHandoff(card) || (fromRect ? { rect: fromRect, turn: frameTurnOf(card.image) } : null);
+
+// Pokémon TCG Live draw / prize take (designs 044/045): deck draws and prize
+// takes join the side's batch; prizes start where the prize was.
 export const playDrawToHand = (user, card, { fromRect, source = 'deck' } = {}) => {
-  if (!card?.image || !drawFlightAllowed()) return;
-  hideForFlight(card);
-  if (source === 'deck') {
-    const key = sideKey(user);
-    if (batches[key]) {
-      batches[key].cards.push(card);
-      return;
-    }
-    batches[key] = { cards: [card] };
-    globalThis.setTimeout(() => {
-      const { cards } = batches[key];
-      batches[key] = null;
-      queueBatch(user, cards);
-    }, BATCH_WINDOW_MS);
+  if (!card?.image) return;
+  const item = {
+    image: card.image,
+    wrapper: card.wrapper,
+    user: card.user,
+    from: source === 'prizes' ? prizeStartOf(card, fromRect) : null,
+  };
+  if (!drawFlightAllowed()) {
+    item.from?.release?.();
     return;
   }
-  const wait = Math.max(0, nextStartAt - performance.now());
-  nextStartAt = performance.now() + wait + STAGGER_MS;
-  globalThis.setTimeout(() => startDrawToHand(user, card, fromRect), wait);
+  hideForFlight(item);
+  const key = sideKey(user);
+  if (batches[key]) {
+    batches[key].items.push(item);
+    return;
+  }
+  batches[key] = { items: [item] };
+  globalThis.setTimeout(() => {
+    const { items } = batches[key];
+    batches[key] = null;
+    queueBatch(user, items);
+  }, BATCH_WINDOW_MS);
 };

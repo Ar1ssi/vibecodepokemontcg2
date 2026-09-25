@@ -113,13 +113,14 @@ const onCurve = (a, c, b, e) => ({
  * card's rect for a card past the spread) and animates for `duration` ms
  * after `delay`; `pose(u)` gives px from the slot's centre, `scale` of the
  * slot, `rotate` with the board turns and `flip` as rotateY (180 = sleeve up).
- * A missing hand rect fades the card out at its slot.
+ * A missing hand rect fades the card out at its slot. `deck` is where the card
+ * starts (design 045: a prize); `fadeIn` false when a sleeve already stands there.
  * @param {{index: number, count: number, deck: object|null, slot: object|null,
- *   hand: object|null, deckTurn?: number, handTurn?: number}} opts - rects in viewport px
+ *   hand: object|null, deckTurn?: number, handTurn?: number, fadeIn?: boolean}} opts - rects in viewport px
  * @returns {{delay: number, duration: number, pose: (u: number) => object} | null}
  *   null when the card has nowhere to be drawn
  */
-export function drawCardTrack({ index, count, deck, slot, hand, deckTurn = 0, handTurn = 0 }) {
+export function drawCardTrack({ index, count, deck, slot, hand, deckTurn = 0, handTurn = 0, fadeIn = true }) {
   const times = drawSceneTimes(count);
   const inSpread = index < MAX_SPREAD;
   const box = inSpread ? slot : hand;
@@ -153,7 +154,7 @@ export function drawCardTrack({ index, count, deck, slot, hand, deckTurn = 0, ha
           tiltX: PEAK_TILT * Math.sin(Math.PI * e),
           flip: 180 * (1 - easeInOutCubic(span(ms, 0, inEnd))),
           scale: lerp(start.scale, end.scale, e),
-          opacity: span(ms, 0, FADE_IN_MS),
+          opacity: fadeIn ? span(ms, 0, FADE_IN_MS) : 1,
         };
       },
     };
@@ -176,7 +177,7 @@ export function drawCardTrack({ index, count, deck, slot, hand, deckTurn = 0, ha
           tiltX: PEAK_TILT * Math.sin(Math.PI * e),
           flip: 180 * (1 - easeInOutCubic(span(ms, 0, inEnd))),
           scale: lerp(start.scale, OVERSHOOT, e),
-          opacity: span(ms, 0, FADE_IN_MS),
+          opacity: fadeIn ? span(ms, 0, FADE_IN_MS) : 1,
         };
       }
       if (ms < outStart) {

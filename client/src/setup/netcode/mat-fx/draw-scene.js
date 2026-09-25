@@ -4,6 +4,8 @@
 // their deck to their hand on design 042's arc, sleeve up. Every card handed
 // in is already hidden in the hand and is shown the moment its overlay lands.
 // Draws animate even with effects off, like the flight they replace.
+// Design 045: a card with `from` (a taken prize) starts there instead of at
+// the deck, and `from.release` removes the sleeve that stood there as it goes.
 import { selfContainerDocument, oppContainerDocument } from '../../../state.js';
 import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
 import { animateFrames, removeWhen, sampleKeyframes, spawnOverlay } from '../../image-logic/mat-fx.mjs';
@@ -57,9 +59,19 @@ const cardFace = (className, src) => {
   return img;
 };
 
+// The sleeve standing where a card starts goes the moment its overlay starts.
+const releaseAt = (card, delay) => {
+  if (!card.from?.release) return;
+  if (delay > 0) setTimeout(card.from.release, delay);
+  else card.from.release();
+};
+
+const startOf = (card, deck) => (usable(card.from?.rect) ? card.from : deck);
+
 /**
  * @param {'self'|'opp'} user
- * @param {{image: HTMLImageElement, wrapper?: Element}[]} cards - hidden in the hand
+ * @param {{image: HTMLImageElement, wrapper?: Element, from?: {rect, turn?, release?}}[]} cards -
+ *   hidden in the hand
  * @param {(card: object) => void} show - reveals one real card
  * @returns {number} the scene length in ms (0 when nothing played)
  */
@@ -75,14 +87,16 @@ export function playDrawScene(user, cards, show) {
   let played = 0;
   cards.forEach((card, index) => {
     const spot = handSpotOf(card);
+    const start = startOf(card, deck);
     const track = drawCardTrack({
       index,
       count: cards.length,
-      deck: deck?.rect || null,
+      deck: start?.rect || null,
       slot: slots[index] || null,
       hand: spot?.rect || null,
-      deckTurn: deck?.turn || 0,
+      deckTurn: start?.turn || 0,
       handTurn: spot?.turn || 0,
+      fadeIn: !card.from?.release,
     });
     const src = card.image.currentSrc || card.image.src;
     if (!track || !src) {
@@ -120,13 +134,14 @@ export function playDrawScene(user, cards, show) {
     ];
     const backstop = track.delay + track.duration + BACKSTOP_PAD_MS;
     removeWhen(host, done, backstop);
+    releaseAt(card, track.delay);
     revealWhen(card, show, done, backstop);
   });
   return played > 0 ? drawSceneTimes(cards.length).total : 0;
 }
 
 /**
- * The opponent's draw: each sleeve arcs from their deck into its hand card,
+ * The opponent's draw: each sleeve arcs from their deck (or its `from`) into its hand card,
  * turned like their board, FLIGHT_STAGGER_MS apart.
  * @returns {number} the last landing in ms (0 when nothing flew)
  */
@@ -137,18 +152,20 @@ export function playOppDrawFlights(user, cards, show) {
   let flown = 0;
   cards.forEach((card) => {
     const spot = handSpotOf(card);
-    if (!deck || !spot) {
+    const start = startOf(card, deck);
+    if (!start || !spot) {
       show(card);
       return;
     }
     const delay = flown * FLIGHT_STAGGER_MS;
     flown += 1;
     const flight = planFlight({
-      ...rectFlightEnds(deck.rect, spot.rect, { fromTurn: deck.turn, toTurn: spot.turn }),
+      ...rectFlightEnds(start.rect, spot.rect, { fromTurn: start.turn || 0, toTurn: spot.turn }),
       seed: Math.floor(Math.random() * 1e6),
     });
+    releaseAt(card, delay);
     const landed = playCardTrack({
-      rect: deck.rect,
+      rect: start.rect,
       src: sleeve,
       pose: (u) => ({ ...flightPose(u, flight), opacity: 1 }),
       duration: FLIGHT_MS,

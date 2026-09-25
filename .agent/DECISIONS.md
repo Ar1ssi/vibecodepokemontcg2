@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D159).
+#   Next id = highest D number in this file and the archive + 1 (next: D160).
 
 ## Active
+- D159[mat-fx] 2026-09-25 Prize takes ride the draw flights: fan up/back on the 042 arc (prize-fan.mjs), a picked sleeve hands off to the 044 draw scene into the hand, opponent prizes arc from their seats; the spring draw flight is gone (design 045).
 - D158[mat-fx] 2026-09-25 Draws = TCG Live scene (draw-scene.mjs/.js): yours flip out of the deck into a mat spread (one card = big preview, 600 ms hold) then drop into the hand; the opponent's sleeves arc to their hand (042 planFlight). Engine: setup deal/mulligan/bonus events carry card ids; turnStarted precedes the turn draw (design 044).
 - D157[mat-fx] 2026-09-25 Opponent Trainer/Stadium play = TCG Live preview (opp-play.mjs/.js: sleeve drops off hand, flips, grows over the mat, holds 1200 ms, lands in its slot; hold 1700); your plays keep presentCard — user scope (design 043).
 - D156[mat-fx] 2026-09-25 KO = TCG Live scene without its mat burst (user cut it; ko-scene.mjs/.js: gold stars, knockback, stack fans out, flies to pile); every discard (cardsDiscarded, cardMoved/zoneMoved to discard) flies from pre-diff origins via card-flight.mjs; KO hold 900 (design 042). (S307)

@@ -1,18 +1,15 @@
 import { systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { cardBackSrcForUser, cardNode } from '../../setup/deck-constructor/hydrate-holo.js';
-import {
-  playDrawFlight,
-  playReturnFlight,
-  prizeFanCardSize,
-  prizeFanSlots,
-  viewportRectOf,
-} from '../../setup/image-logic/card-pop.mjs';
+import { prizeFanCardSize, prizeFanSlots, viewportRectOf } from '../../setup/image-logic/card-pop.mjs';
 import {
   hideForFlight,
-  setHandFlightOrigin,
+  registerPrizeHandoff,
   showAfterFlight,
 } from '../../setup/image-logic/draw-flight.js';
+import { sampleKeyframes } from '../../setup/image-logic/mat-fx.mjs';
+import { frameTurnOf } from '../../setup/netcode/mat-fx/evolve-scene.js';
+import { FAN_BACK_MS, FAN_UP_MS, fanFlightPose } from '../../setup/netcode/mat-fx/prize-fan.mjs';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { takePrizesByIndex } from './prizes-actions.js';
 
@@ -49,32 +46,42 @@ const buildSleeveHost = (dest, sleeveSrc) => {
   return host;
 };
 
-const flyUp = (host, origin, dest) =>
-  new Promise((resolve) => {
-    const startTranslate = {
-      x: origin.left + origin.width / 2 - (dest.left + dest.width / 2),
-      y: origin.top + origin.height / 2 - (dest.top + dest.height / 2),
-    };
-    playDrawFlight(host, {
-      startTranslate,
-      startScale: origin.width / Math.max(dest.width, 1),
-      flip: false,
-      arcSign: -1,
-      onDone: resolve,
-    });
+// Design 045: the sleeves fly up and drop back on design 042's arc (WAAPI).
+// Flying up holds the start pose through its delay and then lets go, so the
+// selected-card CSS still applies; dropping back holds its end until teardown.
+const flyHost = (host, pose, { duration, delay = 0, fill }) => {
+  if (typeof host.animate !== 'function') return Promise.resolve();
+  const H = parseFloat(host.style.height) || 100;
+  const frames = sampleKeyframes(
+    pose,
+    (p) => ({
+      transform:
+        `translate(${p.x}px, ${p.y}px) perspective(${H * 4}px) rotate(${p.rotate}deg) ` +
+        `rotateX(${p.tiltX}deg) scale(${p.scale})`,
+    }),
+    36
+  );
+  return host.animate(frames, { duration, delay, fill, easing: 'linear' }).finished.then(
+    () => undefined,
+    () => undefined
+  );
+};
+
+const flightSeed = () => Math.floor(Math.random() * 1e6);
+
+const flyUp = (entry, delay) =>
+  flyHost(entry.host, fanFlightPose({ from: entry.origin, to: entry.dest, fromTurn: entry.turn, seed: flightSeed() }), {
+    duration: FAN_UP_MS,
+    delay,
+    fill: 'backwards',
   });
 
-const flyBack = (host, origin, dest) =>
-  new Promise((resolve) => {
-    playReturnFlight(host, {
-      endTranslate: {
-        x: origin.left + origin.width / 2 - (dest.left + dest.width / 2),
-        y: origin.top + origin.height / 2 - (dest.top + dest.height / 2),
-      },
-      endScale: origin.width / Math.max(dest.width, 1),
-      onDone: resolve,
-    });
-  });
+const flyBack = (entry) =>
+  flyHost(
+    entry.host,
+    fanFlightPose({ from: entry.origin, to: entry.dest, fromTurn: entry.turn, reverse: true, seed: flightSeed() }),
+    { duration: FAN_BACK_MS, fill: 'forwards' }
+  );
 
 const unhideSources = (cards) => {
   for (const card of cards) {
@@ -108,9 +115,7 @@ const finishPrizeTake = (taken, unhideAll = taken === 0) => {
 const returnUnselectedThenFinish = async (taken) => {
   if (!pending) return;
   const leftover = pending.entries.filter((entry) => !pending.selected.has(entry.card));
-  await Promise.all(
-    leftover.map((entry) => flyBack(entry.host, entry.origin, entry.dest))
-  );
+  await Promise.all(leftover.map(flyBack));
   finishPrizeTake(taken, false);
 };
 
@@ -124,11 +129,18 @@ const confirmSelection = (force = false) => {
   pending.overlay.classList.remove('is-ready');
 
   const chosen = entries.filter((entry) => selected.has(entry.card));
-  for (const entry of chosen) {
-    entry.host.style.visibility = 'hidden';
-  }
+  for (const entry of chosen) handOffChosen(entry);
 
   returnUnselectedThenFinish(onChosen(chosen));
+};
+
+// Design 045: a picked sleeve leaves the overlay (it outlives the teardown) and
+// waits for the flight into the hand to start from it.
+const handOffChosen = (entry) => {
+  const face = entry.host.querySelector('img') || entry.host;
+  const rect = viewportRectOf(face);
+  document.body.appendChild(entry.host);
+  registerPrizeHandoff(entry.card, { rect, release: () => entry.host.remove() });
 };
 
 const selectEntry = (card, host) => {
@@ -207,6 +219,7 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
     const origin = originEl
       ? viewportRectOf(originEl)
       : { left: 40, top: viewport.height - 180, width: 70, height: 98 };
+    const turn = originEl ? frameTurnOf(card.image) : 0;
     hideForFlight(card);
     const host = buildSleeveHost(dests[i], sleeveSrc);
     host.addEventListener('click', (event) => {
@@ -214,7 +227,7 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
       toggleSelect(card, host);
     });
     overlay.appendChild(host);
-    return { card, host, origin, dest: dests[i] };
+    return { card, host, origin, turn, dest: dests[i] };
   });
 
   appendMessage('', `Pick ${noun}.`, 'announcement', false);
@@ -234,16 +247,14 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
 
     let arrived = 0;
     entries.forEach((entry, i) => {
-      globalThis.setTimeout(() => {
-        flyUp(entry.host, entry.origin, dests[i]).then(() => {
-          if (!pending || pending.overlay !== overlay) return;
-          arrived += 1;
-          if (arrived >= pending.entries.length) {
-            pending.ready = true;
-            overlay.classList.add('is-ready');
-          }
-        });
-      }, i * STAGGER_MS);
+      flyUp(entry, i * STAGGER_MS).then(() => {
+        if (!pending || pending.overlay !== overlay) return;
+        arrived += 1;
+        if (arrived >= pending.entries.length) {
+          pending.ready = true;
+          overlay.classList.add('is-ready');
+        }
+      });
     });
   });
 };
@@ -267,9 +278,6 @@ export const promptPrizeTake = (user, count) => {
       const indices = chosen
         .map((entry) => zone.array.indexOf(entry.card))
         .filter((index) => index >= 0);
-      for (const entry of chosen) {
-        setHandFlightOrigin(entry.card, viewportRectOf(entry.host));
-      }
       if (indices.length > 0) {
         takePrizesByIndex(user, user, indices);
       }

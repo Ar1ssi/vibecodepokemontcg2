@@ -68,7 +68,7 @@ const ENTRY_SOURCES = new Set(['hand', 'deck', 'discard']);
 const ENTRY_TARGETS = new Set(['active', 'bench']);
 
 // Draw events carry `[{instanceId}]`; a few engine sites emit bare ids.
-const drawnCards = (cards) => {
+export const drawnCards = (cards) => {
   if (!Array.isArray(cards)) return [];
   return cards
     .map((card) => (card != null && typeof card === 'object' ? card : { instanceId: card }))
@@ -78,8 +78,20 @@ const drawnCards = (cards) => {
 const entersPlay = (event) =>
   event.instanceId != null && ENTRY_SOURCES.has(event.from) && ENTRY_TARGETS.has(event.to);
 
+// Design 045: taken prizes naming their cards also fly into the hand, after the
+// claim burst on the prize zone.
+const PRIZE_TAKES = new Set(['prizesTaken', 'prizeTaken']);
+
+const prizePlans = (event, selfPlayerId) => {
+  const burst = fxPlan(event, selfPlayerId);
+  const cards = drawnCards(event.cards);
+  if (cards.length === 0 || burst.user == null) return burst;
+  return [burst, { kind: 'draw', user: burst.user, cards, count: cards.length, source: 'prizes' }];
+};
+
 export function advisoryAnimationPlan(event, selfPlayerId) {
   if (!event || typeof event !== 'object') return null;
+  if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
   if (event.type === 'cardMoved') {
     if (event.to === 'discard' && event.instanceId != null) {

@@ -148,3 +148,13 @@ test('drawSceneHold: the scene minus the last drop', () => {
   assert.equal(drawSceneHold(1), DRAW_IN_MS + SINGLE_HOLD_MS);
   assert.equal(drawSceneHold(7), drawSceneTimes(7).total - DRAW_OUT_MS);
 });
+
+test('drawCardTrack: a card taking over a standing sleeve (a prize) starts fully shown', () => {
+  const [slot] = drawSpreadRects(1, center, viewport);
+  const prize = { left: 400, top: 300, width: 120, height: 168 };
+  const track = drawCardTrack({ index: 0, count: 1, deck: prize, slot, hand, fadeIn: false });
+  const start = track.pose(0);
+  assert.equal(start.opacity, 1);
+  assert.equal(start.flip, 180);
+  assert.ok(near(start.x, 460 - 800) && near(start.y, 384 - 450));
+});
