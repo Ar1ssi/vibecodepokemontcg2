@@ -194,3 +194,27 @@ test('setupGame: a normal setup clears any stale firstPrizeWins flag', () => {
   setupGame(state);
   assert.equal('firstPrizeWins' in state, false);
 });
+
+test('setupGame: deal, mulligan and bonus-draw events name the cards they put in hand', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'NoBasics', zones: { deck: createTestDeck(false) } },
+      p2: { username: 'HasBasics', zones: { deck: createTestDeck(true) } },
+    },
+    seed: 12345,
+  });
+  const { events } = setupGame(state, { maxMulligans: 3 });
+  const ids = (event) => event.cards.map((c) => c.instanceId);
+  const dealt = events.filter((e) => e.type === 'openingHandDealt');
+  assert.equal(dealt.length, 2);
+  for (const event of dealt) assert.equal(event.cards.length, event.count);
+  const redeals = events.filter((e) => e.type === 'mulliganTaken');
+  assert.ok(redeals.length > 0);
+  const lastRedeal = redeals[redeals.length - 1];
+  const p1Hand = state.players.p1.zones.hand.map((c) => c.instanceId);
+  for (const id of ids(lastRedeal)) assert.ok(p1Hand.includes(id), `p1 holds ${id}`);
+  const bonuses = events.filter((e) => e.type === 'bonusDrawAwarded');
+  assert.ok(bonuses.length > 0);
+  const p2Hand = state.players.p2.zones.hand.map((c) => c.instanceId);
+  for (const event of bonuses) assert.ok(p2Hand.includes(ids(event)[0]), 'bonus card is in p2 hand');
+});

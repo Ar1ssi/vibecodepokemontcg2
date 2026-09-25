@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { advisoryAnimationPlan, EVENT_FX } from '../advisory-animations.mjs';
+import { advisoryAnimationPlan, EVENT_FX, supersededDeals } from '../advisory-animations.mjs';
 import { HOLD_MS } from '../mat-fx/fx-holds.mjs';
 
 test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side', () => {
@@ -289,4 +289,35 @@ test('advisoryAnimationPlan: a zone swept into the discard pile flies that zone'
   assert.equal(plan.sweep, 'board');
   assert.equal(advisoryAnimationPlan({ type: 'zoneMoved', playerId: 'p1', from: 'board', to: 'lostZone', count: 1 }, 'p1'), null);
   assert.equal(advisoryAnimationPlan({ type: 'zoneMoved', playerId: 'p1', to: 'discard', count: 1 }, 'p1'), null);
+});
+
+test('advisoryAnimationPlan: opening deal, mulligan redeal and bonus draw -> draw plans (design 044)', () => {
+  for (const type of ['openingHandDealt', 'mulliganTaken', 'bonusDrawAwarded']) {
+    assert.deepEqual(
+      advisoryAnimationPlan({ type, playerId: 'p1', cards: [{ instanceId: 4 }, { instanceId: 5 }] }, 'p1'),
+      { kind: 'draw', user: 'self', cards: [{ instanceId: 4 }, { instanceId: 5 }], count: 2 },
+      type
+    );
+  }
+  assert.equal(advisoryAnimationPlan({ type: 'openingHandDealt', playerId: 'p1', count: 7 }, 'p1'), null);
+});
+
+test('advisoryAnimationPlan: bare-id draw cards parse like {instanceId}', () => {
+  assert.deepEqual(advisoryAnimationPlan({ type: 'cardsDrawn', playerId: 'p2', cards: [7, null, 8] }, 'p1'), {
+    kind: 'draw',
+    user: 'opp',
+    cards: [{ instanceId: 7 }, { instanceId: 8 }],
+    count: 2,
+  });
+});
+
+test('supersededDeals: only each player\'s last deal survives a mulligan', () => {
+  const firstDeal = { type: 'openingHandDealt', playerId: 'p1' };
+  const oppDeal = { type: 'openingHandDealt', playerId: 'p2' };
+  const redeal1 = { type: 'mulliganTaken', playerId: 'p1' };
+  const redeal2 = { type: 'mulliganTaken', playerId: 'p1' };
+  const bonus = { type: 'bonusDrawAwarded', playerId: 'p2' };
+  const superseded = supersededDeals([firstDeal, oppDeal, redeal1, redeal2, bonus]);
+  assert.deepEqual([...superseded], [firstDeal, redeal1]);
+  assert.equal(supersededDeals(null).size, 0);
 });

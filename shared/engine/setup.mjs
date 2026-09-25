@@ -91,10 +91,13 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     const handCount = Math.min(7, player.zones.deck.length);
     const handCards = player.zones.deck.splice(0, handCount);
     player.zones.hand.push(...handCards);
+    // Design 044: the ids let the client fly each card in (instance ids are
+    // public; the opponent's hand is redacted to them).
     events.push({
       type: 'openingHandDealt',
       playerId: pid,
       count: handCount,
+      cards: handCards.map((card) => ({ instanceId: card.instanceId })),
     });
 
     // Deal prizes (up to 6 cards)
@@ -140,6 +143,7 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
         type: 'mulliganTaken',
         playerId: pid,
         mulliganCount: mulligans[pid],
+        cards: drawn.map((card) => ({ instanceId: card.instanceId })),
       });
     }
   }
@@ -162,6 +166,7 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
         type: 'bonusDrawAwarded',
         playerId: pid,
         sourcePlayerId: source,
+        cards: [{ instanceId: bonusCard.instanceId }],
       });
     }
   }

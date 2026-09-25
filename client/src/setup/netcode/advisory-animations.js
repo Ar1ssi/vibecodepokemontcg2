@@ -3,7 +3,7 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
-import { advisoryAnimationPlan } from './advisory-animations.mjs';
+import { advisoryAnimationPlan, supersededDeals } from './advisory-animations.mjs';
 import {
   getAuthoritativeDeckCount,
   getAuthoritativeZoneArray,
@@ -11,7 +11,7 @@ import {
 } from './apply-view.js';
 import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
 import { playShuffleFlight } from '../image-logic/shuffle-flight.js';
-import { playDrawToHand } from '../image-logic/draw-flight.js';
+import { hideForFlight, playDrawBatch, showAfterFlight } from '../image-logic/draw-flight.js';
 import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
@@ -19,6 +19,7 @@ import { playFx } from './mat-fx/index.js';
 import { afterImpact } from './mat-fx/combat.js';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
 import { holdFor } from './mat-fx/fx-holds.mjs';
+import { drawSceneHold } from './mat-fx/draw-scene.mjs';
 import { flightSrcOf } from './mat-fx/card-flight.mjs';
 import { captureOrigins, discardOrigins, knockoutStack } from './mat-fx/origins.mjs';
 
@@ -37,13 +38,35 @@ const shuffleZoneCount = (user, zoneId) => {
     : getAuthoritativeZoneArray(side, zoneId).length;
 };
 
-const playDrawPlan = (plan) => {
+// Deals a later mulligan replaced in the batch being applied (design 044).
+let skippedDeals = new Set();
+// Revealed by this if their plan never runs (the queue was cleared).
+const HELD_DRAW_BACKSTOP_MS = 6000;
+
+/**
+ * Design 044: the drawn cards are in the hand as soon as the view applies.
+ * Hide them now, so they do not show while earlier effects play; they fly in
+ * when their plan runs. Cards no longer in the hand (a mulligan put them back)
+ * are left out.
+ */
+const holdDrawnCards = (plan) => {
   const registry = getCardRegistry();
+  const drawn = [];
   for (const { instanceId } of plan.cards) {
     const record = registry.get(instanceId);
-    if (!record?.element) continue;
-    playDrawToHand(plan.user, { image: record.element });
+    if (!record?.element?.isConnected || record.zone !== 'hand') continue;
+    drawn.push({ image: record.element, wrapper: record.holoCard?.wrapper, redacted: !!record.isRedacted });
   }
+  drawn.forEach(hideForFlight);
+  const backstop = setTimeout(() => drawn.forEach(showAfterFlight), HELD_DRAW_BACKSTOP_MS);
+  return { ...plan, drawn, backstop };
+};
+
+// Your own draw holds the queue for its scene; the opponent's flies alongside.
+const playDrawPlan = (plan) => {
+  clearTimeout(plan.backstop);
+  const played = playDrawBatch(plan.user, plan.drawn || []);
+  return plan.user === 'self' ? drawSceneHold(played) : 0;
 };
 
 /**
@@ -56,6 +79,7 @@ const playDrawPlan = (plan) => {
  * @param {string|null} selfPlayerId
  */
 export function handleBeforeApply(events, selfPlayerId) {
+  skippedDeals = supersededDeals(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
   for (const event of events) {
@@ -90,10 +114,7 @@ function runPlan(plan) {
     playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
     return 0;
   }
-  if (plan.kind === 'draw') {
-    playDrawPlan(plan);
-    return 0;
-  }
+  if (plan.kind === 'draw') return playDrawPlan(plan);
   if (plan.kind === 'knockout') {
     const ghost = pendingKnockoutGhosts.get(plan.instanceId);
     pendingKnockoutGhosts.delete(plan.instanceId);
@@ -136,6 +157,7 @@ if (typeof document !== 'undefined') {
  * @param {string|null} selfPlayerId
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
+  if (skippedDeals.has(event)) return;
   const planned = advisoryAnimationPlan(event, selfPlayerId);
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];
@@ -157,5 +179,5 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
     return;
   }
 
-  for (const plan of plans) fxQueue.push(plan);
+  for (const plan of plans) fxQueue.push(plan.kind === 'draw' ? holdDrawnCards(plan) : plan);
 }

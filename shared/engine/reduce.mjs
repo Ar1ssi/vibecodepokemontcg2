@@ -2829,6 +2829,14 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     card.abilityUsed = false;
   }
 
+  // Design 044: the turn starts, then its player draws (the rulebook's order),
+  // so the client shows the turn banner before the drawn card.
+  events.push({
+    type: 'turnStarted',
+    player: nextPlayerId,
+    number: draft.turn.number,
+  });
+
   const deck = draft.players[nextPlayerId].zones.deck;
   const hand = draft.players[nextPlayerId].zones.hand;
   if (deck.length === 0) {
@@ -2844,12 +2852,6 @@ function advanceTurn(draft, { nextPlayerId, events }) {
       cards: [{ instanceId: card.instanceId }],
     });
   }
-
-  events.push({
-    type: 'turnStarted',
-    player: nextPlayerId,
-    number: draft.turn.number,
-  });
 }
 
 /**

@@ -67,6 +67,14 @@ const fxPlan = (event, selfPlayerId, effect = EVENT_FX[event.type]) => {
 const ENTRY_SOURCES = new Set(['hand', 'deck', 'discard']);
 const ENTRY_TARGETS = new Set(['active', 'bench']);
 
+// Draw events carry `[{instanceId}]`; a few engine sites emit bare ids.
+const drawnCards = (cards) => {
+  if (!Array.isArray(cards)) return [];
+  return cards
+    .map((card) => (card != null && typeof card === 'object' ? card : { instanceId: card }))
+    .filter((card) => card.instanceId != null);
+};
+
 const entersPlay = (event) =>
   event.instanceId != null && ENTRY_SOURCES.has(event.from) && ENTRY_TARGETS.has(event.to);
 
@@ -95,9 +103,13 @@ export function advisoryAnimationPlan(event, selfPlayerId) {
     case 'zoneShuffledIntoDeck':
       return { kind: 'shuffle', user, zoneId: 'deck' };
 
-    case 'cardsDrawn': {
-      if (!Array.isArray(event.cards) || event.cards.length === 0) return null;
-      const cards = event.cards.filter((c) => c?.instanceId != null);
+    // Design 044: the opening hand, a mulligan redeal and a bonus draw fly in
+    // like any other draw.
+    case 'cardsDrawn':
+    case 'openingHandDealt':
+    case 'mulliganTaken':
+    case 'bonusDrawAwarded': {
+      const cards = drawnCards(event.cards);
       if (cards.length === 0) return null;
       return { kind: 'draw', user, cards, count: cards.length };
     }
@@ -109,4 +121,26 @@ export function advisoryAnimationPlan(event, selfPlayerId) {
     default:
       return null;
   }
+}
+
+const DEAL_EVENTS = new Set(['openingHandDealt', 'mulliganTaken']);
+
+/**
+ * Deals a later mulligan replaced (design 044): only each player's last deal in
+ * a batch is animated, so a card kept through a redeal does not fly in twice.
+ *
+ * @param {object[]} events
+ * @returns {Set<object>} the superseded deal events
+ */
+export function supersededDeals(events) {
+  const superseded = new Set();
+  if (!Array.isArray(events)) return superseded;
+  const lastDeal = new Map();
+  for (const event of events) {
+    if (!DEAL_EVENTS.has(event?.type)) continue;
+    const previous = lastDeal.get(event.playerId);
+    if (previous) superseded.add(previous);
+    lastDeal.set(event.playerId, event);
+  }
+  return superseded;
 }

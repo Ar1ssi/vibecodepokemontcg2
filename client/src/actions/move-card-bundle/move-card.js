@@ -736,7 +736,7 @@ export const moveCard = async (
           isCatchingUp: !!systemState.isCatchingUp,
         })
       ) {
-        playDrawToHand(user, movingCard, { fromRect: flightOrigin });
+        playDrawToHand(user, movingCard, { fromRect: flightOrigin, source: oZoneId });
       }
     }
     //update the cover of the deck/lostzone/discard if applicable

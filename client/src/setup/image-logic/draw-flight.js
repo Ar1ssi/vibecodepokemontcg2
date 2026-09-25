@@ -12,6 +12,7 @@ import {
 } from '../deck-constructor/hydrate-holo.js';
 import { toHighResCardImageUrl } from './card-image-url.mjs';
 import { playDrawFlight, viewportRectOf } from './card-pop.mjs';
+import { playDrawScene, playOppDrawFlights } from '../netcode/mat-fx/draw-scene.js';
 
 const pendingHandOrigins = new WeakMap();
 
@@ -131,19 +132,84 @@ const startDrawToHand = (user, card, fromRect) => {
   });
 };
 
+const drawFlightAllowed = () =>
+  typeof document !== 'undefined' &&
+  shouldAnimateDrawFlight({
+    syncReplaying: !!systemState.syncReplaying,
+    hidden: !!document.hidden,
+  });
+
+// Design 044: the legacy mover draws one card per call, so calls for a side
+// within BATCH_WINDOW_MS join one draw; a side's draws play one after another.
+const BATCH_WINDOW_MS = 90;
+const batches = { self: null, opp: null };
+const sideBusyUntil = { self: 0, opp: 0 };
+
+const sideKey = (user) => (user === 'self' ? 'self' : 'opp');
+
+const runBatch = (user, cards) => {
+  const live = cards.filter((card) => card.image?.isConnected);
+  cards.filter((card) => !live.includes(card)).forEach(showAfterFlight);
+  const faceDown = live.filter((card) => user === 'opp' && (card.redacted || isCardHidden(card)));
+  const faceUp = live.filter((card) => !faceDown.includes(card));
+  const sceneMs = faceUp.length > 0 ? playDrawScene(user, faceUp, showAfterFlight) : 0;
+  const flightMs = faceDown.length > 0 ? playOppDrawFlights(user, faceDown, showAfterFlight) : 0;
+  return Math.max(sceneMs, flightMs);
+};
+
+const queueBatch = (user, cards) => {
+  const key = sideKey(user);
+  const wait = Math.max(0, sideBusyUntil[key] - performance.now());
+  const start = () => {
+    const ms = runBatch(user, cards);
+    sideBusyUntil[key] = Math.max(sideBusyUntil[key], performance.now() + ms);
+  };
+  // Held back until the previous draw has landed, so two draws never share the mat.
+  sideBusyUntil[key] = Math.max(sideBusyUntil[key], performance.now() + wait);
+  if (wait > 0) globalThis.setTimeout(start, wait);
+  else start();
+};
+
+/**
+ * Design 044: plays one whole draw at once (the authoritative advisory path,
+ * where every drawn card arrives in one event). When draws may not animate
+ * the cards are just shown.
+ * @param {'self'|'opp'} user
+ * @param {{image: HTMLImageElement, wrapper?: Element, redacted?: boolean}[]} cards
+ * @returns {number} how many cards the draw plays
+ */
+export const playDrawBatch = (user, cards) => {
+  const valid = (cards || []).filter((card) => card?.image);
+  if (valid.length === 0) return 0;
+  if (!drawFlightAllowed()) {
+    valid.forEach(showAfterFlight);
+    return 0;
+  }
+  valid.forEach(hideForFlight);
+  queueBatch(user, valid);
+  return valid.length;
+};
+
 // Pokémon TCG Live draw / prize take: card lifts from the origin, arcs
-// into the hand, and flips sleeve → face.
-export const playDrawToHand = (user, card, { fromRect } = {}) => {
-  if (!card?.image || typeof document === 'undefined') return;
-  if (
-    !shouldAnimateDrawFlight({
-      syncReplaying: !!systemState.syncReplaying,
-      hidden: typeof document !== 'undefined' && !!document.hidden,
-    })
-  ) {
+// into the hand, and flips sleeve → face. Deck draws (design 044) join the
+// side's batch for the draw scene; prize takes keep this spring flight.
+export const playDrawToHand = (user, card, { fromRect, source = 'deck' } = {}) => {
+  if (!card?.image || !drawFlightAllowed()) return;
+  hideForFlight(card);
+  if (source === 'deck') {
+    const key = sideKey(user);
+    if (batches[key]) {
+      batches[key].cards.push(card);
+      return;
+    }
+    batches[key] = { cards: [card] };
+    globalThis.setTimeout(() => {
+      const { cards } = batches[key];
+      batches[key] = null;
+      queueBatch(user, cards);
+    }, BATCH_WINDOW_MS);
     return;
   }
-  hideForFlight(card);
   const wait = Math.max(0, nextStartAt - performance.now());
   nextStartAt = performance.now() + wait + STAGGER_MS;
   globalThis.setTimeout(() => startDrawToHand(user, card, fromRect), wait);

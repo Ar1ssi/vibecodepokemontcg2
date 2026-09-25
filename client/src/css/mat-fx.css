@@ -10,6 +10,11 @@ body.fx-off .fx-overlay {
   display: none;
 }
 
+/* Design 044: draws animate with effects off, like the flight they replaced. */
+body.fx-off .fx-overlay.fx-draw {
+  display: block;
+}
+
 /* Design 026: Rodin for FX text (same face the PC Box uses; declaring it
    again here keeps the game page independent of the deck-builder sheet). */
 @font-face {
@@ -426,7 +431,13 @@ body.fx-off .fx-overlay {
   overflow: visible;
 }
 
-.fx-opp-play__card {
+.fx-draw-scene {
+  z-index: 2475;
+  overflow: visible;
+}
+
+.fx-opp-play__card,
+.fx-draw-scene__card {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
@@ -434,7 +445,9 @@ body.fx-off .fx-overlay {
 }
 
 .fx-opp-play__back,
-.fx-opp-play__front {
+.fx-opp-play__front,
+.fx-draw-scene__back,
+.fx-draw-scene__front {
   position: absolute;
   inset: 0;
   display: block;
@@ -446,7 +459,8 @@ body.fx-off .fx-overlay {
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
 }
 
-.fx-opp-play__back {
+.fx-opp-play__back,
+.fx-draw-scene__back {
   transform: rotateY(180deg);
 }
 

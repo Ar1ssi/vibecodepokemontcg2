@@ -103,3 +103,38 @@ test('turn-loop: deck-out loss when next player cannot draw at start of turn', (
   assert.equal(gameEndedEvent.winner, 'p1');
   assert.equal(gameEndedEvent.reason, 'deck-out');
 });
+
+test('turn-loop: the new turn starts before its player draws (design 044)', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash', zones: { deck: [createCard({ instanceId: 1, name: 'Card 1' })] } },
+      p2: { username: 'Gary', zones: { deck: [createCard({ instanceId: 2, name: 'Card 2' })] } },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 1, phase: 'main' };
+
+  const { events } = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  const types = events.map((e) => e.type);
+
+  assert.ok(types.indexOf('turnStarted') >= 0);
+  assert.ok(types.indexOf('turnStarted') < types.indexOf('cardsDrawn'));
+});
+
+test('turn-loop: deck-out still starts the turn, then ends the game with no draw', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash' },
+      p2: { username: 'Gary', zones: { deck: [] } },
+    },
+    rulesEnabled: true,
+  });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+
+  const types = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' }).events.map(
+    (e) => e.type
+  );
+
+  assert.ok(types.indexOf('turnStarted') < types.indexOf('gameEnded'));
+  assert.equal(types.includes('cardsDrawn'), false);
+});
