@@ -9,6 +9,7 @@
 #   Next id = highest D number in this file and the archive + 1 (next: D150).
 
 ## Active
+- D150[deck-builder] 2026-09-25 Transform + type forms ship as generated catalog rows; cards resolve them by exact form name/aliases, Arceus/Silvally by card `types` (design 039). (S302)
 - D149[tooling] 2026-09-25 `pnpm audit:attacks` ratchets each unique corpus attack's verdict (ok/partial/ran-no-effect/engine-error) vs scripts/attack-behaviour-baseline.json; a regression fails by name (design 036 slice 16). (S300)
 - D148[render] 2026-09-22 FX kill switch reaches inside the playmat iframes: image-logic/fx-settings owns fx-off/sfx-off/volume and mirrors fx-off/fx-reduced onto each iframe <html> (design 024 O4). (S252) (PR #181 branch id D97)
 - D147[render] 2026-09-22 Game audio is synthesized (mat-fx/fx-audio.mjs voice table, one lazy AudioContext), not sampled; dispatched from dispatcher.mjs with visuals; not gated by reduced motion. (S252) (PR #181 branch id D96)

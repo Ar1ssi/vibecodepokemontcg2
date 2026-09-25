@@ -70,6 +70,47 @@ const BASE_POKEMON_BY_NAME = new Map(
     entry,
   ])
 );
+// Alternate forms by their display name ("Black Kyurem", "Fan Rotom", …), so
+// a card that names the form resolves without a per-form parser branch.
+const FORM_BY_NAME = new Map(
+  POKEMON_SPRITE_CATALOG.filter((entry) => entry.form !== null).map((entry) => [
+    nameKey(entry.name),
+    entry,
+  ])
+);
+// Card wordings the display names cannot reach. Castform and Deoxys spell the
+// form on either side of the species; "Normal Forme" is the base sprite.
+const FORM_NAME_ALIASES = {
+  raincastform: 'castform-rainy',
+  castformrainform: 'castform-rainy',
+  castformrainyform: 'castform-rainy',
+  snowcloudcastform: 'castform-snowy',
+  castformsnowcloudform: 'castform-snowy',
+  castformsnowyform: 'castform-snowy',
+  sunnycastform: 'castform-sunny',
+  castformsunnyform: 'castform-sunny',
+  deoxysattackforme: 'deoxys-attack',
+  deoxysdefenseforme: 'deoxys-defense',
+  deoxysspeedforme: 'deoxys-speed',
+  deoxysnormalforme: 'deoxys',
+};
+// Arceus and Silvally pick their sprite from the card's printed type. Only the
+// types the TCG prints on them map; anything else falls back to the base.
+const TYPE_FORM_SPECIES = new Set(['arceus', 'silvally']);
+const TYPE_FORM_KEYS = {
+  grass: 'grass',
+  fire: 'fire',
+  water: 'water',
+  lightning: 'electric',
+  psychic: 'psychic',
+  fighting: 'fighting',
+  darkness: 'dark',
+  metal: 'steel',
+  fairy: 'fairy',
+  dragon: 'dragon',
+};
+// Eternatus VMAX always depicts the Eternamax form.
+const VMAX_CARD_FORMS = { eternatus: 'eternamax' };
 const ITEM_BY_NAME = new Map(
   ITEM_SPRITE_CATALOG.map((entry) => [nameKey(entry.name), entry])
 );
@@ -115,10 +156,24 @@ function paldeanTaurosForm(types) {
   return 'paldea';
 }
 
+function typeFormFor(slug, types) {
+  if (!TYPE_FORM_SPECIES.has(slug)) return null;
+  const list = Array.isArray(types) ? types : [];
+  for (const type of list) {
+    const key = TYPE_FORM_KEYS[String(type ?? '').toLowerCase()];
+    if (key) return key;
+  }
+  return null;
+}
+
+function entryResult(entry) {
+  return { slug: entry.slug, name: entry.name };
+}
+
 /**
  * Parses a Pokémon card name into a sprite catalog entry.
  * @param {string} cardName
- * @param {{types?: string[]}} [card] - the card's types pick a Paldean Tauros breed
+ * @param {{types?: string[]}} [card] - the card's types pick a Paldean Tauros breed or an Arceus / Silvally type form
  * @returns {{slug: string, name: string}|null}
  */
 export function pokemonSpriteForName(cardName, { types } = {}) {
@@ -139,6 +194,7 @@ export function pokemonSpriteForName(cardName, { types } = {}) {
   const primal = name.match(/^primal\s+(.+)$/i);
   const regional = name.match(/^(alolan|galarian|hisuian|paldean)\s+(.+)$/i);
   const named = name.match(NAMED_FORM_PREFIX);
+  const strike = name.match(/^(single|rapid)[\s-]+strike\s+(.+)$/i);
   if (mega) {
     name = mega[1];
     form = mega[2] ? `mega-${mega[2].toLowerCase()}` : 'mega';
@@ -151,18 +207,31 @@ export function pokemonSpriteForName(cardName, { types } = {}) {
   } else if (named) {
     name = named[2];
     form = namedFormKey(named[1]);
-  } else if (isVmax) {
-    form = 'gmax';
+  } else if (strike) {
+    // pokesprite has no regular Rapid Strike art; only the VMAX form maps.
+    name = strike[2];
+    if (isVmax)
+      form =
+        strike[1].toLowerCase() === 'rapid' ? 'rapid-strike-gmax' : 'gmax';
+  }
+
+  if (!form) {
+    const exact = FORM_BY_NAME.get(nameKey(name));
+    if (exact) return entryResult(exact);
+    const alias = POKEMON_BY_SLUG.get(FORM_NAME_ALIASES[nameKey(name)]);
+    if (alias) return entryResult(alias);
   }
 
   const base = findBaseSpecies(name);
   if (!base) return null;
   if (form === 'paldea' && base.slug === 'tauros')
     form = paldeanTaurosForm(types);
+  if (!form) form = typeFormFor(base.slug, types);
+  if (!form && isVmax) form = VMAX_CARD_FORMS[base.slug] ?? 'gmax';
   if (!form && isEx) form = EX_CARD_FORMS[base.slug] ?? null;
   const formEntry = form ? POKEMON_BY_SLUG.get(`${base.slug}-${form}`) : null;
   const entry = formEntry || base;
-  return { slug: entry.slug, name: entry.name };
+  return entryResult(entry);
 }
 
 /** @returns {{path: string, name: string}|null} the item icon for a Trainer card name. */

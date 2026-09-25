@@ -14,12 +14,14 @@ client/src/setup/deck-builder/core/card-filters.mjs — search filter pills (car
   Trainer subtype); OR within a group, AND across groups; reuses energy-token-assets.mjs's type vocabulary
 client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):
   up to 2 `{slug, shiny}` per deck (D99), catalog search and vendored-art URL building; catalog data in
-  pokemon-sprite-catalog.generated.mjs (905 gen-8 base forms), art in client/src/assets/pokemon/gen8/,
+  pokemon-sprite-catalog.generated.mjs (gen-8 species + Mega/Gmax/regional/transform/type forms, design 039),
+  art in client/src/assets/pokemon/gen8/,
   both refreshed by scripts/generate-pokemon-sprites.mjs; plus hand-kept pokemon-sprite-catalog-gen9.mjs
   (fan art, regular only, D100) with art in client/src/assets/pokemon/gen9/regular/. UI: renderDeckSprites/renderSpritePicker in
   native-deck-builder-renderers.js + native-deck-builder-sprite-picker.js (popover state only)
 client/src/setup/deck-builder/core/card-sprites.mjs — card → sprite (design 025, D98): cardSpriteFor
-  parses Pokémon names to species + Mega/Primal/Gmax/regional form, Item/Tool Trainers to pokesprite item
+  parses Pokémon names to species + Mega/Primal/Gmax/regional/transform form (exact catalog name +
+  alias table, design 039) or Arceus/Silvally type by card `types`, Item/Tool Trainers to pokesprite item
   art (item-sprite-catalog.generated.mjs, art in client/src/assets/items/, via
   scripts/generate-item-sprites.mjs); resolveDisplaySprites auto-fills the 2 deck sprites from the deck
 client/src/setup/deck-builder/core/box-wallpapers.mjs — 16 Gen V PC Box wallpapers (banner + body PNGs in

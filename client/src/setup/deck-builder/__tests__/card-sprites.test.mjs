@@ -86,8 +86,74 @@ test('a Paldean Tauros card picks its breed from the card type', () => {
 });
 
 test('descriptive prefixes the rules do not know still find the species', () => {
-  assert.equal(slugOf('Origin Forme Dialga VSTAR'), 'dialga');
+  assert.equal(slugOf('Armored Mewtwo'), 'mewtwo');
   assert.equal(slugOf('Single Strike Urshifu VMAX'), 'urshifu-gmax');
+});
+
+test('transform-form card names resolve to their form sprite', () => {
+  assert.equal(slugOf('Black Kyurem ex'), 'kyurem-black');
+  assert.equal(slugOf('Black Kyurem-EX'), 'kyurem-black');
+  assert.equal(slugOf('White Kyurem-GX'), 'kyurem-white');
+  assert.equal(slugOf('Dawn Wings Necrozma-GX'), 'necrozma-dawn');
+  assert.equal(slugOf('Dusk Mane Necrozma-GX'), 'necrozma-dusk');
+  assert.equal(slugOf('Ultra Necrozma'), 'necrozma-ultra');
+  assert.equal(slugOf('Fan Rotom'), 'rotom-fan');
+  assert.equal(slugOf('Heat Rotom'), 'rotom-heat');
+  assert.equal(slugOf('Origin Forme Dialga V'), 'dialga-origin');
+  assert.equal(slugOf('Origin Forme Palkia VSTAR'), 'palkia-origin');
+  assert.equal(slugOf('Ice Rider Calyrex VMAX'), 'calyrex-ice-rider');
+  assert.equal(slugOf('Shadow Rider Calyrex V'), 'calyrex-shadow-rider');
+  assert.equal(slugOf('Ash-Greninja-EX'), 'greninja-ash');
+  assert.equal(slugOf('Hoopa Unbound'), 'hoopa-unbound');
+});
+
+test('castform and deoxys card wordings resolve through aliases', () => {
+  assert.equal(slugOf('Sunny Castform'), 'castform-sunny');
+  assert.equal(slugOf('Rain Castform'), 'castform-rainy');
+  assert.equal(slugOf('Castform Rain Form'), 'castform-rainy');
+  assert.equal(slugOf('Castform Rainy Form'), 'castform-rainy');
+  assert.equal(slugOf('Snow-cloud Castform'), 'castform-snowy');
+  assert.equal(slugOf('Castform Snow-Cloud Form'), 'castform-snowy');
+  assert.equal(slugOf('Castform Sunny Form'), 'castform-sunny');
+  assert.equal(slugOf('Deoxys Attack Forme'), 'deoxys-attack');
+  assert.equal(slugOf('Deoxys Defense Forme'), 'deoxys-defense');
+  assert.equal(slugOf('Deoxys Speed Forme'), 'deoxys-speed');
+  // The base look; the alias lands on the base sprite.
+  assert.equal(slugOf('Deoxys Normal Forme'), 'deoxys');
+});
+
+test('strike-style Urshifu VMAX picks the matching Gigantamax form', () => {
+  assert.equal(
+    slugOf('Rapid Strike Urshifu VMAX'),
+    'urshifu-rapid-strike-gmax'
+  );
+  assert.equal(slugOf('Single Strike Urshifu VMAX'), 'urshifu-gmax');
+  // pokesprite has no regular Rapid Strike art, so the plain V falls to base.
+  assert.equal(slugOf('Rapid Strike Urshifu V'), 'urshifu');
+});
+
+test('Arceus and Silvally pick their type form from the card types', () => {
+  const arceusOf = (types) =>
+    cardSpriteFor({ name: 'Arceus', supertype: 'Pokémon', types })?.slug;
+  assert.equal(arceusOf(['Grass']), 'arceus-grass');
+  assert.equal(arceusOf(['Darkness']), 'arceus-dark');
+  assert.equal(arceusOf(['Metal']), 'arceus-steel');
+  assert.equal(arceusOf(['Lightning']), 'arceus-electric');
+  assert.equal(arceusOf(['Dragon']), 'arceus-dragon');
+  // Colorless is the base look; the TCG never prints the missing types.
+  assert.equal(arceusOf(['Colorless']), 'arceus');
+  assert.equal(arceusOf(['Bug']), 'arceus');
+  assert.equal(arceusOf(undefined), 'arceus');
+
+  const silvallyOf = (types) =>
+    cardSpriteFor({ name: 'Silvally-GX', supertype: 'Pokémon', types })?.slug;
+  assert.equal(silvallyOf(['Grass']), 'silvally-grass');
+  assert.equal(silvallyOf(['Colorless']), 'silvally');
+});
+
+test('Eternatus VMAX resolves to Eternamax, the plain V to base', () => {
+  assert.equal(slugOf('Eternatus VMAX'), 'eternatus-eternamax');
+  assert.equal(slugOf('Eternatus V'), 'eternatus');
 });
 
 test('names with punctuation and gender symbols match', () => {

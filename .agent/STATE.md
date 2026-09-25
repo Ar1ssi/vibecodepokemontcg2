@@ -3,18 +3,15 @@
      History belongs to journal/. Contradicts git log / journal? Trust git: rebuild from
      `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
-Session: 301
-Focus: landed `claude/rules-engine-issues-e79707` on main (merge commit below) — main's S297–S300
-  (design 024 FX/settings, S298/S299 board fixes, Gaia Volcano + Birch/Drasna/Gambler) unioned with
-  the branch's S297 I155+ batch and S300 design 036 slice 16 (`pnpm audit:attacks` + baseline).
-  Harness conflicts (journal/DECISIONS/ISSUES/STATE) resolved by union; ids needed no renumber
-  (D146–148 + D149; I177–180 + the branch's closures), next D150 / I181.
-Active: none — pushed to main (`5c8f09fa`); primary folder fast-forwarded to it; suite
-  4158/4159 (known inspector fail), all four behaviour gates PASSED on the merge.
-Next: maintenance due. Remaining backlog, each its own session: I168 copy attacks, I167 attack
-  markers, I166 attack effects, I162 ability-audit backlog. Then I153 (needs a contract first),
-  I137, I121, I126 (partial), I127, I44, I60. User visual check of typed Tera entry/skin + Mega
-  vortex in a real rules-mode game. Pending approval: designs 028 (I85), 029 (I86).
+Session: 302
+Focus: design 039 shipped — the deck sprite catalog gained 86 battle alternate forms (Kyurem
+  B/W, Necrozma dawn/dusk/ultra, Rotom appliances, Calyrex riders, Arceus/Silvally type forms,
+  …), 172 vendored PNGs; `card-sprites.mjs` resolves form names, aliases and card types (D150).
+Active: none.
+Next: user browser check of the sprite picker (search kyurem / necrozma / arceus). Then the
+  backlog from S301: I168 copy attacks, I167 attack markers, I166 attack effects, I162
+  ability-audit backlog, then I153 (needs a contract first), I137, I121, I126 (partial), I127,
+  I44, I60. Pending approval: designs 028 (I85), 029 (I86).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5)
@@ -31,7 +28,8 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - `opponentHandSetAside` (Tickling Machine heads) parses but has no executor — tracked in I137.
 
 ## Recently shipped (≤3 one-liners; older → journal)
+- S302: design 039 transform-form sprites — 86 catalog rows + 172 PNGs; card names/types resolve
+  the form; suite 4165/4166 (known inspector fail), eslint clean.
 - S301: merge `claude/rules-engine-issues-e79707` into main — harness union, no id renumber;
   suite 4158/4159 (known inspector fail), all four behaviour gates PASSED.
 - S300 branch: design 036 slice 16 — `pnpm audit:attacks` gate + per-row baseline; I136 closed.
-- S300 main: Gaia Volcano Stadium-bonus/discard step + Birch/Drasna/Gambler coin shuffle-draw.
