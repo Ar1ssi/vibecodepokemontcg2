@@ -117,6 +117,8 @@ import {
 import {
   inPlayEntries,
   parseCheckupAbilities,
+  parseBetweenTurnsAbilities,
+  resolveBetweenTurnsTargets,
   parseOnOpponentEvolveAbilities,
   parseEndOfTurnAbilities,
   parseOnDamageAbilities,
@@ -2004,8 +2006,14 @@ function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
  * Pecharunt, Team Rocket's Tyranitar, Trevenant. Applied after the per-condition
  * Checkup damage and before between-turns Stadium damage, with a Knockout sweep.
  */
-function applyCheckupAbilities(draft, { events, ctx }) {
-  const effects = parseCheckupAbilities(inPlayEntries(draft), ctx);
+function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [] }) {
+  const entries = inPlayEntries(draft);
+  const effects = parseCheckupAbilities(entries, ctx);
+  for (const effect of betweenEffects) {
+    if (effect.kind !== 'damage') continue;
+    const targets = resolveBetweenTurnsTargets(effect, entries, effect.playerId);
+    if (targets.length > 0) effects.push({ ...effect, targets });
+  }
   const affected = [];
   for (const effect of effects) {
     for (const target of effect.targets) {
@@ -2019,6 +2027,25 @@ function applyCheckupAbilities(draft, { events, ctx }) {
         damage,
       });
       affected.push(target);
+    }
+  }
+  // Between-turns heals resolve before the Knock Out sweep, so a heal and the
+  // damage it offsets in the same phase cancel instead of Knocking Out (I163).
+  for (const effect of betweenEffects) {
+    if (effect.kind !== 'heal') continue;
+    if (stadiumBlocksHealing(draft.stadium)) continue;
+    const targets = resolveBetweenTurnsTargets(effect, entries, effect.playerId);
+    for (const { card } of targets) {
+      const before = card.damage || 0;
+      if (before <= 0) continue;
+      card.damage = Math.max(0, before - effect.amount);
+      events.push({
+        type: 'damageUpdated',
+        instanceId: card.instanceId,
+        damage: card.damage,
+        healed: before - card.damage,
+        source: effect.source,
+      });
     }
   }
   for (const { card, playerId } of affected) {
@@ -2111,6 +2138,17 @@ function resolveCheckup(
   // special Energy makes it immune never reaches Checkup.
   applySpecialEnergyStatusImmunity(draft, { events });
   const triggerCtx = abilitySideContext(draft, endingPlayerId);
+  // "Between turns" abilities (I163): the pre-Checkup wording family.
+  const betweenEffects = parseBetweenTurnsAbilities(inPlayEntries(draft), triggerCtx);
+  const abilityAsleepFlips = (card) => {
+    let flips = 0;
+    for (const effect of betweenEffects) {
+      if (effect.kind === 'sleepFlips' && effect.holder === card) {
+        flips = Math.max(flips, effect.flips);
+      }
+    }
+    return flips;
+  };
 
   for (const pid of Object.keys(draft.players || {})) {
     const player = draft.players[pid];
@@ -2152,8 +2190,9 @@ function resolveCheckup(
     }
     if (hasCondition(active, 'Asleep')) {
       // Slumbering Forest: 2 coins instead of 1; either tails keeps it Asleep.
+      // Stir and Snooze (Snorlax / Slaking) grants the same from the holder (I163).
       const asleepMods = stadiumCheckupCoinModifiers(checkupStadium, { condition: 'Asleep' });
-      const asleepFlips = asleepMods?.asleepFlips ?? 1;
+      const asleepFlips = asleepMods?.asleepFlips ?? (abilityAsleepFlips(active) || 1);
       let asleepHeads = 0;
       for (let i = 0; i < asleepFlips; i++) {
         if (flip() === 'heads') asleepHeads++;
@@ -2182,7 +2221,7 @@ function resolveCheckup(
 
   // Pokémon Checkup abilities resolve after the conditions and before the
   // between-turns Stadium damage (design 034 slice 4).
-  applyCheckupAbilities(draft, { events, ctx: triggerCtx });
+  applyCheckupAbilities(draft, { events, ctx: triggerCtx, betweenEffects });
 
   // Between-turns Stadium damage resolves after Pokémon Checkup.
   applyBetweenTurnsStadiumDamage(draft, { events });

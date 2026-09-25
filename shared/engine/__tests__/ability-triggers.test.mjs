@@ -192,6 +192,180 @@ test('Checkup hook: Magmortar adds counters on the opponent\'s Burned Pokémon',
   assert.equal(res.state.players.p2.zones.active[0].damage, 50);
 });
 
+// ── between-turns abilities (I163) ───────────────────────────────────────
+
+const between = (name, text) => ability(name, text);
+
+test('parseBetweenTurnsAbilities: reads the damage, heal and sleep-flip families', () => {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Seviper',
+      abilities: [between('More Poison', "Put 1 more damage counter on your opponent's Poisoned Pokémon between turns.")],
+    }),
+    pokemon({
+      instanceId: 2,
+      name: 'Serperior',
+      abilities: [between('Royal Heal', 'At any times between turns, heal 10 damage from each of your Pokémon.')],
+    })
+  );
+  state.players.p1.zones.bench.push(
+    pokemon({
+      instanceId: 3,
+      name: 'Snorlax',
+      abilities: [
+        between(
+          'Stir and Snooze',
+          'If this Pokémon is Asleep, flip 2 coins instead of 1 between turns. If either of them is tails, this Pokémon is still Asleep.'
+        ),
+      ],
+    })
+  );
+  const effects = parseBetweenTurnsAbilities(inPlayEntries(state), ctxFor(state, 'p1'));
+  assert.deepEqual(
+    effects.map((e) => [e.source, e.kind]),
+    [
+      ['Seviper', 'damage'],
+      ['Serperior', 'heal'],
+      ['Snorlax', 'sleepFlips'],
+    ]
+  );
+  assert.equal(effects[0].condition, 'Poisoned');
+  assert.equal(effects[0].scope, 'opponent');
+  assert.equal(effects[1].scope, 'own');
+  assert.equal(effects[2].flips, 2);
+});
+
+test('I163 Seviper: More Poison adds a counter to the opponent Poisoned Active', () => {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Seviper',
+      abilities: [between('More Poison', "Put 1 more damage counter on your opponent's Poisoned Pokémon between turns.")],
+    })
+  );
+  const poisoned = pokemon({ instanceId: 2, name: 'Poisoned' });
+  addCondition(poisoned, 'Poisoned');
+  state.players.p2.zones.active.push(poisoned);
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 20, '10 Poison + 10 More Poison');
+});
+
+test('I163 Infernape: Flaming Fighter replaces the Burn counters', () => {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Infernape',
+      abilities: [between('Flaming Fighter', "Put 6 damage counters instead of 2 on your opponent's Burned Pokémon between turns.")],
+    })
+  );
+  const burned = pokemon({ instanceId: 2, name: 'Burned' });
+  addCondition(burned, 'Burned');
+  state.players.p2.zones.active.push(burned);
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' }, { next: () => 0.9 });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 60, '6 counters instead of 2');
+});
+
+test('I163 Serperior: Royal Heal heals each of your Pokémon at Checkup', () => {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Serperior',
+      abilities: [between('Royal Heal', 'At any times between turns, heal 10 damage from each of your Pokémon.')],
+    })
+  );
+  const hurt = pokemon({ instanceId: 2, name: 'Hurt', damage: 30 });
+  state.players.p1.zones.bench.push(hurt);
+  state.players.p2.zones.active.push(pokemon({ instanceId: 3, name: 'Opp' }));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.bench[0].damage, 20);
+});
+
+test('I163 Flygon: Sand Slammer puts a counter on each of the opponent Pokémon', () => {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Flygon',
+      abilities: [
+        between(
+          'Sand Slammer',
+          "At any time between turns, if this Pokémon is your Active Pokémon, put 1 damage counter on each of your opponent's Pokémon."
+        ),
+      ],
+    })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 2, name: 'Active' }));
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 3, name: 'Bench' }));
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 10);
+  assert.equal(res.state.players.p2.zones.bench[0].damage, 10);
+});
+
+test('I163 Weezing: Detention Gas hits only the opponent Basic Pokémon', () => {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Weezing',
+      abilities: [
+        between(
+          'Detention Gas',
+          "As long as this Pokémon is your Active Pokémon, put 1 damage counter on each of your opponent's Basic Pokémon between turns."
+        ),
+      ],
+    })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 2, name: 'Basic' }));
+  state.players.p2.zones.bench.push(
+    pokemon({ instanceId: 3, name: 'Stage 1', stage: 'Stage 1', subtypes: ['Stage 1'] })
+  );
+
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 10);
+  assert.equal(res.state.players.p2.zones.bench[0].damage || 0, 0);
+});
+
+test('I163 Snorlax: Stir and Snooze flips 2 coins and stays Asleep on a tail', () => {
+  const state = setupGame();
+  const snorlax = pokemon({
+    instanceId: 1,
+    name: 'Snorlax',
+    abilities: [
+      between(
+        'Stir and Snooze',
+        'If this Pokémon is Asleep, flip 2 coins instead of 1 between turns. If either of them is tails, this Pokémon is still Asleep.'
+      ),
+    ],
+  });
+  addCondition(snorlax, 'Asleep');
+  state.players.p1.zones.active.push(snorlax);
+  state.players.p2.zones.active.push(pokemon({ instanceId: 2, name: 'Opp' }));
+
+  let i = 0;
+  const seq = [0.1, 0.9];
+  const res = applyCommand(
+    state,
+    { type: 'pass', payload: {}, playerId: 'p1' },
+    { next: () => seq[Math.min(i++, seq.length - 1)] }
+  );
+  assert.equal(res.error, null);
+  assert.ok(hasCondition(res.state.players.p1.zones.active[0], 'Asleep'), 'one tail keeps it Asleep');
+});
+
 // ── end of turn ──────────────────────────────────────────────────────────
 
 test('parseEndOfTurnAbilities: only the Active holder discards', () => {

@@ -29,7 +29,7 @@ import { isAbilityCard } from './ability-effects.mjs';
 import { hasCondition } from './special-conditions.mjs';
 import { attackerTypes, TYPE_LETTER } from './tool-combat.mjs';
 import { resolveAttachedEnergyType } from './energy-effects.mjs';
-import { isBasicEnergy } from './card-classify.mjs';
+import { isBasicEnergy, isExCard } from './card-classify.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
@@ -128,6 +128,7 @@ function resolveCheckupTargets(effect, entries, holderPlayerId) {
     pool = pool.filter((e) => e.playerId === holderPlayerId);
   }
   if (effect.targetActive) pool = pool.filter((e) => e.zone === 'active');
+  if (effect.bench) pool = pool.filter((e) => e.zone === 'bench');
   if (effect.condition) {
     pool = pool.filter((e) => hasCondition(e.card, effect.condition));
   }
@@ -136,6 +137,7 @@ function resolveCheckupTargets(effect, entries, holderPlayerId) {
     pool = pool.filter((e) => attackerTypes(e.card).includes(effect.type));
   }
   if (effect.hasAbility) pool = pool.filter((e) => isAbilityCard(e.card));
+  if (effect.exceptEx) pool = pool.filter((e) => !isExCard(e.card));
   if (effect.exceptName) {
     pool = pool.filter((e) => !lower(e.card.name).includes(effect.exceptName));
   }
@@ -334,9 +336,13 @@ export function parseEndOfTurnAbilities(entries = [], ctx = {}) {
 }
 
 /**
- * "In between turns" ability damage. The current corpus has no ability with
- * this wording (between-turns damage is Stadium/Energy today), but the reader
- * keeps the family in one place for future wordings.
+ * "In between turns" ability effects (I163): the pre-Checkup wording family.
+ * Returns typed descriptors the Checkup hook runs:
+ *   { kind: 'damage', count, more, insteadOf, scope, targetActive, bench, condition, basic, type, exceptEx }
+ *   { kind: 'heal', amount, scope: 'holder'|'own'|'opponent'|'both', bench?, exceptEx? }
+ *   { kind: 'sleepFlips', flips }
+ * A holder clause ("as long as X is your Active Pokémon", "if this Pokémon remains
+ * Asleep") gates the effect; any wording the parser cannot resolve is dropped.
  */
 export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
   const out = [];
@@ -344,21 +350,124 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
     const { card, playerId } = entry;
     if (!holderCanTrigger(card, ctx)) continue;
     const text = cardAbilityText(card);
-    if (!text || !/between turns/.test(text) || !/damage counter/.test(text)) {
+    if (!text) continue;
+    const isBetweenTurns = /between turns/.test(text);
+    const isCheckup = /during pok[eé]mon checkup/.test(text);
+    if (!isBetweenTurns && !isCheckup) continue;
+    const named = selfNamedText(card);
+    const holderActive = HOLDER_ACTIVE_CLAUSE.test(named);
+    if (holderActive && !holderIsActive(card, ctx)) continue;
+
+    // "If this Pokémon is Asleep, flip 2 coins instead of 1 between turns."
+    const flips = text.match(/flip (\d+) coins? instead of (\d+)/);
+    if (flips && /asleep/.test(text)) {
+      out.push({
+        holder: card,
+        playerId,
+        source: card.name,
+        kind: 'sleepFlips',
+        flips: Number(flips[1]) || 2,
+      });
       continue;
     }
-    const m = text.match(/put\s+(\d+)\s+damage/);
-    if (!m) continue;
-    const scope = /your opponent's/.test(text) ? 'opponent' : 'own';
+    // Modern Checkup damage belongs to parseCheckupAbilities; this reader owns the
+    // pre-Checkup "between turns" wording only.
+    if (!isBetweenTurns) continue;
+
+    // "heal N damage from …" / "remove N damage counter(s) from …".
+    const heal =
+      text.match(/heal (\d+) damage from ([^.]*)/) ||
+      text.match(/remove (\d+) damage counters? from ([^.]*)/);
+    if (heal) {
+      const amount = /^heal/.test(heal[0]) ? Number(heal[1]) : (Number(heal[1]) || 0) * 10;
+      const target = betweenTurnsHealTarget(heal[2], card);
+      if (amount > 0 && target) {
+        out.push({ holder: card, playerId, source: card.name, kind: 'heal', amount, ...target });
+      }
+      continue;
+    }
+
+    // "Put N [more] damage counters …" — spreads and condition-damage modifiers.
+    const put = text.match(
+      /put\s+(\d+)\s+(more\s+)?damage counters?\s*(?:instead of \d+\s+)?(?:on|to)\s+([^.]*)/
+    );
+    if (!put) continue;
+    // "as long as X remains Asleep" is the HOLDER's condition, not a target filter.
+    const holderCondition = /remains asleep/.test(named) ? 'Asleep' : null;
+    if (holderCondition && !hasCondition(card, holderCondition)) continue;
+    const target = betweenTurnsDamageTarget(put[3]);
+    if (!target) continue;
+    const instead = text.match(/instead of (\d+)/);
+    const printed = Number(put[1]) || 0;
     out.push({
       holder: card,
       playerId,
-      count: Number(m[1]) || 0,
-      scope,
       source: card.name,
+      kind: 'damage',
+      // "put 6 damage counters instead of 2" replaces the condition's own 2, so the
+      // ability contributes the difference (normalizeCheckup's rule).
+      count: instead ? Math.max(0, printed - Number(instead[1])) : printed,
+      more: Boolean(put[2]) || Boolean(instead),
+      insteadOf: instead ? Number(instead[1]) : null,
+      ...target,
     });
   }
   return out;
+}
+
+// Target phrase of a between-turns damage clause. Null when the scope cannot be read.
+function betweenTurnsDamageTarget(clause) {
+  const t = lower(clause);
+  const scope = /both yours and your opponent's|each player's/.test(t)
+    ? 'both'
+    : /your opponent's/.test(t)
+      ? 'opponent'
+      : /your (?:benched )?pok[eé]mon/.test(t)
+        ? 'own'
+        : null;
+  if (!scope) return null;
+  const condition =
+    CONDITION_WORDS.find(([word]) => new RegExp(`\\b${word}\\b`).test(t))?.[1] || null;
+  const typeMatch = t.match(/\{([a-z])\}/);
+  return {
+    scope,
+    targetActive: /active pok[eé]mon|defending pok[eé]mon/.test(t),
+    bench: /benched/.test(t),
+    condition,
+    basic: /\bbasic pok[eé]mon\b/.test(t),
+    type: typeMatch ? lower(TYPE_LETTER[typeMatch[1]]) : null,
+    exceptEx: /excluding pok[eé]mon-ex/.test(t),
+  };
+}
+
+// Target phrase of a between-turns heal clause. Null when the scope cannot be read.
+function betweenTurnsHealTarget(clause, holder) {
+  const t = lower(clause);
+  const holderName = lower(holder?.name);
+  if (/this pok[eé]mon|itself/.test(t) || (holderName && t.includes(holderName))) {
+    return { scope: 'holder' };
+  }
+  const scope = /both yours and your opponent's/.test(t)
+    ? 'both'
+    : /your opponent's/.test(t)
+      ? 'opponent'
+      : /your (?:benched )?pok[eé]mon/.test(t)
+        ? 'own'
+        : null;
+  if (!scope) return null;
+  return { scope, bench: /benched/.test(t), exceptEx: /excluding pok[eé]mon-ex/.test(t) };
+}
+
+/**
+ * Resolve a between-turns descriptor to `{ card, playerId }[]`. Damage effects
+ * filter by the condition/basic/type/position the clause printed; heals by the
+ * holder's side and position. Exported for the Checkup hook (I163).
+ */
+export function resolveBetweenTurnsTargets(effect, entries, holderPlayerId) {
+  if (effect.kind === 'heal' && effect.scope === 'holder') {
+    return [{ card: effect.holder, playerId: holderPlayerId }];
+  }
+  return resolveCheckupTargets(effect, entries, holderPlayerId);
 }
 
 /**
