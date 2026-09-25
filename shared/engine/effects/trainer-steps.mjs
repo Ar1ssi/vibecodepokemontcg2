@@ -296,6 +296,14 @@ function attachFromHand(ctx) {
   const { player, step } = ctx;
   const energies = () => (player.zones.hand || []).filter((c) => handEnergyMatches(c, step.handEnergy));
   const targets = handAttachTargets(ctx);
+  const attachAll = (cards, root) => {
+    for (const card of cards) attachTo(player, card, root, ctx.events);
+    // "Put 1 damage counter on that Pokémon" (Energy Rain, I164): only on a real attach.
+    if (cards.length > 0 && step.damage > 0) {
+      root.damage = (root.damage || 0) + step.damage * 10;
+      ctx.events.push({ type: 'damageUpdated', instanceId: root.instanceId, damage: root.damage });
+    }
+  };
   const askTarget = (energyIds) => {
     const next = energies().find((c) => c.instanceId === energyIds[0]);
     return ctx.ask({
@@ -312,9 +320,7 @@ function attachFromHand(ctx) {
     if (!root) return skip(ctx, 'target_not_found');
     const pending = ctx.memo.energyIds || [];
     const batch = step.handAttachEach ? pending.slice(0, 1) : pending;
-    for (const card of energies().filter((c) => batch.includes(c.instanceId))) {
-      attachTo(player, card, root, ctx.events);
-    }
+    attachAll(energies().filter((c) => batch.includes(c.instanceId)), root);
     const remaining = step.handAttachEach
       ? pending.slice(1).filter((id) => energies().some((c) => c.instanceId === id))
       : [];
@@ -332,7 +338,7 @@ function attachFromHand(ctx) {
     if (picked.length === 0) return skip(ctx, 'no_energy_selected');
     if (targets.length === 0) return skip(ctx, 'no_attach_target');
     if (targets.length === 1) {
-      for (const card of picked) attachTo(player, card, targets[0], ctx.events);
+      attachAll(picked, targets[0]);
       return null;
     }
     return askTarget(picked.map((c) => c.instanceId));

@@ -981,6 +981,12 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   if (rulesEnabled && requiresFirstTurn(card) && turnNumber > 2) {
     return 'This ability can only be used during your first turn.';
   }
+  // "If you have any {R} Mega Evolution Pokémon ex in play, you may use this Ability"
+  // (Oricorio ex, I164). Callers without `sideCards` fail open.
+  const needed = requiredInPlayDescriptor(card);
+  if (rulesEnabled && needed && Array.isArray(ctx.sideCards) && !sideTops(ctx.sideCards).some((top) => matchesInPlayDescriptor(top, needed))) {
+    return `You need ${needed.label} in play to use this Ability.`;
+  }
   // Legacy powers are off while the holder has the printed Special Conditions. Callers
   // without `holderConditions` (presence-only pickers) fail open.
   const restriction = powerConditionRestriction(card);
@@ -1028,6 +1034,27 @@ export function abilityActivationBlockReason(card, ctx = {}) {
     }
   }
   return null;
+}
+
+const REQUIRED_IN_PLAY = /if you have (?:any|an?) ([^,.]+?) in play, you may use this ability/;
+
+function requiredInPlayDescriptor(card) {
+  const match = lower(cardAbilityText(card)).match(REQUIRED_IN_PLAY);
+  if (!match) return null;
+  const what = match[1];
+  return {
+    label: what,
+    type: TYPE_LETTER[what.match(/\{([a-z])\}/)?.[1]] || null,
+    mega: /\bmega\b/.test(what),
+    ex: /\bex\b/.test(what),
+  };
+}
+
+function matchesInPlayDescriptor(card, needed) {
+  if (!isPokemon(card)) return false;
+  if (needed.type && !attackerTypes(card).includes(needed.type)) return false;
+  if (needed.mega && !isMegaCard(card)) return false;
+  return !needed.ex || isExCard(card);
 }
 
 // "Once during your turn, when this Pokémon moves from your Bench to the Active

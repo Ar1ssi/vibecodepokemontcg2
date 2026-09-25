@@ -962,3 +962,50 @@ test("ability: Pantomime swaps one of your Prizes with your deck's top card", ()
   assert.deepEqual(ids(res2.state.players.p1.zones.prizes), [90, 95]);
   assert.deepEqual(ids(res2.state.players.p1.zones.deck), [91, 96]);
 });
+
+// ── attach follow-ons (I164) ────────────────────────────────────────────
+
+const ENERGY_RAIN =
+  "As often as you like during your turn (before your attack), you may attach a {W} Energy card from your hand to 1 of your Pokémon. Put 1 damage counter on that Pokémon. This power can't be used if Blastoise ex is affected by a Special Condition.";
+
+test('ability: Energy Rain puts the counter on the attach target, not the holder', () => {
+  const { state, rng } = setupGame();
+  holder(state, ENERGY_RAIN, { types: ['Water'] });
+  state.players.p1.zones.bench.push(mon(72, 'Bench'));
+  state.players.p1.zones.hand.push(basicEnergy(80, 'Water'));
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  const res2 = resolveWith(res1, [80], rng);
+  const res3 = resolveWith(res2, [72], rng);
+  assert.equal(res3.error, null);
+  const find = (id) => [...res3.state.players.p1.zones.active, ...res3.state.players.p1.zones.bench].find((c) => c.instanceId === id);
+  assert.equal(find(80).attachedTo, 72);
+  assert.equal(find(72).damage, 10);
+  assert.equal(find(70).damage || 0, 0);
+});
+
+test('ability: Energy Rain with no {W} Energy in hand places no counter', () => {
+  const { state, rng } = setupGame();
+  holder(state, ENERGY_RAIN, { types: ['Water'] });
+  const res = use70(state, rng);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.active[0].damage || 0, 0);
+});
+
+const ORICORIO =
+  'As often as you like during your turn, if you have any {R} Mega Evolution Pokémon ex in play, you may use this Ability. Attach a Basic {R} Energy card from your hand to 1 of your Benched {R} Pokémon.';
+
+test('ability: Oricorio ex needs a {R} Mega Evolution Pokémon ex in play, then attaches', () => {
+  const { state, rng } = setupGame();
+  holder(state, ORICORIO, { types: ['Fire'] });
+  state.players.p1.zones.bench.push(mon(72, 'Charmander', { types: ['Fire'] }));
+  state.players.p1.zones.hand.push(basicEnergy(80, 'Fire'));
+  assert.ok(use70(state, rng).error, 'no Mega ex in play');
+
+  state.players.p1.zones.bench.push(mon(73, 'Mega Charizard X ex', { types: ['Fire'] }));
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  const res2 = resolveWith(res1, [80], rng);
+  const res3 = res2.pendingChoice ? resolveWith(res2, [72], rng) : res2;
+  assert.equal(res3.state.players.p1.zones.bench.find((c) => c.instanceId === 80)?.attachedTo, 72);
+});

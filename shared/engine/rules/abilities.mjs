@@ -374,9 +374,6 @@ const ENERGY_SYMBOL_TYPES = {
 // Carnival, Golden Flame, …) → which hand Energy may go where. Null when the text is not a
 // hand attach. handTarget is the printed target phrase ("this pokémon", "1 of your pokémon").
 function parseHandAttach(lower) {
-  // A repeatable attach behind a board condition the activation gate cannot check (Oricorio ex:
-  // "if you have any {R} Mega Evolution Pokémon ex in play") fails closed.
-  if (/^as often as you like[^.]*?, if you have [^.]*? in play/.test(lower)) return null;
   // The player's own attach action only: not "Whenever you attach…" / "To attach…" rules text.
   const clause = lower.match(/(?:^|\. |you may |if you do, )attach ([^.]*?) from your hand to ([^.]*?)(?:\.|$)/);
   if (!clause || /^this card\b/.test(clause[1])) return null;
@@ -1930,6 +1927,16 @@ export function parseAbility(text = '') {
       step.requiresAttach = true;
       if (step.type === 'healAbility' && /from that pok/.test(attachBonus)) step.target = 'attached Pokémon';
     }
+  }
+
+  // "Attach … to 1 of your Pokémon. Put 1 damage counter on that Pokémon." (Blastoise ex Energy
+  // Rain, I164): the counters land on the attach target, and only when an attach happened.
+  const attachCounters = !attachBonus && lower.match(/\battach[^.]*\.\s*(?:put|place) (\d+) damage counters? on that pok/);
+  const handAttach = steps.find((step) => step.type === 'attachAbility' && step.fromHand);
+  if (attachCounters && handAttach) {
+    handAttach.damage = Number(attachCounters[1]);
+    const counterIndex = steps.findIndex((step) => step.type === 'moveDamageAbility');
+    if (counterIndex >= 0) steps.splice(counterIndex, 1);
   }
 
   // "Discard any Stadium card in play. If you do, <effect>" (Haxorus Grind Up): the Stadium
