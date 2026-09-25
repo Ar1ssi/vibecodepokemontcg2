@@ -39,8 +39,9 @@ guides the next session.
 - **Long features:** work plans are split into session-sized slices that each leave the project
   verifiable.
 - **Delegation:** tools that can spawn subagents may hand off exploration, review, and single
-  design slices to keep the main context small. Rules live in `CLAUDE.md` § Delegation; subagents
-  never write harness state.
+  design slices to keep the main context small, and must review engine/netcode diffs they didn't
+  write. When the session's Agent tool allows spawning only on request, delegation becomes an offer.
+  Rules live in `CLAUDE.md` § Delegation; subagents never write harness state.
 - **Parallel work:** the default harness assumes one writer — delegation is sequential. Use the
   optional team-mode branch when several branches need shared state and integration rules.
 - **Maintenance:** run the maintenance workflow when state requests it or a file exceeds its limit.

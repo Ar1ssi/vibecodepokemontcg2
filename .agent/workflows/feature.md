@@ -56,8 +56,9 @@ Per slice, in order:
 3. If the feature is runnable, exercise it end-to-end once as a user would; record what you observed.
 
 ## 5 · Review — you are now the Reviewer: hostile fresh eyes
-(Best: have a subagent run `workflows/review.md` on the diff — clean context that didn't write it
-(CLAUDE.md § Delegation). No subagents → suggest the user run it in a fresh session.)
+(Required for engine/rules/netcode diffs, best for all: a subagent runs `workflows/review.md` on the
+diff — clean context that didn't write it (CLAUDE.md § Delegation). Spawning gated → offer it before
+landing; no subagents → suggest the user run it in a fresh session.)
 Read the complete diff and hunt: unhandled error paths · dead code / debug leftovers ·
 naming or pattern drift vs neighboring code · diff ≠ design (drift) · tests that could never fail.
 Fix findings now; genuinely out-of-scope ones become ISSUES.md lines.

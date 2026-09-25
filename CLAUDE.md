@@ -12,11 +12,14 @@ any session pick up work with minimal context. First session? `.agent/STATE.md` 
    Tracing a symbol's definition or references: use LSP (`goToDefinition`, `findReferences`, `hover`), not Grep.
    LSP gives exact results; Grep gives text matches. Grep/Glob for discovery (files, patterns); LSP for
    understanding (definitions, references, types). After locating a file, navigate it with LSP rather than
-   reading the whole file. Grep is the fallback when LSP is unavailable.
+   reading the whole file. LSP is a deferred tool: load it once per session with ToolSearch
+   `select:LSP` before the first call. Grep is the fallback when LSP is unavailable.
 4. Never call an API/function you haven't seen defined this session. Verify behavior in source.
 5. Code is truth. A wrong harness doc is a bug — fix it in passing (≤5 lines) or add a `flag:` line to your commit message.
 6. Chat carries outcomes; files carry detail: analysis → `.agent/scratch/`, designs → `.agent/designs/`,
    lasting choices → `.agent/DECISIONS.md`, deferred work → `.agent/ISSUES.md`.
+7. Card text and rulings are looked up, never recalled — however familiar the card. Source order: the
+   corpora in `out/pkmn-*-cards.json`, then TCGdex. Name the source (corpus row or TCGdex id) in the test or commit.
 
 ## Reading budget — large files are grep-only
 Never load these whole: `DECISIONS.md`, `ISSUES.md`, `journal/*` (frozen, pre-S313), `.agent/archive/*`.
@@ -28,6 +31,7 @@ Never load these whole: `DECISIONS.md`, `ISSUES.md`, `journal/*` (frozen, pre-S3
 ## Session protocol
 START: read `.agent/STATE.md` → classify the request (routing below) → open that one workflow and follow it.
 DURING: work on your own branch in a worktree. Crash insurance = WIP commits on that branch, not STATE edits.
+  Context auto-compacts (1M window): never wrap up early or hand off mid-task to save context.
 END — whenever you changed anything:
 - **The journal is the commit message.** Subject `<workflow>: <outcome>`; body ≤4 lines of why,
   plus optional `flag: <debt/risk>` lines. Never append to `.agent/journal/` (frozen history).
@@ -61,11 +65,20 @@ END — whenever you changed anything:
 Each workflow states an exit test; on the fence, start with the lighter workflow.
 
 ## Delegation and model policy
+- Spawn gate: the session's Agent tool description outranks this section. When it says spawn only on
+  the user's request, work inline and *offer* the delegation below (one line); the user's yes is the request.
 - Delegate only work whose spec already lives in files: read-only exploration (returns conclusions and
   `path:line`, never file contents), `review.md` on a diff this session wrote, or one bounded increment
   of an approved design whose contract is pinned (files, signatures, data, test cases — no design judgment).
-- Grunt work (boilerplate, tests, content entry) → `model: sonnet` or `haiku`. Code search →
-  `caveman:cavecrew-investigator`; 1–2 file edits → `caveman:cavecrew-builder`; diff review → `caveman:cavecrew-reviewer`.
+  Research whose next search depends on the last finding stays inline.
+- Work must not grade itself: engine, rules, netcode, and hard-to-reverse changes get `review.md` from
+  an agent that didn't write the diff before landing on `main` (gated? offer it in the task close).
+- Models (`model:` on Agent; omitted = inherit the session model, Opus 5.5): judgment work (design,
+  review, debug) inherits · grunt work (boilerplate, tests, content entry) → `sonnet` or `haiku` ·
+  `fable` (Fable 5.1, Mythos tier: strongest, priciest) only on explicit request — architecture audit,
+  blind option generation for a high-stakes design.
+- Code search → `caveman:cavecrew-investigator`; 1–2 file edits → `caveman:cavecrew-builder`; diff review
+  → `caveman:cavecrew-reviewer`. Independent agents launch in one message so they run concurrently.
 - Briefs are self-contained: goal, exact files/design sections, what to return. Subagents inherit no chat.
 - Subagents never touch harness state (STATE/DECISIONS/ISSUES/MAP/NEXTSTEPS). One writer at a time.
   A subagent's "done" is a claim: you run the tests yourself and review the diff against the spec's
@@ -75,18 +88,28 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
 ## High-complexity specs ship in increments on ONE branch
 ~4+ independent acceptance criteria, or state + UI + cross-system coupling → pin a schema/naming
 contract in the spec first; then one criterion-cluster per commit on `feature/<spec>`, each green
-before the next. One session is fine while context holds; `/clear` only when it degrades. Ledger (done / next) in NEXTSTEPS.md;
+before the next. One session carries the whole spec (context auto-compacts); `/clear` only if quality
+degrades. Ledger (done / next) in NEXTSTEPS.md is the handoff if a session ends mid-spec;
 move it to `.agent/archive/NEXTSTEPS-history.md` when the spec ships.
 
 ## User sync and output
-- Small work (patch route): post a ≤3-line plan in chat and proceed without waiting; user can interrupt.
+- First line of every task: one sentence on what you're about to do, then act in the same reply.
+- Ask-first test = cost of a wrong guess. Clear, or cheap to redo → start now; ask any question
+  alongside the first results. Expensive to redo (many files, batch ops, hard to reverse) AND
+  ambiguous or self-contradictory → AskUserQuestion before building (recommended option first).
+- Small work (patch route): the ≤3-line plan is that first line; proceed without waiting.
 - Approval gate (wait for user) only for schema, netcode, or engine-rule changes, or feature.md work.
-  Before those, post restated goal + out-of-scope list and fold in corrections. Self-approve only when unattended.
-- Scope/cost/approach-changing discovery → surface immediately with a recommendation. Taste calls
-  (naming, UX, product behavior) go to the user when asking is cheap. Ask only what only the user can answer.
-- Lead with the outcome. Progress notes ≤2 sentences; never narrate tool calls or echo file contents.
-  ≤10 lines of code in chat; reference `path:line`.
-- Task close (≤8 lines + Done checklist): Did / Changed / Verified (actual output) / Decided for you / Next.
+  Before those, post restated goal + out-of-scope list and fold in corrections.
+- Unattended (scheduled run, user said they'd check back, a question went unanswered): take the most
+  reasonable reading, state it at the top, carry on — self-approve gates. A decision that can't be
+  undone and could go either way: do the prep, lay out the choice, stop.
+- Surface immediately, with a recommendation: scope/cost/approach-changing discoveries, and limits
+  that change what the user gets. Taste calls (naming, UX, product behavior) go to the user when
+  asking is cheap. Ask only what only the user can answer.
+- Lead with the outcome. Between tool calls, near-silence: progress notes ≤2 sentences, only when
+  something changed or the app asks for a status; never narrate tool calls or echo file contents. ≤10 lines of code in chat; reference `path:line`.
+- Task close (≤8 lines + Done checklist): Changed / Verified (actual output) / Decided for you / Next
+  (one real next step, or none). No recap of the steps taken.
 - Report failures verbatim — never summarized optimism.
 
 ## Code standard

@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D163).
+#   Next id = highest D number in this file and the archive + 1 (next: D164).
 
 ## Active
+- D163 2026-09-25 [harness] Tuned for Opus 5.5: act-first unless a wrong guess is costly; Agent tool's spawn gate wins; engine/netcode diffs reviewed by a non-author agent; card text looked up; `fable` on request only.
 - D162 2026-09-25 [harness] Journal = commit messages; journal/ frozen; no Session counter; STATE/DECISIONS/ISSUES/MAP edited only in the commit landing on main - parallel sessions collided.
 - D161 2026-09-25 [tests] `pnpm test` must be fully green: live network tests opt-in (`pnpm test:live`, LIVE_TESTS=1); `pnpm test:changed` runs sibling __tests__ of branch changes for patch work.
 - D160[drag] 2026-09-25 Drop hovers get depth from shared per-sheet custom properties (`--drop-rgb`/`--drop-deep-rgb`, `--drop-ring` bevel, `--drop-well`); a hovered zone outranks the mat plate reset via `body.mat-active :is(...)`; an Item/Supporter held from the hand breathes its owner's `#board` (`board-drop-ready`, drag.js + `playsOntoBoard`) (design 046).
