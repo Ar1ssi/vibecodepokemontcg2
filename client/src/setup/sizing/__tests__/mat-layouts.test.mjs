@@ -357,3 +357,25 @@ test('index.css expands --mat-container-width to 100vw on :root when drawer is c
 });
 
 
+
+test('withImageAspect sizes one-player printed mats to their artwork', async () => {
+  const { withImageAspect, getMatLayout, layoutToCssVars } = await import(
+    '../mat-layouts.mjs'
+  );
+  const square = withImageAspect(getMatLayout('one-player'), 1.02);
+  assert.equal(square.aspectRatio, 1.02);
+  assert.match(layoutToCssVars(square)['--mat-width'], /\* 1\.02\)/);
+  assert.equal(getMatLayout('one-player').aspectRatio, 1.9394);
+});
+
+test('withImageAspect leaves cover, two-player, and invalid input alone', async () => {
+  const { withImageAspect, getMatLayout } = await import('../mat-layouts.mjs');
+  const cover = getMatLayout('edge-to-edge');
+  const twoPlayer = getMatLayout('two-player');
+  const onePlayer = getMatLayout('one-player');
+  assert.equal(withImageAspect(cover, 1.35), cover);
+  assert.equal(withImageAspect(twoPlayer, 1.0), twoPlayer);
+  assert.equal(withImageAspect(onePlayer, null), onePlayer);
+  assert.equal(withImageAspect(onePlayer, 0), onePlayer);
+  assert.equal(withImageAspect(onePlayer, Number.NaN), onePlayer);
+});

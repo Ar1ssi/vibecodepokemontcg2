@@ -231,6 +231,21 @@ export function resolveMatLayout(mat) {
 }
 
 /**
+ * Size a one-player printed mat's box to its artwork instead of the profile's
+ * nominal ratio. The art image is drawn with `object-fit: fill`, so a box of
+ * the wrong shape stretches it; zones are percentages of the box, so they
+ * follow the art. Cover and two-player profiles keep their own geometry.
+ */
+export function withImageAspect(layout, imageAspect) {
+  const aspect = Number(imageAspect);
+  if (!layout || !Number.isFinite(aspect) || aspect <= 0) return layout;
+  if (layout.matMode !== 'one-player' || layout.matFit !== 'contain') {
+    return layout;
+  }
+  return { ...layout, aspectRatio: aspect };
+}
+
+/**
  * Flatten a profile into the CSS custom properties the container stylesheets
  * read. Prize columns become a max-width so the prize grid reflows to the
  * number of printed columns instead of always being two wide.

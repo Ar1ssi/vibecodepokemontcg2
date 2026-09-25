@@ -13,6 +13,7 @@ import {
   getMatLayout,
   layoutToCssVars,
   resolveMatLayout,
+  withImageAspect,
 } from './mat-layouts.mjs';
 import {
   matImageProxyUrl,
@@ -30,6 +31,9 @@ let currentMats = { self: null, opp: null };
 
 /** Per-half paint tokens so a slow probe cannot overwrite a later pick. */
 const matPaintToken = { self: 0, opp: 0 };
+
+/** Natural width/height of each half's loaded art, so the box matches it. */
+const matArtAspect = { self: null, opp: null };
 
 const normalizeTarget = (target) => (target === 'opp' ? 'opp' : 'self');
 
@@ -70,9 +74,9 @@ const frameDocument = (target) => {
   return doc?.documentElement ? doc : null;
 };
 
-const applyMatLayoutToDoc = (layoutId, doc) => {
+const applyMatLayoutToDoc = (layout, doc) => {
   if (!doc?.documentElement) return;
-  const vars = layoutToCssVars(getMatLayout(layoutId));
+  const vars = layoutToCssVars(layout);
   const root = doc.documentElement;
   for (const [name, value] of Object.entries(vars)) {
     root.style.setProperty(name, value);
@@ -85,9 +89,9 @@ const applyMatLayoutToDoc = (layoutId, doc) => {
   if (scale) root.style.setProperty('--mat-scale', scale);
 };
 
-const applyMatLayoutToElement = (layoutId, el) => {
+const applyMatLayoutToElement = (layout, el) => {
   if (!el) return;
-  const vars = layoutToCssVars(getMatLayout(layoutId));
+  const vars = layoutToCssVars(layout);
   for (const [name, value] of Object.entries(vars)) {
     el.style.setProperty(name, value);
   }
@@ -101,7 +105,8 @@ const NO_MAT_LAYOUT_ID = 'edge-to-edge';
 /** @param {'self'|'opp'} target */
 const layoutForTarget = (target) => {
   const mat = currentMats[target];
-  return mat ? resolveMatLayout(mat) : getMatLayout(NO_MAT_LAYOUT_ID);
+  if (!mat) return getMatLayout(NO_MAT_LAYOUT_ID);
+  return withImageAspect(resolveMatLayout(mat), matArtAspect[target]);
 };
 
 const isTwoPlayerMat = (mat) =>
@@ -124,27 +129,27 @@ const syncIframeLayouts = () => {
 
   const shared = activeTwoPlayerMat();
   if (shared) {
-    const layoutId = resolveMatLayout(shared.mat).id;
+    const layout = resolveMatLayout(shared.mat);
     for (const target of MAT_TARGETS) {
-      applyMatLayoutToDoc(layoutId, frameDocument(target));
+      applyMatLayoutToDoc(layout, frameDocument(target));
     }
-    applyMatLayoutToElement(layoutId, halfSelf);
-    applyMatLayoutToElement(layoutId, halfOpp);
-    applyMatLayoutToDoc(layoutId, document);
+    applyMatLayoutToElement(layout, halfSelf);
+    applyMatLayoutToElement(layout, halfOpp);
+    applyMatLayoutToDoc(layout, document);
     return;
   }
 
   for (const target of MAT_TARGETS) {
-    applyMatLayoutToDoc(layoutForTarget(target).id, frameDocument(target));
+    applyMatLayoutToDoc(layoutForTarget(target), frameDocument(target));
   }
-  applyMatLayoutToElement(layoutForTarget('self').id, halfSelf);
-  applyMatLayoutToElement(layoutForTarget('opp').id, halfOpp);
+  applyMatLayoutToElement(layoutForTarget('self'), halfSelf);
+  applyMatLayoutToElement(layoutForTarget('opp'), halfOpp);
 
   // Stadium sits on the parent page; follow the bottom player's mat, then opp.
   const parentLayout = currentMats.self
     ? layoutForTarget('self')
     : layoutForTarget('opp');
-  applyMatLayoutToDoc(parentLayout.id, document);
+  applyMatLayoutToDoc(parentLayout, document);
 };
 
 /** Ensure each mat half has both an ambient backdrop <img>, a crisp foreground <img>, and a zones overlay <img>. */
@@ -237,6 +242,14 @@ const paintMatImageForTarget = (target, mat) => {
     return;
   }
 
+  art.onload = () => {
+    if (token !== matPaintToken[key]) return;
+    if (!art.naturalWidth || !art.naturalHeight) return;
+    const aspect = art.naturalWidth / art.naturalHeight;
+    if (aspect === matArtAspect[key]) return;
+    matArtAspect[key] = aspect;
+    syncIframeLayouts();
+  };
   art.src = primary;
   ambient.src = primary;
 
@@ -326,11 +339,12 @@ const syncMatArt = () => {
  * Prefer `applyMatForTarget` when zones should differ per player.
  */
 export const applyMatLayout = (layoutId) => {
+  const layout = getMatLayout(layoutId);
   for (const target of MAT_TARGETS) {
-    applyMatLayoutToDoc(layoutId, frameDocument(target));
+    applyMatLayoutToDoc(layout, frameDocument(target));
   }
-  applyMatLayoutToDoc(layoutId, document);
-  return getMatLayout(layoutId);
+  applyMatLayoutToDoc(layout, document);
+  return layout;
 };
 
 /** Apply one player's mat and zone layout without touching the other half. */

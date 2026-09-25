@@ -282,6 +282,10 @@ ul, li {
   border-radius: 4px;
   transition: left 220ms ease, width 220ms ease;
 }
+/* Edge-to-edge art crops to the board rather than stretching to it. */
+#battleMat.mat-fit-cover #battleMatArt .mat-half img.mat-art-image {
+  object-fit: cover;
+}
 #battleMatArt .mat-half img.mat-art-image {
   z-index: 2;
   box-shadow: 0 0 25px rgba(0, 0, 0, 0.75), 0 0 8px rgba(0, 0, 0, 0.5);
