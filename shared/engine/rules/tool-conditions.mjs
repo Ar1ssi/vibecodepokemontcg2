@@ -223,6 +223,10 @@ export function parseToolCondition(card) {
   const retreatExactly = t.match(/retreat cost of exactly\s+(\d+)/);
   if (retreatExactly) out.holderRetreatExactly = Number(retreatExactly[1]);
   if (/\bhas full hp\b/.test(t)) out.holderFullHp = true;
+  // Adversity Policy: "has Weakness to your opponent's Active Pokémon's type".
+  if (/has weakness to your opponent'?s active pok[eé]mon'?s type/.test(t)) {
+    out.holderWeakToAttacker = true;
+  }
   const exceptSub = t.match(/except pok[eé]mon[-\s]?(gx|ex|vmax|vstar|v)\b/);
   if (exceptSub) out.holderExcludeSubtypes = [exceptSub[1]];
   // "…has “Leafeon” or “Glaceon” in its name" (Snow Leaf Badge, Ribbon Badge).
@@ -341,6 +345,10 @@ export function toolConditionMet(cond, ctx = {}) {
     return false;
   }
   if (cond.holderFullHp && (holder?.damage || 0) > 0) return false;
+  if (cond.holderWeakToAttacker) {
+    const weakTo = (holder?.weaknesses || []).map((w) => lower(w?.type ?? w));
+    if (!attacker || !(attacker.types || []).some((ty) => weakTo.includes(lower(ty)))) return false;
+  }
   if (cond.noEnergyAttached && holderHasEnergy(holder, ctx.zoneCards)) {
     return false;
   }

@@ -689,7 +689,7 @@ function isOnKoEffect(parsed) {
 export function attachedToolOnKoEffects(
   victimPlayer,
   victim,
-  { blockTools = false, stadium = null, isActive = true } = {}
+  { blockTools = false, stadium = null, isActive = true, attacker = null } = {}
 ) {
   if (!victimPlayer || !victim || toolBlocked(blockTools, stadium)) return [];
   const zone = [
@@ -705,17 +705,28 @@ export function attachedToolOnKoEffects(
       if (parsed.requiresActive && !isActive) continue;
       if (parsed.trigger === 'selfKo' && !isVictim) continue;
       if (parsed.trigger === 'activeKo' && !isActive) continue;
+      if (!reactiveToolConditionMet(tool, holder, zone, attacker)) continue;
       effects.push({ tool, holder, isVictim, ...parsed });
     }
   }
   return effects;
 }
 
+// The Tool's printed holder/attacker condition (I151): Punk Helmet {D}, Box of Disaster full-HP V,
+// Heavy Baton Retreat 4, Farewell Bell VMAX, Adversity Policy Weakness.
+function reactiveToolConditionMet(tool, holder, zoneCards, attacker) {
+  const zone = zoneCards || [];
+  const ctx = { holder: holderView(holder, zone), attacker, zoneCards: zone };
+  const cond = parseToolCondition(tool);
+  if (!attacker && cond && (cond.attackerTypes || cond.attackerSubtypes || cond.holderWeakToAttacker)) return true;
+  return toolConditionMet(cond, ctx);
+}
+
 /** Reactive Tools on `defender` for one trigger phase ('damage' by default, or 'ko'). */
 export function attachedToolOnDamageEffects(
   defender,
   zoneCards,
-  { blockTools = false, stadium = null, isActive = true, phase = 'damage' } = {}
+  { blockTools = false, stadium = null, isActive = true, phase = 'damage', attacker = null } = {}
 ) {
   if (toolBlocked(blockTools, stadium) || !defender) return [];
   const effects = [];
@@ -723,6 +734,7 @@ export function attachedToolOnDamageEffects(
     const parsed = parseToolOnDamageEffect(tool);
     if (!parsed || parsed.phase !== phase) continue;
     if (parsed.requiresActive && !isActive) continue;
+    if (!reactiveToolConditionMet(tool, defender, zoneCards, attacker)) continue;
     effects.push({ tool, ...parsed });
   }
   return effects;

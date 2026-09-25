@@ -1370,6 +1370,7 @@ function handleKnockout(
     ? attachedToolOnKoEffects(victimPlayer, victim, {
         stadium: draft.stadium,
         isActive: wasActive,
+        attacker: attackerActive ? inPlayView(draft, attackerActive) : null,
       })
     : [];
   const koToolOutcome = applyToolOnKoEffects(draft, {
@@ -5372,6 +5373,7 @@ function resolveAttackEffectPhase(draft, ctx) {
                 stadium: draft.stadium,
                 isActive: true,
                 phase,
+                attacker: inPlayView(draft, attacker),
               })
             : [];
         const reactiveToolEffects = reactiveTools('damage');
