@@ -8,10 +8,10 @@ Focus: S295 special-Energy coverage audit (scratch special-energy-coverage-audit
   on `claude/special-energy-coverage-fixes-db7eb0`. Branch also carries the S294 #182–#184 merges, which were
   never pushed: it is 80 commits ahead of origin/main, 0 behind.
 Active: none. Awaiting user go-ahead to push the branch / fast-forward main.
-Next: maintenance due (S290 skipped; ISSUES Open 49/40, Closed 34/30 over cap).
+Next: maintenance due (S290 skipped; ISSUES Open 50/40, Closed 35/30 over cap).
   036 slice 16 (regression gate `pnpm audit:attacks`, close I136) — ledger NEXTSTEPS.md.
   P2 engine backlog: I151 (reactive Tool conditions), I154 (26 server-missing Trainer steps), I164 (ability
-  follow-on steps), I136. Then I165–I174, I155, I161–I163, I137, I126/I127, I121.
+  follow-on steps), I136. Then I165–I176, I155, I161–I163, I137, I126/I127, I121.
   User visual check of typed Tera entry/skin + Mega vortex in a real rules-mode game.
   Pending approval: designs 028 (I85), 029 (I86).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
@@ -30,6 +30,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Bash heredoc eats `\` and mangles é → use the Edit/Write tools. Primary working copy is CRLF (repo LF).
 
 ## Recently shipped (≤3 one-liners; older → journal)
-- S295 special-Energy audit SE1–SE16: suite 3920/3921 (known inspector fail), oracle/abilities/trainers PASSED.
+- S295 special-Energy audit SE1–SE16 + hostile-review fixes (701b7a13): suite 3930/3931, all 3 gates PASSED.
 - S294 local merge of #182/#183/#184 (unpushed): suite 3879/3880, all three gates PASSED.
 - S293 trainer design 038 complete (I138–I152 fixes) on #182.

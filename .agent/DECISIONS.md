@@ -9,7 +9,7 @@
 #   Next id = highest D number in this file and the archive + 1 (next: D145).
 
 ## Active
-- D144[rules] 2026-09-25 Special-Energy knock-out effects (Rescue, Gift, Legacy, Counter-style) fire only when the KO came from an opponent's attack; Poison/Burn/self-damage KOs skip them — the printings say "by damage from an opponent's attack". (S295)
+- D144[rules] 2026-09-25 Special-Energy KO effects need a KO by attack damage (not Poison/Burn/Ability or attack-placed counters); each step's `source` sets whether it must be the opponent's attack (Gift/Legacy/Splash) or any (Rescue). (S295)
 - D143[rules] 2026-09-25 Passive special-Energy effects with a lasting state (end-of-turn discard, attach refusal, discard-when-condition-lost) run in one `settleSpecialEnergyPassives` sweep in applyCommand's tail, not at each mutation site. (S295)
 - D142[rules] 2026-09-25 Special Energy is priced from its printed provisions (special-energy-parse `specialEnergyProvision`), and the client sends Energy text to the server; name tables are fallbacks only. (S295)
 - D141[rules] 2026-09-24 Lost Zone Knock Out replacement is a per-command reduce flag (draft.__attackLostZoneKnockouts) read by handleKnockout, not an attack step — KOs resolve before after-steps (design 036 slice 13). (S287) (PR #183 id D125[rules])
