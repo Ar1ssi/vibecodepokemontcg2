@@ -7,7 +7,7 @@ Session: 300
 Focus: S299 fixed the #board double-click trap: the free-play board was missing from `doubleClick`'s zoom
   list, so the card got the legacy #fullImage overlay (top document, under the z-index-2 mat iframes,
   unclosable). Zone list + routing now in `double-click-zoom.mjs`; live 2P probe + unit test green.
-Active: none — S300 Gaia Volcano + Birch/Drasna/Gambler fixes merged to main (5fbb5a88, 7c89a4eb); worktrees to remove.
+Active: none — S300 Gaia Volcano + Birch/Drasna/Gambler fixes pushed to main (3d771cbe); worktrees removed.
 Next: maintenance due (S290 skipped; ISSUES Open 51/40, Closed 35/30 over cap).
   Triage I180 (remaining legacy-overlay zones: discard/lostZone/viewCards/attachedCards).
   036 slice 16 (regression gate `pnpm audit:attacks`, close I136) — ledger NEXTSTEPS.md.
