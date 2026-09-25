@@ -3,11 +3,11 @@
      History belongs to journal/. Contradicts git log / journal? Trust git: rebuild from
      `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
-Session: 297
+Session: 298
 Focus: S295 special-Energy coverage audit (scratch special-energy-coverage-audit.md, SE1–SE16) fixed in 6 commits
   on `claude/special-energy-coverage-fixes-db7eb0`. Branch also carries the S294 #182–#184 merges, which were
   never pushed: it is 85 commits ahead of origin/main, 0 behind.
-Active: none. PR #181 (design 024 FX sequencing/audio) merged into main.
+Active: fix/trainer-present-fresh-src worktree — presentSrcFor src-order fix + regression test, uncommitted.
 Next: maintenance due (S290 skipped; ISSUES Open 50/40, Closed 35/30 over cap).
   036 slice 16 (regression gate `pnpm audit:attacks`, close I136) — ledger NEXTSTEPS.md.
   P2 engine backlog: I151 (reactive Tool conditions), I154 (26 server-missing Trainer steps), I164 (ability

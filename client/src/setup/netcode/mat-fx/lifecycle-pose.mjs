@@ -192,5 +192,10 @@ export function devolveBurstPose(t) {
 }
 
 /** The played card's face: the post-update element image beats the pre-diff
- * snapshot, which for an opponent's hand card is still the sleeve. */
-export const presentSrcFor = (origin, element) => element?.currentSrc || element?.src || origin?.src;
+ * snapshot, which for an opponent's hand card is still the sleeve.
+ *
+ * `src` first, not `currentSrc`: setting the attribute updates `src`
+ * synchronously, while `currentSrc` still names the previously loaded resource
+ * until the image's update-the-image-data task runs. Reading `currentSrc` here
+ * (same task as the DOM diff) replayed the pre-diff sleeve. */
+export const presentSrcFor = (origin, element) => element?.src || element?.currentSrc || origin?.src;

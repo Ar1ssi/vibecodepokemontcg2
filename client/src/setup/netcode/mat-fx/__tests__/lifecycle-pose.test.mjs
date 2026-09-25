@@ -120,11 +120,17 @@ test('origins: combat snapshots for attack + damage ids, peeked, rebuilt per bat
   assert.equal(peekCombatOrigin(1), undefined);
 });
 
-test('presentSrcFor: uses the post-update element image over the pre-diff snapshot (opponent hand sleeve fix)', () => {
+test('presentSrcFor: prefers the freshly-set element src over a stale currentSrc (opponent hand sleeve fix)', () => {
   const origin = { src: 'card-back.png' };
-  const element = { currentSrc: 'trainer-face.png' };
-  assert.equal(presentSrcFor(origin, element), 'trainer-face.png');
-  assert.equal(presentSrcFor(origin, { src: 'fallback.png' }), 'fallback.png');
+  // Browser timing (verified in Chromium): setting `src` updates it synchronously,
+  // while `currentSrc` still names the loaded card back until the next image task.
+  assert.equal(
+    presentSrcFor(origin, { src: 'trainer-face.png', currentSrc: 'card-back.png' }),
+    'trainer-face.png'
+  );
+  // No fresh attribute: fall back to the loaded image, then the pre-diff snapshot.
+  assert.equal(presentSrcFor(origin, { currentSrc: 'trainer-face.png' }), 'trainer-face.png');
+  assert.equal(presentSrcFor(origin, { src: '', currentSrc: '' }), 'card-back.png');
   assert.equal(presentSrcFor(origin, null), 'card-back.png');
   assert.equal(presentSrcFor(null, null), undefined);
 });
