@@ -125,9 +125,17 @@ test('SE14: Holon GL ex reduction needs a basic {L}; Holon WP DS shields effects
   for (const text of [HOLON_GL_DF, HOLON_GL_DS]) {
     const withL = hostWith(host, [card('Holon Energy GL', text)], ['Lightning Energy']);
     const withG = hostWith(host, [card('Holon Energy GL', text)], ['Grass Energy']);
-    assert.equal(getSpecialEnergyDamageReduction(host, withL, { attacker: exAttacker, afterWR: false }), 10);
-    assert.equal(getSpecialEnergyDamageReduction(host, withG, { attacker: exAttacker, afterWR: false }), 0);
+    // EX-era timing: after Weakness and Resistance (I175).
+    assert.equal(getSpecialEnergyDamageReduction(host, withL, { attacker: exAttacker, afterWR: true }), 10);
+    assert.equal(getSpecialEnergyDamageReduction(host, withL, { attacker: exAttacker, afterWR: false }), 0);
+    assert.equal(getSpecialEnergyDamageReduction(host, withG, { attacker: exAttacker, afterWR: true }), 0);
+    // "Ignore these effects if Holon Energy GL is attached to Pokémon-ex" (I173).
+    const exHost = { name: 'Mightyena ex', subtypes: ['ex'], types: ['Metal'], instanceId: 1 };
+    const exWithL = hostWith(exHost, [card('Holon Energy GL', text)], ['Lightning Energy']);
+    assert.equal(getSpecialEnergyDamageReduction(exHost, exWithL, { attacker: exAttacker, afterWR: true }), 0);
   }
+  const exHost = { name: 'Mightyena ex', subtypes: ['ex'], types: ['Metal'], instanceId: 1 };
+  assert.equal(hasSpecialEnergyEffectShield(exHost, hostWith(exHost, [card('Holon Energy WP', HOLON_WP_DS)], ['Water Energy'])), false);
   const wp = hostWith(host, [card('Holon Energy WP', HOLON_WP_DS)], ['Water Energy']);
   assert.equal(hasSpecialEnergyEffectShield(host, wp), true);
 });
@@ -149,4 +157,14 @@ test('SE13d: Double Rainbow MA 88 lowers damage after Weakness', () => {
   const defender = { name: 'Bulbasaur', types: ['Grass'], hp: 200, weakness: { type: 'Fire', value: 2 } };
   // Before W/R the penalty would give (30 - 10) × 2 = 40; after W/R it is 30 × 2 - 10 = 50.
   assert.equal(computeAttackDamage(attacker, defender, { name: 'Flare', damage: 30 }, { attackerZoneCards: zone }).total, 50);
+});
+
+test('I173: Heal Energy does nothing on attach to a Pokémon-ex', () => {
+  const HEAL =
+    'Heal Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove 1 damage counter and all Special Conditions from that Pokémon. If Heal Energy is attached to Pokémon-ex, Heal Energy has no effect other than providing Energy.';
+  const heal = card('Heal Energy', HEAL);
+  const plain = planSpecialEnergyTriggers(heal, { trigger: 'attach', fromZone: 'hand', host: { name: 'Pikachu', instanceId: 1 } });
+  assert.ok(plain.length > 0);
+  const onEx = planSpecialEnergyTriggers(heal, { trigger: 'attach', fromZone: 'hand', host: { name: 'Mightyena ex', subtypes: ['ex'], instanceId: 1 } });
+  assert.deepEqual(onEx, []);
 });

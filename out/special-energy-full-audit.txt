@@ -1,19 +1,13 @@
 # Special-energy parse coverage
 Corpus: 214 printings → 129 unique (name+text)
 
-guided 39 / passive 82 / unenforced 8 / unrecognized 0
+guided 40 / passive 87 / unenforced 2 / unrecognized 0
 
 ## Unrecognized
 
 ## Unenforced (parsed, no engine consumer)
 - Treasure Energy: attachFromPrize
 - Call Energy: activatedSearch
-- Holon Energy WP: ignoredOn
-- Holon Energy GL: ignoredOn
-- Holon Energy FF: ignoredOn
-- Heal Energy: ignoredOn
-- Holon Energy WP: ignoredOn
-- Holon Energy GL: ignoredOn
 
 ## Guided (effect steps)
 - Nitro {: provide, onDiscardReturnToHand
@@ -45,6 +39,7 @@ guided 39 / passive 82 / unenforced 8 / unrecognized 0
 - Cyclone Energy: provide, onAttachSwitch
 - Recover Energy: provide, onAttachClearStatus
 - Health Energy: provide, onAttachRemoveDamage
+- Heal Energy: provide, noExtraEffect, onAttachRemoveDamage, ignoredOn
 - Rainbow Energy: provide, onAttachDamageCounter
 - Retro Energy: provide, onAttachDevolve
 - Cyclone Energy: provide, onAttachSwitch
@@ -121,8 +116,13 @@ guided 39 / passive 82 / unenforced 8 / unrecognized 0
 - Double Rainbow Energy: attachRestriction, provide, discardWhenConditionLost, noExtraEffect, attackDamagePenalty
 - Darkness Energy: provide, damageBonus
 - Scramble Energy: attachRestriction, provide, provide, discardWhenConditionLost
+- Holon Energy WP: provide, effectShield, freeRetreat, ignoredOn
+- Holon Energy GL: provide, damageReduction, statusImmunity, ignoredOn
+- Holon Energy FF: provide, noWeakness, ignoresResistance, ignoredOn
 - Dark Metal Energy: provide, noExtraEffect
 - React Energy: provide
+- Holon Energy WP: provide, effectShield, freeRetreat, ignoredOn
+- Holon Energy GL: provide, damageReduction, statusImmunity, ignoredOn
 - Darkness Energy: provide, damageBonus
 - R Energy: attachRestriction, provide, discardAtEndOfTurn, damageBonus
 - Dark Metal Energy: provide, noExtraEffect
@@ -462,7 +462,7 @@ guided 39 / passive 82 / unenforced 8 / unrecognized 0
   - ignored on pokemonEx
 ### Holon Energy GL
   - provides 1 Colorless Energy
-  - host takes -10 damage from Pokémon-EX
+  - host takes -10 damage from Pokémon-EX (after W/R)
   - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
   - ignored on pokemonEx
 ### Holon Energy FF
@@ -487,7 +487,7 @@ guided 39 / passive 82 / unenforced 8 / unrecognized 0
   - ignored on pokemonEx
 ### Holon Energy GL
   - provides 1 Colorless Energy
-  - host takes -10 damage from Pokémon-EX
+  - host takes -10 damage from Pokémon-EX (after W/R)
   - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
   - ignored on pokemonEx
 ### Darkness Energy
