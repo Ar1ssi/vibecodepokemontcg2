@@ -324,6 +324,16 @@ import test, { describe } from 'node:test';
       assert.equal(r.steps[0].type, 'switchOpponent');
     });
 
+    test('Guzma (corpus BUS SV84): gust, then switchOwn', () => {
+      const r = parseTrainerEffect(
+        'Switch 1 of your opponent’s Benched Pokémon with their Active Pokémon. If you do, switch your Active Pokémon with 1 of your Benched Pokémon.'
+      );
+      assert.deepEqual(
+        r.steps.map((s) => s.type),
+        ['switchOpponent', 'switchOwn']
+      );
+    });
+
     test('Buddy-Buddy Poffin: 2 basics ≤70HP go to BENCH (not hand)', () => {
       const r = parseTrainerEffect("Search your deck for up to 2 Basic Pokémon with 70 HP or less and put them onto your Bench. Then, shuffle your deck.");
       assert.equal(r.steps[0].type, 'searchDeck');

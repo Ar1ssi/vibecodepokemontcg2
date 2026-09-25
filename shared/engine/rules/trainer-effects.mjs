@@ -1045,6 +1045,10 @@ function parseTrainerSteps(lower) {
         ...(lower.includes("opponent's benched basic pokémon") ? { filter: 'Basic' } : {}),
         ...(condition ? { thenCondition: condition[1][0].toUpperCase() + condition[1].slice(1) } : {}),
       });
+      // Guzma: "If you do, switch your Active Pokémon with 1 of your Benched Pokémon."
+      if (/if you do, switch your active pok[ée]mon with 1 of your benched pok[ée]mon/.test(lower)) {
+        steps.push({ type: 'switchOwn' });
+      }
     }
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
