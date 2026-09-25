@@ -1,7 +1,7 @@
 // Shared deck/discard search filtering (trainers, abilities, attacks).
 import { energyMatchesSearchWhat } from './energy-effects.mjs';
 import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
-import { isGxCard, isRuleBoxPokemon } from './card-classify.mjs';
+import { isGxCard, isRuleBoxPokemon, isUltraBeastCard } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
 
 const SYMBOL_TO_TYPE = {
@@ -87,17 +87,7 @@ export function matchesSearch(card, what = '') {
     String(card.supertype || card.type || '').toLowerCase().includes('trainer') ||
     TRAINER_KIND_TYPES.has(String(card.type || '').toLowerCase());
   if (w.includes('ultra beast')) {
-    const st = Array.isArray(card.subtypes)
-      ? card.subtypes.map((s) => String(s).toLowerCase())
-      : [];
-    const tags = Array.isArray(card.tags)
-      ? card.tags.map((s) => String(s).toLowerCase())
-      : [];
-    return (
-      st.includes('ultra beast') ||
-      tags.includes('ultra beast') ||
-      /ultra beast/i.test(String(card.name || ''))
-    );
+    return isUltraBeastCard(card);
   }
   if (w.includes('item') && w.includes('tool')) return isTrainer;
   if (w === 'item' || (w.includes('item') && !w.includes('tool'))) {

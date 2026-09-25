@@ -946,6 +946,24 @@ test('stadium: Ultra Space searches the deck for an Ultra Beast', () => {
   assert.ok(res2.state.players.p1.zones.hand.some((c) => c.instanceId === 100));
 });
 
+test('stadium: Ultra Space finds real Ultra Beasts that carry no Ultra Beast subtype', () => {
+  const { state, rng } = setupGame();
+  state.stadium = stadiumWith(
+    72,
+    'Ultra Space',
+    "Once during each player's turn, that player may search their deck for an Ultra Beast card, reveal it, put it into their hand, and shuffle their deck."
+  );
+  const gx = createCard({ instanceId: 100, name: 'Buzzwole-GX', hp: 190, stage: 'Basic', supertype: 'Pokémon', subtypes: ['Basic', 'GX'], type: 'Pokémon' });
+  const necrozma = createCard({ instanceId: 102, name: 'Necrozma', hp: 130, stage: 'Basic', supertype: 'Pokémon', subtypes: ['Basic'], type: 'Pokémon' });
+  const forms = ['Ultra Necrozma', 'Dawn Wings Necrozma', 'Dusk Mane Necrozma'].map((name, i) =>
+    createCard({ instanceId: 103 + i, name, hp: 130, stage: 'Basic', supertype: 'Pokémon', subtypes: ['Basic'], type: 'Pokémon' })
+  );
+  state.players.p1.zones.deck.push(gx, necrozma, ...forms, basicMon(101, 'Pikachu', ['Lightning']));
+
+  const res1 = activate(state, rng);
+  assert.deepEqual(optionIds(res1), [100, 103, 104, 105]);
+});
+
 test('stadium: Shopping Center returns an attached Tool to hand', () => {
   const { state, rng } = setupGame();
   state.stadium = stadiumWith(

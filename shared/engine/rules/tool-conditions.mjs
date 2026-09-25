@@ -22,6 +22,7 @@ import {
   isMegaCard,
   isTeraCard,
   isRuleBoxPokemon,
+  isUltraBeastCard,
 } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { topPokemonCard } from './evolved-pokemon.mjs';
@@ -101,13 +102,7 @@ function hasSubtype(card, word) {
     case 'future':
       return /future/.test(subs) || /future/.test(name);
     case 'ultra beast':
-      return (
-        /ultra beast/.test(subs) ||
-        /ultra beast/.test(
-          Array.isArray(card.tags) ? card.tags.join(' ').toLowerCase() : ''
-        ) ||
-        /ultra beast/.test(name)
-      );
+      return isUltraBeastCard(card);
     default:
       // Strike / Team tags: subtype when present, name fragment otherwise.
       return subs.includes(w) || name.includes(w);

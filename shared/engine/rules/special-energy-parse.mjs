@@ -59,7 +59,7 @@
 //   { type: 'officialIllegal' }
 
 import { isEnergyCard } from './energy-effects.mjs';
-import { isExCard, isGxCard, isRuleBoxPokemon, isVCard } from './card-classify.mjs';
+import { isExCard, isGxCard, isRuleBoxPokemon, isUltraBeastCard, isVCard } from './card-classify.mjs';
 
 const SYMBOL_TYPES = {
   c: 'Colorless',
@@ -1412,8 +1412,7 @@ const isLvXPokemon = (pokemon) =>
   /lv\.?\s*x$/i.test(String(pokemon?.name ?? '')) ||
   (pokemon?.subtypes || []).some((s) => /lv\.?\s*x/i.test(String(s)));
 
-const isUltraBeast = (pokemon) =>
-  (pokemon?.subtypes || []).some((s) => /ultra beast/i.test(String(s)));
+const isUltraBeast = isUltraBeastCard;
 
 const isVOrGx = (pokemon) => isVCard(pokemon) || isGxCard(pokemon);
 

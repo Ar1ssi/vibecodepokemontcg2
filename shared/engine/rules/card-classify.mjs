@@ -37,6 +37,17 @@ const textOf = (card) =>
 
 // ── individual card-type predicates ────────────────────────────────────────
 
+// TCGdex carries no "Ultra Beast" subtype, so membership is by name. Plain Necrozma is not an
+// Ultra Beast; its Ultra, Dawn Wings and Dusk Mane forms are.
+const ULTRA_BEAST_NAME =
+  /(?<![a-z])(?:nihilego|buzzwole|pheromosa|xurkitree|celesteela|kartana|guzzlord|poipole|naganadel|stakataka|blacephalon|ultra necrozma|dawn wings necrozma|dusk mane necrozma)(?![a-z])/;
+
+export function isUltraBeastCard(card = {}) {
+  if (subtypeTokens(card).includes('ultrabeast')) return true;
+  if (Array.isArray(card?.tags) && card.tags.some((t) => collapse(t) === 'ultrabeast')) return true;
+  return ULTRA_BEAST_NAME.test(lower(card?.name));
+}
+
 // The printed suffix needs a separator ("Cetitan ex", "M Venusaur-EX") — a bare
 // `endsWith('ex')` also matched plain names like "Toxapex", mis-classifying them
 // as rule-box ex (App. 8). Same separator rule for GX for symmetry.

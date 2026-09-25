@@ -10,6 +10,7 @@ import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { isUltraBeastCard } from '../rules/card-classify.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import {
@@ -2238,7 +2239,7 @@ function lookAtFaceDownPrize(ctx) {
   const what = String(step.what || '').toLowerCase();
   const matches = (card) =>
     what.includes('ultra beast')
-      ? /ultra beast/i.test(String(card.name || ''))
+      ? isUltraBeastCard(card)
       : isPokemon(card) && stageOf(card) === 'Basic';
   const take = step.take !== false;
 
