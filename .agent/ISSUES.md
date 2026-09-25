@@ -12,6 +12,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I180 2026-09-25 P2 [board-ui] Non-zoom card zones (discard/lostZone/viewCards/attachedCards) still use the legacy #fullImage overlay — top document, no z-index, sticks over the board, click-to-close unreachable (same class as the S299 #board fix); repro: move a card to discard, double-click.
 - I179 2026-09-22 P2 [rules-ui] Known suite failure card-inspector-model.test.mjs "retreat greys only when the cost is unpaid" fails on a clean tree; keeps every run N-1/N. Needs a debug pass. (refs: S251, S252) (PR #181 branch id I83)
 - I178 2026-09-22 P3 [board-ui] No remaining-HP readout (TCG Live shows HP depleting); design 024 O5 scoped it out as new persistent UI, not an effect. (refs: design 024) (PR #181 branch id I82)
 - I177 2026-09-22 P3 [board-ui] Legacy (non-authoritative) mode gets no mat effects or sound: every effect rides the advisory stream, which flows only under SERVER_AUTHORITATIVE. (refs: design 022/024) (PR #181 branch id I81)
