@@ -109,6 +109,16 @@ function main() {
     console.error(`\n${baseline.error} — run with --update-baseline to create it.`);
     return 1;
   }
+  if (
+    baseline.value.corpus !== baselineName ||
+    JSON.stringify(baseline.value.seeds) !== JSON.stringify(DEFAULT_SEEDS)
+  ) {
+    console.error(
+      `\nbaseline is for ${baseline.value.corpus} seeds ${JSON.stringify(baseline.value.seeds)} — ` +
+        `this run is ${baselineName} seeds ${JSON.stringify(DEFAULT_SEEDS)}; refresh with --update-baseline.`
+    );
+    return 1;
+  }
   const { failures, improvements, warnings } = checkAttackGate(rows, baseline.value);
   if (improvements.length) {
     console.log(`\n${improvements.length} improvement(s) — refresh with --update-baseline:`);

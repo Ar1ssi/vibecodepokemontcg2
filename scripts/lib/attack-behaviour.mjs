@@ -319,7 +319,11 @@ export function totalCounts(counts) {
   return total;
 }
 
-/** The committed snapshot: every unique attack's family and verdict, keyed by attackKey. */
+/**
+ * The committed snapshot: every unique attack's family and verdict, keyed by attackKey. Rows
+ * that threw on some seed carry their `errors`, so a later run can tell a new throw from a
+ * known one.
+ */
 export function baselineOf(rows, { seeds = DEFAULT_SEEDS, corpus = 'out/pkmn-pokemon-cards.json' } = {}) {
   const entries = {};
   for (const row of [...rows].sort((a, b) => a.key.localeCompare(b.key))) {
@@ -328,6 +332,7 @@ export function baselineOf(rows, { seeds = DEFAULT_SEEDS, corpus = 'out/pkmn-pok
       attack: row.attack,
       family: row.family,
       verdict: row.verdict,
+      ...(row.errors?.length ? { errors: [...row.errors].sort() } : {}),
     };
   }
   return { corpus, seeds, unique: rows.length, entries };
@@ -336,9 +341,10 @@ export function baselineOf(rows, { seeds = DEFAULT_SEEDS, corpus = 'out/pkmn-pok
 const label = (row) => `${row.name || row.card} ${row.attack}`;
 
 /**
- * Compares the run with the baseline. A row's verdict may only move up (a failure needs
- * `--update-baseline`); a vanished key is a corpus/text edit, a new key is report-only, and a
- * new engine error always fails.
+ * Compares the run with the baseline. A row's verdict may only move up and its error strings
+ * may only disappear (a failure needs `--update-baseline`); a vanished key is a corpus/text
+ * edit and a new key is report-only (trainer-gate precedent), but a new engine error always
+ * fails even when another seed kept the verdict up.
  */
 export function checkAttackGate(rows, baseline) {
   const failures = [];
@@ -357,12 +363,19 @@ export function checkAttackGate(rows, baseline) {
       if (verdictRank(row.verdict) > verdictRank(before.verdict)) improvements.push(line);
       else failures.push(line);
     }
+    const beforeErrors = new Set(before.errors || []);
+    const nowErrors = new Set(row.errors || []);
+    for (const error of nowErrors)
+      if (!beforeErrors.has(error)) failures.push(`${label(row)}: engine error ${error}`);
+    for (const error of beforeErrors)
+      if (!nowErrors.has(error)) improvements.push(`${label(row)}: engine error gone (${error})`);
     if (row.family !== before.family)
       warnings.push(`${label(row)}: family ${before.family} → ${row.family}`);
   }
   for (const row of rows) {
     if (entries[row.key]) continue;
-    if (row.verdict === 'engine-error') failures.push(`${label(row)}: engine-error (new attack)`);
+    if (row.verdict === 'engine-error' || row.errors?.length)
+      failures.push(`${label(row)}: engine-error (new attack)`);
     else warnings.push(`${label(row)}: new to the corpus (${row.verdict})`);
   }
   return { failures, improvements, warnings };

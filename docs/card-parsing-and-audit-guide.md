@@ -153,6 +153,7 @@ npx eslint --rule "linebreak-style: off" --rule "prettier/prettier: off" \
 pnpm audit:oracle                         # attack/ability execution gate (~2 min, D108)
 pnpm audit:abilities                      # ability behaviour gate (~2 min, D126-D128); --rows for per-row JSON
 pnpm audit:attacks                        # attack behaviour gate (~2 min, design 036); --rows for per-row JSON
+pnpm audit:trainers                       # Trainer behaviour gate (seconds, D124)
 node scripts/audit-all-pokemon.mjs        # gap metric + reports
 node scripts/audit-all-ancient-traits.mjs # ancient-trait coverage (`unrecognized 0` gate)
 node --test shared/engine/rules/__tests__/rules-extended.test.mjs   # fast loop
@@ -161,7 +162,7 @@ pnpm test                                 # full suite (2188+)
 
 ## 8. Behaviour gates: parsed is not played (design 034/036)
 
-A clean classify/parse result (§5) says nothing about whether the engine plays the card. Three gates
+A clean classify/parse result (§5) says nothing about whether the engine plays the card. Four gates
 measure behaviour instead, and all ratchet against committed baselines:
 
 - `pnpm audit:oracle` runs every attack and activated ability through the reducer and records what
@@ -181,6 +182,9 @@ measure behaviour instead, and all ratchet against committed baselines:
   ratcheted individually, so an attack that stops working fails by name. `--rows` writes
   `out/attack-behaviour-rows.json`; the `partial` and `ran-no-effect` rows are the attack backlog
   (I166-I168).
+- `pnpm audit:trainers` classes every unique Trainer in `out/pkmn-trainer-cards.json`
+  (`scripts/trainer-behaviour-baseline.json`): parse outcome, parsed step kinds with no server
+  executor, and the parsed play condition.
 
 Two lessons from building them:
 

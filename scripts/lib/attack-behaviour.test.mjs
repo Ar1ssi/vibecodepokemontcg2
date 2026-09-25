@@ -11,6 +11,8 @@ import {
   baselineOf,
   checkAttackGate,
   classifyAttackRow,
+  costPoolFor,
+  scanCorpus,
 } from './attack-behaviour.mjs';
 
 test('attackKey folds reprints and text edits', () => {
@@ -42,8 +44,8 @@ test('attackVerdict: evidence without a board tag still counts as an effect', ()
   assert.equal(attackVerdict({ dealt: [0], tags: ['opp:deck->hand'], oppDrew: true }), 'ok');
 });
 
-test('attackVerdict: a failed condition gate and a skipped step are not no-effect bugs', () => {
-  assert.equal(attackVerdict({ dealt: [null], skipped: ['condition_unmet'] }), 'ok');
+test('attackVerdict: a skipped condition step keeps an executed no-op out of ran-no-effect', () => {
+  assert.equal(attackVerdict({ dealt: [0], skipped: ['condition_unmet'] }), 'ok');
 });
 
 test('attackVerdict: a missing sentence mechanic is partial, a throw is engine-error', () => {
@@ -140,4 +142,63 @@ test('classifyAttackRow: the engine observation feeds the verdict (integration)'
   const noop = classifyAttackRow(card, item('This attack does nothing.'), 0, all('This attack does nothing.'), { seeds: [1] });
   assert.equal(noop.verdict, 'ran-no-effect');
   assert.equal(noop.family, 'unknown');
+});
+
+test('costPoolFor takes the max printed count per symbol', () => {
+  assert.deepEqual(
+    costPoolFor([{ cost: ['Fire', 'Fire'] }, { cost: ['Fire', 'Water', 'Water'] }, { cost: [] }]),
+    { Fire: 2, Water: 2 }
+  );
+});
+
+test('scanCorpus dedupes reprints, skips damage-only attacks and keeps engine indices aligned', () => {
+  const text = [
+    '→Probe One',
+    'This attack does nothing.',
+    '→No Effect 20',
+    '→Heal Probe',
+    'Heal 30 damage from this Pokémon.',
+  ].join('\n');
+  const rows = scanCorpus(
+    [
+      { name: 'Testmon', set: 'Test', number: '1', text },
+      { name: 'Testmon', set: 'Test', number: '2', text },
+    ],
+    { seeds: [1] }
+  );
+  assert.deepEqual(
+    rows.map((r) => `${r.attack} ${r.verdict}`),
+    ['Probe One ran-no-effect', 'Heal Probe ok']
+  );
+  assert.deepEqual(rows[1].printings, ['Testmon [Test 1]', 'Testmon [Test 2]']);
+  assert.equal(rows[1].key, attackKey('Heal Probe', 'Heal 30 damage from this Pokémon.'));
+  assert.ok(rows[1].tags.includes('own:heal'));
+});
+
+test('gate fails a new engine error even when another seed kept the verdict', () => {
+  const before = base({ a: { name: 'Testmon', attack: 'Probe', family: 'heal', verdict: 'ok' } });
+  const { failures } = checkAttackGate([{ ...row('a', 'ok'), errors: ['THROW boom'] }], before);
+  assert.deepEqual(failures, ['Testmon Probe: engine error THROW boom']);
+});
+
+test('gate passes a known error and reports it gone, and a new row with one fails', () => {
+  const known = base({
+    a: { name: 'Testmon', attack: 'Probe', family: 'heal', verdict: 'partial', errors: ['THROW boom'] },
+  });
+  assert.deepEqual(checkAttackGate([{ ...row('a', 'partial'), errors: ['THROW boom'] }], known).failures, []);
+  assert.deepEqual(checkAttackGate([row('a', 'partial')], known).improvements, [
+    'Testmon Probe: engine error gone (THROW boom)',
+  ]);
+  assert.deepEqual(checkAttackGate([{ ...row('b', 'ok'), errors: ['THROW boom'] }], base({})).failures, [
+    'Testmon Probe: engine-error (new attack)',
+  ]);
+});
+
+test('baselineOf stores error strings so a new throw is visible on the next run', () => {
+  const baseline = baselineOf([
+    { ...row('a', 'ok'), errors: ['THROW boom'] },
+    { ...row('b', 'ok'), errors: [] },
+  ]);
+  assert.deepEqual(baseline.entries.a.errors, ['THROW boom']);
+  assert.equal(baseline.entries.b.errors, undefined);
 });

@@ -452,17 +452,20 @@ mechanic.
 - S300 slice 16 (regression gate) built on `claude/rules-engine-issues-e79707`: `pnpm audit:attacks`
   (`scripts/audit-attack-behaviour.mjs` + `scripts/lib/attack-behaviour.mjs` +
   `scripts/lib/attack-harness.mjs`, promoted from the S279 scratch probe/rich harness) with the
-  committed `scripts/attack-behaviour-baseline.json`; 12 unit tests in
+  committed `scripts/attack-behaviour-baseline.json`; 17 unit tests in
   `scripts/lib/attack-behaviour.test.mjs`. Deviations: (a) the gate covers
   `out/pkmn-pokemon-cards.json` (the committed corpus the other gates use, 3,528 unique effect
   attacks); the 10,966-attack full `type:pokemon` sweep stays scratch-only (§F), so this is a
   ratchet over that corpus, not the S279 numbers; (b) the baseline is per unique attack (name+text
   hash → `{name, attack, family, verdict}`), not per-family shares like the ability gate — new
   attacks report as warnings, a vanished key is a corpus/text-edit warning, and each regression
-  names its card (what I166–I168 need); (c) the probe's unused `parseAttackDamage` field was
-  dropped (it threw on every row: `ATTACK_CTX` was read before its declaration). First baseline:
-  3,247 ok / 152 partial / 129 ran-no-effect / 0 engine-error. I136 closed; I137 was already
-  closed by slice 1. The gate's partial/no-effect rows are the I166–I168 ratchet.
+  names its card (what I166–I168 need); (c) the probe's unused `parseAttackDamage` field and the
+  scratch harness's scenario knobs (`oppHp`, `handSize`, …) were dropped — behave.mjs's targeted
+  scenarios already live as the slice-1–15 unit tests (`attack-condition-gate`, `attack-prize-on-ko`,
+  `attack-heal`, …) and dead plumbing is not promoted; (d) per-row `errors` are stored in the
+  baseline when present, and a new engine error fails even when another seed kept the verdict up.
+  First baseline: 3,247 ok / 152 partial / 129 ran-no-effect / 0 engine-error. I136 closed; I137
+  was already closed by slice 1. The gate's partial/no-effect rows are the I166–I168 ratchet.
 
 ---
 Self-approval checklist (only when the user is unreachable):

@@ -1,6 +1,6 @@
 # S297 handoff — I155+ backlog fixes (`claude/rules-engine-issues-e79707`)
 
-Branch is main + 14 commits, **not pushed**. Suite 4023/4024 (only the known
+Branch is main + 15 commits, **not pushed**. Suite 4023/4024 (only the known
 card-inspector-model "retreat greys…" failure); `audit:oracle`, `audit:abilities`,
 `audit:trainers` all PASSED. Revert = revert the branch.
 

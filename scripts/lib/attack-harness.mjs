@@ -65,7 +65,7 @@ const STOCK = {
   Fighting: 1,
 };
 
-function enrich(state, costPool, opts = {}) {
+function enrich(state, costPool) {
   const z = state.players.p1.zones;
   // Three of every Basic type so hand-discard costs ("discard 2 {L} Energy from your hand")
   // are payable as well.
@@ -150,50 +150,14 @@ function enrich(state, costPool, opts = {}) {
   for (const c of [...state.players.p2.zones.active, ...state.players.p2.zones.bench]) {
     if (!c.attachedTo) c.attacks = [{ name: 'Dummy Strike', cost: [], damage: '10', text: '' }];
   }
-  // Targeted-scenario knobs (the targeted scenarios live in the audit's unit tests):
-  // low-HP defender, small attacker hand, attacker already damaged, evolved defender.
-  if (opts.oppHp != null) {
-    const opp = state.players.p2.zones.active.find((c) => !c.attachedTo);
-    if (opp) opp.hp = opts.oppHp;
-  }
-  if (opts.attackerDamage != null) {
-    const atk = state.players.p1.zones.active.find((c) => !c.attachedTo);
-    if (atk) atk.damage = opts.attackerDamage;
-  }
-  if (opts.smallHand) {
-    z.hand.length = 0;
-    z.hand.push(energy('Fire'));
-  }
-  if (opts.handSize != null) {
-    while (z.hand.length > opts.handSize) z.hand.pop();
-    while (z.hand.length < opts.handSize) z.hand.push(energy('Fire'));
-  }
-  if (opts.oppEvolved) {
-    const opp = state.players.p2.zones.active.find((c) => !c.attachedTo);
-    if (opp) {
-      z.oppEvoPlaceholder = true;
-      const evo = mon('Defender Evo', {
-        stage: 'Stage 1',
-        subtypes: ['Stage 1'],
-        evolvesFrom: opp.name,
-        hp: 150,
-      });
-      evo.attachedTo = opp.instanceId;
-      state.players.p2.zones.active.push(evo);
-    }
-  }
-  if (opts.oppStatus) {
-    const opp = state.players.p2.zones.active.find((c) => !c.attachedTo);
-    if (opp) opp.specialCondition = opts.oppStatus;
-  }
 }
 
-export function runAttackOnce(holder, attackIndex, seed, costPool, opts = {}) {
+export function runAttackOnce(holder, attackIndex, seed, costPool) {
   nextId = 90000;
   const state = buildState(holder, 'active');
   state.rulesEnabled = true;
   state.turn = { player: 'p1', number: 5, phase: 'main' };
-  enrich(state, costPool, opts);
+  enrich(state, costPool);
   const before = snapshot(state);
   const events = [];
   const choices = [];
@@ -269,7 +233,7 @@ export function runAttackOnce(holder, attackIndex, seed, costPool, opts = {}) {
   };
 }
 
-export function runAttackRich(holder, attackIndex, { seeds = DEFAULT_SEEDS, costPool, opts } = {}) {
+export function runAttackRich(holder, attackIndex, { seeds = DEFAULT_SEEDS, costPool } = {}) {
   const tags = new Set();
   const errors = new Set();
   const eventTypes = new Set();
@@ -281,7 +245,7 @@ export function runAttackRich(holder, attackIndex, { seeds = DEFAULT_SEEDS, cost
   let oppDrew = false;
   const prizeEvents = [];
   for (const seed of seeds) {
-    const r = runAttackOnce(holder, attackIndex, seed, costPool, opts);
+    const r = runAttackOnce(holder, attackIndex, seed, costPool);
     if (r.error) {
       errors.add(r.error);
       continue;
