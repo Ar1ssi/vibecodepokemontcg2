@@ -12,6 +12,8 @@
     "test:flip": "node flip-gate-test.mjs",
     "test:inspector": "node test-card-inspector-e2e.mjs",
     "test:reset-choice": "node reset-during-choice-test.mjs",
+    "test:changed": "node scripts/test-changed.mjs",
+    "test:live": "node scripts/test-live.mjs",
     "test": "node --test \"shared/**/*.test.mjs\" \"client/**/*.test.mjs\" \"server/**/*.test.mjs\" \"bot/**/*.test.mjs\" \"scripts/**/*.test.mjs\"",
     "audit:oracle": "node scripts/audit-oracle.mjs",
     "audit:abilities": "node scripts/audit-ability-behaviour.mjs",

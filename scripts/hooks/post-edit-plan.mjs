@@ -34,3 +34,23 @@ function testsFor(filePath, exists) {
   const sibling = path.join(directory, '__tests__', `${base}.test.mjs`);
   return exists(sibling) ? [sibling] : [];
 }
+
+/**
+ * Test files covering a set of changed files (repo-relative or absolute), deduped and sorted.
+ * Deleted files are skipped through the injected `exists` probe.
+ *
+ * @param {string[]} changedFiles Changed file paths
+ * @param {string} repoRoot Absolute repo root
+ * @param {(p: string) => boolean} exists File-existence probe
+ * @returns {string[]} Absolute test file paths
+ */
+export function planChangedTests(changedFiles, repoRoot, exists) {
+  const tests = new Set();
+  for (const file of changedFiles ?? []) {
+    if (!file) continue;
+    const absolute = path.resolve(repoRoot, file);
+    if (!exists(absolute)) continue;
+    for (const testFile of planPostEditChecks(absolute, repoRoot, exists).tests) tests.add(testFile);
+  }
+  return [...tests].sort();
+}

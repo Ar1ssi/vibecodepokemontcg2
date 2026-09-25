@@ -37,8 +37,9 @@ ISSUES.md line each, not unplanned edits.
 ## 3 · Close
 1. Re-run `pnpm test` and the lint bar from a clean shell. Show the summary lines, verbatim.
 2. One commit for the whole plan (the user's standing choice): stage only the plan's paths, message
-   `S<n> <slug>: <what the plan delivered>`. Push / open a PR only when asked.
-3. Journal (≤4 lines: plan file, sections shipped, what stayed unverified), DECISIONS.md per lasting
+   `exec-plan <slug>: <what the plan delivered>`, body = the journal (plan file, sections shipped, what
+   stayed unverified). Push / open a PR only when asked.
+3. DECISIONS.md per lasting
    choice the plan forced, MAP.md if structure changed, STATE.md rewritten.
 
 ## Done — copy into your final message and tick honestly

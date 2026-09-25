@@ -23,7 +23,7 @@ feature.md with an explicit removal list, a caller grep proving disuse, and a us
 5. **Coverage gaps are findings.** A hotspot whose behavior lacks tests blocks every future
    cleanup there (refactor.md demands a green safety net first) — file it like any other debt.
 6. **File & close.** One ISSUES.md line per finding (P2/P3); a cleanup bigger than ~1 session
-   also gets a design stub in `.agent/designs/`. Journal: `S<n> audit: <k> findings, cleared:
+   also gets a design stub in `.agent/designs/`. Commit subject: `audit: <k> findings, cleared:
    <areas>` — the cleared list stops future audits from re-litigating the same code. Then
    session END as normal.
 

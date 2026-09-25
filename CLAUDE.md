@@ -14,29 +14,34 @@ any session pick up work with minimal context. First session? `.agent/STATE.md` 
    understanding (definitions, references, types). After locating a file, navigate it with LSP rather than
    reading the whole file. Grep is the fallback when LSP is unavailable.
 4. Never call an API/function you haven't seen defined this session. Verify behavior in source.
-5. Code is truth. A wrong harness doc is a bug — fix it in passing (≤5 lines) or `flag:` it in the journal.
+5. Code is truth. A wrong harness doc is a bug — fix it in passing (≤5 lines) or add a `flag:` line to your commit message.
 6. Chat carries outcomes; files carry detail: analysis → `.agent/scratch/`, designs → `.agent/designs/`,
    lasting choices → `.agent/DECISIONS.md`, deferred work → `.agent/ISSUES.md`.
 
 ## Reading budget — large files are grep-only
-Never load these whole: `DECISIONS.md`, `ISSUES.md`, `journal/*`, `.agent/archive/*`.
+Never load these whole: `DECISIONS.md`, `ISSUES.md`, `journal/*` (frozen, pre-S313), `.agent/archive/*`.
 - DECISIONS/ISSUES: `grep -n "\[<scope>\]"` for the target area, or grep the D/I number.
-- Journal: `tail -n 20 .agent/journal/<YYYY-MM>.md`, or grep `S<n>`.
+- Journal: `git log -20 main --format='%h %ad %s%n%b' --date=short`; flags: `git log --grep='flag:'`.
+  Pre-S313 history: grep `.agent/journal/`.
 - Verbose/closed history: grep `.agent/archive/`.
 
 ## Session protocol
 START: read `.agent/STATE.md` → classify the request (routing below) → open that one workflow and follow it.
-DURING: after each completed slice/checkpoint, update STATE's `Active:` line (crash insurance).
+DURING: work on your own branch in a worktree. Crash insurance = WIP commits on that branch, not STATE edits.
 END — whenever you changed anything:
-- **Light END** (default — patch, debug, refactor, small feature, issue-only, harness typo): append one
-  journal line; edit only the STATE lines that changed (Session +1, Active, Recently shipped).
+- **The journal is the commit message.** Subject `<workflow>: <outcome>`; body ≤4 lines of why,
+  plus optional `flag: <debt/risk>` lines. Never append to `.agent/journal/` (frozen history).
+  Wherever a workflow says "journal", it means this commit message.
+- **Shared harness files** (STATE, DECISIONS, ISSUES, MAP) change only in the commit that lands on
+  `main`, after rebasing/merging on the latest `main` — never on the primary folder mid-task.
+- **Light END** (default — patch, debug, refactor, small feature, issue-only, harness typo): commit
+  message only; edit STATE lines only if Focus/Active/Next/Blocked actually changed.
 - **Full END** (only when priorities/plan changed — exec-plan, feature.md work, maintain): rewrite
-  STATE.md in full (template in it); journal entry.
+  STATE.md in full (template in it).
 - Either END: MAP.md only if files moved/were added; DECISIONS.md only for a genuinely lasting choice.
-- Git log is the "what". Journal entry carries the "why" + flags: `S<n> <YYYY-MM-DD> <workflow>: outcome`
-  — ≤4 lines, ≤200 chars each, optional `  flag: <debt/risk>`. Detail goes in the design or scratch file.
 - Tick your workflow's Done checklist in your final message.
-- New Session number a multiple of 10 → add "maintenance due" to STATE `Next:`.
+- Maintenance due when ≥30 commits landed on `main` since the last `maintain:` commit
+  (`git rev-list --count $(git log -1 --format=%h --grep='^maintain' main)..main`).
 
 ## Routing
 | Request looks like | Route |
@@ -62,7 +67,7 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
 - Grunt work (boilerplate, tests, content entry) → `model: sonnet` or `haiku`. Code search →
   `caveman:cavecrew-investigator`; 1–2 file edits → `caveman:cavecrew-builder`; diff review → `caveman:cavecrew-reviewer`.
 - Briefs are self-contained: goal, exact files/design sections, what to return. Subagents inherit no chat.
-- Subagents never touch harness state (STATE/journal/DECISIONS/ISSUES/MAP/NEXTSTEPS). One writer at a time.
+- Subagents never touch harness state (STATE/DECISIONS/ISSUES/MAP/NEXTSTEPS). One writer at a time.
   A subagent's "done" is a claim: you run the tests yourself and review the diff against the spec's
   acceptance criteria, not taste.
 - Architecture audit (high effort): only on explicit request, roughly once per phase.
@@ -91,12 +96,13 @@ move it to `.agent/archive/NEXTSTEPS-history.md` when the spec ships.
   Visual-only changes (CSS, mat FX, animation, layout) are exempt — the user checks those on localhost.
 - Verification is never a question. The PostToolUse hook (`scripts/hooks/post-edit-check.mjs`) lints
   each edited JS file and runs its own `__tests__/<name>.test.mjs`; fix what it reports. Iterate with
-  `node --test <file>`; run the full `pnpm test` ONCE before commit, not after every edit.
+  `node --test <file>`. Before commit: `pnpm test:changed` for patch work; full `pnpm test` before
+  landing on `main` and after any engine, rules or netcode change.
 - Comments only for constraints and whys. No dead or commented-out code. Match the file's local style.
 
 ## Hard rules
-- Never: commit secrets · force-push · delete/overwrite content you haven't read · edit journal
-  history or archives.
+- Never: commit secrets · force-push · delete/overwrite content you haven't read · edit the frozen
+  `.agent/journal/` or archives.
 - New dependency ⇒ a DECISIONS.md line justifying it.
 - Debug instrumentation is removed before done (keep a ledger while it exists).
 - Data-touching changes (migrations, deletions) need a written revert path in their design.
@@ -104,8 +110,8 @@ move it to `.agent/archive/NEXTSTEPS-history.md` when the spec ships.
 ## Project facts
 - What: web 2-player Pokémon TCG simulator — board mats, deck builder, rules engine, Socket.IO sync, SQLite.
 - Stack: Node.js ES modules, Express 4, Socket.IO 4, SQLite3, EJS, Playwright, `node --test`, ESLint 9 + Prettier.
-- Commands: run `pnpm start` · full tests `pnpm test` (~3400, one known failure: card-inspector-model
-  "retreat greys…") · one file `node --test <path>` · lint touched files `npx eslint --quiet <files>`
+- Commands: run `pnpm start` · full tests `pnpm test` (~4260, all green; live TCGdex tests
+  opt-in via `pnpm test:live`) · changed-only `pnpm test:changed` (tests for files this branch touched) · one file `node --test <path>` · lint touched files `npx eslint --quiet <files>`
   (repo-wide `pnpm lint` is noisy with prettier/CRLF warnings) · engine gate `pnpm audit:oracle` (~2 min,
   after attack/ability engine changes) · build n/a.
 - Entry points: `server/server.js`, `server/game/room.mjs`, `client/index.ejs`, `client/src/front-end.js`.

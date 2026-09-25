@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
-import { planPostEditChecks } from '../post-edit-plan.mjs';
+import { planChangedTests, planPostEditChecks } from '../post-edit-plan.mjs';
 
 const root = path.resolve('/repo');
 const at = (...parts) => path.join(root, ...parts);
@@ -44,4 +44,24 @@ test('missing inputs are skipped', () => {
   assert.deepEqual(planPostEditChecks('', root, existsOnly()), none);
   assert.deepEqual(planPostEditChecks(at('a.mjs'), '', existsOnly()), none);
   assert.deepEqual(planPostEditChecks(undefined, root, existsOnly()), none);
+});
+
+test('changed-file set maps to deduped sibling tests, skipping deleted and untested files', () => {
+  const retreat = at('shared', 'engine', 'rules', 'retreat.mjs');
+  const retreatTest = at('shared', 'engine', 'rules', '__tests__', 'retreat.test.mjs');
+  const view = at('client', 'src', 'setup', 'netcode', 'apply-view.js');
+  const exists = existsOnly(retreat, retreatTest, view);
+  const changed = [
+    'shared/engine/rules/retreat.mjs',
+    'shared/engine/rules/__tests__/retreat.test.mjs',
+    'client/src/setup/netcode/apply-view.js',
+    'shared/engine/gone.mjs',
+    '',
+  ];
+  assert.deepEqual(planChangedTests(changed, root, exists), [retreatTest]);
+});
+
+test('no changed files plans no tests', () => {
+  assert.deepEqual(planChangedTests([], root, existsOnly()), []);
+  assert.deepEqual(planChangedTests(undefined, root, existsOnly()), []);
 });

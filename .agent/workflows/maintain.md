@@ -12,7 +12,7 @@ directive 5; just do it.)
 | DECISIONS.md | 90 lines / 20 KB; each line ≤220 chars | delete superseded lines (cite the superseder); shorten long lines — detail lives in the cited design; full old wording stays in .agent/archive/ |
 | ISSUES.md | Open 40 / Closed 30 lines; each ≤300 chars | merge duplicates, close the stale (check git log), demote or drop P3s; move oldest Closed lines to .agent/archive/ISSUES-closed.md |
 | NEXTSTEPS.md | ~60 lines, in-flight ledgers only | move finished ledgers to .agent/archive/NEXTSTEPS-history.md |
-| journal/<month>.md | entries ≤4 lines, ≤200 chars each | read by `tail`/grep only; months older than 2 → roll up into journal/ARCHIVE.md, ≤1 line per session, keep still-live `flag:` lines |
+| journal/<month>.md | frozen since S313 (journal = commit messages) | grep only; never edit. Flags: `git log --grep='flag:' --since=2.months main` |
 | areas/*.md | 60 lines each | split or prune; DELETE area docs describing deleted code |
 | designs/ (root) | active docs only | shipped/superseded → designs/archive/ |
 

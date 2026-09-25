@@ -44,8 +44,8 @@ Per slice, in order:
    no TODO, no stub, no "for now".
 2. Write tests for the slice's behavior, covering its edge-case rows; tick each row in the
    design: `[x] covered: <test name>`.
-3. Run narrow tests, then the project test command. Green → update STATE `Active:` line;
-   commit if permitted (`S<n> <slug> slice <k>: <summary>`); post a 1-line progress note
+3. Run narrow tests, then the project test command. Green → commit on the feature branch
+   (`feature <slug> slice <k>: <summary>`); post a 1-line progress note
    (slice k/N: what now works) so an attending user can redirect early.
 4. Design wrong or insufficient? Cosmetic → note under `## Deviations`, continue. Structural →
    STOP, return to phase 2, update the design (re-gate if the user gated it).
@@ -68,13 +68,13 @@ Remove trivially-dead leftovers in this diff; anything needing its own removal w
 ISSUES.md line each. Never leave the old path in place silently.
 Then: DECISIONS.md line per lasting choice · MAP.md if structure changed · area doc for a new
 gnarly module (only if a future session would otherwise re-derive it) · design `Status: shipped`
-(move to designs/archive/ when confident) · journal entry · STATE.md rewritten.
+(move to designs/archive/ when confident) · commit message (the journal) · STATE.md rewritten in the commit that lands on `main`.
 
 ## Done — copy into your final message and tick honestly
 - [ ] All design sections resolved; every edge-case row has evidence
 - [ ] Full tests/lint/build green; e2e exercised if runnable (output shown)
 - [ ] Diff free of TODOs, stubs, debug leftovers
 - [ ] Review pass done; residual findings filed in ISSUES.md
-- [ ] MAP/DECISIONS/area docs current; journal appended; STATE rewritten
+- [ ] MAP/DECISIONS/area docs current; commit message written; STATE rewritten
 - [ ] User synced: intent confirmed at scope, design user-approved (or self-approval flagged),
       "Decided for you" list in the close

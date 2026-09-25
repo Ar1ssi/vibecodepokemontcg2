@@ -765,8 +765,10 @@ test('model: an XY Stadium is anchored over its printed box and stretched; defau
 
 test('model: retreat greys only when the cost is unpaid; the card is never dimmed', () => {
   const card = { ...ARCANINE, retreatCost: ['Colorless', 'Colorless', 'Colorless'] };
-  const short = buildInspectorModel(card, { energyTypes: ['Fire'], rulesEnabled: false });
-  assert.equal(short.retreatUsable, true);
+  // Rules mode off exposes no actions (E18), so there is no retreat to offer or grey out.
+  const rulesOff = buildInspectorModel(card, { energyTypes: ['Fire'], rulesEnabled: false });
+  assert.equal(rulesOff.retreatUsable, false);
+  assert.equal(rulesOff.retreatRecede, false);
   const gated = buildInspectorModel(card, { energyTypes: ['Fire'] });
   assert.equal(typeof gated.retreatRecede, 'boolean');
   assert.equal(gated.retreatRecede, !gated.retreatUsable);

@@ -40,7 +40,8 @@ test('the ceremony mounts a material-stamped coin and removes itself', async () 
     result: 'tails',
     winnerLabel: 'You go',
     revealMs: 5,
-    holdMs: 60,
+    // Wide hold so the 40 ms probe below lands mid-reveal even when the full suite starves timers.
+    holdMs: 500,
     fadeMs: 5,
     doc: document,
   });

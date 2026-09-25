@@ -12,7 +12,6 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
-- I182 2026-09-25 P3 [tests] Live TCGdex test "live: PBL Popplio #18 resolves to Pitch Black (me05-018)" fails: `card.id` is undefined, expected 'me05-018'. Reproduces alone; tree had no shared/ changes, so likely upstream data (refs: shared/engine/rules/__tests__/card-identity-live.test.mjs, S304)
 - I181 2026-09-25 P3 [rules] Copy-attack deferrals from design 039: Misty's Psyduck ESP (multi-branch coin), Shiftry ex (opponent-hand pick), Alakazam Star (hand discard then copy), Togetic δ (no δ marker in card data), Smeargle Sketch (needs in-play history) (refs: design 039 Deviations, I168)
 - I180 2026-09-25 P2 [board-ui] Non-zoom card zones (discard/lostZone/viewCards/attachedCards) still use the legacy #fullImage overlay — top document, no z-index, sticks over the board, click-to-close unreachable (same class as the S299 #board fix); repro: move a card to discard, double-click.
 - I179 2026-09-22 P2 [rules-ui] Known suite failure card-inspector-model.test.mjs "retreat greys only when the cost is unpaid" fails on a clean tree; keeps every run N-1/N. Needs a debug pass. (refs: S251, S252) (PR #181 branch id I83)
@@ -53,6 +52,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I182 2026-09-25 P3 [tests] Live TCGdex test "live: PBL Popplio #18 resolves to Pitch Black (me05-018)" fails: `card.id` is undefined, expected 'me05-018'. Reproduces alone; tree had no shared/ changes, so likely upstream data (refs: shared/engine/rules/__tests__/card-identity-live.test.mjs, S304) → closed 2026-09-25 maintain: passes again live (3/3); live tests now opt-in via `pnpm test:live`, never in `pnpm test`.
 - I168 2026-09-24 P3 [rules] Copy-attack wordings still unparsed after design 036 slice 15 (conditional, previous-Evolution, last-turn, deck top, old "copies that attack" prints) (PR #183 id I141) → closed 2026-09-25 S302: design 039 fixed 17 (sources/filters/conditions/lastAttack); 5 deferrals → I181
 - I136 2026-09-24 P2 [rules] Attack behaviour audit: 972 no-effect + 541 partial of 10,966 unique attacks; design 036 slices 1–15 built, 16 open — lists in .agent/scratch/attack-full-audit/ (refs: S280, S282, S284, S287) → closed 2026-09-25 S300: design 036 slice 16 — `pnpm audit:attacks` classes the committed corpus per unique attack and ratchets each row (3,528 rows: 3,247 ok / 152 partial / 129 no-effect); residuals tracked as I166–I168
 - I175 2026-09-25 P3 [rules] Holon Energy GL's Pokémon-ex reduction is applied before Weakness/Resistance (refs: S295 review, attack-engine.mjs Step 4b) → closed 2026-09-25 S297: reduction tagged `afterWR` and applied after W/R (f8c39715)
