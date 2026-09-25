@@ -155,6 +155,7 @@ import {
   getSpecialEnergyRetreatReduction,
   hasSpecialEnergyCannotRetreat,
   specialEnergyAttachDiscardCost,
+  parseSpecialEnergyEffects,
 } from './rules/special-energy-parse.mjs';
 import {
   runSpecialEnergyTriggers,
@@ -2229,7 +2230,10 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
     count: actualCount,
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
   });
-  if (prizes.length > 0) offerPrizeToBench(draft, { playerId, taken });
+  if (prizes.length > 0) {
+    offerPrizeToBench(draft, { playerId, taken });
+    offerPrizeAttach(draft, { playerId, taken });
+  }
 }
 
 /** Runs the Ability triggers of an Energy attached from the hand (`parseOnEnergyAttachAbilities`). */
@@ -2440,6 +2444,7 @@ function resolvePrizeChoice(draft, { playerId, selection, events }) {
     return;
   }
   offerPrizeToBench(draft, { playerId, taken });
+  offerPrizeAttach(draft, { playerId, taken });
 }
 
 const PRIZE_BENCH_EFFECT = 'prizeBench';
@@ -2468,6 +2473,49 @@ function offerPrizeToBench(draft, { playerId, taken }) {
     min: 1,
     max: 1,
     resumeToken: { effectType: PRIZE_BENCH_EFFECT, initiatorPlayerId: playerId, cardId: card.instanceId },
+  });
+}
+
+const PRIZE_ATTACH_EFFECT = 'prizeAttach';
+
+// Treasure Energy (I172): "If you took this card as a face-down Prize card during your turn,
+// before you put it into your hand, you may attach this card to 1 of your Pokémon."
+function offerPrizeAttach(draft, { playerId, taken }) {
+  if (draft.pendingChoice || draft.turn?.player !== playerId || isGameConcluded(draft)) return;
+  const player = draft.players[playerId];
+  const card = taken.find(
+    (c) =>
+      player.zones.hand.includes(c) &&
+      parseSpecialEnergyEffects(c)?.steps.some((step) => step.type === 'attachFromPrize')
+  );
+  const hosts = [...rootsIn(player.zones.active), ...rootsIn(player.zones.bench)];
+  if (!card || hosts.length === 0) return;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: card.name || 'Energy',
+    prompt: `${card.name}: attach it to 1 of your Pokémon? (choose none to keep it in your hand)`,
+    options: hosts,
+    min: 0,
+    max: 1,
+    resumeToken: { effectType: PRIZE_ATTACH_EFFECT, initiatorPlayerId: playerId, cardId: card.instanceId },
+  });
+}
+
+function resumePrizeAttach(draft, { token, selection, events }) {
+  draft.pendingChoice = null;
+  const player = draft.players[token.initiatorPlayerId];
+  const card = player?.zones?.hand?.find((c) => c.instanceId === token.cardId);
+  const target = findCard(draft, Number((selection || [])[0]));
+  if (!card || !target || target.playerId !== token.initiatorPlayerId) return;
+  if (!['active', 'bench'].includes(target.zoneId) || target.card.attachedTo) return;
+  player.zones.hand.splice(player.zones.hand.indexOf(card), 1);
+  card.attachedTo = target.card.instanceId;
+  player.zones[target.zoneId].push(card);
+  events.push({
+    type: 'cardAttached',
+    instanceId: card.instanceId,
+    targetInstanceId: target.card.instanceId,
+    playerId: token.initiatorPlayerId,
   });
 }
 
@@ -7350,6 +7398,8 @@ export function applyCommand(state, command, rng = null) {
           resumeToken: token,
         });
         settleAbilityOutcomes(draft, { events });
+      } else if (token.effectType === PRIZE_ATTACH_EFFECT) {
+        resumePrizeAttach(draft, { token, selection: payload.selection, events });
       } else if (token.effectType === PRIZE_BENCH_EFFECT) {
         resumePrizeToBench(draft, { token, selection: payload.selection, activeRng, events });
       } else if (token.effectType === PRIZE_CHOICE_EFFECT) {

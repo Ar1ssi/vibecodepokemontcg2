@@ -1009,3 +1009,37 @@ test('ability: Oricorio ex needs a {R} Mega Evolution Pokémon ex in play, then 
   const res3 = res2.pendingChoice ? resolveWith(res2, [72], rng) : res2;
   assert.equal(res3.state.players.p1.zones.bench.find((c) => c.instanceId === 80)?.attachedTo, 72);
 });
+
+// ── Treasure Energy (I172) ──────────────────────────────────────────────
+
+const TREASURE_ENERGY =
+  'As long as this card is attached to a Pokémon, it provides {C} Energy. If you took this card as a face-down Prize card during your turn, before you put it into your hand, you may attach this card to 1 of your Pokémon.';
+const treasure = (instanceId) =>
+  createCard({ instanceId, name: 'Treasure Energy', supertype: 'Energy', type: 'Energy', subtypes: ['Special'], text: TREASURE_ENERGY });
+
+test('Treasure Energy taken as a Prize may attach to 1 of your Pokémon', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.deck.push(card(120));
+  state.players.p1.zones.prizes.push(treasure(90), card(91));
+  state.players.p1.flags.prizesOwed = 1;
+  const res2 = resolveWith(use70(state, rng), [90], rng);
+  assert.match(res2.pendingChoice?.prompt || '', /Treasure Energy/);
+  assert.deepEqual(ids(res2.pendingChoice.options), [70]);
+  const res3 = resolveWith(res2, [70], rng);
+  assert.equal(res3.error, null);
+  const attached = res3.state.players.p1.zones.active.find((c) => c.instanceId === 90);
+  assert.equal(attached?.attachedTo, 70);
+  assert.ok(!res3.state.players.p1.zones.hand.some((c) => c.instanceId === 90));
+});
+
+test('declining Treasure Energy keeps it in hand', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.deck.push(card(120));
+  state.players.p1.zones.prizes.push(treasure(90), card(91));
+  state.players.p1.flags.prizesOwed = 1;
+  const res3 = resolveWith(resolveWith(use70(state, rng), [90], rng), [], rng);
+  assert.equal(res3.error, null);
+  assert.ok(res3.state.players.p1.zones.hand.some((c) => c.instanceId === 90));
+});

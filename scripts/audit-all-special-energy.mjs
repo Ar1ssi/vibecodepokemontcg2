@@ -64,7 +64,7 @@ const PASSIVE_STEP_TYPES = new Set([
 // `ignoredOn` is enforced: the conditional form by the `condition` on its sibling steps,
 // the Pokémon-ex form by effectiveSpecialEnergies / planSpecialEnergyTriggers (I173).
 function isUnenforcedStep(step) {
-  return step.type === 'attachFromPrize' || step.type === 'activatedSearch';
+  return step.type === 'activatedSearch';
 }
 
 // Steps that a non-provision clause produced but do not require a choice.

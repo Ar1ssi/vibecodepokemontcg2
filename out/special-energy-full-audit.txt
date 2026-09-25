@@ -1,12 +1,11 @@
 # Special-energy parse coverage
 Corpus: 214 printings → 129 unique (name+text)
 
-guided 40 / passive 87 / unenforced 2 / unrecognized 0
+guided 41 / passive 87 / unenforced 1 / unrecognized 0
 
 ## Unrecognized
 
 ## Unenforced (parsed, no engine consumer)
-- Treasure Energy: attachFromPrize
 - Call Energy: activatedSearch
 
 ## Guided (effect steps)
@@ -20,6 +19,7 @@ guided 40 / passive 87 / unenforced 2 / unrecognized 0
 - Medical Energy: provide, onAttachHeal
 - Regenerative Energy: provide, onEvolveHeal
 - Gift Energy: provide, onKnockoutDraw
+- Treasure Energy: provide, attachFromPrize
 - Lucky Energy: provide, onDamagedDraw
 - Capture Energy: provide, onAttachSearch
 - Speed {: provide, onAttachDraw
