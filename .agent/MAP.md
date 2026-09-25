@@ -132,6 +132,8 @@ client/src/actions/counters/ — damage, special condition, ability counters (DO
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
 
 ## Tests & tooling
+.claude/skills/fx-preview/ — agent skill: host with ?e2e=1 + capture-entry.mjs / capture-board.mjs (Playwright frame
+  captures of mat FX over a fabricated applyView board)
 client/src/**/__tests__/*.mjs — plain `node --test`, no jsdom; `pnpm test` (1223 tests, S85)
 two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
 flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's

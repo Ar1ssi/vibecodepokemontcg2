@@ -5,8 +5,8 @@
      file from the last journal entry + `git log -5`, note the crash in the journal. -->
 
 
-Session: 281
-Focus: S281 feature: Tera entry + crystal skin take the card's type colour (D122, design 037 amendment).
+Session: 282
+Focus: S282 patch: fx-preview agent skill (.claude/skills/fx-preview) for e2e hosting + FX frame captures.
 Active: none.
 Next: maintenance due (S270 and S280, still not run). User visual check of typed Tera entry/skin, Mega vortex
   in a real rules-mode game.
@@ -25,13 +25,13 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Mat FX: see D103, D117-D122. Canvas FX go through entry.js `playCanvasStage` (WAAPI clock). Board cards live in the
   playmat iframes (css/mat-ambient.css); `.card` is preserve-3d, so layer order inside a holo wrapper needs translateZ,
   not z-index. Holo wrappers need TCGdex (unreachable in the sandbox): emulate with buildHoloCard + `holo-wrapper-changed`.
-  To eyeball an effect: Playwright on /?e2e=1, pause `document.getAnimations()`, step `currentTime`, wait 2 rAFs, screenshot.
+  To eyeball an effect: `.claude/skills/fx-preview/SKILL.md` (capture-entry.mjs / capture-board.mjs).
 - Pre-existing `pnpm test` failure: card-inspector-model "retreat greys…".
   ESLint runs after `pnpm install` (`npx eslint <files>`); the repo carries many prettier warnings, so lint touched files only.
 
 ## Recently shipped (≤3 one-liners; anything older lives in the journal)
+- S282 fx-preview skill: e2e hosting + scripted Playwright frame captures of mat FX.
 - S281 Tera crystal (entry prisms/floor/burst + lasting skin tint/facets/rim/glints) is the card's type colour;
   Colorless/unknown stays icy; orb, flash, jewel, rainbow universal.
 - S280 Mega vortex = 3D brush strokes behind/in front of the card; Tera entry = S/V canvas Terastallization; Tera Pokémon
   keep a crystal skin while in play.
-- S279 Mega orb is a 3D canvas shell (mega-orb.mjs): white-hot sphere → faceted cracked shell → perspective shatter.
