@@ -21,10 +21,15 @@ import {
 import { clearAttackMarkers } from '../rules/attack-markers.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
+  evolvedView,
   topPokemonCard as topOfStack,
   rareCandyOptions,
   ownedCards,
 } from '../rules/evolved-pokemon.mjs';
+import {
+  hasSpecialEnergyAbilityShield,
+  hasSpecialEnergyEffectShield,
+} from '../rules/special-energy-parse.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
@@ -103,6 +108,27 @@ export function attachedCards(player, rootId) {
 
 export function topPokemonCard(player, root) {
   return topOfStack([...(player?.zones?.active || []), ...(player?.zones?.bench || [])], root);
+}
+
+/** The zone array holding an in-play root (active or bench), or null. */
+export function zoneOfRoot(player, root) {
+  if ((player?.zones?.active || []).includes(root)) return player.zones.active;
+  if ((player?.zones?.bench || []).includes(root)) return player.zones.bench;
+  return null;
+}
+
+/**
+ * True when an attached special Energy shields this in-play Pokémon from `kind`
+ * effects: 'effect' (Mist/Rocky/Wash/Wonder, attack effects) or 'ability'
+ * (Fusion Strike, opponent Abilities). Reads the top of an evolution stack.
+ */
+export function specialEnergyShielded(player, root, kind = 'effect') {
+  const zone = zoneOfRoot(player, root);
+  if (!zone || !root) return false;
+  const view = evolvedView(zone, root);
+  return kind === 'ability'
+    ? hasSpecialEnergyAbilityShield(view, zone)
+    : hasSpecialEnergyEffectShield(view, zone);
 }
 
 function zoneIdOf(player, card) {
@@ -999,7 +1025,21 @@ function damageCounters(ctx) {
   if (!side) return skip(ctx, 'no_opponent');
   const victimPlayerId = side.playerId;
   const attackerPlayerId = onOpponent ? ctx.player?.playerId : ctx.opponent?.playerId;
-  const targets = /active/i.test(step.target || '') ? [activeOf(side)].filter(Boolean) : rootsOf(side);
+  // Ability counters (moveDamageAbility) are an opponent's Ability effect: Fusion Strike
+  // Energy prevents them on its host. Trainers keep the effect shield's own path.
+  const shieldKind = step.abilityShield && onOpponent ? 'ability' : null;
+  const shieldBlocks = (root) => {
+    if (!shieldKind || !specialEnergyShielded(side, root, shieldKind)) return false;
+    ctx.events.push({
+      type: 'damagePrevented',
+      instanceId: root.instanceId,
+      reason: 'special-energy-ability',
+    });
+    return true;
+  };
+  const targets = (/active/i.test(step.target || '') ? [activeOf(side)].filter(Boolean) : rootsOf(side)).filter(
+    (root) => !shieldBlocks(root)
+  );
 
   const apply = (card) => {
     card.damage = (card.damage || 0) + amount;
@@ -1077,10 +1117,21 @@ function moveOwnDamageToOpponent(ctx) {
   const { step, player, opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   const sources = rootsOf(player).filter((c) => (c.damage || 0) > 0);
+  // Fusion Strike Energy: the counters an opponent's Ability would place on its host
+  // are prevented, so the host is not a legal destination.
+  const destinations = rootsOf(opponent).filter((root) => {
+    if (!specialEnergyShielded(opponent, root, 'ability')) return true;
+    ctx.events.push({
+      type: 'damagePrevented',
+      instanceId: root.instanceId,
+      reason: 'special-energy-ability',
+    });
+    return false;
+  });
 
   if (ctx.selection && ctx.memo?.toId != null) {
     const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
-    const to = rootsOf(opponent).find((c) => c.instanceId === ctx.memo.toId);
+    const to = destinations.find((c) => c.instanceId === ctx.memo.toId);
     const counters = counterCountFromOption(ctx.selection[0]);
     if (!from || !to || counters == null) return skip(ctx, 'target_not_found');
     return moveDamageCounters(ctx, from, to, Math.min(counters, maxMovableCounters(step, from)));
@@ -1088,7 +1139,7 @@ function moveOwnDamageToOpponent(ctx) {
 
   if (ctx.selection && ctx.memo?.fromId != null) {
     const from = sources.find((c) => c.instanceId === ctx.memo.fromId);
-    const to = rootsOf(opponent).find((c) => c.instanceId === ctx.selection[0]);
+    const to = destinations.find((c) => c.instanceId === ctx.selection[0]);
     if (!from || !to) return skip(ctx, 'target_not_found');
     const maxCounters = maxMovableCounters(step, from);
     // "up to N": the player picks how many; a fixed count, or only 1 available, moves at once.
@@ -1110,7 +1161,7 @@ function moveOwnDamageToOpponent(ctx) {
     if (!from) return skip(ctx, 'target_not_found');
     return ctx.ask({
       prompt: `${sourceName(ctx, 'Ability')}: Choose your opponent's Pokémon to move the damage counters to`,
-      options: rootsOf(opponent),
+      options: destinations,
       min: 1,
       max: 1,
       memo: { fromId: from.instanceId },
@@ -1124,7 +1175,7 @@ function moveOwnDamageToOpponent(ctx) {
     );
     if (!hasEnergy) return skip(ctx, 'energy_condition_unmet');
   }
-  if (sources.length === 0 || rootsOf(opponent).length === 0) return skip(ctx, 'no_damage_to_move');
+  if (sources.length === 0 || destinations.length === 0) return skip(ctx, 'no_damage_to_move');
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Ability')}: Choose 1 of your Pokémon to move damage counters from`,
     options: sources,
@@ -3472,6 +3523,7 @@ export const EXTRA_STEP_HANDLERS = {
       step: {
         ...ctx.step,
         target: ctx.step.onOpponent ? "opponent's Pokémon" : 'your Pokémon',
+        abilityShield: true,
       },
     }),
   // Design 034 slice 5 ability executables.

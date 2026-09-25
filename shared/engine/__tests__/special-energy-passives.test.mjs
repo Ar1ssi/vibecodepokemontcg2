@@ -147,6 +147,156 @@ test('SE5: Mist Energy prevents a Special Condition from the opponent’s attack
   assert.equal(hasCondition(defender, 'Paralyzed'), false);
 });
 
+test('I171: Mist Energy prevents an attack switch-out of its host', () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Grimmsnarl',
+      attacks: [
+        {
+          name: "Goad 'n' Grab",
+          damage: 0,
+          cost: [],
+          text: "Switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)",
+        },
+      ],
+    })
+  );
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({ instanceId: 10, name: 'Mist Energy', text: MIST, attachedTo: 9 })
+  );
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 11, name: 'Zorua' }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 9).zoneId, 'active');
+  assert.equal(findCard(res.state, 11).zoneId, 'bench');
+});
+
+test('I171: Mist Energy stops counters on its host but not on the Bench', () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Gengar',
+      attacks: [{ name: 'Spreading Spite', damage: 0, cost: [], text: "Put 2 damage counters on each of your opponent's Pokémon." }],
+    })
+  );
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({ instanceId: 10, name: 'Mist Energy', text: MIST, attachedTo: 9 })
+  );
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 11, name: 'Zorua' }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 9).card.damage || 0, 0, 'shielded host');
+  assert.equal(findCard(res.state, 11).card.damage || 0, 20, 'unshielded bench');
+});
+
+test('I171: Mist Energy prevents an automatic Knock Out from an attack effect', () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Inteleon',
+      attacks: [{ name: 'Bring Down', damage: 0, cost: [], text: "Your opponent's Active Pokémon is Knocked Out." }],
+    })
+  );
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({ instanceId: 10, name: 'Mist Energy', text: MIST, attachedTo: 9 })
+  );
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 9).zoneId, 'active', 'effect KO prevented');
+});
+
+test("I171: Mist Energy keeps counters from being moved onto its host", () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Drifloon',
+      attacks: [
+        {
+          name: 'Transfer Pain',
+          damage: 0,
+          cost: [],
+          text: "Move all damage counters from 1 of your Benched Pokémon to your opponent's Active Pokémon.",
+        },
+      ],
+    })
+  );
+  state.players.p1.zones.bench.push(pokemon({ instanceId: 3, name: 'Bench source', damage: 30 }));
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({ instanceId: 10, name: 'Mist Energy', text: MIST, attachedTo: 9 })
+  );
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 9).card.damage || 0, 0, 'counters stay off the shielded host');
+  assert.equal(findCard(res.state, 3).card.damage || 0, 30, 'source keeps its counters');
+});
+
+test("I171: Mist Energy cannot be moved off its host by an attack", () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Elgyem',
+      attacks: [
+        {
+          name: 'Slight Shift',
+          damage: 0,
+          cost: [],
+          text: "Move an Energy from your opponent's Active Pokémon to 1 of their Benched Pokémon.",
+        },
+      ],
+    })
+  );
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({ instanceId: 10, name: 'Mist Energy', text: MIST, attachedTo: 9 })
+  );
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 11, name: 'Zorua' }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 10).card.attachedTo, 9, 'shielded host keeps its Energy');
+});
+
+test("I171: Mist Energy is not put in the Lost Zone by an attack", () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Dialga G LV.X',
+      attacks: [
+        {
+          name: 'Remove Lost',
+          damage: 0,
+          cost: [],
+          text: "Remove an Energy card attached to your opponent's Active Pokémon and put it in the Lost Zone.",
+        },
+      ],
+    })
+  );
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({ instanceId: 10, name: 'Mist Energy', text: MIST, attachedTo: 9 })
+  );
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 10).zoneId, 'active', 'shielded host keeps its Energy');
+  assert.equal(findCard(res.state, 10).card.attachedTo, 9);
+});
+
 test('SE5: Shadowy Darkness blocks attack damage to its Benched {D} host', () => {
   const state = game();
   state.players.p1.zones.active.push(

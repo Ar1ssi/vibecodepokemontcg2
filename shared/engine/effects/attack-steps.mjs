@@ -57,6 +57,7 @@ import {
   rootsOf,
   skip,
   sourceName,
+  specialEnergyShielded,
   stageOf,
   topPokemonCard,
 } from './trainer-steps.mjs';
@@ -1172,6 +1173,17 @@ function returnSelfToDeckAbility(ctx) {
 // ── damage counters / Knock Out ─────────────────────────────────────────────
 
 function placeCounters(ctx, card, victimPlayerId, amount) {
+  // Mist/Rocky/Wash/Wonder Energy: counters an opponent's attack places are an effect
+  // of that attack, not damage, so the effect shield stops them per target.
+  if (victimPlayerId === ctx.opponent?.playerId && specialEnergyShielded(ctx.opponent, card)) {
+    ctx.events.push({
+      type: 'damagePrevented',
+      instanceId: card.instanceId,
+      attackName: attackName(ctx),
+      reason: 'special-energy-effect',
+    });
+    return false;
+  }
   card.damage = (card.damage || 0) + amount;
   ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage });
   ctx.events.push({
@@ -1182,6 +1194,7 @@ function placeCounters(ctx, card, victimPlayerId, amount) {
     attackerPlayerId: victimPlayerId === ctx.playerId ? ctx.opponent?.playerId : ctx.playerId,
     damage: card.damage,
   });
+  return true;
 }
 
 function atkCountersEach(ctx) {
@@ -1230,7 +1243,7 @@ function atkKnockOutAll(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   const doomed = rootsOf(opponent).filter((root) => {
     const left = remainingHp(ctx, opponent, root);
-    return left > 0 && left <= step.maxRemainingHp;
+    return left > 0 && left <= step.maxRemainingHp && !specialEnergyShielded(opponent, root);
   });
   if (doomed.length === 0) return skip(ctx, 'condition_unmet');
   for (const root of doomed) markKnockOut(ctx, opponent, root);
@@ -1255,12 +1268,13 @@ function atkHpCap(ctx) {
     const active = activeOf(opponent);
     return active ? place(active) : skip(ctx, 'no_opponent_active');
   }
-  const candidates = rootsOf(opponent).filter((root) => countersToCap(root) > 0);
+  const all = rootsOf(opponent).filter((root) => countersToCap(root) > 0);
+  const candidates = all.filter((root) => !specialEnergyShielded(opponent, root));
   if (ctx.selection) {
     const root = candidates.find((c) => c.instanceId === ctx.selection[0]);
     return root ? place(root) : skip(ctx, 'target_not_found');
   }
-  if (candidates.length === 0) return skip(ctx, 'already_at_cap');
+  if (candidates.length === 0) return skip(ctx, all.length > 0 ? 'effect_shield' : 'already_at_cap');
   if (candidates.length === 1) return place(candidates[0]);
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose 1 of your opponent's Pokémon to put damage counters on`,
@@ -1442,15 +1456,19 @@ function markKnockOut(ctx, owner, card) {
 function atkKnockOut(ctx) {
   const { opponent, step } = ctx;
   const target = activeOf(opponent);
+  // Mist/Rocky/Wash/Wonder Energy: an automatic Knock Out from an attack effect is
+  // prevented on the shielded Pokémon (Bring Down ruling), damage-only KOs are not.
+  const shielded = Boolean(target) && specialEnergyShielded(opponent, target);
   if (step.scope === 'both') {
     // Annihilape Destined Fight / Forretress Double KO: both Active Pokémon go at once.
     const self = activeOf(ctx.player);
     if (!target || !self) return skip(ctx, 'no_active');
-    markKnockOut(ctx, opponent, target);
+    if (!shielded) markKnockOut(ctx, opponent, target);
     markKnockOut(ctx, ctx.player, self);
     return null;
   }
   if (!target) return skip(ctx, 'no_opponent_active');
+  if (shielded) return skip(ctx, 'effect_shield');
   if (!knockOutConditionMet(ctx, opponent, target, step)) return skip(ctx, 'condition_unmet');
   markKnockOut(ctx, opponent, target);
   return null;
@@ -1468,6 +1486,7 @@ function atkKnockOutChoose(ctx) {
     const roots = step.scope === 'bench' && !step.leastHp ? benchRootsOf(owner) : rootsOf(owner);
     for (const root of roots) {
       if (step.leastHp && self && root.instanceId === self.instanceId) continue;
+      if (owner === opponent && specialEnergyShielded(owner, root)) continue;
       if (step.ruleBox && !RULE_BOX_MATCHES[step.ruleBox]?.(topPokemonCard(owner, root))) continue;
       if (step.basicOnly && !RULE_BOX_MATCHES.basic(topPokemonCard(owner, root))) continue;
       if (step.exactCounters != null && (root.damage || 0) !== step.exactCounters * 10) continue;
@@ -1974,7 +1993,9 @@ function atkMoveCounterToOpponent(ctx) {
   const pool =
     step.from === 'self' ? [attacker].filter(Boolean) : step.from === 'bench' ? benchRootsOf(player) : rootsOf(player);
   const sources = pool.filter((c) => (c.damage || 0) > 0);
-  const targets = step.to === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent);
+  const targets = (step.to === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent)).filter(
+    (c) => !specialEnergyShielded(opponent, c)
+  );
   const chooseSource = step.from === 'one' || step.from === 'bench';
 
   let fromIds = ctx.memo?.fromIds;

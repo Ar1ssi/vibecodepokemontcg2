@@ -6,6 +6,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { hasCondition } from '../rules/special-conditions.mjs';
 
 function setupGame() {
   const rng = createRng(42);
@@ -1078,4 +1079,54 @@ test('Call Energy on a Benched Pokémon cannot be used', () => {
   state.players.p1.zones.bench.push(mon(72, 'Bench'), callEnergy(80, 72));
   state.players.p1.zones.deck.push(mon(90, 'Pichu', { subtypes: ['Basic'], stage: 'Basic' }));
   assert.ok(useCard(state, 80, rng).error);
+});
+
+// ── Fusion Strike Energy ability shield (I171) ──────────────────────────
+
+const FUSION_STRIKE =
+  'This card can only be attached to a Fusion Strike Pokémon. If this card is attached to anything other than a Fusion Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. Prevent all effects of your opponent’s Pokémon’s Abilities done to the Pokémon this card is attached to.';
+const fusionStrike = (instanceId, attachedTo) =>
+  createCard({
+    instanceId,
+    name: 'Fusion Strike Energy',
+    supertype: 'Energy',
+    type: 'Energy',
+    subtypes: ['Special Energy'],
+    text: FUSION_STRIKE,
+    attachedTo,
+  });
+const oppActive = (res, id = 71) => res.state.players.p2.zones.active.find((c) => c.instanceId === id);
+
+test('I171: Fusion Strike Energy stops an Ability’s counters on its host, not the Bench', () => {
+  const { state, rng } = setupGame();
+  holder(state, "Once during your turn (before your attack), you may put 1 damage counter on 1 of your opponent's Pokémon.");
+  state.players.p2.zones.active.push(fusionStrike(180, 71));
+  state.players.p2.zones.bench.push(mon(72, 'Benched'));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(oppActive(res).damage || 0, 0, 'shielded host takes no counters');
+  assert.equal(res.state.players.p2.zones.bench[0].damage || 0, 10, 'unshielded bench takes them');
+});
+
+test('I171: Fusion Strike Energy stops an Ability’s Special Condition on its host', () => {
+  const { state, rng } = setupGame();
+  holder(state, "Once during your turn, your opponent's Active Pokémon is now Confused.");
+  state.players.p2.zones.active.push(fusionStrike(180, 71));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(hasCondition(oppActive(res), 'Confused'), false);
+});
+
+test('I171: Fusion Strike Energy stops an Ability switching its host out', () => {
+  const { state, rng } = setupGame();
+  holder(state, "Once during your turn, you may switch in 1 of your opponent's Benched Pokémon to the Active Spot.");
+  state.players.p2.zones.active.push(fusionStrike(180, 71));
+  state.players.p2.zones.bench.push(mon(72, 'Benched'));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(oppActive(res)?.instanceId, 71, 'host stays Active');
+  assert.equal(res.state.players.p2.zones.bench[0].instanceId, 72);
 });

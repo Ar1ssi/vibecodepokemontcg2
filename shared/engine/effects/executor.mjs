@@ -14,8 +14,7 @@ import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace, flipCoin } from '../rng.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
-import { evolvedView, topPokemonCard } from '../rules/evolved-pokemon.mjs';
-import { hasSpecialEnergyEffectShield } from '../rules/special-energy-parse.mjs';
+import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -24,7 +23,7 @@ import {
   isEvolutionCard,
   stadiumBlocksHealing,
 } from '../rules/stadium-effects.mjs';
-import { EXTRA_STEP_HANDLERS, rootMatchesTarget } from './trainer-steps.mjs';
+import { EXTRA_STEP_HANDLERS, rootMatchesTarget, specialEnergyShielded } from './trainer-steps.mjs';
 import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
@@ -50,23 +49,43 @@ const OPPONENT_ACTIVE_STEPS = new Set([
   'atkShuffleOppActiveEnergy',
   'atkBounceOppActive',
   'atkChooseCondition',
+  'atkGust',
+  'atkMoveAllCounters',
 ]);
 const OPPONENT_ACTIVE_SCOPED_STEPS = new Set(['atkDiscardOppEnergy', 'atkDiscardOppTools', 'atkDevolve']);
 const OPPONENT_ACTIVE_TARGETED_STEPS = new Set(['atkAddMarker', 'atkHpCap']);
+const OPPONENT_ACTIVE_MOVE_FROM_STEPS = new Set(['atkMoveEnergy', 'atkLostZoneEnergy']);
 
 function targetsOpponentActiveOnly(step) {
   if (OPPONENT_ACTIVE_STEPS.has(step.type)) return true;
   if (OPPONENT_ACTIVE_SCOPED_STEPS.has(step.type)) return step.scope === 'active';
   if (OPPONENT_ACTIVE_TARGETED_STEPS.has(step.type)) return step.target === 'opponentActive';
+  if (OPPONENT_ACTIVE_MOVE_FROM_STEPS.has(step.type)) return step.from === 'opponentActive';
+  return false;
+}
+
+// Ability step kinds whose only target is the opponent's Active Pokémon: what Fusion
+// Strike Energy's "prevent all effects of your opponent's Pokémon's Abilities" stops.
+function targetsOpponentActiveAbilityOnly(step) {
+  if (step.type === 'statusAbility') return step.target === 'opponent' || step.target === 'opponentActive';
+  if (step.type === 'applyStatus') return step.target === 'opponentActive';
+  if (step.type === 'switchAbility' || step.type === 'switchOwn' || step.type === 'switch') {
+    return step.target === 'opponent';
+  }
   return false;
 }
 
 // Rocky Fighting / Mist / Wash Water / Wonder Energy (audit SE5): "Prevent all effects of
 // attacks used by your opponent's Pokémon done to the Pokémon this card is attached to."
 function opponentActiveEffectShielded(opponent) {
-  const zone = opponent?.zones?.active || [];
-  const active = zone.find((c) => !c.attachedTo);
-  return Boolean(active) && hasSpecialEnergyEffectShield(evolvedView(zone, active), zone);
+  const active = (opponent?.zones?.active || []).find((c) => !c.attachedTo);
+  return Boolean(active) && specialEnergyShielded(opponent, active, 'effect');
+}
+
+// Fusion Strike Energy: same shape, for the opponent's Abilities.
+function opponentActiveAbilityShielded(opponent) {
+  const active = (opponent?.zones?.active || []).find((c) => !c.attachedTo);
+  return Boolean(active) && specialEnergyShielded(opponent, active, 'ability');
 }
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
@@ -305,6 +324,16 @@ export function executeSteps(draft, {
       opponentActiveEffectShielded(opponent)
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type });
+      continue;
+    }
+    // Fusion Strike Energy: an opponent's Ability may not affect its host (status,
+    // switch-in, and the counter steps' own handlers).
+    if (
+      effectType === 'ability' &&
+      targetsOpponentActiveAbilityOnly(step) &&
+      opponentActiveAbilityShielded(opponent)
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'ability_shield', step: step.type });
       continue;
     }
     // "Discard a card from your hand. If you do, …" (design 036 A11): the hand cost was paid.
