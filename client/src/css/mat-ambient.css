@@ -190,3 +190,50 @@
     display: none;
   }
 }
+
+/* ── Design 024 slice 5: the kill switch reaches the mats ─────────────────
+   Design 022 noted that idle motion here could not see the parent page's
+   `body.fx-off`, so "effects off" left the board breathing and tilting.
+   fx-settings.js now mirrors the marker classes onto each iframe's <html>,
+   which is what these rules read. */
+
+:root.fx-off :where(#active:has(> img, > .mat-holo)),
+:root.fx-reduced :where(#active:has(> img, > .mat-holo)) {
+  animation: none;
+  box-shadow: none;
+}
+
+:root.fx-off :where(#active, #bench, #board) > :where(img, .mat-holo),
+:root.fx-reduced :where(#active, #bench, #board) > :where(img, .mat-holo) {
+  transition: none;
+}
+
+:root.fx-off :where(#active, #bench, #board) > :where(img, .mat-holo):hover,
+:root.fx-reduced :where(#active, #bench, #board) > :where(img, .mat-holo):hover {
+  scale: 1;
+  filter: none;
+}
+
+:root.fx-off .mat-holo .card__rotator,
+:root.fx-reduced .mat-holo .card__rotator {
+  transform: none;
+  transition: none;
+}
+
+:root.fx-off .mat-holo .card__rotator > .fx-tera-crystal__layer,
+:root.fx-off .mat-holo .card__rotator > .fx-tera-crystal__sheen,
+:root.fx-off .fx-tera-crystal__aura,
+:root.fx-off .fx-tera-crystal__aura::before,
+:root.fx-reduced .mat-holo .card__rotator > .fx-tera-crystal__layer,
+:root.fx-reduced .mat-holo .card__rotator > .fx-tera-crystal__sheen,
+:root.fx-reduced .fx-tera-crystal__aura,
+:root.fx-reduced .fx-tera-crystal__aura::before,
+:root.fx-off .fx-tera-crystal__glint,
+:root.fx-reduced .fx-tera-crystal__glint {
+  animation: none;
+}
+
+:root.fx-off .fx-tera-crystal__glint,
+:root.fx-reduced .fx-tera-crystal__glint {
+  display: none;
+}

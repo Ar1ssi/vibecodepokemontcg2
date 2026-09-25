@@ -10,6 +10,9 @@
 
 ## Active
 - D149[tooling] 2026-09-25 `pnpm audit:attacks` ratchets each unique corpus attack's verdict (ok/partial/ran-no-effect/engine-error) vs scripts/attack-behaviour-baseline.json; a regression fails by name (design 036 slice 16). (S300)
+- D148[render] 2026-09-22 FX kill switch reaches inside the playmat iframes: image-logic/fx-settings owns fx-off/sfx-off/volume and mirrors fx-off/fx-reduced onto each iframe <html> (design 024 O4). (S252) (PR #181 branch id D97)
+- D147[render] 2026-09-22 Game audio is synthesized (mat-fx/fx-audio.mjs voice table, one lazy AudioContext), not sampled; dispatched from dispatcher.mjs with visuals; not gated by reduced motion. (S252) (PR #181 branch id D96)
+- D146[render] 2026-09-22 FX pacing is data: fx-holds.mjs table + fx-queue.mjs drains plans in engine order, budget-capped; an effect returning a number overrides its hold (design 024). (S252) (PR #181 branch id D95)
 - D145[drag] 2026-09-24 Dragged card = body-level avatar that rolls into horizontal motion (design 038); native DnD still drops, ghost blanked via setDragImage, pointer from dragover in all frames; no resize (user). (S287) (PR #186 branch id D124)
 - D144[rules] 2026-09-25 Special-Energy KO effects need a KO by attack damage (not Poison/Burn/Ability or attack-placed counters); each step's `source` sets whether it must be the opponent's attack (Gift/Legacy/Splash) or any (Rescue). (S295)
 - D143[rules] 2026-09-25 Passive special-Energy effects with a lasting state (end-of-turn discard, attach refusal, discard-when-condition-lost) run in one `settleSpecialEnergyPassives` sweep in applyCommand's tail, not at each mutation site. (S295)

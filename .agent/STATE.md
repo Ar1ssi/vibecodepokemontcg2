@@ -3,19 +3,18 @@
      History belongs to journal/. Contradicts git log / journal? Trust git: rebuild from
      `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
-Session: 300
-Focus: design 036 slice 16 shipped on `claude/rules-engine-issues-e79707` (19 commits, not pushed):
-  attack regression gate `pnpm audit:attacks` (`scripts/audit-attack-behaviour.mjs`,
-  `scripts/lib/attack-behaviour.mjs`, `scripts/lib/attack-harness.mjs`) + per-row
-  `scripts/attack-behaviour-baseline.json` (3,528 unique attacks: 3,247 ok / 152 partial /
-  129 ran-no-effect / 0 engine-error); 12 tests; I136 closed.
-Active: none — branch green, ready to push / merge.
-  Handoff: `.agent/designs/300-handoff.md` (branch state, decisions, next sessions).
-Next: push `claude/rules-engine-issues-e79707` (or PR) — it is main + 19 commits, all gates green.
-  Maintenance due (S300). Remaining backlog, each its own session: I168 copy attacks, I167 attack
-  markers, I166 attack effects, I162 ability-audit backlog. Then I153 (needs a contract first),
-  I137, I121, I126 (partial), I127, I44, I60. User visual check of typed Tera entry/skin + Mega
-  vortex in a real rules-mode game. Pending approval: designs 028 (I85), 029 (I86).
+Session: 301
+Focus: landed `claude/rules-engine-issues-e79707` on main (merge commit below) — main's S297–S300
+  (design 024 FX/settings, S298/S299 board fixes, Gaia Volcano + Birch/Drasna/Gambler) unioned with
+  the branch's S297 I155+ batch and S300 design 036 slice 16 (`pnpm audit:attacks` + baseline).
+  Harness conflicts (journal/DECISIONS/ISSUES/STATE) resolved by union; ids needed no renumber
+  (D146–148 + D149; I177–180 + the branch's closures), next D150 / I181.
+Active: merge resolved and green; pushing to main next.
+Next: maintenance due (ISSUES Open 51/40 over cap; Closed pruned to 26/30 by the branch's archive).
+  Remaining backlog, each its own session: I168 copy attacks, I167 attack markers, I166 attack
+  effects, I162 ability-audit backlog. Then I153 (needs a contract first), I137, I121, I126
+  (partial), I127, I44, I60. User visual check of typed Tera entry/skin + Mega vortex in a real
+  rules-mode game. Pending approval: designs 028 (I85), 029 (I86).
 Blocked: I85/I86 need design approval; I87 needs the user's description.
 
 ## Watch-outs (≤5)
@@ -32,8 +31,7 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - `opponentHandSetAside` (Tickling Machine heads) parses but has no executor — tracked in I137.
 
 ## Recently shipped (≤3 one-liners; older → journal)
-- S300: design 036 slice 16 — `pnpm audit:attacks` gate + per-row baseline; I136 closed;
-  suite 4041/4042 (known inspector fail); `audit:attacks` PASSED (no engine diff, other gates untouched).
-- S297b: I171 shields, I155 coin turn-ends + hand abilities, I154 26 trainer executors, I163
-  between-turns Checkup, I161 retreat wordings — suite 4010/4011, all 3 gates PASSED.
-- S297a: I164 I151 I165 I78 I173 I175 I172 I169 — suite 3964/3965, 3 gates PASSED.
+- S301: merge `claude/rules-engine-issues-e79707` into main — harness union, no id renumber;
+  suite 4158/4159 (known inspector fail), all four behaviour gates PASSED.
+- S300 branch: design 036 slice 16 — `pnpm audit:attacks` gate + per-row baseline; I136 closed.
+- S300 main: Gaia Volcano Stadium-bonus/discard step + Birch/Drasna/Gambler coin shuffle-draw.

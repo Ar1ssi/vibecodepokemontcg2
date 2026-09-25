@@ -10,6 +10,7 @@ export const SCREEN_SHAKE_MS = 360;
 export const HIT_SPARKS_MS = 520;
 export const SCREEN_SHAKE_MIN_DAMAGE = 30;
 export const SCREEN_SHAKE_MAX_PX = 6;
+export const TARGET_RING_MS = 620;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -197,5 +198,31 @@ export function createImpactQueue({ setTimer }) {
       context = ctx;
       schedule();
     },
+  };
+}
+
+/**
+ * Design 024 slice 2: attack-name banner text. The attacker's name is the
+ * subtitle so the player can read WHO is attacking, not just with what.
+ * @returns {{title:string, sub:string}|null} null when there is no attack name.
+ */
+export function attackBannerText(attackName, attackerName) {
+  const title = typeof attackName === 'string' ? attackName.trim() : '';
+  if (!title) return null;
+  const sub = typeof attackerName === 'string' ? attackerName.trim() : '';
+  return { title, sub };
+}
+
+/**
+ * Design 024 slice 2: targeting ring drawn on the defender while the banner
+ * reads, so the player sees WHO is about to be hit before damage lands.
+ * Two quick pulses that shrink onto the card, then fade.
+ */
+export function targetRingPose(t) {
+  const c = clamp01(t);
+  const pulse = 1 + 0.18 * Math.abs(Math.sin(c * Math.PI * 2));
+  return {
+    scale: (1.5 - 0.5 * easeOutCubic(c)) * pulse,
+    opacity: c < 0.12 ? c / 0.12 : Math.max(0, 1 - (c - 0.12) / 0.88),
   };
 }

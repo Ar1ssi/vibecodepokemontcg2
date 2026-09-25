@@ -12,6 +12,12 @@ import {
   isLostZoneEnabled,
   setLostZoneEnabled,
 } from '../../mutation-observers/lost-zone-panel.js';
+import {
+  applyFxSettings,
+  setFxOff,
+  setFxVolume,
+  setSfxOff,
+} from '../../../setup/image-logic/fx-settings.js';
 
 export const initializeSettings = () => {
   const darkModeCheckbox = document.getElementById('darkModeCheckbox');
@@ -42,6 +48,35 @@ export const initializeSettings = () => {
     showLostZoneCheckbox.checked = isLostZoneEnabled();
     showLostZoneCheckbox.addEventListener('change', () => {
       setLostZoneEnabled(showLostZoneCheckbox.checked);
+    });
+  }
+
+  // Design 024 slice 5: the FX layer had no UI at all — it was togglable only
+  // by hand-editing localStorage. Each control writes through fx-settings.js,
+  // which also mirrors the kill switch into the playmat iframes.
+  const fx = applyFxSettings();
+
+  const fxOffCheckbox = document.getElementById('fxOffCheckbox');
+  if (fxOffCheckbox) {
+    fxOffCheckbox.checked = fx.fxOff;
+    fxOffCheckbox.addEventListener('change', () => {
+      setFxOff(fxOffCheckbox.checked);
+    });
+  }
+
+  const sfxOffCheckbox = document.getElementById('sfxOffCheckbox');
+  if (sfxOffCheckbox) {
+    sfxOffCheckbox.checked = fx.sfxOff;
+    sfxOffCheckbox.addEventListener('change', () => {
+      setSfxOff(sfxOffCheckbox.checked);
+    });
+  }
+
+  const fxVolumeSlider = document.getElementById('fxVolumeSlider');
+  if (fxVolumeSlider) {
+    fxVolumeSlider.value = String(Math.round(fx.volume * 100));
+    fxVolumeSlider.addEventListener('input', () => {
+      setFxVolume(Number(fxVolumeSlider.value) / 100);
     });
   }
 

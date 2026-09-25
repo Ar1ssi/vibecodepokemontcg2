@@ -6,12 +6,16 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I177). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I181). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I180 2026-09-25 P2 [board-ui] Non-zoom card zones (discard/lostZone/viewCards/attachedCards) still use the legacy #fullImage overlay — top document, no z-index, sticks over the board, click-to-close unreachable (same class as the S299 #board fix); repro: move a card to discard, double-click.
+- I179 2026-09-22 P2 [rules-ui] Known suite failure card-inspector-model.test.mjs "retreat greys only when the cost is unpaid" fails on a clean tree; keeps every run N-1/N. Needs a debug pass. (refs: S251, S252) (PR #181 branch id I83)
+- I178 2026-09-22 P3 [board-ui] No remaining-HP readout (TCG Live shows HP depleting); design 024 O5 scoped it out as new persistent UI, not an effect. (refs: design 024) (PR #181 branch id I82)
+- I177 2026-09-22 P3 [board-ui] Legacy (non-authoritative) mode gets no mat effects or sound: every effect rides the advisory stream, which flows only under SERVER_AUTHORITATIVE. (refs: design 022/024) (PR #181 branch id I81)
 - I168 2026-09-24 P3 [rules] Copy-attack wordings still unparsed after design 036 slice 15: conditional copies (Thievul, Nihilego, Team Rocket's Mimikyu Tera-only), previous-Evolution (Incineroar, Charizard), last-turn (Mimikyu Copycat, Sudowoodo), Slowking deck top, and the old "copies that attack" prints (Metronome, Smeargle, Mew, Togetic, Shiftry ex, Alakazam Star) — attacks do nothing (PR #183 id I141) (refs: design 036 Deviations S287 slice 15, scratch attack-full-audit/copyscan.mjs)
 - I167 2026-09-24 P3 [rules] Attack-marker residuals of design 036 slices 9–10: client inspector does not price attackCostIncrease/retreatDelta; player-wide hand locks (Noivern, Whimsicott VSTAR, Giratina-EX, …), Pelipper two-attack base damage, Light Ledian Active-only immunity, Lunala "can't be healed" unread; stacking markers (edge row 14) untested (PR #183 id I140) (refs: design 036 Deviations S287 slices 9, 10, 15)
 - I166 2026-09-24 P3 [rules] Attack-effect residuals of design 036 slices 8, 11–14: conditional self-heal applies regardless of its condition; ~160 conditional-status sentences with unread conditions apply nothing; Oil Salvo choices, Spiritomb/Maushold spreads, Darkrai & Cresselia Lost Zone, Tentacruel moved-Energy counters, Kingdra/Swampert bench part not gated on "if you do" (PR #183 id I139) (refs: design 036 Deviations S287 slices 8, 11–14)

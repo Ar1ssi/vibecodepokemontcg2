@@ -2,11 +2,15 @@
 // retreat/switch slide, trainer/stadium card presentation. All are detached
 // overlays; every one no-ops when its card or rect cannot be resolved.
 import { getEnergyTokenFront, isEnergyCard } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
+import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
+import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
+import { docForSide } from './side-doc.mjs';
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
   rectForInstance,
   removeWhen,
+  runPose,
   sampleKeyframes,
   spawnOverlay,
   spawnParticles,
@@ -17,9 +21,13 @@ import { brighten, fxRgbForCard, rgbCss } from './fx-colors.mjs';
 import { burstParticles } from './particles.mjs';
 import {
   CARD_PRESENT_MS,
+  DISCARD_PUFF_MS,
   ENERGY_SNAP_MS,
   EVOLVE_BURST_MS,
+  PROMOTE_MS,
   RETREAT_SLIDE_MS,
+  devolveBurstPose,
+  discardPuffPose,
   energySnapPose,
   evolveBurstPose,
   evolvePillarPose,
@@ -27,10 +35,13 @@ import {
   moveIdsForEvent,
   presentDimPose,
   presentPoseFor,
+  presentSrcFor,
   presentTargetRect,
+  promotePose,
   slidePoseFor,
 } from './lifecycle-pose.mjs';
 import { sweepPose } from './flow-pose.mjs';
+import { holdFor } from './fx-holds.mjs';
 import { takeOrigin } from './origins.mjs';
 
 const buildImage = (src, className) => {
@@ -50,7 +61,7 @@ export const evolve = (plan) => {
   const registry = getCardRegistry();
   const id = rectForInstance(plan.instanceId, registry) ? plan.instanceId : plan.targetInstanceId;
   const rect = rectForInstance(id, registry);
-  if (!rect) return;
+  if (!rect) return 0;
   // Design 027: a Mega or Tera evolution plays its signature entry instead.
   const evolved = registry.get(plan.instanceId)?.card;
   if (playSignatureEntry(signatureEntryKind(evolved), rect, plan.instanceId, evolved)) return;
@@ -112,12 +123,51 @@ export const evolve = (plan) => {
   removeWhen(host, done, EVOLVE_BURST_MS * 1.5 + BACKSTOP_PAD_MS);
 };
 
+// Devolving is the quieter mirror of the evolve burst: the ring collapses
+// inward and the card shrinks rather than swells.
+export const devolve = (plan) => {
+  const registry = getCardRegistry();
+  const rect = rectForInstance(plan.instanceId, registry) || rectForInstance(plan.targetInstanceId, registry);
+  if (!rect) return 0;
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-evolve-burst fx-devolve-burst' });
+  const ring = document.createElement('div');
+  ring.className = 'fx-evolve-burst__ring';
+  host.appendChild(ring);
+  runPose(host, EVOLVE_BURST_MS, (t) => {
+    const pose = devolveBurstPose(t);
+    host.style.transform = `scale(${pose.scale})`;
+    host.style.opacity = String(pose.opacity);
+    ring.style.transform = `scale(${pose.ringScale})`;
+    ring.style.opacity = String(pose.ringOpacity);
+  });
+};
+
 export const attach = (plan) => {
   const registry = getCardRegistry();
   const attached = registry.get(plan.instanceId)?.card;
-  if (!isEnergyCard(attached)) return;
+  // No card record at all is "we don't know what this is", not "it's a Tool":
+  // isEnergyCard(undefined) is false, so without this an Energy whose record
+  // has not landed yet would draw the quiet Tool ring instead of its token.
+  if (!attached) return 0;
   const targetRect = rectForInstance(plan.targetInstanceId, registry);
-  if (!targetRect) return;
+  if (!targetRect) return 0;
+  // `cardAttached` covers Energy AND Tools. A Tool attaching is real but
+  // minor, so it gets a soft ring rather than the Energy token's snap — design
+  // 022 left it silent entirely (its edge row 9).
+  if (!isEnergyCard(attached)) {
+    const ringHost = spawnOverlay({ rect: targetRect, className: 'fx-overlay fx-tool-attach' });
+    const toolRing = document.createElement('div');
+    toolRing.className = 'fx-tool-attach__ring';
+    ringHost.appendChild(toolRing);
+    runPose(ringHost, ENERGY_SNAP_MS, (t) => {
+      const pose = energySnapPose(t);
+      toolRing.style.transform = `scale(${0.8 + 0.3 * (1 - pose.scale / 2.4)})`;
+      ringHost.style.opacity = String(pose.opacity);
+    });
+    // Both branches arrive as the `attach` effect, so the Tool's shorter hold
+    // has to be named explicitly rather than read from the plan.
+    return holdFor('tool-attach');
+  }
   const size = Math.max(24, targetRect.width * 0.34);
   const rect = {
     left: targetRect.left + (targetRect.width - size) / 2,
@@ -188,7 +238,7 @@ export const retreat = (plan) => {
 
 const presentCard = (src, fromRect) => {
   const viewport = { width: globalThis.innerWidth || 0, height: globalThis.innerHeight || 0 };
-  if (!src || viewport.width < 2 || viewport.height < 2) return;
+  if (!src || viewport.width < 2 || viewport.height < 2) return 0;
   const target = presentTargetRect(viewport.width, viewport.height);
   const pose = presentPoseFor(fromRect, target);
   const dim = spawnOverlay({
@@ -229,8 +279,6 @@ const presentCard = (src, fromRect) => {
   removeWhen(dim, [animateFrames(dim, dimFrames, { duration: CARD_PRESENT_MS })], CARD_PRESENT_MS + BACKSTOP_PAD_MS);
 };
 
-export const presentSrcFor = (origin, element) => element?.currentSrc || element?.src || origin?.src;
-
 export const trainerPlay = (plan) => {
   const origin = takeOrigin(plan.instanceId);
   const element = getCardRegistry().get(plan.instanceId)?.element;
@@ -240,4 +288,43 @@ export const trainerPlay = (plan) => {
 export const stadiumPlay = (plan) => {
   const element = getCardRegistry().get(plan.instanceId)?.element;
   presentCard(element?.currentSrc || element?.src, null);
+};
+
+export const promote = (plan) => {
+  const registry = getCardRegistry();
+  const rect = rectForInstance(plan.instanceId, registry);
+  if (!rect) return 0;
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-promote' });
+  const glow = document.createElement('div');
+  glow.className = 'fx-promote__glow';
+  host.appendChild(glow);
+  runPose(host, PROMOTE_MS, (t) => {
+    const pose = promotePose(t);
+    host.style.transform = `translate3d(0, ${pose.y}px, 0) scale(${pose.scale})`;
+    glow.style.transform = `scale(${pose.glowScale})`;
+    glow.style.opacity = String(pose.glowOpacity);
+  });
+};
+
+// The discard pile lives inside the side's playmat iframe, same lookup shape
+// as knockout-flight's; `#discardCover` is the pile's visible face.
+const discardRectFor = (user) => {
+  const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
+  const cover = doc?.getElementById('discardCover');
+  const el = cover?.querySelector('img') || cover;
+  if (!el) return null;
+  const rect = visualRectOf(el);
+  if (rect.width < 2 || rect.height < 2) return null;
+  return rect;
+};
+
+export const discard = (plan) => {
+  const rect = discardRectFor(plan.user);
+  if (!rect) return 0;
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-discard-puff' });
+  runPose(host, DISCARD_PUFF_MS, (t) => {
+    const pose = discardPuffPose(t);
+    host.style.transform = `translate3d(0, ${pose.y}px, 0) scale(${pose.scale})`;
+    host.style.opacity = String(pose.opacity);
+  });
 };

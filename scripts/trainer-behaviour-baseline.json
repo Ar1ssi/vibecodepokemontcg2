@@ -1814,7 +1814,7 @@
   },
   "Drasna#1omcz2y": {
    "steps": [
-    "shuffleHandThenDraw"
+    "coinFlip"
    ]
   },
   "Drayton#1l25sft": {
@@ -2810,7 +2810,7 @@
   },
   "Gambler#125wxdq": {
    "steps": [
-    "shuffleHandThenDraw"
+    "coinFlip"
    ]
   },
   "Garchomp Spirit Link#10tobkr": {
@@ -5496,7 +5496,7 @@
   },
   "Professor Birch’s Observations#177hlni": {
    "steps": [
-    "shuffleHandThenDraw"
+    "coinFlip"
    ]
   },
   "Professor Birch#1dyf188": {

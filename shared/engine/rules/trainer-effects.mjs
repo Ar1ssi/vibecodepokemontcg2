@@ -909,6 +909,18 @@ function parseTrainerSteps(lower) {
 
   // shuffle hand then draw (Lillie's Determination)
   if (lower.includes('shuffle your hand into your deck')) {
+    // "Shuffle your hand into your deck [and/. Then,] flip a coin. If heads, draw X cards. If
+    // tails, draw Y cards." (Professor Birch's Observations, Drasna, Gambler): the hand is
+    // shuffled once and the coin picks the count. parseCoinFlipStep owns the heads/tails read.
+    const flipDraw = parseCoinFlipStep(lower);
+    if (flipDraw?.heads?.type === 'draw' && flipDraw?.tails?.type === 'draw') {
+      steps.push({
+        type: 'coinFlip',
+        heads: [{ type: 'shuffleHandThenDraw', count: flipDraw.heads.count }],
+        tails: [{ type: 'shuffleHandThenDraw', count: flipDraw.tails.count }],
+      });
+      return { steps, recognizable: true };
+    }
     const m = lower.match(/draw\s+(\d+)\s+cards?/);
     const b = lower.match(/draw\s+(\d+)\s+cards?\s+instead/);
     steps.push({
@@ -2363,6 +2375,7 @@ export function describeStep(step) {
         if (list.length === 0) return 'nothing';
         return list.map((s) => {
           if (s.type === 'draw') return `draw ${s.count}`;
+          if (s.type === 'shuffleHandThenDraw') return `shuffle, then draw ${s.count}`;
           if (s.type === 'searchDeck') return `search for ${s.what}`;
           if (s.type === 'discardEnergyFromOpponent') return 'discard Energy from opponent';
           if (s.type === 'damageCounters') return `put ${s.count} damage on ${s.target}`;
