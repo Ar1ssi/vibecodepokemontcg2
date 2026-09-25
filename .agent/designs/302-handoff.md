@@ -1,5 +1,9 @@
 # S302 handoff — design 039 / I168 copy-attack residuals (`feature/i168-copy-attacks`)
 
+**Landed (S303, 2026-09-25):** fast-forwarded into `main` as `8f387bdf` (2 commits, no conflicts).
+The branch record below is kept for detail — treat "not pushed" and next-item 1 as historical.
+Verified on the tip before landing: suite 4178/4179 (known inspector fail), all four gates PASSED.
+
 Branch is main (`1d2fb8ae`) + 1 commit `6076be12`, **not pushed and not merged** (user chose one
 commit at the end; no push requested). Revert = drop the branch / revert `6076be12`.
 
