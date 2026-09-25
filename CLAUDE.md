@@ -9,6 +9,10 @@ any session pick up work with minimal context. First session? `.agent/STATE.md` 
    narrowed scope. Can't finish honestly? Say exactly what's missing.
 3. Smallest sufficient context: `.agent/MAP.md` → area doc → grep → read only implicated files.
    Never read directories wholesale. Lost after ~3 reads? Re-scope from MAP/area doc.
+   Tracing a symbol's definition or references: use LSP (`goToDefinition`, `findReferences`, `hover`), not Grep.
+   LSP gives exact results; Grep gives text matches. Grep/Glob for discovery (files, patterns); LSP for
+   understanding (definitions, references, types). After locating a file, navigate it with LSP rather than
+   reading the whole file. Grep is the fallback when LSP is unavailable.
 4. Never call an API/function you haven't seen defined this session. Verify behavior in source.
 5. Code is truth. A wrong harness doc is a bug — fix it in passing (≤5 lines) or `flag:` it in the journal.
 6. Chat carries outcomes; files carry detail: analysis → `.agent/scratch/`, designs → `.agent/designs/`,
@@ -24,12 +28,13 @@ Never load these whole: `DECISIONS.md`, `ISSUES.md`, `journal/*`, `.agent/archiv
 START: read `.agent/STATE.md` → classify the request (routing below) → open that one workflow and follow it.
 DURING: after each completed slice/checkpoint, update STATE's `Active:` line (crash insurance).
 END — whenever you changed anything:
-- **Light END** (patch, issue-only, harness typo): append one journal line; edit only the STATE lines
-  that changed (Session +1, Active, Recently shipped).
-- **Full END** (feature, exec-plan, debug, refactor, maintain): rewrite STATE.md in full (template in it);
-  journal entry; MAP.md if structure changed; one DECISIONS.md line per lasting choice.
-- Journal entry: `S<n> <YYYY-MM-DD> <workflow>: outcome + key files` — ≤4 lines, ≤200 chars each,
-  optional `  flag: <debt/risk>`. Detail goes in the design or scratch file, not the journal.
+- **Light END** (default — patch, debug, refactor, small feature, issue-only, harness typo): append one
+  journal line; edit only the STATE lines that changed (Session +1, Active, Recently shipped).
+- **Full END** (only when priorities/plan changed — exec-plan, feature.md work, maintain): rewrite
+  STATE.md in full (template in it); journal entry.
+- Either END: MAP.md only if files moved/were added; DECISIONS.md only for a genuinely lasting choice.
+- Git log is the "what". Journal entry carries the "why" + flags: `S<n> <YYYY-MM-DD> <workflow>: outcome`
+  — ≤4 lines, ≤200 chars each, optional `  flag: <debt/risk>`. Detail goes in the design or scratch file.
 - Tick your workflow's Done checklist in your final message.
 - New Session number a multiple of 10 → add "maintenance due" to STATE `Next:`.
 
@@ -38,8 +43,8 @@ END — whenever you changed anything:
 |---|---|
 | Whole project from one brief; no product code yet | `.agent/workflows/oneshot.md` |
 | Work through a sectioned plan/brief already in the repo | `.agent/workflows/exec-plan.md` |
-| New capability; or touches >2 files, or any interface/schema/dependency | `.agent/workflows/feature.md` |
-| Small fix or tweak, cause known | `.agent/workflows/patch.md` |
+| New interface/schema/dependency, netcode or engine-rule change, or work spanning >1 session | `.agent/workflows/feature.md` |
+| Fix, tweak, or small feature (any file count) with none of the above | `.agent/workflows/patch.md` |
 | Defect, cause unknown | `.agent/workflows/debug.md` |
 | Restructure with zero behavior change | `.agent/workflows/refactor.md` |
 | Review a diff / PR | `.agent/workflows/review.md` |
@@ -63,14 +68,15 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
 - Architecture audit (high effort): only on explicit request, roughly once per phase.
 
 ## High-complexity specs ship in increments on ONE branch
-~4+ independent acceptance criteria, or state + UI + cross-system coupling → don't build in one session.
-Pin a schema/naming contract in the spec first; then one criterion-cluster per commit on
-`feature/<spec>`, each green before the next, `/clear` between. Ledger (done / next) in NEXTSTEPS.md;
+~4+ independent acceptance criteria, or state + UI + cross-system coupling → pin a schema/naming
+contract in the spec first; then one criterion-cluster per commit on `feature/<spec>`, each green
+before the next. One session is fine while context holds; `/clear` only when it degrades. Ledger (done / next) in NEXTSTEPS.md;
 move it to `.agent/archive/NEXTSTEPS-history.md` when the spec ships.
 
 ## User sync and output
-- Attended: before designing non-trivial work, post the restated goal + out-of-scope list and fold in
-  corrections. Design/plan gates default to user approval; self-approval only when unattended.
+- Small work (patch route): post a ≤3-line plan in chat and proceed without waiting; user can interrupt.
+- Approval gate (wait for user) only for schema, netcode, or engine-rule changes, or feature.md work.
+  Before those, post restated goal + out-of-scope list and fold in corrections. Self-approve only when unattended.
 - Scope/cost/approach-changing discovery → surface immediately with a recommendation. Taste calls
   (naming, UX, product behavior) go to the user when asking is cheap. Ask only what only the user can answer.
 - Lead with the outcome. Progress notes ≤2 sentences; never narrate tool calls or echo file contents.
@@ -81,7 +87,8 @@ move it to `.agent/archive/NEXTSTEPS-history.md` when the spec ships.
 ## Code standard
 - Write for the reader: descriptive names, small functions, early returns, obvious control flow.
 - Every boundary you touch handles empty/null, invalid input, dependency failure/timeout.
-- Every behavior change ships with a test that fails without it.
+- Engine, rules, netcode, and state-logic changes ship with a test that fails without them.
+  Visual-only changes (CSS, mat FX, animation, layout) are exempt — the user checks those on localhost.
 - Verification is never a question. The PostToolUse hook (`scripts/hooks/post-edit-check.mjs`) lints
   each edited JS file and runs its own `__tests__/<name>.test.mjs`; fix what it reports. Iterate with
   `node --test <file>`; run the full `pnpm test` ONCE before commit, not after every edit.

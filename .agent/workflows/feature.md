@@ -1,6 +1,6 @@
 # Workflow: Feature
-For: new capability, or any change touching >2 files or any interface/schema/dependency.
-Exit test — if ALL true, downgrade to patch.md: single known site, no interface change, obvious verification.
+For: new interface/schema/dependency, netcode or engine-rule change, or work spanning >1 session.
+Exit test — if none of those apply, downgrade to patch.md (file count alone never forces feature.md).
 
 Phases have different rules; do not blend them. The design doc is the handover from Architect to
 Builder — write it so a session with zero other context could build from it (one might).
