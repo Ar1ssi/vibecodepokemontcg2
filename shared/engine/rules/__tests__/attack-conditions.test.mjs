@@ -233,6 +233,20 @@ test('one case per kind: the attack proceeds only in the printed state', () => {
   }
 });
 
+test('design 039: empty-hand and exact-Prize clauses gate', () => {
+  const emptyHand = parseAttackCondition('If you have no cards in your hand, this attack does nothing.');
+  assert.deepEqual(emptyHand, { kind: 'handCount', op: 'eq', n: 0, negated: true });
+  assert.equal(attackConditionMet(emptyHand, { ownHandCount: 0 }), false);
+  assert.equal(attackConditionMet(emptyHand, { ownHandCount: 1 }), true);
+
+  const twoPrizes = parseAttackCondition(
+    'You can use this attack only if your opponent has exactly 2 Prize cards remaining.'
+  );
+  assert.deepEqual(twoPrizes, { kind: 'opponentPrizes', op: 'eq', n: 2, negated: false });
+  assert.equal(attackConditionMet(twoPrizes, { opponentPrizes: 2 }), true);
+  assert.equal(attackConditionMet(twoPrizes, { opponentPrizes: 3 }), false);
+});
+
 test('coin-gated "does nothing" clauses are design 032, not a state gate', () => {
   assert.equal(parseAttackCondition('Flip a coin. If tails, this attack does nothing.'), null);
   assert.equal(parseAttackCondition('Flip a coin. If heads, this attack does nothing.'), null);
