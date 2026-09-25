@@ -1043,3 +1043,39 @@ test('declining Treasure Energy keeps it in hand', () => {
   assert.equal(res3.error, null);
   assert.ok(res3.state.players.p1.zones.hand.some((c) => c.instanceId === 90));
 });
+
+// ── Call Energy (I169) ──────────────────────────────────────────────────
+
+const CALL_ENERGY =
+  'Call Energy provides {C} Energy. Once during your turn, if the Pokémon Call Energy is attached to is your Active Pokémon, you may search your deck for up to 2 Basic Pokémon and put them onto your Bench. If you do, shuffle your deck and your turn ends.';
+const callEnergy = (instanceId, attachedTo) =>
+  createCard({ instanceId, name: 'Call Energy', supertype: 'Energy', type: 'Energy', subtypes: ['Special'], text: CALL_ENERGY, attachedTo });
+const useCard = (state, instanceId, rng) =>
+  applyCommand(state, { type: 'useAbility', payload: { instanceId }, playerId: 'p1' }, rng);
+
+test('Call Energy benches up to 2 Basic Pokémon from the deck, then ends the turn', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.active.push(callEnergy(80, 70));
+  state.players.p1.zones.deck.push(
+    mon(90, 'Pichu', { subtypes: ['Basic'], stage: 'Basic' }),
+    mon(91, 'Riolu', { subtypes: ['Basic'], stage: 'Basic' }),
+    card(92)
+  );
+  state.players.p2.zones.deck.push(card(300));
+  const res1 = useCard(state, 80, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(ids(res1.pendingChoice.options).sort(), [90, 91]);
+  const res2 = resolveWith(res1, [90, 91], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(ids(res2.state.players.p1.zones.bench).sort(), [90, 91]);
+  assert.equal(res2.state.turn.player, 'p2', 'turn ended');
+});
+
+test('Call Energy on a Benched Pokémon cannot be used', () => {
+  const { state, rng } = setupGame();
+  holder(state, 'Once during your turn, you may draw a card.');
+  state.players.p1.zones.bench.push(mon(72, 'Bench'), callEnergy(80, 72));
+  state.players.p1.zones.deck.push(mon(90, 'Pichu', { subtypes: ['Basic'], stage: 'Basic' }));
+  assert.ok(useCard(state, 80, rng).error);
+});

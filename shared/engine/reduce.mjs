@@ -2477,6 +2477,73 @@ function offerPrizeToBench(draft, { playerId, taken }) {
 }
 
 const PRIZE_ATTACH_EFFECT = 'prizeAttach';
+const CALL_ENERGY_EFFECT = 'callEnergy';
+
+// Call Energy (I169): "Once during your turn, if the Pokémon Call Energy is attached to is your
+// Active Pokémon, you may search your deck for up to 2 Basic Pokémon and put them onto your
+// Bench. If you do, shuffle your deck and your turn ends." Activated through useAbility on
+// the Energy card itself.
+function callEnergyStep(card) {
+  if (!card || !isSpecialEnergyCard(card)) return null;
+  return parseSpecialEnergyEffects(card)?.steps.find((step) => step.type === 'activatedSearch') || null;
+}
+
+function callEnergyBlockReason(state, cardRef, playerId) {
+  const step = callEnergyStep(cardRef.card);
+  const player = state.players?.[playerId];
+  if (state.turn?.player !== playerId) return "It isn't your turn.";
+  if (cardRef.playerId !== playerId || cardRef.card.attachedTo == null) return 'This Energy is not attached to your Pokémon.';
+  if (step.requiresActive && cardRef.zoneId !== 'active') return 'The Pokémon it is attached to must be your Active Pokémon.';
+  if (step.oncePerTurn && player?.flags?.abilitiesUsed?.[cardRef.card.instanceId]) return 'Already used this turn.';
+  if (rootsIn(player?.zones?.bench || []).length >= 5) return 'Your Bench is full.';
+  return null;
+}
+
+function startCallEnergy(draft, { cardRef, playerId, activeRng, events }) {
+  const step = callEnergyStep(cardRef.card);
+  const player = draft.players[playerId];
+  if (!player.flags) player.flags = {};
+  player.flags.abilitiesUsed = { ...(player.flags.abilitiesUsed || {}), [cardRef.card.instanceId]: true };
+  events.push({ type: 'abilityUsed', instanceId: cardRef.card.instanceId, name: cardRef.card.name, playerId });
+  const room = 5 - rootsIn(player.zones.bench).length;
+  const options = (player.zones.deck || []).filter((c) => isBasicPokemon(c));
+  const max = Math.min(step.count || 1, room, options.length);
+  if (max <= 0) {
+    finishCallEnergy(draft, { playerId, activeRng, events });
+    return;
+  }
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    source: cardRef.card.name,
+    prompt: `${cardRef.card.name}: put up to ${max} Basic Pokémon onto your Bench`,
+    options,
+    min: 0,
+    max,
+    resumeToken: { effectType: CALL_ENERGY_EFFECT, initiatorPlayerId: playerId, max },
+  });
+}
+
+function resumeCallEnergy(draft, { token, selection, activeRng, events }) {
+  draft.pendingChoice = null;
+  const playerId = token.initiatorPlayerId;
+  const player = draft.players[playerId];
+  const picked = (selection || []).slice(0, token.max);
+  for (const id of picked) {
+    const card = player.zones.deck.find((c) => c.instanceId === Number(id));
+    if (!card || !isBasicPokemon(card) || rootsIn(player.zones.bench).length >= 5) continue;
+    player.zones.deck.splice(player.zones.deck.indexOf(card), 1);
+    card.enteredPlayTurn = draft.turn?.number ?? null;
+    player.zones.bench.push(card);
+    events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'bench', playerId });
+  }
+  finishCallEnergy(draft, { playerId, activeRng, events });
+}
+
+function finishCallEnergy(draft, { playerId, activeRng, events }) {
+  if (activeRng) shuffleInPlace(activeRng, draft.players[playerId].zones.deck);
+  events.push({ type: 'deckShuffled', playerId });
+  endTurnFromEffect(draft, { playerId, activeRng, events });
+}
 
 // Treasure Energy (I172): "If you took this card as a face-down Prize card during your turn,
 // before you put it into your hand, you may attach this card to 1 of your Pokémon."
@@ -4043,6 +4110,10 @@ export function validateLegality(state, command) {
 
     case 'useAbility': {
       const cardRef = findCard(state, payload.instanceId);
+      if (cardRef && callEnergyStep(cardRef.card)) {
+        const reason = callEnergyBlockReason(state, cardRef, playerId);
+        return reason ? { allowed: false, reason } : { allowed: true };
+      }
       if (cardRef) {
         // One gate for the server and the picker (design 034 slice 3): the
         // once-per-turn flag, activation wording, Pokémon-source suppression,
@@ -7304,6 +7375,10 @@ export function applyCommand(state, command, rng = null) {
 
     case 'useAbility': {
       const cardRef = findCard(draft, payload.instanceId);
+      if (cardRef && callEnergyStep(cardRef.card)) {
+        startCallEnergy(draft, { cardRef, playerId, activeRng, events });
+        break;
+      }
       if (cardRef) {
         executeAbility(draft, {
           card: cardRef.card,
@@ -7398,6 +7473,8 @@ export function applyCommand(state, command, rng = null) {
           resumeToken: token,
         });
         settleAbilityOutcomes(draft, { events });
+      } else if (token.effectType === CALL_ENERGY_EFFECT) {
+        resumeCallEnergy(draft, { token, selection: payload.selection, activeRng, events });
       } else if (token.effectType === PRIZE_ATTACH_EFFECT) {
         resumePrizeAttach(draft, { token, selection: payload.selection, events });
       } else if (token.effectType === PRIZE_BENCH_EFFECT) {

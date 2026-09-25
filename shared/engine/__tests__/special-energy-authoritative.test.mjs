@@ -161,9 +161,22 @@ test('authoritative special energy: on-attach devolve discards the top evolution
   state.players.p1.zones.hand.push(energy);
   state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Budew' }));
 
-  const res = applyCommand(state, {
+  const asked = applyCommand(state, {
     type: 'attachCard',
     payload: { instanceId: 12, targetInstanceId: 11 },
+    playerId: 'p1',
+  });
+  assert.equal(asked.error, null);
+  // "you may" (I169): declining leaves the Pokémon evolved.
+  const declined = applyCommand(asked.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: asked.state.pendingChoice.choiceId, selection: [2] },
+    playerId: 'p1',
+  });
+  assert.ok(declined.state.players.p1.zones.active.some((c) => c.instanceId === 11), 'declined: still evolved');
+  const res = applyCommand(asked.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: asked.state.pendingChoice.choiceId, selection: [1] },
     playerId: 'p1',
   });
   assert.equal(res.error, null);

@@ -236,6 +236,7 @@ function applyPlan(draft, plan, ctx, selection = null) {
       break;
     }
     case 'devolve': {
+      if (plan.optional && Number((selection || [])[0]) !== 1) break;
       healCard(host, plan.count * 10, events);
       const top = topPokemonCard(zone, host);
       if (top && top.instanceId !== host.instanceId) {
@@ -318,7 +319,12 @@ function discardFromHand(draft, ctx, instanceIds) {
 }
 
 function planIsChoice(plan) {
-  return plan.action === 'search' || plan.action === 'switch' || plan.action === 'discardHand';
+  return (
+    plan.action === 'search' ||
+    plan.action === 'switch' ||
+    plan.action === 'discardHand' ||
+    (plan.action === 'devolve' && plan.optional)
+  );
 }
 
 /** Builds a PendingChoice for a choice plan, or applies it when deterministic. */
@@ -339,6 +345,34 @@ function handleChoicePlan(draft, item, ctx, queue, index) {
       options: hand,
       min: count,
       max: count,
+      resumeToken: {
+        effectType: SPECIAL_ENERGY_EFFECT,
+        trigger: ctx.trigger,
+        hostInstanceId: ctx.hostInstanceId,
+        hostPlayerId: ctx.hostPlayerId,
+        hostZoneId: ctx.hostZoneId,
+        attackerInstanceId: ctx.attackerInstanceId,
+        attackerPlayerId: ctx.attackerPlayerId,
+        fromZone: ctx.fromZone,
+        queue,
+        index,
+      },
+    });
+  }
+  if (plan.action === 'devolve') {
+    // Retro Energy's "you may" (I169): the player chooses; nothing happens on a Basic.
+    const host = findCard(draft, ctx.hostInstanceId)?.card;
+    const zone = zoneOf(draft, ctx.hostPlayerId, ctx.hostZoneId);
+    if (!host || topPokemonCard(zone, host) === host) return 'done';
+    return makeChoice({
+      player: ctx.hostPlayerId,
+      prompt: 'Retro Energy: remove up to 2 damage counters and discard the top card (devolve)?',
+      options: [
+        { instanceId: 1, name: 'Devolve', type: 'option' },
+        { instanceId: 2, name: 'Skip', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
       resumeToken: {
         effectType: SPECIAL_ENERGY_EFFECT,
         trigger: ctx.trigger,

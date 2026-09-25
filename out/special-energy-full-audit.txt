@@ -1,12 +1,11 @@
 # Special-energy parse coverage
 Corpus: 214 printings → 129 unique (name+text)
 
-guided 41 / passive 87 / unenforced 1 / unrecognized 0
+guided 42 / passive 87 / unenforced 0 / unrecognized 0
 
 ## Unrecognized
 
 ## Unenforced (parsed, no engine consumer)
-- Call Energy: activatedSearch
 
 ## Guided (effect steps)
 - Nitro {: provide, onDiscardReturnToHand
@@ -39,6 +38,7 @@ guided 41 / passive 87 / unenforced 1 / unrecognized 0
 - Cyclone Energy: provide, onAttachSwitch
 - Recover Energy: provide, onAttachClearStatus
 - Health Energy: provide, onAttachRemoveDamage
+- Call Energy: provide, activatedSearch
 - Heal Energy: provide, noExtraEffect, onAttachRemoveDamage, ignoredOn
 - Rainbow Energy: provide, onAttachDamageCounter
 - Retro Energy: provide, onAttachDevolve

@@ -187,7 +187,7 @@ test('planSpecialEnergyTriggers: attach plans per effect', () => {
         'This card provides {C} Energy. When you play this card from your hand and attach it to 1 of your Evolved Pokémon, you may remove up to 2 damage counters from that Pokémon and discard the top card from it. (This counts as devolving it.)'
       )
     ),
-    [{ action: 'devolve', count: 2 }]
+    [{ action: 'devolve', count: 2, optional: true }]
   );
 
   const search = plan(energy('Telepathic {', 'provides {P} Energy. When you attach this card from your hand to a {P} Pokémon, search your deck for up to 2 Basic {P} Pokémon and put them onto your Bench.'));

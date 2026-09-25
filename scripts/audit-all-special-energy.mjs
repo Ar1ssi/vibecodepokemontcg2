@@ -59,12 +59,11 @@ const PASSIVE_STEP_TYPES = new Set([
 ]);
 
 // Parsed steps with no engine consumer. Counting them as guided/passive let
-// `unrecognized 0` hide effects that never run (audit SE16). Drop a case here
-// when its consumer lands (Call Energy's activated search: I169). A conditional
-// `ignoredOn` is enforced: the conditional form by the `condition` on its sibling steps,
-// the Pokémon-ex form by effectiveSpecialEnergies / planSpecialEnergyTriggers (I173).
-function isUnenforcedStep(step) {
-  return step.type === 'activatedSearch';
+// `unrecognized 0` hide effects that never run (audit SE16). Every step has a consumer
+// now (Call Energy I169, Treasure Energy I172, Pokémon-ex ignoredOn I173); add a case
+// here when a new step type lands without one.
+function isUnenforcedStep() {
+  return false;
 }
 
 // Steps that a non-provision clause produced but do not require a choice.

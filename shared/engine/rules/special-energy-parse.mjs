@@ -990,7 +990,7 @@ export function planSpecialEnergyTriggers(
         if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'returnBasicEnergy' });
         break;
       case 'onAttachDevolve':
-        if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'devolve', count: step.count });
+        if (trigger === 'attach' && fromZone === 'hand') plans.push({ action: 'devolve', count: step.count, optional: true });
         break;
       case 'onDiscardReturnToHand':
         if (trigger === 'discard' && ready(step) && (!attackCondition(step) || attackExecuting)) {
