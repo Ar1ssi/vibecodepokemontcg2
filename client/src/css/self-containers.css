@@ -1230,3 +1230,11 @@ body.mat-active .outline {
   background: transparent !important;
   background-color: transparent !important;
 }
+
+/* Zone counts stay in the DOM (the deck stack reads #deckCount) but are not
+   drawn on the mat. */
+#deckText,
+#discardText,
+#lostZoneText {
+  display: none;
+}

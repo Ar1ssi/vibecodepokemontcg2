@@ -1162,3 +1162,11 @@ body.mat-active .outline {
 :root {
   --fx-active-glow: 230, 130, 130;
 }
+
+/* Zone counts stay in the DOM (the deck stack reads #deckCount) but are not
+   drawn on the mat. */
+#deckText,
+#discardText,
+#lostZoneText {
+  display: none;
+}
