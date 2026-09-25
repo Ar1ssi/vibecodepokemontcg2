@@ -124,17 +124,11 @@
    ]
   },
   "Alph Lithograph#wrzz0h": {
-   "gaps": [
-    "server-missing:returnStadiumToHand"
-   ],
    "steps": [
     "returnStadiumToHand"
    ]
   },
   "Alph Lithograph#yg3w9e": {
-   "gaps": [
-    "server-missing:shuffleDeckOnly"
-   ],
    "steps": [
     "shuffleDeckOnly"
    ]
@@ -893,9 +887,6 @@
    ]
   },
   "Buddy-Buddy Rescue#ye3ktc": {
-   "gaps": [
-    "server-missing:eachPlayerRecoverPokemon"
-   ],
    "steps": [
     "eachPlayerRecoverPokemon"
    ]
@@ -956,9 +947,6 @@
    ]
   },
   "Caitlin#1ewf2ds": {
-   "gaps": [
-    "server-missing:putHandBottomThenDraw"
-   ],
    "steps": [
     "putHandBottomThenDraw"
    ]
@@ -1991,9 +1979,6 @@
    ]
   },
   "Eneporter#1omdtpc": {
-   "gaps": [
-    "server-missing:moveEnergyOpponent"
-   ],
    "steps": [
     "moveEnergyOpponent"
    ]
@@ -2462,9 +2447,6 @@
    ]
   },
   "Fan of Waves#7id7i0": {
-   "gaps": [
-    "server-missing:sendEnergyToDeckBottom"
-   ],
    "steps": [
     "sendEnergyToDeckBottom"
    ]
@@ -2871,9 +2853,6 @@
    ]
   },
   "Ghetsis#7h84y9": {
-   "gaps": [
-    "server-missing:opponentHandShuffleItemsDraw"
-   ],
    "steps": [
     "opponentHandShuffleItemsDraw"
    ]
@@ -3132,9 +3111,6 @@
    ]
   },
   "Gym Badge#1dxgk99": {
-   "gaps": [
-    "server-missing:flipUntilTailsDraw"
-   ],
    "steps": [
     "flipUntilTailsDraw"
    ]
@@ -3393,9 +3369,6 @@
    ]
   },
   "Hugh#noowl8": {
-   "gaps": [
-    "server-missing:eachPlayerHandToFive"
-   ],
    "steps": [
     "eachPlayerHandToFive"
    ]
@@ -3588,9 +3561,6 @@
    ]
   },
   "Jessie & James#1gtecto": {
-   "gaps": [
-    "server-missing:eachPlayerDiscardFromHand"
-   ],
    "steps": [
     "eachPlayerDiscardFromHand"
    ]
@@ -3990,9 +3960,6 @@
    ]
   },
   "Lost Remover#2uwa9": {
-   "gaps": [
-    "server-missing:sendEnergyToLostZone"
-   ],
    "steps": [
     "sendEnergyToLostZone"
    ]
@@ -4036,9 +4003,6 @@
    ]
   },
   "Lt. Surge#c4h37k": {
-   "gaps": [
-    "server-missing:putHandBasicAsActive"
-   ],
    "steps": [
     "putHandBasicAsActive"
    ]
@@ -4165,9 +4129,6 @@
    ]
   },
   "Lysandre Prism Star#19ckp6q": {
-   "gaps": [
-    "server-missing:opponentDiscardToLostZonePerPokemon"
-   ],
    "steps": [
     "opponentDiscardToLostZonePerPokemon"
    ]
@@ -4329,9 +4290,6 @@
    ]
   },
   "Max Revive#1ejpvxl": {
-   "gaps": [
-    "server-missing:putDiscardOnTop"
-   ],
    "steps": [
     "putDiscardOnTop"
    ]
@@ -4932,9 +4890,6 @@
    ]
   },
   "Oracle#105uqrh": {
-   "gaps": [
-    "server-missing:searchToTop"
-   ],
    "steps": [
     "searchToTop"
    ]
@@ -5316,9 +5271,6 @@
    ]
   },
   "Pokémon Center#farpss": {
-   "gaps": [
-    "server-missing:healAllOwnAndDiscardEnergy"
-   ],
    "steps": [
     "healAllOwnAndDiscardEnergy"
    ]
@@ -5389,9 +5341,6 @@
    ]
   },
   "Pokémon Nurse#fcw4gx": {
-   "gaps": [
-    "server-missing:healOneDiscardEnergy"
-   ],
    "steps": [
     "healOneDiscardEnergy"
    ]
@@ -5940,9 +5889,6 @@
    ]
   },
   "Return Label#w9rh05": {
-   "gaps": [
-    "server-missing:opponentDiscardToDeckBottom"
-   ],
    "steps": [
     "opponentDiscardToDeckBottom"
    ]
@@ -6419,9 +6365,6 @@
    ]
   },
   "Seeker#18zspo2": {
-   "gaps": [
-    "server-missing:eachPlayerReturnBench"
-   ],
    "steps": [
     "eachPlayerReturnBench"
    ]
@@ -6878,9 +6821,6 @@
    ]
   },
   "Surprise Box#16fcp83": {
-   "gaps": [
-    "server-missing:opponentDiscardToHand"
-   ],
    "steps": [
     "opponentDiscardToHand"
    ]
@@ -6944,9 +6884,6 @@
    ]
   },
   "Switching Cups#l7hmq8": {
-   "gaps": [
-    "server-missing:switchHandWithTop"
-   ],
    "steps": [
     "switchHandWithTop"
    ]
@@ -7164,9 +7101,6 @@
    ]
   },
   "Team Rocket’s Handiwork#10fbzqp": {
-   "gaps": [
-    "server-missing:millPerHeads"
-   ],
    "steps": [
     "millPerHeads"
    ]
@@ -7391,9 +7325,6 @@
    ]
   },
   "Tool Retriever#1wiqti8": {
-   "gaps": [
-    "server-missing:toolsToHand"
-   ],
    "steps": [
     "toolsToHand"
    ]
@@ -7409,9 +7340,6 @@
    ]
   },
   "Tormenting Spray#l7vu7j": {
-   "gaps": [
-    "server-missing:discardRandomOpponentHandIfSupporter"
-   ],
    "steps": [
     "discardRandomOpponentHandIfSupporter"
    ]
@@ -7450,9 +7378,6 @@
    ]
   },
   "Trash Exchange#1ba6a7e": {
-   "gaps": [
-    "server-missing:shuffleDiscardThenMill"
-   ],
    "steps": [
     "shuffleDiscardThenMill"
    ]
@@ -7832,9 +7757,6 @@
    ]
   },
   "Wicke#19y4l8e": {
-   "gaps": [
-    "server-missing:eachPlayerShuffleHandDraw"
-   ],
    "steps": [
     "eachPlayerShuffleHandDraw"
    ]
