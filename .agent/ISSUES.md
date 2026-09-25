@@ -6,12 +6,18 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I169). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I175). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I174 2026-09-25 P3 [legacy] move-card.js:670 fires `rules-energy-attached` whenever rules are on; no serverAuthoritative gate found on the rules-bridge.js handler, so authoritative games may run Telepathic/Jet/Enriching locally too — unverified (legacy untested) (refs: scratch special-energy-coverage-audit.md SE17, S295)
+- I173 2026-09-25 P3 [rules] Special-Energy "ignore on Pokémon-ex" gate unenforced: Heal Energy and Holon FF/GL/WP still apply on a Pokémon-ex host (parsed `ignoredOn` with `host`, no consumer; `node scripts/audit-all-special-energy.mjs` lists them as unenforced) (refs: S295)
+- I172 2026-09-25 P3 [rules] Treasure Energy's attach from a face-down Prize (`attachFromPrize`) is parsed but never offered (refs: audit SE9, S295)
+- I171 2026-09-25 P3 [rules] Special-Energy effect shields still miss non-damage paths: gust/switch effects, spread and bench damage from attack effects, placed damage counters; Fusion Strike Energy abilityShield reads only some ability sources (refs: audit SE7, S295)
+- I170 2026-09-25 P3 [rules] Darkness Energy AQ/EX "+10 to the Defending Pokémon" is added before Weakness/Resistance; printing is ambiguous on timing — confirm the ruling and move it after W/R if needed (refs: audit SE14, S295)
+- I169 2026-09-25 P3 [rules] Activated/optional special Energy wordings: Call Energy ignores oncePerTurn / ends-turn / Active-only; Retro Energy's "you may" is applied without a choice (refs: audit SE11e/g, S295)
 - I168 2026-09-24 P3 [rules] Copy-attack wordings still unparsed after design 036 slice 15: conditional copies (Thievul, Nihilego, Team Rocket's Mimikyu Tera-only), previous-Evolution (Incineroar, Charizard), last-turn (Mimikyu Copycat, Sudowoodo), Slowking deck top, and the old "copies that attack" prints (Metronome, Smeargle, Mew, Togetic, Shiftry ex, Alakazam Star) — attacks do nothing (PR #183 id I141) (refs: design 036 Deviations S287 slice 15, scratch attack-full-audit/copyscan.mjs)
 - I167 2026-09-24 P3 [rules] Attack-marker residuals of design 036 slices 9–10: client inspector does not price attackCostIncrease/retreatDelta; player-wide hand locks (Noivern, Whimsicott VSTAR, Giratina-EX, …), Pelipper two-attack base damage, Light Ledian Active-only immunity, Lunala "can't be healed" unread; stacking markers (edge row 14) untested (PR #183 id I140) (refs: design 036 Deviations S287 slices 9, 10, 15)
 - I166 2026-09-24 P3 [rules] Attack-effect residuals of design 036 slices 8, 11–14: conditional self-heal applies regardless of its condition; ~160 conditional-status sentences with unread conditions apply nothing; Oil Salvo choices, Spiritomb/Maushold spreads, Darkrai & Cresselia Lost Zone, Tentacruel moved-Energy counters, Kingdra/Swampert bench part not gated on "if you do" (PR #183 id I139) (refs: design 036 Deviations S287 slices 8, 11–14)

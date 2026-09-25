@@ -6,9 +6,12 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D142).
+#   Next id = highest D number in this file and the archive + 1 (next: D145).
 
 ## Active
+- D144[rules] 2026-09-25 Special-Energy knock-out effects (Rescue, Gift, Legacy, Counter-style) fire only when the KO came from an opponent's attack; Poison/Burn/self-damage KOs skip them — the printings say "by damage from an opponent's attack". (S295)
+- D143[rules] 2026-09-25 Passive special-Energy effects with a lasting state (end-of-turn discard, attach refusal, discard-when-condition-lost) run in one `settleSpecialEnergyPassives` sweep in applyCommand's tail, not at each mutation site. (S295)
+- D142[rules] 2026-09-25 Special Energy is priced from its printed provisions (special-energy-parse `specialEnergyProvision`), and the client sends Energy text to the server; name tables are fallbacks only. (S295)
 - D141[rules] 2026-09-24 Lost Zone Knock Out replacement is a per-command reduce flag (draft.__attackLostZoneKnockouts) read by handleKnockout, not an attack step — KOs resolve before after-steps (design 036 slice 13). (S287) (PR #183 id D125[rules])
 - D140[rules] 2026-09-24 Attacks that use a Supporter's effect splice its parseTrainerEffect steps into the running attack via the executor's ctx.insertSteps; "for the rest of this game" effects live on player.restOfGame and are read as existing marker kinds (nextTurnBonus / incomingReduce) plus a GX-attack legality gate (design 036 E). (S287) (PR #183 id D124[rules])
 - D139 2026-09-24 [rules] "As often as you like during your turn" abilities are never marked used (`isRepeatableAbility`, effects/ability.mjs): each use is announced but the once-per-turn flag stays clear. Their hand attaches (Emboar, Baxcalibur, Iono's Bellibolt ex) run from the button as well as through the accelerated normal attach, so a Poké-Power's printed restriction is honoured on the button path; a repeatable attach behind an uncheckable board condition fails closed. (S287) (PR #184 branch id D131)
