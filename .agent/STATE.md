@@ -6,10 +6,9 @@
 Session: 307
 Focus: design 042 — TCG Live knockout (gold stars, knockback + tip, attachments fan out, all fly
   to the discard pile with a streak; the mat burst was built then cut by the user) and plain
-  every discard flying from where its card was (D156). Branch feature/ko-discard-fx, committed,
-  not pushed.
-Active: none. Every way into the discard pile now flies (cardsDiscarded, cardMoved, zoneMoved).
-  Before main: review pass on the branch diff; user decides push.
+  every discard flying from where its card was (D156). Shipped to main in S307.
+Active: none. User visual check pending: KO + discards in a real game (retreat Energy, trainer
+  sweep paths are unit-tested only).
 Next: maintenance due (S302 handoff item 2): DECISIONS ~156 lines vs 90 cap, designs/ root
   ~50 shipped docs, ISSUES 39 open/30 closed (at cap); triage I180, I182; MAP spot-checks,
   scratch/worktrees. Backlog: I181, I167, I166, I162, I153 (contract first); user visual check:
@@ -31,6 +30,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - KO event names the stack's root Basic; `origins.knockoutStack` picks the drawn card (design 042).
 
 ## Recently shipped (≤3 one-liners; older → journal)
-- S307 (branch): design 042 TCG Live knockout + discard flights (D156), not yet on main.
+- S307: design 042 TCG Live knockout + every discard flying to the pile (D156), pushed to main.
 - S306: design 041 v4 tuning + evolve scene merged with main and pushed (D153–D155).
 - S304 (main): design 040 transform-form sprites (86 forms + 172 PNGs; D152[deck-builder]).

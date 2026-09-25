@@ -1,5 +1,5 @@
 # 042: TCG Live knockout scene and discard flights
-Status: built S307 on feature/ko-discard-fx — slices 1–2 green, video out/ko-scene.mp4; design self-approved (user gave the clip and asked directly; scope posted in chat), flagged at close
+Status: shipped S307 (main c4b9d579) — slices 1–2 green, video out/ko-scene.mp4; design self-approved (user gave the clip and asked directly; scope posted in chat), flagged at close
 Date: 2026-09-25 · Session: S307
 
 ## Problem
