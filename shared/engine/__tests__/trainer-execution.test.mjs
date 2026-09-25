@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
-import { createRng } from '../rng.mjs';
+import { createRng, withForcedCoin } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { viewFor } from '../view.mjs';
 import { hasCondition } from '../rules/special-conditions.mjs';
@@ -616,4 +616,78 @@ test('trainer effect: Dark Bell skips a {D} Active', () => {
   assert.equal(res.error, null);
   assert.ok(hasCondition(res.state.players.p1.zones.active[0], 'Confused'), 'own Active confused');
   assert.ok(!hasCondition(res.state.players.p2.zones.active[0], 'Confused'), '{D} Active skipped');
+});
+
+// ── coin-conditional turn ends (I155) ───────────────────────────────────
+
+const TICKLING_MACHINE =
+  'Flip a coin. If heads, your opponent sets aside all the cards in his or her hand face down. Nobody may look at those cards. At the end of your opponent\u2019s next turn, your opponent puts those cards back into his or her hand. If tails, your turn ends immediately (you can\u2019t attack this turn).';
+const MINION =
+  'Flip 2 coins. If both of them are heads, choose 1 of your opponent\u2019s Benched Pok\u00e9mon and return it and all cards attached to it to his or her hand. If 1 or both of them are tails, your turn ends immediately (you can\u2019t attack this turn).';
+
+test('I155: Tickling Machine tails ends the turn', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 80,
+    name: 'Tickling Machine',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: TICKLING_MACHINE,
+  }));
+  state.players.p2.zones.deck.push(createCard({ instanceId: 90, name: 'Draw' }));
+
+  const res = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 80 }, playerId: 'p1' },
+    withForcedCoin(rng, 'tails')
+  );
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.player, 'p2', 'tails ends the turn');
+});
+
+test('I155: Minion of Team Rocket returns a Benched Pokémon on both heads, turn continues', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 80,
+    name: 'Minion of Team Rocket',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: MINION,
+  }));
+  const benched = createCard({ instanceId: 91, name: 'Zubat', hp: 50, supertype: 'Pokémon' });
+  const energy = createCard({ instanceId: 92, name: 'Psychic Energy', type: 'Energy', attachedTo: 91 });
+  state.players.p2.zones.bench.push(benched, energy);
+
+  const res = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 80 }, playerId: 'p1' },
+    withForcedCoin(rng, 'heads')
+  );
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.player, 'p1', 'both heads keeps the turn');
+  assert.equal(res.state.players.p2.zones.bench.length, 0);
+  const handIds = res.state.players.p2.zones.hand.map((c) => c.instanceId);
+  assert.ok(handIds.includes(91) && handIds.includes(92), 'Pokémon and attached card return to hand');
+});
+
+test('I155: Minion of Team Rocket tails ends the turn and leaves the Bench alone', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.hand.push(createCard({
+    instanceId: 80,
+    name: 'Minion of Team Rocket',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: MINION,
+  }));
+  state.players.p2.zones.bench.push(createCard({ instanceId: 91, name: 'Zubat', hp: 50, supertype: 'Pokémon' }));
+  state.players.p2.zones.deck.push(createCard({ instanceId: 90, name: 'Draw' }));
+
+  const res = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 80 }, playerId: 'p1' },
+    withForcedCoin(rng, 'tails')
+  );
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.player, 'p2', 'tails ends the turn');
+  assert.equal(res.state.players.p2.zones.bench.length, 1, 'no return on tails');
 });

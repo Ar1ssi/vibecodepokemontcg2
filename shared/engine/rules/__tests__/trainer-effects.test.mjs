@@ -2393,3 +2393,28 @@ describe('Lost Zone cards (batch 14)', () => {
     assert.equal(r.steps[0].energyType, '{R}');
   });
 });
+
+describe('coin-conditional turn ends (I155)', () => {
+  test('Tickling Machine: heads sets the hand aside, tails ends the turn', () => {
+    const r = parseTrainerEffect(
+      'Flip a coin. If heads, your opponent sets aside all the cards in his or her hand face down. Nobody may look at those cards. At the end of your opponent\u2019s next turn, your opponent puts those cards back into his or her hand. If tails, your turn ends immediately (you can\u2019t attack this turn).'
+    );
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].heads[0].type, 'opponentHandSetAside');
+    assert.equal(r.steps[0].tails[0].type, 'turnEnds');
+  });
+
+  test('Minion of Team Rocket: both heads returns a Benched Pokémon, otherwise the turn ends', () => {
+    const r = parseTrainerEffect(
+      'Flip 2 coins. If both of them are heads, choose 1 of your opponent\u2019s Benched Pok\u00e9mon and return it and all cards attached to it to his or her hand. If 1 or both of them are tails, your turn ends immediately (you can\u2019t attack this turn).'
+    );
+    assert.equal(r.recognizable, true);
+    assert.equal(r.steps[0].type, 'coinFlip');
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[0].headsAtLeast, 2);
+    assert.equal(r.steps[0].heads[0].type, 'returnPokemonToHand');
+    assert.equal(r.steps[0].heads[0].side, 'opponent');
+    assert.equal(r.steps[0].tails[0].type, 'turnEnds');
+  });
+});

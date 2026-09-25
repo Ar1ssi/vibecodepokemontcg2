@@ -4,7 +4,7 @@
 import { isAbilityCard, classifyAbility } from './ability-effects.mjs';
 import { parseAbility } from './abilities.mjs';
 import { planAbilitySteps, actionableAbilityPlan } from './ability-step-plan.mjs';
-import { cardAbilityText } from './ability-executors.mjs';
+import { cardAbilityText, isHandActivatedAbility } from './ability-executors.mjs';
 import { abilityActivationBlockReason } from './ability-combat.mjs';
 
 /**
@@ -44,7 +44,11 @@ export function isUsableAbilityCard(card, opts = {}) {
   const actionable = actionableAbilityPlan(plan, { mode: 'interactive' }).filter(
     (item) => item.action !== 'promotion'
   );
-  return actionable.length > 0;
+  if (actionable.length > 0) return true;
+  // Luxray Swelling Flash / Charjabug Battery (I155): activated from the hand, but their
+  // steps have no client-side executor, so the plan reads them as announce-only. They are
+  // still legal commands (the server executes them), so the picker/glow must offer them.
+  return zone === 'hand' && isHandActivatedAbility(card);
 }
 
 /**
@@ -57,8 +61,13 @@ export function benchCardHasAbility(card) {
   return isUsableAbilityCard(card, { rulesEnabled: false });
 }
 
-/** Build scan candidates from active + bench (bench Pokémon only). */
-export function collectUsableAbilityCandidates(activeCard, benchCards = []) {
+/**
+ * Build scan candidates from active + bench (bench Pokémon only) plus the hand
+ * (hand-activated abilities like Luxray Swelling Flash). The zone gate in
+ * `filterUsableAbilities` rejects every hand card whose ability is not
+ * hand-activated, so the caller can pass the whole hand safely.
+ */
+export function collectUsableAbilityCandidates(activeCard, benchCards = [], handCards = []) {
   const candidates = [];
   if (activeCard) {
     candidates.push({ card: activeCard, zone: 'active', index: 0 });
@@ -66,6 +75,11 @@ export function collectUsableAbilityCandidates(activeCard, benchCards = []) {
   benchCards.forEach((card, index) => {
     if (card?.type === 'Pokémon') {
       candidates.push({ card, zone: 'bench', index });
+    }
+  });
+  handCards.forEach((card, index) => {
+    if (card?.type === 'Pokémon' || card?.supertype === 'Pokémon') {
+      candidates.push({ card, zone: 'hand', index });
     }
   });
   return candidates;

@@ -79,6 +79,7 @@ export async function computeCardGlows({
         activeCard,
         attachedEnergyCards,
         benchCards,
+        handCards,
         stadiumCard,
         extraAttacks,
         board: specialEnergyBoard({

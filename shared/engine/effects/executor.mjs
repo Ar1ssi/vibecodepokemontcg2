@@ -38,7 +38,7 @@ export const EXECUTOR_STEP_TYPES = new Set([
   'healAbility', 'coinFlip', 'coinDraw', 'returnTool', 'shuffleOwnPokemon', 'revealHand',
   'drawIfNoSupporter', 'putHandToDeck', 'peekReturn', 'peekDiscard', 'benchRestored',
   'fossilBench', 'applyStatus', 'statusAbility', 'recoverEnergy', 'recoverFromDiscard',
-  'attachAbility', 'attachFromDiscard',
+  'attachAbility', 'attachFromDiscard', 'turnEnds',
 ]);
 
 // Attack steps whose only target is the opponent's Active Pokémon (or, with the listed
@@ -1337,15 +1337,23 @@ export function executeSteps(draft, {
       }
 
       case 'coinFlip': {
-        // Memoize the face so resuming a suspended branch choice doesn't re-flip.
+        // Memoize the result so resuming a suspended branch choice doesn't re-flip.
+        // "Flip 2 coins. If both of them are heads" needs count + headsAtLeast (Minion
+        // of Team Rocket); everything else flips once.
         const coinKey = `${idx}:coinFlip`;
-        let face = context[coinKey];
-        if (!face) {
-          face = flipCoin(activeRng);
-          context[coinKey] = face;
-          events.push({ type: 'coinFlipped', playerId, face });
+        let flip = context[coinKey];
+        if (!flip) {
+          const count = Math.max(1, Number(step.count) || 1);
+          let headsCount = 0;
+          for (let i = 0; i < count; i++) {
+            const face = flipCoin(activeRng);
+            if (face === 'heads') headsCount++;
+            events.push({ type: 'coinFlipped', playerId, face });
+          }
+          flip = { face: headsCount >= (Number(step.headsAtLeast) || 1) ? 'heads' : 'tails', headsCount };
+          context[coinKey] = flip;
         }
-        const branch = normalizeSteps(face === 'heads' ? step.heads : step.tails);
+        const branch = normalizeSteps(flip.face === 'heads' ? step.heads : step.tails);
         if (branch.length > 0) {
           const subResult = executeSteps(draft, {
             steps: branch,
@@ -1361,6 +1369,20 @@ export function executeSteps(draft, {
           if (subResult.pendingChoice) {
             return subResult;
           }
+        }
+        break;
+      }
+
+      case 'turnEnds': {
+        // "If tails, your turn ends immediately" (Tickling Machine, Minion of Team
+        // Rocket): the caller ends the turn once the whole effect has resolved.
+        if (!context.turnEnds) {
+          context.turnEnds = true;
+          events.push({
+            type: 'turnEndRequested',
+            playerId,
+            instanceId: sourceCard?.instanceId,
+          });
         }
         break;
       }

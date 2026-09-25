@@ -94,6 +94,29 @@ test('abilityAvailable: a spent ability drops out via the merged predicate', asy
   assert.equal(res.abilityAvailable, false);
 });
 
+test('abilityAvailable: a hand-activated ability is returned with zone hand (I155)', async () => {
+  const active = { ...pikachu([]), ability: { name: 'Pick Up', text: 'Once during your turn: draw 1 card.' } };
+  const luxray = {
+    name: 'Luxray',
+    type: 'Pokémon',
+    ability: {
+      name: 'Swelling Flash',
+      text: 'Once during your turn, if this Pokémon is in your hand and you have more Prize cards remaining than your opponent, you may put this Pokémon onto your Bench.',
+    },
+  };
+  const res = await computeActionAffordances({
+    activeCard: active,
+    handCards: [luxray, { name: 'Poke Ball', type: 'Trainer' }],
+  });
+  assert.deepEqual(
+    res.usableAbilities.map((a) => [a.zone, a.index, a.card.name]),
+    [
+      ['active', 0, 'Pikachu'],
+      ['hand', 0, 'Luxray'],
+    ]
+  );
+});
+
 test('ensureCardData failures are swallowed and the scan still answers', async () => {
   const active = {
     name: 'Unknown',

@@ -293,7 +293,7 @@ export async function enumerateOptions({
   // ── abilities (once per turn, interactive steps only) ─────────────────
   if (canMove) {
     const usable = filterUsableAbilities(
-      collectUsableAbilityCandidates(active, benchCards),
+      collectUsableAbilityCandidates(active, benchCards, handCards),
       { rulesEnabled: rulesState.enabled, isUsed: isAbilityUsed }
     );
     for (const entry of usable) {
@@ -302,6 +302,10 @@ export async function enumerateOptions({
         zone: entry.zone,
         index: entry.index,
         abilityIndex: 0,
+        // The authoritative dispatch addresses the card by instanceId (the legacy
+        // index is empty under server rendering); without it a hand-activated
+        // ability (Luxray, Charjabug) could not resolve.
+        instanceId: idOf(entry.card),
       });
     }
   }

@@ -2811,9 +2811,14 @@ function advanceTurn(draft, { nextPlayerId, events }) {
 /**
  * "… Your turn ends." Trainers end the turn once their effect has fully resolved (no choice
  * pending), unless an Ability exempts that card (Alcremie Additional Order, design 034 slice 6).
+ * A coin branch can request the same ending ("If tails, your turn ends immediately": I155).
  */
 function endTurnAfterTrainer(draft, { card, playerId, activeRng, events }) {
-  if (!card || draft.pendingChoice || !trainerEndsTurn(card)) return;
+  if (!card || draft.pendingChoice) return;
+  const conditionalEnd = events.some(
+    (e) => e.type === 'turnEndRequested' && e.playerId === playerId
+  );
+  if (!trainerEndsTurn(card) && !conditionalEnd) return;
   if (draft.turn?.player !== playerId) return;
   if (abilityTurnNotEnd(card, abilitySideContext(draft, playerId))) {
     events.push({ type: 'turnEndPrevented', playerId, instanceId: card.instanceId });

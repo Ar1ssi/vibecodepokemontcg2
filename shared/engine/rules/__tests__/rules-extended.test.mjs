@@ -4443,6 +4443,38 @@ import test from 'node:test';
       assert.equal(filterUsableAbilities(candidates, { koedLastOppTurn: true }).length, 1);
     });
 
+    test('filterUsableAbilities: hand-activated abilities are offered from the hand (I155)', () => {
+      const luxray = {
+        name: 'Luxray',
+        type: 'Pokémon',
+        ability: {
+          name: 'Swelling Flash',
+          text:
+            'Once during your turn, if this Pokémon is in your hand and you have more Prize cards remaining than your opponent, you may put this Pokémon onto your Bench.',
+        },
+      };
+      const inPlayOnly = {
+        name: 'DrawMon',
+        type: 'Pokémon',
+        ability: { name: 'Draw', text: 'Once during your turn, you may draw a card.' },
+      };
+      const candidates = collectUsableAbilityCandidates(null, [], [luxray, inPlayOnly]);
+      const usable = filterUsableAbilities(candidates);
+      assert.deepEqual(usable.map((u) => [u.zone, u.card.name]), [['hand', 'Luxray']]);
+    });
+
+    test('filterUsableAbilities: a hand card without a hand-activated ability is not offered', () => {
+      const plain = { name: 'Pidgey', type: 'Pokémon' };
+      const bench = {
+        name: 'BenchMon',
+        type: 'Pokémon',
+        ability: { name: 'Draw', text: 'Once during your turn, you may draw a card.' },
+      };
+      const candidates = collectUsableAbilityCandidates(null, [bench], [plain]);
+      const usable = filterUsableAbilities(candidates);
+      assert.deepEqual(usable.map((u) => u.zone), ['bench']);
+    });
+
     // ── start-of-turn draw (taxonomy B) ──
     test('shouldAutoDrawAtTurnStart: true when enabled, not drawn, deck non-empty', () => {
       assert.equal(shouldAutoDrawAtTurnStart({ enabled: true, drewThisTurn: false, deckCount: 3, turnNumber: 2 }), true);

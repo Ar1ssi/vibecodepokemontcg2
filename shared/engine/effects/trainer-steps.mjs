@@ -1205,7 +1205,41 @@ function fossilItem(ctx) {
 
 // Scoop Up Cyclone (keeps attached cards) / Professor Turo's Scenario (discards them).
 function returnPokemonToHand(ctx) {
-  const { player, step } = ctx;
+  const { player, opponent, step } = ctx;
+  // Minion of Team Rocket: the opponent's chosen Benched Pokémon and every attached
+  // card go back to the opponent's hand.
+  if (step.side === 'opponent') {
+    if (!opponent) return skip(ctx, 'no_opponent');
+    const bench = benchRootsOf(opponent);
+    const returnRoot = (root) => {
+      for (const card of [root, ...attachedCards(opponent, root.instanceId)]) {
+        removeFromZones(opponent, card);
+        card.attachedTo = null;
+        opponent.zones.hand.push(card);
+      }
+      ctx.events.push({
+        type: 'cardMoved',
+        instanceId: root.instanceId,
+        from: 'bench',
+        to: 'hand',
+        playerId: opponent.playerId,
+      });
+      return null;
+    };
+    if (ctx.selection) {
+      const root = bench.find((c) => c.instanceId === ctx.selection[0]);
+      return root ? returnRoot(root) : skip(ctx, 'target_not_found');
+    }
+    if (bench.length === 0) return skip(ctx, 'no_opponent_bench');
+    if (bench.length === 1) return returnRoot(bench[0]);
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your opponent's Benched Pokémon to return to their hand`,
+      options: bench,
+      min: 1,
+      max: 1,
+    });
+  }
+
   const roots = rootsOf(player);
 
   if (ctx.memo?.phase === 'promote') {

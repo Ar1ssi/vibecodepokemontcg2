@@ -645,7 +645,29 @@ export function parseSearchDeckParams(lower) {
 }
 
 function parseCoinFlipStep(lower) {
-  if (!lower.includes('flip a coin')) return null;
+  if (!lower.includes('flip a coin') && !lower.includes('flip 2 coins')) return null;
+
+  // Tickling Machine — heads: the opponent's hand is set aside face down (returned at the
+  // end of their next turn); tails: the turn ends immediately.
+  if (/your opponent sets aside all the cards in (?:his or her|their) hand face down/.test(lower)) {
+    return {
+      type: 'coinFlip',
+      heads: [{ type: 'opponentHandSetAside' }],
+      tails: [{ type: 'turnEnds' }],
+    };
+  }
+
+  // Minion of Team Rocket — both heads: return an opponent's Benched Pokémon and its
+  // attached cards to their hand; otherwise the turn ends immediately.
+  if (/flip 2 coins\. if both of them are heads, choose 1 of your opponent's bench/.test(lower)) {
+    return {
+      type: 'coinFlip',
+      count: 2,
+      headsAtLeast: 2,
+      heads: [{ type: 'returnPokemonToHand', side: 'opponent', keepAttached: true }],
+      tails: [{ type: 'turnEnds' }],
+    };
+  }
 
   const headsDraw = lower.match(/if heads,?\s+draw\s+(\d+)\s+cards?/);
   const tailsDraw = lower.match(/if tails,?\s+draw\s+(\d+)\s+cards?/);

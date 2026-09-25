@@ -23,6 +23,7 @@ import { openDiscardPileViewer } from './discard-pile-viewer.js';
 import { openCarouselViewer } from './card-picker.js';
 import { orderAttachedForCarousel } from './carousel-order.mjs';
 import { rulesState, stadiumUsed } from '/shared/engine/rules/rules-state.mjs';
+import { isHandActivatedAbility } from '/shared/engine/rules/ability-executors.mjs';
 import {
   openCardInspector,
   closeCardInspector,
@@ -110,6 +111,8 @@ export const openCardContextMenu = (event) => {
       [true, 'bench'],
       [true, 'stadium'],
       [true, 'discard'],
+      // Luxray Swelling Flash / Charjabug Battery are activated from the hand (I155).
+      [isHandActivatedAbility(mouseClick.card), 'hand'],
     ],
     damageCounterButton: [
       [true, 'active'],
