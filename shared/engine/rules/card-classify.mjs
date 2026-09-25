@@ -62,11 +62,11 @@ export function isGxCard(card = {}) {
 }
 
 // TAG TEAM Pokémon carry a "TAG TEAM" subtype (sometimes absent before async
-// enrichment) and their names are written "<A> & <B>-GX".
+// enrichment) and their names are written "<A> & <B>-GX" (TCGdex: "<A> & <B> GX").
 export function isTagTeamCard(card = {}) {
   if (hasSubtype(card, 'tagteam')) return true;
   const name = nameOf(card);
-  return /-gx$/i.test(name) && name.includes('&');
+  return /[\s-]gx$/i.test(name) && name.includes('&');
 }
 
 // V-UNION pieces share one name and are always written "<Name> V-UNION".

@@ -317,6 +317,43 @@
       );
     }
 
+    // TCGdex omits `stage` on every Pokémon-GX detail (sm1-12 Decidueye GX, sm5-100
+    // Dialga GX) — without a stage the card defaulted to Basic, so evolution GX went
+    // straight to the Bench and were refused as evolutions. Rebuild it from the chain:
+    // no evolveFrom → Basic; otherwise one step past the pre-evolution's stage.
+    const STAGE_AFTER = { basic: 'Stage1', stage1: 'Stage2' };
+    const collapseStageName = (stage) => String(stage || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    export async function inferMissingStage(detail) {
+      if (detail?.stage) return detail.stage;
+      if (String(detail?.category || '').toLowerCase() !== 'pokemon') return null;
+      if (!detail.evolveFrom) return 'Basic';
+      let summaries = [];
+      try {
+        summaries = await fetchSummariesByName(detail.evolveFrom);
+      } catch {
+        /* fall through to the name-only guess below */
+      }
+      for (const summary of summaries.slice(0, 3)) {
+        const pre = await fetchCardDetail(summary.id);
+        if (!pre) continue;
+        const next = STAGE_AFTER[collapseStageName(pre.stage)];
+        if (next) return next;
+        if (!pre.stage) return pre.evolveFrom ? 'Stage2' : 'Stage1';
+      }
+      // Lookup failed: it is still an Evolution; Stage 1 is the common case.
+      return 'Stage1';
+    }
+
+    // TCGdex carries the rule-box marker in `suffix` ("GX", "TAG TEAM-GX", "EX") and has
+    // no `subtypes`; card-classify predicates read subtypes first.
+    export function subtypesFromSuffix(suffix) {
+      const s = String(suffix || '').trim();
+      if (!s) return [];
+      if (/^tag team-?gx$/i.test(s)) return ['TAG TEAM', 'GX'];
+      return [s];
+    }
+
     function applyEnrichedData(card, data) {
       for (const [k, v] of Object.entries(data)) {
         if (k === 'attacks') {
@@ -415,10 +452,10 @@
           resistance: parseTypeValue(detail.resistances?.[0]),
           retreatCost: parseRetreatCost(detail),
           attacks: mapDetailAttacks(detail.attacks),
-          stage: detail.stage || null,
+          stage: (await inferMissingStage(detail)) || null,
           evolvesFrom: detail.evolvesFrom || detail.evolveFrom || null,
           ability: tcgAbilityFromDetail(detail),
-          subtypes: detail.subtypes || [],
+          subtypes: detail.subtypes || subtypesFromSuffix(detail.suffix),
           trainerType: detail.trainerType || null,
           rarity: printedRarity(detail) || card.rarity || '',
           effect: detail.effect || null,

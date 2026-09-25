@@ -54,6 +54,8 @@ import test from 'node:test';
       assert.equal(isTagTeamCard(card({ subtypes: ['TAG TEAM'] })), true);
       assert.equal(isTagTeamCard(card({ name: 'Pikachu & Zekrom-GX' })), true);
       assert.equal(isTagTeamCard(card({ name: 'Reshiram & Charizard-GX' })), true);
+      // TCGdex sm12-1 spells it with a space.
+      assert.equal(isTagTeamCard(card({ name: 'Venusaur & Snivy GX' })), true);
       assert.equal(isTagTeamCard(card({ name: 'Ninetales GX' })), false);
       assert.equal(isTagTeamCard(card({ name: 'Zekrom-GX' })), false);
     });

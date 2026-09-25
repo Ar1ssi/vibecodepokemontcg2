@@ -1042,3 +1042,40 @@ test('parseUnlimitedHandEnergyAcceleration reads {R} as Fire (I98)', () => {
   const text = 'As often as you like during your turn, you may attach a Basic {R} Energy card from your hand to 1 of your Pokémon.';
   assert.equal(parseUnlimitedHandEnergyAcceleration({ abilities: [{ text }] })?.energyType, 'Fire');
 });
+
+// TCGdex sm1-12 "Decidueye GX": no `stage` field, evolveFrom "Dartrix" (live API, 2026-09-26).
+test('stage-less Pokémon-GX with evolvesFrom: not benchable from hand, evolves onto its pre-evolution', () => {
+  const state = setupGame({ turn: { number: 3, player: 'p1', phase: 'turn' } });
+  const dartrix = createCard({
+    instanceId: 501,
+    name: 'Dartrix',
+    supertype: 'Pokémon',
+    stage: 'Stage 1',
+    evolvesFrom: 'Rowlet',
+    enteredPlayTurn: 1,
+  });
+  const decidueye = createCard({
+    instanceId: 502,
+    name: 'Decidueye GX',
+    supertype: 'Pokémon',
+    hp: 240,
+    evolvesFrom: 'Dartrix',
+  });
+  state.players.p1.zones.bench.push(dartrix);
+  state.players.p1.zones.hand.push(decidueye);
+
+  const bench = validateLegality(state, {
+    type: 'moveCard',
+    payload: { instanceId: 502, from: 'hand', to: 'bench' },
+    playerId: 'p1',
+  });
+  assert.equal(bench.allowed, false);
+  assert.match(bench.reason, /Only Basic Pokémon/);
+
+  const evolve = validateLegality(state, {
+    type: 'attachCard',
+    payload: { instanceId: 502, targetInstanceId: 501 },
+    playerId: 'p1',
+  });
+  assert.equal(evolve.allowed, true);
+});

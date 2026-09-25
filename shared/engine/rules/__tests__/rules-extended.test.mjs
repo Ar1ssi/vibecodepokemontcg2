@@ -6249,6 +6249,55 @@ import test from 'node:test';
       });
     });
 
+    // Live TCGdex sm1-12 "Decidueye GX" / sm12-1 "Venusaur & Snivy GX": no `stage`,
+    // no `subtypes`, rule box only in `suffix` (checked 2026-09-26).
+    test('ensureCardData: stage-less Pokémon-GX gets its stage from the evolution chain', async () => {
+      const handler = (url) => {
+        if (url.includes('/cards/gxt-decidueye')) {
+          return detailResponse({
+            id: 'gxt-decidueye', name: 'Decidueye GX', category: 'Pokemon', hp: 240,
+            suffix: 'GX', evolveFrom: 'Dartrix', attacks: [{ name: 'Razor Leaf', damage: 90 }],
+          });
+        }
+        if (url.includes('/cards?name=Dartrix')) {
+          return detailResponse([{ id: 'gxt-dartrix', name: 'Dartrix' }]);
+        }
+        if (url.includes('/cards/gxt-dartrix')) {
+          return detailResponse({
+            id: 'gxt-dartrix', name: 'Dartrix', category: 'Pokemon', stage: 'Stage1', evolveFrom: 'Rowlet',
+          });
+        }
+        if (url.includes('/cards/gxt-dialga')) {
+          return detailResponse({
+            id: 'gxt-dialga', name: 'Dialga GX', category: 'Pokemon', hp: 180, suffix: 'GX',
+            attacks: [{ name: 'Timeless GX', damage: 150 }],
+          });
+        }
+        if (url.includes('/cards/gxt-tagteam')) {
+          return detailResponse({
+            id: 'gxt-tagteam', name: 'Venusaur & Snivy GX', category: 'Pokemon', hp: 270,
+            suffix: 'TAG TEAM-GX', attacks: [{ name: 'Forest Dump', damage: 130 }],
+          });
+        }
+        return { ok: false, json: async () => ({}) };
+      };
+      await withStubbedFetch(handler, async () => {
+        const decidueye = { id: 'gxt-decidueye', name: 'Decidueye GX' };
+        await ensureCardData(decidueye);
+        assert.equal(decidueye.stage, 'Stage2');
+        assert.deepEqual(decidueye.subtypes, ['GX']);
+
+        const dialga = { id: 'gxt-dialga', name: 'Dialga GX' };
+        await ensureCardData(dialga);
+        assert.equal(dialga.stage, 'Basic');
+
+        const tagTeam = { id: 'gxt-tagteam', name: 'Venusaur & Snivy GX' };
+        await ensureCardData(tagTeam);
+        assert.equal(tagTeam.stage, 'Basic');
+        assert.deepEqual(tagTeam.subtypes, ['TAG TEAM', 'GX']);
+      });
+    });
+
     test('ensureCardData: replaces placeholder attack text with TCGdex effect', async () => {
       const callForFamilyText =
         'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';

@@ -3863,14 +3863,20 @@ export function validateLegality(state, command) {
           };
         }
         const baseStage = normalizeStage(topTarget?.stage) || 'Basic';
-        const evoStage = normalizeStage(cardRef.card.stage);
+        const order = ['Basic', 'Stage 1', 'Stage 2'];
+        // Stage-less Evolution (TCGdex Pokémon-GX): the evolvesFrom name check below
+        // still gates it, so it is one step past the Pokémon it lands on.
+        const inferredStage =
+          !cardRef.card.stage && cardRef.card.evolvesFrom
+            ? order[order.indexOf(baseStage) + 1]
+            : null;
+        const evoStage = normalizeStage(cardRef.card.stage) || inferredStage;
         if (!evoStage || evoStage === 'Basic') {
           return {
             allowed: false,
             reason: `${cardRef.card.name} is not an Evolution Pokémon.`,
           };
         }
-        const order = ['Basic', 'Stage 1', 'Stage 2'];
         const baseIdx = order.indexOf(baseStage);
         const evoIdx = order.indexOf(evoStage);
         if (evoIdx !== baseIdx + 1) {

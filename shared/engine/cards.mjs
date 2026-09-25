@@ -178,6 +178,8 @@ export function isBasicPokemon(card) {
   // Pokémon LEGEND are played as a two-card pair, never from hand as a Basic
   // (glossary / App. 21) — the name marker is the reliable signal.
   if (/\blegend\b/i.test(String(card.name || ''))) return false;
+  // TCGdex prints no stage on Pokémon-GX; an evolvesFrom still marks an Evolution.
+  if (!card.stage && card.evolvesFrom) return false;
   const stage = collapseStage(card.stage || card.subtypes?.[0] || 'Basic');
   if (NON_BASIC_STAGES.has(stage)) {
     return false;

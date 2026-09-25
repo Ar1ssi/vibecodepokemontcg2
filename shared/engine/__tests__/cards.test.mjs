@@ -153,3 +153,9 @@ test('isPokemon, isEnergy, isTrainer predicates', () => {
   assert.equal(isTrainer(trainer), true);
   assert.equal(isTrainer(mon), false);
 });
+
+test('isBasicPokemon: a stage-less card with evolvesFrom is an Evolution (TCGdex Pokémon-GX)', () => {
+  const gx = (props) => createCard({ supertype: 'Pokémon', hp: 240, ...props });
+  assert.equal(isBasicPokemon(gx({ name: 'Decidueye GX', evolvesFrom: 'Dartrix' })), false);
+  assert.equal(isBasicPokemon(gx({ name: 'Dialga GX' })), true);
+});
