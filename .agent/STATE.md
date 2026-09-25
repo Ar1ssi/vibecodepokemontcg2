@@ -3,11 +3,11 @@
      History belongs to journal/. Contradicts git log / journal? Trust git: rebuild from
      `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
-Session: 298
+Session: 300
 Focus: S295 special-Energy coverage audit (scratch special-energy-coverage-audit.md, SE1–SE16) fixed in 6 commits
   on `claude/special-energy-coverage-fixes-db7eb0`. Branch also carries the S294 #182–#184 merges, which were
   never pushed: it is 85 commits ahead of origin/main, 0 behind.
-Active: fix/trainer-present-fresh-src worktree — presentSrcFor src-order fix + regression test, uncommitted.
+Active: none — S300 Gaia Volcano Stadium fix done in worktree gaia-volcano-stadium (fix/gaia-volcano-stadium), uncommitted.
 Next: maintenance due (S290 skipped; ISSUES Open 50/40, Closed 35/30 over cap).
   036 slice 16 (regression gate `pnpm audit:attacks`, close I136) — ledger NEXTSTEPS.md.
   P2 engine backlog: I151 (reactive Tool conditions), I154 (26 server-missing Trainer steps), I164 (ability
@@ -30,6 +30,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Bash heredoc eats `\` and mangles é → use the Edit/Write tools. Primary working copy is CRLF (repo LF).
 
 ## Recently shipped (≤3 one-liners; older → journal)
+- S300 Gaia Volcano family: Stadium bonus read + "[Then,] discard that Stadium" step (attack-steps/damage-parser, new test); suite 4062/4063, oracle PASSED.
+- S298 trainer-play popup reads fresh src (a540d7ee).
 - S297 merged PR #181 (design 024: FX queue/holds, procedural audio, attack banner, iframe kill switch) over main's Mega/Tera + FX polish.
-- PRs #186 drag swing, #187 inspector fix, #188 special-Energy merged to main (S296).
-- S295 special-Energy audit SE1–SE16 + hostile-review fixes (701b7a13) + I176 client pricing (b9ad6d7b): suite 3935/3936, all 3 gates PASSED.
