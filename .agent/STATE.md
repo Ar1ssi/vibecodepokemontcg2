@@ -3,7 +3,7 @@
      History belongs to journal/. Contradicts git log / journal? Trust git: rebuild from
      `tail -n 20` of the journal + `git log -5`, note the crash in the journal. -->
 
-Session: 311
+Session: 312
 Focus: design 046 — board glow while an Item/Supporter is held + deeper drop hovers (D160), on
   feature/board-glow (board-glow worktree), stacked on feature/prize-fx (design 045, D159). NOT pushed.
 Active: none. Awaiting the user's localhost look + "push" (both branches; board-glow contains prize-fx).
