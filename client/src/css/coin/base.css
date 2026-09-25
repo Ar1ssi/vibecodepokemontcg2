@@ -200,10 +200,12 @@
   will-change: transform;
 }
 
+/* --coin-toss-ms: the ceremony shortens each toss when an effect flips
+   several coins (coinCeremonyTimeline in mat-fx/coin-pose.mjs). */
 .coin-toss-wrap.tossing .coin-3d {
-  transition: transform 1.35s cubic-bezier(0.22, 0.08, 0.24, 1);
+  transition: transform var(--coin-toss-ms, 1.35s) cubic-bezier(0.22, 0.08, 0.24, 1);
 }
 
 .coin-toss-wrap.tossing {
-  animation: coin-toss-arc 1.35s cubic-bezier(0.3, 0.0, 0.35, 1);
+  animation: coin-toss-arc var(--coin-toss-ms, 1.35s) cubic-bezier(0.3, 0.0, 0.35, 1);
 }

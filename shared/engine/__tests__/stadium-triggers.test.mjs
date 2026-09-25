@@ -667,3 +667,33 @@ test('Chaos Gym: a Pokémon Tool attached from hand flips; Energy does not', () 
   assert.equal(energyRes.error, null);
   assert.ok(!energyRes.events.some((e) => e.type === 'coinFlipped'));
 });
+
+test('Pokémon Checkup reports every Asleep and Burned flip as coinFlipped (coin ceremony)', () => {
+  const slumbering = stadium(
+    'Slumbering Forest',
+    'If a Pokémon is Asleep, its owner flips 2 coins instead of 1 for that Special Condition between turns. If either of them is tails, that Pokémon is still Asleep.'
+  );
+  const asleepState = game();
+  asleepState.stadium = slumbering;
+  const asleepMon = asleepState.players.p1.zones.active[0];
+  asleepMon.specialCondition = 'Asleep';
+  const asleep = applyCommand(asleepState, { type: 'pass', payload: {}, playerId: 'p1' }, rngOf(0.1, 0.9));
+  const asleepFlips = asleep.events.filter((e) => e.type === 'coinFlipped');
+  assert.deepEqual(
+    asleepFlips.map((e) => [e.playerId, e.face, e.source, e.instanceId]),
+    [
+      ['p1', 'heads', 'Asleep', asleepMon.instanceId],
+      ['p1', 'tails', 'Asleep', asleepMon.instanceId],
+    ]
+  );
+
+  const burnedState = game();
+  const burnedMon = burnedState.players.p1.zones.active[0];
+  burnedMon.specialCondition = 'Burned';
+  const burned = applyCommand(burnedState, { type: 'pass', payload: {}, playerId: 'p1' }, rngOf(0.1));
+  const burnedFlips = burned.events.filter((e) => e.type === 'coinFlipped');
+  assert.deepEqual(
+    burnedFlips.map((e) => [e.face, e.source]),
+    [['heads', 'Burned']]
+  );
+});

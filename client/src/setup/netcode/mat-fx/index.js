@@ -48,7 +48,8 @@ const EFFECTS = {
   'prize-claim': prizeClaim,
   'game-over': gameOver,
 };
-const STATIC_FALLBACKS = {};
+// The coin ceremony has its own reduced-motion form (faces shown without the tumble).
+const STATIC_FALLBACKS = { 'coin-flip': coinFlip };
 
 // Design 041: a Mega/Tera evolution keeps the short `evolve` arpeggio under its
 // signature entry; any other plays the evolution scene's score. The dispatcher

@@ -60,8 +60,8 @@ test('the ceremony mounts a material-stamped coin and removes itself', async () 
   assert.ok(resultEl.classList.contains('visible'));
   assert.match(
     live.querySelector('[data-coin-flip-el]').getAttribute('style') || '',
-    /1620deg/,
-    'tails should land on the 4-tumble + 180deg offset'
+    /1980deg/,
+    'tails should land on the 5-tumble + 180deg offset'
   );
 
   await done;
@@ -80,6 +80,66 @@ test('a second ceremony replaces any overlay still on screen', async () => {
   assert.notEqual(document.getElementById(COIN_FLIP_OVERLAY_ID), firstEl);
 
   await Promise.all([first, second]);
+  assert.equal(document.getElementById(COIN_FLIP_OVERLAY_ID), null);
+  dom.window.close();
+});
+
+test('the coin commits its start angle before the spin target, so the tumble transitions', async () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const { document, HTMLElement } = dom.window;
+  const flushes = [];
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get() {
+      if (this.hasAttribute('data-coin-flip-el')) flushes.push(this.style.getPropertyValue('--coin-flip'));
+      return 0;
+    },
+  });
+
+  const done = playCoinFlipCeremony({ coin: COIN, result: 'heads', revealMs: 5, holdMs: 5, fadeMs: 5, doc: document });
+  await done;
+
+  // Without the flush the browser first styles the coin already at its end
+  // angle and there is nothing to transition from: the coin never turns.
+  assert.deepEqual(flushes, [''], 'style flushed once, before --coin-flip was set');
+  dom.window.close();
+});
+
+test('several flips toss one after another in one overlay with a running tally', async () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const { document } = dom.window;
+  let overlays = 0;
+  const observer = new dom.window.MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) if (node.id === COIN_FLIP_OVERLAY_ID) overlays++;
+    }
+  });
+  observer.observe(document.body, { childList: true });
+
+  const done = playCoinFlipCeremony({
+    coin: COIN,
+    results: ['heads', 'tails', 'heads'],
+    label: 'Your coin flip — Thunder Jolt',
+    passive: true,
+    revealMs: 5,
+    // Landings at ~5/460/915 ms; the wide hold keeps the probe inside it under a starved suite.
+    holdMs: 2000,
+    fadeMs: 5,
+    doc: document,
+  });
+  const overlay = document.getElementById(COIN_FLIP_OVERLAY_ID);
+  assert.ok(overlay.classList.contains('passive'), 'an in-game flip lets clicks through');
+  assert.match(overlay.querySelector('.turn-order-coin-flip-label').textContent, /Thunder Jolt/);
+  assert.equal(overlay.querySelector('.turn-order-coin-flip-tally').textContent, 'Flipping 3 coins');
+
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  assert.equal(overlay.querySelector('.turn-order-coin-flip-tally').textContent, '3 of 3 · 2 heads');
+  assert.equal(overlay.querySelector('.turn-order-coin-flip-result').textContent, 'Heads!');
+  assert.match(overlay.querySelector('[data-coin-flip-el]').getAttribute('style') || '', /5400deg/);
+
+  await done;
+  observer.disconnect();
+  assert.equal(overlays, 1, 'one overlay for the whole run');
   assert.equal(document.getElementById(COIN_FLIP_OVERLAY_ID), null);
   dom.window.close();
 });

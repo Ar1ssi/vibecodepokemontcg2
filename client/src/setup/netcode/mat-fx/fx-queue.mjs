@@ -55,8 +55,12 @@ export const createFxQueue = ({
     // pushed and re-armed one of its own. Either way this call no longer owns
     // the chain and must not overwrite what happened while it ran.
     if (epoch !== startedIn || timer !== null) return;
-    if (committedMs >= maxQueueMs) hold = 0;
-    committedMs += hold;
+    // A `blocking` plan (a coin ceremony covering the board) always waits out its
+    // hold and does not spend the budget: what queues behind it must not play under it.
+    if (!plan.blocking) {
+      if (committedMs >= maxQueueMs) hold = 0;
+      committedMs += hold;
+    }
     timer = schedule(step, hold);
   };
 

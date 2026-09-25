@@ -2162,7 +2162,12 @@ function resolveCheckup(
 
     // Every condition resolves, in rules order, and the Knockout check runs once after
     // all Checkup damage (audit A-1: this used to be an else-if chain over one string).
-    const flip = () => ((rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails');
+    // Checkup flips are reported like any other, so the client's coin ceremony shows them.
+    const flip = (condition) => {
+      const face = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
+      events.push({ type: 'coinFlipped', playerId: pid, face, source: condition, instanceId: active.instanceId });
+      return face;
+    };
     const cleared = (condition) => {
       removeCondition(active, condition);
       events.push({
@@ -2191,7 +2196,7 @@ function resolveCheckup(
       checkupDamage('Burned', 20);
       // Wela Volcano Park: the Burned flip happens but can't remove the condition.
       const burnedMods = stadiumCheckupCoinModifiers(checkupStadium, { condition: 'Burned' });
-      if (flip() === 'heads' && !burnedMods?.burnedPersists) cleared('Burned');
+      if (flip('Burned') === 'heads' && !burnedMods?.burnedPersists) cleared('Burned');
     }
     if (hasCondition(active, 'Asleep')) {
       // Slumbering Forest: 2 coins instead of 1; either tails keeps it Asleep.
@@ -2200,7 +2205,7 @@ function resolveCheckup(
       const asleepFlips = asleepMods?.asleepFlips ?? (abilityAsleepFlips(active) || 1);
       let asleepHeads = 0;
       for (let i = 0; i < asleepFlips; i++) {
-        if (flip() === 'heads') asleepHeads++;
+        if (flip('Asleep') === 'heads') asleepHeads++;
       }
       if (asleepHeads === asleepFlips) cleared('Asleep');
     }
@@ -7339,6 +7344,7 @@ export function applyCommand(state, command, rng = null) {
       // Check confused condition
       if (attacker && attacker.specialCondition === 'Confused') {
         const coin = flipCoin(activeRng);
+        events.push({ type: 'coinFlipped', playerId, face: coin, source: 'Confused', instanceId: attacker.instanceId });
         if (coin === 'tails') {
           attacker.damage = (attacker.damage || 0) + 30;
           events.push({

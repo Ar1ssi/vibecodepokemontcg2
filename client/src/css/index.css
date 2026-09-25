@@ -4674,6 +4674,15 @@ body.side-menu-collapsed #oppResizer {
       transition: opacity 0.3s ease;
     }
     .turn-order-coin-flip-result.visible { opacity: 1; }
+    .turn-order-coin-flip-tally {
+      color: #f2f4ff;
+      font-size: 1.7vh;
+      letter-spacing: 0.03em;
+      opacity: 0.8;
+      min-height: 1.7vh;
+    }
+    /* In-game flips report state the board already shows; never block it. */
+    #turnOrderCoinFlipOverlay.passive { pointer-events: none; }
     
     /* ── Customize switcher: Card Sleeve <-> Coin toggle + shared filter ── */
     #nativeDeckBuilderCustomizeSwitcher {

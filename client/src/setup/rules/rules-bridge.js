@@ -94,6 +94,8 @@ import {
   setSelectedCoin,
 } from './mat-coin.js';
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
+import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
+import { holdFxQueue } from '../netcode/advisory-animations.js';
 import {
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
@@ -964,6 +966,10 @@ import { glowColorFor } from './card-glow-colors.mjs';
         turnPlayer: starter,
         isRemote: false,
       });
+      // The server deals right after this result: the opening hands fly in once
+      // the ceremony starts to fade, not underneath it.
+      const opening = coinCeremonyTimeline(1);
+      holdFxQueue(e2eDelayMs(opening.totalMs - opening.fadeMs));
 
       serverTurnOrderStarter = starter;
       const session = rulesSessionGeneration;
@@ -971,7 +977,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
         if (session !== rulesSessionGeneration) return;
         serverTurnOrderAnimationDone = true;
         maybeBeginServerTurnOrder();
-      }, e2eDelayMs(2700));
+      }, e2eDelayMs(coinCeremonyTimeline(1).totalMs));
       return true;
     };
 
@@ -1168,7 +1174,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
           });
         }
     
-        setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner, caller, call: chosenCall }), e2eDelayMs(2700));
+        setTimeout(() => resolve({ turnPlayer, coin, result, coinOwner, caller, call: chosenCall }), e2eDelayMs(coinCeremonyTimeline(1).totalMs));
       });
     };
     

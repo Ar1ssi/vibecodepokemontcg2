@@ -396,3 +396,19 @@ test('a passing condition still runs the attack\'s steps and effects', () => {
   assert.equal(damageOn(res), 150);
   assert.equal(res.state.players.p1.zones.hand.length, 9, 'the draw step ran');
 });
+
+test('a Confused attacker reports its Confusion flip as coinFlipped (coin ceremony)', () => {
+  const confused = { name: 'Primeape', damage: '150', setup: ({ attacker }) => { attacker.specialCondition = 'Confused'; } };
+  const faces = new Set();
+  for (let seed = 1; seed <= 40 && faces.size < 2; seed++) {
+    const b = board('', { ...confused, seed });
+    const res = attack(b);
+    const flips = res.events.filter((e) => e.type === 'coinFlipped' && e.source === 'Confused');
+    assert.equal(flips.length, 1, `seed ${seed}: one Confusion flip`);
+    assert.equal(flips[0].instanceId, b.attacker.instanceId);
+    const fizzled = res.events.some((e) => e.type === 'attackConfusedFizzle');
+    assert.equal(flips[0].face, fizzled ? 'tails' : 'heads');
+    faces.add(flips[0].face);
+  }
+  assert.equal(faces.size, 2, 'both faces seen');
+});

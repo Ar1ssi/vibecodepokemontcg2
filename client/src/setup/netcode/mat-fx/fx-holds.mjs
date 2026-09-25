@@ -30,7 +30,9 @@ export const HOLD_MS = {
   'ability-banner': 480,
   'turn-banner': 260,
   discard: 120,
-  'coin-flip': 420,
+  // One flip's ceremony until its fade; coin.js returns the hold for the plan's
+  // actual flip count (coinCeremonyTimeline).
+  'coin-flip': 2250,
   'game-over': 0,
 };
 

@@ -21,6 +21,12 @@
 // `zoneMoved` into it (played Trainers swept off the board, discard-hand)
 // names only a count, so its plan carries `sweep` — the source zone whose
 // pre-diff cards the effect flies (origins.mjs `takeZoneSweep`).
+//
+// Every coin the engine flips plays the full-screen coin ceremony. The engine
+// reports flips in several event shapes; each becomes one `coin-flip` plan whose
+// `faces` lists every flip in order (coin-pose.mjs `coinFlipFaces`).
+import { coinFlipFaces, MAX_CEREMONY_FLIPS } from './mat-fx/coin-pose.mjs';
+
 export const EVENT_FX = {
   damageUpdated: 'damage',
   attackExecuted: 'attack',
@@ -41,8 +47,15 @@ export const EVENT_FX = {
   pokemonDevolved: 'devolve',
   statusCleared: 'status-clear',
   cardsDiscarded: 'discard',
-  coinFlipped: 'coin-flip',
+  // Coin events (COIN_EVENTS below) plan the `coin-flip` ceremony with their faces.
 };
+
+const COIN_EVENTS = new Set([
+  'coinFlipped',
+  'attackCoinFlipped',
+  'attackMarkerCoinFlipped',
+  'attackFlipGateCoinFlipped',
+]);
 
 // An attack fans into a banner (+ target ring) and then the lunge itself.
 const MULTI_FX = { attackExecuted: ['attack-banner', 'attack'] };
@@ -89,8 +102,24 @@ const prizePlans = (event, selfPlayerId) => {
   return [burst, { kind: 'draw', user: burst.user, cards, count: cards.length, source: 'prizes' }];
 };
 
-export function advisoryAnimationPlan(event, selfPlayerId) {
+// `run` is this event's faces from coinFlipRuns: the whole run for its first
+// flip, [] for a flip already folded into an earlier event's ceremony.
+const coinPlan = (event, selfPlayerId, run) => {
+  const faces = Array.isArray(run) ? run : coinFlipFaces(event);
+  if (faces.length === 0) return null;
+  // A marker event's own `kind` must not replace the plan kind. `blocking`: the
+  // ceremony covers the board, so its hold survives the FX queue's flood budget.
+  return { ...fxPlan(event, selfPlayerId, 'coin-flip'), kind: 'fx', blocking: true, faces };
+};
+
+/**
+ * @param {object} event
+ * @param {string|null} selfPlayerId
+ * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
+ */
+export function advisoryAnimationPlan(event, selfPlayerId, coinRun) {
   if (!event || typeof event !== 'object') return null;
+  if (COIN_EVENTS.has(event.type)) return coinPlan(event, selfPlayerId, coinRun);
   if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
   if (event.type === 'cardMoved') {
@@ -155,4 +184,45 @@ export function supersededDeals(events) {
     lastDeal.set(event.playerId, event);
   }
   return superseded;
+}
+
+const singleFlipFace = (event) => {
+  if (event?.type !== 'coinFlipped' || event.heads !== undefined) return null;
+  const faces = coinFlipFaces(event);
+  return faces.length === 1 ? faces[0] : null;
+};
+
+/**
+ * Back-to-back single flips by one player for one source ("Flip 3 coins" emits
+ * three `coinFlipped`) play as ONE ceremony, one toss after another: the first
+ * event maps to every face in the run, the others to [] so they plan nothing.
+ *
+ * @param {object[]} events
+ * @returns {Map<object, string[]>}
+ */
+export function coinFlipRuns(events) {
+  const runs = new Map();
+  if (!Array.isArray(events)) return runs;
+  let leader = null;
+  for (const event of events) {
+    const face = singleFlipFace(event);
+    if (face == null) {
+      leader = null;
+      continue;
+    }
+    const faces = leader && runs.get(leader);
+    const joins =
+      faces &&
+      leader.playerId === event.playerId &&
+      leader.source === event.source &&
+      faces.length < MAX_CEREMONY_FLIPS;
+    if (joins) {
+      faces.push(face);
+      runs.set(event, []);
+      continue;
+    }
+    leader = event;
+    runs.set(event, [face]);
+  }
+  return runs;
 }

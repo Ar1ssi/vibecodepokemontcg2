@@ -18,6 +18,7 @@
 // Keeping this DOM-free means the whole palette — including how a hit's pitch
 // tracks its damage — is unit-testable without an AudioContext.
 import { classifyHitOnce } from './damage-hit.mjs';
+import { coinCeremonyTimeline } from './coin-pose.mjs';
 
 export const MAX_GAIN = 0.8;
 
@@ -175,12 +176,21 @@ function damageVoices(plan) {
   return Object.freeze(body);
 }
 
+// One chime per flip, timed to the moment that coin lands in the ceremony
+// (coin-pose.mjs), so the sound never gives the result away mid-toss.
 function coinVoices(plan) {
-  const high = plan?.face === 'heads';
-  return Object.freeze([
-    tone(high ? 1319 : 880, 0.12, 0.15, { wave: 'sine' }),
-    tone(high ? 1760 : 659, 0.2, 0.11, { wave: 'sine', delay: 0.09 }),
-  ]);
+  const faces = Array.isArray(plan?.faces) && plan.faces.length > 0 ? plan.faces : [plan?.face];
+  const { landsAt } = coinCeremonyTimeline(faces.length);
+  return Object.freeze(
+    faces.flatMap((face, i) => {
+      const high = face === 'heads';
+      const at = landsAt[i] / 1000;
+      return [
+        tone(high ? 1319 : 880, 0.12, 0.15, { wave: 'sine', delay: at }),
+        tone(high ? 1760 : 659, 0.2, 0.11, { wave: 'sine', delay: at + 0.09 }),
+      ];
+    })
+  );
 }
 
 function gameOverVoices(plan) {

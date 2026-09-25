@@ -203,3 +203,19 @@ test('fx-queue: an effect that pushes mid-run does not orphan a timer', () => {
   assert.equal(queue.pending(), 0);
   assert.equal(clock.armed, null, 'no leftover timer to fire a phantom step');
 });
+
+test('fx-queue: a blocking plan (coin ceremony) keeps its hold past the budget and does not spend it', () => {
+  const { queue, clock } = make((p) => p.hold, { maxQueueMs: 1000 });
+  queue.push({ id: 'banner', hold: 1200 });
+  queue.push({ id: 'coin', hold: 3500, blocking: true });
+  queue.push({ id: 'draw', hold: 300 });
+  clock.drain();
+  // The banner used up the budget; the ceremony still holds, the draw after it collapses.
+  assert.deepEqual(clock.delays, [1200, 3500, 0]);
+
+  const fresh = make((p) => p.hold, { maxQueueMs: 1000 });
+  fresh.queue.push({ id: 'wait', hold: 3500, blocking: true });
+  fresh.queue.push({ id: 'draw', hold: 600 });
+  fresh.clock.drain();
+  assert.deepEqual(fresh.clock.delays, [3500, 600], 'the wait left the budget for what follows it');
+});

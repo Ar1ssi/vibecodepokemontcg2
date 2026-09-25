@@ -224,3 +224,13 @@ test('fx-audio: a cumulative no-op is silent', () => {
   voicesFor('damage', { instanceId: 'c4', damage: 30 });
   assert.deepEqual(voicesFor('damage', { instanceId: 'c4', damage: 30 }), []);
 });
+
+test('fx-audio: coin chimes wait for each coin to land, one per flip', () => {
+  const one = voicesFor('coin-flip', { faces: ['heads'] });
+  assert.equal(one.length, 2);
+  assert.ok(one[0].delay >= 1, 'the chime does not give the result away mid-toss');
+  const three = voicesFor('coin-flip', { faces: ['heads', 'tails', 'heads'] });
+  assert.equal(three.length, 6);
+  assert.ok(three[2].delay > three[0].delay && three[4].delay > three[2].delay);
+  assert.ok(three[0].freq > three[2].freq, 'heads and tails still chime differently');
+});

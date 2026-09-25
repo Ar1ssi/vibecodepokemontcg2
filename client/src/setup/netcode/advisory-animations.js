@@ -3,7 +3,7 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
-import { advisoryAnimationPlan, drawnCards, supersededDeals } from './advisory-animations.mjs';
+import { advisoryAnimationPlan, coinFlipRuns, drawnCards, supersededDeals } from './advisory-animations.mjs';
 import {
   getAuthoritativeDeckCount,
   getAuthoritativeZoneArray,
@@ -40,10 +40,13 @@ const shuffleZoneCount = (user, zoneId) => {
 
 // Deals a later mulligan replaced in the batch being applied (design 044).
 let skippedDeals = new Set();
-// Revealed by this if their plan never runs (the queue was cleared).
-const HELD_DRAW_BACKSTOP_MS = 6000;
+// Revealed by this if their plan never runs (the queue was cleared). Covers the
+// opening coin ceremony the opening deal waits behind (holdFxQueue).
+const HELD_DRAW_BACKSTOP_MS = 9000;
 // Design 045: where each taken prize sat before the diff moved it to the hand.
 let prizeSeats = new Map();
+// Coin flips of the batch being applied, merged into one ceremony per run.
+let coinRuns = new Map();
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -112,6 +115,7 @@ const playDrawPlan = (plan) => {
  */
 export function handleBeforeApply(events, selfPlayerId) {
   skippedDeals = supersededDeals(events);
+  coinRuns = coinFlipRuns(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
   capturePrizeSeats(events, registry, selfPlayerId);
@@ -156,6 +160,7 @@ function runPlan(plan) {
     return holdFor('knockout');
   }
   if (plan.kind === 'fx') return playFx(plan);
+  if (plan.kind === 'wait') return plan.ms;
   return 0;
 }
 
@@ -181,6 +186,18 @@ if (typeof document !== 'undefined') {
 }
 
 /**
+ * Holds the FX queue for `ms` while something outside it covers the board (the
+ * opening coin ceremony), so the plans that arrive meanwhile — the opening deal —
+ * play after it instead of under it.
+ *
+ * @param {number} ms
+ */
+export function holdFxQueue(ms) {
+  if (!(ms > 0)) return;
+  fxQueue.push({ kind: 'wait', ms, blocking: true });
+}
+
+/**
  * Handles one server advisory event: builds the plan (pure), then — unless
  * catch-up replay or a hidden tab (edge cases 5, 6) — queues the animation.
  * An event may produce several plans (an attack is a banner then a lunge);
@@ -191,7 +208,7 @@ if (typeof document !== 'undefined') {
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
   if (skippedDeals.has(event)) return;
-  const planned = advisoryAnimationPlan(event, selfPlayerId);
+  const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event));
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];
   if (plans.length === 0) return;

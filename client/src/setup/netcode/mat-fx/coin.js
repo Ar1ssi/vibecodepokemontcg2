@@ -1,54 +1,38 @@
-// Design 024 slice 4: the in-attack coin flip. Design 013's coin ceremony
-// covers the opening turn-order call only; every `coinFlipped` the engine
-// emits during an attack or ability landed silently. This is a small chip that
-// pops at the acting side's Active Pokemon and names the face.
-import { getCardRegistry } from '../apply-view.js';
-import { rectForInstance, runPose, spawnOverlay } from '../../image-logic/mat-fx.mjs';
-import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
-import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
-import { docForSide } from './side-doc.mjs';
-import { COIN_CHIP_MS, coinChipPose, coinFaceLabel } from './coin-pose.mjs';
+// Every coin the engine flips plays the same full-screen ceremony as the
+// opening turn-order call, with the flipping player's chosen coin. A plan's
+// `faces` (advisory-animations.mjs) may hold several flips; they toss one after
+// another in one overlay.
+import { playCoinFlipCeremony } from '../../rules/coin-flip-ceremony.js';
+import { getSelectedCoin, pickDefaultCoin } from '../../rules/mat-coin.js';
+import { motionReduced } from '../../image-logic/mat-fx.mjs';
+import { coinCeremonyTimeline } from './coin-pose.mjs';
 
-// Anchored on the flipping side's Active slot: that is where the player is
-// already looking during an attack.
-const activeRectFor = (user) => {
-  const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
-  const active = doc?.getElementById('active');
-  if (!active) return null;
-  const rect = visualRectOf(active);
-  if (rect.width < 2 || rect.height < 2) return null;
-  return rect;
+// Ceremonies never cut each other off: the FX queue drops its holds under a
+// flood, so a second flip can arrive while the first is still on screen.
+let ceremonyChain = Promise.resolve();
+
+const headingFor = (plan) => {
+  const owner = plan.user === 'opp' ? "Opponent's" : 'Your';
+  const context = [plan.attackName, plan.source].find(
+    (value) => typeof value === 'string' && value.trim() !== ''
+  );
+  return context ? `${owner} coin flip — ${context}` : `${owner} coin flip`;
 };
 
 export const coinFlip = (plan) => {
-  const label = coinFaceLabel(plan.face);
-  if (!label) return 0;
-  const anchor =
-    rectForInstance(plan.instanceId, getCardRegistry()) || activeRectFor(plan.user);
-  if (!anchor) return 0;
+  const faces = Array.isArray(plan.faces) ? plan.faces : [];
+  if (faces.length === 0) return 0;
+  // The app's reduce-motion setting shows each face without the tumble.
+  const reducedMotion = motionReduced() || undefined;
+  const side = plan.user === 'opp' ? 'opp' : 'self';
+  const coin = getSelectedCoin(side) || pickDefaultCoin();
+  const label = headingFor(plan);
 
-  const size = Math.max(28, anchor.width * 0.45);
-  const rect = {
-    left: anchor.left + (anchor.width - size) / 2,
-    top: anchor.top + (anchor.height - size) / 2,
-    width: size,
-    height: size,
-  };
-  const host = spawnOverlay({
-    rect,
-    className: `fx-overlay fx-coin-chip fx-coin-chip--${plan.face === 'heads' ? 'heads' : 'tails'}`,
-  });
-  host.style.fontSize = `${Math.max(9, size * 0.26)}px`;
-  const chip = document.createElement('div');
-  chip.className = 'fx-coin-chip__face';
-  chip.textContent = label;
-  host.appendChild(chip);
+  ceremonyChain = ceremonyChain
+    .then(() => playCoinFlipCeremony({ coin, results: faces, label, passive: true, reducedMotion }))
+    .catch((err) => console.warn('[mat-fx] coin ceremony failed', err));
 
-  runPose(host, COIN_CHIP_MS, (t) => {
-    const pose = coinChipPose(t);
-    host.style.transform = `translate3d(0, ${pose.y}px, 0)`;
-    host.style.opacity = String(pose.opacity);
-    // scaleX alone reads as a coin turning edge-on, without a 3D context.
-    chip.style.transform = `scale(${pose.scale}) scaleX(${pose.spin})`;
-  });
+  // Hold the queue until the result has been read; later effects start as the overlay fades.
+  const timeline = coinCeremonyTimeline(faces.length, { reducedMotion });
+  return timeline.totalMs - timeline.fadeMs;
 };

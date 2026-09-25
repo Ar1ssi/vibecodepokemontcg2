@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { advisoryAnimationPlan, EVENT_FX, supersededDeals } from '../advisory-animations.mjs';
+import { advisoryAnimationPlan, coinFlipRuns, EVENT_FX, supersededDeals } from '../advisory-animations.mjs';
 import { HOLD_MS } from '../mat-fx/fx-holds.mjs';
 
 test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side', () => {
@@ -339,4 +339,44 @@ test('advisoryAnimationPlan: taken prizes naming cards burst, then fly into the 
   });
   const unknownSide = advisoryAnimationPlan({ type: 'prizesTaken', playerId: 'p2', cards: [{ instanceId: 30 }] }, null);
   assert.equal(unknownSide.kind, 'fx');
+});
+
+test('advisoryAnimationPlan: every coin event shape plays the coin ceremony with its faces', () => {
+  const cases = [
+    [{ type: 'coinFlipped', playerId: 'p2', face: 'tails', source: 'Burned' }, ['tails']],
+    [{ type: 'coinFlipped', playerId: 'p1', face: 'tails', heads: 1 }, ['heads', 'tails']],
+    [{ type: 'attackCoinFlipped', playerId: 'p1', attackName: 'Double Kick', flips: ['heads', 'heads'] }, ['heads', 'heads']],
+    [{ type: 'attackMarkerCoinFlipped', playerId: 'p1', kind: 'attackFlipOrFail', coin: 'tails' }, ['tails']],
+    [{ type: 'attackFlipGateCoinFlipped', playerId: 'p1', coin: 'heads' }, ['heads']],
+  ];
+  for (const [event, faces] of cases) {
+    const plan = advisoryAnimationPlan(event, 'p1');
+    assert.equal(plan.kind, 'fx', event.type);
+    assert.equal(plan.effect, 'coin-flip', event.type);
+    assert.deepEqual(plan.faces, faces, event.type);
+  }
+  const attack = advisoryAnimationPlan(cases[2][0], 'p1');
+  assert.equal(attack.attackName, 'Double Kick', 'the ceremony names the attack');
+  assert.equal(advisoryAnimationPlan(cases[0][0], 'p1').source, 'Burned');
+  assert.equal(advisoryAnimationPlan({ type: 'attackCoinFlipped', playerId: 'p1', flips: [] }, 'p1'), null);
+});
+
+test('coinFlipRuns: back-to-back single flips by one player and source play as one ceremony', () => {
+  const a = { type: 'coinFlipped', playerId: 'p1', face: 'heads', source: 'Asleep' };
+  const b = { type: 'coinFlipped', playerId: 'p1', face: 'tails', source: 'Asleep' };
+  const otherPlayer = { type: 'coinFlipped', playerId: 'p2', face: 'heads', source: 'Asleep' };
+  const gap = { type: 'statusCleared', playerId: 'p2', condition: 'Asleep' };
+  const c = { type: 'coinFlipped', playerId: 'p2', face: 'tails', source: 'Asleep' };
+  const streak = { type: 'coinFlipped', playerId: 'p2', face: 'tails', heads: 2 };
+  const runs = coinFlipRuns([a, b, otherPlayer, gap, c, streak]);
+
+  assert.deepEqual(runs.get(a), ['heads', 'tails']);
+  assert.deepEqual(runs.get(b), []);
+  assert.deepEqual(runs.get(otherPlayer), ['heads'], 'another player starts a new ceremony');
+  assert.deepEqual(runs.get(c), ['tails'], 'any other event in between splits the run');
+  assert.equal(runs.has(streak), false, 'a counted streak already carries its own faces');
+
+  assert.deepEqual(advisoryAnimationPlan(a, 'p1', runs.get(a)).faces, ['heads', 'tails']);
+  assert.equal(advisoryAnimationPlan(b, 'p1', runs.get(b)), null, 'folded flips plan nothing');
+  assert.equal(coinFlipRuns(null).size, 0);
 });
