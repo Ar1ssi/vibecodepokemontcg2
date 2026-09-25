@@ -153,6 +153,7 @@ const CLAUSES = [
     /^you have exactly (\d+) cards? in your hand$/,
     (m) => ({ desc: { kind: 'handCount', op: 'eq', n: Number(m[1]) }, printedNegated: false }),
   ],
+  [/^you have no cards? in your hand$/, () => ({ desc: { kind: 'handCount', op: 'eq', n: 0 }, printedNegated: false })],
   [
     /^you don't have (\d+) or more cards? in your hand$/,
     (m) => ({ desc: { kind: 'handCount', op: 'gte', n: Number(m[1]) }, printedNegated: true }),
@@ -331,6 +332,10 @@ const CLAUSES = [
       desc: { kind: 'opponentPrizes', op: 'eq', n: [Number(m[1]), Number(m[2])] },
       printedNegated: false,
     }),
+  ],
+  [
+    /^your opponent has exactly (\d+) prize cards? remaining$/,
+    (m) => ({ desc: { kind: 'opponentPrizes', op: 'eq', n: Number(m[1]) }, printedNegated: false }),
   ],
   [
     /^your opponent has (\d+) or fewer prize cards? remaining$/,

@@ -96,6 +96,93 @@ test('parseCopyAttack: every printed copy wording maps to its source', () => {
   for (const [text, spec] of cases) assert.deepEqual(parseCopyAttack(text), spec, text);
 });
 
+test('parseCopyAttack: design 039 residual wordings', () => {
+  const cases = [
+    // Old "copies that attack except for its Energy cost" prints (Clefable/Clefairy/Clefable ex).
+    [
+      "Choose 1 of the Defending Pokémon's attacks. Metronome copies that attack except for its Energy cost. (You must still do anything else in order to use that attack.) Clefable performs that attack.",
+      { source: 'oppActive' },
+    ],
+    [
+      "Choose 1 of the Defending Pokémon's attacks. Metronome copies that attack except for its Energy costs and anything else required in order to use that attack, such as discarding Energy cards. (No matter what type the Defending Pokémon is, Clefairy's type is still Colorless.)",
+      { source: 'oppActive' },
+    ],
+    // Mew Star Mimicry: in-play source with the energy gate.
+    [
+      "Choose an attack on 1 of your opponent's Pokémon in play. Mimicry copies that attack. This attack does nothing if Mew Star doesn't have the Energy necessary to use that attack. (You must still do anything else required for that attack.) Mew Star performs that attack.",
+      { source: 'oppInPlay', needsEnergy: true },
+    ],
+    // Togetic Super Metronome: coin-gated in-play source.
+    [
+      "Flip a coin. If heads, choose an attack on 1 of your opponent's Pokémon. Super Metronome copies that attack except for its Energy cost. (You must still do anything else in order to use that attack.) (No matter what type the Defending Pokémon is, Togetic's type is still {C}.) Togetic performs that attack.",
+      { source: 'oppInPlay', coinGate: 'heads' },
+    ],
+    // Mew Re-creation: the opponent's discard pile.
+    [
+      "Choose an attack on 1 of your opponent's Pokémon in his or her discard pile. Re-creation copies that attack except for its Energy cost. (You must still do anything else required for that attack.) Mew performs that attack.",
+      { source: 'oppDiscard' },
+    ],
+    // Smeargle Trace: coin-gated old Bench wording.
+    [
+      "Flip a coin. If heads, choose an attack on 1 of your opponent's Benched Pokémon. Trace copies that attack except for its Energy cost. (You must still do anything else required for that attack.) Smeargle performs that attack.",
+      { source: 'oppBench', coinGate: 'heads' },
+    ],
+    // Dark Hypno Dark Link: own Dark-name in play, excluding the user.
+    [
+      "Flip a coin. If heads, choose an attack on 1 of your Pokémon in play that has Dark in its name (excluding this one). Dark Link copies that attack except for its Energy cost. (You must still do anything else required for that attack.) (No matter what type that Pokémon is, Dark Hypno's type is still {P}{D}.) Dark Hypno performs that attack.",
+      { source: 'ownInPlay', darkName: true, excludeSelf: true, coinGate: 'heads' },
+    ],
+    // Team Rocket's Mimikyu: only an Active Tera Pokémon.
+    [
+      "Choose 1 of your opponent's Active Tera Pokémon's attacks and use it as this attack.",
+      { source: 'oppActive', tera: true },
+    ],
+    // Thievul's copy body (its condition is peeled by the condition parser).
+    ["Choose an attack from 1 of your opponent's Pokémon in play and use it as this attack.", { source: 'oppInPlay' }],
+    // Thievul: the inline empty-hand condition rides on the spec.
+    [
+      "If you have no cards in your hand, choose an attack from 1 of your opponent's Pokémon in play and use it as this attack.",
+      { source: 'oppInPlay', condition: { kind: 'handCount', op: 'eq', n: 0, negated: false } },
+    ],
+    // Nihilego: the "use this attack only if" clause rides on the spec.
+    [
+      "You can use this attack only if your opponent has exactly 2 Prize cards remaining. Choose 1 of your opponent's Pokémon's attacks and use it as this attack.",
+      { source: 'oppInPlay', condition: { kind: 'opponentPrizes', op: 'eq', n: 2, negated: false } },
+    ],
+    // Previous-Evolution copies (Incineroar, Charizard).
+    [
+      "Choose an attack from 1 of this Pokémon's previous Evolutions and use it as this attack.",
+      { source: 'ownEvolutionStack' },
+    ],
+    [
+      "Choose 1 of this Pokémon's attacks from its previous Evolutions and use it as this attack.",
+      { source: 'ownEvolutionStack' },
+    ],
+    // Slowking: discard the deck top, copy it when it has no Rule Box.
+    [
+      "Discard the top card of your deck, and if that card is a Pokémon that doesn't have a Rule Box, choose 1 of its attacks and use it as this attack. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)",
+      { source: 'ownDeckTop', count: 1, noRuleBox: true },
+    ],
+    // Last-turn copies (Mimikyu Copycat, Sudowoodo Watch and Learn).
+    [
+      "If your opponent's Pokémon used an attack that isn't a GX attack during their last turn, use it as this attack.",
+      { source: 'oppLastAttack', excludeGx: true, auto: true },
+    ],
+    [
+      "If your opponent's Pokémon used an attack during his or her last turn, use it as this attack.",
+      { source: 'oppLastAttack', auto: true },
+    ],
+  ];
+  for (const [text, spec] of cases) assert.deepEqual(parseCopyAttack(text), spec, text);
+  // Misty's Psyduck ESP is a multi-branch coin attack: the copy parser must not claim it.
+  assert.equal(
+    parseCopyAttack(
+      "Flip 3 coins. If exactly 1 is heads, draw a card. If exactly 2 are heads, this attack does 20 damage. If all 3 are heads, choose 1 of the Defending Pokémon's attacks. Misty's Psyduck copies that attack except for its Energy costs. (No matter what type the Defending Pokémon is, Misty's Psyduck's type is still {W}.)"
+    ),
+    null
+  );
+});
+
 test('parseCopyAttack: Encore and non-copy texts are not copy attacks', () => {
   assert.equal(
     parseCopyAttack(

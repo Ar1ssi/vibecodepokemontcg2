@@ -1,5 +1,10 @@
 // Copy-attack family (design 031, I118): "Choose 1 of … Pokémon's attacks and use it as this
 // attack." Pure parsing only; reduce.mjs gathers the candidate attacks and runs the copy.
+// Design 039 (I168) adds the residual wordings: old "copies that attack" prints, previous
+// Evolutions, last turn, own deck top, opponent discard, Dark-name and Tera filters, and
+// inline conditions. Multi-coin "all N are heads" wordings fail closed (see peelCopyPrefix).
+
+import { parseConditionClause } from './attack-conditions.mjs';
 
 const TYPE_LETTERS = {
   g: 'Grass',
@@ -22,8 +27,11 @@ function normalize(text) {
   return String(text || '')
     .toLowerCase()
     .replace(/é/g, 'e')
+    .replace(/[’‘]/g, "'")
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\s+/g, ' ')
+    // A removed parenthetical can leave " ." behind (Dark Hypno "…name (excluding this one).").
+    .replace(/\s+([.,])/g, '$1')
     .trim();
 }
 
@@ -90,24 +98,134 @@ const TEMPLATES = [
     ),
     () => ({ source: 'oppBench' }),
   ],
+  // Old "copies that attack except for its Energy cost" prints (Clefable/Clefairy, Clefable ex).
+  [
+    new RegExp(
+      String.raw`^choose 1 of (?:the defending pokemon|your opponent's active pokemon)'s attacks\. [^.]+ copies that attack except for its energy costs?(?: and anything else required in order to use that attack(?:, such as discarding energy cards)?)?\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppActive' }),
+  ],
+  // "Choose an attack on 1 of your opponent's Pokémon [in play]" (Mew Star, Togetic Super
+  // Metronome). The "does nothing if … doesn't have the Energy" sentence adds the energy gate.
+  [
+    new RegExp(
+      String.raw`^choose an attack on 1 of your opponent's pokemon(?: in play)?\. [^.]+ copies that attack(?: except for its energy cost)?\.( this attack does nothing if [^.]+ doesn't have the energy necessary to use that attack\.)?` +
+        PERFORMS +
+        '$'
+    ),
+    (m) => (m[1] ? { source: 'oppInPlay', needsEnergy: true } : { source: 'oppInPlay' }),
+  ],
+  // Mew Re-creation: the opponent's discard pile.
+  [
+    new RegExp(
+      String.raw`^choose an attack on 1 of your opponent's pokemon in (?:his or her|their) discard pile\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppDiscard' }),
+  ],
+  // Smeargle Trace: the old Bench wording ("choose an attack on 1 of … Benched Pokémon").
+  [
+    new RegExp(
+      String.raw`^choose an attack on 1 of your opponent's benched pokemon\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppBench' }),
+  ],
+  // Dark Hypno Dark Link: an own Pokémon in play with Dark in its name, excluding the user
+  // (the printed "(excluding this one)" is stripped by normalize).
+  [
+    new RegExp(
+      String.raw`^choose an attack on 1 of your pokemon in play that has dark in its name\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'ownInPlay', darkName: true, excludeSelf: true }),
+  ],
+  // Team Rocket's Mimikyu: only the opponent's Active Tera Pokémon.
+  [
+    /^choose 1 of your opponent's active tera pokemon's attacks and use it as this attack\.$/,
+    () => ({ source: 'oppActive', tera: true }),
+  ],
+  // Incineroar / Charizard: this Pokémon's previous Evolutions.
+  [
+    /^choose an attack from 1 of this pokemon's previous evolutions and use it as this attack\.$/,
+    () => ({ source: 'ownEvolutionStack' }),
+  ],
+  [
+    /^choose 1 of this pokemon's attacks from its previous evolutions and use it as this attack\.$/,
+    () => ({ source: 'ownEvolutionStack' }),
+  ],
+  // Slowking Seek Inspiration: discard the deck top, then copy from it if it has no Rule Box.
+  [
+    /^discard the top card of your deck, and if that card is a pokemon that doesn't have a rule box, choose 1 of its attacks and use it as this attack\.$/,
+    () => ({ source: 'ownDeckTop', count: 1, noRuleBox: true }),
+  ],
+  // Mimikyu Copycat / Sudowoodo Watch and Learn: the attack the opponent used last turn.
+  [
+    /^if your opponent's pokemon used an attack( that isn't a gx attack)? during (?:their|his or her) last turn, use it as this attack\.$/,
+    (m) =>
+      m[1]
+        ? { source: 'oppLastAttack', excludeGx: true, auto: true }
+        : { source: 'oppLastAttack', auto: true },
+  ],
 ];
+
+/**
+ * Peels one leading gate off a copy wording: the attack's own coin flip, an inline
+ * "If …, <copy wording>" condition, or a "You can use this attack only if …" gate.
+ * Returns the remaining text plus the flag the prefix contributes, or null when the prefix
+ * is not one this parser can read (fail closed: no wrong copy).
+ */
+function peelCopyPrefix(text) {
+  const coin = /^flip (a|an|(\d+)) coins?\. if (heads|tails|all (\d+) are heads), /.exec(text);
+  if (coin) {
+    // Multi-coin gates ("Flip 3 coins. If all 3 are heads, …", Misty's Psyduck ESP) are
+    // multi-branch attacks: the other outcomes carry effects this copy flow would drop.
+    // Fail closed so the attack keeps running its own steps (I168 deferral).
+    const printed = coin[2] == null ? 1 : Number(coin[2]);
+    if (printed > 1 || coin[4] != null) return null;
+    return {
+      rest: text.slice(coin[0].length),
+      flags: { coinGate: coin[3] === 'tails' ? 'tails' : 'heads' },
+    };
+  }
+  const ifClause = /^if (.+?), /.exec(text);
+  if (ifClause) {
+    const condition = parseConditionClause(ifClause[1]);
+    return condition ? { rest: text.slice(ifClause[0].length), flags: { condition } } : null;
+  }
+  const onlyIf = /^you can use this attack only if (.+?)\. /.exec(text);
+  if (onlyIf) {
+    const condition = parseConditionClause(onlyIf[1]);
+    return condition ? { rest: text.slice(onlyIf[0].length), flags: { condition } } : null;
+  }
+  return null;
+}
 
 /**
  * The copy source an attack's whole text asks for, or null when the text is not a copy
  * attack (or carries anything the templates don't cover).
  * @returns {{source: string, group?: string, pokemonType?: string, count?: number,
- *   optional?: boolean, needsEnergy?: boolean, excludeGx?: boolean, coinGate?: string} | null}
+ *   optional?: boolean, needsEnergy?: boolean, excludeGx?: boolean, coinGate?: string,
+ *   condition?: object, tera?: boolean, darkName?: boolean, excludeSelf?: boolean,
+ *   noRuleBox?: boolean, auto?: boolean} | null}
  */
 export function parseCopyAttack(text) {
-  const t = normalize(text);
+  let t = normalize(text);
   if (!t) return null;
-  const whole = matchTemplates(t);
-  if (whole) return whole;
-  // "Flip a coin. If heads, <copy wording>" (Liepard Assist, Ethan's Sudowoodo, Hypno).
-  const coin = /^flip a coin\. if heads, (.+)$/.exec(t);
-  if (!coin) return null;
-  const rest = matchTemplates(coin[1]);
-  return rest ? { ...rest, coinGate: 'heads' } : null;
+  const flags = {};
+  for (;;) {
+    const whole = matchTemplates(t);
+    if (whole) return { ...whole, ...flags };
+    const peeled = peelCopyPrefix(t);
+    if (!peeled) return null;
+    t = peeled.rest;
+    Object.assign(flags, peeled.flags);
+  }
 }
 
 function matchTemplates(t) {

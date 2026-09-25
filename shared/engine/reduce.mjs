@@ -204,6 +204,7 @@ import { trainerEndsTurn } from './rules/trainer-effects.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import {
   evolvedView,
+  priorEvolutionCards,
   trainerTargetCounts,
   ownedCards,
   topPokemonCard,
@@ -4880,6 +4881,18 @@ function runAttackSteps(
  */
 function flipAndResolveAttack(draft, ctx) {
   const { playerId, activeRng, events, attack, attackerPlayer, atkIdx, targetInstanceId, copiedAttack } = ctx;
+  // The attack this player used, for next-turn copy wordings (Mimikyu Copycat, Sudowoodo
+  // Watch and Learn): the copied attack when one was chosen, scoped by turn number so the
+  // opponent reads it only during their next turn (design 039).
+  if (attackerPlayer) {
+    attackerPlayer.lastAttack = {
+      attack: { ...attack },
+      isGx: isGxAttack(attack),
+      attackerName: ctx.attackerView?.name || ctx.attacker?.name || '',
+      attackerInstanceId: ctx.attacker?.instanceId ?? null,
+      turnNumber: draft.turn?.number || 1,
+    };
+  }
   // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
   // the parser resolves from live board counts, then bench/spread damage. Without this
   // every attack dealt its flat printed number regardless of the board (I26 follow-up).
@@ -4940,7 +4953,7 @@ function flipAndResolveAttack(draft, ctx) {
 const rootsIn = (cards) => (cards || []).filter((c) => !c.attachedTo && isPokemon(c));
 
 /** Where a copy attack looks for attacks to use (design 031). */
-function copySourceCards(draft, { copy, playerId, oppId }) {
+function copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard }) {
   const own = draft.players[playerId]?.zones || {};
   const opp = draft.players[oppId]?.zones || {};
   switch (copy.source) {
@@ -4948,12 +4961,25 @@ function copySourceCards(draft, { copy, playerId, oppId }) {
       return rootsIn(own.bench).filter((c) => !copy.group || inCopyGroup(c, copy.group));
     case 'ownDiscard':
       return rootsIn(own.discard).filter((c) => (c.types || []).includes(copy.pokemonType));
+    case 'ownInPlay':
+      return [...rootsIn(own.active), ...rootsIn(own.bench)];
+    case 'ownEvolutionStack': {
+      // Incineroar/Charizard: the Basic plus every Evolution below the current top.
+      const ref = attacker ? findCard(draft, attacker.instanceId) : null;
+      const zone = ref?.player?.zones?.[ref.zoneId];
+      return Array.isArray(zone) ? priorEvolutionCards(zone, attacker) : [];
+    }
+    case 'ownDeckTop':
+      // Slowking: the card is discarded by offerCopiedAttack before candidates are read.
+      return deckTopCard ? [deckTopCard] : [];
     case 'oppActive':
       return rootsIn(opp.active);
     case 'oppBench':
       return rootsIn(opp.bench);
     case 'oppInPlay':
       return [...rootsIn(opp.active), ...rootsIn(opp.bench)];
+    case 'oppDiscard':
+      return rootsIn(opp.discard);
     case 'oppDeckTop':
       return rootsIn((opp.deck || []).slice(0, copy.count));
     default:
@@ -4961,16 +4987,30 @@ function copySourceCards(draft, { copy, playerId, oppId }) {
   }
 }
 
+// Sources whose attacks are read from the card as stored, not from its in-play view.
+const RAW_ATTACK_SOURCES = new Set([
+  'ownDiscard',
+  'oppDeckTop',
+  'oppDiscard',
+  'ownDeckTop',
+  'ownEvolutionStack',
+]);
+
 /**
  * The attacks a copy attack may use: every attack on its source cards except other copy
  * attacks, and — when the text requires it — only those the copier has the Energy for.
+ * Design 039 filters: Tera only, Dark-name only, exclude the user, no Rule Box.
  */
-function copyAttackCandidates(draft, { copy, playerId, oppId, attacker }) {
-  const inPlay = copy.source !== 'ownDiscard' && copy.source !== 'oppDeckTop';
+function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopCard }) {
+  if (copy.source === 'oppLastAttack') return lastTurnAttackCandidates(draft, { copy, oppId });
   const candidates = [];
-  for (const card of copySourceCards(draft, { copy, playerId, oppId })) {
-    const attacks = (inPlay ? inPlayView(draft, card) : card)?.attacks || [];
-    for (const attack of attacks) {
+  for (const card of copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard })) {
+    if (copy.excludeSelf && card.instanceId === attacker?.instanceId) continue;
+    const view = RAW_ATTACK_SOURCES.has(copy.source) ? card : inPlayView(draft, card);
+    if (copy.tera && !isTeraCard(view)) continue;
+    if (copy.darkName && !/dark/i.test(String(view?.name || ''))) continue;
+    if (copy.noRuleBox && isRuleBoxPokemon(view ?? card)) continue;
+    for (const attack of view?.attacks || []) {
       if (!attack?.name || parseCopyAttack(attack.text)) continue;
       if (copy.excludeGx && isGxAttack(attack)) continue;
       if (copy.needsEnergy && !attackCostPayable(draft, playerId, attacker, attack)) continue;
@@ -4981,10 +5021,60 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker }) {
 }
 
 /**
+ * The single attack the opponent used during their last turn (design 039). Empty when they
+ * did not attack, when the wording excludes GX attacks and theirs was one, or when the attack
+ * they used was itself a copy.
+ */
+function lastTurnAttackCandidates(draft, { copy, oppId }) {
+  const last = draft.players?.[oppId]?.lastAttack;
+  const currentTurn = Math.max(1, Number(draft.turn?.number) || 1);
+  if (!last || Number(last.turnNumber) !== currentTurn - 1) return [];
+  if (copy.excludeGx && last.isGx) return [];
+  const attack = last.attack;
+  if (!attack?.name || parseCopyAttack(attack.text)) return [];
+  return [
+    {
+      sourceId: last.attackerInstanceId ?? null,
+      sourceName: last.attackerName || 'Opponent',
+      attack: { ...attack },
+    },
+  ];
+}
+
+/**
  * Asks which attack a copy attack uses. Returns true while that choice is pending; false
  * when there is nothing to copy, and the copy attack then does only its own text.
  */
-function offerCopiedAttack(draft, { copy, playerId, oppId, attacker, atkIdx, targetInstanceId, activeRng, events }) {
+function offerCopiedAttack(
+  draft,
+  {
+    copy,
+    playerId,
+    oppId,
+    defenderPlayerId = oppId,
+    attacker,
+    defender,
+    atkIdx,
+    targetInstanceId,
+    activeRng,
+    events,
+  }
+) {
+  // An inline copy condition ("If you have no cards in your hand, …", Thievul; "You can use
+  // this attack only if …", Nihilego) gates the copy itself: no prompt when it fails, so the
+  // attack does only its own text. A printed whole-attack "does nothing" clause stays the
+  // effect phase's gate.
+  if (copy.condition) {
+    const conditionCtx = buildServerAttackContext(draft, {
+      attackerPlayerId: playerId,
+      defenderPlayerId,
+      attacker,
+      defender,
+      attackerView: attackViewFor(draft, attacker),
+      defenderView: defender ? inPlayView(draft, defender) : null,
+    });
+    if (!attackConditionMet(copy.condition, conditionCtx)) return false;
+  }
   const shuffleOppDeck = copy.source === 'oppDeckTop';
   if (shuffleOppDeck) {
     const looked = (draft.players[oppId]?.zones?.deck || []).slice(0, copy.count);
@@ -4994,7 +5084,24 @@ function offerCopiedAttack(draft, { copy, playerId, oppId, attacker, atkIdx, tar
       cards: looked.map((c) => ({ instanceId: c.instanceId, name: c.name })),
     });
   }
-  const candidates = copyAttackCandidates(draft, { copy, playerId, oppId, attacker });
+  // Slowking Seek Inspiration: discard the top card first; it is only copyable when it is a
+  // Pokémon without a Rule Box. The discard happens even when nothing can be copied.
+  let deckTopCard = null;
+  if (copy.source === 'ownDeckTop') {
+    const deck = draft.players[playerId]?.zones?.deck || [];
+    deckTopCard = deck.shift() || null;
+    if (deckTopCard) {
+      deckTopCard.attachedTo = null;
+      // Prism Star cards go to the Lost Zone (App. 17), like every other discard.
+      discardCardToPlayerZone(draft.players[playerId], deckTopCard);
+      events.push({
+        type: 'cardsDiscarded',
+        playerId,
+        cards: [{ instanceId: deckTopCard.instanceId, name: deckTopCard.name }],
+      });
+    }
+  }
+  const candidates = copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopCard });
   if (candidates.length === 0) {
     if (shuffleOppDeck) shuffleDeckWithRng(draft.players[oppId], activeRng);
     events.push({ type: 'attackCopyNothing', playerId, attackerId: attacker?.instanceId ?? null });
@@ -5009,6 +5116,21 @@ function offerCopiedAttack(draft, { copy, playerId, oppId, attacker, atkIdx, tar
   if (copy.optional) {
     options.push({ instanceId: candidates.length + 1, name: "Don't use an attack", type: 'option' });
   }
+  const resumeToken = {
+    effectType: 'attackCopy',
+    initiatorPlayerId: playerId,
+    attackerId: attacker?.instanceId ?? null,
+    attackIndex: atkIdx,
+    targetInstanceId,
+    candidates,
+    shuffleOppDeck,
+  };
+  // A wording that prints no "choose" (Mimikyu Copycat, Sudowoodo Watch and Learn) uses its
+  // single candidate directly, without a one-option prompt.
+  if (copy.auto && candidates.length === 1) {
+    resumeCopiedAttack(draft, { token: resumeToken, selection: [1], activeRng, events });
+    return true;
+  }
   draft.pendingChoice = createPendingChoice({
     player: playerId,
     source: 'attack',
@@ -5016,15 +5138,7 @@ function offerCopiedAttack(draft, { copy, playerId, oppId, attacker, atkIdx, tar
     options,
     min: 1,
     max: 1,
-    resumeToken: {
-      effectType: 'attackCopy',
-      initiatorPlayerId: playerId,
-      attackerId: attacker?.instanceId ?? null,
-      attackIndex: atkIdx,
-      targetInstanceId,
-      candidates,
-      shuffleOppDeck,
-    },
+    resumeToken,
   });
   return true;
 }
@@ -7219,7 +7333,9 @@ export function applyCommand(state, command, rng = null) {
           copy,
           playerId,
           oppId,
+          defenderPlayerId,
           attacker,
+          defender,
           atkIdx,
           targetInstanceId,
           activeRng,
