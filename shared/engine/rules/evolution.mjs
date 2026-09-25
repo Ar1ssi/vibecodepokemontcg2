@@ -2,7 +2,14 @@
 // turn of the game, (2) the same turn it was played to the bench/active,
 // (3) twice in one turn. Rare Candy skips stage 1.
 
-import { rulesState, ensureCardData, cardDataCache, fetchCardDetail } from './rules-state.mjs';
+import {
+  rulesState,
+  ensureCardData,
+  cardDataCache,
+  fetchCardDetail,
+  fetchTcgdexJson,
+} from './rules-state.mjs';
+import { tcgdexApiUrl } from '../../tcgdex/tcgdex-url.mjs';
 import { getStadiumEvolutionSpeed } from './stadium-effects.mjs';
 import {
   isModernMegaCard,
@@ -149,18 +156,15 @@ export async function resolveStage1EvolvesFrom(stage1Name) {
   if (typeof fetch === 'function' && typeof fetchCardDetail === 'function') {
     try {
       const searchName = cleanKey || stage1Name;
-      const res = await fetch(`https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(searchName)}`);
-      if (res.ok) {
-        const list = await res.json();
-        if (Array.isArray(list) && list.length > 0) {
-          const detail = await fetchCardDetail(list[0].id);
-          const from = detail?.evolveFrom || detail?.evolvesFrom;
-          if (from) {
-            const base = String(from).toLowerCase();
-            STAGE1_EVOLVES_FROM.set(key, base);
-            if (cleanKey) STAGE1_EVOLVES_FROM.set(cleanKey, base);
-            return base;
-          }
+      const list = await fetchTcgdexJson(tcgdexApiUrl(`/cards?name=${encodeURIComponent(searchName)}`));
+      if (Array.isArray(list) && list.length > 0) {
+        const detail = await fetchCardDetail(list[0].id);
+        const from = detail?.evolveFrom || detail?.evolvesFrom;
+        if (from) {
+          const base = String(from).toLowerCase();
+          STAGE1_EVOLVES_FROM.set(key, base);
+          if (cleanKey) STAGE1_EVOLVES_FROM.set(cleanKey, base);
+          return base;
         }
       }
     } catch {}

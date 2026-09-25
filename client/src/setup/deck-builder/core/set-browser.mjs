@@ -1,7 +1,8 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { GENERATED_STARTER_DECKS } from './starter-decks.generated.mjs';
+import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 
-const TCGDEX_BASE = 'https://api.tcgdex.net/v2/en';
+const TCGDEX_BASE = tcgdexApiBase();
     
     // Sets legal in the 2026-27 Standard format (H regulation mark onward).
     // Source: Bulbapedia "2026-27 Standard format (TCG)" — matched to TCGdex IDs.

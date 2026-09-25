@@ -3,6 +3,8 @@
     // currently legal. All gating flows through canPerformAction().
     
     import { printedRarity } from './card-classify.mjs';
+    import { createCachedFetchJson } from '../../tcgdex/tcgdex-cache.mjs';
+    import { tcgdexApiUrl } from '../../tcgdex/tcgdex-url.mjs';
     import {
       buildSetCardIdCandidates,
       extractTcgdexIdFromImageUrl,
@@ -149,6 +151,18 @@
       return null;
     }
 
+    // Every TCGdex read goes through the IndexedDB cache (D102), so a deck's cards
+    // resolve locally on every later load, and a TCGdex outage or block still serves the
+    // last good copy. In the browser the URL is the server's same-origin proxy (D164).
+    // Rejects on a failed or non-OK response; callers treat that as "no data".
+    export const fetchTcgdexJson = createCachedFetchJson({
+      fetchNetwork: async (url) => {
+        const res = await fetchWithRetry(url);
+        if (!res || !res.ok) throw new Error(`TCGdex request failed (${res?.status}) for ${url}`);
+        return res.json();
+      },
+    });
+
     // Network: fetch TCGdex summary objects for a name (with EX/GX variant forms).
     // A deck holds many duplicate-named cards (e.g. 4x N) whose enrichment all
     // starts in the same tick (build-deck.js's bulk Promise.all warm) — without
@@ -168,10 +182,7 @@
         const out = [];
         for (const q of queries) {
           try {
-            const url = `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(q)}`;
-            const res = await fetchWithRetry(url);
-            if (!res || !res.ok) continue;
-            const arr = await res.json();
+            const arr = await fetchTcgdexJson(tcgdexApiUrl(`/cards?name=${encodeURIComponent(q)}`));
             if (Array.isArray(arr)) {
               for (const s of arr) {
                 if (s && s.id && !seen.has(s.id)) {
@@ -222,9 +233,7 @@
       if (detailInFlight.has(id)) return detailInFlight.get(id);
       const promise = (async () => {
         try {
-          const res = await fetchWithRetry(`https://api.tcgdex.net/v2/en/cards/${id}`);
-          if (!res || !res.ok) return null;
-          const detail = await res.json();
+          const detail = await fetchTcgdexJson(tcgdexApiUrl(`/cards/${id}`));
           if (!detail) return null;
           cardDetailCache.set(id, detail);
           return detail;

@@ -17,6 +17,7 @@ import {
   hashOwnerViewZones,
 } from './game/sync-check.mjs';
 import { PROTOCOL_VERSION } from '../shared/engine/commands.mjs';
+import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 
 const SERVER_AUTHORITATIVE =
   process.env.SERVER_AUTHORITATIVE === '1' ||
@@ -218,6 +219,10 @@ async function main() {
       }
     }
   });
+
+  // Card data goes through the server: browsers calling TCGdex directly got
+  // Cloudflare-blocked (CORS errors), leaving every card without stage/attacks.
+  app.get('/api/tcgdex/*', tcgdexProxyHandler(createTcgdexProxy()));
 
   app.use('/shared', express.static(sharedDir));
   app.use(express.static(clientDir));

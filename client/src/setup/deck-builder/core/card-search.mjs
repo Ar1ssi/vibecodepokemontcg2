@@ -1,4 +1,5 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
+import { tcgdexApiUrl } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
@@ -123,7 +124,7 @@ export function resolveSearchPlan(term) {
 }
 
 async function fetchCardSummaries({ cardName, cardStage } = {}) {
-  const url = new URL('https://api.tcgdex.net/v2/en/cards');
+  const url = new URL(tcgdexApiUrl('/cards'));
   if (cardName) url.searchParams.set('name', cardName);
   if (cardStage) url.searchParams.set('stage', cardStage);
   const summaries = await fetchJson(url.toString());
@@ -177,7 +178,7 @@ async function hydrateTcgdexSetReleaseDates(cards = []) {
   await Promise.all(
     missingSetIds.map(async (setId) => {
       try {
-        const setData = await fetchJson(`https://api.tcgdex.net/v2/en/sets/${setId}`);
+        const setData = await fetchJson(tcgdexApiUrl(`/sets/${setId}`));
         tcgdexSetReleaseDateCache.set(setId, setData?.releaseDate || '');
       } catch {
         tcgdexSetReleaseDateCache.set(setId, '');
@@ -232,7 +233,7 @@ export async function queryCardsByName(term = '') {
   const detailedCards = await Promise.all(
     summariesToFetch.map(async (summary) => {
       try {
-        const detail = await fetchJson(`https://api.tcgdex.net/v2/en/cards/${summary.id}`);
+        const detail = await fetchJson(tcgdexApiUrl(`/cards/${summary.id}`));
         return normalizeTcgdexCard(detail);
       } catch {
         return null;
