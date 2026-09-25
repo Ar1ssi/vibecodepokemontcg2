@@ -58,6 +58,8 @@ export function isEvolvePlayedTriggerCard(card) {
  * @param {object[]} [opts.benchCards] raw bench zone array (Pokémon are
  *   filtered inside)
  * @param {object|null} [opts.stadiumCard] the Stadium in play
+ * @param {object} [opts.board] `specialEnergyBoard` facts for conditional
+ *   Special Energy pricing (prizes, Stage 2 count)
  * @param {(card: object) => boolean} [opts.isAbilityUsed] merged already-spent
  *   predicate — legacy flag, stamped flag, server flags, and the
  *   when-played-to-bench window all folded in by the caller (same shape as
@@ -72,6 +74,7 @@ export async function computeActionAffordances({
   benchCards = [],
   stadiumCard = null,
   extraAttacks = [],
+  board = {},
   isAbilityUsed = () => false,
   ensureCardData = async () => {},
   // False when the player had no Pokémon Knocked Out during the opponent's last
@@ -98,6 +101,7 @@ export async function computeActionAffordances({
       stadiumCard,
       abilityUsed: isAbilityUsed,
       extraAttacks,
+      board,
     });
     const { attacks } = listUsableActions(activeCard, {
       energyTypes,

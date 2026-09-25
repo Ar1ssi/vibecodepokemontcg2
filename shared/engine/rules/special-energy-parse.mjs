@@ -1395,10 +1395,17 @@ const isUltraBeast = (pokemon) =>
 
 const isVOrGx = (pokemon) => isVCard(pokemon) || isGxCard(pokemon);
 
+// Client zone cards often carry no instanceId; two undefined ids are not the same card.
+function isSameCard(card, self) {
+  if (!self) return false;
+  if (card === self) return true;
+  return card.instanceId != null && card.instanceId === self.instanceId;
+}
+
 function basicEnergyTypesOn(attached, self) {
   const types = new Set();
   for (const card of attached) {
-    if (!card || card === self || card.instanceId === self?.instanceId) continue;
+    if (!card || isSameCard(card, self)) continue;
     if (isSpecialEnergyCard(card)) continue;
     const m = String(card.name ?? '').match(TYPED_BASIC_NAME);
     if (m) types.add(poolType(SYMBOL_NAME_TYPES[m[1].toLowerCase()]));
@@ -1420,6 +1427,23 @@ const SYMBOL_NAME_TYPES = {
   dragon: 'Dragon',
   fairy: 'Fairy',
 };
+
+/**
+ * Board facts a provide condition reads (Reversal / Counter / Scramble prizes, Super
+ * Boost Stage 2 count), built from client zone reads so the preview prices Energy the
+ * way the server's `energyProvisionContext` does. A missing prize count stays
+ * undefined, which leaves the trailing condition unmet rather than guessed.
+ *
+ * @param {{ownPrizes?:number, opponentPrizes?:number, inPlayPokemon?:object[]}} facts
+ *   `inPlayPokemon` = the top card of each of the player's Active/Benched Pokémon
+ */
+export function specialEnergyBoard({ ownPrizes, opponentPrizes, inPlayPokemon = [] } = {}) {
+  return {
+    ownPrizes: Number.isFinite(ownPrizes) ? ownPrizes : undefined,
+    opponentPrizes: Number.isFinite(opponentPrizes) ? opponentPrizes : undefined,
+    ownStage2InPlay: (inPlayPokemon || []).filter((c) => c && stageKey(c) === 'stage2').length,
+  };
+}
 
 /**
  * Whether a provide step's condition holds. Every condition the parser can emit is
@@ -1465,7 +1489,7 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
       return !isVOrGx(host);
     case 'otherSpecial':
       return attached.some(
-        (card) => card && card !== self && card.instanceId !== self?.instanceId && isSpecialEnergyCard(card)
+        (card) => card && !isSameCard(card, self) && isSpecialEnergyCard(card)
       );
     case 'noBasicEnergy':
       return basicEnergyTypesOn(attached, self).length === 0;

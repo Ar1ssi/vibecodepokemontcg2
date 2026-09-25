@@ -50,7 +50,7 @@ import { promptPrizeTake } from '../zones/prize-take-prompt.js';
 import { shuffleAndDraw } from '../zones/hand-actions.js';
 import { handleKO, promotionGuidance, planPromotion, koOutcome, checkWinConditions, occupiedZoneCount } from '/shared/engine/rules/ko-flow.mjs';
 import { isPrismStarCard, isExCard } from '/shared/engine/rules/card-classify.mjs';
-import { planSpecialEnergyTriggers, isSpecialEnergyCard } from '/shared/engine/rules/special-energy-parse.mjs';
+import { planSpecialEnergyTriggers, isSpecialEnergyCard, specialEnergyBoard } from '/shared/engine/rules/special-energy-parse.mjs';
 import { markRetreated, getEffectiveRetreatCost, energiesToDiscardForRetreat, canRetreat } from '/shared/engine/rules/retreat.mjs';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { moveCardBundle } from '../move-card-bundle/move-card-bundle.js';
@@ -672,6 +672,13 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
         // Energy cost check
         const attachedEnergies = energiesAttachedToPokemon(activeZone, active.image);
         const energyTypes = [];
+        const energyBoard = specialEnergyBoard({
+          ownPrizes: getZone(user, 'prizes').getCount(),
+          opponentPrizes: getZone(oppPlayer, 'prizes').getCount(),
+          inPlayPokemon: ['active', 'bench'].flatMap((id) =>
+            getZone(user, id).array.filter((c) => c?.type === 'Pokémon')
+          ),
+        });
         for (const e of attachedEnergies) {
           await ensureCardData(e);
           const type = e.types?.[0] ||
@@ -698,6 +705,8 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 card: e,
                 stadiumCard: getStadium()?.card || null,
                 hostPokemon: active,
+                attachedCards: attachedEnergies,
+                board: energyBoard,
               }
             )
           );
