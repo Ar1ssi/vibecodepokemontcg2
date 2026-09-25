@@ -249,10 +249,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const incomingBonusAfterWR =
     damageBeforeWR > 0 ? markerSum(defenderEffects, (m) => m.kind === 'incomingBonus' && m.afterWR) : 0;
   const specialEnergyPenaltyAfterWR = getSpecialEnergyAttackPenalty(attacker, attackerZoneCards, { afterWR: true });
+  // Darkness Energy AQ/EX: "+10 after applying Weakness and Resistance" only when it damages.
+  const specialEnergyBonusAfterWR =
+    damageAfterWR > 0 ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true }) : 0;
   damageAfterWR = Math.max(
     0,
-    damageAfterWR + incomingBonusAfterWR - specialEnergyReduction - markerReductionAfterWR -
-      specialEnergyPenaltyAfterWR
+    damageAfterWR + incomingBonusAfterWR + specialEnergyBonusAfterWR - specialEnergyReduction -
+      markerReductionAfterWR - specialEnergyPenaltyAfterWR
   );
 
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance).
@@ -327,7 +330,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     total: finalDamage,
     base,
     attackerBonus,
-    specialEnergyBonus,
+    specialEnergyBonus: specialEnergyBonus + specialEnergyBonusAfterWR,
     specialEnergyPenalty: specialEnergyPenalty + specialEnergyPenaltyAfterWR,
     abilityBonus: abilityBonusBeforeWR || 0,
     abilityReduction:

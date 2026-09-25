@@ -302,7 +302,7 @@ function discardCardFromPlayerZone(draft, instanceId, playerId) {
  */
 function damageBenchedPokemon(
   draft,
-  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, activeRng = null, events }
+  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, countersPlaced = false, activeRng = null, events }
 ) {
   if (dealt <= 0) return;
 
@@ -329,6 +329,10 @@ function damageBenchedPokemon(
       attackName,
       reason: 'special-energy-bench',
     });
+    return;
+  }
+  if (countersPlaced && !ownAttack && counterEffectShielded(draft, victim, victimBench)) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'special-energy-effect' });
     return;
   }
   // Bench shields stop the opponent's attacks, not the attacker's own recoil.
@@ -427,8 +431,15 @@ function damageBenchedPokemon(
       victim,
       events,
       byAttack: true,
+      byDamage: !countersPlaced,
     });
   }
+}
+
+// Mist / Rocky / Wash / Wonder Energy: damage counters an opponent's attack places are an
+// effect of that attack, not damage, so the effect shield stops them (review of audit SE5).
+function counterEffectShielded(draft, victim, zoneCards) {
+  return hasSpecialEnergyEffectShield(inPlayView(draft, victim), zoneCards);
 }
 
 // Chosen-target damage/counters for attacks that let the player pick one or more
@@ -493,9 +504,14 @@ function attackTargetOptions(draft, defenderPlayerId, scope) {
 // Flat damage to an Active target: no W/R for counter placement, and the printed
 // snipe clause is treated as unmodified. Bench targets go through
 // damageBenchedPokemon (Tera/bench-shield guards + KO).
-function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, events }) {
+function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, countersPlaced = false, events }) {
   const victim = ref.card;
   if (!victim || amount <= 0) return 0;
+  const victimZone = ref.player?.zones?.[ref.zoneId] || [];
+  if (countersPlaced && ref.playerId !== attackerPlayerId && counterEffectShielded(draft, victim, victimZone)) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'special-energy-effect' });
+    return 0;
+  }
   victim.damage = (victim.damage || 0) + amount;
   events.push({
     type: 'damageUpdated',
@@ -511,6 +527,7 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, events 
       victim,
       events,
       byAttack: true,
+      byDamage: !countersPlaced,
     });
   }
   return amount;
@@ -857,6 +874,7 @@ function applyAttackTargets(
         dealt: clause.amount,
         auto: false,
         activeRng,
+        countersPlaced: clause.kind === 'counters',
         events,
       });
     } else if (ref.zoneId === 'active') {
@@ -866,6 +884,7 @@ function applyAttackTargets(
           ? activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName })
           : clause.amount,
         attackerPlayerId,
+        countersPlaced: clause.kind === 'counters',
         events,
       });
     }
@@ -1314,7 +1333,7 @@ function handCardsCostReason(player, beforeSteps) {
  */
 function handleKnockout(
   draft,
-  { victimPlayerId, attackerPlayerId, victim, events, byAttack = false, activeRng = null, deferWin = false }
+  { victimPlayerId, attackerPlayerId, victim, events, byAttack = false, byDamage = true, activeRng = null, deferWin = false }
 ) {
   // Discard victim and attached cards from its zone (active or bench)
   const victimActive = draft.players[victimPlayerId]?.zones?.active || [];
@@ -1372,9 +1391,11 @@ function handleKnockout(
       hasOncePerGameSpecialEnergyEffect(c)
   );
   const legacyUsed = !!victimPlayer?.flags?.legacyPrizeReductionUsed;
-  // Gift / Legacy / Rescue / Splash read "Knocked Out by damage from an attack from your
-  // opponent's Pokémon": Poison, Burn, Ability counters and recoil don't count (audit SE12).
-  const koByOpponentAttack = byAttack && draft.turn?.player !== victimPlayerId;
+  // Gift / Legacy / Splash read "Knocked Out by damage from an attack from your opponent's
+  // Pokémon"; Rescue reads "by damage from an attack" (own recoil counts). Poison, Burn,
+  // Ability counters and counters an attack places are not attack damage (audit SE12).
+  const koByAttackDamage = byAttack && byDamage;
+  const koByOpponentAttack = koByAttackDamage && draft.turn?.player !== victimPlayerId;
   let prizeCount = toolPrizeCountAdjust(
     victim,
     victimZoneCards,
@@ -1485,6 +1506,7 @@ function handleKnockout(
   // hand; Gift draws until 7). Attached cards still go to the discard pile.
   const koZoneRef = findCard(draft, victim.instanceId);
   const koSpecial = resolveSpecialEnergyKnockout(draft, {
+    byAttackDamage: koByAttackDamage,
     byOpponentAttack: koByOpponentAttack,
     host: victim,
     hostTop: inPlayView(draft, victim),

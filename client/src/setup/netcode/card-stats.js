@@ -94,7 +94,15 @@ function extractStats(card) {
   // text server-side (audit SE1 — without it every text-derived special Energy did nothing
   // under SERVER_AUTHORITATIVE). Kept off Pokémon, where the server reads card.text as an
   // ability fallback and subtypes as a stage fallback.
-  if (!isTrainerCard(card) && !isEnergyCard(card)) return hasAny ? stats : null;
+  if (!isTrainerCard(card) && !isEnergyCard(card)) {
+    // Exception: "Ultra Beast" exists only as a subtype, and Beast Energy's provision and
+    // bonus read it server-side (review of audit SE2).
+    if (Array.isArray(card.subtypes) && card.subtypes.some((s) => /ultra beast/i.test(String(s)))) {
+      stats.subtypes = card.subtypes.map(String);
+      hasAny = true;
+    }
+    return hasAny ? stats : null;
+  }
   const effectText = [card.effect || card.text || []].flat().join(' ').trim();
   if (effectText) {
     stats.text = effectText;

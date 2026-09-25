@@ -633,3 +633,78 @@ test('SE9: Memory Energy lets an evolved Pokémon use its Basic attack', () => {
   assert.equal(res.error, null);
   assert.equal(findCard(res.state, 9).card.damage, 30);
 });
+
+test('review: Rescue Energy returns a Pokémon Knocked Out by its own attack', () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Voltorb',
+      hp: 50,
+      attacks: [{ name: 'Self Destruct', damage: 10, cost: [], text: 'This Pokémon also does 60 damage to itself.' }],
+    }),
+    specialEnergy({
+      instanceId: 2,
+      type: 'Energy',
+      name: 'Rescue Energy',
+      text: 'Rescue Energy provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon back into your hand. (Discard all cards attached to that Pokémon.)',
+      attachedTo: 1,
+    })
+  );
+  state.players.p1.zones.bench.push(pokemon({ instanceId: 3, name: 'Pikachu' }));
+  state.players.p2.zones.active.push(pokemon({ instanceId: 9, name: 'Snorlax', hp: 200 }));
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 1).zoneId, 'hand');
+});
+
+const CURSE_ATTACK = [{ name: 'Curse', damage: 0, cost: [], text: "Put 10 damage counters on your opponent's Active Pokémon." }];
+
+test('review: a Knock Out by placed damage counters is not "by damage" for Legacy / Gift', () => {
+  for (const [name, text] of [
+    ['Legacy Energy', 'As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, that player takes 1 fewer Prize card. This effect of your Legacy Energy can’t be applied more than once per game.'],
+    ['Gift Energy', 'As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.'],
+  ]) {
+    const state = game();
+    state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Gengar', hp: 120, attacks: CURSE_ATTACK }));
+    state.players.p2.zones.active.push(
+      pokemon({ instanceId: 9, name: 'Snorlax', hp: 100 }),
+      specialEnergy({ instanceId: 10, type: 'Energy', name, text, attachedTo: 9 })
+    );
+    state.players.p2.zones.bench.push(pokemon({ instanceId: 11, name: 'Pikachu' }));
+
+    const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+    assert.equal(res.error, null);
+    assert.equal(findCard(res.state, 9).zoneId, 'discard', `${name}: host Knocked Out`);
+    assert.equal(res.state.players.p1.flags.prizesOwed, 1, `${name}: full Prize`);
+    // p2 draws only its turn-start card, not up to 7.
+    assert.equal(res.state.players.p2.zones.hand.length, 1, `${name}: no Gift draw`);
+  }
+});
+
+test('review: Mist Energy prevents damage counters placed by an opponent attack', () => {
+  const state = game();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Gengar',
+      hp: 120,
+      attacks: [{ name: 'Hex', damage: 0, cost: [], text: "Put 3 damage counters on your opponent's Active Pokémon." }],
+    })
+  );
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Snorlax', hp: 150 }),
+    specialEnergy({
+      instanceId: 10,
+      type: 'Energy',
+      name: 'Mist Energy',
+      text: 'As long as this card is attached to a Pokémon, it provides {C} Energy. Prevent all effects of attacks used by your opponent’s Pokémon done to the Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)',
+      attachedTo: 9,
+    })
+  );
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  assert.equal(findCard(res.state, 9).card.damage || 0, 0);
+});

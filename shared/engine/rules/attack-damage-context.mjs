@@ -48,16 +48,26 @@ function attachedEnergyCards(player, pokemon) {
   );
 }
 
-/** Energy cards attached to one Pokémon, counted as the cost pool sees them. */
-function energyOn(player, pokemon, stadiumCard = null) {
-  const attachedCards = pokemon
-    ? [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
-        (card) => card.attachedTo === pokemon.instanceId
-      )
-    : [];
+/**
+ * Energy cards attached to one Pokémon, counted as the cost pool sees them: the host is
+ * read as its top Evolution card and the board facts match reduce.mjs
+ * energyProvisionContext (Ignition on an Evolution, Counter while trailing).
+ */
+function energyOn(player, pokemon, { stadiumCard = null, opponent = null } = {}) {
+  if (!pokemon) return [];
+  const zone = ['active', 'bench']
+    .map((zoneId) => zoneOf(player, zoneId))
+    .find((cards) => cards.includes(pokemon)) || [];
+  const attachedCards = zone.filter((card) => card.attachedTo === pokemon.instanceId);
+  const board = {
+    ownPrizes: zoneOf(player, 'prizes').length,
+    opponentPrizes: zoneOf(opponent, 'prizes').length,
+    ownStage2InPlay: inPlayPokemon(player).filter(({ view }) => isStage2(view)).length,
+  };
+  const hostPokemon = evolvedView(zone, pokemon);
   return expandEnergyEntries(
     attachedEnergyCards(player, pokemon).map((card) =>
-      serverEnergyDescriptor(card, { stadiumCard, hostPokemon: pokemon, attachedCards })
+      serverEnergyDescriptor(card, { stadiumCard, hostPokemon, attachedCards, board })
     )
   );
 }
@@ -151,9 +161,9 @@ export function buildServerAttackContext(
   const turnNumber = Math.max(1, Number(state?.turn?.number) || 1);
 
   const ctx = {
-    energyCount: energyOn(own, attacker, stadiumCard).length,
+    energyCount: energyOn(own, attacker, { stadiumCard, opponent }).length,
     ownEnergyCount: ownInPlay.reduce(
-      (total, { card }) => total + energyOn(own, card, stadiumCard).length,
+      (total, { card }) => total + energyOn(own, card, { stadiumCard, opponent }).length,
       0
     ),
     opponentPrizes: zoneOf(opponent, 'prizes').length,
@@ -184,7 +194,7 @@ export function buildServerAttackContext(
     stadiumInPlay: Boolean(stadiumCard),
     ownPrizes: zoneOf(own, 'prizes').length,
     attackerConditions: listConditions(attacker),
-    attackerEnergyTypes: [...new Set(energyOn(own, attacker, stadiumCard))],
+    attackerEnergyTypes: [...new Set(energyOn(own, attacker, { stadiumCard, opponent }))],
     attackerEnergyNames: attachedEnergyCards(own, attacker).map((card) => card.name || ''),
     benchNames: ownBench.map(({ card, view }) => view?.name || card?.name || ''),
     benchTypes: ownBench.map(({ card, view }) => [...(view?.types || card?.types || [])]),
@@ -228,7 +238,7 @@ export function buildServerAttackContext(
   if (defender) {
     ctx.defenderHp = Number(defenderCard.hp) || 0;
     ctx.defenderDamage = defender.damage || 0;
-    ctx.opponentEnergyCount = energyOn(opponent, defender, stadiumCard).length;
+    ctx.opponentEnergyCount = energyOn(opponent, defender, { stadiumCard, opponent: own }).length;
     ctx.retreatCostColorless = getRetreatCostCount(defenderCard);
     ctx.opponentStatusCount = listConditions(defender).length;
     ctx.defenderPresent = true;

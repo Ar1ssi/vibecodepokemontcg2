@@ -563,16 +563,22 @@ export function resolveSpecialEnergyDiscard(draft, { energy, host, hostTop = nul
  * On-knockout resolution for the KO'd Pokémon's attached special energies.
  * Returns `{ returnToHand, drawUntil }`.
  */
-export function resolveSpecialEnergyKnockout(draft, { host, hostTop = null, hostPlayerId, hostZoneId, byOpponentAttack = true }) {
+export function resolveSpecialEnergyKnockout(
+  draft,
+  { host, hostTop = null, hostPlayerId, hostZoneId, byAttackDamage = true, byOpponentAttack = true }
+) {
   const out = { returnToHand: false, drawUntil: 0 };
-  // Every on-knockout special Energy requires a KO by damage from an opponent's attack.
-  if (!host || !byOpponentAttack) return out;
+  // Every on-knockout special Energy needs a KO by attack damage (placed counters are not
+  // damage); each plan's `source` says whether the attack must be the opponent's.
+  if (!host || !byAttackDamage) return out;
+  const sourceMet = (plan) => plan.source === 'attack' || byOpponentAttack;
   const zone = zoneOf(draft, hostPlayerId, hostZoneId);
   for (const energy of zone.filter(
     (c) => c && isSpecialEnergyCard(c) && c.attachedTo === host.instanceId
   )) {
     const plans = planSpecialEnergyTriggers(energy, { trigger: 'knockout', host: hostTop || host, zoneArray: zone });
     for (const plan of plans) {
+      if (!sourceMet(plan)) continue;
       if (plan.action === 'returnToHand') out.returnToHand = true;
       if (plan.action === 'drawUntil') out.drawUntil = Math.max(out.drawUntil, plan.until);
     }

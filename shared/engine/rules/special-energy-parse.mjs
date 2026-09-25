@@ -30,7 +30,8 @@
 //   { type: 'onDamagedDraw', count }
 //   { type: 'onEvolveHeal', amount, hostType? }
 //   { type: 'onAttachDraw', count, hostType? }
-//   { type: 'onAttachSearch', what, count, destination, hostType?, oncePerTurn?, endsTurn? }
+//   { type: 'onAttachSearch', what, count, destination, hostType? }
+//   { type: 'activatedSearch', what, count, destination, oncePerTurn, endsTurn, requiresActive }  (Call Energy; no consumer yet)
 //   { type: 'onAttachHeal', amount, hostType? }
 //   { type: 'onAttachRemoveDamage', count, alsoCure?, hostType? }
 //   { type: 'onAttachDamageCounter', count }
@@ -426,7 +427,14 @@ function parseEffects(lower) {
   if (/if (?:the|that) (?:[a-z{}]* )?pokémon this card is attached to is knocked out by damage from (?:an opponent's|an) attack, put (?:that|this) pokémon (?:back )?into your hand/.test(lower)
     || /is knocked out by damage from an opponent's attack, put that pokémon into your hand/.test(lower)) {
     const host = lower.match(/the \{([a-z])\} pokémon this card is attached to is knocked out/);
-    push({ type: 'onKnockoutReturnToHand', hostType: host ? SYMBOL_TYPES[host[1]] : undefined });
+    // Rescue reads "by damage from an attack" (any attack, own recoil included);
+    // Splash reads "from an opponent's attack".
+    const anyAttack = /knocked out by damage from an attack, put/.test(lower);
+    push({
+      type: 'onKnockoutReturnToHand',
+      hostType: host ? SYMBOL_TYPES[host[1]] : undefined,
+      source: anyAttack ? 'attack' : 'opponentAttack',
+    });
   }
   if (/is knocked out by damage from an attack from your opponent's pokémon, draw cards until you have (\d+) cards in your hand/.test(lower)) {
     const m = lower.match(/until you have (\d+) cards in your hand/);
@@ -509,7 +517,9 @@ function parseEffects(lower) {
     push({ type: 'onAttachSwitch', side: 'self', target: 'activeToBench', hostZone: 'active' });
   }
   if (/when you attach this card from your hand to your active pokémon, switch 1 of the defending pokémon with 1 of your opponent's benched pokémon/.test(lower)) {
-    push({ type: 'onAttachSwitch', side: 'opponent', hostZone: 'active' });
+    // Stormfront Cyclone: "Your opponent chooses the Benched Pokémon to switch."
+    const opponentChooses = /your opponent chooses the benched pokémon/.test(lower);
+    push({ type: 'onAttachSwitch', side: 'opponent', hostZone: 'active', ...(opponentChooses ? { chooser: 'opponent' } : {}) });
   }
   if (/attach it to your active pokémon, your opponent switches (?:his or her|their) active pokémon with 1 of (?:his or her|their) benched pokémon/.test(lower)) {
     push({ type: 'onAttachSwitch', side: 'opponent', hostZone: 'active', chooser: 'opponent' });
@@ -541,7 +551,9 @@ function parseEffects(lower) {
   }
   const callSearch = lower.match(/once during your turn, if the pokémon call energy is attached to is your active pokémon, you may search your deck for up to (\d+) basic pokémon and put them onto your bench/);
   if (callSearch) {
-    push({ type: 'onAttachSearch', what: 'Basic Pokémon', count: Number(callSearch[1]), destination: 'bench', oncePerTurn: true, endsTurn: true, requiresActive: true });
+    // An activated once-per-turn action that ends the turn, not an attach trigger. No command
+    // runs it yet (I169), so it fails closed instead of granting a free search on attach.
+    push({ type: 'activatedSearch', what: 'Basic Pokémon', count: Number(callSearch[1]), destination: 'bench', oncePerTurn: true, endsTurn: true, requiresActive: true });
   }
   if (/if you took this card as a face-down prize card during your turn, before you put it into your hand, you may attach this card to 1 of your pokémon/.test(lower)) {
     push({ type: 'attachFromPrize' });
@@ -572,9 +584,9 @@ function parseEffects(lower) {
   }
   if (/if the pokémon darkness energy is attached to (?:damages the defending pokémon|does damage with an attack)/.test(lower)) {
     const m = lower.match(/the attack does (\d+) more damage/);
-    // Aquapolis / Expedition print this bonus for any host; only the end-of-turn
-    // damage counter spares {D} Pokémon (SE14).
-    if (m) push({ type: 'damageBonus', amount: Number(m[1]), target: 'active' });
+    // Aquapolis / Expedition print this bonus for any host, after W/R and only when the
+    // attack does damage; only the end-of-turn damage counter spares {D} Pokémon (SE14).
+    if (m) push({ type: 'damageBonus', amount: Number(m[1]), target: 'active', afterWR: true });
   }
   if (/if the pokémon r energy is attached to attacks, the attack does (\d+) more damage/.test(lower)) {
     const m = lower.match(/the attack does (\d+) more damage/);
@@ -761,6 +773,8 @@ const STEP_DESCRIPTIONS = {
   onDamagedDraw: (s) => `if host is damaged, draw ${s.count} card`,
   onEvolveHeal: (s) => `on evolving the host, heal ${s.amount} damage`,
   onAttachDraw: (s) => `on attach from hand: draw ${s.count}${s.hostType ? ` (${s.hostType})` : ''}`,
+  activatedSearch: (s) =>
+    `once per turn while Active: search ${s.count} ${s.what} → ${s.destination}, then the turn ends`,
   onAttachSearch: (s) =>
     `on attach from hand: search ${s.count} ${s.what} → ${s.destination}${s.oncePerTurn ? ' (once/turn)' : ''}${s.endsTurn ? ' (ends turn)' : ''}`,
   onAttachHeal: (s) => `on attach from hand: heal ${s.amount} damage${s.hostType ? ` (${s.hostType})` : ''}`,
@@ -986,10 +1000,12 @@ export function planSpecialEnergyTriggers(
         }
         break;
       case 'onKnockoutReturnToHand':
-        if (trigger === 'knockout' && ready(step)) plans.push({ action: 'returnToHand' });
+        if (trigger === 'knockout' && ready(step)) {
+          plans.push({ action: 'returnToHand', source: step.source || 'opponentAttack' });
+        }
         break;
       case 'onKnockoutDraw':
-        if (trigger === 'knockout') plans.push({ action: 'drawUntil', until: step.until });
+        if (trigger === 'knockout') plans.push({ action: 'drawUntil', until: step.until, source: 'opponentAttack' });
         break;
       case 'prizeReduction':
         if (trigger === 'knockout') plans.push({ action: 'prizeReduction', count: step.count });
@@ -1050,11 +1066,18 @@ function hostHasBasicEnergy(zoneArray, hostImage, typeName, hostId) {
   );
 }
 
+const normalizeTypeName = (name) => {
+  const lowered = String(name ?? '').toLowerCase();
+  return lowered === 'darkness' ? 'dark' : lowered;
+};
+
+// Every printed type counts (dual-type Pokémon). The name fallback is only for cards
+// whose types have not synced yet; with types present, "Dragonite" is not {N}.
 function hostIsType(pokemon, typeName) {
-  const want = String(typeName ?? '').toLowerCase();
-  const data = String(pokemon?.types?.[0] ?? '').toLowerCase();
-  if (data === want) return true;
-  if ((data === 'dark' || data === 'darkness') && (want === 'dark' || want === 'darkness')) return true;
+  const want = normalizeTypeName(typeName);
+  if (want === 'ultra beast') return isUltraBeast(pokemon);
+  const types = (pokemon?.types || []).map(normalizeTypeName).filter(Boolean);
+  if (types.length > 0) return types.includes(want);
   return String(pokemon?.name ?? '').toLowerCase().includes(want);
 }
 
@@ -1109,13 +1132,13 @@ export function getSpecialEnergyHpBonus(pokemonCard, zoneArray = []) {
 }
 
 /** Attack-damage bonus from the attacker's attached special energies. */
-export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defenderIsActive = true } = {}) {
+export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defenderIsActive = true, afterWR = false } = {}) {
   let total = 0;
   for (const energy of getAttachedSpecialEnergies(attacker, zoneArray)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
-      if (step.type !== 'damageBonus') continue;
+      if (step.type !== 'damageBonus' || !!step.afterWR !== afterWR) continue;
       if (step.target === 'opponentActive' && !defenderIsActive) continue;
       if (!conditionMet(step.condition ?? (step.hostType ? `host:${step.hostType}` : null), attacker, zoneArray)) continue;
       total += step.amount;
@@ -1423,7 +1446,9 @@ function provisionConditionMet(condition, { host = null, attached = [], self = n
     case 'evolution':
       return stageKey(host) !== 'basic';
     case 'threeStage2':
-      return (board.ownStage2InPlay ?? 0) >= 3;
+      // Super Boost: the 4-Energy mode extends the Stage 2 host mode (UPR ruling), so a
+      // Basic host provides only {C} however many Stage 2 are in play.
+      return stageKey(host) === 'stage2' && (board.ownStage2InPlay ?? 0) >= 3;
     case 'delta':
       return conditionMet('delta', host, []);
     case 'hostSP':

@@ -1,12 +1,13 @@
 # Special-energy parse coverage
 Corpus: 214 printings → 129 unique (name+text)
 
-guided 40 / passive 82 / unenforced 7 / unrecognized 0
+guided 39 / passive 82 / unenforced 8 / unrecognized 0
 
 ## Unrecognized
 
 ## Unenforced (parsed, no engine consumer)
 - Treasure Energy: attachFromPrize
+- Call Energy: activatedSearch
 - Holon Energy WP: ignoredOn
 - Holon Energy GL: ignoredOn
 - Holon Energy FF: ignoredOn
@@ -44,7 +45,6 @@ guided 40 / passive 82 / unenforced 7 / unrecognized 0
 - Cyclone Energy: provide, onAttachSwitch
 - Recover Energy: provide, onAttachClearStatus
 - Health Energy: provide, onAttachRemoveDamage
-- Call Energy: provide, onAttachSearch
 - Rainbow Energy: provide, onAttachDamageCounter
 - Retro Energy: provide, onAttachDevolve
 - Cyclone Energy: provide, onAttachSwitch
@@ -426,7 +426,7 @@ guided 40 / passive 82 / unenforced 7 / unrecognized 0
   - on attach from hand: remove 1 damage counter
 ### Call Energy
   - provides 1 Colorless Energy
-  - on attach from hand: search 2 Basic Pokémon → bench (once/turn) (ends turn)
+  - once per turn while Active: search 2 Basic Pokémon → bench, then the turn ends
 ### Multi Energy
   - provides 1 Energy of every type
   - provides 1 Colorless Energy [otherSpecial]

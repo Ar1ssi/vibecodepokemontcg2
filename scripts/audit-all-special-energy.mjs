@@ -60,11 +60,11 @@ const PASSIVE_STEP_TYPES = new Set([
 
 // Parsed steps with no engine consumer. Counting them as guided/passive let
 // `unrecognized 0` hide effects that never run (audit SE16). Drop a case here
-// when its consumer lands. A conditional `ignoredOn` (Darkness/Metal CL) is
-// already enforced by the `condition` on its sibling steps; the Pokémon-ex
-// form (Heal Energy, Holon FF/GL/WP) is not.
+// when its consumer lands (Call Energy's activated search: I169). A conditional
+// `ignoredOn` (Darkness/Metal CL) is already enforced by the `condition` on its
+// sibling steps; the Pokémon-ex form (Heal Energy, Holon FF/GL/WP) is not.
 function isUnenforcedStep(step) {
-  if (step.type === 'attachFromPrize') return true;
+  if (step.type === 'attachFromPrize' || step.type === 'activatedSearch') return true;
   return step.type === 'ignoredOn' && Boolean(step.host);
 }
 

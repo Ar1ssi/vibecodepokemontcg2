@@ -217,7 +217,7 @@ test('planSpecialEnergyTriggers: discard / knockout / evolve / endTurn', () => {
   const { host, zone } = hostWith(['Water'], []);
   assert.deepEqual(
     planSpecialEnergyTriggers(energy('Splash Energy', 'This card provides {W} Energy only while this card is attached to a {W} Pokémon. If the {W} Pokémon this card is attached to is Knocked Out by damage from an opponent’s attack, put that Pokémon into your hand.'), { trigger: 'knockout', host, zoneArray: zone }),
-    [{ action: 'returnToHand' }]
+    [{ action: 'returnToHand', source: 'opponentAttack' }]
   );
   // Wrong host type: gated trigger does not fire.
   const wrong = hostWith(['Fire'], []);
@@ -227,7 +227,7 @@ test('planSpecialEnergyTriggers: discard / knockout / evolve / endTurn', () => {
   );
   assert.deepEqual(
     planSpecialEnergyTriggers(energy('Gift Energy', 'provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.'), { trigger: 'knockout' }),
-    [{ action: 'drawUntil', until: 7 }]
+    [{ action: 'drawUntil', until: 7, source: 'opponentAttack' }]
   );
 
   assert.deepEqual(

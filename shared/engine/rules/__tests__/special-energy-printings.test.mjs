@@ -85,7 +85,24 @@ test('SE14: Darkness Energy bonuses — Unseen Forces parses, Aquapolis applies 
   const darkHost = { name: 'Umbreon', types: ['Darkness'], instanceId: 1 };
   assert.equal(getSpecialEnergyAttackBonus(darkHost, hostWith(darkHost, [card('Darkness Energy', DARK_UF)])), 10);
   const fireHost = { name: 'Charmander', types: ['Fire'], instanceId: 1 };
-  assert.equal(getSpecialEnergyAttackBonus(fireHost, hostWith(fireHost, [card('Darkness Energy', DARK_AQ)])), 10);
+  const aquapolis = hostWith(fireHost, [card('Darkness Energy', DARK_AQ)]);
+  assert.equal(getSpecialEnergyAttackBonus(fireHost, aquapolis), 0, 'not a before-W/R bonus');
+  assert.equal(getSpecialEnergyAttackBonus(fireHost, aquapolis, { afterWR: true }), 10);
+});
+
+test('review: Aquapolis Darkness adds its 10 after Weakness, and only when the attack damages', () => {
+  const attacker = { name: 'Umbreon', types: ['Darkness'], instanceId: 1 };
+  const zone = hostWith(attacker, [card('Darkness Energy', DARK_AQ)]);
+  const weak = { name: 'Espeon', types: ['Psychic'], hp: 200, weakness: { type: 'Darkness', value: 2 }, instanceId: 20 };
+  assert.equal(
+    computeAttackDamage(attacker, weak, { name: 'Bite', damage: 20 }, { attackerZoneCards: zone, defenderZoneCards: [weak] }).total,
+    50
+  );
+  const resists = { name: 'Espeon', types: ['Psychic'], hp: 200, resistance: { type: 'Darkness', value: -30 }, instanceId: 20 };
+  assert.equal(
+    computeAttackDamage(attacker, resists, { name: 'Bite', damage: 20 }, { attackerZoneCards: zone, defenderZoneCards: [resists] }).total,
+    0
+  );
 });
 
 test('SE14: old Metal Energy reduces incoming damage on any host and cuts a non-{M} host’s own damage', () => {
