@@ -1,5 +1,5 @@
 # 044: TCG Live draws (opening hand, turn draw, opponent draws)
-Status: built S308 on feature/draw-fx (not pushed) — video out/draw-scene.webm; design self-approved (user sent two clips, asked directly and answered the two design questions in chat), flagged at close
+Status: built S308 on feature/draw-fx, shipped to main S308 — video out/draw-scene.webm; design self-approved (user sent two clips, asked directly and answered the two design questions in chat), flagged at close
 Date: 2026-09-25 · Session: S308
 
 ## Problem

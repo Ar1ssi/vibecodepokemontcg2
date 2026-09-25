@@ -1,5 +1,5 @@
 # 043: TCG Live opponent Trainer play
-Status: built S308 on feature/opp-play-fx (not pushed) — video out/opp-play.webm; design self-approved (user sent the clip, asked directly and answered the scope questions in chat), flagged at close
+Status: built S308 on feature/opp-play-fx, shipped to main S308 — video out/opp-play.webm; design self-approved (user sent the clip, asked directly and answered the scope questions in chat), flagged at close
 Date: 2026-09-25 · Session: S308
 
 ## Problem
