@@ -4765,6 +4765,15 @@ import test from 'node:test';
       assert.ok(p.notes.some((n) => /resolve the printed count/.test(n)));
     });
 
+    test('parseAttackDamage: Energy Drive multiplies by Energy on both Actives', () => {
+      const atk = {
+        name: 'Energy Drive', damage: '20×',
+        text: "This attack does 20 damage times the amount of Energy attached to both Active Pokémon. This damage isn't affected by Weakness or Resistance.",
+      };
+      const p = parseAttackDamage(atk, {}, {}, { energyCount: 3, opponentEnergyCount: 2 });
+      assert.equal(p.total, 100);
+    });
+
     test('parseAttackDamage: per-each opponent\'s Active Energy (with ctx)', () => {
       const atk = {
         name: 'Ear Force', damage: 80,

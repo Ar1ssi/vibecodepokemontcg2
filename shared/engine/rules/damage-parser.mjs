@@ -215,6 +215,12 @@ export function parseAttackDamage(
     total = more ? printed + parseInt(more[1], 10) * discarded : printed * discarded;
     components.push('per-energy-discarded');
     notes.push(`× ${discarded} Energy discarded in this way`);
+  } else if (text && /times the (?:amount|number) of energy attached to both active/.test(text)) {
+    // Tapu Lele-GX Energy Drive: Energy on your Active plus the opponent's Active.
+    const both = energyCount + (opponentEnergyCount ?? 0);
+    total = base * both;
+    components.push('per-energy');
+    notes.push(`× ${both} Energy on both Active Pokémon`);
   } else if (text && /number of energy|× the number|\* the number/.test(text)) {
     total = base * energyCount;
     components.push('per-energy');
