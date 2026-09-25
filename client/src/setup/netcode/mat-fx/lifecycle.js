@@ -38,7 +38,8 @@ import {
 } from './lifecycle-pose.mjs';
 import { sweepPose } from './flow-pose.mjs';
 import { holdFor } from './fx-holds.mjs';
-import { discardedIds, takeOrigin } from './origins.mjs';
+import { discardedIds, takeOrigin, takeZoneSweep } from './origins.mjs';
+import { cardShapedRect } from './card-flight.mjs';
 import { pileOf, playDiscardFlights } from './card-flight.js';
 
 const buildImage = (src, className) => {
@@ -258,7 +259,8 @@ export const promote = (plan) => {
 
 /**
  * Where each discarded card flies from: its pre-diff snapshot, or the deck for
- * a card that was not on screen. A card whose snapshot another effect already
+ * a card that was not on screen. A sweep (`plan.sweep`) flies the cards that
+ * were in its source zone. A card whose snapshot another effect already
  * took (the trainer presentation) does not fly. The art is the post-diff
  * element's first: discard is public, so an opponent's hand card shows its
  * face there, not the sleeve it had in hand.
@@ -266,12 +268,13 @@ export const promote = (plan) => {
 const discardFlightsFor = (plan, registry, pile) => {
   const deck = pileOf(plan.user, 'deck');
   const cards = [];
-  for (const id of discardedIds(plan.cards)) {
+  const swept = plan.sweep ? takeZoneSweep(plan.user, plan.sweep) : [];
+  for (const id of [...discardedIds(plan.cards), ...swept]) {
     const origin = takeOrigin(id);
     const from = origin?.rect ? origin : origin?.hidden ? deck : null;
     const element = registry.get(id)?.element;
     const src = element?.src || origin?.src;
-    if (from?.rect && src) cards.push({ src, rect: from.rect, turn: from.turn ?? pile.turn });
+    if (from?.rect && src) cards.push({ src, rect: cardShapedRect(from.rect), turn: from.turn ?? pile.turn });
   }
   return cards;
 };

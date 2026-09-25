@@ -6,7 +6,9 @@ import {
   discardedIds,
   knockoutStack,
   takeOrigin,
+  takeZoneSweep,
   visibleStackRecord,
+  zoneCardIds,
 } from '../origins.mjs';
 
 // A Basic (1) with a Stage 1 (2) under it on the board, and a lone Basic (5).
@@ -143,4 +145,42 @@ test('captureOrigins: a discard snapshots cards on screen and marks the rest hid
   captureOrigins([{ type: 'cardsDiscarded', cards: [5] }], registry, capture, () => 'self');
   discardOrigins({ type: 'cardsDiscarded', cards: [5] });
   assert.equal(takeOrigin(5), undefined, 'a skipped discard leaves nothing behind');
+});
+
+const tagged = () => {
+  const el = (id, zone, side) => ({ id, dataset: { zone, side } });
+  return new Map([
+    [10, { element: el('item', 'board', 'you') }],
+    [11, { element: el('supporter', 'board', 'you') }],
+    [12, { element: el('theirs', 'board', 'them') }],
+    [13, { element: el('hand', 'hand', 'you') }],
+    [14, {}],
+  ]);
+};
+
+test('zoneCardIds: rendered cards of one side in one zone', () => {
+  assert.deepEqual(zoneCardIds(tagged(), 'self', 'board'), [10, 11]);
+  assert.deepEqual(zoneCardIds(tagged(), 'opp', 'board'), [12]);
+  assert.deepEqual(zoneCardIds(tagged(), null, 'board'), []);
+  assert.deepEqual(zoneCardIds(null, 'self', 'board'), []);
+});
+
+test('captureOrigins: a card moved into the pile snapshots like a discard', () => {
+  captureOrigins([{ type: 'cardMoved', instanceId: 3, from: 'active', to: 'discard' }], board(), capture, () => 'self');
+  assert.equal(takeOrigin(3).src, 'energy.png');
+  captureOrigins([{ type: 'cardMoved', instanceId: 77, from: 'hand', to: 'discard' }], board(), capture, () => 'self');
+  assert.deepEqual(takeOrigin(77), { hidden: true });
+});
+
+test('captureOrigins: a zone swept into the pile snapshots every card in it, per side', () => {
+  const sweep = { type: 'zoneMoved', from: 'board', to: 'discard', count: 2 };
+  captureOrigins([sweep], tagged(), capture, () => 'self');
+  assert.deepEqual(takeZoneSweep('self', 'board'), [10, 11]);
+  assert.deepEqual(takeZoneSweep('self', 'board'), [], 'taken once');
+  assert.equal(takeOrigin(10).src, 'item.png');
+  assert.equal(takeOrigin(11).src, 'supporter.png');
+  captureOrigins([sweep], tagged(), capture, () => 'self');
+  discardOrigins(sweep);
+  assert.deepEqual(takeZoneSweep('self', 'board'), []);
+  assert.equal(takeOrigin(10), undefined, 'a skipped sweep leaves nothing behind');
 });

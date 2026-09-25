@@ -15,6 +15,12 @@
 // Design 024: an event may now produce SEVERAL plans, returned as an array and
 // queued in order (fx-queue.mjs). `attackExecuted` is the reason: an attack
 // must read as its name, then its impact — one event, two beats.
+//
+// Design 042: every way into the discard pile plays `discard`. A `cardMoved`
+// into it (retreat Energy, a replaced Stadium, …) names its card; a
+// `zoneMoved` into it (played Trainers swept off the board, discard-hand)
+// names only a count, so its plan carries `sweep` — the source zone whose
+// pre-diff cards the effect flies (origins.mjs `takeZoneSweep`).
 export const EVENT_FX = {
   damageUpdated: 'damage',
   attackExecuted: 'attack',
@@ -67,7 +73,15 @@ const entersPlay = (event) =>
 export function advisoryAnimationPlan(event, selfPlayerId) {
   if (!event || typeof event !== 'object') return null;
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
-  if (event.type === 'cardMoved') return entersPlay(event) ? fxPlan(event, selfPlayerId, 'enter') : null;
+  if (event.type === 'cardMoved') {
+    if (event.to === 'discard' && event.instanceId != null) {
+      return { ...fxPlan(event, selfPlayerId, 'discard'), cards: [event.instanceId] };
+    }
+    return entersPlay(event) ? fxPlan(event, selfPlayerId, 'enter') : null;
+  }
+  if (event.type === 'zoneMoved') {
+    return event.to === 'discard' && event.from ? { ...fxPlan(event, selfPlayerId, 'discard'), sweep: event.from } : null;
+  }
   if (event.playerId == null || selfPlayerId == null) return null;
   const user = event.playerId === selfPlayerId ? 'self' : 'opp';
 

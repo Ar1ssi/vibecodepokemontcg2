@@ -8,13 +8,16 @@
 // scene plays, the evolved card is already drawn on top of the stack.
 // Design 042: a discard snapshots each card where it was (hand or board), so it
 // can fly from there to the pile; a card with nothing on screen (deck, prizes)
-// is remembered as `{ hidden: true }`.
+// is remembered as `{ hidden: true }`. A `cardMoved` into the pile counts as
+// a discard of its card; a `zoneMoved` into it names no cards, so every card
+// then in the source zone is snapshotted and listed as that zone's sweep.
 import { topPokemonCard } from '../../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { moveIdsForEvent } from './lifecycle-pose.mjs';
 
 const MAX_ENTRIES = 24;
 const isId = (v) => v != null && v !== '';
 const origins = new Map();
+const sweeps = new Map();
 const combatOrigins = new Map();
 
 const remember = (instanceId, ghost) => {
@@ -22,6 +25,25 @@ const remember = (instanceId, ghost) => {
   origins.set(instanceId, ghost);
   while (origins.size > MAX_ENTRIES) origins.delete(origins.keys().next().value);
 };
+
+const movesToDiscard = (event) => event?.type === 'cardMoved' && event.to === 'discard' && isId(event.instanceId);
+const sweepsToDiscard = (event) => event?.type === 'zoneMoved' && event.to === 'discard' && Boolean(event.from);
+const isDiscard = (event) => event?.type === 'cardsDiscarded' || movesToDiscard(event);
+// apply-view tags every rendered card with its side ('you'/'them') and zone.
+const SIDE_TAG = { self: 'you', opp: 'them' };
+const sweepKey = (user, zoneId) => `${user}:${zoneId}`;
+
+/** Ids of the rendered cards in one side's zone (`element.dataset.zone`/`side`). */
+export function zoneCardIds(registry, user, zoneId) {
+  const side = SIDE_TAG[user];
+  if (!side || !registry) return [];
+  const ids = [];
+  for (const [id, record] of registry) {
+    const tags = record?.element?.dataset;
+    if (tags?.zone === zoneId && tags.side === side) ids.push(id);
+  }
+  return ids;
+}
 
 /** The instance ids in a `cardsDiscarded`'s `cards`: `{instanceId}` entries or bare ids. */
 export function discardedIds(cards) {
@@ -32,6 +54,7 @@ export function discardedIds(cards) {
 const idsToCapture = (event) => {
   if (event?.type === 'trainerPlayed' && event.instanceId != null) return [event.instanceId];
   if (event?.type === 'cardsDiscarded') return discardedIds(event.cards);
+  if (movesToDiscard(event)) return [event.instanceId];
   return moveIdsForEvent(event);
 };
 
@@ -91,9 +114,22 @@ const captureEvolution = (event, registry, capture, sideOf) => {
   if (ghost) remember(event.instanceId, ghost);
 };
 
+const captureSweep = (event, registry, capture, sideOf) => {
+  if (!sweepsToDiscard(event)) return;
+  const user = sideOf(event);
+  const ids = zoneCardIds(registry, user, event.from);
+  for (const id of ids) {
+    const element = registry.get(id)?.element;
+    const ghost = element && capture(user, element);
+    remember(id, ghost || { hidden: true });
+  }
+  sweeps.set(sweepKey(user, event.from), ids);
+};
+
 export function captureOrigins(events, registry, capture, sideOf) {
   combatOrigins.clear();
   for (const event of events) {
+    captureSweep(event, registry, capture, sideOf);
     for (const id of combatIdsFor(event)) {
       if (combatOrigins.has(id)) continue;
       const element = registry.get(id)?.element;
@@ -104,7 +140,7 @@ export function captureOrigins(events, registry, capture, sideOf) {
       const element = registry.get(id)?.element;
       const ghost = element && capture(sideOf(event), element);
       if (ghost) remember(id, ghost);
-      else if (event.type === 'cardsDiscarded') remember(id, { hidden: true });
+      else if (isDiscard(event)) remember(id, { hidden: true });
     }
     captureEvolution(event, registry, capture, sideOf);
   }
@@ -117,9 +153,23 @@ export const takeOrigin = (instanceId) => {
   return ghost;
 };
 
+/** Removes and returns the ids snapshotted in `user`'s `zoneId` for a sweep into the pile. */
+export const takeZoneSweep = (user, zoneId) => {
+  const key = sweepKey(user, zoneId);
+  const ids = sweeps.get(key) || [];
+  sweeps.delete(key);
+  return ids;
+};
+
 /** Drops any captured origins tied to `event` (skipped events must not leak). */
 export const discardOrigins = (event) => {
   for (const id of idsToCapture(event)) origins.delete(id);
+  if (sweepsToDiscard(event)) {
+    // Side unknown here; a skipped sweep drops both sides' lists for that zone.
+    for (const user of Object.keys(SIDE_TAG)) {
+      for (const id of takeZoneSweep(user, event.from)) origins.delete(id);
+    }
+  }
   if (event?.type === 'pokemonEvolved') origins.delete(event.instanceId);
 };
 

@@ -119,6 +119,13 @@ n/a — client cosmetic. Revert = revert the commit; no data touched.
 | 2 | DOM drivers, capture wiring, discard flights, CSS, holds; video check | suite green, video matches |
 
 ## Deviations (Builder appends here during build)
+- Scope grown at the user's request ("do 1 and 2"): every way into the pile flies. `cardMoved`
+  to discard (retreat Energy, replaced Stadium, special-energy/trainer steps, blocked hand card)
+  → `discard` plan with `cards: [instanceId]`; `zoneMoved` to discard (board sweep, discardAll)
+  → `discard` plan with `sweep: from`, and `captureOrigins` snapshots every card then tagged
+  (`dataset.zone`/`side`) in that zone (`zoneCardIds`, `takeZoneSweep`). Energy tokens fly from a
+  card-shaped box twice the token's height (`cardShapedRect`). Covered by advisory-animations,
+  origins and card-flight tests.
 - User cut the mat-wide burst after the first video ("remove the colored explosion thing"):
   `koBurstPose`/`buildKoRays`/`drawKoBurst`, `playMatBurst` and `.fx-ko-mat-burst` are gone; Options 1–2
   are moot. The gold stars stay.

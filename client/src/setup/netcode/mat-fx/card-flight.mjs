@@ -129,6 +129,23 @@ export function rectFlightEnds(fromRect, toRect, { fromTurn = 0, toTurn = 0 } = 
   };
 }
 
+/**
+ * A card-shaped box to fly from. An Energy token's snapshot is a small
+ * square; the card grows out of it at twice its height instead of being
+ * squeezed into it. Card-shaped rects pass through.
+ */
+export function cardShapedRect(rect, aspect = 0.716) {
+  if (!rect || !(rect.height > 0) || rect.width / rect.height <= 0.9) return rect;
+  const height = rect.height * 2;
+  const width = height * aspect;
+  return {
+    left: rect.left + (rect.width - width) / 2,
+    top: rect.top + (rect.height - height) / 2,
+    width,
+    height,
+  };
+}
+
 /** The card art to fly: an Energy drawn as a token keeps its card art aside. */
 export const flightSrcOf = (element) => element?.dataset?.energyCardSrc || element?.src || element?.currentSrc || null;
 

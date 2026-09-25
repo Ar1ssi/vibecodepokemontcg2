@@ -261,14 +261,32 @@ test('advisoryAnimationPlan: board-to-board and out-of-play moves are not an ent
   const moves = [
     ['bench', 'active'],
     ['active', 'bench'],
-    ['bench', 'discard'],
     ['active', 'hand'],
-    ['hand', 'discard'],
     ['deck', 'hand'],
+    ['active', 'lostZone'],
   ];
   for (const [from, to] of moves) {
     const event = { type: 'cardMoved', playerId: 'p1', instanceId: 3, from, to };
     assert.equal(advisoryAnimationPlan(event, 'p1'), null, `${from} -> ${to}`);
   }
   assert.equal(advisoryAnimationPlan({ type: 'cardMoved', playerId: 'p1', from: 'hand', to: 'bench' }, 'p1'), null);
+});
+
+test('advisoryAnimationPlan: a card moved into the discard pile flies there as a discard', () => {
+  for (const from of ['active', 'hand', 'stadium']) {
+    const plan = advisoryAnimationPlan({ type: 'cardMoved', playerId: 'p2', instanceId: 8, from, to: 'discard' }, 'p1');
+    assert.equal(plan.effect, 'discard', from);
+    assert.equal(plan.user, 'opp');
+    assert.deepEqual(plan.cards, [8]);
+  }
+  assert.equal(advisoryAnimationPlan({ type: 'cardMoved', playerId: 'p1', from: 'hand', to: 'discard' }, 'p1'), null);
+});
+
+test('advisoryAnimationPlan: a zone swept into the discard pile flies that zone', () => {
+  const plan = advisoryAnimationPlan({ type: 'zoneMoved', playerId: 'p1', from: 'board', to: 'discard', count: 2 }, 'p1');
+  assert.equal(plan.effect, 'discard');
+  assert.equal(plan.user, 'self');
+  assert.equal(plan.sweep, 'board');
+  assert.equal(advisoryAnimationPlan({ type: 'zoneMoved', playerId: 'p1', from: 'board', to: 'lostZone', count: 1 }, 'p1'), null);
+  assert.equal(advisoryAnimationPlan({ type: 'zoneMoved', playerId: 'p1', to: 'discard', count: 1 }, 'p1'), null);
 });

@@ -6,11 +6,10 @@
 Session: 307
 Focus: design 042 — TCG Live knockout (gold stars, knockback + tip, attachments fan out, all fly
   to the discard pile with a streak; the mat burst was built then cut by the user) and plain
-  `cardsDiscarded` discards flying from hand/board (D156). Branch feature/ko-discard-fx, committed,
+  every discard flying from where its card was (D156). Branch feature/ko-discard-fx, committed,
   not pushed.
-Active: none. Open question to user: extend the flight to discards that arrive as `cardMoved`
-  (retreat Energy, replaced Stadium, some trainer steps) and `zoneMoved` (played trainers swept
-  off the board, discard-hand) — today those still only puff or show nothing.
+Active: none. Every way into the discard pile now flies (cardsDiscarded, cardMoved, zoneMoved).
+  Before main: review pass on the branch diff; user decides push.
 Next: maintenance due (S302 handoff item 2): DECISIONS ~156 lines vs 90 cap, designs/ root
   ~50 shipped docs, ISSUES 39 open/30 closed (at cap); triage I180, I182; MAP spot-checks,
   scratch/worktrees. Backlog: I181, I167, I166, I162, I153 (contract first); user visual check:

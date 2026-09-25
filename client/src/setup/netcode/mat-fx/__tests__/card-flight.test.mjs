@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   FLIGHT_STAGGER_MS,
+  cardShapedRect,
   MAX_FLIGHTS,
   flightDelays,
   flightPose,
@@ -86,4 +87,13 @@ test('flightSrcOf: an Energy token flies its card art; anything else its own src
   assert.equal(flightSrcOf({ src: 'token.png', dataset: { energyCardSrc: 'fire.png' } }), 'fire.png');
   assert.equal(flightSrcOf({ src: 'card.png', dataset: {} }), 'card.png');
   assert.equal(flightSrcOf(null), null);
+});
+
+test('cardShapedRect: an Energy token grows into a card-shaped box around it; cards pass through', () => {
+  const token = { left: 100, top: 100, width: 20, height: 20 };
+  const box = cardShapedRect(token);
+  assert.ok(near(box.height, 40) && near(box.width, 40 * 0.716));
+  assert.ok(near(box.left + box.width / 2, 110) && near(box.top + box.height / 2, 110), 'centred on the token');
+  assert.equal(cardShapedRect(card), card);
+  assert.equal(cardShapedRect(null), null);
 });
