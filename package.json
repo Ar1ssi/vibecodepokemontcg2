@@ -16,6 +16,7 @@
     "audit:oracle": "node scripts/audit-oracle.mjs",
     "audit:abilities": "node scripts/audit-ability-behaviour.mjs",
     "audit:trainers": "node scripts/audit-trainer-behaviour.mjs",
+    "audit:attacks": "node scripts/audit-attack-behaviour.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,json,md}\""
   },

@@ -152,16 +152,17 @@ npx eslint --rule "linebreak-style: off" --rule "prettier/prettier: off" \
 ```bash
 pnpm audit:oracle                         # attack/ability execution gate (~2 min, D108)
 pnpm audit:abilities                      # ability behaviour gate (~2 min, D126-D128); --rows for per-row JSON
+pnpm audit:attacks                        # attack behaviour gate (~2 min, design 036); --rows for per-row JSON
 node scripts/audit-all-pokemon.mjs        # gap metric + reports
 node scripts/audit-all-ancient-traits.mjs # ancient-trait coverage (`unrecognized 0` gate)
 node --test shared/engine/rules/__tests__/rules-extended.test.mjs   # fast loop
 pnpm test                                 # full suite (2188+)
 ```
 
-## 8. Behaviour gates: parsed is not played (design 034)
+## 8. Behaviour gates: parsed is not played (design 034/036)
 
-A clean classify/parse result (§5) says nothing about whether the engine plays the card. Two gates
-measure behaviour instead, and both ratchet against committed baselines:
+A clean classify/parse result (§5) says nothing about whether the engine plays the card. Three gates
+measure behaviour instead, and all ratchet against committed baselines:
 
 - `pnpm audit:oracle` runs every attack and activated ability through the reducer and records what
   changed on the board (`scripts/oracle-baseline.json`).
@@ -172,6 +173,14 @@ measure behaviour instead, and both ratchet against committed baselines:
   otherwise "run" when clicked although no rules-mode player can click it. Passive rows are probed
   (`scripts/lib/ability-passive-probe.mjs`): every wired passive reader is asked the same questions
   with the text printed and stripped, on four boards. A changed answer means the text is read.
+- `pnpm audit:attacks` classes every unique effect-text attack in `out/pkmn-pokemon-cards.json`
+  (`scripts/attack-behaviour-baseline.json`): `ok` / `partial` / `ran-no-effect` / `engine-error`.
+  Each attack runs through the real reducer on a rich board (`scripts/lib/attack-harness.mjs`,
+  rules on and any printed cost payable) and a sentence-by-sentence cross-check asks for the state
+  tag its mechanic should produce; damage-only attacks (empty text) are excluded. Every row is
+  ratcheted individually, so an attack that stops working fails by name. `--rows` writes
+  `out/attack-behaviour-rows.json`; the `partial` and `ran-no-effect` rows are the attack backlog
+  (I166-I168).
 
 Two lessons from building them:
 
