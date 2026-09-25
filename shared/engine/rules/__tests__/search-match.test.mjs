@@ -133,3 +133,14 @@ test('typed Basic search accepts supertype/hp Pokémon markers and stage casing'
   const energy = { name: 'Basic Water Energy', supertype: 'Energy', type: 'Energy' };
   assert.equal(matchesSearch(energy, 'Basic {C} Pokémon ≤100 HP'), false);
 });
+
+test('Cherish Ball (UNM 191, pkmncards): "a Pokémon-GX" matches only GX Pokémon', async () => {
+  const { parseSearchDeckParams } = await import('../trainer-effects.mjs');
+  const step = parseSearchDeckParams(
+    'search your deck for a pokémon-gx, reveal it, and put it into your hand. then, shuffle your deck.'
+  );
+  assert.equal(step.what, 'Pokémon-GX');
+  assert.equal(matchesSearch({ name: 'Necrozma-GX', hp: 190 }, step.what), true);
+  assert.equal(matchesSearch({ name: 'Pikachu', hp: 60 }, step.what), false);
+  assert.equal(matchesSearch({ name: 'Ultra Ball', type: 'Item' }, step.what), false);
+});

@@ -1,7 +1,7 @@
 // Shared deck/discard search filtering (trainers, abilities, attacks).
 import { energyMatchesSearchWhat } from './energy-effects.mjs';
 import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
-import { isRuleBoxPokemon } from './card-classify.mjs';
+import { isGxCard, isRuleBoxPokemon } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
 
 const SYMBOL_TO_TYPE = {
@@ -145,6 +145,7 @@ export function matchesSearch(card, what = '') {
   }
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
+    if (/pok[eé]mon-gx\b/.test(w)) return isGxCard(card);
     const noRuleBox =
       w.includes("doesn't have a rule box") ||
       w.includes("does not have a rule box") ||

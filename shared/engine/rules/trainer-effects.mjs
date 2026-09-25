@@ -576,7 +576,9 @@ export function parseSearchDeckParams(lower) {
   }
 
   const typedPokemonWhat = typedPokemonSearchWhat(lower);
-  if (typedPokemonWhat) {
+  if (/search your deck for (?:a|an)\s+pok[ée]mon-gx\b/.test(lower)) {
+    what = 'Pokémon-GX';
+  } else if (typedPokemonWhat) {
     what = typedPokemonWhat;
     const upToMatch = lower.match(/up to\s+(\d+)/);
     if (upToMatch) count = Number(upToMatch[1]);
