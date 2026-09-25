@@ -1682,3 +1682,28 @@ test('ability: Tsareena Queenly Majesty reveals the hand, then you discard a car
   assert.deepEqual(res2.state.players.p2.zones.discard.map((c) => c.instanceId), [91]);
   assert.deepEqual(res2.state.players.p2.zones.hand.map((c) => c.instanceId), [90]);
 });
+
+test('ability: Dawn Wings Necrozma-GX Invasion swaps itself in with no bench picker (pkmncards SM101)', () => {
+  const { state, rng } = setupGame();
+  const holder = createCard({
+    instanceId: 70,
+    name: 'Dawn Wings Necrozma-GX',
+    hp: 190,
+    supertype: 'Pokémon',
+    abilities: [
+      {
+        name: 'Invasion',
+        type: 'Ability',
+        text: 'Once during your turn (before your attack), if this Pokémon is on your Bench, you may switch it with your Active Pokémon.',
+      },
+    ],
+  });
+  state.players.p1.zones.active.push(benchMon(60, 'Active'));
+  state.players.p1.zones.bench.push(benchMon(61, 'Other'), holder);
+  state.players.p2.zones.active.push(benchMon(71, 'Opp'));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null, 'no picker');
+  assert.deepEqual(res.state.players.p1.zones.active.map((c) => c.instanceId), [70]);
+});

@@ -585,6 +585,8 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'switchAbility',
       target: isOpponentBenchSwitch ? 'opponent' : 'self',
+      // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
+      selfSwap: /switch (?:it|this pok[eé]mon) with your active/.test(lower),
       pokemonType: typedBench ? parseEnergyTypeHint(`{${typedBench[1]}}`) : null,
       exceptName: lower.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
       poisonNewActive,

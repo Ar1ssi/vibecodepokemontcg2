@@ -1012,7 +1012,10 @@ export function executeSteps(draft, {
         }
 
         let chosenBenchId = null;
-        if (stepSelection && stepSelection.length > 0) {
+        const selfOnBench = step.selfSwap && bench.some((c) => c.instanceId === sourceCard?.instanceId);
+        if (selfOnBench) {
+          chosenBenchId = sourceCard.instanceId;
+        } else if (stepSelection && stepSelection.length > 0) {
           chosenBenchId = stepSelection[0];
         } else if (bench.length === 1) {
           // Auto-switch when exactly one bench Pokémon exists
