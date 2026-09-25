@@ -805,8 +805,6 @@ export function applyRetreatCostModifier(baseCost, delta) {
 // the Active Spot (e.g. Latias ex "Skyliner": "Your Basic Pokémon in play have
 // no Retreat Cost."). The active Pokémon's own copy is handled by
 // parseRetreatCostModifier; this covers the ability holder sitting on the Bench.
-// Energy-conditional wordings ("Each of your Pokémon that has any {W} Energy
-// attached…") are not handled here.
 export function teamNoRetreatCostForActive(activeCard, benchCards, activeZoneCards = []) {
   if (!activeCard) return false;
   const activeName = lower(activeCard?.name || '');
@@ -820,8 +818,10 @@ export function teamNoRetreatCostForActive(activeCard, benchCards, activeZoneCar
     if (!/no retreat cost|retreat cost is 0/.test(t)) continue;
     // "All of your Pokémon that have {M} Energy attached have no Retreat Cost."
     // (Archaludon Metal Bridge, Zeraora-GX Thunderclap Zone)
+    // "Each of your Pokémon that has any {W} Energy attached to it has no Retreat Cost."
+    // (Manaphy-EX Aqua Tube)
     const typed = t.match(
-      /all of your pok[eé]mon that have \{([a-z])\} energy attached have no retreat cost/
+      /(?:all|each) of your pok[eé]mon that (?:have|has) (?:any )?\{([a-z])\} energy attached(?: to it)? (?:have|has) no retreat cost/
     );
     if (typed) {
       if (activeEnergy.some((e) => energyIsType(e, typed[1]))) return true;

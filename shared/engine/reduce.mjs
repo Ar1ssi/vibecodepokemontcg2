@@ -2653,6 +2653,83 @@ function resumePrizeToBench(draft, { token, selection, activeRng, events }) {
   }
 }
 
+// 2+ Benched Pokémon and no explicit target: suspend and let the player click the
+// one to switch in (server mat picker, D19). Legality has already guaranteed at
+// least one valid bench target.
+function continueRetreat(draft, { playerId, benchInstanceId, discardEnergyIds, events }) {
+  const benchRoots = (draft.players[playerId]?.zones?.bench || []).filter((c) => !c.attachedTo);
+  if (benchInstanceId == null && benchRoots.length > 1) {
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      prompt: 'Retreat: Choose a Benched Pokémon to switch in',
+      source: 'retreat',
+      options: benchRoots,
+      min: 1,
+      max: 1,
+      stateVersion: draft.stateVersion,
+      resumeToken: { effectType: 'retreat', initiatorPlayerId: playerId, discardEnergyIds },
+    });
+    return;
+  }
+  applyRetreatSwap(draft, { playerId, benchInstanceId, discardEnergyIds, events });
+}
+
+function retreatEnergyUnits(draft, playerId) {
+  const player = draft.players[playerId];
+  const active = player?.zones?.active?.find((c) => !c.attachedTo);
+  if (!active) return { active: null, costN: 0, units: [] };
+  const context = {
+    stadiumCard: draft.stadium?.card || draft.stadium || null,
+    ...energyProvisionContext(draft, playerId, active),
+  };
+  const units = player.zones.active
+    .filter((c) => c.attachedTo === active.instanceId && isEnergy(c))
+    .map((card) => ({
+      card,
+      entries: expandEnergyEntries([serverEnergyDescriptor(card, context)]),
+    }));
+  return { active, costN: computeEffectiveRetreatCost(draft, active, playerId), units };
+}
+
+// The player picks which Energy pays the Retreat Cost (rules: the retreating player
+// chooses). Asked only when the pick matters: the attached Energy is not all the same
+// card and there is more than the cost needs.
+function offerRetreatEnergyChoice(draft, playerId, payload) {
+  const { costN, units } = retreatEnergyUnits(draft, playerId);
+  if (costN <= 0) return false;
+  const total = units.reduce((sum, u) => sum + u.entries.length, 0);
+  const names = new Set(units.map((u) => u.card.name));
+  if (total <= costN || names.size < 2) return false;
+  const allSingle = units.every((u) => u.entries.length === 1);
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    prompt: `Retreat: Choose Energy to discard (cost ${costN})`,
+    source: 'retreat',
+    options: units.map((u) => u.card),
+    min: allSingle ? costN : 1,
+    max: Math.min(costN, units.length),
+    stateVersion: draft.stateVersion,
+    resumeToken: {
+      effectType: 'retreatEnergy',
+      initiatorPlayerId: playerId,
+      benchInstanceId: payload?.benchInstanceId ?? null,
+    },
+  });
+  return true;
+}
+
+// The picked Energy covers the cost, and dropping any one of them would not.
+function isExactRetreatPayment(draft, playerId, pickedIds) {
+  if (pickedIds.length === 0 || new Set(pickedIds).size !== pickedIds.length) return false;
+  const { costN, units } = retreatEnergyUnits(draft, playerId);
+  const picked = pickedIds.map((id) => units.find((u) => u.card.instanceId === id));
+  if (picked.some((u) => !u)) return false;
+  const cost = new Array(costN).fill('Colorless');
+  const pays = (list) => canPayAttackCost(list.flatMap((u) => u.entries), cost);
+  if (!pays(picked)) return false;
+  return picked.every((_, i) => !pays(picked.filter((__, j) => j !== i)));
+}
+
 /**
  * Applies an already-legal retreat: pays the Energy cost and swaps the Active with the
  * chosen Benched Pokémon. Pure; legality (turn, conditions, cost, bench non-empty) is
@@ -7365,9 +7442,6 @@ export function applyCommand(state, command, rng = null) {
 
     case 'retreat': {
       const player = draft.players[playerId];
-      const benchRoots = (player?.zones?.bench || []).filter(
-        (c) => !c.attachedTo
-      );
 
       // Mirage Stadium: the retreat costs a coin flip. Tails leaves the Active
       // unable to retreat this turn and no Energy is discarded.
@@ -7388,35 +7462,14 @@ export function applyCommand(state, command, rng = null) {
         }
       }
 
-      // 2+ Benched Pokémon and no explicit target: suspend and let the player
-      // click the one to switch in (server mat picker, D19). Legality has
-      // already guaranteed at least one valid bench target.
-      if (payload?.benchInstanceId == null && benchRoots.length > 1) {
-        draft.pendingChoice = createPendingChoice({
-          player: playerId,
-          prompt: 'Retreat: Choose a Benched Pokémon to switch in',
-          source: 'retreat',
-          options: benchRoots,
-          min: 1,
-          max: 1,
-          stateVersion: draft.stateVersion,
-          resumeToken: {
-            effectType: 'retreat',
-            initiatorPlayerId: playerId,
-            discardEnergyIds: Array.isArray(payload?.discardEnergyIds)
-              ? payload.discardEnergyIds
-              : [],
-          },
-        });
-        break;
-      }
-
-      applyRetreatSwap(draft, {
+      const chosenEnergyIds = Array.isArray(payload?.discardEnergyIds)
+        ? payload.discardEnergyIds
+        : [];
+      if (chosenEnergyIds.length === 0 && offerRetreatEnergyChoice(draft, playerId, payload)) break;
+      continueRetreat(draft, {
         playerId,
         benchInstanceId: payload?.benchInstanceId ?? null,
-        discardEnergyIds: Array.isArray(payload?.discardEnergyIds)
-          ? payload.discardEnergyIds
-          : [],
+        discardEnergyIds: chosenEnergyIds,
         events,
       });
       break;
@@ -7917,6 +7970,17 @@ export function applyCommand(state, command, rng = null) {
           const millCount = Number.isInteger(pick) && pick > 0 ? pick - 1 : 0;
           resolveAttackEffectPhase(draft, { ...resumeCtx, millCount });
         }
+      } else if (token.effectType === 'retreatEnergy') {
+        // The player chose which attached Energy pays the Retreat Cost; an
+        // underpaying or wasteful pick falls back to the automatic payment.
+        draft.pendingChoice = null;
+        const picked = (payload.selection || []).map(Number);
+        continueRetreat(draft, {
+          playerId: initiatorPlayerId,
+          benchInstanceId: token.benchInstanceId ?? null,
+          discardEnergyIds: isExactRetreatPayment(draft, initiatorPlayerId, picked) ? picked : [],
+          events,
+        });
       } else if (token.effectType === 'retreat') {
         // The player clicked the Benched Pokémon to switch in; pay the retreat
         // cost and perform the swap (retreat does not end the turn).

@@ -66,6 +66,29 @@ describe('team-wide no Retreat Cost abilities', () => {
     );
   });
 
+  it('helper: Manaphy-EX Aqua Tube frees an active only once it has Water Energy', () => {
+    const manaphy = createCard({
+      instanceId: 2,
+      name: 'Manaphy-EX',
+      stage: 'Basic',
+      ability: ability(
+        'Aqua Tube',
+        'Each of your Pokémon that has any {W} Energy attached to it has no Retreat Cost.'
+      ),
+    });
+    const active = createCard({ instanceId: 1, name: 'Snorlax', stage: 'Basic', retreatCost: 4 });
+    assert.equal(teamNoRetreatCostForActive(active, [manaphy], [active]), false);
+    const water = createCard({
+      instanceId: 3,
+      name: 'Water Energy',
+      supertype: 'Energy',
+      types: ['Water'],
+      energyType: 'Water',
+      attachedTo: 1,
+    });
+    assert.equal(teamNoRetreatCostForActive(active, [manaphy], [active, water]), true);
+  });
+
   it('helper: "Your Pokémon in play" grants to any active', () => {
     const holder = createCard({
       instanceId: 2,
