@@ -6,10 +6,14 @@
 // from the DOM by the time its hit plays, so the hit falls back to these.
 // Design 041: an evolution snapshots the card it evolves FROM — by the time the
 // scene plays, the evolved card is already drawn on top of the stack.
+// Design 042: a discard snapshots each card where it was (hand or board), so it
+// can fly from there to the pile; a card with nothing on screen (deck, prizes)
+// is remembered as `{ hidden: true }`.
 import { topPokemonCard } from '../../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { moveIdsForEvent } from './lifecycle-pose.mjs';
 
 const MAX_ENTRIES = 24;
+const isId = (v) => v != null && v !== '';
 const origins = new Map();
 const combatOrigins = new Map();
 
@@ -19,8 +23,15 @@ const remember = (instanceId, ghost) => {
   while (origins.size > MAX_ENTRIES) origins.delete(origins.keys().next().value);
 };
 
+/** The instance ids in a `cardsDiscarded`'s `cards`: `{instanceId}` entries or bare ids. */
+export function discardedIds(cards) {
+  if (!Array.isArray(cards)) return [];
+  return cards.map((card) => (card && typeof card === 'object' ? card.instanceId : card)).filter(isId);
+}
+
 const idsToCapture = (event) => {
   if (event?.type === 'trainerPlayed' && event.instanceId != null) return [event.instanceId];
+  if (event?.type === 'cardsDiscarded') return discardedIds(event.cards);
   return moveIdsForEvent(event);
 };
 
@@ -58,6 +69,20 @@ export function visibleStackRecord(registry, instanceId) {
   return registry.get(top?.instanceId) || root;
 }
 
+/**
+ * Design 042: the stack a knocked-out Pokémon goes down with — `shown` is the
+ * card drawn on top, `rest` every other card in it (lower Stages, Energy,
+ * Tools) in stack order. Empty when the card is unknown.
+ */
+export function knockoutStack(registry, instanceId) {
+  const record = registry?.get(instanceId);
+  if (!record) return { shown: null, rest: [] };
+  const root = record.stackAttached ? record : rootHolding(registry, record) || record;
+  const shown = visibleStackRecord(registry, instanceId) || record;
+  const members = [root, ...(root.stackAttached || []).map((entry) => entry.record)];
+  return { shown, rest: members.filter((member) => member && member !== shown) };
+}
+
 // Keyed by the evolved card's id (`event.instanceId`), which is what the plan names.
 const captureEvolution = (event, registry, capture, sideOf) => {
   if (event?.type !== 'pokemonEvolved' || event.instanceId == null) return;
@@ -77,9 +102,9 @@ export function captureOrigins(events, registry, capture, sideOf) {
     }
     for (const id of idsToCapture(event)) {
       const element = registry.get(id)?.element;
-      if (!element) continue;
-      const ghost = capture(sideOf(event), element);
+      const ghost = element && capture(sideOf(event), element);
       if (ghost) remember(id, ghost);
+      else if (event.type === 'cardsDiscarded') remember(id, { hidden: true });
     }
     captureEvolution(event, registry, capture, sideOf);
   }

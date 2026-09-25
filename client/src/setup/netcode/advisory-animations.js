@@ -19,7 +19,8 @@ import { playFx } from './mat-fx/index.js';
 import { afterImpact } from './mat-fx/combat.js';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
 import { holdFor } from './mat-fx/fx-holds.mjs';
-import { captureOrigins, discardOrigins } from './mat-fx/origins.mjs';
+import { flightSrcOf } from './mat-fx/card-flight.mjs';
+import { captureOrigins, discardOrigins, knockoutStack } from './mat-fx/origins.mjs';
 
 // instanceId -> ghost, captured by handleBeforeApply (card still on board)
 // and consumed by handleAdvisoryEvent's 'knockout' branch (card already
@@ -59,11 +60,15 @@ export function handleBeforeApply(events, selfPlayerId) {
   const registry = getCardRegistry();
   for (const event of events) {
     if (!event || event.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
-    const record = registry.get(event.instanceId);
-    if (!record?.element) continue;
+    // Design 042: the card drawn on top (an evolution sits over its Basic),
+    // plus the cards it goes down with, which fan out and fly with it.
+    const { shown, rest } = knockoutStack(registry, event.instanceId);
+    if (!shown?.element) continue;
     const user = event.playerId === selfPlayerId ? 'self' : 'opp';
-    const ghost = captureKnockoutGhost(user, record.element);
-    if (ghost) pendingKnockoutGhosts.set(event.instanceId, ghost);
+    const ghost = captureKnockoutGhost(user, shown.element);
+    if (!ghost) continue;
+    const attached = rest.map((member) => ({ src: flightSrcOf(member.element) })).filter((a) => a.src);
+    pendingKnockoutGhosts.set(event.instanceId, { ...ghost, attached });
   }
   if (!fxDisabled() && !motionReduced()) {
     captureOrigins(events, registry, captureKnockoutGhost, (event) =>

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   KNOCKOUT_DURATION_MS,
   KNOCKOUT_FLASH_END,
-  knockoutBurstPose,
   knockoutPose,
 } from '../knockout-pose.mjs';
 
@@ -57,20 +56,4 @@ test('knockoutPose: opacity is monotonically non-increasing across the whole tim
 test('knockoutPose: t outside [0,1] is clamped, matching the endpoints', () => {
   assert.deepEqual(knockoutPose(-0.5, { fromRect, toRect }), knockoutPose(0, { fromRect, toRect }));
   assert.deepEqual(knockoutPose(1.5, { fromRect, toRect }), knockoutPose(1, { fromRect, toRect }));
-});
-
-test('knockoutBurstPose: glow flares in then fades out; ring expands and fades', () => {
-  const start = knockoutBurstPose(0);
-  const end = knockoutBurstPose(1);
-  assert.equal(start.opacity, 0);
-  assert.equal(end.opacity, 0);
-  assert.equal(end.ringOpacity, 0);
-  assert.ok(knockoutBurstPose(0.15).opacity > 0.99);
-  assert.ok(end.ringScale > start.ringScale);
-  assert.ok(end.scale > start.scale);
-});
-
-test('knockoutBurstPose: t outside [0,1] clamps to the endpoints', () => {
-  assert.deepEqual(knockoutBurstPose(-3), knockoutBurstPose(0));
-  assert.deepEqual(knockoutBurstPose(9), knockoutBurstPose(1));
 });

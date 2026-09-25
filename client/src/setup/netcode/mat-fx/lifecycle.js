@@ -1,10 +1,8 @@
 // Design 022 slice 4: lifecycle effects — evolution (design 041), energy attach snap,
-// retreat/switch slide, trainer/stadium card presentation. All are detached
-// overlays; every one no-ops when its card or rect cannot be resolved.
+// retreat/switch slide, trainer/stadium card presentation, discards flying to
+// the pile (design 042). All are detached overlays; every one no-ops when its
+// card or rect cannot be resolved.
 import { getEnergyTokenFront, isEnergyCard } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
-import { oppContainerDocument, selfContainerDocument } from '../../../state.js';
-import { visualRectOf } from '../../image-logic/iframe-rect.mjs';
-import { docForSide } from './side-doc.mjs';
 import { getCardRegistry } from '../apply-view.js';
 import {
   animateFrames,
@@ -40,7 +38,8 @@ import {
 } from './lifecycle-pose.mjs';
 import { sweepPose } from './flow-pose.mjs';
 import { holdFor } from './fx-holds.mjs';
-import { takeOrigin } from './origins.mjs';
+import { discardedIds, takeOrigin } from './origins.mjs';
+import { pileOf, playDiscardFlights } from './card-flight.js';
 
 const buildImage = (src, className) => {
   const img = document.createElement('img');
@@ -257,22 +256,31 @@ export const promote = (plan) => {
   });
 };
 
-// The discard pile lives inside the side's playmat iframe, same lookup shape
-// as knockout-flight's; `#discardCover` is the pile's visible face.
-const discardRectFor = (user) => {
-  const doc = docForSide(user, selfContainerDocument, oppContainerDocument);
-  const cover = doc?.getElementById('discardCover');
-  const el = cover?.querySelector('img') || cover;
-  if (!el) return null;
-  const rect = visualRectOf(el);
-  if (rect.width < 2 || rect.height < 2) return null;
-  return rect;
+/**
+ * Where each discarded card flies from: its pre-diff snapshot, or the deck for
+ * a card that was not on screen. A card whose snapshot another effect already
+ * took (the trainer presentation) does not fly. The art is the post-diff
+ * element's first: discard is public, so an opponent's hand card shows its
+ * face there, not the sleeve it had in hand.
+ */
+const discardFlightsFor = (plan, registry, pile) => {
+  const deck = pileOf(plan.user, 'deck');
+  const cards = [];
+  for (const id of discardedIds(plan.cards)) {
+    const origin = takeOrigin(id);
+    const from = origin?.rect ? origin : origin?.hidden ? deck : null;
+    const element = registry.get(id)?.element;
+    const src = element?.src || origin?.src;
+    if (from?.rect && src) cards.push({ src, rect: from.rect, turn: from.turn ?? pile.turn });
+  }
+  return cards;
 };
 
 export const discard = (plan) => {
-  const rect = discardRectFor(plan.user);
-  if (!rect) return 0;
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-discard-puff' });
+  const pile = pileOf(plan.user, 'discard');
+  if (!pile) return 0;
+  if (playDiscardFlights(discardFlightsFor(plan, getCardRegistry(), pile), pile) > 0) return;
+  const host = spawnOverlay({ rect: pile.rect, className: 'fx-overlay fx-discard-puff' });
   runPose(host, DISCARD_PUFF_MS, (t) => {
     const pose = discardPuffPose(t);
     host.style.transform = `translate3d(0, ${pose.y}px, 0) scale(${pose.scale})`;

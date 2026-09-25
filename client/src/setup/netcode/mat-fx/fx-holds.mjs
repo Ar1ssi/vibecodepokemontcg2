@@ -12,7 +12,8 @@ export const HOLD_MS = {
   damage: 180,
   status: 260,
   'status-clear': 160,
-  knockout: 520,
+  // Design 042: the prize claim lands while the knocked-out cards fly to the pile.
+  knockout: 900,
   'prize-claim': 320,
   evolve: 240,
   // Design 041: the next effect lands as the evolved Pokémon emerges from the flare.

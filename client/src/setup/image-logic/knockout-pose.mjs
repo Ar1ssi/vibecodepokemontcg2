@@ -49,23 +49,3 @@ export function knockoutPose(t, { fromRect, toRect }) {
     saturate: 0,
   };
 }
-
-export const KNOCKOUT_BURST_MS = 420;
-
-/**
- * Design 022 slice 2: burst played over the ghost as it flashes, before it
- * drifts to the discard pile. `scale` is relative to the ghost's rect; the
- * ring expands past the card edge while the glow fades.
- * @param {number} t - progress in [0, 1]
- * @returns {{scale: number, opacity: number, ringScale: number, ringOpacity: number}}
- */
-export function knockoutBurstPose(t) {
-  const c = Math.max(0, Math.min(1, t));
-  const out = 1 - (1 - c) ** 3;
-  return {
-    scale: 1 + 0.25 * out,
-    opacity: c < 0.15 ? c / 0.15 : 1 - (c - 0.15) / 0.85,
-    ringScale: 0.6 + 1.1 * out,
-    ringOpacity: 0.9 * (1 - c),
-  };
-}

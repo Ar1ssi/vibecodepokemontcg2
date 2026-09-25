@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigins, discardOrigins, takeOrigin, visibleStackRecord } from '../origins.mjs';
+import {
+  captureOrigins,
+  discardOrigins,
+  discardedIds,
+  knockoutStack,
+  takeOrigin,
+  visibleStackRecord,
+} from '../origins.mjs';
 
 // A Basic (1) with a Stage 1 (2) under it on the board, and a lone Basic (5).
 const card = (instanceId, name, stage, attachedTo) => ({
@@ -100,4 +107,40 @@ test('origins: discard drops a skipped evolution snapshot', () => {
   captureOrigins([event], board(), capture, () => 'self');
   discardOrigins(event);
   assert.equal(takeOrigin(7), undefined);
+});
+
+test('knockoutStack: the top card flies as the knocked-out card, the rest of the stack with it', () => {
+  const registry = board();
+  const { shown, rest } = knockoutStack(registry, 1);
+  assert.equal(shown.card.name, 'Kakuna');
+  assert.deepEqual(
+    rest.map((r) => r.card.name),
+    ['Weedle', 'Grass Energy']
+  );
+  const lone = knockoutStack(registry, 5);
+  assert.equal(lone.shown.card.name, 'Makuhita');
+  assert.deepEqual(lone.rest, []);
+  assert.deepEqual(knockoutStack(registry, 99), { shown: null, rest: [] });
+  assert.deepEqual(knockoutStack(null, 1), { shown: null, rest: [] });
+});
+
+test('discardedIds: reads {instanceId} entries and bare ids, drops the rest', () => {
+  assert.deepEqual(discardedIds([{ instanceId: 3, name: 'Grass Energy' }, 7, null, { name: 'x' }, '']), [3, 7]);
+  assert.deepEqual(discardedIds(undefined), []);
+  assert.deepEqual(discardedIds('nope'), []);
+});
+
+test('captureOrigins: a discard snapshots cards on screen and marks the rest hidden', () => {
+  const registry = board();
+  captureOrigins(
+    [{ type: 'cardsDiscarded', playerId: 'p1', cards: [{ instanceId: 3 }, 42] }],
+    registry,
+    capture,
+    () => 'self'
+  );
+  assert.equal(takeOrigin(3).src, 'energy.png');
+  assert.deepEqual(takeOrigin(42), { hidden: true });
+  captureOrigins([{ type: 'cardsDiscarded', cards: [5] }], registry, capture, () => 'self');
+  discardOrigins({ type: 'cardsDiscarded', cards: [5] });
+  assert.equal(takeOrigin(5), undefined, 'a skipped discard leaves nothing behind');
 });
