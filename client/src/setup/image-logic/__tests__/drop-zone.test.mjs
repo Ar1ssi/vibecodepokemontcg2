@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DROP_ZONE_SELECTOR, zoneOf } from '../drop-zone.mjs';
+import { DROP_ZONE_SELECTOR, playsOntoBoard, zoneOf } from '../drop-zone.mjs';
 
 // Minimal element stand-in: `closest` walks up the parent chain and matches
 // the comma-separated `#id` list the real selector is built from.
@@ -58,4 +58,27 @@ test('the selector lists every card-holding zone', () => {
   for (const id of ['board', 'stadium', 'active', 'bench', 'hand', 'deckCover']) {
     assert.ok(DROP_ZONE_SELECTOR.includes(`#${id}`), `missing #${id}`);
   }
+});
+
+test('playsOntoBoard: Items, Supporters and bare Trainers light the board (design 046)', () => {
+  assert.equal(playsOntoBoard({ supertype: 'Trainer', subtypes: ['Item'] }), true);
+  assert.equal(playsOntoBoard({ type: 'Supporter' }), true);
+  assert.equal(playsOntoBoard({ supertype: 'Trainer', trainerType: 'Supporter' }), true);
+  // A legacy card knows only its type.
+  assert.equal(playsOntoBoard({ type: 'Trainer' }), true);
+});
+
+test('playsOntoBoard: Stadiums and Tools go elsewhere', () => {
+  assert.equal(playsOntoBoard({ type: 'Stadium' }), false);
+  assert.equal(playsOntoBoard({ supertype: 'Trainer', subtypes: ['Stadium'] }), false);
+  assert.equal(playsOntoBoard({ type: 'Pokémon Tool' }), false);
+  assert.equal(playsOntoBoard({ supertype: 'Trainer', trainerType: 'Tool' }), false);
+});
+
+test('playsOntoBoard: Pokémon, Energy and unknown cards do not', () => {
+  assert.equal(playsOntoBoard({ supertype: 'Pokémon', type: 'Pokémon' }), false);
+  assert.equal(playsOntoBoard({ type: 'Energy' }), false);
+  assert.equal(playsOntoBoard({ instanceId: 7 }), false);
+  assert.equal(playsOntoBoard(null), false);
+  assert.equal(playsOntoBoard(undefined), false);
 });

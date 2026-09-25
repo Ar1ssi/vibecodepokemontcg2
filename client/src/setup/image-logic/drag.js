@@ -15,7 +15,7 @@ import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
-import { zoneOf } from './drop-zone.mjs';
+import { playsOntoBoard, zoneOf } from './drop-zone.mjs';
 import { endDragAvatar, startDragAvatar } from './drag-avatar.js';
 
 const popupContainers = [
@@ -36,6 +36,26 @@ const clearExplicitDropHighlights = () => {
   document
     .querySelectorAll(`[data-drop-zone].${DROP_TARGET_CLASS}`)
     .forEach((el) => el.classList.remove(DROP_TARGET_CLASS));
+};
+
+// Design 046: an Item or Supporter picked up from the hand lights its owner's
+// Trainer board until the drag ends, so the drop spot is visible before the
+// pointer reaches it.
+const BOARD_READY_CLASS = 'board-drop-ready';
+
+const clearBoardReady = () => {
+  for (const doc of [selfContainerDocument, oppContainerDocument]) {
+    doc?.getElementById('board')?.classList.remove(BOARD_READY_CLASS);
+  }
+};
+
+const heldCard = (image) =>
+  image.card ?? getZone(mouseClick.cardUser, mouseClick.zoneId)?.array?.[mouseClick.cardIndex];
+
+const markBoardReady = (image) => {
+  clearBoardReady();
+  if (mouseClick.zoneId !== 'hand' || !playsOntoBoard(heldCard(image))) return;
+  getZone(mouseClick.cardUser, 'board')?.element?.classList.add(BOARD_READY_CLASS);
 };
 
 export const dragStart = (event) => {
@@ -60,6 +80,7 @@ export const dragStart = (event) => {
   identifyCard(event);
 
   event.target.classList.add('dragging');
+  markBoardReady(event.target);
 
   if (popupContainers.includes(mouseClick.zoneId)) {
     getZone(mouseClick.cardUser, mouseClick.zoneId).element.style.opacity = '0';
@@ -193,6 +214,7 @@ export const dragEnd = (event) => {
   enablePointerEvents(selfContainerDocument, classList);
   enablePointerEvents(oppContainerDocument, classList);
   clearExplicitDropHighlights();
+  clearBoardReady();
 
   event.target.classList.remove('dragging');
   zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
@@ -245,6 +267,7 @@ export const drop = (event) => {
   zoneOf(event.target)?.classList.remove('highlight', 'highlightBox');
   event.target.parentElement?.classList.remove('highlight', 'highlightBox');
   clearExplicitDropHighlights();
+  clearBoardReady();
 
   let draggedImage =
     document.querySelector('.dragging') ||

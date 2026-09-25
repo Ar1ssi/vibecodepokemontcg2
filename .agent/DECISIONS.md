@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D160).
+#   Next id = highest D number in this file and the archive + 1 (next: D161).
 
 ## Active
+- D160[drag] 2026-09-25 Drop hovers get depth from shared per-sheet custom properties (`--drop-rgb`/`--drop-deep-rgb`, `--drop-ring` bevel, `--drop-well`); a hovered zone outranks the mat plate reset via `body.mat-active :is(...)`; an Item/Supporter held from the hand breathes its owner's `#board` (`board-drop-ready`, drag.js + `playsOntoBoard`) (design 046).
 - D159[mat-fx] 2026-09-25 Prize takes ride the draw flights: fan up/back on the 042 arc (prize-fan.mjs), a picked sleeve hands off to the 044 draw scene into the hand, opponent prizes arc from their seats; the spring draw flight is gone (design 045).
 - D158[mat-fx] 2026-09-25 Draws = TCG Live scene (draw-scene.mjs/.js): yours flip out of the deck into a mat spread (one card = big preview, 600 ms hold) then drop into the hand; the opponent's sleeves arc to their hand (042 planFlight). Engine: setup deal/mulligan/bonus events carry card ids; turnStarted precedes the turn draw (design 044).
 - D157[mat-fx] 2026-09-25 Opponent Trainer/Stadium play = TCG Live preview (opp-play.mjs/.js: sleeve drops off hand, flips, grows over the mat, holds 1200 ms, lands in its slot; hold 1700); your plays keep presentCard — user scope (design 043).
