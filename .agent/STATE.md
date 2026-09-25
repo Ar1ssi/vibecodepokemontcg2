@@ -7,7 +7,7 @@ Session: 300
 Focus: S299 fixed the #board double-click trap: the free-play board was missing from `doubleClick`'s zoom
   list, so the card got the legacy #fullImage overlay (top document, under the z-index-2 mat iframes,
   unclosable). Zone list + routing now in `double-click-zoom.mjs`; live 2P probe + unit test green.
-Active: none — S300 Birch shuffle+coin draw fix done in worktree birch-coinflip (fix/birch-coinflip), uncommitted.
+Active: none — S300 Gaia Volcano + Birch/Drasna/Gambler fixes merged to main (5fbb5a88, 7c89a4eb); worktrees to remove.
 Next: maintenance due (S290 skipped; ISSUES Open 51/40, Closed 35/30 over cap).
   Triage I180 (remaining legacy-overlay zones: discard/lostZone/viewCards/attachedCards).
   036 slice 16 (regression gate `pnpm audit:attacks`, close I136) — ledger NEXTSTEPS.md.
@@ -31,7 +31,6 @@ Blocked: I85/I86 need design approval; I87 needs the user's description.
 - Bash heredoc eats `\` and mangles é → use the Edit/Write tools. Primary working copy is CRLF (repo LF).
 
 ## Recently shipped (≤3 one-liners; older → journal)
+- S300 Gaia Volcano family: Stadium bonus read + "[Then,] discard that Stadium" step (attack-steps/damage-parser, new test); suite 4062/4063, oracle PASSED.
 - S300 Professor Birch's Observations / Drasna / Gambler: coin-picked shuffle-draw (trainer-effects + test); suite 4064/4065, all gates PASSED, trainer baseline updated.
 - S299 #board double-click fix (`double-click-zoom.mjs` + test), live 2P verified; I180 files the remaining zones.
-- S298 trainer-play fly-out card back (`presentSrcFor` src order) + S297 PR #181 design 024 (D146–148, I177–179).
-- PRs #186 drag swing, #187 inspector fix, #188 special-Energy merged to main (S296).

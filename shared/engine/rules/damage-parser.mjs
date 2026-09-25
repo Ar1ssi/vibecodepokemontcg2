@@ -92,6 +92,11 @@ function evalCondition(cond, defender, ctx) {
     const atLeast = clause.match(/^you discarded (\d+) or more cards in this way$/);
     if (atLeast) return ctx.handDiscarded >= Number(atLeast[1]);
   }
+  // "If there is any Stadium card in play" / "If a Stadium is in play" (Gaia Volcano family).
+  // ctx.stadiumInPlay is a buildServerAttackContext read; without it stay unresolved.
+  if (/^(?:there is (?:a|any) stadium card in play|a stadium is in play)$/.test(cond)) {
+    return typeof ctx?.stadiumInPlay === 'boolean' ? ctx.stadiumInPlay : null;
+  }
   const hp = Number(defender?.hp) || 0;
   const hpMore = cond.match(/(\d+) hp or more/);
   if (hpMore) {

@@ -282,6 +282,11 @@ const TEMPLATES = [
     }),
   ],
 
+  // "…this attack does N more damage. [Then,] discard that Stadium." (Gaia Volcano, Draconic
+  // Disaster, Desert Hurricane, Somersault Dive): the damage parser reads the bonus, this
+  // clears the Stadium after damage. (Flygon Desert Geyser's conditional wording is a BLOCK.)
+  [/^discard that stadium(?: card)?$/, () => ({ type: 'atkDiscardStadium', owner: 'any' })],
+
   // Discard from the opponent
   [
     /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
