@@ -446,6 +446,7 @@ export function executeSteps(draft, {
             (!step.energyOnly || isEnergyCard(c)) &&
             (!step.basicOnly || classifyEnergyEffect(c) === 'basic') &&
             (!step.what || matchesSearch(c, step.what)) &&
+            matchesEnergyTypeFilter(c, step.pokemonTypes) &&
             (step.tagFilter !== 'single-strike' || isSingleStrikeCard(c))
         );
         const count = step.count || 1;

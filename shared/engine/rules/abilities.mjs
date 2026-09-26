@@ -181,6 +181,26 @@ const parseEnergyTypeHint = (t) => {
   return null;
 };
 
+// Qualifier of a hand-card discard cost ("a card", "an Ultra Beast card", "a {M} Pokémon",
+// "a Shelmet"). Returns the engine filter fields for the printed noun, or null when the noun
+// is a relative clause ("a Pokémon that has the Mad Party attack") or an Energy cost (read by
+// section 7) — those stay unread rather than silently accepting the wrong cards.
+const discardCostFilterFromNoun = (noun) => {
+  const raw = noun.trim();
+  const n = raw.toLowerCase();
+  if (!n || /^cards?$/.test(n)) return {}; // plain "a card": any card pays
+  if (/ that | attached/.test(n)) return null;
+  if (/\benergy\b/.test(n)) return null;
+  if (/ultra beast/.test(n)) return { what: 'Ultra Beast' };
+  if (/\bpok[eé]mon\b/.test(n)) {
+    const type = parseEnergyTypeHint(n);
+    return type ? { what: 'Pokémon', pokemonTypes: [type] } : { what: 'Pokémon' };
+  }
+  // Named card ("a Shelmet", "a Chill Teaser Toy card"): match by printed name.
+  const name = raw.replace(/\s+cards?$/i, '').trim();
+  return name ? { what: name } : {};
+};
+
 /**
  * Where a move-Energy Ability takes Energy from and puts it (design 034 slice 5b). The
  * printing fixes the destination: `self` ("to this Pokémon"), `active` ("to your Active
@@ -1899,37 +1919,39 @@ export function parseAbility(text = '') {
   }
 
   // ── Hand-card discard cost ("You must discard a card from your hand in order to use this
-  // Ability", "you may discard 2 cards from your hand. If you do, draw …"). Energy-only costs
-  // are section 7; a qualified card ("a Pokémon that has the Mad Party attack") is not read.
+  // Ability", "you may discard 2 cards from your hand. If you do, draw …"). The printed
+  // qualifier filters which cards can pay (Ultra Beast, Pokémon, a named card). Energy-only
+  // costs are section 7; a relative clause ("a Pokémon that has the Mad Party attack") is
+  // left unread.
   const handCardCost = lower.match(
-    /discard (a|an|\d+) cards? from your hand(?: in order to (?:use this ability|draw)|\. (?:if you do|then)\b)/
+    /discard (a|an|\d+) ([^.]*?) from your hand(?: in order to (?:use this ability|draw)|\. (?:if you do|then)\b)/
   );
   if (handCardCost && !steps.some((step) => step.type === 'discardCostAbility')) {
     const count = /^\d+$/.test(handCardCost[1]) ? Number(handCardCost[1]) : 1;
-    steps.push({
-      type: 'discardCostAbility',
-      count,
-      energyOnly: false,
-      guidance: `Once during your turn: discard ${count > 1 ? `${count} cards` : 'a card'} from your hand (cost).`,
-    });
-  }
-  // A qualified cost ("discard an Ultra Beast card from your hand. If you do, draw …",
-  // Naganadel-GX Ultra Conversion): the printed qualifier filters which hand cards can
-  // pay, carried as `what` for the executor/picker. Only simple nouns are read; a
-  // relative clause ("a Pokémon that has the Mad Party attack") stays unparsed.
-  const ultraBeastCost =
-    !steps.some((step) => step.type === 'discardCostAbility') &&
-    lower.match(
-      /discard an ultra beast card from your hand(?: in order to (?:use this ability|draw)|\. (?:if you do|then)\b)/
+    // Read the noun from the printed text so the guidance keeps its original casing.
+    const printedCost = String(text || '').match(
+      /discard (a|an|\d+) ([^.]*?) from your hand(?: in order to (?:use this ability|draw)|\. (?:if you do|then)\b)/i
     );
-  if (ultraBeastCost) {
-    steps.push({
-      type: 'discardCostAbility',
-      count: 1,
-      energyOnly: false,
-      what: 'Ultra Beast',
-      guidance: 'Once during your turn: discard an Ultra Beast card from your hand (cost).',
-    });
+    const noun = (printedCost?.[2] || handCardCost[2]).trim();
+    const filter = discardCostFilterFromNoun(noun);
+    if (filter) {
+      const article = /^[aeiou]/i.test(noun) ? 'an' : 'a';
+      const plain = /^cards?$/i.test(noun);
+      const label = plain
+        ? count > 1
+          ? `${count} cards`
+          : 'a card'
+        : count > 1
+          ? `${count} ${noun}`
+          : `${article} ${noun}`;
+      steps.push({
+        type: 'discardCostAbility',
+        count,
+        energyOnly: false,
+        ...filter,
+        guidance: `Once during your turn: discard ${label} from your hand (cost).`,
+      });
+    }
   }
   // "You must put a card from your hand on the bottom of your deck in order to use this
   // Ability" (Quaquaval Up-Tempo): like the discard-cost family, but the card is not

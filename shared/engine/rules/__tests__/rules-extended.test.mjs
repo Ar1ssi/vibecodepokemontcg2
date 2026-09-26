@@ -897,6 +897,39 @@ import test from 'node:test';
       assert.equal(plain[0].what, undefined);
     });
 
+    test('parseAbility: other qualified hand-discard costs carry the printed noun as a filter', () => {
+      const costOf = (text) => parseAbility(text).find((s) => s.type === 'discardCostAbility');
+
+      const melmetal = costOf(
+        'Once during your turn (before your attack), you may discard a {M} Pokémon from your hand. If you do, heal 100 damage from this Pokémon.'
+      );
+      assert.equal(melmetal.what, 'Pokémon');
+      assert.deepEqual(melmetal.pokemonTypes, ['metal']);
+      assert.equal(melmetal.guidance, 'Once during your turn: discard a {M} Pokémon from your hand (cost).');
+
+      const guzzlord = costOf(
+        'Once during your turn (before your attack), you may discard a Pokémon from your hand. If you do, heal 60 damage from this Pokémon.'
+      );
+      assert.equal(guzzlord.what, 'Pokémon');
+      assert.equal(guzzlord.pokemonTypes, undefined);
+
+      const karrablast = costOf(
+        'Once during your turn (before your attack), you may discard a Shelmet from your hand. If you do, search your deck for a card that evolves from this Pokémon and put it onto this Pokémon to evolve it. Then, shuffle your deck.'
+      );
+      assert.equal(karrablast.what, 'Shelmet');
+
+      const meowstic = costOf(
+        "You must discard a Chill Teaser Toy card from your hand in order to use this Ability. Once during your turn, you may switch in 1 of your opponent's Benched Pokémon to the Active Spot."
+      );
+      assert.equal(meowstic.what, 'Chill Teaser Toy');
+
+      // A relative clause ("that has the Mad Party attack") has no filter reader — left unread.
+      const madParty = parseAbility(
+        'You must discard a Pokémon that has the Mad Party attack from your hand in order to use this Ability. Once during your turn, you may draw 2 cards.'
+      );
+      assert.equal(madParty.some((s) => s.type === 'discardCostAbility'), false);
+    });
+
     test('parseAbility: place damage on opponent without incidental "to" in cost clause', () => {
       const text =
         "Once during your turn, you may discard a Basic Water Energy card from your hand. Place 6 damage counters on 1 of your opponent's Pokémon.";

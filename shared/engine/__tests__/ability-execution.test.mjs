@@ -1852,3 +1852,19 @@ test('ability: Ultra Conversion with no Ultra Beast in hand draws nothing and is
   assert.equal(res.state.players.p1.zones.deck.length, 3);
   assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
 });
+
+test('ability: Melmetal costs a typed {M} Pokémon discard and filters other types out', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'Once during your turn (before your attack), you may discard a {M} Pokémon from your hand. If you do, heal 100 damage from this Pokémon.'
+  );
+  const metal = createCard({ instanceId: 95, name: 'Melmetal', hp: 130, supertype: 'Pokémon', types: ['Metal'] });
+  const water = createCard({ instanceId: 94, name: 'Froakie', hp: 70, supertype: 'Pokémon', types: ['Water'] });
+  state.players.p1.zones.hand.push(metal, water);
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.ok(res.pendingChoice, 'the discard cost opens a picker');
+  assert.deepEqual(res.pendingChoice.options.map((c) => c.instanceId), [95], 'only the {M} Pokémon is offered');
+});

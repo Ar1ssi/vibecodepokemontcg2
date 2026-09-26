@@ -238,9 +238,18 @@ export function matchesDiscardCost(card, step = {}) {
     });
     return matchesSearch(card, what);
   }
-  // A qualified hand cost ("discard an Ultra Beast card from your hand") carries the
-  // printed qualifier as `what`; a plain "discard a card" cost accepts any card.
-  if (step.what) return matchesSearch(card, step.what);
+  // A qualified hand cost ("discard an Ultra Beast card from your hand", "a {M} Pokémon")
+  // carries the printed qualifier as `what`/`pokemonTypes`; a plain "discard a card" cost
+  // accepts any card.
+  if (step.what || (Array.isArray(step.pokemonTypes) && step.pokemonTypes.length > 0)) {
+    if (step.what && !matchesSearch(card, step.what)) return false;
+    if (Array.isArray(step.pokemonTypes) && step.pokemonTypes.length > 0) {
+      return step.pokemonTypes.some((t) =>
+        pokemonMatchesEnergyType(card, WORD_POKEMON_TYPES[t] || t)
+      );
+    }
+    return true;
+  }
   return true;
 }
 
