@@ -199,6 +199,40 @@ test('Voltage Shoot: refused with fewer than 2 {L} Energy cards in hand', () => 
   assert.match(String(res.error), /Energy card\(s\) in your hand/);
 });
 
+// ── Dusk Mane Necrozma Dusk Shot: chosen target (TCGdex curly apostrophes) ──
+
+const DUSK_SHOT =
+  'This attack does 60 damage to 1 of your opponent’s Pokémon-GX or Pokémon-EX. This damage isn’t affected by Weakness or Resistance.';
+
+test('Dusk Shot: the chosen-target clause parses through typographic apostrophes', () => {
+  assert.deepEqual(attackTargetClause(DUSK_SHOT), {
+    kind: 'damage',
+    amount: 60,
+    count: 1,
+    scope: 'any',
+  });
+});
+
+test('Dusk Shot: the player picks the target and it takes 60', () => {
+  const b = board(DUSK_SHOT, {
+    name: 'Dusk Mane Necrozma',
+    attackName: 'Dusk Shot',
+    setup: ({ p2 }) => {
+      p2.zones.active.splice(0);
+      p2.zones.active.push(mon('Plain Active', { hp: 300 }));
+      p2.zones.bench.push(mon('GX Target', { hp: 300, subtypes: ['GX'] }));
+      p2.zones.bench.push(mon('EX Target', { hp: 300, subtypes: ['EX'] }));
+    },
+  });
+  const asked = attack(b);
+  assert.deepEqual(optionNames(asked).sort(), ['EX Target', 'GX Target', 'Plain Active']);
+  const ex = asked.state.pendingChoice.options.find((o) => o.name === 'EX Target');
+  const res = choose(asked, [ex.instanceId], b.rng);
+  assert.equal(damageOn(res, 'p2', 'bench', 'EX Target'), 60);
+  assert.equal(damageOn(res, 'p2', 'bench', 'GX Target'), 0);
+  assert.equal(damageOn(res, 'p2', 'active', 'Plain Active'), 0);
+});
+
 // ── slice 2: timed markers from older wordings ──────────────────────────────
 
 const MACH_WIND = "During your next turn, Vespiquen's Retreat Cost is 0.";

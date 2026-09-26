@@ -1318,7 +1318,9 @@ export function ownBenchDamage(attackText) {
 // { kind: 'damage', amount, count, scope } or null. `scope` is 'bench' when the
 // text names the Bench, otherwise 'any' (Active or Bench). Pure.
 export function attackTargetClause(attackText) {
-  const t = String(attackText || '');
+  // TCGdex prints typographic apostrophes ("opponent’s"); normalize them so the
+  // patterns below match the fetched card text (Dusk Shot et al.).
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
   // Older wording (Raichu LV.X Voltage Shoot): "choose 1 of your opponent's Pokémon. This
   // attack does 80 to that Pokémon."
   const chosen =
