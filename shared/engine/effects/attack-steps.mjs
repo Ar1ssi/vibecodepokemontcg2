@@ -24,6 +24,7 @@ import {
 import { effectiveHp, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
   isExCard,
+  isGxCard,
   isMegaCard,
   isRadiantCard,
   isTeraCard,
@@ -92,6 +93,49 @@ function energyLabel(step) {
 
 function attackName(ctx) {
   return ctx.step.attackName || sourceName(ctx, 'Attack');
+}
+
+// Attack cost symbols ("Darkness", "{D}", "D") as their printed type letter for the
+// extra-Energy comparison below.
+const COST_TYPE_LETTERS = {
+  grass: 'G',
+  fire: 'R',
+  water: 'W',
+  lightning: 'L',
+  psychic: 'P',
+  fighting: 'F',
+  darkness: 'D',
+  dark: 'D',
+  metal: 'M',
+  fairy: 'Y',
+  dragon: 'N',
+  colorless: 'C',
+};
+function costTypeLetter(symbol) {
+  const s = String(symbol || '')
+    .toLowerCase()
+    .replace(/[{}]/g, '');
+  if (!s) return '';
+  return s.length === 1 ? s.toUpperCase() : COST_TYPE_LETTERS[s] || '';
+}
+
+/**
+ * "If this Pokémon has at least N extra Energy attached to it (in addition to this attack's
+ * cost)" (design 048): attached Energy of the printed type (all Energy when untyped) minus
+ * that type's share of the attack's printed cost. Fail closed when the attacker left play.
+ */
+function extraEnergySatisfied(ctx, requirement) {
+  if (!requirement) return true;
+  const ref = attackerRef(ctx);
+  if (!ref) return false;
+  const top = topPokemonCard(ctx.player, ref.card) || ref.card;
+  const attack = (top.attacks || []).find((a) => a?.name === ctx.step.attackName);
+  const cost = Array.isArray(attack?.cost) ? attack.cost : [];
+  const attached = attachedCards(ctx.player, ref.card.instanceId).filter(isEnergy);
+  const type = requirement.energyType ? String(requirement.energyType).toUpperCase() : null;
+  const pool = type ? attached.filter((card) => energyMatches(card, { energyType: type })) : attached;
+  const spent = type ? cost.filter((symbol) => costTypeLetter(symbol) === type).length : cost.length;
+  return pool.length - spent >= (requirement.count || 1);
 }
 
 function shuffleOwnDeck(player, ctx) {
@@ -747,30 +791,68 @@ function atkBenchFromDeckTop(ctx) {
   });
 }
 
+// Basic Pokémon by default; design 048 adds the typed GX/EX combination (Eternal Flame-GX,
+// Dark Union-GX) and the Fossil-evolution filter (Stone Age-GX) plus the extra-Energy attach.
+function benchDiscardCandidates(player, step) {
+  return (player.zones.discard || []).filter((c) => {
+    if (!isPokemon(c)) return false;
+    if (step.evolvesFrom) {
+      const from = String(c.evolvesFrom || c.evolvesFromName || '').toLowerCase();
+      if (from !== String(step.evolvesFrom).toLowerCase()) return false;
+    } else if (stageOf(c) !== 'Basic') {
+      return false;
+    }
+    if (step.pokemonType && !pokemonHasType(c, step.pokemonType)) return false;
+    if (step.maxHp && (Number(c.hp) || 0) > step.maxHp) return false;
+    if (
+      step.ruleBoxes &&
+      !step.ruleBoxes.some((kind) =>
+        kind === 'gx' ? isGxCard(c) : kind === 'ex' ? isExCard(c) : false
+      )
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/** Dark Union-GX: attach N Energy from the discard pile to every Pokémon placed this way. */
+function attachPlacedBenchEnergy(ctx, placed) {
+  const { player, step } = ctx;
+  const per = step.thenAttachPerPlaced;
+  if (!per || placed.length === 0 || !extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return;
+  for (const root of placed) {
+    for (let i = 0; i < per; i++) {
+      const energy = (player.zones.discard || []).find(isEnergy);
+      if (!energy) return;
+      attachTo(player, energy, root, ctx.events);
+    }
+  }
+}
+
 function atkBenchFromDiscard(ctx) {
   const { player, step } = ctx;
-  // Only Basic Pokémon can be put onto the Bench.
-  const candidates = (player.zones.discard || []).filter(
-    (c) =>
-      isPokemon(c) &&
-      stageOf(c) === 'Basic' &&
-      (!step.pokemonType || pokemonHasType(c, step.pokemonType)) &&
-      (!step.maxHp || (Number(c.hp) || 0) <= step.maxHp)
-  );
-  const what = step.pokemonType ? `Basic {${step.pokemonType.toUpperCase()}} Pokémon` : 'Basic Pokémon';
+  const candidates = benchDiscardCandidates(player, step);
+  const what = step.evolvesFrom
+    ? `Pokémon that evolve from ${step.evolvesFrom}`
+    : step.ruleBoxes
+      ? `{${String(step.pokemonType || '').toUpperCase()}} Pokémon-GX/-EX`
+      : step.pokemonType
+        ? `Basic {${step.pokemonType.toUpperCase()}} Pokémon`
+        : 'Basic Pokémon';
   const space = benchSpace(player);
-  if (ctx.selection) {
-    putOnBench(player, pickById(candidates, ctx.selection).slice(0, space), 'discard', ctx.events);
+  const place = (picked) => {
+    putOnBench(player, picked, 'discard', ctx.events);
+    attachPlacedBenchEnergy(ctx, picked);
     return null;
-  }
+  };
+  if (ctx.selection) return place(pickById(candidates, ctx.selection).slice(0, space));
   if (candidates.length === 0) return skip(ctx, 'no_pokemon_in_discard');
   if (space === 0) return skip(ctx, 'bench_full');
-  const max = Math.min(step.count || 1, candidates.length, space);
-  const min = step.upTo ? 0 : max;
-  if (min === max && max === candidates.length) {
-    putOnBench(player, candidates, 'discard', ctx.events);
-    return null;
-  }
+  const cap = step.anyNumber ? candidates.length : step.count || 1;
+  const max = Math.min(cap, candidates.length, space);
+  const min = step.upTo || step.anyNumber ? 0 : max;
+  if (min === max && max === candidates.length) return place(candidates);
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose ${min === max ? max : `up to ${max}`} ${what} to put onto your Bench`,
     options: candidates,
@@ -862,28 +944,24 @@ function atkLookTopTake(ctx) {
 
 function atkShuffleOppBench(ctx) {
   const { opponent, step } = ctx;
-  const bench = benchRootsOf(opponent);
+  if (!opponent) return skip(ctx, 'no_opponent');
+  // `scope: 'any'` (Den of Iniquity-GX) reaches the Active as well as the Bench.
+  const pool = step.scope === 'any' ? rootsOf(opponent) : benchRootsOf(opponent);
   const shuffleIn = (roots) => {
     for (const root of roots) {
-      const stack = [root, ...attachedCards(opponent, root.instanceId)];
-      for (const card of stack) {
-        removeFromZones(opponent, card);
-        card.attachedTo = null;
-        card.damage = 0;
-        clearConditions(card);
-        opponent.zones.deck.push(card);
-      }
-      ctx.events.push({ type: 'cardMoved', instanceId: root.instanceId, from: 'bench', to: 'deck', playerId: opponent.playerId });
+      const ref = findCard(ctx.draft, root.instanceId);
+      shuffleStackIntoDeck(ctx, opponent, root, ref?.zoneId === 'active' ? 'active' : 'bench');
     }
-    shuffleOwnDeck(opponent, ctx);
     return null;
   };
-  if (ctx.selection) return shuffleIn(pickById(bench, ctx.selection).slice(0, step.count || 1));
-  if (bench.length === 0) return skip(ctx, 'no_opponent_bench');
-  if (bench.length <= (step.count || 1)) return shuffleIn(bench);
+  if (ctx.selection) return shuffleIn(pickById(pool, ctx.selection).slice(0, step.count || 1));
+  if (pool.length === 0) {
+    return skip(ctx, step.scope === 'any' ? 'no_opponent_pokemon' : 'no_opponent_bench');
+  }
+  if (pool.length <= (step.count || 1)) return shuffleIn(pool);
   return ctx.ask({
-    prompt: `${attackName(ctx)}: Choose ${step.count} of your opponent's Benched Pokémon`,
-    options: bench,
+    prompt: `${attackName(ctx)}: Choose ${step.count} of your opponent's Pokémon`,
+    options: pool,
     min: step.count,
     max: step.count,
   });
@@ -1716,6 +1794,83 @@ function atkBounceOppActive(ctx) {
   return null;
 }
 
+// Sylveon-GX Plea-GX / Greninja-GX Dark Mist-GX: chosen Benched Pokémon and everything
+// attached go back to the opponent's hand.
+function atkBounceOppBench(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const bench = benchRootsOf(opponent);
+  const bounce = (roots) => {
+    for (const root of roots) {
+      for (const card of [root, ...attachedCards(opponent, root.instanceId)]) {
+        removeFromZones(opponent, card);
+        card.attachedTo = null;
+        card.damage = 0;
+        clearConditions(card);
+        clearAttackMarkers(card);
+        opponent.zones.hand.push(card);
+        ctx.events.push({
+          type: 'cardMoved',
+          instanceId: card.instanceId,
+          from: 'inPlay',
+          to: 'hand',
+          playerId: opponent.playerId,
+          reason: 'attack-bounce',
+        });
+      }
+    }
+    return null;
+  };
+  if (ctx.selection) return bounce(pickById(bench, ctx.selection).slice(0, step.count || 1));
+  if (bench.length === 0) return skip(ctx, 'no_opponent_bench');
+  const count = Math.min(step.count || 1, bench.length);
+  if (bench.length <= count) return bounce(bench);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${count} of your opponent's Benched Pokémon`,
+    options: bench,
+    min: count,
+    max: count,
+  });
+}
+
+// Virizion-GX Breeze Away-GX: any number of your in-play Pokémon back to your hand. A vacated
+// Active is settled by the attack phase's `settleVacatedActive`.
+function atkBounceOwnInPlay(ctx) {
+  const { player, step } = ctx;
+  const roots = rootsOf(player);
+  const bounce = (picked) => {
+    for (const root of picked) {
+      for (const card of [root, ...attachedCards(player, root.instanceId)]) {
+        removeFromZones(player, card);
+        card.attachedTo = null;
+        card.damage = 0;
+        clearConditions(card);
+        clearAttackMarkers(card);
+        player.zones.hand.push(card);
+        ctx.events.push({
+          type: 'cardMoved',
+          instanceId: card.instanceId,
+          from: 'inPlay',
+          to: 'hand',
+          playerId: player.playerId,
+          reason: 'attack-bounce',
+        });
+      }
+    }
+    return null;
+  };
+  if (ctx.selection) return bounce(pickById(roots, ctx.selection));
+  if (roots.length === 0) return skip(ctx, 'no_pokemon_in_play');
+  if (step.count && roots.length <= step.count) return bounce(roots);
+  const max = Math.min(step.count || roots.length, roots.length);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose any number of your Pokémon to return to your hand`,
+    options: roots,
+    min: step.upTo || step.anyNumber ? 0 : 1,
+    max,
+  });
+}
+
 // Damage a heal step removes: `all`, `amount` (damage, older steps) or `count` counters.
 function healLimit(step) {
   if (step.all) return Infinity;
@@ -2402,6 +2557,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkChooseCondition,
   atkDevolve,
   atkBounceOppActive,
+  atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),
+  atkBounceOwnInPlay,
   atkHealEach,
   atkHealCounted,
   atkAddMarker,

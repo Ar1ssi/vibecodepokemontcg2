@@ -180,7 +180,136 @@ function p1HandSize(res) {
 
 // ── I186: bounce / bench setup ──────────────────────────────────────────────
 
-test('placeholder I186', () => {});
+const PLEA = "Put 2 of your opponent's Benched Pokémon and all cards attached to them into your opponent's hand.";
+const DARK_MIST = "Put 1 of your opponent's Benched Pokémon and all cards attached to it into your opponent's hand.";
+const DEN_OF_INIQUITY =
+  "Choose 1 of your opponent's Pokémon. Your opponent shuffles that Pokémon and all cards attached to it into their deck.";
+const DREAM_FEAR =
+  "Choose 1 of your opponent's Benched Pokémon. Your opponent shuffles that Pokémon and all cards attached to it into their deck.";
+const BREEZE_AWAY = 'Put any number of your Pokémon in play and all cards attached to them into your hand.';
+const ETERNAL_FLAME =
+  'Put 3 in any combination of {R} Pokémon-GX or {R} Pokémon-EX from your discard pile onto your Bench.';
+const STONE_AGE = 'Put any number of Pokémon that evolve from Unidentified Fossil from your discard pile onto your Bench.';
+const MASSIVE_CATCH =
+  'Look at the top 12 cards of your deck and put any number of Basic Pokémon you find there onto your Bench. Shuffle the other cards back into your deck.';
+
+test('I186 board: Plea-GX returns 2 Benched Pokémon and their attachments to hand', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Sylveon-GX', { hp: 200, attacks: [atk('Plea-GX', 0, PLEA)] }));
+    for (let i = 0; i < 3; i++) {
+      const b = mon(`Bench ${i}`);
+      p2.zones.bench.push(b, energyCard('Water', b.instanceId));
+    }
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state, { selectionFor: (pc) => pc.options.slice(0, 2).map((o) => o.instanceId) });
+  assert.equal(benchRoots(res.state, 'p2').length, 1);
+  const moved = res.events.filter((e) => e.type === 'cardMoved' && e.to === 'hand');
+  assert.equal(moved.length, 4, '2 Pokémon + 2 Energy');
+});
+
+test('I186 board: Dark Mist-GX returns 1 Benched Pokémon', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Greninja-GX', { hp: 200, attacks: [atk('Dark Mist-GX', 0, DARK_MIST)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p2.zones.bench.push(mon('Only bench'));
+  });
+  const res = runAttack(state);
+  assert.equal(benchRoots(res.state, 'p2').length, 0);
+  const bounced = res.events.filter((e) => e.type === 'cardMoved' && e.to === 'hand' && e.playerId === 'p2');
+  assert.equal(bounced.length, 1);
+});
+
+test('I186 board: Den of Iniquity-GX shuffles any chosen opponent Pokémon into their deck', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Shiftry-GX', { hp: 200, attacks: [atk('Den of Iniquity-GX', 0, DEN_OF_INIQUITY)] }));
+    const active = mon('Defender', { hp: 300 });
+    const bench = mon('Bench', { hp: 120 });
+    p2.zones.active.push(active);
+    p2.zones.bench.push(bench, energyCard('Water', bench.instanceId));
+  });
+  const res = runAttack(state, {
+    selectionFor: (pc) => [pc.options.find((o) => /Bench/.test(o.name)).instanceId],
+  });
+  assert.equal(benchRoots(res.state, 'p2').length, 0, 'the chosen Benched Pokémon left the Bench');
+  const deckNames = res.state.players.p2.zones.deck.map((c) => c.name);
+  assert.ok(deckNames.includes('Bench'));
+  assert.equal(activeRoot(res.state, 'p2').name, 'Defender', 'the Active was not touched');
+});
+
+test('I186 board: Dream Fear-GX shuffles a chosen Benched Pokémon into the deck', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Mimikyu-GX', { hp: 200, attacks: [atk('Dream Fear-GX', 0, DREAM_FEAR)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p2.zones.bench.push(mon('Bench A'), mon('Bench B'));
+  });
+  const res = runAttack(state, { selectionFor: (pc) => [pc.options[0].instanceId] });
+  assert.equal(benchRoots(res.state, 'p2').length, 1);
+});
+
+test('I186 board: Breeze Away-GX returns chosen own Pokémon to hand', () => {
+  const state = game((s, p1, p2) => {
+    const attacker = mon('Virizion-GX', { hp: 200, attacks: [atk('Breeze Away-GX', 0, BREEZE_AWAY)] });
+    const bench = mon('Bench A');
+    p1.zones.active.push(attacker);
+    p1.zones.bench.push(bench, energyCard('Grass', bench.instanceId));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state, {
+    selectionFor: (pc) => [pc.options.find((o) => /Bench/.test(o.name)).instanceId],
+  });
+  assert.equal(benchRoots(res.state, 'p1').length, 0);
+  assert.equal(activeRoot(res.state, 'p1').name, 'Virizion-GX');
+  assert.ok(res.state.players.p1.zones.hand.some((c) => c.name === 'Bench A'));
+});
+
+test('I186 board: Eternal Flame-GX benches only {R} Pokémon-GX/-EX from the discard', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Ho-Oh-GX', { hp: 200, attacks: [atk('Eternal Flame-GX', 0, ETERNAL_FLAME)] }));
+    p1.zones.discard.push(
+      mon('Fire GX', { types: ['Fire'], subtypes: ['GX'] }),
+      mon('Fire EX', { types: ['Fire'], subtypes: ['EX', 'Basic'] }),
+      mon('Water GX', { types: ['Water'], subtypes: ['GX'] }),
+      mon('Fire Basic', { types: ['Fire'] })
+    );
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  const names = benchRoots(res.state, 'p1').map((c) => c.name).sort();
+  assert.deepEqual(names, ['Fire EX', 'Fire GX']);
+});
+
+test('I186 board: Stone Age-GX benches Pokémon that evolve from Unidentified Fossil', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Carracosta-GX', { hp: 200, attacks: [atk('Stone Age-GX', 0, STONE_AGE)] }));
+    p1.zones.discard.push(
+      mon('Carracosta', { stage: 'Stage 1', evolvesFrom: 'Unidentified Fossil' }),
+      mon('Kabutops', { stage: 'Stage 1', evolvesFrom: 'Unidentified Fossil' }),
+      mon('Other Stage 1', { stage: 'Stage 1', evolvesFrom: 'Something Else' })
+    );
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state, { selectionFor: (pc) => pc.options.map((o) => o.instanceId) });
+  const names = benchRoots(res.state, 'p1').map((c) => c.name).sort();
+  assert.deepEqual(names, ['Carracosta', 'Kabutops']);
+});
+
+test('I186 board: Massive Catch-GX benches Basic Pokémon from the top 12', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Wishiwashi-GX', { hp: 200, attacks: [atk('Massive Catch-GX', 0, MASSIVE_CATCH)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p1.zones.deck.length = 0;
+    for (let i = 0; i < 14; i++) p1.zones.deck.push(supporter(`deck ${i}`));
+    p1.zones.deck.unshift(mon('Top Basic A'), supporter('Top Trainer'), mon('Top Basic B'));
+  });
+  const deckBefore = 17;
+  const res = runAttack(state, {
+    selectionFor: (pc) => pc.options.slice(0, pc.max).map((o) => o.instanceId),
+  });
+  const names = benchRoots(res.state, 'p1').map((c) => c.name).sort();
+  assert.deepEqual(names, ['Top Basic A', 'Top Basic B']);
+  assert.equal(res.state.players.p1.zones.deck.length, deckBefore - 2);
+});
 
 // ── I185: KO / prize gaps ───────────────────────────────────────────────────
 

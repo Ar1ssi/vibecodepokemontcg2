@@ -413,6 +413,22 @@ const TEMPLATES = [
       ...(m[4] ? { maxHp: Number(m[4]) } : {}),
     }),
   ],
+  // Ho-Oh-GX Eternal Flame-GX / Greninja & Zoroark-GX Dark Union-GX (design 048): typed
+  // Pokémon-GX/-EX in any combination.
+  [
+    new RegExp(String.raw`^put (up to \d+|\d+) in any combination of \{([a-z])\} pokémon-gx (?:or|and) (?:\{[a-z]\} )?pokémon-ex from your discard pile onto your bench$`),
+    (m) => ({
+      type: 'atkBenchFromDiscard',
+      ...attachCount(m[1]),
+      pokemonType: m[2],
+      ruleBoxes: ['gx', 'ex'],
+    }),
+  ],
+  // Carracosta-GX Stone Age-GX: anything that evolves from Unidentified Fossil.
+  [
+    /^put any number of pokémon that evolve from (.+?) from your discard pile onto your bench$/,
+    (m) => ({ type: 'atkBenchFromDiscard', anyNumber: true, evolvesFrom: m[1].trim() }),
+  ],
   [
     /^put (up to \d+|an?|\d+) (?:((?:trainer|item|supporter|pokémon tool|stadium|basic energy|energy|pokémon) )?)cards? from your discard pile into your hand$/,
     (m) => ({ type: 'atkRecover', ...attachCount(m[1]), what: m[2] ? recoverWhat(m[2].trim()) : null }),
@@ -594,6 +610,16 @@ const TEMPLATES = [
   [
     /^your opponent returns your opponent's active pokémon and all cards attached to it to their hand$/,
     () => ({ type: 'atkBounceOppActive' }),
+  ],
+  // Sylveon-GX Plea-GX / Greninja-GX Dark Mist-GX (design 048).
+  [
+    /^put (a|an|\d+) of your opponent's benched pokémon and all cards attached to (?:it|them) into your opponent's hand$/,
+    (m) => ({ type: 'atkBounceOppBench', count: countOf(m[1]) }),
+  ],
+  // Virizion-GX Breeze Away-GX: your own in-play Pokémon back to your hand.
+  [
+    /^put any number of your pokémon in play and all cards attached to them into your hand$/,
+    () => ({ type: 'atkBounceOwnInPlay' }),
   ],
 
   // Devolve
@@ -805,7 +831,8 @@ const BLOCKS = [
     () => ({ type: 'atkUseSupporter', source: 'deck', discard: true }),
   ],
   [
-    /look at the top (\d+) cards of your deck(?:, and|\.) you may put any number of (basic )?pokémon you find there onto your bench\. shuffle the other cards back into your deck\./g,
+    // Wishiwashi-GX Massive Catch-GX prints the same clause without "you may" (design 048).
+    /look at the top (\d+) cards of your deck(?:, and| and|\.) (?:you may )?put any number of (basic )?pokémon you find there onto your bench\. shuffle the other cards back into your deck\./g,
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),
   ],
   [
@@ -820,6 +847,28 @@ const BLOCKS = [
   [
     /choose (\d+) of your opponent's benched pokémon\. shuffle those pokémon and all attached cards into your opponent's deck\./g,
     (m) => ({ type: 'atkShuffleOppBench', count: Number(m[1]) }),
+  ],
+  // Mimikyu-GX Dream Fear-GX / Shiftry-GX Den of Iniquity-GX (design 048): the singular
+  // "that Pokémon" wording, on the Bench or on any of the opponent's Pokémon.
+  [
+    /choose 1 of your opponent's benched pokémon\. your opponent shuffles that pokémon and all cards attached to it into their deck\./g,
+    () => ({ type: 'atkShuffleOppBench', count: 1, scope: 'bench' }),
+  ],
+  [
+    /choose 1 of your opponent's pokémon\. your opponent shuffles that pokémon and all cards attached to it into their deck\./g,
+    () => ({ type: 'atkShuffleOppBench', count: 1, scope: 'any' }),
+  ],
+  // Greninja & Zoroark-GX Dark Union-GX: bench placement plus the extra-Energy attach.
+  [
+    /put (\d+|up to \d+) in any combination of \{([a-z])\} pokémon-gx (?:or|and) (?:\{[a-z]\} )?pokémon-ex from your discard pile onto your bench\. if this pokémon has at least (\d+) extra energy attached to it, attach (\d+) energy cards? from your discard pile to each pokémon that you put onto your bench in this way\./g,
+    (m) => ({
+      type: 'atkBenchFromDiscard',
+      ...attachCount(m[1]),
+      pokemonType: m[2],
+      ruleBoxes: ['gx', 'ex'],
+      requiresExtraEnergy: { count: Number(m[3]), energyType: null },
+      thenAttachPerPlaced: Number(m[4]),
+    }),
   ],
   [
     /(?:choose (a|\d+) random cards? from your opponent's hand\. your opponent reveals (?:that card|those cards) and shuffles (?:it|them)|choose 1 card from your opponent's hand without looking\. look at (?:the|that) card you chose, then have your opponent shuffle that card) into their deck\./g,
