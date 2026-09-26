@@ -706,10 +706,75 @@ test('I184 board: Supreme Puff-GX takes another turn and the 14 extra Energy shu
   assert.equal(benchRoots(res2.state, 'p2').length, 2, 'no Energy, no Bench shuffle');
 });
 
-// ── I188 / I189: recovery, copy, abilities ──────────────────────────────────
+// ── I188: recovery / copy ───────────────────────────────────────────────────
 
-test('placeholder I188/I189', () => {});
+const BACKFIRE = 'Put 2 {R} Energy attached to this Pokémon into your hand.';
+const TRICKSTER = "Choose 1 of your opponent's Pokémon's attacks and use it as this attack.";
 
-test('placeholder bench helper is used', () => {
-  assert.equal(typeof benchRoots, 'function');
+test('I188 board: Backfire returns 2 {R} Energy to hand and leaves other Energy attached', () => {
+  const state = game((s, p1, p2) => {
+    const attacker = mon('Volcarona-GX', { hp: 200, attacks: [atk('Backfire', 160, BACKFIRE)] });
+    p1.zones.active.push(
+      attacker,
+      energyCard('Fire', attacker.instanceId),
+      energyCard('Fire', attacker.instanceId),
+      energyCard('Water', attacker.instanceId)
+    );
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  const hand = res.state.players.p1.zones.hand;
+  assert.equal(hand.filter((c) => c.name === 'Basic Fire Energy').length, 2);
+  assert.equal(hand.filter((c) => c.name === 'Basic Water Energy').length, 0);
+  assert.equal(
+    res.state.players.p1.zones.active.filter((c) => c.attachedTo != null).length,
+    1,
+    'the Water Energy stays attached'
+  );
+});
+
+test('I188 board: Trickster-GX copies a chosen opponent attack', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Zoroark-GX', { hp: 200, attacks: [atk('Trickster-GX', 0, TRICKSTER)] }));
+    p2.zones.active.push(
+      mon('Defender', {
+        hp: 300,
+        attacks: [
+          { name: 'Heavy Slam', cost: [], damage: '60', text: 'This attack does 60 damage.' },
+          { name: 'Nibble', cost: [], damage: '20', text: '' },
+        ],
+      })
+    );
+  });
+  const res = runAttack(state, {
+    selectionFor: (pc) =>
+      pc.options.filter((o) => /Heavy Slam/.test(o.name || '')).map((o) => o.instanceId),
+  });
+  assert.ok(res.events.some((e) => e.type === 'attackCopied' && e.copiedName === 'Heavy Slam'));
+  assert.equal(activeRoot(res.state, 'p2').damage, 60);
+});
+
+// ── I189: ability gaps ──────────────────────────────────────────────────────
+
+test('I189 board: Disk Reload draws until the hand has 5 cards', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(
+      mon('Silvally-GX', {
+        hp: 200,
+        abilities: [
+          { name: 'Disk Reload', text: 'Once during your turn (before your attack), you may draw cards until you have 5 cards in your hand.' },
+        ],
+      })
+    );
+    p1.zones.hand.push(supporter('a'), supporter('b'));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  }, { rulesEnabled: true });
+  const holder = activeRoot(state, 'p1');
+  const res = applyCommand(
+    state,
+    { type: 'useAbility', playerId: 'p1', payload: { instanceId: holder.instanceId, abilityIndex: 0 } },
+    createRng(9)
+  );
+  assert.equal(res.error, null, res.reason);
+  assert.equal(res.state.players.p1.zones.hand.length, 5);
 });

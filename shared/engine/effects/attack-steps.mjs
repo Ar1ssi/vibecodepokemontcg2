@@ -489,6 +489,39 @@ function atkDiscardSelfEnergy(ctx) {
   return discardChosen(ctx, energies, { label: energyLabel(step) });
 }
 
+// Volcarona-GX Backfire: "Put 2 {R} Energy attached to this Pokémon into your hand."
+function atkMoveSelfEnergyToHand(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  const energies = ref ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, step)) : [];
+  const move = (cards) => {
+    for (const card of cards) {
+      removeFromZones(player, card);
+      card.attachedTo = null;
+      player.zones.hand.push(card);
+      ctx.events.push({
+        type: 'cardMoved',
+        instanceId: card.instanceId,
+        from: 'inPlay',
+        to: 'hand',
+        playerId: player.playerId,
+        reason: 'attack-energy-return',
+      });
+    }
+    return null;
+  };
+  const count = Math.min(step.count || 1, energies.length);
+  if (ctx.selection) return move(pickById(energies, ctx.selection).slice(0, count));
+  if (count === 0) return skip(ctx, 'no_energy');
+  if (energies.length <= count) return move(energies);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${count} ${energyLabel(step)} to put into your hand`,
+    options: energies,
+    min: count,
+    max: count,
+  });
+}
+
 // ── discard from the opponent ───────────────────────────────────────────────
 
 function opponentRootsInScope(opponent, scope) {
@@ -2798,6 +2831,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
   atkDiscardSelfEnergy,
+  atkMoveSelfEnergyToHand,
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
   atkDiscardBothActiveEnergy: optional(
     atkDiscardBothActiveEnergy,

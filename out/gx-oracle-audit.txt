@@ -4,7 +4,7 @@ Oracle: scripts/lib/oracle-harness.mjs, seeds 1,2,3,4,5,6,7,8; observed = rowObs
 blind = family whose state change the oracle cannot see on these cards (marker/passive families); not a failure
 
 Entries: 1723 — 1481 attacks (604 GX) / 242 abilities
-executed 1166 / blind 236 / passive 52 / no-effect 269 / engine-error 0
+executed 1169 / blind 236 / passive 52 / no-effect 266 / engine-error 0
 GX attacks: executed 485/604, blind 6, no-effect 113, engine-error 0
 Run: 24s
 
@@ -25,7 +25,7 @@ Run: 24s
 - ability:damage-prevent: 3/27 (11%)
 - attack:switch: 27/27 (100%)
 - attack:discard-opponent: 26/26 (100%)
-- attack:move-energy: 15/25 (60%)
+- attack:move-energy: 18/25 (72%)
 - attack:status-paralyzed: 21/21 (100%)
 - attack:status-burned: 21/21 (100%)
 - attack:status-confused: 21/21 (100%)
@@ -93,7 +93,7 @@ Run: 24s
 - opponent-disrupt: 3
 - status: 3
 
-## No observed effect (269)
+## No observed effect (266)
 - [attack] [GX] Reshiram & Charizard-GX [Sun & Moon Promos #SM247] Double Blaze-GX (conditional-damage)
 - [attack] [GX] Jirachi-GX [Unified Minds #79a] Star Shield-GX (effect-prevention)
 - [attack] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Psychic Club (bench-damage)
@@ -102,21 +102,18 @@ Run: 24s
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #261] Jumping Balloon (multi-target)
 - [attack] [GX] Flygon-GX [Cosmic Eclipse #256] Sonic Edge-GX (next-turn-lock)
 - [attack] [GX] Solgaleo & Lunala-GX [Cosmic Eclipse #254] Light of the Protector-GX (effect-prevention)
-- [attack] Volcarona-GX [Cosmic Eclipse #252] Backfire (move-energy)
 - [ability] Silvally-GX [Cosmic Eclipse #227] Disk Reload (draw)
 - [attack] Silvally-GX [Cosmic Eclipse #227] Brave Buddies (conditional-damage)
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #226] Jumping Balloon (multi-target)
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #225] Jumping Balloon (multi-target)
 - [attack] [GX] Flygon-GX [Cosmic Eclipse #218] Sonic Edge-GX (next-turn-lock)
 - [attack] [GX] Solgaleo & Lunala-GX [Cosmic Eclipse #216] Light of the Protector-GX (effect-prevention)
-- [attack] Volcarona-GX [Cosmic Eclipse #213] Backfire (move-energy)
 - [ability] Silvally-GX [Cosmic Eclipse #184] Disk Reload (draw)
 - [attack] Silvally-GX [Cosmic Eclipse #184] Brave Buddies (conditional-damage)
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #165] Jumping Balloon (multi-target)
 - [attack] [GX] Flygon-GX [Cosmic Eclipse #110] Sonic Edge-GX (next-turn-lock)
 - [attack] [GX] Solgaleo & Lunala-GX [Cosmic Eclipse #75] Light of the Protector-GX (effect-prevention)
 - [attack] Wishiwashi-GX [Cosmic Eclipse #63] School Storm (per-energy)
-- [attack] Volcarona-GX [Cosmic Eclipse #35] Backfire (move-energy)
 - [attack] [GX] Lunala-GX [Sun & Moon Promos #SM103a] Requiem-GX (next-turn-lock)
 - [attack] [GX] Zoroark-GX [Shining Legends #77a] Trickster-GX (next-turn-lock)
 - [attack] [GX] Raichu-GX [Sun & Moon Promos #SM213] Spark Ball-GX (next-turn-lock)
@@ -1983,9 +1980,9 @@ Run: 24s
 - [ability] Volcarona-GX [Cosmic Eclipse #252] Flaming Shot (move-damage) → executed [discardCostAbility,moveDamageAbility] {ability-used,opp:active+dmg,own:hand->discard}
 - [ability] Volcarona-GX [Cosmic Eclipse #213] Flaming Shot (move-damage) → executed [discardCostAbility,moveDamageAbility] {ability-used,opp:active+dmg,own:hand->discard}
 - [ability] Volcarona-GX [Cosmic Eclipse #35] Flaming Shot (move-damage) → executed [discardCostAbility,moveDamageAbility] {ability-used,opp:active+dmg,own:hand->discard}
-- [attack] Volcarona-GX [Cosmic Eclipse #252] Backfire (move-energy) → no-effect Δ160 {opp:active+dmg,opp:deck->hand}
-- [attack] Volcarona-GX [Cosmic Eclipse #213] Backfire (move-energy) → no-effect Δ160 {opp:active+dmg,opp:deck->hand}
-- [attack] Volcarona-GX [Cosmic Eclipse #35] Backfire (move-energy) → no-effect Δ160 {opp:active+dmg,opp:deck->hand}
+- [attack] Volcarona-GX [Cosmic Eclipse #252] Backfire (move-energy) → executed Δ160 {opp:active+dmg,opp:deck->hand,own:attached->hand}
+- [attack] Volcarona-GX [Cosmic Eclipse #213] Backfire (move-energy) → executed Δ160 {opp:active+dmg,opp:deck->hand,own:attached->hand}
+- [attack] Volcarona-GX [Cosmic Eclipse #35] Backfire (move-energy) → executed Δ160 {opp:active+dmg,opp:deck->hand,own:attached->hand}
 - [attack] [GX] Volcarona-GX [Cosmic Eclipse #252] Massive Heat Wave-GX (multi-target) → executed {opp:attached->discard,opp:deck->hand}
 - [attack] [GX] Volcarona-GX [Cosmic Eclipse #213] Massive Heat Wave-GX (multi-target) → executed {opp:attached->discard,opp:deck->hand}
 - [attack] [GX] Volcarona-GX [Cosmic Eclipse #35] Massive Heat Wave-GX (multi-target) → executed {opp:attached->discard,opp:deck->hand}

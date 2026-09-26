@@ -637,6 +637,12 @@ const TEMPLATES = [
     () => ({ type: 'atkBounceOwnInPlay' }),
   ],
 
+  // Volcarona-GX Backfire (design 048): attached Energy back to the attacker's hand.
+  [
+    new RegExp(String.raw`^put (\d+|a|an) ${ENERGY_TYPE}energy(?: cards?)? attached to this pokémon into your hand$`),
+    (m, s) => ({ type: 'atkMoveSelfEnergyToHand', count: countOf(m[1]), ...energyFilter(m[2], s) }),
+  ],
+
   // Opponent play/attack locks and extra turns (design 048): Noivern-GX Distort/Sonic Volume,
   // Alolan Golem-GX Heavy Rock-GX, Gengar & Mimikyu-GX Horror House-GX, Umbreon & Darkrai-GX
   // Dark Moon-GX, Cobalion-GX Iron Rule-GX, Dialga-GX Timeless-GX, Supreme Puff-GX.
