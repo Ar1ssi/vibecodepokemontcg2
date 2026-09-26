@@ -4,17 +4,17 @@ Oracle: scripts/lib/oracle-harness.mjs, seeds 1,2,3,4,5,6,7,8; observed = rowObs
 blind = family whose state change the oracle cannot see on these cards (marker/passive families); not a failure
 
 Entries: 1723 — 1481 attacks (604 GX) / 242 abilities
-executed 1062 / blind 236 / passive 52 / no-effect 373 / engine-error 0
+executed 1071 / blind 236 / passive 52 / no-effect 364 / engine-error 0
 GX attacks: executed 390/604, blind 6, no-effect 208, engine-error 0
-Run: 25s
+Run: 24s
 
 ## By family
 - attack:next-turn-lock: 147/283 (52%)
 - attack:unknown: 0/180 (0%)
-- attack:bench-damage: 113/126 (90%)
+- attack:bench-damage: 117/126 (93%)
 - attack:per-energy: 101/119 (85%)
 - attack:conditional-damage: 55/111 (50%)
-- attack:discard-cost: 62/77 (81%)
+- attack:discard-cost: 67/77 (87%)
 - attack:per-prize: 25/68 (37%)
 - attack:draw-attach: 62/66 (94%)
 - attack:search-deck: 48/48 (100%)
@@ -93,7 +93,7 @@ Run: 25s
 - opponent-disrupt: 3
 - status: 3
 
-## No observed effect (373)
+## No observed effect (364)
 - [attack] [GX] Reshiram & Charizard-GX [Sun & Moon Promos #SM247] Double Blaze-GX (conditional-damage)
 - [attack] [GX] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143a] Supreme Puff-GX (next-turn-lock)
 - [attack] [GX] Jirachi-GX [Unified Minds #79a] Star Shield-GX (effect-prevention)
@@ -168,7 +168,6 @@ Run: 25s
 - [attack] [GX] Mewtwo & Mew-GX [Unified Minds #242] Miraculous Duo-GX (next-turn-lock)
 - [attack] Raichu & Alolan Raichu-GX [Unified Minds #241] Tandem Shock (conditional-damage)
 - [attack] Keldeo-GX [Unified Minds #240] Sonic Edge (immunity)
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #239] Ditch and Splash (discard-cost)
 - [attack] [GX] Heatran-GX [Unified Minds #238] Hot Burn-GX (per-energy)
 - [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #237] Tropical Hour-GX (next-turn-lock)
 - [attack] [GX] Naganadel-GX [Unified Minds #230] Injection-GX (per-prize)
@@ -182,8 +181,6 @@ Run: 25s
 - [attack] Raichu & Alolan Raichu-GX [Unified Minds #221] Tandem Shock (conditional-damage)
 - [attack] Raichu & Alolan Raichu-GX [Unified Minds #220] Tandem Shock (conditional-damage)
 - [attack] Keldeo-GX [Unified Minds #219] Sonic Edge (immunity)
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #218] Ditch and Splash (discard-cost)
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #217] Ditch and Splash (discard-cost)
 - [attack] [GX] Heatran-GX [Unified Minds #216] Hot Burn-GX (per-energy)
 - [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #215] Tropical Hour-GX (next-turn-lock)
 - [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #214] Tropical Hour-GX (next-turn-lock)
@@ -199,7 +196,6 @@ Run: 25s
 - [attack] [GX] Mewtwo & Mew-GX [Unified Minds #71] Miraculous Duo-GX (next-turn-lock)
 - [attack] Raichu & Alolan Raichu-GX [Unified Minds #54] Tandem Shock (conditional-damage)
 - [attack] Keldeo-GX [Unified Minds #47] Sonic Edge (immunity)
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #35] Ditch and Splash (discard-cost)
 - [attack] [GX] Heatran-GX [Unified Minds #25] Hot Burn-GX (per-energy)
 - [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #1] Tropical Hour-GX (next-turn-lock)
 - [attack] Kangaskhan-GX [Sun & Moon Promos #SM188] Enraged Strike (conditional-damage)
@@ -271,7 +267,6 @@ Run: 25s
 - [attack] [GX] Cobalion-GX [Team Up #106] Iron Rule-GX (next-turn-lock)
 - [attack] [GX] Hoopa-GX [Team Up #96] Devilish Hands-GX (next-turn-lock)
 - [attack] [GX] Lycanroc-GX [Team Up #82] Splintered Shards-GX (next-turn-lock)
-- [attack] Mr. Mime-GX [Team Up #67] Breakdown (bench-damage)
 - [attack] [GX] Gengar & Mimikyu-GX [Team Up #53] Horror House-GX (draw-attach)
 - [attack] Ampharos-GX [Team Up #43] Power Recharge (discard-cost)
 - [attack] [GX] Jolteon-GX [Sun & Moon Promos #SM173] Swift Run-GX (effect-prevention)
@@ -318,16 +313,12 @@ Run: 25s
 - [attack] Altaria-GX [Dragon Majesty #41] Sonic Edge (immunity)
 - [attack] [GX] Scizor-GX [Celestial Storm #175] Cross-Cut-GX (conditional-damage)
 - [attack] Banette-GX [Celestial Storm #174] Shadow Chant (discard-cost)
-- [attack] Mr. Mime-GX [Celestial Storm #173] Breakdown (bench-damage)
 - [attack] [GX] Shiftry-GX [Celestial Storm #169] Den of Iniquity-GX (next-turn-lock)
 - [attack] [GX] Scizor-GX [Celestial Storm #158] Cross-Cut-GX (conditional-damage)
 - [attack] Banette-GX [Celestial Storm #157] Shadow Chant (discard-cost)
-- [attack] Mr. Mime-GX [Celestial Storm #156] Breakdown (bench-damage)
 - [attack] [GX] Shiftry-GX [Celestial Storm #152] Den of Iniquity-GX (next-turn-lock)
 - [attack] [GX] Scizor-GX [Celestial Storm #90] Cross-Cut-GX (conditional-damage)
-- [attack] Alolan Raticate-GX [Celestial Storm #85] Chuck Away (discard-cost)
 - [attack] Banette-GX [Celestial Storm #66] Shadow Chant (discard-cost)
-- [attack] Mr. Mime-GX [Celestial Storm #56] Breakdown (bench-damage)
 - [attack] [GX] Shiftry-GX [Celestial Storm #14] Den of Iniquity-GX (next-turn-lock)
 - [attack] [GX] Dusk Mane Necrozma-GX [Sun & Moon Promos #SM102] Sun's Eclipse-GX (per-prize)
 - [attack] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Dark Flash (immunity)
@@ -485,9 +476,9 @@ Run: 25s
 - [attack] Alolan Exeggutor-GX [Crimson Invasion #118] Dragon Hammer (status-confused) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Alolan Exeggutor-GX [Crimson Invasion #107] Dragon Hammer (status-confused) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Alolan Exeggutor-GX [Crimson Invasion #74] Dragon Hammer (status-confused) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #118] Tower-Go-Round-GX (move-energy) → no-effect {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:heal}
-- [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #107] Tower-Go-Round-GX (move-energy) → no-effect {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:heal}
-- [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #74] Tower-Go-Round-GX (move-energy) → no-effect {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:heal}
+- [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #118] Tower-Go-Round-GX (move-energy) → no-effect Δ180 {opp:active+dmg}
+- [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #107] Tower-Go-Round-GX (move-energy) → no-effect Δ180 {opp:active+dmg}
+- [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #74] Tower-Go-Round-GX (move-energy) → no-effect Δ180 {opp:active+dmg}
 - [attack] Alolan Exeggutor-GX [Crimson Invasion #118] Tropical Head (bench-damage) → executed Δ20 {opp:bench+dmg,opp:deck->hand}
 - [attack] Alolan Exeggutor-GX [Crimson Invasion #107] Tropical Head (bench-damage) → executed Δ20 {opp:bench+dmg,opp:deck->hand}
 - [attack] Alolan Exeggutor-GX [Crimson Invasion #74] Tropical Head (bench-damage) → executed Δ20 {opp:bench+dmg,opp:deck->hand}
@@ -542,7 +533,7 @@ Run: 25s
 - [attack] [GX] Alolan Persian-GX [Cosmic Eclipse #257] Stalking Claws-GX (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Alolan Persian-GX [Cosmic Eclipse #219] Stalking Claws-GX (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Alolan Persian-GX [Cosmic Eclipse #129] Stalking Claws-GX (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand}
-- [attack] Alolan Raticate-GX [Celestial Storm #85] Chuck Away (discard-cost) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
+- [attack] Alolan Raticate-GX [Celestial Storm #85] Chuck Away (discard-cost) → executed Δ80 {opp:active+dmg,opp:deck->hand,own:hand->discard}
 - [attack] Alolan Raticate-GX [Celestial Storm #85] Hyper Fang (coin-flip) → executed Δ150 {coin,opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Alolan Raticate-GX [Celestial Storm #85] Item Maniac-GX (next-turn-lock) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [ability] Alolan Sandslash-GX [Sun & Moon Promos #SM236] Spiky Shield (move-damage) → executed [moveDamageAbility,thornsAbility] {ability-used,opp:active+dmg}
@@ -935,10 +926,10 @@ Run: 25s
 - [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #205] Fairy Song (search-deck) → executed {opp:deck->hand,shuffle}
 - [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #204] Fairy Song (search-deck) → executed {opp:deck->hand,shuffle}
 - [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #130] Fairy Song (search-deck) → executed {opp:deck->hand,shuffle}
-- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #225] Kaleidostorm (move-energy) → no-effect {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:heal}
-- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #205] Kaleidostorm (move-energy) → no-effect {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:heal}
-- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #204] Kaleidostorm (move-energy) → no-effect {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:heal}
-- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #130] Kaleidostorm (move-energy) → no-effect {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:heal}
+- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #225] Kaleidostorm (move-energy) → no-effect Δ150 {opp:active+dmg}
+- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #205] Kaleidostorm (move-energy) → no-effect Δ150 {opp:active+dmg}
+- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #204] Kaleidostorm (move-energy) → no-effect Δ150 {opp:active+dmg}
+- [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #130] Kaleidostorm (move-energy) → no-effect Δ150 {opp:active+dmg}
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #225] Magical Miracle-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #205] Magical Miracle-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #204] Magical Miracle-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
@@ -1445,14 +1436,14 @@ Run: 25s
 - [ability] Mr. Mime-GX [Celestial Storm #173] Magic Evens (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
 - [ability] Mr. Mime-GX [Celestial Storm #156] Magic Evens (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
 - [ability] Mr. Mime-GX [Celestial Storm #56] Magic Evens (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
-- [attack] Mr. Mime-GX [Celestial Storm #173] Breakdown (bench-damage) → no-effect {opp:deck->hand}
-- [attack] Mr. Mime-GX [Celestial Storm #156] Breakdown (bench-damage) → no-effect {opp:deck->hand}
-- [attack] Mr. Mime-GX [Celestial Storm #56] Breakdown (bench-damage) → no-effect {opp:deck->hand}
+- [attack] Mr. Mime-GX [Celestial Storm #173] Breakdown (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] Mr. Mime-GX [Celestial Storm #156] Breakdown (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] Mr. Mime-GX [Celestial Storm #56] Breakdown (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] [GX] Mr. Mime-GX [Celestial Storm #173] Life Trick-GX (next-turn-lock) → executed {opp:deck->hand,own:heal}
 - [attack] [GX] Mr. Mime-GX [Celestial Storm #156] Life Trick-GX (next-turn-lock) → executed {opp:deck->hand,own:heal}
 - [attack] [GX] Mr. Mime-GX [Celestial Storm #56] Life Trick-GX (next-turn-lock) → executed {opp:deck->hand,own:heal}
 - [ability] Mr. Mime-GX [Team Up #67] Magic Odds (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
-- [attack] Mr. Mime-GX [Team Up #67] Breakdown (bench-damage) → no-effect {opp:deck->hand}
+- [attack] Mr. Mime-GX [Team Up #67] Breakdown (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] [GX] Mr. Mime-GX [Team Up #67] Life Trick-GX (next-turn-lock) → executed {opp:deck->hand,own:heal}
 - [attack] [GX] Muk & Alolan Muk-GX [Unbroken Bonds #220] Nasty Goo Mix-GX (dual-status) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] [GX] Muk & Alolan Muk-GX [Unbroken Bonds #197] Nasty Goo Mix-GX (dual-status) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
@@ -1684,9 +1675,9 @@ Run: 25s
 - [attack] [GX] Reshiram & Zekrom-GX [Cosmic Eclipse #259] Cross Break-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Reshiram & Zekrom-GX [Cosmic Eclipse #222] Cross Break-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Reshiram & Zekrom-GX [Cosmic Eclipse #157] Cross Break-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #259] Fabled Flarebolts (bench-damage) → executed Δ180 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #222] Fabled Flarebolts (bench-damage) → executed Δ180 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #157] Fabled Flarebolts (bench-damage) → executed Δ180 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #259] Fabled Flarebolts (bench-damage) → executed Δ90 {opp:bench+dmg,opp:deck->hand}
+- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #222] Fabled Flarebolts (bench-damage) → executed Δ90 {opp:bench+dmg,opp:deck->hand}
+- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #157] Fabled Flarebolts (bench-damage) → executed Δ90 {opp:bench+dmg,opp:deck->hand}
 - [attack] Reshiram-GX [Dragon Majesty #SV51] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Reshiram-GX [Dragon Majesty #71] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Reshiram-GX [Dragon Majesty #65] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
@@ -1810,10 +1801,10 @@ Run: 25s
 - [ability] Silvally-GX [Ultra Prism #116] Gyro Unit (retreat-cost) → passive [retreatCostAbility]
 - [attack] [GX] Silvally-GX [Ultra Prism #116] Rebel-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Silvally-GX [Ultra Prism #116] Turbo Drive (draw-attach) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:discard->attached}
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #239] Ditch and Splash (discard-cost) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #218] Ditch and Splash (discard-cost) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #217] Ditch and Splash (discard-cost) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
-- [attack] Slowpoke & Psyduck-GX [Unified Minds #35] Ditch and Splash (discard-cost) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
+- [attack] Slowpoke & Psyduck-GX [Unified Minds #239] Ditch and Splash (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand,own:hand->discard}
+- [attack] Slowpoke & Psyduck-GX [Unified Minds #218] Ditch and Splash (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand,own:hand->discard}
+- [attack] Slowpoke & Psyduck-GX [Unified Minds #217] Ditch and Splash (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand,own:hand->discard}
+- [attack] Slowpoke & Psyduck-GX [Unified Minds #35] Ditch and Splash (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand,own:hand->discard}
 - [attack] [GX] Slowpoke & Psyduck-GX [Unified Minds #239] Thrilling Times-GX (per-heads-coin) → executed {coin,ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Slowpoke & Psyduck-GX [Unified Minds #218] Thrilling Times-GX (per-heads-coin) → executed {coin,ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Slowpoke & Psyduck-GX [Unified Minds #217] Thrilling Times-GX (per-heads-coin) → executed {coin,ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}

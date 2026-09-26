@@ -343,6 +343,16 @@ const TEMPLATES = [
   // the damage counts, moves before damage in parseAttackSteps; "If you do, …" chains on it.
   [/^discard your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'all' })],
   [/^discard any number of cards from your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'any' })],
+  // Ditch and Splash / Chuck Away (design 048): a kind-filtered or "up to N" hand discard whose
+  // count scales the damage (parseAttackSteps moves it before damage when the text says so).
+  [
+    /^discard any number of supporter cards? from your hand$/,
+    () => ({ type: 'atkDiscardOwnHand', count: 'any', what: 'Supporter' }),
+  ],
+  [
+    /^discard up to (\d+) cards? from your hand$/,
+    (m) => ({ type: 'atkDiscardOwnHand', count: Number(m[1]), upTo: true }),
+  ],
   [/^discard (an?|\d+) cards? from your hand$/, (m) => ({ type: 'atkDiscardOwnHand', count: countOf(m[1]) })],
   [
     new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand$`),
@@ -544,6 +554,11 @@ const TEMPLATES = [
   [
     /^put (\d+) damage counters? on each of your opponent's (benched )?pokémon$/,
     (m) => ({ type: 'atkCountersEach', count: Number(m[1]), scope: m[2] ? 'bench' : 'all' }),
+  ],
+  // Mr. Mime-GX Breakdown: one counter per card in the opponent's hand on their Active.
+  [
+    /^for each card in your opponent's hand, put (\d+|a|an) damage counters? on their active pokémon$/,
+    (m) => ({ type: 'atkCountersEach', count: countOf(m[1]), scope: 'active', perOpponentHand: true }),
   ],
   [
     /^put (\d+|a|an) damage counters? (?:on )?each (of your opponent's |)(benched )?(pokémon|defending pokémon)(.*)$/,
@@ -1167,7 +1182,12 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
   // without the cards (D114). A discard the damage counts ("If you do, this attack does 70 more
   // damage") also runs first, and the reducer counts it.
   const handCost = /if you (?:can't|don't)[^.]*this attack does nothing/.test(normalizeAttackText(text, selfName));
-  const handScaled = /(?:if you do|if you discarded [^,]* in this way), this attack does/.test(normalized);
+  const handScaled =
+    /(?:if you do|if you discarded [^,]* in this way), this attack does/.test(normalized) ||
+    // Ditch and Splash / Chuck Away print the scaling first: "… for each card you discarded in
+    // this way" is the damage count, so the discard runs before damage and is counted (048).
+    /this attack does \d+ damage for each card you discarded in this way/.test(normalized) ||
+    /for each card you discarded in this way, this attack does/.test(normalized);
   if (handCost || handScaled) {
     const costs = result.after.filter((step) => HAND_COST_TYPES.has(step.type));
     result.after = result.after.filter((step) => !costs.includes(step));

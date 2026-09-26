@@ -350,6 +350,19 @@ export function parseAttackDamage(
           : 'per-energy scaling — resolve the printed count'
       );
     }
+  } else if (
+    text &&
+    /discarded in this way/.test(text) &&
+    /this attack does \d+ damage for each/.test(text)
+  ) {
+    // Hand-discard scaling (design 048): "Discard any number of Supporter cards … This attack
+    // does 40 damage for each card you discarded in this way." The reducer marks the discard
+    // step `countsForDamage` and passes the count as ctx.handDiscarded.
+    const per = amount(text, /this attack does (\d+) damage for each/);
+    const discarded = typeof ctx.handDiscarded === 'number' ? ctx.handDiscarded : 0;
+    total = per * discarded;
+    components.push('per-hand-discarded');
+    notes.push(`${per} × ${discarded} cards discarded in this way`);
   } else if (text && /does \d+ less damage for each/.test(text)) {
     // Reduction scaling ("does 10 less damage for each damage counter on this Pokémon").
     const per = amount(text, /does (\d+) less damage for each/);
@@ -365,7 +378,18 @@ export function parseAttackDamage(
     } else {
       notes.push('per-counter reduction — resolve the printed count');
     }
-  } else if (text && /number of energy|× the number|\* the number/.test(text)) {
+  } else if (
+    text &&
+    /number of energy|× the number|\* the number/.test(text) &&
+    // Only a sentence that talks about damage scales the attack: "Move any number of Energy …"
+    // (Kaleidostorm) must not fabricate a multiplier from the move clause (design 048).
+    text
+      .split(/(?<=\.)\s+/)
+      .some(
+        (sentence) =>
+          /number of energy|× the number|\* the number/.test(sentence) && /\bdamage\b/.test(sentence)
+      )
+  ) {
     total = base * energyCount;
     components.push('per-energy');
     notes.push(`× ${energyCount} attached Energy`);
@@ -448,6 +472,10 @@ export function parseAttackDamage(
     } else if (/\{g\} pok[ée]mon in play/.test(unit)) {
       count = grassPokemonCount;
       label = '{G} Pokémon in play';
+    } else if (/pok[ée]mon-gx and pok[ée]mon-ex in play/.test(unit)) {
+      // Mega Lopunny & Jigglypuff-GX Jumping Balloon (design 048).
+      count = ctx.opponentGxExCount;
+      label = "opponent's Pokémon-GX/EX in play";
     } else if (/pok[ée]mon in play/.test(unit)) {
       count = ownPokemonInPlayCount;
       label = 'Pokémon in play';

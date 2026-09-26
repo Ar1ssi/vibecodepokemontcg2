@@ -587,14 +587,17 @@ function atkDiscardHandEnergy(ctx) {
   });
 }
 
-// Design 036 A11: discard N cards, any number, or the whole hand.
+// Design 036 A11: discard N cards, any number, the whole hand, or a kind-filtered subset
+// ("Discard any number of Supporter cards"; Ditch and Splash / Chuck Away, design 048).
 function atkDiscardOwnHand(ctx) {
   const { player, step } = ctx;
   const hand = player.zones.hand || [];
+  const candidates = step.what ? hand.filter((card) => matchesSearch(card, step.what)) : hand;
   const tag = handCostTag(step);
   if (ctx.selection) {
-    const picked = pickById(hand, ctx.selection);
-    if (typeof step.count === 'number' && picked.length < step.count) return skip(ctx, 'not_enough_cards');
+    const picked = pickById(candidates, ctx.selection);
+    const required = !step.upTo && typeof step.count === 'number' ? step.count : 0;
+    if (picked.length < required) return skip(ctx, 'not_enough_cards');
     discardCards(player, picked, ctx.events, tag);
     return null;
   }
@@ -602,24 +605,33 @@ function atkDiscardOwnHand(ctx) {
     discardCards(player, [...hand], ctx.events, tag);
     return null;
   }
-  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  if (candidates.length === 0) return skip(ctx, 'empty_hand');
   if (step.count === 'any') {
     return ctx.ask({
-      prompt: `${attackName(ctx)}: Choose any number of cards to discard from your hand`,
-      options: hand,
+      prompt: `${attackName(ctx)}: Choose any number of ${step.what ? `${step.what} ` : ''}cards to discard from your hand`,
+      options: candidates,
       min: 0,
-      max: hand.length,
+      max: candidates.length,
+    });
+  }
+  const max = Math.min(step.count || 1, candidates.length);
+  if (step.upTo) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose up to ${max} ${step.what ? `${step.what} ` : ''}card(s) to discard from your hand`,
+      options: candidates,
+      min: 0,
+      max,
     });
   }
   const count = step.count || 1;
-  if (hand.length < count) return skip(ctx, 'not_enough_cards');
-  if (hand.length === count) {
-    discardCards(player, [...hand], ctx.events, tag);
+  if (candidates.length < count) return skip(ctx, 'not_enough_cards');
+  if (candidates.length === count) {
+    discardCards(player, [...candidates], ctx.events, tag);
     return null;
   }
   return ctx.ask({
     prompt: `${attackName(ctx)}: Choose ${count} card${count === 1 ? '' : 's'} to discard from your hand`,
-    options: hand,
+    options: candidates,
     min: count,
     max: count,
   });
@@ -1237,7 +1249,11 @@ function atkCountersEach(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   const targets = step.scope === 'bench' ? benchRootsOf(opponent) : rootsOf(opponent);
   if (targets.length === 0) return skip(ctx, 'no_target');
-  for (const card of targets) placeCounters(ctx, card, opponent.playerId, (step.count || 1) * 10);
+  // Breakdown: one counter per card in the opponent's hand instead of a printed count.
+  const amount = step.perOpponentHand
+    ? (opponent.zones.hand || []).length * (step.count || 1)
+    : step.count || 1;
+  for (const card of targets) placeCounters(ctx, card, opponent.playerId, amount * 10);
   return null;
 }
 

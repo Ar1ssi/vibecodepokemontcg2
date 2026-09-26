@@ -15,6 +15,7 @@ import { classifyEnergyEffect } from './energy-effects.mjs';
 import { listConditions } from './special-conditions.mjs';
 import {
   isExCard,
+  isGxCard,
   isTeraCard,
   isRadiantCard,
   isMegaCard,
@@ -277,6 +278,10 @@ export function buildServerAttackContext(
       (sum, { card }) => sum + energyOn(opponent, card, { stadiumCard, opponent: own }).length,
       0
     );
+    // Jumping Balloon: "for each of your opponent's Pokémon-GX and Pokémon-EX in play".
+    ctx.opponentGxExCount = inPlayPokemon(opponent).filter(
+      ({ view }) => isGxCard(view) || isExCard(view)
+    ).length;
   }
   if (headsCount !== undefined) ctx.headsCount = headsCount;
 
