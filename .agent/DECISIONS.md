@@ -9,6 +9,9 @@
 #   Next id = highest D number in this file and the archive + 1 (next: D180).
 
 ## Active
+- D182 2026-09-26 [rules] "Take another turn after this one" consumes `flags.extraTurn` in the attack tail and restarts the same player with no Checkup; a discard-wiped side wins via `settleWipedSides` (no KO event/Prizes). (design 048, S326)
+- D181 2026-09-26 [rules] Attack play/attack locks are player-scoped (`playLocks` by untilTurn, `attackLockUntilTurn`; arrays replaced/pruned), enforced in validateLegality playTrainer/attachCard/moveCard/attack — card fields miss Pokémon played under Iron Rule. (design 048, S326)
+- D180 2026-09-26 [rules] GX "at least N extra {T} Energy (beyond this attack's cost)" is one sentence gate (`requiresExtraEnergy`, typed or not) read by the KO/prize/marker/bench handlers; `energyMatches` resolves {Y}/{N} by element word. (design 048, S326)
 - D179 2026-09-26 [tooling] pkmncards scraping: one query per trainer subtype merged by URL + balanced-span name extraction (`scripts/lib/pkmn-article-html.mjs`) — the comma-OR query drops rows (BLK 085) and the non-greedy span regex truncated `Fairy Charm {` / swallowed `60 HP`. (S325)
 - D178 2026-09-26 [rules] One-shot coin control: `withForcedCoinOnce` marks a shared `forcedCoinUsed` and releases to `forcedCoinParent`; `withForcedCoin` resets the one-shot fields — nulling `forcedCoin` shadowed Malamar's all-tails. (S325)
 - D177 2026-09-26 [rules] Rule-box attacker filters are clause-scoped any-of over "attacks from/of your opponent's", "by your opponent's", "by attacks from"; reminders never gate; VMAX/VSTAR match via card-classify name fallbacks — whole-text scans broke Pot Helmet and the Fairy Charms. (S325)

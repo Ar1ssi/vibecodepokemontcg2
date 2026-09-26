@@ -1362,3 +1362,8 @@ reveal-hand wordings (Zubat/Mandibuzz/Thievul/Hawlucha) remain for 5b.
       `scripts/lib/attack-{harness,behaviour}.mjs`) + per-row `scripts/attack-behaviour-baseline.json`;
       I136 closed. Baseline: 3,528 unique effect attacks â€” 3,247 ok / 152 partial / 129 ran-no-effect /
       0 engine-error. Edge row 14 (stacking markers) stays untested (I167).
+
+# design 048 — GX backlog II (I184–I189), S326
+oneshot 048-gx-backlog-ii · worktree .claude/worktrees/gx-backlog · branch feature/gx-backlog
+Slices 1-7 all committed; hostile review findings fixed; full pnpm test 4391/0 + 4 audits PASS.
+Evidence: shared/engine/__tests__/gx-backlog-ii.test.mjs (50 tests); GX oracle attacks 390?485/604.

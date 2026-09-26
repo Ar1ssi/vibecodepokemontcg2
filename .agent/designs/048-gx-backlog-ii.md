@@ -1,7 +1,7 @@
 # 048: GX backlog II — I184–I189 engine features
 
-Status: approved (self — one-shot)
-Date: 2026-09-26 · Session: S318
+Status: shipped
+Date: 2026-09-26 · Session: S326
 
 ## Problem
 
