@@ -501,7 +501,7 @@ Run: 25s
 - [attack] Alolan Golem-GX [Crimson Invasion #102] Super Electromagnetic Tackle (self-damage) → executed Δ200 {opp:active+dmg,opp:deck->hand,own:active+dmg}
 - [attack] Alolan Golem-GX [Crimson Invasion #34] Super Electromagnetic Tackle (self-damage) → executed Δ200 {opp:active+dmg,opp:deck->hand,own:active+dmg}
 - [ability] Alolan Marowak-GX [Sun & Moon Promos #SM187] Cursed Body (status) → executed [statusAbility] {ability-used,opp:status}
-- [attack] Alolan Marowak-GX [Sun & Moon Promos #SM187] Fiery Bone (status-burned) → executed Δ110 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Alolan Marowak-GX [Sun & Moon Promos #SM187] Fiery Bone (status-burned) → executed Δ110 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] [GX] Alolan Marowak-GX [Sun & Moon Promos #SM187] Lost Boomerang-GX (next-turn-lock) → executed Δ100 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Alolan Muk-GX [Burning Shadows #157] Chemical Breath (per-energy) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
 - [attack] Alolan Muk-GX [Burning Shadows #138] Chemical Breath (per-energy) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
@@ -552,10 +552,10 @@ Run: 25s
 - [attack] Altaria-GX [Dragon Majesty #72] Bright Tone (damage-prevention) → blind Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Altaria-GX [Dragon Majesty #68] Bright Tone (damage-prevention) → blind Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Altaria-GX [Dragon Majesty #41] Bright Tone (damage-prevention) → blind Δ50 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Altaria-GX [Dragon Majesty #SV77] Euphoria-GX (status-asleep) → executed {opp:deck->hand,opp:status,own:heal}
-- [attack] [GX] Altaria-GX [Dragon Majesty #72] Euphoria-GX (status-asleep) → executed {opp:deck->hand,opp:status,own:heal}
-- [attack] [GX] Altaria-GX [Dragon Majesty #68] Euphoria-GX (status-asleep) → executed {opp:deck->hand,opp:status,own:heal}
-- [attack] [GX] Altaria-GX [Dragon Majesty #41] Euphoria-GX (status-asleep) → executed {opp:deck->hand,opp:status,own:heal}
+- [attack] [GX] Altaria-GX [Dragon Majesty #SV77] Euphoria-GX (status-asleep) → executed {coin,opp:deck->hand,opp:status,own:heal}
+- [attack] [GX] Altaria-GX [Dragon Majesty #72] Euphoria-GX (status-asleep) → executed {coin,opp:deck->hand,opp:status,own:heal}
+- [attack] [GX] Altaria-GX [Dragon Majesty #68] Euphoria-GX (status-asleep) → executed {coin,opp:deck->hand,opp:status,own:heal}
+- [attack] [GX] Altaria-GX [Dragon Majesty #41] Euphoria-GX (status-asleep) → executed {coin,opp:deck->hand,opp:status,own:heal}
 - [attack] Altaria-GX [Dragon Majesty #SV77] Sonic Edge (immunity) → no-effect Δ110 {opp:active+dmg,opp:deck->hand}
 - [attack] Altaria-GX [Dragon Majesty #72] Sonic Edge (immunity) → no-effect Δ110 {opp:active+dmg,opp:deck->hand}
 - [attack] Altaria-GX [Dragon Majesty #68] Sonic Edge (immunity) → no-effect Δ110 {opp:active+dmg,opp:deck->hand}
@@ -607,9 +607,9 @@ Run: 25s
 - [attack] [GX] Blacephalon-GX [Lost Thunder #219] Burst-GX (per-prize) → no-effect {opp:deck->hand}
 - [attack] [GX] Blacephalon-GX [Lost Thunder #199] Burst-GX (per-prize) → no-effect {opp:deck->hand}
 - [attack] [GX] Blacephalon-GX [Lost Thunder #52] Burst-GX (per-prize) → no-effect {opp:deck->hand}
-- [attack] Blacephalon-GX [Lost Thunder #219] Bursting Burn (dual-status) → executed Δ20 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Blacephalon-GX [Lost Thunder #199] Bursting Burn (dual-status) → executed Δ20 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Blacephalon-GX [Lost Thunder #52] Bursting Burn (dual-status) → executed Δ20 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Blacephalon-GX [Lost Thunder #219] Bursting Burn (dual-status) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Blacephalon-GX [Lost Thunder #199] Bursting Burn (dual-status) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Blacephalon-GX [Lost Thunder #52] Bursting Burn (dual-status) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Blacephalon-GX [Lost Thunder #219] Mind Blown (per-energy) → executed Δ50 {opp:active+dmg,opp:deck->hand,own:attached->lostZone}
 - [attack] Blacephalon-GX [Lost Thunder #199] Mind Blown (per-energy) → executed Δ50 {opp:active+dmg,opp:deck->hand,own:attached->lostZone}
 - [attack] Blacephalon-GX [Lost Thunder #52] Mind Blown (per-energy) → executed Δ50 {opp:active+dmg,opp:deck->hand,own:attached->lostZone}
@@ -661,14 +661,14 @@ Run: 25s
 - [attack] Carracosta-GX [Sun & Moon Promos #SM239] Ground Crush (next-turn-lock) → executed Δ160 {opp:active+dmg,opp:deck->hand,opp:lock}
 - [attack] [GX] Carracosta-GX [Sun & Moon Promos #SM239] Stone Age-GX (next-turn-lock) → no-effect {opp:deck->hand}
 - [attack] [GX] Celebi & Venusaur-GX [Sun & Moon Promos #SM167] Evergreen-GX (next-turn-lock) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:heal}
-- [attack] Celebi & Venusaur-GX [Sun & Moon Promos #SM167] Pollen Hazard (status-poisoned) → executed Δ80 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Celebi & Venusaur-GX [Sun & Moon Promos #SM167] Pollen Hazard (status-poisoned) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Celebi & Venusaur-GX [Sun & Moon Promos #SM167] Solar Beam (unknown) → blind Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Celebi & Venusaur-GX [Team Up #182] Evergreen-GX (next-turn-lock) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:heal}
 - [attack] [GX] Celebi & Venusaur-GX [Team Up #159] Evergreen-GX (next-turn-lock) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:heal}
 - [attack] [GX] Celebi & Venusaur-GX [Team Up #1] Evergreen-GX (next-turn-lock) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:heal}
-- [attack] Celebi & Venusaur-GX [Team Up #182] Pollen Hazard (status-poisoned) → executed Δ80 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Celebi & Venusaur-GX [Team Up #159] Pollen Hazard (status-poisoned) → executed Δ80 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Celebi & Venusaur-GX [Team Up #1] Pollen Hazard (status-poisoned) → executed Δ80 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Celebi & Venusaur-GX [Team Up #182] Pollen Hazard (status-poisoned) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Celebi & Venusaur-GX [Team Up #159] Pollen Hazard (status-poisoned) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Celebi & Venusaur-GX [Team Up #1] Pollen Hazard (status-poisoned) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Celebi & Venusaur-GX [Team Up #182] Solar Beam (unknown) → blind Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Celebi & Venusaur-GX [Team Up #159] Solar Beam (unknown) → blind Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Celebi & Venusaur-GX [Team Up #1] Solar Beam (unknown) → blind Δ150 {opp:active+dmg,opp:deck->hand}
@@ -884,10 +884,10 @@ Run: 25s
 - [attack] Entei-GX [Shining Legends #74] Combustion (unknown) → blind Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Entei-GX [Shining Legends #71] Combustion (unknown) → blind Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Entei-GX [Shining Legends #10] Combustion (unknown) → blind Δ50 {opp:active+dmg,opp:deck->hand}
-- [attack] Entei-GX [Shining Legends #10a] Fire Fang (status-burned) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Entei-GX [Shining Legends #74] Fire Fang (status-burned) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Entei-GX [Shining Legends #71] Fire Fang (status-burned) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Entei-GX [Shining Legends #10] Fire Fang (status-burned) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Entei-GX [Shining Legends #10a] Fire Fang (status-burned) → executed Δ120 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Entei-GX [Shining Legends #74] Fire Fang (status-burned) → executed Δ120 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Entei-GX [Shining Legends #71] Fire Fang (status-burned) → executed Δ120 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Entei-GX [Shining Legends #10] Fire Fang (status-burned) → executed Δ120 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] [GX] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Cross Division-GX (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
 - [attack] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Psychic Club (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Espeon & Deoxys-GX [Unified Minds #72] Cross Division-GX (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
@@ -1074,16 +1074,16 @@ Run: 25s
 - [attack] [GX] Ho-Oh-GX [Burning Shadows #SV50] Eternal Flame-GX (next-turn-lock) → no-effect {opp:deck->hand}
 - [attack] [GX] Ho-Oh-GX [Burning Shadows #131] Eternal Flame-GX (next-turn-lock) → no-effect {opp:deck->hand}
 - [attack] [GX] Ho-Oh-GX [Burning Shadows #21] Eternal Flame-GX (next-turn-lock) → no-effect {opp:deck->hand}
-- [attack] Ho-Oh-GX [Burning Shadows #SV50] Phoenix Burn (status-burned) → executed Δ200 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
-- [attack] Ho-Oh-GX [Burning Shadows #131] Phoenix Burn (status-burned) → executed Δ200 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
-- [attack] Ho-Oh-GX [Burning Shadows #21] Phoenix Burn (status-burned) → executed Δ200 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Ho-Oh-GX [Burning Shadows #SV50] Phoenix Burn (status-burned) → executed Δ200 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Ho-Oh-GX [Burning Shadows #131] Phoenix Burn (status-burned) → executed Δ200 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Ho-Oh-GX [Burning Shadows #21] Phoenix Burn (status-burned) → executed Δ200 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
 - [attack] Ho-Oh-GX [Burning Shadows #SV50] Sacred Fire (bench-damage) → executed Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Ho-Oh-GX [Burning Shadows #131] Sacred Fire (bench-damage) → executed Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Ho-Oh-GX [Burning Shadows #21] Sacred Fire (bench-damage) → executed Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Ho-Oh-GX [Sun & Moon Promos #SM80] Eternal Flame-GX (next-turn-lock) → no-effect {opp:deck->hand}
 - [attack] [GX] Ho-Oh-GX [Sun & Moon Promos #SM57] Eternal Flame-GX (next-turn-lock) → no-effect {opp:deck->hand}
-- [attack] Ho-Oh-GX [Sun & Moon Promos #SM80] Phoenix Burn (status-burned) → executed Δ200 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
-- [attack] Ho-Oh-GX [Sun & Moon Promos #SM57] Phoenix Burn (status-burned) → executed Δ200 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Ho-Oh-GX [Sun & Moon Promos #SM80] Phoenix Burn (status-burned) → executed Δ200 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Ho-Oh-GX [Sun & Moon Promos #SM57] Phoenix Burn (status-burned) → executed Δ200 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
 - [attack] Ho-Oh-GX [Sun & Moon Promos #SM80] Sacred Fire (bench-damage) → executed Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Ho-Oh-GX [Sun & Moon Promos #SM57] Sacred Fire (bench-damage) → executed Δ50 {opp:active+dmg,opp:deck->hand}
 - [ability] Honchkrow-GX [Unbroken Bonds #223] Ruler of the Night (opponent-disrupt) → passive [playLockAbility]
@@ -1104,13 +1104,13 @@ Run: 25s
 - [attack] Hoopa-GX [Team Up #187] Rogue Ring (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Hoopa-GX [Team Up #166] Rogue Ring (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Hoopa-GX [Team Up #96] Rogue Ring (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
-- [attack] [GX] Incineroar-GX [Guardians Rising #147] Burning Slam-GX (status-burned) → executed Δ220 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] Incineroar-GX [Guardians Rising #147] Burning Slam-GX (status-burned) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Incineroar-GX [Guardians Rising #147] Hustling Strike (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
 - [attack] Incineroar-GX [Guardians Rising #147] Tiger Swing (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Incineroar-GX [Sun & Moon #27] Burning Slam-GX (status-burned) → executed Δ220 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] Incineroar-GX [Sun & Moon #27] Burning Slam-GX (status-burned) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Incineroar-GX [Sun & Moon #27] Hustling Strike (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
 - [attack] Incineroar-GX [Sun & Moon #27] Tiger Swing (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Incineroar-GX [Sun & Moon Promos #SM38] Burning Slam-GX (status-burned) → executed Δ220 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] Incineroar-GX [Sun & Moon Promos #SM38] Burning Slam-GX (status-burned) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Incineroar-GX [Sun & Moon Promos #SM38] Hustling Strike (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
 - [attack] Incineroar-GX [Sun & Moon Promos #SM38] Tiger Swing (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
 - [ability] Incineroar-GX [Team Up #188] Scar Charge (move-damage) → executed [searchAbility,attachAbility,selfDamageAbility] {ability-used,own:active+dmg,own:bench+dmg,own:deck->attached,shuffle}
@@ -1370,10 +1370,10 @@ Run: 25s
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #226] Jumping Balloon (multi-target) → no-effect Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #225] Jumping Balloon (multi-target) → no-effect Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #165] Jumping Balloon (multi-target) → no-effect Δ60 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #261] Puffy Smashers-GX (conditional-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
-- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #226] Puffy Smashers-GX (conditional-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
-- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #225] Puffy Smashers-GX (conditional-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
-- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #165] Puffy Smashers-GX (conditional-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
+- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #261] Puffy Smashers-GX (conditional-damage) → executed {coin,ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
+- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #226] Puffy Smashers-GX (conditional-damage) → executed {coin,ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
+- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #225] Puffy Smashers-GX (conditional-damage) → executed {coin,ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
+- [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #165] Puffy Smashers-GX (conditional-damage) → executed {coin,ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
 - [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #245] Gigafall-GX (next-turn-lock) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #225] Gigafall-GX (next-turn-lock) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #226] Gigafall-GX (next-turn-lock) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
@@ -1619,7 +1619,7 @@ Run: 25s
 - [attack] [GX] Pinsir-GX [Hidden Fates #6] Guillotine-GX (next-turn-lock) → no-effect Δ160 {opp:active+dmg,opp:deck->hand}
 - [attack] Pinsir-GX [Hidden Fates #6] Superpowered Horns (unknown) → blind Δ110 {opp:active+dmg,opp:deck->hand}
 - [ability] Porygon-Z-GX [Sun & Moon Promos #SM216] Troubleshooting (heal) → executed [healAbility] {ability-used,own:heal}
-- [attack] Porygon-Z-GX [Sun & Moon Promos #SM216] Abnormal Overheating (self-status) → executed Δ160 {opp:active+dmg,opp:deck->hand,own:active+dmg,own:status}
+- [attack] Porygon-Z-GX [Sun & Moon Promos #SM216] Abnormal Overheating (self-status) → executed Δ160 {coin,opp:active+dmg,opp:deck->hand,own:active+dmg,own:status}
 - [attack] [GX] Porygon-Z-GX [Sun & Moon Promos #SM216] Critical Error-GX (next-turn-lock) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Primarina-GX [Guardians Rising #149] Bubble Beat (per-energy) → executed Δ30 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Primarina-GX [Guardians Rising #149] Grand Echo-GX (next-turn-lock) → executed {opp:deck->hand,own:heal}
@@ -1691,16 +1691,16 @@ Run: 25s
 - [attack] Reshiram-GX [Dragon Majesty #71] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Reshiram-GX [Dragon Majesty #65] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Reshiram-GX [Dragon Majesty #11] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
-- [attack] Reshiram-GX [Dragon Majesty #SV51] Scorching Column (status-burned) → executed Δ130 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Reshiram-GX [Dragon Majesty #71] Scorching Column (status-burned) → executed Δ130 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Reshiram-GX [Dragon Majesty #65] Scorching Column (status-burned) → executed Δ130 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Reshiram-GX [Dragon Majesty #11] Scorching Column (status-burned) → executed Δ130 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Reshiram-GX [Dragon Majesty #SV51] Scorching Column (status-burned) → executed Δ130 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Reshiram-GX [Dragon Majesty #71] Scorching Column (status-burned) → executed Δ130 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Reshiram-GX [Dragon Majesty #65] Scorching Column (status-burned) → executed Δ130 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Reshiram-GX [Dragon Majesty #11] Scorching Column (status-burned) → executed Δ130 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] [GX] Reshiram-GX [Dragon Majesty #SV51] Vermilion-GX (draw-attach) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:hand->attached}
 - [attack] [GX] Reshiram-GX [Dragon Majesty #71] Vermilion-GX (draw-attach) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:hand->attached}
 - [attack] [GX] Reshiram-GX [Dragon Majesty #65] Vermilion-GX (draw-attach) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:hand->attached}
 - [attack] [GX] Reshiram-GX [Dragon Majesty #11] Vermilion-GX (draw-attach) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:hand->attached}
 - [attack] Reshiram-GX [Sun & Moon Promos #SM137] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
-- [attack] Reshiram-GX [Sun & Moon Promos #SM137] Scorching Column (status-burned) → executed Δ130 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] Reshiram-GX [Sun & Moon Promos #SM137] Scorching Column (status-burned) → executed Δ130 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] [GX] Reshiram-GX [Sun & Moon Promos #SM137] Vermilion-GX (draw-attach) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:hand->attached}
 - [attack] Rowlet & Alolan Exeggutor-GX [Unified Minds #237] Calming Hurricane (heal) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:heal}
 - [attack] Rowlet & Alolan Exeggutor-GX [Unified Minds #215] Calming Hurricane (heal) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:heal}
@@ -1818,12 +1818,12 @@ Run: 25s
 - [attack] [GX] Slowpoke & Psyduck-GX [Unified Minds #218] Thrilling Times-GX (per-heads-coin) → executed {coin,ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Slowpoke & Psyduck-GX [Unified Minds #217] Thrilling Times-GX (per-heads-coin) → executed {coin,ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Slowpoke & Psyduck-GX [Unified Minds #35] Thrilling Times-GX (per-heads-coin) → executed {coin,ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Snorlax-GX [Sun & Moon Promos #SM05] Collapse (self-status) → executed Δ80 {opp:active+dmg,opp:deck->hand,own:status}
-- [attack] [GX] Snorlax-GX [Sun & Moon Promos #SM05] Pulverizing Pancake-GX (self-status) → executed Δ210 {opp:active+dmg,opp:deck->hand,own:status}
+- [attack] Snorlax-GX [Sun & Moon Promos #SM05] Collapse (self-status) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,own:status}
+- [attack] [GX] Snorlax-GX [Sun & Moon Promos #SM05] Pulverizing Pancake-GX (self-status) → executed Δ210 {coin,opp:active+dmg,opp:deck->hand,own:status}
 - [attack] Snorlax-GX [Sun & Moon Promos #SM05] Thunderous Snore (conditional-damage) → no-effect {opp:deck->hand}
-- [attack] Solgaleo & Lunala-GX [Cosmic Eclipse #254] Cosmic Burn (status-burned) → executed Δ250 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
-- [attack] Solgaleo & Lunala-GX [Cosmic Eclipse #216] Cosmic Burn (status-burned) → executed Δ250 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
-- [attack] Solgaleo & Lunala-GX [Cosmic Eclipse #75] Cosmic Burn (status-burned) → executed Δ250 {opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Solgaleo & Lunala-GX [Cosmic Eclipse #254] Cosmic Burn (status-burned) → executed Δ250 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Solgaleo & Lunala-GX [Cosmic Eclipse #216] Cosmic Burn (status-burned) → executed Δ250 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
+- [attack] Solgaleo & Lunala-GX [Cosmic Eclipse #75] Cosmic Burn (status-burned) → executed Δ250 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:lock}
 - [attack] [GX] Solgaleo & Lunala-GX [Cosmic Eclipse #254] Light of the Protector-GX (effect-prevention) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Solgaleo & Lunala-GX [Cosmic Eclipse #216] Light of the Protector-GX (effect-prevention) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Solgaleo & Lunala-GX [Cosmic Eclipse #75] Light of the Protector-GX (effect-prevention) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
@@ -2069,9 +2069,9 @@ Run: 25s
 - [ability] Vileplume-GX [Cosmic Eclipse #250] Fragrant Flower Garden (heal) → executed [healAbility] {ability-used,own:heal}
 - [ability] Vileplume-GX [Cosmic Eclipse #211] Fragrant Flower Garden (heal) → executed [healAbility] {ability-used,own:heal}
 - [ability] Vileplume-GX [Cosmic Eclipse #4] Fragrant Flower Garden (heal) → executed [healAbility] {ability-used,own:heal}
-- [attack] [GX] Vileplume-GX [Cosmic Eclipse #250] Allergic Explosion-GX (status-paralyzed) → executed Δ80 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] [GX] Vileplume-GX [Cosmic Eclipse #211] Allergic Explosion-GX (status-paralyzed) → executed Δ80 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] [GX] Vileplume-GX [Cosmic Eclipse #4] Allergic Explosion-GX (status-paralyzed) → executed Δ80 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] Vileplume-GX [Cosmic Eclipse #250] Allergic Explosion-GX (status-paralyzed) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] Vileplume-GX [Cosmic Eclipse #211] Allergic Explosion-GX (status-paralyzed) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] Vileplume-GX [Cosmic Eclipse #4] Allergic Explosion-GX (status-paralyzed) → executed Δ80 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Vileplume-GX [Cosmic Eclipse #250] Massive Bloom (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Vileplume-GX [Cosmic Eclipse #211] Massive Bloom (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Vileplume-GX [Cosmic Eclipse #4] Massive Bloom (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
@@ -2105,13 +2105,13 @@ Run: 25s
 - [attack] [GX] Whimsicott-GX [Unbroken Bonds #226] Toy Box-GX (next-turn-lock) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] [GX] Whimsicott-GX [Unbroken Bonds #206] Toy Box-GX (next-turn-lock) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] [GX] Whimsicott-GX [Unbroken Bonds #140] Toy Box-GX (next-turn-lock) → executed {opp:deck->hand,own:deck->hand,shuffle}
-- [attack] [GX] White Kyurem-GX [Dragon Majesty #74] Dragon Nova-GX (dual-status) → executed Δ220 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] [GX] White Kyurem-GX [Dragon Majesty #48] Dragon Nova-GX (dual-status) → executed Δ220 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] White Kyurem-GX [Dragon Majesty #74] Dragon Nova-GX (dual-status) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] White Kyurem-GX [Dragon Majesty #48] Dragon Nova-GX (dual-status) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] White Kyurem-GX [Dragon Majesty #74] Raging Blade (conditional-damage) → executed Δ160 {opp:active+dmg,opp:deck->hand}
 - [attack] White Kyurem-GX [Dragon Majesty #48] Raging Blade (conditional-damage) → executed Δ160 {opp:active+dmg,opp:deck->hand}
 - [attack] White Kyurem-GX [Dragon Majesty #74] Shred (immunity) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
 - [attack] White Kyurem-GX [Dragon Majesty #48] Shred (immunity) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] White Kyurem-GX [Sun & Moon Promos #SM141] Dragon Nova-GX (dual-status) → executed Δ220 {opp:active+dmg,opp:deck->hand,opp:status}
+- [attack] [GX] White Kyurem-GX [Sun & Moon Promos #SM141] Dragon Nova-GX (dual-status) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] White Kyurem-GX [Sun & Moon Promos #SM141] Raging Blade (conditional-damage) → executed Δ160 {opp:active+dmg,opp:deck->hand}
 - [attack] White Kyurem-GX [Sun & Moon Promos #SM141] Shred (immunity) → no-effect Δ40 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Wigglytuff-GX [Hidden Fates #42] Lovely Star-GX (next-turn-lock) → executed Δ130 {opp:active+dmg,opp:deck->hand,own:heal}

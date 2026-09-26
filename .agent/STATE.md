@@ -3,15 +3,16 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: TCGdex server proxy + card-classification fixes shipped to main (D164).
+Focus: design 047 shipped — GX oracle audit (`node scripts/audit-gx-oracle.mjs`) + attack scaling/step fixes (D168/D169).
 Active: none.
-Next: top of ISSUES.md (I180 first). User visual check pending: designs 042–046 FX on localhost.
-  Maintenance: DECISIONS and designs/ root over cap (maintain.md).
+Next: top of ISSUES.md (I180 first); GX backlog I184–I189 (detail: out/gx-no-effect-triage.md).
+  User visual check pending: designs 042–046 FX on localhost.
+  Maintenance: DECISIONS/designs root over cap; ISSUES open at 76 vs 40 cap (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.
 
 ## Watch-outs (≤5)
 - Gates after engine changes: `pnpm audit:oracle`, `audit:abilities`, `audit:trainers`,
-  `audit:attacks` (~2 min each). Live TCGdex checks: `pnpm test:live`.
+  `audit:attacks`; GX scope: `node scripts/audit-gx-oracle.mjs` (~25 s). Live TCGdex: `pnpm test:live`.
 - FX video checks: `.agent/scratch/rec-*.mjs` (Playwright video on the e2e board, worktree server
   `PORT=4100 pnpm start`; preview_start reuses the primary's :4000). Stepped frames: fx-preview skill.
 - Copy attacks: spec in `rules/attack-copy.mjs`; unknown prefixes fail closed. `player.lastAttack`

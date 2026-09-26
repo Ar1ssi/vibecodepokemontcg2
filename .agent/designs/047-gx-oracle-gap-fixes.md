@@ -1,6 +1,6 @@
 # 047: GX oracle gap fixes
 
-Status: draft (needs user approval — engine-rule changes)
+Status: shipped
 Date: 2026-09-26 · Session: S316
 
 ## Problem
