@@ -62,6 +62,25 @@ test('seeds without an attackExecuted event (dealt null) are not read as damage 
   assert.equal(rowObserved(attack('flat', { tags: [], dealt: [] })), false);
 });
 
+test('zero-base attacks are observed through target damage or prize/discard events', () => {
+  assert.equal(
+    rowObserved(attack('bench-damage', { printedBase: 0, dealt: [0], deltas: [50, 50] })),
+    true
+  );
+  assert.equal(
+    rowObserved(attack('per-prize', { printedBase: 0, dealt: [0], eventTypes: ['prizesTaken'] })),
+    true
+  );
+  assert.equal(
+    rowObserved(attack('discard-opponent', { printedBase: 0, dealt: [0], eventTypes: ['cardsDiscarded'] })),
+    true
+  );
+  assert.equal(
+    rowObserved(attack('flat', { printedBase: 0, dealt: [0], deltas: [0, 0], eventTypes: ['attackExecuted'] })),
+    false
+  );
+});
+
 test('familyRates counts rows and observed rows per kind:family', () => {
   const rates = familyRates([
     attack('heal', { tags: ['own:heal'] }),

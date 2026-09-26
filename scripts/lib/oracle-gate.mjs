@@ -23,11 +23,18 @@ export const BASE_TAGS = new Set([
  * A row shows its family at work: a non-base state change, or damage dealt ≠ the printed base.
  * An ability makes no attack, so damage and KO fallout are its own effect: only `ability-used`
  * is base there.
+ * A zero-base attack's whole effect hides behind base tags: choose-target/counter placement
+ * shows only as opponent damage apart from `dealt` (oppDamageDelta), and pure prize/Energy
+ * effects only as their own events.
  */
 export function rowObserved(row) {
   if (row.kind !== 'attack') return (row.tags || []).some((t) => t !== 'ability-used');
   if ((row.tags || []).some((t) => !BASE_TAGS.has(t))) return true;
-  return (row.dealt || []).some((d) => d != null && d !== row.printedBase);
+  if ((row.dealt || []).some((d) => d != null && d !== row.printedBase)) return true;
+  if (row.printedBase !== 0) return false;
+  if ((row.deltas || []).some((d) => d > 0)) return true;
+  const events = row.eventTypes || [];
+  return events.includes('prizesTaken') || events.includes('cardsDiscarded');
 }
 
 /** `{ 'attack:<family>': { n, observed } }` over all rows. */

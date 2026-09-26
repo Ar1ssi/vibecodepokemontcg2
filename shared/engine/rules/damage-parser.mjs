@@ -129,6 +129,84 @@ function evalCondition(cond, defender, ctx) {
   return null;
 }
 
+// Printed Energy-symbol letter → lowercase type name used by ctx lists.
+const SYMBOL_TO_TYPE = {
+  g: 'grass',
+  r: 'fire',
+  w: 'water',
+  l: 'lightning',
+  p: 'psychic',
+  f: 'fighting',
+  d: 'darkness',
+  m: 'metal',
+  y: 'fairy',
+  n: 'dragon',
+  c: 'colorless',
+};
+
+/**
+ * Count + label for a "times the amount of <unit>" scaling clause, or null when the context
+ * cannot supply the count (the caller keeps an unresolved note). Pure.
+ */
+function amountScale(unit, ctx) {
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const typedBasic = unit.match(
+    /basic \{([a-z])\} and basic \{([a-z])\} energy attached to your pok[ée]mon/
+  );
+  if (typedBasic) {
+    if (!Array.isArray(ctx.ownBasicEnergyTypes)) return null;
+    const wanted = new Set(typedBasic.slice(1).map((letter) => SYMBOL_TO_TYPE[letter]));
+    return {
+      count: ctx.ownBasicEnergyTypes.filter((t) => wanted.has(t)).length,
+      label: 'basic printed Energy on your Pokémon',
+    };
+  }
+  const typed = unit.match(
+    /\{([a-z])\} energy attached to (this pok[ée]mon|(?:all of )?your pok[ée]mon)/
+  );
+  if (typed) {
+    const type = SYMBOL_TO_TYPE[typed[1]];
+    const list =
+      typed[2] === 'this pok[ée]mon' ? ctx.attackerEnergyTypeList : ctx.ownEnergyTypeList;
+    if (!type || !Array.isArray(list)) return null;
+    return { count: list.filter((t) => t === type).length, label: `${type} Energy attached` };
+  }
+  if (
+    /basic energy attached to this pok[ée]mon/.test(unit) &&
+    Array.isArray(ctx.attackerBasicEnergyTypes)
+  ) {
+    return {
+      count: ctx.attackerBasicEnergyTypes.length,
+      label: 'basic Energy on this Pokémon',
+    };
+  }
+  if (/energy attached to both active pok[ée]mon/.test(unit)) {
+    const own = num(ctx.energyCount);
+    const opponent = num(ctx.opponentEnergyCount);
+    if (own == null || opponent == null) return null;
+    return { count: own + opponent, label: 'Energy on both Active Pokémon' };
+  }
+  if (/energy attached to your opponent's active pok[ée]mon/.test(unit)) {
+    const n = num(ctx.opponentEnergyCount);
+    return n == null ? null : { count: n, label: "Energy on opponent's Active Pokémon" };
+  }
+  if (/energy attached to (?:all of )?your pok[ée]mon/.test(unit)) {
+    const n = num(ctx.ownEnergyCount);
+    return n == null ? null : { count: n, label: 'Energy on all your Pokémon' };
+  }
+  if (/energy attached to this pok[ée]mon/.test(unit)) {
+    const n = num(ctx.energyCount);
+    return n == null ? null : { count: n, label: 'attached Energy' };
+  }
+  // Older prints say "times the number of Energy …" without a scope we can resolve; keep the
+  // historical attacker-energy count rather than dropping the scaling.
+  if (/energy/.test(unit)) {
+    const n = num(ctx.energyCount);
+    return n == null ? null : { count: n, label: 'attached Energy' };
+  }
+  return null;
+}
+
 // Parse the attack text into an effective base damage number + breakdown.
 // See the module header for the shape contract and ctx options.
 export function parseAttackDamage(
@@ -215,12 +293,35 @@ export function parseAttackDamage(
     total = more ? printed + parseInt(more[1], 10) * discarded : printed * discarded;
     components.push('per-energy-discarded');
     notes.push(`× ${discarded} Energy discarded in this way`);
-  } else if (text && /times the (?:amount|number) of energy attached to both active/.test(text)) {
-    // Tapu Lele-GX Energy Drive: Energy on your Active plus the opponent's Active.
-    const both = energyCount + (opponentEnergyCount ?? 0);
-    total = base * both;
+  } else if (text && /times the (?:amount|number) of/.test(text)) {
+    // GX prints say "times the amount of" where older cards print "× the number of". Resolve
+    // the printed unit to a board count; an unreadable unit keeps a note instead of guessing.
+    const unit = (text.match(/times the (?:amount|number) of (.+)/) || [])[1] || '';
+    const scaled = amountScale(unit, ctx);
+    const per = amount(text, /does (\d+)(?: more)? damage times the (?:amount|number) of/) || base;
+    const isMore = /more damage times the (?:amount|number) of/.test(text);
     components.push('per-energy');
-    notes.push(`× ${both} Energy on both Active Pokémon`);
+    if (scaled) {
+      total = isMore ? base + per * scaled.count : per * scaled.count;
+      notes.push(`${isMore ? `+ ${per} × ` : `${per} × `}${scaled.count} (${scaled.label})`);
+    } else {
+      notes.push('per-energy scaling — resolve the printed count');
+    }
+  } else if (text && /does \d+ less damage for each/.test(text)) {
+    // Reduction scaling ("does 10 less damage for each damage counter on this Pokémon").
+    const per = amount(text, /does (\d+) less damage for each/);
+    const unit = (text.match(/does \d+ less damage for each (.+)/) || [])[1] || '';
+    components.push('per-each');
+    if (
+      /damage counter/.test(unit) &&
+      /this pok[ée]mon/.test(unit) &&
+      typeof ctx.attackerDamageCounters === 'number'
+    ) {
+      total = Math.max(0, base - per * ctx.attackerDamageCounters);
+      notes.push(`− ${per} × ${ctx.attackerDamageCounters} damage counters on this Pokémon`);
+    } else {
+      notes.push('per-counter reduction — resolve the printed count');
+    }
   } else if (text && /number of energy|× the number|\* the number/.test(text)) {
     total = base * energyCount;
     components.push('per-energy');

@@ -198,6 +198,13 @@ export function buildState(holder, holderZone) {
   return state;
 }
 
+/** Total damage on one player's cards in a snapshot. */
+function damageTotal(snap, pid) {
+  let total = 0;
+  for (const [, c] of snap.cards) if (c.pid === pid) total += c.damage || 0;
+  return total;
+}
+
 /** Per-card position and markers, keyed by instanceId, plus both Active ids and the winner. */
 export function snapshot(state) {
   const cards = new Map();
@@ -353,19 +360,24 @@ export function runOnce(buildCmd, holder, holderZone, seed) {
     };
   events.push(...(res.events || []));
   const executed = events.filter((e) => e.type === 'attackExecuted').pop();
+  const after = snapshot(res.state);
   return {
-    tags: diffTags(before, snapshot(res.state), events),
+    tags: diffTags(before, after, events),
     eventTypes: events.map((e) => e.type),
     dealt: executed ? executed.damage || 0 : null,
+    // Damage on the opponent apart from `attackExecuted` (choose-target snipes, counter
+    // placement): a zero-base attack's whole effect otherwise hides behind base tags.
+    oppDamageDelta: damageTotal(after, 'p2') - damageTotal(before, 'p2'),
   };
 }
 
-/** Unions runOnce over the seeds; `dealt` keeps one entry per successful seed. */
+/** Unions runOnce over the seeds; `dealt`/`deltas` keep one entry per successful seed. */
 export function runAll(buildCmd, holder, holderZone, seeds = DEFAULT_SEEDS) {
   const tags = new Set();
   const errors = new Set();
   const eventTypes = new Set();
   const dealt = [];
+  const deltas = [];
   for (const seed of seeds) {
     const r = runOnce(buildCmd, holder, holderZone, seed);
     if (r.error) {
@@ -375,12 +387,14 @@ export function runAll(buildCmd, holder, holderZone, seeds = DEFAULT_SEEDS) {
     for (const t of r.tags) tags.add(t);
     for (const t of r.eventTypes) eventTypes.add(t);
     dealt.push(r.dealt);
+    deltas.push(r.oppDamageDelta);
   }
   return {
     tags: [...tags].sort(),
     errors: [...errors],
     eventTypes: [...eventTypes].sort(),
     dealt,
+    deltas,
   };
 }
 
