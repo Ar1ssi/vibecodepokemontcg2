@@ -62,7 +62,9 @@ first unticked slice → confirm `pnpm test:changed` is green there → continue
 3. Scope line: all of the request is in scope. Cut something only when it is truly blocked; each cut
    = one ISSUES line + an ✗ row in Acceptance. Silent narrowing is the classic one-shot failure.
 4. Work plan: slices each green on their own, ordered so behavior runs early (rules → server →
-   client → FX). Run the self-approval checklist → `Status: approved (self — one-shot)`.
+   client → FX). Every row is a pinned contract (TEMPLATE Work-plan columns): all judgment —
+   options, rulings lookups, edge-case expectations — is spent here, so §3 only executes.
+   Run the self-approval checklist → `Status: approved (self — one-shot)`.
 5. Commit `oneshot <slug> slice 0: design`.
 
 ## 3 · Slice loop — Builder; the design is the spec
@@ -74,8 +76,9 @@ Per slice, in order:
 4. Green → tick edge rows and the slice, update the NEXTSTEPS ledger, commit
    `oneshot <slug> slice k/N: <what now works>`. One commit per slice; never batch slices.
 5. Red twice with nothing new learned → run debug.md on that failure. Still blocked → Stopping rule.
-6. Design wrong: cosmetic → `## Deviations`. Structural → fix the design first, log it under
-   Deviations, continue. No re-gate — unless the fix crosses the authorization list above.
+6. Design wrong: cosmetic → `## Deviations`. Structural, or the slice needs a choice its row
+   doesn't pin → back to §2: decide it, re-pin the row, log it under Deviations, then build.
+   No re-gate — unless the fix crosses the authorization list above.
 `Agents: ok` → a slice with a pinned contract goes to the `slice-builder` agent (Opus 5.5, low effort;
 it returns instead of guessing at an unpinned choice — then you decide) (brief = design path +
 slice row + files). You rerun the tests and read its diff against Acceptance before ticking.

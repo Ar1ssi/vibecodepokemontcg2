@@ -32,7 +32,10 @@ Builder — write it so a session with zero other context could build from it (o
    simpler design. Either way the subagent proposes; you decide with full context.
 3. The edge-case table is the completeness contract: every empty/boundary/failure/concurrency
    row filled in, or explicitly struck with a reason.
-4. Work plan: slices of ≤1 session, each leaving the repo green (builds, tests pass).
+4. Work plan: slices of ≤1 session, each leaving the repo green (builds, tests pass). This is the
+   last judgment step: fill every TEMPLATE Work-plan column so each row is a pinned contract
+   (files, signatures, test cases with expected values, cited rulings). Resolve every choice a
+   row would need now, in Options/Design, never during build.
    High complexity (~4+ independent acceptance criteria, or state + UI + cross-system coupling)?
    Pin a schema/naming contract in the design first, then one criterion-cluster per commit on
    `feature/<spec>`. One session carries the whole spec (context auto-compacts). A done/next ledger
@@ -51,8 +54,9 @@ Per slice, in order:
 3. Run narrow tests, then the project test command. Green → commit on the feature branch
    (`feature <slug> slice <k>: <summary>`); post a 1-line progress note
    (slice k/N: what now works) so an attending user can redirect early.
-4. Design wrong or insufficient? Cosmetic → note under `## Deviations`, continue. Structural →
-   STOP, return to phase 2, update the design (re-gate if the user gated it).
+4. Design wrong or insufficient? Cosmetic → note under `## Deviations`, continue. Structural, or the
+   slice needs a choice its row doesn't pin → STOP, return to phase 2, decide it there, re-pin the
+   row, log it under Deviations (re-gate if the user gated it). Building never makes design calls.
 
 ## 4 · Verify
 1. Full test suite + lint + build.

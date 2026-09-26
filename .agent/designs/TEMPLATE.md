@@ -40,9 +40,12 @@ data model · interfaces/signatures · control flow · state & lifecycle · conc
 <data migration, compat window, flagging, and the revert path — or "n/a: <why>">
 
 ## Work plan — slices ≤1 session, each leaving the repo green
-| Slice | Delivers | Green when |
-|---|---|---|
-| 1 | | |
+Judgment ends above this line. Each slice is a pinned contract: a builder at low effort executes it
+without choosing anything. Writing a row needs a choice? Make it in Options/Design first, then pin it.
+| Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
+|---|---|---|---|---|---|
+| 1 | | | | | |
+Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge cases", "etc.".
 
 ## Deviations (Builder appends here during build)
 
@@ -52,4 +55,6 @@ Self-approval checklist (only when the user is unreachable):
 - [ ] Every edge-case row has an expected behavior (or a written strike reason)
 - [ ] Interfaces fully named and typed — no hand-waving
 - [ ] Slices each ≤1 session and independently green
+- [ ] Every slice row is pinned: files, signatures, test cases with expected values, card rulings
+      cited (corpus row / TCGdex id) — no banned words; a builder would make zero choices
 - [ ] No section reads "TBD"
