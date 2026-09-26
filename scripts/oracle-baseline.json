@@ -3,7 +3,7 @@
   "families": {
     "ability:attach": {
       "n": 211,
-      "observed": 134
+      "observed": 174
     },
     "ability:attach-permission": {
       "n": 3,
@@ -175,7 +175,7 @@
     },
     "ability:status": {
       "n": 507,
-      "observed": 363
+      "observed": 366
     },
     "ability:status-recover": {
       "n": 38,
@@ -203,7 +203,7 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 591
+      "observed": 772
     },
     "attack:coin-flip": {
       "n": 429,
@@ -211,7 +211,7 @@
     },
     "attack:conditional-damage": {
       "n": 740,
-      "observed": 176
+      "observed": 305
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -223,7 +223,7 @@
     },
     "attack:damage-prevention": {
       "n": 174,
-      "observed": 7
+      "observed": 8
     },
     "attack:deferred-damage": {
       "n": 3,
@@ -239,11 +239,11 @@
     },
     "attack:discard-cost": {
       "n": 597,
-      "observed": 424
+      "observed": 432
     },
     "attack:discard-opponent": {
       "n": 151,
-      "observed": 99
+      "observed": 144
     },
     "attack:draw-attach": {
       "n": 321,
@@ -275,11 +275,11 @@
     },
     "attack:hp-cap-damage": {
       "n": 9,
-      "observed": 0
+      "observed": 9
     },
     "attack:immunity": {
       "n": 243,
-      "observed": 14
+      "observed": 20
     },
     "attack:look-any-deck": {
       "n": 5,
@@ -307,7 +307,7 @@
     },
     "attack:multi-target": {
       "n": 165,
-      "observed": 84
+      "observed": 107
     },
     "attack:neutralize-opponent-energy": {
       "n": 1,
@@ -319,7 +319,7 @@
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 470
+      "observed": 508
     },
     "attack:once-per-turn": {
       "n": 5,
@@ -327,7 +327,7 @@
     },
     "attack:per-energy": {
       "n": 635,
-      "observed": 341
+      "observed": 459
     },
     "attack:per-heads-coin": {
       "n": 133,
@@ -335,7 +335,7 @@
     },
     "attack:per-prize": {
       "n": 147,
-      "observed": 82
+      "observed": 86
     },
     "attack:recover-status": {
       "n": 12,
@@ -363,7 +363,7 @@
     },
     "attack:self-damage": {
       "n": 166,
-      "observed": 129
+      "observed": 131
     },
     "attack:self-status": {
       "n": 33,
@@ -403,7 +403,7 @@
     },
     "attack:unknown": {
       "n": 1437,
-      "observed": 27
+      "observed": 33
     }
   }
 }

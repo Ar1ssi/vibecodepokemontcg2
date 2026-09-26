@@ -1,0 +1,222 @@
+{
+  "corpusRows": 1723,
+  "printings": 604,
+  "families": {
+    "ability:attach": {
+      "n": 15,
+      "observed": 12
+    },
+    "ability:copy-attack": {
+      "n": 8,
+      "observed": 0
+    },
+    "ability:damage-prevent": {
+      "n": 27,
+      "observed": 3
+    },
+    "ability:draw": {
+      "n": 15,
+      "observed": 12
+    },
+    "ability:effect-prevent": {
+      "n": 3,
+      "observed": 0
+    },
+    "ability:energy-redirect": {
+      "n": 6,
+      "observed": 6
+    },
+    "ability:heal": {
+      "n": 19,
+      "observed": 19
+    },
+    "ability:hp-bonus": {
+      "n": 4,
+      "observed": 0
+    },
+    "ability:ko-prevention": {
+      "n": 3,
+      "observed": 3
+    },
+    "ability:move-damage": {
+      "n": 18,
+      "observed": 18
+    },
+    "ability:on-opponent-evolve": {
+      "n": 4,
+      "observed": 4
+    },
+    "ability:opponent-disrupt": {
+      "n": 14,
+      "observed": 11
+    },
+    "ability:passive": {
+      "n": 12,
+      "observed": 6
+    },
+    "ability:recursion": {
+      "n": 15,
+      "observed": 15
+    },
+    "ability:retreat-cost": {
+      "n": 12,
+      "observed": 0
+    },
+    "ability:search": {
+      "n": 9,
+      "observed": 9
+    },
+    "ability:status": {
+      "n": 8,
+      "observed": 5
+    },
+    "ability:switch": {
+      "n": 28,
+      "observed": 28
+    },
+    "ability:tool-cap": {
+      "n": 3,
+      "observed": 0
+    },
+    "ability:weakness": {
+      "n": 13,
+      "observed": 0
+    },
+    "ability:when-played": {
+      "n": 6,
+      "observed": 6
+    },
+    "attack:bench-damage": {
+      "n": 126,
+      "observed": 113
+    },
+    "attack:coin-flip": {
+      "n": 3,
+      "observed": 3
+    },
+    "attack:conditional-damage": {
+      "n": 111,
+      "observed": 55
+    },
+    "attack:conditional-ko": {
+      "n": 5,
+      "observed": 5
+    },
+    "attack:damage-prevention": {
+      "n": 29,
+      "observed": 0
+    },
+    "attack:discard-cost": {
+      "n": 77,
+      "observed": 62
+    },
+    "attack:discard-opponent": {
+      "n": 26,
+      "observed": 26
+    },
+    "attack:draw-attach": {
+      "n": 66,
+      "observed": 62
+    },
+    "attack:draw-until": {
+      "n": 13,
+      "observed": 9
+    },
+    "attack:dual-status": {
+      "n": 14,
+      "observed": 14
+    },
+    "attack:effect-prevention": {
+      "n": 9,
+      "observed": 0
+    },
+    "attack:first-turn-attack": {
+      "n": 3,
+      "observed": 0
+    },
+    "attack:heal": {
+      "n": 18,
+      "observed": 18
+    },
+    "attack:immunity": {
+      "n": 42,
+      "observed": 1
+    },
+    "attack:mirror-heal": {
+      "n": 3,
+      "observed": 3
+    },
+    "attack:move-energy": {
+      "n": 25,
+      "observed": 15
+    },
+    "attack:multi-target": {
+      "n": 47,
+      "observed": 32
+    },
+    "attack:next-turn-lock": {
+      "n": 283,
+      "observed": 147
+    },
+    "attack:per-energy": {
+      "n": 119,
+      "observed": 101
+    },
+    "attack:per-heads-coin": {
+      "n": 17,
+      "observed": 17
+    },
+    "attack:per-prize": {
+      "n": 68,
+      "observed": 25
+    },
+    "attack:reveal-hand": {
+      "n": 15,
+      "observed": 15
+    },
+    "attack:search-deck": {
+      "n": 48,
+      "observed": 48
+    },
+    "attack:self-damage": {
+      "n": 7,
+      "observed": 7
+    },
+    "attack:self-status": {
+      "n": 3,
+      "observed": 3
+    },
+    "attack:shuffle-cost": {
+      "n": 12,
+      "observed": 12
+    },
+    "attack:status-asleep": {
+      "n": 4,
+      "observed": 4
+    },
+    "attack:status-burned": {
+      "n": 21,
+      "observed": 21
+    },
+    "attack:status-confused": {
+      "n": 21,
+      "observed": 21
+    },
+    "attack:status-paralyzed": {
+      "n": 21,
+      "observed": 21
+    },
+    "attack:status-poisoned": {
+      "n": 18,
+      "observed": 18
+    },
+    "attack:switch": {
+      "n": 27,
+      "observed": 27
+    },
+    "attack:unknown": {
+      "n": 180,
+      "observed": 0
+    }
+  }
+}

@@ -160,16 +160,35 @@ export function buildServerAttackContext(
   const opponentBench = rootPokemon(opponent, 'bench');
   const turnNumber = Math.max(1, Number(state?.turn?.number) || 1);
 
+  const attackerEnergy = attachedEnergyCards(own, attacker);
   const ctx = {
     energyCount: energyOn(own, attacker, { stadiumCard, opponent }).length,
+    attackerEnergyTypeList: attackerEnergy.map((card) =>
+      String(serverEnergyDescriptor(card).type || '').toLowerCase()
+    ),
+    attackerBasicEnergyTypes: attackerEnergy
+      .filter((card) => classifyEnergyEffect(card) === 'basic')
+      .map((card) => String(serverEnergyDescriptor(card).type || '').toLowerCase()),
     ownEnergyCount: ownInPlay.reduce(
       (total, { card }) => total + energyOn(own, card, { stadiumCard, opponent }).length,
       0
     ),
+    // Types of the Energy attached across this player's board, one entry per card, for
+    // "times the amount of {X} Energy attached to your Pokémon" scaling. Card-level descriptor
+    // types: Stadium type rewrites and multi-provision Special Energy are not reflected here.
+    ownEnergyTypeList: ownInPlay
+      .flatMap(({ card }) => attachedEnergyCards(own, card))
+      .map((card) => String(serverEnergyDescriptor(card).type || '').toLowerCase()),
+    ownBasicEnergyTypes: ownInPlay
+      .flatMap(({ card }) => attachedEnergyCards(own, card))
+      .filter((card) => classifyEnergyEffect(card) === 'basic')
+      .map((card) => String(serverEnergyDescriptor(card).type || '').toLowerCase()),
     opponentPrizes: zoneOf(opponent, 'prizes').length,
     turnCount: Math.max(1, Number(state?.turn?.number) || 1),
     attackerHp: Number(attackerCard.hp) || 0,
     attackerDamage: attacker?.damage || 0,
+    // Per-counter clauses read counters (10 damage each), not damage points.
+    attackerDamageCounters: Math.floor((attacker?.damage || 0) / 10),
     ownHandCount: zoneOf(own, 'hand').length,
     opponentHandCount: zoneOf(opponent, 'hand').length,
     opponentHandTrainerCount: zoneOf(opponent, 'hand').filter(isTrainer).length,
@@ -251,6 +270,13 @@ export function buildServerAttackContext(
     ctx.defenderIsTera = isTeraCard(defenderCard);
     ctx.defenderIsRadiant = isRadiantCard(defenderCard);
     ctx.defenderIsMega = isMegaCard(defenderCard);
+  }
+  // "…times the amount of Energy attached to all of your opponent's Pokémon" scaling.
+  if (opponent) {
+    ctx.opponentAllEnergyCount = inPlayPokemon(opponent).reduce(
+      (sum, { card }) => sum + energyOn(opponent, card, { stadiumCard, opponent: own }).length,
+      0
+    );
   }
   if (headsCount !== undefined) ctx.headsCount = headsCount;
 

@@ -6,12 +6,14 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D171).
+#   Next id = highest D number in this file and the archive + 1 (next: D174).
 
 ## Active
-- D170 2026-09-26 [harness] Effort ladder: high plan/debug/review, xhigh schema/netcode/engine design, medium patch, low pinned slice. `fx-designer` agent (high) carries the 041-046 FX house rules; rec-*.mjs scripts now tracked in fx-preview/rec/.
-- D169 2026-09-26 [harness] Judgment ends at the Work plan: every slice row is a pinned contract (files, signatures, input->expected tests, cited rulings; banned vague words); a build-time choice returns to design - lets slices run at low effort (D168).
-- D168 2026-09-26 [harness] Opus 5.5 `low` effort only for pinned-contract slice execution, via `.claude/agents/slice-builder.md` (`effort: low`); design/debug/review/rules stay `medium`+ - a session cannot lower its own effort.
+- D173 2026-09-26 [harness] Effort ladder: high plan/debug/review, xhigh schema/netcode/engine design, medium patch, low pinned slice. `fx-designer` agent (high) carries the 041-046 FX house rules; rec-*.mjs scripts now tracked in fx-preview/rec/.
+- D172 2026-09-26 [harness] Judgment ends at the Work plan: every slice row is a pinned contract (files, signatures, input->expected tests, cited rulings; banned vague words); a build-time choice returns to design - lets slices run at low effort (D171).
+- D171 2026-09-26 [harness] Opus 5.5 `low` effort only for pinned-contract slice execution, via `.claude/agents/slice-builder.md` (`effort: low`); design/debug/review/rules stay `medium`+ - a session cannot lower its own effort.
+- D169 2026-09-26 [tests] Oracle rows observe zero-base attacks via opponent damage delta + effect events (`prizesTaken`/`cardsDiscarded`, non-KO attached discard); tags alone hid their whole effect (design 047).
+- D168 2026-09-26 [rules] "times the amount/number of" attack scaling resolves through one scope map (both Active, opponent board, all-yours, typed/basic Energy); unreadable scopes and choose-target tails stay unresolved, legacy "number of Energy" count kept (design 047).
 - D167 2026-09-26 [harness] `.claude/settings.json` sets ENABLE_TOOL_SEARCH=auto so LSP (and every tool) loads at session start - deferred LSP went unused; costs ~+9k tokens/session (CLI measure), auto falls back to deferral past 10% of window.
 - D166 2026-09-26 [harness] `typescript` devDependency + root `jsconfig.json` (checkJs off) exist only for the LSP tool — typescript-language-server failed without them; jsconfig makes findReferences project-wide.
 - D165 2026-09-26 [harness] Token diet: MAP.md grep-only; STATE ≤25 lines of pointers (backlog stays in ISSUES); Delegation cut to 6 lines; high-complexity rule moved to feature.md; new oneshot-feature.md route.

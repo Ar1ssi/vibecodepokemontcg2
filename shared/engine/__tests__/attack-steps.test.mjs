@@ -763,3 +763,90 @@ test("attack: Sylveon ex Angelite shuffles 2 of the opponent's Benched Pokémon 
   // Into the deck (the opponent's turn-start draw may already have drawn it).
   assert.ok([...zone(res2, 'p2', 'deck'), ...zone(res2, 'p2', 'hand')].some((x) => x.instanceId === a.instanceId));
 });
+
+// Design 047: GX zero-base steps — kindless recovery, both-Active Energy discard, all-opponent
+// Energy shuffle.
+test('parseAttackSteps: kindless "Put N cards from your discard pile into your hand" recovers any card', () => {
+  const parsed = parseAttackSteps('Put 3 cards from your discard pile into your hand.');
+  assert.deepEqual(parsed.after, [{ type: 'atkRecover', count: 3, what: null }]);
+  const upTo = parseAttackSteps('Put up to 2 cards from your discard pile into your hand.');
+  assert.deepEqual(upTo.after, [{ type: 'atkRecover', count: 2, upTo: true, what: null }]);
+  const kinded = parseAttackSteps('Put up to 2 Trainer cards from your discard pile into your hand.');
+  assert.deepEqual(kinded.after, [{ type: 'atkRecover', count: 2, upTo: true, what: 'Trainer' }]);
+});
+
+test('attack: Eevee-GX Joy Maker-GX recovers 3 cards from the discard pile', () => {
+  const b = board('Put 3 cards from your discard pile into your hand.', {
+    name: 'Eevee-GX',
+    setup: ({ p1 }) => p1.zones.discard.push(mon('A'), mon('B'), mon('C')),
+  });
+  const res = attack(b);
+  assert.equal(zone(res, 'p1', 'hand').length, 3);
+  assert.equal(zone(res, 'p1', 'discard').length, 0);
+});
+
+test('attack: Articuno-GX Cold Crush-GX discards all Energy from both Active Pokémon', () => {
+  const b = board('Discard all Energy from both Active Pokémon.', {
+    name: 'Articuno-GX',
+    setup: ({ p1, p2, attacker, defender }) => {
+      p1.zones.active.push(energy('Water', { attachedTo: attacker.instanceId }));
+      p2.zones.active.push(energy('Fire', { attachedTo: defender.instanceId }));
+    },
+  });
+  const res = attack(b);
+  assert.equal(attachedTo(res, 'p1', activeRoot(res, 'p1').instanceId).length, 0);
+  assert.equal(attachedTo(res, 'p2', activeRoot(res, 'p2').instanceId).length, 0);
+  assert.equal(zone(res, 'p1', 'discard').filter((c) => c.supertype === 'Energy').length, 1);
+  assert.equal(zone(res, 'p2', 'discard').filter((c) => c.supertype === 'Energy').length, 1);
+});
+
+test('attack: Palkia-GX Zero Vanish-GX shuffles all opposing Energy into the deck', () => {
+  const b = board("Shuffle all Energy from each of your opponent's Pokémon into their deck.", {
+    name: 'Palkia-GX',
+    setup: ({ p2, defender }) => {
+      p2.zones.active.push(energy('Water', { attachedTo: defender.instanceId }));
+      const bench = mon('Opp Bench');
+      p2.zones.bench.push(bench, energy('Lightning', { attachedTo: bench.instanceId }));
+    },
+  });
+  const deckBefore = zone(b, 'p2', 'deck').length;
+  const res = attack(b);
+  assert.equal(attachedTo(res, 'p2', activeRoot(res, 'p2').instanceId).length, 0);
+  // Both Energies are in the deck or the turn-start draw (the attack ends the turn).
+  assert.equal(zone(res, 'p2', 'deck').length + zone(res, 'p2', 'hand').length, deckBefore + 2);
+});
+
+test('attack: Cold Crush-GX and Zero Vanish-GX respect effect-shield special Energy', () => {
+  const shield = (attachedTo) =>
+    energy('Colorless', {
+      name: 'Mist Energy',
+      subtypes: ['Special'],
+      text: "Provides {C} Energy. Prevent all effects of attacks used by your opponent's Pokémon done to the Pokémon this card is attached to.",
+      attachedTo,
+    });
+  const cold = board('Discard all Energy from both Active Pokémon.', {
+    name: 'Articuno-GX',
+    setup: ({ p1, p2, attacker, defender }) => {
+      p1.zones.active.push(energy('Water', { attachedTo: attacker.instanceId }));
+      p2.zones.active.push(
+        shield(defender.instanceId),
+        energy('Fire', { attachedTo: defender.instanceId })
+      );
+    },
+  });
+  const coldRes = attack(cold);
+  assert.equal(attachedTo(coldRes, 'p1', activeRoot(coldRes, 'p1').instanceId).length, 0);
+  assert.equal(attachedTo(coldRes, 'p2', activeRoot(coldRes, 'p2').instanceId).length, 2);
+
+  const vanish = board("Shuffle all Energy from each of your opponent's Pokémon into their deck.", {
+    name: 'Palkia-GX',
+    setup: ({ p2, defender }) => {
+      p2.zones.active.push(shield(defender.instanceId));
+      const bench = mon('Opp Bench');
+      p2.zones.bench.push(bench, energy('Lightning', { attachedTo: bench.instanceId }));
+    },
+  });
+  const vanishRes = attack(vanish);
+  assert.equal(attachedTo(vanishRes, 'p2', activeRoot(vanishRes, 'p2').instanceId).length, 1);
+  assert.equal(zone(vanishRes, 'p2', 'bench').filter((c) => c.supertype === 'Energy').length, 0);
+});
