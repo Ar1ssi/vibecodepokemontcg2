@@ -133,6 +133,20 @@ function toolBlocked(blockTools, stadium = null) {
   return Boolean(blockTools || stadiumBlocksToolEffects(stadium));
 }
 
+/**
+ * Rule-box wording in the attacker clause. "Pokémon-GX and Pokémon-EX" is
+ * any-of (the parsed `attackerSubtypes` already enforces it); a lone
+ * "Pokémon-EX" / "Pokémon-GX" narrows to that subtype. Treating the compound
+ * as AND made every Fairy Charm fail against GX attackers (audit S&M F3).
+ */
+function attackerMatchesPrintedRuleBox(t, attacker) {
+  const mentionsEx = /pok[eé]mon[-\s]?ex\b|pokemon[-\s]?ex\b/i.test(t);
+  const mentionsGx = /pok[eé]mon[-\s]?gx\b|pokemon[-\s]?gx\b/i.test(t);
+  if (mentionsEx && !mentionsGx && !isExCard(attacker)) return false;
+  if (mentionsGx && !mentionsEx && !isGxCard(attacker)) return false;
+  return true;
+}
+
 export function preventionForCard(card, attacker, ctx = {}) {
   if (!card) return { preventAll: false, reduce: 0, reduceHp: 0 };
   const t = cardAbilityText(card);
@@ -146,10 +160,8 @@ export function preventionForCard(card, attacker, ctx = {}) {
   // "prevent all damage" (a conditional "damage is reduced by N" must not
   // apply to an unlisted attacker). Legacy printings spell "Pokémon-EX" with a
   // hyphen, so the space-only pattern never matched them.
-  if (/pok[eé]mon[-\s]?ex\b|pokemon[-\s]?ex\b/i.test(t)) {
-    if (!isExCard(attacker)) {
-      return { preventAll: false, reduce: 0, reduceHp: 0 };
-    }
+  if (!attackerMatchesPrintedRuleBox(t, attacker)) {
+    return { preventAll: false, reduce: 0, reduceHp: 0 };
   }
   if (/pokémon v\b|pokemon v\b/i.test(t)) {
     if (!isVCard(attacker)) return { preventAll: false, reduce: 0, reduceHp: 0 };
@@ -193,7 +205,7 @@ export function reductionForCard(card, defender, attacker, { skipSymbolFilter = 
   if (/pokémon v\b|pokemon v\b/i.test(t) && !isVCard(attacker)) {
     return 0;
   }
-  if (/pokémon ex\b|pokemon ex\b/i.test(t) && !isExCard(attacker)) {
+  if (!attackerMatchesPrintedRuleBox(t, attacker)) {
     return 0;
   }
   if (!skipSymbolFilter && /\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
@@ -239,7 +251,8 @@ function bonusForTool(
   }
 ) {
   const t = cardAbilityText(tool);
-  const bonus = parseDamageBonus(tool).bonus;
+  const parsedBonus = parseDamageBonus(tool);
+  let bonus = parsedBonus.bonus;
   if (!bonus) return 0;
   if (ctx && !toolConditionMet(parseToolCondition(tool), ctx)) return 0;
   if (/active (?:\{[a-z]\}\s*)?pok[eé]mon/i.test(t) && !defenderIsActive) {
@@ -286,6 +299,13 @@ function bonusForTool(
   if (/pikachu ex/i.test(t) && !/pikachu ex/i.test(lower(attacker?.name)))
     return 0;
   if (/tera pokémon|tera pokemon/i.test(t) && !isTeraCard(attacker)) return 0;
+  // "…for each Prize card you have taken" (Beastite): × taken Prizes, from the
+  // attacker's remaining Prizes; unknown remaining fails to 0 (audit S&M F5).
+  if (parsedBonus.perPrizeTaken) {
+    const remaining = ctx?.flags?.prizesRemaining;
+    const taken = Number.isFinite(remaining) ? Math.max(0, 6 - remaining) : 0;
+    bonus *= taken;
+  }
   return bonus;
 }
 

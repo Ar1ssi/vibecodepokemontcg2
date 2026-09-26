@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { matchesSearch, matchesDiscardCost, isEnergyDiscardCost } = await import('../search-match.mjs');
+const { matchesSearch, matchesDiscardCost, isEnergyDiscardCost, energySearchWhat } = await import(
+  '../search-match.mjs'
+);
 
 const card = (props) => ({ supertype: 'Pokémon', stage: 'Basic', hp: 100, ...props });
 
@@ -51,6 +53,32 @@ test('word-form typed energy search filters by type', () => {
     subtypes: ['special'],
   };
   assert.equal(matchesSearch(special, 'Basic Lightning Energy'), false);
+});
+
+// Dragon/Fairy typed energy searches (audit S&M F1). ENERGY_SYMBOL_TO_TYPE used
+// to omit {N}/{Y}, so every "Basic {N}/{Y} Energy" search matched nothing
+// (Mina LOT 183 searched a Fairy Energy and attached zero).
+test('typed energy search covers Dragon and Fairy symbols', () => {
+  const fairy = { name: 'Fairy Energy', supertype: 'Energy', type: 'Energy', types: ['Fairy'] };
+  const fairyNoTypes = { name: 'Fairy Energy', supertype: 'Energy', type: 'Energy' };
+  const dragon = { name: 'Dragon Energy', supertype: 'Energy', type: 'Energy', types: ['Dragon'] };
+  const water = { name: 'Water Energy', supertype: 'Energy', type: 'Energy', types: ['Water'] };
+  const special = {
+    name: 'Wonderous Fairy Energy',
+    supertype: 'Energy',
+    type: 'Energy',
+    subtypes: ['special'],
+  };
+
+  assert.equal(energySearchWhat({ basic: true, energyType: 'fairy' }), 'Basic {Y} Energy');
+  assert.equal(matchesSearch(fairy, 'Basic {Y} Energy'), true);
+  assert.equal(matchesSearch(fairyNoTypes, 'Basic {Y} Energy'), true);
+  assert.equal(matchesSearch(water, 'Basic {Y} Energy'), false);
+  assert.equal(matchesSearch(special, 'Basic {Y} Energy'), false);
+
+  assert.equal(energySearchWhat({ basic: true, energyType: 'dragon' }), 'Basic {N} Energy');
+  assert.equal(matchesSearch(dragon, 'Basic {N} Energy'), true);
+  assert.equal(matchesSearch(water, 'Basic {N} Energy'), false);
 });
 
 // Discard-cost filtering. An Energy-scoped ability cost (Mortal Shuriken et al.)

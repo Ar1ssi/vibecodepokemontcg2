@@ -64,7 +64,10 @@ function parseArticles(html) {
   const articleRe = /<article class="type-pkmn_card[^"]*"[^>]*>([\s\S]*?)<\/article>/g;
   for (const m of html.matchAll(articleRe)) {
     const body = m[1];
-    const name = firstMatch(/<span class="name"[^>]*>([\s\S]*?)<\/span>/, body);
+    // The name span may contain nested symbol markup; match through to the
+    // wrapping </div>, not the first inner </span> (same class as the trainer
+    // scraper's "Fairy Charm {" truncation).
+    const name = firstMatch(/<span class="name"[^>]*>([\s\S]*?)<\/span><\/div>/, body);
     const subtype = firstMatch(/<span class="sub-type"[^>]*>([\s\S]*?)<\/span>/, body);
     const textBlock = body.match(/<div class="text">([\s\S]*?)<\/div>\s*<div class="release-meta/);
     const text = textBlock ? htmlToText(textBlock[1]) : '';

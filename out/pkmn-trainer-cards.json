@@ -40,6 +40,14 @@
   "url": "https://pkmncards.com/card/poke-pad-30th-celebration-30c-126/"
  },
  {
+  "name": "Paradise Resort",
+  "set": "Mega Evolution Promos",
+  "number": "092",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Psyduck in play (both yours and your opponent’s) is {C} less.",
+  "url": "https://pkmncards.com/card/paradise-resort-mega-evolution-promos-mep-092/"
+ },
+ {
   "name": "Gwynn",
   "set": "Pitch Black",
   "number": "119",
@@ -184,6 +192,14 @@
   "url": "https://pkmncards.com/card/gladions-final-battle-pitch-black-pbl-077/"
  },
  {
+  "name": "Fossil Quarry",
+  "set": "Pitch Black",
+  "number": "076",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for up to 2 Item cards that have “Antique” in their name and put them onto their Bench. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/fossil-quarry-pitch-black-pbl-076/"
+ },
+ {
   "name": "Dark Bell",
   "set": "Pitch Black",
   "number": "075",
@@ -240,6 +256,14 @@
   "url": "https://pkmncards.com/card/tool-scrapper-chaos-rising-cri-115/"
  },
  {
+  "name": "Surfing Beach",
+  "set": "Chaos Rising",
+  "number": "114",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may switch their Active {W} Pokémon with 1 of their Benched {W} Pokémon.",
+  "url": "https://pkmncards.com/card/surfing-beach-chaos-rising-cri-114/"
+ },
+ {
   "name": "Special Red Card",
   "set": "Chaos Rising",
   "number": "113",
@@ -254,6 +278,14 @@
   "subtype": "Supporter",
   "text": "During your opponent’s next turn, their Poisoned Pokémon can’t retreat. (This includes newly Poisoned Pokémon.)",
   "url": "https://pkmncards.com/card/roxies-performance-chaos-rising-cri-112/"
+ },
+ {
+  "name": "Prism Tower",
+  "set": "Chaos Rising",
+  "number": "111",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard 2 cards from their hand in order to draw a card.",
+  "url": "https://pkmncards.com/card/prism-tower-chaos-rising-cri-111/"
  },
  {
   "name": "Philippe",
@@ -320,6 +352,14 @@
   "url": "https://pkmncards.com/card/roxies-performance-chaos-rising-cri-081/"
  },
  {
+  "name": "Prism Tower",
+  "set": "Chaos Rising",
+  "number": "080",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard 2 cards from their hand in order to draw a card.",
+  "url": "https://pkmncards.com/card/prism-tower-chaos-rising-cri-080/"
+ },
+ {
   "name": "Philippe",
   "set": "Chaos Rising",
   "number": "079",
@@ -350,6 +390,14 @@
   "subtype": "Supporter",
   "text": "Switch your Active Pokémon with 1 of your Benched Pokémon. If you moved a Pokémon ex to your Bench in this way, heal 80 damage from that Pokémon.",
   "url": "https://pkmncards.com/card/azs-tranquility-chaos-rising-cri-076/"
+ },
+ {
+  "name": "Ange Floette",
+  "set": "Chaos Rising",
+  "number": "075",
+  "subtype": "Stadium",
+  "text": "You can put this card into play only if you discard a Prism Tower in play, and you can put this card into play during the same turn you play Prism Tower. Each Mega Floette ex in play (both yours and your opponent’s) gets +150 HP.",
+  "url": "https://pkmncards.com/card/ange-floette-chaos-rising-cri-075/"
  },
  {
   "name": "Adversity Policy",
@@ -424,12 +472,28 @@
   "url": "https://pkmncards.com/card/naveen-perfect-order-por-112/"
  },
  {
+  "name": "Lumiose City",
+  "set": "Perfect Order",
+  "number": "111",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic Pokémon and put it onto their Bench. Then, that player shuffles their deck. If a player searches their deck in this way, their turn ends.",
+  "url": "https://pkmncards.com/card/lumiose-city-perfect-order-por-111/"
+ },
+ {
   "name": "Jacinthe",
   "set": "Perfect Order",
   "number": "110",
   "subtype": "Supporter",
   "text": "Heal 150 damage from 1 of your {P} Pokémon.",
   "url": "https://pkmncards.com/card/jacinthe-perfect-order-por-110/"
+ },
+ {
+  "name": "Forest of Vitality",
+  "set": "Perfect Order",
+  "number": "109",
+  "subtype": "Stadium",
+  "text": "Each player’s {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.",
+  "url": "https://pkmncards.com/card/forest-of-vitality-perfect-order-por-109/"
  },
  {
   "name": "Energy Recycler",
@@ -504,6 +568,14 @@
   "url": "https://pkmncards.com/card/lumiose-galette-perfect-order-por-078/"
  },
  {
+  "name": "Lumiose City",
+  "set": "Perfect Order",
+  "number": "077",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic Pokémon and put it onto their Bench. Then, that player shuffles their deck. If a player searches their deck in this way, their turn ends.",
+  "url": "https://pkmncards.com/card/lumiose-city-perfect-order-por-077/"
+ },
+ {
   "name": "Judge",
   "set": "Perfect Order",
   "number": "076",
@@ -576,6 +648,14 @@
   "url": "https://pkmncards.com/card/antique-jaw-fossil-perfect-order-por-068/"
  },
  {
+  "name": "Celebratory Fanfare",
+  "set": "Mega Evolution Promos",
+  "number": "028",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may heal 10 damage from each of their Pokémon. If a player healed any damage in this way, their turn ends.",
+  "url": "https://pkmncards.com/card/celebratory-fanfare-mega-evolution-promos-mep-028-2/"
+ },
+ {
   "name": "Surfer",
   "set": "Ascended Heroes",
   "number": "293",
@@ -622,6 +702,14 @@
   "subtype": "Item",
   "text": "Attach a Basic Energy card from your discard pile to 1 of your Benched N’s Pokémon.",
   "url": "https://pkmncards.com/card/ns-pp-up-ascended-heroes-asc-262/"
+ },
+ {
+  "name": "Jamming Tower",
+  "set": "Ascended Heroes",
+  "number": "261",
+  "subtype": "Stadium",
+  "text": "Pokémon Tools attached to each Pokémon (both yours and your opponent’s) have no effect.",
+  "url": "https://pkmncards.com/card/jamming-tower-ascended-heroes-asc-261/"
  },
  {
   "name": "Glass Trumpet",
@@ -720,6 +808,14 @@
   "url": "https://pkmncards.com/card/thick-scale-ascended-heroes-asc-211/"
  },
  {
+  "name": "Team Rocket’s Watchtower",
+  "set": "Ascended Heroes",
+  "number": "210",
+  "subtype": "Stadium",
+  "text": "{C} Pokémon in play (both yours and your opponent’s) have no Abilities.",
+  "url": "https://pkmncards.com/card/team-rockets-watchtower-ascended-heroes-asc-210/"
+ },
+ {
   "name": "Team Rocket’s Transceiver",
   "set": "Ascended Heroes",
   "number": "209",
@@ -768,6 +864,14 @@
   "url": "https://pkmncards.com/card/team-rockets-giovanni-ascended-heroes-asc-204/"
  },
  {
+  "name": "Team Rocket’s Factory",
+  "set": "Ascended Heroes",
+  "number": "203",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if they played a Supporter card that has “Team Rocket” in its name from their hand this turn, they may draw 2 cards.",
+  "url": "https://pkmncards.com/card/team-rockets-factory-ascended-heroes-asc-203/"
+ },
+ {
   "name": "Team Rocket’s Ariana",
   "set": "Ascended Heroes",
   "number": "202",
@@ -808,6 +912,14 @@
   "url": "https://pkmncards.com/card/poke-pad-ascended-heroes-asc-198/"
  },
  {
+  "name": "Nighttime Mine",
+  "set": "Ascended Heroes",
+  "number": "197",
+  "subtype": "Stadium",
+  "text": "Attacks used by each Tera Pokémon in play (both yours and your opponent’s) cost {C} more.",
+  "url": "https://pkmncards.com/card/nighttime-mine-ascended-heroes-asc-197/"
+ },
+ {
   "name": "Night Stretcher",
   "set": "Ascended Heroes",
   "number": "196",
@@ -822,6 +934,14 @@
   "subtype": "Item",
   "text": "Attach a Basic Energy card from your discard pile to 1 of your Benched N’s Pokémon.",
   "url": "https://pkmncards.com/card/ns-pp-up-ascended-heroes-asc-195/"
+ },
+ {
+  "name": "Mystery Garden",
+  "set": "Ascended Heroes",
+  "number": "194",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard an Energy card from their hand in order to draw cards until they have as many cards in their hand as they have {P} Pokémon in play.",
+  "url": "https://pkmncards.com/card/mystery-garden-ascended-heroes-asc-194/"
  },
  {
   "name": "Mega Signal",
@@ -862,6 +982,14 @@
   "subtype": "Item",
   "text": "You can use this card only if you have any Tera Pokémon in play. Choose up to 2 of your Benched {C} Pokémon and attach a Basic Energy card from your discard pile to each of them.",
   "url": "https://pkmncards.com/card/glass-trumpet-ascended-heroes-asc-189/"
+ },
+ {
+  "name": "Forest of Vitality",
+  "set": "Ascended Heroes",
+  "number": "188",
+  "subtype": "Stadium",
+  "text": "Each player’s {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.",
+  "url": "https://pkmncards.com/card/forest-of-vitality-ascended-heroes-asc-188/"
  },
  {
   "name": "Fighting Gong",
@@ -992,6 +1120,14 @@
   "url": "https://pkmncards.com/card/blowtorch-phantasmal-flames-pfl-117/"
  },
  {
+  "name": "Battle Cage",
+  "set": "Phantasmal Flames",
+  "number": "116",
+  "subtype": "Stadium",
+  "text": "Prevent all damage counters from being placed on Benched Pokémon (both yours and your opponent’s) by effects of attacks and Abilities from the opponent’s Pokémon. (Damage from attacks is still taken.)",
+  "url": "https://pkmncards.com/card/battle-cage-phantasmal-flames-pfl-116/"
+ },
+ {
   "name": "Wondrous Patch",
   "set": "Phantasmal Flames",
   "number": "094",
@@ -1040,6 +1176,14 @@
   "url": "https://pkmncards.com/card/firebreather-phantasmal-flames-pfl-089/"
  },
  {
+  "name": "Dizzying Valley",
+  "set": "Phantasmal Flames",
+  "number": "088",
+  "subtype": "Stadium",
+  "text": "Confused Pokémon (both yours and your opponent’s) don’t recover from that Special Condition when they evolve or devolve.",
+  "url": "https://pkmncards.com/card/dizzying-valley-phantasmal-flames-pfl-088/"
+ },
+ {
   "name": "Dawn",
   "set": "Phantasmal Flames",
   "number": "087",
@@ -1054,6 +1198,14 @@
   "subtype": "Item",
   "text": "You can use this card only if you discard a Basic {R} Energy card from your hand. Discard a Pokémon Tool or Special Energy card from 1 of your opponent’s Pokémon, or discard a Stadium in play.",
   "url": "https://pkmncards.com/card/blowtorch-phantasmal-flames-pfl-086/"
+ },
+ {
+  "name": "Battle Cage",
+  "set": "Phantasmal Flames",
+  "number": "085",
+  "subtype": "Stadium",
+  "text": "Prevent all damage counters from being placed on Benched Pokémon (both yours and your opponent’s) by effects of attacks and Abilities from the opponent’s Pokémon. (Damage from attacks is still taken.)",
+  "url": "https://pkmncards.com/card/battle-cage-phantasmal-flames-pfl-085/"
  },
  {
   "name": "Professor’s Research",
@@ -1160,6 +1312,14 @@
   "url": "https://pkmncards.com/card/night-stretcher-mega-evolution-meg-173/"
  },
  {
+  "name": "Mystery Garden",
+  "set": "Mega Evolution",
+  "number": "172",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard an Energy card from their hand in order to draw cards until they have as many cards in their hand as they have {P} Pokémon in play.",
+  "url": "https://pkmncards.com/card/mystery-garden-mega-evolution-meg-172/"
+ },
+ {
   "name": "Mega Signal",
   "set": "Mega Evolution",
   "number": "171",
@@ -1240,12 +1400,28 @@
   "url": "https://pkmncards.com/card/switch-mega-evolution-meg-130/"
  },
  {
+  "name": "Surfing Beach",
+  "set": "Mega Evolution",
+  "number": "129",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may switch their Active {W} Pokémon with 1 of their Benched {W} Pokémon.",
+  "url": "https://pkmncards.com/card/surfing-beach-mega-evolution-meg-129/"
+ },
+ {
   "name": "Strange Timepiece",
   "set": "Mega Evolution",
   "number": "128",
   "subtype": "Item",
   "text": "Devolve 1 of your evolved {P} Pokémon by putting any number of Evolution cards on it into your hand. (That Pokémon can’t evolve this turn.)",
   "url": "https://pkmncards.com/card/strange-timepiece-mega-evolution-meg-128/"
+ },
+ {
+  "name": "Risky Ruins",
+  "set": "Mega Evolution",
+  "number": "127",
+  "subtype": "Stadium",
+  "text": "Whenever any player puts a Basic non-{D} Pokémon onto their Bench during their turn, place 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/risky-ruins-mega-evolution-meg-127/"
  },
  {
   "name": "Repel",
@@ -1280,6 +1456,14 @@
   "url": "https://pkmncards.com/card/pokemon-center-lady-mega-evolution-meg-123/"
  },
  {
+  "name": "Mystery Garden",
+  "set": "Mega Evolution",
+  "number": "122",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard an Energy card from their hand in order to draw cards until they have as many cards in their hand as they have {P} Pokémon in play.",
+  "url": "https://pkmncards.com/card/mystery-garden-mega-evolution-meg-122/"
+ },
+ {
   "name": "Mega Signal",
   "set": "Mega Evolution",
   "number": "121",
@@ -1310,6 +1494,14 @@
   "subtype": "Item",
   "text": "During your opponent’s next turn, all of your {M} Pokémon take 30 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance). (This includes new Pokémon that come into play.)",
   "url": "https://pkmncards.com/card/iron-defender-mega-evolution-meg-118/"
+ },
+ {
+  "name": "Forest of Vitality",
+  "set": "Mega Evolution",
+  "number": "117",
+  "subtype": "Stadium",
+  "text": "Each player’s {G} Pokémon can evolve into {G} Pokémon during the turn they play those Pokémon, except during their first turn.",
+  "url": "https://pkmncards.com/card/forest-of-vitality-mega-evolution-meg-117/"
  },
  {
   "name": "Fighting Gong",
@@ -1344,6 +1536,14 @@
   "url": "https://pkmncards.com/card/acerolas-mischief-mega-evolution-meg-113/"
  },
  {
+  "name": "Paradise Resort",
+  "set": "Scarlet & Violet Promos",
+  "number": "224",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Psyduck in play (both yours and your opponent’s) is {C} less.",
+  "url": "https://pkmncards.com/card/paradise-resort-scarlet-violet-promos-svp-224/"
+ },
+ {
   "name": "Hilda",
   "set": "White Flare",
   "number": "171",
@@ -1368,20 +1568,20 @@
   "url": "https://pkmncards.com/card/hilda-white-flare-wht-164/"
  },
  {
-  "name": "N’s Plan",
-  "set": "Black Bolt",
-  "number": "163",
-  "subtype": "Supporter",
-  "text": "Move up to 2 Energy from your Benched Pokémon to your Active Pokémon.",
-  "url": "https://pkmncards.com/card/ns-plan-black-bolt-blk-163/"
- },
- {
   "name": "Harlequin",
   "set": "White Flare",
   "number": "163",
   "subtype": "Supporter",
   "text": "Each player shuffles their hand into their deck. Then, flip a coin. If heads, you draw 5 cards, and your opponent draws 3 cards. If tails, you draw 3 cards, and your opponent draws 5 cards.",
   "url": "https://pkmncards.com/card/harlequin-white-flare-wht-163/"
+ },
+ {
+  "name": "N’s Plan",
+  "set": "Black Bolt",
+  "number": "163",
+  "subtype": "Supporter",
+  "text": "Move up to 2 Energy from your Benched Pokémon to your Active Pokémon.",
+  "url": "https://pkmncards.com/card/ns-plan-black-bolt-blk-163/"
  },
  {
   "name": "Fennel",
@@ -1400,12 +1600,12 @@
   "url": "https://pkmncards.com/card/tool-scrapper-white-flare-wht-085/"
  },
  {
-  "name": "Professor’s Research",
-  "set": "Black Bolt",
+  "name": "Tool Scrapper",
+  "set": "White Flare",
   "number": "085",
-  "subtype": "Supporter",
-  "text": "Discard your hand and draw 7 cards.",
-  "url": "https://pkmncards.com/card/professors-research-black-bolt-blk-085/"
+  "subtype": "Item",
+  "text": "Choose up to 2 Pokémon Tools attached to Pokémon (yours or your opponent’s) and discard them.",
+  "url": "https://pkmncards.com/card/tool-scrapper-white-flare-wht-085/"
  },
  {
   "name": "Hilda",
@@ -1472,7 +1672,7 @@
   "url": "https://pkmncards.com/card/energy-coin-black-bolt-blk-081/"
  },
  {
-  "name": "Antique Cover Fossil",
+  "name": "Antique Cover Fossil · 60 HP",
   "set": "Black Bolt",
   "number": "080",
   "subtype": "Item",
@@ -1502,6 +1702,22 @@
   "subtype": "Pokémon Tool",
   "text": "The Retreat Cost of the Pokémon this card is attached to is {C}{C} less.",
   "url": "https://pkmncards.com/card/air-balloon-black-bolt-blk-079/"
+ },
+ {
+  "name": "Levincia",
+  "set": "Destined Rivals",
+  "number": "244",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put up to 2 Basic {L} Energy cards from their discard pile into their hand.",
+  "url": "https://pkmncards.com/card/levincia-destined-rivals-dri-244/"
+ },
+ {
+  "name": "Jamming Tower",
+  "set": "Destined Rivals",
+  "number": "243",
+  "subtype": "Stadium",
+  "text": "Pokémon Tools attached to each Pokémon (both yours and your opponent’s) have no effect.",
+  "url": "https://pkmncards.com/card/jamming-tower-destined-rivals-dri-243/"
  },
  {
   "name": "Team Rocket’s Giovanni",
@@ -1600,6 +1816,14 @@
   "url": "https://pkmncards.com/card/tm-machine-destined-rivals-dri-181/"
  },
  {
+  "name": "Team Rocket’s Watchtower",
+  "set": "Destined Rivals",
+  "number": "180",
+  "subtype": "Stadium",
+  "text": "{C} Pokémon in play (both yours and your opponent’s) have no Abilities.",
+  "url": "https://pkmncards.com/card/team-rockets-watchtower-destined-rivals-dri-180/"
+ },
+ {
   "name": "Team Rocket’s Venture Bomb",
   "set": "Destined Rivals",
   "number": "179",
@@ -1648,6 +1872,14 @@
   "url": "https://pkmncards.com/card/team-rockets-giovanni-destined-rivals-dri-174/"
  },
  {
+  "name": "Team Rocket’s Factory",
+  "set": "Destined Rivals",
+  "number": "173",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if they played a Supporter card that has “Team Rocket” in its name from their hand this turn, they may draw 2 cards.",
+  "url": "https://pkmncards.com/card/team-rockets-factory-destined-rivals-dri-173/"
+ },
+ {
   "name": "Team Rocket’s Bother-Bot",
   "set": "Destined Rivals",
   "number": "172",
@@ -1672,6 +1904,14 @@
   "url": "https://pkmncards.com/card/team-rockets-archer-destined-rivals-dri-170/"
  },
  {
+  "name": "Spikemuth Gym",
+  "set": "Destined Rivals",
+  "number": "169",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Marnie’s Pokémon, reveal it, and put it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/spikemuth-gym-destined-rivals-dri-169/"
+ },
+ {
   "name": "Sacred Ash",
   "set": "Destined Rivals",
   "number": "168",
@@ -1686,6 +1926,14 @@
   "subtype": "Supporter",
   "text": "Each player shuffles their hand into their deck and draws 4 cards.",
   "url": "https://pkmncards.com/card/judge-destined-rivals-dri-167/"
+ },
+ {
+  "name": "Granite Cave",
+  "set": "Destined Rivals",
+  "number": "166",
+  "subtype": "Stadium",
+  "text": "Steven’s Pokémon (both yours and your opponent’s) take 30 less damage from attacks from the opponent’s Pokémon (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/granite-cave-destined-rivals-dri-166/"
  },
  {
   "name": "Ethan’s Adventure",
@@ -1784,6 +2032,14 @@
   "url": "https://pkmncards.com/card/professors-research-journey-together-jtg-155/"
  },
  {
+  "name": "Postwick",
+  "set": "Journey Together",
+  "number": "154",
+  "subtype": "Stadium",
+  "text": "Attacks used by Hop’s Pokémon (both yours and your opponent’s) do 30 more damage to the opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/postwick-journey-together-jtg-154/"
+ },
+ {
   "name": "N’s PP Up",
   "set": "Journey Together",
   "number": "153",
@@ -1792,12 +2048,28 @@
   "url": "https://pkmncards.com/card/ns-pp-up-journey-together-jtg-153/"
  },
  {
+  "name": "N’s Castle",
+  "set": "Journey Together",
+  "number": "152",
+  "subtype": "Stadium",
+  "text": "N’s Pokémon in play (both yours and your opponent’s) have no Retreat Cost.",
+  "url": "https://pkmncards.com/card/ns-castle-journey-together-jtg-152/"
+ },
+ {
   "name": "Lillie’s Pearl",
   "set": "Journey Together",
   "number": "151",
   "subtype": "Pokémon Tool",
   "text": "If the Lillie’s Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, that player takes 1 fewer Prize card.",
   "url": "https://pkmncards.com/card/lillies-pearl-journey-together-jtg-151/"
+ },
+ {
+  "name": "Levincia",
+  "set": "Journey Together",
+  "number": "150",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put up to 2 Basic {L} Energy cards from their discard pile into their hand.",
+  "url": "https://pkmncards.com/card/levincia-journey-together-jtg-150/"
  },
  {
   "name": "Iris’s Fighting Spirit",
@@ -2192,6 +2464,14 @@
   "url": "https://pkmncards.com/card/friends-in-paldea-prismatic-evolutions-pre-109/"
  },
  {
+  "name": "Festival Grounds",
+  "set": "Prismatic Evolutions",
+  "number": "108",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that has any Energy attached (both yours and your opponent’s) recovers from all Special Conditions and can’t be affected by any Special Conditions.",
+  "url": "https://pkmncards.com/card/festival-grounds-prismatic-evolutions-pre-108/"
+ },
+ {
   "name": "Explorer’s Guidance",
   "set": "Prismatic Evolutions",
   "number": "107",
@@ -2296,6 +2576,14 @@
   "url": "https://pkmncards.com/card/binding-mochi-prismatic-evolutions-pre-095/"
  },
  {
+  "name": "Area Zero Underdepths",
+  "set": "Prismatic Evolutions",
+  "number": "094",
+  "subtype": "Stadium",
+  "text": "Each player who has any Tera Pokémon in play can have up to 8 Pokémon on their Bench. If a player no longer has any Tera Pokémon in play, that player discards Pokémon from their Bench until they have 5. When this card leaves play, both players discard Pokémon from their Bench until they have 5, and the player who played this card discards first.",
+  "url": "https://pkmncards.com/card/area-zero-underdepths-prismatic-evolutions-pre-094/"
+ },
+ {
   "name": "Amarys",
   "set": "Prismatic Evolutions",
   "number": "093",
@@ -2310,6 +2598,14 @@
   "subtype": "Item",
   "text": "Put a Pokémon or a Basic Energy card from your discard pile into your hand.",
   "url": "https://pkmncards.com/card/night-stretcher-surging-sparks-ssp-251/"
+ },
+ {
+  "name": "Gravity Mountain",
+  "set": "Surging Sparks",
+  "number": "250",
+  "subtype": "Stadium",
+  "text": "Each Stage 2 Pokémon in play (both yours and your opponent’s) gets -30 HP.",
+  "url": "https://pkmncards.com/card/gravity-mountain-surging-sparks-ssp-250/"
  },
  {
   "name": "Counter Gain",
@@ -2488,6 +2784,14 @@
   "url": "https://pkmncards.com/card/meddling-memo-surging-sparks-ssp-181/"
  },
  {
+  "name": "Lively Stadium",
+  "set": "Surging Sparks",
+  "number": "180",
+  "subtype": "Stadium",
+  "text": "Each Basic Pokémon in play (both yours and your opponent’s) gets +30 HP.",
+  "url": "https://pkmncards.com/card/lively-stadium-surging-sparks-ssp-180/"
+ },
+ {
   "name": "Lisia’s Appeal",
   "set": "Surging Sparks",
   "number": "179",
@@ -2502,6 +2806,14 @@
   "subtype": "Supporter",
   "text": "During your opponent’s next turn, all of your Pokémon take 30 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance). (This includes new Pokémon that come into play.)",
   "url": "https://pkmncards.com/card/jasmines-gaze-surging-sparks-ssp-178/"
+ },
+ {
+  "name": "Gravity Mountain",
+  "set": "Surging Sparks",
+  "number": "177",
+  "subtype": "Stadium",
+  "text": "Each Stage 2 Pokémon in play (both yours and your opponent’s) gets -30 HP.",
+  "url": "https://pkmncards.com/card/gravity-mountain-surging-sparks-ssp-177/"
  },
  {
   "name": "Energy Search Pro",
@@ -2632,6 +2944,14 @@
   "url": "https://pkmncards.com/card/bravery-charm-stellar-crown-scr-175/"
  },
  {
+  "name": "Area Zero Underdepths",
+  "set": "Stellar Crown",
+  "number": "174",
+  "subtype": "Stadium",
+  "text": "Each player who has any Tera Pokémon in play can have up to 8 Pokémon on their Bench. If a player no longer has any Tera Pokémon in play, that player discards Pokémon from their Bench until they have 5. When this card leaves play, both players discard Pokémon from their Bench until they have 5, and the player who played this card discards first.",
+  "url": "https://pkmncards.com/card/area-zero-underdepths-stellar-crown-scr-174/"
+ },
+ {
   "name": "Lacey",
   "set": "Stellar Crown",
   "number": "172",
@@ -2728,6 +3048,14 @@
   "url": "https://pkmncards.com/card/gravity-gemstone-stellar-crown-scr-137/"
  },
  {
+  "name": "Grand Tree",
+  "set": "Stellar Crown",
+  "number": "136",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Stage 1 Pokémon that evolves from 1 of their Basic Pokémon and put it onto that Pokémon to evolve it. If that Pokémon was evolved in this way, that player may search their deck for a Stage 2 Pokémon that evolves from that Pokémon and put it onto that Pokémon to evolve it. Then, that player shuffles their deck. (Players can’t evolve a Basic Pokémon during their first turn or a Basic Pokémon that was put into play this turn.)",
+  "url": "https://pkmncards.com/card/grand-tree-stellar-crown-scr-136/"
+ },
+ {
   "name": "Glass Trumpet",
   "set": "Stellar Crown",
   "number": "135",
@@ -2760,7 +3088,15 @@
   "url": "https://pkmncards.com/card/briar-stellar-crown-scr-132/"
  },
  {
-  "name": "Antique Root Fossil",
+  "name": "Area Zero Underdepths",
+  "set": "Stellar Crown",
+  "number": "131",
+  "subtype": "Stadium",
+  "text": "Each player who has any Tera Pokémon in play can have up to 8 Pokémon on their Bench. If a player no longer has any Tera Pokémon in play, that player discards Pokémon from their Bench until they have 5. When this card leaves play, both players discard Pokémon from their Bench until they have 5, and the player who played this card discards first.",
+  "url": "https://pkmncards.com/card/area-zero-underdepths-stellar-crown-scr-131/"
+ },
+ {
+  "name": "Antique Root Fossil · 60 HP",
   "set": "Stellar Crown",
   "number": "130",
   "subtype": "Item",
@@ -2768,12 +3104,20 @@
   "url": "https://pkmncards.com/card/antique-root-fossil-stellar-crown-scr-130/"
  },
  {
-  "name": "Antique Cover Fossil",
+  "name": "Antique Cover Fossil · 60 HP",
   "set": "Stellar Crown",
   "number": "129",
   "subtype": "Item",
   "text": "Play this card as if it were a 60-HP Basic {C} Pokémon. This card can’t be affected by any Special Conditions and can’t retreat. At any time during your turn, you may discard this card from play. Ability ⇢ Protective Cover Prevent all effects of attacks used by your opponent’s Pokémon done to this Pokémon. (Damage is not an effect.)",
   "url": "https://pkmncards.com/card/antique-cover-fossil-stellar-crown-scr-129/"
+ },
+ {
+  "name": "Paradise Resort",
+  "set": "Scarlet & Violet Promos",
+  "number": "150",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Psyduck in play (both yours and your opponent’s) is {C} less.",
+  "url": "https://pkmncards.com/card/paradise-resort-scarlet-violet-promos-svp-150/"
  },
  {
   "name": "Powerglass",
@@ -2864,6 +3208,14 @@
   "url": "https://pkmncards.com/card/night-stretcher-shrouded-fable-sfa-061/"
  },
  {
+  "name": "Neutralization Zone",
+  "set": "Shrouded Fable",
+  "number": "060",
+  "subtype": "Stadium",
+  "text": "Prevent all damage done to Pokémon that don’t have a Rule Box (both yours and your opponent’s) by attacks from the opponent’s Pokémon ex and Pokémon V. (Pokémon ex, Pokémon V, etc. have Rule Boxes.) This card can’t be put into your hand or deck from the discard pile.",
+  "url": "https://pkmncards.com/card/neutralization-zone-shrouded-fable-sfa-060/"
+ },
+ {
   "name": "Janine’s Secret Art",
   "set": "Shrouded Fable",
   "number": "059",
@@ -2902,6 +3254,14 @@
   "subtype": "Pokémon Tool",
   "text": "Attacks used by the Poisoned Pokémon this card is attached to do 40 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/binding-mochi-shrouded-fable-sfa-055/"
+ },
+ {
+  "name": "Academy at Night",
+  "set": "Shrouded Fable",
+  "number": "054",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put a card from their hand on top of their deck.",
+  "url": "https://pkmncards.com/card/academy-at-night-shrouded-fable-sfa-054/"
  },
  {
   "name": "Rescue Board",
@@ -3112,6 +3472,14 @@
   "url": "https://pkmncards.com/card/kieran-twilight-masquerade-twm-154/"
  },
  {
+  "name": "Jamming Tower",
+  "set": "Twilight Masquerade",
+  "number": "153",
+  "subtype": "Stadium",
+  "text": "Pokémon Tools attached to each Pokémon (both yours and your opponent’s) have no effect.",
+  "url": "https://pkmncards.com/card/jamming-tower-twilight-masquerade-twm-153/"
+ },
+ {
   "name": "Hyper Aroma",
   "set": "Twilight Masquerade",
   "number": "152",
@@ -3136,6 +3504,14 @@
   "url": "https://pkmncards.com/card/handheld-fan-twilight-masquerade-twm-150/"
  },
  {
+  "name": "Festival Grounds",
+  "set": "Twilight Masquerade",
+  "number": "149",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that has any Energy attached (both yours and your opponent’s) recovers from all Special Conditions and can’t be affected by any Special Conditions.",
+  "url": "https://pkmncards.com/card/festival-grounds-twilight-masquerade-twm-149/"
+ },
+ {
   "name": "Enhanced Hammer",
   "set": "Twilight Masquerade",
   "number": "148",
@@ -3150,6 +3526,14 @@
   "subtype": "Supporter",
   "text": "Heal 70 damage from your Active Pokémon.",
   "url": "https://pkmncards.com/card/cook-twilight-masquerade-twm-147/"
+ },
+ {
+  "name": "Community Center",
+  "set": "Twilight Masquerade",
+  "number": "146",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if they played a Supporter card from their hand this turn, they may heal 10 damage from each of their Pokémon.",
+  "url": "https://pkmncards.com/card/community-center-twilight-masquerade-twm-146/"
  },
  {
   "name": "Carmine",
@@ -3312,6 +3696,14 @@
   "url": "https://pkmncards.com/card/prime-catcher-temporal-forces-tef-157/"
  },
  {
+  "name": "Perilous Jungle",
+  "set": "Temporal Forces",
+  "number": "156",
+  "subtype": "Stadium",
+  "text": "During Pokémon Checkup, put 2 more damage counters on each Poisoned non-{D} Pokémon (both yours and your opponent’s).",
+  "url": "https://pkmncards.com/card/perilous-jungle-temporal-forces-tef-156/"
+ },
+ {
   "name": "Morty’s Conviction",
   "set": "Temporal Forces",
   "number": "155",
@@ -3366,6 +3758,14 @@
   "subtype": "Pokémon Tool",
   "text": "The Future Pokémon this card is attached to has no Retreat Cost, and the attacks it uses do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/future-booster-energy-capsule-temporal-forces-tef-149/"
+ },
+ {
+  "name": "Full Metal Lab",
+  "set": "Temporal Forces",
+  "number": "148",
+  "subtype": "Stadium",
+  "text": "{M} Pokémon (both yours and your opponent’s) take 30 less damage from attacks from the opponent’s Pokémon (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/full-metal-lab-temporal-forces-tef-148/"
  },
  {
   "name": "Explorer’s Guidance",
@@ -3592,6 +3992,14 @@
   "url": "https://pkmncards.com/card/nemona-paldean-fates-paf-082/"
  },
  {
+  "name": "Moonlit Hill",
+  "set": "Paldean Fates",
+  "number": "081",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a Basic {P} Energy card from their hand in order to heal 30 damage from each of their Pokémon.",
+  "url": "https://pkmncards.com/card/moonlit-hill-paldean-fates-paf-081/"
+ },
+ {
   "name": "Iono",
   "set": "Paldean Fates",
   "number": "080",
@@ -3624,6 +4032,14 @@
   "url": "https://pkmncards.com/card/atticus-paldean-fates-paf-077/"
  },
  {
+  "name": "Artazon",
+  "set": "Paldean Fates",
+  "number": "076",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic Pokémon that doesn’t have a Rule Box and put it onto their Bench. Then, that player shuffles their deck. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)",
+  "url": "https://pkmncards.com/card/artazon-paldean-fates-paf-076/"
+ },
+ {
   "name": "VS Seeker",
   "set": "Pokémon Trading Card Game Classic—Venusaur",
   "number": "031",
@@ -3649,14 +4065,6 @@
  },
  {
   "name": "Ultra Ball",
-  "set": "Pokémon Trading Card Game Classic—Venusaur",
-  "number": "030",
-  "subtype": "Item",
-  "text": "You can use this card only if you discard 2 other cards from your hand. Search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck. (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/ultra-ball-pokemon-trading-card-game-classic-venusaur-clv-030/"
- },
- {
-  "name": "Ultra Ball",
   "set": "Pokémon Trading Card Game Classic—Charizard",
   "number": "030",
   "subtype": "Item",
@@ -3672,12 +4080,12 @@
   "url": "https://pkmncards.com/card/ultra-ball-pokemon-trading-card-game-classic-blastoise-clb-030/"
  },
  {
-  "name": "Switch",
+  "name": "Ultra Ball",
   "set": "Pokémon Trading Card Game Classic—Venusaur",
-  "number": "029",
+  "number": "030",
   "subtype": "Item",
-  "text": "Switch your Active Pokémon with 1 of your Benched Pokémon. (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/switch-pokemon-trading-card-game-classic-venusaur-clv-029/"
+  "text": "You can use this card only if you discard 2 other cards from your hand. Search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/ultra-ball-pokemon-trading-card-game-classic-venusaur-clv-030/"
  },
  {
   "name": "Switch",
@@ -3694,6 +4102,14 @@
   "subtype": "Item",
   "text": "Switch your Active Pokémon with 1 of your Benched Pokémon. (This card cannot be used at official tournaments.)",
   "url": "https://pkmncards.com/card/switch-pokemon-trading-card-game-classic-blastoise-clb-029/"
+ },
+ {
+  "name": "Switch",
+  "set": "Pokémon Trading Card Game Classic—Venusaur",
+  "number": "029",
+  "subtype": "Item",
+  "text": "Switch your Active Pokémon with 1 of your Benched Pokémon. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/switch-pokemon-trading-card-game-classic-venusaur-clv-029/"
  },
  {
   "name": "Super Scoop Up",
@@ -3752,14 +4168,6 @@
   "url": "https://pkmncards.com/card/rockets-admin-pokemon-trading-card-game-classic-venusaur-clv-026/"
  },
  {
-  "name": "Scorching Charcoal",
-  "set": "Pokémon Trading Card Game Classic—Charizard",
-  "number": "026",
-  "subtype": "Pokémon Tool",
-  "text": "The attacks used by the Charizard this card is attached to do 100 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance). (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/scorching-charcoal-pokemon-trading-card-game-classic-charizard-clc-026/"
- },
- {
   "name": "Rare Candy",
   "set": "Pokémon Trading Card Game Classic—Blastoise",
   "number": "026",
@@ -3768,12 +4176,12 @@
   "url": "https://pkmncards.com/card/rare-candy-pokemon-trading-card-game-classic-blastoise-clb-026/"
  },
  {
-  "name": "Professor Oak",
-  "set": "Pokémon Trading Card Game Classic—Blastoise",
-  "number": "025",
-  "subtype": "Supporter",
-  "text": "Discard your hand and draw 7 cards. (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/professor-oak-pokemon-trading-card-game-classic-blastoise-clb-025/"
+  "name": "Scorching Charcoal",
+  "set": "Pokémon Trading Card Game Classic—Charizard",
+  "number": "026",
+  "subtype": "Pokémon Tool",
+  "text": "The attacks used by the Charizard this card is attached to do 100 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance). (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/scorching-charcoal-pokemon-trading-card-game-classic-charizard-clc-026/"
  },
  {
   "name": "Rocket’s Admin.",
@@ -3792,12 +4200,12 @@
   "url": "https://pkmncards.com/card/rare-candy-pokemon-trading-card-game-classic-venusaur-clv-025/"
  },
  {
-  "name": "Rare Candy",
-  "set": "Pokémon Trading Card Game Classic—Charizard",
-  "number": "024",
-  "subtype": "Item",
-  "text": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card onto the Basic Pokémon to evolve it, skipping the Stage 1. You can’t use this card during your first turn or on a Basic Pokémon that was put into play this turn. (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/rare-candy-pokemon-trading-card-game-classic-charizard-clc-024/"
+  "name": "Professor Oak",
+  "set": "Pokémon Trading Card Game Classic—Blastoise",
+  "number": "025",
+  "subtype": "Supporter",
+  "text": "Discard your hand and draw 7 cards. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/professor-oak-pokemon-trading-card-game-classic-blastoise-clb-025/"
  },
  {
   "name": "Pokémon Fan Club",
@@ -3816,12 +4224,12 @@
   "url": "https://pkmncards.com/card/professor-oak-pokemon-trading-card-game-classic-venusaur-clv-024/"
  },
  {
-  "name": "Pokémon Nurse",
-  "set": "Pokémon Trading Card Game Classic—Venusaur",
-  "number": "023",
-  "subtype": "Supporter",
-  "text": "Heal all damage from 1 of your Pokémon. If you healed any damage in this way, discard all Energy from that Pokémon. (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/pokemon-nurse-pokemon-trading-card-game-classic-venusaur-clv-023/"
+  "name": "Rare Candy",
+  "set": "Pokémon Trading Card Game Classic—Charizard",
+  "number": "024",
+  "subtype": "Item",
+  "text": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card onto the Basic Pokémon to evolve it, skipping the Stage 1. You can’t use this card during your first turn or on a Basic Pokémon that was put into play this turn. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/rare-candy-pokemon-trading-card-game-classic-charizard-clc-024/"
  },
  {
   "name": "Poké Ball",
@@ -3840,6 +4248,22 @@
   "url": "https://pkmncards.com/card/professor-oak-pokemon-trading-card-game-classic-charizard-clc-023/"
  },
  {
+  "name": "Pokémon Nurse",
+  "set": "Pokémon Trading Card Game Classic—Venusaur",
+  "number": "023",
+  "subtype": "Supporter",
+  "text": "Heal all damage from 1 of your Pokémon. If you healed any damage in this way, discard all Energy from that Pokémon. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/pokemon-nurse-pokemon-trading-card-game-classic-venusaur-clv-023/"
+ },
+ {
+  "name": "Pokémon Fan Club",
+  "set": "Pokémon Trading Card Game Classic—Charizard",
+  "number": "022",
+  "subtype": "Supporter",
+  "text": "Search your deck for up to 2 Basic Pokémon, reveal them, and put them into your hand. Then, shuffle your deck. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/pokemon-fan-club-pokemon-trading-card-game-classic-charizard-clc-022/"
+ },
+ {
   "name": "Pokémon Fan Club",
   "set": "Pokémon Trading Card Game Classic—Venusaur",
   "number": "022",
@@ -3856,22 +4280,6 @@
   "url": "https://pkmncards.com/card/fisherman-pokemon-trading-card-game-classic-blastoise-clb-022/"
  },
  {
-  "name": "Pokémon Fan Club",
-  "set": "Pokémon Trading Card Game Classic—Charizard",
-  "number": "022",
-  "subtype": "Supporter",
-  "text": "Search your deck for up to 2 Basic Pokémon, reveal them, and put them into your hand. Then, shuffle your deck. (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/pokemon-fan-club-pokemon-trading-card-game-classic-charizard-clc-022/"
- },
- {
-  "name": "Poké Ball",
-  "set": "Pokémon Trading Card Game Classic—Charizard",
-  "number": "021",
-  "subtype": "Item",
-  "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck. (This card cannot be used at official tournaments.)",
-  "url": "https://pkmncards.com/card/poke-ball-pokemon-trading-card-game-classic-charizard-clc-021/"
- },
- {
   "name": "Drops in the Ocean",
   "set": "Pokémon Trading Card Game Classic—Blastoise",
   "number": "021",
@@ -3886,6 +4294,14 @@
   "subtype": "Item",
   "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck. (This card cannot be used at official tournaments.)",
   "url": "https://pkmncards.com/card/poke-ball-pokemon-trading-card-game-classic-venusaur-clv-021/"
+ },
+ {
+  "name": "Poké Ball",
+  "set": "Pokémon Trading Card Game Classic—Charizard",
+  "number": "021",
+  "subtype": "Item",
+  "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck. (This card cannot be used at official tournaments.)",
+  "url": "https://pkmncards.com/card/poke-ball-pokemon-trading-card-game-classic-charizard-clc-021/"
  },
  {
   "name": "Computer Search",
@@ -3974,6 +4390,14 @@
   "subtype": "Item",
   "text": "You can use this card only if you have more Prize cards remaining than your opponent. Switch in 1 of your opponent’s Benched Pokémon to the Active Spot.",
   "url": "https://pkmncards.com/card/counter-catcher-paradox-rift-par-264/"
+ },
+ {
+  "name": "Beach Court",
+  "set": "Paradox Rift",
+  "number": "263",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Basic Pokémon in play (both yours and your opponent’s) is {C} less.",
+  "url": "https://pkmncards.com/card/beach-court-paradox-rift-par-263/"
  },
  {
   "name": "Tulip",
@@ -4152,7 +4576,7 @@
   "url": "https://pkmncards.com/card/technical-machine-blindside-paradox-rift-par-176/"
  },
  {
-  "name": "Snorlax Doll",
+  "name": "Snorlax Doll · 120 HP",
   "set": "Paradox Rift",
   "number": "175",
   "subtype": "Item",
@@ -4408,6 +4832,14 @@
   "url": "https://pkmncards.com/card/daisys-help-151-mew-158/"
  },
  {
+  "name": "Cycling Road",
+  "set": "151",
+  "number": "157",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a Basic Energy card from their hand in order to draw a card.",
+  "url": "https://pkmncards.com/card/cycling-road-151-mew-157/"
+ },
+ {
   "name": "Bill’s Transfer",
   "set": "151",
   "number": "156",
@@ -4424,7 +4856,7 @@
   "url": "https://pkmncards.com/card/big-air-balloon-151-mew-155/"
  },
  {
-  "name": "Antique Old Amber",
+  "name": "Antique Old Amber · 60 HP",
   "set": "151",
   "number": "154",
   "subtype": "Item",
@@ -4432,7 +4864,7 @@
   "url": "https://pkmncards.com/card/antique-old-amber-151-mew-154/"
  },
  {
-  "name": "Antique Helix Fossil",
+  "name": "Antique Helix Fossil · 60 HP",
   "set": "151",
   "number": "153",
   "subtype": "Item",
@@ -4440,12 +4872,20 @@
   "url": "https://pkmncards.com/card/antique-helix-fossil-151-mew-153/"
  },
  {
-  "name": "Antique Dome Fossil",
+  "name": "Antique Dome Fossil · 60 HP",
   "set": "151",
   "number": "152",
   "subtype": "Item",
   "text": "Play this card as if it were a 60-HP Basic {C} Pokémon. This card can’t be affected by any Special Conditions and can’t retreat. At any time during your turn, you may discard this card from play. Ability ⇢ Domed Armor This Pokémon takes 30 less damage from attacks (after applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/antique-dome-fossil-151-mew-152/"
+ },
+ {
+  "name": "Artazon",
+  "set": "Obsidian Flames",
+  "number": "229",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic Pokémon that doesn’t have a Rule Box and put it onto their Bench. Then, that player shuffles their deck. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)",
+  "url": "https://pkmncards.com/card/artazon-obsidian-flames-obf-229/"
  },
  {
   "name": "Poppy",
@@ -4504,6 +4944,14 @@
   "url": "https://pkmncards.com/card/vengeful-punch-obsidian-flames-obf-197/"
  },
  {
+  "name": "Town Store",
+  "set": "Obsidian Flames",
+  "number": "196",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Pokémon Tool card, reveal it, and put it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/town-store-obsidian-flames-obf-196/"
+ },
+ {
   "name": "Team Star Grunt",
   "set": "Obsidian Flames",
   "number": "195",
@@ -4526,6 +4974,14 @@
   "subtype": "Supporter",
   "text": "Move up to 2 Energy from 1 of your Pokémon to another of your Pokémon.",
   "url": "https://pkmncards.com/card/poppy-obsidian-flames-obf-193/"
+ },
+ {
+  "name": "Pokémon League Headquarters",
+  "set": "Obsidian Flames",
+  "number": "192",
+  "subtype": "Stadium",
+  "text": "Attacks used by each Basic Pokémon in play (both yours and your opponent’s) cost {C} more.",
+  "url": "https://pkmncards.com/card/pokemon-league-headquarters-obsidian-flames-obf-192/"
  },
  {
   "name": "Patrol Cap",
@@ -4574,6 +5030,14 @@
   "subtype": "Supporter",
   "text": "Search your deck for an Item card and a Pokémon Tool card, reveal them, and put them into your hand. Then, shuffle your deck.",
   "url": "https://pkmncards.com/card/arven-obsidian-flames-obf-186/"
+ },
+ {
+  "name": "Paradise Resort",
+  "set": "Scarlet & Violet Promos",
+  "number": "045",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Psyduck in play (both yours and your opponent’s) is {C} less.",
+  "url": "https://pkmncards.com/card/paradise-resort-scarlet-violet-promos-svp-045/"
  },
  {
   "name": "Superior Energy Retrieval",
@@ -4728,6 +5192,14 @@
   "url": "https://pkmncards.com/card/saguaro-paldea-evolved-pal-187/"
  },
  {
+  "name": "Practice Studio",
+  "set": "Paldea Evolved",
+  "number": "186",
+  "subtype": "Stadium",
+  "text": "The attacks of Stage 1 Pokémon (both yours and your opponent’s) do 10 more damage to the opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/practice-studio-paldea-evolved-pal-186/"
+ },
+ {
   "name": "Iono",
   "set": "Paldea Evolved",
   "number": "185",
@@ -4808,6 +5280,22 @@
   "url": "https://pkmncards.com/card/choice-belt-paldea-evolved-pal-176/"
  },
  {
+  "name": "Calamitous Wasteland",
+  "set": "Paldea Evolved",
+  "number": "175",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Basic non-{F} Pokémon in play (both yours and your opponent’s) is {C} more.",
+  "url": "https://pkmncards.com/card/calamitous-wasteland-paldea-evolved-pal-175/"
+ },
+ {
+  "name": "Calamitous Snowy Mountain",
+  "set": "Paldea Evolved",
+  "number": "174",
+  "subtype": "Stadium",
+  "text": "Whenever any player attaches an Energy card from their hand to 1 of their Basic non-{W} Pokémon, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/calamitous-snowy-mountain-paldea-evolved-pal-174/"
+ },
+ {
   "name": "Bravery Charm",
   "set": "Paldea Evolved",
   "number": "173",
@@ -4822,6 +5310,14 @@
   "subtype": "Supporter",
   "text": "Switch in 1 of your opponent’s Benched Pokémon to the Active Spot.",
   "url": "https://pkmncards.com/card/bosss-orders-paldea-evolved-pal-172/"
+ },
+ {
+  "name": "Artazon",
+  "set": "Paldea Evolved",
+  "number": "171",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic Pokémon that doesn’t have a Rule Box and put it onto their Bench. Then, that player shuffles their deck. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)",
+  "url": "https://pkmncards.com/card/artazon-paldea-evolved-pal-171/"
  },
  {
   "name": "Rare Candy",
@@ -5096,6 +5592,14 @@
   "url": "https://pkmncards.com/card/miriam-scarlet-violet-svi-179/"
  },
  {
+  "name": "Mesagoza",
+  "set": "Scarlet & Violet",
+  "number": "178",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may flip a coin. If heads, that player searches their deck for a Pokémon, reveals it, and puts it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/mesagoza-scarlet-violet-svi-178/"
+ },
+ {
   "name": "Katy",
   "set": "Scarlet & Violet",
   "number": "177",
@@ -5174,6 +5678,14 @@
   "subtype": "Item",
   "text": "Flip a coin. If heads, discard an Energy from 1 of your opponent’s Pokémon.",
   "url": "https://pkmncards.com/card/crushing-hammer-scarlet-violet-svi-168/"
+ },
+ {
+  "name": "Beach Court",
+  "set": "Scarlet & Violet",
+  "number": "167",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Basic Pokémon in play (both yours and your opponent’s) is {C} less.",
+  "url": "https://pkmncards.com/card/beach-court-scarlet-violet-svi-167/"
  },
  {
   "name": "Arven",
@@ -5568,6 +6080,14 @@
   "url": "https://pkmncards.com/card/leafy-camo-poncho-silver-tempest-sit-214/"
  },
  {
+  "name": "Gapejaw Bog",
+  "set": "Silver Tempest",
+  "number": "213",
+  "subtype": "Stadium",
+  "text": "Whenever either player puts a Basic Pokémon from their hand onto their Bench, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/gapejaw-bog-silver-tempest-sit-213/"
+ },
+ {
   "name": "Energy Switch",
   "set": "Silver Tempest",
   "number": "212",
@@ -5744,6 +6264,14 @@
   "url": "https://pkmncards.com/card/professor-laventon-silver-tempest-sit-162/"
  },
  {
+  "name": "Primordial Altar",
+  "set": "Silver Tempest",
+  "number": "161",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may look at the top card of their deck. They may discard that card.",
+  "url": "https://pkmncards.com/card/primordial-altar-silver-tempest-sit-161/"
+ },
+ {
   "name": "Leafy Camo Poncho",
   "set": "Silver Tempest",
   "number": "160",
@@ -5886,6 +6414,14 @@
   "subtype": "Item",
   "text": "Attach a basic {D} Energy card from your discard pile to 1 of your Benched {D} Pokémon.",
   "url": "https://pkmncards.com/card/dark-patch-lost-origin-lor-216/"
+ },
+ {
+  "name": "Collapsed Stadium",
+  "set": "Lost Origin",
+  "number": "215",
+  "subtype": "Stadium",
+  "text": "Each player can’t have more than 4 Benched Pokémon. If a player has 5 or more Benched Pokémon, they discard Benched Pokémon until they have 4 Pokémon on the Bench. The player who played this card discards first. If more than one effect changes the number of Benched Pokémon allowed, use the smaller number.",
+  "url": "https://pkmncards.com/card/collapsed-stadium-lost-origin-lor-215/"
  },
  {
   "name": "Box of Disaster",
@@ -6096,6 +6632,22 @@
   "url": "https://pkmncards.com/card/lost-vacuum-lost-origin-lor-162/"
  },
  {
+  "name": "Lost City",
+  "set": "Lost Origin",
+  "number": "161",
+  "subtype": "Stadium",
+  "text": "Whenever a Pokémon (either yours or your opponent’s) is Knocked Out, put that Pokémon in the Lost Zone instead of the discard pile. (Discard all attached cards.)",
+  "url": "https://pkmncards.com/card/lost-city-lost-origin-lor-161/"
+ },
+ {
+  "name": "Lake Acuity",
+  "set": "Lost Origin",
+  "number": "160",
+  "subtype": "Stadium",
+  "text": "All Pokémon that have any {W} or {F} Energy attached (both yours and your opponent’s) take 20 less damage from attacks from the opponent’s Pokémon (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/lake-acuity-lost-origin-lor-160/"
+ },
+ {
   "name": "Lady",
   "set": "Lost Origin",
   "number": "159",
@@ -6158,6 +6710,14 @@
   "subtype": "Item",
   "text": "Look at the top card of your deck. You may switch that card with 1 of your face-down Prize cards. (The cards stay face down.)",
   "url": "https://pkmncards.com/card/arc-phone-lost-origin-lor-152/"
+ },
+ {
+  "name": "Champions Festival",
+  "set": "Sword & Shield Promos",
+  "number": "SWSH296",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, they may heal 10 damage from each of their Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-sword-shield-promos-swsh296/"
  },
  {
   "name": "Candela",
@@ -6256,6 +6816,14 @@
   "url": "https://pkmncards.com/card/rare-candy-pokemon-go-pgo-069/"
  },
  {
+  "name": "PokéStop",
+  "set": "Pokémon GO",
+  "number": "068",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard 3 cards from the top of their deck. If a player discarded any Item cards in this way, they put those Item cards into their hand.",
+  "url": "https://pkmncards.com/card/pokestop-pokemon-go-pgo-068/"
+ },
+ {
   "name": "Lure Module",
   "set": "Pokémon GO",
   "number": "067",
@@ -6334,6 +6902,30 @@
   "subtype": "Item",
   "text": "Look at the top card of your deck. You may put that card into your hand. If you don’t, discard that card and draw a card.",
   "url": "https://pkmncards.com/card/trekking-shoes-astral-radiance-asr-215/"
+ },
+ {
+  "name": "Temple of Sinnoh",
+  "set": "Astral Radiance",
+  "number": "214",
+  "subtype": "Stadium",
+  "text": "All Special Energy attached to Pokémon (both yours and your opponent’s) provide {C} Energy and have no other effect.",
+  "url": "https://pkmncards.com/card/temple-of-sinnoh-astral-radiance-asr-214/"
+ },
+ {
+  "name": "Path to the Peak",
+  "set": "Astral Radiance",
+  "number": "213",
+  "subtype": "Stadium",
+  "text": "Pokémon with a Rule Box in play (both yours and your opponent’s) have no Abilities. (Pokémon V, Pokémon-GX, etc. have Rule Boxes.)",
+  "url": "https://pkmncards.com/card/path-to-the-peak-astral-radiance-asr-213/"
+ },
+ {
+  "name": "Jubilife Village",
+  "set": "Astral Radiance",
+  "number": "212",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may shuffle their hand into their deck and draw 5 cards. If they do, their turn ends.",
+  "url": "https://pkmncards.com/card/jubilife-village-astral-radiance-asr-212/"
  },
  {
   "name": "Choice Belt",
@@ -6520,6 +7112,14 @@
   "url": "https://pkmncards.com/card/trekking-shoes-astral-radiance-asr-156/"
  },
  {
+  "name": "Temple of Sinnoh",
+  "set": "Astral Radiance",
+  "number": "155",
+  "subtype": "Stadium",
+  "text": "All Special Energy attached to Pokémon (both yours and your opponent’s) provide {C} Energy and have no other effect.",
+  "url": "https://pkmncards.com/card/temple-of-sinnoh-astral-radiance-asr-155/"
+ },
+ {
   "name": "Switch Cart",
   "set": "Astral Radiance",
   "number": "154",
@@ -6568,6 +7168,14 @@
   "url": "https://pkmncards.com/card/kamado-astral-radiance-asr-149/"
  },
  {
+  "name": "Jubilife Village",
+  "set": "Astral Radiance",
+  "number": "148",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may shuffle their hand into their deck and draw 5 cards. If they do, their turn ends.",
+  "url": "https://pkmncards.com/card/jubilife-village-astral-radiance-asr-148/"
+ },
+ {
   "name": "Irida",
   "set": "Astral Radiance",
   "number": "147",
@@ -6606,6 +7214,14 @@
   "subtype": "Supporter",
   "text": "Draw 2 cards. If you drew any cards in this way, attach up to 2 {G} Energy cards from your hand to 1 of your Benched Pokémon.",
   "url": "https://pkmncards.com/card/gardenias-vigor-astral-radiance-asr-143/"
+ },
+ {
+  "name": "Gapejaw Bog",
+  "set": "Astral Radiance",
+  "number": "142",
+  "subtype": "Stadium",
+  "text": "Whenever either player puts a Basic Pokémon from their hand onto their Bench, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/gapejaw-bog-astral-radiance-asr-142/"
  },
  {
   "name": "Feather Ball",
@@ -6718,6 +7334,14 @@
   "subtype": "Item",
   "text": "You can use this card only if you discard 2 other cards from your hand. Search your deck for a Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.",
   "url": "https://pkmncards.com/card/ultra-ball-brilliant-stars-brs-186/"
+ },
+ {
+  "name": "Magma Basin",
+  "set": "Brilliant Stars",
+  "number": "185",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may attach a {R} Energy card from their discard pile to 1 of their Benched {R} Pokémon. If a player attached Energy to a Pokémon in this way, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/magma-basin-brilliant-stars-brs-185/"
  },
  {
   "name": "Roseanne’s Backup",
@@ -6848,6 +7472,14 @@
   "url": "https://pkmncards.com/card/marnies-pride-brilliant-stars-brs-145/"
  },
  {
+  "name": "Magma Basin",
+  "set": "Brilliant Stars",
+  "number": "144",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may attach a {R} Energy card from their discard pile to 1 of their Benched {R} Pokémon. If a player attached Energy to a Pokémon in this way, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/magma-basin-brilliant-stars-brs-144/"
+ },
+ {
   "name": "Kindler",
   "set": "Brilliant Stars",
   "number": "143",
@@ -6894,6 +7526,14 @@
   "subtype": "Supporter",
   "text": "Draw cards until you have 5 cards in your hand. If any of your Pokémon were Knocked Out during your opponent’s last turn, draw cards until you have 8 cards in your hand instead.",
   "url": "https://pkmncards.com/card/cynthias-ambition-brilliant-stars-brs-138/"
+ },
+ {
+  "name": "Collapsed Stadium",
+  "set": "Brilliant Stars",
+  "number": "137",
+  "subtype": "Stadium",
+  "text": "Each player can’t have more than 4 Benched Pokémon. If a player has 5 or more Benched Pokémon, they discard Benched Pokémon until they have 4 Pokémon on the Bench. The player who played this card discards first. If more than one effect changes the number of Benched Pokémon allowed, use the smaller number.",
+  "url": "https://pkmncards.com/card/collapsed-stadium-brilliant-stars-brs-137/"
  },
  {
   "name": "Cleansing Gloves",
@@ -6958,6 +7598,14 @@
   "subtype": "Supporter",
   "text": "Your opponent reveals their hand, and you draw a card for each Trainer card you find there.",
   "url": "https://pkmncards.com/card/acerolas-premonition-brilliant-stars-brs-129/"
+ },
+ {
+  "name": "Training Court",
+  "set": "Fusion Strike",
+  "number": "282",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put a basic Energy card from their discard pile into their hand.",
+  "url": "https://pkmncards.com/card/training-court-fusion-strike-fst-282/"
  },
  {
   "name": "Power Tablet",
@@ -7086,6 +7734,14 @@
   "subtype": "Pokémon Tool",
   "text": "The attacks of the Pokémon this card is attached to do 30 more damage to your opponent’s Active {W} Pokémon (before applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/spongy-gloves-fusion-strike-fst-243/"
+ },
+ {
+  "name": "Skaters’ Park",
+  "set": "Fusion Strike",
+  "number": "242",
+  "subtype": "Stadium",
+  "text": "Whenever either player’s Active Pokémon retreats, put any basic Energy that would be discarded into their hand instead of the discard pile.",
+  "url": "https://pkmncards.com/card/skaters-park-fusion-strike-fst-242/"
  },
  {
   "name": "Sidney",
@@ -7288,6 +7944,14 @@
   "url": "https://pkmncards.com/card/professor-burnet-sword-shield-promos-swsh167/"
  },
  {
+  "name": "Turffield Stadium",
+  "set": "Evolving Skies",
+  "number": "234",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for an Evolution {G} Pokémon, reveal it, and put it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/turffield-stadium-evolving-skies-evs-234/"
+ },
+ {
   "name": "Toy Catcher",
   "set": "Evolving Skies",
   "number": "233",
@@ -7296,12 +7960,28 @@
   "url": "https://pkmncards.com/card/toy-catcher-evolving-skies-evs-233/"
  },
  {
+  "name": "Stormy Mountains",
+  "set": "Evolving Skies",
+  "number": "232",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic {L} Pokémon or Basic {N} Pokémon and put it onto their Bench. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/stormy-mountains-evolving-skies-evs-232/"
+ },
+ {
   "name": "Full Face Guard",
   "set": "Evolving Skies",
   "number": "231",
   "subtype": "Pokémon Tool",
   "text": "If the Pokémon this card is attached to has no Abilities, it takes 20 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/full-face-guard-evolving-skies-evs-231/"
+ },
+ {
+  "name": "Crystal Cave",
+  "set": "Evolving Skies",
+  "number": "230",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may heal 30 damage from each of their {M} Pokémon and {N} Pokémon.",
+  "url": "https://pkmncards.com/card/crystal-cave-evolving-skies-evs-230/"
  },
  {
   "name": "Boost Shake",
@@ -7416,6 +8096,14 @@
   "url": "https://pkmncards.com/card/switching-cups-evolving-skies-evs-162/"
  },
  {
+  "name": "Stormy Mountains",
+  "set": "Evolving Skies",
+  "number": "161",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic {L} Pokémon or Basic {N} Pokémon and put it onto their Bench. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/stormy-mountains-evolving-skies-evs-161/"
+ },
+ {
   "name": "Spirit Mask",
   "set": "Evolving Skies",
   "number": "160",
@@ -7438,6 +8126,14 @@
   "subtype": "Pokémon Tool",
   "text": "The Single Strike Pokémon this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.) {F}{M}{M}{C}{C} → Superstrong Slash : 300 Discard all Energy from this Pokémon.",
   "url": "https://pkmncards.com/card/single-strike-scroll-of-the-fanged-dragon-evolving-skies-evs-158/"
+ },
+ {
+  "name": "Shopping Center",
+  "set": "Evolving Skies",
+  "number": "157",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put a Pokémon Tool attached to 1 of their Pokémon into their hand.",
+  "url": "https://pkmncards.com/card/shopping-center-evolving-skies-evs-157/"
  },
  {
   "name": "Rubber Gloves",
@@ -7534,6 +8230,14 @@
   "subtype": "Pokémon Tool",
   "text": "The attacks of the Pokémon this card is attached to do 30 more damage to your opponent’s Active {F} Pokémon (before applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/digging-gloves-evolving-skies-evs-145/"
+ },
+ {
+  "name": "Crystal Cave",
+  "set": "Evolving Skies",
+  "number": "144",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may heal 30 damage from each of their {M} Pokémon and {N} Pokémon.",
+  "url": "https://pkmncards.com/card/crystal-cave-evolving-skies-evs-144/"
  },
  {
   "name": "Copycat",
@@ -7896,6 +8600,22 @@
   "url": "https://pkmncards.com/card/peonia-chilling-reign-cre-149/"
  },
  {
+  "name": "Path to the Peak",
+  "set": "Chilling Reign",
+  "number": "148",
+  "subtype": "Stadium",
+  "text": "Pokémon with a Rule Box in play (both yours and your opponent’s) have no Abilities. (Pokémon V, Pokémon-GX, etc. have Rule Boxes.)",
+  "url": "https://pkmncards.com/card/path-to-the-peak-chilling-reign-cre-148/"
+ },
+ {
+  "name": "Old Cemetery",
+  "set": "Chilling Reign",
+  "number": "147",
+  "subtype": "Stadium",
+  "text": "Whenever any player attaches an Energy card from their hand to 1 of their non-{P} Pokémon, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/old-cemetery-chilling-reign-cre-147/"
+ },
+ {
   "name": "Melony",
   "set": "Chilling Reign",
   "number": "146",
@@ -7982,6 +8702,14 @@
   "subtype": "Item",
   "text": "Put a Basic Pokémon from your opponent’s discard pile onto their Bench.",
   "url": "https://pkmncards.com/card/echoing-horn-chilling-reign-cre-136/"
+ },
+ {
+  "name": "Dyna Tree Hill",
+  "set": "Chilling Reign",
+  "number": "135",
+  "subtype": "Stadium",
+  "text": "Pokémon (both yours and your opponent’s) can’t be healed.",
+  "url": "https://pkmncards.com/card/dyna-tree-hill-chilling-reign-cre-135/"
  },
  {
   "name": "Doctor",
@@ -8158,6 +8886,22 @@
   "subtype": "Item",
   "text": "Shuffle up to 2 Single Strike Energy cards from your discard pile into your deck.",
   "url": "https://pkmncards.com/card/urn-of-vitality-battle-styles-bst-139/"
+ },
+ {
+  "name": "Tower of Waters",
+  "set": "Battle Styles",
+  "number": "138",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Rapid Strike Pokémon in play (both yours and your opponent’s) is {C}{C} less.",
+  "url": "https://pkmncards.com/card/tower-of-waters-battle-styles-bst-138/"
+ },
+ {
+  "name": "Tower of Darkness",
+  "set": "Battle Styles",
+  "number": "137",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may draw 2 cards. In order to use this effect, that player must discard a Single Strike card from their hand.",
+  "url": "https://pkmncards.com/card/tower-of-darkness-battle-styles-bst-137/"
  },
  {
   "name": "Tool Jammer",
@@ -8544,6 +9288,14 @@
   "url": "https://pkmncards.com/card/allister-vivid-voltage-viv-179/"
  },
  {
+  "name": "Wyndon Stadium",
+  "set": "Vivid Voltage",
+  "number": "161",
+  "subtype": "Stadium",
+  "text": "Whenever either player plays a Pokémon VMAX from their hand to evolve a Pokémon V during their turn, heal 100 damage from that Pokémon.",
+  "url": "https://pkmncards.com/card/wyndon-stadium-vivid-voltage-viv-161/"
+ },
+ {
   "name": "Telescopic Sight",
   "set": "Vivid Voltage",
   "number": "160",
@@ -8624,6 +9376,14 @@
   "url": "https://pkmncards.com/card/drone-rotom-vivid-voltage-viv-151/"
  },
  {
+  "name": "Circhester Bath",
+  "set": "Vivid Voltage",
+  "number": "150",
+  "subtype": "Stadium",
+  "text": "All Basic Pokémon (both yours and your opponent’s) take 20 less damage from attacks from the opponent’s Pokémon (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/circhester-bath-vivid-voltage-viv-150/"
+ },
+ {
   "name": "Cara Liss",
   "set": "Vivid Voltage",
   "number": "149",
@@ -8686,6 +9446,14 @@
   "subtype": "Supporter",
   "text": "Draw 3 cards.",
   "url": "https://pkmncards.com/card/hop-champions-path-cpa-073/"
+ },
+ {
+  "name": "Turffield Stadium",
+  "set": "Champion's Path",
+  "number": "068",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for an Evolution {G} Pokémon, reveal it, and put it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/turffield-stadium-champions-path-cpa-068/"
  },
  {
   "name": "Team Yell Grunt",
@@ -8920,6 +9688,22 @@
   "url": "https://pkmncards.com/card/struggle-gloves-darkness-ablaze-daa-171/"
  },
  {
+  "name": "Spikemuth",
+  "set": "Darkness Ablaze",
+  "number": "170",
+  "subtype": "Stadium",
+  "text": "Whenever a player’s Active Pokémon moves to the Bench during their turn, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/spikemuth-darkness-ablaze-daa-170/"
+ },
+ {
+  "name": "Rose Tower",
+  "set": "Darkness Ablaze",
+  "number": "169",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may draw cards until they have 3 cards in their hand.",
+  "url": "https://pkmncards.com/card/rose-tower-darkness-ablaze-daa-169/"
+ },
+ {
   "name": "Rose",
   "set": "Darkness Ablaze",
   "number": "168",
@@ -8928,7 +9712,7 @@
   "url": "https://pkmncards.com/card/rose-darkness-ablaze-daa-168/"
  },
  {
-  "name": "Rare Fossil",
+  "name": "Rare Fossil · 70 HP",
   "set": "Darkness Ablaze",
   "number": "167",
   "subtype": "Item",
@@ -8966,6 +9750,14 @@
   "subtype": "Supporter",
   "text": "Shuffle your hand into your deck. Then, draw 4 cards. If your Active Pokémon is your only Pokémon in play, draw 8 cards instead.",
   "url": "https://pkmncards.com/card/kabu-darkness-ablaze-daa-163/"
+ },
+ {
+  "name": "Glimwood Tangle",
+  "set": "Darkness Ablaze",
+  "number": "162",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, after that player flips any coins for an attack, they may ignore all results of those coin flips and begin flipping those coins again.",
+  "url": "https://pkmncards.com/card/glimwood-tangle-darkness-ablaze-daa-162/"
  },
  {
   "name": "Familiar Bell",
@@ -9120,6 +9912,22 @@
   "url": "https://pkmncards.com/card/bosss-orders-rebel-clash-rcl-189/"
  },
  {
+  "name": "Turffield Stadium",
+  "set": "Rebel Clash",
+  "number": "170",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for an Evolution {G} Pokémon, reveal it, and put it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/turffield-stadium-rebel-clash-rcl-170/"
+ },
+ {
+  "name": "Training Court",
+  "set": "Rebel Clash",
+  "number": "169",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put a basic Energy card from their discard pile into their hand.",
+  "url": "https://pkmncards.com/card/training-court-rebel-clash-rcl-169/"
+ },
+ {
   "name": "Tool Scrapper",
   "set": "Rebel Clash",
   "number": "168",
@@ -9182,6 +9990,14 @@
   "subtype": "Supporter",
   "text": "Discard up to 2 cards from your hand, and draw 2 cards for each card you discarded in this way.",
   "url": "https://pkmncards.com/card/milo-rebel-clash-rcl-161/"
+ },
+ {
+  "name": "Galar Mine",
+  "set": "Rebel Clash",
+  "number": "160",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of both Active Pokémon is {C}{C} more.",
+  "url": "https://pkmncards.com/card/galar-mine-rebel-clash-rcl-160/"
  },
  {
   "name": "Full Heal",
@@ -9600,7 +10416,23 @@
   "url": "https://pkmncards.com/card/tag-call-cosmic-eclipse-cec-270/"
  },
  {
-  "name": "Lillie’s Poké Doll",
+  "name": "Power Plant",
+  "set": "Cosmic Eclipse",
+  "number": "269",
+  "subtype": "Stadium",
+  "text": "Pokémon-GX and Pokémon-EX in play (both yours and your opponent’s) have no Abilities.",
+  "url": "https://pkmncards.com/card/power-plant-cosmic-eclipse-cec-269/"
+ },
+ {
+  "name": "Martial Arts Dojo",
+  "set": "Cosmic Eclipse",
+  "number": "268",
+  "subtype": "Stadium",
+  "text": "The attacks of non-Ultra Beast Pokémon that have any basic {F} Energy attached to them (both yours and your opponent’s) do 10 more damage to the opponent’s Active Pokémon (before applying Weakness and Resistance). If the attacking player has more Prize cards remaining than their opponent, those attacks do 40 more damage instead.",
+  "url": "https://pkmncards.com/card/martial-arts-dojo-cosmic-eclipse-cec-268/"
+ },
+ {
+  "name": "Lillie’s Poké Doll · 30 HP",
   "set": "Cosmic Eclipse",
   "number": "267",
   "subtype": "Item",
@@ -9630,6 +10462,14 @@
   "subtype": "Item",
   "text": "You can play this card only if you discard 2 other cards from your hand. Switch 1 of your opponent’s Benched Pokémon-GX or Pokémon-EX with their Active Pokémon.",
   "url": "https://pkmncards.com/card/great-catcher-cosmic-eclipse-cec-264/"
+ },
+ {
+  "name": "Giant Hearth",
+  "set": "Cosmic Eclipse",
+  "number": "263",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a card from their hand. If they do, that player searches their deck for up to 2 {R} Energy cards, reveals them, and puts them into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/giant-hearth-cosmic-eclipse-cec-263/"
  },
  {
   "name": "Rosa",
@@ -9712,7 +10552,7 @@
   "url": "https://pkmncards.com/card/will-cosmic-eclipse-cec-208/"
  },
  {
-  "name": "Unidentified Fossil",
+  "name": "Unidentified Fossil · 60 HP",
   "set": "Cosmic Eclipse",
   "number": "207",
   "subtype": "Item",
@@ -9792,7 +10632,7 @@
   "url": "https://pkmncards.com/card/mallow-lana-cosmic-eclipse-cec-198/"
  },
  {
-  "name": "Lillie’s Poké Doll",
+  "name": "Lillie’s Poké Doll · 30 HP",
   "set": "Cosmic Eclipse",
   "number": "197",
   "subtype": "Item",
@@ -9896,6 +10736,14 @@
   "url": "https://pkmncards.com/card/clay-cosmic-eclipse-cec-188/"
  },
  {
+  "name": "Chaotic Swell",
+  "set": "Cosmic Eclipse",
+  "number": "187",
+  "subtype": "Stadium",
+  "text": "Whenever either player plays a Stadium card from their hand, discard that Stadium card after discarding this one. (The new Stadium card has no effect.)",
+  "url": "https://pkmncards.com/card/chaotic-swell-cosmic-eclipse-cec-187/"
+ },
+ {
   "name": "Bellelba & Brycen-Man",
   "set": "Cosmic Eclipse",
   "number": "186",
@@ -9968,6 +10816,14 @@
   "url": "https://pkmncards.com/card/aether-foundation-employee-lost-thunder-lot-sv81/"
  },
  {
+  "name": "Shrine of Punishment",
+  "set": "Celestial Storm",
+  "number": "SV90",
+  "subtype": "Stadium",
+  "text": "Between turns, put 1 damage counter on each Pokémon-GX and Pokémon-EX (both yours and your opponent’s).",
+  "url": "https://pkmncards.com/card/shrine-of-punishment-celestial-storm-ces-sv90/"
+ },
+ {
   "name": "Hiker",
   "set": "Celestial Storm",
   "number": "SV85",
@@ -9984,12 +10840,36 @@
   "url": "https://pkmncards.com/card/fisherman-celestial-storm-ces-sv83/"
  },
  {
+  "name": "Mt. Coronet",
+  "set": "Ultra Prism",
+  "number": "SV89",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put 2 {M} Energy cards from their discard pile into their hand.",
+  "url": "https://pkmncards.com/card/mt-coronet-ultra-prism-upr-sv89/"
+ },
+ {
+  "name": "Brooklet Hill",
+  "set": "Guardians Rising",
+  "number": "SV88",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic {W} Pokémon or Basic {F} Pokémon, put it onto their Bench, and shuffle their deck.",
+  "url": "https://pkmncards.com/card/brooklet-hill-guardians-rising-gri-sv88/"
+ },
+ {
   "name": "Cynthia",
   "set": "Ultra Prism",
   "number": "SV82",
   "subtype": "Supporter",
   "text": "Shuffle your hand into your deck. Then, draw 6 cards.",
   "url": "https://pkmncards.com/card/cynthia-ultra-prism-upr-sv82/"
+ },
+ {
+  "name": "Aether Paradise Conservation Area",
+  "set": "Guardians Rising",
+  "number": "SV87",
+  "subtype": "Stadium",
+  "text": "Basic {G} and Basic {L} Pokémon (both yours and your opponent’s) take 30 less damage from the opponent’s attacks (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/aether-paradise-conservation-area-guardians-rising-gri-sv87/"
  },
  {
   "name": "Guzma",
@@ -10056,6 +10936,14 @@
   "url": "https://pkmncards.com/card/mistys-determination-hidden-fates-hif-62/"
  },
  {
+  "name": "Misty’s Cerulean City Gym",
+  "set": "Hidden Fates",
+  "number": "61",
+  "subtype": "Stadium",
+  "text": "The attacks of Starmie-GX (both yours and your opponent’s) do 40 more damage to the opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/mistys-cerulean-city-gym-hidden-fates-hif-61/"
+ },
+ {
   "name": "Lt. Surge’s Strategy",
   "set": "Hidden Fates",
   "number": "60",
@@ -10104,6 +10992,14 @@
   "url": "https://pkmncards.com/card/brocks-training-hidden-fates-hif-55/"
  },
  {
+  "name": "Brock’s Pewter City Gym",
+  "set": "Hidden Fates",
+  "number": "54",
+  "subtype": "Stadium",
+  "text": "Onix-GX (both yours and your opponent’s) take 40 less damage from the opponent’s attacks (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/brocks-pewter-city-gym-hidden-fates-hif-54/"
+ },
+ {
   "name": "Brock’s Grit",
   "set": "Hidden Fates",
   "number": "53",
@@ -10126,6 +11022,22 @@
   "subtype": "Supporter",
   "text": "Look at the top 7 cards of your deck. You may reveal up to 2 Trainer cards you find there and put them into your hand. Shuffle the other cards back into your deck.",
   "url": "https://pkmncards.com/card/bills-analysis-hidden-fates-hif-51/"
+ },
+ {
+  "name": "Champions Festival",
+  "set": "Sun & Moon Promos",
+  "number": "SM231",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, they may heal 10 damage from each of their Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-sun-moon-promos-smp-sm231/"
+ },
+ {
+  "name": "Viridian Forest",
+  "set": "Unified Minds",
+  "number": "256",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a card from their hand. If they do, that player searches their deck for a basic Energy card, reveals it, and puts it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/viridian-forest-unified-minds-unm-256/"
  },
  {
   "name": "U-Turn Board",
@@ -10232,7 +11144,7 @@
   "url": "https://pkmncards.com/card/u-turn-board-unified-minds-unm-211/"
  },
  {
-  "name": "Unidentified Fossil",
+  "name": "Unidentified Fossil · 60 HP",
   "set": "Unified Minds",
   "number": "210",
   "subtype": "Item",
@@ -10256,12 +11168,28 @@
   "url": "https://pkmncards.com/card/stadium-nav-unified-minds-unm-208/"
  },
  {
+  "name": "Slumbering Forest",
+  "set": "Unified Minds",
+  "number": "207",
+  "subtype": "Stadium",
+  "text": "If a Pokémon is Asleep, its owner flips 2 coins instead of 1 for that Special Condition between turns. If either of them is tails, that Pokémon is still Asleep.",
+  "url": "https://pkmncards.com/card/slumbering-forest-unified-minds-unm-207/"
+ },
+ {
   "name": "Reset Stamp",
   "set": "Unified Minds",
   "number": "206",
   "subtype": "Item",
   "text": "Your opponent shuffles their hand into their deck and draws a card for each of their remaining Prize cards.",
   "url": "https://pkmncards.com/card/reset-stamp-unified-minds-unm-206/"
+ },
+ {
+  "name": "Pokémon Research Lab",
+  "set": "Unified Minds",
+  "number": "205",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for up to 2 Pokémon that evolve from Unidentified Fossil, put those Pokémon onto their Bench, and shuffle their deck. If a player searches their deck in this way, their turn ends.",
+  "url": "https://pkmncards.com/card/pokemon-research-lab-unified-minds-unm-205/"
  },
  {
   "name": "Poké Maniac",
@@ -10320,6 +11248,14 @@
   "url": "https://pkmncards.com/card/great-potion-unified-minds-unm-198/"
  },
  {
+  "name": "Giant Hearth",
+  "set": "Unified Minds",
+  "number": "197",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a card from their hand. If they do, that player searches their deck for up to 2 {R} Energy cards, reveals them, and puts them into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/giant-hearth-unified-minds-unm-197/"
+ },
+ {
   "name": "Giant Bomb",
   "set": "Unified Minds",
   "number": "196",
@@ -10342,6 +11278,14 @@
   "subtype": "Pokémon Tool",
   "text": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent’s attack (even if that Pokémon is Knocked Out), the Attacking Pokémon is now Confused.",
   "url": "https://pkmncards.com/card/ear-ringing-bell-unified-minds-unm-194/"
+ },
+ {
+  "name": "Dark City",
+  "set": "Unified Minds",
+  "number": "193",
+  "subtype": "Stadium",
+  "text": "Basic {D} Pokémon in play (both yours and your opponent’s) have no Retreat Cost.",
+  "url": "https://pkmncards.com/card/dark-city-unified-minds-unm-193/"
  },
  {
   "name": "Coach Trainer",
@@ -10382,6 +11326,14 @@
   "subtype": "Supporter",
   "text": "At the end of this turn, draw cards until you have 8 cards in your hand.",
   "url": "https://pkmncards.com/card/blues-tactics-unified-minds-unm-188/"
+ },
+ {
+  "name": "Blizzard Town",
+  "set": "Unified Minds",
+  "number": "187",
+  "subtype": "Stadium",
+  "text": "Pokémon with 40 HP or less remaining (both yours and your opponent’s) can’t attack.",
+  "url": "https://pkmncards.com/card/blizzard-town-unified-minds-unm-187/"
  },
  {
   "name": "Blaine’s Quiz Show",
@@ -10568,6 +11520,14 @@
   "url": "https://pkmncards.com/card/reds-challenge-unbroken-bonds-unb-184/"
  },
  {
+  "name": "Power Plant",
+  "set": "Unbroken Bonds",
+  "number": "183",
+  "subtype": "Stadium",
+  "text": "Pokémon-GX and Pokémon-EX in play (both yours and your opponent’s) have no Abilities.",
+  "url": "https://pkmncards.com/card/power-plant-unbroken-bonds-unb-183/"
+ },
+ {
   "name": "Pokégear 3.0",
   "set": "Unbroken Bonds",
   "number": "182",
@@ -10590,6 +11550,14 @@
   "subtype": "Pokémon Tool",
   "text": "If this card is attached to 1 of your Pokémon, discard it at the end of your opponent’s turn. The {M} Pokémon this card is attached to takes 70 less damage from your opponent’s attacks (after applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/metal-core-barrier-unbroken-bonds-unb-180/"
+ },
+ {
+  "name": "Martial Arts Dojo",
+  "set": "Unbroken Bonds",
+  "number": "179",
+  "subtype": "Stadium",
+  "text": "The attacks of non-Ultra Beast Pokémon that have any basic {F} Energy attached to them (both yours and your opponent’s) do 10 more damage to the opponent’s Active Pokémon (before applying Weakness and Resistance). If the attacking player has more Prize cards remaining than their opponent, those attacks do 40 more damage instead.",
+  "url": "https://pkmncards.com/card/martial-arts-dojo-unbroken-bonds-unb-179/"
  },
  {
   "name": "Lt. Surge’s Strategy",
@@ -10640,7 +11608,7 @@
   "url": "https://pkmncards.com/card/fire-crystal-unbroken-bonds-unb-173/"
  },
  {
-  "name": "Fairy Charm {",
+  "name": "Fairy Charm {L}",
   "set": "Unbroken Bonds",
   "number": "172",
   "subtype": "Pokémon Tool",
@@ -10670,6 +11638,14 @@
   "subtype": "Item",
   "text": "You can play this card only if you discard 2 other cards from your hand. Search your deck for up to 2 in any combination of {L} Pokémon-GX and {L} Pokémon-EX, reveal them, and put them into your hand. Then, shuffle your deck.",
   "url": "https://pkmncards.com/card/electromagnetic-radar-unbroken-bonds-unb-169/"
+ },
+ {
+  "name": "Dust Island",
+  "set": "Unbroken Bonds",
+  "number": "168",
+  "subtype": "Stadium",
+  "text": "Whenever either player switches their Poisoned Active Pokémon with 1 of their Benched Pokémon with the effect of a Trainer card, the new Active Pokémon is now affected by that Special Condition.",
+  "url": "https://pkmncards.com/card/dust-island-unbroken-bonds-unb-168/"
  },
  {
   "name": "Dusk Stone",
@@ -10880,6 +11856,14 @@
   "url": "https://pkmncards.com/card/brocks-grit-team-up-teu-172/"
  },
  {
+  "name": "Wondrous Labyrinth Prism Star",
+  "set": "Team Up",
+  "number": "158",
+  "subtype": "Stadium",
+  "text": "The attacks of non-{Y} Pokémon (both yours and your opponent’s) cost {C} more. Whenever any player plays an Item or Supporter card from their hand, prevent all effects of that card done to this Stadium card.",
+  "url": "https://pkmncards.com/card/wondrous-labyrinth-prism-star-team-up-teu-158/"
+ },
+ {
   "name": "Water Memory",
   "set": "Team Up",
   "number": "157",
@@ -10888,7 +11872,15 @@
   "url": "https://pkmncards.com/card/water-memory-team-up-teu-157/"
  },
  {
-  "name": "Unidentified Fossil",
+  "name": "Viridian Forest",
+  "set": "Team Up",
+  "number": "156",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a card from their hand. If they do, that player searches their deck for a basic Energy card, reveals it, and puts it into their hand. Then, that player shuffles their deck.",
+  "url": "https://pkmncards.com/card/viridian-forest-team-up-teu-156/"
+ },
+ {
+  "name": "Unidentified Fossil · 60 HP",
   "set": "Team Up",
   "number": "155",
   "subtype": "Item",
@@ -10950,6 +11942,14 @@
   "subtype": "Pokémon Tool",
   "text": "The {M} Pokémon this card is attached to takes 30 less damage from your opponent’s attacks (after applying Weakness and Resistance), and your opponent’s attacks and Abilities can’t put damage counters on it.",
   "url": "https://pkmncards.com/card/metal-goggles-team-up-teu-148/"
+ },
+ {
+  "name": "Lavender Town",
+  "set": "Team Up",
+  "number": "147",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may have their opponent reveal their hand.",
+  "url": "https://pkmncards.com/card/lavender-town-team-up-teu-147/"
  },
  {
   "name": "Judge Whistle",
@@ -11046,6 +12046,14 @@
   "subtype": "Supporter",
   "text": "Shuffle 6 in any combination of Pokémon and basic Energy cards from your discard pile into your deck.",
   "url": "https://pkmncards.com/card/brocks-grit-team-up-teu-135/"
+ },
+ {
+  "name": "Black Market Prism Star",
+  "set": "Team Up",
+  "number": "134",
+  "subtype": "Stadium",
+  "text": "When a {D} Pokémon (yours or your opponent’s) that has any {D} Energy attached to it is Knocked Out by damage from an opponent’s attack, that player takes 1 fewer Prize card. Whenever any player plays an Item or Supporter card from their hand, prevent all effects of that card done to this Stadium card.",
+  "url": "https://pkmncards.com/card/black-market-prism-star-team-up-teu-134/"
  },
  {
   "name": "Bill’s Analysis",
@@ -11232,6 +12240,14 @@
   "url": "https://pkmncards.com/card/wait-and-see-hammer-lost-thunder-lot-192/"
  },
  {
+  "name": "Thunder Mountain Prism Star",
+  "set": "Lost Thunder",
+  "number": "191",
+  "subtype": "Stadium",
+  "text": "The attacks of {L} Pokémon (both yours and your opponent’s) cost {L} less. Whenever any player plays an Item or Supporter card from their hand, prevent all effects of that card done to this Stadium card.",
+  "url": "https://pkmncards.com/card/thunder-mountain-prism-star-lost-thunder-lot-191/"
+ },
+ {
   "name": "Spell Tag",
   "set": "Lost Thunder",
   "number": "190",
@@ -11312,6 +12328,14 @@
   "url": "https://pkmncards.com/card/lost-blender-lost-thunder-lot-181/"
  },
  {
+  "name": "Life Forest Prism Star",
+  "set": "Lost Thunder",
+  "number": "180",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may heal 60 damage and remove all Special Conditions from 1 of their {G} Pokémon. Whenever any player plays an Item or Supporter card from their hand, prevent all effects of that card done to this Stadium card.",
+  "url": "https://pkmncards.com/card/life-forest-prism-star-lost-thunder-lot-180/"
+ },
+ {
   "name": "Kahili",
   "set": "Lost Thunder",
   "number": "179",
@@ -11320,7 +12344,15 @@
   "url": "https://pkmncards.com/card/kahili-lost-thunder-lot-179/"
  },
  {
-  "name": "Fairy Charm {",
+  "name": "Heat Factory Prism Star",
+  "set": "Lost Thunder",
+  "number": "178",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a {R} Energy card from their hand. If they do, they draw 3 cards. Whenever any player plays an Item or Supporter card from their hand, prevent all effects of that card done to this Stadium card.",
+  "url": "https://pkmncards.com/card/heat-factory-prism-star-lost-thunder-lot-178/"
+ },
+ {
+  "name": "Fairy Charm {N}",
   "set": "Lost Thunder",
   "number": "177",
   "subtype": "Pokémon Tool",
@@ -11328,7 +12360,7 @@
   "url": "https://pkmncards.com/card/fairy-charm-n-lost-thunder-lot-177/"
  },
  {
-  "name": "Fairy Charm {",
+  "name": "Fairy Charm {F}",
   "set": "Lost Thunder",
   "number": "176",
   "subtype": "Pokémon Tool",
@@ -11336,7 +12368,7 @@
   "url": "https://pkmncards.com/card/fairy-charm-f-lost-thunder-lot-176/"
  },
  {
-  "name": "Fairy Charm {",
+  "name": "Fairy Charm {P}",
   "set": "Lost Thunder",
   "number": "175",
   "subtype": "Pokémon Tool",
@@ -11344,7 +12376,7 @@
   "url": "https://pkmncards.com/card/fairy-charm-p-lost-thunder-lot-175/"
  },
  {
-  "name": "Fairy Charm {",
+  "name": "Fairy Charm {G}",
   "set": "Lost Thunder",
   "number": "174",
   "subtype": "Pokémon Tool",
@@ -11472,6 +12504,14 @@
   "url": "https://pkmncards.com/card/zinnia-dragon-majesty-drm-64/"
  },
  {
+  "name": "Wela Volcano Park",
+  "set": "Dragon Majesty",
+  "number": "63",
+  "subtype": "Stadium",
+  "text": "Whenever a player flips a coin for the Special Condition Burned between turns, that Special Condition isn’t removed even if the result is heads.",
+  "url": "https://pkmncards.com/card/wela-volcano-park-dragon-majesty-drm-63/"
+ },
+ {
   "name": "Switch Raft",
   "set": "Dragon Majesty",
   "number": "62",
@@ -11510,6 +12550,14 @@
   "subtype": "Supporter",
   "text": "You can play this card only when it is the last card in your hand. Draw 2 cards for each {R} Pokémon you have in play.",
   "url": "https://pkmncards.com/card/blaines-last-stand-dragon-majesty-drm-58/"
+ },
+ {
+  "name": "Champions Festival",
+  "set": "Sun & Moon Promos",
+  "number": "SM148",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, they may heal 10 damage from each of their Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-sun-moon-promos-smp-sm148/"
  },
  {
   "name": "Rainbow Brush",
@@ -11662,6 +12710,22 @@
   "subtype": "Supporter",
   "text": "Search your deck for up to 3 cards and put them into your hand. Then, shuffle your deck. Your turn ends.",
   "url": "https://pkmncards.com/card/stevens-resolve-celestial-storm-ces-145/"
+ },
+ {
+  "name": "Sky Pillar",
+  "set": "Celestial Storm",
+  "number": "144",
+  "subtype": "Stadium",
+  "text": "Prevent all effects of the opponent’s attacks, including damage, done to Benched Pokémon (both yours and your opponent’s).",
+  "url": "https://pkmncards.com/card/sky-pillar-celestial-storm-ces-144/"
+ },
+ {
+  "name": "Shrine of Punishment",
+  "set": "Celestial Storm",
+  "number": "143",
+  "subtype": "Stadium",
+  "text": "Between turns, put 1 damage counter on each Pokémon-GX and Pokémon-EX (both yours and your opponent’s).",
+  "url": "https://pkmncards.com/card/shrine-of-punishment-celestial-storm-ces-143/"
  },
  {
   "name": "Rare Candy",
@@ -11896,12 +12960,20 @@
   "url": "https://pkmncards.com/card/bonnie-forbidden-light-fli-128/"
  },
  {
-  "name": "Unidentified Fossil",
+  "name": "Unidentified Fossil · 60 HP",
   "set": "Forbidden Light",
   "number": "116",
   "subtype": "Item",
   "text": "Play this card as if it were a 60-HP {C} Basic Pokémon. At any time during your turn (before your attack), you may discard this card from play. This card can’t retreat.",
   "url": "https://pkmncards.com/card/unidentified-fossil-forbidden-light-fli-116/"
+ },
+ {
+  "name": "Ultra Space",
+  "set": "Forbidden Light",
+  "number": "115",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for an Ultra Beast card, reveal it, put it into their hand, and shuffle their deck.",
+  "url": "https://pkmncards.com/card/ultra-space-forbidden-light-fli-115/"
  },
  {
   "name": "Ultra Recon Squad",
@@ -11926,6 +12998,14 @@
   "subtype": "Pokémon Tool",
   "text": "The {M} Pokémon this card is attached to takes 30 less damage from your opponent’s attacks (after applying Weakness and Resistance) and has no Weakness.",
   "url": "https://pkmncards.com/card/metal-frying-pan-forbidden-light-fli-112/"
+ },
+ {
+  "name": "Lysandre Labs",
+  "set": "Forbidden Light",
+  "number": "111",
+  "subtype": "Stadium",
+  "text": "Pokémon Tool cards in play (both yours and your opponent’s) have no effect.",
+  "url": "https://pkmncards.com/card/lysandre-labs-forbidden-light-fli-111/"
  },
  {
   "name": "Lysandre Prism Star",
@@ -12112,7 +13192,7 @@
   "url": "https://pkmncards.com/card/volkner-ultra-prism-upr-135/"
  },
  {
-  "name": "Unidentified Fossil",
+  "name": "Unidentified Fossil · 60 HP",
   "set": "Ultra Prism",
   "number": "134",
   "subtype": "Item",
@@ -12142,6 +13222,14 @@
   "subtype": "Item",
   "text": "Flip a coin. If heads, search your deck for an Item card, reveal it, and put it into your hand. Then, shuffle your deck.",
   "url": "https://pkmncards.com/card/order-pad-ultra-prism-upr-131/"
+ },
+ {
+  "name": "Mt. Coronet",
+  "set": "Ultra Prism",
+  "number": "130",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put 2 {M} Energy cards from their discard pile into their hand.",
+  "url": "https://pkmncards.com/card/mt-coronet-ultra-prism-upr-130/"
  },
  {
   "name": "Missing Clover",
@@ -12280,6 +13368,14 @@
   "url": "https://pkmncards.com/card/gladion-crimson-invasion-cin-109/"
  },
  {
+  "name": "Sea of Nothingness",
+  "set": "Crimson Invasion",
+  "number": "99",
+  "subtype": "Stadium",
+  "text": "Special Conditions are not removed when Pokémon (both yours and your opponent’s) evolve or devolve.",
+  "url": "https://pkmncards.com/card/sea-of-nothingness-crimson-invasion-cin-99/"
+ },
+ {
   "name": "Psychic Memory",
   "set": "Crimson Invasion",
   "number": "98",
@@ -12318,6 +13414,14 @@
   "subtype": "Pokémon Tool",
   "text": "The Silvally-GX this card is attached to is a {F} Pokémon.",
   "url": "https://pkmncards.com/card/fighting-memory-crimson-invasion-cin-94/"
+ },
+ {
+  "name": "Devoured Field",
+  "set": "Crimson Invasion",
+  "number": "93",
+  "subtype": "Stadium",
+  "text": "The attacks of {D} Pokémon and {N} Pokémon (both yours and your opponent’s) do 10 more damage to the opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/devoured-field-crimson-invasion-cin-93/"
  },
  {
   "name": "Dashing Pouch",
@@ -12488,6 +13592,14 @@
   "url": "https://pkmncards.com/card/damage-mover-shining-legends-slg-58/"
  },
  {
+  "name": "Champions Festival",
+  "set": "Sun & Moon Promos",
+  "number": "SM78",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, they may heal 10 damage from each of their Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-sun-moon-promos-smp-sm78/"
+ },
+ {
   "name": "Super Scoop Up",
   "set": "Burning Shadows",
   "number": "166",
@@ -12640,6 +13752,14 @@
   "url": "https://pkmncards.com/card/rotom-dex-poke-finder-mode-burning-shadows-bus-122/"
  },
  {
+  "name": "Po Town",
+  "set": "Burning Shadows",
+  "number": "121",
+  "subtype": "Stadium",
+  "text": "Whenever any player plays a Pokémon from their hand to evolve 1 of their Pokémon, put 3 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/po-town-burning-shadows-bus-121/"
+ },
+ {
   "name": "Plumeria",
   "set": "Burning Shadows",
   "number": "120",
@@ -12654,6 +13774,14 @@
   "subtype": "Supporter",
   "text": "Search your deck for up to 2 Pokémon-GX, reveal them, and put them into your hand. Then, shuffle your deck.",
   "url": "https://pkmncards.com/card/olivia-burning-shadows-bus-119/"
+ },
+ {
+  "name": "Mount Lanakila",
+  "set": "Burning Shadows",
+  "number": "118",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Basic Pokémon in play (both yours and your opponent’s) is {C} more.",
+  "url": "https://pkmncards.com/card/mount-lanakila-burning-shadows-bus-118/"
  },
  {
   "name": "Lana",
@@ -12888,12 +14016,44 @@
   "url": "https://pkmncards.com/card/choice-band-guardians-rising-gri-121/"
  },
  {
+  "name": "Brooklet Hill",
+  "set": "Guardians Rising",
+  "number": "120",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may search their deck for a Basic {W} Pokémon or Basic {F} Pokémon, put it onto their Bench, and shuffle their deck.",
+  "url": "https://pkmncards.com/card/brooklet-hill-guardians-rising-gri-120/"
+ },
+ {
   "name": "Aqua Patch",
   "set": "Guardians Rising",
   "number": "119",
   "subtype": "Item",
   "text": "Attach a {W} Energy card from your discard pile to 1 of your Benched {W} Pokémon.",
   "url": "https://pkmncards.com/card/aqua-patch-guardians-rising-gri-119/"
+ },
+ {
+  "name": "Altar of the Sunne",
+  "set": "Guardians Rising",
+  "number": "118",
+  "subtype": "Stadium",
+  "text": "{R} Pokémon and {M} Pokémon (both yours and your opponent’s) have no Weakness.",
+  "url": "https://pkmncards.com/card/altar-of-the-sunne-guardians-rising-gri-118/"
+ },
+ {
+  "name": "Altar of the Moone",
+  "set": "Guardians Rising",
+  "number": "117",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Pokémon (both yours and your opponent’s) that has any {P} or {D} Energy attached to it is {C}{C} less.",
+  "url": "https://pkmncards.com/card/altar-of-the-moone-guardians-rising-gri-117/"
+ },
+ {
+  "name": "Aether Paradise Conservation Area",
+  "set": "Guardians Rising",
+  "number": "116",
+  "subtype": "Stadium",
+  "text": "Basic {G} and Basic {L} Pokémon (both yours and your opponent’s) take 30 less damage from the opponent’s attacks (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/aether-paradise-conservation-area-guardians-rising-gri-116/"
  },
  {
   "name": "Big Malasada",
@@ -13472,6 +14632,14 @@
   "url": "https://pkmncards.com/card/karen-xy-promos-xyp-xy177/"
  },
  {
+  "name": "Champions Festival",
+  "set": "XY Promos",
+  "number": "XY176",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, he or she may heal 10 damage from each of his or her Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-xy-promos-xyp-xy176/"
+ },
+ {
   "name": "Professor Sycamore",
   "set": "Steam Siege",
   "number": "114",
@@ -13592,6 +14760,14 @@
   "url": "https://pkmncards.com/card/shauna-fates-collide-fco-111/"
  },
  {
+  "name": "Scorched Earth",
+  "set": "Fates Collide",
+  "number": "110",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a {R} or {F} Energy card from his or her hand. If that player does so, he or she draws 2 cards.",
+  "url": "https://pkmncards.com/card/scorched-earth-fates-collide-fco-110/"
+ },
+ {
   "name": "Random Receiver",
   "set": "Fates Collide",
   "number": "109",
@@ -13672,6 +14848,14 @@
   "url": "https://pkmncards.com/card/fossil-excavation-kit-fates-collide-fco-101/"
  },
  {
+  "name": "Fairy Garden",
+  "set": "Fates Collide",
+  "number": "100",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that has any {Y} Energy attached to it (both yours and your opponent’s) has no Retreat Cost.",
+  "url": "https://pkmncards.com/card/fairy-garden-fates-collide-fco-100/"
+ },
+ {
   "name": "Fairy Drop",
   "set": "Fates Collide",
   "number": "99",
@@ -13710,6 +14894,14 @@
   "subtype": "Item",
   "text": "Devolve 1 of your evolved Pokémon and put the highest Stage Evolution card on it into your hand. (That Pokémon can’t evolve this turn.)",
   "url": "https://pkmncards.com/card/devolution-spray-fates-collide-fco-95/"
+ },
+ {
+  "name": "Chaos Tower",
+  "set": "Fates Collide",
+  "number": "94",
+  "subtype": "Stadium",
+  "text": "Choose which way this card faces before you play it. This ↓ player’s Pokémon can’t be Confused or Poisoned. (If those Pokémon are already Confused or Poisoned, remove those Special Conditions.) Choose which way this card faces before you play it. This ↓ player’s Pokémon can’t be Asleep or Paralyzed. (If those Pokémon are already Asleep or Paralyzed, remove those Special Conditions.)",
+  "url": "https://pkmncards.com/card/chaos-tower-fates-collide-fco-94/"
  },
  {
   "name": "Bent Spoon",
@@ -13944,6 +15136,14 @@
   "url": "https://pkmncards.com/card/scizor-spirit-link-breakpoint-bkp-111/"
  },
  {
+  "name": "Reverse Valley",
+  "set": "BREAKpoint",
+  "number": "110",
+  "subtype": "Stadium",
+  "text": "Choose which way this card faces before you play it. Any damage done to this ↓ player’s {M} Pokémon by an opponent’s attack is reduced by 10 (after applying Weakness and Resistance). Choose which way this card faces before you play it. The attacks of this ↓ player’s {D} Pokémon do 10 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/reverse-valley-breakpoint-bkp-110/"
+ },
+ {
   "name": "Puzzle of Time",
   "set": "BREAKpoint",
   "number": "109",
@@ -14048,6 +15248,14 @@
   "url": "https://pkmncards.com/card/bursting-balloon-breakpoint-bkp-97/"
  },
  {
+  "name": "All-Night Party",
+  "set": "BREAKpoint",
+  "number": "96",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player’s Active Pokémon is Asleep, he or she may remove that Special Condition and heal 30 damage from that Pokémon.",
+  "url": "https://pkmncards.com/card/all-night-party-breakpoint-bkp-96/"
+ },
+ {
   "name": "Aerodactyl Spirit Link",
   "set": "XY Promos",
   "number": "XY99",
@@ -14110,6 +15318,14 @@
   "subtype": "Item",
   "text": "Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/professors-letter-breakthrough-bkt-146/"
+ },
+ {
+  "name": "Parallel City",
+  "set": "BREAKthrough",
+  "number": "145",
+  "subtype": "Stadium",
+  "text": "Choose which way this card faces before you play it. This ↓ player can’t have more than 3 Benched Pokémon. (When this card comes into play, this ↓ player discards Benched Pokémon until he or she has 3 Pokémon on the Bench.) Choose which way this card faces before you play it. Any damage done by attacks from this ↓ player’s {G}, {R}, or {W} Pokémon is reduced by 20 (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/parallel-city-breakthrough-bkt-145/"
  },
  {
   "name": "Mewtwo Spirit Link",
@@ -14208,6 +15424,14 @@
   "url": "https://pkmncards.com/card/assault-vest-breakthrough-bkt-133/"
  },
  {
+  "name": "Champions Festival",
+  "set": "XY Promos",
+  "number": "XY91",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, he or she may heal 10 damage from each of his or her Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-xy-promos-xyp-xy91/"
+ },
+ {
   "name": "Trainers’ Mail",
   "set": "Ancient Origins",
   "number": "100",
@@ -14286,6 +15510,22 @@
   "subtype": "Supporter",
   "text": "Until the end of your opponent’s next turn, each Pokémon in play, in each player’s hand, and in each player’s discard pile has no Abilities. (This includes cards that come into play on that turn.)",
   "url": "https://pkmncards.com/card/hex-maniac-ancient-origins-aor-75/"
+ },
+ {
+  "name": "Forest of Giant Plants",
+  "set": "Ancient Origins",
+  "number": "74",
+  "subtype": "Stadium",
+  "text": "Each player’s {G} Pokémon can evolve during his or her first turn or the turn he or she plays those Pokémon.",
+  "url": "https://pkmncards.com/card/forest-of-giant-plants-ancient-origins-aor-74/"
+ },
+ {
+  "name": "Faded Town",
+  "set": "Ancient Origins",
+  "number": "73",
+  "subtype": "Stadium",
+  "text": "At any time between turns, put 2 damage counters on each Mega Evolution Pokémon.",
+  "url": "https://pkmncards.com/card/faded-town-ancient-origins-aor-73/"
  },
  {
   "name": "Energy Recycler",
@@ -14408,6 +15648,14 @@
   "url": "https://pkmncards.com/card/steven-roaring-skies-ros-90/"
  },
  {
+  "name": "Sky Field",
+  "set": "Roaring Skies",
+  "number": "89",
+  "subtype": "Stadium",
+  "text": "Each player can have 8 Pokémon on his or her Bench. (When this card leaves play, each player discards Benched Pokémon until he or she has 5 Pokémon on the Bench. The owner of this card discards first.)",
+  "url": "https://pkmncards.com/card/sky-field-roaring-skies-ros-89/"
+ },
+ {
   "name": "Revive",
   "set": "Roaring Skies",
   "number": "88",
@@ -14473,19 +15721,19 @@
  },
  {
   "name": "Acro Bike",
-  "set": "XY Trainer Kit—Latias",
-  "number": "20",
-  "subtype": "Item",
-  "text": "Look at the top 2 cards of your deck and put 1 of them into your hand. Discard the other card.",
-  "url": "https://pkmncards.com/card/acro-bike-xy-trainer-kit-latias-tk8a-20/"
- },
- {
-  "name": "Acro Bike",
   "set": "XY Trainer Kit—Latios",
   "number": "20",
   "subtype": "Item",
   "text": "Look at the top 2 cards of your deck and put 1 of them into your hand. Discard the other card.",
   "url": "https://pkmncards.com/card/acro-bike-xy-trainer-kit-latios-tk8o-20/"
+ },
+ {
+  "name": "Acro Bike",
+  "set": "XY Trainer Kit—Latias",
+  "number": "20",
+  "subtype": "Item",
+  "text": "Look at the top 2 cards of your deck and put 1 of them into your hand. Discard the other card.",
+  "url": "https://pkmncards.com/card/acro-bike-xy-trainer-kit-latias-tk8a-20/"
  },
  {
   "name": "Potion",
@@ -14494,6 +15742,14 @@
   "subtype": "Item",
   "text": "Heal 30 damage from 1 of your Pokémon.",
   "url": "https://pkmncards.com/card/potion-xy-trainer-kit-latias-tk8a-15/"
+ },
+ {
+  "name": "Team Magma’s Secret Base",
+  "set": "Double Crisis",
+  "number": "32",
+  "subtype": "Stadium",
+  "text": "Whenever any player puts a Basic Pokémon (except for Team Magma Pokémon) from his or her hand onto his or her Bench, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/team-magmas-secret-base-double-crisis-dcr-32/"
  },
  {
   "name": "Team Magma’s Great Ball",
@@ -14518,6 +15774,14 @@
   "subtype": "Supporter",
   "text": "Put up to 3 Team Magma Pokémon from your discard pile into your hand.",
   "url": "https://pkmncards.com/card/team-magma-admin-double-crisis-dcr-29/"
+ },
+ {
+  "name": "Team Aqua’s Secret Base",
+  "set": "Double Crisis",
+  "number": "28",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Pokémon in play (except for Team Aqua Pokémon) is {C} more.",
+  "url": "https://pkmncards.com/card/team-aquas-secret-base-double-crisis-dcr-28/"
  },
  {
   "name": "Team Aqua’s Great Ball",
@@ -14638,6 +15902,38 @@
   "subtype": "Supporter",
   "text": "You can play this card only if 1 of your Pokémon was Knocked Out during your opponent’s last turn. Search your deck for up to 2 cards and put them into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/teammates-primal-clash-prc-141/"
+ },
+ {
+  "name": "Silent Lab",
+  "set": "Primal Clash",
+  "number": "140",
+  "subtype": "Stadium",
+  "text": "Each Basic Pokémon in play, in each player’s hand, and in each player’s discard pile has no Abilities.",
+  "url": "https://pkmncards.com/card/silent-lab-primal-clash-prc-140/"
+ },
+ {
+  "name": "Shrine of Memories",
+  "set": "Primal Clash",
+  "number": "139",
+  "subtype": "Stadium",
+  "text": "Each player’s evolved Pokémon can use any attack from its previous Evolutions. (That player still needs the necessary Energy to use each attack.)",
+  "url": "https://pkmncards.com/card/shrine-of-memories-primal-clash-prc-139/"
+ },
+ {
+  "name": "Scorched Earth",
+  "set": "Primal Clash",
+  "number": "138",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may discard a {R} or {F} Energy card from his or her hand. If that player does so, he or she draws 2 cards.",
+  "url": "https://pkmncards.com/card/scorched-earth-primal-clash-prc-138/"
+ },
+ {
+  "name": "Rough Seas",
+  "set": "Primal Clash",
+  "number": "137",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may heal 30 damage from each of his or her {W} Pokémon and {L} Pokémon.",
+  "url": "https://pkmncards.com/card/rough-seas-primal-clash-prc-137/"
  },
  {
   "name": "Repeat Ball",
@@ -14824,6 +16120,14 @@
   "url": "https://pkmncards.com/card/target-whistle-team-flare-gear-phantom-forces-phf-106/"
  },
  {
+  "name": "Steel Shelter",
+  "set": "Phantom Forces",
+  "number": "105",
+  "subtype": "Stadium",
+  "text": "Each {M} Pokémon (both yours and your opponent’s) can’t be affected by any Special Conditions. (Remove any Special Conditions affecting those Pokémon.)",
+  "url": "https://pkmncards.com/card/steel-shelter-phantom-forces-phf-105/"
+ },
+ {
   "name": "Shauna",
   "set": "Phantom Forces",
   "number": "104",
@@ -14840,7 +16144,7 @@
   "url": "https://pkmncards.com/card/roller-skates-phantom-forces-phf-103/"
  },
  {
-  "name": "Robo Substitute Team Flare Gear",
+  "name": "Robo Substitute Team Flare Gear · 30 HP",
   "set": "Phantom Forces",
   "number": "102",
   "subtype": "Item",
@@ -14912,6 +16216,14 @@
   "url": "https://pkmncards.com/card/enhanced-hammer-phantom-forces-phf-94/"
  },
  {
+  "name": "Dimension Valley",
+  "set": "Phantom Forces",
+  "number": "93",
+  "subtype": "Stadium",
+  "text": "Each {P} Pokémon’s attacks (both yours and your opponent’s) cost {C} less.",
+  "url": "https://pkmncards.com/card/dimension-valley-phantom-forces-phf-93/"
+ },
+ {
   "name": "Battle Compressor Team Flare Gear",
   "set": "Phantom Forces",
   "number": "92",
@@ -14968,20 +16280,20 @@
   "url": "https://pkmncards.com/card/trevor-xy-trainer-kit-wigglytuff-tk7b-24/"
  },
  {
-  "name": "Trevor",
-  "set": "XY Trainer Kit—Bisharp",
-  "number": "20",
-  "subtype": "Supporter",
-  "text": "Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
-  "url": "https://pkmncards.com/card/trevor-xy-trainer-kit-bisharp-tk7a-20/"
- },
- {
   "name": "Potion",
   "set": "XY Trainer Kit—Wigglytuff",
   "number": "20",
   "subtype": "Item",
   "text": "Heal 30 damage from 1 of your Pokémon.",
   "url": "https://pkmncards.com/card/potion-xy-trainer-kit-wigglytuff-tk7b-20/"
+ },
+ {
+  "name": "Trevor",
+  "set": "XY Trainer Kit—Bisharp",
+  "number": "20",
+  "subtype": "Supporter",
+  "text": "Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+  "url": "https://pkmncards.com/card/trevor-xy-trainer-kit-bisharp-tk7a-20/"
  },
  {
   "name": "Tierno",
@@ -14998,6 +16310,14 @@
   "subtype": "Item",
   "text": "Heal 30 damage from 1 of your Pokémon.",
   "url": "https://pkmncards.com/card/potion-xy-trainer-kit-wigglytuff-tk7b-15/"
+ },
+ {
+  "name": "Champions Festival",
+  "set": "XY Promos",
+  "number": "XY27",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, he or she may heal 10 damage from each of his or her Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-xy-promos-xyp-xy27/"
  },
  {
   "name": "Korrina",
@@ -15022,6 +16342,14 @@
   "subtype": "Supporter",
   "text": "Draw cards until you have the same number of cards in your hand as your opponent.",
   "url": "https://pkmncards.com/card/battle-reporter-furious-fists-ffi-109/"
+ },
+ {
+  "name": "Training Center",
+  "set": "Furious Fists",
+  "number": "102",
+  "subtype": "Stadium",
+  "text": "Each Stage 1 and Stage 2 Pokémon in play (both yours and your opponent’s) gets +30 HP.",
+  "url": "https://pkmncards.com/card/training-center-furious-fists-ffi-102/"
  },
  {
   "name": "Tool Retriever",
@@ -15054,6 +16382,14 @@
   "subtype": "Item",
   "text": "Look at the bottom 7 cards of your deck. You may reveal an Amaura you find there and put it onto your Bench. Shuffle the other cards back into your deck.",
   "url": "https://pkmncards.com/card/sail-fossil-furious-fists-ffi-98/"
+ },
+ {
+  "name": "Mountain Ring",
+  "set": "Furious Fists",
+  "number": "97",
+  "subtype": "Stadium",
+  "text": "Prevent all damage done to Benched Pokémon by attacks (both yours and your opponent’s).",
+  "url": "https://pkmncards.com/card/mountain-ring-furious-fists-ffi-97/"
  },
  {
   "name": "Maintenance",
@@ -15102,6 +16438,14 @@
   "subtype": "Pokémon Tool",
   "text": "If the {F} Pokémon this card is attached to has full HP and would be Knocked Out by damage from an opponent’s attack, that Pokémon is not Knocked Out and its remaining HP becomes 10 instead. Then, discard this card.",
   "url": "https://pkmncards.com/card/focus-sash-furious-fists-ffi-91/"
+ },
+ {
+  "name": "Fighting Stadium",
+  "set": "Furious Fists",
+  "number": "90",
+  "subtype": "Stadium",
+  "text": "The attacks of each {F} Pokémon in play (both yours and your opponent’s) do 20 more damage to the Defending Pokémon-EX (before applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/fighting-stadium-furious-fists-ffi-90/"
  },
  {
   "name": "Energy Switch",
@@ -15206,6 +16550,14 @@
   "subtype": "Item",
   "text": "Shuffle 2 Supporter cards from your discard pile into your deck.",
   "url": "https://pkmncards.com/card/pal-pad-flashfire-flf-92/"
+ },
+ {
+  "name": "Magnetic Storm",
+  "set": "Flashfire",
+  "number": "91",
+  "subtype": "Stadium",
+  "text": "Each Pokémon in play has no Resistance.",
+  "url": "https://pkmncards.com/card/magnetic-storm-flashfire-flf-91/"
  },
  {
   "name": "Lysandre",
@@ -15352,6 +16704,14 @@
   "url": "https://pkmncards.com/card/shauna-xy-xy-127/"
  },
  {
+  "name": "Shadow Circle",
+  "set": "XY",
+  "number": "126",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that has any {D} Energy attached to it (both yours and your opponent’s) has no Weakness.",
+  "url": "https://pkmncards.com/card/shadow-circle-xy-xy-126/"
+ },
+ {
   "name": "Roller Skates",
   "set": "XY",
   "number": "125",
@@ -15414,6 +16774,14 @@
   "subtype": "Item",
   "text": "Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.",
   "url": "https://pkmncards.com/card/great-ball-xy-xy-118/"
+ },
+ {
+  "name": "Fairy Garden",
+  "set": "XY",
+  "number": "117",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that has any {Y} Energy attached to it (both yours and your opponent’s) has no Retreat Cost.",
+  "url": "https://pkmncards.com/card/fairy-garden-xy-xy-117/"
  },
  {
   "name": "Evosoda",
@@ -15680,6 +17048,14 @@
   "url": "https://pkmncards.com/card/caitlin-plasma-blast-plb-78/"
  },
  {
+  "name": "Champions Festival",
+  "set": "Black & White Promos",
+  "number": "BW95",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player has 6 Pokémon in play, he or she may heal 10 damage from each of his or her Pokémon.",
+  "url": "https://pkmncards.com/card/champions-festival-black-white-promos-bwp-bw95/"
+ },
+ {
   "name": "Ultra Ball",
   "set": "Plasma Freeze",
   "number": "122",
@@ -15768,6 +17144,14 @@
   "url": "https://pkmncards.com/card/ghetsis-plasma-freeze-plf-101/"
  },
  {
+  "name": "Frozen City",
+  "set": "Plasma Freeze",
+  "number": "100",
+  "subtype": "Stadium",
+  "text": "Whenever any player attaches an Energy from his or her hand to 1 of his or her Pokémon (excluding Team Plasma Pokémon) put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/frozen-city-plasma-freeze-plf-100/"
+ },
+ {
   "name": "Float Stone",
   "set": "Plasma Freeze",
   "number": "99",
@@ -15816,12 +17200,28 @@
   "url": "https://pkmncards.com/card/dowsing-machine-plasma-storm-pls-128/"
  },
  {
+  "name": "Virbank City Gym",
+  "set": "Plasma Storm",
+  "number": "126",
+  "subtype": "Stadium",
+  "text": "Put 2 more damage counters on Poisoned Pokémon (both yours and your opponent’s) between turns.",
+  "url": "https://pkmncards.com/card/virbank-city-gym-plasma-storm-pls-126/"
+ },
+ {
   "name": "Team Plasma Grunt",
   "set": "Plasma Storm",
   "number": "125",
   "subtype": "Supporter",
   "text": "Discard a Team Plasma card from your hand. (If you can’t discard a Team Plasma card, you can’t play this card.) Draw 4 cards.",
   "url": "https://pkmncards.com/card/team-plasma-grunt-plasma-storm-pls-125/"
+ },
+ {
+  "name": "Plasma Frigate",
+  "set": "Plasma Storm",
+  "number": "124",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that has any Plasma Energy attached to it (both yours and your opponent’s) has no Weakness.",
+  "url": "https://pkmncards.com/card/plasma-frigate-plasma-storm-pls-124/"
  },
  {
   "name": "Hypnotoxic Laser",
@@ -16016,6 +17416,14 @@
   "url": "https://pkmncards.com/card/energy-search-boundaries-crossed-bcr-128/"
  },
  {
+  "name": "Aspertia City Gym",
+  "set": "Boundaries Crossed",
+  "number": "127",
+  "subtype": "Stadium",
+  "text": "Each {C} Pokémon in play (both yours and your opponent’s) gets +20 HP.",
+  "url": "https://pkmncards.com/card/aspertia-city-gym-boundaries-crossed-bcr-127/"
+ },
+ {
   "name": "Super Rod",
   "set": "Dragon Vault",
   "number": "20",
@@ -16072,6 +17480,14 @@
   "url": "https://pkmncards.com/card/devolution-spray-dragons-exalted-drx-113/"
  },
  {
+  "name": "Tropical Beach",
+  "set": "Black & White Promos",
+  "number": "BW50",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may draw cards until he or she has 7 cards in his or her hand. If he or she does, that player’s turn ends.",
+  "url": "https://pkmncards.com/card/tropical-beach-black-white-promos-bwp-bw50/"
+ },
+ {
   "name": "Pokémon Catcher",
   "set": "Dark Explorers",
   "number": "111",
@@ -16086,6 +17502,14 @@
   "subtype": "Item",
   "text": "Discard 2 cards from your hand. (If you can’t discard 2 cards, you can’t play this card.) Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/ultra-ball-dark-explorers-dex-102/"
+ },
+ {
+  "name": "Twist Mountain",
+  "set": "Dark Explorers",
+  "number": "101",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may flip a coin. If heads, that player puts a Restored Pokémon from his or her hand onto his or her Bench.",
+  "url": "https://pkmncards.com/card/twist-mountain-dark-explorers-dex-101/"
  },
  {
   "name": "Rare Candy",
@@ -16168,6 +17592,22 @@
   "url": "https://pkmncards.com/card/cheren-dark-explorers-dex-91/"
  },
  {
+  "name": "Skyarrow Bridge",
+  "set": "Next Destinies",
+  "number": "91",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost of each Basic Pokémon in play is {C} less.",
+  "url": "https://pkmncards.com/card/skyarrow-bridge-next-destinies-nxd-91/"
+ },
+ {
+  "name": "Pokémon Center",
+  "set": "Next Destinies",
+  "number": "90",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may heal 20 damage from 1 of his or her Benched Pokémon.",
+  "url": "https://pkmncards.com/card/pokemon-center-next-destinies-nxd-90/"
+ },
+ {
   "name": "Level Ball",
   "set": "Next Destinies",
   "number": "89",
@@ -16198,6 +17638,14 @@
   "subtype": "Supporter",
   "text": "Search your deck for up to 3 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/cilan-next-destinies-nxd-86/"
+ },
+ {
+  "name": "Battle City",
+  "set": "Black & White Promos",
+  "number": "BW39",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may flip a coin. If heads, the player draws a card.",
+  "url": "https://pkmncards.com/card/battle-city-black-white-promos-bwp-bw39/"
  },
  {
   "name": "N",
@@ -16328,20 +17776,20 @@
   "url": "https://pkmncards.com/card/pokemon-communication-black-white-trainer-kit-zoroark-tk5z-18/"
  },
  {
-  "name": "Energy Retrieval",
-  "set": "Black & White Trainer Kit—Zoroark",
-  "number": "16",
-  "subtype": "Item",
-  "text": "Put 2 basic Energy cards from your discard pile into your hand.",
-  "url": "https://pkmncards.com/card/energy-retrieval-black-white-trainer-kit-zoroark-tk5z-16/"
- },
- {
   "name": "PlusPower",
   "set": "Black & White Trainer Kit—Excadrill",
   "number": "16",
   "subtype": "Item",
   "text": "During this turn, your Pokémon’s attacks do 10 more damage to the Active Pokémon (before applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/pluspower-black-white-trainer-kit-excadrill-tk5e-16/"
+ },
+ {
+  "name": "Energy Retrieval",
+  "set": "Black & White Trainer Kit—Zoroark",
+  "number": "16",
+  "subtype": "Item",
+  "text": "Put 2 basic Energy cards from your discard pile into your hand.",
+  "url": "https://pkmncards.com/card/energy-retrieval-black-white-trainer-kit-zoroark-tk5z-16/"
  },
  {
   "name": "Potion",
@@ -16422,6 +17870,14 @@
   "subtype": "Supporter",
   "text": "Draw cards until you have 6 cards in your hand.",
   "url": "https://pkmncards.com/card/bianca-emerging-powers-epo-90/"
+ },
+ {
+  "name": "Tropical Beach",
+  "set": "Black & White Promos",
+  "number": "BW28",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may draw cards until he or she has 7 cards in his or her hand. If he or she does, that player’s turn ends.",
+  "url": "https://pkmncards.com/card/tropical-beach-black-white-promos-bwp-bw28/"
  },
  {
   "name": "Victory Medal",
@@ -16568,6 +18024,14 @@
   "url": "https://pkmncards.com/card/professor-elms-training-method-call-of-legends-cl-82/"
  },
  {
+  "name": "Lost World",
+  "set": "Call of Legends",
+  "number": "81",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player’s opponent has 6 or more Pokémon in the Lost Zone, the player may choose to win the game.",
+  "url": "https://pkmncards.com/card/lost-world-call-of-legends-cl-81/"
+ },
+ {
   "name": "Lost Remover",
   "set": "Call of Legends",
   "number": "80",
@@ -16640,6 +18104,14 @@
   "url": "https://pkmncards.com/card/junk-arm-triumphant-tm-87/"
  },
  {
+  "name": "Indigo Plateau",
+  "set": "Triumphant",
+  "number": "86",
+  "subtype": "Stadium",
+  "text": "Each Pokémon LEGEND in play (both yours and your opponent’s) gets +30 HP.",
+  "url": "https://pkmncards.com/card/indigo-plateau-triumphant-tm-86/"
+ },
+ {
   "name": "Black Belt",
   "set": "Triumphant",
   "number": "85",
@@ -16680,6 +18152,14 @@
   "url": "https://pkmncards.com/card/sages-training-undaunted-ud-77/"
  },
  {
+  "name": "Ruins of Alph",
+  "set": "Undaunted",
+  "number": "76",
+  "subtype": "Stadium",
+  "text": "Each Pokémon in play has no Resistance.",
+  "url": "https://pkmncards.com/card/ruins-of-alph-undaunted-ud-76/"
+ },
+ {
   "name": "Legend Box",
   "set": "Undaunted",
   "number": "75",
@@ -16710,6 +18190,14 @@
   "subtype": "(Item)",
   "text": "Attach Defender to 1 of your Pokémon. Discard this card at the end of your opponent’s next turn. Any damage done to the Pokémon Defender is attached to by an opponent’s attack is reduced by 20 (after applying Weakness and Resistance).",
   "url": "https://pkmncards.com/card/defender-undaunted-ud-72/"
+ },
+ {
+  "name": "Burned Tower",
+  "set": "Undaunted",
+  "number": "71",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may flip a coin. If heads, the player searches his or her discard pile for a basic Energy card, shows it to his or her opponent, and put it into his or her hand.",
+  "url": "https://pkmncards.com/card/burned-tower-undaunted-ud-71/"
  },
  {
   "name": "Tropical Tidal Wave",
@@ -16840,6 +18328,14 @@
   "url": "https://pkmncards.com/card/cheerleaders-cheer-unleashed-ul-71/"
  },
  {
+  "name": "Ultimate Zone",
+  "set": "Diamond & Pearl Promos",
+  "number": "DP55",
+  "subtype": "Stadium",
+  "text": "During each player’s turn, the player may move an Energy card attached to 1 of his or her Benched Pokémon to his or her Active Arceus as often as he or she likes.",
+  "url": "https://pkmncards.com/card/ultimate-zone-diamond-pearl-promos-dp55/"
+ },
+ {
   "name": "Beginning Door",
   "set": "Diamond & Pearl Promos",
   "number": "DP54",
@@ -16968,7 +18464,7 @@
   "url": "https://pkmncards.com/card/bill-heartgold-soulsilver-hs-89/"
  },
  {
-  "name": "Helix Fossil",
+  "name": "Helix Fossil · 50 HP",
   "set": "Arceus",
   "number": "93",
   "subtype": "(Item)",
@@ -16976,12 +18472,20 @@
   "url": "https://pkmncards.com/card/helix-fossil-arceus-ar-93/"
  },
  {
-  "name": "Dome Fossil",
+  "name": "Dome Fossil · 50 HP",
   "set": "Arceus",
   "number": "92",
   "subtype": "(Item)",
   "text": "Play Dome Fossil as if it were a {C} Basic Pokémon. (Dome Fossil counts as a Trainer card as well, but if Dome Fossil is Knocked Out, this counts as a Knocked Out Pokémon.) Dome Fossil can’t be affected by any Special Conditions and can’t retreat. At any time during your turn before your attack, you may discard Dome Fossil from play. (This doesn’t count as a Knocked Out Pokémon.) Poké-BODY ⇢ Rock Reaction When you attach a {F} Energy card from your hand to Dome Fossil (excluding effects of attacks or Poké-Powers), search your deck for a card that evolves from Dome Fossil and put it onto Dome Fossil (this counts as evolving Dome Fossil). Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/dome-fossil-arceus-ar-92/"
+ },
+ {
+  "name": "Ultimate Zone",
+  "set": "Arceus",
+  "number": "91",
+  "subtype": "Stadium",
+  "text": "During each player’s turn, the player may move an Energy card attached to 1 of his or her Benched Pokémon to his or her Active Arceus as often as he or she likes.",
+  "url": "https://pkmncards.com/card/ultimate-zone-arceus-ar-91/"
  },
  {
   "name": "Professor Oak’s Visit",
@@ -16992,7 +18496,7 @@
   "url": "https://pkmncards.com/card/professor-oaks-visit-arceus-ar-90/"
  },
  {
-  "name": "Old Amber",
+  "name": "Old Amber · 50 HP",
   "set": "Arceus",
   "number": "89",
   "subtype": "(Item)",
@@ -17104,6 +18608,22 @@
   "url": "https://pkmncards.com/card/cynthias-guidance-supreme-victors-sv-136/"
  },
  {
+  "name": "Champion’s Room",
+  "set": "Supreme Victors",
+  "number": "135",
+  "subtype": "Stadium",
+  "text": "The Retreat cost for each Pokémon SP (both yours and your opponent’s) is {C} less.",
+  "url": "https://pkmncards.com/card/champions-room-supreme-victors-sv-135/"
+ },
+ {
+  "name": "Battle Tower",
+  "set": "Supreme Victors",
+  "number": "134",
+  "subtype": "Stadium",
+  "text": "Whenever any player plays any Pokémon from his or her hand to Level-Up 1 of his or her Pokémon, remove 4 damage counters from that Pokémon.",
+  "url": "https://pkmncards.com/card/battle-tower-supreme-victors-sv-134/"
+ },
+ {
   "name": "Tropical Wind",
   "set": "Diamond & Pearl Promos",
   "number": "DP48",
@@ -17160,6 +18680,22 @@
   "url": "https://pkmncards.com/card/team-galactics-invention-g-107-technical-machine-g-rising-rivals-rr-95/"
  },
  {
+  "name": "Sunyshore City Gym",
+  "set": "Rising Rivals",
+  "number": "94",
+  "subtype": "Stadium",
+  "text": "Any damage done by attacks from {L} Pokémon (both yours and your opponent’s) to the Defending Pokémon isn’t affected by Resistance. Each {L} Pokémon in play (both yours and your opponent’s) has no Weakness.",
+  "url": "https://pkmncards.com/card/sunyshore-city-gym-rising-rivals-rr-94/"
+ },
+ {
+  "name": "Pokémon Contest Hall",
+  "set": "Rising Rivals",
+  "number": "93",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if that player’s Bench isn’t full, the player may flip a coin. If heads, that player searches his or her deck for a Basic Pokémon and puts it onto his or her Bench. If the player does, he or she may search his or her deck for a Pokémon Tool card and attach it to that Pokémon. If that player searched his or her deck, the player shuffles his or her deck afterward.",
+  "url": "https://pkmncards.com/card/pokemon-contest-hall-rising-rivals-rr-93/"
+ },
+ {
   "name": "Lucian’s Assignment",
   "set": "Rising Rivals",
   "number": "92",
@@ -17200,7 +18736,7 @@
   "url": "https://pkmncards.com/card/aarons-collection-rising-rivals-rr-88/"
  },
  {
-  "name": "Skull Fossil",
+  "name": "Skull Fossil · 50 HP",
   "set": "Platinum",
   "number": "120",
   "subtype": "(Item)",
@@ -17208,7 +18744,7 @@
   "url": "https://pkmncards.com/card/skull-fossil-platinum-pl-120/"
  },
  {
-  "name": "Armor Fossil",
+  "name": "Armor Fossil · 50 HP",
   "set": "Platinum",
   "number": "119",
   "subtype": "(Item)",
@@ -17272,6 +18808,14 @@
   "url": "https://pkmncards.com/card/pluspower-platinum-pl-112/"
  },
  {
+  "name": "Miasma Valley",
+  "set": "Platinum",
+  "number": "111",
+  "subtype": "Stadium",
+  "text": "Whenever any player puts a Basic Pokémon (excluding {G} or {P} Pokémon) from his or hand onto his or her Bench, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/miasma-valley-platinum-pl-111/"
+ },
+ {
   "name": "Memory Berry",
   "set": "Platinum",
   "number": "110",
@@ -17304,12 +18848,28 @@
   "url": "https://pkmncards.com/card/level-max-platinum-pl-107/"
  },
  {
+  "name": "Galactic HQ",
+  "set": "Platinum",
+  "number": "106",
+  "subtype": "Stadium",
+  "text": "Whenever any player plays any Pokémon from his or her hand to evolve his or her Pokémon, put 2 damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/galactic-hq-platinum-pl-106/"
+ },
+ {
   "name": "Cyrus’s Conspiracy",
   "set": "Platinum",
   "number": "105",
   "subtype": "Supporter",
   "text": "Search your deck for a Supporter card, a basic Energy card, and a Trainer card that has Team Galactic’s Invention in its name, show them to your opponent, and put them into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/cyruss-conspiracy-platinum-pl-105/"
+ },
+ {
+  "name": "Broken Time-Space",
+  "set": "Platinum",
+  "number": "104",
+  "subtype": "Stadium",
+  "text": "Each player may evolve a Pokémon that he or she just played or evolved during that turn.",
+  "url": "https://pkmncards.com/card/broken-time-space-platinum-pl-104/"
  },
  {
   "name": "Switch",
@@ -17400,6 +18960,14 @@
   "url": "https://pkmncards.com/card/energy-link-stormfront-sf-83/"
  },
  {
+  "name": "Conductive Quarry",
+  "set": "Stormfront",
+  "number": "82",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, the player may flip a coin. If heads, that player searches his or her discard pile for a {L} or {M} Energy card, shows it to the opponent, and puts it into his or her hand.",
+  "url": "https://pkmncards.com/card/conductive-quarry-stormfront-sf-82/"
+ },
+ {
   "name": "Victory Medal",
   "set": "Victory Medals",
   "number": "No Number",
@@ -17432,7 +19000,7 @@
   "url": "https://pkmncards.com/card/night-maintenance-pop-series-8-p8-9/"
  },
  {
-  "name": "Root Fossil",
+  "name": "Root Fossil · 40 HP",
   "set": "Legends Awakened",
   "number": "139",
   "subtype": "(Item)",
@@ -17440,7 +19008,7 @@
   "url": "https://pkmncards.com/card/root-fossil-legends-awakened-la-139/"
  },
  {
-  "name": "Claw Fossil",
+  "name": "Claw Fossil · 40 HP",
   "set": "Legends Awakened",
   "number": "138",
   "subtype": "(Item)",
@@ -17462,6 +19030,22 @@
   "subtype": "(Item)",
   "text": "{@} → Evoluter Search your deck for a card that evolves from 1 of your Pokémon and put it onto that Pokémon. (This counts as evolving that Pokémon.) Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/technical-machine-ts-1-legends-awakened-la-136/"
+ },
+ {
+  "name": "Stark Mountain",
+  "set": "Legends Awakened",
+  "number": "135",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may choose a {R} or {F} Energy attached to 1 of his or her Pokémon and move that Energy to 1 of his or her Pokémon.",
+  "url": "https://pkmncards.com/card/stark-mountain-legends-awakened-la-135/"
+ },
+ {
+  "name": "Snowpoint Temple",
+  "set": "Legends Awakened",
+  "number": "134",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that isn’t an Evolved Pokémon in play (both yours and your opponent’s) gets +20 HP.",
+  "url": "https://pkmncards.com/card/snowpoint-temple-legends-awakened-la-134/"
  },
  {
   "name": "Poké Radar",
@@ -17512,7 +19096,7 @@
   "url": "https://pkmncards.com/card/tropical-wind-diamond-pearl-promos-dp25/"
  },
  {
-  "name": "Helix Fossil",
+  "name": "Helix Fossil · 50 HP",
   "set": "Majestic Dawn",
   "number": "91",
   "subtype": "(Item)",
@@ -17528,7 +19112,7 @@
   "url": "https://pkmncards.com/card/energy-search-majestic-dawn-md-90/"
  },
  {
-  "name": "Dome Fossil",
+  "name": "Dome Fossil · 50 HP",
   "set": "Majestic Dawn",
   "number": "89",
   "subtype": "(Item)",
@@ -17568,7 +19152,7 @@
   "url": "https://pkmncards.com/card/poke-ball-majestic-dawn-md-85/"
  },
  {
-  "name": "Old Amber",
+  "name": "Old Amber · 50 HP",
   "set": "Majestic Dawn",
   "number": "84",
   "subtype": "(Item)",
@@ -17608,6 +19192,14 @@
   "url": "https://pkmncards.com/card/dusk-ball-majestic-dawn-md-80/"
  },
  {
+  "name": "Dawn Stadium",
+  "set": "Majestic Dawn",
+  "number": "79",
+  "subtype": "Stadium",
+  "text": "Whenever any player attaches an Energy card from his or her hand to {G} Pokémon or {W} Pokémon, remove 1 damage counter and all Special Conditions from that Pokémon.",
+  "url": "https://pkmncards.com/card/dawn-stadium-majestic-dawn-md-79/"
+ },
+ {
   "name": "Victory Medal",
   "set": "Victory Medals",
   "number": "No Number",
@@ -17630,6 +19222,14 @@
   "subtype": "(Item)",
   "text": "Search your deck or your discard pile for a Pokémon LV.X, show it to your opponent, and put it into your hand. If you search your deck, shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/premier-ball-great-encounters-ge-101/"
+ },
+ {
+  "name": "Moonlight Stadium",
+  "set": "Great Encounters",
+  "number": "100",
+  "subtype": "Stadium",
+  "text": "The Retreat Cost for each {P} and {D} Pokémon (both yours and your opponent’s) is 0.",
+  "url": "https://pkmncards.com/card/moonlight-stadium-great-encounters-ge-100/"
  },
  {
   "name": "Leftovers",
@@ -17752,7 +19352,7 @@
   "url": "https://pkmncards.com/card/time-space-distortion-mysterious-treasures-mt-124/"
  },
  {
-  "name": "Skull Fossil",
+  "name": "Skull Fossil · 50 HP",
   "set": "Mysterious Treasures",
   "number": "117",
   "subtype": "(Item)",
@@ -17760,7 +19360,7 @@
   "url": "https://pkmncards.com/card/skull-fossil-mysterious-treasures-mt-117/"
  },
  {
-  "name": "Armor Fossil",
+  "name": "Armor Fossil · 50 HP",
   "set": "Mysterious Treasures",
   "number": "116",
   "subtype": "(Item)",
@@ -17790,6 +19390,14 @@
   "subtype": "(Item)",
   "text": "Search your discard pile for up to 3 in any combination of Pokémon and basic Energy cards. Show them to your opponent and shuffle them into your deck.",
   "url": "https://pkmncards.com/card/night-maintenance-mysterious-treasures-mt-113/"
+ },
+ {
+  "name": "Lake Boundary",
+  "set": "Mysterious Treasures",
+  "number": "112",
+  "subtype": "Stadium",
+  "text": "Apply Weakness for each Pokémon (both yours and your opponent’s) as ×2 instead.",
+  "url": "https://pkmncards.com/card/lake-boundary-mysterious-treasures-mt-112/"
  },
  {
   "name": "Fossil Excavator",
@@ -17870,6 +19478,14 @@
   "subtype": "(Item)",
   "text": "Flip a coin. If heads, return 1 of your Pokémon and all cards attached to it to your hand.",
   "url": "https://pkmncards.com/card/super-scoop-up-diamond-pearl-dp-115/"
+ },
+ {
+  "name": "Speed Stadium",
+  "set": "Diamond & Pearl",
+  "number": "114",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, the player may flip a coin until he or she gets tails. For each heads, that player draws a card.",
+  "url": "https://pkmncards.com/card/speed-stadium-diamond-pearl-dp-114/"
  },
  {
   "name": "Rival",
@@ -17960,7 +19576,7 @@
   "url": "https://pkmncards.com/card/bills-maintenance-pop-series-5-p5-6/"
  },
  {
-  "name": "Root Fossil",
+  "name": "Root Fossil · 40 HP",
   "set": "Power Keepers",
   "number": "86",
   "subtype": "(Item)",
@@ -17968,7 +19584,7 @@
   "url": "https://pkmncards.com/card/root-fossil-power-keepers-pk-86/"
  },
  {
-  "name": "Mysterious Fossil",
+  "name": "Mysterious Fossil · 50 HP",
   "set": "Power Keepers",
   "number": "85",
   "subtype": "(Item)",
@@ -17976,7 +19592,7 @@
   "url": "https://pkmncards.com/card/mysterious-fossil-power-keepers-pk-85/"
  },
  {
-  "name": "Claw Fossil",
+  "name": "Claw Fossil · 40 HP",
   "set": "Power Keepers",
   "number": "84",
   "subtype": "(Item)",
@@ -17990,6 +19606,14 @@
   "subtype": "Supporter",
   "text": "Draw a number of cards up to the number of your opponent’s Pokémon in play. If you have 7 or more cards (including this one) in your hand, you can’t play this card.",
   "url": "https://pkmncards.com/card/stevens-advice-power-keepers-pk-83/"
+ },
+ {
+  "name": "Sidney’s Stadium",
+  "set": "Power Keepers",
+  "number": "82",
+  "subtype": "Stadium",
+  "text": "Each player’s {D} Pokémon can’t be Asleep, Confused, or Paralyzed.",
+  "url": "https://pkmncards.com/card/sidneys-stadium-power-keepers-pk-82/"
  },
  {
   "name": "Scott",
@@ -18008,6 +19632,14 @@
   "url": "https://pkmncards.com/card/professor-birch-power-keepers-pk-80/"
  },
  {
+  "name": "Phoebe’s Stadium",
+  "set": "Power Keepers",
+  "number": "79",
+  "subtype": "Stadium",
+  "text": "Each player pays {C}{C} less to retreat his or her {P} Pokémon.",
+  "url": "https://pkmncards.com/card/phoebes-stadium-power-keepers-pk-79/"
+ },
+ {
   "name": "Master Ball",
   "set": "Power Keepers",
   "number": "78",
@@ -18022,6 +19654,14 @@
   "subtype": "(Item)",
   "text": "Search your deck for a Basic Pokémon (excluding Pokémon-ex) and put it onto your Bench. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/great-ball-power-keepers-pk-77/"
+ },
+ {
+  "name": "Glacia’s Stadium",
+  "set": "Power Keepers",
+  "number": "76",
+  "subtype": "Stadium",
+  "text": "Each player’s {W} Pokémon (excluding Pokémon-ex) has no Weakness.",
+  "url": "https://pkmncards.com/card/glacias-stadium-power-keepers-pk-76/"
  },
  {
   "name": "Energy Switch",
@@ -18046,6 +19686,22 @@
   "subtype": "(Item)",
   "text": "Search your discard pile for basic Energy cards. You may either show 1 basic Energy card to your opponent and put it into your hand, or show 3 basic Energy cards to your opponent and shuffle them into your deck.",
   "url": "https://pkmncards.com/card/energy-recycle-system-power-keepers-pk-73/"
+ },
+ {
+  "name": "Drake’s Stadium",
+  "set": "Power Keepers",
+  "number": "72",
+  "subtype": "Stadium",
+  "text": "Any damage done to {C} Active Pokémon (both yours and your opponent’s) by an opponent’s attack is reduced by 10 (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/drakes-stadium-power-keepers-pk-72/"
+ },
+ {
+  "name": "Battle Frontier",
+  "set": "Power Keepers",
+  "number": "71",
+  "subtype": "Stadium",
+  "text": "Each player’s {C} Evolved Pokémon, {D} Evolved Pokémon, and {M} Evolved Pokémon can’t use any Poké-Powers or Poké-Bodies.",
+  "url": "https://pkmncards.com/card/battle-frontier-power-keepers-pk-71/"
  },
  {
   "name": "Switch",
@@ -18118,6 +19774,14 @@
   "subtype": "Supporter",
   "text": "Discard a card from your hand. If you can’t discard a card from your hand, you can’t play this card. Search your deck for up to 3 Basic Pokémon that each has 100 HP or less, show them to your opponent, and put them into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/holon-mentor-dragon-frontiers-df-75/"
+ },
+ {
+  "name": "Holon Legacy",
+  "set": "Dragon Frontiers",
+  "number": "74",
+  "subtype": "Stadium",
+  "text": "Each Pokémon in play that has δ on its card (both yours and your opponent’s) has no Weakness and can’t use any Poké-Powers.",
+  "url": "https://pkmncards.com/card/holon-legacy-dragon-frontiers-df-74/"
  },
  {
   "name": "Copycat",
@@ -18200,6 +19864,14 @@
   "url": "https://pkmncards.com/card/memory-berry-crystal-guardians-cg-80/"
  },
  {
+  "name": "Holon Circle",
+  "set": "Crystal Guardians",
+  "number": "79",
+  "subtype": "Stadium",
+  "text": "Prevent all effects of an attack, including damage, done by either player’s Active Pokémon. If an Active Pokémon uses an attack, that attack ends, and discard this card.",
+  "url": "https://pkmncards.com/card/holon-circle-crystal-guardians-cg-79/"
+ },
+ {
   "name": "Dual Ball",
   "set": "Crystal Guardians",
   "number": "78",
@@ -18222,6 +19894,14 @@
   "subtype": "Pokémon Tool",
   "text": "Attach Crystal Shard to 1 of your Pokémon that doesn’t already have a Pokémon Tool attached to it. If that Pokémon is Knocked Out, discard this card. As long as Crystal Shard is attached to a Pokémon, that Pokémon’s type is {C}. If that Pokémon attacks, discard this card at the end of the turn.",
   "url": "https://pkmncards.com/card/crystal-shard-crystal-guardians-cg-76/"
+ },
+ {
+  "name": "Crystal Beach",
+  "set": "Crystal Guardians",
+  "number": "75",
+  "subtype": "Stadium",
+  "text": "Each Special Energy card that provides 2 or more Energy (both yours and your opponent’s) now provides only 1 {C} Energy. This isn’t affected by any Poké-Powers or Poké-Bodies.",
+  "url": "https://pkmncards.com/card/crystal-beach-crystal-guardians-cg-75/"
  },
  {
   "name": "Cessation Crystal",
@@ -18272,7 +19952,7 @@
   "url": "https://pkmncards.com/card/tropical-tidal-wave-nintendo-black-star-promos-036/"
  },
  {
-  "name": "Root Fossil",
+  "name": "Root Fossil · 40 HP",
   "set": "Holon Phantoms",
   "number": "93",
   "subtype": "(Item)",
@@ -18280,7 +19960,7 @@
   "url": "https://pkmncards.com/card/root-fossil-holon-phantoms-hp-93/"
  },
  {
-  "name": "Mysterious Fossil",
+  "name": "Mysterious Fossil · 50 HP",
   "set": "Holon Phantoms",
   "number": "92",
   "subtype": "(Item)",
@@ -18288,7 +19968,7 @@
   "url": "https://pkmncards.com/card/mysterious-fossil-holon-phantoms-hp-92/"
  },
  {
-  "name": "Claw Fossil",
+  "name": "Claw Fossil · 40 HP",
   "set": "Holon Phantoms",
   "number": "91",
   "subtype": "(Item)",
@@ -18320,6 +20000,14 @@
   "url": "https://pkmncards.com/card/mr-stones-project-holon-phantoms-hp-88/"
  },
  {
+  "name": "Holon Lake",
+  "set": "Holon Phantoms",
+  "number": "87",
+  "subtype": "Stadium",
+  "text": "Each player’s Pokémon that has δ on its card can use attacks on this card instead of its own. {C} → Delta Call Search your deck for a Pokémon that has δ on its card, show it to your opponent, and put it into your hand. Shuffle your deck afterward.",
+  "url": "https://pkmncards.com/card/holon-lake-holon-phantoms-hp-87/"
+ },
+ {
   "name": "Holon Fossil",
   "set": "Holon Phantoms",
   "number": "86",
@@ -18336,7 +20024,23 @@
   "url": "https://pkmncards.com/card/holon-adventurer-holon-phantoms-hp-85/"
  },
  {
-  "name": "Root Fossil",
+  "name": "Low Pressure System",
+  "set": "POP Series 3",
+  "number": "11",
+  "subtype": "Stadium",
+  "text": "Each {G} and {L} Pokémon in play (both yours and your opponent’s) gets +10 HP.",
+  "url": "https://pkmncards.com/card/low-pressure-system-pop-series-3-p3-11/"
+ },
+ {
+  "name": "High Pressure System",
+  "set": "POP Series 3",
+  "number": "10",
+  "subtype": "Stadium",
+  "text": "Each player pays {C} less to retreat his or her {R} and {W} Pokémon.",
+  "url": "https://pkmncards.com/card/high-pressure-system-pop-series-3-p3-10/"
+ },
+ {
+  "name": "Root Fossil · 40 HP",
   "set": "Legend Maker",
   "number": "80",
   "subtype": "(Item)",
@@ -18344,7 +20048,7 @@
   "url": "https://pkmncards.com/card/root-fossil-legend-maker-lm-80/"
  },
  {
-  "name": "Mysterious Fossil",
+  "name": "Mysterious Fossil · 50 HP",
   "set": "Legend Maker",
   "number": "79",
   "subtype": "(Item)",
@@ -18352,12 +20056,44 @@
   "url": "https://pkmncards.com/card/mysterious-fossil-legend-maker-lm-79/"
  },
  {
-  "name": "Claw Fossil",
+  "name": "Claw Fossil · 40 HP",
   "set": "Legend Maker",
   "number": "78",
   "subtype": "(Item)",
   "text": "Play Claw Fossil as if it were a Basic Pokémon. While in play, Claw Fossil counts as a {C} Pokémon (as well as a Trainer card). Claw Fossil has no attacks of its own, can’t retreat, and can’t be affected by any Special Conditions. If Claw Fossil is Knocked Out, it doesn’t count as a Knocked Out Pokémon. (Discard it anyway.) At any time during your turn before your attack, you may discard Claw Fossil from play. Poké-BODY ⇢ Jagged Stone If Claw Fossil is your Active Pokémon and is damaged by an opponent’s attack (even if Claw Fossil is Knocked Out), put 1 damage counter on the Attacking Pokémon.",
   "url": "https://pkmncards.com/card/claw-fossil-legend-maker-lm-78/"
+ },
+ {
+  "name": "Strange Cave",
+  "set": "Legend Maker",
+  "number": "77",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put an Omanyte, Kabuto, Aerodactyl, Aerodactyl ex, Lileep, or Anorith onto his or her Bench from his or her hand. Treat the new Benched Pokémon as Basic Pokémon.",
+  "url": "https://pkmncards.com/card/strange-cave-legend-maker-lm-77/"
+ },
+ {
+  "name": "Power Tree",
+  "set": "Legend Maker",
+  "number": "76",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, if the player has no Special Energy cards in his or her discard pile, that player searches his or her discard pile for a basic Energy card, show it to the opponent, and put it into his or her hand.",
+  "url": "https://pkmncards.com/card/power-tree-legend-maker-lm-76/"
+ },
+ {
+  "name": "Giant Stump",
+  "set": "Legend Maker",
+  "number": "75",
+  "subtype": "Stadium",
+  "text": "Each player can’t have more than 3 Benched Pokémon. When Giant Stump comes into play, each player discards Benched Pokémon and any cards attached to them until he or she has 3 Benched Pokémon. (You discard your Pokémon first.)",
+  "url": "https://pkmncards.com/card/giant-stump-legend-maker-lm-75/"
+ },
+ {
+  "name": "Full Flame",
+  "set": "Legend Maker",
+  "number": "74",
+  "subtype": "Stadium",
+  "text": "Put 4 damage counters instead of 2 on each Burned Pokémon between turns. The Special Condition Burned can’t be removed by evolving or devolving the Burned Pokémon.",
+  "url": "https://pkmncards.com/card/full-flame-legend-maker-lm-74/"
  },
  {
   "name": "Fieldworker",
@@ -18366,6 +20102,14 @@
   "subtype": "Supporter",
   "text": "Draw 3 cards. Your opponent may also draw a card.",
   "url": "https://pkmncards.com/card/fieldworker-legend-maker-lm-73/"
+ },
+ {
+  "name": "Cursed Stone",
+  "set": "Legend Maker",
+  "number": "72",
+  "subtype": "Stadium",
+  "text": "At any time between turns, each player puts 1 damage counter on his or her Pokémon that has a Poké-Power.",
+  "url": "https://pkmncards.com/card/cursed-stone-legend-maker-lm-72/"
  },
  {
   "name": "Switch",
@@ -18416,12 +20160,28 @@
   "url": "https://pkmncards.com/card/holon-scientist-delta-species-ds-97/"
  },
  {
+  "name": "Holon Ruins",
+  "set": "Delta Species",
+  "number": "96",
+  "subtype": "Stadium",
+  "text": "Each player that has any Pokémon in play that has δ on its card may draw a card once during his or her turn. If the player does, he or she discards a card from his or her hand.",
+  "url": "https://pkmncards.com/card/holon-ruins-delta-species-ds-96/"
+ },
+ {
   "name": "Holon Researcher",
   "set": "Delta Species",
   "number": "95",
   "subtype": "Supporter",
   "text": "Discard a card from your hand. If you can’t discard a card from your hand, you can’t play this card. Search your deck for a {M} Energy card or a Basic Pokémon (or Evolution card) that has δ on its card, show it to your opponent, and put it into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/holon-researcher-delta-species-ds-95/"
+ },
+ {
+  "name": "Holon Research Tower",
+  "set": "Delta Species",
+  "number": "94",
+  "subtype": "Stadium",
+  "text": "Each player’s basic Energy cards attached to Pokémon that has δ on its card are both their usual Energy type and {M} type but provide only 1 Energy at a time. (Has no effect other than providing Energy.)",
+  "url": "https://pkmncards.com/card/holon-research-tower-delta-species-ds-94/"
  },
  {
   "name": "Holon Mentor",
@@ -18592,6 +20352,14 @@
   "url": "https://pkmncards.com/card/curse-powder-unseen-forces-uf-80/"
  },
  {
+  "name": "Championship Arena",
+  "set": "Nintendo Black Star Promos",
+  "number": "028",
+  "subtype": "Stadium",
+  "text": "At the end of each player’s turn, if that player has 8 or more cards in his or her hand, that player discards a number of cards until that player has 7 cards left in his or her hand.",
+  "url": "https://pkmncards.com/card/championship-arena-nintendo-black-star-promos-028/"
+ },
+ {
   "name": "Tropical Tidal Wave",
   "set": "Nintendo Black Star Promos",
   "number": "027",
@@ -18606,6 +20374,14 @@
   "subtype": "Supporter",
   "text": "Draw 3 cards. Then discard any 1 card from your hand.",
   "url": "https://pkmncards.com/card/tv-reporter-pop-series-2-p2-11/"
+ },
+ {
+  "name": "Pokémon Park",
+  "set": "POP Series 2",
+  "number": "10",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, when that player attaches an Energy card from his or her hand to 1 of his or her Benched Pokémon, he or she removes 1 damage counter from that Pokémon.",
+  "url": "https://pkmncards.com/card/pokemon-park-pop-series-2-p2-10/"
  },
  {
   "name": "Multi Technical Machine 01",
@@ -18704,6 +20480,14 @@
   "url": "https://pkmncards.com/card/double-full-heal-emerald-em-76/"
  },
  {
+  "name": "Battle Frontier",
+  "set": "Emerald",
+  "number": "75",
+  "subtype": "Stadium",
+  "text": "Each player’s {C} Evolved Pokémon, {D} Evolved Pokémon, and {M} Evolved Pokémon can’t use any Poké-Powers or Poké-Bodies.",
+  "url": "https://pkmncards.com/card/battle-frontier-emerald-em-75/"
+ },
+ {
   "name": "Strength Charm",
   "set": "Deoxys",
   "number": "92",
@@ -18712,12 +20496,28 @@
   "url": "https://pkmncards.com/card/strength-charm-deoxys-dx-92/"
  },
  {
+  "name": "Space Center",
+  "set": "Deoxys",
+  "number": "91",
+  "subtype": "Stadium",
+  "text": "Ignore Poké-Bodies for all Basic Pokémon in play (both yours and your opponent’s) (excluding Pokémon-ex and Pokémon that has an owner in its name).",
+  "url": "https://pkmncards.com/card/space-center-deoxys-dx-91/"
+ },
+ {
   "name": "Professor Cozmo’s Discovery",
   "set": "Deoxys",
   "number": "90",
   "subtype": "Supporter",
   "text": "Flip a coin. If heads, draw the bottom 3 cards of your deck. If tails, draw the top 2 cards of your deck.",
   "url": "https://pkmncards.com/card/professor-cozmos-discovery-deoxys-dx-90/"
+ },
+ {
+  "name": "Meteor Falls",
+  "set": "Deoxys",
+  "number": "89",
+  "subtype": "Stadium",
+  "text": "Each player’s Active Evolved Pokémon (excluding Pokémon-ex) can use any attack from its Basic Pokémon or its Stage 1 Evolution card. (You still have to pay for that attack’s Energy cost.)",
+  "url": "https://pkmncards.com/card/meteor-falls-deoxys-dx-89/"
  },
  {
   "name": "Master Ball",
@@ -18792,6 +20592,14 @@
   "url": "https://pkmncards.com/card/surprise-time-machine-team-rocket-returns-tr-91/"
  },
  {
+  "name": "Rocket’s Tricky Gym",
+  "set": "Team Rocket Returns",
+  "number": "90",
+  "subtype": "Stadium",
+  "text": "Each Pokémon with Dark or Rocket’s in its name (both yours and your opponent’s) can use attacks on this card instead of its own. {C} → Feint Attack Does 20 damage to 1 of your opponent’s Pokémon. This attack’s damage isn’t affected by Weakness, Resistance, Poké-Powers, Poké-Bodies, or any other effects on that Pokémon.",
+  "url": "https://pkmncards.com/card/rockets-tricky-gym-team-rocket-returns-tr-90/"
+ },
+ {
   "name": "Rocket’s Poké Ball",
   "set": "Team Rocket Returns",
   "number": "89",
@@ -18806,6 +20614,14 @@
   "subtype": "Supporter",
   "text": "Discard a card from your hand. Then, draw 3 cards. If you discarded a Pokémon that has Dark or Rocket’s in its name, draw 4 cards instead.",
   "url": "https://pkmncards.com/card/rockets-mission-team-rocket-returns-tr-88/"
+ },
+ {
+  "name": "Rocket’s Hideout",
+  "set": "Team Rocket Returns",
+  "number": "87",
+  "subtype": "Stadium",
+  "text": "Each Pokémon with Dark or Rocket’s in its name (both yours and your opponent’s) gets +20 HP.",
+  "url": "https://pkmncards.com/card/rockets-hideout-team-rocket-returns-tr-87/"
  },
  {
   "name": "Rocket’s Admin.",
@@ -18904,6 +20720,14 @@
   "url": "https://pkmncards.com/card/poke-ball-firered-leafgreen-rg-95/"
  },
  {
+  "name": "Mt. Moon",
+  "set": "FireRed & LeafGreen",
+  "number": "94",
+  "subtype": "Stadium",
+  "text": "Any Pokémon (both yours and your opponent’s) with maximum HP less than 70 can’t use any Poké-Powers.",
+  "url": "https://pkmncards.com/card/mt-moon-firered-leafgreen-rg-94/"
+ },
+ {
   "name": "Life Herb",
   "set": "FireRed & LeafGreen",
   "number": "93",
@@ -18976,12 +20800,44 @@
   "url": "https://pkmncards.com/card/stevens-advice-hidden-legends-hl-92/"
  },
  {
+  "name": "Magnetic Storm",
+  "set": "Hidden Legends",
+  "number": "91",
+  "subtype": "Stadium",
+  "text": "Any damage done by attacks from {P} Pokémon and {F} Pokémon (both yours and your opponent’s) is not affected by Resistance.",
+  "url": "https://pkmncards.com/card/magnetic-storm-hidden-legends-hl-91/"
+ },
+ {
   "name": "Life Herb",
   "set": "Hidden Legends",
   "number": "90",
   "subtype": "(Item)",
   "text": "Flip a coin. If heads, choose 1 of your Pokémon (excluding Pokémon-ex). Remove all Special Conditions and 6 damage counters from that Pokémon (all if there are less than 6).",
   "url": "https://pkmncards.com/card/life-herb-hidden-legends-hl-90/"
+ },
+ {
+  "name": "Island Cave",
+  "set": "Hidden Legends",
+  "number": "89",
+  "subtype": "Stadium",
+  "text": "Whenever any player attaches an Energy card from his or hand to {W} Pokémon, {F} Pokémon, or {M} Pokémon, remove any Special Conditions from that Pokémon.",
+  "url": "https://pkmncards.com/card/island-cave-hidden-legends-hl-89/"
+ },
+ {
+  "name": "Desert Ruins",
+  "set": "Hidden Legends",
+  "number": "88",
+  "subtype": "Stadium",
+  "text": "At any time between turns, each player puts 1 damage counter on his or her Pokémon-ex with maximum HP of at least 100.",
+  "url": "https://pkmncards.com/card/desert-ruins-hidden-legends-hl-88/"
+ },
+ {
+  "name": "Ancient Tomb",
+  "set": "Hidden Legends",
+  "number": "87",
+  "subtype": "Stadium",
+  "text": "Don’t apply Weakness for all Pokémon in play (excluding Pokémon-ex and Pokémon that has an owner in its name).",
+  "url": "https://pkmncards.com/card/ancient-tomb-hidden-legends-hl-87/"
  },
  {
   "name": "Ancient Technical Machine [Steel]",
@@ -19024,6 +20880,14 @@
   "url": "https://pkmncards.com/card/team-magma-technical-machine-01-team-magma-vs-team-aqua-ma-84/"
  },
  {
+  "name": "Team Magma Hideout",
+  "set": "Team Magma vs Team Aqua",
+  "number": "83",
+  "subtype": "Stadium",
+  "text": "Whenever any player plays a Basic Pokémon that doesn’t have Team Magma in its name from his or her hand, that player puts 1 damage counter on that Pokémon.",
+  "url": "https://pkmncards.com/card/team-magma-hideout-team-magma-vs-team-aqua-ma-83/"
+ },
+ {
   "name": "Team Magma Conspirator",
   "set": "Team Magma vs Team Aqua",
   "number": "82",
@@ -19054,6 +20918,14 @@
   "subtype": "(Item)",
   "text": "Attach this card to 1 of your Pokémon that has Team Aqua in its name. That Pokémon may use this card’s attack instead of its own. At the end of your turn, discard Team Aqua Technical Machine 01. {C} → Miracle : 10 Choose 1 Special Condition. The Defending Pokémon is now affected by that Special Condition.",
   "url": "https://pkmncards.com/card/team-aqua-technical-machine-01-team-magma-vs-team-aqua-ma-79/"
+ },
+ {
+  "name": "Team Aqua Hideout",
+  "set": "Team Magma vs Team Aqua",
+  "number": "78",
+  "subtype": "Stadium",
+  "text": "Each Pokémon that does not have Team Aqua in its name pays {C} more to retreat.",
+  "url": "https://pkmncards.com/card/team-aqua-hideout-team-magma-vs-team-aqua-ma-78/"
  },
  {
   "name": "Team Aqua Conspirator",
@@ -19144,6 +21016,22 @@
   "url": "https://pkmncards.com/card/mr-brineys-compassion-dragon-dr-87/"
  },
  {
+  "name": "Low Pressure System",
+  "set": "Dragon",
+  "number": "86",
+  "subtype": "Stadium",
+  "text": "Each {G} and {L} Pokémon in play (both yours and your opponent’s) gets +10 HP.",
+  "url": "https://pkmncards.com/card/low-pressure-system-dragon-dr-86/"
+ },
+ {
+  "name": "High Pressure System",
+  "set": "Dragon",
+  "number": "85",
+  "subtype": "Stadium",
+  "text": "Each player pays {C} less to retreat his or her {R} and {W} Pokémon.",
+  "url": "https://pkmncards.com/card/high-pressure-system-dragon-dr-85/"
+ },
+ {
   "name": "Energy Recycle System",
   "set": "Dragon",
   "number": "84",
@@ -19168,7 +21056,7 @@
   "url": "https://pkmncards.com/card/balloon-berry-dragon-dr-82/"
  },
  {
-  "name": "Root Fossil",
+  "name": "Root Fossil · 40 HP",
   "set": "Sandstorm",
   "number": "92",
   "subtype": "(Item)",
@@ -19176,7 +21064,7 @@
   "url": "https://pkmncards.com/card/root-fossil-sandstorm-ss-92/"
  },
  {
-  "name": "Mysterious Fossil",
+  "name": "Mysterious Fossil · 10 HP",
   "set": "Sandstorm",
   "number": "91",
   "subtype": "(Item)",
@@ -19184,7 +21072,7 @@
   "url": "https://pkmncards.com/card/mysterious-fossil-sandstorm-ss-91/"
  },
  {
-  "name": "Claw Fossil",
+  "name": "Claw Fossil · 40 HP",
   "set": "Sandstorm",
   "number": "90",
   "subtype": "(Item)",
@@ -19336,6 +21224,14 @@
   "url": "https://pkmncards.com/card/energy-removal-2-ruby-sapphire-rs-80/"
  },
  {
+  "name": "Underground Lake",
+  "set": "Skyridge",
+  "number": "141",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, that player may put an Omanyte or a Kabuto card from his or her discard pile onto his or her Bench. (Cards put on the Bench this way are considered Basic Pokémon.)",
+  "url": "https://pkmncards.com/card/underground-lake-skyridge-sk-141/"
+ },
+ {
   "name": "Underground Expedition",
   "set": "Skyridge",
   "number": "140",
@@ -19358,6 +21254,14 @@
   "subtype": "Supporter",
   "text": "Choose 2 cards from your deck and shuffle the rest of your deck. Put the chosen cards on top of your deck in any order.",
   "url": "https://pkmncards.com/card/oracle-skyridge-sk-138/"
+ },
+ {
+  "name": "Mystery Zone",
+  "set": "Skyridge",
+  "number": "137",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before he or she attacks), if that player has an Evolution card in his or her hand, he or she may search his or her deck for a basic Energy card, show it to his or her opponent, and put it into his or her hand. Then that player chooses an Evolution card from his or her hand, shows it to his or her opponent, and puts it into his or her deck. That player shuffles his or her deck afterward.",
+  "url": "https://pkmncards.com/card/mystery-zone-skyridge-sk-137/"
  },
  {
   "name": "Mystery Plate δ",
@@ -19390,6 +21294,14 @@
   "subtype": "(Item)",
   "text": "Attach this card to 1 of your Pokémon in play. That Pokémon may use this card’s attack instead of its own. At the end of your turn, discard Mystery Plate ⍺. {C} → Desert Burn If your opponent has 5 or more Prizes, search your deck for a Trainer card, show it to your opponent, and put it into your hand. If your opponent has only 1 Prize, the Defending Pokémon is now Burned, Paralyzed, and Poisoned.",
   "url": "https://pkmncards.com/card/mystery-plate-alpha-skyridge-sk-133/"
+ },
+ {
+  "name": "Mirage Stadium",
+  "set": "Skyridge",
+  "number": "132",
+  "subtype": "Stadium",
+  "text": "Whenever a player tries to retreat a Pokémon during his or her turn, that player flips a coin. If heads, that player retreats that Pokémon (and discards Energy normally). If tails, that Pokémon can’t retreat this turn (the player doesn’t discard any Energy).",
+  "url": "https://pkmncards.com/card/mirage-stadium-skyridge-sk-132/"
  },
  {
   "name": "Miracle Sphere 𝛾",
@@ -19488,6 +21400,14 @@
   "url": "https://pkmncards.com/card/relic-hunter-skyridge-sk-120/"
  },
  {
+  "name": "Ancient Ruins",
+  "set": "Skyridge",
+  "number": "119",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before he or she attacks), if he or she has not played a Supporter card, that player may reveal his or her hand to his or her opponent. If that player reveals his or her hand and there is no Supporter card there, that player draws a card.",
+  "url": "https://pkmncards.com/card/ancient-ruins-skyridge-sk-119/"
+ },
+ {
   "name": "Weakness Guard",
   "set": "Aquapolis",
   "number": "141",
@@ -19502,6 +21422,22 @@
   "subtype": "(Item)",
   "text": "Attach this card to 1 of your {W} Pokémon in play. That Pokémon may use this card’s attack instead of its own. At the end of your turn, discard Water Cube 01. {W} → Splatter Choose 1 of your opponent’s Pokémon. This attack does 20 damage to that Pokémon. Don’t apply Weakness or Resistance.",
   "url": "https://pkmncards.com/card/water-cube-01-aquapolis-aq-140/"
+ },
+ {
+  "name": "Power Plant",
+  "set": "Aquapolis",
+  "number": "139",
+  "subtype": "Stadium",
+  "text": "Once during each of his or her turns, a player may discard a basic Energy card from his or her hand. If that player does, he or she chooses a basic Energy card from his or her discard pile, shows it to his or her opponent, and then puts it into his or her hand.",
+  "url": "https://pkmncards.com/card/power-plant-aquapolis-aq-139/"
+ },
+ {
+  "name": "Undersea Ruins",
+  "set": "Aquapolis",
+  "number": "138",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before attacking), that player may flip a coin. If heads, that player chooses 1 of his or her Evolved Pokémon in play and discards the top Evolution card from that Pokémon, devolving it.",
+  "url": "https://pkmncards.com/card/undersea-ruins-aquapolis-aq-138/"
  },
  {
   "name": "Traveling Salesman",
@@ -19550,6 +21486,14 @@
   "subtype": "(Item)",
   "text": "Attach this card to 1 of your {P} Pokémon in play. That Pokémon may us this card’s attack instead of its own. At the end of your turn, discard Psychic Cube 01. {P} → Psy Confuse The Defending Pokémon is now Confused.",
   "url": "https://pkmncards.com/card/psychic-cube-01-aquapolis-aq-132/"
+ },
+ {
+  "name": "Pokémon Park",
+  "set": "Aquapolis",
+  "number": "131",
+  "subtype": "Stadium",
+  "text": "Once during each of his or her turns, whenever a player attaches an Energy card from his or her hand to 1 of his or her Benched Pokémon, he or she removes 1 damage counter, if any, from that Pokémon.",
+  "url": "https://pkmncards.com/card/pokemon-park-aquapolis-aq-131/"
  },
  {
   "name": "Pokémon Fan Club",
@@ -19646,6 +21590,14 @@
   "subtype": "(Item)",
   "text": "Attach this card to 1 of your {D} Pokémon in play. That Pokémon may use this card’s attack instead of its own. At the end of your turn, discard Darkness Cube 01. {D} → Plunder : 10 Before doing damage, discard any Trainer cards attached to the Defending Pokémon.",
   "url": "https://pkmncards.com/card/darkness-cube-01-aquapolis-aq-119/"
+ },
+ {
+  "name": "Apricorn Forest",
+  "set": "Aquapolis",
+  "number": "118",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before attacking), if that player’s Bench isn’t full, that player flips a coin. If heads, that player shows his or her opponent a basic Energy card from his or her hand. Then, that player searches his or her deck for a Basic Pokémon card of the same type (color) as the revealed Energy card and puts it onto his or her Bench. The player shuffes his or her deck afterward.",
+  "url": "https://pkmncards.com/card/apricorn-forest-aquapolis-aq-118/"
  },
  {
   "name": "Switch",
@@ -19824,7 +21776,7 @@
   "url": "https://pkmncards.com/card/potion-legendary-collection-lc-110/"
  },
  {
-  "name": "Mysterious Fossil",
+  "name": "Mysterious Fossil · 10 HP",
   "set": "Legendary Collection",
   "number": "109",
   "subtype": "(Item)",
@@ -19928,6 +21880,22 @@
   "url": "https://pkmncards.com/card/magnifier-neo-destiny-n4-101/"
  },
  {
+  "name": "Lucky Stadium",
+  "set": "Neo Destiny",
+  "number": "100",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before attacking), that player may flip a coin. If heads, that player draws a card.",
+  "url": "https://pkmncards.com/card/lucky-stadium-neo-destiny-n4-100/"
+ },
+ {
+  "name": "Energy Stadium",
+  "set": "Neo Destiny",
+  "number": "99",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before attacking), that player may flip a coin. If heads, that player puts a basic Energy card from his or her discard pile into his or her hand.",
+  "url": "https://pkmncards.com/card/energy-stadium-neo-destiny-n4-99/"
+ },
+ {
   "name": "Energy Amplifier",
   "set": "Neo Destiny",
   "number": "98",
@@ -19952,6 +21920,14 @@
   "url": "https://pkmncards.com/card/thought-wave-machine-neo-destiny-n4-96/"
  },
  {
+  "name": "Radio Tower",
+  "set": "Neo Destiny",
+  "number": "95",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before attacking), that player may look at the top 2 cards of his or her deck and put them back in the same order.",
+  "url": "https://pkmncards.com/card/radio-tower-neo-destiny-n4-95/"
+ },
+ {
   "name": "Impostor Professor Oak’s Invention",
   "set": "Neo Destiny",
   "number": "94",
@@ -19966,6 +21942,30 @@
   "subtype": "Pokémon Tool",
   "text": "During your opponent’s turn, if your Active Pokémon would be Knocked Out by your opponent’s attack, you may take 1 of the basic Energy cards attached to your Active Pokémon and attach it to the Pokémon with EXP.ALL attached to it. If you do, discard EXP.ALL.",
   "url": "https://pkmncards.com/card/exp-all-neo-destiny-n4-93/"
+ },
+ {
+  "name": "Broken Ground Gym",
+  "set": "Neo Destiny",
+  "number": "92",
+  "subtype": "Stadium",
+  "text": "Each player pays {C} more to retreat a Baby Pokémon or Basic Pokémon.",
+  "url": "https://pkmncards.com/card/broken-ground-gym-neo-destiny-n4-92/"
+ },
+ {
+  "name": "Pokémon Tower",
+  "set": "Wizards Black Star Promos",
+  "number": "42",
+  "subtype": "Stadium",
+  "text": "If the effect of a Pokémon Power, attack, Energy card, or Trainer card would put a card in a discard pile into its owner’s hand, that card stays in that discard pile instead.",
+  "url": "https://pkmncards.com/card/pokemon-tower-wizards-black-star-promos-42/"
+ },
+ {
+  "name": "Lucky Stadium",
+  "set": "Wizards Black Star Promos",
+  "number": "41",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before attacking), that player may flip a coin. If heads, that player draws a card.",
+  "url": "https://pkmncards.com/card/lucky-stadium-wizards-black-star-promos-41/"
  },
  {
   "name": "Pokémon Center",
@@ -19984,12 +21984,28 @@
   "url": "https://pkmncards.com/card/old-rod-neo-revelation-n3-64/"
  },
  {
+  "name": "Rocket’s Hideout",
+  "set": "Neo Revelation",
+  "number": "63",
+  "subtype": "Stadium",
+  "text": "Each Pokémon in play with Dark in its name (even your opponent’s) gets +20 HP.",
+  "url": "https://pkmncards.com/card/rockets-hideout-neo-revelation-n3-63/"
+ },
+ {
   "name": "Pokémon Breeder Fields",
   "set": "Neo Revelation",
   "number": "62",
   "subtype": "(Item)",
   "text": "Flip a coin for 1 or 2 of your non-Baby Pokémon that can evolve. For each heads, search your deck for a later-Stage card that matches that Pokémon. Then put that card into your hand. Shuffle your deck afterward.",
   "url": "https://pkmncards.com/card/pokemon-breeder-fields-neo-revelation-n3-62/"
+ },
+ {
+  "name": "Healing Field",
+  "set": "Neo Revelation",
+  "number": "61",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn, he or she may flip a coin. If heads, that player removes 2 damage counters from his or her Active Pokémon (1 if it only has 1).",
+  "url": "https://pkmncards.com/card/healing-field-neo-revelation-n3-61/"
  },
  {
   "name": "Balloon Berry",
@@ -20078,6 +22094,14 @@
   "subtype": "(Item)",
   "text": "Flip a coin. If heads, return 1 of your Pokémon and all cards attached to it to your hand.",
   "url": "https://pkmncards.com/card/super-scoop-up-neo-genesis-n1-98/"
+ },
+ {
+  "name": "Sprout Tower",
+  "set": "Neo Genesis",
+  "number": "97",
+  "subtype": "Stadium",
+  "text": "All damage done by {C} Pokémon’s attacks is reduced by 30 (after applying Weakness and Resistance).",
+  "url": "https://pkmncards.com/card/sprout-tower-neo-genesis-n1-97/"
  },
  {
   "name": "Professor Elm",
@@ -20176,6 +22200,14 @@
   "url": "https://pkmncards.com/card/energy-charge-neo-genesis-n1-85/"
  },
  {
+  "name": "Ecogym",
+  "set": "Neo Genesis",
+  "number": "84",
+  "subtype": "Stadium",
+  "text": "Whenever an attack, Pokémon Power, or Trainer card discards another player’s non-{C} Energy card from a Pokémon, return that Energy card to its owner’s hand. (Energy cards that are discarded when that Pokémon is Knocked Out don’t count.)",
+  "url": "https://pkmncards.com/card/ecogym-neo-genesis-n1-84/"
+ },
+ {
   "name": "Arcade Game",
   "set": "Neo Genesis",
   "number": "83",
@@ -20208,6 +22240,22 @@
   "url": "https://pkmncards.com/card/fervor-gym-challenge-g2-124/"
  },
  {
+  "name": "Viridian City Gym",
+  "set": "Gym Challenge",
+  "number": "123",
+  "subtype": "Stadium",
+  "text": "Whenever a Pokémon with Giovanni in its name evolves, its owner removes 2 damage counters from that Pokémon (or 1 if it only has 1).",
+  "url": "https://pkmncards.com/card/viridian-city-gym-gym-challenge-g2-123/"
+ },
+ {
+  "name": "Saffron City Gym",
+  "set": "Gym Challenge",
+  "number": "122",
+  "subtype": "Stadium",
+  "text": "As often as each player likes during his or her turn (before attacking), that player may return 1 basic Energy card attached to 1 of his or her Pokémon with Sabrina in its name to his or her hand.",
+  "url": "https://pkmncards.com/card/saffron-city-gym-gym-challenge-g2-122/"
+ },
+ {
   "name": "Sabrina’s Psychic Control",
   "set": "Gym Challenge",
   "number": "121",
@@ -20222,6 +22270,14 @@
   "subtype": "(Item)",
   "text": "Flip a coin. If heads, search your deck for any card and put it into your hand. Shuffle your deck afterward. If tails, you can’t play Trainer cards until the end of your next turn.",
   "url": "https://pkmncards.com/card/rockets-secret-experiment-gym-challenge-g2-120/"
+ },
+ {
+  "name": "Rocket’s Minefield Gym",
+  "set": "Gym Challenge",
+  "number": "119",
+  "subtype": "Stadium",
+  "text": "Whenever a player puts a Basic Pokémon onto his or her Bench from his or her hand, he or she flips a coin. If tails, put damage counters on that Pokémon.",
+  "url": "https://pkmncards.com/card/rockets-minefield-gym-gym-challenge-g2-119/"
  },
  {
   "name": "Misty’s Tears",
@@ -20256,6 +22312,22 @@
   "url": "https://pkmncards.com/card/kogas-ninja-trick-gym-challenge-g2-115/"
  },
  {
+  "name": "Fuchsia City Gym",
+  "set": "Gym Challenge",
+  "number": "114",
+  "subtype": "Stadium",
+  "text": "Once during each player’s turn (before attacking), that player may flip a coin. If heads, that player may shuffle 1 of his or her Pokémon in play with Koga in its name and any cards attached to it into his or her deck.",
+  "url": "https://pkmncards.com/card/fuchsia-city-gym-gym-challenge-g2-114/"
+ },
+ {
+  "name": "Cinnabar City Gym",
+  "set": "Gym Challenge",
+  "number": "113",
+  "subtype": "Stadium",
+  "text": "Ignore Weakness when a {W} Pokémon does damage to a Pokémon with Blaine in its name.",
+  "url": "https://pkmncards.com/card/cinnabar-city-gym-gym-challenge-g2-113/"
+ },
+ {
   "name": "Blaine’s Quiz #3",
   "set": "Gym Challenge",
   "number": "112",
@@ -20278,6 +22350,14 @@
   "subtype": "(Item)",
   "text": "Take all Energy cards attached to 1 of your Pokémon with Sabrina in its name and attach them to another 1 of your Pokémon with Sabrina in its name.",
   "url": "https://pkmncards.com/card/sabrina-gym-challenge-g2-110/"
+ },
+ {
+  "name": "Resistance Gym",
+  "set": "Gym Challenge",
+  "number": "109",
+  "subtype": "Stadium",
+  "text": "Each Pokémon’s Resistance is reduced by 20. (If a Pokémon’s Resistance is -30, it becomes -10.)",
+  "url": "https://pkmncards.com/card/resistance-gym-gym-challenge-g2-109/"
  },
  {
   "name": "Misty’s Wish",
@@ -20326,6 +22406,14 @@
   "subtype": "(Item)",
   "text": "Remove 2 damage counters from each Pokémon (yours and your opponent’s) with any damage counters on it. If a Pokémon has just 1 damage counter, remove it.",
   "url": "https://pkmncards.com/card/erikas-kindness-gym-challenge-g2-103/"
+ },
+ {
+  "name": "Chaos Gym",
+  "set": "Gym Challenge",
+  "number": "102",
+  "subtype": "Stadium",
+  "text": "Whenever a player plays a Trainer card other than a Stadium card, he or she flips a coin. If heads, that player plays that card normally. If tails, the player can’t play that card. If the card isn’t put into play, the player’s opponent may use that card instead, if he or she does everything required in order to play that card (like discarding cards). Either way, the card goes to its owner’s discard pile.",
+  "url": "https://pkmncards.com/card/chaos-gym-gym-challenge-g2-102/"
  },
  {
   "name": "Brock’s Protection",
@@ -20392,6 +22480,14 @@
   "url": "https://pkmncards.com/card/sabrinas-gaze-gym-heroes-g1-125/"
  },
  {
+  "name": "Narrow Gym",
+  "set": "Gym Heroes",
+  "number": "124",
+  "subtype": "Stadium",
+  "text": "No player may have more than 4 Pokémon on his or her Bench. When this card is played, if a player has 5 Pokémon on his or her Bench, that player chooses 1 of them and returns it and all cards attached to it to his or her hand. (If both players have to return a Pokémon, your opponent returns a Pokémon first.)",
+  "url": "https://pkmncards.com/card/narrow-gym-gym-heroes-g1-124/"
+ },
+ {
   "name": "Misty’s Duel",
   "set": "Gym Heroes",
   "number": "123",
@@ -20414,6 +22510,14 @@
   "subtype": "(Item)",
   "text": "Discard any number of other cards from your hand, then flip a coin. If heads, draw twice that many cards.",
   "url": "https://pkmncards.com/card/blaines-gamble-gym-heroes-g1-121/"
+ },
+ {
+  "name": "Vermilion City Gym",
+  "set": "Gym Heroes",
+  "number": "120",
+  "subtype": "Stadium",
+  "text": "Whenever a player attacks with a Pokémon with Lt. Surge in its name, he or she may flip a coin. If heads, and if that Pokémon’s attack does damage to the Defending Pokémon (after applying Weakness and Resistance), that attack does 10 more damage to the Defending Pokémon. If tails, the attacking Pokémon does 10 damage to itself in addition to whatever its attack usually does.",
+  "url": "https://pkmncards.com/card/vermilion-city-gym-gym-heroes-g1-120/"
  },
  {
   "name": "Tickling Machine",
@@ -20446,6 +22550,14 @@
   "subtype": "(Item)",
   "text": "For your attack this turn, your Active Pokémon can use any attack from its Basic Pokémon card or any Evolution card attached to it. (You still have to pay for that attack’s Energy cost.)",
   "url": "https://pkmncards.com/card/recall-gym-heroes-g1-116/"
+ },
+ {
+  "name": "Pewter City Gym",
+  "set": "Gym Heroes",
+  "number": "115",
+  "subtype": "Stadium",
+  "text": "Don’t apply Resistance to any attacks made by Pokémon with Brock in their names.",
+  "url": "https://pkmncards.com/card/pewter-city-gym-gym-heroes-g1-115/"
  },
  {
   "name": "Misty’s Wrath",
@@ -20496,6 +22608,22 @@
   "url": "https://pkmncards.com/card/erikas-maids-gym-heroes-g1-109/"
  },
  {
+  "name": "Cerulean City Gym",
+  "set": "Gym Heroes",
+  "number": "108",
+  "subtype": "Stadium",
+  "text": "Each player pays {C} less to retreat his or her Pokémon if it has Misty in its name.",
+  "url": "https://pkmncards.com/card/cerulean-city-gym-gym-heroes-g1-108/"
+ },
+ {
+  "name": "Celadon City Gym",
+  "set": "Gym Heroes",
+  "number": "107",
+  "subtype": "Stadium",
+  "text": "During each player’s turn, that player may choose to discard an Energy card attached to 1 of his or her Pokémon with Erika in its name. If that player does so, that Pokémon is no longer Asleep, Confused, Paralyzed, or Poisoned.",
+  "url": "https://pkmncards.com/card/celadon-city-gym-gym-heroes-g1-107/"
+ },
+ {
   "name": "Brock’s Training Method",
   "set": "Gym Heroes",
   "number": "106",
@@ -20510,6 +22638,22 @@
   "subtype": "(Item)",
   "text": "You can’t play this card if you have any cards in your hand other than Blaine’s Last Resort. Show your hand to your opponent, then draw 5 cards.",
   "url": "https://pkmncards.com/card/blaines-last-resort-gym-heroes-g1-105/"
+ },
+ {
+  "name": "The Rocket’s Training Gym",
+  "set": "Gym Heroes",
+  "number": "104",
+  "subtype": "Stadium",
+  "text": "Each player pays {C} more to retreat his or her Active Pokémon.",
+  "url": "https://pkmncards.com/card/the-rockets-training-gym-gym-heroes-g1-104/"
+ },
+ {
+  "name": "No Removal Gym",
+  "set": "Gym Heroes",
+  "number": "103",
+  "subtype": "Stadium",
+  "text": "A player must discard 2 cards from his or her hand in order to play an Energy Removal or Super Energy Removal card.",
+  "url": "https://pkmncards.com/card/no-removal-gym-gym-heroes-g1-103/"
  },
  {
   "name": "Misty",
@@ -20880,7 +23024,7 @@
   "url": "https://pkmncards.com/card/computer-search-base-set-2-b2-101/"
  },
  {
-  "name": "Mysterious Fossil",
+  "name": "Mysterious Fossil · 10 HP",
   "set": "Fossil",
   "number": "62",
   "subtype": "(Item)",
@@ -21128,7 +23272,7 @@
   "url": "https://pkmncards.com/card/computer-search-base-set-bs-71/"
  },
  {
-  "name": "Clefairy Doll",
+  "name": "Clefairy Doll · 10 HP",
   "set": "Base Set",
   "number": "70",
   "subtype": "(Item)",

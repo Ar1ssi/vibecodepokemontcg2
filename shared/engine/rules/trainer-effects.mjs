@@ -819,6 +819,16 @@ function parsePlayCondition(lower) {
   const lostZone = lower.match(/only if you have\s+(\d+)\s+or more cards in the lost zone/);
   if (lostZone) return `lostZone>=${lostZone[1]}`;
   if (lower.includes('only if there is any stadium card in play')) return 'stadiumInPlay';
+  // Cyrus Prism Star: "only if your Active Pokémon is a {W} or {M} Pokémon."
+  const ownActiveTypes = lower.match(
+    /only if your active pokémon is a (?:\{([a-z])\} or )?\{([a-z])\} pokémon/
+  );
+  if (ownActiveTypes) {
+    const symbols = [ownActiveTypes[1], ownActiveTypes[2]]
+      .filter(Boolean)
+      .map((s) => s.toUpperCase());
+    return `activeType=${[...new Set(symbols)].join('|')}`;
+  }
   const oppStage = lower.match(/only if your opponent's active pokémon is a (basic|stage 1|stage 2) pokémon/);
   if (oppStage) return `opponentActiveStage=${PLAY_STAGE_WORDS[oppStage[1]]}`;
   if (lower.includes("only if your opponent's active pokémon is poisoned")) return 'opponentActivePoisoned';
@@ -871,7 +881,70 @@ export function parseTrainerEffect(text = '') {
   return playCondition ? { ...result, playCondition } : result;
 }
 
+// Printed energy symbol → type word for typed discard costs.
+const SYMBOL_ENERGY_WORDS = {
+  g: 'grass',
+  r: 'fire',
+  w: 'water',
+  l: 'lightning',
+  p: 'psychic',
+  f: 'fighting',
+  d: 'darkness',
+  m: 'metal',
+  n: 'dragon',
+  y: 'fairy',
+  c: 'colorless',
+};
+
+// Costs printed in the first sentence are not part of every branch's parse, so
+// lift them out in one wrapper:
+//   "Discard N [other] cards from your hand."        (Sophocles, Plumeria, …)
+//   "Discard N {X} Energy cards from your hand."     (Crasher Wake, Molayne, …)
+// Only a leading, non-optional sentence counts — a later "discard" is an effect,
+// not a cost, and "you may discard …" is optional (that needs a decline path).
+// Branches that already emitted a discardCost win (no duplicates).
+function appendLeadingHandDiscardCost(steps, lower) {
+  if (steps.some((s) => s.type === 'discardCost')) return;
+  const first = (lower.split('.')[0] || '').trim();
+  const discardAt = first.indexOf('discard');
+  if (discardAt < 0) return;
+  if (/\bmay\b/.test(first.slice(0, discardAt))) return;
+  const typed = first.match(/discard (\d+) \{([a-z])\} energy cards? from your hand/);
+  if (typed) {
+    const type = SYMBOL_ENERGY_WORDS[typed[2]];
+    steps.unshift({
+      type: 'discardCost',
+      count: Number(typed[1]),
+      energyOnly: true,
+      basicOnly: true,
+      ...(type ? { energyTypes: [type] } : {}),
+    });
+    return;
+  }
+  const plain = first.match(/discard (\d+) (?:other )?cards from your hand/);
+  if (plain) steps.unshift({ type: 'discardCost', count: Number(plain[1]) });
+}
+
+// Primary switches some branches parse past (Switch Raft parses only its heal;
+// Mallow & Lana already emits switchOwn). A "Choose 1:" card must NOT get this:
+// its switch is an alternative mode, not a follow-up (Tate & Liza).
+function appendMissingOwnSwitch(steps, lower) {
+  if (steps.some((s) => s.type === 'switchOwn')) return;
+  if (/\bchoose 1\b/.test(lower)) return;
+  if (!/switch your active (?:\{[a-z]\} )?pokémon with 1 of your benched pokémon/.test(lower)) return;
+  steps.unshift({ type: 'switchOwn' });
+}
+
 function parseTrainerSteps(lower) {
+  const result = parseTrainerStepsInner(lower);
+  if (result?.recognizable && Array.isArray(result.steps) && result.steps.length > 0) {
+    appendLeadingHandDiscardCost(result.steps, lower);
+    appendMissingOwnSwitch(result.steps, lower);
+  }
+  return result;
+}
+
+function parseTrainerStepsInner(lower) {
   const steps = [];
 
   // Lt. Surge's Bargain — opponent chooses: each player takes a Prize, or you draw
@@ -934,6 +1007,25 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
 
+  // Heads-only draw flips (Bug Catcher, Kahili-style): "Draw 2 cards. Flip a
+  // coin. If heads, draw 2 more cards." The coin gate used to be dropped and
+  // the heads draw ran unconditionally (audit S&M, Bug Catcher).
+  {
+    const headsOnly = lower.match(
+      /flip a coin\. if heads,?\s+draw\s+(\d+)\s+(?:more\s+)?cards?/
+    );
+    if (headsOnly && !/if tails,?\s+draw/.test(lower)) {
+      const leading = lower.match(/^\s*draw\s+(\d+)\s+cards?\b/);
+      if (leading) steps.push({ type: 'draw', count: Number(leading[1]) });
+      steps.push({
+        type: 'coinFlip',
+        heads: [{ type: 'draw', count: Number(headsOnly[1]) }],
+        tails: [],
+      });
+      return { steps, recognizable: true };
+    }
+  }
+
   // coin flip (Picnicker, Poké Ball, Team Rocket's Great Ball) — before search/draw
   const coinFlip = parseCoinFlipStep(lower);
   if (coinFlip) {
@@ -989,6 +1081,14 @@ function parseTrainerSteps(lower) {
     appendDiscardCost(steps, lower);
     // Compound effects: search-then-draw is common; append the trailing draw
     appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Missing Clover — the single mode is "look at the top card of your deck";
+  // the generic branch defaulted to 7 (audit S&M, §2). The 4-card play-a
+  // Prize mode needs multi-card play and is deferred.
+  if (lower.includes('you may play 4 missing clover cards at once')) {
+    steps.push({ type: 'lookAtTop', count: 1, pick: 'any', destination: 'hand' });
     return { steps, recognizable: true };
   }
 
@@ -1184,6 +1284,18 @@ function parseTrainerSteps(lower) {
         : lower.includes('active pokémon') ? 'Active Pokémon' : '1 of your Pokémon',
       cure: lower.includes('special condition'),
     });
+    appendTrailingDraw(steps, lower);
+    return { steps, recognizable: true };
+  }
+
+  // Max Potion — heal all damage, then discard that Pokémon's Energy. The
+  // discard-all clause had no step, so the heal ran but the printed cost did
+  // not (audit S&M, §2). healOneDiscardEnergy already had the exact shape.
+  if (
+    lower.includes('heal all damage') &&
+    /discard all energy (?:cards? )?(?:from|attached to) (?:that|this) pokémon/.test(lower)
+  ) {
+    steps.push({ type: 'healOneDiscardEnergy' });
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
@@ -1442,16 +1554,31 @@ function parseTrainerSteps(lower) {
   }
 
   // Attach Energy from your hand (Bede, Brock's Training, Flint's Willpower,
-  // The Masked Royal, Zinnia)
+  // The Masked Royal, Zinnia, Welder). The typed symbol form ("attach up to 2
+  // {R} Energy cards") used to miss this branch entirely (audit S&M, §2).
   {
-    const at = lower.match(/attach (?:up to )?(\d+|a|an)?\s*(basic )?energy cards? from your hand/);
+    const at = lower.match(
+      /attach (?:up to )?(\d+|a|an)?\s*(?:\{([a-z])\}\s*)?(basic\s*)?(?:\{([a-z])\}\s*)?energy cards? from your hand/
+    );
     if (at) {
       const raw = at[1] || '1';
       const count = raw === 'a' || raw === 'an' ? 1 : Number(raw);
       let target = '1 of your Pokémon';
       if (lower.includes('benched')) target = '1 of your Benched Pokémon';
       else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
-      steps.push({ type: 'attachFromHand', count, energy: at[2] ? 'Basic Energy' : 'Energy', target });
+      const symbol = at[2] || at[4];
+      const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : null;
+      const basic = Boolean(at[3] || typeWord);
+      steps.push({
+        type: 'attachFromHand',
+        count,
+        energy: basic ? 'Basic Energy' : 'Energy',
+        target,
+        handCount: count,
+        handTarget: target.toLowerCase(),
+        handEnergy: typeWord ? { basic: true, types: [typeWord] } : basic ? { basic: true } : {},
+      });
+      appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
     }
   }
@@ -1760,6 +1887,7 @@ function parseTrainerSteps(lower) {
       type: 'revealOpponentHandDiscard',
       what: 'Item',
       count: m ? Number(m[1]) : 2,
+      upTo: /discard up to \d+ item/.test(lower),
     });
     return { steps, recognizable: true };
   }
@@ -1770,6 +1898,14 @@ function parseTrainerSteps(lower) {
     const step = { type: 'opponentHandBottom', what };
     if (lower.includes('opponent may draw')) step.optionalOpponentDraw = true;
     steps.push(step);
+    return { steps, recognizable: true };
+  }
+
+  // Peeking Red Card — optional: opponent shuffles their WHOLE hand into their
+  // deck, then draws that many. The Morty branch below grabbed it and shuffled
+  // 1 card with no draw (audit S&M, §2).
+  if (/shuffle those cards into their deck, then draw that many cards/.test(lower)) {
+    steps.push({ type: 'opponentHandShuffleDeck', what: 'card', all: true, drawThatMany: true });
     return { steps, recognizable: true };
   }
 
@@ -1965,6 +2101,17 @@ function parseTrainerSteps(lower) {
     }
   }
 
+  // Faba — choose an opponent Pokémon's Tool/Special Energy, or any Stadium,
+  // and put it in the Lost Zone (the Xerosic branch below discarded instead).
+  if (
+    /choose a pokémon tool or special energy card attached to 1 of your opponent'?s pokémon, or any stadium card in play, and put it in the lost zone/.test(
+      lower
+    )
+  ) {
+    steps.push({ type: 'toolOrStadiumToLostZone', side: 'opponent', includeSpecialEnergy: true });
+    return { steps, recognizable: true };
+  }
+
   // Xerosic — choose a Tool or Special Energy on any Pokémon and discard it
   if (lower.includes('choose a pokémon tool or special energy card')) {
     steps.push({ type: 'discardFromOpponent', target: "a Pokémon Tool or Special Energy card attached to a Pokémon in play" });
@@ -2096,7 +2243,12 @@ function parseTrainerSteps(lower) {
     return { steps, recognizable: true };
   }
   if (/discard up to (\d+) in any combination of/.test(lower)) {
-    steps.push({ type: 'revealOpponentHandDiscard', what: 'card', count: Number(lower.match(/discard up to (\d+)/)[1]) });
+    steps.push({
+      type: 'revealOpponentHandDiscard',
+      what: 'card',
+      count: Number(lower.match(/discard up to (\d+)/)[1]),
+      upTo: true,
+    });
     return { steps, recognizable: true };
   }
 
@@ -2316,6 +2468,42 @@ function parseTrainerSteps(lower) {
   // fall through to the bare-draw branch. A short `detail` is attached so the
   // announcement is descriptive instead of a generic "passive".
 
+  // Cyrus Prism Star — the opponent keeps 2 Benched Pokémon; the rest shuffle
+  // into their deck (with everything attached to them).
+  if (/your opponent chooses 2 benched pokémon and shuffles the others/.test(lower)) {
+    steps.push({ type: 'opponentShuffleBenchToDeck' });
+    return { steps, recognizable: true };
+  }
+
+  // Ultra Forest Kartenvoy — Ultra Beasts ignore defender effects this turn
+  if (
+    /during this turn, damage from your ultra beasts' attacks isn't affected by any effects on your opponent's active pokémon/.test(
+      lower
+    )
+  ) {
+    steps.push({ type: 'ignoreDefenderEffectsTurn', ultraBeast: true });
+    return { steps, recognizable: true };
+  }
+
+  // Will — choose the first coin flip this turn
+  if (lower.includes('choose heads or tails for the first coin flip')) {
+    steps.push({ type: 'chooseFirstCoin' });
+    return { steps, recognizable: true };
+  }
+
+  // Mars — draw 2, then discard a random card from the opponent's hand. Must
+  // run before the leading-draw block below, which would return draw-only.
+  {
+    const mars = lower.match(
+      /^draw (\d+) cards?\. if you do, discard a random card from your opponent's hand/
+    );
+    if (mars) {
+      steps.push({ type: 'draw', count: Number(mars[1]) });
+      steps.push({ type: 'discardRandomOpponentHandIfSupporter', any: true, count: 1 });
+      return { steps, recognizable: true };
+    }
+  }
+
   // A card whose *primary* clause is an unconditional "Draw N cards." must
   // still execute that draw, even when a later clause trips a passive keyword
   // (Aroma Lady, Buck's Training, Professor Kukui, Emcee's Hype). The passive
@@ -2466,6 +2654,11 @@ export function describeStep(step) {
     case 'opponentHandBottom':
       return `Your opponent reveals their hand; choose a ${step.what} and put it on the bottom of their deck${step.optionalOpponentDraw ? ' (they may draw a card)' : ''}.`;
     case 'opponentHandShuffleDeck':
+      if (step.all) {
+        return `Your opponent shuffles their whole hand into their deck${
+          step.drawThatMany ? ', then draws that many cards' : ''
+        }.`;
+      }
       return `Look at your opponent's hand; ${step.upTo ? 'shuffle up to' : 'shuffle'} ${step.count} ${step.what === 'Trainer' ? 'Trainer card' : 'card'}${step.count > 1 ? 's' : ''} from it into their deck${step.optionalOpponentDraw ? ' (they may draw a card)' : ''}.`;
     case 'opponentActiveEnergyToDeck':
       return "Put an Energy from your opponent's Active Pokémon on top of their deck.";
@@ -2544,7 +2737,11 @@ export function describeStep(step) {
     case 'lostZoneCost':
       return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand in the Lost Zone.`;
     case 'toolOrStadiumToLostZone':
-      return 'Choose a Pokémon Tool attached to any Pokémon, or a Stadium in play, and put it in the Lost Zone.';
+      return step.side === 'opponent'
+        ? `Choose a Pokémon Tool${
+            step.includeSpecialEnergy ? ' or Special Energy' : ''
+          } attached to 1 of your opponent's Pokémon, or a Stadium in play, and put it in the Lost Zone.`
+        : 'Choose a Pokémon Tool attached to any Pokémon, or a Stadium in play, and put it in the Lost Zone.';
     case 'sendEnergyToLostZone':
       return `Put a ${step.energy} attached to 1 of your opponent's Pokémon in the Lost Zone.`;
     case 'opponentDiscardToLostZonePerPokemon':

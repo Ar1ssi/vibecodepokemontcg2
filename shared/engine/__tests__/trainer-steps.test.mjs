@@ -604,6 +604,35 @@ test('revealOpponentHandDiscard (Eri) and opponentHandBottom (Ortega)', () => {
   assert.deepEqual(ids(zone(done, 'p2', 'hand')), [target.instanceId]);
 });
 
+test('revealOpponentHandDiscard: Team Skull Grunt mandates 2 Energy, Eri stays up-to (F7)', () => {
+  const game = setup();
+  const e1 = card({ name: 'Fire Energy', type: 'Energy' });
+  const e2 = card({ name: 'Water Energy', type: 'Energy' });
+  const mon = pokemon('x');
+  game.p2.zones.hand.push(e1, e2, mon);
+  const { res } = play(game, 'Your opponent reveals their hand. Discard 2 Energy cards from it.', {
+    trainerType: 'Supporter',
+  });
+  assert.deepEqual(ids(res.pendingChoice.options), [e1.instanceId, e2.instanceId]);
+  assert.equal(res.pendingChoice.min, 2);
+  assert.equal(res.pendingChoice.max, 2);
+  const done = resolve(game, res, [e1.instanceId, e2.instanceId]);
+  assert.equal(zone(done, 'p2', 'hand').filter((c) => c.instanceId === mon.instanceId).length, 1);
+  assert.equal(zone(done, 'p2', 'discard').length, 2);
+
+  // Fewer Energy than the printed count: discard what exists, don't soft-lock.
+  const game2 = setup();
+  const only = card({ name: 'Fire Energy', type: 'Energy' });
+  game2.p2.zones.hand.push(only);
+  const grunt = play(game2, 'Your opponent reveals their hand. Discard 2 Energy cards from it.', {
+    trainerType: 'Supporter',
+  }).res;
+  assert.equal(grunt.pendingChoice.min, 1);
+  assert.equal(grunt.pendingChoice.max, 1);
+  const done2 = resolve(game2, grunt, [only.instanceId]);
+  assert.equal(zone(done2, 'p2', 'hand').length, 0);
+});
+
 test('opponentDiscardUntil and eachPlayerDiscardUntil ask the right player', () => {
   const game = setup();
   const oppHand = [card({ name: 'o1' }), card({ name: 'o2' }), card({ name: 'o3' }), card({ name: 'o4' })];

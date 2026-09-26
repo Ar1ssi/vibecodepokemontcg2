@@ -3,9 +3,10 @@
  * Scrape every Trainer card printing from a pkmncards.com search into
  * out/pkmn-trainer-cards.json.
  *
- * The search covers every Trainer subtype the trainer-effects parser targets:
- * Supporter, Item, Pokémon Tool, Technical Machine, Rocket's Secret Machine,
- * Pokémon Tool F. Output rows: { name, set, number, subtype, text, url }.
+ * The search covers every Trainer subtype: Supporter, Item, Pokémon Tool,
+ * Stadium, Technical Machine, Rocket's Secret Machine, Pokémon Tool F.
+ * Stadiums are stored for the stadium audit; audit-all-trainers.mjs skips them.
+ * Output rows: { name, set, number, subtype, text, url }.
  *
  * Run: node scripts/scrape-pkmncards-trainers.mjs
  */
@@ -17,7 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_PATH = path.join(__dirname, '..', 'out', 'pkmn-trainer-cards.json');
 
 const SEARCH =
-  'type:supporter,item,pokemon-tool,technical-machine,rockets-secret-machine,pokemon-tool-f';
+  'type:supporter,item,pokemon-tool,stadium,technical-machine,rockets-secret-machine,pokemon-tool-f';
 const QUERY = `s=${encodeURIComponent(SEARCH)}&sort=date&ord=auto&display=text`;
 const PAGE_CONCURRENCY = 4;
 const PAGE_DELAY_MS = 150;
@@ -67,7 +68,9 @@ function parseArticles(html) {
   const articleRe = /<article class="type-pkmn_card[^"]*"[^>]*>([\s\S]*?)<\/article>/g;
   for (const m of html.matchAll(articleRe)) {
     const body = m[1];
-    const name = firstMatch(/<span class="name"[^>]*>([\s\S]*?)<\/span>/, body);
+    // The name span may contain nested symbol markup ("Fairy Charm {L}"); match
+    // through to the wrapping </div>, not the first inner </span>.
+    const name = firstMatch(/<span class="name"[^>]*>([\s\S]*?)<\/span><\/div>/, body);
     const subtype = firstMatch(/<span class="sub-type"[^>]*>([\s\S]*?)<\/span>/, body);
     const textBlock = body.match(/<div class="text">([\s\S]*?)<\/div>\s*<div class="release-meta/);
     const text = textBlock ? htmlToText(textBlock[1]) : '';

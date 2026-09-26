@@ -187,12 +187,20 @@ function parseHolderPhrase(t, out) {
     out.holderSubtypes = [what.slice(0, -' pokémon'.length)];
   } else if (what === 'pokémon') {
     // generic "the Pokémon this card is attached to" — no condition
-  } else if (what.endsWith(' pokémon')) {
-    // "The Cynthia's Pokémon this card is attached to"
-    out.holderNames = [what.slice(0, -' pokémon'.length).trim()];
   } else {
-    // "The Zamazenta V this card is attached to"
-    out.holderNames = [what];
+    // "The Cynthia's Pokémon this card is attached to" / "The Zamazenta V this
+    // card is attached to" / "The Regirock, Regice, Registeel, or Regigigas
+    // this card is attached to" (Ancient Crystal, audit S&M F4). Comma/“or”
+    // name lists must split — matching the whole list as one literal name
+    // meant the condition could never hold for a real Regi holder.
+    const base = what.endsWith(' pokémon')
+      ? what.slice(0, -' pokémon'.length).trim()
+      : what;
+    const names = base
+      .split(/\s*,\s*(?:or\s+)?|\s+or\s+/)
+      .map((n) => n.trim())
+      .filter(Boolean);
+    out.holderNames = names.length ? names : [base];
   }
 }
 
@@ -260,6 +268,12 @@ export function parseToolCondition(card) {
   }
   if (attackerTypes.size) out.attackerTypes = [...attackerTypes];
   if (attackerSubtypes.size) out.attackerSubtypes = [...attackerSubtypes];
+  // "…by attacks from your opponent's Ultra Beast Pokémon-GX and Ultra Beast
+  // Pokémon-EX" needs the marker AND a rule-box subtype; `attackerSubtypes`
+  // alone is any-of and let a plain EX through (audit S&M F3, Fairy Charm UB).
+  if (/attacks from your opponent'?s[^.]*ultra beast/.test(t)) {
+    out.attackerUltraBeast = true;
+  }
 
   const defenderClause = t.match(
     /your opponent'?s active ([^.]*?)(?: is knocked out|\.|$)/
@@ -358,6 +372,7 @@ export function toolConditionMet(cond, ctx = {}) {
     return false;
   }
   if (cond.attackerAbility && !hasAbility(attacker)) return false;
+  if (cond.attackerUltraBeast && !isUltraBeastCard(attacker)) return false;
   if (cond.attackerHpAtMost != null) {
     const hp = remainingHp(attacker);
     if (hp == null || hp > cond.attackerHpAtMost) return false;

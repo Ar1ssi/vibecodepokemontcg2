@@ -691,3 +691,344 @@ test('I155: Minion of Team Rocket tails ends the turn and leaves the Bench alone
   assert.equal(res.state.turn.player, 'p2', 'tails ends the turn');
   assert.equal(res.state.players.p2.zones.bench.length, 1, 'no return on tails');
 });
+
+// ── Audit S&M compound clauses (S6) ─────────────────────────────────────────
+
+test('Max Potion: heals all damage and discards the healed Pokémon Energy', () => {
+  const { state, rng } = setupGame();
+  const active = state.players.p1.zones.active[0];
+  active.damage = 60;
+  const e1 = createCard({ instanceId: 40, name: 'Fire Energy', type: 'Energy', attachedTo: active.instanceId });
+  const e2 = createCard({ instanceId: 41, name: 'Water Energy', type: 'Energy', attachedTo: active.instanceId });
+  state.players.p1.zones.active.push(e1, e2);
+  const potion = createCard({
+    instanceId: 50,
+    name: 'Max Potion',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: 'Heal all damage from 1 of your Pokémon. If you do, discard all Energy from that Pokémon.',
+  });
+  state.players.p1.zones.hand.push(potion);
+
+  const res = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 50 }, playerId: 'p1' },
+    rng
+  );
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.active.find((c) => c.instanceId === 1).damage, 0);
+  const discardIds = res.state.players.p1.zones.discard.map((c) => c.instanceId);
+  assert.ok(discardIds.includes(40) && discardIds.includes(41), 'both Energy discarded');
+});
+
+test('Faba: a Tool/Special Energy goes to the Lost Zone, not the discard pile', () => {
+  const { state, rng } = setupGame();
+  const defender = state.players.p2.zones.active[0];
+  const tool = createCard({
+    instanceId: 60,
+    name: 'Choice Band',
+    supertype: 'Trainer',
+    trainerType: 'Tool',
+    attachedTo: defender.instanceId,
+  });
+  const special = createCard({
+    instanceId: 61,
+    name: 'Double Turbo Energy',
+    supertype: 'Energy',
+    subtypes: ['Special'],
+    attachedTo: defender.instanceId,
+  });
+  state.players.p2.zones.active.push(tool, special);
+  const faba = createCard({
+    instanceId: 62,
+    name: 'Faba',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: "Choose a Pokémon Tool or Special Energy card attached to 1 of your opponent's Pokémon, or any Stadium card in play, and put it in the Lost Zone.",
+  });
+  state.players.p1.zones.hand.push(faba);
+
+  const res1 = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 62 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice, 'Faba asks what to send');
+  assert.deepEqual(
+    res1.pendingChoice.options.map((o) => o.instanceId).sort(),
+    [60, 61]
+  );
+  const res2 = applyCommand(
+    res1.state,
+    {
+      type: 'resolveChoice',
+      payload: { choiceId: res1.pendingChoice.choiceId, selection: [61] },
+      playerId: 'p1',
+    },
+    rng
+  );
+  assert.equal(res2.error, null);
+  assert.ok(res2.state.players.p2.zones.lostZone.some((c) => c.instanceId === 61));
+  assert.ok(!res2.state.players.p2.zones.discard.some((c) => c.instanceId === 61));
+});
+
+test('Peeking Red Card: whole hand shuffled then draw that many', () => {
+  const { state, rng } = setupGame();
+  const h1 = createCard({ instanceId: 70, name: 'Potion', type: 'Trainer' });
+  const h2 = createCard({ instanceId: 71, name: 'Fire Energy', type: 'Energy' });
+  const h3 = createCard({ instanceId: 72, name: 'Water Energy', type: 'Energy' });
+  state.players.p2.zones.hand.push(h1, h2, h3);
+  state.players.p2.zones.deck.push(
+    createCard({ instanceId: 80, name: 'Deck A' }),
+    createCard({ instanceId: 81, name: 'Deck B' })
+  );
+  const peeking = createCard({
+    instanceId: 73,
+    name: 'Peeking Red Card',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: 'Your opponent reveals their hand. You may have your opponent count the cards in their hand, shuffle those cards into their deck, then draw that many cards.',
+  });
+  state.players.p1.zones.hand.push(peeking);
+
+  const res = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 73 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null, 'no picker for a whole-hand shuffle');
+  assert.equal(res.state.players.p2.zones.hand.length, 3, 'drew that many');
+  assert.equal(res.state.players.p2.zones.deck.length, 2, '3 shuffled in, 3 drawn out');
+  assert.ok(res.state.players.p2.zones.hand.every((c) => [70, 71, 72, 80, 81].includes(c.instanceId)));
+});
+
+test('Sophocles: discard-2 cost is charged before the draw', () => {
+  const { state, rng } = setupGame();
+  const f1 = createCard({ instanceId: 90, name: 'Fodder A', type: 'Trainer' });
+  const f2 = createCard({ instanceId: 91, name: 'Fodder B', type: 'Trainer' });
+  const f3 = createCard({ instanceId: 92, name: 'Fodder C', type: 'Trainer' });
+  const sophocles = createCard({
+    instanceId: 93,
+    name: 'Sophocles',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: 'Discard 2 cards from your hand. If you do, draw 4 cards.',
+  });
+  state.players.p1.zones.hand.push(f1, f2, f3, sophocles);
+  for (let i = 0; i < 4; i++) {
+    state.players.p1.zones.deck.push(createCard({ instanceId: 100 + i, name: `Deck ${i}` }));
+  }
+
+  const step1 = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 93 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(step1.error, null);
+  assert.ok(step1.pendingChoice);
+  assert.equal(step1.pendingChoice.min, 2);
+  assert.deepEqual(
+    step1.pendingChoice.options.map((o) => o.instanceId).sort(),
+    [90, 91, 92]
+  );
+  const step2 = applyCommand(
+    step1.state,
+    {
+      type: 'resolveChoice',
+      payload: { choiceId: step1.pendingChoice.choiceId, selection: [90, 91] },
+      playerId: 'p1',
+    },
+    rng
+  );
+  assert.equal(step2.error, null);
+  // The two fodder plus the resolved Sophocles itself land in the discard.
+  assert.deepEqual(
+    step2.state.players.p1.zones.discard.map((c) => c.instanceId).sort((a, b) => a - b),
+    [90, 91, 93]
+  );
+  assert.equal(step2.state.players.p1.zones.hand.length, 5, '1 kept + 4 drawn');
+});
+
+test('Cyrus Prism Star: the opponent keeps 2 Benched Pokémon', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.length = 0;
+  state.players.p1.zones.active.push(
+    createCard({ instanceId: 1, name: 'Wailord', hp: 200, types: ['Water'], supertype: 'Pokémon' })
+  );
+  state.players.p2.zones.bench.push(
+    ...[60, 61, 62, 63].map((id) =>
+      createCard({ instanceId: id, name: `Benched ${id}`, hp: 60, supertype: 'Pokémon' })
+    )
+  );
+  state.players.p2.zones.bench.push(
+    createCard({ instanceId: 64, name: 'Water Energy', type: 'Energy', attachedTo: 60 })
+  );
+  const cyrus = createCard({
+    instanceId: 65,
+    name: 'Cyrus Prism Star',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    subtypes: ['Prism Star'],
+    text: 'You can play this card only if your Active Pokémon is a {W} or {M} Pokémon. Your opponent chooses 2 Benched Pokémon and shuffles the others, and all cards attached to them, into their deck.',
+  });
+  state.players.p1.zones.hand.push(cyrus);
+
+  const played = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 65 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(played.error, null);
+  assert.equal(played.pendingChoice?.player, 'p2', 'the opponent chooses what to keep');
+  assert.equal(played.pendingChoice.min, 2);
+
+  const keep = [60, 61];
+  const done = applyCommand(
+    played.state,
+    {
+      type: 'resolveChoice',
+      payload: { choiceId: played.pendingChoice.choiceId, selection: keep },
+      playerId: 'p2',
+    },
+    rng
+  );
+  assert.equal(done.error, null);
+  const benchIds = done.state.players.p2.zones.bench.map((c) => c.instanceId).sort((a, b) => a - b);
+  assert.deepEqual(benchIds, [60, 61, 64], 'kept roots plus the Energy on 60');
+  const deckIds = done.state.players.p2.zones.deck.map((c) => c.instanceId);
+  assert.ok(deckIds.includes(62) && deckIds.includes(63), 'the others shuffled in');
+});
+
+test('Ultra Forest Kartenvoy: Ultra Beast attacks ignore defender effects this turn', () => {
+  const { state, rng } = setupGame();
+  state.players.p2.zones.active.length = 0;
+  const defender = createCard({ instanceId: 200, name: 'Wall', hp: 300, supertype: 'Pokémon' });
+  const tool = createCard({
+    instanceId: 201,
+    name: 'Hard Charm',
+    supertype: 'Trainer',
+    trainerType: 'Tool',
+    text: "The Pokémon this card is attached to takes 20 less damage from your opponent's attacks (after applying Weakness and Resistance).",
+    attachedTo: 200,
+  });
+  state.players.p2.zones.active.push(defender, tool);
+  const ub = createCard({
+    instanceId: 202,
+    name: 'Naganadel',
+    hp: 130,
+    supertype: 'Pokémon',
+    subtypes: ['Basic', 'Ultra Beast'],
+    attacks: [{ name: 'Beast Raid', cost: [], damage: 100 }],
+  });
+  state.players.p1.zones.active.length = 0;
+  state.players.p1.zones.active.push(ub);
+  const kartenvoy = createCard({
+    instanceId: 203,
+    name: 'Ultra Forest Kartenvoy',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: 'During this turn, damage from your Ultra Beasts’ attacks isn’t affected by any effects on your opponent’s Active Pokémon.',
+  });
+  state.players.p1.zones.hand.push(kartenvoy);
+
+  const played = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 203 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(played.error, null);
+  const hit = applyCommand(
+    played.state,
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(hit.error, null);
+  assert.equal(hit.state.players.p2.zones.active[0].damage, 100, 'the 20-less Tool is ignored');
+});
+
+test('Will: the chosen first coin face is forced once', () => {
+  const { state } = setupGame();
+  const will = createCard({
+    instanceId: 210,
+    name: 'Will',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: 'The next time you flip any number of coins for the effect of an attack, Ability, or Trainer card this turn, choose heads or tails for the first coin flip.',
+  });
+  state.players.p1.zones.hand.push(will);
+  const played = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 210 }, playerId: 'p1' },
+    createRng(7)
+  );
+  assert.equal(played.error, null);
+  assert.ok(played.pendingChoice, 'Will asks heads or tails');
+  assert.deepEqual(
+    played.pendingChoice.options.map((o) => o.instanceId),
+    [-3, -4]
+  );
+  const chosen = applyCommand(
+    played.state,
+    {
+      type: 'resolveChoice',
+      payload: { choiceId: played.pendingChoice.choiceId, selection: [-3] },
+      playerId: 'p1',
+    },
+    createRng(7)
+  );
+  assert.equal(chosen.error, null);
+  assert.equal(chosen.state.players.p1.flags.willFirstCoin, 'heads');
+
+  const item = createCard({
+    instanceId: 211,
+    name: 'Coin Item',
+    supertype: 'Trainer',
+    trainerType: 'Item',
+    text: 'Flip a coin. If heads, draw 2 cards.',
+  });
+  chosen.state.players.p1.zones.hand.push(item);
+  for (let i = 0; i < 2; i++) {
+    chosen.state.players.p1.zones.deck.push(createCard({ instanceId: 220 + i, name: `D${i}` }));
+  }
+  // An RNG that would flip tails every time.
+  const tailsRng = { next: () => 0.99, cursor: 0 };
+  const flipped = applyCommand(
+    chosen.state,
+    { type: 'playTrainer', payload: { instanceId: 211 }, playerId: 'p1' },
+    tailsRng
+  );
+  assert.equal(flipped.error, null);
+  assert.equal(flipped.state.players.p1.zones.hand.length, 2, 'heads was forced');
+  assert.equal(flipped.state.players.p1.flags.willFirstCoin, undefined, 'one-shot consumed');
+});
+
+test('Mars: a non-Supporter random card is still discarded', () => {
+  const { state, rng } = setupGame();
+  const randomCard = createCard({ instanceId: 110, name: 'Fire Energy', type: 'Energy' });
+  state.players.p2.zones.hand.push(randomCard);
+  for (let i = 0; i < 2; i++) {
+    state.players.p1.zones.deck.push(createCard({ instanceId: 120 + i, name: `Deck ${i}` }));
+  }
+  const mars = createCard({
+    instanceId: 130,
+    name: 'Mars',
+    supertype: 'Trainer',
+    trainerType: 'Supporter',
+    text: "Draw 2 cards. If you do, discard a random card from your opponent's hand.",
+  });
+  state.players.p1.zones.hand.push(mars);
+
+  const res = applyCommand(
+    state,
+    { type: 'playTrainer', payload: { instanceId: 130 }, playerId: 'p1' },
+    rng
+  );
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 2, 'drew 2');
+  assert.equal(res.state.players.p2.zones.hand.length, 0);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === 110));
+});

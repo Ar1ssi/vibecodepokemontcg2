@@ -187,12 +187,31 @@ export function shuffleInPlace(rng, array) {
  */
 export function flipCoin(rng) {
   const face = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
-  return rng?.forcedCoin || face;
+  if (rng?.forcedCoin) {
+    const forced = rng.forcedCoin;
+    // A one-shot force (Will) is consumed by the first flip it governs. The
+    // usage marker is a shared object so it survives Object.create chains.
+    if (rng.forcedCoinOnce) {
+      rng.forcedCoin = null;
+      if (rng.forcedCoinUsed) rng.forcedCoinUsed.value = true;
+    }
+    return forced;
+  }
+  return face;
 }
 
 /** `rng` with every `flipCoin` result forced to `face`; other draws are unchanged. */
 export function withForcedCoin(rng, face) {
   const forced = Object.create(rng);
   forced.forcedCoin = face;
+  return forced;
+}
+
+/** `rng` with only the next `flipCoin` forced to `face` (Will). */
+export function withForcedCoinOnce(rng, face) {
+  const forced = Object.create(rng);
+  forced.forcedCoin = face;
+  forced.forcedCoinOnce = true;
+  forced.forcedCoinUsed = { value: false };
   return forced;
 }

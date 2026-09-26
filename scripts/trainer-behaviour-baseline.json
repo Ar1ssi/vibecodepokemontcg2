@@ -1,9 +1,17 @@
 {
- "cards": 1348,
+ "cards": 1560,
  "entries": {
   "Aaron’s Collection#71xvih": {
    "steps": [
     "recursion"
+   ]
+  },
+  "Academy at Night#1ay2btx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Accompanying Flute#r0b6hj": {
@@ -45,6 +53,7 @@
   },
   "Adaman#zw3xno": {
    "steps": [
+    "discardCost",
     "searchDeck"
    ]
   },
@@ -79,6 +88,14 @@
     "recursion"
    ]
   },
+  "Aether Paradise Conservation Area#bq88k1": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Agatha#169ibko": {
    "steps": [
     "moveDamageCounters"
@@ -101,6 +118,14 @@
    ]
   },
   "Alakazam Spirit Link#zfwvvk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "All-Night Party#1tjkpdw": {
    "gaps": [
     "passive-only"
    ],
@@ -131,6 +156,19 @@
   "Alph Lithograph#yg3w9e": {
    "steps": [
     "shuffleDeckOnly"
+   ]
+  },
+  "Altar of the Moone#hhj98w": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Altar of the Sunne#ou7rh3": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Altaria Spirit Link#1ab1vzc": {
@@ -183,6 +221,14 @@
     "passive"
    ]
   },
+  "Ancient Ruins#4inuqj": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Ancient Technical Machine [Ice]#42lk8g": {
    "steps": [
     "attachAttackTool"
@@ -198,6 +244,22 @@
     "attachAttackTool"
    ]
   },
+  "Ancient Tomb#1hl5chh": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Ange Floette#pscpqc": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Anthea & Concordia#17s1l2a": {
    "gaps": [
     "passive-only"
@@ -211,17 +273,17 @@
     "fossilItem"
    ]
   },
-  "Antique Cover Fossil#1c5ieek": {
+  "Antique Cover Fossil · 60 HP#1c5ieek": {
    "steps": [
     "fossilItem"
    ]
   },
-  "Antique Dome Fossil#gcvvwo": {
+  "Antique Dome Fossil · 60 HP#gcvvwo": {
    "steps": [
     "fossilItem"
    ]
   },
-  "Antique Helix Fossil#17bltkn": {
+  "Antique Helix Fossil · 60 HP#17bltkn": {
    "steps": [
     "fossilItem"
    ]
@@ -231,7 +293,7 @@
     "fossilItem"
    ]
   },
-  "Antique Old Amber#1oqahkw": {
+  "Antique Old Amber · 60 HP#1oqahkw": {
    "steps": [
     "fossilItem"
    ]
@@ -241,7 +303,7 @@
     "fossilItem"
    ]
   },
-  "Antique Root Fossil#1rwxrf6": {
+  "Antique Root Fossil · 60 HP#1rwxrf6": {
    "steps": [
     "fossilItem"
    ]
@@ -254,6 +316,14 @@
   "Antique Skull Fossil#ubqxbr": {
    "steps": [
     "fossilItem"
+   ]
+  },
+  "Apricorn Forest#hxhv00": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Apricorn Maker#2m5q6s": {
@@ -297,17 +367,17 @@
     "searchDeck"
    ]
   },
+  "Area Zero Underdepths#1g5aqek": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Arezu#1cvku5a": {
    "steps": [
     "searchDeck"
    ]
   },
-  "Armor Fossil Shieldon#1fnmd37": {
-   "steps": [
-    "lookAtBottom"
-   ]
-  },
-  "Armor Fossil#1lvipqm": {
+  "Armor Fossil · 50 HP#1lvipqm": {
    "gaps": [
     "passive-only"
    ],
@@ -315,9 +385,22 @@
     "passive"
    ]
   },
+  "Armor Fossil Shieldon#1fnmd37": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
   "Aroma Lady#q8ge6t": {
    "steps": [
     "draw",
+    "passive"
+   ]
+  },
+  "Artazon#mmtg2j": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
     "passive"
    ]
   },
@@ -329,6 +412,14 @@
   "Arven#13plb2z": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Aspertia City Gym#13sqxwb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Assault Vest#ij23tg": {
@@ -415,14 +506,46 @@
     "draw"
    ]
   },
+  "Battle Cage#1tqhsk4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Battle City#7lsm8v": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Battle Compressor Team Flare Gear#zx85qb": {
    "steps": [
     "searchDeck"
    ]
   },
+  "Battle Frontier#hflh56": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Battle Reporter#1tvoatt": {
    "steps": [
     "drawUntil"
+   ]
+  },
+  "Battle Tower#7x1vei": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Battle VIP Pass#1w2ooiq": {
@@ -434,6 +557,14 @@
   "Bea#k5edpa": {
    "steps": [
     "millSelf"
+   ]
+  },
+  "Beach Court#1wtvb5m": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Beast Ball#1kqqehy": {
@@ -587,7 +718,7 @@
   },
   "Bill’s Teleporter#omdriy": {
    "steps": [
-    "draw"
+    "coinFlip"
    ]
   },
   "Bill’s Transfer#29g330": {
@@ -645,6 +776,14 @@
     "passive-only"
    ],
    "playCondition": "morePrizesThanOpponent",
+   "steps": [
+    "passive"
+   ]
+  },
+  "Black Market Prism Star#17br2on": {
+   "gaps": [
+    "passive-only"
+   ],
    "steps": [
     "passive"
    ]
@@ -711,6 +850,11 @@
    ],
    "steps": [
     "passive"
+   ]
+  },
+  "Blizzard Town#15nc0o7": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Blowtorch#1477t3c": {
@@ -834,6 +978,14 @@
     "shuffleFromDiscard"
    ]
   },
+  "Brock’s Pewter City Gym#hixzfj": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Brock’s Protection#hde4lb": {
    "gaps": [
     "passive-only"
@@ -860,6 +1012,24 @@
   "Brock#saocv9": {
    "steps": [
     "healEachActive"
+   ]
+  },
+  "Broken Ground Gym#38etc5": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Broken Time-Space#1hiujz9": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Brooklet Hill#67thb6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Bruno#1uqu563": {
@@ -917,12 +1087,21 @@
   },
   "Bug Catcher#10ijf22": {
    "steps": [
+    "coinFlip",
     "draw"
    ]
   },
   "Bug Catching Set#1kbixb4": {
    "steps": [
     "lookAtTop"
+   ]
+  },
+  "Burned Tower#1nz999w": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Burning Scarf#1n1yin7": {
@@ -954,6 +1133,22 @@
   "Caitlin#1uasgxx": {
    "steps": [
     "putHandOnBottom"
+   ]
+  },
+  "Calamitous Snowy Mountain#173faof": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Calamitous Wasteland#1ortb0w": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Call Bell#1jmjjvr": {
@@ -1064,9 +1259,27 @@
     "draw"
    ]
   },
+  "Celadon City Gym#j940x": {
+   "steps": [
+    "clearStatus"
+   ]
+  },
+  "Celebratory Fanfare#vl24vd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Celio’s Network#1836n7l": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Cerulean City Gym#17j8h8g": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Cessation Crystal#1j3g599": {
@@ -1082,9 +1295,53 @@
     "draw"
    ]
   },
+  "Champion’s Room#1yk06xm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Champions Festival#1wstow0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Champions Festival#wl7o98": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Championship Arena#196tzih": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Channeler#18pmt8c": {
    "steps": [
     "clearAttackEffects"
+   ]
+  },
+  "Chaos Gym#62r9c1": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Chaos Tower#1r1ii7q": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Chaotic Swell#wwg7yt": {
+   "steps": [
+    "discardStadium"
    ]
   },
   "Charity#1w3zd3n": {
@@ -1183,9 +1440,22 @@
     "searchDeck"
    ]
   },
+  "Cinnabar City Gym#wqppie": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Ciphermaniac’s Codebreaking#bejyg8": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Circhester Bath#1msr5ms": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Clavell#1wxd7kp": {
@@ -1193,41 +1463,41 @@
     "searchDeck"
    ]
   },
+  "Claw Fossil · 40 HP#19kwe37": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil · 40 HP#19my7c3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil · 40 HP#1cjn1c2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil · 40 HP#51weil": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Claw Fossil Anorith#1syr0c6": {
    "steps": [
     "lookAtBottom"
-   ]
-  },
-  "Claw Fossil#19kwe37": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Claw Fossil#19my7c3": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Claw Fossil#1cjn1c2": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Claw Fossil#51weil": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
    ]
   },
   "Clay#134nfrs": {
@@ -1243,7 +1513,7 @@
     "passive"
    ]
   },
-  "Clefairy Doll#zed4wn": {
+  "Clefairy Doll · 10 HP#zed4wn": {
    "gaps": [
     "passive-only"
    ],
@@ -1279,6 +1549,11 @@
     "passive"
    ]
   },
+  "Collapsed Stadium#udkr9z": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Colress Machine#v2u6ty": {
    "steps": [
     "searchDeck"
@@ -1297,6 +1572,14 @@
   "Colress#1pibqr": {
    "steps": [
     "shuffleHandThenDraw"
+   ]
+  },
+  "Community Center#xjm31a": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Computer Error#ylqrrd": {
@@ -1319,6 +1602,14 @@
    "steps": [
     "discardCost",
     "searchDeck"
+   ]
+  },
+  "Conductive Quarry#1sylwf8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Cook#f271kw": {
@@ -1397,6 +1688,7 @@
   },
   "Crasher Wake#o4fz1l": {
    "steps": [
+    "discardCost",
     "searchDeck"
    ]
   },
@@ -1407,7 +1699,8 @@
   },
   "Cross Switcher#1p2gyb4": {
    "steps": [
-    "switchOpponent"
+    "switchOpponent",
+    "switchOwn"
    ]
   },
   "Crossceiver#djznrq": {
@@ -1431,6 +1724,22 @@
   "Crushing Hammer#tzzqjj": {
    "steps": [
     "coinFlip"
+   ]
+  },
+  "Crystal Beach#phev3v": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Crystal Cave#gg9jek": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Crystal Edge#1qfkjzn": {
@@ -1497,10 +1806,26 @@
     "passive"
    ]
   },
+  "Cursed Stone#1ijvldb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Custom Catcher#ux11hl": {
    "steps": [
     "drawUntil",
     "switchOpponent"
+   ]
+  },
+  "Cycling Road#170y0cz": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Cyllene#1c6pnv7": {
@@ -1548,8 +1873,9 @@
    ]
   },
   "Cyrus Prism Star#v97jux": {
-   "gaps": [
-    "unrecognizable"
+   "playCondition": "activeType=W|M",
+   "steps": [
+    "opponentShuffleBenchToDeck"
    ]
   },
   "Cyrus’s Conspiracy#1wcdixn": {
@@ -1608,6 +1934,14 @@
     "applyStatus"
    ]
   },
+  "Dark City#b39ht2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Dark Claw#fwloly": {
    "gaps": [
     "passive-only"
@@ -1627,6 +1961,14 @@
    ]
   },
   "Dashing Pouch#6q6es0": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Dawn Stadium#xrox0x": {
    "gaps": [
     "passive-only"
    ],
@@ -1706,6 +2048,14 @@
     "searchDeck"
    ]
   },
+  "Desert Ruins#tnvp5u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Desert Shaman#14ncrgd": {
    "steps": [
     "shuffleHandThenDraw"
@@ -1729,6 +2079,14 @@
   "Devolution Spray#u89248": {
    "steps": [
     "devolve"
+   ]
+  },
+  "Devoured Field#6qc19c": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Diantha#28mlre": {
@@ -1755,9 +2113,25 @@
     "passive"
    ]
   },
+  "Dimension Valley#1tiqsxb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Dive Ball#11fbxgq": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Dizzying Valley#1kpciz5": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Doctor#b4hxi5": {
@@ -1765,14 +2139,14 @@
     "draw"
    ]
   },
+  "Dome Fossil · 50 HP#14uval6": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
   "Dome Fossil Kabuto#1sempr3": {
    "steps": [
     "lookAtBottom"
-   ]
-  },
-  "Dome Fossil#14uval6": {
-   "steps": [
-    "searchDeck"
    ]
   },
   "Double Full Heal#i8oyu": {
@@ -1788,6 +2162,7 @@
   },
   "Dowsing Machine#1qmlbh6": {
    "steps": [
+    "discardCost",
     "recursion"
    ]
   },
@@ -1805,6 +2180,14 @@
    ]
   },
   "Dragonium Z: Dragon Claw#jhxsnr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Drake’s Stadium#1xj9v0g": {
    "gaps": [
     "passive-only"
    ],
@@ -1870,6 +2253,16 @@
     "searchEvolve"
    ]
   },
+  "Dust Island#y9ctbn": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Dyna Tree Hill#r4r99l": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Ear-Ringing Bell#2quwk5": {
    "gaps": [
     "passive-only"
@@ -1900,6 +2293,11 @@
   "Eco Arm#zi7z43": {
    "steps": [
     "shuffleFromDiscard"
+   ]
+  },
+  "Ecogym#1gz942h": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Egg Incubator#1wfxhbr": {
@@ -2163,6 +2561,14 @@
     "searchDeck"
    ]
   },
+  "Energy Stadium#vxkbi5": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Energy Sticker#1q59eam": {
    "steps": [
     "attachFromDiscard"
@@ -2372,10 +2778,10 @@
   },
   "Faba#oae9tl": {
    "steps": [
-    "discardFromOpponent"
+    "toolOrStadiumToLostZone"
    ]
   },
-  "Fairy Charm {#14bxq6u": {
+  "Faded Town#1n2k35p": {
    "gaps": [
     "passive-only"
    ],
@@ -2383,7 +2789,7 @@
     "passive"
    ]
   },
-  "Fairy Charm {#1m90z2u": {
+  "Fairy Charm {F}#1mw9wnq": {
    "gaps": [
     "passive-only"
    ],
@@ -2391,7 +2797,7 @@
     "passive"
    ]
   },
-  "Fairy Charm {#1mw9wnq": {
+  "Fairy Charm {G}#ef6986": {
    "gaps": [
     "passive-only"
    ],
@@ -2399,7 +2805,7 @@
     "passive"
    ]
   },
-  "Fairy Charm {#5505zq": {
+  "Fairy Charm {L}#5505zq": {
    "gaps": [
     "passive-only"
    ],
@@ -2407,7 +2813,15 @@
     "passive"
    ]
   },
-  "Fairy Charm {#ef6986": {
+  "Fairy Charm {N}#1m90z2u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fairy Charm {P}#14bxq6u": {
    "gaps": [
     "passive-only"
    ],
@@ -2434,6 +2848,14 @@
   "Fairy Drop#1lu9rxc": {
    "steps": [
     "healAmount"
+   ]
+  },
+  "Fairy Garden#epliwi": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Falkner#1ta67ji": {
@@ -2490,6 +2912,14 @@
     "lookAtTop"
    ]
   },
+  "Festival Grounds#u9iatk": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Field Blower#1t91apb": {
    "steps": [
     "discardTools"
@@ -2536,6 +2966,14 @@
    ]
   },
   "Fighting Memory#1xisnwa": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fighting Stadium#10e418w": {
    "gaps": [
     "passive-only"
    ],
@@ -2672,6 +3110,19 @@
     "lookAtTop"
    ]
   },
+  "Forest of Giant Plants#125fmwv": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Forest of Vitality#lyzuof": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Forest Seal Stone#15dwt1n": {
    "steps": [
     "searchDeck"
@@ -2695,6 +3146,14 @@
   "Fossil Excavator#1cghara": {
    "gaps": [
     "unrecognizable"
+   ]
+  },
+  "Fossil Quarry#jw51xf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Fossil Researcher#meuy9a": {
@@ -2737,12 +3196,33 @@
     "draw"
    ]
   },
+  "Frozen City#1napva8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Fuchsia City Gym#11x3bvw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Full Face Guard#1nv0024": {
    "gaps": [
     "passive-only"
    ],
    "steps": [
     "passive"
+   ]
+  },
+  "Full Flame#11ibh6o": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Full Heal#16wqr0t": {
@@ -2761,6 +3241,14 @@
   "Full Heal#hoyl17": {
    "steps": [
     "clearStatus"
+   ]
+  },
+  "Full Metal Lab#1w36iw1": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Furisode Girl#19y3hkn": {
@@ -2792,6 +3280,22 @@
     "passive"
    ]
   },
+  "Galactic HQ#lyjffd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Galar Mine#1b0lwxx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Galarian Chestplate#19xvl3c": {
    "gaps": [
     "passive-only"
@@ -2813,6 +3317,11 @@
     "coinFlip"
    ]
   },
+  "Gapejaw Bog#1tybb59": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Garchomp Spirit Link#10tobkr": {
    "gaps": [
     "passive-only"
@@ -2823,6 +3332,7 @@
   },
   "Gardenia’s Vigor#e619yn": {
    "steps": [
+    "attachFromHand",
     "draw"
    ]
   },
@@ -2878,6 +3388,19 @@
     "passive"
    ]
   },
+  "Giant Hearth#6wt8qf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Giant Stump#lxyd3o": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Giovanni’s Charisma#17ya5qr": {
    "steps": [
     "attachFromHand"
@@ -2900,6 +3423,14 @@
    ]
   },
   "Giovanni#huvou": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Glacia’s Stadium#17el6dl": {
    "gaps": [
     "passive-only"
    ],
@@ -2932,6 +3463,14 @@
   "Glass Trumpet#1p2erbl": {
    "steps": [
     "attachFromDiscard"
+   ]
+  },
+  "Glimwood Tangle#qfkkf8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Gloria#9uvu81": {
@@ -2980,6 +3519,22 @@
     "opponentHandBottom"
    ]
   },
+  "Grand Tree#1evmrui": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Granite Cave#18ogbxn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Grant#33uxk": {
    "gaps": [
     "passive-only"
@@ -3009,6 +3564,11 @@
     "passive"
    ]
   },
+  "Gravity Mountain#l40ec7": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Great Ball#175fcbm": {
    "steps": [
     "searchDeck"
@@ -3026,6 +3586,7 @@
   },
   "Great Catcher#1ppnlcj": {
    "steps": [
+    "discardCost",
     "switchOpponent"
    ]
   },
@@ -3094,7 +3655,8 @@
   },
   "Guzma#ju04ij": {
    "steps": [
-    "switchOpponent"
+    "switchOpponent",
+    "switchOwn"
    ]
   },
   "Gwynn#vh6z4y": {
@@ -3203,9 +3765,25 @@
     "passive"
    ]
   },
+  "Healing Field#1e2h448": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Healing Scarf#1m4d1u5": {
    "steps": [
     "healAmount"
+   ]
+  },
+  "Heat Factory Prism Star#r0m3qf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Heavy Ball#llndw8": {
@@ -3226,14 +3804,14 @@
     "passive"
    ]
   },
+  "Helix Fossil · 50 HP#11qaq43": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
   "Helix Fossil Omanyte#td1k2w": {
    "steps": [
     "lookAtBottom"
-   ]
-  },
-  "Helix Fossil#11qaq43": {
-   "steps": [
-    "searchDeck"
    ]
   },
   "Here Comes Team Rocket!#1t6a3zu": {
@@ -3270,6 +3848,11 @@
     "passive"
    ]
   },
+  "High Pressure System#l5vzms": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Hiker#1i5m7z7": {
    "steps": [
     "lookAtTop"
@@ -3295,6 +3878,14 @@
     "draw"
    ]
   },
+  "Holon Circle#scliqr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Holon Farmer#kel2b9": {
    "steps": [
     "discardCost",
@@ -3306,10 +3897,23 @@
     "coinFlip"
    ]
   },
+  "Holon Lake#f6td9s": {
+   "steps": [
+    "searchDeck"
+   ]
+  },
   "Holon Lass#ulirrl": {
    "steps": [
     "discardCost",
     "lookAtTop"
+   ]
+  },
+  "Holon Legacy#1gogy25": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Holon Mentor#ij0bg4": {
@@ -3317,9 +3921,19 @@
     "searchDeck"
    ]
   },
+  "Holon Research Tower#13cvw0w": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Holon Researcher#b3fa37": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Holon Ruins#56ldr9": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Holon Scientist#1n2nyxz": {
@@ -3449,6 +4063,14 @@
     "opponentShuffleHandDraw"
    ]
   },
+  "Indigo Plateau#d5970y": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Ingo & Emmet#1gokqxi": {
    "steps": [
     "discardHandThenDraw"
@@ -3496,6 +4118,14 @@
     "draw"
    ]
   },
+  "Island Cave#f2mk83": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Island Challenge Amulet#1qedcl3": {
    "gaps": [
     "passive-only"
@@ -3525,6 +4155,14 @@
    ]
   },
   "Jamming Net Team Flare Hyper Gear#5h9grs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Jamming Tower#ls2x70": {
    "gaps": [
     "passive-only"
    ],
@@ -3568,6 +4206,14 @@
   "Jett#g3qqze": {
    "steps": [
     "variableDraw"
+   ]
+  },
+  "Jubilife Village#1v3ye01": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Judge Whistle#1l49951": {
@@ -3735,6 +4381,19 @@
     "searchDeck"
    ]
   },
+  "Lake Acuity#sb9i2h": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lake Boundary#1jkt4f8": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Lana’s Aid#w3zvqh": {
    "steps": [
     "recursion"
@@ -3792,6 +4451,14 @@
    ]
   },
   "Latios Spirit Link#bztgs4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lavender Town#14iwsyr": {
    "gaps": [
     "passive-only"
    ],
@@ -3859,7 +4526,23 @@
     "coinFlip"
    ]
   },
+  "Levincia#1ylzwpt": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Life Dew#1qv6fqn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Life Forest Prism Star#1p22m6v": {
    "gaps": [
     "passive-only"
    ],
@@ -3918,7 +4601,7 @@
     "passive"
    ]
   },
-  "Lillie’s Poké Doll#1w8pkz3": {
+  "Lillie’s Poké Doll · 30 HP#1w8pkz3": {
    "steps": [
     "fossilItem"
    ]
@@ -3936,6 +4619,14 @@
   "Lisia#13uym91": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Lively Stadium#1blshf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Looker Whistle#tl5dxs": {
@@ -3959,6 +4650,11 @@
     "lostZoneCost"
    ]
   },
+  "Lost City#cgc7zw": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Lost Remover#2uwa9": {
    "steps": [
     "sendEnergyToLostZone"
@@ -3970,9 +4666,25 @@
     "toolOrStadiumToLostZone"
    ]
   },
+  "Lost World#7hufhq": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Love Ball#1rdm8gm": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Low Pressure System#1b2d2rf": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Lt. Surge’s Bargain#n92d8": {
@@ -4057,6 +4769,14 @@
     "healAmount"
    ]
   },
+  "Lucky Stadium#bso23t": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Lum Berry#1ttsgen": {
    "gaps": [
     "passive-only"
@@ -4074,6 +4794,14 @@
    ]
   },
   "Lum Berry#e3j097": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Lumiose City#1y5e4lk": {
    "gaps": [
     "passive-only"
    ],
@@ -4128,6 +4856,14 @@
     "searchDeck"
    ]
   },
+  "Lysandre Labs#fbu0w": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Lysandre Prism Star#19ckp6q": {
    "steps": [
     "opponentDiscardToLostZonePerPokemon"
@@ -4143,7 +4879,28 @@
     "switchOpponent"
    ]
   },
+  "Magma Basin#1ouzs6d": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Magma Pointer#12eis20": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Magnetic Storm#1cjgq4d": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Magnetic Storm#rhd5k6": {
    "gaps": [
     "passive-only"
    ],
@@ -4217,7 +4974,16 @@
   },
   "Mars#k5zo7t": {
    "steps": [
+    "discardRandomOpponentHandIfSupporter",
     "draw"
+   ]
+  },
+  "Martial Arts Dojo#jm2rtp": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Mary’s Impulse#1f2p3u3": {
@@ -4276,17 +5042,17 @@
   },
   "Max Potion#13a0ctl": {
    "steps": [
-    "heal"
+    "healOneDiscardEnergy"
    ]
   },
   "Max Potion#6jmf6j": {
    "steps": [
-    "heal"
+    "healOneDiscardEnergy"
    ]
   },
   "Max Potion#vsf0fc": {
    "steps": [
-    "heal"
+    "healOneDiscardEnergy"
    ]
   },
   "Max Revive#1ejpvxl": {
@@ -4393,6 +5159,14 @@
     "passive"
    ]
   },
+  "Mesagoza#16ku4cd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Metal Core Barrier#3i7x6e": {
    "gaps": [
     "passive-only"
@@ -4427,7 +5201,23 @@
     "attachFromDiscard"
    ]
   },
+  "Meteor Falls#5ces1m": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Mewtwo Spirit Link#1xsnp9v": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Miasma Valley#o2x5y4": {
    "gaps": [
     "passive-only"
    ],
@@ -4484,6 +5274,14 @@
     "searchDeck"
    ]
   },
+  "Mirage Stadium#1d7m8ai": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Miriam#h797hi": {
    "steps": [
     "shuffleFromDiscard"
@@ -4503,6 +5301,14 @@
    "steps": [
     "discardCost",
     "searchDeck"
+   ]
+  },
+  "Misty’s Cerulean City Gym#163e9bz": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Misty’s Determination#1qkrpxc": {
@@ -4560,6 +5366,7 @@
   },
   "Molayne#8oqu7n": {
    "steps": [
+    "discardCost",
     "shuffleFromDiscard"
    ]
   },
@@ -4596,6 +5403,22 @@
     "passive"
    ]
   },
+  "Moonlight Stadium#1b7evhw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Moonlit Hill#qixo2v": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Morgan#1v4hcb6": {
    "steps": [
     "lookAtTop"
@@ -4613,6 +5436,22 @@
     "opponentHandShuffleDeck"
    ]
   },
+  "Mount Lanakila#1wulgji": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mountain Ring#852uym": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Mr. Briney’s Compassion#tbyk0x": {
    "steps": [
     "returnPokemonToHand"
@@ -4626,6 +5465,19 @@
   "Mr. Stone’s Project#n1cs91": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Mt. Coronet#55mbbm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Mt. Moon#eurywd": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Multi Switch#vw9mi": {
@@ -4646,7 +5498,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil#14qgz1q": {
+  "Mysterious Fossil · 10 HP#14qgz1q": {
    "gaps": [
     "passive-only"
    ],
@@ -4654,7 +5506,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil#173hz68": {
+  "Mysterious Fossil · 10 HP#19y7j4h": {
    "gaps": [
     "passive-only"
    ],
@@ -4662,7 +5514,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil#19y7j4h": {
+  "Mysterious Fossil · 10 HP#1dt5623": {
    "gaps": [
     "passive-only"
    ],
@@ -4670,7 +5522,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil#1dt5623": {
+  "Mysterious Fossil · 50 HP#173hz68": {
    "gaps": [
     "passive-only"
    ],
@@ -4691,6 +5543,14 @@
     "searchDeck"
    ]
   },
+  "Mystery Garden#mmnng9": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Mystery Plate ⍺#1grb0zu": {
    "steps": [
     "searchDeck"
@@ -4709,6 +5569,22 @@
   "Mystery Plate δ#gci5w3": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Mystery Zone#cdcwk4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "N’s Castle#1vxbb28": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "N’s Plan#p0emcd": {
@@ -4734,6 +5610,11 @@
   "Nanu#1f4cyt6": {
    "steps": [
     "swapWithDiscard"
+   ]
+  },
+  "Narrow Gym#oum1jz": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Naveen#9vwa9m": {
@@ -4764,6 +5645,14 @@
   "Net Ball#1ylh89u": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Neutralization Zone#vjrjp5": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "New Pokédex#1pktu5v": {
@@ -4799,6 +5688,14 @@
     "shuffleFromDiscard"
    ]
   },
+  "Nighttime Mine#99ceoo": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Ninja Boy#7q30d6": {
    "steps": [
     "searchDeck"
@@ -4808,6 +5705,11 @@
    "playCondition": "opponentActiveStage=Basic",
    "steps": [
     "opponentActiveEnergyToDeck"
+   ]
+  },
+  "No Removal Gym#19ha8q8": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Normalium Z: Tackle#15148y9": {
@@ -4841,12 +5743,20 @@
     "swapWithDiscard"
    ]
   },
+  "Old Amber · 50 HP#1rbxrsm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Old Amber Aerodactyl#1sb1w2p": {
    "steps": [
     "lookAtBottom"
    ]
   },
-  "Old Amber#1rbxrsm": {
+  "Old Cemetery#i8hirs": {
    "gaps": [
     "passive-only"
    ],
@@ -4871,6 +5781,7 @@
   },
   "Oleana#iihw5p": {
    "steps": [
+    "discardCost",
     "opponentHandBottom"
    ]
   },
@@ -4959,12 +5870,36 @@
     "passive"
    ]
   },
+  "Paradise Resort#1e4n5xo": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Parallel City#1xjdbi6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Parasol Lady#19x3k0a": {
    "steps": [
     "shuffleHandThenDraw"
    ]
   },
   "Passho Berry#1vbiz51": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Path to the Peak#ur16ds": {
    "gaps": [
     "passive-only"
    ],
@@ -5008,14 +5943,35 @@
     "searchDeck"
    ]
   },
+  "Perilous Jungle#12qam3y": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Perrin#2cpeqt": {
    "steps": [
     "searchDeck"
    ]
   },
+  "Pewter City Gym#v9bq3i": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Philippe#898m4": {
    "steps": [
     "attachMultipleFromDiscard"
+   ]
+  },
+  "Phoebe’s Stadium#1ppv7db": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Phoebe#1mt5ck": {
@@ -5049,6 +6005,14 @@
     "searchDeck"
    ]
   },
+  "Plasma Frigate#95whwy": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Plume Fossil#viv2da": {
    "steps": [
     "lookAtBottom"
@@ -5056,6 +6020,7 @@
   },
   "Plumeria#18utds4": {
    "steps": [
+    "discardCost",
     "discardEnergyFromOpponent"
    ]
   },
@@ -5082,6 +6047,14 @@
    ]
   },
   "PlusPower#b0f68p": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Po Town#dvwezb": {
    "gaps": [
     "passive-only"
    ],
@@ -5270,6 +6243,14 @@
     "healAmount"
    ]
   },
+  "Pokémon Center#bbmas7": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Pokémon Center#farpss": {
    "steps": [
     "healAllOwnAndDiscardEnergy"
@@ -5298,6 +6279,14 @@
   "Pokémon Communication#1bapps9": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Pokémon Contest Hall#yuchun": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Pokémon Fan Club#1uopyjq": {
@@ -5330,6 +6319,14 @@
     "reviveFromDiscard"
    ]
   },
+  "Pokémon League Headquarters#jnp28u": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Pokémon March#uhfnws": {
    "steps": [
     "searchDeck"
@@ -5337,12 +6334,25 @@
   },
   "Pokémon Nurse#1y8o21v": {
    "steps": [
-    "heal"
+    "healOneDiscardEnergy"
    ]
   },
   "Pokémon Nurse#fcw4gx": {
    "steps": [
     "healOneDiscardEnergy"
+   ]
+  },
+  "Pokémon Park#mzisia": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Pokémon Park#uzldqe": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Pokémon Personality Test#f8immy": {
@@ -5358,6 +6368,14 @@
   "Pokémon Rescue#18102l4": {
    "steps": [
     "recursion"
+   ]
+  },
+  "Pokémon Research Lab#16dr818": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Pokémon Retriever#fappsp": {
@@ -5385,6 +6403,11 @@
     "coinFlip"
    ]
   },
+  "Pokémon Tower#eblhvv": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Pokémon Trader#1u2qxv": {
    "gaps": [
     "unrecognizable"
@@ -5400,9 +6423,25 @@
     "lookAtTop"
    ]
   },
+  "PokéStop#tx2mgb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Poppy#1mrieg6": {
    "steps": [
     "moveEnergy"
+   ]
+  },
+  "Postwick#h96kdx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Pot Helmet#1cy23wu": {
@@ -5452,7 +6491,28 @@
     "passive"
    ]
   },
+  "Power Plant#1lj8jqz": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Power Plant#jk3on6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Power Tablet#i4qo56": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Power Tree#1g2bqxr": {
    "gaps": [
     "passive-only"
    ],
@@ -5463,6 +6523,14 @@
   "Powerglass#wbc74z": {
    "steps": [
     "attachFromDiscard"
+   ]
+  },
+  "Practice Studio#9tv845": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Precious Trolley#stuywz": {
@@ -5487,6 +6555,22 @@
    "steps": [
     "switchOpponent",
     "switchOwn"
+   ]
+  },
+  "Primordial Altar#495roi": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Prism Tower#1rijo9h": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Prof. Oak’s Research#1sywf44": {
@@ -5684,6 +6768,14 @@
     "revealUntilCard"
    ]
   },
+  "Radio Tower#gk580q": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Raifort#1ss73gn": {
    "steps": [
     "lookAtTop"
@@ -5769,7 +6861,7 @@
     "evolveStage2"
    ]
   },
-  "Rare Fossil#2bmm1t": {
+  "Rare Fossil · 70 HP#2bmm1t": {
    "steps": [
     "fossilItem"
    ]
@@ -5888,6 +6980,14 @@
     "opponentShuffleHandDraw"
    ]
   },
+  "Resistance Gym#nyexai": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Return Label#w9rh05": {
    "steps": [
     "opponentDiscardToDeckBottom"
@@ -5896,6 +6996,14 @@
   "Reversal Trigger#udifj1": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Reverse Valley#1fijcc8": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Revitalizer#1272hy4": {
@@ -5939,6 +7047,14 @@
     "opponentChoosesFromTop"
    ]
   },
+  "Risky Ruins#1bk3agn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Rival#1t9e0r2": {
    "steps": [
     "opponentChoosesFromTop"
@@ -5950,7 +7066,7 @@
     "recursion"
    ]
   },
-  "Robo Substitute Team Flare Gear#f5bcgs": {
+  "Robo Substitute Team Flare Gear · 30 HP#f5bcgs": {
    "steps": [
     "fossilItem"
    ]
@@ -5981,6 +7097,27 @@
     "ionoShuffle"
    ]
   },
+  "Rocket’s Hideout#50y9kg": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rocket’s Hideout#nrerbq": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Rocket’s Minefield Gym#f5atxn": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Rocket’s Mission#bop0xe": {
    "steps": [
     "draw"
@@ -5999,6 +7136,14 @@
   "Rocket’s Sneak Attack#3x9d8x": {
    "steps": [
     "opponentHandShuffleDeck"
+   ]
+  },
+  "Rocket’s Tricky Gym#1cwaqyw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Rocky Helmet#35yg0k": {
@@ -6032,44 +7177,44 @@
   },
   "Roller Skates#1utvcfv": {
    "steps": [
-    "draw"
+    "coinFlip"
+   ]
+  },
+  "Root Fossil · 40 HP#1ebuuqs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil · 40 HP#1rgszlr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil · 40 HP#f228fa": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil · 40 HP#f511lx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Root Fossil Lileep#7rnasc": {
    "steps": [
     "lookAtBottom"
-   ]
-  },
-  "Root Fossil#1ebuuqs": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Root Fossil#1rgszlr": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Root Fossil#f228fa": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Root Fossil#f511lx": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
    ]
   },
   "Rosa’s Encouragement#1ym480p": {
@@ -6082,6 +7227,14 @@
    "playCondition": "koedLastTurn",
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Rose Tower#1phk07f": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Rose#xki9h": {
@@ -6122,6 +7275,14 @@
   "Rotom Phone#1g24p04": {
    "steps": [
     "lookAtTop"
+   ]
+  },
+  "Rough Seas#109up78": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Roxanne#7axcvn": {
@@ -6169,6 +7330,11 @@
   "Ruin Wall#1ei12x4": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Ruins of Alph#1cjgq4d": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Rust Syndicate Grunt#n5h9te": {
@@ -6250,6 +7416,11 @@
     "passive"
    ]
   },
+  "Saffron City Gym#cai5f8": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Sage’s Training#glqda5": {
    "steps": [
     "lookAtTop"
@@ -6329,6 +7500,14 @@
     "returnPokemonToHand"
    ]
   },
+  "Scorched Earth#195948n": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Scorching Charcoal#1rd7uzp": {
    "gaps": [
     "passive-only"
@@ -6350,6 +7529,11 @@
   "Scramble Switch#s5zycp": {
    "steps": [
     "switchOwn"
+   ]
+  },
+  "Sea of Nothingness#e1ez5x": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Secret Box#1o6l2u4": {
@@ -6380,6 +7564,14 @@
     "switchOpponent"
    ]
   },
+  "Shadow Circle#1ew60da": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Shadow Triad#1j2a0zm": {
    "steps": [
     "recursion"
@@ -6404,6 +7596,32 @@
     "switchOwn"
    ]
   },
+  "Shopping Center#y95zhu": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Shrine of Memories#13fuwyr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Shrine of Punishment#lift03": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Sidney’s Stadium#qocokb": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Sidney#c95qi4": {
    "steps": [
     "revealOpponentHandDiscard"
@@ -6417,6 +7635,14 @@
   "Sightseer#tuem8b": {
    "steps": [
     "drawUntil"
+   ]
+  },
+  "Silent Lab#ifgffs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Silver Bangle#9nd2gu": {
@@ -6479,7 +7705,25 @@
     "healAmount"
    ]
   },
-  "Skull Fossil#1687sdy": {
+  "Skaters’ Park#1t406pb": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Skull Fossil · 50 HP#1687sdy": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sky Field#1szbz0m": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Sky Pillar#1cy5pix": {
    "gaps": [
     "passive-only"
    ],
@@ -6488,6 +7732,14 @@
    ]
   },
   "Sky Seal Stone#1rrpasr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Skyarrow Bridge#gk7ibt": {
    "gaps": [
     "passive-only"
    ],
@@ -6518,7 +7770,12 @@
     "passive"
    ]
   },
-  "Snorlax Doll#1is2mug": {
+  "Slumbering Forest#1glbwsc": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Snorlax Doll · 120 HP#1is2mug": {
    "gaps": [
     "passive-only"
    ],
@@ -6527,6 +7784,14 @@
    ]
   },
   "Snow Leaf Badge#1jiz08n": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Snowpoint Temple#mq63j7": {
    "gaps": [
     "passive-only"
    ],
@@ -6549,12 +7814,21 @@
   },
   "Sophocles#yeeb11": {
    "steps": [
+    "discardCost",
     "draw"
    ]
   },
   "Sordward & Shielbert#1ihd0sl": {
    "steps": [
     "draw"
+   ]
+  },
+  "Space Center#1p19t4n": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Spark#1mkhy04": {
@@ -6590,6 +7864,14 @@
     "opponentShuffleHandDraw"
    ]
   },
+  "Speed Stadium#9idz2y": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Spell Tag#mx1y29": {
    "gaps": [
     "passive-only"
@@ -6601,6 +7883,19 @@
   "Spicy Seasoned Curry#196ozu8": {
    "steps": [
     "healAmount"
+   ]
+  },
+  "Spikemuth Gym#10mau6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Spikemuth#l6cugb": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Spirit Mask#dmvoai": {
@@ -6619,6 +7914,14 @@
     "passive"
    ]
   },
+  "Sprout Tower#12wdzdm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Stadium Nav#1lsnxh0": {
    "steps": [
     "searchDeck"
@@ -6629,12 +7932,28 @@
     "searchDeck"
    ]
   },
+  "Stark Mountain#927xow": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Startling Megaphone#1vsq2g1": {
    "steps": [
     "discardTools"
    ]
   },
   "Stealthy Hood#1790viw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Steel Shelter#gyajq7": {
    "gaps": [
     "passive-only"
    ],
@@ -6670,6 +7989,22 @@
   "Steven#47g6ju": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Stormy Mountains#u5hw15": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Strange Cave#1clb1ci": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Strange Timepiece#1yfnmog": {
@@ -6718,6 +8053,14 @@
    ]
   },
   "Sun Seed#7l25fi": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Sunyshore City Gym#97it69": {
    "gaps": [
     "passive-only"
    ],
@@ -6806,11 +8149,13 @@
   },
   "Superior Energy Retrieval#1ferztr": {
    "steps": [
+    "discardCost",
     "recursion"
    ]
   },
   "Superior Energy Retrieval#1woedmi": {
    "steps": [
+    "discardCost",
     "recursion"
    ]
   },
@@ -6818,6 +8163,14 @@
    "steps": [
     "drawUntil",
     "switchOwn"
+   ]
+  },
+  "Surfing Beach#wh3s6d": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Surprise Box#16fcp83": {
@@ -6855,7 +8208,8 @@
   },
   "Switch Raft#13fmom3": {
    "steps": [
-    "healAmount"
+    "healAmount",
+    "switchOwn"
    ]
   },
   "Switch#1d9d95d": {
@@ -6943,6 +8297,11 @@
     "draw"
    ]
   },
+  "Team Aqua Hideout#19x4wcx": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Team Aqua Schemer#1crj4is": {
    "steps": [
     "draw"
@@ -6956,6 +8315,14 @@
   "Team Aqua’s Great Ball#wu70gz": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Team Aqua’s Secret Base#1laczxg": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Team Flare Grunt#wrckdp": {
@@ -7033,6 +8400,14 @@
     "draw"
    ]
   },
+  "Team Magma Hideout#wvtfx3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Team Magma Schemer#1v4rerb": {
    "steps": [
     "draw"
@@ -7046,6 +8421,14 @@
   "Team Magma’s Great Ball#1iwpvhp": {
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Team Magma’s Secret Base#1tcsf0s": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Team Plasma Badge#em1vsu": {
@@ -7087,6 +8470,14 @@
   "Team Rocket’s Evil Deeds#1va1dub": {
    "steps": [
     "opponentHandShuffleDeck"
+   ]
+  },
+  "Team Rocket’s Factory#wixmgd": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Team Rocket’s Giovanni#kfsn4j": {
@@ -7136,6 +8527,14 @@
   "Team Rocket’s Venture Bomb#1hy9u06": {
    "steps": [
     "coinFlip"
+   ]
+  },
+  "Team Rocket’s Watchtower#tjr8xn": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Team Skull Grunt#1rw0svv": {
@@ -7213,7 +8612,7 @@
   },
   "Technical Machine: Fluorite#16021jo": {
    "steps": [
-    "heal"
+    "healOneDiscardEnergy"
    ]
   },
   "Technical Machine: Turbo Energize#4uoux3": {
@@ -7235,6 +8634,11 @@
     "passive"
    ]
   },
+  "Temple of Sinnoh#6y19em": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Tera Orb#aoqbvm": {
    "steps": [
     "searchDeck"
@@ -7248,6 +8652,11 @@
   "The Masked Royal#19n9srt": {
    "steps": [
     "attachFromHand"
+   ]
+  },
+  "The Rocket’s Training Gym#ajh8nm": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "The Rocket’s Trap#m7xkt": {
@@ -7271,6 +8680,14 @@
   "Thought Wave Machine#c7uysp": {
    "gaps": [
     "unrecognizable"
+   ]
+  },
+  "Thunder Mountain Prism Star#fk9w5m": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Tickling Machine#1blksdo": {
@@ -7344,9 +8761,33 @@
     "discardRandomOpponentHandIfSupporter"
    ]
   },
+  "Tower of Darkness#1i6xqou": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Tower of Waters#1xzhfi3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Town Map#1dh3ktq": {
    "steps": [
     "revealPrizes"
+   ]
+  },
+  "Town Store#1iwzqxm": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Town Volunteers#1mnnwlt": {
@@ -7362,6 +8803,22 @@
   "Trainers’ Mail#1kyyry5": {
    "steps": [
     "lookAtTop"
+   ]
+  },
+  "Training Center#1qqt4ez": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Training Court#19z2acb": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Transformation Tome#11yfc3r": {
@@ -7424,6 +8881,14 @@
     "lookAtTop"
    ]
   },
+  "Tropical Beach#nfb268": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Tropical Tidal Wave#1ftqi9i": {
    "steps": [
     "coinFlip"
@@ -7454,6 +8919,14 @@
     "attachFromDiscard"
    ]
   },
+  "Turffield Stadium#kdq1ka": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "TV Reporter#138s5ut": {
    "steps": [
     "draw"
@@ -7468,6 +8941,14 @@
    "playCondition": "morePrizesThanOpponent",
    "steps": [
     "searchDeck"
+   ]
+  },
+  "Twist Mountain#7lxviw": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Tyme#1ke7oei": {
@@ -7489,6 +8970,11 @@
    ],
    "steps": [
     "passive"
+   ]
+  },
+  "Ultimate Zone#n0l0ko": {
+   "gaps": [
+    "unrecognizable"
    ]
   },
   "Ultra Ball#143u6vj": {
@@ -7516,16 +9002,21 @@
    ]
   },
   "Ultra Forest Kartenvoy#8yhrb8": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "ignoreDefenderEffectsTurn"
    ]
   },
   "Ultra Recon Squad#17hjfi": {
    "steps": [
     "draw"
+   ]
+  },
+  "Ultra Space#1csa5a4": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Underground Expedition#17lenpt": {
@@ -7543,6 +9034,22 @@
     "lookAtBottom"
    ]
   },
+  "Underground Lake#iemal6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Undersea Ruins#caek7o": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Unfair Stamp#1q43ljv": {
    "playCondition": "koedLastTurn",
    "steps": [
@@ -7551,12 +9058,12 @@
     "opponentDraw"
    ]
   },
-  "Unidentified Fossil#1v37j2a": {
+  "Unidentified Fossil · 60 HP#yuoarh": {
    "steps": [
     "fossilItem"
    ]
   },
-  "Unidentified Fossil#yuoarh": {
+  "Unidentified Fossil#1v37j2a": {
    "steps": [
     "fossilItem"
    ]
@@ -7592,6 +9099,14 @@
     "passive"
    ]
   },
+  "Vermilion City Gym#otkc0d": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Victory Cup#biop7m": {
    "steps": [
     "coinFlip"
@@ -7604,6 +9119,27 @@
    ]
   },
   "Victory Piece#8e81q6": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Virbank City Gym#bvwuzi": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Viridian City Gym#n4kon1": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
+  "Viridian Forest#t0wrm7": {
    "gaps": [
     "passive-only"
    ],
@@ -7741,6 +9277,11 @@
     "passive"
    ]
   },
+  "Wela Volcano Park#1xx6dhs": {
+   "gaps": [
+    "unrecognizable"
+   ]
+  },
   "Welcoming Lantern#iovyub": {
    "steps": [
     "recursion"
@@ -7748,6 +9289,7 @@
   },
   "Welder#6upawy": {
    "steps": [
+    "attachFromHand",
     "draw"
    ]
   },
@@ -7770,11 +9312,8 @@
    ]
   },
   "Will#1j1581z": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "chooseFirstCoin"
    ]
   },
   "Windstorm#16h5tm": {
@@ -7800,6 +9339,14 @@
     "moveEnergyToActive"
    ]
   },
+  "Wondrous Labyrinth Prism Star#bp9i4q": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
   "Wondrous Patch#yltwjr": {
    "steps": [
     "attachFromDiscard"
@@ -7808,6 +9355,11 @@
   "Worker#25pjpr": {
    "steps": [
     "draw"
+   ]
+  },
+  "Wyndon Stadium#1vgcg1s": {
+   "steps": [
+    "healAmount"
    ]
   },
   "Xerosic’s Machinations#1jvhg0h": {

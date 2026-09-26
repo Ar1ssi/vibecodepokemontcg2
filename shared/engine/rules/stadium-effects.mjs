@@ -473,6 +473,22 @@ const ONCE_PER_TURN_RE =
 const BOTH_PLAYERS_RE =
   /both players|each player|both active pokémon|both yours and your opponent'?s/;
 
+/**
+ * Triggered Stadium families owned by stadium-triggers.mjs (Po Town, Wela
+ * Volcano Park, Dust Island, Slumbering Forest). Classifying them as 'unknown'
+ * made the inspector and audits report them as unimplemented (audit S&M F6).
+ */
+export function isStadiumTriggered(card) {
+  const t = textOf(card);
+  if (!t) return false;
+  return (
+    (/plays a pokémon from their hand to evolve/.test(t) && /damage counter/.test(t)) ||
+    (/burned between turns/.test(t) && /isn't removed/.test(t)) ||
+    (/switches their poisoned active pokémon/.test(t) && /special condition/.test(t)) ||
+    (/is asleep, its owner flips 2 coins/.test(t) && /still asleep/.test(t))
+  );
+}
+
 /** True when card text names a passive modifier the execution layer can hook. */
 export function hasRecognizedPassiveStadiumEffect(card) {
   const t = textOf(card);
@@ -496,6 +512,8 @@ export function hasRecognizedPassiveStadiumEffect(card) {
     isStadiumAbilityNegation(card) ||
     parseStadiumCheckupPoisonBonus(card) > 0 ||
     parseStadiumAttackCostIncrease(card) > 0 ||
+    isStadiumAttackLock(card) ||
+    isStadiumTriggered(card) ||
     isStadiumEnergyAttachHeal(card) ||
     isStadiumGlimwoodReFlip(card) ||
     isStadiumNoWeakness(card) ||
@@ -1500,14 +1518,18 @@ export function isStadiumHandProtect(card) {
 export function parseStadiumHpModifier(card) {
   const t = textOf(card);
   if (!t || !/hp/.test(t)) return 0;
+  // "N HP or less remaining" is a state condition, not an HP modifier
+  // (Blizzard Town: "Pokémon with 40 HP or less remaining … can't attack").
+  // Without this guard the negative branch read "40 HP" as −40 HP.
+  if (/\b\d+\s*hp\s*or\s+(?:less|fewer)\b/.test(t)) return 0;
   // Negative: "-N HP" / "gets -N HP" / "have N less HP"
   const negSigned = t.match(/(?:gets?\s*)?-\s*(\d+)\s*hp/);
   if (negSigned) return -parseInt(negSigned[1], 10);
   if (/(less|decrease|reduc|lower)/.test(t)) {
     const m = t.match(
-      /(\d+)\s*(?:less|hp)|decreases? by\s*(\d+)|reduced by\s*(\d+)/
+      /(\d+)\s*less\s*hp|decreases? by\s*(\d+)|reduced by\s*(\d+)|lowered by\s*(\d+)/
     );
-    const n = m ? parseInt(m[1] || m[2] || m[3], 10) : 10;
+    const n = m ? parseInt(m[1] || m[2] || m[3] || m[4], 10) : 10;
     return -(n || 10);
   }
   const m = t.match(
@@ -1515,6 +1537,40 @@ export function parseStadiumHpModifier(card) {
   );
   const n = m ? parseInt(m[1] || m[2] || m[3], 10) : 0;
   return n || 0;
+}
+
+/**
+ * Blizzard Town: "Pokémon with N HP or less remaining (both yours and your
+ * opponent's) can't attack." Returns `{ hpAtMost }` or null. This is an
+ * attack lock, not an HP modifier — the two must not be conflated.
+ */
+export function parseStadiumAttackLock(card) {
+  const t = textOf(card);
+  if (!t) return null;
+  if (!/can'?t attack|cannot attack/.test(t)) return null;
+  const m = t.match(/with (\d+) hp or less remaining/);
+  if (!m) return null;
+  return { hpAtMost: Number(m[1]) };
+}
+
+export function isStadiumAttackLock(card) {
+  return parseStadiumAttackLock(card) !== null;
+}
+
+/**
+ * Attack-block reason for `pokemon` while `stadiumCard` is in play, or null.
+ * Fails open when HP data has not synced (matches the HP-cap search policy).
+ */
+export function stadiumAttackLockReason(stadiumCard, pokemon) {
+  const lock = stadiumCard ? parseStadiumAttackLock(stadiumCard) : null;
+  if (!lock || !pokemon) return null;
+  const hp = Number(pokemon.hp);
+  if (!Number.isFinite(hp)) return null;
+  const remaining = hp - (Number(pokemon.damage) || 0);
+  if (remaining > lock.hpAtMost) return null;
+  return `Pokémon with ${lock.hpAtMost} HP or less remaining can't attack (${
+    stadiumCard.name || 'Stadium'
+  }).`;
 }
 
 /** Stadium HP modifier applies to this Pokémon (stage/name/type filters). */
@@ -2068,6 +2124,10 @@ function collectPassiveStadiumResults(card) {
   const costInc = parseStadiumAttackCostIncrease(card);
   if (costInc > 0)
     results.push({ action: 'attack-cost-increase', amount: costInc });
+  const attackLock = parseStadiumAttackLock(card);
+  if (attackLock)
+    results.push({ action: 'attack-lock', hpAtMost: attackLock.hpAtMost });
+  if (isStadiumTriggered(card)) results.push({ action: 'triggered' });
   if (isStadiumEnergyAttachHeal(card))
     results.push({ action: 'energy-attach-heal', amount: 10 });
   if (isStadiumGlimwoodReFlip(card))
