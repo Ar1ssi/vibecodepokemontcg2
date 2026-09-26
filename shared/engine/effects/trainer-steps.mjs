@@ -574,6 +574,18 @@ function lookAtDeckEnd(ctx, fromBottom) {
         memo: { phase: 'attachTarget', energyId: card.instanceId },
       });
     }
+    if (Number(step.takeUpTo) > 1) {
+      // "up to N" (Bug Catching Set): take every chosen match, not just the first.
+      const toBench = step.destination === 'bench';
+      const destination = toBench ? player.zones.bench : player.zones.hand;
+      for (const picked of chosen) {
+        removeFromZones(player, picked);
+        destination.push(picked);
+        ctx.events.push({ type: 'cardMoved', instanceId: picked.instanceId, from: 'deck', to: toBench ? 'bench' : 'hand', playerId: player.playerId });
+        ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: picked.instanceId, name: picked.name }] });
+      }
+      return finishLook(ctx, viewed);
+    }
     if (card) {
       removeFromZones(player, card);
       const toBench = step.destination === 'bench';
@@ -599,13 +611,19 @@ function lookAtDeckEnd(ctx, fromBottom) {
     ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count });
     return finishLook(ctx, viewed);
   }
+  const takeMax = Math.max(1, Number(step.takeUpTo) || 1);
+  const what = pick.replace(' (bench)', '');
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: You may take ${
-      pick === 'any' ? 'a card' : `a ${pick.replace(' (bench)', '')}`
+      takeMax > 1
+        ? `up to ${takeMax} ${pick === 'any' ? 'cards' : what}`
+        : pick === 'any'
+          ? 'a card'
+          : `a ${what}`
     } from the ${fromBottom ? 'bottom' : 'top'} ${count} cards of your deck`,
     options: matches,
     min: 0,
-    max: 1,
+    max: Math.min(takeMax, matches.length),
   });
 }
 

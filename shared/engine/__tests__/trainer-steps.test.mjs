@@ -222,6 +222,34 @@ test('lookAtTop (Pokégear 3.0): only Supporters in the top 7 are offered; rest 
   assert.equal(zone(done, 'p1', 'deck').length, 2);
 });
 
+test('lookAtTop (Bug Catching Set): only {G} Pokémon / Basic {G} Energy offered, take up to 2', () => {
+  const game = setup();
+  const grass1 = pokemon('Chikorita', { types: ['Grass'] });
+  const grass2 = pokemon('Bulbasaur', { types: ['Grass'] });
+  const grassEnergy = card({ name: 'Basic Grass Energy', type: 'Energy', subtypes: ['Basic'], types: ['Grass'] });
+  const waterEnergy = card({ name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] });
+  const waterMon = pokemon('Squirtle', { types: ['Water'] });
+  const filler = card({ name: 'Potion' });
+  game.p1.zones.deck.push(grass1, waterEnergy, grassEnergy, waterMon, grass2, filler);
+  const { res } = play(
+    game,
+    'Look at the top 7 cards of your deck. You may reveal up to 2 in any combination of {G} Pokémon and Basic {G} Energy cards you find there and put them into your hand. Shuffle the other cards back into your deck.'
+  );
+  assert.equal(res.pendingChoice.max, 2);
+  assert.deepEqual(
+    ids(res.pendingChoice.options).sort(),
+    ids([grass1, grass2, grassEnergy]).sort()
+  );
+  const done = resolve(game, res, [grass1.instanceId, grassEnergy.instanceId]);
+  assert.ok(zone(done, 'p1', 'hand').some((c) => c.instanceId === grass1.instanceId));
+  assert.ok(zone(done, 'p1', 'hand').some((c) => c.instanceId === grassEnergy.instanceId));
+  assert.equal(zone(done, 'p1', 'hand').length, 2);
+  assert.deepEqual(
+    ids(zone(done, 'p1', 'deck')).sort(),
+    ids([waterEnergy, waterMon, grass2, filler]).sort()
+  );
+});
+
 test('lookAtTop (Raifort): discard any number of the top 5', () => {
   const game = setup();
   const top = [card({ name: 'a' }), card({ name: 'b' }), card({ name: 'c' })];

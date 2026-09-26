@@ -1096,6 +1096,24 @@ function parseTrainerStepsInner(lower) {
   // from the top")
   if (lower.includes('look at the top') || /look at \d+ cards? from the top/.test(lower)) {
     const m = lower.match(/top\s+(\d+)\s+cards?/) || lower.match(/look at (\d+) cards? from the top/);
+
+    // Bug Catching Set: "reveal up to 2 in any combination of {G} Pokémon and
+    // Basic {G} Energy cards you find there …". Without this the generic branch
+    // below defaulted to `pick: 'any'` (every viewed card offered) and the
+    // executor capped the take at 1.
+    const combo = lower.match(/reveal (?:up to )?(\d+) in any combination of (.+?) cards? you find there/);
+    if (combo) {
+      steps.push({
+        type: 'lookAtTop',
+        count: m ? Number(m[1]) : 7,
+        pick: combinationDiscardWhat(combo[2]),
+        destination: 'hand',
+        takeUpTo: Number(combo[1]),
+      });
+      appendTrailingDraw(steps, lower);
+      return { steps, recognizable: true };
+    }
+
     let pick = 'any';
     if (lower.includes('discard any number of them')) pick = 'discard';
     else if (lower.includes('supporter card')) pick = 'Supporter';
@@ -2593,7 +2611,7 @@ export function describeStep(step) {
     }
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;
     case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
-    case 'lookAtTop': return `Look at the top ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
+    case 'lookAtTop': return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `up to ${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'lookAtBottom': return `Look at the bottom ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';

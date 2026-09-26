@@ -519,29 +519,46 @@ async function runLookStep(card, step, fromBottom, done) {
   const candidates = indices.map((i) => deck.array[i]).filter(Boolean);
   let pool = candidates;
   if (step.pick && step.pick !== 'any') {
-    const filtered = [];
-    for (const c of candidates) {
-      await ensureCardData(c);
-      if (step.pick.includes('Supporter') && String(c.type || '').toLowerCase().includes('trainer')) {
-        filtered.push(c);
-      } else if (step.pick.includes('Pokémon') && _isPokemonCard(c)) {
-        filtered.push(c);
-      } else if (step.pick.includes('Energy')) {
-        filtered.push(c);
-      }
-    }
+    await Promise.all(candidates.map((c) => ensureCardData(c)));
+    const filtered = candidates.filter((c) => _matchesSearch(c, step.pick));
     if (filtered.length) pool = filtered;
   }
+  const destination = step.destination === 'bench' ? 'bench' : 'hand';
+  const sourceText = card.text || card.effect || '';
+  const takeUpTo = Number(step.takeUpTo) > 1 ? Number(step.takeUpTo) : 0;
+
+  if (takeUpTo) {
+    _openChoicePicker({
+      title: `${card.name} — choose up to ${takeUpTo} cards to ${destination === 'bench' ? 'Bench' : 'hand'}`,
+      candidates: pool,
+      zoneFrom: 'deck',
+      destination,
+      multiSelect: true,
+      requiredCount: Math.min(takeUpTo, pool.length),
+      maxCount: takeUpTo,
+      upTo: true,
+      onConfirm: (picked) => {
+        const list = (Array.isArray(picked) ? picked : [picked]).filter(Boolean);
+        maybeAnnounceSearchReveal(_effectOwner, card.name, list, _appendMessage, { step, sourceText });
+        shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
+        done?.();
+      },
+      onCancel: () => {
+        msg('  kept all looked-at cards in deck order — shuffle your deck');
+        shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
+        done?.();
+      },
+    });
+    return;
+  }
+
   _openChoicePicker({
-    title: `${card.name} — choose a card to ${step.destination === 'bench' ? 'Bench' : 'hand'} (optional)`,
+    title: `${card.name} — choose a card to ${destination === 'bench' ? 'Bench' : 'hand'} (optional)`,
     candidates: pool,
     zoneFrom: 'deck',
-    destination: step.destination === 'bench' ? 'bench' : 'hand',
+    destination,
     onPick: (picked) => {
-      maybeAnnounceSearchReveal(_effectOwner, card.name, picked, _appendMessage, {
-        step,
-        sourceText: card.text || card.effect || '',
-      });
+      maybeAnnounceSearchReveal(_effectOwner, card.name, picked, _appendMessage, { step, sourceText });
       shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
       done?.();
     },

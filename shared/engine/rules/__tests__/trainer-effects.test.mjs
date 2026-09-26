@@ -1912,6 +1912,14 @@ describe('recurring-wording coverage (batch 6)', () => {
     assert.equal(r.steps[0].type, 'lookAtTop');
     assert.equal(r.steps[0].count, 7);
   });
+
+  test('Bug Catching Set: reveal up to 2 of {G} Pokémon/Basic {G} Energy → typed pick + takeUpTo', () => {
+    const r = parseTrainerEffect('Look at the top 7 cards of your deck. You may reveal up to 2 in any combination of {G} Pokémon and Basic {G} Energy cards you find there and put them into your hand. Shuffle the other cards back into your deck.');
+    assert.equal(r.steps[0].type, 'lookAtTop');
+    assert.equal(r.steps[0].count, 7);
+    assert.equal(r.steps[0].pick, 'Grass Pokémon or Basic {G} Energy');
+    assert.equal(r.steps[0].takeUpTo, 2);
+  });
 });
 
 describe('opponent-hand and mixed coverage (batch 8)', () => {
