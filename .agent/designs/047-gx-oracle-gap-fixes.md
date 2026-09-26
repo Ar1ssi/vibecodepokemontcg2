@@ -184,6 +184,19 @@ many printings across sets, not just GX.
 
 ## Deviations (Builder appends here during build)
 
+- Slice 5d (counter spread, Divide-GX/Cross Division-GX) needed no engine change: slice 1's
+  opponent-damage delta proved the existing distributable-counter path already executes.
+- Slice 1 grew a general rule: a damaging attack that discards opponent attached cards without a
+  KO (`opp:attached->discard` + `cardsDiscarded`, no `ko` tag) now counts as observed — the same
+  base-tag blind spot, with damage (`Lycanroc-GX Crunch`).
+- Slice 6 groups the 109 remaining unique texts into 11 engine subsystems + "not a gap" classes
+  (full per-row list stays in `out/gx-oracle-audit.txt`); proposed ISSUES lines are listed in
+  `out/gx-no-effect-triage.md` and land with the design.
+- Verified numbers after slices 1-5 (8 seeds, fixture board): per-energy 33/119 → 104/119,
+  bench-damage 90/126 → 113/126, conditional-damage 41/111 → 55/111, multi-target 13/47 → 31/47,
+  next-turn-lock 113/283 → 147/283; 0 engine errors. `Kaleidostorm` emits `pokemonKnockedOut` on
+  the fixture (flagged in triage §7).
+
 ---
 
 Self-approval checklist (only when the user is unreachable):

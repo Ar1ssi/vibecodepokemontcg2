@@ -81,6 +81,31 @@ test('zero-base attacks are observed through target damage or prize/discard even
   );
 });
 
+test('a damaging attack that discards opponent attached cards without a KO is observed', () => {
+  assert.equal(
+    rowObserved(
+      attack('discard-opponent', {
+        printedBase: 120,
+        dealt: [120],
+        tags: ['opp:active+dmg', 'opp:attached->discard'],
+        eventTypes: ['cardsDiscarded'],
+      })
+    ),
+    true
+  );
+  assert.equal(
+    rowObserved(
+      attack('flat', {
+        printedBase: 120,
+        dealt: [120],
+        tags: ['opp:active+dmg', 'ko', 'opp:attached->discard'],
+        eventTypes: ['cardsDiscarded'],
+      })
+    ),
+    false
+  );
+});
+
 test('familyRates counts rows and observed rows per kind:family', () => {
   const rates = familyRates([
     attack('heal', { tags: ['own:heal'] }),

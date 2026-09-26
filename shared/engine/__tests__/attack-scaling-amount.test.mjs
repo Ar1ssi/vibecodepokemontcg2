@@ -28,8 +28,11 @@ function board({
   attackerEnergy = [],
   benchEnergies = [],
   attackerDamage = 0,
+  benchDamage = 0,
   defenderEnergy = [],
   defenderDamage = 0,
+  ownHand = 0,
+  opponentHand = 0,
 }) {
   const state = createGameState({
     players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
@@ -43,10 +46,22 @@ function board({
   attackerEnergy.forEach((type, i) =>
     state.players.p1.zones.active.push(energy(50 + i, type, 1))
   );
-  state.players.p1.zones.bench.push(pokemon({ instanceId: 100, name: 'Own Bench', hp: 60 }));
+  const bench = pokemon({ instanceId: 100, name: 'Own Bench', hp: 60 });
+  bench.damage = benchDamage;
+  state.players.p1.zones.bench.push(bench);
   benchEnergies.forEach((type, i) =>
     state.players.p1.zones.bench.push(energy(150 + i, type, 100))
   );
+  for (let i = 0; i < ownHand; i += 1) {
+    state.players.p1.zones.hand.push(
+      createCard({ instanceId: 300 + i, name: 'Hand Card', supertype: 'Trainer', type: 'Item' })
+    );
+  }
+  for (let i = 0; i < opponentHand; i += 1) {
+    state.players.p2.zones.hand.push(
+      createCard({ instanceId: 350 + i, name: 'Hand Card', supertype: 'Trainer', type: 'Item' })
+    );
+  }
 
   const defender = pokemon({ instanceId: 20, name: 'Defender', hp: 400 });
   defender.damage = defenderDamage;
@@ -108,6 +123,34 @@ const MASSIVE_BLOOM = {
   cost: ['Grass', 'Colorless'],
   damage: 180,
   text: 'This attack does 10 less damage for each damage counter on this Pokémon.',
+};
+
+const RAGING_BLADE = {
+  name: 'Raging Blade',
+  cost: [],
+  damage: 80,
+  text: 'If this Pokémon has any damage counters on it, this attack does 80 more damage.',
+};
+
+const CALAMITOUS_SLASH = {
+  name: 'Calamitous Slash',
+  cost: [],
+  damage: 160,
+  text: "If your opponent's Active Pokémon already has any damage counters on it, this attack does 80 more damage.",
+};
+
+const BERSERK = {
+  name: 'Berserk',
+  cost: [],
+  damage: 80,
+  text: 'If your Benched Pokémon have any damage counters on them, this attack does 70 more damage.',
+};
+
+const EXTRASENSORY = {
+  name: 'Extrasensory',
+  cost: [],
+  damage: 90,
+  text: 'If you have the same number of cards in your hand as your opponent, this attack does 90 more damage.',
 };
 
 test('Energy Drive counts Energy on both Active Pokémon (20 x 7 = 140)', () => {
@@ -192,6 +235,48 @@ test('unreadable scaling counts keep the printed base and an honest note', () =>
   const reduction = parseAttackDamage(MASSIVE_BLOOM, {}, {}, {});
   assert.equal(reduction.total, 180);
   assert.match(reduction.notes.join(' '), /resolve the printed count/);
+});
+
+test('Raging Blade adds 80 with damage counters on itself, base without', () => {
+  const hurt = attackWith(board({ attack: RAGING_BLADE, attackerDamage: 30 }));
+  assert.equal(damageOf(hurt.state, 'p2', 'active', 20), 160);
+  const fresh = attackWith(board({ attack: RAGING_BLADE, attackerDamage: 0 }));
+  assert.equal(damageOf(fresh.state, 'p2', 'active', 20), 80);
+});
+
+test('Calamitous Slash adds 80 when the opponent Active already has damage counters', () => {
+  const hurt = attackWith(board({ attack: CALAMITOUS_SLASH, defenderDamage: 30 }));
+  // 30 were already on the defender; the attack adds 160 + 80.
+  assert.equal(damageOf(hurt.state, 'p2', 'active', 20) - 30, 240);
+  const fresh = attackWith(board({ attack: CALAMITOUS_SLASH, defenderDamage: 0 }));
+  assert.equal(damageOf(fresh.state, 'p2', 'active', 20), 160);
+});
+
+test('Berserk adds 70 when your Benched Pokémon are damaged', () => {
+  const hurt = attackWith(board({ attack: BERSERK, benchDamage: 30 }));
+  assert.equal(damageOf(hurt.state, 'p2', 'active', 20), 150);
+  const fresh = attackWith(board({ attack: BERSERK, benchDamage: 0 }));
+  assert.equal(damageOf(fresh.state, 'p2', 'active', 20), 80);
+});
+
+test('Extrasensory adds 90 only when hand sizes are equal', () => {
+  const equal = attackWith(board({ attack: EXTRASENSORY, ownHand: 2, opponentHand: 2 }));
+  assert.equal(damageOf(equal.state, 'p2', 'active', 20), 180);
+  const unequal = attackWith(board({ attack: EXTRASENSORY, ownHand: 2, opponentHand: 1 }));
+  assert.equal(damageOf(unequal.state, 'p2', 'active', 20), 90);
+});
+
+test('missing condition context keeps the printed base and an unresolved note', () => {
+  for (const [card, base] of [
+    [RAGING_BLADE, 80],
+    [CALAMITOUS_SLASH, 160],
+    [BERSERK, 80],
+    [EXTRASENSORY, 90],
+  ]) {
+    const parsed = parseAttackDamage(card, {}, {}, {});
+    assert.equal(parsed.total, base);
+    assert.match(parsed.notes.join(' '), /resolve the printed condition/);
+  }
 });
 
 test('older "times the number of" wording keeps its attached-Energy count', () => {

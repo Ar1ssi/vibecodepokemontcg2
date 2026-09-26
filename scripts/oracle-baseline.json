@@ -211,7 +211,7 @@
     },
     "attack:conditional-damage": {
       "n": 740,
-      "observed": 210
+      "observed": 305
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -239,11 +239,11 @@
     },
     "attack:discard-cost": {
       "n": 597,
-      "observed": 430
+      "observed": 432
     },
     "attack:discard-opponent": {
       "n": 151,
-      "observed": 99
+      "observed": 144
     },
     "attack:draw-attach": {
       "n": 321,
@@ -307,7 +307,7 @@
     },
     "attack:multi-target": {
       "n": 165,
-      "observed": 100
+      "observed": 107
     },
     "attack:neutralize-opponent-energy": {
       "n": 1,
@@ -319,7 +319,7 @@
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 489
+      "observed": 508
     },
     "attack:once-per-turn": {
       "n": 5,

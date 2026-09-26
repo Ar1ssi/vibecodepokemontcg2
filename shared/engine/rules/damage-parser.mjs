@@ -126,6 +126,27 @@ function evalCondition(cond, defender, ctx) {
     return null;
   }
   if (/is a basic pok[ée]mon/.test(cond)) return defender?.basic !== false;
+  if (/^this pok[ée]mon has any damage counters on it$/.test(cond)) {
+    const counters = ctx?.attackerDamageCounters;
+    return typeof counters === 'number' ? counters > 0 : null;
+  }
+  if (
+    /^(?:your opponent's active pok[ée]mon|the defending pok[ée]mon) (?:already )?has any damage counters on it$/.test(
+      cond
+    )
+  ) {
+    const dmg = ctx?.defenderDamage;
+    return typeof dmg === 'number' ? dmg > 0 : null;
+  }
+  if (/^your benched pok[ée]mon have any damage counters on them$/.test(cond)) {
+    const damaged = ctx?.damagedBenchCount;
+    return typeof damaged === 'number' ? damaged > 0 : null;
+  }
+  if (/^you have the same number of cards in your hand as your opponent$/.test(cond)) {
+    return typeof ctx?.ownHandCount === 'number' && typeof ctx?.opponentHandCount === 'number'
+      ? ctx.ownHandCount === ctx.opponentHandCount
+      : null;
+  }
   return null;
 }
 

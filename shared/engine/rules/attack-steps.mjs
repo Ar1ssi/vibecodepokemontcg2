@@ -239,6 +239,11 @@ const TEMPLATES = [
     /^shuffle 1 of your benched pokémon and all attached cards into your deck$/,
     () => ({ type: 'atkShuffleOwnBench' }),
   ],
+  // Palkia-GX Zero Vanish-GX: every opponent Pokémon sheds its Energy into their deck.
+  [
+    /^shuffle all energy (?:from|attached to) each of your opponent's pokémon into their deck$/,
+    () => ({ type: 'atkShuffleOppEnergy' }),
+  ],
   [
     /^your opponent shuffles their hand into their deck and draws (\d+) cards$/,
     (m) => ({ type: 'atkOppShuffleHandDraw', count: Number(m[1]) }),
@@ -291,6 +296,11 @@ const TEMPLATES = [
   [
     /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
     (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
+  ],
+  // Articuno-GX Cold Crush-GX: both Active Pokémon shed all their Energy.
+  [
+    /^discard all (special )?energy(?: cards?)? (?:from|attached to) both active pokémon$/,
+    (m) => ({ type: 'atkDiscardBothActiveEnergy', ...(m[1] ? { special: true } : {}) }),
   ],
   // Blastoise ex Hyper Whirlpool: the opponent picks the Energy.
   [
@@ -394,8 +404,8 @@ const TEMPLATES = [
     }),
   ],
   [
-    /^put (up to \d+|an?|\d+) (trainer|item|supporter|pokémon tool|stadium|basic energy|energy|pokémon) cards? from your discard pile into your hand$/,
-    (m) => ({ type: 'atkRecover', ...attachCount(m[1]), what: recoverWhat(m[2]) }),
+    /^put (up to \d+|an?|\d+) (?:((?:trainer|item|supporter|pokémon tool|stadium|basic energy|energy|pokémon) )?)cards? from your discard pile into your hand$/,
+    (m) => ({ type: 'atkRecover', ...attachCount(m[1]), what: m[2] ? recoverWhat(m[2].trim()) : null }),
   ],
   // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power
   [/^put a card from your discard pile into your hand$/, () => ({ type: 'atkRecover', count: 1, what: null })],

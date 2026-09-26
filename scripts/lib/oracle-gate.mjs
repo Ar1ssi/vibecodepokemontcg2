@@ -31,9 +31,15 @@ export function rowObserved(row) {
   if (row.kind !== 'attack') return (row.tags || []).some((t) => t !== 'ability-used');
   if ((row.tags || []).some((t) => !BASE_TAGS.has(t))) return true;
   if ((row.dealt || []).some((d) => d != null && d !== row.printedBase)) return true;
+  const tags = row.tags || [];
+  const events = row.eventTypes || [];
+  // An opponent's attached card left play without a KO: a discard/shuffle effect the base
+  // tags hide on a normal damaging attack (Lycanroc-GX Crunch).
+  if (!tags.includes('ko') && tags.includes('opp:attached->discard') && events.includes('cardsDiscarded')) {
+    return true;
+  }
   if (row.printedBase !== 0) return false;
   if ((row.deltas || []).some((d) => d > 0)) return true;
-  const events = row.eventTypes || [];
   return events.includes('prizesTaken') || events.includes('cardsDiscarded');
 }
 

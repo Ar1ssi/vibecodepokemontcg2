@@ -496,6 +496,22 @@ function atkDiscardOppEnergy(ctx) {
   });
 }
 
+// Articuno-GX Cold Crush-GX: every matching Energy leaves both Active Pokémon.
+function atkDiscardBothActiveEnergy(ctx) {
+  const { player, opponent, step } = ctx;
+  const matches = (c) => energyMatches(c, step);
+  let discarded = 0;
+  for (const owner of [opponent, player].filter(Boolean)) {
+    const root = activeOf(owner);
+    if (!root) continue;
+    for (const card of attachedCards(owner, root.instanceId).filter(matches)) {
+      discardCard(ctx.draft, card, ctx.events);
+      discarded += 1;
+    }
+  }
+  return discarded === 0 ? skip(ctx, 'no_energy') : null;
+}
+
 function atkDiscardOppTools(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
@@ -988,6 +1004,19 @@ function atkShuffleOppActiveEnergy(ctx) {
   const energy = attachedCards(opponent, target.instanceId).filter(isEnergy);
   if (energy.length === 0) return skip(ctx, 'no_energy');
   for (const card of energy) moveToZone(opponent, card, 'deck', 'active', ctx.events);
+  shuffleOwnDeck(opponent, ctx);
+  return null;
+}
+
+// Palkia-GX Zero Vanish-GX: every opponent Pokémon sheds its Energy into their deck.
+function atkShuffleOppEnergy(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const energy = rootsOf(opponent).flatMap((root) =>
+    attachedCards(opponent, root.instanceId).filter(isEnergy)
+  );
+  if (energy.length === 0) return skip(ctx, 'no_energy');
+  for (const card of energy) moveToZone(opponent, card, 'deck', 'inPlay', ctx.events);
   shuffleOwnDeck(opponent, ctx);
   return null;
 }
@@ -2288,6 +2317,10 @@ export const ATTACK_STEP_HANDLERS = {
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
   atkDiscardSelfEnergy,
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
+  atkDiscardBothActiveEnergy: optional(
+    atkDiscardBothActiveEnergy,
+    () => 'Discard all Energy from both Active Pokémon'
+  ),
   atkDiscardOppTools: optional(atkDiscardOppTools, () => "Discard Pokémon Tools from your opponent's Pokémon"),
   atkDiscardOppHand: optional(atkDiscardOppHand, () => "Discard from your opponent's hand"),
   atkDiscardOwnHand: optional(atkDiscardOwnHand, (step) =>
@@ -2327,6 +2360,10 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleHandIntoDeck,
   atkDraw,
   atkShuffleOppActiveEnergy,
+  atkShuffleOppEnergy: optional(
+    atkShuffleOppEnergy,
+    () => "Shuffle all Energy from your opponent's Pokémon into their deck"
+  ),
   atkShuffleOppDeck: optional(atkShuffleOppDeck, () => "Have your opponent shuffle their deck"),
   atkKnockOutChoose,
   atkCountersEach,
