@@ -12,7 +12,7 @@ Blocked: I85/I86 need design approval (028/029); I87 needs the user's descriptio
 ## Watch-outs (≤5)
 - Gates after engine changes: `pnpm audit:oracle`, `audit:abilities`, `audit:trainers`,
   `audit:attacks` (~2 min each). Live TCGdex checks: `pnpm test:live`.
-- FX video checks: `.agent/scratch/rec-*.mjs` (Playwright video on the e2e board, worktree server
+- FX video checks: `.claude/skills/fx-preview/rec/rec-*.mjs` (Playwright video on the e2e board, worktree server
   `PORT=4100 pnpm start`; preview_start reuses the primary's :4000). Stepped frames: fx-preview skill.
 - Copy attacks: spec in `rules/attack-copy.mjs`; unknown prefixes fail closed. `player.lastAttack`
   is read only at `turnNumber === currentTurn - 1` (extra turns break it).

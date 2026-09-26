@@ -73,9 +73,10 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
   them before landing on `main`. Gated? Offer it at the task close.
 - Models: judgment work inherits Opus 5.5 · grunt work → `sonnet`/`haiku` · `fable` only on request.
   Agents: `caveman:cavecrew-investigator` (search), `-builder` (1–2 files), `-reviewer` (diffs).
-- Effort (Opus 5.5 default `medium`): `low` only for executing a slice whose contract is pinned →
-  the `slice-builder` agent (`effort: low`); "pinned" = TEMPLATE Work-plan row. Design, debug, review, rules stay at
-  `medium` or higher. A session cannot lower its own effort; the user sets it with `/effort` (`s` = this session only).
+- Effort (Opus 5.5 default `medium`): `high` for design/planning, debugging, review, and rules
+  interpretation (`xhigh` for schema/netcode/engine designs) · `medium` for patch work · `low` only
+  for a pinned slice (TEMPLATE Work-plan row) → `slice-builder` agent. Visual work → `fx-designer`
+  agent (`high`). A session can't change its own effort; the user sets it with `/effort` (`s` = this session only).
 - Subagents never write harness state. Their "done" is a claim: rerun the tests, read the diff.
 
 ## User sync and output

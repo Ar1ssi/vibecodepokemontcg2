@@ -83,6 +83,16 @@ It writes `<prefix>-board.png` (active and bench, cropped) and `<prefix>-full.pn
 - **Offline sandbox?** If `cdn.socket.io` is blocked, set `SIO_JS` to a local copy of
   `socket.io.min.js`; the scripts route the CDN request to it.
 
+## Video recordings of whole scenes (`rec/`)
+
+Frames prove a pose; a video proves pacing. `rec/rec-<effect>.mjs` records one scene on the e2e
+board to `out/<effect>*.webm` (Playwright video, 1280×720): `evolve`, `ko`, `discard`, `opp-play`,
+`draw`, `prize` (designs 041–045). Each imports the effect module straight from `/src/...` and
+fakes only the card rects, so it needs no game state. Start a worktree server on :4100 first
+(`PORT=4100 pnpm start`; the primary's :4000 may be running other code), then
+`node .claude/skills/fx-preview/rec/rec-evolve.mjs`. New effect → copy the closest script.
+Frame sheets from a video: ffmpeg (winget `Gyan.FFmpeg`).
+
 ## Done means
 
 Judge the effect from the frames, not the code. Check the key moments (start, peak, settle)

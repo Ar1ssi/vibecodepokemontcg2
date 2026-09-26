@@ -4,7 +4,7 @@
      pointing at it. `(?)` marks unverified bootstrap guesses — verify on first visit, then remove. -->
 
 .agent/ — agent harness: state, workflows, designs, journal (human manual: .agent/README.md)
-.claude/agents/ — project subagents: slice-builder (Opus 5.5, low effort, pinned-contract slices; D168)
+.claude/agents/ — project subagents: slice-builder (low effort, pinned-contract slices; D168), fx-designer (high effort, board visuals/CSS in the 041–046 house style; D170)
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
 server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views)
 shared/tcgdex/ — TCGdex URL builder (browser → server proxy server/tcgdex-proxy.mjs, D164) + IndexedDB JSON cache (D102)
