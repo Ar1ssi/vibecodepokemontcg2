@@ -977,6 +977,66 @@ test('ability: a discard-cost draw ability with an empty hand does nothing and i
   assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
 });
 
+// Quaquaval Up-Tempo, Surging Sparks 052 (out/pkmn-pokemon-cards.json): the cost is a card
+// from hand to the bottom of the deck, and the player chooses which card.
+test('ability: bottom-of-deck hand cost lets the player pick the card, then draws (Quaquaval Up-Tempo)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'You must put a card from your hand on the bottom of your deck in order to use this Ability. Once during your turn, you may draw cards until you have 5 cards in your hand.'
+  );
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 110, name: 'Keep A' }),
+    createCard({ instanceId: 111, name: 'Bottom B' }),
+    createCard({ instanceId: 112, name: 'Keep C' })
+  );
+  for (const id of [120, 121, 122, 123, 124]) {
+    state.players.p1.zones.deck.push(createCard({ instanceId: id }));
+  }
+
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res1.error, null);
+  assert.deepEqual(
+    res1.pendingChoice.options.map((card) => card.instanceId).sort(),
+    [110, 111, 112],
+    'the whole pre-draw hand is offered'
+  );
+  assert.equal(res1.state.players.p1.zones.hand.length, 3, 'nothing moves until the pick resolves');
+
+  const res2 = applyCommand(res1.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: res1.pendingChoice.choiceId, selection: [111] },
+    playerId: 'p1',
+  }, rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(
+    res2.state.players.p1.zones.deck.map((c) => c.instanceId),
+    [123, 124, 111],
+    'the chosen card — not an auto-picked one — is on the bottom'
+  );
+  assert.deepEqual(
+    res2.state.players.p1.zones.hand.map((c) => c.instanceId).sort(),
+    [110, 112, 120, 121, 122],
+    'hand fills to 5 from the deck'
+  );
+});
+
+test('ability: the bottom-of-deck hand cost is unpayable with an empty hand — no draw, not spent (Quaquaval Up-Tempo)', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'You must put a card from your hand on the bottom of your deck in order to use this Ability. Once during your turn, you may draw cards until you have 5 cards in your hand.'
+  );
+  for (const id of [120, 121, 122, 123, 124]) {
+    state.players.p1.zones.deck.push(createCard({ instanceId: id }));
+  }
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 0, 'the cost could not be paid, so no draw');
+  assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
+});
+
 test('ability: "discard your hand and draw 3 cards" discards the hand first (I92)', () => {
   const { state, rng } = setupGame();
   holderWithAbility(state, 'Once during your turn, you may discard your hand and draw 3 cards.');

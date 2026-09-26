@@ -409,7 +409,12 @@ function putHandOnBottom(ctx) {
     const chosen = pickById(hand, ctx.selection);
     for (const card of chosen) removeFromZones(player, card);
     player.zones.deck.push(...chosen);
-    ctx.events.push({ type: 'cardsMovedToDeckBottom', count: chosen.length, playerId: player.playerId });
+    ctx.events.push({
+      type: 'cardsMovedToDeckBottom',
+      count: chosen.length,
+      playerId: player.playerId,
+      ...(step.cost ? { handCost: true } : {}),
+    });
     return null;
   }
   const count = Math.min(step.count || 1, hand.length);

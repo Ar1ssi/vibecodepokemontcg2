@@ -1913,11 +1913,36 @@ export function parseAbility(text = '') {
       guidance: `Once during your turn: discard ${count > 1 ? `${count} cards` : 'a card'} from your hand (cost).`,
     });
   }
+  // "You must put a card from your hand on the bottom of your deck in order to use this
+  // Ability" (Quaquaval Up-Tempo): like the discard-cost family, but the card is not
+  // discarded — the player picks which card goes under the deck. The draw is gated on
+  // the cost through `requiresHandCost` (the handler tags its event `handCost`).
+  const bottomCost = lower.match(
+    /put (a|an|\d+) cards? from your hand on the bottom of your deck in order to use this ability/
+  );
+  if (bottomCost) {
+    const count = /^\d+$/.test(bottomCost[1]) ? Number(bottomCost[1]) : 1;
+    steps.push({
+      type: 'putHandOnBottom',
+      count,
+      cost: true,
+      guidance: `Once during your turn: put ${count > 1 ? `${count} cards` : 'a card'} from your hand on the bottom of your deck (cost).`,
+    });
+  }
+
   // A cost printed before the effect is paid first: the executor runs steps in order, and
   // drawing before discarding let the player discard a card they had just drawn.
   const costIndex = steps.findIndex((step) => step.type === 'discardCostAbility');
   if (costIndex > 0 && lower.indexOf('discard') < lower.search(/\bdraw/)) {
     steps.unshift(...steps.splice(costIndex, 1));
+  }
+  // The bottom-of-deck cost is always paid before the effect it gates.
+  const bottomCostIndex = steps.findIndex((step) => step.type === 'putHandOnBottom' && step.cost);
+  if (bottomCostIndex > 0) {
+    steps.unshift(...steps.splice(bottomCostIndex, 1));
+    for (const step of steps) {
+      if (step.type !== 'putHandOnBottom') step.requiresHandCost = true;
+    }
   }
 
   // "If you attached Energy to a Pokémon in this way, <bonus>" (Teal Dance, Ripening Charge,
