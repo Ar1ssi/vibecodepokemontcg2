@@ -902,11 +902,13 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               return;
             }
             _applyHealToCard(target, current, false, _effectOwner);
-            const z = zone(_effectOwner, loc.zoneId);
-            for (const att of [...getAttachedCards(z, target)]) {
-              if (isEnergyCard(att)) {
-                const ai = z.array.indexOf(att);
-                if (ai >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'hand', ai, false, 'move');
+            if (step.returnEnergy) {
+              const z = zone(_effectOwner, loc.zoneId);
+              for (const att of [...getAttachedCards(z, target)]) {
+                if (isEnergyCard(att)) {
+                  const ai = z.array.indexOf(att);
+                  if (ai >= 0) moveCardBundle(_effectOwner, _effectOwner, loc.zoneId, 'hand', ai, false, 'move');
+                }
               }
             }
             msg(`  auto: healed all damage from ${target.name}`);

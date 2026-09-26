@@ -758,6 +758,47 @@ test('Judge draws 4 each; Fennel heals each Pokémon; Lisia confuses a Basic', (
   assert.equal(newActive.specialCondition, 'Confused');
 });
 
+test("Wally's Compassion heals a Mega Evolution ex and returns its Energy to hand", () => {
+  const game = setup();
+  const mega = pokemon('Mega Gardevoir ex');
+  mega.damage = 120;
+  game.p1.zones.active[0] = mega;
+  const e = energy();
+  e.attachedTo = mega.instanceId;
+  game.p1.zones.active.push(e);
+
+  const { res } = play(
+    game,
+    "Heal all damage from 1 of your Mega Evolution Pokémon ex. If you healed any damage in this way, put all Energy attached to that Pokémon into your hand.",
+    { trainerType: 'Supporter' },
+  );
+  assert.equal(res.error, null);
+  assert.equal(zone(res, 'p1', 'active').find((c) => c.instanceId === mega.instanceId).damage, 0);
+  const handCard = zone(res, 'p1', 'hand').find((c) => c.instanceId === e.instanceId);
+  assert.ok(handCard, 'Energy returned to hand');
+  assert.equal(handCard.attachedTo, null);
+  assert.ok(!zone(res, 'p1', 'active').some((c) => c.instanceId === e.instanceId), 'Energy leaves play');
+});
+
+test("Wally's Compassion leaves Energy attached when no damage was healed", () => {
+  const game = setup();
+  const mega = pokemon('Mega Gardevoir ex');
+  game.p1.zones.active[0] = mega;
+  const e = energy();
+  e.attachedTo = mega.instanceId;
+  game.p1.zones.active.push(e);
+
+  const { res } = play(
+    game,
+    "Heal all damage from 1 of your Mega Evolution Pokémon ex. If you healed any damage in this way, put all Energy attached to that Pokémon into your hand.",
+    { trainerType: 'Supporter' },
+  );
+  assert.equal(res.error, null);
+  const attachedCard = zone(res, 'p1', 'active').find((c) => c.instanceId === e.instanceId);
+  assert.ok(attachedCard, 'Energy stays attached');
+  assert.equal(attachedCard.attachedTo, mega.instanceId);
+});
+
 test('heal all damage, search-to-attach, attachFromDiscard target choice, Energy Recycler "choose 1 or both"', () => {
   const game = setup();
   game.p1.zones.active[0].damage = 120;

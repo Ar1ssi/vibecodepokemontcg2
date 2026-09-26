@@ -1321,7 +1321,13 @@ function parseTrainerStepsInner(lower) {
 
   // heal all damage (Wally's Compassion)
   if (lower.includes('heal all damage')) {
-    steps.push({ type: 'heal', target: lower.includes('mega evolution') ? 'Mega Evolution Pokémon ex' : 'Pokémon' });
+    steps.push({
+      type: 'heal',
+      target: lower.includes('mega evolution') ? 'Mega Evolution Pokémon ex' : 'Pokémon',
+      // "If you healed any damage in this way, put all Energy attached to that
+      // Pokémon into your hand." Only fires when the heal actually removed damage.
+      returnEnergy: /put all energy attached to that pok[ée]mon into your hand/.test(lower),
+    });
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
@@ -2618,7 +2624,7 @@ export function describeStep(step) {
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';
     case 'discardCost': return `Discard ${step.count} other card${step.count > 1 ? 's' : ''} from your hand (cost).`;
     case 'recursion': return `Put a ${step.what} from your discard pile into your hand.`;
-    case 'heal': return `Heal all damage from your ${step.target}.`;
+    case 'heal': return `Heal all damage from your ${step.target}${step.returnEnergy ? ', then put all its Energy into your hand' : ''}.`;
     case 'healAmount': return `Heal ${step.amount} damage from ${step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;
     case 'attachMultipleFromDiscard': return `Attach up to ${step.count} ${step.energy} cards from your discard pile to ${step.target}.`;

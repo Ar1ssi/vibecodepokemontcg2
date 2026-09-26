@@ -23,7 +23,13 @@ import {
   isEvolutionCard,
   stadiumBlocksHealing,
 } from '../rules/stadium-effects.mjs';
-import { EXTRA_STEP_HANDLERS, rootMatchesTarget, specialEnergyShielded } from './trainer-steps.mjs';
+import {
+  EXTRA_STEP_HANDLERS,
+  rootMatchesTarget,
+  specialEnergyShielded,
+  attachedCards,
+  removeFromZones,
+} from './trainer-steps.mjs';
 import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
@@ -1288,6 +1294,7 @@ export function executeSteps(draft, {
             clearConditions(card);
             events.push({ type: 'specialConditionUpdated', instanceId: card.instanceId, condition: null, conditions: [] });
           }
+          return oldDamage - card.damage;
         };
 
         if (/each of your/i.test(step.target || '')) {
@@ -1332,7 +1339,24 @@ export function executeSteps(draft, {
         const targetRef = findCard(draft, targetId);
         // Edge Case 10: verify target still exists
         if (targetRef && targetRef.card) {
-          healOne(targetRef.card);
+          const healed = healOne(targetRef.card);
+          // Wally's Compassion: "If you healed any damage in this way, put all
+          // Energy attached to that Pokémon into your hand." No heal → no move.
+          if (step.returnEnergy && healed > 0) {
+            const energies = attachedCards(player, targetRef.card.instanceId).filter(isEnergy);
+            for (const energy of energies) {
+              removeFromZones(player, energy);
+              energy.attachedTo = null;
+              player.zones.hand.push(energy);
+              events.push({
+                type: 'cardMoved',
+                instanceId: energy.instanceId,
+                from: 'inPlay',
+                to: 'hand',
+                playerId,
+              });
+            }
+          }
         } else {
           events.push({ type: 'effectStepSkipped', reason: 'target_not_found', targetInstanceId: targetId });
         }

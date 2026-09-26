@@ -106,6 +106,14 @@ import test, { describe } from 'node:test';
     test("Wally's Compassion: heal Mega Evolution ex", () => {
       const r = parseTrainerEffect("Heal all damage from 1 of your Mega Evolution Pokémon ex. If you healed any damage in this way, put all Energy attached to that Pokémon into your hand.");
       assert.equal(r.steps[0].type, 'heal');
+      assert.equal(r.steps[0].target, 'Mega Evolution Pokémon ex');
+      assert.equal(r.steps[0].returnEnergy, true);
+    });
+
+    test("Bianca's Devotion: heal all, no Energy move", () => {
+      const r = parseTrainerEffect('Heal all damage from 1 of your Pokémon that has 30 HP or less remaining.');
+      assert.equal(r.steps[0].type, 'heal');
+      assert.equal(r.steps[0].returnEnergy, false);
     });
     
     test('Wondrous Patch: attach Psychic energy from discard', () => {
