@@ -84,6 +84,34 @@ function normalizeText(text) {
     .toLowerCase();
 }
 
+// TCGdex prints older sets with type words ("Fighting Pokémon", "provides Metal
+// Energy", "ColorlessColorless less") where the pkmncards corpus prints {X} symbols.
+// Canonicalize those words on the effect text so one set of clause matchers reads both
+// notations (cards receive text from the client's TCGdex enrichment, not the corpus).
+const TYPE_WORD_SYMBOLS = [
+  [/\bcolorless\b/g, '{c}'],
+  [/\bgrass\b/g, '{g}'],
+  [/\bfire\b/g, '{r}'],
+  [/\bwater\b/g, '{w}'],
+  [/\blightning\b/g, '{l}'],
+  [/\bpsychic\b/g, '{p}'],
+  [/\bfighting\b/g, '{f}'],
+  [/\bdarkness\b/g, '{d}'],
+  [/\bdark\b/g, '{d}'],
+  [/\bmetal\b/g, '{m}'],
+  [/\bdragon\b/g, '{n}'],
+  [/\bfairy\b/g, '{y}'],
+];
+
+function normalizeEnergyText(text) {
+  let out = normalizeText(text);
+  // {C}{C} arrives with no separator as "colorlesscolorless": convert each member of
+  // the run before the single-word pass sees it.
+  out = out.replace(/colorless(?=colorless)/g, '{c}');
+  for (const [re, symbol] of TYPE_WORD_SYMBOLS) out = out.replace(re, symbol);
+  return out;
+}
+
 function symbolTypes(segment) {
   const seen = new Set();
   const out = [];
@@ -360,7 +388,7 @@ function parseAttachRestriction(lower) {
   else if (/only be attached to (a )?team aqua pokémon/.test(lower)) restrict('teamAqua');
   else if (/can be attached only to a pokémon with team magma in its name/.test(lower)) restrict('teamMagma');
   else if (/can be attached only to a pokémon with team aqua in its name/.test(lower)) restrict('teamAqua');
-  else if (/can be attached only to a pokémon that has dark or rocket's in its name/.test(lower)) {
+  else if (/can be attached only to a pokémon that has (?:dark|\{d\}) or rocket's in its name/.test(lower)) {
     restrict('darkOrRocket');
   } else if (/can be attached to 1 of your shining or light pokémon/.test(lower)) {
     restrict('shiningOrLight');
@@ -403,7 +431,7 @@ function parseEffects(lower) {
   if (/discard (?:it|this card|boost energy|mirror|r energy|magma energy|aqua energy|miracle energy)\b[^.]*at the end of (?:your|the) turn|discard .* at the end of the turn it was attached|at the end of your turn, discard|when your turn ends, discard/.test(lower)) {
     push({ type: 'discardAtEndOfTurn' });
   }
-  if (/at the end of every turn, put (\d+) damage counter on the pokémon darkness energy is attached to/.test(lower)) {
+  if (/at the end of every turn, put (\d+) damage counter on the pokémon (?:darkness|\{d\}) energy is attached to/.test(lower)) {
     const m = lower.match(/put (\d+) damage counter/);
     push({ type: 'endOfTurnDamageCounter', count: Number(m[1]), unless: 'host:Dark' });
   }
@@ -578,11 +606,11 @@ function parseEffects(lower) {
     push({ type: 'damageBonus', amount: Number(m2[1]), hostType, target: 'opponentActive' });
   }
   // Unseen Forces prints "is attached to attack," (SE14).
-  if (/if the pokémon darkness energy is attached to attacks?, the attack does (\d+) more damage/.test(lower)) {
+  if (/if the pokémon (?:darkness|\{d\}) energy is attached to attacks?, the attack does (\d+) more damage/.test(lower)) {
     const m = lower.match(/the attack does (\d+) more damage/);
     push({ type: 'damageBonus', amount: Number(m[1]), hostType: 'Dark', target: 'active', condition: 'host:Dark' });
   }
-  if (/if the pokémon darkness energy is attached to (?:damages the defending pokémon|does damage with an attack)/.test(lower)) {
+  if (/if the pokémon (?:darkness|\{d\}) energy is attached to (?:damages the defending pokémon|does damage with an attack)/.test(lower)) {
     const m = lower.match(/the attack does (\d+) more damage/);
     // Aquapolis / Expedition print this bonus for any host, after W/R and only when the
     // attack does damage; only the end-of-turn damage counter spares {D} Pokémon (SE14).
@@ -621,9 +649,9 @@ function parseEffects(lower) {
   }
   // Metal Energy: Call of Legends gates the reduction on a {M} host ("Ignore this effect
   // if … isn't {M}"); Aquapolis / Expedition print it for any host (SE14).
-  const metalIncoming = lower.match(/damage done (?:by attacks )?to the pokémon (?:that )?metal energy is attached to is reduced by (\d+) \(after applying weakness and resistance\)/);
+  const metalIncoming = lower.match(/damage done (?:by attacks )?to the pokémon (?:that )?(?:metal|\{m\}) energy is attached to is reduced by (\d+) \(after applying weakness and resistance\)/);
   if (metalIncoming) {
-    const gated = /ignore this effect if the pokémon that metal energy is attached to isn't \{m\}/.test(lower);
+    const gated = /ignore this effect if the pokémon that (?:metal|\{m\}) energy is attached to isn't \{m\}/.test(lower);
     push({
       type: 'damageReduction',
       amount: Number(metalIncoming[1]),
@@ -634,7 +662,7 @@ function parseEffects(lower) {
   }
   // "…isn't {M}, whenever it damages a Pokémon, reduce that damage by 10" is the host's
   // own outgoing damage, not incoming (SE14).
-  const metalOutgoing = lower.match(/if the pokémon metal energy is attached to isn't \{m\}, whenever it damages a pokémon[^.]*reduce that damage by (\d+) \((before|after) applying/);
+  const metalOutgoing = lower.match(/if the pokémon (?:metal|\{m\}) energy is attached to isn't \{m\}, whenever it damages a pokémon[^.]*reduce that damage by (\d+) \((before|after) applying/);
   if (metalOutgoing) {
     push({
       type: 'attackDamagePenalty',
@@ -656,7 +684,7 @@ function parseEffects(lower) {
       condition: `hostHasBasic:${SYMBOL_TYPES[holonGlEx[1]]}`,
     });
   }
-  if (/ignore (?:this|these) effects? if (?:the pokémon )?(?:that )?(?:darkness|metal|holon energy|heal energy)[^.]*isn't \{([a-z])\}/.test(lower)) {
+  if (/ignore (?:this|these) effects? if (?:the pokémon )?(?:that )?(?:darkness|metal|\{[dm]\} energy|holon energy|heal energy)[^.]*isn't \{([a-z])\}/.test(lower)) {
     const m = lower.match(/isn't \{([a-z])\}/);
     push({ type: 'ignoredOn', condition: `not:${SYMBOL_TYPES[m[1]]}` });
   }
@@ -707,7 +735,7 @@ function parseEffects(lower) {
   } else if (/prevent all effects of attacks used by your opponent's pokémon done to the pokémon this card is attached to/.test(lower)) {
     push({ type: 'effectShield', source: 'opponentPokemon', excludeDamage: true });
   }
-  if (/prevent all effects of your opponent's attacks, except damage, done to the \{([a-z])\} pokémon that this card is attached to/.test(lower)) {
+  if (/prevent all effects of your opponent's attacks, except damage, done to the \{([a-z])\} pokémon (?:that )?this card is attached to/.test(lower)) {
     const m = lower.match(/done to the \{([a-z])\} pokémon/);
     push({ type: 'effectShield', hostType: SYMBOL_TYPES[m[1]], source: 'opponentPokemon', excludeDamage: true });
   }
@@ -853,7 +881,7 @@ export function parseSpecialEnergyEffects(card) {
   const name = String(card.name);
   const lowerName = normalizeText(name);
   const text = card.text ?? card.effect ?? '';
-  const lower = normalizeText(text);
+  const lower = normalizeEnergyText(text);
   const canonical = { ...card, subtypes: cardSubtypes(card) };
 
   const steps = [];
