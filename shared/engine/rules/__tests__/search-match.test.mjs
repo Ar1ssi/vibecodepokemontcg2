@@ -162,6 +162,20 @@ test('typed Basic search accepts supertype/hp Pokémon markers and stage casing'
   assert.equal(matchesSearch(energy, 'Basic {C} Pokémon ≤100 HP'), false);
 });
 
+test('"Pokémon or Evolution" search excludes Trainers and Energy', () => {
+  const basic = { name: 'Chikorita', supertype: 'Pokémon', stage: 'Basic', hp: 70 };
+  const stage1 = { name: 'Bayleef', supertype: 'Pokémon', stage: 'Stage 1', hp: 100 };
+  const energy = { name: 'Basic Grass Energy', supertype: 'Energy', type: 'Energy' };
+  const trainer = { name: 'Potion', supertype: 'Trainer', type: 'Item' };
+
+  assert.equal(matchesSearch(basic, 'Pokémon or Evolution'), true);
+  assert.equal(matchesSearch(stage1, 'Pokémon or Evolution'), true);
+  assert.equal(matchesSearch(energy, 'Pokémon or Evolution'), false);
+  assert.equal(matchesSearch(trainer, 'Pokémon or Evolution'), false);
+  assert.equal(matchesSearch(energy, 'Evolution'), false);
+  assert.equal(matchesSearch(trainer, 'Evolution'), false);
+});
+
 test('Cherish Ball (UNM 191, pkmncards): "a Pokémon-GX" matches only GX Pokémon', async () => {
   const { parseSearchDeckParams } = await import('../trainer-effects.mjs');
   const step = parseSearchDeckParams(

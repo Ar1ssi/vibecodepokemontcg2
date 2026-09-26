@@ -86,6 +86,11 @@ export function matchesSearch(card, what = '') {
   const isTrainer =
     String(card.supertype || card.type || '').toLowerCase().includes('trainer') ||
     TRAINER_KIND_TYPES.has(String(card.type || '').toLowerCase());
+  // "Evolution card" (Master Ball) means an Evolution Pokémon; as a bare
+  // generic word it used to fall through to the final `return true`, letting
+  // Trainers/Energy match. The "evolution {X} pokémon" form below is a Pokémon
+  // too, so this never excludes a typed match.
+  if (w.includes('evolution') && !isPokemon) return false;
   if (w.includes('ultra beast')) {
     return isUltraBeastCard(card);
   }

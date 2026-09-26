@@ -1107,8 +1107,9 @@ function parseTrainerStepsInner(lower) {
         type: 'lookAtTop',
         count: m ? Number(m[1]) : 7,
         pick: combinationDiscardWhat(combo[2]),
-        destination: 'hand',
+        destination: lower.includes('onto your bench') ? 'bench' : 'hand',
         takeUpTo: Number(combo[1]),
+        ...(lower.includes('put them on the bottom of your deck') ? { restToBottom: true } : {}),
       });
       appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };

@@ -578,7 +578,7 @@ function lookAtDeckEnd(ctx, fromBottom) {
       // "up to N" (Bug Catching Set): take every chosen match, not just the first.
       const toBench = step.destination === 'bench';
       const destination = toBench ? player.zones.bench : player.zones.hand;
-      for (const picked of chosen) {
+      for (const picked of chosen.slice(0, Number(step.takeUpTo))) {
         removeFromZones(player, picked);
         destination.push(picked);
         ctx.events.push({ type: 'cardMoved', instanceId: picked.instanceId, from: 'deck', to: toBench ? 'bench' : 'hand', playerId: player.playerId });

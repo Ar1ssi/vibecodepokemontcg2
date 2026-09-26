@@ -518,10 +518,19 @@ async function runLookStep(card, step, fromBottom, done) {
     : Array.from({ length: count }, (_, i) => i);
   const candidates = indices.map((i) => deck.array[i]).filter(Boolean);
   let pool = candidates;
-  if (step.pick && step.pick !== 'any') {
+  if (step.pick === 'discard') {
+    // Raifort-style "discard any number of them": every viewed card is eligible.
+    pool = candidates;
+  } else if (step.pick && step.pick !== 'any') {
     await Promise.all(candidates.map((c) => ensureCardData(c)));
     const filtered = candidates.filter((c) => _matchesSearch(c, step.pick));
-    if (filtered.length) pool = filtered;
+    if (filtered.length === 0) {
+      msg(`  ${card.name}: no matching cards in the top ${count} — shuffle your deck`);
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
+      done?.();
+      return;
+    }
+    pool = filtered;
   }
   const destination = step.destination === 'bench' ? 'bench' : 'hand';
   const sourceText = card.text || card.effect || '';

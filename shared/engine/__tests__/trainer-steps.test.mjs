@@ -222,6 +222,23 @@ test('lookAtTop (Pokégear 3.0): only Supporters in the top 7 are offered; rest 
   assert.equal(zone(done, 'p1', 'deck').length, 2);
 });
 
+test('lookAtTop (Master Ball): "Pokémon or Evolution" offers only Pokémon, not Energy/Trainers', () => {
+  const game = setup();
+  const basic = pokemon('Chikorita', { types: ['Grass'] });
+  const stage1 = pokemon('Bayleef', { stage: 'Stage 1', types: ['Grass'] });
+  const energy = card({ name: 'Basic Grass Energy', type: 'Energy', subtypes: ['Basic'], types: ['Grass'] });
+  const trainer = card({ name: 'Potion', type: 'Trainer', trainerType: 'Item' });
+  game.p1.zones.deck.push(basic, energy, stage1, trainer);
+  const { res } = play(
+    game,
+    'Look at 7 cards from the top of your deck. You may choose a Basic Pokémon or Evolution card from those cards, show it to your opponent, and put it into your hand. Shuffle the rest into your deck.'
+  );
+  assert.deepEqual(
+    ids(res.pendingChoice.options).sort(),
+    ids([basic, stage1]).sort()
+  );
+});
+
 test('lookAtTop (Bug Catching Set): only {G} Pokémon / Basic {G} Energy offered, take up to 2', () => {
   const game = setup();
   const grass1 = pokemon('Chikorita', { types: ['Grass'] });
