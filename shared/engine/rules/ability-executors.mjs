@@ -550,7 +550,13 @@ export function parseDamageBonus(card) {
   const m =
     t.match(/(\d+)\s+more\s+damage/) ||
     t.match(/(?:deals|does)\s+(\d+)\s+more/);
-  return { bonus: parseNumber(m) };
+  const bonus = parseNumber(m);
+  // Beastite: "…do 10 more damage … for each Prize card you have taken" — the
+  // consumer scales by the attacker's taken Prizes (audit S&M F5).
+  if (bonus && /for each prize card you have taken/.test(t)) {
+    return { bonus, perPrizeTaken: true };
+  }
+  return { bonus };
 }
 
 export function applyDamageBonus(baseDamage, bonus) {

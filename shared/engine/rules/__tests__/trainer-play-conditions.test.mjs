@@ -256,3 +256,26 @@ test('first-turn permission Supporters are playable on turn 1; plain Supporters 
   const carmine = card({ name: 'Carmine', type: 'Trainer', trainerType: 'Supporter', text: TEXTS.Carmine });
   assert.equal(play(first, carmine).error, null);
 });
+
+// Audit S&M I137: Cyrus Prism Star's "{W} or {M} Active" gate was unparsed.
+test('Cyrus Prism Star: only with a {W}/{M} Active Pokémon', () => {
+  const cyrus = {
+    name: 'Cyrus Prism Star',
+    type: 'Trainer',
+    trainerType: 'Supporter',
+    text: 'You can play this card only if your Active Pokémon is a {W} or {M} Pokémon. Your opponent chooses 2 Benched Pokémon and shuffles the others, and all cards attached to them, into their deck.',
+  };
+  assert.equal(parseTrainerEffect(cyrus.text).playCondition, 'activeType=W|M');
+  const args = { turnNumber: 5, myPrizes: 6, opponentPrizes: 6, handCount: 3, card: cyrus };
+  assert.equal(trainerPlayBlockReason({ ...args, ownActive: { types: ['Water'] } }), null);
+  assert.equal(trainerPlayBlockReason({ ...args, ownActive: { types: ['Metal'] } }), null);
+  assert.match(
+    trainerPlayBlockReason({ ...args, ownActive: { types: ['Fire'] } }),
+    /must be a \{W\} or \{M\} Pokémon/
+  );
+  assert.equal(
+    trainerPlayBlockReason({ ...args, ownActive: undefined }),
+    null,
+    'an unknown Active fails open (bot path)'
+  );
+});

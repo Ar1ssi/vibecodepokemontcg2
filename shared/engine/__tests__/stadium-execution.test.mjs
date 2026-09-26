@@ -2000,3 +2000,75 @@ test('stadium: Prism Tower (discard 2) is a no-op with fewer than 2 cards in han
   assert.equal(res3.state.players.p1.zones.deck.length, 1);
   assert.equal(res3.state.players.p1.flags.stadiumUsedThisTurn, true);
 });
+
+// Audit S&M F2: Blizzard Town was read as a −40 HP Stadium (parseStadiumHpModifier
+// matched "40 HP or less remaining") and reduced every Pokémon's effective HP.
+// It is an attack lock: both players' Pokémon at ≤40 HP remaining can't attack.
+test('stadium: Blizzard Town blocks attacks at 40 HP or less remaining, not by lowering HP', () => {
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 60,
+    name: 'Blizzard Town',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: 'Pokémon with 40 HP or less remaining (both yours and your opponent’s) can’t attack.',
+  });
+  const attacker = createCard({
+    instanceId: 10,
+    name: 'Weavile',
+    hp: 90,
+    damage: 50,
+    attacks: [{ name: 'Slash', cost: [], damage: 30 }],
+  });
+  state.players.p1.zones.active.push(attacker);
+  state.players.p2.zones.active.push(createCard({ instanceId: 20, name: 'Wall', hp: 200 }));
+
+  const blocked = applyCommand(
+    state,
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' },
+    rng
+  );
+  assert.match(blocked.error, /40 HP or less remaining can't attack/);
+
+  // 41 HP remaining is enough — the lock is threshold-scoped, not a damage penalty.
+  state.players.p1.zones.active[0].damage = 49;
+  const allowed = applyCommand(
+    state,
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(allowed.error, null);
+  assert.equal(allowed.state.players.p2.zones.active[0].damage, 30);
+
+  // An evolved attacker reads the top evolution's HP: the Basic root's 60 HP
+  // (20 damage) must not lock a 120-HP Stage 1 (review finding 2).
+  state.players.p1.zones.active.length = 0;
+  const root = createCard({
+    instanceId: 30,
+    name: 'Snorunt',
+    hp: 60,
+    damage: 20,
+    stage: 'Basic',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    attacks: [],
+  });
+  const evo = createCard({
+    instanceId: 31,
+    name: 'Glalie',
+    hp: 120,
+    stage: 'Stage 1',
+    evolvesFrom: 'Snorunt',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    attachedTo: 30,
+    attacks: [{ name: 'Icicle', cost: [], damage: 30 }],
+  });
+  state.players.p1.zones.active.push(root, evo);
+  const evolvedAllowed = applyCommand(
+    state,
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(evolvedAllowed.error, null, '100 HP remaining on the Stage 1 must be allowed');
+});

@@ -30,6 +30,7 @@ import {
 import {
   hasSpecialEnergyAbilityShield,
   hasSpecialEnergyEffectShield,
+  isSpecialEnergyCard,
 } from '../rules/special-energy-parse.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
@@ -321,6 +322,19 @@ function handAttachTargets(ctx) {
 // Pokémon (once per card when the text says "in any way you like").
 function attachFromHand(ctx) {
   const { player, step } = ctx;
+  // Gardenia's Vigor prints "Draw 2 cards. If you drew any cards in this way,
+  // attach …": when the leading draw drew nothing the attach does not resolve.
+  // First call only — a resume carries a fresh events array without the draw.
+  if (
+    step.requiresDraw &&
+    !ctx.selection &&
+    !ctx.memo?.phase &&
+    !(ctx.events || []).some(
+      (event) => event.type === 'cardsDrawn' && event.playerId === ctx.playerId && event.count > 0
+    )
+  ) {
+    return skip(ctx, 'draw_failed');
+  }
   const energies = () => (player.zones.hand || []).filter((c) => handEnergyMatches(c, step.handEnergy));
   const targets = handAttachTargets(ctx);
   const attachAll = (cards, root) => {
@@ -1458,11 +1472,17 @@ function revealOpponentHandDiscard(ctx) {
   }
   revealOpponentHand(ctx);
   if (matches.length === 0) return null;
+  // "Discard 2 …" is mandatory (Team Skull Grunt); only a printed "up to N"
+  // lets the player discard fewer (Eri). min 0 here made the mandatory card
+  // optional (audit S&M F7).
+  const max = Math.min(step.count || 2, matches.length);
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Discard up to ${step.count || 2} ${step.what || 'Item'} cards from your opponent's hand`,
+    prompt: `${sourceName(ctx, 'Trainer')}: Discard ${step.upTo ? 'up to ' : ''}${max} ${
+      step.what || 'Item'
+    } cards from your opponent's hand`,
     options: matches,
-    min: 0,
-    max: Math.min(step.count || 2, matches.length),
+    min: step.upTo ? 0 : max,
+    max,
   });
 }
 
@@ -2490,11 +2510,14 @@ function opponentHandShuffleDeck(ctx) {
     step.what === 'Trainer'
       ? hand.filter((c) => isTrainer(c) || isStadiumCard(c) || isToolCard(c))
       : hand;
-  const count = Math.min(step.count || 1, pool.length);
+  // Peeking Red Card shuffles the WHOLE hand ("those cards"), not a chosen 1.
+  const count = step.all ? pool.length : Math.min(step.count || 1, pool.length);
 
   const finish = (moved) => {
     if (moved > 0) shuffleDeck(opponent, ctx);
     if (step.optionalOpponentDraw && moved > 0) drawCards(opponent, 1, ctx.events);
+    // "…shuffle those cards into their deck, then draw that many cards."
+    if (step.drawThatMany && moved > 0) drawCards(opponent, moved, ctx.events);
     return null;
   };
 
@@ -2508,6 +2531,17 @@ function opponentHandShuffleDeck(ctx) {
   }
   revealOpponentHand(ctx);
   if (pool.length === 0) return skip(ctx, 'no_matching_cards');
+  // Whole-hand shuffle (Peeking Red Card): no picker — move everything.
+  // Snapshot first: `pool` aliases opponent.zones.hand, and removing while
+  // iterating it skips every other card.
+  if (step.all) {
+    const all = [...pool];
+    for (const card of all) {
+      removeFromZones(opponent, card);
+      opponent.zones.deck.push(card);
+    }
+    return finish(all.length);
+  }
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose ${step.upTo ? 'up to ' : ''}${count} card${
       count > 1 ? 's' : ''
@@ -2670,7 +2704,14 @@ function revealTopEnergy(ctx) {
 
 // Lost Vacuum — a Tool attached to any Pokémon, or the Stadium in play, goes to the Lost Zone.
 function toolOrStadiumToLostZone(ctx) {
-  const tools = allAttachedMatching(ctx, [ctx.player, ctx.opponent], isToolCard);
+  // Lost Vacuum: a Tool on any Pokémon, or any Stadium in play.
+  // Faba: a Tool/Special Energy on an OPPONENT's Pokémon, or any Stadium.
+  const sides = ctx.step.side === 'opponent' ? [ctx.opponent] : [ctx.player, ctx.opponent];
+  const tools = allAttachedMatching(
+    ctx,
+    sides,
+    (c) => isToolCard(c) || (ctx.step.includeSpecialEnergy && isSpecialEnergyCard(c))
+  );
   const stadium = ctx.draft.stadium;
   const options = [...tools];
   if (stadium) options.push(stadium);
@@ -4156,6 +4197,16 @@ function toolsToHand(ctx) {
 function discardRandomOpponentHandIfSupporter(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  // Mars prints "Draw 2 cards. If you do, discard …": when the draw clause
+  // drew nothing, the follow-up does not resolve (review finding 6).
+  if (
+    ctx.step.requiresDraw &&
+    !(ctx.events || []).some(
+      (event) => event.type === 'cardsDrawn' && event.playerId === ctx.playerId && event.count > 0
+    )
+  ) {
+    return skip(ctx, 'draw_failed');
+  }
   const hand = opponent.zones.hand || [];
   if (hand.length === 0) return skip(ctx, 'empty_hand');
   const at = Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * hand.length);
@@ -4166,7 +4217,9 @@ function discardRandomOpponentHandIfSupporter(ctx) {
     revealedTo: ctx.playerId,
     cards: [{ instanceId: card.instanceId, name: card.name }],
   });
-  if (isSupporterTrainer(card)) {
+  // Mars discards the random card regardless of type; Tormenting Spray only
+  // discards it when it is a Supporter.
+  if (ctx.step.any || isSupporterTrainer(card)) {
     removeFromZones(opponent, card);
     discardCardToPlayerZone(opponent, card);
     ctx.events.push({
@@ -4176,6 +4229,75 @@ function discardRandomOpponentHandIfSupporter(ctx) {
     });
   }
   return null;
+}
+
+// Ultra Forest Kartenvoy: for the rest of the turn the player's Ultra Beast
+// attacks ignore effects on the opponent's Active Pokémon.
+function ignoreDefenderEffectsTurn(ctx) {
+  const { player, step } = ctx;
+  player.flags.ignoreDefenderEffectsTurn = { ultraBeast: Boolean(step.ultraBeast) };
+  return null;
+}
+
+export const WILL_HEADS = -3;
+export const WILL_TAILS = -4;
+
+// Will: choose heads or tails for the first coin flip this turn.
+function chooseFirstCoin(ctx) {
+  const { player } = ctx;
+  if (ctx.selection) {
+    player.flags.willFirstCoin = ctx.selection[0] === WILL_TAILS ? 'tails' : 'heads';
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose heads or tails for the first coin flip this turn`,
+    options: [
+      { instanceId: WILL_HEADS, name: 'Heads' },
+      { instanceId: WILL_TAILS, name: 'Tails' },
+    ],
+    min: 1,
+    max: 1,
+  });
+}
+
+// Cyrus Prism Star: the opponent keeps 2 Benched Pokémon; the others and all
+// cards attached to them shuffle into their deck.
+function opponentShuffleBenchToDeck(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const bench = benchRootsOf(opponent);
+  const shuffleRest = (keepIds) => {
+    const rest = bench.filter((root) => !keepIds.includes(root.instanceId));
+    if (rest.length === 0) return null;
+    let moved = 0;
+    for (const root of rest) {
+      const cards = [root, ...attachedCards(opponent, root.instanceId)];
+      for (const card of cards) {
+        removeFromZones(opponent, card);
+        card.attachedTo = null;
+        opponent.zones.deck.push(card);
+        moved++;
+      }
+    }
+    shuffleDeck(opponent, ctx);
+    ctx.events.push({
+      type: 'cardsMovedToDeck',
+      count: moved,
+      playerId: opponent.playerId,
+      from: 'bench',
+    });
+    return null;
+  };
+  // At 2 or fewer Benched Pokémon the whole board is kept (printed "chooses 2").
+  if (bench.length <= 2) return null;
+  if (ctx.selection) return shuffleRest(ctx.selection.map(Number));
+  return ctx.ask({
+    player: opponent.playerId,
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose 2 Benched Pokémon to keep; the rest shuffle into your deck`,
+    options: bench,
+    min: 2,
+    max: 2,
+  });
 }
 
 // Trash Exchange: shuffle the discard pile in, then mill that many.
@@ -4375,6 +4497,9 @@ export const EXTRA_STEP_HANDLERS = {
   opponentHandBottom,
   opponentDiscardUntil,
   eachPlayerDiscardUntil,
+  ignoreDefenderEffectsTurn,
+  chooseFirstCoin,
+  opponentShuffleBenchToDeck,
   // I154: parsed Trainer step kinds that had no server executor.
   returnStadiumToHand,
   shuffleDeckOnly,

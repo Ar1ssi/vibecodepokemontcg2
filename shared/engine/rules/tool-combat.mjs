@@ -21,6 +21,8 @@ import {
   isGxCard,
   isMegaCard,
   isVCard,
+  isVmaxCard,
+  isVstarCard,
   isTeraCard,
   isRuleBoxPokemon,
 } from './card-classify.mjs';
@@ -133,6 +135,48 @@ function toolBlocked(blockTools, stadium = null) {
   return Boolean(blockTools || stadiumBlocksToolEffects(stadium));
 }
 
+/**
+ * Rule-box wording in the attacker clause. Only the "attacks (from|of) your
+ * opponent's …" segment counts — a trailing reminder like "(Pokémon V,
+ * Pokémon-GX, etc. have Rule Boxes.)" must not gate the effect (Pot Helmet).
+ * Within the clause the listed subtypes are any-of: "Pokémon-GX and Pokémon-EX"
+ * (Fairy Charm, audit S&M F3) and "Pokémon V or Pokémon-GX" (Pot Helmet) both
+ * accept any listed class, while a lone "Pokémon-EX" narrows to EX.
+ */
+function attackerMatchesPrintedRuleBox(t, attacker) {
+  // "attacks from/of your opponent's …", "by your opponent's …" (Keldeo-GX
+  // Pure Heart) and "by attacks from …" even without the possessive (Altaria-GX)
+  // are the attacker-clause wordings in the corpus.
+  const clauses = [
+    ...t.matchAll(
+      /(?:attacks? (?:from|of)|by(?: an? attack from)?)\s+your opponent'?s ([^.]*)/gi
+    ),
+    ...t.matchAll(/by attacks? from ([^.]*)/gi),
+  ]
+    .map((m) => m[1])
+    .join(' ');
+  if (!clauses) {
+    // Legacy fallback for wordings without the attacker clause.
+    const mentionsEx = /pok[eé]mon[-\s]?ex\b|pokemon[-\s]?ex\b/i.test(t);
+    const mentionsGx = /pok[eé]mon[-\s]?gx\b|pokemon[-\s]?gx\b/i.test(t);
+    if (mentionsEx && !mentionsGx && !isExCard(attacker)) return false;
+    if (mentionsGx && !mentionsEx && !isGxCard(attacker)) return false;
+    return true;
+  }
+  const tokens = new Set(
+    [...clauses.matchAll(/\b(gx|ex|vmax|vstar|v)\b/gi)].map((m) => m[1].toLowerCase())
+  );
+  if (tokens.size === 0) return true;
+  return [...tokens].some((token) => {
+    if (token === 'gx') return isGxCard(attacker);
+    if (token === 'ex') return isExCard(attacker);
+    if (token === 'v') return isVCard(attacker);
+    if (token === 'vmax') return isVmaxCard(attacker);
+    if (token === 'vstar') return isVstarCard(attacker);
+    return false;
+  });
+}
+
 export function preventionForCard(card, attacker, ctx = {}) {
   if (!card) return { preventAll: false, reduce: 0, reduceHp: 0 };
   const t = cardAbilityText(card);
@@ -146,13 +190,8 @@ export function preventionForCard(card, attacker, ctx = {}) {
   // "prevent all damage" (a conditional "damage is reduced by N" must not
   // apply to an unlisted attacker). Legacy printings spell "Pokémon-EX" with a
   // hyphen, so the space-only pattern never matched them.
-  if (/pok[eé]mon[-\s]?ex\b|pokemon[-\s]?ex\b/i.test(t)) {
-    if (!isExCard(attacker)) {
-      return { preventAll: false, reduce: 0, reduceHp: 0 };
-    }
-  }
-  if (/pokémon v\b|pokemon v\b/i.test(t)) {
-    if (!isVCard(attacker)) return { preventAll: false, reduce: 0, reduceHp: 0 };
+  if (!attackerMatchesPrintedRuleBox(t, attacker)) {
+    return { preventAll: false, reduce: 0, reduceHp: 0 };
   }
   if (/have an ability|has an ability|that have an ability/i.test(t)) {
     if (!cardHasAbility(attacker))
@@ -190,10 +229,9 @@ export function reductionForCard(card, defender, attacker, { skipSymbolFilter = 
   if (/have an ability|has an ability/i.test(t) && !cardHasAbility(attacker)) {
     return 0;
   }
-  if (/pokémon v\b|pokemon v\b/i.test(t) && !isVCard(attacker)) {
-    return 0;
-  }
-  if (/pokémon ex\b|pokemon ex\b/i.test(t) && !isExCard(attacker)) {
+  // The clause-scoped rule-box check owns V/GX/EX (a whole-text "Pokémon V"
+  // scan made Pot Helmet's "V or Pokémon-GX" fail on GX attackers).
+  if (!attackerMatchesPrintedRuleBox(t, attacker)) {
     return 0;
   }
   if (!skipSymbolFilter && /\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
@@ -239,7 +277,8 @@ function bonusForTool(
   }
 ) {
   const t = cardAbilityText(tool);
-  const bonus = parseDamageBonus(tool).bonus;
+  const parsedBonus = parseDamageBonus(tool);
+  let bonus = parsedBonus.bonus;
   if (!bonus) return 0;
   if (ctx && !toolConditionMet(parseToolCondition(tool), ctx)) return 0;
   if (/active (?:\{[a-z]\}\s*)?pok[eé]mon/i.test(t) && !defenderIsActive) {
@@ -286,6 +325,13 @@ function bonusForTool(
   if (/pikachu ex/i.test(t) && !/pikachu ex/i.test(lower(attacker?.name)))
     return 0;
   if (/tera pokémon|tera pokemon/i.test(t) && !isTeraCard(attacker)) return 0;
+  // "…for each Prize card you have taken" (Beastite): × taken Prizes, from the
+  // attacker's remaining Prizes; unknown remaining fails to 0 (audit S&M F5).
+  if (parsedBonus.perPrizeTaken) {
+    const remaining = ctx?.flags?.prizesRemaining;
+    const taken = Number.isFinite(remaining) ? Math.max(0, 6 - remaining) : 0;
+    bonus *= taken;
+  }
   return bonus;
 }
 

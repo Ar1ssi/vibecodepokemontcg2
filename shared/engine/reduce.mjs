@@ -22,7 +22,13 @@ import {
 } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { setupGame } from './setup.mjs';
-import { createRng, shuffleInPlace, flipCoin, withForcedCoin } from './rng.mjs';
+import {
+  createRng,
+  shuffleInPlace,
+  flipCoin,
+  withForcedCoin,
+  withForcedCoinOnce,
+} from './rng.mjs';
 import {
   computeAttackDamage,
   expandEnergyEntries,
@@ -191,6 +197,7 @@ import {
   getStadiumAttackCostIncreaseFor,
   stadiumAbilityBlockedFor,
   stadiumAllowsSameTurnEvolution,
+  stadiumAttackLockReason,
 } from './rules/stadium-effects.mjs';
 import {
   isRuleBoxPokemon,
@@ -198,6 +205,7 @@ import {
   isVstarCard,
   isTeamFlareHyperGearCard,
   isBasicEnergy,
+  isUltraBeastCard,
 } from './rules/card-classify.mjs';
 import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
 import { trainerEndsTurn } from './rules/trainer-effects.mjs';
@@ -577,6 +585,14 @@ function prizeFlags(draft, attackerPlayerId, defenderPlayerId) {
   };
 }
 
+// Ultra Forest Kartenvoy: for the rest of the turn the player's Ultra Beast
+// attacks ignore effects on the opponent's Active Pokémon.
+function trainerIgnoresDefenderEffects(draft, playerId, attacker) {
+  const flag = draft.players?.[playerId]?.flags?.ignoreDefenderEffectsTurn;
+  if (!flag) return false;
+  return !flag.ultraBeast || isUltraBeastCard(attacker);
+}
+
 // A chosen-target clause's damage to the opponent's Active after Weakness,
 // Resistance and the other attack modifiers computeAttackDamage applies.
 function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }) {
@@ -611,7 +627,8 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
       ...clause.immunity,
       ignoreDefenderEffects:
         clause.immunity?.ignoreDefenderEffects ||
-        abilityReads.ignoreDefenderEffects,
+        abilityReads.ignoreDefenderEffects ||
+        trainerIgnoresDefenderEffects(draft, attackerPlayerId, abilityReads.attacker),
       abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
       abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
       abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
@@ -2899,6 +2916,8 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     if (p.playerId !== nextPlayerId && p.flags) {
       p.flags.briarActive = false;
       delete p.flags.turnDamageBonuses;
+      delete p.flags.ignoreDefenderEffectsTurn;
+      delete p.flags.willFirstCoin;
     }
   }
 
@@ -3968,6 +3987,18 @@ export function validateLegality(state, command) {
           reason: "Asleep — this Pokémon can't attack or retreat.",
         };
       }
+      // Blizzard Town: both players' Pokémon at 40 HP or less remaining can't
+      // attack. Read the in-play (top evolution) effective HP, not the Basic
+      // root's printed HP; unknown stats fail open.
+      const activeEffectiveHp = cardEffectiveHp(state, active, playerId);
+      const attackLockReason =
+        activeEffectiveHp > 0
+          ? stadiumAttackLockReason(state.stadium?.card || state.stadium, {
+              hp: activeEffectiveHp,
+              damage: active.damage || 0,
+            })
+          : null;
+      if (attackLockReason) return { allowed: false, reason: attackLockReason };
       const atkIdx = payload?.attackIndex ?? 0;
       const attacks = attackViewFor(state, active).attacks || [];
       const attack = attacks[atkIdx];
@@ -4226,6 +4257,7 @@ export function validateLegality(state, command) {
           ).length,
           lostZoneCount: (player.zones?.lostZone || []).length,
           opponentActive: opponentActiveTop(opponent),
+          ownActive: opponentActiveTop(player),
           koedLastOppTurn: Boolean(player.flags?.koedLastOppTurn),
           koedLastOppTurnVictims: player.flags?.koedLastOppTurnVictims || [],
           ...trainerTargetCounts(
@@ -5700,7 +5732,9 @@ function resolveAttackEffectPhase(draft, ctx) {
             turnDamageBonuses: draft.players[playerId]?.flags?.turnDamageBonuses || [],
             ...immunity,
             ignoreDefenderEffects:
-              immunity.ignoreDefenderEffects || abilityReads.ignoreDefenderEffects,
+              immunity.ignoreDefenderEffects ||
+              abilityReads.ignoreDefenderEffects ||
+              trainerIgnoresDefenderEffects(draft, playerId, abilityReads.attacker),
             abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
             abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
             abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
@@ -6771,6 +6805,17 @@ export function applyCommand(state, command, rng = null) {
     abilityForcesOpponentTails(abilitySideContext(state, turnOpponentId))
   ) {
     activeRng = withForcedCoin(activeRng, 'tails');
+  }
+  // Will: the turn player chose the face of their next first coin flip this
+  // turn. The force is one-shot — flipCoin clears it on use.
+  const willPlayerId =
+    state.turn?.player && draft.players?.[state.turn.player]?.flags?.willFirstCoin
+      ? state.turn.player
+      : null;
+  let willCoinUsed = null;
+  if (willPlayerId) {
+    activeRng = withForcedCoinOnce(activeRng, draft.players[willPlayerId].flags.willFirstCoin);
+    willCoinUsed = activeRng.forcedCoinUsed;
   }
   const events = [];
 
@@ -8783,6 +8828,11 @@ export function applyCommand(state, command, rng = null) {
   clearFaceDownOffBoard(draft);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;
+
+  // Will is consumed by the first flip; clear the marker once it fired.
+  if (willPlayerId && willCoinUsed?.value) {
+    delete draft.players[willPlayerId].flags.willFirstCoin;
+  }
 
   // Advance state version and append to commandLog
   draft.stateVersion = (state.stateVersion || 0) + 1;

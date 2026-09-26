@@ -10,6 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { extractSpanInnerHtml } from './lib/pkmn-article-html.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_PATH = path.join(__dirname, '..', 'out', 'pkmn-special-energy-cards.json');
@@ -64,7 +65,9 @@ function parseArticles(html) {
   const articleRe = /<article class="type-pkmn_card[^"]*"[^>]*>([\s\S]*?)<\/article>/g;
   for (const m of html.matchAll(articleRe)) {
     const body = m[1];
-    const name = firstMatch(/<span class="name"[^>]*>([\s\S]*?)<\/span>/, body);
+    // Balance-scan the name span: nested symbol markup stays, a following
+    // sibling span stays out.
+    const name = htmlToText(extractSpanInnerHtml(body, 'name'));
     const subtype = firstMatch(/<span class="sub-type"[^>]*>([\s\S]*?)<\/span>/, body);
     const textBlock = body.match(/<div class="text">([\s\S]*?)<\/div>\s*<div class="release-meta/);
     const text = textBlock ? htmlToText(textBlock[1]) : '';

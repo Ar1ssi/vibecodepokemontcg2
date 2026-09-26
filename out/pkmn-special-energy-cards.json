@@ -1,6 +1,6 @@
 [
  {
-  "name": "Voltaic {",
+  "name": "Voltaic {L} Energy",
   "set": "Pitch Black",
   "number": "084",
   "subtype": "Special Energy",
@@ -8,7 +8,7 @@
   "url": "https://pkmncards.com/card/voltaic-l-energy-pitch-black-pbl-084/"
  },
  {
-  "name": "Shadowy {",
+  "name": "Shadowy {D} Energy",
   "set": "Pitch Black",
   "number": "083",
   "subtype": "Special Energy",
@@ -16,7 +16,7 @@
   "url": "https://pkmncards.com/card/shadowy-d-energy-pitch-black-pbl-083/"
  },
  {
-  "name": "Nitro {",
+  "name": "Nitro {R} Energy",
   "set": "Chaos Rising",
   "number": "086",
   "subtype": "Special Energy",
@@ -24,7 +24,7 @@
   "url": "https://pkmncards.com/card/nitro-r-energy-chaos-rising-cri-086/"
  },
  {
-  "name": "Magnetic {",
+  "name": "Magnetic {M} Energy",
   "set": "Chaos Rising",
   "number": "085",
   "subtype": "Special Energy",
@@ -32,7 +32,7 @@
   "url": "https://pkmncards.com/card/magnetic-m-energy-chaos-rising-cri-085/"
  },
  {
-  "name": "Bubbly {",
+  "name": "Bubbly {W} Energy",
   "set": "Chaos Rising",
   "number": "084",
   "subtype": "Special Energy",
@@ -40,7 +40,7 @@
   "url": "https://pkmncards.com/card/bubbly-w-energy-chaos-rising-cri-084/"
  },
  {
-  "name": "Telepathic {",
+  "name": "Telepathic {P} Energy",
   "set": "Perfect Order",
   "number": "088",
   "subtype": "Special Energy",
@@ -48,7 +48,7 @@
   "url": "https://pkmncards.com/card/telepathic-p-energy-perfect-order-por-088/"
  },
  {
-  "name": "Rocky {",
+  "name": "Rocky {F} Energy",
   "set": "Perfect Order",
   "number": "087",
   "subtype": "Special Energy",
@@ -56,7 +56,7 @@
   "url": "https://pkmncards.com/card/rocky-f-energy-perfect-order-por-087/"
  },
  {
-  "name": "Growing {",
+  "name": "Growing {G} Energy",
   "set": "Perfect Order",
   "number": "086",
   "subtype": "Special Energy",
@@ -376,7 +376,7 @@
   "url": "https://pkmncards.com/card/rapid-strike-energy-battle-styles-bst-140/"
  },
  {
-  "name": "Wash {",
+  "name": "Wash {W} Energy",
   "set": "Vivid Voltage",
   "number": "165",
   "subtype": "Special Energy",
@@ -384,7 +384,7 @@
   "url": "https://pkmncards.com/card/wash-w-energy-vivid-voltage-viv-165/"
  },
  {
-  "name": "Stone {",
+  "name": "Stone {F} Energy",
   "set": "Vivid Voltage",
   "number": "164",
   "subtype": "Special Energy",
@@ -392,7 +392,7 @@
   "url": "https://pkmncards.com/card/stone-f-energy-vivid-voltage-viv-164/"
  },
  {
-  "name": "Coating {",
+  "name": "Coating {M} Energy",
   "set": "Vivid Voltage",
   "number": "163",
   "subtype": "Special Energy",
@@ -400,7 +400,7 @@
   "url": "https://pkmncards.com/card/coating-m-energy-vivid-voltage-viv-163/"
  },
  {
-  "name": "Aromatic {",
+  "name": "Aromatic {G} Energy",
   "set": "Vivid Voltage",
   "number": "162",
   "subtype": "Special Energy",
@@ -416,7 +416,7 @@
   "url": "https://pkmncards.com/card/capture-energy-darkness-ablaze-daa-201/"
  },
  {
-  "name": "Powerful {",
+  "name": "Powerful {C} Energy",
   "set": "Darkness Ablaze",
   "number": "176",
   "subtype": "Special Energy",
@@ -424,7 +424,7 @@
   "url": "https://pkmncards.com/card/powerful-c-energy-darkness-ablaze-daa-176/"
  },
  {
-  "name": "Hiding {",
+  "name": "Hiding {D} Energy",
   "set": "Darkness Ablaze",
   "number": "175",
   "subtype": "Special Energy",
@@ -432,7 +432,7 @@
   "url": "https://pkmncards.com/card/hiding-d-energy-darkness-ablaze-daa-175/"
  },
  {
-  "name": "Heat {",
+  "name": "Heat {R} Energy",
   "set": "Darkness Ablaze",
   "number": "174",
   "subtype": "Special Energy",
@@ -456,7 +456,7 @@
   "url": "https://pkmncards.com/card/twin-energy-rebel-clash-rcl-174/"
  },
  {
-  "name": "Speed {",
+  "name": "Speed {L} Energy",
   "set": "Rebel Clash",
   "number": "173",
   "subtype": "Special Energy",
@@ -464,7 +464,7 @@
   "url": "https://pkmncards.com/card/speed-l-energy-rebel-clash-rcl-173/"
  },
  {
-  "name": "Horror {",
+  "name": "Horror {P} Energy",
   "set": "Rebel Clash",
   "number": "172",
   "subtype": "Special Energy",
@@ -576,7 +576,7 @@
   "url": "https://pkmncards.com/card/rainbow-energy-celestial-storm-ces-151/"
  },
  {
-  "name": "Unit Energy {",
+  "name": "Unit Energy {F}{D}{Y}",
   "set": "Forbidden Light",
   "number": "146",
   "subtype": "Special Energy",
@@ -584,7 +584,7 @@
   "url": "https://pkmncards.com/card/unit-energy-fdy-forbidden-light-fli-146/"
  },
  {
-  "name": "Unit Energy {",
+  "name": "Unit Energy {F}{D}{Y}",
   "set": "Forbidden Light",
   "number": "118",
   "subtype": "Special Energy",
@@ -600,7 +600,7 @@
   "url": "https://pkmncards.com/card/beast-energy-prism-star-forbidden-light-fli-117/"
  },
  {
-  "name": "Unit Energy {",
+  "name": "Unit Energy {L}{P}{M}",
   "set": "Ultra Prism",
   "number": "171",
   "subtype": "Special Energy",
@@ -608,7 +608,7 @@
   "url": "https://pkmncards.com/card/unit-energy-lpm-ultra-prism-upr-171/"
  },
  {
-  "name": "Unit Energy {",
+  "name": "Unit Energy {G}{R}{W}",
   "set": "Ultra Prism",
   "number": "170",
   "subtype": "Special Energy",
@@ -616,7 +616,7 @@
   "url": "https://pkmncards.com/card/unit-energy-grw-ultra-prism-upr-170/"
  },
  {
-  "name": "Unit Energy {",
+  "name": "Unit Energy {L}{P}{M}",
   "set": "Ultra Prism",
   "number": "138",
   "subtype": "Special Energy",
@@ -624,7 +624,7 @@
   "url": "https://pkmncards.com/card/unit-energy-lpm-ultra-prism-upr-138/"
  },
  {
-  "name": "Unit Energy {",
+  "name": "Unit Energy {G}{R}{W}",
   "set": "Ultra Prism",
   "number": "137",
   "subtype": "Special Energy",
@@ -896,7 +896,7 @@
   "url": "https://pkmncards.com/card/plasma-energy-plasma-storm-pls-127/"
  },
  {
-  "name": "Blend Energy {",
+  "name": "Blend Energy {W}{L}{F}{M}",
   "set": "Dragons Exalted",
   "number": "118",
   "subtype": "Special Energy",
@@ -904,7 +904,7 @@
   "url": "https://pkmncards.com/card/blend-energy-wlfm-dragons-exalted-drx-118/"
  },
  {
-  "name": "Blend Energy {",
+  "name": "Blend Energy {G}{R}{P}{D}",
   "set": "Dragons Exalted",
   "number": "117",
   "subtype": "Special Energy",

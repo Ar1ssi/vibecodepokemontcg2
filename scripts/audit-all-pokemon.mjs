@@ -3,7 +3,7 @@
  * Full-corpus Pokémon attack + ability audit (source: pkmncards.com, extracted
  * to out/pkmn-pokemon-cards.json by scripts/scrape-pkmncards.mjs).
  *
- * Mirrors scripts/audit-all-stadiums.mjs: it splits each printing's printed text
+ * Mirrors scripts/audit-stadiums.mjs: it splits each printing's printed text
  * into attack / ability entries, runs the real pure parsers
  * (classifyAttackEffect, parseAttackDamage, parseAbility, classifyAbility), and
  * flags unknown families and plausible-but-wrong mis-parses. Every suspicious

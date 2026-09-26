@@ -196,7 +196,7 @@ export function describeEnergyEffect(card) {
 // (callers keep their own type derivation for basic / unknown energies).
 const VALID_TYPES = new Set([
   'colorless', 'grass', 'fire', 'water', 'lightning',
-  'psychic', 'fighting', 'metal', 'dark', 'dragon',
+  'psychic', 'fighting', 'metal', 'dark', 'dragon', 'fairy',
 ]);
 
 // Letter energies (Evolutions set): single-letter name → provided type.
@@ -239,9 +239,9 @@ export function effectiveEnergyType(card) {
 // Printed {R}/{W}/… symbols → TCG type names (trainer search filters).
 // Exported for design 013: the card inspector renders these glyphs as energy orbs
 // in attack text, so it resolves them through this map rather than a copy of it.
-// Note the values are lowercase and there is no dragon/fairy entry — a {N}/{Y}
-// glyph is deliberately unmatched here, and callers that need a display name must
-// supply their own fallback.
+// Covers every printed energy symbol, Dragon and Fairy included — a missing
+// entry made "Basic {Y} Energy" / "Basic {N} Energy" searches match nothing
+// (audit S&M F1, energyMatchesSearchWhat early-returns on an unmatched symbol).
 export const ENERGY_SYMBOL_TO_TYPE = {
   c: 'colorless',
   g: 'grass',
@@ -252,6 +252,8 @@ export const ENERGY_SYMBOL_TO_TYPE = {
   f: 'fighting',
   d: 'dark',
   m: 'metal',
+  n: 'dragon',
+  y: 'fairy',
 };
 
 function primaryEnergyTypeName(card) {

@@ -8,8 +8,8 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 ## Unenforced (parsed, no engine consumer)
 
 ## Guided (effect steps)
-- Nitro {: provide, onDiscardReturnToHand
-- Telepathic {: provide, onAttachSearch
+- Nitro {R} Energy: provide, onDiscardReturnToHand
+- Telepathic {P} Energy: provide, onAttachSearch
 - Spiky Energy: provide, onDamagedDamageCounters
 - Jet Energy: provide, onAttachSwitch
 - Enriching Energy: provide, onAttachDraw
@@ -21,8 +21,8 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 - Treasure Energy: provide, attachFromPrize
 - Lucky Energy: provide, onDamagedDraw
 - Capture Energy: provide, onAttachSearch
-- Speed {: provide, onAttachDraw
-- Horror {: provide, onDamagedDamageCounters
+- Speed {L} Energy: provide, onAttachDraw
+- Horror {P} Energy: provide, onDamagedDamageCounters
 - Draw Energy: provide, onAttachDraw
 - Recycle Energy: provide, onDiscardReturnToHand
 - Rainbow Energy: provide, onAttachDamageCounter
@@ -52,12 +52,12 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 - Rainbow Energy: provide, onAttachDamageCounter
 
 ## Passive
-- Voltaic {: provide, damageBonus
-- Shadowy {: provide, benchDamageShield
-- Magnetic {: provide, freeRetreat
-- Bubbly {: provide, statusImmunity
-- Rocky {: provide, effectShield
-- Growing {: provide, hpBonus
+- Voltaic {L} Energy: provide, damageBonus
+- Shadowy {D} Energy: provide, benchDamageShield
+- Magnetic {M} Energy: provide, freeRetreat
+- Bubbly {W} Energy: provide, statusImmunity
+- Rocky {F} Energy: provide, effectShield
+- Growing {G} Energy: provide, hpBonus
 - Team Rocket’s Energy: attachRestriction, provide
 - Prism Energy: provide, provide
 - Ignition Energy: provide, provide, discardAtEndOfTurn
@@ -74,22 +74,22 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 - Impact Energy: attachRestriction, provide, statusImmunity
 - Single Strike Energy: attachRestriction, provide, damageBonus
 - Rapid Strike Energy: attachRestriction, provide
-- Wash {: provide, effectShield
-- Stone {: provide, damageReduction
-- Coating {: provide, noWeakness
-- Aromatic {: provide, statusImmunity
-- Powerful {: provide, damageBonus
-- Hiding {: provide, freeRetreat
-- Heat {: provide, hpBonus
+- Wash {W} Energy: provide, effectShield
+- Stone {F} Energy: provide, damageReduction
+- Coating {M} Energy: provide, noWeakness
+- Aromatic {G} Energy: provide, statusImmunity
+- Powerful {C} Energy: provide, damageBonus
+- Hiding {D} Energy: provide, freeRetreat
+- Heat {R} Energy: provide, hpBonus
 - Twin Energy: provide, provide
 - Aurora Energy: attachCost, provide
 - Weakness Guard Energy: provide, noWeakness
 - Triple Acceleration Energy: attachRestriction, provide, discardAtEndOfTurn, discardWhenConditionLost
 - Memory Energy: provide, canUseEvolutionAttacks
-- Unit Energy {: provide
+- Unit Energy {F}{D}{Y}: provide
 - Beast Energy Prism Star: provide, provide, damageBonus
-- Unit Energy {: provide
-- Unit Energy {: provide
+- Unit Energy {L}{P}{M}: provide
+- Unit Energy {G}{R}{W}: provide
 - Super Boost Energy Prism Star: provide, provide, provide
 - Counter Energy: provide, provide
 - Double Colorless Energy: provide
@@ -102,8 +102,8 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 - Shield Energy: attachRestriction, provide, damageReduction
 - Mystery Energy: attachRestriction, provide, retreatReduction
 - Plasma Energy: provide
-- Blend Energy {: provide
-- Blend Energy {: provide
+- Blend Energy {W}{L}{F}{M}: provide
+- Blend Energy {G}{R}{P}{D}: provide
 - Prism Energy: provide, provide
 - Metal Energy: provide, damageReduction, ignoredOn
 - Darkness Energy: provide, damageBonus, ignoredOn
@@ -141,28 +141,28 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 - Double Colorless Energy: provide
 
 ## Per-card description
-### Voltaic {
+### Voltaic {L} Energy
   - provides 1 Lightning Energy
   - host attacks do +20 damage (Lightning)
-### Shadowy {
+### Shadowy {D} Energy
   - provides 1 Dark Energy
   - prevents all attack damage on host while benched (Dark)
-### Nitro {
+### Nitro {R} Energy
   - provides 1 Fire Energy
   - if discarded by attackEffect, return to hand
-### Magnetic {
+### Magnetic {M} Energy
   - provides 1 Metal Energy
   - host has no Retreat Cost (Metal)
-### Bubbly {
+### Bubbly {W} Energy
   - provides 1 Water Energy
   - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
-### Telepathic {
+### Telepathic {P} Energy
   - provides 1 Psychic Energy
   - on attach from hand: search 2 Basic Psychic Pokémon → bench
-### Rocky {
+### Rocky {F} Energy
   - provides 1 Fighting Energy
   - prevents attack effects on host (Fighting)
-### Growing {
+### Growing {G} Energy
   - provides 1 Grass Energy
   - host gets +20 HP
 ### Team Rocket’s Energy
@@ -249,37 +249,37 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 ### Rapid Strike Energy
   - attach restricted to rapidStrike Pokémon
   - provides 2 Water / Fighting Energy (any combination)
-### Wash {
+### Wash {W} Energy
   - provides 1 Water Energy
   - prevents attack effects on host (Water)
-### Stone {
+### Stone {F} Energy
   - provides 1 Fighting Energy
   - host takes -20 damage (after W/R)
-### Coating {
+### Coating {M} Energy
   - provides 1 Metal Energy
   - host has no Weakness (Metal)
-### Aromatic {
+### Aromatic {G} Energy
   - provides 1 Grass Energy
   - host immune to Asleep, Confused, Paralyzed, Poisoned, Burned
 ### Capture Energy
   - provides 1 Colorless Energy
   - on attach from hand: search 1 Basic Pokémon → bench
-### Powerful {
+### Powerful {C} Energy
   - provides 1 Colorless Energy
   - host attacks do +20 damage (Colorless)
-### Hiding {
+### Hiding {D} Energy
   - provides 1 Dark Energy
   - host has no Retreat Cost (Dark)
-### Heat {
+### Heat {R} Energy
   - provides 1 Fire Energy
   - host gets +20 HP
 ### Twin Energy
   - provides 2 Colorless Energy [notVOrGx]
   - provides 1 Colorless Energy [isVOrGx]
-### Speed {
+### Speed {L} Energy
   - provides 1 Lightning Energy
   - on attach from hand: draw 2 (Lightning)
-### Horror {
+### Horror {P} Energy
   - provides 1 Psychic Energy
   - if host is damaged, put 2 damage counters on the attacker
 ### Aurora Energy
@@ -305,15 +305,15 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
 ### Rainbow Energy
   - provides 1 Energy of every type
   - on attach from hand: put 1 damage counter
-### Unit Energy {
+### Unit Energy {F}{D}{Y}
   - provides 1 Fighting / Dark / Fairy Energy (any combination)
 ### Beast Energy Prism Star
   - provides 1 Colorless Energy
   - provides 1 Energy of every type [ultraBeast]
   - host attacks do +30 damage (Ultra Beast)
-### Unit Energy {
+### Unit Energy {L}{P}{M}
   - provides 1 Lightning / Psychic / Metal Energy (any combination)
-### Unit Energy {
+### Unit Energy {G}{R}{W}
   - provides 1 Grass / Fire / Water Energy (any combination)
 ### Super Boost Energy Prism Star
   - provides 1 Colorless Energy
@@ -376,9 +376,9 @@ guided 42 / passive 87 / unenforced 0 / unrecognized 0
   - on attach from hand: heal 30 damage (Grass)
 ### Plasma Energy
   - provides 1 Colorless Energy
-### Blend Energy {
+### Blend Energy {W}{L}{F}{M}
   - provides 1 Water / Lightning / Fighting / Metal Energy (any combination)
-### Blend Energy {
+### Blend Energy {G}{R}{P}{D}
   - provides 1 Grass / Fire / Psychic / Dark Energy (any combination)
 ### Prism Energy
   - provides 1 Colorless Energy

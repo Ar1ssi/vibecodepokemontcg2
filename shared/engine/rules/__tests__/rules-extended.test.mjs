@@ -8,7 +8,7 @@ import test from 'node:test';
     const { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, isEnergyCard, effectiveEnergyType, resolveAttachedEnergyType, isLockEnergy, pokemonHasLockedEnergy, isRedirectEnergy, pokemonHasRedirectEnergy, isProtectEnergy, pokemonHasProtectEnergy, applyProtectCap } = await import('../energy-effects.mjs');
     const { classifyAbility, searchTargetType, describeAbilityFamily, applyAbilityEffect, isAbilityCard, ABILITY_FAMILIES } = await import('../ability-effects.mjs');
     const { parseAbility, ancientTraitIn } = await import('../abilities.mjs');
-    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus, isSingleStrikeCard, isEvolutionCard, isStadiumEnergyAttachHeal, isStadiumGlimwoodReFlip } = await import('../stadium-effects.mjs');
+    const { classifyStadiumEffect, describeStadiumEffect, applyStadiumEffect, isStadiumCard, STADIUM_EFFECT_FAMILIES, parseStadiumSetupDraw, parseStadiumOncePerTurn, parseStadiumDamagePrevention, parseStadiumDamageReduction, isStadiumRetreatPrevention, isStadiumHandProtect, parseStadiumCostModifier, parseStadiumHpModifier, getStadiumHpBonus, effectiveHp, parseStadiumAttackLock, isStadiumAttackLock, stadiumAttackLockReason, isStadiumTriggered, parseStadiumEvolutionSpeed, getStadiumEvolutionSpeed, parseStadiumRetreatModifier, getStadiumRetreatCost, parseStadiumBenchDamageOnPlay, stadiumBenchDamageApplies, parseStadiumAttackDamageBonus, getStadiumAttackDamageBonus, getStadiumDamageReduction, parseStadiumCheckupPoisonBonus, getStadiumCheckupPoisonBonus, stadiumAbilityBlocked, parseStadiumAttackCostIncrease, stadiumPreventionApplies, hasRecognizedPassiveStadiumEffect, getEffectiveBenchLimit, stadiumBlocksToolEffects, stadiumOnceConditionMet, matchesStadiumEvolveSearch, stadiumActivationStatus, isSingleStrikeCard, isEvolutionCard, isStadiumEnergyAttachHeal, isStadiumGlimwoodReFlip } = await import('../stadium-effects.mjs');
     const { classifyAttackEffect, describeAttackEffect, applyAttackEffect, ATTACK_FAMILIES } = await import('../attack-effects.mjs');
     const { parseAttackDamage, describeParsedDamage, healTarget, planHeal, planBenchTarget, drawCount, drawUntilTarget, attachEnergyCount, switchClause, oncePerTurnClause, allBenchDamage, discardCost, shuffleDrawClause, discardEnergyScaling, parseAttackSearchClause, resolveAttackText, moveEnergyClause, revealHandClause, conditionalKoClause, exactCounterKoThreshold, redirectDamageCount, handScalingDamage, returnEnergyClause, returnEnergyCount, immunityClause, DAMAGE_COMPONENTS } = await import('../damage-parser.mjs');
     const { computeAttackDamage } = await import('../attack-engine.mjs');
@@ -3813,6 +3813,40 @@ import test from 'node:test';
 
       const gravity = { name: 'Gravity Mountain', subtypes: ['Stadium'], text: 'Each Stage 2 Pokémon in play (both yours and your opponent\'s) gets -30 HP.' };
       assert.equal(parseStadiumHpModifier(gravity), -30);
+
+      // Audit S&M F2: "40 HP or less remaining" is a condition, not a −40 HP modifier.
+      const blizzard = {
+        name: 'Blizzard Town',
+        subtypes: ['Stadium'],
+        text: 'Pokémon with 40 HP or less remaining (both yours and your opponent\'s) can\'t attack.',
+      };
+      assert.equal(parseStadiumHpModifier(blizzard), 0);
+      assert.deepEqual(parseStadiumAttackLock(blizzard), { hpAtMost: 40 });
+      assert.equal(isStadiumAttackLock(blizzard), true);
+      assert.equal(hasRecognizedPassiveStadiumEffect(blizzard), true);
+      assert.equal(
+        stadiumAttackLockReason(blizzard, { name: 'Weavile', hp: 90, damage: 50 }),
+        "Pokémon with 40 HP or less remaining can't attack (Blizzard Town)."
+      );
+      assert.equal(stadiumAttackLockReason(blizzard, { name: 'Weavile', hp: 90, damage: 49 }), null);
+      // HP not synced yet → fail open.
+      assert.equal(stadiumAttackLockReason(blizzard, { name: 'Weavile' }), null);
+      assert.equal(stadiumAttackLockReason(null, { name: 'Weavile', hp: 10 }), null);
+    });
+
+    // Audit S&M F6: implemented trigger Stadiums were classified 'unknown'.
+    test('isStadiumTriggered recognizes the four stadium-triggers families', () => {
+      const triggerCards = [
+        { name: 'Po Town', subtypes: ['Stadium'], text: 'Whenever any player plays a Pokémon from their hand to evolve 1 of their Pokémon, put 3 damage counters on that Pokémon.' },
+        { name: 'Wela Volcano Park', subtypes: ['Stadium'], text: 'Whenever a player flips a coin for the Special Condition Burned between turns, that Special Condition isn\u2019t removed even if the result is heads.' },
+        { name: 'Dust Island', subtypes: ['Stadium'], text: 'Whenever either player switches their Poisoned Active Pokémon with 1 of their Benched Pokémon with the effect of a Trainer card, the new Active Pokémon is now affected by that Special Condition.' },
+        { name: 'Slumbering Forest', subtypes: ['Stadium'], text: 'If a Pokémon is Asleep, its owner flips 2 coins instead of 1 for that Special Condition between turns. If either of them is tails, that Pokémon is still Asleep.' },
+      ];
+      for (const c of triggerCards) {
+        assert.equal(isStadiumTriggered(c), true, c.name);
+        assert.equal(hasRecognizedPassiveStadiumEffect(c), true, c.name);
+        assert.notEqual(classifyStadiumEffect(c), 'unknown', c.name);
+      }
     });
 
     test('TCG Live Standard stadiums: key passive/active parsers recognize real card text', () => {

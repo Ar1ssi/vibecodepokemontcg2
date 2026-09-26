@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRng, createRelayedRng } from '../rng.mjs';
+import {
+  createRng,
+  createRelayedRng,
+  flipCoin,
+  withForcedCoin,
+  withForcedCoinOnce,
+} from '../rng.mjs';
 
 test('createRng is deterministic: same seed produces identical sequences', () => {
   const rng1 = createRng(123456);
@@ -98,6 +104,28 @@ test('createRelayedRng consumes queued shuffle indices when available', () => {
   const fallback = rng.shuffle(cards);
   assert.equal(fallback.length, cards.length);
   assert.deepEqual([...fallback].sort(), [...cards].sort());
+});
+
+// Review finding 4: Will's one-shot force must release back to an inherited
+// all-flips force (Malamar Contrary), not shadow it with null.
+test('withForcedCoinOnce: the parent all-flips force survives the one shot', () => {
+  const base = createRng(5);
+  const allTails = withForcedCoin(base, 'tails');
+  const willHeads = withForcedCoinOnce(allTails, 'heads');
+  assert.equal(flipCoin(willHeads), 'heads', 'the one shot wins the first flip');
+  for (let i = 0; i < 5; i++) {
+    assert.equal(flipCoin(willHeads), 'tails', 'the parent force still applies after it');
+  }
+
+  // Without a parent force, later flips are random (deterministic here).
+  const plainOnce = withForcedCoinOnce(createRng(9), 'heads');
+  assert.equal(flipCoin(plainOnce), 'heads');
+  assert.equal(typeof flipCoin(plainOnce), 'string');
+
+  // An all-flips wrapper over a one-shot wrapper keeps all-flips semantics
+  // (it resets the one-shot fields as its own properties).
+  const overOnce = withForcedCoin(withForcedCoinOnce(createRng(5), 'heads'), 'tails');
+  for (let i = 0; i < 4; i++) assert.equal(flipCoin(overOnce), 'tails');
 });
 
 test('createRelayedRng consumes queued coin values', () => {

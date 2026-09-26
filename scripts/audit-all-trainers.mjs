@@ -6,7 +6,7 @@
  * scripts/scrape-pkmncards-trainers.mjs) checked against
  * shared/engine/rules/trainer-effects.mjs.
  *
- * This is the trainer counterpart to scripts/audit-all-stadiums.mjs: it does
+ * This is the trainer counterpart to scripts/audit-stadiums.mjs: it does
  * NOT filter to Standard-legal, it dedupes reprints by name+text, and it flags
  * *mis-parses* (a parser returning a plausible but wrong step) alongside cards
  * the parser cannot recognize at all.
@@ -17,6 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parseTrainerEffect, describeStep } from '../shared/engine/rules/trainer-effects.mjs';
+import { isExecutableStepType } from '../shared/engine/effects/executor.mjs';
 import { classifyTrainer } from './lib/trainer-behaviour.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -60,10 +61,10 @@ const AUTO_STEP_TYPES = new Set([
   'massDiscardAttached',
 ]);
 
-// Every step type runTrainerSteps() (client/src/setup/rules/trainer-execution.js)
-// handles with a real state change or interactive picker — the legacy client only.
-// The authoritative server's coverage is the separate `server` column below
-// (isExecutableStepType via scripts/lib/trainer-behaviour.mjs).
+// Legacy-client mirror of runTrainerSteps() (client/src/setup/rules/trainer-execution.js).
+// Kept for the client-parity test and the `clientMissing` column; the authoritative
+// server coverage is `isExecutableStepType` from the effects executor (S9: this used
+// to decide the parse outcome, so server gaps looked handled — S279 §I).
 const EXECUTED_STEP_TYPES = new Set([
   'passive',
   ...AUTO_STEP_TYPES,
@@ -161,10 +162,17 @@ function classifyOutcome(parsed) {
   if (!parsed.recognizable) return 'unrecognizable';
   const types = parsed.steps.map((s) => s.type);
   if (types.length === 0) return 'empty';
-  if (types.some((t) => !EXECUTED_STEP_TYPES.has(t))) return 'unhandled-step';
+  // Authoritative-server coverage decides the outcome (the legacy list used to,
+  // which hid the 26 step kinds I154 found).
+  if (types.some((t) => t !== 'passive' && !isExecutableStepType(t))) return 'unhandled-step';
   if (types.every((t) => t === 'passive')) return 'passive-only';
   if (types.some((t) => AUTO_STEP_TYPES.has(t))) return 'automated';
   return 'guided';
+}
+
+// Legacy client coverage, reported separately (parity information only).
+function clientMissingSteps(parsed) {
+  return parsed.steps.map((s) => s.type).filter((t) => !EXECUTED_STEP_TYPES.has(t));
 }
 
 function stepSummary(steps) {
@@ -230,15 +238,21 @@ function classify(card) {
     parsed,
     status,
     serverMissing: classifyTrainer(card).serverMissing,
+    clientMissing: clientMissingSteps(parsed),
     stepSummary: stepSummary(parsed.steps),
     descriptions: parsed.steps.map((s) => describeStep(s)),
     warnings: suspiciousWarnings(parsed, card.text),
   };
 }
 
+// Stadiums have their own parse layer (stadium-effects.mjs) and their own audit;
+// feeding them to parseTrainerEffect inflated the "unrecognizable" bucket.
+const stadiumRows = raw.filter((c) => /stadium/i.test(c.subtype || ''));
+const trainerRows = raw.filter((c) => !/stadium/i.test(c.subtype || ''));
+
 // Dedupe reprints (ignore duplicates): identical name + identical text.
 const groups = new Map();
-for (const c of raw) {
+for (const c of trainerRows) {
   const card = toCard(c);
   const key = `${card.name}\u0000${card.text}`;
   if (!groups.has(key)) groups.set(key, { card, prints: [] });
@@ -260,7 +274,10 @@ const log = (s = '') => {
   console.log(s);
 };
 
-log(`Trainer printings scanned : ${raw.length}`);
+log(`Trainer printings scanned : ${trainerRows.length}`);
+if (stadiumRows.length > 0) {
+  log(`Stadium rows skipped      : ${stadiumRows.length} (see scripts/audit-stadiums.mjs)`);
+}
 log(`Unique (name+text) cards  : ${rows.length}`);
 log('');
 
@@ -272,9 +289,15 @@ for (const [k, v] of tally((r) => r.status)) log(`  ${String(v).padStart(4)}  ${
 
 const serverGaps = rows.filter((r) => r.serverMissing.length > 0);
 log(`\n=== Server coverage: cards with a parsed step the server cannot execute (${serverGaps.length}) ===`);
-log('  (Legacy-client coverage is the parse outcome above; the server is authoritative.)');
+log('  (The parse outcome above is now the SERVER view; the legacy client is below.)');
 for (const r of serverGaps.sort((a, b) => a.card.name.localeCompare(b.card.name))) {
   log(`  [${r.card.subtitle}] ${r.card.name} — server lacks: ${r.serverMissing.join(', ')}`);
+}
+
+const clientGaps = rows.filter((r) => r.clientMissing.length > 0);
+log(`\n=== Legacy-client coverage: parsed steps with no client executor (${clientGaps.length}) ===`);
+for (const r of clientGaps.sort((a, b) => a.card.name.localeCompare(b.card.name))) {
+  log(`  [${r.card.subtitle}] ${r.card.name} — client lacks: ${r.clientMissing.join(', ')}`);
 }
 
 const GAP = (r) => r.status === 'unrecognizable' || r.status === 'empty' || r.status === 'unhandled-step';

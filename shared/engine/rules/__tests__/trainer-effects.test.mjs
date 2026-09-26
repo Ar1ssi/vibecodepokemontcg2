@@ -2428,3 +2428,131 @@ describe('coin-conditional turn ends (I155)', () => {
     assert.equal(r.steps[0].tails[0].type, 'turnEnds');
   });
 });
+
+// Audit S&M compound clauses (S6): printed costs and second clauses that had
+// no parsed step. Card texts are verbatim from the S&M series corpus.
+describe('Audit S&M compound clauses (S6)', () => {
+  test('Sophocles / Plumeria: leading hand-discard cost is parsed', () => {
+    const sophocles = parseTrainerEffect('Discard 2 cards from your hand. If you do, draw 4 cards.');
+    assert.equal(sophocles.steps[0].type, 'discardCost');
+    assert.equal(sophocles.steps[0].count, 2);
+    assert.equal(sophocles.steps[1].type, 'draw');
+    assert.equal(sophocles.steps[1].count, 4);
+
+    const plumeria = parseTrainerEffect(
+      'Discard 2 cards from your hand. If you do, discard an Energy from 1 of your opponent\u2019s Pok\u00e9mon.'
+    );
+    assert.equal(plumeria.steps[0].type, 'discardCost');
+    assert.equal(plumeria.steps[1].type, 'discardEnergyFromOpponent');
+  });
+
+  test('Crasher Wake / Molayne: typed hand-discard cost keeps its Energy filter', () => {
+    const wake = parseTrainerEffect(
+      'Discard 2 {W} Energy cards from your hand. If you do, search your deck for up to 2 cards and put them into your hand. Then, shuffle your deck.'
+    );
+    assert.equal(wake.steps[0].type, 'discardCost');
+    assert.equal(wake.steps[0].count, 2);
+    assert.deepEqual(wake.steps[0].energyTypes, ['water']);
+    assert.equal(wake.steps[0].basicOnly, true);
+
+    const molayne = parseTrainerEffect(
+      'You can play this card only if you discard 2 {M} Energy cards from your hand. Shuffle a Trainer card from your discard pile into your deck.'
+    );
+    assert.equal(molayne.steps[0].type, 'discardCost');
+    assert.deepEqual(molayne.steps[0].energyTypes, ['metal']);
+  });
+
+  test('Max Potion: heal-all now carries the discard-all-Energy follow-up', () => {
+    const r = parseTrainerEffect(
+      'Heal all damage from 1 of your Pok\u00e9mon. If you do, discard all Energy from that Pok\u00e9mon.'
+    );
+    assert.equal(r.steps[0].type, 'healOneDiscardEnergy');
+  });
+
+  test('Welder: typed attach from hand plus the gated draw', () => {
+    const r = parseTrainerEffect(
+      'Attach up to 2 {R} Energy cards from your hand to 1 of your Pok\u00e9mon. If you do, draw 3 cards.'
+    );
+    assert.equal(r.steps[0].type, 'attachFromHand');
+    assert.equal(r.steps[0].handCount, 2);
+    assert.deepEqual(r.steps[0].handEnergy, { basic: true, types: ['fire'] });
+    assert.equal(r.steps[1].type, 'draw');
+    assert.equal(r.steps[1].count, 3);
+  });
+
+  test('Switch Raft: switch clause precedes the heal', () => {
+    const r = parseTrainerEffect(
+      'Switch your Active {W} Pok\u00e9mon with 1 of your Benched Pok\u00e9mon. If you do, heal 30 damage from the Pok\u00e9mon you moved to your Bench.'
+    );
+    assert.deepEqual(r.steps.map((s) => s.type), ['switchOwn', 'healAmount']);
+    assert.equal(r.steps[1].amount, 30);
+  });
+
+  test("Tate & Liza stays Choose-1: no unconditional own switch", () => {
+    const r = parseTrainerEffect(
+      'Choose 1: Shuffle your hand into your deck. Then, draw 5 cards. Switch your Active Pok\u00e9mon with 1 of your Benched Pok\u00e9mon.'
+    );
+    assert.equal(r.steps.some((s) => s.type === 'switchOwn'), false);
+  });
+
+  test('Faba targets the Lost Zone, not the discard pile', () => {
+    const r = parseTrainerEffect(
+      'Choose a Pok\u00e9mon Tool or Special Energy card attached to 1 of your opponent\u2019s Pok\u00e9mon, or any Stadium card in play, and put it in the Lost Zone.'
+    );
+    assert.equal(r.steps[0].type, 'toolOrStadiumToLostZone');
+    assert.equal(r.steps[0].side, 'opponent');
+    assert.equal(r.steps[0].includeSpecialEnergy, true);
+    assert.match(describeStep(r.steps[0]), /Special Energy/);
+  });
+
+  test('Peeking Red Card: whole-hand shuffle, then draw that many', () => {
+    const r = parseTrainerEffect(
+      'Your opponent reveals their hand. You may have your opponent count the cards in their hand, shuffle those cards into their deck, then draw that many cards.'
+    );
+    assert.equal(r.steps[0].type, 'opponentHandShuffleDeck');
+    assert.equal(r.steps[0].all, true);
+    assert.equal(r.steps[0].drawThatMany, true);
+    assert.match(describeStep(r.steps[0]), /whole hand/);
+  });
+
+  test('Missing Clover single mode peeks at 1 card (no take, no shuffle)', () => {
+    const r = parseTrainerEffect(
+      'You may play 4 Missing Clover cards at once. If you played 1 card, look at the top card of your deck. If you played 4 cards, take a Prize card. (This effect works one time for 4 cards.)'
+    );
+    assert.equal(r.steps[0].type, 'peekReturn');
+    assert.equal(r.steps[0].count, 1);
+  });
+
+  test('Bug Catcher / heads-only draw flips keep their coin gate', () => {
+    const bugCatcher = parseTrainerEffect('Draw 2 cards. Flip a coin. If heads, draw 2 more cards.');
+    assert.deepEqual(bugCatcher.steps.map((s) => s.type), ['draw', 'coinFlip']);
+    assert.equal(bugCatcher.steps[0].count, 2);
+    assert.equal(bugCatcher.steps[1].heads[0].count, 2);
+    assert.deepEqual(bugCatcher.steps[1].tails, []);
+
+    const headsOnly = parseTrainerEffect('Flip a coin. If heads, draw 2 cards.');
+    assert.equal(headsOnly.steps.length, 1);
+    assert.equal(headsOnly.steps[0].type, 'coinFlip');
+  });
+
+  test("Gardenia's Vigor: the leading draw runs before the attach", () => {
+    const r = parseTrainerEffect(
+      'Draw 2 cards. If you drew any cards in this way, attach up to 2 {G} Energy cards from your hand to 1 of your Benched Pokémon.'
+    );
+    assert.deepEqual(r.steps.map((s) => s.type), ['draw', 'attachFromHand']);
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[1].handCount, 2);
+    assert.deepEqual(r.steps[1].handEnergy, { basic: true, types: ['grass'] });
+  });
+
+  test("Mars: the random discard follows the draw", () => {
+    const r = parseTrainerEffect(
+      'Draw 2 cards. If you do, discard a random card from your opponent\u2019s hand.'
+    );
+    assert.deepEqual(r.steps.map((s) => s.type), [
+      'draw',
+      'discardRandomOpponentHandIfSupporter',
+    ]);
+    assert.equal(r.steps[1].any, true);
+  });
+});

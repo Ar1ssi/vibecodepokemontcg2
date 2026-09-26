@@ -24,6 +24,7 @@ const {
   combinedToolAttackBonus,
   combinedToolDamagePrevention,
   applyToolDamageReduction,
+  preventionForCard,
 } = await import('../tool-combat.mjs');
 const { parseHpBonus, applyHpBonus, parseRetreatCostModifier } = await import(
   '../ability-executors.mjs'
@@ -991,4 +992,170 @@ test('parseToolCondition: slice 4 corpus conditions (I133b)', () => {
       attackerSubtypes: ['gx', 'ex'],
     }
   );
+});
+
+// Audit S&M F3: the Fairy Charm family. The printed "Pokémon-GX and Pokémon-EX"
+// is any-of; a hard isExCard gate made every typed charm fail against GX
+// attackers, and the Ultra Beast wording leaked onto plain EX/GX.
+test('Fairy Charms filter typed, rule-box, Ability and Ultra Beast attackers (F3)', () => {
+  const fairyHolder = mkMon({ name: 'Fairy Holder', types: ['Fairy'] });
+  const plainHolder = mkMon({ name: 'Plain Holder' });
+  const grassGx = mkMon({ name: 'Grass GX', types: ['Grass'], subtypes: ['Basic', 'GX'] });
+  const grassEx = mkMon({ name: 'Grass EX', types: ['Grass'], subtypes: ['Basic', 'EX'] });
+  const grassPlain = mkMon({ name: 'Grass Plain', types: ['Grass'] });
+  const waterGx = mkMon({ name: 'Water GX', types: ['Water'], subtypes: ['Basic', 'GX'] });
+  const abilityGx = mkMon({
+    name: 'Ability GX',
+    types: ['Grass'],
+    subtypes: ['Basic', 'GX'],
+    abilities: [{ name: 'A', text: 'x' }],
+  });
+  const ubGx = mkMon({
+    name: 'Naganadel-GX',
+    types: ['Grass'],
+    subtypes: ['Basic', 'Ultra Beast', 'GX'],
+  });
+
+  const charmG = tool(
+    'Fairy Charm {G}',
+    'Prevent all damage done to the {Y} Pokémon this card is attached to by attacks from your opponent’s {G} Pokémon-GX and {G} Pokémon-EX.'
+  );
+  const prevent = (holder, attacker, charm) =>
+    combinedToolDamagePrevention(holder, withTool(holder, charm), attacker).preventAll;
+
+  assert.equal(prevent(fairyHolder, grassGx, charmG), true, 'Grass GX is covered');
+  assert.equal(prevent(fairyHolder, grassEx, charmG), true, 'Grass EX is covered');
+  assert.equal(prevent(fairyHolder, grassPlain, charmG), false, 'a plain Grass Pokémon is not');
+  assert.equal(prevent(fairyHolder, waterGx, charmG), false, 'a Water GX is not');
+  assert.equal(prevent(plainHolder, grassGx, charmG), false, 'the holder must be a {Y} Pokémon');
+
+  const charmUb = tool(
+    'Fairy Charm UB',
+    'Prevent all damage done to the {Y} Pokémon this card is attached to by attacks from your opponent’s Ultra Beast Pokémon-GX and Ultra Beast Pokémon-EX.'
+  );
+  assert.equal(prevent(fairyHolder, ubGx, charmUb), true, 'an Ultra Beast GX is covered');
+  assert.equal(prevent(fairyHolder, grassEx, charmUb), false, 'a plain EX is not an Ultra Beast');
+
+  const charmAbility = tool(
+    'Fairy Charm Ability',
+    'Prevent all damage done to the {Y} Pokémon this card is attached to by attacks from your opponent’s Pokémon-GX and Pokémon-EX that have Abilities.'
+  );
+  assert.equal(prevent(fairyHolder, abilityGx, charmAbility), true, 'a GX with an Ability is covered');
+  assert.equal(prevent(fairyHolder, grassGx, charmAbility), false, 'a GX without an Ability is not');
+  assert.equal(
+    prevent(fairyHolder, grassEx, charmAbility),
+    false,
+    'an EX without an Ability is not'
+  );
+});
+
+// Second review: attacker clauses phrased "by your opponent's …" / "by attacks
+// from …" must gate, and a reminder must not; VMAX/VSTAR match by name too.
+test('rule-box attacker clauses: by-clauses, reminders and name fallbacks', () => {
+  const keldeo = {
+    name: 'Keldeo-GX',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "Prevent all effects of attacks, including damage, done to this Pokémon by your opponent's Pokémon-GX or Pokémon-EX.",
+  };
+  const gx = mkMon({ name: 'Mewtwo-GX', subtypes: ['Basic', 'GX'] });
+  const plain = mkMon({ name: 'Plain Attacker' });
+  assert.equal(preventionForCard(keldeo, gx).preventAll, true);
+  assert.equal(preventionForCard(keldeo, plain).preventAll, false);
+
+  const altaria = {
+    name: 'Altaria-GX',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "During your opponent's next turn, prevent all damage done to this Pokémon by attacks from Pokémon-GX and Pokémon-EX.",
+  };
+  assert.equal(preventionForCard(altaria, gx).preventAll, true);
+  assert.equal(preventionForCard(altaria, plain).preventAll, false);
+
+  // The Rule Box reminder belongs to the holder condition, not the attacker.
+  const flowerCurtain = {
+    name: 'Flower Curtain',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "Prevent all damage done to your Benched Pokémon by attacks from your opponent's Pokémon. (Pokémon V, Pokémon-GX, etc. have Rule Boxes.)",
+  };
+  assert.equal(preventionForCard(flowerCurtain, plain).preventAll, true);
+
+  // VMAX/VSTAR match by name when subtypes have not synced.
+  const crystalVeil = {
+    name: 'Glaceon VMAX',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "Prevent all damage done to this Pokémon by attacks from your opponent's Pokémon VMAX, except any Glaceon VMAX.",
+  };
+  assert.equal(preventionForCard(crystalVeil, mkMon({ name: 'Eternatus VMAX' })).preventAll, true);
+});
+
+// Review finding 3: the reminder "(Pokémon V, Pokémon-GX, etc. have Rule Boxes.)"
+// must not gate the attacker — the Rule Box condition is the HOLDER's.
+test('Pot Helmet reduces for any attacker; the Rule Box gate is the holder', () => {
+  const helmet = tool(
+    'Pot Helmet',
+    'If the Pokémon this card is attached to doesn’t have a Rule Box, it takes 30 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance). (Pokémon V, Pokémon-GX, etc. have Rule Boxes.)'
+  );
+  const holder = mkMon({ name: 'Plain Holder' });
+  const plain = mkMon({ name: 'Plain Attacker' });
+  const v = mkMon({ name: 'Zacian V', subtypes: ['Basic', 'V'], hp: 220 });
+  const gx = mkMon({ name: 'Mewtwo-GX', subtypes: ['Basic', 'GX'], hp: 180 });
+  for (const attacker of [plain, v, gx]) {
+    assert.equal(
+      applyToolDamageReduction(100, holder, withTool(holder, helmet), attacker),
+      70,
+      attacker.name
+    );
+  }
+  const exHolder = mkMon({ name: 'Body ex', subtypes: ['Basic', 'ex'] });
+  assert.equal(
+    applyToolDamageReduction(100, exHolder, withTool(exHolder, helmet), plain),
+    100,
+    'an ex holder fails the printed condition'
+  );
+});
+
+// Audit S&M F4: the holder phrase is a name list, not one literal string.
+test('Ancient Crystal holder name list (Regirock, Regice, Registeel, or Regigigas) (F4)', () => {
+  const crystal = tool(
+    'Ancient Crystal',
+    'The Regirock, Regice, Registeel, or Regigigas this card is attached to takes 30 less damage from your opponent’s attacks (after applying Weakness and Resistance).'
+  );
+  assert.deepEqual(parseToolCondition(crystal).holderNames, [
+    'regirock',
+    'regice',
+    'registeel',
+    'regigigas',
+  ]);
+  const attacker = mkMon({ name: 'Attacker' });
+  for (const name of ['Regirock', 'Regice', 'Registeel', 'Regigigas']) {
+    const holder = mkMon({ name });
+    assert.equal(
+      applyToolDamageReduction(100, holder, withTool(holder, crystal), attacker),
+      70,
+      `${name} gets the reduction`
+    );
+  }
+  const plain = mkMon({ name: 'Plain Holder' });
+  assert.equal(applyToolDamageReduction(100, plain, withTool(plain, crystal), attacker), 100);
+});
+
+// Audit S&M F5: Beastite scales with Prizes taken, not a flat 10.
+test('Beastite scales the damage bonus by Prizes taken (F5)', () => {
+  const beastite = tool(
+    'Beastite',
+    'The attacks of the Ultra Beast this card is attached to do 10 more damage to your opponent’s Active Pokémon for each Prize card you have taken (before applying Weakness and Resistance).'
+  );
+  const holder = mkMon({ name: 'Naganadel', subtypes: ['Basic', 'Ultra Beast'] });
+  const defender = mkMon({ name: 'Defender' });
+  const bonus = (prizesRemaining) =>
+    combinedToolAttackBonus(holder, withTool(holder, beastite), defender, {
+      attackerPrizesRemaining: prizesRemaining,
+    });
+  assert.equal(bonus(6), 0, 'no Prizes taken yet');
+  assert.equal(bonus(4), 20, 'two Prizes taken');
+  assert.equal(bonus(1), 50, 'five Prizes taken');
+  assert.equal(bonus(undefined), 0, 'unknown remaining fails closed');
 });

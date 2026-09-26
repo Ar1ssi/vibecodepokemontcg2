@@ -36,6 +36,8 @@ export function isSupporterTrainer(card) {
  * @param {number|null} [params.lostZoneCount] Cards in the player's Lost Zone; null when unknown
  * @param {object|null} [params.opponentActive] The opponent's Active Pokémon (top card, with its
  *   Special Conditions); undefined when unknown, null when the spot is empty
+ * @param {object|null} [params.ownActive] The playing player's Active Pokémon (top card);
+ *   undefined when unknown, null when the spot is empty
  * @param {boolean|null} [params.koedLastOppTurn] Whether any of the player's Pokémon were Knocked
  *   Out during the opponent's last turn; null when unknown
  * @param {{name: string, types: string[]}[]|null} [params.koedLastOppTurnVictims] Those Pokémon
@@ -56,6 +58,7 @@ export function trainerPlayBlockReason({
   toolTargetCount = null,
   lostZoneCount = null,
   opponentActive = undefined,
+  ownActive = undefined,
   koedLastOppTurn = null,
   koedLastOppTurnVictims = null,
 }) {
@@ -124,6 +127,7 @@ export function trainerPlayBlockReason({
     cardName: card.name,
     lostZoneCount,
     opponentActive,
+    ownActive,
     koedLastOppTurn,
     koedLastOppTurnVictims,
   });
@@ -202,6 +206,17 @@ function playConditionBlockReason(condition, ctx) {
       return `Your opponent's Active Pokémon must be a ${oppStage[1]} Pokémon.`;
     }
     return null;
+  }
+  const activeType = condition.match(/^activeType=([A-Z|]+)$/);
+  if (activeType) {
+    if (ctx.ownActive === undefined) return null;
+    const symbols = activeType[1].split('|');
+    const words = symbols.map((s) => TYPE_SYMBOL_WORDS[s.toLowerCase()]);
+    const types = (ctx.ownActive?.types || []).map((t) => String(t).toLowerCase());
+    const ok = types.some(
+      (t) => words.includes(t) || (words.includes('darkness') && t === 'dark')
+    );
+    return ok ? null : `Your Active Pokémon must be a ${symbols.map((s) => `{${s}}`).join(' or ')} Pokémon.`;
   }
   if (condition === 'opponentActivePoisoned') {
     if (ctx.opponentActive === undefined) return null;
