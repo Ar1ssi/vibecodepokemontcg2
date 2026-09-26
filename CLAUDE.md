@@ -40,7 +40,7 @@ END — whenever you changed anything:
   `main`, after rebasing/merging on the latest `main` — never on the primary folder mid-task.
 - **Light END** (default — patch, debug, refactor, small feature, issue-only, harness typo): commit
   message only; edit STATE lines only if Focus/Active/Next/Blocked actually changed.
-- **Full END** (only when priorities/plan changed — exec-plan, feature.md work, maintain): rewrite
+- **Full END** (only when priorities/plan changed — exec-plan, feature.md, oneshot-feature, maintain): rewrite
   STATE.md in full (template in it).
 - Either END: MAP.md only if files moved/were added; DECISIONS.md only for a genuinely lasting choice.
 - Tick your workflow's Done checklist in your final message.
@@ -51,6 +51,7 @@ END — whenever you changed anything:
 | Request looks like | Route |
 |---|---|
 | Whole project from one brief; no product code yet | `.agent/workflows/oneshot.md` |
+| "One-shot" a feature or an implementation doc end to end, no check-ins | `.agent/workflows/oneshot-feature.md` |
 | Work through a sectioned plan/brief already in the repo | `.agent/workflows/exec-plan.md` |
 | New interface/schema/dependency, netcode or engine-rule change, or work spanning >1 session | `.agent/workflows/feature.md` |
 | Fix, tweak, or small feature (any file count) with none of the above | `.agent/workflows/patch.md` |

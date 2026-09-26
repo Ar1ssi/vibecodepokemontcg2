@@ -1,7 +1,8 @@
 # Workflow: Exec-plan — drive a written plan to green, one section at a time.
 For: a sectioned brief that already lives in the repo (`implementation_plan.md` at the root, or a spec in
 `.agent/designs/`) and the user asks to work through it. Exit test — no plan file exists yet, or the ask is
-a single capability? That's feature.md. Plan is empty/finished? Nothing to run.
+a single capability? That's feature.md. Plan is empty/finished? Nothing to run. User wants it done end to
+end with no check-ins? That's oneshot-feature.md.
 
 Verification is the loop's spine, not its epilogue: a section is not done until tests and lint are green
 for it. (The user may waive a run — their call — then STATE `Active:` and the journal must say UNVERIFIED.)
@@ -17,8 +18,8 @@ for it. (The user may waive a run — their call — then STATE `Active:` and th
 ## 1 · One section at a time — never batch
 Per section, in plan order:
 1. Implement it completely. No TODO, no stub, no "phase 2 will cover it".
-2. **Test** — narrowest covering test first, then `pnpm test`. A new test file does nothing until it is
-   added to package.json's explicit file list; add it in the same pass. Test-only change? Still run.
+2. **Test** — narrowest covering test first, then `pnpm test`. New test files must match the
+   `**/*.test.mjs` globs in package.json's `test` script. Test-only change? Still run.
 3. **Lint** — `pnpm lint` is red repo-wide on pre-existing CRLF/no-undef, so the bar is *no new
    violations*: `npx eslint --rule 'linebreak-style: off' --rule 'prettier/prettier: off' <changed files>`.
 4. Red → read the failure, fix, re-run. Loop until green. Paste the real output when reporting; never
@@ -44,7 +45,7 @@ ISSUES.md line each, not unplanned edits.
 
 ## Done — copy into your final message and tick honestly
 - [ ] Sections executed in plan order; none skipped, narrowed, or silently merged
-- [ ] Tests + lint green per section, output pasted; new test files registered in package.json
+- [ ] Tests + lint green per section, output pasted
 - [ ] Plan file annotated; every deviation from its wording visible there
 - [ ] Structural calls put to the user, not assumed
 - [ ] One commit at the end (if permitted); nothing pushed without asking
