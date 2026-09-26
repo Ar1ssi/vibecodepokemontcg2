@@ -2846,6 +2846,12 @@ function moveEnergyTargets(player, step, self, energy) {
 // Design 034 slice 5b: generic move-Energy Ability. The printing fixes the destination
 // (`step.target`, from parseMoveEnergyShape); the Energy and, for a Bench or "another of your
 // Pokémon" destination, the receiving Pokémon are the player's choices.
+//
+// When a single Energy moves and more than one of your Pokémon holds one, the source Pokémon is
+// chosen first (the client renders in-play roots on the mat picker, so the player clicks the
+// Pokémon). A lone matching Energy on that Pokémon is taken automatically; only several matching
+// Energies on one Pokémon fall back to the Energy card picker. Multi-Energy moves keep the
+// Energy-first flow.
 function moveEnergyAbility(ctx) {
   const { player, step } = ctx;
   const self = rootsOf(player).find((c) => c.instanceId === ctx.sourceCard?.instanceId) || null;
@@ -2854,9 +2860,9 @@ function moveEnergyAbility(ctx) {
   const sources = moveEnergySources(player, step, self).filter(
     (c) => c.instanceId !== fixedDestination?.instanceId
   );
-  const energies = sources
-    .flatMap((root) => attachedCards(player, root.instanceId))
-    .filter((c) => moveEnergyMatches(step, c));
+  const energiesOn = (root) =>
+    attachedCards(player, root?.instanceId).filter((c) => moveEnergyMatches(step, c));
+  const allEnergies = () => sources.flatMap((root) => energiesOn(root));
 
   const moveAll = (chosen, target) => {
     for (const energy of chosen) attachTo(player, energy, target, ctx.events);
@@ -2877,13 +2883,32 @@ function moveEnergyAbility(ctx) {
   };
 
   if (ctx.memo?.phase === 'target') {
-    const chosen = pickById(energies, ctx.memo.energyIds || []);
+    const chosen = pickById(allEnergies(), ctx.memo.energyIds || []);
     const target = rootsOf(player).find((c) => c.instanceId === ctx.selection?.[0]);
     if (!target || chosen.length === 0) return skip(ctx, 'target_not_found');
     return moveAll(chosen, target);
   }
-  if (ctx.selection) {
-    const chosen = pickById(energies, ctx.selection);
+  if (ctx.memo?.phase === 'energy') {
+    const source = sources.find((c) => c.instanceId === ctx.memo.sourceId);
+    const chosen = pickById(source ? energiesOn(source) : [], ctx.selection);
+    if (chosen.length === 0) return skip(ctx, 'target_not_found');
+    return toChosenTarget(chosen);
+  }
+  if (ctx.memo?.phase === 'source') {
+    const source = sources.find((c) => c.instanceId === ctx.selection?.[0]);
+    const onSource = source ? energiesOn(source) : [];
+    if (onSource.length === 0) return skip(ctx, 'target_not_found');
+    if (onSource.length === 1) return toChosenTarget(onSource);
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose an Energy to move`,
+      options: onSource,
+      min: 1,
+      max: 1,
+      memo: { phase: 'energy', sourceId: source.instanceId },
+    });
+  }
+  if (ctx.selection && !ctx.memo?.phase) {
+    const chosen = pickById(allEnergies(), ctx.selection);
     if (chosen.length === 0) return skip(ctx, 'target_not_found');
     return toChosenTarget(chosen);
   }
@@ -2892,12 +2917,26 @@ function moveEnergyAbility(ctx) {
     return skip(ctx, 'target_not_found');
   }
   if (step.source === 'self' && !self) return skip(ctx, 'source_not_in_play');
+
+  const energies = allEnergies();
   if (energies.length === 0) return skip(ctx, 'no_energy_to_move');
 
   const cap = step.anyAmount ? energies.length : Math.min(Number(step.upTo) || 1, energies.length);
   const min = step.anyAmount ? 1 : step.exact ? cap : 1;
   // A forced move with nothing to decide (the only Energy that qualifies) needs no prompt.
   if (energies.length === min && min === cap) return toChosenTarget(energies);
+
+  const sourcesWithEnergy = sources.filter((root) => energiesOn(root).length > 0);
+  if (!step.anyAmount && cap === 1 && sourcesWithEnergy.length > 1) {
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to move Energy from`,
+      options: sourcesWithEnergy,
+      min: 1,
+      max: 1,
+      memo: { phase: 'source' },
+    });
+  }
+
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Ability')}: Choose ${step.anyAmount ? 'any amount of' : cap === 1 ? 'an' : `up to ${cap}`} Energy to move`,
     options: energies,

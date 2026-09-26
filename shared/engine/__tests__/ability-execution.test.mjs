@@ -1420,9 +1420,15 @@ test('ability: Energy Trans moves a {G} Energy between two of your Pokémon, tar
     energyOn(75, 'Fire Energy', 72)
   );
 
+  // Source Pokémon first (client: mat picker), then the lone {G} Energy on it is
+  // taken automatically, then the destination.
   const res1 = use70(state, rng);
-  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId).sort(), [73, 74]);
-  const res2 = resolveWith(res1, [73], rng);
+  assert.deepEqual(
+    res1.pendingChoice.options.map((o) => o.instanceId).sort(),
+    [70, 72],
+    'the Pokémon holding a {G} Energy'
+  );
+  const res2 = resolveWith(res1, [72], rng);
   assert.deepEqual(
     res2.pendingChoice.options.map((o) => o.instanceId).sort(),
     [70, 76],
@@ -1431,6 +1437,36 @@ test('ability: Energy Trans moves a {G} Energy between two of your Pokémon, tar
   const res3 = resolveWith(res2, [76], rng);
   assert.equal(res3.error, null);
   assert.equal(hostOf(res3.state, 73), 76);
+});
+
+test('ability: Solar Transfer falls back to the Energy picker when a Pokémon holds several', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'As often as you like during your turn, you may use this Ability. Move a Basic {G} Energy from 1 of your Pokémon to another of your Pokémon.'
+  );
+  state.players.p1.zones.bench.push(
+    benchMon(72, 'A'),
+    benchMon(76, 'B'),
+    energyOn(73, 'Grass Energy', 72, ['Grass']),
+    energyOn(74, 'Grass Energy', 70, ['Grass']),
+    energyOn(77, 'Grass Energy', 72, ['Grass'])
+  );
+
+  const res1 = use70(state, rng);
+  assert.deepEqual(res1.pendingChoice.options.map((o) => o.instanceId).sort(), [70, 72]);
+  const res2 = resolveWith(res1, [72], rng);
+  assert.deepEqual(
+    res2.pendingChoice.options.map((o) => o.instanceId).sort(),
+    [73, 77],
+    'several {G} Energy on the chosen Pokémon'
+  );
+  const res3 = resolveWith(res2, [77], rng);
+  assert.deepEqual(res3.pendingChoice.options.map((o) => o.instanceId).sort(), [70, 76]);
+  const res4 = resolveWith(res3, [76], rng);
+  assert.equal(res4.error, null);
+  assert.equal(hostOf(res4.state, 77), 76);
+  assert.equal(hostOf(res4.state, 73), 72);
 });
 
 test('ability: Rapid Strike Connection only moves Energy to a Rapid Strike Pokémon', () => {
