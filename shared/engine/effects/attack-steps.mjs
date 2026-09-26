@@ -758,6 +758,36 @@ function atkMill(ctx) {
   return null;
 }
 
+// Magcargo-GX Crushing Charge: discard the deck top, then attach it to 1 of your Pokémon when it
+// is a Basic Energy card.
+function atkMillAttachIfEnergy(ctx) {
+  const { player } = ctx;
+  const deck = player.zones.deck || [];
+  if (deck.length === 0) return skip(ctx, 'empty_deck');
+  const [card] = deck.splice(0, 1);
+  discardCards(player, [card], ctx.events);
+  if (!isBasicEnergy(card)) return null;
+  const targets = rootsOf(player);
+  if (targets.length === 0) return skip(ctx, 'no_target');
+  const attach = (target) => {
+    const milled = (player.zones.discard || []).find((c) => c.instanceId === card.instanceId);
+    if (!milled) return skip(ctx, 'card_moved');
+    attachTo(player, milled, target, ctx.events);
+    return null;
+  };
+  if (targets.length === 1) return attach(targets[0]);
+  if (ctx.selection) {
+    const target = targets.find((c) => c.instanceId === ctx.selection[0]);
+    return target ? attach(target) : skip(ctx, 'target_not_found');
+  }
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Attach the discarded Basic Energy to which Pokémon?`,
+    options: targets,
+    min: 1,
+    max: 1,
+  });
+}
+
 // ── attach from the discard pile / hand ─────────────────────────────────────
 
 function attachTargets(ctx) {
@@ -948,6 +978,8 @@ function atkRecover(ctx) {
   };
   if (ctx.selection) return recover(pickById(candidates, ctx.selection));
   if (candidates.length === 0) return skip(ctx, 'nothing_to_recover');
+  // "Put all Electropower cards from your discard pile into your hand": everything matching.
+  if (step.all) return recover(candidates);
   const max = Math.min(step.count || 1, candidates.length);
   const min = step.upTo ? 0 : max;
   if (min === max && max === candidates.length) return recover(candidates);
@@ -2339,6 +2371,7 @@ function resolveSelfName(marker, ctx) {
 // Timed effect for a later turn (design 031): marks the attacker or the opponent's Active.
 function atkAddMarker(ctx) {
   const { step } = ctx;
+  if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
   const owner = step.target === 'opponentActive' ? ctx.opponent : ctx.player;
   const card =
     step.target === 'opponentActive' ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
@@ -2858,6 +2891,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkLostZoneOppActive,
   atkDiscardHandEnergy: optional(atkDiscardHandEnergy, (step) => `Discard ${energyLabel(step)} from your hand`),
   atkMill: optional(atkMill, (step) => `Discard the top ${step.count || 1} card(s) of the deck`),
+  atkMillAttachIfEnergy,
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),

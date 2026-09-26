@@ -188,7 +188,15 @@ export function resolveAbilitySteps(text, { selfName } = {}) {
     .map((p) => p.step);
   const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName });
   const parserFallsShort =
-    actionable.length === 0 || actionable.some((step) => !isExecutableStepType(step.type));
+    actionable.length === 0 ||
+    actionable.some(
+      (step) =>
+        !isExecutableStepType(step.type) ||
+        // A hand/deck attach without a source is guidance-only (the executor keeps the
+        // discard-attach form); the templates own the real effect — Crushing Charge's
+        // mill-then-maybe-attach (design 048).
+        (step.type === 'attachAbility' && !step.fromDiscard)
+    );
   if (parserFallsShort && templateSteps.length > 0) {
     return { source: 'template', steps: templateSteps, holderZone, parsedSteps: steps };
   }

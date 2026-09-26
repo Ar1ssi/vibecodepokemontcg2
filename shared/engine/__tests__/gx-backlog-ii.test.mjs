@@ -778,3 +778,97 @@ test('I189 board: Disk Reload draws until the hand has 5 cards', () => {
   assert.equal(res.error, null, res.reason);
   assert.equal(res.state.players.p1.zones.hand.length, 5);
 });
+
+const CRUSHING_CHARGE =
+  "Once during your turn (before your attack), you may discard the top card of your deck. If it's a basic Energy card, attach it to 1 of your Pokémon.";
+const POWER_RECHARGE = 'Put all Electropower cards from your discard pile into your hand.';
+
+test('I189 board: Crushing Charge discards the deck top and attaches a Basic Energy', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(
+      mon('Magcargo-GX', { hp: 200, abilities: [{ name: 'Crushing Charge', text: CRUSHING_CHARGE }] })
+    );
+    p1.zones.deck.unshift(energyCard('Fire'));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  }, { rulesEnabled: true });
+  const holder = activeRoot(state, 'p1');
+  const res = applyCommand(
+    state,
+    { type: 'useAbility', playerId: 'p1', payload: { instanceId: holder.instanceId, abilityIndex: 0 } },
+    createRng(9)
+  );
+  assert.equal(res.error, null, res.reason);
+  const attached = res.state.players.p1.zones.active.filter((c) => c.attachedTo === holder.instanceId);
+  assert.equal(attached.length, 1);
+  assert.equal(attached[0].name, 'Basic Fire Energy');
+  assert.ok(res.events.some((e) => e.type === 'cardsDiscarded'));
+});
+
+test('I189 board: Crushing Charge discards a non-Energy top card without attaching', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(
+      mon('Magcargo-GX', { hp: 200, abilities: [{ name: 'Crushing Charge', text: CRUSHING_CHARGE }] })
+    );
+    p1.zones.deck.unshift(supporter('Top Card'));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  }, { rulesEnabled: true });
+  const holder = activeRoot(state, 'p1');
+  const res = applyCommand(
+    state,
+    { type: 'useAbility', playerId: 'p1', payload: { instanceId: holder.instanceId, abilityIndex: 0 } },
+    createRng(9)
+  );
+  assert.equal(res.error, null, res.reason);
+  assert.equal(
+    res.state.players.p1.zones.active.filter((c) => c.attachedTo === holder.instanceId).length,
+    0
+  );
+  assert.ok(res.state.players.p1.zones.discard.some((c) => c.name === 'Top Card'));
+});
+
+test('I189 board: Power Recharge recovers every Electropower and nothing else', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(
+      mon('Ampharos-GX', { hp: 200, attacks: [atk('Power Recharge', 30, POWER_RECHARGE)] })
+    );
+    p1.zones.discard.push(item('Electropower'), item('Electropower'), supporter('Other card'));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  const hand = res.state.players.p1.zones.hand;
+  assert.equal(hand.filter((c) => c.name === 'Electropower').length, 2);
+  assert.equal(hand.filter((c) => c.name === 'Other card').length, 0);
+  assert.equal(res.state.players.p1.zones.discard.length, 1);
+});
+
+const ACME =
+  "If this Pokémon has at least 1 extra Energy attached to it (in addition to this attack's cost), and if it would be Knocked Out by damage from an opponent's attack during their next turn, it is not Knocked Out, and its remaining HP becomes 10.";
+
+test('I185 board: Acme of Heroism-GX survives a Knock Out at 10 HP next turn', () => {
+  const state = game((s, p1, p2) => {
+    const hero = mon('Marshadow & Machamp-GX', {
+      hp: 200,
+      attacks: [atk('Acme of Heroism-GX', 0, ACME, ['Fighting'])],
+    });
+    p1.zones.active.push(hero, energyCard('Fighting', hero.instanceId), energyCard('Fighting', hero.instanceId));
+    p2.zones.active.push(
+      mon('Defender', {
+        hp: 300,
+        attacks: [{ name: 'Big Hit', cost: [], damage: '250', text: 'This attack does 250 damage.' }],
+      })
+    );
+  }, { rulesEnabled: true });
+  const afterAttack = runAttack(state);
+  assert.ok(
+    afterAttack.state.players.p1.zones.active.some((c) => (c.attackMarkers || []).some((m) => m.kind === 'surviveKnockOutHp10'))
+  );
+  const res = applyCommand(
+    afterAttack.state,
+    { type: 'attack', playerId: 'p2', payload: { attackIndex: 0 } },
+    createRng(13)
+  );
+  assert.equal(res.error, null, res.reason);
+  const hero = activeRoot(res.state, 'p1');
+  assert.equal(hero.damage, 190, '200 HP − 10 remaining');
+  assert.ok((res.events || []).some((e) => e.type === 'koPrevented' && e.reason === 'attackMarker'));
+});

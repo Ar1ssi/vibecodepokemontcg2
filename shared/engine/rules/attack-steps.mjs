@@ -448,6 +448,11 @@ const TEMPLATES = [
     /^put (up to \d+|an?|\d+) (?:((?:trainer|item|supporter|pokémon tool|stadium|basic energy|energy|pokémon) )?)cards? from your discard pile into your hand$/,
     (m) => ({ type: 'atkRecover', ...attachCount(m[1]), what: m[2] ? recoverWhat(m[2].trim()) : null }),
   ],
+  // Ampharos-GX Power Recharge (design 048): every named card (e.g. Electropower) comes back.
+  [
+    /^put all (.+?) cards? from your discard pile into your hand$/,
+    (m) => ({ type: 'atkRecover', all: true, what: m[1].trim() }),
+  ],
   // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power
   [/^put a card from your discard pile into your hand$/, () => ({ type: 'atkRecover', count: 1, what: null })],
   [
@@ -956,6 +961,25 @@ const BLOCKS = [
   [
     /discard 1 of your prize cards\. if it's an energy card, attach it to 1 of your pokémon\./g,
     () => ({ type: 'atkDiscardPrize', count: 1, attachIfEnergy: true }),
+  ],
+  // Magcargo-GX Crushing Charge (design 048): mill the deck top, attach it if it is a Basic
+  // Energy. The block consumes both sentences so the plain atkMill template cannot drop the
+  // conditional attach.
+  [
+    /discard the top card of your deck\. if it(?:'s| is) a basic energy card, attach it to 1 of your pokémon\./g,
+    () => ({ type: 'atkMillAttachIfEnergy' }),
+  ],
+  // Marshadow & Machamp-GX Acme of Heroism-GX: survive a Knock Out at 10 HP next turn, gated on
+  // the extra Energy. (The sentence order is printed with the condition first.)
+  [
+    /if this pokémon has at least 1 extra energy attached to it,? and if it would be knocked out by damage from an opponent's attack during their next turn, it is not knocked out, and its remaining hp becomes 10\./g,
+    () => ({
+      type: 'atkAddMarker',
+      target: 'self',
+      window: 'opponentNextTurn',
+      marker: { kind: 'surviveKnockOutHp10' },
+      requiresExtraEnergy: [{ count: 1, energyType: null }],
+    }),
   ],
   // Garchomp & Giratina-GX GG End-GX: the extra-Energy clause raises the discard count.
   [

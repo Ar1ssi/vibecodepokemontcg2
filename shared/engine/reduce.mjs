@@ -5859,6 +5859,8 @@ function resolveAttackEffectPhase(draft, ctx) {
         const defenderMarkers = activeAttackMarkers(draft, defenderPlayerId, defender);
         const retaliations = defenderMarkers.filter((m) => m.kind === 'retaliate');
         const surviveOnHeads = defenderMarkers.some((m) => m.kind === 'surviveKnockOutCoin');
+        // Acme of Heroism-GX (design 048): no coin — survive at 10 HP for the turn window.
+        const surviveAt10 = defenderMarkers.some((m) => m.kind === 'surviveKnockOutHp10');
 
         // Snapshot the reactive Tools before a Knock Out discards them: the "even if
         // Knocked Out" wordings (Team Rocket's Hypnotizer, Handheld Fan) still resolve.
@@ -5939,6 +5941,17 @@ function resolveAttackEffectPhase(draft, ctx) {
               }
             } else if (surviveOnHeads && survivesOnCoin(activeRng, defenderPlayerId, events)) {
               // Machamp LV.X Strong-Willed (design 032): heads leaves it at 10 HP.
+              defender.damage = koHp - 10;
+              events.push({
+                type: 'damageUpdated',
+                instanceId: defender.instanceId,
+                damage: defender.damage,
+                dealt: dmgDealt,
+                ...(weaknessApplied && { weakness: true }),
+              });
+              events.push({ type: 'koPrevented', instanceId: defender.instanceId, surviveHp: 10, reason: 'attackMarker' });
+            } else if (surviveAt10) {
+              // Acme of Heroism-GX: not Knocked Out, remaining HP becomes 10.
               defender.damage = koHp - 10;
               events.push({
                 type: 'damageUpdated',
