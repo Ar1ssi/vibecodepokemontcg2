@@ -1913,6 +1913,24 @@ export function parseAbility(text = '') {
       guidance: `Once during your turn: discard ${count > 1 ? `${count} cards` : 'a card'} from your hand (cost).`,
     });
   }
+  // A qualified cost ("discard an Ultra Beast card from your hand. If you do, draw …",
+  // Naganadel-GX Ultra Conversion): the printed qualifier filters which hand cards can
+  // pay, carried as `what` for the executor/picker. Only simple nouns are read; a
+  // relative clause ("a Pokémon that has the Mad Party attack") stays unparsed.
+  const ultraBeastCost =
+    !steps.some((step) => step.type === 'discardCostAbility') &&
+    lower.match(
+      /discard an ultra beast card from your hand(?: in order to (?:use this ability|draw)|\. (?:if you do|then)\b)/
+    );
+  if (ultraBeastCost) {
+    steps.push({
+      type: 'discardCostAbility',
+      count: 1,
+      energyOnly: false,
+      what: 'Ultra Beast',
+      guidance: 'Once during your turn: discard an Ultra Beast card from your hand (cost).',
+    });
+  }
   // "You must put a card from your hand on the bottom of your deck in order to use this
   // Ability" (Quaquaval Up-Tempo): like the discard-cost family, but the card is not
   // discarded — the player picks which card goes under the deck. The draw is gated on

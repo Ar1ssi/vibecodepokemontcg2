@@ -230,13 +230,18 @@ export function isEnergyDiscardCost(step = {}) {
  * filter).
  */
 export function matchesDiscardCost(card, step = {}) {
-  if (!isEnergyDiscardCost(step)) return true;
-  const what = energySearchWhat({
-    basic: step.basicOnly === true || step.basic === true,
-    energyType:
-      (Array.isArray(step.energyTypes) && step.energyTypes[0]) || step.energyType || null,
-  });
-  return matchesSearch(card, what);
+  if (isEnergyDiscardCost(step)) {
+    const what = energySearchWhat({
+      basic: step.basicOnly === true || step.basic === true,
+      energyType:
+        (Array.isArray(step.energyTypes) && step.energyTypes[0]) || step.energyType || null,
+    });
+    return matchesSearch(card, what);
+  }
+  // A qualified hand cost ("discard an Ultra Beast card from your hand") carries the
+  // printed qualifier as `what`; a plain "discard a card" cost accepts any card.
+  if (step.what) return matchesSearch(card, step.what);
+  return true;
 }
 
 /** Filter candidates; returns [] and calls onNoMatches instead of silently showing full deck. */

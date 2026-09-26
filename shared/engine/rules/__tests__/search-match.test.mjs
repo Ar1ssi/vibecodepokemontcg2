@@ -132,6 +132,20 @@ test('matchesDiscardCost: untyped Energy-only cost matches any Energy', () => {
   assert.equal(matchesDiscardCost(trainer, step), false);
 });
 
+test('matchesDiscardCost: qualified cost filters by the printed noun (what)', () => {
+  const step = { energyOnly: false, what: 'Ultra Beast' };
+  const beast = { name: 'Buzzwole', supertype: 'Pokémon', subtypes: ['Ultra Beast'], hp: 130 };
+  const beastByName = { name: 'Naganadel-GX', supertype: 'Pokémon', hp: 210 };
+  const plain = { name: 'Froakie', supertype: 'Pokémon', hp: 70 };
+  const trainer = { name: 'Professor Research', supertype: 'Trainer', type: 'Trainer' };
+
+  assert.equal(isEnergyDiscardCost(step), false);
+  assert.equal(matchesDiscardCost(beast, step), true);
+  assert.equal(matchesDiscardCost(beastByName, step), true);
+  assert.equal(matchesDiscardCost(plain, step), false);
+  assert.equal(matchesDiscardCost(trainer, step), false);
+});
+
 // A typed Basic search still has to honour its HP cap (Fan Call: "up to 3 {C}
 // Pokémon with 100 HP or less"). The type-symbol branch used to return before
 // the HP-cap branch, so every over-cap Colorless Pokémon matched.

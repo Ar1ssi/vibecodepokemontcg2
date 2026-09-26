@@ -12,6 +12,7 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I192 2026-09-26 P3 [rules] Qualified hand-discard ability costs beyond Ultra Beast are still unread and their effects run free: Melmetal "a {M} Pokémon" (heal 100), Naganadel & Guzzlord-GX "a Pokémon" (heal 60), Karrablast "a Shelmet", Meowstic "a Chill Teaser Toy card", Polteageist "a Pokémon that has the Mad Party attack"; extend the `what` filter from Naganadel-GX Ultra Conversion (I92, S327)
 - I191 2026-09-26 P3 [tooling] The ability passive probe asks every reader with the plain opponent Active (V/VMAX/VSTAR sit on the Bench), so attacker rule-box filters read `unconsumed` although they work against a matching attacker (Dauntless Shield / Crystal Veil class) (refs: S325, scripts/lib/ability-passive-probe.mjs)
 - I190 2026-09-26 P3 [rules] Deferred S&M trainer clauses: Bellelba & Brycen-Man CEC 186 and Sabrina's Suggestion TEU 154 unrecognizable; Choose-1 second modes (Rescue Stretcher GRI 130, Energy Recycle System CES 128, Fossil Excavation Map FLI 107, Tate & Liza CES 148); Mallow & Lana CEC 198 optional discard+heal; Missing Clover UPR 129 4-card Prize mode; Cross Switcher BUS 115 2-card play gate (refs: .agent/scratch/sm-trainer-audit/report.md, S325)
 - I183 2026-09-26 P3 [tests] coin-flip-ceremony.test.mjs "ceremony mounts a material-stamped coin" flakes under full `pnpm test` load (message '' vs /Tails! You go first\./); passes 3/3 alone — timing-dependent wait.

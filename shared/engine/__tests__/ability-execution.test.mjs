@@ -1803,3 +1803,52 @@ test('ability: Dawn Wings Necrozma-GX Invasion swaps itself in with no bench pic
   assert.equal(res.pendingChoice, null, 'no picker');
   assert.deepEqual(res.state.players.p1.zones.active.map((c) => c.instanceId), [70]);
 });
+
+test('ability: Naganadel-GX Ultra Conversion prompts for an Ultra Beast discard, then draws 3', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'Once during your turn (before your attack), you may discard an Ultra Beast card from your hand. If you do, draw 3 cards.'
+  );
+  const beast = createCard({
+    instanceId: 95,
+    name: 'Buzzwole',
+    hp: 130,
+    supertype: 'Pokémon',
+    subtypes: ['Ultra Beast'],
+  });
+  const notBeast = createCard({ instanceId: 94, name: 'Professor Research', supertype: 'Trainer' });
+  state.players.p1.zones.hand.push(beast, notBeast);
+  for (const id of [96, 97, 98]) state.players.p1.zones.deck.push(createCard({ instanceId: id }));
+
+  const res1 = use70(state, rng);
+  assert.equal(res1.error, null);
+  assert.ok(res1.pendingChoice, 'the discard cost opens a picker');
+  assert.deepEqual(
+    res1.pendingChoice.options.map((c) => c.instanceId),
+    [95],
+    'only the Ultra Beast is offered'
+  );
+
+  const res2 = resolveWith(res1, [95], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(res2.state.players.p1.zones.discard.map((c) => c.instanceId), [95]);
+  assert.deepEqual(res2.state.players.p1.zones.hand.map((c) => c.instanceId).sort(), [94, 96, 97, 98]);
+  assert.equal(res2.state.players.p1.flags.abilitiesUsed[70], true);
+});
+
+test('ability: Ultra Conversion with no Ultra Beast in hand draws nothing and is not spent', () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(
+    state,
+    'Once during your turn (before your attack), you may discard an Ultra Beast card from your hand. If you do, draw 3 cards.'
+  );
+  state.players.p1.zones.hand.push(createCard({ instanceId: 94, name: 'Professor Research', supertype: 'Trainer' }));
+  for (const id of [96, 97, 98]) state.players.p1.zones.deck.push(createCard({ instanceId: id }));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p1.zones.hand.length, 1);
+  assert.equal(res.state.players.p1.zones.deck.length, 3);
+  assert.notEqual(res.state.players.p1.flags.abilitiesUsed[70], true);
+});

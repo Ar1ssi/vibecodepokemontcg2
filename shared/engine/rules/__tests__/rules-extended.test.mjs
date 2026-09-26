@@ -878,6 +878,25 @@ import test from 'node:test';
       assert.equal(classifyAbility({ name: 'Mega Greninja ex', ability: { text } }), 'move-damage');
     });
 
+    test('parseAbility: Naganadel-GX Ultra Conversion pays a qualified Ultra Beast discard first', () => {
+      const text =
+        'Once during your turn (before your attack), you may discard an Ultra Beast card from your hand. If you do, draw 3 cards.';
+      const steps = parseAbility(text);
+      assert.deepEqual(
+        steps.map((s) => s.type),
+        ['discardCostAbility', 'drawAbility']
+      );
+      const cost = steps[0];
+      assert.equal(cost.count, 1);
+      assert.equal(cost.energyOnly, false);
+      assert.equal(cost.what, 'Ultra Beast');
+
+      // A plain "discard a card" cost stays unfiltered.
+      const plain = parseAbility('Once during your turn, you may discard a card from your hand. If you do, draw 3 cards.');
+      assert.equal(plain[0].type, 'discardCostAbility');
+      assert.equal(plain[0].what, undefined);
+    });
+
     test('parseAbility: place damage on opponent without incidental "to" in cost clause', () => {
       const text =
         "Once during your turn, you may discard a Basic Water Energy card from your hand. Place 6 damage counters on 1 of your opponent's Pokémon.";
