@@ -28,7 +28,7 @@ never executed. The goal was:
 
 ## 2. Corpus and audit
 
-- Audit script: `node scripts/audit-all-stadiums.mjs` → `out/stadium-full-audit.txt`
+- Audit script: `node scripts/audit-stadiums.mjs` → `out/stadium-full-audit.txt`
   (`out/` is not gitignored).
 - Corpus: **268 printings / 212 unique** (name+text) Stadium cards.
 - Final classification: **117 continuous-both · 67 once-per-turn · 28 unknown**.

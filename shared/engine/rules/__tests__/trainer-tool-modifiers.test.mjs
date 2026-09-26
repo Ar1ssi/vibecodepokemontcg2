@@ -24,6 +24,7 @@ const {
   combinedToolAttackBonus,
   combinedToolDamagePrevention,
   applyToolDamageReduction,
+  preventionForCard,
 } = await import('../tool-combat.mjs');
 const { parseHpBonus, applyHpBonus, parseRetreatCostModifier } = await import(
   '../ability-executors.mjs'
@@ -1046,6 +1047,48 @@ test('Fairy Charms filter typed, rule-box, Ability and Ultra Beast attackers (F3
     false,
     'an EX without an Ability is not'
   );
+});
+
+// Second review: attacker clauses phrased "by your opponent's …" / "by attacks
+// from …" must gate, and a reminder must not; VMAX/VSTAR match by name too.
+test('rule-box attacker clauses: by-clauses, reminders and name fallbacks', () => {
+  const keldeo = {
+    name: 'Keldeo-GX',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "Prevent all effects of attacks, including damage, done to this Pokémon by your opponent's Pokémon-GX or Pokémon-EX.",
+  };
+  const gx = mkMon({ name: 'Mewtwo-GX', subtypes: ['Basic', 'GX'] });
+  const plain = mkMon({ name: 'Plain Attacker' });
+  assert.equal(preventionForCard(keldeo, gx).preventAll, true);
+  assert.equal(preventionForCard(keldeo, plain).preventAll, false);
+
+  const altaria = {
+    name: 'Altaria-GX',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "During your opponent's next turn, prevent all damage done to this Pokémon by attacks from Pokémon-GX and Pokémon-EX.",
+  };
+  assert.equal(preventionForCard(altaria, gx).preventAll, true);
+  assert.equal(preventionForCard(altaria, plain).preventAll, false);
+
+  // The Rule Box reminder belongs to the holder condition, not the attacker.
+  const flowerCurtain = {
+    name: 'Flower Curtain',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "Prevent all damage done to your Benched Pokémon by attacks from your opponent's Pokémon. (Pokémon V, Pokémon-GX, etc. have Rule Boxes.)",
+  };
+  assert.equal(preventionForCard(flowerCurtain, plain).preventAll, true);
+
+  // VMAX/VSTAR match by name when subtypes have not synced.
+  const crystalVeil = {
+    name: 'Glaceon VMAX',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    text: "Prevent all damage done to this Pokémon by attacks from your opponent's Pokémon VMAX, except any Glaceon VMAX.",
+  };
+  assert.equal(preventionForCard(crystalVeil, mkMon({ name: 'Eternatus VMAX' })).preventAll, true);
 });
 
 // Review finding 3: the reminder "(Pokémon V, Pokémon-GX, etc. have Rule Boxes.)"

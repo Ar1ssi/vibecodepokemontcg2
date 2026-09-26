@@ -206,6 +206,11 @@ export function flipCoin(rng) {
 export function withForcedCoin(rng, face) {
   const forced = Object.create(rng);
   forced.forcedCoin = face;
+  // Own properties so a one-shot wrapper underneath cannot leak its
+  // once/used/parent state into an all-flips wrapper (review finding 5).
+  forced.forcedCoinOnce = false;
+  forced.forcedCoinUsed = null;
+  forced.forcedCoinParent = null;
   return forced;
 }
 

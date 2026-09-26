@@ -121,6 +121,11 @@ test('withForcedCoinOnce: the parent all-flips force survives the one shot', () 
   const plainOnce = withForcedCoinOnce(createRng(9), 'heads');
   assert.equal(flipCoin(plainOnce), 'heads');
   assert.equal(typeof flipCoin(plainOnce), 'string');
+
+  // An all-flips wrapper over a one-shot wrapper keeps all-flips semantics
+  // (it resets the one-shot fields as its own properties).
+  const overOnce = withForcedCoin(withForcedCoinOnce(createRng(5), 'heads'), 'tails');
+  for (let i = 0; i < 4; i++) assert.equal(flipCoin(overOnce), 'tails');
 });
 
 test('createRelayedRng consumes queued coin values', () => {

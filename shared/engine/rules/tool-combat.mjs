@@ -21,6 +21,8 @@ import {
   isGxCard,
   isMegaCard,
   isVCard,
+  isVmaxCard,
+  isVstarCard,
   isTeraCard,
   isRuleBoxPokemon,
 } from './card-classify.mjs';
@@ -142,7 +144,15 @@ function toolBlocked(blockTools, stadium = null) {
  * accept any listed class, while a lone "Pokémon-EX" narrows to EX.
  */
 function attackerMatchesPrintedRuleBox(t, attacker) {
-  const clauses = [...t.matchAll(/attacks? (?:from|of) your opponent'?s ([^.]*)/gi)]
+  // "attacks from/of your opponent's …", "by your opponent's …" (Keldeo-GX
+  // Pure Heart) and "by attacks from …" even without the possessive (Altaria-GX)
+  // are the attacker-clause wordings in the corpus.
+  const clauses = [
+    ...t.matchAll(
+      /(?:attacks? (?:from|of)|by(?: an? attack from)?)\s+your opponent'?s ([^.]*)/gi
+    ),
+    ...t.matchAll(/by attacks? from ([^.]*)/gi),
+  ]
     .map((m) => m[1])
     .join(' ');
   if (!clauses) {
@@ -161,8 +171,9 @@ function attackerMatchesPrintedRuleBox(t, attacker) {
     if (token === 'gx') return isGxCard(attacker);
     if (token === 'ex') return isExCard(attacker);
     if (token === 'v') return isVCard(attacker);
-    const subtypes = (attacker?.subtypes || []).map((s) => String(s).toLowerCase());
-    return subtypes.includes(token);
+    if (token === 'vmax') return isVmaxCard(attacker);
+    if (token === 'vstar') return isVstarCard(attacker);
+    return false;
   });
 }
 
@@ -181,9 +192,6 @@ export function preventionForCard(card, attacker, ctx = {}) {
   // hyphen, so the space-only pattern never matched them.
   if (!attackerMatchesPrintedRuleBox(t, attacker)) {
     return { preventAll: false, reduce: 0, reduceHp: 0 };
-  }
-  if (/pokémon v\b|pokemon v\b/i.test(t)) {
-    if (!isVCard(attacker)) return { preventAll: false, reduce: 0, reduceHp: 0 };
   }
   if (/have an ability|has an ability|that have an ability/i.test(t)) {
     if (!cardHasAbility(attacker))

@@ -19,8 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_PATH = path.join(__dirname, '..', 'out', 'pkmn-trainer-cards.json');
 
 // One query per subtype, merged by URL. A single comma-OR query
-// (`type:supporter,item,…`) drops rows on pkmncards — it lost 38 printings
-// including Professor's Research BLK 085 while each per-type query has them.
+// (`type:supporter,item,…`) drops rows on pkmncards — it lost Professor's
+// Research BLK 085 (present in `type:supporter`) while the per-type queries
+// each have it; 38 rows overlap across subtypes and are de-duped here.
 const SUBTYPES = [
   'supporter',
   'item',

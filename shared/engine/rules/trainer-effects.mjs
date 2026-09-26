@@ -1581,6 +1581,9 @@ function parseTrainerStepsInner(lower) {
         handCount: count,
         handTarget: target.toLowerCase(),
         handEnergy: typeWord ? { basic: true, types: [typeWord] } : basic ? { basic: true } : {},
+        // "If you drew any cards in this way" (Gardenia's Vigor): the attach
+        // only resolves when the leading draw actually drew (review finding 4).
+        ...(leadingDraw ? { requiresDraw: true } : {}),
       });
       if (!leadingDraw) appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };

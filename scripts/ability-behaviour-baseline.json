@@ -5,8 +5,8 @@
     "runs": 1681,
     "partial": 254,
     "dead": 59,
-    "consumed": 1177,
-    "unconsumed": 1056,
+    "consumed": 1176,
+    "unconsumed": 1057,
     "unparsed": 1
   },
   "families": {
@@ -114,8 +114,8 @@
       "runs": 1,
       "partial": 13,
       "dead": 0,
-      "consumed": 192,
-      "unconsumed": 99,
+      "consumed": 188,
+      "unconsumed": 103,
       "unparsed": 0
     },
     "damage-reduce": {
@@ -339,8 +339,8 @@
       "runs": 2,
       "partial": 0,
       "dead": 0,
-      "consumed": 23,
-      "unconsumed": 27,
+      "consumed": 25,
+      "unconsumed": 25,
       "unparsed": 0
     },
     "recursion": {
@@ -447,8 +447,8 @@
       "runs": 1,
       "partial": 3,
       "dead": 0,
-      "consumed": 205,
-      "unconsumed": 113,
+      "consumed": 206,
+      "unconsumed": 112,
       "unparsed": 0
     },
     "when-played": {

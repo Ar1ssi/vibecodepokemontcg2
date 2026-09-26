@@ -322,6 +322,19 @@ function handAttachTargets(ctx) {
 // Pokémon (once per card when the text says "in any way you like").
 function attachFromHand(ctx) {
   const { player, step } = ctx;
+  // Gardenia's Vigor prints "Draw 2 cards. If you drew any cards in this way,
+  // attach …": when the leading draw drew nothing the attach does not resolve.
+  // First call only — a resume carries a fresh events array without the draw.
+  if (
+    step.requiresDraw &&
+    !ctx.selection &&
+    !ctx.memo?.phase &&
+    !(ctx.events || []).some(
+      (event) => event.type === 'cardsDrawn' && event.playerId === ctx.playerId && event.count > 0
+    )
+  ) {
+    return skip(ctx, 'draw_failed');
+  }
   const energies = () => (player.zones.hand || []).filter((c) => handEnergyMatches(c, step.handEnergy));
   const targets = handAttachTargets(ctx);
   const attachAll = (cards, root) => {

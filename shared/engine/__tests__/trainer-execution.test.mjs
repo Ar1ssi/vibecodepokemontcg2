@@ -902,6 +902,77 @@ test('Cyrus Prism Star: the opponent keeps 2 Benched Pokémon', () => {
   assert.ok(deckIds.includes(62) && deckIds.includes(63), 'the others shuffled in');
 });
 
+test("Gardenia's Vigor: the attach only resolves when the draw drew", () => {
+  const text =
+    'Draw 2 cards. If you drew any cards in this way, attach up to 2 {G} Energy cards from your hand to 1 of your Benched Pokémon.';
+  // Empty deck: the draw draws nothing and the attach is skipped.
+  const dry = setupGame();
+  dry.state.players.p1.zones.bench.push(
+    createCard({ instanceId: 150, name: 'Bench Mon', hp: 60, supertype: 'Pokémon' })
+  );
+  dry.state.players.p1.zones.hand.push(
+    createCard({
+      instanceId: 151,
+      name: "Gardenia's Vigor",
+      supertype: 'Trainer',
+      trainerType: 'Supporter',
+      text,
+    }),
+    createCard({ instanceId: 152, name: 'Grass Energy', type: 'Energy', energyType: 'Grass' })
+  );
+  const dryRes = applyCommand(
+    dry.state,
+    { type: 'playTrainer', payload: { instanceId: 151 }, playerId: 'p1' },
+    dry.rng
+  );
+  assert.equal(dryRes.error, null);
+  assert.equal(
+    dryRes.state.players.p1.zones.bench.filter((c) => c.attachedTo === 150).length,
+    0,
+    'no draw, no attach'
+  );
+
+  // With cards: the draw resolves and the attach is offered.
+  const wet = setupGame();
+  wet.state.players.p1.zones.bench.push(
+    createCard({ instanceId: 160, name: 'Bench Mon', hp: 60, supertype: 'Pokémon' })
+  );
+  wet.state.players.p1.zones.hand.push(
+    createCard({
+      instanceId: 161,
+      name: "Gardenia's Vigor",
+      supertype: 'Trainer',
+      trainerType: 'Supporter',
+      text,
+    }),
+    createCard({ instanceId: 162, name: 'Grass Energy', type: 'Energy', energyType: 'Grass' })
+  );
+  for (let i = 0; i < 2; i++) {
+    wet.state.players.p1.zones.deck.push(createCard({ instanceId: 170 + i, name: `D${i}` }));
+  }
+  const wetRes = applyCommand(
+    wet.state,
+    { type: 'playTrainer', payload: { instanceId: 161 }, playerId: 'p1' },
+    wet.rng
+  );
+  assert.equal(wetRes.error, null);
+  assert.ok(wetRes.pendingChoice, 'asks which Energy to attach');
+  const attached = applyCommand(
+    wetRes.state,
+    {
+      type: 'resolveChoice',
+      payload: { choiceId: wetRes.pendingChoice.choiceId, selection: [162] },
+      playerId: 'p1',
+    },
+    wet.rng
+  );
+  assert.equal(attached.error, null);
+  assert.equal(
+    attached.state.players.p1.zones.bench.filter((c) => c.attachedTo === 160).length,
+    1
+  );
+});
+
 test('Ultra Forest Kartenvoy: Ultra Beast attacks ignore defender effects this turn', () => {
   const { state, rng } = setupGame();
   state.players.p2.zones.active.length = 0;
