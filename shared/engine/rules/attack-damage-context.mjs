@@ -174,7 +174,8 @@ export function buildServerAttackContext(
       0
     ),
     // Types of the Energy attached across this player's board, one entry per card, for
-    // "times the amount of {X} Energy attached to your Pokémon" scaling.
+    // "times the amount of {X} Energy attached to your Pokémon" scaling. Card-level descriptor
+    // types: Stadium type rewrites and multi-provision Special Energy are not reflected here.
     ownEnergyTypeList: ownInPlay
       .flatMap(({ card }) => attachedEnergyCards(own, card))
       .map((card) => String(serverEnergyDescriptor(card).type || '').toLowerCase()),
@@ -269,6 +270,13 @@ export function buildServerAttackContext(
     ctx.defenderIsTera = isTeraCard(defenderCard);
     ctx.defenderIsRadiant = isRadiantCard(defenderCard);
     ctx.defenderIsMega = isMegaCard(defenderCard);
+  }
+  // "…times the amount of Energy attached to all of your opponent's Pokémon" scaling.
+  if (opponent) {
+    ctx.opponentAllEnergyCount = inPlayPokemon(opponent).reduce(
+      (sum, { card }) => sum + energyOn(opponent, card, { stadiumCard, opponent: own }).length,
+      0
+    );
   }
   if (headsCount !== undefined) ctx.headsCount = headsCount;
 

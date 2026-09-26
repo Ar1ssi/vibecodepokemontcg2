@@ -30,6 +30,7 @@ function board({
   attackerDamage = 0,
   benchDamage = 0,
   defenderEnergy = [],
+  opponentBenchEnergies = [],
   defenderDamage = 0,
   ownHand = 0,
   opponentHand = 0,
@@ -68,6 +69,11 @@ function board({
   state.players.p2.zones.active.push(defender);
   defenderEnergy.forEach((type, i) =>
     state.players.p2.zones.active.push(energy(60 + i, type, 20))
+  );
+  const opponentBench = pokemon({ instanceId: 200, name: 'Opp Bench', hp: 60 });
+  state.players.p2.zones.bench.push(opponentBench);
+  opponentBenchEnergies.forEach((type, i) =>
+    state.players.p2.zones.bench.push(energy(250 + i, type, 200))
   );
 
   for (const playerId of ['p1', 'p2']) {
@@ -291,4 +297,95 @@ test('older "times the number of" wording keeps its attached-Energy count', () =
     { energyCount: 3 }
   );
   assert.equal(parsed.total, 90);
+});
+
+test('typed this-Pokémon scaling counts only the attacker, not the whole board', () => {
+  const state = board({
+    attack: HYDRO_PRESSURE,
+    attackerEnergy: ['Water'],
+    benchEnergies: ['Water', 'Water', 'Water'],
+  });
+  const res = attackWith(state);
+  assert.ok(!res.error, `unexpected error: ${res.error}`);
+  assert.equal(damageOf(res.state, 'p2', 'active', 20), 40);
+});
+
+test("all-opponent Energy scope counts the opponent's whole board", () => {
+  const TAPU_THUNDER = {
+    name: 'Tapu Thunder-GX',
+    cost: [],
+    damage: 50,
+    text: "This attack does 50 damage times the amount of Energy attached to all of your opponent's Pokémon.",
+  };
+  const state = board({
+    attack: TAPU_THUNDER,
+    defenderEnergy: ['Water', 'Water'],
+    opponentBenchEnergies: ['Lightning'],
+  });
+  const res = attackWith(state);
+  assert.ok(!res.error, `unexpected error: ${res.error}`);
+  assert.equal(damageOf(res.state, 'p2', 'active', 20), 150);
+});
+
+test('unreadable Energy scopes stay at the printed base instead of guessing a count', () => {
+  const parsed = parseAttackDamage(
+    {
+      name: 'Riptide',
+      damage: 10,
+      text: 'This attack does 10 damage plus 10 more damage times the amount of {W} Energy cards in your discard pile.',
+    },
+    {},
+    {},
+    {}
+  );
+  assert.equal(parsed.total, 10);
+  assert.match(parsed.notes.join(' '), /resolve the printed count/);
+});
+
+test('choose-target scaling tails stay unresolved instead of hitting the Active', () => {
+  const parsed = parseAttackDamage(
+    {
+      name: 'Tropical Head',
+      damage: 0,
+      text: "This attack does 20 damage times the amount of Energy attached to this Pokémon to 1 of your opponent's Pokémon.",
+    },
+    {},
+    {},
+    { energyCount: 4 }
+  );
+  assert.equal(parsed.total, 0);
+  assert.match(parsed.notes.join(' '), /resolve the attack target/);
+});
+
+test('Darkness typed Energy matches both dark and darkness spellings', () => {
+  const darkPulse = {
+    name: 'Dark Pulse',
+    damage: 0,
+    text: 'This attack does 30 damage times the amount of {D} Energy attached to this Pokémon.',
+  };
+  assert.equal(
+    parseAttackDamage(darkPulse, {}, {}, { energyCount: 3, attackerEnergyTypeList: ['dark', 'water'] })
+      .total,
+    30
+  );
+  assert.equal(
+    parseAttackDamage(darkPulse, {}, {}, { energyCount: 3, attackerEnergyTypeList: ['darkness'] })
+      .total,
+    30
+  );
+});
+
+test('compound this-Pokémon scopes stay unresolved rather than counting the attacker', () => {
+  const parsed = parseAttackDamage(
+    {
+      name: 'X Ball',
+      damage: 20,
+      text: 'This attack does 20 damage times the amount of Energy attached to this Pokémon and the Defending Pokémon.',
+    },
+    {},
+    {},
+    { energyCount: 5, opponentEnergyCount: 2 }
+  );
+  assert.equal(parsed.total, 20);
+  assert.match(parsed.notes.join(' '), /resolve the printed count/);
 });

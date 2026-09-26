@@ -496,19 +496,24 @@ function atkDiscardOppEnergy(ctx) {
   });
 }
 
-// Articuno-GX Cold Crush-GX: every matching Energy leaves both Active Pokémon.
+// Articuno-GX Cold Crush-GX: every matching Energy leaves both Active Pokémon. An effect-shield
+// special Energy on the opponent's Active (Wash/Rocky/Mist) protects only that side.
 function atkDiscardBothActiveEnergy(ctx) {
   const { player, opponent, step } = ctx;
   const matches = (c) => energyMatches(c, step);
   let discarded = 0;
-  for (const owner of [opponent, player].filter(Boolean)) {
-    const root = activeOf(owner);
-    if (!root) continue;
+  const drain = (owner, root) => {
+    if (!root) return;
     for (const card of attachedCards(owner, root.instanceId).filter(matches)) {
       discardCard(ctx.draft, card, ctx.events);
       discarded += 1;
     }
+  };
+  if (opponent) {
+    const root = activeOf(opponent);
+    if (root && !specialEnergyShielded(opponent, root, 'effect')) drain(opponent, root);
   }
+  drain(player, activeOf(player));
   return discarded === 0 ? skip(ctx, 'no_energy') : null;
 }
 
@@ -1008,13 +1013,14 @@ function atkShuffleOppActiveEnergy(ctx) {
   return null;
 }
 
-// Palkia-GX Zero Vanish-GX: every opponent Pokémon sheds its Energy into their deck.
+// Palkia-GX Zero Vanish-GX: every opponent Pokémon sheds its Energy into their deck. A
+// shielding special Energy protects only the Pokémon it is attached to.
 function atkShuffleOppEnergy(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const energy = rootsOf(opponent).flatMap((root) =>
-    attachedCards(opponent, root.instanceId).filter(isEnergy)
-  );
+  const energy = rootsOf(opponent)
+    .filter((root) => !specialEnergyShielded(opponent, root, 'effect'))
+    .flatMap((root) => attachedCards(opponent, root.instanceId).filter(isEnergy));
   if (energy.length === 0) return skip(ctx, 'no_energy');
   for (const card of energy) moveToZone(opponent, card, 'deck', 'inPlay', ctx.events);
   shuffleOwnDeck(opponent, ctx);

@@ -177,8 +177,9 @@ const sortedRows = [...rows].sort(
 for (const r of sortedRows) {
   const tags = r.tags?.length ? ` {${r.tags.join(',')}}` : '';
   const steps = r.kind === 'ability' && r.stepTypes?.length ? ` [${r.stepTypes.join(',')}]` : '';
+  const delta = (r.deltas || []).some((d) => d > 0) ? ` Δ${Math.max(...r.deltas)}` : '';
   out(
-    `- [${r.kind}]${r.kind === 'attack' && isGxAttack(r.name) ? ' [GX]' : ''} ${r.card} [${r.set} #${r.number}] ${r.name} (${r.family}) → ${result(r)}${steps}${tags}`
+    `- [${r.kind}]${r.kind === 'attack' && isGxAttack(r.name) ? ' [GX]' : ''} ${r.card} [${r.set} #${r.number}] ${r.name} (${r.family}) → ${result(r)}${delta}${steps}${tags}`
   );
 }
 

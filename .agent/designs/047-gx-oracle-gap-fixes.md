@@ -196,6 +196,16 @@ many printings across sets, not just GX.
   bench-damage 90/126 → 113/126, conditional-damage 41/111 → 55/111, multi-target 13/47 → 31/47,
   next-turn-lock 113/283 → 147/283; 0 engine errors. `Kaleidostorm` emits `pokemonKnockedOut` on
   the fixture (flagged in triage §7).
+- Hostile review (fresh-context subagent, `workflows/review.md`) then fixed: the typed-this scope
+  compared against a bracketed pattern literal (board-wide count); the generic `/energy/` fallback
+  fabricated the attacker count for unreadable scopes (removed — those stay unresolved, and the
+  legacy "number of Energy" fallback is kept); choose-target tails ("…to 1 of your opponent's
+  Pokémon", Tropical Head) stay unresolved instead of hitting the Active; the new steps now honour
+  effect-shield special Energy per Pokémon; Darkness type spellings normalised; report prints
+  `Δ` target damage. Deliberate re-ratchet: per-energy GX 104/119 → 101/119 and global 484/635 →
+  459/635 (fabricated counts removed — the gate correctly failed them once, baselines updated with
+  this reason). ISSUES.md lines stay deferred to the landing commit (shared harness files do not
+  change on a feature branch); the proposed lines are in `out/gx-no-effect-triage.md`.
 
 ---
 
