@@ -9,6 +9,9 @@
 #   Next id = highest D number in this file and the archive + 1 (next: D174).
 
 ## Active
+- D176 2026-09-26 [tooling] pkmncards scraping: one query per trainer subtype merged by URL + balanced-span name extraction (`scripts/lib/pkmn-article-html.mjs`) — the comma-OR query drops rows (BLK 085) and the non-greedy span regex truncated `Fairy Charm {` / swallowed `60 HP`. (S325)
+- D175 2026-09-26 [rules] One-shot coin control: `withForcedCoinOnce` marks a shared `forcedCoinUsed` and releases to `forcedCoinParent`; `withForcedCoin` resets the one-shot fields — nulling `forcedCoin` shadowed Malamar's all-tails. (S325)
+- D174 2026-09-26 [rules] Rule-box attacker filters are clause-scoped any-of over "attacks from/of your opponent's", "by your opponent's", "by attacks from"; reminders never gate; VMAX/VSTAR match via card-classify name fallbacks — whole-text scans broke Pot Helmet and the Fairy Charms. (S325)
 - D173 2026-09-26 [harness] Effort ladder: high plan/debug/review, xhigh schema/netcode/engine design, medium patch, low pinned slice. `fx-designer` agent (high) carries the 041-046 FX house rules; rec-*.mjs scripts now tracked in fx-preview/rec/.
 - D172 2026-09-26 [harness] Judgment ends at the Work plan: every slice row is a pinned contract (files, signatures, input->expected tests, cited rulings; banned vague words); a build-time choice returns to design - lets slices run at low effort (D171).
 - D171 2026-09-26 [harness] Opus 5.5 `low` effort only for pinned-contract slice execution, via `.claude/agents/slice-builder.md` (`effort: low`); design/debug/review/rules stay `medium`+ - a session cannot lower its own effort.

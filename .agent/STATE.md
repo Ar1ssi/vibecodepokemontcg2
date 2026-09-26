@@ -3,11 +3,11 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: design 047 shipped — GX oracle audit + attack scaling/step fixes (D168/D169); agent effort ladder + slice-builder/fx-designer landed (D171–D173).
+Focus: S&M trainer audit fixes shipped (S1–S9 + two hostile-review rounds, commits 727d522d…977ca9b0); artifacts in .agent/scratch/sm-trainer-audit/ (report.md, implementation-plan.md).
 Active: none.
-Next: top of ISSUES.md (I180 first); GX backlog I184–I189 (detail: out/gx-no-effect-triage.md).
+Next: top of ISSUES.md (I191 first); S&M deferred clauses I190; GX backlog I184–I189 (detail: out/gx-no-effect-triage.md).
   User visual check pending: designs 042–046 FX on localhost.
-  Maintenance: DECISIONS/designs root over cap; ISSUES open at 76 vs 40 cap (maintain.md).
+  Maintenance: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.
 
 ## Watch-outs (≤5)

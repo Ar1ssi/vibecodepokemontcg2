@@ -6,12 +6,14 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I190). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I192). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I191 2026-09-26 P3 [tooling] The ability passive probe asks every reader with the plain opponent Active (V/VMAX/VSTAR sit on the Bench), so attacker rule-box filters read `unconsumed` although they work against a matching attacker (Dauntless Shield / Crystal Veil class) (refs: S325, scripts/lib/ability-passive-probe.mjs)
+- I190 2026-09-26 P3 [rules] Deferred S&M trainer clauses: Bellelba & Brycen-Man CEC 186 and Sabrina's Suggestion TEU 154 unrecognizable; Choose-1 second modes (Rescue Stretcher GRI 130, Energy Recycle System CES 128, Fossil Excavation Map FLI 107, Tate & Liza CES 148); Mallow & Lana CEC 198 optional discard+heal; Missing Clover UPR 129 4-card Prize mode; Cross Switcher BUS 115 2-card play gate (refs: .agent/scratch/sm-trainer-audit/report.md, S325)
 - I189 2026-09-26 P3 [rules] GX ability gaps from the design 047 audit: Silvally-GX Disk Reload (draw-until), Magcargo-GX Crushing Charge (discard top + conditional attach), Ampharos-GX Power Recharge (recover named cards) (refs: design 047 triage §10)
 - I188 2026-09-26 P3 [rules] GX attack recovery/copy gaps: Volcarona-GX Backfire (return attached Energy to hand), Zoroark-GX Trickster-GX (use an opponent attack) (refs: design 047 triage §8/§11)
 - I187 2026-09-26 P3 [rules] GX scaling residuals + anomaly: Mr. Mime-GX Breakdown, Slowpoke & Psyduck-GX Ditch and Splash, Alolan Raticate-GX Chuck Away, Jumping Balloon; Kaleidostorm emits pokemonKnockedOut on the fixture — investigate (refs: design 047 triage §7/§9)
