@@ -623,7 +623,19 @@ export function parseAbility(text = '') {
 
   // ── 5. Attach energy (FIXED: verb only, not "attached" describing state) ──
   // "Your opponent can't attach any Energy cards …" (Empoleon Emperor Aura) is a lock, not an attach.
-  if (hasVerbAttach(lower) && !/can(?:'|’|no)t attach/.test(lower) && !(
+  // Magcargo-GX Crushing Charge (design 048): "Discard the top card of your deck. If it's a
+  // basic Energy card, attach it to 1 of your Pokémon." is ONE mill-then-maybe-attach step; the
+  // generic attach branch below would drop the mill (and a source-less attach does not execute).
+  if (
+    /discard the top card of your deck/.test(lower) &&
+    /if it(?:'s| is) a basic energy card, attach it to 1 of your pok[eé]mon/.test(lower)
+  ) {
+    steps.push({
+      type: 'atkMillAttachIfEnergy',
+      guidance:
+        "Once during your turn: discard the top card of your deck and attach it if it's a Basic Energy card.",
+    });
+  } else if (hasVerbAttach(lower) && !/can(?:'|’|no)t attach/.test(lower) && !(
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     (lower.includes('to 1 of your') || lower.includes('to another') || lower.includes('to your active'))

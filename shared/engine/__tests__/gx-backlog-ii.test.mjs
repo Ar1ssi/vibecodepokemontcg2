@@ -23,6 +23,18 @@ const energyCard = (type, attachedTo = null) =>
     energyType: type,
     attachedTo,
   });
+// TCGdex stores the element in `types` and `energyType` as 'Normal'/'Special': the reader must
+// handle that production shape too (review of design 048).
+const tcgdexEnergy = (type, attachedTo = null) =>
+  createCard({
+    instanceId: nextId++,
+    name: `${type} Energy`,
+    supertype: 'Energy',
+    subtypes: ['Basic'],
+    energyType: 'Normal',
+    types: [type],
+    attachedTo,
+  });
 const atk = (name, damage, text, cost = []) => ({ name, cost, damage, text });
 
 function game(setup, { rulesEnabled = false } = {}) {
@@ -95,6 +107,18 @@ test('I187 parse: hand-discard scaling reads the discarded count', () => {
   assert.equal(chuck.total, 40);
 });
 
+test('I187 parse: a hand discard whose count is not this attack’s damage stays unparsed', () => {
+  // Unown ? Hidden Power draws instead of scaling damage; executing only the discard would be
+  // a wrong partial effect (design 048 review).
+  const text = 'Discard up to 2 cards from your hand. For each card you discarded, draw a card.';
+  assert.deepEqual(parseAttackSteps(text).after, []);
+  // The "discard your hand" form has no upTo/kind, so it still parses on its own.
+  assert.deepEqual(parseAttackSteps('Discard your hand. Draw 4 cards.').after[0], {
+    type: 'atkDiscardOwnHand',
+    count: 'all',
+  });
+});
+
 test('I187 parse: Breakdown is a per-opponent-hand counter step', () => {
   const parsed = parseAttackSteps(BREAKDOWN);
   assert.deepEqual(parsed.after, [
@@ -137,6 +161,15 @@ test('I187 board: Breakdown places one counter per card in the opponent hand', (
   });
   const res = runAttack(state);
   assert.equal(activeRoot(res.state, 'p2').damage, 40);
+});
+
+test('I187 board: Breakdown with an empty opponent hand places no counters', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Mr. Mime-GX', { hp: 200, attacks: [atk('Breakdown', 0, BREAKDOWN)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  assert.equal(activeRoot(res.state, 'p2').damage, 0);
 });
 
 test('I187 board: Ditch and Splash scales with the discarded Supporters', () => {
@@ -264,6 +297,18 @@ test('I186 board: Breeze Away-GX returns chosen own Pokémon to hand', () => {
   assert.equal(benchRoots(res.state, 'p1').length, 0);
   assert.equal(activeRoot(res.state, 'p1').name, 'Virizion-GX');
   assert.ok(res.state.players.p1.zones.hand.some((c) => c.name === 'Bench A'));
+});
+
+test('I186 board: Breeze Away-GX may return zero Pokémon', () => {
+  const state = game((s, p1, p2) => {
+    const attacker = mon('Virizion-GX', { hp: 200, attacks: [atk('Breeze Away-GX', 0, BREEZE_AWAY)] });
+    p1.zones.active.push(attacker);
+    p1.zones.bench.push(mon('Bench A'));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state, { selectionFor: () => [] });
+  assert.equal(activeRoot(res.state, 'p1').name, 'Virizion-GX');
+  assert.equal(benchRoots(res.state, 'p1').length, 1, 'nothing chosen, nothing moved');
 });
 
 test('I186 board: Eternal Flame-GX benches only {R} Pokémon-GX/-EX from the discard', () => {
@@ -516,6 +561,54 @@ test('I185 board: discarding the opponent last Pokémon wins the game', () => {
   assert.equal(res.state.winReason, 'no Pokémon in play');
 });
 
+test('I185 board: Burst-GX discards a Prize, and attaches it when it is an Energy card', () => {
+  const BURST = "Discard 1 of your Prize cards. If it's an Energy card, attach it to 1 of your Pokémon.";
+  const withEnergy = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Blacephalon-GX', { hp: 200, attacks: [atk('Burst-GX', 0, BURST)] }));
+    p1.zones.prizes[0] = energyCard('Fire');
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const runner = (state) =>
+    runAttack(state, {
+      selectionFor: (pc) => pc.options.slice(0, pc.min || 1).map((o) => o.instanceId),
+    });
+  const res = runner(withEnergy);
+  assert.equal(res.state.players.p1.zones.prizes.length, 5, 'the Prize was discarded/attached');
+  const attached = res.state.players.p1.zones.active.filter((c) => c.attachedTo != null);
+  assert.equal(attached.length, 1, 'the Energy Prize was attached, not discarded');
+  assert.equal(attached[0].name, 'Basic Fire Energy');
+  assert.equal(res.state.players.p1.zones.discard.length, 0);
+
+  const plain = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Blacephalon-GX', { hp: 200, attacks: [atk('Burst-GX', 0, BURST)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res2 = runner(plain);
+  assert.equal(res2.state.players.p1.zones.prizes.length, 5);
+  assert.equal(res2.state.players.p1.zones.discard.length, 1, 'a non-Energy Prize is discarded');
+  assert.equal(res2.state.players.p1.zones.active.filter((c) => c.attachedTo != null).length, 0);
+});
+
+test('I184 board: Dark Moon-GX Knocks Out only with 5 extra Darkness Energy', () => {
+  const DARK_MOON =
+    "Your opponent can't play any Trainer cards from their hand during their next turn. If this Pokémon has at least 5 extra {D} Energy attached to it (in addition to this attack's cost), your opponent's Active Pokémon is Knocked Out.";
+  const make = (energies) =>
+    game((s, p1, p2) => {
+      const attacker = mon('Umbreon & Darkrai-GX', {
+        hp: 200,
+        attacks: [atk('Dark Moon-GX', 0, DARK_MOON, ['Darkness'])],
+      });
+      p1.zones.active.push(attacker);
+      for (let i = 0; i < energies; i++) p1.zones.active.push(energyCard('Darkness', attacker.instanceId));
+      p2.zones.active.push(mon('Defender', { hp: 300 }));
+      p2.zones.bench.push(mon('Backup'));
+    });
+  const withEnergy = runAttack(make(6));
+  assert.ok(eventTypes(withEnergy).has('pokemonKnockedOut'), '6 Darkness vs a 1-Darkness cost');
+  const without = runAttack(make(1));
+  assert.ok(!eventTypes(without).has('pokemonKnockedOut'));
+});
+
 test('I185 board: Pale Moon-GX Knocks Out the Defending Pokémon at the end of the next turn', () => {
   const state = game((s, p1, p2) => {
     p1.zones.active.push(mon('Trevenant & Dusknoir-GX', { hp: 200, attacks: [atk('Pale Moon-GX', 0, PALE_MOON)] }));
@@ -568,6 +661,16 @@ test('I184 board: Timeless-GX takes another turn and skips the Checkup', () => {
   assert.equal(res.state.players.p1.zones.hand.length, 1, 'the extra turn draws');
   assert.equal(activeRoot(res.state, 'p2').damage, 150, 'only the attack damage — no poison tick');
   assert.ok(eventTypes(res).has('extraTurnGranted'));
+});
+
+test('I184 board: an extra-turn attack that ends the game starts no further turn', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Dialga-GX', { hp: 200, attacks: [atk('Timeless-GX', 200, TIMELESS)] }));
+    p2.zones.active.push(mon('Last Pokémon', { hp: 100 }));
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.turn.phase, 'ended');
+  assert.equal(res.state.winner, 'p1');
 });
 
 test('I184 board: Distort locks Items (not Supporters) for the opponent next turn', () => {
@@ -681,7 +784,7 @@ test('I184 board: Supreme Puff-GX takes another turn and the 14 extra Energy shu
       ],
     });
     p1.zones.active.push(attacker);
-    for (let i = 0; i < 15; i++) p1.zones.active.push(energyCard('Fairy', attacker.instanceId));
+    for (let i = 0; i < 15; i++) p1.zones.active.push(tcgdexEnergy('Fairy', attacker.instanceId));
     p2.zones.active.push(mon('Defender', { hp: 300 }));
     p2.zones.bench.push(mon('Bench A'), mon('Bench B'));
   });

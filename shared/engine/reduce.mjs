@@ -2300,6 +2300,8 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
   const prizes = player.zones.prizes;
   const actualCount = Math.min(owed, prizes.length);
   const taken = prizes.splice(0, actualCount);
+  // A face-up Prize (Blaster-GX) stops being face up once it leaves the Prize zone.
+  for (const card of taken) delete card.revealed;
   player.zones.hand.push(...taken);
   // Drop the key rather than leaving a zeroed one behind, so a fully settled state
   // is byte-identical to one that never saw a Knockout (views and the state hash
@@ -2510,6 +2512,7 @@ function resolvePrizeChoice(draft, { playerId, selection, events }) {
   player.zones.prizes = prizes.filter(
     (card) => !chosenIds.has(card.instanceId)
   );
+  for (const card of taken) delete card.revealed;
   player.zones.hand.push(...taken);
   consumePrizeEntitlement(player, taken.length);
   draft.pendingChoice = null;

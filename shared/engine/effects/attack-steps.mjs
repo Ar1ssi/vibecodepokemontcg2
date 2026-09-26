@@ -99,8 +99,17 @@ const ENERGY_LETTER_WORDS = {
 function energyTypeMatches(card, letter) {
   const wanted = ENERGY_LETTER_WORDS[String(letter || '').toUpperCase()];
   if (!wanted) return false;
-  const raw = String(card?.energyType || String(card?.name || '').replace(/\s*Energy.*/i, '')).toLowerCase();
-  return (raw === 'dark' ? 'darkness' : raw) === wanted;
+  // TCGdex stores `energyType` as 'Normal'/'Special' and the element in `types`; the engine's
+  // own fixtures use the element directly. Check the element sources, then the printed name.
+  const candidates = [
+    card?.energyType,
+    ...(Array.isArray(card?.types) ? card.types : []),
+    String(card?.name || '').replace(/\s*Energy.*/i, ''),
+  ];
+  return candidates.some((value) => {
+    const raw = String(value || '').toLowerCase();
+    return (raw === 'dark' ? 'darkness' : raw) === wanted;
+  });
 }
 
 function energyMatches(card, step) {
@@ -1431,6 +1440,7 @@ function atkCountersEach(ctx) {
   const amount = step.perOpponentHand
     ? (opponent.zones.hand || []).length * (step.count || 1)
     : step.count || 1;
+  if (amount <= 0) return skip(ctx, 'no_counters');
   for (const card of targets) placeCounters(ctx, card, opponent.playerId, amount * 10);
   return null;
 }
@@ -1911,6 +1921,8 @@ function atkPrizeDiscovery(ctx) {
   const taken = [];
   for (const card of prizes.splice(0, prizes.length)) {
     card.attachedTo = null;
+    // Face-up Prizes lose that state once they leave the Prize zone (view redaction).
+    delete card.revealed;
     player.zones.hand.push(card);
     taken.push({ instanceId: card.instanceId });
     ctx.events.push({
@@ -1923,6 +1935,7 @@ function atkPrizeDiscovery(ctx) {
   }
   ctx.events.push({ type: 'prizesTaken', playerId: player.playerId, count, cards: taken });
   for (const card of deck.splice(0, count)) {
+    delete card.revealed;
     player.zones.prizes.push(card);
     ctx.events.push({
       type: 'cardMoved',
@@ -1942,9 +1955,11 @@ function atkShufflePrizesAndRedraw(ctx) {
   const count = step.count || 3;
   for (const owner of [player, opponent].filter(Boolean)) {
     const prizes = owner.zones.prizes || [];
+    for (const card of prizes) delete card.revealed;
     owner.zones.deck.push(...prizes.splice(0, prizes.length));
     shuffleInPlace(ctx.activeRng, owner.zones.deck);
     const taken = owner.zones.deck.splice(0, Math.min(count, owner.zones.deck.length));
+    for (const card of taken) delete card.revealed;
     owner.zones.prizes.push(...taken);
     ctx.events.push({ type: 'deckShuffled', playerId: owner.playerId });
     ctx.events.push({ type: 'prizesRedrawn', playerId: owner.playerId, count: taken.length });
@@ -1962,28 +1977,28 @@ function atkDiscardPrize(ctx) {
     if (!card) return skip(ctx, 'target_not_found');
     const target = targets.find((c) => c.instanceId === ctx.selection?.[0]);
     removeFromZones(player, card);
+    delete card.revealed;
     if (target) attachTo(player, card, target, ctx.events);
     else discardCardToPlayerZone(player, card);
     return null;
   }
   const finish = (card) => {
-    removeFromZones(player, card);
     const attachable = step.attachIfEnergy && isEnergy(card);
-    if (!attachable || targets.length === 0) {
-      discardCardToPlayerZone(player, card);
-      return null;
+    if (attachable && targets.length > 1) {
+      // Ask before removing: the card stays in the Prizes until the choice resolves.
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Attach the Prize card to which Pokémon?`,
+        options: targets,
+        min: 1,
+        max: 1,
+        memo: { cardId: card.instanceId },
+      });
     }
-    if (targets.length === 1) {
-      attachTo(player, card, targets[0], ctx.events);
-      return null;
-    }
-    return ctx.ask({
-      prompt: `${attackName(ctx)}: Attach the Prize card to which Pokémon?`,
-      options: targets,
-      min: 1,
-      max: 1,
-      memo: { cardId: card.instanceId },
-    });
+    removeFromZones(player, card);
+    delete card.revealed;
+    if (attachable && targets.length === 1) attachTo(player, card, targets[0], ctx.events);
+    else discardCardToPlayerZone(player, card);
+    return null;
   };
   if (ctx.selection) {
     const card = prizes.find((c) => c.instanceId === ctx.selection[0]);
@@ -2179,9 +2194,12 @@ function atkBounceOwnInPlay(ctx) {
 function atkOppPlayLock(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const untilTurn = (ctx.draft.turn?.number || 1) + 1;
+  const turn = ctx.draft.turn?.number || 1;
+  const untilTurn = turn + 1;
   const kinds = step.kinds || ['any'];
-  opponent.playLocks = [...(opponent.playLocks || []), { untilTurn, kinds }];
+  // Replace the array (clone-safe) and drop entries that already expired.
+  const live = (opponent.playLocks || []).filter((lock) => (lock.untilTurn || 0) >= turn);
+  opponent.playLocks = [...live, { untilTurn, kinds }];
   ctx.events.push({ type: 'playLockApplied', playerId: opponent.playerId, kinds, untilTurn });
   return null;
 }

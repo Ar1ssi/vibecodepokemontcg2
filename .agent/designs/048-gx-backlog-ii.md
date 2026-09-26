@@ -128,20 +128,20 @@ these changes."
 
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | extra-energy clause unmet / attacker out of play | gate fails closed; the gated step (KO/marker/attach/prize) is skipped | [ ] unit |
-| 2 | extra-energy clause on a card whose attack cost is unknown | cost 0 counted, requirement still enforced | [ ] unit |
-| 3 | play lock expires (current turn > untilTurn) | no block on later turns; array replaced not mutated | [ ] unit |
-| 4 | "can't play any cards" vs Basic Energy attach, Basic play, Trainer play | all three blocked while locked; non-hand actions unaffected | [ ] unit |
-| 5 | extra turn when the attack ended the game | no extra `turnStarted`; game end wins | [ ] unit |
-| 6 | extra turn skips between-turns (no Poison/Burn tick, no deferred KO) | checkup not called; turn number +1, same player, draw 1 | [ ] unit |
-| 7 | bounce of the last opponent's Pokémon / own Active | opponent promotes; own Active settles via `settleVacatedActive` (game end if no bench) | [ ] unit |
-| 8 | discard-vs-KO (GG End/Big Throw) | cards to discard, no `pokemonKnockedOut`, no prizes | [ ] unit |
-| 9 | Stinger/Discovery with fewer deck cards than Prizes | Discovery does nothing (printed); Stinger takes what exists | [ ] unit |
-| 10 | face-up Prizes survive turns | `card.revealed` is a card field, view exposes it | [ ] unit |
-| 11 | mill-attach on a non-Energy top card | card discarded, no attach | [ ] unit |
-| 12 | Break-down/School Storm counts on an empty opponent hand | 0 counters, no NaN/negative | [ ] unit |
-| 13 | Kaleidostorm on a full board | 150 damage (no fabricated ×Energy), move-energy still runs | [ ] probe/test |
-| 14 | name recovery ("Electropower") case-insensitively matches | all matching cards to hand; no other card taken | [ ] unit |
+| 1 | extra-energy clause unmet / attacker out of play | gate fails closed; the gated step (KO/marker/attach/prize) is skipped | [x] Dark Moon/Supreme Puff/Chaotic tests |
+| 2 | extra-energy clause on a card whose attack cost is unknown | the requirement is measured against cost 0; real steps always carry the attack being used | [x] handler invariant (step.attackName is the resolving attack) |
+| 3 | play lock expires (current turn > untilTurn) | no block on later turns; array replaced not mutated | [x] Distort/Iron Rule expiry assertions |
+| 4 | "can't play any cards" vs Basic Energy attach, Basic play, Trainer play | all three blocked while locked; non-hand actions unaffected | [x] Heavy Rock test |
+| 5 | extra turn when the attack ended the game | no extra `turnStarted`; game end wins | [x] Timeless KO test |
+| 6 | extra turn skips between-turns (no Poison/Burn tick, no deferred KO) | checkup not called; turn number +1, same player, draw 1 | [x] Timeless poison test |
+| 7 | bounce of the last opponent's Pokémon / own Active | opponent promotes; own Active settles via `settleVacatedActive` (game end if no bench) | [x] Big Throw wipe test + existing settle path |
+| 8 | discard-vs-KO (GG End/Big Throw) | cards to discard, no `pokemonKnockedOut`, no prizes | [x] GG End / Big Throw tests |
+| 9 | Stinger/Discovery with fewer deck cards than Prizes | Discovery does nothing (printed); Stinger takes what exists | [x] Discovery short-deck test |
+| 10 | face-up Prizes survive turns | `card.revealed` is a card field, view exposes it; cleared when the card leaves the Prize zone | [x] Blaster test + take-clears in reduce/handlers |
+| 11 | mill-attach on a non-Energy top card | card discarded, no attach | [x] Crushing Charge non-Energy test |
+| 12 | Breakdown/School Storm counts on an empty opponent hand | 0 counters, no NaN/negative | [x] Breakdown empty-hand test |
+| 13 | Kaleidostorm on a full board | 150 damage (no fabricated ×Energy), move-energy still runs | [x] probe + board test |
+| 14 | name recovery ("Electropower") case-insensitively matches | all matching cards to hand; no other card taken | [x] Power Recharge test |
 
 ## Test plan
 
@@ -173,4 +173,37 @@ these changes."
 | 7 | harness only | — | run full `pnpm test`, all four audits, fix baseline diffs in their own commit | — | all gates green; acceptance table answered |
 
 ## Deviations (Builder appends here during build)
+
+- Kaleidostorm anomaly root cause: `damage-parser.mjs`'s legacy `/number of energy/` fallback
+  multiplied the printed 150 by the attached count because the move clause says "any number of
+  Energy". Fixed by requiring a sentence that pairs damage with the energy phrase; the oracle
+  row is now dealt 150. The move itself was always executing (the oracle's 12-choice cap and
+  the auto-picker bouncing Energy back made the net snapshot look unchanged — harness artifact,
+  not engine).
+- Clear Vision-GX (`gxLock`) and Pale Moon-GX (`deferredKnockOut`) were already parsed,
+  enforced and unit-covered; I184/I185's audit rows were fixture-limited, so they got
+  regression tests instead of engine changes.
+- Trickster-GX / Disk Reload likewise already worked; their GX rows are empty because the audit
+  fixture's defender has no attacks and its hand is exactly 5. Verified on real boards.
+- Extra-energy prefix: written as a generic sentence gate (one or two typed requirements),
+  consumed by `atkKnockOut`, `atkKnockOutChoose`-adjacent paths, `atkTakePrize`,
+  `atkAddMarker`, `atkBothDrawUntil`, `atkShuffleOppAllBench`, `atkBenchFromDiscard`.
+- `energyMatches` gained an element-word fallback: the shared display map deliberately omits
+  `{N}`/`{Y}`, so any typed step naming Dragon/Fairy matched nothing before (latent bug found
+  while wiring Horror House). The boost is now shared by every typed step.
+- Hostile review (fresh-context agent, review.md) fixed before landing:
+  the ability fallback was narrowed from "any source-less attach" to an `abilities.mjs` branch
+  for Crushing Charge's exact mill-then-attach wording (Teal Dance/Energy Rain/etc. regressed
+  under the broad condition); `atkDiscardPrize` no longer removes the Prize before asking for
+  the attach target (card loss); `energyTypeMatches` reads TCGdex `types`/`Normal` shape;
+  "discard up to N cards from hand" is suppressed unless the attack's damage counts it (Unown ?
+  partial effect); Breeze Away can choose zero; play locks prune expired entries; face-up
+  Prizes clear `revealed` when they leave the Prize zone. Added Burst-GX, Dark Moon, empty-hand
+  Breakdown, extra-turn-game-end, zero-choice and TCGdex-shape tests. `settleWipedSides` may end
+  the game while an attack step still holds a pending choice — left as-is: a wiped side ends the
+  game by rule, and no step refills a board (noted, not a defect).
+- Oracle numbers after review fixes (8 seeds): full `pnpm audit:oracle` PASSED; GX scope
+  executed 1175/1723, GX attacks 485/604 (was 390/604 at design start), 0 engine errors.
+  All four audits (`oracle`, `abilities`, `attack`, `trainer`) PASS; full `pnpm test`
+  4391 pass / 0 fail / 3 skipped.
 

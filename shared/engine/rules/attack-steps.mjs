@@ -636,10 +636,10 @@ const TEMPLATES = [
     /^put (a|an|\d+) of your opponent's benched pokémon and all cards attached to (?:it|them) into your opponent's hand$/,
     (m) => ({ type: 'atkBounceOppBench', count: countOf(m[1]) }),
   ],
-  // Virizion-GX Breeze Away-GX: your own in-play Pokémon back to your hand.
+  // Virizion-GX Breeze Away-GX: your own in-play Pokémon back to your hand ("any number").
   [
     /^put any number of your pokémon in play and all cards attached to them into your hand$/,
-    () => ({ type: 'atkBounceOwnInPlay' }),
+    () => ({ type: 'atkBounceOwnInPlay', anyNumber: true }),
   ],
 
   // Volcarona-GX Backfire (design 048): attached Energy back to the attacker's hand.
@@ -1312,6 +1312,14 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
 
   // Plain mill only when the damage parser does not already mill for scaling.
   const millHandled = Boolean(deckMillScaling(text));
+  // A hand discard whose count this attack's damage reads ("… for each card you discarded in
+  // this way"): Ditch and Splash / Chuck Away. Needed both for the before-damage move and to
+  // suppress a same-wording discard whose count something else uses (Unown ? Hidden Power
+  // draws instead — design 048 review).
+  const handScaled =
+    /(?:if you do|if you discarded [^,]* in this way), this attack does/.test(normalized) ||
+    /this attack does \d+ damage for each card you discarded in this way/.test(normalized) ||
+    /for each card you discarded in this way, this attack does/.test(normalized);
   // A gated self discard runs as a step unless the damage counts it (Raikou Lightning
   // Sphere) or the printed cost can cancel the attack (Charizard Blast Burn): neither is
   // modelled, and a partial effect is worse than none.
@@ -1350,6 +1358,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       if (!step) break;
       if (step.type === 'atkMill' && millHandled) break;
       if (step.type === 'atkDiscardSelfEnergy' && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
+      if (step.type === 'atkDiscardOwnHand' && (step.upTo || step.what) && !handScaled) break;
       const { before, ...stepFlags } = flags;
       const { beforeDamage, ...built } = step;
       (before || beforeDamage ? result.before : result.after).push({ ...built, ...stepFlags });
@@ -1370,12 +1379,6 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
   // without the cards (D114). A discard the damage counts ("If you do, this attack does 70 more
   // damage") also runs first, and the reducer counts it.
   const handCost = /if you (?:can't|don't)[^.]*this attack does nothing/.test(normalizeAttackText(text, selfName));
-  const handScaled =
-    /(?:if you do|if you discarded [^,]* in this way), this attack does/.test(normalized) ||
-    // Ditch and Splash / Chuck Away print the scaling first: "… for each card you discarded in
-    // this way" is the damage count, so the discard runs before damage and is counted (048).
-    /this attack does \d+ damage for each card you discarded in this way/.test(normalized) ||
-    /for each card you discarded in this way, this attack does/.test(normalized);
   if (handCost || handScaled) {
     const costs = result.after.filter((step) => HAND_COST_TYPES.has(step.type));
     result.after = result.after.filter((step) => !costs.includes(step));

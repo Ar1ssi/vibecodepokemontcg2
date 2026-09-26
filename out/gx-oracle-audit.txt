@@ -6,7 +6,7 @@ blind = family whose state change the oracle cannot see on these cards (marker/p
 Entries: 1723 — 1481 attacks (604 GX) / 242 abilities
 executed 1175 / blind 236 / passive 52 / no-effect 260 / engine-error 0
 GX attacks: executed 485/604, blind 6, no-effect 113, engine-error 0
-Run: 24s
+Run: 29s
 
 ## By family
 - attack:next-turn-lock: 208/283 (73%)
@@ -830,10 +830,10 @@ Run: 24s
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #205] Magical Miracle-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #204] Magical Miracle-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #130] Magical Miracle-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
-- [ability] Gardevoir-GX [Burning Shadows #SV75] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy}
-- [ability] Gardevoir-GX [Burning Shadows #159] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy}
-- [ability] Gardevoir-GX [Burning Shadows #140] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy}
-- [ability] Gardevoir-GX [Burning Shadows #93] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy}
+- [ability] Gardevoir-GX [Burning Shadows #SV75] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy_or_target}
+- [ability] Gardevoir-GX [Burning Shadows #159] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy_or_target}
+- [ability] Gardevoir-GX [Burning Shadows #140] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy_or_target}
+- [ability] Gardevoir-GX [Burning Shadows #93] Secret Spring (attach) → executed [attachAbility] {skipped:no_energy_or_target}
 - [attack] Gardevoir-GX [Burning Shadows #SV75] Infinite Force (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] Gardevoir-GX [Burning Shadows #159] Infinite Force (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] Gardevoir-GX [Burning Shadows #140] Infinite Force (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
@@ -1203,9 +1203,9 @@ Run: 24s
 - [attack] [GX] Machamp-GX [Burning Shadows #154] Muscle Punch-GX (next-turn-lock) → no-effect Δ180 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Machamp-GX [Burning Shadows #135] Muscle Punch-GX (next-turn-lock) → no-effect Δ180 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Machamp-GX [Burning Shadows #64] Muscle Punch-GX (next-turn-lock) → no-effect Δ180 {opp:active+dmg,opp:deck->hand}
-- [ability] Magcargo-GX [Lost Thunder #218] Crushing Charge (attach) → executed [attachAbility] {ability-used,own:deck->attached,own:deck->discard}
-- [ability] Magcargo-GX [Lost Thunder #198] Crushing Charge (attach) → executed [attachAbility] {ability-used,own:deck->attached,own:deck->discard}
-- [ability] Magcargo-GX [Lost Thunder #44] Crushing Charge (attach) → executed [attachAbility] {ability-used,own:deck->attached,own:deck->discard}
+- [ability] Magcargo-GX [Lost Thunder #218] Crushing Charge (attach) → executed [atkMillAttachIfEnergy] {ability-used,own:deck->attached,own:deck->discard}
+- [ability] Magcargo-GX [Lost Thunder #198] Crushing Charge (attach) → executed [atkMillAttachIfEnergy] {ability-used,own:deck->attached,own:deck->discard}
+- [ability] Magcargo-GX [Lost Thunder #44] Crushing Charge (attach) → executed [atkMillAttachIfEnergy] {ability-used,own:deck->attached,own:deck->discard}
 - [attack] [GX] Magcargo-GX [Lost Thunder #218] Burning Magma-GX (next-turn-lock) → executed {opp:deck->discard,opp:deck->hand}
 - [attack] [GX] Magcargo-GX [Lost Thunder #198] Burning Magma-GX (next-turn-lock) → executed {opp:deck->discard,opp:deck->hand}
 - [attack] [GX] Magcargo-GX [Lost Thunder #44] Burning Magma-GX (next-turn-lock) → executed {opp:deck->discard,opp:deck->hand}
