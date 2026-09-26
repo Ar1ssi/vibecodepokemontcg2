@@ -37,13 +37,15 @@ function game(setup) {
   return state;
 }
 
-function runAttack(state, { attackIndex = 0, selectionFor = () => [] } = {}) {
+function runAttack(state, { attackIndex = 0, selectionFor } = {}) {
+  const pick = selectionFor || ((pc) => pc.options.slice(0, Math.max(pc.min || 0, 1)).map((o) => o.instanceId));
   let res = applyCommand(
     state,
     { type: 'attack', playerId: 'p1', payload: { attackIndex } },
     createRng(7)
   );
   assert.equal(res.error, null, res.reason);
+  const events = [...(res.events || [])];
   let guard = 0;
   while (res.state.pendingChoice && guard++ < 12) {
     const pc = res.state.pendingChoice;
@@ -52,13 +54,14 @@ function runAttack(state, { attackIndex = 0, selectionFor = () => [] } = {}) {
       {
         type: 'resolveChoice',
         playerId: pc.player,
-        payload: { choiceId: pc.choiceId, selection: selectionFor(pc) },
+        payload: { choiceId: pc.choiceId, selection: pick(pc) },
       },
       createRng(7 + guard)
     );
     assert.equal(res.error, null, res.reason);
+    events.push(...(res.events || []));
   }
-  return res;
+  return { ...res, events };
 }
 
 const eventTypes = (res) => new Set((res.events || []).map((e) => e.type));
@@ -313,7 +316,221 @@ test('I186 board: Massive Catch-GX benches Basic Pokémon from the top 12', () =
 
 // ── I185: KO / prize gaps ───────────────────────────────────────────────────
 
-test('placeholder I185', () => {});
+const SILVER_KNIGHT = "If your opponent's Active Pokémon is an Ultra Beast, it is Knocked Out.";
+const LUNAR_FALL = "Knock Out 1 of your opponent's Basic Pokémon that isn't a Pokémon-GX.";
+const GG_END =
+  "Discard 1 of your opponent's Pokémon and all cards attached to it. If this Pokémon has at least 3 extra {F} Energy attached to it (in addition to this attack's cost), discard 2 of your opponent's Pokémon instead.";
+const BIG_THROW = "Discard your opponent's Active Pokémon and all cards attached to it.";
+const SYMBIONT = "Add the top 2 cards of your opponent's deck to their Prize cards.";
+const INJECTION = "Add a card from your opponent's discard pile to their Prize cards face down.";
+const STINGER =
+  'Both players shuffle their Prize cards into their decks. Then, each player puts the top 3 cards of their deck face down as their Prize cards.';
+const BLASTER = 'Turn all of your Prize cards face up. (Those Prize cards remain face up for the rest of the game.)';
+const DISCOVERY =
+  "Count your Prize cards and put them into your hand. Then, take that many cards from the top of your deck and put them face down as your Prize cards. If you don't have that many cards in your deck, this attack does nothing.";
+const CHAOTIC_ORDER =
+  'Turn all of your Prize cards face up. (Those Prize cards remain face up for the rest of the game.) If this Pokémon has at least 1 extra {P} Energy and 1 extra {D} Energy attached to it (in addition to this attack\'s cost), take 2 Prize cards.';
+const PALE_MOON =
+  "At the end of your opponent's next turn, the Defending Pokémon will be Knocked Out. If this Pokémon has at least 1 extra {P} Energy attached to it (in addition to this attack's cost), discard all Energy from your opponent's Active Pokémon.";
+
+test('I185 board: Silver Knight-GX Knocks Out an Ultra Beast Active', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Silvally-GX', { hp: 200, attacks: [atk('Silver Knight-GX', 0, SILVER_KNIGHT)] }));
+    p2.zones.active.push(mon('Nihilego-GX', { hp: 300 }));
+    p2.zones.bench.push(mon('Backup'));
+  });
+  const res = runAttack(state);
+  assert.ok(eventTypes(res).has('pokemonKnockedOut'));
+  assert.equal(activeRoot(res.state, 'p2').name, 'Backup', 'promoted after the KO');
+});
+
+test('I185 board: Silver Knight-GX leaves a non-Ultra-Beast Active alone', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Silvally-GX', { hp: 200, attacks: [atk('Silver Knight-GX', 0, SILVER_KNIGHT)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  assert.ok(!eventTypes(res).has('pokemonKnockedOut'));
+});
+
+test('I185 board: Lunar Fall-GX Knocks Out a Basic non-GX', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Lunala-GX', { hp: 200, attacks: [atk('Lunar Fall-GX', 0, LUNAR_FALL)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  assert.ok(eventTypes(res).has('pokemonKnockedOut'));
+});
+
+test('I185 board: GG End-GX discards instead of Knocking Out, and 3 extra Energy discard 2', () => {
+  const state = game((s, p1, p2) => {
+    const attacker = mon('Garchomp & Giratina-GX', {
+      hp: 200,
+      attacks: [atk('GG End-GX', 0, GG_END, ['Fighting'])],
+    });
+    p1.zones.active.push(
+      attacker,
+      energyCard('Fighting', attacker.instanceId),
+      energyCard('Fighting', attacker.instanceId),
+      energyCard('Fighting', attacker.instanceId),
+      energyCard('Fighting', attacker.instanceId)
+    );
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p2.zones.bench.push(mon('Bench A'), mon('Bench B'));
+  });
+  const res = runAttack(state, {
+    selectionFor: (pc) =>
+      pc.prompt.includes('discard')
+        ? pc.options.slice(0, pc.min || 1).map((o) => o.instanceId)
+        : pc.options.slice(0, Math.max(pc.min || 0, 1)).map((o) => o.instanceId),
+  });
+  assert.ok(!eventTypes(res).has('pokemonKnockedOut'), 'discard is not a Knock Out');
+  const discardedEvents = res.events.filter(
+    (e) => e.type === 'cardsDiscarded' && e.reason === 'attack-discard'
+  );
+  assert.equal(discardedEvents.length, 2, '4 Fighting Energy vs a 1-Energy cost = 3 extra');
+  assert.equal(res.state.players.p1.flags.prizesOwed || 0, 0, 'no Prizes from a discard');
+});
+
+test('I185 board: Big Throw-GX discards the opponent Active and its attachments', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Bewear-GX', { hp: 200, attacks: [atk('Big Throw-GX', 0, BIG_THROW)] }));
+    const active = mon('Defender', { hp: 300 });
+    p2.zones.active.push(active, energyCard('Water', active.instanceId));
+    p2.zones.bench.push(mon('Backup'));
+  });
+  const res = runAttack(state);
+  assert.ok(!eventTypes(res).has('pokemonKnockedOut'));
+  assert.equal(activeRoot(res.state, 'p2').name, 'Backup');
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.name === 'Defender'));
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.name === 'Basic Water Energy'));
+});
+
+test('I185 board: Symbiont-GX adds the top 2 opponent deck cards to their Prizes', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Nihilego-GX', { hp: 200, attacks: [atk('Symbiont-GX', 0, SYMBIONT)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const before = state.players.p2.zones.deck.length;
+  const res = runAttack(state);
+  assert.equal(res.state.players.p2.zones.prizes.length, 8);
+  const moved = res.events.filter((e) => e.type === 'cardMoved' && e.to === 'prizes');
+  assert.equal(moved.length, 2);
+  assert.equal(res.state.players.p2.zones.deck.length, before - 3, '2 to Prizes + the turn-start draw');
+});
+
+test('I185 board: Injection-GX adds a discard card to the opponent Prizes', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Naganadel-GX', { hp: 200, attacks: [atk('Injection-GX', 0, INJECTION)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p2.zones.discard.push(supporter('Lost card'));
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.players.p2.zones.prizes.length, 7);
+  assert.ok(res.state.players.p2.zones.prizes.some((c) => c.name === 'Lost card'));
+});
+
+test('I185 board: Stinger-GX resets both sides to 3 fresh Prizes', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Naganadel-GX', { hp: 200, attacks: [atk('Stinger-GX', 0, STINGER)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.players.p1.zones.prizes.length, 3);
+  assert.equal(res.state.players.p2.zones.prizes.length, 3);
+  assert.ok(res.state.players.p1.zones.prizes.every((c) => !c.revealed));
+});
+
+test('I185 board: Blaster-GX turns all Prizes face up for the rest of the game', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Celesteela-GX', { hp: 200, attacks: [atk('Blaster-GX', 0, BLASTER)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.players.p1.zones.prizes.filter((c) => c.revealed).length, 6);
+});
+
+test('I185 board: Discovery-GX swaps the Prizes for the same count from the deck', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Celesteela-GX', { hp: 200, attacks: [atk('Discovery-GX', 0, DISCOVERY)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const deckBefore = state.players.p1.zones.deck.length;
+  const res = runAttack(state);
+  assert.equal(res.state.players.p1.zones.hand.length, 6, 'the 6 Prizes went to hand');
+  assert.equal(res.state.players.p1.zones.prizes.length, 6);
+  assert.equal(res.state.players.p1.zones.deck.length, deckBefore - 6);
+});
+
+test('I185 board: Discovery-GX does nothing when the deck is shorter than the Prizes', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Celesteela-GX', { hp: 200, attacks: [atk('Discovery-GX', 0, DISCOVERY)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p1.zones.deck.length = 3;
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.players.p1.zones.prizes.length, 6);
+  assert.equal(res.state.players.p1.zones.hand.length, 0, 'the effect does nothing');
+});
+
+test('I185 board: Chaotic Order-GX reveals Prizes and takes 2 only with the extra Energy', () => {
+  const withEnergy = game((s, p1, p2) => {
+    const attacker = mon('Naganadel & Guzzlord-GX', {
+      hp: 200,
+      attacks: [atk('Chaotic Order-GX', 0, CHAOTIC_ORDER, ['Colorless'])],
+    });
+    p1.zones.active.push(
+      attacker,
+      energyCard('Psychic', attacker.instanceId),
+      energyCard('Darkness', attacker.instanceId)
+    );
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(withEnergy, {
+    selectionFor: (pc) => pc.options.slice(0, pc.min || 1).map((o) => o.instanceId),
+  });
+  assert.equal(res.state.players.p1.zones.prizes.length, 4, '2 of the 6 Prizes were taken');
+  assert.ok(res.state.players.p1.zones.prizes.every((c) => c.revealed));
+  assert.ok(res.state.players.p1.zones.hand.length >= 2, '2 Prize cards taken');
+
+  const without = game((s, p1, p2) => {
+    const attacker = mon('Naganadel & Guzzlord-GX', {
+      hp: 200,
+      attacks: [atk('Chaotic Order-GX', 0, CHAOTIC_ORDER, ['Colorless'])],
+    });
+    p1.zones.active.push(attacker, energyCard('Water', attacker.instanceId));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res2 = runAttack(without);
+  assert.equal(res2.state.players.p1.zones.hand.length, 0, 'no Prizes taken without the extra Energy');
+});
+
+test('I185 board: discarding the opponent last Pokémon wins the game', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Bewear-GX', { hp: 200, attacks: [atk('Big Throw-GX', 0, BIG_THROW)] }));
+    p2.zones.active.push(mon('Only Pokémon', { hp: 300 }));
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.turn.phase, 'ended');
+  assert.equal(res.state.winner, 'p1');
+  assert.equal(res.state.winReason, 'no Pokémon in play');
+});
+
+test('I185 board: Pale Moon-GX Knocks Out the Defending Pokémon at the end of the next turn', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Trevenant & Dusknoir-GX', { hp: 200, attacks: [atk('Pale Moon-GX', 0, PALE_MOON)] }));
+    const defender = mon('Defender', { hp: 300 });
+    p2.zones.active.push(defender);
+    p2.zones.bench.push(mon('Backup'));
+  });
+  const afterAttack = runAttack(state);
+  const res = applyCommand(afterAttack.state, { type: 'pass', playerId: 'p2' }, createRng(11));
+  assert.ok(!res.error, res.reason);
+  assert.ok(
+    (res.events || []).some((e) => e.type === 'deferredKnockOut' || e.type === 'pokemonKnockedOut'),
+    'the deferred KO fires at the end of the opponent next turn'
+  );
+});
 
 // ── I184: locks / extra turns ───────────────────────────────────────────────
 

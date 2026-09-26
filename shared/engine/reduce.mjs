@@ -4951,6 +4951,33 @@ function planAttackSteps(attack, attacker, { coin, headsCount }) {
 }
 
 /**
+ * Ends the game when an attack's effect (not a Knock Out) left a side with no Pokémon in play
+ * — GG End-GX / Big Throw-GX discard Pokémon outright. Prize-based wins keep their own tail
+ * settlement, so this only reads the board (design 048).
+ */
+function settleWipedSides(draft, { events }) {
+  const playerIds = Object.keys(draft.players || {});
+  if (playerIds.length !== 2 || isGameConcluded(draft)) return;
+  const [a, b] = playerIds;
+  const wiped = (pid) =>
+    ![...(draft.players[pid].zones?.active || []), ...(draft.players[pid].zones?.bench || [])].some(
+      (c) => !c.attachedTo && isPokemon(c)
+    );
+  const aWins = wiped(b);
+  const bWins = wiped(a);
+  if (!aWins && !bWins) return;
+  if (aWins && bWins) {
+    setGameEnded(draft, {
+      simultaneous: [a, b],
+      ways: { [a]: ['no Pokémon in play'], [b]: ['no Pokémon in play'] },
+      events,
+    });
+    return;
+  }
+  setGameEnded(draft, { winner: aWins ? a : b, reason: 'no Pokémon in play', events });
+}
+
+/**
  * A step that took the attacker out of play (shuffle into the deck) leaves its Active Spot
  * empty: promote from the Bench, or lose with no Pokémon left in play.
  */
@@ -4988,6 +5015,10 @@ function runAttackSteps(
     budget,
   });
   resolveDamageCounterKnockouts(draft, { events });
+  // A discard effect (GG End-GX / Big Throw-GX) can wipe a side without any Knock Out event;
+  // prize entitlements keep their own tail settlement, so this only reads the board for an
+  // emptied side (design 048).
+  settleWipedSides(draft, { events });
   settleVacatedActive(draft, { playerId, oppId, events });
   if (result.pendingChoice && !isGameConcluded(draft)) {
     draft.pendingChoice = result.pendingChoice;

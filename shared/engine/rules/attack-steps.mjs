@@ -105,6 +105,21 @@ function stripGates(sentence) {
   return { rest, flags };
 }
 
+// Leading "If this Pokémon has at least N extra [type] Energy attached to it (in addition to
+// this attack's cost), …" gates the rest of the sentence (design 048). Compound clauses
+// ("1 extra {P} Energy and 1 extra {D} Energy") yield one requirement each.
+const EXTRA_ENERGY_PREFIX = /^if this pokémon has at least (.+?) attached to it, (?:and )?/;
+function leadingExtraEnergy(sentence) {
+  const m = EXTRA_ENERGY_PREFIX.exec(sentence);
+  if (!m) return null;
+  if (!/^(?:\d+ extra (?:\{[a-z]\} )?energy(?:,? and )?)+$/.test(m[1])) return null;
+  const requirements = [...m[1].matchAll(/(\d+) extra (?:\{([a-z])\} )?energy/g)].map((r) => ({
+    count: Number(r[1]),
+    energyType: r[2] ? r[2].toUpperCase() : null,
+  }));
+  return requirements.length > 0 ? { length: m[0].length, requirements } : null;
+}
+
 const ENERGY_TYPE = String.raw`(?:basic )?(?:\{([a-z])\} )?(?:basic )?`;
 
 // "heal 30 damage" / "heal all damage" / "remove 3 damage counters" / "remove a damage counter".
@@ -655,6 +670,17 @@ const TEMPLATES = [
 
   // Prizes / Knock Out
   [/^(?:discard all energy from this pokémon, and )?take (a|\d+) prize cards?$/, (m) => ({ type: 'atkTakePrize', count: countOf(m[1]) })],
+  // Prize manipulation (design 048): Nihilego-GX Symbiont-GX, Naganadel-GX Injection-GX,
+  // Celesteela-GX Blaster-GX. Stinger/Discovery/Burst are multi-sentence BLOCKS below.
+  [
+    /^add the top (\d+) cards? of your opponent's deck to their prize cards?$/,
+    (m) => ({ type: 'atkOppDeckToPrizes', count: Number(m[1]) }),
+  ],
+  [
+    /^add a card from your opponent's discard pile to their prize cards face down$/,
+    () => ({ type: 'atkOppDiscardToPrizes', count: 1 }),
+  ],
+  [/^turn all of your prize cards face up$/, () => ({ type: 'atkPrizesFaceUp' })],
   [/^your opponent's active pokémon is knocked out$/, () => ({ type: 'atkKnockOut', condition: null })],
   // A4 (design 036): the Active is Knocked Out when its printed condition holds
   // (Haxorus Axe Blast, Haxorus Bring Down the Axe, Armaldo Reaping Claw), and the
@@ -683,6 +709,27 @@ const TEMPLATES = [
   [
     /^if your opponent's active pokémon has exactly (\d+) damage counters on it, (?:it|that pokémon) is knocked out$/,
     (m) => ({ type: 'atkKnockOut', condition: 'exactCounters', counters: Number(m[1]) }),
+  ],
+  // Silvally-GX Silver Knight-GX: the Active is an Ultra Beast (design 048).
+  [
+    /^if your opponent's active pokémon is an ultra beast, it is knocked out$/,
+    () => ({ type: 'atkKnockOut', condition: 'ultraBeast' }),
+  ],
+  // Lunala-GX Lunar Fall-GX: 1 of the opponent's Basic non-GX Pokémon (design 048).
+  [
+    /^knock out 1 of your opponent's basic pokémon that isn't a pokémon-gx$/,
+    () => ({ type: 'atkKnockOutChoose', basicOnly: true, notGx: true }),
+  ],
+
+  // Discard (not Knock Out) opponent Pokémon: Garchomp & Giratina-GX GG End-GX,
+  // Bewear-GX Big Throw-GX (design 048).
+  [
+    /^discard your opponent's active pokémon and all cards attached to it$/,
+    () => ({ type: 'atkDiscardOppPokemon', count: 1, scope: 'active' }),
+  ],
+  [
+    /^discard (a|an|\d+) of your opponent's pokémon and all cards attached to (?:it|them)$/,
+    (m) => ({ type: 'atkDiscardOppPokemon', count: countOf(m[1]), scope: 'any' }),
   ],
 
   // Heal (design 036 A6). Amounts are damage counters (`count`, so "For each heads" scales
@@ -857,6 +904,32 @@ const BLOCKS = [
   [
     /choose 1 of your opponent's pokémon\. your opponent shuffles that pokémon and all cards attached to it into their deck\./g,
     () => ({ type: 'atkShuffleOppBench', count: 1, scope: 'any' }),
+  ],
+  // Naganadel-GX Stinger-GX / Celesteela-GX Discovery-GX / Blacephalon-GX Burst-GX.
+  [
+    /both players shuffle their prize cards? into their decks\. then, each player puts the top (\d+) cards? of their deck face down as their prize cards?\./g,
+    (m) => ({ type: 'atkShufflePrizesAndRedraw', count: Number(m[1]) }),
+  ],
+  [
+    /count your prize cards and put them into your hand\. then, take that many cards from the top of your deck and put them face down as your prize cards?\./g,
+    () => ({ type: 'atkPrizeDiscovery' }),
+  ],
+  [
+    /discard 1 of your prize cards\. if it's an energy card, attach it to 1 of your pokémon\./g,
+    () => ({ type: 'atkDiscardPrize', count: 1, attachIfEnergy: true }),
+  ],
+  // Garchomp & Giratina-GX GG End-GX: the extra-Energy clause raises the discard count.
+  [
+    /discard (a|an|\d+) of your opponent's pokémon and all cards attached to (?:it|them)\. if this pokémon has at least (\d+) extra (?:\{([a-z])\} )?energy attached to it, discard (\d+) of your opponent's pokémon instead\./g,
+    (m) => ({
+      type: 'atkDiscardOppPokemon',
+      count: countOf(m[1]),
+      scope: 'any',
+      alternateCount: Number(m[4]),
+      requiresExtraEnergy: [
+        { count: Number(m[2]), energyType: m[3] ? m[3].toUpperCase() : null },
+      ],
+    }),
   ],
   // Greninja & Zoroark-GX Dark Union-GX: bench placement plus the extra-Energy attach.
   [
@@ -1195,12 +1268,15 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     // runs it only when the attach happened (requiresAttach, I93).
     const wrOrder = /<wr:(before|after)>/.exec(sentence)?.[1];
     const plain = sentence.replace(/\s*<wr:(?:before|after)>/g, '');
-    const chained = ATTACH_CHAIN.exec(plain);
+    const extra = leadingExtraEnergy(plain);
+    const body = extra ? plain.slice(extra.length) : plain;
+    const chained = ATTACH_CHAIN.exec(body);
     const previous = result.after[result.after.length - 1];
     // "Discard a card from your hand. If you do, draw 3 cards." runs only when the hand paid.
-    const handChain = Boolean(chained) && /^if you do, /.test(plain) && HAND_COST_TYPES.has(previous?.type);
+    const handChain = Boolean(chained) && /^if you do, /.test(body) && HAND_COST_TYPES.has(previous?.type);
     if (chained && !handChain && !isAttachStep(previous)) continue;
-    const { rest, flags } = stripGates(chained ? plain.slice(chained[0].length) : plain);
+    const { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
+    if (extra) flags.requiresExtraEnergy = extra.requirements;
     if (handChain) flags.requiresHandCost = true;
     else if (chained) flags.requiresAttach = true;
     const templates = chained && !handChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;

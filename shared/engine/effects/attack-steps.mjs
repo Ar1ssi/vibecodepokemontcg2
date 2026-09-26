@@ -28,6 +28,7 @@ import {
   isMegaCard,
   isRadiantCard,
   isTeraCard,
+  isUltraBeastCard,
 } from '../rules/card-classify.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import {
@@ -126,6 +127,11 @@ function costTypeLetter(symbol) {
  */
 function extraEnergySatisfied(ctx, requirement) {
   if (!requirement) return true;
+  const requirements = Array.isArray(requirement) ? requirement : [requirement];
+  return requirements.every(extraEnergyRequirementSatisfied.bind(null, ctx));
+}
+
+function extraEnergyRequirementSatisfied(ctx, requirement) {
   const ref = attackerRef(ctx);
   if (!ref) return false;
   const top = topPokemonCard(ctx.player, ref.card) || ref.card;
@@ -1567,6 +1573,8 @@ function knockOutConditionMet(ctx, owner, card, step) {
     }
     case 'exactCounters':
       return (card.damage || 0) === step.counters * 10;
+    case 'ultraBeast':
+      return isUltraBeastCard(topPokemonCard(owner, card));
     default:
       return hasCondition(card, step.condition);
   }
@@ -1598,6 +1606,7 @@ function atkKnockOut(ctx) {
   }
   if (!target) return skip(ctx, 'no_opponent_active');
   if (shielded) return skip(ctx, 'effect_shield');
+  if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
   if (!knockOutConditionMet(ctx, opponent, target, step)) return skip(ctx, 'condition_unmet');
   markKnockOut(ctx, opponent, target);
   return null;
@@ -1617,6 +1626,7 @@ function atkKnockOutChoose(ctx) {
       if (step.leastHp && self && root.instanceId === self.instanceId) continue;
       if (owner === opponent && specialEnergyShielded(owner, root)) continue;
       if (step.ruleBox && !RULE_BOX_MATCHES[step.ruleBox]?.(topPokemonCard(owner, root))) continue;
+      if (step.notGx && isGxCard(topPokemonCard(owner, root))) continue;
       if (step.basicOnly && !RULE_BOX_MATCHES.basic(topPokemonCard(owner, root))) continue;
       if (step.exactCounters != null && (root.damage || 0) !== step.exactCounters * 10) continue;
       if (step.maxRemainingHp != null) {
@@ -1691,11 +1701,208 @@ function atkChooseCondition(ctx) {
 
 function atkTakePrize(ctx) {
   const { player, step } = ctx;
+  if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
   if ((player.zones.prizes || []).length === 0) return skip(ctx, 'no_prizes');
   if (!player.flags) player.flags = {};
   player.flags.prizesOwed = (player.flags.prizesOwed || 0) + (step.count || 1);
   ctx.events.push({ type: 'prizeEntitlementGranted', playerId: player.playerId, count: step.count || 1 });
   return null;
+}
+
+// Garchomp & Giratina-GX GG End-GX / Bewear-GX Big Throw-GX: discarding an opponent's Pokémon
+// is not a Knock Out — no `pokemonKnockedOut`, no Prizes; any vacated Active is promoted at the
+// command tail and the reducer's win sweep sees a wiped side.
+function atkDiscardOppPokemon(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const count = extraEnergySatisfied(ctx, step.requiresExtraEnergy)
+    ? step.alternateCount || step.count || 1
+    : step.count || 1;
+  const pool = step.scope === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent);
+  const discard = (roots) => {
+    for (const root of roots) {
+      const ref = findCard(ctx.draft, root.instanceId);
+      if (ref?.playerId !== opponent.playerId) continue;
+      const wasActive = ref.zoneId === 'active';
+      discardCards(opponent, [root, ...attachedCards(opponent, root.instanceId)], ctx.events, {
+        reason: 'attack-discard',
+      });
+      if (wasActive) opponent.promotionPending = true;
+    }
+    return null;
+  };
+  if (ctx.selection) return discard(pickById(pool, ctx.selection).slice(0, count));
+  if (pool.length === 0) return skip(ctx, 'no_opponent_pokemon');
+  if (pool.length <= count) return discard(pool);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose ${count} of your opponent's Pokémon to discard`,
+    options: pool,
+    min: count,
+    max: count,
+  });
+}
+
+// Nihilego-GX Symbiont-GX: top cards of the opponent's deck become their Prizes.
+function atkOppDeckToPrizes(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const deck = opponent.zones.deck || [];
+  const count = Math.min(step.count || 1, deck.length);
+  if (count === 0) return skip(ctx, 'empty_deck');
+  for (const card of deck.splice(0, count)) {
+    opponent.zones.prizes.push(card);
+    ctx.events.push({
+      type: 'cardMoved',
+      instanceId: card.instanceId,
+      from: 'deck',
+      to: 'prizes',
+      playerId: opponent.playerId,
+    });
+  }
+  return null;
+}
+
+// Naganadel-GX Injection-GX: a chosen card of the opponent's discard becomes one of their
+// Prizes, face down.
+function atkOppDiscardToPrizes(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const discard = [...(opponent.zones.discard || [])];
+  const move = (cards) => {
+    for (const card of cards) {
+      removeFromZones(opponent, card);
+      card.attachedTo = null;
+      opponent.zones.prizes.push(card);
+      ctx.events.push({
+        type: 'cardMoved',
+        instanceId: card.instanceId,
+        from: 'discard',
+        to: 'prizes',
+        playerId: opponent.playerId,
+      });
+    }
+    return null;
+  };
+  const count = step.count || 1;
+  if (ctx.selection) return move(pickById(discard, ctx.selection).slice(0, count));
+  if (discard.length === 0) return skip(ctx, 'empty_discard');
+  if (discard.length <= count) return move(discard.slice(0, count));
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a card from your opponent's discard pile to add to their Prizes`,
+    options: discard,
+    min: count,
+    max: count,
+  });
+}
+
+// Celesteela-GX Blaster-GX: every Prize card is turned face up for the rest of the game. The
+// per-card `revealed` flag is what `view.mjs` exposes, and it survives the flags rebuild.
+function atkPrizesFaceUp(ctx) {
+  const { player } = ctx;
+  const prizes = player.zones.prizes || [];
+  if (prizes.length === 0) return skip(ctx, 'no_prizes');
+  for (const card of prizes) card.revealed = true;
+  ctx.events.push({ type: 'prizesRevealed', playerId: player.playerId, count: prizes.length });
+  return null;
+}
+
+// Celesteela-GX Discovery-GX: count your Prizes, take them, then replace them from the deck.
+// "If you don't have that many cards in your deck, this attack does nothing."
+function atkPrizeDiscovery(ctx) {
+  const { player } = ctx;
+  const prizes = player.zones.prizes || [];
+  const deck = player.zones.deck || [];
+  if (prizes.length === 0 || deck.length < prizes.length) return skip(ctx, 'not_enough_deck');
+  const count = prizes.length;
+  const taken = [];
+  for (const card of prizes.splice(0, prizes.length)) {
+    card.attachedTo = null;
+    player.zones.hand.push(card);
+    taken.push({ instanceId: card.instanceId });
+    ctx.events.push({
+      type: 'cardMoved',
+      instanceId: card.instanceId,
+      from: 'prizes',
+      to: 'hand',
+      playerId: player.playerId,
+    });
+  }
+  ctx.events.push({ type: 'prizesTaken', playerId: player.playerId, count, cards: taken });
+  for (const card of deck.splice(0, count)) {
+    player.zones.prizes.push(card);
+    ctx.events.push({
+      type: 'cardMoved',
+      instanceId: card.instanceId,
+      from: 'deck',
+      to: 'prizes',
+      playerId: player.playerId,
+    });
+  }
+  return null;
+}
+
+// Naganadel-GX Stinger-GX: both players shuffle their Prizes into their decks, then take the
+// top N of each deck face down as fresh Prizes.
+function atkShufflePrizesAndRedraw(ctx) {
+  const { player, opponent, step } = ctx;
+  const count = step.count || 3;
+  for (const owner of [player, opponent].filter(Boolean)) {
+    const prizes = owner.zones.prizes || [];
+    owner.zones.deck.push(...prizes.splice(0, prizes.length));
+    shuffleInPlace(ctx.activeRng, owner.zones.deck);
+    const taken = owner.zones.deck.splice(0, Math.min(count, owner.zones.deck.length));
+    owner.zones.prizes.push(...taken);
+    ctx.events.push({ type: 'deckShuffled', playerId: owner.playerId });
+    ctx.events.push({ type: 'prizesRedrawn', playerId: owner.playerId, count: taken.length });
+  }
+  return null;
+}
+
+// Blacephalon-GX Burst-GX: discard one of your Prizes; an Energy card may be attached instead.
+function atkDiscardPrize(ctx) {
+  const { player, step } = ctx;
+  const prizes = player.zones.prizes || [];
+  const targets = rootsOf(player);
+  if (ctx.memo?.cardId != null) {
+    const card = prizes.find((c) => c.instanceId === ctx.memo.cardId);
+    if (!card) return skip(ctx, 'target_not_found');
+    const target = targets.find((c) => c.instanceId === ctx.selection?.[0]);
+    removeFromZones(player, card);
+    if (target) attachTo(player, card, target, ctx.events);
+    else discardCardToPlayerZone(player, card);
+    return null;
+  }
+  const finish = (card) => {
+    removeFromZones(player, card);
+    const attachable = step.attachIfEnergy && isEnergy(card);
+    if (!attachable || targets.length === 0) {
+      discardCardToPlayerZone(player, card);
+      return null;
+    }
+    if (targets.length === 1) {
+      attachTo(player, card, targets[0], ctx.events);
+      return null;
+    }
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Attach the Prize card to which Pokémon?`,
+      options: targets,
+      min: 1,
+      max: 1,
+      memo: { cardId: card.instanceId },
+    });
+  };
+  if (ctx.selection) {
+    const card = prizes.find((c) => c.instanceId === ctx.selection[0]);
+    return card ? finish(card) : skip(ctx, 'target_not_found');
+  }
+  if (prizes.length === 0) return skip(ctx, 'no_prizes');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose 1 of your Prize cards to discard`,
+    // Identity only: Prize cards stay face down.
+    options: prizes.map((c) => ({ instanceId: c.instanceId })),
+    min: 1,
+    max: 1,
+  });
 }
 
 // ── devolve / heal ──────────────────────────────────────────────────────────
@@ -2554,6 +2761,13 @@ export const ATTACK_STEP_HANDLERS = {
   atkKnockOut,
   atkKnockOutAll,
   atkTakePrize,
+  atkDiscardOppPokemon,
+  atkOppDeckToPrizes,
+  atkOppDiscardToPrizes,
+  atkPrizesFaceUp,
+  atkPrizeDiscovery,
+  atkShufflePrizesAndRedraw,
+  atkDiscardPrize,
   atkChooseCondition,
   atkDevolve,
   atkBounceOppActive,
