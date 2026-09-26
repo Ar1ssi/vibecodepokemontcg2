@@ -5,6 +5,7 @@ import {
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
 import { getSortedDeckCardArray } from '../../../setup/deck-builder/core/card-sort.mjs';
+import { buildDeckExportDocument } from '../../../setup/deck-builder/core/deck-export.mjs';
 import { getDeckCounterModel } from '../../../setup/deck-builder/core/deck-counter.mjs';
 import {
   BUILDER_FILTER_GROUPS,
@@ -1244,10 +1245,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     if (target) switchTarget(target);
   });
 
-  exportCsvButton.addEventListener('click', () => {
-    const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget) || null;
-    const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
-    const csv = serializeDeckToSimCsv(deck, { sleeveId, coinId });
+  const downloadDeckCsv = (csv) => {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -1257,6 +1255,39 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
+  };
+
+  exportCsvButton.addEventListener('click', () => {
+    const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget) || null;
+    const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
+    const csv = serializeDeckToSimCsv(deck, { sleeveId, coinId });
+    const cards = getSortedDeckCardArray(deck);
+    const deckName = deckLibrary?.getActiveDeckName?.(currentLoadTarget) || 'Untitled Deck';
+
+    // A popup blocked by the browser (or refused by the user) must still
+    // export: fall back to the direct CSV download this button used to be.
+    let popup = null;
+    try {
+      popup = window.open('', 'ptcgDeckExport', 'popup=yes,width=1280,height=900');
+    } catch {
+      popup = null;
+    }
+    if (!popup) {
+      downloadDeckCsv(csv);
+      return;
+    }
+
+    try {
+      popup.document.open();
+      popup.document.write(buildDeckExportDocument({ cards, deckName, theme: builderTheme }));
+      popup.document.close();
+      popup.focus();
+      popup.document
+        .querySelector('[data-action="download-deck"]')
+        ?.addEventListener('click', () => downloadDeckCsv(csv));
+    } catch {
+      downloadDeckCsv(csv);
+    }
   });
 
   importCsvInput.addEventListener('change', async (event) => {
