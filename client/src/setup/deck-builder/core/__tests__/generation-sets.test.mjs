@@ -8,6 +8,7 @@ import {
   generationEnergySetId,
   buildReverseHoloEnergyCard,
   REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION,
+  REVERSE_HOLO_ENERGY_CARD_IDS_BY_GENERATION,
   GEN6_REVERSE_HOLO_ENERGY_SET_IDS,
   GENERATION_SERIES,
   GENERATIONS,
@@ -58,6 +59,10 @@ const SHARED_ENERGY_SUMMARY = [
   { id: 'bw1-105', name: 'Grass Energy', localId: '105' },
   { id: 'bw4-92', name: 'Double Colorless Energy', localId: '92' },
   { id: 'dp1-100', name: 'Grass Energy', localId: '100' },
+  { id: 'sv02-190', name: 'Jet Energy', localId: '190' },
+  { id: 'sv02-192', name: 'Reversal Energy', localId: '192' },
+  { id: 'sv02-278', name: 'Basic Grass Energy', localId: '278' },
+  { id: 'sv05-162', name: 'Neo Upper Energy', localId: '162' },
 ];
 
 describe('fetchGenerationSets', () => {
@@ -292,6 +297,49 @@ describe('fetchGenerationEnergyCards', () => {
     const rh = cards.find((c) => c.id === 'swsh12.5-152-reverse');
     assert.equal(rh.rarity, 'Reverse Holo');
     assert.equal(rh.localId, '152 · Reverse Holo');
+  });
+
+  it('fetchGenerationEnergyCards(9) reverses only Gen 9 energies with a real reverse print', async () => {
+    stubFetch([
+      ['/series/sv', { id: 'sv', name: 'Scarlet & Violet', sets: [{ id: 'sv02' }, { id: 'sv05' }] }],
+      [
+        '/sets/sv02',
+        {
+          id: 'sv02',
+          name: 'Paldea Evolved',
+          cards: [
+            { id: 'sv02-190', name: 'Jet Energy', localId: '190', image: 'jet' },
+            { id: 'sv02-192', name: 'Reversal Energy', localId: '192', image: 'reversal' },
+            { id: 'sv02-278', name: 'Basic Grass Energy', localId: '278', image: 'gold' },
+          ],
+        },
+      ],
+      [
+        '/sets/sv05',
+        {
+          id: 'sv05',
+          name: 'Temporal Forces',
+          cards: [{ id: 'sv05-162', name: 'Neo Upper Energy', localId: '162', image: 'ace' }],
+        },
+      ],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+
+    const cards = await fetchGenerationEnergyCards(9);
+    const ids = cards.map((c) => c.id);
+
+    // Jet/Reversal have TCGdex `variants.reverse`; the gold basic and ACE SPEC do not.
+    assert.ok(ids.includes('sv02-190'), 'must include base sv02-190');
+    assert.ok(ids.includes('sv02-190-reverse'), 'reverse-eligible special energy must reverse');
+    assert.ok(ids.includes('sv02-192-reverse'), 'reverse-eligible special energy must reverse');
+    assert.ok(!ids.includes('sv02-278-reverse'), 'gold Hyper Rare basic energy has no reverse print');
+    assert.ok(!ids.includes('sv05-162-reverse'), 'ACE SPEC energy has no reverse print');
+
+    const rh = cards.find((c) => c.id === 'sv02-190-reverse');
+    assert.equal(rh.rarity, 'Reverse Holo');
+    assert.equal(rh.localId, '190 · Reverse Holo');
+    assert.equal(rh.name, 'Jet Energy');
+    assert.equal(rh.supertype, 'Energy');
   });
 
   it('fetchGenerationEnergyCards supports Gen 7 (Sun & Moon sm1)', async () => {

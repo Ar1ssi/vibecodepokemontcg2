@@ -524,6 +524,26 @@ const TCGDEX_BASE = tcgdexApiBase();
     };
     export const GEN6_REVERSE_HOLO_ENERGY_SET_IDS = REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION[6];
 
+    // Gen 9 (sv) is keyed by card id, not set: its sets mix reverse-eligible special
+    // energies with gold Hyper Rare and ACE SPEC energies that have no reverse print,
+    // so a set-granular sweep would fabricate reverse variants of cards that never had
+    // one. Source: TCGdex `variants.reverse` per card (/v2/en/cards/<id>), verified 2026-09.
+    export const REVERSE_HOLO_ENERGY_CARD_IDS_BY_GENERATION = {
+      9: new Set([
+        'sv02-190', // Jet Energy
+        'sv02-191', // Luminous Energy
+        'sv02-192', // Reversal Energy
+        'sv02-193', // Therapeutic Energy
+        'sv04-182', // Medical Energy
+        'sv05-161', // Mist Energy
+        'sv06-166', // Boomerang Energy
+        'sv09-159', // Spiky Energy
+        'sv10-182', // Team Rocket's Energy
+        'sv10.5b-086', // Prism Energy
+        'sv10.5w-086', // Ignition Energy
+      ]),
+    };
+
     export function buildReverseHoloEnergyCard(card) {
       return {
         ...card,
@@ -535,20 +555,21 @@ const TCGDEX_BASE = tcgdexApiBase();
 
     // Fetch every Energy card (basic, special, and rarer variants) printed
     // across every set in a Pokémon generation. For generations featuring
-    // Reverse Holo energy prints (Gen 8, 7, 6, 5, 3), this includes their Reverse Holo variants.
+    // Reverse Holo energy prints (Gen 9, 8, 7, 6, 5, 3), this includes their
+    // Reverse Holo variants — by set id where every energy in the set reverses,
+    // or by card id where eligible and ineligible energies coexist (Gen 9).
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);
 
-      const targetSetIds = REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION[Number(generation)];
-      if (targetSetIds && targetSetIds.size > 0) {
-        const reverseHoloCards = cards
-          .filter((card) => targetSetIds.has(card?.set?.id))
-          .map(buildReverseHoloEnergyCard);
-        return sortCardsWithinGroup([...cards, ...reverseHoloCards], { sortBy: 'name', sortDirection: 'asc' });
-      }
+      const gen = Number(generation);
+      const targetSetIds = REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION[gen];
+      const targetCardIds = REVERSE_HOLO_ENERGY_CARD_IDS_BY_GENERATION[gen];
+      const reverseHoloCards = cards
+        .filter((card) => targetSetIds?.has(card?.set?.id) || targetCardIds?.has(card?.id))
+        .map(buildReverseHoloEnergyCard);
 
-      return sortCardsWithinGroup(cards, { sortBy: 'name', sortDirection: 'asc' });
+      return sortCardsWithinGroup([...cards, ...reverseHoloCards], { sortBy: 'name', sortDirection: 'asc' });
     }
 
     // Fetch all cards of one legal set (only those with images).
