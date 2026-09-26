@@ -10,8 +10,9 @@ any session pick up work with minimal context. First session? `.agent/STATE.md` 
 3. Smallest sufficient context: grep MAP.md → area doc → grep → read only implicated files.
    Never read directories wholesale. Lost after ~3 reads? Re-scope from MAP/area doc.
    Grep/Glob find files and text. "Where is X defined / who calls X / what does X take" → LSP
-   (`goToDefinition`, `findReferences`, `hover`) first: load it once per session with ToolSearch
-   `select:LSP`. Grep only if LSP errors (needs `pnpm install` for `typescript`; D166).
+   (`goToDefinition`, `findReferences`, `hover`) first. It is in the starting toolset (D167); if a
+   session lists it as deferred, load it with ToolSearch `select:LSP`. Grep only if LSP errors
+   (needs `pnpm install` for `typescript`; D166).
 4. Never call an API/function you haven't seen defined this session. Verify behavior in source.
 5. Code is truth. A wrong harness doc is a bug — fix it in passing (≤5 lines) or add a `flag:` line to your commit message.
 6. Chat carries outcomes; files carry detail: analysis → `.agent/scratch/`, designs → `.agent/designs/`,

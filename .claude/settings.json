@@ -1,4 +1,7 @@
 {
+  "env": {
+    "ENABLE_TOOL_SEARCH": "auto"
+  },
   "enabledPlugins": {
     "context-engineering@context-engineering-marketplace": false,
     "render@claude-plugins-official": false

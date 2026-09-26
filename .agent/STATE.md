@@ -3,7 +3,7 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: card-classification fixes (Ultra Beast, Pokémon-GX, Energy-named Items) — shipped to main.
+Focus: TCGdex server proxy + card-classification fixes shipped to main (D164).
 Active: none.
 Next: top of ISSUES.md (I180 first). User visual check pending: designs 042–046 FX on localhost.
   Maintenance: DECISIONS and designs/ root over cap (maintain.md).

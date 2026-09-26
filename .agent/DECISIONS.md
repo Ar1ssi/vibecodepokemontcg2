@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D167).
+#   Next id = highest D number in this file and the archive + 1 (next: D168).
 
 ## Active
+- D167 2026-09-26 [harness] `.claude/settings.json` sets ENABLE_TOOL_SEARCH=auto so LSP (and every tool) loads at session start - deferred LSP went unused; costs ~+9k tokens/session (CLI measure), auto falls back to deferral past 10% of window.
 - D166 2026-09-26 [harness] `typescript` devDependency + root `jsconfig.json` (checkJs off) exist only for the LSP tool — typescript-language-server failed without them; jsconfig makes findReferences project-wide.
 - D165 2026-09-26 [harness] Token diet: MAP.md grep-only; STATE ≤25 lines of pointers (backlog stays in ISSUES); Delegation cut to 6 lines; high-complexity rule moved to feature.md; new oneshot-feature.md route.
 - D164 2026-09-26 [netcode] Browser TCGdex reads go via same-origin `/api/tcgdex` proxy (server/tcgdex-proxy.mjs: shared LRU, 4 upstream, 30 s block cooldown) + IndexedDB cache (D102) — direct calls got Cloudflare-blocked.
