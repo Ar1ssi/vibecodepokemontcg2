@@ -957,6 +957,7 @@ import test from 'node:test';
       assert.equal(isStadiumCard({ name: 'Grand Tree', type: 'Trainer' }), true);
       assert.equal(isStadiumCard({ name: 'Artazon', text: 'This Stadium stays in play when you play it. Discard it if another Stadium comes into play.' }), true);
       assert.equal(isStadiumCard({ name: 'Pikachu' }), false);
+      assert.equal(isStadiumCard({ name: 'Magnezone', hp: 150, supertype: 'Pokémon' }), false);
       assert.equal(isStadiumCard(null), false);
     });
 

@@ -448,10 +448,12 @@ const isStadiumCard = (card) => {
   const name = lower(card.name);
   // Name fallbacks for deck-import stubs before TCGdex subtypes load.
   // "Grand Tree" is a Stadium but matches none of the older zone/rooftop hints.
+  // Pokémon like Magnezone carry hp; a stub without it is still name-matched.
+  const looksLikePokemon =
+    (card.hp != null && card.hp !== '') || /pok[eé]mon/.test(lower(card.supertype));
   if (
-    name.includes('zone') ||
-    name.includes('rooftop') ||
-    name === 'grand tree'
+    !looksLikePokemon &&
+    (name.includes('zone') || name.includes('rooftop') || name === 'grand tree')
   ) {
     return true;
   }
