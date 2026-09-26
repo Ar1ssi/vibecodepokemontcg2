@@ -308,6 +308,41 @@ export function parseOnEnergyAttachAbilities(host, energy, ctx = {}) {
   return out;
 }
 
+// The printed α marker identifies the trait (D72); marker-less wording is a real Ability
+// and is not this trait. `effect` is TCGdex's field name for `text`.
+function firstNamedAbility(card) {
+  const entries = Array.isArray(card?.abilities) ? card.abilities : [];
+  for (const entry of entries) {
+    if (!entry) continue;
+    if (typeof entry === 'string') return { name: '', text: entry };
+    const text = entry.text ?? entry.effect;
+    if (typeof text === 'string') return { name: String(entry.name || ''), text };
+  }
+  const single = card?.ability;
+  if (single) {
+    if (typeof single === 'string') return { name: '', text: single };
+    const text = single.text ?? single.effect;
+    if (typeof text === 'string') return { name: String(single.name || ''), text };
+  }
+  const fallback = card?.abilityText ?? card?.text ?? card?.effect;
+  return typeof fallback === 'string' && fallback ? { name: '', text: fallback } : null;
+}
+
+/**
+ * Ancient Trait α Growth: "When you attach an Energy card from your hand to this Pokémon
+ * (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards."
+ * Returns `{ count }` (the printed number) or null. Read the TOP card of the stack — an
+ * evolved Primal Kyogre-EX prints the trait — and only the printed α marker counts.
+ */
+export function parseAlphaGrowthAttach(host) {
+  const ability = firstNamedAbility(host);
+  if (!ability) return null;
+  const steps = parseAbility(`${ability.name} ${ability.text}`.trim());
+  const step = steps.find((s) => s.type === 'attachAbility' && s.triggeredByAttach);
+  if (!step || step.trait !== 'alpha' || !(step.upTo > 0)) return null;
+  return { count: step.upTo };
+}
+
 /**
  * Mandatory end-of-turn effects (Great Tusk ex Quaking Demolition: "if this
  * Pokémon is in the Active Spot, you must discard the top 5 cards of your

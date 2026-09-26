@@ -144,8 +144,16 @@ export function isAncientTraitStep(step) {
  * card has no real Ability for a "no Abilities" effect to suppress.
  */
 export function isAncientTraitAbility(card) {
-  const name = typeof card?.ability?.name === 'string' ? card.ability.name : '';
+  // Server-hydrated cards carry abilities as a plural array (I128) whose entries use
+  // `text` (cardStats) or TCGdex's `effect`; the singular `ability` slot is the fallback.
+  const first = Array.isArray(card?.abilities) ? card.abilities[0] : null;
+  const name =
+    (typeof first?.name === 'string' ? first.name : '') ||
+    (typeof card?.ability?.name === 'string' ? card.ability.name : '');
+  const arrayText =
+    typeof first === 'string' ? first : first?.text ?? first?.effect;
   const text =
+    arrayText ??
     card?.ability?.text ??
     card?.abilityText ??
     card?.text ??

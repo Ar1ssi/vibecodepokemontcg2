@@ -564,6 +564,39 @@ import test from 'node:test';
       assert.equal(tcgAbilityFromDetail({ abilities: [{ type: 'Pokémon Power', name: 'X', effect: 'y' }] }), null);
     });
 
+    // Ancient Traits ride the ability slot so the reducer can identify them (D72); without
+    // this, α Growth (Primal Kyogre-EX) never reached the engine at all.
+    test('tcgAbilityFromDetail: carries an Ancient Trait entry', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            {
+              type: 'Ancient Trait',
+              name: 'α Growth',
+              effect:
+                'When you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.',
+            },
+          ],
+        }),
+        {
+          name: 'α Growth',
+          text: 'When you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.',
+        }
+      );
+    });
+
+    test('tcgAbilityFromDetail: a real Ability outranks an Ancient Trait', () => {
+      assert.deepEqual(
+        tcgAbilityFromDetail({
+          abilities: [
+            { type: 'Ancient Trait', name: 'θ Max', effect: 'Heal all damage.' },
+            { type: 'Ability', name: 'Solid Shell', effect: 'Takes 20 less damage.' },
+          ],
+        }),
+        { name: 'Solid Shell', text: 'Takes 20 less damage.' }
+      );
+    });
+
     // ── per-ability used-tracking (taxonomy C) ──
     test('abilityKey: stable identity via id, then name+number fallback', () => {
       assert.equal(abilityKey({ id: 123, name: 'Pikachu' }), 'id:123');

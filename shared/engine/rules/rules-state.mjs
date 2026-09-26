@@ -207,12 +207,17 @@
     
     // Pure mapper: TCGdex v2 card detail → rules-engine ability shape.
     // v2 exposes abilities[] ({ type, name, effect }); legacy detail.ability is kept for compat.
+    // Ancient Traits (type "Ancient Trait") ride the same slot: the engine identifies them by
+    // their α/Ω/Δ/θ marker (abilities.mjs isAncientTraitAbility), and dropping them here left
+    // every trait invisible to the reducer (α Growth never fired on an attached Energy).
     export function tcgAbilityFromDetail(detail) {
       if (detail?.ability?.text || detail?.ability?.name) return detail.ability;
       // Multiple Ability entries are rare; first match wins (TCGdex order is stable).
-      const entry = (detail?.abilities || []).find(
-        (a) => String(a?.type || '').toLowerCase() === 'ability'
-      );
+      // A real Ability outranks an Ancient Trait when a card prints both.
+      const entries = detail?.abilities || [];
+      const ofType = (type) =>
+        entries.find((a) => String(a?.type || '').toLowerCase() === type);
+      const entry = ofType('ability') || ofType('ancient trait');
       if (!entry) return null;
       return { name: entry.name || '', text: entry.effect || entry.text || '' };
     }

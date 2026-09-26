@@ -13,6 +13,7 @@ import {
   parseOnDamageAbilities,
   parseOnDamageStatus,
   parseOnEnergyAttachAbilities,
+  parseAlphaGrowthAttach,
   parseEndOfTurnAbilities,
   parseOnKoAbilities,
   parseOnPromotionAbilities,
@@ -704,6 +705,69 @@ test('on-KO energy move: Veluza moves its Energy to the only Benched Pokémon', 
 });
 
 
+
+// ── Ancient Trait α Growth (Primal Kyogre-EX, PRC 149) ───────────────────
+
+const GROWTH_TEXT =
+  'When you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.';
+
+test('parseAlphaGrowthAttach: only the printed α marker, with a count', () => {
+  const trait = pokemon({ name: 'Primal Kyogre-EX', abilities: [ability('α Growth', GROWTH_TEXT)] });
+  assert.deepEqual(parseAlphaGrowthAttach(trait), { count: 2 });
+  // Marker-less wording is a real Ability (D72), not the trait.
+  const worded = pokemon({ name: 'Venusaur', abilities: [ability('Growth', GROWTH_TEXT)] });
+  assert.equal(parseAlphaGrowthAttach(worded), null);
+  assert.equal(parseAlphaGrowthAttach(pokemon({ name: 'Plain' })), null);
+});
+
+test('α Growth: attaching an Energy to Primal Kyogre-EX offers 2 more from hand', () => {
+  const state = setupGame();
+  const kyogre = pokemon({ instanceId: 10, name: 'Kyogre-EX' });
+  const primal = pokemon({
+    instanceId: 11,
+    name: 'Primal Kyogre-EX',
+    stage: 'MEGA',
+    attachedTo: 10,
+    abilities: [ability('α Growth', GROWTH_TEXT)],
+  });
+  state.players.p1.zones.active.push(kyogre, primal);
+  state.players.p1.zones.hand.push(energy(30, 'Water'), energy(31, 'Water'), energy(32, 'Water'));
+
+  // The client addresses the card it sees — the Primal Kyogre-EX on top (11) — and the
+  // reducer resolves the attachment host to the stack root (10).
+  const attached = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: 30, targetInstanceId: 11 },
+    playerId: 'p1',
+  });
+  assert.equal(attached.error, null);
+  const choice = attached.pendingChoice;
+  assert.ok(choice, 'α Growth raises a PendingChoice');
+  assert.equal(choice.player, 'p1');
+  assert.equal(choice.min, 0);
+  assert.equal(choice.max, 2);
+  assert.deepEqual(
+    choice.options.map((o) => o.instanceId),
+    [31, 32],
+    'only the Energy still in hand is offered'
+  );
+
+  const resolved = applyCommand(attached.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: choice.choiceId, selection: [31, 32] },
+    playerId: 'p1',
+  });
+  assert.equal(resolved.error, null);
+  assert.equal(resolved.pendingChoice, null);
+  const hosted = resolved.state.players.p1.zones.active.filter(
+    (c) => c.attachedTo === 10 && c.supertype === 'Energy'
+  );
+  assert.deepEqual(
+    hosted.map((c) => c.instanceId).sort((a, b) => a - b),
+    [30, 31, 32],
+    'the first Energy plus both α Growth picks are attached to the host'
+  );
+});
 
 test('parseOnPromotionAbilities: reads Iron Valiant ex Tachyon Bits', () => {
   const state = setupGame();

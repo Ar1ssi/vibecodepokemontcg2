@@ -130,6 +130,7 @@ import {
   parseOnDamageAbilities,
   parseOnDamageStatus,
   parseOnEnergyAttachAbilities,
+  parseAlphaGrowthAttach,
   parseOnKoAbilities,
 } from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
@@ -2324,8 +2325,10 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
   }
 }
 
+const GROWTH_ATTACH_EFFECT = 'alphaGrowth';
+
 /** Runs the Ability triggers of an Energy attached from the hand (`parseOnEnergyAttachAbilities`). */
-function applyEnergyAttachTriggers(draft, { host, energy, playerId, events }) {
+function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, events }) {
   const effects = parseOnEnergyAttachAbilities(host, energy, abilitySideContext(draft, playerId));
   for (const { target, recover, heal, source } of effects) {
     if (recover) {
@@ -2346,6 +2349,47 @@ function applyEnergyAttachTriggers(draft, { host, energy, playerId, events }) {
       });
     }
   }
+
+  // Ancient Trait α Growth (Primal Kyogre-EX, PRC 149): after the normal hand attach the
+  // player may attach up to 2 more Energy cards from hand to this Pokémon. Only the manual
+  // attach command reaches this hook — Trainer/Ability/attack attaches never do — which is
+  // exactly the printed "(except with an attack, Ability, or Trainer card)" clause.
+  const growth = parseAlphaGrowthAttach(hostTop || host);
+  if (!growth) return;
+  const player = draft.players[playerId];
+  const handEnergy = (player?.zones?.hand || []).filter((c) => isEnergy(c));
+  if (handEnergy.length === 0) return;
+  const count = Math.min(growth.count, handEnergy.length);
+  const name = hostTop?.name || host?.name || 'α Growth';
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    prompt: `${name}: attach up to ${count} Energy card${count > 1 ? 's' : ''} from your hand?`,
+    source: name,
+    options: handEnergy,
+    min: 0,
+    max: count,
+    cancellable: true,
+    stateVersion: draft.stateVersion,
+    resumeToken: {
+      effectType: GROWTH_ATTACH_EFFECT,
+      initiatorPlayerId: playerId,
+      hostInstanceId: host.instanceId,
+    },
+  });
+}
+
+/** Resumes the α Growth offer: attach the chosen hand Energy cards to the host. */
+function resumeGrowthAttach(draft, { selection, resumeToken, events }) {
+  draft.pendingChoice = null;
+  const token = resumeToken || {};
+  const player = draft.players[token.initiatorPlayerId];
+  const host = token.hostInstanceId != null ? findCard(draft, token.hostInstanceId)?.card : null;
+  if (!player || !host) return;
+  const wanted = new Set(selection || []);
+  const chosen = (player.zones.hand || []).filter(
+    (c) => wanted.has(c.instanceId) && isEnergy(c)
+  );
+  for (const card of chosen) attachToRoot(player, card, host, events);
 }
 
 function conditionsUpdatedEvent(card, condition) {
@@ -7169,6 +7213,7 @@ export function applyCommand(state, command, rng = null) {
           if (cardRef.zoneId === 'hand' && hostRef.playerId === playerId) {
             applyEnergyAttachTriggers(draft, {
               host: hostRef.card,
+              hostTop: inPlayView(draft, hostRef.card),
               energy: cardRef.card,
               playerId,
               events,
@@ -7871,6 +7916,12 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection || [],
           events,
           resumeToken: token,
+        });
+      } else if (token.effectType === GROWTH_ATTACH_EFFECT) {
+        resumeGrowthAttach(draft, {
+          selection: payload.selection || [],
+          resumeToken: token,
+          events,
         });
       } else if (token.effectType === 'glimwood') {
         // Glimwood Tangle: resume the attack with the kept coin result or a fresh
