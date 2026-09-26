@@ -1084,11 +1084,11 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
-  // Missing Clover — the single mode is "look at the top card of your deck";
-  // the generic branch defaulted to 7 (audit S&M, §2). The 4-card play-a
-  // Prize mode needs multi-card play and is deferred.
+  // Missing Clover — the single mode only LOOKS at the top card; the generic
+  // lookAtTop branch let the player take it and shuffled (review finding 7).
+  // The 4-cards-at-once Prize mode needs multi-card play and is deferred.
   if (lower.includes('you may play 4 missing clover cards at once')) {
-    steps.push({ type: 'lookAtTop', count: 1, pick: 'any', destination: 'hand' });
+    steps.push({ type: 'peekReturn', count: 1 });
     return { steps, recognizable: true };
   }
 
@@ -1569,6 +1569,10 @@ function parseTrainerStepsInner(lower) {
       const symbol = at[2] || at[4];
       const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : null;
       const basic = Boolean(at[3] || typeWord);
+      // Gardenia's Vigor prints "Draw 2 cards. If you drew any cards in this
+      // way, attach …": the draw leads and the attach follows it (review 5).
+      const leadingDraw = lower.match(/^\s*draw\s+(\d+)\s+cards?/);
+      if (leadingDraw) steps.push({ type: 'draw', count: Number(leadingDraw[1]) });
       steps.push({
         type: 'attachFromHand',
         count,
@@ -1578,7 +1582,7 @@ function parseTrainerStepsInner(lower) {
         handTarget: target.toLowerCase(),
         handEnergy: typeWord ? { basic: true, types: [typeWord] } : basic ? { basic: true } : {},
       });
-      appendTrailingDraw(steps, lower);
+      if (!leadingDraw) appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
     }
   }
@@ -2499,7 +2503,13 @@ function parseTrainerStepsInner(lower) {
     );
     if (mars) {
       steps.push({ type: 'draw', count: Number(mars[1]) });
-      steps.push({ type: 'discardRandomOpponentHandIfSupporter', any: true, count: 1 });
+      steps.push({
+        type: 'discardRandomOpponentHandIfSupporter',
+        any: true,
+        count: 1,
+        // "If you do": the discard follows the draw, it is not unconditional.
+        requiresDraw: true,
+      });
       return { steps, recognizable: true };
     }
   }

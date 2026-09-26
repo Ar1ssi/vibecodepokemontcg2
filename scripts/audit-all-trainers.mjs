@@ -6,7 +6,7 @@
  * scripts/scrape-pkmncards-trainers.mjs) checked against
  * shared/engine/rules/trainer-effects.mjs.
  *
- * This is the trainer counterpart to scripts/audit-all-stadiums.mjs: it does
+ * This is the trainer counterpart to scripts/audit-stadiums.mjs: it does
  * NOT filter to Standard-legal, it dedupes reprints by name+text, and it flags
  * *mis-parses* (a parser returning a plausible but wrong step) alongside cards
  * the parser cannot recognize at all.
@@ -276,7 +276,7 @@ const log = (s = '') => {
 
 log(`Trainer printings scanned : ${trainerRows.length}`);
 if (stadiumRows.length > 0) {
-  log(`Stadium rows skipped      : ${stadiumRows.length} (see scripts/audit-all-stadiums.mjs)`);
+  log(`Stadium rows skipped      : ${stadiumRows.length} (see scripts/audit-stadiums.mjs)`);
 }
 log(`Unique (name+text) cards  : ${rows.length}`);
 log('');

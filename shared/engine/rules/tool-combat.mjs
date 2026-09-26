@@ -134,17 +134,36 @@ function toolBlocked(blockTools, stadium = null) {
 }
 
 /**
- * Rule-box wording in the attacker clause. "Pokémon-GX and Pokémon-EX" is
- * any-of (the parsed `attackerSubtypes` already enforces it); a lone
- * "Pokémon-EX" / "Pokémon-GX" narrows to that subtype. Treating the compound
- * as AND made every Fairy Charm fail against GX attackers (audit S&M F3).
+ * Rule-box wording in the attacker clause. Only the "attacks (from|of) your
+ * opponent's …" segment counts — a trailing reminder like "(Pokémon V,
+ * Pokémon-GX, etc. have Rule Boxes.)" must not gate the effect (Pot Helmet).
+ * Within the clause the listed subtypes are any-of: "Pokémon-GX and Pokémon-EX"
+ * (Fairy Charm, audit S&M F3) and "Pokémon V or Pokémon-GX" (Pot Helmet) both
+ * accept any listed class, while a lone "Pokémon-EX" narrows to EX.
  */
 function attackerMatchesPrintedRuleBox(t, attacker) {
-  const mentionsEx = /pok[eé]mon[-\s]?ex\b|pokemon[-\s]?ex\b/i.test(t);
-  const mentionsGx = /pok[eé]mon[-\s]?gx\b|pokemon[-\s]?gx\b/i.test(t);
-  if (mentionsEx && !mentionsGx && !isExCard(attacker)) return false;
-  if (mentionsGx && !mentionsEx && !isGxCard(attacker)) return false;
-  return true;
+  const clauses = [...t.matchAll(/attacks? (?:from|of) your opponent'?s ([^.]*)/gi)]
+    .map((m) => m[1])
+    .join(' ');
+  if (!clauses) {
+    // Legacy fallback for wordings without the attacker clause.
+    const mentionsEx = /pok[eé]mon[-\s]?ex\b|pokemon[-\s]?ex\b/i.test(t);
+    const mentionsGx = /pok[eé]mon[-\s]?gx\b|pokemon[-\s]?gx\b/i.test(t);
+    if (mentionsEx && !mentionsGx && !isExCard(attacker)) return false;
+    if (mentionsGx && !mentionsEx && !isGxCard(attacker)) return false;
+    return true;
+  }
+  const tokens = new Set(
+    [...clauses.matchAll(/\b(gx|ex|vmax|vstar|v)\b/gi)].map((m) => m[1].toLowerCase())
+  );
+  if (tokens.size === 0) return true;
+  return [...tokens].some((token) => {
+    if (token === 'gx') return isGxCard(attacker);
+    if (token === 'ex') return isExCard(attacker);
+    if (token === 'v') return isVCard(attacker);
+    const subtypes = (attacker?.subtypes || []).map((s) => String(s).toLowerCase());
+    return subtypes.includes(token);
+  });
 }
 
 export function preventionForCard(card, attacker, ctx = {}) {
@@ -202,9 +221,8 @@ export function reductionForCard(card, defender, attacker, { skipSymbolFilter = 
   if (/have an ability|has an ability/i.test(t) && !cardHasAbility(attacker)) {
     return 0;
   }
-  if (/pokémon v\b|pokemon v\b/i.test(t) && !isVCard(attacker)) {
-    return 0;
-  }
+  // The clause-scoped rule-box check owns V/GX/EX (a whole-text "Pokémon V"
+  // scan made Pot Helmet's "V or Pokémon-GX" fail on GX attackers).
   if (!attackerMatchesPrintedRuleBox(t, attacker)) {
     return 0;
   }

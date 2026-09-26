@@ -10,6 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { extractSpanInnerHtml } from './lib/pkmn-article-html.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -68,9 +69,9 @@ function parseCards(html) {
   let m;
   while ((m = articleRe.exec(html)) !== null) {
     const block = m[1];
-    // The name span may contain nested symbol markup; match through to the
-    // wrapping </div>, not the first inner </span>.
-    const name = firstMatch(block, /<span class="name" title="Name">([\s\S]*?)<\/span><\/div>/);
+    // Balance-scan the name span: nested symbol markup stays, a following
+    // sibling span (e.g. "60 HP") stays out.
+    const name = htmlToText(extractSpanInnerHtml(block, 'name'));
     const set = firstMatch(block, /<span title="Set">([\s\S]*?)<\/span>/);
     const number = firstMatch(block, /<span class="number">([\s\S]*?)<\/span>/);
     const urlMatch = block.match(/<a href="([^"]+)" class="card-link"/);

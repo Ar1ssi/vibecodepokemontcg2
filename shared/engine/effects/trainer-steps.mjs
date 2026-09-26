@@ -4184,6 +4184,16 @@ function toolsToHand(ctx) {
 function discardRandomOpponentHandIfSupporter(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  // Mars prints "Draw 2 cards. If you do, discard …": when the draw clause
+  // drew nothing, the follow-up does not resolve (review finding 6).
+  if (
+    ctx.step.requiresDraw &&
+    !(ctx.events || []).some(
+      (event) => event.type === 'cardsDrawn' && event.playerId === ctx.playerId && event.count > 0
+    )
+  ) {
+    return skip(ctx, 'draw_failed');
+  }
   const hand = opponent.zones.hand || [];
   if (hand.length === 0) return skip(ctx, 'empty_hand');
   const at = Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * hand.length);

@@ -1048,6 +1048,32 @@ test('Fairy Charms filter typed, rule-box, Ability and Ultra Beast attackers (F3
   );
 });
 
+// Review finding 3: the reminder "(Pokémon V, Pokémon-GX, etc. have Rule Boxes.)"
+// must not gate the attacker — the Rule Box condition is the HOLDER's.
+test('Pot Helmet reduces for any attacker; the Rule Box gate is the holder', () => {
+  const helmet = tool(
+    'Pot Helmet',
+    'If the Pokémon this card is attached to doesn’t have a Rule Box, it takes 30 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance). (Pokémon V, Pokémon-GX, etc. have Rule Boxes.)'
+  );
+  const holder = mkMon({ name: 'Plain Holder' });
+  const plain = mkMon({ name: 'Plain Attacker' });
+  const v = mkMon({ name: 'Zacian V', subtypes: ['Basic', 'V'], hp: 220 });
+  const gx = mkMon({ name: 'Mewtwo-GX', subtypes: ['Basic', 'GX'], hp: 180 });
+  for (const attacker of [plain, v, gx]) {
+    assert.equal(
+      applyToolDamageReduction(100, holder, withTool(holder, helmet), attacker),
+      70,
+      attacker.name
+    );
+  }
+  const exHolder = mkMon({ name: 'Body ex', subtypes: ['Basic', 'ex'] });
+  assert.equal(
+    applyToolDamageReduction(100, exHolder, withTool(exHolder, helmet), plain),
+    100,
+    'an ex holder fails the printed condition'
+  );
+});
+
 // Audit S&M F4: the holder phrase is a name list, not one literal string.
 test('Ancient Crystal holder name list (Regirock, Regice, Registeel, or Regigigas) (F4)', () => {
   const crystal = tool(

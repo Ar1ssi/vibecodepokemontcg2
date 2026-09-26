@@ -2515,11 +2515,11 @@ describe('Audit S&M compound clauses (S6)', () => {
     assert.match(describeStep(r.steps[0]), /whole hand/);
   });
 
-  test('Missing Clover single mode looks at 1 card, not the default 7', () => {
+  test('Missing Clover single mode peeks at 1 card (no take, no shuffle)', () => {
     const r = parseTrainerEffect(
       'You may play 4 Missing Clover cards at once. If you played 1 card, look at the top card of your deck. If you played 4 cards, take a Prize card. (This effect works one time for 4 cards.)'
     );
-    assert.equal(r.steps[0].type, 'lookAtTop');
+    assert.equal(r.steps[0].type, 'peekReturn');
     assert.equal(r.steps[0].count, 1);
   });
 
@@ -2533,6 +2533,16 @@ describe('Audit S&M compound clauses (S6)', () => {
     const headsOnly = parseTrainerEffect('Flip a coin. If heads, draw 2 cards.');
     assert.equal(headsOnly.steps.length, 1);
     assert.equal(headsOnly.steps[0].type, 'coinFlip');
+  });
+
+  test("Gardenia's Vigor: the leading draw runs before the attach", () => {
+    const r = parseTrainerEffect(
+      'Draw 2 cards. If you drew any cards in this way, attach up to 2 {G} Energy cards from your hand to 1 of your Benched Pokémon.'
+    );
+    assert.deepEqual(r.steps.map((s) => s.type), ['draw', 'attachFromHand']);
+    assert.equal(r.steps[0].count, 2);
+    assert.equal(r.steps[1].handCount, 2);
+    assert.deepEqual(r.steps[1].handEnergy, { basic: true, types: ['grass'] });
   });
 
   test("Mars: the random discard follows the draw", () => {

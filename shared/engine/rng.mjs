@@ -187,17 +187,19 @@ export function shuffleInPlace(rng, array) {
  */
 export function flipCoin(rng) {
   const face = (rng ? rng.next() : 0.5) < 0.5 ? 'heads' : 'tails';
-  if (rng?.forcedCoin) {
-    const forced = rng.forcedCoin;
-    // A one-shot force (Will) is consumed by the first flip it governs. The
-    // usage marker is a shared object so it survives Object.create chains.
-    if (rng.forcedCoinOnce) {
-      rng.forcedCoin = null;
-      if (rng.forcedCoinUsed) rng.forcedCoinUsed.value = true;
+  if (!rng?.forcedCoin) return face;
+  if (rng.forcedCoinOnce) {
+    // A one-shot force (Will) governs only the first flip. The usage marker is
+    // a shared object so it survives Object.create chains.
+    if (rng.forcedCoinUsed?.value) {
+      // Spent: fall back to an inherited all-flips force (Malamar Contrary
+      // under Will), else the raw face. Must not shadow the parent's force.
+      return rng.forcedCoinParent?.forcedCoin || face;
     }
-    return forced;
+    if (rng.forcedCoinUsed) rng.forcedCoinUsed.value = true;
+    return rng.forcedCoin;
   }
-  return face;
+  return rng.forcedCoin;
 }
 
 /** `rng` with every `flipCoin` result forced to `face`; other draws are unchanged. */
@@ -213,5 +215,6 @@ export function withForcedCoinOnce(rng, face) {
   forced.forcedCoin = face;
   forced.forcedCoinOnce = true;
   forced.forcedCoinUsed = { value: false };
+  forced.forcedCoinParent = rng;
   return forced;
 }

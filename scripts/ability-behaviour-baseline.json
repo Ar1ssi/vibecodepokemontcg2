@@ -2,19 +2,19 @@
   "corpusRows": 4228,
   "totals": {
     "n": 4228,
-    "runs": 1675,
-    "partial": 257,
-    "dead": 62,
-    "consumed": 1169,
-    "unconsumed": 1064,
+    "runs": 1681,
+    "partial": 254,
+    "dead": 59,
+    "consumed": 1177,
+    "unconsumed": 1056,
     "unparsed": 1
   },
   "families": {
     "attach": {
       "n": 211,
-      "runs": 169,
+      "runs": 172,
       "partial": 2,
-      "dead": 12,
+      "dead": 9,
       "consumed": 0,
       "unconsumed": 28,
       "unparsed": 0
@@ -114,8 +114,8 @@
       "runs": 1,
       "partial": 13,
       "dead": 0,
-      "consumed": 197,
-      "unconsumed": 94,
+      "consumed": 192,
+      "unconsumed": 99,
       "unparsed": 0
     },
     "damage-reduce": {
@@ -147,8 +147,8 @@
     },
     "discard-cost": {
       "n": 2,
-      "runs": 1,
-      "partial": 1,
+      "runs": 2,
+      "partial": 0,
       "dead": 0,
       "consumed": 0,
       "unconsumed": 0,
@@ -258,8 +258,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 4,
-      "unconsumed": 18,
+      "consumed": 5,
+      "unconsumed": 17,
       "unparsed": 0
     },
     "joke": {
@@ -276,8 +276,8 @@
       "runs": 10,
       "partial": 1,
       "dead": 0,
-      "consumed": 14,
-      "unconsumed": 38,
+      "consumed": 15,
+      "unconsumed": 37,
       "unparsed": 0
     },
     "look-at-top": {
@@ -318,11 +318,11 @@
     },
     "opponent-disrupt": {
       "n": 223,
-      "runs": 41,
-      "partial": 38,
+      "runs": 42,
+      "partial": 37,
       "dead": 0,
-      "consumed": 62,
-      "unconsumed": 82,
+      "consumed": 61,
+      "unconsumed": 83,
       "unparsed": 0
     },
     "passive": {
@@ -357,14 +357,14 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 74,
-      "unconsumed": 98,
+      "consumed": 88,
+      "unconsumed": 84,
       "unparsed": 0
     },
     "search": {
       "n": 295,
-      "runs": 236,
-      "partial": 50,
+      "runs": 237,
+      "partial": 49,
       "dead": 3,
       "consumed": 0,
       "unconsumed": 6,
@@ -447,8 +447,8 @@
       "runs": 1,
       "partial": 3,
       "dead": 0,
-      "consumed": 207,
-      "unconsumed": 111,
+      "consumed": 205,
+      "unconsumed": 113,
       "unparsed": 0
     },
     "when-played": {

@@ -273,17 +273,17 @@
     "fossilItem"
    ]
   },
-  "Antique Cover Fossil · 60 HP#1c5ieek": {
+  "Antique Cover Fossil#1c5ieek": {
    "steps": [
     "fossilItem"
    ]
   },
-  "Antique Dome Fossil · 60 HP#gcvvwo": {
+  "Antique Dome Fossil#gcvvwo": {
    "steps": [
     "fossilItem"
    ]
   },
-  "Antique Helix Fossil · 60 HP#17bltkn": {
+  "Antique Helix Fossil#17bltkn": {
    "steps": [
     "fossilItem"
    ]
@@ -293,7 +293,7 @@
     "fossilItem"
    ]
   },
-  "Antique Old Amber · 60 HP#1oqahkw": {
+  "Antique Old Amber#1oqahkw": {
    "steps": [
     "fossilItem"
    ]
@@ -303,7 +303,7 @@
     "fossilItem"
    ]
   },
-  "Antique Root Fossil · 60 HP#1rwxrf6": {
+  "Antique Root Fossil#1rwxrf6": {
    "steps": [
     "fossilItem"
    ]
@@ -377,17 +377,17 @@
     "searchDeck"
    ]
   },
-  "Armor Fossil · 50 HP#1lvipqm": {
+  "Armor Fossil Shieldon#1fnmd37": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Armor Fossil#1lvipqm": {
    "gaps": [
     "passive-only"
    ],
    "steps": [
     "passive"
-   ]
-  },
-  "Armor Fossil Shieldon#1fnmd37": {
-   "steps": [
-    "lookAtBottom"
    ]
   },
   "Aroma Lady#q8ge6t": {
@@ -1463,41 +1463,41 @@
     "searchDeck"
    ]
   },
-  "Claw Fossil · 40 HP#19kwe37": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Claw Fossil · 40 HP#19my7c3": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Claw Fossil · 40 HP#1cjn1c2": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Claw Fossil · 40 HP#51weil": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
   "Claw Fossil Anorith#1syr0c6": {
    "steps": [
     "lookAtBottom"
+   ]
+  },
+  "Claw Fossil#19kwe37": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil#19my7c3": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil#1cjn1c2": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Claw Fossil#51weil": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Clay#134nfrs": {
@@ -1513,7 +1513,7 @@
     "passive"
    ]
   },
-  "Clefairy Doll · 10 HP#zed4wn": {
+  "Clefairy Doll#zed4wn": {
    "gaps": [
     "passive-only"
    ],
@@ -2139,14 +2139,14 @@
     "draw"
    ]
   },
-  "Dome Fossil · 50 HP#14uval6": {
-   "steps": [
-    "searchDeck"
-   ]
-  },
   "Dome Fossil Kabuto#1sempr3": {
    "steps": [
     "lookAtBottom"
+   ]
+  },
+  "Dome Fossil#14uval6": {
+   "steps": [
+    "searchDeck"
    ]
   },
   "Double Full Heal#i8oyu": {
@@ -3804,14 +3804,14 @@
     "passive"
    ]
   },
-  "Helix Fossil · 50 HP#11qaq43": {
-   "steps": [
-    "searchDeck"
-   ]
-  },
   "Helix Fossil Omanyte#td1k2w": {
    "steps": [
     "lookAtBottom"
+   ]
+  },
+  "Helix Fossil#11qaq43": {
+   "steps": [
+    "searchDeck"
    ]
   },
   "Here Comes Team Rocket!#1t6a3zu": {
@@ -4601,7 +4601,7 @@
     "passive"
    ]
   },
-  "Lillie’s Poké Doll · 30 HP#1w8pkz3": {
+  "Lillie’s Poké Doll#1w8pkz3": {
    "steps": [
     "fossilItem"
    ]
@@ -5294,7 +5294,7 @@
   },
   "Missing Clover#1gi5u2g": {
    "steps": [
-    "lookAtTop"
+    "peekReturn"
    ]
   },
   "Misty & Lorelei#xs3g10": {
@@ -5498,7 +5498,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil · 10 HP#14qgz1q": {
+  "Mysterious Fossil#14qgz1q": {
    "gaps": [
     "passive-only"
    ],
@@ -5506,7 +5506,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil · 10 HP#19y7j4h": {
+  "Mysterious Fossil#173hz68": {
    "gaps": [
     "passive-only"
    ],
@@ -5514,7 +5514,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil · 10 HP#1dt5623": {
+  "Mysterious Fossil#19y7j4h": {
    "gaps": [
     "passive-only"
    ],
@@ -5522,7 +5522,7 @@
     "passive"
    ]
   },
-  "Mysterious Fossil · 50 HP#173hz68": {
+  "Mysterious Fossil#1dt5623": {
    "gaps": [
     "passive-only"
    ],
@@ -5743,17 +5743,17 @@
     "swapWithDiscard"
    ]
   },
-  "Old Amber · 50 HP#1rbxrsm": {
+  "Old Amber Aerodactyl#1sb1w2p": {
+   "steps": [
+    "lookAtBottom"
+   ]
+  },
+  "Old Amber#1rbxrsm": {
    "gaps": [
     "passive-only"
    ],
    "steps": [
     "passive"
-   ]
-  },
-  "Old Amber Aerodactyl#1sb1w2p": {
-   "steps": [
-    "lookAtBottom"
    ]
   },
   "Old Cemetery#i8hirs": {
@@ -6861,7 +6861,7 @@
     "evolveStage2"
    ]
   },
-  "Rare Fossil · 70 HP#2bmm1t": {
+  "Rare Fossil#2bmm1t": {
    "steps": [
     "fossilItem"
    ]
@@ -7066,7 +7066,7 @@
     "recursion"
    ]
   },
-  "Robo Substitute Team Flare Gear · 30 HP#f5bcgs": {
+  "Robo Substitute Team Flare Gear#f5bcgs": {
    "steps": [
     "fossilItem"
    ]
@@ -7180,41 +7180,41 @@
     "coinFlip"
    ]
   },
-  "Root Fossil · 40 HP#1ebuuqs": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Root Fossil · 40 HP#1rgszlr": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Root Fossil · 40 HP#f228fa": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
-  "Root Fossil · 40 HP#f511lx": {
-   "gaps": [
-    "passive-only"
-   ],
-   "steps": [
-    "passive"
-   ]
-  },
   "Root Fossil Lileep#7rnasc": {
    "steps": [
     "lookAtBottom"
+   ]
+  },
+  "Root Fossil#1ebuuqs": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil#1rgszlr": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil#f228fa": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
+   ]
+  },
+  "Root Fossil#f511lx": {
+   "gaps": [
+    "passive-only"
+   ],
+   "steps": [
+    "passive"
    ]
   },
   "Rosa’s Encouragement#1ym480p": {
@@ -7710,7 +7710,7 @@
     "unrecognizable"
    ]
   },
-  "Skull Fossil · 50 HP#1687sdy": {
+  "Skull Fossil#1687sdy": {
    "gaps": [
     "passive-only"
    ],
@@ -7775,7 +7775,7 @@
     "unrecognizable"
    ]
   },
-  "Snorlax Doll · 120 HP#1is2mug": {
+  "Snorlax Doll#1is2mug": {
    "gaps": [
     "passive-only"
    ],
@@ -9058,12 +9058,12 @@
     "opponentDraw"
    ]
   },
-  "Unidentified Fossil · 60 HP#yuoarh": {
+  "Unidentified Fossil#1v37j2a": {
    "steps": [
     "fossilItem"
    ]
   },
-  "Unidentified Fossil#1v37j2a": {
+  "Unidentified Fossil#yuoarh": {
    "steps": [
     "fossilItem"
    ]

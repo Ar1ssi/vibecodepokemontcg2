@@ -3987,11 +3987,17 @@ export function validateLegality(state, command) {
           reason: "Asleep — this Pokémon can't attack or retreat.",
         };
       }
-      // Blizzard Town: both players' Pokémon at 40 HP or less remaining can't attack.
-      const attackLockReason = stadiumAttackLockReason(
-        state.stadium?.card || state.stadium,
-        active
-      );
+      // Blizzard Town: both players' Pokémon at 40 HP or less remaining can't
+      // attack. Read the in-play (top evolution) effective HP, not the Basic
+      // root's printed HP; unknown stats fail open.
+      const activeEffectiveHp = cardEffectiveHp(state, active, playerId);
+      const attackLockReason =
+        activeEffectiveHp > 0
+          ? stadiumAttackLockReason(state.stadium?.card || state.stadium, {
+              hp: activeEffectiveHp,
+              damage: active.damage || 0,
+            })
+          : null;
       if (attackLockReason) return { allowed: false, reason: attackLockReason };
       const atkIdx = payload?.attackIndex ?? 0;
       const attacks = attackViewFor(state, active).attacks || [];

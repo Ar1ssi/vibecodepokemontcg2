@@ -2039,4 +2039,36 @@ test('stadium: Blizzard Town blocks attacks at 40 HP or less remaining, not by l
   );
   assert.equal(allowed.error, null);
   assert.equal(allowed.state.players.p2.zones.active[0].damage, 30);
+
+  // An evolved attacker reads the top evolution's HP: the Basic root's 60 HP
+  // (20 damage) must not lock a 120-HP Stage 1 (review finding 2).
+  state.players.p1.zones.active.length = 0;
+  const root = createCard({
+    instanceId: 30,
+    name: 'Snorunt',
+    hp: 60,
+    damage: 20,
+    stage: 'Basic',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    attacks: [],
+  });
+  const evo = createCard({
+    instanceId: 31,
+    name: 'Glalie',
+    hp: 120,
+    stage: 'Stage 1',
+    evolvesFrom: 'Snorunt',
+    supertype: 'Pokémon',
+    type: 'Pokémon',
+    attachedTo: 30,
+    attacks: [{ name: 'Icicle', cost: [], damage: 30 }],
+  });
+  state.players.p1.zones.active.push(root, evo);
+  const evolvedAllowed = applyCommand(
+    state,
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' },
+    rng
+  );
+  assert.equal(evolvedAllowed.error, null, '100 HP remaining on the Stage 1 must be allowed');
 });

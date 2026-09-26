@@ -1031,4 +1031,21 @@ test('Mars: a non-Supporter random card is still discarded', () => {
   assert.equal(res.state.players.p1.zones.hand.length, 2, 'drew 2');
   assert.equal(res.state.players.p2.zones.hand.length, 0);
   assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === 110));
+
+  // "If you do": with an empty deck the draw clause draws nothing and the
+  // discard does not resolve (review finding 6).
+  const dry = setupGame();
+  dry.state.players.p2.zones.hand.push(
+    createCard({ instanceId: 140, name: 'Water Energy', type: 'Energy' })
+  );
+  dry.state.players.p1.zones.hand.push(
+    createCard({ ...mars, instanceId: 141 })
+  );
+  const noDraw = applyCommand(
+    dry.state,
+    { type: 'playTrainer', payload: { instanceId: 141 }, playerId: 'p1' },
+    dry.rng
+  );
+  assert.equal(noDraw.error, null);
+  assert.equal(noDraw.state.players.p2.zones.hand.length, 1, 'no draw, no discard');
 });
