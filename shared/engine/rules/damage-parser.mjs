@@ -430,6 +430,15 @@ export function parseAttackDamage(
     ) {
       count = opponentEnergyCount;
       label = "Energy on opponent's Active Pokémon";
+    } else if (/energy attached to both active pok[ée]mon/.test(unit)) {
+      // Teal Mask Ogerpon ex Myriad Leaf Shower: the count spans both Active
+      // Pokémon. Stay unresolved unless the caller supplied both counts.
+      const own = typeof ctx.energyCount === 'number' ? ctx.energyCount : undefined;
+      count =
+        own === undefined || typeof opponentEnergyCount !== 'number'
+          ? undefined
+          : own + opponentEnergyCount;
+      label = 'Energy on both Active Pokémon';
     } else if (/energy attached/.test(unit)) {
       count = energyCount;
       label = 'Energy attached';

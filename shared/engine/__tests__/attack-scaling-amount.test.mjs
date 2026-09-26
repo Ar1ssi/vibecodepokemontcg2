@@ -103,6 +103,13 @@ const FULL_BURST = {
   text: 'This attack does 30 damage times the amount of Energy attached to this Pokémon.',
 };
 
+const MYRIAD_LEAF_SHOWER = {
+  name: 'Myriad Leaf Shower',
+  cost: ['Grass', 'Grass', 'Grass'],
+  damage: 30,
+  text: 'This attack does 30 more damage for each Energy attached to both Active Pokémon.',
+};
+
 const ESPEON_PSYCHIC = {
   name: 'Psychic',
   cost: ['Psychic', 'Colorless', 'Colorless'],
@@ -168,6 +175,17 @@ test('Energy Drive counts Energy on both Active Pokémon (20 x 7 = 140)', () => 
   const res = attackWith(state);
   assert.ok(!res.error, `unexpected error: ${res.error}`);
   assert.equal(damageOf(res.state, 'p2', 'active', 20), 140);
+});
+
+test('Myriad Leaf Shower adds 30 per Energy on both Active Pokémon (30 + 30 x 5 = 180)', () => {
+  const state = board({
+    attack: MYRIAD_LEAF_SHOWER,
+    attackerEnergy: ['Grass', 'Grass', 'Grass'],
+    defenderEnergy: ['Water', 'Colorless'],
+  });
+  const res = attackWith(state);
+  assert.ok(!res.error, `unexpected error: ${res.error}`);
+  assert.equal(damageOf(res.state, 'p2', 'active', 20), 180);
 });
 
 test('Full Burst counts Energy on this Pokémon (30 x 8 = 240)', () => {
