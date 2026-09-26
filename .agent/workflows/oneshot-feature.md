@@ -76,7 +76,8 @@ Per slice, in order:
 5. Red twice with nothing new learned → run debug.md on that failure. Still blocked → Stopping rule.
 6. Design wrong: cosmetic → `## Deviations`. Structural → fix the design first, log it under
    Deviations, continue. No re-gate — unless the fix crosses the authorization list above.
-`Agents: ok` → a slice with a pinned contract can go to a builder subagent (brief = design path +
+`Agents: ok` → a slice with a pinned contract goes to the `slice-builder` agent (Opus 5.5, low effort;
+it returns instead of guessing at an unpinned choice — then you decide) (brief = design path +
 slice row + files). You rerun the tests and read its diff against Acceptance before ticking.
 
 ## 4 · Verify against the brief, not the design
