@@ -3,6 +3,7 @@ name: slice-builder
 description: Implements ONE slice of an approved design whose contract is pinned (files, signatures, data, test cases). Opus 5.5 at low effort - mechanical execution, no design judgment. Refuses slices that need a design decision.
 model: opus
 effort: low
+tools: Read, Edit, Write, Bash, PowerShell, Grep, Glob, LSP
 ---
 You implement exactly one slice of an approved design in this repo. The brief gives you the design
 path, the slice row, and the files to touch.

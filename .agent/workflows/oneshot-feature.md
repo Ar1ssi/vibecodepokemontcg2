@@ -14,7 +14,7 @@ work at the close, not before. It does NOT authorize:
 - landing on `main` or pushing, unless the prompt says `Land: main` / `Land: main+push`;
 - anything irreversible — data deletion, a migration without a revert path, force operations;
 - work outside the request. Adjacent bugs become ISSUES lines, not edits;
-- subagents, unless the prompt says `Agents: ok` (the Agent tool's spawn gate outranks this file).
+- subagents beyond what `.agent/DELEGATION.md` picks, or any at all when the prompt says `Agents: none`.
 
 ## How the user invokes it (prompt template; every line after the first is optional)
 ```
@@ -22,7 +22,7 @@ One-shot: <the feature in a few lines>   — or —   One-shot <path/to/implemen
 Must: <acceptance criteria, in the user's words>
 Out of scope: <what to leave alone>
 Land: branch (default) | main | main+push
-Agents: none (default) | ok
+Agents: auto (default — DELEGATION.md decides) | none
 ```
 Name cards by exact name + set code; the run looks their text up (CLAUDE.md prime directive 7).
 
@@ -79,7 +79,7 @@ Per slice, in order:
 6. Design wrong: cosmetic → `## Deviations`. Structural, or the slice needs a choice its row
    doesn't pin → back to §2: decide it, re-pin the row, log it under Deviations, then build.
    No re-gate — unless the fix crosses the authorization list above.
-`Agents: ok` → a slice with a pinned contract goes to the `slice-builder` agent (Opus 5.5, low effort;
+Before each slice, run DELEGATION.md's table: a big pinned slice goes to `slice-builder` (low effort;
 it returns instead of guessing at an unpinned choice — then you decide) (brief = design path +
 slice row + files). You rerun the tests and read its diff against Acceptance before ticking.
 
@@ -94,8 +94,8 @@ slice row + files). You rerun the tests and read its diff against Acceptance bef
 ## 5 · Review — hostile fresh eyes
 1. Read `git diff main...HEAD` in full: unhandled error paths · debug leftovers · drift from the
    design · pattern drift from neighbors · tests that could never fail · hidden-info leaks.
-2. Engine, rules, or netcode diff → review.md by an agent that did not write it. `Agents: ok` → run
-   it now and fix findings. Otherwise offer it at the close; this diff does not land until it's done.
+2. Engine, rules, or netcode diff → review.md by an agent that did not write it (DELEGATION.md row 12):
+   run it now and fix findings. `Agents: none` → offer it at the close; the diff does not land until it's done.
 3. Delete pass: remove what the feature made obsolete; bigger removals → ISSUES lines.
 
 ## 6 · Close

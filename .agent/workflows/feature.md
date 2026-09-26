@@ -51,6 +51,8 @@ Per slice, in order:
    no TODO, no stub, no "for now".
 2. Write tests for the slice's behavior, covering its edge-case rows; tick each row in the
    design: `[x] covered: <test name>`.
+   Before each slice: DELEGATION.md's table — a big pinned slice goes to `slice-builder`, FX to
+   `fx-designer`; you still verify (its §After it returns) and commit.
 3. Run narrow tests, then the project test command. Green → commit on the feature branch
    (`feature <slug> slice <k>: <summary>`); post a 1-line progress note
    (slice k/N: what now works) so an attending user can redirect early.
@@ -65,7 +67,7 @@ Per slice, in order:
 
 ## 5 · Review — you are now the Reviewer: hostile fresh eyes
 (Required for engine/rules/netcode diffs, best for all: a subagent runs `workflows/review.md` on the
-diff — clean context that didn't write it (CLAUDE.md § Delegation). Spawning gated → offer it before
+diff — clean context that didn't write it (DELEGATION.md row 12). Spawning forbidden → offer it before
 landing; no subagents → suggest the user run it in a fresh session.)
 Read the complete diff and hunt: unhandled error paths · dead code / debug leftovers ·
 naming or pattern drift vs neighboring code · diff ≠ design (drift) · tests that could never fail.

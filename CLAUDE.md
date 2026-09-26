@@ -66,9 +66,11 @@ END — whenever you changed anything:
 Each workflow states an exit test; on the fence, start with the lighter workflow.
 
 ## Delegation
-- Spawn only when the user asks (the Agent tool's gate outranks this file); otherwise offer it in one line.
+- Whether to spawn is a cost call: run `.agent/DELEGATION.md` (cost model + decision table) before
+  any spawn and at each slice boundary. The user's standing request there authorizes the spawns its
+  table picks; a prompt saying `Agents: none` or "no agents" overrides it. Tool forbids spawning → offer in one line.
 - Delegable: read-only exploration (returns `path:line`, never file contents), `review.md` on this
-  session's diff, or one design slice with a pinned contract. Briefs are self-contained.
+  session's diff, a pinned slice (`slice-builder`), or visual work (`fx-designer`). Briefs point at files.
 - Engine, rules, netcode, and hard-to-reverse diffs get `review.md` from an agent that didn't write
   them before landing on `main`. Gated? Offer it at the task close.
 - Models: judgment work inherits Opus 5.5 · grunt work → `sonnet`/`haiku` · `fable` only on request.

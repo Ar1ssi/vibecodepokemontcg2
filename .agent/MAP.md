@@ -3,8 +3,8 @@
      Cap 120 lines: when over, collapse a subtree into .agent/areas/<x>.md and keep one line here
      pointing at it. `(?)` marks unverified bootstrap guesses — verify on first visit, then remove. -->
 
-.agent/ — agent harness: state, workflows, designs, journal (human manual: .agent/README.md)
-.claude/agents/ — project subagents: slice-builder (low effort, pinned-contract slices; D168), fx-designer (high effort, board visuals/CSS in the 041–046 house style; D170)
+.agent/ — agent harness: state, workflows, designs, journal (human manual: .agent/README.md); spawn-or-inline cost guide: .agent/DELEGATION.md
+.claude/agents/ — project subagents: slice-builder (low effort, pinned-contract slices; D171), fx-designer (high effort, board visuals/CSS in the 041–046 house style; D173)
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
 server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views)
 shared/tcgdex/ — TCGdex URL builder (browser → server proxy server/tcgdex-proxy.mjs, D164) + IndexedDB JSON cache (D102)

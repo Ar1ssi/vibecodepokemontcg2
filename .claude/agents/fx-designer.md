@@ -3,6 +3,7 @@ name: fx-designer
 description: Designs and builds board visuals in this repo — mat FX scenes (evolve, KO, draws, prizes, Trainer plays), CSS for mats/zones/holo/drop hovers, animation timing. Works in the house FX style of designs 041–046. Use for new or reworked visual effects and CSS/layout work; not for rules, netcode, or deck-builder logic.
 model: opus
 effort: high
+tools: Read, Edit, Write, Bash, PowerShell, Grep, Glob, LSP, Skill
 skills:
   - fx-preview
 ---

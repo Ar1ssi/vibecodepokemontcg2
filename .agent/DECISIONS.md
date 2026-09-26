@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D174).
+#   Next id = highest D number in this file and the archive + 1 (next: D175).
 
 ## Active
+- D174 2026-09-26 [harness] Delegation is a cost call via .agent/DELEGATION.md (measured cold starts, break-even ~25k tokens, decision table); user standing request authorizes its picks, `Agents: none` opts out. Agents get tools allowlists (~30k -> ~17-19k start).
 - D173 2026-09-26 [harness] Effort ladder: high plan/debug/review, xhigh schema/netcode/engine design, medium patch, low pinned slice. `fx-designer` agent (high) carries the 041-046 FX house rules; rec-*.mjs scripts now tracked in fx-preview/rec/.
 - D172 2026-09-26 [harness] Judgment ends at the Work plan: every slice row is a pinned contract (files, signatures, input->expected tests, cited rulings; banned vague words); a build-time choice returns to design - lets slices run at low effort (D171).
 - D171 2026-09-26 [harness] Opus 5.5 `low` effort only for pinned-contract slice execution, via `.claude/agents/slice-builder.md` (`effort: low`); design/debug/review/rules stay `medium`+ - a session cannot lower its own effort.
