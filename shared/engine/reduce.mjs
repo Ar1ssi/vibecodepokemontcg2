@@ -685,6 +685,26 @@ function attachLockReason(state, card, targetInstanceId) {
 }
 
 /**
+ * Player-scoped play locks an opponent's attack left behind (Distort, Sonic Volume, Heavy Rock,
+ * Horror House; design 048). A lock counts on the target's next turn and expires by turn number.
+ * @param {object} player The acting player (owner of the lock)
+ * @param {string[]} kinds Card kinds being played: 'item'|'supporter'|'stadium'|'trainer'|
+ *   'basicEnergy'|'specialEnergy'|'pokemon'
+ * @param {number} turnNumber Current turn number
+ * @returns {string|null} refusal reason
+ */
+function playLockReason(player, kinds, turnNumber) {
+  const locks = (player?.playLocks || []).filter((lock) => (lock.untilTurn || 0) >= turnNumber);
+  if (locks.length === 0) return null;
+  const blocked = locks.some((lock) =>
+    (lock.kinds || []).some((kind) => kind === 'any' || kinds.includes(kind))
+  );
+  return blocked
+    ? "Your opponent's attack stops you playing that card during this turn."
+    : null;
+}
+
+/**
  * Ability-side combat reads for one attack (design 034 slice 2): the
  * attacker's bonus and extra types plus the defender's reduction, prevention
  * and Weakness override, in the option shape computeAttackDamage consumes.
@@ -3667,6 +3687,10 @@ export function validateLegality(state, command) {
         payload.from === 'hand' &&
         (payload.to === 'bench' || payload.to === 'active')
       ) {
+        // Heavy Rock/Horror House: "can't play any cards from their hand" blocks playing
+        // Basic Pokémon from hand as well (design 048).
+        const handPlayLock = playLockReason(player, ['pokemon'], state.turn?.number || 1);
+        if (handPlayLock) return { allowed: false, reason: handPlayLock };
         const cardRef = findCard(state, payload.instanceId);
         if (cardRef && !isPokemon(cardRef.card)) {
           return {
@@ -3712,6 +3736,13 @@ export function validateLegality(state, command) {
       if (cardRef?.zoneId === 'hand') {
         const lockReason = attachLockReason(state, cardRef.card, payload.targetInstanceId);
         if (lockReason) return { allowed: false, reason: lockReason };
+        // Distort/Sonic Volume/Heavy Rock/Horror House: playing an Energy card from hand
+        // (Special-only or any card) can be locked for the opponent's next turn (design 048).
+        if (isEnergy(cardRef.card)) {
+          const energyKinds = isSpecialEnergyCard(cardRef.card) ? ['specialEnergy'] : ['basicEnergy'];
+          const handLock = playLockReason(player, energyKinds, state.turn?.number || 1);
+          if (handLock) return { allowed: false, reason: handLock };
+        }
       }
       // "This card can only be attached to …" (Team Rocket's Energy, Shield Energy, …).
       if (cardRef?.zoneId === 'hand' && isEnergy(cardRef.card) && isSpecialEnergyCard(cardRef.card)) {
@@ -4022,6 +4053,17 @@ export function validateLegality(state, command) {
           reason: 'Only one GX attack can be used per game.',
         };
       }
+      // Iron Rule-GX (design 048): a player-scoped attack lock from the opponent's last turn,
+      // covering Pokémon that came into play after the lock landed.
+      if (
+        player.attackLockUntilTurn &&
+        player.attackLockUntilTurn >= (state.turn?.number || 1)
+      ) {
+        return {
+          allowed: false,
+          reason: "Your opponent's attack stops your Pokémon attacking this turn.",
+        };
+      }
       if (
         active.cannotAttackUntilTurn &&
         active.cannotAttackUntilTurn >= (state.turn?.number || 1)
@@ -4267,6 +4309,14 @@ export function validateLegality(state, command) {
           ),
         });
         if (blockReason) return { allowed: false, reason: blockReason };
+        // Opponent-attack play locks (Distort/Sonic Volume/Heavy Rock/Horror House): Item-only,
+        // Special-Energy-only, Trainer-wide, or every card from hand (design 048).
+        const trainerKinds = [
+          isSupporter ? 'supporter' : subStr.includes('stadium') ? 'stadium' : 'item',
+          'trainer',
+        ];
+        const attackPlayLock = playLockReason(player, trainerKinds, state.turn?.number || 1);
+        if (attackPlayLock) return { allowed: false, reason: attackPlayLock };
         // Ability play locks (Gothitelle/Trevenant Items, Copperajah Stadiums,
         // Genesect ACE SPEC, Team Rocket's Arbok Pokémon): the opponent's
         // in-play Abilities, or an "each player" lock, forbid the play.
@@ -6672,13 +6722,20 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
 
       // Auto-end turn after attacking (unless paused by pendingChoice)
       if (!searchTriggered && !extraRemains && !isGameConcluded(draft)) {
-        resolveCheckup(draft, {
-          rng: activeRng,
-          events,
-          endingPlayerId: playerId,
-        });
-        if (!isGameConcluded(draft)) {
-          advanceTurn(draft, { nextPlayerId: oppId, events });
+        // "Take another turn after this one. (Skip the between-turns step.)" (Timeless-GX,
+        // Supreme Puff-GX; design 048): no checkup, then the same player starts turn N+1.
+        if (attackerPlayer.flags?.extraTurn) {
+          delete attackerPlayer.flags.extraTurn;
+          advanceTurn(draft, { nextPlayerId: playerId, events });
+        } else {
+          resolveCheckup(draft, {
+            rng: activeRng,
+            events,
+            endingPlayerId: playerId,
+          });
+          if (!isGameConcluded(draft)) {
+            advanceTurn(draft, { nextPlayerId: oppId, events });
+          }
         }
       }
 }

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
-import { applyCommand } from '../reduce.mjs';
+import { applyCommand, validateLegality } from '../reduce.mjs';
 import { parseAttackDamage } from '../rules/damage-parser.mjs';
 import { parseAttackSteps } from '../rules/attack-steps.mjs';
 
@@ -25,8 +25,8 @@ const energyCard = (type, attachedTo = null) =>
   });
 const atk = (name, damage, text, cost = []) => ({ name, cost, damage, text });
 
-function game(setup) {
-  const state = createGameState({ gameId: 'gx-backlog-ii', seed: 7, rulesEnabled: false });
+function game(setup, { rulesEnabled = false } = {}) {
+  const state = createGameState({ gameId: 'gx-backlog-ii', seed: 7, rulesEnabled });
   for (const id of ['p1', 'p2']) {
     state.players[id] = { playerId: id, username: id, zones: createPlayerZones(), flags: {} };
     for (let i = 0; i < 6; i++) state.players[id].zones.prizes.push(mon(`${id} prize ${i}`));
@@ -534,7 +534,177 @@ test('I185 board: Pale Moon-GX Knocks Out the Defending Pokémon at the end of t
 
 // ── I184: locks / extra turns ───────────────────────────────────────────────
 
-test('placeholder I184', () => {});
+const TIMELESS = 'Take another turn after this one. (Skip the between-turns step.)';
+const DISTORT = "Your opponent can't play any Item cards from their hand during their next turn.";
+const SONIC_VOLUME = "Your opponent can't play any Special Energy cards from their hand during their next turn.";
+const HEAVY_ROCK = "Your opponent can't play any cards from their hand during their next turn.";
+const IRON_RULE = "During your opponent's next turn, their Pokémon can't attack.";
+const HORROR_HOUSE =
+  "Your opponent can't play any cards from their hand during their next turn. If this Pokémon has at least 1 extra {P} Energy attached to it (in addition to this attack's cost), each player draws cards until they have 7 cards in their hand.";
+
+test('I184 parse: lock/extra-turn wordings map to their steps', () => {
+  const cases = [
+    [DISTORT, { type: 'atkOppPlayLock', kinds: ['item'] }],
+    [SONIC_VOLUME, { type: 'atkOppPlayLock', kinds: ['specialEnergy'] }],
+    [HEAVY_ROCK, { type: 'atkOppPlayLock', kinds: ['any'] }],
+    [IRON_RULE, { type: 'atkOppAttackLock' }],
+    [TIMELESS, { type: 'atkTakeAnotherTurn' }],
+  ];
+  for (const [text, expected] of cases) {
+    assert.deepEqual(parseAttackSteps(text).after, [expected], text);
+  }
+});
+
+test('I184 board: Timeless-GX takes another turn and skips the Checkup', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Dialga-GX', { hp: 200, attacks: [atk('Timeless-GX', 150, TIMELESS)] }));
+    const defender = mon('Defender', { hp: 300 });
+    defender.specialCondition = 'Poisoned';
+    p2.zones.active.push(defender);
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.turn.player, 'p1', 'the same player takes the extra turn');
+  assert.equal(res.state.turn.number, 6);
+  assert.equal(res.state.players.p1.zones.hand.length, 1, 'the extra turn draws');
+  assert.equal(activeRoot(res.state, 'p2').damage, 150, 'only the attack damage — no poison tick');
+  assert.ok(eventTypes(res).has('extraTurnGranted'));
+});
+
+test('I184 board: Distort locks Items (not Supporters) for the opponent next turn', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Noivern-GX', { hp: 200, attacks: [atk('Distort', 50, DISTORT)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  }, { rulesEnabled: true });
+  const itemCard = item('Locked Item');
+  const supCard = supporter('Free Supporter');
+  state.players.p2.zones.hand.push(itemCard, supCard);
+  const res = runAttack(state);
+  assert.equal(res.state.turn.player, 'p2');
+  const itemCheck = validateLegality(res.state, {
+    type: 'playTrainer',
+    playerId: 'p2',
+    payload: { instanceId: itemCard.instanceId },
+  });
+  assert.equal(itemCheck.allowed, false);
+  assert.match(itemCheck.reason, /stops you playing/);
+  const supCheck = validateLegality(res.state, {
+    type: 'playTrainer',
+    playerId: 'p2',
+    payload: { instanceId: supCard.instanceId },
+  });
+  assert.equal(supCheck.allowed, true, 'an Item-only lock leaves Supporters playable');
+  // Expiry: two turns later the lock no longer counts.
+  res.state.turn.number = 8;
+  const later = validateLegality(res.state, {
+    type: 'playTrainer',
+    playerId: 'p2',
+    payload: { instanceId: itemCard.instanceId },
+  });
+  assert.equal(later.allowed, true);
+});
+
+test('I184 board: Heavy Rock-GX locks every card from hand (Trainer, Energy, Basic)', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Alolan Golem-GX', { hp: 200, attacks: [atk('Heavy Rock-GX', 100, HEAVY_ROCK)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  }, { rulesEnabled: true });
+  const energy = energyCard('Water');
+  const basic = mon('Hand Basic');
+  const anyItem = item('Any Item');
+  state.players.p2.zones.hand.push(anyItem, energy, basic);
+  const res = runAttack(state);
+  const declined = (command) => validateLegality(res.state, { ...command, playerId: 'p2' }).allowed;
+  assert.equal(declined({ type: 'playTrainer', payload: { instanceId: anyItem.instanceId } }), false);
+  assert.equal(
+    declined({ type: 'attachCard', payload: { instanceId: energy.instanceId, targetInstanceId: activeRoot(res.state, 'p2').instanceId } }),
+    false
+  );
+  assert.equal(
+    declined({ type: 'moveCard', payload: { instanceId: basic.instanceId, from: 'hand', to: 'bench' } }),
+    false
+  );
+});
+
+test('I184 board: Iron Rule-GX stops the opponent attacking on their next turn only', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Cobalion-GX', { hp: 200, attacks: [atk('Iron Rule-GX', 0, IRON_RULE)] }));
+    p2.zones.active.push(
+      mon('Defender', { hp: 300, attacks: [{ name: 'Hit', cost: [], damage: 10, text: '' }] })
+    );
+  }, { rulesEnabled: true });
+  const res = runAttack(state);
+  const p2Active = activeRoot(res.state, 'p2');
+  const attackCheck = validateLegality(res.state, {
+    type: 'attack',
+    playerId: 'p2',
+    payload: { attackIndex: 0, instanceId: p2Active.instanceId },
+  });
+  assert.equal(attackCheck.allowed, false);
+  assert.match(attackCheck.reason, /stops your Pok/);
+  res.state.turn.number = 8;
+  const later = validateLegality(res.state, {
+    type: 'attack',
+    playerId: 'p2',
+    payload: { attackIndex: 0, instanceId: p2Active.instanceId },
+  });
+  assert.equal(later.allowed, true);
+});
+
+test('I184 board: Horror House-GX draws both players to 7 only with the extra Energy', () => {
+  const withEnergy = game((s, p1, p2) => {
+    const attacker = mon('Gengar & Mimikyu-GX', {
+      hp: 200,
+      attacks: [atk('Horror House-GX', 0, HORROR_HOUSE, ['Psychic'])],
+    });
+    p1.zones.active.push(attacker, energyCard('Psychic', attacker.instanceId), energyCard('Psychic', attacker.instanceId));
+    p1.zones.hand.push(mon('a'), mon('b'));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res = runAttack(withEnergy);
+  assert.equal(res.state.players.p1.zones.hand.length, 7);
+  assert.equal(res.state.players.p2.zones.hand.length, 8, '7 from the effect + the turn-start draw');
+
+  const without = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Gengar & Mimikyu-GX', { hp: 200, attacks: [atk('Horror House-GX', 0, HORROR_HOUSE)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  });
+  const res2 = runAttack(without);
+  assert.equal(res2.state.players.p1.zones.hand.length, 0, 'no draw without the extra Energy');
+});
+
+test('I184 board: Supreme Puff-GX takes another turn and the 14 extra Energy shuffle the Bench', () => {
+  const state = game((s, p1, p2) => {
+    const attacker = mon('Togepi & Cleffa & Igglybuff-GX', {
+      hp: 200,
+      attacks: [
+        atk('Supreme Puff-GX', 0, 'Take another turn after this one. (Skip the between-turns step.) If this Pokémon has at least 14 extra {Y} Energy attached to it (in addition to this attack\'s cost), your opponent shuffles all of their Benched Pokémon and all cards attached to them into their deck.', ['Colorless']),
+      ],
+    });
+    p1.zones.active.push(attacker);
+    for (let i = 0; i < 15; i++) p1.zones.active.push(energyCard('Fairy', attacker.instanceId));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p2.zones.bench.push(mon('Bench A'), mon('Bench B'));
+  });
+  const res = runAttack(state);
+  assert.equal(res.state.turn.player, 'p1');
+  assert.equal(benchRoots(res.state, 'p2').length, 0, 'the whole Bench was shuffled away');
+
+  const without = game((s, p1, p2) => {
+    p1.zones.active.push(
+      mon('Togepi & Cleffa & Igglybuff-GX', {
+        hp: 200,
+        attacks: [
+          atk('Supreme Puff-GX', 0, 'Take another turn after this one. (Skip the between-turns step.) If this Pokémon has at least 14 extra {Y} Energy attached to it (in addition to this attack\'s cost), your opponent shuffles all of their Benched Pokémon and all cards attached to them into their deck.', ['Colorless']),
+        ],
+      })
+    );
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+    p2.zones.bench.push(mon('Bench A'), mon('Bench B'));
+  });
+  const res2 = runAttack(without);
+  assert.equal(res2.state.turn.player, 'p1', 'the extra turn is unconditional');
+  assert.equal(benchRoots(res2.state, 'p2').length, 2, 'no Energy, no Bench shuffle');
+});
 
 // ── I188 / I189: recovery, copy, abilities ──────────────────────────────────
 

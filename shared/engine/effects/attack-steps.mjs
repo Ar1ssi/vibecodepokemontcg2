@@ -79,11 +79,40 @@ function attackerRef(ctx) {
   return ref;
 }
 
+// Printed Energy letter → stored `energyType` word. {N}/{Y} are deliberately absent from the
+// shared display map (`ENERGY_SYMBOL_TO_TYPE`), so a step that names them needs the word
+// comparison below instead of matchesSearch.
+const ENERGY_LETTER_WORDS = {
+  G: 'grass',
+  R: 'fire',
+  W: 'water',
+  L: 'lightning',
+  P: 'psychic',
+  F: 'fighting',
+  D: 'darkness',
+  M: 'metal',
+  Y: 'fairy',
+  N: 'dragon',
+  C: 'colorless',
+};
+
+function energyTypeMatches(card, letter) {
+  const wanted = ENERGY_LETTER_WORDS[String(letter || '').toUpperCase()];
+  if (!wanted) return false;
+  const raw = String(card?.energyType || String(card?.name || '').replace(/\s*Energy.*/i, '')).toLowerCase();
+  return (raw === 'dark' ? 'darkness' : raw) === wanted;
+}
+
 function energyMatches(card, step) {
   if (!isEnergy(card)) return false;
   if (step.basic && !isBasicEnergy(card)) return false;
   if (step.special && !isSpecialEnergy(card)) return false;
-  if (step.energyType && !matchesSearch(card, `{${step.energyType}} Energy`)) return false;
+  if (step.energyType) {
+    return (
+      matchesSearch(card, `{${step.energyType}} Energy`) ||
+      energyTypeMatches(card, step.energyType)
+    );
+  }
   return true;
 }
 
@@ -139,7 +168,7 @@ function extraEnergyRequirementSatisfied(ctx, requirement) {
   const cost = Array.isArray(attack?.cost) ? attack.cost : [];
   const attached = attachedCards(ctx.player, ref.card.instanceId).filter(isEnergy);
   const type = requirement.energyType ? String(requirement.energyType).toUpperCase() : null;
-  const pool = type ? attached.filter((card) => energyMatches(card, { energyType: type })) : attached;
+  const pool = type ? attached.filter((card) => energyTypeMatches(card, type)) : attached;
   const spent = type ? cost.filter((symbol) => costTypeLetter(symbol) === type).length : cost.length;
   return pool.length - spent >= (requirement.count || 1);
 }
@@ -2078,6 +2107,75 @@ function atkBounceOwnInPlay(ctx) {
   });
 }
 
+// Noivern-GX Distort/Sonic Volume, Alolan Golem-GX Heavy Rock-GX, Gengar & Mimikyu-GX Horror
+// House-GX, Umbreon & Darkrai-GX Dark Moon-GX: during their next turn the opponent can't play
+// the printed kinds from hand. Stored on the player (flags are rebuilt every turn); the array
+// is replaced, never mutated, so `cloneGameState` snapshots stay independent.
+function atkOppPlayLock(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const untilTurn = (ctx.draft.turn?.number || 1) + 1;
+  const kinds = step.kinds || ['any'];
+  opponent.playLocks = [...(opponent.playLocks || []), { untilTurn, kinds }];
+  ctx.events.push({ type: 'playLockApplied', playerId: opponent.playerId, kinds, untilTurn });
+  return null;
+}
+
+// Cobalion-GX Iron Rule-GX: "their Pokémon can't attack" on their next turn, including
+// Pokémon that come into play then, so the lock lives on the player.
+function atkOppAttackLock(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const untilTurn = (ctx.draft.turn?.number || 1) + 1;
+  opponent.attackLockUntilTurn = untilTurn;
+  ctx.events.push({ type: 'attackLockApplied', playerId: opponent.playerId, untilTurn });
+  return null;
+}
+
+// Dialga-GX Timeless-GX / Togepi & Cleffa & Igglybuff-GX Supreme Puff-GX: the attack tail
+// consumes `flags.extraTurn` and advances the turn to the same player without a checkup.
+function atkTakeAnotherTurn(ctx) {
+  if (!ctx.player.flags) ctx.player.flags = {};
+  ctx.player.flags.extraTurn = true;
+  ctx.events.push({ type: 'extraTurnGranted', playerId: ctx.player.playerId });
+  return null;
+}
+
+// Supreme Puff-GX's extra-Energy clause: the opponent's whole Bench returns to their deck.
+function atkShuffleOppAllBench(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
+  const bench = benchRootsOf(opponent);
+  if (bench.length === 0) return skip(ctx, 'no_opponent_bench');
+  for (const root of bench) shuffleStackIntoDeck(ctx, opponent, root, 'bench');
+  return null;
+}
+
+function drawPlayerTo(player, target, ctx) {
+  const need = Math.max(0, target - (player.zones.hand || []).length);
+  if (need === 0) return;
+  const drawn = (player.zones.deck || []).splice(0, Math.min(need, player.zones.deck.length));
+  if (drawn.length === 0) return;
+  player.zones.hand.push(...drawn);
+  ctx.events.push({
+    type: 'cardsDrawn',
+    playerId: player.playerId,
+    count: drawn.length,
+    cards: drawn.map((c) => ({ instanceId: c.instanceId })),
+  });
+}
+
+// Horror House-GX: each player draws up to the printed hand size.
+function atkBothDrawUntil(ctx) {
+  const { player, opponent, step } = ctx;
+  if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
+  const target = step.count || 7;
+  drawPlayerTo(player, target, ctx);
+  if (opponent) drawPlayerTo(opponent, target, ctx);
+  return null;
+}
+
 // Damage a heal step removes: `all`, `amount` (damage, older steps) or `count` counters.
 function healLimit(step) {
   if (step.all) return Infinity;
@@ -2773,6 +2871,11 @@ export const ATTACK_STEP_HANDLERS = {
   atkBounceOppActive,
   atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),
   atkBounceOwnInPlay,
+  atkOppPlayLock,
+  atkOppAttackLock,
+  atkTakeAnotherTurn,
+  atkShuffleOppAllBench,
+  atkBothDrawUntil,
   atkHealEach,
   atkHealCounted,
   atkAddMarker,

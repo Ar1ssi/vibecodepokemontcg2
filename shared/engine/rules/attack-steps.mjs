@@ -637,6 +637,39 @@ const TEMPLATES = [
     () => ({ type: 'atkBounceOwnInPlay' }),
   ],
 
+  // Opponent play/attack locks and extra turns (design 048): Noivern-GX Distort/Sonic Volume,
+  // Alolan Golem-GX Heavy Rock-GX, Gengar & Mimikyu-GX Horror House-GX, Umbreon & Darkrai-GX
+  // Dark Moon-GX, Cobalion-GX Iron Rule-GX, Dialga-GX Timeless-GX, Supreme Puff-GX.
+  [
+    /^your opponent can't play any item cards? from their hand during their next turn$/,
+    () => ({ type: 'atkOppPlayLock', kinds: ['item'] }),
+  ],
+  [
+    /^your opponent can't play any special energy cards? from their hand during their next turn$/,
+    () => ({ type: 'atkOppPlayLock', kinds: ['specialEnergy'] }),
+  ],
+  [
+    /^your opponent can't play any trainer cards? from their hand during their next turn$/,
+    () => ({ type: 'atkOppPlayLock', kinds: ['trainer'] }),
+  ],
+  [
+    /^your opponent can't play any cards? from their hand during their next turn$/,
+    () => ({ type: 'atkOppPlayLock', kinds: ['any'] }),
+  ],
+  [
+    /^during your opponent's next turn, their pokémon can't attack$/,
+    () => ({ type: 'atkOppAttackLock' }),
+  ],
+  [/^take another turn after this one$/, () => ({ type: 'atkTakeAnotherTurn' })],
+  [
+    /^your opponent shuffles all of their benched pokémon and all cards attached to them into their deck$/,
+    () => ({ type: 'atkShuffleOppAllBench' }),
+  ],
+  [
+    /^each player draws cards until they have (\d+) cards in their hand$/,
+    (m) => ({ type: 'atkBothDrawUntil', count: Number(m[1]) }),
+  ],
+
   // Devolve
   [
     /^choose 1 of either player's evolved pokémon, remove the highest stage evolution card from that pokémon, and put it into that player's hand$/,

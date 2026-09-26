@@ -4,19 +4,19 @@ Oracle: scripts/lib/oracle-harness.mjs, seeds 1,2,3,4,5,6,7,8; observed = rowObs
 blind = family whose state change the oracle cannot see on these cards (marker/passive families); not a failure
 
 Entries: 1723 — 1481 attacks (604 GX) / 242 abilities
-executed 1154 / blind 236 / passive 52 / no-effect 281 / engine-error 0
-GX attacks: executed 473/604, blind 6, no-effect 125, engine-error 0
-Run: 29s
+executed 1166 / blind 236 / passive 52 / no-effect 269 / engine-error 0
+GX attacks: executed 485/604, blind 6, no-effect 113, engine-error 0
+Run: 24s
 
 ## By family
-- attack:next-turn-lock: 200/283 (71%)
+- attack:next-turn-lock: 208/283 (73%)
 - attack:unknown: 0/180 (0%)
 - attack:bench-damage: 117/126 (93%)
 - attack:per-energy: 101/119 (85%)
 - attack:conditional-damage: 58/111 (52%)
 - attack:discard-cost: 67/77 (87%)
 - attack:per-prize: 44/68 (65%)
-- attack:draw-attach: 62/66 (94%)
+- attack:draw-attach: 66/66 (100%)
 - attack:search-deck: 48/48 (100%)
 - attack:multi-target: 36/47 (77%)
 - attack:immunity: 1/42 (2%)
@@ -93,9 +93,8 @@ Run: 29s
 - opponent-disrupt: 3
 - status: 3
 
-## No observed effect (281)
+## No observed effect (269)
 - [attack] [GX] Reshiram & Charizard-GX [Sun & Moon Promos #SM247] Double Blaze-GX (conditional-damage)
-- [attack] [GX] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143a] Supreme Puff-GX (next-turn-lock)
 - [attack] [GX] Jirachi-GX [Unified Minds #79a] Star Shield-GX (effect-prevention)
 - [attack] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Psychic Club (bench-damage)
 - [ability] Silvally-GX [Cosmic Eclipse #262] Disk Reload (draw)
@@ -114,7 +113,6 @@ Run: 29s
 - [ability] Silvally-GX [Cosmic Eclipse #184] Disk Reload (draw)
 - [attack] Silvally-GX [Cosmic Eclipse #184] Brave Buddies (conditional-damage)
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #165] Jumping Balloon (multi-target)
-- [attack] [GX] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143] Supreme Puff-GX (next-turn-lock)
 - [attack] [GX] Flygon-GX [Cosmic Eclipse #110] Sonic Edge-GX (next-turn-lock)
 - [attack] [GX] Solgaleo & Lunala-GX [Cosmic Eclipse #75] Light of the Protector-GX (effect-prevention)
 - [attack] Wishiwashi-GX [Cosmic Eclipse #63] School Storm (per-energy)
@@ -206,21 +204,17 @@ Run: 29s
 - [attack] Cobalion-GX [Team Up #189] Dueling Saber (conditional-damage)
 - [attack] [GX] Cobalion-GX [Team Up #189] Iron Rule-GX (next-turn-lock)
 - [attack] [GX] Hoopa-GX [Team Up #187] Devilish Hands-GX (next-turn-lock)
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #186] Horror House-GX (draw-attach)
 - [attack] Ampharos-GX [Team Up #185] Power Recharge (discard-cost)
 - [attack] Eevee & Snorlax-GX [Team Up #171] Dump Truck Press (conditional-damage)
 - [attack] Cobalion-GX [Team Up #168] Dueling Saber (conditional-damage)
 - [attack] [GX] Cobalion-GX [Team Up #168] Iron Rule-GX (next-turn-lock)
 - [attack] [GX] Hoopa-GX [Team Up #166] Devilish Hands-GX (next-turn-lock)
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #165] Horror House-GX (draw-attach)
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #164] Horror House-GX (draw-attach)
 - [attack] Ampharos-GX [Team Up #163] Power Recharge (discard-cost)
 - [attack] Eevee & Snorlax-GX [Team Up #120] Dump Truck Press (conditional-damage)
 - [attack] Cobalion-GX [Team Up #106] Dueling Saber (conditional-damage)
 - [attack] [GX] Cobalion-GX [Team Up #106] Iron Rule-GX (next-turn-lock)
 - [attack] [GX] Hoopa-GX [Team Up #96] Devilish Hands-GX (next-turn-lock)
 - [attack] [GX] Lycanroc-GX [Team Up #82] Splintered Shards-GX (next-turn-lock)
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #53] Horror House-GX (draw-attach)
 - [attack] Ampharos-GX [Team Up #43] Power Recharge (discard-cost)
 - [attack] [GX] Jolteon-GX [Sun & Moon Promos #SM173] Swift Run-GX (effect-prevention)
 - [attack] [GX] Flareon-GX [Sun & Moon Promos #SM171] Power Burner-GX (next-turn-lock)
@@ -260,19 +254,16 @@ Run: 29s
 - [attack] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Dark Flash (immunity)
 - [attack] [GX] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Moon's Eclipse-GX (per-prize)
 - [attack] Dialga-GX [Forbidden Light #138] Shred (immunity)
-- [attack] [GX] Dialga-GX [Forbidden Light #138] Timeless-GX (next-turn-lock)
 - [attack] Yveltal-GX [Forbidden Light #137] Sonic Evil (immunity)
 - [attack] Lucario-GX [Forbidden Light #135] Aura Strike (conditional-damage)
 - [attack] Naganadel-GX [Forbidden Light #134] Beast Raid (per-energy)
 - [attack] Naganadel-GX [Forbidden Light #134] Jet Needle (immunity)
 - [attack] Dialga-GX [Forbidden Light #125] Shred (immunity)
-- [attack] [GX] Dialga-GX [Forbidden Light #125] Timeless-GX (next-turn-lock)
 - [attack] Yveltal-GX [Forbidden Light #124] Sonic Evil (immunity)
 - [attack] Lucario-GX [Forbidden Light #122] Aura Strike (conditional-damage)
 - [attack] Naganadel-GX [Forbidden Light #121] Beast Raid (per-energy)
 - [attack] Naganadel-GX [Forbidden Light #121] Jet Needle (immunity)
 - [attack] Dialga-GX [Forbidden Light #82] Shred (immunity)
-- [attack] [GX] Dialga-GX [Forbidden Light #82] Timeless-GX (next-turn-lock)
 - [attack] Yveltal-GX [Forbidden Light #79] Sonic Evil (immunity)
 - [attack] Naganadel-GX [Forbidden Light #56] Beast Raid (per-energy)
 - [attack] Naganadel-GX [Forbidden Light #56] Jet Needle (immunity)
@@ -280,7 +271,6 @@ Run: 29s
 - [attack] Darkrai-GX [Burning Shadows #88a] Dark Cleave (immunity)
 - [attack] Lunala-GX [Ultra Prism #172] Moongeist Beam (next-turn-lock)
 - [attack] Dialga-GX [Ultra Prism #164] Shred (immunity)
-- [attack] [GX] Dialga-GX [Ultra Prism #164] Timeless-GX (next-turn-lock)
 - [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #163] Sun's Eclipse-GX (per-prize)
 - [attack] Celesteela-GX [Ultra Prism #162] Rocket Fall (per-energy)
 - [attack] [GX] Celesteela-GX [Ultra Prism #162] Blaster-GX (per-prize)
@@ -288,7 +278,6 @@ Run: 29s
 - [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #161] Moon's Eclipse-GX (per-prize)
 - [attack] Pheromosa-GX [Ultra Prism #158] Fast Raid (first-turn-attack)
 - [attack] Dialga-GX [Ultra Prism #146] Shred (immunity)
-- [attack] [GX] Dialga-GX [Ultra Prism #146] Timeless-GX (next-turn-lock)
 - [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #145] Sun's Eclipse-GX (per-prize)
 - [attack] Celesteela-GX [Ultra Prism #144] Rocket Fall (per-energy)
 - [attack] [GX] Celesteela-GX [Ultra Prism #144] Blaster-GX (per-prize)
@@ -296,7 +285,6 @@ Run: 29s
 - [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #143] Moon's Eclipse-GX (per-prize)
 - [attack] Pheromosa-GX [Ultra Prism #140] Fast Raid (first-turn-attack)
 - [attack] Dialga-GX [Ultra Prism #100] Shred (immunity)
-- [attack] [GX] Dialga-GX [Ultra Prism #100] Timeless-GX (next-turn-lock)
 - [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #90] Sun's Eclipse-GX (per-prize)
 - [attack] Dawn Wings Necrozma-GX [Ultra Prism #63] Dark Flash (immunity)
 - [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #63] Moon's Eclipse-GX (per-prize)
@@ -691,18 +679,18 @@ Run: 29s
 - [attack] Dialga-GX [Forbidden Light #138] Shred (immunity) → no-effect Δ80 {opp:active+dmg,opp:deck->hand}
 - [attack] Dialga-GX [Forbidden Light #125] Shred (immunity) → no-effect Δ80 {opp:active+dmg,opp:deck->hand}
 - [attack] Dialga-GX [Forbidden Light #82] Shred (immunity) → no-effect Δ80 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dialga-GX [Forbidden Light #138] Timeless-GX (next-turn-lock) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dialga-GX [Forbidden Light #125] Timeless-GX (next-turn-lock) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dialga-GX [Forbidden Light #82] Timeless-GX (next-turn-lock) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Dialga-GX [Forbidden Light #138] Timeless-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,own:deck->hand}
+- [attack] [GX] Dialga-GX [Forbidden Light #125] Timeless-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,own:deck->hand}
+- [attack] [GX] Dialga-GX [Forbidden Light #82] Timeless-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,own:deck->hand}
 - [attack] Dialga-GX [Ultra Prism #164] Overclock (draw-until) → executed {opp:deck->hand,own:deck->hand}
 - [attack] Dialga-GX [Ultra Prism #146] Overclock (draw-until) → executed {opp:deck->hand,own:deck->hand}
 - [attack] Dialga-GX [Ultra Prism #100] Overclock (draw-until) → executed {opp:deck->hand,own:deck->hand}
 - [attack] Dialga-GX [Ultra Prism #164] Shred (immunity) → no-effect Δ80 {opp:active+dmg,opp:deck->hand}
 - [attack] Dialga-GX [Ultra Prism #146] Shred (immunity) → no-effect Δ80 {opp:active+dmg,opp:deck->hand}
 - [attack] Dialga-GX [Ultra Prism #100] Shred (immunity) → no-effect Δ80 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dialga-GX [Ultra Prism #164] Timeless-GX (next-turn-lock) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dialga-GX [Ultra Prism #146] Timeless-GX (next-turn-lock) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dialga-GX [Ultra Prism #100] Timeless-GX (next-turn-lock) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Dialga-GX [Ultra Prism #164] Timeless-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,own:deck->hand}
+- [attack] [GX] Dialga-GX [Ultra Prism #146] Timeless-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,own:deck->hand}
+- [attack] [GX] Dialga-GX [Ultra Prism #100] Timeless-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,own:deck->hand}
 - [attack] Dragonite-GX [Dragon Majesty #67] Dragon Claw (unknown) → blind Δ70 {opp:active+dmg,opp:deck->hand}
 - [attack] Dragonite-GX [Dragon Majesty #37] Dragon Claw (unknown) → blind Δ70 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Dragonite-GX [Dragon Majesty #67] Dragonporter-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->bench}
@@ -872,10 +860,10 @@ Run: 29s
 - [attack] Genesect-GX [Lost Thunder #224] Burst Shot (unknown) → blind Δ130 {opp:active+dmg,opp:deck->hand}
 - [attack] Genesect-GX [Lost Thunder #204] Burst Shot (unknown) → blind Δ130 {opp:active+dmg,opp:deck->hand}
 - [attack] Genesect-GX [Lost Thunder #130] Burst Shot (unknown) → blind Δ130 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #186] Horror House-GX (draw-attach) → no-effect {opp:deck->hand}
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #165] Horror House-GX (draw-attach) → no-effect {opp:deck->hand}
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #164] Horror House-GX (draw-attach) → no-effect {opp:deck->hand}
-- [attack] [GX] Gengar & Mimikyu-GX [Team Up #53] Horror House-GX (draw-attach) → no-effect {opp:deck->hand}
+- [attack] [GX] Gengar & Mimikyu-GX [Team Up #186] Horror House-GX (draw-attach) → executed {opp:deck->hand,skipped:extra_energy_unmet}
+- [attack] [GX] Gengar & Mimikyu-GX [Team Up #165] Horror House-GX (draw-attach) → executed {opp:deck->hand,skipped:extra_energy_unmet}
+- [attack] [GX] Gengar & Mimikyu-GX [Team Up #164] Horror House-GX (draw-attach) → executed {opp:deck->hand,skipped:extra_energy_unmet}
+- [attack] [GX] Gengar & Mimikyu-GX [Team Up #53] Horror House-GX (draw-attach) → executed {opp:deck->hand,skipped:extra_energy_unmet}
 - [attack] Gengar & Mimikyu-GX [Team Up #186] Poltergeist (reveal-hand) → executed Δ100 {opp:active+dmg,opp:deck->hand,opp:hand-revealed}
 - [attack] Gengar & Mimikyu-GX [Team Up #165] Poltergeist (reveal-hand) → executed Δ100 {opp:active+dmg,opp:deck->hand,opp:hand-revealed}
 - [attack] Gengar & Mimikyu-GX [Team Up #164] Poltergeist (reveal-hand) → executed Δ100 {opp:active+dmg,opp:deck->hand,opp:hand-revealed}
@@ -1875,8 +1863,8 @@ Run: 29s
 - [attack] [GX] Thundurus-GX [Sun & Moon Promos #SM133] Thundering Hurricane-GX (per-heads-coin) → executed Δ200 {coin,ko,opp:active+dmg,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143a] Rolling Panic (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
 - [attack] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143] Rolling Panic (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143a] Supreme Puff-GX (next-turn-lock) → no-effect {opp:deck->hand}
-- [attack] [GX] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143] Supreme Puff-GX (next-turn-lock) → no-effect {opp:deck->hand}
+- [attack] [GX] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143a] Supreme Puff-GX (next-turn-lock) → executed {own:deck->hand,skipped:extra_energy_unmet}
+- [attack] [GX] Togepi & Cleffa & Igglybuff-GX [Cosmic Eclipse #143] Supreme Puff-GX (next-turn-lock) → executed {own:deck->hand,skipped:extra_energy_unmet}
 - [attack] [GX] Tornadus-GX [Sun & Moon Promos #SM134] Destructive Cyclone-GX (next-turn-lock) → executed Δ130 {opp:active+dmg,opp:attached->discard,opp:deck->hand}
 - [attack] Tornadus-GX [Sun & Moon Promos #SM134] Gust (unknown) → blind Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Tornadus-GX [Sun & Moon Promos #SM134] Wild Fury (per-heads-coin) → executed Δ150 {coin,opp:active+dmg,opp:deck->hand}
