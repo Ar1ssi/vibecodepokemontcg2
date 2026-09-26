@@ -33,6 +33,10 @@ Builder — write it so a session with zero other context could build from it (o
 3. The edge-case table is the completeness contract: every empty/boundary/failure/concurrency
    row filled in, or explicitly struck with a reason.
 4. Work plan: slices of ≤1 session, each leaving the repo green (builds, tests pass).
+   High complexity (~4+ independent acceptance criteria, or state + UI + cross-system coupling)?
+   Pin a schema/naming contract in the design first, then one criterion-cluster per commit on
+   `feature/<spec>`. One session carries the whole spec (context auto-compacts). A done/next ledger
+   in NEXTSTEPS.md is the handoff if it ends mid-spec; archive the ledger when the spec ships.
 5. GATE — approval: default is USER approval. Post a ≤10-line summary — the pick per Options
    entry, any struck edge-case rows, slice count — wait, and fold corrections into the design
    before building. Only when the user is unreachable: run the self-approval checklist at the

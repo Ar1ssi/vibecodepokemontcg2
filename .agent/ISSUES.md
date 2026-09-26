@@ -6,12 +6,13 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I183). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I184). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I183 2026-09-26 P3 [tests] coin-flip-ceremony.test.mjs "ceremony mounts a material-stamped coin" flakes under full `pnpm test` load (message '' vs /Tails! You go first\./); passes 3/3 alone — timing-dependent wait.
 - I181 2026-09-25 P3 [rules] Copy-attack deferrals from design 039: Misty's Psyduck ESP (multi-branch coin), Shiftry ex (opponent-hand pick), Alakazam Star (hand discard then copy), Togetic δ (no δ marker in card data), Smeargle Sketch (needs in-play history) (refs: design 039 Deviations, I168)
 - I180 2026-09-25 P2 [board-ui] Non-zoom card zones (discard/lostZone/viewCards/attachedCards) still use the legacy #fullImage overlay — top document, no z-index, sticks over the board, click-to-close unreachable (same class as the S299 #board fix); repro: move a card to discard, double-click.
 - I179 2026-09-22 P2 [rules-ui] Known suite failure card-inspector-model.test.mjs "retreat greys only when the cost is unpaid" fails on a clean tree; keeps every run N-1/N. Needs a debug pass. (refs: S251, S252) (PR #181 branch id I83)

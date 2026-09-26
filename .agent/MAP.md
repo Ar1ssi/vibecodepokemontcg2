@@ -1,4 +1,4 @@
-# Map — where things live. First stop when locating code; grep comes after, wholesale reading never.
+# Map — where things live. First stop when locating code: grep it (`grep -n -i <keyword> .agent/MAP.md`), never read it whole.
 <!-- One line per module: `path — what it is; entry: <file>`. Update on any structure change.
      Cap 120 lines: when over, collapse a subtree into .agent/areas/<x>.md and keep one line here
      pointing at it. `(?)` marks unverified bootstrap guesses — verify on first visit, then remove. -->

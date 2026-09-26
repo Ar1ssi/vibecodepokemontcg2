@@ -6,7 +6,7 @@ directive 5; just do it.)
 ## Budgets — hard caps
 | File | Cap | When over |
 |---|---|---|
-| STATE.md | 40 lines | rewrite: keep Active/Next/Blocked, top-5 watch-outs, last-3 shipped |
+| STATE.md | 25 lines | rewrite: Focus/Active/Next/Blocked as pointers (backlog stays in ISSUES), top-5 watch-outs |
 | MAP.md | 120 lines | collapse subtrees into `.agent/areas/<x>.md`; keep one pointer line each |
 | PROJECT.md | 80 lines | tighten prose; landmines >15 → merge, retire, or push into area docs |
 | DECISIONS.md | 90 lines / 20 KB; each line ≤220 chars | delete superseded lines (cite the superseder); shorten long lines — detail lives in the cited design; full old wording stays in .agent/archive/ |

@@ -7,13 +7,11 @@ any session pick up work with minimal context. First session? `.agent/STATE.md` 
 1. The user outranks this file; this file outranks habit. Conflicts: Hard rules > active workflow > style.
 2. Correct and complete beats fast. No stubs, placeholders, mock data outside tests, or silently
    narrowed scope. Can't finish honestly? Say exactly what's missing.
-3. Smallest sufficient context: `.agent/MAP.md` → area doc → grep → read only implicated files.
+3. Smallest sufficient context: grep MAP.md → area doc → grep → read only implicated files.
    Never read directories wholesale. Lost after ~3 reads? Re-scope from MAP/area doc.
-   Tracing a symbol's definition or references: use LSP (`goToDefinition`, `findReferences`, `hover`), not Grep.
-   LSP gives exact results; Grep gives text matches. Grep/Glob for discovery (files, patterns); LSP for
-   understanding (definitions, references, types). After locating a file, navigate it with LSP rather than
-   reading the whole file. LSP is a deferred tool: load it once per session with ToolSearch
-   `select:LSP` before the first call. Grep is the fallback when LSP is unavailable.
+   Grep/Glob find files and text. "Where is X defined / who calls X / what does X take" → LSP
+   (`goToDefinition`, `findReferences`, `hover`) first: load it once per session with ToolSearch
+   `select:LSP`. Grep only if LSP errors (needs `pnpm install` for `typescript`; D166).
 4. Never call an API/function you haven't seen defined this session. Verify behavior in source.
 5. Code is truth. A wrong harness doc is a bug — fix it in passing (≤5 lines) or add a `flag:` line to your commit message.
 6. Chat carries outcomes; files carry detail: analysis → `.agent/scratch/`, designs → `.agent/designs/`,
@@ -22,7 +20,8 @@ any session pick up work with minimal context. First session? `.agent/STATE.md` 
    corpora in `out/pkmn-*-cards.json`, then TCGdex. Name the source (corpus row or TCGdex id) in the test or commit.
 
 ## Reading budget — large files are grep-only
-Never load these whole: `DECISIONS.md`, `ISSUES.md`, `journal/*` (frozen, pre-S313), `.agent/archive/*`.
+Never load these whole: `MAP.md`, `DECISIONS.md`, `ISSUES.md`, `journal/*` (frozen, pre-S313), `.agent/archive/*`.
+- MAP: `grep -n -i "<dir|file|keyword>" .agent/MAP.md` (one line per module).
 - DECISIONS/ISSUES: `grep -n "\[<scope>\]"` for the target area, or grep the D/I number.
 - Journal: `git log -20 main --format='%h %ad %s%n%b' --date=short`; flags: `git log --grep='flag:'`.
   Pre-S313 history: grep `.agent/journal/`.
@@ -65,33 +64,15 @@ END — whenever you changed anything:
 
 Each workflow states an exit test; on the fence, start with the lighter workflow.
 
-## Delegation and model policy
-- Spawn gate: the session's Agent tool description outranks this section. When it says spawn only on
-  the user's request, work inline and *offer* the delegation below (one line); the user's yes is the request.
-- Delegate only work whose spec already lives in files: read-only exploration (returns conclusions and
-  `path:line`, never file contents), `review.md` on a diff this session wrote, or one bounded increment
-  of an approved design whose contract is pinned (files, signatures, data, test cases — no design judgment).
-  Research whose next search depends on the last finding stays inline.
-- Work must not grade itself: engine, rules, netcode, and hard-to-reverse changes get `review.md` from
-  an agent that didn't write the diff before landing on `main` (gated? offer it in the task close).
-- Models (`model:` on Agent; omitted = inherit the session model, Opus 5.5): judgment work (design,
-  review, debug) inherits · grunt work (boilerplate, tests, content entry) → `sonnet` or `haiku` ·
-  `fable` (Fable 5.1, Mythos tier: strongest, priciest) only on explicit request — architecture audit,
-  blind option generation for a high-stakes design.
-- Code search → `caveman:cavecrew-investigator`; 1–2 file edits → `caveman:cavecrew-builder`; diff review
-  → `caveman:cavecrew-reviewer`. Independent agents launch in one message so they run concurrently.
-- Briefs are self-contained: goal, exact files/design sections, what to return. Subagents inherit no chat.
-- Subagents never touch harness state (STATE/DECISIONS/ISSUES/MAP/NEXTSTEPS). One writer at a time.
-  A subagent's "done" is a claim: you run the tests yourself and review the diff against the spec's
-  acceptance criteria, not taste.
-- Architecture audit (high effort): only on explicit request, roughly once per phase.
-
-## High-complexity specs ship in increments on ONE branch
-~4+ independent acceptance criteria, or state + UI + cross-system coupling → pin a schema/naming
-contract in the spec first; then one criterion-cluster per commit on `feature/<spec>`, each green
-before the next. One session carries the whole spec (context auto-compacts); `/clear` only if quality
-degrades. Ledger (done / next) in NEXTSTEPS.md is the handoff if a session ends mid-spec;
-move it to `.agent/archive/NEXTSTEPS-history.md` when the spec ships.
+## Delegation
+- Spawn only when the user asks (the Agent tool's gate outranks this file); otherwise offer it in one line.
+- Delegable: read-only exploration (returns `path:line`, never file contents), `review.md` on this
+  session's diff, or one design slice with a pinned contract. Briefs are self-contained.
+- Engine, rules, netcode, and hard-to-reverse diffs get `review.md` from an agent that didn't write
+  them before landing on `main`. Gated? Offer it at the task close.
+- Models: judgment work inherits Opus 5.5 · grunt work → `sonnet`/`haiku` · `fable` only on request.
+  Agents: `caveman:cavecrew-investigator` (search), `-builder` (1–2 files), `-reviewer` (diffs).
+- Subagents never write harness state. Their "done" is a claim: rerun the tests, read the diff.
 
 ## User sync and output
 - First line of every task: one sentence on what you're about to do, then act in the same reply.
@@ -141,9 +122,7 @@ move it to `.agent/archive/NEXTSTEPS-history.md` when the spec ships.
 - Entry points: `server/server.js`, `server/game/room.mjs`, `client/index.ejs`, `client/src/front-end.js`.
 - Deeper facts: `.agent/PROJECT.md` (architecture, constraints, landmines).
 
-## Worktrees and syncing main
-- Unless told otherwise, work in a git worktree (one per task/branch) under `.claude/worktrees/`.
-  Deps: `pnpm install --prefer-offline --frozen-lockfile` (~5 s from the shared pnpm store).
-- After pushing to `main`, sync the primary folder: switch it to `main` and fast-forward before ending.
-- Remove your worktree once its branch is merged (`git worktree remove <path>`; never `--force` on
-  a tree with uncommitted work).
+## Worktrees
+- One worktree per task under `.claude/worktrees/`; deps `pnpm install --prefer-offline --frozen-lockfile`.
+- After landing on `main`: fast-forward the primary folder, then `git worktree remove <path>` (never
+  `--force` on uncommitted work).

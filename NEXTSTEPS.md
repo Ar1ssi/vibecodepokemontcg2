@@ -1,4 +1,4 @@
-# NEXTSTEPS — in-flight increment ledgers ONLY (CLAUDE.md § Token / model policy).
+# NEXTSTEPS — in-flight increment ledgers ONLY (feature.md §2 step 4).
 # Cap ~60 lines. A finished ledger moves to .agent/archive/NEXTSTEPS-history.md in the session
 # that finishes it.
 

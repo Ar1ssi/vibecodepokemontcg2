@@ -55,7 +55,7 @@ first unticked slice → confirm `pnpm test:changed` is green there → continue
 ## 2 · Design — Architect, self-approved
 1. Fill every TEMPLATE section; "n/a — <why>" instead of deleting. Non-obvious choice: ≥2 options,
    one tradeoff line each, the pick and why. ≥4 independent criteria, or state + UI + cross-system
-   coupling → pin the schema/naming contract first (CLAUDE.md § High-complexity specs).
+   coupling → pin the schema/naming contract first (feature.md §2 step 4).
 2. Edge-case table: TEMPLATE rows plus this repo's usual ones — hidden info never reaches the
    opponent · reconnect/resync mid-feature · both seats see the right thing · card variants across
    eras. Netcode: verify with `SERVER_AUTHORITATIVE=1` only.

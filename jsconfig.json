@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "checkJs": false,
+    "noEmit": true,
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": ["client/src/**/*", "shared/**/*", "server/**/*", "bot/**/*", "scripts/**/*", "tools/**/*", "*.mjs"],
+  "exclude": ["node_modules", "out", ".claude", ".qwen", ".agents"]
+}
