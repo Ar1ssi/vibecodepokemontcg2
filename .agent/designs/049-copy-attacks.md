@@ -425,3 +425,8 @@ DECISIONS lines for O1–O11.
   Test: "an evolved Pokémon with no grant cannot use its previous Evolutions".
 - Slice 4 (cosmetic): Memory Berry is flagged for discard when its Pokémon declares an attack
   (before the Confusion flip), the same point the attack is chosen.
+- Slice 7 (structural, fixed in slice): design 039's "ESP already runs its 1/2-head branches"
+  was wrong — the draw ran on every result and the 20 damage never. Added an exact-heads gate:
+  `attack-steps.mjs` `stripGates` reads "If exactly N is/are heads, …" as `headsExactly`
+  (`resolveCoinGates` keeps the step only on N heads) and `damage-parser.mjs` adds "If exactly N
+  are heads, this attack does X damage" on N heads. Rows 50–52 plus a 0-heads test cover it.

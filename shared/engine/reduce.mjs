@@ -5299,9 +5299,12 @@ function flipAndResolveAttack(draft, ctx) {
   // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
   // the parser resolves from live board counts, then bench/spread damage. Without this
   // every attack dealt its flat printed number regardless of the board (I26 follow-up).
-  const coinResult = flipAttackCoins(attack, activeRng);
+  // A copy attack's gate coins (Misty's Psyduck ESP, design 049) are this attack's coins: no
+  // second flip, no second event, and no Glimwood / Victory Star re-flip of the gate.
+  const preset = ctx.presetCoinResult || null;
+  const coinResult = preset || flipAttackCoins(attack, activeRng);
   const { coin, headsCount, flips } = coinResult;
-  if (flips.length > 0) {
+  if (flips.length > 0 && !preset) {
     events.push({
       type: 'attackCoinFlipped',
       playerId,
@@ -5324,7 +5327,7 @@ function flipAndResolveAttack(draft, ctx) {
     !glimwood &&
     !attackerPlayer?.flags?.victoryStarUsedThisTurn &&
     abilityVictoryStar(abilitySideContext(draft, playerId));
-  if (flips.length > 0 && (glimwood || victoryStar)) {
+  if (flips.length > 0 && !preset && (glimwood || victoryStar)) {
     draft.pendingChoice = createPendingChoice({
       player: playerId,
       source: glimwood ? 'stadium' : 'ability',
@@ -7839,8 +7842,40 @@ export function applyCommand(state, command, rng = null) {
       // A copy attack (design 031) picks the attack it uses before any coin is flipped.
       const targetInstanceId = payload?.targetInstanceId ?? null;
       const copy = parseCopyAttack(attack?.text);
-      // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
-      if (copy?.coinGate) {
+      // Misty's Psyduck ESP (design 049): all 3 heads copies; otherwise the attack's own text
+      // resolves with these same coins (1 heads draws, 2 heads does 20 damage).
+      let presetCoinResult = null;
+      if (copy?.coinGateFlips > 1) {
+        const flips = Array.from({ length: copy.coinGateFlips }, () => flipCoin(activeRng));
+        const headsCount = flips.filter((f) => f === 'heads').length;
+        const allMatch = flips.every((f) => f === copy.coinGate);
+        const coin = headsCount === flips.length ? 'heads' : headsCount === 0 ? 'tails' : null;
+        events.push({ type: 'attackCoinFlipped', playerId, attackName: attack.name, coin, headsCount, flips });
+        if (!allMatch && !copy.ownTextOnMiss) {
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
+        if (copy.ownTextOnMiss) presetCoinResult = { coin, headsCount, flips };
+        if (!allMatch) {
+          flipAndResolveAttack(draft, {
+            playerId,
+            activeRng,
+            events,
+            attacker,
+            defender,
+            defenderPlayerId,
+            oppId,
+            attack,
+            attackerPlayer,
+            attackerView,
+            atkIdx,
+            targetInstanceId,
+            presetCoinResult,
+          });
+          break;
+        }
+      } else if (copy?.coinGate) {
+        // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
         const coin = flipCoin(activeRng);
         events.push({
           type: 'attackCoinFlipped',
@@ -7885,6 +7920,7 @@ export function applyCommand(state, command, rng = null) {
         attackerView,
         atkIdx,
         targetInstanceId,
+        presetCoinResult,
       });
       break;
     }

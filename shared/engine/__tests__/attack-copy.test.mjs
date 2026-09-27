@@ -174,10 +174,11 @@ test('parseCopyAttack: design 039 residual wordings', () => {
     ],
   ];
   for (const [text, spec] of cases) assert.deepEqual(parseCopyAttack(text), spec, text);
-  // Misty's Psyduck ESP is a multi-branch coin attack: the copy parser must not claim it.
+  // Any other multi-coin gate still fails closed (Misty's Psyduck ESP has its own whole-text
+  // template since design 049 slice 7).
   assert.equal(
     parseCopyAttack(
-      "Flip 3 coins. If exactly 1 is heads, draw a card. If exactly 2 are heads, this attack does 20 damage. If all 3 are heads, choose 1 of the Defending Pokémon's attacks. Misty's Psyduck copies that attack except for its Energy costs. (No matter what type the Defending Pokémon is, Misty's Psyduck's type is still {W}.)"
+      "Flip 2 coins. If both of them are heads, choose 1 of the Defending Pokémon's attacks. Mon copies that attack except for its Energy cost."
     ),
     null
   );
@@ -649,4 +650,89 @@ test('attack: Skill Copy discards the chosen card from your own hand; unpayable 
   const nothing = attack(none);
   assert.ok(nothing.events.some((e) => e.type === 'attackCopyNothing'));
   assert.ok(zone(nothing, 'p1', 'hand').some((c) => c.name === 'Own Hand Mon'), 'no discard without a payable attack');
+});
+
+// ── design 049 slice 7: Misty's Psyduck ESP (Gym Challenge 90) ───────────────
+
+const ESP =
+  "Flip 3 coins. If exactly 1 is heads, draw a card. If exactly 2 are heads, this attack does 20 damage. If all 3 are heads, choose 1 of the Defending Pokémon's attacks. Misty's Psyduck copies that attack except for its Energy costs. (No matter what type the Defending Pokémon is, Misty's Psyduck's type is still {W}.)";
+
+/** The first seed whose first three coin flips show `heads` heads. */
+async function seedWithHeads(heads) {
+  const { flipCoin } = await import('../rng.mjs');
+  for (let seed = 1; seed < 500; seed++) {
+    const rng = createRng(seed);
+    const flips = [flipCoin(rng), flipCoin(rng), flipCoin(rng)];
+    if (flips.filter((f) => f === 'heads').length === heads) return seed;
+  }
+  throw new Error(`no seed with ${heads} heads`);
+}
+
+test('parseCopyAttack: ESP is a 3-coin gate that keeps its own text on a miss', () => {
+  assert.deepEqual(parseCopyAttack(ESP), {
+    source: 'oppActive',
+    coinGate: 'heads',
+    coinGateFlips: 3,
+    ownTextOnMiss: true,
+  });
+});
+
+test('attack: ESP with 3 heads offers the copy', async () => {
+  const b = board(ESP, {
+    name: "Misty's Psyduck",
+    seed: await seedWithHeads(3),
+    defenderAttacks: [{ name: 'Slam', damage: '30' }],
+  });
+  const res = attack(b);
+  assert.deepEqual(optionNames(res), ['Defender: Slam']);
+  const flipped = res.events.filter((e) => e.type === 'attackCoinFlipped');
+  assert.equal(flipped.length, 1);
+  assert.equal(flipped[0].headsCount, 3);
+});
+
+test('attack: ESP with 1 heads draws a card from the same coins, one coin event', async () => {
+  const b = board(ESP, { name: "Misty's Psyduck", seed: await seedWithHeads(1), defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const handBefore = b.p1.zones.hand.length;
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(zone(res, 'p1', 'hand').length, handBefore + 1);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage || 0, 0);
+  assert.equal(res.events.filter((e) => e.type === 'attackCoinFlipped').length, 1);
+});
+
+test('attack: ESP with 2 heads does 20 damage from the same coins', async () => {
+  const b = board(ESP, { name: "Misty's Psyduck", seed: await seedWithHeads(2), defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const handBefore = b.p1.zones.hand.length;
+  const res = attack(b);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage, 20);
+  assert.equal(zone(res, 'p1', 'hand').length, handBefore, 'the 1-heads draw does not run');
+  assert.equal(res.events.filter((e) => e.type === 'attackCoinFlipped').length, 1);
+});
+
+test('attack: ESP with 0 heads does nothing', async () => {
+  const b = board(ESP, { name: "Misty's Psyduck", seed: await seedWithHeads(0), defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const handBefore = b.p1.zones.hand.length;
+  const res = attack(b);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage || 0, 0);
+  assert.equal(zone(res, 'p1', 'hand').length, handBefore);
+});
+
+test('attack: ESP gate coins are not offered for a Glimwood Tangle re-flip', async () => {
+  const b = board(ESP, {
+    name: "Misty's Psyduck",
+    seed: await seedWithHeads(2),
+    defenderAttacks: [{ name: 'Slam', damage: '30' }],
+    setup: ({ state }) => {
+      state.stadium = createCard({
+        instanceId: 900,
+        name: 'Glimwood Tangle',
+        supertype: 'Trainer',
+        subtypes: ['Stadium'],
+        text: 'Once during each player’s turn, after that player flips any coins for an attack, they may ignore all effects of those coin flips and begin flipping those coins again.',
+      });
+    },
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage, 20);
 });

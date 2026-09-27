@@ -91,6 +91,9 @@ const GATES = [
 function stripGates(sentence) {
   let rest = sentence;
   const flags = {};
+  // "If exactly N is/are heads, …" (Misty's Psyduck ESP, design 049): runs on exactly N heads.
+  const exact = /^if exactly (\d+) (?:is|are) heads, /.exec(rest);
+  if (exact) return { rest: rest.slice(exact[0].length), flags: { headsExactly: Number(exact[1]) } };
   for (const [re, flag] of GATES) {
     if (re.test(rest)) {
       rest = rest.replace(re, '');
@@ -1260,9 +1263,10 @@ export function resolveCoinGates(steps, { coin, headsCount }) {
       if (step.gate === 'heads') return coin === 'heads';
       if (step.gate === 'tails') return coin === 'tails';
       if (step.perHeads) return heads > 0;
+      if (step.headsExactly != null) return (headsCount || 0) === step.headsExactly;
       return true;
     })
-    .map(({ gate, perHeads, ...step }) => (perHeads ? { ...step, count: (step.count || 1) * heads } : step));
+    .map(({ gate, perHeads, headsExactly, ...step }) => (perHeads ? { ...step, count: (step.count || 1) * heads } : step));
 }
 
 const ATTACH_CHAIN = /^if (?:you do|you attached energy (?:to this pokémon )?in this way), /;

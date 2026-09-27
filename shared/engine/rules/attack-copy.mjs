@@ -197,6 +197,12 @@ const TEMPLATES = [
     /^your opponent chooses an attack from 1 of their pokemon in play\. use the chosen attack as this attack\.$/,
     () => ({ source: 'oppInPlay', chooser: 'opponent' }),
   ],
+  // Misty's Psyduck ESP (Gym Challenge 90): 3 coins; all heads copies, 1 or 2 heads run the
+  // attack's own text with the same coins (design 049 O10).
+  [
+    /^flip 3 coins\. if exactly 1 is heads, [^.]+\. if exactly 2 are heads, [^.]+\. if all 3 are heads, choose 1 of the defending pokemon's attacks\. [^.]+ copies that attack except for its energy costs?\.$/,
+    () => ({ source: 'oppActive', coinGate: 'heads', coinGateFlips: 3, ownTextOnMiss: true }),
+  ],
   // Shiftry ex Skill Hack (Power Keepers 97): a Pokémon card in the opponent's hand.
   [
     new RegExp(

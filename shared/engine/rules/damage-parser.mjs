@@ -648,6 +648,18 @@ export function parseAttackDamage(
     }
   }
 
+  // ── Exact-heads branch: "If exactly N is/are heads, this attack does X damage" (Misty's
+  // Psyduck ESP, design 049). Applies only on exactly N heads; the count comes from the caller.
+  const exactHeads = text.match(/if exactly (\d+) (?:is|are) heads, this attack does (\d+) damage/);
+  if (exactHeads && Number.isFinite(headsCount)) {
+    const needed = Number(exactHeads[1]);
+    if (headsCount === needed) {
+      total += Number(exactHeads[2]);
+      components.push('coin');
+      notes.push(`coin: exactly ${needed} heads → +${exactHeads[2]}`);
+    }
+  }
+
   // ── Coin flip (outcome supplied by caller; we never flip) ──
   const headsBonus =
     /if heads, this attack does (\d+) more|if heads, .*(\d+) more damage/.test(
