@@ -324,7 +324,8 @@ function atkSwitchSelf(ctx) {
 function atkGust(ctx) {
   const { opponent } = ctx;
   const active = activeOf(opponent);
-  const bench = benchRootsOf(opponent);
+  // Scizor Snatch: "1 of your opponent's Benched Pokémon with no damage counters on it".
+  const bench = benchRootsOf(opponent).filter((c) => ctx.step.filter !== 'undamaged' || !(c.damage > 0));
   const turn = ctx.draft?.turn?.number;
   if (ctx.selection) {
     const root = bench.find((c) => c.instanceId === ctx.selection[0]);

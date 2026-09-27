@@ -836,3 +836,86 @@ test('Umbreon-EX Veil of Darkness (Fates Collide 119): draw as many cards as wer
   assert.equal(after.length, 3);
   assert.deepEqual(after.filter((n) => n.includes('deck')).length, 2);
 });
+
+// ── gust wordings ─────────────────────────────────────────────────────────────
+
+const oppActive = (state) => state.players.p2.zones.active.find((c) => !c.attachedTo);
+const addBench = (state, playerId, ...names) => {
+  const cards = names.map((name) => mon(name, { hp: 100 }));
+  state.players[playerId].zones.bench.push(...cards);
+  return cards;
+};
+
+test('Kabutops Luring Antenna (Power Keepers 10): the chosen Benched Pokémon comes up and takes the damage', () => {
+  const text =
+    "Before doing damage, you may choose 1 of your opponent's Benched Pokémon and switch it with 1 of the Defending Pokémon. If you do, this attack does 20 damage to the new Defending Pokémon. Your opponent chooses the Defending Pokémon to switch.";
+  let bench;
+  const { state, defender } = board('Kabutops', text, { damage: '20', setup: (s) => (bench = addBench(s, 'p2', 'Omanyte', 'Kabuto')) });
+  let res = attack(state);
+  if (res.pendingChoice?.options.some((o) => o.instanceId === -11)) res = choose(res, [-11]);
+  res = choose(res, [bench[1].instanceId]);
+  assert.equal(oppActive(res.state).instanceId, bench[1].instanceId);
+  assert.equal(oppActive(res.state).damage, 20);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage || 0, 0);
+});
+
+test('Scizor Snatch (Aquapolis 32): only an undamaged Benched Pokémon can be brought up', () => {
+  const text =
+    "Before doing damage, you may choose 1 of your opponent's Benched Pokémon with no damage counters on it and switch the Defending Pokémon with it.";
+  let bench;
+  const { state } = board('Scizor', text, {
+    setup: (s) => {
+      bench = addBench(s, 'p2', 'Hurt', 'Fresh');
+      bench[0].damage = 10;
+    },
+  });
+  let res = attack(state);
+  if (res.pendingChoice?.options.some((o) => o.instanceId === -11)) res = choose(res, [-11]);
+  assert.equal(oppActive(res.state).instanceId, bench[1].instanceId);
+});
+
+test('Hypno Spiral Aura (Aquapolis 16): the switch follows only a surviving Defending Pokémon', () => {
+  const text =
+    "If the Defending Pokémon isn't Knocked Out by the damage from this attack, you may choose 1 of your opponent's Benched Pokémon and switch the Defending Pokémon with it.";
+  let bench;
+  const alive = board('Hypno', text, { setup: (s) => (bench = addBench(s, 'p2', 'Drowzee')) });
+  let res = attack(alive.state);
+  if (res.pendingChoice?.options.some((o) => o.instanceId === -11)) res = choose(res, [-11]);
+  assert.equal(oppActive(res.state).instanceId, bench[0].instanceId);
+
+  const knockedOut = board('Hypno', text, {
+    damage: '500',
+    setup: (s) => addBench(s, 'p2', 'Drowzee', 'Slowpoke'),
+  });
+  res = attack(knockedOut.state);
+  const offered = res.pendingChoice?.player === 'p1' ? res.pendingChoice.options.map((o) => o.name) : [];
+  assert.ok(!offered.includes('Yes'), 'no switch is offered after the Knock Out');
+});
+
+test('Forretress Rapid Spin (Neo Discovery 21): the opponent switches, then the attacker switches', () => {
+  const text =
+    'If your opponent has any Benched Pokémon, he or she chooses 1 of them and switches it with his or her Active Pokémon, then, if you have any Benched Pokémon, you switch 1 of them with your Active Pokémon. (Do the damage before switching the Pokémon.)';
+  let theirs;
+  let mine;
+  const { state, defender } = board('Forretress', text, {
+    setup: (s) => {
+      theirs = addBench(s, 'p2', 'Other');
+      mine = addBench(s, 'p1', 'Pineco');
+    },
+  });
+  const res = attack(state);
+  assert.equal(oppActive(res.state).instanceId, theirs[0].instanceId);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 30);
+  assert.equal(res.state.players.p1.zones.active.find((c) => !c.attachedTo).instanceId, mine[0].instanceId);
+});
+
+test('Malamar V Drag Off (Rebel Clash 186): the damage lands on the new Active Pokémon', () => {
+  const text =
+    "Switch 1 of your opponent's Benched Pokémon with their Active Pokémon. This attack does 30 damage to the new Active Pokémon.";
+  let bench;
+  const { state, defender } = board('Malamar V', text, { setup: (s) => (bench = addBench(s, 'p2', 'Inkay')) });
+  const res = attack(state);
+  assert.equal(oppActive(res.state).instanceId, bench[0].instanceId);
+  assert.equal(oppActive(res.state).damage, 30);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage || 0, 0);
+});

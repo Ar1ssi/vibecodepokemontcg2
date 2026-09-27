@@ -80,6 +80,8 @@ const GATES = [
   [/^if tails, /, { gate: 'tails' }],
   [/^for each heads, /, { perHeads: true }],
   [/^before doing damage, /, { before: true }],
+  // Hypno Spiral Aura.
+  [/^if your opponent's active pokémon isn't knocked out by the damage from this attack, /, { requiresDefenderSurvived: true }],
   [/^after your attack, /, {}],
   [/^after doing damage, /, {}],
   [/^then, /, {}],
@@ -143,6 +145,17 @@ const TEMPLATES = [
   [
     /^(?:switch out your opponent's active pokémon to the bench|have your opponent switch (?:their|your opponent's) active pokémon with 1 of their benched pokémon|your opponent switches (?:their|your opponent's) active pokémon with 1 of their benched pokémon(?:, if any)?)$/,
     () => ({ type: 'atkGust', chooser: 'opponent' }),
+  ],
+  // Older wordings ("1 of the Defending Pokémon" is the Active Pokémon): Kabutops Luring Antenna,
+  // Feraligatr / Machamp Drag Off, Wurmple String Pull, Scizor Snatch, Hypno Spiral Aura.
+  [
+    /^(?:choose 1 of your opponent's benched pokémon( with no damage counters on it)? and switch (?:it with (?:1 of )?your opponent's active pokémon|your opponent's active pokémon with it)|switch 1 of your opponent's benched pokémon with 1 of your opponent's active pokémon|if your opponent has any benched pokémon, choose 1 of them and switch it with your opponent's active pokémon)$/,
+    (m) => ({ type: 'atkGust', chooser: 'self', ...(m[1] ? { filter: 'undamaged' } : {}) }),
+  ],
+  // Forretress Rapid Spin: the opponent switches first, then the attacker.
+  [
+    /^if your opponent has any benched pokémon, (?:he or she|they) chooses? 1 of them and switch(?:es)? it with their active pokémon, then, if you have any benched pokémon, you switch 1 of them with your active pokémon$/,
+    () => [{ type: 'atkGust', chooser: 'opponent' }, { type: 'atkSwitchSelf' }],
   ],
 
   // Golduck Mind Play: a random card from the opponent's hand is looked at before damage (the
@@ -1528,6 +1541,14 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       (before || beforeDamage ? result.before : result.after).push({ ...built, ...stepFlags });
       break;
     }
+  }
+
+  // Malamar V Drag Off: "This attack does 30 damage to the new Active Pokémon" — the switch
+  // happens before the damage.
+  if (/damage to the new (?:active|defending) pokémon/.test(normalized)) {
+    const gusts = result.after.filter((step) => step.type === 'atkGust');
+    result.after = result.after.filter((step) => !gusts.includes(step));
+    result.before.push(...gusts);
   }
 
   // "This attack does N damage for each card put in the Lost Zone in this way": the Lost

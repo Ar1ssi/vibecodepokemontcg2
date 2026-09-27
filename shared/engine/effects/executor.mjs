@@ -341,6 +341,15 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // Hypno Spiral Aura: "If the Defending Pokémon isn't Knocked Out by the damage from this attack".
+    if (
+      step.requiresDefenderSurvived &&
+      (context.defenderKnockedOut || events.some((e) => e.type === 'pokemonKnockedOut' && e.playerId === oppId))
+    ) {
+      context.defenderKnockedOut = true;
+      events.push({ type: 'effectStepSkipped', reason: 'defender_knocked_out', step: step.type });
+      continue;
+    }
     if (
       effectType === 'attackSteps' &&
       targetsOpponentActiveOnly(step) &&
