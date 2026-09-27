@@ -1077,6 +1077,24 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Deck-top Energy attach: Lapras ex Larimar Rain, Dragonite VSTAR Draconic Star ("{W} or {L}"),
+  // Ampharos-EX Thunder Rod, Hatterene V Horoscope ("put the other cards back in any order").
+  [
+    /look at the top (\d+) cards of your deck(?: and|\. you may) attach (?:any number of|as many) ((?:\{[a-z]\}(?: or \{[a-z]\})? )?)energy cards you find there (?:as you like )?to (this pokémon|your pokémon in any way you like)\. (shuffle the other cards back into your deck|put the other cards back in any order)\./g,
+    (m) => {
+      const types = [...m[2].matchAll(/\{([a-z])\}/g)].map((t) => t[1].toUpperCase());
+      return {
+        type: 'atkAttach',
+        source: 'deckTop',
+        look: Number(m[1]),
+        anyNumber: true,
+        ...(types.length ? { energyTypes: types } : {}),
+        target: m[3] === 'this pokémon' ? 'self' : 'any',
+        ...(m[3] === 'this pokémon' ? {} : { spread: true }),
+        rest: /shuffle/.test(m[4]) ? 'shuffle' : 'keep',
+      };
+    },
+  ],
   // Gengar Hurl into Darkness.
   [
     /look at your opponent's hand and choose a number of pokémon you find there up to the number of \{([a-z])\} energy attached to this pokémon\. put the pokémon you chose in the lost zone\./g,

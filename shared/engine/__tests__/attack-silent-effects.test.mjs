@@ -1092,3 +1092,46 @@ test('Magneton Plasma (Neo Revelation 10): a {L} Energy from the discard pile at
   assert.equal(hostOf(res.state, energies[1]), attacker.instanceId);
   assert.equal(hostOf(res.state, energies[0]), undefined);
 });
+
+test('Ampharos-EX Thunder Rod (Ancient Origins 87): {L} Energy from the top 4 cards attach to itself', () => {
+  const text =
+    'Look at the top 4 cards of your deck and attach as many {L} Energy cards you find there as you like to this Pokémon. Shuffle the other cards back into your deck.';
+  let top;
+  const { state, attacker } = board('Ampharos-EX', text, {
+    setup: (s) => {
+      top = [energy('Lightning'), energy('Fire'), energy('Lightning'), trainer('Potion', 'Item'), energy('Lightning')];
+      s.players.p1.zones.deck.unshift(...top);
+    },
+  });
+  let res = attack(state);
+  assert.deepEqual(res.pendingChoice.options.map((o) => o.instanceId), [top[0].instanceId, top[2].instanceId]);
+  res = choose(res, [top[0].instanceId, top[2].instanceId]);
+  assert.deepEqual(
+    top.map((c) => hostOf(res.state, c) ?? null),
+    [attacker.instanceId, null, attacker.instanceId, null, null]
+  );
+  assert.ok(res.events.some((e) => e.type === 'deckShuffled'));
+});
+
+test('Dragonite VSTAR Draconic Star (Sword & Shield Promos SWSH236): {W} or {L} Energy spread over your Pokémon', () => {
+  const text =
+    'Look at the top 12 cards of your deck and attach any number of {W} or {L} Energy cards you find there to your Pokémon in any way you like. Shuffle the other cards back into your deck.';
+  let top;
+  let benched;
+  const { state, attacker } = board('Dragonite VSTAR', text, {
+    setup: (s) => {
+      benched = mon('Dragonair');
+      s.players.p1.zones.bench.push(benched);
+      top = [energy('Water'), energy('Fire'), energy('Lightning')];
+      s.players.p1.zones.deck.unshift(...top);
+    },
+  });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.options.length, 2);
+  res = choose(res, [top[0].instanceId, top[2].instanceId]);
+  res = choose(res, [attacker.instanceId]);
+  res = choose(res, [benched.instanceId]);
+  assert.equal(hostOf(res.state, top[0]), attacker.instanceId);
+  assert.equal(hostOf(res.state, top[2]), benched.instanceId);
+  assert.equal(hostOf(res.state, top[1]), undefined);
+});

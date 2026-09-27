@@ -926,10 +926,30 @@ function attachPicked(ctx, picked, targets) {
   });
 }
 
+// `source: 'deckTop'` (Ampharos-EX Thunder Rod, Dragonite VSTAR Draconic Star, Lapras ex Larimar
+// Rain, Hatterene V Horoscope): Energy found in the top `look` cards; `rest: 'shuffle'` shuffles
+// the deck once the attaching is done.
 function atkAttach(ctx) {
   const { player, step } = ctx;
-  const zone = step.source === 'hand' ? player.zones.hand : player.zones.discard;
-  const candidates = (zone || []).filter((c) => energyMatches(c, step));
+  if (step.source === 'deckTop' && !ctx.selection && !ctx.memo?.cardIds) {
+    ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count: Math.min(step.look, player.zones.deck.length) });
+  }
+  const pending = attachFromZone(ctx);
+  if (!pending && step.source === 'deckTop' && step.rest === 'shuffle') shuffleOwnDeck(player, ctx);
+  return pending;
+}
+
+function attachFromZone(ctx) {
+  const { player, step } = ctx;
+  const zone =
+    step.source === 'hand'
+      ? player.zones.hand
+      : step.source === 'deckTop'
+        ? player.zones.deck.slice(0, step.look)
+        : player.zones.discard;
+  // Dragonite VSTAR: "{W} or {L} Energy cards".
+  const typed = (c) => !step.energyTypes || step.energyTypes.some((t) => energyMatches(c, { energyType: t }));
+  const candidates = (zone || []).filter((c) => energyMatches(c, step) && typed(c));
   const targets = attachTargets(ctx);
 
   if (ctx.memo?.cardIds) {
