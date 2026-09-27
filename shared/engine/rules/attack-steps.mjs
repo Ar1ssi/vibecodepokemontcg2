@@ -161,7 +161,12 @@ const TEMPLATES = [
     (m) => ({ type: 'atkAttachDiscardedForDamage', phrase: `${m[1]} card` }),
   ],
 
-  // Move Energy
+  // Move Energy. Articuno ex Ice Gift: "You may move a {W} Energy attached to Articuno ex to 1
+  // of your Pokémon" — to itself would do nothing, so the choice is among the others.
+  [
+    new RegExp(String.raw`^move (an?|\d+) ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) this pokémon to 1 of your pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'self', to: 'bench', count: countOf(m[1]), ...energyFilter(m[2], s) }),
+  ],
   [
     new RegExp(String.raw`^move (an?|\d+|all) ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) this pokémon to 1 of your benched pokémon$`),
     (m, s) => ({
@@ -187,7 +192,8 @@ const TEMPLATES = [
     }),
   ],
   [
-    new RegExp(String.raw`^move (?:any number of|any amount of|as many) ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) your pokémon to your other pokémon in any way you like$`),
+    // Shaymin LV.X Energy Flare prints "is any way you like".
+    new RegExp(String.raw`^move (?:any number of|any amount of|as many) ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) your pokémon to your other pokémon i[ns] any way you like$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'any', to: 'any', anyNumber: true, spread: true, ...energyFilter(m[1], s) }),
   ],
   [
@@ -331,7 +337,40 @@ const TEMPLATES = [
     (m) => ({ type: 'atkDiscardStadium', owner: 'any', ...(m[1] ? { optional: true } : {}) }),
   ],
 
-  // Discard from the opponent
+  // Discard from the opponent. Exploud ex Derail: "Discard a Special Energy card, if any,
+  // attached to the Defending Pokémon"; Typhlosion Evaporating Heat: "Discard a {W} Energy …".
+  [
+    /^discard (an?|\d+|all|up to \d+) (?:(special )|\{([a-z])\} )?energy(?: cards?)?(?:, if any,)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
+    (m) => ({
+      type: 'atkDiscardOppEnergy',
+      scope: 'active',
+      ...discardCount(m[1]),
+      ...(m[2] ? { special: true } : {}),
+      ...(m[3] ? { energyType: m[3].toUpperCase() } : {}),
+    }),
+  ],
+  // Scizor V Hack Off.
+  [
+    /^discard a pokémon tool and a special energy from your opponent's active pokémon$/,
+    () => [
+      { type: 'atkDiscardOppTools', scope: 'active', count: 1 },
+      { type: 'atkDiscardOppEnergy', scope: 'active', count: 1, special: true },
+    ],
+  ],
+  // Mega Dragalge ex Corrosive Liquid.
+  [
+    /^discard all pokémon tools and special energy from all of your opponent's pokémon$/,
+    () => [
+      { type: 'atkDiscardOppTools', scope: 'any', all: true },
+      { type: 'atkDiscardOppEnergy', scope: 'any', all: true, special: true },
+    ],
+  ],
+  // Skuntank Plunder: "Before doing damage, discard all Trainer cards attached to the Defending
+  // Pokémon" — the attached Trainers are its Pokémon Tools.
+  [
+    /^(?:before doing damage, )?discard all trainer cards attached to your opponent's active pokémon$/,
+    () => ({ type: 'atkDiscardOppTools', scope: 'active', all: true, beforeDamage: true }),
+  ],
   [
     /^discard (an?|\d+|all|up to \d+) (special )?energy(?: cards?)? (?:from|attached to) your opponent's active pokémon(?:, if any)?$/,
     (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', ...discardCount(m[1]), ...(m[2] ? { special: true } : {}) }),
@@ -483,8 +522,20 @@ const TEMPLATES = [
     /^put all (.+?) cards? from your discard pile into your hand$/,
     (m) => ({ type: 'atkRecover', all: true, what: m[1].trim() }),
   ],
-  // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power
-  [/^put a card from your discard pile into your hand$/, () => ({ type: 'atkRecover', count: 1, what: null })],
+  // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power; Azurill Delivery
+  // ("Put any 1 card …").
+  [/^put (?:a|any 1) card from your discard pile into your hand$/, () => ({ type: 'atkRecover', count: 1, what: null })],
+  // Older wording: Heracross Dig Deep ("Search your discard pile for an Energy card, show it to
+  // your opponent, and put it into your hand"), Pichu Electric Circuit ("up to 4 {L} Energy
+  // cards"), Sunny Castform Sunshine ("a Stadium card").
+  [
+    /^search your discard pile for (up to \d+|an?|\d+) ((?:basic )?(?:\{([a-z])\} )?(?:basic )?energy|trainer|item|supporter|stadium|pokémon tool|pokémon) cards?, show (?:it|them) to your opponent, and put (?:it|them) into your hand$/,
+    (m) => ({
+      type: 'atkRecover',
+      ...attachCount(m[1]),
+      what: m[3] ? `${/basic/.test(m[2]) ? 'basic ' : ''}{${m[3].toUpperCase()}} Energy` : recoverWhat(m[2].replace(/\{[a-z]\} /, '')),
+    }),
+  ],
   [
     /^(?:choose a card from your discard pile and put it|search your discard pile for a card, show it to your opponent, and put it) on top of your deck$/,
     () => ({ type: 'atkRecover', count: 1, what: null, to: 'deckTop' }),
@@ -614,6 +665,17 @@ const TEMPLATES = [
   // Leave play
   [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],
   [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
+  // Shaymin-EX Sky Return; Team Rocket's Crobat ex ("… into your hand", its reminder discards
+  // the attached cards); Revavroom ex / Weezing ("Discard this Pokémon …"); Uxie Psychic Restore.
+  [/^return this pokémon and all cards attached to it to your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'hand' })],
+  [/^put this pokémon into your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'discard' })],
+  [/^discard this pokémon and all (?:attached cards|cards attached to it)$/, () => ({ type: 'atkPutSelf', to: 'discard' })],
+  [
+    /^put this pokémon and all cards attached to it on the bottom of your deck in any order$/,
+    () => ({ type: 'atkPutSelf', to: 'deckBottom' }),
+  ],
+  // Comfey Sweet Kiss / Light Togetic Sweet Kiss.
+  [/^your opponent (may )?draws? a card$/, (m) => ({ type: 'atkDraw', side: 'opponent', count: 1, ...(m[1] ? { opponentMay: true } : {}) })],
   [/^draw up to (\d+) cards$/, (m) => ({ type: 'atkDraw', count: Number(m[1]), upTo: true })],
   [/^draw (a|an|\d+) cards?$/, (m) => ({ type: 'atkDraw', count: countOf(m[1]) })],
   [/^draw a number of cards equal to the number of cards in your opponent's hand$/, () => ({ type: 'atkDraw', countFrom: 'opponentHand' })],
@@ -681,6 +743,12 @@ const TEMPLATES = [
   // Volcarona-GX Backfire (design 048): attached Energy back to the attacker's hand.
   [
     new RegExp(String.raw`^put (\d+|a|an) ${ENERGY_TYPE}energy(?: cards?)? attached to this pokémon into your hand$`),
+    (m, s) => ({ type: 'atkMoveSelfEnergyToHand', count: countOf(m[1]), ...energyFilter(m[2], s) }),
+  ],
+  // Kyogre-EX Giant Whirlpool / Deoxys Energy Loop / Starmie Energy Loop: "Return 2 {W} Energy
+  // attached to this Pokémon to your hand."
+  [
+    new RegExp(String.raw`^return (\d+|a|an) ${ENERGY_TYPE}energy(?: cards?)? attached to this pokémon to your hand$`),
     (m, s) => ({ type: 'atkMoveSelfEnergyToHand', count: countOf(m[1]), ...energyFilter(m[2], s) }),
   ],
 
@@ -1064,6 +1132,15 @@ const BLOCKS = [
     /search your deck for an evolution card that evolves from this pokémon and put it onto this pokémon\. shuffle your deck afterward\./g,
     () => ({ type: 'searchEvolve', ontoSource: true }),
   ],
+  // Raticate Pickup: one card of each kind (its "(or Evolution card)" reminder is stripped).
+  [
+    /search your discard pile for a basic pokémon, a trainer card, and an energy card\. show them to your opponent and put them into your hand\./g,
+    () => [
+      { type: 'atkRecover', count: 1, what: 'Pokémon' },
+      { type: 'atkRecover', count: 1, what: 'Trainer' },
+      { type: 'atkRecover', count: 1, what: 'Energy' },
+    ],
+  ],
   // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle: the opponent flips when attacking.
   // Older Smokescreen (Weezing, Magcargo, Solrock Sun Flash): "If the Defending Pokémon tries
   // to attack during your opponent's next turn, … If tails, that attack does nothing."
@@ -1392,7 +1469,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     }
     const block = /^@block(\d+)$/.exec(sentence);
     if (block) {
-      result.after.push(blockSteps[Number(block[1])]);
+      result.after.push(...[blockSteps[Number(block[1])]].flat());
       continue;
     }
     // "If you do, …" / "If you attached Energy in this way, …" after an attach: the executor
@@ -1416,6 +1493,14 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       if (!m) continue;
       const step = build(m, rest, { wrOrder });
       if (!step) break;
+      // One sentence, several steps (Scizor V Hack Off: a Tool and a Special Energy).
+      if (Array.isArray(step)) {
+        const { before, ...stepFlags } = flags;
+        for (const { beforeDamage, ...built } of step) {
+          (before || beforeDamage ? result.before : result.after).push({ ...built, ...stepFlags });
+        }
+        break;
+      }
       if (step.type === 'atkMill' && millHandled) break;
       if (step.type === 'atkDiscardSelfEnergy' && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
       if (step.type === 'atkDiscardOwnHand' && (step.upTo || step.what) && !handScaled) break;

@@ -1248,7 +1248,31 @@ function atkShuffleHandIntoDeck(ctx) {
 // "a number of cards equal to the number of cards in your opponent's hand" reads that hand
 // when the step runs.
 function atkDraw(ctx) {
-  const { player, step } = ctx;
+  const { step } = ctx;
+  // Comfey Sweet Kiss: "Your opponent draws a card"; Light Togetic: "Your opponent may draw a
+  // card" — the opponent answers.
+  if (step.side === 'opponent') {
+    const opponent = ctx.opponent;
+    if (!opponent || opponent.zones.deck.length === 0) return skip(ctx, 'nothing_to_draw');
+    if (step.opponentMay && !ctx.selection) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Draw a card?`,
+        options: [
+          { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+          { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+        ],
+        min: 1,
+        max: 1,
+        player: opponent.playerId,
+      });
+    }
+    if (step.opponentMay && ctx.selection[0] !== ATTACK_YES) return skip(ctx, 'declined');
+    const drawn = opponent.zones.deck.splice(0, Math.min(step.count || 1, opponent.zones.deck.length));
+    opponent.zones.hand.push(...drawn);
+    ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: opponent.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
+    return null;
+  }
+  const { player } = ctx;
   const deck = player.zones.deck;
   if (step.upTo && !ctx.selection) {
     const most = Math.min(step.count || 0, deck.length);
@@ -1469,6 +1493,39 @@ function atkShuffleSelf(ctx) {
     reason: 'attack-shuffle-self',
   });
   shuffleOwnDeck(player, ctx);
+  return null;
+}
+
+/**
+ * The attacker leaves play by its own attack: Shaymin-EX Sky Return (all to hand), Team Rocket's
+ * Crobat ex Assassin's Return (it to hand, attached cards discarded), Revavroom ex Shattering
+ * Speed (all discarded — not a Knock Out, so no Prize cards), Uxie Psychic Restore (bottom of
+ * the deck). `step.to` places the Pokémon cards, `step.attached` everything else.
+ */
+function atkPutSelf(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref || ref.playerId !== player.playerId) return skip(ctx, 'attacker_not_in_play');
+  const place = (card, where) => {
+    if (where === 'discard') player.zones.discard.push(card);
+    else if (where === 'deckBottom') player.zones.deck.push(card);
+    else player.zones.hand.push(card);
+  };
+  for (const card of [ref.card, ...attachedCards(player, ref.card.instanceId)]) {
+    removeFromZones(player, card);
+    card.attachedTo = null;
+    card.damage = 0;
+    clearConditions(card);
+    place(card, isPokemon(card) ? step.to : step.attached || step.to);
+  }
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: ref.card.instanceId,
+    from: ref.zoneId,
+    to: step.to === 'deckBottom' ? 'deck' : step.to,
+    playerId: player.playerId,
+    reason: 'attack-put-self',
+  });
   return null;
 }
 
@@ -3011,6 +3068,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
   atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
+  atkPutSelf: optional(atkPutSelf, (step) => (step.to === 'hand' ? 'Put this Pokémon into your hand' : 'Put this Pokémon on the bottom of your deck')),
   returnSelfToDeckAbility,
   atkLostZoneDeckTop,
   atkLostZoneEnergy,

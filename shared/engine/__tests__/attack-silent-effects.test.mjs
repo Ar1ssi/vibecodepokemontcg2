@@ -532,3 +532,152 @@ test('Giratina Shadow Impact (Lost Thunder 97) and Gengar V Pain Explosion (Fusi
   const gengar = board('Gengar V', 'Put 3 damage counters on this Pokémon.', { damage: '190' });
   assert.equal(root(attack(gengar.state).state, 'p1', gengar.attacker.instanceId).damage, 30);
 });
+
+// ── cards attached to the Defending Pokémon ─────────────────────────────────
+
+const specialEnergy = (attachedTo) =>
+  createCard({ instanceId: nextId++, name: 'Double Turbo Energy', supertype: 'Energy', subtypes: ['Special'], attachedTo });
+const tool = (attachedTo) =>
+  createCard({
+    instanceId: nextId++,
+    name: 'Choice Belt',
+    supertype: 'Trainer',
+    subtypes: ['Pokémon Tool'],
+    type: 'Pokémon Tool',
+    attachedTo,
+  });
+const attachedToDefender = (state, defender) =>
+  state.players.p2.zones.active
+    .filter((c) => c.attachedTo === defender.instanceId)
+    .map((c) => c.name)
+    .sort();
+
+test('Exploud ex Derail (Crystal Guardians 92) and Typhlosion Evaporating Heat (Mysterious Treasures 16)', () => {
+  const derail = board('Exploud ex', 'Discard a Special Energy card, if any, attached to the Defending Pokémon.', {
+    setup: (s) => {
+      const d = s.players.p2.zones.active[0];
+      s.players.p2.zones.active.push(specialEnergy(d.instanceId), energy('Water', d.instanceId));
+    },
+  });
+  assert.deepEqual(attachedToDefender(attack(derail.state).state, derail.defender), ['Basic Water Energy']);
+  const heat = board('Typhlosion', 'Discard a {W} Energy attached to the Defending Pokémon.', {
+    setup: (s) => {
+      const d = s.players.p2.zones.active[0];
+      s.players.p2.zones.active.push(energy('Water', d.instanceId), energy('Fire', d.instanceId));
+    },
+  });
+  assert.deepEqual(attachedToDefender(attack(heat.state).state, heat.defender), ['Basic Fire Energy']);
+});
+
+test('Scizor V Hack Off (Darkness Ablaze 183): a Tool and a Special Energy', () => {
+  const text = "Discard a Pokémon Tool and a Special Energy from your opponent's Active Pokémon.";
+  const { state, defender } = board('Scizor V', text, {
+    setup: (s) => {
+      const d = s.players.p2.zones.active[0];
+      s.players.p2.zones.active.push(tool(d.instanceId), specialEnergy(d.instanceId), energy('Water', d.instanceId));
+    },
+  });
+  assert.deepEqual(attachedToDefender(attack(state).state, defender), ['Basic Water Energy']);
+});
+
+test('Skuntank Plunder (Stormfront 26): the Tool goes before damage', () => {
+  const text = 'Before doing damage, discard all Trainer cards attached to the Defending Pokémon.';
+  const { state, defender } = board('Skuntank', text, {
+    damage: '60',
+    setup: (s) => s.players.p2.zones.active.push(tool(s.players.p2.zones.active[0].instanceId)),
+  });
+  assert.deepEqual(attachedToDefender(attack(state).state, defender), []);
+  assert.deepEqual(parseAttackSteps(text).before.map((s) => s.type), ['atkDiscardOppTools']);
+});
+
+// ── the attacker's own Energy, hand and place in play ───────────────────────
+
+test('Kyogre-EX Giant Whirlpool (Primal Clash 148): 2 {W} Energy return to hand', () => {
+  const { state, attacker } = board('Kyogre-EX', 'Return 2 {W} Energy attached to this Pokémon to your hand.', {
+    damage: '140',
+  });
+  attachTo(state, attacker, ['Water', 'Water', 'Water', 'Fire']);
+  const offered = attack(state);
+  const water = offered.state.pendingChoice.options.map((o) => o.instanceId);
+  assert.equal(water.length, 3, 'the {W} Energy are the choices');
+  const res = choose(offered, water.slice(0, 2));
+  assert.deepEqual(attachedTypes(res.state, attacker), ['Fire', 'Water']);
+  assert.equal(res.state.players.p1.zones.hand.filter((c) => c.energyType === 'Water').length, 2);
+});
+
+test('Articuno ex Ice Gift (Nintendo Black Star Promos 032): a {W} Energy may move to another Pokémon', () => {
+  const text = 'You may move a {W} Energy attached to Articuno ex to 1 of your Pokémon.';
+  const ally = mon('Ally');
+  const { state, attacker } = board('Articuno ex', text, { damage: '10', setup: (s) => s.players.p1.zones.bench.push(ally) });
+  attachTo(state, attacker, ['Water']);
+  let res = attack(state);
+  for (let guard = 0; res.state.pendingChoice && guard < 5; guard++) {
+    const options = res.state.pendingChoice.options;
+    const option = options.find((o) => o.name === 'Yes' || o.instanceId === ally.instanceId) || options[0];
+    res = choose(res, [option.instanceId]);
+  }
+  assert.equal(res.state.players.p1.zones.bench.filter((c) => c.attachedTo === ally.instanceId).length, 1);
+});
+
+test('Pichu Electric Circuit (Stormfront 45): up to 4 {L} Energy from the discard pile', () => {
+  const text =
+    'Search your discard pile for up to 4 {L} Energy cards, show them to your opponent, and put them into your hand.';
+  const { state } = board('Pichu', text, {
+    damage: '',
+    setup: (s) => s.players.p1.zones.discard.push(energy('Lightning'), energy('Lightning'), energy('Fire')),
+  });
+  const offered = attack(state);
+  const lightning = offered.state.pendingChoice.options.map((o) => o.instanceId);
+  assert.equal(lightning.length, 2, 'only the {L} Energy are offered');
+  const res = choose(offered, lightning);
+  assert.equal(res.state.players.p1.zones.hand.filter((c) => c.energyType === 'Lightning').length, 2);
+});
+
+test('Raticate Pickup (FireRed & LeafGreen 48): a Pokémon, a Trainer and an Energy come back', () => {
+  const text =
+    'Search your discard pile for a Basic Pokémon (or Evolution card), a Trainer card, and an Energy card. Show them to your opponent and put them into your hand.';
+  const { state } = board('Raticate', text, {
+    damage: '',
+    setup: (s) => s.players.p1.zones.discard.push(mon('Old Rattata'), trainer('Old Potion', 'Item'), energy('Grass')),
+  });
+  assert.equal(attack(state).state.players.p1.zones.discard.length, 0);
+});
+
+test('Shaymin-EX Sky Return (Roaring Skies 77a) and Revavroom ex Shattering Speed (Shrouded Fable 081)', () => {
+  const sky = board('Shaymin-EX', 'Return this Pokémon and all cards attached to it to your hand.', {
+    setup: (s) => s.players.p1.zones.bench.push(mon('Next Up')),
+  });
+  attachTo(sky.state, sky.attacker, ['Grass']);
+  const returned = attack(sky.state);
+  assert.ok(returned.state.players.p1.zones.hand.some((c) => c.instanceId === sky.attacker.instanceId));
+  assert.ok(returned.state.players.p1.zones.hand.some((c) => c.energyType === 'Grass'));
+  const speed = board('Revavroom ex', 'Discard this Pokémon and all attached cards.', {
+    damage: '250',
+    setup: (s) => s.players.p1.zones.bench.push(mon('Next Up')),
+  });
+  const discarded = attack(speed.state);
+  assert.ok(discarded.state.players.p1.zones.discard.some((c) => c.instanceId === speed.attacker.instanceId));
+  assert.equal(discarded.state.players.p2.zones.prizes.length, 6, 'not a Knock Out: no Prize cards');
+});
+
+test("Team Rocket's Crobat ex Assassin's Return (Destined Rivals 242): to hand, attached cards discarded", () => {
+  const text = 'You may put this Pokémon into your hand. (Discard all cards attached to this Pokémon.)';
+  const { state, attacker } = board("Team Rocket's Crobat ex", text, {
+    damage: '120',
+    setup: (s) => s.players.p1.zones.bench.push(mon('Next Up')),
+  });
+  attachTo(state, attacker, ['Darkness']);
+  const offered = attack(state);
+  const yes = offered.state.pendingChoice.options.find((o) => o.name === 'Yes').instanceId;
+  const res = choose(offered, [yes]);
+  assert.ok(res.state.players.p1.zones.hand.some((c) => c.instanceId === attacker.instanceId));
+  assert.ok(res.state.players.p1.zones.discard.some((c) => c.energyType === 'Darkness'));
+});
+
+test('Comfey Sweet Kiss (Guardians Rising 93): the opponent draws a card', () => {
+  const { state } = board('Comfey', 'Your opponent draws a card.');
+  const before = state.players.p2.zones.hand.length;
+  const res = attack(state);
+  // +1 from Sweet Kiss, +1 from the opponent's turn draw.
+  assert.equal(res.state.players.p2.zones.hand.length, before + 2);
+});
