@@ -451,7 +451,10 @@ function parseTransformShape(lower) {
     : /discard pile/.test(lower)
       ? 'discard'
       : 'hand';
+  // Deoxys Form Change, Castform Temperament, Ditto Duplicate, Unown Shuffle.
+  const formChange = lower.match(/search your deck for (?:any|another) ([^.,]+?) and switch it with/)?.[1];
   const what =
+    formChange ||
     lower.match(/switch this pok[eé]mon with an? ([^.,]+?) in your hand/)?.[1] ||
     lower.match(/choose an? ([^.,]+?)(?:, except any [^,]+,)? (?:from your discard pile|you find there)/)?.[1] ||
     (onTop ? 'basic pokémon' : null);
@@ -459,7 +462,7 @@ function parseTransformShape(lower) {
     source,
     what: what ? what.trim() : null,
     except: lower.match(/except any ([a-z0-9é' -]+?)[,.]/)?.[1]?.trim() || null,
-    keepState: onTop || /remain on the new pok[eé]mon/.test(lower),
+    keepState: onTop || /(?:remain|are now) on the new pok[eé]mon/.test(lower),
     onTop,
     shuffle: source === 'deck',
   };
@@ -508,6 +511,11 @@ function withIfYouDoHalves(lower, parsed) {
     return [{ type: 'selfLeavesAbility', to: 'deckTop', payDeckBottom: true, guidance: 'Once during your turn: discard the bottom card of your deck, then put this Pokémon on top of your deck.' }];
   }
 
+  // Azelf Time Walk: look at the Prizes, take a Pokémon, set a hand card as a Prize.
+  if (/look at all of your face-down prize cards\. if you do, you may choose 1 pok[eé]mon you find there[^.]*put it into your hand\. then, choose 1 card in your hand and put it as a prize card face down/.test(lower)) {
+    return [{ type: 'prizeToHand', count: 1, lookPokemon: true, replace: true, guidance: 'Look at your Prize cards; you may swap a Pokémon there for a card from your hand.' }];
+  }
+
   // Malamar Psychic Insight: two looks, no card moves.
   if (/look at the top card of your opponent's deck\. if you do, look at the top card of your deck/.test(lower)) {
     return [
@@ -530,6 +538,15 @@ function withIfYouDoHalves(lower, parsed) {
     const excluded = lower.match(/(?:except|excluding) (pok[eé]mon-gx or pok[eé]mon-ex|pok[eé]mon-ex|pok[eé]mon-gx)\b/)?.[1] || '';
     const kinds = [excluded.includes('-gx') && 'GX', excluded.includes('-ex') && 'EX'].filter(Boolean);
     if (kinds.length > 0) attach.excludeKinds = kinds;
+  }
+
+  // Elusive Master: the Bench placement is the cost, so it runs before "draw 3 cards".
+  const placement = steps.find((step) => step.type === 'selfBenchPlacementAbility' && step.cost);
+  if (placement) steps = [placement, ...steps.filter((step) => step !== placement)];
+
+  // Pyukumuku Pitch a Pyukumuku: "reveal it and put it on the bottom of your deck. If you do".
+  if (/if this pok[eé]mon is in your hand, you may reveal it and put it on the bottom of your deck\. if you do/.test(lower)) {
+    steps = [{ type: 'selfLeavesAbility', fromHand: true, to: 'deckBottom', cost: true, guidance: 'Put this Pokémon from your hand on the bottom of your deck (cost).' }, ...steps];
   }
 
   // Goodra Gooey Regeneration, Porygon-Z-GX Troubleshooting.
@@ -1754,7 +1771,8 @@ export function parseAbility(text = '') {
       (lower.includes('in your hand') || lower.includes('discard pile'))) ||
     (/switch it with/.test(lower) && lower.includes('discard pile')) ||
     /put a basic pok[eé]mon from your hand on top of this pok[eé]mon/.test(lower) ||
-    /put the chosen pok[eé]mon in its place/.test(lower)
+    /put the chosen pok[eé]mon in its place/.test(lower) ||
+    /search your deck for (?:any|another) [^.,]+? and switch it with/.test(lower)
   ) {
     steps.push({
       type: 'transformAbility',
@@ -1865,15 +1883,20 @@ export function parseAbility(text = '') {
   if (
     (/put this pok[eé]mon onto your bench/.test(lower) ||
       /play this pok[eé]mon onto your bench/.test(lower) ||
+      // Elusive Master: "if this Pokémon is the last card in your hand, you may play it onto your Bench".
+      /last card in your hand, you may play it onto your bench/.test(lower) ||
       /play this pok[eé]mon as your new active pok[eé]mon/.test(lower)) &&
     !lower.includes('when you play')
   ) {
     const morePrizes = /more prize cards? remaining than your opponent/.test(lower);
     const opponentStage2 = /opponent has any stage 2/.test(lower);
+    const lastCard = /last card in your hand/.test(lower);
     steps.push({
       type: 'selfBenchPlacementAbility',
       swapActive: /move your active pok[eé]mon to your bench/.test(lower),
-      condition: morePrizes ? 'morePrizes' : opponentStage2 ? 'opponentStage2' : null,
+      condition: morePrizes ? 'morePrizes' : opponentStage2 ? 'opponentStage2' : lastCard ? 'lastCardInHand' : null,
+      // "If you do, draw 3 cards" only follows a real placement.
+      ...(lastCard ? { cost: true } : {}),
       guidance: /move your active pok[eé]mon to your bench/.test(lower)
         ? 'Once during your turn: move your Active Pokémon to the Bench and put this Pokémon in the Active Spot (as described).'
         : 'Once during your turn: put this Pokémon from your hand onto your Bench (as described).',

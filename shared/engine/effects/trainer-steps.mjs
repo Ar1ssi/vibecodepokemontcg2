@@ -2285,6 +2285,18 @@ function prizeToHand(ctx) {
 
   if (prizes.length === 0) return skip(ctx, 'no_prizes');
   const count = Math.min(step.count || 1, prizes.length);
+  // Azelf Time Walk: the owner looks at every Prize and may take a Pokémon found there.
+  if (step.lookPokemon) {
+    ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, zone: 'prizes', count: prizes.length });
+    const found = prizes.filter(isPokemon);
+    if (found.length === 0) return null;
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Ability')}: You may put a Pokémon from your Prize cards into your hand`,
+      options: found,
+      min: 0,
+      max: count,
+    });
+  }
   // Prizes stay face down: the pick is blind, so the options carry no names (I141).
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${count} Prize card(s) to put into your hand`,
@@ -3090,6 +3102,10 @@ function selfBenchPlacementAbility(ctx) {
   if (step.condition === 'opponentStage2' && !opponentHasStage2(ctx)) {
     return skip(ctx, 'condition_unmet');
   }
+  // Elusive Master: "if this Pokémon is the last card in your hand".
+  if (step.condition === 'lastCardInHand' && player.zones.hand.length !== 1) {
+    return skip(ctx, 'condition_unmet');
+  }
   removeFromZones(player, card);
   card.attachedTo = null;
   if (step.swapActive) {
@@ -3226,6 +3242,16 @@ function selfLeavesAbility(ctx) {
   if (ctx.memo?.phase === 'promote') {
     const newActive = benchRootsOf(player).find((c) => c.instanceId === ctx.selection?.[0]);
     if (newActive) promoteToActive(player, newActive, ctx.events);
+    return null;
+  }
+  // Pyukumuku Pitch a Pyukumuku: the card is revealed from the hand onto the deck's bottom.
+  if (step.fromHand) {
+    const card = (player.zones.hand || []).find((c) => c.instanceId === ctx.sourceCard?.instanceId);
+    if (!card) return skip(ctx, 'card_not_in_hand');
+    removeFromZones(player, card);
+    player.zones.deck.push(card);
+    ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+    ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'deck', playerId: player.playerId, reason: 'ability-self-leaves' });
     return null;
   }
   const root = sourceRoot(ctx);
@@ -3582,6 +3608,8 @@ function transformAbility(ctx) {
     } else if (step.keepState) {
       swapInPlace(player, outgoing, incoming, ctx.events);
       if (step.source === 'hand') player.zones.hand.push(outgoing);
+      // Deoxys Form Change, Castform Temperament: the old form goes back into the deck.
+      else if (step.source === 'deck') player.zones.deck.unshift(outgoing);
       else discardCardToPlayerZone(player, outgoing);
     } else {
       const zone = player.zones[zoneIdOf(player, root)];

@@ -334,3 +334,95 @@ test('ability: Malamar Psychic Insight shows both top cards and moves nothing', 
   assert.deepEqual(res.state.players.p1.zones.deck.map((c) => c.instanceId), [40, 41]);
   assert.equal(res.state.players.p1.zones.hand.length, 0);
 });
+
+// ── form changes and hand-activated halves ───────────────────────────────
+
+// Deoxys Speed Forme, Legends Awakened 26.
+const FORM_CHANGE =
+  'Once during your turn (before your attack), you may search your deck for any Deoxys and switch it with Deoxys Speed Forme. (Any cards attached to Deoxys Speed Forme, damage counters, Special Conditions, and effects on it are now on the new Pokémon.) If you do, put Deoxys Speed Forme on top of your deck. Shuffle your deck afterward. You can\u2019t use more than 1 Form Change Pok\u00e9-Power each turn.';
+
+test('ability: Deoxys Form Change swaps in a deck Deoxys with the stack state; the old form returns to the deck', () => {
+  const { state, rng } = board(FORM_CHANGE, { name: 'Deoxys Speed Forme' });
+  const p1 = state.players.p1.zones;
+  p1.active[0].damage = 40;
+  p1.active.push(energy(60, 'Psychic', { attachedTo: 70 }));
+  p1.deck.push(mon(40, 'Deoxys Attack Forme'), mon(41, 'Pikachu'));
+  let res = use70(state, rng);
+  assert.deepEqual(res.pendingChoice.options.map((o) => o.instanceId), [40]);
+  res = resolveWith(res, [40], rng);
+  const active = res.state.players.p1.zones.active.find((c) => !c.attachedTo);
+  assert.equal(active.instanceId, 40);
+  assert.equal(active.damage, 40);
+  assert.equal(res.state.players.p1.zones.active.find((c) => c.instanceId === 60)?.attachedTo, 40);
+  assert.equal(zoneOf(res, 'p1', 70), 'deck');
+  assert.equal(zoneOf(res, 'p1', 40), 'active');
+});
+
+// Pyukumuku, Sword & Shield Promos SWSH169.
+const PITCH_A_PYUKUMUKU =
+  "Once during your turn, if this Pokémon is in your hand, you may reveal it and put it on the bottom of your deck. If you do, draw a card. You can't use more than 1 Pitch a Pyukumuku Ability each turn.";
+// Beedrill, Vivid Voltage 003.
+const ELUSIVE_MASTER =
+  'Once during your turn, if this Pokémon is the last card in your hand, you may play it onto your Bench. If you do, draw 3 cards.';
+
+function handBoard(text, name) {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(80, 'Own Active'));
+  state.players.p2.zones.active.push(mon(90, 'Opp Active'));
+  state.players.p1.zones.hand.push(mon(70, name, { abilities: [{ name: 'Test Ability', type: 'Ability', text }] }));
+  for (let id = 40; id < 45; id++) state.players.p1.zones.deck.push(createCard({ instanceId: id, name: `Deck ${id}` }));
+  return { state, rng };
+}
+
+test('ability: Pyukumuku Pitch a Pyukumuku goes from the hand to the deck bottom, then draws a card', () => {
+  const { state, rng } = handBoard(PITCH_A_PYUKUMUKU, 'Pyukumuku');
+  const res = use70(state, rng);
+  const deck = res.state.players.p1.zones.deck.map((c) => c.instanceId);
+  assert.equal(deck.at(-1), 70);
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), [40]);
+});
+
+test('ability: Beedrill Elusive Master benches the last card in hand, then draws 3', () => {
+  const { state, rng } = handBoard(ELUSIVE_MASTER, 'Beedrill');
+  const res = use70(state, rng);
+  assert.equal(zoneOf(res, 'p1', 70), 'bench');
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), [40, 41, 42]);
+});
+
+test('ability: Beedrill Elusive Master with another card in hand neither benches nor draws', () => {
+  const { state, rng } = handBoard(ELUSIVE_MASTER, 'Beedrill');
+  state.players.p1.zones.hand.push(createCard({ instanceId: 50, name: 'Other' }));
+  const res = use70(state, rng);
+  assert.equal(zoneOf(res, 'p1', 70), 'hand');
+  assert.equal(res.state.players.p1.zones.hand.length, 2);
+});
+
+// Azelf, Legends Awakened 19.
+const TIME_WALK =
+  'Once during your turn, when you put Azelf from your hand onto your Bench, you may look at all of your face-down Prize cards. If you do, you may choose 1 Pokémon you find there, show it to your opponent, and put it into your hand. Then, choose 1 card in your hand and put it as a Prize card face down.';
+
+function azelfBoard(playedToBenchTurn) {
+  const { state, rng } = board(TIME_WALK, { zone: 'bench', name: 'Azelf' });
+  state.players.p1.zones.bench.find((c) => c.instanceId === 70).playedToBenchTurn = playedToBenchTurn;
+  state.players.p1.zones.prizes.push(createCard({ instanceId: 30, name: 'Potion' }), mon(31, 'Uxie'));
+  state.players.p1.zones.hand.push(createCard({ instanceId: 50, name: 'Rare Candy' }));
+  return { state, rng };
+}
+
+test('ability: Azelf Time Walk swaps a Prize Pokémon for a hand card the turn it is benched', () => {
+  const { state, rng } = azelfBoard(2);
+  let res = use70(state, rng);
+  assert.deepEqual(res.pendingChoice.options.map((o) => o.instanceId), [31]);
+  res = resolveWith(res, [31], rng);
+  res = resolveWith(res, [50], rng);
+  assert.equal(zoneOf(res, 'p1', 31), 'hand');
+  assert.equal(zoneOf(res, 'p1', 50), 'prizes');
+  assert.equal(res.state.players.p1.zones.prizes.length, 2);
+});
+
+test('ability: Azelf Time Walk is refused on a later turn', () => {
+  const { state, rng } = azelfBoard(1);
+  const res = use70(state, rng);
+  assert.ok(res.error);
+  assert.equal(zoneOf(res, 'p1', 31) ?? zoneOf({ state }, 'p1', 31), 'prizes');
+});
