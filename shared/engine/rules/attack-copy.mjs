@@ -350,3 +350,67 @@ function powerStatusOf(t) {
   if (!match) return null;
   return match[1].startsWith('asleep') ? 'rotation' : 'any';
 }
+
+// "Its previous Evolutions", "its Basic Pokémon card or any Evolution card attached to it", "its
+// Basic Pokémon or its Stage 1 Evolution card": all name the cards below the top of the stack.
+const PRIOR_EVOLUTIONS = String.raw`(?:previous evolutions|basic pokemon(?: card)? or (?:its stage 1 evolution card|any evolution card (?:attached to it|from which the pokemon evolved)))`;
+
+const GRANTS = [
+  // Relicanth Memory Dive (TEF 084), Celebi-EX / Shining Celebi Time Recall (BCR 9, SM79).
+  [
+    new RegExp(String.raw`each of your evolved pokemon can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    () => ({ recipients: 'ownEvolved', from: 'priorEvolutions' }),
+  ],
+  // Aerodactyl Prehistoric Memory (Neo Revelation 15): both players' Evolved Pokémon.
+  [
+    new RegExp(String.raw`whenever an evolved pokemon attacks, it can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    () => ({ recipients: 'allEvolved', from: 'priorEvolutions' }),
+  ],
+  // Honchkrow Dark Genes (Mysterious Treasures 10).
+  [
+    /as long as (\S+) has the energy necessary to use its attack, each of your (\S+) can use \1's attack as its own without the energy necessary/,
+    (m) => ({
+      recipients: 'ownNamed',
+      recipientName: m[2],
+      from: 'holderAttacks',
+      costFree: true,
+      holderMustPay: true,
+    }),
+  ],
+  // Memory Capsule (VIV 155), Memory Berry (AQ 128, CG 80, PL 110).
+  [
+    new RegExp(String.raw`the pokemon this card is attached to can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    (m, t) => ({
+      recipients: 'host',
+      from: 'priorEvolutions',
+      discardAfterAttack:
+        /if that pokemon attacks, discard this card at the end of the turn|discard this card at the end of any turn the pokemon attacks/.test(
+          t
+        ),
+    }),
+  ],
+  // Recall (Gym Heroes 116), a Trainer: the player's Active for this turn's attack.
+  [
+    new RegExp(String.raw`for your attack this turn, your active pokemon can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    () => ({ recipients: 'active', from: 'priorEvolutions' }),
+  ],
+];
+
+/**
+ * Attack grants (design 049 slice 4): an Ability, Pokémon Tool or Trainer that lets OTHER
+ * Pokémon use attacks — their own previous Evolutions' (Memory Dive, Memory Capsule, Recall) or
+ * the holder's (Dark Genes). Null for other text.
+ * @returns {{ recipients: 'ownEvolved'|'allEvolved'|'host'|'active'|'ownNamed',
+ *   recipientName?: string, from: 'priorEvolutions'|'holderAttacks', costFree?: boolean,
+ *   holderMustPay?: boolean, discardAfterAttack?: boolean,
+ *   powerStatus: 'rotation'|'any'|null }|null}
+ */
+export function parseAttackGrant(text) {
+  const t = normalize(text);
+  if (!t) return null;
+  for (const [pattern, build] of GRANTS) {
+    const m = pattern.exec(t);
+    if (m) return { ...build(m, t), powerStatus: powerStatusOf(t) };
+  }
+  return null;
+}

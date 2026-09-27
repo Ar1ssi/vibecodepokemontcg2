@@ -419,3 +419,9 @@ DECISIONS lines for O1–O11.
   (it matches "stops working while" too); `powerConditionRestriction` is unchanged because it only
   gates activated Abilities. Dragon DNA's bonus needs no base-damage check at the call site:
   `computeAttackDamage` already drops every bonus when the attack does no damage (row 25).
+- Slice 4 (bug found, fixed in place): `toolGrantedAttacksFor` read every card attached to the
+  root, so evolution cards (attached to their Basic in the authoritative model) handed an
+  evolved Pokémon its Stage 1 attacks for free. It now skips attached Pokémon and Energy.
+  Test: "an evolved Pokémon with no grant cannot use its previous Evolutions".
+- Slice 4 (cosmetic): Memory Berry is flagged for discard when its Pokémon declares an attack
+  (before the Confusion flip), the same point the attack is chosen.

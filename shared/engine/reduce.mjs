@@ -147,6 +147,7 @@ import {
   inCopyGroup,
   copiedAttackFor,
   parseAttackBorrowAbility,
+  parseAttackGrant,
 } from './rules/attack-copy.mjs';
 import {
   attackerMatchesFilter,
@@ -1041,6 +1042,9 @@ function toolGrantedAttacksFor(state, card) {
   const out = [];
   for (const attached of zone) {
     if (attached.attachedTo !== card.instanceId) continue;
+    // Evolution cards sit in the stack attached to the Basic root: their attacks are the
+    // previous Evolutions', usable only through a grant (design 049), never as a Tool's.
+    if (isPokemon(attached) || isEnergy(attached)) continue;
     out.push(...parseGrantedAttacks(attached));
   }
   return out;
@@ -1118,12 +1122,79 @@ function abilityBorrowedAttacks(state, card) {
   return borrowed;
 }
 
-// `inPlayView` with Stadium extras and Ability-borrowed attacks merged into its attacks list.
+const abilityTexts = (view) =>
+  (view?.abilities || []).map((a) => (typeof a === 'string' ? a : a?.text ?? a?.effect ?? ''));
+const cardText = (card) =>
+  [card?.text, card?.effect, card?.cardText].find((v) => typeof v === 'string' && v) || '';
+
+/**
+ * Attacks other cards let `card` use (design 049 slice 4): an in-play Ability on either side
+ * (Relicanth Memory Dive, Celebi-EX Time Recall, Aerodactyl Prehistoric Memory, Honchkrow Dark
+ * Genes), an attached Tool (Memory Capsule, Memory Berry), or this turn's Recall. Each attack
+ * keeps its cost unless the grant says otherwise, and carries `grantedBy`.
+ */
+function grantedAttacksFor(state, card) {
+  const ref = findCard(state, card?.instanceId);
+  if (!ref || !['active', 'bench'].includes(ref.zoneId)) return [];
+  const zone = ref.player?.zones?.[ref.zoneId] || [];
+  const view = inPlayView(state, card);
+  const priorAttacks = (grantedBy) =>
+    priorEvolutionCards(zone, card).flatMap((src) =>
+      (src.attacks || []).filter((a) => a?.name).map((a) => ({ ...a, grantedBy }))
+    );
+  const out = [];
+
+  for (const [ownerId, owner] of Object.entries(state.players || {})) {
+    const sideContext = abilitySideContext(state, ownerId);
+    for (const root of ['active', 'bench'].flatMap((z) => rootsIn(owner?.zones?.[z]))) {
+      const holder = inPlayView(state, root);
+      const grants = abilityTexts(holder).map(parseAttackGrant).filter(Boolean);
+      if (grants.length === 0) continue;
+      if (isAbilitySuppressed(holder, sideContext)) continue;
+      for (const grant of grants) {
+        if (powerStatusBlocks(grant.powerStatus, root)) continue;
+        const sameSide = ownerId === ref.playerId;
+        if (grant.recipients === 'ownEvolved' && sameSide) out.push(...priorAttacks(holder.name));
+        if (grant.recipients === 'allEvolved') out.push(...priorAttacks(holder.name));
+        if (
+          grant.recipients === 'ownNamed' &&
+          sameSide &&
+          root.instanceId !== card.instanceId &&
+          String(view?.name || '').toLowerCase() === grant.recipientName
+        ) {
+          for (const attack of holder.attacks || []) {
+            if (!attack?.name) continue;
+            if (grant.holderMustPay && !attackCostPayable(state, ownerId, root, attack)) continue;
+            const copied = copiedAttackFor(attack, { sourceName: holder.name, copierName: view.name });
+            out.push({ ...copied, ...(grant.costFree ? { cost: [] } : {}), grantedBy: holder.name });
+          }
+        }
+      }
+    }
+  }
+
+  if (!isStadiumToolNegation(state.stadium?.card || state.stadium)) {
+    for (const tool of attachedTools(card, zone)) {
+      const grant = parseAttackGrant(cardText(tool));
+      if (grant?.recipients === 'host') out.push(...priorAttacks(tool.name));
+    }
+  }
+
+  const owner = state.players?.[ref.playerId];
+  if (owner?.flags?.evolutionAttacksTurn && ref.zoneId === 'active') out.push(...priorAttacks('Recall'));
+  return out;
+}
+
+// `inPlayView` with Stadium extras, Ability-borrowed and granted attacks merged into its
+// attacks list, in the order the client panel renders them (design 049).
 function attackViewFor(state, card, { isActive = true } = {}) {
   const view = inPlayView(state, card);
   const extras = mergeAttacks(
-    mergeAttacks(stadiumExtraAttacksFor(state, card, { isActive }), toolGrantedAttacksFor(state, card)),
-    abilityBorrowedAttacks(state, card)
+    mergeAttacks(
+      mergeAttacks(stadiumExtraAttacksFor(state, card, { isActive }), toolGrantedAttacksFor(state, card)),
+      abilityBorrowedAttacks(state, card)
+    ),
+    grantedAttacksFor(state, card)
   );
   if (extras.length === 0) return view;
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
@@ -3059,6 +3130,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
       p.flags.briarActive = false;
       delete p.flags.turnDamageBonuses;
       delete p.flags.ignoreDefenderEffectsTurn;
+      delete p.flags.evolutionAttacksTurn;
       delete p.flags.willFirstCoin;
     }
   }
@@ -3528,7 +3600,13 @@ function attackCostPayable(state, playerId, active, attack) {
   if (!(attack?.cost?.length > 0) && markerIncrease === 0) return true;
   const player = state.players?.[playerId];
   if (!player || !active) return false;
-  const activeZoneCards = player.zones?.active || [];
+  // The holder's own zone: a Benched holder (Honchkrow Dark Genes, design 049) prices its own
+  // Energy. The Active is the usual caller, and its zone is `active`.
+  const holderRef = findCard(state, active.instanceId);
+  const activeZoneCards =
+    (holderRef?.playerId === playerId && holderRef.player?.zones?.[holderRef.zoneId]) ||
+    player.zones?.active ||
+    [];
   const attached = activeZoneCards.filter(
     (c) => c.attachedTo === active.instanceId && isEnergy(c)
   );
@@ -7620,6 +7698,13 @@ export function applyCommand(state, command, rng = null) {
         name: 'Attack',
         damage: 10,
       };
+      // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
+      // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
+      if (attacker) {
+        for (const tool of attachedTools(attacker, attackerPlayer.zones.active)) {
+          if (parseAttackGrant(cardText(tool))?.discardAfterAttack) tool.discardAtEndOfTurn = true;
+        }
+      }
 
       const oppId = Object.keys(draft.players || {}).find(
         (id) => id !== playerId
