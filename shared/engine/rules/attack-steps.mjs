@@ -18,6 +18,7 @@ import {
 } from './damage-parser.mjs';
 import { parseEachFilter } from './each-filter.mjs';
 import { normalizeAttackText } from './attack-text.mjs';
+import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
 
 const WORD_COUNTS = { a: 1, an: 1, one: 1, two: 2, three: 3 };
 
@@ -1302,9 +1303,20 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     normalizeAttackText(text, selfName)
   );
 
-  for (const raw of normalized.split(/(?<=\.)\s+/)) {
+  // "You may <cost>. If you do, this attack does N more damage": the reducer offers and pays
+  // that cost before damage (optional-cost-bonus.mjs), so neither sentence is a step here.
+  const optionalCost = Boolean(optionalCostBonusClause(text, selfName));
+  const sentences = normalized.split(/(?<=\.)\s+/);
+  for (const [index, raw] of sentences.entries()) {
     const sentence = raw.trim().replace(/\.$/, '');
     if (!sentence) continue;
+    if (
+      optionalCost &&
+      ((/^you may /.test(sentence) && /^if you do\b/.test(sentences[index + 1]?.trim() || '')) ||
+        (/^if you do\b/.test(sentence) && /^you may /.test(sentences[index - 1]?.trim() || '')))
+    ) {
+      continue;
+    }
     const block = /^@block(\d+)$/.exec(sentence);
     if (block) {
       result.after.push(blockSteps[Number(block[1])]);

@@ -222,6 +222,8 @@ export function buildServerAttackContext(
     handDiscarded = undefined,
     revealedMatches = undefined,
     attack = null,
+    optionalCostPaid = undefined,
+    optionalCostCount = undefined,
   } = {}
 ) {
   const own = state?.players?.[attackerPlayerId] || null;
@@ -354,6 +356,9 @@ export function buildServerAttackContext(
   if (revealedMatches !== undefined) {
     ctx.revealedMatches = revealedMatches;
   }
+  // "You may <cost>. If you do, …" (optional-cost-bonus.mjs): whether the player paid, and how much.
+  if (optionalCostPaid !== undefined) ctx.optionalCostPaid = optionalCostPaid;
+  if (optionalCostCount !== undefined) ctx.optionalCostCount = optionalCostCount;
 
   // Defender-derived fields only exist while there IS a defender: an effect-only attack
   // (Call for Family with an empty opposing board) must not read 0 HP as "the defender

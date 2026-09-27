@@ -38,6 +38,15 @@ import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 import { parseEachFilter } from './each-filter.mjs';
 import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
 import { normalizeAttackText } from './attack-text.mjs';
+import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
+
+// Scalings that count what an optional "You may discard …" cost paid.
+const COST_SCALING_COMPONENTS = new Set([
+  'per-energy-discarded',
+  'per-milled',
+  'per-hand-discarded',
+  'per-revealed',
+]);
 
 export const DAMAGE_COMPONENTS = [
   'per-energy',
@@ -98,6 +107,12 @@ function sharedCondition(cond, ctx, attacker) {
 // the condition depends on something not present in card data (e.g. "you
 // have an Energy attached…") — the caller keeps an honest unresolved note.
 function evalCondition(cond, defender, ctx, attacker = {}) {
+  // "You may <cost>. If you do [and if …], …" — the reducer settled the offer before damage.
+  const optional = /^you do(?: and if (.+))?$/.exec(cond.trim());
+  if (optional && typeof ctx?.optionalCostPaid === 'boolean') {
+    if (!ctx.optionalCostPaid) return false;
+    return optional[1] ? evalCondition(optional[1], defender, ctx, attacker) : true;
+  }
   const shared = sharedCondition(cond, ctx, attacker);
   if (shared !== null) return shared;
   // Design 036 A11: the hand cards the attack's own before-damage discard took
@@ -438,6 +453,11 @@ export function parseAttackDamage(
       // Revealed-hand scaling (Poltergeist, Liberation-GX, Wonder Flare) counts one card kind.
       count = handKind === 'trainer' ? ctx.opponentHandTrainerCount : ctx.opponentHandEnergyCount;
       label = `${handKind === 'trainer' ? 'Trainer' : 'Energy'} cards in opponent's hand`;
+    } else if (/^(?:energy )?cards? you returned|^damage counters? you put/.test(unit)) {
+      // Yanmega Wind Return / Meganium Bouncy Move: the optional cost the player paid
+      // (ctx.optionalCostCount, set with ctx.optionalCostPaid by the reducer).
+      count = ctx.optionalCostCount;
+      label = 'paid for the optional cost';
     } else if (/energy attached to all of your pok[ée]mon/.test(unit)) {
       count = ownEnergyCount;
       label = 'Energy on all your Pokémon';
@@ -659,17 +679,28 @@ export function parseAttackDamage(
     // Ball prints an unrelated "If you have a Stadium …" first).
     const bonusSentence =
       text.split(/(?<=\.)\s+/).find((s) => /\bif\b/.test(s) && /\d+ more damage/.test(s)) || text;
-    const bonus = amount(bonusSentence, /(\d+) more damage/);
+    // Slaking Dynamic Swing prints its bonus before the "If you do" drawback sentence.
+    const optionalCost = optionalCostBonusClause(attack?.text, attacker?.name);
+    const bonus =
+      optionalCost && !optionalCost.perEach
+        ? optionalCost.bonus
+        : amount(bonusSentence, /(\d+) more damage/);
     const cond =
       (bonusSentence.match(/\bif (.+?),? this attack (?:does|do)\b/) ||
         bonusSentence.match(/\bif (.+?)(?:,| this attack)/) ||
         [])[1] || '';
     const result = evalCondition(cond, defender, ctx, attacker);
+    // "You may discard … If you do, … for each card you discarded": the discard/mill scaling
+    // above already counted what the player paid; there is no separate bonus to gate.
+    const paidByScaling =
+      /^you do\b/.test(cond.trim()) && components.some((c) => COST_SCALING_COMPONENTS.has(c));
     // "If X, this attack does 30 more damage for each Y" (Deoxys-EX Helix Force): the
     // condition gates the scaling computed above rather than adding a flat bonus.
     const gatesScaling =
       /more damage for each/.test(bonusSentence) && components.includes('per-each');
-    if (gatesScaling) {
+    if (paidByScaling) {
+      // The scaling note already explains the damage.
+    } else if (gatesScaling) {
       if (result !== true) total = base;
       notes.push(
         result === null

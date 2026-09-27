@@ -53,6 +53,7 @@ import {
   attachDiscardToBenchSpread,
   returnEnergyBonusClause,
 } from './rules/damage-parser.mjs';
+import { optionalCostBonusClause } from './rules/optional-cost-bonus.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { parseGrantedAttacks } from './rules/tool-attacks.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
@@ -4954,6 +4955,166 @@ function moveAttachedEnergyToHand(draft, { playerId, attacker, energyType, event
   return false;
 }
 
+const YES_NO_OPTIONS = (bonusLabel) => [
+  // Numeric sentinels: the choice validator only accepts integer instanceIds.
+  { instanceId: 1, name: `Yes — ${bonusLabel}`, type: 'option' },
+  { instanceId: 2, name: 'No', type: 'option' },
+];
+
+const energyCardOptions = (cards) =>
+  cards.map((c) => ({ instanceId: c.instanceId, name: c.name, src: c.src || '', type: c.type || 'Energy' }));
+
+/**
+ * The prompt for an optional "You may <cost>. If you do, …" bonus, or null when the cost cannot
+ * be paid (the attack then deals its printed damage without asking). A cost with a card choice
+ * lists the cards (picking none declines); a cost without one is a yes/no.
+ */
+function optionalCostOffer(draft, { playerId, attacker, attack, clause }) {
+  const { cost, bonus, perEach } = clause;
+  const bonusLabel = perEach ? 'more damage' : `+${bonus} damage`;
+  const yesNo = (what) => ({
+    prompt: `${attack.name}: ${what} for ${perEach ? 'more' : `${bonus} more`} damage?`,
+    options: YES_NO_OPTIONS(bonusLabel),
+    min: 1,
+    max: 1,
+    allowedIds: [],
+  });
+  const energy = attachedEnergyCardsFor(draft, playerId, attacker, cost.energyType).filter(
+    (c) => !cost.basicOnly || isBasicEnergy(c)
+  );
+  const typeLabel = cost.energyType ? `${cost.energyType} Energy` : 'Energy';
+  switch (cost.kind) {
+    case 'discardEnergy':
+      if (cost.all) return energy.length > 0 ? yesNo(`discard all ${typeLabel} from this Pokémon`) : null;
+      if (energy.length < cost.count) return null;
+      return {
+        prompt: `${attack.name}: choose ${cost.count} ${typeLabel} to discard for ${bonus} more damage (pick none to decline).`,
+        options: energyCardOptions(energy),
+        min: 0,
+        max: cost.count,
+        allowedIds: energy.map((c) => c.instanceId),
+      };
+    case 'returnEnergy':
+      if (energy.length === 0) return null;
+      if (cost.all) return yesNo(`return all ${typeLabel} to your hand`);
+      return {
+        prompt: `${attack.name}: choose ${typeLabel} to return to your hand for ${bonus} more damage (pick none to decline).`,
+        options: energyCardOptions(energy),
+        min: 0,
+        max: 1,
+        allowedIds: energy.map((c) => c.instanceId),
+      };
+    case 'discardStadium':
+      return draft.stadium ? yesNo('discard the Stadium in play') : null;
+    case 'showHand':
+      return yesNo('show your hand to your opponent');
+    case 'drawback':
+      return yesNo(`do ${bonus} more damage (${cost.text.replace(/\.$/, '')})`);
+    case 'selfCounters':
+      return {
+        prompt: `${attack.name}: how many damage counters to put on this Pokémon?`,
+        options: Array.from({ length: cost.upTo + 1 }, (_, k) => ({
+          instanceId: k + 1,
+          name: k === 0 ? "Don't" : `${k} damage counter${k === 1 ? '' : 's'}`,
+          type: 'option',
+        })),
+        min: 1,
+        max: 1,
+        allowedIds: [],
+      };
+    default:
+      return null;
+  }
+}
+
+/** Moves attached cards (by id) off the attacker to their owner's discard pile or hand. */
+function moveAttachedCards(draft, { playerId, ids, to, reason, events }) {
+  const player = draft.players[playerId];
+  let moved = 0;
+  for (const id of ids) {
+    for (const zoneKey of ['active', 'bench']) {
+      const zone = player?.zones?.[zoneKey] || [];
+      const idx = zone.findIndex((c) => c.instanceId === id && c.attachedTo != null);
+      if (idx < 0) continue;
+      const [card] = zone.splice(idx, 1);
+      card.attachedTo = null;
+      let destination = 'hand';
+      if (to === 'discard') destination = discardCardToPlayerZone(player, card);
+      else player.zones.hand.push(card);
+      events.push({ type: 'cardMoved', instanceId: id, from: zoneKey, to: destination, playerId, reason });
+      moved++;
+      break;
+    }
+  }
+  return moved;
+}
+
+/**
+ * Pays the optional cost the player accepted. Returns `{ paid, count }`: `paid` drives the
+ * "if you do" bonus, `count` any "for each … you returned / put" scaling.
+ */
+function payOptionalCost(draft, { playerId, attacker, token, selection, activeRng, events }) {
+  const cost = token.cost || {};
+  const picked = (selection || []).map(Number).filter((id) => (token.allowedIds || []).includes(id));
+  const yes = Number((selection || [])[0]) === 1;
+  const declined = { paid: false, count: 0 };
+  const energy = () =>
+    attachedEnergyCardsFor(draft, playerId, attacker, cost.energyType)
+      .filter((c) => !cost.basicOnly || isBasicEnergy(c))
+      .map((c) => c.instanceId);
+  switch (cost.kind) {
+    case 'discardEnergy': {
+      if (cost.all) {
+        if (!yes) return declined;
+        const n = moveAttachedCards(draft, { playerId, ids: energy(), to: 'discard', reason: 'attack-energy-discard', events });
+        return { paid: n > 0, count: n };
+      }
+      if (new Set(picked).size !== cost.count) return declined;
+      const n = moveAttachedCards(draft, { playerId, ids: [...new Set(picked)], to: 'discard', reason: 'attack-energy-discard', events });
+      return { paid: n === cost.count, count: n };
+    }
+    case 'returnEnergy': {
+      const ids = cost.all ? (yes ? energy() : []) : picked.slice(0, 1);
+      if (ids.length === 0) return declined;
+      const n = moveAttachedCards(draft, { playerId, ids, to: 'hand', reason: 'attack-return-energy', events });
+      return { paid: n > 0, count: n };
+    }
+    case 'discardStadium':
+      if (!yes || !draft.stadium) return declined;
+      discardCurrentStadium(draft, events, playerId);
+      return { paid: true, count: 1 };
+    case 'showHand': {
+      if (!yes) return declined;
+      const hand = draft.players[playerId]?.zones?.hand || [];
+      events.push({
+        type: 'cardsRevealed',
+        playerId,
+        cards: hand.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+      });
+      return { paid: true, count: 0 };
+    }
+    case 'drawback': {
+      if (!yes) return declined;
+      const steps = parseAttackSteps(cost.text).after;
+      if (steps.length > 0) {
+        const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+        runAttackSteps(draft, { steps, attackerId: attacker?.instanceId, playerId, oppId, activeRng, events });
+      }
+      return { paid: true, count: 0 };
+    }
+    case 'selfCounters': {
+      const k = Math.max(0, Math.min(cost.upTo, Number((selection || [])[0]) - 1 || 0));
+      if (k === 0 || !attacker) return declined;
+      attacker.damage = (attacker.damage || 0) + k * 10;
+      events.push({ type: 'damageCountersPlaced', instanceId: attacker.instanceId, count: k, playerId });
+      events.push({ type: 'damageUpdated', instanceId: attacker.instanceId, damage: attacker.damage });
+      return { paid: true, count: k };
+    }
+    default:
+      return declined;
+  }
+}
+
 /** Shuffles a player's deck with the command RNG (no-op without one). */
 function shuffleDeckWithRng(player, rng) {
   if (player?.zones?.deck && rng) player.zones.deck = rng.shuffle(player.zones.deck);
@@ -5768,6 +5929,36 @@ function resolveAttackEffectPhase(draft, ctx) {
     energyReturned = false;
   }
 
+  // "You may <cost>. If you do, this attack does N more damage." (optional-cost-bonus.mjs):
+  // offer the cost before damage; parseAttackDamage reads ctx.optionalCostPaid.
+  let { optionalCostPaid, optionalCostCount } = ctx;
+  const optionalBonus = optionalCostBonusClause(attack?.text, attackerView?.name || attacker?.name);
+  if (optionalBonus && optionalCostPaid === undefined) {
+    const offer = optionalCostOffer(draft, { playerId, attacker, attack, clause: optionalBonus });
+    if (!offer) {
+      optionalCostPaid = false;
+    } else {
+      draft.pendingChoice = createPendingChoice({
+        player: playerId,
+        source: 'attack',
+        prompt: offer.prompt,
+        options: offer.options,
+        min: offer.min,
+        max: offer.max,
+        resumeToken: {
+          ...resumeBase,
+          effectType: 'attackOptionalCostBonus',
+          cost: optionalBonus.cost,
+          allowedIds: offer.allowedIds,
+          milledMatches,
+          energyDiscarded,
+          energyReturned,
+        },
+      });
+      return;
+    }
+  }
+
   // "Before doing damage, …" clauses (design 030). A gust there moves the damage to the
   // opponent's new Active Pokémon.
   const attackSteps = planAttackSteps(attack, attacker, { coin, headsCount });
@@ -5784,7 +5975,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           attack: {
             phase: 'before',
             resume: resumeBase,
-            values: { energyDiscarded, milledMatches, energyReturned },
+            values: { energyDiscarded, milledMatches, energyReturned, optionalCostPaid, optionalCostCount },
           },
         },
       });
@@ -5827,6 +6018,8 @@ function resolveAttackEffectPhase(draft, ctx) {
           energyDiscarded,
           milledMatches,
           energyReturned,
+          optionalCostPaid,
+          optionalCostCount,
           lostZoned,
           handDiscarded,
           revealedMatches,
@@ -8105,6 +8298,27 @@ export function applyCommand(state, command, rng = null) {
           resolveAttackEffectPhase(draft, {
             ...resumeCtx,
             energyReturned: Boolean(moved),
+          });
+        }
+      } else if (token.effectType === 'attackOptionalCostBonus') {
+        // "You may <cost>. If you do, …": pay the accepted cost, then resume with the answer.
+        draft.pendingChoice = null;
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
+          const { paid, count } = payOptionalCost(draft, {
+            playerId: initiatorPlayerId,
+            attacker: resumeCtx.attacker,
+            token,
+            selection: payload.selection,
+            activeRng,
+            events,
+          });
+          resolveAttackEffectPhase(draft, {
+            ...resumeCtx,
+            energyDiscarded: token.energyDiscarded,
+            energyReturned: token.energyReturned,
+            optionalCostPaid: paid,
+            optionalCostCount: count,
           });
         }
       } else if (token.effectType === 'attackMillPick') {

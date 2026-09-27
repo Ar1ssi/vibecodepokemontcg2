@@ -25,6 +25,8 @@
 // used for a friendly name in descriptions.
 
 // Effect families an attack can be classified into (taxonomy Section D).
+import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
+
 export const ATTACK_FAMILIES = [
   'flat', // bare "30" damage number
   'per-energy', // "× the number of Energy attached" / "for each Energy attached"
@@ -952,6 +954,8 @@ export function parseAttackEnergyDiscard(attack) {
     .find((s) => /discard\b[^.]*\benergy\b[^.]*(?:attached to|from) this pok[ée]mon/.test(s));
   // A coin-gated discard is the atkDiscardSelfEnergy step's (design 032).
   if (!sentence || /^(?:if heads|if tails|for each heads)\b/.test(sentence)) return null;
+  // "You may discard … If you do, …" is offered and paid before damage (optional-cost-bonus.mjs).
+  if (/^you may\b/.test(sentence) && optionalCostBonusClause(attack?.text)) return null;
 
   // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
   if (/discard all energy (?:attached to|from) this pok[ée]mon/i.test(sentence)) {
