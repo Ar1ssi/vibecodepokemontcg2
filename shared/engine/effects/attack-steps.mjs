@@ -82,7 +82,12 @@ function attackEffectShielded(ctx, owner, root, kind = 'effect') {
   const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
   const markers = liveAttackMarkers(root, { turnNumber: ctx.draft.turn?.number || 1, zoneCards: zone });
   const ref = attackerRef(ctx);
-  return markersPreventEffects(markers, ref ? topPokemonCard(ctx.player, ref.card) : ctx.sourceCard);
+  return markersPreventEffects(markers, ref ? attackingView(ctx, ref.card) : ctx.sourceCard);
+}
+
+/** The attacking Pokémon as marker filters read it: its top card, with the stamped Energy count. */
+function attackingView(ctx, root) {
+  return { ...topPokemonCard(ctx.player, root), attackEnergyCount: root.attackEnergyCount };
 }
 
 /** The attacking Pokémon while it is still in play, with its owner and zone. */
@@ -662,6 +667,22 @@ function atkDiscardOppTools(ctx) {
     .flatMap((root) => attachedCards(opponent, root.instanceId))
     .filter(isToolCard);
   return discardChosen(ctx, tools, { label: 'Pokémon Tool' });
+}
+
+// Electivire LV.X Pulse Barrier: "Discard all of your opponent's Pokémon Tool cards and Stadium
+// cards in play. If you do, …" — the chained marker follows any discard.
+function atkDiscardOppToolsAndStadium(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const tools = rootsOf(opponent)
+    .flatMap((root) => attachedCards(opponent, root.instanceId))
+    .filter(isToolCard);
+  discardCards(opponent, tools, ctx.events);
+  const stadium = ctx.draft.stadium;
+  const theirStadium = stadium && (stadium.ownerId || stadium.playerId) === opponent.playerId;
+  if (theirStadium) discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
+  if (tools.length === 0 && !theirStadium) return skip(ctx, 'nothing_to_discard');
+  return addChainedMarker(ctx);
 }
 
 function atkDiscardOppHand(ctx) {
@@ -2632,9 +2653,21 @@ function atkAddMarker(ctx) {
   const { step } = ctx;
   if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
   const owner = step.target === 'opponentActive' ? ctx.opponent : ctx.player;
+  // Entei Protective Flame: every one of the attacker's Benched Pokémon.
+  if (step.target === 'ownBench') {
+    const bench = benchRootsOf(ctx.player);
+    if (bench.length === 0) return skip(ctx, 'no_marker_target');
+    for (const root of bench) markCard(ctx, step, owner, root);
+    return null;
+  }
   const card =
     step.target === 'opponentActive' ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
   if (!card) return skip(ctx, 'no_marker_target');
+  markCard(ctx, step, owner, card);
+  return null;
+}
+
+function markCard(ctx, step, owner, card) {
   const turn = ctx.draft.turn?.number || 1;
   for (const marker of [step.marker, ...(step.alsoMarkers || [])]) {
     addAttackMarker(card, {
@@ -3253,6 +3286,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkLostZoneOppHandPokemon,
   atkSwapCounters,
   atkCountersUntilHp,
+  atkDiscardOppToolsAndStadium,
   atkDevolve,
   atkBounceOppActive,
   atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),
@@ -3295,7 +3329,7 @@ function oppActiveProtected(ctx) {
     zoneCards: ctx.opponent.zones.active || [],
   });
   const ref = attackerRef(ctx);
-  return markersPreventEffects(markers, ref ? topPokemonCard(ctx.player, ref.card) : ctx.sourceCard);
+  return markersPreventEffects(markers, ref ? attackingView(ctx, ref.card) : ctx.sourceCard);
 }
 
 for (const [type, targetsActive] of Object.entries(OPP_ACTIVE_EFFECTS)) {

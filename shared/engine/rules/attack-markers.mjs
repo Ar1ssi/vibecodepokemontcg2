@@ -113,6 +113,8 @@ export function attackerMatchesFilter(filter, attacker) {
   if (filter.types?.length && !filter.types.some((t) => types.includes(t))) return false;
   if (filter.excludeTypes?.some((t) => types.includes(t))) return false;
   if (filter.exceptName && String(attacker.name || '').toLowerCase() === filter.exceptName) return false;
+  // `attackEnergyCount` is stamped by reduce.mjs when the attack resolves; unknown never matches.
+  if (filter.maxEnergy != null && !((attacker.attackEnergyCount ?? Infinity) <= filter.maxEnergy)) return false;
   return true;
 }
 
@@ -130,6 +132,8 @@ const FILTER_PHRASES = [
   [/^stage 1 or stage 2 pokémon$/, () => ({ any: ['stage1', 'stage2'] })],
   [/^stage 2 evolved pokémon$/, () => ({ any: ['stage2'] })],
   [/^\{([a-z])\} pokémon$/, (m) => ({ types: [TYPE_LETTER[m[1]]] })],
+  // Dusknoir Night Spin: "by your opponent's Pokémon that has 2 or less Energy attached to it".
+  [/^pokémon that has (\d+) or less energy attached to it$/, (m) => ({ maxEnergy: Number(m[1]) })],
   // "except any Simisage": the parser has already turned the attacker's own name into
   // "this pokémon"; the handler swaps SELF_NAME for the attacker's printed name.
   [
@@ -252,6 +256,16 @@ const MARKER_BODIES = [
       const filter = parseAttackerFilter(m[1] || m[2]);
       return filter === undefined ? null : [{ kind: 'incomingPrevent', filter }, { kind: 'effectPrevent', filter }];
     },
+  ],
+  // Entei Protective Flame: each of the attacker's Benched Pokémon (atkAddMarker 'ownBench').
+  [
+    /^prevent all effects of attacks, including damage, done to your benched pokémon$/,
+    'ownBench',
+    null,
+    () => [
+      { kind: 'incomingPrevent', filter: null },
+      { kind: 'effectPrevent', filter: null },
+    ],
   ],
   // Latios-EX / Slurpuff Light Pulse ("except damage"), Light Dragonite ("other than damage"),
   // Venomoth ("excluding damage"), Altaria ex Light Pulse ("attacks used by your opponent's

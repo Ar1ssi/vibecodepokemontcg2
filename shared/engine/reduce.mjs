@@ -413,7 +413,11 @@ function damageBenchedPokemon(
     });
     return;
   }
-  if (!ownAttack && sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId)) {
+  if (
+    !ownAttack &&
+    (sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) ||
+      benchMarkerPrevents(draft, victim, victimBench, attackerPlayerId))
+  ) {
     events.push({
       type: 'damagePrevented',
       instanceId: victim.instanceId,
@@ -951,6 +955,15 @@ function spendGxAttack(draft, { playerId, attacker, attack, events }) {
 }
 
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
+// Entei Protective Flame: a damage-prevention marker on the Benched Pokémon itself.
+function benchMarkerPrevents(draft, victim, victimBench, attackerPlayerId) {
+  const markers = liveAttackMarkers(victim, { turnNumber: draft.turn?.number || 1, zoneCards: victimBench });
+  if (!markers.some((m) => m.kind === 'incomingPrevent')) return false;
+  const attacker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  const attackerView = attacker ? inPlayView(draft, attacker) : null;
+  return markers.some((m) => m.kind === 'incomingPrevent' && attackerMatchesFilter(m.filter, attackerView));
+}
+
 function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
   const guard = (draft.players[victimPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
   const attacker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
@@ -5863,6 +5876,18 @@ function statusConditionResults(draft, ctx, branches) {
  * @param {object} draft Cloned GameState
  * @param {object} ctx Derived attack context (see the call site)
  */
+// Dusknoir Night Spin: "… done to Dusknoir by your opponent's Pokémon that has 2 or less Energy
+// attached to it" — marker filters (attack-markers.mjs attackerMatchesFilter) read the attacker's
+// attached Energy cards as the attack's effects resolve.
+function stampAttackEnergyCount(draft, attacker, attackerView) {
+  const ref = attacker ? findCard(draft, attacker.instanceId) : null;
+  if (!ref) return;
+  const zone = ref.player.zones[ref.zoneId] || [];
+  const count = zone.filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length;
+  attacker.attackEnergyCount = count;
+  if (attackerView && attackerView !== attacker) attackerView.attackEnergyCount = count;
+}
+
 function resolveAttackEffectPhase(draft, ctx) {
   ctx = withSelfNamedAttack(ctx);
   const {
@@ -5881,6 +5906,7 @@ function resolveAttackEffectPhase(draft, ctx) {
   } = ctx;
 
   let { defender } = ctx;
+  stampAttackEnergyCount(draft, attacker, attackerView);
 
   // A printed whole-attack condition ("If …, this attack does nothing", design 036 A1) gates the
   // damage and every effect step, so it resolves before any of them. It runs once per attack:

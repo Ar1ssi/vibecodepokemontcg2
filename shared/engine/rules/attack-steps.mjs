@@ -82,6 +82,8 @@ const GATES = [
   [/^before doing damage, /, { before: true }],
   // Hypno Spiral Aura.
   [/^if your opponent's active pokémon isn't knocked out by the damage from this attack, /, { requiresDefenderSurvived: true }],
+  // Scizor Accelerate.
+  [/^if your opponent's active pokémon is knocked out by (?:damage from )?this attack, /, { requiresDefenderKnockedOut: true }],
   [/^after your attack, /, {}],
   [/^after doing damage, /, {}],
   [/^then, /, {}],
@@ -1272,6 +1274,16 @@ const BLOCKS = [
   [
     /(?<=^|\. )(?:after doing damage, )?(you may )?discard all ([a-z][a-z' -]*?) from this pokémon\. if you do, ([^.]+)\./g,
     (m) => chainedMarkerStep({ type: 'atkDiscardSelfTool', toolName: m[2].replace(/s$/, ''), ...(m[1] ? { optional: true } : {}) }, m[3]),
+  ],
+  // Flygon Sand Wall: "Discard a Stadium card your opponent has in play. If you do, …".
+  [
+    /(?<=^|\. )discard a stadium card your opponent has in play\. if you do, ([^.]+)\./g,
+    (m) => chainedMarkerStep({ type: 'atkDiscardStadium', owner: 'opponent' }, m[1]),
+  ],
+  // Electivire LV.X Pulse Barrier.
+  [
+    /(?<=^|\. )discard all of your opponent's pokémon tool cards and stadium cards in play\. if you do, ([^.]+)\./g,
+    (m) => chainedMarkerStep({ type: 'atkDiscardOppToolsAndStadium' }, m[1]),
   ],
   // Flygon Desert Geyser.
   [

@@ -1135,3 +1135,90 @@ test('Dragonite VSTAR Draconic Star (Sword & Shield Promos SWSH236): {W} or {L} 
   assert.equal(hostOf(res.state, top[2]), benched.instanceId);
   assert.equal(hostOf(res.state, top[1]), undefined);
 });
+
+// ── protections ───────────────────────────────────────────────────────────────
+
+const markerKinds = (state, playerId, card) =>
+  (root(state, playerId, card.instanceId)?.attackMarkers || []).map((m) => m.kind).sort();
+const counterAttack = (res) =>
+  applyCommand(res.state, { type: 'attack', playerId: 'p2', payload: { attackIndex: 0 } }, createRng(3));
+const armDefender = (s, text, damage = '30') => {
+  s.players.p2.zones.active[0].attacks = [{ name: 'Reply', cost: [], damage, text }];
+};
+
+test('Entei Protective Flame (Wizards Black Star Promos 34): the Bench takes no damage on the next turn', () => {
+  const text =
+    "During your opponent's next turn, prevent all effects of attacks, including damage, done to your Benched Pokémon.";
+  let bench;
+  const { state } = board('Entei', text, {
+    setup: (s) => {
+      bench = mon('Benched', { hp: 100 });
+      s.players.p1.zones.bench.push(bench);
+      armDefender(s, "This attack does 30 damage to 1 of your opponent's Benched Pokémon.", '');
+    },
+  });
+  let res = counterAttack(attack(state));
+  if (res.pendingChoice) res = chooseAs(res, [bench.instanceId]);
+  assert.equal(root(res.state, 'p1', bench.instanceId).damage || 0, 0);
+});
+
+test('Dusknoir Night Spin (Stormfront 1): only attackers with 2 or less Energy are stopped', () => {
+  const text =
+    "Prevent all effects of an attack, including damage, done to Dusknoir by your opponent's Pokémon that has 2 or less Energy attached to it during your opponent's next turn.";
+  const run = (energyCount) => {
+    const { state, attacker } = board('Dusknoir', text, {
+      setup: (s) => {
+        armDefender(s, '');
+        const def = s.players.p2.zones.active[0];
+        for (let i = 0; i < energyCount; i++) s.players.p2.zones.active.push(energy('Darkness', def.instanceId));
+      },
+    });
+    return root(counterAttack(attack(state)).state, 'p1', attacker.instanceId).damage || 0;
+  };
+  assert.equal(run(2), 0);
+  assert.equal(run(3), 30);
+});
+
+test('Scizor Accelerate (Stormfront 25): protected only after a Knock Out', () => {
+  const text =
+    "If the Defending Pokémon is Knocked Out by this attack, prevent all effects of an attack, including damage, done to Scizor during your opponent's next turn.";
+  const ko = board('Scizor', text, {
+    damage: '50',
+    setup: (s) => {
+      s.players.p2.zones.active[0].hp = 50;
+      addBench(s, 'p2', 'Next');
+    },
+  });
+  assert.deepEqual(markerKinds(attack(ko.state).state, 'p1', ko.attacker), ['effectPrevent', 'incomingPrevent']);
+  const alive = board('Scizor', text, { damage: '50' });
+  assert.deepEqual(markerKinds(attack(alive.state).state, 'p1', alive.attacker), []);
+});
+
+test("Flygon Sand Wall (Rising Rivals 5): protected only after discarding the opponent's Stadium", () => {
+  const text =
+    "Discard a Stadium card your opponent has in play. If you do, prevent all effects of an attack, including damage, done to Flygon during your opponent's next turn.";
+  const stadium = (ownerId) => ({ ...trainer('Stadium', 'Stadium'), ownerId });
+  const theirs = board('Flygon', text, { setup: (s) => (s.stadium = stadium('p2')) });
+  let res = attack(theirs.state);
+  assert.equal(res.state.stadium, null);
+  assert.deepEqual(markerKinds(res.state, 'p1', theirs.attacker), ['effectPrevent', 'incomingPrevent']);
+  const mine = board('Flygon', text, { setup: (s) => (s.stadium = stadium('p1')) });
+  res = attack(mine.state);
+  assert.ok(res.state.stadium);
+  assert.deepEqual(markerKinds(res.state, 'p1', mine.attacker), []);
+});
+
+test('Electivire LV.X Pulse Barrier (Mysterious Treasures 121): Tools discarded earn the protection', () => {
+  const text =
+    "Discard all of your opponent's Pokémon Tool cards and Stadium cards in play. If you do, prevent all effects, including damage, done to Electivire during your opponent's next turn.";
+  let belt;
+  const { state, attacker } = board('Electivire LV.X', text, {
+    setup: (s) => {
+      belt = tool(s.players.p2.zones.active[0].instanceId);
+      s.players.p2.zones.active.push(belt);
+    },
+  });
+  const res = attack(state);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === belt.instanceId));
+  assert.deepEqual(markerKinds(res.state, 'p1', attacker), ['effectPrevent', 'incomingPrevent']);
+});
