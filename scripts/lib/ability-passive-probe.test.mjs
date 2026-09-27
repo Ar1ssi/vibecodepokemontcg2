@@ -2,7 +2,7 @@
 // its answer changes with the text stripped.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { passiveReads, namedPartners } from './ability-passive-probe.mjs';
+import { passiveReads, namedPartners, stackDrops } from './ability-passive-probe.mjs';
 
 test('passiveReads names the readers each passive family reaches', () => {
   assert.ok(passiveReads('Your Pokémon in play get +30 HP.').some((r) => r.startsWith('active:hp:')));
@@ -45,4 +45,17 @@ test('passiveReads ignores answers that only echo the holder card', () => {
   // The holder differs from the control only by its printed ability; a reader returning the
   // card itself (or its id) is not a read.
   assert.deepEqual(passiveReads('This text means nothing to any reader.'), []);
+});
+
+test('stackDrops lists flat-board reads the evolved-stack board loses', () => {
+  assert.deepEqual(
+    stackDrops(['active:hp:X', 'bench:damageBonus:p1Active', 'stack-active:hp:X', 'bench-bare:hp:X']),
+    ['stack-bench:damageBonus:p1Active']
+  );
+});
+
+test('a self-scoped passive printed on an Evolution is still read on the stacked board', () => {
+  const reads = passiveReads("This Pokémon can't be affected by any Special Conditions.");
+  assert.ok(reads.includes('stack-bench:statusImmune'));
+  assert.deepEqual(stackDrops(reads), []);
 });

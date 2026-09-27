@@ -56,6 +56,7 @@ import {
 } from '../../shared/engine/rules/ability-executors.mjs';
 import { parseAttackBorrowAbility } from '../../shared/engine/rules/attack-copy.mjs';
 import { combinedToolRetreatCost, evaluateToolKoPrevention } from '../../shared/engine/rules/tool-combat.mjs';
+import { evolvedView } from '../../shared/engine/rules/evolved-pokemon.mjs';
 import { buildState, mon } from './oracle-harness.mjs';
 
 // One of each basic Energy, attached from the hand to the holder (energy-attach triggers).
@@ -81,10 +82,15 @@ function sideContext(state, pid) {
   };
 }
 
-const at = (ctx, card) => {
-  const isActive = ctx.sideActive.includes(card);
+// `root` fixes the position; the reader may be handed the evolved view of it.
+const at = (ctx, root) => {
+  const isActive = ctx.sideActive.includes(root);
   return { ...ctx, isActive, zone: isActive ? 'active' : 'bench' };
 };
+
+// The engine hands readers the evolved view (reduce.mjs inPlayView) of the Pokémon it asks
+// about; on a flat board that is the root itself.
+const viewOf = (zoneCards, root) => evolvedView(zoneCards, root);
 
 // Cards a play or evolve lock can name. Fixed ids above the harness's so both boards match.
 function playedCards() {
@@ -127,12 +133,28 @@ export function namedPartners(text) {
  * p1's other Benched Pokémon; a `bare` holder has nothing attached and no damage (for "if this
  * Pokémon has no Energy attached" / "has full HP" conditions).
  */
-function probeBoard(holder, zone, { bare, partners }) {
+function probeBoard(holder, zone, { bare, partners, stacked }) {
   const state = buildState(holder, zone);
   const z = state.players.p1.zones;
   const holderCard = [...z.active, ...z.bench].find(
     (c) => !c.attachedTo && c.name !== 'p1Active' && !/^p1Bench/.test(c.name)
   );
+  // A `stacked` holder is an Evolution on top of an ability-less Basic of the same name, as in
+  // play: the root keeps the position and damage, the top card carries the printed Ability.
+  // Readers that look at the root instead of its evolved view lose the text here (evolved
+  // Serperior ex Regal Cheer from the Bench, an evolved Gothitelle's Item lock).
+  if (stacked && holderCard) {
+    const top = createCard({
+      ...holderCard,
+      instanceId: 9100,
+      stage: 'Stage 1',
+      subtypes: ['Stage 1'],
+      evolvesFrom: holderCard.name,
+      attachedTo: holderCard.instanceId,
+    });
+    holderCard.abilities = [];
+    z[zone].push(top);
+  }
   const others = z.bench.filter((c) => !c.attachedTo && c !== holderCard);
   partners.forEach((name, i) => {
     if (others[i]) others[i].name = name;
@@ -161,20 +183,23 @@ function probeBoard(holder, zone, { bare, partners }) {
 function probeAnswers(holder, { turnTrainerName, partners }) {
   const answers = {};
   const boards = [
-    ['active', false],
-    ['bench', false],
-    ['active', true],
-    ['bench', true],
+    ['active', false, false],
+    ['bench', false, false],
+    ['active', true, false],
+    ['bench', true, false],
+    ['active', false, true],
+    ['bench', false, true],
   ];
-  for (const [zone, bare] of boards) {
-    const board = `${zone}${bare ? '-bare' : ''}`;
-    const { state, holderCard } = probeBoard(holder, zone, { bare, partners });
+  for (const [zone, bare, stacked] of boards) {
+    const board = `${stacked ? 'stack-' : ''}${zone}${bare ? '-bare' : ''}`;
+    const { state, holderCard: holderRoot } = probeBoard(holder, zone, { bare, partners, stacked });
     const p1 = sideContext(state, 'p1');
     const p2 = sideContext(state, 'p2');
     const own = roots(p1.sideCards);
     const opp = roots(p2.sideCards);
     const [p1Active] = roots(p1.sideActive);
     const [p2Active] = roots(p2.sideActive);
+    const holderCard = holderRoot && viewOf(p1.sideCards, holderRoot);
     // Suppression is only visible on a card that has an Ability of its own.
     p2Active.abilities = [{ name: 'Probe Power', type: 'Ability', text: 'Once during your turn, you may draw a card.' }];
     const played = playedCards();
@@ -186,8 +211,9 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       }
     };
 
-    for (const card of own) {
-      const ctx = at(p1, card);
+    for (const root of own) {
+      const ctx = at(p1, root);
+      const card = viewOf(p1.sideCards, root);
       ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, ctx));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
@@ -211,8 +237,9 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
         })
       );
     }
-    for (const card of opp) {
-      const ctx = at(p2, card);
+    for (const root of opp) {
+      const ctx = at(p2, root);
+      const card = viewOf(p2.sideCards, root);
       ask(`opp:damageBonus:${card.name}`, () => abilityDamageBonus(card, p1Active, ctx));
       ask(`opp:damageReduction:${card.name}`, () => abilityDamageReduction(card, p1Active, ctx));
       ask(`opp:damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p1Active, ctx));
@@ -303,4 +330,17 @@ export function passiveReads(text, { name = 'Probe Holder', abilityName = 'Probe
   // Attack borrowing is read straight off the text (reduce.mjs attackViewFor).
   if (parseAttackBorrowAbility(text)) reads.push('attackBorrow');
   return reads.sort();
+}
+
+/**
+ * Reads the flat board sees but the evolved-stack board loses: `['stack-<zone>:<reader>:<case>']`
+ * for every `<zone>:<reader>:<case>` read whose stacked twin is not read. An Ability printed on
+ * an Evolution that works only when the card sits in play as a Basic.
+ */
+export function stackDrops(reads) {
+  const have = new Set(reads);
+  return reads
+    .filter((label) => /^(active|bench):/.test(label))
+    .map((label) => `stack-${label}`)
+    .filter((label) => !have.has(label));
 }

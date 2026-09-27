@@ -6,7 +6,10 @@
 import { resolveAbilitySteps } from '../../shared/engine/effects/ability.mjs';
 import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
 import { isActivatedAbility } from '../../shared/engine/rules/ability-executors.mjs';
-import { passiveReads } from './ability-passive-probe.mjs';
+import { parseAbility } from '../../shared/engine/rules/abilities.mjs';
+import { passiveReads, stackDrops } from './ability-passive-probe.mjs';
+import { attackKey, attackMismatches } from './attack-behaviour.mjs';
+import { parseDrift } from './text-variants.mjs';
 
 /**
  * runs      activated; the board changed and every planned step has an executor
@@ -66,19 +69,113 @@ export function rowPassiveReads(row) {
   return passiveReads(row.text, { name: row.card, abilityName: row.name, abilityType: row.abilityType });
 }
 
+const ranForReal = (row) =>
+  (row.tags || []).some((t) => t !== 'ability-used' && t !== 'coin' && !t.startsWith('skipped:'));
+
+// Where-and-when gates name zones without moving anything ("when you put this Pokémon from your
+// hand onto your Bench", "if this Pokémon is on your Bench"); the sentence cross-check would read
+// them as bench searches.
+const ABILITY_GATES = [
+  /\bwhen you (?:put|play) [^,.]+? (?:from your hand )?(?:onto|on|to) your bench(?: during your turn)?,?/g,
+  /\b(?:if|while|as long as) this pokémon is (?:on your bench|in the active spot|your active pokémon),?/g,
+  /\bwhen this pokémon moves from your bench to the active spot,?/g,
+];
+
+/** The ability's text with its where-and-when gates removed, for the clause cross-check. */
+export function abilityClauseText(text) {
+  let t = String(text || '').toLowerCase().replace(/[‘’]/g, "'");
+  for (const re of ABILITY_GATES) t = t.replace(re, '');
+  return t;
+}
+
+// Parsers whose output decides what an ability does in play.
+const abilityParsers = (selfName) => ({
+  parse: (t) => parseAbility(t),
+  plan: (t) => resolveAbilitySteps(t, { selfName }).steps,
+  activated: (t) => isActivatedAbility({ abilities: [{ text: t }] }, 0),
+});
+
 /**
- * One oracle ability row classed: `{ behaviour, unexecutable, reads }` — the planned steps with
- * no executor, and for a passive row the probe labels of the readers consuming it.
+ * Named findings for one row, ratcheted per row by the gate (`checkFlagGate`):
+ *   clause:<mech>          an activated ability's sentence whose mechanic left no state change
+ *                          (Samurott Torrential Whirlpool dropped its "If you do, switch out
+ *                          your opponent's Active" half and still read `runs`)
+ *   typography:<v>:<p>     parser <p> reads the TCGdex spelling <v> differently (text-variants.mjs)
+ *   stack-<zone>:<read>    a passive read lost when the holder is an Evolution on a Basic
+ */
+export function rowFlags(row, { plan, reads }) {
+  const flags = parseDrift(row.text, abilityParsers(row.card)).map((d) => `typography:${d}`);
+  // Only a run that changed the board is cross-checked: a skipped step ("no Energy in hand")
+  // means the board could not meet the ability, not that a clause was dropped.
+  if (plan.activated && ranForReal(row)) {
+    for (const miss of attackMismatches(abilityClauseText(row.text), row.tags)) flags.push(`clause:${miss.mech}`);
+  }
+  for (const drop of stackDrops(reads)) flags.push(drop);
+  return [...new Set(flags)].sort();
+}
+
+/**
+ * One oracle ability row classed: `{ behaviour, unexecutable, reads, flags }` — the planned steps
+ * with no executor, for a passive row the probe labels of the readers consuming it, and the
+ * row's named findings (`rowFlags`). An activated row with a clause finding is `partial`.
  */
 export function classifyRow(row) {
   const plan = abilityPlan(row.text, row.card);
   if (!plan.activated && plan.reason === 'passive') {
     const reads = rowPassiveReads(row);
-    return { behaviour: reads.length ? 'consumed' : 'unconsumed', unexecutable: [], reads };
+    return {
+      behaviour: reads.length ? 'consumed' : 'unconsumed',
+      unexecutable: [],
+      reads,
+      flags: rowFlags(row, { plan, reads }),
+    };
   }
-  if (!plan.activated) return { behaviour: plan.reason, unexecutable: [], reads: [] };
-  const behaviour = !abilityObserved(row) ? 'dead' : plan.unexecutable.length ? 'partial' : 'runs';
-  return { behaviour, unexecutable: plan.unexecutable, reads: [] };
+  if (!plan.activated) {
+    return { behaviour: plan.reason, unexecutable: [], reads: [], flags: rowFlags(row, { plan, reads: [] }) };
+  }
+  const flags = rowFlags(row, { plan, reads: [] });
+  const clauseGap = flags.some((f) => f.startsWith('clause:'));
+  const behaviour = !abilityObserved(row)
+    ? 'dead'
+    : plan.unexecutable.length || clauseGap
+      ? 'partial'
+      : 'runs';
+  return { behaviour, unexecutable: plan.unexecutable, reads: [], flags };
+}
+
+/** Per-row flag key: reprints with the same card name, ability name and text share one row. */
+export const flagKey = (row) => `${row.card}|${attackKey(row.name, row.text)}`;
+
+/** `{ <flagKey>: { card, name, flags } }` for every row that carries a flag. */
+export function flaggedOf(rows) {
+  const out = {};
+  for (const row of rows) {
+    if (!row.flags?.length) continue;
+    const entry = (out[flagKey(row)] ??= { card: row.card, name: row.name, flags: [] });
+    entry.flags = [...new Set([...entry.flags, ...row.flags])].sort();
+  }
+  return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+/**
+ * Per-row ratchet on the named findings: a flag a row did not carry in the baseline fails by
+ * name; a flag that disappeared is an improvement (refresh with --update-baseline).
+ */
+export function checkFlagGate(rows, baselineFlagged = {}) {
+  const failures = [];
+  const improvements = [];
+  const now = flaggedOf(rows);
+  for (const [key, entry] of Object.entries(now)) {
+    const before = new Set(baselineFlagged[key]?.flags || []);
+    for (const flag of entry.flags)
+      if (!before.has(flag)) failures.push(`${entry.card} ${entry.name}: new ${flag}`);
+  }
+  for (const [key, entry] of Object.entries(baselineFlagged)) {
+    const after = new Set(now[key]?.flags || []);
+    for (const flag of entry.flags)
+      if (!after.has(flag)) improvements.push(`${entry.card} ${entry.name}: ${flag} gone`);
+  }
+  return { failures, improvements };
 }
 
 /** The behaviour class of one oracle ability row. */

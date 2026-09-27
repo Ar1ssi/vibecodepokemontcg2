@@ -206,3 +206,34 @@ fails a claim that falls under that share. `pnpm audit:abilities --rows` writes
 `out/ability-behaviour-rows.json` with each row's class, unexecuted step types and probe `reads`;
 the `partial`, `dead` and `unconsumed` rows are the enforcement backlog.
 
+### Busy is not right (2026-09-28)
+
+The rich board only proved that a row did *something*. Keldeo ex Gale Thrust dealt its base 30
+and read `ok` although its +90 never applied; Budew's Item lock parsed to nothing behind its
+10 damage; Samurott's ability switched only its own Active; Serperior ex's Regal Cheer worked
+only when the card sat in play as a Basic. The gates now also check:
+
+- **Unresolved damage** (`audit:attacks`): a damage-parser note "resolve the printed …" is a
+  `partial` finding (`unresolved-damage`). The engine already says when it cannot read a count
+  or condition; nothing used to listen.
+- **Condition-true replay** (`scripts/lib/condition-replay.mjs`): each "If <condition>, this
+  attack does N more damage" clause the setup table can stage is replayed with the condition
+  true and must deal at least base + N (`bonus-not-applied`). Clauses the table cannot stage are
+  counted as `untestedBonus`; add a `CONDITION_SETUPS` row when you add a condition reader.
+- **Locks** (`MECH` in `attack-behaviour.mjs`): "can't play / can't attack / can't retreat"
+  sentences need lock evidence. The snapshot now records per-player `playLocks` /
+  `attackLockUntilTurn` (`opp:play-lock`) and per-card `attackMarkers` (`opp:lock`).
+- **Typography** (`scripts/lib/text-variants.mjs`): every attack and ability is re-parsed as
+  TCGdex prints it — curly apostrophes (SM era) and type words (BW/DP era, "attach a Fire
+  Energy card") — and any parser whose output moves is a finding (`typography:<variant>:<parser>`).
+- **Ability clauses** (`audit:abilities`): an activated ability's sentences go through the same
+  mechanic cross-check as attacks once where-and-when gates are stripped (`clause:<mech>`,
+  row becomes `partial`). Runs that were only skipped are not cross-checked.
+- **Evolved stacks** (`ability-passive-probe.mjs`): two extra probe boards put the holder on top
+  of an ability-less Basic, as in play. A read the flat board sees but the stacked board loses
+  is `stack-<zone>:<reader>` — the engine read the root Basic instead of the evolved view.
+
+Ability findings are ratcheted **per row by name** (`flagged` in
+`scripts/ability-behaviour-baseline.json`, `checkFlagGate`): a new flag on any row fails; a
+vanished one is an improvement. `--rows` output carries `flags` / `mismatches` / `untestedBonus`,
+which are the fix backlog.

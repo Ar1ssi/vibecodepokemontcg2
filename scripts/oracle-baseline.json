@@ -3,7 +3,7 @@
   "families": {
     "ability:attach": {
       "n": 211,
-      "observed": 174
+      "observed": 177
     },
     "ability:attach-permission": {
       "n": 3,
@@ -67,7 +67,7 @@
     },
     "ability:draw": {
       "n": 219,
-      "observed": 197
+      "observed": 198
     },
     "ability:effect-prevent": {
       "n": 151,
@@ -203,15 +203,15 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 772
+      "observed": 776
     },
     "attack:coin-flip": {
       "n": 429,
-      "observed": 415
+      "observed": 417
     },
     "attack:conditional-damage": {
       "n": 740,
-      "observed": 305
+      "observed": 325
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -223,11 +223,11 @@
     },
     "attack:damage-prevention": {
       "n": 174,
-      "observed": 8
+      "observed": 174
     },
     "attack:deferred-damage": {
       "n": 3,
-      "observed": 0
+      "observed": 3
     },
     "attack:devolve-opponent": {
       "n": 11,
@@ -239,7 +239,7 @@
     },
     "attack:discard-cost": {
       "n": 597,
-      "observed": 432
+      "observed": 440
     },
     "attack:discard-opponent": {
       "n": 151,
@@ -247,11 +247,11 @@
     },
     "attack:draw-attach": {
       "n": 321,
-      "observed": 293
+      "observed": 297
     },
     "attack:draw-until": {
       "n": 45,
-      "observed": 40
+      "observed": 44
     },
     "attack:dual-status": {
       "n": 78,
@@ -279,7 +279,7 @@
     },
     "attack:immunity": {
       "n": 243,
-      "observed": 20
+      "observed": 31
     },
     "attack:look-any-deck": {
       "n": 5,
@@ -303,11 +303,11 @@
     },
     "attack:move-energy": {
       "n": 135,
-      "observed": 89
+      "observed": 105
     },
     "attack:multi-target": {
       "n": 165,
-      "observed": 107
+      "observed": 111
     },
     "attack:neutralize-opponent-energy": {
       "n": 1,
@@ -315,11 +315,11 @@
     },
     "attack:next-turn-bonus": {
       "n": 36,
-      "observed": 0
+      "observed": 36
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 508
+      "observed": 604
     },
     "attack:once-per-turn": {
       "n": 5,
@@ -335,7 +335,7 @@
     },
     "attack:per-prize": {
       "n": 147,
-      "observed": 86
+      "observed": 105
     },
     "attack:recover-status": {
       "n": 12,
@@ -343,7 +343,7 @@
     },
     "attack:retaliate": {
       "n": 2,
-      "observed": 1
+      "observed": 2
     },
     "attack:return-opponent-energy": {
       "n": 3,

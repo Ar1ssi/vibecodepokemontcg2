@@ -4,7 +4,7 @@
   "families": {
     "ability:attach": {
       "n": 15,
-      "observed": 12
+      "observed": 15
     },
     "ability:copy-attack": {
       "n": 8,
@@ -88,7 +88,7 @@
     },
     "attack:bench-damage": {
       "n": 126,
-      "observed": 113
+      "observed": 117
     },
     "attack:coin-flip": {
       "n": 3,
@@ -96,7 +96,7 @@
     },
     "attack:conditional-damage": {
       "n": 111,
-      "observed": 55
+      "observed": 62
     },
     "attack:conditional-ko": {
       "n": 5,
@@ -104,11 +104,11 @@
     },
     "attack:damage-prevention": {
       "n": 29,
-      "observed": 0
+      "observed": 29
     },
     "attack:discard-cost": {
       "n": 77,
-      "observed": 62
+      "observed": 70
     },
     "attack:discard-opponent": {
       "n": 26,
@@ -116,11 +116,11 @@
     },
     "attack:draw-attach": {
       "n": 66,
-      "observed": 62
+      "observed": 66
     },
     "attack:draw-until": {
       "n": 13,
-      "observed": 9
+      "observed": 13
     },
     "attack:dual-status": {
       "n": 14,
@@ -148,15 +148,15 @@
     },
     "attack:move-energy": {
       "n": 25,
-      "observed": 15
+      "observed": 18
     },
     "attack:multi-target": {
       "n": 47,
-      "observed": 32
+      "observed": 36
     },
     "attack:next-turn-lock": {
       "n": 283,
-      "observed": 147
+      "observed": 226
     },
     "attack:per-energy": {
       "n": 119,
@@ -168,7 +168,7 @@
     },
     "attack:per-prize": {
       "n": 68,
-      "observed": 25
+      "observed": 44
     },
     "attack:reveal-hand": {
       "n": 15,

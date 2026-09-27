@@ -123,3 +123,10 @@ test('oracleCorpus emits one row per attack and ability with family and damage f
   assert.ok(attack.tags.includes('own:attached->discard'), attack.tags.join());
   assert.deepEqual(oracleCorpus([]), []);
 });
+
+test('diffTags sees a player-scoped play lock, which sits on no card', () => {
+  const state = buildState(attacker({ name: 'Probe', damage: '10' }), 'active');
+  const before = snapshot(state);
+  state.players.p2.playLocks = [{ untilTurn: 6, kinds: ['item'] }];
+  assert.ok(diffTags(before, snapshot(state), []).has('opp:play-lock'));
+});

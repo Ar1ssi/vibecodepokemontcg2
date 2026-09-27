@@ -152,12 +152,17 @@ function enrich(state, costPool) {
   }
 }
 
-export function runAttackOnce(holder, attackIndex, seed, costPool) {
+/**
+ * `mutate(state)` runs after the board is stocked and before the snapshot: the condition
+ * replay (condition-replay.mjs) uses it to make a printed condition true.
+ */
+export function runAttackOnce(holder, attackIndex, seed, costPool, mutate) {
   nextId = 90000;
   const state = buildState(holder, 'active');
   state.rulesEnabled = true;
   state.turn = { player: 'p1', number: 5, phase: 'main' };
   enrich(state, costPool);
+  mutate?.(state);
   const before = snapshot(state);
   const events = [];
   const choices = [];
