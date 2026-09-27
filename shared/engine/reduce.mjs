@@ -142,6 +142,7 @@ import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-ste
 import { pokemonHasType } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
+import { replaceSelfName } from './rules/attack-text.mjs';
 import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
 import {
   parseCopyAttack,
@@ -210,7 +211,7 @@ import {
   isBasicEnergy,
   isUltraBeastCard,
 } from './rules/card-classify.mjs';
-import { trainerPlayBlockReason } from './rules/trainer-play-conditions.mjs';
+import { trainerPlayBlockReason, isToolTrainer } from './rules/trainer-play-conditions.mjs';
 import { trainerEndsTurn } from './rules/trainer-effects.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import {
@@ -3884,6 +3885,17 @@ export function validateLegality(state, command) {
           const handLock = playLockReason(player, energyKinds, state.turn?.number || 1);
           if (handLock) return { allowed: false, reason: handLock };
         }
+        // Chaos Wheel / Trick Wind lock Pokémon Tools (Items since Sun & Moon); Evolution
+        // Jammer locks evolving from hand.
+        const attachKinds = isPokemon(cardRef.card)
+          ? ['evolve']
+          : isToolTrainer(cardRef.card)
+            ? ['tool', 'item', 'trainer']
+            : [];
+        const attachLock = attachKinds.length
+          ? playLockReason(player, attachKinds, state.turn?.number || 1)
+          : null;
+        if (attachLock) return { allowed: false, reason: attachLock };
       }
       // "This card can only be attached to …" (Team Rocket's Energy, Shield Energy, …).
       if (cardRef?.zoneId === 'hand' && isEnergy(cardRef.card) && isSpecialEnergyCard(cardRef.card)) {
@@ -4455,6 +4467,7 @@ export function validateLegality(state, command) {
         const trainerKinds = [
           isSupporter ? 'supporter' : subStr.includes('stadium') ? 'stadium' : 'item',
           'trainer',
+          ...(isToolTrainer(cardRef.card) ? ['tool'] : []),
         ];
         const attackPlayLock = playLockReason(player, trainerKinds, state.turn?.number || 1);
         if (attackPlayLock) return { allowed: false, reason: attackPlayLock };
@@ -5395,7 +5408,18 @@ function runAttackSteps(
  * phase. `copiedAttack` is set when a copy attack chose `attack` (design 031); resume
  * tokens carry it because the copier's own attack list does not hold it.
  */
+// Older printings name the attacker ("Mantine can't attack during your next turn", "Put 1 damage
+// counter on Beldum"). Every reader of the attack's text sees "this Pokémon" instead.
+function withSelfNamedAttack(ctx) {
+  const name = ctx.attackerView?.name || ctx.attacker?.name;
+  const text = ctx.attack?.text;
+  if (!text || !name) return ctx;
+  const named = replaceSelfName(text, name);
+  return named === text ? ctx : { ...ctx, attack: { ...ctx.attack, text: named } };
+}
+
 function flipAndResolveAttack(draft, ctx) {
+  ctx = withSelfNamedAttack(ctx);
   const { playerId, activeRng, events, attack, attackerPlayer, atkIdx, targetInstanceId, copiedAttack } = ctx;
   // A new attack starts with no before-damage discard recorded (attack-steps recordDiscardedForDamage).
   delete draft.attackDiscardedForDamage;
@@ -5744,6 +5768,7 @@ function statusConditionResults(draft, ctx, branches) {
  * @param {object} ctx Derived attack context (see the call site)
  */
 function resolveAttackEffectPhase(draft, ctx) {
+  ctx = withSelfNamedAttack(ctx);
   const {
     playerId,
     activeRng,

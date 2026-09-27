@@ -28,6 +28,27 @@ function countOf(word) {
   return WORD_COUNTS[w] || 1;
 }
 
+// Card kinds a printed play lock names ("Pokémon Tool, Special Energy, or Stadium") → the
+// kinds reduce.mjs playLockReason compares against. No list is "any card".
+const PLAY_LOCK_KINDS = {
+  item: ['item'],
+  supporter: ['supporter'],
+  stadium: ['stadium'],
+  trainer: ['trainer'],
+  'pokémon tool': ['tool'],
+  'special energy': ['specialEnergy'],
+  'basic energy': ['basicEnergy'],
+  energy: ['basicEnergy', 'specialEnergy'],
+};
+
+function playLockStep(list, toEvolve) {
+  if (toEvolve) return list === 'pokémon' ? { type: 'atkOppPlayLock', kinds: ['evolve'] } : null;
+  if (!list || /^cards?$/.test(list)) return { type: 'atkOppPlayLock', kinds: ['any'] };
+  const names = list.split(/,\s*(?:or\s+)?|\s+or\s+/).map((name) => name.trim());
+  const kinds = names.map((name) => PLAY_LOCK_KINDS[name]);
+  return kinds.every(Boolean) ? { type: 'atkOppPlayLock', kinds: kinds.flat() } : null;
+}
+
 // Design 036 A9: "put N damage counters on each [of your opponent's] [benched] Pokémon
 // <filter>". "Each Defending Pokémon" is the Active. An unowned "each Pokémon" is both
 // sides: every such card prints "(both yours and your opponent's)", which the parser strips
@@ -655,21 +676,18 @@ const TEMPLATES = [
   // Opponent play/attack locks and extra turns (design 048): Noivern-GX Distort/Sonic Volume,
   // Alolan Golem-GX Heavy Rock-GX, Gengar & Mimikyu-GX Horror House-GX, Umbreon & Darkrai-GX
   // Dark Moon-GX, Cobalion-GX Iron Rule-GX, Dialga-GX Timeless-GX, Supreme Puff-GX.
+  // Every era's wording: "Your opponent can't play any Item cards from their hand during their
+  // next turn" and the Scarlet & Violet "During your opponent's next turn, they can't play any
+  // Item cards from their hand" (Budew Itchy Pollen, Banette ex, Pikachu V-UNION), lists
+  // ("Pokémon Tool, Special Energy, or Stadium", Giratina-EX Chaos Wheel), Azelf Bind Pulse's
+  // "can't attach any Special Energy cards", and Banette Evolution Jammer's "Pokémon … to evolve".
   [
-    /^your opponent can't play any item cards? from their hand during their next turn$/,
-    () => ({ type: 'atkOppPlayLock', kinds: ['item'] }),
+    /^your opponent can't play any (?:(.+?) )?(?:cards? )?from (?:their|his or) hand( to evolve their pokémon)? during (?:their|your opponent's) next turn$/,
+    (m) => playLockStep(m[1], m[2]),
   ],
   [
-    /^your opponent can't play any special energy cards? from their hand during their next turn$/,
-    () => ({ type: 'atkOppPlayLock', kinds: ['specialEnergy'] }),
-  ],
-  [
-    /^your opponent can't play any trainer cards? from their hand during their next turn$/,
-    () => ({ type: 'atkOppPlayLock', kinds: ['trainer'] }),
-  ],
-  [
-    /^your opponent can't play any cards? from their hand during their next turn$/,
-    () => ({ type: 'atkOppPlayLock', kinds: ['any'] }),
+    /^during your opponent's next turn, (?:they|your opponent) can't (?:play|attach) any (?:(.+?) )?(?:cards? )?from their hand(?: to any of their pokémon)?( to evolve their pokémon)?$/,
+    (m) => playLockStep(m[1], m[2]),
   ],
   [
     /^during your opponent's next turn, their pokémon can't attack$/,

@@ -37,7 +37,7 @@ import { isBasicPokemon } from '../cards.mjs';
 import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 import { parseEachFilter } from './each-filter.mjs';
 import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
-import { normalizeAttackText } from './attack-text.mjs';
+import { normalizeAttackText, replaceSelfName } from './attack-text.mjs';
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
 import { countUnit, normalizeUnit, scalingCap } from './scaling-count.mjs';
 
@@ -307,6 +307,22 @@ function amountScale(unit, ctx) {
   return null;
 }
 
+// Older prints scale with "does 10 damage times the number of damage counters on this Pokémon".
+// Non-Energy units read as the "for each" form the per-each chain resolves; Energy units keep
+// the "times" wording for the per-energy branch.
+function timesAsForEach(text) {
+  return text
+    .split(/(?<=\.)\s+/)
+    .map((sentence) => {
+      const unit = /damage times the (?:amount|number) of (.+)/.exec(sentence)?.[1];
+      if (!unit || /\benergy\b/.test(unit)) return sentence;
+      return sentence
+        .replace(/plus (\d+) (?:more )?damage times the (?:amount|number) of/, 'plus $1 more damage for each')
+        .replace(/(\d+) (more )?damage times the (?:amount|number) of/, '$1 $2damage for each');
+    })
+    .join(' ');
+}
+
 // Parse the attack text into an effective base damage number + breakdown.
 // See the module header for the shape contract and ctx options.
 export function parseAttackDamage(
@@ -315,7 +331,9 @@ export function parseAttackDamage(
   defender = {},
   ctx = {}
 ) {
-  const text = lower(attack?.text ?? '');
+  // Older printings name the attacker ("Arcanine does 40 damage to itself").
+  if (attack?.text && attacker?.name) attack = { ...attack, text: replaceSelfName(attack.text, attacker.name) };
+  const text = timesAsForEach(lower(attack?.text ?? ''));
   // TCGdex prints scaling attacks' damage as strings ("30+", "20×"); their printed number
   // is still the base the "more damage" clauses add to (I117).
   const base = Number.isFinite(attack?.damage)

@@ -152,12 +152,13 @@ function enrich(state, costPool) {
   }
 }
 
-export function runAttackOnce(holder, attackIndex, seed, costPool) {
+export function runAttackOnce(holder, attackIndex, seed, costPool, setup = null) {
   nextId = 90000;
   const state = buildState(holder, 'active');
   state.rulesEnabled = true;
   state.turn = { player: 'p1', number: 5, phase: 'main' };
   enrich(state, costPool);
+  if (setup) setup(state);
   const before = snapshot(state);
   const events = [];
   const choices = [];
@@ -227,6 +228,7 @@ export function runAttackOnce(holder, attackIndex, seed, costPool) {
     dealt: executed ? executed.damage || 0 : null,
     executedName: executed?.attackName || null,
     choices,
+    finalState: res.state,
     skipped: events.filter((e) => e.type === 'effectStepSkipped').map((e) => e.reason),
     scaled: scaled.map((e) => ({ base: e.base, total: e.total, notes: e.notes })),
     prizeEvents,

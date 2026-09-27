@@ -40,6 +40,8 @@ export function normalizeUnit(unit, selfName = '') {
   let out = lower(unit)
     .replace(/[’‘]/g, "'")
     .replace(/pokemon/g, 'pokémon')
+    // Empoleon / Grumpig: "Pokémon in play (both yours and your opponent's), excluding Grumpig".
+    .replace(/ \(both yours and your opponent's\)/, '')
     .split(/\.\s|\.$|;|\(/)[0]
     .replace(/\s+/g, ' ')
     .trim();
@@ -48,7 +50,7 @@ export function normalizeUnit(unit, selfName = '') {
   const name = lower(selfName).trim();
   if (name) {
     out = out.replace(
-      new RegExp(`\\b(attached to|on|under) ${escapeRegExp(name)}(?![\\w'])`, 'g'),
+      new RegExp(`\\b(attached to|on|under|excluding) ${escapeRegExp(name)}(?![\\w'])`, 'g'),
       '$1 this pokémon'
     );
   }
@@ -148,9 +150,18 @@ function inPlayCount(unit, ctx) {
     return matches ? { count: entries.filter(matches).length, label } : null;
   };
   let m;
-  if ((m = /^of your opponent's (.+?)(?: in play)?$/.exec(unit))) return count(opp, m[1], `opponent's ${m[1]}`);
-  if ((m = /^of your benched (.+)$/.exec(unit))) return count(own.filter((e) => e.bench), m[1], `benched ${m[1]}`);
-  if ((m = /^of your (.+?) in play$/.exec(unit))) return count(own, m[1], `your ${m[1]} in play`);
+  // "for each of your …" and the older "times the number of your …" read the same.
+  unit = unit.replace(/^of /, '');
+  // Empoleon Attack Command: "Pokémon in play (both yours and your opponent's)"; Grumpig
+  // Circular Steps: "… , excluding this Pokémon".
+  if ((m = /^pokémon in play(, excluding this pokémon)?$/.exec(unit))) {
+    return { count: own.length + opp.length - (m[1] ? 1 : 0), label: `Pokémon in play${m[1] ? ', excluding this Pokémon' : ''}` };
+  }
+  if (/^pokémon your opponent has in play$/.test(unit)) return { count: opp.length, label: "opponent's Pokémon in play" };
+  if ((m = /^your opponent's benched (.+)$/.exec(unit))) return count(opp.filter((e) => e.bench), m[1], `opponent's Benched ${m[1]}`);
+  if ((m = /^your opponent's (.+?)(?: in play)?$/.exec(unit))) return count(opp, m[1], `opponent's ${m[1]}`);
+  if ((m = /^your benched (.+)$/.exec(unit))) return count(own.filter((e) => e.bench), m[1], `benched ${m[1]}`);
+  if ((m = /^your (.+?) in play$/.exec(unit))) return count(own, m[1], `your ${m[1]} in play`);
   if ((m = /^(.+?) you have in play that has δ on its card$/.exec(unit))) {
     return { count: own.filter((e) => e.delta).length, label: 'δ Pokémon in play' };
   }
@@ -273,6 +284,16 @@ function paidCount(unit, ctx) {
   return null;
 }
 
+function handCount(unit, ctx) {
+  if (/^cards? in your hand$/.test(unit) && typeof ctx.ownHandCount === 'number') {
+    return { count: ctx.ownHandCount, label: 'cards in your hand' };
+  }
+  if (/^cards? in your opponent's hand$/.test(unit) && typeof ctx.opponentHandCount === 'number') {
+    return { count: ctx.opponentHandCount, label: "cards in your opponent's hand" };
+  }
+  return null;
+}
+
 /**
  * @param {string} unit Unit phrase, normalized by `normalizeUnit`
  * @param {object} ctx Server-built attack ctx
@@ -283,6 +304,7 @@ export function countUnit(unit, ctx = {}) {
   if (!text) return null;
   return (
     paidCount(text, ctx) ??
+    handCount(text, ctx) ??
     discardCount(text, ctx) ??
     attachedCount(text, ctx) ??
     energyAcrossCount(text, ctx) ??
