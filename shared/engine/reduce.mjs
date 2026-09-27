@@ -5502,8 +5502,10 @@ function runAttackSteps(
 function withSelfNamedAttack(ctx) {
   const name = ctx.attackerView?.name || ctx.attacker?.name;
   const text = ctx.attack?.text;
-  if (!text || !name) return ctx;
-  const named = replaceSelfName(text, name);
+  if (!text) return ctx;
+  // TCGdex prints curly apostrophes ("opponent’s"); every reader matches straight ones.
+  const straight = String(text).replace(/[‘’]/g, "'");
+  const named = name ? replaceSelfName(straight, name) : straight;
   return named === text ? ctx : { ...ctx, attack: { ...ctx.attack, text: named } };
 }
 

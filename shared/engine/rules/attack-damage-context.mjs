@@ -154,6 +154,11 @@ function ruleBoxKinds(view) {
     const word = String(type).toLowerCase();
     kinds.push(`type:${word === 'dark' ? 'darkness' : word}`);
   }
+  // Group names live in the subtypes (Rapid Strike) or the card name (Team Plasma, Team Rocket's).
+  const label = `${view.name || ''} ${(view.subtypes || []).join(' ')}`.toLowerCase();
+  for (const group of ['single strike', 'rapid strike', 'fusion strike', 'team plasma', 'team aqua', 'team magma', "team rocket's"]) {
+    if (label.includes(group)) kinds.push(`group:${group}`);
+  }
   return kinds;
 }
 

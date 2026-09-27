@@ -123,6 +123,11 @@ const KIND_PHRASES = [
   [/^(?:an? )?basic pokémon$/, () => 'basic'],
   [/^(?:an? )?stage (1|2)(?: evolved)? pokémon$/, (m) => `stage${m[1]}`],
   [/^(?:an? )?(tera|radiant|mega) pokémon$/, (m) => m[1]],
+  // Snorlax Teampact ("Team Plasma Pokémon"), Blaziken VMAX ("Rapid Strike Pokémon").
+  [
+    /^(?:an? )?(single strike|rapid strike|fusion strike|team plasma|team aqua|team magma|team rocket's) pokémon$/,
+    (m) => `group:${m[1]}`,
+  ],
   [/^(?:an? )?\{([a-z])\} pokémon$/, (m) => (ENERGY_LETTER_TYPES[m[1]] ? `type:${ENERGY_LETTER_TYPES[m[1]].toLowerCase()}` : null)],
   [/^(?:an? )?([a-z]+) pokémon$/, (m) => (ENERGY_WORD_TYPES[m[1]] ? `type:${ENERGY_WORD_TYPES[m[1]].toLowerCase()}` : null)],
 ];
@@ -275,6 +280,11 @@ const CLAUSES = [
     /^you have more benched pokémon than your opponent$/,
     () => ({ desc: { kind: 'benchVsOpponent', op: 'gt' }, printedNegated: false }),
   ],
+  // Nidoqueen Give Aid: "the same number of or less Benched Pokémon than your opponent".
+  [
+    /^you have the same number of or (?:less|fewer) benched pokémon than your opponent$/,
+    () => ({ desc: { kind: 'benchVsOpponent', op: 'lte' }, printedNegated: false }),
+  ],
   [
     /^your benched (?:\{([a-z])\} )?pokémon have any damage counters on them$/,
     (m) => ({
@@ -387,6 +397,18 @@ const CLAUSES = [
     /^(?:your opponent's active pokémon|the defending pokémon) is a (tera|radiant|mega) pokémon$/,
     (m) => ({ desc: { kind: 'defenderRuleBox', value: m[1] }, printedNegated: false }),
   ],
+  // Light Machamp Beatdown: the same two tests in the other order.
+  [
+    new RegExp(`^${DEFENDER} has (\\w+) in its name or is an? \\{([a-z])\\} pokémon$`),
+    (m) => ({
+      desc: {
+        kind: 'defenderKindOrName',
+        values: [`type:${String(ENERGY_LETTER_TYPES[m[2]] || '').toLowerCase()}`],
+        nameWord: m[1],
+      },
+      printedNegated: false,
+    }),
+  ],
   // Poliwrath Beatdown: "a {D} Pokémon or has Dark in its name".
   [
     new RegExp(`^${DEFENDER} is an? \\{([a-z])\\} pokémon or has (\\w+) in its name$`),
@@ -438,6 +460,11 @@ const CLAUSES = [
   [
     new RegExp(`^${DEFENDER} has \\{([a-z])\\} resistance$`),
     (m) => ({ desc: { kind: 'defenderResistance', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
+  // Armaldo ex Vortex Chop: "If the Defending Pokémon has any Resistance".
+  [
+    new RegExp(`^${DEFENDER} has any resistance$`),
+    () => ({ desc: { kind: 'defenderResistance', type: null }, printedNegated: false }),
   ],
 
   // ── What happened this turn ────────────────────────────────────────────────
@@ -544,6 +571,11 @@ const CLAUSES = [
     /^(?:your opponent's active pokémon|the defending pokémon) has no damage counters on it(?: before this attack does damage)?$/,
     () => ({ desc: { kind: 'defenderDamageCounters', op: 'eq', n: 0 }, printedNegated: false }),
   ],
+  // Feraligatr Rending Jaws prints "If here are no damage counters on the Defending Pokémon".
+  [
+    /^t?here are no damage counters on (?:your opponent's active pokémon|the defending pokémon)$/,
+    () => ({ desc: { kind: 'defenderDamageCounters', op: 'eq', n: 0 }, printedNegated: false }),
+  ],
   [
     /^(?:your opponent's active pokémon|the defending pokémon) (?:already )?has any damage counters on it(?: before this attack does damage)?$/,
     () => ({ desc: { kind: 'defenderDamageCounters', op: 'gte', n: 1 }, printedNegated: false }),
@@ -645,8 +677,14 @@ const CLAUSES = [
     }),
   ],
   [
-    /^this pokémon and (?:your opponent's active pokémon|the defending pokémon) have the same (?:amount|number) of energy attached(?: to them)?$/,
+    /^this pokémon and (?:your opponent's active pokémon|the defending pokémon) have the same (?:amount|number) of energy(?: cards)? attached(?: to them)?$/,
     () => ({ desc: { kind: 'energyVsDefender', op: 'eq' }, printedNegated: false }),
+  ],
+  // Deoxys / Mew / Metagross Link Blast ("a different amount of Energy"), Alakazam Syncroblast
+  // ("don't have the same number of Energy cards").
+  [
+    /^this pokémon and (?:your opponent's active pokémon|the defending pokémon) (?:have a different (?:amount|number) of energy(?: cards)?|don't have the same (?:amount|number) of energy(?: cards)?) attached(?: to them)?$/,
+    () => ({ desc: { kind: 'energyVsDefender', op: 'eq' }, printedNegated: true }),
   ],
   [
     /^this pokémon has (?:less|fewer) energy attached(?: to it)? than (?:your opponent's active pokémon|the defending pokémon)$/,
@@ -715,6 +753,11 @@ const CLAUSES = [
   [
     /^(?:your opponent's active pokémon|the defending pokémon) has the same or less remaining hp as this pokémon$/,
     () => ({ desc: { kind: 'defenderRemainingHpVsAttacker', op: 'lte' }, printedNegated: false }),
+  ],
+  // Sableye Overconfident / Wormadam Leaf Hurricane: "has fewer remaining HP than this Pokémon".
+  [
+    /^(?:your opponent's active pokémon|the defending pokémon) has (?:fewer|less) remaining hp than this pokémon$/,
+    () => ({ desc: { kind: 'defenderRemainingHpVsAttacker', op: 'lt' }, printedNegated: false }),
   ],
 
   // ── Special Energy on the defender ─────────────────────────────────────────
@@ -930,7 +973,9 @@ const CHECKS = {
   ownInPlayAbility: (cond, ctx) =>
     list(ctx.ownInPlayAbilityKinds).some((kinds) => list(kinds).some((kind) => list(cond.abilityKinds).includes(kind))),
   defenderResistance: (cond, ctx) =>
-    list(ctx.defenderResistanceTypes).some((type) => String(type).toLowerCase() === String(cond.type).toLowerCase()),
+    list(ctx.defenderResistanceTypes).some(
+      (type) => cond.type == null || String(type).toLowerCase() === String(cond.type).toLowerCase()
+    ),
   healedThisTurn: (cond, ctx) => ctx.attackerHealedThisTurn === true,
   damagedLastOpponentTurn: (cond, ctx) => num(ctx.attackerDamageTakenLastTurn) > 0,
   discardedCardIs: (cond, ctx) => {

@@ -335,10 +335,19 @@ const BASE_SWAP = [
  */
 function replacedBase(text, conditionHolds) {
   let unread = false;
-  for (const sentence of text.split(/(?<=\.)\s+/)) {
+  const sentences = text.split(/(?<=\.)\s+/);
+  for (const [index, sentence] of sentences.entries()) {
     const m = BASE_SWAP.map((re) => re.exec(sentence.trim())).find(Boolean);
     if (!m) continue;
     const cond = /^you do\b/.test(m[1]) ? 'you do' : m[1];
+    // Light Machamp Beatdown: "If the Defending Pokémon has Dark in its name …, flip a coin. If
+    // heads, …" — the coin only counts when the earlier condition held.
+    const flipGate = /^if (.+?), flip a coin\.$/.exec((sentences[index - 1] || '').trim());
+    if (flipGate && (cond === 'heads' || cond === 'tails')) {
+      const gate = conditionHolds(flipGate[1]);
+      if (gate === null) unread = true;
+      if (gate !== true) continue;
+    }
     const held = conditionHolds(cond);
     if (held === true) return { value: Number(m[2]), cond };
     if (held === null) unread = true;
@@ -354,8 +363,12 @@ export function parseAttackDamage(
   defender = {},
   ctx = {}
 ) {
-  // Older printings name the attacker ("Arcanine does 40 damage to itself").
-  if (attack?.text && attacker?.name) attack = { ...attack, text: replaceSelfName(attack.text, attacker.name) };
+  // Older printings name the attacker ("Arcanine does 40 damage to itself"); TCGdex prints
+  // curly apostrophes the sub-readers below match as straight ones.
+  if (attack?.text) {
+    const straight = String(attack.text).replace(/[‘’]/g, "'");
+    attack = { ...attack, text: attacker?.name ? replaceSelfName(straight, attacker.name) : straight };
+  }
   const text = timesAsForEach(lower(attack?.text ?? ''));
   // TCGdex prints scaling attacks' damage as strings ("30+", "20×"); their printed number
   // is still the base the "more damage" clauses add to (I117).
@@ -868,7 +881,14 @@ export function parseAttackDamage(
   // "If the Defending Pokémon is a {F} Pokémon, this attack's base damage is 80 instead of 30"
   // (Dewgong Ice Shard); Light Arcanine prints "this attack does 10 damage instead of 50". The
   // first sentence whose condition holds replaces the printed base.
-  const baseSwap = replacedBase(text, (cond) => evalCondition(cond, defender, ctx, attacker));
+  // Arceus LV.X Meteor Blast: "Flip a coin. If tails, this attack's base damage is 50 instead of 100."
+  const baseSwap = replacedBase(text, (cond) => {
+    if (cond === 'heads' || cond === 'tails') {
+      if (ctx.coin == null && typeof headsCount !== 'number') return null;
+      return cond === 'heads' ? ctx.coin === 'heads' || headsCount > 0 : ctx.coin === 'tails';
+    }
+    return evalCondition(cond, defender, ctx, attacker);
+  });
   if (baseSwap) {
     if (baseSwap.value == null) {
       notes.push('base damage replacement — resolve the printed condition');
@@ -1107,7 +1127,7 @@ export function switchClause(attackText) {
 // move-energy family). Matches Wheel Pass: "Move an Energy from this Pokémon
 // to 1 of your Benched Pokémon". Pure.
 export function moveEnergyClause(attackText) {
-  const text = String(attackText || '');
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
   return (
     /move an? energy from this pok[ée]mon/i.test(text) ||
     (/move\b[^.;]*\benergy\b/i.test(text) &&
@@ -1131,7 +1151,7 @@ export function revealHandClause(attackText) {
 // Whether attack text Knocks Out the opponent's Active when it has a Special
 // Condition (taxonomy §D conditional-ko family). Matches Abyss Eye. Pure.
 export function conditionalKoClause(attackText) {
-  const text = String(attackText || '');
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
   if (
     /if your opponent's active pok[ée]mon is affected by a special condition/i.test(
       text
@@ -1267,7 +1287,7 @@ export function returnEnergyClause(attackText) {
 }
 
 export function returnEnergyCount(attackText) {
-  const text = String(attackText || '');
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
   const m = /put (\d+)/i.exec(text);
   if (m) return Math.max(1, parseInt(m[1], 10));
   return /put an energy/i.test(text) ? 1 : 1;
@@ -1325,7 +1345,7 @@ export function copyAttackScope(attackText) {
 
 /** Retaliate/thorns: counters on Attacking Pokémon if damaged next turn. */
 export function retaliateCount(attackText) {
-  const t = String(attackText || '');
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
   if (
     !/if this pok[ée]mon is damaged by an attack/i.test(t) ||
     !/put (\d+ )?damage counters on the attacking pok[ée]mon/i.test(t)
@@ -1338,7 +1358,7 @@ export function retaliateCount(attackText) {
 
 /** Put this Pokémon and attachments into your hand. */
 export function returnSelfClause(attackText) {
-  const t = String(attackText || '');
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
   return (
     /put this pok[ée]mon and all attached cards into your hand/i.test(t) ||
     /put 1 of your benched pok[ée]mon and all attached cards into your hand/i.test(
@@ -1366,7 +1386,7 @@ export function lookOpponentDeckCount(attackText) {
 
 /** Look at top N of your own deck. */
 export function lookOwnDeckCount(attackText) {
-  const t = String(attackText || '');
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
   if (/opponent's deck/i.test(t)) return 0;
   const m = /look at the top (\d+) cards of your deck/i.exec(t);
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
@@ -1439,7 +1459,7 @@ export function bothActiveKoClause(attackText) {
 
 /** KO if opponent Active has Special Energy attached. */
 export function specialEnergyKoClause(attackText) {
-  const t = String(attackText || '');
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
   return (
     /if your opponent's active pok[ée]mon has any special energy attached/i.test(
       t
@@ -1808,7 +1828,7 @@ export function discardEnergyScaling(attackText) {
 }
 
 function discardEnergyScalingClause(attackText) {
-  const text = String(attackText || '');
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
   // Blastoise-GX Rocket Splash shuffles the Energy into the deck instead ("for each card
   // you shuffled into your deck in this way"): destination 'deck'.
   const shuffled = /for each (?:energy )?card you shuffled into your deck/i.test(text);
@@ -1924,7 +1944,7 @@ function discardEnergyScalingClause(attackText) {
 //                   discard any number of the counted kind (players: 'opponent')
 // Pure.
 export function deckMillScaling(attackText) {
-  const text = String(attackText || '');
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
   // Tyranitar Dark Mountain prints "for each Supporter card discard in this way".
   const each =
     /for each ([^.]+?) (?:that )?(?:you )?(?:discarded(?: in this way)?|discard in this way)/i.exec(text);
@@ -2033,7 +2053,7 @@ export function attachDiscardToBenchSpread(attackText) {
 //   hand:   cards to discard from your hand ("discard 2 cards from your hand")
 // An unnumbered clause counts as 1 (the common printed form). Pure.
 export function discardCost(attackText) {
-  const text = String(attackText || '');
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
   const has = (re) => re.test(text);
   const firstNum = (re) => {
     const m = re.exec(text);
@@ -2055,7 +2075,7 @@ export function discardCost(attackText) {
 // clause counts as drawing 1 (consistent with the discardCost convention).
 // Returns { draw: N } with N = 0 when the text has no such clause. Pure.
 export function shuffleDrawClause(attackText) {
-  const text = String(attackText || '');
+  const text = String(attackText || '').replace(/[‘’]/g, "'");
   if (
     !/shuffle\s+(?:your\s+)?hand\s+into\s+(?:your\s+|the\s+)?deck/i.test(text)
   ) {

@@ -303,6 +303,13 @@ function handCount(unit, ctx) {
   if (/^cards? in your opponent's hand$/.test(unit) && typeof ctx.opponentHandCount === 'number') {
     return { count: ctx.opponentHandCount, label: "cards in your opponent's hand" };
   }
+  // Gengar Poltergeist: "Trainer, Supporter, and Stadium cards" — every Trainer card.
+  if (
+    /^trainer(?:, supporter,? and stadium)? cards? in your opponent's hand$/.test(unit) &&
+    typeof ctx.opponentHandTrainerCount === 'number'
+  ) {
+    return { count: ctx.opponentHandTrainerCount, label: "Trainer cards in your opponent's hand" };
+  }
   return null;
 }
 
