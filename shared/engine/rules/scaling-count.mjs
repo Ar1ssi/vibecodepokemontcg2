@@ -251,6 +251,10 @@ function counterCount(unit, ctx) {
   if (/^of those special conditions$/.test(unit) && Array.isArray(ctx.defenderConditions)) {
     return { count: ctx.defenderConditions.length, label: 'Special Conditions on the Defending Pokémon' };
   }
+  // Heracross Get Even: "for each Prize card more than your opponent" (you have left).
+  if (/^prize cards? more than your opponent$/.test(unit) && ctx.ownPrizes != null && ctx.opponentPrizes != null) {
+    return { count: Math.max(0, ctx.ownPrizes - ctx.opponentPrizes), label: 'Prize cards more than your opponent' };
+  }
   if (/^of those pokémon$/.test(unit) && typeof ctx.damagedOwnPokemonCount === 'number') {
     return { count: ctx.damagedOwnPokemonCount, label: 'your Pokémon with damage counters' };
   }

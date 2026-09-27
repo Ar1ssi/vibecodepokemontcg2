@@ -648,7 +648,16 @@ export function parseAttackDamage(
       count = undefined;
       label = unit || 'the printed count';
     }
-    if (per > 0 && typeof count === 'number' && count >= 0) {
+    // "Flip a coin. If heads, this attack does 10 damage plus 10 more damage for each …" (Kabuto
+    // Work Together): tails leaves the printed damage.
+    const scaleSentence = text.split(/(?<=\.)\s+/).find((s) => /damage for each/.test(s)) || '';
+    const headsGated = /^if heads,/.test(scaleSentence) && !/heads/.test(unit);
+    if (headsGated && ctx.coin !== 'heads') {
+      components.push('per-each');
+      notes.push(
+        ctx.coin === 'tails' ? 'scaling not applied (tails)' : 'heads-gated scaling — resolve the coin'
+      );
+    } else if (per > 0 && typeof count === 'number' && count >= 0) {
       // "You can't add more than 60 damage in this way" caps the added part; "You can't do
       // more than 130 damage in this way" caps the whole.
       const cap = scalingCap(text);
@@ -888,7 +897,9 @@ export function parseAttackDamage(
     /benched pok[ée]mon|your bench/.test(text) &&
     /damage|do(?:es)? \d/.test(text)
   ) {
-    bench = amount(text, /(?:also )?do(?:es)? (\d+) damage/);
+    // Only damage done TO a Benched Pokémon: "… 10 more damage for each Kabuto … on your Bench"
+    // (Kabuto Work Together) counts the Bench, it does not hit it.
+    bench = amount(text, /(?:also )?do(?:es)? (\d+) damage to [^.]*bench/);
     if (bench > 0) components.push('bench');
   }
   let heal = 0;
