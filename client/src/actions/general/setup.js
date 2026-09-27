@@ -9,6 +9,7 @@ import { drawHand, setOpeningPrizes } from '../zones/hand-actions.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import { reset } from './reset.js';
 import { waitForDealOrder } from '../../setup/netcode/deal-order.js';
+import { setupShuffleAnimates } from './setup-deal.mjs';
 
 export const setup = async (user, indices, emit = true) => {
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
@@ -81,7 +82,7 @@ export const setupPrizes = async (user, indices, emit = true) => {
   }
   indices = indices ? indices : shuffleIndices(deck.getCount());
   if (deck.getCount() > 0) {
-    shuffleZone(user, user, 'deck', indices, false, false);
+    shuffleZone(user, user, 'deck', indices, false, false, setupShuffleAnimates(systemState));
     await setOpeningPrizes(user, user);
     appendMessage(
       user,

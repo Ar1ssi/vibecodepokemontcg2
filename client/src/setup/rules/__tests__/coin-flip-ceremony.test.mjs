@@ -143,3 +143,22 @@ test('several flips toss one after another in one overlay with a running tally',
   assert.equal(document.getElementById(COIN_FLIP_OVERLAY_ID), null);
   dom.window.close();
 });
+
+test('an OS prefers-reduced-motion flag still tumbles the coin and animates its foil', async () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const { document } = dom.window;
+  // Windows reports this whenever system animations are off; only the app's
+  // own reduce-motion setting may stop the tumble.
+  dom.window.matchMedia = (query) => ({ matches: /prefers-reduced-motion/.test(query), media: query });
+
+  const done = playCoinFlipCeremony({ coin: COIN, result: 'tails', revealMs: 5, holdMs: 300, fadeMs: 5, doc: document });
+  await new Promise((resolve) => setTimeout(resolve, 120));
+
+  const coinEl = document.querySelector('[data-coin-flip-el]');
+  assert.match(coinEl.getAttribute('style') || '', /--coin-flip: 1980deg/, 'the toss spun five turns and landed on tails');
+  assert.ok(coinEl.closest('[data-coin-toss]').classList.contains('tossing'));
+  assert.match(coinEl.style.getPropertyValue('--coin-light-x'), /%$/, 'the fixed light is driven while the coin is up');
+
+  await done;
+  dom.window.close();
+});

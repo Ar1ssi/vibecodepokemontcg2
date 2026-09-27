@@ -116,9 +116,14 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {object} event
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
+ * @param {{ dealShuffle?: boolean }} [options] `dealShuffle`: this `deckShuffled`
+ *   is in dealShuffles, so it animates (other deck shuffles do not)
  */
-export function advisoryAnimationPlan(event, selfPlayerId, coinRun) {
+export function advisoryAnimationPlan(event, selfPlayerId, coinRun, { dealShuffle = false } = {}) {
   if (!event || typeof event !== 'object') return null;
+  if (dealShuffle && event.type === 'deckShuffled' && event.playerId != null && selfPlayerId != null) {
+    return { kind: 'shuffle', user: event.playerId === selfPlayerId ? 'self' : 'opp', zoneId: 'deck' };
+  }
   if (COIN_EVENTS.has(event.type)) return coinPlan(event, selfPlayerId, coinRun);
   if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
@@ -184,6 +189,29 @@ export function supersededDeals(events) {
     lastDeal.set(event.playerId, event);
   }
   return superseded;
+}
+
+/**
+ * The deck shuffles that precede a deal: a player's `deckShuffled` whose next
+ * event for that player is their opening hand or mulligan redeal. Under server
+ * authority these are the opening's only shuffle, so they animate (queued behind
+ * the coin ceremony with the deal); a search effect's shuffle does not.
+ *
+ * @param {object[]} events
+ * @returns {Set<object>} the `deckShuffled` events to animate
+ */
+export function dealShuffles(events) {
+  const shuffles = new Set();
+  if (!Array.isArray(events)) return shuffles;
+  const pending = new Map();
+  for (const event of events) {
+    if (event?.playerId == null) continue;
+    const shuffle = pending.get(event.playerId);
+    pending.delete(event.playerId);
+    if (event.type === 'deckShuffled') pending.set(event.playerId, event);
+    else if (shuffle && DEAL_EVENTS.has(event.type)) shuffles.add(shuffle);
+  }
+  return shuffles;
 }
 
 const singleFlipFace = (event) => {

@@ -6,6 +6,9 @@ import {
   applyCoinEffect,
   coinEffectLayerMarkup,
   coinMaskUrl,
+  coinSpinTiltY,
+  startCoinDrift,
+  stopCoinDrift,
   computeCoinLight,
   resolveCoinEffect,
 } from '../coin-effects.mjs';
@@ -153,4 +156,43 @@ test('applyCoinEffect stamps material/finish and the relief mask', () => {
   assert.equal(el2.dataset.coinRelief, undefined);
   assert.equal(el2.style.props['--coin-relief'], undefined);
   assert.equal(applyCoinEffect(null, {}), null);
+});
+
+test('coinSpinTiltY reads the sine of the coin rotateX from a computed transform', () => {
+  const quarter = Math.PI / 2;
+  // perspective(700px) rotateX(90deg): m22 = cos, m23 = sin, m24 = -sin/700.
+  const m3d = `matrix3d(1, 0, 0, 0, 0, ${Math.cos(quarter)}, ${Math.sin(quarter)}, -0.00142857, 0, -1, 0, 0, 0, 0, 0, 1)`;
+  assert.ok(Math.abs(coinSpinTiltY(m3d) - 1) < 1e-9);
+  assert.ok(Math.abs(coinSpinTiltY('matrix(1, -0.5, 0.5, 1, 0, 0)') + 0.5) < 1e-9);
+  assert.equal(coinSpinTiltY('none'), 0);
+  assert.equal(coinSpinTiltY(''), 0);
+  assert.equal(coinSpinTiltY(undefined), 0);
+  assert.equal(coinSpinTiltY('matrix3d(garbage)'), 0);
+});
+
+test('startCoinDrift with followSpin moves the light with the coin face', () => {
+  const frames = [];
+  let transform = 'none';
+  const style = new Map();
+  const view = {
+    requestAnimationFrame: (fn) => frames.push(fn),
+    cancelAnimationFrame: () => {},
+    getComputedStyle: () => ({ transform }),
+  };
+  const el = { ownerDocument: { defaultView: view }, style: { setProperty: (k, v) => style.set(k, v) } };
+
+  startCoinDrift(el, { followSpin: true });
+  frames.shift()(0);
+  const flatY = style.get('--coin-light-y');
+  // rotateX(-90deg): the idle drift already leans the light toward the top edge, so turn the other way.
+  transform = 'matrix3d(1, 0, 0, 0, 0, 0, -1, 0.00142857, 0, 1, 0, 0, 0, 0, 0, 1)';
+  frames.shift()(0);
+  assert.notEqual(style.get('--coin-light-y'), flatY, 'a face turned edge-on moves the highlight');
+
+  stopCoinDrift(el);
+  assert.equal(frames.length, 1, 'the loop requested one more frame before it stopped');
+  const before = style.get('--coin-light-y');
+  transform = 'none';
+  frames.shift()(0);
+  assert.equal(style.get('--coin-light-y'), before, 'a stopped loop no longer writes the light');
 });

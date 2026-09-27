@@ -3,7 +3,13 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
-import { advisoryAnimationPlan, coinFlipRuns, drawnCards, supersededDeals } from './advisory-animations.mjs';
+import {
+  advisoryAnimationPlan,
+  coinFlipRuns,
+  dealShuffles,
+  drawnCards,
+  supersededDeals,
+} from './advisory-animations.mjs';
 import {
   getAuthoritativeDeckCount,
   getAuthoritativeZoneArray,
@@ -47,6 +53,8 @@ const HELD_DRAW_BACKSTOP_MS = 9000;
 let prizeSeats = new Map();
 // Coin flips of the batch being applied, merged into one ceremony per run.
 let coinRuns = new Map();
+// The batch's deck shuffles that precede a deal (the opening's only shuffle flight).
+let shufflesBeforeDeals = new Set();
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -116,6 +124,7 @@ const playDrawPlan = (plan) => {
 export function handleBeforeApply(events, selfPlayerId) {
   skippedDeals = supersededDeals(events);
   coinRuns = coinFlipRuns(events);
+  shufflesBeforeDeals = dealShuffles(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
   capturePrizeSeats(events, registry, selfPlayerId);
@@ -208,7 +217,9 @@ export function holdFxQueue(ms) {
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
   if (skippedDeals.has(event)) return;
-  const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event));
+  const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event), {
+    dealShuffle: shufflesBeforeDeals.has(event),
+  });
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];
   if (plans.length === 0) return;

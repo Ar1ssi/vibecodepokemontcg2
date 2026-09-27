@@ -23,7 +23,7 @@ export const coinFlip = (plan) => {
   const faces = Array.isArray(plan.faces) ? plan.faces : [];
   if (faces.length === 0) return 0;
   // The app's reduce-motion setting shows each face without the tumble.
-  const reducedMotion = motionReduced() || undefined;
+  const reducedMotion = motionReduced();
   const side = plan.user === 'opp' ? 'opp' : 'self';
   const coin = getSelectedCoin(side) || pickDefaultCoin();
   const label = headingFor(plan);
