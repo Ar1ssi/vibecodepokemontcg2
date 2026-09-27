@@ -11,7 +11,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { isBasicPokemon, isEnergy, isPokemon } from '../cards.mjs';
+import { isBasicPokemon, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import {
@@ -551,6 +551,7 @@ function discardChosen(ctx, cards, options) {
       else discardCard(ctx.draft, card, ctx.events);
     }
     if (options.toOwnerDeck && picked.length > 0) shuffleOwnDeck(options.toOwnerDeck, ctx);
+    recordDiscardedForDamage(ctx, picked);
     return null;
   };
   if (ctx.selection) return removeAll(pickById(cards, ctx.selection));
@@ -713,7 +714,8 @@ function atkDiscardHandEnergy(ctx) {
 function atkDiscardOwnHand(ctx) {
   const { player, step } = ctx;
   const hand = player.zones.hand || [];
-  const candidates = step.what ? hand.filter((card) => matchesSearch(card, step.what)) : hand;
+  const kinds = step.whatAny || (step.what ? [step.what] : []);
+  const candidates = kinds.length ? hand.filter((card) => kinds.some((kind) => matchesSearch(card, kind))) : hand;
   const tag = handCostTag(step);
   if (ctx.selection) {
     const picked = pickById(candidates, ctx.selection);
@@ -758,12 +760,66 @@ function atkDiscardOwnHand(ctx) {
   });
 }
 
+/**
+ * Cards a before-damage discard moved for the damage to read ("If that card is a {R} Energy
+ * card, …", attack-conditions.mjs discardedCardIs). The reducer clears the record when the next
+ * attack starts and at turn end.
+ */
+function recordDiscardedForDamage(ctx, cards) {
+  if (!ctx.step.countsForDamage || cards.length === 0) return;
+  ctx.draft.attackDiscardedForDamage = [
+    ...(ctx.draft.attackDiscardedForDamage || []),
+    ...cards.map((card) => card.instanceId),
+  ];
+}
+
 function atkMill(ctx) {
   const { player, opponent, step } = ctx;
   const sides = step.side === 'self' ? [player] : step.side === 'each' ? [player, opponent] : [opponent];
   for (const side of sides.filter(Boolean)) {
-    discardCards(side, side.zones.deck.slice(0, step.count || 1), ctx.events);
+    const cards = side.zones.deck.slice(0, step.count || 1);
+    discardCards(side, cards, ctx.events);
+    recordDiscardedForDamage(ctx, cards);
   }
+  return null;
+}
+
+// Golduck Mind Play: pick 1 card from the opponent's hand without looking and look at it. The
+// card stays in their hand; the damage and atkDiscardRecordedIf read the record.
+function atkPickOppHandCard(ctx) {
+  const { opponent, player } = ctx;
+  const hand = opponent?.zones?.hand || [];
+  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  const at = Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * hand.length);
+  const card = hand[at];
+  ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [revealedCard(card)] });
+  recordDiscardedForDamage(ctx, [card]);
+  return null;
+}
+
+// Golduck Mind Play: "If that card is a Trainer card, …, and discard that card."
+function atkDiscardRecordedIf(ctx) {
+  const { opponent, step } = ctx;
+  const ids = ctx.draft.attackDiscardedForDamage || [];
+  const card = (opponent?.zones?.hand || []).find((c) => ids.includes(c.instanceId));
+  if (!card) return skip(ctx, 'nothing_recorded');
+  if (/^trainer card$/.test(step.phrase) && !isTrainer(card)) return skip(ctx, 'not_matching');
+  discardCards(opponent, [card], ctx.events);
+  return null;
+}
+
+// Coalossal VMAX Eruption Shot: "If that card is an Energy card, … and attach that card to this
+// Pokémon" — the card the before-damage discard recorded, when it matches.
+function atkAttachDiscardedForDamage(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref) return skip(ctx, 'attacker_gone');
+  const ids = ctx.draft.attackDiscardedForDamage || [];
+  const card = (player.zones.discard || []).find((c) => ids.includes(c.instanceId));
+  if (!card) return skip(ctx, 'nothing_discarded');
+  const matches = /energy card$/.test(step.phrase) ? isEnergy(card) && !isTrainer(card) : true;
+  if (!matches) return skip(ctx, 'not_matching');
+  attachTo(player, card, ref.card, ctx.events);
   return null;
 }
 
@@ -816,11 +872,18 @@ function attachTargets(ctx) {
   );
 }
 
+/** Shaymin LV.X Seed Flare: "… for each {G} Energy attached in this way" counts these attaches. */
+function recordAttachedForDamage(ctx, cards) {
+  if (!ctx.step.countsForDamage || cards.length === 0) return;
+  ctx.draft.attackAttachedForDamage = (ctx.draft.attackAttachedForDamage || 0) + cards.length;
+}
+
 function attachPicked(ctx, picked, targets) {
   const { player, step } = ctx;
   if (picked.length === 0) return null;
   if (targets.length === 1) {
     for (const card of picked) attachTo(player, card, targets[0], ctx.events);
+    recordAttachedForDamage(ctx, picked);
     return null;
   }
   const what = step.spread || picked.length === 1 ? picked[0].name : `${picked.length} Energy`;
@@ -845,6 +908,7 @@ function atkAttach(ctx) {
     if (!target) return skip(ctx, 'target_not_found');
     const batch = step.spread ? picked.slice(0, 1) : picked;
     for (const card of batch) attachTo(player, card, target, ctx.events);
+    recordAttachedForDamage(ctx, batch);
     return attachPicked(ctx, picked.slice(batch.length), targets);
   }
   if (ctx.selection) return attachPicked(ctx, pickById(candidates, ctx.selection), targets);
@@ -2910,6 +2974,9 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardHandEnergy: optional(atkDiscardHandEnergy, (step) => `Discard ${energyLabel(step)} from your hand`),
   atkMill: optional(atkMill, (step) => `Discard the top ${step.count || 1} card(s) of the deck`),
   atkMillAttachIfEnergy,
+  atkAttachDiscardedForDamage,
+  atkPickOppHandCard,
+  atkDiscardRecordedIf,
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),

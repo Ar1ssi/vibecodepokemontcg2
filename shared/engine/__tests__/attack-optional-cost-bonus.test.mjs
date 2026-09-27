@@ -190,6 +190,7 @@ test('clause reader: named attackers, typed Energy, and per-card discards it lea
       bonus: 20,
       extraCondition: null,
       perEach: false,
+      consumed: ['you may discard an energy card attached to this pokémon'],
     }
   );
   // Deoxys ex Psyburst (Deoxys 98): the "for each" scaling is gated on the paid cost.

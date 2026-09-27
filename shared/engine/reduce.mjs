@@ -528,9 +528,23 @@ function resolveAttackTargetClause(text, parsed, spread) {
   }
   const damage = attackTargetClause(t);
   if (damage) {
+    // Raichu ex Power Short: "If that Pokémon has Poké-Powers, this attack does 30 damage plus
+    // 20 more damage" — a bonus read on each chosen target.
+    const targetBonus =
+      /if that pok[ée]mon has (poké-powers|poké-bodies|an ability), this attack does \d+ damage plus (\d+) more damage/i.exec(
+        t.replace(/[‘’]/g, "'")
+      );
     return {
       kind: 'damage',
       amount: damage.amount,
+      ...(targetBonus
+        ? {
+            targetBonus: {
+              abilityKind: /power/i.test(targetBonus[1]) ? 'power' : /bod/i.test(targetBonus[1]) ? 'body' : 'ability',
+              amount: Number(targetBonus[2]),
+            },
+          }
+        : {}),
       count: damage.count,
       scope: damage.scope,
       // Attack damage to the Active applies Weakness/Resistance unless the text
@@ -937,15 +951,30 @@ function retaliationAttackDamage(draft, { marker, striker, strikerView, strikerP
   return result.total;
 }
 
+/** The clause for one chosen target, with a Power Short ability bonus added when it applies. */
+function targetClauseFor(draft, clause, card) {
+  const bonus = clause.targetBonus;
+  if (!bonus) return clause;
+  const abilities = inPlayView(draft, card)?.abilities || [];
+  const has = abilities.some((ability) => {
+    const type = String(ability?.type || '').toLowerCase();
+    const kind = /power/.test(type) ? 'power' : /body/.test(type) ? 'body' : 'ability';
+    return kind === bonus.abilityKind;
+  });
+  return has ? { ...clause, amount: clause.amount + bonus.amount } : clause;
+}
+
 // Applies a chosen-target clause to the selected instanceIds. Returns damage dealt.
 function applyAttackTargets(
   draft,
   { selection, clause, defenderPlayerId, attackerPlayerId, attackName, activeRng = null, events }
 ) {
   let dealt = 0;
+  const baseClause = clause;
   for (const id of selection || []) {
     const ref = findCard(draft, id);
     if (!ref || ref.playerId !== defenderPlayerId) continue;
+    const clause = targetClauseFor(draft, baseClause, ref.card);
     if (ref.zoneId === 'bench') {
       dealt += clause.amount;
       damageBenchedPokemon(draft, {
@@ -3008,6 +3037,8 @@ function applyRetreatSwap(
  * Advances the turn to the next player, reset flags, and performs start-of-turn draw.
  */
 function advanceTurn(draft, { nextPlayerId, events }) {
+  delete draft.attackDiscardedForDamage;
+  delete draft.attackAttachedForDamage;
   // The flags object is replaced wholesale below; a Checkup Knockout may have just
   // entitled the incoming player, and that entitlement must survive the reset so the
   // prize choice raised at the end of the command can be settled.
@@ -5018,18 +5049,18 @@ function optionalCostOffer(draft, { playerId, attacker, attack, clause }) {
     max: 1,
     allowedIds: [],
   });
-  const energy = attachedEnergyCardsFor(draft, playerId, attacker, cost.energyType).filter(
-    (c) => !cost.basicOnly || isBasicEnergy(c)
-  );
-  const typeLabel = cost.energyType ? `${cost.energyType} Energy` : 'Energy';
+  const energy = costEnergyCards(draft, { playerId, attacker, cost });
+  const typeLabel = cost.energyType ? `${[].concat(cost.energyType).join(' or ')} Energy` : 'Energy';
   switch (cost.kind) {
     case 'discardEnergy':
       if (cost.all) return energy.length > 0 ? yesNo(`discard all ${typeLabel} from this Pokémon`) : null;
       if (energy.length < cost.count) return null;
       return {
-        prompt: `${attack.name}: choose ${cost.count} ${typeLabel} to discard for ${bonus} more damage (pick none to decline).`,
+        prompt: clause.mandatory
+          ? `${attack.name}: choose ${cost.count} ${typeLabel} to discard.`
+          : `${attack.name}: choose ${cost.count} ${typeLabel} to discard for ${bonus} more damage (pick none to decline).`,
         options: energyCardOptions(energy),
-        min: 0,
+        min: clause.mandatory ? cost.count : 0,
         max: cost.count,
         allowedIds: energy.map((c) => c.instanceId),
       };
@@ -5066,6 +5097,16 @@ function optionalCostOffer(draft, { playerId, attacker, attack, clause }) {
   }
 }
 
+/** The attacker's Energy a cost may use: of the printed type(s), basic only when printed. */
+function costEnergyCards(draft, { playerId, attacker, cost }) {
+  const types = [].concat(cost.energyType || []);
+  const cards = attachedEnergyCardsFor(draft, playerId, attacker, null).filter(
+    (c) => !cost.basicOnly || isBasicEnergy(c)
+  );
+  if (types.length === 0) return cards;
+  return cards.filter((c) => types.some((type) => matchesSearch(c, `${type} Energy`)));
+}
+
 /** Moves attached cards (by id) off the attacker to their owner's discard pile or hand. */
 function moveAttachedCards(draft, { playerId, ids, to, reason, events }) {
   const player = draft.players[playerId];
@@ -5078,8 +5119,13 @@ function moveAttachedCards(draft, { playerId, ids, to, reason, events }) {
       const [card] = zone.splice(idx, 1);
       card.attachedTo = null;
       let destination = 'hand';
-      if (to === 'discard') destination = discardCardToPlayerZone(player, card);
-      else player.zones.hand.push(card);
+      if (to === 'discard') {
+        destination = discardCardToPlayerZone(player, card);
+        // Flareon Burn Booster / Magcargo Crushing Lava read what the cost discarded.
+        draft.attackDiscardedForDamage = [...(draft.attackDiscardedForDamage || []), id];
+      } else {
+        player.zones.hand.push(card);
+      }
       events.push({ type: 'cardMoved', instanceId: id, from: zoneKey, to: destination, playerId, reason });
       moved++;
       break;
@@ -5097,10 +5143,7 @@ function payOptionalCost(draft, { playerId, attacker, token, selection, activeRn
   const picked = (selection || []).map(Number).filter((id) => (token.allowedIds || []).includes(id));
   const yes = Number((selection || [])[0]) === 1;
   const declined = { paid: false, count: 0 };
-  const energy = () =>
-    attachedEnergyCardsFor(draft, playerId, attacker, cost.energyType)
-      .filter((c) => !cost.basicOnly || isBasicEnergy(c))
-      .map((c) => c.instanceId);
+  const energy = () => costEnergyCards(draft, { playerId, attacker, cost }).map((c) => c.instanceId);
   switch (cost.kind) {
     case 'discardEnergy': {
       if (cost.all) {
@@ -5354,6 +5397,9 @@ function runAttackSteps(
  */
 function flipAndResolveAttack(draft, ctx) {
   const { playerId, activeRng, events, attack, attackerPlayer, atkIdx, targetInstanceId, copiedAttack } = ctx;
+  // A new attack starts with no before-damage discard recorded (attack-steps recordDiscardedForDamage).
+  delete draft.attackDiscardedForDamage;
+  delete draft.attackAttachedForDamage;
   // The attack this player used, for next-turn copy wordings (Mimikyu Copycat, Sudowoodo
   // Watch and Learn): the copied attack when one was chosen, scoped by turn number so the
   // opponent reads it only during their next turn (design 039).
@@ -5928,6 +5974,28 @@ function resolveAttackEffectPhase(draft, ctx) {
     }
   }
 
+  // Arcanine Fire Blow: "flip a number of coins equal to the number of {R} Energy cards you
+  // discarded" — these flips follow the discard, so they happen here, not with the attack's coins.
+  let { discardFlipHeads } = ctx;
+  if (
+    discardFlipHeads === undefined &&
+    typeof energyDiscarded === 'number' &&
+    /flip a number of coins equal to the number of [^.]*you discarded/i.test(attack?.text || '')
+  ) {
+    const discardFlips = Array.from({ length: Math.min(energyDiscarded, 20) }, () => flipCoin(activeRng));
+    discardFlipHeads = discardFlips.filter((face) => face === 'heads').length;
+    if (discardFlips.length > 0) {
+      events.push({
+        type: 'attackCoinFlipped',
+        playerId,
+        attackName: attack.name,
+        coin: null,
+        headsCount: discardFlipHeads,
+        flips: discardFlips,
+      });
+    }
+  }
+
   // Optional return-energy-for-damage (Mega Greninja ex — Ninja Spinner): ask
   // before damage so declining still deals the printed base. The Energy moves
   // to hand only when accepted; the +N bonus is resolved by parseAttackDamage
@@ -5995,6 +6063,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           milledMatches,
           energyDiscarded,
           energyReturned,
+          discardFlipHeads,
         },
       });
       return;
@@ -6006,6 +6075,10 @@ function resolveAttackEffectPhase(draft, ctx) {
   const attackSteps = planAttackSteps(attack, attacker, { coin, headsCount });
   if (attackSteps.before.length > 0) {
     if (!ctx.preStepsDone) {
+      // An attach the damage counts starts from 0, so "attached none" reads as paid nothing.
+      if (attackSteps.before.some((step) => step.type === 'atkAttach' && step.countsForDamage)) {
+        draft.attackAttachedForDamage = 0;
+      }
       const done = runAttackSteps(draft, {
         steps: attackSteps.before,
         attackerId: attacker?.instanceId,
@@ -6017,7 +6090,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           attack: {
             phase: 'before',
             resume: resumeBase,
-            values: { energyDiscarded, milledMatches, energyReturned, optionalCostPaid, optionalCostCount },
+            values: { energyDiscarded, milledMatches, energyReturned, optionalCostPaid, optionalCostCount, discardFlipHeads },
           },
         },
       });
@@ -6056,7 +6129,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           attack,
           defenderView: defender ? inPlayView(draft, defender) : null,
           coin,
-          headsCount,
+          headsCount: discardFlipHeads ?? headsCount,
           energyDiscarded,
           milledMatches,
           energyReturned,
@@ -6671,7 +6744,13 @@ function resolveAttackEffectPhase(draft, ctx) {
 
       // Attack effects: discard energy from attacker (Phase 3)
       // A discard-to-scale attack already discarded the player's picks before damage.
-      const energyDiscardSpec = discardScaling ? null : parseAttackEnergyDiscard(effectiveAttack);
+      const energyDiscardSpec = discardScaling
+        ? null
+        : parseAttackEnergyDiscard({
+            ...effectiveAttack,
+            // Older prints name themselves ("Discard an Energy card attached to Tyranitar").
+            text: normalizeAttackText(effectiveAttack?.text, attackerView?.name || attacker?.name),
+          });
       if (energyDiscardSpec && attacker) {
         const attackerZone = draft.players[playerId]?.zones?.active || [];
         const attachedEnergies = attackerZone.filter(
@@ -8362,8 +8441,12 @@ export function applyCommand(state, command, rng = null) {
             ...resumeCtx,
             energyDiscarded: token.energyDiscarded,
             energyReturned: token.energyReturned,
+            discardFlipHeads: token.discardFlipHeads,
             optionalCostPaid: paid,
             optionalCostCount: count,
+            // "If you discard a {R} Energy card in this way, … is now Burned" (Magcargo Crushing
+            // Lava) reads the paid cost: re-read the status conditions after paying.
+            statusConditionsMet: undefined,
           });
         }
       } else if (token.effectType === 'attackMillPick') {

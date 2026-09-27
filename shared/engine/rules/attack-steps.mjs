@@ -124,6 +124,22 @@ const TEMPLATES = [
     () => ({ type: 'atkGust', chooser: 'opponent' }),
   ],
 
+  // Golduck Mind Play: a random card from the opponent's hand is looked at before damage (the
+  // damage reads it); a Trainer is then discarded, anything else stays in their hand.
+  [
+    /^choose 1 card from your opponent's hand without looking$/,
+    () => ({ type: 'atkPickOppHandCard', beforeDamage: true, countsForDamage: true }),
+  ],
+  [
+    /^if that card is an? (.+?) card, this attack does \d+ damage plus \d+ more damage, and discard that card$/,
+    (m) => ({ type: 'atkDiscardRecordedIf', phrase: `${m[1]} card` }),
+  ],
+  // Coalossal VMAX Eruption Shot: the damage bonus is the damage parser's; the attach runs after.
+  [
+    /^if that card is an? (.+?) card, this attack does \d+ more damage, and attach that card to this pokémon$/,
+    (m) => ({ type: 'atkAttachDiscardedForDamage', phrase: `${m[1]} card` }),
+  ],
+
   // Move Energy
   [
     new RegExp(String.raw`^move (an?|\d+|all) ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) this pokémon to 1 of your benched pokémon$`),
@@ -344,6 +360,12 @@ const TEMPLATES = [
     /^discard up to (\d+) cards? from your hand$/,
     (m) => ({ type: 'atkDiscardOwnHand', count: Number(m[1]), upTo: true }),
   ],
+  // Dark Slowking Litter: "discard a combination of up to 2 Pokémon Tool cards and Rocket's
+  // Secret Machine cards from your hand".
+  [
+    /^discard a combination of up to (\d+) (.+?) cards and (.+?) cards from your hand$/,
+    (m) => ({ type: 'atkDiscardOwnHand', count: Number(m[1]), upTo: true, whatAny: [m[2], m[3]] }),
+  ],
   [/^discard (an?|\d+) cards? from your hand$/, (m) => ({ type: 'atkDiscardOwnHand', count: countOf(m[1]) })],
   [
     new RegExp(String.raw`^discard (an?|\d+) ${ENERGY_TYPE}energy cards? from your hand$`),
@@ -436,6 +458,12 @@ const TEMPLATES = [
     () => ({ type: 'atkRecover', count: 1, what: null, to: 'deckTop' }),
   ],
 
+  // Shaymin LV.X Seed Flare: "Choose as many {G} Energy cards from your hand as you like and
+  // attach them to your Pokémon in any way you like."
+  [
+    new RegExp(String.raw`^choose as many ${ENERGY_TYPE}energy cards from your hand as you like and attach them to your pokémon in any way you like$`),
+    (m, s) => ({ type: 'atkAttach', source: 'hand', anyNumber: true, ...energyFilter(m[1], s), target: 'any', spread: true }),
+  ],
   // Old wording of an attach from the discard pile ("Search your discard pile for … and attach it to …")
   [
     new RegExp(String.raw`^search your discard pile for (an?|up to \d+|\d+|as many) ${ENERGY_TYPE}energy cards?(?: as you like)? and attach (?:it|them) to (this pokémon|1 of your (?:benched )?pokémon|your (?:benched )?pokémon in any way you like)$`),
@@ -1361,6 +1389,24 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const costs = result.after.filter((step) => step.type.startsWith('atkLostZone'));
     result.after = result.after.filter((step) => !costs.includes(step));
     result.before.push(...costs.map((step) => ({ ...step, countsForDamage: true })));
+  }
+
+  // "… for each {G} Energy attached in this way" (Shaymin LV.X Seed Flare): the attach the damage
+  // counts runs first and is recorded.
+  if (/for each [^.]*energy(?: cards?)? attached in this way/.test(normalized)) {
+    const counted = result.after.filter((step) => step.type === 'atkAttach');
+    result.after = result.after.filter((step) => !counted.includes(step));
+    result.before.push(...counted.map((step) => ({ ...step, countsForDamage: true })));
+  }
+
+  // "Discard the top card of your deck. If that card is a {R} Energy card, this attack does 90
+  // more damage" (Torkoal V) / "If you discarded a Pokémon Tool in this way" (Dracovish V): the
+  // damage reads what the discard found, so the discard runs first and is recorded.
+  if (/if (?:that card|the discarded card) is |if you discard(?:ed)? an? [^,]+ in this way, this attack does/.test(normalized)) {
+    const reads = (step) => step.type === 'atkMill' || step.type === 'atkDiscardOppTools';
+    const moved = result.after.filter(reads);
+    result.after = result.after.filter((step) => !reads(step));
+    result.before = [...result.before, ...moved].map((step) => (reads(step) ? { ...step, countsForDamage: true } : step));
   }
 
   // A hand cost the attack cannot be used without ("(If you can't discard a card from your hand,

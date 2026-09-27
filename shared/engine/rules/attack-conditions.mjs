@@ -154,6 +154,29 @@ function abilityKindsOf(phrase) {
   return words.length > 0 && words.every(Boolean) ? words : null;
 }
 
+/**
+ * A printed card kind ("{R} Energy card", "Trainer card", "Pokémon Tool") → predicate over a
+ * discard entry (attack-damage-context.mjs discardEntry), or null for an unread phrase.
+ */
+function discardedPhraseMatcher(phrase) {
+  const text = String(phrase || '').trim().replace(/ cards?$/, '');
+  const energy = /^(basic )?(?:\{([a-z])\} )?energy$/.exec(text);
+  if (energy) {
+    const type = ENERGY_LETTER_TYPES[energy[2]];
+    return (c) =>
+      c.category === 'energy' &&
+      (!energy[1] || c.basicEnergy) &&
+      (!type || String(c.energyType || '').toLowerCase() === type.toLowerCase());
+  }
+  if (text === 'trainer') return (c) => c.category === 'trainer';
+  if (/^(supporter|item|pokémon tool|stadium)$/.test(text)) {
+    const kind = text === 'pokémon tool' ? 'tool' : text;
+    return (c) => c.trainerKind === kind;
+  }
+  if (text === 'pokémon') return (c) => c.category === 'pokemon';
+  return null;
+}
+
 /** "10 or more basic {f} Energy cards in your discard pile" → a discardEnergyCount descriptor. */
 function discardEnergyDescriptor(phrase, basicWord, op, n) {
   const energy = energyFromPhrase(phrase);
@@ -438,6 +461,16 @@ const CLAUSES = [
       const names = splitNames(m[1]);
       return names ? { desc: { kind: 'evolvedThisTurn', fromNames: names }, printedNegated: false } : null;
     },
+  ],
+  // What a before-damage discard found (Torkoal V "If that card is a {R} Energy card", Flareon
+  // "If the discarded card is …", Dracovish V "If you discarded a Pokémon Tool in this way").
+  [
+    /^(?:that card|the discarded card) is (not )?(?:an? )?(.+)$/,
+    (m) => (discardedPhraseMatcher(m[2]) ? { desc: { kind: 'discardedCardIs', phrase: m[2] }, printedNegated: Boolean(m[1]) } : null),
+  ],
+  [
+    /^you discard(?:ed)? (?:an?|any) (.+?) in this way$/,
+    (m) => (discardedPhraseMatcher(m[1]) ? { desc: { kind: 'discardedCardIs', phrase: m[1] }, printedNegated: false } : null),
   ],
   [
     /^this pokémon was damaged by an attack during your opponent's last turn$/,
@@ -896,6 +929,10 @@ const CHECKS = {
     list(ctx.defenderResistanceTypes).some((type) => String(type).toLowerCase() === String(cond.type).toLowerCase()),
   healedThisTurn: (cond, ctx) => ctx.attackerHealedThisTurn === true,
   damagedLastOpponentTurn: (cond, ctx) => num(ctx.attackerDamageTakenLastTurn) > 0,
+  discardedCardIs: (cond, ctx) => {
+    const matches = discardedPhraseMatcher(cond.phrase);
+    return Boolean(matches) && list(ctx.discardedForDamage).some(matches);
+  },
   handEnergyAttachedThisTurn: (cond, ctx) => {
     const types = list(ctx.attackerHandEnergyTypesThisTurn);
     if (!cond.type) return types.length > 0;

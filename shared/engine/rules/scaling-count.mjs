@@ -257,6 +257,18 @@ function counterCount(unit, ctx) {
   return null;
 }
 
+// ── what this attack's own before-damage step did ────────────────────────────
+
+function paidCount(unit, ctx) {
+  if (/^(?:\{[a-z]\} )?energy(?: cards?)? attached in this way$/.test(unit) && typeof ctx.attachedForDamage === 'number') {
+    return { count: ctx.attachedForDamage, label: 'Energy attached in this way' };
+  }
+  if (/^cards? you discarded$/.test(unit) && typeof ctx.handDiscarded === 'number') {
+    return { count: ctx.handDiscarded, label: 'cards you discarded' };
+  }
+  return null;
+}
+
 /**
  * @param {string} unit Unit phrase, normalized by `normalizeUnit`
  * @param {object} ctx Server-built attack ctx
@@ -266,6 +278,7 @@ export function countUnit(unit, ctx = {}) {
   const text = lower(unit).trim();
   if (!text) return null;
   return (
+    paidCount(text, ctx) ??
     discardCount(text, ctx) ??
     attachedCount(text, ctx) ??
     energyAcrossCount(text, ctx) ??

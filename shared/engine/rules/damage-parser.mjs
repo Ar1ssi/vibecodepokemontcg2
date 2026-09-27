@@ -138,6 +138,21 @@ function evalCondition(cond, defender, ctx, attacker = {}) {
     if (!ctx.optionalCostPaid) return false;
     return optional[1] ? evalCondition(optional[1], defender, ctx, attacker) : true;
   }
+  // "You may discard … / Choose … and attach them … If you do, …" where the damage already
+  // counts what was paid (discard-to-scale, hand discard, attach): paid when anything moved.
+  if (optional && !optional[1]) {
+    const paid = [ctx?.energyDiscarded, ctx?.handDiscarded, ctx?.attachedForDamage].find(
+      (value) => typeof value === 'number' && value > 0
+    );
+    if (paid !== undefined) return true;
+    if (
+      typeof ctx?.energyDiscarded === 'number' ||
+      typeof ctx?.handDiscarded === 'number' ||
+      typeof ctx?.attachedForDamage === 'number'
+    ) {
+      return false;
+    }
+  }
   const shared = sharedCondition(cond, ctx, attacker);
   if (shared !== null) return shared;
   // Design 036 A11: the hand cards the attack's own before-damage discard took
@@ -368,7 +383,7 @@ export function parseAttackDamage(
     total = base + reveal.perUnit * counted;
     components.push('per-revealed');
     notes.push(`${reveal.perUnit} × ${counted} revealed from the deck`);
-  } else if (text && discardEnergyScaling(attack?.text)) {
+  } else if (text && discardEnergyScaling(attack?.text) && !/more damage for each heads/.test(text)) {
     const discarded = ctx.energyDiscarded ?? 0;
     // "does N more damage for each card" (Mega Clefable ex) adds to the base;
     // "does N damage for each card" (Inferno X) replaces it.
@@ -729,7 +744,9 @@ export function parseAttackDamage(
     /if .* this attack does \d+ more|if .*more damage/.test(text) &&
     // "During your next turn, if an attack does damage to the Defending Pokémon …, that attack
     // does 40 more damage" is a next-turn marker (attack-markers.mjs), not a bonus on this attack.
-    !/that attack does \d+ more damage/.test(text)
+    !/that attack does \d+ more damage/.test(text) &&
+    // Raichu ex Power Short: a bonus on the chosen target, read by the reducer's target clause.
+    !/if that pok[ée]mon has/.test(text)
   ) {
     // Conditional bonus ("if …, this attack does N more"). The printed
     // condition clause is evaluated from card data where possible (HP
@@ -750,10 +767,12 @@ export function parseAttackDamage(
         ? optionalCost.bonus
         : amount(bonusSentence, /(\d+) more damage/);
     if (thatMuch) bonus = Number(ctx.attackerDamageTakenLastTurn) || 0;
-    const cond =
+    let cond =
       (bonusSentence.match(/\bif (.+?),? this attack (?:does|do)\b/) ||
         bonusSentence.match(/\bif (.+?)(?:,| this attack)/) ||
         [])[1] || '';
+    // Arcanine Fire Blow: "If you do, flip … . This attack does …" — the gate is "you do".
+    if (/^you do,/.test(cond.trim())) cond = 'you do';
     const result = evalCondition(cond, defender, ctx, attacker);
     // "You may discard … If you do, … for each card you discarded": the discard/mill scaling
     // above already counted what the player paid; there is no separate bonus to gate.
@@ -1580,6 +1599,8 @@ function discardEnergyScalingClause(attackText) {
   // BREAK), "for each {M} Energy you discarded" (Genesect-EX).
   const discardedScaling =
     /for each (?:\{[A-Z]\} )?(?:basic )?(?:energy )?(?:cards? )?(?:you )?discard(ed)?\b/i.test(text) ||
+    // Arcanine Fire Blow: the coins flipped equal the Energy discarded.
+    /flip a number of coins equal to the number of [^.]*you discarded/i.test(text) ||
     /times the (?:number|amount) of [^.]*?Energy[^.]*?discarded/i.test(text);
   if (!shuffled && !discardedScaling) return null;
 

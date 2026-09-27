@@ -393,6 +393,19 @@ export function buildServerAttackContext(
         energyType: isEnergy(card) ? serverEnergyDescriptor(card).type : null,
         tool: isTool(card),
       })),
+    // Energy this attack's before-damage attach moved (Shaymin LV.X Seed Flare); absent when
+    // the attack has no such attach.
+    ...(typeof state?.attackAttachedForDamage === 'number' ? { attachedForDamage: state.attackAttachedForDamage } : {}),
+    // Cards this attack's before-damage step discarded or looked at (effects/attack-steps.mjs
+    // recordDiscardedForDamage), for "If that card is …" conditions. Wherever they are now.
+    discardedForDamage: (state?.attackDiscardedForDamage || [])
+      .map((id) =>
+        Object.values(state?.players || {})
+          .flatMap((player) => Object.values(player?.zones || {}).filter(Array.isArray).flat())
+          .find((card) => card.instanceId === id)
+      )
+      .filter(Boolean)
+      .map(discardEntry),
     opponentTrainersInPlay:
       inPlayPokemon(opponent).reduce((sum, { card }) => sum + toolCountOn(opponent, card), 0) +
       (stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId) === 'opponent' ? 1 : 0),

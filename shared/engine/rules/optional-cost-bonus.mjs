@@ -1,11 +1,14 @@
 /**
- * @file Optional-cost damage bonuses: "You may <cost>. If you do, this attack does N more damage."
+ * @file Cost-for-damage clauses the reducer settles before damage:
+ *   "You may <cost>. If you do, this attack does N more damage."
+ *   "Discard an Energy … in order to use this attack. If the discarded card is …" (mandatory)
+ *   "Put up to 12 damage counters on this Pokémon. This attack does 20 damage for each …"
  *
- * The player chooses before damage whether to pay; the reducer offers the cost, pays it, and
- * passes `ctx.optionalCostPaid` to parseAttackDamage, whose "if you do" condition reads it.
- * Only costs the reducer can pay are read; any other wording returns null (no offer, no bonus).
- * Per-card scalings ("… more damage for each card you discarded") belong to the discard/mill
- * scaling parsers and are not read here.
+ * The reducer offers the cost, pays it, and passes `ctx.optionalCostPaid` (and the paid count)
+ * to parseAttackDamage, whose "if you do" condition reads it; a discarded card is recorded for
+ * "If you discard a {F} Energy card in this way" conditions. Only costs the reducer can pay are
+ * read; any other wording returns null (no offer, no bonus). Per-card scalings ("… for each card
+ * you discarded") belong to the discard/mill scaling parsers and are not read here.
  * Pure.
  */
 
@@ -38,6 +41,16 @@ const COSTS = [
       basicOnly: Boolean(m[2]),
     }),
   ],
+  // Magcargo Crushing Lava: "discard a {R} or {F} basic Energy card attached to Magcargo".
+  [
+    /^discard an? \{([a-z])\} or \{([a-z])\} (basic )?energy cards? (?:attached to|from) this pokémon$/,
+    (m) => ({
+      kind: 'discardEnergy',
+      count: 1,
+      energyType: [LETTER_TYPES[m[1]], LETTER_TYPES[m[2]]].filter(Boolean),
+      basicOnly: Boolean(m[3]),
+    }),
+  ],
   [
     /^put an? (?:\{([a-z])\} )?energy(?: card)? attached to this pokémon into your hand$/,
     (m) => ({ kind: 'returnEnergy', energyType: LETTER_TYPES[m[1]] || null }),
@@ -51,10 +64,23 @@ const COSTS = [
   [/^put up to (\d+) damage counters on this pokémon$/, (m) => ({ kind: 'selfCounters', upTo: Number(m[1]) })],
 ];
 
-// "If you do, this attack does [N damage plus] M more damage [for each …]". A "for each" tail
+const costOf = (wording) => {
+  for (const [re, build] of COSTS) {
+    const m = re.exec(wording);
+    if (m) return build(m);
+  }
+  return null;
+};
+
+// "If you do [and if …], this attack does [N damage plus] M more damage [for each …]", or the
+// discard-reading form "If you discard a {F} Energy card in this way, …". A "for each" tail
 // scales: the damage parser gates that scaling on the paid cost.
 const BONUS =
-  /^if you do(?: and if ([^,]+))?, this attack does (?:\d+ damage plus )?(\d+) more damage( for each [^.(]+)?/;
+  /^if (?:you do(?: and if ([^,]+))?|you discard[^,]* in this way), this attack does (?:\d+ damage plus )?(\d+) more damage( for each [^.(]+)?/;
+
+// Flareon Burn Booster: a mandatory cost whose discarded card the bonus reads.
+const MANDATORY = /^(discard .+?) in order to use this attack\.$/;
+const DISCARDED_BONUS = /^if the discarded card is [^,]+, this attack does (?:\d+ damage plus )?(\d+) more damage/;
 
 // Slaking Dynamic Swing: "You may do 100 more damage. If you do, <drawback>."
 const DO_MORE = /^you may do (\d+) more damage\.$/;
@@ -62,10 +88,14 @@ const DO_MORE = /^you may do (\d+) more damage\.$/;
 const PUT_COUNTERS = /^put up to (\d+) damage counters on this pokémon\.$/;
 const PER_COUNTER = /^this attack does (\d+) (?:more )?damage for each damage counter you (?:put|placed)(?: on this pokémon)? in this way\.$/;
 
+const stripPeriod = (sentence) => sentence.replace(/\.$/, '');
+
 /**
  * @param {string} attackText Printed attack text
  * @param {string} [selfName] The attacker's printed name (older prints name themselves)
- * @returns {{ cost: object, bonus: number, extraCondition: string|null, perEach: boolean }|null}
+ * @returns {{ cost: object, bonus: number, extraCondition: string|null, perEach: boolean,
+ *   mandatory?: boolean, consumed?: string[] }|null} `consumed` lists the normalized sentences
+ *   this clause owns, so the step parser does not also run them.
  */
 export function optionalCostBonusClause(attackText, selfName = '') {
   const sentences = normalizeAttackText(attackText, selfName).split(/(?<=\.)\s+/);
@@ -79,7 +109,21 @@ export function optionalCostBonusClause(attackText, selfName = '') {
         bonus: Number(scaled[1]),
         extraCondition: null,
         perEach: true,
-        consumed: [sentences[i].replace(/\.$/, '')],
+        mandatory: true,
+        consumed: [stripPeriod(sentences[i])],
+      };
+    }
+    const mandatory = MANDATORY.exec(sentences[i]);
+    const readsDiscard = mandatory && DISCARDED_BONUS.exec(sentences[i + 1]);
+    const mandatoryCost = readsDiscard && costOf(mandatory[1]);
+    if (mandatoryCost) {
+      return {
+        cost: mandatoryCost,
+        bonus: Number(readsDiscard[1]),
+        extraCondition: null,
+        perEach: false,
+        mandatory: true,
+        consumed: [stripPeriod(sentences[i])],
       };
     }
     const doMore = DO_MORE.exec(sentences[i]);
@@ -93,20 +137,21 @@ export function optionalCostBonusClause(attackText, selfName = '') {
       };
     }
     const offer = /^you may (.+)\.$/.exec(sentences[i]);
-    const bonus = offer && BONUS.exec(sentences[i + 1]);
-    if (!bonus) continue;
-    for (const [re, build] of COSTS) {
-      const m = re.exec(offer[1]);
-      if (m) {
-        return {
-          cost: build(m),
-          bonus: Number(bonus[2]),
-          extraCondition: bonus[1] || null,
-          perEach: Boolean(bonus[3]),
-        };
-      }
-    }
-    return null;
+    if (!offer) continue;
+    // The bonus may follow a sibling clause ("If you discard a {R} … Burned. If you discard a
+    // {F} …, this attack does 40 damage plus 20 more damage.").
+    const bonusAt = [i + 1, i + 2].find((j) => BONUS.test(sentences[j] || ''));
+    if (bonusAt === undefined) continue;
+    const bonus = BONUS.exec(sentences[bonusAt]);
+    const cost = costOf(offer[1]);
+    if (!cost) return null;
+    return {
+      cost,
+      bonus: Number(bonus[2]),
+      extraCondition: bonus[1] || null,
+      perEach: Boolean(bonus[3]),
+      consumed: [stripPeriod(sentences[i])],
+    };
   }
   return null;
 }
