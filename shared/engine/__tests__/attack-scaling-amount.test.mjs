@@ -393,7 +393,7 @@ test('Darkness typed Energy matches both dark and darkness spellings', () => {
   );
 });
 
-test('compound this-Pokémon scopes stay unresolved rather than counting the attacker', () => {
+test('compound "this Pokémon and the Defending Pokémon" scopes count both, never the attacker alone', () => {
   const parsed = parseAttackDamage(
     {
       name: 'X Ball',
@@ -404,6 +404,18 @@ test('compound this-Pokémon scopes stay unresolved rather than counting the att
     {},
     { energyCount: 5, opponentEnergyCount: 2 }
   );
-  assert.equal(parsed.total, 20);
-  assert.match(parsed.notes.join(' '), /resolve the printed count/);
+  assert.equal(parsed.total, 140);
+  // An unreadable compound still keeps a note instead of guessing the attacker's count.
+  const other = parseAttackDamage(
+    {
+      name: 'X Ball',
+      damage: 20,
+      text: 'This attack does 20 damage times the amount of Energy attached to this Pokémon or your Benched Pokémon.',
+    },
+    {},
+    {},
+    { energyCount: 5, opponentEnergyCount: 2 }
+  );
+  assert.equal(other.total, 20);
+  assert.match(other.notes.join(' '), /resolve the printed count/);
 });
