@@ -21,6 +21,21 @@ The user reported three cards that do not work in play, and then a fourth. All f
 | Budew Itchy Pollen (sv08.5-004) | `atkOppPlayLock` matches only the GX wording "Your opponent can't play … during their next turn". The SV wording "During your opponent's next turn, they can't play …" parses to nothing, so `playLocks` is never written. **The reported 0 damage did not reproduce.** The engine deals 10 with TCGdex data. Ask the user what the opponent's Active was (Grass resistance?). |
 | Serperior ex Regal Cheer (sv10.5b-003) | `ability-combat.mjs:108` `sideInPlay()` / `opponentInPlay()` return root cards. An evolved Pokémon's root is its Basic, so team-scoped and opponent-scoped passive readers read the Basic's text. It works from the Active only because reduce passes the attacker's evolved view. The same code path breaks an evolved Gothitelle's Item lock (verified), and also prevention, reduction, suppression, Prize, HP and retreat reads. |
 
+## Handled by another agent: do not pick these up here
+
+The user assigned the first-pass findings to a separate agent. They are listed so the next
+session does not duplicate that work:
+- the three first-reported cards: Keldeo ex Gale Thrust, Samurott Torrential Whirlpool, Budew Itchy Pollen
+- the conditional-bonus holes: routing through `parseConditionClause` (40 of 256 known there), and
+  the "moved from your Bench / was on your Bench and became" siblings (Urshifu, Lopunny, Dragapult,
+  Golisopod, Mawile VSTAR, Raichu & Alolan Raichu-GX, Revavroom, Scizor-EX)
+- the dropped opponent switch after "If you do": Hatterene, Metagross, Vanilluxe, Mawile VSTAR Star Rondo
+- SV-wording Item and Special Energy locks: Banette ex, Noivern ex, Scream Tail ex, Pikachu V-UNION and others
+- curly-apostrophe breakage: Magcargo ex Ground Burn, M Camerupt-EX Magma Eruption, Palossand-GX Sandy Fear-GX
+
+The gate backlog below still counts these rows. When that agent's branch lands, re-run the gates with
+`--update-baseline` and confirm their flags are gone.
+
 ## Why the audits missed them (fixed in `4e030a4d`)
 
 1. The verdict never checked the damage amount. "Dealt damage" counted as the effect.
@@ -67,13 +82,6 @@ Run `pnpm audit:attacks --rows` and `pnpm audit:abilities --rows`. The rows are 
   - Mabosstiff Intimidating Howl and Shinx Big Roar switch your own Active, not the opponent's.
   - Houndoom Fire Breath's Burn lands on its own side.
   - Crawdaunt Unruly Claw pays its hand cost and skips the effect.
-- **Candidate sibling holes:**
-  - 10 attacks use the "moved from your Bench / was on your Bench and became" wording: Rapid
-    Strike Urshifu VMAX, Mega Lopunny ex, Dragapult V, Golisopod(-GX), Mawile VSTAR,
-    Raichu & Alolan Raichu-GX, Revavroom ex, Scizor-EX, Keldeo ex.
-  - The Samurott-style dropped opponent switch also appears on Hatterene, Metagross, Vanilluxe and
-    Mawile VSTAR Star Rondo.
-  - The SV-wording Item lock also appears on Banette ex, Noivern ex, Scream Tail ex and Pikachu V-UNION.
 
 ## Next, in order
 
@@ -81,14 +89,12 @@ Run `pnpm audit:attacks --rows` and `pnpm audit:abilities --rows`. The rows are 
    each root (`evolved-pokemon.mjs`). This one fix should clear most of the 398 `stack-*` flags.
    Callers compare identity against `ctx.sideActive`/`sideBench` (`holderZone`), so keep the root
    for position checks. This is an engine change, so it needs `review.md` by a second agent before main.
-2. Route the damage-parser conditional bonus through `attack-conditions.mjs`
-   `parseConditionClause` / `attackConditionMet` (one condition vocabulary). 40 of the 256
-   unresolved bonus conditions are known there already. Add "your Bench" to the moved-to-Active
-   clause.
-3. Parse the "If you do," follow-up in `parseAbility`'s switch branch (the opponent-switch half),
-   and the SV lock wording in `attack-steps.mjs` (`atkOppPlayLock`).
-4. Fix the typography drift: normalize type words and curly quotes at the parser entry points
-   (the `ea389d92` special-Energy fix is the precedent).
+2. The real bugs the clause check found: Mabosstiff and Shinx gust abilities, Houndoom Fire Breath,
+   Crawdaunt Unruly Claw.
+3. Type-word drift, the BW/DP TCGdex spelling (e.g. "attach a Fire Energy card"): normalize type words
+   at the attack and ability parser entry points. The `ea389d92` special-Energy fix is the precedent.
+   Curly quotes are with the other agent.
+4. The rest of the named backlog, beyond what the other agent covers: the `--rows` output lists each row.
 5. After each fix, run the gates with `--update-baseline` and check that the flags vanish.
 
 ## Notes
