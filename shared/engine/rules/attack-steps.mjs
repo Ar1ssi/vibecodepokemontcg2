@@ -416,6 +416,20 @@ const TEMPLATES = [
     /^your opponent discards (an?|\d+) cards? from their hand$/,
     (m) => ({ type: 'atkDiscardOppHand', count: countOf(m[1]) }),
   ],
+  // Ninjask Chip Off (random) / Feraligatr Pull Away ("5 of more", sic; the opponent picks).
+  [
+    /^if your opponent has \d+ o[rf] more cards in their hand, (?:discard a number of cards without looking|your opponent discards a number of cards) until your opponent has (\d+) cards left in their hand$/,
+    (m) => ({ type: 'atkDiscardOppHand', leaveCount: Number(m[1]), random: /without looking/.test(m[0]) }),
+  ],
+  // Glaceon Ice Bind.
+  [
+    /^if your opponent doesn't discard a card from their hand, your opponent's active pokémon is now (asleep|burned|confused|paralyzed|poisoned)$/,
+    (m) => ({ type: 'atkOppDiscardOrCondition', condition: conditionList(m[1])[0] }),
+  ],
+  // Umbreon-EX Veil of Darkness: "Discard as many cards as you like from your hand. Then, draw
+  // that many cards."
+  [/^discard as many cards as you like from your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'any' })],
+  [/^(?:then, )?draw that many cards$/, () => ({ type: 'atkDraw', countFrom: 'handDiscarded' })],
 
   // Own-hand discards (design 036 A11). A cost the attack cannot be used without, or a discard
   // the damage counts, moves before damage in parseAttackSteps; "If you do, …" chains on it.
@@ -1006,6 +1020,11 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Gengar Hurl into Darkness.
+  [
+    /look at your opponent's hand and choose a number of pokémon you find there up to the number of \{([a-z])\} energy attached to this pokémon\. put the pokémon you chose in the lost zone\./g,
+    (m) => ({ type: 'atkLostZoneOppHandPokemon', energyType: m[1].toUpperCase() }),
+  ],
   // "Use the effect of that Supporter card as the effect of this attack" (design 036 E): where
   // the Supporter comes from, and whether it is discarded on the way.
   [

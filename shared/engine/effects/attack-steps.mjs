@@ -672,7 +672,9 @@ function atkDiscardOppHand(ctx) {
     return null;
   }
   if (hand.length === 0) return skip(ctx, 'empty_hand');
-  const count = Math.min(step.count || 1, hand.length);
+  // Ninjask Chip Off / Feraligatr Pull Away: "… until your opponent has N cards left".
+  if (step.leaveCount != null && hand.length <= step.leaveCount) return skip(ctx, 'condition_unmet');
+  const count = step.leaveCount != null ? hand.length - step.leaveCount : Math.min(step.count || 1, hand.length);
   if (step.random || hand.length <= count) {
     const picked = [];
     const pool = [...hand];
@@ -1288,7 +1290,12 @@ function atkDraw(ctx) {
     ? Math.min(Number(ctx.selection[0]) || 0, step.count || 0)
     : step.countFrom === 'opponentHand'
       ? ctx.opponent?.zones?.hand?.length || 0
-      : step.count || 0;
+      : step.countFrom === 'handDiscarded'
+        ? // Umbreon-EX Veil of Darkness: "Then, draw that many cards."
+          ctx.events
+            .filter((e) => e.type === 'cardsDiscarded' && e.handCost && e.playerId === player.playerId)
+            .reduce((sum, e) => sum + e.cards.length, 0)
+        : step.count || 0;
   const drawn = deck.splice(0, Math.min(count, deck.length));
   if (drawn.length === 0) return skip(ctx, 'nothing_to_draw');
   player.zones.hand.push(...drawn);
@@ -1908,6 +1915,68 @@ function atkKnockOutChoose(ctx) {
 
 // Miracle Powder / Delta Beam: the attacker picks 1 of the printed Special Conditions and it
 // lands on the opponent's Active. Option ids are 1-based indexes into `step.options`.
+// Glaceon Ice Bind: "If your opponent doesn't discard a card from his or her hand, the
+// Defending Pokémon is now Paralyzed." The opponent picks a hand card, or declines.
+function atkOppDiscardOrCondition(ctx) {
+  const { opponent, step } = ctx;
+  const target = activeOf(opponent);
+  if (!target) return skip(ctx, 'no_opponent_active');
+  const hand = opponent.zones.hand || [];
+  const discarded = ctx.selection && hand.find((c) => c.instanceId === ctx.selection[0]);
+  if (discarded) {
+    discardCards(opponent, [discarded], ctx.events);
+    return null;
+  }
+  if (!ctx.selection && hand.length > 0) {
+    return ctx.ask({
+      player: opponent.playerId,
+      prompt: `${attackName(ctx)}: Discard a card from your hand, or your Active Pokémon is now ${step.condition}`,
+      options: [...hand, { instanceId: ATTACK_NO, name: `Don't discard (${step.condition})`, type: 'option' }],
+      min: 1,
+      max: 1,
+    });
+  }
+  const markers = liveAttackMarkers(target, {
+    turnNumber: ctx.draft.turn?.number || 1,
+    zoneCards: opponent.zones?.active || [],
+  });
+  if (markersBlockCondition(markers, step.condition)) return skip(ctx, 'status_immune');
+  addCondition(target, step.condition);
+  ctx.events.push({
+    type: 'specialConditionUpdated',
+    instanceId: target.instanceId,
+    condition: step.condition,
+    conditions: listConditions(target),
+  });
+  return null;
+}
+
+// Gengar Hurl into Darkness: look at the opponent's hand and put up to as many Pokémon found
+// there as this Pokémon has `energyType` Energy attached in the Lost Zone.
+function atkLostZoneOppHandPokemon(ctx) {
+  const { player, opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const hand = opponent.zones.hand || [];
+  const pokemon = hand.filter(isPokemon);
+  if (ctx.selection) {
+    moveToLostZone(ctx, opponent, pickById(pokemon, ctx.selection));
+    return null;
+  }
+  ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, revealedTo: player.playerId, cards: hand.map(revealedCard) });
+  const ref = attackerRef(ctx);
+  const cap = ref
+    ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, { energyType: step.energyType })).length
+    : 0;
+  const max = Math.min(cap, pokemon.length);
+  if (max === 0) return skip(ctx, 'nothing_to_lost_zone');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose up to ${max} Pokémon from your opponent's hand to put in the Lost Zone`,
+    options: pokemon,
+    min: 0,
+    max,
+  });
+}
+
 function atkChooseCondition(ctx) {
   const { opponent, step } = ctx;
   const target = activeOf(opponent);
@@ -3107,6 +3176,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkShufflePrizesAndRedraw,
   atkDiscardPrize,
   atkChooseCondition,
+  atkOppDiscardOrCondition,
+  atkLostZoneOppHandPokemon,
   atkDevolve,
   atkBounceOppActive,
   atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),
@@ -3138,6 +3209,7 @@ const OPP_ACTIVE_EFFECTS = {
   atkShuffleOppActiveEnergy: () => true,
   atkAddMarker: (step) => step.target === 'opponentActive',
   atkLockAttack: () => true,
+  atkOppDiscardOrCondition: () => true,
 };
 
 function oppActiveProtected(ctx) {

@@ -741,3 +741,98 @@ test('Dusknoir Hard Feelings (Diamond & Pearl 2): 5 counters plus 1 per Prize th
   const { state, defender } = board('Dusknoir', text, { damage: '', setup: (s) => s.players.p2.zones.prizes.splice(0, 2) });
   assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 70);
 });
+
+// ── hand disruption ───────────────────────────────────────────────────────────
+
+const chooseAs = (res, selection) =>
+  applyCommand(
+    res.state,
+    {
+      type: 'resolveChoice',
+      playerId: res.state.pendingChoice.player,
+      payload: { choiceId: res.state.pendingChoice.choiceId, selection },
+    },
+    createRng(3)
+  );
+const handOf = (state, playerId, count) => {
+  const cards = Array.from({ length: count }, (_, i) => trainer(`${playerId} hand ${i}`, 'Item'));
+  state.players[playerId].zones.hand.push(...cards);
+  return cards;
+};
+
+test('Ninjask Chip Off (Legends Awakened 67): random discards down to 5 cards, only from 6 or more', () => {
+  const text =
+    'If your opponent has 6 or more cards in his or her hand, discard a number of cards without looking until your opponent has 5 cards left in his or her hand.';
+  const eight = board('Ninjask', text, { setup: (s) => handOf(s, 'p2', 8) });
+  assert.equal(attack(eight.state).state.players.p2.zones.discard.length, 3);
+  const five = board('Ninjask', text, { setup: (s) => handOf(s, 'p2', 5) });
+  assert.equal(attack(five.state).state.players.p2.zones.discard.length, 0);
+});
+
+test('Feraligatr Pull Away (Unseen Forces 4): the opponent discards down to 4 cards', () => {
+  const text =
+    'If your opponent has 5 of more cards in his or her hand, your opponent discards a number of cards until your opponent has 4 cards left in his or her hand.';
+  let hand;
+  const { state } = board('Feraligatr', text, { setup: (s) => (hand = handOf(s, 'p2', 7)) });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.player, 'p2');
+  assert.equal(res.pendingChoice.min, 3);
+  res = chooseAs(res, hand.slice(0, 3).map((c) => c.instanceId));
+  assert.deepEqual(
+    res.state.players.p2.zones.discard.map((c) => c.instanceId),
+    hand.slice(0, 3).map((c) => c.instanceId)
+  );
+});
+
+test('Glaceon Ice Bind (Rising Rivals 41): Paralyzed unless the opponent discards a card', () => {
+  const text =
+    "If your opponent doesn't discard a card from his or her hand, the Defending Pokémon is now Paralyzed.";
+  let hand;
+  const paid = board('Glaceon', text, { setup: (s) => (hand = handOf(s, 'p2', 2)) });
+  let res = attack(paid.state);
+  assert.equal(res.pendingChoice.player, 'p2');
+  res = chooseAs(res, [hand[0].instanceId]);
+  assert.deepEqual(res.state.players.p2.zones.discard.map((c) => c.instanceId), [hand[0].instanceId]);
+  assert.notEqual(root(res.state, 'p2', paid.defender.instanceId).specialCondition, 'Paralyzed');
+
+  const declined = board('Glaceon', text, { setup: (s) => handOf(s, 'p2', 2) });
+  res = chooseAs(attack(declined.state), [-12]);
+  assert.equal(res.state.players.p2.zones.discard.length, 0);
+  assert.equal(root(res.state, 'p2', declined.defender.instanceId).specialCondition, 'Paralyzed');
+
+  const empty = board('Glaceon', text);
+  res = attack(empty.state);
+  assert.equal(root(res.state, 'p2', empty.defender.instanceId).specialCondition, 'Paralyzed');
+});
+
+test('Gengar Hurl into Darkness (30th Celebration 94): up to one Pokémon per {P} Energy goes to the Lost Zone', () => {
+  const text =
+    "Look at your opponent's hand and choose a number of Pokémon you find there up to the number of {P} Energy attached to Gengar. Put the Pokémon you chose in the Lost Zone.";
+  let pokemon;
+  const { state } = board('Gengar', text, {
+    setup: (s) => {
+      attachTo(s, s.players.p1.zones.active[0], ['Psychic', 'Psychic', 'Fire']);
+      pokemon = [mon('Pikachu'), mon('Eevee'), mon('Mew')];
+      s.players.p2.zones.hand.push(...pokemon, trainer('Potion', 'Item'));
+    },
+  });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.max, 2);
+  assert.equal(res.pendingChoice.options.length, 3);
+  res = choose(res, [pokemon[0].instanceId, pokemon[2].instanceId]);
+  assert.deepEqual(
+    res.state.players.p2.zones.lostZone.map((c) => c.name),
+    ['Pikachu', 'Mew']
+  );
+});
+
+test('Umbreon-EX Veil of Darkness (Fates Collide 119): draw as many cards as were discarded', () => {
+  const text = 'Discard as many cards as you like from your hand. Then, draw that many cards.';
+  let hand;
+  const { state } = board('Umbreon-EX', text, { setup: (s) => (hand = handOf(s, 'p1', 3)) });
+  let res = attack(state);
+  res = choose(res, [hand[0].instanceId, hand[1].instanceId]);
+  const after = res.state.players.p1.zones.hand.map((c) => c.name);
+  assert.equal(after.length, 3);
+  assert.deepEqual(after.filter((n) => n.includes('deck')).length, 2);
+});
