@@ -17,6 +17,7 @@ import { normalizeStage } from '../rules/evolution.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { healLocked } from '../rules/attack-markers.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
   isSingleStrikeCard,
@@ -1285,7 +1286,8 @@ export function executeSteps(draft, {
 
         const healOne = (card) => {
           const oldDamage = card.damage || 0;
-          card.damage = Math.max(0, oldDamage - healAmt);
+          // Lunala-GX Moongeist Beam: a heal-locked Pokémon keeps its damage.
+          if (!healLocked(card, draft.turn?.number || 1)) card.damage = Math.max(0, oldDamage - healAmt);
           events.push({
             type: 'damageUpdated',
             instanceId: card.instanceId,

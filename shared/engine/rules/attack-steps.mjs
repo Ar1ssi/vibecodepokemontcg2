@@ -696,6 +696,16 @@ const TEMPLATES = [
     /^your opponent can't play any (?:(.+?) )?(?:cards? )?from (?:their|his or) hand( to evolve their pokémon)? during (?:their|your opponent's) next turn$/,
     (m) => playLockStep(m[1], m[2]),
   ],
+  // Gardevoir Psychic Lock / Jirachi ex Shield Beam: "During your opponent's next turn, your
+  // opponent can't use any Poké-Powers on his or her Pokémon." A player-wide lock, stored with
+  // the play locks as an `ability:<kind>` entry.
+  [
+    /^during your opponent's next turn, your opponent can't use any (poké-powers|poké-bodies|abilities)(?: or (poké-powers|poké-bodies))? on their pokémon$/,
+    (m) => ({
+      type: 'atkOppPlayLock',
+      kinds: [m[1], m[2]].filter(Boolean).map((word) => `ability:${/power/.test(word) ? 'power' : /bod/.test(word) ? 'body' : 'ability'}`),
+    }),
+  ],
   [
     /^during your opponent's next turn, (?:they|your opponent) can't (?:play|attach) any (?:(.+?) )?(?:cards? )?from their hand(?: to any of their pokémon)?( to evolve their pokémon)?$/,
     (m) => playLockStep(m[1], m[2]),
@@ -1055,8 +1065,10 @@ const BLOCKS = [
     () => ({ type: 'searchEvolve', ontoSource: true }),
   ],
   // Octillery Smokescreen Shot / Eevee VMAX G-Max Cuddle: the opponent flips when attacking.
+  // Older Smokescreen (Weezing, Magcargo, Solrock Sun Flash): "If the Defending Pokémon tries
+  // to attack during your opponent's next turn, … If tails, that attack does nothing."
   [
-    /during your opponent's next turn, if your opponent's active pokémon tries to (?:use an )?attack, your opponent flips a coin\. if tails, that attack doesn't happen\./g,
+    /(?:during your opponent's next turn, if your opponent's active pokémon tries to (?:use an )?attack|if your opponent's active pokémon tries to attack during your opponent's next turn), your opponent flips a coin\. if tails, (?:that|this) attack (?:doesn't happen|does nothing)\./g,
     () => ({ type: 'atkAddMarker', target: 'opponentActive', window: 'opponentNextTurn', marker: { kind: 'attackFlipOrFail' } }),
   ],
   // Machamp LV.X Strong-Willed: the printed name is the attacker's short name, so any name.
@@ -1325,7 +1337,9 @@ const CHAIN_TEMPLATES = [
  */
 export function parseAttackSteps(text, { selfName = '' } = {}) {
   const result = { before: [], after: [], handlesSearch: false };
-  let normalized = normalizeAttackText(text, selfName)
+  // EX-era "Pokémon-ex" (Deoxys ex) and XY-era "Pokémon-EX" differ only by case, which the
+  // normalizer drops; the lowercase printing keeps an explicit marker for attacker filters.
+  let normalized = normalizeAttackText(String(text || '').replace(/Pokémon-ex\b/g, 'Pokémon-ex-era'), selfName)
     // Keeps the Weakness order of timed damage changes as a token each sentence lifts off.
     .replace(/\s*\((before|after) applying weakness and resistance\)/g, ' <wr:$1>')
     // Reminder text never carries an effect ("(Your opponent chooses the new Active Pokémon.)").

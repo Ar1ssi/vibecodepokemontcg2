@@ -19,7 +19,7 @@ import {
   copyConditions,
   hasAnyCondition,
 } from '../rules/special-conditions.mjs';
-import { clearAttackMarkers } from '../rules/attack-markers.mjs';
+import { clearAttackMarkers, healLocked } from '../rules/attack-markers.mjs';
 import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
   evolvedView,
@@ -1816,7 +1816,7 @@ function clearStatus(ctx) {
 
 function healCard(ctx, card, amount) {
   const oldDamage = card.damage || 0;
-  if (oldDamage <= 0 || amount <= 0) return false;
+  if (oldDamage <= 0 || amount <= 0 || healLocked(card, ctx.draft?.turn?.number || 1)) return false;
   card.damage = Math.max(0, oldDamage - amount);
   ctx.events.push({
     type: 'damageUpdated',

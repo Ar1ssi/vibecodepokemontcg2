@@ -836,9 +836,27 @@ export function applyAttackEffect(attack, attackerCard = {}) {
  * - selfCannotUseAttack: "can't use [Attack Name] during your next turn"
  * - oppCannotRetreat: "the Defending Pokémon can't retreat during your opponent's next turn"
  * - oppCannotAttack: "the Defending Pokémon can't attack during your opponent's next turn"
+ *
+ * A sentence gated "If heads," / "If tails," counts only when the coin shows that face; any
+ * other "If <condition>, …" sentence counts when `conditionHolds(condition)` is true (Dialga-EX
+ * Chrono Wind: "If the Defending Pokémon is a Pokémon-EX, it can't attack …").
+ * @param {object} attack Printed attack ({ name, text })
+ * @param {{ coin?: 'heads'|'tails'|null, headsCount?: number,
+ *   conditionHolds?: (condition: string) => boolean }} [flip] The attack's coin result and a
+ *   board-condition reader; without one, conditional sentences set no lock
  */
-export function parseNextTurnLock(attack) {
-  const t = lower(attack?.text ?? '');
+export function parseNextTurnLock(attack, { coin = null, headsCount = 0, conditionHolds = () => false } = {}) {
+  const shows = (face) => coin === face || (face === 'heads' && headsCount > 0);
+  const t = lower(attack?.text ?? '')
+    .split(/(?<=\.)\s+/)
+    .flatMap((sentence) => {
+      const gate = /^if (heads|tails),\s*/.exec(sentence);
+      if (gate) return shows(gate[1]) ? [sentence.slice(gate[0].length)] : [];
+      const condition = /^if ([^,]+), (.+)$/.exec(sentence);
+      if (condition) return conditionHolds(condition[1]) === true ? [condition[2]] : [];
+      return /^if\b/.test(sentence) ? [] : [sentence];
+    })
+    .join(' ');
   if (!t) return null;
 
   const out = {
@@ -858,6 +876,11 @@ export function parseNextTurnLock(attack) {
     ) ||
     /can(?:'t|not)\s+retreat\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
       t
+    ) ||
+    // Carvanha Big Bite: "… can't retreat until the end of your opponent's next turn"; Umbreon
+    // ex Black Cry: "… can't retreat or use any Poké-Powers during …".
+    /(?:defending pok[ée]mon|it)\s+can(?:'t|not)\s+retreat(?:\s+or\s+[^.]*?)?\s+(?:during|until\s+the\s+end\s+of)\s+your\s+opponent's\s+next\s+turn/i.test(
+      t
     )
   ) {
     out.oppCannotRetreat = true;
@@ -871,7 +894,11 @@ export function parseNextTurnLock(attack) {
     /during\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+attack/i.test(
       t
     ) ||
-    /can(?:'t|not)\s+attack\s+during\s+your\s+opponent's\s+next\s+turn/i.test(t)
+    /can(?:'t|not)\s+attack\s+during\s+your\s+opponent's\s+next\s+turn/i.test(t) ||
+    // Aurorus Freezing Chill: "During your opponent's next turn, the Defending Pokémon can't use
+    // attacks."
+    /during\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+use\s+attacks/i.test(t) ||
+    /defending\s+pok[ée]mon\s+can(?:'t|not)\s+use\s+attacks\s+during\s+your\s+opponent's\s+next\s+turn/i.test(t)
   ) {
     out.oppCannotAttack = true;
   }
@@ -884,6 +911,9 @@ export function parseNextTurnLock(attack) {
     t.match(/this pok[ée]mon can(?:'t|not) use ([^.]+) during your next turn/i);
   if (specificMatch) {
     out.selfCannotUseAttack = specificMatch[1].trim();
+  } else if (/you can(?:'t|not) use this attack during your next turn/.test(t) && attack?.name) {
+    // Sabrina's Alakazam Mega Burn.
+    out.selfCannotUseAttack = attack.name;
   } else if (
     /during your next turn, this pok[ée]mon can(?:'t|not) attack/i.test(t) ||
     /this pok[ée]mon can(?:'t|not) attack during your next turn/i.test(t)

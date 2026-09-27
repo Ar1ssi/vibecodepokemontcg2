@@ -59,6 +59,24 @@ export function markersBlockCondition(markers, condition) {
   );
 }
 
+/** A `healLock` marker in force on `card` (an in-play root) at `turnNumber`. */
+export function healLocked(card, turnNumber) {
+  return (card?.attackMarkers || []).some(
+    (marker) =>
+      marker.kind === 'healLock' &&
+      marker.untilTurn >= turnNumber &&
+      (marker.fromTurn == null || marker.fromTurn <= turnNumber)
+  );
+}
+
+/**
+ * Does an `effectPrevent` marker ("prevent all effects of attacks … done to this Pokémon")
+ * stop an attack's effects from `attacker` (its top card) landing on the marked Pokémon?
+ */
+export function markersPreventEffects(markers, attacker) {
+  return (markers || []).some((marker) => marker.kind === 'effectPrevent' && attackerMatchesFilter(marker.filter, attacker));
+}
+
 function stageOf(card) {
   const labels = [card?.stage, ...(card?.subtypes || [])].map((s) => String(s || '').toLowerCase());
   if (labels.includes('stage 2')) return 2;
@@ -75,6 +93,8 @@ const FILTER_KINDS = {
   gx: (card) => isGxCard(card),
   // Uppercase "-EX" only: the old Pokémon-EX, not the modern lowercase "ex".
   EX: (card) => /-EX$/.test(String(card?.name || '')),
+  // "Pokémon-ex" of the EX era (Deoxys ex): normalized text cannot tell it from "Pokémon-EX".
+  exEra: (card) => / ex$/.test(String(card?.name || '')),
   tagTeam: (card) => isTagTeamCard(card),
   ability: (card) => cardHasAbility(card),
 };
@@ -104,6 +124,7 @@ const FILTER_PHRASES = [
   [/^pokémon vmax$/, () => ({ any: ['vmax'] })],
   [/^pokémon-gx and pokémon-ex$/, () => ({ any: ['gx', 'EX'] })],
   [/^pokémon-ex$/, () => ({ any: ['EX'] })],
+  [/^pokémon-ex-era$/, () => ({ any: ['exEra'] })],
   [/^tag team pokémon$/, () => ({ any: ['tagTeam'] })],
   [/^evolution pokémon$/, () => ({ any: ['evolution'] })],
   [/^stage 1 or stage 2 pokémon$/, () => ({ any: ['stage1', 'stage2'] })],
@@ -187,6 +208,9 @@ const WINDOW_PHRASES = [
   [/^(.+) during their next turn$/, 'opponentNextTurn'],
 ];
 
+// "poké-powers" → 'power' (the kinds attack-damage-context.mjs abilityKinds reports).
+const abilityKindWord = (word) => (/power/.test(word) ? 'power' : /bod/.test(word) ? 'body' : 'ability');
+
 // "{c}{c}" → 2
 const symbolCount = (symbols) => (String(symbols).match(/\{[a-z]\}/g) || []).length;
 
@@ -214,6 +238,29 @@ const MARKER_BODIES = [
     'self',
     null,
     (m) => incomingPrevent(m[1]),
+  ],
+  // Jirachi-GX Star Shield-GX, Celebi ex Psychic Shield ("… by your opponent's Pokémon-ex"),
+  // Aerodactyl Speed Stroke ("… by attacks from your opponent's Pokémon-ex"): damage and every
+  // other effect of the attack.
+  [
+    new RegExp(
+      `^prevent all effects(?: of (?:an attack|attacks?))?, including damage, done to this pokémon(?: (?:by (your opponent's [^,]+?)|${FROM_ATTACKS}))?$`
+    ),
+    'self',
+    null,
+    (m) => {
+      const filter = parseAttackerFilter(m[1] || m[2]);
+      return filter === undefined ? null : [{ kind: 'incomingPrevent', filter }, { kind: 'effectPrevent', filter }];
+    },
+  ],
+  // Latios-EX / Slurpuff Light Pulse ("except damage"), Light Dragonite ("other than damage"),
+  // Venomoth ("excluding damage"), Altaria ex Light Pulse ("attacks used by your opponent's
+  // Pokémon done to this Pokémon", reminder "Damage is not an effect").
+  [
+    /^prevent all effects of (?:your opponent's attacks|attacks|an attack)(?: used by your opponent's pokémon)?(?:, (?:except|other than|excluding) damage,)? done to this pokémon$/,
+    'self',
+    null,
+    () => ({ kind: 'effectPrevent', filter: null }),
   ],
   // Damage part only; "effects of attacks" stays with the effect-prevention family.
   [
@@ -331,6 +378,17 @@ const MARKER_BODIES = [
     null,
     () => ({ kind: 'evolveLock' }),
   ],
+  // Lunala-GX Moongeist Beam: "The Defending Pokémon can't be healed during your opponent's next turn."
+  [/^your opponent's active pokémon can't be healed$/, 'opponentActive', null, () => ({ kind: 'healLock' })],
+  // Shiftry Seal Off: "The Defending Pokémon can't use any Poké-Powers or Poké-Bodies …";
+  // Umbreon ex Black Cry: "… can't retreat or use any Poké-Powers …" (the retreat half is
+  // attack-effects.mjs parseNextTurnLock's).
+  [
+    /^your opponent's active pokémon can't (?:retreat or )?use any (poké-powers|poké-bodies|abilities)(?: or (poké-powers|poké-bodies))?$/,
+    'opponentActive',
+    null,
+    (m) => ({ kind: 'abilityLock', abilityKinds: [m[1], m[2]].filter(Boolean).map(abilityKindWord) }),
+  ],
   // Goodra Shining Breath / Bayleef Pollen Shield. `conditions: null` blocks every one.
   [/^this pokémon can't (?:be|become) affected by (?:any special conditions|a special condition)$/, 'self', null, () => ({ kind: 'statusImmunity', conditions: null })],
   [
@@ -389,6 +447,13 @@ const MARKER_BODIES = [
     'self',
     null,
     () => ({ kind: 'retaliate', mode: 'counters' }),
+  ],
+  // Dracozolt VMAX Spark Trap, Turtonator-GX Shell Trap, Iron Boulder ex Repulsor Axe.
+  [
+    /^if this pokémon is damaged by an attack(?: \(even if (?:it|this pokémon) is knocked out\))?, (?:put|place) (\d+) damage counters on the attacking pokémon$/,
+    'self',
+    null,
+    (m) => ({ kind: 'retaliate', mode: 'fixedCounters', count: Number(m[1]) }),
   ],
   [
     /^if this pokémon is damaged by an attack, this pokémon attacks your opponent's active pokémon for (\d+) damage$/,

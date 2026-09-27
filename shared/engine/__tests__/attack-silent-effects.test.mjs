@@ -9,6 +9,7 @@ import { createRng } from '../rng.mjs';
 import { applyCommand, validateLegality } from '../reduce.mjs';
 import { parseAttackDamage } from '../rules/damage-parser.mjs';
 import { parseAttackSteps } from '../rules/attack-steps.mjs';
+import { parseNextTurnLock } from '../rules/attack-effects.mjs';
 
 let nextId = 1;
 const mon = (name, extra = {}) =>
@@ -322,4 +323,111 @@ test('Dewgong Ice Shard (Supreme Victors 24): base 80 against a {F} Defending Po
   });
   water.state.players.p1.zones.active[0].attacks[0].damage = '30';
   assert.equal(damageOf(attack(water.state)), 30);
+});
+
+// ── next-turn locks on the Defending Pokémon ────────────────────────────────
+
+test('a coin-gated "can\'t attack" lock needs heads; other wordings lock too', () => {
+  const text = "Flip a coin. If heads, the Defending Pokémon can't attack during your opponent's next turn.";
+  assert.equal(parseNextTurnLock({ text }, { coin: 'tails' }), null);
+  assert.equal(parseNextTurnLock({ text }, { coin: 'heads' }).oppCannotAttack, true);
+  // Carvanha Big Bite (Ruby & Sapphire 51).
+  assert.equal(
+    parseNextTurnLock({ text: "The Defending Pokémon can't retreat until the end of your opponent's next turn." })
+      .oppCannotRetreat,
+    true
+  );
+  // Aurorus Freezing Chill (Perfect Order 092).
+  assert.equal(
+    parseNextTurnLock({ text: "During your opponent's next turn, the Defending Pokémon can't use attacks." }).oppCannotAttack,
+    true
+  );
+  // Sabrina's Alakazam Mega Burn (Gym Challenge 16).
+  assert.equal(
+    parseNextTurnLock({ name: 'Mega Burn', text: "You can't use this attack during your next turn." }).selfCannotUseAttack,
+    'Mega Burn'
+  );
+  // Dialga-EX Chrono Wind (Phantom Forces 122): the condition decides.
+  const chrono = { text: "If the Defending Pokémon is a Pokémon-EX, it can't attack during your opponent's next turn." };
+  assert.equal(parseNextTurnLock(chrono, { conditionHolds: () => false }), null);
+  assert.equal(parseNextTurnLock(chrono, { conditionHolds: () => true }).oppCannotAttack, true);
+});
+
+const powerText = 'Once during your turn (before your attack), you may draw a card.';
+const useAbility = (state, card) =>
+  validateLegality(state, { type: 'useAbility', playerId: 'p2', payload: { instanceId: card.instanceId, abilityIndex: 0 } });
+
+test('Shiftry Seal Off (Rising Rivals 13): the Defending Pokémon cannot use its Poké-Power', () => {
+  const text = "The Defending Pokémon can't use any Poké-Powers or Poké-Bodies during your opponent's next turn.";
+  const { state, defender } = board('Shiftry', text);
+  defender.abilities = [{ name: 'Probe Power', type: 'Poké-Power', text: powerText }];
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.equal(useAbility(res.state, root(res.state, 'p2', defender.instanceId)).allowed, false);
+  res.state.turn.number = 8;
+  assert.equal(useAbility(res.state, root(res.state, 'p2', defender.instanceId)).allowed, true);
+});
+
+test("Gardevoir Psychic Lock (Secret Wonders 7): none of the opponent's Poké-Powers work", () => {
+  const text = "During your opponent's next turn, your opponent can't use any Poké-Powers on his or her Pokémon.";
+  const benched = mon('Benched Power', { abilities: [{ name: 'Probe Power', type: 'Poké-Power', text: powerText }] });
+  const { state } = board('Gardevoir', text, { setup: (s) => s.players.p2.zones.bench.push(benched) });
+  const res = attack(state);
+  assert.equal(useAbility(res.state, benched).allowed, false);
+  res.state.turn.number = 8;
+  assert.equal(useAbility(res.state, benched).allowed, true, 'the lock lasts one turn');
+});
+
+// ── protection markers ──────────────────────────────────────────────────────
+
+const PARALYZE = { name: 'Zap', cost: [], damage: '50', text: 'Your opponent\'s Active Pokémon is now Paralyzed.' };
+const opponentAttacks = (state) =>
+  applyCommand(state, { type: 'attack', playerId: 'p2', payload: { attackIndex: 0 } }, createRng(3));
+
+test('Jirachi-GX Star Shield-GX (Unified Minds 79a): no damage and no effects next turn', () => {
+  const text =
+    "Prevent all effects of attacks, including damage, done to this Pokémon during your opponent's next turn. (You can't use more than 1 GX attack in a game.)";
+  const { state, attacker, defender } = board('Jirachi-GX', text, { damage: '100' });
+  defender.attacks = [PARALYZE];
+  const shielded = attack(state);
+  const hit = opponentAttacks(shielded.state);
+  assert.equal(hit.error, null);
+  const jirachi = root(hit.state, 'p1', attacker.instanceId);
+  assert.equal(jirachi.damage, 0);
+  assert.ok(!hit.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === attacker.instanceId));
+});
+
+test('Latios-EX Light Pulse (XY Promos XY72): damage lands, effects do not', () => {
+  const text =
+    "Prevent all effects of your opponent's attacks, except damage, done to this Pokémon during your opponent's next turn.";
+  const { state, attacker, defender } = board('Latios-EX', text, { damage: '110' });
+  defender.attacks = [PARALYZE];
+  const hit = opponentAttacks(attack(state).state);
+  assert.equal(root(hit.state, 'p1', attacker.instanceId).damage, 50);
+  assert.ok(!hit.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === attacker.instanceId));
+});
+
+test('Dracozolt VMAX Spark Trap (Evolving Skies 210): 12 counters on the Pokémon that hits it', () => {
+  const text =
+    "During your opponent's next turn, if this Pokémon is damaged by an attack (even if it is Knocked Out), put 12 damage counters on the Attacking Pokémon.";
+  const { state, defender } = board('Dracozolt VMAX', text, { damage: '60' });
+  defender.attacks = [{ name: 'Hit', cost: [], damage: '30', text: '' }];
+  const hit = opponentAttacks(attack(state).state);
+  assert.equal(root(hit.state, 'p2', defender.instanceId).damage, 60 + 120);
+});
+
+test('Weezing Smokescreen (XY Promos XY163): the older wording sets the flip-or-fail marker', () => {
+  const steps = parseAttackSteps(
+    "If the Defending Pokémon tries to attack during your opponent's next turn, your opponent flips a coin. If tails, that attack does nothing."
+  ).after;
+  assert.deepEqual(steps.map((s) => s.marker?.kind), ['attackFlipOrFail']);
+});
+
+test('Lunala-GX Moongeist Beam (Ultra Prism 172): the Defending Pokémon cannot be healed', () => {
+  const text = "The Defending Pokémon can't be healed during your opponent's next turn.";
+  const { state, defender } = board('Lunala-GX', text, { damage: '120' });
+  defender.attacks = [{ name: 'Rest', cost: [], damage: '', text: 'Heal 30 damage from this Pokémon.' }];
+  const hit = opponentAttacks(attack(state).state);
+  assert.equal(hit.error, null);
+  assert.equal(root(hit.state, 'p2', defender.instanceId).damage, 120);
 });

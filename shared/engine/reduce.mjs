@@ -143,7 +143,7 @@ import { pokemonHasType } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
 import { replaceSelfName } from './rules/attack-text.mjs';
-import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
+import { parseAttackCondition, attackConditionMet, parseConditionClause } from './rules/attack-conditions.mjs';
 import {
   parseCopyAttack,
   inCopyGroup,
@@ -155,6 +155,7 @@ import {
   clearAttackMarkers,
   liveAttackMarkers,
   markersBlockCondition,
+  markersPreventEffects,
   parseDamageImmunity,
 } from './rules/attack-markers.mjs';
 import {
@@ -492,8 +493,13 @@ function damageBenchedPokemon(
 
 // Mist / Rocky / Wash / Wonder Energy: damage counters an opponent's attack places are an
 // effect of that attack, not damage, so the effect shield stops them (review of audit SE5).
+// An `effectPrevent` marker (Jirachi-GX Star Shield-GX) stops them too.
 function counterEffectShielded(draft, victim, zoneCards) {
-  return hasSpecialEnergyEffectShield(inPlayView(draft, victim), zoneCards);
+  if (hasSpecialEnergyEffectShield(inPlayView(draft, victim), zoneCards)) return true;
+  const ref = findCard(draft, victim.instanceId);
+  const attacker = rootsIn(draft.players[draft.turn?.player]?.zones?.active)[0];
+  const markers = ref ? activeAttackMarkers(draft, ref.playerId, victim) : [];
+  return markersPreventEffects(markers, attacker ? inPlayView(draft, attacker) : null);
 }
 
 // Chosen-target damage/counters for attacks that let the player pick one or more
@@ -760,6 +766,33 @@ function playLockReason(player, kinds, turnNumber) {
     : null;
 }
 
+/** Printed kind of one of a card's abilities: 'power' (Poké-Power), 'body' (Poké-Body), 'ability'. */
+function abilityKindAt(view, index) {
+  const abilities = Array.isArray(view?.abilities) ? view.abilities : view?.ability ? [view.ability] : [];
+  const type = String(abilities[index]?.type || abilities[0]?.type || '').toLowerCase();
+  if (/power/.test(type)) return 'power';
+  if (/body/.test(type)) return 'body';
+  return 'ability';
+}
+
+/**
+ * Ability locks an opponent's attack left: on the Pokémon (Shiftry Seal Off, Umbreon ex Black
+ * Cry — an `abilityLock` marker) or on the whole player (Gardevoir Psychic Lock — an
+ * `ability:<kind>` play-lock entry). Returns the refusal reason or null.
+ */
+function attackAbilityLockReason(state, cardRef, player, abilityIndex) {
+  const kind = abilityKindAt(inPlayView(state, cardRef.card), abilityIndex);
+  const turnNumber = state.turn?.number || 1;
+  const playerLocked = (player?.playLocks || []).some(
+    (lock) => (lock.untilTurn || 0) >= turnNumber && (lock.kinds || []).includes(`ability:${kind}`)
+  );
+  if (playerLocked) return "Your opponent's attack stops you using that Ability this turn.";
+  const root = cardRef.card.attachedTo != null ? findCard(state, cardRef.card.attachedTo)?.card : cardRef.card;
+  const markers = root ? activeAttackMarkers(state, cardRef.playerId, root) : [];
+  const cardLocked = markers.some((m) => m.kind === 'abilityLock' && (m.abilityKinds || []).includes(kind));
+  return cardLocked ? "An attack stops this Pokémon using that Ability this turn." : null;
+}
+
 /**
  * Ability-side combat reads for one attack (design 034 slice 2): the
  * attacker's bonus and extra types plus the defender's reduction, prevention
@@ -886,16 +919,19 @@ function applyRetaliation(
   { markers, dealt, striker, strikerView, strikerPlayerId, attacker, attackerPlayerId, events }
 ) {
   for (const marker of markers) {
-    const target =
-      marker.mode === 'counters'
-        ? attacker
-        : (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+    const onAttacker = marker.mode === 'counters' || marker.mode === 'fixedCounters';
+    const target = onAttacker
+      ? attacker
+      : (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
     const ref = target && findCard(draft, target.instanceId);
     if (!ref || (ref.zoneId !== 'active' && ref.zoneId !== 'bench')) continue;
+    // Dracozolt VMAX Spark Trap: a printed number of counters, whatever the damage was.
     const amount =
       marker.mode === 'counters'
         ? dealt
-        : retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId });
+        : marker.mode === 'fixedCounters'
+          ? (marker.count || 0) * 10
+          : retaliationAttackDamage(draft, { marker, striker, strikerView, strikerPlayerId, target, attackerPlayerId });
     if (amount <= 0) continue;
     target.damage = (target.damage || 0) + amount;
     events.push({
@@ -4530,6 +4566,8 @@ export function validateLegality(state, command) {
             reason: "This Pokémon's Ability is blocked by the Stadium in play.",
           };
         }
+        const attackLock = attackAbilityLockReason(state, cardRef, player, payload?.abilityIndex ?? 0);
+        if (attackLock) return { allowed: false, reason: attackLock };
       }
       return { allowed: true };
     }
@@ -6623,10 +6661,12 @@ function resolveAttackEffectPhase(draft, ctx) {
         // Only apply condition if defender survived the attack (not KO'd)
         const defRef = findCard(draft, defender.instanceId);
         const defZone = defRef?.player?.zones?.active || [];
+        const defMarkers = defRef ? activeAttackMarkers(draft, defRef.playerId, defRef.card) : [];
         const shielded =
-          defRef && hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone);
+          defRef &&
+          (hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone) ||
+            markersPreventEffects(defMarkers, attackerView));
         if (defRef && defRef.zoneId === 'active' && !shielded) {
-          const defMarkers = activeAttackMarkers(draft, defRef.playerId, defRef.card);
           for (const cond of defenderConditions) {
             if (markersBlockCondition(defMarkers, cond)) continue;
             addCondition(defRef.card, cond);
@@ -6828,7 +6868,37 @@ function resolveAttackEffectPhase(draft, ctx) {
       }
 
       // Attack effects: next-turn locks (Phase 3)
-      const locks = parseNextTurnLock(effectiveAttack);
+      const locks = parseNextTurnLock(effectiveAttack, {
+        coin,
+        headsCount,
+        conditionHolds: (clause) => {
+          const condition = parseConditionClause(normalizeAttackText(clause, attackerView?.name || attacker?.name));
+          if (!condition) return false;
+          return attackConditionMet(
+            condition,
+            buildServerAttackContext(draft, {
+              attackerPlayerId: playerId,
+              defenderPlayerId,
+              attacker,
+              defender,
+              attackerView,
+              attack: effectiveAttack,
+              defenderView: defender ? inPlayView(draft, defender) : null,
+              coin,
+              headsCount,
+            })
+          );
+        },
+      });
+      const defenderRef = defender ? findCard(draft, defender.instanceId) : null;
+      // Star Shield-GX / Agility: the Defending Pokémon's effect prevention stops the locks.
+      const defenderShielded =
+        defenderRef &&
+        markersPreventEffects(activeAttackMarkers(draft, defenderRef.playerId, defenderRef.card), attackerView);
+      if (locks && defenderShielded) {
+        locks.oppCannotRetreat = false;
+        locks.oppCannotAttack = false;
+      }
       if (locks) {
         if (locks.selfCannotAttack && attacker) {
           attacker.cannotAttackUntilTurn = (draft.turn.number || 1) + 2;

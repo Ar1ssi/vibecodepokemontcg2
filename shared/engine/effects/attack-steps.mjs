@@ -36,7 +36,9 @@ import {
   clearAttackMarkers,
   liveAttackMarkers,
   markerFromTurn,
+  healLocked,
   markersBlockCondition,
+  markersPreventEffects,
   markerUntilTurn,
   SELF_NAME,
 } from '../rules/attack-markers.mjs';
@@ -69,6 +71,19 @@ export const ATTACK_YES = -11;
 export const ATTACK_NO = -12;
 
 // ── helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Effect shields on one of the opponent's Pokémon: a shielding Special Energy, or an
+ * `effectPrevent` marker ("prevent all effects of attacks … done to this Pokémon").
+ */
+function attackEffectShielded(ctx, owner, root, kind = 'effect') {
+  if (specialEnergyShielded(owner, root, kind)) return true;
+  if (kind !== 'effect' || owner !== ctx.opponent || !root) return false;
+  const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
+  const markers = liveAttackMarkers(root, { turnNumber: ctx.draft.turn?.number || 1, zoneCards: zone });
+  const ref = attackerRef(ctx);
+  return markersPreventEffects(markers, ref ? topPokemonCard(ctx.player, ref.card) : ctx.sourceCard);
+}
 
 /** The attacking Pokémon while it is still in play, with its owner and zone. */
 function attackerRef(ctx) {
@@ -633,7 +648,7 @@ function atkDiscardBothActiveEnergy(ctx) {
   };
   if (opponent) {
     const root = activeOf(opponent);
-    if (root && !specialEnergyShielded(opponent, root, 'effect')) drain(opponent, root);
+    if (root && !attackEffectShielded(ctx, opponent, root, 'effect')) drain(opponent, root);
   }
   drain(player, activeOf(player));
   return discarded === 0 ? skip(ctx, 'no_energy') : null;
@@ -1282,7 +1297,7 @@ function atkShuffleOppEnergy(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   const energy = rootsOf(opponent)
-    .filter((root) => !specialEnergyShielded(opponent, root, 'effect'))
+    .filter((root) => !attackEffectShielded(ctx, opponent, root, 'effect'))
     .flatMap((root) => attachedCards(opponent, root.instanceId).filter(isEnergy));
   if (energy.length === 0) return skip(ctx, 'no_energy');
   for (const card of energy) moveToZone(opponent, card, 'deck', 'inPlay', ctx.events);
@@ -1473,7 +1488,7 @@ function returnSelfToDeckAbility(ctx) {
 function placeCounters(ctx, card, victimPlayerId, amount) {
   // Mist/Rocky/Wash/Wonder Energy: counters an opponent's attack places are an effect
   // of that attack, not damage, so the effect shield stops them per target.
-  if (victimPlayerId === ctx.opponent?.playerId && specialEnergyShielded(ctx.opponent, card)) {
+  if (victimPlayerId === ctx.opponent?.playerId && attackEffectShielded(ctx, ctx.opponent, card)) {
     ctx.events.push({
       type: 'damagePrevented',
       instanceId: card.instanceId,
@@ -1546,7 +1561,7 @@ function atkKnockOutAll(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   const doomed = rootsOf(opponent).filter((root) => {
     const left = remainingHp(ctx, opponent, root);
-    return left > 0 && left <= step.maxRemainingHp && !specialEnergyShielded(opponent, root);
+    return left > 0 && left <= step.maxRemainingHp && !attackEffectShielded(ctx, opponent, root);
   });
   if (doomed.length === 0) return skip(ctx, 'condition_unmet');
   for (const root of doomed) markKnockOut(ctx, opponent, root);
@@ -1572,7 +1587,7 @@ function atkHpCap(ctx) {
     return active ? place(active) : skip(ctx, 'no_opponent_active');
   }
   const all = rootsOf(opponent).filter((root) => countersToCap(root) > 0);
-  const candidates = all.filter((root) => !specialEnergyShielded(opponent, root));
+  const candidates = all.filter((root) => !attackEffectShielded(ctx, opponent, root));
   if (ctx.selection) {
     const root = candidates.find((c) => c.instanceId === ctx.selection[0]);
     return root ? place(root) : skip(ctx, 'target_not_found');
@@ -1763,7 +1778,7 @@ function atkKnockOut(ctx) {
   const target = activeOf(opponent);
   // Mist/Rocky/Wash/Wonder Energy: an automatic Knock Out from an attack effect is
   // prevented on the shielded Pokémon (Bring Down ruling), damage-only KOs are not.
-  const shielded = Boolean(target) && specialEnergyShielded(opponent, target);
+  const shielded = Boolean(target) && attackEffectShielded(ctx, opponent, target);
   if (step.scope === 'both') {
     // Annihilape Destined Fight / Forretress Double KO: both Active Pokémon go at once.
     const self = activeOf(ctx.player);
@@ -1792,7 +1807,7 @@ function atkKnockOutChoose(ctx) {
     const roots = step.scope === 'bench' && !step.leastHp ? benchRootsOf(owner) : rootsOf(owner);
     for (const root of roots) {
       if (step.leastHp && self && root.instanceId === self.instanceId) continue;
-      if (owner === opponent && specialEnergyShielded(owner, root)) continue;
+      if (owner === opponent && attackEffectShielded(ctx, owner, root)) continue;
       if (step.ruleBox && !RULE_BOX_MATCHES[step.ruleBox]?.(topPokemonCard(owner, root))) continue;
       if (step.notGx && isGxCard(topPokemonCard(owner, root))) continue;
       if (step.basicOnly && !RULE_BOX_MATCHES.basic(topPokemonCard(owner, root))) continue;
@@ -2334,7 +2349,8 @@ function healLimit(step) {
 function healPokemon(ctx, card, limit, { cure = false } = {}) {
   let changed = false;
   const damage = card.damage || 0;
-  const healed = Math.min(damage, limit);
+  // Lunala-GX Moongeist Beam: a heal-locked Pokémon keeps its damage (a cure still happens).
+  const healed = healLocked(card, ctx.draft.turn?.number || 1) ? 0 : Math.min(damage, limit);
   if (healed > 0) {
     card.damage = damage - healed;
     ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage, healed });
@@ -2666,7 +2682,7 @@ function atkMoveCounterToOpponent(ctx) {
     step.from === 'self' ? [attacker].filter(Boolean) : step.from === 'bench' ? benchRootsOf(player) : rootsOf(player);
   const sources = pool.filter((c) => (c.damage || 0) > 0);
   const targets = (step.to === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent)).filter(
-    (c) => !specialEnergyShielded(opponent, c)
+    (c) => !attackEffectShielded(ctx, opponent, c)
   );
   const chooseSource = step.from === 'one' || step.from === 'bench';
 
@@ -3051,3 +3067,34 @@ export const ATTACK_STEP_HANDLERS = {
   atkHandCardsToDecks,
   atkLookOppDeck,
 };
+
+// "Prevent all effects of attacks … done to this Pokémon" (an `effectPrevent` marker on the
+// opponent's Active, attack-markers.mjs): the steps that act on that Active do nothing.
+const OPP_ACTIVE_EFFECTS = {
+  atkGust: () => true,
+  atkDiscardOppEnergy: (step) => step.scope === 'active',
+  atkDiscardOppTools: (step) => step.scope === 'active',
+  atkShuffleOppActive: () => true,
+  atkLostZoneOppActive: () => true,
+  atkBounceOppActive: () => true,
+  atkShuffleOppActiveEnergy: () => true,
+  atkAddMarker: (step) => step.target === 'opponentActive',
+  atkLockAttack: () => true,
+};
+
+function oppActiveProtected(ctx) {
+  const defender = activeOf(ctx.opponent);
+  if (!defender) return false;
+  const markers = liveAttackMarkers(defender, {
+    turnNumber: ctx.draft.turn?.number || 1,
+    zoneCards: ctx.opponent.zones.active || [],
+  });
+  const ref = attackerRef(ctx);
+  return markersPreventEffects(markers, ref ? topPokemonCard(ctx.player, ref.card) : ctx.sourceCard);
+}
+
+for (const [type, targetsActive] of Object.entries(OPP_ACTIVE_EFFECTS)) {
+  const handler = ATTACK_STEP_HANDLERS[type];
+  ATTACK_STEP_HANDLERS[type] = (ctx) =>
+    targetsActive(ctx.step) && oppActiveProtected(ctx) ? skip(ctx, 'effect_prevented') : handler(ctx);
+}
