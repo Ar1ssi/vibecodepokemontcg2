@@ -112,3 +112,225 @@ test('ability: Pecharunt ex Subjugating Chains brings up only a non-Pecharunt {D
   const active = res.state.players.p1.zones.active.find((c) => c.instanceId === 82);
   assert.ok(hasCondition(active, 'Poisoned'));
 });
+
+// ── costs and self-leaving halves ────────────────────────────────────────
+
+const energy = (instanceId, type, extra = {}) =>
+  createCard({ instanceId, name: `${type} Energy`, supertype: 'Energy', subtypes: ['Basic'], types: [type], ...extra });
+const specialEnergy = (instanceId, extra = {}) =>
+  createCard({ instanceId, name: 'Double Colorless Energy', supertype: 'Energy', subtypes: ['Special'], ...extra });
+const zoneOf = (res, playerId, id) =>
+  Object.entries(res.state.players[playerId].zones).find(([, cards]) =>
+    Array.isArray(cards) && cards.some((c) => c.instanceId === id)
+  )?.[0];
+const holderCard = (res) => res.state.players.p1.zones.active.find((c) => c.instanceId === 70);
+// Resolves p1's choices by picking `pick(options)` (default: the first `min` options).
+function resolveAll(res, rng, pick = (choice) => choice.options.slice(0, Math.max(1, choice.min))) {
+  let out = res;
+  for (let guard = 0; out.pendingChoice && out.pendingChoice.player === 'p1' && guard < 12; guard++) {
+    out = resolveWith(out, pick(out.pendingChoice).map((o) => o.instanceId), rng);
+  }
+  return out;
+}
+
+// Goodra, Flashfire 74.
+const GOOEY_REGENERATION =
+  'As often as you like during your turn (before your attack), you may discard an Energy attached to this Pokémon. If you do, heal 60 damage from this Pokémon.';
+// Porygon-Z-GX, Sun & Moon Promos SM216.
+const TROUBLESHOOTING =
+  'Once during your turn (before your attack), you may discard a Special Energy from this Pokémon. If you do, heal 80 damage from it.';
+
+test('ability: Goodra Gooey Regeneration discards an attached Energy, then heals 60', () => {
+  const { state, rng } = board(GOOEY_REGENERATION);
+  state.players.p1.zones.active[0].damage = 90;
+  state.players.p1.zones.active.push(energy(60, 'Water', { attachedTo: 70 }));
+  const res = resolveAll(use70(state, rng), rng);
+  assert.equal(zoneOf(res, 'p1', 60), 'discard');
+  assert.equal(holderCard(res).damage, 30);
+});
+
+test('ability: Goodra Gooey Regeneration with no Energy attached heals nothing', () => {
+  const { state, rng } = board(GOOEY_REGENERATION);
+  state.players.p1.zones.active[0].damage = 90;
+  const res = use70(state, rng);
+  assert.equal(holderCard(res).damage, 90);
+});
+
+test('ability: Porygon-Z-GX Troubleshooting pays only with a Special Energy', () => {
+  const basicOnly = board(TROUBLESHOOTING);
+  basicOnly.state.players.p1.zones.active[0].damage = 100;
+  basicOnly.state.players.p1.zones.active.push(energy(60, 'Colorless', { attachedTo: 70 }));
+  assert.equal(holderCard(use70(basicOnly.state, basicOnly.rng)).damage, 100);
+
+  const { state, rng } = board(TROUBLESHOOTING);
+  state.players.p1.zones.active[0].damage = 100;
+  state.players.p1.zones.active.push(specialEnergy(61, { attachedTo: 70 }));
+  const res = resolveAll(use70(state, rng), rng);
+  assert.equal(zoneOf(res, 'p1', 61), 'discard');
+  assert.equal(holderCard(res).damage, 20);
+});
+
+// Ampharos, Lost Thunder 78.
+const UNSEEN_FLASH =
+  "Once during your turn (before your attack), you may put 2 {L} Energy cards from your hand in the Lost Zone. If you do, your opponent's Active Pokémon is now Paralyzed.";
+
+test('ability: Ampharos Unseen Flash puts 2 {L} Energy in the Lost Zone, then Paralyzes', () => {
+  const { state, rng } = board(UNSEEN_FLASH);
+  state.players.p1.zones.hand.push(energy(61, 'Lightning'), energy(62, 'Water'), energy(63, 'Lightning'));
+  let res = use70(state, rng);
+  assert.deepEqual(res.pendingChoice.options.map((o) => o.instanceId).sort(), [61, 63]);
+  res = resolveWith(res, [61, 63], rng);
+  assert.equal(zoneOf(res, 'p1', 61), 'lostZone');
+  assert.ok(hasCondition(res.state.players.p2.zones.active[0], 'Paralyzed'));
+});
+
+test('ability: Ampharos Unseen Flash with 1 {L} Energy in hand does not Paralyze', () => {
+  const { state, rng } = board(UNSEEN_FLASH);
+  state.players.p1.zones.hand.push(energy(61, 'Lightning'), energy(62, 'Water'));
+  const res = use70(state, rng);
+  assert.equal(hasCondition(res.state.players.p2.zones.active[0], 'Paralyzed'), false);
+});
+
+// Cofagrigus, Plasma Freeze 56.
+const SIX_FEET_UNDER =
+  "Once during your turn (before your attack) you may Knock Out this Pokémon. If you do, put 3 damage counters on your opponent's Pokémon in any way you like.";
+// Milotic, Flashfire 23.
+const ENERGY_GRACE =
+  'Once during your turn (before your attack) you may Knock Out this Pokémon. If you do, attach 3 basic Energy cards from your discard pile to 1 of your Pokémon (excluding Pokémon-EX).';
+// Electrode-GX, Celestial Storm SV57.
+const EXTRA_ENERGY_BOMB =
+  'Once during your turn (before your attack), you may attach 5 Energy cards from your discard pile to your Pokémon, except Pokémon-GX or Pokémon-EX, in any way you like. If you do, this Pokémon is Knocked Out.';
+
+test('ability: Cofagrigus Six Feet Under places 3 counters and Knocks Out itself', () => {
+  const { state, rng } = board(SIX_FEET_UNDER, { name: 'Cofagrigus', oppBench: [] });
+  const res = resolveAll(use70(state, rng), rng);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 30);
+  assert.equal(zoneOf(res, 'p1', 70), 'discard');
+});
+
+test('ability: Milotic Energy Grace attaches 3 basic Energy to one non-EX Pokémon, then is Knocked Out', () => {
+  const { state, rng } = board(ENERGY_GRACE, { name: 'Milotic', ownBench: [] });
+  const p1 = state.players.p1.zones;
+  p1.bench.push(mon(81, 'Keldeo-EX'), mon(82, 'Keldeo'));
+  p1.discard.push(energy(61, 'Water'), energy(62, 'Water'), energy(63, 'Water'), energy(64, 'Water'));
+  let res = use70(state, rng);
+  const seen = [];
+  for (let guard = 0; res.pendingChoice?.player === 'p1' && guard < 12; guard++) {
+    const ids = res.pendingChoice.options.map((o) => o.instanceId);
+    if (!ids.includes(61) && !ids.includes(62) && !ids.includes(63)) seen.push(ids);
+    res = resolveWith(res, [ids.includes(82) ? 82 : ids[0]], rng);
+  }
+  // Milotic and the EX are no targets, so Keldeo takes every attach without a target prompt.
+  assert.deepEqual(seen, []);
+  const attached = res.state.players.p1.zones.bench.filter((c) => c.attachedTo === 82);
+  assert.equal(attached.length, 3);
+  assert.equal(zoneOf(res, 'p1', 70), 'discard');
+});
+
+test('ability: Electrode-GX Extra Energy Bomb attaches 5 Energy in any way, then is Knocked Out', () => {
+  const { state, rng } = board(EXTRA_ENERGY_BOMB, { name: 'Electrode-GX', ownBench: [81, 82] });
+  state.players.p1.zones.bench.push(mon(83, 'Tapu Lele-GX'));
+  for (let id = 61; id <= 66; id++) state.players.p1.zones.discard.push(energy(id, 'Lightning'));
+  let res = use70(state, rng);
+  const offered = new Set();
+  let turn = 0;
+  for (let guard = 0; res.pendingChoice?.player === 'p1' && guard < 20; guard++) {
+    const ids = res.pendingChoice.options.map((o) => o.instanceId);
+    if (ids.some((id) => id >= 70 && id !== 70)) ids.forEach((id) => offered.add(id));
+    res = resolveWith(res, [ids.includes(81) ? (turn++ % 2 ? 81 : 82) : ids[0]], rng);
+  }
+  assert.deepEqual([...offered].sort(), [81, 82]);
+  const attached = res.state.players.p1.zones.bench.filter((c) => c.attachedTo === 81 || c.attachedTo === 82);
+  assert.equal(attached.length, 5);
+  assert.equal(zoneOf(res, 'p1', 70), 'discard');
+});
+
+test('ability: Electrode-GX Extra Energy Bomb with no Energy in the discard pile is not Knocked Out', () => {
+  const { state, rng } = board(EXTRA_ENERGY_BOMB, { name: 'Electrode-GX' });
+  const res = use70(state, rng);
+  assert.equal(zoneOf(res, 'p1', 70), 'active');
+});
+
+// Banette, Lost Origin 073.
+const PUPPET_OFFERING =
+  'Once during your turn, you may put a Supporter card from your discard pile into your hand. If you do, put this Pokémon in the Lost Zone. (Discard all attached cards.)';
+// Unown, Ancient Origins 30.
+const FAREWELL_LETTER =
+  'Once during your turn (before your attack), if this Pokémon is on your Bench, you may discard this Pokémon and all cards attached to it (this does not count as a Knock Out). If you do, draw a card.';
+// Tapu Koko Prism Star, Team Up 51.
+const DANCE_OF_THE_ANCIENTS =
+  'Once during your turn (before your attack), if this Pokémon is on your Bench, you may choose 2 of your Benched Pokémon and attach a {L} Energy card from your discard pile to each of them. If you do, discard all cards from this Pokémon and put it in the Lost Zone.';
+// Misty's Psyduck, Destined Rivals 193.
+const FLUSTERED_LEAP =
+  'Once during your turn, if this Pokémon is on your Bench, you may discard the bottom card of your deck. If you do, discard all cards from this Pokémon and put this Pokémon on top of your deck.';
+
+test('ability: Banette Puppet Offering takes a Supporter, then goes to the Lost Zone without its attachments', () => {
+  const { state, rng } = board(PUPPET_OFFERING, { zone: 'bench', name: 'Banette' });
+  state.players.p1.zones.discard.push(createCard({ instanceId: 50, name: 'Boss', supertype: 'Trainer', subtypes: ['Supporter'] }));
+  state.players.p1.zones.bench.push(energy(60, 'Psychic', { attachedTo: 70 }));
+  const res = resolveAll(use70(state, rng), rng);
+  assert.equal(zoneOf(res, 'p1', 50), 'hand');
+  assert.equal(zoneOf(res, 'p1', 70), 'lostZone');
+  assert.equal(zoneOf(res, 'p1', 60), 'discard');
+});
+
+test('ability: Banette Puppet Offering with no Supporter in the discard pile stays in play', () => {
+  const { state, rng } = board(PUPPET_OFFERING, { zone: 'bench', name: 'Banette' });
+  const res = use70(state, rng);
+  assert.equal(zoneOf(res, 'p1', 70), 'bench');
+});
+
+test('ability: Unown Farewell Letter discards itself, then draws a card', () => {
+  const { state, rng } = board(FAREWELL_LETTER, { zone: 'bench', name: 'Unown' });
+  state.players.p1.zones.deck.push(createCard({ instanceId: 40, name: 'Top Card' }));
+  const res = use70(state, rng);
+  assert.equal(zoneOf(res, 'p1', 70), 'discard');
+  assert.equal(zoneOf(res, 'p1', 40), 'hand');
+});
+
+test('ability: Tapu Koko Prism Star attaches a {L} Energy to each of 2 Benched Pokémon, then goes to the Lost Zone', () => {
+  const { state, rng } = board(DANCE_OF_THE_ANCIENTS, { zone: 'bench', name: 'Tapu Koko Prism Star' });
+  state.players.p1.zones.discard.push(energy(61, 'Lightning'), energy(62, 'Water'), energy(63, 'Lightning'));
+  let res = use70(state, rng);
+  for (let guard = 0; res.pendingChoice?.player === 'p1' && guard < 12; guard++) {
+    const ids = res.pendingChoice.options.map((o) => o.instanceId);
+    assert.ok(!ids.includes(62), 'a Water Energy is never offered');
+    assert.ok(!ids.includes(80), 'the Active Pokémon is never offered');
+    res = resolveWith(res, [ids.find((id) => id !== 70)], rng);
+  }
+  const hosts = [61, 63].map((id) => res.state.players.p1.zones.bench.find((c) => c.instanceId === id)?.attachedTo);
+  assert.deepEqual(hosts.sort(), [81, 82]);
+  assert.equal(zoneOf(res, 'p1', 70), 'lostZone');
+});
+
+test("ability: Misty's Psyduck Flustered Leap mills the bottom card, then goes on top of the deck", () => {
+  const { state, rng } = board(FLUSTERED_LEAP, { zone: 'bench', name: "Misty's Psyduck" });
+  state.players.p1.zones.deck.push(createCard({ instanceId: 40, name: 'Top' }), createCard({ instanceId: 41, name: 'Bottom' }));
+  state.players.p1.zones.bench.push(energy(60, 'Water', { attachedTo: 70 }));
+  const res = use70(state, rng);
+  const deck = res.state.players.p1.zones.deck.map((c) => c.instanceId);
+  assert.deepEqual(deck, [70, 40]);
+  assert.equal(zoneOf(res, 'p1', 41), 'discard');
+  assert.equal(zoneOf(res, 'p1', 60), 'discard');
+});
+
+test("ability: Misty's Psyduck Flustered Leap with an empty deck stays on the Bench", () => {
+  const { state, rng } = board(FLUSTERED_LEAP, { zone: 'bench', name: "Misty's Psyduck" });
+  const res = use70(state, rng);
+  assert.equal(zoneOf(res, 'p1', 70), 'bench');
+});
+
+// Malamar, Obsidian Flames 138.
+const PSYCHIC_INSIGHT =
+  "Once during your turn, you may look at the top card of your opponent's deck. If you do, look at the top card of your deck.";
+
+test('ability: Malamar Psychic Insight shows both top cards and moves nothing', () => {
+  const { state, rng } = board(PSYCHIC_INSIGHT, { name: 'Malamar' });
+  state.players.p1.zones.deck.push(createCard({ instanceId: 40, name: 'Mine' }), createCard({ instanceId: 41, name: 'Mine 2' }));
+  state.players.p2.zones.deck.push(createCard({ instanceId: 45, name: 'Theirs' }));
+  const res = use70(state, rng);
+  const revealed = res.events.filter((e) => e.type === 'cardsRevealed').map((e) => e.cards.map((c) => c.instanceId));
+  assert.deepEqual(revealed, [[45], [40]]);
+  assert.deepEqual(res.state.players.p1.zones.deck.map((c) => c.instanceId), [40, 41]);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+});

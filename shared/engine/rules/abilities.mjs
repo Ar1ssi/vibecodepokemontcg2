@@ -491,6 +491,88 @@ function parseSelfAttachEnergyShape(lower) {
   };
 }
 
+const SELF = 'this pok[eé]mon';
+
+/**
+ * Parse-hole sweep D4: the cost or the "If you do," half of an activated Ability that the
+ * keyword branches drop. A `cost: true` step that skips stops the rest of the effect.
+ */
+function withIfYouDoHalves(lower, parsed) {
+  let steps = parsed;
+  const markCosts = () => {
+    for (const step of steps) step.cost = true;
+  };
+
+  // Misty's Psyduck Flustered Leap: bottom card of the deck, then this Pokémon onto the deck.
+  if (new RegExp(`discard the bottom card of your deck\\. if you do, discard all cards from ${SELF} and put ${SELF} on top of your deck`).test(lower)) {
+    return [{ type: 'selfLeavesAbility', to: 'deckTop', payDeckBottom: true, guidance: 'Once during your turn: discard the bottom card of your deck, then put this Pokémon on top of your deck.' }];
+  }
+
+  // Malamar Psychic Insight: two looks, no card moves.
+  if (/look at the top card of your opponent's deck\. if you do, look at the top card of your deck/.test(lower)) {
+    return [
+      { type: 'lookAtTopAbility', count: 1, opponent: true, lookOnly: true, cost: true, guidance: "Look at the top card of your opponent's deck." },
+      { type: 'lookAtTopAbility', count: 1, opponent: false, lookOnly: true, guidance: 'Look at the top card of your deck.' },
+    ];
+  }
+
+  // Repeated discard-pile attaches: Milotic Energy Grace "attach 3 basic Energy cards … to 1 of
+  // your Pokémon (excluding Pokémon-EX)", Electrode-GX "attach 5 Energy cards … to your Pokémon,
+  // except Pokémon-GX or Pokémon-EX, in any way you like", Tapu Koko Prism Star "choose 2 of
+  // your Benched Pokémon and attach a {L} Energy card … to each of them".
+  const attach = steps.find((step) => step.type === 'attachAbility' && step.fromDiscard);
+  const many = lower.match(/attach (\d+) (?:basic )?energy cards from your discard pile to (1 of )?your pok[eé]mon/);
+  const each = lower.match(/choose (\d+) of your benched pok[eé]mon and attach an? \{[a-z]\} energy card from your discard pile to each of them/);
+  if (attach && (many || each)) {
+    attach.count = Number((many || each)[1]);
+    if (many?.[2]) attach.sameTarget = true;
+    if (each) Object.assign(attach, { distinctTargets: true, target: 'your benched pokémon' });
+    const excluded = lower.match(/(?:except|excluding) (pok[eé]mon-gx or pok[eé]mon-ex|pok[eé]mon-ex|pok[eé]mon-gx)\b/)?.[1] || '';
+    const kinds = [excluded.includes('-gx') && 'GX', excluded.includes('-ex') && 'EX'].filter(Boolean);
+    if (kinds.length > 0) attach.excludeKinds = kinds;
+  }
+
+  // Goodra Gooey Regeneration, Porygon-Z-GX Troubleshooting.
+  const energyCost = lower.match(new RegExp(`you may discard (an|a special) energy (?:attached to|from) ${SELF}\\. if you do`));
+  if (energyCost) {
+    steps = [
+      { type: 'discardOwnAttachedEnergy', selfOnly: true, special: energyCost[1] === 'a special', cost: true, guidance: 'Discard an Energy from this Pokémon (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Ampharos Unseen Flash: "put 2 {L} Energy cards from your hand in the Lost Zone. If you do".
+  const lostCost = lower.match(/you may put (\d+) \{([a-z])\} energy cards? from your hand in the lost zone\. if you do/);
+  if (lostCost) {
+    steps = [
+      { type: 'lostZoneCost', count: Number(lostCost[1]), energyType: PROVIDES_SYMBOL_TYPES[lostCost[2]] || null, cost: true, guidance: 'Put Energy from your hand in the Lost Zone (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Unown Farewell Letter: "discard this Pokémon and all cards attached to it (…). If you do".
+  if (new RegExp(`you may discard ${SELF} and all cards attached to it[^.]*\\. if you do`).test(lower)) {
+    steps = [{ type: 'selfLeavesAbility', to: 'discard', cost: true, guidance: 'Discard this Pokémon and its attached cards (cost).' }, ...steps];
+  }
+
+  // Cofagrigus Six Feet Under, Milotic Energy Grace: "you may Knock Out this Pokémon. If you do".
+  const koFirst = new RegExp(`you may knock out ${SELF}\\. if you do`).test(lower);
+  // Electrode-GX Extra Energy Bomb: "… If you do, this Pokémon is Knocked Out."
+  const koAfter = new RegExp(`if you do, ${SELF} is knocked out`).test(lower);
+  if (koFirst || koAfter) {
+    if (koAfter) markCosts();
+    for (const step of steps) if (step.type === 'attachAbility') step.excludeSelf = true;
+    steps = [...steps, { type: 'selfLeavesAbility', to: 'knockOut', guidance: 'This Pokémon is Knocked Out.' }];
+  }
+
+  // Banette Puppet Offering, Tapu Koko Prism Star Dance of the Ancients.
+  if (new RegExp(`if you do, (?:put ${SELF} in the lost zone|discard all cards from ${SELF} and put it in the lost zone)`).test(lower)) {
+    markCosts();
+    steps = [...steps, { type: 'selfLeavesAbility', to: 'lostZone', guidance: 'Put this Pokémon in the Lost Zone; discard its attached cards.' }];
+  }
+  return steps;
+}
+
 // Unown MISSING / HAND / DAMAGE: the printed threshold that wins the game.
 function parseWinCondition(lower) {
   const lostZone = lower.match(/opponent has (\d+) or more supporter cards in the lost zone/);
@@ -625,8 +707,7 @@ export function parseAbility(text = '') {
       target: isOpponentBenchSwitch && !opponentFollowUp ? 'opponent' : 'self',
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
       selfSwap: /switch (?:it|this pok[eé]mon) with your active/.test(lower),
-      // Type symbol ("d"), matched by trainer-steps pokemonHasType.
-      pokemonType: typedBench?.[1] || null,
+      pokemonType: typedBench ? parseEnergyTypeHint(`{${typedBench[1]}}`) : null,
       exceptName: lower.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
       poisonNewActive,
       guidance: isOpponentBenchSwitch && !opponentFollowUp
@@ -1338,6 +1419,7 @@ export function parseAbility(text = '') {
     const upTo = lower.match(/up to\s+(\d+)/)?.[1] || null;
     let what = 'card';
     if (lower.includes('energy')) what = 'Energy';
+    else if (lower.includes('supporter')) what = 'Supporter';
     else if (lower.includes('trainer')) what = 'Trainer';
     else if (lower.includes('item')) what = 'Item';
     else if (lower.includes('pokémon') || lower.includes('pokemon')) what = 'Pokémon';
@@ -2063,6 +2145,8 @@ export function parseAbility(text = '') {
   if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
     steps = steps.filter((step) => step.type !== 'attachAbility');
   }
+
+  steps = withIfYouDoHalves(lower, steps);
 
   // ── Passive fallback (only if NO other step matched) ────────────────────
   if (steps.length === 0 && text) {

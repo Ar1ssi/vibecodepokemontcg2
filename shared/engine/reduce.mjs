@@ -3242,7 +3242,8 @@ function endTurnFromEffect(draft, { playerId, activeRng, events }) {
  * Ability outcomes the effect executor can't apply itself, because the KO and game-end flow
  * lives here (design 034 slice 6), announced as events:
  * - `abilitySelfKnockOut` (Electrode Buzzap): Knock Out the holder — the opponent takes
- *   Prizes as usual — then attach the card to the chosen Pokémon as a Special Energy.
+ *   Prizes as usual — then, when the event names a `cardId`, attach that card to the chosen
+ *   Pokémon as a Special Energy.
  * - `abilityWinsGame` (Unown MISSING / HAND / DAMAGE).
  */
 function settleAbilityOutcomes(draft, { events }) {
@@ -3251,8 +3252,11 @@ function settleAbilityOutcomes(draft, { events }) {
     const oppId = Object.keys(draft.players || {}).find((id) => id !== outcome.playerId);
     const root = findCard(draft, outcome.rootId)?.card;
     const target = findCard(draft, outcome.targetId);
-    if (!player || !root || !target || isGameConcluded(draft)) continue;
+    // A plain self-KO (Cofagrigus Six Feet Under) carries no card to attach afterwards.
+    const attachesSelf = outcome.cardId != null;
+    if (!player || !root || (attachesSelf && !target) || isGameConcluded(draft)) continue;
     handleKnockout(draft, { victimPlayerId: outcome.playerId, attackerPlayerId: oppId, victim: root, events });
+    if (!attachesSelf) continue;
     const ref = findCard(draft, outcome.cardId);
     if (!ref || !['discard', 'lostZone'].includes(ref.zoneId)) continue;
     const pile = player.zones[ref.zoneId];

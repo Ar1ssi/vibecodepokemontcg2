@@ -538,6 +538,20 @@ function variableDraw(ctx) {
 // Look at the top/bottom N cards, optionally take one matching card, shuffle the rest back.
 function lookAtDeckEnd(ctx, fromBottom) {
   const { player, step } = ctx;
+  // Malamar Psychic Insight: the player only sees the cards; nothing moves or shuffles.
+  if (step.lookOnly) {
+    const owner = step.opponent ? ctx.opponent : player;
+    const deck = owner?.zones?.deck || [];
+    if (deck.length === 0) return skip(ctx, 'empty_deck');
+    const seen = fromBottom ? deck.slice(-(step.count || 1)) : deck.slice(0, step.count || 1);
+    ctx.events.push({
+      type: 'cardsRevealed',
+      playerId: owner.playerId,
+      revealedTo: player.playerId,
+      cards: seen.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+    return null;
+  }
   const deck = player.zones.deck;
   const count = Math.min(step.count || 7, deck.length);
   const viewed = fromBottom ? deck.slice(deck.length - count) : deck.slice(0, count);
@@ -1012,19 +1026,23 @@ function returnOwnAttachedEnergy(ctx) {
 }
 
 // Celadon City Gym: discard an Energy attached to a qualifying Pokémon to cure it.
+// `selfOnly`: an Ability's cost from its own Pokémon (Goodra Gooey Regeneration; `special`:
+// Porygon-Z-GX Troubleshooting).
 function discardOwnAttachedEnergy(ctx) {
   const { player, step } = ctx;
   const nameFilter = String(step.nameContains || '').toLowerCase();
+  const self = step.selfOnly ? sourceRoot(ctx) : null;
   const hosts = rootsOf(player).filter(
     (root) =>
-      !nameFilter ||
-      String(topPokemonCard(player, root)?.name || '')
-        .toLowerCase()
-        .includes(nameFilter)
+      (!step.selfOnly || root === self) &&
+      (!nameFilter ||
+        String(topPokemonCard(player, root)?.name || '')
+          .toLowerCase()
+          .includes(nameFilter))
   );
   const attached = hosts
     .flatMap((root) => attachedCards(player, root.instanceId))
-    .filter(isEnergy);
+    .filter((card) => isEnergy(card) && (!step.special || isSpecialEnergy(card)));
 
   const applyDiscard = (energy) => {
     const host = hosts.find((root) => root.instanceId === energy.attachedTo);
@@ -1048,7 +1066,9 @@ function discardOwnAttachedEnergy(ctx) {
   }
   if (attached.length === 0) return skip(ctx, 'no_energy_to_discard');
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Stadium')}: Choose an Energy to discard and cure the Pokémon`,
+    prompt: step.selfOnly
+      ? `${sourceName(ctx, 'Ability')}: Choose an Energy to discard from this Pokémon`
+      : `${sourceName(ctx, 'Stadium')}: Choose an Energy to discard and cure the Pokémon`,
     options: attached,
     min: 1,
     max: 1,
@@ -2431,9 +2451,16 @@ function discardOwnBenchPokemon(ctx) {
 }
 
 // Lost Blender / Lost Vacuum — hand cards to the Lost Zone (an unpayable cost is skipped).
+// `energyType`: only that basic Energy qualifies (Ampharos Unseen Flash, "2 {L} Energy cards").
 function lostZoneCost(ctx) {
   const { player, step } = ctx;
-  const hand = player.zones.hand || [];
+  const wanted = String(step.energyType || '').toLowerCase();
+  const hand = (player.zones.hand || []).filter(
+    (card) =>
+      !wanted ||
+      (isEnergy(card) &&
+        [card.name, ...(card.types || [])].some((t) => String(t || '').toLowerCase().includes(wanted)))
+  );
   const count = step.count || 1;
 
   if (ctx.selection) {
@@ -3166,9 +3193,14 @@ function returnSelfToHandAbility(ctx) {
     playerId: player.playerId,
   });
   if (!wasActive) return null;
-  const bench = benchRootsOf(player);
+  return promoteAfterSelfLeft(ctx);
+}
+
+/** An emptied Active auto-promotes a lone Benched Pokémon, else asks (resumed as `promote`). */
+function promoteAfterSelfLeft(ctx) {
+  const bench = benchRootsOf(ctx.player);
   if (bench.length === 1) {
-    promoteToActive(player, bench[0], ctx.events);
+    promoteToActive(ctx.player, bench[0], ctx.events);
     return null;
   }
   if (bench.length === 0) return null;
@@ -3179,6 +3211,53 @@ function returnSelfToHandAbility(ctx) {
     max: 1,
     memo: { phase: 'promote' },
   });
+}
+
+/**
+ * The Ability's own Pokémon leaves play as its cost or its "If you do," half (parse-hole sweep
+ * D4). `to`: 'knockOut' (Cofagrigus Six Feet Under, Milotic Energy Grace, Electrode-GX Extra
+ * Energy Bomb — the reducer's KO flow gives Prizes), 'discard' (Unown Farewell Letter),
+ * 'lostZone' (Banette Puppet Offering, Tapu Koko Prism Star), 'deckTop' (Misty's Psyduck
+ * Flustered Leap). The Pokémon cards of the stack move; other attached cards are discarded.
+ * `payDeckBottom`: first discard the bottom card of the deck, an unpayable cost when empty.
+ */
+function selfLeavesAbility(ctx) {
+  const { player, step } = ctx;
+  if (ctx.memo?.phase === 'promote') {
+    const newActive = benchRootsOf(player).find((c) => c.instanceId === ctx.selection?.[0]);
+    if (newActive) promoteToActive(player, newActive, ctx.events);
+    return null;
+  }
+  const root = sourceRoot(ctx);
+  if (!root) return skip(ctx, 'source_not_in_play');
+  if (step.to === 'knockOut') {
+    ctx.events.push({ type: 'abilitySelfKnockOut', playerId: player.playerId, rootId: root.instanceId });
+    return null;
+  }
+  if (step.payDeckBottom) {
+    const deck = player.zones.deck || [];
+    if (deck.length === 0) return skip(ctx, 'empty_deck');
+    discardCard(ctx.draft, deck[deck.length - 1], ctx.events);
+  }
+  const from = zoneIdOf(player, root);
+  for (const card of [root, ...attachedCards(player, root.instanceId)]) {
+    removeFromZones(player, card);
+    card.attachedTo = null;
+    card.damage = 0;
+    clearConditions(card);
+    if (!isPokemon(card) || step.to === 'discard') discardCardToPlayerZone(player, card);
+    else if (step.to === 'lostZone') pushToLostZone(player, card);
+    else player.zones.deck.unshift(card);
+  }
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: root.instanceId,
+    from,
+    to: step.to === 'deckTop' ? 'deck' : step.to,
+    playerId: player.playerId,
+    reason: 'ability-self-leaves',
+  });
+  return from === 'active' ? promoteAfterSelfLeft(ctx) : null;
 }
 
 // ── design 034 slice 6: one-off ability executables ─────────────────────
@@ -4539,6 +4618,7 @@ export const EXTRA_STEP_HANDLERS = {
   selfBenchPlacementAbility,
   turnDamageBonusAbility,
   returnSelfToHandAbility,
+  selfLeavesAbility,
   // Design 034 slice 6 one-offs.
   winGameAbility,
   drawVariableAbility,
