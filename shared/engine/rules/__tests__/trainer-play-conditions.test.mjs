@@ -219,7 +219,7 @@ test("a KO on the opponent's turn records the victim for the victim's next turn"
   // The attack ended p1's turn, so the record has already rolled into p2's turn flags.
   assert.equal(result.state.turn.player, 'p2');
   assert.equal(flags.koedLastOppTurn, true);
-  assert.deepEqual(flags.koedLastOppTurnVictims, [{ name: 'Gardevoir', types: ['Psychic'] }]);
+  assert.deepEqual(flags.koedLastOppTurnVictims, [{ name: 'Gardevoir', types: ['Psychic'], byAttackDamage: true }]);
 });
 
 // Design 038 row 16 (I148): other copies of Blaine's Last Resort do not block it.

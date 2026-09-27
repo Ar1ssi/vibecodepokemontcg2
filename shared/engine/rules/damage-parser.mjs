@@ -36,6 +36,8 @@ import { parseSearchDeckParams } from './trainer-effects.mjs';
 import { isBasicPokemon } from '../cards.mjs';
 import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 import { parseEachFilter } from './each-filter.mjs';
+import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
+import { normalizeAttackText } from './attack-text.mjs';
 
 export const DAMAGE_COMPONENTS = [
   'per-energy',
@@ -78,12 +80,26 @@ function amount(text, re) {
   return m ? parseInt(m[1], 10) || 0 : 0;
 }
 
+/**
+ * The whole-attack condition vocabulary (attack-conditions.mjs) read against a server-built
+ * ctx (buildServerAttackContext: `benchNames` marks it). One vocabulary for "does nothing"
+ * gates and "N more damage" bonuses. null = unread wording or no server ctx.
+ */
+function sharedCondition(cond, ctx, attacker) {
+  if (!Array.isArray(ctx?.benchNames)) return null;
+  const desc = parseConditionClause(normalizeAttackText(cond, attacker?.name));
+  if (!desc) return null;
+  return attackConditionMet(desc, ctx);
+}
+
 // Evaluate a single printed "if …" condition against the available card data.
 // `cond` is the lowercased condition clause (text between "if" and the
 // "…more damage" clause). Returns true/false when determinable, or null when
 // the condition depends on something not present in card data (e.g. "you
 // have an Energy attached…") — the caller keeps an honest unresolved note.
-function evalCondition(cond, defender, ctx) {
+function evalCondition(cond, defender, ctx, attacker = {}) {
+  const shared = sharedCondition(cond, ctx, attacker);
+  if (shared !== null) return shared;
   // Design 036 A11: the hand cards the attack's own before-damage discard took
   // (ctx.handDiscarded, set by the reducer only for such attacks).
   if (ctx.handDiscarded !== undefined) {
@@ -405,11 +421,16 @@ export function parseAttackDamage(
     // (caller supplies the game value); when the needed ctx field is absent we
     // keep an honest unresolved note instead of silently computing 0.
     const isMore = /more damage for each/.test(text);
-    const per = amount(text, /does (\d+)(?: more)? damage for each/);
+    // Old prints say "does 20 damage plus 10 more damage for each …": the per-unit is the
+    // "more" number.
+    const per = amount(text, /(\d+) more damage for each/) || amount(text, /does (\d+) damage for each/);
     // Anchor on the DAMAGE clause ("…damage for each X") so a coin-count
     // clause like "flip a coin for each Energy attached" is not mistaken for
     // the damage unit (Work Rush: damage scales per HEADS, not per Energy).
-    const unit = (text.match(/damage for each (.+)/) || [])[1] || '';
+    const unit = ((text.match(/damage for each (.+)/) || [])[1] || '').replace(
+      /\bthe defending pok[ée]mon\b/g,
+      "your opponent's active pokémon"
+    );
     let count;
     let label;
     const handKind = /^(trainer|energy) cards? (?:you find there|in your opponent's hand)/.exec(unit)?.[1];
@@ -634,10 +655,28 @@ export function parseAttackDamage(
     // conditions not derivable from card data stay honest unresolved notes.
     // Coin-conditional bonuses ("if heads/if tails") are handled by the coin
     // block below and must not be misfiled here as an unresolved condition.
-    const bonus = amount(text, /(\d+) more damage/);
-    const cond = (text.match(/if (.+?)(?:,| this attack)/) || [])[1] || '';
-    const result = evalCondition(cond, defender, ctx);
-    if (result === null) {
+    // The "if" that gates the bonus is the one in the bonus's own sentence (Castform Weather
+    // Ball prints an unrelated "If you have a Stadium …" first).
+    const bonusSentence =
+      text.split(/(?<=\.)\s+/).find((s) => /\bif\b/.test(s) && /\d+ more damage/.test(s)) || text;
+    const bonus = amount(bonusSentence, /(\d+) more damage/);
+    const cond =
+      (bonusSentence.match(/\bif (.+?),? this attack (?:does|do)\b/) ||
+        bonusSentence.match(/\bif (.+?)(?:,| this attack)/) ||
+        [])[1] || '';
+    const result = evalCondition(cond, defender, ctx, attacker);
+    // "If X, this attack does 30 more damage for each Y" (Deoxys-EX Helix Force): the
+    // condition gates the scaling computed above rather than adding a flat bonus.
+    const gatesScaling =
+      /more damage for each/.test(bonusSentence) && components.includes('per-each');
+    if (gatesScaling) {
+      if (result !== true) total = base;
+      notes.push(
+        result === null
+          ? `conditional scaling — resolve the printed condition`
+          : `${result ? 'scaling applied' : 'scaling not applied'} (condition ${result ? 'met' : 'not met'}: ${cond.trim()})`
+      );
+    } else if (result === null) {
       notes.push(`conditional +${bonus} bonus — resolve the printed condition`);
     } else if (result) {
       total += bonus;

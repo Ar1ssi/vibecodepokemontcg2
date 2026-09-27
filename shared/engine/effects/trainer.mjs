@@ -222,6 +222,9 @@ export function executeTrainer(draft, {
     // ("a Supporter with X in its name") can be evaluated under authority;
     // without it the once-per-turn Stadium never lit up.
     player.flags.lastSupporterName = card.name || '';
+    // Every Supporter this turn (Dual Brains allows two), for "if you played <name> from your
+    // hand during this turn" attack conditions.
+    player.flags.supporterNamesThisTurn = [...(player.flags.supporterNamesThisTurn || []), card.name || ''];
   }
 
   // Tool attachment: attach to target in play

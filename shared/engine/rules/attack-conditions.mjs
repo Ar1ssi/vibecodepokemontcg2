@@ -26,7 +26,7 @@
  * Pure: reads only its arguments, no state, no randomness.
  */
 
-import { normalizeAttackText } from './attack-steps.mjs';
+import { escapeRegExp, normalizeAttackText } from './attack-text.mjs';
 
 const STATUS_WORDS = {
   asleep: 'Asleep',
@@ -66,9 +66,6 @@ const ENERGY_WORD_TYPES = {
 };
 const KNOWN_TYPES = new Set(Object.values(ENERGY_WORD_TYPES).map((type) => type.toLowerCase()));
 
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 /** Does an in-play card name equal `wanted` as a whole word ("Uxie LV.X" matches "uxie")? */
 function nameMatches(actual, wanted) {
@@ -107,6 +104,53 @@ function energyWordType(phrase) {
   const symbol = /\{([a-z])\}/i.exec(String(phrase || ''))?.[1];
   if (symbol) return ENERGY_LETTER_TYPES[symbol.toLowerCase()] || null;
   return ENERGY_WORD_TYPES[String(phrase || '').trim().toLowerCase()] || null;
+}
+
+const DEFENDER = "(?:your opponent's active pokémon|the defending pokémon)";
+const NOT_A_NAME = new Set(['damaged', 'evolved', 'active', 'benched', 'healthy', 'unaffected', 'knocked']);
+
+// One printed Pokémon kind ("a Pokémon-EX", "an Evolution Pokémon", "a TAG TEAM", "a {D} Pokémon")
+// → the key `ruleBoxKinds` (attack-damage-context.mjs) lists for an in-play Pokémon, or null.
+const KIND_PHRASES = [
+  [/^(?:an? )?pokémon[- ]ex$/, () => 'ex'],
+  [/^(?:an? )?pokémon[- ]gx$/, () => 'gx'],
+  [/^(?:an? )?pokémon v$/, () => 'v'],
+  [/^(?:an? )?pokémon vmax$/, () => 'vmax'],
+  [/^(?:an? )?pokémon vstar$/, () => 'vstar'],
+  [/^(?:an? )?tag team(?: pokémon)?$/, () => 'tagteam'],
+  [/^(?:an? )?ultra beasts?$/, () => 'ultrabeast'],
+  [/^(?:an? )?(?:evolved|evolution) pokémon$/, () => 'evolved'],
+  [/^(?:an? )?basic pokémon$/, () => 'basic'],
+  [/^(?:an? )?(tera|radiant|mega) pokémon$/, (m) => m[1]],
+  [/^(?:an? )?\{([a-z])\} pokémon$/, (m) => (ENERGY_LETTER_TYPES[m[1]] ? `type:${ENERGY_LETTER_TYPES[m[1]].toLowerCase()}` : null)],
+  [/^(?:an? )?([a-z]+) pokémon$/, (m) => (ENERGY_WORD_TYPES[m[1]] ? `type:${ENERGY_WORD_TYPES[m[1]].toLowerCase()}` : null)],
+];
+
+function kindOf(phrase) {
+  for (const [re, build] of KIND_PHRASES) {
+    const m = re.exec(phrase.trim());
+    if (m) return build(m);
+  }
+  return null;
+}
+
+/** "a Pokémon-GX or a Pokémon-EX" → ['gx', 'ex']; null when any part is not a known kind. */
+function kindsOf(phrase) {
+  const kinds = String(phrase || '')
+    .split(/,? or /)
+    .map(kindOf);
+  return kinds.length > 0 && kinds.every(Boolean) ? kinds : null;
+}
+
+const ABILITY_KIND_WORDS = { ability: 'ability', abilities: 'ability', 'poké-power': 'power', 'poké-powers': 'power', 'poké-body': 'body', 'poké-bodies': 'body' };
+
+/** "any Poké-Powers or Poké-Bodies" / "an Ability" → ['power', 'body'] / ['ability'], or null. */
+function abilityKindsOf(phrase) {
+  const words = String(phrase || '')
+    .replace(/^(?:any|an?)\s+/, '')
+    .split(/\s+or\s+/)
+    .map((word) => ABILITY_KIND_WORDS[word.trim()]);
+  return words.length > 0 && words.every(Boolean) ? words : null;
 }
 
 /** "10 or more basic {f} Energy cards in your discard pile" → a discardEnergyCount descriptor. */
@@ -167,6 +211,14 @@ const CLAUSES = [
     (m) => ({ desc: { kind: 'handCount', op: 'lte', n: Number(m[1]) }, printedNegated: false }),
   ],
   [/^you have any cards in your hand$/, () => ({ desc: { kind: 'handCount', op: 'gte', n: 1 }, printedNegated: false })],
+  [
+    /^you have the same (?:number|amount) of cards in your hand as your opponent$/,
+    () => ({ desc: { kind: 'sameHandCountAsOpponent' }, printedNegated: false }),
+  ],
+  [
+    /^you don't have any pokémon in your hand$/,
+    () => ({ desc: { kind: 'handPokemonCount', op: 'gte', n: 1 }, printedNegated: true }),
+  ],
 
   // ── Bench size / named Pokémon ─────────────────────────────────────────────
   [/^you don't have any benched pokémon$/, () => ({ desc: { kind: 'benchCount', op: 'gte', n: 1 }, printedNegated: true })],
@@ -187,6 +239,42 @@ const CLAUSES = [
         desc: { kind: 'benchCount', op: 'lte', n: Number(m[1]), ...(type ? { type } : {}) },
         printedNegated: false,
       };
+    },
+  ],
+  [
+    /^you have (?:less|fewer) benched pokémon than your opponent$/,
+    () => ({ desc: { kind: 'benchVsOpponent', op: 'lt' }, printedNegated: false }),
+  ],
+  [
+    /^you have more benched pokémon than your opponent$/,
+    () => ({ desc: { kind: 'benchVsOpponent', op: 'gt' }, printedNegated: false }),
+  ],
+  [
+    /^your benched (?:\{([a-z])\} )?pokémon have any damage counters on them$/,
+    (m) => ({
+      desc: { kind: 'damagedBench', ...(m[1] ? { type: ENERGY_LETTER_TYPES[m[1]] } : {}) },
+      printedNegated: false,
+    }),
+  ],
+  [
+    /^(.+?) (?:is|are) on your bench$/,
+    (m) => {
+      const names = splitNames(m[1]);
+      return names ? { desc: { kind: 'benchHasName', names }, printedNegated: false } : null;
+    },
+  ],
+  [
+    /^(.+?) (?:is|are) in your discard pile$/,
+    (m) => {
+      const names = splitNames(m[1]);
+      return names ? { desc: { kind: 'discardHasName', names }, printedNegated: false } : null;
+    },
+  ],
+  [
+    /^(.+?) is anywhere under this pokémon$/,
+    (m) => {
+      const names = splitNames(m[1]);
+      return names ? { desc: { kind: 'stackHasName', names }, printedNegated: false } : null;
     },
   ],
   [
@@ -239,14 +327,22 @@ const CLAUSES = [
     new RegExp(`^it is not (${STATUS_RE})$`),
     (m) => ({ desc: { kind: 'attackerStatus', status: STATUS_WORDS[m[1]] }, printedNegated: true }),
   ],
+  [
+    new RegExp(`^${DEFENDER} is (?:not )?affected by (?:a|any) special conditions?$`),
+    (m) => ({ desc: { kind: 'defenderAnyStatus' }, printedNegated: / is not /.test(m[0]) }),
+  ],
+  [
+    /^this pokémon is (?:not )?affected by (?:a|any) special conditions?$/,
+    (m) => ({ desc: { kind: 'attackerAnyStatus' }, printedNegated: / is not /.test(m[0]) }),
+  ],
 
   // ── Rule box / stage of the defender ───────────────────────────────────────
   [
-    /^(?:your opponent's active pokémon|the defending pokémon) (?:isn't|is not) a pokémon[- ]ex$/,
+    /^(?:your opponent's active pokémon|the defending pokémon) (?:isn't|is not) (?:a )?pokémon[- ]ex$/,
     () => ({ desc: { kind: 'defenderRuleBox', value: 'ex' }, printedNegated: true }),
   ],
   [
-    /^(?:your opponent's active pokémon|the defending pokémon) is a pokémon[- ]ex$/,
+    /^(?:your opponent's active pokémon|the defending pokémon) is (?:a )?pokémon[- ]ex$/,
     () => ({ desc: { kind: 'defenderRuleBox', value: 'ex' }, printedNegated: false }),
   ],
   [
@@ -265,14 +361,66 @@ const CLAUSES = [
     /^(?:your opponent's active pokémon|the defending pokémon) is a (tera|radiant|mega) pokémon$/,
     (m) => ({ desc: { kind: 'defenderRuleBox', value: m[1] }, printedNegated: false }),
   ],
+  // Poliwrath Beatdown: "a {D} Pokémon or has Dark in its name".
+  [
+    new RegExp(`^${DEFENDER} is an? \\{([a-z])\\} pokémon or has (\\w+) in its name$`),
+    (m) => ({
+      desc: {
+        kind: 'defenderKindOrName',
+        values: [`type:${String(ENERGY_LETTER_TYPES[m[1]] || '').toLowerCase()}`],
+        nameWord: m[2],
+      },
+      printedNegated: false,
+    }),
+  ],
+  // Any other printed kind list ("an Evolution Pokémon", "a Pokémon-GX or a Pokémon-EX", "a
+  // TAG TEAM"); a bare name ("Seviper") names the defender.
+  [
+    new RegExp(`^${DEFENDER} (is|isn't|is not) (.+)$`),
+    (m) => {
+      const negated = m[1] !== 'is';
+      const values = kindsOf(m[2]);
+      if (values) return { desc: { kind: 'defenderRuleBox', values }, printedNegated: negated };
+      // A name is one printed word ("Seviper"); anything longer is a state we do not read.
+      if (!/^[a-z][\w.'-]*$/.test(m[2]) || NOT_A_NAME.has(m[2])) return null;
+      return { desc: { kind: 'defenderName', names: [m[2]] }, printedNegated: negated };
+    },
+  ],
+  [
+    /^your opponent has (?:any|an?) (.+?) in play$/,
+    (m) => {
+      const values = kindsOf(m[1]);
+      return values ? { desc: { kind: 'opponentInPlayKind', values }, printedNegated: false } : null;
+    },
+  ],
+
+  // ── Abilities ──────────────────────────────────────────────────────────────
+  [
+    new RegExp(`^${DEFENDER} has (an ability|any abilities|any poké-powers or poké-bodies|any poké-bodies or poké-powers|any poké-powers|any poké-bodies)$`),
+    (m) => ({ desc: { kind: 'defenderAbility', abilityKinds: abilityKindsOf(m[1]) }, printedNegated: false }),
+  ],
+  [
+    new RegExp(`^${DEFENDER} has no abilities$`),
+    () => ({ desc: { kind: 'defenderAbility', abilityKinds: ['ability'] }, printedNegated: true }),
+  ],
+  [
+    /^you don't have any pokémon with (any poké-powers|any poké-bodies|an ability|any abilities) in play$/,
+    (m) => ({ desc: { kind: 'ownInPlayAbility', abilityKinds: abilityKindsOf(m[1]) }, printedNegated: true }),
+  ],
+
+  // ── Resistance ─────────────────────────────────────────────────────────────
+  [
+    new RegExp(`^${DEFENDER} has \\{([a-z])\\} resistance$`),
+    (m) => ({ desc: { kind: 'defenderResistance', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
 
   // ── What happened this turn ────────────────────────────────────────────────
   [
-    /^this pokémon didn't move from the bench to the active spot this turn$/,
+    /^this pokémon didn't move from (?:the|your) bench to the active spot this turn$/,
     () => ({ desc: { kind: 'movedToActiveThisTurn' }, printedNegated: true }),
   ],
   [
-    /^this pokémon moved from the bench to the active spot this turn$/,
+    /^this pokémon (?:moved from (?:the|your) bench to the active spot|was on (?:the|your) bench and became your active pokémon) this turn$/,
     () => ({ desc: { kind: 'movedToActiveThisTurn' }, printedNegated: false }),
   ],
   [
@@ -283,6 +431,56 @@ const CLAUSES = [
     /^this pokémon didn't evolve during this turn$/,
     () => ({ desc: { kind: 'evolvedThisTurn' }, printedNegated: true }),
   ],
+  [
+    /^this pokémon evolved from (.+?) during this turn$/,
+    (m) => {
+      const names = splitNames(m[1]);
+      return names ? { desc: { kind: 'evolvedThisTurn', fromNames: names }, printedNegated: false } : null;
+    },
+  ],
+  [
+    /^this pokémon was healed during this turn$/,
+    () => ({ desc: { kind: 'healedThisTurn' }, printedNegated: false }),
+  ],
+  [
+    /^you attach(?:ed)? an? (?:\{([a-z])\} )?energy card from your hand to this pokémon during this turn$/,
+    (m) => ({
+      desc: { kind: 'handEnergyAttachedThisTurn', ...(m[1] ? { type: ENERGY_LETTER_TYPES[m[1]] } : {}) },
+      printedNegated: false,
+    }),
+  ],
+  [
+    /^you played (?:a|any) supporter card from your hand during this turn$/,
+    () => ({ desc: { kind: 'supporterPlayedThisTurn' }, printedNegated: false }),
+  ],
+  [
+    /^you played a supporter card that has "(.+?)" in its name from your hand during this turn$/,
+    (m) => ({ desc: { kind: 'supporterPlayedThisTurn', nameContains: m[1] }, printedNegated: false }),
+  ],
+  [
+    /^you played (.+?) from your hand during this turn$/,
+    (m) => {
+      if (/\b(?:card|cards|any|a)\b/.test(m[1])) return null;
+      return { desc: { kind: 'supporterPlayedThisTurn', names: [m[1].trim()] }, printedNegated: false };
+    },
+  ],
+  [
+    /^this pokémon used (.+?) during your last turn$/,
+    (m) => ({ desc: { kind: 'usedAttackLastTurn', attackName: m[1].trim() }, printedNegated: false }),
+  ],
+
+  // ── Knock Outs during the opponent's last turn ─────────────────────────────
+  [
+    /^any of your (?:\{([a-z])\} )?pokémon were knocked out( by damage from (?:an|an opponent's|your opponent's) attacks?)? during (?:your opponent's|their) last turn$/,
+    (m) => ({
+      desc: {
+        kind: 'koLastOpponentTurn',
+        ...(m[1] ? { type: ENERGY_LETTER_TYPES[m[1]] } : {}),
+        ...(m[2] ? { byAttackDamage: true } : {}),
+      },
+      printedNegated: false,
+    }),
+  ],
 
   // ── Damage counters ────────────────────────────────────────────────────────
   [
@@ -290,12 +488,12 @@ const CLAUSES = [
     () => ({ desc: { kind: 'attackerDamageCounters', op: 'gte', n: 1 }, printedNegated: true }),
   ],
   [
-    /^this pokémon has any damage counters on it$/,
+    /^this pokémon (?:already )?has any damage counters on it$/,
     () => ({ desc: { kind: 'attackerDamageCounters', op: 'gte', n: 1 }, printedNegated: false }),
   ],
   [
-    /^this pokémon has (\d+) or more damage counters on it$/,
-    (m) => ({ desc: { kind: 'attackerDamageCounters', op: 'gte', n: Number(m[1]) }, printedNegated: false }),
+    /^this pokémon (?:already )?has (?:(\d+) or more|at least (\d+)) damage counters on it$/,
+    (m) => ({ desc: { kind: 'attackerDamageCounters', op: 'gte', n: Number(m[1] || m[2]) }, printedNegated: false }),
   ],
   [
     /^this pokémon has (\d+) or fewer damage counters on it$/,
@@ -310,8 +508,8 @@ const CLAUSES = [
     () => ({ desc: { kind: 'defenderDamageCounters', op: 'gte', n: 1 }, printedNegated: false }),
   ],
   [
-    /^(?:your opponent's active pokémon|the defending pokémon) has (\d+) or more damage counters on it$/,
-    (m) => ({ desc: { kind: 'defenderDamageCounters', op: 'gte', n: Number(m[1]) }, printedNegated: false }),
+    /^(?:your opponent's active pokémon|the defending pokémon) (?:already )?has (?:(\d+) or more|at least (\d+)) damage counters on it$/,
+    (m) => ({ desc: { kind: 'defenderDamageCounters', op: 'gte', n: Number(m[1] || m[2]) }, printedNegated: false }),
   ],
   [
     /^(?:your opponent's active pokémon|the defending pokémon) has (\d+) or fewer damage counters on it$/,
@@ -334,15 +532,15 @@ const CLAUSES = [
     }),
   ],
   [
-    /^your opponent has exactly (\d+) prize cards? remaining$/,
+    /^your opponent has (?:exactly|only) (\d+) prize cards? (?:remaining|left)$/,
     (m) => ({ desc: { kind: 'opponentPrizes', op: 'eq', n: Number(m[1]) }, printedNegated: false }),
   ],
   [
-    /^your opponent has (\d+) or fewer prize cards? remaining$/,
+    /^your opponent has (\d+) or fewer prize cards? (?:remaining|left)$/,
     (m) => ({ desc: { kind: 'opponentPrizes', op: 'lte', n: Number(m[1]) }, printedNegated: false }),
   ],
   [
-    /^your opponent has (\d+) or more prize cards? remaining$/,
+    /^your opponent has (\d+) or more prize cards? (?:remaining|left)$/,
     (m) => ({ desc: { kind: 'opponentPrizes', op: 'gte', n: Number(m[1]) }, printedNegated: false }),
   ],
   [
@@ -351,6 +549,18 @@ const CLAUSES = [
       desc: { kind: 'ownPrizes', op: 'eq', n: [Number(m[1]), Number(m[2]), Number(m[3])] },
       printedNegated: false,
     }),
+  ],
+  [
+    /^you have (?:exactly|only) (\d+) prize cards? (?:remaining|left)$/,
+    (m) => ({ desc: { kind: 'ownPrizes', op: 'eq', n: Number(m[1]) }, printedNegated: false }),
+  ],
+  [
+    /^you have more prize cards (?:remaining|left) than your opponent$/,
+    () => ({ desc: { kind: 'prizesVsOpponent', op: 'gt' }, printedNegated: false }),
+  ],
+  [
+    /^you have (?:fewer|less) prize cards (?:remaining|left) than your opponent$/,
+    () => ({ desc: { kind: 'prizesVsOpponent', op: 'lt' }, printedNegated: false }),
   ],
 
   // ── Opponent hand ──────────────────────────────────────────────────────────
@@ -365,18 +575,49 @@ const CLAUSES = [
 
   // ── Attached / discarded Energy ────────────────────────────────────────────
   [
-    /^this pokémon has no (.+?) energy attached$/,
+    /^this pokémon has any special energy(?: cards?)? attached(?: to it)?$/,
+    () => ({ desc: { kind: 'attackerSpecialEnergy' }, printedNegated: false }),
+  ],
+  [
+    /^this pokémon has no special energy(?: cards?)? attached(?: to it)?$/,
+    () => ({ desc: { kind: 'attackerSpecialEnergy' }, printedNegated: true }),
+  ],
+  [
+    /^this pokémon has at least (\d+) extra (?:\{([a-z])\} )?energy attached(?: to it)?(?: \(in addition to this attack's cost\))?$/,
+    (m) => ({
+      desc: { kind: 'attackerExtraEnergy', n: Number(m[1]), ...(m[2] ? { type: ENERGY_LETTER_TYPES[m[2]] } : {}) },
+      printedNegated: false,
+    }),
+  ],
+  [
+    /^this pokémon has no (.+?) energy(?: cards?)? attached(?: to it)?$/,
     (m) => ({
       desc: { kind: 'attackerEnergyType', ...energyFromPhrase(m[1]), n: 1 },
       printedNegated: true,
     }),
   ],
   [
-    /^this pokémon has any (.+?) energy attached$/,
+    /^this pokémon has (any|an?|at least \d+|\d+ or more) (.+?) energy(?: cards?)? attached(?: to it)?$/,
     (m) => ({
-      desc: { kind: 'attackerEnergyType', ...energyFromPhrase(m[1]), n: 1 },
+      desc: { kind: 'attackerEnergyType', ...energyFromPhrase(m[2]), n: Number(/\d+/.exec(m[1])?.[0] || 1) },
       printedNegated: false,
     }),
+  ],
+  [
+    /^this pokémon and (?:your opponent's active pokémon|the defending pokémon) have the same (?:amount|number) of energy attached(?: to them)?$/,
+    () => ({ desc: { kind: 'energyVsDefender', op: 'eq' }, printedNegated: false }),
+  ],
+  [
+    /^this pokémon has (?:less|fewer) energy attached(?: to it)? than (?:your opponent's active pokémon|the defending pokémon)$/,
+    () => ({ desc: { kind: 'energyVsDefender', op: 'lt' }, printedNegated: false }),
+  ],
+  [
+    /^this pokémon has more energy attached(?: to it)? than (?:your opponent's active pokémon|the defending pokémon)$/,
+    () => ({ desc: { kind: 'energyVsDefender', op: 'gt' }, printedNegated: false }),
+  ],
+  [
+    /^(?:your opponent's active pokémon|the defending pokémon) has no energy(?: cards?)? attached(?: to it)?$/,
+    () => ({ desc: { kind: 'defenderEnergyCount', op: 'eq', n: 0 }, printedNegated: false }),
   ],
   [
     /^you don't have (\d+) or more (basic )?(.+?) energy cards? in your discard pile$/,
@@ -391,6 +632,34 @@ const CLAUSES = [
       desc: discardEnergyDescriptor(m[3], m[2], 'lt', Number(m[1])),
       printedNegated: false,
     }),
+  ],
+
+  // ── Pokémon Tools ──────────────────────────────────────────────────────────
+  [
+    /^this pokémon has (?:a|any) pokémon tools?(?: cards?)? attached(?: to it)?$/,
+    () => ({ desc: { kind: 'attackerToolCount', op: 'gte', n: 1 }, printedNegated: false }),
+  ],
+  [
+    /^this pokémon has no pokémon tools?(?: cards?)? attached(?: to it)?$/,
+    () => ({ desc: { kind: 'attackerToolCount', op: 'gte', n: 1 }, printedNegated: true }),
+  ],
+  [
+    /^(?:your opponent's active pokémon|the defending pokémon) has (?:a|any) pokémon tools?(?: cards?)? attached(?: to it)?$/,
+    () => ({ desc: { kind: 'defenderToolCount', op: 'gte', n: 1 }, printedNegated: false }),
+  ],
+
+  // ── Stadium ownership ──────────────────────────────────────────────────────
+  [/^you have a stadium(?: card)? in play$/, () => ({ desc: { kind: 'stadiumOwner', owner: 'self' }, printedNegated: false })],
+  [
+    /^your opponent has a stadium(?: card)? in play$/,
+    () => ({ desc: { kind: 'stadiumOwner', owner: 'opponent' }, printedNegated: false }),
+  ],
+  [
+    /^(.+?) is in play$/,
+    (m) => {
+      const names = splitNames(m[1]);
+      return names ? { desc: { kind: 'namedCardInPlay', names }, printedNegated: false } : null;
+    },
   ],
 
   // ── HP ─────────────────────────────────────────────────────────────────────
@@ -409,11 +678,11 @@ const CLAUSES = [
 
   // ── Special Energy on the defender ─────────────────────────────────────────
   [
-    /^(?:your opponent's active pokémon|the defending pokémon) has any special energy attached$/,
+    /^(?:your opponent's active pokémon|the defending pokémon) has any special energy(?: cards?)? attached(?: to it)?$/,
     () => ({ desc: { kind: 'defenderHasSpecialEnergy' }, printedNegated: false }),
   ],
   [
-    /^(?:your opponent's active pokémon|the defending pokémon) has no special energy attached$/,
+    /^(?:your opponent's active pokémon|the defending pokémon) has no special energy(?: cards?)? attached(?: to it)?$/,
     () => ({ desc: { kind: 'defenderHasSpecialEnergy' }, printedNegated: true }),
   ],
 ];
@@ -429,7 +698,9 @@ function parseClause(raw) {
   if (!clause) return null;
   for (const [re, build] of CLAUSES) {
     const m = re.exec(clause);
-    if (m) return build(m, clause);
+    const printed = m ? build(m, clause) : null;
+    // A row that matches but cannot read its phrase (an unknown name or kind) falls through.
+    if (printed) return printed;
   }
   return null;
 }
@@ -548,6 +819,36 @@ const RULE_BOX_FLAGS = {
   mega: (ctx) => ctx.defenderIsMega,
 };
 
+/** A flag the caller set wins (unit tests set them alone); else the defender's kind list. */
+function defenderIsKind(ctx, value) {
+  const flag = RULE_BOX_FLAGS[value]?.(ctx);
+  if (typeof flag === 'boolean') return flag;
+  return list(ctx.defenderKinds).includes(value);
+}
+
+const COST_LETTERS = { g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic', f: 'fighting', d: 'darkness', m: 'metal', y: 'fairy', n: 'dragon', c: 'colorless' };
+
+/** A printed cost symbol ("Fire", "{R}", "R") → lowercase type word. */
+function costType(symbol) {
+  const raw = String(symbol || '').replace(/[{}]/g, '').trim().toLowerCase();
+  const word = COST_LETTERS[raw] || raw;
+  return word === 'dark' ? 'darkness' : word;
+}
+
+/**
+ * Energy attached beyond the attack's printed cost (App. "extra Energy"): of `type` when
+ * printed ("2 extra {W} Energy" counts Water beyond the cost's Water symbols), else in total.
+ */
+function extraEnergyCount(ctx, type) {
+  const units = list(ctx.attackerEnergyUnits).map((unit) => String(unit).toLowerCase());
+  const cost = list(ctx.attackCost).map(costType);
+  if (!type) return units.length - cost.length;
+  const wanted = String(type).toLowerCase() === 'dark' ? 'darkness' : String(type).toLowerCase();
+  const provides = (unit) =>
+    unit.split('|').some((part) => part === wanted || (wanted === 'darkness' && part === 'dark'));
+  return units.filter(provides).length - cost.filter((symbol) => symbol === wanted).length;
+}
+
 const CHECKS = {
   defenderStatus: (cond, ctx) => list(ctx.defenderConditions).includes(cond.status),
   attackerStatus: (cond, ctx) => list(ctx.attackerConditions).includes(cond.status),
@@ -565,13 +866,77 @@ const CHECKS = {
   discardEnergyCount: (cond, ctx) => compare(discardEnergyCount(ctx, cond), cond.op, cond.n),
   attackerDamageCounters: (cond, ctx) => compare(damageCounters(ctx.attackerDamage), cond.op, cond.n),
   defenderDamageCounters: (cond, ctx) => compare(damageCounters(ctx.defenderDamage), cond.op, cond.n),
-  defenderRuleBox: (cond, ctx) => Boolean(RULE_BOX_FLAGS[cond.value]?.(ctx)),
+  defenderRuleBox: (cond, ctx) => (cond.values || [cond.value]).some((value) => defenderIsKind(ctx, value)),
   movedToActiveThisTurn: (cond, ctx) => ctx.attackerMovedToActiveThisTurn === true,
-  evolvedThisTurn: (cond, ctx) => ctx.attackerEvolvedThisTurn === true,
+  evolvedThisTurn: (cond, ctx) =>
+    ctx.attackerEvolvedThisTurn === true &&
+    (!cond.fromNames ||
+      cond.fromNames.every((name) => list(ctx.attackerStackNames).some((actual) => nameMatches(actual, name)))),
   defenderMaxHp: (cond, ctx) => compare(num(ctx.defenderMaxHp), cond.op, cond.n),
   defenderRemainingHpVsAttacker: (cond, ctx) =>
     compare(num(ctx.defenderRemainingHp), cond.op, num(ctx.attackerRemainingHp)),
   defenderHasSpecialEnergy: (cond, ctx) => num(ctx.defenderSpecialEnergyCount) > 0,
+  defenderAnyStatus: (cond, ctx) => list(ctx.defenderConditions).length > 0,
+  attackerAnyStatus: (cond, ctx) => list(ctx.attackerConditions).length > 0,
+  defenderKindOrName: (cond, ctx) =>
+    cond.values.some((value) => defenderIsKind(ctx, value)) ||
+    new RegExp(`\\b${escapeRegExp(String(cond.nameWord || ''))}\\b`, 'i').test(String(ctx.defenderName || '')),
+  defenderName: (cond, ctx) => list(cond.names).some((name) => nameMatches(ctx.defenderName, name)),
+  opponentInPlayKind: (cond, ctx) =>
+    list(ctx.opponentInPlayKinds).some((kinds) => cond.values.some((value) => list(kinds).includes(value))),
+  defenderAbility: (cond, ctx) => list(ctx.defenderAbilityKinds).some((kind) => list(cond.abilityKinds).includes(kind)),
+  ownInPlayAbility: (cond, ctx) =>
+    list(ctx.ownInPlayAbilityKinds).some((kinds) => list(kinds).some((kind) => list(cond.abilityKinds).includes(kind))),
+  defenderResistance: (cond, ctx) =>
+    list(ctx.defenderResistanceTypes).some((type) => String(type).toLowerCase() === String(cond.type).toLowerCase()),
+  healedThisTurn: (cond, ctx) => ctx.attackerHealedThisTurn === true,
+  handEnergyAttachedThisTurn: (cond, ctx) => {
+    const types = list(ctx.attackerHandEnergyTypesThisTurn);
+    if (!cond.type) return types.length > 0;
+    return types.some((type) => String(type).toLowerCase() === String(cond.type).toLowerCase());
+  },
+  supporterPlayedThisTurn: (cond, ctx) => {
+    const names = list(ctx.supporterNamesThisTurn);
+    if (cond.names) return cond.names.some((wanted) => names.some((actual) => nameMatches(actual, wanted)));
+    if (cond.nameContains) {
+      const word = String(cond.nameContains).toLowerCase();
+      return names.some((actual) => String(actual).toLowerCase().includes(word));
+    }
+    return ctx.supporterPlayedThisTurn === true || names.length > 0;
+  },
+  usedAttackLastTurn: (cond, ctx) =>
+    String(ctx.attackerLastTurnAttackName || '').toLowerCase() === String(cond.attackName).toLowerCase(),
+  koLastOpponentTurn: (cond, ctx) =>
+    list(ctx.koLastOpponentTurnVictims).some(
+      (victim) =>
+        (!cond.byAttackDamage || victim?.byAttackDamage === true) &&
+        (!cond.type || list(victim?.types).some((t) => String(t).toLowerCase() === String(cond.type).toLowerCase()))
+    ),
+  handPokemonCount: (cond, ctx) => compare(num(ctx.ownHandPokemonCount), cond.op, cond.n),
+  benchVsOpponent: (cond, ctx) => compare(list(ctx.benchNames).length, cond.op, num(ctx.opponentBenchCount)),
+  damagedBench: (cond, ctx) =>
+    list(ctx.benchDamaged).some(
+      (damaged, i) =>
+        damaged === true &&
+        (!cond.type ||
+          list(list(ctx.benchTypes)[i]).some((t) => String(t).toLowerCase() === String(cond.type).toLowerCase()))
+    ),
+  discardHasName: (cond, ctx) =>
+    list(cond.names).every((name) => list(ctx.ownDiscardNames).some((actual) => nameMatches(actual, name))),
+  stackHasName: (cond, ctx) =>
+    list(cond.names).every((name) => list(ctx.attackerStackNames).some((actual) => nameMatches(actual, name))),
+  prizesVsOpponent: (cond, ctx) => compare(num(ctx.ownPrizes), cond.op, num(ctx.opponentPrizes)),
+  attackerSpecialEnergy: (cond, ctx) => num(ctx.specialEnergyOnSelfCount) > 0,
+  attackerExtraEnergy: (cond, ctx) => extraEnergyCount(ctx, cond.type) >= num(cond.n),
+  energyVsDefender: (cond, ctx) => compare(num(ctx.energyCount), cond.op, num(ctx.opponentEnergyCount)),
+  defenderEnergyCount: (cond, ctx) => compare(num(ctx.opponentEnergyCount), cond.op, cond.n),
+  attackerToolCount: (cond, ctx) => compare(num(ctx.attackerToolCount), cond.op, cond.n),
+  defenderToolCount: (cond, ctx) => compare(num(ctx.defenderToolCount), cond.op, cond.n),
+  stadiumOwner: (cond, ctx) => ctx.stadiumOwner === cond.owner,
+  namedCardInPlay: (cond, ctx) =>
+    list(cond.names).every((name) =>
+      [ctx.stadiumName, ...list(ctx.allInPlayNames)].some((actual) => nameMatches(actual, name))
+    ),
 };
 
 // A condition about the defender is skipped (attack proceeds) when there is no defender: an
@@ -583,6 +948,14 @@ const DEFENDER_KINDS = new Set([
   'defenderMaxHp',
   'defenderRemainingHpVsAttacker',
   'defenderHasSpecialEnergy',
+  'defenderAnyStatus',
+  'defenderKindOrName',
+  'defenderName',
+  'defenderAbility',
+  'defenderResistance',
+  'energyVsDefender',
+  'defenderEnergyCount',
+  'defenderToolCount',
 ]);
 
 /**

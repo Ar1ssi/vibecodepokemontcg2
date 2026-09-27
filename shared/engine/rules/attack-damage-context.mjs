@@ -19,7 +19,13 @@ import {
   isTeraCard,
   isRadiantCard,
   isMegaCard,
+  isVCard,
+  isVmaxCard,
+  isVstarCard,
+  isTagTeamCard,
+  isUltraBeastCard,
 } from './card-classify.mjs';
+import { priorEvolutionCards } from './evolved-pokemon.mjs';
 
 const zoneOf = (player, zoneId) =>
   Array.isArray(player?.zones?.[zoneId]) ? player.zones[zoneId] : [];
@@ -109,6 +115,73 @@ const isGrassPokemon = ({ card, view }) =>
 const isDamagedTauros = ({ card, view }) =>
   /tauros/i.test(card?.name || view?.name || '') && (card?.damage || 0) > 0;
 
+const isTool = (card) => {
+  const subtypes = Array.isArray(card?.subtypes) ? card.subtypes.join(' ') : card?.subtypes || '';
+  return `${card?.type || ''} ${card?.trainerType || ''} ${subtypes}`.toLowerCase().includes('tool');
+};
+
+function toolCountOn(player, pokemon) {
+  if (!pokemon) return 0;
+  return [...zoneOf(player, 'active'), ...zoneOf(player, 'bench')].filter(
+    (card) => card.attachedTo === pokemon.instanceId && isTool(card)
+  ).length;
+}
+
+/**
+ * The printed kinds an attack condition can name for one in-play Pokémon (attack-conditions.mjs
+ * KIND_PHRASES): rule boxes, Basic/evolved, and `type:<word>` per printed type.
+ */
+function ruleBoxKinds(view) {
+  if (!view) return [];
+  const checks = [
+    ['ex', isExCard],
+    ['gx', isGxCard],
+    ['v', isVCard],
+    ['vmax', isVmaxCard],
+    ['vstar', isVstarCard],
+    ['tagteam', isTagTeamCard],
+    ['ultrabeast', isUltraBeastCard],
+    ['tera', isTeraCard],
+    ['radiant', isRadiantCard],
+    ['mega', isMegaCard],
+  ];
+  const kinds = checks.filter(([, test]) => test(view)).map(([kind]) => kind);
+  kinds.push(isBasicPokemon(view) ? 'basic' : 'evolved');
+  for (const type of view.types || []) {
+    const word = String(type).toLowerCase();
+    kinds.push(`type:${word === 'dark' ? 'darkness' : word}`);
+  }
+  return kinds;
+}
+
+/** Printed ability kinds of one Pokémon: 'ability', 'power' (Poké-Power), 'body' (Poké-Body). */
+function abilityKinds(view) {
+  return (Array.isArray(view?.abilities) ? view.abilities : []).map((ability) => {
+    const type = String(ability?.type || '').toLowerCase();
+    if (/power/.test(type)) return 'power';
+    if (/body/.test(type)) return 'body';
+    return 'ability';
+  });
+}
+
+const attackerZone = (player, pokemon) =>
+  ['active', 'bench'].map((zoneId) => zoneOf(player, zoneId)).find((cards) => cards.includes(pokemon)) || [];
+
+/** 'self' / 'opponent' for the player who put the Stadium in play; null when none or unknown. */
+function stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId) {
+  const owner = stadiumCard?.ownerId ?? stadiumCard?.playerId ?? stadiumCard?.playedBy ?? null;
+  if (!owner) return null;
+  if (owner === attackerPlayerId) return 'self';
+  return owner === defenderPlayerId ? 'opponent' : null;
+}
+
+function resistanceTypes(view) {
+  const raw = view?.resistance ?? view?.resistances;
+  return (Array.isArray(raw) ? raw : raw ? [raw] : [])
+    .map((entry) => (typeof entry === 'string' ? entry : entry?.type))
+    .filter(Boolean);
+}
+
 /**
  * Build the `ctx` argument for `parseAttackDamage`.
  *
@@ -148,6 +221,7 @@ export function buildServerAttackContext(
     lostZoned = undefined,
     handDiscarded = undefined,
     revealedMatches = undefined,
+    attack = null,
   } = {}
 ) {
   const own = state?.players?.[attackerPlayerId] || null;
@@ -231,6 +305,35 @@ export function buildServerAttackContext(
     attackerEvolvedThisTurn: Boolean(attacker && own?.flags?.evolved?.[attacker.instanceId]),
     attackerRemainingHp: Math.max(0, (Number(attackerCard.hp) || 0) - (attacker?.damage || 0)),
     coin,
+    // Conditional-bonus reads (attack-conditions.mjs): what happened this turn and what the
+    // board holds beyond the counts above.
+    attackerEnergyUnits: energyOn(own, attacker, { stadiumCard, opponent }),
+    attackCost: Array.isArray(attack?.cost) ? [...attack.cost] : [],
+    attackerToolCount: toolCountOn(own, attacker),
+    attackerStackNames: attacker
+      ? priorEvolutionCards(attackerZone(own, attacker), attacker).map((card) => card.name || '')
+      : [],
+    attackerHealedThisTurn: attacker != null && Number(attacker.healedTurn) === turnNumber,
+    attackerHandEnergyTypesThisTurn: (own?.flags?.handEnergyAttachedThisTurn || [])
+      .filter((entry) => attacker && entry.hostId === attacker.instanceId)
+      .map((entry) => attackerEnergy.find((card) => card.instanceId === entry.energyId))
+      .filter(Boolean)
+      .map((card) => serverEnergyDescriptor(card).type),
+    attackerLastTurnAttackName:
+      attacker && own?.lastAttack?.attackerInstanceId === attacker.instanceId && own.lastAttack.turnNumber === turnNumber - 2
+        ? own.lastAttack.attack?.name || ''
+        : '',
+    supporterPlayedThisTurn: Boolean(own?.flags?.supporterPlayed),
+    supporterNamesThisTurn: own?.flags?.supporterNamesThisTurn || (own?.flags?.lastSupporterName ? [own.flags.lastSupporterName] : []),
+    koLastOpponentTurnVictims: own?.flags?.koedLastOppTurnVictims || [],
+    ownHandPokemonCount: zoneOf(own, 'hand').filter(isPokemon).length,
+    benchDamaged: ownBench.map(({ card }) => (card.damage || 0) > 0),
+    ownDiscardNames: zoneOf(own, 'discard').map((card) => card.name || ''),
+    ownInPlayAbilityKinds: ownInPlay.map(({ view }) => abilityKinds(view)),
+    opponentInPlayKinds: inPlayPokemon(opponent).map(({ view }) => ruleBoxKinds(view)),
+    stadiumOwner: stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId),
+    stadiumName: stadiumCard?.name || '',
+    allInPlayNames: [...ownInPlay, ...inPlayPokemon(opponent)].map(({ card, view }) => view?.name || card?.name || ''),
   };
 
   if (energyDiscarded !== undefined) {
@@ -271,6 +374,11 @@ export function buildServerAttackContext(
     ctx.defenderIsTera = isTeraCard(defenderCard);
     ctx.defenderIsRadiant = isRadiantCard(defenderCard);
     ctx.defenderIsMega = isMegaCard(defenderCard);
+    ctx.defenderKinds = ruleBoxKinds(defenderCard);
+    ctx.defenderName = defenderCard.name || '';
+    ctx.defenderAbilityKinds = abilityKinds(defenderCard);
+    ctx.defenderResistanceTypes = resistanceTypes(defenderCard);
+    ctx.defenderToolCount = toolCountOn(opponent, defender);
   }
   // "…times the amount of Energy attached to all of your opponent's Pokémon" scaling.
   if (opponent) {

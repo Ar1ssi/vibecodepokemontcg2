@@ -1407,7 +1407,12 @@ function handleKnockout(
     // Typed "only if 1 of your {P} Pokémon was Knocked Out during your opponent's last
     // turn" Trainers (Morty, Diantha, Team Rocket's Archer) need who was Knocked Out.
     const top = topPokemonCard(victimZoneCards, victim) || victim;
-    const koVictim = { name: top.name || '', types: [...(top.types || [])] };
+    const koVictim = {
+      name: top.name || '',
+      types: [...(top.types || [])],
+      // "Knocked Out by damage from an attack" (Revenge, Orichalcum Fang) excludes Poison/ability KOs.
+      byAttackDamage: Boolean(byAttack && byDamage),
+    };
     victimPlayer.flags = {
       ...victimPlayer.flags,
       koedOnOppTurn: true,
@@ -1768,6 +1773,24 @@ function settlePromotionChoices(draft, { events }) {
  * module. The whole stack (root plus attached Evolutions/Tools) is stamped so
  * the activation gate reads the stamp off whichever card the client addresses.
  */
+/**
+ * Stamps `healedTurn` on every in-play Pokémon whose damage went down during this command, for
+ * "If this Pokémon was healed during this turn" (Altaria-EX Powerful Gain). Diffing the damage
+ * covers every heal source (Potion, abilities, attacks, Stadiums) without hooking each one.
+ */
+function stampHealedPokemon(prev, next) {
+  const turnNumber = prev.turn?.number;
+  if (turnNumber == null) return;
+  for (const playerId of Object.keys(next.players || {})) {
+    const zones = next.players[playerId]?.zones || {};
+    for (const card of [...(zones.active || []), ...(zones.bench || [])]) {
+      if (card.attachedTo || !isPokemon(card)) continue;
+      const before = findCard(prev, card.instanceId)?.card;
+      if (before && (card.damage || 0) < (before.damage || 0)) card.healedTurn = turnNumber;
+    }
+  }
+}
+
 function stampActivePromotions(prev, next) {
   const turnNumber = next.turn?.number;
   if (turnNumber == null) return;
@@ -5455,6 +5478,7 @@ function statusConditionResults(draft, ctx, branches) {
     attacker,
     defender,
     attackerView,
+    attack: ctx.attack,
     defenderView: defender ? inPlayView(draft, defender) : null,
     coin,
     headsCount,
@@ -5506,6 +5530,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         attacker,
         defender,
         attackerView,
+        attack,
         defenderView: defender ? inPlayView(draft, defender) : null,
         coin,
         headsCount,
@@ -5795,6 +5820,7 @@ function resolveAttackEffectPhase(draft, ctx) {
           attacker,
           defender,
           attackerView,
+          attack,
           defenderView: defender ? inPlayView(draft, defender) : null,
           coin,
           headsCount,
@@ -7175,6 +7201,14 @@ export function applyCommand(state, command, rng = null) {
             draft.players[playerId].flags = {};
           }
           draft.players[playerId].flags.energyAttached = true;
+          // "If you attach a {F} Energy card from your hand to this Pokémon during this turn"
+          // (Flygon Sand Sonic): the turn-scoped record the attack condition reads.
+          if (cardRef.zoneId === 'hand') {
+            draft.players[playerId].flags.handEnergyAttachedThisTurn = [
+              ...(draft.players[playerId].flags.handEnergyAttachedThisTurn || []),
+              { hostId: hostRef.card.instanceId, energyId: cardRef.card.instanceId },
+            ];
+          }
 
           // Pokémon Park: attaching an Energy from hand to a Benched Pokémon
           // removes 1 damage counter (once per player per turn).
@@ -8980,6 +9014,7 @@ export function applyCommand(state, command, rng = null) {
   settleKoEnergyMoves(draft, { events });
   settlePrizeEntitlements(draft, { events });
   stampActivePromotions(state, draft);
+  stampHealedPokemon(state, draft);
   clearFaceDownOffBoard(draft);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;
