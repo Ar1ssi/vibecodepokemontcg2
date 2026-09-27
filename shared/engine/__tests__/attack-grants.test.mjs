@@ -211,3 +211,20 @@ test('an evolved Pokémon with no grant cannot use its previous Evolutions (evol
   assert.deepEqual(extras(state, basic), []);
   assert.equal(attackCmd(state, 1).error, 'Unknown attack.');
 });
+
+test('Memory Berry: a Tool-negating Stadium keeps it attached (it has no effect)', () => {
+  const state = board();
+  const basic = stage2(state, 'p1');
+  state.players.p1.zones.active.push(tool('Memory Berry', MEMORY_BERRY_AQ, basic.instanceId));
+  state.players.p2.zones.active.push(mon('Foe', { hp: 300 }));
+  state.stadium = createCard({
+    instanceId: 999,
+    name: 'Tool Jammer Stadium',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    text: 'Pokémon Tools attached to each Pokémon (both yours and your opponent’s) have no effect.',
+  });
+  const res = attackCmd(state, 0);
+  assert.equal(res.error, null);
+  assert.ok(res.state.players.p1.zones.active.some((c) => c.name === 'Memory Berry'));
+});

@@ -4,7 +4,7 @@
 // rules-extended.test.mjs.
 
 import { canPayAttackCost, expandEnergyEntries } from './attack-engine.mjs';
-import { oncePerTurnClause } from './damage-parser.mjs';
+import { oncePerTurnClause, isGxAttack, isVstarPowerAttack } from './damage-parser.mjs';
 import {
   passiveCostDiscount,
   applyCostDiscount,
@@ -59,6 +59,7 @@ export function statusAttackBlock(card) {
  *   abilityUsed:  boolean              once-per-turn already used?
  *   rulesEnabled: boolean
  *   blockedReason: string              Asleep/Paralyzed text from statusAttackBlock
+ *   oncePerGame:  { vstarUsed, gxUsed } the player's spent once-per-game allowances
  * }
  * @returns {Array<{name, cost, payable, onceUsed, reason}>}
  */
@@ -71,6 +72,7 @@ export function listAttacks(card, opts = {}) {
     priorAttacks = [],
     extraAttacks = [],
     blockedReason = '',
+    oncePerGame = null,
   } = opts;
 
   // `priorAttacks` are merged only when the card's own text grants inheritance
@@ -89,12 +91,23 @@ export function listAttacks(card, opts = {}) {
         : rawCost;
 
     const payable = canPayAttackCost(energyTypes, effectiveCost);
-    const onceUsed = rulesEnabled && oncePerTurnClause(atk.text) && abilityUsed;
+    // App. 9/19: the server rejects a GX or VSTAR Power attack once that allowance is spent
+    // (design 049), so the panel greys it with the same reason.
+    const gameUsedReason = !rulesEnabled
+      ? ''
+      : isGxAttack(atk) && oncePerGame?.gxUsed
+        ? 'Only one GX attack can be used per game.'
+        : isVstarPowerAttack(atk) && oncePerGame?.vstarUsed
+          ? 'VSTAR Power already used this game.'
+          : '';
+    const onceUsed = (rulesEnabled && oncePerTurnClause(atk.text) && abilityUsed) || !!gameUsedReason;
     const blocked = rulesEnabled && !!blockedReason;
 
     let reason = '';
     if (blocked) {
       reason = blockedReason;
+    } else if (gameUsedReason) {
+      reason = gameUsedReason;
     } else if (onceUsed) {
       reason = 'Already used this turn (once per turn).';
     } else if (!payable) {

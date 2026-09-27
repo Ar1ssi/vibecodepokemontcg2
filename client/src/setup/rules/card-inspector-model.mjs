@@ -437,6 +437,7 @@ export function buildInspectorModel(card, ctx = {}) {
       stadiumCostModifier: Number(ctx.stadiumCostModifier) || 0,
       extraAttacks: ctx.extraAttacks || [],
       blockedReason: statusBlockReason,
+      oncePerGame: ctx.oncePerGame ?? null,
     });
 
   // Stadium-granted / inherited attacks render alongside the printed ones; the

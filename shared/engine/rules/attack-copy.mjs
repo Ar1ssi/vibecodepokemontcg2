@@ -190,7 +190,13 @@ const TEMPLATES = [
   // in play when it was used.
   [
     /^if the defending pokemon attacked last turn, and [^,]+ was in play during that attack, [^.]+ copies that attack except for its energy costs and anything else required in order to use that attack\.$/,
-    () => ({ source: 'oppLastAttack', auto: true, fromDefending: true, requiresInPlayDuring: true }),
+    () => ({
+      source: 'oppLastAttack',
+      auto: true,
+      fromDefending: true,
+      requiresInPlayDuring: true,
+      ignoreRequirements: true,
+    }),
   ],
   // Mime Jr. Mimed Games (Paldean Fates 031/157): the opponent makes the choice.
   [

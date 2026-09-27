@@ -40,7 +40,11 @@ import {
   dispatchAuthoritativeUseAbility,
 } from '../netcode/authoritative-dispatch.js';
 import { getZone } from '../zones/get-zone.js';
-import { getAuthoritativeStadiumArray, getAuthoritativeAttackExtras } from '../netcode/apply-view.js';
+import {
+  getAuthoritativeStadiumArray,
+  getAuthoritativeAttackExtras,
+  getAuthoritativeOncePerGame,
+} from '../netcode/apply-view.js';
 import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
@@ -659,6 +663,7 @@ async function resolveLiveContext(card, zone = 'active') {
     abilityUsed: abilityUsedFlag,
     priorAttacks,
     extraAttacks: resolvedExtra,
+    oncePerGame: getAuthoritativeOncePerGame(),
     attacker: card,
     zone,
     damageCtx: {

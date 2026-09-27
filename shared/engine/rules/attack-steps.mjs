@@ -93,12 +93,16 @@ function stripGates(sentence) {
   const flags = {};
   // "If exactly N is/are heads, …" (Misty's Psyduck ESP, design 049): runs on exactly N heads.
   const exact = /^if exactly (\d+) (?:is|are) heads, /.exec(rest);
-  if (exact) return { rest: rest.slice(exact[0].length), flags: { headsExactly: Number(exact[1]) } };
-  for (const [re, flag] of GATES) {
-    if (re.test(rest)) {
-      rest = rest.replace(re, '');
-      Object.assign(flags, flag);
-      break;
+  if (exact) {
+    rest = rest.slice(exact[0].length);
+    flags.headsExactly = Number(exact[1]);
+  } else {
+    for (const [re, flag] of GATES) {
+      if (re.test(rest)) {
+        rest = rest.replace(re, '');
+        Object.assign(flags, flag);
+        break;
+      }
     }
   }
   if (/^you may /.test(rest)) {

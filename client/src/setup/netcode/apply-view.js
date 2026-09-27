@@ -286,11 +286,26 @@ export function getAuthoritativeStadiumArray() {
 }
 
 /**
+ * Your spent once-per-game allowances from the last view (`{ vstarUsed, gxUsed }`), or null
+ * before any view. The attack panel greys a spent GX / VSTAR Power attack with them (design 049).
+ *
+ * @returns {{ vstarUsed: boolean, gxUsed: boolean }|null}
+ */
+export function getAuthoritativeOncePerGame() {
+  const flags = lastAppliedView?.you?.flags;
+  if (!flags || typeof flags !== 'object') return null;
+  return { vstarUsed: Boolean(flags.vstarUsed), gxUsed: Boolean(flags.gxUsed) };
+}
+
+/**
  * The attacks one of your in-play Pokémon can use beyond its printed ones (Memory Helix,
  * Stadium/Tool grants), in the server's `attackIndex` order (design 049). `[]` when the view
  * lists extras for your other Pokémon only; `null` when the card is not your in-play Pokémon
  * or the last view carries no `attackExtras` (legacy mode, an older server, or no Pokémon with
  * extras), so callers keep their own list.
+ *
+ * The map is keyed by the in-play root (the Basic). An evolved Pokémon's clickable card is its
+ * top Evolution card, attached to that root, so the lookup walks `attachedTo` up to the root.
  *
  * @param {number} instanceId
  * @returns {object[]|null}
@@ -299,13 +314,19 @@ export function getAuthoritativeAttackExtras(instanceId) {
   const you = lastAppliedView?.you;
   const extras = you?.attackExtras;
   if (!extras || typeof extras !== 'object' || instanceId == null) return null;
-  const inPlay = ['active', 'bench'].some((zoneId) =>
-    (Array.isArray(you.zones?.[zoneId]) ? you.zones[zoneId] : []).some(
-      (card) => card?.instanceId === instanceId
-    )
-  );
-  if (!inPlay) return null;
-  const list = extras[instanceId];
+  const zone = ['active', 'bench']
+    .map((zoneId) => (Array.isArray(you.zones?.[zoneId]) ? you.zones[zoneId] : []))
+    .find((cards) => cards.some((card) => card?.instanceId === instanceId));
+  if (!zone) return null;
+  let root = zone.find((card) => card?.instanceId === instanceId);
+  const seen = new Set();
+  while (root?.attachedTo != null && !seen.has(root.instanceId)) {
+    seen.add(root.instanceId);
+    const parent = zone.find((card) => card?.instanceId === root.attachedTo);
+    if (!parent) break;
+    root = parent;
+  }
+  const list = extras[root?.instanceId];
   return Array.isArray(list) ? list : [];
 }
 

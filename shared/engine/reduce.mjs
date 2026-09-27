@@ -1148,7 +1148,11 @@ function grantedAttacksFor(state, card) {
     const sideContext = abilitySideContext(state, ownerId);
     for (const root of ['active', 'bench'].flatMap((z) => rootsIn(owner?.zones?.[z]))) {
       const holder = inPlayView(state, root);
-      const grants = abilityTexts(holder).map(parseAttackGrant).filter(Boolean);
+      // Cheap prefilter: this runs for every root on every attack view.
+      const grants = abilityTexts(holder)
+        .filter((t) => /can use any attack|attack as its own/i.test(t))
+        .map(parseAttackGrant)
+        .filter(Boolean);
       if (grants.length === 0) continue;
       if (isAbilitySuppressed(holder, sideContext)) continue;
       for (const grant of grants) {
@@ -3667,8 +3671,9 @@ function attackCostPayable(state, playerId, active, attack) {
       ...(opponent?.zones?.active || []),
       ...(opponent?.zones?.bench || []),
     ],
-    zone: 'active',
-    isActive: true,
+    // A Benched holder (Dark Genes) keeps its Bench position for Active-only discounts.
+    zone: holderRef?.zoneId === 'bench' ? 'bench' : 'active',
+    isActive: holderRef?.zoneId !== 'bench',
     opponentHandCount: (opponent?.zones?.hand || []).length,
   });
   if (abilityCost.ignoreAll) {
@@ -5281,8 +5286,12 @@ function flipAndResolveAttack(draft, ctx) {
   // Watch and Learn): the copied attack when one was chosen, scoped by turn number so the
   // opponent reads it only during their next turn (design 039).
   if (attackerPlayer) {
+    // Borrow-only fields (Dragon DNA's bonus, the source labels) belong to how this Pokémon used
+    // the attack, not to the attack a next-turn copier reads (design 049 review).
+    const printedAttack = { ...attack };
+    for (const key of ['bonusBeforeWR', 'grantedBy', 'copiedFrom', 'waivesUseGate']) delete printedAttack[key];
     attackerPlayer.lastAttack = {
-      attack: { ...attack },
+      attack: printedAttack,
       isGx: isGxAttack(attack),
       attackerName: ctx.attackerView?.name || ctx.attacker?.name || '',
       attackerInstanceId: ctx.attacker?.instanceId ?? null,
@@ -5413,13 +5422,16 @@ const RAW_ATTACK_SOURCES = new Set([
  * Whether the copier may choose `attack` at all (design 049): the once-per-game limits apply to
  * a copied attack (R2, App. 19), and an attack whose "You can use this attack only if …" gate
  * fails for the copier cannot be chosen (Mimed Games ruling R7). "Does nothing" gates stay the
- * copied attack's own (R1).
+ * copied attack's own (R1). A wording that waives "anything else required in order to use that
+ * attack" (Smeargle Sketch) skips the use gate.
  */
-function copyCandidateAllowed(draft, { playerId, attacker, attack }) {
+function copyCandidateAllowed(draft, { copy, playerId, attacker, attack }) {
   if (onceAttackBlockReason(draft, playerId, attack)) return false;
-  const attackerView = attacker ? attackViewFor(draft, attacker) : null;
-  const gate = parseAttackUseGate(attack?.text, { selfName: attackerView?.name || attacker?.name });
+  if (copy?.ignoreRequirements) return true;
+  const gate = parseAttackUseGate(attack?.text, { selfName: inPlayView(draft, attacker)?.name || attacker?.name });
   if (!gate) return true;
+  // The full attack view (grants scan both sides) only when a gate needs the board.
+  const attackerView = attacker ? attackViewFor(draft, attacker) : null;
   const defenderPlayerId = Object.keys(draft.players || {}).find((id) => id !== playerId);
   const defender = (draft.players[defenderPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
   const conditionCtx = buildServerAttackContext(draft, {
@@ -5455,7 +5467,7 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
       if (!attack?.name || parseCopyAttack(attack.text)) continue;
       if (copy.excludeGx && isGxAttack(attack)) continue;
       if (copy.needsEnergy && !attackCostPayable(draft, playerId, attacker, attack)) continue;
-      if (!copyCandidateAllowed(draft, { playerId, attacker, attack })) continue;
+      if (!copyCandidateAllowed(draft, { copy, playerId, attacker, attack })) continue;
       candidates.push({ sourceId: card.instanceId, sourceName: card.name, attack: { ...attack } });
     }
   }
@@ -5483,7 +5495,7 @@ function lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker }) {
   }
   const attack = last.attack;
   if (!attack?.name || parseCopyAttack(attack.text)) return [];
-  if (!copyCandidateAllowed(draft, { playerId, attacker, attack })) return [];
+  if (!copyCandidateAllowed(draft, { copy, playerId, attacker, attack })) return [];
   return [
     {
       sourceId: last.attackerInstanceId ?? null,
@@ -5586,6 +5598,8 @@ function offerCopiedAttack(
     targetInstanceId,
     candidates,
     shuffleOppDeck,
+    // Smeargle Sketch waives "anything else required": the copied attack's use gate.
+    ...(copy.ignoreRequirements ? { waiveUseGate: true } : {}),
     // Hypnotic Reign / Skill Copy discard the chosen hand card (design 049).
     ...(copy.discardSource
       ? { discardSource: true, sourceZoneOwner: copy.source === 'ownHand' ? playerId : oppId }
@@ -5638,9 +5652,11 @@ function resumeCopiedAttack(draft, { token, selection, activeRng, events }) {
   const attackerView = attackViewFor(draft, attacker);
   const ownAttack = attackerView?.attacks?.[token.attackIndex ?? 0] || { name: 'Attack', damage: 0 };
   const picked = (token.candidates || [])[Number((selection || [])[0]) - 1];
-  const copiedAttack = picked
+  const copied = picked
     ? copiedAttackFor(picked.attack, { sourceName: picked.sourceName, copierName: attacker.name })
     : null;
+  // The flag travels with the attack object through every later resume token.
+  const copiedAttack = copied && token.waiveUseGate ? { ...copied, waivesUseGate: true } : copied;
   if (copiedAttack) {
     events.push({
       type: 'attackCopied',
@@ -5728,9 +5744,12 @@ function resolveAttackEffectPhase(draft, ctx) {
   // damage and every effect step, so it resolves before any of them. It runs once per attack:
   // a resumed effect phase carries `conditionChecked` so a before-damage step cannot flip it.
   if (!ctx.conditionChecked) {
-    const condition = parseAttackCondition(attack?.text, {
-      selfName: attackerView?.name || attacker?.name,
-    });
+    const selfName = attackerView?.name || attacker?.name;
+    // Smeargle Sketch copies "except for … anything else required": its use gate is waived.
+    const condition =
+      attack?.waivesUseGate && parseAttackUseGate(attack?.text, { selfName })
+        ? null
+        : parseAttackCondition(attack?.text, { selfName });
     const conditionCtx =
       condition &&
       buildServerAttackContext(draft, {
@@ -7759,7 +7778,7 @@ export function applyCommand(state, command, rng = null) {
       };
       // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
       // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
-      if (attacker) {
+      if (attacker && !isStadiumToolNegation(draft.stadium?.card || draft.stadium)) {
         for (const tool of attachedTools(attacker, attackerPlayer.zones.active)) {
           if (parseAttackGrant(cardText(tool))?.discardAfterAttack) tool.discardAtEndOfTurn = true;
         }

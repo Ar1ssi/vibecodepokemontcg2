@@ -854,6 +854,9 @@ test("ability: Dragon DNA uses its Basic's attack with 30 more damage to the Def
   const res = attackCmd(state, 1, rng);
   assert.equal(res.error, null);
   assert.equal(res.state.players.p2.zones.active[0].damage, 50);
+  const recorded = res.state.players.p1.lastAttack.attack;
+  assert.equal(recorded.bonusBeforeWR, undefined, 'a next-turn copier does not inherit the +30');
+  assert.equal(recorded.copiedFrom, undefined);
 });
 
 test('ability: Dragon DNA adds nothing to a borrowed attack that does no damage', () => {

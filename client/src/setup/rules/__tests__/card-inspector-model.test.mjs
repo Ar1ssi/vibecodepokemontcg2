@@ -838,3 +838,25 @@ test('049: server extras render after printed attacks with their source label', 
     [1, 'Great Swing', 'Slaking ex'],
   ]);
 });
+
+test('049: a spent VSTAR Power / GX attack recedes with the server reason', () => {
+  const card = {
+    name: 'Spiritomb VSTAR',
+    supertype: 'Pokémon',
+    hp: 240,
+    types: ['Darkness'],
+    attacks: [
+      { name: 'Star Requiem', cost: [], damage: '', text: "(You can't use more than 1 VSTAR Power in a game.)" },
+      { name: 'Tackle-GX', cost: [], damage: '50', text: '' },
+      { name: 'Slam', cost: [], damage: '30', text: '' },
+    ],
+  };
+  const fresh = buildInspectorModel(card, { energyTypes: [], oncePerGame: { vstarUsed: false, gxUsed: false } });
+  assert.deepEqual(fresh.attacks.map((a) => a.usable), [true, true, true]);
+  const spent = buildInspectorModel(card, { energyTypes: [], oncePerGame: { vstarUsed: true, gxUsed: true } });
+  assert.deepEqual(spent.attacks.map((a) => [a.usable, a.reason]), [
+    [false, 'VSTAR Power already used this game.'],
+    [false, 'Only one GX attack can be used per game.'],
+    [true, null],
+  ]);
+});

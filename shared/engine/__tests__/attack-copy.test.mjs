@@ -460,6 +460,7 @@ test('parseCopyAttack: design 049 slice 5 wordings', () => {
     auto: true,
     fromDefending: true,
     requiresInPlayDuring: true,
+    ignoreRequirements: true,
   });
   assert.deepEqual(parseCopyAttack(MIMED_GAMES), { source: 'oppInPlay', chooser: 'opponent' });
 });
@@ -735,4 +736,34 @@ test('attack: ESP gate coins are not offered for a Glimwood Tangle re-flip', asy
   const res = attack(b);
   assert.equal(res.state.pendingChoice, null);
   assert.equal(cardNamed(res, 'p2', 'Defender').damage, 20);
+});
+
+// ── design 049 review fixes ─────────────────────────────────────────────────
+
+test("attack: Sketch waives the copied attack's use gate (\"anything else required\")", () => {
+  const b = board(SKETCH, {
+    name: 'Smeargle',
+    setup: ({ p1, p2, attacker, defender }) => {
+      p1.zones.hand.push(mon('Hand Card'));
+      p2.lastAttack = {
+        attack: { name: 'Empty Hand Hit', cost: [], damage: '60', text: 'You can use this attack only if you have no cards in your hand.' },
+        isGx: false,
+        attackerName: 'Defender',
+        attackerInstanceId: defender.instanceId,
+        turnNumber: 2,
+        opponentInPlayIds: [attacker.instanceId],
+      };
+    },
+  });
+  assert.equal(cardNamed(attack(b), 'p2', 'Defender').damage, 60);
+});
+
+test('parseAttackSteps: "If exactly N are heads, you may …" keeps both the gate and the option', async () => {
+  const { parseAttackSteps, resolveCoinGates } = await import('../rules/attack-steps.mjs');
+  const { after } = parseAttackSteps('Flip 3 coins. If exactly 1 is heads, you may draw a card.');
+  assert.equal(after.length, 1);
+  assert.equal(after[0].headsExactly, 1);
+  assert.equal(after[0].optional, true);
+  assert.equal(resolveCoinGates(after, { coin: null, headsCount: 2 }).length, 0);
+  assert.equal(resolveCoinGates(after, { coin: null, headsCount: 1 }).length, 1);
 });

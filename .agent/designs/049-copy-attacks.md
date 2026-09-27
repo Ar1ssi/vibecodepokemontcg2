@@ -430,3 +430,22 @@ DECISIONS lines for O1–O11.
   `attack-steps.mjs` `stripGates` reads "If exactly N is/are heads, …" as `headsExactly`
   (`resolveCoinGates` keeps the step only on N heads) and `damage-parser.mjs` adds "If exactly N
   are heads, this attack does X damage" on N heads. Rows 50–52 plus a 0-heads test cover it.
+- Review (independent review.md pass) fixes:
+  - blocker: `getAuthoritativeAttackExtras` looked up the clicked card's id, but an evolved
+    Pokémon is clicked by its top Evolution card; the map is keyed by the root. It now walks
+    `attachedTo` to the root (test: Stage 1 / Stage 2 ids resolve to the root's list).
+  - `lastAttack.attack` drops borrow-only fields (`bonusBeforeWR`, `grantedBy`, `copiedFrom`,
+    `waivesUseGate`), so a next-turn copier does not inherit Dragon DNA's +30.
+  - Sketch (`ignoreRequirements`) skips the candidate use gate, and its copied attack carries
+    `waivesUseGate` so the effect phase skips the "only if" gate too.
+  - `copyCandidateAllowed` builds the full attack view only when a use gate exists;
+    `grantedAttacksFor` prefilters ability text before parsing.
+  - Memory Berry is not flagged for discard while a Tool-negating Stadium is in play.
+  - `attackCostPayable` passes a Benched holder's real zone to `abilityAttackCostDiscount`.
+  - "If exactly N are heads, you may …" keeps `optional`.
+  - The panel greys a spent GX / VSTAR Power attack (`listAttacks` `oncePerGame`, fed from
+    `getAuthoritativeOncePerGame`).
+  - Kept, no ruling found: ESP's gate coins get no Glimwood / Victory Star re-flip (same as the
+    existing Mini-Metronome gate) — filed as an issue at landing.
+  - Filed at landing (pre-existing): VSTAR Power Abilities used through `useAbility` never set
+    `oncePerGame.vstarUsed`; the name-lock refusal prints the attack name lowercased.
