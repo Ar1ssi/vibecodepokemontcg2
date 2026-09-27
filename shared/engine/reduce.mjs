@@ -6895,6 +6895,22 @@ function resolveAttackEffectPhase(draft, ctx) {
           attackName: attack.name,
           events,
         });
+        // Manectric Power Wave "(both yours and your opponent's)": the attacker's own matching
+        // Pokémon take it too, with no Weakness or Resistance; their Knock Outs pay the opponent.
+        if (eachDamage.bothSides) {
+          const own = draft.players[playerId];
+          const ownSelection = [...rootsIn(own?.zones?.active), ...rootsIn(own?.zones?.bench)]
+            .filter((root) => eachFilterMatches(own, root, eachDamage.filter))
+            .map((root) => root.instanceId);
+          applyAttackTargets(draft, {
+            selection: ownSelection,
+            clause: { amount: eachDamage.amount, side: 'own' },
+            defenderPlayerId: playerId,
+            attackerPlayerId: defenderPlayerId,
+            attackName: attack.name,
+            events,
+          });
+        }
       }
 
       // Self-recoil spread ("This attack also does 30 damage to each of your Benched

@@ -11,7 +11,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { isBasicPokemon, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
+import { getRetreatCostCount, isBasicPokemon, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import {
@@ -1706,6 +1706,13 @@ function atkHpCap(ctx) {
     const active = activeOf(opponent);
     return active ? place(active) : skip(ctx, 'no_opponent_active');
   }
+  // Palossand ex Barite Jail: every Benched Pokémon, each down to the printed HP.
+  if (step.target === 'opponentBenchEach') {
+    const bench = benchRootsOf(opponent).filter((root) => countersToCap(root) > 0);
+    if (bench.length === 0) return skip(ctx, 'already_at_cap');
+    for (const root of bench) placeCounters(ctx, root, opponent.playerId, countersToCap(root));
+    return null;
+  }
   const all = rootsOf(opponent).filter((root) => countersToCap(root) > 0);
   const candidates = all.filter((root) => !attackEffectShielded(ctx, opponent, root));
   if (ctx.selection) {
@@ -2938,6 +2945,52 @@ function atkSwapCounters(ctx) {
   return null;
 }
 
+// Bronzong Heavy Potential: a counter for each {C} in each opponent Pokémon's Retreat Cost. The
+// printed cost is read; Retreat Cost effects in play are not applied (flagged in the journal).
+function atkCountersByRetreat(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  let placed = 0;
+  for (const root of rootsOf(opponent)) {
+    const cost = getRetreatCostCount(topPokemonCard(opponent, root) || root);
+    if (cost > 0 && !attackEffectShielded(ctx, opponent, root)) {
+      placeCounters(ctx, root, opponent.playerId, cost * 10);
+      placed += 1;
+    }
+  }
+  return placed > 0 ? null : skip(ctx, 'no_retreat_cost');
+}
+
+const TYPE_CHOICES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal', 'Colorless'];
+const TYPE_SYMBOL = { Grass: 'G', Fire: 'R', Water: 'W', Lightning: 'L', Psychic: 'P', Fighting: 'F', Darkness: 'D', Metal: 'M', Colorless: 'C' };
+
+// Spiritomb Color Tag: the player names a type; each opponent Pokémon of that type takes counters.
+function atkCountersEachChosenType(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  if (!ctx.selection) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose a type`,
+      options: TYPE_CHOICES.map((name, i) => ({ instanceId: i + 1, name, type: 'option' })),
+      min: 1,
+      max: 1,
+    });
+  }
+  const chosen = TYPE_CHOICES[Number(ctx.selection[0]) - 1];
+  if (!chosen) return skip(ctx, 'invalid_type');
+  const symbol = TYPE_SYMBOL[chosen];
+  const victims = rootsOf(opponent).filter((root) => {
+    const top = topPokemonCard(opponent, root) || root;
+    return symbol === 'C'
+      ? (top.types || []).some((t) => String(t).toLowerCase() === 'colorless')
+      : pokemonHasType(top, symbol.toLowerCase());
+  });
+  for (const root of victims) {
+    if (!attackEffectShielded(ctx, opponent, root)) placeCounters(ctx, root, opponent.playerId, (step.count || 1) * 10);
+  }
+  return null;
+}
+
 // Unown L Hidden Power: "put damage counters on the Defending Pokémon until it is 10 HP away
 // from being Knocked Out".
 function atkCountersUntilHp(ctx) {
@@ -3287,6 +3340,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkSwapCounters,
   atkCountersUntilHp,
   atkDiscardOppToolsAndStadium,
+  atkCountersByRetreat,
+  atkCountersEachChosenType,
   atkDevolve,
   atkBounceOppActive,
   atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),

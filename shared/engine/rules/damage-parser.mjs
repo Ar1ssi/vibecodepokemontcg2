@@ -282,7 +282,8 @@ function amountScale(unit, ctx) {
       label: 'basic Energy on this Pokémon',
     };
   }
-  if (/energy attached to both active pok[ée]mon/.test(unit)) {
+  // Energy Burst: "… attached to Mewtwo and the Defending Pokémon" (the name is "this pokémon").
+  if (/energy attached to (?:both active pok[ée]mon|this pok[ée]mon and (?:the defending|your opponent's active) pok[ée]mon)/.test(unit)) {
     const own = num(ctx.energyCount);
     const opponent = num(ctx.opponentEnergyCount);
     if (own == null || opponent == null) return null;
@@ -369,7 +370,8 @@ export function parseAttackDamage(
     const straight = String(attack.text).replace(/[‘’]/g, "'");
     attack = { ...attack, text: attacker?.name ? replaceSelfName(straight, attacker.name) : straight };
   }
-  const text = timesAsForEach(lower(attack?.text ?? ''));
+  // Mewtwo / Gardevoir Energy Burst: "times the total amount of Energy attached to …".
+  const text = timesAsForEach(lower(attack?.text ?? '').replace(/times the total amount of/g, 'times the amount of'));
   // TCGdex prints scaling attacks' damage as strings ("30+", "20×"); their printed number
   // is still the base the "more damage" clauses add to (I117).
   const base = Number.isFinite(attack?.damage)
@@ -1569,14 +1571,17 @@ export function eachPokemonDamage(attackText) {
     .replace(/[‘’]/g, "'")
     .toLowerCase()
     .replace(/pokemon/g, 'pokémon');
-  const m = /(?:^|\.\s+)(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon)([^.(]*)/.exec(
+  const m = /(?:^|\.\s+)(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon|pokémon)([^.(]*)(\(both yours and your opponent's\))?/.exec(
     text
   );
   if (!m) return null;
   const tail = m[3].trimEnd();
   if (m[2] === 'defending pokémon') return tail ? null : { amount: Number(m[1]), activeOnly: true, filter: {} };
+  // Manectric Power Wave: "each Pokémon that has any Poké-Powers (both yours and your opponent's)".
+  const bothSides = m[2] === 'pokémon';
+  if (bothSides && !m[4]) return null;
   const filter = parseEachFilter(tail);
-  return filter === undefined ? null : { amount: Number(m[1]), activeOnly: false, filter };
+  return filter === undefined ? null : { amount: Number(m[1]), activeOnly: false, filter, ...(bothSides ? { bothSides } : {}) };
 }
 
 // Damage the attack also does to each of the ATTACKER's own Benched Pokémon (recoil). Pure.

@@ -1222,3 +1222,123 @@ test('Electivire LV.X Pulse Barrier (Mysterious Treasures 121): Tools discarded 
   assert.ok(res.state.players.p2.zones.discard.some((c) => c.instanceId === belt.instanceId));
   assert.deepEqual(markerKinds(res.state, 'p1', attacker), ['effectPrevent', 'incomingPrevent']);
 });
+
+// ── filtered spreads and board-counted damage ─────────────────────────────────
+
+test('Palossand ex Barite Jail (Surging Sparks 221): each Benched Pokémon drops to 100 HP remaining', () => {
+  const text = "Put damage counters on each of your opponent's Benched Pokémon until its remaining HP is 100.";
+  let big;
+  let small;
+  const { state } = board('Palossand ex', text, {
+    damage: '',
+    setup: (s) => {
+      big = mon('Big', { hp: 250 });
+      small = mon('Small', { hp: 70 });
+      s.players.p2.zones.bench.push(big, small);
+    },
+  });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p2', big.instanceId).damage, 150);
+  assert.equal(root(res.state, 'p2', small.instanceId).damage || 0, 0);
+});
+
+test('Bronzong Heavy Potential (Stormfront 13): a counter per {C} of each Retreat Cost', () => {
+  const text =
+    "Put a number of damage counters on each of your opponent's Pokémon equal to the number of {C} Energy in that Pokémon's Retreat Cost (after applying effects to the Retreat Cost).";
+  let heavy;
+  const { state, defender } = board('Bronzong', text, {
+    damage: '',
+    setup: (s) => {
+      s.players.p2.zones.active[0].retreatCost = ['Colorless', 'Colorless'];
+      heavy = mon('Snorlax', { hp: 200, retreatCost: 4 });
+      s.players.p2.zones.bench.push(heavy, mon('Free', { retreatCost: [] }));
+    },
+  });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 20);
+  assert.equal(root(res.state, 'p2', heavy.instanceId).damage, 40);
+});
+
+test('Spiritomb Color Tag (Triumphant 10): a counter on each opponent Pokémon of the named type', () => {
+  const text =
+    'Choose {G}{R}{W}{L}{P}{F}{D}{M} or {C} type. Put 1 damage counter on each Pokémon your opponent has in play of the type you chose.';
+  let water;
+  let fire;
+  const { state } = board('Spiritomb', text, {
+    damage: '',
+    setup: (s) => {
+      water = mon('Squirtle', { types: ['Water'] });
+      fire = mon('Charmander', { types: ['Fire'] });
+      s.players.p2.zones.bench.push(water, fire);
+    },
+  });
+  let res = attack(state);
+  const waterOption = res.pendingChoice.options.find((o) => o.name === 'Water');
+  res = choose(res, [waterOption.instanceId]);
+  assert.equal(root(res.state, 'p2', water.instanceId).damage, 10);
+  assert.equal(root(res.state, 'p2', fire.instanceId).damage || 0, 0);
+});
+
+test('Manectric Power Wave (Platinum 11): 30 to each Pokémon with a Poké-Power, on both sides', () => {
+  const text =
+    "This attack does 30 damage to each Pokémon that has any Poké-Powers (both yours and your opponent's). (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  const power = { name: 'Power', type: 'Poké-Power', text: 'Once during your turn, you may draw a card.' };
+  let theirs;
+  let mine;
+  let plain;
+  const { state, defender } = board('Manectric', text, {
+    damage: '',
+    setup: (s) => {
+      theirs = mon('Their Power', { abilities: [power] });
+      plain = mon('Plain');
+      mine = mon('My Power', { abilities: [power] });
+      s.players.p2.zones.bench.push(theirs, plain);
+      s.players.p1.zones.bench.push(mine);
+    },
+  });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p2', theirs.instanceId).damage, 30);
+  assert.equal(root(res.state, 'p1', mine.instanceId).damage, 30);
+  assert.equal(root(res.state, 'p2', plain.instanceId).damage || 0, 0);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage || 0, 0);
+});
+
+test('Starmie BREAK Break Star (Evolutions 32): 100 to each opponent Pokémon BREAK only', () => {
+  const text =
+    "This attack does 100 damage to each of your opponent's Pokémon BREAK. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  let breakRoot;
+  let other;
+  const { state } = board('Starmie BREAK', text, {
+    damage: '',
+    setup: (s) => {
+      breakRoot = mon('Greninja', { stage: 'Stage 2' });
+      const breakCard = createCard({
+        instanceId: nextId++,
+        name: 'Greninja BREAK',
+        supertype: 'Pokémon',
+        stage: 'BREAK',
+        subtypes: ['BREAK'],
+        hp: 170,
+        attachedTo: breakRoot.instanceId,
+      });
+      other = mon('Froakie');
+      s.players.p2.zones.bench.push(breakRoot, breakCard, other);
+    },
+  });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p2', breakRoot.instanceId).damage, 100);
+  assert.equal(root(res.state, 'p2', other.instanceId).damage || 0, 0);
+});
+
+test('Mewtwo Energy Burst (Delta Species 12): Energy on both Active Pokémon counts', () => {
+  const text = 'Does 10 damage times the total amount of Energy attached to Mewtwo and the Defending Pokémon.';
+  const { state, defender } = board('Mewtwo', text, {
+    damage: '10×',
+    setup: (s) => {
+      attachTo(s, s.players.p1.zones.active[0], ['Psychic', 'Psychic']);
+      const def = s.players.p2.zones.active[0];
+      s.players.p2.zones.active.push(energy('Water', def.instanceId), energy('Water', def.instanceId), energy('Water', def.instanceId));
+    },
+  });
+  assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 50);
+});

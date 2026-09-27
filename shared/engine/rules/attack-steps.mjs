@@ -771,6 +771,17 @@ const TEMPLATES = [
     /^put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) until its remaining hp is (\d+)$/,
     (m) => ({ type: 'atkHpCap', target: m[1].startsWith('1 of') ? 'opponentAny' : 'opponentActive', hp: Number(m[2]) }),
   ],
+  // Palossand ex Barite Jail.
+  [
+    /^put damage counters on each of your opponent's benched pokémon until its remaining hp is (\d+)$/,
+    (m) => ({ type: 'atkHpCap', target: 'opponentBenchEach', hp: Number(m[1]) }),
+  ],
+  // Bronzong Heavy Potential: "… on each of your opponent's Pokémon equal to the number of {C}
+  // Energy in that Pokémon's Retreat Cost (after applying effects to the Retreat Cost)".
+  [
+    /^put a number of damage counters on each of your opponent's pokémon equal to the number of \{c\} energy in that pokémon's retreat cost/,
+    () => ({ type: 'atkCountersByRetreat' }),
+  ],
   [
     /^move all damage counters from 1 of your benched pokémon to your opponent's active pokémon$/,
     () => ({ type: 'atkMoveAllCounters' }),
@@ -1079,6 +1090,11 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Spiritomb Color Tag.
+  [
+    /choose \{g\}\{r\}\{w\}\{l\}\{p\}\{f\}\{d\}\{m\} or \{c\} type\. put 1 damage counter on each pokémon your opponent has in play of the type you chose\./g,
+    () => ({ type: 'atkCountersEachChosenType', count: 1 }),
+  ],
   // Deck-top Energy attach: Lapras ex Larimar Rain, Dragonite VSTAR Draconic Star ("{W} or {L}"),
   // Ampharos-EX Thunder Rod, Hatterene V Horoscope ("put the other cards back in any order").
   [
