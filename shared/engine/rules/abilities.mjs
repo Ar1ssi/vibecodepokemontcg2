@@ -610,20 +610,41 @@ export function parseAbility(text = '') {
     const poisonNewActive =
       lower.includes('if you do') &&
       (lower.includes('now poisoned') || lower.includes('is now poisoned'));
+    // "If you do, your opponent switches their Active Pokémon with 1 of their Benched Pokémon"
+    // (Vanilluxe Slippery Soles, Metagross Magnetic Warp, Hatterene Witch Rondo), "… switch out
+    // your opponent's Active Pokémon to the Bench" (Samurott Torrential Whirlpool): the opponent
+    // picks. Mawile VSTAR Star Rondo: "… switch 1 of your opponent's Benched Pokémon with their
+    // Active Pokémon" — the player picks. Both follow the player's own switch.
+    const opponentFollowUp = /if you do, (?:your opponent switches (?:their|his or her) active pok[eé]mon with 1 of (?:their|his or her) benched pok[eé]mon|switch out your opponent's active pok[eé]mon to the bench)/.test(lower)
+      ? 'switchOpponentOut'
+      : /if you do, switch 1 of your opponent's benched pok[eé]mon with their active pok[eé]mon/.test(lower)
+        ? 'switchOpponent'
+        : null;
     steps.push({
       type: 'switchAbility',
-      target: isOpponentBenchSwitch ? 'opponent' : 'self',
+      target: isOpponentBenchSwitch && !opponentFollowUp ? 'opponent' : 'self',
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
       selfSwap: /switch (?:it|this pok[eé]mon) with your active/.test(lower),
-      pokemonType: typedBench ? parseEnergyTypeHint(`{${typedBench[1]}}`) : null,
+      // Type symbol ("d"), matched by trainer-steps pokemonHasType.
+      pokemonType: typedBench?.[1] || null,
       exceptName: lower.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
       poisonNewActive,
-      guidance: isOpponentBenchSwitch
+      guidance: isOpponentBenchSwitch && !opponentFollowUp
         ? 'Once during your turn: switch in 1 of your opponent\'s Benched Pokémon.'
         : poisonNewActive
           ? 'Once during your turn: switch your Active with 1 of your Benched Pokémon; the new Active is Poisoned.'
           : 'Once during your turn: switch your Active with 1 of your Benched Pokémon.',
     });
+    if (opponentFollowUp) {
+      steps.push({
+        type: opponentFollowUp,
+        afterOwnSwitch: true,
+        guidance:
+          opponentFollowUp === 'switchOpponentOut'
+            ? 'Then your opponent switches their Active Pokémon with 1 of their Benched Pokémon.'
+            : "Then switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
+      });
+    }
   }
 
   // ── 4. Heal / remove damage counters ────────────────────────────────────

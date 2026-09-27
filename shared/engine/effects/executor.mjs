@@ -30,6 +30,7 @@ import {
   specialEnergyShielded,
   attachedCards,
   removeFromZones,
+  pokemonHasType,
 } from './trainer-steps.mjs';
 import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
@@ -1013,7 +1014,13 @@ export function executeSteps(draft, {
           break;
         }
 
-        const bench = (player.zones.bench || []).filter((c) => !c.attachedTo);
+        // Pecharunt ex Subjugating Chains: "1 of your Benched {D} Pokémon, except any Pecharunt ex".
+        const benchAllowed = (c) => {
+          const top = topPokemonCard(player.zones.bench || [], c) || c;
+          if (step.pokemonType && !pokemonHasType(top, step.pokemonType)) return false;
+          return !(step.exceptName && String(top.name || '').toLowerCase() === step.exceptName);
+        };
+        const bench = (player.zones.bench || []).filter((c) => !c.attachedTo && (step.selfSwap || benchAllowed(c)));
         const active = (player.zones.active || []).find((c) => !c.attachedTo);
         if (!active || bench.length === 0) {
           events.push({ type: 'effectStepSkipped', reason: 'no_bench_pokemon', step: step.type });
@@ -1089,6 +1096,11 @@ export function executeSteps(draft, {
             activeId: active.instanceId,
             benchId: benchCard.instanceId,
           });
+          // Pecharunt ex: "If you do, the new Active Pokémon is now Poisoned."
+          if (step.poisonNewActive) {
+            addCondition(benchCard, 'Poisoned');
+            events.push({ type: 'specialConditionUpdated', instanceId: benchCard.instanceId, condition: 'Poisoned' });
+          }
         }
         break;
       }
@@ -1096,6 +1108,15 @@ export function executeSteps(draft, {
       case 'switchOpponent':
       case 'switchOpponentOut': {
         if (!opponent) break;
+        // "If you do, …" after the player's own switch (Vanilluxe Slippery Soles, Samurott).
+        // A bench pick resumes with a fresh events list, so test for the own switch's skip.
+        const ownSwitchSkipped = events.some(
+          (e) => e.type === 'effectStepSkipped' && e.reason === 'no_bench_pokemon'
+        );
+        if (step.afterOwnSwitch && ownSwitchSkipped) {
+          events.push({ type: 'effectStepSkipped', reason: 'no_own_switch', step: step.type });
+          break;
+        }
         const oppBench = (opponent.zones.bench || []).filter(
           (c) => !c.attachedTo && (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c))
         );
