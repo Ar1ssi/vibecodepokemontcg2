@@ -54,6 +54,7 @@ import {
   returnEnergyBonusClause,
 } from './rules/damage-parser.mjs';
 import { optionalCostBonusClause } from './rules/optional-cost-bonus.mjs';
+import { countUnit, normalizeUnit } from './rules/scaling-count.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import { parseGrantedAttacks } from './rules/tool-attacks.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
@@ -243,9 +244,22 @@ import { matchesSearch } from './rules/search-match.mjs';
  *
  * @returns {{ coin: 'heads'|'tails'|null, headsCount: number|undefined, flips: string[] }}
  */
-function flipAttackCoins(attack, rng) {
+function flipAttackCoins(attack, rng, countOf = null) {
   const text = String(attack?.text || '').toLowerCase();
   const flip = () => flipCoin(rng);
+
+  // "Flip a coin for each Energy attached to this Pokémon" / "Flip a number of coins equal to
+  // the number of damage counters on the Defending Pokémon": the board sets the count. A unit
+  // the counter cannot read falls through to the fixed wordings below.
+  const dynamic =
+    /flip a coin for each ([^.]+)\./.exec(text) ||
+    /flip a number of coins equal to the (?:number|amount) of ([^.]+)\./.exec(text);
+  const dynamicCount = dynamic && countOf ? countOf(dynamic[1]) : null;
+  if (typeof dynamicCount === 'number') {
+    const flips = Array.from({ length: Math.min(Math.max(dynamicCount, 0), 20) }, flip);
+    const headsCount = flips.filter((f) => f === 'heads').length;
+    return { coin: flips.length === 1 ? flips[0] : null, headsCount, flips };
+  }
 
   const multi = text.match(/flip (\d+) coins?/);
   if (multi) {
@@ -284,6 +298,31 @@ function flipAttackCoins(attack, rng) {
     return { coin, headsCount: coin === 'heads' ? 1 : 0, flips: [coin] };
   }
   return { coin: null, headsCount: undefined, flips: [] };
+}
+
+/**
+ * A board count for a dynamic coin wording ("for each Energy attached to this Pokémon"): reads
+ * the attacker and the Defending Pokémon (the chosen target when there is one). The ctx is
+ * built only when the attack prints such a wording.
+ */
+function coinCountReader(draft, { playerId, attacker, attackerView, targetInstanceId = null }) {
+  let built = null;
+  return (unit) => {
+    if (!built) {
+      const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+      const target = targetInstanceId != null ? findCard(draft, targetInstanceId) : null;
+      const defender = target?.card || draft.players[oppId]?.zones?.active?.find((c) => !c.attachedTo) || null;
+      built = buildServerAttackContext(draft, {
+        attackerPlayerId: playerId,
+        defenderPlayerId: target?.playerId || oppId,
+        attacker,
+        defender,
+        attackerView,
+        defenderView: defender ? inPlayView(draft, defender) : null,
+      });
+    }
+    return countUnit(normalizeUnit(unit, attackerView?.name || attacker?.name), built)?.count ?? null;
+  };
 }
 
 /** Benched Pokémon of a player, roots only (attached cards are not targets). */
@@ -5330,7 +5369,7 @@ function flipAndResolveAttack(draft, ctx) {
   // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
   // the parser resolves from live board counts, then bench/spread damage. Without this
   // every attack dealt its flat printed number regardless of the board (I26 follow-up).
-  const coinResult = flipAttackCoins(attack, activeRng);
+  const coinResult = flipAttackCoins(attack, activeRng, coinCountReader(draft, ctx));
   const { coin, headsCount, flips } = coinResult;
   if (flips.length > 0) {
     events.push({
@@ -5816,6 +5855,9 @@ function resolveAttackEffectPhase(draft, ctx) {
   // Discard-to-scale: the player picks which Energy to discard before damage.
   let energyDiscarded = ctx.energyDiscarded;
   const discardScaling = discardEnergyScaling(attack?.text);
+  if (discardScaling?.coinGate && energyDiscarded === undefined && coin !== discardScaling.coinGate) {
+    energyDiscarded = 0;
+  }
   if (discardScaling && energyDiscarded === undefined) {
     const groups = discardScalingGroups(draft, { playerId, attacker, scaling: discardScaling });
     const candidates = groups.flatMap((group) => group.cards);
@@ -6146,6 +6188,9 @@ function resolveAttackEffectPhase(draft, ctx) {
         let defenderKnockedOut = false;
 
         if (dmgDealt > 0) {
+          // "If this Pokémon was damaged by an attack during your opponent's last turn, this
+          // attack does that much more damage" (Conkeldurr V / Mega Heracross ex Counter).
+          defender.attackDamageTaken = { turn: Number(draft.turn?.number) || 1, amount: dmgDealt };
           // Special-energy reactions to being damaged (Spiky/Horror/Dangerous
           // Energy, Lucky Energy). Resolved before the KO sweep so an energy on
           // a Pokémon that is Knocked Out still fires ("even if Knocked Out").
@@ -8186,7 +8231,7 @@ export function applyCommand(state, command, rng = null) {
           defender = defenderPlayer?.zones?.active?.find((c) => !c.attachedTo);
         }
         const coinResult = wantsReflip
-          ? flipAttackCoins(attack, activeRng)
+          ? flipAttackCoins(attack, activeRng, coinCountReader(draft, { playerId: initiatorPlayerId, attacker, attackerView, targetInstanceId: token.targetInstanceId ?? null }))
           : token.coinResult;
         const { coin, headsCount, flips } = coinResult;
         if (flips.length > 0) {

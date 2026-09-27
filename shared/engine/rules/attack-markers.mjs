@@ -285,6 +285,15 @@ const MARKER_BODIES = [
     'yourNextTurn',
     (m, { wrOrder }) => incomingBonus(m[1] || m[2], wrOrder),
   ],
+  // Armaldo Crush Claw / Dustox ex Silver Wind ("During your next turn, if an attack does damage
+  // to the Defending Pokémon …, that attack does 40 more damage") and Sharpedo Crunch ("… to
+  // that Pokémon until the end of your next turn"): the same incoming bonus on the defender.
+  [
+    /^if an attack does damage to your opponent's active pokémon, that attack does (\d+) more damage(?: to that pokémon)?$/,
+    'opponentActive',
+    ['yourNextTurn', 'throughYourNextTurn'],
+    (m, { wrOrder }) => incomingBonus(m[1], wrOrder),
+  ],
   // Oranguru: only the Weakness type changes, not its amount.
   [
     /^your opponent's active pokémon's weakness is now \{([a-z])\}$/,
@@ -427,7 +436,11 @@ export function parseMarkerSentence(sentence, context = {}) {
     const m = re.exec(body);
     if (!m) continue;
     // Bonuses need "during your next turn"; protections need one of the opponent-turn windows.
-    const windowFits = requiredWindow ? window === requiredWindow : window && window !== 'yourNextTurn';
+    const windowFits = Array.isArray(requiredWindow)
+      ? requiredWindow.includes(window)
+      : requiredWindow
+        ? window === requiredWindow
+        : window && window !== 'yourNextTurn';
     if (!windowFits) return null;
     const built = build(m, context);
     // One sentence can set two markers ("… cost {c} more, and its retreat cost is {c} more").

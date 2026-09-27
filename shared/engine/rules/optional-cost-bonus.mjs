@@ -59,6 +59,9 @@ const BONUS =
 // Slaking Dynamic Swing: "You may do 100 more damage. If you do, <drawback>."
 const DO_MORE = /^you may do (\d+) more damage\.$/;
 
+const PUT_COUNTERS = /^put up to (\d+) damage counters on this pokémon\.$/;
+const PER_COUNTER = /^this attack does (\d+) (?:more )?damage for each damage counter you (?:put|placed)(?: on this pokémon)? in this way\.$/;
+
 /**
  * @param {string} attackText Printed attack text
  * @param {string} [selfName] The attacker's printed name (older prints name themselves)
@@ -67,6 +70,18 @@ const DO_MORE = /^you may do (\d+) more damage\.$/;
 export function optionalCostBonusClause(attackText, selfName = '') {
   const sentences = normalizeAttackText(attackText, selfName).split(/(?<=\.)\s+/);
   for (let i = 0; i < sentences.length - 1; i++) {
+    // Annihilape ex Angry Grudge: a mandatory "up to" cost the damage counts.
+    const counters = PUT_COUNTERS.exec(sentences[i]);
+    const scaled = counters && PER_COUNTER.exec(sentences[i + 1]);
+    if (scaled) {
+      return {
+        cost: { kind: 'selfCounters', upTo: Number(counters[1]) },
+        bonus: Number(scaled[1]),
+        extraCondition: null,
+        perEach: true,
+        consumed: [sentences[i].replace(/\.$/, '')],
+      };
+    }
     const doMore = DO_MORE.exec(sentences[i]);
     const drawback = doMore && /^if you do, (.+)$/.exec(sentences[i + 1]);
     if (drawback) {

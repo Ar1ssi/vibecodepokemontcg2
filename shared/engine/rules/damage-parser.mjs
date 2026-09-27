@@ -39,6 +39,7 @@ import { parseEachFilter } from './each-filter.mjs';
 import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
 import { normalizeAttackText } from './attack-text.mjs';
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
+import { countUnit, normalizeUnit, scalingCap } from './scaling-count.mjs';
 
 // Scalings that count what an optional "You may discard …" cost paid.
 const COST_SCALING_COMPONENTS = new Set([
@@ -94,6 +95,30 @@ function amount(text, re) {
  * ctx (buildServerAttackContext: `benchNames` marks it). One vocabulary for "does nothing"
  * gates and "N more damage" bonuses. null = unread wording or no server ctx.
  */
+/**
+ * Tiered coin bonuses → Map(heads → bonus), or null. Reads "If 1 of them is heads" / "If you
+ * get 2 heads" / "If all (both) of them are heads" sentences after a "Flip N coins".
+ */
+function coinTierBonuses(text) {
+  const flips = /flip (\d+) coins/.exec(text);
+  if (!flips) return null;
+  const tiers = new Map();
+  const re =
+    /if (?:(\d+|all|both) of them (?:is|are) heads|you get (\d+) heads), this attack does (?:\d+ damage plus )?(\d+) more damage/g;
+  for (const m of text.matchAll(re)) {
+    const word = m[1] ?? m[2];
+    const heads = word === 'all' || word === 'both' ? Number(flips[1]) : Number(word);
+    tiers.set(heads, Number(m[3]));
+  }
+  return tiers.size > 0 ? tiers : null;
+}
+
+/** A "for each <unit>" count from the shared counter, for a server-built ctx only. */
+function serverCount(unit, ctx, attacker) {
+  if (!Array.isArray(ctx?.benchNames)) return null;
+  return countUnit(normalizeUnit(unit, attacker?.name), ctx);
+}
+
 function sharedCondition(cond, ctx, attacker) {
   if (!Array.isArray(ctx?.benchNames)) return null;
   const desc = parseConditionClause(normalizeAttackText(cond, attacker?.name));
@@ -347,7 +372,10 @@ export function parseAttackDamage(
     const discarded = ctx.energyDiscarded ?? 0;
     // "does N more damage for each card" (Mega Clefable ex) adds to the base;
     // "does N damage for each card" (Inferno X) replaces it.
-    const more = /(\d+) more damage for each (?:energy )?card you (?:discard|shuffle)/.exec(text);
+    const more =
+      /(\d+) more damage for each (?:\{[a-z]\} )?(?:basic )?(?:energy )?(?:cards? )?(?:you )?(?:discard|shuffle)/.exec(
+        text
+      );
     // TCGdex prints "+" attacks as strings ("50+"), which leave `base` at 0.
     const printed = base || parseInt(String(attack?.damage ?? ''), 10) || 0;
     total = more ? printed + parseInt(more[1], 10) * discarded : printed * discarded;
@@ -362,9 +390,13 @@ export function parseAttackDamage(
     // the printed unit to a board count; non-Energy units fall through to the legacy chain, and
     // unreadable Energy units or choose-target tails keep a note instead of guessing.
     const unit = (text.match(/times the (?:amount|number) of (.+)/) || [])[1] || '';
-    const scaled = amountScale(unit, ctx);
-    const per = amount(text, /does (\d+)(?: more)? damage times the (?:amount|number) of/) || base;
-    const isMore = /more damage times the (?:amount|number) of/.test(text);
+    const scaled = serverCount(unit, ctx, attacker) || amountScale(unit, ctx);
+    // "Does 10 damage plus 10 damage times the number of …" (Feraligatr Riptide) adds to its base.
+    const plus = /damage plus (\d+) (?:more )?damage times the (?:amount|number) of/.exec(text);
+    const per = plus
+      ? Number(plus[1])
+      : amount(text, /does (\d+)(?: more)? damage times the (?:amount|number) of/) || base;
+    const isMore = Boolean(plus) || /more damage times the (?:amount|number) of/.test(text);
     const targetsTail = / to \d+ of your opponent's pok[ée]mon/.test(text);
     components.push('per-energy');
     if (scaled && !targetsTail) {
@@ -394,12 +426,18 @@ export function parseAttackDamage(
     total = per * discarded;
     components.push('per-hand-discarded');
     notes.push(`${per} × ${discarded} cards discarded in this way`);
-  } else if (text && /does \d+ less damage for each/.test(text)) {
-    // Reduction scaling ("does 10 less damage for each damage counter on this Pokémon").
-    const per = amount(text, /does (\d+) less damage for each/);
-    const unit = (text.match(/does \d+ less damage for each (.+)/) || [])[1] || '';
+  } else if (text && /(?:does \d+ less damage|damage minus \d+ damage) for each/.test(text)) {
+    // Reduction scaling ("does 10 less damage for each damage counter on this Pokémon"; older
+    // prints "does 100 damage minus 10 damage for each …").
+    const per = amount(text, /(?:does (\d+) less damage|damage minus (\d+) damage) for each/) ||
+      amount(text, /damage minus (\d+) damage for each/);
+    const unit = (text.match(/(?:less damage|damage minus \d+ damage) for each (.+)/) || [])[1] || '';
+    const counted = serverCount(unit, ctx, attacker);
     components.push('per-each');
-    if (
+    if (counted) {
+      total = Math.max(0, base - per * counted.count);
+      notes.push(`− ${per} × ${counted.count} (${counted.label})`);
+    } else if (
       /damage counter/.test(unit) &&
       /this pok[ée]mon/.test(unit) &&
       typeof ctx.attackerDamageCounters === 'number'
@@ -427,7 +465,9 @@ export function parseAttackDamage(
   } else if (
     text &&
     /damage for each/.test(text) &&
-    !/damage for each \d+ hp/.test(text)
+    !/damage for each \d+ hp/.test(text) &&
+    // Palkia-EX Dimension Heal: "Heal from this Pokémon 20 damage for each …" scales a heal.
+    !/^heal [^.]*damage for each/.test(text)
   ) {
     // "for each …" scaling (Mega Evolution audit A). "does N damage for each X"
     // → total = N × count (N is the per-unit value, so the printed base = N).
@@ -449,11 +489,15 @@ export function parseAttackDamage(
     let count;
     let label;
     const handKind = /^(trainer|energy) cards? (?:you find there|in your opponent's hand)/.exec(unit)?.[1];
-    if (handKind) {
+    // Anchored units the shared counter reads (scaling-count.mjs) win over the loose chain below.
+    const counted = serverCount(unit, ctx, attacker);
+    if (counted) {
+      ({ count, label } = counted);
+    } else if (handKind) {
       // Revealed-hand scaling (Poltergeist, Liberation-GX, Wonder Flare) counts one card kind.
       count = handKind === 'trainer' ? ctx.opponentHandTrainerCount : ctx.opponentHandEnergyCount;
       label = `${handKind === 'trainer' ? 'Trainer' : 'Energy'} cards in opponent's hand`;
-    } else if (/^(?:energy )?cards? you returned|^damage counters? you put/.test(unit)) {
+    } else if (/^(?:energy )?cards? you returned|^damage counters? you (?:put|placed)/.test(unit)) {
       // Yanmega Wind Return / Meganium Bouncy Move: the optional cost the player paid
       // (ctx.optionalCostCount, set with ctx.optionalCostPaid by the reducer).
       count = ctx.optionalCostCount;
@@ -590,7 +634,10 @@ export function parseAttackDamage(
       label = unit || 'the printed count';
     }
     if (per > 0 && typeof count === 'number' && count >= 0) {
-      total = isMore ? base + per * count : per * count;
+      // "You can't add more than 60 damage in this way" caps the added part; "You can't do
+      // more than 130 damage in this way" caps the whole.
+      const cap = scalingCap(text);
+      total = isMore ? base + Math.min(per * count, cap ?? Infinity) : Math.min(per * count, cap ?? Infinity);
       components.push('per-each');
       notes.push(
         `${isMore ? `+ ${per} × ${count}` : `${per} × ${count}`} (${label})`
@@ -664,10 +711,25 @@ export function parseAttackDamage(
         `+ ${bonus} not applied (Defending Pokémon is not ${typeMatch[1]})`
       );
     }
+  } else if (text && coinTierBonuses(text)) {
+    // Fury Cutter: "Flip 3 coins. If 1 of them is heads, … 10 more damage. If 2 of them are
+    // heads, … 30 more damage. If all of them are heads, … 50 more damage."
+    const tiers = coinTierBonuses(text);
+    if (typeof headsCount !== 'number') {
+      notes.push('coin-tier bonus — resolve the printed count');
+    } else {
+      const bonus = tiers.get(headsCount) ?? 0;
+      total = base + bonus;
+      components.push('coin-tier');
+      notes.push(`+ ${bonus} (${headsCount} heads)`);
+    }
   } else if (
     text &&
     !/if heads|if tails/.test(text) &&
-    /if .* this attack does \d+ more|if .*more damage/.test(text)
+    /if .* this attack does \d+ more|if .*more damage/.test(text) &&
+    // "During your next turn, if an attack does damage to the Defending Pokémon …, that attack
+    // does 40 more damage" is a next-turn marker (attack-markers.mjs), not a bonus on this attack.
+    !/that attack does \d+ more damage/.test(text)
   ) {
     // Conditional bonus ("if …, this attack does N more"). The printed
     // condition clause is evaluated from card data where possible (HP
@@ -681,10 +743,13 @@ export function parseAttackDamage(
       text.split(/(?<=\.)\s+/).find((s) => /\bif\b/.test(s) && /\d+ more damage/.test(s)) || text;
     // Slaking Dynamic Swing prints its bonus before the "If you do" drawback sentence.
     const optionalCost = optionalCostBonusClause(attack?.text, attacker?.name);
-    const bonus =
+    // Counter: "… this attack does that much more damage" repeats the damage this Pokémon took.
+    const thatMuch = /that much more damage/.test(bonusSentence);
+    let bonus =
       optionalCost && !optionalCost.perEach
         ? optionalCost.bonus
         : amount(bonusSentence, /(\d+) more damage/);
+    if (thatMuch) bonus = Number(ctx.attackerDamageTakenLastTurn) || 0;
     const cond =
       (bonusSentence.match(/\bif (.+?),? this attack (?:does|do)\b/) ||
         bonusSentence.match(/\bif (.+?)(?:,| this attack)/) ||
@@ -1485,7 +1550,7 @@ function discardEnergyGroups(text) {
     };
   }
   const all =
-    /discard\s+all\s+(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+attached\s+to\s+([^.,]+?)[.,]/i.exec(
+    /discard\s+all\s+(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+(?:attached\s+to|from)\s+([^.,]+?)[.,]/i.exec(
       text
     );
   if (!all) return null;
@@ -1499,13 +1564,22 @@ function discardEnergyGroups(text) {
 }
 
 export function discardEnergyScaling(attackText) {
+  const scaling = discardEnergyScalingClause(attackText);
+  // Raikou Lightning Sphere: "If heads, discard all {L} Energy …" discards only on heads.
+  if (scaling && /if heads,\s+discard/i.test(String(attackText || ''))) return { ...scaling, coinGate: 'heads' };
+  return scaling;
+}
+
+function discardEnergyScalingClause(attackText) {
   const text = String(attackText || '');
   // Blastoise-GX Rocket Splash shuffles the Energy into the deck instead ("for each card
   // you shuffled into your deck in this way"): destination 'deck'.
   const shuffled = /for each (?:energy )?card you shuffled into your deck/i.test(text);
   // Older prints scale with "… damage times the number (amount) of Energy you discarded".
+  // "for each card you discarded", "for each Energy card discarded in this way" (Ninetales
+  // BREAK), "for each {M} Energy you discarded" (Genesect-EX).
   const discardedScaling =
-    /for each (?:energy )?card you discard(ed)?/i.test(text) ||
+    /for each (?:\{[A-Z]\} )?(?:basic )?(?:energy )?(?:cards? )?(?:you )?discard(ed)?\b/i.test(text) ||
     /times the (?:number|amount) of [^.]*?Energy[^.]*?discarded/i.test(text);
   if (!shuffled && !discardedScaling) return null;
 
@@ -1562,6 +1636,21 @@ export function discardEnergyScaling(attackText) {
     };
   }
 
+  // Magcargo Lava Flow: "discard any number of {R} Energy cards attached to Magcargo when you
+  // use this attack".
+  const anyNumber =
+    /discard\s+any\s+(?:number|amount)\s+of\s+(basic\s+)?\{([A-Z])\}\s+Energy(?:\s+cards?)?\s+attached\s+to\s+([^.,]+?)(?:\s+when\s+you\s+use\s+this\s+attack)?[.,]/i.exec(
+      text
+    );
+  if (anyNumber) {
+    return {
+      max: Infinity,
+      source: discardSourceOf(anyNumber[3]),
+      energyType: energyTypeOf(anyNumber[2]),
+      basicOnly: Boolean(anyNumber[1]),
+    };
+  }
+
   // Flygon ex: "discard any number of React Energy cards attached to Flygon ex"
   // — a named Energy family, counted by card name.
   const named =
@@ -1597,8 +1686,9 @@ export function discardEnergyScaling(attackText) {
 // Pure.
 export function deckMillScaling(attackText) {
   const text = String(attackText || '');
+  // Tyranitar Dark Mountain prints "for each Supporter card discard in this way".
   const each =
-    /for each ([^.]+?) (?:that )?(?:you )?discarded(?: in this way)?/i.exec(text);
+    /for each ([^.]+?) (?:that )?(?:you )?(?:discarded(?: in this way)?|discard in this way)/i.exec(text);
   if (!each) return null;
 
   let players = 'self';

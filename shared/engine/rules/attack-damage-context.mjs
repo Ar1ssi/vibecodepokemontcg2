@@ -147,6 +147,9 @@ function ruleBoxKinds(view) {
   ];
   const kinds = checks.filter(([, test]) => test(view)).map(([kind]) => kind);
   kinds.push(isBasicPokemon(view) ? 'basic' : 'evolved');
+  const stage = normalizeStage(view.stage);
+  if (stage === 'Stage 1') kinds.push('stage1');
+  if (stage === 'Stage 2') kinds.push('stage2');
   for (const type of view.types || []) {
     const word = String(type).toLowerCase();
     kinds.push(`type:${word === 'dark' ? 'darkness' : word}`);
@@ -163,6 +166,42 @@ function abilityKinds(view) {
     return 'ability';
   });
 }
+
+const trainerKind = (card) => {
+  const subtypes = Array.isArray(card?.subtypes) ? card.subtypes.join(' ') : card?.subtypes || '';
+  const kind = `${card?.type || ''} ${card?.trainerType || ''} ${subtypes}`.toLowerCase();
+  return ['supporter', 'tool', 'stadium', 'item'].find((word) => kind.includes(word)) || '';
+};
+
+/** One discard-pile card as the "for each … in your discard pile" counts read it (scaling-count.mjs). */
+function discardEntry(card) {
+  if (isEnergy(card) && !isTrainer(card)) {
+    return {
+      name: card.name || '',
+      category: 'energy',
+      basicEnergy: classifyEnergyEffect(card) === 'basic',
+      energyType: serverEnergyDescriptor(card).type,
+    };
+  }
+  if (isPokemon(card)) {
+    return {
+      name: card.name || '',
+      category: 'pokemon',
+      pokemonTypes: [...(card.types || [])],
+      attackNames: (card.attacks || []).map((a) => a?.name || ''),
+    };
+  }
+  return { name: card.name || '', category: 'trainer', trainerKind: trainerKind(card) };
+}
+
+/** One in-play Pokémon as the in-play "for each …" counts read it. */
+const pokemonEntry = (bench) => ({ card, view }) => ({
+  name: view?.name || card?.name || '',
+  bench,
+  kinds: ruleBoxKinds(view),
+  counters: Math.floor((card?.damage || 0) / 10),
+  delta: /δ|delta species/i.test(`${view?.name || ''} ${view?.subtypes || ''} ${card?.subtypes || ''}`),
+});
 
 const attackerZone = (player, pokemon) =>
   ['active', 'bench'].map((zoneId) => zoneOf(player, zoneId)).find((cards) => cards.includes(pokemon)) || [];
@@ -316,6 +355,10 @@ export function buildServerAttackContext(
       ? priorEvolutionCards(attackerZone(own, attacker), attacker).map((card) => card.name || '')
       : [],
     attackerHealedThisTurn: attacker != null && Number(attacker.healedTurn) === turnNumber,
+    attackerDamageTakenLastTurn:
+      attacker?.attackDamageTaken && Number(attacker.attackDamageTaken.turn) === turnNumber - 1
+        ? Number(attacker.attackDamageTaken.amount) || 0
+        : 0,
     attackerHandEnergyTypesThisTurn: (own?.flags?.handEnergyAttachedThisTurn || [])
       .filter((entry) => attacker && entry.hostId === attacker.instanceId)
       .map((entry) => attackerEnergy.find((card) => card.instanceId === entry.energyId))
@@ -336,6 +379,23 @@ export function buildServerAttackContext(
     stadiumOwner: stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId),
     stadiumName: stadiumCard?.name || '',
     allInPlayNames: [...ownInPlay, ...inPlayPokemon(opponent)].map(({ card, view }) => view?.name || card?.name || ''),
+    // "for each …" scaling and coin-count reads (scaling-count.mjs).
+    ownDiscardCards: zoneOf(own, 'discard').map(discardEntry),
+    opponentDiscardCards: zoneOf(opponent, 'discard').map(discardEntry),
+    ownPokemon: [...rootPokemon(own, 'active').map(pokemonEntry(false)), ...ownBench.map(pokemonEntry(true))],
+    opponentPokemon: [...rootPokemon(opponent, 'active').map(pokemonEntry(false)), ...opponentBench.map(pokemonEntry(true))],
+    attackerAttachedCards: [...zoneOf(own, 'active'), ...zoneOf(own, 'bench')]
+      .filter((card) => attacker && card.attachedTo === attacker.instanceId && !isPokemon(card))
+      .map((card) => ({
+        name: card.name || '',
+        energy: isEnergy(card) && !isTrainer(card),
+        basicEnergy: classifyEnergyEffect(card) === 'basic',
+        energyType: isEnergy(card) ? serverEnergyDescriptor(card).type : null,
+        tool: isTool(card),
+      })),
+    opponentTrainersInPlay:
+      inPlayPokemon(opponent).reduce((sum, { card }) => sum + toolCountOn(opponent, card), 0) +
+      (stadiumOwnerOf(stadiumCard, attackerPlayerId, defenderPlayerId) === 'opponent' ? 1 : 0),
   };
 
   if (energyDiscarded !== undefined) {
@@ -384,6 +444,9 @@ export function buildServerAttackContext(
     ctx.defenderAbilityKinds = abilityKinds(defenderCard);
     ctx.defenderResistanceTypes = resistanceTypes(defenderCard);
     ctx.defenderToolCount = toolCountOn(opponent, defender);
+    ctx.defenderBasicEnergyCount = attachedEnergyCards(opponent, defender).filter(
+      (card) => classifyEnergyEffect(card) === 'basic'
+    ).length;
   }
   // "…times the amount of Energy attached to all of your opponent's Pokémon" scaling.
   if (opponent) {

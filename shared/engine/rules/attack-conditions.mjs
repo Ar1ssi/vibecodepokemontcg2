@@ -121,6 +121,7 @@ const KIND_PHRASES = [
   [/^(?:an? )?ultra beasts?$/, () => 'ultrabeast'],
   [/^(?:an? )?(?:evolved|evolution) pokémon$/, () => 'evolved'],
   [/^(?:an? )?basic pokémon$/, () => 'basic'],
+  [/^(?:an? )?stage (1|2)(?: evolved)? pokémon$/, (m) => `stage${m[1]}`],
   [/^(?:an? )?(tera|radiant|mega) pokémon$/, (m) => m[1]],
   [/^(?:an? )?\{([a-z])\} pokémon$/, (m) => (ENERGY_LETTER_TYPES[m[1]] ? `type:${ENERGY_LETTER_TYPES[m[1]].toLowerCase()}` : null)],
   [/^(?:an? )?([a-z]+) pokémon$/, (m) => (ENERGY_WORD_TYPES[m[1]] ? `type:${ENERGY_WORD_TYPES[m[1]].toLowerCase()}` : null)],
@@ -135,7 +136,7 @@ function kindOf(phrase) {
 }
 
 /** "a Pokémon-GX or a Pokémon-EX" → ['gx', 'ex']; null when any part is not a known kind. */
-function kindsOf(phrase) {
+export function kindsOf(phrase) {
   const kinds = String(phrase || '')
     .split(/,? or /)
     .map(kindOf);
@@ -437,6 +438,10 @@ const CLAUSES = [
       const names = splitNames(m[1]);
       return names ? { desc: { kind: 'evolvedThisTurn', fromNames: names }, printedNegated: false } : null;
     },
+  ],
+  [
+    /^this pokémon was damaged by an attack during your opponent's last turn$/,
+    () => ({ desc: { kind: 'damagedLastOpponentTurn' }, printedNegated: false }),
   ],
   [
     /^this pokémon was healed during this turn$/,
@@ -890,6 +895,7 @@ const CHECKS = {
   defenderResistance: (cond, ctx) =>
     list(ctx.defenderResistanceTypes).some((type) => String(type).toLowerCase() === String(cond.type).toLowerCase()),
   healedThisTurn: (cond, ctx) => ctx.attackerHealedThisTurn === true,
+  damagedLastOpponentTurn: (cond, ctx) => num(ctx.attackerDamageTakenLastTurn) > 0,
   handEnergyAttachedThisTurn: (cond, ctx) => {
     const types = list(ctx.attackerHandEnergyTypesThisTurn);
     if (!cond.type) return types.length > 0;

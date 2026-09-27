@@ -1305,7 +1305,8 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
 
   // "You may <cost>. If you do, this attack does N more damage": the reducer offers and pays
   // that cost before damage (optional-cost-bonus.mjs), so neither sentence is a step here.
-  const optionalCost = Boolean(optionalCostBonusClause(text, selfName));
+  const optionalClause = optionalCostBonusClause(text, selfName);
+  const optionalCost = Boolean(optionalClause);
   const sentences = normalized.split(/(?<=\.)\s+/);
   for (const [index, raw] of sentences.entries()) {
     const sentence = raw.trim().replace(/\.$/, '');
@@ -1313,7 +1314,8 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     if (
       optionalCost &&
       ((/^you may /.test(sentence) && /^if you do\b/.test(sentences[index + 1]?.trim() || '')) ||
-        (/^if you do\b/.test(sentence) && /^you may /.test(sentences[index - 1]?.trim() || '')))
+        (/^if you do\b/.test(sentence) && /^you may /.test(sentences[index - 1]?.trim() || '')) ||
+        (optionalClause.consumed || []).includes(sentence))
     ) {
       continue;
     }
