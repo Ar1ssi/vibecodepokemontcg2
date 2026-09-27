@@ -42,6 +42,8 @@ import {
   ownBenchDamage,
   attackTargetClause,
   ownTargetClause,
+  computedCounterClause,
+  targetClauseGate,
   opponentCounterClause,
   parseAttackSearchClause,
   parsePrizeOnKo,
@@ -587,6 +589,29 @@ function attackTargetOptions(draft, defenderPlayerId, scope, filter = null) {
   const roots = scope === 'bench' ? bench : scope === 'active' ? active : [...active, ...bench];
   const keep = TARGET_FILTERS[filter];
   return keep ? roots.filter((root) => keep(inPlayView(draft, root))) : roots;
+}
+
+/**
+ * A computed counter clause (damage-parser.mjs computedCounterClause) as a counters target:
+ * the count read from the board, capped, on the Defending Pokémon or 1 chosen Pokémon.
+ * Null when the unit cannot be read or the count is 0.
+ */
+function computedCounterTarget(draft, clause, { attackerPlayerId, defenderPlayerId, attacker, defender, attackerView, attack }) {
+  const ctx = buildServerAttackContext(draft, {
+    attackerPlayerId,
+    defenderPlayerId,
+    attacker,
+    defender,
+    attackerView,
+    attack,
+    defenderView: defender ? inPlayView(draft, defender) : null,
+  });
+  const counted = countUnit(normalizeUnit(clause.unit, attackerView?.name || attacker?.name), ctx);
+  if (!counted) return null;
+  let counters = clause.base + clause.per * counted.count;
+  if (clause.cap != null) counters = Math.min(counters, clause.cap);
+  if (counters <= 0) return null;
+  return { kind: 'counters', amount: counters * 10, count: 1, scope: clause.target === 'active' ? 'active' : 'any' };
 }
 
 /** Prompt for one pick of a split clause: a damage counter, or one hit of a repeated choice. */
@@ -6725,7 +6750,49 @@ function resolveAttackEffectPhase(draft, ctx) {
       // Design 036 A9: "does N damage to each of your opponent's Pokémon [that …]" hits every
       // matching Pokémon below; the looser bench reading must not also ask for one target.
       const eachDamage = eachPokemonDamage(attack.text);
-      let attackTarget = eachDamage ? null : resolveAttackTargetClause(attack.text, parsed, spread);
+      // Mr. Mime ex Breakdown / Dusclops ex Shadow Beam: a counter count the board decides.
+      const computedCounters = eachDamage ? null : computedCounterClause(attack.text);
+      let attackTarget = eachDamage
+        ? null
+        : computedCounters
+          ? computedCounterTarget(draft, computedCounters, {
+              attackerPlayerId: playerId,
+              defenderPlayerId,
+              attacker,
+              defender,
+              attackerView,
+              attack,
+            })
+          : resolveAttackTargetClause(attack.text, parsed, spread);
+      // Shedinja Extra Curse: "If the Defending Pokémon is Pokémon-ex, put 4 damage counters instead."
+      const counterSwap = attackTarget?.kind === 'counters'
+        ? /(?:^|\. )if ([^,]+), put (\d+) damage counters instead\./.exec(normalizeAttackText(attack.text, attackerView?.name))
+        : null;
+      if (counterSwap) {
+        const condition = parseConditionClause(counterSwap[1]);
+        const holds =
+          condition &&
+          attackConditionMet(
+            condition,
+            buildServerAttackContext(draft, {
+              attackerPlayerId: playerId,
+              defenderPlayerId,
+              attacker,
+              defender,
+              attackerView,
+              attack,
+              defenderView: defender ? inPlayView(draft, defender) : null,
+            })
+          );
+        if (holds) attackTarget = { ...attackTarget, amount: Number(counterSwap[2]) * 10 };
+      }
+      // "If heads, put 3 damage counters on …" / "For each heads, put 1 damage counter …".
+      const targetGate = attackTarget ? targetClauseGate(attack.text) : null;
+      if (targetGate === 'heads' && !(coin === 'heads' || headsCount > 0)) attackTarget = null;
+      if (targetGate === 'tails' && coin !== 'tails') attackTarget = null;
+      if (targetGate === 'perHeads') {
+        attackTarget = headsCount > 0 ? { ...attackTarget, amount: attackTarget.amount * headsCount } : null;
+      }
       // Wugtrio ex / Tricolor Pump: the snipe does its printed amount once per
       // Energy discarded, and nothing when none were.
       if (

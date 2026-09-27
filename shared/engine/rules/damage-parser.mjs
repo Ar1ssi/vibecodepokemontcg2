@@ -1383,7 +1383,10 @@ export function eachPlayerDrawCount(attackText) {
  * Bench (Dragapult ex Phantom Dive, Ting-Lu ex Land Scoop, Reuniclus Cell Fork).
  */
 export function opponentCounterClause(attackText) {
-  const t = String(attackText || '').replace(/[‘’]/g, "'");
+  // Older prints name "the Defending Pokémon" (Shedinja Curse and Deceive).
+  const t = String(attackText || '')
+    .replace(/[‘’]/g, "'")
+    .replace(/\bthe defending pok[ée]mon\b/gi, "your opponent's Active Pokémon");
   let m =
     /choose (\d+) of your opponent's (benched )?pok[ée]mon and put (\d+) damage counters? on each/i.exec(
       t
@@ -1654,6 +1657,49 @@ export function attackTargetClause(attackText) {
     count: Math.max(1, parseInt(m[2], 10) || 1),
     scope: m[3] ? 'bench' : 'any',
   };
+}
+
+/**
+ * The coin gate on a chosen-target / counter-placement sentence: 'heads' / 'tails' ("If heads,
+ * put 3 damage counters …"), 'perHeads' ("For each heads, put 1 damage counter …"), or null.
+ */
+export function targetClauseGate(attackText) {
+  const sentence = normalizeAttackText(attackText)
+    .split(/(?<=\.)\s+/)
+    .find((s) => /damage counters? on|does \d+ damage to (?:\d+|each of \d+|1) of|damage to (?:that pokémon|it|each of them)\b/.test(s));
+  if (!sentence) return null;
+  if (/^if heads\b/.test(sentence)) return 'heads';
+  if (/^if tails\b/.test(sentence)) return 'tails';
+  if (/^for each heads\b/.test(sentence)) return 'perHeads';
+  return null;
+}
+
+/**
+ * Counters whose number the board decides, on the Defending Pokémon or 1 chosen opponent Pokémon:
+ * Mr. Mime ex Breakdown ("Count the number of cards in your opponent's hand. Put that many damage
+ * counters on the Defending Pokémon"), Dusknoir Pain Pellets ("… equal to the number of damage
+ * counters on this Pokémon"), Dusclops ex Shadow Beam ("2 damage counters … for each Energy
+ * attached to …"), Shedinja Damage Curse ("1 damage counter, plus 1 more … for each …"), Dusknoir
+ * Hard Feelings ("5 damage counters … Then, count the number of Prize cards your opponent has
+ * taken and put that many …"). Returns `{ unit, per, base, target: 'active'|'choose', cap }`;
+ * reduce.mjs counts `unit` (scaling-count.mjs countUnit). Pure.
+ */
+export function computedCounterClause(attackText, selfName = '') {
+  const t = normalizeAttackText(attackText, selfName).replace(/\s*\([^)]*\)/g, '');
+  const ACTIVE = "your opponent's active pokémon";
+  const targetOf = (phrase) => (phrase === ACTIVE ? 'active' : 'choose');
+  const cap = Number((/you can't put more than (\d+) damage counters in this way/.exec(t) || [])[1]) || null;
+  let m = /count the (?:amount|number) of ([^.]+)\. put that many damage counters on (your opponent's active pokémon|1 of your opponent's pokémon)\b/.exec(t);
+  if (m) return { unit: m[1], per: 1, base: 0, target: targetOf(m[2]), cap };
+  m = /put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) equal to the number of ([^.]+)\./.exec(t);
+  if (m) return { unit: m[2], per: 1, base: 0, target: targetOf(m[1]), cap };
+  m = /put (\d+) damage counters?, plus (\d+) more damage counters? for each ([^,]+), on your opponent's active pokémon/.exec(t);
+  if (m) return { unit: m[3], per: Number(m[2]), base: Number(m[1]), target: 'active', cap };
+  m = /put (\d+) damage counters? on (your opponent's active pokémon|that pokémon) for each ([^.]+)\./.exec(t);
+  if (m) return { unit: m[3], per: Number(m[1]), base: 0, target: targetOf(m[2]), cap };
+  m = /put (\d+) damage counters on your opponent's active pokémon\. then, count the number of ([^.]+?) and put that many damage counters on your opponent's active pokémon/.exec(t);
+  if (m) return { unit: m[2], per: 1, base: Number(m[1]), target: 'active', cap };
+  return null;
 }
 
 /**

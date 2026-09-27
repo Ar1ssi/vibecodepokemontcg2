@@ -266,7 +266,19 @@ function counterCount(unit, ctx) {
   if (/^prize cards? more than your opponent$/.test(unit) && ctx.ownPrizes != null && ctx.opponentPrizes != null) {
     return { count: Math.max(0, ctx.ownPrizes - ctx.opponentPrizes), label: 'Prize cards more than your opponent' };
   }
-  if (/^of those pokémon$/.test(unit) && typeof ctx.damagedOwnPokemonCount === 'number') {
+  // Dusknoir Hard Feelings: the opponent started with 6 Prize cards.
+  if (/^prize cards? your opponent has taken$/.test(unit) && typeof ctx.opponentPrizes === 'number') {
+    return { count: Math.max(0, 6 - ctx.opponentPrizes), label: 'Prize cards your opponent has taken' };
+  }
+  // Azelf LV.X Deep Balance.
+  if (/^energy attached to all of your opponent's pokémon$/.test(unit) && typeof ctx.opponentAllEnergyCount === 'number') {
+    return { count: ctx.opponentAllEnergyCount, label: "Energy on your opponent's Pokémon" };
+  }
+  // Unown G Hidden Power: "the number of your Pokémon that have any damage counters on them".
+  if (
+    /^(?:of those pokémon|your pokémon that have any damage counters on them)$/.test(unit) &&
+    typeof ctx.damagedOwnPokemonCount === 'number'
+  ) {
     return { count: ctx.damagedOwnPokemonCount, label: 'your Pokémon with damage counters' };
   }
   return null;

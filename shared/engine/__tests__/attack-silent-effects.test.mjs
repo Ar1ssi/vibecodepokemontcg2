@@ -681,3 +681,63 @@ test('Comfey Sweet Kiss (Guardians Rising 93): the opponent draws a card', () =>
   // +1 from Sweet Kiss, +1 from the opponent's turn draw.
   assert.equal(res.state.players.p2.zones.hand.length, before + 2);
 });
+
+// ── counters on the Defending Pokémon ───────────────────────────────────────
+
+/** Attacks with each seed until the first coin shows `face`. */
+function attackShowing(make, face) {
+  for (let seed = 1; seed < 200; seed++) {
+    const { state, defender } = make();
+    const res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(seed));
+    const flip = res.events.find((e) => e.type === 'attackCoinFlipped');
+    if ((flip?.flips || [flip?.coin])[0] === face) return { res, defender };
+  }
+  throw new Error(`no seed shows ${face}`);
+}
+
+test('a coin-gated counter placement needs heads', () => {
+  const make = () => board('Probe', "Flip a coin. If heads, put 3 damage counters on your opponent's Active Pokémon.", { damage: '' });
+  const tails = attackShowing(make, 'tails');
+  assert.equal(root(tails.res.state, 'p2', tails.defender.instanceId).damage, 0);
+  const heads = attackShowing(make, 'heads');
+  assert.equal(root(heads.res.state, 'p2', heads.defender.instanceId).damage, 30);
+});
+
+test('Mr. Mime ex Breakdown (FireRed & LeafGreen 111): a counter per card in the opponent\'s hand', () => {
+  const text =
+    "Count the number of cards in your opponent's hand. Put that many damage counters on the Defending Pokémon.";
+  const { state, defender } = board('Mr. Mime ex', text, {
+    damage: '',
+    setup: (s) => s.players.p2.zones.hand.push(trainer('A', 'Item'), trainer('B', 'Item'), trainer('C', 'Item')),
+  });
+  assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 30);
+});
+
+test('Dusclops ex Shadow Beam (Emerald 94): 2 counters per attached Energy', () => {
+  const text = 'Put 2 damage counters on the Defending Pokémon for each Energy attached to Dusclops ex.';
+  const { state, attacker, defender } = board('Dusclops ex', text, { damage: '' });
+  attachTo(state, attacker, ['Psychic', 'Psychic']);
+  assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 40);
+});
+
+test('Shedinja Extra Curse (Deoxys 14): 2 counters, or 4 on a Pokémon-ex', () => {
+  const text =
+    'Put 2 damage counters on the Defending Pokémon. If the Defending Pokémon is Pokémon-ex, put 4 damage counters instead.';
+  const plain = board('Shedinja', text, { damage: '' });
+  assert.equal(root(attack(plain.state).state, 'p2', plain.defender.instanceId).damage, 20);
+  const ex = board('Shedinja', text, {
+    damage: '',
+    setup: (s) => {
+      s.players.p2.zones.active[0].name = 'Rayquaza ex';
+      s.players.p2.zones.active[0].subtypes = ['Basic', 'ex'];
+    },
+  });
+  assert.equal(root(attack(ex.state).state, 'p2', ex.defender.instanceId).damage, 40);
+});
+
+test('Dusknoir Hard Feelings (Diamond & Pearl 2): 5 counters plus 1 per Prize the opponent took', () => {
+  const text =
+    'Put 5 damage counters on the Defending Pokémon. Then, count the number of Prize cards your opponent has taken and put that many damage counters on the Defending Pokémon.';
+  const { state, defender } = board('Dusknoir', text, { damage: '', setup: (s) => s.players.p2.zones.prizes.splice(0, 2) });
+  assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 70);
+});
