@@ -1,5 +1,5 @@
 # 049: Copy attacks and attack borrowing — every printed wording, end to end
-Status: approved (user, S327: "implement a plan for EVERY copy attack, not just Mew")
+Status: building — approved (user, S327: "implement a plan for EVERY copy attack"); slices 1–8 built, review pending
 Date: 2026-09-28 · Session: S327
 
 ## Problem
@@ -324,58 +324,58 @@ New TEMPLATES in `attack-copy.mjs`:
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Memory Helix, empty Bench | only Teleportation Burst; `attackExtras` key absent | [ ] |
-| 2 | stale / out-of-range `attackIndex` | existing "Unknown attack." rejection | [ ] existing |
-| 3 | borrowed attack shares a printed name | printed wins (`mergeAttacks`); index aligned | [ ] |
-| 4 | Memory Helix Mew on the Bench | Bench Mew lists its borrowed attacks inert; Active Mew lists Bench Mew's printed attack once | [ ] |
-| 5 | holder's Ability suppressed | borrowed/granted extras empty | [ ] |
-| 6 | copy candidate is GX, own GX spent (or gxLock) | not offered | [ ] |
-| 7 | copy candidate is VSTAR Power, own VSTAR spent | not offered (R2) | [ ] |
-| 8 | copy picks VSTAR Power, VSTAR unspent | resolves; `vstarUsed` true | [ ] |
-| 9 | every candidate filtered | `attackCopyNothing`; turn ends | [ ] |
-| 10 | borrowed VSTAR attack after VSTAR spent | legality "VSTAR Power already used this game." | [ ] |
-| 11 | VSTAR card uses own VSTAR attack twice across turns | second rejected | [ ] |
-| 12 | candidate has failing "only if" gate (Lost Mine, <10 Lost Zone) | not offered (R7) | [ ] |
-| 13 | candidate has failing "does nothing" gate | offered (R1) | [ ] |
-| 14 | Genome Hacking copies Mega Brave | next turn Genome Hacking allowed (R3) | [ ] |
-| 15 | Memory Helix Mega Brave | next turn Mega Brave via Memory Helix rejected (R6) | [ ] |
-| 16 | Memory Helix + Great Swing, opp has no ex/V | allowed (R5) | [ ] |
-| 17 | Genome Hacking copies {R}{R}{R} with {C}{C}{C} | offered and resolves (R1) | [ ] |
-| 18 | view for opponent / spectator | no `attackExtras` key | [ ] |
-| 19 | view without `attackExtras` (legacy / older room) | client uses Stadium-only extras | [ ] |
-| 20 | deck code `Mew ex 30C 66` | `30th-066` | [ ] |
-| 21 | LINK with Unown on both sides | lists own and opponent Unown attacks, not Unown L's own | [ ] |
-| 22 | Mimic / Psymimic holder Asleep (Mimic) or Poisoned (Psymimic) | extras empty | [ ] |
-| 23 | Mimic Sudowoodo on the Bench | extras empty (requiresActive) | [ ] |
-| 24 | Dragon DNA borrowed 20-damage attack vs Defending | 50 before W/R | [ ] |
-| 25 | Dragon DNA borrowed 0-damage attack | no bonus | [ ] |
-| 26 | Memory Dive, evolved Pokémon (Stage 2) | lists Basic + Stage 1 attacks, pays own cost | [ ] |
-| 27 | Memory Dive, unevolved Basic | nothing added | [ ] |
-| 28 | Memory Dive on the opponent's side | own evolved Pokémon get nothing | [ ] |
-| 29 | Prehistoric Memory in play, opponent's evolved Pokémon | opponent's Pokémon also list prior attacks | [ ] |
-| 30 | Prehistoric Memory holder Confused | grants stop | [ ] |
-| 31 | Dark Genes, Honchkrow on Bench can pay | Murkrow lists Honchkrow's attack at cost [] | [ ] |
-| 32 | Dark Genes, Honchkrow cannot pay | nothing granted | [ ] |
-| 33 | Memory Capsule on a Basic | nothing added | [ ] |
-| 34 | Memory Berry (AQ) host attacks | Berry discarded at end of that turn | [ ] |
-| 35 | Memory Berry (Platinum) host attacks | Berry stays | [ ] |
-| 36 | Tool negation Stadium in play | Tool grants skipped | [ ] |
-| 37 | Recall played, then next turn | this turn Active lists prior attacks; next turn not | [ ] |
-| 38 | Genetic Memory with unpayable Basic attack | offered (cost-free) | [ ] |
-| 39 | Delta Copy, no δ Pokémon | `attackCopyNothing` | [ ] |
-| 40 | Sketch, Defending did not attack last turn | nothing copied | [ ] |
-| 41 | Sketch, Smeargle came into play after that attack | nothing copied | [ ] |
-| 42 | Sketch, attacker was a different Pokémon than the Defending | nothing copied | [ ] |
-| 43 | Mimed Games | pendingChoice player = opponent; attacker cannot answer (`not_your_choice`) | [ ] |
-| 44 | Mimed Games vs opponent whose only Pokémon is Mime Jr. | nothing (R7) | [ ] |
-| 45 | Skill Hack, opp hand has no Pokémon | hand revealed; `attackCopyNothing` | [ ] |
-| 46 | Hypnotic Reign, decline | hand revealed; no discard; own text only | [ ] |
-| 47 | Hypnotic Reign picks an attack | that hand card moves to opponent's discard; attack resolves without Energy (R8) | [ ] |
-| 48 | Skill Copy, no payable hand candidate | no discard; `attackCopyNothing` | [ ] |
-| 49 | Skill Copy picks | own hand card discarded; attack resolves | [ ] |
-| 50 | ESP 3 heads | copy offered | [ ] |
-| 51 | ESP 1 heads / 2 heads | own text with the same coins: draw / 20 damage; one coin event | [ ] |
-| 52 | ESP with Glimwood Tangle | no re-flip offer on the gate coins | [ ] |
+| 1 | Memory Helix, empty Bench | only Teleportation Burst; `attackExtras` key absent | [x] covered: view.test "viewFor: attackExtras lists Memory Helix attacks for the owner only" |
+| 2 | stale / out-of-range `attackIndex` | existing "Unknown attack." rejection | [x] covered: reduce.test "attack legality: an out-of-range attack index is rejected, not fabricated" |
+| 3 | borrowed attack shares a printed name | printed wins (`mergeAttacks`); index aligned | [x] covered: ability-one-offs "Memory Helix list: printed name wins…" |
+| 4 | Memory Helix Mew on the Bench | Bench Mew lists its borrowed attacks inert; Active Mew lists Bench Mew's printed attack once | [x] covered: ability-one-offs "Memory Helix list: printed name wins…" (Bench Mew) |
+| 5 | holder's Ability suppressed | borrowed/granted extras empty | [x] covered: ability-one-offs "Memory Helix list: …suppression empties it" |
+| 6 | copy candidate is GX, own GX spent (or gxLock) | not offered | [x] covered: attack-copy "a spent GX attack removes GX candidates", "a gxLock from the opponent removes GX candidates" |
+| 7 | copy candidate is VSTAR Power, own VSTAR spent | not offered (R2) | [x] covered: vstar-attack "Genome Hacking: a spent VSTAR Power removes the VSTAR Power attack…" |
+| 8 | copy picks VSTAR Power, VSTAR unspent | resolves; `vstarUsed` true | [x] covered: vstar-attack "Genome Hacking: copying a VSTAR Power attack spends the VSTAR Power" |
+| 9 | every candidate filtered | `attackCopyNothing`; turn ends | [x] covered: attack-copy "every candidate filtered out → attackCopyNothing…" |
+| 10 | borrowed VSTAR attack after VSTAR spent | legality "VSTAR Power already used this game." | [x] covered: vstar-attack "Memory Helix: a borrowed VSTAR Power attack is rejected…" |
+| 11 | VSTAR card uses own VSTAR attack twice across turns | second rejected | [x] covered: vstar-attack "a VSTAR Power attack spends the VSTAR Power; a second one is rejected" |
+| 12 | candidate has failing "only if" gate (Lost Mine, <10 Lost Zone) | not offered (R7) | [x] covered: attack-copy "a failing \"You can use this attack only if\" gate removes the candidate" |
+| 13 | candidate has failing "does nothing" gate | offered (R1) | [x] covered: attack-copy "a \"does nothing\" gate keeps the candidate" |
+| 14 | Genome Hacking copies Mega Brave | next turn Genome Hacking allowed (R3) | [x] covered: ability-one-offs "R3: Genome Hacking copying Mega Brave…" |
+| 15 | Memory Helix Mega Brave | next turn Mega Brave via Memory Helix rejected (R6) | [x] covered: ability-one-offs "R6: Mega Brave used through Memory Helix…" |
+| 16 | Memory Helix + Great Swing, opp has no ex/V | allowed (R5) | [x] covered: ability-one-offs "R5: Memory Helix uses Great Swing…" |
+| 17 | Genome Hacking copies {R}{R}{R} with {C}{C}{C} | offered and resolves (R1) | [x] covered: ability-one-offs "R1: Genome Hacking uses an attack whose Energy cost…" |
+| 18 | view for opponent / spectator | no `attackExtras` key | [x] covered: view.test "viewFor: attackExtras…" (opponent, spectator) |
+| 19 | view without `attackExtras` (legacy / older room) | client uses Stadium-only extras | [x] covered: apply-view.test "049: getAuthoritativeAttackExtras…" (no key → null) |
+| 20 | deck code `Mew ex 30C 66` | `30th-066` | [x] covered: legacy-set-ids.test "buildPreferredCardId pads modern ME/SV collector numbers" |
+| 21 | LINK with Unown on both sides | lists own and opponent Unown attacks, not Unown L's own | [x] covered: ability-one-offs "LINK borrows every Unown's attacks…" |
+| 22 | Mimic / Psymimic holder Asleep (Mimic) or Poisoned (Psymimic) | extras empty | [x] covered: ability-one-offs "Mimic lists…", "Psymimic lists…" |
+| 23 | Mimic Sudowoodo on the Bench | extras empty (requiresActive) | [x] covered: ability-one-offs "Mimic lists…" (Bench) |
+| 24 | Dragon DNA borrowed 20-damage attack vs Defending | 50 before W/R | [x] covered: ability-one-offs "Dragon DNA uses its Basic's attack with 30 more damage…" |
+| 25 | Dragon DNA borrowed 0-damage attack | no bonus | [x] covered: ability-one-offs "Dragon DNA adds nothing to a borrowed attack that does no damage" |
+| 26 | Memory Dive, evolved Pokémon (Stage 2) | lists Basic + Stage 1 attacks, pays own cost | [x] covered: attack-grants "Memory Dive: an evolved Pokémon lists its previous Evolutions…" |
+| 27 | Memory Dive, unevolved Basic | nothing added | [x] covered: attack-grants "Memory Dive: nothing for an unevolved Pokémon…" |
+| 28 | Memory Dive on the opponent's side | own evolved Pokémon get nothing | [x] covered: attack-grants "Memory Dive: nothing … for the other player" |
+| 29 | Prehistoric Memory in play, opponent's evolved Pokémon | opponent's Pokémon also list prior attacks | [x] covered: attack-grants "Prehistoric Memory: both players' evolved Pokémon…" |
+| 30 | Prehistoric Memory holder Confused | grants stop | [x] covered: attack-grants "Prehistoric Memory: … off while Aerodactyl is Confused" |
+| 31 | Dark Genes, Honchkrow on Bench can pay | Murkrow lists Honchkrow's attack at cost [] | [x] covered: attack-grants "Dark Genes: Murkrow uses Honchkrow's attack…" |
+| 32 | Dark Genes, Honchkrow cannot pay | nothing granted | [x] covered: attack-grants "Dark Genes…" (no Energy on Honchkrow) |
+| 33 | Memory Capsule on a Basic | nothing added | [x] covered: attack-grants "Memory Capsule: an evolved host lists prior attacks; a Basic host gets nothing" |
+| 34 | Memory Berry (AQ) host attacks | Berry discarded at end of that turn | [x] covered: attack-grants "Memory Berry: the Aquapolis print is discarded…" |
+| 35 | Memory Berry (Platinum) host attacks | Berry stays | [x] covered: attack-grants "Memory Berry: the Platinum print stays…" |
+| 36 | Tool negation Stadium in play | Tool grants skipped | [x] covered: attack-grants "Memory Capsule: a Tool-negating Stadium turns the grant off" |
+| 37 | Recall played, then next turn | this turn Active lists prior attacks; next turn not | [x] covered: attack-grants "Recall: the flag grants the Active prior attacks this turn only" |
+| 38 | Genetic Memory with unpayable Basic attack | offered (cost-free) | [x] covered: attack-copy "Genetic Memory uses an attack from its own Basic or Evolution card, cost-free" |
+| 39 | Delta Copy, no δ Pokémon | `attackCopyNothing` | [x] covered: attack-copy "Delta Copy offers only δ Pokémon attacks…" |
+| 40 | Sketch, Defending did not attack last turn | nothing copied | [x] covered: attack-copy "Sketch copies the Defending Pokémon last attack…" (turn too old) |
+| 41 | Sketch, Smeargle came into play after that attack | nothing copied | [x] covered: attack-copy "Sketch…" (opponentInPlayIds empty) |
+| 42 | Sketch, attacker was a different Pokémon than the Defending | nothing copied | [x] covered: attack-copy "Sketch…" (other attacker) |
+| 43 | Mimed Games | pendingChoice player = opponent; attacker cannot answer (`not_your_choice`) | [x] covered: attack-copy "Mimed Games — the opponent chooses, the attacker cannot answer" |
+| 44 | Mimed Games vs opponent whose only Pokémon is Mime Jr. | nothing (R7) | [x] covered: attack-copy "Mimed Games against an opponent whose only Pokémon is Mime Jr.…" |
+| 45 | Skill Hack, opp hand has no Pokémon | hand revealed; `attackCopyNothing` | [x] covered: attack-copy "Skill Hack with no Pokémon in hand…" |
+| 46 | Hypnotic Reign, decline | hand revealed; no discard; own text only | [x] covered: attack-copy "Hypnotic Reign discards the chosen Pokémon…" (declined) |
+| 47 | Hypnotic Reign picks an attack | that hand card moves to opponent's discard; attack resolves without Energy (R8) | [x] covered: attack-copy "Hypnotic Reign discards the chosen Pokémon…" |
+| 48 | Skill Copy, no payable hand candidate | no discard; `attackCopyNothing` | [x] covered: attack-copy "Skill Copy discards the chosen card…" (no payable candidate) |
+| 49 | Skill Copy picks | own hand card discarded; attack resolves | [x] covered: attack-copy "Skill Copy discards the chosen card…" |
+| 50 | ESP 3 heads | copy offered | [x] covered: attack-copy "ESP with 3 heads offers the copy" |
+| 51 | ESP 1 heads / 2 heads | own text with the same coins: draw / 20 damage; one coin event | [x] covered: attack-copy "ESP with 1 heads draws…", "ESP with 2 heads does 20 damage…", "ESP with 0 heads does nothing" |
+| 52 | ESP with Glimwood Tangle | no re-flip offer on the gate coins | [x] covered: attack-copy "ESP gate coins are not offered for a Glimwood Tangle re-flip" |
 | 53 | concurrent / repeated invocation | n/a: reducer single-threaded per room; pendingChoice guard | struck |
 | 54 | dependency timeout | n/a: no I/O in these paths | struck |
 
