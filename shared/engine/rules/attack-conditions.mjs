@@ -195,6 +195,8 @@ function discardEnergyDescriptor(phrase, basicWord, op, n) {
 // predicate is FALSE. `parseAttackCondition` flips that into the gate's `negated` flag.
 // Order matters: the more specific wording must come first.
 const CLAUSES = [
+  // "If you do, …" after an offered cost (optional-cost-bonus.mjs): the reducer passes whether it was paid.
+  [/^you do$/, () => ({ desc: { kind: 'optionalCostPaid' }, printedNegated: false })],
   // ── Stadium ────────────────────────────────────────────────────────────────
   [/^there is no stadium(?: card)? in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: false })],
   [/^there is any stadium card in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: true })],
@@ -444,7 +446,8 @@ const CLAUSES = [
     () => ({ desc: { kind: 'movedToActiveThisTurn' }, printedNegated: true }),
   ],
   [
-    /^this pokémon (?:moved from (?:the|your) bench to the active spot|was on (?:the|your) bench and became your active pokémon) this turn$/,
+    // Swellow Mach Descent: "If Swellow was on your Bench this turn".
+    /^this pokémon (?:moved from (?:the|your) bench to the active spot|was on (?:the|your) bench and became your active pokémon|was on (?:the|your) bench) this turn$/,
     () => ({ desc: { kind: 'movedToActiveThisTurn' }, printedNegated: false }),
   ],
   [
@@ -888,6 +891,7 @@ function extraEnergyCount(ctx, type) {
 }
 
 const CHECKS = {
+  optionalCostPaid: (cond, ctx) => ctx.optionalCostPaid === true,
   defenderStatus: (cond, ctx) => list(ctx.defenderConditions).includes(cond.status),
   attackerStatus: (cond, ctx) => list(ctx.attackerConditions).includes(cond.status),
   noStadium: (cond, ctx) => !ctx.stadiumInPlay,

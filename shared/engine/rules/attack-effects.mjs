@@ -946,7 +946,9 @@ const discardCount = (raw) =>
 export function parseAttackEnergyDiscard(attack) {
   const t = lower(attack?.text ?? '')
     .replace(/\{([a-z])\}/g, (m, letter) => ENERGY_SYMBOL_WORDS[letter] || m)
-    .replace(/\bbasic (?=[a-z]+ energy)/g, '');
+    .replace(/\bbasic (?=[a-z]+ energy)/g, '')
+    // "Discard all {R} Energy cards attached to Arcanine" reads as "… Energy attached to …".
+    .replace(/\benergy cards?\b/g, 'energy');
   if (!t || !t.includes('discard')) return null;
 
   const sentence = t
@@ -964,16 +966,20 @@ export function parseAttackEnergyDiscard(attack) {
 
   if (/\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(sentence)) return null;
 
-  // "Discard a {W} and a {L} Energy attached to this Pokémon"
-  const pair = sentence.match(
-    /discard\s+(\d+|an?)\s+([a-z]+)(?:\s+energy)?\s+and\s+(\d+|an?)\s+([a-z]+)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/
-  );
-  if (pair && energyTypeName(pair[2]) && energyTypeName(pair[4])) {
-    const parts = [
-      { count: discardCount(pair[1]), energyType: energyTypeName(pair[2]) },
-      { count: discardCount(pair[3]), energyType: energyTypeName(pair[4]) },
-    ];
-    return { all: false, count: parts[0].count + parts[1].count, energyType: null, parts };
+  // "Discard a {W} and a {L} Energy attached to this Pokémon"; Lugia ex Elemental Blast lists
+  // three: "Discard a {R} Energy, {W} Energy, and {L} Energy attached to …".
+  const GROUP = String.raw`(?:(?:\d+|an?)\s+)?[a-z]+(?:\s+energy)?`;
+  const list = new RegExp(
+    String.raw`discard\s+(${GROUP}(?:,\s*(?:and\s+)?${GROUP})*,?\s+and\s+${GROUP})\s+(?:attached to|from)\s+this\s+pok[ée]mon`
+  ).exec(sentence);
+  if (list) {
+    const parts = list[1].split(/,\s*(?:and\s+)?|\s+and\s+/).map((group) => {
+      const m = /^(?:(\d+|an?)\s+)?([a-z]+)(?:\s+energy)?$/.exec(group.trim());
+      return m && energyTypeName(m[2]) ? { count: m[1] ? discardCount(m[1]) : 1, energyType: energyTypeName(m[2]) } : null;
+    });
+    if (parts.length > 1 && parts.every(Boolean)) {
+      return { all: false, count: parts.reduce((sum, part) => sum + part.count, 0), energyType: null, parts };
+    }
   }
 
   // "Discard all {M} Energy from this Pokémon"

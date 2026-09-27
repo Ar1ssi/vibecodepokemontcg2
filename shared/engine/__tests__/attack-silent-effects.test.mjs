@@ -203,3 +203,123 @@ test('older "does N damage times the number of …" units read the board', () =>
     90
   );
 });
+
+// ── Stadium discards ────────────────────────────────────────────────────────
+
+const withStadium = (state) => {
+  state.stadium = trainer('Artazon', 'Stadium');
+  state.stadium.ownerId = 'p2';
+};
+const choose = (res, selection) =>
+  applyCommand(
+    res.state,
+    { type: 'resolveChoice', playerId: 'p1', payload: { choiceId: res.state.pendingChoice.choiceId, selection } },
+    createRng(3)
+  );
+const damageOf = (res) => res.events.find((e) => e.type === 'attackExecuted')?.damage;
+
+test('Great Tusk ex Bedrock Breaker (Scarlet & Violet 246): the Stadium is discarded', () => {
+  const { state } = board('Great Tusk ex', 'Discard a Stadium in play.', { setup: withStadium });
+  assert.equal(attack(state).state.stadium, null);
+});
+
+test('Lugia VSTAR Tempest Dive (Silver Tempest 211): the Stadium discard is offered', () => {
+  const { state } = board('Lugia VSTAR', 'You may discard a Stadium in play.', { setup: withStadium });
+  const offered = attack(state);
+  assert.ok(offered.state.pendingChoice);
+  const yes = offered.state.pendingChoice.options.find((o) => o.name === 'Yes').instanceId;
+  const no = offered.state.pendingChoice.options.find((o) => o.name === 'No').instanceId;
+  assert.equal(choose(offered, [yes]).state.stadium, null);
+  const kept = board('Lugia VSTAR', 'You may discard a Stadium in play.', { setup: withStadium });
+  assert.equal(choose(attack(kept.state), [no]).state.stadium?.name, 'Artazon');
+});
+
+test("Brock's Primeape Mega Thrash (Gym Challenge 35): recoil, then the Stadium goes", () => {
+  const text = "Brock's Primeape does 20 damage to itself. If there is a Stadium card in play, discard it.";
+  const { state, attacker } = board("Brock's Primeape", text, { damage: '60', setup: withStadium });
+  const res = attack(state);
+  assert.equal(res.state.stadium, null);
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 20);
+});
+
+// ── the attacker's own Energy ───────────────────────────────────────────────
+
+const attachTo = (state, attacker, types) => {
+  for (const type of types) state.players.p1.zones.active.push(energy(type, attacker.instanceId));
+};
+const attachedTypes = (state, attacker) =>
+  state.players.p1.zones.active.filter((c) => c.attachedTo === attacker.instanceId).map((c) => c.energyType).sort();
+
+test('Arcanine White Flames (Skyridge 3): "Discard all {R} Energy cards attached to Arcanine"', () => {
+  const { state, attacker } = board('Arcanine', 'Discard all {R} Energy cards attached to Arcanine.', { damage: '70' });
+  attachTo(state, attacker, ['Fire', 'Fire', 'Water']);
+  assert.deepEqual(attachedTypes(attack(state).state, attacker), ['Water']);
+});
+
+test('Lugia ex Elemental Blast (Unseen Forces 105): a three-type discard list', () => {
+  const text = 'Discard a {R} Energy, {W} Energy, and {L} Energy attached to Lugia ex.';
+  const { state, attacker } = board('Lugia ex', text, { damage: '200' });
+  attachTo(state, attacker, ['Fire', 'Water', 'Lightning', 'Psychic']);
+  assert.deepEqual(attachedTypes(attack(state).state, attacker), ['Psychic']);
+});
+
+// ── offered bonuses ─────────────────────────────────────────────────────────
+
+test('Electrode Ion Blast (Secret Wonders 26): +60 and 100 recoil only when accepted', () => {
+  const text = 'You may do 40 damage plus 60 more damage. If you do, Electrode does 100 damage to itself.';
+  const yes = board('Electrode', text, { damage: '40+' });
+  const accepted = choose(attack(yes.state), [1]);
+  assert.equal(damageOf(accepted), 100);
+  assert.equal(root(accepted.state, 'p1', yes.attacker.instanceId).damage, 100);
+  const no = board('Electrode', text, { damage: '40+' });
+  const declined = choose(attack(no.state), [2]);
+  assert.equal(damageOf(declined), 40);
+  assert.equal(root(declined.state, 'p1', no.attacker.instanceId).damage, 0);
+});
+
+test('Arcanine Burn Out (Rising Rivals 1): accepting burns Arcanine', () => {
+  const text = 'You may do 30 damage plus 30 more damage. If you do, Arcanine is now Burned.';
+  const { state, attacker } = board('Arcanine', text, { damage: '30+' });
+  const accepted = choose(attack(state), [1]);
+  assert.equal(damageOf(accepted), 60);
+  assert.ok(accepted.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === attacker.instanceId));
+});
+
+test('Ampharos Lightning Strike (Expedition 34): paying swaps the base damage to 80', () => {
+  const text =
+    'You may discard all {L} Energy cards attached to Ampharos. If you do, this attack\'s base damage is 80 instead of 40.';
+  const { state, attacker } = board('Ampharos', text, { damage: '40' });
+  attachTo(state, attacker, ['Lightning', 'Lightning', 'Water']);
+  const paid = choose(attack(state), [1]);
+  assert.equal(damageOf(paid), 80);
+  assert.deepEqual(attachedTypes(paid.state, attacker), ['Water']);
+});
+
+test('Staraptor FB LV.X Defog (Supreme Victors 147): discard the Stadium before damage for base 70', () => {
+  const text =
+    "Before doing damage, you may discard any Stadium card in play. If you do, this attack's base damage is 70 instead of 40.";
+  const { state } = board('Staraptor FB LV.X', text, { damage: '40', setup: withStadium });
+  const paid = choose(attack(state), [1]);
+  assert.equal(damageOf(paid), 70);
+  assert.equal(paid.state.stadium, null);
+});
+
+// ── "this attack's base damage is N instead of M" ───────────────────────────
+
+test('Dewgong Ice Shard (Supreme Victors 24): base 80 against a {F} Defending Pokémon', () => {
+  const text = "If the Defending Pokémon is a {F} Pokémon, this attack's base damage is 80 instead of 30.";
+  const fighting = board('Dewgong', text, {
+    setup: (s) => {
+      s.players.p2.zones.active[0].types = ['Fighting'];
+    },
+  });
+  fighting.state.players.p1.zones.active[0].attacks[0].damage = '30';
+  assert.equal(damageOf(attack(fighting.state)), 80);
+  const water = board('Dewgong', text, {
+    setup: (s) => {
+      s.players.p2.zones.active[0].types = ['Water'];
+    },
+  });
+  water.state.players.p1.zones.active[0].attacks[0].damage = '30';
+  assert.equal(damageOf(attack(water.state)), 30);
+});

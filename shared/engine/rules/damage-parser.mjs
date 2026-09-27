@@ -323,6 +323,29 @@ function timesAsForEach(text) {
     .join(' ');
 }
 
+const BASE_SWAP = [
+  /^if (.+?), this attack's base damage is (\d+)(?: instead of \d+)?\.?$/,
+  /^if (.+?), this attack does (\d+) damage instead of \d+\.?$/,
+];
+
+/**
+ * First "If <cond>, this attack's base damage is N [instead of M]" sentence whose condition
+ * holds: `{ value, cond }`; `{ value: null }` when a condition cannot be read; null when the
+ * text has no such sentence or none holds.
+ */
+function replacedBase(text, conditionHolds) {
+  let unread = false;
+  for (const sentence of text.split(/(?<=\.)\s+/)) {
+    const m = BASE_SWAP.map((re) => re.exec(sentence.trim())).find(Boolean);
+    if (!m) continue;
+    const cond = /^you do\b/.test(m[1]) ? 'you do' : m[1];
+    const held = conditionHolds(cond);
+    if (held === true) return { value: Number(m[2]), cond };
+    if (held === null) unread = true;
+  }
+  return unread ? { value: null } : null;
+}
+
 // Parse the attack text into an effective base damage number + breakdown.
 // See the module header for the shape contract and ctx options.
 export function parseAttackDamage(
@@ -829,6 +852,33 @@ export function parseAttackDamage(
     }
   }
 
+  // "You may do 40 damage plus 60 more damage. If you do, Electrode does 100 damage to itself."
+  // The offer carries the bonus; the conditional block above never sees an "if … more damage".
+  const drawbackOffer = text ? optionalCostBonusClause(attack?.text, attacker?.name) : null;
+  if (drawbackOffer?.cost?.kind === 'drawback' && !/\bif\b[^.]*more damage/.test(text)) {
+    if (ctx.optionalCostPaid === true) {
+      total += drawbackOffer.bonus;
+      components.push('conditional');
+      notes.push(`+ ${drawbackOffer.bonus} (you did)`);
+    } else {
+      notes.push(`+ ${drawbackOffer.bonus} not applied (you didn't)`);
+    }
+  }
+
+  // "If the Defending Pokémon is a {F} Pokémon, this attack's base damage is 80 instead of 30"
+  // (Dewgong Ice Shard); Light Arcanine prints "this attack does 10 damage instead of 50". The
+  // first sentence whose condition holds replaces the printed base.
+  const baseSwap = replacedBase(text, (cond) => evalCondition(cond, defender, ctx, attacker));
+  if (baseSwap) {
+    if (baseSwap.value == null) {
+      notes.push('base damage replacement — resolve the printed condition');
+    } else {
+      total += baseSwap.value - base;
+      components.push('base-replaced');
+      notes.push(`base ${baseSwap.value} instead of ${base} (condition met: ${baseSwap.cond})`);
+    }
+  }
+
   // ── Coin flip (outcome supplied by caller; we never flip) ──
   const headsBonus =
     /if heads, this attack does (\d+) more|if heads, .*(\d+) more damage/.test(
@@ -896,8 +946,13 @@ export function parseAttackDamage(
       text,
       /(?:this pok[ée]mon|it) (?:also )?does (\d+) damage to itself/
     );
+    // Electrode Ion Blast: "You may do 40 damage plus 60 more damage. If you do, Electrode does
+    // 100 damage to itself." — the recoil is part of the accepted offer.
+    const selfSentence = text.split(/(?<=\.)\s+/).find((s) => /does \d+ damage to itself/.test(s)) || '';
+    const declinedRecoil = /^if you do,/.test(selfSentence) && ctx.optionalCostPaid !== true;
     if (
       directSelfDamage > 0 &&
+      !declinedRecoil &&
       !/if tails|if both of them are tails/.test(text)
     ) {
       selfDamage += directSelfDamage;

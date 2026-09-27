@@ -2517,6 +2517,19 @@ function atkDiscardStadium(ctx) {
   if (!stadium) return skip(ctx, 'no_stadium');
   const ownerId = stadium.ownerId || stadium.playerId || null;
   if (ctx.step.owner === 'opponent' && ownerId !== ctx.opponent?.playerId) return skip(ctx, 'not_opponent_stadium');
+  // Lugia VSTAR Tempest Dive / Dubwool Knock Over: "You may discard a Stadium in play."
+  if (ctx.step.optional && !ctx.selection) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Discard ${stadium.name}?`,
+      options: [
+        { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+        { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  if (ctx.step.optional && ctx.selection[0] !== ATTACK_YES) return skip(ctx, 'declined');
   discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
   return addChainedMarker(ctx);
 }

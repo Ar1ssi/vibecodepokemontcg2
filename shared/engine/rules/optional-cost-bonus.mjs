@@ -59,7 +59,7 @@ const COSTS = [
     /^return all (?:\{([a-z])\} )?energy(?: cards?)? attached to this pokémon to your hand$/,
     (m) => ({ kind: 'returnEnergy', all: true, energyType: LETTER_TYPES[m[1]] || null }),
   ],
-  [/^discard a stadium(?: card)? in play$/, () => ({ kind: 'discardStadium' })],
+  [/^discard (?:a|any) stadium(?: card)? in play$/, () => ({ kind: 'discardStadium' })],
   [/^show your hand to your opponent$/, () => ({ kind: 'showHand' })],
   [/^put up to (\d+) damage counters on this pokémon$/, (m) => ({ kind: 'selfCounters', upTo: Number(m[1]) })],
 ];
@@ -82,8 +82,13 @@ const BONUS =
 const MANDATORY = /^(discard .+?) in order to use this attack\.$/;
 const DISCARDED_BONUS = /^if the discarded card is [^,]+, this attack does (?:\d+ damage plus )?(\d+) more damage/;
 
-// Slaking Dynamic Swing: "You may do 100 more damage. If you do, <drawback>."
-const DO_MORE = /^you may do (\d+) more damage\.$/;
+// Slaking Dynamic Swing: "You may do 100 more damage. If you do, <drawback>." Older prints:
+// "You may do 40 damage plus 60 more damage. If you do, Electrode does 100 damage to itself."
+const DO_MORE = /^you may do (?:\d+ damage plus )?(\d+) more damage\.$/;
+
+// Ampharos Lightning Strike / Staraptor FB LV.X Defog: "If you do, this attack's base damage is
+// 80 instead of 40." — the bonus is the difference.
+const BASE_BONUS = /^if you do, this attack's base damage is (\d+) instead of (\d+)/;
 
 const PUT_COUNTERS = /^put up to (\d+) damage counters on this pokémon\.$/;
 const PER_COUNTER = /^this attack does (\d+) (?:more )?damage for each damage counter you (?:put|placed)(?: on this pokémon)? in this way\.$/;
@@ -136,8 +141,20 @@ export function optionalCostBonusClause(attackText, selfName = '') {
         perEach: false,
       };
     }
-    const offer = /^you may (.+)\.$/.exec(sentences[i]);
+    // Dark Magcargo: "… when you use this attack"; Staraptor FB LV.X: "Before doing damage, you may …".
+    const offer = /^(?:before doing damage, )?you may (.+?)(?: when you use this attack)?\.$/.exec(sentences[i]);
     if (!offer) continue;
+    const base = BASE_BONUS.exec(sentences[i + 1] || '');
+    const baseCost = base && costOf(offer[1]);
+    if (baseCost) {
+      return {
+        cost: baseCost,
+        bonus: Number(base[1]) - Number(base[2]),
+        extraCondition: null,
+        perEach: false,
+        consumed: [stripPeriod(sentences[i]), stripPeriod(sentences[i + 1])],
+      };
+    }
     // The bonus may follow a sibling clause ("If you discard a {R} … Burned. If you discard a
     // {F} …, this attack does 40 damage plus 20 more damage.").
     const bonusAt = [i + 1, i + 2].find((j) => BONUS.test(sentences[j] || ''));

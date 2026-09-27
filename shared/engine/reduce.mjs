@@ -5752,6 +5752,7 @@ function statusConditionResults(draft, ctx, branches) {
     defenderView: defender ? inPlayView(draft, defender) : null,
     coin,
     headsCount,
+    optionalCostPaid: ctx.optionalCostPaid,
   });
   return branches.map((branch) =>
     branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null

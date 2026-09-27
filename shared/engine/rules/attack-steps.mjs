@@ -319,6 +319,17 @@ const TEMPLATES = [
   // Disaster, Desert Hurricane, Somersault Dive): the damage parser reads the bonus, this
   // clears the Stadium after damage. (Flygon Desert Geyser's conditional wording is a BLOCK.)
   [/^discard that stadium(?: card)?$/, () => ({ type: 'atkDiscardStadium', owner: 'any' })],
+  // Great Tusk ex Bedrock Breaker, Kingdra-EX Big Storm, Lugia VSTAR Tempest Dive ("You may …"),
+  // Brock's Primeape Mega Thrash / Light Piloswine Knock Over ("If there is a Stadium card in
+  // play, [you may] discard it").
+  [
+    /^(you may )?discard (?:a|any) stadium(?: card)? in play$/,
+    (m) => ({ type: 'atkDiscardStadium', owner: 'any', ...(m[1] ? { optional: true } : {}) }),
+  ],
+  [
+    /^if there is (?:a|any) stadium card in play, (you may )?discard it$/,
+    (m) => ({ type: 'atkDiscardStadium', owner: 'any', ...(m[1] ? { optional: true } : {}) }),
+  ],
 
   // Discard from the opponent
   [
