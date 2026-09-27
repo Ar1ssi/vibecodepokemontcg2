@@ -1109,6 +1109,20 @@ function attackViewFor(state, card, { isActive = true } = {}) {
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
 }
 
+/**
+ * The attacks an in-play Pokémon can use beyond its printed ones (Stadium, Tool, borrowed and
+ * granted), in the order `attackViewFor` merges them — so printed.length + k is the
+ * `attackIndex` of extra k. Projected to the owner's view for the attack panel (design 049).
+ * @returns {object[]} [] when the card is not in play or has no extras
+ */
+export function attackExtrasFor(state, card) {
+  const ref = card ? findCard(state, card.instanceId) : null;
+  if (!ref || !['active', 'bench'].includes(ref.zoneId)) return [];
+  const printedCount = (inPlayView(state, card)?.attacks || []).length;
+  const all = attackViewFor(state, card, { isActive: ref.zoneId === 'active' })?.attacks || [];
+  return all.slice(printedCount);
+}
+
 // Effective HP including printed base stats, top evolution, attached Tools, Stadium modifiers, and ability HP bonuses.
 function cardEffectiveHp(state, card, playerId) {
   if (!card) return 0;

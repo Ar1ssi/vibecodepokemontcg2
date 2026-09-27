@@ -5331,6 +5331,13 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   text-overflow: ellipsis;
 }
 .ptcg-atk__right { display: flex; align-items: center; gap: calc(var(--u) * 0.5); }
+/* Design 049: where an unprinted attack comes from ("from Slaking ex"). */
+.ptcg-atk__from {
+  margin: 0;
+  font-size: calc(var(--u) * 2.2);
+  font-style: italic;
+  opacity: 0.8;
+}
 .ptcg-atk__dmg {
   font-size: calc(var(--u) * 4.5);
   font-weight: 900;

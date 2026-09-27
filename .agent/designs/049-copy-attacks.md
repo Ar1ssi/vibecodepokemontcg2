@@ -412,3 +412,6 @@ After the slices: ISSUES lines for O12 (last-turn name locks) and Transform/Shap
 DECISIONS lines for O1–O11.
 
 ## Deviations (Builder appends here during build)
+- Slice 2 (cosmetic): the owner block of a view is `you`, not `self`; the map ships as
+  `view.you.attackExtras`. `getAuthoritativeAttackExtras` returns null for a card outside your
+  Active/Bench, so an inspected opponent card keeps its Stadium-only list.

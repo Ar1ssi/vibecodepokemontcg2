@@ -142,14 +142,35 @@ function redactPendingChoiceForOpponent(choice) {
 }
 
 /**
+ * `{ attackExtras: { [instanceId]: Attack[] } }` for the owner's in-play Pokémon that can use
+ * attacks they do not print (Memory Helix, Tool/Stadium grants; design 049), or `{}` when none
+ * do or no gatherer was given. Only the owner attacks with them, so the opponent never gets it.
+ */
+function ownerAttackExtras(state, owner, attackExtrasFor) {
+  if (typeof attackExtrasFor !== 'function') return {};
+  const extras = {};
+  for (const zoneId of ['active', 'bench']) {
+    for (const card of owner?.zones?.[zoneId] || []) {
+      if (card?.attachedTo != null || card?.instanceId == null) continue;
+      const attacks = attackExtrasFor(state, card);
+      if (attacks.length > 0) extras[card.instanceId] = JSON.parse(JSON.stringify(attacks));
+    }
+  }
+  return Object.keys(extras).length > 0 ? { attackExtras: extras } : {};
+}
+
+/**
  * Generates an authoritative, redacted view of GameState for a specific player or spectator.
  * Maps absolute player IDs to { you, them } (Hazard H1).
  *
  * @param {object} state GameState
  * @param {string|null} playerId Absolute player ID (or null for spectator)
+ * @param {{ attackExtrasFor?: (state: object, card: object) => object[] }} [options]
+ *   `attackExtrasFor` (reduce.mjs) lists a Pokémon's non-printed attacks; injected so this
+ *   module does not import the reducer (design 049 O2).
  * @returns {object} Redacted view
  */
-export function viewFor(state, playerId) {
+export function viewFor(state, playerId, { attackExtrasFor } = {}) {
   if (!state) return null;
 
   const playerIds = Object.keys(state.players || {});
@@ -211,6 +232,7 @@ export function viewFor(state, playerId) {
       username: owner.username,
       flags: playerFlags(owner),
       zones: redactOwnerZones(owner),
+      ...ownerAttackExtras(state, owner, attackExtrasFor),
     },
     them: opponent
       ? {

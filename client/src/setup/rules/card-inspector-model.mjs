@@ -479,6 +479,9 @@ export function buildInspectorModel(card, ctx = {}) {
     return {
       index: i,
       name: String(raw?.name ?? entry?.name ?? `Attack ${i + 1}`),
+      // The Pokémon or card an unprinted attack comes from (Memory Helix, Memory Capsule;
+      // design 049), shown under the name; null for a printed attack.
+      from: raw?.copiedFrom || raw?.grantedBy || null,
       cost: cost.map(String),
       text: String(raw?.text ?? raw?.effect ?? ''),
       damageLabel: damageLabel == null ? null : damageLabel,

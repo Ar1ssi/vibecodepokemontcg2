@@ -162,3 +162,50 @@ test('viewFor formats spectator view with hand and deck counts only', () => {
   assert.ok(serialized.includes('Public Raichu'));
   assert.ok(serialized.includes('Opponent Public Pidgeot ex'));
 });
+
+// Design 049: the owner's view carries the attacks an in-play Pokémon uses without printing them.
+test('viewFor: attackExtras lists Memory Helix attacks for the owner only', async () => {
+  const { attackExtrasFor } = await import('../reduce.mjs');
+  const state = createGameState({
+    gameId: 'attack-extras',
+    players: { p1: { username: 'One' }, p2: { username: 'Two' } },
+  });
+  const mew = createCard({
+    instanceId: 1,
+    name: 'Mew ex',
+    supertype: 'Pokémon',
+    stage: 'Basic',
+    hp: 160,
+    attacks: [{ name: 'Teleportation Burst', cost: ['Psychic'], damage: '30', text: '' }],
+    abilities: [
+      {
+        name: 'Memory Helix',
+        text: 'This Pokémon can use the attacks of any of your Benched Pokémon. (You still need the necessary Energy to use each attack.)',
+      },
+    ],
+  });
+  const slaking = createCard({
+    instanceId: 2,
+    name: 'Slaking ex',
+    supertype: 'Pokémon',
+    stage: 'Stage 2',
+    hp: 340,
+    attacks: [{ name: 'Great Swing', cost: ['Colorless', 'Colorless'], damage: '280', text: 'Discard an Energy from this Pokémon.' }],
+  });
+  state.players.p1.zones.active.push(mew);
+  state.players.p1.zones.bench.push(slaking);
+  state.players.p2.zones.active.push(createCard({ instanceId: 3, name: 'Foe', supertype: 'Pokémon', stage: 'Basic', hp: 100 }));
+
+  const own = viewFor(state, 'p1', { attackExtrasFor });
+  assert.deepEqual(own.you.attackExtras[1].map((a) => a.name), ['Great Swing']);
+  assert.equal(own.you.attackExtras[1][0].copiedFrom, 'Slaking ex');
+  assert.equal(own.you.attackExtras[2], undefined, 'Slaking borrows nothing');
+
+  assert.equal('attackExtras' in viewFor(state, 'p2', { attackExtrasFor }).you, false);
+  assert.equal('attackExtras' in (viewFor(state, 'p2', { attackExtrasFor }).them || {}), false);
+  assert.equal(viewFor(state, null, { attackExtrasFor }).you, null);
+  assert.equal('attackExtras' in viewFor(state, 'p1').you, false, 'no gatherer, no key');
+
+  state.players.p1.zones.bench.length = 0;
+  assert.equal('attackExtras' in viewFor(state, 'p1', { attackExtrasFor }).you, false, 'empty Bench, no key');
+});

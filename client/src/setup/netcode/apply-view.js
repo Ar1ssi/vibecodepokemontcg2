@@ -286,6 +286,30 @@ export function getAuthoritativeStadiumArray() {
 }
 
 /**
+ * The attacks one of your in-play Pokémon can use beyond its printed ones (Memory Helix,
+ * Stadium/Tool grants), in the server's `attackIndex` order (design 049). `[]` when the view
+ * lists extras for your other Pokémon only; `null` when the card is not your in-play Pokémon
+ * or the last view carries no `attackExtras` (legacy mode, an older server, or no Pokémon with
+ * extras), so callers keep their own list.
+ *
+ * @param {number} instanceId
+ * @returns {object[]|null}
+ */
+export function getAuthoritativeAttackExtras(instanceId) {
+  const you = lastAppliedView?.you;
+  const extras = you?.attackExtras;
+  if (!extras || typeof extras !== 'object' || instanceId == null) return null;
+  const inPlay = ['active', 'bench'].some((zoneId) =>
+    (Array.isArray(you.zones?.[zoneId]) ? you.zones[zoneId] : []).some(
+      (card) => card?.instanceId === instanceId
+    )
+  );
+  if (!inPlay) return null;
+  const list = extras[instanceId];
+  return Array.isArray(list) ? list : [];
+}
+
+/**
  * Resolves the DOM document and zone container for a player side ('you' | 'them').
  *
  * @param {string} side 'you' | 'them'
