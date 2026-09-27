@@ -197,6 +197,29 @@ const TEMPLATES = [
     /^your opponent chooses an attack from 1 of their pokemon in play\. use the chosen attack as this attack\.$/,
     () => ({ source: 'oppInPlay', chooser: 'opponent' }),
   ],
+  // Shiftry ex Skill Hack (Power Keepers 97): a Pokémon card in the opponent's hand.
+  [
+    new RegExp(
+      String.raw`^look at your opponent's hand and choose a basic pokemon or evolution card you find there\. choose 1 of that pokemon's attacks\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppHand' }),
+  ],
+  // Malamar Hypnotic Reign (Unbroken Bonds 119): the chosen Pokémon is discarded from their hand.
+  [
+    /^your opponent reveals their hand\. you may discard a pokemon you find there and use one of that pokemon's non-gx attacks as this attack\.$/,
+    () => ({ source: 'oppHand', excludeGx: true, optional: true, discardSource: true }),
+  ],
+  // Alakazam Star Skill Copy (Crystal Guardians 99): discard a Pokémon card from your own hand.
+  [
+    new RegExp(
+      String.raw`^discard a basic pokemon or evolution card from your hand\. choose 1 of that card's attacks\. [^.]+ copies that attack\. this attack does nothing if [^.]+ doesn't have the energy necessary to use that attack\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'ownHand', needsEnergy: true, discardSource: true }),
+  ],
 ];
 
 /**

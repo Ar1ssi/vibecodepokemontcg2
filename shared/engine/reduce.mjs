@@ -5385,6 +5385,11 @@ function copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard }
       return rootsIn(opp.discard);
     case 'oppDeckTop':
       return rootsIn((opp.deck || []).slice(0, copy.count));
+    // Shiftry ex Skill Hack, Malamar Hypnotic Reign / Alakazam Star Skill Copy (design 049).
+    case 'oppHand':
+      return rootsIn(opp.hand);
+    case 'ownHand':
+      return rootsIn(own.hand);
     default:
       return [];
   }
@@ -5397,6 +5402,8 @@ const RAW_ATTACK_SOURCES = new Set([
   'oppDiscard',
   'ownDeckTop',
   'ownEvolutionStack',
+  'oppHand',
+  'ownHand',
 ]);
 
 /**
@@ -5526,6 +5533,16 @@ function offerCopiedAttack(
       cards: looked.map((c) => ({ instanceId: c.instanceId, name: c.name })),
     });
   }
+  // Skill Hack looks at / Hypnotic Reign reveals the opponent's hand, even when it holds no
+  // Pokémon to copy (design 049).
+  if (copy.source === 'oppHand') {
+    events.push({
+      type: 'cardsRevealed',
+      playerId: oppId,
+      hand: true,
+      cards: (draft.players[oppId]?.zones?.hand || []).map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+  }
   // Slowking Seek Inspiration: discard the top card first; it is only copyable when it is a
   // Pokémon without a Rule Box. The discard happens even when nothing can be copied.
   let deckTopCard = null;
@@ -5566,6 +5583,10 @@ function offerCopiedAttack(
     targetInstanceId,
     candidates,
     shuffleOppDeck,
+    // Hypnotic Reign / Skill Copy discard the chosen hand card (design 049).
+    ...(copy.discardSource
+      ? { discardSource: true, sourceZoneOwner: copy.source === 'ownHand' ? playerId : oppId }
+      : {}),
   };
   // A wording that prints no "choose" (Mimikyu Copycat, Sudowoodo Watch and Learn) uses its
   // single candidate directly, without a one-option prompt.
@@ -5588,6 +5609,17 @@ function offerCopiedAttack(
     resumeToken,
   });
   return true;
+}
+
+/** Moves the hand card a copy attack used to its owner's discard pile (Hypnotic Reign, Skill Copy). */
+function discardCopySourceFromHand(draft, ownerId, instanceId, events) {
+  const owner = draft.players?.[ownerId];
+  const hand = owner?.zones?.hand || [];
+  const index = hand.findIndex((c) => c.instanceId === instanceId);
+  if (index < 0) return;
+  const [card] = hand.splice(index, 1);
+  discardCardToPlayerZone(owner, card);
+  events.push({ type: 'cardsDiscarded', playerId: ownerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
 }
 
 /** Resumes a copy attack with the chosen attack (or its own text when declined). */
@@ -5615,6 +5647,7 @@ function resumeCopiedAttack(draft, { token, selection, activeRng, events }) {
       copiedName: copiedAttack.name,
       sourceId: picked.sourceId,
     });
+    if (token.discardSource) discardCopySourceFromHand(draft, token.sourceZoneOwner, picked.sourceId, events);
   }
   let defender = null;
   let defenderPlayerId = oppId;

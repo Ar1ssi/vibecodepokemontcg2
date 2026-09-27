@@ -559,3 +559,94 @@ test("attack: Mimed Games against an opponent whose only Pokémon is Mime Jr. do
   assert.equal(res.state.pendingChoice, null);
   assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
 });
+
+// ── design 049 slice 6: copying from a hand ──────────────────────────────────
+
+const SKILL_HACK =
+  "Look at your opponent's hand and choose a Basic Pokémon or Evolution card you find there. Choose 1 of that Pokémon's attacks. Skill Hack copies that attack except for its Energy cost. (You must still do anything else required for that attack.) (No matter what type that Pokémon is, Shiftry ex's type is still {D}.) Shiftry ex performs that attack.";
+const HYPNOTIC_REIGN =
+  "Your opponent reveals their hand. You may discard a Pokémon you find there and use one of that Pokémon's non-GX attacks as this attack.";
+const SKILL_COPY =
+  "Discard a Basic Pokémon or Evolution card from your hand. Choose 1 of that card's attacks. Skill Copy copies that attack. This attack does nothing if Alakazam Star doesn't have the Energy necessary to use that attack. (You must still do anything else required for that attack.) Alakazam Star performs that attack.";
+const trainerCard = (name) => createCard({ instanceId: nextId++, name, supertype: 'Trainer', subtypes: ['Item'] });
+
+test('parseCopyAttack: design 049 slice 6 hand wordings', () => {
+  assert.deepEqual(parseCopyAttack(SKILL_HACK), { source: 'oppHand' });
+  assert.deepEqual(parseCopyAttack(HYPNOTIC_REIGN), {
+    source: 'oppHand',
+    excludeGx: true,
+    optional: true,
+    discardSource: true,
+  });
+  assert.deepEqual(parseCopyAttack(SKILL_COPY), { source: 'ownHand', needsEnergy: true, discardSource: true });
+});
+
+test('attack: Skill Hack reveals the hand and copies from a Pokémon card; the card stays', () => {
+  const b = board(SKILL_HACK, {
+    name: 'Shiftry ex',
+    setup: ({ p2 }) =>
+      p2.zones.hand.push(trainerCard('Potion'), withAttacks('Hand Mon', [{ name: 'Hand Hit', cost: ['Fire'], damage: '40' }])),
+  });
+  const res = attack(b);
+  const reveal = res.events.find((e) => e.type === 'cardsRevealed' && e.hand);
+  assert.deepEqual(reveal.cards.map((c) => c.name), ['Potion', 'Hand Mon']);
+  assert.deepEqual(optionNames(res), ['Hand Mon: Hand Hit']);
+  const done = choose(res, [1], b.rng);
+  assert.equal(cardNamed(done, 'p2', 'Defender').damage, 40);
+  assert.ok(zone(done, 'p2', 'hand').some((c) => c.name === 'Hand Mon'), 'Skill Hack does not discard');
+});
+
+test('attack: Skill Hack with no Pokémon in hand still reveals it and copies nothing', () => {
+  const b = board(SKILL_HACK, { name: 'Shiftry ex', setup: ({ p2 }) => p2.zones.hand.push(trainerCard('Potion')) });
+  const res = attack(b);
+  assert.ok(res.events.some((e) => e.type === 'cardsRevealed' && e.hand));
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+});
+
+test('attack: Hypnotic Reign discards the chosen Pokémon and uses its non-GX attack without Energy (R8)', () => {
+  const setup = ({ p2 }) =>
+    p2.zones.hand.push(
+      withAttacks('Hand Mon', [
+        { name: 'Heavy Hit', cost: ['Fire', 'Fire', 'Fire'], damage: '90' },
+        { name: 'Hand Blast-GX', damage: '200' },
+      ])
+    );
+  const b1 = board(HYPNOTIC_REIGN, { name: 'Malamar', setup });
+  const res1 = attack(b1);
+  assert.deepEqual(optionNames(res1), ['Hand Mon: Heavy Hit', "Don't use an attack"]);
+  const used = choose(res1, [1], b1.rng);
+  assert.equal(cardNamed(used, 'p2', 'Defender').damage, 90);
+  assert.ok(zone(used, 'p2', 'discard').some((c) => c.name === 'Hand Mon'));
+  assert.equal(zone(used, 'p2', 'hand').some((c) => c.name === 'Hand Mon'), false);
+
+  const b2 = board(HYPNOTIC_REIGN, { name: 'Malamar', setup });
+  const res2 = attack(b2);
+  const declined = choose(res2, [optionFor(res2, "Don't use an attack")], b2.rng);
+  assert.equal(zone(declined, 'p2', 'discard').some((c) => c.name === 'Hand Mon'), false, 'no discard when declined');
+});
+
+test('attack: Skill Copy discards the chosen card from your own hand; unpayable attacks are not offered', () => {
+  const b = board(SKILL_COPY, {
+    name: 'Alakazam Star',
+    setup: ({ p1 }) =>
+      p1.zones.hand.push(
+        withAttacks('Own Hand Mon', [
+          { name: 'Free Hit', cost: [], damage: '50' },
+          { name: 'Costly Hit', cost: ['Fire'], damage: '120' },
+        ])
+      ),
+  });
+  const res = attack(b);
+  assert.deepEqual(optionNames(res), ['Own Hand Mon: Free Hit']);
+  const done = choose(res, [1], b.rng);
+  assert.equal(cardNamed(done, 'p2', 'Defender').damage, 50);
+  assert.ok(zone(done, 'p1', 'discard').some((c) => c.name === 'Own Hand Mon'));
+
+  const none = board(SKILL_COPY, {
+    name: 'Alakazam Star',
+    setup: ({ p1 }) => p1.zones.hand.push(withAttacks('Own Hand Mon', [{ name: 'Costly Hit', cost: ['Fire'], damage: '120' }])),
+  });
+  const nothing = attack(none);
+  assert.ok(nothing.events.some((e) => e.type === 'attackCopyNothing'));
+  assert.ok(zone(nothing, 'p1', 'hand').some((c) => c.name === 'Own Hand Mon'), 'no discard without a payable attack');
+});
