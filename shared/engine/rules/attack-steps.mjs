@@ -742,13 +742,24 @@ const TEMPLATES = [
   ],
   // Design 036 D: your damage counters onto the opponent (Xerneas-GX Sanctuary, Drifloon Transfer Pain).
   [
-    /^move (all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|any) of your pokémon) to (your opponent's active pokémon|(?:1|any) of your opponent's pokémon)$/,
+    /^move (?:up to )?(all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|any) of your pokémon) to (your opponent's active pokémon|(?:1|any) of your opponent's (?:benched )?pokémon)$/,
     (m) => ({
       type: 'atkMoveCounterToOpponent',
       count: m[1] === 'all' ? 'all' : countOf(m[1]),
       from: m[2] === 'this pokémon' ? 'self' : /^each/.test(m[2]) ? 'each' : /benched/.test(m[2]) ? 'bench' : 'one',
-      to: /active/.test(m[3]) ? 'active' : 'any',
+      // Dusknoir Reaper Pulse: "to 1 of your opponent's Benched Pokémon".
+      to: /active/.test(m[3]) ? 'active' : /benched/.test(m[3]) ? 'bench' : 'any',
     }),
+  ],
+  // Wobbuffet V Gritty Comeback, Unown J Hidden Power.
+  [
+    /^switch all damage counters on this pokémon with those on your opponent's active pokémon$/,
+    () => ({ type: 'atkSwapCounters' }),
+  ],
+  // Unown L Hidden Power.
+  [
+    /^put damage counters on your opponent's active pokémon until it is (\d+) hp away from being knocked out$/,
+    (m) => ({ type: 'atkCountersUntilHp', hp: Number(m[1]) }),
   ],
 
   // Opponent's Active back to their hand (Fan Rotom Spin Storm, Unown Hidden Power)

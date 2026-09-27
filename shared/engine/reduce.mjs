@@ -6794,7 +6794,12 @@ function resolveAttackEffectPhase(draft, ctx) {
       }
       // "If heads, put 3 damage counters on …" / "For each heads, put 1 damage counter …".
       const targetGate = attackTarget ? targetClauseGate(attack.text) : null;
-      if (targetGate === 'heads' && !(coin === 'heads' || headsCount > 0)) attackTarget = null;
+      if (targetGate === 'heads' && !(coin === 'heads' || headsCount > 0)) {
+        // Unown Hidden Power (Unseen Forces): "If heads, … on 1 of your opponent's Pokémon.
+        // If tails, put 2 damage counters on 1 of your Pokémon." — the tails sentence's target.
+        const tailsSentence = /(?:^|\.\s+)if tails, ([^.]*\.)/i.exec(attack.text || '')?.[1];
+        attackTarget = coin === 'tails' && tailsSentence ? resolveAttackTargetClause(tailsSentence, null, 0) : null;
+      }
       if (targetGate === 'tails' && coin !== 'tails') attackTarget = null;
       if (targetGate === 'perHeads') {
         attackTarget = headsCount > 0 ? { ...attackTarget, amount: attackTarget.amount * headsCount } : null;

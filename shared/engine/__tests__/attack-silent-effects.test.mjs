@@ -919,3 +919,57 @@ test('Malamar V Drag Off (Rebel Clash 186): the damage lands on the new Active P
   assert.equal(oppActive(res.state).damage, 30);
   assert.equal(root(res.state, 'p2', defender.instanceId).damage || 0, 0);
 });
+
+// ── counter swaps and moves ───────────────────────────────────────────────────
+
+test('Dusknoir Reaper Pulse (Diamond & Pearl Promos DP33): up to 2 counters move to a Benched Pokémon', () => {
+  const text = "Move up to 2 damage counters from Dusknoir to 1 of your opponent's Benched Pokémon.";
+  let bench;
+  const { state, attacker, defender } = board('Dusknoir', text, {
+    damage: '20',
+    setup: (s) => {
+      s.players.p1.zones.active[0].damage = 50;
+      bench = addBench(s, 'p2', 'Target');
+    },
+  });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 30);
+  assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 20);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 20);
+});
+
+test('Wobbuffet V Gritty Comeback (Sword & Shield 191): the two Active Pokémon trade damage counters', () => {
+  const text = "Switch all damage counters on this Pokémon with those on your opponent's Active Pokémon.";
+  const { state, attacker, defender } = board('Wobbuffet V', text, {
+    damage: '',
+    setup: (s) => {
+      s.players.p1.zones.active[0].damage = 120;
+      s.players.p2.zones.active[0].damage = 10;
+    },
+  });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 10);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 120);
+});
+
+test('Unown L Hidden Power (Unseen Forces L): heads leaves the Defending Pokémon 10 HP from a Knock Out', () => {
+  const text =
+    'Flip a coin. If heads, put damage counters on the Defending Pokémon until it is 10 HP away from being Knocked Out.';
+  const make = () => board('Unown', text, { damage: '', setup: (s) => (s.players.p2.zones.active[0].damage = 100) });
+  const heads = attackShowing(make, 'heads');
+  assert.equal(root(heads.res.state, 'p2', heads.defender.instanceId).damage, 390);
+  const tails = attackShowing(make, 'tails');
+  assert.equal(root(tails.res.state, 'p2', tails.defender.instanceId).damage, 100);
+});
+
+test('Unown Hidden Power (Unseen Forces XY149 text): tails puts the 2 counters on your own Pokémon', () => {
+  const text =
+    "Flip a coin. If heads, put 2 damage counters on 1 of your opponent's Pokémon. If tails, put 2 damage counters on 1 of your Pokémon.";
+  const make = () => board('Unown', text, { damage: '' });
+  const tails = attackShowing(make, 'tails');
+  const attacker = tails.res.state.players.p1.zones.active[0];
+  assert.equal(attacker.damage, 20);
+  assert.equal(root(tails.res.state, 'p2', tails.defender.instanceId).damage || 0, 0);
+  const heads = attackShowing(make, 'heads');
+  assert.equal(root(heads.res.state, 'p2', heads.defender.instanceId).damage, 20);
+});

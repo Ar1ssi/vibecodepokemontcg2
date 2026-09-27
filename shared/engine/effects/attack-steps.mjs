@@ -2808,9 +2808,13 @@ function atkMoveCounterToOpponent(ctx) {
   const pool =
     step.from === 'self' ? [attacker].filter(Boolean) : step.from === 'bench' ? benchRootsOf(player) : rootsOf(player);
   const sources = pool.filter((c) => (c.damage || 0) > 0);
-  const targets = (step.to === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent)).filter(
-    (c) => !attackEffectShielded(ctx, opponent, c)
-  );
+  const targetPool =
+    step.to === 'active'
+      ? [activeOf(opponent)].filter(Boolean)
+      : step.to === 'bench'
+        ? benchRootsOf(opponent)
+        : rootsOf(opponent);
+  const targets = targetPool.filter((c) => !attackEffectShielded(ctx, opponent, c));
   const chooseSource = step.from === 'one' || step.from === 'bench';
 
   let fromIds = ctx.memo?.fromIds;
@@ -2848,6 +2852,34 @@ function atkMoveCounterToOpponent(ctx) {
     ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
   }
   if (moved > 0) placeCounters(ctx, target, opponent.playerId, moved);
+  return null;
+}
+
+// Wobbuffet V Gritty Comeback / Unown J Hidden Power: "Switch all damage counters on this
+// Pokémon with those on your opponent's Active Pokémon."
+function atkSwapCounters(ctx) {
+  const { opponent } = ctx;
+  const attacker = attackerRef(ctx)?.card;
+  const defender = activeOf(opponent);
+  if (!attacker || !defender) return skip(ctx, 'no_target');
+  if (attackEffectShielded(ctx, opponent, defender)) return skip(ctx, 'effect_prevented');
+  const mine = attacker.damage || 0;
+  attacker.damage = defender.damage || 0;
+  defender.damage = mine;
+  ctx.events.push({ type: 'damageUpdated', instanceId: attacker.instanceId, damage: attacker.damage });
+  ctx.events.push({ type: 'damageUpdated', instanceId: defender.instanceId, damage: defender.damage });
+  return null;
+}
+
+// Unown L Hidden Power: "put damage counters on the Defending Pokémon until it is 10 HP away
+// from being Knocked Out".
+function atkCountersUntilHp(ctx) {
+  const { opponent, step } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const amount = remainingHp(ctx, opponent, defender) - step.hp;
+  if (amount <= 0) return skip(ctx, 'already_at_hp');
+  placeCounters(ctx, defender, opponent.playerId, amount);
   return null;
 }
 
@@ -3179,6 +3211,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkChooseCondition,
   atkOppDiscardOrCondition,
   atkLostZoneOppHandPokemon,
+  atkSwapCounters,
+  atkCountersUntilHp,
   atkDevolve,
   atkBounceOppActive,
   atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),
