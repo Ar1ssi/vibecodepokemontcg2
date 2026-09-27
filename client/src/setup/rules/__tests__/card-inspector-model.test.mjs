@@ -814,3 +814,30 @@ test('finishFor: rarity picks the animation tier', () => {
   assert.equal(finishFor({ rarity: 'Special Illustration Rare' }), 'secret');
   assert.equal(finishFor({ rarity: 'Rare Holo ex' }), 'ultra');
 });
+
+// ── design 049: server-projected extra attacks ─────────────────────────────
+
+test('model: server extras render after the printed attacks; index 1 is the borrowed one', () => {
+  const mew = {
+    name: 'Mew ex',
+    supertype: 'Pokémon',
+    types: ['Psychic'],
+    hp: 180,
+    attacks: [{ name: 'Teleportation Burst', cost: ['Psychic'], damage: '30', text: '' }],
+  };
+  const greatSwing = {
+    name: 'Great Swing',
+    cost: ['Colorless', 'Colorless'],
+    damage: '280',
+    text: 'Discard an Energy from this Pokémon.',
+    copiedFrom: 'Slaking ex',
+  };
+  const m = buildInspectorModel(mew, { energyTypes: ['Psychic', 'Psychic'], extraAttacks: [greatSwing] });
+  assert.deepEqual(
+    m.attacks.map((a) => [a.index, a.name, a.copiedFrom]),
+    [
+      [0, 'Teleportation Burst', null],
+      [1, 'Great Swing', 'Slaking ex'],
+    ]
+  );
+});

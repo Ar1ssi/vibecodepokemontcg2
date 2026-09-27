@@ -481,6 +481,8 @@ export function buildInspectorModel(card, ctx = {}) {
       name: String(raw?.name ?? entry?.name ?? `Attack ${i + 1}`),
       cost: cost.map(String),
       text: String(raw?.text ?? raw?.effect ?? ''),
+      // Design 049: a borrowed attack (Memory Helix) names the Pokémon it comes from.
+      copiedFrom: raw?.copiedFrom ? String(raw.copiedFrom) : null,
       damageLabel: damageLabel == null ? null : damageLabel,
       printedLabel: printed,
       payable,

@@ -5321,6 +5321,14 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   padding: calc(var(--u) * 0.4) calc(var(--u) * 1.6);
   white-space: nowrap;
 }
+/* Design 049: "from Slaking ex" under a borrowed attack's banner. */
+.ptcg-atk__source {
+  padding: calc(var(--u) * 0.6) calc(var(--u) * 2) 0;
+  font-size: calc(var(--u) * 2.4);
+  font-style: italic;
+  opacity: 0.8;
+}
+
 .ptcg-atk__name {
   flex: 1;
   font-size: calc(var(--u) * 3.2);

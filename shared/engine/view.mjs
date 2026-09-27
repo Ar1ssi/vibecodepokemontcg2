@@ -149,7 +149,7 @@ function redactPendingChoiceForOpponent(choice) {
  * @param {string|null} playerId Absolute player ID (or null for spectator)
  * @returns {object} Redacted view
  */
-export function viewFor(state, playerId) {
+export function viewFor(state, playerId, { attackExtrasFor } = {}) {
   if (!state) return null;
 
   const playerIds = Object.keys(state.players || {});
@@ -211,6 +211,7 @@ export function viewFor(state, playerId) {
       username: owner.username,
       flags: playerFlags(owner),
       zones: redactOwnerZones(owner),
+      ...ownerAttackExtras(owner, state, attackExtrasFor),
     },
     them: opponent
       ? {
@@ -221,6 +222,24 @@ export function viewFor(state, playerId) {
         }
       : null,
   };
+}
+
+/**
+ * Design 049: the attacks each of the owner's in-play Pokémon can use beyond its printed ones,
+ * keyed by instanceId, so the client's attack panel indexes the list the server resolves.
+ * `attackExtrasFor` is injected (reduce.mjs) to keep the reducer out of this module.
+ */
+function ownerAttackExtras(owner, state, attackExtrasFor) {
+  if (typeof attackExtrasFor !== 'function') return {};
+  const extras = {};
+  for (const zoneId of ['active', 'bench']) {
+    for (const card of owner?.zones?.[zoneId] || []) {
+      if (!card || card.attachedTo) continue;
+      const attacks = attackExtrasFor(state, card);
+      if (attacks.length > 0) extras[card.instanceId] = JSON.parse(JSON.stringify(attacks));
+    }
+  }
+  return Object.keys(extras).length > 0 ? { attackExtras: extras } : {};
 }
 
 /**

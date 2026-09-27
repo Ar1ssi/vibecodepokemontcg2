@@ -274,6 +274,19 @@ export function getAuthoritativeDeckCount(side) {
 }
 
 /**
+ * Design 049: the attacks the server says this own in-play Pokémon can use beyond its printed
+ * ones (Stadium, Tool, Ability-borrowed), in the order the `attack` command indexes them.
+ * Null when the last view carries no list for it (no view yet, an older server, legacy mode).
+ *
+ * @param {number|string} instanceId
+ * @returns {object[]|null}
+ */
+export function getAuthoritativeAttackExtras(instanceId) {
+  const extras = lastAppliedView?.you?.attackExtras?.[instanceId];
+  return Array.isArray(extras) ? extras : null;
+}
+
+/**
  * Returns the neutral Stadium card as a single-element array, matching the
  * shape `hashState`'s `playerHashZones` builds server-side
  * (`state.stadium ? [state.stadium] : []`), or an empty array when there is

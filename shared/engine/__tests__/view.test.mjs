@@ -162,3 +162,61 @@ test('viewFor formats spectator view with hand and deck counts only', () => {
   assert.ok(serialized.includes('Public Raichu'));
   assert.ok(serialized.includes('Opponent Public Pidgeot ex'));
 });
+
+// ── design 049: attack extras for the owner's attack panel ─────────────────
+
+const MEMORY_HELIX_TEXT =
+  'This Pokémon can use the attacks of any of your Benched Pokémon. (You still need the necessary Energy to use each attack.)';
+
+async function memoryHelixGame({ bench = true } = {}) {
+  const { attackExtrasFor } = await import('../reduce.mjs');
+  const state = createGameState({ gameId: 'attack-extras', players: { p1: { username: 'a' }, p2: { username: 'b' } } });
+  // Mew ex (corpus 30th Celebration 066); Slaking ex Great Swing (corpus Surging Sparks 227).
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: 1,
+      name: 'Mew ex',
+      supertype: 'Pokémon',
+      hp: 180,
+      abilities: [{ name: 'Memory Helix', type: 'Ability', text: MEMORY_HELIX_TEXT }],
+      attacks: [{ name: 'Teleportation Burst', cost: ['Psychic'], damage: '30', text: '' }],
+    })
+  );
+  if (bench) {
+    state.players.p1.zones.bench.push(
+      createCard({
+        instanceId: 2,
+        name: 'Slaking ex',
+        supertype: 'Pokémon',
+        hp: 340,
+        attacks: [
+          { name: 'Great Swing', cost: ['Colorless', 'Colorless'], damage: '280', text: 'Discard an Energy from this Pokémon.' },
+        ],
+      })
+    );
+  }
+  state.players.p2.zones.active.push(createCard({ instanceId: 3, name: 'Opp', supertype: 'Pokémon', hp: 100 }));
+  return { state, attackExtrasFor };
+}
+
+test('viewFor projects borrowed attacks for the owner, keyed by instanceId', async () => {
+  const { state, attackExtrasFor } = await memoryHelixGame();
+  const view = viewFor(state, 'p1', { attackExtrasFor });
+  assert.deepEqual(Object.keys(view.you.attackExtras), ['1']);
+  const [greatSwing] = view.you.attackExtras[1];
+  assert.equal(greatSwing.name, 'Great Swing');
+  assert.equal(greatSwing.copiedFrom, 'Slaking ex');
+  assert.equal(view.you.attackExtras[2], undefined, 'a Benched Pokémon cannot attack');
+});
+
+test('viewFor omits attackExtras with an empty Bench, for the opponent, and for spectators', async () => {
+  const empty = await memoryHelixGame({ bench: false });
+  assert.equal('attackExtras' in viewFor(empty.state, 'p1', { attackExtrasFor: empty.attackExtrasFor }).you, false);
+  const { state, attackExtrasFor } = await memoryHelixGame();
+  const oppView = viewFor(state, 'p2', { attackExtrasFor });
+  assert.equal('attackExtras' in oppView.you, false);
+  assert.equal('attackExtras' in oppView.them, false);
+  const spectator = viewFor(state, null, { attackExtrasFor });
+  assert.equal(JSON.stringify(spectator).includes('attackExtras'), false);
+  assert.equal('attackExtras' in viewFor(state, 'p1').you, false, 'no function, no key');
+});

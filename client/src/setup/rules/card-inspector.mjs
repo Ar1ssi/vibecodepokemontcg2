@@ -40,7 +40,10 @@ import {
   dispatchAuthoritativeUseAbility,
 } from '../netcode/authoritative-dispatch.js';
 import { getZone } from '../zones/get-zone.js';
-import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
+import {
+  getAuthoritativeAttackExtras,
+  getAuthoritativeStadiumArray,
+} from '../netcode/apply-view.js';
 import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
@@ -219,6 +222,9 @@ const attackEl = (attack, cardType) => {
   }
   head.appendChild(right);
   section.appendChild(head);
+  if (attack.copiedFrom) {
+    section.appendChild(el('div', 'ptcg-atk__source', `from ${attack.copiedFrom}`));
+  }
 
   if (attack.text) {
     const body = textBody(attack.text);
@@ -613,15 +619,17 @@ async function resolveLiveContext(card, zone = 'active') {
     getStadium(),
     getAuthoritativeStadiumArray()
   );
-  // Stadium-granted / inherited attacks (Shrine of Memories, Meteor Falls,
-  // Holon Lake, Rocket's Tricky Gym) rendered alongside the printed ones. The
-  // same merge order is used by the server, so an `attackIndex` picked here
-  // resolves to the same attack there.
-  const extraAttacks = stadiumExtraAttacksFromZone(stadiumCard, {
-    zoneCards,
-    card,
-    isActive: zoneId === 'active',
-  });
+  // Extra attacks rendered after the printed ones. The server's list (design 049: Stadium,
+  // Tool and Ability-borrowed, e.g. Memory Helix) wins when the view carries one, so the
+  // `attackIndex` picked here is the index the server resolves. Without it, fall back to the
+  // Stadium-granted ones (Shrine of Memories, Meteor Falls, …) in the server's merge order.
+  const extraAttacks =
+    getAuthoritativeAttackExtras(card?.instanceId) ??
+    stadiumExtraAttacksFromZone(stadiumCard, {
+      zoneCards,
+      card,
+      isActive: zoneId === 'active',
+    });
   const {
     energyTypes,
     stadiumCostModifier,

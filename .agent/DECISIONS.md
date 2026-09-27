@@ -9,6 +9,8 @@
 #   Next id = highest D number in this file and the archive + 1 (next: D180).
 
 ## Active
+- D184 2026-09-28 [rules] A VSTAR Power attack is identified by its text ("more than 1 VSTAR Power"), not by the card, so the marker travels with a copied attack; declaring one spends `oncePerGame.vstarUsed` beside `spendGxAttack`, and copy-attack candidates skip GX/VSTAR attacks whose allowance the copier spent. (design 049 O4, S327)
+- D183 2026-09-28 [netcode] The owner's view carries `you.attackExtras: {instanceId: Attack[]}` (Stadium + Tool + Ability-borrowed, Active only) from an injected `attackExtrasFor`; the client attack panel indexes it instead of recomputing, and falls back to Stadium extras when absent. (design 049 O1–O3, S327)
 - D182 2026-09-26 [rules] "Take another turn after this one" consumes `flags.extraTurn` in the attack tail and restarts the same player with no Checkup; a discard-wiped side wins via `settleWipedSides` (no KO event/Prizes). (design 048, S326)
 - D181 2026-09-26 [rules] Attack play/attack locks are player-scoped (`playLocks` by untilTurn, `attackLockUntilTurn`; arrays replaced/pruned), enforced in validateLegality playTrainer/attachCard/moveCard/attack — card fields miss Pokémon played under Iron Rule. (design 048, S326)
 - D180 2026-09-26 [rules] GX "at least N extra {T} Energy (beyond this attack's cost)" is one sentence gate (`requiresExtraEnergy`, typed or not) read by the KO/prize/marker/bench handlers; `energyMatches` resolves {Y}/{N} by element word. (design 048, S326)

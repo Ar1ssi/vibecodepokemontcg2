@@ -47,6 +47,7 @@ import {
   prizeFilterMatches,
   prizeRuleBoxes,
   isGxAttack,
+  isVstarPowerAttack,
   discardEnergyScaling,
   deckMillScaling,
   deckRevealScaling,
@@ -812,6 +813,25 @@ function spendGxAttack(draft, { playerId, attacker, attack, events }) {
   }
 }
 
+/**
+ * Spends the player's once-per-game VSTAR Power when the declared attack is a VSTAR Power attack
+ * (App. 9). Runs beside `spendGxAttack`, so a copied VSTAR Power attack spends it too.
+ */
+function spendVstarAttack(draft, { playerId, attacker, attack, events }) {
+  if (!isVstarPowerAttack(attack)) return;
+  const oncePerGame = ensureOncePerGame(draft, playerId);
+  if (oncePerGame && !oncePerGame.vstarUsed) {
+    oncePerGame.vstarUsed = true;
+    events.push({
+      type: 'vstarUsed',
+      playerId,
+      instanceId: attacker?.instanceId,
+      kind: 'vstar',
+      attackName: attack.name,
+    });
+  }
+}
+
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
 function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
   const guard = (draft.players[victimPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
@@ -1066,6 +1086,18 @@ function attackViewFor(state, card, { isActive = true } = {}) {
   );
   if (extras.length === 0) return view;
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
+}
+
+/**
+ * The attacks an in-play Pokémon can use beyond its printed ones (Stadium, Tool, borrowed by an
+ * Ability), in the order the `attack` command indexes them after the printed list (design 049).
+ * Only the Active attacks, so a Benched Pokémon gets none.
+ */
+export function attackExtrasFor(state, card) {
+  const ref = findCard(state, card?.instanceId);
+  if (!ref || ref.zoneId !== 'active') return [];
+  const printedCount = (inPlayView(state, card)?.attacks || []).length;
+  return (attackViewFor(state, card).attacks || []).slice(printedCount);
 }
 
 // Effective HP including printed base stats, top evolution, attached Tools, Stadium modifiers, and ability HP bonuses.
@@ -4100,6 +4132,10 @@ export function validateLegality(state, command) {
           reason: 'Only one GX attack can be used per game.',
         };
       }
+      // App. 9: one VSTAR Power per game, whether an Ability or an attack.
+      if (isVstarPowerAttack(attack) && oncePerGameUsed(player, 'vstar')) {
+        return { allowed: false, reason: 'VSTAR Power already used this game.' };
+      }
       // Iron Rule-GX (design 048): a player-scoped attack lock from the opponent's last turn,
       // covering Pokémon that came into play after the lock landed.
       if (
@@ -5252,7 +5288,7 @@ const RAW_ATTACK_SOURCES = new Set([
  * Design 039 filters: Tera only, Dark-name only, exclude the user, no Rule Box.
  */
 function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopCard }) {
-  if (copy.source === 'oppLastAttack') return lastTurnAttackCandidates(draft, { copy, oppId });
+  if (copy.source === 'oppLastAttack') return lastTurnAttackCandidates(draft, { copy, oppId, playerId });
   const candidates = [];
   for (const card of copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard })) {
     if (copy.excludeSelf && card.instanceId === attacker?.instanceId) continue;
@@ -5263,6 +5299,7 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
     for (const attack of view?.attacks || []) {
       if (!attack?.name || parseCopyAttack(attack.text)) continue;
       if (copy.excludeGx && isGxAttack(attack)) continue;
+      if (oncePerGameSpentFor(draft.players[playerId], attack)) continue;
       if (copy.needsEnergy && !attackCostPayable(draft, playerId, attacker, attack)) continue;
       candidates.push({ sourceId: card.instanceId, sourceName: card.name, attack: { ...attack } });
     }
@@ -5270,18 +5307,26 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
   return candidates;
 }
 
+// A copy attack cannot pick a GX or VSTAR Power attack once the copier's own allowance is spent
+// (App. 9/19; Genome Hacking ruling 2023-12-14). The source owner's allowance does not matter.
+function oncePerGameSpentFor(player, attack) {
+  if (isGxAttack(attack) && oncePerGameUsed(player, 'gx')) return true;
+  return isVstarPowerAttack(attack) && oncePerGameUsed(player, 'vstar');
+}
+
 /**
  * The single attack the opponent used during their last turn (design 039). Empty when they
  * did not attack, when the wording excludes GX attacks and theirs was one, or when the attack
  * they used was itself a copy.
  */
-function lastTurnAttackCandidates(draft, { copy, oppId }) {
+function lastTurnAttackCandidates(draft, { copy, oppId, playerId }) {
   const last = draft.players?.[oppId]?.lastAttack;
   const currentTurn = Math.max(1, Number(draft.turn?.number) || 1);
   if (!last || Number(last.turnNumber) !== currentTurn - 1) return [];
   if (copy.excludeGx && last.isGx) return [];
   const attack = last.attack;
   if (!attack?.name || parseCopyAttack(attack.text)) return [];
+  if (oncePerGameSpentFor(draft.players?.[playerId], attack)) return [];
   return [
     {
       sourceId: last.attackerInstanceId ?? null,
@@ -5519,6 +5564,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         condition,
       });
       spendGxAttack(draft, { playerId, attacker, attack, events });
+      spendVstarAttack(draft, { playerId, attacker, attack, events });
       endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
       return;
     }
@@ -6718,6 +6764,7 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
       // App. 19: using a GX attack spends the player's single GX attack for the game. Set on the
       // resolving path and on a condition-failed attack; a Confused fizzle never reaches either.
       spendGxAttack(draft, { playerId, attacker, attack, events });
+      spendVstarAttack(draft, { playerId, attacker, attack, events });
 
       // Raikou: "Then, attach those {L} Energy cards to 1 of your Pokémon."
       if (mill?.attachMatched && milledIds.length > 0 && !draft.pendingChoice) {
@@ -8316,6 +8363,12 @@ export function applyCommand(state, command, rng = null) {
               });
             }
           }
+          spendVstarAttack(draft, {
+            playerId: initiatorPlayerId,
+            attacker: null,
+            attack: token.effectiveAttack,
+            events,
+          });
           if (targetPlayer) {
             if (!targetPlayer.flags) targetPlayer.flags = {};
             targetPlayer.flags.attackerAttacked = true;
