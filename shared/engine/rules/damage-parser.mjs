@@ -958,6 +958,9 @@ export function parseAttackDamage(
       selfDamage += directSelfDamage;
     }
   }
+  // Beldum Metal Charge / Gengar V Pain Explosion: "Put 3 damage counters on this Pokémon."
+  const selfCounters = /(?:^|\. )put (\d+) damage counters? on this pok[ée]mon\./.exec(text);
+  if (selfCounters) selfDamage += Number(selfCounters[1]) * 10;
   if (selfDamage > 0) {
     if (!components.includes('self-damage')) components.push('self-damage');
     notes.push(`${selfDamage} damage to self`);
@@ -1375,20 +1378,28 @@ export function eachPlayerDrawCount(attackText) {
   return m ? Math.max(0, parseInt(m[1], 10)) : 0;
 }
 
-/** Put/place damage counters on opponent Pokémon. */
+/**
+ * Put/place damage counters on opponent Pokémon. `scope: 'bench'` when the text names the
+ * Bench (Dragapult ex Phantom Dive, Ting-Lu ex Land Scoop, Reuniclus Cell Fork).
+ */
 export function opponentCounterClause(attackText) {
-  const t = String(attackText || '');
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
   let m =
-    /choose (\d+) of your opponent's pok[ée]mon and put (\d+) damage counters? on each/i.exec(
+    /choose (\d+) of your opponent's (benched )?pok[ée]mon and put (\d+) damage counters? on each/i.exec(
       t
     );
   if (m) {
     return {
       mode: 'multi',
       targets: parseInt(m[1], 10) || 1,
-      count: parseInt(m[2], 10) || 0,
+      count: parseInt(m[3], 10) || 0,
+      ...(m[2] ? { scope: 'bench' } : {}),
     };
   }
+  m = /(?:place|put) (\d+) damage counters? on 1 of your opponent's benched pok[ée]mon/i.exec(t);
+  if (m) return { mode: 'any', count: parseInt(m[1], 10) || 0, scope: 'bench' };
+  m = /(?:place|put) (\d+) damage counters? on your opponent's benched pok[ée]mon in any way/i.exec(t);
+  if (m) return { mode: 'any', count: parseInt(m[1], 10) || 0, scope: 'bench', anyWay: true };
   m =
     /(?:place|put) (\d+) damage counters? on your opponent's active pok[ée]mon/i.exec(
       t
@@ -1555,23 +1566,83 @@ export function ownBenchDamage(attackText) {
 // Pokémon" / "…to 1 of your opponent's Benched Pokémon". Returns
 // { kind: 'damage', amount, count, scope } or null. `scope` is 'bench' when the
 // text names the Bench, otherwise 'any' (Active or Bench). Pure.
+// The chosen Pokémon's description → a candidate filter reduce.mjs attackTargetOptions reads.
+const TARGET_FILTERS = [
+  [/^pok[ée]mon$/i, null],
+  [/^pok[ée]mon that has any damage counters on it$/i, 'damaged'],
+  [/^pok[ée]mon-gx or pok[ée]mon-ex$/i, 'gxOrEx'],
+  [/^pok[ée]mon lv\.x$/i, 'lvx'],
+];
+const targetFilter = (phrase) => {
+  const row = TARGET_FILTERS.find(([re]) => re.test(phrase.trim()));
+  return row ? { filter: row[1] } : null;
+};
+
 export function attackTargetClause(attackText) {
   // TCGdex prints typographic apostrophes ("opponent’s"); normalize them so the
   // patterns below match the fetched card text (Dusk Shot et al.).
-  const t = String(attackText || '').replace(/[‘’]/g, "'");
+  const t = String(attackText || '').replace(/[‘’]/g, "'").replace(/\s+/g, ' ');
+  const withFilter = (clause, phrase) => {
+    const described = targetFilter(phrase);
+    if (!described) return null;
+    return described.filter ? { ...clause, filter: described.filter } : clause;
+  };
+  // Arboliva ex Oil Salvo / Zeraora VSTAR: "Choose 1 of your opponent's Pokémon 6 times. … For
+  // each time you chose a Pokémon, do 20 damage to it." One pick per hit, repeats allowed.
+  const repeated =
+    /choose 1 of your opponent's (pok[ée]mon(?:-gx or pok[ée]mon-ex)?) (\d+) times\.(?: \([^)]*\))? for each time you chose a pok[ée]mon, do (\d+) damage to it/i.exec(
+      t
+    );
+  if (repeated) {
+    return withFilter(
+      {
+        kind: 'damage',
+        amount: Number(repeated[3]),
+        count: 1,
+        scope: 'any',
+        distributable: true,
+        remaining: Number(repeated[2]),
+      },
+      repeated[1]
+    );
+  }
   // Older wording (Raichu LV.X Voltage Shoot): "choose 1 of your opponent's Pokémon. This
-  // attack does 80 to that Pokémon."
+  // attack does 80 to that Pokémon."; Aggron ex Split Bomb: "Choose 2 … This attack does 30
+  // damage to each of them."; Shedinja Spike Wound: "… Pokémon that has any damage counters on it".
   const chosen =
-    /choose (\d+) of your opponent's (benched )?pok[ée]mon\. this attack does (\d+)(?: damage)? to that pok[ée]mon/i.exec(
-      t.replace(/\s+/g, ' ')
+    /choose (\d+) of your opponent's (benched )?(pok[ée]mon[^.]*?)\. this attack does (\d+)(?: damage)? to (?:that pok[ée]mon|each of them|each of those pok[ée]mon)/i.exec(
+      t
     );
   if (chosen) {
+    return withFilter(
+      {
+        kind: 'damage',
+        amount: Math.max(0, parseInt(chosen[4], 10) || 0),
+        count: Math.max(1, parseInt(chosen[1], 10) || 1),
+        scope: chosen[2] ? 'bench' : 'any',
+      },
+      chosen[3]
+    );
+  }
+  // Erika's Bellsprout Stretch Vine: "Choose 1 of your opponent's Benched Pokémon, and this
+  // attack does 10 damage to it."; Gengar Dark Mind: "If your opponent has any Benched Pokémon,
+  // choose 1 of them and this attack does 10 damage to it."
+  const joined =
+    /(?:choose (\d+) of your opponent's (benched )?pok[ée]mon,|if your opponent has any benched pok[ée]mon, choose 1 of them) and this attack does (\d+) damage to it/i.exec(
+      t
+    );
+  if (joined) {
     return {
       kind: 'damage',
-      amount: Math.max(0, parseInt(chosen[3], 10) || 0),
-      count: Math.max(1, parseInt(chosen[1], 10) || 1),
-      scope: chosen[2] ? 'bench' : 'any',
+      amount: Number(joined[3]),
+      count: Number(joined[1] || 1),
+      scope: joined[2] || !joined[1] ? 'bench' : 'any',
     };
+  }
+  // Mega Eelektross ex Split Bomb: "This attack does 60 damage to each of 2 of your opponent's Pokémon."
+  const each = /does (\d+) damage to each of (\d+) of your opponent's (benched )?pok[ée]mon/i.exec(t);
+  if (each) {
+    return { kind: 'damage', amount: Number(each[1]), count: Number(each[2]), scope: each[3] ? 'bench' : 'any' };
   }
   const m = /does (\d+) damage to (\d+) of your opponent's (benched )?pok[ée]mon/i.exec(
     t
@@ -1583,6 +1654,23 @@ export function attackTargetClause(attackText) {
     count: Math.max(1, parseInt(m[2], 10) || 1),
     scope: m[3] ? 'bench' : 'any',
   };
+}
+
+/**
+ * Damage or counters the attacker puts on 1 of its own Pokémon: Drapion V Dynamic Tail ("This
+ * attack also does 60 damage to 1 of your Pokémon"), Raikou Raging Thunder ("Does 20 damage to 1
+ * of your Pokémon and don't apply Weakness and Resistance"), Giratina Shadow Impact ("Put 4
+ * damage counters on 1 of your Pokémon"). Never Weakness or Resistance. Pure.
+ */
+export function ownTargetClause(attackText) {
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
+  const damage = /does (\d+) damage to 1 of your pok[ée]mon\b/i.exec(t);
+  if (damage) return { kind: 'damage', amount: Number(damage[1]), count: 1, scope: 'any', side: 'own', activeWR: false };
+  const counters = /put (\d+) damage counters? on 1 of your pok[ée]mon\b/i.exec(t);
+  if (counters) {
+    return { kind: 'counters', amount: Number(counters[1]) * 10, count: 1, scope: 'any', side: 'own', activeWR: false };
+  }
+  return null;
 }
 
 // Parse a printed "discard Energy to scale damage" clause

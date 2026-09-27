@@ -41,6 +41,7 @@ import {
   eachPokemonDamage,
   ownBenchDamage,
   attackTargetClause,
+  ownTargetClause,
   opponentCounterClause,
   parseAttackSearchClause,
   parsePrizeOnKo,
@@ -521,7 +522,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
         kind: 'counters',
         amount: 10,
         count: 1,
-        scope: 'any',
+        scope: counters.scope || 'any',
         distributable: true,
         remaining: counters.count,
       };
@@ -530,7 +531,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       kind: 'counters',
       amount: counters.count * 10,
       count: counters.mode === 'multi' ? counters.targets : 1,
-      scope: 'any',
+      scope: counters.scope || 'any',
     };
   }
   const damage = attackTargetClause(t);
@@ -554,26 +555,50 @@ function resolveAttackTargetClause(text, parsed, spread) {
         : {}),
       count: damage.count,
       scope: damage.scope,
+      ...(damage.filter ? { filter: damage.filter } : {}),
+      ...(damage.distributable ? { distributable: true, remaining: damage.remaining } : {}),
       // Attack damage to the Active applies Weakness/Resistance unless the text
-      // waives it for every target ("... for Benched Pokémon" waives only those).
-      activeWR: !/don't apply weakness and resistance(?! for benched)/i.test(t),
+      // waives it for every target ("... for Benched Pokémon" waives only those;
+      // Arboliva ex: "This damage isn't affected by Weakness or Resistance").
+      activeWR:
+        !/don't apply weakness and resistance(?! for benched)/i.test(t) &&
+        !/this damage isn't affected by weakness or resistance/i.test(t.replace(/[‘’]/g, "'")),
       immunity: parseDamageImmunity(t),
     };
   }
   if (parsed?.bench > 0) {
     return { kind: 'damage', amount: parsed.bench, count: 1, scope: 'bench' };
   }
-  return null;
+  return ownTargetClause(t);
 }
 
-function attackTargetOptions(draft, defenderPlayerId, scope) {
+// Candidate filters a printed target description names (damage-parser.mjs attackTargetClause).
+const TARGET_FILTERS = {
+  damaged: (view) => (view?.damage || 0) > 0,
+  gxOrEx: (view) => isGxCard(view) || /-EX$/.test(String(view?.name || '')),
+  lvx: (view) => /\bLV\.X\b/i.test(String(view?.name || '')),
+};
+
+/** In-play roots a chosen-target clause may pick: the opponent's, or the attacker's own. */
+function attackTargetOptions(draft, defenderPlayerId, scope, filter = null) {
   const player = draft.players[defenderPlayerId];
   const active = (player?.zones?.active || []).filter((c) => !c.attachedTo);
   const bench = (player?.zones?.bench || []).filter((c) => !c.attachedTo);
-  if (scope === 'bench') return bench;
-  if (scope === 'active') return active;
-  return [...active, ...bench];
+  const roots = scope === 'bench' ? bench : scope === 'active' ? active : [...active, ...bench];
+  const keep = TARGET_FILTERS[filter];
+  return keep ? roots.filter((root) => keep(inPlayView(draft, root))) : roots;
 }
+
+/** Prompt for one pick of a split clause: a damage counter, or one hit of a repeated choice. */
+function distributedPrompt(attackName, clause, left) {
+  return clause.kind === 'counters'
+    ? `${attackName}: Place a damage counter (${left} left)`
+    : `${attackName}: Choose a Pokémon to take ${clause.amount} damage (${left} left)`;
+}
+
+/** Whose Pokémon a chosen-target clause hits: the opponent's, or (`side: 'own'`) the attacker's. */
+const targetPlayerOf = (clause, attackerPlayerId, defenderPlayerId) =>
+  clause?.side === 'own' ? attackerPlayerId : defenderPlayerId;
 
 // Flat damage to an Active target: no W/R for counter placement, and the printed
 // snipe clause is treated as unmodified. Bench targets go through
@@ -1023,6 +1048,7 @@ function applyAttackTargets(
         auto: false,
         activeRng,
         countersPlaced: clause.kind === 'counters',
+        ownAttack: clause.side === 'own',
         events,
       });
     } else if (ref.zoneId === 'active') {
@@ -7071,11 +7097,12 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
       // effect) so a click-to-select suspension never drops them. The player
       // clicks the target(s) on the mat (design 017 / D19).
       if (attackTarget) {
-        const candidates = attackTargetOptions(
-          draft,
-          defenderPlayerId,
-          attackTarget.scope
-        );
+        // Drapion V Dynamic Tail / Giratina Shadow Impact hit the attacker's own Pokémon; a
+        // Knock Out there gives the opponent the Prize cards.
+        const ownSide = attackTarget.side === 'own';
+        const targetOwnerId = targetPlayerOf(attackTarget, playerId, defenderPlayerId);
+        const creditedId = ownSide ? oppId : playerId;
+        const candidates = attackTargetOptions(draft, targetOwnerId, attackTarget.scope, attackTarget.filter);
         if (candidates.length === 0) {
           events.push({
             type: 'attackBenchFizzled',
@@ -7099,8 +7126,8 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
             benchDealt += applyAttackTargets(draft, {
               selection: picksFor(candidates),
               clause: attackTarget,
-              defenderPlayerId,
-              attackerPlayerId: playerId,
+              defenderPlayerId: targetOwnerId,
+              attackerPlayerId: creditedId,
               attackName: attack.name,
               activeRng,
               events,
@@ -7110,8 +7137,8 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
               player: playerId,
               source: 'attack',
               prompt: distributable
-                ? `${attack.name}: Place a damage counter (${required} left)`
-                : `${attack.name}: Choose ${attackTarget.count} of your opponent's Pokémon to take damage`,
+                ? distributedPrompt(attack.name, attackTarget, required)
+                : `${attack.name}: Choose ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} Pokémon to take damage`,
               options: candidates,
               min: distributable ? 1 : attackTarget.count,
               max: distributable ? 1 : attackTarget.count,
@@ -7119,6 +7146,8 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
                 effectType: 'attack',
                 initiatorPlayerId: playerId,
                 oppId,
+                targetOwnerId,
+                creditedId,
                 attackTarget,
                 effectiveAttack,
                 damage: dmgDealt,
@@ -7131,8 +7160,8 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
             benchDealt += applyAttackTargets(draft, {
               selection: picksFor(candidates),
               clause: attackTarget,
-              defenderPlayerId,
-              attackerPlayerId: playerId,
+              defenderPlayerId: targetOwnerId,
+              attackerPlayerId: creditedId,
               attackName: attack.name,
               activeRng,
               events,
@@ -8729,11 +8758,13 @@ export function applyCommand(state, command, rng = null) {
           const selection = Array.isArray(payload.selection)
             ? payload.selection
             : [];
+          // Tokens from before own-side targets carry no owner ids: the opponent's Pokémon.
+          const targetOwnerId = token.targetOwnerId ?? token.oppId;
           const dealt = applyAttackTargets(draft, {
             selection,
             clause: token.attackTarget,
-            defenderPlayerId: token.oppId,
-            attackerPlayerId: initiatorPlayerId,
+            defenderPlayerId: targetOwnerId,
+            attackerPlayerId: token.creditedId ?? initiatorPlayerId,
             attackName: token.effectiveAttack?.name || '',
             activeRng,
             events,
@@ -8749,12 +8780,17 @@ export function applyCommand(state, command, rng = null) {
             ? (token.attackTarget.remaining || 1) - 1
             : 0;
           if (remaining > 0) {
-            const options = attackTargetOptions(draft, token.oppId, 'any');
+            const options = attackTargetOptions(
+              draft,
+              targetOwnerId,
+              token.attackTarget.scope || 'any',
+              token.attackTarget.filter
+            );
             if (options.length > 0) {
               draft.pendingChoice = createPendingChoice({
                 player: initiatorPlayerId,
                 source: 'attack',
-                prompt: `${token.effectiveAttack?.name || 'Attack'}: Place a damage counter (${remaining} left)`,
+                prompt: distributedPrompt(token.effectiveAttack?.name || 'Attack', token.attackTarget, remaining),
                 options,
                 min: 1,
                 max: 1,

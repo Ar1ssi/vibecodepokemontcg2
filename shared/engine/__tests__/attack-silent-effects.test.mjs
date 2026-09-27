@@ -431,3 +431,104 @@ test('Lunala-GX Moongeist Beam (Ultra Prism 172): the Defending Pokémon cannot 
   assert.equal(hit.error, null);
   assert.equal(root(hit.state, 'p2', defender.instanceId).damage, 120);
 });
+
+// ── chosen targets ──────────────────────────────────────────────────────────
+
+const benchOf = (state, playerId) => state.players[playerId].zones.bench.filter((c) => !c.attachedTo);
+const pickTarget = (res, id) => choose(res, [id]);
+
+test('Dragapult ex Phantom Dive (Ascended Heroes 160): 6 counters split over the Bench only', () => {
+  const text = "Put 6 damage counters on your opponent's Benched Pokémon in any way you like.";
+  const a = mon('Bench A', { hp: 200 });
+  const b = mon('Bench B', { hp: 200 });
+  const { state, defender } = board('Dragapult ex', text, {
+    damage: '200',
+    setup: (s) => s.players.p2.zones.bench.push(a, b),
+  });
+  let res = attack(state);
+  for (let placed = 0; placed < 6; placed++) {
+    assert.ok(res.state.pendingChoice, `pick ${placed + 1}`);
+    const ids = res.state.pendingChoice.options.map((o) => o.instanceId);
+    assert.ok(!ids.includes(defender.instanceId), 'the Active is not a choice');
+    res = pickTarget(res, placed < 4 ? a.instanceId : b.instanceId);
+  }
+  assert.equal(res.state.pendingChoice, null);
+  const [afterA, afterB] = benchOf(res.state, 'p2');
+  assert.equal(afterA.damage, 40);
+  assert.equal(afterB.damage, 20);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 200);
+});
+
+test('Ting-Lu ex Land Scoop (Paldean Fates 244): 2 counters on 1 Benched Pokémon', () => {
+  const text = "Put 2 damage counters on 1 of your opponent's Benched Pokémon.";
+  const benched = mon('Bench A', { hp: 200 });
+  const { state } = board('Ting-Lu ex', text, { damage: '150', setup: (s) => s.players.p2.zones.bench.push(benched) });
+  const res = attack(state);
+  assert.equal(benchOf(res.state, 'p2')[0].damage, 20);
+});
+
+test('Aggron ex Split Bomb (Crystal Guardians 89): 30 to each of 2 chosen Pokémon', () => {
+  const text =
+    "Choose 2 of your opponent's Pokémon. This attack does 30 damage to each of them. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  const a = mon('Bench A', { hp: 200 });
+  const b = mon('Bench B', { hp: 200 });
+  const { state, defender } = board('Aggron ex', text, { damage: '', setup: (s) => s.players.p2.zones.bench.push(a, b) });
+  const offered = attack(state);
+  assert.equal(offered.state.pendingChoice.min, 2);
+  const res = choose(offered, [defender.instanceId, b.instanceId]);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 30);
+  assert.equal(benchOf(res.state, 'p2')[1].damage, 30);
+  assert.equal(benchOf(res.state, 'p2')[0].damage, 0);
+});
+
+test('Arboliva ex Oil Salvo (Destined Rivals 207): 6 picks of 20, repeats allowed', () => {
+  const text =
+    "Choose 1 of your opponent's Pokémon 6 times. (You can choose the same Pokémon more than once.) For each time you chose a Pokémon, do 20 damage to it. This damage isn't affected by Weakness or Resistance.";
+  const a = mon('Bench A', { hp: 300 });
+  const { state, defender } = board('Arboliva ex', text, { damage: '', setup: (s) => s.players.p2.zones.bench.push(a) });
+  defender.weakness = { type: 'Grass', value: 2 };
+  let res = attack(state);
+  for (let pick = 0; pick < 6; pick++) res = pickTarget(res, pick < 5 ? defender.instanceId : a.instanceId);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 100, 'no Weakness');
+  assert.equal(benchOf(res.state, 'p2')[0].damage, 20);
+});
+
+test('Shedinja Spike Wound (Supreme Victors 44): only a damaged Pokémon can be chosen', () => {
+  const text =
+    "Choose 1 of your opponent's Pokémon that has any damage counters on it. This attack does 30 damage to that Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  const hurt = mon('Hurt', { hp: 200, damage: 10 });
+  const fresh = mon('Fresh', { hp: 200 });
+  const { state } = board('Shedinja', text, { damage: '', setup: (s) => s.players.p2.zones.bench.push(hurt, fresh) });
+  const res = attack(state);
+  assert.equal(benchOf(res.state, 'p2')[0].damage, 40, 'the only damaged Pokémon is picked');
+  assert.equal(benchOf(res.state, 'p2')[1].damage, 0);
+});
+
+test('Gengar Dark Mind (Legendary Collection 11): 10 to 1 Benched Pokémon', () => {
+  const text =
+    "If your opponent has any Benched Pokémon, choose 1 of them and this attack does 10 damage to it. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  const benched = mon('Bench A', { hp: 200 });
+  const { state, defender } = board('Gengar', text, { setup: (s) => s.players.p2.zones.bench.push(benched) });
+  const res = attack(state);
+  assert.equal(benchOf(res.state, 'p2')[0].damage, 10);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 30);
+});
+
+test('Drapion V Dynamic Tail (Crown Zenith GG49): 60 to 1 of your own Pokémon', () => {
+  const text =
+    "This attack also does 60 damage to 1 of your Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  const ally = mon('Ally', { hp: 200 });
+  const { state, attacker } = board('Drapion V', text, { damage: '190', setup: (s) => s.players.p1.zones.bench.push(ally) });
+  const offered = attack(state);
+  const ids = offered.state.pendingChoice.options.map((o) => o.instanceId).sort();
+  assert.deepEqual(ids, [attacker.instanceId, ally.instanceId].sort(), 'only your own Pokémon');
+  const res = choose(offered, [ally.instanceId]);
+  assert.equal(benchOf(res.state, 'p1')[0].damage, 60);
+});
+
+test('Giratina Shadow Impact (Lost Thunder 97) and Gengar V Pain Explosion (Fusion Strike 156)', () => {
+  const giratina = board('Giratina', 'Put 4 damage counters on 1 of your Pokémon.', { damage: '130' });
+  assert.equal(root(attack(giratina.state).state, 'p1', giratina.attacker.instanceId).damage, 40);
+  const gengar = board('Gengar V', 'Put 3 damage counters on this Pokémon.', { damage: '190' });
+  assert.equal(root(attack(gengar.state).state, 'p1', gengar.attacker.instanceId).damage, 30);
+});
