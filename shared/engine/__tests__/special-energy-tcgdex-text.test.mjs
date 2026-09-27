@@ -35,6 +35,8 @@ const BURNING =
   "This card can only be attached to Fire Pokémon. This card provides Fire Energy only while this card is attached to a Fire Pokémon.\n\nIf this card is discarded by an attack of the Fire Pokémon this card is attached to, attach this card from your discard pile to that Pokémon after attacking.\n\n(If this card is attached to anything other than a Fire Pokémon, discard this card.)";
 const SPLASH =
   "This card can only be attached to Water Pokémon. This card provides Water Energy only while this card is attached to a Water Pokémon.\n\nIf the Water Pokémon this card is attached to is Knocked Out by damage from an opponent's attack, put that Pokémon into your hand. (Discard all cards attached to it.)\n\n(If this card is attached to anything other than a Water Pokémon, discard this card.)";
+const DANGEROUS =
+  "This card can only be attached to Darkness Pokémon. This card provides Darkness Energy only while this card is attached to a Darkness Pokémon.\n\nWhenever the Darkness Pokémon this card is attached to is your Active Pokémon and is damaged by an attack from your opponent's Pokémon-EX (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon-EX.\n\n(If this card is attached to anything other than a Darkness Pokémon, discard this card.)";
 const DOUBLE_DRAGON =
   'This card can only be attached to Dragon Pokémon. This card provides every type of Energy, but provides only 2 Energy at a time, only while this card is attached to a Dragon Pokémon.\n\n(If this card is attached to anything other than a Dragon Pokémon, discard this card.)';
 
@@ -45,7 +47,7 @@ const hostWith = (name, types, energyCard) => {
 };
 const stepTypes = (card) => parseSpecialEnergyEffects(card).steps.map((s) => s.type);
 
-test('TCGdex word notation parses every Gen 6 special Energy effect (xy3-104, xy3-103, xy5-143, xy5-144, xy4-112, xy7-83, xy8-151, xy9-113, xy6-97)', () => {
+test('TCGdex word notation parses every Gen 6 special Energy effect (xy3-104, xy3-103, xy5-143, xy5-144, xy4-112, xy7-83, xy8-151, xy9-113, xy6-97, xy7-82)', () => {
   assert.deepEqual(stepTypes(energy('Strong Energy', STRONG)), ['attachRestriction', 'provide', 'damageBonus']);
   assert.deepEqual(stepTypes(energy('Herbal Energy', HERBAL)), ['attachRestriction', 'provide', 'onAttachHeal']);
   assert.deepEqual(stepTypes(energy('Shield Energy', SHIELD)), ['attachRestriction', 'provide', 'damageReduction']);
@@ -55,10 +57,17 @@ test('TCGdex word notation parses every Gen 6 special Energy effect (xy3-104, xy
   assert.deepEqual(stepTypes(energy('Burning Energy', BURNING)), ['attachRestriction', 'provide', 'onDiscardReattach']);
   assert.deepEqual(stepTypes(energy('Splash Energy', SPLASH)), ['attachRestriction', 'provide', 'onKnockoutReturnToHand']);
   assert.deepEqual(stepTypes(energy('Double Dragon Energy', DOUBLE_DRAGON)), ['attachRestriction', 'provide']);
+  assert.deepEqual(stepTypes(energy('Dangerous Energy', DANGEROUS)), ['attachRestriction', 'provide', 'onDamagedDamageCounters']);
 
   const restriction = parseSpecialEnergyEffects(energy('Strong Energy', STRONG)).steps[0];
   assert.equal(restriction.kind, 'type');
   assert.equal(restriction.hostType, 'Fighting');
+  const dangerous = parseSpecialEnergyEffects(energy('Dangerous Energy', DANGEROUS)).steps.find(
+    (s) => s.type === 'onDamagedDamageCounters'
+  );
+  assert.equal(dangerous.count, 2);
+  assert.equal(dangerous.hostType, 'Dark');
+  assert.equal(dangerous.against, 'pokemonEx');
   const [doubleDragon] = parseSpecialEnergyEffects(energy('Double Dragon Energy', DOUBLE_DRAGON)).provides;
   assert.deepEqual(doubleDragon.energyTypes, ['Any']);
   assert.equal(doubleDragon.count, 2);
