@@ -1222,3 +1222,136 @@ test('I171: Fusion Strike Energy stops an Ability switching its host out', () =>
   assert.equal(oppActive(res)?.instanceId, 71, 'host stays Active');
   assert.equal(res.state.players.p2.zones.bench[0].instanceId, 72);
 });
+
+// ── design 049 slice 8: Mew ex ruling pins ──────────────────────────────────
+// Card text: Mew ex (30th Celebration 066) Memory Helix; Mew ex (151 #151) Genome Hacking;
+// Mega Lucario ex (Mega Evolution Promos 033) Mega Brave; Slaking ex (Surging Sparks 227).
+
+const GENOME_HACKING_TEXT = "Choose 1 of your opponent's Active Pokémon's attacks and use it as this attack.";
+const MEGA_BRAVE = {
+  name: 'Mega Brave',
+  cost: ['Fighting', 'Fighting'],
+  damage: '270',
+  text: "During your next turn, this Pokémon can't use Mega Brave.",
+};
+const BORN_TO_SLACK = "If your opponent has no Pokémon ex or Pokémon V in play, this Pokémon can't attack.";
+
+/** p1's next turn: two turns later, nothing pending, not yet attacked. */
+function nextOwnTurn(res) {
+  const state = structuredClone(res.state);
+  state.turn = { player: 'p1', number: res.state.turn.number + 1, phase: 'main' };
+  state.pendingChoice = null;
+  state.players.p1.flags = { ...state.players.p1.flags, attackerAttacked: false, attacksThisTurn: 0 };
+  return state;
+}
+
+test('R6: Mega Brave used through Memory Helix locks Mega Brave on Mew ex next turn', () => {
+  const { state, rng } = setupGame();
+  holder(state, MEMORY_HELIX, {
+    name: 'Mew ex',
+    hp: 400,
+    attacks: [{ name: 'Teleportation Burst', cost: [], damage: '30', text: '' }],
+  });
+  state.players.p1.zones.active.push(basicEnergy(80, 'Fighting', 70), basicEnergy(81, 'Fighting', 70));
+  state.players.p1.zones.bench.push(mon(72, 'Mega Lucario ex', { hp: 340, attacks: [MEGA_BRAVE] }));
+  state.players.p2.zones.active[0].hp = 1000;
+  for (let i = 0; i < 4; i++) state.players.p2.zones.deck.push(card(120 + i));
+  state.players.p1.zones.deck.push(card(130), card(131));
+
+  const first = attackCmd(state, 1, rng);
+  assert.equal(first.error, null);
+  assert.equal(first.state.players.p2.zones.active[0].damage, 270);
+  const again = applyCommand(nextOwnTurn(first), { type: 'attack', payload: { attackIndex: 1 }, playerId: 'p1' }, rng);
+  assert.match(again.error, /can't use mega brave during this turn/i);
+  const other = applyCommand(nextOwnTurn(first), { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' }, rng);
+  assert.equal(other.error, null, 'Teleportation Burst stays usable');
+});
+
+test('R3: Genome Hacking copying Mega Brave does not lock Genome Hacking next turn', () => {
+  const { state, rng } = setupGame();
+  holder(state, '', {
+    name: 'Mew ex',
+    hp: 400,
+    abilities: [],
+    attacks: [{ name: 'Genome Hacking', cost: [], damage: '', text: GENOME_HACKING_TEXT }],
+  });
+  state.players.p2.zones.active[0].hp = 1000;
+  state.players.p2.zones.active[0].attacks = [MEGA_BRAVE];
+  for (let i = 0; i < 4; i++) state.players.p2.zones.deck.push(card(120 + i));
+  state.players.p1.zones.deck.push(card(130), card(131));
+
+  const offered = attackCmd(state, 0, rng);
+  const copied = resolveWith(offered, [1], rng);
+  assert.equal(copied.error, null);
+  assert.equal(copied.state.players.p2.zones.active[0].damage, 270);
+  const next = applyCommand(nextOwnTurn(copied), { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' }, rng);
+  assert.equal(next.error, null);
+});
+
+test('R1: Genome Hacking uses an attack whose Energy cost Mew ex cannot pay', () => {
+  const { state, rng } = setupGame();
+  holder(state, '', {
+    name: 'Mew ex',
+    hp: 400,
+    abilities: [],
+    attacks: [{ name: 'Genome Hacking', cost: ['Colorless', 'Colorless', 'Colorless'], damage: '', text: GENOME_HACKING_TEXT }],
+  });
+  state.players.p1.zones.active.push(
+    basicEnergy(80, 'Psychic', 70),
+    basicEnergy(81, 'Psychic', 70),
+    basicEnergy(82, 'Psychic', 70)
+  );
+  state.players.p2.zones.active[0].hp = 1000;
+  state.players.p2.zones.active[0].attacks = [{ name: 'Flare', cost: ['Fire', 'Fire', 'Fire'], damage: '100', text: '' }];
+  state.players.p2.zones.deck.push(card(120));
+  const offered = attackCmd(state, 0, rng);
+  assert.deepEqual(offered.state.pendingChoice.options.map((o) => o.name), ['Opp: Flare']);
+  assert.equal(resolveWith(offered, [1], rng).state.players.p2.zones.active[0].damage, 100);
+});
+
+test("R5: Memory Helix uses Great Swing although Slaking ex's Born to Slack would stop Slaking", () => {
+  const { state, rng } = setupGame();
+  holder(state, MEMORY_HELIX, {
+    name: 'Mew ex',
+    hp: 400,
+    attacks: [{ name: 'Teleportation Burst', cost: ['Psychic'], damage: '30', text: '' }],
+  });
+  state.players.p1.zones.active.push(basicEnergy(80, 'Psychic', 70), basicEnergy(81, 'Psychic', 70));
+  state.players.p1.zones.bench.push(
+    mon(72, 'Slaking ex', {
+      hp: 340,
+      abilities: [{ name: 'Born to Slack', type: 'Ability', text: BORN_TO_SLACK }],
+      attacks: [{ name: 'Great Swing', cost: ['Colorless', 'Colorless'], damage: '280', text: 'Discard an Energy from this Pokémon.' }],
+    })
+  );
+  state.players.p2.zones.active[0].hp = 1000;
+  state.players.p2.zones.deck.push(card(120));
+  const res = attackCmd(state, 1, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 280);
+  const mewEnergy = res.state.players.p1.zones.active.filter((c) => c.attachedTo === 70);
+  assert.equal(mewEnergy.length, 1, "Great Swing discards an Energy from Mew ex (R4: it's Mew's attack)");
+});
+
+test('Memory Helix list: printed name wins, Bench Mew adds only its printed attack, suppression empties it', async () => {
+  const { state } = setupGame();
+  holder(state, MEMORY_HELIX, { name: 'Mew ex', attacks: [{ name: 'Teleportation Burst', cost: [], damage: '30', text: '' }] });
+  state.players.p1.zones.bench.push(
+    mon(72, 'Mew ex', {
+      abilities: [{ name: 'Memory Helix', type: 'Ability', text: MEMORY_HELIX }],
+      attacks: [{ name: 'Teleportation Burst', cost: [], damage: '30', text: '' }],
+    }),
+    mon(73, 'Benched', { attacks: [{ name: 'Big Hit', cost: [], damage: '70', text: '' }] })
+  );
+  assert.deepEqual(await extrasOf(state, 70), ['Big Hit'], 'the Benched Mew ex duplicate name adds nothing');
+  assert.deepEqual(await extrasOf(state, 72), ['Big Hit'], 'a Benched Mew ex lists Bench attacks, never the Active');
+
+  state.players.p2.zones.active[0].abilities = [
+    {
+      name: 'Neutralizing Gas',
+      type: 'Ability',
+      text: "As long as this Pokémon is in the Active Spot, your opponent's Pokémon in play have no Abilities, except for Neutralizing Gas.",
+    },
+  ];
+  assert.deepEqual(await extrasOf(state, 70), [], 'a suppressed Memory Helix borrows nothing');
+});
