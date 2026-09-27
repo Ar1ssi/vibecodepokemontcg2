@@ -5287,6 +5287,13 @@ function flipAndResolveAttack(draft, ctx) {
       attackerName: ctx.attackerView?.name || ctx.attacker?.name || '',
       attackerInstanceId: ctx.attacker?.instanceId ?? null,
       turnNumber: draft.turn?.number || 1,
+      // Who was in play on the other side during this attack (Smeargle Sketch, design 049).
+      opponentInPlayIds: ['active', 'bench'].flatMap((zoneId) =>
+        rootsIn(
+          draft.players?.[ctx.oppId ?? Object.keys(draft.players || {}).find((id) => id !== playerId)]
+            ?.zones?.[zoneId]
+        ).map((c) => c.instanceId)
+      ),
     };
   }
   // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
@@ -5431,6 +5438,8 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
     const view = RAW_ATTACK_SOURCES.has(copy.source) ? card : inPlayView(draft, card);
     if (copy.tera && !isTeraCard(view)) continue;
     if (copy.darkName && !/dark/i.test(String(view?.name || ''))) continue;
+    // Togetic δ Delta Copy: δ Pokémon carry "δ" in their TCGdex name (ex15-1 … ex15-40).
+    if (copy.delta && !/δ/.test(String(view?.name || ''))) continue;
     if (copy.noRuleBox && isRuleBoxPokemon(view ?? card)) continue;
     for (const attack of view?.attacks || []) {
       if (!attack?.name || parseCopyAttack(attack.text)) continue;
@@ -5453,6 +5462,15 @@ function lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker }) {
   const currentTurn = Math.max(1, Number(draft.turn?.number) || 1);
   if (!last || Number(last.turnNumber) !== currentTurn - 1) return [];
   if (copy.excludeGx && last.isGx) return [];
+  // Smeargle Sketch (design 049): the Defending Pokémon must be the one that attacked, and the
+  // copier must have been in play during that attack.
+  if (copy.fromDefending) {
+    const defending = rootsIn(draft.players?.[oppId]?.zones?.active)[0];
+    if (!defending || defending.instanceId !== last.attackerInstanceId) return [];
+  }
+  if (copy.requiresInPlayDuring && !(last.opponentInPlayIds || []).includes(attacker?.instanceId)) {
+    return [];
+  }
   const attack = last.attack;
   if (!attack?.name || parseCopyAttack(attack.text)) return [];
   if (!copyCandidateAllowed(draft, { playerId, attacker, attack })) return [];
@@ -5555,10 +5573,15 @@ function offerCopiedAttack(
     resumeCopiedAttack(draft, { token: resumeToken, selection: [1], activeRng, events });
     return true;
   }
+  // Mime Jr. Mimed Games: "Your opponent chooses an attack" — the opponent answers the prompt;
+  // the token still resumes the attacker's attack.
+  const opponentChooses = copy.chooser === 'opponent';
   draft.pendingChoice = createPendingChoice({
-    player: playerId,
+    player: opponentChooses ? oppId : playerId,
     source: 'attack',
-    prompt: 'Choose the attack to use as this attack.',
+    prompt: opponentChooses
+      ? `Choose the attack your opponent's ${attacker?.name || 'Pokémon'} uses as this attack.`
+      : 'Choose the attack to use as this attack.',
     options,
     min: 1,
     max: 1,

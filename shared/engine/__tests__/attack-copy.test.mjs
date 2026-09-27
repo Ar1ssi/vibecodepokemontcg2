@@ -433,3 +433,129 @@ test('parseAttackBorrowAbility: design 049 slice 3 wordings', async () => {
     null
   );
 });
+
+// ── design 049 slice 5: Genetic Memory, Delta Copy, Sketch, Mimed Games ─────
+
+const GENETIC_MEMORY =
+  "Use any attack from Kingdra's Basic Pokémon card or Evolution card. (Kingdra doesn't have to pay for that attack's Energy cost.)";
+const DELTA_COPY =
+  "Choose an attack on 1 of your opponent's Pokémon in play that has δ on its card. Delta Copy copies that attack except for its Energy cost. (You must still do anything else required for that attack.) Togetic performs that attack.";
+const SKETCH =
+  'If the Defending Pokémon attacked last turn, and Smeargle was in play during that attack, Smeargle copies that attack except for its Energy costs and anything else required in order to use that attack.';
+const MIMED_GAMES =
+  'Your opponent chooses an attack from 1 of their Pokémon in play. Use the chosen attack as this attack.';
+
+test('parseCopyAttack: design 049 slice 5 wordings', () => {
+  assert.deepEqual(parseCopyAttack(GENETIC_MEMORY), { source: 'ownEvolutionStack' });
+  assert.deepEqual(
+    parseCopyAttack(
+      "Use any attack from Kingdra ex's Basic Pokémon card or Stage 1 Evolution card. (Kingdra ex doesn't have to pay for that attack's Energy cost.)"
+    ),
+    { source: 'ownEvolutionStack' }
+  );
+  assert.deepEqual(parseCopyAttack(DELTA_COPY), { source: 'oppInPlay', delta: true });
+  assert.deepEqual(parseCopyAttack(SKETCH), {
+    source: 'oppLastAttack',
+    auto: true,
+    fromDefending: true,
+    requiresInPlayDuring: true,
+  });
+  assert.deepEqual(parseCopyAttack(MIMED_GAMES), { source: 'oppInPlay', chooser: 'opponent' });
+});
+
+test('attack: Genetic Memory uses an attack from its own Basic or Evolution card, cost-free', () => {
+  const b = board(GENETIC_MEMORY, {
+    name: 'Horsea',
+    setup: ({ attacker, p1 }) => {
+      attacker.attacks = [{ name: 'Bubble', cost: ['Water', 'Water'], damage: '20', text: '' }];
+      p1.zones.active.push(
+        mon('Seadra', { stage: 'Stage 1', attachedTo: attacker.instanceId, attacks: [{ name: 'Water Gun', cost: [], damage: '30', text: '' }] }),
+        mon('Kingdra', {
+          stage: 'Stage 2',
+          attachedTo: attacker.instanceId,
+          attacks: [{ name: 'Genetic Memory', cost: [], damage: '', text: GENETIC_MEMORY }],
+        })
+      );
+    },
+  });
+  const res = attack(b);
+  assert.deepEqual(optionNames(res), ['Horsea: Bubble', 'Seadra: Water Gun']);
+  assert.equal(cardNamed(choose(res, [1], b.rng), 'p2', 'Defender').damage, 20);
+});
+
+test('attack: Delta Copy offers only δ Pokémon attacks; none → attackCopyNothing', () => {
+  const b = board(DELTA_COPY, {
+    defenderAttacks: [{ name: 'Slam', damage: '30' }],
+    setup: ({ p2 }) => p2.zones.bench.push(withAttacks('Flygon δ', [{ name: 'Delta Hit', damage: '50' }])),
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Flygon δ: Delta Hit']);
+  const none = board(DELTA_COPY, { defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const res = attack(none);
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+});
+
+test('attack: every resolved attack records who was in play on the other side', () => {
+  const b = board('', { defenderAttacks: [] });
+  b.attacker.attacks = [{ name: 'Tackle', cost: [], damage: '10', text: '' }];
+  const res = attack(b);
+  assert.deepEqual(res.state.players.p1.lastAttack.opponentInPlayIds, [b.defender.instanceId]);
+});
+
+test('attack: Sketch copies the Defending Pokémon last attack only when Smeargle was in play', () => {
+  const sketchBoard = (last) =>
+    board(SKETCH, {
+      name: 'Smeargle',
+      setup: ({ p2, attacker, defender }) => {
+        p2.lastAttack = {
+          attack: { name: 'Big Bite', cost: ['Darkness'], damage: '60', text: '' },
+          isGx: false,
+          attackerName: 'Defender',
+          attackerInstanceId: defender.instanceId,
+          turnNumber: 2,
+          opponentInPlayIds: [attacker.instanceId],
+          ...last(attacker, defender),
+        };
+      },
+    });
+  const copied = attack(sketchBoard(() => ({})));
+  assert.equal(cardNamed(copied, 'p2', 'Defender').damage, 60);
+
+  const notInPlay = attack(sketchBoard(() => ({ opponentInPlayIds: [] })));
+  assert.equal(cardNamed(notInPlay, 'p2', 'Defender').damage || 0, 0);
+  const otherAttacker = attack(sketchBoard(() => ({ attackerInstanceId: 999 })));
+  assert.equal(cardNamed(otherAttacker, 'p2', 'Defender').damage || 0, 0);
+  const tooOld = attack(sketchBoard(() => ({ turnNumber: 1 })));
+  assert.equal(cardNamed(tooOld, 'p2', 'Defender').damage || 0, 0);
+});
+
+test('attack: Mimed Games — the opponent chooses, the attacker cannot answer', () => {
+  const b = board(MIMED_GAMES, {
+    name: 'Mime Jr.',
+    defenderAttacks: [{ name: 'Slam', damage: '30' }, { name: 'Mimed Games', damage: '', text: MIMED_GAMES }],
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice.player, 'p2');
+  assert.deepEqual(optionNames(res), ['Defender: Slam'], 'a copy attack is never offered (R7)');
+  const wrong = applyCommand(
+    res.state,
+    {
+      type: 'resolveChoice',
+      playerId: 'p1',
+      payload: { choiceId: res.state.pendingChoice.choiceId, selection: [1] },
+    },
+    b.rng
+  );
+  assert.equal(wrong.error, 'not_your_choice');
+  const done = choose(res, [1], b.rng);
+  assert.equal(cardNamed(done, 'p2', 'Defender').damage, 30);
+});
+
+test("attack: Mimed Games against an opponent whose only Pokémon is Mime Jr. does nothing (R7)", () => {
+  const b = board(MIMED_GAMES, {
+    name: 'Mime Jr.',
+    defenderAttacks: [{ name: 'Mimed Games', damage: '', text: MIMED_GAMES }],
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+});

@@ -172,6 +172,31 @@ const TEMPLATES = [
         ? { source: 'oppLastAttack', excludeGx: true, auto: true }
         : { source: 'oppLastAttack', auto: true },
   ],
+  // Kingdra / Kingdra ex Genetic Memory (Neo Revelation 19, Dragon 92): cost-free, from the stack.
+  [
+    /^use any attack from [^.]+'s basic pokemon card or (?:stage 1 )?evolution card\.$/,
+    () => ({ source: 'ownEvolutionStack' }),
+  ],
+  // Togetic δ Delta Copy (Dragon Frontiers 11; TCGdex ex15-11): δ Pokémon carry "δ" in the name.
+  [
+    new RegExp(
+      String.raw`^choose an attack on 1 of your opponent's pokemon in play that has δ on its card\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppInPlay', delta: true }),
+  ],
+  // Smeargle Sketch (Neo Discovery 11/30): the Defending Pokémon's last attack, if Smeargle was
+  // in play when it was used.
+  [
+    /^if the defending pokemon attacked last turn, and [^,]+ was in play during that attack, [^.]+ copies that attack except for its energy costs and anything else required in order to use that attack\.$/,
+    () => ({ source: 'oppLastAttack', auto: true, fromDefending: true, requiresInPlayDuring: true }),
+  ],
+  // Mime Jr. Mimed Games (Paldean Fates 031/157): the opponent makes the choice.
+  [
+    /^your opponent chooses an attack from 1 of their pokemon in play\. use the chosen attack as this attack\.$/,
+    () => ({ source: 'oppInPlay', chooser: 'opponent' }),
+  ],
 ];
 
 /**
