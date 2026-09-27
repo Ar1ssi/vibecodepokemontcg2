@@ -259,14 +259,47 @@ const TEMPLATES = [
     new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to each of your benched pokémon$`),
     (m, s) => ({ type: 'atkAttachEachBench', source: 'discard', ...energyFilter(m[1], s) }),
   ],
+  // Blaziken VMAX Max Blaze: "… of your Benched Rapid Strike Pokémon …" (`tag`).
   [
-    new RegExp(String.raw`^choose up to (\d+) of your benched pokémon and attach an? ${ENERGY_TYPE}energy card from your discard pile to each of them$`),
-    (m, s) => ({ type: 'atkAttachEachBench', source: 'discard', max: Number(m[1]), ...energyFilter(m[2], s) }),
+    new RegExp(String.raw`^choose up to (\d+) of your benched (rapid strike |single strike |fusion strike |team plasma )?pokémon and attach an? ${ENERGY_TYPE}energy card from your discard pile to each of them$`),
+    (m, s) => ({
+      type: 'atkAttachEachBench',
+      source: 'discard',
+      max: Number(m[1]),
+      ...(m[2] ? { tag: m[2].trim() } : {}),
+      ...energyFilter(m[3], s),
+    }),
   ],
-  // Druddigon Dragon's Fury: a typed attach target.
+  // Latias Prism Star Dreamy Mist: "… to each of your Basic Benched {N} Pokémon".
   [
-    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to 1 of your \{([a-z])\} pokémon$`),
-    (m, s) => ({ type: 'atkAttach', source: 'discard', count: 1, ...energyFilter(m[1], s), target: 'any', pokemonType: m[2] }),
+    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to each of your basic benched \{([a-z])\} pokémon$`),
+    (m, s) => ({ type: 'atkAttachEachBench', source: 'discard', basicOnly: true, pokemonType: m[2], ...energyFilter(m[1], s) }),
+  ],
+  // Druddigon Dragon's Fury: a typed attach target; Carbink BREAK Diamond Gift attaches 2.
+  [
+    new RegExp(String.raw`^attach (an?|\d+) ${ENERGY_TYPE}energy cards? from your discard pile to 1 of your \{([a-z])\} pokémon$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', count: countOf(m[1]), ...energyFilter(m[2], s), target: 'any', pokemonType: m[3] }),
+  ],
+  // Thundurus-EX Raiden Knuckle: "… to 1 of your Benched Team Plasma Pokémon".
+  [
+    new RegExp(String.raw`^attach an? ${ENERGY_TYPE}energy card from your discard pile to 1 of your benched team plasma pokémon$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', count: 1, ...energyFilter(m[1], s), target: 'bench', tag: 'team plasma' }),
+  ],
+  // Pichu Paste: "… attach it to 1 of your Pokémon that has δ on its card".
+  [
+    new RegExp(String.raw`^search your discard pile for an? ${ENERGY_TYPE}energy card and attach it to 1 of your pokémon that has δ on its card$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', count: 1, ...energyFilter(m[1], s), target: 'any', tag: 'δ' }),
+  ],
+  // Magneton Plasma: "If there are any {L} Energy cards in your discard pile, attach 1 of them".
+  [
+    /^if there are any \{([a-z])\} energy cards in your discard pile, attach 1 of them to this pokémon$/,
+    (m) => ({ type: 'atkAttach', source: 'discard', count: 1, energyType: m[1].toUpperCase(), target: 'self' }),
+  ],
+  // Solgaleo / Lunala Prism Star: "For each of your opponent's Pokémon in play, attach a {M}
+  // Energy card from your discard pile to your Pokémon in any way you like."
+  [
+    new RegExp(String.raw`^for each of your opponent's pokémon in play, attach an? ${ENERGY_TYPE}energy card from your discard pile to your pokémon in any way you like$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', countFrom: 'opponentInPlay', ...energyFilter(m[1], s), target: 'any', spread: true }),
   ],
   // Shuffle clauses.
   [

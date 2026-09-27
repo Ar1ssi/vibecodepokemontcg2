@@ -873,6 +873,14 @@ function atkMillAttachIfEnergy(ctx) {
 
 // ── attach from the discard pile / hand ─────────────────────────────────────
 
+// A printed group or mark on the Pokémon: 'rapid strike' (subtypes), 'team plasma' (the name),
+// 'δ' (Delta Species) — the same places attack-damage-context.mjs ruleBoxKinds reads.
+function rootHasTag(player, root, tag) {
+  const top = topPokemonCard(player, root) || root;
+  const label = `${top.name || ''} ${[top.subtypes || []].flat().join(' ')}`.toLowerCase();
+  return tag === 'δ' ? /δ|delta species/.test(label) : label.includes(tag);
+}
+
 function attachTargets(ctx) {
   const { player, step } = ctx;
   if (step.target === 'self') {
@@ -880,13 +888,17 @@ function attachTargets(ctx) {
     return ref ? [ref.card] : [];
   }
   const attacker = attackerRef(ctx)?.card;
+  const tagged = (c) => !step.tag || rootHasTag(player, c, step.tag);
   if (step.target === 'bench') {
     return benchRootsOf(player).filter(
-      (c) => c !== attacker && (!step.targetEx || /-EX$/.test(String(topPokemonCard(player, c)?.name || '')))
+      (c) =>
+        c !== attacker &&
+        tagged(c) &&
+        (!step.targetEx || /-EX$/.test(String(topPokemonCard(player, c)?.name || '')))
     );
   }
   return rootsOf(player).filter(
-    (c) => !step.pokemonType || pokemonHasType(topPokemonCard(player, c) || c, step.pokemonType)
+    (c) => tagged(c) && (!step.pokemonType || pokemonHasType(topPokemonCard(player, c) || c, step.pokemonType))
   );
 }
 
@@ -933,7 +945,9 @@ function atkAttach(ctx) {
   if (candidates.length === 0) return skip(ctx, 'no_energy');
   if (targets.length === 0) return skip(ctx, 'no_target');
 
-  const max = step.anyNumber ? candidates.length : Math.min(step.count || 1, candidates.length);
+  // Solgaleo / Lunala Prism Star: one Energy for each of the opponent's Pokémon in play.
+  const count = step.countFrom === 'opponentInPlay' ? rootsOf(ctx.opponent).length : step.count || 1;
+  const max = step.anyNumber ? candidates.length : Math.min(count, candidates.length);
   const min = step.anyNumber || step.upTo ? 0 : max;
   if (min === max && max === candidates.length) return attachPicked(ctx, candidates, targets);
   return ctx.ask({
@@ -2933,7 +2947,13 @@ function atkLookDeckReorder(ctx) {
 // Pokémon". Energy of one type is interchangeable, so each Pokémon takes the next match.
 function atkAttachEachBench(ctx) {
   const { player, step } = ctx;
-  const bench = benchRootsOf(player);
+  // Blaziken VMAX (Rapid Strike), Latias Prism Star (Basic {N}).
+  const bench = benchRootsOf(player).filter((c) => {
+    const top = topPokemonCard(player, c) || c;
+    if (step.tag && !rootHasTag(player, c, step.tag)) return false;
+    if (step.basicOnly && stageOf(top) !== 'Basic') return false;
+    return !step.pokemonType || pokemonHasType(top, step.pokemonType);
+  });
   if (bench.length === 0) return skip(ctx, 'no_bench_pokemon');
   let chosen = bench;
   if (step.max && bench.length > step.max) {

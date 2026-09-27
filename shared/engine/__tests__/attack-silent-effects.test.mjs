@@ -973,3 +973,122 @@ test('Unown Hidden Power (Unseen Forces XY149 text): tails puts the 2 counters o
   const heads = attackShowing(make, 'heads');
   assert.equal(root(heads.res.state, 'p2', heads.defender.instanceId).damage, 20);
 });
+
+// ── discard-pile attaches ─────────────────────────────────────────────────────
+
+const discardEnergy = (state, ...types) => {
+  const cards = types.map((type) => energy(type));
+  state.players.p1.zones.discard.push(...cards);
+  return cards;
+};
+const hostOf = (state, card) =>
+  [...state.players.p1.zones.active, ...state.players.p1.zones.bench].find((c) => c.instanceId === card.instanceId)
+    ?.attachedTo;
+
+test('Blaziken VMAX Max Blaze (Silver Tempest TG15): only Benched Rapid Strike Pokémon receive Energy', () => {
+  const text =
+    'Choose up to 2 of your Benched Rapid Strike Pokémon and attach an Energy card from your discard pile to each of them.';
+  let rapid;
+  let other;
+  let energies;
+  const { state } = board('Blaziken VMAX', text, {
+    setup: (s) => {
+      rapid = mon('Urshifu V', { subtypes: ['Basic', 'V', 'Rapid Strike'] });
+      other = mon('Pikachu');
+      s.players.p1.zones.bench.push(rapid, other);
+      energies = discardEnergy(s, 'Fire', 'Water');
+    },
+  });
+  const res = attack(state);
+  const hosts = energies.map((e) => hostOf(res.state, e)).filter(Boolean);
+  assert.deepEqual(hosts, [rapid.instanceId]);
+});
+
+test('Latias Prism Star Dreamy Mist (Celestial Storm 107): each Basic Benched {N} Pokémon gets a basic Energy', () => {
+  const text = 'Attach a basic Energy card from your discard pile to each of your Basic Benched {N} Pokémon.';
+  let dragons;
+  let energies;
+  const { state } = board('Latias Prism Star', text, {
+    setup: (s) => {
+      dragons = [mon('Latios', { types: ['Dragon'] }), mon('Dratini', { types: ['Dragon'] })];
+      s.players.p1.zones.bench.push(...dragons, mon('Pikachu', { types: ['Lightning'] }));
+      energies = discardEnergy(s, 'Fire', 'Water', 'Grass');
+    },
+  });
+  const res = attack(state);
+  const hosts = energies.map((e) => hostOf(res.state, e)).filter(Boolean).sort();
+  assert.deepEqual(hosts, dragons.map((d) => d.instanceId).sort());
+});
+
+test('Solgaleo Prism Star Radiant Star (Ultra Prism 89): one {M} Energy per opponent Pokémon in play', () => {
+  const text =
+    "For each of your opponent's Pokémon in play, attach a {M} Energy card from your discard pile to your Pokémon in any way you like.";
+  let metals;
+  const { state, attacker } = board('Solgaleo Prism Star', text, {
+    setup: (s) => {
+      addBench(s, 'p2', 'Opp A', 'Opp B');
+      metals = discardEnergy(s, 'Metal', 'Metal', 'Metal', 'Metal', 'Fire');
+    },
+  });
+  let res = attack(state);
+  for (let guard = 0; res.pendingChoice?.player === 'p1' && guard < 10; guard++) {
+    const ids = res.pendingChoice.options.map((o) => o.instanceId);
+    res = choose(res, ids.includes(attacker.instanceId) ? [attacker.instanceId] : ids.slice(0, res.pendingChoice.max));
+  }
+  assert.equal(metals.filter((e) => hostOf(res.state, e) === attacker.instanceId).length, 3);
+});
+
+test('Carbink BREAK Diamond Gift (Fates Collide 51): 2 Energy onto 1 {F} Pokémon', () => {
+  const text = 'Attach 2 Energy cards from your discard pile to 1 of your {F} Pokémon.';
+  let fighter;
+  let energies;
+  const { state } = board('Carbink BREAK', text, {
+    setup: (s) => {
+      fighter = mon('Lucario', { types: ['Fighting'] });
+      s.players.p1.zones.bench.push(fighter);
+      energies = discardEnergy(s, 'Fighting', 'Water');
+    },
+  });
+  const res = attack(state);
+  assert.deepEqual(energies.map((e) => hostOf(res.state, e)), [fighter.instanceId, fighter.instanceId]);
+});
+
+test('Thundurus-EX Raiden Knuckle (Black & White Promos BW81): only a Benched Team Plasma Pokémon', () => {
+  const text = 'Attach an Energy card from your discard pile to 1 of your Benched Team Plasma Pokémon.';
+  let plasma;
+  let energies;
+  const { state } = board('Thundurus-EX', text, {
+    setup: (s) => {
+      plasma = mon('Deoxys-EX Team Plasma');
+      s.players.p1.zones.bench.push(mon('Pikachu'), plasma);
+      energies = discardEnergy(s, 'Lightning');
+    },
+  });
+  const res = attack(state);
+  assert.equal(hostOf(res.state, energies[0]), plasma.instanceId);
+});
+
+test('Pichu Paste (Holon Phantoms 76): the Energy goes to a Pokémon that has δ', () => {
+  const text =
+    'Search your discard pile for an Energy card and attach it to 1 of your Pokémon that has δ on its card.';
+  let delta;
+  let energies;
+  const { state } = board('Pichu', text, {
+    setup: (s) => {
+      delta = mon('Flygon δ');
+      s.players.p1.zones.bench.push(mon('Pikachu'), delta);
+      energies = discardEnergy(s, 'Grass');
+    },
+  });
+  const res = attack(state);
+  assert.equal(hostOf(res.state, energies[0]), delta.instanceId);
+});
+
+test('Magneton Plasma (Neo Revelation 10): a {L} Energy from the discard pile attaches to Magneton', () => {
+  const text = 'If there are any {L} Energy cards in your discard pile, attach 1 of them to Magneton.';
+  let energies;
+  const { state, attacker } = board('Magneton', text, { setup: (s) => (energies = discardEnergy(s, 'Fire', 'Lightning')) });
+  const res = attack(state);
+  assert.equal(hostOf(res.state, energies[1]), attacker.instanceId);
+  assert.equal(hostOf(res.state, energies[0]), undefined);
+});
