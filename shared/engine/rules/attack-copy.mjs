@@ -254,21 +254,59 @@ export function copiedAttackFor(attack, { sourceName, copierName }) {
   return { ...attack, text: renamed, copiedFrom: sourceName || '' };
 }
 
+// "(You still need the necessary Energy …)" and its older / Pokémon Power equivalents: the
+// borrowed attack keeps its cost. Read on the raw text — normalize() drops parentheticals.
+const BORROW_KEEPS_COST =
+  /you still need the necessary energy|still (?:has|have) to pay for that attack's energy cost|including (?:its|their) (?:energy )?costs?/;
+
+// Pokémon Power wordings that are not "can use the attacks of …" (design 049 B3/B4).
+const WHOLE_BORROWS = [
+  // Sudowoodo Mimic (Neo Revelation 26).
+  [
+    /as long as [^.]+ is your active pokemon, it copies all of the defending pokemon's attacks, including their costs\./,
+    { scopes: ['oppActive'], requiresActive: true },
+  ],
+  // Alakazam Psymimic (Expedition 1/33): used "instead of Alakazam's normal attack".
+  [
+    /instead of [^.]+'s normal attack, you may choose 1 of your opponent's pokemon's attacks\. [^.]+ copies that attack including its energy costs/,
+    { scopes: ['oppInPlay'] },
+  ],
+];
+
 /**
- * Attack-borrowing Abilities (design 034 slice 6): "This Pokémon can use the attacks of …
- * (You still need the necessary Energy …)". Returns where the attacks come from and which
- * Pokémon qualify; reduce.mjs gathers them into the attacker's view. Null for other text.
+ * Attack-borrowing Abilities (design 034 slice 6, design 049 slice 3): "This Pokémon can use the
+ * attacks of … (You still need the necessary Energy …)", "can use any attack from …", Mimic and
+ * Psymimic. Returns where the attacks come from and which Pokémon qualify; reduce.mjs gathers
+ * them into the attacker's view. Null for other text.
  * @returns {{ scopes: string[], basic: boolean, noRuleBox: boolean, gxOrEx: boolean,
- *   evolvesFrom: string|null, names: string[]|null, requiresActive: boolean }|null}
+ *   evolvesFrom: string|null, names: string[]|null, namePrefix: string|null,
+ *   requiresActive: boolean, bonusBeforeWR: number, powerStatus: 'rotation'|'any'|null }|null}
  */
 export function parseAttackBorrowAbility(text) {
-  if (!/you still need the necessary energy/i.test(String(text || ''))) return null;
+  const raw = String(text || '').toLowerCase().replace(/[’‘]/g, "'");
+  if (!BORROW_KEEPS_COST.test(raw)) return null;
   const t = normalize(text);
-  const phrase = t.match(/can use the attacks of (.+?)(?: as its own)?\s*\./)?.[1]?.trim();
+  const base = {
+    scopes: [],
+    basic: false,
+    noRuleBox: false,
+    gxOrEx: false,
+    evolvesFrom: null,
+    names: null,
+    namePrefix: null,
+    requiresActive: false,
+    bonusBeforeWR: 0,
+    powerStatus: powerStatusOf(t),
+  };
+  const whole = WHOLE_BORROWS.find(([pattern]) => pattern.test(t));
+  if (whole) return { ...base, ...whole[1] };
+  const phrase = t.match(/can use (?:the attacks of|any attack from) (.+?)(?: as its own)?\s*\./)?.[1]?.trim();
   if (!phrase) return null;
   let scopes;
   if (/lost zone/.test(phrase)) scopes = ['ownLostZone', 'oppLostZone'];
   else if (/opponent's active|^that pokemon/.test(phrase)) scopes = ['oppActive'];
+  // Gyarados Dragon DNA: "its Basic Pokémon" is the Basic under this Pokémon.
+  else if (phrase === 'its basic pokemon') scopes = ['selfBasic'];
   else {
     scopes = [];
     if (/bench/.test(phrase)) scopes.push('ownBench');
@@ -278,6 +316,7 @@ export function parseAttackBorrowAbility(text) {
       if (!/\byour\b|you have/.test(phrase)) scopes.push('oppInPlay');
     }
   }
+  if (scopes.length === 0) return null;
   const named = phrase.match(/^all (.+?) you have in play/)?.[1];
   const names =
     named && !/pokemon/.test(named)
@@ -286,13 +325,28 @@ export function parseAttackBorrowAbility(text) {
           .map((n) => n.replace(/^other\s+/, '').trim())
           .filter(Boolean)
       : null;
+  // Unown L LINK: "any Unown in play" — every Pokémon whose name starts with that word.
+  const anyNamed = phrase.match(/^any (\S+) in play$/)?.[1];
   return {
+    ...base,
     scopes,
-    basic: /basic pokemon/.test(phrase),
+    basic: /basic pokemon/.test(phrase) && scopes[0] !== 'selfBasic',
     noRuleBox: /except for pokemon with a rule box/.test(phrase),
     gxOrEx: /pokemon-gx or pokemon-ex/.test(phrase),
     evolvesFrom: phrase.match(/evolve from (\w+)/)?.[1] || null,
     names,
+    namePrefix: anyNamed && anyNamed !== 'pokemon' ? anyNamed : null,
     requiresActive: /if this pokemon is your active|as long as [^.]+ is your active/.test(t),
+    bonusBeforeWR: Number(t.match(/that attack does (\d+) more damage to the defending pokemon/)?.[1] || 0),
   };
+}
+
+// Legacy Pokémon Power status gates: "This power can't be used if … is Asleep, Confused, or
+// Paralyzed" / "… stops working while …" ('rotation'), "… affected by a Special Condition" ('any').
+function powerStatusOf(t) {
+  const match = t.match(
+    /power (?:can't be used if|stops working while) [^.]*?(asleep, confused, or paralyzed|affected by a special condition)/
+  );
+  if (!match) return null;
+  return match[1].startsWith('asleep') ? 'rotation' : 'any';
 }

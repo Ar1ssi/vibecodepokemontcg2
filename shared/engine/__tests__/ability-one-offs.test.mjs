@@ -804,6 +804,98 @@ test("ability: Metamorphosis Gene borrows the opponent's Active attack", () => {
   assert.equal(res.state.players.p2.zones.active[0].damage, 30);
 });
 
+// Design 049 slice 3: borrow wordings that are not "can use the attacks of …" (corpus rows:
+// Unown L Great Encounters 91, Gyarados Mysterious Treasures 26, Sudowoodo Neo Revelation 26,
+// Alakazam Expedition 33).
+const LINK =
+  "Unown L can use any attack from any Unown in play (both yours and your opponent's). (You still have to pay for that attack's Energy cost.)";
+const DRAGON_DNA =
+  "Gyarados can use any attack from its Basic Pokémon. (You still have to pay for that attack's Energy cost.) If Gyarados uses any attack from its Basic Pokémon, that attack does 30 more damage to the Defending Pokémon (before applying Weakness and Resistance).";
+const MIMIC =
+  "As long as Sudowoodo is your Active Pokémon, it copies all of the Defending Pokémon's attacks, including their costs. This power can't be used if Sudowoodo is Asleep, Confused, or Paralyzed.";
+const PSYMIMIC =
+  "Once during your turn, instead of Alakazam's normal attack, you may choose 1 of your opponent's Pokémon's attacks. Alakazam copies that attack including its Energy costs and anything else required in order to use that attack, such as discarding Energy cards. (No matter what type that Pokémon is, Alakazam's type is still Psychic.) This power can't be used if Alakazam is affected by a Special Condition.";
+const extrasOf = async (state, instanceId) => {
+  const { attackExtrasFor } = await import('../reduce.mjs');
+  const card = [...state.players.p1.zones.active, ...state.players.p1.zones.bench].find(
+    (c) => c.instanceId === instanceId
+  );
+  return attackExtrasFor(state, card).map((a) => a.name);
+};
+
+test("ability: LINK borrows every Unown's attacks on both sides, not its own", async () => {
+  const { state } = setupGame();
+  holder(state, LINK, { name: 'Unown L', attacks: [{ name: 'Hidden Power', cost: [], damage: '', text: '' }] });
+  state.players.p1.zones.bench.push(
+    mon(72, 'Unown A', { attacks: [{ name: 'A Hit', cost: [], damage: '10', text: '' }] }),
+    mon(73, 'Pikachu', { attacks: [{ name: 'Gnaw', cost: [], damage: '10', text: '' }] })
+  );
+  state.players.p2.zones.bench.push(mon(74, 'Unown B', { attacks: [{ name: 'B Hit', cost: [], damage: '10', text: '' }] }));
+  assert.deepEqual(await extrasOf(state, 70), ['A Hit', 'B Hit']);
+});
+
+test("ability: Dragon DNA uses its Basic's attack with 30 more damage to the Defending Pokémon", () => {
+  const { state, rng } = setupGame();
+  const magikarp = mon(60, 'Magikarp', {
+    stage: 'Basic',
+    attacks: [{ name: 'Splash', cost: [], damage: '20', text: '' }],
+  });
+  const gyarados = mon(61, 'Gyarados', {
+    stage: 'Stage 1',
+    evolvesFrom: 'Magikarp',
+    attachedTo: 60,
+    hp: 200,
+    abilities: [{ name: 'Dragon DNA', type: 'Poké-Body', text: DRAGON_DNA }],
+    attacks: [{ name: 'Enrage', cost: ['Water', 'Water', 'Colorless', 'Colorless'], damage: '80', text: '' }],
+  });
+  state.players.p1.zones.active.push(magikarp, gyarados);
+  state.players.p2.zones.active.push(mon(71, 'Opp', { hp: 300 }));
+  state.players.p2.zones.deck.push(card(120));
+  const res = attackCmd(state, 1, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 50);
+});
+
+test('ability: Dragon DNA adds nothing to a borrowed attack that does no damage', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(
+    mon(60, 'Magikarp', { stage: 'Basic', attacks: [{ name: 'Flail Around', cost: [], damage: '', text: '' }] }),
+    mon(61, 'Gyarados', {
+      stage: 'Stage 1',
+      attachedTo: 60,
+      abilities: [{ name: 'Dragon DNA', type: 'Poké-Body', text: DRAGON_DNA }],
+      attacks: [{ name: 'Enrage', cost: ['Water'], damage: '80', text: '' }],
+    })
+  );
+  state.players.p2.zones.active.push(mon(71, 'Opp', { hp: 300 }));
+  state.players.p2.zones.deck.push(card(120));
+  const res = attackCmd(state, 1, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
+});
+
+test("ability: Mimic lists the Defending Pokémon's attacks only while Active and not Asleep", async () => {
+  const { state } = setupGame();
+  const sudowoodo = holder(state, MIMIC, { name: 'Sudowoodo', attacks: [{ name: 'Slam', cost: [], damage: '20', text: '' }] });
+  state.players.p2.zones.active[0].attacks = [{ name: 'Bite', cost: ['Colorless'], damage: '30', text: '' }];
+  assert.deepEqual(await extrasOf(state, 70), ['Bite']);
+  sudowoodo.specialCondition = 'Asleep';
+  assert.deepEqual(await extrasOf(state, 70), []);
+  sudowoodo.specialCondition = null;
+  state.players.p1.zones.bench.push(state.players.p1.zones.active.pop());
+  assert.deepEqual(await extrasOf(state, 70), [], 'Mimic needs the Active Spot');
+});
+
+test("ability: Psymimic lists opponent attacks; any Special Condition turns it off", async () => {
+  const { state } = setupGame();
+  const alakazam = holder(state, PSYMIMIC, { name: 'Alakazam', attacks: [] });
+  state.players.p2.zones.active[0].attacks = [{ name: 'Bite', cost: [], damage: '30', text: '' }];
+  state.players.p2.zones.bench.push(mon(74, 'Benched Foe', { attacks: [{ name: 'Ember', cost: [], damage: '40', text: '' }] }));
+  assert.deepEqual(await extrasOf(state, 70), ['Bite', 'Ember']);
+  alakazam.poisoned = true;
+  assert.deepEqual(await extrasOf(state, 70), []);
+});
+
 // ── coin-flip control ───────────────────────────────────────────────────
 
 const CONTRARY =

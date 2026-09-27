@@ -414,3 +414,22 @@ test('attack: every candidate filtered out → attackCopyNothing and the turn en
   assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
   turnPassed(res);
 });
+
+test('parseAttackBorrowAbility: design 049 slice 3 wordings', async () => {
+  const { parseAttackBorrowAbility } = await import('../rules/attack-copy.mjs');
+  const link = parseAttackBorrowAbility(
+    "Unown L can use any attack from any Unown in play (both yours and your opponent's). (You still have to pay for that attack's Energy cost.)"
+  );
+  assert.deepEqual([link.scopes, link.namePrefix], [['ownInPlay', 'oppInPlay'], 'unown']);
+  const dna = parseAttackBorrowAbility(
+    "Gyarados can use any attack from its Basic Pokémon. (You still have to pay for that attack's Energy cost.) If Gyarados uses any attack from its Basic Pokémon, that attack does 30 more damage to the Defending Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.deepEqual([dna.scopes, dna.bonusBeforeWR, dna.basic], [['selfBasic'], 30, false]);
+  // Prehistoric Memory and Memory Dive grant to other Pokémon: parseAttackGrant reads them.
+  assert.equal(
+    parseAttackBorrowAbility(
+      "Whenever an Evolved Pokémon attacks (even if it's your opponent's), it can use any attack from its Basic Pokémon card or any Evolution card attached to it. It still has to pay for that attack's Energy cost. This power stops working while Aerodactyl is Asleep, Confused, or Paralyzed."
+    ),
+    null
+  );
+});

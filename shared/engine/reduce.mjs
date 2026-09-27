@@ -1056,7 +1056,17 @@ function borrowSourceMatches(card, borrow) {
     return false;
   }
   if (borrow.names && !borrow.names.includes(name)) return false;
+  if (borrow.namePrefix && !name.startsWith(borrow.namePrefix)) return false;
   return true;
+}
+
+// Legacy Pokémon Power status gate (Mimic, Psymimic; design 049): 'rotation' is off while the
+// holder is Asleep, Confused or Paralyzed, 'any' while it has any Special Condition.
+function powerStatusBlocks(powerStatus, holder) {
+  if (!powerStatus) return false;
+  const conditions = listConditions(holder);
+  if (powerStatus === 'any') return conditions.length > 0;
+  return conditions.some((c) => ['Asleep', 'Confused', 'Paralyzed'].includes(c));
 }
 
 /**
@@ -1074,6 +1084,7 @@ function abilityBorrowedAttacks(state, card) {
   if (!borrow) return [];
   if (borrow.requiresActive && ref.zoneId !== 'active') return [];
   if (isAbilitySuppressed(view, abilitySideContext(state, ref.playerId))) return [];
+  if (powerStatusBlocks(borrow.powerStatus, card)) return [];
   const own = state.players?.[ref.playerId];
   const opp = Object.values(state.players || {}).find((p) => p.playerId !== ref.playerId);
   const inPlay = (p, zones) =>
@@ -1086,13 +1097,22 @@ function abilityBorrowedAttacks(state, card) {
     ownDiscard: () => own?.zones?.discard || [],
     ownLostZone: () => own?.zones?.lostZone || [],
     oppLostZone: () => opp?.zones?.lostZone || [],
+    // Gyarados Dragon DNA: the Basic card under this Pokémon (the stack root itself).
+    selfBasic: () =>
+      priorEvolutionCards(ref.player?.zones?.[ref.zoneId] || [], card).filter(
+        (c) => (normalizeStage(c.stage) || 'Basic') === 'Basic'
+      ),
   };
   const borrowed = [];
-  for (const source of borrow.scopes.flatMap((scope) => bySource[scope]?.() || [])) {
-    if (source.instanceId === card.instanceId || !borrowSourceMatches(source, borrow)) continue;
-    for (const attack of source.attacks || []) {
-      if (!attack?.name) continue;
-      borrowed.push(copiedAttackFor(attack, { sourceName: source.name, copierName: view.name }));
+  for (const scope of borrow.scopes) {
+    for (const source of bySource[scope]?.() || []) {
+      const isSelf = source.instanceId === card.instanceId;
+      if ((isSelf && scope !== 'selfBasic') || !borrowSourceMatches(source, borrow)) continue;
+      for (const attack of source.attacks || []) {
+        if (!attack?.name) continue;
+        const copied = copiedAttackFor(attack, { sourceName: source.name, copierName: view.name });
+        borrowed.push(borrow.bonusBeforeWR ? { ...copied, bonusBeforeWR: borrow.bonusBeforeWR } : copied);
+      }
     }
   }
   return borrowed;
@@ -5940,7 +5960,10 @@ function resolveAttackEffectPhase(draft, ctx) {
               immunity.ignoreDefenderEffects ||
               abilityReads.ignoreDefenderEffects ||
               trainerIgnoresDefenderEffects(draft, playerId, abilityReads.attacker),
-            abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+            // Gyarados Dragon DNA: a borrowed Basic attack does 30 more to the Defending Pokémon
+            // (design 049). computeAttackDamage drops every bonus when the attack does no damage.
+            abilityBonusBeforeWR:
+              abilityReads.abilityBonusBeforeWR + (Number(effectiveAttack?.bonusBeforeWR) || 0),
             abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
             abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
             abilityPrevention: abilityReads.abilityPrevention,

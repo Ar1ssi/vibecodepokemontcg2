@@ -415,3 +415,7 @@ DECISIONS lines for O1–O11.
 - Slice 2 (cosmetic): the owner block of a view is `you`, not `self`; the map ships as
   `view.you.attackExtras`. `getAuthoritativeAttackExtras` returns null for a card outside your
   Active/Bench, so an inspected opponent card keeps its Stadium-only list.
+- Slice 3 (cosmetic): the Pokémon Power status read lives in `attack-copy.mjs` `powerStatusOf`
+  (it matches "stops working while" too); `powerConditionRestriction` is unchanged because it only
+  gates activated Abilities. Dragon DNA's bonus needs no base-damage check at the call site:
+  `computeAttackDamage` already drops every bonus when the attack does no damage (row 25).
