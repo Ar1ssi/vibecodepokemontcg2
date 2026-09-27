@@ -47,6 +47,7 @@ import {
   prizeFilterMatches,
   prizeRuleBoxes,
   isGxAttack,
+  isVstarPowerAttack,
   discardEnergyScaling,
   deckMillScaling,
   deckRevealScaling,
@@ -140,7 +141,7 @@ import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-ste
 import { pokemonHasType } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
-import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
+import { parseAttackCondition, parseAttackUseGate, attackConditionMet } from './rules/attack-conditions.mjs';
 import {
   parseCopyAttack,
   inCopyGroup,
@@ -810,6 +811,46 @@ function spendGxAttack(draft, { playerId, attacker, attack, events }) {
       attackName: attack.name,
     });
   }
+}
+
+/**
+ * Spends the player's once-per-game VSTAR Power when the attack used is a VSTAR Power attack
+ * (App. 9, design 049): the printed one, a copied one, or a borrowed one. Runs beside every
+ * `spendGxAttack` call.
+ */
+function spendVstarAttack(draft, { playerId, attacker, attack, events }) {
+  if (!isVstarPowerAttack(attack)) return;
+  const oncePerGame = ensureOncePerGame(draft, playerId);
+  if (oncePerGame && !oncePerGame.vstarUsed) {
+    oncePerGame.vstarUsed = true;
+    events.push({
+      type: 'vstarUsed',
+      playerId,
+      instanceId: attacker?.instanceId,
+      kind: 'vstar',
+      attackName: attack.name,
+    });
+  }
+}
+
+/**
+ * Why `playerId` may not use `attack` under the once-per-game rules, or null (App. 9/19): a gxLock
+ * from the opponent, a spent GX attack, or a spent VSTAR Power. Shared by attack legality and
+ * every copy-candidate filter so a copied attack obeys the same limits (design 049 O5).
+ */
+function onceAttackBlockReason(state, playerId, attack) {
+  const player = state.players?.[playerId];
+  if (isGxAttack(attack)) {
+    const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
+    if (state.players?.[opponentId]?.restOfGame?.some((e) => e.kind === 'gxLock')) {
+      return "Your opponent's attack stops you using GX attacks for the rest of the game.";
+    }
+    if (oncePerGameUsed(player, 'gx')) return 'Only one GX attack can be used per game.';
+  }
+  if (isVstarPowerAttack(attack) && oncePerGameUsed(player, 'vstar')) {
+    return 'VSTAR Power already used this game.';
+  }
+  return null;
 }
 
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
@@ -4087,19 +4128,12 @@ export function validateLegality(state, command) {
       if (attacks.length > 0 && !attack) {
         return { allowed: false, reason: 'Unknown attack.' };
       }
-      // App. 19: one GX attack per player per game. The flag is game-scoped, so this is
-      // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide. Share the
-      // `useVStarGX` guard so a legacy state whose marker lives on `flags` also blocks it.
-      const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
-      if (isGxAttack(attack) && state.players[opponentId]?.restOfGame?.some((e) => e.kind === 'gxLock')) {
-        return { allowed: false, reason: "Your opponent's attack stops you using GX attacks for the rest of the game." };
-      }
-      if (isGxAttack(attack) && oncePerGameUsed(player, 'gx')) {
-        return {
-          allowed: false,
-          reason: 'Only one GX attack can be used per game.',
-        };
-      }
+      // App. 9/19: one VSTAR Power and one GX attack per player per game. The flags are
+      // game-scoped, so this is the cross-turn gate that `attackerAttacked` (per-turn) cannot
+      // provide. `oncePerGameUsed` shares the `useVStarGX` guard, so a legacy state whose marker
+      // lives on `flags` also blocks it.
+      const onceReason = onceAttackBlockReason(state, playerId, attack);
+      if (onceReason) return { allowed: false, reason: onceReason };
       // Iron Rule-GX (design 048): a player-scoped attack lock from the opponent's last turn,
       // covering Pokémon that came into play after the lock landed.
       if (
@@ -5247,12 +5281,38 @@ const RAW_ATTACK_SOURCES = new Set([
 ]);
 
 /**
+ * Whether the copier may choose `attack` at all (design 049): the once-per-game limits apply to
+ * a copied attack (R2, App. 19), and an attack whose "You can use this attack only if …" gate
+ * fails for the copier cannot be chosen (Mimed Games ruling R7). "Does nothing" gates stay the
+ * copied attack's own (R1).
+ */
+function copyCandidateAllowed(draft, { playerId, attacker, attack }) {
+  if (onceAttackBlockReason(draft, playerId, attack)) return false;
+  const attackerView = attacker ? attackViewFor(draft, attacker) : null;
+  const gate = parseAttackUseGate(attack?.text, { selfName: attackerView?.name || attacker?.name });
+  if (!gate) return true;
+  const defenderPlayerId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  const defender = (draft.players[defenderPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  const conditionCtx = buildServerAttackContext(draft, {
+    attackerPlayerId: playerId,
+    defenderPlayerId,
+    attacker,
+    defender,
+    attackerView,
+    defenderView: defender ? inPlayView(draft, defender) : null,
+  });
+  return attackConditionMet(gate, conditionCtx);
+}
+
+/**
  * The attacks a copy attack may use: every attack on its source cards except other copy
  * attacks, and — when the text requires it — only those the copier has the Energy for.
  * Design 039 filters: Tera only, Dark-name only, exclude the user, no Rule Box.
  */
 function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopCard }) {
-  if (copy.source === 'oppLastAttack') return lastTurnAttackCandidates(draft, { copy, oppId });
+  if (copy.source === 'oppLastAttack') {
+    return lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker });
+  }
   const candidates = [];
   for (const card of copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard })) {
     if (copy.excludeSelf && card.instanceId === attacker?.instanceId) continue;
@@ -5264,6 +5324,7 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
       if (!attack?.name || parseCopyAttack(attack.text)) continue;
       if (copy.excludeGx && isGxAttack(attack)) continue;
       if (copy.needsEnergy && !attackCostPayable(draft, playerId, attacker, attack)) continue;
+      if (!copyCandidateAllowed(draft, { playerId, attacker, attack })) continue;
       candidates.push({ sourceId: card.instanceId, sourceName: card.name, attack: { ...attack } });
     }
   }
@@ -5275,13 +5336,14 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
  * did not attack, when the wording excludes GX attacks and theirs was one, or when the attack
  * they used was itself a copy.
  */
-function lastTurnAttackCandidates(draft, { copy, oppId }) {
+function lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker }) {
   const last = draft.players?.[oppId]?.lastAttack;
   const currentTurn = Math.max(1, Number(draft.turn?.number) || 1);
   if (!last || Number(last.turnNumber) !== currentTurn - 1) return [];
   if (copy.excludeGx && last.isGx) return [];
   const attack = last.attack;
   if (!attack?.name || parseCopyAttack(attack.text)) return [];
+  if (!copyCandidateAllowed(draft, { playerId, attacker, attack })) return [];
   return [
     {
       sourceId: last.attackerInstanceId ?? null,
@@ -5519,6 +5581,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         condition,
       });
       spendGxAttack(draft, { playerId, attacker, attack, events });
+      spendVstarAttack(draft, { playerId, attacker, attack, events });
       endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
       return;
     }
@@ -6717,7 +6780,9 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
 
       // App. 19: using a GX attack spends the player's single GX attack for the game. Set on the
       // resolving path and on a condition-failed attack; a Confused fizzle never reaches either.
+      // A VSTAR Power attack spends the VSTAR Power the same way (App. 9).
       spendGxAttack(draft, { playerId, attacker, attack, events });
+      spendVstarAttack(draft, { playerId, attacker, attack, events });
 
       // Raikou: "Then, attach those {L} Energy cards to 1 of your Pokémon."
       if (mill?.attachMatched && milledIds.length > 0 && !draft.pendingChoice) {
@@ -8315,6 +8380,14 @@ export function applyCommand(state, command, rng = null) {
                 attackName: token.effectiveAttack?.name,
               });
             }
+          }
+          if (token.effectiveAttack) {
+            spendVstarAttack(draft, {
+              playerId: initiatorPlayerId,
+              attacker: null,
+              attack: token.effectiveAttack,
+              events,
+            });
           }
           if (targetPlayer) {
             if (!targetPlayer.flags) targetPlayer.flags = {};

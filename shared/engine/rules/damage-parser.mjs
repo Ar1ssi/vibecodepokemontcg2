@@ -1262,6 +1262,13 @@ export function isGxAttack(attack) {
   return /(?:^|[\s-])GX$/i.test(name.trim());
 }
 
+// Whether an attack is a VSTAR Power attack (App. 9): its text carries the once-per-game marker —
+// corpus "(You can't use more than 1 VSTAR Power in a game.)", TCGdex "(Can't use more than 1
+// VSTAR Power per game.)". Read from the attack itself so a copied attack keeps it (design 049).
+export function isVstarPowerAttack(attack) {
+  return /more than 1 VSTAR Power/i.test(String(attack?.text ?? attack?.effect ?? ''));
+}
+
 // Per-Pokémon spread damage to a whole Bench, per side. Matches "Do 10 damage to each of your
 // opponent's Benched Pokémon", "20 damage to all of your opponent's Benched Pokémon", the
 // self-recoil "30 damage to each of your Benched Pokémon" and "10 damage to each Benched

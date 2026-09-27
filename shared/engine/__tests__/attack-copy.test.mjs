@@ -357,3 +357,60 @@ test('attack: Haughty Order reveals 10, may copy, and shuffles the deck either w
   // 13 cards, 1 drawn at the start of p2's turn; none left the deck to the copy.
   assert.equal(zone(declined, 'p2', 'deck').length + zone(declined, 'p2', 'hand').length, 13);
 });
+
+// ── design 049 slice 1: once-per-game limits and "only if" gates on candidates ──
+
+test('attack: a spent GX attack removes GX candidates (App. 19)', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [{ name: 'Tackle-GX', damage: '100' }, { name: 'Slam', damage: '30' }],
+    setup: ({ p1 }) => {
+      p1.oncePerGame = { gxUsed: true, vstarUsed: false };
+    },
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Slam']);
+});
+
+test('attack: a gxLock from the opponent removes GX candidates', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [{ name: 'Tackle-GX', damage: '100' }, { name: 'Slam', damage: '30' }],
+    setup: ({ p2 }) => {
+      p2.restOfGame = [{ kind: 'gxLock' }];
+    },
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Slam']);
+});
+
+test('attack: a failing "You can use this attack only if" gate removes the candidate (Mimed Games ruling)', () => {
+  const gated = { name: 'Empty Hand Hit', damage: '60', text: 'You can use this attack only if you have no cards in your hand.' };
+  const plain = { name: 'Slam', damage: '30' };
+  const withHand = board(GENOME_HACKING, {
+    defenderAttacks: [gated, plain],
+    setup: ({ p1 }) => p1.zones.hand.push(mon('Hand Card')),
+  });
+  assert.deepEqual(optionNames(attack(withHand)), ['Defender: Slam']);
+  const emptyHand = board(GENOME_HACKING, { defenderAttacks: [gated, plain] });
+  assert.deepEqual(optionNames(attack(emptyHand)), ['Defender: Empty Hand Hit', 'Defender: Slam']);
+});
+
+test('attack: a "does nothing" gate keeps the candidate; it applies when used (R1)', () => {
+  const gated = {
+    name: 'Needs Damage',
+    damage: '60',
+    text: "If this Pokémon has no damage counters on it, this attack does nothing.",
+  };
+  const b = board(GENOME_HACKING, { defenderAttacks: [gated] });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Needs Damage']);
+});
+
+test('attack: every candidate filtered out → attackCopyNothing and the turn ends', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [{ name: 'Tackle-GX', damage: '100' }],
+    setup: ({ p1 }) => {
+      p1.oncePerGame = { gxUsed: true, vstarUsed: false };
+    },
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+  turnPassed(res);
+});

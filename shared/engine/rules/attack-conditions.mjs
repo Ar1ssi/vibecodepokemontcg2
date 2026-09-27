@@ -485,6 +485,26 @@ export function parseAttackCondition(text, { selfName = '' } = {}) {
   return null;
 }
 
+/**
+ * Only the "You can use this attack only if …" gate of an attack's text, or null. A copy attack
+ * cannot choose an attack whose use gate fails (Mimed Games ruling, 2024-02-01); a "does
+ * nothing" gate stays the copied attack's own business (design 049 O6).
+ * @param {string} text Printed attack effect text
+ * @param {{ selfName?: string }} [options] The copier's printed name
+ * @returns {object|null}
+ */
+export function parseAttackUseGate(text, { selfName = '' } = {}) {
+  const normalized = normalizeAttackText(text, selfName);
+  if (!normalized) return null;
+  for (const sentence of normalized.split(/(?<=\.)\s+/)) {
+    const useOnly = USE_ONLY_IF.exec(sentence.trim());
+    if (!useOnly) continue;
+    const printed = parseClause(useOnly[1]);
+    if (printed) return { ...printed.desc, negated: printed.printedNegated };
+  }
+  return null;
+}
+
 const CMP = {
   eq: (a, b) => a === b,
   neq: (a, b) => a !== b,
