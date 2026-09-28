@@ -782,9 +782,10 @@ export function parseAttackDamage(
   }
 
   // ── Type-gated bonus: "+N if the Defending Pokémon is a [type] Pokémon" ──
-  const typeMatch = text.match(
-    /if the defending pokémon is a (grass|fire|water|lightning|psychic|fighting|dark|metal|fairy|dragon) pokémon.*?does (\d+) more damage/
-  );
+  // symbolizeTypeWords hands this reader "{w}"; older callers and tests pass the word.
+  const typeMatch = text
+    .replace(/\{([a-z])\}(?= pokémon)/g, (m, symbol) => lower(energyTypeOf(symbol)) || m)
+    .match(/if the defending pokémon is a (grass|fire|water|lightning|psychic|fighting|dark|metal|fairy|dragon) pokémon.*?does (\d+) more damage/);
   if (typeMatch) {
     const bonus = parseInt(typeMatch[2], 10) || 0;
     const defenderType = lower(defender?.types?.[0] ?? defender?.type);

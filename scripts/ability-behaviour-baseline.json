@@ -2,8 +2,8 @@
   "corpusRows": 4228,
   "totals": {
     "n": 4228,
-    "runs": 1569,
-    "partial": 375,
+    "runs": 1590,
+    "partial": 354,
     "dead": 56,
     "consumed": 1192,
     "unconsumed": 1035,
@@ -399,8 +399,8 @@
     },
     "status": {
       "n": 507,
-      "runs": 168,
-      "partial": 53,
+      "runs": 183,
+      "partial": 38,
       "dead": 21,
       "consumed": 112,
       "unconsumed": 153,
@@ -417,8 +417,8 @@
     },
     "switch": {
       "n": 256,
-      "runs": 219,
-      "partial": 24,
+      "runs": 224,
+      "partial": 19,
       "dead": 0,
       "consumed": 0,
       "unconsumed": 13,
@@ -453,8 +453,8 @@
     },
     "when-played": {
       "n": 39,
-      "runs": 20,
-      "partial": 18,
+      "runs": 21,
+      "partial": 17,
       "dead": 1,
       "consumed": 0,
       "unconsumed": 0,
@@ -462,56 +462,11 @@
     }
   },
   "flagged": {
-    "Abomasnow|blessings of the frost#b15rvi": {
-      "card": "Abomasnow",
-      "name": "Blessings of the Frost",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Abomasnow|blessings of the frost#e6nnn2": {
-      "card": "Abomasnow",
-      "name": "Blessings of the Frost",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
     "Aipom|snappy move#kkic62": {
       "card": "Aipom",
       "name": "Snappy Move",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Ampharos|unseen flash#9i3xyp": {
-      "card": "Ampharos",
-      "name": "Unseen Flash",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Armaldo ex|dual armor#5dxp7k": {
-      "card": "Armaldo ex",
-      "name": "Dual Armor",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Aromatisse|scent collection#1d5g8yp": {
-      "card": "Aromatisse",
-      "name": "Scent Collection",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Articuno|frosty flapping#1xngh6n": {
-      "card": "Articuno",
-      "name": "Frosty Flapping",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Azumarill|bubble turn#112vkl4": {
@@ -521,64 +476,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Azumarill|froth#pu6ew5": {
-      "card": "Azumarill",
-      "name": "Froth",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
-    "Azumarill|glistening bubbles#15iw5ge": {
-      "card": "Azumarill",
-      "name": "Glistening Bubbles",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Barbaracle|stone arms#pnudwa": {
-      "card": "Barbaracle",
-      "name": "Stone Arms",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Baxcalibur|super cold#dsmq0m": {
-      "card": "Baxcalibur",
-      "name": "Super Cold",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Beedrill|venom spray#1js2gss": {
-      "card": "Beedrill",
-      "name": "Venom Spray",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
     "Beldum|metal chain#1x9kgpb": {
       "card": "Beldum",
       "name": "Metal Chain",
       "flags": [
         "clause:attach-from-hand"
-      ]
-    },
-    "Blastoise ex|energy rain#1hoa4wu": {
-      "card": "Blastoise ex",
-      "name": "Energy Rain",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Blastoise|deluge#1de6awa": {
-      "card": "Blastoise",
-      "name": "Deluge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Blastoise|dig well#63tki": {
@@ -588,101 +490,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Blastoise|rain dance#26wwso": {
-      "card": "Blastoise",
-      "name": "Rain Dance",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Blastoise|waterlog#1bxdr5a": {
-      "card": "Blastoise",
-      "name": "Waterlog",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Blaziken|double type#yae5s7": {
-      "card": "Blaziken",
-      "name": "Double Type",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Bloodmoon Ursaluna|battle-hardened#v080ew": {
-      "card": "Bloodmoon Ursaluna",
-      "name": "Battle-Hardened",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Bronzong G|galactic switch#11iu3to": {
       "card": "Bronzong G",
       "name": "Galactic Switch",
       "flags": [
         "clause:move-energy"
-      ]
-    },
-    "Burmy Plant Cloak|wear cloak#z49yyh": {
-      "card": "Burmy Plant Cloak",
-      "name": "Wear Cloak",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Burmy Sandy Cloak|wear cloak#1wtn0cm": {
-      "card": "Burmy Sandy Cloak",
-      "name": "Wear Cloak",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Burmy Trash Cloak|wear cloak#1lsvok9": {
-      "card": "Burmy Trash Cloak",
-      "name": "Wear Cloak",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Carbink|double type#1wokutl": {
-      "card": "Carbink",
-      "name": "Double Type",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Celebi|crystal type#17g6fin": {
-      "card": "Celebi",
-      "name": "Crystal Type",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Celebi|forest breath#1mx8zmc": {
-      "card": "Celebi",
-      "name": "Forest Breath",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Chandelure|flare navigate#11x7cd0": {
-      "card": "Chandelure",
-      "name": "Flare Navigate",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Charizard ex|infernal reign#16na2gf": {
-      "card": "Charizard ex",
-      "name": "Infernal Reign",
-      "flags": [
-        "typography:typeWords:parse"
       ]
     },
     "Charizard|peal of thunder#1f5cfjj": {
@@ -692,22 +504,6 @@
         "clause:attach-from-deck"
       ]
     },
-    "Charizard|roaring resolve#uvq3fp": {
-      "card": "Charizard",
-      "name": "Roaring Resolve",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Charjabug|battery#15b5k8x": {
-      "card": "Charjabug",
-      "name": "Battery",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Charmeleon|burning fighter#1dxdtes": {
       "card": "Charmeleon",
       "name": "Burning Fighter",
@@ -715,44 +511,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Cherrim|spring bloom#cqd35m": {
-      "card": "Cherrim",
-      "name": "Spring Bloom",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Chien-Pao ex|shivery chill#4hy1j8": {
-      "card": "Chien-Pao ex",
-      "name": "Shivery Chill",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Clawitzer|fall back to reload#1mol5ia": {
-      "card": "Clawitzer",
-      "name": "Fall Back to Reload",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Claydol ex|type shift#gts2ft": {
-      "card": "Claydol ex",
-      "name": "Type Shift",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
     "Clefairy|moon-watching party#wy97g9": {
       "card": "Clefairy",
       "name": "Moon-Watching Party",
       "flags": [
-        "clause:attach-from-deck",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
+        "clause:attach-from-deck"
       ]
     },
     "Comfey|flower selecting#1ns6f27": {
@@ -762,58 +525,11 @@
         "clause:lost-zone"
       ]
     },
-    "Crawdaunt|unruly claw#9tchab": {
-      "card": "Crawdaunt",
-      "name": "Unruly Claw",
-      "flags": [
-        "clause:discard-opp-energy"
-      ]
-    },
-    "Crobat|crystal type#ph79ww": {
-      "card": "Crobat",
-      "name": "Crystal Type",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Dark Dragonite|dark trance#egyq6j": {
-      "card": "Dark Dragonite",
-      "name": "Dark Trance",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Dark Electrode|darkness navigation#1cplj7p": {
       "card": "Dark Electrode",
       "name": "Darkness Navigation",
       "flags": [
-        "clause:attach-from-deck",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Dark Gloom|pollen stench#1f9r38v": {
-      "card": "Dark Gloom",
-      "name": "Pollen Stench",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
-    "Dark Houndoom|fire breath#rha8t6": {
-      "card": "Dark Houndoom",
-      "name": "Fire Breath",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
-    "Darkrai Prism Star|nightmare star#1x13s41": {
-      "card": "Darkrai Prism Star",
-      "name": "Nightmare Star",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
+        "clause:attach-from-deck"
       ]
     },
     "Darkrai-GX|restoration#17weqbm": {
@@ -821,30 +537,6 @@
       "name": "Restoration",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Delphox BREAK|flare witch#1s8mw3n": {
-      "card": "Delphox BREAK",
-      "name": "Flare Witch",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Dragonite|delta charge#x1y0n0": {
-      "card": "Dragonite",
-      "name": "Delta Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Dragonite|hurricane charge#10if2ch": {
-      "card": "Dragonite",
-      "name": "Hurricane Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Dragonite|step in#1qa356l": {
@@ -858,23 +550,7 @@
       "card": "Drilbur",
       "name": "Dig Dig Dig",
       "flags": [
-        "clause:search-to-hand",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Drowzee|long-distance hypnosis#1tdarra": {
-      "card": "Drowzee",
-      "name": "Long-Distance Hypnosis",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
-    "Drowzee|long-distance hypnosis#swfpzk": {
-      "card": "Drowzee",
-      "name": "Long-Distance Hypnosis",
-      "flags": [
-        "clause:status-opp"
+        "clause:search-to-hand"
       ]
     },
     "Duskull|spiritborne evolution#1o72pt": {
@@ -898,28 +574,11 @@
         "clause:attach-from-hand"
       ]
     },
-    "Electivire|motor drive#1qw8u8k": {
-      "card": "Electivire",
-      "name": "Motor Drive",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Electrode|buzzap generator#yhsrqh": {
-      "card": "Electrode",
-      "name": "Buzzap Generator",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Electrode|buzzap thunder#tadjc1": {
       "card": "Electrode",
       "name": "Buzzap Thunder",
       "flags": [
-        "clause:attach-from-deck",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
+        "clause:attach-from-deck"
       ]
     },
     "Electrode|buzzap#1dqfmn1": {
@@ -936,34 +595,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Electrode|electro shaker#1gmec3f": {
-      "card": "Electrode",
-      "name": "Electro Shaker",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
     "Electrode|energymite#17uhc66": {
       "card": "Electrode",
       "name": "Energymite",
       "flags": [
         "clause:attach-from-deck"
-      ]
-    },
-    "Emboar|inferno fandango#1rau4qc": {
-      "card": "Emboar",
-      "name": "Inferno Fandango",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Emboar|inferno fandango#5qabhf": {
-      "card": "Emboar",
-      "name": "Inferno Fandango",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Empoleon|emergency surfacing#es273u": {
@@ -981,28 +617,11 @@
         "clause:mill-self"
       ]
     },
-    "Ethan's Ho-Oh ex|golden flame#19o9kqe": {
-      "card": "Ethan's Ho-Oh ex",
-      "name": "Golden Flame",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Fan Rotom|fan call#12i25b5": {
       "card": "Fan Rotom",
       "name": "Fan Call",
       "flags": [
-        "clause:search-to-hand",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Fan Rotom|fan shift#1ohnkg8": {
-      "card": "Fan Rotom",
-      "name": "Fan Shift",
-      "flags": [
-        "typography:typeWords:parse"
+        "clause:search-to-hand"
       ]
     },
     "Feraligatr|major tsunami#1fjojnv": {
@@ -1012,30 +631,6 @@
         "clause:gust"
       ]
     },
-    "Feraligatr|rain dance#6yc66c": {
-      "card": "Feraligatr",
-      "name": "Rain Dance",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Finneon|oceanic accompaniment#yv2813": {
-      "card": "Finneon",
-      "name": "Oceanic Accompaniment",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Floatzel|water acceleration#1jat1zv": {
-      "card": "Floatzel",
-      "name": "Water Acceleration",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Flygon ex|emerge charge#1aghwcs": {
       "card": "Flygon ex",
       "name": "Emerge Charge",
@@ -1043,90 +638,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Forretress ex|exploding energy#29eaxw": {
-      "card": "Forretress ex",
-      "name": "Exploding Energy",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Froslass|frost over#1l324qm": {
-      "card": "Froslass",
-      "name": "Frost Over",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Frosmoth|ice dance#7nbgjj": {
-      "card": "Frosmoth",
-      "name": "Ice Dance",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Frost Rotom|frost shift#u5e9ee": {
-      "card": "Frost Rotom",
-      "name": "Frost Shift",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Galarian Articuno|cruel charge#1llokbz": {
-      "card": "Galarian Articuno",
-      "name": "Cruel Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Galarian Moltres|malevolent charge#yas4tn": {
-      "card": "Galarian Moltres",
-      "name": "Malevolent Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Galarian Zapdos|strong legs charge#1qvuksk": {
-      "card": "Galarian Zapdos",
-      "name": "Strong Legs Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Gallade|double type#1f6b761": {
-      "card": "Gallade",
-      "name": "Double Type",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Gardevoir-GX|secret spring#1v8twri": {
-      "card": "Gardevoir-GX",
-      "name": "Secret Spring",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Gardevoir|psy shadow#sjqoj8": {
-      "card": "Gardevoir",
-      "name": "Psy Shadow",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Genesect ex|metallic signal#2jn8u": {
       "card": "Genesect ex",
       "name": "Metallic Signal",
       "flags": [
-        "clause:search-to-hand",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
+        "clause:search-to-hand"
       ]
     },
     "Gengar|manipulate#uq45zm": {
@@ -1143,41 +659,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Giratina Prism Star|chaotic star#1u1gjz5": {
-      "card": "Giratina Prism Star",
-      "name": "Chaotic Star",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Giratina|distortion door#xxwz93": {
       "card": "Giratina",
       "name": "Distortion Door",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Golduck|chaos flash#6vlfkl": {
-      "card": "Golduck",
-      "name": "Chaos Flash",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
-    "Golem|crystal type#1arckr8": {
-      "card": "Golem",
-      "name": "Crystal Type",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Golurk|double type#1f6b761": {
-      "card": "Golurk",
-      "name": "Double Type",
-      "flags": [
-        "typography:typeWords:parse"
       ]
     },
     "Gyarados|flame vapor#1v4dfqw": {
@@ -1194,64 +680,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Haxorus|grind up#1lpg2s9": {
-      "card": "Haxorus",
-      "name": "Grind Up",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Heat Rotom|heat shift#1ochi4p": {
-      "card": "Heat Rotom",
-      "name": "Heat Shift",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Heliolisk|frilled generator#zctkms": {
-      "card": "Heliolisk",
-      "name": "Frilled Generator",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Hisuian Lilligant VSTAR|star perfume#fmq204": {
-      "card": "Hisuian Lilligant VSTAR",
-      "name": "Star Perfume",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Ho-Oh V|reviving flame#x6dyfd": {
       "card": "Ho-Oh V",
       "name": "Reviving Flame",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Ho-Oh|crystal type#zyrfdg": {
-      "card": "Ho-Oh",
-      "name": "Crystal Type",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Hoopa V|two-faced#16c0cqw": {
-      "card": "Hoopa V",
-      "name": "Two-Faced",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Houndoom|fire breath#ah8zze": {
-      "card": "Houndoom",
-      "name": "Fire Breath",
-      "flags": [
-        "clause:status-opp"
       ]
     },
     "Huntail|reactive generator#2xdxpr": {
@@ -1261,80 +694,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Hydrapple ex|ripening charge#1wpv64j": {
-      "card": "Hydrapple ex",
-      "name": "Ripening Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Hydreigon|dark squall#u7behy": {
-      "card": "Hydreigon",
-      "name": "Dark Squall",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Hypno|sleep pendulum#z6rne0": {
-      "card": "Hypno",
-      "name": "Sleep Pendulum",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
-    "Incineroar-GX|scar charge#2iqkfe": {
-      "card": "Incineroar-GX",
-      "name": "Scar Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Infernape|blaze dance#6ver7c": {
-      "card": "Infernape",
-      "name": "Blaze Dance",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Infernape|pyro dance#1r9zwl3": {
-      "card": "Infernape",
-      "name": "Pyro Dance",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Iono's Bellibolt ex|electric streamer#oywkmf": {
-      "card": "Iono's Bellibolt ex",
-      "name": "Electric Streamer",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Iono's Kilowattrel|flashing draw#74asyl": {
       "card": "Iono's Kilowattrel",
       "name": "Flashing Draw",
       "flags": [
         "clause:discard-self-energy"
-      ]
-    },
-    "Iron Treads|dual core#f0aa54": {
-      "card": "Iron Treads",
-      "name": "Dual Core",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Jirachi|stardust song#rgmata": {
-      "card": "Jirachi",
-      "name": "Stardust Song",
-      "flags": [
-        "typography:typeWords:plan"
       ]
     },
     "Kabuto|revive friends#t1vzo": {
@@ -1344,121 +708,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Kecleon|colorful body#17hrxpt": {
-      "card": "Kecleon",
-      "name": "Colorful Body",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Kecleon|reactive colors#1hr2moj": {
-      "card": "Kecleon",
-      "name": "Reactive Colors",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Kecleon|unit color 1#1kfi1q1": {
-      "card": "Kecleon",
-      "name": "Unit Color 1",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Kecleon|unit color 2#noav82": {
-      "card": "Kecleon",
-      "name": "Unit Color 2",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Kecleon|unit color 3#m3i3th": {
-      "card": "Kecleon",
-      "name": "Unit Color 3",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Kyurem|plasma bane#vidpg": {
-      "card": "Kyurem",
-      "name": "Plasma Bane",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Lanturn|dual armor#yzlsf3": {
-      "card": "Lanturn",
-      "name": "Dual Armor",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Lanturn|underwater dive#1czq38n": {
-      "card": "Lanturn",
-      "name": "Underwater Dive",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Latias|delta aura#1etrglu": {
-      "card": "Latias",
-      "name": "Delta Aura",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Latias|red assist#o9yx0u": {
-      "card": "Latias",
-      "name": "Red Assist",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Latios|blue assist#1g3gf5j": {
-      "card": "Latios",
-      "name": "Blue Assist",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Latios|delta aura#1eqghp1": {
-      "card": "Latios",
-      "name": "Delta Aura",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Leafeon V|greening cells#1tbjuvu": {
-      "card": "Leafeon V",
-      "name": "Greening Cells",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Light Machamp|tag team#jrgcv7": {
       "card": "Light Machamp",
       "name": "Tag Team",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Lucario|roaring resolve#12dzlor": {
-      "card": "Lucario",
-      "name": "Roaring Resolve",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Lugia|crystal type#wsd1rl": {
-      "card": "Lugia",
-      "name": "Crystal Type",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Lunala|blessing of the moone#1qgyxpl": {
@@ -1468,20 +722,6 @@
         "clause:attach-from-deck"
       ]
     },
-    "Lunatone|lunar eclipse#1ubh0ip": {
-      "card": "Lunatone",
-      "name": "Lunar Eclipse",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Mabosstiff|intimidating howl#19ofwuv": {
-      "card": "Mabosstiff",
-      "name": "Intimidating Howl",
-      "flags": [
-        "clause:gust"
-      ]
-    },
     "Machamp|fighting tag#8m7mim": {
       "card": "Machamp",
       "name": "Fighting Tag",
@@ -1489,41 +729,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Magcargo|dual armor#538a63": {
-      "card": "Magcargo",
-      "name": "Dual Armor",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
     "Magcargo|streaming mantle#kv2llk": {
       "card": "Magcargo",
       "name": "Streaming Mantle",
       "flags": [
         "clause:recover-to-deck"
-      ]
-    },
-    "Magnezone|double type#2l2dgm": {
-      "card": "Magnezone",
-      "name": "Double Type",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Magnezone|magnetic circuit#1c1qs1x": {
-      "card": "Magnezone",
-      "name": "Magnetic Circuit",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Magnezone|magnetic circuit#tb2klg": {
-      "card": "Magnezone",
-      "name": "Magnetic Circuit",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Magnezone|super connectivity#wopjci": {
@@ -1540,13 +750,6 @@
         "clause:attach-from-hand"
       ]
     },
-    "Marnie's Grimmsnarl ex|punk up#1kfdfp6": {
-      "card": "Marnie's Grimmsnarl ex",
-      "name": "Punk Up",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
     "Marshtomp|plunge#5wyrm5": {
       "card": "Marshtomp",
       "name": "Plunge",
@@ -1554,27 +757,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Medicham|dual armor#10yy2je": {
-      "card": "Medicham",
-      "name": "Dual Armor",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
     "Meganium ex|nurture and heal#1cf1yl": {
       "card": "Meganium ex",
       "name": "Nurture and Heal",
       "flags": [
-        "clause:attach-from-hand",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Meganium|wild growth#ps0cog": {
-      "card": "Meganium",
-      "name": "Wild Growth",
-      "flags": [
-        "typography:typeWords:parse"
+        "clause:attach-from-hand"
       ]
     },
     "Metagross|super connectivity#1ppph5r": {
@@ -1596,59 +783,6 @@
       "name": "Far-Flying Meteor",
       "flags": [
         "clause:attach-from-hand"
-      ]
-    },
-    "Miraidon ex|tandem unit#1a95k6g": {
-      "card": "Miraidon ex",
-      "name": "Tandem Unit",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Miraidon|photon cord#19uh025": {
-      "card": "Miraidon",
-      "name": "Photon Cord",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Moltres|fiery flapping#1pk99lx": {
-      "card": "Moltres",
-      "name": "Fiery Flapping",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Moltres|flame charge#1rc2ols": {
-      "card": "Moltres",
-      "name": "Flame Charge",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Mow Rotom|mow shift#g6jlu0": {
-      "card": "Mow Rotom",
-      "name": "Mow Shift",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Munkidori|adrena-brain#111pbae": {
-      "card": "Munkidori",
-      "name": "Adrena-Brain",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Nidoking|crystal type#sa3bat": {
-      "card": "Nidoking",
-      "name": "Crystal Type",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Nidoqueen|evolution helper#nszc38": {
@@ -1679,38 +813,6 @@
         "clause:search-to-bench"
       ]
     },
-    "Oricorio ex|excited turbo#69zios": {
-      "card": "Oricorio ex",
-      "name": "Excited Turbo",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Pachirisu|self-generation#1flx1xx": {
-      "card": "Pachirisu",
-      "name": "Self-Generation",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Pawmot|electrogenesis#h3ccgl": {
-      "card": "Pawmot",
-      "name": "Electrogenesis",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Pecharunt ex|subjugating chains#an965t": {
-      "card": "Pecharunt ex",
-      "name": "Subjugating Chains",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Pelipper|delta transport#xs029h": {
       "card": "Pelipper",
       "name": "Delta Transport",
@@ -1731,13 +833,6 @@
       "flags": [
         "clause:attach-from-deck",
         "clause:search-to-bench"
-      ]
-    },
-    "Poliwrath|strange spiral#1cof3tk": {
-      "card": "Poliwrath",
-      "name": "Strange Spiral",
-      "flags": [
-        "clause:status-opp"
       ]
     },
     "Porygon-Z|bug transmission#1uwnyvc": {
@@ -1766,14 +861,6 @@
       "name": "Thunder Rumble",
       "flags": [
         "clause:attach-from-hand"
-      ]
-    },
-    "Rapidash|heat boost#appts1": {
-      "card": "Rapidash",
-      "name": "Heat Boost",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Rayquaza-GX|stormy winds#12o9frg": {
@@ -1812,22 +899,6 @@
         "clause:discard-own-hand"
       ]
     },
-    "Reshiram|turboblaze#1xk8lpg": {
-      "card": "Reshiram",
-      "name": "Turboblaze",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Rillaboom|voltage beat#b93yyo": {
-      "card": "Rillaboom",
-      "name": "Voltage Beat",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Rocket's Persian ex|night cry#1e7yk85": {
       "card": "Rocket's Persian ex",
       "name": "Night Cry",
@@ -1835,85 +906,18 @@
         "clause:search-to-bench"
       ]
     },
-    "Rocket's Scizor ex|dual armor#r64xs7": {
-      "card": "Rocket's Scizor ex",
-      "name": "Dual Armor",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Rocket's Scyther ex|dual armor#lskrwn": {
-      "card": "Rocket's Scyther ex",
-      "name": "Dual Armor",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
     "Roserade|energy signal#1t15j73": {
       "card": "Roserade",
       "name": "Energy Signal",
       "flags": [
-        "clause:attach-from-hand",
-        "clause:status-opp"
-      ]
-    },
-    "Rotom|type shift#uc3c27": {
-      "card": "Rotom",
-      "name": "Type Shift",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Salamence ex|type shift#17nhifs": {
-      "card": "Salamence ex",
-      "name": "Type Shift",
-      "flags": [
-        "typography:typeWords:parse"
+        "clause:attach-from-hand"
       ]
     },
     "Sceptile|nurture and heal#1jh76lg": {
       "card": "Sceptile",
       "name": "Nurture and Heal",
       "flags": [
-        "clause:attach-from-hand",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Scovillain ex|double type#1aur89y": {
-      "card": "Scovillain ex",
-      "name": "Double Type",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Scovillain|double type#1aur89y": {
-      "card": "Scovillain",
-      "name": "Double Type",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Shadow Rider Calyrex VMAX|underworld door#vh5428": {
-      "card": "Shadow Rider Calyrex VMAX",
-      "name": "Underworld Door",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Sharpedo|greedy evolution#18mlqsx": {
-      "card": "Sharpedo",
-      "name": "Greedy Evolution",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Shinx|big roar#hbsgm0": {
-      "card": "Shinx",
-      "name": "Big Roar",
-      "flags": [
-        "clause:gust"
+        "clause:attach-from-hand"
       ]
     },
     "Silcoon|multiplying cocoon#ihxemn": {
@@ -1930,58 +934,11 @@
         "clause:attach-from-hand"
       ]
     },
-    "Slowbro|dual armor#f93p78": {
-      "card": "Slowbro",
-      "name": "Dual Armor",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Solgaleo|sunrise#9z6zmr": {
-      "card": "Solgaleo",
-      "name": "Sunrise",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Solrock|solar eclipse#1mj2j9z": {
-      "card": "Solrock",
-      "name": "Solar Eclipse",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Starmie|aqua recycle#cyyvjs": {
-      "card": "Starmie",
-      "name": "Aqua Recycle",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
     "Starmie|metal navigation#14ae51z": {
       "card": "Starmie",
       "name": "Metal Navigation",
       "flags": [
-        "clause:attach-from-deck",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Steven's Metagross ex|x-boot#u7ihq5": {
-      "card": "Steven's Metagross ex",
-      "name": "X-Boot",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Swampert|muddy maker#1pecz9d": {
-      "card": "Swampert",
-      "name": "Muddy Maker",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
+        "clause:attach-from-deck"
       ]
     },
     "Swampert|natural remedy#8304g7": {
@@ -1991,43 +948,11 @@
         "clause:attach-from-hand"
       ]
     },
-    "Swampert|water call#qs61c": {
-      "card": "Swampert",
-      "name": "Water Call",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Tapu Koko Prism Star|dance of the ancients#70y180": {
-      "card": "Tapu Koko Prism Star",
-      "name": "Dance of the Ancients",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Tapu Lele|charmed charm#nuzsh4": {
       "card": "Tapu Lele",
       "name": "Charmed Charm",
       "flags": [
         "clause:attach-from-hand"
-      ]
-    },
-    "Teal Mask Ogerpon ex|teal dance#dd9h0a": {
-      "card": "Teal Mask Ogerpon ex",
-      "name": "Teal Dance",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Team Magma's Camerupt|burning draft#pb1mbz": {
-      "card": "Team Magma's Camerupt",
-      "name": "Burning Draft",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     },
     "Togekiss|serene grace#13bvhyh": {
@@ -2044,21 +969,6 @@
         "clause:attach-from-deck"
       ]
     },
-    "Torkoal|hot snort#hk1mkh": {
-      "card": "Torkoal",
-      "name": "Hot Snort",
-      "flags": [
-        "clause:status-opp"
-      ]
-    },
-    "Toxtricity|sinister surge#1v17ing": {
-      "card": "Toxtricity",
-      "name": "Sinister Surge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Trumbeak|mountain pass#1m8hwtj": {
       "card": "Trumbeak",
       "name": "Mountain Pass",
@@ -2066,36 +976,11 @@
         "clause:lost-zone"
       ]
     },
-    "Typhlosion ex|bursting up#3pvztl": {
-      "card": "Typhlosion ex",
-      "name": "Bursting Up",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Typhlosion|afterburner#n2u9q9": {
-      "card": "Typhlosion",
-      "name": "Afterburner",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
     "Typhlosion|fire boost#1sre76z": {
       "card": "Typhlosion",
       "name": "Fire Boost",
       "flags": [
-        "clause:attach-from-deck",
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Typhlosion|heat up#17zlmnk": {
-      "card": "Typhlosion",
-      "name": "Heat Up",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
+        "clause:attach-from-deck"
       ]
     },
     "Unown ?|?#7bbknf": {
@@ -2204,34 +1089,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Unown Y|[yield]#n0aa8h": {
-      "card": "Unown Y",
-      "name": "[Yield]",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Unown Y|yawn#1796co6": {
       "card": "Unown Y",
       "name": "YAWN",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Unown|dark#12i6uu3": {
-      "card": "Unown",
-      "name": "DARK",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Veluza|fillet memento#ig4jfz": {
-      "card": "Veluza",
-      "name": "Fillet Memento",
-      "flags": [
-        "typography:typeWords:parse"
       ]
     },
     "Victreebel|wafting scent#nxte1n": {
@@ -2241,27 +1103,11 @@
         "clause:discard-self-energy"
       ]
     },
-    "Vikavolt|strong charge#3xw8cu": {
-      "card": "Vikavolt",
-      "name": "Strong Charge",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
     "Vileplume|energy reaction#16o3gug": {
       "card": "Vileplume",
       "name": "Energy Reaction",
       "flags": [
-        "clause:attach-from-hand",
-        "clause:status-opp"
-      ]
-    },
-    "Vileplume|poison pollen#8q0wk9": {
-      "card": "Vileplume",
-      "name": "Poison Pollen",
-      "flags": [
-        "clause:status-opp"
+        "clause:attach-from-hand"
       ]
     },
     "Vivillon|grand wing#1fz1pcr": {
@@ -2271,80 +1117,11 @@
         "clause:opp-shuffle-hand"
       ]
     },
-    "Volcanion-EX|steam up#1q2k36o": {
-      "card": "Volcanion-EX",
-      "name": "Steam Up",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Walrein|gather ice#qnpe7h": {
-      "card": "Walrein",
-      "name": "Gather Ice",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Wash Rotom|wash shift#53cs3o": {
-      "card": "Wash Rotom",
-      "name": "Wash Shift",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
-    "Weavile|dark engage#1hwk9if": {
-      "card": "Weavile",
-      "name": "Dark Engage",
-      "flags": [
-        "typography:typeWords:parse"
-      ]
-    },
     "Wigglytuff|good neighbor#u4duwr": {
       "card": "Wigglytuff",
       "name": "Good Neighbor",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Xatu|clairvoyant sense#1cqeqyg": {
-      "card": "Xatu",
-      "name": "Clairvoyant Sense",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Yanmega ex|buzzing boost#8pq80m": {
-      "card": "Yanmega ex",
-      "name": "Buzzing Boost",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Yanmega|speed boost#2rouw9": {
-      "card": "Yanmega",
-      "name": "Speed Boost",
-      "flags": [
-        "typography:typeWords:plan"
-      ]
-    },
-    "Zacian V|roar of the sword#qis2ew": {
-      "card": "Zacian V",
-      "name": "Roar of the Sword",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
-      ]
-    },
-    "Zapdos|flash-pop flapping#1qaqx5x": {
-      "card": "Zapdos",
-      "name": "Flash-Pop Flapping",
-      "flags": [
-        "typography:typeWords:parse",
-        "typography:typeWords:plan"
       ]
     }
   }
