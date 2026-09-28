@@ -1,5 +1,5 @@
 # 052: Build & Battle unboxing scene (box, deck, packs, card reveals)
-Status: approved (user, 2026-09-28: "start working on design 52") · slice 1 built · depends on design 051 slices 1–4
+Status: approved (user, 2026-09-28: "start working on design 52") · slices 1–2 built · depends on design 051 slices 1–4
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -256,26 +256,26 @@ house rule 8). Phone width: box scales to the viewport width, packs wrap two per
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | reduced motion flag set | every beat completes instantly, sounds still play, holo tilt still works | [ ] |
-| 2 | `body.fx-off` / `fxDisabled()` | instant beats, no sound, no flare, no particles | [ ] |
-| 3 | illegal event (reveal before tear, tear twice, finish mid-pack) | reducer returns the same object; DOM does nothing | [x] unboxing.test row 3 (DOM half: slice 2) |
-| 4 | reload at each stage (sealed/opened/deckShown/packs with 3 of 10 revealed/done) | remounts settled at that stage; the 3 revealed cards are in the fan, 7 on the stack | [x] state round trip, unboxing.test row 4 (remount: slice 2) |
+| 1 | reduced motion flag set | every beat completes instantly, sounds still play, holo tilt still works | [x] `instant()` in the DOM twin; browser run with the flag |
+| 2 | `body.fx-off` / `fxDisabled()` | instant beats, no sound, no flare, no particles | [x] `playHitFlare` returns early; browser run: 0 flare/particle nodes |
+| 3 | illegal event (reveal before tear, tear twice, finish mid-pack) | reducer returns the same object; DOM does nothing | [x] unboxing.test row 3; DOM: `dispatch` returns null and the beat stops |
+| 4 | reload at each stage (sealed/opened/deckShown/packs with 3 of 10 revealed/done) | remounts settled at that stage; the 3 revealed cards are in the fan, 7 on the stack | [x] state round trip, unboxing.test row 4; remount: browser reload mid-pack |
 | 5 | drag released at 39 % / 40 % / click with 5 px / 7 px movement | springs back / tears / tears / nothing (treated as a short drag) | [x] unboxing.test row 5 (`tearReleaseOutcome`) |
-| 6 | double-click on the stack | one reveal per completed flip; a second click during `CARD_FLIP_MS` queues at most one | [ ] |
+| 6 | double-click on the stack | one reveal per completed flip; a second click during `CARD_FLIP_MS` queues at most one | [x] `requestReveal` lanes; browser: 1 + 3 fast clicks → 3 revealed |
 | 7 | Reveal all pressed mid-reveal | continues from the current index; no duplicate cards | [x] unboxing.test row 7 |
-| 8 | WAAPI missing (old browser) | `animateFrames` degrades (existing behavior): states still settle via the backstop | [ ] |
-| 9 | animation never finishes (tab hidden) | `SCENE_BACKSTOP_MS` settles the state | [ ] |
+| 8 | WAAPI missing (old browser) | `animateFrames` degrades (existing behavior): states still settle via the backstop | [x] reasoning: `animateFrames` applies the last frame; state saved before each pose |
+| 9 | animation never finishes (tab hidden) | `SCENE_BACKSTOP_MS` settles the state | [x] `withBackstop` around every beat |
 | 10b | `packArtIndexes(42)` twice / different seeds / `openBox(42)` before and after adding art | identical arrays / arrays differ somewhere across 100 seeds / the card pool is byte-identical to slice 2's | [x] unboxing.test row 10b |
-| 10a | `faceMatrix3d` on a rectangle / a skewed quad / a degenerate quad (two equal corners) | identity-like matrix / corners land within 0.5 px of the target / throws, and the face falls back to the procedural layout | [x] unboxing.test row 10a (fallback: slice 2) |
-| 10 | card image 404 / logo 404 / key art 404 / face texture 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [ ] |
+| 10a | `faceMatrix3d` on a rectangle / a skewed quad / a degenerate quad (two equal corners) | identity-like matrix / corners land within 0.5 px of the target / throws, and the face falls back to the procedural layout | [x] unboxing.test row 10a; `mountTexture` keeps the CSS face on a throw |
+| 10 | card image 404 / logo 404 / key art 404 / face texture 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [x] browser run with TCGdex routed to 404 |
 | 11 | tier mapping across all 130 me02 cards + promos | every `unboxingHoloRarity` result is a family `holo/*.css` styles (or null); reverse slot always ends in "reverse holo"; Rare/Promo → rare holo | [x] unboxing.test row 11 |
-| 12 | hit flare never leaves the card rect | flare + particles are children of the card host with `overflow: hidden` | [ ] |
+| 12 | hit flare never leaves the card rect | flare + particles are children of the card host with `overflow: hidden` | [x] `.bb-flyer__front` clips `.bb-flare` / `.bb-sparks` |
 | 13 | pool integrity | revealed ids == `session.packs[i]` in order; the scene reads, never writes, `packs` | [ ] |
 | 14 | face shown before the flip midpoint | never: the holo node is created at 50 % of `CARD_FLIP_MS` | [ ] video |
-| 15 | keyboard-only user | Tab reaches wrap, lid, deck, packs, stack; Enter/Space fires each beat | [ ] |
-| 16 | phone width (390 px) | no horizontal scroll; box, tray, fan wrap | [ ] |
-| 17 | "Skip scene" from sealed | jumps to done, Pool tab available, one `unbox-done` sound | [x] reducer + voice, unboxing.test row 17 (Pool tab: slice 2) |
-| 18 | sound context locked (no gesture yet) | `playFxSound` no-ops until the first gesture (existing `bindGestureUnlock`) | [ ] reasoning |
+| 15 | keyboard-only user | Tab reaches wrap, lid, deck, packs, stack; Enter/Space fires each beat | [x] all are buttons; browser run driven by Enter only |
+| 16 | phone width (390 px) | no horizontal scroll; box, tray, fan wrap | [x] `@media (max-width: 520px)`; browser: scrollWidth 390 (visual check: slice 3) |
+| 17 | "Skip scene" from sealed | jumps to done, Pool tab available, one `unbox-done` sound | [x] reducer + voice, unboxing.test row 17; browser: Pool tab shown after skip |
+| 18 | sound context locked (no gesture yet) | `playFxSound` no-ops until the first gesture (existing `bindGestureUnlock`) | [x] reasoning: every beat starts from a gesture |
 
 ## Test plan
 Unit (`core/build-battle/__tests__/unboxing.test.mjs`): reducer transitions (rows 3, 4, 7, 17), pose
@@ -323,6 +323,23 @@ Slice 1 (2026-09-28):
 - The 051 flip controller (`native-deck-builder-build-battle.js`) now drives the reducer
   (`tearWrap`…`tearPack`/`revealAll` per opened pack) so the session keeps one progress record
   until slice 2 replaces the flip. A 051 session without `unboxing` parses as `done`.
+
+Slice 2 (2026-09-28):
+- `#bbUnboxing` is created by the Box-tab controller inside `#buildBattleBoxPanel`, not in
+  `index.ejs`: the panel re-renders between the "Open box" screen and the scene, which would wipe a
+  static root. The 051 flip (`revealPacks`, `.bb-pack-card`, "Open all") is deleted.
+- Box geometry is fixed at 200 × 290 × 130 px (`BOX_PROPORTIONS`), so the face matrices are computed
+  once; phone width scales the host (0.8) instead of recomputing them. The lid is the top face on a
+  back-edge hinge group; CSS y points down, so the pose's −112° is applied as `rotateX(+112°)`.
+  Inner rim walls and a tray floor fill the opening once the lid is up.
+- Tray items are 2D (deck, promo, packs, code card, tip sheet in a wrapping row beside the box); a
+  torn pack spills into its own reveal row (torn pack + stack + ten-slot fan), newest packs stay
+  until the scene is done. Tearing another pack waits while a reveal is in flight.
+- Fan slots are fixed at ten per pack (`fanSlot(k, 10, w)`), so cards never re-spread while
+  "Reveal all" has several in flight; a ResizeObserver re-lays the fan on width changes.
+- The scene hands over to the Pool tab after the collapse (and after "Skip scene"), with a 240 ms
+  fade on the Pool panel. Box-face photos are cached across re-renders so the CSS face never flashes.
+- Pack art is vendored at 440 px wide (≈ 80 KB each; the refs are 780 px).
 
 ---
 Self-approval checklist (only when the user is unreachable):

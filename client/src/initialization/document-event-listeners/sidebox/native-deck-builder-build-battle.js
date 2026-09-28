@@ -27,22 +27,19 @@ import {
   poolRefusalMessage,
   poolRemaining,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
-import {
-  advanceUnboxing,
-  tornPackCount,
-} from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
+import { advanceUnboxing } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
-import { resolveDefaultCardBackSrc } from '../../../setup/deck-constructor/default-card-back.mjs';
+import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
  * The Box and Pool tabs of the Build & Battle builder tab (design 051 § Builder-tab controller).
  * The deck pane, library, Play and autosave stay with native-deck-builder.js; this module owns
- * the opened box, the reveal and the pool grid, and reports pool errors back to it.
+ * the opened box, the unboxing scene (design 052, native-deck-builder-unboxing.js) and the pool
+ * grid, and reports pool errors back to it.
  */
 
 // The only box today; the catalog is a list so a later box is data, not code.
 const BOX = BUILD_BATTLE_BOXES[0];
-const REVEAL_STAGGER_MS = 60;
 const MEMORY_ONLY_TEXT = 'Your box will not survive a reload';
 const NEW_BOX_CONFIRM =
   'Discard this pool and open a new box? Your built deck stays in My Decks.';
@@ -113,8 +110,7 @@ export const initializeBuildBattle = ({
   let pool = [];
   let memoryOnly = false;
   let poolStatus = '';
-  // Packs whose cards flip on the next Box render; every other opened pack renders face-up.
-  let flippingPacks = new Set();
+  let scene = null;
 
   const deckEntryOf = (activeSession) =>
     getBuildBattleBox(activeSession.boxKey)?.decks.find((deck) => deck.key === activeSession.deckKey);
@@ -166,20 +162,23 @@ export const initializeBuildBattle = ({
     renderAll();
   };
 
-  // Until the unboxing scene (design 052 slice 2) replaces this flip, opening a pack plays the
-  // scene's beats up to that pack at once, so the session keeps one progress record.
-  const revealPacks = (count) => {
-    if (!session) return;
-    const openedPacks = tornPackCount(session.unboxing);
-    const next = Math.min(BOX.packCount, Math.max(openedPacks, count));
-    const events = [{ type: 'tearWrap' }, { type: 'openLid' }, { type: 'unwrapDeck' }];
-    for (let index = openedPacks; index < next; index += 1) {
-      flippingPacks.add(index);
-      events.push({ type: 'tearPack', packIndex: index }, { type: 'revealAll', packIndex: index });
-    }
-    session = { ...session, unboxing: events.reduce(advanceUnboxing, session.unboxing) };
+  // The scene's beats: a refused event returns null and the scene does nothing (design 052 row 3).
+  const dispatchUnboxing = (event) => {
+    if (!session) return null;
+    const next = advanceUnboxing(session.unboxing, event);
+    if (next === session.unboxing) return null;
+    session = { ...session, unboxing: next };
     persist();
-    renderBox();
+    return next;
+  };
+
+  // The Pool tab fades in when the scene hands over to it.
+  const handOverToPool = () => {
+    showPool();
+    if (!poolPanelEl) return;
+    poolPanelEl.classList.remove('bb-enter');
+    void poolPanelEl.offsetWidth;
+    poolPanelEl.classList.add('bb-enter');
   };
 
   const discardBox = () => {
@@ -188,7 +187,6 @@ export const initializeBuildBattle = ({
     session = null;
     pool = [];
     poolStatus = '';
-    flippingPacks = new Set();
     detachEditor();
     renderAll();
   };
@@ -229,101 +227,39 @@ export const initializeBuildBattle = ({
     boxPanelEl.append(sealed);
   };
 
-  const renderPackCard = (card, index, isOpen) => {
-    const tile = el('div', `bb-pack-card${isOpen ? ' is-open' : ''}`);
-    tile.style.setProperty('--bb-delay', `${index * REVEAL_STAGGER_MS}ms`);
-    tile.dataset.cardId = card.id;
-    const inner = el('div', 'bb-pack-card-inner');
-    const back = el('img', 'bb-pack-card-back');
-    back.src = resolveDefaultCardBackSrc();
-    back.alt = '';
-    const front = el('img', 'bb-pack-card-front');
-    front.src = cardImage(card);
-    front.alt = card.name;
-    front.loading = 'lazy';
-    inner.append(back, front);
-    tile.append(inner);
-    return tile;
-  };
-
   const renderOpenedBox = () => {
     const cardsById = new Map(setCards.map((card) => [card.id, card]));
     const deckEntry = deckEntryOf(session);
     const header = el('div', 'bb-box-header');
     header.append(el('h3', 'bb-title', boxHeadline(BOX, deckEntry, session.seed)));
     const actions = el('div', 'bb-box-actions');
-    const openAll = el('button', 'bb-secondary', 'Open all');
-    openAll.type = 'button';
-    openAll.disabled = tornPackCount(session.unboxing) >= BOX.packCount;
-    openAll.addEventListener('click', () => revealPacks(BOX.packCount));
-    const build = el('button', 'bb-primary', 'Build your deck');
-    build.type = 'button';
-    build.addEventListener('click', showPool);
     const newBox = el('button', 'bb-secondary', 'New box');
     newBox.id = 'buildBattleNewBox';
     newBox.type = 'button';
     newBox.addEventListener('click', discardBox);
-    actions.append(openAll, build, newBox);
+    actions.append(newBox);
     header.append(actions);
     boxPanelEl.append(header);
 
-    const promo = boxDecks[session.deckKey]?.find((row) => row.id === deckEntry.promoId);
-    const deckCard = el('div', 'bb-deck-card');
-    const promoImg = el('img', 'bb-deck-promo');
-    promoImg.src = cardImage(promo, 'large');
-    promoImg.alt = promo?.name || deckEntry.name;
-    promoImg.dataset.previewCardId = deckEntry.promoId;
-    const deckText = el('div', 'bb-deck-text');
-    deckText.append(
-      el('strong', '', `${deckEntry.name} deck`),
-      el('span', '', '40 cards, ready to play. It is in My Decks; edit it from your pool.')
-    );
-    deckCard.append(promoImg, deckText);
-    boxPanelEl.append(deckCard);
-
-    const packsEl = el('div', 'bb-packs');
-    const openedPacks = tornPackCount(session.unboxing);
-    session.packs.forEach((pack, packIndex) => {
-      const isOpen = packIndex < openedPacks;
-      const row = el('div', 'bb-pack-row');
-      const packButton = el(
-        'button',
-        'bb-pack',
-        isOpen ? `Pack ${packIndex + 1}` : `Open pack ${packIndex + 1}`
-      );
-      packButton.type = 'button';
-      // This flip opens packs in order, so the torn count is the next pack.
-      packButton.disabled = packIndex !== openedPacks;
-      packButton.addEventListener('click', () => revealPacks(packIndex + 1));
-      const cardsEl = el('div', 'bb-pack-cards');
-      pack.forEach((id, cardIndex) => {
-        const card = cardsById.get(id);
-        if (!card) return;
-        const flipsNow = flippingPacks.has(packIndex);
-        cardsEl.append(renderPackCard(card, cardIndex, isOpen && !flipsNow));
-      });
-      row.append(packButton, cardsEl);
-      packsEl.append(row);
+    const root = el('div', 'bb-scene');
+    root.id = 'bbUnboxing';
+    boxPanelEl.append(root);
+    scene = mountUnboxingScene({
+      root,
+      getUnboxing: () => session.unboxing,
+      dispatch: dispatchUnboxing,
+      packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
+      packModel: BOX.packModel,
+      seed: session.seed,
+      promo: boxDecks[session.deckKey]?.find((row) => row.id === deckEntry.promoId) || null,
+      onBuildDeck: handOverToPool,
     });
-    boxPanelEl.append(packsEl);
-
-    if (!flippingPacks.size) return;
-    const flipping = [...flippingPacks];
-    flippingPacks = new Set();
-    // Two frames: the face-down tiles must paint once before the flip can transition.
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        for (const packIndex of flipping) {
-          packsEl.children[packIndex]
-            ?.querySelectorAll('.bb-pack-card')
-            .forEach((tile) => tile.classList.add('is-open'));
-        }
-      })
-    );
   };
 
   const renderBox = () => {
     if (!boxPanelEl) return;
+    scene?.unmount();
+    scene = null;
     boxPanelEl.replaceChildren();
     renderBanner(boxPanelEl);
     if (session) renderOpenedBox();
@@ -421,9 +357,9 @@ export const initializeBuildBattle = ({
   });
 
   boxPanelEl?.addEventListener('contextmenu', (event) => {
-    const image = event.target.closest('.bb-pack-card.is-open, .bb-deck-promo');
+    const image = event.target.closest('[data-preview-card-id]');
     if (!image) return;
-    const id = image.dataset.cardId || image.dataset.previewCardId;
+    const id = image.dataset.previewCardId;
     const card =
       setCards.find((entry) => entry.id === id) ||
       Object.values(boxDecks)
