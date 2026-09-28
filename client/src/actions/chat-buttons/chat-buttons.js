@@ -3826,24 +3826,6 @@ export const drawAbility = async (user, emit = true, targetCard = null) => {
     'announcement',
     false
   );
-
-  // Dudunsparce, Run Away Draw: "If you drew any cards in this way, shuffle this Pokémon …".
-  const shuffleStep = parseAbility(abilityText).find(
-    (s) => s.type === 'returnSelfToDeckAbility' && s.shuffleSelf
-  );
-  if (shuffleStep && (!shuffleStep.requiresDraw || drew > 0)) {
-    const { targetZone, targetIdx } = resolveAbilityTarget(user, targetCard);
-    if (targetIdx >= 0) {
-      await moveCardBundle(user, user, targetZone, 'deck', targetIdx, false, 'move', emit);
-      shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: target.name });
-      appendMessage(
-        user,
-        `🔁 ${target.name} and attached cards are shuffled into your deck.`,
-        'announcement',
-        false
-      );
-    }
-  }
 };
 
 // Status ability: apply a Special Condition to the opponent's Active Pokémon.
