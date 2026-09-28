@@ -141,6 +141,31 @@ test('Banette Evolution Jammer (Roaring Skies 32): evolving from hand is locked'
   assert.equal(item.allowed, true, 'only evolving is locked');
 });
 
+// Card text: TCGdex sv05-069 (not in the pkmncards corpus).
+test('Bronzong Evolution Jammer (Temporal Forces 69): evolving from hand is locked for one turn', () => {
+  const text =
+    "During your opponent's next turn, they can't play any Pokémon from their hand to evolve their Pokémon.";
+  assert.deepEqual(parseAttackSteps(text).after.find((s) => s.type === 'atkOppPlayLock')?.kinds, ['evolve']);
+  const { state, defender } = board('Bronzong', text);
+  const evolution = mon('Evolved Defender', { stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Defender' });
+  const potion = trainer('Potion', 'Item');
+  state.players.p2.zones.hand.push(evolution, potion);
+  const res = attack(state);
+  assert.equal(res.error, null);
+  assert.equal(res.state.turn.player, 'p2');
+  const evolve = () =>
+    validateLegality(res.state, {
+      type: 'attachCard',
+      playerId: 'p2',
+      payload: { instanceId: evolution.instanceId, targetInstanceId: defender.instanceId },
+    });
+  assert.equal(evolve().allowed, false);
+  const item = validateLegality(res.state, { type: 'playTrainer', playerId: 'p2', payload: { instanceId: potion.instanceId } });
+  assert.equal(item.allowed, true, 'only evolving is locked');
+  res.state.turn.number = 8;
+  assert.equal(evolve().allowed, true, 'the lock ends after that turn');
+});
+
 // ── the attacker's own name ─────────────────────────────────────────────────
 
 test("Mantine Aqua Slash (Team Rocket Returns 45): \"Mantine can't attack during your next turn\" locks the attacker", () => {
