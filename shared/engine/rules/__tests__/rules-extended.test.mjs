@@ -2344,6 +2344,18 @@ import test from 'node:test';
       assert.ok(ATTACK_FAMILIES.includes('conditional-ko'));
     });
 
+    test('parseAttackSearchClause: Kirlia Call Sign searches up to 3 Pokémon (TCGdex me01-059)', () => {
+      const callSign =
+        'Search your deck for up to 3 Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.';
+      assert.deepEqual(parseAttackSearchClause(callSign), {
+        what: 'Pokémon',
+        count: 3,
+        destination: 'hand',
+        upTo: true,
+        reveal: true,
+      });
+    });
+
     test('parseAttackSearchClause: Call for Family and rotation search attacks', () => {
       const callForFamilyOne =
         'Search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.';

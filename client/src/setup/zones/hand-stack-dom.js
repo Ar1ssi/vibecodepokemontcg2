@@ -71,7 +71,7 @@ function getCardName(img, card) {
  * unwrapping cards from any existing .hand-card-stack containers.
  *
  * @param {HTMLElement} handElement
- * @returns {Array<{ rootNode: HTMLElement, img: HTMLImageElement, card: object|null, name: string, isHidden: boolean }>}
+ * @returns {Array<{ rootNode: HTMLElement, img: HTMLImageElement, card: object|null, name: string, isHidden: boolean, src: string }>}
  */
 function collectHandCardDescriptors(handElement) {
   const descriptors = [];
@@ -96,6 +96,7 @@ function collectHandCardDescriptors(handElement) {
           card,
           name,
           isHidden: hidden,
+          src: img.currentSrc || img.src || '',
         });
       }
     } else if (
@@ -113,6 +114,7 @@ function collectHandCardDescriptors(handElement) {
         card,
         name,
         isHidden: hidden,
+        src: img.currentSrc || img.src || '',
       });
     }
   }

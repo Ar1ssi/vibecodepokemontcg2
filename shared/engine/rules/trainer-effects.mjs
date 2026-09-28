@@ -630,9 +630,9 @@ export function parseSearchDeckParams(lower) {
     const countMatch = lower.match(/up to\s+(\d+)/);
     if (countMatch) count = Number(countMatch[1]);
     what = typed ? `Basic ${typed[1].toUpperCase()} Energy` : 'Basic Energy';
-  } else if (lower.includes('up to 4') && lower.includes('pokémon')) {
+  } else if (/search your deck for up to\s+\d+\s+(?:\{\s*[a-z]\s*\}\s+)?pok[ée]mon\b/.test(lower)) {
     what = 'Pokémon';
-    count = 4;
+    count = Number(lower.match(/search your deck for up to\s+(\d+)/)[1]);
   } else if (lower.includes('energy') && /\bor\b/.test(lower) && lower.includes('pokémon')) {
     what = 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
