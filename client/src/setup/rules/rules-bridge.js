@@ -2647,6 +2647,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
 
       let executed = false;
       let skipAbilityMark = false;
+      let drewCards = false;
       const orchestrated = { orchestrated: true };
 
       for (const item of plan) {
@@ -2655,7 +2656,22 @@ import { glowColorFor } from './card-glow-colors.mjs';
         if (item.action === 'draw') {
           // A when-played ability's draw is resolved inside runWhenPlayedStep.
           if (whenPlayedHandlesDraw) continue;
-          await executeAbilityDraw(user, item.step);
+          if (await executeAbilityDraw(user, item.step)) drewCards = true;
+          executed = true;
+        } else if (item.action === 'return-self-to-deck') {
+          // "If you drew any cards in this way, shuffle this Pokémon and all attached cards into your deck."
+          if (item.step.requiresDraw && !drewCards) {
+            appendMessage('', `  ${card.name} stays in play (no cards drawn)`, 'announcement', false);
+            continue;
+          }
+          const zoneId = ['active', 'bench'].find((z) => getZone(user, z).array.includes(card));
+          if (!zoneId) continue;
+          const { moveCardBundle } = await import('../../actions/move-card-bundle/move-card-bundle.js');
+          moveCardBundle(user, user, zoneId, 'deck', getZone(user, zoneId).array.indexOf(card), false, 'move');
+          shuffleDeckAfterSearch(user, appendMessage, shuffleZone, { sourceName: card.name });
+          appendMessage('', `  ${card.name} and its attached cards were shuffled into your deck`, 'announcement', false);
+          // It left play: a used-flag on a card in the deck would block its next use.
+          skipAbilityMark = true;
           executed = true;
         } else if (item.action === 'search') {
           // A when-played + search combo resolves its search entirely inside
