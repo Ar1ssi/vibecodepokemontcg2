@@ -117,6 +117,16 @@ SEED=18 node .claude/skills/fx-preview/rec/rec-unboxing.mjs    # seed 18 holds a
   `pack-tear`, `flip-t0`, `flip-hit-t<tier>` (the box's best card) and `collapse`. A chained phase
   (promo after the unwrap, collapse after the last card) is timed from its own animation's start.
 - Pass 3 shoots `phone-390.png` mid-pack and checks row 16 (no horizontal scroll).
+- 3D packs (design 054): Chromium launches with `--use-angle=swiftshader --enable-unsafe-swiftshader
+  --ignore-gpu-blocklist`, so WebGL runs headless. Pass 1 also checks the spread draws in WebGL
+  (`#bbUnboxing[data-render='3d']`), a reload at the spread returns to it, and the pocket hand-off
+  leaves the canvas empty (a screenshot with the `.bb-gl` canvas hidden is byte-identical). The
+  WebGL clock is `requestAnimationFrame`, which the WAAPI seeks of pass 2 cannot freeze, so in 3D
+  pass 2 shoots `fly-3d-landed.png` instead of the fly/cut strips, and pass 4 installs Playwright's
+  fake clock (`page.clock.install()`, `pauseAt`, `runFor`) and writes `rip3d-{spread,peel-30,rip,
+  strip-flight,cards-rising,handoff-before,handoff-after}.png` from a real drag. Pass 5 (always)
+  checks reduced motion (no stage rAF loop at rest, the rip lands at once), 20 mount/unmount
+  cycles (no leaked context), and a browser with `--disable-webgl` (the DOM scene).
 - `CARD_IMG=<png|url>` serves one image for every card face (TCGdex and the Limitless promo
   host). Use it where those hosts are blocked; without it a blocked face shows the card-back
   fallback and the foil layers have nothing to sit on. The card faces are then a stand-in: judge

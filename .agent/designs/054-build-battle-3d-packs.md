@@ -1,5 +1,5 @@
 # 054: Build & Battle 3D packs — WebGL pillow packs, a real rip, cards out of the mouth
-Status: approved (user, 2026-09-29: "Approved") · building
+Status: approved (user, 2026-09-29: "Approved") · built (slices 1–4); box, lid and wrap follow in design 055
 Date: 2026-09-29 · Session: S330 · depends on design 052 (unboxing scene, Pocket-style rework)
 
 ## Problem
@@ -287,26 +287,26 @@ background: none; }`, `.bb-pocket.is-awaiting-3d { visibility: hidden; }`. No id
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | WebGL unavailable / context creation fails | `createPackStage` → null; `data-render='dom'`; the 052 scene runs unchanged | [x] `createPackStage` gets the `webgl2` context itself (none → null, no three console error); `.agent/scratch/bb3d/cap-slice2.mjs nowebgl` (`--disable-webgl`): `data-render=dom`, no canvas, the DOM tear lands on the pocket |
+| 1 | WebGL unavailable / context creation fails | `createPackStage` → null; `data-render='dom'`; the 052 scene runs unchanged | [x] `createPackStage` gets the `webgl2` context itself (none → null, no three console error); `.agent/scratch/bb3d/cap-slice2.mjs nowebgl` (`--disable-webgl`): `data-render=dom`, no canvas, the DOM tear lands on the pocket; rec-unboxing pass 5 `checkNoWebgl` (seeds 42, 18) |
 | 2 | `import()` of the stage or vendored three fails (404, offline) | DOM path, no console error spam, scene playable | [x] `loadPackStage` `.catch(() => null)`; cap-slice2 `noimport` (stage module 404) and `nothree` (vendor 404): DOM spread, tear works, no console output besides the 404 lines |
 | 3 | pack art texture fails to load | stage → null before first use (DOM path) | [x] `createPackStage` awaits every pack texture before returning; cap-slice2 `noart` (pack webp 404): `data-render=dom` |
 | 4 | top-card texture 404 / CORS blocked / slower than 1500 ms | stack shows the card back; hand-off unchanged | [x] `dressStack` races the face against `CARD_TEXTURE_TIMEOUT_MS` (a failed load is null → card back); cap-slice3 `noface`: TCGdex 404 and a 20 s delay both rise on the card back (`noface-slow-rising.png`), hand-off unchanged, no errors |
 | 5 | `body.fx-off` / `fxDisabled()` | no stage created, no WebGL context | [x] `loadPackStage` and `createPackStage` check `fxDisabled()`; the loop drops the stage (`onLost`) if FX go off mid-spread; cap-slice2 `fxoff` (0 WebGL contexts) and `fxoffmid` (DOM, canvas gone) |
-| 6 | `motionReduced()` | stage renders static packs; no rAF loop; rip/flight/settle land at once; sounds play | [x] (slice 2 part) `animate` applies the last frame and plays its sound at once, no loop; redraws on resize / `transitionend` only; cap-slice2 `reduced`: 0 stage rAF calls in 1 s at rest (`reduced-spread.png`). Slice 3: cap-slice3 `reduced`: a drag rip lands flight, rise, drop and settle at once and hands off (`reduced-after-rip.png`), canvas empty after, no errors; `unbox-tear` still plays (runBeat) |
+| 6 | `motionReduced()` | stage renders static packs; no rAF loop; rip/flight/settle land at once; sounds play | [x] (slice 2 part) `animate` applies the last frame and plays its sound at once, no loop; redraws on resize / `transitionend` only; cap-slice2 `reduced`: 0 stage rAF calls in 1 s at rest (`reduced-spread.png`). Slice 3: cap-slice3 `reduced`: a drag rip lands flight, rise, drop and settle at once and hands off (`reduced-after-rip.png`), canvas empty after, no errors; `unbox-tear` still plays (runBeat); rec-unboxing pass 5 `checkReducedMotion` (seeds 42, 18) |
 | 7 | drag released at 39 % / 40 %, press < 6 px, Enter/Space | spring back / rip / rip / rip (052 row 5 outcomes, via the unchanged `bindTear`) | [x] `bindTear` unchanged except an `onStart` hook; cap-slice3 `flow`: release at 39 % springs back (`spring-back-mid.png`), a drag past 40 % rips mid-drag, a press under 6 px rips, Enter on the focused button rips (side 1) and hands off |
 | 8 | pointer drag starting on the right half | peel runs right → left (`peelSide` −1) | [x] `onStart` → `beginTear({ side: peelSide(x, anchor rect) })`; cap-slice3 `flow` pack 4: `peel-30-right.png` folds from the right corner, the strip flies left |
 | 9 | second press while a rip plays (`busy`) | ignored, as today | [x] `bindTear` ignores presses while `busy`; the 3D tear button is hidden (`.is-ripping`); cap-slice3 `flow`: a click and an Enter during the rip leave `packsTorn` at `[true,false,false,false]` |
 | 10 | Skip scene mid-rip / mid-fly | `jumpToEnd`, scene ends, `dispose` releases the context; no late callback touches the DOM (`generation`) | [x] `render()` (skip) → `jumpToEnd` + `clearCards`, unmount → `dispose`; cap-slice3 `skip` (skip 300 ms into the rip): stage `done`, canvas released, no errors after 2 s more of page clock |
 | 11 | tab hidden mid-rip (rAF paused) | `withBackstop` fires, `jumpToEnd`, render proceeds | [x] cap-slice3 `hidden` (rAF stubbed after the rip): the backstop renders the pocket (hidden, awaiting); rAF back → `settleStackTo`, `jumpToEnd`, hand-off lands, canvas empty, no errors |
 | 12 | `webglcontextlost` mid-spread | stage disposed, scene re-renders on the DOM path at the same state | [x] `webglcontextlost` → `preventDefault`, `onLost` → `dropPackStage` disposes and re-renders; cap-slice2 `lost` (`WEBGL_lose_context`): DOM spread at the same state, no console output |
-| 13 | reload at spread / mid-pocket / summary | spread: 3D packs at rest; pocket/summary: DOM only, no stack in the canvas | [x] cap-slice2 `reload`: the spread reloads to 3D; a mid-pocket reload draws nothing in the canvas (screenshots with and without the canvas are byte-equal). Summary is view-only (a reload lands on the next spread) and uses the same `hide()` |
-| 14 | box mounted and unmounted 20 times (Box ↔ Pool tabs) | one context at a time; no "Too many active WebGL contexts" warning | [x] unmount → `dispose()` (`forceContextLoss`); a stage resolving after unmount is disposed; cap-slice2 `mounts`: 20 mount → 3D → unmount cycles, no leftover canvas, no warning |
+| 13 | reload at spread / mid-pocket / summary | spread: 3D packs at rest; pocket/summary: DOM only, no stack in the canvas | [x] cap-slice2 `reload`: the spread reloads to 3D; a mid-pocket reload draws nothing in the canvas (screenshots with and without the canvas are byte-equal). Summary is view-only (a reload lands on the next spread) and uses the same `hide()`; rec-unboxing pass 1 "reload at the spread: back in WebGL on pack 2" and the mid-pack reload (seeds 42, 18) |
+| 14 | box mounted and unmounted 20 times (Box ↔ Pool tabs) | one context at a time; no "Too many active WebGL contexts" warning | [x] unmount → `dispose()` (`forceContextLoss`); a stage resolving after unmount is disposed; cap-slice2 `mounts`: 20 mount → 3D → unmount cycles, no leftover canvas, no warning; rec-unboxing pass 5 `checkMountCycles` (seeds 42, 18) |
 | 15 | window resize / phone width 390 px mid-spread | renderer and camera resize; packs follow the anchors; no horizontal scroll | [x] `ResizeObserver` on host and canvas; packs re-read anchor rects every frame; cap-slice2 `main` (1280×800 → 900×700: canvas buffer = viewport) and `phone` (390 px: no horizontal scroll, `phone-390-spread.png`) |
 | 16 | hit card on top of a fresh pack (tier ≥ 2) | 3D stack shows the card back; DOM shows the face-down hit with its aura after hand-off (052 row 14 holds) | [x] `topCardOf` sets `faceDown` from `isHiddenHit`; no seed 1..5000 has a hit as a pack's first card (`.agent/scratch/bb3d/find-hit-seed.mjs`: all 20000 first cards tier 0), so cap-slice3 `hit` mounts the real scene and reducer with a real SIR (Mega Charizard X ex) first: the stack rises on the card back (`hit-stack-rising.png`), the DOM top card is `.is-hit` tier 3 after the hand-off (`hit-handoff-after.png`) |
 | 17 | pool integrity | the stage reads `packs`, never writes; `session.unboxing` changes only through `dispatch` | [x] the stage gets card URLs only and never sees `dispatch` or the session; cap-slice3 `flow`: `session.packs` byte-equal before and after four 3D rips |
-| 18 | `packTearLine` vs `packTearEdge` | same points for seeds 1, 18, 42, 999 × packs 0–3 | [ ] |
-| 19 | vendored three drifts from the pinned package | `vendor-three.test.mjs` fails | [ ] |
-| 20 | `pnpm lint` / `pnpm format` | skip `client/src/vendor/**` | [ ] |
+| 18 | `packTearLine` vs `packTearEdge` | same points for seeds 1, 18, 42, 999 × packs 0–3 | [x] pack3d.test "packTearLine is packTearEdge point for point" + "packTearEdge keeps its seeded output" |
+| 19 | vendored three drifts from the pinned package | `vendor-three.test.mjs` fails | [x] vendor-three.test "a changed or missing vendored file is reported as drift"; `.gitattributes` `-text` keeps the bytes on Windows checkouts |
+| 20 | `pnpm lint` / `pnpm format` | skip `client/src/vendor/**` | [x] `eslint.config.mjs` ignores, `.prettierignore`; `npx eslint client/src/vendor/three/three.core.min.js` reports the file ignored |
 
 ## Test plan
 Unit (`core/build-battle/__tests__/pack3d.test.mjs`): `pillowZ` is 0 in both seals and outside the
@@ -429,3 +429,12 @@ Self-approval checklist (only when the user is unreachable):
 - [ ] Every slice row is pinned: files, signatures, test cases with expected values, card rulings
       cited (corpus row / TCGdex id) — no banned words; a builder would make zero choices
 - [ ] No section reads "TBD"
+Slice 4 (2026-09-29):
+- `rec-unboxing.mjs`: in 3D, pass 2 cannot seek the fly or the rip (the WebGL clock is rAF, not
+  WAAPI; `__beat.startAt` would wait forever for a DOM animation), so it shoots
+  `fly-3d-landed.png` and tears the hit pack without a strip; the 3D fly and rip frames come from
+  a new pass 4 that steps Playwright's fake clock (`pauseAt` + `runFor`). Pass 5 (fallbacks) runs
+  even with `STRIPS=0`. Both seeds pass: 42 (full, with strips) and 18 (`STRIPS=0`).
+- The reduced-motion canvas check waits 300 ms after the hand-off: the canvas still holds the
+  settled stack for one frame (`clearCards` renders on the next rAF), under the identical DOM
+  card, so nothing visible changes; a canvas-only shot at the hand-off is empty.
