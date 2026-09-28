@@ -8,7 +8,7 @@ import { isBasicPokemon } from './cards.mjs';
 import { createRng } from './rng.mjs';
 import {
   OPENING_HAND_SIZE,
-  deckFormatsMatch,
+  decksMismatchFormat,
   normalizeDeckFormat,
   prizeCountForFormat,
 } from './formats.mjs';
@@ -52,9 +52,12 @@ export function mulliganBonusDraws(
 /**
  * Design 051 / I202: the decks about to be dealt when their formats differ, else null.
  * Only players with a loaded deck count, so a seat still choosing a deck never blocks.
+ * Design 053: with a room format both players agreed on, every deck must be that format.
+ * @param {object} state
+ * @param {string|null} [roomFormat]
  * @returns {{ playerId: string, username: string, format: string }[] | null}
  */
-export function deckFormatMismatch(state) {
+export function deckFormatMismatch(state, roomFormat = null) {
   const decks = Object.values(state?.players || {})
     .filter((player) => player?.zones?.deck?.length > 0)
     .map((player) => ({
@@ -62,8 +65,7 @@ export function deckFormatMismatch(state) {
       username: player.username || player.playerId,
       format: normalizeDeckFormat(player.deckFormat),
     }));
-  const differs = decks.some((deck) => !deckFormatsMatch(deck.format, decks[0].format));
-  return differs ? decks : null;
+  return decksMismatchFormat(decks, roomFormat);
 }
 
 /**

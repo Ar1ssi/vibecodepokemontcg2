@@ -4,7 +4,7 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { hasDeckLoaded } from '../../setup/general/has-deck-loaded.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
-import { deckFormatsMatch, formatMismatchMessage } from '/shared/engine/formats.mjs';
+import { decksMismatchFormat, formatMismatchMessage } from '/shared/engine/formats.mjs';
 import { deckFormatOf } from '../../setup/deck-constructor/deck-format-args.mjs';
 import { setup, setupPrizes } from './setup.js';
 
@@ -68,21 +68,22 @@ export const clearReady = (user) => {
 // at deck load (a deck restored on room join must stay replaceable). Mirrors the server's
 // GameRoom.refuseDealOnFormatMismatch: both Set Ups clear, so the players load a matching
 // deck and press Set Up again.
+const agreedRoomFormat = () =>
+  systemState.isTwoPlayer && systemState.roomFormat?.roomId === systemState.roomId
+    ? systemState.roomFormat.format
+    : null;
+
 const refuseDealOnFormatMismatch = () => {
-  const self = deckFormatOf(systemState, 'self');
-  const opp = deckFormatOf(systemState, 'opp');
-  if (deckFormatsMatch(self, opp)) return false;
+  const players = [
+    { username: determineUsername('self'), format: deckFormatOf(systemState, 'self') },
+    { username: determineUsername('opp'), format: deckFormatOf(systemState, 'opp') },
+  ];
+  // Design 053: in a room both players agreed on a format, every deck must be that format.
+  const roomFormat = agreedRoomFormat();
+  if (!decksMismatchFormat(players, roomFormat)) return false;
   systemState.selfReady = false;
   systemState.oppReady = false;
-  appendMessage(
-    '',
-    formatMismatchMessage([
-      { username: determineUsername('self'), format: self },
-      { username: determineUsername('opp'), format: opp },
-    ]),
-    'announcement',
-    false
-  );
+  appendMessage('', formatMismatchMessage(players, roomFormat), 'announcement', false);
   updateReadyButtons();
   return true;
 };

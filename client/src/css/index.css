@@ -1029,6 +1029,46 @@ ul, li {
 #roomHeaderCopyButton img{
   height: 3vh;
 }
+/* Design 053: the format both seated players agree on. */
+#roomFormatPanel {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 2px solid #61cea4;
+  border-radius: 10px;
+  background: #eef8f4;
+  color: black;
+  font-size: 1.6vh;
+}
+#roomFormatPanel[hidden] {
+  display: none;
+}
+#roomFormatPanel[data-mode='pick'],
+#roomFormatPanel[data-mode='answer'] {
+  border-color: #e0a526;
+  background: #fff6de;
+}
+.room-format-text {
+  margin: 0 0 6px;
+  font-weight: bold;
+}
+.room-format-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.room-format-buttons button {
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 1.5vh;
+  cursor: pointer;
+}
+.room-format-blocked {
+  margin: 6px 0 0;
+  color: #9e3c53;
+  font-weight: bold;
+}
 #p2Chatbox {
   background: white;
   width: 100%;

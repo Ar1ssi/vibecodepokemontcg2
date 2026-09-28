@@ -7,6 +7,7 @@ import {
   DECK_FORMAT_VALUES,
   OPENING_HAND_SIZE,
   deckFormatsMatch,
+  decksMismatchFormat,
   formatMismatchMessage,
   isDeckFormat,
   prizeCountForFormat,
@@ -56,4 +57,19 @@ test('Prizes taken count down from the format\'s starting Prizes (I203)', () => 
   assert.equal(prizesTakenFor(4, 'tcg'), 2);
   assert.equal(prizesTakenFor(6, undefined), 0);
   assert.equal(prizesTakenFor(7, 'tcg'), 0);
+});
+
+test('053 rows 8-9: with an agreed room format every deck must be it; without one, decks match each other', () => {
+  const bb = { username: 'Ash', format: 'build-battle' };
+  const std = { username: 'Gary', format: 'tcg' };
+  assert.equal(decksMismatchFormat([bb, { ...bb, username: 'Gary' }], 'build-battle'), null);
+  assert.deepEqual(decksMismatchFormat([std, { ...std, username: 'Ash' }], 'build-battle').length, 2);
+  assert.equal(decksMismatchFormat([std, { ...std, username: 'Ash' }], null), null);
+  assert.deepEqual(decksMismatchFormat([bb, std], null), [bb, std]);
+  assert.equal(decksMismatchFormat([], 'build-battle'), null);
+  assert.equal(
+    formatMismatchMessage([bb, std], 'build-battle'),
+    "This room plays Build & Battle (40 cards, 4 Prizes), but Gary's deck is Standard (60 cards, 6 Prizes). " +
+      'Load a matching deck and press Set Up again.'
+  );
 });

@@ -9,6 +9,7 @@ import { initializeTableTilt } from './setup/sizing/apply-table-tilt.js';
 import { initSyncLogger } from './setup/general/sync-logger-bridge.js';
 import { initDecisionLogger } from './setup/general/decision-logger-bridge.js';
 import { installE2eApi } from './setup/general/e2e-api.js';
+import { initializeRoomFormatPanel } from './setup/general/room-format-panel.js';
 import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-settings.js';
 
 applyFxSettings();
@@ -16,6 +17,7 @@ watchFxSettingTargets();
 initSyncLogger();
 initDecisionLogger();
 initializeSocketEventListeners();
+initializeRoomFormatPanel();
 initializeDOMEventListeners();
 initializeMutationObservers();
 initializeMatLayout();
