@@ -3125,6 +3125,47 @@ function atkOppBenchTrap(ctx) {
   return null;
 }
 
+const GUESS_KINDS = ['Pokémon', 'Trainer', 'Energy'];
+
+// Unown Hidden Power (Unseen Forces): "Choose a card from your hand and put it face down. Your
+// opponent guesses if the card is a Pokémon, Trainer, or Energy card. Reveal the card. If your
+// opponent guessed wrong, draw 2 cards. Put the card back into your hand."
+function atkGuessHandCard(ctx) {
+  const { player, opponent, step } = ctx;
+  const hand = player.zones.hand || [];
+  if (ctx.memo?.cardId != null) {
+    const card = hand.find((c) => c.instanceId === ctx.memo.cardId);
+    if (!card) return skip(ctx, 'card_not_found');
+    const guess = GUESS_KINDS[Number(ctx.selection?.[0]) - 1];
+    const actual = isPokemon(card) ? 'Pokémon' : isEnergy(card) ? 'Energy' : 'Trainer';
+    ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [revealedCard(card)], guess });
+    if (guess === actual) return null;
+    const drawn = player.zones.deck.splice(0, Math.min(step.draw || 2, player.zones.deck.length));
+    player.zones.hand.push(...drawn);
+    ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: player.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
+    return null;
+  }
+  if (ctx.selection) {
+    const card = hand.find((c) => c.instanceId === ctx.selection[0]);
+    if (!card || !opponent) return skip(ctx, 'card_not_found');
+    return ctx.ask({
+      player: opponent.playerId,
+      prompt: `${attackName(ctx)}: Guess the face-down card: Pokémon, Trainer, or Energy?`,
+      options: GUESS_KINDS.map((name, i) => ({ instanceId: i + 1, name, type: 'option' })),
+      min: 1,
+      max: 1,
+      memo: { cardId: card.instanceId },
+    });
+  }
+  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a card from your hand to put face down`,
+    options: hand,
+    min: 1,
+    max: 1,
+  });
+}
+
 // Unown Z Hidden Power: "Remove as many damage counters as you like from each Unown you have in
 // play. Put that many damage counters on the Defending Pokémon." One count per damaged Unown.
 function atkMoveCountersFromNamed(ctx) {
@@ -3568,6 +3609,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkDevolveOwnBench,
   atkFaceDownOppEnergy,
   atkMoveCountersFromNamed,
+  atkGuessHandCard,
   atkApplyCondition: optional(atkApplyCondition, (step) => `Leave your opponent's Active Pokémon ${step.condition}`),
   atkDevolve,
   atkBounceOppActive,

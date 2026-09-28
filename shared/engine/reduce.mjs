@@ -564,6 +564,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       ...(damage.filter ? { filter: damage.filter } : {}),
       ...(damage.distributable ? { distributable: true, remaining: damage.remaining } : {}),
       ...(damage.countFromEnergy ? { countFromEnergy: damage.countFromEnergy } : {}),
+      ...(damage.chooser ? { chooser: damage.chooser } : {}),
       // Attack damage to the Active applies Weakness/Resistance unless the text
       // waives it for every target ("... for Benched Pokémon" waives only those;
       // Arboliva ex: "This damage isn't affected by Weakness or Resistance").
@@ -7364,7 +7365,8 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
             });
           } else if (!searchTriggered) {
             draft.pendingChoice = createPendingChoice({
-              player: playerId,
+              // Dark Ivysaur Fury Strikes: the opponent places the markers.
+              player: attackTarget.chooser === 'opponent' ? targetOwnerId : playerId,
               source: 'attack',
               prompt: distributable
                 ? distributedPrompt(attack.name, attackTarget, required)
@@ -9028,7 +9030,7 @@ export function applyCommand(state, command, rng = null) {
             );
             if (options.length > 0) {
               draft.pendingChoice = createPendingChoice({
-                player: initiatorPlayerId,
+                player: token.attackTarget.chooser === 'opponent' ? targetOwnerId : initiatorPlayerId,
                 source: 'attack',
                 prompt: distributedPrompt(token.effectiveAttack?.name || 'Attack', token.attackTarget, remaining),
                 options,

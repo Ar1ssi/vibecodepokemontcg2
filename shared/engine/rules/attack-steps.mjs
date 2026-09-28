@@ -1143,6 +1143,11 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Unown Hidden Power (Unseen Forces): the opponent guesses the face-down hand card's kind.
+  [
+    /choose a card from your hand and put it face down\. your opponent guesses if the card is a pokémon, trainer, or energy card\. reveal the card\. if your opponent guessed wrong, draw (\d+) cards\. put the card back into your hand\./g,
+    (m) => ({ type: 'atkGuessHandCard', draw: Number(m[1]) }),
+  ],
   // Unown Z Hidden Power (Secret Wonders 72).
   [
     /remove as many damage counters as you like from each (unown) you have in play\. put that many damage counters on your opponent's active pokémon\./g,

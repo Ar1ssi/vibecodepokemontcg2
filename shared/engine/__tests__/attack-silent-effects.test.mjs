@@ -1686,3 +1686,39 @@ test('Unown I Hidden Power (Mysterious Treasures 37): a Defending Energy provide
   const faceUp = res.state.players.p2.zones.active.find((c) => c.instanceId === water.instanceId);
   assert.equal(faceUp.asEnergy, undefined);
 });
+
+test('Dark Ivysaur Fury Strikes (Best of Game 6): the opponent places 3 markers, 10 damage each', () => {
+  const text =
+    "Your opponent puts 3 markers onto his or her Pokémon (divided as he or she chooses). (More than 1 marker can be put on the same Pokémon.) Then, this attack does 10 damage to each Pokémon for each marker on it. Don't apply Weakness and Resistance. Remove the markers at the end of the turn.";
+  let bench;
+  const { state, defender } = board('Dark Ivysaur', text, { damage: '', setup: (s) => (bench = addBench(s, 'p2', 'Oddish')) });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.player, 'p2');
+  res = chooseAs(res, [bench[0].instanceId]);
+  res = chooseAs(res, [bench[0].instanceId]);
+  assert.equal(res.pendingChoice.player, 'p2');
+  res = chooseAs(res, [defender.instanceId]);
+  assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 20);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 10);
+});
+
+test('Unown Hidden Power (Unseen Forces, the Shuffle Unown): a wrong guess draws 2 cards', () => {
+  const text =
+    'Choose a card from your hand and put it face down. Your opponent guesses if the card is a Pokémon, Trainer, or Energy card. Reveal the card. If your opponent guessed wrong, draw 2 cards. Put the card back into your hand.';
+  const run = (guess) => {
+    let potion;
+    const { state } = board('Unown', text, {
+      damage: '',
+      setup: (s) => {
+        potion = trainer('Potion', 'Item');
+        s.players.p1.zones.hand.push(potion);
+      },
+    });
+    let res = choose(attack(state), [potion.instanceId]);
+    assert.equal(res.pendingChoice.player, 'p2');
+    res = chooseAs(res, [res.pendingChoice.options.find((o) => o.name === guess).instanceId]);
+    return res.state.players.p1.zones.hand.length;
+  };
+  assert.equal(run('Trainer'), 1);
+  assert.equal(run('Energy'), 3);
+});

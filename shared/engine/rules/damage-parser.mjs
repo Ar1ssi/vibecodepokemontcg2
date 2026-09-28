@@ -1674,6 +1674,24 @@ export function attackTargetClause(attackText) {
       scope: joined[2] || !joined[1] ? 'bench' : 'any',
     };
   }
+  // Dark Ivysaur Fury Strikes: "Your opponent puts 3 markers onto his or her Pokémon (divided as
+  // he or she chooses). … this attack does 10 damage to each Pokémon for each marker on it." The
+  // opponent places each 10 damage (`chooser: 'opponent'`).
+  const markers =
+    /your opponent puts (\d+) markers onto (?:his or her|their) pok[ée]mon \(divided as (?:he or she|they) chooses?\)\.(?: \([^)]*\))? then, this attack does (\d+) damage to each pok[ée]mon for each marker on it/i.exec(
+      t
+    );
+  if (markers) {
+    return {
+      kind: 'damage',
+      amount: Number(markers[2]),
+      count: 1,
+      scope: 'any',
+      distributable: true,
+      remaining: Number(markers[1]),
+      chooser: 'opponent',
+    };
+  }
   // Probopass Metal Bomber: "Choose a number of your opponent's Benched Pokémon up to the amount
   // of {M} Energy attached to Probopass. This attack does 20 damage to each of them." The count
   // is the attacker's Energy of that type (reduce.mjs resolves `countFromEnergy`).
