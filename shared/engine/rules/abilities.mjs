@@ -89,6 +89,8 @@ const typeChangeText = (t) =>
   /provides? .*energy of every type/.test(t) ||
   /is both \{[a-z]\} and \{[a-z]\}/.test(t);
 
+const OPPONENT_ACTIVE_ENERGY_DISCARD = /when you play [^.]*from your hand to evolve[^.]*, you may discard an energy attached to your opponent's active pok[eé]mon/;
+
 // Bench ↔ Active swap wording ("switch … Benched … with your Active …").
 export const isBenchActiveSwitchText = (t) =>
   t.includes('switch') &&
@@ -896,6 +898,19 @@ export function parseAbility(text = '') {
     });
   }
 
+  // ── 6b. Discard an Energy from the opponent's Active ────────────────────
+  // Crawdaunt Unruly Claw, Lycanroc-GX Twilight Eyes (played to evolve). "From your hand" there
+  // names the evolution card, not a hand cost.
+  if (OPPONENT_ACTIVE_ENERGY_DISCARD.test(lower)) {
+    steps.push({
+      type: 'discardEnergyFromOpponent',
+      energy: 'any Energy',
+      count: 1,
+      scope: 'Active',
+      guidance: "Discard an Energy attached to your opponent's Active Pokémon.",
+    });
+  }
+
   // ── 7. Discard cost (Energy from hand to use ability) ───────────────────
   if (
     lower.includes('discard') &&
@@ -903,7 +918,8 @@ export function parseAbility(text = '') {
     lower.includes('energy') &&
     // Haxorus Grind Up: the discarded card is the Stadium in play, not a hand cost.
     !/discard (?:any|a) stadium card in play/.test(lower) &&
-    !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower)
+    !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower) &&
+    !OPPONENT_ACTIVE_ENERGY_DISCARD.test(lower)
   ) {
     const countMatch = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+/);
     const count = countMatch ? Number(countMatch[1]) : 1;

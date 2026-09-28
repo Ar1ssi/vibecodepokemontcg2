@@ -488,6 +488,32 @@ test('ability: Walrein ex Chilling Breath locks Trainers on the next turn, only 
   assert.ok(use70(stale.state, stale.rng).error);
 });
 
+// Crawdaunt, Primal Clash 92 (Lycanroc-GX Twilight Eyes, Team Up 82, prints the same effect).
+const UNRULY_CLAW =
+  "When you play this Pokémon from your hand to evolve 1 of your Pokémon, you may discard an Energy attached to your opponent's Active Pokémon.";
+
+test("ability: Crawdaunt Unruly Claw discards an Energy from the opponent's Active, not from the hand", () => {
+  const { state, rng } = board(UNRULY_CLAW, { name: 'Crawdaunt' });
+  state.players.p1.zones.active[0].enteredPlayTurn = 2;
+  state.players.p1.zones.hand.push(energy(60, 'Water'));
+  state.players.p2.zones.active.push(energy(61, 'Fire', { attachedTo: 90 }));
+  state.players.p2.zones.bench.push(energy(62, 'Fire', { attachedTo: 91 }));
+  let res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.deepEqual(res.pendingChoice?.options.map((o) => o.instanceId), [61]);
+  res = resolveWith(res, [61], rng);
+  assert.equal(zoneOf(res, 'p2', 61), 'discard');
+  assert.equal(zoneOf(res, 'p2', 62), 'bench');
+  assert.equal(zoneOf(res, 'p1', 60), 'hand');
+});
+
+test('ability: Crawdaunt Unruly Claw is refused when it did not evolve this turn', () => {
+  const { state, rng } = board(UNRULY_CLAW, { name: 'Crawdaunt' });
+  state.players.p1.zones.active[0].enteredPlayTurn = 1;
+  state.players.p2.zones.active.push(energy(61, 'Fire', { attachedTo: 90 }));
+  assert.ok(use70(state, rng).error);
+});
+
 // Ninetales, Team Up 16 / Volcanion Prism Star, Forbidden Light 31: a hand-discard cost, then the
 // opponent's switch — the player's own Active never moves (parse-hole review B1).
 const NINE_TEMPTATIONS =
