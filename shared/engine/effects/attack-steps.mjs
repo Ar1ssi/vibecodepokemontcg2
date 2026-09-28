@@ -519,6 +519,47 @@ function atkDiscardSelfEnergy(ctx) {
   return discardChosen(ctx, energies, { label: energyLabel(step) });
 }
 
+// Toxtricity ex Gaia Punk: "Discard 3 {L} Energy from your Pokémon." — from any of them.
+function atkDiscardOwnEnergy(ctx) {
+  const { player, step } = ctx;
+  const energies = rootsOf(player)
+    .flatMap((root) => attachedCards(player, root.instanceId))
+    .filter((c) => energyMatches(c, step));
+  return discardChosen(ctx, energies, { label: energyLabel(step) });
+}
+
+// Arcanine ex Flame Swirl: "Discard 2 {R} Energy or 1 React Energy card attached to Arcanine
+// ex." — the player picks which, when both are possible.
+function atkDiscardSelfEnergyEither(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  const attached = ref ? attachedCards(player, ref.card.instanceId) : [];
+  const typed = attached.filter((c) => energyMatches(c, { energyType: step.energyType }));
+  const named = attached.filter((c) => isEnergy(c) && String(c.name || '').toLowerCase().includes(step.name));
+  const typedOk = typed.length >= step.count;
+  const discard = (cards) => {
+    for (const card of cards) discardCard(ctx.draft, card, ctx.events);
+    return null;
+  };
+  if (ctx.selection) {
+    return discard(ctx.selection[0] === ATTACK_YES ? typed.slice(0, step.count) : named.slice(0, 1));
+  }
+  if (typedOk && named.length > 0) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Which Energy do you discard?`,
+      options: [
+        { instanceId: ATTACK_YES, name: `${step.count} {${step.energyType}} Energy`, type: 'option' },
+        { instanceId: ATTACK_NO, name: `1 ${named[0].name}`, type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  if (typedOk) return discard(typed.slice(0, step.count));
+  if (named.length > 0) return discard(named.slice(0, 1));
+  return discard(typed);
+}
+
 // Volcarona-GX Backfire: "Put 2 {R} Energy attached to this Pokémon into your hand."
 function atkMoveSelfEnergyToHand(ctx) {
   const { player, step } = ctx;
@@ -815,8 +856,16 @@ function recordDiscardedForDamage(ctx, cards) {
 function atkMill(ctx) {
   const { player, opponent, step } = ctx;
   const sides = step.side === 'self' ? [player] : step.side === 'each' ? [player, opponent] : [opponent];
+  // Dialga-EX Fast Forward: one card for each named Energy attached to this Pokémon.
+  const ref = step.perAttachedEnergy ? attackerRef(ctx) : null;
+  const count = step.perAttachedEnergy
+    ? (ref ? attachedCards(player, ref.card.instanceId) : []).filter(
+        (c) => isEnergy(c) && String(c.name || '').toLowerCase().includes(step.perAttachedEnergy)
+      ).length
+    : step.count || 1;
+  if (count === 0) return skip(ctx, 'nothing_to_mill');
   for (const side of sides.filter(Boolean)) {
-    const cards = side.zones.deck.slice(0, step.count || 1);
+    const cards = side.zones.deck.slice(0, count);
     discardCards(side, cards, ctx.events);
     recordDiscardedForDamage(ctx, cards);
   }
@@ -1154,7 +1203,9 @@ function atkMirrorHeal(ctx) {
   const ref = attackerRef(ctx);
   if (!ref || !(ctx.step.amount > 0) || !(ref.card.damage > 0)) return skip(ctx, 'nothing_to_heal');
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
-  const healed = Math.min(ref.card.damage, ctx.step.amount);
+  // Mega Drain: half the damage done, rounded up to the nearest 10.
+  const amount = ctx.step.half ? Math.ceil(ctx.step.amount / 20) * 10 : ctx.step.amount;
+  const healed = Math.min(ref.card.damage, amount);
   ref.card.damage -= healed;
   ctx.events.push({ type: 'damageUpdated', instanceId: ref.card.instanceId, damage: ref.card.damage, healed });
   return null;
@@ -1999,6 +2050,28 @@ function atkOppDiscardOrCondition(ctx) {
       max: 1,
     });
   }
+  const markers = liveAttackMarkers(target, {
+    turnNumber: ctx.draft.turn?.number || 1,
+    zoneCards: opponent.zones?.active || [],
+  });
+  if (markersBlockCondition(markers, step.condition)) return skip(ctx, 'status_immune');
+  addCondition(target, step.condition);
+  ctx.events.push({
+    type: 'specialConditionUpdated',
+    instanceId: target.instanceId,
+    condition: step.condition,
+    conditions: listConditions(target),
+  });
+  return null;
+}
+
+// A Special Condition on the opponent's Active that no status branch reads: Crobat BREAK Silent
+// Bite ("You may leave your opponent's Active Pokémon Paralyzed"), M Ampharos-EX Exavolt's
+// accepted offer.
+function atkApplyCondition(ctx) {
+  const { opponent, step } = ctx;
+  const target = activeOf(opponent);
+  if (!target) return skip(ctx, 'no_opponent_active');
   const markers = liveAttackMarkers(target, {
     turnNumber: ctx.draft.turn?.number || 1,
     zoneCards: opponent.zones?.active || [],
@@ -3177,7 +3250,10 @@ function supporterSource(ctx) {
   switch (step.source) {
     case 'hand':
       return { owner: player, zone: 'hand' };
+    // Jirachi / Magby Detour ('played'): "a Supporter card in play" is the one played this
+    // turn, now in the discard pile.
     case 'discard':
+    case 'played':
       return { owner: player, zone: 'discard' };
     case 'deck':
     case 'deckTop':
@@ -3223,7 +3299,13 @@ function atkUseSupporter(ctx) {
     }
     return useSupporterEffect(ctx, owner, top);
   }
-  const candidates = cards.filter(isSupporterCard);
+  const playedNames = ctx.player.flags?.supporterNamesThisTurn || [];
+  const candidates = cards.filter(
+    (c) => isSupporterCard(c) && (step.source !== 'played' || playedNames.includes(c.name || ''))
+  );
+  if (step.source === 'played' && candidates.length === 1 && !ctx.selection) {
+    return useSupporterEffect(ctx, owner, candidates[0]);
+  }
   if (ctx.selection) {
     const chosen = candidates.find((c) => c.instanceId === ctx.selection[0]);
     if (!chosen) {
@@ -3342,6 +3424,9 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardOppToolsAndStadium,
   atkCountersByRetreat,
   atkCountersEachChosenType,
+  atkDiscardOwnEnergy,
+  atkDiscardSelfEnergyEither,
+  atkApplyCondition: optional(atkApplyCondition, (step) => `Leave your opponent's Active Pokémon ${step.condition}`),
   atkDevolve,
   atkBounceOppActive,
   atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),
@@ -3374,6 +3459,7 @@ const OPP_ACTIVE_EFFECTS = {
   atkAddMarker: (step) => step.target === 'opponentActive',
   atkLockAttack: () => true,
   atkOppDiscardOrCondition: () => true,
+  atkApplyCondition: () => true,
 };
 
 function oppActiveProtected(ctx) {

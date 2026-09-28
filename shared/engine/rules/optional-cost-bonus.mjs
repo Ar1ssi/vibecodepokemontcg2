@@ -84,7 +84,9 @@ const DISCARDED_BONUS = /^if the discarded card is [^,]+, this attack does (?:\d
 
 // Slaking Dynamic Swing: "You may do 100 more damage. If you do, <drawback>." Older prints:
 // "You may do 40 damage plus 60 more damage. If you do, Electrode does 100 damage to itself."
-const DO_MORE = /^you may do (?:\d+ damage plus )?(\d+) more damage\.$/;
+// M Ampharos-EX Exavolt adds "… and leave your opponent's Active Pokémon Paralyzed".
+const DO_MORE =
+  /^you may do (?:\d+ damage plus )?(\d+) more damage(?: and leave your opponent's active pokémon (asleep|burned|confused|paralyzed|poisoned))?\.$/;
 
 // Ampharos Lightning Strike / Staraptor FB LV.X Defog: "If you do, this attack's base damage is
 // 80 instead of 40." — the bonus is the difference.
@@ -134,8 +136,9 @@ export function optionalCostBonusClause(attackText, selfName = '') {
     const doMore = DO_MORE.exec(sentences[i]);
     const drawback = doMore && /^if you do, (.+)$/.exec(sentences[i + 1]);
     if (drawback) {
+      const condition = doMore[2] ? doMore[2][0].toUpperCase() + doMore[2].slice(1) : null;
       return {
-        cost: { kind: 'drawback', text: drawback[1] },
+        cost: { kind: 'drawback', text: drawback[1], ...(condition ? { condition } : {}) },
         bonus: Number(doMore[1]),
         extraCondition: null,
         perEach: false,

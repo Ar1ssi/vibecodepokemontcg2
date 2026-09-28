@@ -1408,7 +1408,10 @@ export function opponentCounterClause(attackText) {
   // Older prints name "the Defending Pokémon" (Shedinja Curse and Deceive).
   const t = String(attackText || '')
     .replace(/[‘’]/g, "'")
-    .replace(/\bthe defending pok[ée]mon\b/gi, "your opponent's Active Pokémon");
+    .replace(/\bthe defending pok[ée]mon\b/gi, "your opponent's Active Pokémon")
+    // Wobbuffet Shadow Tag: counters placed "at the end of your opponent's next turn" are a
+    // timed marker (attack-steps.mjs), not this attack's counters.
+    .replace(/[^.]*at the end of your opponent's next turn\./gi, '');
   let m =
     /choose (\d+) of your opponent's (benched )?pok[ée]mon and put (\d+) damage counters? on each/i.exec(
       t
@@ -1665,6 +1668,22 @@ export function attackTargetClause(attackText) {
       amount: Number(joined[3]),
       count: Number(joined[1] || 1),
       scope: joined[2] || !joined[1] ? 'bench' : 'any',
+    };
+  }
+  // Probopass Metal Bomber: "Choose a number of your opponent's Benched Pokémon up to the amount
+  // of {M} Energy attached to Probopass. This attack does 20 damage to each of them." The count
+  // is the attacker's Energy of that type (reduce.mjs resolves `countFromEnergy`).
+  const energyCounted =
+    /choose a number of your opponent's benched pok[ée]mon up to the amount of \{([a-z])\} energy attached to [^.]+\. this attack does (\d+) damage to each of them/i.exec(
+      t
+    );
+  if (energyCounted) {
+    return {
+      kind: 'damage',
+      amount: Number(energyCounted[2]),
+      count: 1,
+      countFromEnergy: energyCounted[1].toUpperCase(),
+      scope: 'bench',
     };
   }
   // Mega Eelektross ex Split Bomb: "This attack does 60 damage to each of 2 of your opponent's Pokémon."

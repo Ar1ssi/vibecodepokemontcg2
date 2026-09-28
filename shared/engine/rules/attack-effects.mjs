@@ -921,9 +921,15 @@ export function parseNextTurnLock(attack, { coin = null, headsCount = 0, conditi
     out.selfCannotAttack = true;
   }
 
+  // Gouging Fire ex Blaze Blitz: "This Pokémon can't use Blaze Blitz again until it leaves the
+  // Active Spot."
+  const whileActive = t.match(/this pok[ée]mon can(?:'t|not) use ([^.]+?) again until it leaves the active spot/);
+  if (whileActive) out.selfCannotUseAttackWhileActive = whileActive[1].trim();
+
   if (
     !out.selfCannotAttack &&
     !out.selfCannotUseAttack &&
+    !out.selfCannotUseAttackWhileActive &&
     !out.oppCannotRetreat &&
     !out.oppCannotAttack
   ) {

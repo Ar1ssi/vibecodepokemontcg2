@@ -563,6 +563,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       scope: damage.scope,
       ...(damage.filter ? { filter: damage.filter } : {}),
       ...(damage.distributable ? { distributable: true, remaining: damage.remaining } : {}),
+      ...(damage.countFromEnergy ? { countFromEnergy: damage.countFromEnergy } : {}),
       // Attack damage to the Active applies Weakness/Resistance unless the text
       // waives it for every target ("... for Benched Pokémon" waives only those;
       // Arboliva ex: "This damage isn't affected by Weakness or Resistance").
@@ -2201,6 +2202,25 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
 function resolveDeferredKnockouts(draft, { events }) {
   for (const pid of Object.keys(draft.players || {})) {
     const active = draft.players[pid].zones?.active?.find((c) => !c.attachedTo);
+    // Wobbuffet Shadow Tag: "Put 7 damage counters on the Defending Pokémon at the end of your
+    // opponent's next turn."
+    const counters = activeAttackMarkers(draft, pid, active).find(
+      (m) => m.kind === 'deferredCounters' && m.untilTurn === draft.turn?.number
+    );
+    if (counters) {
+      active.damage = (active.damage || 0) + counters.count * 10;
+      events.push({ type: 'damageUpdated', instanceId: active.instanceId, damage: active.damage });
+      const hp = cardEffectiveHp(draft, active, pid);
+      if (hp > 0 && active.damage >= hp) {
+        handleKnockout(draft, {
+          victimPlayerId: pid,
+          attackerPlayerId: Object.keys(draft.players).find((id) => id !== pid),
+          victim: active,
+          events,
+        });
+        continue;
+      }
+    }
     const marker = activeAttackMarkers(draft, pid, active).find((m) => m.kind === 'deferredKnockOut');
     if (!marker || marker.untilTurn !== draft.turn?.number) continue;
     events.push({ type: 'deferredKnockOut', instanceId: active.instanceId, playerId: pid, sourceAttack: marker.sourceAttack });
@@ -4341,6 +4361,18 @@ export function validateLegality(state, command) {
           };
         }
       }
+      // Gouging Fire ex Blaze Blitz: locked until this Pokémon leaves the Active Spot.
+      const whileActive = active.attackLockedWhileActive;
+      if (
+        whileActive &&
+        (active.movedToActiveTurn ?? 0) === whileActive.activeSince &&
+        String(attack?.name || '').toLowerCase() === String(whileActive.name).toLowerCase()
+      ) {
+        return {
+          allowed: false,
+          reason: `This Pokémon can't use ${attack?.name || whileActive.name} again until it leaves the Active Spot.`,
+        };
+      }
       // Encore / Amnesia (design 033): attack locks the opponent put on this Pokémon.
       const chosenName = String(attack?.name || '').toLowerCase();
       for (const lock of activeAttackMarkers(state, playerId, active).filter((m) => m.kind === 'attackLock')) {
@@ -5297,6 +5329,8 @@ function payOptionalCost(draft, { playerId, attacker, token, selection, activeRn
     case 'drawback': {
       if (!yes) return declined;
       const steps = parseAttackSteps(cost.text).after;
+      // M Ampharos-EX Exavolt: the accepted offer also leaves the opponent's Active Paralyzed.
+      if (cost.condition) steps.push({ type: 'atkApplyCondition', condition: cost.condition });
       if (steps.length > 0) {
         const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
         runAttackSteps(draft, { steps, attackerId: attacker?.instanceId, playerId, oppId, activeRng, events });
@@ -5876,6 +5910,26 @@ function statusConditionResults(draft, ctx, branches) {
  * @param {object} draft Cloned GameState
  * @param {object} ctx Derived attack context (see the call site)
  */
+const ENERGY_LETTER_TYPES = {
+  G: 'grass', R: 'fire', W: 'water', L: 'lightning', P: 'psychic',
+  F: 'fighting', D: 'darkness', M: 'metal', N: 'dragon', Y: 'fairy', C: 'colorless',
+};
+
+/** Energy cards of one printed type ("{M}") attached to an in-play Pokémon. */
+function attachedEnergyOfType(draft, root, letter) {
+  const ref = root ? findCard(draft, root.instanceId) : null;
+  const wanted = ENERGY_LETTER_TYPES[letter];
+  if (!ref || !wanted) return 0;
+  return (ref.player.zones[ref.zoneId] || []).filter((c) => {
+    if (c.attachedTo !== root.instanceId || !isEnergy(c)) return false;
+    const names = [c.energyType, ...(c.types || []), String(c.name || '').replace(/\s*energy.*/i, '')];
+    return names.some((n) => {
+      const t = String(n || '').toLowerCase().replace(/^basic /, '');
+      return (t === 'dark' ? 'darkness' : t) === wanted;
+    });
+  }).length;
+}
+
 // Dusknoir Night Spin: "… done to Dusknoir by your opponent's Pokémon that has 2 or less Energy
 // attached to it" — marker filters (attack-markers.mjs attackerMatchesFilter) read the attacker's
 // attached Energy cards as the attack's effects resolve.
@@ -6796,6 +6850,11 @@ function resolveAttackEffectPhase(draft, ctx) {
               attack,
             })
           : resolveAttackTargetClause(attack.text, parsed, spread);
+      // Probopass Metal Bomber: as many picks as the attacker has Energy of the printed type.
+      if (attackTarget?.countFromEnergy) {
+        const picks = attachedEnergyOfType(draft, attacker, attackTarget.countFromEnergy);
+        attackTarget = picks > 0 ? { ...attackTarget, count: picks } : null;
+      }
       // Shedinja Extra Curse: "If the Defending Pokémon is Pokémon-ex, put 4 damage counters instead."
       const counterSwap = attackTarget?.kind === 'counters'
         ? /(?:^|\. )if ([^,]+), put (\d+) damage counters instead\./.exec(normalizeAttackText(attack.text, attackerView?.name))
@@ -7051,6 +7110,14 @@ function resolveAttackEffectPhase(draft, ctx) {
         } else if (locks.selfCannotUseAttack && attacker) {
           attacker.cannotAttackUntilTurn = (draft.turn.number || 1) + 2;
           attacker.cannotAttackAttackName = locks.selfCannotUseAttack;
+        }
+        // The lock lasts until this Pokémon leaves the Active Spot: a later move there stamps a
+        // new `movedToActiveTurn`.
+        if (locks.selfCannotUseAttackWhileActive && attacker) {
+          attacker.attackLockedWhileActive = {
+            name: locks.selfCannotUseAttackWhileActive,
+            activeSince: attacker.movedToActiveTurn ?? 0,
+          };
         }
         if (locks.oppCannotRetreat && defender) {
           const defRef = findCard(draft, defender.instanceId);

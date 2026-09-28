@@ -52,6 +52,7 @@ export function normalizeAttackText(text, selfName = '') {
     out = out.replace(new RegExp(`(?<![\\w'])${escapeRegExp(printed)}(?![\\w'])`, 'g'), 'this pokémon');
   }
   return out
-    .replace(/\bthe defending pokémon\b/g, "your opponent's active pokémon")
+    // Elekid Magnetic Trip prints "this Defending Pokémon".
+    .replace(/\b(?:the|this) defending pokémon\b/g, "your opponent's active pokémon")
     .replace(/\bhis or her\b/g, 'their');
 }

@@ -154,6 +154,22 @@ const TEMPLATES = [
     /^(?:choose 1 of your opponent's benched pokémon( with no damage counters on it)? and switch (?:it with (?:1 of )?your opponent's active pokémon|your opponent's active pokémon with it)|switch 1 of your opponent's benched pokémon with 1 of your opponent's active pokémon|if your opponent has any benched pokémon, choose 1 of them and switch it with your opponent's active pokémon)$/,
     (m) => ({ type: 'atkGust', chooser: 'self', ...(m[1] ? { filter: 'undamaged' } : {}) }),
   ],
+  // Wobbuffet Shadow Tag (reduce.mjs resolveDeferredKnockouts places them).
+  [
+    /^put (\d+) damage counters on your opponent's active pokémon at the end of your opponent's next turn$/,
+    (m) => ({
+      type: 'atkAddMarker',
+      target: 'opponentActive',
+      window: 'opponentNextTurn',
+      marker: { kind: 'deferredCounters', count: Number(m[1]) },
+    }),
+  ],
+  // Unown Hidden Power (Unseen Forces I): after its switch, "The new Defending Pokémon is now
+  // Burned and Confused."
+  [
+    /^the new defending pokémon is now (asleep|burned|confused|paralyzed|poisoned)(?: and (asleep|burned|confused|paralyzed|poisoned))?$/,
+    (m) => conditionList(m.slice(1).filter(Boolean).join(' ')).map((condition) => ({ type: 'atkApplyCondition', condition })),
+  ],
   // Forretress Rapid Spin: the opponent switches first, then the attacker.
   [
     /^if your opponent has any benched pokémon, (?:he or she|they) chooses? 1 of them and switch(?:es)? it with their active pokémon, then, if you have any benched pokémon, you switch 1 of them with your active pokémon$/,
@@ -525,6 +541,11 @@ const TEMPLATES = [
     /^your opponent discards the top (?:(\d+) cards|card) (?:of|from) their deck$/,
     (m) => ({ type: 'atkMill', side: 'opponent', count: m[1] ? Number(m[1]) : 1 }),
   ],
+  // Dialga-EX Fast Forward.
+  [
+    /^for each (plasma) energy attached to this pokémon, discard the top card of your opponent's deck$/,
+    (m) => ({ type: 'atkMill', side: 'opponent', perAttachedEnergy: m[1] }),
+  ],
 
   // Attach from the discard pile / hand
   [
@@ -770,6 +791,16 @@ const TEMPLATES = [
   [
     /^put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) until its remaining hp is (\d+)$/,
     (m) => ({ type: 'atkHpCap', target: m[1].startsWith('1 of') ? 'opponentAny' : 'opponentActive', hp: Number(m[2]) }),
+  ],
+  // Toxtricity ex Gaia Punk.
+  [
+    /^discard (\d+) (?:\{([a-z])\} )?energy from your pokémon$/,
+    (m) => ({ type: 'atkDiscardOwnEnergy', count: Number(m[1]), ...(m[2] ? { energyType: m[2].toUpperCase() } : {}) }),
+  ],
+  // Arcanine ex Flame Swirl.
+  [
+    /^discard (\d+) \{([a-z])\} energy or 1 (react) energy card attached to this pokémon$/,
+    (m) => ({ type: 'atkDiscardSelfEnergyEither', count: Number(m[1]), energyType: m[2].toUpperCase(), name: m[3] }),
   ],
   // Palossand ex Barite Jail.
   [
@@ -1039,6 +1070,11 @@ const TEMPLATES = [
     /^(?:remove from this pokémon the number of damage counters equal to the damage you did to your opponent's active pokémon|remove a number of damage counters from this pokémon equal to the damage done to your opponent's active pokémon)$/,
     () => ({ type: 'atkMirrorHeal' }),
   ],
+  // Venusaur / Erika's Vileplume Mega Drain: half the damage done, rounded up to the nearest 10.
+  [
+    /^(?:if this pokémon does damage to your opponent's active pokémon(?: \(after applying weakness and resistance\))?, )?remove a number of damage counters from this pokémon equal to half the damage done to your opponent's active pokémon(?: \(after applying weakness and resistance\))?(?: \(rounded up to the nearest 10\))?$/,
+    () => ({ type: 'atkMirrorHeal', half: true }),
+  ],
 
   // Timed effects on later turns (design 031)
   ...MARKER_TEMPLATES,
@@ -1090,6 +1126,14 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Crobat BREAK Silent Bite ("… all cards attached to into your deck", sic).
+  [
+    /you may leave your opponent's active pokémon (asleep|burned|confused|paralyzed|poisoned)\. if you do, shuffle this pokémon and all cards attached to (?:it )?into your deck\./g,
+    (m) => [
+      { type: 'atkApplyCondition', condition: conditionList(m[1])[0], optional: true, cost: true },
+      { type: 'atkShuffleSelf' },
+    ],
+  ],
   // Spiritomb Color Tag.
   [
     /choose \{g\}\{r\}\{w\}\{l\}\{p\}\{f\}\{d\}\{m\} or \{c\} type\. put 1 damage counter on each pokémon your opponent has in play of the type you chose\./g,
@@ -1127,6 +1171,11 @@ const BLOCKS = [
   [
     /(?:your opponent reveals? their hand\. discard a supporter card you find there\.|look at your opponent's hand, choose a supporter card you find there, and discard it\. then,) use the effect of that card as the effect of this attack\./g,
     () => ({ type: 'atkUseSupporter', source: 'oppHand', discard: true }),
+  ],
+  // Jirachi / Magby Detour ("the effect on that card", Team Rocket Returns).
+  [
+    /if you have a supporter card in play, use the effect (?:of|on) that card as the effect of this attack\./g,
+    () => ({ type: 'atkUseSupporter', source: 'played' }),
   ],
   [
     /discard a supporter card from your hand\. if you do, use the effect of that card as the effect of this attack\./g,

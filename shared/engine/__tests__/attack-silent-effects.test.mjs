@@ -1342,3 +1342,163 @@ test('Mewtwo Energy Burst (Delta Species 12): Energy on both Active Pokémon cou
   });
   assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 50);
 });
+
+// ── one-offs ──────────────────────────────────────────────────────────────────
+
+test('Gouging Fire ex Blaze Blitz (Scarlet & Violet Promos 144): locked until it leaves the Active Spot', () => {
+  const text = "This Pokémon can't use Blaze Blitz again until it leaves the Active Spot.";
+  const { state, attacker } = board('Gouging Fire ex', text, { damage: '260' });
+  state.players.p1.zones.active[0].attacks[0].name = 'Blaze Blitz';
+  const res = attack(state);
+  res.state.turn = { player: 'p1', number: 7, phase: 'main' };
+  res.state.players.p1.flags = {};
+  const legal = () => validateLegality(res.state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } });
+  assert.match(legal().reason || '', /Blaze Blitz again/);
+  // Leaving the Active Spot and coming back stamps a new movedToActiveTurn.
+  root(res.state, 'p1', attacker.instanceId).movedToActiveTurn = 7;
+  assert.equal(legal().allowed, true);
+});
+
+test('Toxtricity ex Gaia Punk (Paradox Rift 227): 3 {L} Energy from any of your Pokémon', () => {
+  const text = 'Discard 3 {L} Energy from your Pokémon.';
+  let benched;
+  const { state, attacker } = board('Toxtricity ex', text, {
+    damage: '270',
+    setup: (s) => {
+      attachTo(s, s.players.p1.zones.active[0], ['Lightning', 'Lightning', 'Fire']);
+      benched = mon('Toxel');
+      s.players.p1.zones.bench.push(benched, energy('Lightning', benched.instanceId), energy('Lightning', benched.instanceId));
+    },
+  });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.options.length, 4);
+  res = choose(res, res.pendingChoice.options.slice(0, 3).map((o) => o.instanceId));
+  assert.equal(res.state.players.p1.zones.discard.filter((c) => c.energyType === 'Lightning').length, 3);
+  assert.deepEqual(attachedTypes(res.state, attacker).filter((t) => t === 'Fire'), ['Fire']);
+});
+
+test('Arcanine ex Flame Swirl (Legend Maker 83): 2 {R} Energy or 1 React Energy, the player picks', () => {
+  const text = 'Discard 2 {R} Energy or 1 React Energy card attached to Arcanine ex.';
+  const { state, attacker } = board('Arcanine ex', text, {
+    damage: '100',
+    setup: (s) => {
+      const host = s.players.p1.zones.active[0];
+      attachTo(s, host, ['Fire', 'Fire']);
+      s.players.p1.zones.active.push(
+        createCard({ instanceId: nextId++, name: 'React Energy', supertype: 'Energy', subtypes: ['Special'], attachedTo: host.instanceId })
+      );
+    },
+  });
+  let res = attack(state);
+  res = choose(res, [-12]);
+  assert.deepEqual(res.state.players.p1.zones.discard.map((c) => c.name), ['React Energy']);
+  assert.deepEqual(attachedTypes(res.state, attacker), ['Fire', 'Fire']);
+});
+
+test('Crobat BREAK Silent Bite (XY Promos XY181): Paralysis, then Crobat shuffles itself away', () => {
+  const text =
+    "You may leave your opponent's Active Pokémon Paralyzed. If you do, shuffle this Pokémon and all cards attached to into your deck.";
+  const make = () => board('Crobat BREAK', text, { damage: '60', setup: (s) => addBench(s, 'p1', 'Zubat') });
+  const yes = make();
+  let res = choose(attack(yes.state), [-11]);
+  assert.equal(root(res.state, 'p2', yes.defender.instanceId).specialCondition, 'Paralyzed');
+  assert.ok(res.state.players.p1.zones.deck.some((c) => c.instanceId === yes.attacker.instanceId));
+  const no = make();
+  res = choose(attack(no.state), [-12]);
+  assert.notEqual(root(res.state, 'p2', no.defender.instanceId).specialCondition, 'Paralyzed');
+  assert.ok(root(res.state, 'p1', no.attacker.instanceId));
+});
+
+test('M Ampharos-EX Exavolt (Ancient Origins 88): the accepted offer adds 50, Paralyzes, and costs 30', () => {
+  const text =
+    "You may do 50 more damage and leave your opponent's Active Pokémon Paralyzed. If you do, this Pokémon does 30 damage to itself.";
+  const { state, attacker, defender } = board('M Ampharos-EX', text, { damage: '110' });
+  const res = choose(attack(state), [1]);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 160);
+  assert.equal(root(res.state, 'p2', defender.instanceId).specialCondition, 'Paralyzed');
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 30);
+});
+
+test('Venusaur Mega Drain (Wizards Black Star Promos 13): heals half the damage done, rounded up', () => {
+  const text =
+    'Remove a number of damage counters from Venusaur equal to half the damage done to the Defending Pokémon (after applying Weakness and Resistance) (rounded up to the nearest 10). If Venusaur has fewer damage counters than that, remove all of them.';
+  const { state, attacker } = board('Venusaur', text, {
+    damage: '50',
+    setup: (s) => (s.players.p1.zones.active[0].damage = 60),
+  });
+  assert.equal(root(attack(state).state, 'p1', attacker.instanceId).damage, 30);
+});
+
+test('Elekid Magnetic Trip (Unseen Forces 23): "this Defending Pokémon" is Confused under Low Pressure System', () => {
+  const text = 'If Low Pressure System is in play, this Defending Pokémon is now Confused.';
+  const { state, defender } = board('Elekid', text, {
+    damage: '10',
+    setup: (s) => (s.stadium = { ...trainer('Low Pressure System', 'Stadium'), ownerId: 'p1' }),
+  });
+  assert.equal(root(attack(state).state, 'p2', defender.instanceId).specialCondition, 'Confused');
+});
+
+test('Jirachi Detour (Rising Rivals 7): the effect of the Supporter played this turn', () => {
+  const text = 'If you have a Supporter card in play, use the effect of that card as the effect of this attack.';
+  const { state } = board('Jirachi', text, {
+    damage: '',
+    setup: (s) => {
+      const supporter = { ...trainer("Professor's Research", 'Supporter'), text: 'Draw 2 cards.' };
+      s.players.p1.zones.discard.push(supporter);
+      s.players.p1.flags = { supporterPlayed: true, supporterNamesThisTurn: ["Professor's Research"] };
+    },
+  });
+  const res = attack(state);
+  assert.ok(res.events.some((e) => e.type === 'supporterEffectUsed'));
+  const none = board('Jirachi', text, { damage: '' });
+  assert.ok(!attack(none.state).events.some((e) => e.type === 'supporterEffectUsed'));
+});
+
+test('Dialga-EX Fast Forward (Plasma Blast 99): a card milled per Plasma Energy', () => {
+  const text = "For each Plasma Energy attached to this Pokémon, discard the top card of your opponent's deck.";
+  const plasma = (host) =>
+    createCard({ instanceId: nextId++, name: 'Plasma Energy', supertype: 'Energy', subtypes: ['Special'], attachedTo: host });
+  const { state } = board('Dialga-EX', text, {
+    setup: (s) => {
+      const host = s.players.p1.zones.active[0].instanceId;
+      s.players.p1.zones.active.push(plasma(host), plasma(host), energy('Metal', host));
+    },
+  });
+  assert.equal(attack(state).state.players.p2.zones.discard.length, 2);
+});
+
+test('Probopass Metal Bomber (Legends Awakened 13): one Benched pick per {M} Energy', () => {
+  const text =
+    "Choose a number of your opponent's Benched Pokémon up to the amount of {M} Energy attached to Probopass. This attack does 20 damage to each of them. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  let bench;
+  const { state } = board('Probopass', text, {
+    damage: '',
+    setup: (s) => {
+      attachTo(s, s.players.p1.zones.active[0], ['Metal', 'Metal', 'Fire']);
+      bench = addBench(s, 'p2', 'A', 'B', 'C');
+    },
+  });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.max, 2);
+  res = choose(res, [bench[0].instanceId, bench[2].instanceId]);
+  assert.deepEqual(bench.map((c) => root(res.state, 'p2', c.instanceId).damage || 0), [20, 0, 20]);
+});
+
+test('Unown Hidden Power (Unseen Forces I): the new Defending Pokémon is Burned and Confused', () => {
+  const text =
+    "Switch 1 of your opponent's Benched Pokémon with 1 of the Defending Pokémon. Your opponent chooses the Defending Pokémon to switch. The new Defending Pokémon is now Burned and Confused.";
+  let bench;
+  const { state } = board('Unown', text, { damage: '', setup: (s) => (bench = addBench(s, 'p2', 'Next')) });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p2', bench[0].instanceId).specialCondition, 'Confused');
+  assert.ok(res.events.some((e) => e.type === 'specialConditionUpdated' && e.condition === 'Burned'));
+});
+
+test("Wobbuffet Shadow Tag (Legend Maker 28): 7 counters at the end of the opponent's next turn", () => {
+  const text = "Put 7 damage counters on the Defending Pokémon at the end of your opponent's next turn.";
+  const { state, defender } = board('Wobbuffet', text, { damage: '' });
+  let res = attack(state);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage || 0, 0);
+  res = applyCommand(res.state, { type: 'pass', playerId: 'p2', payload: {} }, createRng(3));
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 70);
+});
