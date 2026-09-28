@@ -1,22 +1,34 @@
 {
+  "schemaVersion": 1,
   "targets": {
     "deck-builder": {
       "projectId": "fb8931cc-624a-4da8-9676-f5b3b5a94522",
       "baselineDraftId": "c5527b9f-00e5-49e1-bf25-b7cf32ece4cb",
-      "activeDraftId": "59b1e351-b11d-421c-bccc-be974659bad5",
-      "branches": {
-        "59b1e351-b11d-421c-bccc-be974659bad5": "Direction A: pokemon.com poster (red header band, type-tinted deck tiles, Poke-ball counter)",
-        "7a464c8c-d9db-4018-b120-27d99861766d": "Fork of A: Pokemon PC Box (3DS) style",
-        "5685dd13-9b25-4795-9a93-299e6048d1a5": "Flow page: Sets tab (PC Box style)",
-        "e4b1204f-d360-48f3-818d-848c35a3306e": "Flow page: Customize tab (PC Box style)",
-        "cae6fe8c-f922-4a6a-92e1-62700a3f835e": "Flow page: Front drawer Solo tab (PC Box style)",
-        "07273b88-9d7f-4b80-9102-74602ad7c053": "Direction B: TCG Live table (ocean felt stage, left rail, grouped deck list)"
-      },
+      "activeDraftId": "12b205d8-9946-4dd0-a7f2-698c33370890",
+      "designSystemPath": ".superdesign/design-system.md",
       "contextFiles": [
         ".superdesign/design-system.md",
-        "client/index.ejs:244:360",
-        "client/src/css/deck-builder-live.css:13:76"
-      ]
+        "client/index.ejs:245:350",
+        "client/src/css/deck-builder-pc-box.css",
+        "client/src/css/deck-builder-live.css:13:76",
+        "client/src/setup/deck-builder/core/card-filters.mjs"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "ff366008da6b936083901f038b5025cf4c3804d5a690a1d379c7a3fa24175ca3",
+        "client/index.ejs": "9cf600de508835b5940fd70a20342e06a1bc70932bb911089480b7e35a7db04f",
+        "client/src/css/deck-builder-pc-box.css": "25d0351e7d5ea757da8d3635813b853faa458736a04ac5a5f4530f7972523b58",
+        "client/src/css/deck-builder-live.css": "d7f39c74067bfb1fd83a84928be24424a31120aaa2df9a02a52b9cddcbd7d4db",
+        "client/src/setup/deck-builder/core/card-filters.mjs": "e4e11e89d4ac082fe56f887dda5d87e9d1339b3981333525a5e7298dc0fa34fc"
+      },
+      "drafts": {
+        "c5527b9f-00e5-49e1-bf25-b7cf32ece4cb": { "title": "Pixel-Perfect TCG Live Deck Builder", "visualDirection": "baseline reproduction (pre-PC Box)" },
+        "59b1e351-b11d-421c-bccc-be974659bad5": { "title": "Direction A: pokemon.com poster", "visualDirection": "red header band, type-tinted deck tiles", "parentDraftId": "c5527b9f-00e5-49e1-bf25-b7cf32ece4cb" },
+        "7a464c8c-d9db-4018-b120-27d99861766d": { "title": "3DS Handheld Style Deck Builder", "visualDirection": "PC Box (shipped look)", "parentDraftId": "59b1e351-b11d-421c-bccc-be974659bad5", "currentVersion": 9 },
+        "07273b88-9d7f-4b80-9102-74602ad7c053": { "title": "TCG Live Pro-Tool Deck Builder", "visualDirection": "Direction B: ocean felt stage", "parentDraftId": "c5527b9f-00e5-49e1-bf25-b7cf32ece4cb" },
+        "44ced87a-a464-4420-aa2d-c8d2866a59ab": { "title": "PC Box Deck Builder - Standalone Filter Workspace", "visualDirection": "standalone popup, persistent left filter sidebar", "parentDraftId": "7a464c8c-d9db-4018-b120-27d99861766d", "currentVersion": 1 },
+        "12b205d8-9946-4dd0-a7f2-698c33370890": { "title": "PC Box Deck Builder - Standalone with TCG Live Filter Drawer", "visualDirection": "standalone popup, TCG Live filter drawer (user-selected 2026-09-28)", "parentDraftId": "7a464c8c-d9db-4018-b120-27d99861766d", "currentVersion": 1 }
+      },
+      "updatedAt": "2026-09-28T12:00:00Z"
     }
   }
 }

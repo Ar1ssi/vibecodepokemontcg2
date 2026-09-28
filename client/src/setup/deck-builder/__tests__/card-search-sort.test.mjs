@@ -82,6 +82,29 @@ test('name desc tie-break uses later release dates first', () => {
   assert.deepEqual(results.map((c) => c.id), ['pikachu-new', 'pikachu-mid', 'pikachu-old']);
 });
 
+test('applyLocalControls sorts by HP, Pokémon first in both directions', () => {
+  const cards = [
+    { id: 'nest', name: 'Nest Ball', hp: null, set: {} },
+    { id: 'pika', name: 'Pikachu', hp: 60, set: {} },
+    { id: 'zard', name: 'Charizard ex', hp: 330, set: {} },
+  ];
+  const desc = applyLocalControls(cards, { sortBy: 'hp', sortDirection: 'desc' });
+  assert.deepEqual(desc.map((card) => card.id), ['zard', 'pika', 'nest']);
+  const asc = applyLocalControls(cards, { sortBy: 'hp', sortDirection: 'asc' });
+  assert.deepEqual(asc.map((card) => card.id), ['pika', 'zard', 'nest']);
+});
+
+test('applyLocalControls sorts collector numbers the way they read', () => {
+  const set = { id: 'swsh12', releaseDate: '2022-11-11' };
+  const cards = [
+    { id: 'tg', name: 'A', number: 'TG12', set },
+    { id: 'n100', name: 'B', number: '100', set },
+    { id: 'n9', name: 'C', number: '9', set },
+  ];
+  const asc = applyLocalControls(cards, { sortBy: 'number', sortDirection: 'asc' });
+  assert.deepEqual(asc.map((card) => card.id), ['n9', 'n100', 'tg']);
+});
+
 test('applyLocalControls no longer truncates by visible count', () => {
   const results = applyLocalControls(sample, { sortBy: 'name', sortDirection: 'asc', cardType: 'all', visibleCount: 1 });
   assert.deepEqual(results.map((c) => c.name), ['Abra', 'Bulbasaur', 'Charmander']);
