@@ -240,6 +240,7 @@
                 <div class="native-deck-builder-actions">
                     <button id="nativeDeckBuilderThemeToggle" class="native-deck-builder-theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme">☀️</button>
                     <button id="nativeDeckBuilderExportCsv" class="self-color">Export Deck</button>
+                    <button id="nativeDeckBuilderImportList" class="self-color" type="button" title="Paste a text decklist">Import List</button>
                     <label for="nativeDeckBuilderCsvImport" id="nativeDeckBuilderImportCsvLabel" class="self-color native-deck-builder-inline-label">Import Deck</label>
                     <input id="nativeDeckBuilderCsvImport" type="file" accept=".csv" style="display:none;" />
                 </div>
@@ -327,6 +328,25 @@
                             <button type="button" data-wallpaper-step="1" aria-label="Next box wallpaper" title="Next box wallpaper">&#9654;</button>
                         </div>
                     </div></div>
+            </div>
+            <div id="nativeDeckBuilderImportListModal" class="native-deck-builder-modal" role="dialog" aria-modal="true" aria-label="Import card list" hidden>
+                <div class="native-deck-builder-modal-box native-deck-builder-import-box">
+                    <div class="native-deck-builder-modal-title">Import Card List</div>
+                    <label class="native-deck-builder-modal-label">
+                        Paste a decklist (Pokémon TCG Live, Limitless, or plain "4 Pikachu ex")
+                        <textarea id="nativeImportListText" class="native-deck-builder-modal-input native-deck-builder-import-text" spellcheck="false" placeholder="4 Pikachu ex SVI 57&#10;4 Ultra Ball&#10;8 Basic {L} Energy"></textarea>
+                    </label>
+                    <div class="native-deck-builder-import-mode" role="radiogroup" aria-label="Import mode">
+                        <label><input type="radio" name="nativeImportListMode" value="replace" checked /> Replace current deck</label>
+                        <label><input type="radio" name="nativeImportListMode" value="add" /> Add to current deck</label>
+                    </div>
+                    <div id="nativeImportListStatus" class="native-deck-builder-import-status" aria-live="polite"></div>
+                    <ul id="nativeImportListProblems" class="native-deck-builder-import-problems" hidden></ul>
+                    <div class="native-deck-builder-modal-actions">
+                        <button id="nativeImportListCancel" class="neutral-color" type="button">Close</button>
+                        <button id="nativeImportListSubmit" class="self-color" type="button">Import</button>
+                    </div>
+                </div>
             </div>
             <div id="nativeDeckBuilderCustomCardModal" class="native-deck-builder-modal" role="dialog" aria-modal="true" aria-label="Add custom card" hidden>
                 <div class="native-deck-builder-modal-box">

@@ -59,6 +59,10 @@ import {
 } from '../../../setup/deck-builder/core/box-wallpapers.mjs';
 import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
 import {
+  importDeckEntries,
+  parseDeckText,
+} from '../../../setup/deck-builder/core/deck-text-import.mjs';
+import {
   addCard,
   createEmptyDeck,
   filterDeck,
@@ -67,6 +71,7 @@ import {
 } from '../../../setup/deck-builder/core/deck-state.mjs';
 import {
   applyLocalControls,
+  fetchCardDetail as fetchNormalizedCardDetail,
   queryCards,
 } from '../../../setup/deck-builder/core/card-search.mjs';
 import {
@@ -274,6 +279,13 @@ export const initializeNativeDeckBuilder = ({ role = 'host' } = {}) => {
   const customCardModal = document.getElementById(
     'nativeDeckBuilderCustomCardModal'
   );
+  const importListButton = document.getElementById('nativeDeckBuilderImportList');
+  const importListModal = document.getElementById('nativeDeckBuilderImportListModal');
+  const importListText = document.getElementById('nativeImportListText');
+  const importListStatus = document.getElementById('nativeImportListStatus');
+  const importListProblems = document.getElementById('nativeImportListProblems');
+  const importListSubmit = document.getElementById('nativeImportListSubmit');
+  const importListCancel = document.getElementById('nativeImportListCancel');
   const customCardQty = document.getElementById('nativeCustomCardQty');
   const customCardName = document.getElementById('nativeCustomCardName');
   const customCardType = document.getElementById('nativeCustomCardType');
@@ -1126,6 +1138,94 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     customCardModal.setAttribute('hidden', '');
   };
 
+  // "Import List" popup: a pasted text decklist resolved through TCGdex.
+  const openImportListModal = () => {
+    importListStatus.textContent = '';
+    importListProblems.replaceChildren();
+    importListProblems.hidden = true;
+    importListModal.removeAttribute('hidden');
+    importListText.focus();
+  };
+
+  const closeImportListModal = () => {
+    importListModal.setAttribute('hidden', '');
+  };
+
+  const showImportProblems = (lines) => {
+    importListProblems.replaceChildren(
+      ...lines.map((text) => {
+        const item = document.createElement('li');
+        item.textContent = text;
+        return item;
+      })
+    );
+    importListProblems.hidden = lines.length === 0;
+  };
+
+  const submitImportList = async () => {
+    const { entries, skipped } = parseDeckText(importListText.value);
+    importListProblems.hidden = true;
+    if (!entries.length) {
+      importListStatus.textContent = 'No card lines found. Use lines like "4 Pikachu ex SVI 57".';
+      showImportProblems(skipped.map((line) => `Skipped: ${line}`));
+      return;
+    }
+
+    const replace =
+      importListModal.querySelector('input[name="nativeImportListMode"]:checked')?.value !== 'add';
+    const nameSearches = new Map();
+    const deps = {
+      fetchCardDetail: fetchNormalizedCardDetail,
+      searchByName: (name) => {
+        if (!nameSearches.has(name)) {
+          nameSearches.set(name, queryCards({ term: name }).then((search) => search.results));
+        }
+        return nameSearches.get(name);
+      },
+    };
+
+    importListSubmit.disabled = true;
+    try {
+      const result = await importDeckEntries(entries, {
+        deck: replace ? createEmptyDeck() : deck,
+        addCard,
+        deps,
+        onProgress: (done, total) => {
+          importListStatus.textContent = `Looking up cards… ${done} / ${total}`;
+        },
+      });
+
+      if (result.imported > 0) {
+        deck = result.deck;
+        syncedDecks[currentLoadTarget] = deck;
+        deckDirty = true;
+        render();
+      }
+      importListStatus.textContent = result.imported
+        ? `Imported ${result.imported} card${result.imported === 1 ? '' : 's'}.`
+        : 'Nothing was imported.';
+      showImportProblems([
+        ...result.failed.map(({ line, reason }) => `${line} — ${reason}`),
+        ...skipped.map((line) => `Skipped: ${line}`),
+      ]);
+      if (!result.failed.length && !skipped.length && result.imported > 0) {
+        importListText.value = '';
+        closeImportListModal();
+      }
+    } catch (error) {
+      importListStatus.textContent = `Import failed: ${error.message}`;
+    } finally {
+      importListSubmit.disabled = false;
+    }
+  };
+
+  importListButton.addEventListener('click', openImportListModal);
+  importListCancel.addEventListener('click', closeImportListModal);
+  importListSubmit.addEventListener('click', submitImportList);
+  importListModal.addEventListener('click', (event) => {
+    if (event.target === importListModal) closeImportListModal();
+  });
+
   addCustomCardButton.addEventListener('click', openCustomCardModal);
   customCardCancel.addEventListener('click', closeCustomCardModal);
 
@@ -1246,7 +1346,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     );
 
     const isSelf = currentLoadTarget === 'self';
-    for (const el of [exportCsvButton, importCsvLabel, clearButton]) {
+    for (const el of [exportCsvButton, importListButton, importCsvLabel, clearButton]) {
       if (!el) continue;
       el.classList.toggle('self-color', isSelf);
       el.classList.toggle('opp-color', !isSelf);

@@ -1342,6 +1342,15 @@
   color: var(--db-red);
 }
 
+.db-live .native-deck-builder-import-mode,
+.db-live .native-deck-builder-import-status {
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-import-problems {
+  color: var(--db-red);
+}
+
 .db-live .native-deck-builder-modal-actions button {
   border-radius: var(--db-radius-pill);
   font-weight: 700;

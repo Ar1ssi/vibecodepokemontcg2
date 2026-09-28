@@ -3108,6 +3108,46 @@ body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-s
   color: white;
 }
 
+/* Import list popup */
+.native-deck-builder-import-box {
+  max-width: 34vw;
+  min-width: 28vw;
+}
+.native-deck-builder-import-text {
+  min-height: 24vh;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.4;
+}
+.native-deck-builder-import-mode {
+  display: flex;
+  gap: 1.2vw;
+  font-size: 1.5vh;
+  color: #3b4a7a;
+}
+.native-deck-builder-import-mode label {
+  display: flex;
+  align-items: center;
+  gap: 0.3vw;
+  cursor: pointer;
+}
+.native-deck-builder-import-status {
+  font-size: 1.4vh;
+  color: #3b4a7a;
+  min-height: 1.8vh;
+}
+.native-deck-builder-import-problems {
+  margin: 0;
+  padding-left: 1.2vw;
+  max-height: 14vh;
+  overflow-y: auto;
+  font-size: 1.35vh;
+  color: #c0392b;
+}
+.native-deck-builder-import-problems[hidden] {
+  display: none;
+}
+
 body.dark-mode-1 .native-deck-builder-inner {
   background: rgba(20, 24, 29, 0.94);
   border-left-color: rgba(120, 144, 214, 0.16);
