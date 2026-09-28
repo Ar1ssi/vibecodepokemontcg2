@@ -338,6 +338,7 @@ export function buildServerAttackContext(
     attackerEnergyTypes: [...new Set(energyOn(own, attacker, { stadiumCard, opponent }))],
     attackerEnergyNames: attachedEnergyCards(own, attacker).map((card) => card.name || ''),
     benchNames: ownBench.map(({ card, view }) => view?.name || card?.name || ''),
+    benchStages: ownBench.map(({ view }) => normalizeStage(view?.stage)),
     benchTypes: ownBench.map(({ card, view }) => [...(view?.types || card?.types || [])]),
     ownInPlayNames: ownInPlay.map(({ card, view }) => view?.name || card?.name || ''),
     ownDiscardEnergy: zoneOf(own, 'discard')
