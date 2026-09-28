@@ -20,6 +20,7 @@ import {
   saveSession,
   validatePoolDeck,
 } from '../build-battle-session.mjs';
+import { advanceUnboxing, createUnboxing, finishedUnboxing } from '../unboxing.mjs';
 
 const box = getBuildBattleBox('phantasmal-flames');
 const setCards = BUILD_BATTLE_SET_CARDS.me02;
@@ -51,14 +52,14 @@ const throwingStorage = {
   },
 };
 
-test('createSession starts sealed-deck state: nothing revealed, no library deck', () => {
+test('createSession starts with the box sealed and no library deck', () => {
   assert.deepEqual(freshSession(), {
     version: 1,
     boxKey: 'phantasmal-flames',
     seed: 42,
     deckKey: opened.deckKey,
     packs: opened.packs,
-    openedPacks: 0,
+    unboxing: createUnboxing(),
     deckId: null,
     createdAt: 1000,
   });
@@ -66,7 +67,14 @@ test('createSession starts sealed-deck state: nothing revealed, no library deck'
 
 test('a session round-trips through storage and clears', () => {
   const storage = memoryStorage();
-  const session = { ...freshSession(), openedPacks: 2, deckId: 'abc12345' };
+  const unboxing = [
+    { type: 'tearWrap' },
+    { type: 'openLid' },
+    { type: 'unwrapDeck' },
+    { type: 'tearPack', packIndex: 1 },
+    { type: 'revealCard', packIndex: 1 },
+  ].reduce(advanceUnboxing, createUnboxing());
+  const session = { ...freshSession(), unboxing, deckId: 'abc12345' };
   assert.equal(saveSession(storage, session), true);
   assert.deepEqual(loadSession(storage), session);
   assert.equal(clearSession(storage), true);
@@ -98,9 +106,13 @@ test('parseSession refuses anything it cannot trust', () => {
   );
   assert.equal(bad({ packs: good.packs.slice(1) }), null);
   assert.equal(bad({ packs: [[], ...good.packs.slice(1)] }), null);
-  assert.equal(bad({ openedPacks: -1 }), null);
-  assert.equal(bad({ openedPacks: 5 }), null);
-  assert.equal(bad({ openedPacks: 1.5 }), null);
+  assert.equal(bad({ unboxing: null }), null);
+  assert.equal(bad({ unboxing: { ...createUnboxing(), stage: 'lidless' } }), null);
+  assert.equal(
+    bad({ unboxing: { ...createUnboxing(), revealed: [3, 0, 0, 0] } }),
+    null,
+    'cards revealed from an untorn pack'
+  );
   assert.equal(bad({ seed: -1 }), null);
   assert.equal(bad({ seed: 2 ** 31 }), null);
   assert.equal(bad({ deckId: 7 }), null);
@@ -211,4 +223,12 @@ test('Basic Energy is unlimited: never checked against the pool', () => {
   assert.equal(canAddFromPool(deck, pool, darkness), true);
   assert.deepEqual(validatePoolDeck({}, []), []);
   assert.deepEqual(validatePoolDeck(undefined, undefined), []);
+});
+
+test('a design 051 session without `unboxing` resumes at the end of the scene', () => {
+  const { unboxing: _unboxing, ...legacy } = freshSession();
+  const parsed = parseSession(JSON.stringify({ ...legacy, openedPacks: 2 }));
+  assert.deepEqual(parsed.unboxing, finishedUnboxing());
+  assert.equal('openedPacks' in parsed, false);
+  assert.deepEqual(parsed.packs, opened.packs);
 });

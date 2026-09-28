@@ -1,5 +1,5 @@
 # 052: Build & Battle unboxing scene (box, deck, packs, card reveals)
-Status: draft — awaiting user approval (feature.md phase 2 gate) · depends on design 051 slices 1–4
+Status: approved (user, 2026-09-28: "start working on design 52") · slice 1 built · depends on design 051 slices 1–4
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -258,23 +258,23 @@ house rule 8). Phone width: box scales to the viewport width, packs wrap two per
 |---|---|---|---|
 | 1 | reduced motion flag set | every beat completes instantly, sounds still play, holo tilt still works | [ ] |
 | 2 | `body.fx-off` / `fxDisabled()` | instant beats, no sound, no flare, no particles | [ ] |
-| 3 | illegal event (reveal before tear, tear twice, finish mid-pack) | reducer returns the same object; DOM does nothing | [ ] |
-| 4 | reload at each stage (sealed/opened/deckShown/packs with 3 of 10 revealed/done) | remounts settled at that stage; the 3 revealed cards are in the fan, 7 on the stack | [ ] |
-| 5 | drag released at 39 % / 40 % / click with 5 px / 7 px movement | springs back / tears / tears / nothing (treated as a short drag) | [ ] |
+| 3 | illegal event (reveal before tear, tear twice, finish mid-pack) | reducer returns the same object; DOM does nothing | [x] unboxing.test row 3 (DOM half: slice 2) |
+| 4 | reload at each stage (sealed/opened/deckShown/packs with 3 of 10 revealed/done) | remounts settled at that stage; the 3 revealed cards are in the fan, 7 on the stack | [x] state round trip, unboxing.test row 4 (remount: slice 2) |
+| 5 | drag released at 39 % / 40 % / click with 5 px / 7 px movement | springs back / tears / tears / nothing (treated as a short drag) | [x] unboxing.test row 5 (`tearReleaseOutcome`) |
 | 6 | double-click on the stack | one reveal per completed flip; a second click during `CARD_FLIP_MS` queues at most one | [ ] |
-| 7 | Reveal all pressed mid-reveal | continues from the current index; no duplicate cards | [ ] |
+| 7 | Reveal all pressed mid-reveal | continues from the current index; no duplicate cards | [x] unboxing.test row 7 |
 | 8 | WAAPI missing (old browser) | `animateFrames` degrades (existing behavior): states still settle via the backstop | [ ] |
 | 9 | animation never finishes (tab hidden) | `SCENE_BACKSTOP_MS` settles the state | [ ] |
-| 10b | `packArtIndexes(42)` twice / different seeds / `openBox(42)` before and after adding art | identical arrays / arrays differ somewhere across 100 seeds / the card pool is byte-identical to slice 2's | [ ] |
-| 10a | `faceMatrix3d` on a rectangle / a skewed quad / a degenerate quad (two equal corners) | identity-like matrix / corners land within 0.5 px of the target / throws, and the face falls back to the procedural layout | [ ] |
+| 10b | `packArtIndexes(42)` twice / different seeds / `openBox(42)` before and after adding art | identical arrays / arrays differ somewhere across 100 seeds / the card pool is byte-identical to slice 2's | [x] unboxing.test row 10b |
+| 10a | `faceMatrix3d` on a rectangle / a skewed quad / a degenerate quad (two equal corners) | identity-like matrix / corners land within 0.5 px of the target / throws, and the face falls back to the procedural layout | [x] unboxing.test row 10a (fallback: slice 2) |
 | 10 | card image 404 / logo 404 / key art 404 / face texture 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [ ] |
-| 11 | tier mapping across all 130 me02 cards + promos | every `unboxingHoloRarity` result is a family `holo/*.css` styles (or null); reverse slot always ends in "reverse holo"; Rare/Promo → rare holo | [ ] |
+| 11 | tier mapping across all 130 me02 cards + promos | every `unboxingHoloRarity` result is a family `holo/*.css` styles (or null); reverse slot always ends in "reverse holo"; Rare/Promo → rare holo | [x] unboxing.test row 11 |
 | 12 | hit flare never leaves the card rect | flare + particles are children of the card host with `overflow: hidden` | [ ] |
 | 13 | pool integrity | revealed ids == `session.packs[i]` in order; the scene reads, never writes, `packs` | [ ] |
 | 14 | face shown before the flip midpoint | never: the holo node is created at 50 % of `CARD_FLIP_MS` | [ ] video |
 | 15 | keyboard-only user | Tab reaches wrap, lid, deck, packs, stack; Enter/Space fires each beat | [ ] |
 | 16 | phone width (390 px) | no horizontal scroll; box, tray, fan wrap | [ ] |
-| 17 | "Skip scene" from sealed | jumps to done, Pool tab available, one `unbox-done` sound | [ ] |
+| 17 | "Skip scene" from sealed | jumps to done, Pool tab available, one `unbox-done` sound | [x] reducer + voice, unboxing.test row 17 (Pool tab: slice 2) |
 | 18 | sound context locked (no gesture yet) | `playFxSound` no-ops until the first gesture (existing `bindGestureUnlock`) | [ ] reasoning |
 
 ## Test plan
@@ -302,6 +302,27 @@ mounts at `done`. Revert path: revert the commits; sessions keep working (the fi
 | 3 Verify | create `.claude/skills/fx-preview/rec/rec-unboxing.mjs`; modify `fx-preview/SKILL.md` (builder-tab section) | recorder opens `/build-and-battle?seed=42&e2e=1`, drives beats via DOM clicks, writes `out/unboxing.webm` + strips | rows 4, 13, 14 by video; strips at the seven beats listed | — | video + strips recorded and reviewed; user check on localhost |
 
 ## Deviations (Builder appends here during build)
+Slice 1 (2026-09-28):
+- `Unboxing` gains `wrapTorn: boolean`: five stages cannot hold three pre-pack beats. `tearWrap`
+  sets it inside `sealed`; `openLid` needs it and moves to `opened`; the first `tearPack` moves
+  `deckShown` → `packs`.
+- `finish` is refused while a torn pack still has face-down cards (row 3 "finish mid-pack"); it
+  is legal from every other stage (row 17). Slice 2's "Skip scene" plays `revealAll` on that pack
+  first, then `finish`.
+- `unboxingTimeline(u, { packIndex?, tiers? })`: the beats need the tier of each card, which the
+  state does not carry. A hit starts the next card only after it settles; a `collapse` beat closes
+  the last pack.
+- Extra pure exports the DOM twin needs: `cardRevealPhases(tier)` (lift/flip/settle split; the
+  flip uses a symmetric ease so 90° falls exactly at the flip-window midpoint, which is where the
+  test plan's "crosses 90° at 0.5" is checked), `tearReleaseOutcome`, `packSlotKind`
+  (reverse vs normal draw from the pack model), `parseUnboxing`, `finishedUnboxing`,
+  `tornPackCount`, `homography`, `cubicBezier`.
+- Sound table wins over "each ≤ 3 voices": `unbox-hit-2` is 4 notes, `unbox-hit-3` adds the swell.
+- `box-textures.mjs` stores each asset's `cropInRender` (render pixels) and the `quad` relative
+  to that crop; slice 2 cuts `front.webp` at 212,40 812×1336 and `left.webp` at 0,28 246×1348.
+- The 051 flip controller (`native-deck-builder-build-battle.js`) now drives the reducer
+  (`tearWrap`…`tearPack`/`revealAll` per opened pack) so the session keeps one progress record
+  until slice 2 replaces the flip. A 051 session without `unboxing` parses as `done`.
 
 ---
 Self-approval checklist (only when the user is unreachable):

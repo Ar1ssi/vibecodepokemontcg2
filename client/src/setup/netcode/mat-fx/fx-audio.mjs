@@ -71,6 +71,9 @@ const EVOLVE_SCORE = Object.freeze([
   ...arpeggio([2637, 3136, 2349, 3520, 2794], { step: 0.12, dur: 0.25, gain: 0.035, wave: 'sine', at: 2.45 }),
 ]);
 
+const UNBOX_HIT_1 = arpeggio([523, 659, 784], { step: 0.07, dur: 0.22, gain: 0.14, wave: 'sine' });
+const UNBOX_HIT_2 = arpeggio([1047, 1319, 1568, 2093], { step: 0.07, dur: 0.24, gain: 0.12, wave: 'sine' });
+
 // ── Static palette: effects whose sound never varies with the plan ──────────
 const STATIC_VOICES = Object.freeze({
   'attack-banner': [
@@ -120,6 +123,21 @@ const STATIC_VOICES = Object.freeze({
   ],
   'status-clear': arpeggio([622, 831, 1109], { step: 0.05, dur: 0.16, gain: 0.12, wave: 'sine' }),
   discard: [noise(0.12, 0.14, { type: 'lowpass', freq: 1100, q: 0.7 })],
+  // Design 052: the Build & Battle unboxing (builder tab). The hit chime climbs with the tier.
+  'unbox-tear': [noise(0.18, 0.35, { type: 'bandpass', freq: 1800, q: 0.9 })],
+  'unbox-lid': [
+    tone(140, 0.22, 0.3, { wave: 'triangle', freqTo: 90 }),
+    noise(0.09, 0.15, { type: 'lowpass', freq: 900, q: 0.7 }, { delay: 0.06 }),
+  ],
+  'unbox-unwrap': [noise(0.14, 0.25, { type: 'highpass', freq: 3000, q: 0.7 })],
+  'unbox-flip': [tone(900, 0.04, 0.12, { wave: 'square' })],
+  'unbox-hit-1': UNBOX_HIT_1,
+  'unbox-hit-2': UNBOX_HIT_2,
+  'unbox-hit-3': Object.freeze([
+    ...UNBOX_HIT_2,
+    tone(262, 1.2, 0.18, { wave: 'sawtooth', attack: 0.8 }),
+  ]),
+  'unbox-done': [tone(392, 0.26, 0.25, { wave: 'triangle', freqTo: 523 })],
 });
 
 // ── Per-condition status motifs ────────────────────────────────────────────

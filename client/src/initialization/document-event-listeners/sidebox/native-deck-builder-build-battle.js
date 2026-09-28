@@ -27,6 +27,10 @@ import {
   poolRefusalMessage,
   poolRemaining,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
+import {
+  advanceUnboxing,
+  tornPackCount,
+} from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { resolveDefaultCardBackSrc } from '../../../setup/deck-constructor/default-card-back.mjs';
 
@@ -162,11 +166,18 @@ export const initializeBuildBattle = ({
     renderAll();
   };
 
+  // Until the unboxing scene (design 052 slice 2) replaces this flip, opening a pack plays the
+  // scene's beats up to that pack at once, so the session keeps one progress record.
   const revealPacks = (count) => {
     if (!session) return;
-    const next = Math.min(BOX.packCount, Math.max(session.openedPacks, count));
-    for (let index = session.openedPacks; index < next; index += 1) flippingPacks.add(index);
-    session = { ...session, openedPacks: next };
+    const openedPacks = tornPackCount(session.unboxing);
+    const next = Math.min(BOX.packCount, Math.max(openedPacks, count));
+    const events = [{ type: 'tearWrap' }, { type: 'openLid' }, { type: 'unwrapDeck' }];
+    for (let index = openedPacks; index < next; index += 1) {
+      flippingPacks.add(index);
+      events.push({ type: 'tearPack', packIndex: index }, { type: 'revealAll', packIndex: index });
+    }
+    session = { ...session, unboxing: events.reduce(advanceUnboxing, session.unboxing) };
     persist();
     renderBox();
   };
@@ -243,7 +254,7 @@ export const initializeBuildBattle = ({
     const actions = el('div', 'bb-box-actions');
     const openAll = el('button', 'bb-secondary', 'Open all');
     openAll.type = 'button';
-    openAll.disabled = session.openedPacks >= BOX.packCount;
+    openAll.disabled = tornPackCount(session.unboxing) >= BOX.packCount;
     openAll.addEventListener('click', () => revealPacks(BOX.packCount));
     const build = el('button', 'bb-primary', 'Build your deck');
     build.type = 'button';
@@ -271,8 +282,9 @@ export const initializeBuildBattle = ({
     boxPanelEl.append(deckCard);
 
     const packsEl = el('div', 'bb-packs');
+    const openedPacks = tornPackCount(session.unboxing);
     session.packs.forEach((pack, packIndex) => {
-      const isOpen = packIndex < session.openedPacks;
+      const isOpen = packIndex < openedPacks;
       const row = el('div', 'bb-pack-row');
       const packButton = el(
         'button',
@@ -280,8 +292,8 @@ export const initializeBuildBattle = ({
         isOpen ? `Pack ${packIndex + 1}` : `Open pack ${packIndex + 1}`
       );
       packButton.type = 'button';
-      // Packs open in order: the session stores how many are open, not which.
-      packButton.disabled = packIndex !== session.openedPacks;
+      // This flip opens packs in order, so the torn count is the next pack.
+      packButton.disabled = packIndex !== openedPacks;
       packButton.addEventListener('click', () => revealPacks(packIndex + 1));
       const cardsEl = el('div', 'bb-pack-cards');
       pack.forEach((id, cardIndex) => {
