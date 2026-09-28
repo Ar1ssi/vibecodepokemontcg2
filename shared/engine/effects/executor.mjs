@@ -178,6 +178,21 @@ export function createPendingChoice({
   };
 }
 
+// "up to 2 Basic Pokémon or 1 Evolution Pokémon": keep only the picks that fit the branch the
+// first pick chose, up to that branch's count.
+function pickAlternativeBranch(deck, selection, alternatives) {
+  const cardOf = (id) => deck.find((c) => c.instanceId === id);
+  const firstCard = cardOf(selection[0]);
+  const branch = firstCard && alternatives.find((alt) => matchesSearch(firstCard, alt.what));
+  if (!branch) return [];
+  return selection
+    .filter((id) => {
+      const card = cardOf(id);
+      return card && matchesSearch(card, branch.what);
+    })
+    .slice(0, branch.count);
+}
+
 function opponentBenchIsEvolved(player, root) {
   const stage = normalizeStage(root.stage);
   if (stage && stage !== 'Basic') return true;
@@ -642,7 +657,10 @@ export function executeSteps(draft, {
           // Resume: move chosen cards to destination
           const deck = player.zones.deck || [];
           const pickedCards = [];
-          for (const sId of stepSelection) {
+          const allowedIds = step.alternatives
+            ? pickAlternativeBranch(deck, stepSelection, step.alternatives)
+            : stepSelection;
+          for (const sId of allowedIds) {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
               const benchCount = currentBench.filter((b) => !b.attachedTo).length;

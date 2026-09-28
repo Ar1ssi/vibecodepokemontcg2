@@ -537,6 +537,24 @@ export function parseSearchDeckParams(lower) {
     };
   }
 
+  // "up to 2 Basic Pokémon or 1 Evolution Pokémon" (Brock's Scouting): one branch, not a mixed pick.
+  const basicOrEvo = lower.match(
+    /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/
+  );
+  if (basicOrEvo && !lower.includes('onto your bench')) {
+    return {
+      what: 'Basic Pokémon or Evolution Pokémon',
+      count: Math.max(Number(basicOrEvo[1]), Number(basicOrEvo[2])),
+      destination: 'hand',
+      upTo: true,
+      alternatives: [
+        { what: 'Basic Pokémon', count: Number(basicOrEvo[1]) },
+        { what: 'Evolution Pokémon', count: Number(basicOrEvo[2]) },
+      ],
+      ...(reveal ? { reveal: true } : {}),
+    };
+  }
+
   // up to N Basic Pokémon → bench WITH an HP cap (Buddy-Buddy Poffin, etc.)
   const basicHpBench = lower.match(
     /search your deck for (?:up to\s+)?(\d+)\s+basic pok[ée]mon(?:\s+cards?)?\s+with\s+(\d+)\s+hp\s+or\s+less/
