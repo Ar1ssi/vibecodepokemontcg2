@@ -56,6 +56,7 @@ export const systemState = {
   selfDeckData: '',
   p1OppDeckData: '', // refers to the opponent's data in 1 player mode, i.e., the "alt" deck data
   p2OppDeckData: '', // refers to the opponent's data in 2 player mode, i.e., the other player's deck data
+  deckFormat: { self: 'tcg', opp: 'tcg' }, // design 051: 'tcg' | 'build-battle', sets the Prize count
   cardBackSrc: defaultCardBackSrc,
   p1OppCardBackSrc: defaultCardBackSrc,
   p2OppCardBackSrc: defaultCardBackSrc,

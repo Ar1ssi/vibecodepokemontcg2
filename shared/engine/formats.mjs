@@ -18,6 +18,17 @@ export const PRIZE_COUNT_BY_FORMAT = Object.freeze({
 
 export const OPENING_HAND_SIZE = 7;
 
+const FORMAT_LABELS = Object.freeze({
+  [DECK_FORMAT_TCG]: 'Standard (60 cards, 6 Prizes)',
+  [DECK_FORMAT_BUILD_BATTLE]: 'Build & Battle (40 cards, 4 Prizes)',
+});
+
+/** @returns {string} the chat line when a deck's format differs from the opponent's. */
+export function formatMismatchMessage(username, format) {
+  const label = FORMAT_LABELS[format] || FORMAT_LABELS[DECK_FORMAT_TCG];
+  return `${username}'s deck is ${label}; both players must use the same format`;
+}
+
 /** @returns {boolean} true only for a format the engine knows. */
 export function isDeckFormat(value) {
   return DECK_FORMAT_VALUES.includes(value);

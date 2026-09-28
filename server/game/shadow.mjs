@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { hashState, PLAYER_ZONES } from '../../shared/engine/state.mjs';
 import { createCard, isEnergy, mintInstanceId } from '../../shared/engine/cards.mjs';
 import { createRelayedRng } from '../../shared/engine/rng.mjs';
+import { DECK_FORMAT_TCG, isDeckFormat } from '../../shared/engine/formats.mjs';
 import { GameRoom } from './room.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,8 +75,8 @@ export function initializePlayerDeck(state, playerId, deckData = []) {
 
 /**
  * Extracts deckData array from legacy action parameters.
- * - exchangeData: parameters are [username, deckData, cardBack, coachingMode, callback, matId]
- * - loadDeckData: parameters are [deckData] (or legacy [user, deckData])
+ * - exchangeData: parameters are [username, deckData, cardBack, coachingMode, callback, matId, format]
+ * - loadDeckData: parameters are [deckData, format] (or legacy [user, deckData])
  * @param {string} action
  * @param {any[]} parameters
  * @returns {any[] | null}
@@ -91,6 +92,22 @@ export function extractDeckData(action, parameters) {
     return null;
   }
   return null;
+}
+
+/**
+ * Design 051: the deck format a legacy deck-load packet names.
+ * - exchangeData: parameters[6], after matId
+ * - loadDeckData: parameters[1] (parameters are [deckData, format])
+ * Anything that is not a known format reads as Standard.
+ * @param {string} action
+ * @param {any[]} parameters
+ * @returns {'tcg'|'build-battle'}
+ */
+export function extractDeckFormat(action, parameters) {
+  if (!Array.isArray(parameters)) return DECK_FORMAT_TCG;
+  const index = { exchangeData: 6, loadDeckData: 1 }[action];
+  const format = index == null ? null : parameters[index];
+  return isDeckFormat(format) ? format : DECK_FORMAT_TCG;
 }
 
 /**

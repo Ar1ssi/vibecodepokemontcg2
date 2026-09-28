@@ -6,6 +6,7 @@ import {
   DECK_FORMAT_TCG,
   DECK_FORMAT_VALUES,
   OPENING_HAND_SIZE,
+  formatMismatchMessage,
   isDeckFormat,
   prizeCountForFormat,
 } from '../formats.mjs';
@@ -25,4 +26,19 @@ test('Build & Battle deals 4 Prizes, Standard 6, anything unknown 6 (pokemon.com
   assert.equal(prizeCountForFormat('pocket'), 6);
   assert.equal(prizeCountForFormat(undefined), 6);
   assert.equal(OPENING_HAND_SIZE, 7);
+});
+
+test('the format mismatch chat line names the player and their deck format', () => {
+  assert.equal(
+    formatMismatchMessage('Ash', 'build-battle'),
+    "Ash's deck is Build & Battle (40 cards, 4 Prizes); both players must use the same format"
+  );
+  assert.equal(
+    formatMismatchMessage('Gary', 'tcg'),
+    "Gary's deck is Standard (60 cards, 6 Prizes); both players must use the same format"
+  );
+  assert.equal(
+    formatMismatchMessage('Gary', 'pocket'),
+    "Gary's deck is Standard (60 cards, 6 Prizes); both players must use the same format"
+  );
 });

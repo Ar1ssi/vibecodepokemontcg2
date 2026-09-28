@@ -88,10 +88,16 @@ export const initializeHeaderButtons = () => {
       resetNetcodeForRoomChange();
       systemState.spectatorId = '';
       if (systemState.selfDeckData) {
-        processAction('self', true, 'loadDeckData', [systemState.selfDeckData]);
+        processAction('self', true, 'loadDeckData', [
+          systemState.selfDeckData,
+          systemState.deckFormat.self,
+        ]);
       }
       if (systemState.p1OppDeckData) {
-        processAction('opp', true, 'loadDeckData', [systemState.p1OppDeckData]);
+        processAction('opp', true, 'loadDeckData', [
+          systemState.p1OppDeckData,
+          systemState.deckFormat.opp,
+        ]);
       }
     }
   });

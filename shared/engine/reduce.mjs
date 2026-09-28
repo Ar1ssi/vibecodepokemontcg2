@@ -21,6 +21,7 @@ import {
   mintInstanceId,
 } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
+import { DECK_FORMAT_TCG, isDeckFormat } from './formats.mjs';
 import { setupGame } from './setup.mjs';
 import {
   createRng,
@@ -10058,6 +10059,21 @@ export function applyCommand(state, command, rng = null) {
     case 'loadDeck': {
       const player = draft.players[playerId];
       const deckData = Array.isArray(payload.deckData) ? payload.deckData : [];
+      const format = isDeckFormat(payload.format) ? payload.format : DECK_FORMAT_TCG;
+      // Design 051: both decks must be dealt under one format's Prize count.
+      const otherFormat = Object.values(state.players || {}).find(
+        (other) => other.playerId !== playerId && other.deckList?.length > 0 && other.deckFormat !== format
+      )?.deckFormat;
+      if (otherFormat) {
+        return {
+          state,
+          events: [],
+          pendingChoice: state.pendingChoice,
+          error: 'format_mismatch',
+          reason: `Deck format ${format} does not match the opponent's ${otherFormat}`,
+        };
+      }
+      player.deckFormat = format;
       player.zones.deck = [];
       let syncInstance = 0;
       for (const item of deckData) {
@@ -10103,6 +10119,7 @@ export function applyCommand(state, command, rng = null) {
         type: 'deckLoaded',
         playerId,
         count: player.zones.deck.length,
+        format,
       });
       break;
     }

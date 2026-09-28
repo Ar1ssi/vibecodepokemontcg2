@@ -1,5 +1,5 @@
 # 051: Build & Battle game mode (Phantasmal Flames box)
-Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–2 done
+Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–3 done
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -328,14 +328,14 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 | 13 | 39 / 40 / 41 cards | Play disabled / enabled / disabled; counter "x / 40" | [x] `deck-validation.test.mjs` "Build & Battle wants exactly 40" (Play button: slice 4) |
 | 14 | no Basic Pokémon after edits | error from `validateDeck`; Play disabled | [x] `deck-validation.test.mjs` "Build & Battle still requires a Basic Pokémon" (Play: slice 4) |
 | 15 | `load-deck` with `format` missing / `'tcg'` / `'build-battle'` / `'pocket'` | tcg / tcg / build-battle / rejected | [x] `builder-window.test.mjs` "load-deck format: …" |
-| 16 | engine: 40-card deck, format build-battle | setup deals 7 hand + 4 prizes, 29 left in deck; win at 4 prizes taken | [ ] |
-| 17 | engine: 60-card deck, format tcg (regression) | 7 + 6, unchanged events | [ ] |
-| 18 | engine: deck of 3 cards, build-battle | prizes = 3 (min), as today with 6 | [ ] |
-| 19 | second player loads a differing format | `format_mismatch`, no state change, first deck intact, chat line both sides, no deal | [ ] |
-| 20 | mismatch then the second player reloads a matching deck | accepted; deal proceeds when both ready | [ ] |
-| 21 | rematch (`resetGame`) after a B&B game | replayed `loadDeck` carries the format; 4 prizes again | [ ] |
-| 22 | undo replay through `commandLog` | `loadDeck` payload includes `format`; replay yields 4 prizes | [ ] |
-| 23 | legacy (rules off) deal with format build-battle | `setupDealPlan` → 4 prizes | [ ] |
+| 16 | engine: 40-card deck, format build-battle | setup deals 7 hand + 4 prizes, 29 left in deck; win at 4 prizes taken | [x] `setup.test.mjs` "a Build & Battle deck of 40…"; `reduce.test.mjs` "…takes the 4th Prize wins" |
+| 17 | engine: 60-card deck, format tcg (regression) | 7 + 6, unchanged events | [x] `setup.test.mjs` "a Standard deck still deals 6 Prizes…" |
+| 18 | engine: deck of 3 cards, build-battle | prizes = 3 (min), as today with 6 | [x] `setup.test.mjs` "a 3-card Build & Battle deck…" (see Deviations: hand is dealt first) |
+| 19 | second player loads a differing format | `format_mismatch`, no state change, first deck intact, chat line both sides, no deal | [x] `room.test.mjs` "a second deck in a different format is refused…"; text: `formats.test.mjs` (room emit: by hand, slice 4 e2e) |
+| 20 | mismatch then the second player reloads a matching deck | accepted; deal proceeds when both ready | [x] `room.test.mjs` "after a mismatch the matching reload…" |
+| 21 | rematch (`resetGame`) after a B&B game | replayed `loadDeck` carries the format; 4 prizes again | [x] `room.test.mjs` "a rematch after a Build & Battle game…" |
+| 22 | undo replay through `commandLog` | `loadDeck` payload includes `format`; replay yields 4 prizes | [x] `room.test.mjs` "undo: replaying the command log…" |
+| 23 | legacy (rules off) deal with format build-battle | `setupDealPlan` → 4 prizes | [x] `setup-deal.test.mjs` |
 | 24 | room join after Play (restore-on-join) | restore loads the B&B library deck with its format (last-used deck id), not a 60-card deck | [ ] |
 | 25 | standard builder opens a B&B library deck | counter "x / 40", badge; pool not enforced (documented) | [x] `deck-library.test.mjs` format tests + `validateDeck` requiredCards 40 (counter/badge: slice 4) |
 | 26 | New box with an existing built deck | confirm; on yes the old library deck stays, new session; on no nothing changes | [ ] |
@@ -403,6 +403,21 @@ persisted artifacts are `ptcg-sim.build-battle.v1` (ignored by older code) and l
 - Slice 2: added `randomSeed(crypto = globalThis.crypto)` to the session module (the Web Crypto
   31-bit seed § Session describes). Rows 9, 13, 14 keep their UI halves (double-click guard,
   Play disabled) for slice 4.
+- Slice 3: `loadDeckData(user, deckData, format, emit)` and `exchangeData(..., matId, format, emit)` take
+  the format as the argument just before `emit`, not after it: `acceptAction` replays a peer action as
+  `fn(user, ...wireParameters, emit)`, so wire order must equal argument order. A pre-format packet
+  puts `emit` (boolean) in the format slot; `deck-format-args.mjs resolveFormatAndEmit` reads it back
+  as emit + `'tcg'`. Every `processAction(..., 'loadDeckData', ...)` call site and the state export now
+  send `[deckData, format]`; e2e-api's `loadDeckData('self', rows, true)` dropped the `true`.
+- Slice 3: row 18 as built — the engine deals the hand before the Prizes, so a 3-card deck gets 3 in
+  hand and 0 Prizes (the same as with 6); a 10-card B&B deck gets min(4, 3) = 3 Prizes.
+- Slice 3: the mismatch check runs inside `reduce.mjs case 'loadDeck'` and returns the untouched input
+  state, so it applies with rules off too. A player may still swap their own deck's format while the
+  opponent has no deck. The chat text is `formats.mjs formatMismatchMessage(username, format)`;
+  `server.js` emits it as an `appendMessage` announcement to the whole room.
+- Slice 3: `view.mjs` adds `deckFormat` to `you`, `them` and spectator player entries. The host's
+  `applyBuilderMessage('load-deck')` already forwards `payload.format` (one-line change in
+  `native-deck-builder.js`). `GET /build-and-battle` renders with `builderMode`; the EJS body class is slice 4.
 
 ---
 Self-approval checklist (only when the user is unreachable):

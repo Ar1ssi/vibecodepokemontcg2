@@ -11,7 +11,8 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
-import { ShadowSession, extractDeckData } from './game/shadow.mjs';
+import { ShadowSession, extractDeckData, extractDeckFormat } from './game/shadow.mjs';
+import { formatMismatchMessage } from '../shared/engine/formats.mjs';
 import {
   findFirstDivergentZone,
   hashOwnerViewZones,
@@ -234,6 +235,16 @@ async function main() {
   app.get('/deck-builder', (req, res) => {
     if (req.path.endsWith('/')) return res.redirect(301, '/deck-builder');
     res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED, builderWindow: true });
+  });
+  // Build & Battle (design 051): the builder tab in box-opening mode.
+  app.get('/build-and-battle', (req, res) => {
+    if (req.path.endsWith('/')) return res.redirect(301, '/build-and-battle');
+    res.render('index', {
+      importDataJSON: null,
+      e2eAllowed: E2E_ENABLED,
+      builderWindow: true,
+      builderMode: 'build-battle',
+    });
   });
   app.get('/import', (req, res) => {
     const key = req.query.key;
@@ -938,10 +949,21 @@ async function main() {
                 // Routed through handleCommand (design 002 slice 3.4e / I16), not a direct
                 // state mutation: this is the only way deck loading lands in commandLog, which
                 // undo's replay depends on to reconstruct the pre-game state.
+                const format = extractDeckFormat(data.action, data.parameters);
                 const result = gameRoom.handleCommand(socket.id, {
                   type: 'loadDeck',
-                  payload: { deckData },
+                  payload: { deckData, format },
                 });
+                if (result.error === 'format_mismatch') {
+                  const username = gameRoom.state.players[playerId]?.username || playerId;
+                  io.to(roomId).emit('appendMessage', {
+                    roomId,
+                    user: '',
+                    message: formatMismatchMessage(username, format),
+                    type: 'announcement',
+                    emit: false,
+                  });
+                }
 
                 if (result.success) {
                   // Server is the sole minter of instanceId (design 002 §3.1 / D10).

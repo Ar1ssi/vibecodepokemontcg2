@@ -1620,7 +1620,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // Play read the deck that is actually on the board.
         deckLibrary?.refresh();
         deckLibrary?.setActiveDeck(payload.target, payload.deckId);
-        loadDeckData(payload.target, payload.rows);
+        loadDeckData(payload.target, payload.rows, payload.format);
         return;
       }
       const link = createLocalGameLink();

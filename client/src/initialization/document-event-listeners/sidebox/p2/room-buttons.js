@@ -169,10 +169,16 @@ export const initializeRoomButtons = () => {
       systemState.spectatorId = '';
       // add the deck data back to the actiondata list
       if (systemState.selfDeckData) {
-        processAction('self', true, 'loadDeckData', [systemState.selfDeckData]);
+        processAction('self', true, 'loadDeckData', [
+          systemState.selfDeckData,
+          systemState.deckFormat.self,
+        ]);
       }
       if (systemState.p1OppDeckData) {
-        processAction('opp', true, 'loadDeckData', [systemState.p1OppDeckData]);
+        processAction('opp', true, 'loadDeckData', [
+          systemState.p1OppDeckData,
+          systemState.deckFormat.opp,
+        ]);
       }
     }
   });

@@ -415,7 +415,7 @@ export const initializeP1BottomButtons = () => {
       user: 'self',
       emit: true,
       action: 'loadDeckData',
-      parameters: [systemState.selfDeckData],
+      parameters: [systemState.selfDeckData, systemState.deckFormat.self],
     };
     const oppData = {
       user: 'opp',
@@ -425,6 +425,7 @@ export const initializeP1BottomButtons = () => {
         systemState.isTwoPlayer
           ? systemState.p2OppDeckData
           : systemState.p1OppDeckData,
+        systemState.deckFormat.opp,
       ],
     };
     const versionData = { version: version };

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createGameState, getZone, findCard } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { setupGame } from '../setup.mjs';
 import { topPokemonCard, evolvedView } from '../rules/evolved-pokemon.mjs';
 import { addCondition } from '../rules/special-conditions.mjs';
 
@@ -508,6 +509,39 @@ test('last prize + empty board on one KO is an outright attacker win (two ways)'
   // The Prize entitlement is collected on game end; nothing is left owed.
   assert.equal(res.state.players.p1.zones.prizes.length, 0);
   assert.equal(res.state.players.p1.flags.prizesOwed, undefined);
+});
+
+// Design 051: a Build & Battle game is won by taking the fourth Prize card.
+test('Build & Battle: the Knock Out that takes the 4th Prize wins the game', () => {
+  const deck = (idBase) =>
+    Array.from({ length: 40 }, (_, i) =>
+      createCard({ instanceId: idBase + i, name: `Sandile ${i}`, supertype: 'Pokémon', stage: 'Basic' })
+    );
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash', deckFormat: 'build-battle', zones: { deck: deck(1) } },
+      p2: { username: 'Gary', deckFormat: 'build-battle', zones: { deck: deck(1001) } },
+    },
+    rulesEnabled: true,
+    seed: 5,
+  });
+  setupGame(state, { firstPlayerId: 'p1' });
+  const p1 = state.players.p1;
+  assert.equal(p1.zones.prizes.length, 4);
+  // Three Prizes already taken; one Knock Out left to win.
+  p1.zones.hand.push(...p1.zones.prizes.splice(0, 3));
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  p1.zones.active = [
+    createCard({ instanceId: 5000, name: 'Mewtwo', hp: 120, attacks: [{ name: 'Psystrike', cost: [], damage: 100 }] }),
+  ];
+  state.players.p2.zones.active = [createCard({ instanceId: 5001, name: 'Eevee', hp: 60 })];
+  state.players.p2.zones.bench = [createCard({ instanceId: 5002, name: 'Pikachu', hp: 60 })];
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' }, TAILS);
+
+  assert.equal(res.error, null);
+  assert.equal(res.state.winner, 'p1');
+  assert.equal(res.state.winReason, 'all prize cards taken');
 });
 
 // Both players' only Pokémon are Poisoned and faint in the same Checkup: two

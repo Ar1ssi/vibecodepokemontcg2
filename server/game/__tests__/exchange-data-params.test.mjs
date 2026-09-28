@@ -1,7 +1,7 @@
 ﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameRoom } from '../room.mjs';
-import { initializePlayerDeck, extractDeckData } from '../shadow.mjs';
+import { initializePlayerDeck, extractDeckData, extractDeckFormat } from '../shadow.mjs';
 
 function fixtureDeck(prefix = 'Card') {
   return [
@@ -91,4 +91,21 @@ test('Finding 4 authoritative server integration: pushAction with exchangeData i
   assert.equal(room.state.players.p1.zones.deck.length, 20);
   assert.equal(room.state.players.p1.zones.deck[0].name, 'Alice A');
   assert.equal(room.state.players.p1.zones.deck[19].name, 'Alice Basic');
+});
+
+test('design 051: extractDeckFormat reads the format after matId (exchangeData) or after the deck (loadDeckData)', () => {
+  const deck = fixtureDeck('Fmt');
+  assert.equal(
+    extractDeckFormat('exchangeData', ['Alice', deck, 'sleeve.png', false, false, 'mat-1', 'build-battle']),
+    'build-battle'
+  );
+  assert.equal(extractDeckFormat('exchangeData', ['Alice', deck, 'sleeve.png', false, false, 'mat-1']), 'tcg');
+  assert.equal(extractDeckFormat('loadDeckData', [deck, 'build-battle']), 'build-battle');
+  assert.equal(extractDeckFormat('loadDeckData', [deck]), 'tcg');
+  // A packet from before the format existed: the peer's emit flag is not a format.
+  assert.equal(extractDeckFormat('loadDeckData', ['self', deck]), 'tcg');
+  assert.equal(extractDeckFormat('loadDeckData', [deck, 'pocket']), 'tcg');
+  assert.equal(extractDeckFormat('loadDeckData', [deck, 7]), 'tcg');
+  assert.equal(extractDeckFormat('loadDeckData', null), 'tcg');
+  assert.equal(extractDeckFormat('unknownAction', [deck, 'build-battle']), 'tcg');
 });

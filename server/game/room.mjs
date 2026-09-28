@@ -9,6 +9,7 @@ import {
   createPlayerZones,
 } from '../../shared/engine/state.mjs';
 import { createRng } from '../../shared/engine/rng.mjs';
+import { DECK_FORMAT_TCG } from '../../shared/engine/formats.mjs';
 import { deckPeekFor, viewFor } from '../../shared/engine/view.mjs';
 import { applyCommand, attackExtrasFor } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
@@ -124,6 +125,7 @@ export class GameRoom {
         playerId,
         username: username || playerId,
         deckList: Array.isArray(deckList) ? [...deckList] : [],
+        deckFormat: DECK_FORMAT_TCG,
         zones: createPlayerZones(),
         flags: {},
         oncePerGame: { vstarUsed: false, gxUsed: false },
@@ -576,6 +578,7 @@ export class GameRoom {
         playerId,
         username: player.username || playerId,
         deckList: Array.isArray(player.deckList) ? [...player.deckList] : [],
+        deckFormat: player.deckFormat,
         socketId: this.playerToSocket.get(playerId) || null,
         printedStats: collectPrintedStats(player),
       });
@@ -604,6 +607,7 @@ export class GameRoom {
         playerId: entry.playerId,
         username: entry.username,
         deckList: [],
+        deckFormat: DECK_FORMAT_TCG,
         zones: createPlayerZones(),
         flags: {},
         oncePerGame: { vstarUsed: false, gxUsed: false },
@@ -616,7 +620,7 @@ export class GameRoom {
           this.state,
           {
             type: 'loadDeck',
-            payload: { deckData: entry.deckList },
+            payload: { deckData: entry.deckList, format: entry.deckFormat },
             playerId: entry.playerId,
           },
           this.rng

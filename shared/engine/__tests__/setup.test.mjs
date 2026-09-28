@@ -218,3 +218,79 @@ test('setupGame: deal, mulligan and bonus-draw events name the cards they put in
   const p2Hand = state.players.p2.zones.hand.map((c) => c.instanceId);
   for (const event of bonuses) assert.ok(p2Hand.includes(ids(event)[0]), 'bonus card is in p2 hand');
 });
+
+// ── Design 051: the deck format sets the Prize count (Prerelease rules, pokemon.com) ──
+
+function fortyCardDeck(idBase) {
+  return Array.from({ length: 40 }, (_, i) =>
+    createCard({
+      instanceId: idBase + i,
+      name: i < 12 ? `Sandile ${i}` : 'Fighting Energy',
+      supertype: i < 12 ? 'Pokémon' : 'Energy',
+      stage: i < 12 ? 'Basic' : undefined,
+    })
+  );
+}
+
+test('setupGame: a Build & Battle deck of 40 deals 7 to hand and 4 Prizes, leaving 29', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash', deckFormat: 'build-battle', zones: { deck: fortyCardDeck(1) } },
+      p2: { username: 'Gary', deckFormat: 'build-battle', zones: { deck: fortyCardDeck(101) } },
+    },
+    seed: 7,
+  });
+  const { events } = setupGame(state, { firstPlayerId: 'p1' });
+
+  for (const pid of ['p1', 'p2']) {
+    const bonus = pid === 'p1' ? 1 : 0; // the starter's first-turn draw
+    assert.equal(state.players[pid].zones.prizes.length, 4, pid);
+    assert.equal(state.players[pid].zones.hand.length, 7 + bonus, pid);
+    assert.equal(state.players[pid].zones.deck.length, 29 - bonus, pid);
+  }
+  const prizeEvents = events.filter((e) => e.type === 'prizesSet');
+  assert.deepEqual(prizeEvents.map((e) => e.count), [4, 4]);
+});
+
+test('setupGame: a Standard deck still deals 6 Prizes and players default to Standard', () => {
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash', zones: { deck: createTestDeck(true) } },
+      p2: { username: 'Gary', deckFormat: 'tcg', zones: { deck: createTestDeck(true) } },
+    },
+    seed: 42,
+  });
+  assert.equal(state.players.p1.deckFormat, 'tcg');
+  const { events } = setupGame(state);
+  assert.equal(state.players.p1.zones.prizes.length, 6);
+  assert.equal(state.players.p2.zones.prizes.length, 6);
+  assert.deepEqual(
+    events.filter((e) => e.type === 'prizesSet').map((e) => e.count),
+    [6, 6]
+  );
+});
+
+test('setupGame: a 3-card Build & Battle deck deals what is left after the hand', () => {
+  const tinyDeck = (idBase) =>
+    Array.from({ length: 10 }, (_, i) =>
+      createCard({ instanceId: idBase + i, name: `Pikachu ${i}`, supertype: 'Pokémon', stage: 'Basic' })
+    );
+  const state = createGameState({
+    players: {
+      p1: { username: 'Ash', deckFormat: 'build-battle', zones: { deck: tinyDeck(1) } },
+      p2: { username: 'Gary', deckFormat: 'build-battle', zones: { deck: tinyDeck(101).slice(0, 3) } },
+    },
+    seed: 3,
+  });
+  setupGame(state, { firstPlayerId: 'p1' });
+  // 10 cards: 7 in hand, 3 left for Prizes (min of 4 and the deck).
+  assert.equal(state.players.p1.zones.prizes.length, 3);
+  // 3 cards: all three go to hand; the Prize count is capped by the empty deck.
+  assert.equal(state.players.p2.zones.hand.length, 3);
+  assert.equal(state.players.p2.zones.prizes.length, 0);
+});
+
+test('createGameState: an unknown deck format reads as Standard', () => {
+  const state = createGameState({ players: { p1: { username: 'Ash', deckFormat: 'pocket' } } });
+  assert.equal(state.players.p1.deckFormat, 'tcg');
+});

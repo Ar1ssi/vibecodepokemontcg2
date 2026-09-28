@@ -10,11 +10,13 @@ import { setupDealPlan } from '../general/setup-deal.mjs';
 import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 const dealMoveOpts = () => (systemState.syncReplaying ? { syncReplay: true } : {});
+const dealPlanFor = (user) =>
+  setupDealPlan(getZone(user, 'deck').getCount(), { format: systemState.deckFormat?.[user] });
 
 // Place prize cards from the top of the deck (rules-mode step 1).
 export const setOpeningPrizes = async (user, initiator) => {
   const moveOpts = dealMoveOpts();
-  const plan = setupDealPlan(getZone(user, 'deck').getCount());
+  const plan = dealPlanFor(user);
   for (let i = 0; i < plan.prizes; i++) {
     await moveCard(user, initiator, 'deck', 'prizes', 0, false, moveOpts);
   }
@@ -30,7 +32,7 @@ export const drawOpeningHand = async (user, initiator, emit = false) => {
     return;
   }
   const moveOpts = dealMoveOpts();
-  const plan = setupDealPlan(getZone(user, 'deck').getCount());
+  const plan = dealPlanFor(user);
   for (let i = 0; i < plan.hand; i++) {
     await moveCard(user, initiator, 'deck', 'hand', 0, false, moveOpts);
   }
@@ -39,7 +41,7 @@ export const drawOpeningHand = async (user, initiator, emit = false) => {
   }
 };
 
-// Draw starting hand of 7 and prize 6 (non-rules / legacy setup path).
+// Draw the starting hand of 7 and the format's Prizes (non-rules / legacy setup path).
 // moveCard is async (ensureCardData). Firing the loop without await raced
 // every deal off deck[0]; the sync log sometimes showed only 3 prize moves.
 export const drawHand = async (user, initiator) => {
