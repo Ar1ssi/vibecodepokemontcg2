@@ -1,5 +1,6 @@
 # 054: Build & Battle boxes of every era (XY kits → SM → SWSH → SV → ME)
-Status: draft (plan only — nothing built; the user gates the merge and the copy-limit pick in § Options 4)
+Status: approved (self — one-shot, 2026-09-28; the user's "one shot this implementation in the same
+branch" — Land: branch `claude/build-battle-boxes-plan-38pf0r`). Read the slices with § Deviations applied.
 Date: 2026-09-28 · Builds on designs 051 (box, packs, format), 052 (unboxing scene), 053 (room format)
 
 ## Problem
@@ -577,14 +578,79 @@ Each slice is built by a fresh thread from `main`; data slices (3–8) need TCGd
 | 8 XY kits (optional) | `fates-collide` (xy10, `xyp-XY127`…), `steam-siege` (xy11, XY144…), `evolutions` (xy12, set-numbered 11/34/51/59); `packModelKey: 'xy'`; BREAK rows | as slice 5 | rows 4, 17; row 10 on xy12 | Bulbapedia kit pages (§ Research 3 XY) | same |
 | 9 Close | `.agent/areas/deck-builder.md`, `MAP.md` (sets/, boxes/, pack-models, box-data), `DECISIONS.md` (D192+: Options 1–10 picks), `ISSUES.md` (room box choice follow-up; engine gaps found), `STATE.md`, design status | — | `review.md` by a fresh agent on slices 1, 2, 4 diff | — | `pnpm test` green; findings filed |
 
+## Acceptance
+Brief (verbatim, 2026-09-28): "https://github.com/Ar1ssi/vibecodepokemontcg2/blob/claude/build-battle-boxes-plan-38pf0r/.agent/designs/054-build-and-battle-boxes-all-eras.md
+One shot this implementation in the same branch." — the criteria are this design's promises.
+| # | Criterion (the design's words) | Evidence |
+|---|---|---|
+| 1 | "every other Build & Battle Box (and the Prerelease Kits …)": 41 boxes added, 42 in the catalog, release order, five eras | |
+| 2 | "each era's real contents": fixed decks (ME), 23-card Evolution packs (Fates Collide → Fusion Strike), 40-card Evolution decks (Brilliant Stars → Destined Rivals), every line from its Bulbapedia page | |
+| 3 | "and pack structure": per-era pack anatomy (§ Research 5) as pack models | |
+| 4 | "every pack — Phantasmal Flames included — rolling the boosted 30th Celebration pull rates" | |
+| 5 | "the play rules (40 cards, 4 Prizes) are the same in every era"; copy limit = Limited rule (Option 4 B) | |
+| 6 | Per-set data modules loaded on demand, ≤ 60 KB each, none eager (Option 2 B) | |
+| 7 | One seed = one box, bit for bit (D186) | |
+| 8 | A 051 me02 session still opens (Option 8 B) | |
+| 9 | Builder tab: era chips + box select, `?box=`, load/error states (§ Builder tab) | |
+| 10 | Unboxing skinned per era, kind-aware labels, procedural pack fronts; me02 keeps its vendored art (Option 6 C) | |
+| 11 | Generator bakes every box from TCGdex; `--check` clean (§ Generated data) | |
+| 12 | Recorder PASS for a fixed, an evolution-pack and an evolution-deck box (§ Recorder) | |
+
+## Assumptions
+- A1 (assumed) "In the same branch" = `claude/build-battle-boxes-plan-38pf0r`, where this design lives: slices commit
+  and push there (Land: branch). STATE/DECISIONS/ISSUES/MAP edits are listed for the landing commit, not made here.
+- A2 (assumed) Option 4 = B (the Limited copy rule). The design recommended it and left it to the user; a one-shot
+  takes the recommendation. Reverting is the one-line `maxCopiesPerCard` change plus its test.
+- A3 (assumed) No source says which types an Evolution deck's Basic Energy are (every Bulbapedia page, pokemon.com
+  and the Pokémon Center listing only say "17 basic Energy"). Rule: the promo group gets 9 (or its share of
+  40 − pack size), the other group 8; each group's share splits over the Energy types its Pokémon's attack costs
+  name (TCGdex `attacks[].cost`, weighted by copies, largest remainder); a group with no typed cost gives its
+  share to the other. Basic Energy is unlimited (D188), so the player can re-split freely.
+- A4 (assumed) Where a page's numbers disagree with the product (a 23-card Evolution pack, a 40-card deck), the
+  product wins: Trainer draws fill the pack to 23 and an Evolution deck takes 40 − pack size Basic Energy. Each
+  case is commented in its box source file and listed in § Deviations.
+- A5 (assumed) Rules a page states without a rule to follow are not simulated: Fates Collide's optional Shuckle
+  swap, Guardians Rising's "an Item is deducted for each Oricorio [Pa'u Style]". Listed in § Deviations.
+- A6 (assumed) XY kits are in scope (Option 10 A); the user asked for every era.
+- A7 (assumed) New library decks are named `B&B <short name> <deck> #<seed>`; records already saved keep their name.
+- A8 (assumed) Deck sprites: fixed decks 2 slugs (the promo's Pokémon + the list's other main line), Evolution
+  groups 1 slug (the promo's Pokémon); an Evolution box's library deck gets both groups' slugs. A missing slug → none.
+
 ## Deviations (Builder appends here during build)
+Plan-time re-pins (§2 of oneshot-feature, from reading all 42 Bulbapedia pages and the 46 TCGdex sets):
+- D1 (structural) Box contents are richer than § Opening a box assumed. Group rows may carry a copy range
+  (`1-2`, `0-1`, `2-3`: Fates Collide, Forbidden Light, Stellar Crown, Surging Sparks, Destined Rivals) or
+  alternative prints (`SVI 189/190`: Paldea Evolved, Surging Sparks); some boxes add rows to every box (Journey
+  Together § 2); the random Trainers come from one or more pools with a count each (XY and SM kits split
+  Supporters and Items) and per-card `min-max` (0-1, 0-2, 1-2); Temporal Forces swaps one Basic Energy for a
+  Luminous Energy when the Koraidon or Miraidon group is in. Box source and `BoxData` therefore carry
+  `groups` (rows with `min`/`max`/`alts`), `common`, `trainers: [{ name, count: null|n|[lo,hi], cards }]`,
+  `extras: [{ when: groupKey[], rows, replacesBasicEnergy }]`, `energyNeeds[groupKey]` (A3). Draw order after the
+  other group: ranged/alternative rows of the two groups in line order → pool counts → pool draws (mins first,
+  then uniform among cards still under their max, stop when none) → packs. A box without a pool holds exactly its
+  fixed rows. The generator checks every pairing at both ends of every range (row 4).
+- D2 (structural) Session: `groupKeys` + `evolutionPack` (card ids, one per copy, promo first) + `energy`
+  (`[label, qty][]`) instead of `trainerIds`, so a stored box never re-resolves ranges; `verifySessionCards` checks
+  `evolutionPack` ids against the box data. v1 sessions (no fields) are fixed-decks boxes, unchanged.
+- D3 TCGdex rarity strings differ from § Research 5: SWSH holo rares are `Holo Rare` (not `Rare`); Silver Tempest's
+  Trainer Gallery uses `Holo Rare`, `Holo Rare V`, `Holo Rare VMAX`, `Full Art Trainer`; every TG subset has 2
+  `Secret Rare` (gold-black); Sun & Moon's 9 Basic Energy are secret-numbered `Common`s. Matchers apply to main-set
+  rows unless they name `subset: 'tg'`; the TG classes list all those strings; the C/U/rare/reverse fillers take
+  non-secret main-set rows and never Basic Energy.
+- D4 TCGdex has no art for any Trainer Gallery card (120) or 7 SM cards (sm2-143, sm6-82/90/122/126/134/140):
+  those rows carry `images` from images.pokemontcg.io (HEAD 200 at bake; the app already allows that host). MEP
+  promos keep 051's Limitless URLs.
+- D5 Skin: logo and symbol URLs come from the set module (`SET.logo`, `SET.symbol`, TCGdex) instead of catalog
+  literals; `packArtCardIds` defaults to the box's four promos.
+- D6 `artIndexes` stay derived from the seed in the scene (052); `openBox` has only the rng stream.
+- D7 `aceSpec` class reveals at tier 2 (the design gave it no tier).
 
 ---
 Self-approval checklist (only when the user is unreachable):
-- [ ] Every constraint traceable into the Design section
-- [ ] Every edge-case row has an expected behavior (or a written strike reason)
-- [ ] Interfaces fully named and typed — no hand-waving
-- [ ] Slices each ≤1 session and independently green
-- [ ] Every slice row is pinned: files, signatures, test cases with expected values, card rulings
+- [x] Every constraint traceable into the Design section
+- [x] Every edge-case row has an expected behavior (or a written strike reason)
+- [x] Interfaces fully named and typed — no hand-waving
+- [x] Slices each ≤1 session and independently green
+- [x] Every slice row is pinned: files, signatures, test cases with expected values, card rulings
       cited (corpus row / TCGdex id) — no banned words; a builder would make zero choices
-- [ ] No section reads "TBD"
+- [x] No section reads "TBD"
