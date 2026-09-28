@@ -24,6 +24,12 @@ import {
   detectDeckFormat,
   validateDeck,
 } from '../../../setup/deck-builder/core/deck-validation.mjs';
+import { withPoolErrors } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
+import {
+  DECK_FORMAT_BUILD_BATTLE,
+  DECK_FORMAT_TCG,
+} from '../../../../../shared/engine/formats.mjs';
+import { initializeBuildBattle } from './native-deck-builder-build-battle.js';
 import { systemState } from '../../../state.js';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { cachedFetchJson } from '../../../../../shared/tcgdex/tcgdex-cache.mjs';
@@ -161,7 +167,7 @@ const showGameSidebox = () => {
  * (editor) they travel to the game tab as messages.
  */
 const createLocalGameLink = () => ({
-  loadDeck: (target, rows) => loadDeckData(target, rows),
+  loadDeck: (target, rows, _deckId, format) => loadDeckData(target, rows, format),
   changeCardBack: (target, image, emit) => changeCardBack(target, image, emit),
   announceSleeve: (target, image) =>
     document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target, image } })),
@@ -192,8 +198,8 @@ const createRemoteGameLink = ({ onHostState }) => {
     },
   });
   return {
-    loadDeck: (target, rows, deckId) =>
-      host.post('load-deck', { target, deckId: deckId || null, rows }),
+    loadDeck: (target, rows, deckId, format) =>
+      host.post('load-deck', { target, deckId: deckId || null, rows, format }),
     changeCardBack: (target, image, emit) =>
       host.post('card-back', { target, image, emit: Boolean(emit) }),
     announceSleeve: (target, image) => host.post('sleeve', { target, image: image || null }),
@@ -213,9 +219,12 @@ const createRemoteGameLink = ({ onHostState }) => {
  * @param {object} [options]
  * @param {'host'|'editor'} [options.role] - 'editor' in the deck builder's own
  *   tab, 'host' on the game tab (see builder-window.mjs resolveBuilderRole).
+ * @param {'standard'|'build-battle'} [options.mode] - 'build-battle' on the
+ *   Build & Battle tab (design 051): Box and Pool replace Search and Browse.
  */
-export const initializeNativeDeckBuilder = ({ role = 'host' } = {}) => {
+export const initializeNativeDeckBuilder = ({ role = 'host', mode = 'standard' } = {}) => {
   const isEditor = role === 'editor';
+  const isBuildBattle = isEditor && mode === 'build-battle';
   const targetMainButton = document.getElementById(
     'nativeDeckBuilderTargetMain'
   );
@@ -451,6 +460,10 @@ export const initializeNativeDeckBuilder = ({ role = 'host' } = {}) => {
       const tabSearch = document.getElementById('nativeDeckBuilderTabSearch');
       const tabBrowse = document.getElementById('nativeDeckBuilderTabBrowse');
 const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
+      const tabBox = document.getElementById('buildBattleTabBox');
+      const tabPool = document.getElementById('buildBattleTabPool');
+      const boxPanel = document.getElementById('buildBattleBoxPanel');
+      const poolPanel = document.getElementById('buildBattlePoolPanel');
       const searchPane = document.querySelector('.native-deck-builder-pane-main-header');
       const resultsShell = document.querySelector('.native-deck-builder-results-shell');
       const browserPanel = document.getElementById('nativeDeckBuilderSetBrowserPanel');
@@ -487,6 +500,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         const isBrowse = mode === 'browse';
         const isCustomize = mode === 'customize';
         activeMode = mode;
+        tabBox?.classList.toggle('active', mode === 'box');
+        tabPool?.classList.toggle('active', mode === 'pool');
+        if (boxPanel) boxPanel.hidden = mode !== 'box';
+        if (poolPanel) poolPanel.hidden = mode !== 'pool';
         closeFilterDrawer();
         // Filters applied from Browse Sets re-run the search when it is next shown.
         if (isSearch && searchIsStale) {
@@ -818,6 +835,21 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   // null = show every card in the deck list; 'pokemon'|'trainer'|'energy'
   // narrows it to that supertype, set by clicking a summary-bar segment.
   let deckListFilter = null;
+  // The Box / Pool controller; null outside Build & Battle, and until it boots below.
+  let buildBattle = null;
+  // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
+  const currentDeckFormat = () =>
+    isBuildBattle
+      ? DECK_FORMAT_BUILD_BATTLE
+      : deckLibrary?.getActiveDeckFormat?.(currentLoadTarget) || null;
+  // What the game is told: the saved record's own format wins, so a Standard deck
+  // opened from My Decks in the Build & Battle tab still plays with 6 Prizes.
+  const loadFormat = () => {
+    const recorded = deckLibrary?.getActiveDeckFormat?.(currentLoadTarget);
+    if (recorded) return recorded;
+    const isUnsaved = !deckLibrary?.getActiveDeckId?.(currentLoadTarget);
+    return isBuildBattle && isUnsaved ? DECK_FORMAT_BUILD_BATTLE : DECK_FORMAT_TCG;
+  };
 
   const flashDeckStatus = () => {
     if (!deckStatus) return;
@@ -1182,7 +1214,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // the active deck binding is session state and starts null.
         deckLibrary?.saveActiveDeck(deck);
         const counts = getDeckCounts(deck);
-    const result = validateDeck(deck, detectDeckFormat(deck));
+    const result = withPoolErrors(
+      validateDeck(deck, currentDeckFormat() || detectDeckFormat(deck)),
+      buildBattle?.poolErrors(deck) || []
+    );
     // The summary bar's counts always reflect the whole deck; only the list
     // of cards below it narrows when a segment filter is active.
     const deckForList = deckListFilter
@@ -1205,8 +1240,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     }
     // With no game tab to load into, Play has nowhere to go (edge case 7).
     const isConnected = gameLink.isConnected();
-    playButton.disabled = !hasDeckCards || !isConnected;
-    playButton.title = isConnected ? '' : 'Open the deck builder from the game tab to play';
+    // Build & Battle only plays a legal deck from the pool; the standard builder
+    // leaves legality to the player.
+    const buildBattleBlock = isBuildBattle && !result.isValid ? result.errors[0] || '' : '';
+    playButton.disabled = !hasDeckCards || !isConnected || Boolean(buildBattleBlock);
+    playButton.title = !isConnected
+      ? 'Open the deck builder from the game tab to play'
+      : buildBattleBlock;
     if (linkBanner) linkBanner.hidden = !isEditor || isConnected;
     const isTwoPlayer = gameLink.isTwoPlayer();
     targetAltButton.style.cursor = isTwoPlayer ? 'default' : 'pointer';
@@ -1302,6 +1342,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     });
 
     renderResults();
+    buildBattle?.refresh();
   };
 
   const loadCurrentDeck = () => {
@@ -1313,7 +1354,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       gameLink.loadDeck(
         currentLoadTarget,
         deckRows,
-        deckLibrary?.getActiveDeckId?.(currentLoadTarget) || null
+        deckLibrary?.getActiveDeckId?.(currentLoadTarget) || null,
+        loadFormat()
       );
       if (currentLoadTarget === 'self') persistLastUsedSession();
     }
@@ -1645,6 +1687,45 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       apply: applyBuilderMessage,
       getHostState: () => ({ isTwoPlayer: Boolean(systemState.isTwoPlayer) }),
     });
+  }
+
+  if (isBuildBattle) {
+    // The Build & Battle tab builds only from its pool: no Search, no Browse Sets.
+    if (tabSearch) tabSearch.hidden = true;
+    if (tabBrowse) tabBrowse.hidden = true;
+    tabBox?.addEventListener('click', () => switchMode('box'));
+    tabPool?.addEventListener('click', () => switchMode('pool'));
+    buildBattle = initializeBuildBattle({
+      boxPanelEl: boxPanel,
+      poolPanelEl: poolPanel,
+      deckLibrary,
+      getTarget: () => currentLoadTarget,
+      getDeck: () => deck,
+      addToDeck: (card) => {
+        deck = addCard(deck, card);
+        deckDirty = true;
+        render();
+        flashDeckStatus();
+      },
+      showUnsavedDeck: (cards) => {
+        deckLibrary?.setActiveDeck(currentLoadTarget, null);
+        deck = cards;
+        syncedDecks[currentLoadTarget] = cards;
+        deckDirty = true;
+        render();
+      },
+      detachEditor: () => {
+        deckLibrary?.setActiveDeck(currentLoadTarget, null);
+        rememberCosmetic(currentLoadTarget, 'sprites', []);
+        deck = createEmptyDeck();
+        syncedDecks[currentLoadTarget] = deck;
+        deckDirty = false;
+        render();
+      },
+      showPool: () => switchMode('pool'),
+      onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
+    });
+    switchMode('box');
   }
 
   render();

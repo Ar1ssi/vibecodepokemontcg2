@@ -2,6 +2,7 @@ import {
       createDeckInLibrary,
       deleteDeckFromLibrary,
       getDeckFromLibrary,
+      getDeckFormat,
       LIBRARY_STORAGE_KEY,
       listDecks,
       loadLibraryFromStorage,
@@ -24,6 +25,7 @@ import {
     import { resolveDisplaySprites } from '../../../setup/deck-builder/core/card-sprites.mjs';
     import { renderDeckSprites } from './native-deck-builder-renderers.js';
     import { getStarterDecks, STARTER_DECK_CATALOG } from '../../../setup/deck-builder/core/set-browser.mjs';
+    import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
     
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -271,6 +273,7 @@ import {
               <span class="native-deck-builder-library-chip${isActive ? ' active' : ''}" data-deck-id="${safeId}">
                 <span class="native-deck-builder-deck-sprites native-deck-builder-chip-sprites" data-chip-sprites="${safeId}"></span>
                 <button class="native-deck-builder-library-chip-name" title="Open deck for editing">${safeName}</button>
+                ${deck.format === DECK_FORMAT_BUILD_BATTLE ? '<span class="native-deck-builder-format-badge" title="Build &amp; Battle: 40 cards, 4 Prizes">B&amp;B 40</span>' : ''}
                 <span class="native-deck-builder-library-chip-actions">
                   <button class="native-deck-builder-library-chip-btn" data-action="rename" title="Rename deck" aria-label="Rename deck">&#9998;</button>
                   <button class="native-deck-builder-library-chip-btn" data-action="delete" title="Delete deck" aria-label="Delete deck">&#10005;</button>
@@ -341,6 +344,36 @@ import {
         setTarget: (target) => {
           currentTarget = target === 'opp' ? 'opp' : 'self';
           render();
+        },
+        /** Opens a saved deck into the editor, as picking it from My Decks does. */
+        openDeckById: (target, deckId) => {
+          reload();
+          if (!library?.decks?.[deckId]) return false;
+          openDeck(target, deckId);
+          return true;
+        },
+        /**
+         * Creates a deck without prompting (Build & Battle box decks) and opens it for `target`.
+         *
+         * @returns {string|null} the new deck id, or null at the deck limit or on the read-only game tab.
+         */
+        createAndOpenDeck: (target, name, cards, options = {}) => {
+          if (!allowDeckWrites) return null;
+          reload();
+          if (listDecks(library).length >= MAX_LIBRARY_DECKS) {
+            showStatus(`Deck limit reached (${MAX_LIBRARY_DECKS}). Delete a deck first.`);
+            return null;
+          }
+          const { library: nextLibrary, deckId } = createDeckInLibrary(
+            library,
+            name,
+            cards,
+            Date.now(),
+            options
+          );
+          commit(nextLibrary, { silent: true });
+          openDeck(target, deckId);
+          return deckId;
         },
         setActiveDeck: (target, deckId) => {
           const key = target === 'opp' ? 'opp' : 'self';
@@ -441,6 +474,13 @@ import {
             created,
             name: nextLibrary.decks[deckId]?.name || null,
           };
+        },
+        // 'build-battle' for Build & Battle decks, null otherwise: a Standard record must leave
+        // room for detectDeckFormat to spot a Pocket deck (design 051, slice 2 pin).
+        getActiveDeckFormat: (target) => {
+          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          const format = activeId ? getDeckFormat(library, activeId) : null;
+          return format === DECK_FORMAT_BUILD_BATTLE ? format : null;
         },
         getActiveDeckId: (target) =>
           activeDeckIds[target === 'opp' ? 'opp' : 'self'] ??

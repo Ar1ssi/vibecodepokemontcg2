@@ -20,6 +20,7 @@
 @import url('./coin/coin.css');
 @import url('./deck-builder-live.css');
 @import url('./deck-builder-pc-box.css');
+@import url('./deck-builder-build-battle.css');
 
 :root {
   --mat-half-height: 50vh;

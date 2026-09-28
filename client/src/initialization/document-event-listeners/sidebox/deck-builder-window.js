@@ -1,4 +1,6 @@
 import {
+  BUILD_BATTLE_WINDOW_NAME,
+  BUILD_BATTLE_WINDOW_PATH,
   BUILDER_WINDOW_NAME,
   BUILDER_WINDOW_PATH,
   buildBuilderMessage,
@@ -18,10 +20,16 @@ import {
  *
  * @returns {Window|null} null when the browser blocked the new tab.
  */
-export const openDeckBuilderWindow = () => {
+export const openDeckBuilderWindow = () => openBuilderTab(BUILDER_WINDOW_NAME, BUILDER_WINDOW_PATH);
+
+/** The Build & Battle tab (design 051): the same editor in its own named tab. */
+export const openBuildBattleWindow = () =>
+  openBuilderTab(BUILD_BATTLE_WINDOW_NAME, BUILD_BATTLE_WINDOW_PATH);
+
+function openBuilderTab(name, path) {
   let builder = null;
   try {
-    builder = window.open('', BUILDER_WINDOW_NAME);
+    builder = window.open('', name);
   } catch {
     return null;
   }
@@ -34,10 +42,10 @@ export const openDeckBuilderWindow = () => {
     // A cross-origin document in a tab with our name: take the tab over.
     isBlank = true;
   }
-  if (isBlank) builder.location.replace(BUILDER_WINDOW_PATH);
+  if (isBlank) builder.location.replace(path);
   builder.focus();
   return builder;
-};
+}
 
 /**
  * Game tab: applies messages from the builder tab. Only same-origin messages

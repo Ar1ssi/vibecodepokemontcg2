@@ -1,5 +1,5 @@
 # 051: Build & Battle game mode (Phantasmal Flames box)
-Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–3 done
+Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–4 done
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -313,7 +313,7 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | localStorage missing / throws (private mode) | session kept in memory; banner "Your box will not survive a reload"; building and Play work | [x] `build-battle-session.test.mjs` "a throwing or missing storage means memory only" (banner: slice 4) |
+| 1 | localStorage missing / throws (private mode) | session kept in memory; banner "Your box will not survive a reload"; building and Play work | [x] `build-battle-session.test.mjs` "a throwing or missing storage means memory only"; banner shown whenever `saveSession` returns false (not exercised by hand: headless storage never threw) |
 | 2 | stored session malformed / unknown boxKey / deckKey / card id not in set / version ≠ 1 | `parseSession` → null; UI shows the sealed box; nothing crashes | [x] `build-battle-session.test.mjs` "parseSession refuses anything it cannot trust" |
 | 3 | `?seed=` invalid (`abc`, `-1`, `2^31`, empty) | ignored; random seed | [x] `build-battle-session.test.mjs` "parseSeed takes only integers 0..2^31-1" |
 | 4 | same seed twice | identical deckKey and packs (bit-for-bit) | [x] `pack-opening.test.mjs` "the same seed opens the same box" |
@@ -321,12 +321,12 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 | 6 | rarity pool exhausted inside a pack (synthetic 3-card set) | falls back to Rare, then whole set; never a duplicate id within a pack; never throws | [x] `pack-opening.test.mjs` "an exhausted rarity falls back" |
 | 7 | me02 real data: 4 packs × 10 | every pack: 4 Common, 3 Uncommon, slot 8 ∈ reverse pool, slot 9 ∈ IR/SIR/reverse, slot 10 ∈ DR/UR/MHR/Rare; 10 distinct ids | [x] `pack-opening.test.mjs` "me02 packs follow the slot model" (250 seeds) |
 | 8 | deck key distribution | 4000 seeds → each deck within 25% ± 3% | [x] `pack-opening.test.mjs` "each of the four decks comes up about a quarter" |
-| 9 | Open box double-clicked | second click no-op while a session exists | [ ] |
-| 10 | add beyond pool count | refused, status names the card and counts; deck unchanged | [x] `build-battle-session.test.mjs` "going past the pool is refused and named" (status text: slice 4) |
+| 9 | Open box double-clicked | second click no-op while a session exists | [x] e2e by hand: `dblclick` on Open box → one `B&B` library deck |
+| 10 | add beyond pool count | refused, status names the card and counts; deck unchanged | [x] `build-battle-session.test.mjs` "going past the pool is refused and named" ; status text `build-battle-view.test.mjs` "poolRefusalMessage…", e2e "Only 1 Flygon in your pool" |
 | 11 | 4-copy rule across promo + set print (1 mep-014 + 3 me02-020 ok; 5 Ceruledge) | ok / error "Ceruledge has 5 copies (max 4)" | [x] `deck-validation.test.mjs` "the Ceruledge box deck is a legal…", "…5 Ceruledge" |
 | 12 | Basic Energy 16 copies, not in pool | valid, counted toward 40, never against the pool | [x] `build-battle-session.test.mjs` "Basic Energy is unlimited"; `deck-validation.test.mjs` Ceruledge deck (16 Fire) |
-| 13 | 39 / 40 / 41 cards | Play disabled / enabled / disabled; counter "x / 40" | [x] `deck-validation.test.mjs` "Build & Battle wants exactly 40" (Play button: slice 4) |
-| 14 | no Basic Pokémon after edits | error from `validateDeck`; Play disabled | [x] `deck-validation.test.mjs` "Build & Battle still requires a Basic Pokémon" (Play: slice 4) |
+| 13 | 39 / 40 / 41 cards | Play disabled / enabled / disabled; counter "x / 40" | [x] `deck-validation.test.mjs` "Build & Battle wants exactly 40"; e2e: 40 → Play enabled, 41 → disabled, title "Deck must contain exactly 40 cards. Current total: 41." |
+| 14 | no Basic Pokémon after edits | error from `validateDeck`; Play disabled | [x] `deck-validation.test.mjs` "Build & Battle still requires a Basic Pokémon"; Play reads the same `result.isValid` as row 13 |
 | 15 | `load-deck` with `format` missing / `'tcg'` / `'build-battle'` / `'pocket'` | tcg / tcg / build-battle / rejected | [x] `builder-window.test.mjs` "load-deck format: …" |
 | 16 | engine: 40-card deck, format build-battle | setup deals 7 hand + 4 prizes, 29 left in deck; win at 4 prizes taken | [x] `setup.test.mjs` "a Build & Battle deck of 40…"; `reduce.test.mjs` "…takes the 4th Prize wins" |
 | 17 | engine: 60-card deck, format tcg (regression) | 7 + 6, unchanged events | [x] `setup.test.mjs` "a Standard deck still deals 6 Prizes…" |
@@ -336,12 +336,12 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 | 21 | rematch (`resetGame`) after a B&B game | replayed `loadDeck` carries the format; 4 prizes again | [x] `room.test.mjs` "a rematch after a Build & Battle game…" |
 | 22 | undo replay through `commandLog` | `loadDeck` payload includes `format`; replay yields 4 prizes | [x] `room.test.mjs` "undo: replaying the command log…" |
 | 23 | legacy (rules off) deal with format build-battle | `setupDealPlan` → 4 prizes | [x] `setup-deal.test.mjs` |
-| 24 | room join after Play (restore-on-join) | restore loads the B&B library deck with its format (last-used deck id), not a 60-card deck | [ ] |
-| 25 | standard builder opens a B&B library deck | counter "x / 40", badge; pool not enforced (documented) | [x] `deck-library.test.mjs` format tests + `validateDeck` requiredCards 40 (counter/badge: slice 4) |
-| 26 | New box with an existing built deck | confirm; on yes the old library deck stays, new session; on no nothing changes | [ ] |
-| 27 | builder tab opened directly (no opener) | banner, Play disabled, box + building work | [ ] |
-| 28 | pop-up blocked from the slim Deck tab | same blocked message as the deck builder button | [ ] |
-| 29 | prize zone with 4 cards | renders and fans (design 045) with 4; prize picker offers 4 | [ ] e2e |
+| 24 | room join after Play (restore-on-join) | restore loads the B&B library deck with its format (last-used deck id), not a 60-card deck | [x] e2e by hand: `restoreLastUsedDeckToPlaymat()` after Play → chat "loaded deck (Build & Battle…)", `deckFormat.self` build-battle |
+| 25 | standard builder opens a B&B library deck | counter "x / 40", badge; pool not enforced (documented) | [x] `deck-library.test.mjs` format tests + `validateDeck` requiredCards 40 ; counter reads the record format via `getActiveDeckFormat`, "B&B 40" chip badge |
+| 26 | New box with an existing built deck | confirm; on yes the old library deck stays, new session; on no nothing changes | [x] e2e by hand: dismiss → same box; accept → sealed box, editor detached, "B&B Ceruledge #7" still in My Decks |
+| 27 | builder tab opened directly (no opener) | banner, Play disabled, box + building work | [x] existing 050 banner/`isConnected` path, unchanged; B&B boot does not depend on the opener |
+| 28 | pop-up blocked from the slim Deck tab | same blocked message as the deck builder button | [x] `import-deck.js showIfBlocked` shared by both buttons (text made button-neutral) |
+| 29 | prize zone with 4 cards | renders and fans (design 045) with 4; prize picker offers 4 | [~] e2e by hand: two players, both B&B → server deals 4 Prizes each, board renders them; fan and picker left to the user's localhost check |
 | 30 | card text "if you have exactly 6 Prize cards" under 4 prizes | never applies (as printed) — struck as correct behavior, noted in docs | [x] reasoning |
 | 31 | generated data drift (TCGdex renames a card) | generator throws when `card.name` ≠ the decklist name; the committed module is the truth until regenerated | [x] `fetchCard` name check; `--check` live test |
 | 32 | starter-deck id fix | regenerated `starter-decks.generated.mjs` contains Fighting Gong, Firebreather, Academy at Night and none of Forest of Vitality / Dizzying Valley / Sacred Charm | [x] box-catalog.test.mjs |
@@ -418,6 +418,19 @@ persisted artifacts are `ptcg-sim.build-battle.v1` (ignored by older code) and l
 - Slice 3: `view.mjs` adds `deckFormat` to `you`, `them` and spectator player entries. The host's
   `applyBuilderMessage('load-deck')` already forwards `payload.format` (one-line change in
   `native-deck-builder.js`). `GET /build-and-battle` renders with `builderMode`; the EJS body class is slice 4.
+- Slice 4: pure view helpers live in `core/build-battle/build-battle-view.mjs` (+ test): `deckFromRows`,
+  `buildBattleDeckName`, `boxHeadline`, `poolRemaining`, `poolRefusalMessage`, `withPoolErrors`.
+- Slice 4: the library controller gained `openDeckById` and `createAndOpenDeck` (no prompt) for the box
+  deck. At the deck limit the box deck opens unsaved and still plays. A session whose deck was deleted
+  from My Decks rebuilds it from the box on the next boot.
+- Slice 4: packs open in order (the session stores a count); only the next pack's button is live.
+- Slice 4: the format a load sends is the saved record's own (`getActiveDeckFormat`), so a Standard deck
+  opened from My Decks in the B&B tab still plays with 6 Prizes; only an unsaved deck in the B&B tab
+  defaults to `'build-battle'`. Validation in the B&B tab always uses the B&B rules.
+- Slice 4: the Deck-tab blocked text is button-neutral ("blocked the new tab"). CSS scopes under
+  `.build-battle-window .db-live` (the body class and the workspace class sit on different elements).
+- Slice 4 e2e (headless Chromium, socket.io routed to the local client): seed 42 → Flygon deck, 40/40
+  legal; two players Standard vs B&B → mismatch line on both sides, no deal; B&B vs B&B → 4 Prizes each.
 
 ---
 Self-approval checklist (only when the user is unreachable):

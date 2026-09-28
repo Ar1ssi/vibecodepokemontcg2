@@ -1,0 +1,278 @@
+/*
+ * Build & Battle tab (design 051): the Box and Pool panels of the deck builder
+ * on /build-and-battle. Scoped under the tab's body class and the builder's
+ * `.db-live` workspace, so the tokens from deck-builder-live.css (dark and
+ * light) apply and nothing here needs !important.
+ */
+
+.build-battle-window .db-live .native-deck-builder-mode-tab[hidden] {
+  display: none;
+}
+
+.build-battle-window .db-live .bb-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.2vh 1vw 2vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4vh;
+}
+.build-battle-window .db-live .bb-panel[hidden] {
+  display: none;
+}
+
+.build-battle-window .db-live .bb-banner {
+  margin: 0;
+  padding: 0.7vh 0.9vw;
+  border: 1px solid var(--db-gold-dark);
+  border-radius: var(--db-radius-sm);
+  background: var(--db-panel-2);
+  color: var(--db-gold);
+  font-size: 1.4vh;
+}
+
+.build-battle-window .db-live .bb-title {
+  margin: 0;
+  font-size: 1.9vh;
+  color: var(--db-text);
+}
+
+.build-battle-window .db-live .bb-note {
+  margin: 0;
+  font-size: 1.4vh;
+  color: var(--db-text-dim);
+}
+
+.build-battle-window .db-live .bb-primary,
+.build-battle-window .db-live .bb-secondary,
+.build-battle-window .db-live .bb-pack {
+  border-radius: var(--db-radius-pill);
+  padding: 0.6vh 1.1vw;
+  font-size: 1.4vh;
+  font-weight: 600;
+  cursor: pointer;
+}
+.build-battle-window .db-live .bb-primary {
+  background: var(--db-gold);
+  color: #1b2127;
+  border: 1px solid var(--db-gold-dark);
+}
+.build-battle-window .db-live .bb-secondary,
+.build-battle-window .db-live .bb-pack {
+  background: var(--db-raised);
+  color: var(--db-text);
+  border: 1px solid var(--db-border-strong);
+}
+.build-battle-window .db-live .bb-primary:disabled,
+.build-battle-window .db-live .bb-secondary:disabled,
+.build-battle-window .db-live .bb-pack:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Sealed box ───────────────────────────────────────────────────────── */
+.build-battle-window .db-live .bb-sealed {
+  align-self: center;
+  max-width: 420px;
+  margin-top: 4vh;
+  padding: 2.4vh 1.6vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4vh;
+  text-align: center;
+  background: linear-gradient(160deg, var(--db-panel-2), var(--db-panel));
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius);
+  box-shadow: var(--db-shadow);
+}
+
+.build-battle-window .db-live .bb-seed-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5vw;
+  font-size: 1.4vh;
+  color: var(--db-text-dim);
+}
+.build-battle-window .db-live .bb-seed-input {
+  width: 9em;
+  padding: 0.4vh 0.6vw;
+  background: var(--db-input);
+  color: var(--db-text);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-sm);
+}
+
+/* ── Opened box ───────────────────────────────────────────────────────── */
+.build-battle-window .db-live .bb-box-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1vh 1vw;
+}
+.build-battle-window .db-live .bb-box-actions {
+  display: flex;
+  gap: 0.5vw;
+}
+
+.build-battle-window .db-live .bb-deck-card {
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+  padding: 1vh 1vw;
+  background: var(--db-panel);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+}
+.build-battle-window .db-live .bb-deck-promo {
+  width: 110px;
+  aspect-ratio: 63 / 88;
+  border-radius: 5px;
+  box-shadow: var(--db-shadow-soft);
+}
+.build-battle-window .db-live .bb-deck-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4vh;
+  font-size: 1.4vh;
+  color: var(--db-text-dim);
+}
+.build-battle-window .db-live .bb-deck-text strong {
+  font-size: 1.8vh;
+  color: var(--db-text);
+}
+
+.build-battle-window .db-live .bb-packs {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2vh;
+}
+.build-battle-window .db-live .bb-pack-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6vh;
+}
+.build-battle-window .db-live .bb-pack-cards {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 0.4vw;
+  width: 100%;
+}
+
+/* The flip: back face shows until `.is-open`, then each card turns after its
+ * own --bb-delay (60 ms stagger). The card is the host; only the inner turns. */
+.build-battle-window .db-live .bb-pack-card {
+  aspect-ratio: 63 / 88;
+  perspective: 800px;
+}
+.build-battle-window .db-live .bb-pack-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 420ms ease-out;
+  transition-delay: var(--bb-delay, 0ms);
+}
+.build-battle-window .db-live .bb-pack-card.is-open .bb-pack-card-inner {
+  transform: rotateY(180deg);
+}
+.build-battle-window .db-live .bb-pack-card-back,
+.build-battle-window .db-live .bb-pack-card-front {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  backface-visibility: hidden;
+}
+.build-battle-window .db-live .bb-pack-card-front {
+  transform: rotateY(180deg);
+}
+body.fx-off.build-battle-window .db-live .bb-pack-card-inner {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .build-battle-window .db-live .bb-pack-card-inner {
+    transition: none;
+  }
+}
+
+/* ── Pool ─────────────────────────────────────────────────────────────── */
+.build-battle-window .db-live .bb-pool-status {
+  margin: 0;
+  min-height: 1.6em;
+  font-size: 1.4vh;
+  color: var(--db-gold);
+}
+.build-battle-window .db-live .bb-pool-group-title {
+  margin: 0 0 0.6vh;
+  font-size: 1.5vh;
+  color: var(--db-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.build-battle-window .db-live .bb-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.6vw;
+}
+.build-battle-window .db-live .bb-pool-card {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 5px;
+}
+.build-battle-window .db-live .bb-pool-card:hover .bb-pool-card-image {
+  box-shadow: 0 0 0 2px var(--db-gold);
+}
+.build-battle-window .db-live .bb-pool-card-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  border-radius: 5px;
+}
+.build-battle-window .db-live .bb-pool-card.is-spent .bb-pool-card-image {
+  filter: grayscale(0.85) brightness(0.6);
+}
+.build-battle-window .db-live .bb-pool-badge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 0.1vh 0.5vw;
+  border-radius: var(--db-radius-pill);
+  background: var(--db-chrome);
+  color: var(--db-text);
+  font-size: 1.2vh;
+  font-weight: 700;
+  box-shadow: var(--db-shadow-soft);
+}
+.build-battle-window .db-live .bb-pool-card.is-unlimited .bb-pool-badge {
+  color: var(--db-gold);
+}
+
+/* "B&B 40" on Build & Battle decks in My Decks (both builder tabs). */
+.db-live .native-deck-builder-format-badge {
+  padding: 0 0.4vw;
+  border-radius: var(--db-radius-pill);
+  border: 1px solid var(--db-gold-dark);
+  color: var(--db-gold);
+  font-size: 1.1vh;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Disabled Play says why in its title; make that discoverable. */
+.build-battle-window .db-live .native-deck-builder-play-button:disabled[title]:not([title='']) {
+  cursor: help;
+}
+
+@media (max-width: 700px) {
+  .build-battle-window .db-live .bb-pack-cards {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}

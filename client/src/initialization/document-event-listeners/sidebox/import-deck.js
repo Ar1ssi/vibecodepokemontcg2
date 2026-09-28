@@ -1,15 +1,19 @@
 import { systemState } from '../../../state.js';
-import { openDeckBuilderWindow } from './deck-builder-window.js';
+import { openBuildBattleWindow, openDeckBuilderWindow } from './deck-builder-window.js';
 
 /**
  * Opens (or focuses) the deck builder tab from the Deck tab (design 050) and
  * says so when the browser's pop-up blocker refused it.
  */
-export const openDeckBuilderFromDeckTab = () => {
+export const openDeckBuilderFromDeckTab = () => showIfBlocked(openDeckBuilderWindow());
+
+/** The same for the Build & Battle tab (design 051); both buttons share the blocked message. */
+export const openBuildBattleFromDeckTab = () => showIfBlocked(openBuildBattleWindow());
+
+function showIfBlocked(openedTab) {
   const blockedText = document.getElementById('deckBuilderBlockedText');
-  const builder = openDeckBuilderWindow();
-  if (blockedText) blockedText.hidden = Boolean(builder);
-};
+  if (blockedText) blockedText.hidden = Boolean(openedTab);
+}
 
 export const initializeImport = () => {
   const changeCardBackButton = document.getElementById('changeCardBackButton');
@@ -65,4 +69,7 @@ export const initializeImport = () => {
   document
     .getElementById('openDeckBuilderButton')
     ?.addEventListener('click', openDeckBuilderFromDeckTab);
+  document
+    .getElementById('openBuildBattleButton')
+    ?.addEventListener('click', openBuildBattleFromDeckTab);
 };
