@@ -36,6 +36,8 @@ test('every message type parses in its valid shape', () => {
   const valid = [
     ['ready', {}],
     ['host-state', { isTwoPlayer: false }],
+    ['host-state', { isTwoPlayer: true, roomId: 'room-A' }],
+    ['host-state', { isTwoPlayer: false, roomId: null }],
     ['load-deck', { target: 'opp', deckId: null, rows: [ROW.slice(0, 4)] }],
     ['card-back', { target: 'self', image: '/src/assets/cardback.png', emit: true }],
     ['sleeve', { target: 'self', image: null }],
@@ -68,6 +70,8 @@ test('bad targets, ids and flags are rejected', () => {
   reject('mat', { target: 'self', matId: 'x'.repeat(129), emit: true });
   reject('mat', { target: 'self', matId: 'mat-1' });
   reject('host-state', { isTwoPlayer: 'yes' });
+  reject('host-state', { isTwoPlayer: true, roomId: 42 });
+  reject('host-state', { isTwoPlayer: true, roomId: '' });
   reject('load-deck', { target: 'self', rows: [ROW] });
 });
 

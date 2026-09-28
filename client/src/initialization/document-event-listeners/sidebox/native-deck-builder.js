@@ -50,7 +50,11 @@ import {
   renderFilterDrawer,
   renderSearchResults,
 } from './native-deck-builder-renderers.js';
-import { connectToHost, installDeckBuilderHost } from './deck-builder-window.js';
+import {
+  announceHostState,
+  connectToHost,
+  installDeckBuilderHost,
+} from './deck-builder-window.js';
 import { initializeNativeDeckBuilderSpritePicker } from './native-deck-builder-sprite-picker.js';
 import {
   MAX_DECK_SPRITES,
@@ -351,6 +355,7 @@ export const initializeNativeDeckBuilder = ({ role = 'host', mode = 'standard' }
         onHostState: (state) => {
           // P2 is Solo-only: a game that is now multiplayer takes P2 away.
           if (state.isTwoPlayer && currentLoadTarget === 'opp') switchTarget('self');
+          buildBattle?.setRoom(state.roomId ?? null);
           render();
         },
       })
@@ -1818,8 +1823,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     };
     installDeckBuilderHost({
       apply: applyBuilderMessage,
-      getHostState: () => ({ isTwoPlayer: Boolean(systemState.isTwoPlayer) }),
+      getHostState: () => ({
+        isTwoPlayer: Boolean(systemState.isTwoPlayer),
+        roomId: (systemState.isTwoPlayer && systemState.roomId) || null,
+      }),
     });
+    // Leaving a room (joining is announced once the join completes, in socket-event-listeners).
+    document.addEventListener('room-changed', announceHostState);
   }
 
   if (isBuildBattle) {
@@ -1856,7 +1866,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         render();
       },
       showPool: () => switchMode('pool'),
+      showBox: () => switchMode('box'),
       onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
+      waitForRoom: isEditor && gameLink.isConnected(),
     });
     switchMode(buildBattle.initialMode());
   }

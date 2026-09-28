@@ -19,6 +19,7 @@ import {
   parseSession,
   randomSeed,
   saveSession,
+  sessionBelongsHere,
   validatePoolDeck,
 } from '../build-battle-session.mjs';
 import { advanceUnboxing, createUnboxing, finishedUnboxing } from '../unboxing.mjs';
@@ -63,8 +64,29 @@ test('createSession starts with the box sealed and no library deck', () => {
     unboxing: createUnboxing(),
     deckId: null,
     unsavedDeck: null,
+    roomId: null,
     createdAt: 1000,
   });
+});
+
+test('a box remembers the room it was opened for and survives a reload there', () => {
+  const storage = memoryStorage();
+  const box = getBuildBattleBox('phantasmal-flames');
+  const session = createSession({ boxKey: box.key, seed: 42, ...opened, roomId: 'room-A', now: 1000 });
+  assert.equal(session.roomId, 'room-A');
+  saveSession(storage, session);
+  assert.equal(loadSession(storage).roomId, 'room-A');
+  assert.equal(parseSession(JSON.stringify({ ...session, roomId: 7 })).roomId, null);
+});
+
+test('a box from another room does not belong in this one; outside a room every box is kept', () => {
+  const inRoomA = { ...freshSession(), roomId: 'room-A' };
+  assert.equal(sessionBelongsHere(inRoomA, 'room-A'), true);
+  assert.equal(sessionBelongsHere(inRoomA, 'room-B'), false);
+  assert.equal(sessionBelongsHere(freshSession(), 'room-B'), false);
+  assert.equal(sessionBelongsHere(inRoomA, null), true);
+  assert.equal(sessionBelongsHere(inRoomA, ''), true);
+  assert.equal(sessionBelongsHere(null, 'room-A'), false);
 });
 
 test('a session round-trips through storage and clears', () => {

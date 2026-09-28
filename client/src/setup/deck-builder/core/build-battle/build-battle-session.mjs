@@ -15,10 +15,12 @@ const MAX_ID_LENGTH = 128;
 /**
  * @typedef {{version: 1, boxKey: string, seed: number, deckKey: string, packs: string[][],
  *   unboxing: import('./unboxing.mjs').Unboxing, deckId: string|null,
- *   unsavedDeck: [string, number][]|null, createdAt: number}} Session
+ *   unsavedDeck: [string, number][]|null, roomId: string|null, createdAt: number}} Session
  * `unboxing` is the scene's progress (design 052); it never changes `packs`.
  * `unsavedDeck` holds the editor deck as [cardId, count] pairs while no My Decks record is bound
  * (the library was full), so a reload rebuilds the player's edits instead of the box deck (I207).
+ * `roomId` is the multiplayer room the box was opened for, or null when opened outside a room: a
+ * box belongs to one room's match, and a different room starts a fresh box.
  */
 
 /** @returns {Session} a freshly opened box: still sealed, no library deck bound. */
@@ -27,6 +29,7 @@ export function createSession({
   seed,
   deckKey,
   packs,
+  roomId = null,
   now = Date.now(),
 }) {
   return {
@@ -38,6 +41,7 @@ export function createSession({
     unboxing: createUnboxing(),
     deckId: null,
     unsavedDeck: null,
+    roomId: isRoomId(roomId) ? roomId : null,
     createdAt: now,
   };
 }
@@ -82,6 +86,9 @@ export function deckCardCounts(deck = {}) {
 
 const isSeed = (value) =>
   Number.isInteger(value) && value >= 0 && value <= MAX_SEED;
+
+const isRoomId = (value) =>
+  typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH;
 
 const isDeckId = (value) =>
   value === null ||
@@ -134,8 +141,22 @@ export function parseSession(json) {
     unboxing,
     deckId: value.deckId,
     unsavedDeck: value.deckId === null ? parseUnsavedDeck(value.unsavedDeck) : null,
+    roomId: isRoomId(value.roomId) ? value.roomId : null,
     createdAt: value.createdAt,
   };
+}
+
+/**
+ * Whether the saved box still belongs to where the player is now. Outside a room every box is
+ * kept (Solo play, or a game tab that is not connected); in a room only the box opened for that
+ * room is, so leaving a room and joining another starts a fresh box.
+ * @param {Session|null} session
+ * @param {string|null} currentRoomId the room the game tab is in, or null when in none
+ */
+export function sessionBelongsHere(session, currentRoomId) {
+  if (!session) return false;
+  if (!isRoomId(currentRoomId)) return true;
+  return session.roomId === currentRoomId;
 }
 
 /** @returns {boolean} false when the session could not be stored (memory only). */

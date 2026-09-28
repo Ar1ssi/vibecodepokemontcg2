@@ -19,6 +19,7 @@ import {
   parseSeed,
   randomSeed,
   saveSession,
+  sessionBelongsHere,
   validatePoolDeck,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-session.mjs';
 import {
@@ -51,6 +52,10 @@ const MEMORY_ONLY_TEXT = 'Your box will not survive a reload';
 const UNSAVED_DECK_TEXT =
   'My Decks is full, so this deck is kept with your box in this browser only. ' +
   'Delete a deck in My Decks, then press Save to keep it there.';
+const NEW_ROOM_TEXT =
+  'You are in a new room, so this is a fresh box. Decks you built stay in My Decks.';
+// How long a builder tab opened from the game waits for the game to name its room.
+const ROOM_WAIT_MS = 800;
 const NEW_BOX_CONFIRM =
   'Discard this pool and open a new box? Your built deck stays in My Decks.';
 const STAGE_ACTIVE_CLASS = 'bb-unboxing-active';
@@ -99,8 +104,12 @@ const unlimitedEnergyCards = () =>
  * @param {(cards: object) => void} options.showUnsavedDeck puts cards in the editor with no library deck bound
  * @param {() => void} options.detachEditor unbinds and empties the editor
  * @param {() => void} options.showPool switches the left pane to the Pool tab
+ * @param {() => void} options.showBox switches the left pane to the Box tab
+ * @param {boolean} [options.waitForRoom] the game tab will name its room: hold the saved box
+ *   until it does (or ROOM_WAIT_MS passes), so a box from another room never shows
  * @param {(imageUrl: string, card: object, sourceEl: Element) => void} options.onPreviewCard
- * @returns {{poolErrors: (deck: object) => string[], initialMode: () => 'box'|'pool', refresh: () => void}}
+ * @returns {{poolErrors: (deck: object) => string[], initialMode: () => 'box'|'pool',
+ *   refresh: () => void, setRoom: (roomId: string|null) => void}}
  */
 export const initializeBuildBattle = ({
   boxPanelEl,
@@ -112,7 +121,9 @@ export const initializeBuildBattle = ({
   showUnsavedDeck,
   detachEditor,
   showPool,
+  showBox,
   onPreviewCard,
+  waitForRoom = false,
 }) => {
   const storage = browserStorage();
   const setCards = BUILD_BATTLE_SET_CARDS[BOX.setId] || [];
@@ -126,6 +137,11 @@ export const initializeBuildBattle = ({
   let poolStatus = '';
   let scene = null;
   let stageEl = null;
+  // The game tab's room (null outside one); a box belongs to the room it was opened for.
+  let currentRoomId = null;
+  let resumed = false;
+  let resumeTimer = null;
+  let newRoomNote = false;
   // The builder workspace: the stage is its child so the Live tokens and scene CSS apply.
   const workspaceEl = boxPanelEl?.closest('.db-live') || null;
 
@@ -187,8 +203,14 @@ export const initializeBuildBattle = ({
   };
 
   const resumeSession = () => {
-    session = loadSession(storage);
-    if (!session) return;
+    const saved = loadSession(storage);
+    if (!saved) return;
+    if (!sessionBelongsHere(saved, currentRoomId)) {
+      clearSession(storage);
+      newRoomNote = true;
+      return;
+    }
+    session = saved;
     computePool();
     const reopened = session.deckId && deckLibrary?.openDeckById?.(getTarget(), session.deckId);
     if (reopened) return;
@@ -203,9 +225,10 @@ export const initializeBuildBattle = ({
     if (session) return;
     const seed = parseSeed(seedText.trim()) ?? randomSeed();
     const opened = openBox({ box: BOX, cards: setCards, rng: createRng(seed) });
-    session = createSession({ boxKey: BOX.key, seed, ...opened });
+    session = createSession({ boxKey: BOX.key, seed, roomId: currentRoomId, ...opened });
     computePool();
     poolStatus = '';
+    newRoomNote = false;
     openBoxDeck();
     renderAll();
   };
@@ -280,6 +303,7 @@ export const initializeBuildBattle = ({
 
   // ── Box tab ─────────────────────────────────────────────────────────────
   const renderBanner = (parent) => {
+    if (newRoomNote && !session) parent.append(el('p', 'bb-banner', NEW_ROOM_TEXT));
     if (memoryOnly) parent.append(el('p', 'bb-banner', MEMORY_ONLY_TEXT));
     if (session && !session.deckId) parent.append(el('p', 'bb-banner', UNSAVED_DECK_TEXT));
   };
@@ -356,6 +380,7 @@ export const initializeBuildBattle = ({
     scene = null;
     if (unboxingDone()) closeStage();
     boxPanelEl.replaceChildren();
+    if (!resumed) return; // still waiting for the game tab to name its room
     renderBanner(boxPanelEl);
     if (session) renderOpenedBox();
     else renderSealedBox();
@@ -474,8 +499,41 @@ export const initializeBuildBattle = ({
     renderPool();
   };
 
-  resumeSession();
-  renderAll();
+  const finishResume = () => {
+    if (resumed) return;
+    resumed = true;
+    clearTimeout(resumeTimer);
+    resumeSession();
+    renderAll();
+    // A late resume picks the tab itself; an immediate one leaves it to initialMode().
+    if (waitForRoom && session && unboxingDone()) showPool();
+  };
+
+  // The game tab joined or left a room. A box opened for another room is put away (its deck
+  // stays in My Decks) and the player starts a fresh one; a reload in the same room resumes.
+  const setRoom = (roomId) => {
+    currentRoomId = roomId || null;
+    if (!resumed) {
+      finishResume();
+      return;
+    }
+    if (!session || sessionBelongsHere(session, currentRoomId)) return;
+    clearSession(storage);
+    session = null;
+    pool = [];
+    poolStatus = '';
+    newRoomNote = true;
+    detachEditor();
+    renderAll();
+    showBox();
+  };
+
+  if (waitForRoom) {
+    resumeTimer = setTimeout(finishResume, ROOM_WAIT_MS);
+    renderAll();
+  } else {
+    finishResume();
+  }
 
   return {
     poolErrors: (deck) => (session ? validatePoolDeck(deck, pool) : []),
@@ -485,5 +543,6 @@ export const initializeBuildBattle = ({
       trackUnsavedDeck();
       refreshPoolCounts();
     },
+    setRoom,
   };
 };
