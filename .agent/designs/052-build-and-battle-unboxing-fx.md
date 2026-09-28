@@ -339,7 +339,7 @@ Slice 2 (2026-09-28):
   "Reveal all" has several in flight; a ResizeObserver re-lays the fan on width changes.
 - The scene hands over to the Pool tab after the collapse (and after "Skip scene"), with a 240 ms
   fade on the Pool panel. Box-face photos are cached across re-renders so the CSS face never flashes.
-- Pack art is vendored at 440 px wide (≈ 80 KB each; the refs are 780 px).
+- Pack art is vendored at 440 px wide (≈ 80 KB each; the refs are 780 px). Superseded by the sharpness fix below: packs now ship the 780 px refs.
 
 Slice 3 (2026-09-28):
 - The recorder runs three passes: real-speed video with PASS/FAIL checks (rows 4, 13, 14, plus the
@@ -387,6 +387,13 @@ Pocket-style rework (2026-09-28, user ask relayed in the same thread):
   `unboxingTimeline`) stay in the pure module but the DOM no longer uses them.
 - rec-unboxing drives the new flow (spread, in-order tears, swipes, flips, summaries, reload
   mid-pack) and adds 390 px shots of the spread and the pocket.
+
+Sharpness fix (2026-09-28, user: "why are the boxes so low res?"):
+- The box art was sharp, but Chrome rasterises layers under a perspective near their layout size,
+  so the 200 px cuboid shown at 1.35x on HiDPI was upscaled (perspective off or body transform off
+  each made it crisp). `.bb-box` now lays out at `zoom: 2.5` and scales back down with
+  `--bb-box-scale`; its margins return the extra footprint, so on-screen size and position are
+  unchanged. Packs ship the 780 px refs (the big pack is now up to 30vh wide).
 
 ---
 Self-approval checklist (only when the user is unreachable):
