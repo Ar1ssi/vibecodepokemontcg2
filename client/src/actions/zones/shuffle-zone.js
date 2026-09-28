@@ -18,7 +18,8 @@ export const shuffleZone = (
   zoneId,
   indices,
   message = true,
-  emit = true
+  emit = true,
+  animate = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
   if (user === 'opp' && emit && systemState.isTwoPlayer) {
@@ -46,13 +47,15 @@ export const shuffleZone = (
   // catch-up replay or a hidden tab still stays silent (design 009 slice 4;
   // the old "made the other deck look like it shuffled too" complaint was
   // about a wrong user/side mapping, not the animation itself — confirm live).
+  // `animate: false` is for a caller whose shuffle is animated elsewhere.
   if (
-    emit ||
-    shouldAnimateMirror({
-      syncReplaying: !!systemState.syncReplaying,
-      isCatchingUp: !!systemState.isCatchingUp,
-      hidden: typeof document !== 'undefined' && !!document.hidden,
-    })
+    animate &&
+    (emit ||
+      shouldAnimateMirror({
+        syncReplaying: !!systemState.syncReplaying,
+        isCatchingUp: !!systemState.isCatchingUp,
+        hidden: typeof document !== 'undefined' && !!document.hidden,
+      }))
   ) {
     playShuffleFlight(user, zoneId, zone.getCount());
   }

@@ -7,13 +7,18 @@
 // (#turnOrderCoinFlipOverlay + .turn-order-coin-flip-*); the coin's material
 // and fixed-light layers come from css/coin/* via coin-effects.mjs. The schedule
 // (toss length, landings, hold) is coinCeremonyTimeline in mat-fx/coin-pose.mjs.
+// While the overlay is up the coin's fixed light drifts and follows the spin, so
+// the foil moves like the mat token's does.
 
 import {
   applyCoinEffect,
   coinArtUrl,
   coinEffectLayerMarkup,
   COIN_BACK_URL,
+  startCoinDrift,
+  stopCoinDrift,
 } from '../deck-builder/core/coin-effects.mjs';
+import { motionReduced } from '../image-logic/mat-fx.mjs';
 import {
   coinCeremonyTimeline,
   coinFlipAngle,
@@ -29,15 +34,6 @@ const escapeHtml = (value = '') =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
-
-const preferReducedMotion = (doc) => {
-  const view = doc?.defaultView || (typeof window !== 'undefined' ? window : null);
-  try {
-    return view?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
-  } catch {
-    return false;
-  }
-};
 
 const scheduleFrame = (doc, fn) => {
   const view = doc?.defaultView || (typeof window !== 'undefined' ? window : null);
@@ -98,8 +94,10 @@ export const coinFlipCeremonyMarkup = ({
  * `results` flips the coin once per face, in order, in one overlay; `result`
  * is the single-flip shorthand. `revealMs` overrides the toss length (tests).
  * `passive` lets clicks through to the board: an in-game flip is cosmetic, the
- * board state it reports is already applied. `reducedMotion` overrides the
- * `prefers-reduced-motion` query (the app has its own setting).
+ * board state it reports is already applied. `reducedMotion` defaults to the
+ * app's own reduce-motion setting, never the OS `prefers-reduced-motion` flag:
+ * Windows raises that whenever system animations are off, which froze every
+ * coin (see motionReduced in image-logic/mat-fx.mjs).
  *
  * @param {{
  *   coin?: object|null,
@@ -138,7 +136,7 @@ export const playCoinFlipCeremony = ({
     }
 
     const faces = Array.isArray(results) && results.length > 0 ? results : [result];
-    const reducedMotion = reducedMotionOverride ?? preferReducedMotion(doc);
+    const reducedMotion = reducedMotionOverride ?? motionReduced();
     const timeline = coinCeremonyTimeline(faces.length, {
       reducedMotion,
       tossMs: revealMs,
@@ -173,6 +171,7 @@ export const playCoinFlipCeremony = ({
       finished = true;
       overlay.classList.add('fading');
       setTimeout(() => {
+        stopCoinDrift(coinEl);
         overlay.remove();
         resolve();
       }, timeline.fadeMs);
@@ -214,5 +213,7 @@ export const playCoinFlipCeremony = ({
 
     if (tallyEl) tallyEl.textContent = coinTallyText(faces, 0);
     scheduleFrame(doc, () => toss(0));
+    // After the toss is queued, so the first frame starts the spin before it samples it.
+    startCoinDrift(coinEl, { followSpin: !reducedMotion });
   });
 };

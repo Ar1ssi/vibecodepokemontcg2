@@ -172,14 +172,33 @@ export function wireCoinPointerLight(el) {
   };
 }
 
-// ── auto drift (mat token) ────────────────────────────────────────────
-// Only the two board tokens run a loop, so an rAF per token is cheap. The
+/**
+ * How far a tumbling coin's face is turned toward or away from the viewer, as a
+ * unit tilt: sin of its rotateX angle, read from a computed `transform`
+ * (matrix3d m23 / matrix b is the sine term). 0 for `none` or anything unparsable.
+ */
+export function coinSpinTiltY(transform) {
+  const match = /^matrix(3d)?\(([^)]+)\)$/.exec(String(transform ?? '').trim());
+  if (!match) return 0;
+  const values = match[2].split(',').map(Number);
+  const sine = match[1] ? values[6] : values[1];
+  return Number.isFinite(sine) ? clamp(sine, -1, 1) : 0;
+}
+
+// ── auto drift (mat token, flip ceremony) ─────────────────────────────
+// Only a handful of coins ever run a loop, so an rAF per coin is cheap. The
 // drift keeps the foil alive with no visible rotation, like holo's board cards.
+// `followSpin` (the flip ceremony) also sweeps the light with the coin's own
+// rotation, so the foil flashes as the face turns through the light.
 const activeDrifts = new WeakMap();
 
-export function startCoinDrift(el, { phaseOffset = 0 } = {}) {
+export function startCoinDrift(el, { phaseOffset = 0, followSpin = false } = {}) {
   if (!el) return () => {};
   stopCoinDrift(el);
+
+  // The ceremony's coin lives in the top document, the mat tokens in iframes.
+  const view = el.ownerDocument?.defaultView || globalThis;
+  if (typeof view.requestAnimationFrame !== 'function') return () => {};
 
   const offsetMs = phaseOffset * 13000;
   let rafId = null;
@@ -188,17 +207,18 @@ export function startCoinDrift(el, { phaseOffset = 0 } = {}) {
   const tick = (now) => {
     if (!running) return;
     const tilt = driftTilt(now + offsetMs);
+    const spin = followSpin ? coinSpinTiltY(view.getComputedStyle?.(el)?.transform) : 0;
     applyCoinLight(
       el,
-      computeCoinLight({ tiltX: tilt.tiltX, tiltY: tilt.tiltY })
+      computeCoinLight({ tiltX: tilt.tiltX, tiltY: tilt.tiltY + spin })
     );
-    rafId = requestAnimationFrame(tick);
+    rafId = view.requestAnimationFrame(tick);
   };
-  rafId = requestAnimationFrame(tick);
+  rafId = view.requestAnimationFrame(tick);
 
   const stop = () => {
     running = false;
-    if (rafId != null) cancelAnimationFrame(rafId);
+    if (rafId != null) view.cancelAnimationFrame?.(rafId);
     activeDrifts.delete(el);
   };
   activeDrifts.set(el, stop);
