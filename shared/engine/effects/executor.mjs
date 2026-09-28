@@ -17,6 +17,7 @@ import { normalizeStage } from '../rules/evolution.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { healLocked } from '../rules/attack-markers.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
   isSingleStrikeCard,
@@ -30,7 +31,7 @@ import {
   attachedCards,
   removeFromZones,
 } from './trainer-steps.mjs';
-import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
+import { ATTACK_STEP_HANDLERS, EXTRA_ENERGY_SELF_GATED, stepExtraEnergySatisfied } from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
@@ -122,6 +123,16 @@ export function matchesEnergyTypeFilter(card, energyTypes) {
     const t = String(type).toLowerCase();
     return types.includes(t) || name.includes(t);
   });
+}
+
+// "except Pokémon-GX or Pokémon-EX" (Electrode-GX Extra Energy Bomb): the printed suffix is
+// case-sensitive — "EX" is the XY-era rule box, "ex" the Scarlet & Violet / EX-era one.
+const RULE_BOX_SUFFIX = { GX: /[- ]GX$/, EX: /[- ]EX$/, ex: /[- ]ex$/ };
+
+function hasRuleBoxKind(player, root, kind) {
+  const zone = [...(player.zones.active || []), ...(player.zones.bench || [])];
+  const name = String((topPokemonCard(zone, root) || root).name || '');
+  return Boolean(RULE_BOX_SUFFIX[kind]?.test(name));
 }
 
 /**
@@ -297,8 +308,14 @@ export function executeSteps(draft, {
   const opponent = oppId ? draft.players[oppId] : null;
 
   let currentSelection = selection;
+  // A `cost` step ("… you may discard X. If you do, …") that skipped stops the rest of the effect.
+  let costEventsFrom = null;
 
   for (let idx = fromStepIndex; idx < steps.length; idx++) {
+    if (costEventsFrom != null && events.slice(costEventsFrom).some((e) => e.type === 'effectStepSkipped')) {
+      return { pendingChoice: null, completed: true };
+    }
+    costEventsFrom = steps[idx]?.cost ? events.length : null;
     budget.count++;
     // Edge Case 15: Step budget check to prevent infinite loops
     if (budget.count > MAX_EFFECT_STEPS) {
@@ -322,6 +339,31 @@ export function executeSteps(draft, {
     }
     if (step.requiresAttach && !context.attachedEnergy) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
+      continue;
+    }
+    // GX "If this Pokémon has at least N extra Energy attached to it, …" (Tropical Hour-GX).
+    if (
+      effectType === 'attackSteps' &&
+      step.requiresExtraEnergy &&
+      !EXTRA_ENERGY_SELF_GATED.has(step.type) &&
+      !stepExtraEnergySatisfied({ draft, player, sourceCard, step })
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'extra_energy_unmet', step: step.type });
+      continue;
+    }
+    // Hypno Spiral Aura: "If the Defending Pokémon isn't Knocked Out by the damage from this
+    // attack"; Scizor Accelerate: "If the Defending Pokémon is Knocked Out by this attack".
+    // The Defending Pokémon itself, not a Bench Knock Out from the same attack's spread.
+    const defenderId = context.attack?.tail?.defenderId;
+    if (events.some((e) => e.type === 'pokemonKnockedOut' && e.playerId === oppId && (defenderId == null || e.instanceId === defenderId))) {
+      context.defenderKnockedOut = true;
+    }
+    if (step.requiresDefenderSurvived && context.defenderKnockedOut) {
+      events.push({ type: 'effectStepSkipped', reason: 'defender_knocked_out', step: step.type });
+      continue;
+    }
+    if (step.requiresDefenderKnockedOut && !context.defenderKnockedOut) {
+      events.push({ type: 'effectStepSkipped', reason: 'defender_not_knocked_out', step: step.type });
       continue;
     }
     if (
@@ -1012,9 +1054,16 @@ export function executeSteps(draft, {
           break;
         }
 
-        const bench = (player.zones.bench || []).filter((c) => !c.attachedTo);
+        // Pecharunt ex Subjugating Chains: "1 of your Benched {D} Pokémon, except any Pecharunt ex".
+        const benchAllowed = (c) => {
+          const top = topPokemonCard(player.zones.bench || [], c) || c;
+          if (step.pokemonType && !matchesEnergyTypeFilter({ types: top.types }, [step.pokemonType])) return false;
+          return !(step.exceptName && String(top.name || '').toLowerCase() === step.exceptName);
+        };
+        const bench = (player.zones.bench || []).filter((c) => !c.attachedTo && (step.selfSwap || benchAllowed(c)));
         const active = (player.zones.active || []).find((c) => !c.attachedTo);
         if (!active || bench.length === 0) {
+          context.ownSwitchSkipped = true;
           events.push({ type: 'effectStepSkipped', reason: 'no_bench_pokemon', step: step.type });
           break;
         }
@@ -1088,6 +1137,11 @@ export function executeSteps(draft, {
             activeId: active.instanceId,
             benchId: benchCard.instanceId,
           });
+          // Pecharunt ex: "If you do, the new Active Pokémon is now Poisoned."
+          if (step.poisonNewActive) {
+            addCondition(benchCard, 'Poisoned');
+            events.push({ type: 'specialConditionUpdated', instanceId: benchCard.instanceId, condition: 'Poisoned' });
+          }
         }
         break;
       }
@@ -1095,6 +1149,13 @@ export function executeSteps(draft, {
       case 'switchOpponent':
       case 'switchOpponentOut': {
         if (!opponent) break;
+        // "If you do, …" after the player's own switch (Vanilluxe Slippery Soles, Samurott).
+        // The own switch records its skip in the resumable context (a bench pick resumes with a
+        // fresh events list).
+        if (step.afterOwnSwitch && context.ownSwitchSkipped) {
+          events.push({ type: 'effectStepSkipped', reason: 'no_own_switch', step: step.type });
+          break;
+        }
         const oppBench = (opponent.zones.bench || []).filter(
           (c) => !c.attachedTo && (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c))
         );
@@ -1116,7 +1177,10 @@ export function executeSteps(draft, {
         } else {
           const choice = createPendingChoice({
             player: choicePlayer,
-            prompt: `${sourceCard?.name || 'Gust'}: Select opponent's Benched Pokémon to switch to Active`,
+            prompt:
+              choicePlayer === playerId
+                ? `${sourceCard?.name || 'Gust'}: Select opponent's Benched Pokémon to switch to Active`
+                : `${sourceCard?.name || 'Gust'}: Choose your new Active Pokémon`,
             source: sourceCard?.name || '',
             options: oppBench,
             min: 1,
@@ -1227,6 +1291,8 @@ export function executeSteps(draft, {
 
         const candidates = discard.filter((c) => matchesSearch(c, what));
         if (candidates.length === 0) {
+          // Reported, so an "If you do," half (Banette Puppet Offering) does not follow.
+          events.push({ type: 'effectStepSkipped', reason: 'no_matching_cards', step: step.type });
           break;
         }
 
@@ -1285,7 +1351,8 @@ export function executeSteps(draft, {
 
         const healOne = (card) => {
           const oldDamage = card.damage || 0;
-          card.damage = Math.max(0, oldDamage - healAmt);
+          // Lunala-GX Moongeist Beam: a heal-locked Pokémon keeps its damage.
+          if (!healLocked(card, draft.turn?.number || 1)) card.damage = Math.max(0, oldDamage - healAmt);
           events.push({
             type: 'damageUpdated',
             instanceId: card.instanceId,
@@ -1868,7 +1935,43 @@ export function executeSteps(draft, {
       case 'attachFromDiscard': {
         const discard = player.zones.discard || [];
         const memoKey = `${idx}:attachFromDiscard`;
-        const targets = inPlayRoots(player).filter((c) => rootMatchesTarget(player, c, step.target));
+        // Repeated attaches (parse-hole sweep D4): `count` Energy in all, onto one Pokémon
+        // (`sameTarget`, Milotic Energy Grace), one each onto different Pokémon
+        // (`distinctTargets`, Tapu Koko Prism Star), or in any way (Electrode-GX).
+        const progress = context[memoKey] || {};
+        const selfRootId = sourceCard?.attachedTo ?? sourceCard?.instanceId;
+        const targets = inPlayRoots(player).filter(
+          (c) =>
+            rootMatchesTarget(player, c, step.target) &&
+            // `excludeSelf`: the Ability's Pokémon is Knocked Out by the same Ability (Milotic).
+            !(step.excludeSelf && c.instanceId === selfRootId) &&
+            !(step.excludeKinds || []).some((kind) => hasRuleBoxKind(player, c, kind)) &&
+            !(progress.lockedTargetId != null && c.instanceId !== progress.lockedTargetId) &&
+            !(progress.usedTargetIds || []).includes(c.instanceId)
+        );
+        // Another attach of a repeated step; returns a pending choice, or null when done.
+        const continueAttaching = (target) => {
+          const done = (progress.done || 0) + 1;
+          if (done >= (step.count || 1)) return null;
+          const next = {
+            done,
+            lockedTargetId: step.sameTarget ? target.instanceId : null,
+            usedTargetIds: step.distinctTargets ? [...(progress.usedTargetIds || []), target.instanceId] : [],
+          };
+          const moreEnergy = (player.zones.discard || []).some((c) => attachableEnergy(c));
+          const moreTargets = inPlayRoots(player).some(
+            (c) =>
+              targets.includes(c) &&
+              (next.lockedTargetId == null || c.instanceId === next.lockedTargetId) &&
+              !next.usedTargetIds.includes(c.instanceId)
+          );
+          if (!moreEnergy || !moreTargets) return null;
+          return ask(
+            `${sourceCard?.name || 'Attach'}: Select an Energy card from discard to attach (${done + 1} of ${step.count})`,
+            (player.zones.discard || []).filter((c) => attachableEnergy(c)),
+            next
+          );
+        };
         // Magma Basin: attaching in this way puts damage counters on the target.
         const applyAttachmentDamage = (target) => {
           if (!step.damage || !target) return;
@@ -1879,9 +1982,11 @@ export function executeSteps(draft, {
             damage: target.damage,
           });
         };
-        const energyCandidates = discard.filter(
-          (c) => String(c.name || '').toLowerCase().includes('energy') && matchesSearch(c, step.energy || 'Basic Energy')
-        );
+        const attachableEnergy = (c) =>
+          String(c.name || '').toLowerCase().includes('energy') &&
+          matchesSearch(c, step.energy || 'Basic Energy') &&
+          matchesEnergyTypeFilter(c, step.energyType ? [step.energyType] : null);
+        const energyCandidates = discard.filter(attachableEnergy);
         const ask = (prompt, options, memo) => {
           context[memoKey] = memo;
           return createPendingChoice({
@@ -1914,6 +2019,8 @@ export function executeSteps(draft, {
           if (energyCard && targetCard) {
             attachToRoot(player, energyCard, targetCard, events);
             applyAttachmentDamage(targetCard);
+            const more = continueAttaching(targetCard);
+            if (more) return { pendingChoice: more, completed: false };
           } else {
             events.push({ type: 'effectStepSkipped', reason: 'target_not_found' });
           }
@@ -1933,12 +2040,14 @@ export function executeSteps(draft, {
             attachToRoot(player, chosenEnergy, targets[0], events);
             applyAttachmentDamage(targets[0]);
             delete context[memoKey];
+            const more = continueAttaching(targets[0]);
+            if (more) return { pendingChoice: more, completed: false };
             break;
           }
           const choice = ask(
             `${sourceCard?.name || 'Attach'}: Choose ${step.target || 'a Pokémon'} to attach ${chosenEnergy.name} to`,
             targets,
-            { energyId: chosenEnergy.instanceId }
+            { ...progress, energyId: chosenEnergy.instanceId }
           );
           return { pendingChoice: choice, completed: false };
         }

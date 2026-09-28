@@ -149,11 +149,17 @@ test('a conditional wording with no known gate applies nothing (Suicune Aurora W
     'Asleep',
   ]);
   assert.deepEqual(applied(text, { coin: 'tails', headsCount: 0, flips: ['tails', 'tails'] }).defenderConditions, []);
-  // "if this Pokémon has at least 1 extra Energy attached …" is a damage condition this parser
-  // does not evaluate: it must not leak in as an unconditional status.
+  // Charizard & Braixen-GX Crimson Flame Pillar-GX (SM230): the extra-Energy clause is a board
+  // condition the shared vocabulary reads, so the statuses stay gated on it, never unconditional.
   const conditional =
     "If this Pokémon has at least 1 extra Energy attached to it (in addition to this attack's cost), your opponent's Active Pokémon is now Burned and Confused.";
-  assert.deepEqual(branches(conditional), []);
+  assert.deepEqual(branches(conditional), [
+    {
+      when: { condition: { kind: 'attackerExtraEnergy', n: 1, negated: false } },
+      target: 'defender',
+      statuses: ['Burned', 'Confused'],
+    },
+  ]);
 });
 
 test('three statuses in one clause all apply (Radiant Venusaur Pollen Hazard)', () => {

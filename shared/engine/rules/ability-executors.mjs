@@ -68,8 +68,9 @@ export function requiresFirstTurn(card) {
 
 // Luxray Swelling Flash / Klinklang Emergency Rotation ("if this Pokémon is in your hand"),
 // Charjabug Battery ("attach this card from your hand"): activated from the hand, not play.
+// Beedrill / Greninja-GX Elusive Master: "if this Pokémon is the last card in your hand".
 const HAND_ACTIVATION_CLAUSE =
-  /if this pok[eé]mon is in your hand(?! when you are setting up)|attach this card from your hand/;
+  /if this pok[eé]mon is in your hand(?! when you are setting up)|if this pok[eé]mon is the last card in your hand|attach this card from your hand/;
 
 export function isHandActivatedAbility(card) {
   return HAND_ACTIVATION_CLAUSE.test(textOf(card));
@@ -94,8 +95,9 @@ export function requiresKoOnOpponentTurn(card) {
 // (Primarina Enriching Melody) is a one-shot trigger, legal only on the turn
 // that Pokémon was played. Distinct from the played-to-Bench wording, which
 // has its own one-shot window.
+// Older prints name the Pokémon (Walrein ex Chilling Breath: "when you play Walrein ex …").
 const EVOLVE_PLAYED_CLAUSE =
-  /when you play this pok[eé]mon from your hand to evolve\b/;
+  /when you play (?:this pok[eé]mon|(?!an? )[a-z0-9é' -]+?) from your hand to evolve\b(?! this pok[eé]mon)/;
 
 function matchesFirstAbilityOrText(card, clause) {
   const arrText =
@@ -114,8 +116,9 @@ export function isEvolvePlayedTrigger(card) {
 // "When you play this Pokémon from your hand onto your Bench during your turn"
 // (Meowth ex Last Ditch Catch) is a one-shot trigger: legal only while the
 // Pokémon is still on the Bench the turn it was played there from hand.
+// Azelf Time Walk prints "when you put Azelf from your hand onto your Bench".
 const BENCH_PLAYED_CLAUSE =
-  /when you play this pok[eé]mon from your hand (?:on)?to your bench\b/;
+  /when you (?:play this pok[eé]mon|put [a-z0-9é' -]+?) from your hand (?:on)?to your bench\b/;
 
 export function isBenchPlayedTrigger(card) {
   return matchesFirstAbilityOrText(card, BENCH_PLAYED_CLAUSE);

@@ -130,3 +130,10 @@ test('diffTags sees a player-scoped play lock, which sits on no card', () => {
   state.players.p2.playLocks = [{ untilTurn: 6, kinds: ['item'] }];
   assert.ok(diffTags(before, snapshot(state), []).has('opp:play-lock'));
 });
+
+test('diffTags sees a Bench trap, a player-level effect no card carries', () => {
+  const state = { players: { p1: { zones: {} }, p2: { zones: {} } } };
+  const before = snapshot(state);
+  state.players.p2.benchTraps = [{ untilTurn: 3 }];
+  assert.ok(diffTags(before, snapshot(state), []).has('opp:play-lock'));
+});

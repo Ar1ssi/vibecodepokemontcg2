@@ -41,6 +41,12 @@ export function createPlayerZones() {
  * @returns {'discard' | 'lostZone'}
  */
 export function discardCardToPlayerZone(player, card) {
+  // Unown I Hidden Power: a face-down Energy is face up again once it leaves play.
+  if (card?.faceDownUntilTurn != null) {
+    delete card.asEnergy;
+    delete card.faceDownUntilTurn;
+    delete card.faceDownHostId;
+  }
   const zoneKey = isPrismStarCard(card) ? 'lostZone' : 'discard';
   if (!Array.isArray(player.zones[zoneKey])) player.zones[zoneKey] = [];
   player.zones[zoneKey].push(card);

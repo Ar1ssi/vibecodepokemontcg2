@@ -59,6 +59,24 @@ export function markersBlockCondition(markers, condition) {
   );
 }
 
+/** A `healLock` marker in force on `card` (an in-play root) at `turnNumber`. */
+export function healLocked(card, turnNumber) {
+  return (card?.attackMarkers || []).some(
+    (marker) =>
+      marker.kind === 'healLock' &&
+      marker.untilTurn >= turnNumber &&
+      (marker.fromTurn == null || marker.fromTurn <= turnNumber)
+  );
+}
+
+/**
+ * Does an `effectPrevent` marker ("prevent all effects of attacks … done to this Pokémon")
+ * stop an attack's effects from `attacker` (its top card) landing on the marked Pokémon?
+ */
+export function markersPreventEffects(markers, attacker) {
+  return (markers || []).some((marker) => marker.kind === 'effectPrevent' && attackerMatchesFilter(marker.filter, attacker));
+}
+
 function stageOf(card) {
   const labels = [card?.stage, ...(card?.subtypes || [])].map((s) => String(s || '').toLowerCase());
   if (labels.includes('stage 2')) return 2;
@@ -75,6 +93,8 @@ const FILTER_KINDS = {
   gx: (card) => isGxCard(card),
   // Uppercase "-EX" only: the old Pokémon-EX, not the modern lowercase "ex".
   EX: (card) => /-EX$/.test(String(card?.name || '')),
+  // "Pokémon-ex" of the EX era (Deoxys ex): normalized text cannot tell it from "Pokémon-EX".
+  exEra: (card) => / ex$/.test(String(card?.name || '')),
   tagTeam: (card) => isTagTeamCard(card),
   ability: (card) => cardHasAbility(card),
 };
@@ -93,6 +113,8 @@ export function attackerMatchesFilter(filter, attacker) {
   if (filter.types?.length && !filter.types.some((t) => types.includes(t))) return false;
   if (filter.excludeTypes?.some((t) => types.includes(t))) return false;
   if (filter.exceptName && String(attacker.name || '').toLowerCase() === filter.exceptName) return false;
+  // `attackEnergyCount` is stamped by reduce.mjs when the attack resolves; unknown never matches.
+  if (filter.maxEnergy != null && !((attacker.attackEnergyCount ?? Infinity) <= filter.maxEnergy)) return false;
   return true;
 }
 
@@ -104,11 +126,14 @@ const FILTER_PHRASES = [
   [/^pokémon vmax$/, () => ({ any: ['vmax'] })],
   [/^pokémon-gx and pokémon-ex$/, () => ({ any: ['gx', 'EX'] })],
   [/^pokémon-ex$/, () => ({ any: ['EX'] })],
+  [/^pokémon-ex-era$/, () => ({ any: ['exEra'] })],
   [/^tag team pokémon$/, () => ({ any: ['tagTeam'] })],
   [/^evolution pokémon$/, () => ({ any: ['evolution'] })],
   [/^stage 1 or stage 2 pokémon$/, () => ({ any: ['stage1', 'stage2'] })],
   [/^stage 2 evolved pokémon$/, () => ({ any: ['stage2'] })],
   [/^\{([a-z])\} pokémon$/, (m) => ({ types: [TYPE_LETTER[m[1]]] })],
+  // Dusknoir Night Spin: "by your opponent's Pokémon that has 2 or less Energy attached to it".
+  [/^pokémon that has (\d+) or less energy attached to it$/, (m) => ({ maxEnergy: Number(m[1]) })],
   // "except any Simisage": the parser has already turned the attacker's own name into
   // "this pokémon"; the handler swaps SELF_NAME for the attacker's printed name.
   [
@@ -187,6 +212,9 @@ const WINDOW_PHRASES = [
   [/^(.+) during their next turn$/, 'opponentNextTurn'],
 ];
 
+// "poké-powers" → 'power' (the kinds attack-damage-context.mjs abilityKinds reports).
+const abilityKindWord = (word) => (/power/.test(word) ? 'power' : /bod/.test(word) ? 'body' : 'ability');
+
 // "{c}{c}" → 2
 const symbolCount = (symbols) => (String(symbols).match(/\{[a-z]\}/g) || []).length;
 
@@ -214,6 +242,39 @@ const MARKER_BODIES = [
     'self',
     null,
     (m) => incomingPrevent(m[1]),
+  ],
+  // Jirachi-GX Star Shield-GX, Celebi ex Psychic Shield ("… by your opponent's Pokémon-ex"),
+  // Aerodactyl Speed Stroke ("… by attacks from your opponent's Pokémon-ex"): damage and every
+  // other effect of the attack.
+  [
+    new RegExp(
+      `^prevent all effects(?: of (?:an attack|attacks?))?, including damage, done to this pokémon(?: (?:by (your opponent's [^,]+?)|${FROM_ATTACKS}))?$`
+    ),
+    'self',
+    null,
+    (m) => {
+      const filter = parseAttackerFilter(m[1] || m[2]);
+      return filter === undefined ? null : [{ kind: 'incomingPrevent', filter }, { kind: 'effectPrevent', filter }];
+    },
+  ],
+  // Entei Protective Flame: each of the attacker's Benched Pokémon (atkAddMarker 'ownBench').
+  [
+    /^prevent all effects of attacks, including damage, done to your benched pokémon$/,
+    'ownBench',
+    null,
+    () => [
+      { kind: 'incomingPrevent', filter: null },
+      { kind: 'effectPrevent', filter: null },
+    ],
+  ],
+  // Latios-EX / Slurpuff Light Pulse ("except damage"), Light Dragonite ("other than damage"),
+  // Venomoth ("excluding damage"), Altaria ex Light Pulse ("attacks used by your opponent's
+  // Pokémon done to this Pokémon", reminder "Damage is not an effect").
+  [
+    /^prevent all effects of (?:your opponent's attacks|attacks|an attack)(?: used by your opponent's pokémon)?(?:, (?:except|other than|excluding) damage,)? done to this pokémon$/,
+    'self',
+    null,
+    () => ({ kind: 'effectPrevent', filter: null }),
   ],
   // Damage part only; "effects of attacks" stays with the effect-prevention family.
   [
@@ -285,6 +346,15 @@ const MARKER_BODIES = [
     'yourNextTurn',
     (m, { wrOrder }) => incomingBonus(m[1] || m[2], wrOrder),
   ],
+  // Armaldo Crush Claw / Dustox ex Silver Wind ("During your next turn, if an attack does damage
+  // to the Defending Pokémon …, that attack does 40 more damage") and Sharpedo Crunch ("… to
+  // that Pokémon until the end of your next turn"): the same incoming bonus on the defender.
+  [
+    /^if an attack does damage to your opponent's active pokémon, that attack does (\d+) more damage(?: to that pokémon)?$/,
+    'opponentActive',
+    ['yourNextTurn', 'throughYourNextTurn'],
+    (m, { wrOrder }) => incomingBonus(m[1], wrOrder),
+  ],
   // Oranguru: only the Weakness type changes, not its amount.
   [
     /^your opponent's active pokémon's weakness is now \{([a-z])\}$/,
@@ -321,6 +391,17 @@ const MARKER_BODIES = [
     'opponentActive',
     null,
     () => ({ kind: 'evolveLock' }),
+  ],
+  // Lunala-GX Moongeist Beam: "The Defending Pokémon can't be healed during your opponent's next turn."
+  [/^your opponent's active pokémon can't be healed$/, 'opponentActive', null, () => ({ kind: 'healLock' })],
+  // Shiftry Seal Off: "The Defending Pokémon can't use any Poké-Powers or Poké-Bodies …";
+  // Umbreon ex Black Cry: "… can't retreat or use any Poké-Powers …" (the retreat half is
+  // attack-effects.mjs parseNextTurnLock's).
+  [
+    /^your opponent's active pokémon can't (?:retreat or )?use any (poké-powers|poké-bodies|abilities)(?: or (poké-powers|poké-bodies))?$/,
+    'opponentActive',
+    null,
+    (m) => ({ kind: 'abilityLock', abilityKinds: [m[1], m[2]].filter(Boolean).map(abilityKindWord) }),
   ],
   // Goodra Shining Breath / Bayleef Pollen Shield. `conditions: null` blocks every one.
   [/^this pokémon can't (?:be|become) affected by (?:any special conditions|a special condition)$/, 'self', null, () => ({ kind: 'statusImmunity', conditions: null })],
@@ -381,6 +462,13 @@ const MARKER_BODIES = [
     null,
     () => ({ kind: 'retaliate', mode: 'counters' }),
   ],
+  // Dracozolt VMAX Spark Trap, Turtonator-GX Shell Trap, Iron Boulder ex Repulsor Axe.
+  [
+    /^if this pokémon is damaged by an attack(?: \(even if (?:it|this pokémon) is knocked out\))?, (?:put|place) (\d+) damage counters on the attacking pokémon$/,
+    'self',
+    null,
+    (m) => ({ kind: 'retaliate', mode: 'fixedCounters', count: Number(m[1]) }),
+  ],
   [
     /^if this pokémon is damaged by an attack, this pokémon attacks your opponent's active pokémon for (\d+) damage$/,
     'self',
@@ -427,7 +515,11 @@ export function parseMarkerSentence(sentence, context = {}) {
     const m = re.exec(body);
     if (!m) continue;
     // Bonuses need "during your next turn"; protections need one of the opponent-turn windows.
-    const windowFits = requiredWindow ? window === requiredWindow : window && window !== 'yourNextTurn';
+    const windowFits = Array.isArray(requiredWindow)
+      ? requiredWindow.includes(window)
+      : requiredWindow
+        ? window === requiredWindow
+        : window && window !== 'yourNextTurn';
     if (!windowFits) return null;
     const built = build(m, context);
     // One sentence can set two markers ("… cost {c} more, and its retreat cost is {c} more").

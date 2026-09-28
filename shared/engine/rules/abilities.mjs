@@ -451,7 +451,10 @@ function parseTransformShape(lower) {
     : /discard pile/.test(lower)
       ? 'discard'
       : 'hand';
+  // Deoxys Form Change, Castform Temperament, Ditto Duplicate, Unown Shuffle.
+  const formChange = lower.match(/search your deck for (?:any|another) ([^.,]+?) and switch it with/)?.[1];
   const what =
+    formChange ||
     lower.match(/switch this pok[eé]mon with an? ([^.,]+?) in your hand/)?.[1] ||
     lower.match(/choose an? ([^.,]+?)(?:, except any [^,]+,)? (?:from your discard pile|you find there)/)?.[1] ||
     (onTop ? 'basic pokémon' : null);
@@ -459,7 +462,7 @@ function parseTransformShape(lower) {
     source,
     what: what ? what.trim() : null,
     except: lower.match(/except any ([a-z0-9é' -]+?)[,.]/)?.[1]?.trim() || null,
-    keepState: onTop || /remain on the new pok[eé]mon/.test(lower),
+    keepState: onTop || /(?:remain|are now) on the new pok[eé]mon/.test(lower),
     onTop,
     shuffle: source === 'deck',
   };
@@ -489,6 +492,107 @@ function parseSelfAttachEnergyShape(lower) {
     targetOther: Boolean(target?.[1]),
     targetFilter: target?.[2]?.trim() || null,
   };
+}
+
+const SELF = 'this pok[eé]mon';
+
+/**
+ * Parse-hole sweep D4: the cost or the "If you do," half of an activated Ability that the
+ * keyword branches drop. A `cost: true` step that skips stops the rest of the effect.
+ */
+function withIfYouDoHalves(lower, parsed) {
+  let steps = parsed;
+  const markCosts = () => {
+    for (const step of steps) step.cost = true;
+  };
+
+  // Misty's Psyduck Flustered Leap: bottom card of the deck, then this Pokémon onto the deck.
+  if (new RegExp(`discard the bottom card of your deck\\. if you do, discard all cards from ${SELF} and put ${SELF} on top of your deck`).test(lower)) {
+    return [{ type: 'selfLeavesAbility', to: 'deckTop', payDeckBottom: true, guidance: 'Once during your turn: discard the bottom card of your deck, then put this Pokémon on top of your deck.' }];
+  }
+
+  // Azelf Time Walk: look at the Prizes, take a Pokémon, set a hand card as a Prize.
+  if (/look at all of your face-down prize cards\. if you do, you may choose 1 pok[eé]mon you find there[^.]*put it into your hand\. then, choose 1 card in your hand and put it as a prize card face down/.test(lower)) {
+    return [{ type: 'prizeToHand', count: 1, lookPokemon: true, replace: true, guidance: 'Look at your Prize cards; you may swap a Pokémon there for a card from your hand.' }];
+  }
+
+  // Malamar Psychic Insight: two looks, no card moves.
+  if (/look at the top card of your opponent's deck\. if you do, look at the top card of your deck/.test(lower)) {
+    return [
+      { type: 'lookAtTopAbility', count: 1, opponent: true, lookOnly: true, cost: true, guidance: "Look at the top card of your opponent's deck." },
+      { type: 'lookAtTopAbility', count: 1, opponent: false, lookOnly: true, guidance: 'Look at the top card of your deck.' },
+    ];
+  }
+
+  // Repeated discard-pile attaches: Milotic Energy Grace "attach 3 basic Energy cards … to 1 of
+  // your Pokémon (excluding Pokémon-EX)", Electrode-GX "attach 5 Energy cards … to your Pokémon,
+  // except Pokémon-GX or Pokémon-EX, in any way you like", Tapu Koko Prism Star "choose 2 of
+  // your Benched Pokémon and attach a {L} Energy card … to each of them".
+  const attach = steps.find((step) => step.type === 'attachAbility' && step.fromDiscard);
+  const many = lower.match(/attach (\d+) (?:basic )?energy cards from your discard pile to (1 of )?your pok[eé]mon/);
+  const each = lower.match(/choose (\d+) of your benched pok[eé]mon and attach an? \{[a-z]\} energy card from your discard pile to each of them/);
+  if (attach && (many || each)) {
+    attach.count = Number((many || each)[1]);
+    if (many?.[2]) attach.sameTarget = true;
+    if (each) Object.assign(attach, { distinctTargets: true, target: 'your benched pokémon' });
+    const excluded = lower.match(/(?:except|excluding) (pok[eé]mon-gx or pok[eé]mon-ex|pok[eé]mon-ex|pok[eé]mon-gx)\b/)?.[1] || '';
+    const kinds = [excluded.includes('-gx') && 'GX', excluded.includes('-ex') && 'EX'].filter(Boolean);
+    if (kinds.length > 0) attach.excludeKinds = kinds;
+  }
+
+  // "Discard … from your hand. If you do, …" (Ninetales Nine Temptations): the discard is the
+  // cost, so it runs first (its handler ends the effect when the hand cannot pay).
+  const handCost = steps.find((step) => step.type === 'discardCostAbility');
+  if (handCost && /from your hand\. if you do\b/.test(lower)) steps = [handCost, ...steps.filter((step) => step !== handCost)];
+
+  // Elusive Master: the Bench placement is the cost, so it runs before "draw 3 cards".
+  const placement = steps.find((step) => step.type === 'selfBenchPlacementAbility' && step.cost);
+  if (placement) steps = [placement, ...steps.filter((step) => step !== placement)];
+
+  // Pyukumuku Pitch a Pyukumuku: "reveal it and put it on the bottom of your deck. If you do".
+  if (/if this pok[eé]mon is in your hand, you may reveal it and put it on the bottom of your deck\. if you do/.test(lower)) {
+    steps = [{ type: 'selfLeavesAbility', fromHand: true, to: 'deckBottom', cost: true, guidance: 'Put this Pokémon from your hand on the bottom of your deck (cost).' }, ...steps];
+  }
+
+  // Goodra Gooey Regeneration, Porygon-Z-GX Troubleshooting.
+  const energyCost = lower.match(new RegExp(`you may discard (an|a special) energy (?:attached to|from) ${SELF}\\. if you do`));
+  if (energyCost) {
+    steps = [
+      { type: 'discardOwnAttachedEnergy', selfOnly: true, special: energyCost[1] === 'a special', cost: true, guidance: 'Discard an Energy from this Pokémon (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Ampharos Unseen Flash: "put 2 {L} Energy cards from your hand in the Lost Zone. If you do".
+  const lostCost = lower.match(/you may put (\d+) \{([a-z])\} energy cards? from your hand in the lost zone\. if you do/);
+  if (lostCost) {
+    steps = [
+      { type: 'lostZoneCost', count: Number(lostCost[1]), energyType: PROVIDES_SYMBOL_TYPES[lostCost[2]] || null, cost: true, guidance: 'Put Energy from your hand in the Lost Zone (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Unown Farewell Letter: "discard this Pokémon and all cards attached to it (…). If you do".
+  if (new RegExp(`you may discard ${SELF} and all cards attached to it[^.]*\\. if you do`).test(lower)) {
+    steps = [{ type: 'selfLeavesAbility', to: 'discard', cost: true, guidance: 'Discard this Pokémon and its attached cards (cost).' }, ...steps];
+  }
+
+  // Cofagrigus Six Feet Under, Milotic Energy Grace: "you may Knock Out this Pokémon. If you do".
+  const koFirst = new RegExp(`you may knock out ${SELF}\\. if you do`).test(lower);
+  // Electrode-GX Extra Energy Bomb: "… If you do, this Pokémon is Knocked Out."
+  const koAfter = new RegExp(`if you do, ${SELF} is knocked out`).test(lower);
+  if (koFirst || koAfter) {
+    if (koAfter) markCosts();
+    for (const step of steps) if (step.type === 'attachAbility') step.excludeSelf = true;
+    steps = [...steps, { type: 'selfLeavesAbility', to: 'knockOut', guidance: 'This Pokémon is Knocked Out.' }];
+  }
+
+  // Banette Puppet Offering, Tapu Koko Prism Star Dance of the Ancients.
+  if (new RegExp(`if you do, (?:put ${SELF} in the lost zone|discard all cards from ${SELF} and put it in the lost zone)`).test(lower)) {
+    markCosts();
+    steps = [...steps, { type: 'selfLeavesAbility', to: 'lostZone', guidance: 'Put this Pokémon in the Lost Zone; discard its attached cards.' }];
+  }
+  return steps;
 }
 
 // Unown MISSING / HAND / DAMAGE: the printed threshold that wins the game.
@@ -610,20 +714,52 @@ export function parseAbility(text = '') {
     const poisonNewActive =
       lower.includes('if you do') &&
       (lower.includes('now poisoned') || lower.includes('is now poisoned'));
-    steps.push({
+    // "If you do, your opponent switches their Active Pokémon with 1 of their Benched Pokémon"
+    // (Vanilluxe Slippery Soles, Metagross Magnetic Warp, Hatterene Witch Rondo), "… switch out
+    // your opponent's Active Pokémon to the Bench" (Samurott Torrential Whirlpool): the opponent
+    // picks. Mawile VSTAR Star Rondo: "… switch 1 of your opponent's Benched Pokémon with their
+    // Active Pokémon" — the player picks. Both follow the player's own switch.
+    const opponentFollowUp = /if you do, (?:your opponent switches (?:their|his or her) active pok[eé]mon with 1 of (?:their|his or her) benched pok[eé]mon|switch out your opponent's active pok[eé]mon to the bench)/.test(lower)
+      ? 'switchOpponentOut'
+      : /if you do, switch 1 of your opponent's benched pok[eé]mon with their active pok[eé]mon/.test(lower)
+        ? 'switchOpponent'
+        : null;
+    // The follow-up comes after the player's own switch only when one is printed before "If
+    // you do"; Ninetales Nine Temptations / Volcanion Prism Star Jet Geyser pay a hand discard.
+    const ownSwitchFirst = /switch (?:your active pok[eé]mon with 1 of your benched|(?:it|this pok[eé]mon) with your active|1 of your benched [^.]*with your active)[^.]*[.,] if you do/.test(lower);
+    if (opponentFollowUp && !ownSwitchFirst) {
+      steps.push({
+        type: opponentFollowUp,
+        guidance:
+          opponentFollowUp === 'switchOpponentOut'
+            ? 'Your opponent switches their Active Pokémon with 1 of their Benched Pokémon.'
+            : "Switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
+      });
+    }
+    if (!opponentFollowUp || ownSwitchFirst) steps.push({
       type: 'switchAbility',
-      target: isOpponentBenchSwitch ? 'opponent' : 'self',
+      target: isOpponentBenchSwitch && !opponentFollowUp ? 'opponent' : 'self',
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
       selfSwap: /switch (?:it|this pok[eé]mon) with your active/.test(lower),
       pokemonType: typedBench ? parseEnergyTypeHint(`{${typedBench[1]}}`) : null,
       exceptName: lower.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
       poisonNewActive,
-      guidance: isOpponentBenchSwitch
+      guidance: isOpponentBenchSwitch && !opponentFollowUp
         ? 'Once during your turn: switch in 1 of your opponent\'s Benched Pokémon.'
         : poisonNewActive
           ? 'Once during your turn: switch your Active with 1 of your Benched Pokémon; the new Active is Poisoned.'
           : 'Once during your turn: switch your Active with 1 of your Benched Pokémon.',
     });
+    if (opponentFollowUp && ownSwitchFirst) {
+      steps.push({
+        type: opponentFollowUp,
+        afterOwnSwitch: true,
+        guidance:
+          opponentFollowUp === 'switchOpponentOut'
+            ? 'Then your opponent switches their Active Pokémon with 1 of their Benched Pokémon.'
+            : "Then switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
+      });
+    }
   }
 
   // ── 4. Heal / remove damage counters ────────────────────────────────────
@@ -1006,7 +1142,7 @@ export function parseAbility(text = '') {
     // "from your hand to evolve 1 of your Pokémon" is the evolve trigger (Primarina
     // Enriching Melody), gated by the turn that Pokémon evolved — not the played-to-
     // Bench window. Flagged so the orchestrators pick the right gate.
-    const evolve = /when you play this pok[eé]mon from your hand to evolve/.test(lower);
+    const evolve = /when you play (?:this pok[eé]mon|(?!an? )[a-z0-9é' -]+?) from your hand to evolve(?! this pok[eé]mon)/.test(lower);
     const toBench = /when you play this pok[eé]mon from your hand (?:on)?to your bench/.test(lower);
     steps.push({
       type: 'whenPlayedAbility',
@@ -1317,6 +1453,7 @@ export function parseAbility(text = '') {
     const upTo = lower.match(/up to\s+(\d+)/)?.[1] || null;
     let what = 'card';
     if (lower.includes('energy')) what = 'Energy';
+    else if (lower.includes('supporter')) what = 'Supporter';
     else if (lower.includes('trainer')) what = 'Trainer';
     else if (lower.includes('item')) what = 'Item';
     else if (lower.includes('pokémon') || lower.includes('pokemon')) what = 'Pokémon';
@@ -1530,8 +1667,21 @@ export function parseAbility(text = '') {
     lower
   );
   const neitherCanPlay = /neither player can play/.test(lower);
-  if (canPlayLock || eachPlayerLock || neitherCanPlay) {
-    const evolveLock = lower.includes('to evolve');
+  // Walrein ex Chilling Breath: a one-shot lock for the opponent's next turn, set when the
+  // Ability is used (the attack step's player-level playLocks).
+  const nextTurnTrainerLock =
+    /your opponent can'?t play any (item|supporter|stadium|trainer) cards from (?:his or her|their) hand during your opponent's next turn/.exec(
+      lower
+    );
+  if (nextTurnTrainerLock) {
+    steps.push({
+      type: 'atkOppPlayLock',
+      kinds: [nextTurnTrainerLock[1]],
+      guidance: `Your opponent can't play ${nextTurnTrainerLock[1]} cards during their next turn.`,
+    });
+  } else if (canPlayLock || eachPlayerLock || neitherCanPlay) {
+    // "to evolve" in the lock itself, not in a "when you play … to evolve" trigger.
+    const evolveLock = /can(?:'?t)? play [^.]*to evolve/.test(lower);
     if (evolveLock) {
       steps.push({
         type: 'evolveLockAbility',
@@ -1651,7 +1801,8 @@ export function parseAbility(text = '') {
       (lower.includes('in your hand') || lower.includes('discard pile'))) ||
     (/switch it with/.test(lower) && lower.includes('discard pile')) ||
     /put a basic pok[eé]mon from your hand on top of this pok[eé]mon/.test(lower) ||
-    /put the chosen pok[eé]mon in its place/.test(lower)
+    /put the chosen pok[eé]mon in its place/.test(lower) ||
+    /search your deck for (?:any|another) [^.,]+? and switch it with/.test(lower)
   ) {
     steps.push({
       type: 'transformAbility',
@@ -1762,15 +1913,20 @@ export function parseAbility(text = '') {
   if (
     (/put this pok[eé]mon onto your bench/.test(lower) ||
       /play this pok[eé]mon onto your bench/.test(lower) ||
+      // Elusive Master: "if this Pokémon is the last card in your hand, you may play it onto your Bench".
+      /last card in your hand, you may play it onto your bench/.test(lower) ||
       /play this pok[eé]mon as your new active pok[eé]mon/.test(lower)) &&
     !lower.includes('when you play')
   ) {
     const morePrizes = /more prize cards? remaining than your opponent/.test(lower);
     const opponentStage2 = /opponent has any stage 2/.test(lower);
+    const lastCard = /last card in your hand/.test(lower);
     steps.push({
       type: 'selfBenchPlacementAbility',
       swapActive: /move your active pok[eé]mon to your bench/.test(lower),
-      condition: morePrizes ? 'morePrizes' : opponentStage2 ? 'opponentStage2' : null,
+      condition: morePrizes ? 'morePrizes' : opponentStage2 ? 'opponentStage2' : lastCard ? 'lastCardInHand' : null,
+      // "If you do, draw 3 cards" only follows a real placement.
+      ...(lastCard ? { cost: true } : {}),
       guidance: /move your active pok[eé]mon to your bench/.test(lower)
         ? 'Once during your turn: move your Active Pokémon to the Bench and put this Pokémon in the Active Spot (as described).'
         : 'Once during your turn: put this Pokémon from your hand onto your Bench (as described).',
@@ -2042,6 +2198,8 @@ export function parseAbility(text = '') {
   if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
     steps = steps.filter((step) => step.type !== 'attachAbility');
   }
+
+  steps = withIfYouDoHalves(lower, steps);
 
   // ── Passive fallback (only if NO other step matched) ────────────────────
   if (steps.length === 0 && text) {

@@ -25,6 +25,8 @@
 // used for a friendly name in descriptions.
 
 // Effect families an attack can be classified into (taxonomy Section D).
+import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
+
 export const ATTACK_FAMILIES = [
   'flat', // bare "30" damage number
   'per-energy', // "× the number of Energy attached" / "for each Energy attached"
@@ -834,9 +836,27 @@ export function applyAttackEffect(attack, attackerCard = {}) {
  * - selfCannotUseAttack: "can't use [Attack Name] during your next turn"
  * - oppCannotRetreat: "the Defending Pokémon can't retreat during your opponent's next turn"
  * - oppCannotAttack: "the Defending Pokémon can't attack during your opponent's next turn"
+ *
+ * A sentence gated "If heads," / "If tails," counts only when the coin shows that face; any
+ * other "If <condition>, …" sentence counts when `conditionHolds(condition)` is true (Dialga-EX
+ * Chrono Wind: "If the Defending Pokémon is a Pokémon-EX, it can't attack …").
+ * @param {object} attack Printed attack ({ name, text })
+ * @param {{ coin?: 'heads'|'tails'|null, headsCount?: number,
+ *   conditionHolds?: (condition: string) => boolean }} [flip] The attack's coin result and a
+ *   board-condition reader; without one, conditional sentences set no lock
  */
-export function parseNextTurnLock(attack) {
-  const t = lower(attack?.text ?? '');
+export function parseNextTurnLock(attack, { coin = null, headsCount = 0, conditionHolds = () => false } = {}) {
+  const shows = (face) => coin === face || (face === 'heads' && headsCount > 0);
+  const t = lower(attack?.text ?? '')
+    .split(/(?<=\.)\s+/)
+    .flatMap((sentence) => {
+      const gate = /^if (heads|tails),\s*/.exec(sentence);
+      if (gate) return shows(gate[1]) ? [sentence.slice(gate[0].length)] : [];
+      const condition = /^if ([^,]+), (.+)$/.exec(sentence);
+      if (condition) return conditionHolds(condition[1]) === true ? [condition[2]] : [];
+      return /^if\b/.test(sentence) ? [] : [sentence];
+    })
+    .join(' ');
   if (!t) return null;
 
   const out = {
@@ -856,6 +876,11 @@ export function parseNextTurnLock(attack) {
     ) ||
     /can(?:'t|not)\s+retreat\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
       t
+    ) ||
+    // Carvanha Big Bite: "… can't retreat until the end of your opponent's next turn"; Umbreon
+    // ex Black Cry: "… can't retreat or use any Poké-Powers during …".
+    /(?:defending pok[ée]mon|it)\s+can(?:'t|not)\s+retreat(?:\s+or\s+[^.]*?)?\s+(?:during|until\s+the\s+end\s+of)\s+your\s+opponent's\s+next\s+turn/i.test(
+      t
     )
   ) {
     out.oppCannotRetreat = true;
@@ -869,7 +894,11 @@ export function parseNextTurnLock(attack) {
     /during\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+attack/i.test(
       t
     ) ||
-    /can(?:'t|not)\s+attack\s+during\s+your\s+opponent's\s+next\s+turn/i.test(t)
+    /can(?:'t|not)\s+attack\s+during\s+your\s+opponent's\s+next\s+turn/i.test(t) ||
+    // Aurorus Freezing Chill: "During your opponent's next turn, the Defending Pokémon can't use
+    // attacks."
+    /during\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+use\s+attacks/i.test(t) ||
+    /defending\s+pok[ée]mon\s+can(?:'t|not)\s+use\s+attacks\s+during\s+your\s+opponent's\s+next\s+turn/i.test(t)
   ) {
     out.oppCannotAttack = true;
   }
@@ -882,6 +911,9 @@ export function parseNextTurnLock(attack) {
     t.match(/this pok[ée]mon can(?:'t|not) use ([^.]+) during your next turn/i);
   if (specificMatch) {
     out.selfCannotUseAttack = specificMatch[1].trim();
+  } else if (/you can(?:'t|not) use this attack during your next turn/.test(t) && attack?.name) {
+    // Sabrina's Alakazam Mega Burn.
+    out.selfCannotUseAttack = attack.name;
   } else if (
     /during your next turn, this pok[ée]mon can(?:'t|not) attack/i.test(t) ||
     /this pok[ée]mon can(?:'t|not) attack during your next turn/i.test(t)
@@ -889,9 +921,15 @@ export function parseNextTurnLock(attack) {
     out.selfCannotAttack = true;
   }
 
+  // Gouging Fire ex Blaze Blitz: "This Pokémon can't use Blaze Blitz again until it leaves the
+  // Active Spot."
+  const whileActive = t.match(/this pok[ée]mon can(?:'t|not) use ([^.]+?) again until it leaves the active spot/);
+  if (whileActive) out.selfCannotUseAttackWhileActive = whileActive[1].trim();
+
   if (
     !out.selfCannotAttack &&
     !out.selfCannotUseAttack &&
+    !out.selfCannotUseAttackWhileActive &&
     !out.oppCannotRetreat &&
     !out.oppCannotAttack
   ) {
@@ -944,7 +982,9 @@ const discardCount = (raw) =>
 export function parseAttackEnergyDiscard(attack) {
   const t = lower(attack?.text ?? '')
     .replace(/\{([a-z])\}/g, (m, letter) => ENERGY_SYMBOL_WORDS[letter] || m)
-    .replace(/\bbasic (?=[a-z]+ energy)/g, '');
+    .replace(/\bbasic (?=[a-z]+ energy)/g, '')
+    // "Discard all {R} Energy cards attached to Arcanine" reads as "… Energy attached to …".
+    .replace(/\benergy cards?\b/g, 'energy');
   if (!t || !t.includes('discard')) return null;
 
   const sentence = t
@@ -952,6 +992,8 @@ export function parseAttackEnergyDiscard(attack) {
     .find((s) => /discard\b[^.]*\benergy\b[^.]*(?:attached to|from) this pok[ée]mon/.test(s));
   // A coin-gated discard is the atkDiscardSelfEnergy step's (design 032).
   if (!sentence || /^(?:if heads|if tails|for each heads)\b/.test(sentence)) return null;
+  // "You may discard … If you do, …" is offered and paid before damage (optional-cost-bonus.mjs).
+  if (optionalCostBonusClause(attack?.text)?.cost?.kind === 'discardEnergy') return null;
 
   // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
   if (/discard all energy (?:attached to|from) this pok[ée]mon/i.test(sentence)) {
@@ -960,16 +1002,20 @@ export function parseAttackEnergyDiscard(attack) {
 
   if (/\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(sentence)) return null;
 
-  // "Discard a {W} and a {L} Energy attached to this Pokémon"
-  const pair = sentence.match(
-    /discard\s+(\d+|an?)\s+([a-z]+)(?:\s+energy)?\s+and\s+(\d+|an?)\s+([a-z]+)\s+energy\s+(?:attached to|from)\s+this\s+pok[ée]mon/
-  );
-  if (pair && energyTypeName(pair[2]) && energyTypeName(pair[4])) {
-    const parts = [
-      { count: discardCount(pair[1]), energyType: energyTypeName(pair[2]) },
-      { count: discardCount(pair[3]), energyType: energyTypeName(pair[4]) },
-    ];
-    return { all: false, count: parts[0].count + parts[1].count, energyType: null, parts };
+  // "Discard a {W} and a {L} Energy attached to this Pokémon"; Lugia ex Elemental Blast lists
+  // three: "Discard a {R} Energy, {W} Energy, and {L} Energy attached to …".
+  const GROUP = String.raw`(?:(?:\d+|an?)\s+)?[a-z]+(?:\s+energy)?`;
+  const list = new RegExp(
+    String.raw`discard\s+(${GROUP}(?:,\s*(?:and\s+)?${GROUP})*,?\s+and\s+${GROUP})\s+(?:attached to|from)\s+this\s+pok[ée]mon`
+  ).exec(sentence);
+  if (list) {
+    const parts = list[1].split(/,\s*(?:and\s+)?|\s+and\s+/).map((group) => {
+      const m = /^(?:(\d+|an?)\s+)?([a-z]+)(?:\s+energy)?$/.exec(group.trim());
+      return m && energyTypeName(m[2]) ? { count: m[1] ? discardCount(m[1]) : 1, energyType: energyTypeName(m[2]) } : null;
+    });
+    if (parts.length > 1 && parts.every(Boolean)) {
+      return { all: false, count: parts.reduce((sum, part) => sum + part.count, 0), energyType: null, parts };
+    }
   }
 
   // "Discard all {M} Energy from this Pokémon"

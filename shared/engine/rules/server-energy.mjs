@@ -22,7 +22,9 @@ export function serverEnergyDescriptor(card, options = {}) {
   if (!card) return { type: 'Colorless', family: 'basic' };
   if (typeof card === 'string') return { type: card, family: 'basic' };
   // A Pokémon attached as Special Energy by its own Ability (Buzzap, Battery).
-  if (card.asEnergy && card.attachedTo != null) {
+  // Unown I Hidden Power's face-down Energy provides {C} only on the Pokémon it was turned on.
+  const faceDownElsewhere = card.faceDownHostId != null && card.attachedTo !== card.faceDownHostId;
+  if (card.asEnergy && card.attachedTo != null && !faceDownElsewhere) {
     const provides = [...(card.asEnergy.provides || [])];
     return rewriteEnergyDescriptor(
       {

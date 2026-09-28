@@ -12,6 +12,7 @@ import { isEnergy } from '../cards.mjs';
 import { isExCard, isGxCard, isVCard } from './card-classify.mjs';
 import { isPokemonToolCard } from './ability-executors.mjs';
 import { topPokemonCard } from './evolved-pokemon.mjs';
+import { normalizeStage } from './evolution.mjs';
 import { cardHasAbility } from './tool-combat.mjs';
 
 const TAILS = [
@@ -24,6 +25,10 @@ const TAILS = [
   [/^ v$/, () => ({ ruleBox: ['v'] })],
   [/^ ex and pokémon v$/, () => ({ ruleBox: ['ex', 'v'] })],
   [/^-gx and pokémon-ex$/, () => ({ ruleBox: ['gx', 'ex'] })],
+  // Starmie BREAK Break Star: "each of your opponent's Pokémon BREAK".
+  [/^ break$/, () => ({ stage: 'BREAK' })],
+  // Manectric Power Wave: "each Pokémon that has any Poké-Powers".
+  [/^ that has any poké-powers$/, () => ({ hasPokePower: true })],
 ];
 
 /**
@@ -53,5 +58,9 @@ export function eachFilterMatches(owner, root, filter = {}) {
   if (filter.hasTool && !attached.some((c) => isPokemonToolCard(c))) return false;
   if (filter.hasAbility && !cardHasAbility(top)) return false;
   if (filter.ruleBox && !filter.ruleBox.some((kind) => RULE_BOX[kind]?.(top))) return false;
+  if (filter.stage && normalizeStage(top.stage) !== filter.stage) return false;
+  if (filter.hasPokePower && !(top.abilities || []).some((a) => /pok[eé]-power/i.test(String(a?.type || '')))) {
+    return false;
+  }
   return true;
 }

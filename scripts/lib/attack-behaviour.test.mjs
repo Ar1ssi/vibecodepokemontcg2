@@ -37,6 +37,13 @@ test('attackVerdict: a no-effect attack with no gate is ran-no-effect', () => {
   assert.equal(attackVerdict({ dealt: [0], tags: ['own:heal'] }), 'ok');
 });
 
+test('attackVerdict: an unresolved printed count or condition is partial, a coin note is not', () => {
+  const run = (note) => attackVerdict({ dealt: [30], tags: ['opp:active+dmg'], scaled: [{ notes: [note] }] });
+  assert.equal(run('per-energy scaling — resolve the printed count'), 'partial');
+  assert.equal(run('conditional +30 bonus — resolve the printed condition'), 'partial');
+  assert.equal(run('coin: tails (attack effect)'), 'ok');
+});
+
 test('attackVerdict: evidence without a board tag still counts as an effect', () => {
   assert.equal(attackVerdict({ dealt: [0], preTurnEvents: ['cardsLookedAt'] }), 'ok');
   assert.equal(attackVerdict({ dealt: [0], tags: ['shuffle'] }), 'ok');

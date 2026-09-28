@@ -11,7 +11,7 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { isBasicPokemon, isEnergy, isPokemon } from '../cards.mjs';
+import { getRetreatCostCount, isBasicPokemon, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import {
@@ -36,7 +36,9 @@ import {
   clearAttackMarkers,
   liveAttackMarkers,
   markerFromTurn,
+  healLocked,
   markersBlockCondition,
+  markersPreventEffects,
   markerUntilTurn,
   SELF_NAME,
 } from '../rules/attack-markers.mjs';
@@ -69,6 +71,24 @@ export const ATTACK_YES = -11;
 export const ATTACK_NO = -12;
 
 // ── helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Effect shields on one of the opponent's Pokémon: a shielding Special Energy, or an
+ * `effectPrevent` marker ("prevent all effects of attacks … done to this Pokémon").
+ */
+function attackEffectShielded(ctx, owner, root, kind = 'effect') {
+  if (specialEnergyShielded(owner, root, kind)) return true;
+  if (kind !== 'effect' || owner !== ctx.opponent || !root) return false;
+  const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
+  const markers = liveAttackMarkers(root, { turnNumber: ctx.draft.turn?.number || 1, zoneCards: zone });
+  const ref = attackerRef(ctx);
+  return markersPreventEffects(markers, ref ? attackingView(ctx, ref.card) : ctx.sourceCard);
+}
+
+/** The attacking Pokémon as marker filters read it: its top card, with the stamped Energy count. */
+function attackingView(ctx, root) {
+  return { ...topPokemonCard(ctx.player, root), attackEnergyCount: root.attackEnergyCount };
+}
 
 /** The attacking Pokémon while it is still in play, with its owner and zone. */
 function attackerRef(ctx) {
@@ -163,6 +183,23 @@ function costTypeLetter(symbol) {
  * cost)" (design 048): attached Energy of the printed type (all Energy when untyped) minus
  * that type's share of the attack's printed cost. Fail closed when the attacker left play.
  */
+// Handlers that read `requiresExtraEnergy` themselves (a partial effect, or their own skip);
+// every other attack step with the requirement is gated by the executor (effects/executor.mjs).
+export const EXTRA_ENERGY_SELF_GATED = new Set([
+  'atkBenchFromDiscard',
+  'atkKnockOut',
+  'atkTakePrize',
+  'atkDiscardOppPokemon',
+  'atkShuffleOppAllBench',
+  'atkBothDrawUntil',
+  'atkAddMarker',
+]);
+
+/** Whether an attack step's "at least N extra Energy" requirement holds (executor gate). */
+export function stepExtraEnergySatisfied(ctx) {
+  return extraEnergySatisfied(ctx, ctx.step.requiresExtraEnergy);
+}
+
 function extraEnergySatisfied(ctx, requirement) {
   if (!requirement) return true;
   const requirements = Array.isArray(requirement) ? requirement : [requirement];
@@ -309,7 +346,8 @@ function atkSwitchSelf(ctx) {
 function atkGust(ctx) {
   const { opponent } = ctx;
   const active = activeOf(opponent);
-  const bench = benchRootsOf(opponent);
+  // Scizor Snatch: "1 of your opponent's Benched Pokémon with no damage counters on it".
+  const bench = benchRootsOf(opponent).filter((c) => ctx.step.filter !== 'undamaged' || !(c.damage > 0));
   const turn = ctx.draft?.turn?.number;
   if (ctx.selection) {
     const root = bench.find((c) => c.instanceId === ctx.selection[0]);
@@ -498,6 +536,67 @@ function atkDiscardSelfEnergy(ctx) {
   return discardChosen(ctx, energies, { label: energyLabel(step) });
 }
 
+// Reshiram & Zekrom-GX Fabled Flarebolts: "Discard up to 3 in any combination of basic {R} and
+// basic {L} Energy cards from your Benched Pokémon." The damage counts the discard (forDamage).
+function atkDiscardBenchEnergy(ctx) {
+  const { player, step } = ctx;
+  const candidates = benchRootsOf(player)
+    .flatMap((root) => attachedCards(player, root.instanceId))
+    .filter((c) => isBasicEnergy(c) && step.energyTypes.some((t) => energyMatches(c, { energyType: t })));
+  if (ctx.selection) {
+    discardCards(player, pickById(candidates, ctx.selection).slice(0, step.count), ctx.events, { forDamage: true });
+    return null;
+  }
+  if (candidates.length === 0) return skip(ctx, 'no_energy');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose up to ${step.count} Energy on your Benched Pokémon to discard`,
+    options: candidates,
+    min: 0,
+    max: Math.min(step.count, candidates.length),
+  });
+}
+
+// Toxtricity ex Gaia Punk: "Discard 3 {L} Energy from your Pokémon." — from any of them.
+function atkDiscardOwnEnergy(ctx) {
+  const { player, step } = ctx;
+  const energies = rootsOf(player)
+    .flatMap((root) => attachedCards(player, root.instanceId))
+    .filter((c) => energyMatches(c, step));
+  return discardChosen(ctx, energies, { label: energyLabel(step) });
+}
+
+// Arcanine ex Flame Swirl: "Discard 2 {R} Energy or 1 React Energy card attached to Arcanine
+// ex." — the player picks which, when both are possible.
+function atkDiscardSelfEnergyEither(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  const attached = ref ? attachedCards(player, ref.card.instanceId) : [];
+  const typed = attached.filter((c) => energyMatches(c, { energyType: step.energyType }));
+  const named = attached.filter((c) => isEnergy(c) && String(c.name || '').toLowerCase().includes(step.name));
+  const typedOk = typed.length >= step.count;
+  const discard = (cards) => {
+    for (const card of cards) discardCard(ctx.draft, card, ctx.events);
+    return null;
+  };
+  if (ctx.selection) {
+    return discard(ctx.selection[0] === ATTACK_YES ? typed.slice(0, step.count) : named.slice(0, 1));
+  }
+  if (typedOk && named.length > 0) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Which Energy do you discard?`,
+      options: [
+        { instanceId: ATTACK_YES, name: `${step.count} {${step.energyType}} Energy`, type: 'option' },
+        { instanceId: ATTACK_NO, name: `1 ${named[0].name}`, type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  if (typedOk) return discard(typed.slice(0, step.count));
+  if (named.length > 0) return discard(named.slice(0, 1));
+  return discard(typed);
+}
+
 // Volcarona-GX Backfire: "Put 2 {R} Energy attached to this Pokémon into your hand."
 function atkMoveSelfEnergyToHand(ctx) {
   const { player, step } = ctx;
@@ -551,6 +650,7 @@ function discardChosen(ctx, cards, options) {
       else discardCard(ctx.draft, card, ctx.events);
     }
     if (options.toOwnerDeck && picked.length > 0) shuffleOwnDeck(options.toOwnerDeck, ctx);
+    recordDiscardedForDamage(ctx, picked);
     return null;
   };
   if (ctx.selection) return removeAll(pickById(cards, ctx.selection));
@@ -632,7 +732,7 @@ function atkDiscardBothActiveEnergy(ctx) {
   };
   if (opponent) {
     const root = activeOf(opponent);
-    if (root && !specialEnergyShielded(opponent, root, 'effect')) drain(opponent, root);
+    if (root && !attackEffectShielded(ctx, opponent, root, 'effect')) drain(opponent, root);
   }
   drain(player, activeOf(player));
   return discarded === 0 ? skip(ctx, 'no_energy') : null;
@@ -647,6 +747,22 @@ function atkDiscardOppTools(ctx) {
   return discardChosen(ctx, tools, { label: 'Pokémon Tool' });
 }
 
+// Electivire LV.X Pulse Barrier: "Discard all of your opponent's Pokémon Tool cards and Stadium
+// cards in play. If you do, …" — the chained marker follows any discard.
+function atkDiscardOppToolsAndStadium(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const tools = rootsOf(opponent)
+    .flatMap((root) => attachedCards(opponent, root.instanceId))
+    .filter(isToolCard);
+  discardCards(opponent, tools, ctx.events);
+  const stadium = ctx.draft.stadium;
+  const theirStadium = stadium && (stadium.ownerId || stadium.playerId) === opponent.playerId;
+  if (theirStadium) discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
+  if (tools.length === 0 && !theirStadium) return skip(ctx, 'nothing_to_discard');
+  return addChainedMarker(ctx);
+}
+
 function atkDiscardOppHand(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
@@ -656,7 +772,9 @@ function atkDiscardOppHand(ctx) {
     return null;
   }
   if (hand.length === 0) return skip(ctx, 'empty_hand');
-  const count = Math.min(step.count || 1, hand.length);
+  // Ninjask Chip Off / Feraligatr Pull Away: "… until your opponent has N cards left".
+  if (step.leaveCount != null && hand.length <= step.leaveCount) return skip(ctx, 'condition_unmet');
+  const count = step.leaveCount != null ? hand.length - step.leaveCount : Math.min(step.count || 1, hand.length);
   if (step.random || hand.length <= count) {
     const picked = [];
     const pool = [...hand];
@@ -713,7 +831,8 @@ function atkDiscardHandEnergy(ctx) {
 function atkDiscardOwnHand(ctx) {
   const { player, step } = ctx;
   const hand = player.zones.hand || [];
-  const candidates = step.what ? hand.filter((card) => matchesSearch(card, step.what)) : hand;
+  const kinds = step.whatAny || (step.what ? [step.what] : []);
+  const candidates = kinds.length ? hand.filter((card) => kinds.some((kind) => matchesSearch(card, kind))) : hand;
   const tag = handCostTag(step);
   if (ctx.selection) {
     const picked = pickById(candidates, ctx.selection);
@@ -758,12 +877,74 @@ function atkDiscardOwnHand(ctx) {
   });
 }
 
+/**
+ * Cards a before-damage discard moved for the damage to read ("If that card is a {R} Energy
+ * card, …", attack-conditions.mjs discardedCardIs). The reducer clears the record when the next
+ * attack starts and at turn end.
+ */
+function recordDiscardedForDamage(ctx, cards) {
+  if (!ctx.step.countsForDamage || cards.length === 0) return;
+  ctx.draft.attackDiscardedForDamage = [
+    ...(ctx.draft.attackDiscardedForDamage || []),
+    ...cards.map((card) => card.instanceId),
+  ];
+}
+
 function atkMill(ctx) {
   const { player, opponent, step } = ctx;
   const sides = step.side === 'self' ? [player] : step.side === 'each' ? [player, opponent] : [opponent];
+  // Dialga-EX Fast Forward: one card for each named Energy attached to this Pokémon.
+  const ref = step.perAttachedEnergy ? attackerRef(ctx) : null;
+  const count = step.perAttachedEnergy
+    ? (ref ? attachedCards(player, ref.card.instanceId) : []).filter(
+        (c) => isEnergy(c) && String(c.name || '').toLowerCase().includes(step.perAttachedEnergy)
+      ).length
+    : step.count || 1;
+  if (count === 0) return skip(ctx, 'nothing_to_mill');
   for (const side of sides.filter(Boolean)) {
-    discardCards(side, side.zones.deck.slice(0, step.count || 1), ctx.events);
+    const cards = side.zones.deck.slice(0, count);
+    discardCards(side, cards, ctx.events);
+    recordDiscardedForDamage(ctx, cards);
   }
+  return null;
+}
+
+// Golduck Mind Play: pick 1 card from the opponent's hand without looking and look at it. The
+// card stays in their hand; the damage and atkDiscardRecordedIf read the record.
+function atkPickOppHandCard(ctx) {
+  const { opponent, player } = ctx;
+  const hand = opponent?.zones?.hand || [];
+  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  const at = Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * hand.length);
+  const card = hand[at];
+  ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [revealedCard(card)] });
+  recordDiscardedForDamage(ctx, [card]);
+  return null;
+}
+
+// Golduck Mind Play: "If that card is a Trainer card, …, and discard that card."
+function atkDiscardRecordedIf(ctx) {
+  const { opponent, step } = ctx;
+  const ids = ctx.draft.attackDiscardedForDamage || [];
+  const card = (opponent?.zones?.hand || []).find((c) => ids.includes(c.instanceId));
+  if (!card) return skip(ctx, 'nothing_recorded');
+  if (/^trainer card$/.test(step.phrase) && !isTrainer(card)) return skip(ctx, 'not_matching');
+  discardCards(opponent, [card], ctx.events);
+  return null;
+}
+
+// Coalossal VMAX Eruption Shot: "If that card is an Energy card, … and attach that card to this
+// Pokémon" — the card the before-damage discard recorded, when it matches.
+function atkAttachDiscardedForDamage(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref) return skip(ctx, 'attacker_gone');
+  const ids = ctx.draft.attackDiscardedForDamage || [];
+  const card = (player.zones.discard || []).find((c) => ids.includes(c.instanceId));
+  if (!card) return skip(ctx, 'nothing_discarded');
+  const matches = /energy card$/.test(step.phrase) ? isEnergy(card) && !isTrainer(card) : true;
+  if (!matches) return skip(ctx, 'not_matching');
+  attachTo(player, card, ref.card, ctx.events);
   return null;
 }
 
@@ -799,6 +980,14 @@ function atkMillAttachIfEnergy(ctx) {
 
 // ── attach from the discard pile / hand ─────────────────────────────────────
 
+// A printed group or mark on the Pokémon: 'rapid strike' (subtypes), 'team plasma' (the name),
+// 'δ' (Delta Species) — the same places attack-damage-context.mjs ruleBoxKinds reads.
+function rootHasTag(player, root, tag) {
+  const top = topPokemonCard(player, root) || root;
+  const label = `${top.name || ''} ${[top.subtypes || []].flat().join(' ')}`.toLowerCase();
+  return tag === 'δ' ? /δ|delta species/.test(label) : label.includes(tag);
+}
+
 function attachTargets(ctx) {
   const { player, step } = ctx;
   if (step.target === 'self') {
@@ -806,14 +995,24 @@ function attachTargets(ctx) {
     return ref ? [ref.card] : [];
   }
   const attacker = attackerRef(ctx)?.card;
+  const tagged = (c) => !step.tag || rootHasTag(player, c, step.tag);
   if (step.target === 'bench') {
     return benchRootsOf(player).filter(
-      (c) => c !== attacker && (!step.targetEx || /-EX$/.test(String(topPokemonCard(player, c)?.name || '')))
+      (c) =>
+        c !== attacker &&
+        tagged(c) &&
+        (!step.targetEx || /-EX$/.test(String(topPokemonCard(player, c)?.name || '')))
     );
   }
   return rootsOf(player).filter(
-    (c) => !step.pokemonType || pokemonHasType(topPokemonCard(player, c) || c, step.pokemonType)
+    (c) => tagged(c) && (!step.pokemonType || pokemonHasType(topPokemonCard(player, c) || c, step.pokemonType))
   );
+}
+
+/** Shaymin LV.X Seed Flare: "… for each {G} Energy attached in this way" counts these attaches. */
+function recordAttachedForDamage(ctx, cards) {
+  if (!ctx.step.countsForDamage || cards.length === 0) return;
+  ctx.draft.attackAttachedForDamage = (ctx.draft.attackAttachedForDamage || 0) + cards.length;
 }
 
 function attachPicked(ctx, picked, targets) {
@@ -821,6 +1020,7 @@ function attachPicked(ctx, picked, targets) {
   if (picked.length === 0) return null;
   if (targets.length === 1) {
     for (const card of picked) attachTo(player, card, targets[0], ctx.events);
+    recordAttachedForDamage(ctx, picked);
     return null;
   }
   const what = step.spread || picked.length === 1 ? picked[0].name : `${picked.length} Energy`;
@@ -833,10 +1033,30 @@ function attachPicked(ctx, picked, targets) {
   });
 }
 
+// `source: 'deckTop'` (Ampharos-EX Thunder Rod, Dragonite VSTAR Draconic Star, Lapras ex Larimar
+// Rain, Hatterene V Horoscope): Energy found in the top `look` cards; `rest: 'shuffle'` shuffles
+// the deck once the attaching is done.
 function atkAttach(ctx) {
   const { player, step } = ctx;
-  const zone = step.source === 'hand' ? player.zones.hand : player.zones.discard;
-  const candidates = (zone || []).filter((c) => energyMatches(c, step));
+  if (step.source === 'deckTop' && !ctx.selection && !ctx.memo?.cardIds) {
+    ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count: Math.min(step.look, player.zones.deck.length) });
+  }
+  const pending = attachFromZone(ctx);
+  if (!pending && step.source === 'deckTop' && step.rest === 'shuffle') shuffleOwnDeck(player, ctx);
+  return pending;
+}
+
+function attachFromZone(ctx) {
+  const { player, step } = ctx;
+  const zone =
+    step.source === 'hand'
+      ? player.zones.hand
+      : step.source === 'deckTop'
+        ? player.zones.deck.slice(0, step.look)
+        : player.zones.discard;
+  // Dragonite VSTAR: "{W} or {L} Energy cards".
+  const typed = (c) => !step.energyTypes || step.energyTypes.some((t) => energyMatches(c, { energyType: t }));
+  const candidates = (zone || []).filter((c) => energyMatches(c, step) && typed(c));
   const targets = attachTargets(ctx);
 
   if (ctx.memo?.cardIds) {
@@ -845,13 +1065,16 @@ function atkAttach(ctx) {
     if (!target) return skip(ctx, 'target_not_found');
     const batch = step.spread ? picked.slice(0, 1) : picked;
     for (const card of batch) attachTo(player, card, target, ctx.events);
+    recordAttachedForDamage(ctx, batch);
     return attachPicked(ctx, picked.slice(batch.length), targets);
   }
   if (ctx.selection) return attachPicked(ctx, pickById(candidates, ctx.selection), targets);
   if (candidates.length === 0) return skip(ctx, 'no_energy');
   if (targets.length === 0) return skip(ctx, 'no_target');
 
-  const max = step.anyNumber ? candidates.length : Math.min(step.count || 1, candidates.length);
+  // Solgaleo / Lunala Prism Star: one Energy for each of the opponent's Pokémon in play.
+  const count = step.countFrom === 'opponentInPlay' ? rootsOf(ctx.opponent).length : step.count || 1;
+  const max = step.anyNumber ? candidates.length : Math.min(count, candidates.length);
   const min = step.anyNumber || step.upTo ? 0 : max;
   if (min === max && max === candidates.length) return attachPicked(ctx, candidates, targets);
   return ctx.ask({
@@ -1017,7 +1240,9 @@ function atkMirrorHeal(ctx) {
   const ref = attackerRef(ctx);
   if (!ref || !(ctx.step.amount > 0) || !(ref.card.damage > 0)) return skip(ctx, 'nothing_to_heal');
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
-  const healed = Math.min(ref.card.damage, ctx.step.amount);
+  // Mega Drain: half the damage done, rounded up to the nearest 10.
+  const amount = ctx.step.half ? Math.ceil(ctx.step.amount / 20) * 10 : ctx.step.amount;
+  const healed = Math.min(ref.card.damage, amount);
   ref.card.damage -= healed;
   ctx.events.push({ type: 'damageUpdated', instanceId: ref.card.instanceId, damage: ref.card.damage, healed });
   return null;
@@ -1169,7 +1394,31 @@ function atkShuffleHandIntoDeck(ctx) {
 // "a number of cards equal to the number of cards in your opponent's hand" reads that hand
 // when the step runs.
 function atkDraw(ctx) {
-  const { player, step } = ctx;
+  const { step } = ctx;
+  // Comfey Sweet Kiss: "Your opponent draws a card"; Light Togetic: "Your opponent may draw a
+  // card" — the opponent answers.
+  if (step.side === 'opponent') {
+    const opponent = ctx.opponent;
+    if (!opponent || opponent.zones.deck.length === 0) return skip(ctx, 'nothing_to_draw');
+    if (step.opponentMay && !ctx.selection) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Draw a card?`,
+        options: [
+          { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+          { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+        ],
+        min: 1,
+        max: 1,
+        player: opponent.playerId,
+      });
+    }
+    if (step.opponentMay && ctx.selection[0] !== ATTACK_YES) return skip(ctx, 'declined');
+    const drawn = opponent.zones.deck.splice(0, Math.min(step.count || 1, opponent.zones.deck.length));
+    opponent.zones.hand.push(...drawn);
+    ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: opponent.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
+    return null;
+  }
+  const { player } = ctx;
   const deck = player.zones.deck;
   if (step.upTo && !ctx.selection) {
     const most = Math.min(step.count || 0, deck.length);
@@ -1185,7 +1434,12 @@ function atkDraw(ctx) {
     ? Math.min(Number(ctx.selection[0]) || 0, step.count || 0)
     : step.countFrom === 'opponentHand'
       ? ctx.opponent?.zones?.hand?.length || 0
-      : step.count || 0;
+      : step.countFrom === 'handDiscarded'
+        ? // Umbreon-EX Veil of Darkness: "Then, draw that many cards."
+          ctx.events
+            .filter((e) => e.type === 'cardsDiscarded' && e.handCost && e.playerId === player.playerId)
+            .reduce((sum, e) => sum + e.cards.length, 0)
+        : step.count || 0;
   const drawn = deck.splice(0, Math.min(count, deck.length));
   if (drawn.length === 0) return skip(ctx, 'nothing_to_draw');
   player.zones.hand.push(...drawn);
@@ -1218,7 +1472,7 @@ function atkShuffleOppEnergy(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   const energy = rootsOf(opponent)
-    .filter((root) => !specialEnergyShielded(opponent, root, 'effect'))
+    .filter((root) => !attackEffectShielded(ctx, opponent, root, 'effect'))
     .flatMap((root) => attachedCards(opponent, root.instanceId).filter(isEnergy));
   if (energy.length === 0) return skip(ctx, 'no_energy');
   for (const card of energy) moveToZone(opponent, card, 'deck', 'inPlay', ctx.events);
@@ -1393,6 +1647,39 @@ function atkShuffleSelf(ctx) {
   return null;
 }
 
+/**
+ * The attacker leaves play by its own attack: Shaymin-EX Sky Return (all to hand), Team Rocket's
+ * Crobat ex Assassin's Return (it to hand, attached cards discarded), Revavroom ex Shattering
+ * Speed (all discarded — not a Knock Out, so no Prize cards), Uxie Psychic Restore (bottom of
+ * the deck). `step.to` places the Pokémon cards, `step.attached` everything else.
+ */
+function atkPutSelf(ctx) {
+  const { player, step } = ctx;
+  const ref = attackerRef(ctx);
+  if (!ref || ref.playerId !== player.playerId) return skip(ctx, 'attacker_not_in_play');
+  const place = (card, where) => {
+    if (where === 'discard') player.zones.discard.push(card);
+    else if (where === 'deckBottom') player.zones.deck.push(card);
+    else player.zones.hand.push(card);
+  };
+  for (const card of [ref.card, ...attachedCards(player, ref.card.instanceId)]) {
+    removeFromZones(player, card);
+    card.attachedTo = null;
+    card.damage = 0;
+    clearConditions(card);
+    place(card, isPokemon(card) ? step.to : step.attached || step.to);
+  }
+  ctx.events.push({
+    type: 'cardMoved',
+    instanceId: ref.card.instanceId,
+    from: ref.zoneId,
+    to: step.to === 'deckBottom' ? 'deck' : step.to,
+    playerId: player.playerId,
+    reason: 'attack-put-self',
+  });
+  return null;
+}
+
 /** Ability form (Dudunsparce, Run Away Draw): "If you drew any cards in this way" gates the shuffle. */
 function returnSelfToDeckAbility(ctx) {
   const { step, playerId, events } = ctx;
@@ -1409,7 +1696,7 @@ function returnSelfToDeckAbility(ctx) {
 function placeCounters(ctx, card, victimPlayerId, amount) {
   // Mist/Rocky/Wash/Wonder Energy: counters an opponent's attack places are an effect
   // of that attack, not damage, so the effect shield stops them per target.
-  if (victimPlayerId === ctx.opponent?.playerId && specialEnergyShielded(ctx.opponent, card)) {
+  if (victimPlayerId === ctx.opponent?.playerId && attackEffectShielded(ctx, ctx.opponent, card)) {
     ctx.events.push({
       type: 'damagePrevented',
       instanceId: card.instanceId,
@@ -1482,7 +1769,7 @@ function atkKnockOutAll(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   const doomed = rootsOf(opponent).filter((root) => {
     const left = remainingHp(ctx, opponent, root);
-    return left > 0 && left <= step.maxRemainingHp && !specialEnergyShielded(opponent, root);
+    return left > 0 && left <= step.maxRemainingHp && !attackEffectShielded(ctx, opponent, root);
   });
   if (doomed.length === 0) return skip(ctx, 'condition_unmet');
   for (const root of doomed) markKnockOut(ctx, opponent, root);
@@ -1507,8 +1794,15 @@ function atkHpCap(ctx) {
     const active = activeOf(opponent);
     return active ? place(active) : skip(ctx, 'no_opponent_active');
   }
+  // Palossand ex Barite Jail: every Benched Pokémon, each down to the printed HP.
+  if (step.target === 'opponentBenchEach') {
+    const bench = benchRootsOf(opponent).filter((root) => countersToCap(root) > 0);
+    if (bench.length === 0) return skip(ctx, 'already_at_cap');
+    for (const root of bench) placeCounters(ctx, root, opponent.playerId, countersToCap(root));
+    return null;
+  }
   const all = rootsOf(opponent).filter((root) => countersToCap(root) > 0);
-  const candidates = all.filter((root) => !specialEnergyShielded(opponent, root));
+  const candidates = all.filter((root) => !attackEffectShielded(ctx, opponent, root));
   if (ctx.selection) {
     const root = candidates.find((c) => c.instanceId === ctx.selection[0]);
     return root ? place(root) : skip(ctx, 'target_not_found');
@@ -1699,7 +1993,7 @@ function atkKnockOut(ctx) {
   const target = activeOf(opponent);
   // Mist/Rocky/Wash/Wonder Energy: an automatic Knock Out from an attack effect is
   // prevented on the shielded Pokémon (Bring Down ruling), damage-only KOs are not.
-  const shielded = Boolean(target) && specialEnergyShielded(opponent, target);
+  const shielded = Boolean(target) && attackEffectShielded(ctx, opponent, target);
   if (step.scope === 'both') {
     // Annihilape Destined Fight / Forretress Double KO: both Active Pokémon go at once.
     const self = activeOf(ctx.player);
@@ -1728,7 +2022,7 @@ function atkKnockOutChoose(ctx) {
     const roots = step.scope === 'bench' && !step.leastHp ? benchRootsOf(owner) : rootsOf(owner);
     for (const root of roots) {
       if (step.leastHp && self && root.instanceId === self.instanceId) continue;
-      if (owner === opponent && specialEnergyShielded(owner, root)) continue;
+      if (owner === opponent && attackEffectShielded(ctx, owner, root)) continue;
       if (step.ruleBox && !RULE_BOX_MATCHES[step.ruleBox]?.(topPokemonCard(owner, root))) continue;
       if (step.notGx && isGxCard(topPokemonCard(owner, root))) continue;
       if (step.basicOnly && !RULE_BOX_MATCHES.basic(topPokemonCard(owner, root))) continue;
@@ -1772,6 +2066,90 @@ function atkKnockOutChoose(ctx) {
 
 // Miracle Powder / Delta Beam: the attacker picks 1 of the printed Special Conditions and it
 // lands on the opponent's Active. Option ids are 1-based indexes into `step.options`.
+// Glaceon Ice Bind: "If your opponent doesn't discard a card from his or her hand, the
+// Defending Pokémon is now Paralyzed." The opponent picks a hand card, or declines.
+function atkOppDiscardOrCondition(ctx) {
+  const { opponent, step } = ctx;
+  const target = activeOf(opponent);
+  if (!target) return skip(ctx, 'no_opponent_active');
+  const hand = opponent.zones.hand || [];
+  const discarded = ctx.selection && hand.find((c) => c.instanceId === ctx.selection[0]);
+  if (discarded) {
+    discardCards(opponent, [discarded], ctx.events);
+    return null;
+  }
+  if (!ctx.selection && hand.length > 0) {
+    return ctx.ask({
+      player: opponent.playerId,
+      prompt: `${attackName(ctx)}: Discard a card from your hand, or your Active Pokémon is now ${step.condition}`,
+      options: [...hand, { instanceId: ATTACK_NO, name: `Don't discard (${step.condition})`, type: 'option' }],
+      min: 1,
+      max: 1,
+    });
+  }
+  const markers = liveAttackMarkers(target, {
+    turnNumber: ctx.draft.turn?.number || 1,
+    zoneCards: opponent.zones?.active || [],
+  });
+  if (markersBlockCondition(markers, step.condition)) return skip(ctx, 'status_immune');
+  addCondition(target, step.condition);
+  ctx.events.push({
+    type: 'specialConditionUpdated',
+    instanceId: target.instanceId,
+    condition: step.condition,
+    conditions: listConditions(target),
+  });
+  return null;
+}
+
+// A Special Condition on the opponent's Active that no status branch reads: Crobat BREAK Silent
+// Bite ("You may leave your opponent's Active Pokémon Paralyzed"), M Ampharos-EX Exavolt's
+// accepted offer.
+function atkApplyCondition(ctx) {
+  const { opponent, step } = ctx;
+  const target = activeOf(opponent);
+  if (!target) return skip(ctx, 'no_opponent_active');
+  const markers = liveAttackMarkers(target, {
+    turnNumber: ctx.draft.turn?.number || 1,
+    zoneCards: opponent.zones?.active || [],
+  });
+  if (markersBlockCondition(markers, step.condition)) return skip(ctx, 'status_immune');
+  addCondition(target, step.condition);
+  ctx.events.push({
+    type: 'specialConditionUpdated',
+    instanceId: target.instanceId,
+    condition: step.condition,
+    conditions: listConditions(target),
+  });
+  return null;
+}
+
+// Gengar Hurl into Darkness: look at the opponent's hand and put up to as many Pokémon found
+// there as this Pokémon has `energyType` Energy attached in the Lost Zone.
+function atkLostZoneOppHandPokemon(ctx) {
+  const { player, opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const hand = opponent.zones.hand || [];
+  const pokemon = hand.filter(isPokemon);
+  if (ctx.selection) {
+    moveToLostZone(ctx, opponent, pickById(pokemon, ctx.selection));
+    return null;
+  }
+  ctx.events.push({ type: 'cardsRevealed', playerId: opponent.playerId, revealedTo: player.playerId, cards: hand.map(revealedCard) });
+  const ref = attackerRef(ctx);
+  const cap = ref
+    ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, { energyType: step.energyType })).length
+    : 0;
+  const max = Math.min(cap, pokemon.length);
+  if (max === 0) return skip(ctx, 'nothing_to_lost_zone');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose up to ${max} Pokémon from your opponent's hand to put in the Lost Zone`,
+    options: pokemon,
+    min: 0,
+    max,
+  });
+}
+
 function atkChooseCondition(ctx) {
   const { opponent, step } = ctx;
   const target = activeOf(opponent);
@@ -2067,6 +2445,35 @@ function devolveChosen(ctx) {
   });
 }
 
+// Celebi Prism Star Time Distortion / Porygon-Z Digital Reboot: "Devolve any number of your
+// Benched Pokémon as many times as you like. Put each Evolution card removed this way into your
+// hand." The player picks Evolution cards; each stack sheds its picked cards from the top down.
+function atkDevolveOwnBench(ctx) {
+  const { player } = ctx;
+  const stacks = benchRootsOf(player).map((root) => ({
+    root,
+    evolutions: attachedCards(player, root.instanceId).filter((c) => isPokemon(c)),
+  }));
+  const options = stacks.flatMap((stack) => stack.evolutions);
+  if (!ctx.selection) {
+    if (options.length === 0) return skip(ctx, 'no_evolved_pokemon');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose the Evolution cards to remove from your Benched Pokémon`,
+      options,
+      min: 0,
+      max: options.length,
+    });
+  }
+  const picked = new Set(ctx.selection);
+  for (const { root } of stacks) {
+    for (let top = topPokemonCard(player, root); top && top !== root && picked.has(top.instanceId); ) {
+      devolveRoot(ctx, player, root, 'hand');
+      top = topPokemonCard(player, root);
+    }
+  }
+  return null;
+}
+
 function atkDevolve(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
@@ -2270,7 +2677,8 @@ function healLimit(step) {
 function healPokemon(ctx, card, limit, { cure = false } = {}) {
   let changed = false;
   const damage = card.damage || 0;
-  const healed = Math.min(damage, limit);
+  // Lunala-GX Moongeist Beam: a heal-locked Pokémon keeps its damage (a cure still happens).
+  const healed = healLocked(card, ctx.draft.turn?.number || 1) ? 0 : Math.min(damage, limit);
   if (healed > 0) {
     card.damage = damage - healed;
     ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage, healed });
@@ -2319,7 +2727,13 @@ function atkHealEach(ctx) {
 function atkHealCounted(ctx) {
   const { player, opponent, step } = ctx;
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
-  const limit = healLimit(step);
+  // Ludicolo Healing Steps: "If you do, remove that many damage counters from Ludicolo."
+  const limit =
+    step.countFrom === 'handDiscarded'
+      ? ctx.events
+          .filter((e) => e.type === 'cardsDiscarded' && e.handCost && e.playerId === player.playerId)
+          .reduce((sum, e) => sum + e.cards.length, 0) * 10
+      : healLimit(step);
 
   if (step.target === 'self' || step.target === 'opponentActive' || step.target === 'bothActive') {
     const targets = {
@@ -2391,9 +2805,21 @@ function atkAddMarker(ctx) {
   const { step } = ctx;
   if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
   const owner = step.target === 'opponentActive' ? ctx.opponent : ctx.player;
+  // Entei Protective Flame: every one of the attacker's Benched Pokémon.
+  if (step.target === 'ownBench') {
+    const bench = benchRootsOf(ctx.player);
+    if (bench.length === 0) return skip(ctx, 'no_marker_target');
+    for (const root of bench) markCard(ctx, step, owner, root);
+    return null;
+  }
   const card =
     step.target === 'opponentActive' ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
   if (!card) return skip(ctx, 'no_marker_target');
+  markCard(ctx, step, owner, card);
+  return null;
+}
+
+function markCard(ctx, step, owner, card) {
   const turn = ctx.draft.turn?.number || 1;
   for (const marker of [step.marker, ...(step.alsoMarkers || [])]) {
     addAttackMarker(card, {
@@ -2453,6 +2879,19 @@ function atkDiscardStadium(ctx) {
   if (!stadium) return skip(ctx, 'no_stadium');
   const ownerId = stadium.ownerId || stadium.playerId || null;
   if (ctx.step.owner === 'opponent' && ownerId !== ctx.opponent?.playerId) return skip(ctx, 'not_opponent_stadium');
+  // Lugia VSTAR Tempest Dive / Dubwool Knock Over: "You may discard a Stadium in play."
+  if (ctx.step.optional && !ctx.selection) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Discard ${stadium.name}?`,
+      options: [
+        { instanceId: ATTACK_YES, name: 'Yes', type: 'option' },
+        { instanceId: ATTACK_NO, name: 'No', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  if (ctx.step.optional && ctx.selection[0] !== ATTACK_YES) return skip(ctx, 'declined');
   discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
   return addChainedMarker(ctx);
 }
@@ -2588,9 +3027,13 @@ function atkMoveCounterToOpponent(ctx) {
   const pool =
     step.from === 'self' ? [attacker].filter(Boolean) : step.from === 'bench' ? benchRootsOf(player) : rootsOf(player);
   const sources = pool.filter((c) => (c.damage || 0) > 0);
-  const targets = (step.to === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent)).filter(
-    (c) => !specialEnergyShielded(opponent, c)
-  );
+  const targetPool =
+    step.to === 'active'
+      ? [activeOf(opponent)].filter(Boolean)
+      : step.to === 'bench'
+        ? benchRootsOf(opponent)
+        : rootsOf(opponent);
+  const targets = targetPool.filter((c) => !attackEffectShielded(ctx, opponent, c));
   const chooseSource = step.from === 'one' || step.from === 'bench';
 
   let fromIds = ctx.memo?.fromIds;
@@ -2628,6 +3071,218 @@ function atkMoveCounterToOpponent(ctx) {
     ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
   }
   if (moved > 0) placeCounters(ctx, target, opponent.playerId, moved);
+  return null;
+}
+
+// Wobbuffet V Gritty Comeback / Unown J Hidden Power: "Switch all damage counters on this
+// Pokémon with those on your opponent's Active Pokémon."
+function atkSwapCounters(ctx) {
+  const { opponent } = ctx;
+  const attacker = attackerRef(ctx)?.card;
+  const defender = activeOf(opponent);
+  if (!attacker || !defender) return skip(ctx, 'no_target');
+  if (attackEffectShielded(ctx, opponent, defender)) return skip(ctx, 'effect_prevented');
+  const mine = attacker.damage || 0;
+  attacker.damage = defender.damage || 0;
+  defender.damage = mine;
+  ctx.events.push({ type: 'damageUpdated', instanceId: attacker.instanceId, damage: attacker.damage });
+  ctx.events.push({ type: 'damageUpdated', instanceId: defender.instanceId, damage: defender.damage });
+  return null;
+}
+
+// Bronzong Heavy Potential: a counter for each {C} in each opponent Pokémon's Retreat Cost. The
+// printed cost is read; Retreat Cost effects in play are not applied (flagged in the journal).
+function atkCountersByRetreat(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  let placed = 0;
+  for (const root of rootsOf(opponent)) {
+    const cost = getRetreatCostCount(topPokemonCard(opponent, root) || root);
+    if (cost > 0 && !attackEffectShielded(ctx, opponent, root)) {
+      placeCounters(ctx, root, opponent.playerId, cost * 10);
+      placed += 1;
+    }
+  }
+  return placed > 0 ? null : skip(ctx, 'no_retreat_cost');
+}
+
+const TYPE_CHOICES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal', 'Colorless'];
+const TYPE_SYMBOL = { Grass: 'G', Fire: 'R', Water: 'W', Lightning: 'L', Psychic: 'P', Fighting: 'F', Darkness: 'D', Metal: 'M', Colorless: 'C' };
+
+// Spiritomb Color Tag: the player names a type; each opponent Pokémon of that type takes counters.
+function atkCountersEachChosenType(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  if (!ctx.selection) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose a type`,
+      options: TYPE_CHOICES.map((name, i) => ({ instanceId: i + 1, name, type: 'option' })),
+      min: 1,
+      max: 1,
+    });
+  }
+  const chosen = TYPE_CHOICES[Number(ctx.selection[0]) - 1];
+  if (!chosen) return skip(ctx, 'invalid_type');
+  const symbol = TYPE_SYMBOL[chosen];
+  const victims = rootsOf(opponent).filter((root) => {
+    const top = topPokemonCard(opponent, root) || root;
+    return symbol === 'C'
+      ? (top.types || []).some((t) => String(t).toLowerCase() === 'colorless')
+      : pokemonHasType(top, symbol.toLowerCase());
+  });
+  for (const root of victims) {
+    if (!attackEffectShielded(ctx, opponent, root)) placeCounters(ctx, root, opponent.playerId, (step.count || 1) * 10);
+  }
+  return null;
+}
+
+// Torterra Land Shake: "During your opponent's next turn, when your opponent puts a Basic Pokémon
+// from their hand onto their Bench, put 2 damage counters on that Pokémon." reduce.mjs reads the
+// trap where a hand card is benched.
+function atkOppBenchTrap(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const turn = (ctx.draft.turn?.number || 1) + 1;
+  opponent.benchTraps = [
+    ...(opponent.benchTraps || []).filter((trap) => trap.untilTurn >= turn - 1),
+    { count: step.count, fromTurn: turn, untilTurn: turn, source: attackName(ctx) },
+  ];
+  ctx.events.push({ type: 'benchTrapSet', playerId: opponent.playerId, count: step.count });
+  return null;
+}
+
+const GUESS_KINDS = ['Pokémon', 'Trainer', 'Energy'];
+
+// Unown Hidden Power (Unseen Forces): "Choose a card from your hand and put it face down. Your
+// opponent guesses if the card is a Pokémon, Trainer, or Energy card. Reveal the card. If your
+// opponent guessed wrong, draw 2 cards. Put the card back into your hand."
+function atkGuessHandCard(ctx) {
+  const { player, opponent, step } = ctx;
+  const hand = player.zones.hand || [];
+  // The face-down card lives in a server-only draft field: the guess prompt goes to the
+  // opponent, and view.mjs hands the recipient the whole pending choice (memo included).
+  if (ctx.memo?.guessing) {
+    const card = hand.find((c) => c.instanceId === ctx.draft.faceDownGuessCardId);
+    delete ctx.draft.faceDownGuessCardId;
+    if (!card) return skip(ctx, 'card_not_found');
+    const guess = GUESS_KINDS[Number(ctx.selection?.[0]) - 1];
+    const actual = isPokemon(card) ? 'Pokémon' : isEnergy(card) ? 'Energy' : 'Trainer';
+    ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [revealedCard(card)], guess });
+    if (guess === actual) return null;
+    const drawn = player.zones.deck.splice(0, Math.min(step.draw || 2, player.zones.deck.length));
+    player.zones.hand.push(...drawn);
+    ctx.events.push({ type: 'cardsDrawn', count: drawn.length, playerId: player.playerId, cards: drawn.map((c) => ({ instanceId: c.instanceId })) });
+    return null;
+  }
+  if (ctx.selection) {
+    const card = hand.find((c) => c.instanceId === ctx.selection[0]);
+    if (!card || !opponent) return skip(ctx, 'card_not_found');
+    ctx.draft.faceDownGuessCardId = card.instanceId;
+    return ctx.ask({
+      player: opponent.playerId,
+      prompt: `${attackName(ctx)}: Guess the face-down card: Pokémon, Trainer, or Energy?`,
+      options: GUESS_KINDS.map((name, i) => ({ instanceId: i + 1, name, type: 'option' })),
+      min: 1,
+      max: 1,
+      memo: { guessing: true },
+    });
+  }
+  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose a card from your hand to put face down`,
+    options: hand,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Unown Z Hidden Power: "Remove as many damage counters as you like from each Unown you have in
+// play. Put that many damage counters on the Defending Pokémon." One count per damaged Unown.
+function atkMoveCountersFromNamed(ctx) {
+  const { player, opponent, step } = ctx;
+  const named = rootsOf(player).filter(
+    (root) =>
+      (root.damage || 0) > 0 &&
+      String(topPokemonCard(player, root)?.name || '').toLowerCase().startsWith(step.name)
+  );
+  const doneIds = [...(ctx.memo?.doneIds || [])];
+  let moved = ctx.memo?.moved || 0;
+  const current = ctx.selection && named.find((root) => root.instanceId === ctx.memo?.currentId);
+  if (current) {
+    const take = Math.min(Number(ctx.selection[0]) - 1, Math.floor(current.damage / 10));
+    if (take > 0) {
+      current.damage -= take * 10;
+      ctx.events.push({ type: 'damageUpdated', instanceId: current.instanceId, damage: current.damage });
+      moved += take;
+    }
+    doneIds.push(current.instanceId);
+  }
+  const next = named.find((root) => !doneIds.includes(root.instanceId) && (root.damage || 0) > 0);
+  if (next) {
+    const counters = Math.floor(next.damage / 10);
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Remove how many damage counters from ${topPokemonCard(player, next)?.name || 'this Unown'}?`,
+      options: Array.from({ length: counters + 1 }, (_, k) => ({ instanceId: k + 1, name: String(k), type: 'option' })),
+      min: 1,
+      max: 1,
+      memo: { doneIds, moved, currentId: next.instanceId },
+    });
+  }
+  const defender = activeOf(opponent);
+  if (moved === 0 || !defender) return moved === 0 ? skip(ctx, 'nothing_moved') : skip(ctx, 'no_opponent_active');
+  placeCounters(ctx, defender, opponent.playerId, moved * 10);
+  return null;
+}
+
+// Unown I Hidden Power: an Energy on the Defending Pokémon goes face down and provides only {C}
+// until the end of the opponent's next turn (reduce.mjs turns it face up; serverEnergyDescriptor
+// reads `asEnergy`).
+function atkFaceDownOppEnergy(ctx) {
+  const { opponent } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const energies = attachedCards(opponent, defender.instanceId).filter(isEnergy);
+  const flip = (card) => {
+    card.asEnergy = { provides: ['Colorless'] };
+    card.faceDownUntilTurn = (ctx.draft.turn?.number || 1) + 1;
+    // Only while it stays on this Pokémon (rules/server-energy.mjs checks the host).
+    card.faceDownHostId = defender.instanceId;
+    ctx.events.push({ type: 'energyFaceDown', instanceId: card.instanceId, playerId: opponent.playerId });
+    return null;
+  };
+  if (ctx.selection) {
+    const card = energies.find((c) => c.instanceId === ctx.selection[0]);
+    return card ? flip(card) : skip(ctx, 'target_not_found');
+  }
+  if (energies.length === 0) return skip(ctx, 'no_energy');
+  if (energies.length === 1) return flip(energies[0]);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose an Energy card on your opponent's Active Pokémon to put face down`,
+    options: energies,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Cofagrigus Slap of Misfortune / Unown E Hidden Power: the opponent's coin flips next turn are
+// tails (reduce.mjs wraps that turn's RNG).
+function atkOppCoinsTails(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  opponent.coinsTailsTurn = (ctx.draft.turn?.number || 1) + 1;
+  ctx.events.push({ type: 'coinsForcedTails', playerId: opponent.playerId, turn: opponent.coinsTailsTurn });
+  return null;
+}
+
+// Unown L Hidden Power: "put damage counters on the Defending Pokémon until it is 10 HP away
+// from being Knocked Out".
+function atkCountersUntilHp(ctx) {
+  const { opponent, step } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const amount = remainingHp(ctx, opponent, defender) - step.hp;
+  if (amount <= 0) return skip(ctx, 'already_at_hp');
+  placeCounters(ctx, defender, opponent.playerId, amount);
   return null;
 }
 
@@ -2681,7 +3336,13 @@ function atkLookDeckReorder(ctx) {
 // Pokémon". Energy of one type is interchangeable, so each Pokémon takes the next match.
 function atkAttachEachBench(ctx) {
   const { player, step } = ctx;
-  const bench = benchRootsOf(player);
+  // Blaziken VMAX (Rapid Strike), Latias Prism Star (Basic {N}).
+  const bench = benchRootsOf(player).filter((c) => {
+    const top = topPokemonCard(player, c) || c;
+    if (step.tag && !rootHasTag(player, c, step.tag)) return false;
+    if (step.basicOnly && stageOf(top) !== 'Basic') return false;
+    return !step.pokemonType || pokemonHasType(top, step.pokemonType);
+  });
   if (bench.length === 0) return skip(ctx, 'no_bench_pokemon');
   let chosen = bench;
   if (step.max && bench.length > step.max) {
@@ -2799,7 +3460,10 @@ function supporterSource(ctx) {
   switch (step.source) {
     case 'hand':
       return { owner: player, zone: 'hand' };
+    // Jirachi / Magby Detour ('played'): "a Supporter card in play" is the one played this
+    // turn, now in the discard pile.
     case 'discard':
+    case 'played':
       return { owner: player, zone: 'discard' };
     case 'deck':
     case 'deckTop':
@@ -2845,7 +3509,13 @@ function atkUseSupporter(ctx) {
     }
     return useSupporterEffect(ctx, owner, top);
   }
-  const candidates = cards.filter(isSupporterCard);
+  const playedNames = ctx.player.flags?.supporterNamesThisTurn || [];
+  const candidates = cards.filter(
+    (c) => isSupporterCard(c) && (step.source !== 'played' || playedNames.includes(c.name || ''))
+  );
+  if (step.source === 'played' && candidates.length === 1 && !ctx.selection) {
+    return useSupporterEffect(ctx, owner, candidates[0]);
+  }
   if (ctx.selection) {
     const chosen = candidates.find((c) => c.instanceId === ctx.selection[0]);
     if (!chosen) {
@@ -2882,7 +3552,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
   atkDiscardSelfEnergy,
-  atkMoveSelfEnergyToHand,
+  atkMoveSelfEnergyToHand: optional(atkMoveSelfEnergyToHand, () => 'Return an Energy attached to this Pokémon to your hand'),
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
   atkDiscardBothActiveEnergy: optional(
     atkDiscardBothActiveEnergy,
@@ -2910,11 +3580,15 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardHandEnergy: optional(atkDiscardHandEnergy, (step) => `Discard ${energyLabel(step)} from your hand`),
   atkMill: optional(atkMill, (step) => `Discard the top ${step.count || 1} card(s) of the deck`),
   atkMillAttachIfEnergy,
+  atkAttachDiscardedForDamage,
+  atkPickOppHandCard,
+  atkDiscardRecordedIf,
   atkAttach: optional(atkAttach, (step) => `Attach ${whatOf(step)} from your ${step.source === 'hand' ? 'hand' : 'discard pile'}`),
   atkBenchFromDeckTop: atkBenchFromDeckTop,
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
   atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
+  atkPutSelf: optional(atkPutSelf, (step) => (step.to === 'hand' ? 'Put this Pokémon into your hand' : 'Put this Pokémon on the bottom of your deck')),
   returnSelfToDeckAbility,
   atkLostZoneDeckTop,
   atkLostZoneEnergy,
@@ -2953,6 +3627,23 @@ export const ATTACK_STEP_HANDLERS = {
   atkShufflePrizesAndRedraw,
   atkDiscardPrize,
   atkChooseCondition,
+  atkOppDiscardOrCondition,
+  atkLostZoneOppHandPokemon,
+  atkSwapCounters,
+  atkCountersUntilHp,
+  atkDiscardOppToolsAndStadium,
+  atkCountersByRetreat,
+  atkCountersEachChosenType,
+  atkDiscardOwnEnergy,
+  atkDiscardSelfEnergyEither,
+  atkOppBenchTrap,
+  atkOppCoinsTails,
+  atkDevolveOwnBench,
+  atkFaceDownOppEnergy,
+  atkMoveCountersFromNamed,
+  atkGuessHandCard,
+  atkDiscardBenchEnergy,
+  atkApplyCondition: optional(atkApplyCondition, (step) => `Leave your opponent's Active Pokémon ${step.condition}`),
   atkDevolve,
   atkBounceOppActive,
   atkBounceOppBench: optional(atkBounceOppBench, () => 'Return your opponent\'s Benched Pokémon to their hand'),
@@ -2971,3 +3662,37 @@ export const ATTACK_STEP_HANDLERS = {
   atkHandCardsToDecks,
   atkLookOppDeck,
 };
+
+// "Prevent all effects of attacks … done to this Pokémon" (an `effectPrevent` marker on the
+// opponent's Active, attack-markers.mjs): the steps that act on that Active do nothing.
+const OPP_ACTIVE_EFFECTS = {
+  atkGust: () => true,
+  atkDiscardOppEnergy: (step) => step.scope === 'active',
+  atkDiscardOppTools: (step) => step.scope === 'active',
+  atkShuffleOppActive: () => true,
+  atkLostZoneOppActive: () => true,
+  atkBounceOppActive: () => true,
+  atkShuffleOppActiveEnergy: () => true,
+  atkAddMarker: (step) => step.target === 'opponentActive',
+  atkLockAttack: () => true,
+  atkOppDiscardOrCondition: () => true,
+  atkApplyCondition: () => true,
+  atkFaceDownOppEnergy: () => true,
+};
+
+function oppActiveProtected(ctx) {
+  const defender = activeOf(ctx.opponent);
+  if (!defender) return false;
+  const markers = liveAttackMarkers(defender, {
+    turnNumber: ctx.draft.turn?.number || 1,
+    zoneCards: ctx.opponent.zones.active || [],
+  });
+  const ref = attackerRef(ctx);
+  return markersPreventEffects(markers, ref ? attackingView(ctx, ref.card) : ctx.sourceCard);
+}
+
+for (const [type, targetsActive] of Object.entries(OPP_ACTIVE_EFFECTS)) {
+  const handler = ATTACK_STEP_HANDLERS[type];
+  ATTACK_STEP_HANDLERS[type] = (ctx) =>
+    targetsActive(ctx.step) && oppActiveProtected(ctx) ? skip(ctx, 'effect_prevented') : handler(ctx);
+}

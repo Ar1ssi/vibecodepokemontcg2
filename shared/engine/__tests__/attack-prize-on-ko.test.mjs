@@ -39,10 +39,13 @@ test('parsePrizeOnKo: every printed wording, and the clauses that must not match
       { count: 2, filter: { ruleBox: 'mega' } },
     ],
     ["If the Defending Pokémon is Knocked Out by this attack, take 1 more Prize card.", { count: 1 }],
-    // Beast Game-GX: the base clause parses; the extra-Energy "instead" upgrade is not this clause.
+    // Beast Game-GX: the base clause, plus the extra-Energy "instead" upgrade reduce.mjs checks.
     [
       "If your opponent's Pokémon is Knocked Out by damage from this attack, take 1 more Prize card. If this Pokémon has at least 7 extra Energy attached to it (in addition to this attack's cost), take 3 more Prize cards instead.",
-      { count: 1 },
+      {
+        count: 1,
+        instead: { condition: "this pokémon has at least 7 extra energy attached to it (in addition to this attack's cost)", count: 3 },
+      },
     ],
   ];
   for (const [text, expected] of cases) assert.deepEqual(parsePrizeOnKo(text), expected, text);

@@ -231,6 +231,8 @@ export function snapshot(state) {
             c.cannotRetreatUntilTurn,
             c.cannotAttackAttackName,
             c.attackMarkers,
+            c.attackLockedWhileActive,
+            c.asEnergy,
           ]),
         });
       }
@@ -245,12 +247,13 @@ export function snapshot(state) {
     deckOrders: ['p1', 'p2'].map((pid) =>
       (state.players[pid]?.zones?.deck || []).map((c) => c.instanceId).join(',')
     ),
-    // Player-scoped locks (Item/Supporter play locks, Iron Rule): they sit on no card, so a
-    // per-card diff alone cannot see them.
-    playerLocks: ['p1', 'p2'].map((pid) =>
-      JSON.stringify([state.players[pid]?.playLocks, state.players[pid]?.attackLockUntilTurn])
-    ),
     winner: state.winner,
+    // Player-scoped effects no card carries, so a per-card diff alone cannot see them: play
+    // locks ("can't play Item cards"), Iron Rule attack locks, Bench traps, forced-tails coins.
+    playerLocks: ['p1', 'p2'].map((pid) => {
+      const p = state.players[pid] || {};
+      return JSON.stringify([p.playLocks, p.attackLockUntilTurn, p.benchTraps, p.coinsTailsTurn]);
+    }),
   };
 }
 

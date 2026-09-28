@@ -232,6 +232,7 @@ export function runAttackOnce(holder, attackIndex, seed, costPool, mutate) {
     dealt: executed ? executed.damage || 0 : null,
     executedName: executed?.attackName || null,
     choices,
+    finalState: res.state,
     skipped: events.filter((e) => e.type === 'effectStepSkipped').map((e) => e.reason),
     scaled: scaled.map((e) => ({ base: e.base, total: e.total, notes: e.notes })),
     prizeEvents,
