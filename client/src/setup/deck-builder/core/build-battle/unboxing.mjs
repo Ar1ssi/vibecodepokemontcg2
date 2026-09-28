@@ -372,6 +372,88 @@ export function cardRevealPose(t, { tier = 0 } = {}) {
   };
 }
 
+// ── Pocket-style packs (fullscreen rework): fly-out, spread, swipe, hit flip ──────────────────
+export const PACK_FLY_MS = 680;
+export const PACK_FLY_STAGGER_MS = 120;
+export const POCKET_CUT_MS = 420;
+export const SWIPE_AWAY_MS = 300;
+export const HIT_FLIP_MS = 640;
+export const SUMMARY_STAGGER_MS = 45;
+// A card dragged this share of its width is swiped away; less springs back.
+export const SWIPE_AT = 0.28;
+
+const SPREAD_SIDE_SCALE = 0.62;
+const SPREAD_SIDE_BRIGHTNESS = 0.55;
+const FLY_ARC_PX = 90;
+const FLY_SPIN_DEG = -24;
+const SWIPE_LIFT_PX = 30;
+const SWIPE_TILT_DEG = 20;
+const HIT_FLIP_POP = 0.14;
+
+/**
+ * Pack `index` in the fullscreen spread with pack `focus` (`spacingPx` wide) centred at full
+ * size: packs after it queue to the right, smaller and darker, clear of each other.
+ */
+export function packSpreadSlot(index, focus, spacingPx) {
+  const offset = index - focus;
+  if (!Number.isFinite(offset) || offset === 0 || !Number.isFinite(spacingPx)) {
+    return { xPx: 0, scale: 1, brightness: 1, zIndex: 10 };
+  }
+  const distance = Math.abs(offset);
+  const sideStep = spacingPx * (SPREAD_SIDE_SCALE + 0.06);
+  const xPx = Math.sign(offset) * ((spacingPx + spacingPx * SPREAD_SIDE_SCALE) / 2 + 12 + sideStep * (distance - 1));
+  return { xPx, scale: SPREAD_SIDE_SCALE, brightness: SPREAD_SIDE_BRIGHTNESS, zIndex: 10 - distance };
+}
+
+/**
+ * A pack flying out of the box into its spread slot: it starts `dxPx, dyPx` away (the box
+ * mouth, in the slot's own pixels) at `fromScale`, arcs up, spins level and lands at rest.
+ */
+export function packFlyPose(t, { dxPx = 0, dyPx = 0, fromScale = 0.3 } = {}) {
+  const x = easeLift(clamp01(t));
+  const arc = Math.sin(Math.PI * clamp01(t)) * FLY_ARC_PX;
+  return {
+    translateXPx: lerp(dxPx, 0, x),
+    translateYPx: lerp(dyPx, 0, x) - arc,
+    rotateZDeg: lerp(FLY_SPIN_DEG, 0, x),
+    scale: lerp(fromScale, 1, x),
+  };
+}
+
+/** A released drag on the top card: swipe it away, treat it as a tap, or spring back. */
+export function swipeOutcome({ dxPx, movedPx, widthPx }) {
+  if (Number.isFinite(movedPx) && movedPx < TAP_SLOP_PX) return 'tap';
+  if (!(widthPx > 0) || !Number.isFinite(dxPx)) return 'spring';
+  return Math.abs(dxPx) >= SWIPE_AT * widthPx ? 'swipe' : 'spring';
+}
+
+/** The top card leaving the stack toward `direction` (±1), from `fromPx` across `distancePx`. */
+export function swipeAwayPose(t, { direction = 1, fromPx = 0, distancePx = 400 } = {}) {
+  const x = clamp01(t);
+  const side = direction < 0 ? -1 : 1;
+  return {
+    translateXPx: lerp(fromPx, side * distancePx, x * x),
+    translateYPx: -SWIPE_LIFT_PX * x,
+    rotateZDeg: side * SWIPE_TILT_DEG * x,
+    opacity: 1 - clamp01((x - 0.6) / 0.4),
+  };
+}
+
+/**
+ * A face-down hit turning over in place: 180° (back to the camera) → 0°, crossing 90° exactly at
+ * the middle, with a pop in scale and, for tier ≥ 2, the flare bell of `cardRevealPose`.
+ */
+export function hitFlipPose(t, { tier = 2 } = {}) {
+  const x = clamp01(t);
+  const flip = easeInOutSine(x);
+  const flare = tier >= 2 ? Math.max(0, 1 - Math.abs(x - FLARE_PEAK) / FLARE_HALF_WIDTH) : 0;
+  return {
+    rotateYDeg: 180 * (1 - flip),
+    scale: 1 + HIT_FLIP_POP * Math.sin(Math.PI * x),
+    flare,
+  };
+}
+
 const FAN_MAX_DEG = 8;
 
 /** Revealed card `index` of `count` fanned across `widthPx`, centred. */

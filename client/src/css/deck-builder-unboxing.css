@@ -1,8 +1,9 @@
 /*
  * Build & Battle unboxing scene (design 052 § CSS): the CSS 3D box, its faces,
- * the tray, packs, reveal rows and the card fan. Poses come from unboxing.mjs
+ * the tray, the fullscreen pack spread, the one-card-at-a-time pocket view and
+ * the pack summary. Poses come from unboxing.mjs
  * through WAAPI; this sheet only holds the settled layout. Only
- * `.bb-box__body`, `.bb-box__lid` and `.bb-flyer` are preserve-3d, and
+ * `.bb-box__body`, `.bb-box__lid` and `.bb-pcard__flip` are preserve-3d, and
  * opacity never animates on them (house rule: it would flatten them).
  * The JS gate for motion is the ptcg-reduce-motion flag; the media query at
  * the end is the CSS fallback for the idle loops.
@@ -19,9 +20,7 @@
   --bb-wrap: rgba(255, 255, 255, 0.26);
   --bb-card-w: 76px;
   --bb-card-h: 106px;
-  --bb-pack-w: 84px;
   --bb-pack-h: 151px;
-  --bb-tray-pack-w: 62px;
   --bb-card-radius: 4.5% / 3.3%;
   --bb-rim: 18px;
   display: flex;
@@ -522,8 +521,7 @@
 .build-battle-window .db-live .bb-box__wrap:focus-visible,
 .build-battle-window .db-live .bb-box__open:focus-visible,
 .build-battle-window .db-live .bb-deck:focus-visible,
-.build-battle-window .db-live .bb-pack__top:focus-visible,
-.build-battle-window .db-live .bb-stack:focus-visible {
+.build-battle-window .db-live .bb-pack__top:focus-visible {
   outline: 2px solid var(--db-gold);
   outline-offset: 3px;
 }
@@ -602,14 +600,6 @@
   transform-origin: 50% 100%;
 }
 
-.build-battle-window .db-live .bb-pack {
-  position: relative;
-  width: var(--bb-tray-pack-w);
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
-}
-.build-battle-window .db-live .bb-pack.is-torn {
-  opacity: 0.5;
-}
 .build-battle-window .db-live .bb-pack__body,
 .build-battle-window .db-live .bb-pack__strip {
   position: relative;
@@ -632,7 +622,7 @@
 }
 /* Silver pack back when the art is missing. */
 .build-battle-window .db-live .bb-pack__body,
-.build-battle-window .db-live .bb-reveal__pack {
+.build-battle-window .db-live .bb-pocket__pack {
   background: linear-gradient(180deg, #d9dbe0, #9aa0aa, #d9dbe0);
 }
 /* The two soft foil highlights of the real pack, drifting a few px. */
@@ -715,92 +705,6 @@
   color: #3a2f1c;
 }
 
-/* ── Reveal rows: torn pack, face-down stack, fan ─────────────────────────── */
-.build-battle-window .db-live .bb-scene__reveals {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4vh;
-}
-.build-battle-window .db-live .bb-scene__reveals:empty {
-  display: none;
-}
-.build-battle-window .db-live .bb-reveal {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 1vh 1.2vw;
-  padding: 1vh 1vw;
-  border: 1px solid var(--db-border);
-  border-radius: var(--db-radius);
-  background: var(--db-panel);
-  perspective: 900px;
-  transform-origin: 0 0;
-}
-.build-battle-window .db-live .bb-reveal__count {
-  flex-basis: 100%;
-  margin: 0;
-  font-size: 1.3vh;
-  color: var(--db-text-dim);
-}
-.build-battle-window .db-live .bb-reveal__src {
-  position: relative;
-  flex: 0 0 auto;
-  width: calc(var(--bb-pack-w) + 12px + var(--bb-card-w) + 26px);
-  height: var(--bb-pack-h);
-  margin-top: 10px;
-}
-.build-battle-window .db-live .bb-reveal__pack {
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: 2;
-  width: var(--bb-pack-w);
-  height: var(--bb-pack-h);
-  pointer-events: none;
-}
-.build-battle-window .db-live .bb-stack {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-.build-battle-window .db-live .bb-stack:disabled {
-  cursor: default;
-}
-.build-battle-window .db-live .bb-stack__card {
-  position: absolute;
-  left: 4px;
-  top: 0;
-  width: var(--bb-card-w);
-  height: var(--bb-card-h);
-  border-radius: var(--bb-card-radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.build-battle-window .db-live .bb-fan {
-  position: relative;
-  flex: 1 1 320px;
-  min-width: 0;
-  height: calc(var(--bb-card-h) + 40px);
-}
-.build-battle-window .db-live .bb-fan__card {
-  position: absolute;
-  left: 50%;
-  top: 14px;
-  width: var(--bb-card-w);
-  margin-left: calc(var(--bb-card-w) / -2);
-  transform: translateX(var(--bb-fan-x, 0px)) rotate(var(--bb-fan-rot, 0deg));
-  transition: transform 160ms ease-out;
-}
-.build-battle-window .db-live .bb-fan__card:hover {
-  z-index: 5;
-  transform: translateX(var(--bb-fan-x, 0px)) translateY(-10px) rotate(var(--bb-fan-rot, 0deg)) scale(1.35);
-}
-
 .build-battle-window .db-live .bb-card-holder {
   width: 100%;
 }
@@ -837,32 +741,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The card in flight: two faces, the front turned away until the flip passes 90°. */
-.build-battle-window .db-live .bb-flyer {
-  position: absolute;
-  z-index: 6;
-  width: var(--bb-card-w);
-  height: var(--bb-card-h);
-  transform-style: preserve-3d;
-  pointer-events: none;
-}
-.build-battle-window .db-live .bb-flyer__back,
-.build-battle-window .db-live .bb-flyer__front {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: var(--bb-card-radius);
-  backface-visibility: hidden;
-}
-.build-battle-window .db-live .bb-flyer__front {
-  transform: rotateY(180deg);
-}
-.build-battle-window .db-live .bb-flyer__back-img {
-  display: block;
-  width: 100%;
-  height: 100%;
 }
 
 /* Hit flare and sparks live inside the clipped front: nothing leaves the card (row 12). */
@@ -956,44 +834,247 @@
   margin: 84px 56px;
   transform: scale(1.35);
 }
-/* Packs: the box steps back beside the tray and the open pack takes the centre. */
-.build-battle-window .db-live .bb-scene--stage[data-stage='packs'] .bb-scene__top {
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.build-battle-window .db-live .bb-scene--stage[data-stage='packs'] .bb-box {
-  margin: -90px -50px -70px;
-  transform: scale(0.6);
-}
 .build-battle-window .db-live .bb-scene--stage .bb-hint {
   font-size: 1.8vh;
   text-align: center;
 }
-.build-battle-window .db-live .bb-scene--stage .bb-scene__reveals {
-  width: 100%;
-  align-items: center;
-}
-.build-battle-window .db-live .bb-scene--stage .bb-reveal {
-  width: min(900px, 100%);
-  justify-content: center;
-  transform-origin: 50% 50%;
-}
 .build-battle-window .db-live .bb-scene--stage .bb-controls {
   justify-content: center;
 }
-/* The pack that tears next. */
-.build-battle-window .db-live .bb-pack.is-next {
-  animation: bb-next-pack 1.6s ease-in-out infinite;
+/* The dock (hint + controls) sits at the foot of the stage over the packs and cards. */
+.build-battle-window .db-live .bb-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
 }
-@keyframes bb-next-pack {
-  0%,
+.build-battle-window .db-live .bb-scene--stage {
+  padding-bottom: 12vh;
+}
+.build-battle-window .db-live .bb-scene--stage .bb-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 3vh;
+  z-index: 5;
+  align-items: center;
+  pointer-events: none;
+}
+.build-battle-window .db-live .bb-scene--stage .bb-dock > * {
+  pointer-events: auto;
+}
+
+/* ── Spread: the packs fly out of the box and fill the screen ────────────── */
+.build-battle-window .db-live .bb-scene--stage {
+  --bb-big-pack-w: min(30vh, 56vw);
+  --bb-big-card-w: min(40vh, 66vw);
+}
+.build-battle-window .db-live .bb-spread {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+.build-battle-window .db-live .bb-bigpack {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: var(--bb-big-pack-w);
+  transform: translate(-50%, -50%);
+  transition:
+    transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 320ms ease-out;
+}
+.build-battle-window .db-live .bb-bigpack__fly {
+  position: relative;
+  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.55));
+}
+.build-battle-window .db-live .bb-bigpack .bb-pack__top {
+  height: 18%;
+  cursor: grab;
+  touch-action: none;
+}
+.build-battle-window .db-live .bb-bigpack .bb-pack__top::after {
+  top: 42%;
+}
+/* The cut following the finger along the crimp. */
+.build-battle-window .db-live .bb-cutline {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 7.5%;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #fff6c8, #ffd65a);
+  box-shadow: 0 0 10px 2px rgba(255, 214, 90, 0.85);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+/* A glint running along the cut line: "swipe here". */
+.build-battle-window .db-live .bb-bigpack.is-focus .bb-pack__top:not(:disabled)::before {
+  content: '';
+  position: absolute;
+  left: 4%;
+  top: calc(42% - 7px);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(255, 214, 90, 0.9) 40%, transparent 70%);
+  animation: bb-swipe-hint 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes bb-swipe-hint {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
   100% {
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+    transform: translateX(calc(var(--bb-big-pack-w) * 0.9));
+    opacity: 0;
   }
-  50% {
-    filter: drop-shadow(0 0 10px rgba(255, 214, 90, 0.85));
+}
+
+/* ── Pocket: the cards of the opened pack, one at a time ─────────────────── */
+.build-battle-window .db-live .bb-pocket {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vh;
+  padding: 3vh 16px 16vh;
+}
+.build-battle-window .db-live .bb-pocket__count {
+  margin: 0;
+  font-size: 1.7vh;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--db-text-dim);
+}
+.build-battle-window .db-live .bb-pocket__stack {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: var(--bb-big-card-w);
+  aspect-ratio: 63 / 88;
+}
+.build-battle-window .db-live .bb-pocket__edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 4.5% / 3.3%;
+  background: linear-gradient(160deg, #2b3a78, #141c3d);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transform: translate(calc(var(--bb-depth) * 3px), calc(var(--bb-depth) * 4px));
+}
+.build-battle-window .db-live .bb-pcard {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  perspective: 1400px;
+}
+.build-battle-window .db-live .bb-pcard.is-under {
+  z-index: 1;
+}
+.build-battle-window .db-live .bb-pcard.is-top {
+  z-index: 3;
+  cursor: grab;
+  touch-action: pan-y;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.5));
+}
+.build-battle-window .db-live .bb-pcard.is-top:focus-visible {
+  outline: 3px solid var(--db-gold);
+  outline-offset: 4px;
+  border-radius: 4.5% / 3.3%;
+}
+.build-battle-window .db-live .bb-pcard__flip {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.build-battle-window .db-live .bb-pcard__front,
+.build-battle-window .db-live .bb-pcard__back {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 4.5% / 3.3%;
+  backface-visibility: hidden;
+}
+.build-battle-window .db-live .bb-pcard__back {
+  transform: rotateY(180deg);
+}
+.build-battle-window .db-live .bb-pcard__back-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* A hit waiting face down: a pulsing aura in its tier colour, outside the card only as glow. */
+.build-battle-window .db-live .bb-pcard.is-hit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 4.5% / 3.3%;
+  box-shadow:
+    0 0 22px 6px rgba(255, 214, 90, 0.8),
+    0 0 48px 12px rgba(255, 170, 40, 0.35);
+  animation: bb-hit-aura 1.3s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.build-battle-window .db-live .bb-pcard.is-hit[data-tier='3']::after {
+  box-shadow:
+    0 0 22px 6px rgba(255, 90, 200, 0.85),
+    0 0 52px 14px rgba(120, 180, 255, 0.45);
+}
+.build-battle-window .db-live .bb-pcard.is-turning::after {
+  animation: none;
+  opacity: 0;
+  transition: opacity 200ms;
+}
+@keyframes bb-hit-aura {
+  from {
+    opacity: 0.55;
   }
+  to {
+    opacity: 1;
+  }
+}
+.build-battle-window .db-live .bb-pocket__seen {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  min-height: calc(min(5vh, 9vw) * 88 / 63);
+}
+.build-battle-window .db-live .bb-pocket__thumb {
+  width: min(5vh, 9vw);
+}
+.build-battle-window .db-live .bb-pocket__pack {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  z-index: 0;
+  width: var(--bb-big-pack-w);
+  aspect-ratio: 1 / 1.8;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+/* The ten cards of a finished pack, laid out. */
+.build-battle-window .db-live .bb-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, min(15vh, 17vw)));
+  gap: 1.2vh 1vw;
+}
+.build-battle-window .db-live .bb-summary__card {
+  position: relative;
 }
 
 /* The builder UI loading back in once the opening is done. */
@@ -1032,32 +1113,34 @@
 
 /* ── Kill switch and reduced motion ───────────────────────────────────────── */
 body.fx-off.build-battle-window .db-live .bb-pack__foil,
-body.fx-off.build-battle-window .db-live .bb-pack.is-next,
+body.fx-off.build-battle-window .db-live .bb-pcard.is-hit::after,
+body.fx-off.build-battle-window .db-live .bb-bigpack.is-focus .bb-pack__top:not(:disabled)::before,
 body.fx-off.build-battle-window .db-live.bb-ui-enter .native-deck-builder-header,
 body.fx-off.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-main,
 body.fx-off.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-side,
 body.fx-off.build-battle-window .db-live .bb-panel.bb-enter {
   animation: none;
 }
-body.fx-off.build-battle-window .db-live .bb-fan__card,
+body.fx-off.build-battle-window .db-live .bb-bigpack,
 body.fx-off.build-battle-window .db-live .bb-pack__top::after {
   transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .build-battle-window .db-live .bb-pack__foil,
-  .build-battle-window .db-live .bb-pack.is-next,
+  .build-battle-window .db-live .bb-pcard.is-hit::after,
+  .build-battle-window .db-live .bb-bigpack.is-focus .bb-pack__top:not(:disabled)::before,
   .build-battle-window .db-live.bb-ui-enter .native-deck-builder-header,
   .build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-main,
   .build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-side,
   .build-battle-window .db-live .bb-panel.bb-enter {
     animation: none;
   }
-  .build-battle-window .db-live .bb-fan__card {
+  .build-battle-window .db-live .bb-bigpack {
     transition: none;
   }
 }
 
-/* ── Phone width: the box shrinks, the tray and fan wrap ──────────────────── */
+/* ── Phone width: the box shrinks, the tray wraps ──────────────────── */
 @media (max-width: 520px) {
   .build-battle-window .db-live .bb-box {
     margin: -34px -30px -30px;
@@ -1070,23 +1153,7 @@ body.fx-off.build-battle-window .db-live .bb-pack__top::after {
     margin: -34px -30px -30px;
     transform: scale(0.8);
   }
-  .build-battle-window .db-live .bb-scene--stage[data-stage='packs'] .bb-box {
-    margin: -110px -60px -90px;
-    transform: scale(0.5);
-  }
-  .build-battle-window .db-live .bb-fan {
-    flex-basis: 100%;
-    height: auto;
-    display: flex;
-    flex-wrap: wrap;
+  .build-battle-window .db-live .bb-summary {
     gap: 6px;
-  }
-  .build-battle-window .db-live .bb-fan__card,
-  .build-battle-window .db-live .bb-fan__card:hover {
-    position: relative;
-    left: auto;
-    top: auto;
-    margin: 0;
-    transform: none;
   }
 }

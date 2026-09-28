@@ -8,34 +8,42 @@ import {
   CARDS_PER_PACK,
   DECK_UNWRAP_MS,
   FAN_COLLAPSE_MS,
+  HIT_FLIP_MS,
+  HIT_HOLD_MS,
   LID_OPEN_MS,
   PACK_ARTS,
-  PACK_SPILL_MS,
+  PACK_FLY_MS,
+  PACK_FLY_STAGGER_MS,
   PACK_TEAR_MS,
+  PACK_TORN_AT,
+  POCKET_CUT_MS,
+  PROMO_HOLD_MS,
   PROMO_LIFT_MS,
+  REVEAL_STAGGER_MS,
   SCENE_BACKSTOP_MS,
+  SUMMARY_STAGGER_MS,
+  SWIPE_AWAY_MS,
   TAP_SLOP_PX,
   TRAY_TOTAL_MS,
   WRAP_TEAR_MS,
-  cardRevealPhases,
-  cardRevealPose,
-  cubicBezier,
   faceMatrix3d,
-  fanSlot,
+  hitFlipPose,
   hitTierFor,
   lidPose,
   nextPackToTear,
   packArtIndexes,
+  packFlyPose,
   packSlotKind,
-  packSpillPose,
+  packSpreadSlot,
   packTearEdge,
   packTearProgress,
   packTornAt,
   promoLiftPose,
+  swipeAwayPose,
+  swipeOutcome,
   tearReleaseOutcome,
   trayRisePose,
   unboxingHoloRarity,
-  unboxingTimeline,
   unboxingVoiceFor,
   wrapTearPose,
 } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
@@ -52,9 +60,10 @@ import { brighten, fxRgbForCard, rgbCss } from '../../../setup/netcode/mat-fx/fx
 import { burstParticles } from '../../../setup/netcode/mat-fx/particles.mjs';
 
 /**
- * The Build & Battle unboxing scene (design 052 § DOM twin): a CSS 3D box under shrink-wrap,
- * a hinged lid, the tray (deck, four packs, code card, tip sheet), packs torn by drag or press,
- * and cards revealed one at a time into a fan. Every beat is `dispatch(event)` (reducer + save)
+ * The Build & Battle unboxing scene (design 052 § DOM twin, Pocket-style rework in § Deviations):
+ * a CSS 3D box under shrink-wrap, a hinged lid, the tray (deck, promo, code card, tip sheet); the
+ * four packs then fly out of the box and fill the screen, each is swiped open in turn, and its
+ * cards are swiped off one at a time (hits turn over first), ending on a ten-card summary. Every beat is `dispatch(event)` (reducer + save)
  * first, then sound, then the pose sampled from unboxing.mjs; a beat that is refused does nothing.
  * The DOM re-renders the settled state after each beat, so a reload lands on the same picture.
  */
@@ -62,24 +71,20 @@ import { burstParticles } from '../../../setup/netcode/mat-fx/particles.mjs';
 const BOX_W = 200;
 const BOX_H = Math.round(BOX_W * BOX_PROPORTIONS.height);
 const BOX_D = Math.round(BOX_W * BOX_PROPORTIONS.depth);
-// The reveal row's pack and cards; the tray pack is the same art drawn smaller by CSS.
-const PACK_W = 84;
-const PACK_H = Math.round(PACK_W * 1.8);
-const CARD_W = 76;
-const CARD_H = Math.round((CARD_W * 88) / 63);
-const FAN_TOP_PX = 14;
 const SPRING_BACK_MS = 160;
+const FADE_TOP_MS = 320;
+// Where the flying packs start: the box's open mouth, as shares of the box host's rect.
+const BOX_MOUTH_Y = 0.42;
+const FLY_FROM_WIDTH = 0.4;
+const DRAG_TILT = 0.06;
 const SWEEP_MS = 420;
 const SPARK_COUNT = 16;
 const SPARK_MS = 640;
 const COLLAPSE_SCALE = 0.2;
-const DEFAULT_FAN_WIDTH_PX = 560;
 const SET_LOGO_URL = 'https://assets.tcgdex.net/en/me/me02/logo.webp';
 const KEY_ART_URL = 'https://assets.tcgdex.net/en/me/me02/125/high.webp';
 
-const easeSettle = cubicBezier(0.2, 0.8, 0.2, 1);
 const easeOut = (t) => 1 - (1 - t) ** 3;
-const clamp01 = (value) => Math.min(1, Math.max(0, value));
 const lerp = (from, to, t) => from + (to - from) * t;
 
 const el = (tag, className, text) => {
@@ -144,12 +149,14 @@ const packBodyClip = (tearEdge) => {
   return `polygon(${[...points, '0% 100%', '100% 100%'].join(', ')})`;
 };
 
-/** Where revealed card `index` sits in a fan `fanWidthPx` wide (fixed ten slots, left to right). */
-const fanPosition = (index, fanWidthPx) => {
-  const width = fanWidthPx > CARD_W ? fanWidthPx : DEFAULT_FAN_WIDTH_PX;
-  const spread = Math.min((width - CARD_W) / 0.9, CARD_W * 1.1 * CARDS_PER_PACK);
-  return fanSlot(index, CARDS_PER_PACK, spread);
-};
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// A drag writes inline transforms; a pose that finished earlier still fills and would win.
+const dropPoses = (node) =>
+  node
+    ?.getAnimations?.()
+    .filter((animation) => !(animation instanceof CSSAnimation) && !(animation instanceof CSSTransition))
+    .forEach((animation) => animation.cancel());
 
 // ── Procedural box faces (design 052 § Box reference) ─────────────────────
 const wordmark = (className) => {
@@ -328,6 +335,7 @@ const cardFallback = (card) => {
   return node;
 };
 
+
 // ── Scene ─────────────────────────────────────────────────────────────────
 /**
  * @param {object} options
@@ -360,23 +368,23 @@ export const mountUnboxingScene = ({
   const tierOf = (packIndex, cardIndex) =>
     hitTierFor(packs[packIndex]?.[cardIndex], slotOf(packIndex, cardIndex));
 
-  // Bumped by every render: async beat continuations from an older picture stop touching the DOM.
+  // Bumped by every render: async continuations from an older picture stop touching the DOM.
   let generation = 0;
   let holoStops = [];
-  let observers = [];
   let timers = new Set();
-  let lanes = new Map();
-  let beatRunning = false;
+  // A beat or a card move is playing; input waits, and one tap made meanwhile plays after it.
+  let busy = false;
+  let queuedTap = false;
+  // Bumped to stop "Reveal all"; a render does not stop it, since every swipe re-renders.
+  let autoToken = 0;
+  let autoRevealing = false;
   let collapsing = false;
-
-  const laneOf = (packIndex) => {
-    if (!lanes.has(packIndex)) {
-      lanes.set(packIndex, { busy: false, queued: false, revealAll: false, current: null });
-    }
-    return lanes.get(packIndex);
-  };
-  const anyLaneBusy = () =>
-    [...lanes.values()].some((lane) => lane.busy || lane.revealAll);
+  // View state that is never saved, so a reload lands on the settled picture of the state: the
+  // packs have left the box, the pack whose ten cards are laid out, the hits already turned over.
+  const initialStage = getUnboxing().stage;
+  let packsOut = initialStage === 'deckShown' || initialStage === 'packs';
+  let summaryPack = null;
+  const flippedHits = new Set();
 
   const later = (fn, ms) => {
     const id = setTimeout(() => {
@@ -386,22 +394,21 @@ export const mountUnboxingScene = ({
     timers.add(id);
   };
 
+  const onResize = () => root.querySelectorAll('.bb-spread').forEach(layoutSpread);
+  window.addEventListener('resize', onResize);
+
   const teardown = () => {
     generation += 1;
     holoStops.forEach((stop) => stop());
     holoStops = [];
-    observers.forEach((observer) => observer.disconnect());
-    observers = [];
     timers.forEach((id) => clearTimeout(id));
     timers = new Set();
-    lanes = new Map();
-    beatRunning = false;
+    busy = false;
   };
 
   /**
-   * The revealed card's face in a holder: a holo node when it wears foil, a plain image otherwise.
-   * A failed image swaps for the fallback inside the holder, so whoever moves the holder (the
-   * flyer landing in the fan) moves whichever one is showing.
+   * The card's face in a holder: a holo node when it wears foil, a plain image otherwise. A failed
+   * image swaps for the fallback inside the holder.
    */
   const cardFace = (card, slot) => {
     const holder = el('div', 'bb-card-holder');
@@ -432,23 +439,16 @@ export const mountUnboxingScene = ({
     return holo;
   };
 
-  const fanCard = (packIndex, cardIndex, face) => {
-    const card = packs[packIndex]?.[cardIndex];
-    const node = el('div', 'bb-fan__card');
-    node.dataset.cardIndex = String(cardIndex);
-    if (card?.id) node.dataset.previewCardId = card.id;
-    node.title = card?.name || '';
-    node.append(face || cardFace(card, slotOf(packIndex, cardIndex)));
-    return node;
-  };
+  // ── Which picture the state shows ────────────────────────────────────
+  const lastTorn = (u) => u.packsTorn.lastIndexOf(true);
 
-  const layoutFan = (fan) => {
-    const width = fan.clientWidth;
-    fan.querySelectorAll('.bb-fan__card').forEach((node) => {
-      const { xPx, rotateZDeg } = fanPosition(Number(node.dataset.cardIndex), width);
-      node.style.setProperty('--bb-fan-x', `${xPx.toFixed(1)}px`);
-      node.style.setProperty('--bb-fan-rot', `${rotateZDeg.toFixed(2)}deg`);
-    });
+  const viewOf = (u) => {
+    if (summaryPack !== null) return 'summary';
+    if (u.stage === 'packs') {
+      return u.revealed[lastTorn(u)] < CARDS_PER_PACK ? 'pocket' : 'spread';
+    }
+    if (u.stage === 'deckShown' && packsOut) return 'spread';
+    return 'box';
   };
 
   // ── Box ───────────────────────────────────────────────────────────────
@@ -510,7 +510,7 @@ export const mountUnboxingScene = ({
       )
     );
 
-  // ── Tray ──────────────────────────────────────────────────────────────
+  // ── Tray: the deck, its promo and the paper; the packs stay in the box until they fly ──
   const trayItem = (index, child) => {
     const item = el('div', 'bb-tray__item');
     item.dataset.trayIndex = String(index);
@@ -559,46 +559,6 @@ export const mountUnboxingScene = ({
     return img;
   };
 
-  const renderTrayPack = (u, packIndex) => {
-    const pack = el('div', 'bb-pack');
-    pack.dataset.pack = String(packIndex);
-    const torn = u.packsTorn[packIndex];
-    const isNext = packIndex === nextPackToTear(u);
-    pack.classList.toggle('is-torn', torn);
-    pack.classList.toggle('is-next', isNext);
-    const bodyEl = el('div', 'bb-pack__body');
-    bodyEl.append(packArt('bb-pack__art', packIndex), el('div', 'bb-pack__foil'));
-    if (torn) bodyEl.style.clipPath = packBodyClip(tearEdges[packIndex]);
-    pack.append(bodyEl);
-    if (!torn) {
-      const strip = el('div', 'bb-pack__strip');
-      strip.style.clipPath = tearEdges[packIndex];
-      strip.append(packArt('bb-pack__art', packIndex));
-      const top = button('bb-pack__top', `Tear open pack ${packIndex + 1}`);
-      // Packs open one after the other: only the next one tears.
-      top.disabled = !isNext;
-      const stripShift = (progress) => (top.clientWidth || PACK_W) * progress * 0.5;
-      bindTear(top, {
-        widthOf: () => top.clientWidth || PACK_W,
-        onProgress: (progress) => {
-          strip.style.transform = `translateX(${stripShift(progress)}px) rotate(${progress * 6}deg)`;
-        },
-        onSpring: (progress) =>
-          playPose(
-            strip,
-            (t) => lerp(stripShift(progress), 0, easeOut(t)),
-            (x) => ({ transform: `translateX(${x}px)` }),
-            SPRING_BACK_MS,
-            { samples: 8 }
-          ),
-        onTear: (progress) => beatTearPack(packIndex, stripShift(progress)),
-      });
-      pack.append(strip, top);
-    }
-    pack.append(el('span', 'bb-tray__label', torn ? 'Opened' : `Pack ${packIndex + 1}`));
-    return pack;
-  };
-
   const renderProp = (kind, title, sub) => {
     const prop = el('div', `bb-prop bb-prop--${kind}`);
     prop.append(el('strong', '', title), el('span', '', sub));
@@ -609,114 +569,249 @@ export const mountUnboxingScene = ({
     const tray = el('div', 'bb-tray');
     tray.append(trayItem(0, renderDeck(u)));
     if (u.stage !== 'opened') tray.append(renderPromo());
-    packs.forEach((_, packIndex) => tray.append(trayItem(packIndex + 1, renderTrayPack(u, packIndex))));
     tray.append(
-      trayItem(5, renderProp('code', 'Code card', 'Pokémon TCG Live')),
-      trayItem(6, renderProp('tips', 'How to play', 'Quick-start sheet'))
+      trayItem(1, renderProp('code', 'Code card', 'Pokémon TCG Live')),
+      trayItem(2, renderProp('tips', 'How to play', 'Quick-start sheet'))
     );
     return tray;
   };
 
-  // ── Reveal rows ───────────────────────────────────────────────────────
-  const stackCardAt = (depth) => {
-    const node = cardBackImg('bb-stack__card');
-    const pose = packSpillPose(1, depth, { packWidthPx: PACK_W, packHeightPx: PACK_H });
-    node.style.transform = `translate(${pose.translateXPx}px, ${pose.translateYPx}px) rotate(${pose.rotateZDeg}deg)`;
+  // ── Spread: the sealed packs fill the screen, the next one centred ────
+  const renderBigPack = (u, packIndex, focus) => {
+    const pack = el('div', 'bb-bigpack');
+    pack.dataset.pack = String(packIndex);
+    const fly = el('div', 'bb-bigpack__fly');
+    const bodyEl = el('div', 'bb-pack__body');
+    bodyEl.append(packArt('bb-pack__art', packIndex), el('div', 'bb-pack__foil'));
+    fly.append(bodyEl);
+    if (packIndex === focus) {
+      pack.classList.add('is-focus');
+      const strip = el('div', 'bb-pack__strip');
+      strip.style.clipPath = tearEdges[packIndex];
+      strip.append(packArt('bb-pack__art', packIndex));
+      const cut = el('div', 'bb-cutline');
+      const top = button('bb-pack__top', `Swipe across pack ${packIndex + 1} to open it`);
+      top.disabled = packIndex !== nextPackToTear(u);
+      const widthOf = () => top.clientWidth || 200;
+      const stripShift = (progress) => widthOf() * progress * 0.5;
+      bindTear(top, {
+        widthOf,
+        onProgress: (progress) => {
+          cut.style.transform = `scaleX(${Math.min(1, progress / PACK_TORN_AT)})`;
+          strip.style.transform = `translateX(${stripShift(progress)}px) rotate(${progress * 6}deg)`;
+        },
+        onSpring: (progress) => {
+          cut.style.transform = 'scaleX(0)';
+          return playPose(
+            strip,
+            (t) => lerp(stripShift(progress), 0, easeOut(t)),
+            (x) => ({ transform: `translateX(${x}px)` }),
+            SPRING_BACK_MS,
+            { samples: 8 }
+          );
+        },
+        onTear: (progress) => beatTearPack(packIndex, stripShift(progress)),
+      });
+      fly.append(strip, cut, top);
+    }
+    pack.append(fly);
+    return pack;
+  };
+
+  const renderSpread = (u) => {
+    const spread = el('div', 'bb-spread');
+    const focus = nextPackToTear(u);
+    spread.dataset.focus = String(focus);
+    packs.forEach((_, packIndex) => {
+      if (!u.packsTorn[packIndex]) spread.append(renderBigPack(u, packIndex, focus));
+    });
+    return spread;
+  };
+
+  const spreadSlotOf = (node, spread) => {
+    const focusEl = spread.querySelector('.bb-bigpack.is-focus');
+    return packSpreadSlot(Number(node.dataset.pack), Number(spread.dataset.focus), focusEl?.offsetWidth || 200);
+  };
+
+  function layoutSpread(spread) {
+    spread.querySelectorAll('.bb-bigpack').forEach((node) => {
+      const slot = spreadSlotOf(node, spread);
+      node.style.transform = `translate(-50%, -50%) translateX(${slot.xPx.toFixed(1)}px) scale(${slot.scale})`;
+      node.style.filter = slot.brightness < 1 ? `brightness(${slot.brightness})` : '';
+      node.style.zIndex = String(slot.zIndex);
+    });
+  }
+
+  // ── Pocket: the opened pack's cards, one at a time ────────────────────
+  const hitKey = (packIndex, cardIndex) => `${packIndex}:${cardIndex}`;
+  const isHiddenHit = (packIndex, cardIndex) =>
+    tierOf(packIndex, cardIndex) >= 2 && !flippedHits.has(hitKey(packIndex, cardIndex));
+
+  // Two faces back to back; a hit starts turned over and shows its glowing back until tapped.
+  const renderPocketCard = (packIndex, cardIndex, { top }) => {
+    const card = packs[packIndex]?.[cardIndex];
+    const node = top ? button('bb-pcard is-top', 'Swipe the card away') : el('div', 'bb-pcard is-under');
+    node.dataset.cardIndex = String(cardIndex);
+    if (card?.id) node.dataset.previewCardId = card.id;
+    const flip = el('div', 'bb-pcard__flip');
+    const front = el('div', 'bb-pcard__front');
+    front.append(cardFace(card, slotOf(packIndex, cardIndex)));
+    const back = el('div', 'bb-pcard__back');
+    back.append(cardBackImg('bb-pcard__back-img'));
+    flip.append(front, back);
+    node.append(flip);
+    if (isHiddenHit(packIndex, cardIndex)) {
+      node.classList.add('is-hit');
+      node.dataset.tier = String(tierOf(packIndex, cardIndex));
+      flip.style.transform = 'rotateY(180deg)';
+      if (top) node.setAttribute('aria-label', 'A rare card: tap to turn it over');
+    }
+    if (top) bindSwipe(node, packIndex);
     return node;
   };
 
-  const renderReveal = (u, packIndex) => {
-    const row = el('section', 'bb-reveal');
-    row.dataset.pack = String(packIndex);
-    const src = el('div', 'bb-reveal__src');
-    const packEl = el('div', 'bb-reveal__pack');
-    packEl.style.clipPath = packBodyClip(tearEdges[packIndex]);
-    packEl.append(packArt('bb-pack__art', packIndex), el('div', 'bb-pack__foil'));
-    const stack = button('bb-stack', `Flip the next card of pack ${packIndex + 1}`);
-    const remaining = CARDS_PER_PACK - u.revealed[packIndex];
-    for (let depth = 0; depth < remaining; depth += 1) stack.append(stackCardAt(depth));
-    stack.disabled = remaining === 0;
-    stack.addEventListener('click', () => requestReveal(packIndex));
-    src.append(stack, packEl);
-
-    const fan = el('div', 'bb-fan');
-    for (let cardIndex = 0; cardIndex < u.revealed[packIndex]; cardIndex += 1) {
-      fan.append(fanCard(packIndex, cardIndex));
+  const renderPocket = (u, packIndex) => {
+    const pocket = el('div', 'bb-pocket');
+    pocket.dataset.pack = String(packIndex);
+    const shown = u.revealed[packIndex];
+    const count = el('p', 'bb-pocket__count', `Pack ${packIndex + 1} · ${shown + 1} / ${CARDS_PER_PACK}`);
+    const stack = el('div', 'bb-pocket__stack');
+    const beneath = CARDS_PER_PACK - shown - 1;
+    for (let depth = Math.min(beneath - 1, 4); depth >= 1; depth -= 1) {
+      const edge = el('div', 'bb-pocket__edge');
+      edge.style.setProperty('--bb-depth', String(depth));
+      stack.append(edge);
     }
-    const count = el('p', 'bb-reveal__count', `Pack ${packIndex + 1} · ${u.revealed[packIndex]} / ${CARDS_PER_PACK}`);
-    row.append(count, src, fan);
-    if (typeof ResizeObserver === 'function') {
-      const observer = new ResizeObserver(() => layoutFan(fan));
-      observer.observe(fan);
-      observers.push(observer);
+    if (beneath > 0) stack.append(renderPocketCard(packIndex, shown + 1, { top: false }));
+    stack.append(renderPocketCard(packIndex, shown, { top: true }));
+    const seen = el('div', 'bb-pocket__seen');
+    for (let cardIndex = 0; cardIndex < shown; cardIndex += 1) {
+      const card = packs[packIndex]?.[cardIndex];
+      const thumb = el('div', 'bb-pocket__thumb');
+      if (card?.id) thumb.dataset.previewCardId = card.id;
+      thumb.title = card?.name || '';
+      thumb.append(cardFace(card, slotOf(packIndex, cardIndex)));
+      seen.append(thumb);
     }
-    return row;
+    pocket.append(count, stack, seen);
+    return pocket;
   };
 
-  // Counts the cards that have landed; the state already holds the ones still in flight.
-  const updateRevealRow = (packIndex) => {
-    const row = root.querySelector(`.bb-reveal[data-pack="${packIndex}"]`);
-    if (!row) return;
-    const landed = row.querySelectorAll('.bb-fan__card').length;
-    row.querySelector('.bb-reveal__count').textContent =
-      `Pack ${packIndex + 1} · ${landed} / ${CARDS_PER_PACK}`;
-    const stack = row.querySelector('.bb-stack');
-    stack.disabled = !stack.querySelector('.bb-stack__card');
+  const renderSummary = (packIndex) => {
+    const pocket = el('div', 'bb-pocket is-summary');
+    pocket.dataset.pack = String(packIndex);
+    const grid = el('div', 'bb-summary');
+    packs[packIndex].forEach((card, cardIndex) => {
+      const cell = el('div', 'bb-summary__card');
+      cell.dataset.cardIndex = String(cardIndex);
+      if (card?.id) cell.dataset.previewCardId = card.id;
+      cell.title = card?.name || '';
+      cell.append(cardFace(card, slotOf(packIndex, cardIndex)));
+      grid.append(cell);
+    });
+    pocket.append(el('p', 'bb-pocket__count', `Pack ${packIndex + 1}`), grid);
+    return pocket;
   };
 
-  // ── Controls and hint ────────────────────────────────────────────────
-  const midRevealPack = (u) =>
-    u.packsTorn.findIndex((torn, index) => torn && u.revealed[index] < CARDS_PER_PACK);
-
-  const hintFor = (u) => {
+  // ── Dock: hint and controls ──────────────────────────────────────────
+  const hintFor = (u, view) => {
+    if (view === 'summary') {
+      return u.stage === 'done'
+        ? 'All four packs are open. Your deck is ready to build.'
+        : `Pack ${summaryPack + 1} done. On to pack ${nextPackToTear(u) + 1}.`;
+    }
+    if (view === 'pocket') {
+      const packIndex = lastTorn(u);
+      return isHiddenHit(packIndex, u.revealed[packIndex])
+        ? 'Something rare! Tap the card to turn it over.'
+        : 'Swipe the card away to see the next one.';
+    }
+    if (view === 'spread') return `Swipe across the top of pack ${nextPackToTear(u) + 1} to open it.`;
     if (u.stage === 'sealed') {
       return u.wrapTorn ? 'Open the lid.' : 'Drag across the shrink-wrap to tear it off, or press it.';
     }
     if (u.stage === 'opened') return 'Unwrap the deck to see its foil promo.';
-    if (u.stage === 'deckShown') return 'Tear open pack 1: drag across its top, or press it.';
-    if (u.stage === 'packs') {
-      return midRevealPack(u) >= 0
-        ? 'Tap the stack to flip the next card.'
-        : `Tear open pack ${nextPackToTear(u) + 1}.`;
-    }
+    if (u.stage === 'deckShown') return 'Here come your packs…';
     return 'All four packs are open. Build your deck from your pool.';
   };
 
-  const renderControls = (u) => {
-    const controls = el('div', 'bb-controls');
-    const revealAll = el('button', 'bb-secondary', 'Reveal all');
-    revealAll.type = 'button';
-    revealAll.dataset.control = 'reveal-all';
-    revealAll.addEventListener('click', () => {
-      const packIndex = midRevealPack(getUnboxing());
-      if (packIndex >= 0) revealAllPack(packIndex);
-    });
-    const skip = el('button', 'bb-secondary', 'Skip scene');
-    skip.type = 'button';
-    skip.dataset.control = 'skip';
-    skip.addEventListener('click', skipScene);
-    controls.append(revealAll, skip);
-    if (u.stage === 'done') {
-      const build = el('button', 'bb-primary', 'Build your deck');
-      build.type = 'button';
-      build.addEventListener('click', onBuildDeck);
-      controls.append(build);
-    }
-    return controls;
+  const control = (label, name, onClick, primary = false) => {
+    const node = el('button', primary ? 'bb-primary' : 'bb-secondary', label);
+    node.type = 'button';
+    node.dataset.control = name;
+    node.addEventListener('click', onClick);
+    return node;
   };
 
-  const updateControls = () => {
+  const renderDock = (u, view) => {
+    const dock = el('div', 'bb-dock');
+    const hint = el('p', 'bb-hint', hintFor(u, view));
+    hint.setAttribute('role', 'status');
+    const controls = el('div', 'bb-controls');
+    if (view === 'pocket') {
+      controls.append(control('Reveal all', 'reveal-all', () => revealAllPack(lastTorn(getUnboxing()))));
+    }
+    if (view === 'summary' && u.stage === 'done') {
+      controls.append(control('Build your deck', 'build', finishScene, true));
+    } else if (view === 'summary') {
+      controls.append(control('Next pack', 'next-pack', showNextPack, true));
+    } else if (u.stage === 'done') {
+      controls.append(control('Build your deck', 'build', onBuildDeck, true));
+    }
+    if (u.stage !== 'done') controls.append(control('Skip scene', 'skip', skipScene));
+    dock.append(hint, controls);
+    return dock;
+  };
+
+  const updateDock = () => {
     const u = getUnboxing();
-    const packIndex = midRevealPack(u);
-    const revealAll = root.querySelector('[data-control="reveal-all"]');
-    if (revealAll) revealAll.disabled = packIndex < 0 || laneOf(packIndex).revealAll;
-    const skip = root.querySelector('[data-control="skip"]');
-    if (skip) skip.disabled = u.stage === 'done';
     const hint = root.querySelector('.bb-hint');
-    if (hint) hint.textContent = hintFor(u);
+    if (hint) hint.textContent = hintFor(u, viewOf(u));
+    const revealAll = root.querySelector('[data-control="reveal-all"]');
+    if (revealAll) revealAll.disabled = autoRevealing;
   };
 
   // ── Render (the settled picture of the state) ────────────────────────
+  const render = ({ entrance = null } = {}) => {
+    teardown();
+    const u = getUnboxing();
+    const view = viewOf(u);
+    root.replaceChildren();
+    root.dataset.stage = u.stage;
+    root.dataset.view = view;
+    root.dataset.wrap = u.wrapTorn ? 'off' : 'on';
+
+    // The box stays on screen while the packs fly out of it, then fades.
+    if (view === 'box' || entrance?.fly) {
+      const top = el('div', 'bb-scene__top');
+      top.append(renderBox(u));
+      if (u.stage !== 'sealed') top.append(renderTray(u));
+      root.append(top);
+    }
+    if (view === 'spread') root.append(renderSpread(u));
+    if (view === 'pocket') root.append(renderPocket(u, lastTorn(u)));
+    if (view === 'summary') root.append(renderSummary(summaryPack));
+    root.append(renderDock(u, view));
+    root.querySelectorAll('.bb-spread').forEach(layoutSpread);
+    updateDock();
+    playEntrance(entrance);
+  };
+
+  // ── Entrances (played on the freshly rendered picture) ───────────────
+  const holdWhile = (promise) => {
+    const gen = generation;
+    busy = true;
+    return withBackstop(promise).then(() => {
+      if (gen !== generation) return false;
+      busy = false;
+      if (queuedTap) {
+        queuedTap = false;
+        tapTop();
+      }
+      return true;
+    });
+  };
+
   const playEntrance = (entrance) => {
     if (entrance === 'tray') {
       root.querySelectorAll('.bb-tray__item').forEach((item) => {
@@ -736,37 +831,124 @@ export const mountUnboxingScene = ({
         (pose) => ({ transform: promoTransform(pose) }),
         PROMO_LIFT_MS
       );
+      later(flyOut, instant() ? 0 : PROMO_LIFT_MS + PROMO_HOLD_MS);
     }
-    if (entrance?.spill !== undefined) playSpill(entrance.spill);
+    if (entrance?.fly) playFly(entrance.fly);
+    if (entrance?.cut !== undefined) playCut();
+    if (entrance === 'summary') playDeal();
+    if (entrance === 'spread') playSpreadIn();
+    if (entrance === 'sweep') playSweep();
   };
 
-  const render = ({ entrance = null } = {}) => {
-    teardown();
-    const u = getUnboxing();
-    root.replaceChildren();
-    root.dataset.stage = u.stage;
-    root.dataset.wrap = u.wrapTorn ? 'off' : 'on';
+  // The four packs leave the box mouth one after another and land in the spread.
+  const playFly = (boxRect) => {
+    const top = root.querySelector('.bb-scene__top');
+    const fade = playPose(top, (t) => 1 - t, (opacity) => ({ opacity }), FADE_TOP_MS, { samples: 8 }).then(
+      () => top?.remove()
+    );
+    const spread = root.querySelector('.bb-spread');
+    if (!spread || !boxRect) {
+      holdWhile(fade);
+      return;
+    }
+    const fromX = boxRect.left + boxRect.width / 2;
+    const fromY = boxRect.top + boxRect.height * BOX_MOUTH_Y;
+    const flights = [...spread.querySelectorAll('.bb-bigpack')].map((node, order) => {
+      const slot = spreadSlotOf(node, spread);
+      const rect = node.getBoundingClientRect();
+      const width = node.offsetWidth || rect.width || 1;
+      const params = {
+        dxPx: (fromX - (rect.left + rect.width / 2)) / slot.scale,
+        dyPx: (fromY - (rect.top + rect.height / 2)) / slot.scale,
+        fromScale: (boxRect.width * FLY_FROM_WIDTH) / width / slot.scale,
+      };
+      const delay = order * PACK_FLY_STAGGER_MS;
+      later(() => sound('unbox-unwrap'), instant() ? 0 : delay);
+      return playPose(
+        node.querySelector('.bb-bigpack__fly'),
+        (t) => packFlyPose(t, params),
+        (pose) => ({
+          transform: `translate(${pose.translateXPx}px, ${pose.translateYPx}px) rotate(${pose.rotateZDeg}deg) scale(${pose.scale})`,
+        }),
+        PACK_FLY_MS,
+        { delay, samples: 28 }
+      );
+    });
+    holdWhile(Promise.all([fade, ...flights]));
+  };
 
-    const top = el('div', 'bb-scene__top');
-    top.append(renderBox(u));
-    if (u.stage !== 'sealed') top.append(renderTray(u));
-    const hint = el('p', 'bb-hint', hintFor(u));
-    hint.setAttribute('role', 'status');
-    const reveals = el('div', 'bb-scene__reveals');
-    // One pack at a time: the latest torn pack holds the reveal row until the next one tears.
-    const shownPack = u.packsTorn.lastIndexOf(true);
-    if (u.stage === 'packs' && shownPack >= 0) reveals.append(renderReveal(u, shownPack));
-    root.append(top, hint, reveals, renderControls(u));
-    root.querySelectorAll('.bb-fan').forEach(layoutFan);
-    updateControls();
-    playEntrance(entrance);
+  // The torn pack drops away as its cards rise into the centre.
+  const playCut = () => {
+    const stack = root.querySelector('.bb-pocket__stack');
+    if (!stack || instant()) return;
+    const u = getUnboxing();
+    const packIndex = lastTorn(u);
+    const packEl = el('div', 'bb-pocket__pack');
+    packEl.style.clipPath = packBodyClip(tearEdges[packIndex]);
+    packEl.append(packArt('bb-pack__art', packIndex), el('div', 'bb-pack__foil'));
+    stack.after(packEl);
+    const drop = playPose(
+      packEl,
+      (t) => ({ y: 70 * easeOut(t), opacity: 1 - Math.max(0, (t - 0.35) / 0.65) }),
+      ({ y, opacity }) => ({ transform: `translate(-50%, -50%) translateY(${y}vh)`, opacity }),
+      POCKET_CUT_MS * 1.6,
+      { samples: 12 }
+    ).then(() => packEl.remove());
+    const rise = playPose(
+      stack,
+      (t) => ({ y: lerp(140, 0, easeOut(t)), scale: lerp(0.8, 1, easeOut(t)), opacity: Math.min(1, t * 2) }),
+      ({ y, scale, opacity }) => ({ transform: `translateY(${y}px) scale(${scale})`, opacity }),
+      POCKET_CUT_MS,
+      { delay: 120, samples: 12 }
+    );
+    holdWhile(Promise.all([drop, rise]));
+  };
+
+  const playDeal = () => {
+    root.querySelectorAll('.bb-summary__card').forEach((cell, index) =>
+      playPose(
+        cell,
+        (t) => ({ y: lerp(28, 0, easeOut(t)), scale: lerp(0.86, 1, easeOut(t)), opacity: t }),
+        ({ y, scale, opacity }) => ({ transform: `translateY(${y}px) scale(${scale})`, opacity }),
+        SWIPE_AWAY_MS,
+        { delay: index * SUMMARY_STAGGER_MS, samples: 8 }
+      )
+    );
+  };
+
+  const playSpreadIn = () => {
+    root.querySelectorAll('.bb-bigpack__fly').forEach((fly, index) =>
+      playPose(
+        fly,
+        (t) => ({ x: lerp(160, 0, easeOut(t)), opacity: t }),
+        ({ x, opacity }) => ({ transform: `translateX(${x}px)`, opacity }),
+        PACK_FLY_MS / 2,
+        { delay: index * PACK_FLY_STAGGER_MS * 0.5, samples: 10 }
+      )
+    );
+  };
+
+  // A reverse-holo slot catches the light as it comes to the top.
+  const playSweep = () => {
+    const front = root.querySelector('.bb-pcard.is-top .bb-pcard__front');
+    if (!front || fxDisabled()) return;
+    sound(unboxingVoiceFor('revealCard', 1));
+    const sweep = el('div', 'bb-sweep');
+    front.append(sweep);
+    playPose(
+      sweep,
+      (t) => lerp(-120, 120, t),
+      (x) => ({ transform: `translateX(${x}%) skewX(-18deg)` }),
+      SWEEP_MS,
+      { samples: 8 }
+    ).then(() => sweep.remove());
   };
 
   // ── Beats ─────────────────────────────────────────────────────────────
   const runBeat = async (event, effect, animate, entrance) => {
-    if (beatRunning || collapsing) return;
+    if (busy || collapsing) return;
     if (!dispatch(event)) return;
-    beatRunning = true;
+    busy = true;
     const gen = generation;
     sound(effect);
     await withBackstop(animate());
@@ -820,307 +1002,250 @@ export const mountUnboxingScene = ({
       'promo'
     );
 
+  function flyOut() {
+    if (packsOut) return;
+    const boxRect = root.querySelector('.bb-box')?.getBoundingClientRect() || null;
+    packsOut = true;
+    render({ entrance: { fly: boxRect } });
+  }
+
   const beatTearPack = (packIndex, fromShiftPx = 0) => {
-    // A new reveal row re-renders the scene; never pull cards out from under a flip in flight.
-    if (anyLaneBusy()) return;
-    const strip = root.querySelector(`.bb-pack[data-pack="${packIndex}"] .bb-pack__strip`);
-    const travel = (strip?.clientWidth || PACK_W) * 1.2;
-    const previousRow = root.querySelector('.bb-reveal');
+    const focus = root.querySelector(`.bb-bigpack[data-pack="${packIndex}"]`);
+    const strip = focus?.querySelector('.bb-pack__strip');
+    const cut = focus?.querySelector('.bb-cutline');
+    if (cut) cut.style.transform = 'scaleX(1)';
+    const travel = (strip?.clientWidth || 200) * 1.2;
     runBeat(
       { type: 'tearPack', packIndex },
       unboxingVoiceFor('tearPack'),
       () =>
-        Promise.all([
-          playPose(
-            strip,
-            (t) => ({ x: lerp(fromShiftPx, travel, easeOut(t)), rotate: lerp(4, 16, t), opacity: 1 - t }),
-            ({ x, rotate, opacity }) => ({ transform: `translateX(${x}px) rotate(${rotate}deg)`, opacity }),
-            PACK_TEAR_MS
-          ),
-          // The finished pack's fan clears away as the next pack opens.
-          collapseRow(previousRow, PACK_TEAR_MS),
-        ]),
-      { spill: packIndex }
+        playPose(
+          strip,
+          (t) => ({ x: lerp(fromShiftPx, travel, easeOut(t)), y: -60 * t, rotate: lerp(4, 24, t), opacity: 1 - t }),
+          ({ x, y, rotate, opacity }) => ({ transform: `translate(${x}px, ${y}px) rotate(${rotate}deg)`, opacity }),
+          PACK_TEAR_MS
+        ),
+      { cut: packIndex }
     );
   };
 
-  const playSpill = (packIndex) => {
-    const row = root.querySelector(`.bb-reveal[data-pack="${packIndex}"]`);
-    if (!row || instant()) return;
-    const lane = laneOf(packIndex);
-    const gen = generation;
-    lane.busy = true;
-    const cards = [...row.querySelectorAll('.bb-stack__card')];
-    const spills = cards.map((node, depth) =>
-      playPose(
-        node,
-        (t) => packSpillPose(t, depth, { packWidthPx: PACK_W, packHeightPx: PACK_H }),
-        (pose) => ({
-          transform: `translate(${pose.translateXPx}px, ${pose.translateYPx}px) rotate(${pose.rotateZDeg}deg)`,
-        }),
-        PACK_SPILL_MS
-      )
-    );
-    lane.current = withBackstop(Promise.all(spills)).then(() => {
-      if (gen !== generation) return;
-      lane.busy = false;
-      lane.current = null;
-      if (lane.queued) {
-        lane.queued = false;
-        requestReveal(packIndex);
-      }
-    });
-  };
+  // ── Card moves: swipe the top card away, or turn a hit over ──────────
+  const topCard = () => root.querySelector('.bb-pcard.is-top');
 
-  // ── Card reveals ─────────────────────────────────────────────────────
+  function tapTop() {
+    const node = topCard();
+    if (!node) return Promise.resolve();
+    const packIndex = lastTorn(getUnboxing());
+    const cardIndex = Number(node.dataset.cardIndex);
+    return isHiddenHit(packIndex, cardIndex) ? flipHit(node, packIndex, cardIndex) : swipeAway(1, 0);
+  }
+
   const flareFor = (card) => {
     const flare = el('div', 'bb-flare');
     flare.style.setProperty('--bb-flare-rgb', rgbCss(brighten(fxRgbForCard(card), 0.45), 0.95));
     return flare;
   };
 
-  /** Lift, flip and settle one card from the stack into its fan slot (design 052 § Reveal). */
-  const animateReveal = async (packIndex, cardIndex) => {
-    const gen = generation;
-    const row = root.querySelector(`.bb-reveal[data-pack="${packIndex}"]`);
-    if (!row) return;
-    const card = packs[packIndex]?.[cardIndex];
-    const slot = slotOf(packIndex, cardIndex);
-    const tier = tierOf(packIndex, cardIndex);
-    const fan = row.querySelector('.bb-fan');
-    const stack = row.querySelector('.bb-stack');
-    const stackCards = stack.querySelectorAll('.bb-stack__card');
-    const topCard = stackCards[stackCards.length - 1];
-    sound(unboxingVoiceFor('revealCard', tier));
-
-    if (instant()) {
-      topCard?.remove();
-      fan.append(fanCard(packIndex, cardIndex));
-      layoutFan(fan);
-      updateRevealRow(packIndex);
-      return;
-    }
-
-    const rowRect = row.getBoundingClientRect();
-    const stackRect = stack.getBoundingClientRect();
-    const fanRect = fan.getBoundingClientRect();
-    const depth = Math.max(0, stackCards.length - 1);
-    const from = packSpillPose(1, depth, { packWidthPx: PACK_W, packHeightPx: PACK_H });
-    const fromX = stackRect.left - rowRect.left + from.translateXPx;
-    const fromY = stackRect.top - rowRect.top + from.translateYPx;
-    const slotPose = fanPosition(cardIndex, fan.clientWidth);
-    const toX = fanRect.left - rowRect.left + fanRect.width / 2 - CARD_W / 2 + slotPose.xPx;
-    const toY = fanRect.top - rowRect.top + FAN_TOP_PX;
-    topCard?.remove();
-
-    const flyer = el('div', 'bb-flyer');
-    flyer.style.left = `${fromX}px`;
-    flyer.style.top = `${fromY}px`;
-    const back = el('div', 'bb-flyer__back');
-    back.append(cardBackImg('bb-flyer__back-img'));
-    const front = el('div', 'bb-flyer__front');
-    flyer.append(back, front);
-    row.append(flyer);
-
-    const phases = cardRevealPhases(tier);
-    const pose = (t) => {
-      const reveal = cardRevealPose(t, { tier });
-      const settle = easeSettle(clamp01((t - phases.flipEnd) / (1 - phases.flipEnd)));
-      return {
-        ...reveal,
-        x: (toX - fromX) * settle,
-        y: (toY - fromY) * settle,
-        rotate: lerp(from.rotateZDeg, slotPose.rotateZDeg, settle),
-      };
-    };
-    const flight = playPose(
-      flyer,
-      pose,
-      (p) => ({
-        transform: `translate(${p.x}px, ${p.y + p.translateYPx}px) rotate(${p.rotate}deg) rotateY(${p.rotateYDeg}deg) scale(${p.scale})`,
-      }),
-      phases.totalMs,
-      { samples: 36 }
-    );
-
-    // The face exists only from the flip midpoint on, when the card is edge-on (row 14).
-    let face = null;
-    later(() => {
-      if (gen !== generation) return;
-      face = cardFace(card, slot);
-      front.append(face);
-      if (tier >= 1) {
-        const sweep = el('div', 'bb-sweep');
-        front.append(sweep);
-        playPose(
-          sweep,
-          (t) => lerp(-120, 120, t),
-          (x) => ({ transform: `translateX(${x}%) skewX(-18deg)` }),
-          SWEEP_MS,
-          { delay: phases.flipMs / 2, samples: 8 }
-        );
-      }
-      if (tier >= 2) playHitFlare(front, card, tier, phases);
-    }, phases.liftMs + phases.flipMs / 2);
-
-    await withBackstop(flight);
-    if (gen !== generation || !flyer.isConnected) return;
-    const node = fanCard(packIndex, cardIndex, face || cardFace(card, slot));
-    flyer.remove();
-    fan.append(node);
-    layoutFan(fan);
-    updateRevealRow(packIndex);
-  };
-
-  // A local flare and sparks, both inside the card's own clipped layer (rows 2, 12).
-  const playHitFlare = (front, card, tier, phases) => {
+  // A local flare and sparks, inside the card's own clipped face (rows 2, 12).
+  const playHitFlare = (front, card, tier) => {
     if (fxDisabled()) return;
     const flare = flareFor(card);
     const sparks = el('div', 'bb-sparks');
     front.append(flare, sparks);
-    const startT = phases.flipMid;
-    const remainingMs = phases.totalMs * (1 - startT);
-    playPose(
-      flare,
-      (t) => cardRevealPose(lerp(startT, 1, t), { tier }).flare,
-      (value) => ({ opacity: value }),
-      remainingMs
-    );
-    const peakDelay = Math.max(0, phases.totalMs * (0.55 - startT));
+    playPose(flare, (t) => hitFlipPose(t, { tier }).flare, (value) => ({ opacity: value }), HIT_FLIP_MS);
     later(() => {
       if (!sparks.isConnected) return;
       spawnParticles(
         sparks,
         burstParticles({
           count: SPARK_COUNT,
-          distance: CARD_W * 0.42,
-          size: [3, 6],
+          distance: (front.clientWidth || 200) * 0.42,
+          size: [3, 7],
           maxDelay: 0.2,
           seed: Math.round(fxRgbForCard(card)[0]) + tier,
         }),
         { color: rgbCss(brighten(fxRgbForCard(card), 0.5)), duration: SPARK_MS }
       );
-    }, peakDelay);
+    }, instant() ? 0 : HIT_FLIP_MS * 0.5);
   };
 
-  // The last card of a pack unlocks the next pack in the tray without a re-render.
-  const updateTrayPacks = () => {
-    const next = nextPackToTear(getUnboxing());
-    root.querySelectorAll('.bb-tray .bb-pack').forEach((pack) => {
-      const isNext = Number(pack.dataset.pack) === next;
-      pack.classList.toggle('is-next', isNext);
-      const top = pack.querySelector('.bb-pack__top');
-      if (top) top.disabled = !isNext;
-    });
+  // Turning over a hit: the face is on the far side from the start (backface-visibility), so it
+  // can only be seen once the card passes edge-on (row 14).
+  const flipHit = async (node, packIndex, cardIndex) => {
+    if (busy || collapsing) return;
+    const tier = tierOf(packIndex, cardIndex);
+    const card = packs[packIndex]?.[cardIndex];
+    const flip = node.querySelector('.bb-pcard__flip');
+    sound(unboxingVoiceFor('revealCard', tier));
+    node.classList.add('is-turning');
+    playHitFlare(node.querySelector('.bb-pcard__front'), card, tier);
+    const turned = playPose(
+      flip,
+      (t) => hitFlipPose(t, { tier }),
+      (pose) => ({ transform: `rotateY(${pose.rotateYDeg}deg) scale(${pose.scale})` }),
+      HIT_FLIP_MS,
+      { samples: 32 }
+    );
+    flippedHits.add(hitKey(packIndex, cardIndex));
+    const current = await holdWhile(turned);
+    if (!current) return;
+    node.classList.remove('is-hit', 'is-turning');
+    node.classList.add('is-flipped');
+    node.setAttribute('aria-label', 'Swipe the card away');
+    updateDock();
   };
 
-  const afterReveal = (packIndex) => {
-    updateRevealRow(packIndex);
-    updateTrayPacks();
-    updateControls();
-    if (getUnboxing().stage === 'done') collapseScene();
-  };
-
-  const revealNext = async (packIndex) => {
-    const lane = laneOf(packIndex);
-    const gen = generation;
-    const cardIndex = getUnboxing().revealed[packIndex];
+  const swipeAway = async (direction, fromPx) => {
+    const node = topCard();
+    if (!node || busy || collapsing) return;
+    const u = getUnboxing();
+    const packIndex = lastTorn(u);
+    const cardIndex = u.revealed[packIndex];
     if (!dispatch({ type: 'revealCard', packIndex })) return;
-    lane.busy = true;
-    lane.current = animateReveal(packIndex, cardIndex);
-    await lane.current;
-    if (gen !== generation) return;
-    lane.busy = false;
-    lane.current = null;
-    afterReveal(packIndex);
-    if (lane.queued) {
-      lane.queued = false;
-      requestReveal(packIndex);
-    }
-  };
-
-  // One reveal per completed flip; a press during a flip queues at most one more (row 6).
-  const requestReveal = (packIndex) => {
-    if (beatRunning || collapsing) return;
-    const lane = laneOf(packIndex);
-    if (lane.revealAll) return;
-    if (lane.busy) {
-      lane.queued = true;
-      return;
-    }
-    revealNext(packIndex);
-  };
-
-  const revealAllPack = async (packIndex) => {
-    const lane = laneOf(packIndex);
-    if (lane.revealAll || beatRunning || collapsing) return;
-    lane.revealAll = true;
-    lane.queued = false;
-    updateControls();
+    sound(unboxingVoiceFor('revealCard', 0));
+    const distancePx = Math.max(window.innerWidth * 0.6, 360);
+    dropPoses(node);
+    const gone = playPose(
+      node,
+      (t) => swipeAwayPose(t, { direction, fromPx, distancePx }),
+      (pose) => ({
+        transform: `translate(${pose.translateXPx}px, ${pose.translateYPx}px) rotate(${pose.rotateZDeg}deg)`,
+        opacity: pose.opacity,
+      }),
+      SWIPE_AWAY_MS,
+      { samples: 16 }
+    );
     const gen = generation;
-    if (lane.current) await lane.current;
+    busy = true;
+    await withBackstop(gone);
     if (gen !== generation) return;
-    lane.busy = false;
-
-    if (instant()) {
-      const from = getUnboxing().revealed[packIndex];
-      if (!dispatch({ type: 'revealAll', packIndex })) return;
-      for (let cardIndex = from; cardIndex < CARDS_PER_PACK; cardIndex += 1) {
-        await animateReveal(packIndex, cardIndex);
-      }
-      lane.revealAll = false;
-      afterReveal(packIndex);
+    const next = getUnboxing();
+    if (next.revealed[packIndex] >= CARDS_PER_PACK) {
+      summaryPack = packIndex;
+      if (next.stage === 'done') sound(unboxingVoiceFor('finish'));
+      render({ entrance: 'summary' });
       return;
     }
-
-    const tiers = packs[packIndex].map((_, cardIndex) => tierOf(packIndex, cardIndex));
-    const beats = unboxingTimeline(getUnboxing(), { packIndex, tiers }).filter(
-      (beat) => beat.kind !== 'collapse'
-    );
-    const flights = beats.map(
-      (beat) =>
-        new Promise((resolve) => {
-          later(() => {
-            if (gen !== generation) return resolve();
-            if (getUnboxing().revealed[packIndex] !== beat.cardIndex) return resolve();
-            if (!dispatch({ type: 'revealCard', packIndex })) return resolve();
-            updateRevealRow(packIndex);
-            animateReveal(packIndex, beat.cardIndex).then(resolve);
-          }, beat.at);
-        })
-    );
-    await Promise.all(flights);
-    if (gen !== generation) return;
-    lane.revealAll = false;
-    afterReveal(packIndex);
+    render({ entrance: tierOf(packIndex, cardIndex + 1) === 1 ? 'sweep' : null });
+    if (queuedTap) {
+      queuedTap = false;
+      tapTop();
+    }
   };
+
+  // Drag the top card sideways; release past SWIPE_AT sends it off that side. A hit that is still
+  // face down turns over instead, whatever the gesture.
+  function bindSwipe(node, packIndex) {
+    let drag = null;
+    const widthOf = () => node.clientWidth || 200;
+    const hidden = () => isHiddenHit(packIndex, Number(node.dataset.cardIndex));
+    const follow = (dx) => {
+      node.style.transform = `translateX(${dx}px) rotate(${dx * DRAG_TILT}deg)`;
+    };
+    node.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      if (busy) {
+        queuedTap = true;
+        return;
+      }
+      dropPoses(node);
+      drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, dx: 0, moved: 0 };
+      node.setPointerCapture?.(event.pointerId);
+    });
+    node.addEventListener('pointermove', (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      drag.dx = event.clientX - drag.x0;
+      drag.moved = Math.max(drag.moved, Math.hypot(drag.dx, event.clientY - drag.y0));
+      if (drag.moved >= TAP_SLOP_PX && !hidden()) follow(drag.dx);
+    });
+    const release = (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const { dx, moved } = drag;
+      drag = null;
+      const outcome =
+        event.type === 'pointercancel' ? 'spring' : swipeOutcome({ dxPx: dx, movedPx: moved, widthPx: widthOf() });
+      if (hidden()) {
+        if (outcome !== 'spring') tapTop();
+        return;
+      }
+      if (outcome === 'tap') tapTop();
+      else if (outcome === 'swipe') swipeAway(Math.sign(dx) || 1, dx);
+      else {
+        playPose(
+          node,
+          (t) => lerp(dx, 0, easeOut(t)),
+          (x) => ({ transform: `translateX(${x}px) rotate(${x * DRAG_TILT}deg)` }),
+          SPRING_BACK_MS,
+          { samples: 8 }
+        );
+      }
+    };
+    node.addEventListener('pointerup', release);
+    node.addEventListener('pointercancel', release);
+    // Pointer presses are handled on release; `detail === 0` is Enter/Space or a scripted click.
+    node.addEventListener('click', (event) => {
+      if (event.detail !== 0) return;
+      if (busy) queuedTap = true;
+      else tapTop();
+    });
+  }
+
+  const waitIdle = async (token) => {
+    while (busy && token === autoToken) await sleep(30);
+  };
+
+  // Reveal all: the same moves, played for the player; a hit still turns over and holds a beat.
+  const revealAllPack = async (packIndex) => {
+    if (autoRevealing || collapsing || packIndex < 0) return;
+    autoRevealing = true;
+    const token = (autoToken += 1);
+    updateDock();
+    const running = () =>
+      token === autoToken && summaryPack === null && getUnboxing().revealed[packIndex] < CARDS_PER_PACK;
+    while (running()) {
+      await waitIdle(token);
+      if (!running()) break;
+      const node = topCard();
+      if (!node) break;
+      const cardIndex = Number(node.dataset.cardIndex);
+      if (isHiddenHit(packIndex, cardIndex)) {
+        await flipHit(node, packIndex, cardIndex);
+        await sleep(instant() ? 0 : HIT_HOLD_MS);
+      } else {
+        await swipeAway(1, 0);
+        await sleep(instant() ? 0 : REVEAL_STAGGER_MS);
+      }
+    }
+    autoRevealing = false;
+    updateDock();
+  };
+
+  function showNextPack() {
+    if (busy || collapsing) return;
+    summaryPack = null;
+    render({ entrance: 'spread' });
+  }
 
   // ── End of the scene ─────────────────────────────────────────────────
-  const collapseRow = (row, durationMs = FAN_COLLAPSE_MS) =>
-    playPose(
-      row,
-      (t) => ({ scale: lerp(1, COLLAPSE_SCALE, easeOut(t)), opacity: 1 - t }),
-      ({ scale, opacity }) => ({ transform: `scale(${scale})`, opacity }),
-      durationMs,
-      { samples: 12 }
-    );
-
-  const collapseScene = async () => {
+  const finishScene = async () => {
     if (collapsing) return;
     collapsing = true;
-    const gen = generation;
-    sound(unboxingVoiceFor('finish'));
-    const rows = [...root.querySelectorAll('.bb-reveal')];
-    await withBackstop(Promise.all(rows.map((row) => collapseRow(row))));
-    collapsing = false;
-    if (gen !== generation) return;
-    render();
+    await withBackstop(
+      playPose(
+        root.querySelector('.bb-pocket'),
+        (t) => ({ scale: lerp(1, COLLAPSE_SCALE, easeOut(t)), opacity: 1 - t }),
+        ({ scale, opacity }) => ({ transform: `scale(${scale})`, opacity }),
+        FAN_COLLAPSE_MS,
+        { samples: 12 }
+      )
+    );
     onBuildDeck();
   };
 
   // Skip scene: a pack mid-reveal is revealed first, since `finish` refuses mid-pack.
-  const skipScene = () => {
+  function skipScene() {
     if (collapsing) return;
+    autoToken += 1;
     let u = getUnboxing();
     if (u.stage === 'done') return;
     u.packsTorn.forEach((torn, packIndex) => {
@@ -1131,15 +1256,16 @@ export const mountUnboxingScene = ({
     u = getUnboxing();
     if (u.stage !== 'done' && !dispatch({ type: 'finish' })) return;
     sound(unboxingVoiceFor('finish'));
+    summaryPack = null;
     render();
     onBuildDeck();
-  };
+  }
 
   // ── Tear input: drag ≥ 40 % across, or press (row 5); Enter/Space on the button ─
   function bindTear(target, { widthOf, onProgress, onSpring, onTear }) {
     let drag = null;
     target.addEventListener('pointerdown', (event) => {
-      if (target.disabled || event.button !== 0) return;
+      if (target.disabled || busy || event.button !== 0) return;
       drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, dx: 0, moved: 0, fired: false };
       target.setPointerCapture?.(event.pointerId);
     });
@@ -1173,7 +1299,7 @@ export const mountUnboxingScene = ({
     target.addEventListener('pointercancel', release);
     // Pointer presses are handled on release; `detail === 0` is Enter/Space or a scripted click.
     target.addEventListener('click', (event) => {
-      if (event.detail === 0 && !target.disabled) onTear(0);
+      if (event.detail === 0 && !target.disabled && !busy) onTear(0);
     });
   }
 
@@ -1181,7 +1307,9 @@ export const mountUnboxingScene = ({
 
   return {
     unmount: () => {
+      autoToken += 1;
       teardown();
+      window.removeEventListener('resize', onResize);
       root.replaceChildren();
     },
   };

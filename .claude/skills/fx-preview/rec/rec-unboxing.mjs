@@ -1,11 +1,13 @@
-// Design 052 video check: the Build & Battle unboxing scene in the builder tab.
-// Pass 1 records a whole box at real speed to out/unboxing[-<seed>].webm and checks rows 4
-// (reload mid-pack), 13 (pool integrity) and 14 (no face before the flip midpoint).
-// Pass 2 (no video) freezes each beat at start / peak / settle and writes
-// <OUT>/<beat>-{start,peak,settle}.png for tear, lid, promo, pack-tear, flip-t0, flip-hit, collapse.
-// Pass 3 shoots <OUT>/phone-390.png mid-pack and checks row 16 (no horizontal scroll).
-// The opening plays on a fullscreen stage (#bbUnboxingStage) with the builder UI hidden; packs
-// open in order, each after the last is fully revealed; the UI returns on the Pool tab.
+// Design 052 video check: the Build & Battle unboxing scene in the builder tab (Pocket-style
+// rework, 052 § Deviations). The opening plays on a fullscreen stage (#bbUnboxingStage) with the
+// builder UI hidden; the packs fly out of the box, each is swiped open in order, its cards are
+// swiped off one at a time (hits turn over first) and a ten-card summary closes each pack.
+// Pass 1 records a whole box at real speed to out/unboxing[-<seed>].webm and checks the stage,
+// pack order, rows 4 (reload mid-pack), 13 (pool integrity), 14 (every hit starts face down)
+// and the hand-back to the builder (deck 40 / 40, 40 pack cards left to add).
+// Pass 2 (no video) freezes beats at start / peak / settle and writes
+// <OUT>/<beat>-{start,peak,settle}.png for tear, lid, promo, fly, cut, swipe, hit, summary.
+// Pass 3 shoots <OUT>/phone-390-{spread,pocket}.png and checks row 16 (no horizontal scroll).
 //
 // Env: SEED (42) · BASE_URL (http://localhost:4100) · OUT (.agent/scratch/unboxing[-<seed>])
 //      CARD_IMG: a local image or URL served for every TCGdex card face (sandboxes where TCGdex is blocked)
@@ -57,24 +59,6 @@ const preparePage = async (context) => {
       await page.route(host, (r) => r.fulfill({ status: 302, headers: { location: process.env.CARD_IMG } }));
     }
   }
-  // Row 14 probe: when a flyer's front first gets content, how far through its flight is it?
-  await page.addInitScript(() => {
-    window.__faceAt = [];
-    new MutationObserver((records) => {
-      for (const record of records) {
-        const front = record.target;
-        if (!front.classList?.contains('bb-flyer__front') || front.dataset.seen) continue;
-        front.dataset.seen = '1';
-        const flight = front.parentElement?.getAnimations()[0];
-        const timing = flight?.effect?.getComputedTiming();
-        // The front shows only once it faces the camera: the flyer's z axis points away (m33 < 0).
-        const matrix = new DOMMatrix(getComputedStyle(front.parentElement).transform);
-        window.__faceAt.push(
-          flight ? { t: flight.currentTime / timing.duration, totalMs: timing.duration, facing: matrix.m33 < 0 } : null
-        );
-      }
-    }).observe(document, { childList: true, subtree: true });
-  });
   return page;
 };
 
@@ -125,16 +109,15 @@ const tiersOf = (page) =>
     );
   }, { module: MODULE, key: STORAGE_KEY });
 
-const fanIds = (page, packIndex) =>
-  page.evaluate(
-    (i) =>
-      [...document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`)]
-        .sort((a, b) => a.dataset.cardIndex - b.dataset.cardIndex)
-        .map((node) => node.dataset.previewCardId),
-    packIndex
+
+const summaryIds = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.bb-summary__card')]
+      .sort((a, b) => a.dataset.cardIndex - b.dataset.cardIndex)
+      .map((node) => node.dataset.previewCardId)
   );
 
-// Every fanned card wears foil exactly when unboxingHoloRarity says so, in that family.
+// Every summary card wears foil exactly when unboxingHoloRarity says so, in that family.
 const foilMismatches = (page, packIndex) =>
   page.evaluate(
     async ({ module, key, i }) => {
@@ -144,7 +127,7 @@ const foilMismatches = (page, packIndex) =>
       const box = BUILD_BATTLE_BOXES[0];
       const byId = new Map(BUILD_BATTLE_SET_CARDS[box.setId].map((card) => [card.id, card]));
       const ids = JSON.parse(localStorage.getItem(key)).packs[i];
-      return [...document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`)].flatMap((node) => {
+      return [...document.querySelectorAll('.bb-summary__card')].flatMap((node) => {
         const k = Number(node.dataset.cardIndex);
         const card = byId.get(ids[k]);
         const want = unboxingHoloRarity(card, packSlotKind(box.packModel, k, card));
@@ -156,25 +139,79 @@ const foilMismatches = (page, packIndex) =>
     { module: MODULE, key: STORAGE_KEY, i: packIndex }
   );
 
-const revealed = (page, packIndex) =>
-  page.evaluate((i) => document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`).length, packIndex);
+const topIndex = (page) =>
+  page.evaluate(() => {
+    const top = document.querySelector('.bb-pcard.is-top');
+    return top ? Number(top.dataset.cardIndex) : null;
+  });
 
-// Click the stack once and wait for that card to land in the fan.
-const flipOne = async (page, packIndex, tier) => {
-  const before = await revealed(page, packIndex);
-  await press(page, `.bb-reveal[data-pack="${packIndex}"] .bb-stack`);
+// Is the top card showing its back? The flip's z axis points away from the camera (m33 < 0).
+const topFaceDown = (page) =>
+  page.evaluate(() => {
+    const flip = document.querySelector('.bb-pcard.is-top .bb-pcard__flip');
+    return !!flip && new DOMMatrix(getComputedStyle(flip).transform).m33 < 0;
+  });
+
+const hitsFaceDown = [];
+
+// One card: a hit turns over first (and must start face down), then the card is swiped off.
+const swipeOne = async (page, packIndex, tiers, { drag = false } = {}) => {
+  const k = await topIndex(page);
+  if (tiers[packIndex][k] >= 2) {
+    hitsFaceDown.push(await topFaceDown(page));
+    await press(page, '.bb-pcard.is-top');
+    await page.waitForFunction(() => document.querySelector('.bb-pcard.is-top')?.classList.contains('is-flipped'), null, { timeout: 6000 });
+    await page.waitForTimeout(500);
+  }
+  if (drag) {
+    const box = await page.locator('.bb-pcard.is-top').boundingBox();
+    const y = box.y + box.height / 2;
+    await page.mouse.move(box.x + box.width / 2, y);
+    await page.mouse.down();
+    for (let step = 1; step <= 10; step += 1) {
+      await page.mouse.move(box.x + box.width / 2 - step * box.width * 0.05, y + step);
+      await page.waitForTimeout(16);
+    }
+    await page.mouse.up();
+  } else {
+    await press(page, '.bb-pcard.is-top');
+  }
+  const last = k === 9;
   await page.waitForFunction(
-    ([i, n]) => document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`).length > n,
-    [packIndex, before],
+    ([n, done]) =>
+      done ? !!document.querySelector('.bb-summary') : Number(document.querySelector('.bb-pcard.is-top')?.dataset.cardIndex) === n,
+    [k + 1, last],
     { timeout: 6000 }
   );
-  await page.waitForTimeout(tier >= 2 ? 500 : 140);
+  await page.waitForTimeout(tiers[packIndex][k + 1] >= 1 ? 420 : 160);
 };
 
-const waitStage = (page, stage) =>
-  page.waitForFunction((s) => document.getElementById('bbUnboxing')?.dataset.stage === s, stage, { timeout: 6000 });
+const waitView = (page, view) =>
+  page.waitForFunction((v) => document.getElementById('bbUnboxing')?.dataset.view === v, view, { timeout: 8000 });
 
-// ── Pass 1: the whole box on video, plus rows 4, 13 and 14 ─────────────────────────────
+const openToSpread = async (page, { drag = false } = {}) => {
+  if (drag) {
+    await dragTear(page, '.bb-box__wrap');
+    await page.waitForTimeout(700);
+  }
+  if ((await session(page)).unboxing.wrapTorn !== true) await press(page, '.bb-box__wrap');
+  await page.waitForTimeout(500);
+  await press(page, '.bb-box__open');
+  await page.waitForTimeout(1300);
+  await press(page, '.bb-deck');
+  await waitView(page, 'spread');
+  await page.waitForTimeout(1400);
+};
+
+const tearPack = async (page, packIndex, { drag = false } = {}) => {
+  const top = `.bb-bigpack[data-pack="${packIndex}"] .bb-pack__top`;
+  if (drag) await dragTear(page, top);
+  else await press(page, top);
+  await waitView(page, 'pocket');
+  await page.waitForTimeout(900);
+};
+
+// ── Pass 1: the whole box on video ─────────────────────────────────────────────────────
 const recordVideo = async (browser) => {
   const context = await browser.newContext({
     viewport: VIEWPORT,
@@ -192,79 +229,53 @@ const recordVideo = async (browser) => {
       getComputedStyle(document.querySelector('.native-deck-builder-inner')).visibility === 'hidden'
   );
   check(uiHidden, 'stage: the opening is fullscreen and the builder UI is hidden');
-  await dragTear(page, '.bb-box__wrap');
-  await page.waitForTimeout(700);
-  if ((await session(page)).unboxing.wrapTorn !== true) await press(page, '.bb-box__wrap');
-  await page.waitForTimeout(500);
-  await press(page, '.bb-box__open');
-  await waitStage(page, 'opened');
-  await page.waitForTimeout(1200);
-  await press(page, '.bb-deck');
-  await waitStage(page, 'deckShown');
-  await page.waitForTimeout(1800);
+  await openToSpread(page, { drag: true });
+  const spread = await page.evaluate(() => ({
+    packs: document.querySelectorAll('.bb-spread .bb-bigpack').length,
+    tearable: [...document.querySelectorAll('.bb-bigpack .bb-pack__top')].map((node) => node.closest('.bb-bigpack').dataset.pack),
+  }));
+  check(spread.packs === 4 && spread.tearable.join() === '0', 'the four packs fill the screen and only pack 1 can be opened', JSON.stringify(spread));
 
-  // Packs open one after the other, in order.
-  const order = [0, 1, 2, 3];
-  await press(page, '.bb-pack[data-pack="1"] .bb-pack__top');
-  await page.waitForTimeout(300);
-  check((await session(page)).unboxing.stage === 'deckShown', 'pack 2 does not tear before pack 1');
-  for (const [n, packIndex] of order.entries()) {
-    const top = `.bb-pack[data-pack="${packIndex}"] .bb-pack__top`;
-    if (n === 0) await dragTear(page, top);
-    else await press(page, top);
-    await page.waitForSelector(`.bb-reveal[data-pack="${packIndex}"] .bb-stack`);
-    await page.waitForTimeout(700);
-
-    if (n === 0) {
-      for (let k = 0; k < 3; k += 1) await flipOne(page, packIndex, tiers[packIndex][k]);
-      await press(page, '.bb-pack[data-pack="1"] .bb-pack__top');
+  for (const packIndex of [0, 1, 2, 3]) {
+    await tearPack(page, packIndex, { drag: packIndex === 0 });
+    if (packIndex === 0) {
+      for (let k = 0; k < 3; k += 1) await swipeOne(page, 0, tiers, { drag: k === 0 });
       await page.waitForTimeout(300);
-      check(!(await session(page)).unboxing.packsTorn[1], 'pack 2 waits while pack 1 is mid-reveal');
-      await page.waitForTimeout(400);
       await page.reload();
-      await page.waitForSelector(`.bb-reveal[data-pack="${packIndex}"] .bb-stack`, { timeout: 30000 });
+      await page.waitForSelector('.bb-pcard.is-top', { timeout: 30000 });
       await page.waitForTimeout(600);
-      const counts = await page.evaluate(
-        (i) => ({
-          fan: document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`).length,
-          stack: document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-stack__card`).length,
-        }),
-        packIndex
-      );
-      check(counts.fan === 3 && counts.stack === 7, 'row 4 reload mid-pack remounts 3 in the fan, 7 on the stack', JSON.stringify(counts));
+      const counts = await page.evaluate(() => ({
+        seen: document.querySelectorAll('.bb-pocket__thumb').length,
+        top: Number(document.querySelector('.bb-pcard.is-top')?.dataset.cardIndex),
+        stage: !!document.getElementById('bbUnboxingStage'),
+      }));
+      check(counts.seen === 3 && counts.top === 3 && counts.stage, 'row 4 reload mid-pack: 3 seen, card 4 on top, still fullscreen', JSON.stringify(counts));
     }
-    const isLast = n === order.length - 1;
-    if (n === 1) {
+    if (packIndex === 1) {
       await press(page, '[data-control="reveal-all"]');
-      await page.waitForFunction((i) => document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`).length === 10, packIndex, { timeout: 15000 });
+      await page.waitForSelector('.bb-summary', { timeout: 30000 });
     } else {
-      const lastToClick = isLast ? 9 : 10;
-      for (let k = await revealed(page, packIndex); k < lastToClick; k += 1) {
-        await flipOne(page, packIndex, tiers[packIndex][k]);
-      }
+      while (!(await page.$('.bb-summary'))) await swipeOne(page, packIndex, tiers);
     }
+    await page.waitForTimeout(900);
     const saved = (await session(page)).packs[packIndex];
-    const shown = await fanIds(page, packIndex);
-    check(
-      shown.every((id, k) => id === saved[k]) && shown.length === (isLast ? 9 : 10),
-      `row 13 pack ${packIndex + 1} fan ids match session.packs in order`,
-      `${shown.length} shown`
-    );
+    const shown = await summaryIds(page);
+    check(shown.join() === saved.join(), `row 13 pack ${packIndex + 1} summary ids match session.packs in order`, `${shown.length} shown`);
     const foil = await foilMismatches(page, packIndex);
     check(foil.length === 0, `foil pack ${packIndex + 1}: holo family per card matches unboxingHoloRarity`, foil.join('; '));
-    if (isLast) {
-      await press(page, `.bb-reveal[data-pack="${packIndex}"] .bb-stack`);
-      await waitStage(page, 'done');
-      await page.waitForTimeout(1600);
-    } else {
-      await page.waitForTimeout(500);
+    if (packIndex < 3) {
+      await press(page, '[data-control="next-pack"]');
+      await waitView(page, 'spread');
+      await page.waitForTimeout(700);
     }
   }
+  check(hitsFaceDown.length > 0 && hitsFaceDown.every(Boolean), 'row 14 every hit starts face down until tapped', `${hitsFaceDown.length} hits`);
+  await press(page, '[data-control="build"]');
+  await page.waitForFunction(() => !document.getElementById('bbUnboxingStage'), null, { timeout: 8000 });
+  await page.waitForTimeout(1200);
   check(JSON.stringify((await session(page)).packs) === packsAtOpen, 'row 13 the scene never rewrote session.packs');
-  const poolShown = await page.evaluate(() => !document.getElementById('buildBattlePoolPanel')?.hidden);
-  check(poolShown, 'collapse hands over to the Pool tab');
   const back = await page.evaluate(() => ({
-    stage: !!document.getElementById('bbUnboxingStage'),
+    pool: !document.getElementById('buildBattlePoolPanel')?.hidden,
     ui: getComputedStyle(document.querySelector('.native-deck-builder-inner')).visibility,
     deck: document.querySelector('.native-deck-builder-pane-side')?.innerText.match(/\b(\d+)\s*\/\s*40\b/)?.[1],
     left: [...document.querySelectorAll('#buildBattlePoolPanel .bb-pool-card:not(.is-unlimited)')].reduce(
@@ -273,32 +284,16 @@ const recordVideo = async (browser) => {
     ),
   }));
   check(
-    !back.stage && back.ui === 'visible' && back.deck === '40' && back.left === 40,
-    'UI returns with the 40-card box deck loaded and the 40 pack cards left to add',
+    back.pool && back.ui === 'visible' && back.deck === '40' && back.left === 40,
+    'UI returns on the Pool tab with the 40-card box deck loaded and the 40 pack cards left to add',
     JSON.stringify(back)
   );
-  await page.waitForTimeout(1200);
-
-  const faceAt = await page.evaluate(() => window.__faceAt);
-  const phases = await page.evaluate(async (module) => {
-    const { cardRevealPhases } = await import(module);
-    return [0, 2].map((tier) => cardRevealPhases(tier));
-  }, MODULE);
-  const flipMidFor = (totalMs) => phases.find((p) => p.totalMs === totalMs)?.flipMid;
-  // The face node is added on a timer and the flight runs on the animation clock, which starts a
-  // frame or more later; the node may land early as long as the card still shows its back.
-  const shownEarly = faceAt.filter((f) => !f || (f.facing && f.t < flipMidFor(f.totalMs) - 0.01));
-  const lead = Math.max(...faceAt.map((f) => (f ? (flipMidFor(f.totalMs) - f.t) * f.totalMs : 0)));
-  check(
-    faceAt.length > 0 && shownEarly.length === 0,
-    'row 14 no card face shown before the flip midpoint',
-    `${faceAt.length} reveals probed; face node lands up to ${Math.round(lead)} ms of flight before the midpoint, card back still toward the camera`
-  );
+  await page.waitForTimeout(800);
   const video = page.video();
   await context.close();
   renameSync(await video.path(), VIDEO);
   console.log('video', VIDEO);
-  return { tiers, order };
+  return { tiers };
 };
 
 // ── Pass 2: frozen frames at each beat's start / peak / settle ─────────────────────────
@@ -309,8 +304,8 @@ const FREEZE = () => {
       this.t0 = document.timeline.currentTime;
       this.starts = new Map();
     },
-    // A chained phase (the promo after the unwrap, the collapse after the last card) starts on
-    // its own animation's clock: wait for it, then time the strip from it.
+    // A chained phase (the promo after the unwrap, the fly after the promo) starts on its own
+    // animation's clock: wait for it, then time the strip from it.
     async startAt(selector) {
       for (;;) {
         const animation = document.querySelector(selector)?.getAnimations()[0];
@@ -323,7 +318,7 @@ const FREEZE = () => {
       }
     },
     async fresh() {
-      const list = document.getAnimations().filter((a) => !this.before.has(a));
+      const list = document.getAnimations().filter((a) => !this.before.has(a) && !(a instanceof CSSAnimation));
       await Promise.all(list.map((a) => a.ready.catch(() => {})));
       for (const a of list) if (!this.starts.has(a)) this.starts.set(a, a.startTime ?? this.t0);
       return list;
@@ -346,146 +341,91 @@ const FREEZE = () => {
   };
 };
 
-const shoot = async (page, clipSelector, file) => {
-  await page.evaluate((sel) => document.querySelector(sel)?.scrollIntoView({ block: 'center' }), clipSelector);
-  const box = await page.locator(clipSelector).first().boundingBox();
-  const pad = 24;
-  const clip = box && {
-    x: Math.max(0, box.x - pad),
-    y: Math.max(0, box.y - pad),
-    width: Math.min(VIEWPORT.width - Math.max(0, box.x - pad), box.width + pad * 2),
-    height: Math.min(VIEWPORT.height - Math.max(0, box.y - pad), box.height + pad * 2),
-  };
-  await page.screenshot({ path: join(OUT, file), ...(clip ? { clip } : { fullPage: true }) });
-};
+const shoot = (page, file) => page.screenshot({ path: join(OUT, file) });
 
 /**
  * Trigger one beat and write its three frames. Real time runs to `peakMs` before the peak seek,
- * so timer-driven steps (the card face at the flip midpoint) have happened when it is shot.
+ * so timer-driven steps have happened when it is shot.
  */
-const strip = async (page, name, trigger, { clip, peakMs, settleMs = 300, settleClip = clip, phase }) => {
+const strip = async (page, name, trigger, { peakMs, settleMs = 300, phase }) => {
   await page.evaluate(() => window.__beat.mark());
   await trigger();
   if (phase) await page.evaluate((sel) => window.__beat.startAt(sel), phase);
   const started = Date.now();
   await page.evaluate(() => window.__beat.seek(0));
-  await shoot(page, clip, `${name}-start.png`);
+  await shoot(page, `${name}-start.png`);
   const wait = peakMs + 40 - (Date.now() - started);
   if (wait > 0) await page.waitForTimeout(wait);
   await page.evaluate((ms) => window.__beat.seek(ms), peakMs);
-  await shoot(page, clip, `${name}-peak.png`);
+  await shoot(page, `${name}-peak.png`);
   await page.evaluate(() => window.__beat.resume());
   await page.waitForTimeout(settleMs);
-  await shoot(page, settleClip, `${name}-settle.png`);
+  await shoot(page, `${name}-settle.png`);
   console.log('strip', name);
 };
 
-const recordStrips = async (browser, { tiers, order }) => {
+const recordStrips = async (browser, { tiers }) => {
   mkdirSync(OUT, { recursive: true });
   const context = await browser.newContext({ viewport: VIEWPORT });
   await context.addInitScript(FREEZE);
   const page = await preparePage(context);
   await openFreshBox(page);
-  const phase = await page.evaluate(async (module) => {
+  const ms = await page.evaluate(async (module) => {
     const m = await import(module);
-    return { t0: m.cardRevealPhases(0), hit: m.cardRevealPhases(2), m: Object.fromEntries(Object.entries(m).filter(([, v]) => typeof v === 'number')) };
+    return Object.fromEntries(Object.entries(m).filter(([, v]) => typeof v === 'number'));
   }, MODULE);
-  const ms = phase.m;
-  const top = '.bb-scene__top';
 
-  await strip(page, 'tear', () => press(page, '.bb-box__wrap'), { clip: top, peakMs: ms.WRAP_TEAR_MS * 0.2 });
-  await strip(page, 'lid', () => press(page, '.bb-box__open'), { clip: top, peakMs: ms.LID_OPEN_MS / 2, settleMs: ms.TRAY_TOTAL_MS + 200 });
-  await strip(page, 'promo', () => press(page, '.bb-deck'), { clip: top, phase: '.bb-promo__lift', peakMs: ms.PROMO_LIFT_MS / 2, settleMs: ms.PROMO_LIFT_MS / 2 + 300 });
-
-  const flat = order.flatMap((packIndex) => tiers[packIndex].map((tier, cardIndex) => ({ packIndex, cardIndex, tier })));
-  const hit = flat.reduce((a, b) => (b.tier > a.tier ? b : a));
-  const hitPack = hit.packIndex;
-  const hitRow = `.bb-reveal[data-pack="${hitPack}"]`;
-  // "Reveal all" acts on the pack mid-reveal; packs open in order, so the ones before the hit
-  // pack are opened and finished first.
-  const revealAllOf = async (packIndex) => {
-    await press(page, '[data-control="reveal-all"]');
-    await page.waitForFunction((i) => document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`).length === 10, packIndex, { timeout: 15000 });
-    await page.waitForTimeout(300);
-  };
-  const openPack = async (packIndex) => {
-    await press(page, `.bb-pack[data-pack="${packIndex}"] .bb-pack__top`);
-    await page.waitForSelector(`.bb-reveal[data-pack="${packIndex}"] .bb-stack`);
-    await page.waitForTimeout(700);
-  };
-  for (const packIndex of order.filter((i) => i < hitPack)) {
-    await openPack(packIndex);
-    await revealAllOf(packIndex);
-  }
-  await strip(page, 'pack-tear', () => press(page, `.bb-pack[data-pack="${hitPack}"] .bb-pack__top`), {
-    clip: top,
-    settleClip: '#bbUnboxing',
-    peakMs: ms.PACK_TEAR_MS / 2,
-    settleMs: ms.PACK_SPILL_MS + 300,
-  });
-  await page.waitForTimeout(300);
-  const flipPeak = (p) => p.liftMs + p.flipMs * 0.75;
-  const plain = tiers[hitPack].findIndex((tier) => tier === 0);
-  for (let k = 0; k < hit.cardIndex; k += 1) {
-    if (k === plain) {
-      await strip(page, 'flip-t0', () => press(page, `${hitRow} .bb-stack`), { clip: hitRow, peakMs: flipPeak(phase.t0), settleMs: 300 });
-    } else {
-      await flipOne(page, hitPack, tiers[hitPack][k]);
-    }
-  }
-  const hitPeak = Math.round(phase.hit.totalMs * 0.55);
-  await strip(page, `flip-hit-t${hit.tier}`, () => press(page, `${hitRow} .bb-stack`), { clip: hitRow, peakMs: hitPeak, settleMs: 300 });
-  console.log('hit', JSON.stringify(hit));
-
-  // Finish the box quickly; the collapse is frozen on the last card of the last pack.
-  const lastPack = order.at(-1);
-  if (hitPack !== lastPack) {
-    await revealAllOf(hitPack);
-    for (const packIndex of order.filter((i) => i > hitPack)) {
-      await openPack(packIndex);
-      if (packIndex !== lastPack) await revealAllOf(packIndex);
-    }
-    for (let k = 0; k < 9; k += 1) await flipOne(page, lastPack, tiers[lastPack][k]);
-  } else {
-    for (let k = hit.cardIndex + 1; k < 9; k += 1) await flipOne(page, lastPack, tiers[lastPack][k]);
-  }
-  if ((await revealed(page, lastPack)) === 10) {
-    console.log('strip collapse skipped: the hit was the last card of the box');
-    await context.close();
-    return;
-  }
-  const row = `.bb-reveal[data-pack="${lastPack}"]`;
-  await strip(page, 'collapse', () => press(page, `${row} .bb-stack`), {
-    clip: '.bb-scene__reveals',
-    settleClip: '#bbUnboxing',
-    phase: '.bb-reveal',
-    peakMs: ms.FAN_COLLAPSE_MS / 2,
+  await strip(page, 'tear', () => press(page, '.bb-box__wrap'), { peakMs: ms.WRAP_TEAR_MS * 0.2 });
+  await strip(page, 'lid', () => press(page, '.bb-box__open'), { peakMs: ms.LID_OPEN_MS / 2, settleMs: ms.TRAY_TOTAL_MS + 200 });
+  await strip(page, 'promo', () => press(page, '.bb-deck'), { phase: '.bb-promo__lift', peakMs: ms.PROMO_LIFT_MS / 2, settleMs: 100 });
+  await strip(page, 'fly', async () => {}, {
+    phase: '.bb-bigpack__fly',
+    peakMs: ms.PACK_FLY_MS * 0.5 + ms.PACK_FLY_STAGGER_MS,
     settleMs: 600,
   });
+  // The pack holding the box's best card is opened for the swipe and hit strips.
+  const best = tiers.map((pack) => Math.max(...pack));
+  const hitPack = best.indexOf(Math.max(...best));
+  for (let packIndex = 0; packIndex < hitPack; packIndex += 1) {
+    await tearPack(page, packIndex);
+    await press(page, '[data-control="reveal-all"]');
+    await page.waitForSelector('.bb-summary', { timeout: 30000 });
+    await page.waitForTimeout(600);
+    await press(page, '[data-control="next-pack"]');
+    await waitView(page, 'spread');
+    await page.waitForTimeout(700);
+  }
+  await strip(page, 'cut', () => press(page, `.bb-bigpack[data-pack="${hitPack}"] .bb-pack__top`), {
+    phase: '.bb-pocket__stack',
+    peakMs: ms.POCKET_CUT_MS / 2,
+    settleMs: 900,
+  });
+  await strip(page, 'swipe', () => press(page, '.bb-pcard.is-top'), { peakMs: ms.SWIPE_AWAY_MS / 2, settleMs: 300 });
+  const hitCard = tiers[hitPack].indexOf(best[hitPack]);
+  while ((await topIndex(page)) < hitCard) await swipeOne(page, hitPack, tiers);
+  await shoot(page, 'hit-waiting.png');
+  await strip(page, `hit-t${best[hitPack]}`, () => press(page, '.bb-pcard.is-top'), { peakMs: ms.HIT_FLIP_MS * 0.55, settleMs: 400 });
+  while (!(await page.$('.bb-summary'))) await swipeOne(page, hitPack, tiers);
+  await page.waitForTimeout(1200);
+  await shoot(page, 'summary.png');
+  console.log('hit', JSON.stringify({ pack: hitPack, card: hitCard, tier: best[hitPack] }));
   await context.close();
 };
 
-// ── Pass 3: phone width (row 16), mid-pack, one full-page frame ──────────────────────────
+// ── Pass 3: phone width (row 16) ────────────────────────────────────────────────────────
 const recordPhone = async (browser) => {
   const width = 390;
   const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true });
   const page = await preparePage(context);
   await openFreshBox(page);
-  await press(page, '.bb-box__wrap');
-  await page.waitForTimeout(600);
-  await press(page, '.bb-box__open');
-  await waitStage(page, 'opened');
-  await page.waitForTimeout(1000);
-  await press(page, '.bb-deck');
-  await waitStage(page, 'deckShown');
-  await page.waitForTimeout(1200);
-  await press(page, '.bb-pack[data-pack="0"] .bb-pack__top');
-  await page.waitForSelector('.bb-reveal[data-pack="0"] .bb-stack');
-  await page.waitForTimeout(700);
-  for (let k = 0; k < 3; k += 1) await flipOne(page, 0, 0);
+  const tiers = await tiersOf(page);
+  await openToSpread(page);
+  await page.screenshot({ path: join(OUT, 'phone-390-spread.png') });
+  await tearPack(page, 0);
+  for (let k = 0; k < 3; k += 1) await swipeOne(page, 0, tiers);
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   check(scrollWidth <= width, 'row 16 no horizontal scroll at 390 px', `scrollWidth ${scrollWidth}`);
-  await page.screenshot({ path: join(OUT, 'phone-390.png'), fullPage: true });
+  await page.screenshot({ path: join(OUT, 'phone-390-pocket.png') });
   await context.close();
 };
 

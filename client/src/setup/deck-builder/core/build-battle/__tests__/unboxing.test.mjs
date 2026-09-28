@@ -29,8 +29,14 @@ import {
   finishedUnboxing,
   hitTierFor,
   homography,
+  hitFlipPose,
   lidPose,
   nextPackToTear,
+  packFlyPose,
+  packSpreadSlot,
+  swipeAwayPose,
+  swipeOutcome,
+  SWIPE_AT,
   packArtIndexes,
   packSlotKind,
   packSpillPose,
@@ -459,4 +465,54 @@ test('box textures: the front and left are cut from the render, the rest are pro
     const { width, height } = face.cropInRender;
     assert.ok(face.quad.every(({ x, y }) => x >= 0 && x <= width && y >= 0 && y <= height));
   }
+});
+
+// ── Pocket-style packs ───────────────────────────────────────────────────────
+test('packSpreadSlot centres the focused pack and queues the rest to the right, apart', () => {
+  assert.deepEqual(packSpreadSlot(1, 1, 200), { xPx: 0, scale: 1, brightness: 1, zIndex: 10 });
+  const next = packSpreadSlot(2, 1, 200);
+  const after = packSpreadSlot(3, 1, 200);
+  assert.ok(next.xPx > 0 && after.xPx > next.xPx, 'later packs sit further right');
+  assert.ok(next.scale < 1 && next.brightness < 1);
+  assert.ok(next.xPx - (200 * next.scale) / 2 > 100, 'the first side pack clears the focused one');
+  assert.ok(after.xPx - next.xPx > 200 * next.scale, 'side packs do not overlap');
+  assert.ok(next.zIndex > after.zIndex, 'the nearer pack draws on top');
+});
+
+test('packFlyPose starts at the box mouth and lands at rest', () => {
+  const from = packFlyPose(0, { dxPx: -300, dyPx: 120, fromScale: 0.25 });
+  assert.equal(from.translateXPx, -300);
+  assert.equal(from.translateYPx, 120);
+  assert.equal(from.scale, 0.25);
+  const mid = packFlyPose(0.5, { dxPx: 0, dyPx: 0 });
+  assert.ok(mid.translateYPx < 0, 'arcs upward on the way');
+  const to = packFlyPose(1, { dxPx: -300, dyPx: 120, fromScale: 0.25 });
+  assert.ok(Math.abs(to.translateXPx) < 1e-9 && Math.abs(to.translateYPx) < 1e-9);
+  assert.equal(to.scale, 1);
+  assert.equal(to.rotateZDeg, 0);
+});
+
+test('swipeOutcome: a short press taps, a long drag swipes, anything else springs back', () => {
+  assert.equal(swipeOutcome({ dxPx: 2, movedPx: 3, widthPx: 200 }), 'tap');
+  assert.equal(swipeOutcome({ dxPx: -SWIPE_AT * 200, movedPx: 60, widthPx: 200 }), 'swipe');
+  assert.equal(swipeOutcome({ dxPx: SWIPE_AT * 200 - 1, movedPx: 60, widthPx: 200 }), 'spring');
+  assert.equal(swipeOutcome({ dxPx: 80, movedPx: 80, widthPx: 0 }), 'spring');
+});
+
+test('swipeAwayPose leaves toward its side and fades only at the end', () => {
+  const left = swipeAwayPose(1, { direction: -1, distancePx: 500 });
+  assert.equal(left.translateXPx, -500);
+  assert.ok(left.rotateZDeg < 0);
+  assert.equal(left.opacity, 0);
+  assert.equal(swipeAwayPose(0.5, { direction: 1 }).opacity, 1);
+  assert.equal(swipeAwayPose(0, { direction: 1, fromPx: 40 }).translateXPx, 40, 'picks up from the drag');
+});
+
+test('hitFlipPose turns the back away and is edge-on at the midpoint', () => {
+  assert.equal(hitFlipPose(0).rotateYDeg, 180);
+  assert.ok(Math.abs(hitFlipPose(0.5).rotateYDeg - 90) < 1e-9);
+  assert.equal(hitFlipPose(1).rotateYDeg, 0);
+  assert.ok(hitFlipPose(0.5).scale > 1);
+  assert.equal(hitFlipPose(0.55, { tier: 3 }).flare, 1);
+  assert.equal(hitFlipPose(0.55, { tier: 1 }).flare, 0);
 });

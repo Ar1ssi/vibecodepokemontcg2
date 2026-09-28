@@ -373,6 +373,21 @@ Fullscreen rework (2026-09-28, user ask in the project thread):
 - rec-unboxing opens packs in order and checks the stage (UI hidden, pack 2 refused before and
   during pack 1) and the hand-back (stage gone, UI visible, deck 40 / 40, 40 pack cards left).
 
+Pocket-style rework (2026-09-28, user ask relayed in the same thread):
+- After the deck is shown, the four packs fly out of the box (`packFlyPose`, staggered) into a
+  full-screen spread: the next pack large in the centre, the rest dimmed at the side
+  (`packSpreadSlot`). Only the centre pack takes a swipe along its crimp; the cut line follows
+  the finger, the top flies off and the cards rise out of the pack.
+- Cards show one at a time, large, on a stack (`.bb-pocket`). Swipe the top card away
+  (`swipeOutcome`, `swipeAwayPose`) to see the next; the seen cards gather as thumbnails. Hits
+  wait face down with a tier aura until tapped (`hitFlipPose`), so row 14 now rests on
+  `backface-visibility` rather than the face timer. After card 10 the pack's ten cards are laid
+  out (`.bb-summary`) with "Next pack", and the spread slides to the next pack.
+- The old spill/fan/reveal-row poses (`packSpillPose`, `fanSlot`, `cardRevealPose`,
+  `unboxingTimeline`) stay in the pure module but the DOM no longer uses them.
+- rec-unboxing drives the new flow (spread, in-order tears, swipes, flips, summaries, reload
+  mid-pack) and adds 390 px shots of the spread and the pocket.
+
 ---
 Self-approval checklist (only when the user is unreachable):
 - [ ] Every constraint traceable into the Design section
