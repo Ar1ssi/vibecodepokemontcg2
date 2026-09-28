@@ -60,11 +60,11 @@ This design replaces 051's step 3 ("Reveal") with a full scene in the house FX s
    dispatcher is board-only. B: `deck-builder/core/build-battle/unboxing.mjs` (pure poses + timeline)
    with a DOM twin `sidebox/native-deck-builder-unboxing.js`, importing the shared primitives from
    `image-logic/mat-fx.mjs` and the voice player. **Pick B.**
-2. **Box and pack art.** A: vendor product photos — no. B: procedural: CSS cuboid with the set logo,
-   palette tokens, a printed-cardboard gradient and a shrink-wrap sheen layer; packs are the same
-   palette with crimped top/bottom edges (repeating-linear-gradient) and the logo. **Pick B.**
-   Palette (taste call, tunable in Deviations): `--bb-box-1: #7f1d1d`, `--bb-box-2: #f97316`,
-   `--bb-foil: #fde68a`, `--bb-wrap: rgba(255,255,255,.28)`.
+2. **Box and pack art.** A: vendor product photos — no. B: procedural: a CSS cuboid whose six faces
+   reproduce the real box's layout (user's reference frames, 2026-09-28, § Box reference) from
+   palette tokens, CSS gradients for the diagonal-slash key art, TCGdex images the app already
+   shows (the set logo and one card's full-art illustration as the key art), and a shrink-wrap
+   sheen layer; packs use the same palette with crimped top/bottom edges. **Pick B.**
 3. **Opening interaction.** A: click everything. B: tear-by-drag (pointer down on the wrap / pack
    top edge, drag ≥ 40 % of its width) with click fallback (a press with < 6 px movement tears too).
    C: drag only. **Pick B**: the drag sells the physicality; the fallback keeps mobile and keyboard
@@ -174,6 +174,38 @@ Mounted into `#buildBattleBoxPanel` (051) as `#bbUnboxing`. Structure:
 | `unbox-hit-1` / `-2` / `-3` | sine arpeggio 523/659/784 Hz (tier 1), +1 octave and a 4th note (tier 2), tier 3 adds a 1.2 s sawtooth swell at 262 Hz gain .18 |
 | `unbox-done` | triangle 392→523 Hz 260 ms gain .25 |
 
+### Box reference (user frames `.agent/designs/refs/052-box-{front,left,right,back,top}.webp`)
+Proportions W : H : D = 1 : 1.4 : 0.65 (measured on the top and front frames). Faces:
+- **Front** (portrait): top strip — red rounded plate with the Pokémon TCG wordmark (text, app
+  font, `--bb-red` plate, yellow letters) at the left; a magenta slashed banner carrying a black
+  "PLAY LEVEL 2" pill with two filled Poké Balls and one empty ring; a black "6+" badge in the
+  top-right corner. Middle two thirds — the key art: Mega Charizard X (black body, blue flames)
+  over diagonal slashes of magenta, lime, yellow and black. Rendered as `me02-125` (Special
+  Illustration Rare Mega Charizard X ex, `assets.tcgdex.net/en/me/me02/125/high.webp`) with
+  `object-fit: cover` positioned on the dragon, under a `linear-gradient(115deg, …)` slash overlay
+  at 55 % opacity in `--bb-magenta` / `--bb-lime` / `--bb-yellow` / `--bb-black`. Lower third —
+  the "MEGA EVOLUTION" gold pill and the "PHANTASMAL FLAMES" logotype = the TCGdex set logo
+  (`assets.tcgdex.net/en/me/me02/logo.webp`, verified 200). Bottom band — black, the Play! Pokémon
+  mark (red/white circle glyph drawn in CSS) and "BUILD & BATTLE" in white extended caps, a red
+  Poké Ball emblem clipped at the right edge.
+- **Left / Right**: the key art's slashes wrap around (black base, magenta/lime/yellow/blue
+  diagonal streaks continuing the front's angle, no characters); the same top strip and bottom
+  band colours continue as thin bands.
+- **Back**: black with a faint diamond/geometric texture (`repeating-linear-gradient` pair at
+  ±45°, 4 % white); top: Play! mark + "BUILD & BATTLE"; two thin gold rules framing "Inside,
+  you'll find:" and three bullets (40-card ready-to-play deck including 1 of 4 unique foil promo
+  cards · 4 Phantasmal Flames booster packs · a code card for Pokémon TCG Live); a red band with
+  "WWW.POKEMON.COM"; small legal text as unreadable grey lines (never real legal copy); the
+  Poké Ball corner emblem; "Gotta catch 'em all!" at the foot.
+- **Top / Bottom**: black textured with a wide gold band (`linear-gradient(90deg, #d9a92c,
+  #f6d65a, #d9a92c)`) carrying the Pokémon TCG wordmark plate.
+- **Shrink-wrap**: a glossy layer over all faces (`--bb-wrap`), two diagonal highlight streaks,
+  a seam line down the back, removed by `wrapTearPose`.
+- Palette tokens: `--bb-black: #0b0b10`, `--bb-magenta: #ff2fa3`, `--bb-lime: #7fe000`,
+  `--bb-yellow: #ffd400`, `--bb-blue: #2f7bff`, `--bb-red: #d62828`, `--bb-gold: #e0b431`,
+  `--bb-wrap: rgba(255,255,255,.26)`. The wordmarks are typeset, never traced logos; the fx-designer
+  may tune hues in Deviations, not the layout.
+
 ### CSS (`client/src/css/deck-builder-unboxing.css`, scoped `.db-live.build-battle-window`)
 Tokens from Options 2; cuboid faces via `transform-style: preserve-3d` on `.bb-box__body` only (its
 host `.bb-box` carries opacity/perspective); `.bb-pack__top` crimp with
@@ -194,7 +226,7 @@ house rule 8). Phone width: box scales to the viewport width, packs wrap two per
 | 7 | Reveal all pressed mid-reveal | continues from the current index; no duplicate cards | [ ] |
 | 8 | WAAPI missing (old browser) | `animateFrames` degrades (existing behavior): states still settle via the backstop | [ ] |
 | 9 | animation never finishes (tab hidden) | `SCENE_BACKSTOP_MS` settles the state | [ ] |
-| 10 | card image 404 / logo 404 | card shows the card back with the name; box shows the palette without the logo | [ ] |
+| 10 | card image 404 / logo 404 / key art 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [ ] |
 | 11 | tier mapping across all 130 me02 cards + promos | every `unboxingHoloRarity` result is a family `holo/*.css` styles (or null); reverse slot always ends in "reverse holo"; Rare/Promo → rare holo | [ ] |
 | 12 | hit flare never leaves the card rect | flare + particles are children of the card host with `overflow: hidden` | [ ] |
 | 13 | pool integrity | revealed ids == `session.packs[i]` in order; the scene reads, never writes, `packs` | [ ] |
