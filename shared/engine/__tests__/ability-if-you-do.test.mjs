@@ -7,6 +7,7 @@ import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { hasCondition } from '../rules/special-conditions.mjs';
+import { isEvolvePlayedTrigger } from '../rules/ability-executors.mjs';
 
 function setupGame() {
   const rng = createRng(42);
@@ -440,4 +441,64 @@ test('ability: Walrein ex Chilling Breath locks Trainers on the next turn, only 
   const stale = board(CHILLING_BREATH, { name: 'Walrein ex' });
   stale.state.players.p1.zones.active[0].enteredPlayTurn = 1;
   assert.ok(use70(stale.state, stale.rng).error);
+});
+
+// Ninetales, Team Up 16 / Volcanion Prism Star, Forbidden Light 31: a hand-discard cost, then the
+// opponent's switch — the player's own Active never moves (parse-hole review B1).
+const NINE_TEMPTATIONS =
+  "Once during your turn (before your attack), you may discard 2 {R} Energy cards from your hand. If you do, switch 1 of your opponent's Benched Pokémon with their Active Pokémon.";
+const JET_GEYSER =
+  'Once during your turn (before your attack), you may discard a {W} Energy card from your hand. If you do, your opponent switches their Active Pokémon with 1 of their Benched Pokémon.';
+const fireEnergy = (instanceId, type = 'Fire') =>
+  createCard({ instanceId, name: `${type} Energy`, supertype: 'Energy', subtypes: ['Basic'], types: [type] });
+
+test('ability: Ninetales Nine Temptations pays 2 {R} from hand, then gusts; the own Active stays', () => {
+  const { state, rng } = board(NINE_TEMPTATIONS, { name: 'Ninetales', ownBench: [], oppBench: [91, 92] });
+  state.players.p1.zones.hand.push(fireEnergy(60), fireEnergy(61));
+  let res = use70(state, rng);
+  for (let guard = 0; res.pendingChoice && guard < 5; guard++) {
+    const ids = res.pendingChoice.options.map((o) => o.instanceId);
+    res = resolveWith(res, ids.includes(60) ? [60, 61] : [92], rng);
+  }
+  assert.equal(activeId(res, 'p1'), 70);
+  assert.equal(activeId(res, 'p2'), 92);
+  assert.equal(res.state.players.p1.zones.discard.length, 2);
+});
+
+test('ability: Ninetales Nine Temptations with 1 {R} in hand does not gust', () => {
+  const { state, rng } = board(NINE_TEMPTATIONS, { name: 'Ninetales', ownBench: [], oppBench: [91] });
+  state.players.p1.zones.hand.push(fireEnergy(60));
+  const res = use70(state, rng);
+  assert.equal(activeId(res, 'p2'), 90);
+});
+
+test('ability: Volcanion Prism Star Jet Geyser pays a {W} from hand; the opponent picks their new Active', () => {
+  const { state, rng } = board(JET_GEYSER, { name: 'Volcanion Prism Star', ownBench: [81] });
+  state.players.p1.zones.hand.push(fireEnergy(60, 'Water'));
+  let res = use70(state, rng);
+  if (res.pendingChoice?.player === 'p1') res = resolveWith(res, [60], rng);
+  assert.equal(res.pendingChoice?.player, 'p2');
+  res = resolveWith(res, [92], rng);
+  assert.equal(activeId(res, 'p1'), 70);
+  assert.equal(activeId(res, 'p2'), 92);
+});
+
+test('evolve-played trigger: a named Pokémon is one, "a Pokémon" and "to evolve this Pokémon" are not (review S2)', () => {
+  const card = (text) => mon(1, 'X', { abilities: [{ name: 'A', type: 'Ability', text }] });
+  // Walrein ex, Power Keepers 99.
+  assert.equal(isEvolvePlayedTrigger(card(CHILLING_BREATH)), true);
+  // Eevee Resonant Evolution, Astral Radiance 119.
+  assert.equal(
+    isEvolvePlayedTrigger(
+      card('Once during your turn, when you play a Pokémon from your hand to evolve 1 of your other Eevee, you may search your deck for a card that evolves from this Pokémon and put it onto this Pokémon to evolve it. Then, shuffle your deck.')
+    ),
+    false
+  );
+  // Alakazam-EX Kinesis, Fates Collide 125.
+  assert.equal(
+    isEvolvePlayedTrigger(
+      card("When you play M Alakazam-EX from your hand to evolve this Pokémon, before it evolves, you may put 2 damage counters on your opponent's Active Pokémon and 3 damage counters on 1 of your opponent's Benched Pokémon.")
+    ),
+    false
+  );
 });

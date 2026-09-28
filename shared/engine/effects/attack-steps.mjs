@@ -2727,7 +2727,13 @@ function atkHealEach(ctx) {
 function atkHealCounted(ctx) {
   const { player, opponent, step } = ctx;
   if (stadiumBlocksHealing(ctx.draft.stadium)) return skip(ctx, 'healing_blocked');
-  const limit = healLimit(step);
+  // Ludicolo Healing Steps: "If you do, remove that many damage counters from Ludicolo."
+  const limit =
+    step.countFrom === 'handDiscarded'
+      ? ctx.events
+          .filter((e) => e.type === 'cardsDiscarded' && e.handCost && e.playerId === player.playerId)
+          .reduce((sum, e) => sum + e.cards.length, 0) * 10
+      : healLimit(step);
 
   if (step.target === 'self' || step.target === 'opponentActive' || step.target === 'bothActive') {
     const targets = {
@@ -3153,8 +3159,11 @@ const GUESS_KINDS = ['Pokémon', 'Trainer', 'Energy'];
 function atkGuessHandCard(ctx) {
   const { player, opponent, step } = ctx;
   const hand = player.zones.hand || [];
-  if (ctx.memo?.cardId != null) {
-    const card = hand.find((c) => c.instanceId === ctx.memo.cardId);
+  // The face-down card lives in a server-only draft field: the guess prompt goes to the
+  // opponent, and view.mjs hands the recipient the whole pending choice (memo included).
+  if (ctx.memo?.guessing) {
+    const card = hand.find((c) => c.instanceId === ctx.draft.faceDownGuessCardId);
+    delete ctx.draft.faceDownGuessCardId;
     if (!card) return skip(ctx, 'card_not_found');
     const guess = GUESS_KINDS[Number(ctx.selection?.[0]) - 1];
     const actual = isPokemon(card) ? 'Pokémon' : isEnergy(card) ? 'Energy' : 'Trainer';
@@ -3168,13 +3177,14 @@ function atkGuessHandCard(ctx) {
   if (ctx.selection) {
     const card = hand.find((c) => c.instanceId === ctx.selection[0]);
     if (!card || !opponent) return skip(ctx, 'card_not_found');
+    ctx.draft.faceDownGuessCardId = card.instanceId;
     return ctx.ask({
       player: opponent.playerId,
       prompt: `${attackName(ctx)}: Guess the face-down card: Pokémon, Trainer, or Energy?`,
       options: GUESS_KINDS.map((name, i) => ({ instanceId: i + 1, name, type: 'option' })),
       min: 1,
       max: 1,
-      memo: { cardId: card.instanceId },
+      memo: { guessing: true },
     });
   }
   if (hand.length === 0) return skip(ctx, 'empty_hand');
@@ -3235,6 +3245,8 @@ function atkFaceDownOppEnergy(ctx) {
   const flip = (card) => {
     card.asEnergy = { provides: ['Colorless'] };
     card.faceDownUntilTurn = (ctx.draft.turn?.number || 1) + 1;
+    // Only while it stays on this Pokémon (rules/server-energy.mjs checks the host).
+    card.faceDownHostId = defender.instanceId;
     ctx.events.push({ type: 'energyFaceDown', instanceId: card.instanceId, playerId: opponent.playerId });
     return null;
   };
@@ -3540,7 +3552,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
   atkDiscardSelfEnergy,
-  atkMoveSelfEnergyToHand,
+  atkMoveSelfEnergyToHand: optional(atkMoveSelfEnergyToHand, () => 'Return an Energy attached to this Pokémon to your hand'),
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, (step) => `Discard ${whatOf(step)} from your opponent's Pokémon`),
   atkDiscardBothActiveEnergy: optional(
     atkDiscardBothActiveEnergy,

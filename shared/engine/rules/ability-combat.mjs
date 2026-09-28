@@ -953,6 +953,26 @@ function suppressionTargets(text, holder, card, ctx) {
 }
 
 /**
+ * Shiftry Seal Off ("The Defending Pokémon can't use any Poké-Powers or Poké-Bodies during your
+ * opponent's next turn"): a live `abilityLock` marker covering this card's ability kind also
+ * silences its passive Poké-Body. Without a turn number the window cannot be read: no lock.
+ */
+function attackLockedAbility(card, turnNumber) {
+  if (typeof turnNumber !== 'number') return false;
+  const kinds = (card.abilities || []).map((a) => {
+    const type = String(a?.type || '').toLowerCase();
+    return /body/.test(type) ? 'body' : /power/.test(type) ? 'power' : 'ability';
+  });
+  return (card.attackMarkers || []).some(
+    (m) =>
+      m.kind === 'abilityLock' &&
+      (m.fromTurn ?? 0) <= turnNumber &&
+      turnNumber <= (m.untilTurn ?? 0) &&
+      (m.abilityKinds || []).some((kind) => kinds.includes(kind))
+  );
+}
+
+/**
  * "Each Pokémon … has no Abilities" (design 034 slice 3): true when an in-play
  * source suppresses `card`'s Abilities. Sources on either side are scanned;
  * holder-position conditions fail closed, Ancient Traits are exempt (D72), and
@@ -962,6 +982,7 @@ function suppressionTargets(text, holder, card, ctx) {
 export function isAbilitySuppressed(card, ctx = {}) {
   if (!card || !isPokemon(card)) return false;
   if (isAncientTraitAbility(card)) return false;
+  if (attackLockedAbility(card, ctx.turnNumber)) return true;
   const sources = dedupe([
     ...rootsOf(ctx.sideCards || []),
     ...rootsOf(ctx.opponentSideCards || []),

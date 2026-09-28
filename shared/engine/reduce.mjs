@@ -252,6 +252,10 @@ import { matchesSearch } from './rules/search-match.mjs';
 function flipAttackCoins(attack, rng, countOf = null) {
   const text = String(attack?.text || '').toLowerCase();
   const flip = () => flipCoin(rng);
+  // Electivire Discharge / Arcanine Fire Blow: the coins follow the discard (discardFlipHeads).
+  if (/flip (?:a coin for each|a number of coins equal to the number of) [^.]*you discarded/.test(text)) {
+    return { coin: null, headsCount: 0, flips: [] };
+  }
 
   // "Flip a coin for each Energy attached to this Pokémon" / "Flip a number of coins equal to
   // the number of damage counters on the Defending Pokémon": the board sets the count. A unit
@@ -566,6 +570,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       ...(damage.countFromEnergy ? { countFromEnergy: damage.countFromEnergy } : {}),
       ...(damage.chooser ? { chooser: damage.chooser } : {}),
       ...(damage.amountPerEnergy ? { amountPerEnergy: true } : {}),
+      ...(damage.remainingFromDiscard ? { remainingFromDiscard: true } : {}),
       // Attack damage to the Active applies Weakness/Resistance unless the text
       // waives it for every target ("... for Benched Pokémon" waives only those;
       // Arboliva ex: "This damage isn't affected by Weakness or Resistance").
@@ -1938,15 +1943,6 @@ function settlePromotionChoices(draft, { events }) {
 }
 
 /**
- * Stamps `movedToActiveTurn` on every card that entered a player's Active Spot
- * during this command, and clears it from every card that left (design 034
- * slice 4b on-promotion window). Diffing the pre/post Active zones here covers
- * every bench→active site — manual move, KO promotion, Switch/Boss's Orders
- * attack and trainer steps — without threading a stamp through each effect
- * module. The whole stack (root plus attached Evolutions/Tools) is stamped so
- * the activation gate reads the stamp off whichever card the client addresses.
- */
-/**
  * Stamps `healedTurn` on every in-play Pokémon whose damage went down during this command, for
  * "If this Pokémon was healed during this turn" (Altaria-EX Powerful Gain). Diffing the damage
  * covers every heal source (Potion, abilities, attacks, Stadiums) without hooking each one.
@@ -1964,6 +1960,15 @@ function stampHealedPokemon(prev, next) {
   }
 }
 
+/**
+ * Stamps `movedToActiveTurn` on every card that entered a player's Active Spot
+ * during this command, and clears it from every card that left (design 034
+ * slice 4b on-promotion window). Diffing the pre/post Active zones here covers
+ * every bench→active site — manual move, KO promotion, Switch/Boss's Orders
+ * attack and trainer steps — without threading a stamp through each effect
+ * module. The whole stack (root plus attached Evolutions/Tools) is stamped so
+ * the activation gate reads the stamp off whichever card the client addresses.
+ */
 function stampActivePromotions(prev, next) {
   const turnNumber = next.turn?.number;
   if (turnNumber == null) return;
@@ -2204,11 +2209,12 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
 function resolveDeferredKnockouts(draft, { events }) {
   // Unown I Hidden Power: "Put that card face up at the end of your opponent's next turn."
   for (const pid of Object.keys(draft.players || {})) {
-    for (const zoneId of ['active', 'bench']) {
+    for (const zoneId of Object.keys(draft.players[pid].zones || {})) {
       for (const card of draft.players[pid].zones?.[zoneId] || []) {
         if (card.faceDownUntilTurn == null || card.faceDownUntilTurn > (draft.turn?.number || 0)) continue;
         delete card.asEnergy;
         delete card.faceDownUntilTurn;
+        delete card.faceDownHostId;
         events.push({ type: 'energyFaceUp', instanceId: card.instanceId, playerId: pid });
       }
     }
@@ -3786,6 +3792,8 @@ function abilitySideContext(state, playerId) {
     sideBench: own.bench || [],
     opponentActive: other.active || [],
     opponentBench: other.bench || [],
+    // Shiftry Seal Off's abilityLock marker is live only inside its window (isAbilitySuppressed).
+    turnNumber: state.turn?.number,
   };
 }
 
@@ -5560,11 +5568,6 @@ function runAttackSteps(
   return true;
 }
 
-/**
- * Flips the attack's coins, offers a Glimwood Tangle re-flip, then resolves the effect
- * phase. `copiedAttack` is set when a copy attack chose `attack` (design 031); resume
- * tokens carry it because the copier's own attack list does not hold it.
- */
 // Older printings name the attacker ("Mantine can't attack during your next turn", "Put 1 damage
 // counter on Beldum"). Every reader of the attack's text sees "this Pokémon" instead.
 function withSelfNamedAttack(ctx) {
@@ -5577,6 +5580,11 @@ function withSelfNamedAttack(ctx) {
   return named === text ? ctx : { ...ctx, attack: { ...ctx.attack, text: named } };
 }
 
+/**
+ * Flips the attack's coins, offers a Glimwood Tangle re-flip, then resolves the effect
+ * phase. `copiedAttack` is set when a copy attack chose `attack` (design 031); resume
+ * tokens carry it because the copier's own attack list does not hold it.
+ */
 function flipAndResolveAttack(draft, ctx) {
   ctx = withSelfNamedAttack(ctx);
   const { playerId, activeRng, events, attack, attackerPlayer, atkIdx, targetInstanceId, copiedAttack } = ctx;
@@ -5918,15 +5926,6 @@ function statusConditionResults(draft, ctx, branches) {
   );
 }
 
-/**
- * Resolves the part of an attack that runs after its coins are flipped:
- * printed-text damage, recoil, status, bench/spread damage, searches, and the
- * terminal checkup/turn hand-off. Extracted so Glimwood Tangle can re-enter it
- * with a fresh (or kept) coin result without re-running the confusion check.
- *
- * @param {object} draft Cloned GameState
- * @param {object} ctx Derived attack context (see the call site)
- */
 const ENERGY_LETTER_TYPES = {
   G: 'grass', R: 'fire', W: 'water', L: 'lightning', P: 'psychic',
   F: 'fighting', D: 'darkness', M: 'metal', N: 'dragon', Y: 'fairy', C: 'colorless',
@@ -5959,6 +5958,15 @@ function stampAttackEnergyCount(draft, attacker, attackerView) {
   if (attackerView && attackerView !== attacker) attackerView.attackEnergyCount = count;
 }
 
+/**
+ * Resolves the part of an attack that runs after its coins are flipped:
+ * printed-text damage, recoil, status, bench/spread damage, searches, and the
+ * terminal checkup/turn hand-off. Extracted so Glimwood Tangle can re-enter it
+ * with a fresh (or kept) coin result without re-running the confusion check.
+ *
+ * @param {object} draft Cloned GameState
+ * @param {object} ctx Derived attack context (see the call site)
+ */
 function resolveAttackEffectPhase(draft, ctx) {
   ctx = withSelfNamedAttack(ctx);
   const {
@@ -6165,10 +6173,7 @@ function resolveAttackEffectPhase(draft, ctx) {
       draft.pendingChoice = createPendingChoice({
         player: playerId,
         source: 'attack',
-        prompt:
-          discardScaling.destination === 'deck'
-            ? `${attack.name}: choose Energy to shuffle into your deck (${parseInt(attack.damage, 10) || 0} damage each).`
-            : `${attack.name}: choose Energy to discard (${attack.damage || 0} damage each).`,
+        prompt: discardScalePrompt(attack, discardScaling),
         options: candidates.map((c) => ({
           instanceId: c.instanceId,
           name: c.name,
@@ -6198,7 +6203,8 @@ function resolveAttackEffectPhase(draft, ctx) {
   if (
     discardFlipHeads === undefined &&
     typeof energyDiscarded === 'number' &&
-    /flip a number of coins equal to the number of [^.]*you discarded/i.test(attack?.text || '')
+    // Electivire Discharge: "Flip a coin for each {L} Energy you discarded."
+    /flip (?:a number of coins equal to the number of|a coin for each) [^.]*you discarded/i.test(attack?.text || '')
   ) {
     const discardFlips = Array.from({ length: Math.min(energyDiscarded, 20) }, () => flipCoin(activeRng));
     discardFlipHeads = discardFlips.filter((face) => face === 'heads').length;
@@ -6869,6 +6875,10 @@ function resolveAttackEffectPhase(draft, ctx) {
               attack,
             })
           : resolveAttackTargetClause(attack.text, parsed, spread);
+      // Bronzong BREAK Metal Rain: one 30-damage pick per Energy card the discard paid.
+      if (attackTarget?.remainingFromDiscard) {
+        attackTarget = energyDiscarded > 0 ? { ...attackTarget, remaining: energyDiscarded } : null;
+      }
       // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
       if (attackTarget?.amountPerEnergy) {
         const ref = attacker ? findCard(draft, attacker.instanceId) : null;
@@ -7229,15 +7239,20 @@ function searchCoinGateOpen(attack, coinResult) {
   return !gate || coinResult?.coin === gate;
 }
 
-/**
- * A3 (design 036): "If your opponent's Pokémon is Knocked Out by damage from this attack,
- * take N more Prize card(s)." The printed clause is not a step — it pays for each of this
- * command's Knock Out events whose victim the clause's filter accepts. Callers run it
- * before `resolveCheckup` (so a checkup Knock Out never pays); the count is floored at the
- * attacker's remaining Prize cards (edge case 10). `paid` carries the victim ids a previous
- * call in the same command already paid, so a tail that grants before and after the
- * chosen-target damage never pays one Knock Out twice.
- */
+// The discard-to-scale prompt names what each card is worth as printed: "N (more) damage for each"
+// (Genesect-EX Rapid Blaster +20), "do N damage to it" (Bronzong BREAK Metal Rain), else the
+// printed damage.
+function discardScalePrompt(attack, discardScaling) {
+  const text = String(attack?.text || '');
+  const per =
+    /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
+    /do (\d+) damage to it/i.exec(text)?.[1] ||
+    parseInt(attack?.damage, 10) ||
+    0;
+  const verb = discardScaling.destination === 'deck' ? 'shuffle into your deck' : 'discard';
+  return `${attack.name}: choose Energy to ${verb} (${per} damage each).`;
+}
+
 // Beast Game-GX's "… take 3 more Prize cards instead" condition, read against the attacker.
 function prizeInsteadHolds(draft, playerId, attack, instead) {
   const condition = parseConditionClause(instead.condition);
@@ -7259,6 +7274,15 @@ function prizeInsteadHolds(draft, playerId, attack, instead) {
   );
 }
 
+/**
+ * A3 (design 036): "If your opponent's Pokémon is Knocked Out by damage from this attack,
+ * take N more Prize card(s)." The printed clause is not a step — it pays for each of this
+ * command's Knock Out events whose victim the clause's filter accepts. Callers run it
+ * before `resolveCheckup` (so a checkup Knock Out never pays); the count is floored at the
+ * attacker's remaining Prize cards (edge case 10). `paid` carries the victim ids a previous
+ * call in the same command already paid, so a tail that grants before and after the
+ * chosen-target damage never pays one Knock Out twice.
+ */
 function grantPrizeOnKoBonus(draft, { playerId, attack, events, paid }) {
   const bonus = parsePrizeOnKo(attack?.text);
   if (!bonus) return;
@@ -7388,7 +7412,7 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
               source: 'attack',
               prompt: distributable
                 ? distributedPrompt(attack.name, attackTarget, required)
-                : `${attack.name}: Choose ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} Pokémon to take damage`,
+                : `${attack.name}: Choose ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} ${attackTarget.scope === 'bench' ? 'Benched ' : ''}Pokémon to take damage`,
               options: candidates,
               min: distributable ? 1 : attackTarget.count,
               max: distributable ? 1 : attackTarget.count,

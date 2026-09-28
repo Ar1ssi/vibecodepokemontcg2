@@ -353,7 +353,11 @@ export function executeSteps(draft, {
     }
     // Hypno Spiral Aura: "If the Defending Pokémon isn't Knocked Out by the damage from this
     // attack"; Scizor Accelerate: "If the Defending Pokémon is Knocked Out by this attack".
-    if (events.some((e) => e.type === 'pokemonKnockedOut' && e.playerId === oppId)) context.defenderKnockedOut = true;
+    // The Defending Pokémon itself, not a Bench Knock Out from the same attack's spread.
+    const defenderId = context.attack?.tail?.defenderId;
+    if (events.some((e) => e.type === 'pokemonKnockedOut' && e.playerId === oppId && (defenderId == null || e.instanceId === defenderId))) {
+      context.defenderKnockedOut = true;
+    }
     if (step.requiresDefenderSurvived && context.defenderKnockedOut) {
       events.push({ type: 'effectStepSkipped', reason: 'defender_knocked_out', step: step.type });
       continue;
@@ -1059,6 +1063,7 @@ export function executeSteps(draft, {
         const bench = (player.zones.bench || []).filter((c) => !c.attachedTo && (step.selfSwap || benchAllowed(c)));
         const active = (player.zones.active || []).find((c) => !c.attachedTo);
         if (!active || bench.length === 0) {
+          context.ownSwitchSkipped = true;
           events.push({ type: 'effectStepSkipped', reason: 'no_bench_pokemon', step: step.type });
           break;
         }
@@ -1145,11 +1150,9 @@ export function executeSteps(draft, {
       case 'switchOpponentOut': {
         if (!opponent) break;
         // "If you do, …" after the player's own switch (Vanilluxe Slippery Soles, Samurott).
-        // A bench pick resumes with a fresh events list, so test for the own switch's skip.
-        const ownSwitchSkipped = events.some(
-          (e) => e.type === 'effectStepSkipped' && e.reason === 'no_bench_pokemon'
-        );
-        if (step.afterOwnSwitch && ownSwitchSkipped) {
+        // The own switch records its skip in the resumable context (a bench pick resumes with a
+        // fresh events list).
+        if (step.afterOwnSwitch && context.ownSwitchSkipped) {
           events.push({ type: 'effectStepSkipped', reason: 'no_own_switch', step: step.type });
           break;
         }

@@ -511,6 +511,11 @@ const TEMPLATES = [
   // that many cards."
   [/^discard as many cards as you like from your hand$/, () => ({ type: 'atkDiscardOwnHand', count: 'any' })],
   [/^(?:then, )?draw that many cards$/, () => ({ type: 'atkDraw', countFrom: 'handDiscarded' })],
+  // Ludicolo Healing Steps: after "You may discard as many cards as you like from your hand".
+  [
+    /^remove that many damage counters from this pokémon$/,
+    () => ({ type: 'atkHealCounted', target: 'self', countFrom: 'handDiscarded' }),
+  ],
 
   // Own-hand discards (design 036 A11). A cost the attack cannot be used without, or a discard
   // the damage counts, moves before damage in parseAttackSteps; "If you do, …" chains on it.
@@ -718,6 +723,11 @@ const TEMPLATES = [
   ],
 
   // Energy back to the opponent's hand
+  // Palkia Pearl Blast: "choose an Energy card attached to the Defending Pokémon and return it".
+  [
+    /^choose an energy card attached to your opponent's active pokémon and return it to your opponent's hand$/,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'active', count: 1, toHand: true }),
+  ],
   [
     /^put (an?|\d+) energy(?: cards?)? attached to your opponent's active pokémon into their hand$/,
     (m) => ({ type: 'atkDiscardOppEnergy', scope: 'active', count: countOf(m[1]), toHand: true }),
@@ -1696,12 +1706,17 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const previous = result.after[result.after.length - 1];
     // "Discard a card from your hand. If you do, draw 3 cards." runs only when the hand paid.
     const handChain = Boolean(chained) && /^if you do, /.test(body) && HAND_COST_TYPES.has(previous?.type);
-    if (chained && !handChain && !isAttachStep(previous)) continue;
+    // "You may <step>. If you do, <step>." (Palkia Pearl Blast): the optional step becomes the
+    // cost the executor checks; a declined or skipped cost ends the effect.
+    const optionalChain =
+      Boolean(chained) && /^if you do, /.test(body) && !handChain && !isAttachStep(previous) && previous?.optional;
+    if (optionalChain) previous.cost = true;
+    if (chained && !handChain && !isAttachStep(previous) && !optionalChain) continue;
     const { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
     if (extra) flags.requiresExtraEnergy = extra.requirements;
     if (handChain) flags.requiresHandCost = true;
-    else if (chained) flags.requiresAttach = true;
-    const templates = chained && !handChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    else if (chained && !optionalChain) flags.requiresAttach = true;
+    const templates = chained && !handChain && !optionalChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;

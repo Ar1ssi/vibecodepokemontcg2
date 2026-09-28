@@ -3634,7 +3634,7 @@
    "name": "Umbreon & Darkrai-GX",
    "attack": "Dark Moon-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "dark mountain#5hcxg2": {
    "name": "Tyranitar",
@@ -8266,7 +8266,7 @@
    "name": "Magnezone",
    "attack": "Gyro Ball",
    "family": "switch",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "gyro ball#jpixkl": {
    "name": "Magnezone",
@@ -8716,7 +8716,7 @@
    "name": "Unown I",
    "attack": "Hidden Power",
    "family": "neutralize-opponent-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#1b1y3rk": {
    "name": "Unown U",
@@ -8740,7 +8740,7 @@
    "name": "Unown E",
    "attack": "Hidden Power",
    "family": "coin-flip",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#1frtcey": {
    "name": "Unown",
@@ -10012,7 +10012,7 @@
    "name": "Cobalion-GX",
    "attack": "Iron Rule-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "iron swing#1k2dmqx": {
    "name": "Melmetal ex",
@@ -10828,7 +10828,7 @@
    "name": "Sableye",
    "attack": "Limitation",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "line force#1n45rmw": {
    "name": "Celebi V",
@@ -16018,7 +16018,7 @@
    "name": "Scream Tail ex",
    "attack": "Scream",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "screaming circle#1hj158x": {
    "name": "Gengar",

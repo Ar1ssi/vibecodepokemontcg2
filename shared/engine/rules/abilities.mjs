@@ -540,6 +540,11 @@ function withIfYouDoHalves(lower, parsed) {
     if (kinds.length > 0) attach.excludeKinds = kinds;
   }
 
+  // "Discard … from your hand. If you do, …" (Ninetales Nine Temptations): the discard is the
+  // cost, so it runs first (its handler ends the effect when the hand cannot pay).
+  const handCost = steps.find((step) => step.type === 'discardCostAbility');
+  if (handCost && /from your hand\. if you do\b/.test(lower)) steps = [handCost, ...steps.filter((step) => step !== handCost)];
+
   // Elusive Master: the Bench placement is the cost, so it runs before "draw 3 cards".
   const placement = steps.find((step) => step.type === 'selfBenchPlacementAbility' && step.cost);
   if (placement) steps = [placement, ...steps.filter((step) => step !== placement)];
@@ -719,7 +724,19 @@ export function parseAbility(text = '') {
       : /if you do, switch 1 of your opponent's benched pok[eé]mon with their active pok[eé]mon/.test(lower)
         ? 'switchOpponent'
         : null;
-    steps.push({
+    // The follow-up comes after the player's own switch only when one is printed before "If
+    // you do"; Ninetales Nine Temptations / Volcanion Prism Star Jet Geyser pay a hand discard.
+    const ownSwitchFirst = /switch (?:your active pok[eé]mon with 1 of your benched|(?:it|this pok[eé]mon) with your active|1 of your benched [^.]*with your active)[^.]*[.,] if you do/.test(lower);
+    if (opponentFollowUp && !ownSwitchFirst) {
+      steps.push({
+        type: opponentFollowUp,
+        guidance:
+          opponentFollowUp === 'switchOpponentOut'
+            ? 'Your opponent switches their Active Pokémon with 1 of their Benched Pokémon.'
+            : "Switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
+      });
+    }
+    if (!opponentFollowUp || ownSwitchFirst) steps.push({
       type: 'switchAbility',
       target: isOpponentBenchSwitch && !opponentFollowUp ? 'opponent' : 'self',
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
@@ -733,7 +750,7 @@ export function parseAbility(text = '') {
           ? 'Once during your turn: switch your Active with 1 of your Benched Pokémon; the new Active is Poisoned.'
           : 'Once during your turn: switch your Active with 1 of your Benched Pokémon.',
     });
-    if (opponentFollowUp) {
+    if (opponentFollowUp && ownSwitchFirst) {
       steps.push({
         type: opponentFollowUp,
         afterOwnSwitch: true,
@@ -1125,7 +1142,7 @@ export function parseAbility(text = '') {
     // "from your hand to evolve 1 of your Pokémon" is the evolve trigger (Primarina
     // Enriching Melody), gated by the turn that Pokémon evolved — not the played-to-
     // Bench window. Flagged so the orchestrators pick the right gate.
-    const evolve = /when you play (?:this pok[eé]mon|[a-z0-9é' -]+?) from your hand to evolve/.test(lower);
+    const evolve = /when you play (?:this pok[eé]mon|(?!an? )[a-z0-9é' -]+?) from your hand to evolve(?! this pok[eé]mon)/.test(lower);
     const toBench = /when you play this pok[eé]mon from your hand (?:on)?to your bench/.test(lower);
     steps.push({
       type: 'whenPlayedAbility',

@@ -7,7 +7,8 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand, validateLegality } from '../reduce.mjs';
-import { parseAttackDamage } from '../rules/damage-parser.mjs';
+import { parseAttackDamage, opponentCounterClause } from '../rules/damage-parser.mjs';
+import { isAbilitySuppressed } from '../rules/ability-combat.mjs';
 import { parseAttackSteps } from '../rules/attack-steps.mjs';
 import { parseNextTurnLock } from '../rules/attack-effects.mjs';
 
@@ -1801,4 +1802,126 @@ test('Alolan Exeggutor-GX Tropical Head (Crimson Invasion 118): 20 per attached 
   });
   const res = choose(attack(state), [bench[0].instanceId]);
   assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 60);
+});
+
+// ── review regressions (parse-hole review B1–B5, S1–S5) ───────────────────────
+
+test('Delibird Souvenir (Team Rocket Returns 21) / Magneton Electric Blast (Skyridge 19): no stray counter clause', () => {
+  // Coin tiers and reminder text are not an unconditional counter placement.
+  assert.equal(
+    opponentCounterClause(
+      'Flip 3 coins. If 1 of them is heads, put 4 damage counters on the Defending Pokémon. If 2 of them are heads, remove 1 damage counter from the Defending Pokémon. If all of them are heads, put 10 damage counters on the Defending Pokémon. If all of them are tails, remove all damage counters from the Defending Pokémon.'
+    ),
+    null
+  );
+  assert.equal(
+    opponentCounterClause(
+      "You may discard all {L} Energy cards attached to Magneton when you use this attack. If you do, put damage counters equal to the amount of Energy cards removed in this way on any number of your opponent's Benched Pokémon in the way you like. (For example, if you discard 3 {L} Energy cards, you can put 1 damage counter on 1 of your opponent's Benched Pokémon and 2 on another.)"
+    ),
+    null
+  );
+});
+
+test('Electivire Discharge (Secret Wonders 25): one coin per {L} discarded, 50 per heads', () => {
+  const text =
+    'Discard all {L} Energy attached to Electivire. Flip a coin for each {L} Energy you discarded. This attack does 50 damage times the number of heads.';
+  const { state, defender } = board('Electivire', text, {
+    damage: '50×',
+    setup: (s) => attachTo(s, s.players.p1.zones.active[0], ['Lightning', 'Lightning', 'Lightning', 'Fire']),
+  });
+  const res = attack(state);
+  const flips = res.events.filter((e) => e.type === 'attackCoinFlipped').flatMap((e) => e.flips || []);
+  assert.equal(flips.length, 3);
+  const heads = flips.filter((f) => f === 'heads').length;
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage || 0, 50 * heads);
+  assert.equal(res.state.players.p1.zones.discard.length, 3);
+});
+
+test('Bronzong BREAK Metal Rain (Fates Collide 62): 30 damage per discarded {M}, placed one pick at a time', () => {
+  const text =
+    "Discard as many {M} Energy attached to this Pokémon as you like. For each Energy card discarded in this way, choose 1 of your opponent's Pokémon and do 30 damage to it. Don't apply Weakness and Resistance. (You may choose the same Pokémon more than once.)";
+  let metals;
+  let bench;
+  const { state, defender } = board('Bronzong BREAK', text, {
+    damage: '',
+    setup: (s) => {
+      const host = s.players.p1.zones.active[0];
+      metals = [energy('Metal', host.instanceId), energy('Metal', host.instanceId)];
+      s.players.p1.zones.active.push(...metals);
+      bench = addBench(s, 'p2', 'B');
+    },
+  });
+  let res = attack(state);
+  res = choose(res, metals.map((c) => c.instanceId));
+  res = choose(res, [bench[0].instanceId]);
+  res = choose(res, [defender.instanceId]);
+  assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 30);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 30);
+});
+
+test('Ludicolo Healing Steps (Deoxys 10): heals one counter per card discarded', () => {
+  const text =
+    'You may discard as many cards as you like from your hand. If you do, remove that many damage counters from Ludicolo.';
+  let hand;
+  const { state, attacker } = board('Ludicolo', text, {
+    damage: '',
+    setup: (s) => {
+      s.players.p1.zones.active[0].damage = 50;
+      hand = handOf(s, 'p1', 3);
+    },
+  });
+  let res = attack(state);
+  if (res.pendingChoice?.options.some((o) => o.instanceId === -11)) res = choose(res, [-11]);
+  res = choose(res, [hand[0].instanceId, hand[1].instanceId]);
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 30);
+});
+
+test('Palkia Pearl Blast (Majestic Dawn 11): the opponent loses an Energy only after Palkia returns one', () => {
+  const text =
+    "You may return an Energy card attached to Palkia to your hand. If you do, choose an Energy card attached to the Defending Pokémon and return it to your opponent's hand.";
+  const run = (answer) => {
+    let theirs;
+    const { state } = board('Palkia', text, {
+      damage: '',
+      setup: (s) => {
+        attachTo(s, s.players.p1.zones.active[0], ['Water']);
+        theirs = energy('Fire', s.players.p2.zones.active[0].instanceId);
+        s.players.p2.zones.active.push(theirs);
+      },
+    });
+    let res = attack(state);
+    res = choose(res, [answer]);
+    return res.state.players.p2.zones.hand.some((c) => c.instanceId === theirs.instanceId);
+  };
+  assert.equal(run(-11), true);
+  assert.equal(run(-12), false);
+});
+
+test('Shiftry Seal Off (Rising Rivals 13): the Defending Pokémon\'s Poké-Body is silenced next turn only', () => {
+  const text = "The Defending Pokémon can't use any Poké-Powers or Poké-Bodies during your opponent's next turn.";
+  const { state, defender } = board('Shiftry', text, {
+    damage: '60',
+    setup: (s) => (s.players.p2.zones.active[0].abilities = [{ name: 'Guard', type: 'Poké-Body', text: 'Any damage done to this Pokémon by attacks is reduced by 20.' }]),
+  });
+  const res = attack(state);
+  const card = root(res.state, 'p2', defender.instanceId);
+  assert.equal(isAbilitySuppressed(card, { turnNumber: 6 }), true);
+  assert.equal(isAbilitySuppressed(card, { turnNumber: 8 }), false);
+});
+
+test('Unown Hidden Power guess: the opponent\'s prompt carries no hand card id', () => {
+  const text =
+    'Choose a card from your hand and put it face down. Your opponent guesses if the card is a Pokémon, Trainer, or Energy card. Reveal the card. If your opponent guessed wrong, draw 2 cards. Put the card back into your hand.';
+  let potion;
+  const { state } = board('Unown', text, {
+    damage: '',
+    setup: (s) => {
+      potion = trainer('Potion', 'Item');
+      s.players.p1.zones.hand.push(potion);
+    },
+  });
+  const res = choose(attack(state), [potion.instanceId]);
+  assert.equal(res.pendingChoice.player, 'p2');
+  assert.ok(!JSON.stringify(res.state.pendingChoice).includes(`"${potion.instanceId}"`));
+  assert.ok(!JSON.stringify(res.state.pendingChoice).includes(`:${potion.instanceId},`));
 });

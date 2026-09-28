@@ -439,7 +439,13 @@ export function parseAttackDamage(
     total = base + reveal.perUnit * counted;
     components.push('per-revealed');
     notes.push(`${reveal.perUnit} × ${counted} revealed from the deck`);
-  } else if (text && discardEnergyScaling(attack?.text) && !/more damage for each heads/.test(text)) {
+  } else if (
+    text &&
+    discardEnergyScaling(attack?.text) &&
+    // Electivire Discharge: the discard sets the coin count; the heads scale the damage.
+    // (timesAsForEach has already rewritten "times the number of heads" to "for each heads").
+    !/damage (?:times the number of|for each) heads/.test(text)
+  ) {
     const discarded = ctx.energyDiscarded ?? 0;
     // "does N more damage for each card" (Mega Clefable ex) adds to the base;
     // "does N damage for each card" (Inferno X) replaces it.
@@ -1415,7 +1421,12 @@ export function opponentCounterClause(attackText) {
     .replace(/\bthe defending pok[ée]mon\b/gi, "your opponent's Active Pokémon")
     // Wobbuffet Shadow Tag: counters placed "at the end of your opponent's next turn" are a
     // timed marker (attack-steps.mjs), not this attack's counters.
-    .replace(/[^.]*at the end of your opponent's next turn\./gi, '');
+    .replace(/[^.]*at the end of your opponent's next turn\./gi, '')
+    // Delibird Souvenir's coin tiers ("If 1 of them is heads, put 4 damage counters …") are not
+    // an unconditional placement; Magneton Electric Blast's reminder "(For example, … put 1
+    // damage counter on 1 of your opponent's Benched Pokémon …)" is not one either.
+    .replace(/[^.]*\bif (?:\d+|all|none) of them (?:is|are) (?:heads|tails)[^.]*\./gi, '')
+    .replace(/\s*\([^)]*\)/g, '');
   let m =
     /choose (\d+) of your opponent's (benched )?pok[ée]mon and put (\d+) damage counters? on each/i.exec(
       t
@@ -1685,6 +1696,22 @@ export function attackTargetClause(attackText) {
       amount: Number(joined[3]),
       count: Number(joined[1] || 1),
       scope: joined[2] || !joined[1] ? 'bench' : 'any',
+    };
+  }
+  // Bronzong BREAK Metal Rain: "For each Energy card discarded in this way, choose 1 of your
+  // opponent's Pokémon and do 30 damage to it." One pick per discarded card (reduce.mjs sets
+  // `remaining` from the discard; repeats allowed).
+  const perDiscard =
+    /for each energy card discarded in this way, choose 1 of your opponent's pok[ée]mon and do (\d+) damage to it/i.exec(t);
+  if (perDiscard) {
+    return {
+      kind: 'damage',
+      amount: Number(perDiscard[1]),
+      count: 1,
+      scope: 'any',
+      distributable: true,
+      remaining: 0,
+      remainingFromDiscard: true,
     };
   }
   // Alolan Exeggutor-GX Tropical Head: "This attack does 20 damage times the amount of Energy

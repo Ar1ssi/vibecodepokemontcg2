@@ -97,7 +97,7 @@ export function requiresKoOnOpponentTurn(card) {
 // has its own one-shot window.
 // Older prints name the Pokémon (Walrein ex Chilling Breath: "when you play Walrein ex …").
 const EVOLVE_PLAYED_CLAUSE =
-  /when you play (?:this pok[eé]mon|[a-z0-9é' -]+?) from your hand to evolve\b/;
+  /when you play (?:this pok[eé]mon|(?!an? )[a-z0-9é' -]+?) from your hand to evolve\b(?! this pok[eé]mon)/;
 
 function matchesFirstAbilityOrText(card, clause) {
   const arrText =

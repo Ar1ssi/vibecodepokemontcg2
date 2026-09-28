@@ -45,6 +45,7 @@ export function discardCardToPlayerZone(player, card) {
   if (card?.faceDownUntilTurn != null) {
     delete card.asEnergy;
     delete card.faceDownUntilTurn;
+    delete card.faceDownHostId;
   }
   const zoneKey = isPrismStarCard(card) ? 'lostZone' : 'discard';
   if (!Array.isArray(player.zones[zoneKey])) player.zones[zoneKey] = [];
