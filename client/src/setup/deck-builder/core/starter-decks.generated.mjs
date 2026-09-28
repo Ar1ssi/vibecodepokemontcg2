@@ -206,18 +206,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 2
     },
     {
-      "id": "sv10.5b-084",
-      "name": "Pokégear 3.0",
+      "id": "sv10.5w-084",
+      "name": "Hilda",
       "supertype": "Trainer",
       "localId": "084",
-      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp",
+      "image": "https://assets.tcgdex.net/en/sv/sv10.5w/084/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/084/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv10.5w/084/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10.5w/084/high.webp"
       },
       "set": {
-        "id": "sv10.5b",
-        "name": "Black Bolt",
+        "id": "sv10.5w",
+        "name": "White Flare",
         "releaseDate": ""
       },
       "qty": 1
@@ -274,31 +274,31 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "me01-120",
-      "name": "Lt. Surge's Bargain",
+      "id": "sv08-177",
+      "name": "Gravity Mountain",
       "supertype": "Trainer",
-      "localId": "120",
-      "image": "https://assets.tcgdex.net/en/me/me01/120/high.webp",
+      "localId": "177",
+      "image": "https://assets.tcgdex.net/en/sv/sv08/177/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/120/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/120/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv08/177/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv08/177/high.webp"
       },
       "set": {
-        "id": "me01",
-        "name": "Mega Evolution",
+        "id": "sv08",
+        "name": "Surging Sparks",
         "releaseDate": ""
       },
       "qty": 2
     },
     {
-      "id": "me01-117",
-      "name": "Forest of Vitality",
+      "id": "me01-116",
+      "name": "Fighting Gong",
       "supertype": "Trainer",
-      "localId": "117",
-      "image": "https://assets.tcgdex.net/en/me/me01/117/high.webp",
+      "localId": "116",
+      "image": "https://assets.tcgdex.net/en/me/me01/116/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/me/me01/117/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me01/117/high.webp"
+        "small": "https://assets.tcgdex.net/en/me/me01/116/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me01/116/high.webp"
       },
       "set": {
         "id": "me01",
@@ -616,14 +616,14 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 2
     },
     {
-      "id": "me02-088",
-      "name": "Dizzying Valley",
+      "id": "me02-089",
+      "name": "Firebreather",
       "supertype": "Trainer",
-      "localId": "088",
-      "image": "https://assets.tcgdex.net/en/me/me02/088/high.webp",
+      "localId": "089",
+      "image": "https://assets.tcgdex.net/en/me/me02/089/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/088/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/088/high.webp"
+        "small": "https://assets.tcgdex.net/en/me/me02/089/low.webp",
+        "large": "https://assets.tcgdex.net/en/me/me02/089/high.webp"
       },
       "set": {
         "id": "me02",
@@ -684,14 +684,14 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "sv06-161",
-      "name": "Raifort",
+      "id": "sv06-155",
+      "name": "Lana's Aid",
       "supertype": "Trainer",
-      "localId": "161",
-      "image": "https://assets.tcgdex.net/en/sv/sv06/161/high.webp",
+      "localId": "155",
+      "image": "https://assets.tcgdex.net/en/sv/sv06/155/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv06/161/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv06/161/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv06/155/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv06/155/high.webp"
       },
       "set": {
         "id": "sv06",
@@ -752,18 +752,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 4
     },
     {
-      "id": "sv10.5b-082",
-      "name": "Fennel",
+      "id": "sv10.5w-082",
+      "name": "Energy Retrieval",
       "supertype": "Trainer",
       "localId": "082",
-      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/082/high.webp",
+      "image": "https://assets.tcgdex.net/en/sv/sv10.5w/082/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/082/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/082/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv10.5w/082/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10.5w/082/high.webp"
       },
       "set": {
-        "id": "sv10.5b",
-        "name": "Black Bolt",
+        "id": "sv10.5w",
+        "name": "White Flare",
         "releaseDate": ""
       },
       "qty": 2
@@ -837,18 +837,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "me03-083",
-      "name": "Potion",
+      "id": "sv08-185",
+      "name": "Precious Trolley",
       "supertype": "Trainer",
-      "localId": "083",
-      "image": "https://assets.tcgdex.net/en/me/me03/083/high.webp",
+      "localId": "185",
+      "image": "https://assets.tcgdex.net/en/sv/sv08/185/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/me/me03/083/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me03/083/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv08/185/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv08/185/high.webp"
       },
       "set": {
-        "id": "me03",
-        "name": "Perfect Order",
+        "id": "sv08",
+        "name": "Surging Sparks",
         "releaseDate": ""
       },
       "qty": 1
@@ -1179,18 +1179,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "me02-093",
-      "name": "Sacred Charm",
+      "id": "sv06.5-054",
+      "name": "Academy at Night",
       "supertype": "Trainer",
-      "localId": "093",
-      "image": "https://assets.tcgdex.net/en/me/me02/093/high.webp",
+      "localId": "054",
+      "image": "https://assets.tcgdex.net/en/sv/sv06.5/054/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/me/me02/093/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me02/093/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv06.5/054/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv06.5/054/high.webp"
       },
       "set": {
-        "id": "me02",
-        "name": "Phantasmal Flames",
+        "id": "sv06.5",
+        "name": "Shrouded Fable",
         "releaseDate": ""
       },
       "qty": 2
@@ -1264,18 +1264,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 2
     },
     {
-      "id": "me05-070",
-      "name": "Silvally",
-      "supertype": "Pokémon",
-      "localId": "070",
-      "image": "https://assets.tcgdex.net/en/me/me05/070/high.webp",
+      "id": "sv06.5-058",
+      "name": "Dangerous Laser",
+      "supertype": "Trainer",
+      "localId": "058",
+      "image": "https://assets.tcgdex.net/en/sv/sv06.5/058/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/me/me05/070/low.webp",
-        "large": "https://assets.tcgdex.net/en/me/me05/070/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv06.5/058/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv06.5/058/high.webp"
       },
       "set": {
-        "id": "me05",
-        "name": "Pitch Black",
+        "id": "sv06.5",
+        "name": "Shrouded Fable",
         "releaseDate": ""
       },
       "qty": 1
@@ -2016,18 +2016,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 1
     },
     {
-      "id": "sv10.5b-084",
-      "name": "Pokégear 3.0",
+      "id": "sv10.5w-084",
+      "name": "Hilda",
       "supertype": "Trainer",
       "localId": "084",
-      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp",
+      "image": "https://assets.tcgdex.net/en/sv/sv10.5w/084/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/084/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/084/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv10.5w/084/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10.5w/084/high.webp"
       },
       "set": {
-        "id": "sv10.5b",
-        "name": "Black Bolt",
+        "id": "sv10.5w",
+        "name": "White Flare",
         "releaseDate": ""
       },
       "qty": 1
@@ -2203,18 +2203,18 @@ export const GENERATED_STARTER_DECKS = {
       "qty": 2
     },
     {
-      "id": "sv10.5b-082",
-      "name": "Fennel",
+      "id": "sv10.5w-082",
+      "name": "Energy Retrieval",
       "supertype": "Trainer",
       "localId": "082",
-      "image": "https://assets.tcgdex.net/en/sv/sv10.5b/082/high.webp",
+      "image": "https://assets.tcgdex.net/en/sv/sv10.5w/082/high.webp",
       "images": {
-        "small": "https://assets.tcgdex.net/en/sv/sv10.5b/082/low.webp",
-        "large": "https://assets.tcgdex.net/en/sv/sv10.5b/082/high.webp"
+        "small": "https://assets.tcgdex.net/en/sv/sv10.5w/082/low.webp",
+        "large": "https://assets.tcgdex.net/en/sv/sv10.5w/082/high.webp"
       },
       "set": {
-        "id": "sv10.5b",
-        "name": "Black Bolt",
+        "id": "sv10.5w",
+        "name": "White Flare",
         "releaseDate": ""
       },
       "qty": 1

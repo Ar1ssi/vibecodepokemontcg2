@@ -2,7 +2,10 @@
 // Sets LIVE_TESTS here instead of in package.json so it works in cmd, PowerShell and sh alike.
 import { spawnSync } from 'node:child_process';
 
-const LIVE_TEST_FILES = ['shared/engine/rules/__tests__/card-identity-live.test.mjs'];
+const LIVE_TEST_FILES = [
+  'shared/engine/rules/__tests__/card-identity-live.test.mjs',
+  'scripts/__tests__/build-battle-box-live.test.mjs',
+];
 
 const run = spawnSync(process.execPath, ['--test', ...LIVE_TEST_FILES], {
   stdio: 'inherit',

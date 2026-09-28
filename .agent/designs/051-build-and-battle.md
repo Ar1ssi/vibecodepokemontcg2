@@ -1,5 +1,5 @@
 # 051: Build & Battle game mode (Phantasmal Flames box)
-Status: draft — awaiting user approval (feature.md phase 2 gate)
+Status: approved 2026-09-28 (user: "start working on the first slice") — slice 1 done
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -186,7 +186,7 @@ Flygon MEP 16, Toxtricity MEP 17 (TCGdex ids mep-014…mep-017, verified live); 
     `3 Lillie's Determination`, `2 Brock's Scouting`, `2 Rare Candy`, `2 Dusk Ball`, `1 Switch`,
     `1 Energy Recycler`, `12 Basic Darkness Energy`.
   - Trainer ids (TCGdex live 2026-09-28): Firebreather me02-089, Lillie's Determination me01-119,
-    Hilda sv10.5b-084, Energy Retrieval sv10.5b-082, Ultra Ball me01-131, Switch me01-130, Dawn
+    Hilda sv10.5w-084, Energy Retrieval sv10.5w-082, Ultra Ball me01-131, Switch me01-130, Dawn
     me02-087, Rare Candy me01-125, Fighting Gong me01-116, Premium Power Pro me01-124, Dusk Ball
     sv08-175, Brock's Scouting sv09-146, Iris's Fighting Spirit sv09-149, Drayton sv08-174,
     Wondrous Patch me02-094, Grimsley's Move me02-090, Energy Recycler sv10-164.
@@ -342,8 +342,8 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 | 28 | pop-up blocked from the slim Deck tab | same blocked message as the deck builder button | [ ] |
 | 29 | prize zone with 4 cards | renders and fans (design 045) with 4; prize picker offers 4 | [ ] e2e |
 | 30 | card text "if you have exactly 6 Prize cards" under 4 prizes | never applies (as printed) — struck as correct behavior, noted in docs | [x] reasoning |
-| 31 | generated data drift (TCGdex renames a card) | generator throws when `card.name` ≠ the decklist name; the committed module is the truth until regenerated | [ ] |
-| 32 | starter-deck id fix | regenerated `starter-decks.generated.mjs` contains Fighting Gong, Firebreather, Academy at Night and none of Forest of Vitality / Dizzying Valley / Sacred Charm | [ ] |
+| 31 | generated data drift (TCGdex renames a card) | generator throws when `card.name` ≠ the decklist name; the committed module is the truth until regenerated | [x] `fetchCard` name check; `--check` live test |
+| 32 | starter-deck id fix | regenerated `starter-decks.generated.mjs` contains Fighting Gong, Firebreather, Academy at Night and none of Forest of Vitality / Dizzying Valley / Sacred Charm | [x] box-catalog.test.mjs |
 
 ## Test plan
 Unit (`node --test`, no DOM): `build-battle/__tests__/pack-opening.test.mjs` (rows 4–8 on the real
@@ -376,6 +376,17 @@ persisted artifacts are `ptcg-sim.build-battle.v1` (ignored by older code) and l
 | 5 Close | `.agent/areas/deck-builder.md` (+ B&B lines), `MAP.md` (build-battle dir, formats.mjs), `DECISIONS.md` (D185+: picks 1,2,3,5,6,7,8), `STATE.md`, design status | — | review.md pass by a fresh agent on the whole diff | — | `pnpm test` + review findings filed |
 
 ## Deviations (Builder appends here during build)
+- Slice 1: the four lists were verified against Bulbapedia's decklist tables (screenshot from the
+  user, 2026-09-28); they matched `DECK_SOURCES` card for card.
+- Slice 1: the name check found 7 wrong `TRAINER_IDS`, not 3. Hilda and Energy Retrieval are White
+  Flare (`sv10.5w-084`/`-082`, as Bulbapedia's 084/086 and 082/086 say), not Black Bolt (Pokégear 3.0 /
+  Fennel). Also Gravity Mountain `sv08-177` (was Lt. Surge's Bargain), Lana's Aid `sv06-155` (Raifort),
+  Precious Trolley `sv08-185` (Potion), Academy at Night `sv06.5-054` (Sacred Charm), Dangerous Laser
+  `sv06.5-058` (Silvally). The regenerated starter decks change only those 10 rows.
+- Slice 1: TCGdex has no image for mep-014…017; `normalizeCard` falls back to the Limitless CDN
+  (`tpci/MEP/MEP_014_R_EN.png`, `_LG` large). The generated module is ~115 KB, not ~55 KB.
+- Slice 1: the box ships Basic Energy as MEE 002–007; baked as SVE (same card, existing image source).
+- Slice 1: `--check` runs as `scripts/__tests__/build-battle-box-live.test.mjs` in `pnpm test:live`.
 
 ---
 Self-approval checklist (only when the user is unreachable):
