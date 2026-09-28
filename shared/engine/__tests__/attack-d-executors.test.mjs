@@ -226,6 +226,40 @@ for (const textField of ['text', 'effect']) {
   });
 }
 
+test('Overflowing Wishes with fewer Energy than Benched Pokémon lets you choose the recipients', () => {
+  let state = attack(
+    board({
+      text: OVERFLOWING_WISHES,
+      ownBench: [
+        { instanceId: 2, name: 'A' },
+        { instanceId: 3, name: 'B' },
+        { instanceId: 4, name: 'C' },
+      ],
+      deck: [energy(80, 'Psychic'), energy(81, 'Psychic'), energy(82, 'Fire')],
+    })
+  );
+  assert.equal(state.pendingChoice.player, 'p1');
+  assert.equal(state.pendingChoice.min, 2);
+  assert.equal(state.pendingChoice.max, 2);
+  assert.deepEqual(ids(state.pendingChoice.options).sort(), [2, 3, 4]);
+  state = choose(state, [2, 4]);
+  assert.ok(!state.pendingChoice, 'one prompt only');
+  const hosts = state.players.p1.zones.bench.filter((c) => c.attachedTo != null).map((c) => c.attachedTo);
+  assert.deepEqual(hosts.sort(), [2, 4]);
+});
+
+test('Overflowing Wishes with no matching Energy in the deck attaches nothing and does not prompt', () => {
+  const state = attack(
+    board({
+      text: OVERFLOWING_WISHES,
+      ownBench: [{ instanceId: 2, name: 'A' }, { instanceId: 3, name: 'B' }],
+      deck: [energy(80, 'Fire')],
+    })
+  );
+  assert.ok(!state.pendingChoice);
+  assert.equal(state.players.p1.zones.bench.filter((c) => c.attachedTo != null).length, 0);
+});
+
 test('Dual Turbo lets you choose which 2 Benched Pokémon take the Energy', () => {
   let state = attack(
     board({

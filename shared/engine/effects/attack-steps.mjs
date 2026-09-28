@@ -3416,9 +3416,14 @@ function atkAttachEachBench(ctx) {
     return !step.pokemonType || pokemonHasType(top, step.pokemonType);
   });
   if (bench.length === 0) return skip(ctx, 'no_bench_pokemon');
+  // Second prompt (fewer Energy than Pokémon) resumes with the first prompt's targets in memo.
+  const shortageStage = Boolean(ctx.memo?.shortage);
   let chosen = bench;
-  if (step.max && bench.length > step.max) {
-    if (!ctx.selection) {
+  let selection = ctx.selection;
+  if (shortageStage) {
+    chosen = bench.filter((c) => ctx.memo.targetIds.includes(c.instanceId));
+  } else if (step.max && bench.length > step.max) {
+    if (!selection) {
       return ctx.ask({
         prompt: `${attackName(ctx)}: Choose up to ${step.max} of your Benched Pokémon`,
         options: bench,
@@ -3426,10 +3431,24 @@ function atkAttachEachBench(ctx) {
         max: step.max,
       });
     }
-    chosen = pickById(bench, ctx.selection).slice(0, step.max);
+    chosen = pickById(bench, selection).slice(0, step.max);
+    selection = null;
   }
   const zone = step.source === 'deck' ? player.zones.deck : player.zones.discard;
   const pool = (zone || []).filter((c) => energyMatches(c, step));
+  // Not enough Energy for every target: the player decides which Pokémon get one.
+  if (pool.length > 0 && pool.length < chosen.length) {
+    if (!shortageStage || !selection) {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Choose ${pool.length} Benched Pokémon to attach an Energy to (${pool.length} Energy found)`,
+        options: chosen,
+        min: pool.length,
+        max: pool.length,
+        memo: { shortage: true, targetIds: chosen.map((c) => c.instanceId) },
+      });
+    }
+    chosen = pickById(chosen, selection).slice(0, pool.length);
+  }
   for (const root of chosen) {
     const energy = pool.shift();
     if (!energy) break;
