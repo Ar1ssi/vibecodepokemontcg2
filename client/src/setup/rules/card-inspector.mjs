@@ -40,7 +40,11 @@ import {
   dispatchAuthoritativeUseAbility,
 } from '../netcode/authoritative-dispatch.js';
 import { getZone } from '../zones/get-zone.js';
-import { getAuthoritativeStadiumArray } from '../netcode/apply-view.js';
+import {
+  getAuthoritativeStadiumArray,
+  getAuthoritativeAttackExtras,
+  getAuthoritativeOncePerGame,
+} from '../netcode/apply-view.js';
 import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
@@ -219,6 +223,7 @@ const attackEl = (attack, cardType) => {
   }
   head.appendChild(right);
   section.appendChild(head);
+  if (attack.from) section.appendChild(el('p', 'ptcg-atk__from', `from ${attack.from}`));
 
   if (attack.text) {
     const body = textBody(attack.text);
@@ -613,15 +618,18 @@ async function resolveLiveContext(card, zone = 'active') {
     getStadium(),
     getAuthoritativeStadiumArray()
   );
-  // Stadium-granted / inherited attacks (Shrine of Memories, Meteor Falls,
-  // Holon Lake, Rocket's Tricky Gym) rendered alongside the printed ones. The
-  // same merge order is used by the server, so an `attackIndex` picked here
-  // resolves to the same attack there.
-  const extraAttacks = stadiumExtraAttacksFromZone(stadiumCard, {
-    zoneCards,
-    card,
-    isActive: zoneId === 'active',
-  });
+  // Attacks beyond the printed ones, in the server's `attackIndex` order. Under server
+  // authority the view lists them all (Stadium, Tool, Memory Helix and other borrowed or
+  // granted attacks; design 049). Without that list, fall back to the Stadium-granted ones
+  // (Shrine of Memories, Meteor Falls, Holon Lake, Rocket's Tricky Gym), merged in the same
+  // order the server uses.
+  const extraAttacks =
+    getAuthoritativeAttackExtras(card?.instanceId) ??
+    stadiumExtraAttacksFromZone(stadiumCard, {
+      zoneCards,
+      card,
+      isActive: zoneId === 'active',
+    });
   const {
     energyTypes,
     stadiumCostModifier,
@@ -655,6 +663,7 @@ async function resolveLiveContext(card, zone = 'active') {
     abilityUsed: abilityUsedFlag,
     priorAttacks,
     extraAttacks: resolvedExtra,
+    oncePerGame: getAuthoritativeOncePerGame(),
     attacker: card,
     zone,
     damageCtx: {

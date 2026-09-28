@@ -648,6 +648,18 @@ export function parseAttackDamage(
     }
   }
 
+  // ── Exact-heads branch: "If exactly N is/are heads, this attack does X damage" (Misty's
+  // Psyduck ESP, design 049). Applies only on exactly N heads; the count comes from the caller.
+  const exactHeads = text.match(/if exactly (\d+) (?:is|are) heads, this attack does (\d+) damage/);
+  if (exactHeads && Number.isFinite(headsCount)) {
+    const needed = Number(exactHeads[1]);
+    if (headsCount === needed) {
+      total += Number(exactHeads[2]);
+      components.push('coin');
+      notes.push(`coin: exactly ${needed} heads → +${exactHeads[2]}`);
+    }
+  }
+
   // ── Coin flip (outcome supplied by caller; we never flip) ──
   const headsBonus =
     /if heads, this attack does (\d+) more|if heads, .*(\d+) more damage/.test(
@@ -1260,6 +1272,13 @@ export function oncePerTurnClause(attackText) {
 export function isGxAttack(attack) {
   const name = typeof attack === 'string' ? attack : String(attack?.name ?? '');
   return /(?:^|[\s-])GX$/i.test(name.trim());
+}
+
+// Whether an attack is a VSTAR Power attack (App. 9): its text carries the once-per-game marker —
+// corpus "(You can't use more than 1 VSTAR Power in a game.)", TCGdex "(Can't use more than 1
+// VSTAR Power per game.)". Read from the attack itself so a copied attack keeps it (design 049).
+export function isVstarPowerAttack(attack) {
+  return /more than 1 VSTAR Power/i.test(String(attack?.text ?? attack?.effect ?? ''));
 }
 
 // Per-Pokémon spread damage to a whole Bench, per side. Matches "Do 10 damage to each of your

@@ -47,6 +47,7 @@ import {
   prizeFilterMatches,
   prizeRuleBoxes,
   isGxAttack,
+  isVstarPowerAttack,
   discardEnergyScaling,
   deckMillScaling,
   deckRevealScaling,
@@ -140,12 +141,13 @@ import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-ste
 import { pokemonHasType } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
-import { parseAttackCondition, attackConditionMet } from './rules/attack-conditions.mjs';
+import { parseAttackCondition, parseAttackUseGate, attackConditionMet } from './rules/attack-conditions.mjs';
 import {
   parseCopyAttack,
   inCopyGroup,
   copiedAttackFor,
   parseAttackBorrowAbility,
+  parseAttackGrant,
 } from './rules/attack-copy.mjs';
 import {
   attackerMatchesFilter,
@@ -812,6 +814,46 @@ function spendGxAttack(draft, { playerId, attacker, attack, events }) {
   }
 }
 
+/**
+ * Spends the player's once-per-game VSTAR Power when the attack used is a VSTAR Power attack
+ * (App. 9, design 049): the printed one, a copied one, or a borrowed one. Runs beside every
+ * `spendGxAttack` call.
+ */
+function spendVstarAttack(draft, { playerId, attacker, attack, events }) {
+  if (!isVstarPowerAttack(attack)) return;
+  const oncePerGame = ensureOncePerGame(draft, playerId);
+  if (oncePerGame && !oncePerGame.vstarUsed) {
+    oncePerGame.vstarUsed = true;
+    events.push({
+      type: 'vstarUsed',
+      playerId,
+      instanceId: attacker?.instanceId,
+      kind: 'vstar',
+      attackName: attack.name,
+    });
+  }
+}
+
+/**
+ * Why `playerId` may not use `attack` under the once-per-game rules, or null (App. 9/19): a gxLock
+ * from the opponent, a spent GX attack, or a spent VSTAR Power. Shared by attack legality and
+ * every copy-candidate filter so a copied attack obeys the same limits (design 049 O5).
+ */
+function onceAttackBlockReason(state, playerId, attack) {
+  const player = state.players?.[playerId];
+  if (isGxAttack(attack)) {
+    const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
+    if (state.players?.[opponentId]?.restOfGame?.some((e) => e.kind === 'gxLock')) {
+      return "Your opponent's attack stops you using GX attacks for the rest of the game.";
+    }
+    if (oncePerGameUsed(player, 'gx')) return 'Only one GX attack can be used per game.';
+  }
+  if (isVstarPowerAttack(attack) && oncePerGameUsed(player, 'vstar')) {
+    return 'VSTAR Power already used this game.';
+  }
+  return null;
+}
+
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
 function sideMarkerPrevents(draft, victimPlayerId, attackerPlayerId) {
   const guard = (draft.players[victimPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
@@ -1000,6 +1042,9 @@ function toolGrantedAttacksFor(state, card) {
   const out = [];
   for (const attached of zone) {
     if (attached.attachedTo !== card.instanceId) continue;
+    // Evolution cards sit in the stack attached to the Basic root: their attacks are the
+    // previous Evolutions', usable only through a grant (design 049), never as a Tool's.
+    if (isPokemon(attached) || isEnergy(attached)) continue;
     out.push(...parseGrantedAttacks(attached));
   }
   return out;
@@ -1015,7 +1060,17 @@ function borrowSourceMatches(card, borrow) {
     return false;
   }
   if (borrow.names && !borrow.names.includes(name)) return false;
+  if (borrow.namePrefix && !name.startsWith(borrow.namePrefix)) return false;
   return true;
+}
+
+// Legacy Pokémon Power status gate (Mimic, Psymimic; design 049): 'rotation' is off while the
+// holder is Asleep, Confused or Paralyzed, 'any' while it has any Special Condition.
+function powerStatusBlocks(powerStatus, holder) {
+  if (!powerStatus) return false;
+  const conditions = listConditions(holder);
+  if (powerStatus === 'any') return conditions.length > 0;
+  return conditions.some((c) => ['Asleep', 'Confused', 'Paralyzed'].includes(c));
 }
 
 /**
@@ -1033,6 +1088,7 @@ function abilityBorrowedAttacks(state, card) {
   if (!borrow) return [];
   if (borrow.requiresActive && ref.zoneId !== 'active') return [];
   if (isAbilitySuppressed(view, abilitySideContext(state, ref.playerId))) return [];
+  if (powerStatusBlocks(borrow.powerStatus, card)) return [];
   const own = state.players?.[ref.playerId];
   const opp = Object.values(state.players || {}).find((p) => p.playerId !== ref.playerId);
   const inPlay = (p, zones) =>
@@ -1045,27 +1101,121 @@ function abilityBorrowedAttacks(state, card) {
     ownDiscard: () => own?.zones?.discard || [],
     ownLostZone: () => own?.zones?.lostZone || [],
     oppLostZone: () => opp?.zones?.lostZone || [],
+    // Gyarados Dragon DNA: the Basic card under this Pokémon (the stack root itself).
+    selfBasic: () =>
+      priorEvolutionCards(ref.player?.zones?.[ref.zoneId] || [], card).filter(
+        (c) => (normalizeStage(c.stage) || 'Basic') === 'Basic'
+      ),
   };
   const borrowed = [];
-  for (const source of borrow.scopes.flatMap((scope) => bySource[scope]?.() || [])) {
-    if (source.instanceId === card.instanceId || !borrowSourceMatches(source, borrow)) continue;
-    for (const attack of source.attacks || []) {
-      if (!attack?.name) continue;
-      borrowed.push(copiedAttackFor(attack, { sourceName: source.name, copierName: view.name }));
+  for (const scope of borrow.scopes) {
+    for (const source of bySource[scope]?.() || []) {
+      const isSelf = source.instanceId === card.instanceId;
+      if ((isSelf && scope !== 'selfBasic') || !borrowSourceMatches(source, borrow)) continue;
+      for (const attack of source.attacks || []) {
+        if (!attack?.name) continue;
+        const copied = copiedAttackFor(attack, { sourceName: source.name, copierName: view.name });
+        borrowed.push(borrow.bonusBeforeWR ? { ...copied, bonusBeforeWR: borrow.bonusBeforeWR } : copied);
+      }
     }
   }
   return borrowed;
 }
 
-// `inPlayView` with Stadium extras and Ability-borrowed attacks merged into its attacks list.
+const abilityTexts = (view) =>
+  (view?.abilities || []).map((a) => (typeof a === 'string' ? a : a?.text ?? a?.effect ?? ''));
+const cardText = (card) =>
+  [card?.text, card?.effect, card?.cardText].find((v) => typeof v === 'string' && v) || '';
+
+/**
+ * Attacks other cards let `card` use (design 049 slice 4): an in-play Ability on either side
+ * (Relicanth Memory Dive, Celebi-EX Time Recall, Aerodactyl Prehistoric Memory, Honchkrow Dark
+ * Genes), an attached Tool (Memory Capsule, Memory Berry), or this turn's Recall. Each attack
+ * keeps its cost unless the grant says otherwise, and carries `grantedBy`.
+ */
+function grantedAttacksFor(state, card) {
+  const ref = findCard(state, card?.instanceId);
+  if (!ref || !['active', 'bench'].includes(ref.zoneId)) return [];
+  const zone = ref.player?.zones?.[ref.zoneId] || [];
+  const view = inPlayView(state, card);
+  const priorAttacks = (grantedBy) =>
+    priorEvolutionCards(zone, card).flatMap((src) =>
+      (src.attacks || []).filter((a) => a?.name).map((a) => ({ ...a, grantedBy }))
+    );
+  const out = [];
+
+  for (const [ownerId, owner] of Object.entries(state.players || {})) {
+    const sideContext = abilitySideContext(state, ownerId);
+    for (const root of ['active', 'bench'].flatMap((z) => rootsIn(owner?.zones?.[z]))) {
+      const holder = inPlayView(state, root);
+      // Cheap prefilter: this runs for every root on every attack view.
+      const grants = abilityTexts(holder)
+        .filter((t) => /can use any attack|attack as its own/i.test(t))
+        .map(parseAttackGrant)
+        .filter(Boolean);
+      if (grants.length === 0) continue;
+      if (isAbilitySuppressed(holder, sideContext)) continue;
+      for (const grant of grants) {
+        if (powerStatusBlocks(grant.powerStatus, root)) continue;
+        const sameSide = ownerId === ref.playerId;
+        if (grant.recipients === 'ownEvolved' && sameSide) out.push(...priorAttacks(holder.name));
+        if (grant.recipients === 'allEvolved') out.push(...priorAttacks(holder.name));
+        if (
+          grant.recipients === 'ownNamed' &&
+          sameSide &&
+          root.instanceId !== card.instanceId &&
+          String(view?.name || '').toLowerCase() === grant.recipientName
+        ) {
+          for (const attack of holder.attacks || []) {
+            if (!attack?.name) continue;
+            if (grant.holderMustPay && !attackCostPayable(state, ownerId, root, attack)) continue;
+            const copied = copiedAttackFor(attack, { sourceName: holder.name, copierName: view.name });
+            out.push({ ...copied, ...(grant.costFree ? { cost: [] } : {}), grantedBy: holder.name });
+          }
+        }
+      }
+    }
+  }
+
+  if (!isStadiumToolNegation(state.stadium?.card || state.stadium)) {
+    for (const tool of attachedTools(card, zone)) {
+      const grant = parseAttackGrant(cardText(tool));
+      if (grant?.recipients === 'host') out.push(...priorAttacks(tool.name));
+    }
+  }
+
+  const owner = state.players?.[ref.playerId];
+  if (owner?.flags?.evolutionAttacksTurn && ref.zoneId === 'active') out.push(...priorAttacks('Recall'));
+  return out;
+}
+
+// `inPlayView` with Stadium extras, Ability-borrowed and granted attacks merged into its
+// attacks list, in the order the client panel renders them (design 049).
 function attackViewFor(state, card, { isActive = true } = {}) {
   const view = inPlayView(state, card);
   const extras = mergeAttacks(
-    mergeAttacks(stadiumExtraAttacksFor(state, card, { isActive }), toolGrantedAttacksFor(state, card)),
-    abilityBorrowedAttacks(state, card)
+    mergeAttacks(
+      mergeAttacks(stadiumExtraAttacksFor(state, card, { isActive }), toolGrantedAttacksFor(state, card)),
+      abilityBorrowedAttacks(state, card)
+    ),
+    grantedAttacksFor(state, card)
   );
   if (extras.length === 0) return view;
   return { ...view, attacks: mergeAttacks(view?.attacks || [], extras) };
+}
+
+/**
+ * The attacks an in-play Pokémon can use beyond its printed ones (Stadium, Tool, borrowed and
+ * granted), in the order `attackViewFor` merges them — so printed.length + k is the
+ * `attackIndex` of extra k. Projected to the owner's view for the attack panel (design 049).
+ * @returns {object[]} [] when the card is not in play or has no extras
+ */
+export function attackExtrasFor(state, card) {
+  const ref = card ? findCard(state, card.instanceId) : null;
+  if (!ref || !['active', 'bench'].includes(ref.zoneId)) return [];
+  const printedCount = (inPlayView(state, card)?.attacks || []).length;
+  const all = attackViewFor(state, card, { isActive: ref.zoneId === 'active' })?.attacks || [];
+  return all.slice(printedCount);
 }
 
 // Effective HP including printed base stats, top evolution, attached Tools, Stadium modifiers, and ability HP bonuses.
@@ -2984,6 +3134,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
       p.flags.briarActive = false;
       delete p.flags.turnDamageBonuses;
       delete p.flags.ignoreDefenderEffectsTurn;
+      delete p.flags.evolutionAttacksTurn;
       delete p.flags.willFirstCoin;
     }
   }
@@ -3453,7 +3604,13 @@ function attackCostPayable(state, playerId, active, attack) {
   if (!(attack?.cost?.length > 0) && markerIncrease === 0) return true;
   const player = state.players?.[playerId];
   if (!player || !active) return false;
-  const activeZoneCards = player.zones?.active || [];
+  // The holder's own zone: a Benched holder (Honchkrow Dark Genes, design 049) prices its own
+  // Energy. The Active is the usual caller, and its zone is `active`.
+  const holderRef = findCard(state, active.instanceId);
+  const activeZoneCards =
+    (holderRef?.playerId === playerId && holderRef.player?.zones?.[holderRef.zoneId]) ||
+    player.zones?.active ||
+    [];
   const attached = activeZoneCards.filter(
     (c) => c.attachedTo === active.instanceId && isEnergy(c)
   );
@@ -3514,8 +3671,9 @@ function attackCostPayable(state, playerId, active, attack) {
       ...(opponent?.zones?.active || []),
       ...(opponent?.zones?.bench || []),
     ],
-    zone: 'active',
-    isActive: true,
+    // A Benched holder (Dark Genes) keeps its Bench position for Active-only discounts.
+    zone: holderRef?.zoneId === 'bench' ? 'bench' : 'active',
+    isActive: holderRef?.zoneId !== 'bench',
     opponentHandCount: (opponent?.zones?.hand || []).length,
   });
   if (abilityCost.ignoreAll) {
@@ -4087,19 +4245,12 @@ export function validateLegality(state, command) {
       if (attacks.length > 0 && !attack) {
         return { allowed: false, reason: 'Unknown attack.' };
       }
-      // App. 19: one GX attack per player per game. The flag is game-scoped, so this is
-      // the cross-turn gate that `attackerAttacked` (per-turn) cannot provide. Share the
-      // `useVStarGX` guard so a legacy state whose marker lives on `flags` also blocks it.
-      const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
-      if (isGxAttack(attack) && state.players[opponentId]?.restOfGame?.some((e) => e.kind === 'gxLock')) {
-        return { allowed: false, reason: "Your opponent's attack stops you using GX attacks for the rest of the game." };
-      }
-      if (isGxAttack(attack) && oncePerGameUsed(player, 'gx')) {
-        return {
-          allowed: false,
-          reason: 'Only one GX attack can be used per game.',
-        };
-      }
+      // App. 9/19: one VSTAR Power and one GX attack per player per game. The flags are
+      // game-scoped, so this is the cross-turn gate that `attackerAttacked` (per-turn) cannot
+      // provide. `oncePerGameUsed` shares the `useVStarGX` guard, so a legacy state whose marker
+      // lives on `flags` also blocks it.
+      const onceReason = onceAttackBlockReason(state, playerId, attack);
+      if (onceReason) return { allowed: false, reason: onceReason };
       // Iron Rule-GX (design 048): a player-scoped attack lock from the opponent's last turn,
       // covering Pokémon that came into play after the lock landed.
       if (
@@ -5135,20 +5286,34 @@ function flipAndResolveAttack(draft, ctx) {
   // Watch and Learn): the copied attack when one was chosen, scoped by turn number so the
   // opponent reads it only during their next turn (design 039).
   if (attackerPlayer) {
+    // Borrow-only fields (Dragon DNA's bonus, the source labels) belong to how this Pokémon used
+    // the attack, not to the attack a next-turn copier reads (design 049 review).
+    const printedAttack = { ...attack };
+    for (const key of ['bonusBeforeWR', 'grantedBy', 'copiedFrom', 'waivesUseGate']) delete printedAttack[key];
     attackerPlayer.lastAttack = {
-      attack: { ...attack },
+      attack: printedAttack,
       isGx: isGxAttack(attack),
       attackerName: ctx.attackerView?.name || ctx.attacker?.name || '',
       attackerInstanceId: ctx.attacker?.instanceId ?? null,
       turnNumber: draft.turn?.number || 1,
+      // Who was in play on the other side during this attack (Smeargle Sketch, design 049).
+      opponentInPlayIds: ['active', 'bench'].flatMap((zoneId) =>
+        rootsIn(
+          draft.players?.[ctx.oppId ?? Object.keys(draft.players || {}).find((id) => id !== playerId)]
+            ?.zones?.[zoneId]
+        ).map((c) => c.instanceId)
+      ),
     };
   }
   // Printed-text damage (design 013): coin flips first, then the "for each …" scaling
   // the parser resolves from live board counts, then bench/spread damage. Without this
   // every attack dealt its flat printed number regardless of the board (I26 follow-up).
-  const coinResult = flipAttackCoins(attack, activeRng);
+  // A copy attack's gate coins (Misty's Psyduck ESP, design 049) are this attack's coins: no
+  // second flip, no second event, and no Glimwood / Victory Star re-flip of the gate.
+  const preset = ctx.presetCoinResult || null;
+  const coinResult = preset || flipAttackCoins(attack, activeRng);
   const { coin, headsCount, flips } = coinResult;
-  if (flips.length > 0) {
+  if (flips.length > 0 && !preset) {
     events.push({
       type: 'attackCoinFlipped',
       playerId,
@@ -5171,7 +5336,7 @@ function flipAndResolveAttack(draft, ctx) {
     !glimwood &&
     !attackerPlayer?.flags?.victoryStarUsedThisTurn &&
     abilityVictoryStar(abilitySideContext(draft, playerId));
-  if (flips.length > 0 && (glimwood || victoryStar)) {
+  if (flips.length > 0 && !preset && (glimwood || victoryStar)) {
     draft.pendingChoice = createPendingChoice({
       player: playerId,
       source: glimwood ? 'stadium' : 'ability',
@@ -5232,6 +5397,11 @@ function copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard }
       return rootsIn(opp.discard);
     case 'oppDeckTop':
       return rootsIn((opp.deck || []).slice(0, copy.count));
+    // Shiftry ex Skill Hack, Malamar Hypnotic Reign / Alakazam Star Skill Copy (design 049).
+    case 'oppHand':
+      return rootsIn(opp.hand);
+    case 'ownHand':
+      return rootsIn(own.hand);
     default:
       return [];
   }
@@ -5244,7 +5414,36 @@ const RAW_ATTACK_SOURCES = new Set([
   'oppDiscard',
   'ownDeckTop',
   'ownEvolutionStack',
+  'oppHand',
+  'ownHand',
 ]);
+
+/**
+ * Whether the copier may choose `attack` at all (design 049): the once-per-game limits apply to
+ * a copied attack (R2, App. 19), and an attack whose "You can use this attack only if …" gate
+ * fails for the copier cannot be chosen (Mimed Games ruling R7). "Does nothing" gates stay the
+ * copied attack's own (R1). A wording that waives "anything else required in order to use that
+ * attack" (Smeargle Sketch) skips the use gate.
+ */
+function copyCandidateAllowed(draft, { copy, playerId, attacker, attack }) {
+  if (onceAttackBlockReason(draft, playerId, attack)) return false;
+  if (copy?.ignoreRequirements) return true;
+  const gate = parseAttackUseGate(attack?.text, { selfName: inPlayView(draft, attacker)?.name || attacker?.name });
+  if (!gate) return true;
+  // The full attack view (grants scan both sides) only when a gate needs the board.
+  const attackerView = attacker ? attackViewFor(draft, attacker) : null;
+  const defenderPlayerId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  const defender = (draft.players[defenderPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  const conditionCtx = buildServerAttackContext(draft, {
+    attackerPlayerId: playerId,
+    defenderPlayerId,
+    attacker,
+    defender,
+    attackerView,
+    defenderView: defender ? inPlayView(draft, defender) : null,
+  });
+  return attackConditionMet(gate, conditionCtx);
+}
 
 /**
  * The attacks a copy attack may use: every attack on its source cards except other copy
@@ -5252,18 +5451,23 @@ const RAW_ATTACK_SOURCES = new Set([
  * Design 039 filters: Tera only, Dark-name only, exclude the user, no Rule Box.
  */
 function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopCard }) {
-  if (copy.source === 'oppLastAttack') return lastTurnAttackCandidates(draft, { copy, oppId });
+  if (copy.source === 'oppLastAttack') {
+    return lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker });
+  }
   const candidates = [];
   for (const card of copySourceCards(draft, { copy, playerId, oppId, attacker, deckTopCard })) {
     if (copy.excludeSelf && card.instanceId === attacker?.instanceId) continue;
     const view = RAW_ATTACK_SOURCES.has(copy.source) ? card : inPlayView(draft, card);
     if (copy.tera && !isTeraCard(view)) continue;
     if (copy.darkName && !/dark/i.test(String(view?.name || ''))) continue;
+    // Togetic δ Delta Copy: δ Pokémon carry "δ" in their TCGdex name (ex15-1 … ex15-40).
+    if (copy.delta && !/δ/.test(String(view?.name || ''))) continue;
     if (copy.noRuleBox && isRuleBoxPokemon(view ?? card)) continue;
     for (const attack of view?.attacks || []) {
       if (!attack?.name || parseCopyAttack(attack.text)) continue;
       if (copy.excludeGx && isGxAttack(attack)) continue;
       if (copy.needsEnergy && !attackCostPayable(draft, playerId, attacker, attack)) continue;
+      if (!copyCandidateAllowed(draft, { copy, playerId, attacker, attack })) continue;
       candidates.push({ sourceId: card.instanceId, sourceName: card.name, attack: { ...attack } });
     }
   }
@@ -5275,13 +5479,23 @@ function copyAttackCandidates(draft, { copy, playerId, oppId, attacker, deckTopC
  * did not attack, when the wording excludes GX attacks and theirs was one, or when the attack
  * they used was itself a copy.
  */
-function lastTurnAttackCandidates(draft, { copy, oppId }) {
+function lastTurnAttackCandidates(draft, { copy, oppId, playerId, attacker }) {
   const last = draft.players?.[oppId]?.lastAttack;
   const currentTurn = Math.max(1, Number(draft.turn?.number) || 1);
   if (!last || Number(last.turnNumber) !== currentTurn - 1) return [];
   if (copy.excludeGx && last.isGx) return [];
+  // Smeargle Sketch (design 049): the Defending Pokémon must be the one that attacked, and the
+  // copier must have been in play during that attack.
+  if (copy.fromDefending) {
+    const defending = rootsIn(draft.players?.[oppId]?.zones?.active)[0];
+    if (!defending || defending.instanceId !== last.attackerInstanceId) return [];
+  }
+  if (copy.requiresInPlayDuring && !(last.opponentInPlayIds || []).includes(attacker?.instanceId)) {
+    return [];
+  }
   const attack = last.attack;
   if (!attack?.name || parseCopyAttack(attack.text)) return [];
+  if (!copyCandidateAllowed(draft, { copy, playerId, attacker, attack })) return [];
   return [
     {
       sourceId: last.attackerInstanceId ?? null,
@@ -5334,6 +5548,16 @@ function offerCopiedAttack(
       cards: looked.map((c) => ({ instanceId: c.instanceId, name: c.name })),
     });
   }
+  // Skill Hack looks at / Hypnotic Reign reveals the opponent's hand, even when it holds no
+  // Pokémon to copy (design 049).
+  if (copy.source === 'oppHand') {
+    events.push({
+      type: 'cardsRevealed',
+      playerId: oppId,
+      hand: true,
+      cards: (draft.players[oppId]?.zones?.hand || []).map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+  }
   // Slowking Seek Inspiration: discard the top card first; it is only copyable when it is a
   // Pokémon without a Rule Box. The discard happens even when nothing can be copied.
   let deckTopCard = null;
@@ -5374,6 +5598,12 @@ function offerCopiedAttack(
     targetInstanceId,
     candidates,
     shuffleOppDeck,
+    // Smeargle Sketch waives "anything else required": the copied attack's use gate.
+    ...(copy.ignoreRequirements ? { waiveUseGate: true } : {}),
+    // Hypnotic Reign / Skill Copy discard the chosen hand card (design 049).
+    ...(copy.discardSource
+      ? { discardSource: true, sourceZoneOwner: copy.source === 'ownHand' ? playerId : oppId }
+      : {}),
   };
   // A wording that prints no "choose" (Mimikyu Copycat, Sudowoodo Watch and Learn) uses its
   // single candidate directly, without a one-option prompt.
@@ -5381,16 +5611,32 @@ function offerCopiedAttack(
     resumeCopiedAttack(draft, { token: resumeToken, selection: [1], activeRng, events });
     return true;
   }
+  // Mime Jr. Mimed Games: "Your opponent chooses an attack" — the opponent answers the prompt;
+  // the token still resumes the attacker's attack.
+  const opponentChooses = copy.chooser === 'opponent';
   draft.pendingChoice = createPendingChoice({
-    player: playerId,
+    player: opponentChooses ? oppId : playerId,
     source: 'attack',
-    prompt: 'Choose the attack to use as this attack.',
+    prompt: opponentChooses
+      ? `Choose the attack your opponent's ${attacker?.name || 'Pokémon'} uses as this attack.`
+      : 'Choose the attack to use as this attack.',
     options,
     min: 1,
     max: 1,
     resumeToken,
   });
   return true;
+}
+
+/** Moves the hand card a copy attack used to its owner's discard pile (Hypnotic Reign, Skill Copy). */
+function discardCopySourceFromHand(draft, ownerId, instanceId, events) {
+  const owner = draft.players?.[ownerId];
+  const hand = owner?.zones?.hand || [];
+  const index = hand.findIndex((c) => c.instanceId === instanceId);
+  if (index < 0) return;
+  const [card] = hand.splice(index, 1);
+  discardCardToPlayerZone(owner, card);
+  events.push({ type: 'cardsDiscarded', playerId: ownerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
 }
 
 /** Resumes a copy attack with the chosen attack (or its own text when declined). */
@@ -5406,9 +5652,11 @@ function resumeCopiedAttack(draft, { token, selection, activeRng, events }) {
   const attackerView = attackViewFor(draft, attacker);
   const ownAttack = attackerView?.attacks?.[token.attackIndex ?? 0] || { name: 'Attack', damage: 0 };
   const picked = (token.candidates || [])[Number((selection || [])[0]) - 1];
-  const copiedAttack = picked
+  const copied = picked
     ? copiedAttackFor(picked.attack, { sourceName: picked.sourceName, copierName: attacker.name })
     : null;
+  // The flag travels with the attack object through every later resume token.
+  const copiedAttack = copied && token.waiveUseGate ? { ...copied, waivesUseGate: true } : copied;
   if (copiedAttack) {
     events.push({
       type: 'attackCopied',
@@ -5418,6 +5666,7 @@ function resumeCopiedAttack(draft, { token, selection, activeRng, events }) {
       copiedName: copiedAttack.name,
       sourceId: picked.sourceId,
     });
+    if (token.discardSource) discardCopySourceFromHand(draft, token.sourceZoneOwner, picked.sourceId, events);
   }
   let defender = null;
   let defenderPlayerId = oppId;
@@ -5495,9 +5744,12 @@ function resolveAttackEffectPhase(draft, ctx) {
   // damage and every effect step, so it resolves before any of them. It runs once per attack:
   // a resumed effect phase carries `conditionChecked` so a before-damage step cannot flip it.
   if (!ctx.conditionChecked) {
-    const condition = parseAttackCondition(attack?.text, {
-      selfName: attackerView?.name || attacker?.name,
-    });
+    const selfName = attackerView?.name || attacker?.name;
+    // Smeargle Sketch copies "except for … anything else required": its use gate is waived.
+    const condition =
+      attack?.waivesUseGate && parseAttackUseGate(attack?.text, { selfName })
+        ? null
+        : parseAttackCondition(attack?.text, { selfName });
     const conditionCtx =
       condition &&
       buildServerAttackContext(draft, {
@@ -5519,6 +5771,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         condition,
       });
       spendGxAttack(draft, { playerId, attacker, attack, events });
+      spendVstarAttack(draft, { playerId, attacker, attack, events });
       endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
       return;
     }
@@ -5863,7 +6116,10 @@ function resolveAttackEffectPhase(draft, ctx) {
               immunity.ignoreDefenderEffects ||
               abilityReads.ignoreDefenderEffects ||
               trainerIgnoresDefenderEffects(draft, playerId, abilityReads.attacker),
-            abilityBonusBeforeWR: abilityReads.abilityBonusBeforeWR,
+            // Gyarados Dragon DNA: a borrowed Basic attack does 30 more to the Defending Pokémon
+            // (design 049). computeAttackDamage drops every bonus when the attack does no damage.
+            abilityBonusBeforeWR:
+              abilityReads.abilityBonusBeforeWR + (Number(effectiveAttack?.bonusBeforeWR) || 0),
             abilityReductionBeforeWR: abilityReads.abilityReductionBeforeWR,
             abilityReductionAfterWR: abilityReads.abilityReductionAfterWR,
             abilityPrevention: abilityReads.abilityPrevention,
@@ -6717,7 +6973,9 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
 
       // App. 19: using a GX attack spends the player's single GX attack for the game. Set on the
       // resolving path and on a condition-failed attack; a Confused fizzle never reaches either.
+      // A VSTAR Power attack spends the VSTAR Power the same way (App. 9).
       spendGxAttack(draft, { playerId, attacker, attack, events });
+      spendVstarAttack(draft, { playerId, attacker, attack, events });
 
       // Raikou: "Then, attach those {L} Energy cards to 1 of your Pokémon."
       if (mill?.attachMatched && milledIds.length > 0 && !draft.pendingChoice) {
@@ -7518,6 +7776,13 @@ export function applyCommand(state, command, rng = null) {
         name: 'Attack',
         damage: 10,
       };
+      // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
+      // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
+      if (attacker && !isStadiumToolNegation(draft.stadium?.card || draft.stadium)) {
+        for (const tool of attachedTools(attacker, attackerPlayer.zones.active)) {
+          if (parseAttackGrant(cardText(tool))?.discardAfterAttack) tool.discardAtEndOfTurn = true;
+        }
+      }
 
       const oppId = Object.keys(draft.players || {}).find(
         (id) => id !== playerId
@@ -7596,8 +7861,40 @@ export function applyCommand(state, command, rng = null) {
       // A copy attack (design 031) picks the attack it uses before any coin is flipped.
       const targetInstanceId = payload?.targetInstanceId ?? null;
       const copy = parseCopyAttack(attack?.text);
-      // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
-      if (copy?.coinGate) {
+      // Misty's Psyduck ESP (design 049): all 3 heads copies; otherwise the attack's own text
+      // resolves with these same coins (1 heads draws, 2 heads does 20 damage).
+      let presetCoinResult = null;
+      if (copy?.coinGateFlips > 1) {
+        const flips = Array.from({ length: copy.coinGateFlips }, () => flipCoin(activeRng));
+        const headsCount = flips.filter((f) => f === 'heads').length;
+        const allMatch = flips.every((f) => f === copy.coinGate);
+        const coin = headsCount === flips.length ? 'heads' : headsCount === 0 ? 'tails' : null;
+        events.push({ type: 'attackCoinFlipped', playerId, attackName: attack.name, coin, headsCount, flips });
+        if (!allMatch && !copy.ownTextOnMiss) {
+          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+          break;
+        }
+        if (copy.ownTextOnMiss) presetCoinResult = { coin, headsCount, flips };
+        if (!allMatch) {
+          flipAndResolveAttack(draft, {
+            playerId,
+            activeRng,
+            events,
+            attacker,
+            defender,
+            defenderPlayerId,
+            oppId,
+            attack,
+            attackerPlayer,
+            attackerView,
+            atkIdx,
+            targetInstanceId,
+            presetCoinResult,
+          });
+          break;
+        }
+      } else if (copy?.coinGate) {
+        // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
         const coin = flipCoin(activeRng);
         events.push({
           type: 'attackCoinFlipped',
@@ -7642,6 +7939,7 @@ export function applyCommand(state, command, rng = null) {
         attackerView,
         atkIdx,
         targetInstanceId,
+        presetCoinResult,
       });
       break;
     }
@@ -8315,6 +8613,14 @@ export function applyCommand(state, command, rng = null) {
                 attackName: token.effectiveAttack?.name,
               });
             }
+          }
+          if (token.effectiveAttack) {
+            spendVstarAttack(draft, {
+              playerId: initiatorPlayerId,
+              attacker: null,
+              attack: token.effectiveAttack,
+              events,
+            });
           }
           if (targetPlayer) {
             if (!targetPlayer.flags) targetPlayer.flags = {};

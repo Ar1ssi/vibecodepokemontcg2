@@ -814,3 +814,49 @@ test('finishFor: rarity picks the animation tier', () => {
   assert.equal(finishFor({ rarity: 'Special Illustration Rare' }), 'secret');
   assert.equal(finishFor({ rarity: 'Rare Holo ex' }), 'ultra');
 });
+
+
+// Design 049: extras from the server view render after the printed attacks, in the server's
+// attackIndex order, labelled with where they come from.
+test('049: server extras render after printed attacks with their source label', () => {
+  const mew = {
+    name: 'Mew ex',
+    supertype: 'Pokémon',
+    hp: 160,
+    types: ['Psychic'],
+    attacks: [{ name: 'Teleportation Burst', cost: ['Psychic'], damage: '30', text: '' }],
+  };
+  const m = buildInspectorModel(mew, {
+    energyTypes: ['Psychic', 'Psychic'],
+    extraAttacks: [
+      { name: 'Great Swing', cost: ['Colorless', 'Colorless'], damage: '280', text: '', copiedFrom: 'Slaking ex' },
+      { name: 'Teleportation Burst', cost: [], damage: '10', text: '', copiedFrom: 'Other Mew' },
+    ],
+  });
+  assert.deepEqual(m.attacks.map((a) => [a.index, a.name, a.from]), [
+    [0, 'Teleportation Burst', null],
+    [1, 'Great Swing', 'Slaking ex'],
+  ]);
+});
+
+test('049: a spent VSTAR Power / GX attack recedes with the server reason', () => {
+  const card = {
+    name: 'Spiritomb VSTAR',
+    supertype: 'Pokémon',
+    hp: 240,
+    types: ['Darkness'],
+    attacks: [
+      { name: 'Star Requiem', cost: [], damage: '', text: "(You can't use more than 1 VSTAR Power in a game.)" },
+      { name: 'Tackle-GX', cost: [], damage: '50', text: '' },
+      { name: 'Slam', cost: [], damage: '30', text: '' },
+    ],
+  };
+  const fresh = buildInspectorModel(card, { energyTypes: [], oncePerGame: { vstarUsed: false, gxUsed: false } });
+  assert.deepEqual(fresh.attacks.map((a) => a.usable), [true, true, true]);
+  const spent = buildInspectorModel(card, { energyTypes: [], oncePerGame: { vstarUsed: true, gxUsed: true } });
+  assert.deepEqual(spent.attacks.map((a) => [a.usable, a.reason]), [
+    [false, 'VSTAR Power already used this game.'],
+    [false, 'Only one GX attack can be used per game.'],
+    [true, null],
+  ]);
+});

@@ -174,10 +174,11 @@ test('parseCopyAttack: design 039 residual wordings', () => {
     ],
   ];
   for (const [text, spec] of cases) assert.deepEqual(parseCopyAttack(text), spec, text);
-  // Misty's Psyduck ESP is a multi-branch coin attack: the copy parser must not claim it.
+  // Any other multi-coin gate still fails closed (Misty's Psyduck ESP has its own whole-text
+  // template since design 049 slice 7).
   assert.equal(
     parseCopyAttack(
-      "Flip 3 coins. If exactly 1 is heads, draw a card. If exactly 2 are heads, this attack does 20 damage. If all 3 are heads, choose 1 of the Defending Pokémon's attacks. Misty's Psyduck copies that attack except for its Energy costs. (No matter what type the Defending Pokémon is, Misty's Psyduck's type is still {W}.)"
+      "Flip 2 coins. If both of them are heads, choose 1 of the Defending Pokémon's attacks. Mon copies that attack except for its Energy cost."
     ),
     null
   );
@@ -356,4 +357,413 @@ test('attack: Haughty Order reveals 10, may copy, and shuffles the deck either w
   turnPassed(declined);
   // 13 cards, 1 drawn at the start of p2's turn; none left the deck to the copy.
   assert.equal(zone(declined, 'p2', 'deck').length + zone(declined, 'p2', 'hand').length, 13);
+});
+
+// ── design 049 slice 1: once-per-game limits and "only if" gates on candidates ──
+
+test('attack: a spent GX attack removes GX candidates (App. 19)', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [{ name: 'Tackle-GX', damage: '100' }, { name: 'Slam', damage: '30' }],
+    setup: ({ p1 }) => {
+      p1.oncePerGame = { gxUsed: true, vstarUsed: false };
+    },
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Slam']);
+});
+
+test('attack: a gxLock from the opponent removes GX candidates', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [{ name: 'Tackle-GX', damage: '100' }, { name: 'Slam', damage: '30' }],
+    setup: ({ p2 }) => {
+      p2.restOfGame = [{ kind: 'gxLock' }];
+    },
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Slam']);
+});
+
+test('attack: a failing "You can use this attack only if" gate removes the candidate (Mimed Games ruling)', () => {
+  const gated = { name: 'Empty Hand Hit', damage: '60', text: 'You can use this attack only if you have no cards in your hand.' };
+  const plain = { name: 'Slam', damage: '30' };
+  const withHand = board(GENOME_HACKING, {
+    defenderAttacks: [gated, plain],
+    setup: ({ p1 }) => p1.zones.hand.push(mon('Hand Card')),
+  });
+  assert.deepEqual(optionNames(attack(withHand)), ['Defender: Slam']);
+  const emptyHand = board(GENOME_HACKING, { defenderAttacks: [gated, plain] });
+  assert.deepEqual(optionNames(attack(emptyHand)), ['Defender: Empty Hand Hit', 'Defender: Slam']);
+});
+
+test('attack: a "does nothing" gate keeps the candidate; it applies when used (R1)', () => {
+  const gated = {
+    name: 'Needs Damage',
+    damage: '60',
+    text: "If this Pokémon has no damage counters on it, this attack does nothing.",
+  };
+  const b = board(GENOME_HACKING, { defenderAttacks: [gated] });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Needs Damage']);
+});
+
+test('attack: every candidate filtered out → attackCopyNothing and the turn ends', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [{ name: 'Tackle-GX', damage: '100' }],
+    setup: ({ p1 }) => {
+      p1.oncePerGame = { gxUsed: true, vstarUsed: false };
+    },
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+  turnPassed(res);
+});
+
+test('parseAttackBorrowAbility: design 049 slice 3 wordings', async () => {
+  const { parseAttackBorrowAbility } = await import('../rules/attack-copy.mjs');
+  const link = parseAttackBorrowAbility(
+    "Unown L can use any attack from any Unown in play (both yours and your opponent's). (You still have to pay for that attack's Energy cost.)"
+  );
+  assert.deepEqual([link.scopes, link.namePrefix], [['ownInPlay', 'oppInPlay'], 'unown']);
+  const dna = parseAttackBorrowAbility(
+    "Gyarados can use any attack from its Basic Pokémon. (You still have to pay for that attack's Energy cost.) If Gyarados uses any attack from its Basic Pokémon, that attack does 30 more damage to the Defending Pokémon (before applying Weakness and Resistance)."
+  );
+  assert.deepEqual([dna.scopes, dna.bonusBeforeWR, dna.basic], [['selfBasic'], 30, false]);
+  // Prehistoric Memory and Memory Dive grant to other Pokémon: parseAttackGrant reads them.
+  assert.equal(
+    parseAttackBorrowAbility(
+      "Whenever an Evolved Pokémon attacks (even if it's your opponent's), it can use any attack from its Basic Pokémon card or any Evolution card attached to it. It still has to pay for that attack's Energy cost. This power stops working while Aerodactyl is Asleep, Confused, or Paralyzed."
+    ),
+    null
+  );
+});
+
+// ── design 049 slice 5: Genetic Memory, Delta Copy, Sketch, Mimed Games ─────
+
+const GENETIC_MEMORY =
+  "Use any attack from Kingdra's Basic Pokémon card or Evolution card. (Kingdra doesn't have to pay for that attack's Energy cost.)";
+const DELTA_COPY =
+  "Choose an attack on 1 of your opponent's Pokémon in play that has δ on its card. Delta Copy copies that attack except for its Energy cost. (You must still do anything else required for that attack.) Togetic performs that attack.";
+const SKETCH =
+  'If the Defending Pokémon attacked last turn, and Smeargle was in play during that attack, Smeargle copies that attack except for its Energy costs and anything else required in order to use that attack.';
+const MIMED_GAMES =
+  'Your opponent chooses an attack from 1 of their Pokémon in play. Use the chosen attack as this attack.';
+
+test('parseCopyAttack: design 049 slice 5 wordings', () => {
+  assert.deepEqual(parseCopyAttack(GENETIC_MEMORY), { source: 'ownEvolutionStack' });
+  assert.deepEqual(
+    parseCopyAttack(
+      "Use any attack from Kingdra ex's Basic Pokémon card or Stage 1 Evolution card. (Kingdra ex doesn't have to pay for that attack's Energy cost.)"
+    ),
+    { source: 'ownEvolutionStack' }
+  );
+  assert.deepEqual(parseCopyAttack(DELTA_COPY), { source: 'oppInPlay', delta: true });
+  assert.deepEqual(parseCopyAttack(SKETCH), {
+    source: 'oppLastAttack',
+    auto: true,
+    fromDefending: true,
+    requiresInPlayDuring: true,
+    ignoreRequirements: true,
+  });
+  assert.deepEqual(parseCopyAttack(MIMED_GAMES), { source: 'oppInPlay', chooser: 'opponent' });
+});
+
+test('attack: Genetic Memory uses an attack from its own Basic or Evolution card, cost-free', () => {
+  const b = board(GENETIC_MEMORY, {
+    name: 'Horsea',
+    setup: ({ attacker, p1 }) => {
+      attacker.attacks = [{ name: 'Bubble', cost: ['Water', 'Water'], damage: '20', text: '' }];
+      p1.zones.active.push(
+        mon('Seadra', { stage: 'Stage 1', attachedTo: attacker.instanceId, attacks: [{ name: 'Water Gun', cost: [], damage: '30', text: '' }] }),
+        mon('Kingdra', {
+          stage: 'Stage 2',
+          attachedTo: attacker.instanceId,
+          attacks: [{ name: 'Genetic Memory', cost: [], damage: '', text: GENETIC_MEMORY }],
+        })
+      );
+    },
+  });
+  const res = attack(b);
+  assert.deepEqual(optionNames(res), ['Horsea: Bubble', 'Seadra: Water Gun']);
+  assert.equal(cardNamed(choose(res, [1], b.rng), 'p2', 'Defender').damage, 20);
+});
+
+test('attack: Delta Copy offers only δ Pokémon attacks; none → attackCopyNothing', () => {
+  const b = board(DELTA_COPY, {
+    defenderAttacks: [{ name: 'Slam', damage: '30' }],
+    setup: ({ p2 }) => p2.zones.bench.push(withAttacks('Flygon δ', [{ name: 'Delta Hit', damage: '50' }])),
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Flygon δ: Delta Hit']);
+  const none = board(DELTA_COPY, { defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const res = attack(none);
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+});
+
+test('attack: every resolved attack records who was in play on the other side', () => {
+  const b = board('', { defenderAttacks: [] });
+  b.attacker.attacks = [{ name: 'Tackle', cost: [], damage: '10', text: '' }];
+  const res = attack(b);
+  assert.deepEqual(res.state.players.p1.lastAttack.opponentInPlayIds, [b.defender.instanceId]);
+});
+
+test('attack: Sketch copies the Defending Pokémon last attack only when Smeargle was in play', () => {
+  const sketchBoard = (last) =>
+    board(SKETCH, {
+      name: 'Smeargle',
+      setup: ({ p2, attacker, defender }) => {
+        p2.lastAttack = {
+          attack: { name: 'Big Bite', cost: ['Darkness'], damage: '60', text: '' },
+          isGx: false,
+          attackerName: 'Defender',
+          attackerInstanceId: defender.instanceId,
+          turnNumber: 2,
+          opponentInPlayIds: [attacker.instanceId],
+          ...last(attacker, defender),
+        };
+      },
+    });
+  const copied = attack(sketchBoard(() => ({})));
+  assert.equal(cardNamed(copied, 'p2', 'Defender').damage, 60);
+
+  const notInPlay = attack(sketchBoard(() => ({ opponentInPlayIds: [] })));
+  assert.equal(cardNamed(notInPlay, 'p2', 'Defender').damage || 0, 0);
+  const otherAttacker = attack(sketchBoard(() => ({ attackerInstanceId: 999 })));
+  assert.equal(cardNamed(otherAttacker, 'p2', 'Defender').damage || 0, 0);
+  const tooOld = attack(sketchBoard(() => ({ turnNumber: 1 })));
+  assert.equal(cardNamed(tooOld, 'p2', 'Defender').damage || 0, 0);
+});
+
+test('attack: Mimed Games — the opponent chooses, the attacker cannot answer', () => {
+  const b = board(MIMED_GAMES, {
+    name: 'Mime Jr.',
+    defenderAttacks: [{ name: 'Slam', damage: '30' }, { name: 'Mimed Games', damage: '', text: MIMED_GAMES }],
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice.player, 'p2');
+  assert.deepEqual(optionNames(res), ['Defender: Slam'], 'a copy attack is never offered (R7)');
+  const wrong = applyCommand(
+    res.state,
+    {
+      type: 'resolveChoice',
+      playerId: 'p1',
+      payload: { choiceId: res.state.pendingChoice.choiceId, selection: [1] },
+    },
+    b.rng
+  );
+  assert.equal(wrong.error, 'not_your_choice');
+  const done = choose(res, [1], b.rng);
+  assert.equal(cardNamed(done, 'p2', 'Defender').damage, 30);
+});
+
+test("attack: Mimed Games against an opponent whose only Pokémon is Mime Jr. does nothing (R7)", () => {
+  const b = board(MIMED_GAMES, {
+    name: 'Mime Jr.',
+    defenderAttacks: [{ name: 'Mimed Games', damage: '', text: MIMED_GAMES }],
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+});
+
+// ── design 049 slice 6: copying from a hand ──────────────────────────────────
+
+const SKILL_HACK =
+  "Look at your opponent's hand and choose a Basic Pokémon or Evolution card you find there. Choose 1 of that Pokémon's attacks. Skill Hack copies that attack except for its Energy cost. (You must still do anything else required for that attack.) (No matter what type that Pokémon is, Shiftry ex's type is still {D}.) Shiftry ex performs that attack.";
+const HYPNOTIC_REIGN =
+  "Your opponent reveals their hand. You may discard a Pokémon you find there and use one of that Pokémon's non-GX attacks as this attack.";
+const SKILL_COPY =
+  "Discard a Basic Pokémon or Evolution card from your hand. Choose 1 of that card's attacks. Skill Copy copies that attack. This attack does nothing if Alakazam Star doesn't have the Energy necessary to use that attack. (You must still do anything else required for that attack.) Alakazam Star performs that attack.";
+const trainerCard = (name) => createCard({ instanceId: nextId++, name, supertype: 'Trainer', subtypes: ['Item'] });
+
+test('parseCopyAttack: design 049 slice 6 hand wordings', () => {
+  assert.deepEqual(parseCopyAttack(SKILL_HACK), { source: 'oppHand' });
+  assert.deepEqual(parseCopyAttack(HYPNOTIC_REIGN), {
+    source: 'oppHand',
+    excludeGx: true,
+    optional: true,
+    discardSource: true,
+  });
+  assert.deepEqual(parseCopyAttack(SKILL_COPY), { source: 'ownHand', needsEnergy: true, discardSource: true });
+});
+
+test('attack: Skill Hack reveals the hand and copies from a Pokémon card; the card stays', () => {
+  const b = board(SKILL_HACK, {
+    name: 'Shiftry ex',
+    setup: ({ p2 }) =>
+      p2.zones.hand.push(trainerCard('Potion'), withAttacks('Hand Mon', [{ name: 'Hand Hit', cost: ['Fire'], damage: '40' }])),
+  });
+  const res = attack(b);
+  const reveal = res.events.find((e) => e.type === 'cardsRevealed' && e.hand);
+  assert.deepEqual(reveal.cards.map((c) => c.name), ['Potion', 'Hand Mon']);
+  assert.deepEqual(optionNames(res), ['Hand Mon: Hand Hit']);
+  const done = choose(res, [1], b.rng);
+  assert.equal(cardNamed(done, 'p2', 'Defender').damage, 40);
+  assert.ok(zone(done, 'p2', 'hand').some((c) => c.name === 'Hand Mon'), 'Skill Hack does not discard');
+});
+
+test('attack: Skill Hack with no Pokémon in hand still reveals it and copies nothing', () => {
+  const b = board(SKILL_HACK, { name: 'Shiftry ex', setup: ({ p2 }) => p2.zones.hand.push(trainerCard('Potion')) });
+  const res = attack(b);
+  assert.ok(res.events.some((e) => e.type === 'cardsRevealed' && e.hand));
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+});
+
+test('attack: Hypnotic Reign discards the chosen Pokémon and uses its non-GX attack without Energy (R8)', () => {
+  const setup = ({ p2 }) =>
+    p2.zones.hand.push(
+      withAttacks('Hand Mon', [
+        { name: 'Heavy Hit', cost: ['Fire', 'Fire', 'Fire'], damage: '90' },
+        { name: 'Hand Blast-GX', damage: '200' },
+      ])
+    );
+  const b1 = board(HYPNOTIC_REIGN, { name: 'Malamar', setup });
+  const res1 = attack(b1);
+  assert.deepEqual(optionNames(res1), ['Hand Mon: Heavy Hit', "Don't use an attack"]);
+  const used = choose(res1, [1], b1.rng);
+  assert.equal(cardNamed(used, 'p2', 'Defender').damage, 90);
+  assert.ok(zone(used, 'p2', 'discard').some((c) => c.name === 'Hand Mon'));
+  assert.equal(zone(used, 'p2', 'hand').some((c) => c.name === 'Hand Mon'), false);
+
+  const b2 = board(HYPNOTIC_REIGN, { name: 'Malamar', setup });
+  const res2 = attack(b2);
+  const declined = choose(res2, [optionFor(res2, "Don't use an attack")], b2.rng);
+  assert.equal(zone(declined, 'p2', 'discard').some((c) => c.name === 'Hand Mon'), false, 'no discard when declined');
+});
+
+test('attack: Skill Copy discards the chosen card from your own hand; unpayable attacks are not offered', () => {
+  const b = board(SKILL_COPY, {
+    name: 'Alakazam Star',
+    setup: ({ p1 }) =>
+      p1.zones.hand.push(
+        withAttacks('Own Hand Mon', [
+          { name: 'Free Hit', cost: [], damage: '50' },
+          { name: 'Costly Hit', cost: ['Fire'], damage: '120' },
+        ])
+      ),
+  });
+  const res = attack(b);
+  assert.deepEqual(optionNames(res), ['Own Hand Mon: Free Hit']);
+  const done = choose(res, [1], b.rng);
+  assert.equal(cardNamed(done, 'p2', 'Defender').damage, 50);
+  assert.ok(zone(done, 'p1', 'discard').some((c) => c.name === 'Own Hand Mon'));
+
+  const none = board(SKILL_COPY, {
+    name: 'Alakazam Star',
+    setup: ({ p1 }) => p1.zones.hand.push(withAttacks('Own Hand Mon', [{ name: 'Costly Hit', cost: ['Fire'], damage: '120' }])),
+  });
+  const nothing = attack(none);
+  assert.ok(nothing.events.some((e) => e.type === 'attackCopyNothing'));
+  assert.ok(zone(nothing, 'p1', 'hand').some((c) => c.name === 'Own Hand Mon'), 'no discard without a payable attack');
+});
+
+// ── design 049 slice 7: Misty's Psyduck ESP (Gym Challenge 90) ───────────────
+
+const ESP =
+  "Flip 3 coins. If exactly 1 is heads, draw a card. If exactly 2 are heads, this attack does 20 damage. If all 3 are heads, choose 1 of the Defending Pokémon's attacks. Misty's Psyduck copies that attack except for its Energy costs. (No matter what type the Defending Pokémon is, Misty's Psyduck's type is still {W}.)";
+
+/** The first seed whose first three coin flips show `heads` heads. */
+async function seedWithHeads(heads) {
+  const { flipCoin } = await import('../rng.mjs');
+  for (let seed = 1; seed < 500; seed++) {
+    const rng = createRng(seed);
+    const flips = [flipCoin(rng), flipCoin(rng), flipCoin(rng)];
+    if (flips.filter((f) => f === 'heads').length === heads) return seed;
+  }
+  throw new Error(`no seed with ${heads} heads`);
+}
+
+test('parseCopyAttack: ESP is a 3-coin gate that keeps its own text on a miss', () => {
+  assert.deepEqual(parseCopyAttack(ESP), {
+    source: 'oppActive',
+    coinGate: 'heads',
+    coinGateFlips: 3,
+    ownTextOnMiss: true,
+  });
+});
+
+test('attack: ESP with 3 heads offers the copy', async () => {
+  const b = board(ESP, {
+    name: "Misty's Psyduck",
+    seed: await seedWithHeads(3),
+    defenderAttacks: [{ name: 'Slam', damage: '30' }],
+  });
+  const res = attack(b);
+  assert.deepEqual(optionNames(res), ['Defender: Slam']);
+  const flipped = res.events.filter((e) => e.type === 'attackCoinFlipped');
+  assert.equal(flipped.length, 1);
+  assert.equal(flipped[0].headsCount, 3);
+});
+
+test('attack: ESP with 1 heads draws a card from the same coins, one coin event', async () => {
+  const b = board(ESP, { name: "Misty's Psyduck", seed: await seedWithHeads(1), defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const handBefore = b.p1.zones.hand.length;
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(zone(res, 'p1', 'hand').length, handBefore + 1);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage || 0, 0);
+  assert.equal(res.events.filter((e) => e.type === 'attackCoinFlipped').length, 1);
+});
+
+test('attack: ESP with 2 heads does 20 damage from the same coins', async () => {
+  const b = board(ESP, { name: "Misty's Psyduck", seed: await seedWithHeads(2), defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const handBefore = b.p1.zones.hand.length;
+  const res = attack(b);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage, 20);
+  assert.equal(zone(res, 'p1', 'hand').length, handBefore, 'the 1-heads draw does not run');
+  assert.equal(res.events.filter((e) => e.type === 'attackCoinFlipped').length, 1);
+});
+
+test('attack: ESP with 0 heads does nothing', async () => {
+  const b = board(ESP, { name: "Misty's Psyduck", seed: await seedWithHeads(0), defenderAttacks: [{ name: 'Slam', damage: '30' }] });
+  const handBefore = b.p1.zones.hand.length;
+  const res = attack(b);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage || 0, 0);
+  assert.equal(zone(res, 'p1', 'hand').length, handBefore);
+});
+
+test('attack: ESP gate coins are not offered for a Glimwood Tangle re-flip', async () => {
+  const b = board(ESP, {
+    name: "Misty's Psyduck",
+    seed: await seedWithHeads(2),
+    defenderAttacks: [{ name: 'Slam', damage: '30' }],
+    setup: ({ state }) => {
+      state.stadium = createCard({
+        instanceId: 900,
+        name: 'Glimwood Tangle',
+        supertype: 'Trainer',
+        subtypes: ['Stadium'],
+        text: 'Once during each player’s turn, after that player flips any coins for an attack, they may ignore all effects of those coin flips and begin flipping those coins again.',
+      });
+    },
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage, 20);
+});
+
+// ── design 049 review fixes ─────────────────────────────────────────────────
+
+test("attack: Sketch waives the copied attack's use gate (\"anything else required\")", () => {
+  const b = board(SKETCH, {
+    name: 'Smeargle',
+    setup: ({ p1, p2, attacker, defender }) => {
+      p1.zones.hand.push(mon('Hand Card'));
+      p2.lastAttack = {
+        attack: { name: 'Empty Hand Hit', cost: [], damage: '60', text: 'You can use this attack only if you have no cards in your hand.' },
+        isGx: false,
+        attackerName: 'Defender',
+        attackerInstanceId: defender.instanceId,
+        turnNumber: 2,
+        opponentInPlayIds: [attacker.instanceId],
+      };
+    },
+  });
+  assert.equal(cardNamed(attack(b), 'p2', 'Defender').damage, 60);
+});
+
+test('parseAttackSteps: "If exactly N are heads, you may …" keeps both the gate and the option', async () => {
+  const { parseAttackSteps, resolveCoinGates } = await import('../rules/attack-steps.mjs');
+  const { after } = parseAttackSteps('Flip 3 coins. If exactly 1 is heads, you may draw a card.');
+  assert.equal(after.length, 1);
+  assert.equal(after[0].headsExactly, 1);
+  assert.equal(after[0].optional, true);
+  assert.equal(resolveCoinGates(after, { coin: null, headsCount: 2 }).length, 0);
+  assert.equal(resolveCoinGates(after, { coin: null, headsCount: 1 }).length, 1);
 });

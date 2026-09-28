@@ -4301,6 +4301,13 @@ function ignoreDefenderEffectsTurn(ctx) {
   return null;
 }
 
+// Recall (Gym Heroes 116): for the rest of the turn the player's Active may use attacks from
+// its previous Evolutions (design 049). Cleared at the end of the turn in reduce.mjs.
+function evolutionAttacksTurn(ctx) {
+  ctx.player.flags.evolutionAttacksTurn = true;
+  return null;
+}
+
 export const WILL_HEADS = -3;
 export const WILL_TAILS = -4;
 
@@ -4560,6 +4567,7 @@ export const EXTRA_STEP_HANDLERS = {
   opponentDiscardUntil,
   eachPlayerDiscardUntil,
   ignoreDefenderEffectsTurn,
+  evolutionAttacksTurn,
   chooseFirstCoin,
   opponentShuffleBenchToDeck,
   // I154: parsed Trainer step kinds that had no server executor.

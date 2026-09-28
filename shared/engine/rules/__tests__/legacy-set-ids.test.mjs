@@ -42,6 +42,8 @@ test('modern table maps Pitch Black (PBL) to me05', () => {
 test('buildPreferredCardId pads modern ME/SV collector numbers', () => {
   assert.equal(buildPreferredCardId('PBL', '18'), 'me05-018');
   assert.equal(buildPreferredCardId('PFL', '24'), 'me02-024');
+  // 30th Celebration Mew ex: Limitless 30C #66, TCGdex 30th-066 (design 049).
+  assert.equal(buildPreferredCardId('30C', '66'), '30th-066');
   assert.equal(buildLegacyCardId('TRR', '32'), 'ex7-32');
 });
 

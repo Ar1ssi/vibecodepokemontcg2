@@ -2517,6 +2517,17 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
+  // Recall (Gym Heroes 116) — this turn the Active may use its previous Evolutions' attacks
+  // (design 049; the grant itself is read by reduce.mjs grantedAttacksFor).
+  if (
+    /for your attack this turn, your active pok[eé]mon can use any attack from its basic pok[eé]mon card or any evolution card attached to it/.test(
+      lower
+    )
+  ) {
+    steps.push({ type: 'evolutionAttacksTurn' });
+    return { steps, recognizable: true };
+  }
+
   // Will — choose the first coin flip this turn
   if (lower.includes('choose heads or tails for the first coin flip')) {
     steps.push({ type: 'chooseFirstCoin' });

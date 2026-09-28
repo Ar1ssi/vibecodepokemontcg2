@@ -172,6 +172,66 @@ const TEMPLATES = [
         ? { source: 'oppLastAttack', excludeGx: true, auto: true }
         : { source: 'oppLastAttack', auto: true },
   ],
+  // Kingdra / Kingdra ex Genetic Memory (Neo Revelation 19, Dragon 92): cost-free, from the stack.
+  [
+    /^use any attack from [^.]+'s basic pokemon card or (?:stage 1 )?evolution card\.$/,
+    () => ({ source: 'ownEvolutionStack' }),
+  ],
+  // Togetic δ Delta Copy (Dragon Frontiers 11; TCGdex ex15-11): δ Pokémon carry "δ" in the name.
+  [
+    new RegExp(
+      String.raw`^choose an attack on 1 of your opponent's pokemon in play that has δ on its card\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppInPlay', delta: true }),
+  ],
+  // Smeargle Sketch (Neo Discovery 11/30): the Defending Pokémon's last attack, if Smeargle was
+  // in play when it was used.
+  [
+    /^if the defending pokemon attacked last turn, and [^,]+ was in play during that attack, [^.]+ copies that attack except for its energy costs and anything else required in order to use that attack\.$/,
+    () => ({
+      source: 'oppLastAttack',
+      auto: true,
+      fromDefending: true,
+      requiresInPlayDuring: true,
+      ignoreRequirements: true,
+    }),
+  ],
+  // Mime Jr. Mimed Games (Paldean Fates 031/157): the opponent makes the choice.
+  [
+    /^your opponent chooses an attack from 1 of their pokemon in play\. use the chosen attack as this attack\.$/,
+    () => ({ source: 'oppInPlay', chooser: 'opponent' }),
+  ],
+  // Misty's Psyduck ESP (Gym Challenge 90): 3 coins; all heads copies, 1 or 2 heads run the
+  // attack's own text with the same coins (design 049 O10).
+  [
+    /^flip 3 coins\. if exactly 1 is heads, [^.]+\. if exactly 2 are heads, [^.]+\. if all 3 are heads, choose 1 of the defending pokemon's attacks\. [^.]+ copies that attack except for its energy costs?\.$/,
+    () => ({ source: 'oppActive', coinGate: 'heads', coinGateFlips: 3, ownTextOnMiss: true }),
+  ],
+  // Shiftry ex Skill Hack (Power Keepers 97): a Pokémon card in the opponent's hand.
+  [
+    new RegExp(
+      String.raw`^look at your opponent's hand and choose a basic pokemon or evolution card you find there\. choose 1 of that pokemon's attacks\. [^.]+ copies that attack except for its energy cost\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'oppHand' }),
+  ],
+  // Malamar Hypnotic Reign (Unbroken Bonds 119): the chosen Pokémon is discarded from their hand.
+  [
+    /^your opponent reveals their hand\. you may discard a pokemon you find there and use one of that pokemon's non-gx attacks as this attack\.$/,
+    () => ({ source: 'oppHand', excludeGx: true, optional: true, discardSource: true }),
+  ],
+  // Alakazam Star Skill Copy (Crystal Guardians 99): discard a Pokémon card from your own hand.
+  [
+    new RegExp(
+      String.raw`^discard a basic pokemon or evolution card from your hand\. choose 1 of that card's attacks\. [^.]+ copies that attack\. this attack does nothing if [^.]+ doesn't have the energy necessary to use that attack\.` +
+        PERFORMS +
+        '$'
+    ),
+    () => ({ source: 'ownHand', needsEnergy: true, discardSource: true }),
+  ],
 ];
 
 /**
@@ -254,21 +314,59 @@ export function copiedAttackFor(attack, { sourceName, copierName }) {
   return { ...attack, text: renamed, copiedFrom: sourceName || '' };
 }
 
+// "(You still need the necessary Energy …)" and its older / Pokémon Power equivalents: the
+// borrowed attack keeps its cost. Read on the raw text — normalize() drops parentheticals.
+const BORROW_KEEPS_COST =
+  /you still need the necessary energy|still (?:has|have) to pay for that attack's energy cost|including (?:its|their) (?:energy )?costs?/;
+
+// Pokémon Power wordings that are not "can use the attacks of …" (design 049 B3/B4).
+const WHOLE_BORROWS = [
+  // Sudowoodo Mimic (Neo Revelation 26).
+  [
+    /as long as [^.]+ is your active pokemon, it copies all of the defending pokemon's attacks, including their costs\./,
+    { scopes: ['oppActive'], requiresActive: true },
+  ],
+  // Alakazam Psymimic (Expedition 1/33): used "instead of Alakazam's normal attack".
+  [
+    /instead of [^.]+'s normal attack, you may choose 1 of your opponent's pokemon's attacks\. [^.]+ copies that attack including its energy costs/,
+    { scopes: ['oppInPlay'] },
+  ],
+];
+
 /**
- * Attack-borrowing Abilities (design 034 slice 6): "This Pokémon can use the attacks of …
- * (You still need the necessary Energy …)". Returns where the attacks come from and which
- * Pokémon qualify; reduce.mjs gathers them into the attacker's view. Null for other text.
+ * Attack-borrowing Abilities (design 034 slice 6, design 049 slice 3): "This Pokémon can use the
+ * attacks of … (You still need the necessary Energy …)", "can use any attack from …", Mimic and
+ * Psymimic. Returns where the attacks come from and which Pokémon qualify; reduce.mjs gathers
+ * them into the attacker's view. Null for other text.
  * @returns {{ scopes: string[], basic: boolean, noRuleBox: boolean, gxOrEx: boolean,
- *   evolvesFrom: string|null, names: string[]|null, requiresActive: boolean }|null}
+ *   evolvesFrom: string|null, names: string[]|null, namePrefix: string|null,
+ *   requiresActive: boolean, bonusBeforeWR: number, powerStatus: 'rotation'|'any'|null }|null}
  */
 export function parseAttackBorrowAbility(text) {
-  if (!/you still need the necessary energy/i.test(String(text || ''))) return null;
+  const raw = String(text || '').toLowerCase().replace(/[’‘]/g, "'");
+  if (!BORROW_KEEPS_COST.test(raw)) return null;
   const t = normalize(text);
-  const phrase = t.match(/can use the attacks of (.+?)(?: as its own)?\s*\./)?.[1]?.trim();
+  const base = {
+    scopes: [],
+    basic: false,
+    noRuleBox: false,
+    gxOrEx: false,
+    evolvesFrom: null,
+    names: null,
+    namePrefix: null,
+    requiresActive: false,
+    bonusBeforeWR: 0,
+    powerStatus: powerStatusOf(t),
+  };
+  const whole = WHOLE_BORROWS.find(([pattern]) => pattern.test(t));
+  if (whole) return { ...base, ...whole[1] };
+  const phrase = t.match(/can use (?:the attacks of|any attack from) (.+?)(?: as its own)?\s*\./)?.[1]?.trim();
   if (!phrase) return null;
   let scopes;
   if (/lost zone/.test(phrase)) scopes = ['ownLostZone', 'oppLostZone'];
   else if (/opponent's active|^that pokemon/.test(phrase)) scopes = ['oppActive'];
+  // Gyarados Dragon DNA: "its Basic Pokémon" is the Basic under this Pokémon.
+  else if (phrase === 'its basic pokemon') scopes = ['selfBasic'];
   else {
     scopes = [];
     if (/bench/.test(phrase)) scopes.push('ownBench');
@@ -278,6 +376,7 @@ export function parseAttackBorrowAbility(text) {
       if (!/\byour\b|you have/.test(phrase)) scopes.push('oppInPlay');
     }
   }
+  if (scopes.length === 0) return null;
   const named = phrase.match(/^all (.+?) you have in play/)?.[1];
   const names =
     named && !/pokemon/.test(named)
@@ -286,13 +385,92 @@ export function parseAttackBorrowAbility(text) {
           .map((n) => n.replace(/^other\s+/, '').trim())
           .filter(Boolean)
       : null;
+  // Unown L LINK: "any Unown in play" — every Pokémon whose name starts with that word.
+  const anyNamed = phrase.match(/^any (\S+) in play$/)?.[1];
   return {
+    ...base,
     scopes,
-    basic: /basic pokemon/.test(phrase),
+    basic: /basic pokemon/.test(phrase) && scopes[0] !== 'selfBasic',
     noRuleBox: /except for pokemon with a rule box/.test(phrase),
     gxOrEx: /pokemon-gx or pokemon-ex/.test(phrase),
     evolvesFrom: phrase.match(/evolve from (\w+)/)?.[1] || null,
     names,
+    namePrefix: anyNamed && anyNamed !== 'pokemon' ? anyNamed : null,
     requiresActive: /if this pokemon is your active|as long as [^.]+ is your active/.test(t),
+    bonusBeforeWR: Number(t.match(/that attack does (\d+) more damage to the defending pokemon/)?.[1] || 0),
   };
+}
+
+// Legacy Pokémon Power status gates: "This power can't be used if … is Asleep, Confused, or
+// Paralyzed" / "… stops working while …" ('rotation'), "… affected by a Special Condition" ('any').
+function powerStatusOf(t) {
+  const match = t.match(
+    /power (?:can't be used if|stops working while) [^.]*?(asleep, confused, or paralyzed|affected by a special condition)/
+  );
+  if (!match) return null;
+  return match[1].startsWith('asleep') ? 'rotation' : 'any';
+}
+
+// "Its previous Evolutions", "its Basic Pokémon card or any Evolution card attached to it", "its
+// Basic Pokémon or its Stage 1 Evolution card": all name the cards below the top of the stack.
+const PRIOR_EVOLUTIONS = String.raw`(?:previous evolutions|basic pokemon(?: card)? or (?:its stage 1 evolution card|any evolution card (?:attached to it|from which the pokemon evolved)))`;
+
+const GRANTS = [
+  // Relicanth Memory Dive (TEF 084), Celebi-EX / Shining Celebi Time Recall (BCR 9, SM79).
+  [
+    new RegExp(String.raw`each of your evolved pokemon can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    () => ({ recipients: 'ownEvolved', from: 'priorEvolutions' }),
+  ],
+  // Aerodactyl Prehistoric Memory (Neo Revelation 15): both players' Evolved Pokémon.
+  [
+    new RegExp(String.raw`whenever an evolved pokemon attacks, it can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    () => ({ recipients: 'allEvolved', from: 'priorEvolutions' }),
+  ],
+  // Honchkrow Dark Genes (Mysterious Treasures 10).
+  [
+    /as long as (\S+) has the energy necessary to use its attack, each of your (\S+) can use \1's attack as its own without the energy necessary/,
+    (m) => ({
+      recipients: 'ownNamed',
+      recipientName: m[2],
+      from: 'holderAttacks',
+      costFree: true,
+      holderMustPay: true,
+    }),
+  ],
+  // Memory Capsule (VIV 155), Memory Berry (AQ 128, CG 80, PL 110).
+  [
+    new RegExp(String.raw`the pokemon this card is attached to can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    (m, t) => ({
+      recipients: 'host',
+      from: 'priorEvolutions',
+      discardAfterAttack:
+        /if that pokemon attacks, discard this card at the end of the turn|discard this card at the end of any turn the pokemon attacks/.test(
+          t
+        ),
+    }),
+  ],
+  // Recall (Gym Heroes 116), a Trainer: the player's Active for this turn's attack.
+  [
+    new RegExp(String.raw`for your attack this turn, your active pokemon can use any attack from its ${PRIOR_EVOLUTIONS}`),
+    () => ({ recipients: 'active', from: 'priorEvolutions' }),
+  ],
+];
+
+/**
+ * Attack grants (design 049 slice 4): an Ability, Pokémon Tool or Trainer that lets OTHER
+ * Pokémon use attacks — their own previous Evolutions' (Memory Dive, Memory Capsule, Recall) or
+ * the holder's (Dark Genes). Null for other text.
+ * @returns {{ recipients: 'ownEvolved'|'allEvolved'|'host'|'active'|'ownNamed',
+ *   recipientName?: string, from: 'priorEvolutions'|'holderAttacks', costFree?: boolean,
+ *   holderMustPay?: boolean, discardAfterAttack?: boolean,
+ *   powerStatus: 'rotation'|'any'|null }|null}
+ */
+export function parseAttackGrant(text) {
+  const t = normalize(text);
+  if (!t) return null;
+  for (const [pattern, build] of GRANTS) {
+    const m = pattern.exec(t);
+    if (m) return { ...build(m, t), powerStatus: powerStatusOf(t) };
+  }
+  return null;
 }

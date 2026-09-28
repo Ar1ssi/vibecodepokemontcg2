@@ -6880,11 +6880,8 @@
    ]
   },
   "Recall#7mwicp": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "evolutionAttacksTurn"
    ]
   },
   "Recycle#1ab05ns": {

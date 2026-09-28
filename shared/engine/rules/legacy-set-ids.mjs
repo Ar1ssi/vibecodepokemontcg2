@@ -136,6 +136,8 @@ export const MODERN_SET_CODE_TO_TCGDEX_ID = {
   PBL: 'me05',
   MEP: 'mep',
   MEE: 'mee',
+  // 30th Celebration (Limitless code 30C; TCGdex 30th-066 Mew ex, design 049)
+  '30C': '30th',
   // Scarlet & Violet (find-type.js SVEra)
   SVI: 'sv01',
   PAL: 'sv02',
@@ -238,13 +240,13 @@ export function buildLegacyCardId(setCode, number) {
 }
 
 // Preferred id for sync callers (import, image-url extraction). Modern ME/SV
-// sets zero-pad to three digits on TCGdex (me05-018); the unpadded first
+// and 30th Celebration sets zero-pad to three digits on TCGdex (me05-018, 30th-066); the unpadded first
 // candidate (me05-18) 404s, so prefer the padded form when present.
 export function buildPreferredCardId(setCode, number) {
   const candidates = buildSetCardIdCandidates(setCode, number);
   if (!candidates.length) return null;
   const setId = resolveTcgdexSetId(setCode);
-  if (setId && /^(me|sv)/.test(setId)) {
+  if (setId && /^(me|sv|30th)/.test(setId)) {
     const padded = candidates.find((c) => {
       const local = c.slice(String(setId).length + 1);
       return /^\d{3}[a-zA-Z]?$/.test(local);

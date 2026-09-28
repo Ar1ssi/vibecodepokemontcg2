@@ -13,6 +13,7 @@ import {
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
   getAuthoritativeStadiumArray,
+  getAuthoritativeAttackExtras,
   repositionCardOverlays,
 } from '../apply-view.js';
 
@@ -1572,6 +1573,62 @@ test('I24: hasAuthoritativeView/getAuthoritativeZoneArray/getAuthoritativeStadiu
   assert.deepEqual(getAuthoritativeStadiumArray(), []);
 });
 
+
+// Design 049: the owner's unprinted attacks come from the view; no key keeps the caller's list.
+test('049: getAuthoritativeAttackExtras reads view.you.attackExtras for own in-play Pokémon', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  assert.equal(getAuthoritativeAttackExtras(1), null, 'no view yet');
+
+  const zones = {
+    active: [{ instanceId: 1, name: 'Mew ex' }],
+    bench: [{ instanceId: 2, name: 'Slaking ex' }],
+    hand: [],
+  };
+  applyView(
+    {
+      stateVersion: 1,
+      you: { playerId: 'p1', zones, attackExtras: { 1: [{ name: 'Great Swing', copiedFrom: 'Slaking ex' }] } },
+      them: { playerId: 'p2', zones: { active: [{ instanceId: 9, name: 'Foe' }], hand: [] } },
+    },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  assert.deepEqual(getAuthoritativeAttackExtras(1), [{ name: 'Great Swing', copiedFrom: 'Slaking ex' }]);
+  assert.deepEqual(getAuthoritativeAttackExtras(2), [], 'own Pokémon without extras');
+  assert.equal(getAuthoritativeAttackExtras(9), null, "opponent's Pokémon keeps the caller's list");
+
+  // An evolved Pokémon is clicked by its top Evolution card, attached to the Basic root.
+  applyView(
+    {
+      stateVersion: 2,
+      you: {
+        playerId: 'p1',
+        zones: {
+          active: [
+            { instanceId: 1, name: 'Horsea' },
+            { instanceId: 5, name: 'Seadra', attachedTo: 1 },
+            { instanceId: 6, name: 'Kingdra', attachedTo: 1 },
+          ],
+          hand: [],
+        },
+        attackExtras: { 1: [{ name: 'Bubble', grantedBy: 'Memory Capsule' }] },
+      },
+      them: { playerId: 'p2', zones: { hand: [] } },
+    },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  assert.deepEqual(getAuthoritativeAttackExtras(6), [{ name: 'Bubble', grantedBy: 'Memory Capsule' }]);
+  assert.deepEqual(getAuthoritativeAttackExtras(5), [{ name: 'Bubble', grantedBy: 'Memory Capsule' }]);
+
+  applyView(
+    { stateVersion: 3, you: { playerId: 'p1', zones }, them: { playerId: 'p2', zones: { hand: [] } } },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  assert.equal(getAuthoritativeAttackExtras(1), null, 'no attackExtras key: fall back');
+  resetRenderState();
+});
 
 // Design 002 slice 3.12: the flip gate found that nothing applied view.turn — the server
 // advanced its own turn while the client's rulesState.turnPlayer stayed frozen, so the
