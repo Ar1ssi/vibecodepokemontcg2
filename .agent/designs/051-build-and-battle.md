@@ -1,5 +1,5 @@
 # 051: Build & Battle game mode (Phantasmal Flames box)
-Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–4 done
+Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–5 done; review findings I202–I207 open (I202 blocks real 2-player use)
 Date: 2026-09-28 · Session: S328
 
 ## Problem

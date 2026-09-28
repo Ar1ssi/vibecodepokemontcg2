@@ -6,12 +6,18 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I202). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I208). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+I207 2026-09-28 P3 [deck-builder] B&B at the deck limit: every reload rebuilds a fresh unsaved box deck (session.deckId null), pool edits lost with no warning — native-deck-builder-build-battle.js:140,151 (design 051 review)
+I206 2026-09-28 P3 [netcode] A `format_mismatch`-refused loadDeck is still broadcast/cached (server.js:905 before :952); peers print "X loaded deck (Build & Battle…)" beside the refusal line. Skip emit+cache on error (design 051 review)
+I205 2026-09-28 P2 [deck-builder] B&B tab Save at the deck limit creates a `tcg` record (saveCurrentDeck passes no format, native-deck-builder.js:1521 → library.js:462) → plays 6 Prizes. Pass format when isBuildBattle (design 051 review)
+I204 2026-09-28 P2 [netcode] `systemState.deckFormat.opp` is one slot for the solo alt deck and the remote opponent (import.js:23, exchange-data.js:38); after leaving a B&B room the alt deck re-deals 4 Prizes. Split p1Opp/p2Opp (design 051 review)
+I203 2026-09-28 P2 [rules] Prize math hard-codes 6: ko-flow.mjs:40 (solo/legacy B&B never wins at 4), ability-executors:228, tool-combat:332, scaling-count:271, turn-damage-bonus:86 count 2 taken before any KO in B&B. Use prizeCountForFormat (design 051 review)
+I202 2026-09-28 P1 [netcode] B&B format lock: loadDeck refuses a format differing from the opponent's LOADED deck (reduce.mjs:10064); room join reloads the last-used deck, so two Standard-last players both get format_mismatch on B&B Play. Check at deal, not load (design 051 review)
 - I201 2026-09-28 P3 [client] No UI to attack from the Bench: the engine accepts `attackerInstanceId` (I196, Alakazam ex Dimensional Hand) but chat-buttons.js / dual-run-bridge.js always attack with the Active (refs: S328)
 - I200 2026-09-28 P2 [rules] `atkCountersEach` (effects/attack-steps.mjs) ignores `scope: 'active'`, so "put … damage counters on their Active Pokémon for each card in your opponent's hand" (rules/attack-steps.mjs ~812) hits every opponent Pokémon (refs: S328 I195 review)
 - I199 2026-09-28 P3 [deck-builder] find-type.js, find-old-type.js (+ its database/updater) and tcgdex-image-url.mjs lost their only caller when the text decklist importer was removed (design 050); delete them with their tests or revive them for a new importer

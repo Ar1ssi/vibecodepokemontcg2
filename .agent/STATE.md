@@ -3,13 +3,12 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: PRs #190–#194 landed together (S327): design 049 copy/borrow attacks (#192), parse-hole
-  sweep + audit gates for locks/typography/ability clauses/evolved stacks (#193, #190/#194:
-  evolved Abilities read the top card), coin ceremony (#191). #189 superseded by #192, not merged.
-Active: none.
-Next: `.agent/designs/parse-holes-next-handoff.md` items 2–5 (type-word drift flags 12 gate rows);
-  then top of ISSUES.md (I196 first).
-  User visual check pending: designs 042–046 FX on localhost.
+Focus: Build & Battle mode (design 051) built on branch claude/build-battle-gamemode-plan-cl70k6:
+  /build-and-battle tab, seeded box/packs, 40-card 4-Prize format end to end (D185–D189).
+Active: design 052 (B&B unboxing scene) drafted, awaiting user approval.
+Next: I202 (P1 B&B format lock on room join) before the branch merges; then I203–I205 from the 051
+  review; then `.agent/designs/parse-holes-next-handoff.md` items 2–5; then top of ISSUES.md.
+  User visual check pending: designs 042–046 FX; B&B row 29 prize fan + memory-only banner.
   Maintenance: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.
 
