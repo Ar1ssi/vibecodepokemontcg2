@@ -73,7 +73,11 @@ This design replaces 051's step 3 ("Reveal") with a full scene in the house FX s
    left faces** (the official render `refs/052-box-render.webp` is sharp and near-frontal) **and
    B for right, back, top and bottom** (the video frames are motion-blurred; the back is mostly
    text, which types cleanly). The user can swap any face to C later by photographing it squarely.
-   Packs stay B (no pack reference yet).
+   Packs are C too: the four official pack fronts (`refs/052-pack-{charizard,gengar,heracross,
+   lopunny}.webp`, Mega Charizard X / Mega Gengar / Mega Heracross / Mega Lopunny) ship as
+   `client/src/assets/build-battle/packs/me02-<key>.webp` (≤ 250 KB each); each of the box's four
+   packs gets one art chosen from the seed (§ Pure poses `packArtIndexes`), so a box can hold
+   duplicates as real boxes do. Pack backs are procedural silver foil with the set logo.
 3. **Opening interaction.** A: click everything. B: tear-by-drag (pointer down on the wrap / pack
    top edge, drag ≥ 40 % of its width) with click fallback (a press with < 6 px movement tears too).
    C: drag only. **Pick B**: the drag sells the physicality; the fallback keeps mobile and keyboard
@@ -130,8 +134,9 @@ revealed: number[4] }` (`revealed[i]` = cards revealed in pack i, 0..10). `creat
 - `promoLiftPose(t) -> { translateYPx, rotateXDeg, rotateYDeg, scale }` — lifts 40 px, tilts
   −8°/+6° then settles to 0 (the holo tilt takes over on pointer).
 - `packTearProgress(dxPx, packWidthPx) -> 0..1` and `packTornAt(progress) -> boolean` (≥ 0.4).
-- `packSpillPose(t, cardIndex) -> { translateXPx, translateYPx, rotateZDeg }` — ten cards slide
-  2 px each into a slightly offset stack (max 8° fan).
+- `packSpillPose(t, cardIndex) -> { translateXPx, translateYPx, rotateZDeg }` — ten cards rise
+  out of the torn top (pack mouth) by 55 % of the pack height, then settle into a slightly offset
+  stack beside the pack (2 px per card, max 8° fan).
 - `cardRevealPose(t, { tier }) -> { translateYPx, rotateYDeg, scale, flare }` — lift (tier 0: 18 px,
   tier ≥ 1: 34 px), `rotateYDeg` 0 → 180 across the flip window, `flare` 0..1 only for tier ≥ 2
   (peaks at 0.55, drives a radial highlight clipped to the card).
@@ -140,6 +145,12 @@ revealed: number[4] }` (`revealed[i]` = cards revealed in pack i, 0..10). `creat
   Double rare; 2 Ultra Rare / Illustration rare; 3 Special illustration rare / Mega Hyper Rare.
 - `unboxingHoloRarity(card, slot) -> string|null` per Options 5.
 - `unboxingVoiceFor(event, tier) -> effect name` (table under Sound).
+- `PACK_ARTS = ['charizard', 'gengar', 'heracross', 'lopunny']`;
+  `packArtIndexes(seed, count = 4) -> number[]` — `createRng(seed ^ 0x9e3779b9)` and `int(4)` per
+  pack: a separate stream, so the art never shifts the card pool that `openBox(seed)` produced
+  (051 slice 2 is already landed and must stay bit-identical).
+- `packTearEdge(seed, packIndex, teeth = 12) -> string` — the jagged `clip-path: polygon(...)` of
+  the torn top strip (tooth heights 2–5 % of the pack height, seeded so a reload shows the same tear).
 - `faceMatrix3d(srcQuad, dstWidthPx, dstHeightPx) -> string` — the CSS `matrix3d(...)` that maps
   the four source corners of a face in a reference image (`[{x,y}×4]`, clockwise from top-left,
   in image pixels) onto the `dstWidth × dstHeight` face rectangle (standard 8-DOF homography
@@ -188,6 +199,18 @@ Mounted into `#buildBattleBoxPanel` (051) as `#bbUnboxing`. Structure:
 | `unbox-flip` | square 900 Hz 40 ms gain .12 |
 | `unbox-hit-1` / `-2` / `-3` | sine arpeggio 523/659/784 Hz (tier 1), +1 octave and a 4th note (tier 2), tier 3 adds a 1.2 s sawtooth swell at 262 Hz gain .18 |
 | `unbox-done` | triangle 392→523 Hz 260 ms gain .25 |
+
+### Pack reference (official fronts `refs/052-pack-*.webp`)
+Portrait, W : H = 1 : 1.8, crimped seal strips top and bottom (7 % of the height each, a
+serrated `repeating-linear-gradient` texture in the vendored image already), a black "6+" badge
+top-right, the Pokémon TCG wordmark, the Mega key art, the "Mega Evolution / Phantasmal Flames"
+logos, and a red bottom band "⑩ ADDITIONAL GAME CARDS" with the Poké Ball emblem. The foil shows
+two soft vertical highlights near the left and right edges; the DOM twin adds a `.bb-pack__foil`
+layer (same two highlights, drifting 4 px with the fixed-light holo drift) over the image. Tear
+geometry: `.bb-pack__top` is the top crimp strip; a tear separates it along `packTearEdge`, the
+strip slides right and fades on its host, and the cards emerge from the open mouth
+(`packSpillPose`). Pack back: procedural silver (`linear-gradient(180deg, #d9dbe0, #9aa0aa,
+#d9dbe0)`) with the same crimps and the set logo centred.
 
 ### Box reference (user frames `.agent/designs/refs/052-box-{front,left,right,back,top}.webp`)
 Proportions W : H : D = 1 : 1.45 : 0.65 (front from the official render `refs/052-box-render.webp`,
@@ -242,6 +265,7 @@ house rule 8). Phone width: box scales to the viewport width, packs wrap two per
 | 7 | Reveal all pressed mid-reveal | continues from the current index; no duplicate cards | [ ] |
 | 8 | WAAPI missing (old browser) | `animateFrames` degrades (existing behavior): states still settle via the backstop | [ ] |
 | 9 | animation never finishes (tab hidden) | `SCENE_BACKSTOP_MS` settles the state | [ ] |
+| 10b | `packArtIndexes(42)` twice / different seeds / `openBox(42)` before and after adding art | identical arrays / arrays differ somewhere across 100 seeds / the card pool is byte-identical to slice 2's | [ ] |
 | 10a | `faceMatrix3d` on a rectangle / a skewed quad / a degenerate quad (two equal corners) | identity-like matrix / corners land within 0.5 px of the target / throws, and the face falls back to the procedural layout | [ ] |
 | 10 | card image 404 / logo 404 / key art 404 / face texture 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [ ] |
 | 11 | tier mapping across all 130 me02 cards + promos | every `unboxingHoloRarity` result is a family `holo/*.css` styles (or null); reverse slot always ends in "reverse holo"; Rare/Promo → rare holo | [ ] |
@@ -274,7 +298,7 @@ mounts at `done`. Revert path: revert the commits; sessions keep working (the fi
 | Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
 |---|---|---|---|---|---|
 | 1 Pure + sound | create `core/build-battle/unboxing.mjs`, `box-textures.mjs` (asset paths + corner constants, cut with the reference frames open), `__tests__/unboxing.test.mjs`; modify `mat-fx/fx-audio.mjs` (+7 voices), `mat-fx/__tests__/fx-audio*.test.mjs`, `build-battle-session.mjs` (`unboxing` field replaces `openedPacks`) | § Beats, § State machine, § Pure poses, § Sound verbatim | rows 3–5, 7, 11, 17; pose endpoints listed in § Test plan | pokemon.com "foil promo"; TCGdex me02 `variants.holo` | `node --test` on the new tests + `pnpm test:changed` |
-| 2 DOM + CSS (fx-designer) | create `sidebox/native-deck-builder-unboxing.js`, `css/deck-builder-unboxing.css`, `client/src/assets/build-battle/box/{front,left}.webp` (cut from `refs/052-box-render.webp`, ≤ 250 KB each); modify `native-deck-builder-build-battle.js` (mount, remove the 051 flip), `index.ejs` (`#bbUnboxing` root), `css/__tests__/fx-kill-switch-css.test.mjs` (+ the new sheet) | § DOM twin structure and ids, § CSS tokens | rows 1, 2, 6, 8–10, 12, 15, 16, 18 | — | lint clean; kill-switch test green |
+| 2 DOM + CSS (fx-designer) | create `sidebox/native-deck-builder-unboxing.js`, `css/deck-builder-unboxing.css`, `client/src/assets/build-battle/box/{front,left}.webp` (cut from `refs/052-box-render.webp`, ≤ 250 KB each), `client/src/assets/build-battle/packs/me02-{charizard,gengar,heracross,lopunny}.webp` (from `refs/052-pack-*.webp`, ≤ 250 KB each); modify `native-deck-builder-build-battle.js` (mount, remove the 051 flip), `index.ejs` (`#bbUnboxing` root), `css/__tests__/fx-kill-switch-css.test.mjs` (+ the new sheet) | § DOM twin structure and ids, § CSS tokens | rows 1, 2, 6, 8–10, 12, 15, 16, 18 | — | lint clean; kill-switch test green |
 | 3 Verify | create `.claude/skills/fx-preview/rec/rec-unboxing.mjs`; modify `fx-preview/SKILL.md` (builder-tab section) | recorder opens `/build-and-battle?seed=42&e2e=1`, drives beats via DOM clicks, writes `out/unboxing.webm` + strips | rows 4, 13, 14 by video; strips at the seven beats listed | — | video + strips recorded and reviewed; user check on localhost |
 
 ## Deviations (Builder appends here during build)
