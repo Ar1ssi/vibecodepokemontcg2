@@ -106,6 +106,7 @@ the wrap and the first pack.
 PORT=4100 pnpm start &                     # worktree server
 node .claude/skills/fx-preview/rec/rec-unboxing.mjs            # SEED=42 by default
 SEED=18 node .claude/skills/fx-preview/rec/rec-unboxing.mjs    # seed 18 holds a tier-3 hit (SIR/MHR)
+BOX=team-up node .claude/skills/fx-preview/rec/rec-unboxing.mjs # any catalog box (design 054); files get -<box>
 ```
 
 - Pass 1 records the whole box at real speed to `out/unboxing.webm` (`out/unboxing-<seed>.webm`

@@ -9,7 +9,8 @@
 // <OUT>/<beat>-{start,peak,settle}.png for tear, lid, promo, fly, cut, swipe, hit, summary.
 // Pass 3 shoots <OUT>/phone-390-{spread,pocket}.png and checks row 16 (no horizontal scroll).
 //
-// Env: SEED (42) · BASE_URL (http://localhost:4100) · OUT (.agent/scratch/unboxing[-<seed>])
+// Env: SEED (42) · BOX (a catalog box key; default phantasmal-flames) · BASE_URL (http://localhost:4100)
+//      OUT (.agent/scratch/unboxing[-<box>][-<seed>])
 //      CARD_IMG: a local image or URL served for every TCGdex card face (sandboxes where TCGdex is blocked)
 //      SIO_JS: a local socket.io.min.js (default: the server's own /socket.io/socket.io.js)
 //      CHROMIUM: a browser binary (the cloud container has /opt/pw-browsers/chromium)
@@ -18,10 +19,13 @@ import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
 const SEED = Number(process.env.SEED ?? 42);
+const BOX = process.env.BOX || 'phantasmal-flames';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:4100';
-const OUT = process.env.OUT || `.agent/scratch/unboxing${SEED === 42 ? '' : `-${SEED}`}`;
-const VIDEO = `out/unboxing${SEED === 42 ? '' : `-${SEED}`}.webm`;
-const PAGE_URL = `${BASE_URL}/build-and-battle?seed=${SEED}&e2e=1`;
+// Design 054 § Recorder: the default box keeps 052's file names; another box names its files.
+const NAME_TAG = `${BOX === 'phantasmal-flames' ? '' : `-${BOX}`}${SEED === 42 ? '' : `-${SEED}`}`;
+const OUT = process.env.OUT || `.agent/scratch/unboxing${NAME_TAG}`;
+const VIDEO = `out/unboxing${NAME_TAG}.webm`;
+const PAGE_URL = `${BASE_URL}/build-and-battle?seed=${SEED}&e2e=1&box=${encodeURIComponent(BOX)}`;
 const STORAGE_KEY = 'ptcg-sim.build-battle.v1';
 const VIEWPORT = { width: 1280, height: 800 };
 const MODULE = '/src/setup/deck-builder/core/build-battle/unboxing.mjs';
@@ -30,7 +34,7 @@ const CARD_HOSTS = ['https://assets.tcgdex.net/**', 'https://limitlesstcg.nyc3.d
 
 const failures = [];
 const check = (ok, label, detail = '') => {
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${label}${detail ? ` — ${detail}` : ''}`);
+  console.log(`${ok ? 'PASS' : 'FAIL'} [${BOX}] ${label}${detail ? ` — ${detail}` : ''}`);
   if (!ok) failures.push(label);
 };
 
@@ -66,7 +70,7 @@ const openFreshBox = async (page) => {
   await page.goto(PAGE_URL);
   await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
   await page.reload();
-  await page.waitForSelector('#buildBattleOpenBox', { state: 'visible', timeout: 30000 });
+  await page.waitForSelector('#buildBattleOpenBox:not([disabled])', { state: 'visible', timeout: 30000 });
   await page.waitForTimeout(400);
   await page.click('#buildBattleOpenBox');
   await page.waitForSelector('#bbUnboxing .bb-box__wrap', { state: 'visible' });
@@ -283,7 +287,11 @@ const recordVideo = async (browser) => {
   await press(page, '[data-control="build"]');
   await page.waitForFunction(() => !document.getElementById('bbUnboxingStage'), null, { timeout: 8000 });
   await page.waitForTimeout(1200);
-  check(JSON.stringify((await session(page)).packs) === packsAtOpen, 'row 13 the scene never rewrote session.packs');
+  const saved = await session(page);
+  check(JSON.stringify(saved.packs) === packsAtOpen, 'row 13 the scene never rewrote session.packs');
+  check(saved.boxKey === BOX, 'the opened box is the one asked for', saved.boxKey);
+  // The editor starts on the box's own deck: 40 cards, or a 23-card Evolution pack (design 054 rows 14–15).
+  const startingDeck = saved.evolutionPack && !saved.energy ? saved.evolutionPack.length : 40;
   const back = await page.evaluate(() => ({
     pool: !document.getElementById('buildBattlePoolPanel')?.hidden,
     ui: getComputedStyle(document.querySelector('.native-deck-builder-inner')).visibility,
@@ -294,8 +302,8 @@ const recordVideo = async (browser) => {
     ),
   }));
   check(
-    back.pool && back.ui === 'visible' && back.deck === '40' && back.left === 40,
-    'UI returns on the Pool tab with the 40-card box deck loaded and the 40 pack cards left to add',
+    back.pool && back.ui === 'visible' && back.deck === String(startingDeck) && back.left === 40,
+    `UI returns on the Pool tab with the ${startingDeck}-card box deck loaded and the 40 pack cards left to add`,
     JSON.stringify(back)
   );
   await page.waitForTimeout(800);

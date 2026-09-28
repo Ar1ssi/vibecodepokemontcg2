@@ -15,6 +15,8 @@ import {
   deckFromRows,
   deckLoadFormat,
   parseBoxKey,
+  showsPlayLevel,
+  unboxingLabels,
   poolRefusalMessage,
   poolRemaining,
   withPoolErrors,
@@ -75,6 +77,29 @@ test('the sealed box says what is inside per kind', () => {
     boxContentsLine({ ...box, kind: 'evolution-deck' }, 'Temporal Forces'),
     '4 Temporal Forces packs and a 40-card Evolution deck (1 of 4 promos). Build a 40-card deck from them; games use 4 Prizes.'
   );
+});
+
+test('the unboxing labels follow the box kind; the Play Level pill starts with Lost Origin', () => {
+  assert.deepEqual(unboxingLabels(box, 'Phantasmal Flames'), {
+    deckLabel: '40-card deck',
+    backLines: [
+      '40-card ready-to-play deck including 1 of 4 unique foil promo cards',
+      '4 Phantasmal Flames booster packs',
+      'A code card for Pokémon TCG Live',
+    ],
+    codeCardGame: 'Pokémon TCG Live',
+    productTitle: 'Build & Battle',
+  });
+  const kit = { ...box, name: 'Fates Collide Prerelease Kit', shortName: 'Fates Collide', kind: 'evolution-pack' };
+  assert.equal(unboxingLabels(kit).deckLabel, '23-card Evolution pack');
+  assert.equal(unboxingLabels(kit).productTitle, 'Prerelease Kit');
+  assert.equal(unboxingLabels(kit).codeCardGame, 'Pokémon TCG Online');
+  assert.equal(unboxingLabels(kit).backLines[1], '4 Fates Collide booster packs');
+  const deck = { ...box, kind: 'evolution-deck', energyCount: 17 };
+  assert.equal(unboxingLabels(deck).deckLabel, '40-card Evolution deck');
+  assert.match(unboxingLabels(deck).backLines[0], /^40-card Evolution deck \(23 cards \+ 17 Basic Energy\)/);
+  assert.equal(showsPlayLevel(box), true);
+  assert.equal(showsPlayLevel({ key: 'nope', era: 'sm' }), false);
 });
 
 test('row 1: ?box= takes only a catalog box key', () => {

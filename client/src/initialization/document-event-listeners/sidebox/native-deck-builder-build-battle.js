@@ -2,7 +2,10 @@ import { createRng } from '../../../../../shared/engine/rng.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
 import {
   BASIC_ENERGY_LABELS,
+  BUILD_BATTLE_ERA_NAMES,
+  BUILD_BATTLE_ERAS,
   DEFAULT_BOX_KEY,
+  boxesForEra,
   getBuildBattleBox,
 } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
 import { loadBoxData } from '../../../setup/deck-builder/core/build-battle/box-data.mjs';
@@ -32,8 +35,11 @@ import {
   buildBattleDeckName,
   deckFromCardCounts,
   deckFromRows,
+  parseBoxKey,
   poolRefusalMessage,
   poolRemaining,
+  showsPlayLevel,
+  unboxingLabels,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
 import { advanceUnboxing, boxSkin } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
@@ -135,10 +141,12 @@ export const initializeBuildBattle = ({
 }) => {
   const storage = browserStorage();
   const energyCards = unlimitedEnergyCards();
-  const urlSeed = parseSeed(new URLSearchParams(window.location.search).get('seed') ?? '');
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlSeed = parseSeed(urlParams.get('seed') ?? '');
 
-  // The box on the sealed screen, or the opened box's; its data once `loadBoxData` settles.
-  let activeBox = getBuildBattleBox(DEFAULT_BOX_KEY);
+  // The box on the sealed screen (`?box=`, else the default), or the opened box's; its data once
+  // `loadBoxData` settles.
+  let activeBox = getBuildBattleBox(parseBoxKey(urlParams.get('box')) ?? DEFAULT_BOX_KEY);
   let loaded = null;
   let loadError = null;
   // Bumped per load, so a slow load for a box the player moved away from is dropped.
@@ -392,6 +400,65 @@ export const initializeBuildBattle = ({
     if (session && !session.deckId) parent.append(el('p', 'bb-banner', UNSAVED_DECK_TEXT));
   };
 
+  // The picked box goes into the URL, so a reload or a shared link opens the same box.
+  const rememberBoxInUrl = (box) => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('box', box.key);
+      window.history.replaceState(window.history.state, '', url);
+    } catch {
+      // A sandboxed or file: page may refuse; the picker still works.
+    }
+  };
+
+  const pickBox = (box) => {
+    if (!box || session || box.key === activeBox.key) return;
+    rememberBoxInUrl(box);
+    loadActiveBox(box);
+  };
+
+  // Era chips and the era's boxes in release order (design 054 § Builder tab). Only the sealed
+  // screen shows the picker, so a box cannot change under an opened session (row 22).
+  const renderPicker = () => {
+    const picker = el('div', 'bb-picker');
+    const eras = el('div', 'bb-era-row');
+    eras.id = 'buildBattleEra';
+    eras.setAttribute('role', 'group');
+    eras.setAttribute('aria-label', 'Era');
+    for (const era of BUILD_BATTLE_ERAS) {
+      const chip = el('button', 'bb-era-chip', era.name);
+      chip.type = 'button';
+      chip.dataset.era = era.key;
+      chip.disabled = !era.boxKeys.length;
+      chip.setAttribute('aria-pressed', String(era.key === activeBox.era));
+      chip.addEventListener('click', () => {
+        if (era.key !== activeBox.era) pickBox(getBuildBattleBox(era.boxKeys[0]));
+      });
+      eras.append(chip);
+    }
+    const label = el('label', 'bb-box-label', 'Box');
+    const select = el('select', 'bb-box-select');
+    select.id = 'buildBattleBox';
+    for (const box of boxesForEra(activeBox.era)) {
+      const option = el('option', '', box.shortName);
+      option.value = box.key;
+      option.selected = box.key === activeBox.key;
+      select.append(option);
+    }
+    select.addEventListener('change', () => pickBox(getBuildBattleBox(select.value)));
+    label.append(select);
+    picker.append(eras, label);
+    return picker;
+  };
+
+  // Every re-render replaces the picker; the control the player was on keeps focus (keyboard use).
+  const pickerFocus = () => {
+    const active = document.activeElement;
+    if (!boxPanelEl?.contains(active)) return null;
+    if (active.id === 'buildBattleBox') return '#buildBattleBox';
+    return active.dataset?.era ? `.bb-era-chip[data-era="${active.dataset.era}"]` : null;
+  };
+
   const sealedNote = () => {
     if (loadError) return `Could not load ${activeBox.name}. Reload to try again.`;
     if (!isLoaded()) return `Loading ${activeBox.name}…`;
@@ -404,7 +471,7 @@ export const initializeBuildBattle = ({
     note.id = 'buildBattleBoxNote';
     note.setAttribute('role', 'status');
     if (loadError) note.classList.add('is-error');
-    sealed.append(el('h3', 'bb-title', activeBox.name), note);
+    sealed.append(renderPicker(), el('h3', 'bb-title', activeBox.name), note);
     const seedLabel = el('label', 'bb-seed-label', 'Box #');
     const seedInput = el('input', 'bb-seed-input');
     seedInput.id = 'buildBattleSeed';
@@ -458,7 +525,13 @@ export const initializeBuildBattle = ({
       packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
       packModel: resolvePackModel(activeBox.packModelKey, cards, setInfo),
       classOf: (card) => cardClass(card, activeBox.era, setInfo),
-      skin: boxSkin({ box: activeBox, setInfo, cards, data }),
+      look: {
+        skin: boxSkin({ box: activeBox, setInfo, cards, data }),
+        labels: unboxingLabels(activeBox, setInfo.name),
+        seriesName: BUILD_BATTLE_ERA_NAMES[activeBox.era],
+        setName: setInfo.name,
+        playLevel: showsPlayLevel(activeBox),
+      },
       seed: session.seed,
       promo: boxPromoRow({ box: activeBox, data, deckKey: session.deckKey }),
       onBuildDeck: finishOpening,
@@ -470,11 +543,13 @@ export const initializeBuildBattle = ({
     scene?.unmount();
     scene = null;
     if (unboxingDone()) closeStage();
+    const focused = pickerFocus();
     boxPanelEl.replaceChildren();
     if (!resumed) return; // still waiting for the game tab to name its room
     renderBanner(boxPanelEl);
     if (session && isLoaded()) renderOpenedBox();
     else renderSealedBox();
+    if (focused) boxPanelEl.querySelector(focused)?.focus();
   };
 
   // ── Pool tab ────────────────────────────────────────────────────────────

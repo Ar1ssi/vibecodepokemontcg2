@@ -5,7 +5,7 @@ import {
   DECK_FORMAT_BUILD_BATTLE,
   DECK_FORMAT_TCG,
 } from '../../../../../../shared/engine/formats.mjs';
-import { getBuildBattleBox } from './box-catalog.mjs';
+import { BUILD_BATTLE_BOXES, getBuildBattleBox } from './box-catalog.mjs';
 
 /** @returns {object} the editor's `{ [name]: { cards: [{ data, count }], totalCount } }` map for box deck rows. */
 export function deckFromRows(rows = []) {
@@ -71,6 +71,65 @@ const CONTENTS_BY_KIND = {
   'evolution-pack': (box) => `a 23-card Evolution pack (1 of ${box.decks.length} promos)`,
   'evolution-deck': (box) => `a 40-card Evolution deck (1 of ${box.decks.length} promos)`,
 };
+
+// Bulbapedia "Build & Battle Box (TCG)": "Beginning with the Lost Origin expansion, Build & Battle
+// Boxes are categorized as Play Level 2."
+const FIRST_PLAY_LEVEL_BOX = 'lost-origin';
+
+const releaseIndex = (key) => BUILD_BATTLE_BOXES.findIndex((box) => box.key === key);
+
+/** @returns {boolean} whether the box's face carries the "Play level 2" pill. */
+export function showsPlayLevel(box) {
+  const first = releaseIndex(FIRST_PLAY_LEVEL_BOX);
+  const era = box?.era;
+  if (first === -1) return era === 'sv' || era === 'me';
+  return releaseIndex(box?.key) >= first;
+}
+
+/**
+ * The printed words of the unboxing scene per box kind (design 054 § Unboxing skin): the tray's
+ * deck label, the back of the box, the code card's game and the band under the key art.
+ * @returns {{deckLabel: string, backLines: string[], codeCardGame: string, productTitle: string}}
+ */
+export function unboxingLabels(box, setName = box.shortName) {
+  const packsLine = `${box.packCount} ${setName} booster packs`;
+  const promoCount = box.decks.length;
+  const productTitle = /Prerelease Kit$/.test(box.name) ? 'Prerelease Kit' : 'Build & Battle';
+  if (box.kind === 'evolution-pack') {
+    return {
+      deckLabel: '23-card Evolution pack',
+      backLines: [
+        `23-card Evolution pack including 1 of ${promoCount} foil promo cards`,
+        packsLine,
+        'A code card for Pokémon TCG Online',
+      ],
+      codeCardGame: 'Pokémon TCG Online',
+      productTitle,
+    };
+  }
+  if (box.kind === 'evolution-deck') {
+    return {
+      deckLabel: '40-card Evolution deck',
+      backLines: [
+        `40-card Evolution deck (23 cards + ${box.energyCount} Basic Energy) including 1 of ${promoCount} foil promo cards`,
+        packsLine,
+        'A code card for Pokémon TCG Live',
+      ],
+      codeCardGame: 'Pokémon TCG Live',
+      productTitle,
+    };
+  }
+  return {
+    deckLabel: '40-card deck',
+    backLines: [
+      `40-card ready-to-play deck including 1 of ${promoCount} unique foil promo cards`,
+      packsLine,
+      'A code card for Pokémon TCG Live',
+    ],
+    codeCardGame: 'Pokémon TCG Live',
+    productTitle,
+  };
+}
 
 /** @returns {string} the sealed box's note: what is inside and what the player builds. */
 export function boxContentsLine(box, setName = box.shortName) {

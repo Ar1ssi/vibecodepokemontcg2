@@ -660,6 +660,12 @@ Build notes:
   Rising), 4589383 (Pitch Black); TCGdex names replace Bulbapedia's shorthand for Special Energy ("Growing G
   Energy" → "Growing Grass Energy"). Key art rule: the SIR of the Pokémon on the set's first Mega Hyper Rare
   (me01-178, me03-120, me04-116, me05-116; 051's me02-125 fits it). `--check` (live, 5 ME boxes): clean.
+- Slice 4: the scene takes a `look` (skin + `unboxingLabels` + series/set names + Play Level); the Play Level
+  pill shows from Lost Origin on (Bulbapedia box list) and Prerelease Kits print "Prerelease Kit" in the title
+  band — both additions. Picker focus survives every re-render; the picked box is written to `?box=`.
+  Recorder seed 42 PASS for phantasmal-flames and mega-evolution (procedural skin); `bb-box-picker-test.mjs`
+  ALL PASS (rows 1, 5, 6, 22, 29); `bb-room-reset-test.mjs` and `room-format-test.mjs` ALL PASS. In this
+  sandbox the proxy blocks some TCGdex/Limitless art (ERR_BLOCKED_BY_ORB), so skin screenshots use stand-ins.
 
 ---
 Self-approval checklist (only when the user is unreachable):
