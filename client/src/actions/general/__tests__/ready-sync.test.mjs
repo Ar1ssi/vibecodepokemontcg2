@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { deckDataEquals } from '../../../setup/general/sync-action-args.mjs';
-import { setupDealPlan } from '../setup-deal.mjs';
+import { setupDealPlan, setupShuffleAnimates } from '../setup-deal.mjs';
 
 // Simulates selfReady/oppReady on two clients for the fixed readyUp contract.
 function simulateReadyExchange({ hostInitiator, joinerInitiator }) {
@@ -165,3 +165,11 @@ test('prize picker contract: solo mode prompts for both players on shared board'
   );
 });
 
+test('setupPrizes leaves the opening shuffle flight to the server under authority', () => {
+  // The server's deckShuffled events play it behind the coin ceremony; the local
+  // shuffle resumes on the same dealOrder message and would fly under the coin.
+  assert.equal(setupShuffleAnimates({ isTwoPlayer: true, serverAuthoritative: true }), false);
+  assert.equal(setupShuffleAnimates({ isTwoPlayer: true, serverAuthoritative: false }), true);
+  assert.equal(setupShuffleAnimates({ isTwoPlayer: false, serverAuthoritative: true }), true);
+  assert.equal(setupShuffleAnimates(), true);
+});

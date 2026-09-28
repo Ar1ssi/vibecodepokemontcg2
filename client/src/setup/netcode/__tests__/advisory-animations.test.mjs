@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { advisoryAnimationPlan, coinFlipRuns, EVENT_FX, supersededDeals } from '../advisory-animations.mjs';
+import {
+  advisoryAnimationPlan,
+  coinFlipRuns,
+  dealShuffles,
+  EVENT_FX,
+  supersededDeals,
+} from '../advisory-animations.mjs';
 import { HOLD_MS } from '../mat-fx/fx-holds.mjs';
 
 test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side', () => {
@@ -379,4 +385,31 @@ test('coinFlipRuns: back-to-back single flips by one player and source play as o
   assert.deepEqual(advisoryAnimationPlan(a, 'p1', runs.get(a)).faces, ['heads', 'tails']);
   assert.equal(advisoryAnimationPlan(b, 'p1', runs.get(b)), null, 'folded flips plan nothing');
   assert.equal(coinFlipRuns(null).size, 0);
+});
+
+test('the opening deal shuffles animate; a search effect deck shuffle does not', () => {
+  // shared/engine/setup.mjs emits, per player: deckShuffled, openingHandDealt, prizesSet.
+  const shuffleA = { type: 'deckShuffled', playerId: 'A' };
+  const shuffleB = { type: 'deckShuffled', playerId: 'B' };
+  const searchShuffle = { type: 'deckShuffled', playerId: 'A' };
+  const events = [
+    shuffleA,
+    { type: 'openingHandDealt', playerId: 'A', cards: [] },
+    { type: 'prizesSet', playerId: 'A' },
+    shuffleB,
+    { type: 'openingHandDealt', playerId: 'B', cards: [] },
+    searchShuffle,
+    { type: 'cardsDrawn', playerId: 'A', cards: [] },
+  ];
+  const shuffles = dealShuffles(events);
+  assert.deepEqual([...shuffles], [shuffleA, shuffleB]);
+
+  assert.deepEqual(advisoryAnimationPlan(shuffleA, 'A', undefined, { dealShuffle: true }), {
+    kind: 'shuffle',
+    user: 'self',
+    zoneId: 'deck',
+  });
+  assert.equal(advisoryAnimationPlan(shuffleB, 'A', undefined, { dealShuffle: true }).user, 'opp');
+  assert.equal(advisoryAnimationPlan(searchShuffle, 'A'), null);
+  assert.deepEqual([...dealShuffles(null)], []);
 });
