@@ -31,7 +31,7 @@ import {
   attachedCards,
   removeFromZones,
 } from './trainer-steps.mjs';
-import { ATTACK_STEP_HANDLERS } from './attack-steps.mjs';
+import { ATTACK_STEP_HANDLERS, EXTRA_ENERGY_SELF_GATED, stepExtraEnergySatisfied } from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 export const MAX_EFFECT_STEPS = 200;
@@ -339,6 +339,16 @@ export function executeSteps(draft, {
     }
     if (step.requiresAttach && !context.attachedEnergy) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
+      continue;
+    }
+    // GX "If this Pokémon has at least N extra Energy attached to it, …" (Tropical Hour-GX).
+    if (
+      effectType === 'attackSteps' &&
+      step.requiresExtraEnergy &&
+      !EXTRA_ENERGY_SELF_GATED.has(step.type) &&
+      !stepExtraEnergySatisfied({ draft, player, sourceCard, step })
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'extra_energy_unmet', step: step.type });
       continue;
     }
     // Hypno Spiral Aura: "If the Defending Pokémon isn't Knocked Out by the damage from this

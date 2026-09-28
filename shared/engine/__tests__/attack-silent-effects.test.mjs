@@ -1534,3 +1534,115 @@ test('Torterra Land Shake (Stormfront 11): a Basic benched from hand next turn t
   assert.equal(res.error, null);
   assert.equal(root(res.state, 'p2', basic.instanceId).damage, 20);
 });
+
+test("Unown E Hidden Power (Mysterious Treasures 65): the opponent's coins are tails on their next turn", () => {
+  const text = "During your opponent's next turn, whenever your opponent flips a coin, treat it as tails.";
+  const { state, attacker } = board('Unown E', text, {
+    damage: '',
+    setup: (s) => armDefender(s, 'Flip 3 coins. This attack does 30 damage for each heads.', '30×'),
+  });
+  const res = counterAttack(attack(state));
+  const flips = res.events.filter((e) => e.type === 'attackCoinFlipped').flatMap((e) => e.flips || [e.coin]);
+  assert.deepEqual(flips, ['tails', 'tails', 'tails']);
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage || 0, 0);
+});
+
+test('Espeon & Deoxys-GX Cross Division-GX (Sun & Moon Promos SM240): 20 counters with 3 extra Energy', () => {
+  const text =
+    "Put 10 damage counters on your opponent's Pokémon in any way you like. If this Pokémon has at least 3 extra Energy attached to it (in addition to this attack's cost), put 20 damage counters on them instead. (You can't use more than 1 GX attack in a game.)";
+  const run = (energyCount) => {
+    const { state, defender } = board('Espeon & Deoxys-GX', text, {
+      damage: '',
+      setup: (s) => attachTo(s, s.players.p1.zones.active[0], Array(energyCount).fill('Psychic')),
+    });
+    return root(attack(state).state, 'p2', defender.instanceId).damage;
+  };
+  assert.equal(run(3), 200);
+  assert.equal(run(2), 100);
+});
+
+test('Rowlet & Alolan Exeggutor-GX Tropical Hour-GX (Unified Minds 237): with 3 extra Energy, their Energy is shuffled away', () => {
+  const text =
+    "If this Pokémon has at least 3 extra Energy attached to it (in addition to this attack's cost), your opponent shuffles all Energy from all of their Pokémon into their deck. (You can't use more than 1 GX attack in a game.)";
+  const run = (energyCount) => {
+    const { state, defender } = board('Rowlet & Alolan Exeggutor-GX', text, {
+      damage: '200',
+      setup: (s) => {
+        attachTo(s, s.players.p1.zones.active[0], Array(energyCount).fill('Grass'));
+        s.players.p2.zones.active.push(energy('Water', s.players.p2.zones.active[0].instanceId));
+      },
+    });
+    const res = attack(state);
+    return res.state.players.p2.zones.active.filter((c) => c.attachedTo === defender.instanceId).length;
+  };
+  assert.equal(run(3), 0);
+  assert.equal(run(2), 1);
+});
+
+test('Pheromosa & Buzzwole-GX Beast Game-GX (Unbroken Bonds 215): 3 more Prizes with 7 extra Energy', () => {
+  const text =
+    "If your opponent's Pokémon is Knocked Out by damage from this attack, take 1 more Prize card. If this Pokémon has at least 7 extra Energy attached to it (in addition to this attack's cost), take 3 more Prize cards instead. (You can't use more than 1 GX attack in a game.)";
+  const run = (energyCount) => {
+    const { state } = board('Pheromosa & Buzzwole-GX', text, {
+      damage: '500',
+      setup: (s) => {
+        attachTo(s, s.players.p1.zones.active[0], Array(energyCount).fill('Grass'));
+        addBench(s, 'p2', 'Next');
+      },
+    });
+    return attack(state).events.find((e) => e.type === 'prizeEntitlementGranted')?.count;
+  };
+  assert.equal(run(7), 3);
+  assert.equal(run(6), 1);
+});
+
+test('Porygon2 Machine Burst (Delta Species 25): Asleep and Burned only with a Technical Machine attached', () => {
+  const text =
+    'If Porygon2 has a Technical Machine card attached to it, the Defending Pokémon is now Asleep and Burned.';
+  const run = (withTm) => {
+    const { state, defender } = board('Porygon2', text, {
+      damage: '30',
+      setup: (s) => {
+        if (!withTm) return;
+        const tm = tool(s.players.p1.zones.active[0].instanceId);
+        tm.name = 'Technical Machine: Evolution';
+        s.players.p1.zones.active.push(tm);
+      },
+    });
+    const res = attack(state);
+    return res.events
+      .filter((e) => e.type === 'specialConditionUpdated' && e.instanceId === defender.instanceId)
+      .map((e) => e.condition)
+      .sort();
+  };
+  assert.deepEqual(run(true), ['Asleep', 'Burned']);
+  assert.deepEqual(run(false), []);
+});
+
+test('Porygon-Z Digital Reboot (Ancient Origins 67): chosen Evolution cards return to hand, top down', () => {
+  const text =
+    'Devolve as many of your Benched Pokémon as many times as you like. Put each Evolution card removed this way into your hand.';
+  let basic;
+  let stage1;
+  let stage2;
+  const { state } = board('Porygon-Z', text, {
+    damage: '',
+    setup: (s) => {
+      basic = mon('Porygon');
+      stage1 = createCard({ instanceId: nextId++, name: 'Porygon2', supertype: 'Pokémon', stage: 'Stage 1', hp: 80, attachedTo: basic.instanceId });
+      stage2 = createCard({ instanceId: nextId++, name: 'Porygon-Z', supertype: 'Pokémon', stage: 'Stage 2', hp: 130, attachedTo: basic.instanceId });
+      s.players.p1.zones.bench.push(basic, stage1, stage2);
+    },
+  });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.options.length, 2);
+  // Picking only the Stage 1 under a kept Stage 2 removes nothing.
+  res = choose(res, [stage1.instanceId]);
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.instanceId), []);
+  const again = board('Porygon-Z', text, {
+    damage: '',
+    setup: (s) => s.players.p1.zones.bench.push(basic, { ...stage1 }, { ...stage2 }),
+  });
+  res = choose(attack(again.state), [stage1.instanceId, stage2.instanceId]);
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.name).sort(), ['Porygon-Z', 'Porygon2']);
+});

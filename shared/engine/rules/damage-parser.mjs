@@ -1232,12 +1232,16 @@ const PRIZE_ON_KO_CLAUSES = [
 export function parsePrizeOnKo(attackText) {
   const text = lower(attackText).replace(/\s+/g, ' ');
   if (!text) return null;
+  // Pheromosa & Buzzwole-GX Beast Game-GX: "If this Pokémon has at least 7 extra Energy …, take
+  // 3 more Prize cards instead." reduce.mjs checks the condition when it pays.
+  const instead = /(?:^|\. )if ([^,]+), take (\d+) more prize cards? instead/.exec(text);
   for (const [re, ruleBox] of PRIZE_ON_KO_CLAUSES) {
     const m = re.exec(text);
     if (!m) continue;
     return {
       count: parseInt(m[1], 10) || 1,
       ...(ruleBox ? { filter: { ruleBox } } : {}),
+      ...(instead ? { instead: { condition: instead[1], count: Number(instead[2]) } } : {}),
     };
   }
   return null;

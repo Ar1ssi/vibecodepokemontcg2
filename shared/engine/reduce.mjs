@@ -6860,8 +6860,10 @@ function resolveAttackEffectPhase(draft, ctx) {
         attackTarget = picks > 0 ? { ...attackTarget, count: picks } : null;
       }
       // Shedinja Extra Curse: "If the Defending Pokémon is Pokémon-ex, put 4 damage counters instead."
+      // Espeon & Deoxys-GX Cross Division-GX: "If this Pokémon has at least 3 extra Energy …,
+      // put 20 damage counters on them instead." — spread counters swap their total.
       const counterSwap = attackTarget?.kind === 'counters'
-        ? /(?:^|\. )if ([^,]+), put (\d+) damage counters instead\./.exec(normalizeAttackText(attack.text, attackerView?.name))
+        ? /(?:^|\. )if ([^,]+), put (\d+) damage counters (?:on them )?instead\./.exec(normalizeAttackText(attack.text, attackerView?.name))
         : null;
       if (counterSwap) {
         const condition = parseConditionClause(counterSwap[1]);
@@ -6879,7 +6881,11 @@ function resolveAttackEffectPhase(draft, ctx) {
               defenderView: defender ? inPlayView(draft, defender) : null,
             })
           );
-        if (holds) attackTarget = { ...attackTarget, amount: Number(counterSwap[2]) * 10 };
+        if (holds) {
+          attackTarget = attackTarget.distributable
+            ? { ...attackTarget, remaining: Number(counterSwap[2]) }
+            : { ...attackTarget, amount: Number(counterSwap[2]) * 10 };
+        }
       }
       // "If heads, put 3 damage counters on …" / "For each heads, put 1 damage counter …".
       const targetGate = attackTarget ? targetClauseGate(attack.text) : null;
@@ -7202,6 +7208,27 @@ function searchCoinGateOpen(attack, coinResult) {
  * call in the same command already paid, so a tail that grants before and after the
  * chosen-target damage never pays one Knock Out twice.
  */
+// Beast Game-GX's "… take 3 more Prize cards instead" condition, read against the attacker.
+function prizeInsteadHolds(draft, playerId, attack, instead) {
+  const condition = parseConditionClause(instead.condition);
+  const attacker = (draft.players[playerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  if (!condition || !attacker) return false;
+  const defenderPlayerId = Object.keys(draft.players).find((id) => id !== playerId);
+  return (
+    attackConditionMet(
+      condition,
+      buildServerAttackContext(draft, {
+        attackerPlayerId: playerId,
+        defenderPlayerId,
+        attacker,
+        defender: (draft.players[defenderPlayerId]?.zones?.active || []).find((c) => !c.attachedTo) || null,
+        attackerView: inPlayView(draft, attacker),
+        attack,
+      })
+    ) === true
+  );
+}
+
 function grantPrizeOnKoBonus(draft, { playerId, attack, events, paid }) {
   const bonus = parsePrizeOnKo(attack?.text);
   if (!bonus) return;
@@ -7218,7 +7245,8 @@ function grantPrizeOnKoBonus(draft, { playerId, attack, events, paid }) {
   );
   if (victims.length === 0) return;
   for (const victim of victims) seen.add(victim.instanceId);
-  const count = Math.min(bonus.count * victims.length, prizes.length);
+  const perKo = bonus.instead && prizeInsteadHolds(draft, playerId, attack, bonus.instead) ? bonus.instead.count : bonus.count;
+  const count = Math.min(perKo * victims.length, prizes.length);
   if (count <= 0) return;
   if (!player.flags) player.flags = {};
   player.flags.prizesOwed = (player.flags.prizesOwed || 0) + count;
@@ -7606,10 +7634,13 @@ export function applyCommand(state, command, rng = null) {
   // Malamar Contrary / Shiftry Unlucky Wind: the turn player's coin flips are tails. Flips by
   // the other player (surviveKnockOutCoin) and Checkup draw raw RNG, so they are unaffected.
   const turnOpponentId = Object.keys(state.players || {}).find((id) => id !== state.turn?.player);
+  // Cofagrigus Slap of Misfortune / Unown E Hidden Power: an attack forced the turn player's
+  // coins to tails for this turn (effects/attack-steps.mjs atkOppCoinsTails).
+  const turnPlayerCoinsTails = state.players?.[state.turn?.player]?.coinsTailsTurn === state.turn?.number;
   if (
     state.turn?.player &&
     turnOpponentId &&
-    abilityForcesOpponentTails(abilitySideContext(state, turnOpponentId))
+    (turnPlayerCoinsTails || abilityForcesOpponentTails(abilitySideContext(state, turnOpponentId)))
   ) {
     activeRng = withForcedCoin(activeRng, 'tails');
   }

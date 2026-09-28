@@ -183,6 +183,23 @@ function costTypeLetter(symbol) {
  * cost)" (design 048): attached Energy of the printed type (all Energy when untyped) minus
  * that type's share of the attack's printed cost. Fail closed when the attacker left play.
  */
+// Handlers that read `requiresExtraEnergy` themselves (a partial effect, or their own skip);
+// every other attack step with the requirement is gated by the executor (effects/executor.mjs).
+export const EXTRA_ENERGY_SELF_GATED = new Set([
+  'atkBenchFromDiscard',
+  'atkKnockOut',
+  'atkTakePrize',
+  'atkDiscardOppPokemon',
+  'atkShuffleOppAllBench',
+  'atkBothDrawUntil',
+  'atkAddMarker',
+]);
+
+/** Whether an attack step's "at least N extra Energy" requirement holds (executor gate). */
+export function stepExtraEnergySatisfied(ctx) {
+  return extraEnergySatisfied(ctx, ctx.step.requiresExtraEnergy);
+}
+
 function extraEnergySatisfied(ctx, requirement) {
   if (!requirement) return true;
   const requirements = Array.isArray(requirement) ? requirement : [requirement];
@@ -2408,6 +2425,35 @@ function devolveChosen(ctx) {
   });
 }
 
+// Celebi Prism Star Time Distortion / Porygon-Z Digital Reboot: "Devolve any number of your
+// Benched Pokémon as many times as you like. Put each Evolution card removed this way into your
+// hand." The player picks Evolution cards; each stack sheds its picked cards from the top down.
+function atkDevolveOwnBench(ctx) {
+  const { player } = ctx;
+  const stacks = benchRootsOf(player).map((root) => ({
+    root,
+    evolutions: attachedCards(player, root.instanceId).filter((c) => isPokemon(c)),
+  }));
+  const options = stacks.flatMap((stack) => stack.evolutions);
+  if (!ctx.selection) {
+    if (options.length === 0) return skip(ctx, 'no_evolved_pokemon');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose the Evolution cards to remove from your Benched Pokémon`,
+      options,
+      min: 0,
+      max: options.length,
+    });
+  }
+  const picked = new Set(ctx.selection);
+  for (const { root } of stacks) {
+    for (let top = topPokemonCard(player, root); top && top !== root && picked.has(top.instanceId); ) {
+      devolveRoot(ctx, player, root, 'hand');
+      top = topPokemonCard(player, root);
+    }
+  }
+  return null;
+}
+
 function atkDevolve(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
@@ -3079,6 +3125,16 @@ function atkOppBenchTrap(ctx) {
   return null;
 }
 
+// Cofagrigus Slap of Misfortune / Unown E Hidden Power: the opponent's coin flips next turn are
+// tails (reduce.mjs wraps that turn's RNG).
+function atkOppCoinsTails(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  opponent.coinsTailsTurn = (ctx.draft.turn?.number || 1) + 1;
+  ctx.events.push({ type: 'coinsForcedTails', playerId: opponent.playerId, turn: opponent.coinsTailsTurn });
+  return null;
+}
+
 // Unown L Hidden Power: "put damage counters on the Defending Pokémon until it is 10 HP away
 // from being Knocked Out".
 function atkCountersUntilHp(ctx) {
@@ -3442,6 +3498,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkDiscardOwnEnergy,
   atkDiscardSelfEnergyEither,
   atkOppBenchTrap,
+  atkOppCoinsTails,
+  atkDevolveOwnBench,
   atkApplyCondition: optional(atkApplyCondition, (step) => `Leave your opponent's Active Pokémon ${step.condition}`),
   atkDevolve,
   atkBounceOppActive,

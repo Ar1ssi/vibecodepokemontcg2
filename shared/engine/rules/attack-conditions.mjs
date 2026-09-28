@@ -718,6 +718,11 @@ const CLAUSES = [
     /^this pokémon has (?:a|any) pokémon tools?(?: cards?)? attached(?: to it)?$/,
     () => ({ desc: { kind: 'attackerToolCount', op: 'gte', n: 1 }, printedNegated: false }),
   ],
+  // Porygon2 Machine Burst: "If Porygon2 has a Technical Machine card attached to it".
+  [
+    /^this pokémon has a technical machine card attached(?: to it)?$/,
+    () => ({ desc: { kind: 'attackerTechnicalMachine' }, printedNegated: false }),
+  ],
   [
     /^this pokémon has no pokémon tools?(?: cards?)? attached(?: to it)?$/,
     () => ({ desc: { kind: 'attackerToolCount', op: 'gte', n: 1 }, printedNegated: true }),
@@ -1023,6 +1028,10 @@ const CHECKS = {
   energyVsDefender: (cond, ctx) => compare(num(ctx.energyCount), cond.op, num(ctx.opponentEnergyCount)),
   defenderEnergyCount: (cond, ctx) => compare(num(ctx.opponentEnergyCount), cond.op, cond.n),
   attackerToolCount: (cond, ctx) => compare(num(ctx.attackerToolCount), cond.op, cond.n),
+  attackerTechnicalMachine: (cond, ctx) =>
+    Array.isArray(ctx.attackerAttachedCards)
+      ? ctx.attackerAttachedCards.some((c) => /technical machine/i.test(String(c?.name || '')))
+      : null,
   defenderToolCount: (cond, ctx) => compare(num(ctx.defenderToolCount), cond.op, cond.n),
   stadiumOwner: (cond, ctx) => ctx.stadiumOwner === cond.owner,
   namedCardInPlay: (cond, ctx) =>

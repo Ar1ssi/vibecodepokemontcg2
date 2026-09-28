@@ -154,6 +154,16 @@ const TEMPLATES = [
     /^(?:choose 1 of your opponent's benched pokémon( with no damage counters on it)? and switch (?:it with (?:1 of )?your opponent's active pokémon|your opponent's active pokémon with it)|switch 1 of your opponent's benched pokémon with 1 of your opponent's active pokémon|if your opponent has any benched pokémon, choose 1 of them and switch it with your opponent's active pokémon)$/,
     (m) => ({ type: 'atkGust', chooser: 'self', ...(m[1] ? { filter: 'undamaged' } : {}) }),
   ],
+  // Celebi Prism Star Time Distortion, Porygon-Z Digital Reboot.
+  [
+    /^devolve (?:any number of|as many of) your benched pokémon as many times as you like$/,
+    () => ({ type: 'atkDevolveOwnBench' }),
+  ],
+  // Cofagrigus Slap of Misfortune, Unown E Hidden Power.
+  [
+    /^(?:whenever your opponent flips a coin during their next turn|during your opponent's next turn, whenever your opponent flips a coin), treat it as tails$/,
+    () => ({ type: 'atkOppCoinsTails' }),
+  ],
   // Torterra Land Shake.
   [
     /^during your opponent's next turn, when your opponent puts a basic pokémon from their hand onto their bench, put (\d+) damage counters on that pokémon$/,
@@ -344,7 +354,9 @@ const TEMPLATES = [
   ],
   // Palkia-GX Zero Vanish-GX: every opponent Pokémon sheds its Energy into their deck.
   [
-    /^shuffle all energy (?:from|attached to) each of your opponent's pokémon into their deck$/,
+    // Rowlet & Alolan Exeggutor-GX Tropical Hour-GX: "your opponent shuffles all Energy from
+    // all of their Pokémon into their deck".
+    /^(?:shuffle all energy (?:from|attached to) each of your opponent's pokémon|your opponent shuffles all energy from all of their pokémon) into their deck$/,
     () => ({ type: 'atkShuffleOppEnergy' }),
   ],
   [
