@@ -839,3 +839,62 @@ test('parsePlayLocks: delegates to the shared play-lock reader', () => {
   assert.ok(lock);
   assert.deepEqual(lock.cards, ['Item']);
 });
+
+// ── evolved holders ──────────────────────────────────────────────────────
+// An Evolution is stacked under its Basic root (reduce.mjs attachCard): the Ability is printed on
+// the top card while damage, conditions and attached Energy stay on the root.
+
+test('evolved holders: an evolved Froslass puts Checkup counters; the root takes the write (pkmn corpus Froslass Twilight Masquerade 053)', () => {
+  const state = setupGame();
+  const snorunt = pokemon({ instanceId: 1, name: 'Snorunt' });
+  const froslass = pokemon({
+    instanceId: 2,
+    name: 'Froslass',
+    stage: 'Stage 1',
+    attachedTo: 1,
+    abilities: [
+      ability(
+        'Freezing Shroud',
+        "During Pokémon Checkup, put 1 damage counter on each Pokémon that has an Ability (both yours and your opponent's), except any Froslass."
+      ),
+    ],
+  });
+  // An evolved target: its Ability is printed on the top card too.
+  const ralts = pokemon({ instanceId: 3, name: 'Ralts' });
+  const kirlia = pokemon({
+    instanceId: 4,
+    name: 'Kirlia',
+    stage: 'Stage 1',
+    attachedTo: 3,
+    abilities: [ability('Refinement', 'Once during your turn, you may draw 2 cards.')],
+  });
+  state.players.p1.zones.active.push(snorunt, froslass);
+  state.players.p2.zones.active.push(ralts, kirlia);
+
+  const effects = parseCheckupAbilities(inPlayEntries(state), ctxFor(state, 'p1'));
+  assert.equal(effects.length, 1);
+  assert.equal(effects[0].source, 'Froslass');
+  assert.equal(effects[0].holder, snorunt);
+  assert.deepEqual(effects[0].targets.map((t) => t.card), [ralts]);
+});
+
+test('evolved holders: attaching Energy to an evolved Wailord recovers it (pkmn corpus Wailord Vivid Voltage 032)', () => {
+  const state = setupGame();
+  const wailmer = pokemon({ instanceId: 10, name: 'Wailmer' });
+  const wailord = pokemon({
+    instanceId: 11,
+    name: 'Wailord',
+    stage: 'Stage 1',
+    attachedTo: 10,
+    abilities: [
+      ability('Water Veil', 'Whenever you attach an Energy card from your hand to this Pokémon, it recovers from all Special Conditions.'),
+    ],
+  });
+  addCondition(wailmer, 'Asleep');
+  state.players.p1.zones.active.push(wailmer, wailord);
+  state.players.p1.zones.hand.push(energy(30, 'Water'));
+  const res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 30, targetInstanceId: 10 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  const root = res.state.players.p1.zones.active.find((c) => c.instanceId === 10);
+  assert.equal(hasCondition(root, 'Asleep'), false);
+});

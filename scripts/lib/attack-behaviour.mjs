@@ -4,8 +4,13 @@
 // every row with the committed baseline so an attack that stops working fails the gate instead
 // of drifting back in silently.
 import { classifyAttackEffect } from '../../shared/engine/rules/attack-effects.mjs';
-import { mon, DEFAULT_SEEDS } from './oracle-harness.mjs';
+import { parseAttackSteps } from '../../shared/engine/rules/attack-steps.mjs';
+import { parseAttackDamage } from '../../shared/engine/rules/damage-parser.mjs';
+import { parseAttackCondition } from '../../shared/engine/rules/attack-conditions.mjs';
+import { mon, DEFAULT_SEEDS, printedBase } from './oracle-harness.mjs';
 import { runAttackRich } from './attack-harness.mjs';
+import { replayBonuses } from './condition-replay.mjs';
+import { parseDrift } from './text-variants.mjs';
 import { splitCard } from './split-card-text.mjs';
 
 /**
@@ -118,7 +123,38 @@ const MECH = [
   ['mill-self', /discard the top (\d+ cards?|card) of your deck/, /^own:deck->discard$/],
   ['mill-opp', /discard the top (\d+ cards?|card) of your opponent's deck/, /^opp:deck->discard$/],
   ['lost-zone', /(put|send)[^.]*(in|into) the lost zone/, /->lostZone$/],
+  // Locks leave no zone change: the snapshot's per-card locks/markers and per-player play locks
+  // (oracle-harness.mjs) are their only evidence. Budew Itchy Pollen's Item lock parsed to
+  // nothing and still read `ok` because its 10 damage counted as the effect.
+  ['lock-opp-play', /(your opponent|they) can't play any/, /^opp:play-lock$/],
+  [
+    'lock-opp-pokemon',
+    /(defending pokémon|your opponent's active pokémon) can't (attack|retreat|use)/,
+    /^opp:(lock|play-lock)$/,
+  ],
+  ['lock-self', /this pokémon can't (attack|retreat|use)/, /^own:lock$/],
 ];
+
+// Damage-parser notes that mean a printed count or condition was not understood (the engine
+// deals the base damage and says so). Coin notes are outcomes, not gaps.
+const UNRESOLVED_NOTE = /resolve the printed|pending — pass/;
+
+/** Engine damage notes naming an unread count/condition, as mismatches. */
+export function unresolvedNoteMismatches(scaled) {
+  const notes = new Set();
+  for (const s of scaled || []) for (const n of s.notes || []) if (UNRESOLVED_NOTE.test(n) && !/^coin/.test(n)) notes.add(n);
+  return [...notes].sort().map((note) => ({ mech: 'unresolved-damage', sentence: note, conditional: false }));
+}
+
+// Parsers whose output decides what an attack does in play; family is display-only.
+const attackParsers = (item, selfName) => ({
+  steps: (t) => parseAttackSteps(t, { selfName }),
+  damage: (t) => {
+    const r = parseAttackDamage({ damage: item.damageText || '', text: t }, {}, {}, {});
+    return [r.total, r.components, r.notes];
+  },
+  condition: (t) => parseAttackCondition(t, { selfName }),
+});
 
 const CONDITIONAL =
   /\bif\b|\bwhen(ever)?\b|during your next turn|during your opponent's next turn|until the end|as long as|for each|\bunless\b/;
@@ -220,11 +256,24 @@ export function classifyAttackRow(card, item, attackIndex, allAttacks, { seeds =
     m.type = 'Pokémon';
     return m;
   };
-  const run = runAttackRich(holder, attackIndex, {
-    seeds,
-    costPool: costPoolFor(allAttacks),
+  const costPool = costPoolFor(allAttacks);
+  const run = runAttackRich(holder, attackIndex, { seeds, costPool });
+  const replay = replayBonuses(holder, attackIndex, {
+    text: item.text,
+    printedBase: printedBase(item.damageText),
+    costPool,
   });
-  const mismatches = attackMismatches(item.text, run.tags);
+  const drift = parseDrift(item.text, attackParsers(item, card.name));
+  const mismatches = [
+    ...attackMismatches(item.text, run.tags),
+    ...unresolvedNoteMismatches(run.scaled),
+    ...replay.failed.map((f) => ({
+      mech: 'bonus-not-applied',
+      sentence: `${f.clause} (dealt ${f.dealt}, want ≥ ${f.want})`,
+      conditional: true,
+    })),
+    ...drift.map((d) => ({ mech: 'typography', sentence: d, conditional: false })),
+  ];
   return {
     key: attackKey(item.name, item.text),
     card: card.name,
@@ -242,6 +291,7 @@ export function classifyAttackRow(card, item, attackIndex, allAttacks, { seeds =
     scaled: run.scaled,
     errors: run.errors,
     mismatches,
+    untestedBonus: replay.untested,
     printings: [],
   };
 }

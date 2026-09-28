@@ -66,7 +66,7 @@ import {
 import { isBasicPokemon, isPokemon } from '../cards.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
-import { topPokemonCard } from './evolved-pokemon.mjs';
+import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
 import { normalizeStage } from './evolution.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
@@ -79,11 +79,7 @@ function dedupe(cards) {
   const out = [];
   for (const card of cards || []) {
     if (!card) continue;
-    const seen = out.some((c) =>
-      card.instanceId != null && c.instanceId != null
-        ? c.instanceId === card.instanceId
-        : c === card
-    );
+    const seen = out.some((c) => sameCard(c, card));
     if (!seen) out.push(card);
   }
   return out;
@@ -105,17 +101,37 @@ function nonStackingOnce(cards) {
   });
 }
 
+/**
+ * The same in-play Pokémon: identical objects, or the same instanceId. An evolved Pokémon's
+ * view (evolvedView) is a copy of its root, so position lists holding roots match by id.
+ */
+function sameCard(a, b) {
+  if (!a || !b) return false;
+  return a === b || (a.instanceId != null && a.instanceId === b.instanceId);
+}
+
+const containsCard = (cards, card) => (cards || []).some((c) => sameCard(c, card));
+
+// Each in-play Pokémon as its evolved view: an evolution's printed Ability sits on the top
+// card, not on the root Basic (evolved-pokemon.mjs).
+function inPlayViews(zoneCards) {
+  const cards = zoneCards || [];
+  return rootsOf(cards)
+    .filter(isPokemon)
+    .map((root) => evolvedView(cards, root));
+}
+
 function sideInPlay(ctx = {}) {
-  return rootsOf(ctx.sideCards || ctx.inPlayCards || []).filter(isPokemon);
+  return inPlayViews(ctx.sideCards || ctx.inPlayCards);
 }
 
 function opponentInPlay(ctx = {}) {
-  return rootsOf(ctx.opponentSideCards || []).filter(isPokemon);
+  return inPlayViews(ctx.opponentSideCards);
 }
 
 function holderZone(card, ctx = {}) {
-  if ((ctx.sideActive || []).some((c) => c === card)) return 'active';
-  if ((ctx.sideBench || []).some((c) => c === card)) return 'bench';
+  if (containsCard(ctx.sideActive, card)) return 'active';
+  if (containsCard(ctx.sideBench, card)) return 'bench';
   return null;
 }
 
@@ -330,9 +346,6 @@ export function selfNamedText(holder) {
   return out;
 }
 
-const sameCard = (a, b) =>
-  a === b || (a?.instanceId != null && a.instanceId === b?.instanceId);
-
 // Who a damage-bonus Ability boosts: `self` (the holder's own attacks) or `team` with the printed
 // attacker category ("your Basic {L} Pokémon's attacks", "attacks used by your Cynthia's
 // Pokémon", "your Nidoqueen's attacks"). Null when the wording names no attacker.
@@ -509,7 +522,7 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     const t = cardAbilityText(holder);
     if (!t || !parseDamageReduction(holder).reduce) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
-    if (isSelfScoped(t) && holder !== defender) continue;
+    if (isSelfScoped(t) && !sameCard(holder, defender)) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     if (!attackerTypeRequirementMet(t, attacker)) continue;
     const red = reductionForCard(holder, defender, attacker, {
@@ -537,8 +550,8 @@ export function abilityDamagePrevention(defender, attacker, ctx = {}) {
     const parsed = parseDamagePrevention(holder);
     if (!parsed.preventAll && !parsed.reduceHp) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
-    if (isSelfScoped(t) && holder !== defender) continue;
-    if (/to this pok[eé]mon/.test(t) && holder !== defender) continue;
+    if (isSelfScoped(t) && !sameCard(holder, defender)) continue;
+    if (/to this pok[eé]mon/.test(t) && !sameCard(holder, defender)) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     const applied = preventionForCard(holder, attacker);
     if (applied.preventAll) out.preventAll = true;
@@ -629,7 +642,7 @@ export function abilityHpBonus(pokemon, ctx = {}) {
     if (!t || !parseHpBonus(holder).bonus) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (/for each/.test(t)) continue;
-    if (/this pok[eé]mon|this pokemon/.test(t) && holder !== pokemon) continue;
+    if (/this pok[eé]mon|this pokemon/.test(t) && !sameCard(holder, pokemon)) continue;
     if (!inPlayConditionMet(t, pokemon, ctx)) continue;
     total += parseHpBonus(holder).bonus;
   }
@@ -753,7 +766,7 @@ export function abilityRetreatCost(target, ctx = {}) {
     if (!teamMore) continue;
     const except = teamMore[1] ? lower(teamMore[1]).trim() : null;
     if (except) {
-      if (except.includes('this pokémon') && card === target) continue;
+      if (except.includes('this pokémon') && sameCard(card, target)) continue;
       if (lower(target?.name || '').includes(except)) continue;
       if (except.includes('team aqua') && lower(target?.name || '').includes('team aqua')) continue;
     }
@@ -785,7 +798,7 @@ export function abilityAttackCostDiscount(attacker, ctx = {}) {
       /ignore all \{c\} energy in the costs? of attacks used by this pok[eé]mon/
     );
     if (!all && !colorless) continue;
-    if (/this pok[eé]mon/.test(t) && holder !== attacker) continue;
+    if (/this pok[eé]mon/.test(t) && !sameCard(holder, attacker)) continue;
     if (!inPlayConditionMet(t, attacker, ctx)) continue;
     if (all) out.ignoreAll = true;
     else out.ignoreColorless = true;
@@ -865,14 +878,14 @@ const SELF_KO_ABILITY =
 function sideOf(card, ctx = {}) {
   if (!card) return null;
   const inSide =
-    (ctx.sideCards || []).includes(card) ||
-    (ctx.sideActive || []).includes(card) ||
-    (ctx.sideBench || []).includes(card);
+    containsCard(ctx.sideCards, card) ||
+    containsCard(ctx.sideActive, card) ||
+    containsCard(ctx.sideBench, card);
   if (inSide) return 'side';
   const inOpponent =
-    (ctx.opponentSideCards || []).includes(card) ||
-    (ctx.opponentActive || []).includes(card) ||
-    (ctx.opponentBench || []).includes(card);
+    containsCard(ctx.opponentSideCards, card) ||
+    containsCard(ctx.opponentActive, card) ||
+    containsCard(ctx.opponentBench, card);
   if (inOpponent) return 'opponent';
   return null;
 }
@@ -893,8 +906,8 @@ function holderPositionMet(text, holder, ctx) {
   if (!side) return false;
   const active = side === 'side' ? ctx.sideActive : ctx.opponentActive;
   const bench = side === 'side' ? ctx.sideBench : ctx.opponentBench;
-  if (activeClause) return (active || []).includes(holder);
-  return (bench || []).includes(holder);
+  if (activeClause) return containsCard(active, holder);
+  return containsCard(bench, holder);
 }
 
 /** "except for <AbilityName>" exempts the holder itself; other exceptions filter targets. */
@@ -905,7 +918,7 @@ function selfExemptFromSuppression(text, holder, card) {
   if (/[{\u007b]/.test(clause) || /pok[eé]mon/.test(clause) || /rule box/.test(clause)) {
     return false;
   }
-  return holder === card;
+  return sameCard(holder, card);
 }
 
 /** True when the suppression text's target filter matches `card`. */
@@ -930,7 +943,7 @@ function suppressionTargets(text, holder, card, ctx) {
   }
   if (/your opponent's active pok[eé]mon/.test(text)) {
     const targetActive = holderSide === 'side' ? ctx.opponentActive : ctx.sideActive;
-    if (!(targetActive || []).includes(card)) return false;
+    if (!containsCard(targetActive, card)) return false;
   }
   const ruleBoxExcept = /except for pok[eé]mon with a rule box/.test(text);
   if (ruleBoxExcept) {
@@ -963,9 +976,9 @@ export function isAbilitySuppressed(card, ctx = {}) {
   if (!card || !isPokemon(card)) return false;
   if (isAncientTraitAbility(card)) return false;
   const sources = dedupe([
-    ...rootsOf(ctx.sideCards || []),
-    ...rootsOf(ctx.opponentSideCards || []),
-    ...rootsOf(ctx.inPlayCards || []),
+    ...inPlayViews(ctx.sideCards),
+    ...inPlayViews(ctx.opponentSideCards),
+    ...inPlayViews(ctx.inPlayCards),
   ]).filter(isPokemon);
   for (const holder of sources) {
     const t = cardAbilityText(holder);
@@ -1241,7 +1254,7 @@ export function abilityRetreatLock(active, ctx = {}) {
       /as long as this pok[eé]mon is (?:your active pok[eé]mon|in the active spot)/.test(
         t
       ) &&
-      !(ctx.opponentActive || []).includes(holder)
+      !containsCard(ctx.opponentActive, holder)
     ) {
       continue;
     }
@@ -1260,9 +1273,9 @@ export function abilityRetreatLock(active, ctx = {}) {
 /** Patrat CR: damage counters on any in-play Pokémon can't be moved. */
 export function abilityCounterMoveLock(ctx = {}) {
   const cards = dedupe([
-    ...rootsOf(ctx.sideCards || []),
-    ...rootsOf(ctx.opponentSideCards || []),
-    ...rootsOf(ctx.inPlayCards || []),
+    ...inPlayViews(ctx.sideCards),
+    ...inPlayViews(ctx.opponentSideCards),
+    ...inPlayViews(ctx.inPlayCards),
   ]).filter(isPokemon);
   return cards.some(
     (c) =>

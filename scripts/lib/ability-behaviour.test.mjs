@@ -10,6 +10,10 @@ import {
   checkBehaviourGate,
   checkExecutedClaims,
   worksShare,
+  classifyRow,
+  abilityClauseText,
+  checkFlagGate,
+  flaggedOf,
 } from './ability-behaviour.mjs';
 
 const SWITCH =
@@ -204,4 +208,42 @@ test('executed claims need half the family running or read (D136)', () => {
     'ghost: claimed executed but has no ability rows',
   ]);
   assert.deepEqual(warnings, ['tool: 4/4 rows work — not claimed executed']);
+});
+
+// Samurott Torrential Whirlpool (TCGdex sv10.5w-023): the second clause must move the opponent.
+const WHIRLPOOL =
+  "Once during your turn, you may switch your Active Pokémon with 1 of your Benched Pokémon. If you do, switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)";
+
+test('an activated ability whose follow-up clause changed nothing is partial, by name', () => {
+  const ownOnly = classifyRow(row(WHIRLPOOL, ['ability-used', 'own:active-changed']));
+  assert.equal(ownOnly.behaviour, 'partial');
+  assert.ok(ownOnly.flags.includes('clause:gust'));
+  const both = classifyRow(row(WHIRLPOOL, ['ability-used', 'own:active-changed', 'opp:active-changed']));
+  assert.equal(both.behaviour, 'runs');
+  assert.ok(!both.flags.some((f) => f.startsWith('clause:')));
+});
+
+test('a skipped-only run is not cross-checked (the board could not meet the ability)', () => {
+  const skipped = classifyRow(row(WHIRLPOOL, ['ability-used', 'skipped:no_target']));
+  assert.ok(!skipped.flags.some((f) => f.startsWith('clause:')));
+});
+
+test('abilityClauseText drops where-and-when gates before the cross-check', () => {
+  assert.equal(
+    abilityClauseText('Once during your turn, when you put Uxie from your hand onto your Bench, you may draw 2 cards.').includes('bench'),
+    false
+  );
+  assert.equal(
+    abilityClauseText('Once during your turn, if this Pokémon is on your Bench, you may draw a card.').includes('bench'),
+    false
+  );
+});
+
+test('flag gate fails a new flag by name and reports a vanished one', () => {
+  const r = (flags) => ({ card: 'Samurott', name: 'Torrential Whirlpool', text: WHIRLPOOL, flags });
+  const baseline = flaggedOf([r(['typography:curly:parse'])]);
+  const { failures, improvements } = checkFlagGate([r(['clause:gust'])], baseline);
+  assert.deepEqual(failures, ['Samurott Torrential Whirlpool: new clause:gust']);
+  assert.deepEqual(improvements, ['Samurott Torrential Whirlpool: typography:curly:parse gone']);
+  assert.deepEqual(checkFlagGate([r(['typography:curly:parse'])], baseline), { failures: [], improvements: [] });
 });

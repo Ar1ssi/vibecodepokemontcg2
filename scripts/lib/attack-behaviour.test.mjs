@@ -13,6 +13,7 @@ import {
   classifyAttackRow,
   costPoolFor,
   scanCorpus,
+  unresolvedNoteMismatches,
 } from './attack-behaviour.mjs';
 
 test('attackKey folds reprints and text edits', () => {
@@ -201,4 +202,46 @@ test('baselineOf stores error strings so a new throw is visible on the next run'
   ]);
   assert.deepEqual(baseline.entries.a.errors, ['THROW boom']);
   assert.equal(baseline.entries.b.errors, undefined);
+});
+
+test('unresolvedNoteMismatches turns the engine\'s unread-condition notes into findings', () => {
+  const scaled = [
+    { notes: ['conditional +90 bonus — resolve the printed condition', 'coin flip pending — pass ctx.coin to resolve'] },
+    { notes: ['+ 30 (condition met: x)', 'conditional +90 bonus — resolve the printed condition'] },
+  ];
+  // Deduped, and coin notes are outcomes of the flip, not unread text.
+  assert.deepEqual(unresolvedNoteMismatches(scaled), [
+    { mech: 'unresolved-damage', sentence: 'conditional +90 bonus — resolve the printed condition', conditional: false },
+  ]);
+});
+
+test('lock sentences need lock evidence, not just the hit', () => {
+  const itemLock = "During your opponent's next turn, they can't play any Item cards from their hand.";
+  assert.equal(attackMismatches(itemLock, ['opp:active+dmg'])[0].mech, 'lock-opp-play');
+  assert.deepEqual(attackMismatches(itemLock, ['opp:active+dmg', 'opp:play-lock']), []);
+  assert.equal(attackMismatches("The Defending Pokémon can't retreat during your opponent's next turn.", [])[0].mech, 'lock-opp-pokemon');
+  assert.equal(attackMismatches("During your next turn, this Pokémon can't attack.", [])[0].mech, 'lock-self');
+});
+
+test('classifyAttackRow: a damage attack whose bonus, lock or typography is missed is partial', () => {
+  const card = { name: 'Testmon', set: 'Test', number: '1' };
+  const row = (damageText, text) =>
+    classifyAttackRow(card, { name: 'Probe', cost: [], damageText, text }, 0, [{ name: 'Probe', cost: [], damage: damageText, text }], { seeds: [1] });
+
+  // A parsed lock is observed on the player (Noivern-GX Distort wording).
+  const distort = row('30', "Your opponent can't play any Item cards from their hand during their next turn.");
+  assert.equal(distort.verdict, 'ok');
+  assert.ok(distort.tags.includes('opp:play-lock'));
+
+  // A resolved conditional bonus replays clean; its damage-only run was already ok.
+  const stadium = row('30+', 'If there is any Stadium card in play, this attack does 90 more damage.');
+  assert.equal(stadium.verdict, 'ok');
+  assert.deepEqual(stadium.untestedBonus, []);
+
+  // Unresolved: the engine notes it and the condition-true replay falls short (Keldeo ex Gale Thrust
+  // wording, TCGdex sv10.5w-030). Built from a condition no reader knows so the test outlives fixes.
+  const unread = row('30+', 'If this Pokémon is wearing a hat, this attack does 90 more damage.');
+  assert.equal(unread.verdict, 'partial');
+  assert.ok(unread.mismatches.some((m) => m.mech === 'unresolved-damage'));
+  assert.deepEqual(unread.untestedBonus, ['this pokémon is wearing a hat']);
 });

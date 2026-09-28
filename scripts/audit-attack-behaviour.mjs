@@ -69,11 +69,19 @@ function main() {
     ).toFixed(0)}s\n`
   );
   printTable(counts);
+  // What the partial rows are missing, by mechanic: the cross-check sentences plus the
+  // unresolved-damage notes, condition-true replays and typography drift.
+  const mechs = {};
+  for (const row of rows) for (const m of row.mismatches || []) mechs[m.mech] = (mechs[m.mech] || 0) + 1;
+  const untested = rows.filter((r) => r.untestedBonus?.length).length;
+  console.log(`
+findings by mechanic: ${JSON.stringify(mechs)}`);
+  console.log(`conditional bonuses the replay cannot stage yet: ${untested} rows`);
   if (process.argv.includes('--rows')) {
     fs.writeFileSync(
       ROWS_OUT,
       JSON.stringify(
-        rows.map(({ key, card, set, number, attack, family, verdict, text, dealt, skipped, tags, errors, mismatches, printings }) => ({
+        rows.map(({ key, card, set, number, attack, family, verdict, text, dealt, skipped, tags, errors, mismatches, untestedBonus, printings }) => ({
           key,
           card,
           set,
@@ -87,6 +95,7 @@ function main() {
           tags,
           errors,
           mismatches,
+          untestedBonus,
           printings,
         }))
       )

@@ -23,6 +23,8 @@ import {
   totalCounts,
   checkBehaviourGate,
   checkExecutedClaims,
+  checkFlagGate,
+  flaggedOf,
 } from './lib/ability-behaviour.mjs';
 import { EXECUTED_ABILITY_FAMILIES } from './lib/executed-families.mjs';
 
@@ -34,7 +36,8 @@ const ROWS_OUT = path.join(ROOT, 'out/ability-behaviour-rows.json');
 function readBaseline() {
   if (!fs.existsSync(BASELINE)) return { error: `${BASELINE} missing` };
   try {
-    return { baseline: JSON.parse(fs.readFileSync(BASELINE, 'utf8')).families };
+    const file = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+    return { baseline: file.families, flagged: file.flagged || {} };
   } catch (e) {
     return { error: `${BASELINE} unreadable: ${e.message}` };
   }
@@ -83,7 +86,7 @@ function main() {
   printTable(counts);
   if (process.argv.includes('--rows')) {
     const out = rows.map(
-      ({ card, set, number, name, family, behaviour, unexecutable, reads, tags, errors }) => ({
+      ({ card, set, number, name, family, behaviour, unexecutable, reads, flags, tags, errors }) => ({
         card,
         set,
         number,
@@ -92,6 +95,7 @@ function main() {
         behaviour,
         unexecutable,
         reads,
+        flags,
         tags,
         errors,
       })
@@ -110,6 +114,7 @@ function main() {
           corpusRows: rows.length,
           totals: totalCounts(counts),
           families: sorted,
+          flagged: flaggedOf(rows),
         },
         null,
         2
@@ -118,14 +123,27 @@ function main() {
     console.log(`\nbaseline written: ${BASELINE}`);
   }
 
-  const { baseline, error } = update ? { baseline: counts } : readBaseline();
+  const { baseline, flagged, error } = update
+    ? { baseline: counts, flagged: flaggedOf(rows) }
+    : readBaseline();
   if (error) {
     console.error(`\n${error} — run with --update-baseline to create it.`);
     process.exit(1);
   }
   const gate = checkBehaviourGate(counts, baseline);
   const claims = checkExecutedClaims(counts, EXECUTED_ABILITY_FAMILIES);
-  const failures = [...gate.failures, ...claims.failures];
+  // Named per-row findings (clause / typography / evolved-stack), see rowFlags.
+  const flagGate = checkFlagGate(rows, flagged);
+  const flagTotals = {};
+  for (const entry of Object.values(flaggedOf(rows)))
+    for (const flag of entry.flags) {
+      const kind = flag.replace(/^(clause|typography|stack-\w+):.*/, '$1');
+      flagTotals[kind] = (flagTotals[kind] || 0) + 1;
+    }
+  console.log(`
+flagged rows by kind: ${JSON.stringify(flagTotals)}`);
+  for (const line of flagGate.improvements.slice(0, 40)) console.log(`IMPROVED ${line}`);
+  const failures = [...gate.failures, ...claims.failures, ...flagGate.failures];
   const warnings = [...gate.warnings, ...claims.warnings];
   for (const w of warnings) console.log(`WARN ${w}`);
   for (const f of failures) console.log(`FAIL ${f}`);

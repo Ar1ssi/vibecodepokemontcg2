@@ -98,7 +98,8 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'switch',
   'tool-cap',
   'weakness',
-  'when-played',
+  // 'when-played' withdrawn: the clause cross-check (scripts/lib/ability-behaviour.mjs rowFlags)
+  // found 6 rows that paid their hand cost but skipped the effect (Crawdaunt Unruly Claw), 17/39.
 ]);
 
 /** Executed families the oracle cannot observe (key 'attack:<f>' / 'ability:<f>' → why). */

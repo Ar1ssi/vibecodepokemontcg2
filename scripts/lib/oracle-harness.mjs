@@ -230,6 +230,7 @@ export function snapshot(state) {
             c.cannotAttackUntilTurn,
             c.cannotRetreatUntilTurn,
             c.cannotAttackAttackName,
+            c.attackMarkers,
           ]),
         });
       }
@@ -243,6 +244,11 @@ export function snapshot(state) {
     activeIds: [activeId('p1'), activeId('p2')],
     deckOrders: ['p1', 'p2'].map((pid) =>
       (state.players[pid]?.zones?.deck || []).map((c) => c.instanceId).join(',')
+    ),
+    // Player-scoped locks (Item/Supporter play locks, Iron Rule): they sit on no card, so a
+    // per-card diff alone cannot see them.
+    playerLocks: ['p1', 'p2'].map((pid) =>
+      JSON.stringify([state.players[pid]?.playLocks, state.players[pid]?.attackLockUntilTurn])
     ),
     winner: state.winner,
   };
@@ -273,6 +279,10 @@ export function diffTags(before, after, events) {
     tags.add('own:active-changed');
   if (before.activeIds[1] !== after.activeIds[1])
     tags.add('opp:active-changed');
+  ['p1', 'p2'].forEach((pid, i) => {
+    if ((before.playerLocks?.[i] ?? '') !== (after.playerLocks?.[i] ?? ''))
+      tags.add(`${role(pid)}:play-lock`);
+  });
   for (const e of events) {
     if (/coin|flip/i.test(e.type)) tags.add('coin');
     if (/shuffle/i.test(e.type)) tags.add('shuffle');
