@@ -18,7 +18,6 @@
       markEnergyAttached,
       markAbilityUsed,
       abilityUsed,
-      setTurnAttackBonus,
       loadRulesEnabled,
       persistRulesEnabled,
       getStadium,
@@ -28,7 +27,6 @@
       markAttacked,
       resetRulesSessionState,
       canUsePlayedToBenchTrigger,
-      consumePlayedToBenchTrigger,
     } from '/shared/engine/rules/rules-state.mjs';
     import { executeAttack, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
     import { handleKO, checkWinConditions, occupiedZoneCount, resetPrizes, prizeState } from '/shared/engine/rules/ko-flow.mjs';
@@ -60,8 +58,8 @@ import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
 import { isStadiumCard, isStadiumHandProtect, effectiveHp, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects, isStadiumEnergyAttachHeal, stadiumExtraAttacksFromZone } from '/shared/engine/rules/stadium-effects.mjs';
 import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMatchesSearchWhat } from '/shared/engine/rules/energy-effects.mjs';
-import { isPokemonCard, matchesSearch, filterSearchMatches, matchesDiscardCost, isEnergyDiscardCost, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
-import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
+import { isPokemonCard, matchesSearch, filterSearchMatches, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
+import { maybeAnnounceSearchReveal, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import {
   parseSpecialEnergyEffects,
   describeSpecialEnergyEffects,
@@ -69,17 +67,12 @@ import {
   isSpecialEnergyCard,
 } from '/shared/engine/rules/special-energy-parse.mjs';
 import { classifyAbility, describeAbilityFamily } from '/shared/engine/rules/ability-effects.mjs';
-import {
-  planAbilitySteps,
-  actionableAbilityPlan,
-  markAbilityUseAfterSearchStep,
-} from '/shared/engine/rules/ability-step-plan.mjs';
+import { planAbilitySteps } from '/shared/engine/rules/ability-step-plan.mjs';
 import { decideTurnOrder, resolveTurnOrderCaller } from '/shared/engine/rules/rules-turnorder.mjs';
 import {
   getTurnOrderResult,
   resetTurnOrderCall,
 } from '../netcode/turn-order-call.js';
-import { healAbility, switchAbility, attachAbility, energyRedirectAbility, statusAbility, moveDamageAbility, selfDamageAbility, moveDamageBetweenAbility, lookAtTopAbility, recursionAbility, evolveAbility } from '../../actions/chat-buttons/chat-buttons.js';
 import { hideCard } from '../../actions/general/reveal-and-hide.js';
 import { addDamageCounter, updateDamageCounter, removeDamageCounter } from '../../actions/counters/damage-counter.js';
 import { evaluateMulligans, bonusDrawsOwed } from '/shared/engine/rules/mulligan.mjs';
@@ -2442,20 +2435,6 @@ import { glowColorFor } from './card-glow-colors.mjs';
       return ran;
     };
 
-    const ABILITY_EXECUTOR_FNS = {
-      heal: healAbility,
-      switch: switchAbility,
-      attach: attachAbility,
-      'energy-redirect': energyRedirectAbility,
-      status: statusAbility,
-      'move-damage': moveDamageAbility,
-      'self-damage': selfDamageAbility,
-      'move-damage-between': moveDamageBetweenAbility,
-      'look-at-top': lookAtTopAbility,
-      evolve: evolveAbility,
-      'recursion-discard': recursionAbility,
-    };
-
     const runPromotionAbilityEffect = async (user, card, promo) => {
       if (rulesState.enabled && abilityUsed(user, card)) return false;
       if (promo.effect === 'damage' && promo.count) {
@@ -2506,11 +2485,6 @@ import { glowColorFor } from './card-glow-colors.mjs';
         });
         return result.ok;
       }
-      if (promo.effect === 'moveEnergy') {
-        await energyRedirectAbility(user, true, card, { orchestrated: true });
-        if (rulesState.enabled) markAbilityUsed(user, card);
-        return true;
-      }
       appendMessage('', `⬆️ ${card.name}: ${promo.guidance}`, 'announcement', false);
       return false;
     };
@@ -2540,258 +2514,6 @@ import { glowColorFor } from './card-glow-colors.mjs';
       }
     };
 
-    // "Heal all damage from 1 of your Pokémon" (Primarina Enriching Melody) lets the
-    // player choose among their damaged Pokémon. Returns the chosen card, or null
-    // when nothing is damaged / the pick is canceled (so the ability is not spent).
-    const pickDamageHealTarget = async (user, source) => {
-      const candidates = [];
-      const active = getZone(user, 'active').array[0];
-      if (active?.type === 'Pokémon') candidates.push(active);
-      for (const c of getZone(user, 'bench').array) {
-        if (c?.type === 'Pokémon') candidates.push(c);
-      }
-      const damaged = candidates.filter(
-        (c) => (parseInt(c.image?.damageCounter?.textContent || '0', 10) || 0) > 0
-      );
-      if (damaged.length === 0) {
-        appendMessage('', `  ${source.name}: no damaged Pokémon to heal`, 'announcement', false);
-        return null;
-      }
-      if (damaged.length === 1) return damaged[0];
-      const result = await awaitChoicePicker({
-        title: `${source.name} — choose a Pokémon to heal`,
-        candidates: damaged,
-        zoneFrom: 'board',
-        destination: null,
-      });
-      return result.ok ? result.picks[0] : null;
-    };
-
-    export async function runAbilitySteps(user, card) {
-      if (rulesState.enabled && rulesState.turnPlayer !== user) {
-        appendMessage(user, `⛔ It's not your turn.`, 'announcement', false);
-        return;
-      }
-
-      await ensureCardData(card);
-      const abilityText = card.ability?.text || card.abilityText || '';
-      const steps = parseAbility(abilityText);
-      // "When you play this Pokémon onto your Bench" triggers (e.g. Meowth's
-      // Last Ditch Catch) aren't a recurring once-per-turn action — they're
-      // gated by the one-shot window opened when the card was played from
-      // hand to Bench, not the per-turn abilitiesUsed map.
-      //
-      // "When you play this Pokémon from your hand to evolve 1 of your Pokémon"
-      // (Primarina Enriching Melody) is a different trigger: it is legal only on
-      // the turn that Pokémon evolved, so gate it on enteredPlayTurn instead.
-      const isPlayedToBenchTrigger = steps.some(
-        (s) => s.type === 'whenPlayedAbility' && !s.evolve
-      );
-      const isEvolvePlayedTrigger = steps.some(
-        (s) => s.type === 'whenPlayedAbility' && s.evolve
-      );
-
-      if (isEvolvePlayedTrigger) {
-        if (
-          rulesState.enabled &&
-          (abilityUsed(user, card) ||
-            card.enteredPlayTurn !== rulesState.turnNumber)
-        ) {
-          appendMessage(
-            user,
-            `⛔ ${card.name}'s ability only works the turn it was played from your hand to evolve.`,
-            'announcement',
-            false
-          );
-          return;
-        }
-      } else if (isPlayedToBenchTrigger) {
-        if (rulesState.enabled && !canUsePlayedToBenchTrigger(user, card)) {
-          appendMessage(
-            user,
-            `⛔ ${card.name}'s ability only works the turn it's played from hand to the Bench.`,
-            'announcement',
-            false
-          );
-          return;
-        }
-      } else if (rulesState.enabled && abilityUsed(user, card)) {
-        appendMessage(user, `⛔ ${card.name}'s ability was already used this turn.`, 'announcement', false);
-        return;
-      }
-
-      const plan = planAbilitySteps(steps, { mode: 'interactive' });
-      const actionable = actionableAbilityPlan(plan, { mode: 'interactive' });
-      if (actionable.length === 0) {
-        appendMessage(user, `⛔ No actionable steps for ${card.name}'s ability.`, 'announcement', false);
-        return;
-      }
-
-      // runWhenPlayedStep already resolves the draw/search body of a "when you
-      // play" ability, so the matching plan step is skipped to avoid resolving
-      // it twice (the same reason the bench trigger skipped its search).
-      const whenPlayedEffect = parseWhenPlayedEffect(card);
-      const hasWhenPlayedTrigger = isPlayedToBenchTrigger || isEvolvePlayedTrigger;
-      const whenPlayedHandlesDraw =
-        hasWhenPlayedTrigger && whenPlayedEffect?.kind === 'draw';
-      const whenPlayedHandlesSearch =
-        hasWhenPlayedTrigger && whenPlayedEffect?.kind === 'search';
-
-      const name = card.ability?.name || 'Ability';
-      appendMessage('', `✦ ${card.name} — ${name}:`, 'announcement', false);
-
-      let executed = false;
-      let skipAbilityMark = false;
-      const orchestrated = { orchestrated: true };
-
-      for (const item of plan) {
-        if (item.action === 'skip') continue;
-
-        if (item.action === 'draw') {
-          // A when-played ability's draw is resolved inside runWhenPlayedStep.
-          if (whenPlayedHandlesDraw) continue;
-          await executeAbilityDraw(user, item.step);
-          executed = true;
-        } else if (item.action === 'search') {
-          // A when-played + search combo resolves its search entirely inside
-          // runWhenPlayedStep below — running it again here would pop the
-          // picker twice for one trigger.
-          if (whenPlayedHandlesSearch) continue;
-          const completed = await runAbilitySearchPicker(user, card, item.step);
-          if (markAbilityUseAfterSearchStep(completed)) {
-            executed = true;
-          }
-        } else if (item.action === 'when-played') {
-          if (await runWhenPlayedStep(user, card, steps, item.stepIndex)) executed = true;
-        } else if (item.action === 'turn-damage-bonus') {
-          const amount = item.step.amount || 0;
-          if (amount > 0) {
-            setTurnAttackBonus(user, card, amount, { activeOnly: true });
-            appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
-            executed = true;
-          }
-        } else if (item.action === 'promotion') {
-          appendMessage(
-            '',
-            `  ${item.step.guidance} (triggers when this Pokémon moves from Bench to Active)`,
-            'announcement',
-            false
-          );
-        } else if (item.action === 'opponent-disrupt') {
-          appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
-          executed = true;
-        } else if (item.action === 'executor' && item.executor) {
-          const fn = ABILITY_EXECUTOR_FNS[item.executor];
-          if (fn) {
-            if (item.step?.unlimited) skipAbilityMark = true;
-            let executorOpts = orchestrated;
-            if (item.executor === 'heal' && item.step?.target === '1 of your Pokémon') {
-              // Pick any of your damaged Pokémon before healing (Primarina).
-              const targetCard = await pickDamageHealTarget(user, card);
-              if (!targetCard) continue;
-              executorOpts = {
-                orchestrated: true,
-                targetCard,
-                healAll: item.step.all === true,
-                amount: item.step.amount ?? null,
-              };
-            }
-            await fn(user, true, card, executorOpts);
-            executed = true;
-          }
-        } else if (item.action === 'discard-cost') {
-          const hand = getZone(user, 'hand');
-          const energyScoped = isEnergyDiscardCost(item.step);
-          const candidates = hand.array.filter((c) => matchesDiscardCost(c, item.step));
-          if (!candidates.length) {
-            appendMessage(
-              '',
-              `  no matching ${energyScoped ? 'Energy' : 'card'} in hand to pay the cost`,
-              'announcement',
-              false
-            );
-          } else {
-            const result = await awaitChoicePicker({
-              title: `${card.name} — discard ${item.step.count} ${energyScoped ? 'Energy' : `card${item.step.count > 1 ? 's' : ''}`} (cost)`,
-              candidates,
-              zoneFrom: 'hand',
-              destination: 'discard',
-              multiSelect: item.step.count > 1,
-              requiredCount: Math.min(item.step.count, candidates.length),
-              onConfirm: (selected) => {
-                import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                  for (const s of selected) {
-                    const idx = getZone(user, 'hand').array.indexOf(s);
-                    if (idx >= 0) moveCardBundle(user, user, 'hand', 'discard', idx, false, 'move');
-                  }
-                });
-              },
-            });
-            if (result.ok) executed = true;
-          }
-        } else if (item.action === 'recursion-discard') {
-          const discard = getZone(user, 'discard');
-          const what = item.step.what || 'card';
-          const searchWhat = what === 'card' ? 'a card' : what === 'Pokémon' ? 'a Pokémon' : what;
-          const matches = [];
-          for (const c of discard.array) {
-            await ensureCardData(c);
-            if (matchesSearch(c, searchWhat)) matches.push(c);
-          }
-          if (matches.length === 0 && discard.array.length > 0) {
-            appendMessage('', `  no cards in discard match "${searchWhat}"`, 'announcement', false);
-          }
-          if (matches.length > 0) {
-            const upTo = item.step.upTo || 1;
-            if (upTo > 1) {
-              const result = await awaitChoicePicker({
-                title: `${card.name} — choose up to ${upTo} cards from discard`,
-                candidates: matches,
-                zoneFrom: 'discard',
-                destination: 'hand',
-                multiSelect: true,
-                requiredCount: Math.min(upTo, matches.length),
-                onConfirm: (selected) => {
-                  announceDiscardPick(user, card.name, selected, appendMessage);
-                  import('../../actions/move-card-bundle/move-card-bundle.js').then(({ moveCardBundle }) => {
-                    for (const s of selected) {
-                      const idx = getZone(user, 'discard').array.indexOf(s);
-                      if (idx >= 0) moveCardBundle(user, user, 'discard', 'hand', idx, false, 'move');
-                    }
-                  });
-                },
-              });
-              if (result.ok) executed = true;
-            } else {
-              const result = await awaitChoicePicker({
-                title: `${card.name} — take a card from discard`,
-                candidates: matches,
-                zoneFrom: 'discard',
-                destination: 'hand',
-                onPick: (picked) => {
-                  announceDiscardPick(user, card.name, picked, appendMessage);
-                },
-              });
-              if (result.ok) executed = true;
-            }
-          }
-        } else if (item.action === 'look-at-top') {
-          openDeckSearchWindow(`${card.name} — look at the top of your deck`);
-          appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
-          executed = true;
-        } else if (item.action === 'opponent-draw') {
-          appendMessage('', `  ${item.step.guidance} (opponent must consent)`, 'announcement', false);
-        } else if (item.action === 'announce') {
-          appendMessage('', `  ${item.step.guidance}`, 'announcement', false);
-        }
-      }
-
-      if (executed && rulesState.enabled && !skipAbilityMark) {
-        if (isPlayedToBenchTrigger) consumePlayedToBenchTrigger(user, card);
-        else markAbilityUsed(user, card);
-      }
-    }
-    
 
     initTrainerExecution({
       getZone,

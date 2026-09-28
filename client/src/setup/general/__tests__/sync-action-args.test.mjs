@@ -171,23 +171,6 @@ test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => 
   );
 });
 
-test('switchAbility relays active/bench swaps via moveCardBundle', () => {
-  const path = fileURLToPath(
-    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  const start = src.indexOf('export const switchAbility');
-  assert.ok(start >= 0, 'switchAbility export');
-  const next = src.indexOf('\nexport const ', start + 1);
-  const body = src.slice(start, next === -1 ? undefined : next);
-  assert.match(body, /moveCardBundle\(/);
-  assert.equal(
-    [...body.matchAll(/(?<![\w])moveCard\(/g)].length,
-    0,
-    'switchAbility must not call raw moveCard (local-only, never emitted)'
-  );
-});
-
 test('trainer-execution must not call raw moveCard (local-only, never emitted)', () => {
   const path = fileURLToPath(
     new URL('../../rules/trainer-execution.js', import.meta.url)
@@ -236,25 +219,6 @@ test('abilityKey differentiates duplicate cards when cardId or syncInstance diff
   assert.notEqual(abilityKey(cardC), abilityKey(cardD));
   assert.equal(abilityKey(cardC), 'sync:self_10');
   assert.equal(abilityKey(cardD), 'sync:self_11');
-});
-
-test('attachAbility, energyRedirectAbility, and moveDamageAbility do not use raw moveCard', () => {
-  const path = fileURLToPath(
-    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  for (const fnName of ['export const attachAbility', 'export const energyRedirectAbility', 'export const moveDamageAbility']) {
-    const start = src.indexOf(fnName);
-    assert.ok(start >= 0, `${fnName} export`);
-    const next = src.indexOf('\nexport const ', start + 1);
-    const body = src.slice(start, next === -1 ? undefined : next);
-    assert.match(body, /moveCardBundle\(/, `${fnName} must use moveCardBundle`);
-    assert.equal(
-      [...body.matchAll(/(?<![\w])moveCard\(/g)].length,
-      0,
-      `${fnName} must not call raw moveCard (local-only, never emitted)`
-    );
-  }
 });
 
 test('discardEnergyScaling uses rngBundle.energyDiscarded on replay', () => {

@@ -45,7 +45,7 @@ import {
   getAuthoritativeAttackExtras,
   getAuthoritativeOncePerGame,
 } from '../netcode/apply-view.js';
-import { runAbilitySteps } from './rules-bridge.js';
+import { useAbility as legacyUseAbility } from '../../actions/counters/use-ability.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
 import {
@@ -776,7 +776,10 @@ const useAbility = (card, zone) => {
   ) {
     return;
   }
-  runAbilitySteps('self', card);
+  // Not dispatched (flag off, or a card without an authoritative stamp): the legacy action marks
+  // the ability used and relays it; the effect itself is played by hand.
+  const index = getZone('self', zone)?.array?.indexOf(card) ?? -1;
+  legacyUseAbility('self', 'self', zone, Math.max(index, 0), true, undefined, card?.instanceId ?? null);
 };
 
 export const closeCardInspector = () => {
