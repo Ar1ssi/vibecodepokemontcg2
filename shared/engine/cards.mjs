@@ -18,6 +18,13 @@ export function mintInstanceId(state) {
   return state.nextInstanceId;
 }
 
+// TCGdex prints an attack's rules text as `effect`; every engine parser reads `text`.
+function attackWithText(attack) {
+  const copy = { ...attack };
+  if (!copy.text && typeof copy.effect === 'string') copy.text = copy.effect;
+  return copy;
+}
+
 /**
  * Creates a pure Card object.
  *
@@ -40,7 +47,7 @@ export function createCard(props = {}) {
     subtypes: Array.isArray(props.subtypes) ? [...props.subtypes] : [],
     hp: props.hp != null ? props.hp : null,
     attacks: Array.isArray(props.attacks)
-      ? props.attacks.map((a) => ({ ...a }))
+      ? props.attacks.map((a) => attackWithText(a))
       : [],
     weaknesses: Array.isArray(props.weaknesses)
       ? props.weaknesses.map((w) => ({ ...w }))

@@ -118,3 +118,12 @@ test('SE1: special Energy sends its effect text and subtypes; basic-shaped Energ
     },
   ]);
 });
+
+// TCGdex-native attacks print their rules text as `effect` (Mega Gardevoir ex Overflowing Wishes);
+// the server's parsers read `text`, so the payload must carry it across.
+test('attack rules text sent from `effect` when `text` is absent', () => {
+  const { stats } = buildCardStatsPayload([
+    { syncInstance: 0, hp: 190, attacks: [{ name: 'Overflowing Wishes', effect: 'Search your deck.' }] },
+  ]);
+  assert.equal(stats[0].attacks[0].text, 'Search your deck.');
+});

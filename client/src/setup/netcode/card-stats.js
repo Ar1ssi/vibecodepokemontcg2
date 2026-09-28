@@ -43,7 +43,7 @@ function extractStats(card) {
       // Damage is a printed string ('10', '30+', ''); the server's computeAttackDamage
       // coerces it, so it is passed through unchanged rather than parsed here.
       damage: attack?.damage ?? 0,
-      text: attack?.text ?? '',
+      text: attack?.text || attack?.effect || '',
       ...(attack?.cost ? { cost: attack.cost } : {}),
     }));
     hasAny = true;

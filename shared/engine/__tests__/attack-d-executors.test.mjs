@@ -64,7 +64,7 @@ const energy = (instanceId, type, props = {}) =>
     ...props,
   });
 
-function board({ text, own = [], ownBench = [], opp = [], oppBench = [], deck = [], discard = [], oppHand = [] }) {
+function board({ text, textField = 'text', own = [], ownBench = [], opp = [], oppBench = [], deck = [], discard = [], oppHand = [] }) {
   const state = createGameState({
     players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } },
     rulesEnabled: true,
@@ -72,7 +72,7 @@ function board({ text, own = [], ownBench = [], opp = [], oppBench = [], deck = 
   state.turn = { player: 'p1', number: 2, phase: 'main' };
   const p1 = state.players.p1.zones;
   const p2 = state.players.p2.zones;
-  p1.active.push(pokemon({ instanceId: 1, name: 'Attacker', hp: 200, attacks: [{ name: 'Hit', cost: [], damage: '', text }] }));
+  p1.active.push(pokemon({ instanceId: 1, name: 'Attacker', hp: 200, attacks: [{ name: 'Hit', cost: [], damage: '', [textField]: text }] }));
   p1.active.push(...own);
   for (const props of ownBench) p1.bench.push(pokemon(props));
   p2.active.push(pokemon({ instanceId: 20, name: 'Defender', hp: 200 }));
@@ -196,6 +196,35 @@ test('Overflowing Wishes attaches a {P} Energy from the deck to each Benched Pok
   assert.deepEqual(attached.map((c) => c.attachedTo).sort(), [2, 3]);
   assert.ok(attached.every((c) => c.energyType === 'Psychic'));
 });
+
+// Mega Gardevoir ex (corpus meg-060/159/178/187, mep-032, asc-089; TCGdex): the per-Bench attach
+// owns the deck search, so no second "search for 1 Energy to hand" prompt follows it.
+const OVERFLOWING_WISHES =
+  'For each of your Benched Pokémon, search your deck for a Basic {P} Energy card and attach it to that Pokémon. Then, shuffle your deck.';
+
+for (const textField of ['text', 'effect']) {
+  test(`Overflowing Wishes (${textField} field) attaches to each Bench and offers no extra search`, () => {
+    const state = attack(
+      board({
+        text: OVERFLOWING_WISHES,
+        textField,
+        ownBench: [
+          { instanceId: 2, name: 'A' },
+          { instanceId: 3, name: 'B' },
+          { instanceId: 4, name: 'C' },
+        ],
+        deck: [80, 81, 82, 83, 84, 85].map((id) => energy(id, 'Psychic')),
+      })
+    );
+    assert.equal(state.pendingChoice, null, 'no leftover deck-search prompt');
+    const zones = state.players.p1.zones;
+    assert.deepEqual(
+      zones.bench.filter((c) => c.attachedTo != null).map((c) => c.attachedTo).sort(),
+      [2, 3, 4]
+    );
+    assert.equal(zones.hand.filter((c) => c.energyType === 'Psychic').length, 0, 'nothing searched to hand');
+  });
+}
 
 test('Dual Turbo lets you choose which 2 Benched Pokémon take the Energy', () => {
   let state = attack(

@@ -1834,5 +1834,9 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     result.after = result.after.filter((step) => !costs.includes(step));
     result.before.push(...costs.map((step) => (handScaled ? { ...step, countsForDamage: true } : step)));
   }
+  // Overflowing Wishes / Mud Stock search the deck once per Benched Pokémon themselves.
+  if ([...result.before, ...result.after].some((step) => step.type === 'atkAttachEachBench' && step.source === 'deck')) {
+    result.handlesSearch = true;
+  }
   return result;
 }
