@@ -442,6 +442,53 @@ describe('Phase 1: Combat Passives & Modifier Pipeline', () => {
     });
   });
 
+  describe('Knocked-Out-only counters (Maractus JTG 160, out/pkmn-pokemon-cards.json)', () => {
+    const exploding = (hp) => {
+      const state = createTestGame();
+      state.players.p1.zones.active.push(
+        createCard({
+          instanceId: 1,
+          name: 'Attacker',
+          subtypes: ['Basic'],
+          types: ['Colorless'],
+          hp: 200,
+          attacks: [{ name: 'Hit', cost: [], damage: 30 }],
+        })
+      );
+      state.players.p2.zones.active.push(
+        createCard({
+          instanceId: 2,
+          name: 'Maractus',
+          subtypes: ['Basic'],
+          types: ['Grass'],
+          hp,
+          ability: {
+            name: 'Exploding Needles',
+            type: 'Ability',
+            text: "If this Pokémon is in the Active Spot and is Knocked Out by damage from an attack from your opponent's Pokémon, put 6 damage counters on the Attacking Pokémon.",
+          },
+          attacks: [],
+        })
+      );
+      state.players.p2.zones.bench.push(
+        createCard({ instanceId: 3, name: 'Bench', subtypes: ['Basic'], types: ['Grass'], hp: 60, attacks: [] })
+      );
+      return applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+    };
+
+    test('no counters when Maractus survives the hit', () => {
+      const res = exploding(90);
+      assert.equal(res.error, null);
+      assert.equal(res.state.players.p1.zones.active[0].damage || 0, 0);
+    });
+
+    test('6 counters on the attacker when Maractus is Knocked Out', () => {
+      const res = exploding(30);
+      assert.equal(res.error, null);
+      assert.equal(res.state.players.p1.zones.active[0].damage, 60);
+    });
+  });
+
   describe('KO Prevention', () => {
     test('Survival Brace prevents KO from full HP, leaves 10 HP, and discards itself', () => {
       const state = createTestGame();
