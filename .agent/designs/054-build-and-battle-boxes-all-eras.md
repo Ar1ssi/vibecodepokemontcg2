@@ -127,8 +127,62 @@ Sources: the Bulbapedia box page (list table), each per-box page, and the promo-
   Celebration *per-pack hit chances* on it: an ex-class hit in 25 % of packs, an illustration-class
   in 20 %, a special-illustration-class in 5 %, the era's top tier in 1 %.
 
-### 5. Booster anatomy per era
-See § Design → Pack models; sources are listed there (filled from the pack-structure research).
+### 5. Booster anatomy per era (English packs)
+| Era | Game cards | C | U | Reverse slots | Rare slot holds | Extra |
+|---|---|---|---|---|---|---|
+| XY (kits: xy10–xy12) | 10 | 5 | 3 | 1 | Rare / holo / EX / BREAK / full art / secret | code card |
+| SM (sm1–sm12) | 10 | 5 | 3 | 1 | Rare / holo / GX / Prism Star / full art / rainbow / gold | + 1 Basic Energy (11th card), code card |
+| SWSH (swsh1–swsh8) | 10 | 5 | 3 | 1 | Rare / holo / V / VMAX / VSTAR / full art / rainbow / gold | + Energy, code card |
+| SWSH from Brilliant Stars (swsh9–swsh12) | 10 | 5 | 3 | 1, **reverse or Trainer Gallery** | + Radiant (ASR →) | + Energy, code card |
+| SV (sv01–sv10) | 10 | 4 | 3 | 2: #1 reverse (**or ACE SPEC**, TEF →); #2 reverse **or IR / SIR / Hyper** | holo Rare / Double rare / Ultra Rare | + Energy, code card |
+| ME (me01–me05) | 10 | 4 | 3 | 2: #1 reverse; #2 reverse **or IR / SIR** | Rare / Double rare / Ultra Rare / Mega Hyper Rare | + Energy, code card |
+Sources: PokéBeach 2017 "Sun & Moon booster packs reintroducing 11 cards" (5 C, 3 U, 1 reverse, 1
+rare, the Energy as the 11th card) https://www.pokebeach.com/2017/01/sun-moon-booster-packs-reintroducing-11-cards-new-reverse-holo-style ;
+Bulbapedia "Booster pack" (Energy "in addition to the 10 other cards" since SM)
+https://bulbapedia.bulbagarden.net/wiki/Booster_pack_(TCG) ; SWSH: DigitalTQ Lost Origin / Brilliant
+Stars ("10 cards, 1 energy card and a code card", one reverse, one rare; 5 commons inferred), TCGplayer
+Astral Radiance / Lost Origin / Silver Tempest ("Trainer Gallery card in the Reverse-Holo slot", Radiant
+in the rare slot); SV: PokéBeach 2023 "Scarlet & Violet booster pack configuration finally revealed"
+(4 C, 3 U, 2 reverse, 1 holo; IR/SIR take the second reverse slot)
+https://www.pokebeach.com/2023/03/scarlet-violet-booster-pack-configuration-finally-revealed-major-exciting-changes ,
+TCGplayer Temporal Forces pull rates (ACE SPEC in the first reverse slot; Hyper in the second)
+https://www.tcgplayer.com/content/article/Pok%C3%A9mon-TCG-Temporal-Forces-Pull-Rates/28c0ad22-00a4-428f-b22d-e7fee9ec50bc/ ;
+ME: TCGplayer Phantasmal Flames / Perfect Order (IR/SIR in the second reverse slot; DR/UR in the rare
+slot). The XY row reuses the SM layout (same 10-card anatomy without the Energy card; the kits' sets
+predate it) — not separately sourced, pinned as the SM model.
+- **Measured baseline rates the boosted profile replaces** (per pack, "any card of that rarity";
+  TCGplayer Authentication Center, 8,000+ packs per set unless noted; article ids in the URL pattern
+  `tcgplayer.com/content/article/<slug>/<uuid>/`): SV base DR 13.8 %, UR 6.6 %, IR 7.7 %, SIR 3.2 %,
+  Hyper 1.9 % (a7702fce); Temporal Forces DR 16.8 %, UR 6.7 %, ACE SPEC 5.0 %, IR 7.7 %, SIR 1.2 %,
+  Hyper 0.7 % (28c0ad22); Surging Sparks DR 16.9 %, UR 6.7 %, ACE SPEC 5.0 %, IR 7.7 %, SIR 1.15 %,
+  Hyper 0.5 % (6ccfb6ab); Mega Evolution DR 20.9 %, UR 8.2 %, IR 10.9 %, SIR 1.0 %, MHR 0.08 %
+  (40cbeedc); Phantasmal Flames DR 20.8 %, UR 8.1 %, IR 11.0 %, SIR 1.25 %, MHR 0.08 % (9abae60d);
+  Perfect Order DR 21.0 %, UR 8.5 %, IR 11.2 %, SIR 1.2 %, MHR 0.06 % (73148119). SWSH: Astral
+  Radiance V 12.8 %, VMAX/VSTAR 3.5 %, full-art V 2.1 %, full-art Trainer 1.1 %, rainbow 1.3 %, gold
+  0.8 %, Trainer Gallery 12.6 % (10da749f); Lost Origin V 11.6 %, VMAX/VSTAR 4.4 %, Radiant 5.0 %,
+  TG 12.3 % (of which non-V 8.3 %, V/VMAX/Trainer 3.2 %, gold-black VMAX 0.9 %) (ba20ac4d); Silver
+  Tempest similar (6490d591); Evolving Skies V 1 in 9, VMAX 1 in 18, full art 1 in 36, alt-art V 1 in
+  91, rainbow 1 in 118, gold 1 in 109 (6a743d7b). SM (weak data, Flipside 720-pack Ultra Prism
+  review): GX ≈ 1 in 12, full art ≈ 1 in 23, secret ≈ 1 in 55, Prism Star ≈ 1 in 11
+  https://flipsidegaming.com/blogs/pokemon-blog/a-review-of-rarity-in-ultra-prism . XY: none found.
+- **TCGdex rarity vocabulary** (interfaces.d.ts of tcgdex/cards-database, and per-card files read
+  2026-09-28): `Common`, `Uncommon`, `Rare`, `Rare Holo` / `Holo Rare`, `Ultra Rare`, `Secret Rare`,
+  `Holo Rare V`, `Holo Rare VMAX`, `Holo Rare VSTAR`, `Radiant Rare`, `Amazing Rare`, `Double rare`,
+  `Illustration rare`, `Special illustration rare`, `Hyper rare`, `ACE SPEC Rare`, `Mega Hyper Rare`,
+  `Shiny rare`, `Shiny Ultra Rare`, `Black White Rare`, `Mega Attack Rare`, `Promo`. **TCGdex merges
+  tiers**: SM regular GX and full-art GX are both `Ultra Rare` (sm12-156 vs sm12-221); rainbow, gold
+  and alt-art VMAX are all `Secret Rare` (sm12-250, sm12-265, swsh7-215); SM Prism Star cards are
+  `Rare` (sm5-136); SWSH non-V holos are `Rare` (holo-ness lives in `variants`, not `rarity`); Trainer
+  Gallery cards are separate sets `swsh9tg`, `swsh10tg`, `swsh11tg`, `swsh12tg` with rarities `Rare`
+  (non-V) and `Ultra Rare` (V/VMAX/Trainer/gold-black). Secret cards are the ones whose numeric
+  localId exceeds the set's official count (`cardCount.official`). Card ids: `<setId>-<localId>`;
+  SV/ME pad to 3 digits (`sv08-057`), early SM/SWSH do not (`swsh7-215`, `sm12-1`), later SWSH files
+  do (`swsh10-046`) → the generator matches localIds numerically against the fetched set list.
+- TCGdex set ids: XY `xy10` Fates Collide, `xy11` Steam Siege, `xy12` Evolutions, `xyp`; SM `sm1`…
+  `sm12` (`sm3.5` Shining Legends, `sm7.5` Dragon Majesty, `sm115` Hidden Fates), `smp`; SWSH `swsh1`…
+  `swsh12` (`swsh3.5`, `swsh4.5`, `swsh10.5`, `swsh12.5`; TG `swsh<n>tg`), `swshp`; SV `sv01`…`sv10`
+  (`sv03.5`, `sv04.5`, `sv06.5`, `sv08.5`, `sv10.5b`, `sv10.5w`), `svp`, `sve`; ME `me01`…`me05`,
+  `me02.5`, `mep`. (Read from the TCGdex data repo `data/<Series>/<Set>.ts`; the API was unreachable.)
 
 ## Constraints
 - No build step, no new dependency, same-origin tabs, `postMessage` validated (PROJECT.md, D183).
@@ -270,6 +324,10 @@ expansion's own set id for Evolutions and Destined Rivals.
   reachable at generation (`--check` HEAD ≠ 200) and a Limitless URL is (as 051 slice 1 did for MEP).
   `set.name`/`releaseDate` live once per module: `export const SET = { id, name, releaseDate, series }`.
   Every row's `rarity` is TCGdex's string verbatim; the generator fails when a row has none.
+  `SET.official` = TCGdex `cardCount.official` (secret detection, § Pack models). For Brilliant
+  Stars → Silver Tempest the generator also fetches `<setId>tg` and appends its rows with
+  `subset: 'tg'` (localId `TG01`…, never secret); every other row has no `subset`. Lines and pack
+  draws match a localId numerically (`Number(localId)`), never by padded string (§ Research 5).
 - `boxes/<boxKey>.generated.mjs`: `export default BoxData` where
   `BoxData = { kind, decks?: Record<deckKey, DeckRow[]>,            // fixed-decks: 40 rows each
                groups?: Record<deckKey, DeckRow[]>,                 // evolution-*: the group, promo excluded
@@ -304,39 +362,71 @@ expansion's own set id for Evolutions and Destined Rivals.
 
 ### Pack models (`core/build-battle/pack-models.mjs`, pure)
 `PackModel = { key, size: 10, slots: Slot[] }`, `Slot = { count, pools?: string[], table?: [pool,
-weight][] }` as 051, where a pool is a TCGdex rarity string, `'reverse'` (Common ∪ Uncommon ∪ the
-era's plain-rare string), `'energy'` (the set's Basic Energy rows, `isBasicEnergy`), or a **class**
-name resolved per set: `hit`, `ultra`, `illustration`, `specialIllustration`, `top`.
+weight][] }` as 051, where a pool is `'Common'`, `'Uncommon'`, a **filler** (`'reverse'` = Common ∪
+Uncommon ∪ plain rare; `'rare'` = the era's plain rare: non-secret `Rare` / `Rare Holo` / `Holo
+Rare`) or a **class** resolved per set by matchers on TCGdex fields (`rarity`, secret = numeric
+`localId` > `SET.official`, `subset`): `hit`, `ultra`, `illustration`, `specialIllustration`,
+`aceSpec`, `top`. The Basic Energy card outside the ten (SM →) is not simulated: Basic Energy never
+enters the pool (D188) and the scene keeps 052's ten-card pocket flow (§ Options 5 note).
 ```
 BOOSTED_RATE_PROFILE = Object.freeze({ hit: 0.25, ultra: 0.08, illustration: 0.20,
-                                       specialIllustration: 0.05, top: 0.01 })
-// 30th Celebration per-pack chances (§ Research 4: ex-class 22–28 % → .25; IR 1 in 5; SIR 1 in 20;
-// Futuristic/top 1 in ~100). `ultra` (full-art rule-box) has no 30th tier → Phantasmal Flames'
-// measured 8.06 % kept.
-RARITY_CLASSES = {                    // era → class → TCGdex rarity strings (§ 5 sources)
-  xy:   { hit: ['Rare Holo EX'], ultra: ['Rare Ultra', 'Rare BREAK'], top: ['Rare Secret'] },
-  sm:   { hit: ['Rare Holo GX', 'Rare Prism Star'], ultra: ['Rare Ultra'],
-          top: ['Rare Rainbow', 'Rare Secret'] },
-  swsh: { hit: ['Rare Holo V', 'Rare Holo VMAX', 'Rare Holo VSTAR', 'Radiant Rare', 'Amazing Rare'],
-          ultra: ['Rare Ultra'], illustration: ['Trainer Gallery Rare Holo'],
-          specialIllustration: ['Trainer Gallery Rare Ultra'], top: ['Rare Rainbow', 'Rare Secret'] },
-  sv:   { hit: ['Double rare'], ultra: ['Ultra Rare', 'ACE SPEC Rare'], illustration: ['Illustration rare'],
-          specialIllustration: ['Special illustration rare'], top: ['Hyper rare'] },
-  me:   { hit: ['Double rare'], ultra: ['Ultra Rare'], illustration: ['Illustration rare'],
-          specialIllustration: ['Special illustration rare'], top: ['Mega Hyper Rare'] } }
+                                       specialIllustration: 0.05, aceSpec: 0.05, top: 0.01 })
+// 30th Celebration per-pack chances (§ Research 4): ex-class 22–28 % → .25; IR 1 in 5 → .20;
+// SIR 1 in 20 → .05; top tier (Futuristic Rare 1 in ~100–120) → .01. No 30th tier exists for
+// full-art rule-box cards or ACE SPEC → their measured rates stay (Phantasmal Flames UR 8.06 %;
+// Temporal Forces / Surging Sparks ACE SPEC 5.0 %).
+const P = BOOSTED_RATE_PROFILE;
+RARITY_CLASSES = {          // era → class → matchers { rarity, secret?, subset? } (§ Research 5)
+  xy:   { hit: [{ rarity: 'Ultra Rare', secret: false }],                     // EX, full-art EX, BREAK (TCGdex merges them)
+          top: [{ rarity: 'Secret Rare' }, { rarity: 'Ultra Rare', secret: true }] },
+  sm:   { hit: [{ rarity: 'Ultra Rare', secret: false }],                     // GX regular + full art (merged by TCGdex)
+          top: [{ rarity: 'Secret Rare' }, { rarity: 'Ultra Rare', secret: true }] },  // rainbow, gold, character rares
+  swsh: { hit: [{ rarity: 'Holo Rare V', secret: false }, { rarity: 'Holo Rare VMAX', secret: false },
+                { rarity: 'Holo Rare VSTAR', secret: false }, { rarity: 'Radiant Rare' }, { rarity: 'Amazing Rare' }],
+          ultra: [{ rarity: 'Ultra Rare', secret: false }],                   // full-art / alt-art V, full-art Trainers
+          illustration: [{ subset: 'tg', rarity: 'Rare' }],                  // Trainer Gallery non-V holos
+          specialIllustration: [{ subset: 'tg', rarity: 'Ultra Rare' }],     // TG V/VMAX/Trainer + gold-black VMAX
+          top: [{ rarity: 'Secret Rare' }, { rarity: 'Ultra Rare', secret: true }] },
+  sv:   { hit: [{ rarity: 'Double rare' }], ultra: [{ rarity: 'Ultra Rare' }], aceSpec: [{ rarity: 'ACE SPEC Rare' }],
+          illustration: [{ rarity: 'Illustration rare' }], specialIllustration: [{ rarity: 'Special illustration rare' }],
+          top: [{ rarity: 'Hyper rare' }] },
+  me:   { hit: [{ rarity: 'Double rare' }], ultra: [{ rarity: 'Ultra Rare' }],
+          illustration: [{ rarity: 'Illustration rare' }], specialIllustration: [{ rarity: 'Special illustration rare' }],
+          top: [{ rarity: 'Mega Hyper Rare' }] } };
+PACK_MODELS = {             // key → era, slots (weights normalized per slot, as 051)
+  xy:   { era: 'xy', slots: [C×5, U×3, [['reverse', 1]], [['hit', P.hit + P.ultra], ['top', P.top], ['rare', 1 - P.hit - P.ultra - P.top]]] },
+  sm:   { era: 'sm', slots: same as xy },       // XY/SM: TCGdex cannot split regular from full-art GX/EX, so hit carries both weights
+  swsh: { era: 'swsh', slots: [C×5, U×3, [['reverse', 1]],
+                                [['hit', P.hit], ['ultra', P.ultra], ['top', P.top], ['rare', 1 - P.hit - P.ultra - P.top]]] },
+  'swsh-tg': { era: 'swsh', slots: [C×5, U×3, [['illustration', P.illustration], ['specialIllustration', P.specialIllustration], ['reverse', 1 - P.illustration - P.specialIllustration]],
+                                     rare slot as swsh] },
+  sv:   { era: 'sv', slots: [C×4, U×3, [['reverse', 1]],
+                              [['illustration', P.illustration], ['specialIllustration', P.specialIllustration], ['top', P.top], ['reverse', 1 - P.illustration - P.specialIllustration - P.top]],
+                              [['hit', P.hit], ['ultra', P.ultra], ['rare', 1 - P.hit - P.ultra]]] },
+  'sv-acespec': { era: 'sv', slots: sv with slot 3 = [['aceSpec', P.aceSpec], ['reverse', 1 - P.aceSpec]] },
+  me:   { era: 'me', slots: [C×4, U×3, [['reverse', 1]],
+                              [['illustration', P.illustration], ['specialIllustration', P.specialIllustration], ['reverse', 1 - P.illustration - P.specialIllustration]],
+                              [['hit', P.hit], ['ultra', P.ultra], ['top', P.top], ['rare', 1 - P.hit - P.ultra - P.top]]] } };
 ```
-The exact strings are pinned by slice 1's test against the baked sets (`sets/<id>.generated.mjs`
-rarity tallies) — a class naming a string absent from every set of its era fails the test, so a
-TCGdex spelling drift is caught at bake time, not at play. Per-era slot layouts and the measured
-baseline rates each replaces are in **§ Pack anatomy** below (filled from the pack-structure
-research; every row cites its source).
+`C×n` = `{ pools: ['Common'], count: n }`, `U×3` likewise; a bracketed list is `{ count: 1, table }`.
+Box → model: XY kits `xy`; SM `sm`; Sword & Shield → Fusion Strike `swsh`; Brilliant Stars → Silver
+Tempest `swsh-tg`; Scarlet & Violet → Paradox Rift `sv`; Temporal Forces → Destined Rivals
+`sv-acespec`; ME `me` (Phantasmal Flames moves from `ME_PACK_MODEL` to this, which is the same layout
+with the profile's weights). Slot placements follow § Research 5: SV Hyper rares in the second
+reverse slot, ME Mega Hyper Rares in the rare slot (051), Radiant/Amazing in the rare slot, Trainer
+Gallery in the reverse slot, ACE SPEC in the first reverse slot. Prism Star cards (TCGdex `Rare`)
+draw as plain rares (uniform among the set's rares); their per-deck limit is validation's, unchanged.
 
-`resolvePackModel(model, cards, era) -> ResolvedPackModel`: replaces each class name in a slot's
-table by the era's rarity strings that occur in `cards`; a class with no card in this set moves its
-weight to the slot's filler row (`'reverse'` for the art slot, the era's plain rare for the hit slot)
-— rates of the other classes are unchanged (row 9). `openPack` takes the resolved model (its
-signature and fallbacks unchanged: an exhausted pool → filler → plain rare → whole set, never a
-duplicate id).
+`resolvePackModel(model, cards, setInfo) -> ResolvedPackModel`: each class pool becomes the ids of
+`cards` matching any of the era's matchers (a class's cards are drawn uniformly, so VMAX vs V or
+regular vs full-art GX come up in proportion to how many the set prints); a class with no card in
+this set moves its weight to the slot's filler row (`'reverse'` in a reverse/art slot, `'rare'` in
+the rare slot) — the other rows' rates are unchanged (row 9). Pack cards are drawn from the box
+set's module only (main set + its TG subset); promo-set cards never appear in packs. `openPack`
+takes the resolved model; its fallbacks are unchanged (an exhausted pool → the filler → plain rare →
+whole set; never a duplicate id). Slice 1's test asserts every matcher string of an era occurs in at
+least one baked set of that era once the era's data slice lands (`RARITY_CLASSES` vs the sets'
+rarity tallies), so a TCGdex spelling drift fails at bake time, not at play.
 
 ### Opening a box (`pack-opening.mjs`)
 `openBox({ box, data, cards, rng }) -> Opened`, `Opened = { deckKey, groupKeys: [deckKey, other]|null,
@@ -429,8 +519,8 @@ starting rows; PASS/FAIL lines name the box.
 | 7 | same seed, same box, twice | identical deckKey, groupKeys, trainerIds, packs, artIndexes | [ ] `pack-opening.test.mjs` (fixed + evolution fixtures) |
 | 8 | same seed, different box | independent contents; changing the box before Open re-draws | [ ] `pack-opening.test.mjs` |
 | 9 | a class absent from a set (SM: no `illustration`) | its weight joins the slot filler; `hit`/`top` chances unchanged (25 % / 1 %) | [ ] `pack-models.test.mjs` "an absent class keeps the other rates" |
-| 10 | rate profile: 4,000 packs of a baked SV set | ex-class 25 % ± 2, IR 20 % ± 2, SIR 5 % ± 1, top 1 % ± 0.5 per pack | [ ] `pack-models.test.mjs` (also me02: DR 25 %, IR 20 %, SIR 5 %, MHR 1 %; UR 8 %) |
-| 11 | `energy` slot (eras whose pack holds a Basic Energy) | draws only `isBasicEnergy` rows of the set; a set without Energy rows → filler `'reverse'` | [ ] `pack-models.test.mjs` |
+| 10 | rate profile: 4,000 packs of a baked set per model | `me`/`sv`: hit 25 % ± 2, UR 8 % ± 1.5, IR 20 % ± 2, SIR 5 % ± 1, top 1 % ± 0.5 (`sv-acespec`: ACE SPEC 5 % ± 1); `swsh`: hit 25 %, UR 8 %, top 1 %; `swsh-tg`: + TG 25 % ± 2 (20 + 5); `sm`/`xy`: `Ultra Rare` non-secret 33 % ± 2, top 1 % | [ ] `pack-models.test.mjs` per model (synthetic set until the era's data lands, then the baked set) |
+| 11 | secret detection: numeric localId > `SET.official`; TG localIds (`TG01`) are never secret; a set with `official` missing | secrets only above the official count; TG rows classed by `subset`; missing `official` → generator throws at bake | [ ] `pack-models.test.mjs`; generator test |
 | 12 | 5 copies of one card in a B&B deck (pool has 5) | valid (Option 4 B); `tcg` still errors at 5; ACE SPEC ×2 / Radiant ×2 / Prism Star same name ×2 still error in B&B | [ ] `deck-validation.test.mjs` |
 | 13 | v1 me02 session (no `groupKeys`/`trainerIds`) after the upgrade | parses; pool and scene as before; deck name unchanged | [ ] `build-battle-session.test.mjs` "a 051 session still opens" |
 | 14 | evolution-deck starting deck | editor holds 23 + 17 Basic Energy = 40 at open; counter 40 / 40; Play enabled when a Basic exists | [ ] `build-battle-view.test.mjs` `startingDeckRows`; e2e by hand |
@@ -440,7 +530,7 @@ starting rows; PASS/FAIL lines name the box.
 | 18 | TCGdex renames / renumbers a card | generator throws (name check); committed modules stay the truth | [ ] `--check` live test |
 | 19 | sprite slug for an old-era promo missing (Alolan forms) | `sprites: []` allowed; library shows the default; test checks only listed slugs | [ ] `box-catalog.test.mjs` |
 | 20 | 41 set modules on disk | each ≤ 60 KB; none imported by the eager catalog (grep test: no static import of `sets/` outside `box-data.mjs`) | [ ] `box-data.test.mjs` |
-| 21 | pack from an era with 11 cards (if § Pack anatomy says so) or a Basic Energy inside the 10 | `size` is the model's; pool counts and the recorder read `size × packCount` | [ ] `pack-models.test.mjs` |
+| 21 | a `swsh-tg` box whose set module has no `subset: 'tg'` rows (TG fetch failed at bake) | generator refuses to bake the box (throws "no Trainer Gallery rows for swsh9tg"); at play an absent class falls to the filler as row 9 | [ ] generator test; `pack-models.test.mjs` |
 | 22 | picker changed after a session exists | picker disabled; "New box" first | [ ] e2e by hand |
 | 23 | two players, different boxes, both B&B | deal proceeds (formats equal); each pool is its own | [ ] `room.test.mjs` unchanged (format only) — reasoning |
 | 24 | skin URL 404 (logo/symbol/key art) | image removed on `error` as 052 does; procedural face still readable | [ ] existing `error` handlers; e2e by hand with the host blocked |
@@ -481,8 +571,8 @@ Each slice is built by a fresh thread from `main`; data slices (3–8) need TCGd
 | 2 Generator | modify `scripts/generate-build-battle-box.mjs` (loop, `--only`, per-box outputs), `scripts/lib/decklist-lines.mjs` (`SET_MAP` all codes, set-numbered promo lines, `fetchSet` cache); create `scripts/build-battle/boxes/phantasmal-flames.mjs` (from `DECK_SOURCES`), `scripts/build-battle/box-sources.mjs` (loader); modify `scripts/__tests__/build-battle-box-live.test.mjs` | `node scripts/generate-build-battle-box.mjs [--only k] [--check]`; box source shape § Generated data | regenerating me02 reproduces slice 1's modules byte for byte (`--check` clean); a source with a wrong name throws `Expected <name>, got <other>`; an evolution source with n < 0 throws naming the pairing (row 4) | TCGdex set ids from `/v2/en/series/{xy,sm,swsh,sv,me}` (verified in this slice, recorded in Deviations) | `pnpm test` + `pnpm test:live` (me02 `--check`) green |
 | 3 ME data | create sources + generated modules for `mega-evolution` (me01, MEP 001–004), `perfect-order` (me03, 064–067), `chaos-rising` (me04, 074–077), `pitch-black` (me05, 082–085); catalog rows (kind `fixed-decks`, era `me`, `packModelKey: 'me'`, skins with `keyArtCardId` = each set's Mega ex SIR named in the source file, `packArtCardIds` = the 4 promos' set prints); `box-catalog.test.mjs` rows | decklists as printed on each Bulbapedia box page (URL in `sources.box`); every deck 40 rows, promo once | per box: 4 × 40, promo ids present, rarity tally equals the page's set size; pack test rows 7, 10 on me01 | Bulbapedia per-box pages (§ Research 3 ME) | `pnpm test` green; `--check` clean for the 4 boxes |
 | 4 UI + skins | modify `native-deck-builder-build-battle.js` (picker, `?box=`, load states), `native-deck-builder-unboxing.js` (`boxSkin`, kind-aware labels, procedural pack front), `css/deck-builder-build-battle.css` (era chips, select), `css/deck-builder-unboxing.css` (five palette blocks by `data-era`), `box-textures.mjs` (`packArtSrc` → vendored map keyed by box), `rec-unboxing.mjs` (`BOX=`); `index.ejs` untouched (panel is built by the controller) | § Builder tab, § Unboxing skin, § Recorder verbatim; ids `#buildBattleEra`, `#buildBattleBox` | rows 1, 5, 6, 14, 15, 22, 24, 25, 29 by hand + recorder PASS for `phantasmal-flames` and `mega-evolution` at seed 42 (video + 390 px shots in `.agent/scratch/`) | — | lint clean; recorder PASS; screenshots recorded in Deviations |
-| 5 SV data | sources + modules for the 10 SV boxes: kinds `evolution-deck` (17 Energy), `packModelKey: 'sv'` (`'sv-acespec'` from Temporal Forces if § Pack anatomy splits it), promo ids `svp-005`… and `sv10-034`… for Destined Rivals; groups, Trainer pools and Energy from each box page; catalog rows and skins (`keyArtCardId` = the set's cover Pokémon ex SIR, named per box in its source) | `groups`, `trainerPool`, `energy` per § Generated data | rows 4, 16, 17, 27 per box; `pack-models` row 10 on sv04 and sv05; opener row 7 on `temporal-forces` | Bulbapedia per-box pages (§ Research 3 SV); rarity strings from the baked sets | `pnpm test` green; `--check` clean |
-| 6 SWSH data | the 12 SWSH boxes: `evolution-pack` (SSH → FST) and `evolution-deck` (BRS → SIT); `packModelKey: 'swsh'` / `'swsh-tg'` (BRS →); promo ids `swshp-SWSH006`…; Trainer Gallery rows kept in the set module (`localId` `TG01`…) | as slice 5 | rows 4, 17, 27; row 10 on swsh7 (no TG) and swsh9 (TG); opener rows 7, 15 on `team-up`-style pack kind (`sword-shield`) | Bulbapedia (§ Research 3 SWSH) | same |
+| 5 SV data | sources + modules for the 10 SV boxes: kinds `evolution-deck` (17 Energy), `packModelKey: 'sv'` (Scarlet & Violet → Paradox Rift) / `'sv-acespec'` (Temporal Forces → Destined Rivals), promo ids `svp-005`… and `sv10-034`… for Destined Rivals; groups, Trainer pools and Energy from each box page; catalog rows and skins (`keyArtCardId` = the set's cover Pokémon ex SIR, named per box in its source) | `groups`, `trainerPool`, `energy` per § Generated data | rows 4, 16, 17, 27 per box; `pack-models` row 10 on sv04 and sv05; opener row 7 on `temporal-forces` | Bulbapedia per-box pages (§ Research 3 SV); rarity strings from the baked sets | `pnpm test` green; `--check` clean |
+| 6 SWSH data | the 12 SWSH boxes: `evolution-pack` (SSH → FST) and `evolution-deck` (BRS → SIT); `packModelKey: 'swsh'` / `'swsh-tg'` (BRS →); promo ids `swshp-SWSH006`…; Trainer Gallery rows merged from `swsh9tg`…`swsh12tg` into the set modules with `subset: 'tg'` | as slice 5 | rows 4, 17, 27; row 10 on swsh7 (no TG) and swsh9 (TG); opener rows 7, 15 on `team-up`-style pack kind (`sword-shield`) | Bulbapedia (§ Research 3 SWSH) | same |
 | 7 SM data | the 12 SM boxes: `evolution-pack`, `packModelKey: 'sm'`; promo ids `smp-SM010`…; Prism Star rows | as slice 5 | rows 4, 9 (no illustration class), 17, 27; row 10 on sm12 | Bulbapedia (§ Research 3 SM) | same |
 | 8 XY kits (optional) | `fates-collide` (xy10, `xyp-XY127`…), `steam-siege` (xy11, XY144…), `evolutions` (xy12, set-numbered 11/34/51/59); `packModelKey: 'xy'`; BREAK rows | as slice 5 | rows 4, 17; row 10 on xy12 | Bulbapedia kit pages (§ Research 3 XY) | same |
 | 9 Close | `.agent/areas/deck-builder.md`, `MAP.md` (sets/, boxes/, pack-models, box-data), `DECISIONS.md` (D192+: Options 1–10 picks), `ISSUES.md` (room box choice follow-up; engine gaps found), `STATE.md`, design status | — | `review.md` by a fresh agent on slices 1, 2, 4 diff | — | `pnpm test` green; findings filed |
