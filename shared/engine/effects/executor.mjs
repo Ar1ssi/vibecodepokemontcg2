@@ -1177,7 +1177,10 @@ export function executeSteps(draft, {
         } else {
           const choice = createPendingChoice({
             player: choicePlayer,
-            prompt: `${sourceCard?.name || 'Gust'}: Select opponent's Benched Pokémon to switch to Active`,
+            prompt:
+              choicePlayer === playerId
+                ? `${sourceCard?.name || 'Gust'}: Select opponent's Benched Pokémon to switch to Active`
+                : `${sourceCard?.name || 'Gust'}: Choose your new Active Pokémon`,
             source: sourceCard?.name || '',
             options: oppBench,
             min: 1,

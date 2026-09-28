@@ -982,7 +982,10 @@ function attackLockedAbility(card, turnNumber) {
 export function isAbilitySuppressed(card, ctx = {}) {
   if (!card || !isPokemon(card)) return false;
   if (isAncientTraitAbility(card)) return false;
-  if (attackLockedAbility(card, ctx.turnNumber)) return true;
+  // The marker binds the Defending Pokémon: it lapses once the card leaves the Active Spot.
+  const actives = [...(ctx.sideActive || []), ...(ctx.opponentActive || [])];
+  const stillActive = actives.some((c) => c.instanceId === card.instanceId || c.instanceId === card.attachedTo);
+  if (stillActive && attackLockedAbility(card, ctx.turnNumber)) return true;
   const sources = dedupe([
     ...rootsOf(ctx.sideCards || []),
     ...rootsOf(ctx.opponentSideCards || []),

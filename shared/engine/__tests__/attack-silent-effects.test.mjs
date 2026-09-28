@@ -1905,8 +1905,11 @@ test('Shiftry Seal Off (Rising Rivals 13): the Defending Pokémon\'s Poké-Body 
   });
   const res = attack(state);
   const card = root(res.state, 'p2', defender.instanceId);
-  assert.equal(isAbilitySuppressed(card, { turnNumber: 6 }), true);
-  assert.equal(isAbilitySuppressed(card, { turnNumber: 8 }), false);
+  const active = { opponentActive: res.state.players.p2.zones.active };
+  assert.equal(isAbilitySuppressed(card, { ...active, turnNumber: 6 }), true);
+  assert.equal(isAbilitySuppressed(card, { ...active, turnNumber: 8 }), false);
+  // Switched to the Bench, the Pokémon is no longer the Defending Pokémon.
+  assert.equal(isAbilitySuppressed(card, { opponentActive: [], turnNumber: 6 }), false);
 });
 
 test('Unown Hidden Power guess: the opponent\'s prompt carries no hand card id', () => {
