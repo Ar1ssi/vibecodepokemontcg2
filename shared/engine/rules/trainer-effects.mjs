@@ -1279,6 +1279,14 @@ function parseTrainerStepsInner(lower) {
       appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
     }
+    // Energy Retrieval / Superior Energy Retrieval — a counted Basic Energy pick; the plain
+    // branch below would offer every discard card.
+    const basicEnergy = lower.match(/put (?:up to )?(\d+|an?) basic energy cards? from your discard pile into your hand/);
+    if (basicEnergy) {
+      const count = /^\d+$/.test(basicEnergy[1]) ? Number(basicEnergy[1]) : 1;
+      steps.push({ type: 'recursion', what: 'Basic Energy', count, from: 'discard' });
+      return { steps, recognizable: true };
+    }
     let what = 'card';
     if (lower.includes('pokémon or a basic energy')) what = 'Pokémon or Basic Energy';
     else if (
@@ -2228,7 +2236,7 @@ function parseTrainerStepsInner(lower) {
     const m = lower.match(/trade\s+(\d+)\s+of the other cards in your hand for (?:up to )?(\d+) basic energy/);
     if (m) {
       steps.push({ type: 'discardCost', count: Number(m[1]) });
-      steps.push({ type: 'recursion', what: 'Basic Energy', from: 'discard' });
+      steps.push({ type: 'recursion', what: 'Basic Energy', count: Number(m[2]), from: 'discard' });
       return { steps, recognizable: true };
     }
   }

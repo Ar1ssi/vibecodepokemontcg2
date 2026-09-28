@@ -2196,6 +2196,16 @@ describe('legacy mechanisms coverage (batch 11)', () => {
     assert.equal(ser.steps[0].count, 2);
   });
 
+  test('Energy Retrieval (modern wording): counted Basic Energy pick, not every discard card', () => {
+    // Corpus rows: Energy Retrieval (CRI 108 / WHT 082), Superior Energy Retrieval (PAL 277) in out/pkmn-trainer-cards.json.
+    const er = parseTrainerEffect('Put up to 2 Basic Energy cards from your discard pile into your hand.');
+    assert.deepEqual(er.steps, [{ type: 'recursion', what: 'Basic Energy', count: 2, from: 'discard' }]);
+    const ser = parseTrainerEffect('You can use this card only if you discard 2 other cards from your hand. Put up to 4 Basic Energy cards from your discard pile into your hand. (You can\u2019t choose a card you discarded with the effect of this card.)');
+    assert.equal(ser.steps[0].type, 'discardCost');
+    assert.equal(ser.steps[1].what, 'Basic Energy');
+    assert.equal(ser.steps[1].count, 4);
+  });
+
   test("Team Rocket's Handiwork: mill 2 per heads", () => {
     const r = parseTrainerEffect("Flip 2 coins. For each heads, discard 2 cards from the top of your opponent's deck.");
     assert.equal(r.steps[0].type, 'millPerHeads');
