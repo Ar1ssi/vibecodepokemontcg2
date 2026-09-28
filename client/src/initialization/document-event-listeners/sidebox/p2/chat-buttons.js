@@ -1,5 +1,4 @@
-import { attack, attachAbility, healAbility, pass, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
-import { abilityPicker } from '../../../../actions/ability-picker.js';
+import { attack, pass, retreat, stadiumEffect } from '../../../../actions/chat-buttons/chat-buttons.js';
 import { wireEndTurnButton } from '../../../../setup/general/end-turn-button.mjs';
 import { systemState } from '../../../../state.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
@@ -43,28 +42,8 @@ export const initializeP2ChatButtons = () => {
   const p2RetreatButton = document.getElementById('p2RetreatButton');
   p2RetreatButton.addEventListener('click', () => retreat(getP2User()));
 
-  const p2HealButton = document.getElementById('p2HealButton');
-  p2HealButton.addEventListener('click', () => healAbility(getP2User()));
-
-  const p2SwitchButton = document.getElementById('p2SwitchButton');
-  p2SwitchButton.addEventListener('click', () => switchAbility(getP2User()));
-
-  const p2AttachButton = document.getElementById('p2AttachButton');
-  p2AttachButton.addEventListener('click', () => attachAbility(getP2User()));
-
-  const p2SearchButton = document.getElementById('p2SearchButton');
-  p2SearchButton.addEventListener('click', () => searchAbility(getP2User()));
-
-  const p2AbilityButton = document.getElementById('p2AbilityButton');
-  p2AbilityButton.addEventListener('click', () => abilityPicker(getP2User()));
-
   const p2StadiumButton = document.getElementById('p2StadiumButton');
   p2StadiumButton.addEventListener('click', () => stadiumEffect(getP2User()));
-
-  const p2EnergyRedirectButton = document.getElementById('p2EnergyRedirectButton');
-  p2EnergyRedirectButton.addEventListener('click', () =>
-    energyRedirectAbility(getP2User())
-  );
 
   const p2PassButton = document.getElementById('p2PassButton');
   p2PassButton.addEventListener('click', () => pass(getP2User()));

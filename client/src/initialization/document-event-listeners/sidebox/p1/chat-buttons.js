@@ -1,5 +1,4 @@
-import { attack, attachAbility, healAbility, retreat, searchAbility, stadiumEffect, switchAbility, energyRedirectAbility } from '../../../../actions/chat-buttons/chat-buttons.js';
-import { abilityPicker } from '../../../../actions/ability-picker.js';
+import { attack, retreat, stadiumEffect } from '../../../../actions/chat-buttons/chat-buttons.js';
 import { undo } from '../../../../actions/general/undo.js';
 import { systemState } from '../../../../state.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
@@ -41,26 +40,8 @@ export const initializeP1ChatButtons = () => {
   const retreatButton = document.getElementById('retreatButton');
   retreatButton.addEventListener('click', () => retreat(systemState.initiator));
 
-  const healButton = document.getElementById('healButton');
-  healButton.addEventListener('click', () => healAbility(systemState.initiator));
-
-  const switchButton = document.getElementById('switchButton');
-  switchButton.addEventListener('click', () => switchAbility(systemState.initiator));
-
-  const attachButton = document.getElementById('attachButton');
-  attachButton.addEventListener('click', () => attachAbility(systemState.initiator));
-
-  const searchButton = document.getElementById('searchButton');
-  searchButton.addEventListener('click', () => searchAbility(systemState.initiator));
-
-  const abilityButton = document.getElementById('abilityButton');
-  abilityButton.addEventListener('click', () => abilityPicker(systemState.initiator));
-
   const stadiumButton = document.getElementById('stadiumButton');
   stadiumButton.addEventListener('click', () => stadiumEffect(systemState.initiator));
-
-  const energyRedirectButton = document.getElementById('energyRedirectButton');
-  energyRedirectButton.addEventListener('click', () => energyRedirectAbility(systemState.initiator));
 
   const messageInput = document.getElementById('messageInput');
   messageInput.addEventListener('keydown', (event) => {

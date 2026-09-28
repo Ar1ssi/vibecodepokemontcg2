@@ -1831,12 +1831,10 @@ import { glowColorFor } from './card-glow-colors.mjs';
       const sideboxes = [
         {
           attackButton: document.getElementById('attackButton'),
-          abilityButton: document.getElementById('abilityButton'),
           user: () => (systemState.isTwoPlayer ? systemState.initiator : 'self'),
         },
         {
           attackButton: document.getElementById('p2AttackButton'),
-          abilityButton: document.getElementById('p2AbilityButton'),
           user: () => (systemState.isTwoPlayer ? systemState.initiator : 'opp'),
         },
       ];
@@ -1897,7 +1895,6 @@ import { glowColorFor } from './card-glow-colors.mjs';
           clearGlow();
           for (const box of sideboxes) {
             box.attackButton?.classList.remove('attacks-available', 'turn-disabled');
-            box.abilityButton?.classList.remove('abilities-available', 'turn-disabled');
           }
           return;
         }
@@ -1971,8 +1968,6 @@ import { glowColorFor } from './card-glow-colors.mjs';
         for (const { box, isTurn, glows, activeCard, stadiumCard } of scored) {
           box.attackButton?.classList.toggle('attacks-available', !!glows?.activeCanAttack);
           box.attackButton?.classList.toggle('turn-disabled', !isTurn);
-          box.abilityButton?.classList.toggle('abilities-available', !!glows?.abilityCards.length);
-          box.abilityButton?.classList.toggle('turn-disabled', !isTurn);
           if (!glows) continue;
           for (const [card, color] of glows.handPlayable) collectGlow(next, card, { color });
           for (const { card } of glows.abilityCards) collectGlow(next, card, { ability: true });

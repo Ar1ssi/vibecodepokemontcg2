@@ -854,9 +854,9 @@ ul, li {
 }
 /* Turn-aware action affordances (highlight-parity plan B1/B3), toggled by
    rules-bridge.js hookActionAffordances. Gold = some attack on the Active is
-   payable right now; blue = some ability is activatable right now; dimmed =
-   not this side's turn. ID+class beats the .self-color/.opp-color gradients
-   and the container :hover rules, so hover is restated per state. */
+   payable right now; dimmed = not this side's turn. ID+class beats the
+   .self-color/.opp-color gradients and the container :hover rules, so hover is
+   restated per state. */
 #attackButton.attacks-available,
 #p2AttackButton.attacks-available {
   background: linear-gradient(to bottom, rgba(200, 170, 60, 0.864), rgba(170, 140, 40, 0.864));
@@ -864,14 +864,6 @@ ul, li {
 #attackButton.attacks-available:hover,
 #p2AttackButton.attacks-available:hover {
   background: linear-gradient(to bottom, rgba(224, 196, 96, 0.9), rgba(190, 160, 55, 0.9));
-}
-#abilityButton.abilities-available,
-#p2AbilityButton.abilities-available {
-  background: linear-gradient(to bottom, rgba(80, 150, 220, 0.864), rgba(60, 120, 190, 0.864));
-}
-#abilityButton.abilities-available:hover,
-#p2AbilityButton.abilities-available:hover {
-  background: linear-gradient(to bottom, rgba(112, 178, 238, 0.9), rgba(84, 142, 212, 0.9));
 }
 .chat-button-container button.turn-disabled {
   opacity: 0.4;
