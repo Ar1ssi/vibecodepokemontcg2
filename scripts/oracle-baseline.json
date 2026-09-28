@@ -3,7 +3,7 @@
   "families": {
     "ability:attach": {
       "n": 211,
-      "observed": 174
+      "observed": 177
     },
     "ability:attach-permission": {
       "n": 3,
@@ -67,7 +67,7 @@
     },
     "ability:draw": {
       "n": 219,
-      "observed": 197
+      "observed": 198
     },
     "ability:effect-prevent": {
       "n": 151,
@@ -123,7 +123,7 @@
     },
     "ability:look-at-top": {
       "n": 67,
-      "observed": 67
+      "observed": 66
     },
     "ability:lost-zone": {
       "n": 2,
@@ -171,7 +171,7 @@
     },
     "ability:setup": {
       "n": 9,
-      "observed": 1
+      "observed": 2
     },
     "ability:status": {
       "n": 507,
@@ -203,15 +203,15 @@
     },
     "attack:bench-damage": {
       "n": 850,
-      "observed": 772
+      "observed": 817
     },
     "attack:coin-flip": {
       "n": 429,
-      "observed": 415
+      "observed": 418
     },
     "attack:conditional-damage": {
       "n": 740,
-      "observed": 305
+      "observed": 380
     },
     "attack:conditional-ko": {
       "n": 20,
@@ -231,35 +231,35 @@
     },
     "attack:devolve-opponent": {
       "n": 11,
-      "observed": 8
+      "observed": 9
     },
     "attack:devolve-self": {
       "n": 2,
-      "observed": 0
+      "observed": 2
     },
     "attack:discard-cost": {
       "n": 597,
-      "observed": 432
+      "observed": 582
     },
     "attack:discard-opponent": {
       "n": 151,
-      "observed": 144
+      "observed": 146
     },
     "attack:draw-attach": {
       "n": 321,
-      "observed": 293
+      "observed": 317
     },
     "attack:draw-until": {
       "n": 45,
-      "observed": 40
+      "observed": 44
     },
     "attack:dual-status": {
       "n": 78,
-      "observed": 72
+      "observed": 76
     },
     "attack:effect-prevention": {
       "n": 26,
-      "observed": 0
+      "observed": 2
     },
     "attack:extra-by-type": {
       "n": 1,
@@ -271,7 +271,7 @@
     },
     "attack:heal": {
       "n": 148,
-      "observed": 142
+      "observed": 146
     },
     "attack:hp-cap-damage": {
       "n": 9,
@@ -279,7 +279,7 @@
     },
     "attack:immunity": {
       "n": 243,
-      "observed": 20
+      "observed": 24
     },
     "attack:look-any-deck": {
       "n": 5,
@@ -291,7 +291,7 @@
     },
     "attack:lost-zone": {
       "n": 11,
-      "observed": 9
+      "observed": 11
     },
     "attack:mirror-heal": {
       "n": 11,
@@ -303,15 +303,15 @@
     },
     "attack:move-energy": {
       "n": 135,
-      "observed": 89
+      "observed": 115
     },
     "attack:multi-target": {
       "n": 165,
-      "observed": 107
+      "observed": 137
     },
     "attack:neutralize-opponent-energy": {
       "n": 1,
-      "observed": 0
+      "observed": 1
     },
     "attack:next-turn-bonus": {
       "n": 36,
@@ -319,7 +319,7 @@
     },
     "attack:next-turn-lock": {
       "n": 720,
-      "observed": 508
+      "observed": 653
     },
     "attack:once-per-turn": {
       "n": 5,
@@ -327,15 +327,15 @@
     },
     "attack:per-energy": {
       "n": 635,
-      "observed": 459
+      "observed": 573
     },
     "attack:per-heads-coin": {
       "n": 133,
-      "observed": 123
+      "observed": 132
     },
     "attack:per-prize": {
       "n": 147,
-      "observed": 86
+      "observed": 74
     },
     "attack:recover-status": {
       "n": 12,
@@ -351,7 +351,7 @@
     },
     "attack:return-self": {
       "n": 15,
-      "observed": 9
+      "observed": 14
     },
     "attack:reveal-hand": {
       "n": 44,
@@ -363,7 +363,7 @@
     },
     "attack:self-damage": {
       "n": 166,
-      "observed": 131
+      "observed": 165
     },
     "attack:self-status": {
       "n": 33,
@@ -379,15 +379,15 @@
     },
     "attack:status-burned": {
       "n": 94,
-      "observed": 90
+      "observed": 91
     },
     "attack:status-confused": {
       "n": 130,
-      "observed": 123
+      "observed": 127
     },
     "attack:status-paralyzed": {
       "n": 155,
-      "observed": 142
+      "observed": 145
     },
     "attack:status-poisoned": {
       "n": 152,
@@ -395,11 +395,11 @@
     },
     "attack:supporter-effect": {
       "n": 5,
-      "observed": 1
+      "observed": 3
     },
     "attack:switch": {
       "n": 147,
-      "observed": 139
+      "observed": 140
     },
     "attack:unknown": {
       "n": 1437,

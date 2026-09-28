@@ -95,8 +95,9 @@ export function requiresKoOnOpponentTurn(card) {
 // (Primarina Enriching Melody) is a one-shot trigger, legal only on the turn
 // that Pokémon was played. Distinct from the played-to-Bench wording, which
 // has its own one-shot window.
+// Older prints name the Pokémon (Walrein ex Chilling Breath: "when you play Walrein ex …").
 const EVOLVE_PLAYED_CLAUSE =
-  /when you play this pok[eé]mon from your hand to evolve\b/;
+  /when you play (?:this pok[eé]mon|[a-z0-9é' -]+?) from your hand to evolve\b/;
 
 function matchesFirstAbilityOrText(card, clause) {
   const arrText =

@@ -426,3 +426,18 @@ test('ability: Azelf Time Walk is refused on a later turn', () => {
   assert.ok(res.error);
   assert.equal(zoneOf(res, 'p1', 31) ?? zoneOf({ state }, 'p1', 31), 'prizes');
 });
+
+// Walrein ex, Power Keepers 99.
+const CHILLING_BREATH =
+  "Once during your turn, when you play Walrein ex from your hand to evolve 1 of your Pokémon, you may use this power. Your opponent can't play any Trainer cards from his or her hand during your opponent's next turn.";
+
+test('ability: Walrein ex Chilling Breath locks Trainers on the next turn, only the turn it evolved', () => {
+  const fresh = board(CHILLING_BREATH, { name: 'Walrein ex' });
+  fresh.state.players.p1.zones.active[0].enteredPlayTurn = 2;
+  const res = use70(fresh.state, fresh.rng);
+  assert.deepEqual(res.state.players.p2.playLocks?.map((l) => l.kinds), [['trainer']]);
+
+  const stale = board(CHILLING_BREATH, { name: 'Walrein ex' });
+  stale.state.players.p1.zones.active[0].enteredPlayTurn = 1;
+  assert.ok(use70(stale.state, stale.rng).error);
+});

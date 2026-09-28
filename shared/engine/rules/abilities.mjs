@@ -1125,7 +1125,7 @@ export function parseAbility(text = '') {
     // "from your hand to evolve 1 of your Pokémon" is the evolve trigger (Primarina
     // Enriching Melody), gated by the turn that Pokémon evolved — not the played-to-
     // Bench window. Flagged so the orchestrators pick the right gate.
-    const evolve = /when you play this pok[eé]mon from your hand to evolve/.test(lower);
+    const evolve = /when you play (?:this pok[eé]mon|[a-z0-9é' -]+?) from your hand to evolve/.test(lower);
     const toBench = /when you play this pok[eé]mon from your hand (?:on)?to your bench/.test(lower);
     steps.push({
       type: 'whenPlayedAbility',
@@ -1650,8 +1650,21 @@ export function parseAbility(text = '') {
     lower
   );
   const neitherCanPlay = /neither player can play/.test(lower);
-  if (canPlayLock || eachPlayerLock || neitherCanPlay) {
-    const evolveLock = lower.includes('to evolve');
+  // Walrein ex Chilling Breath: a one-shot lock for the opponent's next turn, set when the
+  // Ability is used (the attack step's player-level playLocks).
+  const nextTurnTrainerLock =
+    /your opponent can'?t play any (item|supporter|stadium|trainer) cards from (?:his or her|their) hand during your opponent's next turn/.exec(
+      lower
+    );
+  if (nextTurnTrainerLock) {
+    steps.push({
+      type: 'atkOppPlayLock',
+      kinds: [nextTurnTrainerLock[1]],
+      guidance: `Your opponent can't play ${nextTurnTrainerLock[1]} cards during their next turn.`,
+    });
+  } else if (canPlayLock || eachPlayerLock || neitherCanPlay) {
+    // "to evolve" in the lock itself, not in a "when you play … to evolve" trigger.
+    const evolveLock = /can(?:'?t)? play [^.]*to evolve/.test(lower);
     if (evolveLock) {
       steps.push({
         type: 'evolveLockAbility',

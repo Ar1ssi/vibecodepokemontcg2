@@ -123,3 +123,10 @@ test('oracleCorpus emits one row per attack and ability with family and damage f
   assert.ok(attack.tags.includes('own:attached->discard'), attack.tags.join());
   assert.deepEqual(oracleCorpus([]), []);
 });
+
+test('a player-level lock (no card changes) is tagged', () => {
+  const state = { players: { p1: { zones: {} }, p2: { zones: {} } } };
+  const before = snapshot(state);
+  state.players.p2.playLocks = [{ untilTurn: 3, kinds: ['item'] }];
+  assert.ok(diffTags(before, snapshot(state), []).has('opp:player-lock'));
+});

@@ -230,6 +230,8 @@ export function snapshot(state) {
             c.cannotAttackUntilTurn,
             c.cannotRetreatUntilTurn,
             c.cannotAttackAttackName,
+            c.attackLockedWhileActive,
+            c.asEnergy,
           ]),
         });
       }
@@ -245,6 +247,12 @@ export function snapshot(state) {
       (state.players[pid]?.zones?.deck || []).map((c) => c.instanceId).join(',')
     ),
     winner: state.winner,
+    // Player-level effects no card carries: play locks ("can't play Item cards"), attack locks,
+    // Bench traps, forced-tails coins (parse-hole sweep gate item 3).
+    playerLocks: ['p1', 'p2'].map((pid) => {
+      const p = state.players[pid] || {};
+      return JSON.stringify([p.playLocks, p.attackLockUntilTurn, p.benchTraps, p.coinsTailsTurn]);
+    }),
   };
 }
 
@@ -269,6 +277,9 @@ export function diffTags(before, after, events) {
   }
   for (const [id, b] of before.cards)
     if (!after.cards.has(id)) tags.add(`${role(b.pid)}:${b.zone}->gone`);
+  ['p1', 'p2'].forEach((pid, i) => {
+    if ((before.playerLocks?.[i] ?? '') !== (after.playerLocks?.[i] ?? '')) tags.add(`${role(pid)}:player-lock`);
+  });
   if (before.activeIds[0] !== after.activeIds[0])
     tags.add('own:active-changed');
   if (before.activeIds[1] !== after.activeIds[1])
