@@ -57,12 +57,16 @@ export function roomFormatView({ format, proposal, seated = [], self, spectator 
   }
 
   if (live) {
+    const counter = otherFormat(live.format);
+    const keeping = counter === agreed;
     return {
       mode: 'answer',
-      text: `${live.by} proposes ${formatLabel(live.format)}.`,
+      text: keeping
+        ? `${live.by} proposes switching from ${formatLabel(agreed)} to ${formatLabel(live.format)}.`
+        : `${live.by} proposes ${formatLabel(live.format)}.`,
       buttons: [
         { id: 'accept', label: 'Accept', action: { type: 'accept', format: live.format } },
-        proposeButton(otherFormat(live.format), `Play ${SHORT_NAMES[otherFormat(live.format)]} instead`),
+        proposeButton(counter, keeping ? `Keep ${SHORT_NAMES[counter]}` : `Play ${SHORT_NAMES[counter]} instead`),
       ],
     };
   }

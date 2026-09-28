@@ -110,3 +110,9 @@ One slice: pure helpers and tests → server wiring → client panel → e2e run
   accepted mid-game. That is dev-only; production runs authoritative (D17).
 - `room-format-test.mjs` (repo root, next to the other two-player e2e scripts) walks rows 1–3c, 6,
   7 and 8, plus the box tab opening on accept. All 14 checks pass with SERVER_AUTHORITATIVE=1.
+- Review fixes: the format locks when the opening coin call opens (`roomFormatLocked`), not only
+  after the deal, and the server re-broadcasts at that moment. `server/game/room-format-seat.mjs`
+  `roomFormatSeatRefusal` requires exactly two seats and, in authoritative mode, the socket that
+  holds the seat. Countering a switch with the agreed format declines it ("Keep …").
+- Accepting Build & Battle opens the box before the server confirms, to keep the click's user
+  gesture; a refused accept leaves an open box tab, which is harmless.

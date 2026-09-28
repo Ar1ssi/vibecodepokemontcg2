@@ -32,7 +32,11 @@ export function applyRoomFormatAction(state, action) {
 
   if (type === 'propose') {
     if (!isDeckFormat(format)) return refuse(current, 'invalid_format');
-    if (!current.proposal && current.format === format) return refuse(current, 'already_agreed');
+    if (current.format === format) {
+      if (!current.proposal) return refuse(current, 'already_agreed');
+      // Answering a switch with the format already agreed declines the switch.
+      return accept({ format: current.format, proposal: null });
+    }
     return accept({ format: current.format, proposal: { format, by: username } });
   }
 

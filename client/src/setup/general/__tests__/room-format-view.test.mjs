@@ -31,6 +31,14 @@ test('053 row 3: the proposer waits and can withdraw; the other player accepts o
   assert.equal(theirs.buttons[1].label, 'Play Standard instead');
 });
 
+test('053 row 3b: answering a switch away from the agreed format offers to keep it', () => {
+  const proposal = { format: 'build-battle', by: 'Ash' };
+  const view = roomFormatView({ format: 'tcg', proposal, seated, self: 'Gary' });
+  assert.match(view.text, /^Ash proposes switching from .+ to Build & Battle/);
+  assert.equal(view.buttons[1].label, 'Keep Standard');
+  assert.deepEqual(view.buttons[1].action, { type: 'propose', format: 'tcg' });
+});
+
 test('053 row 3a: an agreed Build & Battle room offers the box and a switch', () => {
   const view = roomFormatView({ format: 'build-battle', proposal: null, seated, self: 'Gary' });
   assert.equal(view.text, 'Format: Build & Battle (40 cards, 4 Prizes)');

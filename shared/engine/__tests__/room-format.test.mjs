@@ -33,6 +33,14 @@ test('053 row 3c: nobody accepts their own proposal or a format that is no longe
   assert.equal(act(emptyRoomFormat(), { type: 'accept', format: 'tcg', username: 'Gary' }).reason, 'no_proposal');
 });
 
+test('053 row 3b: countering a switch with the agreed format declines it', () => {
+  const pending = { format: 'tcg', proposal: { format: 'build-battle', by: 'Ash' } };
+  assert.deepEqual(act(pending, { type: 'propose', format: 'tcg', username: 'Gary' }).state, {
+    format: 'tcg',
+    proposal: null,
+  });
+});
+
 test('053: only the proposer withdraws a proposal, and the agreed format survives it', () => {
   const agreed = { format: 'tcg', proposal: { format: 'build-battle', by: 'Ash' } };
   assert.equal(act(agreed, { type: 'cancel', username: 'Gary' }).reason, 'own_proposal');

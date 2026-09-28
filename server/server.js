@@ -22,6 +22,7 @@ import {
   clearRoomFormatProposal,
   emptyRoomFormat,
 } from '../shared/engine/room-format.mjs';
+import { roomFormatLocked, roomFormatSeatRefusal } from './game/room-format-seat.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 
 const SERVER_AUTHORITATIVE =
@@ -504,6 +505,7 @@ async function main() {
     if (gameRoom.refuseDealOnFormatMismatch()) return;
     const opened = gameRoom.beginTurnOrderCall();
     if (!opened) return;
+    broadcastRoomFormat(roomId);
 
     for (const pid of Object.keys(gameRoom.state.players)) {
       const pSocketId = gameRoom.playerToSocket.get(pid);
@@ -548,11 +550,7 @@ async function main() {
       if (shadow) shadow.gameRoom.roomFormat = next.format;
     }
   };
-  const roomHasDealt = (roomId) => {
-    if (!SERVER_AUTHORITATIVE) return false;
-    const phase = gameRooms.get(roomId)?.state?.turn?.phase;
-    return Boolean(phase) && phase !== 'setup';
-  };
+  const roomHasDealt = (roomId) => SERVER_AUTHORITATIVE && roomFormatLocked(gameRooms.get(roomId));
 
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
@@ -765,6 +763,7 @@ async function main() {
           let activeShadow = shadow;
           if (!activeShadow) {
             activeShadow = new ShadowSession({ roomId });
+            activeShadow.gameRoom.roomFormat = roomInfo.get(roomId)?.format?.format ?? null;
             shadowSessions.set(roomId, activeShadow);
           }
           if (isSpectator) {
@@ -872,6 +871,7 @@ async function main() {
         let shadow = shadowSessions.get(data.roomId);
         if (!shadow) {
           shadow = new ShadowSession({ roomId: data.roomId });
+          shadow.gameRoom.roomFormat = roomInfo.get(data.roomId)?.format?.format ?? null;
           shadowSessions.set(data.roomId, shadow);
         }
         if (!data.notSpectator) {
@@ -912,8 +912,15 @@ async function main() {
     socket.on('roomFormatAction', (data) => {
       const seat = socket.data.seat;
       const room = seat ? roomInfo.get(seat.roomId) : null;
-      if (!room || data?.roomId !== seat.roomId) {
-        socket.emit('roomFormatRejected', { roomId: data?.roomId, reason: 'not_seated' });
+      const refusal = roomFormatSeatRefusal({
+        seat,
+        requestRoomId: data?.roomId,
+        room,
+        gameRoom: SERVER_AUTHORITATIVE ? gameRooms.get(seat?.roomId) : null,
+        socketId: socket.id,
+      });
+      if (refusal) {
+        socket.emit('roomFormatRejected', { roomId: data?.roomId, reason: refusal });
         return;
       }
       const result = applyRoomFormatAction(room.format, {
