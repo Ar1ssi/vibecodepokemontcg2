@@ -3649,9 +3649,7 @@ function validateReferences(state, command) {
     }
 
     case 'attack': {
-      const active = state.players?.[playerId]?.zones?.active?.find(
-        (c) => !c.attachedTo
-      );
+      const active = resolveAttacker(state, playerId, payload);
       if (!active) {
         return { valid: false, error: 'stale_view' };
       }
@@ -3835,6 +3833,23 @@ function validateReferences(state, command) {
     default:
       return { valid: true };
   }
+}
+
+// Alakazam ex Dimensional Hand: "This attack can be used even if this Pokémon is on the Bench."
+const BENCH_ATTACK_CLAUSE = /can be used even if this Pok[eé]mon is on the Bench/i;
+
+// The Pokémon an attack command names. No `attackerInstanceId` (or the Active's own id) means
+// the Active. A Benched Pokémon qualifies only for an attack that prints the Bench clause;
+// anything else returns null.
+function resolveAttacker(state, playerId, payload) {
+  const zones = state.players?.[playerId]?.zones;
+  const active = zones?.active?.find((c) => !c.attachedTo) || null;
+  const requestedId = payload?.attackerInstanceId;
+  if (requestedId == null || requestedId === active?.instanceId) return active;
+  const benched = zones?.bench?.find((c) => c.instanceId === requestedId && !c.attachedTo);
+  if (!benched) return null;
+  const attack = attackViewFor(state, benched)?.attacks?.[payload?.attackIndex ?? 0];
+  return BENCH_ATTACK_CLAUSE.test(String(attack?.text || '')) ? benched : null;
 }
 
 /**
@@ -4431,7 +4446,7 @@ export function validateLegality(state, command) {
 
     case 'attack': {
       if (state.turn?.number === 1) {
-        const goingFirstActive = player.zones?.active?.find((c) => !c.attachedTo);
+        const goingFirstActive = resolveAttacker(state, playerId, payload);
         // Pheromosa-GX Fast Raid: "If you go first, you can use this attack on your first turn."
         const chosenText = String(goingFirstActive?.attacks?.[payload?.attackIndex]?.text || '');
         const attackAllowsFirstTurn = /you can use this attack (?:on|during) your first turn/i.test(chosenText);
@@ -4451,7 +4466,7 @@ export function validateLegality(state, command) {
           };
         }
       }
-      const active = player.zones?.active?.find((c) => !c.attachedTo);
+      const active = resolveAttacker(state, playerId, payload);
       if (player.flags?.attackerAttacked) {
         // An extra-attack Ability (Dipplin Festival Lead, Ω Barrage) allows a
         // second attack in the same turn while its condition holds.
@@ -8536,9 +8551,10 @@ export function applyCommand(state, command, rng = null) {
 
     case 'attack': {
       const attackerPlayer = draft.players[playerId];
-      const attacker = attackerPlayer?.zones?.active?.find(
-        (c) => !c.attachedTo
-      );
+      const attacker = resolveAttacker(draft, playerId, payload);
+      const attackerZone = attackerPlayer?.zones?.bench?.includes(attacker)
+        ? attackerPlayer.zones.bench
+        : attackerPlayer?.zones?.active;
       const atkIdx = payload?.attackIndex ?? 0;
       const attackerView = attackViewFor(draft, attacker);
       const attack = attackerView?.attacks?.[atkIdx] || {
@@ -8548,7 +8564,7 @@ export function applyCommand(state, command, rng = null) {
       // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
       // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
       if (attacker && !isStadiumToolNegation(draft.stadium?.card || draft.stadium)) {
-        for (const tool of attachedTools(attacker, attackerPlayer.zones.active)) {
+        for (const tool of attachedTools(attacker, attackerZone)) {
           if (parseAttackGrant(cardText(tool))?.discardAfterAttack) tool.discardAtEndOfTurn = true;
         }
       }
