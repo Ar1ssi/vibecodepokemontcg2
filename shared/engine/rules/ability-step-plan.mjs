@@ -91,6 +91,13 @@ export function planAbilitySteps(steps = [], { mode = 'auto' } = {}) {
       case 'drawAbility':
         planned.push({ ...base, action: 'draw' });
         break;
+      case 'returnSelfToDeckAbility':
+        // Only the shuffle wording executes (Dudunsparce, Run Away Draw); the top/bottom variants announce.
+        planned.push({
+          ...base,
+          action: mode !== 'auto' && step.shuffleSelf ? 'return-self-to-deck' : 'announce',
+        });
+        break;
       case 'opponentDraw':
         planned.push({
           ...base,
