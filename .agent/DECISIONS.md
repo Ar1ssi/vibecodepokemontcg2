@@ -6,12 +6,13 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D190).
+#   Next id = highest D number in this file and the archive + 1 (next: D191).
 
 ## Active
+- D190 2026-09-28 [netcode] Formats are checked at the deal, not at load: `setup` refuses mixed formats and both Set Ups clear with a chat line, so a restored last-used deck stays replaceable (I202). (Supersedes D187's load refusal.)
 - D189 2026-09-28 [deck-builder] A built B&B deck is a library record with `format: 'build-battle'`, so restore-on-join reloads it as 40/4; the Standard builder shows it but does not enforce the pool. (design 051)
 - D188 2026-09-28 [deck-builder] Build & Battle Basic Energy is unlimited (the eight SVE prints), never counted against the pool, still counted toward 40 — as Prerelease events supply it. (design 051)
-- D187 2026-09-28 [netcode] Prize count comes from an explicit deck `format` riding load-deck → loadDeckData → `loadDeck` → `player.deckFormat` (commandLog/rematch replay it); a second player's differing format is refused `format_mismatch`. (design 051)
+- D187 2026-09-28 [netcode] Prize count comes from an explicit deck `format` riding load-deck → loadDeckData → `loadDeck` → `player.deckFormat` (commandLog/rematch replay it). (design 051)
 - D186 2026-09-28 [deck-builder] B&B set data is baked (me02 + 4 decks, generated module), packs follow the printed slot model with published rates, and every box is `createRng(seed)` — "Box #<seed>", `?seed=` reproduces it. (design 051)
 - D185 2026-09-28 [deck-builder] Build & Battle is a third builder-tab mode at /build-and-battle (same index.ejs, builder role, `ptcgBuildBattle` tab) reusing the deck pane, library and Play seam of D183. (design 051)
 - D184 2026-09-28 [deck-builder] Builder filters go to TCGdex as /cards params (types, stage, hp, regulationMark, legal.*, rarity, suffix…) and are re-applied client-side as the truth; Tera is not offered (TCGdex has no Tera marker). (design 050)

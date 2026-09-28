@@ -1159,3 +1159,19 @@ test('Beastite scales the damage bonus by Prizes taken (F5)', () => {
   assert.equal(bonus(1), 50, 'five Prizes taken');
   assert.equal(bonus(undefined), 0, 'unknown remaining fails closed');
 });
+
+test('Beastite in Build & Battle counts Prizes taken from 4 (I203)', () => {
+  const beastite = tool(
+    'Beastite',
+    'The attacks of the Ultra Beast this card is attached to do 10 more damage to your opponent’s Active Pokémon for each Prize card you have taken (before applying Weakness and Resistance).'
+  );
+  const holder = mkMon({ name: 'Naganadel', subtypes: ['Basic', 'Ultra Beast'] });
+  const defender = mkMon({ name: 'Defender' });
+  const bonus = (prizesRemaining) =>
+    combinedToolAttackBonus(holder, withTool(holder, beastite), defender, {
+      attackerPrizesRemaining: prizesRemaining,
+      attackerDeckFormat: 'build-battle',
+    });
+  assert.equal(bonus(4), 0, 'no Prizes taken yet');
+  assert.equal(bonus(1), 30, 'three Prizes taken');
+});

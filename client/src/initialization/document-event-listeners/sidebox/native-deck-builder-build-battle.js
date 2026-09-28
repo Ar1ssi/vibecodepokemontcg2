@@ -14,6 +14,7 @@ import {
   canAddFromPool,
   clearSession,
   createSession,
+  deckCardCounts,
   loadSession,
   parseSeed,
   randomSeed,
@@ -23,6 +24,7 @@ import {
 import {
   boxHeadline,
   buildBattleDeckName,
+  deckFromCardCounts,
   deckFromRows,
   poolRefusalMessage,
   poolRemaining,
@@ -40,6 +42,9 @@ import { resolveDefaultCardBackSrc } from '../../../setup/deck-constructor/defau
 const BOX = BUILD_BATTLE_BOXES[0];
 const REVEAL_STAGGER_MS = 60;
 const MEMORY_ONLY_TEXT = 'Your box will not survive a reload';
+const UNSAVED_DECK_TEXT =
+  'My Decks is full, so this deck is kept with your box in this browser only. ' +
+  'Delete a deck in My Decks, then press Save to keep it there.';
 const NEW_BOX_CONFIRM =
   'Discard this pool and open a new box? Your built deck stays in My Decks.';
 const POOL_GROUPS = [
@@ -125,11 +130,19 @@ export const initializeBuildBattle = ({
       : [];
   };
 
+  // Every card an unsaved deck may name: the pool, the box deck's own rows (its Basic Energy is
+  // not a pool entry) and the unlimited Energy.
+  const knownCards = () => [
+    ...pool.map((entry) => entry.card),
+    ...(boxDecks[session.deckKey] || []),
+    ...energyCards,
+  ];
+
   // The box deck goes into My Decks as a Build & Battle record and opens in the editor. At the
-  // deck limit it still opens, unsaved, so the box stays playable.
-  const openBoxDeck = () => {
+  // deck limit it still opens, unsaved, and the session keeps its cards so edits survive a
+  // reload (I207); the Box tab says so until the player saves it.
+  const openBoxDeck = (cards = deckFromRows(boxDecks[session.deckKey] || [])) => {
     const deckEntry = deckEntryOf(session);
-    const cards = deckFromRows(boxDecks[session.deckKey] || []);
     const deckId =
       deckLibrary?.createAndOpenDeck?.(
         getTarget(),
@@ -138,7 +151,26 @@ export const initializeBuildBattle = ({
         { format: DECK_FORMAT_BUILD_BATTLE, sprites: deckEntry.sprites }
       ) || null;
     if (!deckId) showUnsavedDeck(cards);
-    session = { ...session, deckId };
+    session = { ...session, deckId, unsavedDeck: deckId ? null : deckCardCounts(cards) };
+    persist();
+  };
+
+  // Runs after every editor change. While no My Decks record is bound, the edits go into the
+  // session; once the player saves a Build & Battle record, the session binds to it.
+  const trackUnsavedDeck = () => {
+    if (!session || session.deckId) return;
+    const target = getTarget();
+    const activeId = deckLibrary?.getActiveDeckId?.(target) || null;
+    if (activeId && deckLibrary?.getActiveDeckFormat?.(target) === DECK_FORMAT_BUILD_BATTLE) {
+      session = { ...session, deckId: activeId, unsavedDeck: null };
+      persist();
+      renderBox();
+      return;
+    }
+    if (activeId) return; // another My Decks deck is open: leave the box's own deck alone
+    const unsavedDeck = deckCardCounts(getDeck());
+    if (JSON.stringify(unsavedDeck) === JSON.stringify(session.unsavedDeck)) return;
+    session = { ...session, unsavedDeck };
     persist();
   };
 
@@ -147,8 +179,12 @@ export const initializeBuildBattle = ({
     if (!session) return;
     computePool();
     const reopened = session.deckId && deckLibrary?.openDeckById?.(getTarget(), session.deckId);
-    // The bound deck was deleted from My Decks: build it again from the box.
-    if (!reopened) openBoxDeck();
+    if (reopened) return;
+    // Unsaved at the deck limit: reopen the player's edits. A bound deck deleted from My Decks
+    // is built again from the box.
+    openBoxDeck(
+      session.unsavedDeck ? deckFromCardCounts(session.unsavedDeck, knownCards()) : undefined
+    );
   };
 
   const openNewBox = (seedText) => {
@@ -184,8 +220,8 @@ export const initializeBuildBattle = ({
 
   // ── Box tab ─────────────────────────────────────────────────────────────
   const renderBanner = (parent) => {
-    if (!memoryOnly) return;
-    parent.append(el('p', 'bb-banner', MEMORY_ONLY_TEXT));
+    if (memoryOnly) parent.append(el('p', 'bb-banner', MEMORY_ONLY_TEXT));
+    if (session && !session.deckId) parent.append(el('p', 'bb-banner', UNSAVED_DECK_TEXT));
   };
 
   const renderSealedBox = () => {
@@ -432,6 +468,9 @@ export const initializeBuildBattle = ({
 
   return {
     poolErrors: (deck) => (session ? validatePoolDeck(deck, pool) : []),
-    refresh: refreshPoolCounts,
+    refresh: () => {
+      trackUnsavedDeck();
+      refreshPoolCounts();
+    },
   };
 };

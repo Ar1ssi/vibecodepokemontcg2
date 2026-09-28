@@ -4,6 +4,8 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { hasDeckLoaded } from '../../setup/general/has-deck-loaded.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
+import { deckFormatsMatch, formatMismatchMessage } from '/shared/engine/formats.mjs';
+import { deckFormatOf } from '../../setup/deck-constructor/deck-format-args.mjs';
 import { setup, setupPrizes } from './setup.js';
 
 const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
@@ -62,6 +64,29 @@ export const clearReady = (user) => {
   }
 };
 
+// Design 051 / I202: both decks deal under one format, checked here at the deal rather than
+// at deck load (a deck restored on room join must stay replaceable). Mirrors the server's
+// GameRoom.refuseDealOnFormatMismatch: both Set Ups clear, so the players load a matching
+// deck and press Set Up again.
+const refuseDealOnFormatMismatch = () => {
+  const self = deckFormatOf(systemState, 'self');
+  const opp = deckFormatOf(systemState, 'opp');
+  if (deckFormatsMatch(self, opp)) return false;
+  systemState.selfReady = false;
+  systemState.oppReady = false;
+  appendMessage(
+    '',
+    formatMismatchMessage([
+      { username: determineUsername('self'), format: self },
+      { username: determineUsername('opp'), format: opp },
+    ]),
+    'announcement',
+    false
+  );
+  updateReadyButtons();
+  return true;
+};
+
 // Called when a player presses their Set Up button. Rather than drawing a
 // hand and setting prizes immediately, this marks that player as "ready".
 // Once both players have pressed their Set Up button, prizes are placed
@@ -98,6 +123,7 @@ export const readyUp = async (user, emit = true) => {
   }
 
   if (systemState.selfReady && systemState.oppReady) {
+    if (refuseDealOnFormatMismatch()) return;
     if (systemState.syncReplaying) {
       updateReadyButtons();
       return;

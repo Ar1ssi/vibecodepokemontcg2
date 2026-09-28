@@ -6,9 +6,11 @@ import {
   DECK_FORMAT_TCG,
   DECK_FORMAT_VALUES,
   OPENING_HAND_SIZE,
+  deckFormatsMatch,
   formatMismatchMessage,
   isDeckFormat,
   prizeCountForFormat,
+  prizesTakenFor,
 } from '../formats.mjs';
 
 test('the two deck formats are the only known values', () => {
@@ -28,17 +30,30 @@ test('Build & Battle deals 4 Prizes, Standard 6, anything unknown 6 (pokemon.com
   assert.equal(OPENING_HAND_SIZE, 7);
 });
 
-test('the format mismatch chat line names the player and their deck format', () => {
+test('the deal-time mismatch chat line names each player and their deck format (I202)', () => {
   assert.equal(
-    formatMismatchMessage('Ash', 'build-battle'),
-    "Ash's deck is Build & Battle (40 cards, 4 Prizes); both players must use the same format"
+    formatMismatchMessage([
+      { username: 'Ash', format: 'build-battle' },
+      { username: 'Gary', format: 'pocket' },
+    ]),
+    'Deck formats differ (Ash: Build & Battle (40 cards, 4 Prizes); Gary: Standard (60 cards, 6 Prizes)). ' +
+      'Both players must use the same format — load a matching deck and press Set Up again.'
   );
-  assert.equal(
-    formatMismatchMessage('Gary', 'tcg'),
-    "Gary's deck is Standard (60 cards, 6 Prizes); both players must use the same format"
-  );
-  assert.equal(
-    formatMismatchMessage('Gary', 'pocket'),
-    "Gary's deck is Standard (60 cards, 6 Prizes); both players must use the same format"
-  );
+});
+
+test('formats match after unknown values read as Standard', () => {
+  assert.equal(deckFormatsMatch('tcg', 'tcg'), true);
+  assert.equal(deckFormatsMatch('tcg', undefined), true);
+  assert.equal(deckFormatsMatch('pocket', 'tcg'), true);
+  assert.equal(deckFormatsMatch('build-battle', 'build-battle'), true);
+  assert.equal(deckFormatsMatch('build-battle', 'tcg'), false);
+  assert.equal(deckFormatsMatch(undefined, 'build-battle'), false);
+});
+
+test('Prizes taken count down from the format\'s starting Prizes (I203)', () => {
+  assert.equal(prizesTakenFor(4, 'build-battle'), 0);
+  assert.equal(prizesTakenFor(1, 'build-battle'), 3);
+  assert.equal(prizesTakenFor(4, 'tcg'), 2);
+  assert.equal(prizesTakenFor(6, undefined), 0);
+  assert.equal(prizesTakenFor(7, 'tcg'), 0);
 });

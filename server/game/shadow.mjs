@@ -11,7 +11,12 @@ import { fileURLToPath } from 'url';
 import { hashState, PLAYER_ZONES } from '../../shared/engine/state.mjs';
 import { createCard, isEnergy, mintInstanceId } from '../../shared/engine/cards.mjs';
 import { createRelayedRng } from '../../shared/engine/rng.mjs';
-import { DECK_FORMAT_TCG, isDeckFormat } from '../../shared/engine/formats.mjs';
+import {
+  DECK_FORMAT_TCG,
+  OPENING_HAND_SIZE,
+  isDeckFormat,
+  prizeCountForFormat,
+} from '../../shared/engine/formats.mjs';
 import { GameRoom } from './room.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -144,6 +149,7 @@ export function translateLegacyAction(
       const deckData = extractDeckData(action, parameters);
       if (deckData) {
         initializePlayerDeck(state, playerId, deckData);
+        player.deckFormat = extractDeckFormat(action, parameters);
       }
       return { handled: true };
     }
@@ -169,13 +175,12 @@ export function translateLegacyAction(
           rng?.shuffle || ((arr) => indices.map((i) => arr[i]).filter(Boolean))
         )(player.zones.deck);
       }
-      // Draw starting hand: 7 cards to hand
-      const handCount = Math.min(7, player.zones.deck.length);
+      const handCount = Math.min(OPENING_HAND_SIZE, player.zones.deck.length);
       const handCards = player.zones.deck.splice(0, handCount);
       player.zones.hand.push(...handCards);
 
-      // Deal opening prizes: 6 cards to prizes
-      const prizeCount = Math.min(6, player.zones.deck.length);
+      // The format's Prizes: Standard 6, Build & Battle 4 (design 051 / I203).
+      const prizeCount = Math.min(prizeCountForFormat(player.deckFormat), player.zones.deck.length);
       const prizeCards = player.zones.deck.splice(0, prizeCount);
       player.zones.prizes.push(...prizeCards);
 
@@ -191,14 +196,14 @@ export function translateLegacyAction(
           rng?.shuffle || ((arr) => indices.map((i) => arr[i]).filter(Boolean))
         )(player.zones.deck);
       }
-      const prizeCount = Math.min(6, player.zones.deck.length);
+      const prizeCount = Math.min(prizeCountForFormat(player.deckFormat), player.zones.deck.length);
       const prizeCards = player.zones.deck.splice(0, prizeCount);
       player.zones.prizes.push(...prizeCards);
       return { handled: true };
     }
 
     case 'drawOpeningHand': {
-      const handCount = Math.min(7, player.zones.deck.length);
+      const handCount = Math.min(OPENING_HAND_SIZE, player.zones.deck.length);
       const handCards = player.zones.deck.splice(0, handCount);
       player.zones.hand.push(...handCards);
       return { handled: true };

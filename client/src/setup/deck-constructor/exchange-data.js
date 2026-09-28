@@ -35,7 +35,7 @@ export const exchangeData = (
     systemState.p2OppUsername = username;
     systemState.p2OppDeckData = deckData;
     systemState.p2OppCardBackSrc = cardBack;
-    systemState.deckFormat.opp = deckFormat;
+    systemState.deckFormat.p2Opp = deckFormat;
     if (matId) changePlaymat('opp', matId, false);
     if (coachingModeCheckbox.checked && coachingMode) {
       systemState.coachingMode = true;

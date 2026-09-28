@@ -146,6 +146,18 @@ test('translateLegacyAction: setupPrizes and drawOpeningHand split setup steps a
   assert.equal(state.players.p1.zones.deck.length, 7);
 });
 
+test('translateLegacyAction: a Build & Battle loadDeckData deals 4 Prizes on setup and setupPrizes (I203)', () => {
+  for (const action of ['setup', 'setupPrizes']) {
+    const state = createGameState({ gameId: 'g1', players: { p1: { username: 'Alice' } } });
+    translateLegacyAction('loadDeckData', [fixtureDeck('P1'), 'build-battle'], 'p1', state);
+    assert.equal(state.players.p1.deckFormat, 'build-battle');
+
+    translateLegacyAction(action, [null], 'p1', state, createRelayedRng());
+
+    assert.equal(state.players.p1.zones.prizes.length, 4, action);
+  }
+});
+
 test('translateLegacyAction: moveCardBundle translates to moveCard command', () => {
   const state = createGameState({
     gameId: 'g1',

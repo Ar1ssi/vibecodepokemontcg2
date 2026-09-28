@@ -13,7 +13,10 @@ const MAX_ID_LENGTH = 128;
 
 /**
  * @typedef {{version: 1, boxKey: string, seed: number, deckKey: string, packs: string[][],
- *   openedPacks: number, deckId: string|null, createdAt: number}} Session
+ *   openedPacks: number, deckId: string|null, unsavedDeck: [string, number][]|null,
+ *   createdAt: number}} Session
+ * `unsavedDeck` holds the editor deck as [cardId, count] pairs while no My Decks record is bound
+ * (the library was full), so a reload rebuilds the player's edits instead of the box deck (I207).
  */
 
 /** @returns {Session} a freshly opened box: no pack revealed yet, no library deck bound. */
@@ -32,8 +35,47 @@ export function createSession({
     packs: packs.map((pack) => [...pack]),
     openedPacks: 0,
     deckId: null,
+    unsavedDeck: null,
     createdAt: now,
   };
+}
+
+const MAX_UNSAVED_ENTRIES = 80;
+const MAX_COPIES = 60;
+
+/** @returns {[string, number][]|null} the stored pairs, or null when absent or untrustworthy. */
+function parseUnsavedDeck(value) {
+  if (!Array.isArray(value) || value.length > MAX_UNSAVED_ENTRIES) return null;
+  const valid = value.every(
+    (entry) =>
+      Array.isArray(entry) &&
+      entry.length === 2 &&
+      typeof entry[0] === 'string' &&
+      entry[0].length > 0 &&
+      entry[0].length <= MAX_ID_LENGTH &&
+      Number.isInteger(entry[1]) &&
+      entry[1] > 0 &&
+      entry[1] <= MAX_COPIES
+  );
+  return valid ? value.map(([id, count]) => [id, count]) : null;
+}
+
+/**
+ * The editor deck as [cardId, count] pairs, merged by id; cards without an id are skipped.
+ * @param {object} deck `{ [name]: { cards: [{ data, count }] } }`
+ * @returns {[string, number][]}
+ */
+export function deckCardCounts(deck = {}) {
+  const counts = new Map();
+  for (const group of Object.values(deck || {})) {
+    for (const entry of group?.cards || []) {
+      const id = entry?.data?.id;
+      const count = Number(entry?.count) || 0;
+      if (!id || count <= 0) continue;
+      counts.set(id, (counts.get(id) || 0) + count);
+    }
+  }
+  return [...counts.entries()];
 }
 
 const isSeed = (value) =>
@@ -89,6 +131,7 @@ export function parseSession(json) {
     packs: value.packs.map((pack) => [...pack]),
     openedPacks,
     deckId: value.deckId,
+    unsavedDeck: value.deckId === null ? parseUnsavedDeck(value.unsavedDeck) : null,
     createdAt: value.createdAt,
   };
 }

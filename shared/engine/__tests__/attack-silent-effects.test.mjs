@@ -768,6 +768,17 @@ test('Dusknoir Hard Feelings (Diamond & Pearl 2): 5 counters plus 1 per Prize th
   assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 70);
 });
 
+test('Dusknoir Hard Feelings in Build & Battle counts from 4 Prizes, not 6 (I203)', () => {
+  const text =
+    'Put 5 damage counters on the Defending Pokémon. Then, count the number of Prize cards your opponent has taken and put that many damage counters on the Defending Pokémon.';
+  const setup = (s) => {
+    s.players.p2.deckFormat = 'build-battle';
+    s.players.p2.zones.prizes.splice(0, 2); // 4 left: none taken yet
+  };
+  const { state, defender } = board('Dusknoir', text, { damage: '', setup });
+  assert.equal(root(attack(state).state, 'p2', defender.instanceId).damage, 50);
+});
+
 // ── hand disruption ───────────────────────────────────────────────────────────
 
 const chooseAs = (res, selection) =>

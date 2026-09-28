@@ -1,5 +1,5 @@
 # 051: Build & Battle game mode (Phantasmal Flames box)
-Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–5 done; review findings I202–I207 open (I202 blocks real 2-player use)
+Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–5 done; review findings I202–I207 fixed (see Deviations, Review fixes)
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -331,8 +331,8 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 | 16 | engine: 40-card deck, format build-battle | setup deals 7 hand + 4 prizes, 29 left in deck; win at 4 prizes taken | [x] `setup.test.mjs` "a Build & Battle deck of 40…"; `reduce.test.mjs` "…takes the 4th Prize wins" |
 | 17 | engine: 60-card deck, format tcg (regression) | 7 + 6, unchanged events | [x] `setup.test.mjs` "a Standard deck still deals 6 Prizes…" |
 | 18 | engine: deck of 3 cards, build-battle | prizes = 3 (min), as today with 6 | [x] `setup.test.mjs` "a 3-card Build & Battle deck…" (see Deviations: hand is dealt first) |
-| 19 | second player loads a differing format | `format_mismatch`, no state change, first deck intact, chat line both sides, no deal | [x] `room.test.mjs` "a second deck in a different format is refused…"; text: `formats.test.mjs` (room emit: by hand, slice 4 e2e) |
-| 20 | mismatch then the second player reloads a matching deck | accepted; deal proceeds when both ready | [x] `room.test.mjs` "after a mismatch the matching reload…" |
+| 19 | both players pressed Set Up with differing formats (I202: checked at the deal) | `setup` refused `format_mismatch`, nothing dealt, both Set Ups cleared, chat line both sides | [x] `room.test.mjs` "decks in different formats are refused at the deal…", "refuseDealOnFormatMismatch…"; text: `formats.test.mjs` |
+| 20 | restored Standard decks, then both play B&B decks; or a matching reload after a mismatch | every load accepted; deal proceeds when both press Set Up | [x] `room.test.mjs` "both restored Standard decks can be replaced…", "refuseDealOnFormatMismatch…" |
 | 21 | rematch (`resetGame`) after a B&B game | replayed `loadDeck` carries the format; 4 prizes again | [x] `room.test.mjs` "a rematch after a Build & Battle game…" |
 | 22 | undo replay through `commandLog` | `loadDeck` payload includes `format`; replay yields 4 prizes | [x] `room.test.mjs` "undo: replaying the command log…" |
 | 23 | legacy (rules off) deal with format build-battle | `setupDealPlan` → 4 prizes | [x] `setup-deal.test.mjs` |
@@ -431,6 +431,12 @@ persisted artifacts are `ptcg-sim.build-battle.v1` (ignored by older code) and l
   `.build-battle-window .db-live` (the body class and the workspace class sit on different elements).
 - Slice 4 e2e (headless Chromium, socket.io routed to the local client): seed 42 → Flygon deck, 40/40
   legal; two players Standard vs B&B → mismatch line on both sides, no deal; B&B vs B&B → 4 Prizes each.
+- Review fixes (I202–I207, D190): the format check moved from `loadDeck` to the deal — `reduce.mjs case
+  'setup'` refuses via `setup.mjs deckFormatMismatch`, `GameRoom.isReadyToDeal`/`refuseDealOnFormatMismatch`
+  clear both Set Ups, and `ready.js` does the same on each client with `formatMismatchMessage(players)`.
+  Prizes taken read each player's format (`formats.mjs prizesTakenFor`); the client keeps
+  `deckFormat.{self,p1Opp,p2Opp}`; Save records `deckLoadFormat`; an unsaved box deck lives in
+  `session.unsavedDeck` ([cardId, count]) with a Box-tab warning until saved.
 
 ---
 Self-approval checklist (only when the user is unreachable):

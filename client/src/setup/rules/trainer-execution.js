@@ -6,6 +6,9 @@ import { moveCardBundle } from '../../actions/move-card-bundle/move-card-bundle.
 import { addDamageCounter, updateDamageCounter } from '../../actions/counters/damage-counter.js';
 import { applyStatus, clearStatuses } from '/shared/engine/rules/status.mjs';
 import { rulesState, ensureCardData, getStadium } from '/shared/engine/rules/rules-state.mjs';
+import { prizeCountForFormat } from '/shared/engine/formats.mjs';
+import { systemState } from '../../state.js';
+import { deckFormatOf } from '../deck-constructor/deck-format-args.mjs';
 import { normalizeStage, isRareCandyJump, canEvolve } from '/shared/engine/rules/evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from '/shared/engine/rules/energy-effects.mjs';
 import { filterSearchMatches, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
@@ -128,10 +131,12 @@ function getRemainingPrizes(who) {
   const pZone = getZoneSafe(who, 'prizes');
   const count = pZone?.getCount ? pZone.getCount() : 0;
   if (count > 0) return count;
+  // The player's format sets the starting Prizes: Standard 6, Build & Battle 4 (I203).
+  const prizeTotal = prizeCountForFormat(deckFormatOf(systemState, who));
   if (_prizeState?.[who]?.taken != null) {
-    return Math.max(0, 6 - (_prizeState[who].taken || 0));
+    return Math.max(0, prizeTotal - (_prizeState[who].taken || 0));
   }
-  return 6;
+  return prizeTotal;
 }
 
 function applyStatusToCard(player, card, conditions = []) {
@@ -693,7 +698,8 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
             message: null,
           });
           let drawCount = step.count;
-          const prizesRemaining = Math.max(0, 6 - (_prizeState?.self?.taken || 0));
+          // Printed "exactly 6 Prize cards remaining": a 4-Prize Build & Battle game never qualifies.
+          const prizesRemaining = getRemainingPrizes(_effectOwner);
           if (step.bonusCount && step.bonusWhen === 'prizesRemaining==6' && prizesRemaining === 6) {
             drawCount = step.bonusCount;
           }

@@ -24,11 +24,11 @@ import {
   detectDeckFormat,
   validateDeck,
 } from '../../../setup/deck-builder/core/deck-validation.mjs';
-import { withPoolErrors } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
 import {
-  DECK_FORMAT_BUILD_BATTLE,
-  DECK_FORMAT_TCG,
-} from '../../../../../shared/engine/formats.mjs';
+  deckLoadFormat,
+  withPoolErrors,
+} from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
+import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
 import { initializeBuildBattle } from './native-deck-builder-build-battle.js';
 import { systemState } from '../../../state.js';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
@@ -844,12 +844,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       : deckLibrary?.getActiveDeckFormat?.(currentLoadTarget) || null;
   // What the game is told: the saved record's own format wins, so a Standard deck
   // opened from My Decks in the Build & Battle tab still plays with 6 Prizes.
-  const loadFormat = () => {
-    const recorded = deckLibrary?.getActiveDeckFormat?.(currentLoadTarget);
-    if (recorded) return recorded;
-    const isUnsaved = !deckLibrary?.getActiveDeckId?.(currentLoadTarget);
-    return isBuildBattle && isUnsaved ? DECK_FORMAT_BUILD_BATTLE : DECK_FORMAT_TCG;
-  };
+  const loadFormat = () =>
+    deckLoadFormat({
+      isBuildBattle,
+      recordedFormat: deckLibrary?.getActiveDeckFormat?.(currentLoadTarget),
+      isUnsaved: !deckLibrary?.getActiveDeckId?.(currentLoadTarget),
+    });
 
   const flashDeckStatus = () => {
     if (!deckStatus) return;
@@ -1527,6 +1527,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       wallpaperId:
         chosen.wallpaperId ?? deckLibrary?.getActiveWallpaper?.(currentLoadTarget) ?? null,
       sprites: currentDeckSprites(),
+      // I205: a deck first saved from the Build & Battle tab is a 4-Prize record; a saved
+      // record keeps its own format.
+      format: loadFormat(),
     });
     if (!result?.saved) return;
     warmDeckCardCache(deck, fetchCardDetail);

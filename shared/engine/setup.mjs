@@ -6,7 +6,12 @@
 
 import { isBasicPokemon } from './cards.mjs';
 import { createRng } from './rng.mjs';
-import { OPENING_HAND_SIZE, prizeCountForFormat } from './formats.mjs';
+import {
+  OPENING_HAND_SIZE,
+  deckFormatsMatch,
+  normalizeDeckFormat,
+  prizeCountForFormat,
+} from './formats.mjs';
 
 /**
  * Checks if an array of cards contains at least one Basic Pokémon.
@@ -42,6 +47,23 @@ export function mulliganBonusDraws(
     }
   }
   return owed;
+}
+
+/**
+ * Design 051 / I202: the decks about to be dealt when their formats differ, else null.
+ * Only players with a loaded deck count, so a seat still choosing a deck never blocks.
+ * @returns {{ playerId: string, username: string, format: string }[] | null}
+ */
+export function deckFormatMismatch(state) {
+  const decks = Object.values(state?.players || {})
+    .filter((player) => player?.zones?.deck?.length > 0)
+    .map((player) => ({
+      playerId: player.playerId,
+      username: player.username || player.playerId,
+      format: normalizeDeckFormat(player.deckFormat),
+    }));
+  const differs = decks.some((deck) => !deckFormatsMatch(deck.format, decks[0].format));
+  return differs ? decks : null;
 }
 
 /**

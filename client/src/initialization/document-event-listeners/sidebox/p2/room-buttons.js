@@ -177,7 +177,7 @@ export const initializeRoomButtons = () => {
       if (systemState.p1OppDeckData) {
         processAction('opp', true, 'loadDeckData', [
           systemState.p1OppDeckData,
-          systemState.deckFormat.opp,
+          systemState.deckFormat.p1Opp,
         ]);
       }
     }

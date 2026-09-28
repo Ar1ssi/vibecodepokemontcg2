@@ -1,6 +1,11 @@
 // What the Build & Battle tab shows, derived from the session and the editor deck (design 051
 // § Builder-tab controller). Pure: the DOM glue in native-deck-builder-build-battle.js renders it.
 
+import {
+  DECK_FORMAT_BUILD_BATTLE,
+  DECK_FORMAT_TCG,
+} from '../../../../../../shared/engine/formats.mjs';
+
 /** @returns {object} the editor's `{ [name]: { cards: [{ data, count }], totalCount } }` map for box deck rows. */
 export function deckFromRows(rows = []) {
   const deck = {};
@@ -14,6 +19,33 @@ export function deckFromRows(rows = []) {
     deck[row.name] = group;
   }
   return deck;
+}
+
+/**
+ * Rebuilds an editor deck from [cardId, count] pairs (I207). Ids missing from `cards` are
+ * dropped, so a stored deck can never add a card the box did not hold.
+ * @param {[string, number][]} counts
+ * @param {object[]} cards every card the pair ids may name (pool, box deck, unlimited Energy)
+ */
+export function deckFromCardCounts(counts = [], cards = []) {
+  const byId = new Map(cards.filter((card) => card?.id).map((card) => [card.id, card]));
+  const rows = [];
+  for (const [id, qty] of counts) {
+    const card = byId.get(id);
+    if (card) rows.push({ ...card, qty });
+  }
+  return deckFromRows(rows);
+}
+
+/**
+ * The format a deck is played and first saved with: a saved record's own format wins, so a
+ * Standard deck opened from My Decks in the Build & Battle tab keeps 6 Prizes; only an unsaved
+ * deck in the Build & Battle tab is Build & Battle (I205: its first Save records that).
+ * @returns {'tcg'|'build-battle'}
+ */
+export function deckLoadFormat({ isBuildBattle = false, recordedFormat = null, isUnsaved = true } = {}) {
+  if (recordedFormat === DECK_FORMAT_BUILD_BATTLE) return DECK_FORMAT_BUILD_BATTLE;
+  return isBuildBattle && isUnsaved ? DECK_FORMAT_BUILD_BATTLE : DECK_FORMAT_TCG;
 }
 
 /** @returns {string} the library name of the deck built from one box. */

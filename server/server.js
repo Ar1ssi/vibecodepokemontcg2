@@ -12,7 +12,6 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
 import { ShadowSession, extractDeckData, extractDeckFormat } from './game/shadow.mjs';
-import { formatMismatchMessage } from '../shared/engine/formats.mjs';
 import {
   findFirstDivergentZone,
   hashOwnerViewZones,
@@ -492,6 +491,9 @@ async function main() {
    * late deck load or a duplicate readyUp cannot re-roll the caller or re-deal.
    */
   const dealOpeningHandsIfReady = (gameRoom, roomId) => {
+    // Design 051 / I202: formats are checked at the deal, not at deck load. Both Set Ups are
+    // cleared; each client prints the mismatch line from its own ready check (ready.js).
+    if (gameRoom.refuseDealOnFormatMismatch()) return;
     const opened = gameRoom.beginTurnOrderCall();
     if (!opened) return;
 
@@ -954,16 +956,6 @@ async function main() {
                   type: 'loadDeck',
                   payload: { deckData, format },
                 });
-                if (result.error === 'format_mismatch') {
-                  const username = gameRoom.state.players[playerId]?.username || playerId;
-                  io.to(roomId).emit('appendMessage', {
-                    roomId,
-                    user: '',
-                    message: formatMismatchMessage(username, format),
-                    type: 'announcement',
-                    emit: false,
-                  });
-                }
 
                 if (result.success) {
                   // Server is the sole minter of instanceId (design 002 §3.1 / D10).

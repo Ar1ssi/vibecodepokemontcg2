@@ -28,6 +28,7 @@ import {
 } from './card-classify.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { isSpecialEnergyCard } from './special-energy-parse.mjs';
+import { prizesTakenFor } from '../formats.mjs';
 import {
   holderView,
   parseToolCondition,
@@ -329,7 +330,7 @@ function bonusForTool(
   // attacker's remaining Prizes; unknown remaining fails to 0 (audit S&M F5).
   if (parsedBonus.perPrizeTaken) {
     const remaining = ctx?.flags?.prizesRemaining;
-    const taken = Number.isFinite(remaining) ? Math.max(0, 6 - remaining) : 0;
+    const taken = Number.isFinite(remaining) ? prizesTakenFor(remaining, ctx?.flags?.deckFormat) : 0;
     bonus *= taken;
   }
   return bonus;
@@ -418,6 +419,7 @@ export function combinedToolAttackBonus(
     defenderPoisoned = false,
     attackerTrailingPrizes = false,
     attackerPrizesRemaining,
+    attackerDeckFormat,
     stadium = null,
   } = {}
 ) {
@@ -433,6 +435,7 @@ export function combinedToolAttackBonus(
       defenderPoisoned,
       trailingPrizes: attackerTrailingPrizes,
       prizesRemaining: attackerPrizesRemaining,
+      deckFormat: attackerDeckFormat,
     },
   };
   for (const tool of attachedTools(attacker, zoneCards)) {

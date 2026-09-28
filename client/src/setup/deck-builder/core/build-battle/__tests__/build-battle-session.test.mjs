@@ -13,6 +13,7 @@ import {
   canAddFromPool,
   clearSession,
   createSession,
+  deckCardCounts,
   loadSession,
   parseSeed,
   parseSession,
@@ -60,6 +61,7 @@ test('createSession starts sealed-deck state: nothing revealed, no library deck'
     packs: opened.packs,
     openedPacks: 0,
     deckId: null,
+    unsavedDeck: null,
     createdAt: 1000,
   });
 });
@@ -112,6 +114,41 @@ test('parseSession refuses anything it cannot trust', () => {
     JSON.stringify({ ...good, deckKey: 'charizard' })
   );
   assert.equal(loadSession(storage), null);
+});
+
+test('an unbound session keeps the edited deck across a reload (I207)', () => {
+  const storage = memoryStorage();
+  const session = { ...freshSession(), unsavedDeck: [['me02-001', 2], ['sve-002', 10]] };
+  saveSession(storage, session);
+  assert.deepEqual(loadSession(storage).unsavedDeck, [['me02-001', 2], ['sve-002', 10]]);
+  // A bound session reads its deck from My Decks, never from the session.
+  saveSession(storage, { ...session, deckId: 'abc12345' });
+  assert.equal(loadSession(storage).unsavedDeck, null);
+});
+
+test('parseSession drops an untrustworthy unsaved deck but keeps the box (I207)', () => {
+  const good = freshSession();
+  const unsaved = (value) => parseSession(JSON.stringify({ ...good, unsavedDeck: value })).unsavedDeck;
+  assert.equal(unsaved(undefined), null);
+  assert.equal(unsaved('me02-001'), null);
+  assert.equal(unsaved([['me02-001', 0]]), null);
+  assert.equal(unsaved([['me02-001', 61]]), null);
+  assert.equal(unsaved([['me02-001', 1.5]]), null);
+  assert.equal(unsaved([[7, 1]]), null);
+  assert.equal(unsaved([['x'.repeat(129), 1]]), null);
+  assert.equal(unsaved(Array.from({ length: 81 }, (_, i) => [`id-${i}`, 1])), null);
+  assert.equal(parseSession(JSON.stringify({ ...good, unsavedDeck: 'bad' })).seed, 42);
+});
+
+test('deckCardCounts merges the editor deck into [cardId, count] pairs', () => {
+  const deck = {
+    Pikachu: { cards: [{ data: { id: 'a-1', name: 'Pikachu' }, count: 2 }, { data: { id: 'b-1' }, count: 1 }], totalCount: 3 },
+    'Fire Energy': { cards: [{ data: { id: 'e-2' }, count: 8 }, { data: { id: 'e-2' }, count: 2 }], totalCount: 10 },
+    Nameless: { cards: [{ data: {}, count: 1 }], totalCount: 1 },
+  };
+  assert.deepEqual(deckCardCounts(deck), [['a-1', 2], ['b-1', 1], ['e-2', 10]]);
+  assert.deepEqual(deckCardCounts({}), []);
+  assert.deepEqual(deckCardCounts(null), []);
 });
 
 test('parseSeed takes only integers 0..2^31-1', () => {

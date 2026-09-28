@@ -10,7 +10,7 @@ import { processAction } from '../general/process-action.js';
 import { resolveDefaultCardBackSrc } from './default-card-back.mjs';
 import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../shared/engine/formats.mjs';
-import { resolveFormatAndEmit } from './deck-format-args.mjs';
+import { deckFormatSlot, resolveFormatAndEmit } from './deck-format-args.mjs';
 
 // Decks are built and loaded in the deck builder's own tab (design 050); this
 // module keeps the board-side loaders it calls and the Deck tab's card back.
@@ -20,7 +20,7 @@ const mainImportHeaderButton = document.getElementById('mainImportHeaderButton')
 // Wire parameters are [deckData, format]; see deck-format-args.mjs for the argument order.
 export const loadDeckData = (user, deckData, format, emitArg) => {
   const { format: deckFormat, emit } = resolveFormatAndEmit(format, emitArg);
-  systemState.deckFormat[user] = deckFormat;
+  systemState.deckFormat[deckFormatSlot(user, systemState.isTwoPlayer)] = deckFormat;
   if (user === 'self') {
     systemState.selfDeckData = deckData;
   } else if (systemState.isTwoPlayer) {

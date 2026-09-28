@@ -1,6 +1,7 @@
 import { reset } from '../../../../actions/general/reset.js';
 import { restartGame } from '../../../../actions/general/restart.js';
 import { readyUp, updateReadyButtons } from '../../../../actions/general/ready.js';
+import { deckFormatOf } from '../../../../setup/deck-constructor/deck-format-args.mjs';
 import {
   socket,
   systemState,
@@ -425,7 +426,7 @@ export const initializeP1BottomButtons = () => {
         systemState.isTwoPlayer
           ? systemState.p2OppDeckData
           : systemState.p1OppDeckData,
-        systemState.deckFormat.opp,
+        deckFormatOf(systemState, 'opp'),
       ],
     };
     const versionData = { version: version };

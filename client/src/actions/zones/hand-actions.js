@@ -7,11 +7,12 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { moveCard } from '../move-card-bundle/move-card.js';
 import { shuffleZone } from './shuffle-zone.js';
 import { setupDealPlan } from '../general/setup-deal.mjs';
+import { deckFormatOf } from '../../setup/deck-constructor/deck-format-args.mjs';
 import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-dispatch.js';
 
 const dealMoveOpts = () => (systemState.syncReplaying ? { syncReplay: true } : {});
 const dealPlanFor = (user) =>
-  setupDealPlan(getZone(user, 'deck').getCount(), { format: systemState.deckFormat?.[user] });
+  setupDealPlan(getZone(user, 'deck').getCount(), { format: deckFormatOf(systemState, user) });
 
 // Place prize cards from the top of the deck (rules-mode step 1).
 export const setOpeningPrizes = async (user, initiator) => {

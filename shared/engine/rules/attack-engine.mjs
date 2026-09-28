@@ -62,6 +62,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defenderTrailingPrizes = false,
     attackerPrizesRemaining,
     defenderPrizesRemaining,
+    attackerDeckFormat,
+    defenderDeckFormat,
     defenderPoisoned = false,
     baseDamage = null,
     blockTools = false,
@@ -119,6 +121,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defenderPoisoned,
     attackerTrailingPrizes,
     attackerPrizesRemaining,
+    attackerDeckFormat,
     stadium,
   });
 
@@ -131,6 +134,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const turnBonus = turnDamageBonusTotal(turnDamageBonuses, attacker, defender, {
     defenderIsActive,
     defenderPrizesRemaining,
+    defenderDeckFormat,
   });
 
   // Step 2d: Attack markers placed on earlier turns. A next-turn bonus needs damage to add to.

@@ -5,13 +5,15 @@ import { createRng } from '../../../../../../../shared/engine/rng.mjs';
 import { getBuildBattleBox } from '../box-catalog.mjs';
 import { BUILD_BATTLE_DECKS, BUILD_BATTLE_SET_CARDS } from '../build-battle.generated.mjs';
 import { openBox, poolFromBox } from '../pack-opening.mjs';
-import { validatePoolDeck } from '../build-battle-session.mjs';
+import { deckCardCounts, validatePoolDeck } from '../build-battle-session.mjs';
 import { validateDeck } from '../../deck-validation.mjs';
 import { addCard } from '../../deck-state.mjs';
 import {
   boxHeadline,
   buildBattleDeckName,
+  deckFromCardCounts,
   deckFromRows,
+  deckLoadFormat,
   poolRefusalMessage,
   poolRemaining,
   withPoolErrors,
@@ -78,4 +80,23 @@ test('withPoolErrors appends pool errors and makes the deck invalid', () => {
     errors: ['Sandile: 4 in deck, 3 in your pool'],
     totalCards: 40,
   });
+});
+
+test('deckFromCardCounts rebuilds an edited box deck and drops unknown ids (I207)', () => {
+  const boxDeck = deckFromRows(decks.ceruledge);
+  const counts = deckCardCounts(boxDeck);
+  // Basic Energy is not a pool entry; the box deck's own rows name it.
+  const cards = [...pool.map((entry) => entry.card), ...decks.ceruledge];
+  const rebuilt = deckFromCardCounts([...counts, ['not-a-card', 3]], cards);
+  assert.deepEqual(deckCardCounts(rebuilt), counts);
+  assert.equal(validateDeck(rebuilt, 'build-battle').totalCards, 40);
+  assert.deepEqual(deckFromCardCounts([], cards), {});
+});
+
+test('deckLoadFormat: an unsaved Build & Battle tab deck plays and first saves as Build & Battle (I205)', () => {
+  assert.equal(deckLoadFormat({ isBuildBattle: true, recordedFormat: null, isUnsaved: true }), 'build-battle');
+  assert.equal(deckLoadFormat({ isBuildBattle: true, recordedFormat: null, isUnsaved: false }), 'tcg', 'a Standard record keeps 6 Prizes');
+  assert.equal(deckLoadFormat({ isBuildBattle: false, recordedFormat: 'build-battle', isUnsaved: false }), 'build-battle');
+  assert.equal(deckLoadFormat({ isBuildBattle: false, recordedFormat: null, isUnsaved: true }), 'tcg');
+  assert.equal(deckLoadFormat(), 'tcg');
 });
