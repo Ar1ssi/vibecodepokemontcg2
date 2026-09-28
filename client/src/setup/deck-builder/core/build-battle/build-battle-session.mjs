@@ -5,6 +5,7 @@
 import { isBasicEnergy } from '../../../../../../shared/engine/rules/card-classify.mjs';
 import { getBuildBattleBox } from './box-catalog.mjs';
 import { BUILD_BATTLE_SET_CARDS } from './build-battle.generated.mjs';
+import { createUnboxing, finishedUnboxing, parseUnboxing } from './unboxing.mjs';
 
 export const BUILD_BATTLE_STORAGE_KEY = 'ptcg-sim.build-battle.v1';
 const SESSION_VERSION = 1;
@@ -13,13 +14,14 @@ const MAX_ID_LENGTH = 128;
 
 /**
  * @typedef {{version: 1, boxKey: string, seed: number, deckKey: string, packs: string[][],
- *   openedPacks: number, deckId: string|null, unsavedDeck: [string, number][]|null,
- *   createdAt: number}} Session
+ *   unboxing: import('./unboxing.mjs').Unboxing, deckId: string|null,
+ *   unsavedDeck: [string, number][]|null, createdAt: number}} Session
+ * `unboxing` is the scene's progress (design 052); it never changes `packs`.
  * `unsavedDeck` holds the editor deck as [cardId, count] pairs while no My Decks record is bound
  * (the library was full), so a reload rebuilds the player's edits instead of the box deck (I207).
  */
 
-/** @returns {Session} a freshly opened box: no pack revealed yet, no library deck bound. */
+/** @returns {Session} a freshly opened box: still sealed, no library deck bound. */
 export function createSession({
   boxKey,
   seed,
@@ -33,7 +35,7 @@ export function createSession({
     seed,
     deckKey,
     packs: packs.map((pack) => [...pack]),
-    openedPacks: 0,
+    unboxing: createUnboxing(),
     deckId: null,
     unsavedDeck: null,
     createdAt: now,
@@ -115,13 +117,13 @@ export function parseSession(json) {
   if (!box || !box.decks.some((deck) => deck.key === value.deckKey))
     return null;
   if (!isSeed(value.seed) || !arePacksInSet(value.packs, box)) return null;
-  const { openedPacks } = value;
-  if (
-    !Number.isInteger(openedPacks) ||
-    openedPacks < 0 ||
-    openedPacks > box.packCount
-  )
-    return null;
+  // A session saved before the unboxing scene existed (design 051) has no `unboxing`: every
+  // pack was already shown to that player, so it resumes at the end of the scene.
+  const unboxing =
+    value.unboxing === undefined
+      ? finishedUnboxing()
+      : parseUnboxing(value.unboxing);
+  if (!unboxing) return null;
   if (!isDeckId(value.deckId) || !Number.isFinite(value.createdAt)) return null;
   return {
     version: SESSION_VERSION,
@@ -129,7 +131,7 @@ export function parseSession(json) {
     seed: value.seed,
     deckKey: value.deckKey,
     packs: value.packs.map((pack) => [...pack]),
-    openedPacks,
+    unboxing,
     deckId: value.deckId,
     unsavedDeck: value.deckId === null ? parseUnsavedDeck(value.unsavedDeck) : null,
     createdAt: value.createdAt,

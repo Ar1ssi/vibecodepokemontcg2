@@ -45,8 +45,7 @@
 }
 
 .build-battle-window .db-live .bb-primary,
-.build-battle-window .db-live .bb-secondary,
-.build-battle-window .db-live .bb-pack {
+.build-battle-window .db-live .bb-secondary {
   border-radius: var(--db-radius-pill);
   padding: 0.6vh 1.1vw;
   font-size: 1.4vh;
@@ -58,15 +57,13 @@
   color: #1b2127;
   border: 1px solid var(--db-gold-dark);
 }
-.build-battle-window .db-live .bb-secondary,
-.build-battle-window .db-live .bb-pack {
+.build-battle-window .db-live .bb-secondary {
   background: var(--db-raised);
   color: var(--db-text);
   border: 1px solid var(--db-border-strong);
 }
 .build-battle-window .db-live .bb-primary:disabled,
-.build-battle-window .db-live .bb-secondary:disabled,
-.build-battle-window .db-live .bb-pack:disabled {
+.build-battle-window .db-live .bb-secondary:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -115,89 +112,6 @@
 .build-battle-window .db-live .bb-box-actions {
   display: flex;
   gap: 0.5vw;
-}
-
-.build-battle-window .db-live .bb-deck-card {
-  display: flex;
-  align-items: center;
-  gap: 1vw;
-  padding: 1vh 1vw;
-  background: var(--db-panel);
-  border: 1px solid var(--db-border);
-  border-radius: var(--db-radius);
-}
-.build-battle-window .db-live .bb-deck-promo {
-  width: 110px;
-  aspect-ratio: 63 / 88;
-  border-radius: 5px;
-  box-shadow: var(--db-shadow-soft);
-}
-.build-battle-window .db-live .bb-deck-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4vh;
-  font-size: 1.4vh;
-  color: var(--db-text-dim);
-}
-.build-battle-window .db-live .bb-deck-text strong {
-  font-size: 1.8vh;
-  color: var(--db-text);
-}
-
-.build-battle-window .db-live .bb-packs {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2vh;
-}
-.build-battle-window .db-live .bb-pack-row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.6vh;
-}
-.build-battle-window .db-live .bb-pack-cards {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 0.4vw;
-  width: 100%;
-}
-
-/* The flip: back face shows until `.is-open`, then each card turns after its
- * own --bb-delay (60 ms stagger). The card is the host; only the inner turns. */
-.build-battle-window .db-live .bb-pack-card {
-  aspect-ratio: 63 / 88;
-  perspective: 800px;
-}
-.build-battle-window .db-live .bb-pack-card-inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-  transition: transform 420ms ease-out;
-  transition-delay: var(--bb-delay, 0ms);
-}
-.build-battle-window .db-live .bb-pack-card.is-open .bb-pack-card-inner {
-  transform: rotateY(180deg);
-}
-.build-battle-window .db-live .bb-pack-card-back,
-.build-battle-window .db-live .bb-pack-card-front {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 4px;
-  backface-visibility: hidden;
-}
-.build-battle-window .db-live .bb-pack-card-front {
-  transform: rotateY(180deg);
-}
-body.fx-off.build-battle-window .db-live .bb-pack-card-inner {
-  transition: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .build-battle-window .db-live .bb-pack-card-inner {
-    transition: none;
-  }
 }
 
 /* ── Pool ─────────────────────────────────────────────────────────────── */
@@ -269,10 +183,4 @@ body.fx-off.build-battle-window .db-live .bb-pack-card-inner {
 /* Disabled Play says why in its title; make that discoverable. */
 .build-battle-window .db-live .native-deck-builder-play-button:disabled[title]:not([title='']) {
   cursor: help;
-}
-
-@media (max-width: 700px) {
-  .build-battle-window .db-live .bb-pack-cards {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
 }

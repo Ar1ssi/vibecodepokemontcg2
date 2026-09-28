@@ -234,3 +234,39 @@ test('fx-audio: coin chimes wait for each coin to land, one per flip', () => {
   assert.ok(three[2].delay > three[0].delay && three[4].delay > three[2].delay);
   assert.ok(three[0].freq > three[2].freq, 'heads and tails still chime differently');
 });
+
+const UNBOX_EFFECTS = [
+  'unbox-tear',
+  'unbox-lid',
+  'unbox-unwrap',
+  'unbox-flip',
+  'unbox-hit-1',
+  'unbox-hit-2',
+  'unbox-hit-3',
+  'unbox-done',
+];
+
+test('fx-audio: every unboxing beat (design 052) has a playable voice', () => {
+  for (const effect of UNBOX_EFFECTS) {
+    const voices = voicesFor(effect);
+    assert.ok(voices.length > 0, `${effect} has no voice`);
+    for (const voice of voices) {
+      assert.ok(voice.dur > 0 && voice.dur < 2, `${effect}: bad dur ${voice.dur}`);
+      assert.ok(voice.gain > 0 && voice.gain <= MAX_GAIN, `${effect}: bad gain ${voice.gain}`);
+      if (voice.type === 'noise') assert.ok(voice.filter?.type, `${effect}: noise needs a filter`);
+    }
+  }
+});
+
+test('fx-audio: the unboxing hit chime climbs with the tier', () => {
+  const highest = (voices) => Math.max(...voices.map((v) => v.freq || 0));
+  const [one, two, three] = [1, 2, 3].map((tier) => voicesFor(`unbox-hit-${tier}`));
+  assert.deepEqual(one.map((v) => v.freq), [523, 659, 784]);
+  assert.ok(highest(two) > highest(one), 'tier 2 is an octave up');
+  assert.ok(two.length > one.length, 'tier 2 adds a fourth note');
+  assert.ok(three.length >= 2);
+  const swell = three.find((v) => v.wave === 'sawtooth');
+  assert.equal(swell?.freq, 262);
+  assert.equal(swell?.dur, 1.2);
+  assert.equal(swell?.gain, 0.18);
+});

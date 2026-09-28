@@ -27,6 +27,9 @@ client/src/setup/deck-builder/core/build-battle/ — Build & Battle mode (design
   model: openPack/openBox/poolFromBox), build-battle-session.mjs (localStorage `ptcg-sim.build-battle.v1`,
   memory-only on throw; validatePoolDeck/canAddFromPool), build-battle-view.mjs (UI strings/helpers).
   DOM: sidebox/native-deck-builder-build-battle.js (Box + Pool tabs), css/deck-builder-build-battle.css.
+  Unboxing scene (design 052): pure unboxing.mjs (reducer `session.unboxing`, poses, tiers, pack art) +
+  box-textures.mjs; DOM sidebox/native-deck-builder-unboxing.js (CSS 3D box, tray, pack tears, reveal fan),
+  css/deck-builder-unboxing.css, vendored art client/src/assets/build-battle/{box,packs}/.
   Library records carry `format` ('tcg' | 'build-battle'); a load sends the record's own format.
   Standard builder shows a B&B deck with a 40 counter but does not enforce the pool (by design).
   Decklist lines/TCGdex fetch shared with starter decks: scripts/lib/decklist-lines.mjs (throws on name drift).
