@@ -2,14 +2,17 @@ import { createRng } from '../../../../../shared/engine/rng.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
 import {
   BASIC_ENERGY_LABELS,
-  BUILD_BATTLE_BOXES,
+  DEFAULT_BOX_KEY,
   getBuildBattleBox,
 } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
+import { loadBoxData } from '../../../setup/deck-builder/core/build-battle/box-data.mjs';
 import {
-  BUILD_BATTLE_DECKS,
-  BUILD_BATTLE_SET_CARDS,
-} from '../../../setup/deck-builder/core/build-battle/build-battle.generated.mjs';
-import { openBox, poolFromBox } from '../../../setup/deck-builder/core/build-battle/pack-opening.mjs';
+  boxPromoRow,
+  openBox,
+  poolFromBox,
+  startingDeckRows,
+} from '../../../setup/deck-builder/core/build-battle/pack-opening.mjs';
+import { cardClass, resolvePackModel } from '../../../setup/deck-builder/core/build-battle/pack-models.mjs';
 import {
   canAddFromPool,
   clearSession,
@@ -21,8 +24,10 @@ import {
   saveSession,
   sessionBelongsHere,
   validatePoolDeck,
+  verifySessionCards,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-session.mjs';
 import {
+  boxContentsLine,
   boxHeadline,
   buildBattleDeckName,
   deckFromCardCounts,
@@ -30,30 +35,33 @@ import {
   poolRefusalMessage,
   poolRemaining,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
-import { advanceUnboxing } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
+import { advanceUnboxing, boxSkin } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { fxDisabled, motionReduced } from '../../../setup/image-logic/mat-fx.mjs';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
- * The Box and Pool tabs of the Build & Battle builder tab (design 051 § Builder-tab controller).
- * The deck pane, library, Play and autosave stay with native-deck-builder.js; this module owns
- * the opened box, the unboxing scene (design 052, native-deck-builder-unboxing.js) and the pool
- * grid, and reports pool errors back to it.
+ * The Box and Pool tabs of the Build & Battle builder tab (designs 051 § Builder-tab controller,
+ * 054 § Builder tab). The deck pane, library, Play and autosave stay with native-deck-builder.js;
+ * this module owns the chosen box and its loaded data, the opened box, the unboxing scene (design
+ * 052, native-deck-builder-unboxing.js) and the pool grid, and reports pool errors back to it.
+ *
+ * A box's card data loads on demand (`loadBoxData`); until it has, the sealed box shows a loading
+ * line and cannot be opened, and a saved box waits for its data before it resumes.
  *
  * Until the unboxing is done the scene plays on a fullscreen stage and the builder UI is hidden;
  * at the end the stage fades out, the UI comes back with the box deck already in the deck pane
  * and the Pool tab open. A finished box shows its settled scene inline in the Box tab.
  */
 
-// The only box today; the catalog is a list so a later box is data, not code.
-const BOX = BUILD_BATTLE_BOXES[0];
 const MEMORY_ONLY_TEXT = 'Your box will not survive a reload';
 const UNSAVED_DECK_TEXT =
   'My Decks is full, so this deck is kept with your box in this browser only. ' +
   'Delete a deck in My Decks, then press Save to keep it there.';
 const NEW_ROOM_TEXT =
   'You are in a new room, so this is a fresh box. Decks you built stay in My Decks.';
+const STALE_BOX_TEXT =
+  'Your saved box no longer matches its card data, so it was put away. Decks you built stay in My Decks.';
 // How long a builder tab opened from the game waits for the game to name its room.
 const ROOM_WAIT_MS = 800;
 const NEW_BOX_CONFIRM =
@@ -126,11 +134,15 @@ export const initializeBuildBattle = ({
   waitForRoom = false,
 }) => {
   const storage = browserStorage();
-  const setCards = BUILD_BATTLE_SET_CARDS[BOX.setId] || [];
-  const boxDecks = BUILD_BATTLE_DECKS[BOX.key] || {};
   const energyCards = unlimitedEnergyCards();
   const urlSeed = parseSeed(new URLSearchParams(window.location.search).get('seed') ?? '');
 
+  // The box on the sealed screen, or the opened box's; its data once `loadBoxData` settles.
+  let activeBox = getBuildBattleBox(DEFAULT_BOX_KEY);
+  let loaded = null;
+  let loadError = null;
+  // Bumped per load, so a slow load for a box the player moved away from is dropped.
+  let loadToken = 0;
   let session = null;
   let pool = [];
   let memoryOnly = false;
@@ -142,41 +154,54 @@ export const initializeBuildBattle = ({
   let resumed = false;
   let resumeTimer = null;
   let newRoomNote = false;
+  let staleBoxNote = false;
   // The builder workspace: the stage is its child so the Live tokens and scene CSS apply.
   const workspaceEl = boxPanelEl?.closest('.db-live') || null;
 
-  const deckEntryOf = (activeSession) =>
-    getBuildBattleBox(activeSession.boxKey)?.decks.find((deck) => deck.key === activeSession.deckKey);
+  const isLoaded = () => loaded?.box.key === activeBox.key;
+
+  const deckEntryOf = (activeSession, key = activeSession.deckKey) =>
+    getBuildBattleBox(activeSession.boxKey)?.decks.find((deck) => deck.key === key);
 
   const persist = () => {
     memoryOnly = !saveSession(storage, session);
   };
 
   const computePool = () => {
-    pool = session
-      ? poolFromBox({ box: BOX, decks: boxDecks, cards: setCards, opened: session })
-      : [];
+    pool =
+      session && isLoaded()
+        ? poolFromBox({ box: activeBox, data: loaded.data, cards: loaded.cards, opened: session })
+        : [];
   };
 
-  // Every card an unsaved deck may name: the pool, the box deck's own rows (its Basic Energy is
+  const boxStartingRows = () =>
+    session && isLoaded() ? startingDeckRows({ box: activeBox, data: loaded.data, opened: session }) : [];
+
+  // Every card an unsaved deck may name: the pool, the box's own deck rows (their Basic Energy is
   // not a pool entry) and the unlimited Energy.
   const knownCards = () => [
     ...pool.map((entry) => entry.card),
-    ...(boxDecks[session.deckKey] || []),
+    ...boxStartingRows(),
     ...energyCards,
   ];
+
+  // A fixed deck shows its own two sprites; an Evolution deck each group's promo Pokémon.
+  const deckSprites = () => {
+    if (!session.groupKeys) return deckEntryOf(session)?.sprites || [];
+    return session.groupKeys.map((key) => deckEntryOf(session, key)?.sprites?.[0]).filter(Boolean);
+  };
 
   // The box deck goes into My Decks as a Build & Battle record and opens in the editor. At the
   // deck limit it still opens, unsaved, and the session keeps its cards so edits survive a
   // reload (I207); the Box tab says so until the player saves it.
-  const openBoxDeck = (cards = deckFromRows(boxDecks[session.deckKey] || [])) => {
+  const openBoxDeck = (cards = deckFromRows(boxStartingRows())) => {
     const deckEntry = deckEntryOf(session);
     const deckId =
       deckLibrary?.createAndOpenDeck?.(
         getTarget(),
-        buildBattleDeckName(deckEntry.name, session.seed),
+        buildBattleDeckName(activeBox, deckEntry.name, session.seed),
         cards,
-        { format: DECK_FORMAT_BUILD_BATTLE, sprites: deckEntry.sprites }
+        { format: DECK_FORMAT_BUILD_BATTLE, sprites: deckSprites() }
       ) || null;
     if (!deckId) showUnsavedDeck(cards);
     session = { ...session, deckId, unsavedDeck: deckId ? null : deckCardCounts(cards) };
@@ -202,33 +227,93 @@ export const initializeBuildBattle = ({
     persist();
   };
 
-  const resumeSession = () => {
-    const saved = loadSession(storage);
-    if (!saved) return;
-    if (!sessionBelongsHere(saved, currentRoomId)) {
+  const unboxingDone = () => !session || session.unboxing.stage === 'done';
+
+  // A saved box resumes once its box's data is in: the pool is built, and its deck reopens from My
+  // Decks (or, unsaved at the deck limit, from the session). Cards the data no longer has put the
+  // box away (design 054 row 2).
+  const resumeLoadedSession = (saved) => {
+    if (!verifySessionCards(saved, loaded)) {
       clearSession(storage);
-      newRoomNote = true;
+      staleBoxNote = true;
       return;
     }
     session = saved;
     computePool();
     const reopened = session.deckId && deckLibrary?.openDeckById?.(getTarget(), session.deckId);
-    if (reopened) return;
-    // Unsaved at the deck limit: reopen the player's edits. A bound deck deleted from My Decks
-    // is built again from the box.
-    openBoxDeck(
-      session.unsavedDeck ? deckFromCardCounts(session.unsavedDeck, knownCards()) : undefined
+    if (!reopened) {
+      // Unsaved at the deck limit: reopen the player's edits. A bound deck deleted from My Decks
+      // is built again from the box.
+      openBoxDeck(
+        session.unsavedDeck ? deckFromCardCounts(session.unsavedDeck, knownCards()) : undefined
+      );
+    }
+    if (unboxingDone()) showPool();
+  };
+
+  let pendingSession = null;
+
+  const onBoxLoaded = () => {
+    if (pendingSession) {
+      const saved = pendingSession;
+      pendingSession = null;
+      resumeLoadedSession(saved);
+    }
+    renderAll();
+  };
+
+  // Loads `box`'s data; the panel shows "Loading …" until it settles, and a failure shows the
+  // load error with no session created (design 054 row 5).
+  const loadActiveBox = (box) => {
+    activeBox = box;
+    loadError = null;
+    if (isLoaded()) {
+      onBoxLoaded();
+      return;
+    }
+    const token = ++loadToken;
+    renderAll();
+    loadBoxData(box.key).then(
+      (result) => {
+        if (token !== loadToken) return;
+        loaded = result;
+        onBoxLoaded();
+      },
+      (error) => {
+        if (token !== loadToken) return;
+        loadError = error;
+        pendingSession = null;
+        renderAll();
+      }
     );
   };
 
+  const resumeSession = () => {
+    const saved = loadSession(storage);
+    if (saved && !sessionBelongsHere(saved, currentRoomId)) {
+      clearSession(storage);
+      newRoomNote = true;
+    }
+    const resumable = saved && sessionBelongsHere(saved, currentRoomId) ? saved : null;
+    pendingSession = resumable;
+    loadActiveBox(resumable ? getBuildBattleBox(resumable.boxKey) : activeBox);
+  };
+
   const openNewBox = (seedText) => {
-    if (session) return;
+    if (session || !isLoaded()) return;
     const seed = parseSeed(seedText.trim()) ?? randomSeed();
-    const opened = openBox({ box: BOX, cards: setCards, rng: createRng(seed) });
-    session = createSession({ boxKey: BOX.key, seed, roomId: currentRoomId, ...opened });
+    const opened = openBox({
+      box: activeBox,
+      data: loaded.data,
+      cards: loaded.cards,
+      setInfo: loaded.setInfo,
+      rng: createRng(seed),
+    });
+    session = createSession({ boxKey: activeBox.key, seed, roomId: currentRoomId, ...opened });
     computePool();
     poolStatus = '';
     newRoomNote = false;
+    staleBoxNote = false;
     openBoxDeck();
     renderAll();
   };
@@ -242,8 +327,6 @@ export const initializeBuildBattle = ({
     persist();
     return next;
   };
-
-  const unboxingDone = () => !session || session.unboxing.stage === 'done';
 
   // The Pool tab fades in when the scene hands over to it.
   const handOverToPool = () => {
@@ -260,7 +343,7 @@ export const initializeBuildBattle = ({
     stageEl = el('div', 'bb-stage');
     stageEl.id = 'bbUnboxingStage';
     stageEl.setAttribute('role', 'dialog');
-    stageEl.setAttribute('aria-label', `Opening your ${BOX.name}`);
+    stageEl.setAttribute('aria-label', `Opening your ${activeBox.name}`);
     workspaceEl.classList.remove(UI_ENTER_CLASS);
     workspaceEl.classList.add(STAGE_ACTIVE_CLASS);
     workspaceEl.append(stageEl);
@@ -304,21 +387,24 @@ export const initializeBuildBattle = ({
   // ── Box tab ─────────────────────────────────────────────────────────────
   const renderBanner = (parent) => {
     if (newRoomNote && !session) parent.append(el('p', 'bb-banner', NEW_ROOM_TEXT));
+    if (staleBoxNote && !session) parent.append(el('p', 'bb-banner', STALE_BOX_TEXT));
     if (memoryOnly) parent.append(el('p', 'bb-banner', MEMORY_ONLY_TEXT));
     if (session && !session.deckId) parent.append(el('p', 'bb-banner', UNSAVED_DECK_TEXT));
   };
 
+  const sealedNote = () => {
+    if (loadError) return `Could not load ${activeBox.name}. Reload to try again.`;
+    if (!isLoaded()) return `Loading ${activeBox.name}…`;
+    return boxContentsLine(activeBox, loaded.setInfo.name);
+  };
+
   const renderSealedBox = () => {
     const sealed = el('div', 'bb-sealed');
-    sealed.append(
-      el('h3', 'bb-title', BOX.name),
-      el(
-        'p',
-        'bb-note',
-        `${BOX.packCount} Phantasmal Flames packs and one of ${BOX.decks.length} 40-card decks. ` +
-          'Build a 40-card deck from them; games use 4 Prizes.'
-      )
-    );
+    const note = el('p', 'bb-note', sealedNote());
+    note.id = 'buildBattleBoxNote';
+    note.setAttribute('role', 'status');
+    if (loadError) note.classList.add('is-error');
+    sealed.append(el('h3', 'bb-title', activeBox.name), note);
     const seedLabel = el('label', 'bb-seed-label', 'Box #');
     const seedInput = el('input', 'bb-seed-input');
     seedInput.id = 'buildBattleSeed';
@@ -330,6 +416,7 @@ export const initializeBuildBattle = ({
     const openButton = el('button', 'bb-primary', 'Open box');
     openButton.id = 'buildBattleOpenBox';
     openButton.type = 'button';
+    openButton.disabled = !isLoaded();
     openButton.addEventListener('click', () => {
       openButton.disabled = true;
       openNewBox(seedInput.value);
@@ -339,10 +426,10 @@ export const initializeBuildBattle = ({
   };
 
   const renderOpenedBox = () => {
-    const cardsById = new Map(setCards.map((card) => [card.id, card]));
+    const cardsById = new Map(loaded.cards.map((card) => [card.id, card]));
     const deckEntry = deckEntryOf(session);
     const header = el('div', 'bb-box-header');
-    header.append(el('h3', 'bb-title', boxHeadline(BOX, deckEntry, session.seed)));
+    header.append(el('h3', 'bb-title', boxHeadline(activeBox, deckEntry, session.seed)));
     const actions = el('div', 'bb-box-actions');
     const newBox = el('button', 'bb-secondary', 'New box');
     newBox.id = 'buildBattleNewBox';
@@ -354,6 +441,7 @@ export const initializeBuildBattle = ({
 
     const root = el('div', 'bb-scene');
     root.id = 'bbUnboxing';
+    root.dataset.era = activeBox.era;
     const stage = unboxingDone() ? null : openStage();
     if (stage) {
       root.classList.add('bb-scene--stage');
@@ -362,14 +450,17 @@ export const initializeBuildBattle = ({
     } else {
       boxPanelEl.append(root);
     }
+    const { setInfo, cards, data } = loaded;
     scene = mountUnboxingScene({
       root,
       getUnboxing: () => session.unboxing,
       dispatch: dispatchUnboxing,
       packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
-      packModel: BOX.packModel,
+      packModel: resolvePackModel(activeBox.packModelKey, cards, setInfo),
+      classOf: (card) => cardClass(card, activeBox.era, setInfo),
+      skin: boxSkin({ box: activeBox, setInfo, cards, data }),
       seed: session.seed,
-      promo: boxDecks[session.deckKey]?.find((row) => row.id === deckEntry.promoId) || null,
+      promo: boxPromoRow({ box: activeBox, data, deckKey: session.deckKey }),
       onBuildDeck: finishOpening,
     });
   };
@@ -382,7 +473,7 @@ export const initializeBuildBattle = ({
     boxPanelEl.replaceChildren();
     if (!resumed) return; // still waiting for the game tab to name its room
     renderBanner(boxPanelEl);
-    if (session) renderOpenedBox();
+    if (session && isLoaded()) renderOpenedBox();
     else renderSealedBox();
   };
 
@@ -481,13 +572,10 @@ export const initializeBuildBattle = ({
 
   boxPanelEl?.addEventListener('contextmenu', (event) => {
     const image = event.target.closest('[data-preview-card-id]');
-    if (!image) return;
+    if (!image || !isLoaded()) return;
     const id = image.dataset.previewCardId;
     const card =
-      setCards.find((entry) => entry.id === id) ||
-      Object.values(boxDecks)
-        .flat()
-        .find((row) => row.id === id);
+      loaded.cards.find((entry) => entry.id === id) || loaded.data.cardsById.get(id) || null;
     if (!card) return;
     event.preventDefault();
     event.stopPropagation();
@@ -504,9 +592,6 @@ export const initializeBuildBattle = ({
     resumed = true;
     clearTimeout(resumeTimer);
     resumeSession();
-    renderAll();
-    // A late resume picks the tab itself; an immediate one leaves it to initialMode().
-    if (waitForRoom && session && unboxingDone()) showPool();
   };
 
   // The game tab joined or left a room. A box opened for another room is put away (its deck
@@ -537,7 +622,8 @@ export const initializeBuildBattle = ({
 
   return {
     poolErrors: (deck) => (session ? validatePoolDeck(deck, pool) : []),
-    // A finished box opens on the Pool tab; a new or unfinished one on the Box tab.
+    // A finished box opens on the Pool tab; a new or unfinished one on the Box tab. A box whose
+    // data is still loading picks its tab itself once it resumes.
     initialMode: () => (session && unboxingDone() ? 'pool' : 'box'),
     refresh: () => {
       trackUnsavedDeck();

@@ -4,6 +4,8 @@
 
 import { createRng } from '../../../../../../shared/engine/rng.mjs';
 import { resolveHoloEffect } from '../holo.mjs';
+import { BOX_FACE_TEXTURES, packArtSrc } from './box-textures.mjs';
+import { REVERSE_POOL } from './pack-models.mjs';
 
 // ── Beats and timing ─────────────────────────────────────────────────────────
 export const WRAP_TEAR_MS = 320;
@@ -469,12 +471,11 @@ export function fanSlot(index, count, widthPx) {
 }
 
 // ── Slots, tiers, foil ───────────────────────────────────────────────────────
-const REVERSE_POOL = 'reverse';
-
 /**
- * Whether card `index` of a pack came from a reverse-holo draw. A slot whose table also names
- * hit rarities (the IR/SIR slot) is a reverse draw unless the card is one of those rarities.
+ * Whether card `index` of a pack came from a reverse-holo draw. A slot that also names hit classes
+ * (the IR/SIR, Trainer Gallery or ACE SPEC slot) is a reverse draw unless the card is one of them.
  *
+ * @param {object|null} packModel from `resolvePackModel`
  * @returns {'normal'|'reverse'}
  */
 export function packSlotKind(packModel, index, card) {
@@ -482,34 +483,41 @@ export function packSlotKind(packModel, index, card) {
   for (const slot of packModel?.slots || []) {
     const end = start + (slot.count || 0);
     if (index >= start && index < end) {
-      const pools = Array.isArray(slot.table)
-        ? slot.table.map(([pool]) => pool)
-        : slot.pools || [];
-      if (!pools.includes(REVERSE_POOL)) return 'normal';
-      return pools.includes(card?.rarity) ? 'normal' : 'reverse';
+      const rows = slot.rows || [];
+      if (!rows.some((row) => row.pool === REVERSE_POOL)) return 'normal';
+      const isHit = rows.some((row) => row.pool !== REVERSE_POOL && row.ids.includes(card?.id));
+      return isHit ? 'normal' : 'reverse';
     }
     start = end;
   }
   return 'normal';
 }
 
-const TIER_BY_RARITY = {
-  'Double rare': 1,
-  'Ultra Rare': 2,
-  'Illustration rare': 2,
-  'Special illustration rare': 3,
-  'Mega Hyper Rare': 3,
+// Design 054 § Unboxing skin: tiers follow the card's hit class (`cardClass`), not its rarity
+// string, so every era's hits reveal alike.
+const TIER_BY_CLASS = {
+  hit: 1,
+  ultra: 2,
+  illustration: 2,
+  aceSpec: 2,
+  specialIllustration: 3,
+  top: 3,
 };
 
-/** @returns {0|1|2|3} how big the reveal is: 0 plain, 1 reverse or Double rare, 2 UR/IR, 3 SIR/MHR. */
-export function hitTierFor(card, slot) {
-  const tier = TIER_BY_RARITY[card?.rarity] || 0;
+/**
+ * @param {string|null} className the card's `cardClass` in its box's era
+ * @returns {0|1|2|3} how big the reveal is: 0 plain, 1 reverse or ex-class, 2 full art /
+ *   illustration / ACE SPEC, 3 special illustration or the era's top tier.
+ */
+export function hitTierFor(card, slot, className = null) {
+  const tier = card ? TIER_BY_CLASS[className] || 0 : 0;
   return slot === 'reverse' ? Math.max(1, tier) : tier;
 }
 
-// ME-era Rares are holo prints (TCGdex me02 Rare records carry `variants.holo: true`); promos
-// are "foil promo cards" (pokemon.com Build & Battle box listing).
-const HOLO_PRINT_RARITIES = new Set(['Rare', 'Promo']);
+// ME-era Rares are holo prints (TCGdex me02 Rare records carry `variants.holo: true`), as are the
+// holo rares of SM and SWSH (`Rare Holo`, `Holo Rare`); promos are "foil promo cards" (pokemon.com
+// Build & Battle box listing).
+const HOLO_PRINT_RARITIES = new Set(['Rare', 'Rare Holo', 'Holo Rare', 'Promo']);
 const NO_FOIL_RARITIES = new Set(['Common', 'Uncommon']);
 
 /** @returns {string|null} the holo family (`data-rarity`) the revealed card wears, or null for none. */
@@ -539,15 +547,50 @@ export function unboxingVoiceFor(event, tier = 0) {
 }
 
 // ── Pack art and tear edge (seeded, separate from the pool's RNG stream) ─────
+// The four vendored Phantasmal Flames pack fronts (design 052).
 export const PACK_ARTS = ['charizard', 'gengar', 'heracross', 'lopunny'];
 
 /**
- * One pack-front art per pack. A stream of its own (`seed ^ 0x9e3779b9`), so adding art never
- * shifts the pool `openBox(seed)` draws. Duplicates are allowed, as in real boxes.
+ * One pack-front art per pack, an index into the box skin's four `packArts`. A stream of its own
+ * (`seed ^ 0x9e3779b9`), so adding art never shifts the pool `openBox(seed)` draws. Duplicates are
+ * allowed, as in real boxes.
  */
 export function packArtIndexes(seed, count = PACK_COUNT) {
   const rng = createRng(seed ^ 0x9e3779b9);
   return Array.from({ length: Math.max(0, count | 0) }, () => rng.int(PACK_ARTS.length));
+}
+
+const withWebp = (base) => (base ? `${base}.webp` : null);
+const largeImageOf = (card) => card?.images?.large || card?.image || null;
+
+/**
+ * What the unboxing scene dresses the box in (design 054 § Unboxing skin, D5): the set's TCGdex
+ * logo and symbol, the key card's art for a procedural front, the era palette, the four pack
+ * fronts (vendored files or a procedural front over a card's art) and the vendored box faces.
+ *
+ * @param {{box: object, setInfo?: object, cards?: object[], data?: {cardsById?: Map<string, object>}}} args
+ * @returns {{setLogoUrl: string|null, setSymbolUrl: string|null, keyArtUrl: string|null,
+ *   palette: string, packArts: ({kind: 'vendored', src: string}|{kind: 'procedural', cardId: string,
+ *   imageUrl: string|null})[], faces: object|null}}
+ */
+export function boxSkin({ box, setInfo = {}, cards = [], data = {} }) {
+  const skin = box?.skin || {};
+  const cardById = (id) => cards.find((card) => card.id === id) || data.cardsById?.get(id) || null;
+  const packArts = skin.vendored?.packs
+    ? PACK_ARTS.map((key) => ({ kind: 'vendored', src: packArtSrc(box.setId, key) }))
+    : (skin.packArtCardIds || []).map((cardId) => ({
+        kind: 'procedural',
+        cardId,
+        imageUrl: largeImageOf(cardById(cardId)),
+      }));
+  return {
+    setLogoUrl: withWebp(setInfo.logo),
+    setSymbolUrl: withWebp(setInfo.symbol),
+    keyArtUrl: largeImageOf(cardById(skin.keyArtCardId)),
+    palette: skin.palette || box?.era || 'me',
+    packArts,
+    faces: skin.vendored?.box ? BOX_FACE_TEXTURES : null,
+  };
 }
 
 const TEAR_LINE_PCT = 7;

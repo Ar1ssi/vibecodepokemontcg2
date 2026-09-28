@@ -96,18 +96,26 @@ const dragTear = async (page, selector) => {
 };
 
 const session = (page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
+// The saved box's card data, as the tab loads it (design 054: per-box modules on demand).
+const BOX_DATA = '/src/setup/deck-builder/core/build-battle/box-data.mjs';
+const PACK_MODELS_MODULE = '/src/setup/deck-builder/core/build-battle/pack-models.mjs';
+
 const tiersOf = (page) =>
-  page.evaluate(async ({ module, key }) => {
+  page.evaluate(async ({ module, key, boxData, packModels }) => {
     const { hitTierFor, packSlotKind } = await import(module);
-    const { BUILD_BATTLE_BOXES } = await import('/src/setup/deck-builder/core/build-battle/box-catalog.mjs');
-    const { BUILD_BATTLE_SET_CARDS } = await import('/src/setup/deck-builder/core/build-battle/build-battle.generated.mjs');
-    const box = BUILD_BATTLE_BOXES[0];
-    const byId = new Map(BUILD_BATTLE_SET_CARDS[box.setId].map((card) => [card.id, card]));
-    const { packs } = JSON.parse(localStorage.getItem(key));
-    return packs.map((pack) =>
-      pack.map((id, index) => hitTierFor(byId.get(id), packSlotKind(box.packModel, index, byId.get(id))))
+    const { loadBoxData } = await import(boxData);
+    const { cardClass, resolvePackModel } = await import(packModels);
+    const saved = JSON.parse(localStorage.getItem(key));
+    const { box, cards, setInfo } = await loadBoxData(saved.boxKey);
+    const byId = new Map(cards.map((card) => [card.id, card]));
+    const packModel = resolvePackModel(box.packModelKey, cards, setInfo);
+    return saved.packs.map((pack) =>
+      pack.map((id, index) => {
+        const card = byId.get(id);
+        return hitTierFor(card, packSlotKind(packModel, index, card), cardClass(card, box.era, setInfo));
+      })
     );
-  }, { module: MODULE, key: STORAGE_KEY });
+  }, { module: MODULE, key: STORAGE_KEY, boxData: BOX_DATA, packModels: PACK_MODELS_MODULE });
 
 
 const summaryIds = (page) =>
@@ -120,23 +128,25 @@ const summaryIds = (page) =>
 // Every summary card wears foil exactly when unboxingHoloRarity says so, in that family.
 const foilMismatches = (page, packIndex) =>
   page.evaluate(
-    async ({ module, key, i }) => {
+    async ({ module, key, i, boxData, packModels }) => {
       const { unboxingHoloRarity, packSlotKind } = await import(module);
-      const { BUILD_BATTLE_BOXES } = await import('/src/setup/deck-builder/core/build-battle/box-catalog.mjs');
-      const { BUILD_BATTLE_SET_CARDS } = await import('/src/setup/deck-builder/core/build-battle/build-battle.generated.mjs');
-      const box = BUILD_BATTLE_BOXES[0];
-      const byId = new Map(BUILD_BATTLE_SET_CARDS[box.setId].map((card) => [card.id, card]));
-      const ids = JSON.parse(localStorage.getItem(key)).packs[i];
+      const { loadBoxData } = await import(boxData);
+      const { resolvePackModel } = await import(packModels);
+      const saved = JSON.parse(localStorage.getItem(key));
+      const { box, cards, setInfo } = await loadBoxData(saved.boxKey);
+      const byId = new Map(cards.map((card) => [card.id, card]));
+      const packModel = resolvePackModel(box.packModelKey, cards, setInfo);
+      const ids = saved.packs[i];
       return [...document.querySelectorAll('.bb-summary__card')].flatMap((node) => {
         const k = Number(node.dataset.cardIndex);
         const card = byId.get(ids[k]);
-        const want = unboxingHoloRarity(card, packSlotKind(box.packModel, k, card));
+        const want = unboxingHoloRarity(card, packSlotKind(packModel, k, card));
         const holo = node.querySelector('.card[data-rarity]');
         const got = holo ? holo.dataset.rarity : null;
         return (want || null)?.toLowerCase() === got?.toLowerCase() ? [] : [`card ${k + 1} ${card?.rarity}: want ${want}, got ${got}`];
       });
     },
-    { module: MODULE, key: STORAGE_KEY, i: packIndex }
+    { module: MODULE, key: STORAGE_KEY, i: packIndex, boxData: BOX_DATA, packModels: PACK_MODELS_MODULE }
   );
 
 const topIndex = (page) =>

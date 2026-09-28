@@ -5,6 +5,7 @@ import {
   DECK_FORMAT_BUILD_BATTLE,
   DECK_FORMAT_TCG,
 } from '../../../../../../shared/engine/formats.mjs';
+import { getBuildBattleBox } from './box-catalog.mjs';
 
 /** @returns {object} the editor's `{ [name]: { cards: [{ data, count }], totalCount } }` map for box deck rows. */
 export function deckFromRows(rows = []) {
@@ -48,14 +49,36 @@ export function deckLoadFormat({ isBuildBattle = false, recordedFormat = null, i
   return isBuildBattle && isUnsaved ? DECK_FORMAT_BUILD_BATTLE : DECK_FORMAT_TCG;
 }
 
-/** @returns {string} the library name of the deck built from one box. */
-export function buildBattleDeckName(deckName, seed) {
-  return `B&B ${deckName} #${seed}`;
+/** @returns {string|null} the `?box=` value when it names a catalog box, else null (row 1). */
+export function parseBoxKey(value) {
+  if (typeof value !== 'string' || !value) return null;
+  return getBuildBattleBox(value) ? value : null;
 }
 
-/** @returns {string} "<Box name> · <Deck name> deck · Box #<seed>". */
+/** @returns {string} the library name of the deck built from one box: "B&B <box> <deck> #<seed>". */
+export function buildBattleDeckName(box, deckName, seed) {
+  return `B&B ${box.shortName} ${deckName} #${seed}`;
+}
+
+/** @returns {string} "<Box name> · <Deck name> deck|promo · Box #<seed>". */
 export function boxHeadline(box, deckEntry, seed) {
-  return `${box.name} · ${deckEntry.name} deck · Box #${seed}`;
+  const noun = box.kind === 'fixed-decks' ? 'deck' : 'promo';
+  return `${box.name} · ${deckEntry.name} ${noun} · Box #${seed}`;
+}
+
+const CONTENTS_BY_KIND = {
+  'fixed-decks': (box) => `one of ${box.decks.length} 40-card decks`,
+  'evolution-pack': (box) => `a 23-card Evolution pack (1 of ${box.decks.length} promos)`,
+  'evolution-deck': (box) => `a 40-card Evolution deck (1 of ${box.decks.length} promos)`,
+};
+
+/** @returns {string} the sealed box's note: what is inside and what the player builds. */
+export function boxContentsLine(box, setName = box.shortName) {
+  const contents = CONTENTS_BY_KIND[box.kind]?.(box) || '';
+  return (
+    `${box.packCount} ${setName} packs and ${contents}. ` +
+    'Build a 40-card deck from them; games use 4 Prizes.'
+  );
 }
 
 function deckCountsById(deck) {

@@ -2,7 +2,6 @@ import { buildHoloCard, startHoloAnimation } from '../../../setup/deck-builder/c
 import {
   BOX_PROPORTIONS,
   boxFaceTexture,
-  packArtSrc,
 } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
 import {
   CARDS_PER_PACK,
@@ -11,7 +10,6 @@ import {
   HIT_FLIP_MS,
   HIT_HOLD_MS,
   LID_OPEN_MS,
-  PACK_ARTS,
   PACK_FLY_MS,
   PACK_FLY_STAGGER_MS,
   PACK_TEAR_MS,
@@ -344,7 +342,9 @@ const cardFallback = (card) => {
  * @param {(event: {type: string, packIndex?: number}) => object|null} options.dispatch reduces and
  *   saves; null when the event was refused
  * @param {(object|null)[][]} options.packs the session's packs as card rows, in slot order
- * @param {object} options.packModel the box's pack model (reverse-slot lookup)
+ * @param {object} options.packModel the box's resolved pack model (reverse-slot lookup)
+ * @param {(card: object) => string|null} options.classOf the card's hit class (reveal tier)
+ * @param {object} options.skin `boxSkin(...)`: pack fronts, logo, key art, palette
  * @param {number} options.seed the box seed (pack art, tear edges)
  * @param {object|null} options.promo the deck's foil promo card row
  * @param {() => void} options.onBuildDeck ends the opening: closes the stage, shows the Pool tab
@@ -356,6 +356,8 @@ export const mountUnboxingScene = ({
   dispatch,
   packs,
   packModel,
+  classOf,
+  skin,
   seed,
   promo,
   onBuildDeck,
@@ -365,8 +367,10 @@ export const mountUnboxingScene = ({
   const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
   const slotOf = (packIndex, cardIndex) =>
     packSlotKind(packModel, cardIndex, packs[packIndex]?.[cardIndex]);
-  const tierOf = (packIndex, cardIndex) =>
-    hitTierFor(packs[packIndex]?.[cardIndex], slotOf(packIndex, cardIndex));
+  const tierOf = (packIndex, cardIndex) => {
+    const card = packs[packIndex]?.[cardIndex];
+    return hitTierFor(card, slotOf(packIndex, cardIndex), card ? classOf(card) : null);
+  };
 
   // Bumped by every render: async continuations from an older picture stop touching the DOM.
   let generation = 0;
@@ -550,12 +554,15 @@ export const mountUnboxingScene = ({
     return host;
   };
 
+  // A vendored pack front is the whole image; a procedural one shows its card's art.
   const packArt = (className, packIndex) => {
+    const art = skin.packArts[artIndexes[packIndex]];
     const img = el('img', className);
     img.alt = '';
     img.draggable = false;
     img.addEventListener('error', () => img.remove(), { once: true });
-    img.src = `/${packArtSrc(PACK_ARTS[artIndexes[packIndex]])}`;
+    const src = art?.kind === 'vendored' ? `/${art.src}` : art?.imageUrl;
+    if (src) img.src = src;
     return img;
   };
 

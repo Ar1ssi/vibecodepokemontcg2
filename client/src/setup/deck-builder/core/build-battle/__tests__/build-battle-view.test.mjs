@@ -2,28 +2,31 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRng } from '../../../../../../../shared/engine/rng.mjs';
-import { getBuildBattleBox } from '../box-catalog.mjs';
-import { BUILD_BATTLE_DECKS, BUILD_BATTLE_SET_CARDS } from '../build-battle.generated.mjs';
-import { openBox, poolFromBox } from '../pack-opening.mjs';
+import { loadBoxData } from '../box-data.mjs';
+import { openBox, poolFromBox, startingDeckRows } from '../pack-opening.mjs';
 import { deckCardCounts, validatePoolDeck } from '../build-battle-session.mjs';
 import { validateDeck } from '../../deck-validation.mjs';
 import { addCard } from '../../deck-state.mjs';
 import {
+  boxContentsLine,
   boxHeadline,
   buildBattleDeckName,
   deckFromCardCounts,
   deckFromRows,
   deckLoadFormat,
+  parseBoxKey,
   poolRefusalMessage,
   poolRemaining,
   withPoolErrors,
 } from '../build-battle-view.mjs';
 
-const box = getBuildBattleBox('phantasmal-flames');
-const decks = BUILD_BATTLE_DECKS['phantasmal-flames'];
-const setCards = BUILD_BATTLE_SET_CARDS.me02;
-const opened = { deckKey: 'ceruledge', packs: openBox({ box, cards: setCards, rng: createRng(42) }).packs };
-const pool = poolFromBox({ box, decks, cards: setCards, opened });
+const { box, cards: setCards, setInfo, data } = await loadBoxData('phantasmal-flames');
+const decks = data.decks;
+const opened = {
+  deckKey: 'ceruledge',
+  packs: openBox({ box, data, cards: setCards, setInfo, rng: createRng(42) }).packs,
+};
+const pool = poolFromBox({ box, data, cards: setCards, opened });
 const byId = (id) => pool.find((entry) => entry.card.id === id);
 
 test('deckFromRows turns the Ceruledge box deck into a legal 40-card editor deck', () => {
@@ -45,12 +48,48 @@ test('deckFromRows skips rows without a name or a positive qty', () => {
   assert.deepEqual(deckFromRows([{ id: 'x', qty: 2 }, { id: 'y', name: 'Y', qty: 0 }, null]), {});
 });
 
-test('the library name and headline name the deck and the seed', () => {
-  assert.equal(buildBattleDeckName('Ceruledge', 42), 'B&B Ceruledge #42');
+test('the library name and headline name the box, the deck and the seed', () => {
+  assert.equal(buildBattleDeckName(box, 'Ceruledge', 42), 'B&B Phantasmal Flames Ceruledge #42');
   assert.equal(
     boxHeadline(box, box.decks[0], 42),
     'Phantasmal Flames Build & Battle Box · Ceruledge deck · Box #42'
   );
+  const evolution = { ...box, name: 'Team Up Build & Battle Box', shortName: 'Team Up', kind: 'evolution-pack' };
+  assert.equal(buildBattleDeckName(evolution, 'Charizard', 7), 'B&B Team Up Charizard #7');
+  assert.equal(
+    boxHeadline(evolution, { name: 'Charizard' }, 7),
+    'Team Up Build & Battle Box · Charizard promo · Box #7'
+  );
+});
+
+test('the sealed box says what is inside per kind', () => {
+  assert.equal(
+    boxContentsLine(box, setInfo.name),
+    '4 Phantasmal Flames packs and one of 4 40-card decks. Build a 40-card deck from them; games use 4 Prizes.'
+  );
+  assert.equal(
+    boxContentsLine({ ...box, shortName: 'Team Up', kind: 'evolution-pack' }),
+    '4 Team Up packs and a 23-card Evolution pack (1 of 4 promos). Build a 40-card deck from them; games use 4 Prizes.'
+  );
+  assert.equal(
+    boxContentsLine({ ...box, kind: 'evolution-deck' }, 'Temporal Forces'),
+    '4 Temporal Forces packs and a 40-card Evolution deck (1 of 4 promos). Build a 40-card deck from them; games use 4 Prizes.'
+  );
+});
+
+test('row 1: ?box= takes only a catalog box key', () => {
+  assert.equal(parseBoxKey('phantasmal-flames'), 'phantasmal-flames');
+  for (const value of ['', 'nope', 'me02', 'Phantasmal-Flames', null, undefined, 42]) {
+    assert.equal(parseBoxKey(value), null, String(value));
+  }
+});
+
+test('rows 14 + 15: the starting deck fills the editor counter (fixed: 40 / 40)', () => {
+  const rows = startingDeckRows({ box, data, opened: { deckKey: 'zacian', packs: [] } });
+  const result = validateDeck(deckFromRows(rows), 'build-battle');
+  assert.equal(result.totalCards, 40);
+  assert.equal(result.requiredCards, 40);
+  assert.equal(result.isValid, true, result.errors.join('; '));
 });
 
 test('poolRemaining counts down as copies go into the deck and never goes below 0', () => {

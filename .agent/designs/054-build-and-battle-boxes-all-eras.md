@@ -644,6 +644,12 @@ Plan-time re-pins (§2 of oneshot-feature, from reading all 42 Bulbapedia pages 
   literals; `packArtCardIds` defaults to the box's four promos.
 - D6 `artIndexes` stay derived from the seed in the scene (052); `openBox` has only the rng stream.
 - D7 `aceSpec` class reveals at tier 2 (the design gave it no tier).
+Build notes:
+- Slice 1: me02 split from 051's module by a one-off script; hydrated rows equal 051's rows byte for byte
+  (JSON order included). `packArtSrc(setId, key)` (vendored files are per set). The seed-42 box keeps 051's
+  draws except pack 1 card 9, now me02-129 (the art slot's boosted SIR band; row 31). Recorder seed 42: every
+  row PASS, tiers `[[…,1,3,0],[…,1,2,1],[…,1,2,0],[…,1,1,0]]`. `pnpm test`: 5092 pass, 0 fail.
+  Evolution-session parse tests land with the first Evolution box (slice 5): parseSession reads the catalog.
 
 ---
 Self-approval checklist (only when the user is unreachable):
