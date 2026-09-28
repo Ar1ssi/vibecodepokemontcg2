@@ -163,9 +163,23 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
   if (!normalized) return [];
   const branches = [];
   let sawConditional = false;
+  let previousWasOptionalCost = false;
   for (const raw of normalized.split(/(?<=\.)\s+/)) {
     const sentence = raw.trim().replace(/\.$/, '');
     if (!sentence) continue;
+    // Magcargo Lava Plume: "You may discard the top card of your deck. If you do, the
+    // Defending Pokémon is now Burned." — the engine always pays optional "you may" costs
+    // (attack-steps.mjs's `optional` executors), so "if you do" after one is unconditional.
+    const doChain = previousWasOptionalCost && /^if you do,\s*/.test(sentence);
+    previousWasOptionalCost = /^you may\b/.test(sentence);
+    if (doChain) {
+      const body = sentence.replace(/^if you do,\s*/, '');
+      const application = statusesIn(body);
+      if (application) {
+        branches.push({ when: 'always', target: application.target, statuses: application.statuses });
+        continue;
+      }
+    }
     const gate = sentenceGate(sentence);
     if (!gate && /^if\b/.test(sentence)) {
       const condition = conditionBranch(sentence);

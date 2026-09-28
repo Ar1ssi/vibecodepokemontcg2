@@ -12,6 +12,7 @@ import { combinedToolRetreatCost } from './tool-combat.mjs';
 import { getStadiumRetreatCost, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { pendingRetreatCostDelta } from './attack-pending-effects.mjs';
 import { classifyEnergyEffect, pokemonHasRedirectEnergy } from './energy-effects.mjs';
+import { getRetreatCostCount } from '../cards.mjs';
 
 /**
  * Effective retreat cost for an active Pokémon taking into account:
@@ -26,13 +27,13 @@ export function getEffectiveRetreatCost(
   zoneCards = [],
   benchCards = []
 ) {
-  if (!rulesState.enabled) return activeCard?.retreatCost || 0;
+  if (!rulesState.enabled) return getRetreatCostCount(activeCard);
   const cards = Array.isArray(zoneCards) ? zoneCards : (zoneCards?.array || []);
   // Switching Energy (taxonomy §F, family 3): free switch
   if (pokemonHasRedirectEnergy(activeCard, cards)) return 0;
   // Team-wide "no Retreat Cost" ability on a Benched Pokémon (Latias ex "Skyliner").
   if (teamNoRetreatCostForActive(activeCard, benchCards, cards)) return 0;
-  let cost = activeCard?.retreatCost || 0;
+  let cost = getRetreatCostCount(activeCard);
   cost = getStadiumRetreatCost(cost, activeCard, player);
   cost = combinedToolRetreatCost(cost, activeCard, cards, {
     blockTools: stadiumBlocksToolEffects(),

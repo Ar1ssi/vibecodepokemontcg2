@@ -385,6 +385,17 @@ function moveEnergyEnds(ctx) {
         energies: attacker ? attachedCards(player, attacker.instanceId).filter(matches) : [],
         targets: benchRootsOf(player).filter((c) => c !== attacker),
       };
+    // Mothim/Ninjask Quick Touch: "… switch this Pokémon with 1 of your Benched Pokémon. If you
+    // do, move [Energy] attached to this Pokémon to the new Active Pokémon." Runs after
+    // atkSwitchSelf, so the attacker is now the benched card and the new Active is its target.
+    case 'selfToNewActive': {
+      const target = activeOf(player);
+      return {
+        owner: player,
+        energies: attacker && target && target !== attacker ? attachedCards(player, attacker.instanceId).filter(matches) : [],
+        targets: target ? [target] : [],
+      };
+    }
     case 'bench': {
       const target = step.to === 'active' ? activeOf(player) : attacker;
       return {
@@ -1825,6 +1836,8 @@ function atkMoveAllCounters(ctx) {
   const move = (from) => {
     const amount = from.damage || 0;
     from.damage = 0;
+    // Moving counters off is not healing — stampHealedPokemon must not read this as one.
+    from.__counterMoveOnly = true;
     ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: 0 });
     placeCounters(ctx, target, opponent.playerId, amount);
     return null;
@@ -3063,10 +3076,35 @@ function atkMoveCounterToOpponent(ctx) {
       memo: { stage: 'to', fromIds },
     });
   }
+  // Dusknoir Reaper Pulse: "Move UP TO N damage counters …" — the player picks how many (0..N),
+  // not a fixed amount.
+  const maxAvailable = sources
+    .filter((c) => fromIds.includes(c.instanceId))
+    .reduce((sum, c) => sum + (c.damage || 0), 0);
+  const cap = Math.min(step.count || 1, Math.floor(maxAvailable / 10));
+  let chosenCount = ctx.memo?.count;
+  if (step.upTo && chosenCount === undefined) {
+    if (cap <= 0) {
+      chosenCount = 0;
+    } else if (ctx.memo?.stage === 'amount') {
+      chosenCount = Number(ctx.selection?.[0]);
+    } else {
+      return ctx.ask({
+        prompt: `${attackName(ctx)}: Choose how many damage counters to move (0-${cap})`,
+        options: Array.from({ length: cap + 1 }, (_, n) => ({ instanceId: n, name: String(n), type: 'option' })),
+        min: 1,
+        max: 1,
+        memo: { stage: 'amount', fromIds, count: undefined },
+      });
+    }
+  }
+  const count = step.upTo ? chosenCount ?? cap : step.count;
   let moved = 0;
   for (const from of sources.filter((c) => fromIds.includes(c.instanceId))) {
-    const amount = step.count === 'all' ? from.damage || 0 : Math.min(from.damage || 0, (step.count || 1) * 10);
+    const amount = count === 'all' ? from.damage || 0 : Math.min(from.damage || 0, (count || 0) * 10);
     from.damage -= amount;
+    // Moving counters off is not healing — stampHealedPokemon must not read this as one.
+    if (amount > 0) from.__counterMoveOnly = true;
     moved += amount;
     ctx.events.push({ type: 'damageUpdated', instanceId: from.instanceId, damage: from.damage });
   }
@@ -3083,21 +3121,27 @@ function atkSwapCounters(ctx) {
   if (!attacker || !defender) return skip(ctx, 'no_target');
   if (attackEffectShielded(ctx, opponent, defender)) return skip(ctx, 'effect_prevented');
   const mine = attacker.damage || 0;
-  attacker.damage = defender.damage || 0;
+  const theirs = defender.damage || 0;
+  attacker.damage = theirs;
   defender.damage = mine;
+  // Swapping counters is not healing either side — stampHealedPokemon must not read a drop as one.
+  if (attacker.damage < mine) attacker.__counterMoveOnly = true;
+  if (defender.damage < theirs) defender.__counterMoveOnly = true;
   ctx.events.push({ type: 'damageUpdated', instanceId: attacker.instanceId, damage: attacker.damage });
   ctx.events.push({ type: 'damageUpdated', instanceId: defender.instanceId, damage: defender.damage });
   return null;
 }
 
-// Bronzong Heavy Potential: a counter for each {C} in each opponent Pokémon's Retreat Cost. The
-// printed cost is read; Retreat Cost effects in play are not applied (flagged in the journal).
+// Bronzong Heavy Potential: a counter for each {C} in each opponent Pokémon's Retreat Cost,
+// "after applying effects to the Retreat Cost" — i.e. the effective, not printed, cost (Tools,
+// Stadiums, and in-play abilities that raise/lower it).
 function atkCountersByRetreat(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   let placed = 0;
   for (const root of rootsOf(opponent)) {
-    const cost = getRetreatCostCount(topPokemonCard(opponent, root) || root);
+    // Stamped by reduce.mjs stampOpponentRetreatCosts; the printed cost is the fallback.
+    const cost = root.effectiveRetreatCost ?? getRetreatCostCount(topPokemonCard(opponent, root) || root);
     if (cost > 0 && !attackEffectShielded(ctx, opponent, root)) {
       placeCounters(ctx, root, opponent.playerId, cost * 10);
       placed += 1;
@@ -3547,7 +3591,14 @@ function atkRestOfGame(ctx) {
   return null;
 }
 
+// Imakuni?'s Doduo Harmonize: "you must begin to sing a song" is joke text (I197) — a recognized,
+// harmless no-op so the printed damage is the whole effect and the step is never "unparsed".
+function atkJokeNoOp() {
+  return null;
+}
+
 export const ATTACK_STEP_HANDLERS = {
+  atkJokeNoOp,
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
