@@ -1,5 +1,5 @@
 # 052: Build & Battle unboxing scene (box, deck, packs, card reveals)
-Status: approved (user, 2026-09-28: "start working on design 52") · slices 1–2 built · depends on design 051 slices 1–4
+Status: approved (user, 2026-09-28: "start working on design 52") · slices 1–3 built · depends on design 051 slices 1–4
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -270,10 +270,10 @@ house rule 8). Phone width: box scales to the viewport width, packs wrap two per
 | 10 | card image 404 / logo 404 / key art 404 / face texture 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [x] browser run with TCGdex routed to 404 |
 | 11 | tier mapping across all 130 me02 cards + promos | every `unboxingHoloRarity` result is a family `holo/*.css` styles (or null); reverse slot always ends in "reverse holo"; Rare/Promo → rare holo | [x] unboxing.test row 11 |
 | 12 | hit flare never leaves the card rect | flare + particles are children of the card host with `overflow: hidden` | [x] `.bb-flyer__front` clips `.bb-flare` / `.bb-sparks` |
-| 13 | pool integrity | revealed ids == `session.packs[i]` in order; the scene reads, never writes, `packs` | [ ] |
-| 14 | face shown before the flip midpoint | never: the holo node is created at 50 % of `CARD_FLIP_MS` | [ ] video |
+| 13 | pool integrity | revealed ids == `session.packs[i]` in order; the scene reads, never writes, `packs` | [x] rec-unboxing pass 1: fan ids per pack, `packs` unchanged at the end (seeds 42, 18) |
+| 14 | face shown before the flip midpoint | never: the holo node is created at 50 % of `CARD_FLIP_MS` | [x] rec-unboxing probe: at every face insert the front still faces away (37 reveals × 2 seeds); video |
 | 15 | keyboard-only user | Tab reaches wrap, lid, deck, packs, stack; Enter/Space fires each beat | [x] all are buttons; browser run driven by Enter only |
-| 16 | phone width (390 px) | no horizontal scroll; box, tray, fan wrap | [x] `@media (max-width: 520px)`; browser: scrollWidth 390 (visual check: slice 3) |
+| 16 | phone width (390 px) | no horizontal scroll; box, tray, fan wrap | [x] `@media (max-width: 520px)`; rec-unboxing pass 3: scrollWidth 390 (visual: the builder's deck pane covers the Box tab at 390 px, slice 3 note) |
 | 17 | "Skip scene" from sealed | jumps to done, Pool tab available, one `unbox-done` sound | [x] reducer + voice, unboxing.test row 17; browser: Pool tab shown after skip |
 | 18 | sound context locked (no gesture yet) | `playFxSound` no-ops until the first gesture (existing `bindGestureUnlock`) | [x] reasoning: every beat starts from a gesture |
 
@@ -340,6 +340,21 @@ Slice 2 (2026-09-28):
 - The scene hands over to the Pool tab after the collapse (and after "Skip scene"), with a 240 ms
   fade on the Pool panel. Box-face photos are cached across re-renders so the CSS face never flashes.
 - Pack art is vendored at 440 px wide (≈ 80 KB each; the refs are 780 px).
+
+Slice 3 (2026-09-28):
+- The recorder runs three passes: real-speed video with PASS/FAIL checks (rows 4, 13, 14, plus the
+  foil family of every fanned card against `unboxingHoloRarity`), frozen strips, and a 390 px shot.
+  Strips pause only the animations a beat started and seek them; chained phases (promo lift, fan
+  collapse) are timed from their own animation's start, since a paused first phase never hands on.
+- Seed 42's best card is tier 2 (Ultra Rare), so the tier-3 strip comes from `SEED=18` (tiers
+  per pack printed by the recorder); `flip-hit-t<tier>` names the tier shot.
+- `CARD_IMG` stands in for TCGdex and the Limitless promo host where they are blocked (the cloud
+  sandbox): foil, flare and pacing were checked on a stand-in face, never on real card art.
+- Findings for a later slice (not fixed here): the card face is added on a wall-clock timer while
+  the flip runs on the animation clock, so under load the node lands up to ~380 ms of flight early
+  (hidden by `backface-visibility`, so row 14 holds); at 390 px the builder's deck pane covers the
+  Box tab (the builder window has no phone layout); the shrink-wrap reads faintly and `.bb-hint`
+  is yellow on white.
 
 ---
 Self-approval checklist (only when the user is unreachable):

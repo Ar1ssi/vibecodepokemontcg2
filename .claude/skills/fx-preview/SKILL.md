@@ -1,6 +1,6 @@
 ---
 name: fx-preview
-description: Host the app in e2e mode and capture screenshots/frame strips of board visual effects (Tera/Mega entry animations, Tera crystal skin, holo foil) without playing a real game. Use when changing anything under client/src/setup/netcode/mat-fx/ or mat CSS and you need to see the result.
+description: Host the app in e2e mode and capture screenshots/frame strips of board visual effects (Tera/Mega entry animations, Tera crystal skin, holo foil) without playing a real game, and record the Build & Battle unboxing scene in the builder tab. Use when changing anything under client/src/setup/netcode/mat-fx/, mat CSS, or the unboxing scene and you need to see the result.
 ---
 
 # Previewing board effects in e2e mode
@@ -92,6 +92,35 @@ fakes only the card rects, so it needs no game state. Start a worktree server on
 (`PORT=4100 pnpm start`; the primary's :4000 may be running other code), then
 `node .claude/skills/fx-preview/rec/rec-evolve.mjs`. New effect → copy the closest script.
 Frame sheets from a video: ffmpeg (winget `Gyan.FFmpeg`).
+
+## Builder tab: the Build & Battle unboxing (`rec/rec-unboxing.mjs`)
+
+The unboxing scene (design 052) lives in the builder tab, not on the board, so its recorder drives
+the real page: `/build-and-battle?seed=<SEED>&e2e=1`, a fresh box (it clears
+`ptcg-sim.build-battle.v1` from localStorage), then scripted clicks on the scene's own buttons
+(`.bb-box__wrap`, `.bb-box__open`, `.bb-deck`, `.bb-pack__top`, `.bb-stack`, "Reveal all"; a
+scripted click has `detail === 0`, which the tear buttons accept) plus one real pointer drag on
+the wrap and the first pack.
+
+```bash
+PORT=4100 pnpm start &                     # worktree server
+node .claude/skills/fx-preview/rec/rec-unboxing.mjs            # SEED=42 by default
+SEED=18 node .claude/skills/fx-preview/rec/rec-unboxing.mjs    # seed 18 holds a tier-3 hit (SIR/MHR)
+```
+
+- Pass 1 records the whole box at real speed to `out/unboxing.webm` (`out/unboxing-<seed>.webm`
+  for other seeds) and prints PASS/FAIL for design 052 rows 4 (reload with 3 of 10 revealed),
+  13 (fan ids equal `session.packs`, which never changes), 14 (no card face toward the camera
+  before the flip midpoint) and the foil family of every fanned card. Exit code 1 on any FAIL.
+- Pass 2 (skip with `STRIPS=0`) freezes each beat's animations at start / peak / settle and writes
+  `.agent/scratch/unboxing[-<seed>]/<beat>-{start,peak,settle}.png` for `tear`, `lid`, `promo`,
+  `pack-tear`, `flip-t0`, `flip-hit-t<tier>` (the box's best card) and `collapse`. A chained phase
+  (promo after the unwrap, collapse after the last card) is timed from its own animation's start.
+- Pass 3 shoots `phone-390.png` mid-pack and checks row 16 (no horizontal scroll).
+- `CARD_IMG=<png|url>` serves one image for every card face (TCGdex and the Limitless promo
+  host). Use it where those hosts are blocked; without it a blocked face shows the card-back
+  fallback and the foil layers have nothing to sit on. The card faces are then a stand-in: judge
+  foil, flare and pacing from them, never the card art.
 
 ## Done means
 
