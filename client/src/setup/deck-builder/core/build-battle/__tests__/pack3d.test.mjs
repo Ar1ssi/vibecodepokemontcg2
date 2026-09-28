@@ -39,6 +39,14 @@ import {
   tearHingeV,
   tiltTarget,
   worldPerPixel,
+  PACK_ASPECT,
+  PACK_DROP_BRIGHTNESS,
+  grabLevelPose,
+  linearBrightness,
+  packSpaceY,
+  stackSettlePose,
+  tearFarEnd,
+  tearProgressPose,
 } from '../pack3d.mjs';
 import { packFlyPose, packSpreadSlot, packTearEdge } from '../unboxing.mjs';
 
@@ -425,4 +433,100 @@ test('packPlacement adds sway, tilt and the flight (CSS y down, clockwise) in wo
   close(landed.scale, 1);
   close(landed.rotateYDeg, 0);
   close(landed.rotateZDeg, 0);
+});
+
+test('cardsEmergePose also gives the stack centre in pack space', () => {
+  for (const t of [0, 0.5, 1]) {
+    const pose = cardsEmergePose(t);
+    close(pose.y, pose.v * PACK_ASPECT);
+  }
+});
+
+test('packSpaceY maps art rows to pack space: top edge up, bottom edge down', () => {
+  close(packSpaceY(0), PACK_ASPECT / 2);
+  close(packSpaceY(0.5), 0);
+  close(packSpaceY(1), -PACK_ASPECT / 2);
+  close(packSpaceY(Number.NaN), PACK_ASPECT / 2);
+});
+
+test('tearFarEnd is the end of the tear line the peel runs toward', () => {
+  const line = packTearLine(42, 0);
+  const right = tearFarEnd(line, 1);
+  assert.equal(right.x, 0.5);
+  close(right.y, packSpaceY(line.at(-1).y));
+  const left = tearFarEnd(line, -1);
+  assert.equal(left.x, -0.5);
+  close(left.y, packSpaceY(line[0].y));
+  assert.deepEqual(tearFarEnd([], 1), { x: 0.5, y: packSpaceY(0) });
+});
+
+test('tearProgressPose eases from the release point to the target', () => {
+  close(tearProgressPose(0, 0.3, 0), 0.3);
+  close(tearProgressPose(1, 0.3, 0), 0);
+  close(tearProgressPose(1, 0.4, 1), 1);
+  assert.ok(
+    tearProgressPose(0.5, 0.4, 1) > 0.4 + 0.3,
+    'eases out: most of the way by half time'
+  );
+  close(tearProgressPose(2, 2, -1), 0, 1e-9, 'inputs clamp to 0..1');
+});
+
+test('grabLevelPose runs 0 → 1', () => {
+  assert.equal(grabLevelPose(0), 0);
+  assert.equal(grabLevelPose(1), 1);
+  assert.ok(grabLevelPose(0.5) > 0 && grabLevelPose(0.5) < 1);
+});
+
+test('stackSettlePose glides from the risen stack to the DOM card', () => {
+  const from = { x: 0.1, y: 0.9, z: 0.02, scale: 0.8 };
+  const to = { x: 0, y: 0.2, z: 0, scale: 1.3 };
+  const start = stackSettlePose(0, from, to);
+  const end = stackSettlePose(1, from, to);
+  for (const key of ['x', 'y', 'z', 'scale']) {
+    close(start[key], from[key], 1e-6);
+    close(end[key], to[key], 1e-6);
+  }
+  close(start.turn, 0, 1e-6);
+  close(end.turn, 1, 1e-6);
+  const mid = stackSettlePose(0.5, from, to);
+  assert.ok(mid.turn > 0.5 && mid.turn < 1);
+  assert.ok(mid.y < from.y && mid.y > to.y);
+});
+
+test('linearBrightness matches CSS brightness() once the renderer encodes to sRGB', () => {
+  assert.equal(linearBrightness(1), 1);
+  assert.equal(linearBrightness(0), 0);
+  close(linearBrightness(0.55) ** (1 / 2.2), 0.55, 1e-9);
+  assert.ok(
+    linearBrightness(0.55) < 0.3,
+    'side packs dim far more in linear light'
+  );
+  assert.equal(linearBrightness(2), 1);
+});
+
+test('packPlacement: level stills sway and tilt, drop moves the pack away', () => {
+  const home = { x: 0, y: 0, width: 1, height: 1.8 };
+  const sway = { rotateYDeg: 3, rotateXDeg: 2, bob: 0.01 };
+  const tilt = { rotateYDeg: 5, rotateXDeg: -4 };
+  const loose = packPlacement({ home, sway, tilt, level: 0 });
+  close(loose.rotateYDeg, 8);
+  const still = packPlacement({ home, sway, tilt, level: 1 });
+  close(still.rotateYDeg, 0);
+  close(still.rotateXDeg, 0);
+  close(still.y, 0);
+  const half = packPlacement({ home, sway, tilt, level: 0.5 });
+  close(half.rotateYDeg, 4);
+  const dropped = packPlacement({
+    home,
+    level: 1,
+    drop: { y: -2, rotateXDeg: -14 },
+  });
+  close(dropped.y, -2);
+  close(dropped.rotateXDeg, -14);
+});
+
+test('packDropPose dims the falling pack to the queued packs’ level', () => {
+  assert.equal(packDropPose(0).brightness, 1);
+  close(packDropPose(1).brightness, PACK_DROP_BRIGHTNESS, 1e-6);
+  assert.ok(packDropPose(0.5).brightness < 1);
 });

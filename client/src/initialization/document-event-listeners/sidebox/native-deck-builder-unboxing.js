@@ -4,7 +4,7 @@ import {
   boxFaceTexture,
   packArtSrc,
 } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
-import { packFlyParams } from '../../../setup/deck-builder/core/build-battle/pack3d.mjs';
+import { packFlyParams, peelSide } from '../../../setup/deck-builder/core/build-battle/pack3d.mjs';
 import {
   CARDS_PER_PACK,
   DECK_UNWRAP_MS,
@@ -601,12 +601,24 @@ export const mountUnboxingScene = ({
       const stripShift = (progress) => widthOf() * progress * 0.5;
       bindTear(top, {
         widthOf,
+        // With the 3D stage the finger peels the WebGL strip; the cut line runs from the grabbed end.
+        onStart: (event) => {
+          if (!packStage) return;
+          const side = peelSide(event.clientX, pack.getBoundingClientRect());
+          cut.style.transformOrigin = side === 1 ? '0 50%' : '100% 50%';
+          packStage.beginTear({ packIndex, side });
+        },
         onProgress: (progress) => {
           cut.style.transform = `scaleX(${Math.min(1, progress / PACK_TORN_AT)})`;
+          if (packStage) {
+            packStage.setTearProgress(progress);
+            return;
+          }
           strip.style.transform = `translateX(${stripShift(progress)}px) rotate(${progress * 6}deg)`;
         },
         onSpring: (progress) => {
           cut.style.transform = 'scaleX(0)';
+          if (packStage) return packStage.springBack(progress);
           return playPose(
             strip,
             (t) => lerp(stripShift(progress), 0, easeOut(t)),
@@ -615,7 +627,7 @@ export const mountUnboxingScene = ({
             { samples: 8 }
           );
         },
-        onTear: (progress) => beatTearPack(packIndex, stripShift(progress)),
+        onTear: (progress) => beatTearPack(packIndex, stripShift(progress), progress),
       });
       fly.append(strip, cut, top);
     }
@@ -781,7 +793,11 @@ export const mountUnboxingScene = ({
     teardown();
     const u = getUnboxing();
     const view = viewOf(u);
-    packStage?.jumpToEnd();
+    // A new picture lands every 3D animation, except the rip's own hand-off to the pocket.
+    if (entrance?.cut3d === undefined) {
+      packStage?.jumpToEnd();
+      packStage?.clearCards();
+    }
     root.replaceChildren();
     adoptPackStage();
     if (packStage) root.append(packStage.canvas);
@@ -812,10 +828,18 @@ export const mountUnboxingScene = ({
   const spreadAnchors = () => [...root.querySelectorAll('.bb-spread .bb-bigpack')];
   const spreadFocus = () => Number(root.querySelector('.bb-spread')?.dataset.focus) || 0;
 
+  // The top card the stack shows when pack `packIndex` is ripped: a hit stays face down (row 16).
+  const topCardOf = (packIndex) => ({
+    imageUrl: cardImage(packs[packIndex]?.[0], 'small') || null,
+    faceDown: isHiddenHit(packIndex, 0),
+  });
+
   function syncPackStage(view) {
     if (!packStage) return;
-    if (view === 'spread') packStage.showSpread({ anchors: spreadAnchors(), focus: spreadFocus() });
-    else packStage.hide();
+    if (view === 'spread') {
+      const focus = spreadFocus();
+      packStage.showSpread({ anchors: spreadAnchors(), focus, topCard: topCardOf(focus) });
+    } else packStage.hide();
   }
 
   function adoptPackStage() {
@@ -903,6 +927,7 @@ export const mountUnboxingScene = ({
     }
     if (entrance?.fly) playFly(entrance.fly);
     if (entrance?.cut !== undefined) playCut();
+    if (entrance?.cut3d !== undefined) playCut3d();
     if (entrance === 'summary') playDeal();
     if (entrance === 'spread') playSpreadIn();
     if (entrance === 'sweep') playSweep();
@@ -947,11 +972,41 @@ export const mountUnboxingScene = ({
   // anchors' tear buttons (and their glint) stay hidden until the packs are down.
   const playFly3d = (spread, boxRect, fade) => {
     spread.classList.add('is-landing');
-    const flights = packStage.showSpread({ anchors: spreadAnchors(), focus: spreadFocus(), fromBoxRect: boxRect });
+    const focus = spreadFocus();
+    const flights = packStage.showSpread({
+      anchors: spreadAnchors(),
+      focus,
+      fromBoxRect: boxRect,
+      topCard: topCardOf(focus),
+    });
     holdWhile(Promise.all([fade, flights])).then((current) => {
       if (!current) return;
       packStage?.jumpToEnd();
       spread.classList.remove('is-landing');
+    });
+  };
+
+  // The 3D stack glides onto the pocket's top card, then in one frame the DOM stack shows and the
+  // WebGL stack goes (the pocket renders hidden, layout kept, until then).
+  const playCut3d = () => {
+    const pocket = root.querySelector('.bb-pocket');
+    const top = root.querySelector('.bb-pcard.is-top');
+    if (!packStage || !pocket || !top) {
+      packStage?.jumpToEnd();
+      packStage?.clearCards();
+      return;
+    }
+    pocket.classList.add('is-awaiting-3d');
+    const gen = generation;
+    holdWhile(packStage.settleStackTo(top.getBoundingClientRect())).then(() => {
+      if (gen !== generation) return;
+      // A backstop that won (hidden tab) lands whatever is still playing.
+      packStage?.jumpToEnd();
+      requestAnimationFrame(() => {
+        if (gen !== generation) return;
+        pocket.classList.remove('is-awaiting-3d');
+        packStage?.clearCards();
+      });
     });
   };
 
@@ -1087,7 +1142,11 @@ export const mountUnboxingScene = ({
     render({ entrance: { fly: boxRect } });
   }
 
-  const beatTearPack = (packIndex, fromShiftPx = 0) => {
+  const beatTearPack = (packIndex, fromShiftPx = 0, fromProgress = 0) => {
+    if (packStage) {
+      beatTearPack3d(packIndex, fromProgress);
+      return;
+    }
     const focus = root.querySelector(`.bb-bigpack[data-pack="${packIndex}"]`);
     const strip = focus?.querySelector('.bb-pack__strip');
     const cut = focus?.querySelector('.bb-cutline');
@@ -1096,29 +1155,34 @@ export const mountUnboxingScene = ({
     runBeat(
       { type: 'tearPack', packIndex },
       unboxingVoiceFor('tearPack'),
-      () => {
-        releaseTornPack(focus, packIndex);
-        return playPose(
+      () =>
+        playPose(
           strip,
           (t) => ({ x: lerp(fromShiftPx, travel, easeOut(t)), y: -60 * t, rotate: lerp(4, 24, t), opacity: 1 - t }),
           ({ x, y, rotate, opacity }) => ({ transform: `translate(${x}px, ${y}px) rotate(${rotate}deg)`, opacity }),
           PACK_TEAR_MS
-        );
-      },
+        ),
       { cut: packIndex }
     );
   };
 
-  // Until the 3D rip exists (design 054 slice 3) the torn pack is the DOM one: the stage lets go
-  // of it and keeps drawing the packs still queued.
-  function releaseTornPack(focusEl, packIndex) {
-    if (!packStage || !focusEl) return;
-    focusEl.classList.add('is-dom-tear');
-    packStage.showSpread({
-      anchors: spreadAnchors().filter((anchor) => Number(anchor.dataset.pack) !== packIndex),
-      focus: packIndex,
-    });
-  }
+  // The WebGL rip: the strip finishes tearing and flies, the cards rise out of the mouth and the
+  // pack drops away; the pocket then takes over (`cut3d`). The cut line gives way to the torn edge.
+  const beatTearPack3d = (packIndex, fromProgress) => {
+    const focus = root.querySelector(`.bb-bigpack[data-pack="${packIndex}"]`);
+    const cut = focus?.querySelector('.bb-cutline');
+    runBeat(
+      { type: 'tearPack', packIndex },
+      unboxingVoiceFor('tearPack'),
+      () => {
+        if (cut) cut.style.transform = 'scaleX(0)';
+        // The tear button's hint, glint and focus ring would float over the flying strip.
+        focus?.classList.add('is-ripping');
+        return packStage ? packStage.rip({ fromProgress, topCard: topCardOf(packIndex) }) : Promise.resolve();
+      },
+      { cut3d: packIndex }
+    );
+  };
 
   // ── Card moves: swipe the top card away, or turn a hit over ──────────
   const topCard = () => root.querySelector('.bb-pcard.is-top');
@@ -1353,12 +1417,13 @@ export const mountUnboxingScene = ({
   }
 
   // ── Tear input: drag ≥ 40 % across, or press (row 5); Enter/Space on the button ─
-  function bindTear(target, { widthOf, onProgress, onSpring, onTear }) {
+  function bindTear(target, { widthOf, onStart, onProgress, onSpring, onTear }) {
     let drag = null;
     target.addEventListener('pointerdown', (event) => {
       if (target.disabled || busy || event.button !== 0) return;
       drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, dx: 0, moved: 0, fired: false };
       target.setPointerCapture?.(event.pointerId);
+      onStart?.(event);
     });
     target.addEventListener('pointermove', (event) => {
       if (!drag || event.pointerId !== drag.id || drag.fired) return;

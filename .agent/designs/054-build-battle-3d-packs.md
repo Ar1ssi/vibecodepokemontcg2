@@ -290,20 +290,20 @@ background: none; }`, `.bb-pocket.is-awaiting-3d { visibility: hidden; }`. No id
 | 1 | WebGL unavailable / context creation fails | `createPackStage` → null; `data-render='dom'`; the 052 scene runs unchanged | [x] `createPackStage` gets the `webgl2` context itself (none → null, no three console error); `.agent/scratch/bb3d/cap-slice2.mjs nowebgl` (`--disable-webgl`): `data-render=dom`, no canvas, the DOM tear lands on the pocket |
 | 2 | `import()` of the stage or vendored three fails (404, offline) | DOM path, no console error spam, scene playable | [x] `loadPackStage` `.catch(() => null)`; cap-slice2 `noimport` (stage module 404) and `nothree` (vendor 404): DOM spread, tear works, no console output besides the 404 lines |
 | 3 | pack art texture fails to load | stage → null before first use (DOM path) | [x] `createPackStage` awaits every pack texture before returning; cap-slice2 `noart` (pack webp 404): `data-render=dom` |
-| 4 | top-card texture 404 / CORS blocked / slower than 1500 ms | stack shows the card back; hand-off unchanged | [ ] |
+| 4 | top-card texture 404 / CORS blocked / slower than 1500 ms | stack shows the card back; hand-off unchanged | [x] `dressStack` races the face against `CARD_TEXTURE_TIMEOUT_MS` (a failed load is null → card back); cap-slice3 `noface`: TCGdex 404 and a 20 s delay both rise on the card back (`noface-slow-rising.png`), hand-off unchanged, no errors |
 | 5 | `body.fx-off` / `fxDisabled()` | no stage created, no WebGL context | [x] `loadPackStage` and `createPackStage` check `fxDisabled()`; the loop drops the stage (`onLost`) if FX go off mid-spread; cap-slice2 `fxoff` (0 WebGL contexts) and `fxoffmid` (DOM, canvas gone) |
-| 6 | `motionReduced()` | stage renders static packs; no rAF loop; rip/flight/settle land at once; sounds play | [x] (slice 2 part) `animate` applies the last frame and plays its sound at once, no loop; redraws on resize / `transitionend` only; cap-slice2 `reduced`: 0 stage rAF calls in 1 s at rest (`reduced-spread.png`). Rip/settle: slice 3 |
-| 7 | drag released at 39 % / 40 %, press < 6 px, Enter/Space | spring back / rip / rip / rip (052 row 5 outcomes, via the unchanged `bindTear`) | [ ] |
-| 8 | pointer drag starting on the right half | peel runs right → left (`peelSide` −1) | [ ] |
-| 9 | second press while a rip plays (`busy`) | ignored, as today | [ ] |
-| 10 | Skip scene mid-rip / mid-fly | `jumpToEnd`, scene ends, `dispose` releases the context; no late callback touches the DOM (`generation`) | [ ] |
-| 11 | tab hidden mid-rip (rAF paused) | `withBackstop` fires, `jumpToEnd`, render proceeds | [ ] |
+| 6 | `motionReduced()` | stage renders static packs; no rAF loop; rip/flight/settle land at once; sounds play | [x] (slice 2 part) `animate` applies the last frame and plays its sound at once, no loop; redraws on resize / `transitionend` only; cap-slice2 `reduced`: 0 stage rAF calls in 1 s at rest (`reduced-spread.png`). Slice 3: cap-slice3 `reduced`: a drag rip lands flight, rise, drop and settle at once and hands off (`reduced-after-rip.png`), canvas empty after, no errors; `unbox-tear` still plays (runBeat) |
+| 7 | drag released at 39 % / 40 %, press < 6 px, Enter/Space | spring back / rip / rip / rip (052 row 5 outcomes, via the unchanged `bindTear`) | [x] `bindTear` unchanged except an `onStart` hook; cap-slice3 `flow`: release at 39 % springs back (`spring-back-mid.png`), a drag past 40 % rips mid-drag, a press under 6 px rips, Enter on the focused button rips (side 1) and hands off |
+| 8 | pointer drag starting on the right half | peel runs right → left (`peelSide` −1) | [x] `onStart` → `beginTear({ side: peelSide(x, anchor rect) })`; cap-slice3 `flow` pack 4: `peel-30-right.png` folds from the right corner, the strip flies left |
+| 9 | second press while a rip plays (`busy`) | ignored, as today | [x] `bindTear` ignores presses while `busy`; the 3D tear button is hidden (`.is-ripping`); cap-slice3 `flow`: a click and an Enter during the rip leave `packsTorn` at `[true,false,false,false]` |
+| 10 | Skip scene mid-rip / mid-fly | `jumpToEnd`, scene ends, `dispose` releases the context; no late callback touches the DOM (`generation`) | [x] `render()` (skip) → `jumpToEnd` + `clearCards`, unmount → `dispose`; cap-slice3 `skip` (skip 300 ms into the rip): stage `done`, canvas released, no errors after 2 s more of page clock |
+| 11 | tab hidden mid-rip (rAF paused) | `withBackstop` fires, `jumpToEnd`, render proceeds | [x] cap-slice3 `hidden` (rAF stubbed after the rip): the backstop renders the pocket (hidden, awaiting); rAF back → `settleStackTo`, `jumpToEnd`, hand-off lands, canvas empty, no errors |
 | 12 | `webglcontextlost` mid-spread | stage disposed, scene re-renders on the DOM path at the same state | [x] `webglcontextlost` → `preventDefault`, `onLost` → `dropPackStage` disposes and re-renders; cap-slice2 `lost` (`WEBGL_lose_context`): DOM spread at the same state, no console output |
 | 13 | reload at spread / mid-pocket / summary | spread: 3D packs at rest; pocket/summary: DOM only, no stack in the canvas | [x] cap-slice2 `reload`: the spread reloads to 3D; a mid-pocket reload draws nothing in the canvas (screenshots with and without the canvas are byte-equal). Summary is view-only (a reload lands on the next spread) and uses the same `hide()` |
 | 14 | box mounted and unmounted 20 times (Box ↔ Pool tabs) | one context at a time; no "Too many active WebGL contexts" warning | [x] unmount → `dispose()` (`forceContextLoss`); a stage resolving after unmount is disposed; cap-slice2 `mounts`: 20 mount → 3D → unmount cycles, no leftover canvas, no warning |
 | 15 | window resize / phone width 390 px mid-spread | renderer and camera resize; packs follow the anchors; no horizontal scroll | [x] `ResizeObserver` on host and canvas; packs re-read anchor rects every frame; cap-slice2 `main` (1280×800 → 900×700: canvas buffer = viewport) and `phone` (390 px: no horizontal scroll, `phone-390-spread.png`) |
-| 16 | hit card on top of a fresh pack (tier ≥ 2) | 3D stack shows the card back; DOM shows the face-down hit with its aura after hand-off (052 row 14 holds) | [ ] |
-| 17 | pool integrity | the stage reads `packs`, never writes; `session.unboxing` changes only through `dispatch` | [ ] |
+| 16 | hit card on top of a fresh pack (tier ≥ 2) | 3D stack shows the card back; DOM shows the face-down hit with its aura after hand-off (052 row 14 holds) | [x] `topCardOf` sets `faceDown` from `isHiddenHit`; no seed 1..5000 has a hit as a pack's first card (`.agent/scratch/bb3d/find-hit-seed.mjs`: all 20000 first cards tier 0), so cap-slice3 `hit` mounts the real scene and reducer with a real SIR (Mega Charizard X ex) first: the stack rises on the card back (`hit-stack-rising.png`), the DOM top card is `.is-hit` tier 3 after the hand-off (`hit-handoff-after.png`) |
+| 17 | pool integrity | the stage reads `packs`, never writes; `session.unboxing` changes only through `dispatch` | [x] the stage gets card URLs only and never sees `dispatch` or the session; cap-slice3 `flow`: `session.packs` byte-equal before and after four 3D rips |
 | 18 | `packTearLine` vs `packTearEdge` | same points for seeds 1, 18, 42, 999 × packs 0–3 | [ ] |
 | 19 | vendored three drifts from the pinned package | `vendor-three.test.mjs` fails | [ ] |
 | 20 | `pnpm lint` / `pnpm format` | skip `client/src/vendor/**` | [ ] |
@@ -388,6 +388,37 @@ Slice 2 (2026-09-29):
   DOM fly does (`fill: both`), and plays `unbox-unwrap` at its launch.
 - After a `render()` the anchors ease into their slots over the existing 320 ms CSS transition (the
   DOM path does this too), so 3D side packs slide out from behind the focus pack after each render.
+
+Slice 3 (2026-09-29):
+- Stage API additions: `showSpread` takes `topCard` (`{imageUrl, faceDown}` of the focus pack's
+  first card) and starts loading its face then (the preload the brief asked for); the 1500 ms race
+  runs from the rip. `springBack()` springs from the drawn peel, not its argument.
+- Pure additions in `pack3d.mjs` (tested): `SPRING_BACK_MS`, `packSpaceY`, `tearFarEnd` (fleck
+  origin), `tearProgressPose` (spring back and rip finish, ease-out), `grabLevelPose`,
+  `stackSettlePose`, `linearBrightness`, `PACK_DROP_BRIGHTNESS` (0.55); `cardsEmergePose` also
+  returns `y` in pack space; `packDropPose` also returns `brightness`; `packPlacement` takes `level`
+  (stills sway and tilt) and `drop`.
+- Side-pack dimming: slice 2 multiplied linear light by the slot brightness, which after sRGB
+  encoding is far weaker than CSS `brightness(0.55)` (side/focus luminance 0.73 vs the DOM's
+  0.66). Now `linearBrightness(b) = b^2.2` scales `color`, `emissiveIntensity` and `clearcoat`;
+  `envMapIntensity` stays 0.35, since `color` already scales the env's diffuse and tinted reflection
+  (scaling both dimmed to 0.27). Measured side/focus luminance: 0.60.
+- The falling pack dims to 0.55 (`PACK_DROP_BRIGHTNESS`) as it drops: tipped back 14°, its face
+  caught the room's bright ceiling and washed out.
+- Card stack faces are `MeshBasicMaterial`, `toneMapped: false`, `alphaTest` 0.5 (the images' round
+  corners): unlit, so the settled stack matches the DOM card pixel for pixel at the hand-off. Until
+  the card back texture loads the faces are the back's blue (0x1d3f8f).
+- The mouth clip plane is dropped (moved to infinity) once the settle starts, so the stack never
+  clips against the falling pack; it follows the pack's world matrix until then.
+- Scene: the 3D tear button, its hint and focus ring hide during the rip (`.is-ripping`), and the
+  DOM cut line resets at the rip (it would sit glowing on the torn edge); during the drag it runs
+  from the grabbed side. `render()` lands 3D animations and clears the stack on every new picture
+  except the rip's own `cut3d` hand-off, so the pack keeps falling while the stack settles.
+- Flecks: `fx-particle--shard`, silver `#d9dbe0`, 560 ms, 2–5 px, reach 0.3 × the pack's on-screen
+  width, a 150° spray toward the tear's far side with light gravity, in a fixed `.bb-flecks` host
+  (z-index 4) at the projected far end of the tear line; skipped in reduced motion and on `jumpToEnd`.
+- The interim DOM tear (`releaseTornPack`, `.is-dom-tear`) is gone; without a stage `beatTearPack`
+  is the pre-slice-2 code (diffed against dde2631c).
 
 ---
 Self-approval checklist (only when the user is unreachable):

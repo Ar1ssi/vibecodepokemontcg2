@@ -26,6 +26,7 @@ export const PEEL_BAND = 0.18;
 export const PEEL_CURL = 0.35;
 export const GRAB_LEVEL_MS = 120;
 export const RIP_FINISH_MS = 140;
+export const SPRING_BACK_MS = 160;
 export const RIP_TICK_STEP = 0.1;
 export const STRIP_FLIGHT_MS = 650;
 export const STRIP_GRAVITY = -6;
@@ -41,6 +42,9 @@ export const CARDS_TO_V = 0.5;
 export const PACK_DROP_MS = 520;
 export const PACK_DROP_AT = 0.45;
 export const PACK_DROP_ROTATE_X_DEG = -14;
+// The emptied pack dims as it falls, to the queued packs' level: tipped back, its face would
+// otherwise catch the room's bright ceiling and wash out.
+export const PACK_DROP_BRIGHTNESS = 0.55;
 const PACK_DROP_VIEWPORTS = 1.4;
 export const STACK_SETTLE_MS = 280;
 export const STACK_CARD_WIDTH = 0.62;
@@ -174,18 +178,80 @@ export function stripFlightPose(t, { side = 1 } = {}) {
   };
 }
 
-/** @returns {{v: number}} the card stack's offset out of the mouth, in pack heights. */
+/**
+ * @returns {{v: number, y: number}} the card stack's centre relative to the pack's centre: `v` in
+ *   pack heights, `y` in pack space (pack widths, y up)
+ */
 export function cardsEmergePose(t) {
-  return { v: lerp(CARDS_FROM_V, CARDS_TO_V, easeLift(clamp01(t))) };
+  const v = lerp(CARDS_FROM_V, CARDS_TO_V, easeLift(clamp01(t)));
+  return { v, y: v * PACK_ASPECT };
 }
 
-/** The emptied pack falling away below the screen and tipping back. */
+/** @returns {number} art row `v` (0 at the top) as a y in pack space (pack centred, y up). */
+export function packSpaceY(v) {
+  return (0.5 - (Number.isFinite(v) ? v : 0)) * PACK_ASPECT;
+}
+
+/**
+ * The end of the tear line the peel runs toward (where the rip finishes and the flecks fly), in
+ * pack space: the right end for a left → right tear (`side` 1), the left end otherwise.
+ *
+ * @returns {{x: number, y: number}}
+ */
+export function tearFarEnd(line, side = 1) {
+  const points = Array.isArray(line) ? line : [];
+  const end = side === -1 ? points[0] : points.at(-1);
+  return {
+    x: side === -1 ? -0.5 : 0.5,
+    y: packSpaceY(end?.y ?? 0),
+  };
+}
+
+/**
+ * The peel's progress `t` of the way from `fromProgress` to `toProgress`, easing out: the spring
+ * back (to 0, `SPRING_BACK_MS`) and the finished rip (to 1, `RIP_FINISH_MS`).
+ */
+export function tearProgressPose(t, fromProgress, toProgress) {
+  const x = clamp01(t);
+  return lerp(clamp01(fromProgress), clamp01(toProgress), 1 - (1 - x) ** 3);
+}
+
+/** How level the grabbed pack is, 0 (swaying, tilting) → 1 (still), over `GRAB_LEVEL_MS`. */
+export function grabLevelPose(t) {
+  return smoothstep(0, 1, t);
+}
+
+/**
+ * The risen stack gliding onto the DOM top card: `from` / `to` are `{x, y, z, scale}` in world
+ * units; `turn` is the eased share for the rotation (the DOM twin slerps to upright by it).
+ */
+export function stackSettlePose(t, from, to) {
+  const k = easeLift(clamp01(t));
+  return {
+    x: lerp(from.x, to.x, k),
+    y: lerp(from.y, to.y, k),
+    z: lerp(from.z, to.z, k),
+    scale: lerp(from.scale, to.scale, k),
+    turn: k,
+  };
+}
+
+/**
+ * The linear-light factor that dims a lit pack like CSS `brightness(b)` dims the DOM one: CSS
+ * multiplies the sRGB-encoded value, the renderer multiplies linear light before encoding.
+ */
+export function linearBrightness(brightness) {
+  return clamp01(brightness) ** 2.2;
+}
+
+/** The emptied pack falling away below the screen, tipping back and dimming. */
 export function packDropPose(t, { viewportWorldH = 0 } = {}) {
   const x = clamp01(t);
   const height = Number.isFinite(viewportWorldH) ? viewportWorldH : 0;
   return {
     y: -PACK_DROP_VIEWPORTS * height * x * x,
     rotateXDeg: PACK_DROP_ROTATE_X_DEG * easeLift(x),
+    brightness: lerp(1, PACK_DROP_BRIGHTNESS, easeLift(x)),
   };
 }
 
@@ -224,25 +290,42 @@ export function packFlyParams(boxRect, anchorRect, slotScale = 1) {
  * One pack's transform this frame, y up: its anchor's rect on the z = 0 plane (`home`, from
  * `rectToWorld`), its spread slot's depth and turn, the idle sway, the pointer tilt and, while it
  * flies, a `packFlyPose3d` (client pixels relative to home; CSS rotates clockwise, y down).
+ * `level` (0..1, `grabLevelPose`) stills the sway and tilt of a grabbed pack; `drop`
+ * (`packDropPose`) moves the emptied pack away.
  *
  * @returns {{x: number, y: number, z: number, rotateXDeg: number, rotateYDeg: number,
  *   rotateZDeg: number, scale: number}|null} null without a home
  */
-export function packPlacement({ home, slot, sway, tilt, fly, worldPerPx }) {
+export function packPlacement({
+  home,
+  slot,
+  sway,
+  tilt,
+  fly,
+  worldPerPx,
+  level = 0,
+  drop = null,
+}) {
   if (!home || !(home.width > 0)) return null;
   const num = (value) => (Number.isFinite(value) ? value : 0);
   const perPx = num(worldPerPx);
+  const loose = 1 - clamp01(level);
   const scale = home.width * (fly && fly.scale > 0 ? fly.scale : 1);
   return {
     x: home.x + num(fly?.translateXPx) * perPx,
-    y: home.y - num(fly?.translateYPx) * perPx + num(sway?.bob) * scale,
+    y:
+      home.y -
+      num(fly?.translateYPx) * perPx +
+      num(sway?.bob) * scale * loose +
+      num(drop?.y),
     z: num(slot?.zWorld),
-    rotateXDeg: num(sway?.rotateXDeg) + num(tilt?.rotateXDeg),
+    rotateXDeg:
+      (num(sway?.rotateXDeg) + num(tilt?.rotateXDeg)) * loose +
+      num(drop?.rotateXDeg),
     rotateYDeg:
       num(slot?.rotateYDeg) +
       num(fly?.rotateYDeg) +
-      num(sway?.rotateYDeg) +
-      num(tilt?.rotateYDeg),
+      (num(sway?.rotateYDeg) + num(tilt?.rotateYDeg)) * loose,
     rotateZDeg: -num(fly?.rotateZDeg),
     scale,
   };

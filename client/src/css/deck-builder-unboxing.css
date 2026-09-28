@@ -1083,18 +1083,20 @@
 .build-battle-window .db-live [data-render='3d'] .bb-spread.is-landing .bb-pack__top {
   visibility: hidden;
 }
-/* Until the 3D rip (054 slice 3): the pack being torn is the DOM one again. */
-.build-battle-window
-  .db-live
-  [data-render='3d']
-  .bb-bigpack.is-dom-tear
-  .bb-pack__body,
-.build-battle-window
-  .db-live
-  [data-render='3d']
-  .bb-bigpack.is-dom-tear
-  .bb-pack__strip {
-  visibility: visible;
+.build-battle-window .db-live [data-render='3d'] .bb-bigpack.is-ripping .bb-pack__top {
+  visibility: hidden;
+}
+/* The pocket keeps its layout (the 3D stack settles onto its top card) until the hand-off. */
+.build-battle-window .db-live .bb-pocket.is-awaiting-3d {
+  visibility: hidden;
+}
+/* The silver flecks of the rip, sprayed from the far end of the tear line over the canvas. */
+.build-battle-window .db-live .bb-flecks {
+  position: fixed;
+  z-index: 4;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
 /* ── Pocket: the cards of the opened pack, one at a time ─────────────────── */
