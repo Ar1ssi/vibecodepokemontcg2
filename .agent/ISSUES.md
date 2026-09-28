@@ -6,12 +6,17 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I192). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I197). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I196 2026-09-28 P2 [rules] Alakazam ex Dimensional Hand ("can be used even if this Pokémon is on the Bench") unsupported: the attack pipeline assumes the Active attacks; needs attacker selection by instanceId (refs: .agent/scratch/parse-holes/landing.md)
+- I195 2026-09-28 P2 [rules] Flygon ex Psychic Protector (discard up to 4 when damaged, −10 each) and Delibird Souvenir coin tiers unimplemented: need a defender prompt mid-damage / a per-tier coin step (refs: parse-holes review.md)
+- I194 2026-09-28 P3 [rules] Approximations: Bronzong Heavy Potential reads printed Retreat Cost; Night Spin counts Energy cards not units; Metal Bomber / Reaper Pulse "up to" take the max; stampHealedPokemon counts counter moves as heals; Mothim/Ninjask Quick Touch and Magcargo Lava Plume "If you do" halves unparsed
+- I193 2026-09-28 P3 [tooling] Parse-hole gate item 2 open: condition-true replay (satisfy each parsed bonus condition on a second board, assert base + bonus) (refs: .agent/scratch/parse-holes/FINDINGS.md)
+- I192 2026-09-28 P3 [rules] Imakuni?'s Doduo Harmonize (sing a song; joke text) not modelled
 - I191 2026-09-26 P3 [tooling] The ability passive probe asks every reader with the plain opponent Active (V/VMAX/VSTAR sit on the Bench), so attacker rule-box filters read `unconsumed` although they work against a matching attacker (Dauntless Shield / Crystal Veil class) (refs: S325, scripts/lib/ability-passive-probe.mjs)
 - I190 2026-09-26 P3 [rules] Deferred S&M trainer clauses: Bellelba & Brycen-Man CEC 186 and Sabrina's Suggestion TEU 154 unrecognizable; Choose-1 second modes (Rescue Stretcher GRI 130, Energy Recycle System CES 128, Fossil Excavation Map FLI 107, Tate & Liza CES 148); Mallow & Lana CEC 198 optional discard+heal; Missing Clover UPR 129 4-card Prize mode; Cross Switcher BUS 115 2-card play gate (refs: .agent/scratch/sm-trainer-audit/report.md, S325)
 - I183 2026-09-26 P3 [tests] coin-flip-ceremony.test.mjs "ceremony mounts a material-stamped coin" flakes under full `pnpm test` load (message '' vs /Tails! You go first\./); passes 3/3 alone — timing-dependent wait.
