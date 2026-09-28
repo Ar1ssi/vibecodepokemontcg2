@@ -565,6 +565,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       ...(damage.distributable ? { distributable: true, remaining: damage.remaining } : {}),
       ...(damage.countFromEnergy ? { countFromEnergy: damage.countFromEnergy } : {}),
       ...(damage.chooser ? { chooser: damage.chooser } : {}),
+      ...(damage.amountPerEnergy ? { amountPerEnergy: true } : {}),
       // Attack damage to the Active applies Weakness/Resistance unless the text
       // waives it for every target ("... for Benched Pokémon" waives only those;
       // Arboliva ex: "This damage isn't affected by Weakness or Resistance").
@@ -6321,7 +6322,9 @@ function resolveAttackEffectPhase(draft, ctx) {
   // Cards a before-damage Lost Zone cost moved (Rotom V Scrap Short). The cost is those
   // attacks' only before-damage step, so it moves in the command that reaches damage.
   const handDiscarded = attackSteps.before.some(
-    (step) => step.countsForDamage && (step.type === 'atkDiscardOwnHand' || step.type === 'atkDiscardHandEnergy')
+    (step) =>
+      step.countsForDamage &&
+      ['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkDiscardBenchEnergy'].includes(step.type)
   )
     ? events
         .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
@@ -6866,6 +6869,14 @@ function resolveAttackEffectPhase(draft, ctx) {
               attack,
             })
           : resolveAttackTargetClause(attack.text, parsed, spread);
+      // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
+      if (attackTarget?.amountPerEnergy) {
+        const ref = attacker ? findCard(draft, attacker.instanceId) : null;
+        const energyCards = ref
+          ? (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length
+          : 0;
+        attackTarget = energyCards > 0 ? { ...attackTarget, amount: attackTarget.amount * energyCards } : null;
+      }
       // Probopass Metal Bomber: as many picks as the attacker has Energy of the printed type.
       if (attackTarget?.countFromEnergy) {
         const picks = attachedEnergyOfType(draft, attacker, attackTarget.countFromEnergy);
@@ -6959,7 +6970,8 @@ function resolveAttackEffectPhase(draft, ctx) {
 
       // The Active takes the damage-each clause through Weakness and Resistance unless the
       // text waives them; the Bench never does.
-      if (eachDamage) {
+      // Chingling Uproar: "If heads, this attack does 10 damage to each of your opponent's Pokémon."
+      if (eachDamage && (!eachDamage.gate || coin === eachDamage.gate)) {
         const victimPlayer = draft.players[defenderPlayerId];
         const zones = victimPlayer?.zones || {};
         const roots = eachDamage.activeOnly
@@ -6967,6 +6979,12 @@ function resolveAttackEffectPhase(draft, ctx) {
           : [...rootsIn(zones.active), ...rootsIn(zones.bench)];
         const selection = roots
           .filter((root) => eachFilterMatches(victimPlayer, root, eachDamage.filter))
+          .filter((root) => {
+            if (!eachDamage.perTargetCoin) return true;
+            const face = flipCoin(activeRng);
+            events.push({ type: 'coinFlipped', playerId, face, instanceId: root.instanceId, source: attack.name });
+            return face === 'heads';
+          })
           .map((root) => root.instanceId);
         benchDealt += applyAttackTargets(draft, {
           selection,

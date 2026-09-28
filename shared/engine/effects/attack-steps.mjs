@@ -536,6 +536,26 @@ function atkDiscardSelfEnergy(ctx) {
   return discardChosen(ctx, energies, { label: energyLabel(step) });
 }
 
+// Reshiram & Zekrom-GX Fabled Flarebolts: "Discard up to 3 in any combination of basic {R} and
+// basic {L} Energy cards from your Benched Pokémon." The damage counts the discard (forDamage).
+function atkDiscardBenchEnergy(ctx) {
+  const { player, step } = ctx;
+  const candidates = benchRootsOf(player)
+    .flatMap((root) => attachedCards(player, root.instanceId))
+    .filter((c) => isBasicEnergy(c) && step.energyTypes.some((t) => energyMatches(c, { energyType: t })));
+  if (ctx.selection) {
+    discardCards(player, pickById(candidates, ctx.selection).slice(0, step.count), ctx.events, { forDamage: true });
+    return null;
+  }
+  if (candidates.length === 0) return skip(ctx, 'no_energy');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose up to ${step.count} Energy on your Benched Pokémon to discard`,
+    options: candidates,
+    min: 0,
+    max: Math.min(step.count, candidates.length),
+  });
+}
+
 // Toxtricity ex Gaia Punk: "Discard 3 {L} Energy from your Pokémon." — from any of them.
 function atkDiscardOwnEnergy(ctx) {
   const { player, step } = ctx;
@@ -3610,6 +3630,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkFaceDownOppEnergy,
   atkMoveCountersFromNamed,
   atkGuessHandCard,
+  atkDiscardBenchEnergy,
   atkApplyCondition: optional(atkApplyCondition, (step) => `Leave your opponent's Active Pokémon ${step.condition}`),
   atkDevolve,
   atkBounceOppActive,

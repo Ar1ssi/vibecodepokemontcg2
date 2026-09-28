@@ -1570,25 +1570,36 @@ export function allBenchDamage(attackText) {
 /**
  * Design 036 A9: "This attack does N damage to each of your opponent's Pokémon [filter]" and
  * the old "Does N damage to each Defending Pokémon" (the Active only). A sentence-leading
- * clause only: a coin-gated "If heads, … to each …" is not read. Pure.
- * @returns {{ amount: number, activeOnly: boolean, filter: object }|null}
+ * clause, or a coin-gated one (Chingling Uproar: "If heads, … to each …", `gate`). Pure.
+ * @returns {{ amount: number, activeOnly: boolean, filter: object, gate?: string }|null}
  */
 export function eachPokemonDamage(attackText) {
   const text = String(attackText || '')
     .replace(/[‘’]/g, "'")
     .toLowerCase()
     .replace(/pokemon/g, 'pokémon');
-  const m = /(?:^|\.\s+)(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon|pokémon)([^.(]*)(\(both yours and your opponent's\))?/.exec(
+  // Mega Zygarde ex Nullifying Zero: "For each of your opponent's Pokémon, flip a coin. If heads,
+  // this attack does 150 damage to that Pokémon." One flip per Pokémon (reduce.mjs).
+  const perTarget =
+    /(?:^|\.\s+)for each of your opponent's pokémon, flip a coin\. if heads, this attack does (\d+) damage to that pokémon/.exec(
+      text
+    );
+  if (perTarget) return { amount: Number(perTarget[1]), activeOnly: false, filter: {}, perTargetCoin: true };
+  const m = /(?:^|\.\s+)(?:if (heads|tails), )?(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon|pokémon)([^.(]*)(\(both yours and your opponent's\))?/.exec(
     text
   );
   if (!m) return null;
-  const tail = m[3].trimEnd();
-  if (m[2] === 'defending pokémon') return tail ? null : { amount: Number(m[1]), activeOnly: true, filter: {} };
+  const [, gate, amount, scope, rawTail, both] = m;
+  const gated = gate ? { gate } : {};
+  const tail = rawTail.trimEnd();
+  if (scope === 'defending pokémon') return tail ? null : { amount: Number(amount), activeOnly: true, filter: {}, ...gated };
   // Manectric Power Wave: "each Pokémon that has any Poké-Powers (both yours and your opponent's)".
-  const bothSides = m[2] === 'pokémon';
-  if (bothSides && !m[4]) return null;
+  const bothSides = scope === 'pokémon';
+  if (bothSides && !both) return null;
   const filter = parseEachFilter(tail);
-  return filter === undefined ? null : { amount: Number(m[1]), activeOnly: false, filter, ...(bothSides ? { bothSides } : {}) };
+  return filter === undefined
+    ? null
+    : { amount: Number(amount), activeOnly: false, filter, ...(bothSides ? { bothSides } : {}), ...gated };
 }
 
 // Damage the attack also does to each of the ATTACKER's own Benched Pokémon (recoil). Pure.
@@ -1645,7 +1656,9 @@ export function attackTargetClause(attackText) {
   // attack does 80 to that Pokémon."; Aggron ex Split Bomb: "Choose 2 … This attack does 30
   // damage to each of them."; Shedinja Spike Wound: "… Pokémon that has any damage counters on it".
   const chosen =
-    /choose (\d+) of your opponent's (benched )?(pok[ée]mon[^.]*?)\. this attack does (\d+)(?: damage)? to (?:that pok[ée]mon|each of them|each of those pok[ée]mon)/i.exec(
+    // Jumpluff Cottonweed Punch: "… For each heads, this attack does 30 damage to that Pokémon."
+    // (targetClauseGate reads the coin gate).
+    /choose (\d+) of your opponent's (benched )?(pok[ée]mon[^.]*?)\. (?:(?:for each|if) heads, )?this attack does (\d+)(?: damage)? to (?:that pok[ée]mon|each of them|each of those pok[ée]mon)/i.exec(
       t
     );
   if (chosen) {
@@ -1673,6 +1686,13 @@ export function attackTargetClause(attackText) {
       count: Number(joined[1] || 1),
       scope: joined[2] || !joined[1] ? 'bench' : 'any',
     };
+  }
+  // Alolan Exeggutor-GX Tropical Head: "This attack does 20 damage times the amount of Energy
+  // attached to this Pokémon to 1 of your opponent's Pokémon." reduce.mjs multiplies `amount`.
+  const perEnergy =
+    /does (\d+) damage times the amount of energy attached to (?:this pok[ée]mon|[^.]+?) to 1 of your opponent's pok[ée]mon/i.exec(t);
+  if (perEnergy) {
+    return { kind: 'damage', amount: Number(perEnergy[1]), count: 1, scope: 'any', amountPerEnergy: true };
   }
   // Dark Ivysaur Fury Strikes: "Your opponent puts 3 markers onto his or her Pokémon (divided as
   // he or she chooses). … this attack does 10 damage to each Pokémon for each marker on it." The

@@ -809,6 +809,17 @@ const TEMPLATES = [
     /^put damage counters on (1 of your opponent's pokémon|your opponent's active pokémon) until its remaining hp is (\d+)$/,
     (m) => ({ type: 'atkHpCap', target: m[1].startsWith('1 of') ? 'opponentAny' : 'opponentActive', hp: Number(m[2]) }),
   ],
+  // Reshiram & Zekrom-GX Fabled Flarebolts: the discard its damage counts, before damage.
+  [
+    /^discard up to (\d+) in any combination of basic \{([a-z])\} and basic \{([a-z])\} energy cards from your benched pokémon$/,
+    (m) => ({
+      type: 'atkDiscardBenchEnergy',
+      count: Number(m[1]),
+      energyTypes: [m[2].toUpperCase(), m[3].toUpperCase()],
+      beforeDamage: true,
+      countsForDamage: true,
+    }),
+  ],
   // Toxtricity ex Gaia Punk.
   [
     /^discard (\d+) (?:\{([a-z])\} )?energy from your pokémon$/,

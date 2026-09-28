@@ -170,6 +170,7 @@ export function attackVerdict({
   skipped = [],
   mismatches = [],
   oppDrew = false,
+  scaled = [],
 } = {}) {
   const executed = dealt.some((d) => d != null);
   const noise = oppDrew ? [] : ['opp:deck->hand'];
@@ -181,7 +182,12 @@ export function attackVerdict({
   if (errors.length && !executed) return 'engine-error';
   if (executed && stateTags.length === 0 && !hasEventEvidence && !tags.includes('shuffle') && !gated)
     return 'ran-no-effect';
-  if (mismatches.length) return 'partial';
+  // A count or condition the damage parser could not resolve deals the printed number, not
+  // the card's damage (parse-hole sweep D1): partial, never ok. Coin notes are not unresolved.
+  const unresolved = scaled.some((s) =>
+    (s?.notes || []).some((note) => /resolve the printed/.test(note) && !/\bcoin\b/.test(note))
+  );
+  if (mismatches.length || unresolved) return 'partial';
   return 'ok';
 }
 

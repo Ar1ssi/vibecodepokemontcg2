@@ -1722,3 +1722,83 @@ test('Unown Hidden Power (Unseen Forces, the Shuffle Unown): a wrong guess draws
   assert.equal(run('Trainer'), 1);
   assert.equal(run('Energy'), 3);
 });
+
+// ── spreads and snipes the old Bench reading misplaced ───────────────────────
+
+test('Chingling Uproar (Majestic Dawn 58): heads hits every opponent Pokémon, tails none', () => {
+  const text =
+    "Flip a coin. If heads, this attack does 10 damage to each of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  let bench;
+  const make = () => board('Chingling', text, { damage: '', setup: (s) => (bench = addBench(s, 'p2', 'B')) });
+  const heads = attackShowing(make, 'heads');
+  assert.equal(root(heads.res.state, 'p2', heads.defender.instanceId).damage, 10);
+  assert.equal(root(heads.res.state, 'p2', bench[0].instanceId).damage, 10);
+  const tails = attackShowing(make, 'tails');
+  assert.equal(root(tails.res.state, 'p2', tails.defender.instanceId).damage || 0, 0);
+});
+
+test('Jumpluff Cottonweed Punch (Secret Wonders 11): the chosen Pokémon takes 30 per heads', () => {
+  const text =
+    "Flip 2 coins. Choose 1 of your opponent's Pokémon. For each heads, this attack does 30 damage to that Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  let bench;
+  for (let seed = 1; seed < 60; seed++) {
+    const { state } = board('Jumpluff', text, { damage: '', setup: (s) => (bench = addBench(s, 'p2', 'B')) });
+    let res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(seed));
+    const heads = (res.events.find((e) => e.type === 'attackCoinFlipped')?.flips || []).filter((f) => f === 'heads').length;
+    if (heads === 0) {
+      assert.equal(res.pendingChoice, null);
+      continue;
+    }
+    res = choose(res, [bench[0].instanceId]);
+    assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 30 * heads);
+    return;
+  }
+  assert.fail('no seed shows heads');
+});
+
+test('Mega Zygarde ex Nullifying Zero (Mega Evolution Promos 071): one flip per opponent Pokémon', () => {
+  const text =
+    "For each of your opponent's Pokémon, flip a coin. If heads, this attack does 150 damage to that Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  const { state } = board('Mega Zygarde ex', text, { damage: '', setup: (s) => addBench(s, 'p2', 'B1', 'B2') });
+  const res = attack(state);
+  const flips = res.events.filter((e) => e.type === 'coinFlipped' && e.source === 'Probe');
+  assert.equal(flips.length, 3);
+  for (const flip of flips) {
+    const hit = res.events.some((e) => e.type === 'damageUpdated' && e.instanceId === flip.instanceId && e.damage >= 150)
+      || res.events.some((e) => e.type === 'pokemonKnockedOut' && e.instanceId === flip.instanceId);
+    assert.equal(hit, flip.face === 'heads');
+  }
+});
+
+test('Reshiram & Zekrom-GX Fabled Flarebolts (Cosmic Eclipse 259): 90 per Bench {R}/{L} discarded', () => {
+  const text =
+    'Discard up to 3 in any combination of basic {R} and basic {L} Energy cards from your Benched Pokémon. This attack does 90 damage for each card you discarded in this way.';
+  let fires;
+  const { state, defender } = board('Reshiram & Zekrom-GX', text, {
+    damage: '90×',
+    setup: (s) => {
+      const benched = mon('Reshiram');
+      fires = [energy('Fire', benched.instanceId), energy('Lightning', benched.instanceId), energy('Water', benched.instanceId)];
+      s.players.p1.zones.bench.push(benched, ...fires);
+    },
+  });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.options.length, 2);
+  res = choose(res, [fires[0].instanceId, fires[1].instanceId]);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 180);
+});
+
+test('Alolan Exeggutor-GX Tropical Head (Crimson Invasion 118): 20 per attached Energy to the chosen Pokémon', () => {
+  const text =
+    "This attack does 20 damage times the amount of Energy attached to this Pokémon to 1 of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  let bench;
+  const { state } = board('Alolan Exeggutor-GX', text, {
+    damage: '',
+    setup: (s) => {
+      attachTo(s, s.players.p1.zones.active[0], ['Grass', 'Grass', 'Water']);
+      bench = addBench(s, 'p2', 'B');
+    },
+  });
+  const res = choose(attack(state), [bench[0].instanceId]);
+  assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 60);
+});

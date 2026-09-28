@@ -388,7 +388,7 @@
    "name": "Claydol",
    "attack": "Ancient Mantra",
    "family": "conditional-damage",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "ancient star#1272moe": {
    "name": "Aerodactyl VSTAR",
@@ -952,7 +952,7 @@
    "name": "Pheromosa-GX",
    "attack": "Beauty-GX",
    "family": "per-prize",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "bedrock breaker#1yikpyk": {
    "name": "Machamp-GX",
@@ -1102,7 +1102,7 @@
    "name": "Bewear-GX",
    "attack": "Big Throw-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "big wheel-gx#1ee39qh": {
    "name": "Drampa-GX",
@@ -1672,7 +1672,7 @@
    "name": "Starmie BREAK",
    "attack": "Break Star",
    "family": "multi-target",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "break through#10jhwhh": {
    "name": "Xerneas-EX",
@@ -1690,13 +1690,13 @@
    "name": "Mr. Mime-GX",
    "attack": "Breakdown",
    "family": "bench-damage",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "breakdown#2vhq5y": {
    "name": "Mr. Mime ex",
    "attack": "Breakdown",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "breaking swipe#uy6w32": {
    "name": "Duraludon V",
@@ -1708,7 +1708,7 @@
    "name": "Virizion-GX",
    "attack": "Breeze Away-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "brick smash#3n1v87": {
    "name": "Machamp",
@@ -1972,7 +1972,7 @@
    "name": "Muk",
    "attack": "Burning Sludge",
    "family": "dual-status",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "burning tail#12r7sgu": {
    "name": "Moltres",
@@ -2026,7 +2026,7 @@
    "name": "Blacephalon-GX",
    "attack": "Burst-GX",
    "family": "per-prize",
-   "verdict": "ran-no-effect"
+   "verdict": "partial"
   },
   "bursting burn#1asz0sg": {
    "name": "Blacephalon-GX",
@@ -2218,7 +2218,7 @@
    "name": "Naganadel & Guzzlord-GX",
    "attack": "Chaotic Order-GX",
    "family": "per-prize",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "chaotic pain#cdcjcu": {
    "name": "Gengar ex",
@@ -2506,7 +2506,7 @@
    "name": "Articuno-GX",
    "attack": "Cold Crush-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "cold crush#1faq575": {
    "name": "Articuno ex",
@@ -2596,7 +2596,7 @@
    "name": "Spiritomb",
    "attack": "Color Tag",
    "family": "multi-target",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "colorful harmony#1pek9wn": {
    "name": "Sylveon ex",
@@ -2770,7 +2770,7 @@
    "name": "Mega Dragalge ex",
    "attack": "Corrosive Liquid",
    "family": "discard-cost",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "cosmic burn#1jycnk5": {
    "name": "Solgaleo & Lunala-GX",
@@ -2920,7 +2920,7 @@
    "name": "Charizard & Braixen-GX",
    "attack": "Crimson Flame Pillar-GX",
    "family": "dual-status",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "crimson storm#1v5wyme": {
    "name": "Charizard-GX",
@@ -3202,7 +3202,7 @@
    "name": "Magcargo",
    "attack": "Crushing Lava",
    "family": "conditional-damage",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "crushing mantle#19rfxzp": {
    "name": "Groudon ex",
@@ -3442,13 +3442,13 @@
    "name": "Shedinja",
    "attack": "Damage Curse",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "damage even#1n6zsta": {
    "name": "Dusknoir",
    "attack": "Damage Even",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "damage rush#1c3ur8z": {
    "name": "Bouffalant",
@@ -3628,7 +3628,7 @@
    "name": "Greninja-GX",
    "attack": "Dark Mist-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "dark moon-gx#1161315": {
    "name": "Umbreon & Darkrai-GX",
@@ -3754,7 +3754,7 @@
    "name": "Mismagius GL LV.X",
    "attack": "Darkness Magic",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "darkness mist#cjz0rd": {
    "name": "Dusknoir",
@@ -3778,7 +3778,7 @@
    "name": "Banette",
    "attack": "Darkness Switch",
    "family": "conditional-damage",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "data retrieval#18i637s": {
    "name": "Porygon2",
@@ -3820,7 +3820,7 @@
    "name": "Azelf LV.X",
    "attack": "Deep Balance",
    "family": "bench-damage",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "deep hurricane#189phyj": {
    "name": "Lugia-EX",
@@ -3856,7 +3856,7 @@
    "name": "Azurill",
    "attack": "Delivery",
    "family": "discard-cost",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "delta beam#jt9ywo": {
    "name": "Porygon2",
@@ -3916,7 +3916,7 @@
    "name": "Shiftry-GX",
    "attack": "Den of Iniquity-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "derail#gn2y5v": {
    "name": "Exploud ex",
@@ -4066,7 +4066,7 @@
    "name": "Carbink BREAK",
    "attack": "Diamond Gift",
    "family": "draw-attach",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "diamond rain#kl1cdj": {
    "name": "Diancie Prism Star",
@@ -4078,7 +4078,7 @@
    "name": "Heracross",
    "attack": "Dig Deep",
    "family": "discard-cost",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "dig out#1fw96et": {
    "name": "Excadrill-EX",
@@ -4198,7 +4198,7 @@
    "name": "Celesteela-GX",
    "attack": "Discovery-GX",
    "family": "conditional-damage",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "disorder#1tumh0i": {
    "name": "Girafarig",
@@ -4534,7 +4534,7 @@
    "name": "Dragonite VSTAR",
    "attack": "Draconic Star",
    "family": "draw-attach",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "drag off#1fj0hkg": {
    "name": "Malamar V",
@@ -4864,7 +4864,7 @@
    "name": "Mimikyu-GX",
    "attack": "Dream Fear-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "dream's touch#1ci6daz": {
    "name": "Shiinotic",
@@ -4876,7 +4876,7 @@
    "name": "Latias Prism Star",
    "attack": "Dreamy Mist",
    "family": "draw-attach",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "dredge#1xyxhve": {
    "name": "Excadrill",
@@ -5212,7 +5212,7 @@
    "name": "Pichu",
    "attack": "Electric Circuit",
    "family": "discard-cost",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "electric riot#zwns3m": {
    "name": "Toxtricity V",
@@ -5776,7 +5776,7 @@
    "name": "Coalossal VMAX",
    "attack": "Eruption Shot",
    "family": "conditional-damage",
-   "verdict": "ok"
+   "verdict": "partial"
   },
   "eruption#24o5tu": {
    "name": "Camerupt ex",
@@ -5818,7 +5818,7 @@
    "name": "Typhlosion",
    "attack": "Evaporating Heat",
    "family": "discard-cost",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "evergreen-gx#xk3jli": {
    "name": "Celebi & Venusaur-GX",
@@ -6016,7 +6016,7 @@
    "name": "Shedinja",
    "attack": "Extra Curse",
    "family": "conditional-damage",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "extra flame#1ds2inn": {
    "name": "Kingdra",
@@ -6058,7 +6058,7 @@
    "name": "Flygon LV.X",
    "attack": "Extreme Attack",
    "family": "bench-damage",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "extreme current#4ngafd": {
    "name": "Tapu Koko ex",
@@ -6070,7 +6070,7 @@
    "name": "Reshiram & Zekrom-GX",
    "attack": "Fabled Flarebolts",
    "family": "bench-damage",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "fade out#1otrwk1": {
    "name": "Spiritomb",
@@ -6184,7 +6184,7 @@
    "name": "Gengar VMAX",
    "attack": "Fear and Panic",
    "family": "multi-target",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "fearsome shadow#111gxwp": {
    "name": "Honchkrow V",
@@ -6604,7 +6604,7 @@
    "name": "Moltres ex",
    "attack": "Flame Gift",
    "family": "move-energy",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "flame jet-gx#8hhd8i": {
    "name": "Salamence-GX",
@@ -6802,7 +6802,7 @@
    "name": "Roselia",
    "attack": "Flick Poison",
    "family": "status-poisoned",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "flickering flames#hhecaa": {
    "name": "Typhlosion",
@@ -7204,7 +7204,7 @@
    "name": "Lucario & Melmetal-GX",
    "attack": "Full Metal Wall-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "full moon ray#ovvkrz": {
    "name": "Lunala",
@@ -7222,7 +7222,7 @@
    "name": "Lunala Prism Star",
    "attack": "Full Moon Star",
    "family": "multi-target",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "full retaliation#ob5eif": {
    "name": "Gyarados",
@@ -7294,7 +7294,7 @@
    "name": "Dark Ivysaur",
    "attack": "Fury Strikes",
    "family": "multi-target",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "fury swipes#14upwiw": {
    "name": "Vespiquen",
@@ -7684,13 +7684,13 @@
    "name": "Mothim",
    "attack": "Get Help",
    "family": "bench-damage",
-   "verdict": "partial"
+   "verdict": "ran-no-effect"
   },
   "gg end-gx#4hdw5c": {
    "name": "Garchomp & Giratina-GX",
    "attack": "GG End-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "ghost eye#1jf2g3g": {
    "name": "Mimikyu",
@@ -7870,7 +7870,7 @@
    "name": "Mega Sableye & Tyranitar-GX",
    "attack": "Gigafall-GX",
    "family": "next-turn-lock",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "gigantic bolt#3s1ens": {
    "name": "Thundurus",
@@ -8278,7 +8278,7 @@
    "name": "Scizor V",
    "attack": "Hack Off",
    "family": "discard-opponent",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "hadron spark#12j1000": {
    "name": "Miraidon ex",
@@ -8380,7 +8380,7 @@
    "name": "Dusknoir",
    "attack": "Hard Feelings",
    "family": "per-prize",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hard scissors#voqyns": {
    "name": "Scizor VMAX",
@@ -8602,7 +8602,7 @@
    "name": "Bronzong",
    "attack": "Heavy Potential",
    "family": "multi-target",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "heavy press#2wpvi": {
    "name": "Snorlax",
@@ -8752,19 +8752,19 @@
    "name": "Unown",
    "attack": "Hidden Power",
    "family": "dual-status",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#1jzj8lp": {
    "name": "Unown",
    "attack": "Hidden Power",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#1k21sp0": {
    "name": "Unown",
    "attack": "Hidden Power",
    "family": "draw-attach",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#1kt4cu1": {
    "name": "Unown ?",
@@ -8824,7 +8824,7 @@
    "name": "Unown",
    "attack": "Hidden Power",
    "family": "coin-flip",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#1yngtl3": {
    "name": "Unown",
@@ -8908,7 +8908,7 @@
    "name": "Unown M",
    "attack": "Hidden Power",
    "family": "coin-flip",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#kq55z4": {
    "name": "Unown N",
@@ -8962,7 +8962,7 @@
    "name": "Unown",
    "attack": "Hidden Power",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hidden power#vlsw8d": {
    "name": "Unown",
@@ -9046,7 +9046,7 @@
    "name": "Decidueye-GX",
    "attack": "Hollow Hunt-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hollow missile#2t63ie": {
    "name": "Galarian Cursola V",
@@ -9088,7 +9088,7 @@
    "name": "Hatterene V",
    "attack": "Horoscope",
    "family": "draw-attach",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "horrifying fang#1gsx8om": {
    "name": "Houndstone ex",
@@ -9106,7 +9106,7 @@
    "name": "Gengar & Mimikyu-GX",
    "attack": "Horror House-GX",
    "family": "draw-attach",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "horror note#1uyrd7s": {
    "name": "Gourgeist",
@@ -9202,7 +9202,7 @@
    "name": "Gengar",
    "attack": "Hurl into Darkness",
    "family": "lost-zone",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "hurricane kick#c8y8xy": {
    "name": "Lucario",
@@ -9622,7 +9622,7 @@
    "name": "Black Kyurem ex",
    "attack": "Ice Age",
    "family": "status-paralyzed",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "ice barrier#943mej": {
    "name": "Latios ex",
@@ -9688,7 +9688,7 @@
    "name": "Articuno ex",
    "attack": "Ice Gift",
    "family": "move-energy",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "ice path-gx#1avtllt": {
    "name": "Alolan Ninetales-GX",
@@ -9886,7 +9886,7 @@
    "name": "Naganadel-GX",
    "attack": "Injection-GX",
    "family": "per-prize",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "inquire#140dqqi": {
    "name": "Igglybuff",
@@ -10060,7 +10060,7 @@
    "name": "Pecharunt ex",
    "attack": "Irritated Outburst",
    "family": "per-prize",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "item maniac-gx#o4wg5c": {
    "name": "Alolan Raticate-GX",
@@ -10084,7 +10084,7 @@
    "name": "Mimikyu V",
    "attack": "Jealous Eyes",
    "family": "bench-damage",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "jealously singe#dp28zv": {
    "name": "Chi-Yu ex",
@@ -10162,7 +10162,7 @@
    "name": "Eevee-GX",
    "attack": "Joy Maker-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "juggernaut horn#1gbze5w": {
    "name": "Mega Heracross ex",
@@ -10444,7 +10444,7 @@
    "name": "Lapras ex",
    "attack": "Larimar Rain",
    "family": "draw-attach",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "laser blade#1xd62v": {
    "name": "Iron Valiant ex",
@@ -10576,7 +10576,7 @@
    "name": "Celebi Star",
    "attack": "Leaf Shade",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "leaf tornado#1h9wkw4": {
    "name": "Serperior",
@@ -10708,7 +10708,7 @@
    "name": "Shiftry",
    "attack": "Light Touch Throw",
    "family": "per-energy",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "light wave#10vzput": {
    "name": "Light Dragonite",
@@ -10774,7 +10774,7 @@
    "name": "Zeraora VSTAR",
    "attack": "Lightning Storm Star",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "lightning storm#phtbv2": {
    "name": "Rayquaza",
@@ -11044,7 +11044,7 @@
    "name": "Lunala-GX",
    "attack": "Lunar Fall-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "lunar flight#1tp5v7j": {
    "name": "Cresselia",
@@ -11218,7 +11218,7 @@
    "name": "Polteageist",
    "attack": "Mad Party",
    "family": "multi-target",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "maddening scent#p5wkr3": {
    "name": "Oinkologne ex",
@@ -11380,7 +11380,7 @@
    "name": "Wishiwashi-GX",
    "attack": "Massive Catch-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "massive heat wave-gx#1w6peov": {
    "name": "Volcarona-GX",
@@ -11944,7 +11944,7 @@
    "name": "Bronzong BREAK",
    "attack": "Metal Rain",
    "family": "immunity",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "metal scissors#19ltifv": {
    "name": "Scizor",
@@ -12796,7 +12796,7 @@
    "name": "Arboliva ex",
    "attack": "Oil Salvo",
    "family": "immunity",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "ominous eyes#b04en1": {
    "name": "Duskull",
@@ -12952,13 +12952,13 @@
    "name": "Dusknoir",
    "attack": "Pain Pellets",
    "family": "bench-damage",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "pale moon-gx#jcchvc": {
    "name": "Trevenant & Dusknoir-GX",
    "attack": "Pale Moon-GX",
    "family": "next-turn-lock",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "panic liquid#172hhvi": {
    "name": "Muk",
@@ -13222,7 +13222,7 @@
    "name": "Raticate",
    "attack": "Pickup",
    "family": "discard-cost",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "piercing drill#1fmg3vu": {
    "name": "Excadrill ex",
@@ -13378,7 +13378,7 @@
    "name": "Sylveon-GX",
    "attack": "Plea-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "plunder#wevkx": {
    "name": "Skuntank",
@@ -13864,7 +13864,7 @@
    "name": "Manectric",
    "attack": "Power Wave",
    "family": "multi-target",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "powerful axe#1eetj7v": {
    "name": "Haxorus",
@@ -13954,7 +13954,7 @@
    "name": "Sylveon-EX",
    "attack": "Precious Ribbon",
    "family": "bench-damage",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "precious touch#m7cgis": {
    "name": "Sylveon VMAX",
@@ -14188,7 +14188,7 @@
    "name": "Celebi",
    "attack": "Psychic Damage",
    "family": "per-heads-coin",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "psychic defense#1o3nq1p": {
    "name": "Deoxys Defense Forme",
@@ -14518,7 +14518,7 @@
    "name": "Feraligatr",
    "attack": "Pull Away",
    "family": "discard-cost",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "pull in#1nc16mq": {
    "name": "Dark Gengar",
@@ -14734,13 +14734,13 @@
    "name": "Team Rocket's Porygon-Z",
    "attack": "R Command",
    "family": "discard-cost",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "radiant star#1izlddz": {
    "name": "Solgaleo Prism Star",
    "attack": "Radiant Star",
    "family": "multi-target",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "radiating heat#1a5lvfc": {
    "name": "Centiskorch V",
@@ -14944,7 +14944,7 @@
    "name": "Genesect-EX",
    "attack": "Rapid Blaster",
    "family": "discard-cost",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "rapid draw#14wtnoh": {
    "name": "Seaking",
@@ -16186,7 +16186,7 @@
    "name": "Dusclops ex",
    "attack": "Shadow Beam",
    "family": "per-energy",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "shadow bind#15wyprm": {
    "name": "Dusknoir",
@@ -16318,7 +16318,7 @@
    "name": "Wobbuffet",
    "attack": "Shadow Tag",
    "family": "bench-damage",
-   "verdict": "ran-no-effect"
+   "verdict": "partial"
   },
   "shadowy hunter-gx#1ftozyl": {
    "name": "Greninja-GX",
@@ -16618,7 +16618,7 @@
    "name": "Silvally-GX",
    "attack": "Silver Knight-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "silver wind#1605hnz": {
    "name": "Dustox ex",
@@ -16630,7 +16630,7 @@
    "name": "Alolan Vulpix VSTAR",
    "attack": "Silvery Snow Star",
    "family": "multi-target",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "singe#1dekwjf": {
    "name": "Fuecoco ex",
@@ -16828,7 +16828,7 @@
    "name": "Hypno",
    "attack": "Sleep Inducer",
    "family": "status-asleep",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "sleep pinchers#1tebs7y": {
    "name": "Parasect",
@@ -17428,7 +17428,7 @@
    "name": "Garchomp",
    "attack": "Speed Impact",
    "family": "per-energy",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "speed shot#15yea98": {
    "name": "Magnezone",
@@ -18100,7 +18100,7 @@
    "name": "Naganadel-GX",
    "attack": "Stinger-GX",
    "family": "per-prize",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "stir the brain#1y82vib": {
    "name": "Hypno",
@@ -18256,7 +18256,7 @@
    "name": "Wurmple",
    "attack": "String Pull",
    "family": "switch",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "strong bite#og2chl": {
    "name": "Krookodile ex",
@@ -18340,7 +18340,7 @@
    "name": "Alolan Ninetales-GX",
    "attack": "Sublimation-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "subspace swell#rd8jb1": {
    "name": "Origin Forme Palkia VSTAR",
@@ -18382,7 +18382,7 @@
    "name": "Sunny Castform",
    "attack": "Sunshine",
    "family": "discard-cost",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "sunsteel strike#lavzfd": {
    "name": "Solgaleo-GX",
@@ -18508,7 +18508,7 @@
    "name": "Togepi & Cleffa & Igglybuff-GX",
    "attack": "Supreme Puff-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "surge#hhptuj": {
    "name": "Dewgong",
@@ -18706,7 +18706,7 @@
    "name": "Nihilego-GX",
    "attack": "Symbiont-GX",
    "family": "per-prize",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "synchro buster#vyms49": {
    "name": "Grapploct",
@@ -18892,7 +18892,7 @@
    "name": "Hisuian Electrode V",
    "attack": "Tantrum Blast",
    "family": "per-energy",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "tantrum#1fwvv2z": {
    "name": "Porygon-Z",
@@ -18952,7 +18952,7 @@
    "name": "Snorlax",
    "attack": "Teampact",
    "family": "per-energy",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "techno blast#15t3unn": {
    "name": "Genesect V",
@@ -19030,7 +19030,7 @@
    "name": "Dudunsparce ex",
    "attack": "Tenacious Tail",
    "family": "multi-target",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "tentacle lock#k4zw8w": {
    "name": "Omastar V",
@@ -19114,7 +19114,7 @@
    "name": "Zapdos ex",
    "attack": "Thunder Gift",
    "family": "move-energy",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "thunder jolt#tziz1": {
    "name": "Electrode",
@@ -19138,7 +19138,7 @@
    "name": "Ampharos-EX",
    "attack": "Thunder Rod",
    "family": "draw-attach",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "thunder shock#ni0xsi": {
    "name": "Pikachu-EX",
@@ -19378,7 +19378,7 @@
    "name": "Banette-GX",
    "attack": "Tomb Hunt-GX",
    "family": "next-turn-lock",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "tongue smack#mrsnqa": {
    "name": "Kecleon",
@@ -19714,7 +19714,7 @@
    "name": "Mr. Mime",
    "attack": "Trick Play",
    "family": "coin-flip",
-   "verdict": "ran-no-effect"
+   "verdict": "ok"
   },
   "trick portal#3cxdjq": {
    "name": "Mega Delphox ex",
@@ -20164,7 +20164,7 @@
    "name": "Flamigo",
    "attack": "United Wings",
    "family": "multi-target",
-   "verdict": "ok"
+   "verdict": "ran-no-effect"
   },
   "unseen claw#1svhx9r": {
    "name": "Sceptile-EX",
