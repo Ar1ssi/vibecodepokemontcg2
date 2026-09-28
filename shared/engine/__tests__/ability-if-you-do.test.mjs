@@ -114,6 +114,51 @@ test('ability: Pecharunt ex Subjugating Chains brings up only a non-Pecharunt {D
   assert.ok(hasCondition(active, 'Poisoned'));
 });
 
+// Mabosstiff, Paldean Fates 063 (also Scarlet & Violet 137).
+const INTIMIDATING_HOWL =
+  "Once during your turn, you may switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)";
+// Shinx, Paldea Evolved 068.
+const BIG_ROAR =
+  "Once during your turn, if this Pokémon is in the Active Spot, you may switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.)";
+// Iron Bundle, Paradox Rift 056.
+const HYPER_BLOWER =
+  "Once during your turn, if this Pokémon is on your Bench, you may switch out your opponent's Active Pokémon to the Bench. (Your opponent chooses the new Active Pokémon.) If you do, discard this Pokémon and all attached cards.";
+
+test('ability: Mabosstiff Intimidating Howl switches out the opponent Active and leaves the own Active', () => {
+  const { state, rng } = board(INTIMIDATING_HOWL, { zone: 'bench', name: 'Mabosstiff' });
+  let res = use70(state, rng);
+  assert.equal(res.pendingChoice?.player, 'p2');
+  res = resolveWith(res, [92], rng);
+  assert.equal(activeId(res, 'p2'), 92);
+  assert.equal(activeId(res, 'p1'), 80);
+});
+
+test('ability: Shinx Big Roar works from the Active Spot and is refused from the Bench', () => {
+  const active = board(BIG_ROAR, { name: 'Shinx', oppBench: [91] });
+  const res = use70(active.state, active.rng);
+  assert.equal(activeId(res, 'p2'), 91);
+  assert.equal(activeId(res, 'p1'), 70);
+  const benched = board(BIG_ROAR, { zone: 'bench', name: 'Shinx' });
+  assert.ok(use70(benched.state, benched.rng).error);
+});
+
+test('ability: Iron Bundle Hyper Blower switches out the opponent Active, then discards itself', () => {
+  const { state, rng } = board(HYPER_BLOWER, { zone: 'bench', name: 'Iron Bundle', oppBench: [91] });
+  state.players.p1.zones.bench.push(energy(60, 'Water', { attachedTo: 70 }));
+  const res = use70(state, rng);
+  assert.equal(activeId(res, 'p2'), 91);
+  assert.equal(activeId(res, 'p1'), 80);
+  assert.equal(zoneOf(res, 'p1', 70), 'discard');
+  assert.equal(zoneOf(res, 'p1', 60), 'discard');
+});
+
+test('ability: Iron Bundle Hyper Blower with no opponent Bench stays in play', () => {
+  const { state, rng } = board(HYPER_BLOWER, { zone: 'bench', name: 'Iron Bundle', oppBench: [] });
+  const res = use70(state, rng);
+  assert.equal(zoneOf(res, 'p1', 70), 'bench');
+  assert.equal(activeId(res, 'p2'), 90);
+});
+
 // ── costs and self-leaving halves ────────────────────────────────────────
 
 const energy = (instanceId, type, extra = {}) =>

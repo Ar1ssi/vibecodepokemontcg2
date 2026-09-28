@@ -587,6 +587,12 @@ function withIfYouDoHalves(lower, parsed) {
     steps = [...steps, { type: 'selfLeavesAbility', to: 'knockOut', guidance: 'This Pokémon is Knocked Out.' }];
   }
 
+  // Iron Bundle Hyper Blower: "If you do, discard this Pokémon and all attached cards."
+  if (new RegExp(`if you do, discard ${SELF} and all attached cards`).test(lower)) {
+    markCosts();
+    steps = [...steps, { type: 'selfLeavesAbility', to: 'discard', guidance: 'Discard this Pokémon and its attached cards.' }];
+  }
+
   // Banette Puppet Offering, Tapu Koko Prism Star Dance of the Ancients.
   if (new RegExp(`if you do, (?:put ${SELF} in the lost zone|discard all cards from ${SELF} and put it in the lost zone)`).test(lower)) {
     markCosts();
@@ -727,6 +733,15 @@ export function parseAbility(text = '') {
     // The follow-up comes after the player's own switch only when one is printed before "If
     // you do"; Ninetales Nine Temptations / Volcanion Prism Star Jet Geyser pay a hand discard.
     const ownSwitchFirst = /switch (?:your active pok[eé]mon with 1 of your benched|(?:it|this pok[eé]mon) with your active|1 of your benched [^.]*with your active)[^.]*[.,] if you do/.test(lower);
+    // Mabosstiff Intimidating Howl, Shinx Big Roar, Iron Bundle Hyper Blower: the gust is the
+    // whole effect and the opponent picks. The Active/Bench position gate lives in the executors.
+    const gustOnly = !opponentFollowUp && /you may switch out your opponent's active pok[eé]mon to the bench/.test(lower);
+    if (gustOnly) {
+      steps.push({
+        type: 'switchOpponentOut',
+        guidance: "Once during your turn: switch out your opponent's Active Pokémon to the Bench (your opponent chooses the new Active).",
+      });
+    }
     if (opponentFollowUp && !ownSwitchFirst) {
       steps.push({
         type: opponentFollowUp,
@@ -736,7 +751,7 @@ export function parseAbility(text = '') {
             : "Switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
       });
     }
-    if (!opponentFollowUp || ownSwitchFirst) steps.push({
+    if (!gustOnly && (!opponentFollowUp || ownSwitchFirst)) steps.push({
       type: 'switchAbility',
       target: isOpponentBenchSwitch && !opponentFollowUp ? 'opponent' : 'self',
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
@@ -1051,6 +1066,7 @@ export function parseAbility(text = '') {
   if (
     lower.includes('opponent') &&
     !isSelfHandDiscardCost(lower) &&
+    !/if you do, discard this pok[eé]mon and all attached cards/.test(lower) &&
     (lower.includes('discard') || lower.includes('shuffle') || lower.includes('reveal') ||
      (lower.includes('put') && (lower.includes('into their hand') || lower.includes("into your opponent's hand"))))
   ) {
