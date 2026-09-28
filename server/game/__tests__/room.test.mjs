@@ -518,3 +518,157 @@ test('GameRoom.peekDeck answers the asking seat only and refuses unknown sockets
   assert.equal(room.peekDeck('socket-ash', { side: 'them', count: 1 }).ok, false);
   assert.equal(room.peekDeck('socket-spectator', { count: 1 }).ok, false);
 });
+
+// ── Design 051: Build & Battle decks carry their format through loadDeck ──
+
+function formatDeck(size) {
+  return Array.from({ length: size }, (_, i) => [
+    1,
+    `Card ${i}`,
+    i < 12 ? 'Pokémon' : 'Energy',
+    'u',
+    String(i).padStart(3, '0'),
+    'e2e',
+    `x-${i}`,
+  ]);
+}
+
+function formatRoom(roomId) {
+  const room = new GameRoom({ roomId, rulesEnabled: false });
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  return room;
+}
+
+const loadDeckAs = (room, socketId, size, format) =>
+  room.handleCommand(socketId, {
+    type: 'loadDeck',
+    payload: format === undefined ? { deckData: formatDeck(size) } : { deckData: formatDeck(size), format },
+  });
+
+const setUp = (room) => {
+  room.markReady('p1');
+  room.markReady('p2');
+  return room.handleCommand('sock-a', { type: 'setup', payload: {} });
+};
+
+test('loadDeck: both restored Standard decks can be replaced by Build & Battle decks (I202)', () => {
+  const room = formatRoom('format-restore-then-play');
+  // Room join reloads each player's last-used deck; both were Standard.
+  assert.equal(loadDeckAs(room, 'sock-a', 60, 'tcg').success, true);
+  assert.equal(loadDeckAs(room, 'sock-b', 60, 'tcg').success, true);
+
+  const first = loadDeckAs(room, 'sock-a', 40, 'build-battle');
+  const second = loadDeckAs(room, 'sock-b', 40, 'build-battle');
+
+  assert.equal(first.success, true, first.reason);
+  assert.equal(second.success, true, second.reason);
+  assert.equal(second.events.find((e) => e.type === 'deckLoaded').format, 'build-battle');
+  assert.equal(setUp(room).success, true);
+  assert.equal(room.state.players.p1.zones.prizes.length, 4);
+  assert.equal(room.state.players.p2.zones.prizes.length, 4);
+});
+
+test('setup: decks in different formats are refused at the deal and nothing is dealt (I202)', () => {
+  const room = formatRoom('format-mismatch-at-deal');
+  assert.equal(loadDeckAs(room, 'sock-a', 40, 'build-battle').success, true);
+  assert.equal(loadDeckAs(room, 'sock-b', 60).success, true);
+  room.markReady('p1');
+  room.markReady('p2');
+  assert.equal(room.isReadyToDeal(), false);
+  const versionBefore = room.state.stateVersion;
+  const logBefore = room.state.commandLog.length;
+
+  const refused = room.handleCommand('sock-a', { type: 'setup', payload: {} });
+
+  assert.equal(refused.success, false);
+  assert.equal(refused.error, 'format_mismatch');
+  assert.equal(room.state.stateVersion, versionBefore, 'no state change');
+  assert.equal(room.state.commandLog.length, logBefore, 'nothing logged');
+  assert.equal(room.state.players.p1.zones.prizes.length, 0);
+  assert.equal(room.state.players.p2.zones.hand.length, 0);
+  assert.equal(room.getView('p2').them.deckFormat, 'build-battle');
+});
+
+test('refuseDealOnFormatMismatch: clears both Set Ups; a matching reload then deals 4 Prizes (I202)', () => {
+  const room = formatRoom('format-mismatch-then-match');
+  loadDeckAs(room, 'sock-a', 40, 'build-battle');
+  loadDeckAs(room, 'sock-b', 60, 'tcg');
+  room.markReady('p1');
+  assert.equal(room.refuseDealOnFormatMismatch(), null, 'one seat not ready yet');
+  room.markReady('p2');
+
+  const refused = room.refuseDealOnFormatMismatch();
+
+  assert.deepEqual(refused, [
+    { playerId: 'p1', username: 'Ash', format: 'build-battle' },
+    { playerId: 'p2', username: 'Gary', format: 'tcg' },
+  ]);
+  assert.equal(room.readyPlayerIds.size, 0);
+  assert.equal(loadDeckAs(room, 'sock-b', 40, 'build-battle').success, true);
+  assert.equal(room.refuseDealOnFormatMismatch(), null);
+  room.markReady('p1');
+  room.markReady('p2');
+  assert.equal(room.isReadyToDeal(), true);
+  assert.equal(room.handleCommand('sock-a', { type: 'setup', payload: {} }).success, true);
+  assert.equal(room.state.players.p1.zones.prizes.length, 4);
+  assert.equal(room.state.players.p2.zones.prizes.length, 4);
+});
+
+test('loadDeck: a player may swap their own deck to another format while the opponent has none', () => {
+  const room = formatRoom('format-own-swap');
+  loadDeckAs(room, 'sock-a', 60);
+  assert.equal(loadDeckAs(room, 'sock-a', 40, 'build-battle').success, true);
+  assert.equal(room.state.players.p1.deckFormat, 'build-battle');
+});
+
+test('loadDeck: an unknown or missing format loads as Standard with 6 Prizes', () => {
+  const room = formatRoom('format-unknown');
+  const first = loadDeckAs(room, 'sock-a', 60, 'pocket');
+  assert.equal(first.success, true);
+  assert.equal(first.events.find((e) => e.type === 'deckLoaded').format, 'tcg');
+  assert.equal(loadDeckAs(room, 'sock-b', 60).success, true);
+  assert.equal(setUp(room).success, true);
+  assert.equal(room.state.players.p1.zones.prizes.length, 6);
+  assert.equal(room.state.players.p2.zones.prizes.length, 6);
+});
+
+test('resetGame: a rematch after a Build & Battle game reloads both decks as Build & Battle', () => {
+  const room = formatRoom('format-rematch');
+  loadDeckAs(room, 'sock-a', 40, 'build-battle');
+  loadDeckAs(room, 'sock-b', 40, 'build-battle');
+  assert.equal(setUp(room).success, true);
+
+  room.resetGame();
+
+  const replayed = room.state.commandLog.filter((c) => c.type === 'loadDeck');
+  assert.deepEqual(replayed.map((c) => c.payload.format), ['build-battle', 'build-battle']);
+  assert.equal(room.state.players.p1.deckFormat, 'build-battle');
+  assert.equal(setUp(room).success, true);
+  assert.equal(room.state.players.p1.zones.prizes.length, 4);
+  assert.equal(room.state.players.p2.zones.prizes.length, 4);
+});
+
+test('undo: replaying the command log keeps the Build & Battle format and its 4 Prizes', () => {
+  const room = formatRoom('format-undo');
+  loadDeckAs(room, 'sock-a', 40, 'build-battle');
+  loadDeckAs(room, 'sock-b', 40, 'build-battle');
+  assert.equal(setUp(room).success, true);
+  const p1 = room.state.players.p1;
+  const moved = p1.zones.hand[0];
+  assert.equal(
+    room.handleCommand('sock-a', {
+      type: 'moveCard',
+      payload: { instanceId: moved.instanceId, from: 'hand', to: 'discard' },
+    }).success,
+    true
+  );
+
+  const undone = room.handleCommand('sock-a', { type: 'undo', payload: {} });
+
+  assert.equal(undone.success, true, undone.reason);
+  assert.equal(room.state.players.p1.deckFormat, 'build-battle');
+  assert.equal(room.state.players.p1.zones.prizes.length, 4);
+  assert.equal(room.state.players.p2.zones.prizes.length, 4);
+  assert.equal(room.state.players.p1.zones.discard.length, 0);
+});

@@ -20,6 +20,19 @@ client/src/setup/deck-builder/core/builder-window.mjs — the builder runs in it
   side effect goes through `gameLink` (local on the game tab, messages from the builder tab); the game
   tab's library is read-only for deck cards (`allowDeckWrites: false`) and every library write re-reads
   storage first (two tabs share it). Deck tab = slim panel (P1/P2, card back, Open Deck Builder).
+client/src/setup/deck-builder/core/build-battle/ — Build & Battle mode (design 051, D185–D189): /build-and-battle
+  is a third builder-tab mode (`resolveBuilderMode`, `body.build-battle-window`). Pure: box-catalog.mjs (box →
+  4 decks, promos, sprites), build-battle.generated.mjs (me02 set + 4 decks, from
+  scripts/generate-build-battle-box.mjs; `--check` runs in `pnpm test:live`), pack-opening.mjs (seeded slot
+  model: openPack/openBox/poolFromBox), build-battle-session.mjs (localStorage `ptcg-sim.build-battle.v1`,
+  memory-only on throw; validatePoolDeck/canAddFromPool), build-battle-view.mjs (UI strings/helpers).
+  DOM: sidebox/native-deck-builder-build-battle.js (Box + Pool tabs), css/deck-builder-build-battle.css.
+  Unboxing scene (design 052): pure unboxing.mjs (reducer `session.unboxing`, poses, tiers, pack art) +
+  box-textures.mjs; DOM sidebox/native-deck-builder-unboxing.js (CSS 3D box, tray, pack tears, reveal fan),
+  css/deck-builder-unboxing.css, vendored art client/src/assets/build-battle/{box,packs}/.
+  Library records carry `format` ('tcg' | 'build-battle'); a load sends the record's own format.
+  Standard builder shows a B&B deck with a 40 counter but does not enforce the pool (by design).
+  Decklist lines/TCGdex fetch shared with starter decks: scripts/lib/decklist-lines.mjs (throws on name drift).
 client/src/setup/deck-builder/core/set-browser-filters.mjs — the same drawer filters on Browse Sets: TCGdex narrows
   each set (`set.id=eq:`), full records decide; filters TCGdex cannot narrow only scan the open set.
 client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):

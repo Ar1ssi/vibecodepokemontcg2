@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <% const isBuilderWindow = typeof builderWindow !== 'undefined' && builderWindow; %>
-    <title><%= isBuilderWindow ? 'Deck Builder | PTCG-sim' : 'PTCG-sim | Pokémon TCG Tabletop Simulator' %></title>
+    <% const isBuildBattle = isBuilderWindow && typeof builderMode !== 'undefined' && builderMode === 'build-battle'; %>
+    <title><%= isBuildBattle ? 'Build & Battle | PTCG-sim' : isBuilderWindow ? 'Deck Builder | PTCG-sim' : 'PTCG-sim | Pokémon TCG Tabletop Simulator' %></title>
     <meta name="description" content="PTCG-sim is an open-source Pokémon Trading Card Game (Pokémon TCG) tabletop simulator supporting single player and online multiplayer. Simulate your favorite card game!">
     <meta name="keywords" content="ptcg sim,ptcg,pokemon trading card game simulator,pokemon trading card game sim,pokemon tcg simulator,pokemon tcg sim,pokemon sim,pokemon simulator,pokemon card simulator,pokemon card sim,pokemon tabletop simulator,pokemon tabletop sim,pokemon,pokemon card,pokemonsim,pokemon game sim,ptcg os,pokemon open source"/>
     <meta charset="UTF-8">
@@ -34,8 +35,9 @@
         };
     </script>
 </head>
-<%# /deck-builder renders this same page as the deck builder's own tab (design 050). %>
-<body<% if (isBuilderWindow) { %> class="deck-builder-window"<% } %>>
+<%# /deck-builder renders this same page as the deck builder's own tab (design 050);
+    /build-and-battle is that tab in Build & Battle mode (design 051). %>
+<body<% if (isBuildBattle) { %> class="deck-builder-window build-battle-window"<% } else if (isBuilderWindow) { %> class="deck-builder-window"<% } %>>
     <div id="importDataJSON" style="display: none;"><%= importDataJSON %></div>
     <div id="cover"></div>
     <div id="battleMat">
@@ -200,7 +202,8 @@
         <div id="deckTabPanel">
             <p class="deck-tab-intro">Build and load decks in the <strong>Deck Builder</strong> tab. Press <strong>Play</strong> there to load the deck into this game.</p>
             <button id="openDeckBuilderButton" class="self-color">Open Deck Builder</button>
-            <p id="deckBuilderBlockedText" class="deck-tab-warning" role="alert" hidden>Your browser blocked the Deck Builder tab. Allow pop-ups for this site, then press Open Deck Builder again.</p>
+            <button id="openBuildBattleButton" class="self-color" title="Open a Phantasmal Flames Build &amp; Battle Box and build a 40-card deck (4 Prizes)">Build &amp; Battle</button>
+            <p id="deckBuilderBlockedText" class="deck-tab-warning" role="alert" hidden>Your browser blocked the new tab. Allow pop-ups for this site, then press the button again.</p>
         </div>
         <div id="uploadButtonsContainer">
             <button id="changeCardBackButton" class="self-color">Change Card Back</button>
@@ -213,7 +216,7 @@
             <!-- One header row: title, which deck is being edited, and actions. -->
             <div class="native-deck-builder-header">
                 <div>
-                    <strong>Deck Builder</strong>
+                    <strong><%= isBuildBattle ? 'Build & Battle' : 'Deck Builder' %></strong>
                 </div>
                 <div class="native-deck-builder-targetbar">
                     <span class="native-deck-builder-target-label">Current Deck</span>
@@ -250,6 +253,10 @@
                     <div class="native-deck-builder-mode-tabs">
                             <button id="nativeDeckBuilderTabSearch" class="native-deck-builder-mode-tab active" type="button">Search</button>
                             <button id="nativeDeckBuilderTabBrowse" class="native-deck-builder-mode-tab" type="button">Browse Sets</button>
+                            <% if (isBuildBattle) { %>
+                            <button id="buildBattleTabBox" class="native-deck-builder-mode-tab" type="button">Box</button>
+                            <button id="buildBattleTabPool" class="native-deck-builder-mode-tab" type="button">Pool</button>
+                            <% } %>
                             <button id="nativeDeckBuilderTabCustomize" class="native-deck-builder-mode-tab" type="button">Customize</button>
                         </div>
                         <div class="native-deck-builder-pane-main-header">
@@ -285,6 +292,10 @@
                     </div>
                     <div id="nativeDeckBuilderSetBrowserPanel" class="native-deck-builder-set-browser" hidden>
                     </div>
+                    <% if (isBuildBattle) { %>
+                    <div id="buildBattleBoxPanel" class="bb-panel" hidden></div>
+                    <div id="buildBattlePoolPanel" class="bb-panel" hidden></div>
+                    <% } %>
                     <div id="nativeDeckBuilderCustomizeSwitcher" hidden>
                       <div class="customize-switcher-toggle" role="tablist">
                         <button type="button" data-view="sleeve" class="active">Card Sleeve</button>

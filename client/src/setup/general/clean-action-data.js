@@ -1,4 +1,5 @@
 import { systemState } from '../../state.js';
+import { DECK_FORMAT_TCG } from '../../../../shared/engine/formats.mjs';
 
 export const cleanActionData = (user) => {
   if (user === 'self') {
@@ -11,5 +12,6 @@ export const cleanActionData = (user) => {
     systemState.oppCounter = 0;
     systemState.oppActionData = [];
     systemState.p2OppDeckData = '';
+    systemState.deckFormat.p2Opp = DECK_FORMAT_TCG;
   }
 };

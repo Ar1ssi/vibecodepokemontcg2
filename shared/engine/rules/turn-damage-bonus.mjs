@@ -9,6 +9,7 @@
 // some scale per Prize card the opponent has taken (Iris, Karen's Conviction).
 import { TYPE_LETTER, attackerTypes, isBasicCard } from './tool-combat.mjs';
 import { isExCard, isVCard, isRuleBoxPokemon } from './card-classify.mjs';
+import { prizesTakenFor } from '../formats.mjs';
 
 // Groups: 1 type letter ({F}), 2 no-Rule-Box attacker, 3 amount, 4 ex defender, 5 ex-or-V defender.
 const USED_BY_RE =
@@ -77,13 +78,13 @@ export function turnDamageBonusTotal(
   bonuses,
   attacker,
   defender,
-  { defenderIsActive = true, defenderPrizesRemaining } = {}
+  { defenderIsActive = true, defenderPrizesRemaining, defenderDeckFormat } = {}
 ) {
   if (!Array.isArray(bonuses) || bonuses.length === 0 || !defenderIsActive)
     return 0;
   const types = attackerTypes(attacker);
   const prizesTaken = Number.isFinite(defenderPrizesRemaining)
-    ? Math.max(0, 6 - defenderPrizesRemaining)
+    ? prizesTakenFor(defenderPrizesRemaining, defenderDeckFormat)
     : 0;
   let total = 0;
   for (const bonus of bonuses) {

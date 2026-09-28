@@ -305,6 +305,7 @@ export function buildServerAttackContext(
       .filter((card) => classifyEnergyEffect(card) === 'basic')
       .map((card) => String(serverEnergyDescriptor(card).type || '').toLowerCase()),
     opponentPrizes: zoneOf(opponent, 'prizes').length,
+    opponentDeckFormat: opponent?.deckFormat,
     turnCount: Math.max(1, Number(state?.turn?.number) || 1),
     attackerHp: Number(attackerCard.hp) || 0,
     attackerDamage: attacker?.damage || 0,

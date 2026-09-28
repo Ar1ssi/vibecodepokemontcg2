@@ -201,6 +201,22 @@ test('parseTurnDamageBonus: Fusion Strike / Single Strike styles and per-Prize s
   assert.equal(iris.perPrizeTaken, true);
 });
 
+test('turnDamageBonusTotal: per-Prize scaling counts from the defender\'s format (I203)', () => {
+  const iris = parseTurnDamageBonus(
+    "During this turn, your Pokémon's attacks do 10 more damage to the Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."
+  );
+  const attacker = { name: 'Lucario' };
+  const defender = { name: 'Defender' };
+  const bb = (remaining) =>
+    turnDamageBonusTotal([iris], attacker, defender, {
+      defenderPrizesRemaining: remaining,
+      defenderDeckFormat: 'build-battle',
+    });
+  assert.equal(bb(4), 0, 'a 4-Prize game has taken none at 4 left');
+  assert.equal(bb(1), 30);
+  assert.equal(turnDamageBonusTotal([iris], attacker, defender, { defenderPrizesRemaining: 4 }), 20);
+});
+
 test('turnDamageBonusTotal: style filters and per-Prize scaling', () => {
   const conviction = parseTurnDamageBonus(
     "During this turn, your Single Strike Pokémon's attacks do 20 more damage to your opponent's Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."

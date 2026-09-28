@@ -6,6 +6,7 @@
 import { hashBoardSnapshot, hashZoneMap } from './zones/zone-hash.mjs';
 import { cloneCard, createCard } from './cards.mjs';
 import { isPrismStarCard } from './rules/card-classify.mjs';
+import { DECK_FORMAT_TCG, isDeckFormat } from './formats.mjs';
 
 export const PLAYER_ZONES = [
   'deck',
@@ -99,6 +100,7 @@ export function createGameState({
       playerId,
       username: pData.username || playerId,
       deckList: Array.isArray(pData.deckList) ? [...pData.deckList] : [],
+      deckFormat: isDeckFormat(pData.deckFormat) ? pData.deckFormat : DECK_FORMAT_TCG,
       zones: createPlayerZones(),
       flags: { ...(pData.flags || {}) },
         // Per-player, per-game once-only allowances. Unlike `flags`, this object

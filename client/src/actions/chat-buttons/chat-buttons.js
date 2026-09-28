@@ -1,4 +1,5 @@
 import { systemState } from '../../state.js';
+import { deckFormatOf } from '../../setup/deck-constructor/deck-format-args.mjs';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
@@ -428,7 +429,13 @@ function koWithToolPrizes(attackerPlayer, defender, defenderBoard) {
     outcome.type === 'prizes'
       ? toolPrizeCountAdjust(defender, zoneCards, outcome.count, { blockTools })
       : undefined;
-  return handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride });
+  return handleKO({
+    attackerPlayer,
+    defender,
+    defenderBoard,
+    prizeCountOverride,
+    attackerFormat: deckFormatOf(systemState, attackerPlayer),
+  });
 }
 
 // Re-read attack effect text after ensureCardData may have merged TCGdex data.
@@ -1025,6 +1032,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             energyCount: attachedEnergies.length,
             energyDiscarded,
             opponentPrizes: getZone(oppPlayer, 'prizes').getCount(),
+            opponentDeckFormat: deckFormatOf(systemState, oppPlayer),
             turnCount: Math.max(1, rulesState.turnNumber),
             attackerHp: active?.hp ?? 0,
             defenderHp: oppActive?.hp ?? 0,

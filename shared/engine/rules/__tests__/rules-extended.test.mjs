@@ -85,6 +85,16 @@ import test from 'node:test';
       assert.equal(r.reason, 'all prize cards taken');
     });
 
+    test('handleKO: a Build & Battle attacker wins on its 4th Prize (I203)', () => {
+      resetPrizes();
+      awardPrizes('self', 2, 'build-battle');
+      const r = handleKO({ attackerPlayer: 'self', defender: { name: 'Cetitan ex' }, attackerFormat: 'build-battle' });
+      assert.equal(r.prizesTaken, 4);
+      assert.equal(r.prizesRemaining, 0);
+      assert.equal(r.won, true);
+      assert.equal(r.reason, 'all prize cards taken');
+    });
+
     test('handleKO: ex awards 2 prizes', () => {
       resetPrizes();
       const r = handleKO({ attackerPlayer: 'self', defender: { name: 'Cetitan ex' } });
@@ -3044,6 +3054,8 @@ import test from 'node:test';
       const charizard = card('Radiant Charizard', "This Pokémon's attacks cost {C} less for each Prize card your opponent has taken.");
       assert.equal(passiveCostDiscount(charizard, { opponentPrizesLeft: 2 }), 4);
       assert.equal(passiveCostDiscount(charizard, {}), 0);
+      // I203: in a 4-Prize Build & Battle game, 2 left means 2 taken, not 4.
+      assert.equal(passiveCostDiscount(charizard, { opponentPrizesLeft: 2, opponentDeckFormat: 'build-battle' }), 2);
 
       const florges = card('Florges', "Each of your Pokémon's attacks costs {Y} less.");
       assert.deepEqual(costDiscountRead(florges, {}), { count: 1, symbol: 'Fairy' });

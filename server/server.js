@@ -11,7 +11,7 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
-import { ShadowSession, extractDeckData } from './game/shadow.mjs';
+import { ShadowSession, extractDeckData, extractDeckFormat } from './game/shadow.mjs';
 import {
   findFirstDivergentZone,
   hashOwnerViewZones,
@@ -234,6 +234,16 @@ async function main() {
   app.get('/deck-builder', (req, res) => {
     if (req.path.endsWith('/')) return res.redirect(301, '/deck-builder');
     res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED, builderWindow: true });
+  });
+  // Build & Battle (design 051): the builder tab in box-opening mode.
+  app.get('/build-and-battle', (req, res) => {
+    if (req.path.endsWith('/')) return res.redirect(301, '/build-and-battle');
+    res.render('index', {
+      importDataJSON: null,
+      e2eAllowed: E2E_ENABLED,
+      builderWindow: true,
+      builderMode: 'build-battle',
+    });
   });
   app.get('/import', (req, res) => {
     const key = req.query.key;
@@ -481,6 +491,9 @@ async function main() {
    * late deck load or a duplicate readyUp cannot re-roll the caller or re-deal.
    */
   const dealOpeningHandsIfReady = (gameRoom, roomId) => {
+    // Design 051 / I202: formats are checked at the deal, not at deck load. Both Set Ups are
+    // cleared; each client prints the mismatch line from its own ready check (ready.js).
+    if (gameRoom.refuseDealOnFormatMismatch()) return;
     const opened = gameRoom.beginTurnOrderCall();
     if (!opened) return;
 
@@ -938,9 +951,10 @@ async function main() {
                 // Routed through handleCommand (design 002 slice 3.4e / I16), not a direct
                 // state mutation: this is the only way deck loading lands in commandLog, which
                 // undo's replay depends on to reconstruct the pre-game state.
+                const format = extractDeckFormat(data.action, data.parameters);
                 const result = gameRoom.handleCommand(socket.id, {
                   type: 'loadDeck',
-                  payload: { deckData },
+                  payload: { deckData, format },
                 });
 
                 if (result.success) {

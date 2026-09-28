@@ -6,6 +6,12 @@
 
 import { isBasicPokemon } from './cards.mjs';
 import { createRng } from './rng.mjs';
+import {
+  OPENING_HAND_SIZE,
+  deckFormatsMatch,
+  normalizeDeckFormat,
+  prizeCountForFormat,
+} from './formats.mjs';
 
 /**
  * Checks if an array of cards contains at least one Basic Pokémon.
@@ -44,9 +50,26 @@ export function mulliganBonusDraws(
 }
 
 /**
+ * Design 051 / I202: the decks about to be dealt when their formats differ, else null.
+ * Only players with a loaded deck count, so a seat still choosing a deck never blocks.
+ * @returns {{ playerId: string, username: string, format: string }[] | null}
+ */
+export function deckFormatMismatch(state) {
+  const decks = Object.values(state?.players || {})
+    .filter((player) => player?.zones?.deck?.length > 0)
+    .map((player) => ({
+      playerId: player.playerId,
+      username: player.username || player.playerId,
+      format: normalizeDeckFormat(player.deckFormat),
+    }));
+  const differs = decks.some((deck) => !deckFormatsMatch(deck.format, decks[0].format));
+  return differs ? decks : null;
+}
+
+/**
  * Executes deterministic setup sequence for GameState:
  * 1. Shuffles each player's deck using rng.shuffle().
- * 2. Deals 7 cards to hand and 6 cards to prizes.
+ * 2. Deals the opening hand and the format's Prize cards (Standard 6, Build & Battle 4).
  * 3. Evaluates mulligans, redrawing hands without Basic Pokémon and awarding opponent bonus draws.
  * 4. Resolves turn order via rng (or options.firstPlayerId).
  * 5. Sets turn to { player: starter, number: 1, phase: 'main' } and initializes player flags.
@@ -78,7 +101,7 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     mulligans[pid] = 0;
   }
 
-  // Step 1 & 2: Shuffle deck, deal 7 hand cards and 6 prize cards
+  // Step 1 & 2: Shuffle deck, deal the opening hand and each player's format's Prize cards
   for (const pid of playerIds) {
     const player = state.players[pid];
     if (!player.zones) continue;
@@ -87,8 +110,7 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     player.zones.deck = activeRng.shuffle([...player.zones.deck]);
     events.push({ type: 'deckShuffled', playerId: pid });
 
-    // Deal opening hand (up to 7 cards)
-    const handCount = Math.min(7, player.zones.deck.length);
+    const handCount = Math.min(OPENING_HAND_SIZE, player.zones.deck.length);
     const handCards = player.zones.deck.splice(0, handCount);
     player.zones.hand.push(...handCards);
     // Design 044: the ids let the client fly each card in (instance ids are
@@ -100,8 +122,7 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
       cards: handCards.map((card) => ({ instanceId: card.instanceId })),
     });
 
-    // Deal prizes (up to 6 cards)
-    const prizeCount = Math.min(6, player.zones.deck.length);
+    const prizeCount = Math.min(prizeCountForFormat(player.deckFormat), player.zones.deck.length);
     const prizeCards = player.zones.deck.splice(0, prizeCount);
     player.zones.prizes.push(...prizeCards);
     events.push({
@@ -134,8 +155,7 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
       // Reshuffle deck
       player.zones.deck = activeRng.shuffle([...player.zones.deck]);
 
-      // Redraw 7 cards
-      const count = Math.min(7, player.zones.deck.length);
+      const count = Math.min(OPENING_HAND_SIZE, player.zones.deck.length);
       const drawn = player.zones.deck.splice(0, count);
       player.zones.hand.push(...drawn);
 

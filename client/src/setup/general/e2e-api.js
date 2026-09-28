@@ -482,7 +482,7 @@ export function installE2eApi() {
       document.getElementById('joinRoomButton')?.click();
     },
     loadFixtureDeck(prefix = 'E2E') {
-      loadDeckData('self', e2eFixtureDeck(prefix), true);
+      loadDeckData('self', e2eFixtureDeck(prefix));
     },
     // Debug mode: turns off every legality gate canPerformAction checks (turn
     // order, once-per-turn limits, evolve/attack/retreat restrictions, phase
@@ -502,8 +502,9 @@ export function installE2eApi() {
     // Design 004 slice 6: loads an arbitrary deck (the same 7-field row shape
     // e2eFixtureDeck produces — [quantity, name, type, imageURL, number, set, tcgId]) for
     // the playtest runner's `--deck` option, instead of the built-in all-Basic fixture.
-    loadDeckList(deckRows) {
-      loadDeckData('self', deckRows, true);
+    // `format` ('tcg' | 'build-battle', design 051) defaults to Standard.
+    loadDeckList(deckRows, format) {
+      loadDeckData('self', deckRows, format);
     },
     // Pre-warms this page's TCGdex enrichment cache for a real (non-fixture) deck's
     // unique cards, one at a time, before the deck is even built. build-deck.js's own

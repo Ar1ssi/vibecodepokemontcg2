@@ -5,6 +5,7 @@ import { processAction } from '../general/process-action.js';
 import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
 import { deckDataEquals } from '../general/sync-action-args.mjs';
 import { changePlaymat, getStoredMatId } from '../sizing/apply-mat-layout.js';
+import { resolveFormatAndEmit } from './deck-format-args.mjs';
 
 export const exchangeData = (
   user,
@@ -14,13 +15,16 @@ export const exchangeData = (
   coachingMode,
   callback = true,
   matId = null,
-  emit = true
+  format,
+  emitArg
 ) => {
+  const { format: deckFormat, emit } = resolveFormatAndEmit(format, emitArg);
   const flipBoardButton = document.getElementById('flipBoardButton');
   const coachingModeCheckbox = document.getElementById('coachingModeCheckbox');
 
   if (user === 'self') {
     systemState.selfDeckData = deckData;
+    systemState.deckFormat.self = deckFormat;
     if (emit) {
       reset('self', true, true, false, false);
     }
@@ -31,6 +35,7 @@ export const exchangeData = (
     systemState.p2OppUsername = username;
     systemState.p2OppDeckData = deckData;
     systemState.p2OppCardBackSrc = cardBack;
+    systemState.deckFormat.p2Opp = deckFormat;
     if (matId) changePlaymat('opp', matId, false);
     if (coachingModeCheckbox.checked && coachingMode) {
       systemState.coachingMode = true;
@@ -59,6 +64,7 @@ export const exchangeData = (
         coachingModeCheckbox.checked,
         false,
         getStoredMatId('self'),
+        systemState.deckFormat.self,
         true
       );
     }
@@ -71,5 +77,6 @@ export const exchangeData = (
     coachingMode,
     callback,
     matId,
+    deckFormat,
   ]);
 };

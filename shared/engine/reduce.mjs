@@ -21,7 +21,8 @@ import {
   mintInstanceId,
 } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
-import { setupGame } from './setup.mjs';
+import { DECK_FORMAT_TCG, isDeckFormat } from './formats.mjs';
+import { deckFormatMismatch, setupGame } from './setup.mjs';
 import {
   createRng,
   shuffleInPlace,
@@ -716,6 +717,8 @@ function prizeFlags(draft, attackerPlayerId, defenderPlayerId) {
     defenderTrailingPrizes: defenderPrizesRemaining > attackerPrizesRemaining,
     attackerPrizesRemaining,
     defenderPrizesRemaining,
+    attackerDeckFormat: draft.players[attackerPlayerId]?.deckFormat,
+    defenderDeckFormat: draft.players[defenderPlayerId]?.deckFormat,
   };
 }
 
@@ -3918,6 +3921,7 @@ function attackCostPayable(state, playerId, active, attack) {
     ownHandCount: (player.zones?.hand || []).length,
     ownPrizesLeft: (player.zones?.prizes || []).length,
     opponentPrizesLeft: (opponent?.zones?.prizes || []).length,
+    opponentDeckFormat: opponent?.deckFormat,
     ownSideCards: sideCards,
     opponentSideCards: [...(opponent?.zones?.active || []), ...(opponent?.zones?.bench || [])],
     opponentActive: opponent?.zones?.active || [],
@@ -8652,6 +8656,17 @@ export function applyCommand(state, command, rng = null) {
     }
 
     case 'setup': {
+      // Design 051 / I202: both decks are dealt under one format's Prize count.
+      const mismatch = deckFormatMismatch(state);
+      if (mismatch) {
+        return {
+          state,
+          events: [],
+          pendingChoice: state.pendingChoice,
+          error: 'format_mismatch',
+          reason: `Deck formats differ: ${mismatch.map((p) => `${p.playerId} ${p.format}`).join(', ')}`,
+        };
+      }
       const setupResult = setupGame(draft, {
         firstPlayerId: payload?.firstPlayerId,
         rng: activeRng,
@@ -10058,6 +10073,9 @@ export function applyCommand(state, command, rng = null) {
     case 'loadDeck': {
       const player = draft.players[playerId];
       const deckData = Array.isArray(payload.deckData) ? payload.deckData : [];
+      // Any format loads: the one-format rule is checked when the cards are dealt ('setup'),
+      // so a deck restored on room join can still be replaced by a matching one (I202).
+      player.deckFormat = isDeckFormat(payload.format) ? payload.format : DECK_FORMAT_TCG;
       player.zones.deck = [];
       let syncInstance = 0;
       for (const item of deckData) {
@@ -10103,6 +10121,7 @@ export function applyCommand(state, command, rng = null) {
         type: 'deckLoaded',
         playerId,
         count: player.zones.deck.length,
+        format: player.deckFormat,
       });
       break;
     }

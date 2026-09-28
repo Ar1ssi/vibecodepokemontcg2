@@ -8,6 +8,7 @@
 
 import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
+import { prizesTakenFor } from '../formats.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -225,7 +226,7 @@ function discountUnits(sentence, ctx) {
     return opp.filter((p) => !(ctx.opponentActive || []).includes(p)).length;
   }
   if (/prize card your opponent has taken/.test(each)) {
-    return ctx.opponentPrizesLeft == null ? null : Math.max(0, 6 - ctx.opponentPrizesLeft);
+    return ctx.opponentPrizesLeft == null ? null : prizesTakenFor(ctx.opponentPrizesLeft, ctx.opponentDeckFormat);
   }
   if (/your opponent's pok[eé]mon v in play/.test(each)) return opp.filter((p) => isVCard(p)).length;
   if (/single strike, rapid strike, and fusion strike/.test(each)) {

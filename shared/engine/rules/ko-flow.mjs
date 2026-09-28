@@ -2,6 +2,7 @@
     // and detect win conditions (all prizes taken / no Pokémon left / deck-out).
     
     import { rulesState } from './rules-state.mjs';
+    import { prizeCountForFormat } from '../formats.mjs';
     import {
       isExCard,
       isGxCard,
@@ -13,7 +14,7 @@
     // Re-exported here so existing ko-flow.mjs importers keep working.
     export { isExCard, isGxCard, isMegaCard, prizesForKO };
 
-    // prize state per player (prizes they have TAKEN, 0..6)
+    // prize state per player (prizes they have TAKEN, 0..their format's Prize count)
     export const prizeState = {
       self: { taken: 0 },
       opp: { taken: 0 },
@@ -33,11 +34,13 @@
     }
     
     // Award prizes to the attacking player. Returns the new count and whether
-    // the game is now won.
-    export function awardPrizes(player, count = 1) {
+    // the game is now won: taking all of the attacker's format's Prizes (Standard 6,
+    // Build & Battle 4; I203).
+    export function awardPrizes(player, count = 1, format) {
       prizeState[player].taken += count;
       const total = prizeState[player].taken;
-      return { total, won: total >= 6, remaining: Math.max(0, 6 - total) };
+      const prizeTotal = prizeCountForFormat(format);
+      return { total, won: total >= prizeTotal, remaining: Math.max(0, prizeTotal - total) };
     }
     
     // ── win detection ────────────────────────────────────────────────────
@@ -74,12 +77,12 @@
     
     // Called when the attack engine reports a KO. Handles prize award + any
     // win check. Returns an announcement payload for the UI.
-    export function handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride }) {
+    export function handleKO({ attackerPlayer, defender, defenderBoard, prizeCountOverride, attackerFormat }) {
       // A Knockout always awards prizes (GX included: 2). The attacker only
-      // wins when the award reaches all 6; simultaneous board-empties are
+      // wins when the award reaches all of its format's Prizes; simultaneous board-empties are
       // detected separately by checkWinConditions.
       const prizeCount = prizeCountOverride ?? prizesForKO(defender);
-      const award = awardPrizes(attackerPlayer, prizeCount);
+      const award = awardPrizes(attackerPlayer, prizeCount, attackerFormat);
       return {
         prizeCount,
         prizesTaken: award.total,

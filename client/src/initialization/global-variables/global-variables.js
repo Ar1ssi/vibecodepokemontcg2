@@ -56,6 +56,8 @@ export const systemState = {
   selfDeckData: '',
   p1OppDeckData: '', // refers to the opponent's data in 1 player mode, i.e., the "alt" deck data
   p2OppDeckData: '', // refers to the opponent's data in 2 player mode, i.e., the other player's deck data
+  // Design 051: 'tcg' | 'build-battle', sets the Prize count. Opp slots mirror p1Opp/p2OppDeckData (I204).
+  deckFormat: { self: 'tcg', p1Opp: 'tcg', p2Opp: 'tcg' },
   cardBackSrc: defaultCardBackSrc,
   p1OppCardBackSrc: defaultCardBackSrc,
   p2OppCardBackSrc: defaultCardBackSrc,

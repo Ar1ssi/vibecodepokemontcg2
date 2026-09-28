@@ -11,6 +11,12 @@ import { fileURLToPath } from 'url';
 import { hashState, PLAYER_ZONES } from '../../shared/engine/state.mjs';
 import { createCard, isEnergy, mintInstanceId } from '../../shared/engine/cards.mjs';
 import { createRelayedRng } from '../../shared/engine/rng.mjs';
+import {
+  DECK_FORMAT_TCG,
+  OPENING_HAND_SIZE,
+  isDeckFormat,
+  prizeCountForFormat,
+} from '../../shared/engine/formats.mjs';
 import { GameRoom } from './room.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,8 +80,8 @@ export function initializePlayerDeck(state, playerId, deckData = []) {
 
 /**
  * Extracts deckData array from legacy action parameters.
- * - exchangeData: parameters are [username, deckData, cardBack, coachingMode, callback, matId]
- * - loadDeckData: parameters are [deckData] (or legacy [user, deckData])
+ * - exchangeData: parameters are [username, deckData, cardBack, coachingMode, callback, matId, format]
+ * - loadDeckData: parameters are [deckData, format] (or legacy [user, deckData])
  * @param {string} action
  * @param {any[]} parameters
  * @returns {any[] | null}
@@ -91,6 +97,22 @@ export function extractDeckData(action, parameters) {
     return null;
   }
   return null;
+}
+
+/**
+ * Design 051: the deck format a legacy deck-load packet names.
+ * - exchangeData: parameters[6], after matId
+ * - loadDeckData: parameters[1] (parameters are [deckData, format])
+ * Anything that is not a known format reads as Standard.
+ * @param {string} action
+ * @param {any[]} parameters
+ * @returns {'tcg'|'build-battle'}
+ */
+export function extractDeckFormat(action, parameters) {
+  if (!Array.isArray(parameters)) return DECK_FORMAT_TCG;
+  const index = { exchangeData: 6, loadDeckData: 1 }[action];
+  const format = index == null ? null : parameters[index];
+  return isDeckFormat(format) ? format : DECK_FORMAT_TCG;
 }
 
 /**
@@ -127,6 +149,7 @@ export function translateLegacyAction(
       const deckData = extractDeckData(action, parameters);
       if (deckData) {
         initializePlayerDeck(state, playerId, deckData);
+        player.deckFormat = extractDeckFormat(action, parameters);
       }
       return { handled: true };
     }
@@ -152,13 +175,12 @@ export function translateLegacyAction(
           rng?.shuffle || ((arr) => indices.map((i) => arr[i]).filter(Boolean))
         )(player.zones.deck);
       }
-      // Draw starting hand: 7 cards to hand
-      const handCount = Math.min(7, player.zones.deck.length);
+      const handCount = Math.min(OPENING_HAND_SIZE, player.zones.deck.length);
       const handCards = player.zones.deck.splice(0, handCount);
       player.zones.hand.push(...handCards);
 
-      // Deal opening prizes: 6 cards to prizes
-      const prizeCount = Math.min(6, player.zones.deck.length);
+      // The format's Prizes: Standard 6, Build & Battle 4 (design 051 / I203).
+      const prizeCount = Math.min(prizeCountForFormat(player.deckFormat), player.zones.deck.length);
       const prizeCards = player.zones.deck.splice(0, prizeCount);
       player.zones.prizes.push(...prizeCards);
 
@@ -174,14 +196,14 @@ export function translateLegacyAction(
           rng?.shuffle || ((arr) => indices.map((i) => arr[i]).filter(Boolean))
         )(player.zones.deck);
       }
-      const prizeCount = Math.min(6, player.zones.deck.length);
+      const prizeCount = Math.min(prizeCountForFormat(player.deckFormat), player.zones.deck.length);
       const prizeCards = player.zones.deck.splice(0, prizeCount);
       player.zones.prizes.push(...prizeCards);
       return { handled: true };
     }
 
     case 'drawOpeningHand': {
-      const handCount = Math.min(7, player.zones.deck.length);
+      const handCount = Math.min(OPENING_HAND_SIZE, player.zones.deck.length);
       const handCards = player.zones.deck.splice(0, handCount);
       player.zones.hand.push(...handCards);
       return { handled: true };

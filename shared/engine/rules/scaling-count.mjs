@@ -12,6 +12,7 @@
 
 import { kindsOf } from './attack-conditions.mjs';
 import { escapeRegExp } from './attack-text.mjs';
+import { prizesTakenFor } from '../formats.mjs';
 
 const LETTER_TYPES = {
   g: 'grass',
@@ -266,9 +267,12 @@ function counterCount(unit, ctx) {
   if (/^prize cards? more than your opponent$/.test(unit) && ctx.ownPrizes != null && ctx.opponentPrizes != null) {
     return { count: Math.max(0, ctx.ownPrizes - ctx.opponentPrizes), label: 'Prize cards more than your opponent' };
   }
-  // Dusknoir Hard Feelings: the opponent started with 6 Prize cards.
+  // Dusknoir Hard Feelings: the opponent started with their format's Prizes (Standard 6, B&B 4).
   if (/^prize cards? your opponent has taken$/.test(unit) && typeof ctx.opponentPrizes === 'number') {
-    return { count: Math.max(0, 6 - ctx.opponentPrizes), label: 'Prize cards your opponent has taken' };
+    return {
+      count: prizesTakenFor(ctx.opponentPrizes, ctx.opponentDeckFormat),
+      label: 'Prize cards your opponent has taken',
+    };
   }
   // Azelf LV.X Deep Balance.
   if (/^energy attached to all of your opponent's pokémon$/.test(unit) && typeof ctx.opponentAllEnergyCount === 'number') {

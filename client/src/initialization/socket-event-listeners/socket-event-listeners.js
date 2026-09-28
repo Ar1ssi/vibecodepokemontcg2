@@ -362,6 +362,7 @@ export const initializeSocketEventListeners = () => {
       document.getElementById('coachingModeCheckbox').checked,
       false,
       getStoredMatId('self'),
+      systemState.deckFormat.self,
       true
     );
     socket.emit('rulesEvent', {

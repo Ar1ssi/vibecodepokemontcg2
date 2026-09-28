@@ -5,6 +5,7 @@
 import { isBasicEnergy } from '../../../../../../shared/engine/rules/card-classify.mjs';
 import { getBuildBattleBox } from './box-catalog.mjs';
 import { BUILD_BATTLE_SET_CARDS } from './build-battle.generated.mjs';
+import { createUnboxing, finishedUnboxing, parseUnboxing } from './unboxing.mjs';
 
 export const BUILD_BATTLE_STORAGE_KEY = 'ptcg-sim.build-battle.v1';
 const SESSION_VERSION = 1;
@@ -13,10 +14,14 @@ const MAX_ID_LENGTH = 128;
 
 /**
  * @typedef {{version: 1, boxKey: string, seed: number, deckKey: string, packs: string[][],
- *   openedPacks: number, deckId: string|null, createdAt: number}} Session
+ *   unboxing: import('./unboxing.mjs').Unboxing, deckId: string|null,
+ *   unsavedDeck: [string, number][]|null, createdAt: number}} Session
+ * `unboxing` is the scene's progress (design 052); it never changes `packs`.
+ * `unsavedDeck` holds the editor deck as [cardId, count] pairs while no My Decks record is bound
+ * (the library was full), so a reload rebuilds the player's edits instead of the box deck (I207).
  */
 
-/** @returns {Session} a freshly opened box: no pack revealed yet, no library deck bound. */
+/** @returns {Session} a freshly opened box: still sealed, no library deck bound. */
 export function createSession({
   boxKey,
   seed,
@@ -30,10 +35,49 @@ export function createSession({
     seed,
     deckKey,
     packs: packs.map((pack) => [...pack]),
-    openedPacks: 0,
+    unboxing: createUnboxing(),
     deckId: null,
+    unsavedDeck: null,
     createdAt: now,
   };
+}
+
+const MAX_UNSAVED_ENTRIES = 80;
+const MAX_COPIES = 60;
+
+/** @returns {[string, number][]|null} the stored pairs, or null when absent or untrustworthy. */
+function parseUnsavedDeck(value) {
+  if (!Array.isArray(value) || value.length > MAX_UNSAVED_ENTRIES) return null;
+  const valid = value.every(
+    (entry) =>
+      Array.isArray(entry) &&
+      entry.length === 2 &&
+      typeof entry[0] === 'string' &&
+      entry[0].length > 0 &&
+      entry[0].length <= MAX_ID_LENGTH &&
+      Number.isInteger(entry[1]) &&
+      entry[1] > 0 &&
+      entry[1] <= MAX_COPIES
+  );
+  return valid ? value.map(([id, count]) => [id, count]) : null;
+}
+
+/**
+ * The editor deck as [cardId, count] pairs, merged by id; cards without an id are skipped.
+ * @param {object} deck `{ [name]: { cards: [{ data, count }] } }`
+ * @returns {[string, number][]}
+ */
+export function deckCardCounts(deck = {}) {
+  const counts = new Map();
+  for (const group of Object.values(deck || {})) {
+    for (const entry of group?.cards || []) {
+      const id = entry?.data?.id;
+      const count = Number(entry?.count) || 0;
+      if (!id || count <= 0) continue;
+      counts.set(id, (counts.get(id) || 0) + count);
+    }
+  }
+  return [...counts.entries()];
 }
 
 const isSeed = (value) =>
@@ -73,13 +117,13 @@ export function parseSession(json) {
   if (!box || !box.decks.some((deck) => deck.key === value.deckKey))
     return null;
   if (!isSeed(value.seed) || !arePacksInSet(value.packs, box)) return null;
-  const { openedPacks } = value;
-  if (
-    !Number.isInteger(openedPacks) ||
-    openedPacks < 0 ||
-    openedPacks > box.packCount
-  )
-    return null;
+  // A session saved before the unboxing scene existed (design 051) has no `unboxing`: every
+  // pack was already shown to that player, so it resumes at the end of the scene.
+  const unboxing =
+    value.unboxing === undefined
+      ? finishedUnboxing()
+      : parseUnboxing(value.unboxing);
+  if (!unboxing) return null;
   if (!isDeckId(value.deckId) || !Number.isFinite(value.createdAt)) return null;
   return {
     version: SESSION_VERSION,
@@ -87,8 +131,9 @@ export function parseSession(json) {
     seed: value.seed,
     deckKey: value.deckKey,
     packs: value.packs.map((pack) => [...pack]),
-    openedPacks,
+    unboxing,
     deckId: value.deckId,
+    unsavedDeck: value.deckId === null ? parseUnsavedDeck(value.unsavedDeck) : null,
     createdAt: value.createdAt,
   };
 }

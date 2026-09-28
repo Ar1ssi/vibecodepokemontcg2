@@ -152,6 +152,20 @@ test('iframe stylesheets also keep their prefers-reduced-motion fallback', () =>
   }
 });
 
+test('the unboxing scene sheet guards every idle loop with body.fx-off and reduced motion', () => {
+  // Design 052: the builder tab is a parent page, so its guard is the body class.
+  const css = read('deck-builder-unboxing.css');
+  const idle = idleSelectors(css);
+  assert.ok(idle.length > 0, 'the pack foil drift is expected to be an idle loop');
+  const guarded = guardSelectors(css, 'body.fx-off').map(tokensOf);
+  for (const selector of idle) {
+    const tokens = tokensOf(selector);
+    assert.ok(guarded.some((g) => isSubset(g, tokens)), `"${selector}" is not covered by body.fx-off`);
+  }
+  assert.ok(css.includes('prefers-reduced-motion'), 'lost its reduced-motion query');
+  assert.ok(read('index.css').includes("@import url('./deck-builder-unboxing.css')"));
+});
+
 test('parent-page overlays are still killed by the body class', () => {
   // mat-fx.css overlays are body children, so they use body.fx-off, not :root.
   assert.ok(read('mat-fx.css').includes('body.fx-off .fx-overlay'));

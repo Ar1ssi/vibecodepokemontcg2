@@ -207,6 +207,7 @@ export function viewFor(state, playerId, { attackExtrasFor } = {}) {
       spectatorPlayers[id] = {
         playerId: id,
         username: player.username,
+        deckFormat: player.deckFormat,
         flags: playerFlags(player),
         zones: redactSpectatorZones(player),
       };
@@ -230,6 +231,7 @@ export function viewFor(state, playerId, { attackExtrasFor } = {}) {
     you: {
       playerId,
       username: owner.username,
+      deckFormat: owner.deckFormat,
       flags: playerFlags(owner),
       zones: redactOwnerZones(owner),
       ...ownerAttackExtras(state, owner, attackExtrasFor),
@@ -238,6 +240,7 @@ export function viewFor(state, playerId, { attackExtrasFor } = {}) {
       ? {
           playerId: opponent.playerId,
           username: opponent.username,
+          deckFormat: opponent.deckFormat,
           flags: playerFlags(opponent),
           zones: redactOpponentZones(opponent),
         }

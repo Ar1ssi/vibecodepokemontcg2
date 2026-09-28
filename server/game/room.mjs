@@ -9,6 +9,8 @@ import {
   createPlayerZones,
 } from '../../shared/engine/state.mjs';
 import { createRng } from '../../shared/engine/rng.mjs';
+import { DECK_FORMAT_TCG } from '../../shared/engine/formats.mjs';
+import { deckFormatMismatch } from '../../shared/engine/setup.mjs';
 import { deckPeekFor, viewFor } from '../../shared/engine/view.mjs';
 import { applyCommand, attackExtrasFor } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
@@ -124,6 +126,7 @@ export class GameRoom {
         playerId,
         username: username || playerId,
         deckList: Array.isArray(deckList) ? [...deckList] : [],
+        deckFormat: DECK_FORMAT_TCG,
         zones: createPlayerZones(),
         flags: {},
         oncePerGame: { vstarUsed: false, gxUsed: false },
@@ -392,12 +395,33 @@ export class GameRoom {
   isReadyToDeal() {
     if (this.state.turn?.phase !== 'setup') return false;
     const players = Object.values(this.state.players || {});
+    return this.#bothSeatsReady(players) && !deckFormatMismatch(this.state);
+  }
+
+  #bothSeatsReady(players) {
     return (
       players.length === 2 &&
       players.every(
         (p) => p.zones?.deck?.length > 0 && this.readyPlayerIds.has(p.playerId)
       )
     );
+  }
+
+  /**
+   * Design 051 / I202: when both seats pressed Set Up but their decks' formats differ, the
+   * deal is refused and both Set Ups are cleared, so a player loads a matching deck and
+   * both press Set Up again (the clients clear theirs on the same condition).
+   *
+   * @returns {{ playerId: string, username: string, format: string }[]|null}
+   *   the two decks when the deal was refused, else null
+   */
+  refuseDealOnFormatMismatch() {
+    if (this.state.turn?.phase !== 'setup') return null;
+    if (!this.#bothSeatsReady(Object.values(this.state.players || {}))) return null;
+    const mismatch = deckFormatMismatch(this.state);
+    if (!mismatch) return null;
+    this.readyPlayerIds.clear();
+    return mismatch;
   }
 
   /**
@@ -576,6 +600,7 @@ export class GameRoom {
         playerId,
         username: player.username || playerId,
         deckList: Array.isArray(player.deckList) ? [...player.deckList] : [],
+        deckFormat: player.deckFormat,
         socketId: this.playerToSocket.get(playerId) || null,
         printedStats: collectPrintedStats(player),
       });
@@ -604,6 +629,7 @@ export class GameRoom {
         playerId: entry.playerId,
         username: entry.username,
         deckList: [],
+        deckFormat: DECK_FORMAT_TCG,
         zones: createPlayerZones(),
         flags: {},
         oncePerGame: { vstarUsed: false, gxUsed: false },
@@ -616,7 +642,7 @@ export class GameRoom {
           this.state,
           {
             type: 'loadDeck',
-            payload: { deckData: entry.deckList },
+            payload: { deckData: entry.deckList, format: entry.deckFormat },
             playerId: entry.playerId,
           },
           this.rng
