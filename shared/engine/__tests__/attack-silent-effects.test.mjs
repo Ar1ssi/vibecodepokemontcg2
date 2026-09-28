@@ -962,7 +962,7 @@ test('Unown L Hidden Power (Unseen Forces L): heads leaves the Defending Pokémo
   assert.equal(root(tails.res.state, 'p2', tails.defender.instanceId).damage, 100);
 });
 
-test('Unown Hidden Power (Unseen Forces XY149 text): tails puts the 2 counters on your own Pokémon', () => {
+test('Unown ! Hidden Power (Legends Awakened 42): tails puts the 2 counters on your own Pokémon', () => {
   const text =
     "Flip a coin. If heads, put 2 damage counters on 1 of your opponent's Pokémon. If tails, put 2 damage counters on 1 of your Pokémon.";
   const make = () => board('Unown', text, { damage: '' });
@@ -1645,4 +1645,44 @@ test('Porygon-Z Digital Reboot (Ancient Origins 67): chosen Evolution cards retu
   });
   res = choose(attack(again.state), [stage1.instanceId, stage2.instanceId]);
   assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.name).sort(), ['Porygon-Z', 'Porygon2']);
+});
+
+test('Unown Z Hidden Power (Secret Wonders 72): counters removed from your Unown land on the Defending Pokémon', () => {
+  const text =
+    'Remove as many damage counters as you like from each Unown you have in play. Put that many damage counters on the Defending Pokémon.';
+  let other;
+  const { state, attacker, defender } = board('Unown Z', text, {
+    damage: '',
+    setup: (s) => {
+      s.players.p1.zones.active[0].damage = 30;
+      other = mon('Unown A');
+      other.damage = 20;
+      s.players.p1.zones.bench.push(other, Object.assign(mon('Pikachu'), { damage: 50 }));
+    },
+  });
+  let res = attack(state);
+  res = choose(res, [4]); // all 3 from Unown Z
+  res = choose(res, [2]); // 1 of 2 from Unown A
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 0);
+  assert.equal(root(res.state, 'p1', other.instanceId).damage, 10);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 40);
+});
+
+test('Unown I Hidden Power (Mysterious Treasures 37): a Defending Energy provides {C} until their turn ends', () => {
+  const text =
+    "Choose an Energy card attached to the Defending Pokémon and put it face down. Treat that card as a Special Energy card that provides {C} Energy and doesn't have any effect other than providing Energy. Put that card face up at the end of your opponent's next turn.";
+  let water;
+  const { state } = board('Unown I', text, {
+    damage: '',
+    setup: (s) => {
+      water = energy('Water', s.players.p2.zones.active[0].instanceId);
+      s.players.p2.zones.active.push(water);
+    },
+  });
+  let res = attack(state);
+  const faceDown = res.state.players.p2.zones.active.find((c) => c.instanceId === water.instanceId);
+  assert.deepEqual(faceDown.asEnergy, { provides: ['Colorless'] });
+  res = applyCommand(res.state, { type: 'pass', playerId: 'p2', payload: {} }, createRng(3));
+  const faceUp = res.state.players.p2.zones.active.find((c) => c.instanceId === water.instanceId);
+  assert.equal(faceUp.asEnergy, undefined);
 });

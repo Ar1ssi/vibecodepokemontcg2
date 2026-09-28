@@ -2200,6 +2200,17 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
 // The marker is live only on that turn, and only while the Pokémon is still Active and
 // unevolved, so a switched-out or evolved target is spared.
 function resolveDeferredKnockouts(draft, { events }) {
+  // Unown I Hidden Power: "Put that card face up at the end of your opponent's next turn."
+  for (const pid of Object.keys(draft.players || {})) {
+    for (const zoneId of ['active', 'bench']) {
+      for (const card of draft.players[pid].zones?.[zoneId] || []) {
+        if (card.faceDownUntilTurn == null || card.faceDownUntilTurn > (draft.turn?.number || 0)) continue;
+        delete card.asEnergy;
+        delete card.faceDownUntilTurn;
+        events.push({ type: 'energyFaceUp', instanceId: card.instanceId, playerId: pid });
+      }
+    }
+  }
   for (const pid of Object.keys(draft.players || {})) {
     const active = draft.players[pid].zones?.active?.find((c) => !c.attachedTo);
     // Wobbuffet Shadow Tag: "Put 7 damage counters on the Defending Pokémon at the end of your
@@ -6890,7 +6901,7 @@ function resolveAttackEffectPhase(draft, ctx) {
       // "If heads, put 3 damage counters on …" / "For each heads, put 1 damage counter …".
       const targetGate = attackTarget ? targetClauseGate(attack.text) : null;
       if (targetGate === 'heads' && !(coin === 'heads' || headsCount > 0)) {
-        // Unown Hidden Power (Unseen Forces): "If heads, … on 1 of your opponent's Pokémon.
+        // Unown ! Hidden Power (Legends Awakened 42): "If heads, … on 1 of your opponent's Pokémon.
         // If tails, put 2 damage counters on 1 of your Pokémon." — the tails sentence's target.
         const tailsSentence = /(?:^|\.\s+)if tails, ([^.]*\.)/i.exec(attack.text || '')?.[1];
         attackTarget = coin === 'tails' && tailsSentence ? resolveAttackTargetClause(tailsSentence, null, 0) : null;

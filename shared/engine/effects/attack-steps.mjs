@@ -3125,6 +3125,72 @@ function atkOppBenchTrap(ctx) {
   return null;
 }
 
+// Unown Z Hidden Power: "Remove as many damage counters as you like from each Unown you have in
+// play. Put that many damage counters on the Defending Pokémon." One count per damaged Unown.
+function atkMoveCountersFromNamed(ctx) {
+  const { player, opponent, step } = ctx;
+  const named = rootsOf(player).filter(
+    (root) =>
+      (root.damage || 0) > 0 &&
+      String(topPokemonCard(player, root)?.name || '').toLowerCase().startsWith(step.name)
+  );
+  const doneIds = [...(ctx.memo?.doneIds || [])];
+  let moved = ctx.memo?.moved || 0;
+  const current = ctx.selection && named.find((root) => root.instanceId === ctx.memo?.currentId);
+  if (current) {
+    const take = Math.min(Number(ctx.selection[0]) - 1, Math.floor(current.damage / 10));
+    if (take > 0) {
+      current.damage -= take * 10;
+      ctx.events.push({ type: 'damageUpdated', instanceId: current.instanceId, damage: current.damage });
+      moved += take;
+    }
+    doneIds.push(current.instanceId);
+  }
+  const next = named.find((root) => !doneIds.includes(root.instanceId) && (root.damage || 0) > 0);
+  if (next) {
+    const counters = Math.floor(next.damage / 10);
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Remove how many damage counters from ${topPokemonCard(player, next)?.name || 'this Unown'}?`,
+      options: Array.from({ length: counters + 1 }, (_, k) => ({ instanceId: k + 1, name: String(k), type: 'option' })),
+      min: 1,
+      max: 1,
+      memo: { doneIds, moved, currentId: next.instanceId },
+    });
+  }
+  const defender = activeOf(opponent);
+  if (moved === 0 || !defender) return moved === 0 ? skip(ctx, 'nothing_moved') : skip(ctx, 'no_opponent_active');
+  placeCounters(ctx, defender, opponent.playerId, moved * 10);
+  return null;
+}
+
+// Unown I Hidden Power: an Energy on the Defending Pokémon goes face down and provides only {C}
+// until the end of the opponent's next turn (reduce.mjs turns it face up; serverEnergyDescriptor
+// reads `asEnergy`).
+function atkFaceDownOppEnergy(ctx) {
+  const { opponent } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const energies = attachedCards(opponent, defender.instanceId).filter(isEnergy);
+  const flip = (card) => {
+    card.asEnergy = { provides: ['Colorless'] };
+    card.faceDownUntilTurn = (ctx.draft.turn?.number || 1) + 1;
+    ctx.events.push({ type: 'energyFaceDown', instanceId: card.instanceId, playerId: opponent.playerId });
+    return null;
+  };
+  if (ctx.selection) {
+    const card = energies.find((c) => c.instanceId === ctx.selection[0]);
+    return card ? flip(card) : skip(ctx, 'target_not_found');
+  }
+  if (energies.length === 0) return skip(ctx, 'no_energy');
+  if (energies.length === 1) return flip(energies[0]);
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Choose an Energy card on your opponent's Active Pokémon to put face down`,
+    options: energies,
+    min: 1,
+    max: 1,
+  });
+}
+
 // Cofagrigus Slap of Misfortune / Unown E Hidden Power: the opponent's coin flips next turn are
 // tails (reduce.mjs wraps that turn's RNG).
 function atkOppCoinsTails(ctx) {
@@ -3500,6 +3566,8 @@ export const ATTACK_STEP_HANDLERS = {
   atkOppBenchTrap,
   atkOppCoinsTails,
   atkDevolveOwnBench,
+  atkFaceDownOppEnergy,
+  atkMoveCountersFromNamed,
   atkApplyCondition: optional(atkApplyCondition, (step) => `Leave your opponent's Active Pokémon ${step.condition}`),
   atkDevolve,
   atkBounceOppActive,
@@ -3534,6 +3602,7 @@ const OPP_ACTIVE_EFFECTS = {
   atkLockAttack: () => true,
   atkOppDiscardOrCondition: () => true,
   atkApplyCondition: () => true,
+  atkFaceDownOppEnergy: () => true,
 };
 
 function oppActiveProtected(ctx) {

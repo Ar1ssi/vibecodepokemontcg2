@@ -1143,6 +1143,16 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Unown Z Hidden Power (Secret Wonders 72).
+  [
+    /remove as many damage counters as you like from each (unown) you have in play\. put that many damage counters on your opponent's active pokémon\./g,
+    (m) => ({ type: 'atkMoveCountersFromNamed', name: m[1] }),
+  ],
+  // Unown I Hidden Power (Mysterious Treasures 37).
+  [
+    /choose an energy card attached to your opponent's active pokémon and put it face down\. treat that card as a special energy card that provides \{c\} energy and doesn't have any effects? other than providing energy\. put that card face up at the end of your opponent's next turn\./g,
+    () => ({ type: 'atkFaceDownOppEnergy' }),
+  ],
   // Crobat BREAK Silent Bite ("… all cards attached to into your deck", sic).
   [
     /you may leave your opponent's active pokémon (asleep|burned|confused|paralyzed|poisoned)\. if you do, shuffle this pokémon and all cards attached to (?:it )?into your deck\./g,
