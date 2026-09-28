@@ -1198,7 +1198,8 @@ export function parseAbility(text = '') {
       namesStatus ||
       (statusText.includes('special condition') && namesStatus && !statusText.includes('recover')))
   ) {
-    const target = statusText.includes('opponent') ? 'opponent' : 'attacker';
+    // "The Defending Pokémon" / "1 of the Defending Pokémon" (Houndoom, Blaziken Fire Breath) is the opponent's Active.
+    const target = statusText.includes('opponent') || /defending pok[eé]mon/.test(statusText) ? 'opponent' : 'attacker';
     let status = null;
     if (statusText.includes('asleep')) status = 'asleep';
     else if (statusText.includes('burned')) status = 'burned';
@@ -1386,10 +1387,11 @@ export function parseAbility(text = '') {
   }
 
   // ── 27. Effect prevention / negation ────────────────────────────────────
+  // "This power can't be used if …" restricts use (statusText drops it); it prevents nothing.
   if (
     !isAbilityUsageLimitText(lower) &&
     (((lower.includes('prevent') ||
-      lower.includes("can't") ||
+      statusText.includes("can't") ||
       lower.includes('have no effect') ||
       lower.includes('has no effect') ||
       lower.includes('have no abilities') ||

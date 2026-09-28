@@ -4,7 +4,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
-import { addCondition, hasAnyCondition } from '../rules/special-conditions.mjs';
+import { addCondition, hasAnyCondition, hasCondition } from '../rules/special-conditions.mjs';
 import { parseAbility } from '../rules/abilities.mjs';
 
 function setupGame() {
@@ -891,6 +891,38 @@ test('ability: coin-flip statusAbility only applies on heads (I88)', () => {
     assert.deepEqual(conditionsOf(res.state.players.p1.zones.active[0]), []);
   }
   assert.deepEqual([...faces].sort(), ['heads', 'tails']);
+});
+
+// Houndoom, Undaunted 82: "the Defending Pokémon" is the opponent's Active.
+const HOUNDOOM_FIRE_BREATH =
+  "Once during your turn (before your attack), you may flip a coin. If heads, the Defending Pokémon is now Burned. This power can't be used if Houndoom is affected by a Special Condition.";
+// Blaziken, Platinum 3.
+const BLAZIKEN_FIRE_BREATH =
+  "Once during your turn (before your attack), you may choose 1 of the Defending Pokémon. That Pokémon is now Burned. This power can't be used if Blaziken is affected by a Special Condition.";
+
+test('ability: Houndoom Fire Breath Burns the Defending Pokémon on heads, never its own side', () => {
+  for (let seed = 1; seed <= 8; seed++) {
+    const { state } = setupStatusAbility(HOUNDOOM_FIRE_BREATH);
+    const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 40 }, playerId: 'p1' }, createRng(seed));
+    assert.equal(res.error, null);
+    const heads = res.events.find((e) => e.type === 'coinFlipped')?.face === 'heads';
+    assert.equal(hasCondition(res.state.players.p2.zones.active[0], 'Burned'), heads);
+    assert.equal(hasAnyCondition(res.state.players.p1.zones.active[0]), false);
+  }
+});
+
+test('ability: Blaziken Fire Breath Burns the Defending Pokémon', () => {
+  const { state, rng } = setupStatusAbility(BLAZIKEN_FIRE_BREATH);
+  const res = applyCommand(state, { type: 'useAbility', payload: { instanceId: 40 }, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.ok(hasCondition(res.state.players.p2.zones.active[0], 'Burned'));
+  assert.equal(hasAnyCondition(res.state.players.p1.zones.active[0]), false);
+});
+
+test("parseAbility: a Poké-Power's \"can't be used if\" restriction is not an effect prevention", () => {
+  for (const text of [HOUNDOOM_FIRE_BREATH, BLAZIKEN_FIRE_BREATH]) {
+    assert.deepEqual(parseAbility(text).map((step) => step.type), ['statusAbility']);
+  }
 });
 
 function holderWithAbility(state, text) {
