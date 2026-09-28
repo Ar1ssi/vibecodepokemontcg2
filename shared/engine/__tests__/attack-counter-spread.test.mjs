@@ -51,7 +51,13 @@ test('eachPokemonDamage: filters, the Defending-Pokémon form, and what it leave
     { amount: 60, activeOnly: false, filter: { ruleBox: ['ex'] } }
   );
   assert.deepEqual(eachPokemonDamage('Does 20 damage to each Defending Pokémon.'), { amount: 20, activeOnly: true, filter: {} });
-  assert.equal(eachPokemonDamage('Flip a coin. If heads, this attack does 10 damage to each Defending Pokémon.'), null);
+  // A coin-gated clause carries its gate; reduce.mjs applies it on that face only.
+  assert.deepEqual(eachPokemonDamage('Flip a coin. If heads, this attack does 10 damage to each Defending Pokémon.'), {
+    amount: 10,
+    activeOnly: true,
+    filter: {},
+    gate: 'heads',
+  });
   assert.equal(
     eachPokemonDamage("Does 10 damage to each of your opponent's Pokémon for each Energy card attached to that Pokémon."),
     null
