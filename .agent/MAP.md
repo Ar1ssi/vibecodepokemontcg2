@@ -72,6 +72,7 @@ client/src/setup/zones/get-zone.js — `getZone(user, zoneId)` → { array, elem
 shared/engine/zones/zone-hash.mjs — `hashCardList`/`hashBoardSnapshot`; `SYNC_HASH_ZONES` is 8 zones (excludes UI scratch)
 shared/engine/zones/*.mjs — pure: board-snapshot, card-state, hand-sort, resolve-card-index, active-pokemon
 client/src/setup/deck-constructor/card.js — `Card` class; identity is `card.image` (HTMLImageElement)
+client/src/setup/deck-constructor/own-deck.mjs — `systemState.ownDeck`: the deck this player loaded (set by import.js loadDeckData on emit); leaving a room restores selfDeckData from it (I198)
 
 ## Actions (~10,582 lines, ~85% DOM-coupled — every mutation goes through the DOM)
 client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary mutation path

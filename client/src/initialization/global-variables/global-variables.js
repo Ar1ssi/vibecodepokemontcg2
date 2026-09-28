@@ -54,6 +54,7 @@ export const systemState = {
   p2OppUsername: '',
   spectatorUsername: '',
   selfDeckData: '',
+  ownDeck: null, // { deckData, format } this player loaded; restored on leaving a room (own-deck.mjs)
   p1OppDeckData: '', // refers to the opponent's data in 1 player mode, i.e., the "alt" deck data
   p2OppDeckData: '', // refers to the opponent's data in 2 player mode, i.e., the other player's deck data
   // Design 051: 'tcg' | 'build-battle', sets the Prize count. Opp slots mirror p1Opp/p2OppDeckData (I204).

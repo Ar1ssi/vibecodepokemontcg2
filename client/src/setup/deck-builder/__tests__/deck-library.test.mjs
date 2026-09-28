@@ -19,7 +19,10 @@ import test from 'node:test';
       saveLibraryToStorage,
       LIBRARY_STORAGE_KEY,
       MAX_LIBRARY_DECKS,
+      deckCardsKey,
+      hasUnsavedDraft,
     } from '../core/deck-library.mjs';
+    import { restorableDeckId } from '../core/last-session.mjs';
     
     function makeCards(overrides = {}) {
       return {
@@ -352,4 +355,25 @@ test('saving over a Build & Battle deck keeps its format; a created snapshot tak
   const created = saveDeckSnapshot(createEmptyLibrary(), { name: 'New', format: 'build-battle' }, 2000);
   assert.equal(created.created, true);
   assert.equal(getDeckFormat(created.library, created.deckId), 'build-battle');
+});
+
+test('deckCardsKey matches equal decks and tells edited ones apart', () => {
+  assert.equal(deckCardsKey(makeCards()), deckCardsKey(makeCards()));
+  assert.notEqual(deckCardsKey(makeCards()), deckCardsKey({}));
+  assert.equal(deckCardsKey(null), deckCardsKey({}));
+});
+
+test('only cards with no saved deck behind them count as an unsaved draft', () => {
+  assert.equal(hasUnsavedDraft(null, makeCards()), true);
+  assert.equal(hasUnsavedDraft('deck-1', makeCards()), false);
+  assert.equal(hasUnsavedDraft(null, {}), false);
+  assert.equal(hasUnsavedDraft(null, undefined), false);
+});
+
+test('the builder tab reopens the last-used deck only while it still exists', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Mine', makeCards(), 1);
+  assert.equal(restorableDeckId({ deckId }, library), deckId);
+  assert.equal(restorableDeckId({ deckId: 'deleted' }, library), null);
+  assert.equal(restorableDeckId(null, library), null);
+  assert.equal(restorableDeckId({ deckId }, null), null);
 });

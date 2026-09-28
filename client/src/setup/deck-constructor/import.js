@@ -11,6 +11,7 @@ import { resolveDefaultCardBackSrc } from './default-card-back.mjs';
 import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../shared/engine/formats.mjs';
 import { deckFormatSlot, resolveFormatAndEmit } from './deck-format-args.mjs';
+import { rememberOwnDeck } from './own-deck.mjs';
 
 // Decks are built and loaded in the deck builder's own tab (design 050); this
 // module keeps the board-side loaders it calls and the Deck tab's card back.
@@ -23,6 +24,8 @@ export const loadDeckData = (user, deckData, format, emitArg) => {
   systemState.deckFormat[deckFormatSlot(user, systemState.isTwoPlayer)] = deckFormat;
   if (user === 'self') {
     systemState.selfDeckData = deckData;
+    // Replays (emit=false) may carry another player's deck; only a local load is ours.
+    if (emit) rememberOwnDeck(systemState, deckData, deckFormat);
   } else if (systemState.isTwoPlayer) {
     systemState.p2OppDeckData = deckData;
   } else {

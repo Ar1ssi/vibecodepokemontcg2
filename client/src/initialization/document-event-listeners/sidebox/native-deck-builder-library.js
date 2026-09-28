@@ -1,5 +1,6 @@
 import {
       createDeckInLibrary,
+      deckCardsKey,
       deleteDeckFromLibrary,
       getDeckFromLibrary,
       getDeckFormat,
@@ -54,12 +55,15 @@ import {
      *   so the caller can flush the current editor deck into its saved deck.
      * @param {boolean} [options.allowDeckWrites] - false on the game tab: it
      *   never edits deck cards, so its stale editor copy must never be saved.
+     * @param {function} [options.onExternalDeckChange] - called with (target,
+     *   deckId, cards) when another tab rewrote a deck this tab has open.
      * @returns {object|null} controller, or null when the bar markup is missing.
      */
     export const initializeNativeDeckBuilderLibrary = ({
       onOpenDeck,
       onSaveCurrentDeck,
       allowDeckWrites = true,
+      onExternalDeckChange,
     }) => {
       const barEl = document.getElementById('nativeDeckBuilderLibraryBar');
       const listEl = document.getElementById('nativeDeckBuilderLibraryList');
@@ -105,6 +109,8 @@ import {
       let library = loadLibraryFromStorage(window.localStorage);
       let currentTarget = 'self';
       const activeDeckIds = { self: null, opp: null };
+      // deckCardsKey of each target's cards as this tab last loaded or wrote them.
+      const baselines = { self: null, opp: null };
 
       const reload = () => {
         library = loadLibraryFromStorage(window.localStorage);
@@ -188,11 +194,18 @@ import {
         setTimeout(() => statusEl.classList.remove('visible'), 2400);
       };
     
+      const STORAGE_FAILED_MESSAGE =
+        'Could not save: browser storage is full or blocked. Delete a deck or allow site data.';
+
+      // Returns whether the write reached storage; a failed write keeps the
+      // in-memory library but says so instead of claiming the deck was saved.
       const commit = (nextLibrary, { savedMessage, silent = false } = {}) => {
         library = nextLibrary;
-        saveLibraryToStorage(window.localStorage, library);
+        const stored = saveLibraryToStorage(window.localStorage, library);
         if (!silent) render();
-        if (savedMessage) showStatus(savedMessage);
+        if (!stored) showStatus(STORAGE_FAILED_MESSAGE);
+        else if (savedMessage) showStatus(savedMessage);
+        return stored;
       };
     
       const openDeck = (target, deckId) => {
@@ -201,6 +214,7 @@ import {
         if (!cards) return;
         const key = target === 'opp' ? 'opp' : 'self';
         activeDeckIds[key] = deckId;
+        baselines[key] = deckCardsKey(cards);
         closePicker();
         onOpenDeck(target, deckId, cards);
         render();
@@ -221,6 +235,7 @@ import {
           Date.now()
         );
         activeDeckIds[currentTarget] = deckId;
+        baselines[currentTarget] = deckCardsKey({});
         commit(nextLibrary);
         onOpenDeck(currentTarget, deckId, {});
         showStatus('Deck created.');
@@ -318,10 +333,25 @@ import {
         createNewDeck();
       });
 
+      // Another tab rewrote a deck this tab has open: adopt its cards, so this
+      // tab's next autosave builds on them instead of reverting them.
+      const adoptExternalDeckChanges = () => {
+        for (const key of ['self', 'opp']) {
+          const deckId = activeDeckIds[key];
+          const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
+          if (!cards) continue;
+          const storedKey = deckCardsKey(cards);
+          if (storedKey === baselines[key]) continue;
+          baselines[key] = storedKey;
+          onExternalDeckChange?.(key, deckId, cards);
+        }
+      };
+
       // The other tab changed the library (key null = storage cleared).
       window.addEventListener('storage', (event) => {
         if (event.key !== null && event.key !== LIBRARY_STORAGE_KEY) return;
         reload();
+        if (allowDeckWrites) adoptExternalDeckChanges();
         render();
       });
 
@@ -355,7 +385,7 @@ import {
         /**
          * Creates a deck without prompting (Build & Battle box decks) and opens it for `target`.
          *
-         * @returns {string|null} the new deck id, or null at the deck limit or on the read-only game tab.
+         * @returns {string|null} the new deck id, or null at the deck limit, on the read-only game tab, or when storage refuses the write.
          */
         createAndOpenDeck: (target, name, cards, options = {}) => {
           if (!allowDeckWrites) return null;
@@ -371,13 +401,18 @@ import {
             Date.now(),
             options
           );
-          commit(nextLibrary, { silent: true });
+          if (!commit(nextLibrary, { silent: true })) {
+            reload();
+            return null;
+          }
           openDeck(target, deckId);
           return deckId;
         },
         setActiveDeck: (target, deckId) => {
           const key = target === 'opp' ? 'opp' : 'self';
           activeDeckIds[key] = deckId || null;
+          const cards = deckId ? getDeckFromLibrary(library, deckId) : null;
+          baselines[key] = cards ? deckCardsKey(cards) : null;
           render();
         },
         setActiveSleeve: (target, sleeveId) =>
@@ -423,9 +458,12 @@ import {
           reload();
           const activeId = activeDeckIds[currentTarget];
           if (!activeId || !library?.decks?.[activeId]) return false;
-          commit(saveDeckToLibrary(library, activeId, cards, Date.now()), {
-            silent: true,
-          });
+          const cardsKey = deckCardsKey(cards);
+          if (cardsKey === baselines[currentTarget]) return true;
+          if (!commit(saveDeckToLibrary(library, activeId, cards, Date.now()), { silent: true })) {
+            return false;
+          }
+          baselines[currentTarget] = cardsKey;
           return true;
         },
         /**
@@ -435,7 +473,7 @@ import {
          * the work away.
          *
          * @returns {{saved: boolean, created: boolean, name: string|null,
-         *   reason?: 'cancelled'|'limit'}}
+         *   reason?: 'cancelled'|'limit'|'read-only'|'storage'}}
          */
         saveCurrentDeck: (cards, cosmetics = {}) => {
           if (!allowDeckWrites) {
@@ -465,10 +503,18 @@ import {
             Date.now()
           );
 
-          activeDeckIds[currentTarget] = deckId;
-          commit(nextLibrary, {
+          const stored = commit(nextLibrary, {
             savedMessage: created ? 'Deck created.' : 'Deck saved.',
           });
+          if (!stored) {
+            // Nothing reached storage: drop the unsaved write so the deck list
+            // and binding match what a reload will find.
+            reload();
+            render();
+            return { saved: false, created: false, name: null, reason: 'storage' };
+          }
+          activeDeckIds[currentTarget] = deckId;
+          baselines[currentTarget] = deckCardsKey(cards);
           return {
             saved: true,
             created,

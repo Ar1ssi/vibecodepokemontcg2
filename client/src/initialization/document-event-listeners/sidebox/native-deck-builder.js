@@ -93,8 +93,12 @@ import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-pick
 import { initializeDeckBuilderMatPicker } from './native-deck-builder-mat-picker.js';
 import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
 import { getMatById } from '../../../setup/deck-builder/core/mats.mjs';
-import { getDeckFromLibrary } from '../../../setup/deck-builder/core/deck-library.mjs';
-import { loadLastSession, saveLastSession } from '../../../setup/deck-builder/core/last-session.mjs';
+import { getDeckFromLibrary, hasUnsavedDraft } from '../../../setup/deck-builder/core/deck-library.mjs';
+import {
+  loadLastSession,
+  restorableDeckId,
+  saveLastSession,
+} from '../../../setup/deck-builder/core/last-session.mjs';
 import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
 import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
 import { updateReadyButtons } from '../../../actions/general/ready.js';
@@ -404,6 +408,14 @@ export const initializeNativeDeckBuilder = ({ role = 'host', mode = 'standard' }
         },
         // Only the builder tab edits decks; the game tab's copy is read-only.
         allowDeckWrites: isEditor,
+        // Another builder tab edited a deck this one has open: show its cards
+        // (the target's editor copy included) so autosave never reverts them.
+        onExternalDeckChange: (target, _deckId, cards) => {
+          syncedDecks[target] = cards;
+          if (target !== currentLoadTarget) return;
+          deck = cards;
+          render();
+        },
       });
 
       // ── Deck Pokémon sprites (design 024) ────────────────────────────────
@@ -1755,6 +1767,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   if (isEditor) {
     // Closing the builder tab still loads an edited deck into the game (edge case 6).
     window.addEventListener('pagehide', loadCurrentDeck);
+    if (!isBuildBattle) {
+      // Cards no saved deck owns are lost on close; autosave only covers a bound deck.
+      window.addEventListener('beforeunload', (event) => {
+        if (!hasUnsavedDraft(deckLibrary?.getActiveDeckId?.(currentLoadTarget), deck)) return;
+        event.preventDefault();
+        event.returnValue = '';
+      });
+      // A fresh builder tab reopens the last-used deck, so edits autosave into
+      // it instead of into an unbound editor that nothing saves.
+      const restoreId = restorableDeckId(
+        loadLastSession(window.localStorage),
+        deckLibrary?.getLibrary?.()
+      );
+      if (restoreId && deckLibrary?.openDeckById?.('self', restoreId)) {
+        // Only reopened, not edited: closing the tab must not reload it onto the board.
+        deckDirty = false;
+      }
+    }
   } else {
     // ── The game tab applies what the builder tab sends (design 050) ────
     const applyBuilderMessage = ({ type, payload }) => {

@@ -31,3 +31,14 @@ export function loadLastSession(storage) {
     return null;
   }
 }
+
+/**
+ * The last-used deck id when it still names a deck in `library`, else null
+ * (deleted since, or never saved). The builder tab reopens it at boot so edits
+ * autosave into it instead of into an unbound editor.
+ */
+export function restorableDeckId(session, library) {
+  const deckId = session?.deckId;
+  if (!deckId || !library?.decks?.[deckId]) return null;
+  return deckId;
+}

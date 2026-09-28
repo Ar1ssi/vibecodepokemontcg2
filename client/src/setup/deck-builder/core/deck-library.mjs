@@ -264,3 +264,16 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       }
     }
     
+/**
+ * Comparable fingerprint of a deck's cards. Autosave compares it with the copy
+ * this tab last loaded or wrote, so a tab that changed nothing never writes its
+ * stale copy over an edit another tab made to the same deck.
+ */
+export function deckCardsKey(cards = {}) {
+  return JSON.stringify(cards ?? {});
+}
+
+/** True when the editor holds cards that no saved deck owns (closing would lose them). */
+export function hasUnsavedDraft(activeDeckId, cards = {}) {
+  return !activeDeckId && Object.keys(cards ?? {}).length > 0;
+}

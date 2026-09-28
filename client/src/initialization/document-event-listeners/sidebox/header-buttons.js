@@ -2,6 +2,7 @@ import { reset } from '../../../actions/general/reset.js';
 import { socket, systemState } from '../../../state.js';
 import { cleanActionData } from '../../../setup/general/clean-action-data.js';
 import { processAction } from '../../../setup/general/process-action.js';
+import { restoreOwnDeck } from '../../../setup/deck-constructor/own-deck.mjs';
 import { show } from '../../../setup/home-header/header-toggle.js';
 import { handleSpectatorButtons } from '../../../setup/spectator/handle-spectator-buttons.js';
 import { openDeckBuilderFromDeckTab } from './import-deck.js';
@@ -51,30 +52,9 @@ export const initializeHeaderButtons = () => {
       cleanActionData('opp');
       reset('opp', true, true, false, true);
 
-      // repopulate self deck with the correct current decklist
-      systemState.selfDeckData = '';
-      let decklistTable = document.getElementById('selfCurrentDecklistTable');
-      if (decklistTable) {
-        let rows = decklistTable.rows;
-        let deckData = [];
-        for (let i = 1; i < rows.length; i++) {
-          let cells = rows[i].cells;
-
-          let quantity = cells[0].innerText;
-          let name = cells[1].innerText;
-          let type = cells[2].querySelector('select').value;
-          let url = cells[3].innerText;
-          let number = rows[i].dataset.cardNumber || null;
-          let set = rows[i].dataset.cardSet || null;
-          let tcgId = rows[i].dataset.cardTcgId || null;
-
-          let cardData = [quantity, name, type, url, number, set, tcgId];
-          deckData.push(cardData);
-        }
-        if (deckData.length > 0) {
-          systemState.selfDeckData = deckData;
-        }
-      }
+      // Put back the deck this player loaded (spectating or the room may have
+      // replaced the self slot).
+      restoreOwnDeck(systemState);
 
       reset('self', true, true, false, true);
       p2Chatbox.innerHTML = '';
