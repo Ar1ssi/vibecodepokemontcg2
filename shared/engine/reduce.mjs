@@ -97,9 +97,11 @@ import {
   applyStadiumSwitchTriggers,
 } from './effects/stadium-trigger-apply.mjs';
 import { classifyEnergyEffect } from './rules/energy-effects.mjs';
+import { getEnergyValue } from './rules/retreat.mjs';
 import {
   abilityDamageBonus,
   abilityDamageReduction,
+  abilityHandDiscardProtector,
   abilityDamagePrevention,
   abilityWeaknessOverride,
   abilityHpBonus,
@@ -575,6 +577,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       ...(damage.filter ? { filter: damage.filter } : {}),
       ...(damage.distributable ? { distributable: true, remaining: damage.remaining } : {}),
       ...(damage.countFromEnergy ? { countFromEnergy: damage.countFromEnergy } : {}),
+      ...(damage.upTo ? { upTo: true } : {}),
       ...(damage.chooser ? { chooser: damage.chooser } : {}),
       ...(damage.amountPerEnergy ? { amountPerEnergy: true } : {}),
       ...(damage.remainingFromDiscard ? { remainingFromDiscard: true } : {}),
@@ -1421,12 +1424,15 @@ function markerCount(markers, kind, field) {
 }
 
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
-function computeEffectiveRetreatCost(state, card, playerId) {
+// `zoneId` 'bench' prices a Benched Pokémon: its own zone's Tools/Energy, and none of the
+// "your Active Pokémon's Retreat Cost" wordings (Bronzong Heavy Potential, I194).
+function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'active' } = {}) {
   if (!card) return 0;
+  const isActive = zoneId === 'active';
   // Vespiquen Mach Wind (design 033): the Retreat Cost is 0 during the next turn.
   if (activeAttackMarkers(state, playerId, card).some((m) => m.kind === 'freeRetreat')) return 0;
   const player = state.players?.[playerId];
-  const activeZone = player?.zones?.active || [];
+  const activeZone = player?.zones?.[zoneId] || [];
   const stadium = state.stadium;
   const baseRetreat = getRetreatCostCount(inPlayView(state, card));
 
@@ -1437,7 +1443,7 @@ function computeEffectiveRetreatCost(state, card, playerId) {
   const benchViews = (player?.zones?.bench || []).map((b) =>
     inPlayView(state, b)
   );
-  if (teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
+  if (isActive && teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
   // Magnetic Metal / Hiding Darkness / Holon WP Energy (audit SE6): "has no Retreat Cost".
   if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone)) return 0;
 
@@ -1465,8 +1471,8 @@ function computeEffectiveRetreatCost(state, card, playerId) {
   cost += abilityRetreatCost(inPlayView(state, card), {
     sideCards,
     opponentSideCards,
-    zone: 'active',
-    isActive: true,
+    zone: zoneId,
+    isActive,
   });
 
   // 3. Stadium retreat modifier (e.g. Beach Court)
@@ -2109,6 +2115,11 @@ function stampHealedPokemon(prev, next) {
     const zones = next.players[playerId]?.zones || {};
     for (const card of [...(zones.active || []), ...(zones.bench || [])]) {
       if (card.attachedTo || !isPokemon(card)) continue;
+      // Attack effects that move damage counters off a Pokémon (Reaper Pulse, Fury Strikes swap,
+      // "move all damage counters …") flag themselves so the drop is never read as a heal.
+      const counterMoveOnly = card.__counterMoveOnly;
+      delete card.__counterMoveOnly;
+      if (counterMoveOnly) continue;
       const before = findCard(prev, card.instanceId)?.card;
       if (before && (card.damage || 0) < (before.damage || 0)) card.healedTurn = turnNumber;
     }
@@ -3649,9 +3660,7 @@ function validateReferences(state, command) {
     }
 
     case 'attack': {
-      const active = state.players?.[playerId]?.zones?.active?.find(
-        (c) => !c.attachedTo
-      );
+      const active = resolveAttacker(state, playerId, payload);
       if (!active) {
         return { valid: false, error: 'stale_view' };
       }
@@ -3835,6 +3844,23 @@ function validateReferences(state, command) {
     default:
       return { valid: true };
   }
+}
+
+// Alakazam ex Dimensional Hand: "This attack can be used even if this Pokémon is on the Bench."
+const BENCH_ATTACK_CLAUSE = /can be used even if this Pok[eé]mon is on the Bench/i;
+
+// The Pokémon an attack command names. No `attackerInstanceId` (or the Active's own id) means
+// the Active. A Benched Pokémon qualifies only for an attack that prints the Bench clause;
+// anything else returns null.
+function resolveAttacker(state, playerId, payload) {
+  const zones = state.players?.[playerId]?.zones;
+  const active = zones?.active?.find((c) => !c.attachedTo) || null;
+  const requestedId = payload?.attackerInstanceId;
+  if (requestedId == null || requestedId === active?.instanceId) return active;
+  const benched = zones?.bench?.find((c) => c.instanceId === requestedId && !c.attachedTo);
+  if (!benched) return null;
+  const attack = attackViewFor(state, benched)?.attacks?.[payload?.attackIndex ?? 0];
+  return BENCH_ATTACK_CLAUSE.test(String(attack?.text || '')) ? benched : null;
 }
 
 /**
@@ -4431,7 +4457,7 @@ export function validateLegality(state, command) {
 
     case 'attack': {
       if (state.turn?.number === 1) {
-        const goingFirstActive = player.zones?.active?.find((c) => !c.attachedTo);
+        const goingFirstActive = resolveAttacker(state, playerId, payload);
         // Pheromosa-GX Fast Raid: "If you go first, you can use this attack on your first turn."
         const chosenText = String(goingFirstActive?.attacks?.[payload?.attackIndex]?.text || '');
         const attackAllowsFirstTurn = /you can use this attack (?:on|during) your first turn/i.test(chosenText);
@@ -4451,7 +4477,7 @@ export function validateLegality(state, command) {
           };
         }
       }
-      const active = player.zones?.active?.find((c) => !c.attachedTo);
+      const active = resolveAttacker(state, playerId, payload);
       if (player.flags?.attackerAttacked) {
         // An extra-attack Ability (Dipplin Festival Lead, Ω Barrage) allows a
         // second attack in the same turn while its condition holds.
@@ -5540,6 +5566,22 @@ function shuffleDeckWithRng(player, rng) {
   if (player?.zones?.deck && rng) player.zones.deck = rng.shuffle(player.zones.deck);
 }
 
+/** Moves the chosen cards from a player's hand to their discard pile; returns how many moved. */
+function discardHandCards(draft, { playerId, instanceIds, events }) {
+  const player = draft.players[playerId];
+  const hand = player?.zones?.hand || [];
+  const moved = [];
+  for (const id of instanceIds) {
+    const index = hand.findIndex((c) => c.instanceId === id);
+    if (index < 0) continue;
+    const [card] = hand.splice(index, 1);
+    discardCardToPlayerZone(player, card);
+    moved.push({ instanceId: card.instanceId, name: card.name });
+  }
+  if (moved.length > 0) events.push({ type: 'cardsDiscarded', playerId, cards: moved });
+  return moved.length;
+}
+
 /**
  * Rebuilds the attack context an attack-phase PendingChoice suspended, from its
  * resumeToken. Returns null when the attacker or attack is no longer in play.
@@ -6206,12 +6248,27 @@ function attachedEnergyOfType(draft, root, letter) {
 
 // Dusknoir Night Spin: "… done to Dusknoir by your opponent's Pokémon that has 2 or less Energy
 // attached to it" — marker filters (attack-markers.mjs attackerMatchesFilter) read the attacker's
-// attached Energy cards as the attack's effects resolve.
+// attached Energy cards as the attack's effects resolve. Counts Energy *units* (a Double Colorless
+// or other double-provider counts as 2), not Energy cards.
+// Bronzong Heavy Potential reads each opponent Pokémon's Retreat Cost "after applying effects"
+// (I194); the executor cannot import this reducer, so the cost is stamped on the root here.
+function stampOpponentRetreatCosts(draft, oppId) {
+  const opponent = draft.players?.[oppId];
+  if (!opponent) return;
+  for (const zoneId of ['active', 'bench']) {
+    for (const root of (opponent.zones?.[zoneId] || []).filter((c) => !c.attachedTo)) {
+      root.effectiveRetreatCost = computeEffectiveRetreatCost(draft, root, oppId, { zoneId });
+    }
+  }
+}
+
 function stampAttackEnergyCount(draft, attacker, attackerView) {
   const ref = attacker ? findCard(draft, attacker.instanceId) : null;
   if (!ref) return;
   const zone = ref.player.zones[ref.zoneId] || [];
-  const count = zone.filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length;
+  const count = zone
+    .filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c))
+    .reduce((sum, c) => sum + getEnergyValue(c), 0);
   attacker.attackEnergyCount = count;
   if (attackerView && attackerView !== attacker) attackerView.attackEnergyCount = count;
 }
@@ -6244,6 +6301,7 @@ function resolveAttackEffectPhase(draft, ctx) {
 
   let { defender } = ctx;
   stampAttackEnergyCount(draft, attacker, attackerView);
+  stampOpponentRetreatCosts(draft, oppId);
 
   // A printed whole-attack condition ("If …, this attack does nothing", design 036 A1) gates the
   // damage and every effect step, so it resolves before any of them. It runs once per attack:
@@ -6589,7 +6647,7 @@ function resolveAttackEffectPhase(draft, ctx) {
   }
   // Cards a before-damage Lost Zone cost moved (Rotom V Scrap Short). The cost is those
   // attacks' only before-damage step, so it moves in the command that reaches damage.
-  const handDiscarded = attackSteps.before.some(
+  const handDiscarded = ctx.handDiscarded ?? attackSteps.before.some(
     (step) =>
       step.countsForDamage &&
       ['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkDiscardBenchEnergy'].includes(step.type)
@@ -6598,7 +6656,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
         .reduce((total, e) => total + e.cards.length, 0)
     : undefined;
-  const lostZoned = attackSteps.before.some((step) => step.countsForDamage)
+  const lostZoned = ctx.lostZoned ?? attackSteps.before.some((step) => step.countsForDamage)
     ? events
         .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
         .reduce((total, e) => total + e.count, 0)
@@ -6700,6 +6758,58 @@ function resolveAttackEffectPhase(draft, ctx) {
         dmgDealt = dmgResult.total;
         weaknessApplied = dmgResult.multiplier > 1 || dmgResult.flat > 0;
 
+        // Flygon ex Psychic Protector: before the damage lands the defending player may discard
+        // up to N cards from their hand, each reducing it by M. The attack suspends on that
+        // player's choice and re-enters here with `protectorDiscarded` settled.
+        const protector =
+          dmgDealt > 0 && !dmgResult.prevented
+            ? abilityHandDiscardProtector(defenderView, {
+                sideCards: defenderInPlayCards,
+                opponentSideCards: [
+                  ...attackerZoneCards,
+                  ...(draft.players[playerId]?.zones?.bench || []),
+                ],
+                sideActive: defenderZoneCards,
+                opponentActive: attackerZoneCards,
+                turnNumber: draft.turn?.number,
+              })
+            : null;
+        const defenderHand = draft.players[defenderPlayerId]?.zones?.hand || [];
+        if (protector && ctx.protectorDiscarded === undefined && defenderHand.length > 0) {
+          draft.pendingChoice = createPendingChoice({
+            player: defenderPlayerId,
+            source: 'ability',
+            prompt: `${defenderView.name || 'Your Pokémon'} is being damaged by ${attack.name}: discard up to ${protector.max} cards from your hand to reduce the damage by ${protector.perCard} each?`,
+            options: defenderHand.map((c) => ({
+              instanceId: c.instanceId,
+              name: c.name,
+              src: c.src || '',
+              type: c.type || '',
+            })),
+            min: 0,
+            max: Math.min(protector.max, defenderHand.length),
+            resumeToken: {
+              ...resumeBase,
+              effectType: 'attackHandDiscardProtector',
+              targetInstanceId: defender.instanceId,
+              values: {
+                energyDiscarded,
+                milledMatches,
+                revealedMatches,
+                energyReturned,
+                optionalCostPaid,
+                optionalCostCount,
+                discardFlipHeads,
+                handDiscarded,
+                lostZoned,
+                preStepsDone: true,
+              },
+            },
+          });
+          return;
+        }
+        const protectorReduction = protector ? (ctx.protectorDiscarded || 0) * protector.perCard : 0;
+
         // Vermilion City Gym: Lt. Surge's Pokémon flip when attacking. Heads adds
         // 10 damage after Weakness/Resistance when the attack does damage; tails
         // deals 10 to the attacker in addition to the attack. The printed "may
@@ -6716,6 +6826,17 @@ function resolveAttackEffectPhase(draft, ctx) {
           } else {
             stadiumSelfDamage = vermilion.tailsSelfDamage;
           }
+        }
+
+        if (protectorReduction > 0 && dmgDealt > 0) {
+          dmgDealt = Math.max(0, dmgDealt - protectorReduction);
+          events.push({
+            type: 'damageReducedByDiscard',
+            instanceId: defender.instanceId,
+            playerId: defenderPlayerId,
+            discarded: ctx.protectorDiscarded,
+            reduction: protectorReduction,
+          });
         }
 
         if (dmgResult.prevented) {
@@ -7657,9 +7778,12 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
             distributable
               ? new Array(required).fill(cards[0].instanceId)
               : cards.slice(0, attackTarget.count).map((c) => c.instanceId);
+          // Probopass Metal Bomber: "Choose a number … UP TO N" always lets the player pick,
+          // including fewer than the candidates on the board — never auto-applied to all of them.
           if (
-            attackTarget.scope === 'active' ||
-            candidates.length <= (distributable ? 1 : attackTarget.count)
+            !attackTarget.upTo &&
+            (attackTarget.scope === 'active' ||
+              candidates.length <= (distributable ? 1 : attackTarget.count))
           ) {
             benchDealt += applyAttackTargets(draft, {
               selection: picksFor(candidates),
@@ -7677,9 +7801,11 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
               source: 'attack',
               prompt: distributable
                 ? distributedPrompt(attack.name, attackTarget, required)
-                : `${attack.name}: Choose ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} ${attackTarget.scope === 'bench' ? 'Benched ' : ''}Pokémon to take damage`,
+                : attackTarget.upTo
+                  ? `${attack.name}: Choose up to ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} ${attackTarget.scope === 'bench' ? 'Benched ' : ''}Pokémon to take damage`
+                  : `${attack.name}: Choose ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} ${attackTarget.scope === 'bench' ? 'Benched ' : ''}Pokémon to take damage`,
               options: candidates,
-              min: distributable ? 1 : attackTarget.count,
+              min: distributable ? 1 : attackTarget.upTo ? 0 : attackTarget.count,
               max: distributable ? 1 : attackTarget.count,
               resumeToken: {
                 effectType: 'attack',
@@ -8536,9 +8662,10 @@ export function applyCommand(state, command, rng = null) {
 
     case 'attack': {
       const attackerPlayer = draft.players[playerId];
-      const attacker = attackerPlayer?.zones?.active?.find(
-        (c) => !c.attachedTo
-      );
+      const attacker = resolveAttacker(draft, playerId, payload);
+      const attackerZone = attackerPlayer?.zones?.bench?.includes(attacker)
+        ? attackerPlayer.zones.bench
+        : attackerPlayer?.zones?.active;
       const atkIdx = payload?.attackIndex ?? 0;
       const attackerView = attackViewFor(draft, attacker);
       const attack = attackerView?.attacks?.[atkIdx] || {
@@ -8548,7 +8675,7 @@ export function applyCommand(state, command, rng = null) {
       // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
       // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
       if (attacker && !isStadiumToolNegation(draft.stadium?.card || draft.stadium)) {
-        for (const tool of attachedTools(attacker, attackerPlayer.zones.active)) {
+        for (const tool of attachedTools(attacker, attackerZone)) {
           if (parseAttackGrant(cardText(tool))?.discardAfterAttack) tool.discardAtEndOfTurn = true;
         }
       }
@@ -9139,6 +9266,19 @@ export function applyCommand(state, command, rng = null) {
             ...resumeCtx,
             energyReturned: Boolean(moved),
           });
+        }
+      } else if (token.effectType === 'attackHandDiscardProtector') {
+        // Flygon ex Psychic Protector: the defending player discards the chosen hand cards,
+        // then the attack re-enters its damage step with the count settled.
+        draft.pendingChoice = null;
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
+          const protectorDiscarded = discardHandCards(draft, {
+            playerId: choice.player,
+            instanceIds: payload.selection || [],
+            events,
+          });
+          resolveAttackEffectPhase(draft, { ...resumeCtx, ...(token.values || {}), protectorDiscarded });
         }
       } else if (token.effectType === 'attackOptionalCostBonus') {
         // "You may <cost>. If you do, …": pay the accepted cost, then resume with the answer.

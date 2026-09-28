@@ -145,6 +145,12 @@ function healAmount(healWord, removeWord) {
 // Each entry: [regex, (match, sentence) => step | null]. The regex is anchored on the
 // sentence with its gate removed and its final period stripped.
 const TEMPLATES = [
+  // Imakuni?'s Doduo Harmonize: joke text with no rules effect beyond the printed damage — a
+  // recognized no-op so the engine (and audits) don't read it as unparsed.
+  [
+    /^from the moment you use this attack, you must begin to sing a song$/,
+    () => ({ type: 'atkJokeNoOp' }),
+  ],
   // Switch / gust
   [/^switch this pokémon with 1 of your benched pokémon(?:, if any)?$/, () => ({ type: 'atkSwitchSelf' })],
   [
@@ -256,6 +262,13 @@ const TEMPLATES = [
   [
     new RegExp(String.raw`^move an? ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) 1 of your pokémon to another of your pokémon$`),
     (m, s) => ({ type: 'atkMoveEnergy', from: 'any', to: 'any', count: 1, ...energyFilter(m[1], s) }),
+  ],
+  // Mothim/Ninjask Quick Touch: "You may switch this Pokémon with 1 of your Benched Pokémon. If
+  // you do, [you may] move {as many/any number of} [{type}] Energy cards attached to this
+  // Pokémon [as you like] to the new Active Pokémon." Chained after the optional switch step.
+  [
+    new RegExp(String.raw`^move (?:as many|any number of) ${ENERGY_TYPE}energy(?: cards?)? (?:from|attached to) this pokémon(?: as you like)? to the new active pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'selfToNewActive', anyNumber: true, ...energyFilter(m[1], s) }),
   ],
   // Rest-of-game effects (design 036 E): kept on the attacking player, read by the damage path
   // and the attack legality gate.
@@ -863,14 +876,17 @@ const TEMPLATES = [
     () => ({ type: 'atkMoveAllCounters' }),
   ],
   // Design 036 D: your damage counters onto the opponent (Xerneas-GX Sanctuary, Drifloon Transfer Pain).
+  // Dusknoir Reaper Pulse: "Move UP TO 2 damage counters …" — the player chooses how many, not a
+  // fixed amount (`upTo: true` lets the executor ask instead of always moving the max).
   [
-    /^move (?:up to )?(all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|any) of your pokémon) to (your opponent's active pokémon|(?:1|any) of your opponent's (?:benched )?pokémon)$/,
+    /^move (up to )?(all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|any) of your pokémon) to (your opponent's active pokémon|(?:1|any) of your opponent's (?:benched )?pokémon)$/,
     (m) => ({
       type: 'atkMoveCounterToOpponent',
-      count: m[1] === 'all' ? 'all' : countOf(m[1]),
-      from: m[2] === 'this pokémon' ? 'self' : /^each/.test(m[2]) ? 'each' : /benched/.test(m[2]) ? 'bench' : 'one',
+      count: m[2] === 'all' ? 'all' : countOf(m[2]),
+      ...(m[1] && m[2] !== 'all' ? { upTo: true } : {}),
+      from: m[3] === 'this pokémon' ? 'self' : /^each/.test(m[3]) ? 'each' : /benched/.test(m[3]) ? 'bench' : 'one',
       // Dusknoir Reaper Pulse: "to 1 of your opponent's Benched Pokémon".
-      to: /active/.test(m[3]) ? 'active' : /benched/.test(m[3]) ? 'bench' : 'any',
+      to: /active/.test(m[4]) ? 'active' : /benched/.test(m[4]) ? 'bench' : 'any',
     }),
   ],
   // Wobbuffet V Gritty Comeback, Unown J Hidden Power.
@@ -1171,6 +1187,27 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Delibird Souvenir (Team Rocket Returns 21): one outcome per heads tier of the 3 coins.
+  [
+    /if 1 of them is heads, put (\d+) damage counters on your opponent's active pokémon\. if 2 of them are heads, remove (\d+|a) damage counters? from your opponent's active pokémon\. if all of them are heads, put (\d+) damage counters on your opponent's active pokémon\. if all of them are tails, remove all damage counters from your opponent's active pokémon\./g,
+    (m) => {
+      const counters = (count, headsExactly) => ({
+        type: 'atkCountersEachFiltered',
+        count,
+        side: 'opponent',
+        scope: 'active',
+        filter: {},
+        headsExactly,
+      });
+      const heal = (amount, headsExactly) => ({ type: 'atkHealCounted', ...amount, target: 'opponentActive', headsExactly });
+      return [
+        counters(Number(m[1]), 1),
+        heal({ count: countOf(m[2]) }, 2),
+        counters(Number(m[3]), 3),
+        heal({ all: true }, 0),
+      ];
+    },
+  ],
   // Unown Hidden Power (Unseen Forces): the opponent guesses the face-down hand card's kind.
   [
     /choose a card from your hand and put it face down\. your opponent guesses if the card is a pokémon, trainer, or energy card\. reveal the card\. if your opponent guessed wrong, draw (\d+) cards\. put the card back into your hand\./g,
