@@ -939,7 +939,8 @@ export function parseKoPrevention(card) {
 // of "the Attacking Pokémon"; the attack-damage context is required so the
 // energy-attach costs that print the same "put N damage counters on that
 // Pokémon" clause stay out. `zone` reports whether the printed text restricts
-// the trigger to the Active Spot (callers gate on it; the parser does not).
+// the trigger to the Active Spot (callers gate on it; the parser does not); `koOnly` likewise
+// marks a trigger that needs the holder Knocked Out by the attack.
 export function parseThorns(card) {
   const t = textOf(card);
   if (
@@ -959,7 +960,10 @@ export function parseThorns(card) {
   const zone = /in the active spot|is your active pokémon/.test(t)
     ? 'active'
     : 'any';
-  return { count, zone };
+  // "… is Knocked Out by damage from an attack …" (Maractus Exploding Needles) only fires on a KO.
+  const koOnly =
+    /knocked out by damage/.test(t) && !/damaged by/.test(t);
+  return koOnly ? { count, zone, koOnly } : { count, zone };
 }
 
 // During Pokémon Checkup damage

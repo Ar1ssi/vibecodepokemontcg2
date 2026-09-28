@@ -7087,7 +7087,7 @@ function resolveAttackEffectPhase(draft, ctx) {
             ...abilitySideContext(draft, defenderPlayerId),
             isActive: true,
           });
-          if (thorns?.count > 0) {
+          if (thorns?.count > 0 && (!thorns.koOnly || defenderKnockedOut)) {
             thornsDamage += thorns.count * 10;
           }
 
