@@ -73,9 +73,18 @@
   --bb-m-b: 0px;
   zoom: var(--bb-box-zoom);
   transform: scale(calc(var(--bb-box-scale) / var(--bb-box-zoom)));
-  margin: calc(((var(--bb-h) + 170px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-t)) / var(--bb-box-zoom))
-    calc(((var(--bb-w) + 100px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-x)) / var(--bb-box-zoom))
-    calc(((var(--bb-h) + 170px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-b)) / var(--bb-box-zoom));
+  margin: calc(
+      ((var(--bb-h) + 170px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-t)) /
+        var(--bb-box-zoom)
+    )
+    calc(
+      ((var(--bb-w) + 100px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-x)) /
+        var(--bb-box-zoom)
+    )
+    calc(
+      ((var(--bb-h) + 170px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-b)) /
+        var(--bb-box-zoom)
+    );
 }
 .build-battle-window .db-live .bb-box::after {
   content: '';
@@ -177,7 +186,11 @@
   backface-visibility: hidden;
   transform: rotateX(90deg) translateZ(calc(var(--bb-h) / 2 - var(--bb-rim)));
   background:
-    repeating-linear-gradient(90deg, transparent 0 22%, rgba(0, 0, 0, 0.35) 22% 24%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 22%,
+      rgba(0, 0, 0, 0.35) 22% 24%
+    ),
     linear-gradient(180deg, #232a3a, #121620);
 }
 
@@ -238,7 +251,12 @@
   align-items: center;
   gap: 4px;
   padding: 4px 6px;
-  background: linear-gradient(104deg, var(--bb-black) 0 42%, var(--bb-magenta) 42% 88%, var(--bb-black) 88%);
+  background: linear-gradient(
+    104deg,
+    var(--bb-black) 0 42%,
+    var(--bb-magenta) 42% 88%,
+    var(--bb-black) 88%
+  );
 }
 .build-battle-window .db-live .bb-wordmark {
   display: flex;
@@ -285,13 +303,32 @@
   width: 26px;
   height: 8px;
   background:
-    radial-gradient(circle at 4px 4px, #fff 0 1.2px, #000 1.3px 1.8px, transparent 1.9px),
-    radial-gradient(circle at 4px 4px, var(--bb-red) 0 3.6px, transparent 3.7px) 0 0 / 9px 4px no-repeat,
-    radial-gradient(circle at 4px 4px, #fff 0 3.6px, transparent 3.7px) 0 0 / 9px 8px no-repeat,
-    radial-gradient(circle at 13px 4px, #fff 0 1.2px, #000 1.3px 1.8px, transparent 1.9px),
-    radial-gradient(circle at 4px 4px, var(--bb-red) 0 3.6px, transparent 3.7px) 9px 0 / 9px 4px no-repeat,
-    radial-gradient(circle at 4px 4px, #fff 0 3.6px, transparent 3.7px) 9px 0 / 9px 8px no-repeat,
-    radial-gradient(circle at 22px 4px, transparent 0 2.6px, #fff 2.7px 3.6px, transparent 3.7px);
+    radial-gradient(
+      circle at 4px 4px,
+      #fff 0 1.2px,
+      #000 1.3px 1.8px,
+      transparent 1.9px
+    ),
+    radial-gradient(circle at 4px 4px, var(--bb-red) 0 3.6px, transparent 3.7px)
+      0 0 / 9px 4px no-repeat,
+    radial-gradient(circle at 4px 4px, #fff 0 3.6px, transparent 3.7px) 0 0 /
+      9px 8px no-repeat,
+    radial-gradient(
+      circle at 13px 4px,
+      #fff 0 1.2px,
+      #000 1.3px 1.8px,
+      transparent 1.9px
+    ),
+    radial-gradient(circle at 4px 4px, var(--bb-red) 0 3.6px, transparent 3.7px)
+      9px 0 / 9px 4px no-repeat,
+    radial-gradient(circle at 4px 4px, #fff 0 3.6px, transparent 3.7px) 9px 0 /
+      9px 8px no-repeat,
+    radial-gradient(
+      circle at 22px 4px,
+      transparent 0 2.6px,
+      #fff 2.7px 3.6px,
+      transparent 3.7px
+    );
 }
 .build-battle-window .db-live .bb-age {
   margin-left: auto;
@@ -396,13 +433,23 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 26%, var(--bb-red) 28% 58%, #fff 60%);
+  background: radial-gradient(
+    circle,
+    #fff 0 26%,
+    var(--bb-red) 28% 58%,
+    #fff 60%
+  );
 }
 
 /* Left/right: the front's slashes wrap around, with the strip and band colours as thin bands. */
 .build-battle-window .db-live .bb-pf--side {
   background:
-    linear-gradient(180deg, var(--bb-magenta) 0 5%, transparent 5% 89%, #000 89% 100%),
+    linear-gradient(
+      180deg,
+      var(--bb-magenta) 0 5%,
+      transparent 5% 89%,
+      #000 89% 100%
+    ),
     linear-gradient(
       118deg,
       var(--bb-black) 0 20%,
@@ -423,8 +470,16 @@
   gap: 5px;
   padding: 10px 12px;
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 9px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 9px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 9px
+    ),
     var(--bb-black);
   font-size: 7px;
 }
@@ -480,7 +535,11 @@
   display: grid;
   align-items: center;
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.04) 0 1px,
+      transparent 1px 8px
+    ),
     var(--bb-black);
 }
 .build-battle-window .db-live .bb-cap__band {
@@ -507,14 +566,29 @@
       rgba(255, 255, 255, 0.3) 63%,
       transparent 69%
     ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05) 40%, rgba(255, 255, 255, 0.12));
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0.05) 40%,
+      rgba(255, 255, 255, 0.12)
+    );
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 .build-battle-window .db-live .bb-box__face--back .bb-face__wrap {
   /* The heat-seal seam down the back. */
   background-image:
-    linear-gradient(90deg, transparent 49.4%, rgba(255, 255, 255, 0.4) 49.6% 50.4%, transparent 50.6%),
-    linear-gradient(125deg, transparent 18%, var(--bb-wrap) 23%, transparent 29%);
+    linear-gradient(
+      90deg,
+      transparent 49.4%,
+      rgba(255, 255, 255, 0.4) 49.6% 50.4%,
+      transparent 50.6%
+    ),
+    linear-gradient(
+      125deg,
+      transparent 18%,
+      var(--bb-wrap) 23%,
+      transparent 29%
+    );
 }
 
 /* The wrap and lid hit areas cover the drawn box; they are buttons for keyboard users. */
@@ -692,7 +766,9 @@
   transition: opacity 120ms;
 }
 .build-battle-window .db-live .bb-pack__top:not(:disabled):hover::after,
-.build-battle-window .db-live .bb-pack__top:not(:disabled):focus-visible::after {
+.build-battle-window
+  .db-live
+  .bb-pack__top:not(:disabled):focus-visible::after {
   opacity: 1;
 }
 
@@ -771,7 +847,11 @@
   opacity: 0;
   mix-blend-mode: screen;
   border-radius: inherit;
-  background: radial-gradient(circle at 50% 42%, var(--bb-flare-rgb, #fff) 0%, transparent 64%);
+  background: radial-gradient(
+    circle at 50% 42%,
+    var(--bb-flare-rgb, #fff) 0%,
+    transparent 64%
+  );
 }
 .build-battle-window .db-live .bb-sparks {
   inset: 0;
@@ -784,7 +864,12 @@
   left: 30%;
   width: 40%;
   mix-blend-mode: screen;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
   transform: translateX(-120%) skewX(-18deg);
 }
 
@@ -819,7 +904,11 @@
   overflow: auto;
   padding: 3vh 16px;
   background:
-    radial-gradient(ellipse 60% 55% at 50% 42%, rgba(255, 214, 90, 0.1), transparent 70%),
+    radial-gradient(
+      ellipse 60% 55% at 50% 42%,
+      rgba(255, 214, 90, 0.1),
+      transparent 70%
+    ),
     linear-gradient(180deg, var(--db-bg-top), var(--db-bg-bottom));
   color: var(--db-text);
   transition: opacity 360ms ease-out;
@@ -928,7 +1017,10 @@
   pointer-events: none;
 }
 /* A glint running along the cut line: "swipe here". */
-.build-battle-window .db-live .bb-bigpack.is-focus .bb-pack__top:not(:disabled)::before {
+.build-battle-window
+  .db-live
+  .bb-bigpack.is-focus
+  .bb-pack__top:not(:disabled)::before {
   content: '';
   position: absolute;
   left: 4%;
@@ -936,7 +1028,12 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff 0%, rgba(255, 214, 90, 0.9) 40%, transparent 70%);
+  background: radial-gradient(
+    circle,
+    #fff 0%,
+    rgba(255, 214, 90, 0.9) 40%,
+    transparent 70%
+  );
   animation: bb-swipe-hint 1.8s ease-in-out infinite;
   pointer-events: none;
 }
@@ -989,7 +1086,10 @@
   border-radius: 4.5% / 3.3%;
   background: linear-gradient(160deg, #2b3a78, #141c3d);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  transform: translate(calc(var(--bb-depth) * 3px), calc(var(--bb-depth) * 4px));
+  transform: translate(
+    calc(var(--bb-depth) * 3px),
+    calc(var(--bb-depth) * 4px)
+  );
 }
 .build-battle-window .db-live .bb-pcard {
   position: absolute;
@@ -1132,10 +1232,19 @@
 /* ── Kill switch and reduced motion ───────────────────────────────────────── */
 body.fx-off.build-battle-window .db-live .bb-pack__foil,
 body.fx-off.build-battle-window .db-live .bb-pcard.is-hit::after,
-body.fx-off.build-battle-window .db-live .bb-bigpack.is-focus .bb-pack__top:not(:disabled)::before,
-body.fx-off.build-battle-window .db-live.bb-ui-enter .native-deck-builder-header,
-body.fx-off.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-main,
-body.fx-off.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-side,
+body.fx-off.build-battle-window
+  .db-live
+  .bb-bigpack.is-focus
+  .bb-pack__top:not(:disabled)::before,
+body.fx-off.build-battle-window
+  .db-live.bb-ui-enter
+  .native-deck-builder-header,
+body.fx-off.build-battle-window
+  .db-live.bb-ui-enter
+  .native-deck-builder-pane-main,
+body.fx-off.build-battle-window
+  .db-live.bb-ui-enter
+  .native-deck-builder-pane-side,
 body.fx-off.build-battle-window .db-live .bb-panel.bb-enter {
   animation: none;
 }
@@ -1146,7 +1255,10 @@ body.fx-off.build-battle-window .db-live .bb-pack__top::after {
 @media (prefers-reduced-motion: reduce) {
   .build-battle-window .db-live .bb-pack__foil,
   .build-battle-window .db-live .bb-pcard.is-hit::after,
-  .build-battle-window .db-live .bb-bigpack.is-focus .bb-pack__top:not(:disabled)::before,
+  .build-battle-window
+    .db-live
+    .bb-bigpack.is-focus
+    .bb-pack__top:not(:disabled)::before,
   .build-battle-window .db-live.bb-ui-enter .native-deck-builder-header,
   .build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-main,
   .build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-side,
