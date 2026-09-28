@@ -25,9 +25,11 @@ This design replaces 051's step 3 ("Reveal") with a full scene in the house FX s
   rare, "Ultra Rare" → ultra rare, "Illustration rare" / "Special illustration rare" → their
   families, "Mega Hyper Rare" → hyper rare. "Rare", "Promo", "Common", "Uncommon" map to nothing
   today; the reverse slot needs a rarity ending in "reverse holo" (`reverse-holo.css:18`).
-- No product art can be vendored (licensing, PROJECT constraints). Box and pack faces are drawn
-  procedurally from the set logo (`${set.logo}.webp` on assets.tcgdex.net, verified for me02) and a
-  palette; card faces are TCGdex images already in the baked set (051).
+- Vendored product art is existing practice (sleeves 368 KB, playmats 57 MB, coins under
+  `client/src/assets/`), so box-face textures may ship as assets; there is no photogrammetry
+  toolchain and no WebGL/three.js in the app (a mesh renderer would be a new dependency, D-line
+  required, and the page has no build step). A box is a cuboid, so six flat face textures on a CSS
+  3D cuboid are the whole "3D model". Card faces are TCGdex images already in the baked set (051).
 - Cosmetic only: the pool is fixed at box open (051 § Session); the scene never changes what the
   player receives, and every beat is skippable. State machine = `session.unboxing` (below), so a
   reload resumes at the last completed beat.
@@ -60,11 +62,18 @@ This design replaces 051's step 3 ("Reveal") with a full scene in the house FX s
    dispatcher is board-only. B: `deck-builder/core/build-battle/unboxing.mjs` (pure poses + timeline)
    with a DOM twin `sidebox/native-deck-builder-unboxing.js`, importing the shared primitives from
    `image-logic/mat-fx.mjs` and the voice player. **Pick B.**
-2. **Box and pack art.** A: vendor product photos — no. B: procedural: a CSS cuboid whose six faces
-   reproduce the real box's layout (user's reference frames, 2026-09-28, § Box reference) from
-   palette tokens, CSS gradients for the diagonal-slash key art, TCGdex images the app already
-   shows (the set logo and one card's full-art illustration as the key art), and a shrink-wrap
-   sheen layer; packs use the same palette with crimped top/bottom edges. **Pick B.**
+2. **Box and pack art.** A: a real 3D scan (photogrammetry from the video frames) — not feasible:
+   it needs 30–80 sharp overlapping photos and a reconstruction tool, and the result is a mesh the
+   app cannot draw without WebGL. B: procedural CSS faces reproducing the real layout (§ Box
+   reference) from palette tokens, gradients, the TCGdex set logo and one card's full-art image
+   as the key art. C: **box unwrap** — six flat textures cut from the references and vendored under
+   `client/src/assets/build-battle/box/<face>.webp`, each perspective-corrected by a `matrix3d`
+   computed from four hand-picked corner points (`faceMatrix3d`, pure, tested), mapped on the CSS
+   cuboid; procedural fallback per face where no sharp source exists. **Pick C for the front and
+   left faces** (the official render `refs/052-box-render.webp` is sharp and near-frontal) **and
+   B for right, back, top and bottom** (the video frames are motion-blurred; the back is mostly
+   text, which types cleanly). The user can swap any face to C later by photographing it squarely.
+   Packs stay B (no pack reference yet).
 3. **Opening interaction.** A: click everything. B: tear-by-drag (pointer down on the wrap / pack
    top edge, drag ≥ 40 % of its width) with click fallback (a press with < 6 px movement tears too).
    C: drag only. **Pick B**: the drag sells the physicality; the fallback keeps mobile and keyboard
@@ -131,6 +140,12 @@ revealed: number[4] }` (`revealed[i]` = cards revealed in pack i, 0..10). `creat
   Double rare; 2 Ultra Rare / Illustration rare; 3 Special illustration rare / Mega Hyper Rare.
 - `unboxingHoloRarity(card, slot) -> string|null` per Options 5.
 - `unboxingVoiceFor(event, tier) -> effect name` (table under Sound).
+- `faceMatrix3d(srcQuad, dstWidthPx, dstHeightPx) -> string` — the CSS `matrix3d(...)` that maps
+  the four source corners of a face in a reference image (`[{x,y}×4]`, clockwise from top-left,
+  in image pixels) onto the `dstWidth × dstHeight` face rectangle (standard 8-DOF homography
+  solved by Gaussian elimination, no dependency). The corner points per vendored face are constants
+  in `box-textures.mjs` next to the asset paths; the DOM twin applies the matrix to an `<img>`
+  inside an `overflow: hidden` face.
 - `unboxingTimeline(unboxing) -> Beat[]` — `Beat = { at, durationMs, kind, packIndex?, cardIndex? }`
   for `revealAll` (the DOM twin just plays the list).
 
@@ -175,7 +190,8 @@ Mounted into `#buildBattleBoxPanel` (051) as `#bbUnboxing`. Structure:
 | `unbox-done` | triangle 392→523 Hz 260 ms gain .25 |
 
 ### Box reference (user frames `.agent/designs/refs/052-box-{front,left,right,back,top}.webp`)
-Proportions W : H : D = 1 : 1.4 : 0.65 (measured on the top and front frames). Faces:
+Proportions W : H : D = 1 : 1.45 : 0.65 (front from the official render `refs/052-box-render.webp`,
+depth from the top frame). Faces:
 - **Front** (portrait): top strip — red rounded plate with the Pokémon TCG wordmark (text, app
   font, `--bb-red` plate, yellow letters) at the left; a magenta slashed banner carrying a black
   "PLAY LEVEL 2" pill with two filled Poké Balls and one empty ring; a black "6+" badge in the
@@ -226,7 +242,8 @@ house rule 8). Phone width: box scales to the viewport width, packs wrap two per
 | 7 | Reveal all pressed mid-reveal | continues from the current index; no duplicate cards | [ ] |
 | 8 | WAAPI missing (old browser) | `animateFrames` degrades (existing behavior): states still settle via the backstop | [ ] |
 | 9 | animation never finishes (tab hidden) | `SCENE_BACKSTOP_MS` settles the state | [ ] |
-| 10 | card image 404 / logo 404 / key art 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [ ] |
+| 10a | `faceMatrix3d` on a rectangle / a skewed quad / a degenerate quad (two equal corners) | identity-like matrix / corners land within 0.5 px of the target / throws, and the face falls back to the procedural layout | [ ] |
+| 10 | card image 404 / logo 404 / key art 404 / face texture 404 | card shows the card back with the name; box shows the palette and typeset titles without the logo or key art | [ ] |
 | 11 | tier mapping across all 130 me02 cards + promos | every `unboxingHoloRarity` result is a family `holo/*.css` styles (or null); reverse slot always ends in "reverse holo"; Rare/Promo → rare holo | [ ] |
 | 12 | hit flare never leaves the card rect | flare + particles are children of the card host with `overflow: hidden` | [ ] |
 | 13 | pool integrity | revealed ids == `session.packs[i]` in order; the scene reads, never writes, `packs` | [ ] |
@@ -256,8 +273,8 @@ mounts at `done`. Revert path: revert the commits; sessions keep working (the fi
 ## Work plan — slices ≤1 session, each leaving the repo green
 | Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
 |---|---|---|---|---|---|
-| 1 Pure + sound | create `core/build-battle/unboxing.mjs`, `__tests__/unboxing.test.mjs`; modify `mat-fx/fx-audio.mjs` (+7 voices), `mat-fx/__tests__/fx-audio*.test.mjs`, `build-battle-session.mjs` (`unboxing` field replaces `openedPacks`) | § Beats, § State machine, § Pure poses, § Sound verbatim | rows 3–5, 7, 11, 17; pose endpoints listed in § Test plan | pokemon.com "foil promo"; TCGdex me02 `variants.holo` | `node --test` on the new tests + `pnpm test:changed` |
-| 2 DOM + CSS (fx-designer) | create `sidebox/native-deck-builder-unboxing.js`, `css/deck-builder-unboxing.css`; modify `native-deck-builder-build-battle.js` (mount, remove the 051 flip), `index.ejs` (`#bbUnboxing` root), `css/__tests__/fx-kill-switch-css.test.mjs` (+ the new sheet) | § DOM twin structure and ids, § CSS tokens | rows 1, 2, 6, 8–10, 12, 15, 16, 18 | — | lint clean; kill-switch test green |
+| 1 Pure + sound | create `core/build-battle/unboxing.mjs`, `box-textures.mjs` (asset paths + corner constants, cut with the reference frames open), `__tests__/unboxing.test.mjs`; modify `mat-fx/fx-audio.mjs` (+7 voices), `mat-fx/__tests__/fx-audio*.test.mjs`, `build-battle-session.mjs` (`unboxing` field replaces `openedPacks`) | § Beats, § State machine, § Pure poses, § Sound verbatim | rows 3–5, 7, 11, 17; pose endpoints listed in § Test plan | pokemon.com "foil promo"; TCGdex me02 `variants.holo` | `node --test` on the new tests + `pnpm test:changed` |
+| 2 DOM + CSS (fx-designer) | create `sidebox/native-deck-builder-unboxing.js`, `css/deck-builder-unboxing.css`, `client/src/assets/build-battle/box/{front,left}.webp` (cut from `refs/052-box-render.webp`, ≤ 250 KB each); modify `native-deck-builder-build-battle.js` (mount, remove the 051 flip), `index.ejs` (`#bbUnboxing` root), `css/__tests__/fx-kill-switch-css.test.mjs` (+ the new sheet) | § DOM twin structure and ids, § CSS tokens | rows 1, 2, 6, 8–10, 12, 15, 16, 18 | — | lint clean; kill-switch test green |
 | 3 Verify | create `.claude/skills/fx-preview/rec/rec-unboxing.mjs`; modify `fx-preview/SKILL.md` (builder-tab section) | recorder opens `/build-and-battle?seed=42&e2e=1`, drives beats via DOM clicks, writes `out/unboxing.webm` + strips | rows 4, 13, 14 by video; strips at the seven beats listed | — | video + strips recorded and reviewed; user check on localhost |
 
 ## Deviations (Builder appends here during build)
