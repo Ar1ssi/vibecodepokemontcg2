@@ -38,7 +38,10 @@ export function createSession({
     seed,
     deckKey,
     packs: packs.map((pack) => [...pack]),
-    unboxing: createUnboxing(),
+    unboxing: createUnboxing({
+      packCount: packs.length,
+      cardsPerPack: getBuildBattleBox(boxKey)?.packModel.size,
+    }),
     deckId: null,
     unsavedDeck: null,
     roomId: isRoomId(roomId) ? roomId : null,
@@ -128,9 +131,15 @@ export function parseSession(json) {
   // pack was already shown to that player, so it resumes at the end of the scene.
   const unboxing =
     value.unboxing === undefined
-      ? finishedUnboxing()
+      ? finishedUnboxing({ packCount: box.packCount, cardsPerPack: box.packModel.size })
       : parseUnboxing(value.unboxing);
   if (!unboxing) return null;
+  // The reducer accepts any box size; this one's scene must match this box.
+  if (
+    unboxing.packsTorn.length !== box.packCount ||
+    unboxing.cardsPerPack !== box.packModel.size
+  )
+    return null;
   if (!isDeckId(value.deckId) || !Number.isFinite(value.createdAt)) return null;
   return {
     version: SESSION_VERSION,

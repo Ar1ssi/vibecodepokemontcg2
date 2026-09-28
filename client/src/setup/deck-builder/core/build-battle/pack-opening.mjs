@@ -90,7 +90,8 @@ function withoutQty(card) {
   return rest;
 }
 
-function comparePoolEntries(a, b) {
+/** Pool order: Pokémon → Trainer → Energy, then by localId, then by id. */
+export function comparePoolEntries(a, b) {
   const typeOrder = (entry) => {
     const index = SUPERTYPE_ORDER.indexOf(entry.card.supertype);
     return index === -1 ? SUPERTYPE_ORDER.length : index;

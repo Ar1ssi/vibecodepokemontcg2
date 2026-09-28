@@ -270,3 +270,18 @@ test('fx-audio: the unboxing hit chime climbs with the tier', () => {
   assert.equal(swell?.dur, 1.2);
   assert.equal(swell?.gain, 0.18);
 });
+
+test('fx-audio: the Elite Trainer Box props have voices (design 055)', () => {
+  const dice = voicesFor('unbox-dice');
+  assert.deepEqual(dice.map((voice) => voice.delay), [0, 0.07, 0.15], 'three clicks');
+  for (const voice of dice) {
+    assert.equal(voice.type, 'noise');
+    assert.equal(voice.dur, 0.04);
+    assert.deepEqual({ type: voice.filter.type, freq: voice.filter.freq }, { type: 'bandpass', freq: 2400 });
+  }
+  const [coin] = voicesFor('unbox-coin');
+  assert.deepEqual(
+    { wave: coin.wave, freq: coin.freq, freqTo: coin.freqTo, dur: coin.dur, gain: coin.gain },
+    { wave: 'sine', freq: 2600, freqTo: 2200, dur: 0.32, gain: 0.18 }
+  );
+});

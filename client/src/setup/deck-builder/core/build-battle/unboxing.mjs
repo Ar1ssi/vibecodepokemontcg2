@@ -31,10 +31,21 @@ export const EASE_LID = 'cubic-bezier(.3,1.2,.4,1)';
 
 // Tray items: deck, packs 1–4, code card, tip sheet.
 export const TRAY_ITEM_COUNT = 7;
-export const TRAY_TOTAL_MS = TRAY_RISE_MS + (TRAY_ITEM_COUNT - 1) * TRAY_STAGGER_MS;
 
+/** @returns {number} ms until the last of `itemCount` staggered tray items has risen. */
+export function trayRiseMs(itemCount) {
+  return TRAY_RISE_MS + (Math.max(1, itemCount | 0) - 1) * TRAY_STAGGER_MS;
+}
+
+export const TRAY_TOTAL_MS = trayRiseMs(TRAY_ITEM_COUNT);
+
+// The Build & Battle sizes, and the defaults when a caller names none. An Elite Trainer Box
+// (design 055) passes its own pack count and pack size.
 export const PACK_COUNT = 4;
 export const CARDS_PER_PACK = 10;
+// Bounds a stored state must respect (an ETB holds 9, a Pokémon Center one 11).
+const MAX_PACK_COUNT = 36;
+const MAX_CARDS_PER_PACK = 20;
 export const PACK_TORN_AT = 0.4;
 // A press that moves less than this is a click, and a click tears.
 export const TAP_SLOP_PX = 6;
@@ -76,39 +87,45 @@ export const UNBOXING_STAGES = ['sealed', 'opened', 'deckShown', 'packs', 'done'
 
 /**
  * @typedef {{stage: 'sealed'|'opened'|'deckShown'|'packs'|'done', wrapTorn: boolean,
- *   packsTorn: boolean[], revealed: number[]}} Unboxing
- * `revealed[i]` counts the cards revealed in pack i (0..10). `wrapTorn` splits the sealed stage
- * into "shrink-wrap on" and "wrap off, lid still closed".
+ *   packsTorn: boolean[], revealed: number[], cardsPerPack: number}} Unboxing
+ * `revealed[i]` counts the cards revealed in pack i (0..cardsPerPack); `packsTorn.length` is the
+ * pack count. `wrapTorn` splits the sealed stage into "shrink-wrap on" and "wrap off, lid still
+ * closed".
  */
 
 /** @returns {Unboxing} a sealed box. */
-export function createUnboxing() {
+export function createUnboxing({ packCount = PACK_COUNT, cardsPerPack = CARDS_PER_PACK } = {}) {
   return {
     stage: 'sealed',
     wrapTorn: false,
-    packsTorn: Array(PACK_COUNT).fill(false),
-    revealed: Array(PACK_COUNT).fill(0),
+    packsTorn: Array(packCount).fill(false),
+    revealed: Array(packCount).fill(0),
+    cardsPerPack,
   };
 }
 
 /** @returns {Unboxing} every beat played: the state a skipped scene or an older session lands in. */
-export function finishedUnboxing() {
+export function finishedUnboxing({ packCount = PACK_COUNT, cardsPerPack = CARDS_PER_PACK } = {}) {
   return {
     stage: 'done',
     wrapTorn: true,
-    packsTorn: Array(PACK_COUNT).fill(true),
-    revealed: Array(PACK_COUNT).fill(CARDS_PER_PACK),
+    packsTorn: Array(packCount).fill(true),
+    revealed: Array(packCount).fill(cardsPerPack),
+    cardsPerPack,
   };
 }
 
-const isPackIndex = (index) =>
-  Number.isInteger(index) && index >= 0 && index < PACK_COUNT;
+const sizesOf = (u) => ({ packCount: u.packsTorn.length, cardsPerPack: u.cardsPerPack });
 
-const allRevealed = (revealed) => revealed.every((count) => count === CARDS_PER_PACK);
+const isPackIndex = (u, index) =>
+  Number.isInteger(index) && index >= 0 && index < u.packsTorn.length;
+
+const allRevealed = (u, revealed = u.revealed) =>
+  revealed.every((count) => count === u.cardsPerPack);
 
 // A pack is mid-reveal while it is torn and still has face-down cards.
 const hasPackMidReveal = (u) =>
-  u.packsTorn.some((torn, index) => torn && u.revealed[index] < CARDS_PER_PACK);
+  u.packsTorn.some((torn, index) => torn && u.revealed[index] < u.cardsPerPack);
 
 /**
  * The pack the player may tear next, or -1: packs open one after the other, in order, and the
@@ -121,7 +138,7 @@ export function nextPackToTear(u) {
 
 function withReveal(u, packIndex, count) {
   const revealed = u.revealed.map((value, index) => (index === packIndex ? count : value));
-  return { ...u, revealed, stage: allRevealed(revealed) ? 'done' : u.stage };
+  return { ...u, revealed, stage: allRevealed(u, revealed) ? 'done' : u.stage };
 }
 
 /**
@@ -148,19 +165,19 @@ export function advanceUnboxing(u, event) {
     case 'unwrapDeck':
       return u.stage === 'opened' ? { ...u, stage: 'deckShown' } : u;
     case 'tearPack': {
-      if (!isPackIndex(packIndex) || packIndex !== nextPackToTear(u)) return u;
+      if (!isPackIndex(u, packIndex) || packIndex !== nextPackToTear(u)) return u;
       const packsTorn = u.packsTorn.map((torn, index) => torn || index === packIndex);
       return { ...u, stage: 'packs', packsTorn };
     }
     case 'revealCard':
     case 'revealAll': {
-      if (u.stage !== 'packs' || !isPackIndex(packIndex)) return u;
+      if (u.stage !== 'packs' || !isPackIndex(u, packIndex)) return u;
       const count = u.revealed[packIndex];
-      if (!u.packsTorn[packIndex] || count >= CARDS_PER_PACK) return u;
-      return withReveal(u, packIndex, type === 'revealAll' ? CARDS_PER_PACK : count + 1);
+      if (!u.packsTorn[packIndex] || count >= u.cardsPerPack) return u;
+      return withReveal(u, packIndex, type === 'revealAll' ? u.cardsPerPack : count + 1);
     }
     case 'finish':
-      return hasPackMidReveal(u) ? u : finishedUnboxing();
+      return hasPackMidReveal(u) ? u : finishedUnboxing(sizesOf(u));
     default:
       return u;
   }
@@ -175,31 +192,40 @@ function isStageConsistent(u) {
     case 'deckShown':
       return u.wrapTorn && !anyTorn;
     case 'packs':
-      return u.wrapTorn && anyTorn && !allRevealed(u.revealed);
+      return u.wrapTorn && anyTorn && !allRevealed(u);
     case 'done':
-      return u.wrapTorn && allRevealed(u.revealed);
+      return u.wrapTorn && allRevealed(u);
     default:
       return false;
   }
 }
 
-/** @returns {Unboxing|null} a copy of a stored scene state, or null for anything inconsistent. */
+/**
+ * @returns {Unboxing|null} a copy of a stored scene state, or null for anything inconsistent. A
+ * state saved before `cardsPerPack` existed (design 052) is a Build & Battle one: 10 cards a pack.
+ */
 export function parseUnboxing(value) {
   if (!value || typeof value !== 'object') return null;
   const { stage, wrapTorn, packsTorn, revealed } = value;
+  const cardsPerPack = value.cardsPerPack === undefined ? CARDS_PER_PACK : value.cardsPerPack;
   if (!UNBOXING_STAGES.includes(stage) || typeof wrapTorn !== 'boolean') return null;
-  if (!Array.isArray(packsTorn) || packsTorn.length !== PACK_COUNT) return null;
-  if (!Array.isArray(revealed) || revealed.length !== PACK_COUNT) return null;
+  if (!Number.isInteger(cardsPerPack) || cardsPerPack < 1 || cardsPerPack > MAX_CARDS_PER_PACK) {
+    return null;
+  }
+  if (!Array.isArray(packsTorn) || packsTorn.length < 1 || packsTorn.length > MAX_PACK_COUNT) {
+    return null;
+  }
+  if (!Array.isArray(revealed) || revealed.length !== packsTorn.length) return null;
   if (!packsTorn.every((torn) => typeof torn === 'boolean')) return null;
   const countsValid = revealed.every(
     (count, index) =>
       Number.isInteger(count) &&
       count >= 0 &&
-      count <= CARDS_PER_PACK &&
+      count <= cardsPerPack &&
       (count === 0 || packsTorn[index])
   );
   if (!countsValid) return null;
-  const u = { stage, wrapTorn, packsTorn: [...packsTorn], revealed: [...revealed] };
+  const u = { stage, wrapTorn, packsTorn: [...packsTorn], revealed: [...revealed], cardsPerPack };
   return isStageConsistent(u) ? u : null;
 }
 
@@ -258,11 +284,94 @@ export function wrapTearPose(t) {
   return { clipPath: `polygon(${list})` };
 }
 
+const LID_LIFT_RISE = 0.6;
+const LID_LIFT_TILT_DEG = -8;
+const LID_LIFT_SLIDE = 0.4;
+const LID_LIFT_SLIDE_AT = 0.7;
+export const LID_LIFT_MS = 640;
+
+/**
+ * An Elite Trainer Box's lift-off cover (design 055): it rises by 0.6 × the box height with the
+ * lid's overshoot easing and tilts −8°, then from t = 0.7 slides back by 0.4 × the depth while its
+ * host fades out.
+ */
+export function liftLidPose(t, { heightPx = 76, depthPx = 36 } = {}) {
+  const x = clamp01(t);
+  const rise = easeLid(Math.min(1, x / LID_LIFT_SLIDE_AT));
+  const slide = easeLift(clamp01((x - LID_LIFT_SLIDE_AT) / (1 - LID_LIFT_SLIDE_AT)));
+  return {
+    translateZPx: LID_LIFT_RISE * heightPx * rise + 0,
+    translateYPx: -LID_LIFT_SLIDE * depthPx * slide + 0,
+    rotateXDeg: LID_LIFT_TILT_DEG * rise + 0,
+    opacity: 1 - slide,
+  };
+}
+
+export const DICE_MS = 520;
+const DICE_OUT_PX = 18;
+const DICE_TUMBLE_TURNS = 2;
+// The rotation that shows each of a cube's six faces to the camera.
+const DIE_FACE_ROTATIONS = [
+  [0, 0],
+  [90, 0],
+  [180, 0],
+  [270, 0],
+  [0, 90],
+  [0, 270],
+];
+
+// Die `index`'s landing: its face, direction out of the pouch and resting spin. A stream of its
+// own (`seed ^ 0x5bd1e995`), so the props never shift a pool draw.
+function dieLanding(index, seed) {
+  const rng = createRng(seed ^ 0x5bd1e995);
+  let landing = null;
+  for (let die = 0; die <= index; die += 1) {
+    landing = { face: rng.int(DIE_FACE_ROTATIONS.length), angle: rng.next(), spin: rng.next() };
+  }
+  return landing;
+}
+
+/**
+ * Die `index` (six damage-counter dice, then the flip die at 6) tumbling 18 px out of the pouch
+ * and landing on a seeded face.
+ */
+export function dicePose(t, index, seed) {
+  const x = easeLift(clamp01(t));
+  const die = Math.max(0, index | 0);
+  const { face, angle, spin } = dieLanding(die, seed);
+  const direction = 2 * Math.PI * ((die + angle) / 7);
+  const [faceX, faceY] = DIE_FACE_ROTATIONS[face];
+  const tumble = 360 * DICE_TUMBLE_TURNS;
+  return {
+    translateXPx: DICE_OUT_PX * Math.cos(direction) * x + 0,
+    translateYPx: DICE_OUT_PX * Math.sin(direction) * x + 0,
+    rotateXDeg: (tumble + faceX) * x + 0,
+    rotateYDeg: (tumble + faceY) * x + 0,
+    rotateZDeg: lerp(0, 90 * spin - 45, x) + 0,
+  };
+}
+
+export const COIN_FLIP_MS = 700;
+const COIN_FLIP_TURNS = 3;
+const COIN_LIFT_PX = 12;
+
+/** The box's coin flipping three turns on the spot with a 12 px lift. */
+export function coinFlipPose(t) {
+  const x = clamp01(t);
+  return {
+    rotateXDeg: 360 * COIN_FLIP_TURNS * easeInOutSine(x),
+    translateYPx: -COIN_LIFT_PX * Math.sin(Math.PI * x) + 0,
+  };
+}
+
 const TRAY_RISE_PX = 24;
 
-/** Tray item `index` (0 deck, 1–4 packs, 5 code card, 6 tip sheet) rising into place. */
-export function trayRisePose(t, index) {
-  const elapsed = clamp01(t) * TRAY_TOTAL_MS - Math.max(0, index) * TRAY_STAGGER_MS;
+/**
+ * Tray item `index` rising into place, of `itemCount` staggered items (Build & Battle: 0 deck,
+ * 1–4 packs, 5 code card, 6 tip sheet).
+ */
+export function trayRisePose(t, index, itemCount = TRAY_ITEM_COUNT) {
+  const elapsed = clamp01(t) * trayRiseMs(itemCount) - Math.max(0, index) * TRAY_STAGGER_MS;
   const local = easeLift(clamp01(elapsed / TRAY_RISE_MS));
   return { translateYPx: TRAY_RISE_PX * (1 - local), opacity: local };
 }
@@ -391,17 +500,23 @@ const SWIPE_TILT_DEG = 20;
 const HIT_FLIP_POP = 0.14;
 
 /**
- * Pack `index` in the fullscreen spread with pack `focus` (`spacingPx` wide) centred at full
- * size: packs after it queue to the right, smaller and darker, clear of each other.
+ * Pack `index` of `count` in the fullscreen spread with pack `focus` (`spacingPx` wide) centred at
+ * full size: packs after it queue to the right, smaller and darker, clear of each other. `spacing`
+ * is `spacingPx` or `{ spacingPx, availableWidthPx }`; the side packs then step by at most
+ * `availableWidthPx / (count - 1)` so many packs fit the stage.
  */
-export function packSpreadSlot(index, focus, spacingPx) {
+export function packSpreadSlot(index, focus, spacing, count = PACK_COUNT) {
+  const spacingPx = typeof spacing === 'number' ? spacing : spacing?.spacingPx;
+  const availableWidthPx =
+    typeof spacing === 'number' ? Infinity : (spacing?.availableWidthPx ?? Infinity);
   const offset = index - focus;
   if (!Number.isFinite(offset) || offset === 0 || !Number.isFinite(spacingPx)) {
     return { xPx: 0, scale: 1, brightness: 1, zIndex: 10 };
   }
   const distance = Math.abs(offset);
-  const sideStep = spacingPx * (SPREAD_SIDE_SCALE + 0.06);
-  const xPx = Math.sign(offset) * ((spacingPx + spacingPx * SPREAD_SIDE_SCALE) / 2 + 12 + sideStep * (distance - 1));
+  const sidePx = Math.min(spacingPx, availableWidthPx / Math.max(1, count - 1));
+  const sideStep = sidePx * (SPREAD_SIDE_SCALE + 0.06);
+  const xPx = Math.sign(offset) * ((spacingPx + sidePx * SPREAD_SIDE_SCALE) / 2 + 12 + sideStep * (distance - 1));
   return { xPx, scale: SPREAD_SIDE_SCALE, brightness: SPREAD_SIDE_BRIGHTNESS, zIndex: 10 - distance };
 }
 
@@ -530,6 +645,10 @@ const VOICE_BY_EVENT = {
   openLid: 'unbox-lid',
   unwrapDeck: 'unbox-unwrap',
   finish: 'unbox-done',
+  // Elite Trainer Box props (design 055).
+  dice: 'unbox-dice',
+  coin: 'unbox-coin',
+  sleeves: 'unbox-unwrap',
 };
 
 /** @returns {string|null} the `STATIC_VOICES` effect a beat plays; a reveal's pitch rises with its tier. */
@@ -659,14 +778,14 @@ export function unboxingTimeline(unboxing, { packIndex, tiers = [] } = {}) {
   const pack =
     packIndex ??
     unboxing.packsTorn.findIndex(
-      (torn, index) => torn && unboxing.revealed[index] < CARDS_PER_PACK
+      (torn, index) => torn && unboxing.revealed[index] < unboxing.cardsPerPack
     );
-  if (!isPackIndex(pack) || !unboxing.packsTorn[pack]) return [];
+  if (!isPackIndex(unboxing, pack) || !unboxing.packsTorn[pack]) return [];
 
   const beats = [];
   let at = 0;
   let end = 0;
-  for (let cardIndex = unboxing.revealed[pack]; cardIndex < CARDS_PER_PACK; cardIndex += 1) {
+  for (let cardIndex = unboxing.revealed[pack]; cardIndex < unboxing.cardsPerPack; cardIndex += 1) {
     const tier = tiers[cardIndex] || 0;
     const { totalMs } = cardRevealPhases(tier);
     const kind = tier >= 2 ? 'hit' : 'reveal';
@@ -675,7 +794,7 @@ export function unboxingTimeline(unboxing, { packIndex, tiers = [] } = {}) {
     at = kind === 'hit' ? at + totalMs : at + REVEAL_STAGGER_MS;
   }
   const othersDone = unboxing.revealed.every(
-    (count, index) => index === pack || count === CARDS_PER_PACK
+    (count, index) => index === pack || count === unboxing.cardsPerPack
   );
   if (othersDone) {
     beats.push({ at: end, durationMs: FAN_COLLAPSE_MS, kind: 'collapse', packIndex: pack });

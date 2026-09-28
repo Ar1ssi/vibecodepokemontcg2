@@ -291,3 +291,20 @@ test('a design 051 session without `unboxing` resumes at the end of the scene', 
   assert.equal('openedPacks' in parsed, false);
   assert.deepEqual(parsed.packs, opened.packs);
 });
+
+test('design 055: a session scene is sized to its box, and a scene of another size is refused', () => {
+  const session = freshSession();
+  assert.equal(session.unboxing.cardsPerPack, 10);
+  assert.equal(session.unboxing.packsTorn.length, 4);
+  assert.equal(parseSession(JSON.stringify(session)).unboxing.cardsPerPack, 10);
+  const nine = { ...session, unboxing: createUnboxing({ packCount: 9 }) };
+  assert.equal(parseSession(JSON.stringify(nine)), null);
+  const fiveCard = { ...session, unboxing: createUnboxing({ cardsPerPack: 5 }) };
+  assert.equal(parseSession(JSON.stringify(fiveCard)), null);
+});
+
+test('row 20: a design 052 session saved without `cardsPerPack` resumes with 10', () => {
+  const { cardsPerPack: _cardsPerPack, ...legacyUnboxing } = createUnboxing();
+  const session = { ...freshSession(), unboxing: legacyUnboxing };
+  assert.deepEqual(parseSession(JSON.stringify(session)).unboxing, createUnboxing());
+});

@@ -52,6 +52,13 @@ import {
   unboxingTimeline,
   unboxingVoiceFor,
   wrapTearPose,
+  TRAY_RISE_MS,
+  TRAY_STAGGER_MS,
+  TRAY_TOTAL_MS,
+  coinFlipPose,
+  dicePose,
+  liftLidPose,
+  trayRiseMs,
 } from '../unboxing.mjs';
 
 const box = getBuildBattleBox('phantasmal-flames');
@@ -515,4 +522,123 @@ test('hitFlipPose turns the back away and is edge-on at the midpoint', () => {
   assert.ok(hitFlipPose(0.5).scale > 1);
   assert.equal(hitFlipPose(0.55, { tier: 3 }).flare, 1);
   assert.equal(hitFlipPose(0.55, { tier: 1 }).flare, 0);
+});
+
+// ── Elite Trainer Box sizes and props (design 055) ───────────────────────────
+test('design 055: createUnboxing() is the old Build & Battle state plus cardsPerPack 10', () => {
+  assert.deepEqual(createUnboxing(), {
+    stage: 'sealed',
+    wrapTorn: false,
+    packsTorn: [false, false, false, false],
+    revealed: [0, 0, 0, 0],
+    cardsPerPack: 10,
+  });
+  assert.deepEqual(finishedUnboxing(), {
+    stage: 'done',
+    wrapTorn: true,
+    packsTorn: [true, true, true, true],
+    revealed: [10, 10, 10, 10],
+    cardsPerPack: 10,
+  });
+});
+
+test('row 3b: nine packs of five finish after 9 × 5 reveals, packs strictly in order', () => {
+  const start = createUnboxing({ packCount: 9, cardsPerPack: 5 });
+  assert.equal(start.packsTorn.length, 9);
+  let u = play(toPacks, start);
+  for (let pack = 0; pack < 9; pack += 1) {
+    assert.equal(nextPackToTear(u), pack);
+    u = advanceUnboxing(u, tear(pack));
+    for (let card = 0; card < 5; card += 1) {
+      assert.notEqual(u.stage, 'done', `pack ${pack} card ${card}`);
+      u = advanceUnboxing(u, reveal(pack));
+    }
+    assert.equal(advanceUnboxing(u, reveal(pack)), u, 'no sixth card');
+  }
+  assert.equal(u.stage, 'done');
+  assert.deepEqual(u, finishedUnboxing({ packCount: 9, cardsPerPack: 5 }));
+  assert.deepEqual(
+    advanceUnboxing(start, { type: 'finish' }),
+    finishedUnboxing({ packCount: 9, cardsPerPack: 5 }),
+    'Skip scene keeps the box size'
+  );
+  const midPack = play([...toPacks, tear(0), reveal(0), reveal(0)], start);
+  assert.deepEqual(parseUnboxing(JSON.parse(JSON.stringify(midPack))), midPack);
+  assert.equal(unboxingTimeline(midPack).length, 3, 'three cards left in a five-card pack');
+});
+
+test('row 20: a stored scene without cardsPerPack is a ten-card one; oversize reveals are refused', () => {
+  const { cardsPerPack: _cardsPerPack, ...legacy } = play([...toPacks, tear(0), reveal(0)]);
+  assert.deepEqual(parseUnboxing(legacy), { ...legacy, cardsPerPack: 10 });
+  const fiveCard = createUnboxing({ packCount: 9, cardsPerPack: 5 });
+  const torn = play([...toPacks, tear(0)], fiveCard);
+  assert.equal(parseUnboxing({ ...torn, revealed: [6, 0, 0, 0, 0, 0, 0, 0, 0] }), null);
+  assert.equal(parseUnboxing({ ...fiveCard, cardsPerPack: 0 }), null);
+  assert.equal(parseUnboxing({ ...fiveCard, cardsPerPack: 2.5 }), null);
+  assert.equal(parseUnboxing({ ...fiveCard, packsTorn: [], revealed: [] }), null);
+});
+
+test('liftLidPose rises and tilts, then slides back and fades out', () => {
+  assert.deepEqual(liftLidPose(0), { translateZPx: 0, translateYPx: 0, rotateXDeg: 0, opacity: 1 });
+  const open = liftLidPose(1, { heightPx: 100, depthPx: 50 });
+  assert.equal(open.opacity, 0);
+  assert.ok(Math.abs(open.translateZPx - 60) < 1e-9, 'rises 0.6 × the box height');
+  assert.ok(Math.abs(open.translateYPx + 20) < 1e-9, 'slides back 0.4 × the depth');
+  assert.ok(Math.abs(open.rotateXDeg + 8) < 1e-9);
+  assert.equal(liftLidPose(0.7).opacity, 1, 'the fade starts at t = 0.7');
+  assert.deepEqual(liftLidPose(2), liftLidPose(1));
+});
+
+test('dicePose tumbles seven dice 18 px out onto faces reproducible per seed', () => {
+  for (let index = 0; index < 7; index += 1) {
+    assert.deepEqual(dicePose(0, index, 42), {
+      translateXPx: 0,
+      translateYPx: 0,
+      rotateXDeg: 0,
+      rotateYDeg: 0,
+      rotateZDeg: 0,
+    });
+    const end = dicePose(1, index, 42);
+    assert.deepEqual(end, dicePose(1, index, 42));
+    assert.ok(Math.abs(Math.hypot(end.translateXPx, end.translateYPx) - 18) < 1e-9);
+    assert.equal(end.rotateXDeg % 90, 0, 'lands flat on a face');
+    assert.equal(end.rotateYDeg % 90, 0, 'lands flat on a face');
+  }
+  const faces = (seed) => Array.from({ length: 7 }, (_, index) => dicePose(1, index, seed));
+  assert.notDeepEqual(faces(42), faces(43));
+});
+
+test('coinFlipPose turns three times with a 12 px lift and lands flat', () => {
+  assert.deepEqual(coinFlipPose(0), { rotateXDeg: 0, translateYPx: 0 });
+  assert.equal(coinFlipPose(1).rotateXDeg, 1080);
+  assert.ok(Math.abs(coinFlipPose(1).translateYPx) < 1e-9);
+  assert.ok(Math.abs(coinFlipPose(0.5).translateYPx + 12) < 1e-9);
+});
+
+test('trayRiseMs staggers the ETB tray; the Build & Battle total is unchanged', () => {
+  assert.equal(TRAY_TOTAL_MS, TRAY_RISE_MS + 6 * TRAY_STAGGER_MS);
+  assert.equal(trayRiseMs(16), TRAY_RISE_MS + 15 * TRAY_STAGGER_MS);
+  for (let index = 0; index < 16; index += 1) {
+    assert.deepEqual(trayRisePose(1, index, 16), { translateYPx: 0, opacity: 1 });
+  }
+  assert.deepEqual(trayRisePose(0.5, 3), trayRisePose(0.5, 3, 7));
+});
+
+test('packSpreadSlot fits nine packs to the stage width; the number form is unchanged', () => {
+  const slot = packSpreadSlot(8, 4, { spacingPx: 220, availableWidthPx: 900 }, 9);
+  assert.ok(Math.abs(slot.xPx) <= 450, `x ${slot.xPx}`);
+  for (let index = 0; index < 9; index += 1) {
+    assert.ok(Math.abs(packSpreadSlot(index, 4, { spacingPx: 220, availableWidthPx: 900 }, 9).xPx) <= 450);
+  }
+  assert.deepEqual(packSpreadSlot(3, 1, { spacingPx: 200 }), packSpreadSlot(3, 1, 200));
+  assert.deepEqual(packSpreadSlot(3, 1, 200, 9), packSpreadSlot(3, 1, 200));
+});
+
+test('the ETB props name voices the palette has', () => {
+  assert.equal(unboxingVoiceFor('dice'), 'unbox-dice');
+  assert.equal(unboxingVoiceFor('coin'), 'unbox-coin');
+  assert.equal(unboxingVoiceFor('sleeves'), 'unbox-unwrap');
+  for (const event of ['dice', 'coin', 'sleeves']) {
+    assert.ok(voicesFor(unboxingVoiceFor(event)).length >= 1, event);
+  }
 });

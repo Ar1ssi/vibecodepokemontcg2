@@ -1,5 +1,5 @@
 # 055: Elite Trainer Box simulation (shelf, ETB unboxing, collection)
-Status: draft (plan only — nothing built) · depends on designs 051/052 (on main) and on design 054
+Status: building — slice 1 ✅ (pure model, S332); slices 2–6 open · depends on designs 051/052 (on main) and on design 054
 (the other Build & Battle boxes plan, thread "Plan other Build & Battle boxes": pack-model registry,
 boosted 30th Celebration pull rates, per-set baking). 054 is that thread's number; renumber this file
 at merge if the two collide.
@@ -335,26 +335,26 @@ Sounds: `unbox-dice` (three noise clicks 40 ms, bandpass 2.4 kHz, gain .2, delay
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | empty collection / no ETB opened | Collection tab shows the empty line; no owned badges anywhere; pickers unchanged | [ ] collection.test row 1; browser run |
-| 2 | malformed collection or session JSON (wrong version, count 10000, id 200 chars, unknown energy label, `revealed[i] > cardsPerPack`) | `parseCollection`/`parseEtbSession` return null → fresh collection / no resume; nothing thrown | [ ] collection.test row 2, etb-session.test row 2 |
-| 3 | boundaries: 0 products, 500 products (+1 drops the oldest, counts kept), pack of 5 cards (30th), 11 packs (PC row, catalog-only) | as stated; `cardsPerPack` 5 finishes at 5 reveals | [ ] collection.test row 3, unboxing.test row 3b |
-| 4 | *Open* pressed twice / two tabs open the same seed | the button disables on first press; the second tab re-reads storage before writing, so both openings are in the collection (two products) | [ ] etb.test: `withFreshCollection` merge; browser: double click → one session |
-| 5 | storage throws on save (collection or session) | memory-only banner on Shelf and Collection; the scene plays; a reload loses the box | [ ] etb-session.test row 5 (`saveEtbSession` false); banner text asserted |
+| 1 | empty collection / no ETB opened | Collection tab shows the empty line; no owned badges anywhere; pickers unchanged | [x] collection.test row 1 (slice 1); [ ] browser run |
+| 2 | malformed collection or session JSON (wrong version, count 10000, id 200 chars, unknown energy label, `revealed[i] > cardsPerPack`) | `parseCollection`/`parseEtbSession` return null → fresh collection / no resume; nothing thrown | [x] collection.test row 2, etb-session.test row 2 |
+| 3 | boundaries: 0 products, 500 products (+1 drops the oldest, counts kept), pack of 5 cards (30th), 11 packs (PC row, catalog-only) | as stated; `cardsPerPack` 5 finishes at 5 reveals | [x] collection.test row 3, unboxing.test row 3b |
+| 4 | *Open* pressed twice / two tabs open the same seed | the button disables on first press; the second tab re-reads storage before writing, so both openings are in the collection (two products) | [x] collection.test rows 4 + 5: `withFreshCollection` merge; [ ] browser: double click → one session |
+| 5 | storage throws on save (collection or session) | memory-only banner on Shelf and Collection; the scene plays; a reload loses the box | [x] etb-session.test row 5 (`saveEtbSession` false); [ ] banner text asserted (slice 3) |
 | 6 | reload mid-scene (sealed / lid off / promo shown / pack 5 with 3 revealed / done) | resumes settled at that state (052 row 4); done → Shelf, session cleared | [ ] rec-etb pass 1 reload probe |
-| 7 | `packModelFor(setId)` null (row for an unbaked set) | `availableEtbs` hides the row; `openEtb` throws; catalog test asserts every shipped row resolves | [ ] etb-catalog.test row 7 |
-| 8 | promo / sleeve / coin id not in its catalog | catalog test fails (ids pinned); at runtime a missing sleeve or coin shows the prop without art and still adds the id | [ ] etb-catalog.test row 8 |
+| 7 | `packModelFor(setId)` null (row for an unbaked set) | `availableEtbs` hides the row; `openEtb` throws; catalog test asserts every shipped row resolves | [x] etb-catalog.test row 7, etb-opening.test row 7 |
+| 8 | promo / sleeve / coin id not in its catalog | catalog test fails (ids pinned); at runtime a missing sleeve or coin shows the prop without art and still adds the id | [x] etb-catalog.test row 8 |
 | 9 | product art missing (`productArt` null) or face texture 404 | procedural faces; scene continues | [ ] browser run with textures routed to 404 |
 | 10 | promo art 404 (TCGdex and Limitless) | card back with the name (052 row 10) | [ ] rec-etb with card hosts routed to 404 |
 | 11 | Reset collection while a scene is open | collection emptied (the open box's cards included: confirm text says so); the scene continues; the done summary still reads what the box held | [ ] browser run |
 | 12 | deck count above owned count | amber badge, Play unaffected | [ ] collection view test; browser run |
 | 13 | B&B window and the game tab | no Shelf/Collection tabs, no collection reads or writes (`grep` of the B&B controller stays free of `collection.mjs`) | [ ] index.ejs conditional; test: B&B window markup has no `#etbTabShelf` |
 | 14 | reduced motion / `fx-off` / keyboard only / phone 390 px | as 052 rows 1, 2, 15, 16; nine packs wrap, no horizontal scroll | [ ] rec-etb pass 3 |
-| 15 | pool integrity | every pack id in the summary equals `session.packs`; `collection.cards` equals the multiset of `packs` + promo after one opening; the scene never writes the collection | [ ] rec-etb pass 1 probe; collection.test row 15 |
+| 15 | pool integrity | every pack id in the summary equals `session.packs`; `collection.cards` equals the multiset of `packs` + promo after one opening; the scene never writes the collection | [x] collection.test row 15; [ ] rec-etb pass 1 probe |
 | 16 | hits face down until tapped; face never shown before the flip midpoint | 052 row 14 (`backface-visibility`) | [ ] rec-etb probe |
 | 17 | Skip scene from sealed | collection already holds the box; Shelf returns; one `unbox-done` voice | [ ] unboxing.test row 17 (existing) + browser |
-| 18 | seed reproducibility | `openEtb` with seed 42 twice → identical packs; seeds 42 vs 43 differ; `openBox(42)` output unchanged by this design | [ ] etb-opening.test row 18 |
+| 18 | seed reproducibility | `openEtb` with seed 42 twice → identical packs; seeds 42 vs 43 differ; `openBox(42)` output unchanged by this design | [x] etb-opening.test row 18 |
 | 19 | unknown `?etb=` key | Shelf ignores it (no prefill, no open) | [ ] etb view test |
-| 20 | existing B&B sessions saved before this design (no `cardsPerPack`) | `parseUnboxing` fills 10; B&B tests unchanged | [ ] unboxing.test row 20 |
+| 20 | existing B&B sessions saved before this design (no `cardsPerPack`) | `parseUnboxing` fills 10; B&B tests unchanged | [x] unboxing.test row 20, build-battle-session.test row 20 |
 
 ## Test plan
 Unit (`core/elite-trainer-box/__tests__/`): `etb-catalog.test.mjs` (rows 7, 8; energy sums to 40;
@@ -388,7 +388,7 @@ Judgment ends above this line. Each slice is a pinned contract: a builder at low
 without choosing anything.
 | Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
 |---|---|---|---|---|---|
-| 1 Pure model | create `core/elite-trainer-box/{etb-catalog,etb-opening,collection,etb-session}.mjs` + `__tests__/{etb-catalog,etb-opening,collection,etb-session}.test.mjs`; modify `core/build-battle/box-catalog.mjs` (`PACK_MODELS`, `packModelFor`), `pack-opening.mjs` (export `comparePoolEntries`), `unboxing.mjs` (§ Reducer sizes: `cardsPerPack`, `liftLidPose`, `dicePose`, `coinFlipPose`, `packSpreadSlot` count/width, `trayRiseMs`, voices), `__tests__/unboxing.test.mjs`, `build-battle-session.test.mjs` (states carry `cardsPerPack: 10`), `mat-fx/fx-audio.mjs` (+`unbox-dice`, `unbox-coin`) and its test | § Data, § Opening, § Collection, § Session, § Reducer sizes verbatim; `etbContents(etb, promos = {})` takes the promo rows as an argument, so nothing in this slice imports `ETB_PROMOS` (slice 2 writes it; the DOM passes it in slice 3); the catalog test checks `promoId` matches `/^mep-\d{3}$/` and slice 2 adds the `ETB_PROMOS[key].id === promoId` assertion | rows 1–5, 7, 8, 15, 18, 20; `createUnboxing({packCount: 9, cardsPerPack: 5})` → `packsTorn.length 9`, done after 9 × 5 reveals; `createUnboxing()` deep-equals the old state plus `cardsPerPack: 10`; `packSpreadSlot(8, 4, {spacingPx: 220, availableWidthPx: 900}, 9).xPx` within ±450 | Charcadet MEP 022 = Phantasmal Flames ETB promo (Bulbapedia "Charcadet (Phantasmal Flames 19)", PokeBeach set guide); contents per § ETB reference [3][4] | `node --test` on the new and changed tests; `pnpm test:changed` |
+| 1 Pure model ✅ | create `core/elite-trainer-box/{etb-catalog,etb-opening,collection,etb-session}.mjs` + `__tests__/{etb-catalog,etb-opening,collection,etb-session}.test.mjs`; modify `core/build-battle/box-catalog.mjs` (`PACK_MODELS`, `packModelFor`), `pack-opening.mjs` (export `comparePoolEntries`), `unboxing.mjs` (§ Reducer sizes: `cardsPerPack`, `liftLidPose`, `dicePose`, `coinFlipPose`, `packSpreadSlot` count/width, `trayRiseMs`, voices), `__tests__/unboxing.test.mjs`, `build-battle-session.test.mjs` (states carry `cardsPerPack: 10`), `mat-fx/fx-audio.mjs` (+`unbox-dice`, `unbox-coin`) and its test | § Data, § Opening, § Collection, § Session, § Reducer sizes verbatim; `etbContents(etb, promos = {})` takes the promo rows as an argument, so nothing in this slice imports `ETB_PROMOS` (slice 2 writes it; the DOM passes it in slice 3); the catalog test checks `promoId` matches `/^mep-\d{3}$/` and slice 2 adds the `ETB_PROMOS[key].id === promoId` assertion | rows 1–5, 7, 8, 15, 18, 20; `createUnboxing({packCount: 9, cardsPerPack: 5})` → `packsTorn.length 9`, done after 9 × 5 reveals; `createUnboxing()` deep-equals the old state plus `cardsPerPack: 10`; `packSpreadSlot(8, 4, {spacingPx: 220, availableWidthPx: 900}, 9).xPx` within ±450 | Charcadet MEP 022 = Phantasmal Flames ETB promo (Bulbapedia "Charcadet (Phantasmal Flames 19)", PokeBeach set guide); contents per § ETB reference [3][4] | `node --test` on the new and changed tests; `pnpm test:changed` |
 | 2 Data | modify `scripts/generate-build-battle-box.mjs` (`ETB_PROMO_SOURCES`, `ETB_PROMOS` export, `--check` covers it), `build-battle.generated.mjs` (regenerated on a networked machine: TCGdex is blocked in the cloud sandbox), `scripts/__tests__/build-battle-box-live.test.mjs` (`--check` still passes), `core/build-battle/box-textures.mjs` (`PRODUCT_ART`, `productArt`; old exports kept), `__tests__/box-textures.test.mjs` (create), `sidebox/native-deck-builder-unboxing.js` (reads `product` instead of the constants; B&B passes `productArt('phantasmal-flames')`) | § Data "Generated data", § Product art verbatim | `ETB_PROMOS['phantasmal-flames-etb']` → `{ id: 'mep-022', name: 'Charcadet', supertype: 'Pokémon', rarity: 'Illustration rare', qty: 1, image: https… }`; `productArt('phantasmal-flames')` → the pre-slice constants; `productArt('nope')` → null; B&B recorder `rec-unboxing.mjs` passes unchanged | TCGdex `mep-022` name "Charcadet" (generator name check); rarity string as TCGdex returns it, verified at bake | `pnpm test:changed`; `node scripts/generate-build-battle-box.mjs --check` on the networked machine |
 | 3 Shelf + Collection | create `sidebox/native-deck-builder-etb.js`, `sidebox/native-deck-builder-stage.js`, `css/deck-builder-etb.css`, `core/elite-trainer-box/etb-view.mjs` + `__tests__/etb-view.test.mjs` (shelf line text, badge text, amber rule, `?etb=` parse); modify `client/index.ejs` (tabs + panels under `isBuilderWindow && !isBuildBattle`), `native-deck-builder.js` (`switchMode` shelf/collection, mount, `getOwned` plumbing), `native-deck-builder-build-battle.js` (uses `createStage`; behavior identical), `css/__tests__/fx-kill-switch-css.test.mjs` (+ the new sheet), `server/__tests__/builder-window-markup.test.mjs` (create, § Test plan row 13) | § Standard builder integration: ids `#etbTabShelf`, `#etbTabCollection`, `#etbShelfPanel`, `#etbCollectionPanel`, `#etbOpen-<key>`; `initializeEliteTrainerBox` signature; scene mounted with `product`, `contents`, `packModel`, `onFinish`; nine packs play through the **existing** spread/pocket/summary (slice 4 restyles; here the lid still uses `lidPose` and the tray shows only promo + packs) | rows 4, 6, 11–13, 17, 19; view test: `shelfLine(etb)` → "9 packs · Charcadet promo · 65 sleeves · 40 Energy · dice · coin"; `ownedBadge(3, 4)` → "3 owned · 4 in deck" with `over: true` | — | lint clean; `pnpm test:changed`; browser: open seed 42, skip, Collection shows 91 cards |
 | 4 Scene (fx-designer) | modify `sidebox/native-deck-builder-unboxing.js` (lift lid host + rim, ETB tray order and props, nine-pack spread via `packSpreadSlot(..., count)`, prop interactions, done summary/controls, `unbox-dice`/`unbox-coin` calls), `css/deck-builder-etb.css`, `css/deck-builder-unboxing.css` (procedural ETB faces from § Product art, `[data-lid="lift"]`), `box-textures.mjs` (texture quads only when `refs/055-etb-*.webp` exist; else untouched) | § Scene beats 1–7 and § Product art procedural faces verbatim; every prop a `button`; timings `LID_LIFT_MS 640`, `DICE_MS 520`, `COIN_FLIP_MS 700` | rows 9, 10, 14, 16; strips at wrap/lid/tray/promo/dice/coin/spread/cut/hit/summary; 390 px: `scrollWidth === 390` | — | lint clean; kill-switch test; strips reviewed against 052's look; user check on localhost |
@@ -399,6 +399,24 @@ Order: 1 → 2 → 3 → 4 → 5 → 6. Slice 4 can run in parallel with 5 after
 slice 1 or 2, those slices rebase onto its `packModelFor` / `productArt` and keep only what is missing.
 
 ## Deviations (Builder appends here during build)
+Slice 1 (S332, branch `claude/keen-shannon-i8h98o`; 054 had not landed, so this slice defines
+`PACK_MODELS`/`packModelFor` as written here):
+- `liftLidPose(t, { heightPx = 76, depthPx = 36 } = {})`: the rise (0.6 × height) and slide
+  (0.4 × depth) need the box's pixel size, so they are options; the pinned `t`-only call still works.
+- `trayRisePose(t, index, itemCount = TRAY_ITEM_COUNT)`: a 16-item ETB tray cannot rise inside the
+  7-item `TRAY_TOTAL_MS`; the third argument times it by `trayRiseMs(itemCount)`. B&B calls unchanged.
+- `packSpreadSlot`: the focused pack keeps `spacingPx` for its half-width; only the side packs step by
+  `min(spacingPx, availableWidthPx / (count - 1))`. With `focus = 4` all nine slots stay within
+  ±450 px at 900 px; with `focus = 0` the ninth pack sits at ≈ 692 px, so slice 4 must centre the
+  spread on the queue (or pass a narrower width) rather than on the focused pack.
+- `parseUnboxing` bounds a stored scene to 1–36 packs and 1–20 cards a pack.
+- The B&B `createSession`/`parseSession` size the scene from the box (`packCount`,
+  `packModel.size`) and refuse a stored scene of another size: the old fixed `PACK_COUNT` check
+  enforced this before the reducer was generalized.
+- `dicePose`: face, direction jitter and resting spin come from one `seed ^ 0x5bd1e995` stream,
+  three draws per die in index order; end rotations are whole quarter turns plus two tumbles.
+- `parseCollection`: counts must be 1–9999 (a stored 0 is refused; `addProduct` never writes one);
+  `sleeves`/`coins` are capped at 500 ids each.
 
 ## Sources
 1. Bulbapedia, "Elite Trainer Box (TCG)" — per-era packs, sleeves, Energy, dividers, markers, first

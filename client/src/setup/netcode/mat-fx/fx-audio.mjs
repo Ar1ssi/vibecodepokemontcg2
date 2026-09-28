@@ -138,6 +138,11 @@ const STATIC_VOICES = Object.freeze({
     tone(262, 1.2, 0.18, { wave: 'sawtooth', attack: 0.8 }),
   ]),
   'unbox-done': [tone(392, 0.26, 0.25, { wave: 'triangle', freqTo: 523 })],
+  // Design 055: the Elite Trainer Box props — dice clattering out of the pouch, the coin's ring.
+  'unbox-dice': [0, 0.07, 0.15].map((delay) =>
+    noise(0.04, 0.2, { type: 'bandpass', freq: 2400, q: 0.9 }, { delay })
+  ),
+  'unbox-coin': [tone(2600, 0.32, 0.18, { wave: 'sine', freqTo: 2200 })],
 });
 
 // ── Per-condition status motifs ────────────────────────────────────────────

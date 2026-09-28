@@ -28,6 +28,14 @@ export const ME_PACK_MODEL = Object.freeze({
   ],
 });
 
+/** The pack each baked set's boosters roll, keyed by set id (the seam design 054 fills). */
+export const PACK_MODELS = Object.freeze({ me02: ME_PACK_MODEL });
+
+/** @returns {object|null} the pack model for `setId`, or null for a set with none. */
+export function packModelFor(setId) {
+  return Object.hasOwn(PACK_MODELS, setId) ? PACK_MODELS[setId] : null;
+}
+
 export const BUILD_BATTLE_BOXES = [
   {
     key: 'phantasmal-flames',
