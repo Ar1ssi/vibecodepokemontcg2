@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
-import { applyCommand } from '../reduce.mjs';
+import { applyCommand, attackExtrasFor } from '../reduce.mjs';
 import { hasCondition } from '../rules/special-conditions.mjs';
 
 function setupGame() {
@@ -802,6 +802,140 @@ test("ability: Metamorphosis Gene borrows the opponent's Active attack", () => {
   const res = attackCmd(state, 0, rng);
   assert.equal(res.error, null);
   assert.equal(res.state.players.p2.zones.active[0].damage, 30);
+});
+
+// Design 049: Memory Helix rulings (PokeGym 30th Celebration FAQ, 2026-09-15) and the
+// attack list the client panel indexes. Mew ex: corpus 30th Celebration 066.
+const helixMew = (state, extra = {}) =>
+  holder(state, MEMORY_HELIX, {
+    name: 'Mew ex',
+    attacks: [{ name: 'Teleportation Burst', cost: ['Psychic'], damage: '30', text: '' }],
+    ...extra,
+  });
+const extraNames = (state, instanceId) =>
+  attackExtrasFor(state, state.players.p1.zones.active.find((c) => c.instanceId === instanceId) || { instanceId }).map(
+    (a) => a.name
+  );
+
+test('ability: Memory Helix extras list only Bench attacks; printed names win a clash', () => {
+  const { state } = setupGame();
+  helixMew(state);
+  assert.deepEqual(extraNames(state, 70), [], 'empty Bench, no extras');
+  state.players.p1.zones.bench.push(
+    mon(72, 'Benched', {
+      attacks: [
+        { name: 'Teleportation Burst', cost: [], damage: '99', text: '' },
+        { name: 'Big Hit', cost: [], damage: '70', text: '' },
+      ],
+    })
+  );
+  assert.deepEqual(extraNames(state, 70), ['Big Hit']);
+});
+
+test('ability: a second Memory Helix Mew on the Bench lends its printed attack once, and gets no extras', () => {
+  const { state } = setupGame();
+  helixMew(state);
+  state.players.p1.zones.bench.push(
+    mon(73, 'Mew ex', {
+      abilities: [{ name: 'Memory Helix', type: 'Ability', text: MEMORY_HELIX }],
+      attacks: [{ name: 'Mind Wave', cost: [], damage: '40', text: '' }],
+    }),
+    mon(74, 'Benched', { attacks: [{ name: 'Big Hit', cost: [], damage: '70', text: '' }] })
+  );
+  assert.deepEqual(extraNames(state, 70), ['Mind Wave', 'Big Hit']);
+  assert.deepEqual(attackExtrasFor(state, state.players.p1.zones.bench[0]), [], 'the Bench cannot attack');
+});
+
+test("ability: Memory Helix under the opponent's Iron Thorns ex Initialization lends nothing", () => {
+  const { state } = setupGame();
+  helixMew(state);
+  state.players.p1.zones.bench.push(mon(72, 'Benched', { attacks: [{ name: 'Big Hit', cost: [], damage: '70', text: '' }] }));
+  // Iron Thorns ex Initialization (corpus Prismatic Evolutions 032).
+  state.players.p2.zones.active[0] = mon(71, 'Iron Thorns ex', {
+    abilities: [
+      {
+        name: 'Initialization',
+        type: 'Ability',
+        text: "As long as this Pokémon is in the Active Spot, Pokémon with a Rule Box in play (both yours and your opponent's) have no Abilities, except for Future Pokémon. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)",
+      },
+    ],
+  });
+  assert.deepEqual(extraNames(state, 70), []);
+});
+
+test('ability: Memory Helix cannot use a VSTAR Power attack after the VSTAR Power is spent (App. 9)', () => {
+  const { state, rng } = setupGame();
+  helixMew(state);
+  // Zacian VSTAR Sword Star (corpus Crown Zenith 096).
+  state.players.p1.zones.bench.push(
+    mon(72, 'Zacian VSTAR', {
+      attacks: [
+        {
+          name: 'Sword Star',
+          cost: [],
+          damage: '310',
+          text: "This Pokémon also does 30 damage to itself. (You can't use more than 1 VSTAR Power in a game.)",
+        },
+      ],
+    })
+  );
+  state.players.p1.oncePerGame = { vstarUsed: true, gxUsed: false };
+  assert.equal(attackCmd(state, 1, rng).error, 'VSTAR Power already used this game.');
+});
+
+test("ability: Memory Helix Mega Brave keeps its name, so next turn Mew ex can't use Mega Brave", () => {
+  const { state, rng } = setupGame();
+  helixMew(state);
+  state.players.p1.zones.active.push(basicEnergy(80, 'Fighting', 70), basicEnergy(81, 'Fighting', 70));
+  // Mega Lucario ex Mega Brave (corpus Mega Evolution Promos 033).
+  state.players.p1.zones.bench.push(
+    mon(72, 'Mega Lucario ex', {
+      hp: 340,
+      attacks: [
+        {
+          name: 'Mega Brave',
+          cost: ['Fighting', 'Fighting'],
+          damage: '270',
+          text: "During your next turn, this Pokémon can't use Mega Brave.",
+        },
+      ],
+    })
+  );
+  state.players.p2.zones.active[0].hp = 400;
+  state.players.p2.zones.deck.push(card(120), card(121));
+  const first = attackCmd(state, 1, rng);
+  assert.equal(first.error, null);
+  const next = structuredClone(first.state);
+  next.turn = { player: 'p1', number: 4, phase: 'main' };
+  next.players.p1.flags = { abilitiesUsed: {} };
+  assert.match(attackCmd(next, 1, rng).error || '', /can't use mega brave/i);
+});
+
+test("ability: Memory Helix uses Slaking ex Great Swing although Born to Slack would stop Slaking", () => {
+  const { state, rng } = setupGame();
+  helixMew(state);
+  state.players.p1.zones.active.push(basicEnergy(80, 'Psychic', 70), basicEnergy(81, 'Psychic', 70));
+  // Slaking ex (corpus Surging Sparks 227); the opponent has no Pokémon ex or V.
+  state.players.p1.zones.bench.push(
+    mon(72, 'Slaking ex', {
+      hp: 340,
+      abilities: [
+        {
+          name: 'Born to Slack',
+          type: 'Ability',
+          text: "If your opponent has no Pokémon ex or Pokémon V in play, this Pokémon can't attack.",
+        },
+      ],
+      attacks: [{ name: 'Great Swing', cost: ['Colorless', 'Colorless'], damage: '280', text: 'Discard an Energy from this Pokémon.' }],
+    })
+  );
+  state.players.p2.zones.active[0].hp = 400;
+  state.players.p2.zones.deck.push(card(120));
+  const res = attackCmd(state, 1, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.state.players.p2.zones.active[0].damage, 280);
+  const energyLeft = res.state.players.p1.zones.active.filter((c) => c.attachedTo === 70).length;
+  assert.equal(energyLeft, 1, 'Great Swing discards 1 Energy from Mew ex');
 });
 
 // ── coin-flip control ───────────────────────────────────────────────────

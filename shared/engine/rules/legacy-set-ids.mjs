@@ -131,6 +131,8 @@ export const MODERN_SET_CODE_TO_TCGDEX_ID = {
   MEG: 'me01',
   PFL: 'me02',
   ASC: 'me02.5',
+  // 30th Celebration (Limitless set code 30C); TCGdex numbers are 3-digit (30th-066).
+  '30C': '30th',
   POR: 'me03',
   CRI: 'me04',
   PBL: 'me05',
@@ -244,7 +246,7 @@ export function buildPreferredCardId(setCode, number) {
   const candidates = buildSetCardIdCandidates(setCode, number);
   if (!candidates.length) return null;
   const setId = resolveTcgdexSetId(setCode);
-  if (setId && /^(me|sv)/.test(setId)) {
+  if (setId && /^(me|sv|30th)/.test(setId)) {
     const padded = candidates.find((c) => {
       const local = c.slice(String(setId).length + 1);
       return /^\d{3}[a-zA-Z]?$/.test(local);

@@ -39,6 +39,12 @@ test('modern table maps Pitch Black (PBL) to me05', () => {
   assert.equal(resolveTcgdexSetId('PBL'), 'me05');
 });
 
+test('buildPreferredCardId resolves 30th Celebration (30C) to 3-digit TCGdex ids', () => {
+  // Mew ex, TCGdex 30th-066.
+  assert.equal(MODERN_SET_CODE_TO_TCGDEX_ID['30C'], '30th');
+  assert.equal(buildPreferredCardId('30C', '66'), '30th-066');
+});
+
 test('buildPreferredCardId pads modern ME/SV collector numbers', () => {
   assert.equal(buildPreferredCardId('PBL', '18'), 'me05-018');
   assert.equal(buildPreferredCardId('PFL', '24'), 'me02-024');

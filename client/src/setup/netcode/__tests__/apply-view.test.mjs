@@ -13,6 +13,7 @@ import {
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
   getAuthoritativeStadiumArray,
+  getAuthoritativeAttackExtras,
   repositionCardOverlays,
 } from '../apply-view.js';
 
@@ -1572,6 +1573,37 @@ test('I24: hasAuthoritativeView/getAuthoritativeZoneArray/getAuthoritativeStadiu
   assert.deepEqual(getAuthoritativeStadiumArray(), []);
 });
 
+test('design 049: getAuthoritativeAttackExtras reads the owner list, null when the view has none', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  resetRenderState();
+  assert.equal(getAuthoritativeAttackExtras(1), null, 'no view yet');
+
+  const greatSwing = { name: 'Great Swing', cost: ['Colorless', 'Colorless'], damage: '280', copiedFrom: 'Slaking ex' };
+  applyView(
+    {
+      stateVersion: 1,
+      you: { playerId: 'p1', zones: { active: [{ instanceId: 1, name: 'Mew ex' }], hand: [] }, attackExtras: { 1: [greatSwing] } },
+      them: { playerId: 'p2', zones: { active: [], hand: [] } },
+    },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  assert.deepEqual(getAuthoritativeAttackExtras(1), [greatSwing]);
+  assert.equal(getAuthoritativeAttackExtras(2), null, 'no list for this Pokémon');
+
+  // An older server (or legacy mode) sends no attackExtras: the inspector falls back to Stadium extras.
+  applyView(
+    {
+      stateVersion: 2,
+      you: { playerId: 'p1', zones: { active: [{ instanceId: 1, name: 'Mew ex' }], hand: [] } },
+      them: { playerId: 'p2', zones: { active: [], hand: [] } },
+    },
+    [],
+    { document: doc, getZone: mockGetZone }
+  );
+  assert.equal(getAuthoritativeAttackExtras(1), null);
+  resetRenderState();
+});
 
 // Design 002 slice 3.12: the flip gate found that nothing applied view.turn — the server
 // advanced its own turn while the client's rulesState.turnPlayer stayed frozen, so the

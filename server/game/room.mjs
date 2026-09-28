@@ -10,7 +10,7 @@ import {
 } from '../../shared/engine/state.mjs';
 import { createRng } from '../../shared/engine/rng.mjs';
 import { deckPeekFor, viewFor } from '../../shared/engine/view.mjs';
-import { applyCommand } from '../../shared/engine/reduce.mjs';
+import { applyCommand, attackExtrasFor } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
 import {
   flipCoinFace,
@@ -272,7 +272,7 @@ export class GameRoom {
           success: true,
           dedupe: true,
           stateVersion: this.state.stateVersion,
-          view: viewFor(this.state, playerId),
+          view: viewFor(this.state, playerId, { attackExtrasFor }),
           clientSeq: cmd.clientSeq,
           lastClientSeq: lastSeq,
         };
@@ -308,7 +308,7 @@ export class GameRoom {
       broadcasts.push({
         socketId: sockId,
         playerId: pId,
-        view: viewFor(this.state, pId),
+        view: viewFor(this.state, pId, { attackExtrasFor }),
         lastClientSeq: this.clientSeqByPlayer.get(pId) ?? 0,
       });
     }
@@ -316,7 +316,7 @@ export class GameRoom {
       broadcasts.push({
         socketId: sSockId,
         playerId: null,
-        view: viewFor(this.state, null),
+        view: viewFor(this.state, null, { attackExtrasFor }),
         lastClientSeq: 0,
       });
     }
@@ -339,7 +339,7 @@ export class GameRoom {
    * @returns {object}
    */
   getView(playerId) {
-    return viewFor(this.state, playerId);
+    return viewFor(this.state, playerId, { attackExtrasFor });
   }
 
   /**
@@ -350,7 +350,7 @@ export class GameRoom {
    */
   getViewForSocket(socketId) {
     const playerId = this.socketToPlayer.get(socketId) || null;
-    return viewFor(this.state, playerId);
+    return viewFor(this.state, playerId, { attackExtrasFor });
   }
 
   /**

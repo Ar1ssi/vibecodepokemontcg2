@@ -357,3 +357,79 @@ test('attack: Haughty Order reveals 10, may copy, and shuffles the deck either w
   // 13 cards, 1 drawn at the start of p2's turn; none left the deck to the copy.
   assert.equal(zone(declined, 'p2', 'deck').length + zone(declined, 'p2', 'hand').length, 13);
 });
+
+// ── once-per-game allowances and name locks (design 049) ────────────────────
+
+// Zacian VSTAR Sword Star (corpus Crown Zenith 096).
+const SWORD_STAR = {
+  name: 'Sword Star',
+  damage: '310',
+  text: "This Pokémon also does 30 damage to itself. (You can't use more than 1 VSTAR Power in a game.)",
+};
+
+test('attack: Genome Hacking skips a GX attack once the copier spent its GX attack (App. 19)', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [{ name: 'Tackle-GX', damage: '100' }, { name: 'Slam', damage: '30' }],
+    setup: ({ p1 }) => {
+      p1.oncePerGame = { vstarUsed: false, gxUsed: true };
+    },
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Slam']);
+});
+
+test('attack: Genome Hacking skips a VSTAR Power attack once the copier spent its VSTAR Power (ruling 2023-12-14)', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [SWORD_STAR, { name: 'Lost Impact', damage: '280' }],
+    setup: ({ p1 }) => {
+      p1.oncePerGame = { vstarUsed: true, gxUsed: false };
+    },
+  });
+  assert.deepEqual(optionNames(attack(b)), ['Defender: Lost Impact']);
+});
+
+test("attack: Genome Hacking may copy a VSTAR Power attack the opponent already spent, and spends the copier's", () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [SWORD_STAR],
+    setup: ({ p2 }) => {
+      p2.oncePerGame = { vstarUsed: true, gxUsed: false };
+    },
+  });
+  const res = choose(attack(b), [1], b.rng);
+  assert.equal(cardNamed(res, 'p2', 'Defender').damage, 310);
+  assert.equal(res.state.players.p1.oncePerGame.vstarUsed, true);
+  assert.ok(res.events.some((e) => e.type === 'vstarUsed' && e.attackName === 'Sword Star'));
+});
+
+test('attack: Genome Hacking with every candidate spent does only its own text', () => {
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [SWORD_STAR, { name: 'Tackle-GX', damage: '100' }],
+    setup: ({ p1 }) => {
+      p1.oncePerGame = { vstarUsed: true, gxUsed: true };
+    },
+  });
+  const res = attack(b);
+  assert.equal(res.state.pendingChoice, null);
+  assert.ok(res.events.some((e) => e.type === 'attackCopyNothing'));
+  turnPassed(res);
+});
+
+test('attack: after Genome Hacking copies Mega Brave, Genome Hacking stays usable next turn (ruling 2025-01-09)', () => {
+  // Mega Lucario ex Mega Brave (corpus Mega Evolution Promos 033).
+  const b = board(GENOME_HACKING, {
+    defenderAttacks: [
+      {
+        name: 'Mega Brave',
+        damage: '270',
+        cost: ['Fighting', 'Fighting'],
+        text: "During your next turn, this Pokémon can't use Mega Brave.",
+      },
+    ],
+  });
+  const res = choose(attack(b), [1], b.rng);
+  assert.equal(cardNamed(res, 'p1', 'Copier').cannotAttackAttackName, 'mega brave', 'the copied lock lands');
+  const state = structuredClone(res.state);
+  state.turn = { player: 'p1', number: 5, phase: 'main' };
+  state.players.p1.flags = {};
+  const again = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, b.rng);
+  assert.equal(again.error, null);
+});
