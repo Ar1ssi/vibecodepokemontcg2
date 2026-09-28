@@ -5,6 +5,7 @@ import {
   isStackableCard,
   getCardStackOffset,
   computeHandStacks,
+  getPrintingKey,
 } from '../hand-stack.mjs';
 
 test('isStackableCard: validates stackable criteria', () => {
@@ -42,9 +43,9 @@ test('computeHandStacks: empty or null input', () => {
 
 test('computeHandStacks: hand with all unique cards', () => {
   const cards = [
-    { id: 1, name: 'Rare Candy' },
-    { id: 2, name: 'Ultra Ball' },
-    { id: 3, name: 'Nest Ball' },
+    { uid: 1, name: 'Rare Candy' },
+    { uid: 2, name: 'Ultra Ball' },
+    { uid: 3, name: 'Nest Ball' },
   ];
 
   const stacks = computeHandStacks(cards);
@@ -66,8 +67,8 @@ test('computeHandStacks: hand with all unique cards', () => {
 });
 
 test('computeHandStacks: 2 duplicate cards (just like screenshot)', () => {
-  const cardA = { id: 101, name: 'Rare Candy' };
-  const cardB = { id: 102, name: 'Rare Candy' };
+  const cardA = { uid: 101, name: 'Rare Candy' };
+  const cardB = { uid: 102, name: 'Rare Candy' };
   const cards = [cardA, cardB];
 
   const stacks = computeHandStacks(cards);
@@ -95,10 +96,10 @@ test('computeHandStacks: 2 duplicate cards (just like screenshot)', () => {
 });
 
 test('computeHandStacks: 3 and 4 duplicate copies step upwards', () => {
-  const c1 = { id: 1, name: 'Water Energy' };
-  const c2 = { id: 2, name: 'Water Energy' };
-  const c3 = { id: 3, name: 'Water Energy' };
-  const c4 = { id: 4, name: 'Water Energy' };
+  const c1 = { uid: 1, name: 'Water Energy' };
+  const c2 = { uid: 2, name: 'Water Energy' };
+  const c3 = { uid: 3, name: 'Water Energy' };
+  const c4 = { uid: 4, name: 'Water Energy' };
 
   const stacks = computeHandStacks([c1, c2, c3, c4]);
   assert.equal(stacks.length, 1);
@@ -122,12 +123,12 @@ test('computeHandStacks: 3 and 4 duplicate copies step upwards', () => {
 
 test('computeHandStacks: multiple duplicate groups preserve first-seen ordering', () => {
   const cards = [
-    { id: 1, name: 'Rare Candy' },
-    { id: 2, name: 'Ultra Ball' },
-    { id: 3, name: 'Rare Candy' },
-    { id: 4, name: "Professor's Research" },
-    { id: 5, name: 'Ultra Ball' },
-    { id: 6, name: 'Rare Candy' },
+    { uid: 1, name: 'Rare Candy' },
+    { uid: 2, name: 'Ultra Ball' },
+    { uid: 3, name: 'Rare Candy' },
+    { uid: 4, name: "Professor's Research" },
+    { uid: 5, name: 'Ultra Ball' },
+    { uid: 6, name: 'Rare Candy' },
   ];
 
   const stacks = computeHandStacks(cards);
@@ -138,7 +139,7 @@ test('computeHandStacks: multiple duplicate groups preserve first-seen ordering'
   assert.equal(stacks[0].count, 3);
   assert.equal(stacks[0].isStack, true);
   assert.deepEqual(
-    stacks[0].cards.map((c) => c.card.id),
+    stacks[0].cards.map((c) => c.card.uid),
     [1, 3, 6]
   );
 
@@ -147,7 +148,7 @@ test('computeHandStacks: multiple duplicate groups preserve first-seen ordering'
   assert.equal(stacks[1].count, 2);
   assert.equal(stacks[1].isStack, true);
   assert.deepEqual(
-    stacks[1].cards.map((c) => c.card.id),
+    stacks[1].cards.map((c) => c.card.uid),
     [2, 5]
   );
 
@@ -156,17 +157,17 @@ test('computeHandStacks: multiple duplicate groups preserve first-seen ordering'
   assert.equal(stacks[2].count, 1);
   assert.equal(stacks[2].isStack, false);
   assert.deepEqual(
-    stacks[2].cards.map((c) => c.card.id),
+    stacks[2].cards.map((c) => c.card.uid),
     [4]
   );
 });
 
 test('computeHandStacks: hidden or redacted cards are never stacked', () => {
   const cards = [
-    { id: 1, name: 'Rare Candy', isRedacted: true },
-    { id: 2, name: 'Rare Candy', isRedacted: true },
-    { id: 3, name: 'Rare Candy' }, // only one face up
-    { id: 4, name: 'Rare Candy' }, // second face up
+    { uid: 1, name: 'Rare Candy', isRedacted: true },
+    { uid: 2, name: 'Rare Candy', isRedacted: true },
+    { uid: 3, name: 'Rare Candy' }, // only one face up
+    { uid: 4, name: 'Rare Candy' }, // second face up
   ];
 
   const stacks = computeHandStacks(cards);
@@ -177,7 +178,43 @@ test('computeHandStacks: hidden or redacted cards are never stacked', () => {
   assert.equal(stacks[2].isStack, true);
   assert.equal(stacks[2].count, 2);
   assert.deepEqual(
-    stacks[2].cards.map((c) => c.card.id),
+    stacks[2].cards.map((c) => c.card.uid),
     [3, 4]
   );
+});
+
+test('computeHandStacks: same name but different printing (card id) never stacks', () => {
+  const cards = [
+    { name: 'Rare Candy', id: 'sv01-191' },
+    { name: 'Rare Candy', id: 'sv02-200' },
+    { name: 'Rare Candy', id: 'sv01-191' },
+  ];
+
+  const stacks = computeHandStacks(cards);
+  assert.equal(stacks.length, 2);
+  assert.equal(stacks[0].count, 2);
+  assert.equal(stacks[0].isStack, true);
+  assert.deepEqual(
+    stacks[0].cards.map((c) => c.card.id),
+    ['sv01-191', 'sv01-191']
+  );
+  assert.equal(stacks[1].count, 1);
+  assert.equal(stacks[1].cards[0].card.id, 'sv02-200');
+});
+
+test('getPrintingKey: id, then set/number, then face src, then empty', () => {
+  assert.equal(getPrintingKey({ id: 'a-1', set: 'x', number: '2' }), 'id:a-1');
+  assert.equal(getPrintingKey({ set: 'x', number: '2' }), 'sn:x/2');
+  assert.equal(getPrintingKey({ card: { id: 'a-1' }, src: 'u' }), 'id:a-1');
+  assert.equal(getPrintingKey({ card: null, src: 'u.png' }), 'src:u.png');
+  assert.equal(getPrintingKey({ name: 'Rare Candy' }), '');
+  assert.equal(getPrintingKey(null), '');
+});
+
+test('computeHandStacks: descriptors with different face src do not stack', () => {
+  const stacks = computeHandStacks([
+    { name: 'Boss', card: null, src: 'a.png' },
+    { name: 'Boss', card: null, src: 'b.png' },
+  ]);
+  assert.equal(stacks.length, 2);
 });

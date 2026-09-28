@@ -24,6 +24,24 @@ export function isStackableCard(card, options = {}) {
 }
 
 /**
+ * Identity of a card's printing. Same-name cards from different printings (other set, other
+ * artwork) are different cards to the player and must not share a stack.
+ *
+ * Falls back id -> set/number -> face src; cards carrying none of them share the empty key
+ * (name-only grouping).
+ *
+ * @param {object} card Card, view stamp, or DOM descriptor (reads `.card` when present)
+ * @returns {string}
+ */
+export function getPrintingKey(card) {
+  const source = card?.card && typeof card.card === 'object' ? card.card : card;
+  if (source?.id) return `id:${source.id}`;
+  if (source?.set || source?.number) return `sn:${source.set ?? ''}/${source.number ?? ''}`;
+  const src = source?.src || card?.src || '';
+  return src ? `src:${src}` : '';
+}
+
+/**
  * Returns the vertical pixel offset for a card layer in a stack.
  *
  * @param {number} layerIndex 0 for front, 1 for first card behind, etc.
@@ -62,7 +80,7 @@ export function computeHandStacks(cards, options = {}) {
     if (!card) continue;
 
     if (isStackableCard(card, options)) {
-      const key = `name:${card.name}`;
+      const key = `name:${card.name}|${getPrintingKey(card)}`;
       if (!groupsByKey.has(key)) {
         const group = { key, name: card.name, items: [] };
         groupsByKey.set(key, group);
