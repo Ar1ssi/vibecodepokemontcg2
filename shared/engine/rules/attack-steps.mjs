@@ -379,6 +379,11 @@ const TEMPLATES = [
     /^(?:shuffle all energy (?:from|attached to) each of your opponent's pokémon|your opponent shuffles all energy from all of their pokémon) into their deck$/,
     () => ({ type: 'atkShuffleOppEnergy' }),
   ],
+  // Banette Cursed Words: the opponent picks the cards.
+  [
+    /^your opponent chooses (\d+) cards? from their hand and shuffles (?:those|that) cards? into their deck$/,
+    (m) => ({ type: 'atkOppHandToDeck', count: Number(m[1]) }),
+  ],
   [
     /^your opponent shuffles their hand into their deck and draws (\d+) cards$/,
     (m) => ({ type: 'atkOppShuffleHandDraw', count: Number(m[1]) }),

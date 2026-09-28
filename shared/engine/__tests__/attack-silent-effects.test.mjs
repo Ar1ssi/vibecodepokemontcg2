@@ -810,6 +810,32 @@ test('Feraligatr Pull Away (Unseen Forces 4): the opponent discards down to 4 ca
   );
 });
 
+test('Banette Cursed Words (TCGdex sv09-060): the opponent picks 3 cards to shuffle into their deck', () => {
+  const text = 'Your opponent chooses 3 cards from their hand and shuffles those cards into their deck.';
+  let hand;
+  const { state } = board('Banette', text, { damage: '', setup: (s) => (hand = handOf(s, 'p2', 5)) });
+  let res = attack(state);
+  assert.equal(res.pendingChoice.player, 'p2');
+  assert.equal(res.pendingChoice.min, 3);
+  const picked = hand.slice(1, 4).map((c) => c.instanceId);
+  res = chooseAs(res, picked);
+  const p2 = res.state.players.p2.zones;
+  for (const id of picked) {
+    assert.ok(p2.deck.some((c) => c.instanceId === id), 'chosen card is in the deck');
+    assert.ok(!p2.hand.some((c) => c.instanceId === id), 'chosen card left the hand');
+  }
+  for (const card of [hand[0], hand[4]]) assert.ok(p2.hand.some((c) => c.instanceId === card.instanceId));
+
+  let two;
+  const small = board('Banette', text, { damage: '', setup: (s) => (two = handOf(s, 'p2', 2)) });
+  const whole = attack(small.state);
+  assert.ok(!whole.pendingChoice, 'a hand of 3 or fewer is shuffled in whole, no choice');
+  for (const card of two) assert.ok(whole.state.players.p2.zones.deck.some((c) => c.instanceId === card.instanceId));
+
+  const empty = board('Banette', text, { damage: '' });
+  assert.ok(!attack(empty.state).pendingChoice);
+});
+
 test('Glaceon Ice Bind (Rising Rivals 41): Paralyzed unless the opponent discards a card', () => {
   const text =
     "If your opponent doesn't discard a card from his or her hand, the Defending Pokémon is now Paralyzed.";

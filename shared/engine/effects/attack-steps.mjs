@@ -1390,6 +1390,34 @@ function atkRevealOppHand(ctx) {
   });
 }
 
+// Banette Cursed Words: "Your opponent chooses 3 cards from their hand and shuffles those cards
+// into their deck." A hand of `count` or fewer cards is shuffled in whole.
+function atkOppHandToDeck(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const hand = opponent.zones.hand;
+  const shuffleIn = (cards) => {
+    for (const card of cards) {
+      hand.splice(hand.indexOf(card), 1);
+      opponent.zones.deck.push(card);
+      ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'hand', to: 'deck', playerId: opponent.playerId });
+    }
+    shuffleOwnDeck(opponent, ctx);
+    return null;
+  };
+  if (ctx.selection) return shuffleIn(pickById(hand, ctx.selection).slice(0, step.count));
+  if (hand.length === 0) return skip(ctx, 'empty_hand');
+  const count = Math.min(step.count || 1, hand.length);
+  if (hand.length <= count) return shuffleIn([...hand]);
+  return ctx.ask({
+    player: opponent.playerId,
+    prompt: `${attackName(ctx)}: Choose ${count} card${count === 1 ? '' : 's'} from your hand to shuffle into your deck`,
+    options: hand,
+    min: count,
+    max: count,
+  });
+}
+
 function atkShuffleHandIntoDeck(ctx) {
   const { player } = ctx;
   const hand = player.zones.hand.splice(0);
@@ -3623,6 +3651,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOppActive,
   atkShuffleOwnBench,
   atkOppShuffleHandDraw,
+  atkOppHandToDeck,
   atkUseSupporter,
   atkRestOfGame,
   atkLostZoneOppDiscard,
