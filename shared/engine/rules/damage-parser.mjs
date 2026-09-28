@@ -37,7 +37,7 @@ import { isBasicPokemon } from '../cards.mjs';
 import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 import { parseEachFilter } from './each-filter.mjs';
 import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
-import { normalizeAttackText, replaceSelfName } from './attack-text.mjs';
+import { normalizeAttackText, replaceSelfName, symbolizeTypeWords } from './attack-text.mjs';
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
 import { countUnit, normalizeUnit, scalingCap } from './scaling-count.mjs';
 
@@ -365,9 +365,9 @@ export function parseAttackDamage(
   ctx = {}
 ) {
   // Older printings name the attacker ("Arcanine does 40 damage to itself"); TCGdex prints
-  // curly apostrophes the sub-readers below match as straight ones.
+  // curly apostrophes the sub-readers below match as straight ones, and type words for {X}.
   if (attack?.text) {
-    const straight = String(attack.text).replace(/[‘’]/g, "'");
+    const straight = symbolizeTypeWords(attack.text).replace(/[‘’]/g, "'");
     attack = { ...attack, text: attacker?.name ? replaceSelfName(straight, attacker.name) : straight };
   }
   // Mewtwo / Gardevoir Energy Burst: "times the total amount of Energy attached to …".
@@ -782,9 +782,10 @@ export function parseAttackDamage(
   }
 
   // ── Type-gated bonus: "+N if the Defending Pokémon is a [type] Pokémon" ──
-  const typeMatch = text.match(
-    /if the defending pokémon is a (grass|fire|water|lightning|psychic|fighting|dark|metal|fairy|dragon) pokémon.*?does (\d+) more damage/
-  );
+  // symbolizeTypeWords hands this reader "{w}"; older callers and tests pass the word.
+  const typeMatch = text
+    .replace(/\{([a-z])\}(?= pokémon)/g, (m, symbol) => lower(energyTypeOf(symbol)) || m)
+    .match(/if the defending pokémon is a (grass|fire|water|lightning|psychic|fighting|dark|metal|fairy|dragon) pokémon.*?does (\d+) more damage/);
   if (typeMatch) {
     const bonus = parseInt(typeMatch[2], 10) || 0;
     const defenderType = lower(defender?.types?.[0] ?? defender?.type);

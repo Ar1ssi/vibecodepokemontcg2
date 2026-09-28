@@ -21,8 +21,24 @@ const COMPOUND_STEPS = new Set([
 ]);
 
 // Known open rows, each with its reason (journal flag).
+const MASKED = 'Poké-Power cost half never parsed; a spurious effectPreventAbility step hid it until the "can\'t be used if" fix';
 const KNOWN_GAPS = new Map([
   ['Flygon ex — Psychic Protector', 'a damage-time hand discard needs a defender prompt mid-attack'],
+  ...[
+    'Claydol — Cosmic Power',
+    'Smeargle — Portrait',
+    'Electivire FB LV.X — Energy Recycle',
+    'Banette — Temper Tantrum',
+    'Unown V — VACATION',
+    'Blastoise — Waterlog',
+    'Latias ex — Fellow Boost',
+    'Swampert ex — Energy Recycle',
+    'Slowking — Prize Shift',
+    'Beedrill — Final Sting',
+    'Poliwrath — Strange Spiral',
+    'Electrode — Buzzap',
+    'Dragonite — Special Delivery',
+  ].map((label) => [label, MASKED]),
 ]);
 
 test('every "If you do," Ability parses both halves', () => {

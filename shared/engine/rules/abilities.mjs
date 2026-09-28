@@ -10,12 +10,13 @@
 // Backward-compat: the bridge auto-draws by finding `type === 'drawAbility'`
 // and reading `.count`. That step type + property are preserved.
 import { energySearchWhat } from './search-match.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 
 // Normalize printed card text before matching.
 //   curly quotes  ' ' `  →  straight '
 //   energy symbol { P } {G}  →  {P} (no inner spaces)
 function normalizeText(text) {
-  return String(text)
+  return symbolizeTypeWords(text)
     .replace(/[\u2018\u2019\u201A\u201B`]/g, "'")
     .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
     .toLowerCase();
@@ -88,6 +89,8 @@ const typeChangeText = (t) =>
   /in addition to its existing type/.test(t) ||
   /provides? .*energy of every type/.test(t) ||
   /is both \{[a-z]\} and \{[a-z]\}/.test(t);
+
+const OPPONENT_ACTIVE_ENERGY_DISCARD = /when you play [^.]*from your hand to evolve[^.]*, you may discard an energy attached to your opponent's active pok[eé]mon/;
 
 // Bench ↔ Active swap wording ("switch … Benched … with your Active …").
 export const isBenchActiveSwitchText = (t) =>
@@ -587,6 +590,12 @@ function withIfYouDoHalves(lower, parsed) {
     steps = [...steps, { type: 'selfLeavesAbility', to: 'knockOut', guidance: 'This Pokémon is Knocked Out.' }];
   }
 
+  // Iron Bundle Hyper Blower: "If you do, discard this Pokémon and all attached cards."
+  if (new RegExp(`if you do, discard ${SELF} and all attached cards`).test(lower)) {
+    markCosts();
+    steps = [...steps, { type: 'selfLeavesAbility', to: 'discard', guidance: 'Discard this Pokémon and its attached cards.' }];
+  }
+
   // Banette Puppet Offering, Tapu Koko Prism Star Dance of the Ancients.
   if (new RegExp(`if you do, (?:put ${SELF} in the lost zone|discard all cards from ${SELF} and put it in the lost zone)`).test(lower)) {
     markCosts();
@@ -727,6 +736,15 @@ export function parseAbility(text = '') {
     // The follow-up comes after the player's own switch only when one is printed before "If
     // you do"; Ninetales Nine Temptations / Volcanion Prism Star Jet Geyser pay a hand discard.
     const ownSwitchFirst = /switch (?:your active pok[eé]mon with 1 of your benched|(?:it|this pok[eé]mon) with your active|1 of your benched [^.]*with your active)[^.]*[.,] if you do/.test(lower);
+    // Mabosstiff Intimidating Howl, Shinx Big Roar, Iron Bundle Hyper Blower: the gust is the
+    // whole effect and the opponent picks. The Active/Bench position gate lives in the executors.
+    const gustOnly = !opponentFollowUp && /you may switch out your opponent's active pok[eé]mon to the bench/.test(lower);
+    if (gustOnly) {
+      steps.push({
+        type: 'switchOpponentOut',
+        guidance: "Once during your turn: switch out your opponent's Active Pokémon to the Bench (your opponent chooses the new Active).",
+      });
+    }
     if (opponentFollowUp && !ownSwitchFirst) {
       steps.push({
         type: opponentFollowUp,
@@ -736,7 +754,7 @@ export function parseAbility(text = '') {
             : "Switch 1 of your opponent's Benched Pokémon with their Active Pokémon.",
       });
     }
-    if (!opponentFollowUp || ownSwitchFirst) steps.push({
+    if (!gustOnly && (!opponentFollowUp || ownSwitchFirst)) steps.push({
       type: 'switchAbility',
       target: isOpponentBenchSwitch && !opponentFollowUp ? 'opponent' : 'self',
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
@@ -881,6 +899,19 @@ export function parseAbility(text = '') {
     });
   }
 
+  // ── 6b. Discard an Energy from the opponent's Active ────────────────────
+  // Crawdaunt Unruly Claw, Lycanroc-GX Twilight Eyes (played to evolve). "From your hand" there
+  // names the evolution card, not a hand cost.
+  if (OPPONENT_ACTIVE_ENERGY_DISCARD.test(lower)) {
+    steps.push({
+      type: 'discardEnergyFromOpponent',
+      energy: 'any Energy',
+      count: 1,
+      scope: 'Active',
+      guidance: "Discard an Energy attached to your opponent's Active Pokémon.",
+    });
+  }
+
   // ── 7. Discard cost (Energy from hand to use ability) ───────────────────
   if (
     lower.includes('discard') &&
@@ -888,7 +919,8 @@ export function parseAbility(text = '') {
     lower.includes('energy') &&
     // Haxorus Grind Up: the discarded card is the Stadium in play, not a hand cost.
     !/discard (?:any|a) stadium card in play/.test(lower) &&
-    !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower)
+    !/(?:to attach|whenever you attach)[^.]*energy card from your hand[^.]*discard an energy card attached/.test(lower) &&
+    !OPPONENT_ACTIVE_ENERGY_DISCARD.test(lower)
   ) {
     const countMatch = lower.match(/discard\s+(?:up to\s+)?(\d+)\s+/);
     const count = countMatch ? Number(countMatch[1]) : 1;
@@ -1051,6 +1083,7 @@ export function parseAbility(text = '') {
   if (
     lower.includes('opponent') &&
     !isSelfHandDiscardCost(lower) &&
+    !/if you do, discard this pok[eé]mon and all attached cards/.test(lower) &&
     (lower.includes('discard') || lower.includes('shuffle') || lower.includes('reveal') ||
      (lower.includes('put') && (lower.includes('into their hand') || lower.includes("into your opponent's hand"))))
   ) {
@@ -1182,7 +1215,8 @@ export function parseAbility(text = '') {
       namesStatus ||
       (statusText.includes('special condition') && namesStatus && !statusText.includes('recover')))
   ) {
-    const target = statusText.includes('opponent') ? 'opponent' : 'attacker';
+    // "The Defending Pokémon" / "1 of the Defending Pokémon" (Houndoom, Blaziken Fire Breath) is the opponent's Active.
+    const target = statusText.includes('opponent') || /defending pok[eé]mon/.test(statusText) ? 'opponent' : 'attacker';
     let status = null;
     if (statusText.includes('asleep')) status = 'asleep';
     else if (statusText.includes('burned')) status = 'burned';
@@ -1370,10 +1404,11 @@ export function parseAbility(text = '') {
   }
 
   // ── 27. Effect prevention / negation ────────────────────────────────────
+  // "This power can't be used if …" restricts use (statusText drops it); it prevents nothing.
   if (
     !isAbilityUsageLimitText(lower) &&
     (((lower.includes('prevent') ||
-      lower.includes("can't") ||
+      statusText.includes("can't") ||
       lower.includes('have no effect') ||
       lower.includes('has no effect') ||
       lower.includes('have no abilities') ||

@@ -4,21 +4,21 @@ Oracle: scripts/lib/oracle-harness.mjs, seeds 1,2,3,4,5,6,7,8; observed = rowObs
 blind = family whose state change the oracle cannot see on these cards (marker/passive families); not a failure
 
 Entries: 1723 — 1481 attacks (604 GX) / 242 abilities
-executed 1226 / blind 207 / passive 52 / no-effect 238 / engine-error 0
-GX attacks: executed 501/604, blind 0, no-effect 103, engine-error 0
-Run: 33s
+executed 1263 / blind 207 / passive 52 / no-effect 201 / engine-error 0
+GX attacks: executed 514/604, blind 0, no-effect 90, engine-error 0
+Run: 67s
 
 ## By family
-- attack:next-turn-lock: 226/283 (80%)
+- attack:next-turn-lock: 238/283 (84%)
 - attack:unknown: 0/180 (0%)
-- attack:bench-damage: 117/126 (93%)
+- attack:bench-damage: 126/126 (100%)
 - attack:per-energy: 101/119 (85%)
 - attack:conditional-damage: 62/111 (56%)
-- attack:discard-cost: 70/77 (91%)
+- attack:discard-cost: 77/77 (100%)
 - attack:per-prize: 44/68 (65%)
 - attack:draw-attach: 66/66 (100%)
 - attack:search-deck: 48/48 (100%)
-- attack:multi-target: 36/47 (77%)
+- attack:multi-target: 39/47 (83%)
 - attack:immunity: 1/42 (2%)
 - attack:damage-prevention: 29/29 (100%)
 - ability:switch: 28/28 (100%)
@@ -46,7 +46,7 @@ Run: 33s
 - attack:shuffle-cost: 12/12 (100%)
 - ability:retreat-cost: 0/12 (0%)
 - ability:search: 9/9 (100%)
-- attack:effect-prevention: 0/9 (0%)
+- attack:effect-prevention: 6/9 (67%)
 - ability:copy-attack: 0/8 (0%)
 - ability:status: 5/8 (63%)
 - attack:self-damage: 7/7 (100%)
@@ -92,10 +92,8 @@ Run: 33s
 - opponent-disrupt: 3
 - status: 3
 
-## No observed effect (238)
+## No observed effect (201)
 - [attack] [GX] Reshiram & Charizard-GX [Sun & Moon Promos #SM247] Double Blaze-GX (conditional-damage)
-- [attack] [GX] Jirachi-GX [Unified Minds #79a] Star Shield-GX (effect-prevention)
-- [attack] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Psychic Club (bench-damage)
 - [ability] Silvally-GX [Cosmic Eclipse #262] Disk Reload (draw)
 - [attack] Silvally-GX [Cosmic Eclipse #262] Brave Buddies (conditional-damage)
 - [attack] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #261] Jumping Balloon (multi-target)
@@ -119,15 +117,12 @@ Run: 33s
 - [attack] [GX] Gyarados-GX [Sun & Moon Promos #SM212] Hyper Beam-GX (next-turn-lock)
 - [attack] [GX] Charizard-GX [Sun & Moon Promos #SM211] Flare Blitz-GX (next-turn-lock)
 - [attack] [GX] Scizor-GX [Celestial Storm #SV72] Cross-Cut-GX (conditional-damage)
-- [attack] Banette-GX [Celestial Storm #SV61] Shadow Chant (discard-cost)
 - [attack] Darkrai-GX [Burning Shadows #SV70] Dark Cleave (immunity)
-- [attack] Turtonator-GX [Guardians Rising #SV52] Shell Trap (bench-damage)
 - [attack] Golisopod-GX [Burning Shadows #SV48] First Impression (conditional-damage)
 - [attack] Lucario-GX [Forbidden Light #SV64] Aura Strike (conditional-damage)
 - [attack] Naganadel-GX [Forbidden Light #SV63] Beast Raid (per-energy)
 - [attack] Naganadel-GX [Forbidden Light #SV63] Jet Needle (immunity)
 - [attack] [GX] Guzzlord-GX [Crimson Invasion #SV71] Glutton-GX (per-prize)
-- [attack] [GX] Lycanroc-GX [Team Up #SV67] Splintered Shards-GX (next-turn-lock)
 - [attack] [GX] Mewtwo-GX [Shining Legends #SV59] Psystrike-GX (next-turn-lock)
 - [attack] Altaria-GX [Dragon Majesty #SV77] Sonic Edge (immunity)
 - [attack] [GX] Raichu-GX [Hidden Fates #20] Spark Ball-GX (next-turn-lock)
@@ -139,7 +134,6 @@ Run: 33s
 - [attack] Raichu & Alolan Raichu-GX [Unified Minds #241] Tandem Shock (conditional-damage)
 - [attack] Keldeo-GX [Unified Minds #240] Sonic Edge (immunity)
 - [attack] [GX] Heatran-GX [Unified Minds #238] Hot Burn-GX (per-energy)
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #237] Tropical Hour-GX (next-turn-lock)
 - [attack] Mega Sableye & Tyranitar-GX [Unified Minds #225] Greedy Crush (per-prize)
 - [attack] Mega Sableye & Tyranitar-GX [Unified Minds #226] Greedy Crush (per-prize)
 - [attack] [GX] Latios-GX [Unified Minds #223] Clear Vision-GX (next-turn-lock)
@@ -147,26 +141,19 @@ Run: 33s
 - [attack] Raichu & Alolan Raichu-GX [Unified Minds #220] Tandem Shock (conditional-damage)
 - [attack] Keldeo-GX [Unified Minds #219] Sonic Edge (immunity)
 - [attack] [GX] Heatran-GX [Unified Minds #216] Hot Burn-GX (per-energy)
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #215] Tropical Hour-GX (next-turn-lock)
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #214] Tropical Hour-GX (next-turn-lock)
 - [attack] [GX] Reshiram & Charizard-GX [Sun & Moon Promos #SM201] Double Blaze-GX (conditional-damage)
 - [attack] Mega Sableye & Tyranitar-GX [Unified Minds #126] Greedy Crush (per-prize)
-- [attack] [GX] Jirachi-GX [Unified Minds #79] Star Shield-GX (effect-prevention)
 - [attack] [GX] Latios-GX [Unified Minds #78] Clear Vision-GX (next-turn-lock)
-- [attack] Espeon & Deoxys-GX [Unified Minds #72] Psychic Club (bench-damage)
 - [attack] Raichu & Alolan Raichu-GX [Unified Minds #54] Tandem Shock (conditional-damage)
 - [attack] Keldeo-GX [Unified Minds #47] Sonic Edge (immunity)
 - [attack] [GX] Heatran-GX [Unified Minds #25] Hot Burn-GX (per-energy)
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #1] Tropical Hour-GX (next-turn-lock)
 - [attack] Kangaskhan-GX [Sun & Moon Promos #SM188] Enraged Strike (conditional-damage)
-- [attack] Persian-GX [Unbroken Bonds #227] Vengeance (multi-target)
 - [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #225] Kaleidostorm (move-energy)
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #225] Magical Miracle-GX (next-turn-lock)
 - [attack] Marshadow & Machamp-GX [Unbroken Bonds #221] Revenge (conditional-damage)
 - [attack] [GX] Reshiram & Charizard-GX [Unbroken Bonds #217] Double Blaze-GX (conditional-damage)
 - [attack] Venomoth-GX [Unbroken Bonds #216] Shinobi Mastery (conditional-damage)
 - [attack] [GX] Pheromosa & Buzzwole-GX [Unbroken Bonds #215] Beast Game-GX (per-prize)
-- [attack] Persian-GX [Unbroken Bonds #207] Vengeance (multi-target)
 - [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #205] Kaleidostorm (move-energy)
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #205] Magical Miracle-GX (next-turn-lock)
 - [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #204] Kaleidostorm (move-energy)
@@ -177,7 +164,6 @@ Run: 33s
 - [attack] Venomoth-GX [Unbroken Bonds #193] Shinobi Mastery (conditional-damage)
 - [attack] [GX] Pheromosa & Buzzwole-GX [Unbroken Bonds #192] Beast Game-GX (per-prize)
 - [attack] [GX] Pheromosa & Buzzwole-GX [Unbroken Bonds #191] Beast Game-GX (per-prize)
-- [attack] Persian-GX [Unbroken Bonds #149] Vengeance (multi-target)
 - [attack] Gardevoir & Sylveon-GX [Unbroken Bonds #130] Kaleidostorm (move-energy)
 - [attack] [GX] Gardevoir & Sylveon-GX [Unbroken Bonds #130] Magical Miracle-GX (next-turn-lock)
 - [attack] Marshadow & Machamp-GX [Unbroken Bonds #82] Revenge (conditional-damage)
@@ -195,9 +181,6 @@ Run: 33s
 - [attack] Eevee & Snorlax-GX [Team Up #120] Dump Truck Press (conditional-damage)
 - [attack] Cobalion-GX [Team Up #106] Dueling Saber (conditional-damage)
 - [attack] [GX] Hoopa-GX [Team Up #96] Devilish Hands-GX (next-turn-lock)
-- [attack] [GX] Lycanroc-GX [Team Up #82] Splintered Shards-GX (next-turn-lock)
-- [attack] [GX] Jolteon-GX [Sun & Moon Promos #SM173] Swift Run-GX (effect-prevention)
-- [attack] [GX] Flareon-GX [Sun & Moon Promos #SM171] Power Burner-GX (next-turn-lock)
 - [attack] [GX] Genesect-GX [Lost Thunder #224] Break Buster-GX (next-turn-lock)
 - [attack] [GX] Tyranitar-GX [Lost Thunder #223] Lay the Smackdown-GX (next-turn-lock)
 - [attack] Sigilyph-GX [Lost Thunder #222] Sonic Wing (immunity)
@@ -222,11 +205,8 @@ Run: 33s
 - [attack] White Kyurem-GX [Dragon Majesty #48] Shred (immunity)
 - [attack] Altaria-GX [Dragon Majesty #41] Sonic Edge (immunity)
 - [attack] [GX] Scizor-GX [Celestial Storm #175] Cross-Cut-GX (conditional-damage)
-- [attack] Banette-GX [Celestial Storm #174] Shadow Chant (discard-cost)
 - [attack] [GX] Scizor-GX [Celestial Storm #158] Cross-Cut-GX (conditional-damage)
-- [attack] Banette-GX [Celestial Storm #157] Shadow Chant (discard-cost)
 - [attack] [GX] Scizor-GX [Celestial Storm #90] Cross-Cut-GX (conditional-damage)
-- [attack] Banette-GX [Celestial Storm #66] Shadow Chant (discard-cost)
 - [attack] [GX] Dusk Mane Necrozma-GX [Sun & Moon Promos #SM102] Sun's Eclipse-GX (per-prize)
 - [attack] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Dark Flash (immunity)
 - [attack] [GX] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Moon's Eclipse-GX (per-prize)
@@ -246,7 +226,6 @@ Run: 33s
 - [attack] Naganadel-GX [Forbidden Light #56] Jet Needle (immunity)
 - [attack] Lucario-GX [Sun & Moon Promos #SM100] Aura Strike (conditional-damage)
 - [attack] Darkrai-GX [Burning Shadows #88a] Dark Cleave (immunity)
-- [attack] Lunala-GX [Ultra Prism #172] Moongeist Beam (next-turn-lock)
 - [attack] Dialga-GX [Ultra Prism #164] Shred (immunity)
 - [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #163] Sun's Eclipse-GX (per-prize)
 - [attack] Celesteela-GX [Ultra Prism #162] Rocket Fall (per-energy)
@@ -290,45 +269,29 @@ Run: 33s
 - [attack] Darkrai-GX [Burning Shadows #158] Dark Cleave (immunity)
 - [attack] Alolan Muk-GX [Burning Shadows #157] Chemical Breath (per-energy)
 - [attack] Machamp-GX [Burning Shadows #154] Cross-Cut (conditional-damage)
-- [attack] Machamp-GX [Burning Shadows #154] Bedrock Breaker (discard-cost)
 - [attack] [GX] Machamp-GX [Burning Shadows #154] Muscle Punch-GX (next-turn-lock)
 - [attack] [GX] Necrozma-GX [Burning Shadows #153] Black Ray-GX (multi-target)
 - [attack] Golisopod-GX [Burning Shadows #148] First Impression (conditional-damage)
 - [attack] Darkrai-GX [Burning Shadows #139] Dark Cleave (immunity)
 - [attack] Alolan Muk-GX [Burning Shadows #138] Chemical Breath (per-energy)
 - [attack] Machamp-GX [Burning Shadows #135] Cross-Cut (conditional-damage)
-- [attack] Machamp-GX [Burning Shadows #135] Bedrock Breaker (discard-cost)
 - [attack] [GX] Machamp-GX [Burning Shadows #135] Muscle Punch-GX (next-turn-lock)
 - [attack] [GX] Necrozma-GX [Burning Shadows #134] Black Ray-GX (multi-target)
 - [attack] Golisopod-GX [Burning Shadows #129] First Impression (conditional-damage)
 - [attack] Darkrai-GX [Burning Shadows #88] Dark Cleave (immunity)
 - [attack] Alolan Muk-GX [Burning Shadows #84] Chemical Breath (per-energy)
 - [attack] Machamp-GX [Burning Shadows #64] Cross-Cut (conditional-damage)
-- [attack] Machamp-GX [Burning Shadows #64] Bedrock Breaker (discard-cost)
 - [attack] [GX] Machamp-GX [Burning Shadows #64] Muscle Punch-GX (next-turn-lock)
 - [attack] [GX] Necrozma-GX [Burning Shadows #63] Black Ray-GX (multi-target)
 - [attack] Golisopod-GX [Burning Shadows #17] First Impression (conditional-damage)
-- [attack] Incineroar-GX [Sun & Moon Promos #SM38] Hustling Strike (bench-damage)
 - [attack] Kommo-o-GX [Guardians Rising #159] Shred (immunity)
 - [attack] [GX] Kommo-o-GX [Guardians Rising #159] Ultra Uppercut-GX (next-turn-lock)
-- [attack] [GX] Toxapex-GX [Guardians Rising #154] Total Shelter-GX (effect-prevention)
-- [attack] Turtonator-GX [Guardians Rising #148] Shell Trap (bench-damage)
-- [attack] Incineroar-GX [Guardians Rising #147] Hustling Strike (bench-damage)
 - [attack] Kommo-o-GX [Guardians Rising #141] Shred (immunity)
 - [attack] [GX] Kommo-o-GX [Guardians Rising #141] Ultra Uppercut-GX (next-turn-lock)
-- [attack] [GX] Toxapex-GX [Guardians Rising #136] Total Shelter-GX (effect-prevention)
-- [attack] Turtonator-GX [Guardians Rising #131] Shell Trap (bench-damage)
 - [attack] Kommo-o-GX [Guardians Rising #100] Shred (immunity)
 - [attack] [GX] Kommo-o-GX [Guardians Rising #100] Ultra Uppercut-GX (next-turn-lock)
-- [attack] [GX] Toxapex-GX [Guardians Rising #57] Total Shelter-GX (effect-prevention)
-- [attack] Turtonator-GX [Guardians Rising #18] Shell Trap (bench-damage)
-- [attack] Lunala-GX [Sun & Moon Promos #SM17] Moongeist Beam (next-turn-lock)
-- [attack] Lunala-GX [Sun & Moon #153] Moongeist Beam (next-turn-lock)
 - [attack] [GX] Lurantis-GX [Sun & Moon #150] Chloroscythe-GX (per-energy)
-- [attack] Lunala-GX [Sun & Moon #141] Moongeist Beam (next-turn-lock)
 - [attack] [GX] Lurantis-GX [Sun & Moon #138] Chloroscythe-GX (per-energy)
-- [attack] Lunala-GX [Sun & Moon #66] Moongeist Beam (next-turn-lock)
-- [attack] Incineroar-GX [Sun & Moon #27] Hustling Strike (bench-damage)
 - [attack] [GX] Lurantis-GX [Sun & Moon #15] Chloroscythe-GX (per-energy)
 - [attack] Snorlax-GX [Sun & Moon Promos #SM05] Thunderous Snore (conditional-damage)
 
@@ -352,9 +315,9 @@ Run: 33s
 - [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #118] Tower-Go-Round-GX (move-energy) → no-effect Δ180 {opp:active+dmg}
 - [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #107] Tower-Go-Round-GX (move-energy) → no-effect Δ180 {opp:active+dmg}
 - [attack] [GX] Alolan Exeggutor-GX [Crimson Invasion #74] Tower-Go-Round-GX (move-energy) → no-effect Δ180 {opp:active+dmg}
-- [attack] Alolan Exeggutor-GX [Crimson Invasion #118] Tropical Head (bench-damage) → executed Δ20 {opp:bench+dmg,opp:deck->hand}
-- [attack] Alolan Exeggutor-GX [Crimson Invasion #107] Tropical Head (bench-damage) → executed Δ20 {opp:bench+dmg,opp:deck->hand}
-- [attack] Alolan Exeggutor-GX [Crimson Invasion #74] Tropical Head (bench-damage) → executed Δ20 {opp:bench+dmg,opp:deck->hand}
+- [attack] Alolan Exeggutor-GX [Crimson Invasion #118] Tropical Head (bench-damage) → executed Δ160 {opp:active+dmg,opp:deck->hand}
+- [attack] Alolan Exeggutor-GX [Crimson Invasion #107] Tropical Head (bench-damage) → executed Δ160 {opp:active+dmg,opp:deck->hand}
+- [attack] Alolan Exeggutor-GX [Crimson Invasion #74] Tropical Head (bench-damage) → executed Δ160 {opp:active+dmg,opp:deck->hand}
 - [attack] Alolan Golem-GX [Crimson Invasion #113] Hammer In (unknown) → blind Δ80 {opp:active+dmg,opp:deck->hand}
 - [attack] Alolan Golem-GX [Crimson Invasion #102] Hammer In (unknown) → blind Δ80 {opp:active+dmg,opp:deck->hand}
 - [attack] Alolan Golem-GX [Crimson Invasion #34] Hammer In (unknown) → blind Δ80 {opp:active+dmg,opp:deck->hand}
@@ -457,10 +420,10 @@ Run: 33s
 - [ability] Banette-GX [Celestial Storm #174] Shady Move (move-damage) → executed [moveDamageBetweenAbility] {ability-used,own:bench+dmg,own:heal}
 - [ability] Banette-GX [Celestial Storm #157] Shady Move (move-damage) → executed [moveDamageBetweenAbility] {ability-used,own:bench+dmg,own:heal}
 - [ability] Banette-GX [Celestial Storm #66] Shady Move (move-damage) → executed [moveDamageBetweenAbility] {ability-used,own:bench+dmg,own:heal}
-- [attack] Banette-GX [Celestial Storm #SV61] Shadow Chant (discard-cost) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] Banette-GX [Celestial Storm #174] Shadow Chant (discard-cost) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] Banette-GX [Celestial Storm #157] Shadow Chant (discard-cost) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] Banette-GX [Celestial Storm #66] Shadow Chant (discard-cost) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
+- [attack] Banette-GX [Celestial Storm #SV61] Shadow Chant (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand}
+- [attack] Banette-GX [Celestial Storm #174] Shadow Chant (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand}
+- [attack] Banette-GX [Celestial Storm #157] Shadow Chant (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand}
+- [attack] Banette-GX [Celestial Storm #66] Shadow Chant (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Banette-GX [Celestial Storm #SV61] Tomb Hunt-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->hand}
 - [attack] [GX] Banette-GX [Celestial Storm #174] Tomb Hunt-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->hand}
 - [attack] [GX] Banette-GX [Celestial Storm #157] Tomb Hunt-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->hand}
@@ -557,11 +520,11 @@ Run: 33s
 - [attack] Charizard & Braixen-GX [Cosmic Eclipse #251] Brilliant Flare (search-deck) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Charizard & Braixen-GX [Cosmic Eclipse #212] Brilliant Flare (search-deck) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Charizard & Braixen-GX [Cosmic Eclipse #22] Brilliant Flare (search-deck) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:deck->hand,shuffle}
-- [attack] [GX] Charizard & Braixen-GX [Cosmic Eclipse #251] Crimson Flame Pillar-GX (dual-status) → executed {opp:deck->hand,own:discard->attached}
-- [attack] [GX] Charizard & Braixen-GX [Cosmic Eclipse #212] Crimson Flame Pillar-GX (dual-status) → executed {opp:deck->hand,own:discard->attached}
-- [attack] [GX] Charizard & Braixen-GX [Cosmic Eclipse #22] Crimson Flame Pillar-GX (dual-status) → executed {opp:deck->hand,own:discard->attached}
+- [attack] [GX] Charizard & Braixen-GX [Cosmic Eclipse #251] Crimson Flame Pillar-GX (dual-status) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:discard->attached}
+- [attack] [GX] Charizard & Braixen-GX [Cosmic Eclipse #212] Crimson Flame Pillar-GX (dual-status) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:discard->attached}
+- [attack] [GX] Charizard & Braixen-GX [Cosmic Eclipse #22] Crimson Flame Pillar-GX (dual-status) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:discard->attached}
 - [attack] Charizard & Braixen-GX [Sun & Moon Promos #SM230] Brilliant Flare (search-deck) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:deck->hand,shuffle}
-- [attack] [GX] Charizard & Braixen-GX [Sun & Moon Promos #SM230] Crimson Flame Pillar-GX (dual-status) → executed {opp:deck->hand,own:discard->attached}
+- [attack] [GX] Charizard & Braixen-GX [Sun & Moon Promos #SM230] Crimson Flame Pillar-GX (dual-status) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,opp:status,own:discard->attached}
 - [attack] Charizard-GX [Burning Shadows #SV49] Crimson Storm (discard-cost) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:attached->discard,own:prizes->hand}
 - [attack] Charizard-GX [Burning Shadows #150] Crimson Storm (discard-cost) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:attached->discard,own:prizes->hand}
 - [attack] Charizard-GX [Burning Shadows #20] Crimson Storm (discard-cost) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:attached->discard,own:prizes->hand}
@@ -607,16 +570,16 @@ Run: 33s
 - [attack] [GX] Darkrai-GX [Burning Shadows #88] Dead End-GX (conditional-ko) → executed {opp:deck->hand,skipped:condition_unmet}
 - [ability] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Invasion (switch) → executed [switchAbility] {ability-used,own:active->bench,own:active-changed,own:bench->active}
 - [attack] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Dark Flash (immunity) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Moon's Eclipse-GX (per-prize) → no-effect Δ180 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Dawn Wings Necrozma-GX [Sun & Moon Promos #SM101] Moon's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
 - [ability] Dawn Wings Necrozma-GX [Ultra Prism #161] Invasion (switch) → executed [switchAbility] {ability-used,own:active->bench,own:active-changed,own:bench->active}
 - [ability] Dawn Wings Necrozma-GX [Ultra Prism #143] Invasion (switch) → executed [switchAbility] {ability-used,own:active->bench,own:active-changed,own:bench->active}
 - [ability] Dawn Wings Necrozma-GX [Ultra Prism #63] Invasion (switch) → executed [switchAbility] {ability-used,own:active->bench,own:active-changed,own:bench->active}
 - [attack] Dawn Wings Necrozma-GX [Ultra Prism #161] Dark Flash (immunity) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
 - [attack] Dawn Wings Necrozma-GX [Ultra Prism #143] Dark Flash (immunity) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
 - [attack] Dawn Wings Necrozma-GX [Ultra Prism #63] Dark Flash (immunity) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #161] Moon's Eclipse-GX (per-prize) → no-effect Δ180 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #143] Moon's Eclipse-GX (per-prize) → no-effect Δ180 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #63] Moon's Eclipse-GX (per-prize) → no-effect Δ180 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #161] Moon's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
+- [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #143] Moon's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
+- [attack] [GX] Dawn Wings Necrozma-GX [Ultra Prism #63] Moon's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
 - [ability] Decidueye-GX [Guardians Rising #SV47] Feather Arrow (move-damage) → executed [moveDamageAbility] {ability-used,opp:active+dmg}
 - [ability] Decidueye-GX [Guardians Rising #146] Feather Arrow (move-damage) → executed [moveDamageAbility] {ability-used,opp:active+dmg}
 - [attack] [GX] Decidueye-GX [Guardians Rising #SV47] Hollow Hunt-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->hand}
@@ -691,16 +654,16 @@ Run: 33s
 - [attack] Drampa-GX [Guardians Rising #115] Righteous Edge (discard-opponent) → executed Δ20 {opp:active+dmg,opp:deck->hand,skipped:nothing_to_discard}
 - [attack] Dusk Mane Necrozma-GX [Sun & Moon Promos #SM102] Claw Slash (unknown) → blind Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Dusk Mane Necrozma-GX [Sun & Moon Promos #SM102] Meteor Tempest (discard-cost) → executed Δ220 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] [GX] Dusk Mane Necrozma-GX [Sun & Moon Promos #SM102] Sun's Eclipse-GX (per-prize) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Dusk Mane Necrozma-GX [Sun & Moon Promos #SM102] Sun's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
 - [attack] Dusk Mane Necrozma-GX [Ultra Prism #163] Claw Slash (unknown) → blind Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Dusk Mane Necrozma-GX [Ultra Prism #145] Claw Slash (unknown) → blind Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Dusk Mane Necrozma-GX [Ultra Prism #90] Claw Slash (unknown) → blind Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Dusk Mane Necrozma-GX [Ultra Prism #163] Meteor Tempest (discard-cost) → executed Δ220 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] Dusk Mane Necrozma-GX [Ultra Prism #145] Meteor Tempest (discard-cost) → executed Δ220 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] Dusk Mane Necrozma-GX [Ultra Prism #90] Meteor Tempest (discard-cost) → executed Δ220 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #163] Sun's Eclipse-GX (per-prize) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #145] Sun's Eclipse-GX (per-prize) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #90] Sun's Eclipse-GX (per-prize) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #163] Sun's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
+- [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #145] Sun's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
+- [attack] [GX] Dusk Mane Necrozma-GX [Ultra Prism #90] Sun's Eclipse-GX (per-prize) → no-effect {opp:deck->hand}
 - [attack] Eevee & Snorlax-GX [Sun & Moon Promos #SM169] Cheer Up (draw-attach) → executed {opp:deck->hand,own:hand->attached}
 - [attack] Eevee & Snorlax-GX [Sun & Moon Promos #SM169] Dump Truck Press (conditional-damage) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Eevee & Snorlax-GX [Sun & Moon Promos #SM169] Megaton Friends-GX (draw-until) → executed Δ210 {opp:active+dmg,opp:deck->hand,own:deck->hand}
@@ -728,10 +691,10 @@ Run: 33s
 - [attack] [GX] Eevee-GX [Sun & Moon Promos #SM176] Joy Maker-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->hand}
 - [attack] [GX] Eevee-GX [Sun & Moon Promos #SM175] Joy Maker-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->hand}
 - [attack] [GX] Eevee-GX [Sun & Moon Promos #SM174] Joy Maker-GX (next-turn-lock) → executed {opp:deck->hand,own:discard->hand}
-- [ability] Electrode-GX [Celestial Storm #SV57] Extra Energy Bomb (attach) → executed [attachAbility] {ability-used,own:discard->attached}
-- [ability] Electrode-GX [Celestial Storm #172] Extra Energy Bomb (attach) → executed [attachAbility] {ability-used,own:discard->attached}
-- [ability] Electrode-GX [Celestial Storm #155] Extra Energy Bomb (attach) → executed [attachAbility] {ability-used,own:discard->attached}
-- [ability] Electrode-GX [Celestial Storm #48] Extra Energy Bomb (attach) → executed [attachAbility] {ability-used,own:discard->attached}
+- [ability] Electrode-GX [Celestial Storm #SV57] Extra Energy Bomb (attach) → executed [attachAbility,selfLeavesAbility] {ability-used,ko,opp:prizes->hand,own:active->discard,own:active-changed,own:attached->discard,own:bench->active,own:bench->discard,own:discard->attached,own:heal}
+- [ability] Electrode-GX [Celestial Storm #172] Extra Energy Bomb (attach) → executed [attachAbility,selfLeavesAbility] {ability-used,ko,opp:prizes->hand,own:active->discard,own:active-changed,own:attached->discard,own:bench->active,own:bench->discard,own:discard->attached,own:heal}
+- [ability] Electrode-GX [Celestial Storm #155] Extra Energy Bomb (attach) → executed [attachAbility,selfLeavesAbility] {ability-used,ko,opp:prizes->hand,own:active->discard,own:active-changed,own:attached->discard,own:bench->active,own:bench->discard,own:discard->attached,own:heal}
+- [ability] Electrode-GX [Celestial Storm #48] Extra Energy Bomb (attach) → executed [attachAbility,selfLeavesAbility] {ability-used,ko,opp:prizes->hand,own:active->discard,own:active-changed,own:attached->discard,own:bench->active,own:bench->discard,own:discard->attached,own:heal}
 - [attack] [GX] Electrode-GX [Celestial Storm #SV57] Crush and Burn-GX (next-turn-lock) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] [GX] Electrode-GX [Celestial Storm #172] Crush and Burn-GX (next-turn-lock) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] [GX] Electrode-GX [Celestial Storm #155] Crush and Burn-GX (next-turn-lock) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:attached->discard}
@@ -752,10 +715,10 @@ Run: 33s
 - [attack] Entei-GX [Shining Legends #74] Fire Fang (status-burned) → executed Δ120 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Entei-GX [Shining Legends #71] Fire Fang (status-burned) → executed Δ120 {coin,opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Entei-GX [Shining Legends #10] Fire Fang (status-burned) → executed Δ120 {coin,opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] [GX] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Cross Division-GX (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
-- [attack] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Psychic Club (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Espeon & Deoxys-GX [Unified Minds #72] Cross Division-GX (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
-- [attack] Espeon & Deoxys-GX [Unified Minds #72] Psychic Club (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Cross Division-GX (bench-damage) → executed Δ120 {opp:active+dmg}
+- [attack] Espeon & Deoxys-GX [Sun & Moon Promos #SM240] Psychic Club (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Espeon & Deoxys-GX [Unified Minds #72] Cross Division-GX (bench-damage) → executed Δ120 {opp:active+dmg}
+- [attack] Espeon & Deoxys-GX [Unified Minds #72] Psychic Club (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Espeon-GX [Sun & Moon #SV60] Divide-GX (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Espeon-GX [Sun & Moon #152] Divide-GX (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Espeon-GX [Sun & Moon #140] Divide-GX (bench-damage) → executed Δ100 {opp:active+dmg,opp:deck->hand}
@@ -773,7 +736,7 @@ Run: 33s
 - [attack] Espeon-GX [Sun & Moon Promos #SM35] Psychic (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] Flareon-GX [Sun & Moon Promos #SM171] Bright Flame (discard-cost) → executed Δ190 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] Flareon-GX [Sun & Moon Promos #SM171] Heat Stage (draw-attach) → executed Δ30 {opp:active+dmg,opp:deck->hand,own:hand->attached}
-- [attack] [GX] Flareon-GX [Sun & Moon Promos #SM171] Power Burner-GX (next-turn-lock) → no-effect Δ20 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Flareon-GX [Sun & Moon Promos #SM171] Power Burner-GX (next-turn-lock) → executed Δ40 {opp:active+dmg,opp:deck->hand}
 - [ability] Flygon-GX [Cosmic Eclipse #256] Dusty Defense (passive) → passive [weaknessAbility,damageReductionAbility]
 - [ability] Flygon-GX [Cosmic Eclipse #218] Dusty Defense (passive) → passive [weaknessAbility,damageReductionAbility]
 - [ability] Flygon-GX [Cosmic Eclipse #110] Dusty Defense (passive) → passive [weaknessAbility,damageReductionAbility]
@@ -838,7 +801,7 @@ Run: 33s
 - [attack] Gengar & Mimikyu-GX [Team Up #53] Poltergeist (reveal-hand) → executed Δ100 {opp:active+dmg,opp:deck->hand,opp:hand-revealed}
 - [ability] Glaceon-GX [Sun & Moon Promos #SM147] Freezing Gaze (opponent-disrupt) → executed [opponentDisruptAbility,effectPreventAbility] {skipped:unsupported_step}
 - [attack] Glaceon-GX [Sun & Moon Promos #SM147] Frost Bullet (bench-damage) → executed Δ120 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Glaceon-GX [Sun & Moon Promos #SM147] Polar Spear-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Glaceon-GX [Sun & Moon Promos #SM147] Polar Spear-GX (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [ability] Glaceon-GX [Ultra Prism #SV55] Freezing Gaze (opponent-disrupt) → executed [opponentDisruptAbility,effectPreventAbility] {skipped:unsupported_step}
 - [ability] Glaceon-GX [Ultra Prism #159] Freezing Gaze (opponent-disrupt) → executed [opponentDisruptAbility,effectPreventAbility] {skipped:unsupported_step}
 - [ability] Glaceon-GX [Ultra Prism #141] Freezing Gaze (opponent-disrupt) → executed [opponentDisruptAbility,effectPreventAbility] {skipped:unsupported_step}
@@ -847,10 +810,10 @@ Run: 33s
 - [attack] Glaceon-GX [Ultra Prism #159] Frost Bullet (bench-damage) → executed Δ120 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Glaceon-GX [Ultra Prism #141] Frost Bullet (bench-damage) → executed Δ120 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Glaceon-GX [Ultra Prism #39] Frost Bullet (bench-damage) → executed Δ120 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Glaceon-GX [Ultra Prism #SV55] Polar Spear-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Glaceon-GX [Ultra Prism #159] Polar Spear-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Glaceon-GX [Ultra Prism #141] Polar Spear-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Glaceon-GX [Ultra Prism #39] Polar Spear-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Glaceon-GX [Ultra Prism #SV55] Polar Spear-GX (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Glaceon-GX [Ultra Prism #159] Polar Spear-GX (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Glaceon-GX [Ultra Prism #141] Polar Spear-GX (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Glaceon-GX [Ultra Prism #39] Polar Spear-GX (per-energy) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Golisopod-GX [Burning Shadows #SV48] Armor Press (damage-prevention) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Golisopod-GX [Burning Shadows #148] Armor Press (damage-prevention) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Golisopod-GX [Burning Shadows #129] Armor Press (damage-prevention) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:lock}
@@ -886,7 +849,7 @@ Run: 33s
 - [attack] [GX] Greninja-GX [Forbidden Light #133] Shadowy Hunter-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Greninja-GX [Forbidden Light #120] Shadowy Hunter-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Greninja-GX [Forbidden Light #24] Shadowy Hunter-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
-- [ability] Greninja-GX [Sun & Moon Promos #SM197] Elusive Master (draw) → executed [drawAbility] {ability-used,own:deck->hand}
+- [ability] Greninja-GX [Sun & Moon Promos #SM197] Elusive Master (draw) → executed [selfBenchPlacementAbility,drawAbility] {skipped:condition_unmet}
 - [attack] [GX] Greninja-GX [Sun & Moon Promos #SM197] Dark Mist-GX (next-turn-lock) → executed {opp:attached->hand,opp:bench->hand,opp:deck->hand,opp:heal}
 - [attack] Greninja-GX [Sun & Moon Promos #SM197] Mist Slash (immunity) → no-effect Δ130 {opp:active+dmg,opp:deck->hand}
 - [ability] Gumshoos-GX [Sun & Moon #157] Search the Premises (opponent-disrupt) → executed [opponentDisruptAbility] {ability-used,opp:hand-revealed}
@@ -969,13 +932,13 @@ Run: 33s
 - [attack] Hoopa-GX [Team Up #166] Rogue Ring (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Hoopa-GX [Team Up #96] Rogue Ring (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] [GX] Incineroar-GX [Guardians Rising #147] Burning Slam-GX (status-burned) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Incineroar-GX [Guardians Rising #147] Hustling Strike (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
+- [attack] Incineroar-GX [Guardians Rising #147] Hustling Strike (bench-damage) → executed Δ70 {opp:active+dmg,opp:deck->hand}
 - [attack] Incineroar-GX [Guardians Rising #147] Tiger Swing (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Incineroar-GX [Sun & Moon #27] Burning Slam-GX (status-burned) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Incineroar-GX [Sun & Moon #27] Hustling Strike (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
+- [attack] Incineroar-GX [Sun & Moon #27] Hustling Strike (bench-damage) → executed Δ70 {opp:active+dmg,opp:deck->hand}
 - [attack] Incineroar-GX [Sun & Moon #27] Tiger Swing (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Incineroar-GX [Sun & Moon Promos #SM38] Burning Slam-GX (status-burned) → executed Δ220 {coin,opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] Incineroar-GX [Sun & Moon Promos #SM38] Hustling Strike (bench-damage) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
+- [attack] Incineroar-GX [Sun & Moon Promos #SM38] Hustling Strike (bench-damage) → executed Δ70 {opp:active+dmg,opp:deck->hand}
 - [attack] Incineroar-GX [Sun & Moon Promos #SM38] Tiger Swing (per-heads-coin) → executed Δ180 {coin,opp:active+dmg,opp:deck->hand}
 - [ability] Incineroar-GX [Team Up #188] Scar Charge (move-damage) → executed [searchAbility,attachAbility,selfDamageAbility] {ability-used,own:active+dmg,own:bench+dmg,own:deck->attached,shuffle}
 - [ability] Incineroar-GX [Team Up #167] Scar Charge (move-damage) → executed [searchAbility,attachAbility,selfDamageAbility] {ability-used,own:active+dmg,own:bench+dmg,own:deck->attached,shuffle}
@@ -983,18 +946,18 @@ Run: 33s
 - [attack] Incineroar-GX [Team Up #188] Crushing Punch (discard-opponent) → executed Δ130 {opp:active+dmg,opp:deck->hand,skipped:nothing_to_discard}
 - [attack] Incineroar-GX [Team Up #167] Crushing Punch (discard-opponent) → executed Δ130 {opp:active+dmg,opp:deck->hand,skipped:nothing_to_discard}
 - [attack] Incineroar-GX [Team Up #97] Crushing Punch (discard-opponent) → executed Δ130 {opp:active+dmg,opp:deck->hand,skipped:nothing_to_discard}
-- [attack] [GX] Incineroar-GX [Team Up #188] Darkest Tornado-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Incineroar-GX [Team Up #167] Darkest Tornado-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Incineroar-GX [Team Up #97] Darkest Tornado-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Incineroar-GX [Team Up #188] Darkest Tornado-GX (per-energy) → executed Δ160 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Incineroar-GX [Team Up #167] Darkest Tornado-GX (per-energy) → executed Δ160 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Incineroar-GX [Team Up #97] Darkest Tornado-GX (per-energy) → executed Δ160 {opp:active+dmg,opp:deck->hand}
 - [ability] Jirachi-GX [Unified Minds #79a] Psychic Zone (weakness) → blind [weaknessAbility]
 - [ability] Jirachi-GX [Unified Minds #79] Psychic Zone (weakness) → blind [weaknessAbility]
 - [attack] Jirachi-GX [Unified Minds #79a] Star Search (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Jirachi-GX [Unified Minds #79] Star Search (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
-- [attack] [GX] Jirachi-GX [Unified Minds #79a] Star Shield-GX (effect-prevention) → no-effect Δ100 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Jirachi-GX [Unified Minds #79] Star Shield-GX (effect-prevention) → no-effect Δ100 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Jirachi-GX [Unified Minds #79a] Star Shield-GX (effect-prevention) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:lock}
+- [attack] [GX] Jirachi-GX [Unified Minds #79] Star Shield-GX (effect-prevention) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Jolteon-GX [Sun & Moon Promos #SM173] Electrobullet (bench-damage) → executed Δ60 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Jolteon-GX [Sun & Moon Promos #SM173] Head Bolt (unknown) → blind Δ110 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Jolteon-GX [Sun & Moon Promos #SM173] Swift Run-GX (effect-prevention) → no-effect Δ110 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Jolteon-GX [Sun & Moon Promos #SM173] Swift Run-GX (effect-prevention) → executed Δ110 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Kangaskhan-GX [Sun & Moon Promos #SM188] Enraged Strike (conditional-damage) → no-effect Δ80 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Kangaskhan-GX [Sun & Moon Promos #SM188] Familial Combo-GX (draw-attach) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:deck->hand}
 - [attack] Kangaskhan-GX [Sun & Moon Promos #SM188] Split Spiral Punch (status-confused) → executed Δ20 {opp:active+dmg,opp:deck->hand,opp:status}
@@ -1013,9 +976,9 @@ Run: 33s
 - [ability] Keldeo-GX [Unified Minds #240] Pure Heart (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
 - [ability] Keldeo-GX [Unified Minds #219] Pure Heart (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
 - [ability] Keldeo-GX [Unified Minds #47] Pure Heart (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
-- [attack] [GX] Keldeo-GX [Unified Minds #240] Resolute Blade-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Keldeo-GX [Unified Minds #219] Resolute Blade-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Keldeo-GX [Unified Minds #47] Resolute Blade-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] [GX] Keldeo-GX [Unified Minds #240] Resolute Blade-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Keldeo-GX [Unified Minds #219] Resolute Blade-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Keldeo-GX [Unified Minds #47] Resolute Blade-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Keldeo-GX [Unified Minds #240] Sonic Edge (immunity) → no-effect Δ110 {opp:active+dmg,opp:deck->hand}
 - [attack] Keldeo-GX [Unified Minds #219] Sonic Edge (immunity) → no-effect Δ110 {opp:active+dmg,opp:deck->hand}
 - [attack] Keldeo-GX [Unified Minds #47] Sonic Edge (immunity) → no-effect Δ110 {opp:active+dmg,opp:deck->hand}
@@ -1096,14 +1059,14 @@ Run: 33s
 - [attack] Lucario-GX [Forbidden Light #SV64] Aura Strike (conditional-damage) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
 - [attack] Lucario-GX [Forbidden Light #135] Aura Strike (conditional-damage) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
 - [attack] Lucario-GX [Forbidden Light #122] Aura Strike (conditional-damage) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Lucario-GX [Forbidden Light #SV64] Cantankerous Beatdown-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Lucario-GX [Forbidden Light #135] Cantankerous Beatdown-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Lucario-GX [Forbidden Light #122] Cantankerous Beatdown-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Lucario-GX [Forbidden Light #SV64] Cantankerous Beatdown-GX (per-energy) → executed Δ90 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Lucario-GX [Forbidden Light #135] Cantankerous Beatdown-GX (per-energy) → executed Δ90 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Lucario-GX [Forbidden Light #122] Cantankerous Beatdown-GX (per-energy) → executed Δ90 {opp:active+dmg,opp:deck->hand}
 - [attack] Lucario-GX [Forbidden Light #SV64] Cyclone Kick (unknown) → blind Δ130 {opp:active+dmg,opp:deck->hand}
 - [attack] Lucario-GX [Forbidden Light #135] Cyclone Kick (unknown) → blind Δ130 {opp:active+dmg,opp:deck->hand}
 - [attack] Lucario-GX [Forbidden Light #122] Cyclone Kick (unknown) → blind Δ130 {opp:active+dmg,opp:deck->hand}
 - [attack] Lucario-GX [Sun & Moon Promos #SM100] Aura Strike (conditional-damage) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Lucario-GX [Sun & Moon Promos #SM100] Cantankerous Beatdown-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Lucario-GX [Sun & Moon Promos #SM100] Cantankerous Beatdown-GX (per-energy) → executed Δ90 {opp:active+dmg,opp:deck->hand}
 - [attack] Lucario-GX [Sun & Moon Promos #SM100] Cyclone Kick (unknown) → blind Δ130 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Lugia-GX [Lost Thunder #227] Lost Purge-GX (next-turn-lock) → executed {opp:active->lostZone,opp:active-changed,opp:attached->lostZone,opp:deck->hand,opp:heal}
 - [attack] [GX] Lugia-GX [Lost Thunder #207] Lost Purge-GX (next-turn-lock) → executed {opp:active->lostZone,opp:active-changed,opp:attached->lostZone,opp:deck->hand,opp:heal}
@@ -1120,21 +1083,21 @@ Run: 33s
 - [attack] [GX] Lunala-GX [Sun & Moon #153] Lunar Fall-GX (next-turn-lock) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Lunala-GX [Sun & Moon #141] Lunar Fall-GX (next-turn-lock) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Lunala-GX [Sun & Moon #66] Lunar Fall-GX (next-turn-lock) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Lunala-GX [Sun & Moon #153] Moongeist Beam (next-turn-lock) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
-- [attack] Lunala-GX [Sun & Moon #141] Moongeist Beam (next-turn-lock) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
-- [attack] Lunala-GX [Sun & Moon #66] Moongeist Beam (next-turn-lock) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
+- [attack] Lunala-GX [Sun & Moon #153] Moongeist Beam (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:lock}
+- [attack] Lunala-GX [Sun & Moon #141] Moongeist Beam (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:lock}
+- [attack] Lunala-GX [Sun & Moon #66] Moongeist Beam (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:lock}
 - [ability] Lunala-GX [Sun & Moon Promos #SM17] Psychic Transfer (energy-redirect) → executed [moveEnergyAbility] {ability-used,own:attached-move}
 - [attack] Lunala-GX [Sun & Moon Promos #SM103a] Glide (unknown) → blind Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Lunala-GX [Sun & Moon Promos #SM103] Glide (unknown) → blind Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Lunala-GX [Sun & Moon Promos #SM17] Lunar Fall-GX (next-turn-lock) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] Lunala-GX [Sun & Moon Promos #SM103a] Lunar Javelin (discard-cost) → executed Δ200 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] Lunala-GX [Sun & Moon Promos #SM103] Lunar Javelin (discard-cost) → executed Δ200 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] Lunala-GX [Sun & Moon Promos #SM17] Moongeist Beam (next-turn-lock) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
+- [attack] Lunala-GX [Sun & Moon Promos #SM17] Moongeist Beam (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:lock}
 - [attack] [GX] Lunala-GX [Sun & Moon Promos #SM103a] Requiem-GX (next-turn-lock) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Lunala-GX [Sun & Moon Promos #SM103] Requiem-GX (next-turn-lock) → no-effect Δ250 {opp:active+dmg,opp:deck->hand}
 - [ability] Lunala-GX [Ultra Prism #172] Psychic Transfer (energy-redirect) → executed [moveEnergyAbility] {ability-used,own:attached-move}
 - [attack] [GX] Lunala-GX [Ultra Prism #172] Lunar Fall-GX (next-turn-lock) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Lunala-GX [Ultra Prism #172] Moongeist Beam (next-turn-lock) → no-effect Δ120 {opp:active+dmg,opp:deck->hand}
+- [attack] Lunala-GX [Ultra Prism #172] Moongeist Beam (next-turn-lock) → executed Δ120 {opp:active+dmg,opp:deck->hand,opp:lock}
 - [attack] [GX] Lurantis-GX [Sun & Moon #150] Chloroscythe-GX (per-energy) → no-effect Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Lurantis-GX [Sun & Moon #138] Chloroscythe-GX (per-energy) → no-effect Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Lurantis-GX [Sun & Moon #15] Chloroscythe-GX (per-energy) → no-effect Δ50 {opp:active+dmg,opp:deck->hand}
@@ -1158,22 +1121,22 @@ Run: 33s
 - [attack] Lycanroc-GX [Guardians Rising #156] Claw Slash (unknown) → blind Δ110 {opp:active+dmg,opp:deck->hand}
 - [attack] Lycanroc-GX [Guardians Rising #138] Claw Slash (unknown) → blind Δ110 {opp:active+dmg,opp:deck->hand}
 - [attack] Lycanroc-GX [Guardians Rising #74] Claw Slash (unknown) → blind Δ110 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Lycanroc-GX [Guardians Rising #SV66] Dangerous Rogue-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Lycanroc-GX [Guardians Rising #156] Dangerous Rogue-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Lycanroc-GX [Guardians Rising #138] Dangerous Rogue-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Lycanroc-GX [Guardians Rising #74] Dangerous Rogue-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] [GX] Lycanroc-GX [Guardians Rising #SV66] Dangerous Rogue-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Lycanroc-GX [Guardians Rising #156] Dangerous Rogue-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Lycanroc-GX [Guardians Rising #138] Dangerous Rogue-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Lycanroc-GX [Guardians Rising #74] Dangerous Rogue-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Lycanroc-GX [Sun & Moon Promos #SM14] Accelerock (unknown) → blind Δ120 {opp:active+dmg,opp:deck->hand}
 - [attack] Lycanroc-GX [Sun & Moon Promos #SM14] Crunch (discard-opponent) → executed Δ30 {opp:active+dmg,opp:attached->discard,opp:deck->hand}
 - [attack] [GX] Lycanroc-GX [Sun & Moon Promos #SM14] Lycanfang-GX (next-turn-lock) → executed Δ200 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [ability] Lycanroc-GX [Team Up #SV67] Twilight Eyes (when-played) → executed [discardCostAbility,whenPlayedAbility] {ability-used,opp:attached->discard}
-- [ability] Lycanroc-GX [Team Up #82] Twilight Eyes (when-played) → executed [discardCostAbility,whenPlayedAbility] {ability-used,opp:attached->discard}
+- [ability] Lycanroc-GX [Team Up #SV67] Twilight Eyes (when-played) → executed [discardEnergyFromOpponent,whenPlayedAbility] {ability-used,opp:attached->discard}
+- [ability] Lycanroc-GX [Team Up #82] Twilight Eyes (when-played) → executed [discardEnergyFromOpponent,whenPlayedAbility] {ability-used,opp:attached->discard}
 - [attack] Lycanroc-GX [Team Up #SV67] Accelerock (unknown) → blind Δ120 {opp:active+dmg,opp:deck->hand}
 - [attack] Lycanroc-GX [Team Up #82] Accelerock (unknown) → blind Δ120 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Lycanroc-GX [Team Up #SV67] Splintered Shards-GX (next-turn-lock) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Lycanroc-GX [Team Up #82] Splintered Shards-GX (next-turn-lock) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] Machamp-GX [Burning Shadows #154] Bedrock Breaker (discard-cost) → no-effect Δ130 {opp:active+dmg,opp:deck->hand}
-- [attack] Machamp-GX [Burning Shadows #135] Bedrock Breaker (discard-cost) → no-effect Δ130 {opp:active+dmg,opp:deck->hand}
-- [attack] Machamp-GX [Burning Shadows #64] Bedrock Breaker (discard-cost) → no-effect Δ130 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Lycanroc-GX [Team Up #SV67] Splintered Shards-GX (next-turn-lock) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Lycanroc-GX [Team Up #82] Splintered Shards-GX (next-turn-lock) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] Machamp-GX [Burning Shadows #154] Bedrock Breaker (discard-cost) → executed Δ130 {opp:active+dmg,opp:deck->hand,skipped:no_stadium}
+- [attack] Machamp-GX [Burning Shadows #135] Bedrock Breaker (discard-cost) → executed Δ130 {opp:active+dmg,opp:deck->hand,skipped:no_stadium}
+- [attack] Machamp-GX [Burning Shadows #64] Bedrock Breaker (discard-cost) → executed Δ130 {opp:active+dmg,opp:deck->hand,skipped:no_stadium}
 - [attack] Machamp-GX [Burning Shadows #154] Cross-Cut (conditional-damage) → no-effect Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Machamp-GX [Burning Shadows #135] Cross-Cut (conditional-damage) → no-effect Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Machamp-GX [Burning Shadows #64] Cross-Cut (conditional-damage) → no-effect Δ60 {opp:active+dmg,opp:deck->hand}
@@ -1238,10 +1201,10 @@ Run: 33s
 - [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #226] Puffy Smashers-GX (conditional-damage) → executed {coin,ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
 - [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #225] Puffy Smashers-GX (conditional-damage) → executed {coin,ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
 - [attack] [GX] Mega Lopunny & Jigglypuff-GX [Cosmic Eclipse #165] Puffy Smashers-GX (conditional-damage) → executed {coin,ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,opp:status,own:prizes->hand}
-- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #245] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->discard,opp:deck->hand}
-- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #225] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->discard,opp:deck->hand}
-- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #226] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->discard,opp:deck->hand}
-- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #126] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->discard,opp:deck->hand}
+- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #245] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->hand,skipped:extra_energy_unmet}
+- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #225] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->hand,skipped:extra_energy_unmet}
+- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #226] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->hand,skipped:extra_energy_unmet}
+- [attack] [GX] Mega Sableye & Tyranitar-GX [Unified Minds #126] Gigafall-GX (next-turn-lock) → executed Δ250 {opp:active+dmg,opp:deck->hand,skipped:extra_energy_unmet}
 - [attack] Mega Sableye & Tyranitar-GX [Unified Minds #245] Greedy Crush (per-prize) → no-effect Δ210 {opp:active+dmg,opp:deck->hand}
 - [attack] Mega Sableye & Tyranitar-GX [Unified Minds #225] Greedy Crush (per-prize) → no-effect Δ210 {opp:active+dmg,opp:deck->hand}
 - [attack] Mega Sableye & Tyranitar-GX [Unified Minds #226] Greedy Crush (per-prize) → no-effect Δ210 {opp:active+dmg,opp:deck->hand}
@@ -1292,9 +1255,9 @@ Run: 33s
 - [attack] [GX] Mimikyu-GX [Lost Thunder #226] Dream Fear-GX (next-turn-lock) → executed {opp:attached->deck,opp:attached->hand,opp:bench->deck,opp:bench->hand,opp:deck->hand,opp:heal,shuffle}
 - [attack] [GX] Mimikyu-GX [Lost Thunder #206] Dream Fear-GX (next-turn-lock) → executed {opp:attached->deck,opp:attached->hand,opp:bench->deck,opp:bench->hand,opp:deck->hand,opp:heal,shuffle}
 - [attack] [GX] Mimikyu-GX [Lost Thunder #149] Dream Fear-GX (next-turn-lock) → executed {opp:attached->deck,opp:attached->hand,opp:bench->deck,opp:bench->hand,opp:deck->hand,opp:heal,shuffle}
-- [attack] Mimikyu-GX [Lost Thunder #226] Let's Snuggle & Fall (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Mimikyu-GX [Lost Thunder #206] Let's Snuggle & Fall (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Mimikyu-GX [Lost Thunder #149] Let's Snuggle & Fall (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] Mimikyu-GX [Lost Thunder #226] Let's Snuggle & Fall (per-energy) → executed Δ100 {opp:active+dmg,opp:deck->hand}
+- [attack] Mimikyu-GX [Lost Thunder #206] Let's Snuggle & Fall (per-energy) → executed Δ100 {opp:active+dmg,opp:deck->hand}
+- [attack] Mimikyu-GX [Lost Thunder #149] Let's Snuggle & Fall (per-energy) → executed Δ100 {opp:active+dmg,opp:deck->hand}
 - [attack] Mimikyu-GX [Lost Thunder #226] Perplex (status-confused) → executed {opp:deck->hand,opp:status}
 - [attack] Mimikyu-GX [Lost Thunder #206] Perplex (status-confused) → executed {opp:deck->hand,opp:status}
 - [attack] Mimikyu-GX [Lost Thunder #149] Perplex (status-confused) → executed {opp:deck->hand,opp:status}
@@ -1330,10 +1293,10 @@ Run: 33s
 - [attack] Muk & Alolan Muk-GX [Unbroken Bonds #197] Severe Poison (status-poisoned) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Muk & Alolan Muk-GX [Unbroken Bonds #196] Severe Poison (status-poisoned) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Muk & Alolan Muk-GX [Unbroken Bonds #61] Severe Poison (status-poisoned) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
-- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #260] Violent Appetite (heal) → executed [healAbility,discardCostAbility] {ability-used,own:hand->discard,own:heal}
-- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #224] Violent Appetite (heal) → executed [healAbility,discardCostAbility] {ability-used,own:hand->discard,own:heal}
-- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #223] Violent Appetite (heal) → executed [healAbility,discardCostAbility] {ability-used,own:hand->discard,own:heal}
-- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #158] Violent Appetite (heal) → executed [healAbility,discardCostAbility] {ability-used,own:hand->discard,own:heal}
+- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #260] Violent Appetite (heal) → executed [discardCostAbility,healAbility] {ability-used,own:hand->discard,own:heal}
+- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #224] Violent Appetite (heal) → executed [discardCostAbility,healAbility] {ability-used,own:hand->discard,own:heal}
+- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #223] Violent Appetite (heal) → executed [discardCostAbility,healAbility] {ability-used,own:hand->discard,own:heal}
+- [ability] Naganadel & Guzzlord-GX [Cosmic Eclipse #158] Violent Appetite (heal) → executed [discardCostAbility,healAbility] {ability-used,own:hand->discard,own:heal}
 - [attack] [GX] Naganadel & Guzzlord-GX [Cosmic Eclipse #260] Chaotic Order-GX (per-prize) → executed {opp:deck->hand,own:prizes->hand}
 - [attack] [GX] Naganadel & Guzzlord-GX [Cosmic Eclipse #224] Chaotic Order-GX (per-prize) → executed {opp:deck->hand,own:prizes->hand}
 - [attack] [GX] Naganadel & Guzzlord-GX [Cosmic Eclipse #223] Chaotic Order-GX (per-prize) → executed {opp:deck->hand,own:prizes->hand}
@@ -1372,12 +1335,12 @@ Run: 33s
 - [attack] [GX] Necrozma-GX [Burning Shadows #153] Black Ray-GX (multi-target) → no-effect {opp:deck->hand}
 - [attack] [GX] Necrozma-GX [Burning Shadows #134] Black Ray-GX (multi-target) → no-effect {opp:deck->hand}
 - [attack] [GX] Necrozma-GX [Burning Shadows #63] Black Ray-GX (multi-target) → no-effect {opp:deck->hand}
-- [attack] Necrozma-GX [Burning Shadows #153] Prismatic Burst (discard-cost) → executed Δ10 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] Necrozma-GX [Burning Shadows #134] Prismatic Burst (discard-cost) → executed Δ10 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] Necrozma-GX [Burning Shadows #63] Prismatic Burst (discard-cost) → executed Δ10 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Necrozma-GX [Burning Shadows #153] Prismatic Burst (discard-cost) → executed Δ70 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Necrozma-GX [Burning Shadows #134] Prismatic Burst (discard-cost) → executed Δ70 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Necrozma-GX [Burning Shadows #63] Prismatic Burst (discard-cost) → executed Δ70 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [ability] Necrozma-GX [Sun & Moon Promos #SM58] Light's End (damage-prevent) → passive [damagePreventAbility,effectPreventAbility]
 - [attack] [GX] Necrozma-GX [Sun & Moon Promos #SM58] Black Ray-GX (multi-target) → no-effect {opp:deck->hand}
-- [attack] Necrozma-GX [Sun & Moon Promos #SM58] Prismatic Burst (discard-cost) → executed Δ10 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Necrozma-GX [Sun & Moon Promos #SM58] Prismatic Burst (discard-cost) → executed Δ70 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [ability] Nihilego-GX [Crimson Invasion #SV62] Empty Light (status) → executed [whenPlayedAbility,statusAbility] {ability-used,own:status}
 - [ability] Nihilego-GX [Crimson Invasion #114] Empty Light (status) → executed [whenPlayedAbility,statusAbility] {ability-used,own:status}
 - [ability] Nihilego-GX [Crimson Invasion #103] Empty Light (status) → executed [whenPlayedAbility,statusAbility] {ability-used,own:status}
@@ -1441,9 +1404,9 @@ Run: 33s
 - [attack] [GX] Persian-GX [Unbroken Bonds #227] Slash Back-GX (switch) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:active->bench,own:active-changed,own:bench->active}
 - [attack] [GX] Persian-GX [Unbroken Bonds #207] Slash Back-GX (switch) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:active->bench,own:active-changed,own:bench->active}
 - [attack] [GX] Persian-GX [Unbroken Bonds #149] Slash Back-GX (switch) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:active->bench,own:active-changed,own:bench->active}
-- [attack] Persian-GX [Unbroken Bonds #227] Vengeance (multi-target) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
-- [attack] Persian-GX [Unbroken Bonds #207] Vengeance (multi-target) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
-- [attack] Persian-GX [Unbroken Bonds #149] Vengeance (multi-target) → no-effect Δ10 {opp:active+dmg,opp:deck->hand}
+- [attack] Persian-GX [Unbroken Bonds #227] Vengeance (multi-target) → executed Δ30 {opp:active+dmg,opp:deck->hand}
+- [attack] Persian-GX [Unbroken Bonds #207] Vengeance (multi-target) → executed Δ30 {opp:active+dmg,opp:deck->hand}
+- [attack] Persian-GX [Unbroken Bonds #149] Vengeance (multi-target) → executed Δ30 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Pheromosa & Buzzwole-GX [Unbroken Bonds #215] Beast Game-GX (per-prize) → no-effect Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Pheromosa & Buzzwole-GX [Unbroken Bonds #192] Beast Game-GX (per-prize) → no-effect Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Pheromosa & Buzzwole-GX [Unbroken Bonds #191] Beast Game-GX (per-prize) → no-effect Δ50 {opp:active+dmg,opp:deck->hand}
@@ -1456,11 +1419,11 @@ Run: 33s
 - [attack] Pheromosa & Buzzwole-GX [Unbroken Bonds #192] Jet Punch (bench-damage) → executed Δ60 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Pheromosa & Buzzwole-GX [Unbroken Bonds #191] Jet Punch (bench-damage) → executed Δ60 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Pheromosa & Buzzwole-GX [Unbroken Bonds #1] Jet Punch (bench-damage) → executed Δ60 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Pheromosa-GX [Sun & Moon Promos #SM66] Beauty-GX (per-prize) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Pheromosa-GX [Sun & Moon Promos #SM66] Beauty-GX (per-prize) → executed {opp:deck->hand}
 - [attack] Pheromosa-GX [Sun & Moon Promos #SM66] Cruel Spike (status-confused) → executed Δ60 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Pheromosa-GX [Sun & Moon Promos #SM66] Fast Raid (first-turn-attack) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Pheromosa-GX [Ultra Prism #158] Beauty-GX (per-prize) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Pheromosa-GX [Ultra Prism #140] Beauty-GX (per-prize) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Pheromosa-GX [Ultra Prism #158] Beauty-GX (per-prize) → executed {opp:deck->hand}
+- [attack] [GX] Pheromosa-GX [Ultra Prism #140] Beauty-GX (per-prize) → executed {opp:deck->hand}
 - [attack] Pheromosa-GX [Ultra Prism #158] Cruel Spike (status-confused) → executed Δ60 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Pheromosa-GX [Ultra Prism #140] Cruel Spike (status-confused) → executed Δ60 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Pheromosa-GX [Ultra Prism #158] Fast Raid (first-turn-attack) → no-effect Δ30 {opp:active+dmg,opp:deck->hand}
@@ -1477,12 +1440,12 @@ Run: 33s
 - [attack] [GX] Pikachu & Zekrom-GX [Team Up #184] Tag Bolt-GX (conditional-damage) → executed Δ180 {ko,opp:active+dmg,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Pikachu & Zekrom-GX [Team Up #162] Tag Bolt-GX (conditional-damage) → executed Δ180 {ko,opp:active+dmg,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Pikachu & Zekrom-GX [Team Up #33] Tag Bolt-GX (conditional-damage) → executed Δ180 {ko,opp:active+dmg,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Pikachu-GX [Sun & Moon Promos #SM232] Agility (coin-flip) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand}
+- [attack] Pikachu-GX [Sun & Moon Promos #SM232] Agility (coin-flip) → executed Δ20 {coin,opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] [GX] Pikachu-GX [Sun & Moon Promos #SM232] Tail Break-GX (status-paralyzed) → executed Δ100 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Pikachu-GX [Sun & Moon Promos #SM232] Volt Tackle (self-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:active+dmg}
 - [attack] [GX] Pinsir-GX [Hidden Fates #6] Guillotine-GX (next-turn-lock) → no-effect Δ160 {opp:active+dmg,opp:deck->hand}
 - [attack] Pinsir-GX [Hidden Fates #6] Superpowered Horns (unknown) → blind Δ110 {opp:active+dmg,opp:deck->hand}
-- [ability] Porygon-Z-GX [Sun & Moon Promos #SM216] Troubleshooting (heal) → executed [healAbility] {ability-used,own:heal}
+- [ability] Porygon-Z-GX [Sun & Moon Promos #SM216] Troubleshooting (heal) → executed [discardOwnAttachedEnergy,healAbility] {skipped:no_energy_to_discard}
 - [attack] Porygon-Z-GX [Sun & Moon Promos #SM216] Abnormal Overheating (self-status) → executed Δ160 {coin,opp:active+dmg,opp:deck->hand,own:active+dmg,own:status}
 - [attack] [GX] Porygon-Z-GX [Sun & Moon Promos #SM216] Critical Error-GX (next-turn-lock) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Primarina-GX [Guardians Rising #149] Bubble Beat (per-energy) → executed Δ30 {opp:active+dmg,opp:deck->hand}
@@ -1534,23 +1497,23 @@ Run: 33s
 - [attack] [GX] Reshiram & Charizard-GX [Sun & Moon Promos #SM201] Double Blaze-GX (conditional-damage) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] Reshiram & Charizard-GX [Sun & Moon Promos #SM247] Flare Strike (next-turn-lock) → executed Δ230 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Reshiram & Charizard-GX [Sun & Moon Promos #SM201] Flare Strike (next-turn-lock) → executed Δ230 {opp:active+dmg,opp:deck->hand,own:lock}
-- [attack] Reshiram & Charizard-GX [Sun & Moon Promos #SM247] Outrage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Reshiram & Charizard-GX [Sun & Moon Promos #SM201] Outrage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] Reshiram & Charizard-GX [Sun & Moon Promos #SM247] Outrage (per-energy) → executed Δ60 {opp:active+dmg,opp:deck->hand}
+- [attack] Reshiram & Charizard-GX [Sun & Moon Promos #SM201] Outrage (per-energy) → executed Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Reshiram & Charizard-GX [Unbroken Bonds #217] Double Blaze-GX (conditional-damage) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Reshiram & Charizard-GX [Unbroken Bonds #194] Double Blaze-GX (conditional-damage) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Reshiram & Charizard-GX [Unbroken Bonds #20] Double Blaze-GX (conditional-damage) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
 - [attack] Reshiram & Charizard-GX [Unbroken Bonds #217] Flare Strike (next-turn-lock) → executed Δ230 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Reshiram & Charizard-GX [Unbroken Bonds #194] Flare Strike (next-turn-lock) → executed Δ230 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Reshiram & Charizard-GX [Unbroken Bonds #20] Flare Strike (next-turn-lock) → executed Δ230 {opp:active+dmg,opp:deck->hand,own:lock}
-- [attack] Reshiram & Charizard-GX [Unbroken Bonds #217] Outrage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Reshiram & Charizard-GX [Unbroken Bonds #194] Outrage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Reshiram & Charizard-GX [Unbroken Bonds #20] Outrage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] Reshiram & Charizard-GX [Unbroken Bonds #217] Outrage (per-energy) → executed Δ60 {opp:active+dmg,opp:deck->hand}
+- [attack] Reshiram & Charizard-GX [Unbroken Bonds #194] Outrage (per-energy) → executed Δ60 {opp:active+dmg,opp:deck->hand}
+- [attack] Reshiram & Charizard-GX [Unbroken Bonds #20] Outrage (per-energy) → executed Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Reshiram & Zekrom-GX [Cosmic Eclipse #259] Cross Break-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Reshiram & Zekrom-GX [Cosmic Eclipse #222] Cross Break-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
 - [attack] [GX] Reshiram & Zekrom-GX [Cosmic Eclipse #157] Cross Break-GX (bench-damage) → executed {ko,opp:attached->discard,opp:bench->discard,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #259] Fabled Flarebolts (bench-damage) → executed Δ90 {opp:bench+dmg,opp:deck->hand}
-- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #222] Fabled Flarebolts (bench-damage) → executed Δ90 {opp:bench+dmg,opp:deck->hand}
-- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #157] Fabled Flarebolts (bench-damage) → executed Δ90 {opp:bench+dmg,opp:deck->hand}
+- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #259] Fabled Flarebolts (bench-damage) → executed {opp:deck->hand,skipped:no_energy}
+- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #222] Fabled Flarebolts (bench-damage) → executed {opp:deck->hand,skipped:no_energy}
+- [attack] Reshiram & Zekrom-GX [Cosmic Eclipse #157] Fabled Flarebolts (bench-damage) → executed {opp:deck->hand,skipped:no_energy}
 - [attack] Reshiram-GX [Dragon Majesty #SV51] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Reshiram-GX [Dragon Majesty #71] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Reshiram-GX [Dragon Majesty #65] Flame Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
@@ -1574,10 +1537,10 @@ Run: 33s
 - [attack] Rowlet & Alolan Exeggutor-GX [Unified Minds #215] Super Growth (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Rowlet & Alolan Exeggutor-GX [Unified Minds #214] Super Growth (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
 - [attack] Rowlet & Alolan Exeggutor-GX [Unified Minds #1] Super Growth (search-deck) → executed {opp:deck->hand,own:deck->hand,shuffle}
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #237] Tropical Hour-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #215] Tropical Hour-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #214] Tropical Hour-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #1] Tropical Hour-GX (next-turn-lock) → no-effect Δ200 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #237] Tropical Hour-GX (next-turn-lock) → executed Δ200 {opp:active+dmg,opp:attached->deck,opp:attached->hand,opp:deck->hand,shuffle}
+- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #215] Tropical Hour-GX (next-turn-lock) → executed Δ200 {opp:active+dmg,opp:attached->deck,opp:attached->hand,opp:deck->hand,shuffle}
+- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #214] Tropical Hour-GX (next-turn-lock) → executed Δ200 {opp:active+dmg,opp:attached->deck,opp:attached->hand,opp:deck->hand,shuffle}
+- [attack] [GX] Rowlet & Alolan Exeggutor-GX [Unified Minds #1] Tropical Hour-GX (next-turn-lock) → executed Δ200 {opp:active+dmg,opp:attached->deck,opp:attached->hand,opp:deck->hand,shuffle}
 - [ability] Salamence-GX [Dragon Majesty #73] Dragon Lift (retreat-cost) → passive [retreatCostAbility]
 - [ability] Salamence-GX [Dragon Majesty #44] Dragon Lift (retreat-cost) → passive [retreatCostAbility]
 - [attack] Salamence-GX [Dragon Majesty #73] Bright Flame (discard-cost) → executed Δ200 {opp:active+dmg,opp:deck->hand,own:attached->discard}
@@ -1660,19 +1623,19 @@ Run: 33s
 - [ability] Silvally-GX [Crimson Invasion #119] Gyro Unit (retreat-cost) → passive [retreatCostAbility]
 - [ability] Silvally-GX [Crimson Invasion #108] Gyro Unit (retreat-cost) → passive [retreatCostAbility]
 - [ability] Silvally-GX [Crimson Invasion #90] Gyro Unit (retreat-cost) → passive [retreatCostAbility]
-- [attack] [GX] Silvally-GX [Crimson Invasion #SV79] Rebel-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Silvally-GX [Crimson Invasion #119] Rebel-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Silvally-GX [Crimson Invasion #108] Rebel-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] [GX] Silvally-GX [Crimson Invasion #90] Rebel-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] [GX] Silvally-GX [Crimson Invasion #SV79] Rebel-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Silvally-GX [Crimson Invasion #119] Rebel-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Silvally-GX [Crimson Invasion #108] Rebel-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Silvally-GX [Crimson Invasion #90] Rebel-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Silvally-GX [Crimson Invasion #SV79] Turbo Drive (draw-attach) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:discard->attached}
 - [attack] Silvally-GX [Crimson Invasion #119] Turbo Drive (draw-attach) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:discard->attached}
 - [attack] Silvally-GX [Crimson Invasion #108] Turbo Drive (draw-attach) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:discard->attached}
 - [attack] Silvally-GX [Crimson Invasion #90] Turbo Drive (draw-attach) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:discard->attached}
 - [ability] Silvally-GX [Sun & Moon Promos #SM91] Gyro Unit (retreat-cost) → passive [retreatCostAbility]
-- [attack] [GX] Silvally-GX [Sun & Moon Promos #SM91] Rebel-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] [GX] Silvally-GX [Sun & Moon Promos #SM91] Rebel-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Silvally-GX [Sun & Moon Promos #SM91] Turbo Drive (draw-attach) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:discard->attached}
 - [ability] Silvally-GX [Ultra Prism #116] Gyro Unit (retreat-cost) → passive [retreatCostAbility]
-- [attack] [GX] Silvally-GX [Ultra Prism #116] Rebel-GX (bench-damage) → executed Δ200 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
+- [attack] [GX] Silvally-GX [Ultra Prism #116] Rebel-GX (bench-damage) → executed Δ150 {opp:active+dmg,opp:deck->hand}
 - [attack] Silvally-GX [Ultra Prism #116] Turbo Drive (draw-attach) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:discard->attached}
 - [attack] Slowpoke & Psyduck-GX [Unified Minds #239] Ditch and Splash (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand,own:hand->discard}
 - [attack] Slowpoke & Psyduck-GX [Unified Minds #218] Ditch and Splash (discard-cost) → executed Δ40 {opp:active+dmg,opp:deck->hand,own:hand->discard}
@@ -1757,14 +1720,14 @@ Run: 33s
 - [attack] Tapu Bulu-GX [Burning Shadows #SV91] Horn Attack (unknown) → blind Δ30 {opp:active+dmg,opp:deck->hand}
 - [attack] Tapu Bulu-GX [Burning Shadows #149] Horn Attack (unknown) → blind Δ30 {opp:active+dmg,opp:deck->hand}
 - [attack] Tapu Bulu-GX [Burning Shadows #130] Horn Attack (unknown) → blind Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] Tapu Bulu-GX [Burning Shadows #SV91] Nature's Judgment (conditional-damage) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] Tapu Bulu-GX [Burning Shadows #149] Nature's Judgment (conditional-damage) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] Tapu Bulu-GX [Burning Shadows #130] Nature's Judgment (conditional-damage) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Tapu Bulu-GX [Burning Shadows #SV91] Nature's Judgment (conditional-damage) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Tapu Bulu-GX [Burning Shadows #149] Nature's Judgment (conditional-damage) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Tapu Bulu-GX [Burning Shadows #130] Nature's Judgment (conditional-damage) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] [GX] Tapu Bulu-GX [Burning Shadows #SV91] Tapu Wilderness-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:heal}
 - [attack] [GX] Tapu Bulu-GX [Burning Shadows #149] Tapu Wilderness-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:heal}
 - [attack] [GX] Tapu Bulu-GX [Burning Shadows #130] Tapu Wilderness-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:heal}
 - [attack] Tapu Bulu-GX [Sun & Moon Promos #SM32] Horn Attack (unknown) → blind Δ30 {opp:active+dmg,opp:deck->hand}
-- [attack] Tapu Bulu-GX [Sun & Moon Promos #SM32] Nature's Judgment (conditional-damage) → executed Δ120 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Tapu Bulu-GX [Sun & Moon Promos #SM32] Nature's Judgment (conditional-damage) → executed Δ180 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] [GX] Tapu Bulu-GX [Sun & Moon Promos #SM32] Tapu Wilderness-GX (next-turn-lock) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:heal}
 - [attack] Tapu Fini-GX [Burning Shadows #SV92] Aqua Ring (switch) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:active->bench,own:active-changed,own:bench->active}
 - [attack] Tapu Fini-GX [Burning Shadows #39a] Aqua Ring (switch) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:active->bench,own:active-changed,own:bench->active}
@@ -1820,12 +1783,12 @@ Run: 33s
 - [attack] Tauros-GX [Sun & Moon #156] Horn Attack (unknown) → blind Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Tauros-GX [Sun & Moon #144] Horn Attack (unknown) → blind Δ60 {opp:active+dmg,opp:deck->hand}
 - [attack] Tauros-GX [Sun & Moon #100] Horn Attack (unknown) → blind Δ60 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Tauros-GX [Sun & Moon #156] Mad Bull-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Tauros-GX [Sun & Moon #144] Mad Bull-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] [GX] Tauros-GX [Sun & Moon #100] Mad Bull-GX (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Tauros-GX [Sun & Moon #156] Rage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Tauros-GX [Sun & Moon #144] Rage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
-- [attack] Tauros-GX [Sun & Moon #100] Rage (per-energy) → executed {ko,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
+- [attack] [GX] Tauros-GX [Sun & Moon #156] Mad Bull-GX (per-energy) → executed Δ90 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Tauros-GX [Sun & Moon #144] Mad Bull-GX (per-energy) → executed Δ90 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Tauros-GX [Sun & Moon #100] Mad Bull-GX (per-energy) → executed Δ90 {opp:active+dmg,opp:deck->hand}
+- [attack] Tauros-GX [Sun & Moon #156] Rage (per-energy) → executed Δ50 {opp:active+dmg,opp:deck->hand}
+- [attack] Tauros-GX [Sun & Moon #144] Rage (per-energy) → executed Δ50 {opp:active+dmg,opp:deck->hand}
+- [attack] Tauros-GX [Sun & Moon #100] Rage (per-energy) → executed Δ50 {opp:active+dmg,opp:deck->hand}
 - [attack] Thundurus-GX [Sun & Moon Promos #SM133] Charge (search-deck) → executed {opp:deck->hand,own:deck->attached,shuffle}
 - [attack] Thundurus-GX [Sun & Moon Promos #SM133] Electric Ball (unknown) → blind Δ140 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Thundurus-GX [Sun & Moon Promos #SM133] Thundering Hurricane-GX (per-heads-coin) → executed Δ200 {coin,ko,opp:active+dmg,opp:active->discard,opp:active-changed,opp:attached->discard,opp:bench->active,opp:deck->hand,opp:heal,own:prizes->hand}
@@ -1842,11 +1805,11 @@ Run: 33s
 - [attack] Toxapex-GX [Guardians Rising #154] Super Intense Poison (status-poisoned) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Toxapex-GX [Guardians Rising #136] Super Intense Poison (status-poisoned) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
 - [attack] Toxapex-GX [Guardians Rising #57] Super Intense Poison (status-poisoned) → executed Δ10 {opp:active+dmg,opp:deck->hand,opp:status}
-- [attack] [GX] Toxapex-GX [Guardians Rising #154] Total Shelter-GX (effect-prevention) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Toxapex-GX [Guardians Rising #136] Total Shelter-GX (effect-prevention) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
-- [attack] [GX] Toxapex-GX [Guardians Rising #57] Total Shelter-GX (effect-prevention) → no-effect Δ150 {opp:active+dmg,opp:deck->hand}
+- [attack] [GX] Toxapex-GX [Guardians Rising #154] Total Shelter-GX (effect-prevention) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:lock}
+- [attack] [GX] Toxapex-GX [Guardians Rising #136] Total Shelter-GX (effect-prevention) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:lock}
+- [attack] [GX] Toxapex-GX [Guardians Rising #57] Total Shelter-GX (effect-prevention) → executed Δ150 {opp:active+dmg,opp:deck->hand,own:lock}
 - [attack] Trevenant & Dusknoir-GX [Sun & Moon Promos #SM217] Night Watch (shuffle-cost) → executed Δ150 {opp:active+dmg,opp:deck->hand,opp:hand->deck,shuffle}
-- [attack] [GX] Trevenant & Dusknoir-GX [Sun & Moon Promos #SM217] Pale Moon-GX (next-turn-lock) → executed {opp:attached->discard,opp:deck->hand,opp:lock}
+- [attack] [GX] Trevenant & Dusknoir-GX [Sun & Moon Promos #SM217] Pale Moon-GX (next-turn-lock) → executed {opp:deck->hand,opp:lock,skipped:extra_energy_unmet}
 - [attack] Tsareena-GX [Sun & Moon Promos #SM56] Jumping Side Kick (conditional-damage) → no-effect Δ90 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Tsareena-GX [Sun & Moon Promos #SM56] Queen's Command-GX (next-turn-lock) → executed {opp:deck->hand,opp:hand->discard}
 - [attack] Tsareena-GX [Sun & Moon Promos #SM56] Side Eye (status-confused) → executed {opp:active->bench,opp:active-changed,opp:bench->active,opp:deck->hand}
@@ -1858,10 +1821,10 @@ Run: 33s
 - [attack] [GX] Turtonator-GX [Guardians Rising #148] Nitro Tank-GX (draw-attach) → executed {opp:deck->hand,own:discard->attached}
 - [attack] [GX] Turtonator-GX [Guardians Rising #131] Nitro Tank-GX (draw-attach) → executed {opp:deck->hand,own:discard->attached}
 - [attack] [GX] Turtonator-GX [Guardians Rising #18] Nitro Tank-GX (draw-attach) → executed {opp:deck->hand,own:discard->attached}
-- [attack] Turtonator-GX [Guardians Rising #SV52] Shell Trap (bench-damage) → no-effect Δ20 {opp:active+dmg,opp:deck->hand}
-- [attack] Turtonator-GX [Guardians Rising #148] Shell Trap (bench-damage) → no-effect Δ20 {opp:active+dmg,opp:deck->hand}
-- [attack] Turtonator-GX [Guardians Rising #131] Shell Trap (bench-damage) → no-effect Δ20 {opp:active+dmg,opp:deck->hand}
-- [attack] Turtonator-GX [Guardians Rising #18] Shell Trap (bench-damage) → no-effect Δ20 {opp:active+dmg,opp:deck->hand}
+- [attack] Turtonator-GX [Guardians Rising #SV52] Shell Trap (bench-damage) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:lock}
+- [attack] Turtonator-GX [Guardians Rising #148] Shell Trap (bench-damage) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:lock}
+- [attack] Turtonator-GX [Guardians Rising #131] Shell Trap (bench-damage) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:lock}
+- [attack] Turtonator-GX [Guardians Rising #18] Shell Trap (bench-damage) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:lock}
 - [ability] Tyranitar-GX [Lost Thunder #223] Lost Out (recursion) → executed [opponentDisruptAbility] {skipped:unsupported_step}
 - [ability] Tyranitar-GX [Lost Thunder #203] Lost Out (recursion) → executed [opponentDisruptAbility] {skipped:unsupported_step}
 - [ability] Tyranitar-GX [Lost Thunder #121] Lost Out (recursion) → executed [opponentDisruptAbility] {skipped:unsupported_step}
@@ -1871,15 +1834,15 @@ Run: 33s
 - [attack] [GX] Tyranitar-GX [Lost Thunder #223] Lay the Smackdown-GX (next-turn-lock) → no-effect Δ220 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Tyranitar-GX [Lost Thunder #203] Lay the Smackdown-GX (next-turn-lock) → no-effect Δ220 {opp:active+dmg,opp:deck->hand}
 - [attack] [GX] Tyranitar-GX [Lost Thunder #121] Lay the Smackdown-GX (next-turn-lock) → no-effect Δ220 {opp:active+dmg,opp:deck->hand}
-- [attack] Ultra Necrozma-GX [Dragon Majesty #78] Photon Geyser (discard-cost) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Ultra Necrozma-GX [Dragon Majesty #78] Photon Geyser (discard-cost) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] [GX] Ultra Necrozma-GX [Dragon Majesty #78] Sky-Scorching Light-GX (bench-damage) → executed Δ240 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] Ultra Necrozma-GX [Forbidden Light #140] Photon Geyser (discard-cost) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] Ultra Necrozma-GX [Forbidden Light #127] Photon Geyser (discard-cost) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:attached->discard}
-- [attack] Ultra Necrozma-GX [Forbidden Light #95] Photon Geyser (discard-cost) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Ultra Necrozma-GX [Forbidden Light #140] Photon Geyser (discard-cost) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Ultra Necrozma-GX [Forbidden Light #127] Photon Geyser (discard-cost) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Ultra Necrozma-GX [Forbidden Light #95] Photon Geyser (discard-cost) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] [GX] Ultra Necrozma-GX [Forbidden Light #140] Sky-Scorching Light-GX (bench-damage) → executed Δ240 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] [GX] Ultra Necrozma-GX [Forbidden Light #127] Sky-Scorching Light-GX (bench-damage) → executed Δ240 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] [GX] Ultra Necrozma-GX [Forbidden Light #95] Sky-Scorching Light-GX (bench-damage) → executed Δ240 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
-- [attack] Ultra Necrozma-GX [Sun & Moon Promos #SM126] Photon Geyser (discard-cost) → executed Δ20 {opp:active+dmg,opp:deck->hand,own:attached->discard}
+- [attack] Ultra Necrozma-GX [Sun & Moon Promos #SM126] Photon Geyser (discard-cost) → executed Δ100 {opp:active+dmg,opp:deck->hand,own:attached->discard}
 - [attack] [GX] Ultra Necrozma-GX [Sun & Moon Promos #SM126] Sky-Scorching Light-GX (bench-damage) → executed Δ240 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] Umbreon & Darkrai-GX [Sun & Moon Promos #SM241] Black Lance (bench-damage) → executed Δ210 {opp:active+dmg,opp:bench+dmg,opp:deck->hand}
 - [attack] [GX] Umbreon & Darkrai-GX [Sun & Moon Promos #SM241] Dark Moon-GX (next-turn-lock) → executed {opp:deck->hand,opp:play-lock,skipped:extra_energy_unmet}

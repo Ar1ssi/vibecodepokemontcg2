@@ -2,8 +2,10 @@
 
 Written 2026-09-28. Continues `.agent/designs/parse-holes-handoff.md` (on branch
 `claude/card-parsing-issues-9aedd6`). This branch starts at that branch's head `0c892e3d`, so it
-carries the audit-gate hardening `4e030a4d`. It is **not merged**. The user said: do not merge
-unless told to.
+carries the audit-gate hardening `4e030a4d`. Merged to `main` with PR #190 as PR #194 (`385483b`).
+
+**Update (branch `claude/pr-194-handoff-check-oekv67`): items 2–5 below are done; see
+"Items 2–5: done" at the end.** Everything above that section is history.
 
 ## Base decision (from the user)
 
@@ -97,3 +99,47 @@ the review first.
   - the gate outputs `abil*.txt`
 - The primary working copy is CRLF. The node edit scripts keep CRLF. The Bash heredoc mangles `\`.
 - `gh` is authenticated as Ar1ssi.
+
+## Items 2–5: done (branch `claude/pr-194-handoff-check-oekv67`)
+
+Written 2026-09-28. Item 1's review was not run: the user asked to open the PR without it.
+
+- **2. Gust Abilities** (`abilities.mjs` §3): a stand-alone "you may switch out your opponent's
+  Active Pokémon to the Bench" emits `switchOpponentOut` (the opponent picks). Covers Mabosstiff
+  Intimidating Howl, Shinx Big Roar (the Active Spot gate is `requiresActiveSpot`) and Iron Bundle
+  Hyper Blower. Iron Bundle's "If you do, discard this Pokémon and all attached cards" is a
+  `selfLeavesAbility` after the gust. It no longer parses a spurious `opponentDisruptAbility`.
+- **3. Fire Breath**: "the Defending Pokémon" / "1 of the Defending Pokémon" is now
+  `target: 'opponent'`. This fixed 29 old Poké-Powers (Hypno, Drapion, Articuno, Vileplume …).
+  §27 reads `statusText`, so a "This power can't be used if …" restriction no longer adds an
+  `effectPreventAbility`. That step was dropped from 292 rows.
+- **4. Unruly Claw**: Crawdaunt and Lycanroc-GX Twilight Eyes emit
+  `discardEnergyFromOpponent { scope: 'Active' }`. The new `Active` scope is in `trainer-steps.mjs`.
+- **5. Type words**: `symbolizeTypeWords` (`rules/attack-text.mjs`) runs in `normalizeAttackText`,
+  in the ability `normalizeText` and at the `parseAttackDamage` entry. It converts a type word only
+  in a cost run or before Energy/Pokémon/type/less/more/Weakness/Resistance, or after "type is" /
+  "attack for". Names and Double Colorless / Double Dragon / Dark Metal Energy keep their words.
+  The damage type-gated bonus reader now accepts `{w} pokémon`.
+  - Corpus parses: unchanged.
+  - Typography flags: Abilities 252 → 0, attacks 171 → 0.
+  - New gate: `typography-parity.test.mjs`, type-words case.
+
+Verified:
+- `pnpm test`: 4808 pass, 0 fail.
+- `audit:abilities`, `audit:attacks`, `audit:trainers`, `audit:oracle` and the GX oracle all
+  PASSED. The Ability and attack baselines were ratcheted.
+- GX oracle: no-effect went 238 → 201, and no family regressed.
+
+### Next
+
+1. **Review** this branch's engine diff (`review.md`) before building more on it.
+2. **13 masked "If you do," Poké-Powers.** Their cost half never parsed. They are listed in the
+   `KNOWN_GAPS` of `scripts/lib/ability-if-you-do-coverage.test.mjs`: Poliwrath Strange Spiral,
+   Beedrill Final Sting, Electrode Buzzap, …
+3. **Krookodile Black Eyes** (Emerging Powers 62): a coin-gated opponent-Active Energy discard. It
+   parses as `opponentDisruptAbility`. Reuse `scope: 'Active'` inside a `coinFlip`.
+4. **Feraligatr Major Tsunami** (Expedition 12/47): the opponent switches, then this Pokémon
+   switches ("Either way"). It parses as the player's own switch only.
+5. **Venusaur Solar Power** (Wizards Promo 13) and **Ditto Transform** (Fossil 18) are cures or
+   copies. They are still parsed as a `statusAbility`.
+6. `clause` flags: 98 rows left (`pnpm audit:abilities --rows`).

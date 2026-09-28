@@ -963,7 +963,12 @@ function discardEnergyFromOpponent(ctx) {
     return null;
   }
 
-  const energies = allAttachedMatching(ctx, [opponent], matchesEnergy);
+  // scope 'Active': only the opponent's Active Pokémon (Crawdaunt Unruly Claw).
+  const active = step.scope === 'Active' ? activeOf(opponent) : null;
+  const energies =
+    step.scope === 'Active'
+      ? (active ? attachedCards(opponent, active.instanceId).filter(matchesEnergy) : [])
+      : allAttachedMatching(ctx, [opponent], matchesEnergy);
   if (ctx.selection) {
     const energy = energies.find((c) => c.instanceId === ctx.selection[0]);
     if (!energy) return skip(ctx, 'target_not_found');
@@ -979,7 +984,7 @@ function discardEnergyFromOpponent(ctx) {
   }
   if (energies.length === 0) return skip(ctx, 'no_opponent_energy');
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Choose an Energy attached to your opponent's Pokémon`,
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose an Energy attached to your opponent's ${step.scope === 'Active' ? 'Active ' : ''}Pokémon`,
     options: energies,
     min: 1,
     max: 1,
