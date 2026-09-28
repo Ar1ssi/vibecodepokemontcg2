@@ -2,6 +2,7 @@ import {
       createDeckInLibrary,
       deleteDeckFromLibrary,
       getDeckFromLibrary,
+      LIBRARY_STORAGE_KEY,
       listDecks,
       loadLibraryFromStorage,
       renameDeckInLibrary,
@@ -39,27 +40,73 @@ import {
      * per target (P1 / P2). This avoids stale cross-session bindings overwriting
      * saved decks on page load.
      *
+     * The deck builder tab and the game tab both hold a controller over the
+     * same stored library (design 050), so every change re-reads storage first
+     * and writes back only its own edit, and a `storage` event from the other
+     * tab reloads this one.
+     *
      * @param {object} options
      * @param {function} options.onOpenDeck - called with (target, deckId, cards)
      *   when a saved deck is opened; deckId is null when the editor is cleared.
      * @param {function} options.onSaveCurrentDeck - called before switching decks
      *   so the caller can flush the current editor deck into its saved deck.
+     * @param {boolean} [options.allowDeckWrites] - false on the game tab: it
+     *   never edits deck cards, so its stale editor copy must never be saved.
      * @returns {object|null} controller, or null when the bar markup is missing.
      */
     export const initializeNativeDeckBuilderLibrary = ({
       onOpenDeck,
       onSaveCurrentDeck,
+      allowDeckWrites = true,
     }) => {
       const barEl = document.getElementById('nativeDeckBuilderLibraryBar');
       const listEl = document.getElementById('nativeDeckBuilderLibraryList');
       const newDeckButton = document.getElementById('nativeDeckBuilderNewDeck');
       const statusEl = document.getElementById('nativeDeckBuilderLibraryStatus');
-    
+      // "My Decks" is a dropdown beside Current Deck (design 050): the toggle
+      // names the open deck, the popover holds the deck chips.
+      const toggleEl = document.getElementById('nativeDeckBuilderLibraryToggle');
+      const popoverEl = document.getElementById('nativeDeckBuilderLibraryPopover');
+      const toggleLabelEl = toggleEl?.querySelector('[data-deck-picker-label]') || null;
+
       if (!barEl || !listEl || !newDeckButton) return null;
+
+      const onPickerKeydown = (event) => {
+        if (event.key === 'Escape') {
+          closePicker();
+          toggleEl?.focus();
+        }
+      };
+      const onPickerOutside = (event) => {
+        if (!barEl.contains(event.target)) closePicker();
+      };
+      const openPicker = () => {
+        if (!popoverEl) return;
+        popoverEl.hidden = false;
+        toggleEl?.setAttribute('aria-expanded', 'true');
+        document.addEventListener('keydown', onPickerKeydown);
+        document.addEventListener('mousedown', onPickerOutside);
+      };
+      // Hoisted: openDeck, defined below, closes the picker once a deck is picked.
+      function closePicker() {
+        if (!popoverEl || popoverEl.hidden) return;
+        popoverEl.hidden = true;
+        toggleEl?.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('keydown', onPickerKeydown);
+        document.removeEventListener('mousedown', onPickerOutside);
+      }
+      toggleEl?.addEventListener('click', () => {
+        if (popoverEl?.hidden) openPicker();
+        else closePicker();
+      });
     
       let library = loadLibraryFromStorage(window.localStorage);
       let currentTarget = 'self';
       const activeDeckIds = { self: null, opp: null };
+
+      const reload = () => {
+        library = loadLibraryFromStorage(window.localStorage);
+      };
     
       // Seed premade starter/battle decks so every player has playable lists.
       // Adds any catalog deck missing from the library; backfills sleeve/coin on
@@ -147,15 +194,18 @@ import {
       };
     
       const openDeck = (target, deckId) => {
+        reload();
         const cards = getDeckFromLibrary(library, deckId);
         if (!cards) return;
         const key = target === 'opp' ? 'opp' : 'self';
         activeDeckIds[key] = deckId;
+        closePicker();
         onOpenDeck(target, deckId, cards);
         render();
       };
     
       const createNewDeck = () => {
+        reload();
         if (listDecks(library).length >= MAX_LIBRARY_DECKS) {
           showStatus(`Deck limit reached (${MAX_LIBRARY_DECKS}). Delete a deck first.`);
           return;
@@ -175,6 +225,7 @@ import {
       };
     
       const renameDeck = (deckId) => {
+        reload();
         const deck = library?.decks?.[deckId];
         if (!deck) return;
         const newName = window.prompt('Rename deck:', deck.name);
@@ -183,6 +234,7 @@ import {
       };
     
       const deleteDeck = (deckId) => {
+        reload();
         const deck = library?.decks?.[deckId];
         if (!deck) return;
         if (!window.confirm(`Delete deck "${deck.name}"? This cannot be undone.`)) return;
@@ -200,7 +252,10 @@ import {
       const render = () => {
         const decks = listDecks(library);
         const activeId = activeDeckIds[currentTarget];
-    
+        if (toggleLabelEl) {
+          toggleLabelEl.textContent = library?.decks?.[activeId]?.name || 'Choose a deck';
+        }
+
         if (decks.length === 0) {
           listEl.innerHTML =
             '<span class="native-deck-builder-library-empty">No saved decks yet — create one to get started.</span>';
@@ -259,12 +314,28 @@ import {
         onSaveCurrentDeck?.();
         createNewDeck();
       });
-    
+
+      // The other tab changed the library (key null = storage cleared).
+      window.addEventListener('storage', (event) => {
+        if (event.key !== null && event.key !== LIBRARY_STORAGE_KEY) return;
+        reload();
+        render();
+      });
+
       render();
-    
+
+      // Cosmetic setters: re-read, then write only this deck's field.
+      const setActiveField = (target, value, setField, { silent = true } = {}) => {
+        reload();
+        const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+        if (!activeId || !library?.decks?.[activeId]) return false;
+        commit(setField(library, activeId, value), { silent });
+        return true;
+      };
+
       return {
         refresh: () => {
-          library = loadLibraryFromStorage(window.localStorage);
+          reload();
           render();
         },
         setTarget: (target) => {
@@ -276,36 +347,14 @@ import {
           activeDeckIds[key] = deckId || null;
           render();
         },
-        setActiveSleeve: (target, sleeveId) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
-              if (!activeId || !library?.decks?.[activeId]) return false;
-              commit(setDeckSleeve(library, activeId, sleeveId), { silent: true });
-              return true;
-            },
-        setActiveCoin: (target, coinId) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
-              if (!activeId || !library?.decks?.[activeId]) return false;
-              commit(setDeckCoin(library, activeId, coinId), { silent: true });
-              return true;
-            },
-        setActiveMat: (target, matId) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
-              if (!activeId || !library?.decks?.[activeId]) return false;
-              commit(setDeckMat(library, activeId, matId), { silent: true });
-              return true;
-            },
-        setActiveSprites: (target, sprites) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
-              if (!activeId || !library?.decks?.[activeId]) return false;
-              commit(setDeckSprites(library, activeId, sprites));
-              return true;
-            },
-        setActiveWallpaper: (target, wallpaperId) => {
-              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
-              if (!activeId || !library?.decks?.[activeId]) return false;
-              commit(setDeckWallpaper(library, activeId, wallpaperId), { silent: true });
-              return true;
-            },
+        setActiveSleeve: (target, sleeveId) =>
+          setActiveField(target, sleeveId, setDeckSleeve),
+        setActiveCoin: (target, coinId) => setActiveField(target, coinId, setDeckCoin),
+        setActiveMat: (target, matId) => setActiveField(target, matId, setDeckMat),
+        setActiveSprites: (target, sprites) =>
+          setActiveField(target, sprites, setDeckSprites, { silent: false }),
+        setActiveWallpaper: (target, wallpaperId) =>
+          setActiveField(target, wallpaperId, setDeckWallpaper),
         getActiveWallpaper: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId]
@@ -337,6 +386,8 @@ import {
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].matId || null : null;
             },
             saveActiveDeck: (cards) => {
+          if (!allowDeckWrites) return false;
+          reload();
           const activeId = activeDeckIds[currentTarget];
           if (!activeId || !library?.decks?.[activeId]) return false;
           commit(saveDeckToLibrary(library, activeId, cards, Date.now()), {
@@ -354,6 +405,10 @@ import {
          *   reason?: 'cancelled'|'limit'}}
          */
         saveCurrentDeck: (cards, cosmetics = {}) => {
+          if (!allowDeckWrites) {
+            return { saved: false, created: false, name: null, reason: 'read-only' };
+          }
+          reload();
           const activeId = activeDeckIds[currentTarget];
           const isNew = !activeId || !library?.decks?.[activeId];
 

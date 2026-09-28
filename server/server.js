@@ -229,6 +229,12 @@ async function main() {
   app.get('/', (_, res) => {
     res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED });
   });
+  // The deck builder's own tab (design 050): the same page in builder mode.
+  // The page's asset URLs are relative, so a trailing slash would break them.
+  app.get('/deck-builder', (req, res) => {
+    if (req.path.endsWith('/')) return res.redirect(301, '/deck-builder');
+    res.render('index', { importDataJSON: null, e2eAllowed: E2E_ENABLED, builderWindow: true });
+  });
   app.get('/import', (req, res) => {
     const key = req.query.key;
     if (!key) {

@@ -10,8 +10,18 @@ client/src/css/deck-builder-live.css — deck builder's PTCG Live theme (D: S252
   to the pre-Live grey palette. Token block at the top is the only thing the two themes differ by.
 client/src/setup/deck-builder/core/builder-theme.mjs — theme resolve/persist (dark default)
 client/src/setup/deck-builder/core/deck-counter.mjs — "x / 60" counter model from a validateDeck result
-client/src/setup/deck-builder/core/card-filters.mjs — search filter pills (card class / energy type /
-  Trainer subtype); OR within a group, AND across groups; reuses energy-token-assets.mjs's type vocabulary
+client/src/setup/deck-builder/core/card-filters.mjs — TCG Live filter drawer model (design 050): format,
+  reg mark, card/energy/Trainer type, stage, Special (ex/EX/GX/V/Mega/…), HP, retreat, weakness, rarity,
+  expansion, Has Ability, In deck; OR within a group, AND across; `buildTcgdexFilterParams` = the server-
+  narrowable subset (TCGdex narrows, client filter is the truth); chips via describeActiveFilters
+client/src/setup/deck-builder/core/builder-window.mjs — the builder runs in its own tab at /deck-builder
+  (same index.ejs, `body.deck-builder-window`); role resolve + validated postMessage protocol to the game
+  tab. DOM glue: initialization/.../sidebox/deck-builder-window.js. In native-deck-builder.js every game
+  side effect goes through `gameLink` (local on the game tab, messages from the builder tab); the game
+  tab's library is read-only for deck cards (`allowDeckWrites: false`) and every library write re-reads
+  storage first (two tabs share it). Deck tab = slim panel (P1/P2, card back, Open Deck Builder).
+client/src/setup/deck-builder/core/set-browser-filters.mjs — the same drawer filters on Browse Sets: TCGdex narrows
+  each set (`set.id=eq:`), full records decide; filters TCGdex cannot narrow only scan the open set.
 client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):
   up to 2 `{slug, shiny}` per deck (D99), catalog search and vendored-art URL building; catalog data in
   pokemon-sprite-catalog.generated.mjs (gen-8 species + Mega/Gmax/regional/transform/type forms, design 039),

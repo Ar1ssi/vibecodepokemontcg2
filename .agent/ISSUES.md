@@ -6,12 +6,14 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I198). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I200). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I199 2026-09-28 P3 [deck-builder] find-type.js, find-old-type.js (+ its database/updater) and tcgdex-image-url.mjs lost their only caller when the text decklist importer was removed (design 050); delete them with their tests or revive them for a new importer
+- I198 2026-09-28 P2 [deck-builder] Leaving a room repopulates selfDeckData from #selfCurrentDecklistTable (header-buttons.js, room-buttons.js), which only the removed text importer filled — builder-loaded decks are dropped on leave; read the deck from the builder/library instead (refs: design 050)
 - I196 2026-09-28 P2 [rules] Alakazam ex Dimensional Hand ("can be used even if this Pokémon is on the Bench") unsupported: the attack pipeline assumes the Active attacks; needs attacker selection by instanceId (refs: .agent/scratch/parse-holes/landing.md)
 - I195 2026-09-28 P2 [rules] Flygon ex Psychic Protector (discard up to 4 when damaged, −10 each) and Delibird Souvenir coin tiers unimplemented: need a defender prompt mid-damage / a per-tier coin step (refs: parse-holes review.md)
 - I194 2026-09-28 P3 [rules] Approximations: Bronzong Heavy Potential reads printed Retreat Cost; Night Spin counts Energy cards not units; Metal Bomber / Reaper Pulse "up to" take the max; stampHealedPokemon counts counter moves as heals; Mothim/Ninjask Quick Touch and Magcargo Lava Plume "If you do" halves unparsed

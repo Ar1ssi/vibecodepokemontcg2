@@ -53,53 +53,153 @@ const escapeHtml = (value = '') => String(value)
       });
     };
     
+    const HP_SLIDER = { min: 0, max: 400, step: 10 };
+
+    const isOptionOn = (group, option, filters) => {
+      if (group.kind === 'single') return filters?.[group.key] === option.value;
+      if (group.kind === 'toggles') return filters?.[option.value] === true;
+      return (filters?.[group.key] || []).includes(option.value);
+    };
+
+    const groupActiveCount = (group, filters) => {
+      if (group.kind === 'range') return filters?.hpMin != null || filters?.hpMax != null ? 1 : 0;
+      return group.options.filter((option) => isOptionOn(group, option, filters)).length;
+    };
+
+    const renderFilterControl = (group, option, filters) => {
+      const isOn = isOptionOn(group, option, filters);
+      const label = escapeHtml(option.label);
+      // Toggles flip a boolean named by the option itself, not by the group.
+      const dataGroup = escapeHtml(group.kind === 'toggles' ? option.value : group.key);
+      const data = `data-filter-group="${dataGroup}" data-filter-value="${escapeHtml(option.value)}"`;
+
+      if (group.kind === 'toggles') {
+        return `<button type="button" role="switch" aria-checked="${isOn}" class="native-deck-builder-ftoggle${isOn ? ' on' : ''}" ${data}>
+            <span class="native-deck-builder-ftoggle-label">${label}</span>
+            <span class="native-deck-builder-ftoggle-track" aria-hidden="true"><span class="native-deck-builder-ftoggle-dot"></span></span>
+          </button>`;
+      }
+      if (group.kind === 'icons') {
+        return `<button type="button" class="native-deck-builder-ficon${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}" title="${label}" aria-label="${label}">
+            <img src="${escapeHtml(option.icon)}" alt="" />
+          </button>`;
+      }
+      if (group.kind === 'pips') {
+        return `<button type="button" class="native-deck-builder-fpip${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}" title="Retreat ${label}">${label}</button>`;
+      }
+      return `<button type="button" class="native-deck-builder-fpill${isOn ? ' on' : ''}" ${data} aria-pressed="${isOn}">${label}</button>`;
+    };
+
+    const renderHpRange = (filters) => {
+      const low = filters?.hpMin ?? HP_SLIDER.min;
+      const high = filters?.hpMax ?? HP_SLIDER.max;
+      const range = `min="${HP_SLIDER.min}" max="${HP_SLIDER.max}" step="${HP_SLIDER.step}"`;
+      return `<div class="native-deck-builder-frange">
+          <input type="range" ${range} value="${low}" data-hp-bound="min" aria-label="Minimum HP" />
+          <input type="range" ${range} value="${high}" data-hp-bound="max" aria-label="Maximum HP" />
+        </div>
+        <div class="native-deck-builder-frange-readout"><span data-hp-readout="min">${low}</span><span data-hp-readout="max">${high}</span></div>`;
+    };
+
     /**
-     * Renders Pokémon TCG Live's filter pill rows above the card gallery.
-     * `groups` comes from card-filters.mjs's BUILDER_FILTER_GROUPS and
-     * `filters` is the active state; this function draws and reports clicks
-     * only — toggling and filtering live in that pure module.
+     * Renders the TCG Live filter drawer (design 050) from card-filters.mjs's
+     * BUILDER_FILTER_GROUPS. `filters` is the draft being edited; this function
+     * draws and reports intent only — all filter logic lives in that module.
+     * `setOptions` fills the Expansion group, whose options come from results.
      */
-    export const renderFilterBar = ({ filterBarEl, groups, filters, onToggle, onClear }) => {
-      if (!filterBarEl) return;
+    export const renderFilterDrawer = ({
+      drawerEl,
+      groups,
+      filters,
+      setOptions = [],
+      onToggle,
+      onHpChange,
+      onReset,
+      onApply,
+      onClose,
+    }) => {
+      if (!drawerEl) return;
 
-      const activeCount = groups.reduce(
-        (total, group) => total + (filters?.[group.key]?.length || 0),
-        0
-      );
-
-      const rows = groups
+      const sections = groups
         .map((group) => {
-          const active = filters?.[group.key] || [];
-          const pills = group.options
-            .map((option) => {
-              const isOn = active.includes(option.value);
-              const icon = option.icon
-                ? `<img class="native-deck-builder-filter-icon" src="${escapeHtml(option.icon)}" alt="" aria-hidden="true" />`
-                : '';
-              return `<button type="button" class="native-deck-builder-filter-pill${isOn ? ' active' : ''}" data-filter-group="${escapeHtml(group.key)}" data-filter-value="${escapeHtml(option.value)}" aria-pressed="${isOn}" title="${escapeHtml(option.label)}">${icon}<span>${escapeHtml(option.label)}</span></button>`;
-            })
-            .join('');
-
+          const options = group.dynamic === 'sets' ? setOptions : group.options;
+          const count = groupActiveCount({ ...group, options }, filters);
+          let body;
+          if (group.kind === 'range') {
+            body = renderHpRange(filters);
+          } else if (!options.length) {
+            body = '<span class="native-deck-builder-fsec-empty">Search first — the expansions in your results appear here.</span>';
+          } else {
+            body = options.map((option) => renderFilterControl(group, option, filters)).join('');
+          }
           return `
-            <div class="native-deck-builder-filter-row" data-filter-row="${escapeHtml(group.key)}">
-              <span class="native-deck-builder-filter-label">${escapeHtml(group.label)}</span>
-              <div class="native-deck-builder-filter-pills">${pills}</div>
-            </div>`;
+            <section class="native-deck-builder-fsec${group.span === 2 ? ' span2' : ''}" data-fsec="${escapeHtml(group.key)}">
+              <h4>${escapeHtml(group.label)}${count ? ` <em>${count}</em>` : ''}</h4>
+              <div class="native-deck-builder-fsec-body native-deck-builder-fsec-${escapeHtml(group.kind)}">${body}</div>
+            </section>`;
         })
         .join('');
 
-      filterBarEl.innerHTML = `${rows}
-        <button type="button" id="nativeDeckBuilderFilterClear" class="native-deck-builder-filter-clear"${activeCount ? '' : ' hidden'}>Clear filters (${activeCount})</button>`;
+      drawerEl.innerHTML = `
+        <div class="native-deck-builder-fdrawer-head">
+          <span class="native-deck-builder-fdrawer-title">Filters</span>
+          <button type="button" class="native-deck-builder-fdrawer-close" data-fdrawer-close aria-label="Close filters" title="Close">&#10005;</button>
+        </div>
+        <div class="native-deck-builder-fdrawer-body">${sections}</div>
+        <div class="native-deck-builder-fdrawer-foot">
+          <button type="button" class="native-deck-builder-fdrawer-reset" data-fdrawer-reset>Reset</button>
+          <button type="button" class="native-deck-builder-fdrawer-apply" data-fdrawer-apply>Apply filters</button>
+        </div>`;
 
-      filterBarEl.querySelectorAll('[data-filter-value]').forEach((pill) => {
-        pill.addEventListener('click', () => {
-          onToggle?.(pill.dataset.filterGroup, pill.dataset.filterValue);
+      drawerEl.querySelectorAll('[data-filter-value]').forEach((control) => {
+        control.addEventListener('click', () => {
+          onToggle?.(control.dataset.filterGroup, control.dataset.filterValue);
         });
       });
 
-      filterBarEl
-        .querySelector('#nativeDeckBuilderFilterClear')
-        ?.addEventListener('click', () => onClear?.());
+      // The readout follows the thumb while dragging; the draft only changes
+      // on release, so a re-render never interrupts a drag.
+      const bounds = drawerEl.querySelectorAll('[data-hp-bound]');
+      bounds.forEach((input) => {
+        input.addEventListener('input', () => {
+          const readout = drawerEl.querySelector(`[data-hp-readout="${input.dataset.hpBound}"]`);
+          if (readout) readout.textContent = input.value;
+        });
+        input.addEventListener('change', () => {
+          const [low, high] = [...bounds].map((entry) => Number(entry.value));
+          onHpChange?.(low, high);
+        });
+      });
+
+      drawerEl.querySelector('[data-fdrawer-close]')?.addEventListener('click', () => onClose?.());
+      drawerEl.querySelector('[data-fdrawer-reset]')?.addEventListener('click', () => onReset?.());
+      drawerEl.querySelector('[data-fdrawer-apply]')?.addEventListener('click', () => onApply?.());
+    };
+
+    /**
+     * Renders the active-filter chip strip under the search row: a result
+     * count, one removable chip per filter (from describeActiveFilters) and a
+     * Reset all link. Hidden when nothing is active and nothing was searched.
+     */
+    export const renderFilterChips = ({ chipsEl, chips = [], resultLabel = '', onRemove, onReset }) => {
+      if (!chipsEl) return;
+
+      chipsEl.hidden = chips.length === 0 && !resultLabel;
+      const chipHtml = chips
+        .map(
+          (chip, index) => `<span class="native-deck-builder-fchip">${escapeHtml(chip.label)}<button type="button" data-chip-index="${index}" aria-label="Remove filter ${escapeHtml(chip.label)}" title="Remove">&#10005;</button></span>`
+        )
+        .join('');
+
+      chipsEl.innerHTML = `
+        ${resultLabel ? `<span class="native-deck-builder-fchips-count">${escapeHtml(resultLabel)}</span>` : ''}
+        ${chipHtml}
+        ${chips.length ? '<button type="button" class="native-deck-builder-fchips-reset" data-chips-reset>Reset all</button>' : ''}`;
+
+      chipsEl.querySelectorAll('[data-chip-index]').forEach((button) => {
+        button.addEventListener('click', () => onRemove?.(chips[Number(button.dataset.chipIndex)]));
+      });
+      chipsEl.querySelector('[data-chips-reset]')?.addEventListener('click', () => onReset?.());
     };
 
     export const renderDeckCards = ({ cardsEl, sortedCards, onAdd, onRemove }) => {

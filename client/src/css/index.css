@@ -1054,6 +1054,35 @@ ul, li {
   display: none;
   z-index: 1300;
 }
+/* Slim Deck tab (design 050): the builder itself lives in its own tab. */
+#deckTabPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.2vh;
+  padding: 2vh 1vw;
+  font-size: 1.8vh;
+  background: white;
+  border-radius: 0 0 10px 10px;
+  box-sizing: border-box;
+  width: 100%;
+}
+#deckTabPanel p {
+  margin: 0;
+}
+#openDeckBuilderButton {
+  padding: 0.9vh 1.2vw;
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  font-size: 1.9vh;
+  font-weight: bold;
+  cursor: pointer;
+}
+.deck-tab-warning {
+  color: #9e3c53;
+  font-weight: bold;
+}
 
     /* ── Set browser (Mega Evolution / TCGdex) ──────────────────────────── */
     .native-deck-builder-mode-tabs {
@@ -1290,22 +1319,47 @@ ul, li {
       border-color: rgba(120, 144, 214, 0.16);
     }
     
-    /* ── Saved deck library ("My Decks") bar ─────────────────────────────── */
-    .native-deck-builder-library-bar {
-      display: flex;
-      flex-direction: column;
-      gap: 0.45vh;
-      padding: 0.65vh 0.8vw;
-      background: rgb(198, 203, 211);
-      border-bottom: 1px solid rgba(0,0,0,0.04);
+    /* ── Saved deck library ("My Decks"): a dropdown in the header (design 050) ── */
+    .native-deck-builder-deck-picker {
+      position: relative;
     }
-    .native-deck-builder-library-header {
-      display: flex;
+    .native-deck-builder-deck-picker-toggle {
+      display: inline-flex;
       align-items: center;
-      gap: 0.55vw;
+      gap: 0.5vw;
+      max-width: 22vw;
+      padding: 0.55vh 1vw;
+      font-size: 1.55vh;
+      font-weight: 700;
+      cursor: pointer;
+      border-radius: 999px;
     }
-    .native-deck-builder-library-title {
-      font-size: 1.65vh;
+    .native-deck-builder-deck-picker-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .native-deck-builder-deck-picker-popover {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 60;
+      width: min(440px, 80vw);
+      max-height: 60vh;
+      overflow-y: auto;
+      padding: 8px;
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+    .native-deck-builder-deck-picker-popover[hidden] {
+      display: none;
+    }
+    .native-deck-builder-deck-picker-popover .native-deck-builder-library-list {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      max-height: none;
+      overflow: visible;
+      gap: 6px;
     }
     .native-deck-builder-new-deck {
       border: none;
@@ -1404,11 +1458,6 @@ ul, li {
     }
     
     /* dark mode */
-    body.dark-mode-1 .native-deck-builder-library-bar {
-      background: rgba(31, 36, 43, 0.9);
-      border-color: rgba(126, 145, 199, 0.14);
-      color: #eef3ff;
-    }
     body.dark-mode-1 .native-deck-builder-library-chip {
       background: rgba(40, 50, 80, 0.7);
       border-color: rgba(120, 144, 214, 0.25);
@@ -1457,6 +1506,48 @@ ul, li {
   visibility: visible;
   pointer-events: auto;
 }
+
+/* The deck builder's own tab (/deck-builder, design 050): the same page with
+ * only the builder showing, full window, deck list pinned to the right edge.
+ * !important beats the inline display styles the game's boot scripts set on
+ * the board and sideboxes; the id selectors beat the side-menu media rules. */
+body.deck-builder-window {
+  overflow: hidden;
+}
+body.deck-builder-window > :not(#nativeDeckBuilderWorkspace):not(#nativeDeckBuilderCardPreviewScrim):not(.card-preview-overlay):not(script) {
+  display: none !important;
+}
+body.deck-builder-window #nativeDeckBuilderWorkspace {
+  left: 0;
+  right: 0;
+  transform: none;
+  transition: none;
+  visibility: visible;
+  pointer-events: auto;
+}
+/* The filter drawer is positioned against the card pane. */
+.native-deck-builder-pane-main {
+  position: relative;
+}
+body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-side {
+  flex: 0 0 360px;
+  max-width: 360px;
+}
+/* Its own line under the header row, only while shown. */
+.native-deck-builder-link-banner {
+  flex: 1 1 100%;
+  order: 10;
+  padding: 0.6vh 0.9vw;
+  font-size: 1.5vh;
+  font-weight: 600;
+  color: #5c1d2c;
+  background: #fde8ec;
+  border: 1px solid #e0a3b1;
+  border-radius: 8px;
+}
+.native-deck-builder-link-banner[hidden] {
+  display: none;
+}
 .native-deck-builder-inner {
   position: relative;
   width: 100%;
@@ -1476,17 +1567,13 @@ ul, li {
 }
 .native-deck-builder-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1vw;
   padding: 0.85vh 0.8vw;
   border-bottom: 1px solid rgba(0, 0, 0, 0.035);
   background: rgb(207, 211, 218);
-}
-.native-deck-builder-subtitle {
-  font-size: 1.55vh;
-  opacity: 0.62;
-  margin-top: 0.2vh;
 }
 .native-deck-builder-actions {
   display: flex;
@@ -1517,14 +1604,16 @@ ul, li {
   font-size: 1.65vh;
   opacity: 0.92;
 }
+/* Current deck controls share the header row with the title and actions. */
 .native-deck-builder-targetbar {
   display: flex;
-  justify-content: space-between;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 0.8vw;
-  padding: 0.65vh 0.8vw;
-  background: rgb(198, 203, 211);
-  border-bottom: 1px solid rgba(0,0,0,0.04);
+  gap: 0.7vw;
+  min-width: 0;
+}
+.native-deck-builder-targetbar .native-deck-builder-play-button {
+  margin-left: auto;
 }
 .native-deck-builder-target-label {
   font-size: 1.65vh;
@@ -3171,24 +3260,6 @@ body.dark-mode-1 .native-deck-builder-edge-toggle:hover {
   background-color: rgba(171, 171, 171, 0.864);
   cursor: pointer;
 }
-#decklistTable {
-  z-index: 1000;
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 76%;
-  height: 100%;
-  background: rgba(222, 221, 221, 0.852);
-  z-index: 1000;
-  overflow: auto;
-  padding: 30px;
-  box-sizing: border-box;
-  font-size: 1.75vh;
-}
-#decklistTable td {
-  padding: 0.3vh 2vw;
-}
 .main-select {
   font-weight: bold;
   background: linear-gradient(to bottom, rgba(90, 110, 188, 0.864), rgba(60, 80, 158, 0.864))  !important;
@@ -3203,69 +3274,10 @@ body.dark-mode-1 .native-deck-builder-edge-toggle:hover {
   border: .25vw solid rgba(153, 58, 81, 0.864) !important;
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
 }
-#mainDeckImportInput, #altDeckImportInput {
-  height: 100%;
-  width: 100%;
-  padding: 2vh;
-  border-radius: 5px 5px 10px 10px;
-  font-size: 1.75vh;
-  box-sizing: border-box;
-  resize: none;
-  outline: none;
-}
-#mainDeckImportInput {
-  border: .2vw solid rgba(40, 57, 124, 0.864);
-  display: inline-block;
-}
-#altDeckImportInput {
-  display: none;
-  border: .2vw solid rgba(153, 58, 81, 0.864) !important;
-}
-#importBottom {
-  margin-top: 1vh;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.5vw;
-}
-#importButton, #confirmButton {
-  background: linear-gradient(to bottom, #95c6b4, #72ab97);
-  color: white;
-}
-#confirmButton {
-  margin-left: 0.3vw;
-}
-#importButton {
-  cursor: pointer;
-  width: 25%;
-  height: 3.5vh;
-  border-radius: .5rem;
-  border: none;
-  font-weight: bold;
-}
-#importButton:hover, #confirmButton:hover {
-  background: linear-gradient(to bottom, #7bb9a2, #5faa96);
-}
-#cancelButton, #confirmButton, #saveButton {
-  cursor: pointer;
-  display: none;
-  width: 20%;
-  border-radius: .5rem;
-  padding: .7vh;
-  border: none;
-  color: white;
-  font-weight: bold;
-}
-#cancelButton {
-  background: linear-gradient(to bottom, #e19b94, #b9857b);
-}
-#cancelButton:hover {
-  background: linear-gradient(to bottom, #c97571, #ab7270);
-}
 #uploadButtonsContainer {
   margin: 0.3vw;
 }
-#uploadFileButton, #changeCardBackButton, #changeLanguageButton, #saveCurrentButton, #changeBackgroundButton {
+#uploadFileButton, #changeCardBackButton, #saveCurrentButton, #changeBackgroundButton {
   padding: 3px 6px;
   cursor: pointer;
   color: white;
@@ -3287,69 +3299,12 @@ body.dark-mode-1 .native-deck-builder-edge-toggle:hover {
 #saveCurrentButton.opp-color:hover {
   background-color: rgba(189, 112, 130, 0.864);  
 }
-#changeLanguageButton:hover, #saveButton:hover, #changeBackgroundButton:hover {
+#changeBackgroundButton:hover {
   background-color: rgba(150, 144, 144, 0.864);  
-}
-.language-container {
-  position: relative;
-  display: inline-block;
-}
-#languageDropdown {
-  display: none;
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  background-color: #f9f9f9;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-  z-index: 1;
-  border-radius: 5px;
-}
-#languageDropdown ul {
-  list-style-type: none;
-  margin: 0;
-  padding: 0;
-}
-#languageDropdown li {
-  padding: 10px;
-  cursor: pointer;
-}
-#languageDropdown li:hover {
-  background-color: #d7d7d7;
-  color: #141414;
 }
 #saveCurrentButton {
   display: none;
   margin-left: 0.3vw;
-}
-#randomButton {
-  position: absolute;
-  right: 5%;
-  border: none;
-  font-size: x-large;
-  cursor: pointer;
-  border-radius: .5rem;
-  background: linear-gradient(to bottom, #c2b07f, #ac9c52);
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-}
-#randomButton:hover {
-  background: linear-gradient(to bottom, #bca668, #8c7e46);
-}
-#decklistsButton {
-  margin-left: .3vw;
-  border: none;
-  font-size: x-large;
-  cursor: pointer;
-  border-radius: .5rem;
-  box-sizing: border-box;
-  padding-bottom: .3vh;
-  padding-top: .5vh;
-  background: linear-gradient(to bottom, #b0b0b0, #909090);
-}
-#decklistsButton:hover {
-  background: linear-gradient(to bottom, #a4a4a4, #807f7f);
-}
-#successText, #failedText, #loadingText, #invalidText {
-  display: none;
 }
 #settings {
   display: none;
@@ -3512,39 +3467,6 @@ a:hover {
   background-color: rgba(247, 217, 223, 0.864);  
   text-align: left;
   width: fit-content;
-}
-.decklists-context-menu {
-  display: none;
-  position: absolute;
-  border-radius: 5px;
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  border: 1px solid #ccc;
-  z-index: 2;
-  height: fit-content;
-}
-.decklists-context-menu-item {
-  padding: .3vh 1vw;
-  cursor: pointer;
-  font-size: small;
-}
-.decklists-context-menu-sub-menu {
-  font-weight: normal;
-  display: none;
-  position: absolute;
-  background-color: #c1c1c1;
-  left: 99%; 
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  top: 0;
-  height: 100%;
-  width: 112%;
-  color: #141414;
-}
-.decklist-highlight {
-  background-color: #f0f0f0;
-  font-weight: bold;
 }
 .custom-popup {
   position: fixed;

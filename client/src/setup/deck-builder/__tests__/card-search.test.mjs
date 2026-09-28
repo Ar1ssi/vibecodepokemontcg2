@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeSearchQuery, resolveSearchPlan } from '../core/card-search.mjs';
+import {
+  buildSummaryQuery,
+  normalizeSearchQuery,
+  normalizeTcgdexCard,
+  queryCards,
+  resolveSearchPlan,
+} from '../core/card-search.mjs';
 
 // ---------------------------------------------------------------------------
 // normalizeSearchQuery
@@ -153,4 +159,84 @@ test('resolveSearchPlan: hyphen-GX → dual query including space-GX', () => {
   assert.equal(plan.type, 'name');
   assert.ok(plan.queries.includes('Charizard-GX'));
   assert.ok(plan.queries.includes('Charizard GX'));
+});
+
+// ---------------------------------------------------------------------------
+// Design 050: filter params and the fields the filter drawer reads
+// ---------------------------------------------------------------------------
+
+test('normalizeTcgdexCard keeps the fields the filter drawer reads', () => {
+  // Trimmed from api.tcgdex.net/v2/en/cards/sv03-125 (2026-09-28).
+  const card = normalizeTcgdexCard({
+    id: 'sv03-125',
+    name: 'Charizard ex',
+    category: 'Pokemon',
+    image: 'https://assets.tcgdex.net/en/sv/sv03/125',
+    localId: '125',
+    rarity: 'Double rare',
+    set: { id: 'sv03', name: 'Obsidian Flames' },
+    hp: 330,
+    types: ['Darkness'],
+    stage: 'Stage2',
+    suffix: 'ex',
+    abilities: [{ type: 'Ability', name: 'Infernal Reign', effect: '…' }],
+    weaknesses: [{ type: 'Grass', value: '×2' }],
+    retreat: 2,
+    regulationMark: 'G',
+    legal: { standard: false, expanded: true },
+  });
+  assert.equal(card.hp, 330);
+  assert.equal(card.retreat, 2);
+  assert.deepEqual(card.weaknesses, ['Grass']);
+  assert.deepEqual(card.abilities, ['Infernal Reign']);
+  assert.equal(card.regulationMark, 'G');
+  assert.deepEqual(card.legal, { standard: false, expanded: true });
+  assert.equal(card.suffix, 'ex');
+  assert.equal(card.supertype, 'Pokémon');
+});
+
+test('normalizeTcgdexCard gives Trainers null HP/retreat and empty lists', () => {
+  const card = normalizeTcgdexCard({
+    id: 'sv01-181',
+    name: 'Nest Ball',
+    category: 'Trainer',
+    trainerType: 'Item',
+    image: 'https://assets.tcgdex.net/en/sv/sv01/181',
+  });
+  assert.equal(card.hp, null);
+  assert.equal(card.retreat, null);
+  assert.deepEqual(card.weaknesses, []);
+  assert.deepEqual(card.abilities, []);
+  assert.deepEqual(card.legal, { standard: false, expanded: false });
+});
+
+test('buildSummaryQuery merges the name, stage plan and filter params', () => {
+  assert.deepEqual(buildSummaryQuery({ cardName: 'Charizard', params: { types: 'Fire' } }), {
+    name: 'Charizard',
+    types: 'Fire',
+  });
+  // The LV.X plan's stage wins over a Stage filter.
+  assert.deepEqual(
+    buildSummaryQuery({ cardName: 'Arceus', cardStage: 'LEVEL-UP', params: { stage: 'Basic' } }),
+    { name: 'Arceus', stage: 'LEVEL-UP' }
+  );
+  assert.deepEqual(buildSummaryQuery({ params: { hp: '', types: 'Water' } }), { types: 'Water' });
+});
+
+test('buildSummaryQuery drops the loosest filter params to fit the proxy limit', () => {
+  const rarity = Array.from({ length: 30 }, (_, index) => `Rarity number ${index}`).join('|');
+  const query = buildSummaryQuery({
+    cardName: 'Pikachu',
+    params: { rarity, types: 'Lightning', stage: 'Basic' },
+  });
+  assert.deepEqual(query, { name: 'Pikachu', types: 'Lightning', stage: 'Basic' });
+  assert.ok(new URLSearchParams(query).toString().length <= 300);
+});
+
+test('queryCards with no name and no params fetches nothing', async () => {
+  const response = await queryCards({ term: '  ', params: {} });
+  assert.deepEqual(response.results, []);
+  assert.equal(response.totalSummaries, 0);
+  assert.equal(response.detailedCount, 0);
+  assert.equal(response.isHugeResultSet, false);
 });
