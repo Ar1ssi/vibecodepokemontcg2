@@ -97,6 +97,7 @@ import {
   applyStadiumSwitchTriggers,
 } from './effects/stadium-trigger-apply.mjs';
 import { classifyEnergyEffect } from './rules/energy-effects.mjs';
+import { getEnergyValue } from './rules/retreat.mjs';
 import {
   abilityDamageBonus,
   abilityDamageReduction,
@@ -575,6 +576,7 @@ function resolveAttackTargetClause(text, parsed, spread) {
       ...(damage.filter ? { filter: damage.filter } : {}),
       ...(damage.distributable ? { distributable: true, remaining: damage.remaining } : {}),
       ...(damage.countFromEnergy ? { countFromEnergy: damage.countFromEnergy } : {}),
+      ...(damage.upTo ? { upTo: true } : {}),
       ...(damage.chooser ? { chooser: damage.chooser } : {}),
       ...(damage.amountPerEnergy ? { amountPerEnergy: true } : {}),
       ...(damage.remainingFromDiscard ? { remainingFromDiscard: true } : {}),
@@ -1421,12 +1423,15 @@ function markerCount(markers, kind, field) {
 }
 
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
-function computeEffectiveRetreatCost(state, card, playerId) {
+// `zoneId` 'bench' prices a Benched Pokémon: its own zone's Tools/Energy, and none of the
+// "your Active Pokémon's Retreat Cost" wordings (Bronzong Heavy Potential, I194).
+function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'active' } = {}) {
   if (!card) return 0;
+  const isActive = zoneId === 'active';
   // Vespiquen Mach Wind (design 033): the Retreat Cost is 0 during the next turn.
   if (activeAttackMarkers(state, playerId, card).some((m) => m.kind === 'freeRetreat')) return 0;
   const player = state.players?.[playerId];
-  const activeZone = player?.zones?.active || [];
+  const activeZone = player?.zones?.[zoneId] || [];
   const stadium = state.stadium;
   const baseRetreat = getRetreatCostCount(inPlayView(state, card));
 
@@ -1437,7 +1442,7 @@ function computeEffectiveRetreatCost(state, card, playerId) {
   const benchViews = (player?.zones?.bench || []).map((b) =>
     inPlayView(state, b)
   );
-  if (teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
+  if (isActive && teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
   // Magnetic Metal / Hiding Darkness / Holon WP Energy (audit SE6): "has no Retreat Cost".
   if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone)) return 0;
 
@@ -1465,8 +1470,8 @@ function computeEffectiveRetreatCost(state, card, playerId) {
   cost += abilityRetreatCost(inPlayView(state, card), {
     sideCards,
     opponentSideCards,
-    zone: 'active',
-    isActive: true,
+    zone: zoneId,
+    isActive,
   });
 
   // 3. Stadium retreat modifier (e.g. Beach Court)
@@ -2109,6 +2114,11 @@ function stampHealedPokemon(prev, next) {
     const zones = next.players[playerId]?.zones || {};
     for (const card of [...(zones.active || []), ...(zones.bench || [])]) {
       if (card.attachedTo || !isPokemon(card)) continue;
+      // Attack effects that move damage counters off a Pokémon (Reaper Pulse, Fury Strikes swap,
+      // "move all damage counters …") flag themselves so the drop is never read as a heal.
+      const counterMoveOnly = card.__counterMoveOnly;
+      delete card.__counterMoveOnly;
+      if (counterMoveOnly) continue;
       const before = findCard(prev, card.instanceId)?.card;
       if (before && (card.damage || 0) < (before.damage || 0)) card.healedTurn = turnNumber;
     }
@@ -6206,12 +6216,27 @@ function attachedEnergyOfType(draft, root, letter) {
 
 // Dusknoir Night Spin: "… done to Dusknoir by your opponent's Pokémon that has 2 or less Energy
 // attached to it" — marker filters (attack-markers.mjs attackerMatchesFilter) read the attacker's
-// attached Energy cards as the attack's effects resolve.
+// attached Energy cards as the attack's effects resolve. Counts Energy *units* (a Double Colorless
+// or other double-provider counts as 2), not Energy cards.
+// Bronzong Heavy Potential reads each opponent Pokémon's Retreat Cost "after applying effects"
+// (I194); the executor cannot import this reducer, so the cost is stamped on the root here.
+function stampOpponentRetreatCosts(draft, oppId) {
+  const opponent = draft.players?.[oppId];
+  if (!opponent) return;
+  for (const zoneId of ['active', 'bench']) {
+    for (const root of (opponent.zones?.[zoneId] || []).filter((c) => !c.attachedTo)) {
+      root.effectiveRetreatCost = computeEffectiveRetreatCost(draft, root, oppId, { zoneId });
+    }
+  }
+}
+
 function stampAttackEnergyCount(draft, attacker, attackerView) {
   const ref = attacker ? findCard(draft, attacker.instanceId) : null;
   if (!ref) return;
   const zone = ref.player.zones[ref.zoneId] || [];
-  const count = zone.filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length;
+  const count = zone
+    .filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c))
+    .reduce((sum, c) => sum + getEnergyValue(c), 0);
   attacker.attackEnergyCount = count;
   if (attackerView && attackerView !== attacker) attackerView.attackEnergyCount = count;
 }
@@ -6244,6 +6269,7 @@ function resolveAttackEffectPhase(draft, ctx) {
 
   let { defender } = ctx;
   stampAttackEnergyCount(draft, attacker, attackerView);
+  stampOpponentRetreatCosts(draft, oppId);
 
   // A printed whole-attack condition ("If …, this attack does nothing", design 036 A1) gates the
   // damage and every effect step, so it resolves before any of them. It runs once per attack:
@@ -7657,9 +7683,12 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
             distributable
               ? new Array(required).fill(cards[0].instanceId)
               : cards.slice(0, attackTarget.count).map((c) => c.instanceId);
+          // Probopass Metal Bomber: "Choose a number … UP TO N" always lets the player pick,
+          // including fewer than the candidates on the board — never auto-applied to all of them.
           if (
-            attackTarget.scope === 'active' ||
-            candidates.length <= (distributable ? 1 : attackTarget.count)
+            !attackTarget.upTo &&
+            (attackTarget.scope === 'active' ||
+              candidates.length <= (distributable ? 1 : attackTarget.count))
           ) {
             benchDealt += applyAttackTargets(draft, {
               selection: picksFor(candidates),
@@ -7677,9 +7706,11 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
               source: 'attack',
               prompt: distributable
                 ? distributedPrompt(attack.name, attackTarget, required)
-                : `${attack.name}: Choose ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} ${attackTarget.scope === 'bench' ? 'Benched ' : ''}Pokémon to take damage`,
+                : attackTarget.upTo
+                  ? `${attack.name}: Choose up to ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} ${attackTarget.scope === 'bench' ? 'Benched ' : ''}Pokémon to take damage`
+                  : `${attack.name}: Choose ${attackTarget.count} of ${ownSide ? 'your' : "your opponent's"} ${attackTarget.scope === 'bench' ? 'Benched ' : ''}Pokémon to take damage`,
               options: candidates,
-              min: distributable ? 1 : attackTarget.count,
+              min: distributable ? 1 : attackTarget.upTo ? 0 : attackTarget.count,
               max: distributable ? 1 : attackTarget.count,
               resumeToken: {
                 effectType: 'attack',

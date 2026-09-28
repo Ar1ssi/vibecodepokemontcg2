@@ -1772,6 +1772,9 @@ export function attackTargetClause(attackText) {
       amount: Number(energyCounted[2]),
       count: 1,
       countFromEnergy: energyCounted[1].toUpperCase(),
+      // "Choose a number … UP TO the amount of Energy": the player picks how many Benched
+      // Pokémon to hit, from 0 up to the Energy count — not always the maximum.
+      upTo: true,
       scope: 'bench',
     };
   }

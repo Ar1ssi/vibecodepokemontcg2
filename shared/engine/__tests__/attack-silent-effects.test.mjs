@@ -923,7 +923,7 @@ test('Malamar V Drag Off (Rebel Clash 186): the damage lands on the new Active P
 
 // ── counter swaps and moves ───────────────────────────────────────────────────
 
-test('Dusknoir Reaper Pulse (Diamond & Pearl Promos DP33): up to 2 counters move to a Benched Pokémon', () => {
+test('Dusknoir Reaper Pulse (Diamond & Pearl Promos DP33): the player chooses how many, up to 2, counters to move', () => {
   const text = "Move up to 2 damage counters from Dusknoir to 1 of your opponent's Benched Pokémon.";
   let bench;
   const { state, attacker, defender } = board('Dusknoir', text, {
@@ -933,10 +933,44 @@ test('Dusknoir Reaper Pulse (Diamond & Pearl Promos DP33): up to 2 counters move
       bench = addBench(s, 'p2', 'Target');
     },
   });
-  const res = attack(state);
+  const offered = attack(state);
+  // "Up to" means the player picks the amount (0-2) — never a fixed max.
+  assert.ok(offered.state.pendingChoice);
+  assert.equal(offered.state.pendingChoice.min, 1);
+  assert.equal(offered.state.pendingChoice.max, 1);
+  assert.deepEqual(offered.state.pendingChoice.options.map((o) => o.name), ['0', '1', '2']);
+  const two = offered.state.pendingChoice.options.find((o) => o.name === '2').instanceId;
+  const res = applyCommand(
+    offered.state,
+    { type: 'resolveChoice', playerId: 'p1', payload: { choiceId: offered.state.pendingChoice.choiceId, selection: [two] } },
+    createRng(3)
+  );
   assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 30);
   assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 20);
   assert.equal(root(res.state, 'p2', defender.instanceId).damage, 20);
+  // Moving damage counters off is not healing (I194): stampHealedPokemon must not stamp it.
+  assert.equal(root(res.state, 'p1', attacker.instanceId).healedTurn, undefined);
+});
+
+test('Dusknoir Reaper Pulse: choosing 0 moves nothing and does not stamp a heal', () => {
+  const text = "Move up to 2 damage counters from Dusknoir to 1 of your opponent's Benched Pokémon.";
+  let bench;
+  const { state, attacker } = board('Dusknoir', text, {
+    damage: '20',
+    setup: (s) => {
+      s.players.p1.zones.active[0].damage = 50;
+      bench = addBench(s, 'p2', 'Target');
+    },
+  });
+  const offered = attack(state);
+  const zero = offered.state.pendingChoice.options.find((o) => o.name === '0').instanceId;
+  const res = applyCommand(
+    offered.state,
+    { type: 'resolveChoice', playerId: 'p1', payload: { choiceId: offered.state.pendingChoice.choiceId, selection: [zero] } },
+    createRng(3)
+  );
+  assert.equal(root(res.state, 'p1', attacker.instanceId).damage, 50);
+  assert.equal(root(res.state, 'p2', bench[0].instanceId).damage, 0);
 });
 
 test('Wobbuffet V Gritty Comeback (Sword & Shield 191): the two Active Pokémon trade damage counters', () => {
@@ -1180,6 +1214,32 @@ test('Dusknoir Night Spin (Stormfront 1): only attackers with 2 or less Energy a
   assert.equal(run(3), 30);
 });
 
+test('Dusknoir Night Spin (Stormfront 1): counts Energy units, not Energy cards (I194)', () => {
+  const text =
+    "Prevent all effects of an attack, including damage, done to Dusknoir by your opponent's Pokémon that has 2 or less Energy attached to it during your opponent's next turn.";
+  // 2 Double Colorless Energy cards = 4 Energy units, well over the "2 or less" gate, even
+  // though the card count (2) alone would read as "2 or less" under the old, wrong count.
+  const { state, attacker } = board('Dusknoir', text, {
+    setup: (s) => {
+      armDefender(s, '');
+      const def = s.players.p2.zones.active[0];
+      for (let i = 0; i < 2; i++) {
+        s.players.p2.zones.active.push(
+          createCard({
+            instanceId: nextId++,
+            name: 'Double Colorless Energy',
+            supertype: 'Energy',
+            subtypes: ['Special', 'Double Colorless'],
+            attachedTo: def.instanceId,
+          })
+        );
+      }
+    },
+  });
+  const dealt = root(counterAttack(attack(state)).state, 'p1', attacker.instanceId).damage || 0;
+  assert.equal(dealt, 30);
+});
+
 test('Scizor Accelerate (Stormfront 25): protected only after a Knock Out', () => {
   const text =
     "If the Defending Pokémon is Knocked Out by this attack, prevent all effects of an attack, including damage, done to Scizor during your opponent's next turn.";
@@ -1258,6 +1318,97 @@ test('Bronzong Heavy Potential (Stormfront 13): a counter per {C} of each Retrea
   const res = attack(state);
   assert.equal(root(res.state, 'p2', defender.instanceId).damage, 20);
   assert.equal(root(res.state, 'p2', heavy.instanceId).damage, 40);
+});
+
+test('Bronzong Heavy Potential (I194): reads the Retreat Cost after a Tool, not the printed one', () => {
+  const text =
+    "Put a number of damage counters on each of your opponent's Pokémon equal to the number of {C} Energy in that Pokémon's Retreat Cost (after applying effects to the Retreat Cost).";
+  let heavy;
+  const { state } = board('Bronzong', text, {
+    damage: '',
+    setup: (s) => {
+      s.players.p2.zones.active[0].retreatCost = [];
+      heavy = mon('Snorlax', { hp: 200, retreatCost: 4 });
+      const floatStone = createCard({
+        instanceId: nextId++,
+        name: 'Float Stone',
+        supertype: 'Trainer',
+        subtypes: ['Item', 'Pokémon Tool'],
+        type: 'Pokémon Tool',
+        text: 'The Pokémon this card is attached to has no Retreat Cost.',
+        attachedTo: heavy.instanceId,
+      });
+      s.players.p2.zones.bench.push(heavy, floatStone);
+    },
+  });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p2', heavy.instanceId).damage || 0, 0);
+});
+
+test('Probopass Metal Bomber (I194): "up to" lets the player pick fewer, even when every Benched Pokémon fits', () => {
+  const text =
+    "Choose a number of your opponent's Benched Pokémon up to the amount of {M} Energy attached to Probopass. This attack does 20 damage to each of them. (Don't apply Weakness and Resistance for Benched Pokémon.)";
+  let bench;
+  const { state } = board('Probopass', text, {
+    damage: '',
+    setup: (s) => {
+      attachTo(s, s.players.p1.zones.active[0], ['Metal', 'Metal']);
+      bench = addBench(s, 'p2', 'A', 'B');
+    },
+  });
+  let res = attack(state);
+  assert.equal(res.pendingChoice?.min, 0);
+  res = choose(res, [bench[1].instanceId]);
+  assert.deepEqual(bench.map((c) => root(res.state, 'p2', c.instanceId).damage || 0), [0, 20]);
+});
+
+test('Mothim Quick Touch (I194): "if you do" chains the switch into moving Energy to the new Active', () => {
+  const text =
+    'You may switch Mothim with 1 of your Benched Pokémon. If you do, move as many Energy cards attached to Mothim as you like to the new Active Pokémon.';
+  let bench;
+  let attackerEnergy;
+  const { state } = board('Mothim', text, {
+    damage: '40',
+    setup: (s) => {
+      bench = addBench(s, 'p1', 'Wormadam');
+      attackerEnergy = energy('Grass', s.players.p1.zones.active[0].instanceId);
+      s.players.p1.zones.active.push(attackerEnergy);
+    },
+  });
+  let res = attack(state);
+  // Accept the optional switch.
+  res = choose(res, [-11]);
+  // Mothim is now benched; Wormadam is the new Active. Move the Energy along.
+  const newActive = res.state.players.p1.zones.active.find((c) => !c.attachedTo);
+  assert.equal(newActive.instanceId, bench[0].instanceId);
+  assert.ok(res.state.pendingChoice);
+  assert.deepEqual(res.state.pendingChoice.options.map((o) => o.instanceId), [attackerEnergy.instanceId]);
+  res = choose(res, [attackerEnergy.instanceId]);
+  const movedEnergy = [...res.state.players.p1.zones.active, ...res.state.players.p1.zones.bench].find(
+    (c) => c.instanceId === attackerEnergy.instanceId
+  );
+  assert.equal(movedEnergy.attachedTo, newActive.instanceId);
+});
+
+test('Magcargo Lava Plume (I194): "if you do" chains the mill into Burning the Defending Pokémon', () => {
+  const text = 'You may discard the top card of your deck. If you do, the Defending Pokémon is now Burned.';
+  const { state, defender } = board('Magcargo', text, { damage: '60' });
+  const deckBefore = state.players.p1.zones.deck.length;
+  let res = attack(state);
+  assert.ok(res.state.pendingChoice);
+  res = choose(res, [-11]);
+  assert.equal(res.state.players.p1.zones.deck.length, deckBefore - 1);
+  assert.equal(root(res.state, 'p2', defender.instanceId).burned, true);
+});
+
+test("Imakuni?'s Doduo Harmonize (I197): the joke text is a recognized no-op, not an unparsed sentence", () => {
+  const text =
+    'From the moment you use this attack, you must begin to sing a song. When the song is finished, this attack does 30 damage.';
+  const steps = parseAttackSteps(text, { selfName: "Imakuni?'s Doduo" });
+  assert.deepEqual(steps.after, [{ type: 'atkJokeNoOp' }]);
+  const { state, defender } = board("Imakuni?'s Doduo", text, { damage: '30' });
+  const res = attack(state);
+  assert.equal(root(res.state, 'p2', defender.instanceId).damage, 30);
 });
 
 test('Spiritomb Color Tag (Triumphant 10): a counter on each opponent Pokémon of the named type', () => {
