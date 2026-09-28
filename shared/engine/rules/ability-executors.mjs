@@ -365,9 +365,26 @@ export function parseDamagePrevention(card) {
   // "The Retreat Cost … is reduced by N" is a retreat modifier, not damage
   // prevention (same guard as passiveCostDiscount).
   if (/retreat/.test(t) && !/damage/.test(t)) return out;
+  // Flygon ex Psychic Protector scales with a hand discard the defender chooses mid-attack
+  // (parseHandDiscardProtector); it is no flat reduction.
+  if (parseHandDiscardProtector(card)) return out;
   const m = t.match(/reduc(?:e|ed).*?(\d+)/);
   if (m) out.reduceHp = parseInt(m[1], 10) || 0;
   return out;
+}
+
+const HAND_DISCARD_PROTECTOR =
+  /is damaged by an opponent's attack, you may discard up to (\d+) cards? from your hand\. if you do, any damage done to [^.]* is reduced by (\d+) for each card you discarded/;
+
+/**
+ * "If <this Pokémon> is damaged by an opponent's attack, you may discard up to N cards from your
+ * hand. If you do, any damage done to <it> is reduced by M for each card you discarded." (Flygon
+ * ex Psychic Protector). Returns `{ max, perCard }` (HP units) or null.
+ */
+export function parseHandDiscardProtector(card) {
+  const m = HAND_DISCARD_PROTECTOR.exec(textOf(card));
+  if (!m) return null;
+  return { max: parseInt(m[1], 10), perCard: parseInt(m[2], 10) };
 }
 
 // Apply prevention to an incoming damage amount (HP units).

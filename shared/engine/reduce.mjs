@@ -100,6 +100,7 @@ import { classifyEnergyEffect } from './rules/energy-effects.mjs';
 import {
   abilityDamageBonus,
   abilityDamageReduction,
+  abilityHandDiscardProtector,
   abilityDamagePrevention,
   abilityWeaknessOverride,
   abilityHpBonus,
@@ -5555,6 +5556,22 @@ function shuffleDeckWithRng(player, rng) {
   if (player?.zones?.deck && rng) player.zones.deck = rng.shuffle(player.zones.deck);
 }
 
+/** Moves the chosen cards from a player's hand to their discard pile; returns how many moved. */
+function discardHandCards(draft, { playerId, instanceIds, events }) {
+  const player = draft.players[playerId];
+  const hand = player?.zones?.hand || [];
+  const moved = [];
+  for (const id of instanceIds) {
+    const index = hand.findIndex((c) => c.instanceId === id);
+    if (index < 0) continue;
+    const [card] = hand.splice(index, 1);
+    discardCardToPlayerZone(player, card);
+    moved.push({ instanceId: card.instanceId, name: card.name });
+  }
+  if (moved.length > 0) events.push({ type: 'cardsDiscarded', playerId, cards: moved });
+  return moved.length;
+}
+
 /**
  * Rebuilds the attack context an attack-phase PendingChoice suspended, from its
  * resumeToken. Returns null when the attacker or attack is no longer in play.
@@ -6604,7 +6621,7 @@ function resolveAttackEffectPhase(draft, ctx) {
   }
   // Cards a before-damage Lost Zone cost moved (Rotom V Scrap Short). The cost is those
   // attacks' only before-damage step, so it moves in the command that reaches damage.
-  const handDiscarded = attackSteps.before.some(
+  const handDiscarded = ctx.handDiscarded ?? attackSteps.before.some(
     (step) =>
       step.countsForDamage &&
       ['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkDiscardBenchEnergy'].includes(step.type)
@@ -6613,7 +6630,7 @@ function resolveAttackEffectPhase(draft, ctx) {
         .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
         .reduce((total, e) => total + e.cards.length, 0)
     : undefined;
-  const lostZoned = attackSteps.before.some((step) => step.countsForDamage)
+  const lostZoned = ctx.lostZoned ?? attackSteps.before.some((step) => step.countsForDamage)
     ? events
         .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
         .reduce((total, e) => total + e.count, 0)
@@ -6715,6 +6732,58 @@ function resolveAttackEffectPhase(draft, ctx) {
         dmgDealt = dmgResult.total;
         weaknessApplied = dmgResult.multiplier > 1 || dmgResult.flat > 0;
 
+        // Flygon ex Psychic Protector: before the damage lands the defending player may discard
+        // up to N cards from their hand, each reducing it by M. The attack suspends on that
+        // player's choice and re-enters here with `protectorDiscarded` settled.
+        const protector =
+          dmgDealt > 0 && !dmgResult.prevented
+            ? abilityHandDiscardProtector(defenderView, {
+                sideCards: defenderInPlayCards,
+                opponentSideCards: [
+                  ...attackerZoneCards,
+                  ...(draft.players[playerId]?.zones?.bench || []),
+                ],
+                sideActive: defenderZoneCards,
+                opponentActive: attackerZoneCards,
+                turnNumber: draft.turn?.number,
+              })
+            : null;
+        const defenderHand = draft.players[defenderPlayerId]?.zones?.hand || [];
+        if (protector && ctx.protectorDiscarded === undefined && defenderHand.length > 0) {
+          draft.pendingChoice = createPendingChoice({
+            player: defenderPlayerId,
+            source: 'ability',
+            prompt: `${defenderView.name || 'Your Pokémon'} is being damaged by ${attack.name}: discard up to ${protector.max} cards from your hand to reduce the damage by ${protector.perCard} each?`,
+            options: defenderHand.map((c) => ({
+              instanceId: c.instanceId,
+              name: c.name,
+              src: c.src || '',
+              type: c.type || '',
+            })),
+            min: 0,
+            max: Math.min(protector.max, defenderHand.length),
+            resumeToken: {
+              ...resumeBase,
+              effectType: 'attackHandDiscardProtector',
+              targetInstanceId: defender.instanceId,
+              values: {
+                energyDiscarded,
+                milledMatches,
+                revealedMatches,
+                energyReturned,
+                optionalCostPaid,
+                optionalCostCount,
+                discardFlipHeads,
+                handDiscarded,
+                lostZoned,
+                preStepsDone: true,
+              },
+            },
+          });
+          return;
+        }
+        const protectorReduction = protector ? (ctx.protectorDiscarded || 0) * protector.perCard : 0;
+
         // Vermilion City Gym: Lt. Surge's Pokémon flip when attacking. Heads adds
         // 10 damage after Weakness/Resistance when the attack does damage; tails
         // deals 10 to the attacker in addition to the attack. The printed "may
@@ -6731,6 +6800,17 @@ function resolveAttackEffectPhase(draft, ctx) {
           } else {
             stadiumSelfDamage = vermilion.tailsSelfDamage;
           }
+        }
+
+        if (protectorReduction > 0 && dmgDealt > 0) {
+          dmgDealt = Math.max(0, dmgDealt - protectorReduction);
+          events.push({
+            type: 'damageReducedByDiscard',
+            instanceId: defender.instanceId,
+            playerId: defenderPlayerId,
+            discarded: ctx.protectorDiscarded,
+            reduction: protectorReduction,
+          });
         }
 
         if (dmgResult.prevented) {
@@ -9155,6 +9235,19 @@ export function applyCommand(state, command, rng = null) {
             ...resumeCtx,
             energyReturned: Boolean(moved),
           });
+        }
+      } else if (token.effectType === 'attackHandDiscardProtector') {
+        // Flygon ex Psychic Protector: the defending player discards the chosen hand cards,
+        // then the attack re-enters its damage step with the count settled.
+        draft.pendingChoice = null;
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
+          const protectorDiscarded = discardHandCards(draft, {
+            playerId: choice.player,
+            instanceIds: payload.selection || [],
+            events,
+          });
+          resolveAttackEffectPhase(draft, { ...resumeCtx, ...(token.values || {}), protectorDiscarded });
         }
       } else if (token.effectType === 'attackOptionalCostBonus') {
         // "You may <cost>. If you do, …": pay the accepted cost, then resume with the answer.

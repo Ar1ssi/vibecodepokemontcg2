@@ -34,6 +34,7 @@ import {
   parseDamageBonus,
   parseDamageReduction,
   parseDamagePrevention,
+  parseHandDiscardProtector,
   parseHpBonus,
   parsePrizeModify,
   parseEnergyMultiplier,
@@ -533,6 +534,18 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     else out.afterWR += red;
   }
   return out;
+}
+
+/**
+ * The defender's own "discard up to N cards from your hand; damage reduced by M for each"
+ * Poké-Body (Flygon ex Psychic Protector) as `{ max, perCard }`, or null when it has none or
+ * the ability is suppressed.
+ */
+export function abilityHandDiscardProtector(defender, ctx = {}) {
+  if (!defender) return null;
+  const protector = parseHandDiscardProtector(defender);
+  if (!protector || isAbilitySuppressed(defender, ctx)) return null;
+  return protector;
 }
 
 // --- damage prevention ---------------------------------------------------
