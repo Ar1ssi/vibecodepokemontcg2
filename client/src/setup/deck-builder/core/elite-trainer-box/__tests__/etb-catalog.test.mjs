@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BASIC_ENERGY_LABELS, ME_PACK_MODEL, packModelFor } from '../../build-battle/box-catalog.mjs';
-import { BUILD_BATTLE_SET_CARDS } from '../../build-battle/build-battle.generated.mjs';
+import { BUILD_BATTLE_SET_CARDS, ETB_PROMOS } from '../../build-battle/build-battle.generated.mjs';
 import { getCoins } from '../../coins.mjs';
 import { getSleeves } from '../../sleeves.mjs';
 import { ELITE_TRAINER_BOXES, availableEtbs, getEtb } from '../etb-catalog.mjs';
@@ -36,6 +36,7 @@ test('row 8: every shipped row names ids its catalogs hold', () => {
     assert.ok(sleeveIds.has(etb.sleeveId), `${etb.key}: sleeve ${etb.sleeveId}`);
     assert.ok(coinIds.has(etb.coinId), `${etb.key}: coin ${etb.coinId}`);
     assert.match(etb.promoId, /^mep-\d{3}$/);
+    assert.equal(ETB_PROMOS[etb.key]?.id, etb.promoId, `${etb.key}: baked promo`);
     const setIds = new Set((BUILD_BATTLE_SET_CARDS[etb.setId] || []).map((card) => card.id));
     assert.ok(setIds.has(etb.keyArtCardId), `${etb.key}: key art ${etb.keyArtCardId}`);
   }

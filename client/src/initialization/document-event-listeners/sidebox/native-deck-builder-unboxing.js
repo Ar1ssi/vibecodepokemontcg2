@@ -1,9 +1,5 @@
 import { buildHoloCard, startHoloAnimation } from '../../../setup/deck-builder/core/holo.mjs';
-import {
-  BOX_PROPORTIONS,
-  boxFaceTexture,
-  packArtSrc,
-} from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
+import { productArt } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
 import {
   CARDS_PER_PACK,
   DECK_UNWRAP_MS,
@@ -11,7 +7,6 @@ import {
   HIT_FLIP_MS,
   HIT_HOLD_MS,
   LID_OPEN_MS,
-  PACK_ARTS,
   PACK_FLY_MS,
   PACK_FLY_STAGGER_MS,
   PACK_TEAR_MS,
@@ -69,8 +64,6 @@ import { burstParticles } from '../../../setup/netcode/mat-fx/particles.mjs';
  */
 
 const BOX_W = 200;
-const BOX_H = Math.round(BOX_W * BOX_PROPORTIONS.height);
-const BOX_D = Math.round(BOX_W * BOX_PROPORTIONS.depth);
 const SPRING_BACK_MS = 160;
 const FADE_TOP_MS = 320;
 // Where the flying packs start: the box's open mouth, as shares of the box host's rect.
@@ -81,8 +74,15 @@ const SWEEP_MS = 420;
 const SPARK_COUNT = 16;
 const SPARK_MS = 640;
 const COLLAPSE_SCALE = 0.2;
-const SET_LOGO_URL = 'https://assets.tcgdex.net/en/me/me02/logo.webp';
-const KEY_ART_URL = 'https://assets.tcgdex.net/en/me/me02/125/high.webp';
+// A scene mounted without product art (row 9) draws the Build & Battle box with CSS faces only.
+const PROCEDURAL_ONLY_ART = Object.freeze({ ...productArt('phantasmal-flames'), faces: Object.freeze({}) });
+
+/** The box's pixel size: width fixed at BOX_W, height and depth from the product's proportions. */
+const boxSizeFor = ({ height, depth }) => ({
+  width: BOX_W,
+  height: Math.round(BOX_W * height),
+  depth: Math.round(BOX_W * depth),
+});
 
 const easeOut = (t) => 1 - (1 - t) ** 3;
 const lerp = (from, to, t) => from + (to - from) * t;
@@ -137,8 +137,8 @@ const playPose = (node, poseFn, toFrame, durationMs, { delay = 0, samples = 24 }
 };
 
 // CSS y points down: the pose's lid angle (y up, negative = swinging up and back) flips sign here.
-const lidTransform = ({ rotateXDeg, translateYPx }) =>
-  `translate3d(0, ${-BOX_H / 2 + translateYPx}px, ${-BOX_D / 2}px) rotateX(${-rotateXDeg}deg)`;
+const lidTransform = ({ rotateXDeg, translateYPx }, size) =>
+  `translate3d(0, ${-size.height / 2 + translateYPx}px, ${-size.depth / 2}px) rotateX(${-rotateXDeg}deg)`;
 
 const promoTransform = ({ translateYPx, rotateXDeg, rotateYDeg, scale }) =>
   `translateY(${translateYPx}px) rotateX(${rotateXDeg}deg) rotateY(${rotateYDeg}deg) scale(${scale})`;
@@ -177,37 +177,37 @@ const buildBattleTitle = () => {
   return title;
 };
 
-const setLogo = () => {
+const setLogo = (logoUrl) => {
   const block = el('div', 'bb-setlogo');
   block.append(el('span', 'bb-setlogo__mega', 'Mega Evolution'), el('span', 'bb-setlogo__name', 'Phantasmal Flames'));
   const logo = el('img', 'bb-setlogo__img');
   logo.alt = '';
-  logo.src = SET_LOGO_URL;
+  logo.src = logoUrl;
   logo.addEventListener('load', () => block.classList.add('has-logo'), { once: true });
   logo.addEventListener('error', () => logo.remove(), { once: true });
   block.append(logo);
   return block;
 };
 
-const proceduralFront = () => {
+const proceduralFront = (art) => {
   const face = el('div', 'bb-pf bb-pf--front');
   const top = el('div', 'bb-pf__strip');
   const level = el('div', 'bb-level');
   level.append(el('span', 'bb-level__pill', 'Play level 2'));
   top.append(wordmark(), level, el('span', 'bb-age', '6+'));
-  const art = el('div', 'bb-keyart');
-  art.append(el('div', 'bb-keyart__slashes'));
-  face.append(top, art, setLogo(), buildBattleTitle());
+  const keyArt = el('div', 'bb-keyart');
+  keyArt.append(el('div', 'bb-keyart__slashes'));
+  face.append(top, keyArt, setLogo(art.logoUrl), buildBattleTitle());
   return face;
 };
 
 // The key art only matters when the front texture is missing, so it loads on that failure only.
-const mountKeyArt = (face) => {
+const mountKeyArt = (face, keyArtUrl) => {
   const art = face.querySelector('.bb-keyart');
   if (!art || art.querySelector('img')) return;
   const img = el('img', 'bb-keyart__img');
   img.alt = '';
-  img.src = KEY_ART_URL;
+  img.src = keyArtUrl;
   img.addEventListener('error', () => img.remove(), { once: true });
   art.prepend(img);
 };
@@ -247,29 +247,28 @@ const proceduralTop = (name) => {
   return face;
 };
 
-const proceduralFace = (name) => {
-  if (name === 'front') return proceduralFront();
+const proceduralFace = (name, art) => {
+  if (name === 'front') return proceduralFront(art);
   if (name === 'back') return proceduralBack();
   if (name === 'top' || name === 'bottom') return proceduralTop(name);
   return proceduralSide(name);
 };
 
-const FACE_SIZE = {
-  front: [BOX_W, BOX_H],
-  back: [BOX_W, BOX_H],
-  left: [BOX_D, BOX_H],
-  right: [BOX_D, BOX_H],
-  top: [BOX_W, BOX_D],
-  bottom: [BOX_W, BOX_D],
+const faceSize = (name, size) => {
+  if (name === 'left' || name === 'right') return [size.depth, size.height];
+  if (name === 'top' || name === 'bottom') return [size.width, size.depth];
+  return [size.width, size.height];
 };
+
+const faceTexture = (art, name) => (Object.hasOwn(art.faces, name) ? art.faces[name] : null);
 
 /**
  * A vendored face photo, squared onto the face by `faceMatrix3d`; any failure keeps the CSS face.
  * A loaded photo is kept in `cache` and moved into the next render's face, so a re-render never
  * flashes the CSS face while the new image decodes.
  */
-const mountTexture = (face, name, cache) => {
-  const texture = boxFaceTexture(name);
+const mountTexture = (face, name, { art, size, textures: cache }) => {
+  const texture = faceTexture(art, name);
   if (!texture) return;
   const cached = cache.get(name);
   if (cached) {
@@ -277,12 +276,12 @@ const mountTexture = (face, name, cache) => {
     face.append(cached);
     return;
   }
-  const [width, height] = FACE_SIZE[name];
+  const [width, height] = faceSize(name, size);
   let matrix;
   try {
     matrix = faceMatrix3d(texture.quad, width, height);
   } catch {
-    if (name === 'front') mountKeyArt(face);
+    if (name === 'front') mountKeyArt(face, art.keyArtUrl);
     return;
   }
   const img = el('img', 'bb-box__texture');
@@ -303,7 +302,7 @@ const mountTexture = (face, name, cache) => {
     'error',
     () => {
       img.remove();
-      if (name === 'front') mountKeyArt(face);
+      if (name === 'front') mountKeyArt(face, art.keyArtUrl);
     },
     { once: true }
   );
@@ -311,10 +310,10 @@ const mountTexture = (face, name, cache) => {
   face.append(img);
 };
 
-const boxFace = (name, { wrapped, textures }) => {
+const boxFace = (name, { wrapped, ...product }) => {
   const face = el('div', `bb-box__face bb-box__face--${name}`);
-  face.append(proceduralFace(name));
-  mountTexture(face, name, textures);
+  face.append(proceduralFace(name, product.art));
+  mountTexture(face, name, product);
   if (wrapped) face.append(el('div', 'bb-face__wrap'));
   return face;
 };
@@ -347,6 +346,8 @@ const cardFallback = (card) => {
  * @param {object} options.packModel the box's pack model (reverse-slot lookup)
  * @param {number} options.seed the box seed (pack art, tear edges)
  * @param {object|null} options.promo the deck's foil promo card row
+ * @param {object|null} options.product the box's art descriptor (`productArt(key)`); null draws
+ *   the Build & Battle box with CSS faces only
  * @param {() => void} options.onBuildDeck ends the opening: closes the stage, shows the Pool tab
  * @returns {{unmount: () => void}}
  */
@@ -358,8 +359,11 @@ export const mountUnboxingScene = ({
   packModel,
   seed,
   promo,
+  product,
   onBuildDeck,
 }) => {
+  const art = product || PROCEDURAL_ONLY_ART;
+  const size = boxSizeFor(art.proportions);
   const artIndexes = packArtIndexes(seed);
   const textures = new Map();
   const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
@@ -454,12 +458,12 @@ export const mountUnboxingScene = ({
   // ── Box ───────────────────────────────────────────────────────────────
   const renderBox = (u) => {
     const host = el('div', 'bb-box');
-    host.style.setProperty('--bb-w', `${BOX_W}px`);
-    host.style.setProperty('--bb-h', `${BOX_H}px`);
-    host.style.setProperty('--bb-d', `${BOX_D}px`);
+    host.style.setProperty('--bb-w', `${size.width}px`);
+    host.style.setProperty('--bb-h', `${size.height}px`);
+    host.style.setProperty('--bb-d', `${size.depth}px`);
     const body = el('div', 'bb-box__body');
     const wrapped = !u.wrapTorn;
-    const faceOptions = { wrapped, textures };
+    const faceOptions = { wrapped, art, size, textures };
     for (const name of ['back', 'left', 'right', 'bottom']) body.append(boxFace(name, faceOptions));
     for (const name of ['back', 'left', 'right', 'front']) {
       body.append(el('div', `bb-box__inner bb-box__inner--${name}`));
@@ -470,14 +474,14 @@ export const mountUnboxingScene = ({
     const lidOuter = boxFace('top', faceOptions);
     lidOuter.classList.add('bb-box__lid-outer');
     lid.append(lidOuter, el('div', 'bb-box__lid-inner'));
-    lid.style.transform = lidTransform(lidPose(u.stage === 'sealed' ? 0 : 1));
+    lid.style.transform = lidTransform(lidPose(u.stage === 'sealed' ? 0 : 1), size);
     body.append(lid);
     host.append(body);
 
     if (wrapped) {
       const wrapButton = button('bb-box__wrap', 'Tear off the shrink-wrap');
       bindTear(wrapButton, {
-        widthOf: () => wrapButton.clientWidth || BOX_W,
+        widthOf: () => wrapButton.clientWidth || size.width,
         onProgress: (progress) => setWrapClip(wrapTearPose(progress).clipPath),
         onSpring: (progress) => springWrap(progress),
         onTear: (progress) => beatTearWrap(progress),
@@ -555,7 +559,7 @@ export const mountUnboxingScene = ({
     img.alt = '';
     img.draggable = false;
     img.addEventListener('error', () => img.remove(), { once: true });
-    img.src = `/${packArtSrc(PACK_ARTS[artIndexes[packIndex]])}`;
+    img.src = `/${art.packArtSrc(art.packArts[artIndexes[packIndex]])}`;
     return img;
   };
 
@@ -982,7 +986,7 @@ export const mountUnboxingScene = ({
         playPose(
           root.querySelector('.bb-box__lid'),
           lidPose,
-          (pose) => ({ transform: lidTransform(pose) }),
+          (pose) => ({ transform: lidTransform(pose, size) }),
           LID_OPEN_MS
         ),
       'tray'

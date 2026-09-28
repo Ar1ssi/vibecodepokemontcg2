@@ -9,6 +9,7 @@ import {
   BUILD_BATTLE_DECKS,
   BUILD_BATTLE_SET_CARDS,
 } from '../../../setup/deck-builder/core/build-battle/build-battle.generated.mjs';
+import { productArt } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
 import { openBox, poolFromBox } from '../../../setup/deck-builder/core/build-battle/pack-opening.mjs';
 import {
   canAddFromPool,
@@ -370,6 +371,7 @@ export const initializeBuildBattle = ({
       packModel: BOX.packModel,
       seed: session.seed,
       promo: boxDecks[session.deckKey]?.find((row) => row.id === deckEntry.promoId) || null,
+      product: productArt(BOX.key),
       onBuildDeck: finishOpening,
     });
   };

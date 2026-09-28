@@ -6,7 +6,11 @@ import {
   BUILD_BATTLE_BOXES,
   getBuildBattleBox,
 } from '../box-catalog.mjs';
-import { BUILD_BATTLE_DECKS, BUILD_BATTLE_SET_CARDS } from '../build-battle.generated.mjs';
+import {
+  BUILD_BATTLE_DECKS,
+  BUILD_BATTLE_SET_CARDS,
+  ETB_PROMOS,
+} from '../build-battle.generated.mjs';
 import { findPokemonBySlug } from '../../deck-sprites.mjs';
 import { GENERATED_STARTER_DECKS } from '../../starter-decks.generated.mjs';
 
@@ -111,6 +115,19 @@ test('the Ceruledge deck matches the printed list', () => {
     'me01-130': 1,
     'sve-002': 16,
   });
+});
+
+// TCGdex mep-022 "Charcadet" (rarity "Promo"): the Phantasmal Flames ETB promo (design 055).
+test('the Phantasmal Flames ETB promo is baked as one Charcadet MEP 022', () => {
+  assert.deepEqual(Object.keys(ETB_PROMOS), ['phantasmal-flames-etb']);
+  const promo = ETB_PROMOS['phantasmal-flames-etb'];
+  assert.equal(promo.id, 'mep-022');
+  assert.equal(promo.name, 'Charcadet');
+  assert.equal(promo.supertype, 'Pokémon');
+  assert.equal(promo.rarity, 'Promo');
+  assert.equal(promo.qty, 1);
+  assert.match(promo.image, /^https:\/\//);
+  assert.match(promo.images.small, /^https:\/\//);
 });
 
 test('every box deck sprite slug exists in the sprite catalog', () => {

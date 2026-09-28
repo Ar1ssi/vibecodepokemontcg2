@@ -4220,3 +4220,30 @@ export const BUILD_BATTLE_DECKS = {
     ]
   }
 };
+
+export const ETB_PROMOS = {
+  "phantasmal-flames-etb": {
+    "id": "mep-022",
+    "name": "Charcadet",
+    "supertype": "Pokémon",
+    "localId": "022",
+    "image": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/MEP/MEP_022_R_EN_LG.png",
+    "images": {
+      "small": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/MEP/MEP_022_R_EN.png",
+      "large": "https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/MEP/MEP_022_R_EN_LG.png"
+    },
+    "set": {
+      "id": "mep",
+      "name": "MEP Black Star Promos",
+      "releaseDate": ""
+    },
+    "rarity": "Promo",
+    "category": "Pokemon",
+    "stage": "Basic",
+    "types": [
+      "Fire"
+    ],
+    "hp": 70,
+    "qty": 1
+  }
+};

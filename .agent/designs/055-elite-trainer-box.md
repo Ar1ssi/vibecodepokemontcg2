@@ -417,6 +417,13 @@ Slice 1 (S332, branch `claude/keen-shannon-i8h98o`; 054 had not landed, so this 
   three draws per die in index order; end rotations are whole quarter turns plus two tumbles.
 - `parseCollection`: counts must be 1–9999 (a stored 0 is refused; `addProduct` never writes one);
   `sleeves`/`coins` are capped at 500 ids each.
+Slice 2 (S332, same branch):
+- `ETB_PROMOS['phantasmal-flames-etb']` is also pinned in `box-catalog.test.mjs`; `etb-catalog.test.mjs`
+  asserts `ETB_PROMOS[key].id === promoId` for every row.
+- TCGdex `mep-022` rarity is `"Promo"`, not `"Illustration rare"` (bake 2026-09-29). With that rarity,
+  `unboxingHoloRarity(promo, 'normal')` does not give the tier 2 flare Scene beat 4 expects. Slice 4
+  pins the promo's foil tier explicitly.
+- `mountUnboxingScene({ product })`: null `product` draws the B&B box with CSS faces only (row 9).
 
 ## Sources
 1. Bulbapedia, "Elite Trainer Box (TCG)" — per-era packs, sleeves, Energy, dividers, markers, first
