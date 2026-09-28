@@ -10,12 +10,13 @@
 // Backward-compat: the bridge auto-draws by finding `type === 'drawAbility'`
 // and reading `.count`. That step type + property are preserved.
 import { energySearchWhat } from './search-match.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 
 // Normalize printed card text before matching.
 //   curly quotes  ' ' `  →  straight '
 //   energy symbol { P } {G}  →  {P} (no inner spaces)
 function normalizeText(text) {
-  return String(text)
+  return symbolizeTypeWords(text)
     .replace(/[\u2018\u2019\u201A\u201B`]/g, "'")
     .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
     .toLowerCase();

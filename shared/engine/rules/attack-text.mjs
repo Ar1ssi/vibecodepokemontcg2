@@ -36,13 +36,52 @@ export function replaceSelfName(text, selfName) {
   return out;
 }
 
+const TYPE_WORD_SYMBOLS = {
+  grass: 'G',
+  fire: 'R',
+  water: 'W',
+  lightning: 'L',
+  psychic: 'P',
+  fighting: 'F',
+  darkness: 'D',
+  metal: 'M',
+  fairy: 'Y',
+  dragon: 'N',
+  colorless: 'C',
+};
+const TYPE_WORD = Object.keys(TYPE_WORD_SYMBOLS).join('|');
+const TYPE_WORD_RUN = new RegExp(`\\b(?:${TYPE_WORD}){2,}\\b`, 'gi');
+// A type word (or an "X, Y, or Z" list of them) that names a type: before a noun the corpus
+// prints after a {X} symbol (Dark Electrode: "a Darkness or Dark Metal Energy"). Names ("Dark Gyarados", "Dragon Rush") never match, nor do the
+// special Energy names Double Colorless / Double Dragon / Dark Metal Energy.
+const TYPE_WORD_LIST = new RegExp(
+  `(?<!\\b(?:double|dark) )\\b(?:${TYPE_WORD})(?:(?:,|,? and|,? or) (?:basic )?(?:${TYPE_WORD}))* (?=(?:energy|pok[eé]mon|type|less|more|basic|weakness|resistance|(?:or|and) (?:dark metal|double colorless|double dragon) energy)(?![a-z]))`,
+  'gi'
+);
+// "Rotom's type is Water until …" (Type Shift), "can use the Double-Edge attack for Psychic".
+const TYPE_WORD_AFTER = new RegExp(`(?<=\\b(?:type is|type becomes|attack for) )(?:${TYPE_WORD})\\b`, 'gi');
+const symbolOf = (word) => `{${TYPE_WORD_SYMBOLS[word.toLowerCase()]}}`;
+
+/**
+ * TCGdex prints older sets with type words ("attach a Fire Energy card", "costs ColorlessColorless
+ * less") where pkmncards prints {X} symbols. Turns those words back into symbols so every parser
+ * reads one notation (ea389d92 did the same for special Energy). Case is kept.
+ */
+export function symbolizeTypeWords(text) {
+  const each = new RegExp(`(?:${TYPE_WORD})`, 'gi');
+  return String(text || '')
+    .replace(TYPE_WORD_RUN, (run) => run.replace(each, symbolOf))
+    .replace(TYPE_WORD_LIST, (list) => list.replace(each, symbolOf))
+    .replace(TYPE_WORD_AFTER, symbolOf);
+}
+
 /**
  * Lowercases and flattens printed wording so one template covers every printing era:
  * the attacker's own name and "the Defending Pokémon" become "this pokémon" /
  * "your opponent's active pokémon", and "his or her" becomes "their".
  */
 export function normalizeAttackText(text, selfName = '') {
-  let out = String(text || '')
+  let out = symbolizeTypeWords(text)
     .replace(/[’‘]/g, "'")
     .replace(/\s+/g, ' ')
     .trim()

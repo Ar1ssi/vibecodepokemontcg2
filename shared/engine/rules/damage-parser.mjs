@@ -37,7 +37,7 @@ import { isBasicPokemon } from '../cards.mjs';
 import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 import { parseEachFilter } from './each-filter.mjs';
 import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
-import { normalizeAttackText, replaceSelfName } from './attack-text.mjs';
+import { normalizeAttackText, replaceSelfName, symbolizeTypeWords } from './attack-text.mjs';
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
 import { countUnit, normalizeUnit, scalingCap } from './scaling-count.mjs';
 
@@ -365,9 +365,9 @@ export function parseAttackDamage(
   ctx = {}
 ) {
   // Older printings name the attacker ("Arcanine does 40 damage to itself"); TCGdex prints
-  // curly apostrophes the sub-readers below match as straight ones.
+  // curly apostrophes the sub-readers below match as straight ones, and type words for {X}.
   if (attack?.text) {
-    const straight = String(attack.text).replace(/[‘’]/g, "'");
+    const straight = symbolizeTypeWords(attack.text).replace(/[‘’]/g, "'");
     attack = { ...attack, text: attacker?.name ? replaceSelfName(straight, attacker.name) : straight };
   }
   // Mewtwo / Gardevoir Energy Burst: "times the total amount of Energy attached to …".
