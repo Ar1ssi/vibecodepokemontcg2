@@ -1502,3 +1502,35 @@ test("Wobbuffet Shadow Tag (Legend Maker 28): 7 counters at the end of the oppon
   res = applyCommand(res.state, { type: 'pass', playerId: 'p2', payload: {} }, createRng(3));
   assert.equal(root(res.state, 'p2', defender.instanceId).damage, 70);
 });
+
+test('Pheromosa-GX Fast Raid (Ultra Prism 158): usable on the first turn by the player going first', () => {
+  const text = 'If you go first, you can use this attack on your first turn.';
+  const { state } = board('Pheromosa-GX', text, { damage: '30' });
+  state.turn = { player: 'p1', number: 1, phase: 'main' };
+  state.players.p1.zones.active[0].attacks.push({ name: 'Other', cost: [], damage: '10', text: '' });
+  const legal = (attackIndex) =>
+    validateLegality(state, { type: 'attack', playerId: 'p1', payload: { attackIndex } }).allowed;
+  assert.equal(legal(0), true);
+  assert.equal(legal(1), false);
+});
+
+test('Torterra Land Shake (Stormfront 11): a Basic benched from hand next turn takes 2 counters', () => {
+  const text =
+    "During your opponent's next turn, when your opponent puts a Basic Pokémon from his or her hand onto his or her Bench, put 2 damage counters on that Pokémon.";
+  let basic;
+  const { state } = board('Torterra', text, {
+    damage: '80',
+    setup: (s) => {
+      basic = mon('Bidoof', { hp: 60 });
+      s.players.p2.zones.hand.push(basic);
+    },
+  });
+  let res = attack(state);
+  res = applyCommand(
+    res.state,
+    { type: 'moveCard', playerId: 'p2', payload: { instanceId: basic.instanceId, from: 'hand', to: 'bench' } },
+    createRng(3)
+  );
+  assert.equal(res.error, null);
+  assert.equal(root(res.state, 'p2', basic.instanceId).damage, 20);
+});

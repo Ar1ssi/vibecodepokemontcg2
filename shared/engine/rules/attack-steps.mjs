@@ -154,6 +154,11 @@ const TEMPLATES = [
     /^(?:choose 1 of your opponent's benched pokémon( with no damage counters on it)? and switch (?:it with (?:1 of )?your opponent's active pokémon|your opponent's active pokémon with it)|switch 1 of your opponent's benched pokémon with 1 of your opponent's active pokémon|if your opponent has any benched pokémon, choose 1 of them and switch it with your opponent's active pokémon)$/,
     (m) => ({ type: 'atkGust', chooser: 'self', ...(m[1] ? { filter: 'undamaged' } : {}) }),
   ],
+  // Torterra Land Shake.
+  [
+    /^during your opponent's next turn, when your opponent puts a basic pokémon from their hand onto their bench, put (\d+) damage counters on that pokémon$/,
+    (m) => ({ type: 'atkOppBenchTrap', count: Number(m[1]) }),
+  ],
   // Wobbuffet Shadow Tag (reduce.mjs resolveDeferredKnockouts places them).
   [
     /^put (\d+) damage counters on your opponent's active pokémon at the end of your opponent's next turn$/,

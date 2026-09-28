@@ -4248,14 +4248,18 @@ export function validateLegality(state, command) {
     case 'attack': {
       if (state.turn?.number === 1) {
         const goingFirstActive = player.zones?.active?.find((c) => !c.attachedTo);
+        // Pheromosa-GX Fast Raid: "If you go first, you can use this attack on your first turn."
+        const chosenText = String(goingFirstActive?.attacks?.[payload?.attackIndex]?.text || '');
+        const attackAllowsFirstTurn = /you can use this attack (?:on|during) your first turn/i.test(chosenText);
         // Meloetta ex: "If you go first, this Pokémon can use attacks during
         // your first turn." Turn 1 is always the going-first player's turn.
         if (
           !goingFirstActive ||
-          !abilityFirstTurnAttack(goingFirstActive, {
-            ...abilitySideContext(state, playerId),
-            turnNumber: state.turn.number,
-          })
+          (!attackAllowsFirstTurn &&
+            !abilityFirstTurnAttack(goingFirstActive, {
+              ...abilitySideContext(state, playerId),
+              turnNumber: state.turn.number,
+            }))
         ) {
           return {
             allowed: false,
@@ -7730,6 +7734,13 @@ export function applyCommand(state, command, rng = null) {
                 hostPlayerId: playerId,
                 events,
               });
+            }
+            // Torterra Land Shake (effects/attack-steps.mjs atkOppBenchTrap).
+            const turnNumber = draft.turn.number;
+            for (const trap of draft.players[playerId].benchTraps || []) {
+              if (trap.fromTurn > turnNumber || trap.untilTurn < turnNumber || !isBasicPokemon(card)) continue;
+              card.damage = (card.damage || 0) + trap.count * 10;
+              events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage, source: trap.source });
             }
           } else {
             delete card.playedToBenchTurn;

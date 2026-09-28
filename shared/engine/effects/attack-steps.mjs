@@ -3064,6 +3064,21 @@ function atkCountersEachChosenType(ctx) {
   return null;
 }
 
+// Torterra Land Shake: "During your opponent's next turn, when your opponent puts a Basic Pokémon
+// from their hand onto their Bench, put 2 damage counters on that Pokémon." reduce.mjs reads the
+// trap where a hand card is benched.
+function atkOppBenchTrap(ctx) {
+  const { opponent, step } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const turn = (ctx.draft.turn?.number || 1) + 1;
+  opponent.benchTraps = [
+    ...(opponent.benchTraps || []).filter((trap) => trap.untilTurn >= turn - 1),
+    { count: step.count, fromTurn: turn, untilTurn: turn, source: attackName(ctx) },
+  ];
+  ctx.events.push({ type: 'benchTrapSet', playerId: opponent.playerId, count: step.count });
+  return null;
+}
+
 // Unown L Hidden Power: "put damage counters on the Defending Pokémon until it is 10 HP away
 // from being Knocked Out".
 function atkCountersUntilHp(ctx) {
@@ -3426,6 +3441,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkCountersEachChosenType,
   atkDiscardOwnEnergy,
   atkDiscardSelfEnergyEither,
+  atkOppBenchTrap,
   atkApplyCondition: optional(atkApplyCondition, (step) => `Leave your opponent's Active Pokémon ${step.condition}`),
   atkDevolve,
   atkBounceOppActive,
