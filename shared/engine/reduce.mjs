@@ -5516,6 +5516,10 @@ function payOptionalCost(draft, { playerId, attacker, token, selection, activeRn
         const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
         runAttackSteps(draft, { steps, attackerId: attacker?.instanceId, playerId, oppId, activeRng, events });
       }
+      // Nasal Lariat / Strong-Arm Lariat: "If you do, during your next turn, this Pokémon can't
+      // attack." The attack's own lock pass skips "If you do" sentences, so acceptance sets it here.
+      const lock = parseNextTurnLock({ text: cost.text });
+      if (lock?.selfCannotAttack && attacker) attacker.cannotAttackUntilTurn = (draft.turn?.number || 1) + 2;
       return { paid: true, count: 0 };
     }
     case 'selfCounters': {

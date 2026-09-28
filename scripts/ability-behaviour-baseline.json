@@ -2,18 +2,18 @@
   "corpusRows": 4228,
   "totals": {
     "n": 4228,
-    "runs": 1545,
-    "partial": 394,
-    "dead": 55,
-    "consumed": 1191,
-    "unconsumed": 1042,
+    "runs": 1569,
+    "partial": 375,
+    "dead": 56,
+    "consumed": 1192,
+    "unconsumed": 1035,
     "unparsed": 1
   },
   "families": {
     "attach": {
       "n": 211,
-      "runs": 169,
-      "partial": 8,
+      "runs": 170,
+      "partial": 7,
       "dead": 6,
       "consumed": 0,
       "unconsumed": 28,
@@ -87,8 +87,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 28,
-      "unconsumed": 2,
+      "consumed": 29,
+      "unconsumed": 1,
       "unparsed": 0
     },
     "cost-discount": {
@@ -96,8 +96,8 @@
       "runs": 7,
       "partial": 0,
       "dead": 0,
-      "consumed": 43,
-      "unconsumed": 41,
+      "consumed": 44,
+      "unconsumed": 40,
       "unparsed": 0
     },
     "damage-bonus": {
@@ -111,10 +111,10 @@
     },
     "damage-prevent": {
       "n": 305,
-      "runs": 1,
+      "runs": 3,
       "partial": 13,
       "dead": 0,
-      "consumed": 188,
+      "consumed": 186,
       "unconsumed": 103,
       "unparsed": 0
     },
@@ -156,8 +156,8 @@
     },
     "draw": {
       "n": 219,
-      "runs": 178,
-      "partial": 18,
+      "runs": 180,
+      "partial": 16,
       "dead": 21,
       "consumed": 0,
       "unconsumed": 2,
@@ -246,8 +246,8 @@
     },
     "heal": {
       "n": 211,
-      "runs": 144,
-      "partial": 10,
+      "runs": 146,
+      "partial": 8,
       "dead": 0,
       "consumed": 13,
       "unconsumed": 44,
@@ -282,9 +282,9 @@
     },
     "look-at-top": {
       "n": 67,
-      "runs": 59,
+      "runs": 58,
       "partial": 8,
-      "dead": 0,
+      "dead": 1,
       "consumed": 0,
       "unconsumed": 0,
       "unparsed": 0
@@ -318,8 +318,8 @@
     },
     "opponent-disrupt": {
       "n": 223,
-      "runs": 42,
-      "partial": 37,
+      "runs": 43,
+      "partial": 36,
       "dead": 0,
       "consumed": 61,
       "unconsumed": 83,
@@ -345,8 +345,8 @@
     },
     "recursion": {
       "n": 119,
-      "runs": 35,
-      "partial": 51,
+      "runs": 38,
+      "partial": 48,
       "dead": 0,
       "consumed": 2,
       "unconsumed": 31,
@@ -390,20 +390,20 @@
     },
     "setup": {
       "n": 9,
-      "runs": 1,
+      "runs": 2,
       "partial": 0,
       "dead": 0,
       "consumed": 7,
-      "unconsumed": 1,
+      "unconsumed": 0,
       "unparsed": 0
     },
     "status": {
       "n": 507,
-      "runs": 167,
-      "partial": 54,
+      "runs": 168,
+      "partial": 53,
       "dead": 21,
-      "consumed": 111,
-      "unconsumed": 154,
+      "consumed": 112,
+      "unconsumed": 153,
       "unparsed": 0
     },
     "status-recover": {
@@ -417,11 +417,11 @@
     },
     "switch": {
       "n": 256,
-      "runs": 210,
-      "partial": 30,
+      "runs": 219,
+      "partial": 24,
       "dead": 0,
       "consumed": 0,
-      "unconsumed": 16,
+      "unconsumed": 13,
       "unparsed": 0
     },
     "tool-cap": {
@@ -453,8 +453,8 @@
     },
     "when-played": {
       "n": 39,
-      "runs": 17,
-      "partial": 21,
+      "runs": 20,
+      "partial": 18,
       "dead": 1,
       "consumed": 0,
       "unconsumed": 0,
@@ -487,7 +487,8 @@
       "card": "Ampharos",
       "name": "Unseen Flash",
       "flags": [
-        "clause:lost-zone"
+        "typography:typeWords:parse",
+        "typography:typeWords:plan"
       ]
     },
     "Armaldo ex|dual armor#5dxp7k": {
@@ -534,13 +535,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Banette|puppet offering#1n3xqed": {
-      "card": "Banette",
-      "name": "Puppet Offering",
-      "flags": [
-        "clause:lost-zone"
-      ]
-    },
     "Barbaracle|stone arms#pnudwa": {
       "card": "Barbaracle",
       "name": "Stone Arms",
@@ -555,13 +549,6 @@
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Beedrill|elusive master#1myygfc": {
-      "card": "Beedrill",
-      "name": "Elusive Master",
-      "flags": [
-        "clause:search-to-bench"
       ]
     },
     "Beedrill|venom spray#1js2gss": {
@@ -1193,32 +1180,11 @@
         "typography:typeWords:parse"
       ]
     },
-    "Goodra|gooey regeneration#14srdau": {
-      "card": "Goodra",
-      "name": "Gooey Regeneration",
-      "flags": [
-        "clause:discard-self-energy"
-      ]
-    },
-    "Greninja-GX|elusive master#uc4c6z": {
-      "card": "Greninja-GX",
-      "name": "Elusive Master",
-      "flags": [
-        "clause:search-to-bench"
-      ]
-    },
     "Gyarados|flame vapor#1v4dfqw": {
       "card": "Gyarados",
       "name": "Flame Vapor",
       "flags": [
         "clause:discard-opp-energy"
-      ]
-    },
-    "Hatterene|witch rondo#1d2o4ve": {
-      "card": "Hatterene",
-      "name": "Witch Rondo",
-      "flags": [
-        "clause:gust"
       ]
     },
     "Haunter|head trip#yjar7s": {
@@ -1611,13 +1577,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Metagross|magnetic warp#daqlu8": {
-      "card": "Metagross",
-      "name": "Magnetic Warp",
-      "flags": [
-        "clause:gust"
-      ]
-    },
     "Metagross|super connectivity#1ppph5r": {
       "card": "Metagross",
       "name": "Super Connectivity",
@@ -1781,13 +1740,6 @@
         "clause:status-opp"
       ]
     },
-    "Porygon-Z-GX|troubleshooting#1usbfyd": {
-      "card": "Porygon-Z-GX",
-      "name": "Troubleshooting",
-      "flags": [
-        "clause:discard-self-energy"
-      ]
-    },
     "Porygon-Z|bug transmission#1uwnyvc": {
       "card": "Porygon-Z",
       "name": "Bug Transmission",
@@ -1919,13 +1871,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Samurott|torrential whirlpool#nw432i": {
-      "card": "Samurott",
-      "name": "Torrential Whirlpool",
-      "flags": [
-        "clause:gust"
-      ]
-    },
     "Sceptile|nurture and heal#1jh76lg": {
       "card": "Sceptile",
       "name": "Nurture and Heal",
@@ -1954,6 +1899,13 @@
       "name": "Underworld Door",
       "flags": [
         "typography:typeWords:parse",
+        "typography:typeWords:plan"
+      ]
+    },
+    "Sharpedo|greedy evolution#18mlqsx": {
+      "card": "Sharpedo",
+      "name": "Greedy Evolution",
+      "flags": [
         "typography:typeWords:plan"
       ]
     },
@@ -2000,6 +1952,13 @@
         "typography:typeWords:parse"
       ]
     },
+    "Starmie|aqua recycle#cyyvjs": {
+      "card": "Starmie",
+      "name": "Aqua Recycle",
+      "flags": [
+        "typography:typeWords:plan"
+      ]
+    },
     "Starmie|metal navigation#14ae51z": {
       "card": "Starmie",
       "name": "Metal Navigation",
@@ -2044,7 +2003,8 @@
       "card": "Tapu Koko Prism Star",
       "name": "Dance of the Ancients",
       "flags": [
-        "clause:lost-zone"
+        "typography:typeWords:parse",
+        "typography:typeWords:plan"
       ]
     },
     "Tapu Lele|charmed charm#nuzsh4": {
@@ -2267,13 +2227,6 @@
         "typography:typeWords:plan"
       ]
     },
-    "Vanilluxe|slippery soles#uh9png": {
-      "card": "Vanilluxe",
-      "name": "Slippery Soles",
-      "flags": [
-        "clause:gust"
-      ]
-    },
     "Veluza|fillet memento#ig4jfz": {
       "card": "Veluza",
       "name": "Fillet Memento",
@@ -2316,13 +2269,6 @@
       "name": "Grand Wing",
       "flags": [
         "clause:opp-shuffle-hand"
-      ]
-    },
-    "Volcanion Prism Star|jet geyser#1bobm1v": {
-      "card": "Volcanion Prism Star",
-      "name": "Jet Geyser",
-      "flags": [
-        "clause:gust"
       ]
     },
     "Volcanion-EX|steam up#1q2k36o": {

@@ -3,11 +3,12 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: GX backlog II shipped — design 048 lands I184–I189 (play/attack locks, extra turns,
-  KO/prize manipulation, bounce/bench setup, scaling fixes, Backfire, GX abilities). GX oracle
-  attacks 390/604 → 485/604 executed. S&M trainer audit fixes (S325) landed just before.
+Focus: PRs #190–#194 landed together (S327): design 049 copy/borrow attacks (#192), parse-hole
+  sweep + audit gates for locks/typography/ability clauses/evolved stacks (#193, #190/#194:
+  evolved Abilities read the top card), coin ceremony (#191). #189 superseded by #192, not merged.
 Active: none.
-Next: top of ISSUES.md (I191 first); S&M deferred clauses I190.
+Next: `.agent/designs/parse-holes-next-handoff.md` items 2–5 (type-word drift flags 12 gate rows);
+  then top of ISSUES.md (I196 first).
   User visual check pending: designs 042–046 FX on localhost.
   Maintenance: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.

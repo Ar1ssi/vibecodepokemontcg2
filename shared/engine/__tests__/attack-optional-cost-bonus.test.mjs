@@ -149,6 +149,21 @@ test('Slaking Dynamic Swing (Unified Minds 170): +100 now, +100 taken next turn'
   assert.ok(!declined.events.some((e) => e.type === 'attackMarkerAdded'));
 });
 
+test('Copperajah Nasal Lariat (Shrouded Fable 042): +100 only with the next-turn attack lock', () => {
+  const text = "You may do 100 more damage. If you do, during your next turn, this Pokémon can't attack.";
+  const { state, attacker } = board('Copperajah', { name: 'Nasal Lariat', damage: '130+', text });
+  const paid = choose(attack(state), [1]);
+  assert.equal(paid.error, null);
+  assert.equal(damageOf(paid), 230);
+  const locked = paid.state.players.p1.zones.active.find((c) => c.instanceId === attacker.instanceId);
+  assert.equal(locked.cannotAttackUntilTurn, 7, "can't attack during p1's next turn (turn 7)");
+  const { state: again, attacker: fresh } = board('Copperajah', { name: 'Nasal Lariat', damage: '130+', text });
+  const declined = choose(attack(again), [2]);
+  assert.equal(damageOf(declined), 130);
+  const free = declined.state.players.p1.zones.active.find((c) => c.instanceId === fresh.instanceId);
+  assert.ok(!free.cannotAttackUntilTurn, 'declining the offer sets no lock');
+});
+
 test('Banette Loneliness (Platinum 19): the bonus also needs a hand with no Pokémon', () => {
   const text =
     "You may show your hand to your opponent. If you do and if you don't have any Pokémon in your hand, this attack does 30 damage plus 30 more damage.";

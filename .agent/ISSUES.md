@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I197). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I198). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
@@ -15,8 +15,7 @@
 - I196 2026-09-28 P2 [rules] Alakazam ex Dimensional Hand ("can be used even if this Pokémon is on the Bench") unsupported: the attack pipeline assumes the Active attacks; needs attacker selection by instanceId (refs: .agent/scratch/parse-holes/landing.md)
 - I195 2026-09-28 P2 [rules] Flygon ex Psychic Protector (discard up to 4 when damaged, −10 each) and Delibird Souvenir coin tiers unimplemented: need a defender prompt mid-damage / a per-tier coin step (refs: parse-holes review.md)
 - I194 2026-09-28 P3 [rules] Approximations: Bronzong Heavy Potential reads printed Retreat Cost; Night Spin counts Energy cards not units; Metal Bomber / Reaper Pulse "up to" take the max; stampHealedPokemon counts counter moves as heals; Mothim/Ninjask Quick Touch and Magcargo Lava Plume "If you do" halves unparsed
-- I193 2026-09-28 P3 [tooling] Parse-hole gate item 2 open: condition-true replay (satisfy each parsed bonus condition on a second board, assert base + bonus) (refs: .agent/scratch/parse-holes/FINDINGS.md)
-- I192 2026-09-28 P3 [rules] Imakuni?'s Doduo Harmonize (sing a song; joke text) not modelled
+- I197 2026-09-28 P3 [rules] Imakuni?'s Doduo Harmonize (sing a song; joke text) not modelled
 - I191 2026-09-26 P3 [tooling] The ability passive probe asks every reader with the plain opponent Active (V/VMAX/VSTAR sit on the Bench), so attacker rule-box filters read `unconsumed` although they work against a matching attacker (Dauntless Shield / Crystal Veil class) (refs: S325, scripts/lib/ability-passive-probe.mjs)
 - I190 2026-09-26 P3 [rules] Deferred S&M trainer clauses: Bellelba & Brycen-Man CEC 186 and Sabrina's Suggestion TEU 154 unrecognizable; Choose-1 second modes (Rescue Stretcher GRI 130, Energy Recycle System CES 128, Fossil Excavation Map FLI 107, Tate & Liza CES 148); Mallow & Lana CEC 198 optional discard+heal; Missing Clover UPR 129 4-card Prize mode; Cross Switcher BUS 115 2-card play gate (refs: .agent/scratch/sm-trainer-audit/report.md, S325)
 - I183 2026-09-26 P3 [tests] coin-flip-ceremony.test.mjs "ceremony mounts a material-stamped coin" flakes under full `pnpm test` load (message '' vs /Tails! You go first\./); passes 3/3 alone — timing-dependent wait.
@@ -60,6 +59,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I193 2026-09-28 P3 [tooling] Parse-hole gate item 2 open: condition-true replay (satisfy each parsed bonus condition on a second board, assert base + bonus) (refs: .agent/scratch/parse-holes/FINDINGS.md) → closed 2026-09-28 S327: landed with PR #190/#194 — scripts/lib/condition-replay.mjs replays each parsed bonus condition (`bonus-not-applied` rows in audit:attacks)
 - I192 2026-09-26 P3 [rules] Qualified hand-discard ability costs beyond Ultra Beast still unread and their effects run free: Melmetal "a {M} Pokémon" (heal 100), Naganadel & Guzzlord-GX "a Pokémon" (heal 60), Karrablast "a Shelmet", Meowstic "a Chill Teaser Toy card", Polteageist "a Pokémon that has the Mad Party attack" (refs: I92, S327) → closed 2026-09-26 S327: general noun-capture in the discard-cost branch + `what`/`pokemonTypes` filters in executor & matchesDiscardCost; Polteageist's relative clause stays unread by design
 - I189 2026-09-26 P3 [rules] GX ability gaps from the design 047 audit: Silvally-GX Disk Reload (draw-until), Magcargo-GX Crushing Charge (discard top + conditional attach), Ampharos-GX Power Recharge (recover named cards) (refs: design 047 triage §10) → closed 2026-09-26 S326: design 048 — mill-attach step + abilities.mjs branch; recover-all name step (Disk Reload already worked; board test)
 - I188 2026-09-26 P3 [rules] GX attack recovery/copy gaps: Volcarona-GX Backfire (return attached Energy to hand), Zoroark-GX Trickster-GX (use an opponent attack) (refs: design 047 triage §8/§11) → closed 2026-09-26 S326: design 048 — energy-to-hand step; Trickster already parsed/executed (fixture defender had no attacks; board test added)
