@@ -1171,6 +1171,27 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Delibird Souvenir (Team Rocket Returns 21): one outcome per heads tier of the 3 coins.
+  [
+    /if 1 of them is heads, put (\d+) damage counters on your opponent's active pokémon\. if 2 of them are heads, remove (\d+|a) damage counters? from your opponent's active pokémon\. if all of them are heads, put (\d+) damage counters on your opponent's active pokémon\. if all of them are tails, remove all damage counters from your opponent's active pokémon\./g,
+    (m) => {
+      const counters = (count, headsExactly) => ({
+        type: 'atkCountersEachFiltered',
+        count,
+        side: 'opponent',
+        scope: 'active',
+        filter: {},
+        headsExactly,
+      });
+      const heal = (amount, headsExactly) => ({ type: 'atkHealCounted', ...amount, target: 'opponentActive', headsExactly });
+      return [
+        counters(Number(m[1]), 1),
+        heal({ count: countOf(m[2]) }, 2),
+        counters(Number(m[3]), 3),
+        heal({ all: true }, 0),
+      ];
+    },
+  ],
   // Unown Hidden Power (Unseen Forces): the opponent guesses the face-down hand card's kind.
   [
     /choose a card from your hand and put it face down\. your opponent guesses if the card is a pokémon, trainer, or energy card\. reveal the card\. if your opponent guessed wrong, draw (\d+) cards\. put the card back into your hand\./g,
