@@ -426,6 +426,16 @@ export function parseSearchDeckParams(lower) {
   if (lower.includes('stadium card and an energy card') || lower.includes('stadium card and a energy card')) {
     return { what: 'Stadium + Energy', count: 2, destination: 'hand' };
   }
+  // Hilda: one of each, not two picks from a shared pool.
+  if (/search your deck for an evolution pok[ée]mon and an energy card/.test(lower)) {
+    return {
+      type: 'searchDeckSequence',
+      stages: [
+        { what: 'Evolution Pokémon', count: 1, destination: 'hand' },
+        { what: 'Energy', count: 1, destination: 'hand' },
+      ],
+    };
+  }
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
     return {
       type: 'searchDeckSequence',
@@ -533,6 +543,24 @@ export function parseSearchDeckParams(lower) {
       count: cnt,
       destination: 'hand',
       ...(pkmnHpHand[1] ? { upTo: true } : {}),
+      ...(reveal ? { reveal: true } : {}),
+    };
+  }
+
+  // "up to 2 Basic Pokémon or 1 Evolution Pokémon" (Brock's Scouting): one branch, not a mixed pick.
+  const basicOrEvo = lower.match(
+    /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/
+  );
+  if (basicOrEvo && !lower.includes('onto your bench')) {
+    return {
+      what: 'Basic Pokémon or Evolution Pokémon',
+      count: Math.max(Number(basicOrEvo[1]), Number(basicOrEvo[2])),
+      destination: 'hand',
+      upTo: true,
+      alternatives: [
+        { what: 'Basic Pokémon', count: Number(basicOrEvo[1]) },
+        { what: 'Evolution Pokémon', count: Number(basicOrEvo[2]) },
+      ],
       ...(reveal ? { reveal: true } : {}),
     };
   }
