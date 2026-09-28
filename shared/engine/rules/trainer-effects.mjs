@@ -426,6 +426,16 @@ export function parseSearchDeckParams(lower) {
   if (lower.includes('stadium card and an energy card') || lower.includes('stadium card and a energy card')) {
     return { what: 'Stadium + Energy', count: 2, destination: 'hand' };
   }
+  // Hilda: one of each, not two picks from a shared pool.
+  if (/search your deck for an evolution pok[ée]mon and an energy card/.test(lower)) {
+    return {
+      type: 'searchDeckSequence',
+      stages: [
+        { what: 'Evolution Pokémon', count: 1, destination: 'hand' },
+        { what: 'Energy', count: 1, destination: 'hand' },
+      ],
+    };
+  }
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
     return {
       type: 'searchDeckSequence',

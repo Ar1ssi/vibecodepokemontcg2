@@ -63,3 +63,41 @@ test("Brock's Scouting: Basic + Evolution collapses to the first pick's branch",
   assert.deepEqual(run([1, 3]).hand, [1]);
   assert.deepEqual(run([3, 4]).hand, [3]);
 });
+
+// Source: out/pkmn-trainer-cards.json "Hilda" (White Flare 084)
+const HILDA =
+  'Search your deck for an Evolution Pokémon and an Energy card, reveal them, and put them into your hand. Then, shuffle your deck.';
+
+test('Hilda parses as one Evolution then one Energy', () => {
+  const step = parseTrainerEffect(HILDA).steps[0];
+  assert.equal(step.type, 'searchDeckSequence');
+  assert.deepEqual(step.stages.map((s) => s.what), ['Evolution Pokémon', 'Energy']);
+});
+
+test('Hilda fetches exactly one Evolution and one Energy', () => {
+  const state = createGameState({ gameId: 'hilda', seed: 1, rulesEnabled: true });
+  state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
+  state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 1, name: 'Pikachu', supertype: 'Pokémon', subtypes: 'Basic' }),
+    createCard({ instanceId: 2, name: 'Raichu', supertype: 'Pokémon', subtypes: 'Stage 1', stage: 'Stage 1' }),
+    createCard({ instanceId: 3, name: 'Charizard', supertype: 'Pokémon', subtypes: 'Stage 2', stage: 'Stage 2' }),
+    createCard({ instanceId: 4, name: 'Basic Lightning Energy', supertype: 'Energy', type: 'Energy' })
+  );
+  const base = {
+    steps: parseTrainerEffect(HILDA).steps,
+    fromStepIndex: 0,
+    effectType: 'trainer',
+    sourceCard: { name: 'Hilda' },
+    playerId: 'p1',
+    activeRng: createRng(1),
+    events: [],
+  };
+  const first = executeSteps(state, base);
+  assert.deepEqual(first.pendingChoice.options.map((c) => c.instanceId).sort(), [2, 3]);
+  assert.equal(first.pendingChoice.max, 1);
+  const second = executeSteps(state, { ...base, fromStepIndex: first.pendingChoice.stepIndex, selection: [2], resume: first.pendingChoice.resumeToken });
+  assert.ok(second.pendingChoice, 'second stage asks for Energy');
+  assert.deepEqual(second.pendingChoice.options.map((c) => c.instanceId), [4]);
+});
