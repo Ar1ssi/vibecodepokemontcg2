@@ -1,0 +1,310 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  BULGE,
+  BODY_INSET_U,
+  CAMERA_DISTANCE,
+  CAMERA_FOV_DEG,
+  CARDS_FROM_V,
+  CARDS_TO_V,
+  FLY_SPIN_Y_DEG,
+  PACK_DROP_ROTATE_X_DEG,
+  PEEL_MAX_DEG,
+  SEAL_BOTTOM_V,
+  SEAL_TOP_V,
+  SPREAD_SIDE_ROTATE_Y_DEG,
+  SPREAD_SIDE_Z,
+  TILT_MAX_X_DEG,
+  TILT_MAX_Y_DEG,
+  cardsEmergePose,
+  followTilt,
+  packDropPose,
+  packFlyPose3d,
+  packSpreadSlot3d,
+  packTearLine,
+  peelAngleDeg,
+  peelSide,
+  peelVertex,
+  pillowZ,
+  rectToWorld,
+  ripTicksCrossed,
+  smoothstep,
+  stripFlightPose,
+  swayPose,
+  tearHingeV,
+  tiltTarget,
+  worldPerPixel,
+} from '../pack3d.mjs';
+import { packFlyPose, packSpreadSlot, packTearEdge } from '../unboxing.mjs';
+
+const close = (actual, expected, epsilon = 1e-9, message) =>
+  assert.ok(
+    Math.abs(actual - expected) <= epsilon,
+    message || `${actual} ≉ ${expected}`
+  );
+
+test('smoothstep clamps and eases between its edges', () => {
+  assert.equal(smoothstep(0, 1, -1), 0);
+  assert.equal(smoothstep(0, 1, 2), 1);
+  close(smoothstep(0, 1, 0.5), 0.5);
+  assert.equal(smoothstep(0, 0, 0), 1, 'a zero-width step is a hard edge');
+});
+
+test('pillowZ is flat on both seals and outside the body columns', () => {
+  for (const u of [0, 0.3, 0.5, 1]) {
+    assert.equal(pillowZ(u, 0), 0);
+    assert.equal(pillowZ(u, SEAL_TOP_V - 1e-6), 0);
+    assert.equal(pillowZ(u, SEAL_BOTTOM_V + 1e-6), 0);
+    assert.equal(pillowZ(u, 1), 0);
+  }
+  for (const v of [0.3, 0.5, 0.8]) {
+    assert.equal(pillowZ(BODY_INSET_U / 2, v), 0);
+    assert.equal(pillowZ(1 - BODY_INSET_U / 2, v), 0);
+  }
+  assert.equal(pillowZ(Number.NaN, 0.5), 0);
+});
+
+test('pillowZ peaks at BULGE in the body centre and is symmetric across', () => {
+  close(pillowZ(0.5, 0.5), BULGE);
+  for (const u of [0.1, 0.25, 0.4])
+    close(pillowZ(u, 0.5), pillowZ(1 - u, 0.5), 1e-12);
+  assert.ok(pillowZ(0.25, 0.5) < BULGE && pillowZ(0.25, 0.5) > 0);
+  assert.ok(
+    pillowZ(0.5, SEAL_TOP_V + 0.01) < pillowZ(0.5, SEAL_TOP_V + 0.05),
+    'ramps up off the seal'
+  );
+});
+
+test('packTearLine is packTearEdge point for point, left to right, in 0..1', () => {
+  for (const seed of [1, 18, 42, 999]) {
+    for (let packIndex = 0; packIndex < 4; packIndex += 1) {
+      const fromEdge = packTearEdge(seed, packIndex)
+        .slice('polygon('.length, -1)
+        .split(', ')
+        .slice(2)
+        .map((point) =>
+          point.split(' ').map((value) => Number.parseFloat(value) / 100)
+        )
+        .reverse();
+      const line = packTearLine(seed, packIndex);
+      assert.equal(line.length, fromEdge.length);
+      line.forEach((point, index) => {
+        close(point.x, fromEdge[index][0], 5e-5);
+        close(point.y, fromEdge[index][1], 5e-5);
+      });
+      assert.equal(line[0].x, 0);
+      assert.equal(line.at(-1).x, 1);
+    }
+  }
+});
+
+test('packTearEdge keeps its seeded output (the numeric line is shared, not changed)', () => {
+  assert.ok(
+    packTearEdge(42, 0).startsWith(
+      'polygon(0% 0%, 100% 0%, 100% 7%, 95.83% 11.36%, 91.67% 7%, 87.5% 9.88%, 83.33% 7%, 79.17% 10.75%'
+    )
+  );
+});
+
+test('tearHingeV is the mean depth of the line, inside the teeth band', () => {
+  const hinge = tearHingeV(packTearLine(42, 0));
+  assert.ok(hinge > 0.07 && hinge < 0.12, `${hinge}`);
+  assert.equal(tearHingeV([]), 0);
+  close(
+    tearHingeV([
+      { x: 0, y: 0.1 },
+      { x: 1, y: 0.2 },
+    ]),
+    0.15
+  );
+});
+
+test('peelSide: a press in the left half tears left → right', () => {
+  const rect = { left: 100, top: 0, width: 200, height: 50 };
+  assert.equal(peelSide(120, rect), 1);
+  assert.equal(peelSide(250, rect), -1);
+  assert.equal(peelSide(Number.NaN, rect), 1);
+  assert.equal(peelSide(120, { left: 0, top: 0, width: 0, height: 0 }), 1);
+});
+
+test('peelAngleDeg: flat before the drag, fully folded at the end, monotonic, mirrored by side', () => {
+  for (const u of [0, 0.3, 0.7, 1]) {
+    assert.equal(peelAngleDeg(u, 0, 1), 0);
+    assert.equal(peelAngleDeg(u, 1, 1), PEEL_MAX_DEG);
+    assert.equal(peelAngleDeg(u, 1, -1), PEEL_MAX_DEG);
+  }
+  let previous = -1;
+  for (let step = 0; step <= 20; step += 1) {
+    const angle = peelAngleDeg(0.4, step / 20, 1);
+    assert.ok(angle >= previous);
+    previous = angle;
+  }
+  assert.ok(
+    peelAngleDeg(0.1, 0.4, 1) > peelAngleDeg(0.9, 0.4, 1),
+    'the start side folds first'
+  );
+  close(peelAngleDeg(0.2, 0.4, 1), peelAngleDeg(0.8, 0.4, -1), 1e-12);
+});
+
+test('peelVertex: identity at 0°, hinge fixed, 90° lays the strip toward the camera', () => {
+  assert.deepEqual(
+    peelVertex({ y: 1.2, z: 0.01 }, { hingeY: 1, angleDeg: 0 }),
+    { y: 1.2, z: 0.01 }
+  );
+  const onHinge = peelVertex({ y: 1, z: 0 }, { hingeY: 1, angleDeg: 120 });
+  close(onHinge.y, 1);
+  close(onHinge.z, 0);
+  const d = 0.001;
+  const folded = peelVertex({ y: 1 + d, z: 0 }, { hingeY: 1, angleDeg: 90 });
+  close(folded.y, 1, 1e-6);
+  close(folded.z, d, 1e-6);
+  const high = peelVertex({ y: 1.2, z: 0 }, { hingeY: 1, angleDeg: 90 });
+  assert.ok(
+    high.z > 0.19 && high.y < 1,
+    'points above the hinge curl a little past 90°'
+  );
+});
+
+test('stripFlightPose starts where it tore, falls below, and fades out', () => {
+  const start = stripFlightPose(0, { side: 1 });
+  assert.deepEqual(
+    [
+      start.x,
+      start.y,
+      start.z,
+      start.rotX,
+      start.rotY,
+      start.rotZ,
+      start.opacity,
+    ],
+    [0, 0, 0, -0, 0, 0, 1]
+  );
+  const end = stripFlightPose(1, { side: 1 });
+  assert.equal(end.opacity, 0);
+  assert.ok(end.y < 0 && end.x > 0 && end.z > 0);
+  const mirrored = stripFlightPose(1, { side: -1 });
+  close(mirrored.x, -end.x);
+  close(mirrored.rotZ, -end.rotZ);
+  assert.equal(stripFlightPose(0.5).opacity, 1, 'opaque until STRIP_FADE_FROM');
+});
+
+test('cardsEmergePose and packDropPose endpoints', () => {
+  close(cardsEmergePose(0).v, CARDS_FROM_V);
+  close(cardsEmergePose(1).v, CARDS_TO_V);
+  const start = packDropPose(0, { viewportWorldH: 3 });
+  close(start.y, 0);
+  close(start.rotateXDeg, 0);
+  const end = packDropPose(1, { viewportWorldH: 3 });
+  close(end.y, -4.2);
+  close(end.rotateXDeg, PACK_DROP_ROTATE_X_DEG);
+  close(packDropPose(1, { viewportWorldH: Number.NaN }).y, 0);
+});
+
+test('packFlyPose3d keeps every packFlyPose field and turns −180° → 0°', () => {
+  const params = { dxPx: -120, dyPx: 80, fromScale: 0.3 };
+  for (const t of [0, 0.4, 1]) {
+    const pose = packFlyPose3d(t, params);
+    for (const [key, value] of Object.entries(packFlyPose(t, params)))
+      assert.equal(pose[key], value);
+  }
+  assert.equal(packFlyPose3d(0, params).rotateYDeg, FLY_SPIN_Y_DEG);
+  assert.equal(packFlyPose3d(1, params).rotateYDeg, 0);
+});
+
+test('packSpreadSlot3d: the focus pack sits at the front, the queue sits back and turns in', () => {
+  const focus = packSpreadSlot3d(1, 1, 300);
+  assert.deepEqual(focus, {
+    ...packSpreadSlot(1, 1, 300),
+    zWorld: 0,
+    rotateYDeg: 0,
+  });
+  const side = packSpreadSlot3d(3, 1, 300);
+  assert.equal(side.zWorld, SPREAD_SIDE_Z);
+  assert.equal(side.rotateYDeg, SPREAD_SIDE_ROTATE_Y_DEG);
+  assert.equal(side.xPx, packSpreadSlot(3, 1, 300).xPx);
+});
+
+test('swayPose is bounded, seeded by the pack index, and still for a bad clock', () => {
+  assert.deepEqual(swayPose(Number.NaN, 0), {
+    rotateYDeg: 0,
+    rotateXDeg: 0,
+    bob: 0,
+  });
+  for (let time = 0; time < 9000; time += 250) {
+    const pose = swayPose(time, 2);
+    assert.ok(Math.abs(pose.rotateYDeg) <= 4 && Math.abs(pose.rotateXDeg) <= 2);
+  }
+  assert.notEqual(swayPose(1000, 0).rotateYDeg, swayPose(1000, 1).rotateYDeg);
+});
+
+test('tiltTarget turns the face toward the pointer and clamps outside the pack', () => {
+  const rect = { left: 0, top: 0, width: 200, height: 400 };
+  assert.deepEqual(tiltTarget({ x: 100, y: 200 }, rect), {
+    rotateYDeg: 0,
+    rotateXDeg: -0,
+  });
+  assert.deepEqual(tiltTarget({ x: 900, y: -900 }, rect), {
+    rotateYDeg: TILT_MAX_Y_DEG,
+    rotateXDeg: -TILT_MAX_X_DEG,
+  });
+  assert.deepEqual(tiltTarget(null, rect), { rotateYDeg: 0, rotateXDeg: 0 });
+});
+
+test('followTilt converges on the target and ignores a zero or negative frame', () => {
+  const current = { rotateYDeg: 0, rotateXDeg: 0 };
+  const target = { rotateYDeg: 10, rotateXDeg: -5 };
+  assert.equal(followTilt(current, target, 0), current);
+  assert.equal(followTilt(current, target, -16), current);
+  let tilt = current;
+  for (let frame = 0; frame < 120; frame += 1)
+    tilt = followTilt(tilt, target, 16);
+  close(tilt.rotateYDeg, 10, 1e-3);
+  close(tilt.rotateXDeg, -5, 1e-3);
+});
+
+test('worldPerPixel × viewport height is the visible height at the z = 0 plane', () => {
+  const visible =
+    2 * CAMERA_DISTANCE * Math.tan((CAMERA_FOV_DEG * Math.PI) / 360);
+  close(worldPerPixel(900) * 900, visible);
+  assert.equal(worldPerPixel(0), 0);
+});
+
+test('rectToWorld maps the viewport centre to the origin, y up', () => {
+  const viewport = { width: 1600, height: 900 };
+  const centred = rectToWorld(
+    { left: 700, top: 350, width: 200, height: 200 },
+    viewport
+  );
+  close(centred.x, 0);
+  close(centred.y, 0);
+  close(centred.width, 200 * worldPerPixel(900));
+  const upperLeft = rectToWorld(
+    { left: 0, top: 0, width: 100, height: 100 },
+    viewport
+  );
+  assert.ok(upperLeft.x < 0 && upperLeft.y > 0);
+  assert.equal(
+    rectToWorld({ left: 0, top: 0, width: 0, height: 10 }, viewport),
+    null
+  );
+  assert.equal(
+    rectToWorld(
+      { left: 0, top: 0, width: 10, height: 10 },
+      { width: 0, height: 0 }
+    ),
+    null
+  );
+});
+
+test('ripTicksCrossed counts whole 10 % marks crossed going up', () => {
+  assert.equal(ripTicksCrossed(0.05, 0.31), 3);
+  assert.equal(ripTicksCrossed(0.3, 0.2), 0);
+  assert.equal(
+    ripTicksCrossed(0.2, 0.3),
+    1,
+    '0.3 / 0.1 must not round down to 2'
+  );
+  assert.equal(ripTicksCrossed(0, 1), 10);
+  assert.equal(ripTicksCrossed(Number.NaN, 0.5), 5);
+});

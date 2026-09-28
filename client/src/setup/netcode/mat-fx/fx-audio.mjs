@@ -125,6 +125,8 @@ const STATIC_VOICES = Object.freeze({
   discard: [noise(0.12, 0.14, { type: 'lowpass', freq: 1100, q: 0.7 })],
   // Design 052: the Build & Battle unboxing (builder tab). The hit chime climbs with the tier.
   'unbox-tear': [noise(0.18, 0.35, { type: 'bandpass', freq: 1800, q: 0.9 })],
+  // Design 054: one tick per 10 % of the rip while the finger peels the 3D pack's strip.
+  'unbox-rip-tick': [noise(0.04, 0.12, { type: 'bandpass', freq: 2400, q: 0.9 })],
   'unbox-lid': [
     tone(140, 0.22, 0.3, { wave: 'triangle', freqTo: 90 }),
     noise(0.09, 0.15, { type: 'lowpass', freq: 900, q: 0.7 }, { delay: 0.06 }),

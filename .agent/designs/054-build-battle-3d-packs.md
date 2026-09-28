@@ -1,5 +1,5 @@
 # 054: Build & Battle 3D packs — WebGL pillow packs, a real rip, cards out of the mouth
-Status: draft
+Status: approved (user, 2026-09-29: "Approved") · building
 Date: 2026-09-29 · Session: S330 · depends on design 052 (unboxing scene, Pocket-style rework)
 
 ## Problem
@@ -342,6 +342,17 @@ degrades to today's scene. Revert path: revert the commits; drop `three` from de
 | 4 Verify | modify `.claude/skills/fx-preview/rec/rec-unboxing.mjs`, `.claude/skills/fx-preview/SKILL.md` (WebGL flags, 3D checks) | § Test plan browser paragraph | rows 1, 6, 13, 14 by recorder | — | recorder PASS on seeds 42/18 + reduced-motion + no-WebGL passes; full `pnpm test`; user check on localhost |
 
 ## Deviations (Builder appends here during build)
+Slice 1 (2026-09-29):
+- The tear RNG is not copied: `unboxing.mjs` gains `packTearPoints(seed, packIndex, teeth)` (the
+  numeric line in percent, right → left) and `packTearEdge` formats it; its output is unchanged
+  (checked against the pre-change output for seeds 1/18/42/999 × packs 0–3, plus a prefix test).
+  `pack3d.mjs` `packTearLine` maps it to 0..1, left → right.
+- `.gitattributes` marks `client/src/vendor/** -text`: with `core.autocrlf=true` a Windows
+  checkout would rewrite the vendored LF files and the byte-identity test would fail.
+- `scripts/vendor-three.mjs --check` exits 1 on drift (CI-style use); the test calls
+  `driftedFiles()` directly.
+- Extra pure exports the stage needs: `smoothstep`, `STACK_CARD_WIDTH` (0.62), `STACK_CARD_ASPECT`
+  (88/63), `STACK_DEPTH` (0.035). Strip flight rotations are radians (`rotX/rotY/rotZ`).
 
 ---
 Self-approval checklist (only when the user is unreachable):

@@ -555,21 +555,31 @@ const TOOTH_MIN_PCT = 2;
 const TOOTH_MAX_PCT = 5;
 
 /**
- * The torn top strip as a `clip-path` polygon in the pack's own percent space: the full top edge,
- * then a jagged tear line whose teeth reach 2–5 % of the pack height below the crimp. Seeded per
- * pack so a reload shows the same tear.
+ * The jagged tear line of a pack in its own percent space, ordered right → left: points on the
+ * line at 7 % of the pack height, teeth 2–5 % deeper between them. Seeded per pack so a reload
+ * shows the same tear; the 3D pack (design 054) reads the same line as numbers.
+ *
+ * @returns {{xPct: number, yPct: number}[]}
  */
-export function packTearEdge(seed, packIndex, teeth = 12) {
+export function packTearPoints(seed, packIndex, teeth = 12) {
   const toothCount = Math.max(1, teeth | 0);
   const rng = createRng(((seed ^ 0x85ebca6b) + Math.imul(packIndex + 1, 0x632be5ab)) >>> 0);
-  const points = ['0% 0%', '100% 0%'];
+  const points = [];
   for (let step = 0; step <= 2 * toothCount; step += 1) {
-    const x = 100 - (step * 100) / (2 * toothCount);
     const depth =
       step % 2 === 1 ? lerp(TOOTH_MIN_PCT, TOOTH_MAX_PCT, rng.next()) : 0;
-    points.push(`${pct(x)} ${pct(TEAR_LINE_PCT + depth)}`);
+    points.push({ xPct: 100 - (step * 100) / (2 * toothCount), yPct: TEAR_LINE_PCT + depth });
   }
-  return `polygon(${points.join(', ')})`;
+  return points;
+}
+
+/**
+ * The torn top strip as a `clip-path` polygon in the pack's own percent space: the full top edge,
+ * then the jagged `packTearPoints` whose teeth reach 2–5 % of the pack height below the crimp.
+ */
+export function packTearEdge(seed, packIndex, teeth = 12) {
+  const line = packTearPoints(seed, packIndex, teeth).map(({ xPct, yPct }) => `${pct(xPct)} ${pct(yPct)}`);
+  return `polygon(${['0% 0%', '100% 0%', ...line].join(', ')})`;
 }
 
 // ── Box face perspective ─────────────────────────────────────────────────────
