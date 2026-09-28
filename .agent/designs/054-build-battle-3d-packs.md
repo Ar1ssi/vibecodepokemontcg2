@@ -287,21 +287,21 @@ background: none; }`, `.bb-pocket.is-awaiting-3d { visibility: hidden; }`. No id
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | WebGL unavailable / context creation fails | `createPackStage` → null; `data-render='dom'`; the 052 scene runs unchanged | [ ] |
-| 2 | `import()` of the stage or vendored three fails (404, offline) | DOM path, no console error spam, scene playable | [ ] |
-| 3 | pack art texture fails to load | stage → null before first use (DOM path) | [ ] |
+| 1 | WebGL unavailable / context creation fails | `createPackStage` → null; `data-render='dom'`; the 052 scene runs unchanged | [x] `createPackStage` gets the `webgl2` context itself (none → null, no three console error); `.agent/scratch/bb3d/cap-slice2.mjs nowebgl` (`--disable-webgl`): `data-render=dom`, no canvas, the DOM tear lands on the pocket |
+| 2 | `import()` of the stage or vendored three fails (404, offline) | DOM path, no console error spam, scene playable | [x] `loadPackStage` `.catch(() => null)`; cap-slice2 `noimport` (stage module 404) and `nothree` (vendor 404): DOM spread, tear works, no console output besides the 404 lines |
+| 3 | pack art texture fails to load | stage → null before first use (DOM path) | [x] `createPackStage` awaits every pack texture before returning; cap-slice2 `noart` (pack webp 404): `data-render=dom` |
 | 4 | top-card texture 404 / CORS blocked / slower than 1500 ms | stack shows the card back; hand-off unchanged | [ ] |
-| 5 | `body.fx-off` / `fxDisabled()` | no stage created, no WebGL context | [ ] |
-| 6 | `motionReduced()` | stage renders static packs; no rAF loop; rip/flight/settle land at once; sounds play | [ ] |
+| 5 | `body.fx-off` / `fxDisabled()` | no stage created, no WebGL context | [x] `loadPackStage` and `createPackStage` check `fxDisabled()`; the loop drops the stage (`onLost`) if FX go off mid-spread; cap-slice2 `fxoff` (0 WebGL contexts) and `fxoffmid` (DOM, canvas gone) |
+| 6 | `motionReduced()` | stage renders static packs; no rAF loop; rip/flight/settle land at once; sounds play | [x] (slice 2 part) `animate` applies the last frame and plays its sound at once, no loop; redraws on resize / `transitionend` only; cap-slice2 `reduced`: 0 stage rAF calls in 1 s at rest (`reduced-spread.png`). Rip/settle: slice 3 |
 | 7 | drag released at 39 % / 40 %, press < 6 px, Enter/Space | spring back / rip / rip / rip (052 row 5 outcomes, via the unchanged `bindTear`) | [ ] |
 | 8 | pointer drag starting on the right half | peel runs right → left (`peelSide` −1) | [ ] |
 | 9 | second press while a rip plays (`busy`) | ignored, as today | [ ] |
 | 10 | Skip scene mid-rip / mid-fly | `jumpToEnd`, scene ends, `dispose` releases the context; no late callback touches the DOM (`generation`) | [ ] |
 | 11 | tab hidden mid-rip (rAF paused) | `withBackstop` fires, `jumpToEnd`, render proceeds | [ ] |
-| 12 | `webglcontextlost` mid-spread | stage disposed, scene re-renders on the DOM path at the same state | [ ] |
-| 13 | reload at spread / mid-pocket / summary | spread: 3D packs at rest; pocket/summary: DOM only, no stack in the canvas | [ ] |
-| 14 | box mounted and unmounted 20 times (Box ↔ Pool tabs) | one context at a time; no "Too many active WebGL contexts" warning | [ ] |
-| 15 | window resize / phone width 390 px mid-spread | renderer and camera resize; packs follow the anchors; no horizontal scroll | [ ] |
+| 12 | `webglcontextlost` mid-spread | stage disposed, scene re-renders on the DOM path at the same state | [x] `webglcontextlost` → `preventDefault`, `onLost` → `dropPackStage` disposes and re-renders; cap-slice2 `lost` (`WEBGL_lose_context`): DOM spread at the same state, no console output |
+| 13 | reload at spread / mid-pocket / summary | spread: 3D packs at rest; pocket/summary: DOM only, no stack in the canvas | [x] cap-slice2 `reload`: the spread reloads to 3D; a mid-pocket reload draws nothing in the canvas (screenshots with and without the canvas are byte-equal). Summary is view-only (a reload lands on the next spread) and uses the same `hide()` |
+| 14 | box mounted and unmounted 20 times (Box ↔ Pool tabs) | one context at a time; no "Too many active WebGL contexts" warning | [x] unmount → `dispose()` (`forceContextLoss`); a stage resolving after unmount is disposed; cap-slice2 `mounts`: 20 mount → 3D → unmount cycles, no leftover canvas, no warning |
+| 15 | window resize / phone width 390 px mid-spread | renderer and camera resize; packs follow the anchors; no horizontal scroll | [x] `ResizeObserver` on host and canvas; packs re-read anchor rects every frame; cap-slice2 `main` (1280×800 → 900×700: canvas buffer = viewport) and `phone` (390 px: no horizontal scroll, `phone-390-spread.png`) |
 | 16 | hit card on top of a fresh pack (tier ≥ 2) | 3D stack shows the card back; DOM shows the face-down hit with its aura after hand-off (052 row 14 holds) | [ ] |
 | 17 | pool integrity | the stage reads `packs`, never writes; `session.unboxing` changes only through `dispatch` | [ ] |
 | 18 | `packTearLine` vs `packTearEdge` | same points for seeds 1, 18, 42, 999 × packs 0–3 | [ ] |
@@ -353,6 +353,41 @@ Slice 1 (2026-09-29):
   `driftedFiles()` directly.
 - Extra pure exports the stage needs: `smoothstep`, `STACK_CARD_WIDTH` (0.62), `STACK_CARD_ASPECT`
   (88/63), `STACK_DEPTH` (0.035). Strip flight rotations are radians (`rotX/rotY/rotZ`).
+
+Slice 2 (2026-09-29):
+- Stage API additions: `createPackStage` also takes `seed` (tear masks) and `onLost`; the stage
+  exposes `canvas` (the scene re-appends it after each `root.replaceChildren()`) and `hide()` (pocket
+  and summary draw nothing; the loop idles). `packArtUrls` is per pack, in pack order, fetched once
+  per distinct URL, so `showSpread` takes no `artIndexes`.
+- Pure additions in `pack3d.mjs` (tested): `BOX_MOUTH_Y`, `FLY_FROM_WIDTH` and `packFlyParams` moved
+  out of the scene (the DOM `playFly` uses them too, same numbers), and `packPlacement` (home + slot
+  + sway + tilt + fly → one transform).
+- The env map is bound on each material. With `scene.environment`, three r185 ignores
+  `envMapIntensity` and uses `scene.environmentIntensity` (default 1), which laid a white veil over
+  the facing pack (measured ≈ 1.25 × art + 0.21). Per-material binding also lets side packs dim
+  their reflection. Final numbers: `envMapIntensity` 0.35 (design 0.9); every other material and
+  light number is the design's (emissive 0.45, metalness 0.35, roughness 0.32, clearcoat 0.6 / 0.18,
+  iridescence 0.2, light 1.2 at (−2, 3, 4)). Side packs scale `color`, `emissiveIntensity` and
+  `envMapIntensity` by the slot brightness.
+- Back face: the grid displaced to `−pillowZ` with `side: BackSide` and the front's UVs, so its
+  silhouette and tear mask match the front in world space (a π turn about y would mirror them).
+- Seam: the strip mask is the exact complement of the body mask plus a 2 px stroke along the line,
+  so the whole pack shows no hairline at rest.
+- CSS: `[data-render='3d'] .bb-spread` gets z-index 3 over the canvas' 2. `.bb-spread` is its own
+  stacking context, so `.bb-pack__top { z-index: 3 }` alone cannot lift the tear button, its glint
+  and the cut line over the canvas. `.bb-gl` needs `width/height: 100%` (a fixed canvas does not
+  stretch with `inset: 0`). `.bb-spread.is-landing` hides the tear buttons while the 3D packs fly;
+  `.bb-bigpack__fly` drops its drop-shadow filter in 3D (the stage has its own shadow quad).
+- Interim tear (until slice 3): `beatTearPack` adds `.is-dom-tear` (that DOM pack shows again) and
+  re-calls `showSpread` without it, so the queued packs stay 3D while the DOM tear and `playCut` run.
+  The torn pack visibly swaps from the swaying 3D pack to the flat DOM one on that beat.
+- Hand-over: a stage that becomes ready while a beat plays is adopted at the next `render()`; when
+  idle it takes over at once. A reload at the spread shows the DOM packs for the load time (three +
+  four pack textures) before the 3D ones replace them in place.
+- The fly holds each pack at frame 0 (in the box mouth, silver back out) until its stagger, as the
+  DOM fly does (`fill: both`), and plays `unbox-unwrap` at its launch.
+- After a `render()` the anchors ease into their slots over the existing 320 ms CSS transition (the
+  DOM path does this too), so 3D side packs slide out from behind the focus pack after each render.
 
 ---
 Self-approval checklist (only when the user is unreachable):

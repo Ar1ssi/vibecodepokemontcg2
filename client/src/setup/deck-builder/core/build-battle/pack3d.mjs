@@ -197,6 +197,57 @@ export function packFlyPose3d(t, params) {
   };
 }
 
+// Where the flying packs start: the box's open mouth, as shares of the box's rect.
+export const BOX_MOUTH_Y = 0.42;
+export const FLY_FROM_WIDTH = 0.4;
+
+/**
+ * The `packFlyPose` params for a pack leaving the box mouth (`boxRect`) for its landed client rect
+ * `anchorRect`. `slotScale` is the scale its spread slot already applies around the pose (the DOM
+ * path animates inside the scaled anchor); 1 when the pose is applied in client pixels.
+ *
+ * @returns {{dxPx: number, dyPx: number, fromScale: number}|null} null for an empty rect
+ */
+export function packFlyParams(boxRect, anchorRect, slotScale = 1) {
+  if (!isRect(boxRect) || !isRect(anchorRect)) return null;
+  const scale = slotScale > 0 ? slotScale : 1;
+  const fromX = boxRect.left + boxRect.width / 2;
+  const fromY = boxRect.top + boxRect.height * BOX_MOUTH_Y;
+  return {
+    dxPx: (fromX - (anchorRect.left + anchorRect.width / 2)) / scale,
+    dyPx: (fromY - (anchorRect.top + anchorRect.height / 2)) / scale,
+    fromScale: (boxRect.width * FLY_FROM_WIDTH) / anchorRect.width,
+  };
+}
+
+/**
+ * One pack's transform this frame, y up: its anchor's rect on the z = 0 plane (`home`, from
+ * `rectToWorld`), its spread slot's depth and turn, the idle sway, the pointer tilt and, while it
+ * flies, a `packFlyPose3d` (client pixels relative to home; CSS rotates clockwise, y down).
+ *
+ * @returns {{x: number, y: number, z: number, rotateXDeg: number, rotateYDeg: number,
+ *   rotateZDeg: number, scale: number}|null} null without a home
+ */
+export function packPlacement({ home, slot, sway, tilt, fly, worldPerPx }) {
+  if (!home || !(home.width > 0)) return null;
+  const num = (value) => (Number.isFinite(value) ? value : 0);
+  const perPx = num(worldPerPx);
+  const scale = home.width * (fly && fly.scale > 0 ? fly.scale : 1);
+  return {
+    x: home.x + num(fly?.translateXPx) * perPx,
+    y: home.y - num(fly?.translateYPx) * perPx + num(sway?.bob) * scale,
+    z: num(slot?.zWorld),
+    rotateXDeg: num(sway?.rotateXDeg) + num(tilt?.rotateXDeg),
+    rotateYDeg:
+      num(slot?.rotateYDeg) +
+      num(fly?.rotateYDeg) +
+      num(sway?.rotateYDeg) +
+      num(tilt?.rotateYDeg),
+    rotateZDeg: -num(fly?.rotateZDeg),
+    scale,
+  };
+}
+
 /** `packSpreadSlot` plus depth: the queued packs sit back and turn toward the centre. */
 export function packSpreadSlot3d(index, focus, spacingPx) {
   const slot = packSpreadSlot(index, focus, spacingPx);

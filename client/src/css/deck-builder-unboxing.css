@@ -1054,6 +1054,49 @@
   }
 }
 
+/* ── 3D packs (design 054): a WebGL canvas draws the packs, the DOM keeps layout and input ── */
+.build-battle-window .db-live .bb-gl {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* The anchors stay laid out but draw nothing; their tear button, its glint and the cut line sit
+   over the canvas. */
+.build-battle-window .db-live [data-render='3d'] .bb-spread {
+  z-index: 3;
+}
+.build-battle-window .db-live [data-render='3d'] .bb-bigpack .bb-pack__body,
+.build-battle-window .db-live [data-render='3d'] .bb-bigpack .bb-pack__strip {
+  visibility: hidden;
+}
+.build-battle-window .db-live [data-render='3d'] .bb-bigpack .bb-pack__top {
+  z-index: 3;
+  background: none;
+}
+.build-battle-window .db-live [data-render='3d'] .bb-bigpack__fly {
+  filter: none;
+}
+.build-battle-window .db-live [data-render='3d'] .bb-spread.is-landing .bb-pack__top {
+  visibility: hidden;
+}
+/* Until the 3D rip (054 slice 3): the pack being torn is the DOM one again. */
+.build-battle-window
+  .db-live
+  [data-render='3d']
+  .bb-bigpack.is-dom-tear
+  .bb-pack__body,
+.build-battle-window
+  .db-live
+  [data-render='3d']
+  .bb-bigpack.is-dom-tear
+  .bb-pack__strip {
+  visibility: visible;
+}
+
 /* ── Pocket: the cards of the opened pack, one at a time ─────────────────── */
 .build-battle-window .db-live .bb-pocket {
   position: fixed;

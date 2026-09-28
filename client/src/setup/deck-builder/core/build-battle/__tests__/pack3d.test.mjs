@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  BOX_MOUTH_Y,
   BULGE,
   BODY_INSET_U,
   CAMERA_DISTANCE,
   CAMERA_FOV_DEG,
   CARDS_FROM_V,
   CARDS_TO_V,
+  FLY_FROM_WIDTH,
   FLY_SPIN_Y_DEG,
   PACK_DROP_ROTATE_X_DEG,
   PEEL_MAX_DEG,
@@ -20,7 +22,9 @@ import {
   cardsEmergePose,
   followTilt,
   packDropPose,
+  packFlyParams,
   packFlyPose3d,
+  packPlacement,
   packSpreadSlot3d,
   packTearLine,
   peelAngleDeg,
@@ -307,4 +311,118 @@ test('ripTicksCrossed counts whole 10 % marks crossed going up', () => {
   );
   assert.equal(ripTicksCrossed(0, 1), 10);
   assert.equal(ripTicksCrossed(Number.NaN, 0.5), 5);
+});
+
+test('packFlyParams starts the pack at the box mouth, in the slot’s own pixels', () => {
+  const box = { left: 100, top: 50, width: 200, height: 300 };
+  const anchor = { left: 500, top: 200, width: 100, height: 180 };
+  const params = packFlyParams(box, anchor);
+  close(params.dxPx, 100 + 100 - 550);
+  close(params.dyPx, 50 + 300 * BOX_MOUTH_Y - 290);
+  close(params.fromScale, (200 * FLY_FROM_WIDTH) / 100);
+  const scaled = packFlyParams(box, anchor, 0.5);
+  close(
+    scaled.dxPx,
+    params.dxPx / 0.5,
+    1e-9,
+    'offsets divide by the slot scale'
+  );
+  close(
+    scaled.fromScale,
+    params.fromScale,
+    1e-9,
+    'the start size is already relative to the rect'
+  );
+  const pose = packFlyPose(0, params);
+  close(
+    anchor.left + anchor.width / 2 + pose.translateXPx,
+    box.left + box.width / 2
+  );
+  assert.equal(packFlyParams(null, anchor), null);
+  assert.equal(
+    packFlyParams(box, { left: 0, top: 0, width: 0, height: 0 }),
+    null
+  );
+  assert.deepEqual(
+    packFlyParams(box, anchor, 0),
+    params,
+    'a bad slot scale counts as 1'
+  );
+});
+
+test('packPlacement puts a pack at rest on its home, sized by the rect width', () => {
+  const home = { x: 0.3, y: -0.2, width: 0.9, height: 1.6 };
+  const rest = packPlacement({
+    home,
+    slot: packSpreadSlot3d(0, 0, 200),
+    worldPerPx: 0.004,
+  });
+  assert.deepEqual(rest, {
+    x: 0.3,
+    y: -0.2,
+    z: 0,
+    rotateXDeg: 0,
+    rotateYDeg: 0,
+    rotateZDeg: -0,
+    scale: 0.9,
+  });
+  const side = packPlacement({
+    home,
+    slot: packSpreadSlot3d(2, 0, 200),
+    worldPerPx: 0.004,
+  });
+  assert.equal(side.z, SPREAD_SIDE_Z);
+  assert.equal(side.rotateYDeg, SPREAD_SIDE_ROTATE_Y_DEG);
+  assert.equal(packPlacement({ home: null }), null);
+  assert.equal(packPlacement({ home: { ...home, width: 0 } }), null);
+});
+
+test('packPlacement adds sway, tilt and the flight (CSS y down, clockwise) in world terms', () => {
+  const home = { x: 0, y: 0, width: 1, height: 1.8 };
+  const placed = packPlacement({
+    home,
+    slot: { zWorld: 0, rotateYDeg: 0 },
+    sway: { rotateYDeg: 2, rotateXDeg: 1, bob: 0.01 },
+    tilt: { rotateYDeg: 5, rotateXDeg: -3 },
+    fly: {
+      translateXPx: 100,
+      translateYPx: 50,
+      rotateZDeg: -24,
+      scale: 0.5,
+      rotateYDeg: -180,
+    },
+    worldPerPx: 0.01,
+  });
+  close(placed.x, 1);
+  close(
+    placed.y,
+    -0.5 + 0.01 * 0.5,
+    1e-9,
+    'a flight down the screen is down in world y'
+  );
+  close(placed.scale, 0.5);
+  close(placed.rotateYDeg, 2 + 5 - 180);
+  close(placed.rotateXDeg, -2);
+  close(
+    placed.rotateZDeg,
+    24,
+    1e-9,
+    'a counter-clockwise CSS turn is a positive world z turn'
+  );
+  const landed = packPlacement({
+    home,
+    fly: packFlyPose3d(
+      1,
+      packFlyParams(
+        { left: 0, top: 0, width: 200, height: 300 },
+        { left: 400, top: 300, width: 100, height: 180 }
+      )
+    ),
+    worldPerPx: 0.01,
+  });
+  close(landed.x, 0);
+  close(landed.y, 0);
+  close(landed.scale, 1);
+  close(landed.rotateYDeg, 0);
+  close(landed.rotateZDeg, 0);
 });

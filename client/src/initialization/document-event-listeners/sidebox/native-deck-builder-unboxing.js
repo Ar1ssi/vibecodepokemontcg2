@@ -4,6 +4,7 @@ import {
   boxFaceTexture,
   packArtSrc,
 } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
+import { packFlyParams } from '../../../setup/deck-builder/core/build-battle/pack3d.mjs';
 import {
   CARDS_PER_PACK,
   DECK_UNWRAP_MS,
@@ -73,9 +74,8 @@ const BOX_H = Math.round(BOX_W * BOX_PROPORTIONS.height);
 const BOX_D = Math.round(BOX_W * BOX_PROPORTIONS.depth);
 const SPRING_BACK_MS = 160;
 const FADE_TOP_MS = 320;
-// Where the flying packs start: the box's open mouth, as shares of the box host's rect.
-const BOX_MOUTH_Y = 0.42;
-const FLY_FROM_WIDTH = 0.4;
+// The WebGL pack stage (design 054), loaded only when a box is opened.
+const PACK_STAGE_MODULE = './native-deck-builder-pack3d.js';
 const DRAG_TILT = 0.06;
 const SWEEP_MS = 420;
 const SPARK_COUNT = 16;
@@ -385,6 +385,11 @@ export const mountUnboxingScene = ({
   let packsOut = initialStage === 'deckShown' || initialStage === 'packs';
   let summaryPack = null;
   const flippedHits = new Set();
+  // The 3D pack stage: `packStage` draws the spread (`data-render='3d'`); a stage that became ready
+  // mid-beat waits in `pendingStage` for the next settled picture. Null → the DOM scene (row 1).
+  let packStage = null;
+  let pendingStage = null;
+  let unmounted = false;
 
   const later = (fn, ms) => {
     const id = setTimeout(() => {
@@ -776,7 +781,11 @@ export const mountUnboxingScene = ({
     teardown();
     const u = getUnboxing();
     const view = viewOf(u);
+    packStage?.jumpToEnd();
     root.replaceChildren();
+    adoptPackStage();
+    if (packStage) root.append(packStage.canvas);
+    root.dataset.render = packStage ? '3d' : 'dom';
     root.dataset.stage = u.stage;
     root.dataset.view = view;
     root.dataset.wrap = u.wrapTorn ? 'off' : 'on';
@@ -793,8 +802,67 @@ export const mountUnboxingScene = ({
     if (view === 'summary') root.append(renderSummary(summaryPack));
     root.append(renderDock(u, view));
     root.querySelectorAll('.bb-spread').forEach(layoutSpread);
+    // A fly entrance hands the packs to the stage itself, from the box mouth.
+    if (!entrance?.fly) syncPackStage(view);
     updateDock();
     playEntrance(entrance);
+  };
+
+  // ── 3D pack stage (design 054 § Scene integration) ───────────────────
+  const spreadAnchors = () => [...root.querySelectorAll('.bb-spread .bb-bigpack')];
+  const spreadFocus = () => Number(root.querySelector('.bb-spread')?.dataset.focus) || 0;
+
+  function syncPackStage(view) {
+    if (!packStage) return;
+    if (view === 'spread') packStage.showSpread({ anchors: spreadAnchors(), focus: spreadFocus() });
+    else packStage.hide();
+  }
+
+  function adoptPackStage() {
+    if (!pendingStage) return;
+    packStage = pendingStage;
+    pendingStage = null;
+  }
+
+  // Context lost or FX switched off: the DOM scene takes over at the same state (row 12).
+  const dropPackStage = () => {
+    pendingStage?.dispose();
+    pendingStage = null;
+    const live = packStage;
+    packStage = null;
+    if (!live) return;
+    live.dispose();
+    if (!unmounted) render();
+  };
+
+  // Any failure (no WebGL, a 404 on three or the pack art) leaves the DOM scene as it is, quietly.
+  const loadPackStage = () => {
+    if (initialStage === 'done' || fxDisabled()) return;
+    import(PACK_STAGE_MODULE)
+      .then((module) =>
+        module.createPackStage({
+          host: root,
+          seed,
+          packArtUrls: packs.map((_, packIndex) => `/${packArtSrc(PACK_ARTS[artIndexes[packIndex]])}`),
+          cardBackUrl: resolveDefaultCardBackSrc(),
+          onLost: dropPackStage,
+        })
+      )
+      .catch(() => null)
+      .then((stage) => {
+        if (!stage) return;
+        if (unmounted || fxDisabled()) {
+          stage.dispose();
+          return;
+        }
+        pendingStage = stage;
+        if (busy) return;
+        // Idle: take over the current picture now (a box is not drawn in 3D, so only a spread changes).
+        adoptPackStage();
+        root.append(packStage.canvas);
+        root.dataset.render = '3d';
+        syncPackStage(viewOf(getUnboxing()));
+      });
   };
 
   // ── Entrances (played on the freshly rendered picture) ───────────────
@@ -848,20 +916,18 @@ export const mountUnboxingScene = ({
     );
     const spread = root.querySelector('.bb-spread');
     if (!spread || !boxRect) {
+      syncPackStage(viewOf(getUnboxing()));
       holdWhile(fade);
       return;
     }
-    const fromX = boxRect.left + boxRect.width / 2;
-    const fromY = boxRect.top + boxRect.height * BOX_MOUTH_Y;
+    if (packStage) {
+      playFly3d(spread, boxRect, fade);
+      return;
+    }
     const flights = [...spread.querySelectorAll('.bb-bigpack')].map((node, order) => {
       const slot = spreadSlotOf(node, spread);
-      const rect = node.getBoundingClientRect();
-      const width = node.offsetWidth || rect.width || 1;
-      const params = {
-        dxPx: (fromX - (rect.left + rect.width / 2)) / slot.scale,
-        dyPx: (fromY - (rect.top + rect.height / 2)) / slot.scale,
-        fromScale: (boxRect.width * FLY_FROM_WIDTH) / width / slot.scale,
-      };
+      const params = packFlyParams(boxRect, node.getBoundingClientRect(), slot.scale);
+      if (!params) return Promise.resolve();
       const delay = order * PACK_FLY_STAGGER_MS;
       later(() => sound('unbox-unwrap'), instant() ? 0 : delay);
       return playPose(
@@ -875,6 +941,18 @@ export const mountUnboxingScene = ({
       );
     });
     holdWhile(Promise.all([fade, ...flights]));
+  };
+
+  // The same flight in WebGL: the stage turns each pack in from its silver back as it lands. The
+  // anchors' tear buttons (and their glint) stay hidden until the packs are down.
+  const playFly3d = (spread, boxRect, fade) => {
+    spread.classList.add('is-landing');
+    const flights = packStage.showSpread({ anchors: spreadAnchors(), focus: spreadFocus(), fromBoxRect: boxRect });
+    holdWhile(Promise.all([fade, flights])).then((current) => {
+      if (!current) return;
+      packStage?.jumpToEnd();
+      spread.classList.remove('is-landing');
+    });
   };
 
   // The torn pack drops away as its cards rise into the centre.
@@ -1018,16 +1096,29 @@ export const mountUnboxingScene = ({
     runBeat(
       { type: 'tearPack', packIndex },
       unboxingVoiceFor('tearPack'),
-      () =>
-        playPose(
+      () => {
+        releaseTornPack(focus, packIndex);
+        return playPose(
           strip,
           (t) => ({ x: lerp(fromShiftPx, travel, easeOut(t)), y: -60 * t, rotate: lerp(4, 24, t), opacity: 1 - t }),
           ({ x, y, rotate, opacity }) => ({ transform: `translate(${x}px, ${y}px) rotate(${rotate}deg)`, opacity }),
           PACK_TEAR_MS
-        ),
+        );
+      },
       { cut: packIndex }
     );
   };
+
+  // Until the 3D rip exists (design 054 slice 3) the torn pack is the DOM one: the stage lets go
+  // of it and keeps drawing the packs still queued.
+  function releaseTornPack(focusEl, packIndex) {
+    if (!packStage || !focusEl) return;
+    focusEl.classList.add('is-dom-tear');
+    packStage.showSpread({
+      anchors: spreadAnchors().filter((anchor) => Number(anchor.dataset.pack) !== packIndex),
+      focus: packIndex,
+    });
+  }
 
   // ── Card moves: swipe the top card away, or turn a hit over ──────────
   const topCard = () => root.querySelector('.bb-pcard.is-top');
@@ -1304,11 +1395,18 @@ export const mountUnboxingScene = ({
   }
 
   render();
+  loadPackStage();
 
   return {
     unmount: () => {
+      unmounted = true;
       autoToken += 1;
       teardown();
+      packStage?.jumpToEnd();
+      packStage?.dispose();
+      packStage = null;
+      pendingStage?.dispose();
+      pendingStage = null;
       window.removeEventListener('resize', onResize);
       root.replaceChildren();
     },
