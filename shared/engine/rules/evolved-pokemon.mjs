@@ -26,7 +26,10 @@ function stageRank(card) {
   return STAGE_RANK[normalizeStage(card?.stage) || 'Basic'] ?? 0;
 }
 
+// A root without an instanceId has no stack: `attachedTo === undefined` would match every
+// unattached card in the zone.
 function stackEvolutions(zoneCards, root) {
+  if (root?.instanceId == null) return [];
   return (zoneCards || []).filter(
     (c) => c.attachedTo === root.instanceId && isPokemon(c)
   );

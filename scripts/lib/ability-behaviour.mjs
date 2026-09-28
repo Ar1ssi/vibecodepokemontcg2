@@ -110,7 +110,7 @@ export function rowFlags(row, { plan, reads }) {
   if (plan.activated && ranForReal(row)) {
     for (const miss of attackMismatches(abilityClauseText(row.text), row.tags)) flags.push(`clause:${miss.mech}`);
   }
-  for (const drop of stackDrops(reads)) flags.push(drop);
+  for (const drop of stackDrops(reads, row.text)) flags.push(drop);
   return [...new Set(flags)].sort();
 }
 

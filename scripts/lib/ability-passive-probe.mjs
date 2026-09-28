@@ -258,7 +258,14 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`victoryStar:${side}`, () => abilityVictoryStar(ctx));
       ask(`supporterLimit:${side}`, () => abilitySupporterLimit(ctx));
       ask(`turnNotEnd:${side}`, () => abilityTurnNotEnd({ name: turnTrainerName || 'Probe Supporter' }, ctx));
-      ask(`noRetreatForActive:${side}`, () => teamNoRetreatCostForActive(roots(ctx.sideActive)[0], roots(ctx.sideBench)));
+      // As reduce.mjs retreat cost passes it: evolved views, and the Active's zone for its Energy.
+      ask(`noRetreatForActive:${side}`, () =>
+        teamNoRetreatCostForActive(
+          viewOf(ctx.sideActive, roots(ctx.sideActive)[0]),
+          roots(ctx.sideBench).map((root) => viewOf(ctx.sideBench, root)),
+          ctx.sideActive
+        )
+      );
     }
     ask('counterMoveLock', () => abilityCounterMoveLock(p1));
     ask('energyMultiplier', () => abilityEnergyMultiplier(p1.sideCards));
@@ -332,12 +339,18 @@ export function passiveReads(text, { name = 'Probe Holder', abilityName = 'Probe
   return reads.sort();
 }
 
+// Wordings whose answer depends on the holder's stage ("your Basic Pokémon's attacks", "it can
+// evolve during your first turn"): the stacked holder is a Stage 1, so its read may differ for real.
+const STAGE_WORDING = /\bbasic\b(?! energy)|\bcan evolve\b/i;
+
 /**
  * Reads the flat board sees but the evolved-stack board loses: `['stack-<zone>:<reader>:<case>']`
  * for every `<zone>:<reader>:<case>` read whose stacked twin is not read. An Ability printed on
- * an Evolution that works only when the card sits in play as a Basic.
+ * an Evolution that works only when the card sits in play as a Basic. Pass the ability `text` to
+ * skip stage-dependent wordings (`STAGE_WORDING`).
  */
-export function stackDrops(reads) {
+export function stackDrops(reads, text = '') {
+  if (STAGE_WORDING.test(String(text))) return [];
   const have = new Set(reads);
   return reads
     .filter((label) => /^(active|bench):/.test(label))

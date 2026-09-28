@@ -25,7 +25,7 @@ import {
   isUltraBeastCard,
 } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
-import { topPokemonCard } from './evolved-pokemon.mjs';
+import { evolvedView } from './evolved-pokemon.mjs';
 import {
   parseHpBonus,
   parseRetreatCostModifier,
@@ -396,10 +396,10 @@ export function toolConditionMet(cond, ctx = {}) {
   return true;
 }
 
-/** The in-play view of a tool's holder: top evolution when evolved. */
+/** The in-play view of a tool's holder: the root's state (Energy, damage) with the top evolution's printed stats. */
 export function holderView(pokemon, zoneCards) {
   if (!pokemon) return null;
-  return topPokemonCard(zoneCards, pokemon) || pokemon;
+  return evolvedView(zoneCards, pokemon) || pokemon;
 }
 
 /** Gated HP bonus of one Tool (0 when its printed condition fails). */

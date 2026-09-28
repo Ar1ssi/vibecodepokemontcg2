@@ -11,7 +11,9 @@
  * Dependency note (D125): this module may import `ability-combat.mjs` and
  * `tool-combat.mjs`; nothing those import may reach back here.
  *
- * Entries are `{ card, playerId, zone }` in-play roots. `ctx` is the
+ * Entries are `{ card, view, playerId, zone }`: `card` is the in-play root (damage,
+ * conditions and writes live there), `view` its evolved view (evolved-pokemon.mjs), which
+ * carries the top card's printed Ability. Entries without `view` read `card`. `ctx` is the
  * `abilitySideContext` shape used by `ability-combat.mjs`
  * (`sideCards`/`opponentSideCards`/`sideActive`/`sideBench`/…); holder-position
  * conditions fail closed when the context cannot say where the holder sits.
@@ -30,10 +32,11 @@ import { hasCondition } from './special-conditions.mjs';
 import { attackerTypes, TYPE_LETTER } from './tool-combat.mjs';
 import { resolveAttachedEnergyType } from './energy-effects.mjs';
 import { isBasicEnergy, isExCard } from './card-classify.mjs';
+import { evolvedView } from './evolved-pokemon.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
 
-/** In-play Pokémon roots from a zone-card array. */
+/** In-play Pokémon roots, each with its evolved view, from both players' zones. */
 export function inPlayEntries(state) {
   const out = [];
   for (const playerId of Object.keys(state?.players || {})) {
@@ -41,13 +44,19 @@ export function inPlayEntries(state) {
     for (const zone of ['active', 'bench']) {
       for (const card of zones[zone] || []) {
         if (card && !card.attachedTo && isPokemon(card)) {
-          out.push({ card, playerId, zone });
+          out.push({ card, view: evolvedView(zones[zone], card), playerId, zone });
         }
       }
     }
   }
   return out;
 }
+
+// The card whose printed text an entry's Ability reads: the top of the stack.
+const printedOf = (entry) => entry.view || entry.card;
+
+const sameCard = (a, b) =>
+  Boolean(a && b) && (a === b || (a.instanceId != null && a.instanceId === b.instanceId));
 
 function holderCanTrigger(card, ctx) {
   if (!card || !isPokemon(card)) return false;
@@ -58,11 +67,9 @@ function holderCanTrigger(card, ctx) {
 
 /** True when `card` is in the Active Spot of whichever side the ctx places it. */
 function holderIsActive(card, ctx) {
-  const onSide =
-    (ctx.sideActive || []).includes(card) ||
-    (ctx.sideBench || []).includes(card);
-  const active = onSide ? ctx.sideActive : ctx.opponentActive;
-  return (active || []).includes(card);
+  const within = (cards) => (cards || []).some((c) => sameCard(c, card));
+  const onSide = within(ctx.sideActive) || within(ctx.sideBench);
+  return within(onSide ? ctx.sideActive : ctx.opponentActive);
 }
 
 const CONDITION_WORDS = [
@@ -132,14 +139,14 @@ function resolveCheckupTargets(effect, entries, holderPlayerId) {
   if (effect.condition) {
     pool = pool.filter((e) => hasCondition(e.card, effect.condition));
   }
-  if (effect.basic) pool = pool.filter((e) => isBasicPokemon(e.card));
+  if (effect.basic) pool = pool.filter((e) => isBasicPokemon(printedOf(e)));
   if (effect.type) {
-    pool = pool.filter((e) => attackerTypes(e.card).includes(effect.type));
+    pool = pool.filter((e) => attackerTypes(printedOf(e)).includes(effect.type));
   }
-  if (effect.hasAbility) pool = pool.filter((e) => isAbilityCard(e.card));
-  if (effect.exceptEx) pool = pool.filter((e) => !isExCard(e.card));
+  if (effect.hasAbility) pool = pool.filter((e) => isAbilityCard(printedOf(e)));
+  if (effect.exceptEx) pool = pool.filter((e) => !isExCard(printedOf(e)));
   if (effect.exceptName) {
-    pool = pool.filter((e) => !lower(e.card.name).includes(effect.exceptName));
+    pool = pool.filter((e) => !lower(printedOf(e).name).includes(effect.exceptName));
   }
   return pool.map((e) => ({ card: e.card, playerId: e.playerId }));
 }
@@ -154,21 +161,22 @@ export function parseCheckupAbilities(entries = [], ctx = {}) {
   const out = [];
   for (const entry of entries) {
     const { card, playerId } = entry;
-    if (!holderCanTrigger(card, ctx)) continue;
-    const text = cardAbilityText(card);
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
     if (!text || !/checkup/.test(text) || !/damage counter/.test(text)) continue;
     if (!parseAbility(text).some((s) => s.type === 'checkupAbility')) continue;
     const effect = normalizeCheckup(text);
     if (!(effect.count > 0)) continue;
     // "as long as Pecharunt is your Active Pokémon": the printed name is the holder.
-    effect.holderActive ||= HOLDER_ACTIVE_CLAUSE.test(selfNamedText(card));
+    effect.holderActive ||= HOLDER_ACTIVE_CLAUSE.test(selfNamedText(printed));
     if (effect.holderActive && !holderIsActive(card, ctx)) continue;
     const targets = resolveCheckupTargets(effect, entries, playerId);
     if (targets.length === 0) continue;
     out.push({
       holder: card,
       playerId,
-      source: card.name,
+      source: printed.name,
       ...effect,
       targets,
     });
@@ -186,18 +194,19 @@ export function parseOnOpponentEvolveAbilities(entries = [], ctx = {}) {
   const seen = new Set();
   for (const entry of entries) {
     const { card, playerId } = entry;
-    if (!holderCanTrigger(card, ctx)) continue;
-    const text = cardAbilityText(card);
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
     if (!text) continue;
     if (!parseAbility(text).some((s) => s.type === 'onOpponentEvolveAbility')) {
       continue;
     }
-    const { count } = parseOnOpponentEvolve(card);
+    const { count } = parseOnOpponentEvolve(printed);
     if (!(count > 0)) continue;
-    const key = lower(card.name);
+    const key = lower(printed.name);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ holder: card, playerId, count, source: card.name });
+    out.push({ holder: card, playerId, count, source: printed.name });
   }
   return out;
 }
@@ -287,12 +296,14 @@ export function parseOnEnergyAttachAbilities(host, energy, ctx = {}) {
   const out = [];
   if (!host || !energy) return out;
   const energyType = lower(resolveAttachedEnergyType(energy));
-  const holders = [host, ...(ctx.sideActive || []).filter((c) => c && !c.attachedTo && c !== host)];
-  for (const holder of holders) {
+  const zoneCards = ctx.sideCards || [...(ctx.sideActive || []), ...(ctx.sideBench || [])];
+  const holders = [host, ...(ctx.sideActive || []).filter((c) => c && !c.attachedTo && !sameCard(c, host))];
+  for (const root of holders) {
+    const holder = evolvedView(zoneCards, root);
     if (!holderCanTrigger(holder, ctx)) continue;
     const text = selfNamedText(holder).replace(/’/g, "'");
     if (/this power (?:stops working|can't be used)/.test(text)) continue;
-    const self = holder === host ? text.match(ATTACH_SELF) : null;
+    const self = sameCard(holder, host) ? text.match(ATTACH_SELF) : null;
     if (self) {
       const typeOk = !self[2] || TYPE_LETTER[self[2]] === energyType;
       const basicOk = !(self[1] || self[3]) || isBasicEnergy(energy);
@@ -353,8 +364,9 @@ export function parseEndOfTurnAbilities(entries = [], ctx = {}) {
   const out = [];
   for (const entry of entries) {
     const { card, playerId } = entry;
-    if (!holderCanTrigger(card, ctx)) continue;
-    const text = cardAbilityText(card);
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
     if (!text || !/end of your turn/.test(text)) continue;
     const discard = text.match(/discard the top (\d+) cards? of your deck/);
     if (!discard) continue;
@@ -364,7 +376,7 @@ export function parseEndOfTurnAbilities(entries = [], ctx = {}) {
       playerId,
       kind: 'discardTop',
       n: Number(discard[1]) || 0,
-      source: card.name,
+      source: printed.name,
     });
   }
   return out;
@@ -383,13 +395,14 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
   const out = [];
   for (const entry of entries) {
     const { card, playerId } = entry;
-    if (!holderCanTrigger(card, ctx)) continue;
-    const text = cardAbilityText(card);
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
     if (!text) continue;
     const isBetweenTurns = /between turns/.test(text);
     const isCheckup = /during pok[eé]mon checkup/.test(text);
     if (!isBetweenTurns && !isCheckup) continue;
-    const named = selfNamedText(card);
+    const named = selfNamedText(printed);
     const holderActive = HOLDER_ACTIVE_CLAUSE.test(named);
     if (holderActive && !holderIsActive(card, ctx)) continue;
 
@@ -399,7 +412,7 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
       out.push({
         holder: card,
         playerId,
-        source: card.name,
+        source: printed.name,
         kind: 'sleepFlips',
         flips: Number(flips[1]) || 2,
       });
@@ -415,9 +428,9 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
       text.match(/remove (\d+) damage counters? from ([^.]*)/);
     if (heal) {
       const amount = /^heal/.test(heal[0]) ? Number(heal[1]) : (Number(heal[1]) || 0) * 10;
-      const target = betweenTurnsHealTarget(heal[2], card);
+      const target = betweenTurnsHealTarget(heal[2], printed);
       if (amount > 0 && target) {
-        out.push({ holder: card, playerId, source: card.name, kind: 'heal', amount, ...target });
+        out.push({ holder: card, playerId, source: printed.name, kind: 'heal', amount, ...target });
       }
       continue;
     }
@@ -433,15 +446,15 @@ export function parseBetweenTurnsAbilities(entries = [], ctx = {}) {
     const target = betweenTurnsDamageTarget(put[3]);
     if (!target) continue;
     const instead = text.match(/instead of (\d+)/);
-    const printed = Number(put[1]) || 0;
+    const printedCount = Number(put[1]) || 0;
     out.push({
       holder: card,
       playerId,
-      source: card.name,
+      source: printed.name,
       kind: 'damage',
       // "put 6 damage counters instead of 2" replaces the condition's own 2, so the
       // ability contributes the difference (normalizeCheckup's rule).
-      count: instead ? Math.max(0, printed - Number(instead[1])) : printed,
+      count: instead ? Math.max(0, printedCount - Number(instead[1])) : printedCount,
       more: Boolean(put[2]) || Boolean(instead),
       insteadOf: instead ? Number(instead[1]) : null,
       ...target,
@@ -515,8 +528,9 @@ export function parseOnKoAbilities(entries = [], ctx = {}) {
   const out = [];
   for (const entry of entries) {
     const { card, playerId } = entry;
-    if (!holderCanTrigger(card, ctx)) continue;
-    const text = cardAbilityText(card);
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
     if (!text) continue;
     const step = parseAbility(text).find((s) => s.type === 'energyOnKoAbility');
     if (!step) continue;
@@ -526,7 +540,7 @@ export function parseOnKoAbilities(entries = [], ctx = {}) {
     out.push({
       holder: card,
       playerId,
-      source: card.name,
+      source: printed.name,
       basic: Boolean(step.basic),
       upTo: step.upTo ? Number(step.upTo) : move?.[1] ? Number(move[1]) : null,
       // Printed Energy symbol ({L} → 'lightning'), or null for "any Energy".
@@ -553,15 +567,16 @@ export function parseOnPromotionAbilities(entries = [], ctx = {}) {
   const out = [];
   for (const entry of entries) {
     const { card, playerId } = entry;
-    if (!holderCanTrigger(card, ctx)) continue;
-    const text = cardAbilityText(card);
+    const printed = printedOf(entry);
+    if (!holderCanTrigger(printed, ctx)) continue;
+    const text = cardAbilityText(printed);
     if (!text) continue;
     const step = parseAbility(text).find((s) => s.type === 'onPromotionAbility');
     if (!step) continue;
     out.push({
       holder: card,
       playerId,
-      source: card.name,
+      source: printed.name,
       effect: step.effect,
       count: step.count ?? null,
     });

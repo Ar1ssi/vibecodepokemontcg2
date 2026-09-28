@@ -52,6 +52,23 @@ test('stackDrops lists flat-board reads the evolved-stack board loses', () => {
     stackDrops(['active:hp:X', 'bench:damageBonus:p1Active', 'stack-active:hp:X', 'bench-bare:hp:X']),
     ['stack-bench:damageBonus:p1Active']
   );
+  // The stacked holder is a Stage 1, so a Basic-stage wording may read differently for real.
+  const basicOnly = "Your Basic Pokémon's attacks do 30 more damage to your opponent's Active Pokémon.";
+  assert.deepEqual(stackDrops(['bench:damageBonus:p1Active'], basicOnly), []);
+  assert.deepEqual(
+    stackDrops(['bench:damageBonus:p1Active'], 'Attach a Basic Energy card.'),
+    ['stack-bench:damageBonus:p1Active']
+  );
+});
+
+test('stacked holders: team and trigger readers see an evolved holder (Latias ex Skyliner, Froslass Freezing Shroud)', () => {
+  // pkmn corpus: Latias ex Surging Sparks 239, Froslass Twilight Masquerade 053.
+  const skyliner = passiveReads('Your Basic Pokémon in play have no Retreat Cost.');
+  assert.ok(skyliner.includes('stack-bench:noRetreatForActive:p1'), skyliner.join(' '));
+  const shroud = passiveReads(
+    "During Pokémon Checkup, put 1 damage counter on each Pokémon that has an Ability (both yours and your opponent's), except any Froslass."
+  );
+  assert.ok(shroud.includes('stack-bench:checkup:conditioned') || shroud.includes('stack-bench:checkup'), shroud.join(' '));
 });
 
 test('a self-scoped passive printed on an Evolution is still read on the stacked board', () => {

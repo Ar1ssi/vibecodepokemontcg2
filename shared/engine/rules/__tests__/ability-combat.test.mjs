@@ -1743,3 +1743,70 @@ test('abilityStatusImmune: all-conditions and named-condition wordings', () => {
   assert.equal(abilityStatusImmune(slowpoke, 'Confused'), true);
   assert.equal(abilityStatusImmune(mon('Plain'), 'Asleep'), false);
 });
+
+// ── evolved holders ──────────────────────────────────────────────────────
+// The server stacks an Evolution under its Basic root, so the Ability is printed on the top
+// card, not the root. Team- and opponent-scoped readers must read the top card.
+
+/** A Basic root with evolution cards attached under it; returns the zone's cards. */
+function evolvedStack(basicName, ...evolutions) {
+  const root = mon(basicName);
+  const tops = evolutions.map((extra, i) =>
+    mon(extra.name, { stage: `Stage ${i + 1}`, subtypes: [`Stage ${i + 1}`], attachedTo: root.instanceId, ...extra })
+  );
+  return [root, ...tops];
+}
+
+test('evolved holders: an evolved Gothitelle in the Active Spot locks Items (pkmn corpus Legendary Treasures 72)', () => {
+  const item = { name: 'Ultra Ball', type: 'Trainer', supertype: 'Trainer', trainerType: 'Item', subtypes: ['Item'] };
+  const stack = evolvedStack(
+    'Gothita',
+    { name: 'Gothorita' },
+    {
+      name: 'Gothitelle',
+      abilities: [
+        ability(
+          'Magic Room',
+          "As long as this Pokémon is your Active Pokémon, your opponent can't play any Item cards from his or her hand."
+        ),
+      ],
+    }
+  );
+  const ctx = { sideCards: [], opponentSideCards: stack, opponentActive: stack, opponentBench: [] };
+  assert.deepEqual(abilityPlayLocks(item, ctx)?.cards, ['Item']);
+  // Benched, the position clause still holds it back.
+  const benched = { ...ctx, opponentActive: [], opponentBench: stack };
+  assert.equal(abilityPlayLocks(item, benched), null);
+});
+
+test('evolved holders: a benched evolved Serperior ex boosts the Active attacker (pkmn corpus Black Bolt 164)', () => {
+  const attacker = mon('Attacker');
+  const defender = mon('Defender');
+  const stack = evolvedStack(
+    'Snivy',
+    { name: 'Servine' },
+    {
+      name: 'Serperior ex',
+      subtypes: ['Stage 2', 'ex'],
+      abilities: [
+        ability(
+          'Regal Cheer',
+          "Attacks used by your Pokémon do 20 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance)."
+        ),
+      ],
+    }
+  );
+  const ctx = { sideCards: [attacker, ...stack], sideActive: [attacker], sideBench: stack, isActive: true };
+  assert.equal(abilityDamageBonus(attacker, defender, ctx), 20);
+});
+
+test('evolved holders: an evolved Metang with Energy on its root has no Retreat Cost (pkmn corpus Hidden Legends 44)', async () => {
+  const { combinedToolRetreatCost } = await import('../tool-combat.mjs');
+  const [beldum, metang] = evolvedStack('Beldum', {
+    name: 'Metang',
+    abilities: [ability('Levitate', "If Metang has any Energy attached to it, Metang's Retreat Cost is 0.")],
+  });
+  const zone = [beldum, metang, attached(energy('Metal Energy', 'Metal'), beldum)];
+  assert.equal(combinedToolRetreatCost(2, beldum, zone), 0);
+  assert.equal(combinedToolRetreatCost(2, beldum, [beldum, metang]), 2);
+});

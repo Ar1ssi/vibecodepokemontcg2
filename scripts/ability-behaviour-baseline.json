@@ -5,8 +5,8 @@
     "runs": 1545,
     "partial": 394,
     "dead": 55,
-    "consumed": 1178,
-    "unconsumed": 1055,
+    "consumed": 1191,
+    "unconsumed": 1042,
     "unparsed": 1
   },
   "families": {
@@ -357,8 +357,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 88,
-      "unconsumed": 84,
+      "consumed": 101,
+      "unconsumed": 71,
       "unparsed": 0
     },
     "search": {
@@ -476,68 +476,6 @@
         "typography:typeWords:plan"
       ]
     },
-    "Abomasnow|snow veil#86qd2q": {
-      "card": "Abomasnow",
-      "name": "Snow Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Abomasnow|toughness boost#1cwd0xt": {
-      "card": "Abomasnow",
-      "name": "Toughness Boost",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Abra|psychoflow#1fysvwq": {
-      "card": "Abra",
-      "name": "Psychoflow",
-      "flags": [
-        "stack-active:ownRetreat:Abra"
-      ]
-    },
-    "Aegislash|big shield#1dpfrbb": {
-      "card": "Aegislash",
-      "name": "Big Shield",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Aerodactyl|ancient scream#18n49ww": {
-      "card": "Aerodactyl",
-      "name": "Ancient Scream",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Aerodactyl|reactive protection#w6k3gd": {
-      "card": "Aerodactyl",
-      "name": "Reactive Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Aipom|snappy move#kkic62": {
       "card": "Aipom",
       "name": "Snappy Move",
@@ -545,211 +483,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Alakazam|power cancel#vy5vz9": {
-      "card": "Alakazam",
-      "name": "Power Cancel",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Alolan Dugtrio|hair wall#h7vi44": {
-      "card": "Alolan Dugtrio",
-      "name": "Hair Wall",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Alolan Dugtrio|tangling hair#la93ir": {
-      "card": "Alolan Dugtrio",
-      "name": "Tangling Hair",
-      "flags": [
-        "stack-active:opp:retreat:p2Active",
-        "stack-bench:opp:retreat:p2Active"
-      ]
-    },
-    "Alolan Muk|power of alchemy#y7ag29": {
-      "card": "Alolan Muk",
-      "name": "Power of Alchemy",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:Alolan Muk",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2",
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:Alolan Muk",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
-      ]
-    },
-    "Alolan Vulpix|snowed in#1rk254l": {
-      "card": "Alolan Vulpix",
-      "name": "Snowed In",
-      "flags": [
-        "stack-bench:damagePrevention:Alolan Vulpix"
-      ]
-    },
-    "Altaria ex|mist#mhoybr": {
-      "card": "Altaria ex",
-      "name": "Mist",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Altaria|fight song#1vu54xm": {
-      "card": "Altaria",
-      "name": "Fight Song",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Altaria|fight song#fileol": {
-      "card": "Altaria",
-      "name": "Fight Song",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
     "Ampharos|unseen flash#9i3xyp": {
       "card": "Ampharos",
       "name": "Unseen Flash",
       "flags": [
         "clause:lost-zone"
-      ]
-    },
-    "Anorith|solid shell#p5nea8": {
-      "card": "Anorith",
-      "name": "Solid Shell",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Arbok|intimidating fang#chjci6": {
-      "card": "Arbok",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Arbok|intimidating pattern#nbr3q9": {
-      "card": "Arbok",
-      "name": "Intimidating Pattern",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Arcanine G|extreme speed#aqpf9m": {
-      "card": "Arcanine G",
-      "name": "Extreme Speed",
-      "flags": [
-        "stack-active:ownRetreat:Arcanine G"
-      ]
-    },
-    "Arcanine|extreme speed#1dkgki7": {
-      "card": "Arcanine",
-      "name": "Extreme Speed",
-      "flags": [
-        "stack-active:ownRetreat:Arcanine",
-        "stack-bench:ownRetreat:Arcanine"
-      ]
-    },
-    "Arcanine|security guard#c12mkd": {
-      "card": "Arcanine",
-      "name": "Security Guard",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Archeops|ancient power#35h8y8": {
-      "card": "Archeops",
-      "name": "Ancient Power",
-      "flags": [
-        "stack-active:evolveLock:p1",
-        "stack-active:evolveLock:p2",
-        "stack-bench:evolveLock:p1",
-        "stack-bench:evolveLock:p2"
-      ]
-    },
-    "Ariados|gluey slime#ythea3": {
-      "card": "Ariados",
-      "name": "Gluey Slime",
-      "flags": [
-        "stack-active:opp:retreat:p2Active",
-        "stack-active:opp:retreat:p2Bench0",
-        "stack-active:opp:retreat:p2Bench1",
-        "stack-active:opp:retreat:p2Bench2",
-        "stack-active:retreat:Ariados",
-        "stack-active:retreat:p1Bench0",
-        "stack-active:retreat:p1Bench1",
-        "stack-active:retreat:p1Bench2",
-        "stack-bench:opp:retreat:p2Active",
-        "stack-bench:opp:retreat:p2Bench0",
-        "stack-bench:opp:retreat:p2Bench1",
-        "stack-bench:opp:retreat:p2Bench2",
-        "stack-bench:retreat:Ariados",
-        "stack-bench:retreat:p1Active",
-        "stack-bench:retreat:p1Bench1",
-        "stack-bench:retreat:p1Bench2"
-      ]
-    },
-    "Ariados|sticky#b56ve9": {
-      "card": "Ariados",
-      "name": "Sticky",
-      "flags": [
-        "stack-active:opp:retreat:p2Active",
-        "stack-active:opp:retreat:p2Bench0",
-        "stack-active:opp:retreat:p2Bench1",
-        "stack-active:opp:retreat:p2Bench2",
-        "stack-active:retreat:p1Bench0",
-        "stack-active:retreat:p1Bench1",
-        "stack-active:retreat:p1Bench2",
-        "stack-bench:opp:retreat:p2Active",
-        "stack-bench:opp:retreat:p2Bench0",
-        "stack-bench:opp:retreat:p2Bench1",
-        "stack-bench:opp:retreat:p2Bench2",
-        "stack-bench:retreat:p1Active",
-        "stack-bench:retreat:p1Bench1",
-        "stack-bench:retreat:p1Bench2"
       ]
     },
     "Armaldo ex|dual armor#5dxp7k": {
@@ -767,64 +505,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Articuno|blizzard veil#6i69v6": {
-      "card": "Articuno",
-      "name": "Blizzard Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Articuno|frosty flapping#1xngh6n": {
       "card": "Articuno",
       "name": "Frosty Flapping",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Articuno|ice float#vr4spe": {
-      "card": "Articuno",
-      "name": "Ice Float",
-      "flags": [
-        "stack-active:ownRetreat:Articuno"
-      ]
-    },
-    "Articuno|ice symbol#ueovg0": {
-      "card": "Articuno",
-      "name": "Ice Symbol",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Articuno|δ plus#1ujvtnt": {
-      "card": "Articuno",
-      "name": "Δ Plus",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
-    "Aurorus|ice shield#1plxxth": {
-      "card": "Aurorus",
-      "name": "Ice Shield",
-      "flags": [
-        "stack-bench:damagePrevention:p1Active"
-      ]
-    },
-    "Aurorus|tundra wall#16mx89b": {
-      "card": "Aurorus",
-      "name": "Tundra Wall",
-      "flags": [
-        "stack-bench:damageReduction:p1Active"
       ]
     },
     "Azumarill|bubble turn#112vkl4": {
@@ -848,18 +534,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Azumarill|thick fat#dk3q7t": {
-      "card": "Azumarill",
-      "name": "Thick Fat",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Banette|puppet offering#1n3xqed": {
       "card": "Banette",
       "name": "Puppet Offering",
@@ -873,29 +547,6 @@
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Bastiodon|earthen shield#u9l35y": {
-      "card": "Bastiodon",
-      "name": "Earthen Shield",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Bastiodon|protective wall#dftkwt": {
-      "card": "Bastiodon",
-      "name": "Protective Wall",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Baxcalibur|super cold#dsmq0m": {
@@ -920,57 +571,11 @@
         "clause:status-opp"
       ]
     },
-    "Beldum|levitate#tx4c8h": {
-      "card": "Beldum",
-      "name": "Levitate",
-      "flags": [
-        "stack-active:ownRetreat:Beldum",
-        "stack-bench:ownRetreat:Beldum"
-      ]
-    },
     "Beldum|metal chain#1x9kgpb": {
       "card": "Beldum",
       "name": "Metal Chain",
       "flags": [
         "clause:attach-from-hand"
-      ]
-    },
-    "Bewear|carry and run#2n6ynz": {
-      "card": "Bewear",
-      "name": "Carry and Run",
-      "flags": [
-        "stack-bench:retreat:p1Active"
-      ]
-    },
-    "Bibarel|unaware#1pbfnb4": {
-      "card": "Bibarel",
-      "name": "Unaware",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Bidoof|carefree countenance#1b9g2ms": {
-      "card": "Bidoof",
-      "name": "Carefree Countenance",
-      "flags": [
-        "stack-bench:damagePrevention:Bidoof"
-      ]
-    },
-    "Bidoof|wacan berry#oygzhz": {
-      "card": "Bidoof",
-      "name": "Wacan Berry",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Blastoise ex|energy rain#1hoa4wu": {
@@ -1027,58 +632,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Bouffalant|curly wall#4s2218": {
-      "card": "Bouffalant",
-      "name": "Curly Wall",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
     "Bronzong G|galactic switch#11iu3to": {
       "card": "Bronzong G",
       "name": "Galactic Switch",
       "flags": [
         "clause:move-energy"
-      ]
-    },
-    "Bronzong|metal fortress#1lk65k2": {
-      "card": "Bronzong",
-      "name": "Metal Fortress",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Bronzong|protective bell#105yt4a": {
-      "card": "Bronzong",
-      "name": "Protective Bell",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Budew|poison enzyme#nmwts6": {
-      "card": "Budew",
-      "name": "Poison Enzyme",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Burmy Plant Cloak|wear cloak#z49yyh": {
@@ -1102,42 +660,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Camerupt|delta protection#158nsbe": {
-      "card": "Camerupt",
-      "name": "Delta Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Carbink|double type#1wokutl": {
       "card": "Carbink",
       "name": "Double Type",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Carbink|jewel armor#143b76e": {
-      "card": "Carbink",
-      "name": "Jewel Armor",
-      "flags": [
-        "stack-bench:damagePrevention:Carbink"
-      ]
-    },
-    "Cascoon|hard cocoon#1gw7x4q": {
-      "card": "Cascoon",
-      "name": "Hard Cocoon",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Celebi|crystal type#17g6fin": {
@@ -1154,25 +681,6 @@
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Celesteela-GX|force canceler#1a9zyro": {
-      "card": "Celesteela-GX",
-      "name": "Force Canceler",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Chandelure VMAX|cursed shimmer#y8tyo8": {
-      "card": "Chandelure VMAX",
-      "name": "Cursed Shimmer",
-      "flags": [
-        "stack-active:playLock:p2:Probe Tool"
       ]
     },
     "Chandelure|flare navigate#11x7cd0": {
@@ -1220,18 +728,6 @@
         "clause:attach-from-deck"
       ]
     },
-    "Cherrim|cloudy sky#7d5vkd": {
-      "card": "Cherrim",
-      "name": "Cloudy Sky",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Cherrim|spring bloom#cqd35m": {
       "card": "Cherrim",
       "name": "Spring Bloom",
@@ -1240,36 +736,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Cherrim|sunny day#121i96b": {
-      "card": "Cherrim",
-      "name": "Sunny Day",
-      "flags": [
-        "stack-active:damageBonus:p1Bench0",
-        "stack-active:damageBonus:p1Bench1",
-        "stack-active:damageBonus:p1Bench2",
-        "stack-bench:damageBonus:p1Active",
-        "stack-bench:damageBonus:p1Bench1",
-        "stack-bench:damageBonus:p1Bench2"
-      ]
-    },
     "Chien-Pao ex|shivery chill#4hy1j8": {
       "card": "Chien-Pao ex",
       "name": "Shivery Chill",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Clamperl|exoskeleton#12t9ehn": {
-      "card": "Clamperl",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Clawitzer|fall back to reload#1mol5ia": {
@@ -1296,108 +768,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Cleffa|sweet sleeping face#34dn8f": {
-      "card": "Cleffa",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Cloyster|exoskeleton#1su1uf": {
-      "card": "Cloyster",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Cloyster|solid shell#1yt1zqo": {
-      "card": "Cloyster",
-      "name": "Solid Shell",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Comfey|flower selecting#1ns6f27": {
       "card": "Comfey",
       "name": "Flower Selecting",
       "flags": [
         "clause:lost-zone"
-      ]
-    },
-    "Copperajah|massive body#h5qhhj": {
-      "card": "Copperajah",
-      "name": "Massive Body",
-      "flags": [
-        "stack-active:playLock:p2:Probe Stadium"
-      ]
-    },
-    "Corphish|exoskeleton#1kd6ydz": {
-      "card": "Corphish",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Cosmog|cosmic guard#qxfrar": {
-      "card": "Cosmog",
-      "name": "Cosmic Guard",
-      "flags": [
-        "stack-bench:damagePrevention:Cosmog"
-      ]
-    },
-    "Cradily ex|primal vibes#hbzzqm": {
-      "card": "Cradily ex",
-      "name": "Primal Vibes",
-      "flags": [
-        "stack-active:evolveLock:p2",
-        "stack-bench:evolveLock:p2"
-      ]
-    },
-    "Cradily|super suction cups#1u2xuaq": {
-      "card": "Cradily",
-      "name": "Super Suction Cups",
-      "flags": [
-        "stack-active:retreatLock:p2",
-        "stack-bench:retreatLock:p2"
-      ]
-    },
-    "Cradily|swaying strangle#fqteh0": {
-      "card": "Cradily",
-      "name": "Swaying Strangle",
-      "flags": [
-        "stack-active:retreatLock:p2",
-        "stack-bench:retreatLock:p2"
-      ]
-    },
-    "Crawdaunt|dark protection#1vy4vxl": {
-      "card": "Crawdaunt",
-      "name": "Dark Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Crawdaunt|unruly claw#9tchab": {
@@ -1413,26 +788,6 @@
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Cubone|lonely bone#g95y6g": {
-      "card": "Cubone",
-      "name": "Lonely Bone",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Dark Ampharos|darkest impulse#1ar54yx": {
-      "card": "Dark Ampharos",
-      "name": "Darkest Impulse",
-      "flags": [
-        "stack-active:onOpponentEvolve",
-        "stack-bench:onOpponentEvolve"
       ]
     },
     "Dark Dragonite|dark trance#egyq6j": {
@@ -1466,20 +821,6 @@
         "clause:status-opp"
       ]
     },
-    "Dark Muk|sticky goo#1uic1am": {
-      "card": "Dark Muk",
-      "name": "Sticky Goo",
-      "flags": [
-        "stack-active:opp:retreat:p2Active"
-      ]
-    },
-    "Dark Muk|sticky goo#1yk6ba1": {
-      "card": "Dark Muk",
-      "name": "Sticky Goo",
-      "flags": [
-        "stack-active:opp:retreat:p2Active"
-      ]
-    },
     "Darkrai Prism Star|nightmare star#1x13s41": {
       "card": "Darkrai Prism Star",
       "name": "Nightmare Star",
@@ -1495,164 +836,12 @@
         "clause:search-to-bench"
       ]
     },
-    "Darkrai|darkness guard#13w02ps": {
-      "card": "Darkrai",
-      "name": "Darkness Guard",
-      "flags": [
-        "stack-bench:damageReduction:p1Active"
-      ]
-    },
     "Delphox BREAK|flare witch#1s8mw3n": {
       "card": "Delphox BREAK",
       "name": "Flare Witch",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Dewgong|cold fat#15xuyfo": {
-      "card": "Dewgong",
-      "name": "Cold Fat",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Dewgong|delta protection#ys8lnm": {
-      "card": "Dewgong",
-      "name": "Delta Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Dewgong|thick fat#1tovcx5": {
-      "card": "Dewgong",
-      "name": "Thick Fat",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Dhelmise|steelworker#gxfbfg": {
-      "card": "Dhelmise",
-      "name": "Steelworker",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Dialga|time aura#pabhue": {
-      "card": "Dialga",
-      "name": "Time Aura",
-      "flags": [
-        "stack-active:evolveLock:p2",
-        "stack-bench:evolveLock:p2"
-      ]
-    },
-    "Diancie Prism Star|princess's cheers#1pjdnnl": {
-      "card": "Diancie Prism Star",
-      "name": "Princess's Cheers",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Diancie-EX|sparkling veil#z3oisj": {
-      "card": "Diancie-EX",
-      "name": "Sparkling Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Diancie|princess's curtain#cjvd4i": {
-      "card": "Diancie",
-      "name": "Princess's Curtain",
-      "flags": [
-        "stack-active:damagePrevention:Diancie",
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2"
-      ]
-    },
-    "Diancie|sparkle veil#z3qio1": {
-      "card": "Diancie",
-      "name": "Sparkle Veil",
-      "flags": [
-        "stack-active:damageReduction:Diancie",
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2"
-      ]
-    },
-    "Diglett|submerge#157q45c": {
-      "card": "Diglett",
-      "name": "Submerge",
-      "flags": [
-        "stack-bench:damagePrevention:Diglett"
-      ]
-    },
-    "Dodrio|retreat aid#1ol0agv": {
-      "card": "Dodrio",
-      "name": "Retreat Aid",
-      "flags": [
-        "stack-bench:retreat:p1Active"
-      ]
-    },
-    "Dodrio|retreat aid#1sdr76v": {
-      "card": "Dodrio",
-      "name": "Retreat Aid",
-      "flags": [
-        "stack-bench:retreat:p1Active"
-      ]
-    },
-    "Dodrio|retreat aid#ui6mft": {
-      "card": "Dodrio",
-      "name": "Retreat Aid",
-      "flags": [
-        "stack-bench:retreat:p1Active"
-      ]
-    },
-    "Donphan|exoskeleton#hpsqho": {
-      "card": "Donphan",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Dracovish|primal law#1deaowo": {
-      "card": "Dracovish",
-      "name": "Primal Law",
-      "flags": [
-        "stack-active:evolveLock:p2"
-      ]
-    },
-    "Dragalge|poison barrier#5y152l": {
-      "card": "Dragalge",
-      "name": "Poison Barrier",
-      "flags": [
-        "stack-active:retreatLock:p2",
-        "stack-bench:retreatLock:p2"
       ]
     },
     "Dragonite|delta charge#x1y0n0": {
@@ -1671,57 +860,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Dragonite|jet cruise#1tfyktu": {
-      "card": "Dragonite",
-      "name": "Jet Cruise",
-      "flags": [
-        "stack-active:noRetreatForActive:p1",
-        "stack-bench:noRetreatForActive:p1"
-      ]
-    },
     "Dragonite|step in#1qa356l": {
       "card": "Dragonite",
       "name": "Step In",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Dragonite|δ plus#1ujvtnt": {
-      "card": "Dragonite",
-      "name": "Δ Plus",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
-    "Dratini|aqua lift#kf9cii": {
-      "card": "Dratini",
-      "name": "Aqua Lift",
-      "flags": [
-        "stack-active:ownRetreat:Dratini"
-      ]
-    },
-    "Drifblim FB|pump up#gsgzdm": {
-      "card": "Drifblim FB",
-      "name": "Pump Up",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Drifloon|unburden#1tzuzsh": {
-      "card": "Drifloon",
-      "name": "Unburden",
-      "flags": [
-        "stack-active:ownRetreat:Drifloon"
       ]
     },
     "Drilbur|dig dig dig#zcn4do": {
@@ -1747,17 +890,6 @@
         "clause:status-opp"
       ]
     },
-    "Dugtrio|sand veil#et9t6": {
-      "card": "Dugtrio",
-      "name": "Sand Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Duskull|spiritborne evolution#1o72pt": {
       "card": "Duskull",
       "name": "Spiritborne Evolution",
@@ -1765,54 +897,11 @@
         "clause:search-to-hand"
       ]
     },
-    "Dustox|camouflage pattern#v755n6": {
-      "card": "Dustox",
-      "name": "Camouflage Pattern",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Dustox|protective dust#1ay488r": {
-      "card": "Dustox",
-      "name": "Protective Dust",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Dustox|δ plus#1ujvtnt": {
-      "card": "Dustox",
-      "name": "Δ Plus",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
     "Eelektross|electric swamp#1oakeu9": {
       "card": "Eelektross",
       "name": "Electric Swamp",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Eevee|boosted evolution#aygjck": {
-      "card": "Eevee",
-      "name": "Boosted Evolution",
-      "flags": [
-        "stack-active:evolvePermission"
       ]
     },
     "Eevee|energy evolution#1amuwf1": {
@@ -1874,18 +963,6 @@
         "clause:attach-from-deck"
       ]
     },
-    "Elekid|sweet sleeping face#19ra94v": {
-      "card": "Elekid",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Emboar|inferno fandango#1rau4qc": {
       "card": "Emboar",
       "name": "Inferno Fandango",
@@ -1902,47 +979,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Empoleon V|emperor's eyes#ftz4hn": {
-      "card": "Empoleon V",
-      "name": "Emperor's Eyes",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active"
-      ]
-    },
-    "Empoleon|dignified fighter#agopg1": {
-      "card": "Empoleon",
-      "name": "Dignified Fighter",
-      "flags": [
-        "stack-active:damageBonus:Empoleon",
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
     "Empoleon|emergency surfacing#es273u": {
       "card": "Empoleon",
       "name": "Emergency Surfacing",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Enamorus V|guardian of love#11mn5q6": {
-      "card": "Enamorus V",
-      "name": "Guardian of Love",
-      "flags": [
-        "stack-bench:damagePrevention:p1Active"
-      ]
-    },
-    "Entei|explosive heat dash#1gkxj2l": {
-      "card": "Entei",
-      "name": "Explosive Heat Dash",
-      "flags": [
-        "stack-active:ownRetreat:Entei"
-      ]
-    },
-    "Entei|extreme speed#jgu4ma": {
-      "card": "Entei",
-      "name": "Extreme Speed",
-      "flags": [
-        "stack-active:ownRetreat:Entei"
       ]
     },
     "Entei|howl#kctuos": {
@@ -1953,67 +994,12 @@
         "clause:mill-self"
       ]
     },
-    "Entei|pressure#zw6d14": {
-      "card": "Entei",
-      "name": "Pressure",
-      "flags": [
-        "stack-active:damageReduction:Entei"
-      ]
-    },
-    "Erika's Dratini|strange barrier#ccn3m": {
-      "card": "Erika's Dratini",
-      "name": "Strange Barrier",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Espeon VMAX|solar revelation#gb13zd": {
-      "card": "Espeon VMAX",
-      "name": "Solar Revelation",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Espeon|sunlight veil#2tmpu7": {
-      "card": "Espeon",
-      "name": "Sunlight Veil",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
     "Ethan's Ho-Oh ex|golden flame#19o9kqe": {
       "card": "Ethan's Ho-Oh ex",
       "name": "Golden Flame",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Falinks V|iron defense formation#1lzb03e": {
-      "card": "Falinks V",
-      "name": "Iron Defense Formation",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
       ]
     },
     "Fan Rotom|fan call#12i25b5": {
@@ -2030,37 +1016,6 @@
       "name": "Fan Shift",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Feebas|submerge#157q45c": {
-      "card": "Feebas",
-      "name": "Submerge",
-      "flags": [
-        "stack-bench:damagePrevention:Feebas"
-      ]
-    },
-    "Feebas|submerge#jynz9a": {
-      "card": "Feebas",
-      "name": "Submerge",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Feraligatr|intimidating fang#l9nz2z": {
-      "card": "Feraligatr",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Feraligatr|major tsunami#1fjojnv": {
@@ -2086,65 +1041,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Flareon|incandescent awakening#1tnagp4": {
-      "card": "Flareon",
-      "name": "Incandescent Awakening",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:Flareon",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2",
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench1",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:Flareon",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
-      ]
-    },
     "Floatzel|water acceleration#1jat1zv": {
       "card": "Floatzel",
       "name": "Water Acceleration",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Floette|flower veil#3xyel7": {
-      "card": "Floette",
-      "name": "Flower Veil",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Florges|blooming garden#18x8f9r": {
-      "card": "Florges",
-      "name": "Blooming Garden",
-      "flags": [
-        "stack-active:weakness:p1Bench0",
-        "stack-active:weakness:p1Bench1",
-        "stack-active:weakness:p1Bench2",
-        "stack-bench:weakness:p1Active",
-        "stack-bench:weakness:p1Bench1",
-        "stack-bench:weakness:p1Bench2"
-      ]
-    },
-    "Flutter Mane|midnight fluttering#19iuh4d": {
-      "card": "Flutter Mane",
-      "name": "Midnight Fluttering",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active"
       ]
     },
     "Flygon ex|emerge charge#1aghwcs": {
@@ -2154,108 +1056,12 @@
         "clause:attach-from-deck"
       ]
     },
-    "Flygon ex|psychic protector#hye6d0": {
-      "card": "Flygon ex",
-      "name": "Psychic Protector",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Flygon-GX|dusty defense#1ykvsij": {
-      "card": "Flygon-GX",
-      "name": "Dusty Defense",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Flygon|dragon guard#1yqkba5": {
-      "card": "Flygon",
-      "name": "Dragon Guard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Flygon|labyrinth of sand#gukeca": {
-      "card": "Flygon",
-      "name": "Labyrinth of Sand",
-      "flags": [
-        "stack-active:retreatLock:p2"
-      ]
-    },
-    "Flygon|sand guard#1ddj2l0": {
-      "card": "Flygon",
-      "name": "Sand Guard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Forretress ex|exploding energy#29eaxw": {
       "card": "Forretress ex",
       "name": "Exploding Energy",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Forretress|exoskeleton#jlstvb": {
-      "card": "Forretress",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Froakie|frubbles#1izr7co": {
-      "card": "Froakie",
-      "name": "Frubbles",
-      "flags": [
-        "stack-active:ownRetreat:Froakie"
-      ]
-    },
-    "Froslass ex|evanescent#1ga3btn": {
-      "card": "Froslass ex",
-      "name": "Evanescent",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
-    "Froslass|freezing shroud#9vv9bh": {
-      "card": "Froslass",
-      "name": "Freezing Shroud",
-      "flags": [
-        "stack-active:checkup",
-        "stack-active:checkup:conditioned",
-        "stack-bench:checkup",
-        "stack-bench:checkup:conditioned"
       ]
     },
     "Froslass|frost over#1l324qm": {
@@ -2296,35 +1102,6 @@
         "typography:typeWords:plan"
       ]
     },
-    "Galarian Mr. Rime|screen cleaner#16zox42": {
-      "card": "Galarian Mr. Rime",
-      "name": "Screen Cleaner",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Galarian Perrserker|steely spirit#13hqadz": {
-      "card": "Galarian Perrserker",
-      "name": "Steely Spirit",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Galarian Weezing|neutralizing gas#6fj8b2": {
-      "card": "Galarian Weezing",
-      "name": "Neutralizing Gas",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2"
-      ]
-    },
     "Galarian Zapdos|strong legs charge#1qvuksk": {
       "card": "Galarian Zapdos",
       "name": "Strong Legs Charge",
@@ -2338,38 +1115,6 @@
       "name": "Double Type",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Garbodor|garbotoxin#1eulhx5": {
-      "card": "Garbodor",
-      "name": "Garbotoxin",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2",
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench1",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
-      ]
-    },
-    "Garbodor|gloomy garbage#1165fwv": {
-      "card": "Garbodor",
-      "name": "Gloomy Garbage",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
       ]
     },
     "Gardevoir-GX|secret spring#1v8twri": {
@@ -2388,13 +1133,6 @@
         "typography:typeWords:plan"
       ]
     },
-    "Garganacl|powerful a-salt#1lxywtw": {
-      "card": "Garganacl",
-      "name": "Powerful a-Salt",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
     "Genesect ex|metallic signal#2jn8u": {
       "card": "Genesect ex",
       "name": "Metallic Signal",
@@ -2402,14 +1140,6 @@
         "clause:search-to-hand",
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Genesect|ace nullifier#1jnlo50": {
-      "card": "Genesect",
-      "name": "ACE Nullifier",
-      "flags": [
-        "stack-active:playLock:p2:Probe ACE",
-        "stack-active:playLock:p2:Probe Tool"
       ]
     },
     "Gengar|manipulate#uq45zm": {
@@ -2424,13 +1154,6 @@
       "name": "Netherworld Gate",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Gible|rock hiding#5qszy6": {
-      "card": "Gible",
-      "name": "Rock Hiding",
-      "flags": [
-        "stack-active:ownRetreat:Gible"
       ]
     },
     "Giratina Prism Star|chaotic star#1u1gjz5": {
@@ -2448,94 +1171,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Glaceon-GX|freezing gaze#10mnyrk": {
-      "card": "Glaceon-GX",
-      "name": "Freezing Gaze",
-      "flags": [
-        "stack-active:opp:suppressed:p2Bench2"
-      ]
-    },
-    "Glaceon|frost wind#1objt83": {
-      "card": "Glaceon",
-      "name": "Frost Wind",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Glalie|craggy face#11eomgn": {
-      "card": "Glalie",
-      "name": "Craggy Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Glalie|ice wall#19er55d": {
-      "card": "Glalie",
-      "name": "Ice Wall",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Glalie|synergy effect#b6i4e5": {
-      "card": "Glalie",
-      "name": "Synergy Effect",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Gloom|enervating pollen#34xgcz": {
-      "card": "Gloom",
-      "name": "Enervating Pollen",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Golduck|chaos flash#6vlfkl": {
       "card": "Golduck",
       "name": "Chaos Flash",
       "flags": [
         "clause:status-opp"
-      ]
-    },
-    "Golduck|damp#1yvgw6m": {
-      "card": "Golduck",
-      "name": "Damp",
-      "flags": [
-        "stack-active:suppressed:Golduck",
-        "stack-bench:suppressed:Golduck"
-      ]
-    },
-    "Golduck|delta block#gf6yyp": {
-      "card": "Golduck",
-      "name": "Delta Block",
-      "flags": [
-        "stack-active:playLock:p2:Probe Stadium",
-        "stack-bench:playLock:p2:Probe Stadium"
       ]
     },
     "Golem|crystal type#1arckr8": {
@@ -2544,18 +1184,6 @@
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Golem|rock body#1p3o4oe": {
-      "card": "Golem",
-      "name": "Rock Body",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Golurk|double type#1f6b761": {
@@ -2572,60 +1200,6 @@
         "clause:discard-self-energy"
       ]
     },
-    "Gorebyss|rapid strike canceler#kfpubo": {
-      "card": "Gorebyss",
-      "name": "Rapid Strike Canceler",
-      "flags": [
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench0"
-      ]
-    },
-    "Gothitelle|magic room#1nu3ckv": {
-      "card": "Gothitelle",
-      "name": "Magic Room",
-      "flags": [
-        "stack-active:playLock:p2:Probe ACE",
-        "stack-active:playLock:p2:Probe Item"
-      ]
-    },
-    "Granbull|intimidating fang#121p5cq": {
-      "card": "Granbull",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Grapploct|stranglehold master#1qa2sec": {
-      "card": "Grapploct",
-      "name": "Stranglehold Master",
-      "flags": [
-        "stack-active:opp:retreat:p2Active"
-      ]
-    },
-    "Graveler|exoskeleton#1jxez0r": {
-      "card": "Graveler",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Great Tusk ex|quaking demolition#1i4eghs": {
-      "card": "Great Tusk ex",
-      "name": "Quaking Demolition",
-      "flags": [
-        "stack-active:endOfTurn"
-      ]
-    },
     "Greninja-GX|elusive master#uc4c6z": {
       "card": "Greninja-GX",
       "name": "Elusive Master",
@@ -2633,55 +1207,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Grumpig|thick fat#ukuagl": {
-      "card": "Grumpig",
-      "name": "Thick Fat",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Gyarados|flame vapor#1v4dfqw": {
       "card": "Gyarados",
       "name": "Flame Vapor",
       "flags": [
         "clause:discard-opp-energy"
-      ]
-    },
-    "Hariyama ex|commanding aura#exrh85": {
-      "card": "Hariyama ex",
-      "name": "Commanding Aura",
-      "flags": [
-        "stack-active:playLock:p2:Probe Stadium",
-        "stack-bench:playLock:p2:Probe Stadium"
-      ]
-    },
-    "Hariyama|arm thrust practice#nq6h73": {
-      "card": "Hariyama",
-      "name": "Arm Thrust Practice",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Hariyama|reversal aura#30lamx": {
-      "card": "Hariyama",
-      "name": "Reversal Aura",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Hatterene|witch rondo#1d2o4ve": {
@@ -2696,30 +1226,6 @@
       "name": "Head Trip",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Haunter|transparency#kjqox": {
-      "card": "Haunter",
-      "name": "Transparency",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Haunter|transparency#rslkyd": {
-      "card": "Haunter",
-      "name": "Transparency",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Haxorus|grind up#1lpg2s9": {
@@ -2745,71 +1251,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Heracross|crust#thixpj": {
-      "card": "Heracross",
-      "name": "Crust",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Hippowdon E4|sand armor#1ofwico": {
-      "card": "Hippowdon E4",
-      "name": "Sand Armor",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Hisuian Lilligant VSTAR|star perfume#fmq204": {
       "card": "Hisuian Lilligant VSTAR",
       "name": "Star Perfume",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Hisuian Sneasler|carry and climb#vhba1h": {
-      "card": "Hisuian Sneasler",
-      "name": "Carry and Climb",
-      "flags": [
-        "stack-bench:retreat:p1Active"
-      ]
-    },
-    "Hitmonchan|stages of evolution#e3n6z3": {
-      "card": "Hitmonchan",
-      "name": "Stages of Evolution",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Hitmontop|stages of evolution#1opmfmq": {
-      "card": "Hitmontop",
-      "name": "Stages of Evolution",
-      "flags": [
-        "stack-active:onOpponentEvolve",
-        "stack-bench:onOpponentEvolve"
-      ]
-    },
-    "Ho-Oh ex|golden wing#ihof8b": {
-      "card": "Ho-Oh ex",
-      "name": "Golden Wing",
-      "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo"
       ]
     },
     "Ho-Oh V|reviving flame#x6dyfd": {
@@ -2827,14 +1274,6 @@
         "typography:typeWords:plan"
       ]
     },
-    "Honchkrow-GX|ruler of the night#jun9t2": {
-      "card": "Honchkrow-GX",
-      "name": "Ruler of the Night",
-      "flags": [
-        "stack-active:playLock:p2:Probe Stadium",
-        "stack-active:playLock:p2:Probe Tool"
-      ]
-    },
     "Hoopa V|two-faced#16c0cqw": {
       "card": "Hoopa V",
       "name": "Two-Faced",
@@ -2842,27 +1281,11 @@
         "typography:typeWords:parse"
       ]
     },
-    "Hoppip|lightweight#btnru8": {
-      "card": "Hoppip",
-      "name": "Lightweight",
-      "flags": [
-        "stack-active:ownRetreat:Hoppip",
-        "stack-bench:ownRetreat:Hoppip"
-      ]
-    },
     "Houndoom|fire breath#ah8zze": {
       "card": "Houndoom",
       "name": "Fire Breath",
       "flags": [
         "clause:status-opp"
-      ]
-    },
-    "Houndoom|lonesome#1y0ofm7": {
-      "card": "Houndoom",
-      "name": "Lonesome",
-      "flags": [
-        "stack-active:playLock:p2:Probe Supporter",
-        "stack-bench:playLock:p2:Probe Supporter"
       ]
     },
     "Huntail|reactive generator#2xdxpr": {
@@ -2880,32 +1303,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Hydreigon ex|greedy eater#1jf2oen": {
-      "card": "Hydreigon ex",
-      "name": "Greedy Eater",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
     "Hydreigon|dark squall#u7behy": {
       "card": "Hydreigon",
       "name": "Dark Squall",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Hypno|binding aura#uc4p0w": {
-      "card": "Hypno",
-      "name": "Binding Aura",
-      "flags": [
-        "stack-active:evolveLock:p2",
-        "stack-bench:evolveLock:p2"
       ]
     },
     "Hypno|sleep pendulum#z6rne0": {
@@ -2915,75 +1318,12 @@
         "clause:status-opp"
       ]
     },
-    "Igglybuff|sweet sleeping face#1fr4le7": {
-      "card": "Igglybuff",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Illumise|beacon protection#1nybh5y": {
-      "card": "Illumise",
-      "name": "Beacon Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Illumise|glowing screen#1yuuno4": {
-      "card": "Illumise",
-      "name": "Glowing Screen",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Illumise|supereffective pheromones#1cdzjmv": {
-      "card": "Illumise",
-      "name": "Supereffective Pheromones",
-      "flags": [
-        "stack-active:opp:weakness:p2Active",
-        "stack-active:opp:weakness:p2Bench0",
-        "stack-active:opp:weakness:p2Bench1",
-        "stack-active:opp:weakness:p2Bench2",
-        "stack-active:weakness:Volbeat",
-        "stack-active:weakness:p1Bench1",
-        "stack-active:weakness:p1Bench2",
-        "stack-bench:opp:weakness:p2Active",
-        "stack-bench:opp:weakness:p2Bench0",
-        "stack-bench:opp:weakness:p2Bench1",
-        "stack-bench:opp:weakness:p2Bench2",
-        "stack-bench:weakness:Volbeat",
-        "stack-bench:weakness:p1Active",
-        "stack-bench:weakness:p1Bench2"
-      ]
-    },
     "Incineroar-GX|scar charge#2iqkfe": {
       "card": "Incineroar-GX",
       "name": "Scar Charge",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Incineroar|strong cheer#opkkc2": {
-      "card": "Incineroar",
-      "name": "Strong Cheer",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
       ]
     },
     "Infernape|blaze dance#6ver7c": {
@@ -3017,60 +1357,11 @@
         "clause:discard-self-energy"
       ]
     },
-    "Iron Thorns ex|initialization#1qh3pym": {
-      "card": "Iron Thorns ex",
-      "name": "Initialization",
-      "flags": [
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:Iron Thorns ex"
-      ]
-    },
     "Iron Treads|dual core#f0aa54": {
       "card": "Iron Treads",
       "name": "Dual Core",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Jellicent ex|oceanic curse#y9dilo": {
-      "card": "Jellicent ex",
-      "name": "Oceanic Curse",
-      "flags": [
-        "stack-active:playLock:p2:Probe ACE",
-        "stack-active:playLock:p2:Probe Item",
-        "stack-active:playLock:p2:Probe Tool"
-      ]
-    },
-    "Jellicent|stickiness#1817tdk": {
-      "card": "Jellicent",
-      "name": "Stickiness",
-      "flags": [
-        "stack-active:opp:retreat:p2Active",
-        "stack-active:opp:retreat:p2Bench0",
-        "stack-active:opp:retreat:p2Bench1",
-        "stack-active:opp:retreat:p2Bench2",
-        "stack-active:retreat:Jellicent",
-        "stack-active:retreat:p1Bench0",
-        "stack-active:retreat:p1Bench1",
-        "stack-active:retreat:p1Bench2",
-        "stack-bench:opp:retreat:p2Active",
-        "stack-bench:opp:retreat:p2Bench0",
-        "stack-bench:opp:retreat:p2Bench1",
-        "stack-bench:opp:retreat:p2Bench2",
-        "stack-bench:retreat:Jellicent",
-        "stack-bench:retreat:p1Active",
-        "stack-bench:retreat:p1Bench1",
-        "stack-bench:retreat:p1Bench2"
-      ]
-    },
-    "Jirachi V|wish connector#19hfees": {
-      "card": "Jirachi V",
-      "name": "Wish Connector",
-      "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo"
       ]
     },
     "Jirachi|stardust song#rgmata": {
@@ -3080,194 +1371,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Jirachi|stellar veil#ljt4ls": {
-      "card": "Jirachi",
-      "name": "Stellar Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Jolteon|thunderous awakening#1ls2wim": {
-      "card": "Jolteon",
-      "name": "Thunderous Awakening",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:Jolteon",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2",
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench1",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:Jolteon",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
-      ]
-    },
-    "Jumpluff|cotton spore#127b290": {
-      "card": "Jumpluff",
-      "name": "Cotton Spore",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Jumpluff|fluff#9wnq11": {
-      "card": "Jumpluff",
-      "name": "Fluff",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Jynx|stages of evolution#bzlr6b": {
-      "card": "Jynx",
-      "name": "Stages of Evolution",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Kabuto|exoskeleton#fhkhcq": {
-      "card": "Kabuto",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Kabuto|revive friends#t1vzo": {
       "card": "Kabuto",
       "name": "Revive Friends",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Kabuto|thick shell#d1jv8u": {
-      "card": "Kabuto",
-      "name": "Thick Shell",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Kabutops|ancient shell#1i11jh1": {
-      "card": "Kabutops",
-      "name": "Ancient Shell",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Kabutops|ancient way#1fbynz5": {
-      "card": "Kabutops",
-      "name": "Ancient Way",
-      "flags": [
-        "stack-active:opp:weakness:p2Active",
-        "stack-active:opp:weakness:p2Bench0",
-        "stack-active:opp:weakness:p2Bench1",
-        "stack-active:opp:weakness:p2Bench2",
-        "stack-bench:opp:weakness:p2Active",
-        "stack-bench:opp:weakness:p2Bench0",
-        "stack-bench:opp:weakness:p2Bench1",
-        "stack-bench:opp:weakness:p2Bench2"
-      ]
-    },
-    "Kabutops|fossilized memories#19yecxj": {
-      "card": "Kabutops",
-      "name": "Fossilized Memories",
-      "flags": [
-        "stack-active:playLock:p2:Probe Supporter"
-      ]
-    },
-    "Kabutops|primal stare#1gy7x3w": {
-      "card": "Kabutops",
-      "name": "Primal Stare",
-      "flags": [
-        "stack-active:evolveLock:p2",
-        "stack-bench:evolveLock:p2"
-      ]
-    },
-    "Kakuna|exoskeleton#1bmkkyx": {
-      "card": "Kakuna",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Kakuna|exoskeleton#wxg1an": {
-      "card": "Kakuna",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Kakuna|grass cushion#chdec3": {
-      "card": "Kakuna",
-      "name": "Grass Cushion",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Kecleon|camouflage#1j4cdq8": {
-      "card": "Kecleon",
-      "name": "Camouflage",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Kecleon|colorful body#17hrxpt": {
@@ -3305,77 +1413,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Kingambit|leadership#1w5eebb": {
-      "card": "Kingambit",
-      "name": "Leadership",
-      "flags": [
-        "stack-active:damageBonus:Kingambit",
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Kingdra ex|extra smoke#1y2de4m": {
-      "card": "Kingdra ex",
-      "name": "Extra Smoke",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Kingdra|deep sea king#x0wvmu": {
-      "card": "Kingdra",
-      "name": "Deep Sea King",
-      "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo"
-      ]
-    },
-    "Klefki|mischievous lock#14aa60h": {
-      "card": "Klefki",
-      "name": "Mischievous Lock",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2"
-      ]
-    },
-    "Klinklang|gear coating#1wkq5ud": {
-      "card": "Klinklang",
-      "name": "Gear Coating",
-      "flags": [
-        "stack-bench:damageReduction:p1Active"
-      ]
-    },
-    "Klinklang|gear wall#147980": {
-      "card": "Klinklang",
-      "name": "Gear Wall",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Kricketune|swelling tune#chk20h": {
-      "card": "Kricketune",
-      "name": "Swelling Tune",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
     "Kyurem|plasma bane#vidpg": {
       "card": "Kyurem",
       "name": "Plasma Bane",
@@ -3390,14 +1427,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Lanturn|energy grounding#9gerc2": {
-      "card": "Lanturn",
-      "name": "Energy Grounding",
-      "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo"
-      ]
-    },
     "Lanturn|underwater dive#1czq38n": {
       "card": "Lanturn",
       "name": "Underwater Dive",
@@ -3405,33 +1434,11 @@
         "typography:typeWords:parse"
       ]
     },
-    "Larvitar|submerge#157q45c": {
-      "card": "Larvitar",
-      "name": "Submerge",
-      "flags": [
-        "stack-bench:damagePrevention:Larvitar"
-      ]
-    },
-    "Latias ex|skyliner#49nkf3": {
-      "card": "Latias ex",
-      "name": "Skyliner",
-      "flags": [
-        "stack-active:noRetreatForActive:p1",
-        "stack-bench:noRetreatForActive:p1"
-      ]
-    },
     "Latias|delta aura#1etrglu": {
       "card": "Latias",
       "name": "Delta Aura",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Latias|mist float#amtc2h": {
-      "card": "Latias",
-      "name": "Mist Float",
-      "flags": [
-        "stack-active:ownRetreat:Latias"
       ]
     },
     "Latias|red assist#o9yx0u": {
@@ -3465,75 +1472,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Leafeon|energy refresh#15vuv8f": {
-      "card": "Leafeon",
-      "name": "Energy Refresh",
-      "flags": [
-        "stack-active:onEnergyAttach"
-      ]
-    },
-    "Leavanny|blanket weaver#7cl18b": {
-      "card": "Leavanny",
-      "name": "Blanket Weaver",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Ledian|powder protection#1sr1y7c": {
-      "card": "Ledian",
-      "name": "Powder Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Light Machamp|tag team#jrgcv7": {
       "card": "Light Machamp",
       "name": "Tag Team",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Lilligant|sunny day#gkc8tt": {
-      "card": "Lilligant",
-      "name": "Sunny Day",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Lombre|aqua lift#kf9cii": {
-      "card": "Lombre",
-      "name": "Aqua Lift",
-      "flags": [
-        "stack-active:ownRetreat:Lombre"
-      ]
-    },
-    "Lotad|swift swim#12ip789": {
-      "card": "Lotad",
-      "name": "Swift Swim",
-      "flags": [
-        "stack-active:ownRetreat:Lotad"
-      ]
-    },
-    "Lucario LV.X|stance#1tpmz8y": {
-      "card": "Lucario LV.X",
-      "name": "Stance",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Lucario|roaring resolve#12dzlor": {
@@ -3544,60 +1487,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Lucario|tag coach#1cfwlen": {
-      "card": "Lucario",
-      "name": "Tag Coach",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Ludicolo|vibrant dance#1s2dse5": {
-      "card": "Ludicolo",
-      "name": "Vibrant Dance",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Lugia-EX|overflow#1crgw9x": {
-      "card": "Lugia-EX",
-      "name": "Overflow",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
     "Lugia|crystal type#wsd1rl": {
       "card": "Lugia",
       "name": "Crystal Type",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Lugia|pressure#13iw9uo": {
-      "card": "Lugia",
-      "name": "Pressure",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Lunala|blessing of the moone#1qgyxpl": {
@@ -3607,81 +1502,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Lunala|shadow shield#9znl0b": {
-      "card": "Lunala",
-      "name": "Shadow Shield",
-      "flags": [
-        "stack-bench:damageReduction:p1Active"
-      ]
-    },
     "Lunatone|lunar eclipse#1ubh0ip": {
       "card": "Lunatone",
       "name": "Lunar Eclipse",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Lunatone|marvel eyes#32hfcf": {
-      "card": "Lunatone",
-      "name": "Marvel Eyes",
-      "flags": [
-        "stack-active:damagePrevention:Solrock",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:Solrock",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Lunatone|new moon#c0n1c4": {
-      "card": "Lunatone",
-      "name": "New Moon",
-      "flags": [
-        "stack-active:damagePrevention:Solrock",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:Solrock",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Lunatone|sol shade#86rfkx": {
-      "card": "Lunatone",
-      "name": "Sol Shade",
-      "flags": [
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-bench:opp:suppressed:p2Bench2"
-      ]
-    },
-    "Lurantis|sunny day#kgu9rt": {
-      "card": "Lurantis",
-      "name": "Sunny Day",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Luxray|intimidating fang#19zf8f7": {
-      "card": "Luxray",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Luxray|intimidating fang#1ah83yr": {
-      "card": "Luxray",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Mabosstiff|intimidating howl#19ofwuv": {
@@ -3691,60 +1516,11 @@
         "clause:gust"
       ]
     },
-    "Machamp LV.X|no guard#1yj6hu5": {
-      "card": "Machamp LV.X",
-      "name": "No Guard",
-      "flags": [
-        "stack-active:damageBonus:Machamp LV.X"
-      ]
-    },
-    "Machamp|fighting fury#17yvwtj": {
-      "card": "Machamp",
-      "name": "Fighting Fury",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
     "Machamp|fighting tag#8m7mim": {
       "card": "Machamp",
       "name": "Fighting Tag",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Machamp|immunity#1bizcfx": {
-      "card": "Machamp",
-      "name": "Immunity",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Machoke|daunting pose#14n9e9z": {
-      "card": "Machoke",
-      "name": "Daunting Pose",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Magby|sweet sleeping face#tk8uhd": {
-      "card": "Magby",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Magcargo|dual armor#538a63": {
@@ -3759,50 +1535,6 @@
       "name": "Streaming Mantle",
       "flags": [
         "clause:recover-to-deck"
-      ]
-    },
-    "Magearna-EX|mystic heart#1k9ajem": {
-      "card": "Magearna-EX",
-      "name": "Mystic Heart",
-      "flags": [
-        "stack-bench:damagePrevention:p1Active"
-      ]
-    },
-    "Magearna|auto heal#1toeiag": {
-      "card": "Magearna",
-      "name": "Auto Heal",
-      "flags": [
-        "stack-active:onEnergyAttach"
-      ]
-    },
-    "Magikarp|submerge#157q45c": {
-      "card": "Magikarp",
-      "name": "Submerge",
-      "flags": [
-        "stack-bench:damagePrevention:Magikarp"
-      ]
-    },
-    "Magmortar|magma surge#isuzj1": {
-      "card": "Magmortar",
-      "name": "Magma Surge",
-      "flags": [
-        "stack-active:checkup:conditioned",
-        "stack-bench:checkup:conditioned"
-      ]
-    },
-    "Magnemite|solid unit#1vya5xb": {
-      "card": "Magnemite",
-      "name": "Solid Unit",
-      "flags": [
-        "stack-bench:damagePrevention:Magnemite"
-      ]
-    },
-    "Magneton|reactive recharge#rqbc8a": {
-      "card": "Magneton",
-      "name": "Reactive Recharge",
-      "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo"
       ]
     },
     "Magnezone|double type#2l2dgm": {
@@ -3842,53 +1574,11 @@
         "clause:attach-from-hand"
       ]
     },
-    "Manaphy|wave veil#ms69eq": {
-      "card": "Manaphy",
-      "name": "Wave Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Manectric|electric barrier#3c7gf8": {
-      "card": "Manectric",
-      "name": "Electric Barrier",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mantine|mantine surf#99sbmi": {
-      "card": "Mantine",
-      "name": "Mantine Surf",
-      "flags": [
-        "stack-active:ownRetreat:Mantine",
-        "stack-bench:ownRetreat:Mantine"
-      ]
-    },
     "Marnie's Grimmsnarl ex|punk up#1kfdfp6": {
       "card": "Marnie's Grimmsnarl ex",
       "name": "Punk Up",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Marowak|bodyguard#18v47bs": {
-      "card": "Marowak",
-      "name": "Bodyguard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Marshtomp|plunge#5wyrm5": {
@@ -3898,50 +1588,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Masquerain|intimidating pattern#358rsd": {
-      "card": "Masquerain",
-      "name": "Intimidating Pattern",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Masquerain|intimidating pattern#godc3g": {
-      "card": "Masquerain",
-      "name": "Intimidating Pattern",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Medicham|dual armor#10yy2je": {
       "card": "Medicham",
       "name": "Dual Armor",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Meditite|yoga guard#jznyzn": {
-      "card": "Meditite",
-      "name": "Yoga Guard",
-      "flags": [
-        "stack-bench:damagePrevention:Meditite"
-      ]
-    },
-    "Mega Chandelure ex|binding flame#qgn4ip": {
-      "card": "Mega Chandelure ex",
-      "name": "Binding Flame",
-      "flags": [
-        "stack-active:opp:retreat:p2Active",
-        "stack-bench:opp:retreat:p2Active"
       ]
     },
     "Meganium ex|nurture and heal#1cf1yl": {
@@ -3960,26 +1611,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Metagross|gravitation#ziwzfm": {
-      "card": "Metagross",
-      "name": "Gravitation",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Metagross|levitation field#14n291j": {
-      "card": "Metagross",
-      "name": "Levitation Field",
-      "flags": [
-        "stack-active:noRetreatForActive:p1",
-        "stack-bench:noRetreatForActive:p1"
-      ]
-    },
     "Metagross|magnetic warp#daqlu8": {
       "card": "Metagross",
       "name": "Magnetic Warp",
@@ -3992,186 +1623,6 @@
       "name": "Super Connectivity",
       "flags": [
         "clause:attach-from-deck"
-      ]
-    },
-    "Metang|levitate#1orggij": {
-      "card": "Metang",
-      "name": "Levitate",
-      "flags": [
-        "stack-active:ownRetreat:Metang",
-        "stack-bench:ownRetreat:Metang"
-      ]
-    },
-    "Metapod|energy protection#1uhnisw": {
-      "card": "Metapod",
-      "name": "Energy Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Metapod|exoskeleton#mwzvx": {
-      "card": "Metapod",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mew|bench barrier#2284jn": {
-      "card": "Mew",
-      "name": "Bench Barrier",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mew|neutral shield#1ix11yg": {
-      "card": "Mew",
-      "name": "Neutral Shield",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mewtwo LV.X|psybarrier#prqoj3": {
-      "card": "Mewtwo LV.X",
-      "name": "Psybarrier",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mewtwo|pressure#byw4vl": {
-      "card": "Mewtwo",
-      "name": "Pressure",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Mightyena|intimidating fang#qsgjqv": {
-      "card": "Mightyena",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Milotic|aqua mirage#1xwhzzp": {
-      "card": "Milotic",
-      "name": "Aqua Mirage",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Milotic|dew guard#1jfybjw": {
-      "card": "Milotic",
-      "name": "Dew Guard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Milotic|marvel scale#txtvbu": {
-      "card": "Milotic",
-      "name": "Marvel Scale",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Miltank|moomoo malt#6n4w0r": {
-      "card": "Miltank",
-      "name": "Moomoo Malt",
-      "flags": [
-        "stack-active:onEnergyAttach"
-      ]
-    },
-    "Miltank|thick fat#b3aszq": {
-      "card": "Miltank",
-      "name": "Thick Fat",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mime Jr.|sweet sleeping face#khq0jj": {
-      "card": "Mime Jr.",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mimikyu|shadow box#1ou1f58": {
-      "card": "Mimikyu",
-      "name": "Shadow Box",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:Mimikyu",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2",
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench1",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:Mimikyu",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
       ]
     },
     "Minior|falling star#155i0g6": {
@@ -4200,28 +1651,7 @@
       "card": "Miraidon",
       "name": "Photon Cord",
       "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo",
         "typography:typeWords:parse"
-      ]
-    },
-    "Misty's Cloyster|shell armor#1eiex0q": {
-      "card": "Misty's Cloyster",
-      "name": "Shell Armor",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Misty's Magikarp|so submerged#15e4n9f": {
-      "card": "Misty's Magikarp",
-      "name": "So Submerged",
-      "flags": [
-        "stack-bench:damagePrevention:Misty's Magikarp"
       ]
     },
     "Moltres|fiery flapping#1pk99lx": {
@@ -4239,72 +1669,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Moltres|flare float#1cyi2cq": {
-      "card": "Moltres",
-      "name": "Flare Float",
-      "flags": [
-        "stack-active:ownRetreat:Moltres"
-      ]
-    },
-    "Moltres|flare symbol#xtxwnp": {
-      "card": "Moltres",
-      "name": "Flare Symbol",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
     "Mow Rotom|mow shift#g6jlu0": {
       "card": "Mow Rotom",
       "name": "Mow Shift",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Mr. Mime|bench barrier#18ur43d": {
-      "card": "Mr. Mime",
-      "name": "Bench Barrier",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mr. Mime|energy barrier#92a1qf": {
-      "card": "Mr. Mime",
-      "name": "Energy Barrier",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Mudkip|submerge#1rlj06m": {
-      "card": "Mudkip",
-      "name": "Submerge",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Munkidori ex|oh no you don't#fed4fj": {
-      "card": "Munkidori ex",
-      "name": "Oh No You Don't",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
       ]
     },
     "Munkidori|adrena-brain#111pbae": {
@@ -4313,18 +1682,6 @@
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Natu|δ plus#1ujvtnt": {
-      "card": "Natu",
-      "name": "Δ Plus",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
       ]
     },
     "Nidoking|crystal type#sa3bat": {
@@ -4340,24 +1697,6 @@
       "name": "Evolution Helper",
       "flags": [
         "clause:attach-from-deck"
-      ]
-    },
-    "Ninetales|barrier shrine#12tpf9q": {
-      "card": "Ninetales",
-      "name": "Barrier Shrine",
-      "flags": [
-        "stack-active:playLock:p1:Probe Stadium",
-        "stack-active:playLock:p2:Probe Stadium",
-        "stack-bench:playLock:p1:Probe Stadium",
-        "stack-bench:playLock:p2:Probe Stadium"
-      ]
-    },
-    "Ninetales|byway of the nine-tailed fox#prww65": {
-      "card": "Ninetales",
-      "name": "Byway of the Nine-Tailed Fox",
-      "flags": [
-        "stack-active:retreat:Ninetales",
-        "stack-bench:retreat:p1Active"
       ]
     },
     "Ninjask|cast-off shell#1cofqoa": {
@@ -4381,53 +1720,6 @@
         "clause:search-to-bench"
       ]
     },
-    "Ninjask|fast protection#11s0nl6": {
-      "card": "Ninjask",
-      "name": "Fast Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Numel|dense#1kuk9bs": {
-      "card": "Numel",
-      "name": "Dense",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Octillery|super suction cups#1rusx5v": {
-      "card": "Octillery",
-      "name": "Super Suction Cups",
-      "flags": [
-        "stack-active:retreatLock:p2",
-        "stack-bench:retreatLock:p2"
-      ]
-    },
-    "Omastar|primal stare#n2xsnq": {
-      "card": "Omastar",
-      "name": "Primal Stare",
-      "flags": [
-        "stack-active:evolveLock:p2",
-        "stack-bench:evolveLock:p2"
-      ]
-    },
-    "Omastar|primordial tentacles#vqp5d8": {
-      "card": "Omastar",
-      "name": "Primordial Tentacles",
-      "flags": [
-        "stack-active:retreatLock:p2"
-      ]
-    },
     "Oricorio ex|excited turbo#69zios": {
       "card": "Oricorio ex",
       "name": "Excited Turbo",
@@ -4436,39 +1728,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Oricorio|lesson in zeal#14z70mn": {
-      "card": "Oricorio",
-      "name": "Lesson in Zeal",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
     "Pachirisu|self-generation#1flx1xx": {
       "card": "Pachirisu",
       "name": "Self-Generation",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Palkia|absolute space#1sgr33c": {
-      "card": "Palkia",
-      "name": "Absolute Space",
-      "flags": [
-        "stack-active:playLock:p2:Probe Stadium"
-      ]
-    },
-    "Patrat|watchful eye#1sqqg3a": {
-      "card": "Patrat",
-      "name": "Watchful Eye",
-      "flags": [
-        "stack-active:counterMoveLock",
-        "stack-bench:counterMoveLock"
       ]
     },
     "Pawmot|electrogenesis#h3ccgl": {
@@ -4487,100 +1752,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Pecharunt|toxic subjugation#19au23u": {
-      "card": "Pecharunt",
-      "name": "Toxic Subjugation",
-      "flags": [
-        "stack-active:checkup:conditioned"
-      ]
-    },
     "Pelipper|delta transport#xs029h": {
       "card": "Pelipper",
       "name": "Delta Transport",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Pelipper|mist#nvce4l": {
-      "card": "Pelipper",
-      "name": "Mist",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Pichu|sweet sleeping face#si06qz": {
-      "card": "Pichu",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Pikachu|keep hidden#161kvuo": {
-      "card": "Pikachu",
-      "name": "Keep Hidden",
-      "flags": [
-        "stack-bench:damagePrevention:Pikachu"
-      ]
-    },
-    "Pikachu|lonely gaze#kp99jz": {
-      "card": "Pikachu",
-      "name": "Lonely Gaze",
-      "flags": [
-        "stack-active:damageReduction:Pikachu"
-      ]
-    },
-    "Pikachu|pika dash#8wv9yv": {
-      "card": "Pikachu",
-      "name": "Pika Dash",
-      "flags": [
-        "stack-active:ownRetreat:Pikachu",
-        "stack-bench:ownRetreat:Pikachu"
-      ]
-    },
-    "Pineco|exoskeleton#106crg3": {
-      "card": "Pineco",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Pinsir|armor#1uxe8jl": {
-      "card": "Pinsir",
-      "name": "Armor",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Pinsir|crust#1cmcx91": {
-      "card": "Pinsir",
-      "name": "Crust",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Politoed|leap frog#fjbscs": {
@@ -4598,26 +1774,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Poliwrath|spiral#1hh9ekh": {
-      "card": "Poliwrath",
-      "name": "Spiral",
-      "flags": [
-        "stack-active:retreatLock:p2",
-        "stack-bench:retreatLock:p2"
-      ]
-    },
     "Poliwrath|strange spiral#1cof3tk": {
       "card": "Poliwrath",
       "name": "Strange Spiral",
       "flags": [
         "clause:status-opp"
-      ]
-    },
-    "Poltchageist|storehouse hideaway#m06wh8": {
-      "card": "Poltchageist",
-      "name": "Storehouse Hideaway",
-      "flags": [
-        "stack-bench:damagePrevention:Poltchageist"
       ]
     },
     "Porygon-Z-GX|troubleshooting#1usbfyd": {
@@ -4641,116 +1802,11 @@
         "clause:discard-self-energy"
       ]
     },
-    "Probopass|steel coating#se62i3": {
-      "card": "Probopass",
-      "name": "Steel Coating",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Psyduck|damp#1yvgw6m": {
-      "card": "Psyduck",
-      "name": "Damp",
-      "flags": [
-        "stack-active:suppressed:Psyduck",
-        "stack-bench:suppressed:Psyduck"
-      ]
-    },
-    "Pupitar|energy protection#1cqsn8g": {
-      "card": "Pupitar",
-      "name": "Energy Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Pyroar|flare command#1olvdu3": {
       "card": "Pyroar",
       "name": "Flare Command",
       "flags": [
         "clause:discard-self-energy"
-      ]
-    },
-    "Pyroar|intimidating fang#sv8sx7": {
-      "card": "Pyroar",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damageReduction:Pyroar"
-      ]
-    },
-    "Pyroar|scorching aura#1tq1phs": {
-      "card": "Pyroar",
-      "name": "Scorching Aura",
-      "flags": [
-        "stack-active:checkup:conditioned",
-        "stack-bench:checkup:conditioned"
-      ]
-    },
-    "Quagsire GL|submerge#1oe2m3c": {
-      "card": "Quagsire GL",
-      "name": "Submerge",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Quagsire|dense#dvpc55": {
-      "card": "Quagsire",
-      "name": "Dense",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Rabsca|spherical shield#m8h1nk": {
-      "card": "Rabsca",
-      "name": "Spherical Shield",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Radiant Hisuian Sneasler|poison peak#6hhmmd": {
-      "card": "Radiant Hisuian Sneasler",
-      "name": "Poison Peak",
-      "flags": [
-        "stack-active:checkup:conditioned",
-        "stack-bench:checkup:conditioned"
-      ]
-    },
-    "Raichu|electrical grounding#1oca4no": {
-      "card": "Raichu",
-      "name": "Electrical Grounding",
-      "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo"
-      ]
-    },
-    "Raikou|extreme speed#olo4km": {
-      "card": "Raikou",
-      "name": "Extreme Speed",
-      "flags": [
-        "stack-active:ownRetreat:Raikou"
       ]
     },
     "Raikou|thunder rumble#1kll7xt": {
@@ -4768,73 +1824,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Rapidash|wild guard#1v73npi": {
-      "card": "Rapidash",
-      "name": "Wild Guard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Rayquaza & Deoxys LEGEND|space virus#1i5q9l6": {
-      "card": "Rayquaza & Deoxys LEGEND",
-      "name": "Space Virus",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
     "Rayquaza-GX|stormy winds#12o9frg": {
       "card": "Rayquaza-GX",
       "name": "Stormy Winds",
       "flags": [
         "clause:attach-from-discard"
-      ]
-    },
-    "Rayquaza|dragon aura#s5gmua": {
-      "card": "Rayquaza",
-      "name": "Dragon Aura",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Rayquaza|ozone wall#82kxdr": {
-      "card": "Rayquaza",
-      "name": "Ozone Wall",
-      "flags": [
-        "stack-bench:damagePrevention:Rayquaza"
-      ]
-    },
-    "Regice ex|crystal body#tm7mz7": {
-      "card": "Regice ex",
-      "name": "Crystal Body",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Regice|icy barrier#4t3iax": {
-      "card": "Regice",
-      "name": "Icy Barrier",
-      "flags": [
-        "stack-active:playLock:p2:Probe Stadium"
       ]
     },
     "Regice|regi move#1evcoej": {
@@ -4852,14 +1846,6 @@
         "clause:mill-self"
       ]
     },
-    "Regieleki VMAX|transistor#q4gqmj": {
-      "card": "Regieleki VMAX",
-      "name": "Transistor",
-      "flags": [
-        "stack-active:damageBonus:Regieleki VMAX",
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
     "Regigigas LV.X|sacrifice#ukdtzs": {
       "card": "Regigigas LV.X",
       "name": "Sacrifice",
@@ -4867,42 +1853,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Regirock-EX|regi power#13x3pu0": {
-      "card": "Regirock-EX",
-      "name": "Regi Power",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
     "Regirock|regi cycle#itn9r6": {
       "card": "Regirock",
       "name": "Regi Cycle",
       "flags": [
         "clause:discard-own-hand"
-      ]
-    },
-    "Regirock|rock armor#1v2916n": {
-      "card": "Regirock",
-      "name": "Rock Armor",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Registeel ex|exoskeleton#16jqp78": {
-      "card": "Registeel ex",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Reshiram|turboblaze#1xk8lpg": {
@@ -4913,67 +1868,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Rhydon|power diffusion#9fqnew": {
-      "card": "Rhydon",
-      "name": "Power Diffusion",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Rhyperior|rock wall#i4sao4": {
-      "card": "Rhyperior",
-      "name": "Rock Wall",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Rhyperior|wide wall#496sj3": {
-      "card": "Rhyperior",
-      "name": "Wide Wall",
-      "flags": [
-        "stack-active:damagePrevention:Rhyperior",
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2"
-      ]
-    },
-    "Ribombee|mysterious buzz#1ksxcx5": {
-      "card": "Ribombee",
-      "name": "Mysterious Buzz",
-      "flags": [
-        "stack-bench:damagePrevention:Ribombee",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Rillaboom|voltage beat#b93yyo": {
       "card": "Rillaboom",
       "name": "Voltage Beat",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Rocket's Articuno ex|darkness veil#o78fzm": {
-      "card": "Rocket's Articuno ex",
-      "name": "Darkness Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Rocket's Persian ex|night cry#1e7yk85": {
@@ -4995,18 +1895,6 @@
       "name": "Dual Armor",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Rocket's Zapdos ex|darkness guard#6f415v": {
-      "card": "Rocket's Zapdos ex",
-      "name": "Darkness Guard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Roserade|energy signal#1t15j73": {
@@ -5031,54 +1919,11 @@
         "typography:typeWords:parse"
       ]
     },
-    "Salamence LV.X|double fall#482ypo": {
-      "card": "Salamence LV.X",
-      "name": "Double Fall",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
-      ]
-    },
-    "Salamence-GX|dragon lift#1utkeqm": {
-      "card": "Salamence-GX",
-      "name": "Dragon Lift",
-      "flags": [
-        "stack-bench:noRetreatForActive:p1"
-      ]
-    },
-    "Salamence|intimidating fang#1mu53w6": {
-      "card": "Salamence",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Samurott|torrential whirlpool#nw432i": {
       "card": "Samurott",
       "name": "Torrential Whirlpool",
       "flags": [
         "clause:gust"
-      ]
-    },
-    "Sandile|intimidating fang#zk2bfm": {
-      "card": "Sandile",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
       ]
     },
     "Sceptile|nurture and heal#1jh76lg": {
@@ -5088,42 +1933,6 @@
         "clause:attach-from-hand",
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Sceptile|power of nature#abclmz": {
-      "card": "Sceptile",
-      "name": "Power of Nature",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Scizor|honeycomb defender#8zpt0v": {
-      "card": "Scizor",
-      "name": "Honeycomb Defender",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Scizor|red armor#10dndtk": {
-      "card": "Scizor",
-      "name": "Red Armor",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Scovillain ex|double type#1aur89y": {
@@ -5140,113 +1949,12 @@
         "typography:typeWords:parse"
       ]
     },
-    "Scyther|leaf ride#tnhs8j": {
-      "card": "Scyther",
-      "name": "Leaf Ride",
-      "flags": [
-        "stack-active:ownRetreat:Scyther",
-        "stack-bench:ownRetreat:Scyther"
-      ]
-    },
-    "Serperior ex|regal cheer#51azif": {
-      "card": "Serperior ex",
-      "name": "Regal Cheer",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Serperior|royal garden#t33evd": {
-      "card": "Serperior",
-      "name": "Royal Garden",
-      "flags": [
-        "stack-active:ownRetreat:Serperior",
-        "stack-bench:ownRetreat:Serperior"
-      ]
-    },
     "Shadow Rider Calyrex VMAX|underworld door#vh5428": {
       "card": "Shadow Rider Calyrex VMAX",
       "name": "Underworld Door",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Shaymin LV.X|thankfulness#12namo8": {
-      "card": "Shaymin LV.X",
-      "name": "Thankfulness",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Shaymin|flower curtain#12b3ruk": {
-      "card": "Shaymin",
-      "name": "Flower Curtain",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Shedinja|marvel shell#2izkkn": {
-      "card": "Shedinja",
-      "name": "Marvel Shell",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Shelgon|exoskeleton#1o30527": {
-      "card": "Shelgon",
-      "name": "Exoskeleton",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Shelgon|hard protection#19th1yz": {
-      "card": "Shelgon",
-      "name": "Hard Protection",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Shining Arceus|fabled defense#e3d3qd": {
-      "card": "Shining Arceus",
-      "name": "Fabled Defense",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Shining Ho-Oh|golden wing#18ngv8v": {
-      "card": "Shining Ho-Oh",
-      "name": "Golden Wing",
-      "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo"
       ]
     },
     "Shinx|big roar#hbsgm0": {
@@ -5256,93 +1964,11 @@
         "clause:gust"
       ]
     },
-    "Shuckle|hard shell#qbr957": {
-      "card": "Shuckle",
-      "name": "Hard Shell",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Shuckle|shell barricade#1equd5j": {
-      "card": "Shuckle",
-      "name": "Shell Barricade",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Shuckle|vase body#107r2o": {
-      "card": "Shuckle",
-      "name": "Vase Body",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Silcoon|hard cocoon#q6ft6j": {
-      "card": "Silcoon",
-      "name": "Hard Cocoon",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Silcoon|multiplying cocoon#ihxemn": {
       "card": "Silcoon",
       "name": "Multiplying Cocoon",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Silvally-GX|gyro unit#1q0pljb": {
-      "card": "Silvally-GX",
-      "name": "Gyro Unit",
-      "flags": [
-        "stack-active:noRetreatForActive:p1",
-        "stack-bench:noRetreatForActive:p1"
-      ]
-    },
-    "Skiploom|cotton balloon#x8mf8n": {
-      "card": "Skiploom",
-      "name": "Cotton Balloon",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Skiploom|lightweight#1f1l2si": {
-      "card": "Skiploom",
-      "name": "Lightweight",
-      "flags": [
-        "stack-active:ownRetreat:Skiploom",
-        "stack-bench:ownRetreat:Skiploom"
       ]
     },
     "Skiploom|solar evolution#1bm2lmf": {
@@ -5352,111 +1978,11 @@
         "clause:attach-from-hand"
       ]
     },
-    "Slaking|lazy#1aqvmoy": {
-      "card": "Slaking",
-      "name": "Lazy",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2"
-      ]
-    },
-    "Slowbro|dense body#m2pse2": {
-      "card": "Slowbro",
-      "name": "Dense Body",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Slowbro|dual armor#f93p78": {
       "card": "Slowbro",
       "name": "Dual Armor",
       "flags": [
         "typography:typeWords:parse"
-      ]
-    },
-    "Slowpoke|dense#1sqtx6b": {
-      "card": "Slowpoke",
-      "name": "Dense",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Smoochum|sweet sleeping face#1rwstjz": {
-      "card": "Smoochum",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Snorlax|bad sleeping habits#11k49cr": {
-      "card": "Snorlax",
-      "name": "Bad Sleeping Habits",
-      "flags": [
-        "stack-active:retreatLock:p2",
-        "stack-bench:retreatLock:p2"
-      ]
-    },
-    "Snorlax|block#1fq2ny9": {
-      "card": "Snorlax",
-      "name": "Block",
-      "flags": [
-        "stack-active:retreatLock:p2"
-      ]
-    },
-    "Snorlax|block#1tc2yyh": {
-      "card": "Snorlax",
-      "name": "Block",
-      "flags": [
-        "stack-active:retreatLock:p2"
-      ]
-    },
-    "Snorlax|guard#4ywzds": {
-      "card": "Snorlax",
-      "name": "Guard",
-      "flags": [
-        "stack-active:retreatLock:p2",
-        "stack-bench:retreatLock:p2"
-      ]
-    },
-    "Solgaleo-GX|shining mane#1ie3ehu": {
-      "card": "Solgaleo-GX",
-      "name": "Shining Mane",
-      "flags": [
-        "stack-active:weakness:p1Bench0",
-        "stack-active:weakness:p1Bench1",
-        "stack-active:weakness:p1Bench2",
-        "stack-bench:weakness:p1Active",
-        "stack-bench:weakness:p1Bench1",
-        "stack-bench:weakness:p1Bench2"
-      ]
-    },
-    "Solgaleo|armor of the sunne#fqimhy": {
-      "card": "Solgaleo",
-      "name": "Armor of the Sunne",
-      "flags": [
-        "stack-active:damageReduction:Lunala",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:Lunala",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench2"
       ]
     },
     "Solgaleo|sunrise#9z6zmr": {
@@ -5474,99 +2000,6 @@
         "typography:typeWords:parse"
       ]
     },
-    "Spidops ex|trap territory#1fmqdde": {
-      "card": "Spidops ex",
-      "name": "Trap Territory",
-      "flags": [
-        "stack-active:opp:retreat:p2Active",
-        "stack-bench:opp:retreat:p2Active"
-      ]
-    },
-    "Spiritomb|cursed whirlpool#m1wdpw": {
-      "card": "Spiritomb",
-      "name": "Cursed Whirlpool",
-      "flags": [
-        "stack-active:retreatLock:p2"
-      ]
-    },
-    "Spiritomb|fettered in misfortune#1kziuuo": {
-      "card": "Spiritomb",
-      "name": "Fettered in Misfortune",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:Spiritomb",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2",
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:Spiritomb",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
-      ]
-    },
-    "Spiritomb|sealing scream#1klyotd": {
-      "card": "Spiritomb",
-      "name": "Sealing Scream",
-      "flags": [
-        "stack-active:playLock:p1:Probe ACE",
-        "stack-active:playLock:p2:Probe ACE",
-        "stack-bench:playLock:p1:Probe ACE",
-        "stack-bench:playLock:p2:Probe ACE"
-      ]
-    },
-    "Squirtle|solid shell#1h43kgm": {
-      "card": "Squirtle",
-      "name": "Solid Shell",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Stakataka-GX|ultra wall#kaczvi": {
-      "card": "Stakataka-GX",
-      "name": "Ultra Wall",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Staraptor|protect wing#tjdkrq": {
-      "card": "Staraptor",
-      "name": "Protect Wing",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Starmie|core guard#10j98sq": {
-      "card": "Starmie",
-      "name": "Core Guard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Starmie|metal navigation#14ae51z": {
       "card": "Starmie",
       "name": "Metal Navigation",
@@ -5576,113 +2009,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Staryu|core guard#1phn7j8": {
-      "card": "Staryu",
-      "name": "Core Guard",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Steven's Carbink|stone palace#n3i4hx": {
-      "card": "Steven's Carbink",
-      "name": "Stone Palace",
-      "flags": [
-        "stack-bench:damageReduction:Steven's Carbink",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
     "Steven's Metagross ex|x-boot#u7ihq5": {
       "card": "Steven's Metagross ex",
       "name": "X-Boot",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Stoutland|intimidating fang#wf4gun": {
-      "card": "Stoutland",
-      "name": "Intimidating Fang",
-      "flags": [
-        "stack-active:damageReduction:Stoutland",
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2"
-      ]
-    },
-    "Stoutland|sentinel#e2effq": {
-      "card": "Stoutland",
-      "name": "Sentinel",
-      "flags": [
-        "stack-active:playLock:p2:Probe Supporter"
-      ]
-    },
-    "Suicune ex|aqua lift#87fcoa": {
-      "card": "Suicune ex",
-      "name": "Aqua Lift",
-      "flags": [
-        "stack-active:ownRetreat:Suicune ex"
-      ]
-    },
-    "Suicune|crystal body#1ol5fi2": {
-      "card": "Suicune",
-      "name": "Crystal Body",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Suicune|extreme speed#1abdi0b": {
-      "card": "Suicune",
-      "name": "Extreme Speed",
-      "flags": [
-        "stack-active:ownRetreat:Suicune"
-      ]
-    },
-    "Suicune|wind charm#1iqkmlt": {
-      "card": "Suicune",
-      "name": "Wind Charm",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Swablu|feathery#xm70wk": {
-      "card": "Swablu",
-      "name": "Feathery",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Swablu|fluff#15b5daw": {
-      "card": "Swablu",
-      "name": "Fluff",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Swampert|muddy maker#1pecz9d": {
@@ -5700,36 +2032,12 @@
         "clause:attach-from-hand"
       ]
     },
-    "Swampert|root protector#urvtgs": {
-      "card": "Swampert",
-      "name": "Root Protector",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Swampert|water call#qs61c": {
       "card": "Swampert",
       "name": "Water Call",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Swellow|δ plus#1ujvtnt": {
-      "card": "Swellow",
-      "name": "Δ Plus",
-      "flags": [
-        "stack-active:prize:p1Bench0",
-        "stack-active:prize:p1Bench1",
-        "stack-active:prize:p1Bench2",
-        "stack-bench:prize:p1Active",
-        "stack-bench:prize:p1Bench1",
-        "stack-bench:prize:p1Bench2"
       ]
     },
     "Tapu Koko Prism Star|dance of the ancients#70y180": {
@@ -5754,128 +2062,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Team Aqua's Muk|sludge festival#1or95zi": {
-      "card": "Team Aqua's Muk",
-      "name": "Sludge Festival",
-      "flags": [
-        "stack-active:opp:retreat:p2Active",
-        "stack-active:opp:retreat:p2Bench0",
-        "stack-active:opp:retreat:p2Bench1",
-        "stack-active:opp:retreat:p2Bench2",
-        "stack-active:retreat:p1Bench0",
-        "stack-active:retreat:p1Bench1",
-        "stack-active:retreat:p1Bench2",
-        "stack-bench:opp:retreat:p2Active",
-        "stack-bench:opp:retreat:p2Bench0",
-        "stack-bench:opp:retreat:p2Bench1",
-        "stack-bench:opp:retreat:p2Bench2",
-        "stack-bench:retreat:p1Active",
-        "stack-bench:retreat:p1Bench1",
-        "stack-bench:retreat:p1Bench2"
-      ]
-    },
     "Team Magma's Camerupt|burning draft#pb1mbz": {
       "card": "Team Magma's Camerupt",
       "name": "Burning Draft",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Team Rocket's Ampharos|darkest impulse#2iwd66": {
-      "card": "Team Rocket's Ampharos",
-      "name": "Darkest Impulse",
-      "flags": [
-        "stack-active:onOpponentEvolve",
-        "stack-bench:onOpponentEvolve"
-      ]
-    },
-    "Team Rocket's Arbok|potent glare#163hrf7": {
-      "card": "Team Rocket's Arbok",
-      "name": "Potent Glare",
-      "flags": [
-        "stack-active:playLock:p2:Probe Ability Mon"
-      ]
-    },
-    "Team Rocket's Articuno|repelling veil#ouauht": {
-      "card": "Team Rocket's Articuno",
-      "name": "Repelling Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Team Rocket's Tyranitar|sand stream#2aktpm": {
-      "card": "Team Rocket's Tyranitar",
-      "name": "Sand Stream",
-      "flags": [
-        "stack-active:checkup",
-        "stack-active:checkup:conditioned"
-      ]
-    },
-    "Thievul|baffling#1o8r7ex": {
-      "card": "Thievul",
-      "name": "Baffling",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Thundurus|adverse weather#10inu96": {
-      "card": "Thundurus",
-      "name": "Adverse Weather",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2"
-      ]
-    },
-    "Ting-Lu ex|cursed land#1ljz615": {
-      "card": "Ting-Lu ex",
-      "name": "Cursed Land",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2"
-      ]
-    },
-    "Toedscruel ex|protective mycelium#1rtaq57": {
-      "card": "Toedscruel ex",
-      "name": "Protective Mycelium",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Toedscruel|secret forest path#100e6dg": {
-      "card": "Toedscruel",
-      "name": "Secret Forest Path",
-      "flags": [
-        "stack-bench:retreat:p1Active"
-      ]
-    },
-    "Togekiss|bright veil#5g66w7": {
-      "card": "Togekiss",
-      "name": "Bright Veil",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Togekiss|serene grace#13bvhyh": {
@@ -5892,54 +2084,11 @@
         "clause:attach-from-deck"
       ]
     },
-    "Togetic|holy shield#1o3n8el": {
-      "card": "Togetic",
-      "name": "Holy Shield",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Torkoal|hot snort#hk1mkh": {
       "card": "Torkoal",
       "name": "Hot Snort",
       "flags": [
         "clause:status-opp"
-      ]
-    },
-    "Torkoal|white smoke#1tnlwz1": {
-      "card": "Torkoal",
-      "name": "White Smoke",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Toxicroak G|anticipation#1fl058m": {
-      "card": "Toxicroak G",
-      "name": "Anticipation",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Toxicroak|more poison#17ss15t": {
-      "card": "Toxicroak",
-      "name": "More Poison",
-      "flags": [
-        "stack-active:checkup:conditioned",
-        "stack-bench:checkup:conditioned"
       ]
     },
     "Toxtricity|sinister surge#1v17ing": {
@@ -5950,35 +2099,11 @@
         "typography:typeWords:plan"
       ]
     },
-    "Trevenant|forest miasma#1dmuwph": {
-      "card": "Trevenant",
-      "name": "Forest Miasma",
-      "flags": [
-        "stack-active:checkup",
-        "stack-active:checkup:conditioned"
-      ]
-    },
-    "Trevenant|forest's curse#519tdo": {
-      "card": "Trevenant",
-      "name": "Forest's Curse",
-      "flags": [
-        "stack-active:playLock:p2:Probe ACE",
-        "stack-active:playLock:p2:Probe Item"
-      ]
-    },
     "Trumbeak|mountain pass#1m8hwtj": {
       "card": "Trumbeak",
       "name": "Mountain Pass",
       "flags": [
         "clause:lost-zone"
-      ]
-    },
-    "Tynamo|levitate#rgdoy8": {
-      "card": "Tynamo",
-      "name": "Levitate",
-      "flags": [
-        "stack-active:ownRetreat:Tynamo",
-        "stack-bench:ownRetreat:Tynamo"
       ]
     },
     "Typhlosion ex|bursting up#3pvztl": {
@@ -6013,38 +2138,6 @@
         "typography:typeWords:plan"
       ]
     },
-    "Tyranitar|daunting gaze#14gy3ho": {
-      "card": "Tyranitar",
-      "name": "Daunting Gaze",
-      "flags": [
-        "stack-active:playLock:p2:Probe ACE",
-        "stack-active:playLock:p2:Probe Item"
-      ]
-    },
-    "Tyrogue|sweet sleeping face#1zcycn": {
-      "card": "Tyrogue",
-      "name": "Sweet Sleeping Face",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Umbreon|dark shade#uv39f7": {
-      "card": "Umbreon",
-      "name": "Dark Shade",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
     "Unown ?|?#7bbknf": {
       "card": "Unown ?",
       "name": "?",
@@ -6066,18 +2159,6 @@
         "clause:search-to-bench"
       ]
     },
-    "Unown E|equip#1lphx0i": {
-      "card": "Unown E",
-      "name": "EQUIP",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
     "Unown F|[find]#1nfgh76": {
       "card": "Unown F",
       "name": "[Find]",
@@ -6097,18 +2178,6 @@
       "name": "[Give]",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Unown G|guard#1wau8qy": {
-      "card": "Unown G",
-      "name": "GUARD",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Unown I|item#8f2yt0": {
@@ -6161,35 +2230,11 @@
         "clause:search-to-bench"
       ]
     },
-    "Unown U|unseen#4zn4sn": {
-      "card": "Unown U",
-      "name": "UNSEEN",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Unown W|[want]#11lyk1h": {
       "card": "Unown W",
       "name": "[Want]",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Unown W|wall#u5wgun": {
-      "card": "Unown W",
-      "name": "WALL",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Unown X|x-ray#1yf9ubx": {
@@ -6229,93 +2274,11 @@
         "clause:gust"
       ]
     },
-    "Vaporeon|torrential awakening#ec46iw": {
-      "card": "Vaporeon",
-      "name": "Torrential Awakening",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2",
-        "stack-active:suppressed:Vaporeon",
-        "stack-active:suppressed:p1Bench0",
-        "stack-active:suppressed:p1Bench1",
-        "stack-active:suppressed:p1Bench2",
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench1",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:Vaporeon",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
-      ]
-    },
-    "Vaporeon|vitality cheer#3hofxs": {
-      "card": "Vaporeon",
-      "name": "Vitality Cheer",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Vaporeon|watery shroud#6vu4rd": {
-      "card": "Vaporeon",
-      "name": "Watery Shroud",
-      "flags": [
-        "stack-bench:damagePrevention:Vaporeon"
-      ]
-    },
     "Veluza|fillet memento#ig4jfz": {
       "card": "Veluza",
       "name": "Fillet Memento",
       "flags": [
-        "stack-active:onKo",
-        "stack-bench:onKo",
         "typography:typeWords:parse"
-      ]
-    },
-    "Venomoth|protective dust#d3y4x2": {
-      "card": "Venomoth",
-      "name": "Protective Dust",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Vespiquen|defense sign#1nfpcgw": {
-      "card": "Vespiquen",
-      "name": "Defense Sign",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Vibrava|levitate#14wz2ge": {
-      "card": "Vibrava",
-      "name": "Levitate",
-      "flags": [
-        "stack-active:ownRetreat:Vibrava",
-        "stack-bench:ownRetreat:Vibrava"
-      ]
-    },
-    "Victreebel|tangling tendrils#r9pkwa": {
-      "card": "Victreebel",
-      "name": "Tangling Tendrils",
-      "flags": [
-        "stack-active:opp:retreat:p2Active"
       ]
     },
     "Victreebel|wafting scent#nxte1n": {
@@ -6333,34 +2296,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Vileplume ex|block dust#7nxtq1": {
-      "card": "Vileplume ex",
-      "name": "Block Dust",
-      "flags": [
-        "stack-active:playLock:p2:Probe Supporter",
-        "stack-bench:playLock:p2:Probe Supporter"
-      ]
-    },
     "Vileplume|energy reaction#16o3gug": {
       "card": "Vileplume",
       "name": "Energy Reaction",
       "flags": [
         "clause:attach-from-hand",
         "clause:status-opp"
-      ]
-    },
-    "Vileplume|irritating pollen#ghzuin": {
-      "card": "Vileplume",
-      "name": "Irritating Pollen",
-      "flags": [
-        "stack-active:playLock:p1:Probe ACE",
-        "stack-active:playLock:p1:Probe Item",
-        "stack-active:playLock:p2:Probe ACE",
-        "stack-active:playLock:p2:Probe Item",
-        "stack-bench:playLock:p1:Probe ACE",
-        "stack-bench:playLock:p1:Probe Item",
-        "stack-bench:playLock:p2:Probe ACE",
-        "stack-bench:playLock:p2:Probe Item"
       ]
     },
     "Vileplume|poison pollen#8q0wk9": {
@@ -6392,22 +2333,6 @@
         "typography:typeWords:plan"
       ]
     },
-    "Voltorb|floating electrons#14eaws3": {
-      "card": "Voltorb",
-      "name": "Floating Electrons",
-      "flags": [
-        "stack-active:ownRetreat:Voltorb",
-        "stack-bench:ownRetreat:Voltorb"
-      ]
-    },
-    "Voltorb|floating electrons#pv18gx": {
-      "card": "Voltorb",
-      "name": "Floating Electrons",
-      "flags": [
-        "stack-active:ownRetreat:Voltorb",
-        "stack-bench:ownRetreat:Voltorb"
-      ]
-    },
     "Walrein|gather ice#qnpe7h": {
       "card": "Walrein",
       "name": "Gather Ice",
@@ -6430,129 +2355,11 @@
         "typography:typeWords:parse"
       ]
     },
-    "Weezing|levitate#1lkqqqm": {
-      "card": "Weezing",
-      "name": "Levitate",
-      "flags": [
-        "stack-active:ownRetreat:Weezing",
-        "stack-bench:ownRetreat:Weezing"
-      ]
-    },
-    "Whiscash|submerge#157q45c": {
-      "card": "Whiscash",
-      "name": "Submerge",
-      "flags": [
-        "stack-bench:damagePrevention:Whiscash"
-      ]
-    },
-    "Whiscash|submerge#1cx8ho5": {
-      "card": "Whiscash",
-      "name": "Submerge",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
     "Wigglytuff|good neighbor#u4duwr": {
       "card": "Wigglytuff",
       "name": "Good Neighbor",
       "flags": [
         "clause:search-to-bench"
-      ]
-    },
-    "Wishiwashi|meet up#mtw6j9": {
-      "card": "Wishiwashi",
-      "name": "Meet Up",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Wobbuffet|bide barricade#tmhuok": {
-      "card": "Wobbuffet",
-      "name": "Bide Barricade",
-      "flags": [
-        "stack-active:opp:suppressed:p2Active",
-        "stack-active:opp:suppressed:p2Bench0",
-        "stack-active:opp:suppressed:p2Bench1",
-        "stack-active:opp:suppressed:p2Bench2"
-      ]
-    },
-    "Wobbuffet|shady tail#brq0c4": {
-      "card": "Wobbuffet",
-      "name": "Shady Tail",
-      "flags": [
-        "stack-bench:opp:suppressed:p2Active",
-        "stack-bench:opp:suppressed:p2Bench0",
-        "stack-bench:opp:suppressed:p2Bench1",
-        "stack-bench:opp:suppressed:p2Bench2",
-        "stack-bench:suppressed:Wobbuffet",
-        "stack-bench:suppressed:p1Active",
-        "stack-bench:suppressed:p1Bench1",
-        "stack-bench:suppressed:p1Bench2"
-      ]
-    },
-    "Wobbuffet|tenacious bind#1ve65uo": {
-      "card": "Wobbuffet",
-      "name": "Tenacious Bind",
-      "flags": [
-        "stack-active:opp:retreat:p2Active"
-      ]
-    },
-    "Wormadam Plant Cloak|plant cloak#u4tzvj": {
-      "card": "Wormadam Plant Cloak",
-      "name": "Plant Cloak",
-      "flags": [
-        "stack-active:hp:p1Bench0",
-        "stack-active:hp:p1Bench1",
-        "stack-active:hp:p1Bench2",
-        "stack-bench:hp:p1Active",
-        "stack-bench:hp:p1Bench1",
-        "stack-bench:hp:p1Bench2"
-      ]
-    },
-    "Wormadam Sandy Cloak|sandy cloak#7g4y2k": {
-      "card": "Wormadam Sandy Cloak",
-      "name": "Sandy Cloak",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Wormadam Sandy Cloak|sandy cloak#x4nhc2": {
-      "card": "Wormadam Sandy Cloak",
-      "name": "Sandy Cloak",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
-      ]
-    },
-    "Wormadam Trash Cloak|trash cloak#1lp9bt2": {
-      "card": "Wormadam Trash Cloak",
-      "name": "Trash Cloak",
-      "flags": [
-        "stack-active:damagePrevention:p1Bench0",
-        "stack-active:damagePrevention:p1Bench1",
-        "stack-active:damagePrevention:p1Bench2",
-        "stack-bench:damagePrevention:p1Active",
-        "stack-bench:damagePrevention:p1Bench1",
-        "stack-bench:damagePrevention:p1Bench2"
       ]
     },
     "Xatu|clairvoyant sense#1cqeqyg": {
@@ -6586,57 +2393,12 @@
         "typography:typeWords:plan"
       ]
     },
-    "Zamazenta VSTAR|shield star#lphham": {
-      "card": "Zamazenta VSTAR",
-      "name": "Shield Star",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Zamazenta|metal shield#1xwulgd": {
-      "card": "Zamazenta",
-      "name": "Metal Shield",
-      "flags": [
-        "stack-active:damageReduction:p1Bench0",
-        "stack-active:damageReduction:p1Bench1",
-        "stack-active:damageReduction:p1Bench2",
-        "stack-bench:damageReduction:p1Active",
-        "stack-bench:damageReduction:p1Bench1",
-        "stack-bench:damageReduction:p1Bench2"
-      ]
-    },
-    "Zapdos ex|voltaic float#3kawew": {
-      "card": "Zapdos ex",
-      "name": "Voltaic Float",
-      "flags": [
-        "stack-active:ownRetreat:Zapdos ex"
-      ]
-    },
     "Zapdos|flash-pop flapping#1qaqx5x": {
       "card": "Zapdos",
       "name": "Flash-Pop Flapping",
       "flags": [
         "typography:typeWords:parse",
         "typography:typeWords:plan"
-      ]
-    },
-    "Zapdos|lightning symbol#r1kd9o": {
-      "card": "Zapdos",
-      "name": "Lightning Symbol",
-      "flags": [
-        "stack-bench:damageBonus:p1Active"
-      ]
-    },
-    "Zoroark|nighttime byway#1fdyd8f": {
-      "card": "Zoroark",
-      "name": "Nighttime Byway",
-      "flags": [
-        "stack-bench:retreat:p1Active"
       ]
     }
   }

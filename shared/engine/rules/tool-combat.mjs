@@ -493,7 +493,7 @@ export function combinedToolRetreatCost(
           ? pokemon.damage
           : (parseInt(pokemon?.image?.damageCounter?.textContent || '0', 10) ||
               0) * 10;
-      const hp = pokemon?.hp || 0;
+      const hp = holder?.hp || 0;
       if (hp > 0 && hp - dmg <= 30) cost = 0;
     }
   }
