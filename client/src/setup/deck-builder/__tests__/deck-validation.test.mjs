@@ -8,6 +8,7 @@ import {
   officialCardName,
   validateDeck,
 } from '../core/deck-validation.mjs';
+import { BUILD_BATTLE_DECKS } from '../core/build-battle/build-battle.generated.mjs';
 
 function makeGroup({ name, count, supertype = 'Pokémon', pocket = false, extra = {} }) {
   const image = pocket
@@ -407,4 +408,70 @@ test('a printed one-per-deck Special Energy cap beats the format copy limit', ()
 
   const result = validateDeck(deck, DECK_FORMATS.TCG);
   assert.ok(result.errors.some((e) => e.includes('Miracle Energy has 2 copies (max 1).')));
+});
+
+// ── Build & Battle (design 051): 40 cards, Standard copy rule, Basic Energy exempt ──
+
+function deckFromBoxRows(rows) {
+  const deck = {};
+  for (const { qty, ...card } of rows) {
+    deck[card.name] ??= { cards: [], totalCount: 0 };
+    deck[card.name].cards.push({ data: card, count: qty });
+    deck[card.name].totalCount += qty;
+  }
+  return deck;
+}
+
+function withCount(deck, name, delta) {
+  const next = structuredClone(deck);
+  next[name].cards.at(-1).count += delta;
+  next[name].totalCount += delta;
+  return next;
+}
+
+const ceruledgeDeck = deckFromBoxRows(BUILD_BATTLE_DECKS['phantasmal-flames'].ceruledge);
+
+test('the Ceruledge box deck is a legal 40-card Build & Battle deck (promo + set print share 4 copies)', () => {
+  const result = validateDeck(ceruledgeDeck, DECK_FORMATS.BUILD_BATTLE);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.isValid, true);
+  assert.equal(result.totalCards, 40);
+  assert.equal(result.requiredCards, 40);
+  assert.equal(result.formatName, 'Build & Battle');
+  assert.equal(result.selectedFormat, 'build-battle');
+  assert.equal(ceruledgeDeck['Basic Fire Energy'].totalCount, 16);
+});
+
+test('Build & Battle wants exactly 40: 39 and 41 fail with the counter total', () => {
+  const short = validateDeck(withCount(ceruledgeDeck, 'Basic Fire Energy', -1), DECK_FORMATS.BUILD_BATTLE);
+  assert.equal(short.isValid, false);
+  assert.equal(short.totalCards, 39);
+  assert.deepEqual(short.errors, ['Deck must contain exactly 40 cards. Current total: 39.']);
+  const long = validateDeck(withCount(ceruledgeDeck, 'Basic Fire Energy', 1), DECK_FORMATS.BUILD_BATTLE);
+  assert.equal(long.totalCards, 41);
+  assert.deepEqual(long.errors, ['Deck must contain exactly 40 cards. Current total: 41.']);
+});
+
+test('Build & Battle counts copies across the promo and the set print (5 Ceruledge)', () => {
+  const deck = withCount(withCount(ceruledgeDeck, 'Ceruledge', 1), 'Basic Fire Energy', -1);
+  const result = validateDeck(deck, DECK_FORMATS.BUILD_BATTLE);
+  assert.equal(result.totalCards, 40);
+  assert.deepEqual(result.errors, ['Ceruledge has 5 copies (max 4).']);
+});
+
+test('Build & Battle still requires a Basic Pokémon', () => {
+  const deck = structuredClone(ceruledgeDeck);
+  deck['Basic Fire Energy'].cards[0].count += deck.Charcadet.totalCount + deck.Moltres.totalCount;
+  deck['Basic Fire Energy'].totalCount += deck.Charcadet.totalCount + deck.Moltres.totalCount;
+  delete deck.Charcadet;
+  delete deck.Moltres;
+  const result = validateDeck(deck, DECK_FORMATS.BUILD_BATTLE);
+  assert.equal(result.totalCards, 40);
+  assert.deepEqual(result.errors, ['Deck must contain at least one Basic Pokémon.']);
+});
+
+test('Build & Battle refuses Pocket cards like TCG does', () => {
+  const deck = buildDeck([makeGroup({ name: 'Pikachu', count: 40, pocket: true })]);
+  const result = validateDeck(deck, DECK_FORMATS.BUILD_BATTLE);
+  assert.ok(result.errors.includes('Build & Battle format selected, but deck contains Pocket cards.'));
 });

@@ -7,6 +7,8 @@ import test from 'node:test';
       renameDeckInLibrary,
       deleteDeckFromLibrary,
       getDeckFromLibrary,
+      getDeckFormat,
+      saveDeckSnapshot,
       saveDeckToLibrary,
       setDeckSprites,
       listDecks,
@@ -282,6 +284,7 @@ test('listDecks exposes sprites, cards and wallpaper so the deck chips can draw 
       sprites: [{ slug: 'pikachu', shiny: false }],
       cards: {},
       wallpaperId: 'cave',
+      format: 'tcg',
     },
   ]);
 });
@@ -301,4 +304,52 @@ test('wallpaper round-trips through serialize and parse', () => {
     wallpaperId: 'volcano',
   });
   assert.equal(parseLibrary(serializeLibrary(library)).decks[deckId].wallpaperId, 'volcano');
+});
+
+// ── Deck format (design 051) ──
+
+test('a new deck is Standard unless created as Build & Battle', () => {
+  const standard = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000);
+  assert.equal(standard.library.decks[standard.deckId].format, 'tcg');
+  assert.equal(getDeckFormat(standard.library, standard.deckId), 'tcg');
+
+  const boxDeck = createDeckInLibrary(standard.library, 'B&B Ceruledge #42', {}, 1000, {
+    format: 'build-battle',
+  });
+  assert.equal(getDeckFormat(boxDeck.library, boxDeck.deckId), 'build-battle');
+  assert.equal(listDecks(boxDeck.library)[1].format, 'build-battle');
+  assert.equal(getDeckFormat(boxDeck.library, 'missing'), null);
+
+  const unknown = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000, { format: 'pocket' });
+  assert.equal(getDeckFormat(unknown.library, unknown.deckId), 'tcg');
+});
+
+test('the format survives serialize/parse; legacy or bad values read as Standard', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000, {
+    format: 'build-battle',
+  });
+  assert.equal(parseLibrary(serializeLibrary(library)).decks[deckId].format, 'build-battle');
+
+  const legacy = JSON.stringify({
+    decks: {
+      abc12345: { id: 'abc12345', name: 'Old', cards: {} },
+      bad00000: { id: 'bad00000', name: 'Bad', cards: {}, format: { evil: true } },
+    },
+    order: ['abc12345', 'bad00000'],
+  });
+  const parsed = parseLibrary(legacy);
+  assert.equal(parsed.decks.abc12345.format, 'tcg');
+  assert.equal(parsed.decks.bad00000.format, 'tcg');
+});
+
+test('saving over a Build & Battle deck keeps its format; a created snapshot takes the given one', () => {
+  const { library, deckId } = createDeckInLibrary(createEmptyLibrary(), 'Deck', {}, 1000, {
+    format: 'build-battle',
+  });
+  const saved = saveDeckSnapshot(library, { deckId, cards: makeCards() }, 2000);
+  assert.equal(getDeckFormat(saved.library, deckId), 'build-battle');
+
+  const created = saveDeckSnapshot(createEmptyLibrary(), { name: 'New', format: 'build-battle' }, 2000);
+  assert.equal(created.created, true);
+  assert.equal(getDeckFormat(created.library, created.deckId), 'build-battle');
 });

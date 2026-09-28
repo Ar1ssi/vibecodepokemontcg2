@@ -4,8 +4,12 @@ import assert from 'node:assert/strict';
 import {
   BUILDER_MESSAGE_SOURCE,
   BUILDER_WINDOW_PATH,
+  BUILD_BATTLE_WINDOW_NAME,
+  BUILD_BATTLE_WINDOW_PATH,
+  DECK_FORMAT_VALUES,
   buildBuilderMessage,
   parseBuilderMessage,
+  resolveBuilderMode,
   resolveBuilderRole,
 } from '../core/builder-window.mjs';
 
@@ -24,7 +28,7 @@ test('a built message round-trips through the parser', () => {
   assert.equal(message.source, BUILDER_MESSAGE_SOURCE);
   assert.deepEqual(parseBuilderMessage(message), {
     type: 'load-deck',
-    payload: { target: 'self', deckId: 'deck-1', rows: [ROW] },
+    payload: { target: 'self', deckId: 'deck-1', rows: [ROW], format: 'tcg' },
   });
 });
 
@@ -88,4 +92,27 @@ test('deck rows must be short arrays of plain cells', () => {
   assert.equal(load([[...ROW, 'extra']]), null);
   assert.equal(load([['4', { name: 'x' }, 'Pokémon', 'u']]), null);
   assert.equal(load(Array.from({ length: 501 }, () => ROW)), null);
+});
+
+test('the Build & Battle path is an editor tab in build-battle mode', () => {
+  assert.equal(BUILD_BATTLE_WINDOW_NAME, 'ptcgBuildBattle');
+  assert.equal(resolveBuilderRole(BUILD_BATTLE_WINDOW_PATH), 'editor');
+  assert.equal(resolveBuilderRole('/build-and-battle/'), 'editor');
+  assert.equal(resolveBuilderMode('/build-and-battle'), 'build-battle');
+  assert.equal(resolveBuilderMode('/build-and-battle/'), 'build-battle');
+  assert.equal(resolveBuilderMode(BUILDER_WINDOW_PATH), 'standard');
+  assert.equal(resolveBuilderMode('/'), 'standard');
+  assert.equal(resolveBuilderMode(undefined), 'standard');
+});
+
+test('load-deck format: missing and tcg are Standard, build-battle passes, anything else is refused', () => {
+  const load = (extra) =>
+    parseBuilderMessage(buildBuilderMessage('load-deck', { target: 'self', deckId: null, rows: [ROW], ...extra }));
+  assert.deepEqual(DECK_FORMAT_VALUES, ['tcg', 'build-battle']);
+  assert.equal(load({}).payload.format, 'tcg');
+  assert.equal(load({ format: 'tcg' }).payload.format, 'tcg');
+  assert.equal(load({ format: 'build-battle' }).payload.format, 'build-battle');
+  assert.equal(load({ format: 'pocket' }), null);
+  assert.equal(load({ format: null }), null);
+  assert.equal(load({ format: 4 }), null);
 });

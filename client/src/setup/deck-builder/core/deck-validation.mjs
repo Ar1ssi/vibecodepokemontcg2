@@ -17,10 +17,12 @@ import {
   isRadiantCard,
 } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { specialEnergyDeckLimit } from '../../../../../shared/engine/rules/special-energy-parse.mjs';
+import { DECK_FORMAT_BUILD_BATTLE, DECK_FORMAT_TCG } from '../../../../../shared/engine/formats.mjs';
 
 export const DECK_FORMATS = {
   POCKET: 'pocket',
-  TCG: 'tcg',
+  TCG: DECK_FORMAT_TCG,
+  BUILD_BATTLE: DECK_FORMAT_BUILD_BATTLE,
 };
 
 export const POCKET_DECK_RULES = {
@@ -35,9 +37,20 @@ export const TCG_DECK_RULES = {
   maxCopiesPerCard: 4,
 };
 
+// Prerelease rules (pokemon.com, design 051): 40 cards; the Standard 4-copy rule still applies.
+export const BUILD_BATTLE_DECK_RULES = {
+  formatName: 'Build & Battle',
+  deckSize: { min: 40, max: 40 },
+  maxCopiesPerCard: 4,
+};
+
+// Formats built from the TCG card pool; Pocket cards are refused in them.
+const TCG_POOL_FORMATS = new Set([DECK_FORMATS.TCG, DECK_FORMATS.BUILD_BATTLE]);
+
 const RULES_BY_FORMAT = {
   [DECK_FORMATS.POCKET]: POCKET_DECK_RULES,
   [DECK_FORMATS.TCG]: TCG_DECK_RULES,
+  [DECK_FORMATS.BUILD_BATTLE]: BUILD_BATTLE_DECK_RULES,
 };
 
 export function isPocketCard(card = {}) {
@@ -162,15 +175,15 @@ export function validateDeck(decklist = {}, selectedFormat = DECK_FORMATS.POCKET
     errors.push('Deck contains a mix of TCG and Pocket cards. Use only one card pool per deck.');
   } else if (selectedFormat === DECK_FORMATS.POCKET && hasTcgCards) {
     errors.push('Pocket format selected, but deck contains TCG cards.');
-  } else if (selectedFormat === DECK_FORMATS.TCG && hasPocketCards) {
-    errors.push('TCG format selected, but deck contains Pocket cards.');
+  } else if (TCG_POOL_FORMATS.has(selectedFormat) && hasPocketCards) {
+    errors.push(`${rules.formatName} format selected, but deck contains Pocket cards.`);
   }
 
   return {
     isValid: errors.length === 0,
     errors,
     totalCards,
-    // The legal deck size for this format (60 for TCG, 20 for Pocket). The
+    // The legal deck size for this format (60 TCG, 40 Build & Battle, 20 Pocket). The
     // Live-style "x / y" counter reads it so it never hard-codes 60.
     requiredCards: rules.deckSize.max,
     formatName: rules.formatName,

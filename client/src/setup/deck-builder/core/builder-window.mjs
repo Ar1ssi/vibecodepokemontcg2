@@ -8,8 +8,15 @@
  * host must never load a malformed deck into a game.
  */
 
+import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/formats.mjs';
+
+export { DECK_FORMAT_VALUES } from '../../../../../shared/engine/formats.mjs';
+
 export const BUILDER_WINDOW_NAME = 'ptcgDeckBuilder';
 export const BUILDER_WINDOW_PATH = '/deck-builder';
+// Build & Battle (design 051) is the same editor tab in another mode.
+export const BUILD_BATTLE_WINDOW_NAME = 'ptcgBuildBattle';
+export const BUILD_BATTLE_WINDOW_PATH = '/build-and-battle';
 export const BUILDER_MESSAGE_SOURCE = 'ptcg-deck-builder';
 const PROTOCOL_VERSION = 1;
 
@@ -20,10 +27,17 @@ const MAX_DECK_ROWS = 500;
 const MIN_ROW_LENGTH = 4;
 const MAX_ROW_LENGTH = 7;
 
-/** `'editor'` on the builder tab's own path, `'host'` everywhere else. */
+const trimPath = (pathname) => String(pathname ?? '').replace(/\/+$/, '');
+
+/** `'editor'` on either builder tab path, `'host'` everywhere else. */
 export function resolveBuilderRole(pathname = '') {
-  const path = String(pathname).replace(/\/+$/, '');
-  return path === BUILDER_WINDOW_PATH ? 'editor' : 'host';
+  const path = trimPath(pathname);
+  return path === BUILDER_WINDOW_PATH || path === BUILD_BATTLE_WINDOW_PATH ? 'editor' : 'host';
+}
+
+/** `'build-battle'` on the Build & Battle path, `'standard'` everywhere else. */
+export function resolveBuilderMode(pathname = '') {
+  return trimPath(pathname) === BUILD_BATTLE_WINDOW_PATH ? 'build-battle' : 'standard';
 }
 
 export function buildBuilderMessage(type, payload = {}) {
@@ -63,7 +77,10 @@ const PAYLOAD_VALIDATORS = {
   ready: () => true,
   'host-state': (payload) => typeof payload.isTwoPlayer === 'boolean',
   'load-deck': (payload) =>
-    isTarget(payload.target) && isNullableId(payload.deckId) && isDeckRows(payload.rows),
+    isTarget(payload.target) &&
+    isNullableId(payload.deckId) &&
+    isDeckRows(payload.rows) &&
+    (payload.format === undefined || isDeckFormat(payload.format)),
   'card-back': (payload) =>
     isTarget(payload.target) && isImageUrl(payload.image) && typeof payload.emit === 'boolean',
   sleeve: (payload) =>
@@ -85,5 +102,10 @@ export function parseBuilderMessage(data) {
   if (!validate) return null;
   const payload = data.payload;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-  return validate(payload) ? { type: data.type, payload } : null;
+  if (!validate(payload)) return null;
+  // A builder without formats sends no `format`: that deck is Standard.
+  if (data.type === 'load-deck') {
+    return { type: data.type, payload: { ...payload, format: payload.format ?? DECK_FORMAT_TCG } };
+  }
+  return { type: data.type, payload };
 }

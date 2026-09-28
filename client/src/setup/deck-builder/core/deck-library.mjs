@@ -1,4 +1,5 @@
 import { normalizeDeckSprites } from './deck-sprites.mjs';
+import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/formats.mjs';
 
     const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
     const DECK_ID_LENGTH = 8;
@@ -28,6 +29,12 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
         .slice(0, MAX_DECK_NAME_LENGTH);
       return trimmed || fallback;
     }
+
+    // A record's deck format (design 051). Records saved before formats existed,
+    // or holding anything unknown, are Standard.
+    function normalizeDeckFormat(format) {
+      return isDeckFormat(format) ? format : DECK_FORMAT_TCG;
+    }
     
     export function createDeckInLibrary(
       library = {},
@@ -49,6 +56,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
         matId: options.matId ?? null,
         wallpaperId: options.wallpaperId ?? null,
         sprites: normalizeDeckSprites(options.sprites),
+        format: normalizeDeckFormat(options.format),
       };
       nextLibrary.order = [...(nextLibrary.order || []), deckId];
       return { library: nextLibrary, deckId };
@@ -73,6 +81,13 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
       const deck = library?.decks?.[deckId];
       if (!deck) return null;
       return structuredClone(deck.cards || {});
+    }
+
+    /** @returns {'tcg'|'build-battle'|null} the saved deck's format, or null when no such deck. */
+    export function getDeckFormat(library = {}, deckId) {
+      const deck = library?.decks?.[deckId];
+      if (!deck) return null;
+      return normalizeDeckFormat(deck.format);
     }
     
     export function setDeckSleeve(library = {}, deckId, sleeveId = null) {
@@ -131,7 +146,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
     
     /**
      * Writes the builder's current state — cards plus the chosen sleeve, coin,
-     * mat and Pokémon sprites — over one saved deck, creating it when `deckId`
+     * mat, Pokémon sprites and deck format — over one saved deck, creating it when `deckId`
      * names no deck in the library (the "Untitled Deck" case, where nothing is
      * loaded yet).
      *
@@ -143,7 +158,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
      */
     export function saveDeckSnapshot(
       library = {},
-      { deckId, name, cards = {}, sleeveId, coinId, matId, wallpaperId, sprites } = {},
+      { deckId, name, cards = {}, sleeveId, coinId, matId, wallpaperId, sprites, format } = {},
       now = Date.now()
     ) {
       if (!deckId || !library?.decks?.[deckId]) {
@@ -153,6 +168,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
           matId: matId ?? null,
           wallpaperId: wallpaperId ?? null,
           sprites,
+          format,
         });
         return { library: created.library, deckId: created.deckId, created: true };
       }
@@ -165,6 +181,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
       if (matId !== undefined) deck.matId = matId;
       if (wallpaperId !== undefined) deck.wallpaperId = wallpaperId;
       if (sprites !== undefined) deck.sprites = normalizeDeckSprites(sprites);
+      if (format !== undefined) deck.format = normalizeDeckFormat(format);
       deck.updatedAt = now;
       return { library: nextLibrary, deckId, created: false };
     }
@@ -181,6 +198,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
           sprites: normalizeDeckSprites(decks[deckId].sprites),
           cards: structuredClone(decks[deckId].cards || {}),
           wallpaperId: decks[deckId].wallpaperId ?? null,
+          format: normalizeDeckFormat(decks[deckId].format),
         }));
     }
     
@@ -217,6 +235,7 @@ import { normalizeDeckSprites } from './deck-sprites.mjs';
             // Decks saved before sprites existed have no field at all; a
             // hand-edited one may have nonsense. Both normalize to [].
             sprites: normalizeDeckSprites(deck.sprites),
+            format: normalizeDeckFormat(deck.format),
           };
         }
       }

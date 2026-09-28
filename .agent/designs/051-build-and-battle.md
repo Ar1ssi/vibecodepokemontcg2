@@ -1,5 +1,5 @@
 # 051: Build & Battle game mode (Phantasmal Flames box)
-Status: approved 2026-09-28 (user: "start working on the first slice") — slice 1 done
+Status: approved 2026-09-28 (user: "start working on the first slice") — slices 1–2 done
 Date: 2026-09-28 · Session: S328
 
 ## Problem
@@ -313,21 +313,21 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | localStorage missing / throws (private mode) | session kept in memory; banner "Your box will not survive a reload"; building and Play work | [ ] |
-| 2 | stored session malformed / unknown boxKey / deckKey / card id not in set / version ≠ 1 | `parseSession` → null; UI shows the sealed box; nothing crashes | [ ] |
-| 3 | `?seed=` invalid (`abc`, `-1`, `2^31`, empty) | ignored; random seed | [ ] |
-| 4 | same seed twice | identical deckKey and packs (bit-for-bit) | [ ] |
-| 5 | weighted table sums ≠ 1 | normalized by total weight; 0-weight rows never picked | [ ] |
-| 6 | rarity pool exhausted inside a pack (synthetic 3-card set) | falls back to Rare, then whole set; never a duplicate id within a pack; never throws | [ ] |
-| 7 | me02 real data: 4 packs × 10 | every pack: 4 Common, 3 Uncommon, slot 8 ∈ reverse pool, slot 9 ∈ IR/SIR/reverse, slot 10 ∈ DR/UR/MHR/Rare; 10 distinct ids | [ ] |
-| 8 | deck key distribution | 4000 seeds → each deck within 25% ± 3% | [ ] |
+| 1 | localStorage missing / throws (private mode) | session kept in memory; banner "Your box will not survive a reload"; building and Play work | [x] `build-battle-session.test.mjs` "a throwing or missing storage means memory only" (banner: slice 4) |
+| 2 | stored session malformed / unknown boxKey / deckKey / card id not in set / version ≠ 1 | `parseSession` → null; UI shows the sealed box; nothing crashes | [x] `build-battle-session.test.mjs` "parseSession refuses anything it cannot trust" |
+| 3 | `?seed=` invalid (`abc`, `-1`, `2^31`, empty) | ignored; random seed | [x] `build-battle-session.test.mjs` "parseSeed takes only integers 0..2^31-1" |
+| 4 | same seed twice | identical deckKey and packs (bit-for-bit) | [x] `pack-opening.test.mjs` "the same seed opens the same box" |
+| 5 | weighted table sums ≠ 1 | normalized by total weight; 0-weight rows never picked | [x] `pack-opening.test.mjs` "weighted tables are normalized" |
+| 6 | rarity pool exhausted inside a pack (synthetic 3-card set) | falls back to Rare, then whole set; never a duplicate id within a pack; never throws | [x] `pack-opening.test.mjs` "an exhausted rarity falls back" |
+| 7 | me02 real data: 4 packs × 10 | every pack: 4 Common, 3 Uncommon, slot 8 ∈ reverse pool, slot 9 ∈ IR/SIR/reverse, slot 10 ∈ DR/UR/MHR/Rare; 10 distinct ids | [x] `pack-opening.test.mjs` "me02 packs follow the slot model" (250 seeds) |
+| 8 | deck key distribution | 4000 seeds → each deck within 25% ± 3% | [x] `pack-opening.test.mjs` "each of the four decks comes up about a quarter" |
 | 9 | Open box double-clicked | second click no-op while a session exists | [ ] |
-| 10 | add beyond pool count | refused, status names the card and counts; deck unchanged | [ ] |
-| 11 | 4-copy rule across promo + set print (1 mep-014 + 3 me02-020 ok; 5 Ceruledge) | ok / error "Ceruledge has 5 copies (max 4)" | [ ] |
-| 12 | Basic Energy 16 copies, not in pool | valid, counted toward 40, never against the pool | [ ] |
-| 13 | 39 / 40 / 41 cards | Play disabled / enabled / disabled; counter "x / 40" | [ ] |
-| 14 | no Basic Pokémon after edits | error from `validateDeck`; Play disabled | [ ] |
-| 15 | `load-deck` with `format` missing / `'tcg'` / `'build-battle'` / `'pocket'` | tcg / tcg / build-battle / rejected | [ ] |
+| 10 | add beyond pool count | refused, status names the card and counts; deck unchanged | [x] `build-battle-session.test.mjs` "going past the pool is refused and named" (status text: slice 4) |
+| 11 | 4-copy rule across promo + set print (1 mep-014 + 3 me02-020 ok; 5 Ceruledge) | ok / error "Ceruledge has 5 copies (max 4)" | [x] `deck-validation.test.mjs` "the Ceruledge box deck is a legal…", "…5 Ceruledge" |
+| 12 | Basic Energy 16 copies, not in pool | valid, counted toward 40, never against the pool | [x] `build-battle-session.test.mjs` "Basic Energy is unlimited"; `deck-validation.test.mjs` Ceruledge deck (16 Fire) |
+| 13 | 39 / 40 / 41 cards | Play disabled / enabled / disabled; counter "x / 40" | [x] `deck-validation.test.mjs` "Build & Battle wants exactly 40" (Play button: slice 4) |
+| 14 | no Basic Pokémon after edits | error from `validateDeck`; Play disabled | [x] `deck-validation.test.mjs` "Build & Battle still requires a Basic Pokémon" (Play: slice 4) |
+| 15 | `load-deck` with `format` missing / `'tcg'` / `'build-battle'` / `'pocket'` | tcg / tcg / build-battle / rejected | [x] `builder-window.test.mjs` "load-deck format: …" |
 | 16 | engine: 40-card deck, format build-battle | setup deals 7 hand + 4 prizes, 29 left in deck; win at 4 prizes taken | [ ] |
 | 17 | engine: 60-card deck, format tcg (regression) | 7 + 6, unchanged events | [ ] |
 | 18 | engine: deck of 3 cards, build-battle | prizes = 3 (min), as today with 6 | [ ] |
@@ -337,7 +337,7 @@ block from `deck-builder-live.css`, no `!important`): sealed box card, pack rows
 | 22 | undo replay through `commandLog` | `loadDeck` payload includes `format`; replay yields 4 prizes | [ ] |
 | 23 | legacy (rules off) deal with format build-battle | `setupDealPlan` → 4 prizes | [ ] |
 | 24 | room join after Play (restore-on-join) | restore loads the B&B library deck with its format (last-used deck id), not a 60-card deck | [ ] |
-| 25 | standard builder opens a B&B library deck | counter "x / 40", badge; pool not enforced (documented) | [ ] |
+| 25 | standard builder opens a B&B library deck | counter "x / 40", badge; pool not enforced (documented) | [x] `deck-library.test.mjs` format tests + `validateDeck` requiredCards 40 (counter/badge: slice 4) |
 | 26 | New box with an existing built deck | confirm; on yes the old library deck stays, new session; on no nothing changes | [ ] |
 | 27 | builder tab opened directly (no opener) | banner, Play disabled, box + building work | [ ] |
 | 28 | pop-up blocked from the slim Deck tab | same blocked message as the deck builder button | [ ] |
@@ -388,6 +388,21 @@ persisted artifacts are `ptcg-sim.build-battle.v1` (ignored by older code) and l
   (`tpci/MEP/MEP_014_R_EN.png`, `_LG` large). The generated module is ~115 KB, not ~55 KB.
 - Slice 1: the box ships Basic Energy as MEE 002–007; baked as SVE (same card, existing image source).
 - Slice 1: `--check` runs as `scripts/__tests__/build-battle-box-live.test.mjs` in `pnpm test:live`.
+- Slice 2: `DECK_FORMAT_VALUES` lives in `shared/engine/formats.mjs`; `builder-window.mjs` re-exports it.
+  `parseBuilderMessage` fills a missing `load-deck` `format` with `'tcg'`, so consumers read
+  `payload.format` directly (the round-trip test now expects it); `format: null` is refused.
+- Slice 2: `getDeckFormat` returns null for an unknown deck id. `listDecks` rows and
+  `saveDeckSnapshot` carry `format` (create path takes it; an existing deck keeps its own unless
+  one is passed). **Slice 4 pin:** `getActiveDeckFormat(target)` must return `'build-battle'` only for
+  B&B records and null otherwise, so the `|| detectDeckFormat(deck)` fallback still spots Pocket
+  decks (every legacy record reads as `'tcg'`).
+- Slice 2: `openPack` returns fewer than `size` cards only when the whole set is smaller than the
+  pack (no duplicate ids ever). `openBox` draws `rng.int(box.decks.length)`, not a literal 4.
+  `poolFromBox` strips `qty` from deck rows (pool cards are SetCard-shaped) and sorts Pokémon →
+  Trainer → Energy, then localId, then id.
+- Slice 2: added `randomSeed(crypto = globalThis.crypto)` to the session module (the Web Crypto
+  31-bit seed § Session describes). Rows 9, 13, 14 keep their UI halves (double-click guard,
+  Play disabled) for slice 4.
 
 ---
 Self-approval checklist (only when the user is unreachable):
