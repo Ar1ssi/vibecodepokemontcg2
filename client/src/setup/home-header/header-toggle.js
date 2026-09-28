@@ -5,9 +5,6 @@ export const show = (id, button) => {
   const settings = document.getElementById('settings');
   const p1Box = document.getElementById('p1Box');
   const p2Box = document.getElementById('p2Box');
-  const successText = document.getElementById('successText');
-  const failedText = document.getElementById('failedText');
-  const invalidText = document.getElementById('invalidText');
   const p1Button = document.getElementById('p1Button');
   const p2Button = document.getElementById('p2Button');
   const settingsButton = document.getElementById('settingsButton');
@@ -21,9 +18,6 @@ export const show = (id, button) => {
   p1Box.style.display = 'none';
   p2Box.style.display = 'none';
   page.style.display = 'flex';
-  successText.style.display = 'none';
-  failedText.style.display = 'none';
-  invalidText.style.display = 'none';
 
   if (systemState.isReplay) {
     jsonReplayDiv.style.display = 'none';

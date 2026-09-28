@@ -10,7 +10,14 @@ import { getDeckCounterModel } from '../../../setup/deck-builder/core/deck-count
 import {
   BUILDER_FILTER_GROUPS,
   applyCardFilters,
+  buildTcgdexFilterParams,
+  countActiveFilters,
   createEmptyFilters,
+  deriveSetOptions,
+  describeActiveFilters,
+  hasActiveFilters,
+  removeFilterChip,
+  setHpRange,
   toggleFilter,
 } from '../../../setup/deck-builder/core/card-filters.mjs';
 import {
@@ -33,9 +40,11 @@ import {
   renderDeckCounter,
   renderDeckSprites,
   renderDeckSummary,
-  renderFilterBar,
+  renderFilterChips,
+  renderFilterDrawer,
   renderSearchResults,
 } from './native-deck-builder-renderers.js';
+import { connectToHost, installDeckBuilderHost } from './deck-builder-window.js';
 import { initializeNativeDeckBuilderSpritePicker } from './native-deck-builder-sprite-picker.js';
 import {
   MAX_DECK_SPRITES,
@@ -58,7 +67,7 @@ import {
 } from '../../../setup/deck-builder/core/deck-state.mjs';
 import {
   applyLocalControls,
-  queryCardsByName,
+  queryCards,
 } from '../../../setup/deck-builder/core/card-search.mjs';
 import {
   applyBuilderTheme,
@@ -119,7 +128,94 @@ let restoreLastUsedDeckImpl = null;
 /** Restore the last played deck (and its customization) onto the self playmat. */
 export const restoreLastUsedDeckToPlaymat = () => Boolean(restoreLastUsedDeckImpl?.());
 
-export const initializeNativeDeckBuilder = () => {
+const coinPayload = (coin) =>
+  coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null;
+
+// apply-mat-layout.js listens for this to render the mat and re-fit the
+// board zones; nothing here touches the board.
+const matPayload = (mat) =>
+  mat
+    ? {
+        id: mat.id,
+        title: mat.title,
+        image: mat.image,
+        imageUrl: mat.imageUrl,
+        thumb: mat.thumb,
+        board: mat.board,
+        layout: mat.layout,
+      }
+    : null;
+
+// Shows the game's own sidebox again after Play.
+const showGameSidebox = () => {
+  if (systemState.isTwoPlayer) {
+    show('p2Box', document.getElementById('p2Button'));
+  } else {
+    show('p1Box', document.getElementById('p1Button'));
+  }
+};
+
+/**
+ * Where the builder's game side effects land (design 050). On the game tab
+ * (host) they touch this page's board directly; in the builder's own tab
+ * (editor) they travel to the game tab as messages.
+ */
+const createLocalGameLink = () => ({
+  loadDeck: (target, rows) => loadDeckData(target, rows),
+  changeCardBack: (target, image, emit) => changeCardBack(target, image, emit),
+  announceSleeve: (target, image) =>
+    document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target, image } })),
+  announceMat: (target, mat, emit = false) => {
+    if (emit) {
+      changePlaymat(target, mat?.id ?? null, true);
+      return;
+    }
+    document.dispatchEvent(
+      new CustomEvent('playmat-changed', { detail: { target, mat: matPayload(mat) } })
+    );
+  },
+  announceCoin: (target, coin) =>
+    document.dispatchEvent(
+      new CustomEvent('rules-coin-changed', { detail: { target, coin: coinPayload(coin) } })
+    ),
+  play: () => showGameSidebox(),
+  isTwoPlayer: () => systemState.isTwoPlayer,
+  isConnected: () => true,
+});
+
+const createRemoteGameLink = ({ onHostState }) => {
+  let hostState = { isTwoPlayer: false };
+  const host = connectToHost({
+    onHostState: (state) => {
+      hostState = state;
+      onHostState(state);
+    },
+  });
+  return {
+    loadDeck: (target, rows, deckId) =>
+      host.post('load-deck', { target, deckId: deckId || null, rows }),
+    changeCardBack: (target, image, emit) =>
+      host.post('card-back', { target, image, emit: Boolean(emit) }),
+    announceSleeve: (target, image) => host.post('sleeve', { target, image: image || null }),
+    announceMat: (target, mat, emit = false) =>
+      host.post('mat', { target, matId: mat?.id ?? null, emit: Boolean(emit) }),
+    announceCoin: (target, coin) => host.post('coin', { target, coinId: coin?.id ?? null }),
+    play: (target) => {
+      host.post('play', { target });
+      window.close();
+    },
+    isTwoPlayer: () => hostState.isTwoPlayer,
+    isConnected: () => host.isConnected(),
+  };
+};
+
+/**
+ * @param {object} [options]
+ * @param {'host'|'editor'} [options.role] - 'editor' in the deck builder's own
+ *   tab, 'host' on the game tab (see builder-window.mjs resolveBuilderRole).
+ */
+export const initializeNativeDeckBuilder = ({ role = 'host' } = {}) => {
+  const isEditor = role === 'editor';
   const targetMainButton = document.getElementById(
     'nativeDeckBuilderTargetMain'
   );
@@ -223,32 +319,29 @@ export const initializeNativeDeckBuilder = () => {
     renderThemeToggle();
   });
 
+  const linkBanner = document.getElementById('nativeDeckBuilderLinkBanner');
+  // The host answers asynchronously, after this function has finished.
+  const gameLink = isEditor
+    ? createRemoteGameLink({
+        onHostState: (state) => {
+          // P2 is Solo-only: a game that is now multiplayer takes P2 away.
+          if (state.isTwoPlayer && currentLoadTarget === 'opp') switchTarget('self');
+          render();
+        },
+      })
+    : createLocalGameLink();
+  if (linkBanner) linkBanner.hidden = !isEditor || gameLink.isConnected();
+
   playButton.addEventListener('click', () => {
-    if (systemState.isTwoPlayer) {
-      show('p2Box', document.getElementById('p2Button'));
-    } else {
-      show('p1Box', document.getElementById('p1Button'));
-    }
-    document.dispatchEvent(new CustomEvent('deck-builder-closing'));
-    const panel = document.getElementById('nativeDeckBuilderWorkspace');
-    if (panel) panel.classList.remove('open');
- 
-    
-        // apply the ACTIVE DECK's saved sleeve to the playmat via the sim's
-        // official card-back API — runs on every Play, so reloads and deck
-        // switches always show the right sleeve
-        try {
-          const activeId = deckLibrary?.getActiveDeckId?.(currentLoadTarget);
-          const lib = deckLibrary?.getLibrary?.();
-          const deck = activeId && lib?.decks?.[activeId];
-          const sleeveId = deck?.sleeveId;
-          const sleeve = sleeveId ? getSleeves().find((s) => s.id === sleeveId) : null;
-          const fallback = resolveDefaultCardBackSrc();
-          const image = sleeve?.image || fallback;
-          import('../../../setup/deck-constructor/import.js').then(({ changeCardBack }) => {
-            changeCardBack(currentLoadTarget, image, false);
-          });
-        } catch {}
+    const target = currentLoadTarget;
+    // Play always loads what is on screen, even if nothing changed since the
+    // last load, then shows the active deck's sleeve on the playmat.
+    deckDirty = true;
+    loadCurrentDeck();
+    const sleeveId = deckLibrary?.getActiveSleeve?.(target);
+    const sleeve = sleeveId ? getSleeves().find((entry) => entry.id === sleeveId) : null;
+    gameLink.changeCardBack(target, sleeve?.image || resolveDefaultCardBackSrc(), false);
+    gameLink.play(target);
   });
 
   const syncedDecks = {
@@ -288,6 +381,8 @@ export const initializeNativeDeckBuilder = () => {
         onSaveCurrentDeck: () => {
           deckLibrary?.saveActiveDeck(deck);
         },
+        // Only the builder tab edits decks; the game tab's copy is read-only.
+        allowDeckWrites: isEditor,
       });
 
       // ── Deck Pokémon sprites (design 024) ────────────────────────────────
@@ -444,18 +539,14 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         onChange: (sleeve) => {
           deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
               rememberCosmetic(currentLoadTarget, 'sleeveId', sleeve ? sleeve.id : null);
-          if (sleeve?.image) {
-                // Route through the syncable changeCardBack action: sets the
-                // correct self/opp state var, re-points the target container's
-                // back images, and (in multiplayer) broadcasts to the opponent.
-                changeCardBack(currentLoadTarget, sleeve.image, true);
-                document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: sleeve.image } }));
-              } else {
-                document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: null } }));
-              }
-            },
+          // Route through the syncable changeCardBack action: sets the
+          // correct self/opp state var, re-points the target container's
+          // back images, and (in multiplayer) broadcasts to the opponent.
+          if (sleeve?.image) gameLink.changeCardBack(currentLoadTarget, sleeve.image, true);
+          gameLink.announceSleeve(currentLoadTarget, sleeve?.image || null);
+        },
       });
-    
+
           // Coin picker (Customize tab, below sleeves) — selection persists
           // in localStorage.
           const coinPicker = initializeDeckBuilderCoinPicker({
@@ -463,9 +554,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             onChange: (coin) => {
               deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
               rememberCosmetic(currentLoadTarget, 'coinId', coin ? coin.id : null);
-              document.dispatchEvent(new CustomEvent('rules-coin-changed', {
-                detail: { target: currentLoadTarget, coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null },
-              }));
+              gameLink.announceCoin(currentLoadTarget, coin);
             },
           });
 
@@ -489,32 +578,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               return null;
             }
           };
-          // apply-mat-layout.js listens for this to render the mat and re-fit
-          // the board zones; nothing here touches the board.
-          const matPayload = (mat) =>
-            mat
-              ? {
-                  id: mat.id,
-                  title: mat.title,
-                  image: mat.image,
-                  imageUrl: mat.imageUrl,
-                  thumb: mat.thumb,
-                  board: mat.board,
-                  layout: mat.layout,
-                }
-              : null;
-
-          const announceMat = (target, mat, emit = false) => {
-            if (emit) {
-              changePlaymat(target, mat?.id ?? null, true);
-              return;
-            }
-            document.dispatchEvent(
-              new CustomEvent('playmat-changed', {
-                detail: { target, mat: matPayload(mat) },
-              })
-            );
-          };
+          const announceMat = (target, mat, emit = false) =>
+            gameLink.announceMat(target, mat, emit);
           const matPicker = initializeDeckBuilderMatPicker({
             panelEl: matPanel,
             onChange: (mat) => {
@@ -538,14 +603,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // player's sleeve/deck silently overwrites the other player's
           // custom sleeve back to the default the next time either of
           // their card backs happens to be redrawn (e.g. on shuffle).
-          const setCardBackForTarget = (target, image) => {
-            if (target === 'opp') {
-              if (systemState.isTwoPlayer) systemState.p2OppCardBackSrc = image;
-              else systemState.p1OppCardBackSrc = image;
-            } else {
-              systemState.cardBackSrc = image;
-            }
-          };
           const getCardBackForTarget = (target) => (
             target === 'opp'
               ? (systemState.isTwoPlayer ? systemState.p2OppCardBackSrc : systemState.p1OppCardBackSrc)
@@ -593,29 +650,27 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               doc.querySelectorAll('img').forEach((img) => {
                 if (knownBacks.has(img.src)) img.src = resolvedTarget;
               });
-            } catch {}
+            } catch {
+              // The board iframe is mid-reload; its next build reads the new back.
+            }
           };
           document.addEventListener('deck-sleeve-changed', (e) => applySleeveToPlaymat(e.detail?.image, e.detail?.target || 'self'));
     
           // ── per-deck customization restore ─────────────────────────────
+          // Board-side only (restoreLastUsedDeckToPlaymat): the game tab
+          // restores the sleeve of the deck it holds.
           const syncCustomizationToDeck = () => {
-            try {
-              const activeId = deckLibrary?.getActiveDeckId?.(currentLoadTarget)
-                || (deckLibrary?.getActiveDeckName?.(currentLoadTarget) ? null : null);
-              // sleeve -> playmat card back via the library's own data
-              const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
-              const sleeves = typeof getSleeves === 'function' ? getSleeves() : [];
-              const sleeve = sleeves.find((s) => s.id === sleeveId) || null;
-              const backImage = sleeve?.image || null;
-              // only write/apply for the target actually being viewed — an
-              // unset sleeve on this deck must never clobber the OTHER
-              // player's already-chosen card back
-              // emit=false: runs locally on init/switch; do not broadcast on load.
-              if (backImage) changeCardBack(currentLoadTarget, backImage, false);
-              document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: backImage } }));
-            } catch {}
+            // sleeve -> playmat card back via the library's own data
+            const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
+            const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
+            const backImage = sleeve?.image || null;
+            // only write/apply for the target actually being viewed — an
+            // unset sleeve on this deck must never clobber the OTHER
+            // player's already-chosen card back
+            // emit=false: runs locally on init/switch; do not broadcast on load.
+            if (backImage) changeCardBack(currentLoadTarget, backImage, false);
+            document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: backImage } }));
           };
-      syncCustomizationToDeck();
     
           const customizeSwitcher = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
           const customizeFilter = document.getElementById('nativeDeckBuilderCustomizeFilter');
@@ -685,12 +740,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
         const coin = coinId ? getCoinById(coinId) : null;
         coinPicker?.setSelected(coinId);
-        document.dispatchEvent(new CustomEvent('rules-coin-changed', {
-          detail: {
-            target: currentLoadTarget,
-            coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null,
-          },
-        }));
+        gameLink.announceCoin(currentLoadTarget, coin);
       };
 
       // Reflect the active deck's mat when decks switch, and re-announce it
@@ -731,11 +781,23 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let deck = createEmptyDeck();
   let currentResults = [];
   let currentRawResults = [];
+  // Applied filters drive the search; the drawer edits a draft copy that only
+  // replaces them on Apply (design 050).
   let cardFilters = createEmptyFilters();
-  const filterBar = document.getElementById('nativeDeckBuilderFilterBar');
+  let draftFilters = createEmptyFilters();
+  const filtersButton = document.getElementById('nativeDeckBuilderFiltersButton');
+  const filterChips = document.getElementById('nativeDeckBuilderFilterChips');
+  const filterDrawer = document.getElementById('nativeDeckBuilderFilterDrawer');
+  const filterScrim = document.getElementById('nativeDeckBuilderFilterScrim');
+  // Expansion names seen in any search, so a chip keeps its label after the
+  // results it came from are replaced.
+  const knownSetNames = {};
   let currentLoadTarget = 'self';
   let currentTotalSummaries = 0;
+  let currentDetailedCount = 0;
   let currentHugeResultSet = false;
+  let hasSearched = false;
+  let latestSearchId = 0;
   let deckDirty = false;
   let flashFrame = null;
   // null = show every card in the deck list; 'pokemon'|'trainer'|'energy'
@@ -755,7 +817,63 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     });
   };
 
+  const updateVisibleResults = () => {
+    // Filters narrow first, then the TCG/Pocket select and the sort run over
+    // what is left — sorting a smaller set is cheaper and the order is the
+    // same either way.
+    currentResults = applyLocalControls(
+      applyCardFilters(currentRawResults, cardFilters, { quantities: cardQuantities() }),
+      {
+        cardType: cardTypeFilter.value,
+        sortBy: sortBySelect.value,
+        sortDirection: sortDirectionSelect.value,
+      }
+    );
+  };
+
+  const getSearchStatusText = () => {
+    if (currentHugeResultSet) {
+      return `Too many matches (${currentTotalSummaries}). Add a card name or more filters.`;
+    }
+    if (currentResults.length === 0) return 'No matching cards found.';
+    if (currentDetailedCount < currentTotalSummaries) {
+      return `Showing ${currentResults.length} card(s) from the first ${currentDetailedCount} of ${currentTotalSummaries} matches. Add filters to narrow it down.`;
+    }
+    return `Showing ${currentResults.length} card(s). Click a card to add it.`;
+  };
+
+  const renderFilterSummary = () => {
+    const activeCount = countActiveFilters(cardFilters);
+    if (filtersButton) {
+      filtersButton.dataset.count = String(activeCount);
+      const badge = filtersButton.querySelector('[data-filters-count]');
+      if (badge) {
+        badge.textContent = String(activeCount);
+        badge.hidden = activeCount === 0;
+      }
+      filtersButton.setAttribute(
+        'aria-label',
+        activeCount ? `Filters, ${activeCount} active` : 'Filters'
+      );
+    }
+    renderFilterChips({
+      chipsEl: filterChips,
+      chips: describeActiveFilters(cardFilters, { setNames: knownSetNames }),
+      resultLabel: hasSearched ? `${currentResults.length} result(s)` : '',
+      onRemove: (chip) => {
+        cardFilters = removeFilterChip(cardFilters, chip);
+        runSearch();
+      },
+      onReset: () => {
+        cardFilters = createEmptyFilters();
+        runSearch();
+      },
+    });
+  };
+
   const renderResults = () => {
+    // Re-filter on every render: "In current deck" follows the deck as it changes.
+    if (hasSearched) updateVisibleResults();
     renderSearchResults({
       searchResultsEl: searchResults,
       results: currentResults,
@@ -767,29 +885,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         flashDeckStatus();
       },
     });
-  };
-
-  const updateVisibleResults = () => {
-    // Pills narrow first, then the TCG/Pocket select and the sort run over
-    // what is left — sorting a smaller set is cheaper and the order is the
-    // same either way.
-    currentResults = applyLocalControls(
-      applyCardFilters(currentRawResults, cardFilters),
-      {
-        cardType: cardTypeFilter.value,
-        sortBy: sortBySelect.value,
-        sortDirection: sortDirectionSelect.value,
-      }
-    );
-  };
-
-  const getSearchStatusText = () => {
-    if (currentHugeResultSet) {
-      return `Too many results (${currentTotalSummaries}). Please redefine your search terms.`;
-    }
-    return currentResults.length > 0
-      ? `Showing all ${currentResults.length} result(s). Click a card to add it.`
-      : 'No matching cards found.';
+    renderFilterSummary();
   };
 
   const switchTarget = (target) => {
@@ -1084,9 +1180,14 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const hasLoadedDeck = Boolean(deckLibrary?.getActiveDeckId?.(currentLoadTarget));
       saveButton.textContent = hasLoadedDeck ? 'Save' : 'Save As...';
     }
-    playButton.disabled = !hasDeckCards;
-    targetAltButton.style.cursor = systemState.isTwoPlayer ? 'default' : 'pointer';
-    targetAltButton.style.opacity = systemState.isTwoPlayer ? '0.5' : '';
+    // With no game tab to load into, Play has nowhere to go (edge case 7).
+    const isConnected = gameLink.isConnected();
+    playButton.disabled = !hasDeckCards || !isConnected;
+    playButton.title = isConnected ? '' : 'Open the deck builder from the game tab to play';
+    if (linkBanner) linkBanner.hidden = !isEditor || isConnected;
+    const isTwoPlayer = gameLink.isTwoPlayer();
+    targetAltButton.style.cursor = isTwoPlayer ? 'default' : 'pointer';
+    targetAltButton.style.opacity = isTwoPlayer ? '0.5' : '';
 
     // TCG Live-style deck name strip: show the active saved deck's name
         const deckNameEl = document.getElementById('nativeDeckBuilderDeckName');
@@ -1184,44 +1285,66 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     syncedDecks[currentLoadTarget] = deck;
     const deckRows = deckToSimRows(deck);
     if (deckRows.length > 0) {
-      loadDeckData(currentLoadTarget, deckRows);
+      gameLink.loadDeck(
+        currentLoadTarget,
+        deckRows,
+        deckLibrary?.getActiveDeckId?.(currentLoadTarget) || null
+      );
       if (currentLoadTarget === 'self') persistLastUsedSession();
     }
     render();
   };
 
-  const runSearch = async (options = {}) => {
-    const term = (options.term ?? searchInput.value).trim();
+  const clearSearchResults = () => {
+    currentResults = [];
+    currentRawResults = [];
+    currentTotalSummaries = 0;
+    currentDetailedCount = 0;
+    currentHugeResultSet = false;
+    hasSearched = false;
+  };
 
-    if (!term) {
-      currentResults = [];
-      currentRawResults = [];
-      currentTotalSummaries = 0;
-      searchStatus.textContent = '';
+  // A name, the filters TCGdex can apply, or both (design 050). Only the
+  // latest search may write results: a slow earlier one must not overwrite it.
+  const runSearch = async () => {
+    const term = searchInput.value.trim();
+    const params = buildTcgdexFilterParams(cardFilters);
+    const searchId = ++latestSearchId;
+
+    if (!term && Object.keys(params).length === 0) {
+      clearSearchResults();
+      searchStatus.textContent = hasActiveFilters(cardFilters)
+        ? 'Add a card name, or a Format, Type, Stage, HP, Rarity or Regulation mark filter, to search.'
+        : '';
       render();
       return;
     }
 
     searchButton.disabled = true;
-    searchStatus.textContent = `Searching for “${term}”...`;
+    searchStatus.textContent = term ? `Searching for “${term}”...` : 'Searching with your filters...';
 
     try {
-      const searchResponse = await queryCardsByName(term);
+      const searchResponse = await queryCards({ term, params });
+      if (searchId !== latestSearchId) return;
       currentRawResults = searchResponse.results;
       currentTotalSummaries = searchResponse.totalSummaries;
+      currentDetailedCount = searchResponse.detailedCount;
       currentHugeResultSet = searchResponse.isHugeResultSet;
+      hasSearched = true;
+      for (const option of deriveSetOptions(currentRawResults)) {
+        knownSetNames[option.value] = option.label;
+      }
       updateVisibleResults();
-
       searchStatus.textContent = getSearchStatusText();
     } catch (error) {
-      currentResults = [];
-      currentRawResults = [];
-      currentTotalSummaries = 0;
-      currentHugeResultSet = false;
+      if (searchId !== latestSearchId) return;
+      clearSearchResults();
       searchStatus.textContent = `Search failed: ${error.message}`;
     } finally {
-      searchButton.disabled = false;
-      render();
+      if (searchId === latestSearchId) {
+        searchButton.disabled = false;
+        render();
+      }
     }
   };
 
@@ -1233,7 +1356,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   });
 
   targetAltButton.addEventListener('click', () => {
-    if (systemState.isTwoPlayer) return;
+    if (gameLink.isTwoPlayer()) return;
     switchTarget('opp');
     document.dispatchEvent(
       new CustomEvent('deck-target-changed', { detail: { target: 'opp' } })
@@ -1306,17 +1429,14 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         sleevePicker?.setSelected(sleeveId);
         const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
         if (sleeve?.image) {
-          changeCardBack(currentLoadTarget, sleeve.image, true);
-          document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: sleeve.image } }));
+          gameLink.changeCardBack(currentLoadTarget, sleeve.image, true);
+          gameLink.announceSleeve(currentLoadTarget, sleeve.image);
         }
       }
       if (coinId !== null) {
         deckLibrary?.setActiveCoin(currentLoadTarget, coinId);
         coinPicker?.setSelected(coinId);
-        const coin = getCoinById(coinId) || null;
-        document.dispatchEvent(new CustomEvent('rules-coin-changed', {
-          detail: { target: currentLoadTarget, coin: coin ? { id: coin.id, name: coin.name, thumb: coin.thumb, material: coin.material } : null },
-        }));
+        gameLink.announceCoin(currentLoadTarget, getCoinById(coinId) || null);
       }
 
       render();
@@ -1362,30 +1482,81 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       });
 
   const rerenderSearchLocally = () => {
-    if (currentRawResults.length === 0) return;
+    if (!hasSearched) return;
     updateVisibleResults();
     searchStatus.textContent = getSearchStatusText();
     renderResults();
   };
 
-  const renderFilters = () => {
-    renderFilterBar({
-      filterBarEl: filterBar,
+  // ── TCG Live filter drawer (design 050) ──────────────────────────────
+  // Expansions come from the results, plus any picked earlier that the
+  // current results no longer contain, so a picked set can always be unpicked.
+  const drawerSetOptions = () => {
+    const options = deriveSetOptions(currentRawResults);
+    const listed = new Set(options.map((option) => option.value));
+    for (const setId of draftFilters.sets) {
+      if (!listed.has(setId)) options.push({ value: setId, label: knownSetNames[setId] || setId });
+    }
+    return options;
+  };
+
+  const renderDrawer = () => {
+    renderFilterDrawer({
+      drawerEl: filterDrawer,
       groups: BUILDER_FILTER_GROUPS,
-      filters: cardFilters,
+      filters: draftFilters,
+      setOptions: drawerSetOptions(),
       onToggle: (group, value) => {
-        cardFilters = toggleFilter(cardFilters, group, value);
-        renderFilters();
-        rerenderSearchLocally();
+        draftFilters = toggleFilter(draftFilters, group, value);
+        renderDrawer();
       },
-      onClear: () => {
-        cardFilters = createEmptyFilters();
-        renderFilters();
-        rerenderSearchLocally();
+      onHpChange: (low, high) => {
+        draftFilters = setHpRange(draftFilters, low, high);
+        renderDrawer();
       },
+      onReset: () => {
+        draftFilters = createEmptyFilters();
+        renderDrawer();
+      },
+      onApply: () => {
+        cardFilters = draftFilters;
+        closeFilterDrawer();
+        runSearch();
+      },
+      onClose: () => closeFilterDrawer(),
     });
   };
-  renderFilters();
+
+  const onDrawerKeydown = (event) => {
+    if (event.key === 'Escape') closeFilterDrawer();
+  };
+
+  const openFilterDrawer = () => {
+    if (!filterDrawer) return;
+    draftFilters = cardFilters;
+    renderDrawer();
+    filterDrawer.hidden = false;
+    if (filterScrim) filterScrim.hidden = false;
+    filtersButton?.setAttribute('aria-expanded', 'true');
+    document.addEventListener('keydown', onDrawerKeydown);
+    filterDrawer.querySelector('[data-fdrawer-close]')?.focus();
+  };
+
+  // Closing without Apply keeps the applied filters and drops the draft.
+  function closeFilterDrawer() {
+    if (!filterDrawer || filterDrawer.hidden) return;
+    filterDrawer.hidden = true;
+    if (filterScrim) filterScrim.hidden = true;
+    filtersButton?.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('keydown', onDrawerKeydown);
+    filtersButton?.focus();
+  }
+
+  filtersButton?.addEventListener('click', () => {
+    if (filterDrawer?.hidden) openFilterDrawer();
+    else closeFilterDrawer();
+  });
+  filterScrim?.addEventListener('click', () => closeFilterDrawer());
 
   cardTypeFilter.addEventListener('change', rerenderSearchLocally);
   sortBySelect.addEventListener('change', rerenderSearchLocally);
@@ -1403,22 +1574,55 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
   document.addEventListener('deck-builder-closing', loadCurrentDeck);
 
-  const deckImportButton = document.getElementById('deckImportButton');
-  if (deckImportButton) deckImportButton.addEventListener('click', () => {
-    if (systemState.isTwoPlayer && currentLoadTarget === 'opp') {
-      switchTarget('self');
-      document.dispatchEvent(new CustomEvent('deck-target-changed', { detail: { target: 'self' } }));
-    }
-    render();
-  });
+  if (isEditor) {
+    // Closing the builder tab still loads an edited deck into the game (edge case 6).
+    window.addEventListener('pagehide', loadCurrentDeck);
+  } else {
+    // ── The game tab applies what the builder tab sends (design 050) ────
+    const applyBuilderMessage = ({ type, payload }) => {
+      // P2 is Solo-only; the builder tab's view of the game can be stale.
+      if (payload.target === 'opp' && systemState.isTwoPlayer) return;
+      if (type === 'load-deck') {
+        // Mirror the builder's binding so restoring the last deck and a later
+        // Play read the deck that is actually on the board.
+        deckLibrary?.refresh();
+        deckLibrary?.setActiveDeck(payload.target, payload.deckId);
+        loadDeckData(payload.target, payload.rows);
+        return;
+      }
+      const link = createLocalGameLink();
+      if (type === 'card-back') {
+        link.changeCardBack(payload.target, payload.image, payload.emit);
+      } else if (type === 'sleeve') {
+        link.announceSleeve(payload.target, payload.image);
+      } else if (type === 'mat') {
+        const mat = payload.matId ? getMatById(payload.matId) : null;
+        if (payload.matId && !mat) return;
+        link.announceMat(payload.target, mat, payload.emit);
+      } else if (type === 'coin') {
+        const coin = payload.coinId ? getCoinById(payload.coinId) : null;
+        if (payload.coinId && !coin) return;
+        link.announceCoin(payload.target, coin);
+      } else if (type === 'play') {
+        link.play(payload.target);
+        window.focus();
+      }
+    };
+    installDeckBuilderHost({
+      apply: applyBuilderMessage,
+      getHostState: () => ({ isTwoPlayer: Boolean(systemState.isTwoPlayer) }),
+    });
+  }
 
   render();
   // Restore each player's saved mat so both halves of the board pick up their
   // own layout on load, even if the player never opens the mat picker.
-  announceAllMats();
+  if (!isEditor) announceAllMats();
 
   restoreLastUsedDeckImpl = () => {
     try {
+      // The builder tab may have changed the library since this tab loaded it.
+      deckLibrary?.refresh();
       const session = loadLastSession(window.localStorage);
       if (!session?.deckId) return false;
       const lib = deckLibrary?.getLibrary?.();

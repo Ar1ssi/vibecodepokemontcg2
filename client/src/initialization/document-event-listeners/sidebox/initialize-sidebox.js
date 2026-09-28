@@ -7,6 +7,7 @@ import { initializeSettings } from './settings.js';
 import { initializeSideMenuToggle } from './side-menu-toggle.js';
 import { initializeRulesEngine, buildRulesToggle } from '../../../setup/rules/rules-bridge.js';
 import { buildDebugMenu } from '../../../setup/rules/debug-menu.js';
+import { resolveBuilderRole } from '../../../setup/deck-builder/core/builder-window.mjs';
 
 export const initializeSidebox = () => {
   initializeHeaderButtons();
@@ -14,7 +15,7 @@ export const initializeSidebox = () => {
   initializeP2Page();
   initializeSettings();
   initializeImport();
-  initializeNativeDeckBuilder();
+  initializeNativeDeckBuilder({ role: resolveBuilderRole(window.location.pathname) });
   initializeSideMenuToggle();
   initializeRulesEngine();
   buildRulesToggle();

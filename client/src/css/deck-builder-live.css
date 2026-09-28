@@ -394,133 +394,437 @@
   opacity: 1;
 }
 
-/* --------------------------------------------------------- filter pills -- */
+/* ------------------------------------------- filter drawer (design 050) -- */
 
-.native-deck-builder-filter-bar {
+.native-deck-builder-results-shell {
+  position: relative;
+}
+
+.db-live .native-deck-builder-filters-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4vw;
+  padding: 0.65vh 1vw;
+  font-size: max(11px, 1.5vh);
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--db-text);
+  background: var(--db-raised);
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-filters-button:hover,
+.db-live .native-deck-builder-filters-button[aria-expanded='true'] {
+  border-color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-filters-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #fff;
+  background: #e3350d;
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-filters-count[hidden] {
+  display: none;
+}
+
+/* Active-filter chips under the search row. */
+.db-live .native-deck-builder-fchips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.6vh;
+}
+
+.db-live .native-deck-builder-fchips[hidden] {
+  display: none;
+}
+
+.db-live .native-deck-builder-fchips-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--db-text);
+  background: var(--db-input);
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-fchip button {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  color: #e3350d;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+}
+
+.db-live .native-deck-builder-fchip button:hover {
+  background: rgba(227, 53, 13, 0.12);
+}
+
+.db-live .native-deck-builder-fchips-reset {
+  padding: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  color: #e3350d;
+  background: none;
+  border: none;
+}
+
+/* The drawer slides over the result grid from the left, as in TCG Live. */
+.db-live .native-deck-builder-fdrawer-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(8, 12, 28, 0.45);
+}
+
+.db-live .native-deck-builder-fdrawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  width: min(440px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 0.4vh;
+  color: var(--db-text);
+  background: var(--db-panel);
+  border-right: 1px solid var(--db-border-strong);
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.3);
+  animation: native-deck-builder-fdrawer-in 180ms ease-out;
 }
 
-.db-live .native-deck-builder-filter-bar {
-  padding: 0.5vh 0 0.6vh;
+.db-live .native-deck-builder-fdrawer[hidden],
+.db-live .native-deck-builder-fdrawer-scrim[hidden] {
+  display: none;
 }
 
-.db-live .native-deck-builder-filter-row {
+@keyframes native-deck-builder-fdrawer-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+
+.db-live .native-deck-builder-fdrawer-head {
   display: flex;
   align-items: center;
-  gap: 0.5vw;
-  min-width: 0;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--db-chrome);
+  border-bottom: 1px solid var(--db-border);
 }
 
-.db-live .native-deck-builder-filter-label {
-  flex: 0 0 auto;
-  width: 5.2vw;
-  min-width: 58px;
-  font-size: 1.2vh;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--db-text-faint);
+.db-live .native-deck-builder-fdrawer-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.db-live .native-deck-builder-filter-pills {
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  gap: 0.25vw 0.22vw;
-  min-width: 0;
+.db-live .native-deck-builder-fdrawer-close {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--db-text);
+  background: var(--db-input);
+  border: 1px solid var(--db-border);
+  border-radius: 50%;
 }
 
-.db-live .native-deck-builder-filter-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2vw;
-  padding: 0.3vh 0.55vw;
-  font-size: 1.25vh;
+.db-live .native-deck-builder-fdrawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  align-content: start;
+  padding: 12px;
+}
+
+.db-live .native-deck-builder-fsec {
+  min-width: 0;
+  padding: 8px;
+  background: var(--db-panel-2);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-sm);
+}
+
+.db-live .native-deck-builder-fsec.span2 {
+  grid-column: 1 / -1;
+}
+
+.db-live .native-deck-builder-fsec h4 {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-fsec h4 em {
+  margin-left: 4px;
+  padding: 0 5px;
+  font-style: normal;
+  color: #23190a;
+  background: var(--db-gold);
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-fsec-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.db-live .native-deck-builder-fsec-toggles {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-live .native-deck-builder-fsec-range {
+  display: block;
+}
+
+.db-live .native-deck-builder-fsec-empty {
+  font-size: 11px;
+  color: var(--db-text-faint);
+}
+
+.db-live .native-deck-builder-fpill,
+.db-live .native-deck-builder-fpip {
+  padding: 3px 9px;
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.3;
   cursor: pointer;
   color: var(--db-text-dim);
   background: var(--db-input);
   border: 1px solid var(--db-border);
   border-radius: var(--db-radius-pill);
-  transition:
-    color 120ms ease,
-    background 120ms ease,
-    border-color 120ms ease;
 }
 
-.db-live .native-deck-builder-filter-pill:hover {
+.db-live .native-deck-builder-fpip {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.db-live .native-deck-builder-fpill:hover,
+.db-live .native-deck-builder-fpip:hover,
+.db-live .native-deck-builder-ficon:hover {
   color: var(--db-text);
   border-color: var(--db-border-strong);
 }
 
-.db-live .native-deck-builder-filter-pill.active {
+.db-live .native-deck-builder-fpill.on,
+.db-live .native-deck-builder-fpip.on {
   color: #23190a;
   background: var(--db-gold);
   border-color: var(--db-gold);
 }
 
-.db-live .native-deck-builder-filter-icon {
-  width: 1.6vh;
-  height: 1.6vh;
-  min-width: 13px;
-  min-height: 13px;
+.db-live .native-deck-builder-ficon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: var(--db-input);
+  border: 1px solid var(--db-border);
+  border-radius: 7px;
+}
+
+.db-live .native-deck-builder-ficon img {
+  width: 20px;
+  height: 20px;
   object-fit: contain;
-}
-
-/* The energy row is symbol-led, as in Live: the type name is tooltip-only. */
-.db-live
-  .native-deck-builder-filter-row[data-filter-row='energyTypes']
-  .native-deck-builder-filter-pill
-  span {
-  display: none;
-}
-
-.db-live
-  .native-deck-builder-filter-row[data-filter-row='energyTypes']
-  .native-deck-builder-filter-pill {
-  padding: 0.25vh 0.3vw;
-}
-
-/* Icon-only pills carry no label to recolour, so an active one is marked by a
-   gold ring and a slight lift instead of a filled background. */
-.db-live
-  .native-deck-builder-filter-row[data-filter-row='energyTypes']
-  .native-deck-builder-filter-pill.active {
-  background: transparent;
-  border-color: var(--db-gold);
-  box-shadow: 0 0 0 1px var(--db-gold);
-}
-
-.db-live
-  .native-deck-builder-filter-row[data-filter-row='energyTypes']
-  .native-deck-builder-filter-pill:not(.active)
-  .native-deck-builder-filter-icon {
   opacity: 0.55;
 }
 
-.db-live .native-deck-builder-filter-clear {
-  align-self: flex-start;
-  margin-top: 0.15vh;
-  padding: 0.25vh 0.6vw;
-  font-size: 1.15vh;
-  font-weight: 700;
+.db-live .native-deck-builder-ficon.on {
+  border-color: var(--db-gold);
+  box-shadow: 0 0 0 2px var(--db-gold);
+}
+
+.db-live .native-deck-builder-ficon.on img {
+  opacity: 1;
+}
+
+.db-live .native-deck-builder-ftoggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
-  color: var(--db-text-dim);
-  background: transparent;
-  border: 1px solid var(--db-border);
+  color: var(--db-text);
+  background: none;
+  border: none;
+}
+
+.db-live .native-deck-builder-ftoggle-track {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  background: var(--db-input);
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius-pill);
+  transition: background 140ms ease;
+}
+
+.db-live .native-deck-builder-ftoggle-dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: left 140ms ease;
+}
+
+.db-live .native-deck-builder-ftoggle.on .native-deck-builder-ftoggle-track {
+  background: var(--db-gold);
+  border-color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-ftoggle.on .native-deck-builder-ftoggle-dot {
+  left: 18px;
+}
+
+/* Two stacked range inputs make one two-thumb HP slider; only the thumbs
+ * take pointer events so either one can be grabbed. */
+.db-live .native-deck-builder-frange {
+  position: relative;
+  height: 22px;
+  margin: 4px 2px 0;
+}
+
+.db-live .native-deck-builder-frange input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  pointer-events: none;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.db-live .native-deck-builder-frange input::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--db-input);
   border-radius: var(--db-radius-pill);
 }
 
-.db-live .native-deck-builder-filter-clear:hover {
-  color: var(--db-text);
-  border-color: var(--db-border-strong);
+.db-live .native-deck-builder-frange input::-moz-range-track {
+  height: 6px;
+  background: var(--db-input);
+  border-radius: var(--db-radius-pill);
 }
 
-.db-live .native-deck-builder-filter-clear[hidden] {
-  display: none;
+.db-live .native-deck-builder-frange input::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  pointer-events: auto;
+  cursor: pointer;
+  background: #fff;
+  border: 2px solid var(--db-gold);
+  border-radius: 50%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.db-live .native-deck-builder-frange input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  pointer-events: auto;
+  cursor: pointer;
+  background: #fff;
+  border: 2px solid var(--db-gold);
+  border-radius: 50%;
+}
+
+.db-live .native-deck-builder-frange-readout {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--db-text-dim);
+}
+
+.db-live .native-deck-builder-fdrawer-foot {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--db-border);
+}
+
+.db-live .native-deck-builder-fdrawer-reset,
+.db-live .native-deck-builder-fdrawer-apply {
+  flex: 1;
+  padding: 7px 12px;
+  font-weight: 800;
+  cursor: pointer;
+  border-radius: var(--db-radius-pill);
+}
+
+.db-live .native-deck-builder-fdrawer-reset {
+  color: var(--db-text);
+  background: transparent;
+  border: 1px solid var(--db-border-strong);
+}
+
+.db-live .native-deck-builder-fdrawer-apply {
+  color: #23190a;
+  background: linear-gradient(to bottom, var(--db-gold), var(--db-gold-dark));
+  border: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-live .native-deck-builder-fdrawer {
+    animation: none;
+  }
 }
 
 /* ------------------------------------------------------------- results --- */

@@ -4,6 +4,7 @@ import { cleanActionData } from '../../../setup/general/clean-action-data.js';
 import { processAction } from '../../../setup/general/process-action.js';
 import { show } from '../../../setup/home-header/header-toggle.js';
 import { handleSpectatorButtons } from '../../../setup/spectator/handle-spectator-buttons.js';
+import { openDeckBuilderFromDeckTab } from './import-deck.js';
 import {
   removeSyncIntervals,
   resetNetcodeForRoomChange,
@@ -114,12 +115,8 @@ export const initializeHeaderButtons = () => {
   const deckImportButton = document.getElementById('deckImportButton');
   deckImportButton.addEventListener('click', () => {
     show('deckImport', deckImportButton);
-    const changelog = document.getElementById('changelog');
-    if (changelog) changelog.style.display = 'none';
-    const donationsPage = document.getElementById('donationsPage');
-    if (donationsPage) donationsPage.style.display = 'none';
-    const panel = document.getElementById('nativeDeckBuilderWorkspace');
-    if (panel) panel.classList.add('open');
+    closeOverlays();
+    openDeckBuilderFromDeckTab();
   });
 
   const settingsButton = document.getElementById('settingsButton');

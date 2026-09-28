@@ -16,12 +16,10 @@
     const T = (n, c) => console.log(`${c ? 'PASS' : 'FAIL'} — ${n}`);
     
     try {
-      await page.goto('http://localhost:4000/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // The deck builder has its own tab (design 050).
+      await page.goto('http://localhost:4000/deck-builder', { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(2000);
-    
-      await page.click('#deckImportButton');
-      await page.waitForTimeout(800);
-    
+
       await page.click('#nativeDeckBuilderNewDeck');
       await page.waitForTimeout(300);
       const chips = await page.locator('.native-deck-builder-library-chip').count();

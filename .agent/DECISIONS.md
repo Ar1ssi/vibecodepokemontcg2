@@ -6,9 +6,11 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D180).
+#   Next id = highest D number in this file and the archive + 1 (next: D185).
 
 ## Active
+- D184 2026-09-28 [deck-builder] Builder filters go to TCGdex as /cards params (types, stage, hp, regulationMark, legal.*, rarity, suffix…) and are re-applied client-side as the truth; Tera is not offered (TCGdex has no Tera marker). (design 050)
+- D183 2026-09-28 [deck-builder] The deck builder runs in its own browser tab (/deck-builder, same page, builder role); game effects cross via a validated postMessage protocol; the game tab never writes deck cards. Text decklist import removed (user call). (design 050)
 - D182 2026-09-26 [rules] "Take another turn after this one" consumes `flags.extraTurn` in the attack tail and restarts the same player with no Checkup; a discard-wiped side wins via `settleWipedSides` (no KO event/Prizes). (design 048, S326)
 - D181 2026-09-26 [rules] Attack play/attack locks are player-scoped (`playLocks` by untilTurn, `attackLockUntilTurn`; arrays replaced/pruned), enforced in validateLegality playTrainer/attachCard/moveCard/attack — card fields miss Pokémon played under Iron Rule. (design 048, S326)
 - D180 2026-09-26 [rules] GX "at least N extra {T} Energy (beyond this attack's cost)" is one sentence gate (`requiresExtraEnergy`, typed or not) read by the KO/prize/marker/bench handlers; `energyMatches` resolves {Y}/{N} by element word. (design 048, S326)

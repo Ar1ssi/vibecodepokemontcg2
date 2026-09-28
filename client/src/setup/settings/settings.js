@@ -53,8 +53,6 @@ export const darkMode = () => {
     'p2Box',
     'settings',
     'deckImport',
-    'mainDeckImportInput',
-    'altDeckImportInput',
     'deckHeader',
     'handHeader',
     'boardHeader',
@@ -133,11 +131,6 @@ export const darkMode = () => {
   document.getElementById('changelog').classList.toggle('dark-mode-6');
   document.getElementById('donationsPage').classList.toggle('dark-mode-6');
   document.getElementById('keybindModal').classList.toggle('dark-mode-6');
-  document.getElementById('languageDropdown').classList.toggle('dark-mode-6');
-  document.getElementById('decklistTable').classList.toggle('dark-mode-6');
-  document.querySelectorAll('.decklists-context-menu').forEach((menu) => {
-    menu.classList.toggle('dark-mode-6');
-  });
 
   //HTML body
   document.getElementById('cover').classList.toggle('dark-mode-7');

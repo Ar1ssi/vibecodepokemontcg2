@@ -1,5 +1,5 @@
 # 050: Deck builder in its own window, TCG Live filter drawer, slim Deck tab
-Status: approved (user) — picks made via AskUserQuestion 2026-09-28 (layout B drawer, real
+Status: shipped (branch claude/deckbuilder-tab-filtering-c11cff) — approved (user) — picks made via AskUserQuestion 2026-09-28 (layout B drawer, real
 browser window/tab, slim Deck tab, filter-only search). Leftover calls listed under Options.
 Date: 2026-09-28 · Superdesign draft 12b205d8 ("PC Box Deck Builder — Standalone with TCG Live Filter Drawer")
 
@@ -149,18 +149,18 @@ under the search row with the result count and "Reset all". Renderers: `renderFi
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | no term, no server-narrowable filter | results cleared, status asks for a name or a Format/Type/Stage filter | [ ] |
-| 2 | malformed postMessage (wrong source/type/target/rows) | ignored, nothing applied | [ ] |
-| 3 | HP range min>max / out of range / full range | swapped / clamped / cleared to null | [ ] |
-| 4 | Deck tab clicked twice | same window focused, not reloaded | [ ] |
-| 5 | TCGdex down / timeout | status "Search failed: ...", results cleared (existing path) | [ ] |
-| 6 | builder tab closed with a dirty deck | `pagehide` flushes `load-deck` to the game tab | [ ] |
-| 7 | builder opened directly, no opener | banner shown, Play disabled, library editing works | [ ] |
-| 8 | opp load while multiplayer | host rejects (`isTwoPlayer`) | [ ] |
-| 9 | other window wrote the library | storage event -> reload + re-render; mutations re-read first | [ ] |
-| 10 | pop-up blocked | slim tab shows "Allow pop-ups for this site to open the deck builder" | [ ] |
-| 11 | card lacks a property (Trainer vs HP filter) | excluded by that group's constraint | [ ] |
-| 12 | more than 150 matches | first 150 detailed, status says so and asks for filters | [ ] |
+| 1 | no term, no server-narrowable filter | results cleared, status asks for a name or a Format/Type/Stage filter | [x] covered: card-search.test "queryCards with no name and no params fetches nothing"; runSearch status branch |
+| 2 | malformed postMessage (wrong source/type/target/rows) | ignored, nothing applied | [x] covered: builder-window.test (envelopes, targets, rows, images); e2e junk rows ignored on the game tab |
+| 3 | HP range min>max / out of range / full range | swapped / clamped / cleared to null | [x] covered: card-filters.test "setHpRange snaps, clamps, swaps, and clears a full range" |
+| 4 | Deck tab clicked twice | same window focused, not reloaded | [x] reasoning: openDeckBuilderWindow opens '' by name and navigates only an about:blank window |
+| 5 | TCGdex down / timeout | status "Search failed: ...", results cleared (existing path) | [x] reasoning: runSearch catch -> clearSearchResults + status (unchanged path) |
+| 6 | builder tab closed with a dirty deck | `pagehide` flushes `load-deck` to the game tab | [x] reasoning: pagehide -> loadCurrentDeck -> gameLink.loadDeck (postMessage is synchronous enqueue) |
+| 7 | builder opened directly, no opener | banner shown, Play disabled, library editing works | [x] e2e: /deck-builder opened directly showed the banner and a disabled Play |
+| 8 | opp load while multiplayer | host rejects (`isTwoPlayer`) | [x] reasoning: applyBuilderMessage drops every opp-target message while systemState.isTwoPlayer |
+| 9 | other window wrote the library | storage event -> reload + re-render; mutations re-read first | [x] reasoning: library reload() before each write + storage listener |
+| 10 | pop-up blocked | slim tab shows "Allow pop-ups for this site to open the deck builder" | [x] e2e: the browser pane blocks window.open; the Deck tab showed the blocked message |
+| 11 | card lacks a property (Trainer vs HP filter) | excluded by that group's constraint | [x] covered: card-filters.test "an HP range excludes Trainers and Energy, and is inclusive" |
+| 12 | more than 150 matches | first 150 detailed, status says so and asks for filters | [x] e2e: Standard + Supporter, no name -> "Showing 127 card(s) from the first 150 of 215 matches" |
 
 ## Test plan
 Unit: `card-filters.test.mjs` (all groups, chips, params, HP), `card-search.test.mjs` (normalize
@@ -181,3 +181,5 @@ layout and `#deckImport` come back with it. Text-importer removal is the only lo
 | 4 | server.js, header-buttons.js, import*.js, sample.decklists.js, settings.js, header-toggle.js, index.css | slim tab + route | e2e by hand | — | full `pnpm test` green |
 
 ## Deviations (Builder appends here during build)
+- The boot-time syncCustomizationToDeck() call was removed: it ran before `currentLoadTarget` was declared, so it always threw into its own try/catch and never did anything. restoreLastUsedDeckToPlaymat still calls it.
+- import.js kept only loadDeckData/changeCardBack/the card-back button; sample.decklists.js deleted; find-type/find-old-type/tcgdex-image-url orphaned (I199).

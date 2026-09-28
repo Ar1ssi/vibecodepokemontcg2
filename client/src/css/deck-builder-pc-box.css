@@ -199,6 +199,123 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.5);
 }
 
+/* Filter drawer (design 050, draft 12b205d8): the pane's white-Box tokens
+ * already paint it; the Box accents swap Live's gold for sky and blue. */
+.db-live:not(.db-light) .native-deck-builder-filters-button {
+  color: var(--box-blue);
+  background: #fff;
+  border: 2px solid var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fchip {
+  color: var(--box-ink);
+  background: #eef6fd;
+  border-color: rgba(63, 136, 197, 0.4);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fdrawer {
+  border-right: 3px solid var(--box-sky);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fdrawer-scrim {
+  background: rgba(14, 48, 101, 0.35);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fdrawer-head {
+  color: #fff;
+  background: linear-gradient(to right, var(--box-sky), var(--box-blue));
+  border-bottom: 2px solid #fff;
+}
+
+.db-live:not(.db-light) .native-deck-builder-fdrawer-close {
+  color: var(--box-blue);
+  background: #fff;
+  border: 2px solid var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fsec {
+  background: #f7fbff;
+  border: 2px solid rgba(123, 181, 230, 0.4);
+  border-radius: 8px;
+}
+
+.db-live:not(.db-light) .native-deck-builder-fsec h4 {
+  color: var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fsec h4 em {
+  color: #fff;
+  background: var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fpill,
+.db-live:not(.db-light) .native-deck-builder-fpip,
+.db-live:not(.db-light) .native-deck-builder-ficon {
+  color: var(--box-ink);
+  background: #fff;
+  border: 2px solid rgba(123, 181, 230, 0.5);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fpill.on,
+.db-live:not(.db-light) .native-deck-builder-fpip.on {
+  color: #fff;
+  background: var(--box-blue);
+  border-color: #fff;
+  box-shadow: 0 0 0 1px var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-ficon.on {
+  border-color: var(--box-yellow);
+  box-shadow: 0 0 0 2px var(--box-yellow);
+}
+
+.db-live:not(.db-light) .native-deck-builder-ftoggle-track {
+  background: #dce9f5;
+  border-color: transparent;
+}
+
+.db-live:not(.db-light) .native-deck-builder-ftoggle.on .native-deck-builder-ftoggle-track {
+  background: var(--box-blue);
+  border-color: var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-frange input::-webkit-slider-runnable-track {
+  background: #dce9f5;
+}
+
+.db-live:not(.db-light) .native-deck-builder-frange input::-moz-range-track {
+  background: #dce9f5;
+}
+
+.db-live:not(.db-light) .native-deck-builder-frange input::-webkit-slider-thumb {
+  border-color: var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-frange input::-moz-range-thumb {
+  border-color: var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-frange-readout {
+  color: var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fdrawer-foot {
+  border-top: 2px solid var(--box-checker);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fdrawer-reset {
+  color: var(--box-blue);
+  background: #fff;
+  border: 2px solid var(--box-blue);
+}
+
+.db-live:not(.db-light) .native-deck-builder-fdrawer-apply {
+  color: #fff;
+  background: linear-gradient(to bottom, var(--box-sky), var(--box-blue));
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.5);
+}
+
 /* Checkerboard Box floor behind every card grid. */
 .db-live:not(.db-light) .native-deck-builder-results-shell,
 .db-live:not(.db-light) .native-deck-builder-set-browser-results {

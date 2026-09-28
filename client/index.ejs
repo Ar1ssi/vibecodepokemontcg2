@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>PTCG-sim | Pokémon TCG Tabletop Simulator </title>
+    <% const isBuilderWindow = typeof builderWindow !== 'undefined' && builderWindow; %>
+    <title><%= isBuilderWindow ? 'Deck Builder | PTCG-sim' : 'PTCG-sim | Pokémon TCG Tabletop Simulator' %></title>
     <meta name="description" content="PTCG-sim is an open-source Pokémon Trading Card Game (Pokémon TCG) tabletop simulator supporting single player and online multiplayer. Simulate your favorite card game!">
     <meta name="keywords" content="ptcg sim,ptcg,pokemon trading card game simulator,pokemon trading card game sim,pokemon tcg simulator,pokemon tcg sim,pokemon sim,pokemon simulator,pokemon card simulator,pokemon card sim,pokemon tabletop simulator,pokemon tabletop sim,pokemon,pokemon card,pokemonsim,pokemon game sim,ptcg os,pokemon open source"/>
     <meta charset="UTF-8">
@@ -33,7 +34,8 @@
         };
     </script>
 </head>
-<body>
+<%# /deck-builder renders this same page as the deck builder's own tab (design 050). %>
+<body<% if (isBuilderWindow) { %> class="deck-builder-window"<% } %>>
     <div id="importDataJSON" style="display: none;"><%= importDataJSON %></div>
     <div id="cover"></div>
     <div id="battleMat">
@@ -188,58 +190,21 @@
         </div>
        
     </div>
+    <!-- Deck tab: the deck builder opens in its own browser tab (design 050);
+         this panel keeps only the per-player card back. -->
     <div id="deckImport" class="sidebox">
-        <div>
-            <!-- <button id="decklistButton">New format decks</button>
-            <script>
-                const decklistButton = document.getElementById('decklistButton');
-                    decklistButton.addEventListener('click', function() {
-                    window.open('https://drive.google.com/drive/folders/1Vk04FldAH9dTzOI38O_KCUP4zPhm6pyn', '_blank');
-                });
-            </script> -->
-            </div>
-        <!-- Render targets populated by the native deck builder; hidden until in use. -->
-        <div id="nativeDeckBuilderSummary" style="display:none;"></div>
-        <div id="nativeDeckBuilderValidation" style="display:none;"></div>
-        <div id="nativeDeckBuilderCards" style="display:none;"></div>
         <div id="importButtonContainer">
             <button id="mainImportHeaderButton" class="main-select">P1</button>
             <button id="altImportHeaderButton">P2 (Solo only)</button>
         </div>
-        <textarea id="mainDeckImportInput" spellcheck="false"></textarea>
-        <script>
-            document.getElementById("mainDeckImportInput").placeholder = "Paste your decklist here or use the deck builder. \n\nClick the book 📖 to look through popular decks or click the wand 🪄 for a random deck! \n\nFor uploading custom images, write the quantity and name (i.e. 2 Pikachu) and click on the 'Import' button below. \n\nInternational languages are supported for cards using Limitless URLs.";
-        </script>          
-        <textarea id="altDeckImportInput" spellcheck="false"></textarea>
-        <script>
-            document.getElementById("altDeckImportInput").placeholder = "Paste the P2 decklist here for Solo mode. \n\nClick the book 📖 to look through popular decks or click the wand 🪄 for a random deck! \n\nFor uploading custom images, write the quantity and name (i.e. 2 Pikachu) and click on the 'Import' button below. \n\nInternational languages are supported for cards using Limitless URLs.";
-        </script>
-        <div id="importBottom">
-            <button id="decklistsButton">📖</button>
-            <button id="importButton">Import</button>
-            <button id="confirmButton">Confirm</button>
-            <button id="cancelButton">Cancel</button>
-            <button id="saveButton" class="neutral-color">Save</button>
-            <div id="decklistsContextMenu" class="decklists-context-menu"></div>
-            <button id="randomButton">🪄</button>
-            <div id="successText">Success!</div><div id="failedText">Error!</div><div id="loadingText"></div><div id="invalidText">Solo only!</div>
+        <div id="deckTabPanel">
+            <p class="deck-tab-intro">Build and load decks in the <strong>Deck Builder</strong> tab. Press <strong>Play</strong> there to load the deck into this game.</p>
+            <button id="openDeckBuilderButton" class="self-color">Open Deck Builder</button>
+            <p id="deckBuilderBlockedText" class="deck-tab-warning" role="alert" hidden>Your browser blocked the Deck Builder tab. Allow pop-ups for this site, then press Open Deck Builder again.</p>
         </div>
         <div id="uploadButtonsContainer">
             <button id="changeCardBackButton" class="self-color">Change Card Back</button>
-            <div class="language-container">
-                <button id="changeLanguageButton" class="neutral-color">Language: English</button>
-                <div id="languageDropdown">
-                    <ul>
-                        <li>English</li>
-                        <li>French</li>
-                        <li>German</li>
-                        <li>Italian</li>
-                        <li>Portuguese</li>
-                        <li>Spanish</li>
-                    </ul>
-                </div>
-            </div>
-        </div>                
+        </div>
     </div>
     
     <div id="nativeDeckBuilderWorkspace" class="native-deck-builder-workspace db-live">
@@ -249,6 +214,9 @@
                 <div>
                     <strong>Deck Builder</strong>
                     <div class="native-deck-builder-subtitle">Search cards, build decks, and load them directly into the simulator.</div>
+                </div>
+                <div id="nativeDeckBuilderLinkBanner" class="native-deck-builder-link-banner" role="status" hidden>
+                    Not connected to a game tab. Open the deck builder from the game's Deck tab to play; your decks still save here.
                 </div>
                 <div class="native-deck-builder-actions">
                     <button id="nativeDeckBuilderThemeToggle" class="native-deck-builder-theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme">☀️</button>
@@ -292,21 +260,27 @@
                                 <option value="tcg">TCG</option>
                                 <option value="pocket">Pocket</option>
                             </select>
-                            <select id="nativeDeckBuilderSortBy" class="native-deck-builder-search-select">
+                            <select id="nativeDeckBuilderSortBy" class="native-deck-builder-search-select" aria-label="Sort by">
                                 <option value="releaseDate">Release Date</option>
                                 <option value="name">Name</option>
+                                <option value="hp">HP</option>
+                                <option value="number">Number</option>
                             </select>
-                            <select id="nativeDeckBuilderSortDirection" class="native-deck-builder-search-select">
+                            <select id="nativeDeckBuilderSortDirection" class="native-deck-builder-search-select" aria-label="Sort direction">
                                 <option value="desc">Desc</option>
                                 <option value="asc">Asc</option>
                             </select>
                             <button id="nativeDeckBuilderSearchButton" class="self-color">Search</button>
+                            <button id="nativeDeckBuilderFiltersButton" class="native-deck-builder-filters-button" type="button" aria-controls="nativeDeckBuilderFilterDrawer" aria-expanded="false">Filters <span class="native-deck-builder-filters-count" data-filters-count hidden>0</span></button>
                         </div>
-                        <div id="nativeDeckBuilderFilterBar" class="native-deck-builder-filter-bar" role="group" aria-label="Card filters"></div>
+                        <div id="nativeDeckBuilderFilterChips" class="native-deck-builder-fchips" aria-label="Active filters" hidden></div>
                         <div id="nativeDeckBuilderSearchStatus" class="native-deck-builder-search-status"></div>
                     </div>
                     <div class="native-deck-builder-results-shell">
                         <div id="nativeDeckBuilderSearchResults" class="native-deck-builder-search-results"></div>
+                        <!-- TCG Live filter drawer (design 050): slides over the result grid. -->
+                        <div id="nativeDeckBuilderFilterScrim" class="native-deck-builder-fdrawer-scrim" hidden></div>
+                        <div id="nativeDeckBuilderFilterDrawer" class="native-deck-builder-fdrawer" role="dialog" aria-label="Card filters" hidden></div>
                     </div>
                     <div id="nativeDeckBuilderSetBrowserPanel" class="native-deck-builder-set-browser" hidden>
                     </div>
@@ -620,19 +594,6 @@
             </p>
         </div>
     </div>
-
-    <table id="decklistTable">
-        <thead>
-            <tr>
-                <th>QTY</th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>URL</th>
-            </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
 
     <table id="selfCurrentDecklistTable" style="display: none;"></table>
     <table id="oppCurrentDecklistTable" style="display: none;"></table>
