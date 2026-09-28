@@ -30,6 +30,7 @@ import {
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
 import { initializeBuildBattle } from './native-deck-builder-build-battle.js';
+import { initializeEliteTrainerBox } from './native-deck-builder-etb.js';
 import { systemState } from '../../../state.js';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { cachedFetchJson } from '../../../../../shared/tcgdex/tcgdex-cache.mjs';
@@ -493,6 +494,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const tabPool = document.getElementById('buildBattleTabPool');
       const boxPanel = document.getElementById('buildBattleBoxPanel');
       const poolPanel = document.getElementById('buildBattlePoolPanel');
+      const tabShelf = document.getElementById('etbTabShelf');
+      const tabCollection = document.getElementById('etbTabCollection');
+      const shelfPanel = document.getElementById('etbShelfPanel');
+      const collectionPanel = document.getElementById('etbCollectionPanel');
       const searchPane = document.querySelector('.native-deck-builder-pane-main-header');
       const resultsShell = document.querySelector('.native-deck-builder-results-shell');
       const browserPanel = document.getElementById('nativeDeckBuilderSetBrowserPanel');
@@ -533,6 +538,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         tabPool?.classList.toggle('active', mode === 'pool');
         if (boxPanel) boxPanel.hidden = mode !== 'box';
         if (poolPanel) poolPanel.hidden = mode !== 'pool';
+        tabShelf?.classList.toggle('active', mode === 'shelf');
+        tabCollection?.classList.toggle('active', mode === 'collection');
+        if (shelfPanel) shelfPanel.hidden = mode !== 'shelf';
+        if (collectionPanel) collectionPanel.hidden = mode !== 'collection';
         closeFilterDrawer();
         // Filters applied from Browse Sets re-run the search when it is next shown.
         if (isSearch && searchIsStale) {
@@ -866,6 +875,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let deckListFilter = null;
   // The Box / Pool controller; null outside Build & Battle, and until it boots below.
   let buildBattle = null;
+  // The Shelf / Collection controller (design 055); null outside the Standard builder tab.
+  let eliteTrainerBox = null;
   // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
   const currentDeckFormat = () =>
     isBuildBattle
@@ -1460,6 +1471,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
     renderResults();
     buildBattle?.refresh();
+    eliteTrainerBox?.refresh();
   };
 
   const loadCurrentDeck = () => {
@@ -1871,6 +1883,27 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       waitForRoom: isEditor && gameLink.isConnected(),
     });
     switchMode(buildBattle.initialMode());
+  }
+
+  if (isEditor && !isBuildBattle && shelfPanel) {
+    tabShelf?.addEventListener('click', () => switchMode('shelf'));
+    tabCollection?.addEventListener('click', () => switchMode('collection'));
+    eliteTrainerBox = initializeEliteTrainerBox({
+      shelfPanelEl: shelfPanel,
+      collectionPanelEl: collectionPanel,
+      getDeck: () => deck,
+      addToDeck: (card) => {
+        deck = addCard(deck, card);
+        deckDirty = true;
+        render();
+        flashDeckStatus();
+      },
+      showShelf: () => switchMode('shelf'),
+      showCollection: () => switchMode('collection'),
+      onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
+    });
+    const etbMode = eliteTrainerBox.initialMode();
+    if (etbMode) switchMode(etbMode);
   }
 
   render();

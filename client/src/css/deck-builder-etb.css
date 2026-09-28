@@ -1,0 +1,101 @@
+/*
+ * Elite Trainer Box Shelf and Collection (design 055) in the Standard deck
+ * builder tab (`body.etb-host`). Panels, buttons and card tiles come from
+ * deck-builder-build-battle.css; this sheet adds the shelf cards and the
+ * owned badges. Scoped under `.db-live` so the Live tokens apply.
+ */
+
+.etb-host .db-live .etb-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.4vh 1vw;
+}
+
+.etb-host .db-live .etb-shelf__card {
+  display: flex;
+  gap: 1vw;
+  padding: 1.4vh 1vw;
+  background: linear-gradient(160deg, var(--db-panel-2), var(--db-panel));
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius);
+  box-shadow: var(--db-shadow);
+}
+
+/* The lid seen from above: black field, the box art, the red "Elite Trainer Box" plate. */
+.etb-host .db-live .etb-shelf__box {
+  position: relative;
+  flex: 0 0 auto;
+  width: 132px;
+  aspect-ratio: 1 / 0.76;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #0b0b10;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 6px 14px rgba(0, 0, 0, 0.45);
+}
+.etb-host .db-live .etb-shelf__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+}
+.etb-host .db-live .etb-shelf__plate {
+  position: absolute;
+  inset: 0 0 auto;
+  padding: 3px 0;
+  background: #c8102e;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.etb-host .db-live .etb-shelf__body {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.8vh;
+}
+.etb-host .db-live .etb-shelf__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8vh 0.8vw;
+  margin-top: auto;
+}
+
+.etb-host .db-live .etb-shelf__inflight {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1vh 1vw;
+  padding: 0.8vh 0.9vw;
+  border: 1px solid var(--db-gold-dark);
+  border-radius: var(--db-radius-sm);
+  background: var(--db-panel-2);
+}
+
+/* A deck holding more copies than the boxes gave: amber, never blocking (design 055 row 12). */
+.etb-host .db-live .etb-owned-card.is-over .bb-pool-badge {
+  background: #b7791f;
+  color: #1b2127;
+}
+
+@media (max-width: 520px) {
+  .etb-host .db-live .etb-shelf {
+    grid-template-columns: 1fr;
+  }
+  .etb-host .db-live .etb-shelf__card {
+    flex-direction: column;
+  }
+  .etb-host .db-live .etb-shelf__box {
+    width: 100%;
+  }
+}

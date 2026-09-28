@@ -334,6 +334,12 @@ const cardFallback = (card) => {
   return node;
 };
 
+// The end of an Elite Trainer Box opening: everything it held is already in the collection.
+const etbDoneText = (packs, contents) => {
+  const cards = packs.reduce((sum, pack) => sum + pack.length, 0) + (contents.promo ? 1 : 0);
+  const energy = contents.energy.reduce((sum, [, count]) => sum + count, 0);
+  return `Everything is in your collection: ${cards} cards · ${energy} Energy · sleeves · coin`;
+};
 
 // ── Scene ─────────────────────────────────────────────────────────────────
 /**
@@ -348,7 +354,12 @@ const cardFallback = (card) => {
  * @param {object|null} options.promo the deck's foil promo card row
  * @param {object|null} options.product the box's art descriptor (`productArt(key)`); null draws
  *   the Build & Battle box with CSS faces only
- * @param {() => void} options.onBuildDeck ends the opening: closes the stage, shows the Pool tab
+ * @param {object|null} [options.contents] an Elite Trainer Box's non-pack contents (`etbContents`,
+ *   design 055); null for a Build & Battle box. With contents the tray holds the promo pouch and
+ *   the packs, and the end of the scene points at the collection.
+ * @param {(destination: 'collection'|'shelf') => void} options.onFinish ends the opening: the
+ *   last summary's button asks for 'collection', Skip scene for 'shelf' (Build & Battle ignores it
+ *   and shows its Pool tab)
  * @returns {{unmount: () => void}}
  */
 export const mountUnboxingScene = ({
@@ -360,11 +371,14 @@ export const mountUnboxingScene = ({
   seed,
   promo,
   product,
-  onBuildDeck,
+  contents = null,
+  onFinish,
 }) => {
   const art = product || PROCEDURAL_ONLY_ART;
   const size = boxSizeFor(art.proportions);
-  const artIndexes = packArtIndexes(seed);
+  const artIndexes = packArtIndexes(seed, packs.length);
+  const isEtb = Boolean(contents);
+  const doneText = isEtb ? etbDoneText(packs, contents) : 'All four packs are open.';
   const textures = new Map();
   const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
   const slotOf = (packIndex, cardIndex) =>
@@ -523,7 +537,7 @@ export const mountUnboxingScene = ({
   };
 
   const renderDeck = (u) => {
-    const deck = button('bb-deck', 'Unwrap the deck');
+    const deck = button('bb-deck', isEtb ? 'Open the promo pouch' : 'Unwrap the deck');
     deck.disabled = u.stage !== 'opened';
     const stack = el('div', 'bb-deck__stack');
     stack.append(cardBackImg('bb-deck__back'));
@@ -538,7 +552,7 @@ export const mountUnboxingScene = ({
       windowEl.append(img);
       deck.append(windowEl, el('div', 'bb-deck__wrap'));
     }
-    deck.append(el('span', 'bb-tray__label', '40-card deck'));
+    deck.append(el('span', 'bb-tray__label', isEtb ? 'Promo pouch' : '40-card deck'));
     deck.addEventListener('click', beatUnwrapDeck);
     return deck;
   };
@@ -573,6 +587,7 @@ export const mountUnboxingScene = ({
     const tray = el('div', 'bb-tray');
     tray.append(trayItem(0, renderDeck(u)));
     if (u.stage !== 'opened') tray.append(renderPromo());
+    if (isEtb) return tray;
     tray.append(
       trayItem(1, renderProp('code', 'Code card', 'Pokémon TCG Live')),
       trayItem(2, renderProp('tips', 'How to play', 'Quick-start sheet'))
@@ -721,7 +736,7 @@ export const mountUnboxingScene = ({
   const hintFor = (u, view) => {
     if (view === 'summary') {
       return u.stage === 'done'
-        ? 'All four packs are open. Your deck is ready to build.'
+        ? `${doneText}${isEtb ? '' : ' Your deck is ready to build.'}`
         : `Pack ${summaryPack + 1} done. On to pack ${nextPackToTear(u) + 1}.`;
     }
     if (view === 'pocket') {
@@ -734,9 +749,11 @@ export const mountUnboxingScene = ({
     if (u.stage === 'sealed') {
       return u.wrapTorn ? 'Open the lid.' : 'Drag across the shrink-wrap to tear it off, or press it.';
     }
-    if (u.stage === 'opened') return 'Unwrap the deck to see its foil promo.';
+    if (u.stage === 'opened') {
+      return isEtb ? 'Open the promo pouch to see your promo.' : 'Unwrap the deck to see its foil promo.';
+    }
     if (u.stage === 'deckShown') return 'Here come your packs…';
-    return 'All four packs are open. Build your deck from your pool.';
+    return isEtb ? doneText : `${doneText} Build your deck from your pool.`;
   };
 
   const control = (label, name, onClick, primary = false) => {
@@ -755,12 +772,16 @@ export const mountUnboxingScene = ({
     if (view === 'pocket') {
       controls.append(control('Reveal all', 'reveal-all', () => revealAllPack(lastTorn(getUnboxing()))));
     }
+    const finishLabel = isEtb ? 'See collection' : 'Build your deck';
     if (view === 'summary' && u.stage === 'done') {
-      controls.append(control('Build your deck', 'build', finishScene, true));
+      controls.append(control(finishLabel, 'build', () => finishScene('collection'), true));
     } else if (view === 'summary') {
       controls.append(control('Next pack', 'next-pack', showNextPack, true));
     } else if (u.stage === 'done') {
-      controls.append(control('Build your deck', 'build', onBuildDeck, true));
+      controls.append(control(finishLabel, 'build', () => onFinish('collection'), true));
+    }
+    if (isEtb && u.stage === 'done') {
+      controls.append(control('Open another', 'open-another', () => onFinish('shelf')));
     }
     if (u.stage !== 'done') controls.append(control('Skip scene', 'skip', skipScene));
     dock.append(hint, controls);
@@ -1231,7 +1252,7 @@ export const mountUnboxingScene = ({
   }
 
   // ── End of the scene ─────────────────────────────────────────────────
-  const finishScene = async () => {
+  const finishScene = async (destination) => {
     if (collapsing) return;
     collapsing = true;
     await withBackstop(
@@ -1243,7 +1264,7 @@ export const mountUnboxingScene = ({
         { samples: 12 }
       )
     );
-    onBuildDeck();
+    onFinish(destination);
   };
 
   // Skip scene: a pack mid-reveal is revealed first, since `finish` refuses mid-pack.
@@ -1262,7 +1283,7 @@ export const mountUnboxingScene = ({
     sound(unboxingVoiceFor('finish'));
     summaryPack = null;
     render();
-    onBuildDeck();
+    onFinish('shelf');
   }
 
   // ── Tear input: drag ≥ 40 % across, or press (row 5); Enter/Space on the button ─

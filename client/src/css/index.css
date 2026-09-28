@@ -22,6 +22,7 @@
 @import url('./deck-builder-pc-box.css');
 @import url('./deck-builder-build-battle.css');
 @import url('./deck-builder-unboxing.css');
+@import url('./deck-builder-etb.css');
 
 :root {
   --mat-half-height: 50vh;

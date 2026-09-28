@@ -170,3 +170,20 @@ test('parent-page overlays are still killed by the body class', () => {
   // mat-fx.css overlays are body children, so they use body.fx-off, not :root.
   assert.ok(read('mat-fx.css').includes('body.fx-off .fx-overlay'));
 });
+
+test('the Elite Trainer Box sheet is loaded and has no unguarded idle loop', () => {
+  // Design 055: the Shelf and Collection live in the builder tab, a parent page (body guard).
+  const css = read('deck-builder-etb.css');
+  const guarded = guardSelectors(css, 'body.fx-off').map(tokensOf);
+  for (const selector of idleSelectors(css)) {
+    assert.ok(guarded.some((g) => isSubset(g, tokensOf(selector))), `"${selector}" is not covered by body.fx-off`);
+  }
+  assert.ok(read('index.css').includes("@import url('./deck-builder-etb.css')"));
+});
+
+test('the Build & Battle sheets also style the Standard builder tab that hosts the ETB scene', () => {
+  for (const name of ['deck-builder-unboxing.css', 'deck-builder-build-battle.css']) {
+    const css = read(name);
+    assert.ok(!/(?<!:is\()\.build-battle-window(?!, \.etb-host\))/.test(css), `${name}: a rule misses .etb-host`);
+  }
+});

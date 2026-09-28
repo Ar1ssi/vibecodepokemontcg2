@@ -2,14 +2,15 @@
  * Build & Battle tab (design 051): the Box and Pool panels of the deck builder
  * on /build-and-battle. Scoped under the tab's body class and the builder's
  * `.db-live` workspace, so the tokens from deck-builder-live.css (dark and
- * light) apply and nothing here needs !important.
+ * light) apply and nothing here needs !important. `.etb-host` is the Standard
+ * builder tab, whose Shelf and Collection (design 055) reuse these panels.
  */
 
-.build-battle-window .db-live .native-deck-builder-mode-tab[hidden] {
+:is(.build-battle-window, .etb-host) .db-live .native-deck-builder-mode-tab[hidden] {
   display: none;
 }
 
-.build-battle-window .db-live .bb-panel {
+:is(.build-battle-window, .etb-host) .db-live .bb-panel {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -18,11 +19,11 @@
   flex-direction: column;
   gap: 1.4vh;
 }
-.build-battle-window .db-live .bb-panel[hidden] {
+:is(.build-battle-window, .etb-host) .db-live .bb-panel[hidden] {
   display: none;
 }
 
-.build-battle-window .db-live .bb-banner {
+:is(.build-battle-window, .etb-host) .db-live .bb-banner {
   margin: 0;
   padding: 0.7vh 0.9vw;
   border: 1px solid var(--db-gold-dark);
@@ -32,44 +33,44 @@
   font-size: 1.4vh;
 }
 
-.build-battle-window .db-live .bb-title {
+:is(.build-battle-window, .etb-host) .db-live .bb-title {
   margin: 0;
   font-size: 1.9vh;
   color: var(--db-text);
 }
 
-.build-battle-window .db-live .bb-note {
+:is(.build-battle-window, .etb-host) .db-live .bb-note {
   margin: 0;
   font-size: 1.4vh;
   color: var(--db-text-dim);
 }
 
-.build-battle-window .db-live .bb-primary,
-.build-battle-window .db-live .bb-secondary {
+:is(.build-battle-window, .etb-host) .db-live .bb-primary,
+:is(.build-battle-window, .etb-host) .db-live .bb-secondary {
   border-radius: var(--db-radius-pill);
   padding: 0.6vh 1.1vw;
   font-size: 1.4vh;
   font-weight: 600;
   cursor: pointer;
 }
-.build-battle-window .db-live .bb-primary {
+:is(.build-battle-window, .etb-host) .db-live .bb-primary {
   background: var(--db-gold);
   color: #1b2127;
   border: 1px solid var(--db-gold-dark);
 }
-.build-battle-window .db-live .bb-secondary {
+:is(.build-battle-window, .etb-host) .db-live .bb-secondary {
   background: var(--db-raised);
   color: var(--db-text);
   border: 1px solid var(--db-border-strong);
 }
-.build-battle-window .db-live .bb-primary:disabled,
-.build-battle-window .db-live .bb-secondary:disabled {
+:is(.build-battle-window, .etb-host) .db-live .bb-primary:disabled,
+:is(.build-battle-window, .etb-host) .db-live .bb-secondary:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
 /* ── Sealed box ───────────────────────────────────────────────────────── */
-.build-battle-window .db-live .bb-sealed {
+:is(.build-battle-window, .etb-host) .db-live .bb-sealed {
   align-self: center;
   max-width: 420px;
   margin-top: 4vh;
@@ -85,14 +86,14 @@
   box-shadow: var(--db-shadow);
 }
 
-.build-battle-window .db-live .bb-seed-label {
+:is(.build-battle-window, .etb-host) .db-live .bb-seed-label {
   display: flex;
   align-items: center;
   gap: 0.5vw;
   font-size: 1.4vh;
   color: var(--db-text-dim);
 }
-.build-battle-window .db-live .bb-seed-input {
+:is(.build-battle-window, .etb-host) .db-live .bb-seed-input {
   width: 9em;
   padding: 0.4vh 0.6vw;
   background: var(--db-input);
@@ -102,38 +103,38 @@
 }
 
 /* ── Opened box ───────────────────────────────────────────────────────── */
-.build-battle-window .db-live .bb-box-header {
+:is(.build-battle-window, .etb-host) .db-live .bb-box-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1vh 1vw;
 }
-.build-battle-window .db-live .bb-box-actions {
+:is(.build-battle-window, .etb-host) .db-live .bb-box-actions {
   display: flex;
   gap: 0.5vw;
 }
 
 /* ── Pool ─────────────────────────────────────────────────────────────── */
-.build-battle-window .db-live .bb-pool-status {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-status {
   margin: 0;
   min-height: 1.6em;
   font-size: 1.4vh;
   color: var(--db-gold);
 }
-.build-battle-window .db-live .bb-pool-group-title {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-group-title {
   margin: 0 0 0.6vh;
   font-size: 1.5vh;
   color: var(--db-text-dim);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.build-battle-window .db-live .bb-pool-grid {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 0.6vw;
 }
-.build-battle-window .db-live .bb-pool-card {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-card {
   position: relative;
   padding: 0;
   border: 0;
@@ -141,19 +142,19 @@
   cursor: pointer;
   border-radius: 5px;
 }
-.build-battle-window .db-live .bb-pool-card:hover .bb-pool-card-image {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-card:hover .bb-pool-card-image {
   box-shadow: 0 0 0 2px var(--db-gold);
 }
-.build-battle-window .db-live .bb-pool-card-image {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-card-image {
   display: block;
   width: 100%;
   aspect-ratio: 63 / 88;
   border-radius: 5px;
 }
-.build-battle-window .db-live .bb-pool-card.is-spent .bb-pool-card-image {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-card.is-spent .bb-pool-card-image {
   filter: grayscale(0.85) brightness(0.6);
 }
-.build-battle-window .db-live .bb-pool-badge {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-badge {
   position: absolute;
   right: 4px;
   bottom: 4px;
@@ -165,7 +166,7 @@
   font-weight: 700;
   box-shadow: var(--db-shadow-soft);
 }
-.build-battle-window .db-live .bb-pool-card.is-unlimited .bb-pool-badge {
+:is(.build-battle-window, .etb-host) .db-live .bb-pool-card.is-unlimited .bb-pool-badge {
   color: var(--db-gold);
 }
 
@@ -181,6 +182,6 @@
 }
 
 /* Disabled Play says why in its title; make that discoverable. */
-.build-battle-window .db-live .native-deck-builder-play-button:disabled[title]:not([title='']) {
+:is(.build-battle-window, .etb-host) .db-live .native-deck-builder-play-button:disabled[title]:not([title='']) {
   cursor: help;
 }

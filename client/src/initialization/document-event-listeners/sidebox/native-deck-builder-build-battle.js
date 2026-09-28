@@ -33,7 +33,7 @@ import {
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
 import { advanceUnboxing } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
-import { fxDisabled, motionReduced } from '../../../setup/image-logic/mat-fx.mjs';
+import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
@@ -59,10 +59,6 @@ const NEW_ROOM_TEXT =
 const ROOM_WAIT_MS = 800;
 const NEW_BOX_CONFIRM =
   'Discard this pool and open a new box? Your built deck stays in My Decks.';
-const STAGE_ACTIVE_CLASS = 'bb-unboxing-active';
-const UI_ENTER_CLASS = 'bb-ui-enter';
-const STAGE_FADE_MS = 360;
-const UI_ENTER_MS = 900;
 const POOL_GROUPS = [
   ['Pokémon', 'Pokémon'],
   ['Trainer', 'Trainers'],
@@ -137,14 +133,12 @@ export const initializeBuildBattle = ({
   let memoryOnly = false;
   let poolStatus = '';
   let scene = null;
-  let stageEl = null;
   // The game tab's room (null outside one); a box belongs to the room it was opened for.
   let currentRoomId = null;
   let resumed = false;
   let resumeTimer = null;
   let newRoomNote = false;
-  // The builder workspace: the stage is its child so the Live tokens and scene CSS apply.
-  const workspaceEl = boxPanelEl?.closest('.db-live') || null;
+  const stage = createStage(boxPanelEl?.closest('.db-live') || null, `Opening your ${BOX.name}`);
 
   const deckEntryOf = (activeSession) =>
     getBuildBattleBox(activeSession.boxKey)?.decks.find((deck) => deck.key === activeSession.deckKey);
@@ -255,38 +249,9 @@ export const initializeBuildBattle = ({
     poolPanelEl.classList.add('bb-enter');
   };
 
-  // ── Fullscreen stage (the opening hides the builder UI) ─────────────────
-  const openStage = () => {
-    if (stageEl || !workspaceEl) return stageEl;
-    stageEl = el('div', 'bb-stage');
-    stageEl.id = 'bbUnboxingStage';
-    stageEl.setAttribute('role', 'dialog');
-    stageEl.setAttribute('aria-label', `Opening your ${BOX.name}`);
-    workspaceEl.classList.remove(UI_ENTER_CLASS);
-    workspaceEl.classList.add(STAGE_ACTIVE_CLASS);
-    workspaceEl.append(stageEl);
-    return stageEl;
-  };
-
-  // The stage fades out while the builder UI loads back in, piece by piece (CSS stagger).
-  const closeStage = () => {
-    if (!stageEl) return;
-    const leaving = stageEl;
-    stageEl = null;
-    workspaceEl?.classList.remove(STAGE_ACTIVE_CLASS);
-    if (motionReduced() || fxDisabled()) {
-      leaving.remove();
-      return;
-    }
-    leaving.classList.add('is-leaving');
-    setTimeout(() => leaving.remove(), STAGE_FADE_MS);
-    workspaceEl?.classList.add(UI_ENTER_CLASS);
-    setTimeout(() => workspaceEl?.classList.remove(UI_ENTER_CLASS), UI_ENTER_MS);
-  };
-
   const finishOpening = () => {
-    if (stageEl) {
-      closeStage();
+    if (stage.el) {
+      stage.close();
       renderBox();
     }
     handOverToPool();
@@ -355,10 +320,10 @@ export const initializeBuildBattle = ({
 
     const root = el('div', 'bb-scene');
     root.id = 'bbUnboxing';
-    const stage = unboxingDone() ? null : openStage();
-    if (stage) {
+    const stageEl = unboxingDone() ? null : stage.open();
+    if (stageEl) {
       root.classList.add('bb-scene--stage');
-      stage.replaceChildren(root);
+      stageEl.replaceChildren(root);
       boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
     } else {
       boxPanelEl.append(root);
@@ -372,7 +337,7 @@ export const initializeBuildBattle = ({
       seed: session.seed,
       promo: boxDecks[session.deckKey]?.find((row) => row.id === deckEntry.promoId) || null,
       product: productArt(BOX.key),
-      onBuildDeck: finishOpening,
+      onFinish: finishOpening,
     });
   };
 
@@ -380,7 +345,7 @@ export const initializeBuildBattle = ({
     if (!boxPanelEl) return;
     scene?.unmount();
     scene = null;
-    if (unboxingDone()) closeStage();
+    if (unboxingDone()) stage.close();
     boxPanelEl.replaceChildren();
     if (!resumed) return; // still waiting for the game tab to name its room
     renderBanner(boxPanelEl);

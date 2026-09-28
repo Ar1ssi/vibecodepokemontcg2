@@ -37,7 +37,7 @@
 </head>
 <%# /deck-builder renders this same page as the deck builder's own tab (design 050);
     /build-and-battle is that tab in Build & Battle mode (design 051). %>
-<body<% if (isBuildBattle) { %> class="deck-builder-window build-battle-window"<% } else if (isBuilderWindow) { %> class="deck-builder-window"<% } %>>
+<body<% if (isBuildBattle) { %> class="deck-builder-window build-battle-window"<% } else if (isBuilderWindow) { %> class="deck-builder-window etb-host"<% } %>>
     <div id="importDataJSON" style="display: none;"><%= importDataJSON %></div>
     <div id="cover"></div>
     <div id="battleMat">
@@ -257,6 +257,9 @@
                             <% if (isBuildBattle) { %>
                             <button id="buildBattleTabBox" class="native-deck-builder-mode-tab" type="button">Box</button>
                             <button id="buildBattleTabPool" class="native-deck-builder-mode-tab" type="button">Pool</button>
+                            <% } else if (isBuilderWindow) { %>
+                            <button id="etbTabShelf" class="native-deck-builder-mode-tab" type="button">Shelf</button>
+                            <button id="etbTabCollection" class="native-deck-builder-mode-tab" type="button">Collection</button>
                             <% } %>
                             <button id="nativeDeckBuilderTabCustomize" class="native-deck-builder-mode-tab" type="button">Customize</button>
                         </div>
@@ -296,6 +299,9 @@
                     <% if (isBuildBattle) { %>
                     <div id="buildBattleBoxPanel" class="bb-panel" hidden></div>
                     <div id="buildBattlePoolPanel" class="bb-panel" hidden></div>
+                    <% } else if (isBuilderWindow) { %>
+                    <div id="etbShelfPanel" class="bb-panel" hidden></div>
+                    <div id="etbCollectionPanel" class="bb-panel" hidden></div>
                     <% } %>
                     <div id="nativeDeckBuilderCustomizeSwitcher" hidden>
                       <div class="customize-switcher-toggle" role="tablist">

@@ -6,10 +6,11 @@
  * `.bb-box__body`, `.bb-box__lid` and `.bb-pcard__flip` are preserve-3d, and
  * opacity never animates on them (house rule: it would flatten them).
  * The JS gate for motion is the ptcg-reduce-motion flag; the media query at
- * the end is the CSS fallback for the idle loops.
+ * the end is the CSS fallback for the idle loops. `.etb-host` is the Standard
+ * builder tab, where the Elite Trainer Box opening (design 055) plays.
  */
 
-.build-battle-window .db-live .bb-scene {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene {
   --bb-black: #0b0b10;
   --bb-magenta: #ff2fa3;
   --bb-lime: #7fe000;
@@ -29,28 +30,28 @@
   min-width: 0;
 }
 
-.build-battle-window .db-live .bb-scene__top {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene__top {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 1.6vh 1.4vw;
 }
 
-.build-battle-window .db-live .bb-hint {
+:is(.build-battle-window, .etb-host) .db-live .bb-hint {
   margin: 0;
   min-height: 1.5em;
   font-size: 1.4vh;
   color: var(--db-gold);
 }
 
-.build-battle-window .db-live .bb-controls {
+:is(.build-battle-window, .etb-host) .db-live .bb-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6vh 0.5vw;
 }
 
 /* ── The box: a perspective host around a preserve-3d cuboid ────────────── */
-.build-battle-window .db-live .bb-box {
+:is(.build-battle-window, .etb-host) .db-live .bb-box {
   position: relative;
   flex: 0 0 auto;
   width: calc(var(--bb-w) + 100px);
@@ -86,7 +87,7 @@
         var(--bb-box-zoom)
     );
 }
-.build-battle-window .db-live .bb-box::after {
+:is(.build-battle-window, .etb-host) .db-live .bb-box::after {
   content: '';
   position: absolute;
   left: 18%;
@@ -98,7 +99,7 @@
   pointer-events: none;
 }
 
-.build-battle-window .db-live .bb-box__body {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__body {
   position: relative;
   width: 0;
   height: 0;
@@ -107,39 +108,39 @@
   transform: rotateX(-14deg) rotateY(26deg);
 }
 
-.build-battle-window .db-live .bb-box__face {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face {
   position: absolute;
   overflow: hidden;
   backface-visibility: hidden;
   background: var(--bb-black);
 }
-.build-battle-window .db-live .bb-box__face--front,
-.build-battle-window .db-live .bb-box__face--back {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--front,
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--back {
   width: var(--bb-w);
   height: var(--bb-h);
   left: calc(var(--bb-w) / -2);
   top: calc(var(--bb-h) / -2);
 }
-.build-battle-window .db-live .bb-box__face--front {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--front {
   transform: translateZ(calc(var(--bb-d) / 2));
 }
-.build-battle-window .db-live .bb-box__face--back {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--back {
   transform: rotateY(180deg) translateZ(calc(var(--bb-d) / 2));
 }
-.build-battle-window .db-live .bb-box__face--left,
-.build-battle-window .db-live .bb-box__face--right {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--left,
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--right {
   width: var(--bb-d);
   height: var(--bb-h);
   left: calc(var(--bb-d) / -2);
   top: calc(var(--bb-h) / -2);
 }
-.build-battle-window .db-live .bb-box__face--left {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--left {
   transform: rotateY(-90deg) translateZ(calc(var(--bb-w) / 2));
 }
-.build-battle-window .db-live .bb-box__face--right {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--right {
   transform: rotateY(90deg) translateZ(calc(var(--bb-w) / 2));
 }
-.build-battle-window .db-live .bb-box__face--bottom {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--bottom {
   width: var(--bb-w);
   height: var(--bb-d);
   left: calc(var(--bb-w) / -2);
@@ -148,36 +149,36 @@
 }
 
 /* Inside the box: a rim of cardboard walls and the tray floor, seen once the lid is up. */
-.build-battle-window .db-live .bb-box__inner {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner {
   position: absolute;
   height: var(--bb-rim);
   top: calc(var(--bb-h) / -2);
   backface-visibility: hidden;
   background: linear-gradient(180deg, #3a2f28, #1e1916);
 }
-.build-battle-window .db-live .bb-box__inner--back,
-.build-battle-window .db-live .bb-box__inner--front {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--back,
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--front {
   width: var(--bb-w);
   left: calc(var(--bb-w) / -2);
 }
-.build-battle-window .db-live .bb-box__inner--left,
-.build-battle-window .db-live .bb-box__inner--right {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--left,
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--right {
   width: var(--bb-d);
   left: calc(var(--bb-d) / -2);
 }
-.build-battle-window .db-live .bb-box__inner--back {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--back {
   transform: translateZ(calc(var(--bb-d) / -2 + 1px));
 }
-.build-battle-window .db-live .bb-box__inner--front {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--front {
   transform: rotateY(180deg) translateZ(calc(var(--bb-d) / -2 + 1px));
 }
-.build-battle-window .db-live .bb-box__inner--left {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--left {
   transform: rotateY(90deg) translateZ(calc(var(--bb-w) / -2 + 1px));
 }
-.build-battle-window .db-live .bb-box__inner--right {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__inner--right {
   transform: rotateY(-90deg) translateZ(calc(var(--bb-w) / -2 + 1px));
 }
-.build-battle-window .db-live .bb-box__floor {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__floor {
   position: absolute;
   width: var(--bb-w);
   height: var(--bb-d);
@@ -195,7 +196,7 @@
 }
 
 /* The lid: a zero-size group on the back-top hinge; the JS sets its rotateX. */
-.build-battle-window .db-live .bb-box__lid {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__lid {
   position: absolute;
   left: 0;
   top: 0;
@@ -203,8 +204,8 @@
   height: 0;
   transform-style: preserve-3d;
 }
-.build-battle-window .db-live .bb-box__lid-outer,
-.build-battle-window .db-live .bb-box__lid-inner {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__lid-outer,
+:is(.build-battle-window, .etb-host) .db-live .bb-box__lid-inner {
   position: absolute;
   width: var(--bb-w);
   height: var(--bb-d);
@@ -213,16 +214,16 @@
   transform-origin: 50% 0;
   backface-visibility: hidden;
 }
-.build-battle-window .db-live .bb-box__lid-outer {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__lid-outer {
   transform: rotateX(90deg);
 }
-.build-battle-window .db-live .bb-box__lid-inner {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__lid-inner {
   transform: rotateX(90deg) rotateY(180deg);
   background: linear-gradient(180deg, #4a3d33, #2b231d);
 }
 
 /* A face photo squared by faceMatrix3d; the CSS face stays underneath as the fallback. */
-.build-battle-window .db-live .bb-box__texture {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__texture {
   position: absolute;
   left: 0;
   top: 0;
@@ -233,7 +234,7 @@
 }
 
 /* ── Procedural faces ─────────────────────────────────────────────────────── */
-.build-battle-window .db-live .bb-pf {
+:is(.build-battle-window, .etb-host) .db-live .bb-pf {
   position: absolute;
   inset: 0;
   color: #fff;
@@ -241,12 +242,12 @@
   line-height: 1.1;
 }
 
-.build-battle-window .db-live .bb-pf--front {
+:is(.build-battle-window, .etb-host) .db-live .bb-pf--front {
   display: grid;
   grid-template-rows: 19% 1fr 17% 11%;
   background: var(--bb-black);
 }
-.build-battle-window .db-live .bb-pf__strip {
+:is(.build-battle-window, .etb-host) .db-live .bb-pf__strip {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -258,7 +259,7 @@
     var(--bb-black) 88%
   );
 }
-.build-battle-window .db-live .bb-wordmark {
+:is(.build-battle-window, .etb-host) .db-live .bb-wordmark {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -266,27 +267,27 @@
   border-radius: 6px;
   background: var(--bb-red);
 }
-.build-battle-window .db-live .bb-wordmark__name {
+:is(.build-battle-window, .etb-host) .db-live .bb-wordmark__name {
   color: var(--bb-yellow);
   font-size: 15px;
   font-weight: 900;
   letter-spacing: -0.02em;
   -webkit-text-stroke: 0.6px #1d3a8a;
 }
-.build-battle-window .db-live .bb-wordmark__sub {
+:is(.build-battle-window, .etb-host) .db-live .bb-wordmark__sub {
   font-size: 4.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.build-battle-window .db-live .bb-wordmark--small .bb-wordmark__name {
+:is(.build-battle-window, .etb-host) .db-live .bb-wordmark--small .bb-wordmark__name {
   font-size: 11px;
 }
-.build-battle-window .db-live .bb-level {
+:is(.build-battle-window, .etb-host) .db-live .bb-level {
   display: flex;
   align-items: center;
 }
-.build-battle-window .db-live .bb-level__pill {
+:is(.build-battle-window, .etb-host) .db-live .bb-level__pill {
   display: flex;
   align-items: center;
   gap: 3px;
@@ -298,7 +299,7 @@
   text-transform: uppercase;
 }
 /* Two filled Poké Balls and one empty ring. */
-.build-battle-window .db-live .bb-level__pill::after {
+:is(.build-battle-window, .etb-host) .db-live .bb-level__pill::after {
   content: '';
   width: 26px;
   height: 8px;
@@ -330,7 +331,7 @@
       transparent 3.7px
     );
 }
-.build-battle-window .db-live .bb-age {
+:is(.build-battle-window, .etb-host) .db-live .bb-age {
   margin-left: auto;
   align-self: flex-start;
   padding: 1px 3px;
@@ -340,7 +341,7 @@
   font-size: 8px;
   font-weight: 800;
 }
-.build-battle-window .db-live .bb-keyart {
+:is(.build-battle-window, .etb-host) .db-live .bb-keyart {
   position: relative;
   overflow: hidden;
   background: linear-gradient(
@@ -355,7 +356,7 @@
     var(--bb-black) 84%
   );
 }
-.build-battle-window .db-live .bb-keyart__img {
+:is(.build-battle-window, .etb-host) .db-live .bb-keyart__img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -363,7 +364,7 @@
   object-fit: cover;
   object-position: 50% 28%;
 }
-.build-battle-window .db-live .bb-keyart__slashes {
+:is(.build-battle-window, .etb-host) .db-live .bb-keyart__slashes {
   position: absolute;
   inset: 0;
   opacity: 0.55;
@@ -378,7 +379,7 @@
     var(--bb-yellow) 60px 63px
   );
 }
-.build-battle-window .db-live .bb-setlogo {
+:is(.build-battle-window, .etb-host) .db-live .bb-setlogo {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -387,7 +388,7 @@
   gap: 2px;
   background: var(--bb-black);
 }
-.build-battle-window .db-live .bb-setlogo__mega {
+:is(.build-battle-window, .etb-host) .db-live .bb-setlogo__mega {
   padding: 1px 8px;
   border-radius: 999px;
   background: linear-gradient(90deg, #b4861d, #f6d65a, #b4861d);
@@ -396,7 +397,7 @@
   font-weight: 900;
   text-transform: uppercase;
 }
-.build-battle-window .db-live .bb-setlogo__name {
+:is(.build-battle-window, .etb-host) .db-live .bb-setlogo__name {
   color: #c9b8ff;
   font-size: 14px;
   font-weight: 900;
@@ -405,17 +406,17 @@
   text-transform: uppercase;
   text-shadow: 0 0 6px #7a3cff;
 }
-.build-battle-window .db-live .bb-setlogo__img {
+:is(.build-battle-window, .etb-host) .db-live .bb-setlogo__img {
   position: absolute;
   inset: 4px 10px;
   width: calc(100% - 20px);
   height: calc(100% - 8px);
   object-fit: contain;
 }
-.build-battle-window .db-live .bb-setlogo.has-logo > span {
+:is(.build-battle-window, .etb-host) .db-live .bb-setlogo.has-logo > span {
   visibility: hidden;
 }
-.build-battle-window .db-live .bb-bbtitle {
+:is(.build-battle-window, .etb-host) .db-live .bb-bbtitle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -428,7 +429,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.build-battle-window .db-live .bb-playmark {
+:is(.build-battle-window, .etb-host) .db-live .bb-playmark {
   flex: 0 0 auto;
   width: 11px;
   height: 11px;
@@ -442,7 +443,7 @@
 }
 
 /* Left/right: the front's slashes wrap around, with the strip and band colours as thin bands. */
-.build-battle-window .db-live .bb-pf--side {
+:is(.build-battle-window, .etb-host) .db-live .bb-pf--side {
   background:
     linear-gradient(
       180deg,
@@ -463,7 +464,7 @@
     );
 }
 
-.build-battle-window .db-live .bb-pf--back {
+:is(.build-battle-window, .etb-host) .db-live .bb-pf--back {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -483,28 +484,28 @@
     var(--bb-black);
   font-size: 7px;
 }
-.build-battle-window .db-live .bb-pf--back .bb-bbtitle {
+:is(.build-battle-window, .etb-host) .db-live .bb-pf--back .bb-bbtitle {
   padding: 3px 6px;
   font-size: 10px;
 }
-.build-battle-window .db-live .bb-back__rule {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__rule {
   align-self: stretch;
   height: 1px;
   background: var(--bb-gold);
 }
-.build-battle-window .db-live .bb-back__inside {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__inside {
   margin: 0;
   font-size: 9px;
   font-weight: 800;
 }
-.build-battle-window .db-live .bb-back__list {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__list {
   margin: 0;
   padding-left: 12px;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-.build-battle-window .db-live .bb-back__site {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__site {
   align-self: stretch;
   padding: 2px 0;
   background: var(--bb-red);
@@ -512,26 +513,26 @@
   text-align: center;
   text-transform: uppercase;
 }
-.build-battle-window .db-live .bb-back__legal {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__legal {
   align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-.build-battle-window .db-live .bb-back__legal i {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__legal i {
   height: 2px;
   background: rgba(255, 255, 255, 0.22);
 }
-.build-battle-window .db-live .bb-back__legal i:last-child {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__legal i:last-child {
   width: 60%;
 }
-.build-battle-window .db-live .bb-back__motto {
+:is(.build-battle-window, .etb-host) .db-live .bb-back__motto {
   margin: auto 0 0;
   font-weight: 800;
   font-style: italic;
 }
 
-.build-battle-window .db-live .bb-pf--cap {
+:is(.build-battle-window, .etb-host) .db-live .bb-pf--cap {
   display: grid;
   align-items: center;
   background:
@@ -542,7 +543,7 @@
     ),
     var(--bb-black);
 }
-.build-battle-window .db-live .bb-cap__band {
+:is(.build-battle-window, .etb-host) .db-live .bb-cap__band {
   display: flex;
   justify-content: center;
   padding: 4px 0;
@@ -550,8 +551,8 @@
 }
 
 /* Shrink-wrap: a glossy film with two diagonal streaks; clip-path peels it away. */
-.build-battle-window .db-live .bb-face__wrap,
-.build-battle-window .db-live .bb-deck__wrap {
+:is(.build-battle-window, .etb-host) .db-live .bb-face__wrap,
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__wrap {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -574,7 +575,7 @@
     );
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
-.build-battle-window .db-live .bb-box__face--back .bb-face__wrap {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__face--back .bb-face__wrap {
   /* The heat-seal seam down the back. */
   background-image:
     linear-gradient(
@@ -592,8 +593,8 @@
 }
 
 /* The wrap and lid hit areas cover the drawn box; they are buttons for keyboard users. */
-.build-battle-window .db-live .bb-box__wrap,
-.build-battle-window .db-live .bb-box__open {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__wrap,
+:is(.build-battle-window, .etb-host) .db-live .bb-box__open {
   position: absolute;
   inset: 112px 34px 34px;
   padding: 0;
@@ -602,22 +603,22 @@
   background: transparent;
   touch-action: pan-y;
 }
-.build-battle-window .db-live .bb-box__wrap {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__wrap {
   cursor: grab;
 }
-.build-battle-window .db-live .bb-box__open {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__open {
   cursor: pointer;
 }
-.build-battle-window .db-live .bb-box__wrap:focus-visible,
-.build-battle-window .db-live .bb-box__open:focus-visible,
-.build-battle-window .db-live .bb-deck:focus-visible,
-.build-battle-window .db-live .bb-pack__top:focus-visible {
+:is(.build-battle-window, .etb-host) .db-live .bb-box__wrap:focus-visible,
+:is(.build-battle-window, .etb-host) .db-live .bb-box__open:focus-visible,
+:is(.build-battle-window, .etb-host) .db-live .bb-deck:focus-visible,
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__top:focus-visible {
   outline: 2px solid var(--db-gold);
   outline-offset: 3px;
 }
 
 /* ── Tray ─────────────────────────────────────────────────────────────────── */
-.build-battle-window .db-live .bb-tray {
+:is(.build-battle-window, .etb-host) .db-live .bb-tray {
   flex: 1 1 260px;
   min-width: 0;
   display: flex;
@@ -626,10 +627,10 @@
   gap: 1.4vh 0.9vw;
   padding-top: 44px;
 }
-.build-battle-window .db-live .bb-tray__item {
+:is(.build-battle-window, .etb-host) .db-live .bb-tray__item {
   position: relative;
 }
-.build-battle-window .db-live .bb-tray__label {
+:is(.build-battle-window, .etb-host) .db-live .bb-tray__label {
   display: block;
   margin-top: 6px;
   font-size: 1.2vh;
@@ -638,7 +639,7 @@
   white-space: nowrap;
 }
 
-.build-battle-window .db-live .bb-deck {
+:is(.build-battle-window, .etb-host) .db-live .bb-deck {
   position: relative;
   padding: 0;
   border: 0;
@@ -646,17 +647,17 @@
   color: inherit;
   cursor: pointer;
 }
-.build-battle-window .db-live .bb-deck:disabled {
+:is(.build-battle-window, .etb-host) .db-live .bb-deck:disabled {
   cursor: default;
 }
-.build-battle-window .db-live .bb-deck__stack,
-.build-battle-window .db-live .bb-deck__window {
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__stack,
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__window {
   width: var(--bb-card-w);
   height: var(--bb-card-h);
   border-radius: var(--bb-card-radius);
   overflow: hidden;
 }
-.build-battle-window .db-live .bb-deck__stack {
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__stack {
   position: relative;
   box-shadow:
     1px 1px 0 #1b2230,
@@ -665,44 +666,44 @@
     4px 4px 0 #3a4459,
     5px 6px 12px rgba(0, 0, 0, 0.45);
 }
-.build-battle-window .db-live .bb-deck__window {
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__window {
   position: absolute;
   left: 0;
   top: 0;
 }
-.build-battle-window .db-live .bb-deck__back,
-.build-battle-window .db-live .bb-deck__promo {
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__back,
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__promo {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.build-battle-window .db-live .bb-deck__wrap {
+:is(.build-battle-window, .etb-host) .db-live .bb-deck__wrap {
   height: var(--bb-card-h);
   border-radius: var(--bb-card-radius);
 }
 
-.build-battle-window .db-live .bb-promo {
+:is(.build-battle-window, .etb-host) .db-live .bb-promo {
   width: calc(var(--bb-card-w) * 1.25);
   perspective: 700px;
 }
-.build-battle-window .db-live .bb-promo__lift {
+:is(.build-battle-window, .etb-host) .db-live .bb-promo__lift {
   transform-origin: 50% 100%;
 }
 
-.build-battle-window .db-live .bb-pack__body,
-.build-battle-window .db-live .bb-pack__strip {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__body,
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__strip {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1.8;
 }
-.build-battle-window .db-live .bb-pack__strip {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__strip {
   position: absolute;
   left: 0;
   top: 0;
   transform-origin: 0 8%;
 }
-.build-battle-window .db-live .bb-pack__art {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__art {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -711,12 +712,12 @@
   user-select: none;
 }
 /* Silver pack back when the art is missing. */
-.build-battle-window .db-live .bb-pack__body,
-.build-battle-window .db-live .bb-pocket__pack {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__body,
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket__pack {
   background: linear-gradient(180deg, #d9dbe0, #9aa0aa, #d9dbe0);
 }
 /* The two soft foil highlights of the real pack, drifting a few px. */
-.build-battle-window .db-live .bb-pack__foil {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__foil {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -740,7 +741,7 @@
     transform: translateX(2px);
   }
 }
-.build-battle-window .db-live .bb-pack__top {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__top {
   position: absolute;
   left: 0;
   right: 0;
@@ -752,10 +753,10 @@
   cursor: grab;
   touch-action: pan-y;
 }
-.build-battle-window .db-live .bb-pack__top:disabled {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__top:disabled {
   cursor: default;
 }
-.build-battle-window .db-live .bb-pack__top::after {
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__top::after {
   content: '';
   position: absolute;
   left: 6%;
@@ -765,14 +766,14 @@
   opacity: 0;
   transition: opacity 120ms;
 }
-.build-battle-window .db-live .bb-pack__top:not(:disabled):hover::after,
-.build-battle-window
+:is(.build-battle-window, .etb-host) .db-live .bb-pack__top:not(:disabled):hover::after,
+:is(.build-battle-window, .etb-host)
   .db-live
   .bb-pack__top:not(:disabled):focus-visible::after {
   opacity: 1;
 }
 
-.build-battle-window .db-live .bb-prop {
+:is(.build-battle-window, .etb-host) .db-live .bb-prop {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -785,41 +786,41 @@
   line-height: 1.15;
   box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.35);
 }
-.build-battle-window .db-live .bb-prop strong {
+:is(.build-battle-window, .etb-host) .db-live .bb-prop strong {
   font-size: 1.25vh;
 }
-.build-battle-window .db-live .bb-prop--code {
+:is(.build-battle-window, .etb-host) .db-live .bb-prop--code {
   background: linear-gradient(160deg, #1d4fa8, #0e2554);
   color: #fff;
 }
-.build-battle-window .db-live .bb-prop--tips {
+:is(.build-battle-window, .etb-host) .db-live .bb-prop--tips {
   background: linear-gradient(160deg, #fbf7ea, #e2dac2);
   color: #3a2f1c;
 }
 
-.build-battle-window .db-live .bb-card-holder {
+:is(.build-battle-window, .etb-host) .db-live .bb-card-holder {
   width: 100%;
 }
-.build-battle-window .db-live .bb-card-face {
+:is(.build-battle-window, .etb-host) .db-live .bb-card-face {
   display: block;
   width: 100%;
   aspect-ratio: 63 / 88;
   border-radius: var(--bb-card-radius);
 }
-.build-battle-window .db-live .card.bb-card-face {
+:is(.build-battle-window, .etb-host) .db-live .card.bb-card-face {
   aspect-ratio: var(--card-aspect);
 }
-.build-battle-window .db-live .bb-card-fallback {
+:is(.build-battle-window, .etb-host) .db-live .bb-card-fallback {
   position: relative;
   width: 100%;
 }
-.build-battle-window .db-live .bb-card-fallback__back {
+:is(.build-battle-window, .etb-host) .db-live .bb-card-fallback__back {
   display: block;
   width: 100%;
   aspect-ratio: 63 / 88;
   border-radius: var(--bb-card-radius);
 }
-.build-battle-window .db-live .bb-card-fallback__name {
+:is(.build-battle-window, .etb-host) .db-live .bb-card-fallback__name {
   position: absolute;
   left: 6%;
   right: 6%;
@@ -836,13 +837,13 @@
 }
 
 /* Hit flare and sparks live inside the clipped front: nothing leaves the card (row 12). */
-.build-battle-window .db-live .bb-flare,
-.build-battle-window .db-live .bb-sparks,
-.build-battle-window .db-live .bb-sweep {
+:is(.build-battle-window, .etb-host) .db-live .bb-flare,
+:is(.build-battle-window, .etb-host) .db-live .bb-sparks,
+:is(.build-battle-window, .etb-host) .db-live .bb-sweep {
   position: absolute;
   pointer-events: none;
 }
-.build-battle-window .db-live .bb-flare {
+:is(.build-battle-window, .etb-host) .db-live .bb-flare {
   inset: 0;
   opacity: 0;
   mix-blend-mode: screen;
@@ -853,12 +854,12 @@
     transparent 64%
   );
 }
-.build-battle-window .db-live .bb-sparks {
+:is(.build-battle-window, .etb-host) .db-live .bb-sparks {
   inset: 0;
   overflow: hidden;
   border-radius: inherit;
 }
-.build-battle-window .db-live .bb-sweep {
+:is(.build-battle-window, .etb-host) .db-live .bb-sweep {
   top: -10%;
   bottom: -10%;
   left: 30%;
@@ -874,7 +875,7 @@
 }
 
 /* The Pool tab fading in when the scene hands over. */
-.build-battle-window .db-live .bb-panel.bb-enter {
+:is(.build-battle-window, .etb-host) .db-live .bb-panel.bb-enter {
   animation: bb-pool-in 240ms ease-out both;
 }
 @keyframes bb-pool-in {
@@ -889,14 +890,14 @@
 }
 
 /* ── Fullscreen stage: the opening plays alone, the builder UI steps aside ──── */
-.build-battle-window .db-live.bb-unboxing-active > :not(.bb-stage) {
+:is(.build-battle-window, .etb-host) .db-live.bb-unboxing-active > :not(.bb-stage) {
   visibility: hidden;
   opacity: 0;
   transition:
     opacity 200ms ease-out,
     visibility 0s linear 200ms;
 }
-.build-battle-window .db-live .bb-stage {
+:is(.build-battle-window, .etb-host) .db-live .bb-stage {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -913,51 +914,51 @@
   color: var(--db-text);
   transition: opacity 360ms ease-out;
 }
-.build-battle-window .db-live .bb-stage.is-leaving {
+:is(.build-battle-window, .etb-host) .db-live .bb-stage.is-leaving {
   opacity: 0;
   pointer-events: none;
 }
-.build-battle-window .db-live .bb-scene--stage {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage {
   width: min(1100px, 100%);
   margin: auto;
   align-items: center;
   gap: 2vh;
 }
-.build-battle-window .db-live .bb-scene--stage .bb-scene__top {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage .bb-scene__top {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: center;
 }
-.build-battle-window .db-live .bb-scene--stage .bb-tray {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage .bb-tray {
   flex: 0 0 auto;
   max-width: 100%;
   justify-content: center;
   padding-top: 0;
 }
 /* Before the tray exists the box is the whole picture: bigger, dead centre. */
-.build-battle-window .db-live .bb-scene--stage[data-stage='sealed'] .bb-box {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage[data-stage='sealed'] .bb-box {
   --bb-m-t: 84px;
   --bb-m-x: 56px;
   --bb-m-b: 84px;
   --bb-box-scale: 1.35;
 }
-.build-battle-window .db-live .bb-scene--stage .bb-hint {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage .bb-hint {
   font-size: 1.8vh;
   text-align: center;
 }
-.build-battle-window .db-live .bb-scene--stage .bb-controls {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage .bb-controls {
   justify-content: center;
 }
 /* The dock (hint + controls) sits at the foot of the stage over the packs and cards. */
-.build-battle-window .db-live .bb-dock {
+:is(.build-battle-window, .etb-host) .db-live .bb-dock {
   display: flex;
   flex-direction: column;
   gap: 1vh;
 }
-.build-battle-window .db-live .bb-scene--stage {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage {
   padding-bottom: 12vh;
 }
-.build-battle-window .db-live .bb-scene--stage .bb-dock {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage .bb-dock {
   position: fixed;
   left: 0;
   right: 0;
@@ -966,21 +967,21 @@
   align-items: center;
   pointer-events: none;
 }
-.build-battle-window .db-live .bb-scene--stage .bb-dock > * {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage .bb-dock > * {
   pointer-events: auto;
 }
 
 /* ── Spread: the packs fly out of the box and fill the screen ────────────── */
-.build-battle-window .db-live .bb-scene--stage {
+:is(.build-battle-window, .etb-host) .db-live .bb-scene--stage {
   --bb-big-pack-w: min(30vh, 56vw);
   --bb-big-card-w: min(40vh, 66vw);
 }
-.build-battle-window .db-live .bb-spread {
+:is(.build-battle-window, .etb-host) .db-live .bb-spread {
   position: fixed;
   inset: 0;
   z-index: 1;
 }
-.build-battle-window .db-live .bb-bigpack {
+:is(.build-battle-window, .etb-host) .db-live .bb-bigpack {
   position: absolute;
   left: 50%;
   top: 45%;
@@ -990,20 +991,20 @@
     transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
     filter 320ms ease-out;
 }
-.build-battle-window .db-live .bb-bigpack__fly {
+:is(.build-battle-window, .etb-host) .db-live .bb-bigpack__fly {
   position: relative;
   filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.55));
 }
-.build-battle-window .db-live .bb-bigpack .bb-pack__top {
+:is(.build-battle-window, .etb-host) .db-live .bb-bigpack .bb-pack__top {
   height: 18%;
   cursor: grab;
   touch-action: none;
 }
-.build-battle-window .db-live .bb-bigpack .bb-pack__top::after {
+:is(.build-battle-window, .etb-host) .db-live .bb-bigpack .bb-pack__top::after {
   top: 42%;
 }
 /* The cut following the finger along the crimp. */
-.build-battle-window .db-live .bb-cutline {
+:is(.build-battle-window, .etb-host) .db-live .bb-cutline {
   position: absolute;
   left: 4%;
   right: 4%;
@@ -1017,7 +1018,7 @@
   pointer-events: none;
 }
 /* A glint running along the cut line: "swipe here". */
-.build-battle-window
+:is(.build-battle-window, .etb-host)
   .db-live
   .bb-bigpack.is-focus
   .bb-pack__top:not(:disabled)::before {
@@ -1055,7 +1056,7 @@
 }
 
 /* ── Pocket: the cards of the opened pack, one at a time ─────────────────── */
-.build-battle-window .db-live .bb-pocket {
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket {
   position: fixed;
   inset: 0;
   z-index: 1;
@@ -1066,21 +1067,21 @@
   gap: 2vh;
   padding: 3vh 16px 16vh;
 }
-.build-battle-window .db-live .bb-pocket__count {
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket__count {
   margin: 0;
   font-size: 1.7vh;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--db-text-dim);
 }
-.build-battle-window .db-live .bb-pocket__stack {
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket__stack {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
   width: var(--bb-big-card-w);
   aspect-ratio: 63 / 88;
 }
-.build-battle-window .db-live .bb-pocket__edge {
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket__edge {
   position: absolute;
   inset: 0;
   border-radius: 4.5% / 3.3%;
@@ -1091,7 +1092,7 @@
     calc(var(--bb-depth) * 4px)
   );
 }
-.build-battle-window .db-live .bb-pcard {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard {
   position: absolute;
   inset: 0;
   padding: 0;
@@ -1099,43 +1100,43 @@
   background: none;
   perspective: 1400px;
 }
-.build-battle-window .db-live .bb-pcard.is-under {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-under {
   z-index: 1;
 }
-.build-battle-window .db-live .bb-pcard.is-top {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-top {
   z-index: 3;
   cursor: grab;
   touch-action: pan-y;
   filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.5));
 }
-.build-battle-window .db-live .bb-pcard.is-top:focus-visible {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-top:focus-visible {
   outline: 3px solid var(--db-gold);
   outline-offset: 4px;
   border-radius: 4.5% / 3.3%;
 }
-.build-battle-window .db-live .bb-pcard__flip {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard__flip {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
 }
-.build-battle-window .db-live .bb-pcard__front,
-.build-battle-window .db-live .bb-pcard__back {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard__front,
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard__back {
   position: absolute;
   inset: 0;
   overflow: hidden;
   border-radius: 4.5% / 3.3%;
   backface-visibility: hidden;
 }
-.build-battle-window .db-live .bb-pcard__back {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard__back {
   transform: rotateY(180deg);
 }
-.build-battle-window .db-live .bb-pcard__back-img {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard__back-img {
   display: block;
   width: 100%;
   height: 100%;
 }
 /* A hit waiting face down: a pulsing aura in its tier colour, outside the card only as glow. */
-.build-battle-window .db-live .bb-pcard.is-hit::after {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-hit::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -1147,12 +1148,12 @@
   animation: bb-hit-aura 1.3s ease-in-out infinite alternate;
   pointer-events: none;
 }
-.build-battle-window .db-live .bb-pcard.is-hit[data-tier='3']::after {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-hit[data-tier='3']::after {
   box-shadow:
     0 0 22px 6px rgba(255, 90, 200, 0.85),
     0 0 52px 14px rgba(120, 180, 255, 0.45);
 }
-.build-battle-window .db-live .bb-pcard.is-turning::after {
+:is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-turning::after {
   animation: none;
   opacity: 0;
   transition: opacity 200ms;
@@ -1165,17 +1166,17 @@
     opacity: 1;
   }
 }
-.build-battle-window .db-live .bb-pocket__seen {
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket__seen {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 4px;
   min-height: calc(min(5vh, 9vw) * 88 / 63);
 }
-.build-battle-window .db-live .bb-pocket__thumb {
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket__thumb {
   width: min(5vh, 9vw);
 }
-.build-battle-window .db-live .bb-pocket__pack {
+:is(.build-battle-window, .etb-host) .db-live .bb-pocket__pack {
   position: absolute;
   left: 50%;
   top: 45%;
@@ -1186,25 +1187,25 @@
   pointer-events: none;
 }
 /* The ten cards of a finished pack, laid out. */
-.build-battle-window .db-live .bb-summary {
+:is(.build-battle-window, .etb-host) .db-live .bb-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, min(15vh, 17vw)));
   gap: 1.2vh 1vw;
 }
-.build-battle-window .db-live .bb-summary__card {
+:is(.build-battle-window, .etb-host) .db-live .bb-summary__card {
   position: relative;
 }
 
 /* The builder UI loading back in once the opening is done. */
-.build-battle-window .db-live.bb-ui-enter .native-deck-builder-header,
-.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-main,
-.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-side {
+:is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-header,
+:is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-pane-main,
+:is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-pane-side {
   animation: bb-ui-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-main {
+:is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-pane-main {
   animation-delay: 140ms;
 }
-.build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-side {
+:is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-pane-side {
   animation-name: bb-ui-in-side;
   animation-delay: 280ms;
 }
@@ -1230,64 +1231,64 @@
 }
 
 /* ── Kill switch and reduced motion ───────────────────────────────────────── */
-body.fx-off.build-battle-window .db-live .bb-pack__foil,
-body.fx-off.build-battle-window .db-live .bb-pcard.is-hit::after,
-body.fx-off.build-battle-window
+body.fx-off:is(.build-battle-window, .etb-host) .db-live .bb-pack__foil,
+body.fx-off:is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-hit::after,
+body.fx-off:is(.build-battle-window, .etb-host)
   .db-live
   .bb-bigpack.is-focus
   .bb-pack__top:not(:disabled)::before,
-body.fx-off.build-battle-window
+body.fx-off:is(.build-battle-window, .etb-host)
   .db-live.bb-ui-enter
   .native-deck-builder-header,
-body.fx-off.build-battle-window
+body.fx-off:is(.build-battle-window, .etb-host)
   .db-live.bb-ui-enter
   .native-deck-builder-pane-main,
-body.fx-off.build-battle-window
+body.fx-off:is(.build-battle-window, .etb-host)
   .db-live.bb-ui-enter
   .native-deck-builder-pane-side,
-body.fx-off.build-battle-window .db-live .bb-panel.bb-enter {
+body.fx-off:is(.build-battle-window, .etb-host) .db-live .bb-panel.bb-enter {
   animation: none;
 }
-body.fx-off.build-battle-window .db-live .bb-bigpack,
-body.fx-off.build-battle-window .db-live .bb-pack__top::after {
+body.fx-off:is(.build-battle-window, .etb-host) .db-live .bb-bigpack,
+body.fx-off:is(.build-battle-window, .etb-host) .db-live .bb-pack__top::after {
   transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .build-battle-window .db-live .bb-pack__foil,
-  .build-battle-window .db-live .bb-pcard.is-hit::after,
-  .build-battle-window
+  :is(.build-battle-window, .etb-host) .db-live .bb-pack__foil,
+  :is(.build-battle-window, .etb-host) .db-live .bb-pcard.is-hit::after,
+  :is(.build-battle-window, .etb-host)
     .db-live
     .bb-bigpack.is-focus
     .bb-pack__top:not(:disabled)::before,
-  .build-battle-window .db-live.bb-ui-enter .native-deck-builder-header,
-  .build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-main,
-  .build-battle-window .db-live.bb-ui-enter .native-deck-builder-pane-side,
-  .build-battle-window .db-live .bb-panel.bb-enter {
+  :is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-header,
+  :is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-pane-main,
+  :is(.build-battle-window, .etb-host) .db-live.bb-ui-enter .native-deck-builder-pane-side,
+  :is(.build-battle-window, .etb-host) .db-live .bb-panel.bb-enter {
     animation: none;
   }
-  .build-battle-window .db-live .bb-bigpack {
+  :is(.build-battle-window, .etb-host) .db-live .bb-bigpack {
     transition: none;
   }
 }
 
 /* ── Phone width: the box shrinks, the tray wraps ──────────────────── */
 @media (max-width: 520px) {
-  .build-battle-window .db-live .bb-box {
+  :is(.build-battle-window, .etb-host) .db-live .bb-box {
     --bb-m-t: -34px;
     --bb-m-x: -30px;
     --bb-m-b: -30px;
     --bb-box-scale: 0.8;
   }
-  .build-battle-window .db-live .bb-tray {
+  :is(.build-battle-window, .etb-host) .db-live .bb-tray {
     padding-top: 40px;
   }
-  .build-battle-window .db-live .bb-scene--stage[data-stage='sealed'] .bb-box {
+  :is(.build-battle-window, .etb-host) .db-live .bb-scene--stage[data-stage='sealed'] .bb-box {
     --bb-m-t: -34px;
     --bb-m-x: -30px;
     --bb-m-b: -30px;
     --bb-box-scale: 0.8;
   }
-  .build-battle-window .db-live .bb-summary {
+  :is(.build-battle-window, .etb-host) .db-live .bb-summary {
     gap: 6px;
   }
 }
