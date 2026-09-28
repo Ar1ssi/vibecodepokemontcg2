@@ -672,3 +672,26 @@ test('undo: replaying the command log keeps the Build & Battle format and its 4 
   assert.equal(room.state.players.p2.zones.prizes.length, 4);
   assert.equal(room.state.players.p1.zones.discard.length, 0);
 });
+
+test('053 row 8: an agreed room format refuses two matching decks of the other format', () => {
+  const room = new GameRoom({ roomId: 'room-format-1', rulesEnabled: false });
+  room.addPlayer('sock-a', 'p1', 'Ash');
+  room.addPlayer('sock-b', 'p2', 'Gary');
+  loadReadyDeck(room, 'sock-a');
+  loadReadyDeck(room, 'sock-b');
+  room.roomFormat = 'build-battle';
+  room.markReady('p1');
+  room.markReady('p2');
+  assert.equal(room.isReadyToDeal(), false, 'two Standard decks in a Build & Battle room');
+  const refused = room.refuseDealOnFormatMismatch();
+  assert.deepEqual(
+    refused.map((deck) => deck.format),
+    ['tcg', 'tcg']
+  );
+  assert.equal(room.readyPlayerIds.size, 0, 'both Set Ups cleared');
+
+  room.roomFormat = 'tcg';
+  room.markReady('p1');
+  room.markReady('p2');
+  assert.equal(room.isReadyToDeal(), true, 'the same decks deal once the room plays Standard');
+});

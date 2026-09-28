@@ -448,6 +448,9 @@ export const initializeBuildBattle = ({
     const card = tile && findPoolCard(tile.dataset.cardId);
     if (!card) return;
     event.preventDefault();
+    // The document-level contextmenu listener runs closePopups, which would
+    // shut the preview in the same event that opened it.
+    event.stopPropagation();
     onPreviewCard(cardImage(card, 'large'), card, tile);
   });
 
@@ -462,6 +465,7 @@ export const initializeBuildBattle = ({
         .find((row) => row.id === id);
     if (!card) return;
     event.preventDefault();
+    event.stopPropagation();
     onPreviewCard(cardImage(card, 'large'), card, image);
   });
 

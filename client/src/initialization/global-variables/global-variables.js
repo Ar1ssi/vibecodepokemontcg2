@@ -59,6 +59,8 @@ export const systemState = {
   p2OppDeckData: '', // refers to the opponent's data in 2 player mode, i.e., the other player's deck data
   // Design 051: 'tcg' | 'build-battle', sets the Prize count. Opp slots mirror p1Opp/p2OppDeckData (I204).
   deckFormat: { self: 'tcg', p1Opp: 'tcg', p2Opp: 'tcg' },
+  // Design 053: the room's agreed format and any live proposal, as the server last broadcast it.
+  roomFormat: { roomId: '', format: null, proposal: null, seated: [], dealt: false },
   cardBackSrc: defaultCardBackSrc,
   p1OppCardBackSrc: defaultCardBackSrc,
   p2OppCardBackSrc: defaultCardBackSrc,

@@ -43,9 +43,28 @@ export function deckFormatsMatch(a, b) {
  * (I202: checked at the deal, never at deck load, so a restored deck can still be replaced).
  * @param {{ username: string, format: string }[]} players
  */
-export function formatMismatchMessage(players) {
+export function formatMismatchMessage(players, roomFormat = null) {
   const decks = players.map(({ username, format }) => `${username}: ${formatLabel(format)}`);
+  if (isDeckFormat(roomFormat)) {
+    const off = players
+      .filter(({ format }) => !deckFormatsMatch(format, roomFormat))
+      .map(({ username, format }) => `${username}'s deck is ${formatLabel(format)}`);
+    return `This room plays ${formatLabel(roomFormat)}, but ${off.join(' and ')}. Load a matching deck and press Set Up again.`;
+  }
   return `Deck formats differ (${decks.join('; ')}). Both players must use the same format — load a matching deck and press Set Up again.`;
+}
+
+/**
+ * Design 053: the loaded decks, when the deal must be refused. With a room format both players
+ * agreed on, every deck must be that format; without one, the decks must match each other.
+ * @param {{ format: string }[]} decks
+ * @param {string|null} [roomFormat]
+ * @returns {object[]|null} the decks when they do not fit, else null
+ */
+export function decksMismatchFormat(decks, roomFormat = null) {
+  if (!Array.isArray(decks) || decks.length === 0) return null;
+  const target = isDeckFormat(roomFormat) ? roomFormat : decks[0].format;
+  return decks.some((deck) => !deckFormatsMatch(deck.format, target)) ? decks : null;
 }
 
 /** @returns {boolean} true only for a format the engine knows. */

@@ -67,6 +67,7 @@ shared/engine/cards.mjs — pure `Card` model, `mintInstanceId`, DOM-free (repla
 shared/engine/state.mjs — pure `GameState` model (8 zones/player, neutral stadium), zone accessors, `hashState`; per-player `oncePerGame: { vstarUsed, gxUsed }` survives `advanceTurn` (rulebook 30c 1.2); `discardCardToPlayerZone` routes Prism Star discards to the Lost Zone (30c 3.5)
 shared/engine/rng.mjs — seeded `mulberry32` PRNG, deterministic replay source (Invariant 6)
 shared/engine/formats.mjs — deck formats ('tcg' 6 Prizes | 'build-battle' 4), `prizeCountForFormat`, `formatMismatchMessage`; `player.deckFormat` set by reduce `loadDeck` (refuses `format_mismatch`), read by setup.mjs, room.mjs rematch, client setup-deal.mjs; wire arg order in deck-constructor/deck-format-args.mjs (design 051)
+shared/engine/room-format.mjs — room format propose/accept/cancel reducer `applyRoomFormatAction` (design 053); server/game/room-format-seat.mjs seat check + coin-call lock; client setup/general/room-format-view.mjs (pure) + room-format-panel.js (#roomFormatPanel)
 shared/engine/view.mjs — `viewFor(state, playerId)` authoritative redacted view per player/spectator (H1, Invariant 5)
 client/src/setup/zones/get-zone.js — `getZone(user, zoneId)` → { array, element, ... }; 10 zones/player, stadium neutral
 shared/engine/zones/zone-hash.mjs — `hashCardList`/`hashBoardSnapshot`; `SYNC_HASH_ZONES` is 8 zones (excludes UI scratch)

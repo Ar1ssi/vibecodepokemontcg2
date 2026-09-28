@@ -17,6 +17,12 @@ import {
   hashOwnerViewZones,
 } from './game/sync-check.mjs';
 import { PROTOCOL_VERSION } from '../shared/engine/commands.mjs';
+import {
+  applyRoomFormatAction,
+  clearRoomFormatProposal,
+  emptyRoomFormat,
+} from '../shared/engine/room-format.mjs';
+import { roomFormatLocked, roomFormatSeatRefusal } from './game/room-format-seat.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 
 const SERVER_AUTHORITATIVE =
@@ -365,6 +371,7 @@ async function main() {
       if (socketId) io.to(socketId).emit('gameReset', { roomId });
     }
     broadcastFreshGame(gameRoom, roomId, players);
+    broadcastRoomFormat(roomId);
   };
 
   const broadcastFreshGame = (gameRoom, roomId, players) => {
@@ -408,6 +415,8 @@ async function main() {
       payload: { firstPlayerId: starterPlayerId },
     });
     if (!setupResult.success) return;
+    // Design 053: the format is fixed from here; the panels drop their Switch button.
+    broadcastRoomFormat(roomId);
 
     // Broadcast the post-setup view so the authoritative renderer draws the
     // dealt prizes and hands (prizes DOM is suppressed on the legacy path in
@@ -496,6 +505,7 @@ async function main() {
     if (gameRoom.refuseDealOnFormatMismatch()) return;
     const opened = gameRoom.beginTurnOrderCall();
     if (!opened) return;
+    broadcastRoomFormat(roomId);
 
     for (const pid of Object.keys(gameRoom.state.players)) {
       const pSocketId = gameRoom.playerToSocket.get(pid);
@@ -518,6 +528,29 @@ async function main() {
     if (typeof timer.unref === 'function') timer.unref();
     turnOrderTimers.set(roomId, timer);
   };
+
+  // Design 053: the format both seated players agreed on lives on roomInfo (both server modes)
+  // and is mirrored onto the GameRoom, whose deal check reads it.
+  const roomFormatPayload = (roomId, room) => {
+    const { format, proposal } = room.format || emptyRoomFormat();
+    return { roomId, format, proposal, seated: [...room.players], dealt: roomHasDealt(roomId) };
+  };
+  const broadcastRoomFormat = (roomId) => {
+    const room = roomInfo.get(roomId);
+    if (room) io.to(roomId).emit('roomFormat', roomFormatPayload(roomId, room));
+  };
+  const setRoomFormat = (roomId, room, next) => {
+    room.format = next;
+    if (SERVER_AUTHORITATIVE) {
+      const gameRoom = gameRooms.get(roomId);
+      if (gameRoom) gameRoom.roomFormat = next.format;
+    }
+    if (SHADOW_MODE) {
+      const shadow = shadowSessions.get(roomId);
+      if (shadow) shadow.gameRoom.roomFormat = next.format;
+    }
+  };
+  const roomHasDealt = (roomId) => SERVER_AUTHORITATIVE && roomFormatLocked(gameRooms.get(roomId));
 
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
@@ -550,8 +583,10 @@ async function main() {
         if (socket.data.leaveRoom) {
           const leftAsPlayer = room.players.has(username);
           if (leftAsPlayer) {
+            socket.data.seat = null;
             room.players.delete(username);
             room.setupActionCache?.delete(socket.id);
+            setRoomFormat(roomId, room, clearRoomFormatProposal(room.format));
           } else if (room.spectators.has(username)) {
             room.spectators.delete(username);
           }
@@ -565,8 +600,9 @@ async function main() {
               gameRooms.delete(roomId);
             }
             if (SHADOW_MODE) shadowSessions.delete(roomId);
-          } else if (leftAsPlayer && SERVER_AUTHORITATIVE) {
-            resetGameAfterPlayerLeft(roomId, username);
+          } else if (leftAsPlayer) {
+            if (SERVER_AUTHORITATIVE) resetGameAfterPlayerLeft(roomId, username);
+            broadcastRoomFormat(roomId);
           }
         } else {
           // For unintended disconnections, remove from spectators, but retain seated players
@@ -664,6 +700,7 @@ async function main() {
           // socket.broadcast.to(roomId) only reaches sockets already joined
           // at emit time, so a late joiner otherwise misses them forever).
           setupActionCache: new Map(),
+          format: emptyRoomFormat(),
         });
       }
       const room = roomInfo.get(roomId);
@@ -701,6 +738,7 @@ async function main() {
           let activeGameRoom = gameRoom;
           if (!activeGameRoom) {
             activeGameRoom = new GameRoom({ roomId });
+            activeGameRoom.roomFormat = room.format?.format ?? null;
             gameRooms.set(roomId, activeGameRoom);
           }
           if (isSpectator) {
@@ -725,6 +763,7 @@ async function main() {
           let activeShadow = shadow;
           if (!activeShadow) {
             activeShadow = new ShadowSession({ roomId });
+            activeShadow.gameRoom.roomFormat = roomInfo.get(roomId)?.format?.format ?? null;
             shadowSessions.set(roomId, activeShadow);
           }
           if (isSpectator) {
@@ -774,7 +813,9 @@ async function main() {
           socket.data.disconnectListener = () =>
             disconnectHandler(roomId, username);
           socket.on('disconnect', socket.data.disconnectListener);
+          socket.data.seat = { roomId, username };
         }
+        broadcastRoomFormat(roomId);
       } else {
         socket.emit('roomReject');
       }
@@ -793,6 +834,7 @@ async function main() {
         roomInfo.set(data.roomId, {
           players: new Set(),
           spectators: new Set(),
+          format: emptyRoomFormat(),
         });
       }
       const room = roomInfo.get(data.roomId);
@@ -801,6 +843,7 @@ async function main() {
         let gameRoom = gameRooms.get(data.roomId);
         if (!gameRoom) {
           gameRoom = new GameRoom({ roomId: data.roomId });
+          gameRoom.roomFormat = room.format?.format ?? null;
           gameRooms.set(data.roomId, gameRoom);
         }
         if (!data.notSpectator) {
@@ -828,6 +871,7 @@ async function main() {
         let shadow = shadowSessions.get(data.roomId);
         if (!shadow) {
           shadow = new ShadowSession({ roomId: data.roomId });
+          shadow.gameRoom.roomFormat = roomInfo.get(data.roomId)?.format?.format ?? null;
           shadowSessions.set(data.roomId, shadow);
         }
         if (!data.notSpectator) {
@@ -857,8 +901,41 @@ async function main() {
         socket.data.disconnectListener = () =>
           disconnectHandler(data.roomId, data.username);
         socket.on('disconnect', socket.data.disconnectListener);
+        socket.data.seat = { roomId: data.roomId, username: data.username };
         io.to(data.roomId).emit('userReconnected', data);
       }
+      broadcastRoomFormat(data.roomId);
+    });
+
+    // Design 053: propose / accept / withdraw the room's format. Only a seated player of this
+    // socket's own room acts; a refusal goes back to the sender alone.
+    socket.on('roomFormatAction', (data) => {
+      const seat = socket.data.seat;
+      const room = seat ? roomInfo.get(seat.roomId) : null;
+      const refusal = roomFormatSeatRefusal({
+        seat,
+        requestRoomId: data?.roomId,
+        room,
+        gameRoom: SERVER_AUTHORITATIVE ? gameRooms.get(seat?.roomId) : null,
+        socketId: socket.id,
+      });
+      if (refusal) {
+        socket.emit('roomFormatRejected', { roomId: data?.roomId, reason: refusal });
+        return;
+      }
+      const result = applyRoomFormatAction(room.format, {
+        type: data.type,
+        format: data.format,
+        username: seat.username,
+        seated: [...room.players],
+        dealt: roomHasDealt(seat.roomId),
+      });
+      if (!result.ok) {
+        socket.emit('roomFormatRejected', { roomId: seat.roomId, reason: result.reason });
+        return;
+      }
+      setRoomFormat(seat.roomId, room, result.state);
+      broadcastRoomFormat(seat.roomId);
     });
 
     // List of socket events

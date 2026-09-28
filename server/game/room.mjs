@@ -52,6 +52,10 @@ export class GameRoom {
         rulesEnabled: this.rulesEnabled,
       });
 
+    // Design 053: the format both seated players agreed on (null = decks just match each other).
+    // Room-level, never engine state, so undo replay and rematches are untouched.
+    this.roomFormat = null;
+
     // Socket and player mappings (Hazard H1)
     this.socketToPlayer = new Map(); // socketId -> playerId
     this.playerToSocket = new Map(); // playerId -> socketId
@@ -395,7 +399,7 @@ export class GameRoom {
   isReadyToDeal() {
     if (this.state.turn?.phase !== 'setup') return false;
     const players = Object.values(this.state.players || {});
-    return this.#bothSeatsReady(players) && !deckFormatMismatch(this.state);
+    return this.#bothSeatsReady(players) && !deckFormatMismatch(this.state, this.roomFormat);
   }
 
   #bothSeatsReady(players) {
@@ -408,7 +412,8 @@ export class GameRoom {
   }
 
   /**
-   * Design 051 / I202: when both seats pressed Set Up but their decks' formats differ, the
+   * Design 051 / I202: when both seats pressed Set Up but their decks' formats differ (or, design
+   * 053, either deck differs from the agreed room format), the
    * deal is refused and both Set Ups are cleared, so a player loads a matching deck and
    * both press Set Up again (the clients clear theirs on the same condition).
    *
@@ -418,7 +423,7 @@ export class GameRoom {
   refuseDealOnFormatMismatch() {
     if (this.state.turn?.phase !== 'setup') return null;
     if (!this.#bothSeatsReady(Object.values(this.state.players || {}))) return null;
-    const mismatch = deckFormatMismatch(this.state);
+    const mismatch = deckFormatMismatch(this.state, this.roomFormat);
     if (!mismatch) return null;
     this.readyPlayerIds.clear();
     return mismatch;
