@@ -286,7 +286,8 @@ Flow (`native-deck-builder-build-battle.js`, DOM glue, ~1 file, imports the pure
    `"B&B <Deck name> #<seed>"` with the box deck's rows (`format: 'build-battle'`, sleeve/coin/mat null,
    `sprites` from the catalog), bind it as the active deck for `currentLoadTarget` and load it into
    the editor (`deck` map). Header line: "<Box name> · <Deck name> deck · Box #<seed>".
-3. Reveal: the deck card shows the promo image (`promoId`) and the deck name; the four packs are
+3. Reveal (baseline; design 052 replaces this step with the full unboxing scene and renames
+   `openedPacks` to `unboxing`): the deck card shows the promo image (`promoId`) and the deck name; the four packs are
    `button.bb-pack` rows; clicking one (or "Open all") flips its ten `.bb-pack-card` face-up with a
    60 ms stagger (CSS `rotateY`, no mat-fx) and bumps `session.openedPacks` (`saveSession`). Opening
    is cosmetic only: the pool is fixed at box open.
