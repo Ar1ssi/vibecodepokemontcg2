@@ -31,6 +31,7 @@ import {
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
 import { advanceUnboxing } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
+import { fxDisabled, motionReduced } from '../../../setup/image-logic/mat-fx.mjs';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
@@ -38,6 +39,10 @@ import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
  * The deck pane, library, Play and autosave stay with native-deck-builder.js; this module owns
  * the opened box, the unboxing scene (design 052, native-deck-builder-unboxing.js) and the pool
  * grid, and reports pool errors back to it.
+ *
+ * Until the unboxing is done the scene plays on a fullscreen stage and the builder UI is hidden;
+ * at the end the stage fades out, the UI comes back with the box deck already in the deck pane
+ * and the Pool tab open. A finished box shows its settled scene inline in the Box tab.
  */
 
 // The only box today; the catalog is a list so a later box is data, not code.
@@ -48,6 +53,10 @@ const UNSAVED_DECK_TEXT =
   'Delete a deck in My Decks, then press Save to keep it there.';
 const NEW_BOX_CONFIRM =
   'Discard this pool and open a new box? Your built deck stays in My Decks.';
+const STAGE_ACTIVE_CLASS = 'bb-unboxing-active';
+const UI_ENTER_CLASS = 'bb-ui-enter';
+const STAGE_FADE_MS = 360;
+const UI_ENTER_MS = 900;
 const POOL_GROUPS = [
   ['Pokémon', 'Pokémon'],
   ['Trainer', 'Trainers'],
@@ -91,7 +100,7 @@ const unlimitedEnergyCards = () =>
  * @param {() => void} options.detachEditor unbinds and empties the editor
  * @param {() => void} options.showPool switches the left pane to the Pool tab
  * @param {(imageUrl: string, card: object, sourceEl: Element) => void} options.onPreviewCard
- * @returns {{poolErrors: (deck: object) => string[], refresh: () => void}}
+ * @returns {{poolErrors: (deck: object) => string[], initialMode: () => 'box'|'pool', refresh: () => void}}
  */
 export const initializeBuildBattle = ({
   boxPanelEl,
@@ -116,6 +125,9 @@ export const initializeBuildBattle = ({
   let memoryOnly = false;
   let poolStatus = '';
   let scene = null;
+  let stageEl = null;
+  // The builder workspace: the stage is its child so the Live tokens and scene CSS apply.
+  const workspaceEl = boxPanelEl?.closest('.db-live') || null;
 
   const deckEntryOf = (activeSession) =>
     getBuildBattleBox(activeSession.boxKey)?.decks.find((deck) => deck.key === activeSession.deckKey);
@@ -208,6 +220,8 @@ export const initializeBuildBattle = ({
     return next;
   };
 
+  const unboxingDone = () => !session || session.unboxing.stage === 'done';
+
   // The Pool tab fades in when the scene hands over to it.
   const handOverToPool = () => {
     showPool();
@@ -215,6 +229,43 @@ export const initializeBuildBattle = ({
     poolPanelEl.classList.remove('bb-enter');
     void poolPanelEl.offsetWidth;
     poolPanelEl.classList.add('bb-enter');
+  };
+
+  // ── Fullscreen stage (the opening hides the builder UI) ─────────────────
+  const openStage = () => {
+    if (stageEl || !workspaceEl) return stageEl;
+    stageEl = el('div', 'bb-stage');
+    stageEl.id = 'bbUnboxingStage';
+    stageEl.setAttribute('role', 'dialog');
+    stageEl.setAttribute('aria-label', `Opening your ${BOX.name}`);
+    workspaceEl.classList.remove(UI_ENTER_CLASS);
+    workspaceEl.classList.add(STAGE_ACTIVE_CLASS);
+    workspaceEl.append(stageEl);
+    return stageEl;
+  };
+
+  // The stage fades out while the builder UI loads back in, piece by piece (CSS stagger).
+  const closeStage = () => {
+    if (!stageEl) return;
+    const leaving = stageEl;
+    stageEl = null;
+    workspaceEl?.classList.remove(STAGE_ACTIVE_CLASS);
+    if (motionReduced() || fxDisabled()) {
+      leaving.remove();
+      return;
+    }
+    leaving.classList.add('is-leaving');
+    setTimeout(() => leaving.remove(), STAGE_FADE_MS);
+    workspaceEl?.classList.add(UI_ENTER_CLASS);
+    setTimeout(() => workspaceEl?.classList.remove(UI_ENTER_CLASS), UI_ENTER_MS);
+  };
+
+  const finishOpening = () => {
+    if (stageEl) {
+      closeStage();
+      renderBox();
+    }
+    handOverToPool();
   };
 
   const discardBox = () => {
@@ -279,7 +330,14 @@ export const initializeBuildBattle = ({
 
     const root = el('div', 'bb-scene');
     root.id = 'bbUnboxing';
-    boxPanelEl.append(root);
+    const stage = unboxingDone() ? null : openStage();
+    if (stage) {
+      root.classList.add('bb-scene--stage');
+      stage.replaceChildren(root);
+      boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
+    } else {
+      boxPanelEl.append(root);
+    }
     scene = mountUnboxingScene({
       root,
       getUnboxing: () => session.unboxing,
@@ -288,7 +346,7 @@ export const initializeBuildBattle = ({
       packModel: BOX.packModel,
       seed: session.seed,
       promo: boxDecks[session.deckKey]?.find((row) => row.id === deckEntry.promoId) || null,
-      onBuildDeck: handOverToPool,
+      onBuildDeck: finishOpening,
     });
   };
 
@@ -296,6 +354,7 @@ export const initializeBuildBattle = ({
     if (!boxPanelEl) return;
     scene?.unmount();
     scene = null;
+    if (unboxingDone()) closeStage();
     boxPanelEl.replaceChildren();
     renderBanner(boxPanelEl);
     if (session) renderOpenedBox();
@@ -416,6 +475,8 @@ export const initializeBuildBattle = ({
 
   return {
     poolErrors: (deck) => (session ? validatePoolDeck(deck, pool) : []),
+    // A finished box opens on the Pool tab; a new or unfinished one on the Box tab.
+    initialMode: () => (session && unboxingDone() ? 'pool' : 'box'),
     refresh: () => {
       trackUnsavedDeck();
       refreshPoolCounts();

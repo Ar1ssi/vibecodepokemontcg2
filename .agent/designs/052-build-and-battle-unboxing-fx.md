@@ -356,6 +356,23 @@ Slice 3 (2026-09-28):
   Box tab (the builder window has no phone layout); the shrink-wrap reads faintly and `.bb-hint`
   is yellow on white.
 
+Fullscreen rework (2026-09-28, user ask in the project thread):
+- The opening plays on a fullscreen stage: `#bbUnboxingStage.bb-stage` is appended to the builder
+  workspace (not `document.body`, so the `.db-live` tokens and scene CSS still apply) and
+  `.bb-unboxing-active` hides every other workspace child. The box is centred and scaled up
+  while sealed; from the first torn pack it steps back beside the tray. Resolves slice 3's
+  "deck pane covers the Box tab at 390 px".
+- Packs open one after the other: `tearPack` takes only `nextPackToTear(u)` (the first untorn
+  pack, and only once no torn pack has face-down cards). The next pack pulses; only the latest
+  torn pack keeps a reveal row, and it collapses as the next pack tears. Stored sessions torn
+  out of order still parse and resume.
+- "Build your deck" shows only at `done`. When the scene ends (collapse or Skip) the stage
+  fades out, the header and both panes stagger back in (`.bb-ui-enter`), and the Pool tab opens
+  with the box deck already in the deck pane (it was loaded at box open, 051 step 2). A
+  finished box boots on the Pool tab and shows its settled scene inline in the Box tab.
+- rec-unboxing opens packs in order and checks the stage (UI hidden, pack 2 refused before and
+  during pack 1) and the hand-back (stage gone, UI visible, deck 40 / 40, 40 pack cards left).
+
 ---
 Self-approval checklist (only when the user is unreachable):
 - [ ] Every constraint traceable into the Design section

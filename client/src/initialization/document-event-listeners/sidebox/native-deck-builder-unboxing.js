@@ -24,6 +24,7 @@ import {
   fanSlot,
   hitTierFor,
   lidPose,
+  nextPackToTear,
   packArtIndexes,
   packSlotKind,
   packSpillPose,
@@ -338,7 +339,7 @@ const cardFallback = (card) => {
  * @param {object} options.packModel the box's pack model (reverse-slot lookup)
  * @param {number} options.seed the box seed (pack art, tear edges)
  * @param {object|null} options.promo the deck's foil promo card row
- * @param {() => void} options.onBuildDeck switches to the Pool tab
+ * @param {() => void} options.onBuildDeck ends the opening: closes the stage, shows the Pool tab
  * @returns {{unmount: () => void}}
  */
 export const mountUnboxingScene = ({
@@ -562,7 +563,9 @@ export const mountUnboxingScene = ({
     const pack = el('div', 'bb-pack');
     pack.dataset.pack = String(packIndex);
     const torn = u.packsTorn[packIndex];
+    const isNext = packIndex === nextPackToTear(u);
     pack.classList.toggle('is-torn', torn);
+    pack.classList.toggle('is-next', isNext);
     const bodyEl = el('div', 'bb-pack__body');
     bodyEl.append(packArt('bb-pack__art', packIndex), el('div', 'bb-pack__foil'));
     if (torn) bodyEl.style.clipPath = packBodyClip(tearEdges[packIndex]);
@@ -572,7 +575,8 @@ export const mountUnboxingScene = ({
       strip.style.clipPath = tearEdges[packIndex];
       strip.append(packArt('bb-pack__art', packIndex));
       const top = button('bb-pack__top', `Tear open pack ${packIndex + 1}`);
-      top.disabled = u.stage !== 'deckShown' && u.stage !== 'packs';
+      // Packs open one after the other: only the next one tears.
+      top.disabled = !isNext;
       const stripShift = (progress) => (top.clientWidth || PACK_W) * progress * 0.5;
       bindTear(top, {
         widthOf: () => top.clientWidth || PACK_W,
@@ -669,11 +673,11 @@ export const mountUnboxingScene = ({
       return u.wrapTorn ? 'Open the lid.' : 'Drag across the shrink-wrap to tear it off, or press it.';
     }
     if (u.stage === 'opened') return 'Unwrap the deck to see its foil promo.';
-    if (u.stage === 'deckShown') return 'Tear open a pack: drag across its top, or press it.';
+    if (u.stage === 'deckShown') return 'Tear open pack 1: drag across its top, or press it.';
     if (u.stage === 'packs') {
       return midRevealPack(u) >= 0
         ? 'Tap the stack to flip the next card.'
-        : 'Tear open the next pack.';
+        : `Tear open pack ${nextPackToTear(u) + 1}.`;
     }
     return 'All four packs are open. Build your deck from your pool.';
   };
@@ -691,10 +695,13 @@ export const mountUnboxingScene = ({
     skip.type = 'button';
     skip.dataset.control = 'skip';
     skip.addEventListener('click', skipScene);
-    const build = el('button', u.stage === 'done' ? 'bb-primary' : 'bb-secondary', 'Build your deck');
-    build.type = 'button';
-    build.addEventListener('click', onBuildDeck);
-    controls.append(revealAll, skip, build);
+    controls.append(revealAll, skip);
+    if (u.stage === 'done') {
+      const build = el('button', 'bb-primary', 'Build your deck');
+      build.type = 'button';
+      build.addEventListener('click', onBuildDeck);
+      controls.append(build);
+    }
     return controls;
   };
 
@@ -746,11 +753,9 @@ export const mountUnboxingScene = ({
     const hint = el('p', 'bb-hint', hintFor(u));
     hint.setAttribute('role', 'status');
     const reveals = el('div', 'bb-scene__reveals');
-    if (u.stage === 'packs') {
-      u.packsTorn.forEach((torn, packIndex) => {
-        if (torn) reveals.append(renderReveal(u, packIndex));
-      });
-    }
+    // One pack at a time: the latest torn pack holds the reveal row until the next one tears.
+    const shownPack = u.packsTorn.lastIndexOf(true);
+    if (u.stage === 'packs' && shownPack >= 0) reveals.append(renderReveal(u, shownPack));
     root.append(top, hint, reveals, renderControls(u));
     root.querySelectorAll('.bb-fan').forEach(layoutFan);
     updateControls();
@@ -820,16 +825,21 @@ export const mountUnboxingScene = ({
     if (anyLaneBusy()) return;
     const strip = root.querySelector(`.bb-pack[data-pack="${packIndex}"] .bb-pack__strip`);
     const travel = (strip?.clientWidth || PACK_W) * 1.2;
+    const previousRow = root.querySelector('.bb-reveal');
     runBeat(
       { type: 'tearPack', packIndex },
       unboxingVoiceFor('tearPack'),
       () =>
-        playPose(
-          strip,
-          (t) => ({ x: lerp(fromShiftPx, travel, easeOut(t)), rotate: lerp(4, 16, t), opacity: 1 - t }),
-          ({ x, rotate, opacity }) => ({ transform: `translateX(${x}px) rotate(${rotate}deg)`, opacity }),
-          PACK_TEAR_MS
-        ),
+        Promise.all([
+          playPose(
+            strip,
+            (t) => ({ x: lerp(fromShiftPx, travel, easeOut(t)), rotate: lerp(4, 16, t), opacity: 1 - t }),
+            ({ x, rotate, opacity }) => ({ transform: `translateX(${x}px) rotate(${rotate}deg)`, opacity }),
+            PACK_TEAR_MS
+          ),
+          // The finished pack's fan clears away as the next pack opens.
+          collapseRow(previousRow, PACK_TEAR_MS),
+        ]),
       { spill: packIndex }
     );
   };
@@ -993,8 +1003,20 @@ export const mountUnboxingScene = ({
     }, peakDelay);
   };
 
+  // The last card of a pack unlocks the next pack in the tray without a re-render.
+  const updateTrayPacks = () => {
+    const next = nextPackToTear(getUnboxing());
+    root.querySelectorAll('.bb-tray .bb-pack').forEach((pack) => {
+      const isNext = Number(pack.dataset.pack) === next;
+      pack.classList.toggle('is-next', isNext);
+      const top = pack.querySelector('.bb-pack__top');
+      if (top) top.disabled = !isNext;
+    });
+  };
+
   const afterReveal = (packIndex) => {
     updateRevealRow(packIndex);
+    updateTrayPacks();
     updateControls();
     if (getUnboxing().stage === 'done') collapseScene();
   };
@@ -1074,25 +1096,22 @@ export const mountUnboxingScene = ({
   };
 
   // ── End of the scene ─────────────────────────────────────────────────
+  const collapseRow = (row, durationMs = FAN_COLLAPSE_MS) =>
+    playPose(
+      row,
+      (t) => ({ scale: lerp(1, COLLAPSE_SCALE, easeOut(t)), opacity: 1 - t }),
+      ({ scale, opacity }) => ({ transform: `scale(${scale})`, opacity }),
+      durationMs,
+      { samples: 12 }
+    );
+
   const collapseScene = async () => {
     if (collapsing) return;
     collapsing = true;
     const gen = generation;
     sound(unboxingVoiceFor('finish'));
     const rows = [...root.querySelectorAll('.bb-reveal')];
-    await withBackstop(
-      Promise.all(
-        rows.map((row) =>
-          playPose(
-            row,
-            (t) => ({ scale: lerp(1, COLLAPSE_SCALE, easeOut(t)), opacity: 1 - t }),
-            ({ scale, opacity }) => ({ transform: `scale(${scale})`, opacity }),
-            FAN_COLLAPSE_MS,
-            { samples: 12 }
-          )
-        )
-      )
-    );
+    await withBackstop(Promise.all(rows.map((row) => collapseRow(row))));
     collapsing = false;
     if (gen !== generation) return;
     render();

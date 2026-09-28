@@ -110,6 +110,15 @@ const allRevealed = (revealed) => revealed.every((count) => count === CARDS_PER_
 const hasPackMidReveal = (u) =>
   u.packsTorn.some((torn, index) => torn && u.revealed[index] < CARDS_PER_PACK);
 
+/**
+ * The pack the player may tear next, or -1: packs open one after the other, in order, and the
+ * next one waits until every card of the last one is face up.
+ */
+export function nextPackToTear(u) {
+  if (!u || (u.stage !== 'deckShown' && u.stage !== 'packs') || hasPackMidReveal(u)) return -1;
+  return u.packsTorn.indexOf(false);
+}
+
 function withReveal(u, packIndex, count) {
   const revealed = u.revealed.map((value, index) => (index === packIndex ? count : value));
   return { ...u, revealed, stage: allRevealed(revealed) ? 'done' : u.stage };
@@ -119,6 +128,8 @@ function withReveal(u, packIndex, count) {
  * The scene's reducer. `event` is `{ type, packIndex? }` with type one of `tearWrap`, `openLid`,
  * `unwrapDeck`, `tearPack`, `revealCard`, `revealAll`, `finish`. An event the current state does
  * not allow returns `u` itself, so callers can test `next === u` to do nothing.
+ *
+ * `tearPack` takes only `nextPackToTear(u)`: packs open in order, one at a time.
  *
  * `finish` (Skip scene) is refused while a torn pack still has face-down cards: the player is
  * mid-pack, and "Reveal all" is the way through it.
@@ -137,8 +148,7 @@ export function advanceUnboxing(u, event) {
     case 'unwrapDeck':
       return u.stage === 'opened' ? { ...u, stage: 'deckShown' } : u;
     case 'tearPack': {
-      if (u.stage !== 'deckShown' && u.stage !== 'packs') return u;
-      if (!isPackIndex(packIndex) || u.packsTorn[packIndex]) return u;
+      if (!isPackIndex(packIndex) || packIndex !== nextPackToTear(u)) return u;
       const packsTorn = u.packsTorn.map((torn, index) => torn || index === packIndex);
       return { ...u, stage: 'packs', packsTorn };
     }

@@ -30,6 +30,7 @@ import {
   hitTierFor,
   homography,
   lidPose,
+  nextPackToTear,
   packArtIndexes,
   packSlotKind,
   packSpillPose,
@@ -66,9 +67,9 @@ test('the beats walk sealed → opened → deckShown → packs → done', () => 
   assert.equal(wrapOff.wrapTorn, true);
   assert.equal(play(toPacks.slice(0, 2)).stage, 'opened');
   assert.equal(play(toPacks).stage, 'deckShown');
-  const firstTear = play([...toPacks, tear(2)]);
+  const firstTear = play([...toPacks, tear(0)]);
   assert.equal(firstTear.stage, 'packs');
-  assert.deepEqual(firstTear.packsTorn, [false, false, true, false]);
+  assert.deepEqual(firstTear.packsTorn, [true, false, false, false]);
 
   const allOpen = play([0, 1, 2, 3].flatMap((i) => [tear(i), revealAll(i)]), play(toPacks));
   assert.equal(allOpen.stage, 'done');
@@ -99,6 +100,23 @@ test('row 3: an illegal event returns the same object', () => {
   assert.equal(advanceUnboxing(sealed, undefined), sealed);
 });
 
+test('packs open one after the other: in order, each after the last is fully revealed', () => {
+  const deckShown = play(toPacks);
+  assert.equal(nextPackToTear(createUnboxing()), -1, 'not before the deck is shown');
+  assert.equal(nextPackToTear(deckShown), 0);
+  assert.equal(advanceUnboxing(deckShown, tear(2)), deckShown, 'pack 3 before pack 1');
+
+  const midPack = play([tear(0), reveal(0)], deckShown);
+  assert.equal(nextPackToTear(midPack), -1, 'pack 1 still has face-down cards');
+  assert.equal(advanceUnboxing(midPack, tear(1)), midPack, 'pack 2 while pack 1 is mid-reveal');
+
+  const firstDone = play([revealAll(0)], midPack);
+  assert.equal(nextPackToTear(firstDone), 1);
+  assert.equal(advanceUnboxing(firstDone, tear(3)), firstDone, 'pack 4 skips pack 2');
+  assert.deepEqual(play([tear(1)], firstDone).packsTorn, [true, true, false, false]);
+  assert.equal(nextPackToTear(finishedUnboxing()), -1);
+});
+
 test('row 17: Skip scene from sealed jumps to done', () => {
   assert.deepEqual(advanceUnboxing(createUnboxing(), { type: 'finish' }), finishedUnboxing());
   const packDone = play([...toPacks, tear(0), revealAll(0)]);
@@ -106,7 +124,7 @@ test('row 17: Skip scene from sealed jumps to done', () => {
 });
 
 test('row 7: Reveal all continues from the current card', () => {
-  const three = play([...toPacks, tear(1), reveal(1), reveal(1), reveal(1)]);
+  const three = play([...toPacks, tear(0), revealAll(0), tear(1), reveal(1), reveal(1), reveal(1)]);
   assert.equal(three.revealed[1], 3);
   const beats = unboxingTimeline(three, { packIndex: 1 });
   const cards = beats.filter((beat) => beat.kind !== 'collapse').map((beat) => beat.cardIndex);

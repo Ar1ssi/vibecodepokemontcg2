@@ -4,6 +4,8 @@
 // Pass 2 (no video) freezes each beat at start / peak / settle and writes
 // <OUT>/<beat>-{start,peak,settle}.png for tear, lid, promo, pack-tear, flip-t0, flip-hit, collapse.
 // Pass 3 shoots <OUT>/phone-390.png mid-pack and checks row 16 (no horizontal scroll).
+// The opening plays on a fullscreen stage (#bbUnboxingStage) with the builder UI hidden; packs
+// open in order, each after the last is fully revealed; the UI returns on the Pool tab.
 //
 // Env: SEED (42) · BASE_URL (http://localhost:4100) · OUT (.agent/scratch/unboxing[-<seed>])
 //      CARD_IMG: a local image or URL served for every TCGdex card face (sandboxes where TCGdex is blocked)
@@ -184,6 +186,12 @@ const recordVideo = async (browser) => {
   const packsAtOpen = JSON.stringify((await session(page)).packs);
   console.log('tiers', JSON.stringify(tiers));
 
+  const uiHidden = await page.evaluate(
+    () =>
+      !!document.getElementById('bbUnboxingStage') &&
+      getComputedStyle(document.querySelector('.native-deck-builder-inner')).visibility === 'hidden'
+  );
+  check(uiHidden, 'stage: the opening is fullscreen and the builder UI is hidden');
   await dragTear(page, '.bb-box__wrap');
   await page.waitForTimeout(700);
   if ((await session(page)).unboxing.wrapTorn !== true) await press(page, '.bb-box__wrap');
@@ -195,9 +203,11 @@ const recordVideo = async (browser) => {
   await waitStage(page, 'deckShown');
   await page.waitForTimeout(1800);
 
-  // Pack order: the plain packs first, the one holding the box's best hit last.
-  const best = tiers.map((pack) => Math.max(...pack));
-  const order = [0, 1, 2, 3].sort((a, b) => best[a] - best[b] || a - b);
+  // Packs open one after the other, in order.
+  const order = [0, 1, 2, 3];
+  await press(page, '.bb-pack[data-pack="1"] .bb-pack__top');
+  await page.waitForTimeout(300);
+  check((await session(page)).unboxing.stage === 'deckShown', 'pack 2 does not tear before pack 1');
   for (const [n, packIndex] of order.entries()) {
     const top = `.bb-pack[data-pack="${packIndex}"] .bb-pack__top`;
     if (n === 0) await dragTear(page, top);
@@ -207,6 +217,9 @@ const recordVideo = async (browser) => {
 
     if (n === 0) {
       for (let k = 0; k < 3; k += 1) await flipOne(page, packIndex, tiers[packIndex][k]);
+      await press(page, '.bb-pack[data-pack="1"] .bb-pack__top');
+      await page.waitForTimeout(300);
+      check(!(await session(page)).unboxing.packsTorn[1], 'pack 2 waits while pack 1 is mid-reveal');
       await page.waitForTimeout(400);
       await page.reload();
       await page.waitForSelector(`.bb-reveal[data-pack="${packIndex}"] .bb-stack`, { timeout: 30000 });
@@ -250,6 +263,21 @@ const recordVideo = async (browser) => {
   check(JSON.stringify((await session(page)).packs) === packsAtOpen, 'row 13 the scene never rewrote session.packs');
   const poolShown = await page.evaluate(() => !document.getElementById('buildBattlePoolPanel')?.hidden);
   check(poolShown, 'collapse hands over to the Pool tab');
+  const back = await page.evaluate(() => ({
+    stage: !!document.getElementById('bbUnboxingStage'),
+    ui: getComputedStyle(document.querySelector('.native-deck-builder-inner')).visibility,
+    deck: document.querySelector('.native-deck-builder-pane-side')?.innerText.match(/\b(\d+)\s*\/\s*40\b/)?.[1],
+    left: [...document.querySelectorAll('#buildBattlePoolPanel .bb-pool-card:not(.is-unlimited)')].reduce(
+      (sum, tile) => sum + (Number.parseInt(tile.querySelector('.bb-pool-badge')?.textContent, 10) || 0),
+      0
+    ),
+  }));
+  check(
+    !back.stage && back.ui === 'visible' && back.deck === '40' && back.left === 40,
+    'UI returns with the 40-card box deck loaded and the 40 pack cards left to add',
+    JSON.stringify(back)
+  );
+  await page.waitForTimeout(1200);
 
   const faceAt = await page.evaluate(() => window.__faceAt);
   const phases = await page.evaluate(async (module) => {
@@ -373,6 +401,22 @@ const recordStrips = async (browser, { tiers, order }) => {
   const hit = flat.reduce((a, b) => (b.tier > a.tier ? b : a));
   const hitPack = hit.packIndex;
   const hitRow = `.bb-reveal[data-pack="${hitPack}"]`;
+  // "Reveal all" acts on the pack mid-reveal; packs open in order, so the ones before the hit
+  // pack are opened and finished first.
+  const revealAllOf = async (packIndex) => {
+    await press(page, '[data-control="reveal-all"]');
+    await page.waitForFunction((i) => document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`).length === 10, packIndex, { timeout: 15000 });
+    await page.waitForTimeout(300);
+  };
+  const openPack = async (packIndex) => {
+    await press(page, `.bb-pack[data-pack="${packIndex}"] .bb-pack__top`);
+    await page.waitForSelector(`.bb-reveal[data-pack="${packIndex}"] .bb-stack`);
+    await page.waitForTimeout(700);
+  };
+  for (const packIndex of order.filter((i) => i < hitPack)) {
+    await openPack(packIndex);
+    await revealAllOf(packIndex);
+  }
   await strip(page, 'pack-tear', () => press(page, `.bb-pack[data-pack="${hitPack}"] .bb-pack__top`), {
     clip: top,
     settleClip: '#bbUnboxing',
@@ -394,22 +438,22 @@ const recordStrips = async (browser, { tiers, order }) => {
   console.log('hit', JSON.stringify(hit));
 
   // Finish the box quickly; the collapse is frozen on the last card of the last pack.
-  // "Reveal all" acts on the pack mid-reveal, so each pack is finished before the next is torn.
-  const revealAllOf = async (packIndex) => {
-    await press(page, '[data-control="reveal-all"]');
-    await page.waitForFunction((i) => document.querySelectorAll(`.bb-reveal[data-pack="${i}"] .bb-fan__card`).length === 10, packIndex, { timeout: 15000 });
-    await page.waitForTimeout(300);
-  };
-  await revealAllOf(hitPack);
-  const rest = order.filter((i) => i !== hitPack);
-  const lastPack = rest.at(-1);
-  for (const packIndex of rest) {
-    await press(page, `.bb-pack[data-pack="${packIndex}"] .bb-pack__top`);
-    await page.waitForSelector(`.bb-reveal[data-pack="${packIndex}"] .bb-stack`);
-    await page.waitForTimeout(700);
-    if (packIndex !== lastPack) await revealAllOf(packIndex);
+  const lastPack = order.at(-1);
+  if (hitPack !== lastPack) {
+    await revealAllOf(hitPack);
+    for (const packIndex of order.filter((i) => i > hitPack)) {
+      await openPack(packIndex);
+      if (packIndex !== lastPack) await revealAllOf(packIndex);
+    }
+    for (let k = 0; k < 9; k += 1) await flipOne(page, lastPack, tiers[lastPack][k]);
+  } else {
+    for (let k = hit.cardIndex + 1; k < 9; k += 1) await flipOne(page, lastPack, tiers[lastPack][k]);
   }
-  for (let k = 0; k < 9; k += 1) await flipOne(page, lastPack, tiers[lastPack][k]);
+  if ((await revealed(page, lastPack)) === 10) {
+    console.log('strip collapse skipped: the hit was the last card of the box');
+    await context.close();
+    return;
+  }
   const row = `.bb-reveal[data-pack="${lastPack}"]`;
   await strip(page, 'collapse', () => press(page, `${row} .bb-stack`), {
     clip: '.bb-scene__reveals',

@@ -1728,7 +1728,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       showPool: () => switchMode('pool'),
       onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
     });
-    switchMode('box');
+    switchMode(buildBattle.initialMode());
   }
 
   render();
