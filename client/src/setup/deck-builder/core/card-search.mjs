@@ -196,7 +196,7 @@ export function buildSummaryQuery({ cardName, cardStage, params = {} } = {}) {
   return query;
 }
 
-async function fetchCardSummaries(options = {}) {
+export async function fetchCardSummaries(options = {}) {
   const url = new URL(tcgdexApiUrl('/cards'));
   for (const [key, value] of Object.entries(buildSummaryQuery(options))) {
     url.searchParams.set(key, value);
@@ -366,6 +366,12 @@ export async function queryCards({ term = '', params = {} } = {}) {
     term: cleanName,
     isHugeResultSet: false,
   };
+}
+
+/** One card's full TCGdex record, normalized like a search result. */
+export async function fetchCardDetail(cardId) {
+  const detail = await fetchJson(tcgdexApiUrl(`/cards/${encodeURIComponent(cardId)}`));
+  return normalizeTcgdexCard(detail);
 }
 
 /** Name-only search, for callers with no filters (the rules debug menu). */

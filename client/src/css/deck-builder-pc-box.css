@@ -62,9 +62,21 @@
   font-family: var(--box-font);
 }
 
-.db-live:not(.db-light) .native-deck-builder-targetbar,
-.db-live:not(.db-light) .native-deck-builder-library-bar {
-  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+/* "My Decks" dropdown: glossy toggle, deep-blue Box panel for the chips. */
+.db-live:not(.db-light) .native-deck-builder-deck-picker-toggle {
+  color: var(--box-stage);
+  background: #fff;
+  border: 2px solid var(--box-yellow);
+  font-family: var(--box-font);
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-picker-popover {
+  background: var(--box-stage);
+  border: 2px solid #fff;
+}
+
+.db-live:not(.db-light) .native-deck-builder-deck-picker-popover .native-deck-builder-library-chip {
+  width: auto;
 }
 
 /* Glossy Box buttons: white rim, sky gradient. Play stays the yellow primary. */
@@ -215,6 +227,8 @@
 
 .db-live:not(.db-light) .native-deck-builder-fdrawer {
   border-right: 3px solid var(--box-sky);
+  border-radius: 9px 0 0 9px;
+  overflow: hidden;
 }
 
 .db-live:not(.db-light) .native-deck-builder-fdrawer-scrim {

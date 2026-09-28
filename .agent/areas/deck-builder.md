@@ -20,6 +20,8 @@ client/src/setup/deck-builder/core/builder-window.mjs — the builder runs in it
   side effect goes through `gameLink` (local on the game tab, messages from the builder tab); the game
   tab's library is read-only for deck cards (`allowDeckWrites: false`) and every library write re-reads
   storage first (two tabs share it). Deck tab = slim panel (P1/P2, card back, Open Deck Builder).
+client/src/setup/deck-builder/core/set-browser-filters.mjs — the same drawer filters on Browse Sets: TCGdex narrows
+  each set (`set.id=eq:`), full records decide; filters TCGdex cannot narrow only scan the open set.
 client/src/setup/deck-builder/core/deck-sprites.mjs — deck Pokémon sprite slots (design 024, D97):
   up to 2 `{slug, shiny}` per deck (D99), catalog search and vendored-art URL building; catalog data in
   pokemon-sprite-catalog.generated.mjs (gen-8 species + Mega/Gmax/regional/transform/type forms, design 039),

@@ -7,6 +7,16 @@ import {
       sortCardsWithinGroup,
       GENERATIONS,
     } from '../../../setup/deck-builder/core/set-browser.mjs';
+    import { hasActiveFilters } from '../../../setup/deck-builder/core/card-filters.mjs';
+    import {
+      fetchCardDetail,
+      fetchCardSummaries,
+    } from '../../../setup/deck-builder/core/card-search.mjs';
+    import {
+      filtersCoverEverySet,
+      findSetFilterMatches,
+      scopeFilterSets,
+    } from '../../../setup/deck-builder/core/set-browser-filters.mjs';
 
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -29,6 +39,7 @@ import {
      * @param {HTMLElement} options.panelEl - container for this panel
      * @param {function} options.onAddCard - called with the clicked card
      * @param {function} options.onPreviewCard - called with the card image url
+     * @param {function} [options.getQuantities] - card id -> copies in the deck
      * @returns {object|null} controller, or null when the panel is missing
      */
     export const initializeNativeDeckBuilderSetBrowser = ({
@@ -60,6 +71,12 @@ import {
       let activeCategory = 'standard';
       const cardsBySet = new Map(); // setId -> Card[] (loaded lazily)
       const pendingBySet = new Map(); // setId -> Promise<Card[]>
+      // The deck builder's shared TCG Live filters (design 050). filterMatches
+      // is null while no filter is active; otherwise setId -> Set of card ids
+      // that pass (a set without an entry was not scanned and shows nothing).
+      let cardFilters = null;
+      let filterMatches = null;
+      let filterPassId = 0;
 
       // ── DOM scaffold (injected once) ────────────────────────────────────
       const generationPillsHtml = GENERATIONS.map(
@@ -75,9 +92,13 @@ import {
         '    <button class="native-deck-builder-set-browser-series-tag native-deck-builder-set-browser-series-tag--other" data-category="other" type="button">other</button>',
         generationPillsHtml,
         '  </div>',
-        '  <input class="native-deck-builder-set-browser-filter" type="text"',
-        '    placeholder="Filter by card name..." aria-label="Filter cards by name" />',
+        '  <div class="native-deck-builder-set-browser-controls">',
+        '    <input class="native-deck-builder-set-browser-filter" type="text"',
+        '      placeholder="Filter by card name..." aria-label="Filter cards by name" />',
+        '    <button id="nativeDeckBuilderBrowseFiltersButton" class="native-deck-builder-filters-button" type="button" aria-controls="nativeDeckBuilderFilterDrawer" aria-expanded="false">Filters <span class="native-deck-builder-filters-count" data-filters-count hidden>0</span></button>',
+        '  </div>',
         '</div>',
+        '<div id="nativeDeckBuilderBrowseFilterChips" class="native-deck-builder-fchips" aria-label="Active filters" hidden></div>',
         '<div class="native-deck-builder-set-browser-status" aria-live="polite"></div>',
         '<div class="native-deck-builder-set-browser-tabs"></div>',
         '<div class="native-deck-builder-set-browser-results"></div>',
@@ -159,6 +180,86 @@ import {
         return `<div class="native-deck-builder-set-browser-dropdown-section" data-set-id="${escapeHtml(set.setId)}">${label}${body}</div>`;
       };
 
+      // The sets the active pill shows: 'standard' and 'other' split one payload.
+      const activeGroup = () => {
+        const state = categoryState.get(activeCategory);
+        if (!state?.loaded) return { label: '', sets: [] };
+        if (activeCategory === 'standard' || activeCategory === 'other') {
+          const isOther = activeCategory === 'other';
+          return {
+            label: isOther ? 'other' : 'Standard 2026-27',
+            sets: state.sets.filter((set) => ((set.category || 'standard') === 'other') === isOther),
+          };
+        }
+        return { label: '', sets: state.sets };
+      };
+
+      const showCategoryStatus = () => {
+        const state = categoryState.get(activeCategory);
+        if (!state?.loaded) return;
+        const total = state.sets.reduce((sum, s) => sum + s.cardCount, 0);
+        showStatus(`${state.sets.length} sets, ${total} cards. Click a set to expand it.`);
+      };
+
+      // One filter pass over the active pill's sets (design 050). A newer
+      // pass (filters, pill or opened set changed) makes an older one moot.
+      const refreshFilterMatches = async () => {
+        const passId = ++filterPassId;
+        if (!cardFilters || !hasActiveFilters(cardFilters)) {
+          filterMatches = null;
+          showCategoryStatus();
+          render();
+          return;
+        }
+        const state = categoryState.get(activeCategory);
+        if (!state?.loaded) return;
+
+        const setIds = activeGroup().sets.map((set) => set.setId);
+        const scope = scopeFilterSets({ filters: cardFilters, setIds, expandedSetId });
+        if (!scope.length) {
+          filterMatches = new Map();
+          showStatus(
+            'Open a set to apply these filters, or add a Card type, Pokémon type, Stage, HP, Rarity, Format or Regulation mark filter to filter every set.'
+          );
+          render();
+          return;
+        }
+
+        showStatus(`Filtering ${scope.length} set(s)...`);
+        try {
+          const result = await findSetFilterMatches({
+            setIds: scope,
+            filters: cardFilters,
+            fetchSummaries: (params) => fetchCardSummaries({ params }),
+            loadSetCards: getCardsForSet,
+            fetchDetail: fetchCardDetail,
+          });
+          // Tiles need each matching set's own listing cards.
+          const matchedSets = [...result.matches].filter(([, ids]) => ids.size > 0);
+          await Promise.all(matchedSets.map(([setId]) => getCardsForSet(setId)));
+          if (passId !== filterPassId) return;
+
+          filterMatches = result.matches;
+          const matchCount = matchedSets.reduce((sum, [, ids]) => sum + ids.size, 0);
+          const where = filtersCoverEverySet(cardFilters)
+            ? `in ${matchedSets.length} set(s)`
+            : 'in the open set';
+          const capNote = result.truncated
+            ? ` Checked the first ${result.checkedCount} of ${result.candidateCount} candidates; add filters to narrow it down.`
+            : '';
+          showStatus(`${matchCount} card(s) ${where} match your filters.${capNote}`);
+        } catch (error) {
+          if (passId !== filterPassId) return;
+          filterMatches = new Map();
+          showStatus(`Filtering failed: ${error.message}`);
+        }
+        render();
+      };
+
+      // Filters that only cover the opened set need a new pass when it changes.
+      const scopeFollowsOpenSet = () =>
+        Boolean(cardFilters) && hasActiveFilters(cardFilters) && !filtersCoverEverySet(cardFilters);
+
       const render = () => {
         const state = categoryState.get(activeCategory);
         if (!state?.loaded) {
@@ -168,7 +269,13 @@ import {
         }
 
         const hasNameFilter = String(filterTerm || '').trim() !== '';
-        const isFiltering = hasNameFilter || Boolean(supertypeFilter);
+        const isFiltering = hasNameFilter || Boolean(supertypeFilter) || filterMatches !== null;
+        const quantities = getQuantities ? getQuantities() : {};
+        const passesCardFilters = (setId, card) => {
+          if (filterMatches === null) return true;
+          if (!filterMatches.get(setId)?.has(card.id)) return false;
+          return !cardFilters?.inDeck || quantities[card.id] > 0;
+        };
         const dropdownSections = [];
 
         const buildTabsFor = (groupSets) => {
@@ -179,13 +286,16 @@ import {
             if (expanded || isFiltering) {
               const cards = cardsBySet.get(set.setId);
               if (cards) {
-                const filtered = filterCardsBySupertype(filterCardsByName(cards, filterTerm), supertypeFilter);
+                const filtered = filterCardsBySupertype(
+                  filterCardsByName(cards, filterTerm),
+                  supertypeFilter
+                ).filter((card) => passesCardFilters(set.setId, card));
                 if (isFiltering) {
                   expanded = filtered.length > 0;
                 }
                 if (expanded) {
                   const cardsHtml = filtered.length
-                    ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), getQuantities ? getQuantities() : {})
+                    ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), quantities)
                     : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
                   dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
                 }
@@ -214,17 +324,7 @@ import {
           ].join('');
         };
 
-        let groupLabel;
-        let groupSets;
-        if (activeCategory === 'standard' || activeCategory === 'other') {
-          const standardSets = state.sets.filter((set) => (set.category || 'standard') !== 'other');
-          const otherSets = state.sets.filter((set) => (set.category || 'standard') === 'other');
-          groupLabel = activeCategory === 'other' ? 'other' : 'Standard 2026-27';
-          groupSets = activeCategory === 'other' ? otherSets : standardSets;
-        } else {
-          groupLabel = '';
-          groupSets = state.sets;
-        }
+        const { label: groupLabel, sets: groupSets } = activeGroup();
 
         if (groupSets.length === 0) {
           tabsEl.innerHTML = '';
@@ -245,10 +345,15 @@ import {
             const setId = button.dataset.toggleSet;
             if (expandedSetId === setId) {
               expandedSetId = null;
-              render();
+              if (scopeFollowsOpenSet()) refreshFilterMatches();
+              else render();
               return;
             }
             expandedSetId = setId;
+            if (scopeFollowsOpenSet()) {
+              refreshFilterMatches();
+              return;
+            }
             // render collapsed skeleton first, then fetch cards if needed
             if (!cardsBySet.has(setId)) {
               render();
@@ -313,10 +418,8 @@ import {
           }
 
           if (categoryId === activeCategory) {
-            const active = categoryState.get(activeCategory);
-            const total = active.sets.reduce((sum, s) => sum + s.cardCount, 0);
-            showStatus(`${active.sets.length} sets, ${total} cards. Click a set to expand it.`);
-            render();
+            // Also shows the plain set/card count when no filter is active.
+            refreshFilterMatches();
           }
         } catch (error) {
           state.loading = false;
@@ -344,6 +447,8 @@ import {
         categoryPills.forEach((pill) => {
           pill.classList.toggle('active', pill.dataset.category === category);
         });
+        // An already-loaded pill filters now; a new one filters once loaded.
+        if (categoryState.get(category)?.loaded) refreshFilterMatches();
         loadCategory(category);
         render();
       };
@@ -385,6 +490,14 @@ import {
           if (supertypeFilter === supertype) return;
           supertypeFilter = supertype;
           render();
+        },
+        // The active pill's sets, as the filter drawer's Expansion options.
+        getSetOptions: () =>
+          activeGroup().sets.map((set) => ({ value: set.setId, label: set.name })),
+        // The deck builder's applied TCG Live filters (design 050).
+        setCardFilters: (filters) => {
+          cardFilters = filters;
+          refreshFilterMatches();
         },
       };
     };

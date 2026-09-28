@@ -86,6 +86,7 @@
   background: var(--db-chrome);
   border-bottom: 1px solid var(--db-border);
   align-items: center;
+  row-gap: 0.6vh;
   padding: 1vh 1vw;
 }
 
@@ -95,10 +96,6 @@
   text-transform: uppercase;
 }
 
-.db-live .native-deck-builder-subtitle {
-  color: var(--db-text-dim);
-  opacity: 1;
-}
 
 /* The theme switch sits with the header actions but reads as a quiet icon. */
 .db-live .native-deck-builder-theme-toggle {
@@ -153,10 +150,20 @@
   transform: translateY(-1px);
 }
 
-.db-live .native-deck-builder-targetbar {
-  background: var(--db-chrome-2);
-  border-bottom: 1px solid var(--db-border);
-  padding: 0.8vh 1vw;
+.db-live .native-deck-builder-deck-picker-toggle {
+  color: var(--db-text);
+  background: var(--db-input);
+  border: 1px solid var(--db-border-strong);
+}
+
+.db-live .native-deck-builder-deck-picker-toggle:hover,
+.db-live .native-deck-builder-deck-picker-toggle[aria-expanded='true'] {
+  border-color: var(--db-gold);
+}
+
+.db-live .native-deck-builder-deck-picker-popover {
+  background: var(--db-panel);
+  border: 1px solid var(--db-border-strong);
 }
 
 .db-live .native-deck-builder-target-label,
@@ -229,11 +236,6 @@
 }
 
 /* ------------------------------------------------------------ deck list -- */
-
-.db-live .native-deck-builder-library-bar {
-  background: var(--db-chrome-2);
-  border-bottom: 1px solid var(--db-border);
-}
 
 .db-live .native-deck-builder-library-chip {
   background: var(--db-raised);
@@ -396,8 +398,10 @@
 
 /* ------------------------------------------- filter drawer (design 050) -- */
 
-.native-deck-builder-results-shell {
-  position: relative;
+.native-deck-builder-set-browser-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5vw;
 }
 
 .db-live .native-deck-builder-filters-button {

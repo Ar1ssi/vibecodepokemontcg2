@@ -486,7 +486,14 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         const isSearch = mode === 'search';
         const isBrowse = mode === 'browse';
         const isCustomize = mode === 'customize';
-    
+        activeMode = mode;
+        closeFilterDrawer();
+        // Filters applied from Browse Sets re-run the search when it is next shown.
+        if (isSearch && searchIsStale) {
+          searchIsStale = false;
+          runSearch();
+        }
+
         if (tabSearch) tabSearch.classList.toggle('active', isSearch);
         if (tabBrowse) tabBrowse.classList.toggle('active', isBrowse);
         if (tabCustomize) tabCustomize.classList.toggle('active', isCustomize);
@@ -781,12 +788,20 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let deck = createEmptyDeck();
   let currentResults = [];
   let currentRawResults = [];
-  // Applied filters drive the search; the drawer edits a draft copy that only
-  // replaces them on Apply (design 050).
+  // Applied filters drive both Search and Browse Sets; the drawer edits a
+  // draft copy that only replaces them on Apply (design 050).
   let cardFilters = createEmptyFilters();
   let draftFilters = createEmptyFilters();
-  const filtersButton = document.getElementById('nativeDeckBuilderFiltersButton');
+  let activeMode = 'search';
+  let searchIsStale = false;
+  // One Filters button and chip strip per tab, one shared drawer.
+  const filtersButtons = [
+    document.getElementById('nativeDeckBuilderFiltersButton'),
+    document.getElementById('nativeDeckBuilderBrowseFiltersButton'),
+  ].filter(Boolean);
   const filterChips = document.getElementById('nativeDeckBuilderFilterChips');
+  const browseFilterChips = document.getElementById('nativeDeckBuilderBrowseFilterChips');
+  let drawerOpener = null;
   const filterDrawer = document.getElementById('nativeDeckBuilderFilterDrawer');
   const filterScrim = document.getElementById('nativeDeckBuilderFilterScrim');
   // Expansion names seen in any search, so a chip keeps its label after the
@@ -842,33 +857,41 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     return `Showing ${currentResults.length} card(s). Click a card to add it.`;
   };
 
+  // The one way filters change: both tabs follow. A hidden Search tab
+  // re-runs when it is next shown rather than fetching now.
+  const applyCardFilterState = (nextFilters) => {
+    cardFilters = nextFilters;
+    setBrowser?.setCardFilters(cardFilters);
+    if (activeMode === 'search') {
+      runSearch();
+    } else {
+      searchIsStale = true;
+      renderFilterSummary();
+    }
+  };
+
   const renderFilterSummary = () => {
     const activeCount = countActiveFilters(cardFilters);
-    if (filtersButton) {
-      filtersButton.dataset.count = String(activeCount);
-      const badge = filtersButton.querySelector('[data-filters-count]');
+    for (const button of filtersButtons) {
+      const badge = button.querySelector('[data-filters-count]');
       if (badge) {
         badge.textContent = String(activeCount);
         badge.hidden = activeCount === 0;
       }
-      filtersButton.setAttribute(
-        'aria-label',
-        activeCount ? `Filters, ${activeCount} active` : 'Filters'
-      );
+      button.setAttribute('aria-label', activeCount ? `Filters, ${activeCount} active` : 'Filters');
     }
+    const chips = describeActiveFilters(cardFilters, { setNames: knownSetNames });
+    const onRemove = (chip) => applyCardFilterState(removeFilterChip(cardFilters, chip));
+    const onReset = () => applyCardFilterState(createEmptyFilters());
     renderFilterChips({
       chipsEl: filterChips,
-      chips: describeActiveFilters(cardFilters, { setNames: knownSetNames }),
+      chips,
       resultLabel: hasSearched ? `${currentResults.length} result(s)` : '',
-      onRemove: (chip) => {
-        cardFilters = removeFilterChip(cardFilters, chip);
-        runSearch();
-      },
-      onReset: () => {
-        cardFilters = createEmptyFilters();
-        runSearch();
-      },
+      onRemove,
+      onReset,
     });
+    // Browse Sets reports its own match count in its status line.
+    renderFilterChips({ chipsEl: browseFilterChips, chips, onRemove, onReset });
   };
 
   const renderResults = () => {
@@ -1241,6 +1264,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     // Keep the Browse Sets panel's own card grid in sync with the same
     // filter — the summary bar drives both the deck list and Browse Sets.
     setBrowser?.setSupertypeFilter?.(deckListFilter);
+    // "In current deck" follows the deck as it changes in Browse Sets too.
+    if (cardFilters.inDeck && activeMode === 'browse') setBrowser?.render();
 
     renderDeckCounter({
       counterEl: deckCounter,
@@ -1492,7 +1517,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   // Expansions come from the results, plus any picked earlier that the
   // current results no longer contain, so a picked set can always be unpicked.
   const drawerSetOptions = () => {
-    const options = deriveSetOptions(currentRawResults);
+    const options =
+      activeMode === 'browse'
+        ? setBrowser?.getSetOptions?.() || []
+        : deriveSetOptions(currentRawResults);
+    for (const option of options) knownSetNames[option.value] = option.label;
     const listed = new Set(options.map((option) => option.value));
     for (const setId of draftFilters.sets) {
       if (!listed.has(setId)) options.push({ value: setId, label: knownSetNames[setId] || setId });
@@ -1519,9 +1548,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         renderDrawer();
       },
       onApply: () => {
-        cardFilters = draftFilters;
         closeFilterDrawer();
-        runSearch();
+        applyCardFilterState(draftFilters);
       },
       onClose: () => closeFilterDrawer(),
     });
@@ -1531,31 +1559,36 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     if (event.key === 'Escape') closeFilterDrawer();
   };
 
-  const openFilterDrawer = () => {
+  const openFilterDrawer = (opener) => {
     if (!filterDrawer) return;
+    drawerOpener = opener;
     draftFilters = cardFilters;
     renderDrawer();
     filterDrawer.hidden = false;
     if (filterScrim) filterScrim.hidden = false;
-    filtersButton?.setAttribute('aria-expanded', 'true');
+    opener?.setAttribute('aria-expanded', 'true');
     document.addEventListener('keydown', onDrawerKeydown);
     filterDrawer.querySelector('[data-fdrawer-close]')?.focus();
   };
 
   // Closing without Apply keeps the applied filters and drops the draft.
+  // A function declaration: switchMode, defined earlier, closes it too.
   function closeFilterDrawer() {
     if (!filterDrawer || filterDrawer.hidden) return;
     filterDrawer.hidden = true;
     if (filterScrim) filterScrim.hidden = true;
-    filtersButton?.setAttribute('aria-expanded', 'false');
+    drawerOpener?.setAttribute('aria-expanded', 'false');
     document.removeEventListener('keydown', onDrawerKeydown);
-    filtersButton?.focus();
+    drawerOpener?.focus();
+    drawerOpener = null;
   }
 
-  filtersButton?.addEventListener('click', () => {
-    if (filterDrawer?.hidden) openFilterDrawer();
-    else closeFilterDrawer();
-  });
+  for (const button of filtersButtons) {
+    button.addEventListener('click', () => {
+      if (filterDrawer?.hidden) openFilterDrawer(button);
+      else closeFilterDrawer();
+    });
+  }
   filterScrim?.addEventListener('click', () => closeFilterDrawer());
 
   cardTypeFilter.addEventListener('change', rerenderSearchLocally);

@@ -63,8 +63,42 @@ import {
       const listEl = document.getElementById('nativeDeckBuilderLibraryList');
       const newDeckButton = document.getElementById('nativeDeckBuilderNewDeck');
       const statusEl = document.getElementById('nativeDeckBuilderLibraryStatus');
-    
+      // "My Decks" is a dropdown beside Current Deck (design 050): the toggle
+      // names the open deck, the popover holds the deck chips.
+      const toggleEl = document.getElementById('nativeDeckBuilderLibraryToggle');
+      const popoverEl = document.getElementById('nativeDeckBuilderLibraryPopover');
+      const toggleLabelEl = toggleEl?.querySelector('[data-deck-picker-label]') || null;
+
       if (!barEl || !listEl || !newDeckButton) return null;
+
+      const onPickerKeydown = (event) => {
+        if (event.key === 'Escape') {
+          closePicker();
+          toggleEl?.focus();
+        }
+      };
+      const onPickerOutside = (event) => {
+        if (!barEl.contains(event.target)) closePicker();
+      };
+      const openPicker = () => {
+        if (!popoverEl) return;
+        popoverEl.hidden = false;
+        toggleEl?.setAttribute('aria-expanded', 'true');
+        document.addEventListener('keydown', onPickerKeydown);
+        document.addEventListener('mousedown', onPickerOutside);
+      };
+      // Hoisted: openDeck, defined below, closes the picker once a deck is picked.
+      function closePicker() {
+        if (!popoverEl || popoverEl.hidden) return;
+        popoverEl.hidden = true;
+        toggleEl?.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('keydown', onPickerKeydown);
+        document.removeEventListener('mousedown', onPickerOutside);
+      }
+      toggleEl?.addEventListener('click', () => {
+        if (popoverEl?.hidden) openPicker();
+        else closePicker();
+      });
     
       let library = loadLibraryFromStorage(window.localStorage);
       let currentTarget = 'self';
@@ -165,6 +199,7 @@ import {
         if (!cards) return;
         const key = target === 'opp' ? 'opp' : 'self';
         activeDeckIds[key] = deckId;
+        closePicker();
         onOpenDeck(target, deckId, cards);
         render();
       };
@@ -217,7 +252,10 @@ import {
       const render = () => {
         const decks = listDecks(library);
         const activeId = activeDeckIds[currentTarget];
-    
+        if (toggleLabelEl) {
+          toggleLabelEl.textContent = library?.decks?.[activeId]?.name || 'Choose a deck';
+        }
+
         if (decks.length === 0) {
           listEl.innerHTML =
             '<span class="native-deck-builder-library-empty">No saved decks yet — create one to get started.</span>';

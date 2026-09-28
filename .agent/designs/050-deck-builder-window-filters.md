@@ -181,5 +181,6 @@ layout and `#deckImport` come back with it. Text-importer removal is the only lo
 | 4 | server.js, header-buttons.js, import*.js, sample.decklists.js, settings.js, header-toggle.js, index.css | slim tab + route | e2e by hand | — | full `pnpm test` green |
 
 ## Deviations (Builder appends here during build)
+- Follow-up (user, 2026-09-28): My Decks became a dropdown in a single header row with Current Deck/P1/P2/+ New Deck/Play (subtitle and library bar removed); the drawer moved to the card pane and also filters Browse Sets via core/set-browser-filters.mjs (per-set `set.id=eq:<id>` TCGdex narrowing, full records checked, 300-record cap; detail-only filters cover just the open set).
 - The boot-time syncCustomizationToDeck() call was removed: it ran before `currentLoadTarget` was declared, so it always threw into its own try/catch and never did anything. restoreLastUsedDeckToPlaymat still calls it.
 - import.js kept only loadDeckData/changeCardBack/the card-back button; sample.decklists.js deleted; find-type/find-old-type/tcgdex-image-url orphaned (I199).

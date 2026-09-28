@@ -210,10 +210,29 @@
     <div id="nativeDeckBuilderWorkspace" class="native-deck-builder-workspace db-live">
         <button id="nativeDeckBuilderEdgeToggle" class="native-deck-builder-edge-toggle" aria-label="Collapse deck builder workspace" title="Collapse deck builder workspace">❮</button>
         <div class="native-deck-builder-inner">
+            <!-- One header row: title, which deck is being edited, and actions. -->
             <div class="native-deck-builder-header">
                 <div>
                     <strong>Deck Builder</strong>
-                    <div class="native-deck-builder-subtitle">Search cards, build decks, and load them directly into the simulator.</div>
+                </div>
+                <div class="native-deck-builder-targetbar">
+                    <span class="native-deck-builder-target-label">Current Deck</span>
+                    <div class="native-deck-builder-target-controls">
+                        <button id="nativeDeckBuilderTargetMain" class="native-target-button native-target-selected">P1</button>
+                        <button id="nativeDeckBuilderTargetAlt" class="native-target-button">P2 (Solo only)</button>
+                    </div>
+                    <div id="nativeDeckBuilderLibraryBar" class="native-deck-builder-deck-picker" data-target="self">
+                        <button id="nativeDeckBuilderLibraryToggle" class="native-deck-builder-deck-picker-toggle" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="nativeDeckBuilderLibraryPopover" title="My Decks">
+                            <span class="native-deck-builder-deck-picker-label" data-deck-picker-label>Choose a deck</span>
+                            <span aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div id="nativeDeckBuilderLibraryPopover" class="native-deck-builder-deck-picker-popover" role="dialog" aria-label="My Decks" hidden>
+                            <div id="nativeDeckBuilderLibraryList" class="native-deck-builder-library-list"></div>
+                        </div>
+                    </div>
+                    <button id="nativeDeckBuilderNewDeck" class="native-deck-builder-new-deck" type="button">+ New Deck</button>
+                    <span id="nativeDeckBuilderLibraryStatus" class="native-deck-builder-library-status" aria-live="polite"></span>
+                    <button id="nativeDeckBuilderPlayButton" class="native-deck-builder-play-button" disabled>Play</button>
                 </div>
                 <div id="nativeDeckBuilderLinkBanner" class="native-deck-builder-link-banner" role="status" hidden>
                     Not connected to a game tab. Open the deck builder from the game's Deck tab to play; your decks still save here.
@@ -224,22 +243,6 @@
                     <label for="nativeDeckBuilderCsvImport" id="nativeDeckBuilderImportCsvLabel" class="self-color native-deck-builder-inline-label">Import Deck</label>
                     <input id="nativeDeckBuilderCsvImport" type="file" accept=".csv" style="display:none;" />
                 </div>
-            </div>
-            <div id="nativeDeckBuilderLibraryBar" class="native-deck-builder-library-bar" data-target="self">
-                    <div class="native-deck-builder-library-header">
-                        <strong class="native-deck-builder-library-title">My Decks</strong>
-                        <button id="nativeDeckBuilderNewDeck" class="native-deck-builder-new-deck" type="button">+ New Deck</button>
-                        <span id="nativeDeckBuilderLibraryStatus" class="native-deck-builder-library-status" aria-live="polite"></span>
-                    </div>
-                    <div id="nativeDeckBuilderLibraryList" class="native-deck-builder-library-list"></div>
-                </div>
-                <div class="native-deck-builder-targetbar">
-                <strong class="native-deck-builder-target-label">Current Deck</strong>
-                <div class="native-deck-builder-target-controls">
-                    <button id="nativeDeckBuilderTargetMain" class="native-target-button native-target-selected">P1</button>
-                    <button id="nativeDeckBuilderTargetAlt" class="native-target-button">P2 (Solo only)</button>
-                </div>
-                <button id="nativeDeckBuilderPlayButton" class="native-deck-builder-play-button" disabled>Play</button>
             </div>
             <div class="native-deck-builder-body">
                 <div class="native-deck-builder-pane native-deck-builder-pane-main">
@@ -278,9 +281,6 @@
                     </div>
                     <div class="native-deck-builder-results-shell">
                         <div id="nativeDeckBuilderSearchResults" class="native-deck-builder-search-results"></div>
-                        <!-- TCG Live filter drawer (design 050): slides over the result grid. -->
-                        <div id="nativeDeckBuilderFilterScrim" class="native-deck-builder-fdrawer-scrim" hidden></div>
-                        <div id="nativeDeckBuilderFilterDrawer" class="native-deck-builder-fdrawer" role="dialog" aria-label="Card filters" hidden></div>
                     </div>
                     <div id="nativeDeckBuilderSetBrowserPanel" class="native-deck-builder-set-browser" hidden>
                     </div>
@@ -297,7 +297,12 @@
                     </div>
     
                     <div id="nativeDeckBuilderCoinPanel" class="native-deck-builder-coin-picker" hidden></div>
-                    <div id="nativeDeckBuilderMatPanel" class="native-deck-builder-mat-picker" hidden></div>         </div>
+                    <div id="nativeDeckBuilderMatPanel" class="native-deck-builder-mat-picker" hidden></div>
+                    <!-- TCG Live filter drawer (design 050), shared by Search and Browse Sets:
+                         slides over this pane from the left. -->
+                    <div id="nativeDeckBuilderFilterScrim" class="native-deck-builder-fdrawer-scrim" hidden></div>
+                    <div id="nativeDeckBuilderFilterDrawer" class="native-deck-builder-fdrawer" role="dialog" aria-label="Card filters" hidden></div>
+                </div>
                 
                 <div class="native-deck-builder-pane native-deck-builder-pane-side">
                         <div class="native-deck-builder-deck-header">
