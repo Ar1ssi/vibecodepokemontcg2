@@ -656,6 +656,10 @@ Build notes:
   hand transcription line for line; `--check` reproduces slice 1's modules byte for byte (live, no cache).
   SET_MAP: 67 codes, every one fetched and name-checked against TCGdex (HIF is `sm115`, not `sm11.5`). A name
   mismatch keeps 051's message (`<id> is "<name>", decklist says "<name>"`), not § Work plan's wording.
+- Slice 3: ME boxes imported from pages rev 4531474 (Mega Evolution), 4531476 (Perfect Order), 4547426 (Chaos
+  Rising), 4589383 (Pitch Black); TCGdex names replace Bulbapedia's shorthand for Special Energy ("Growing G
+  Energy" → "Growing Grass Energy"). Key art rule: the SIR of the Pokémon on the set's first Mega Hyper Rare
+  (me01-178, me03-120, me04-116, me05-116; 051's me02-125 fits it). `--check` (live, 5 ME boxes): clean.
 
 ---
 Self-approval checklist (only when the user is unreachable):

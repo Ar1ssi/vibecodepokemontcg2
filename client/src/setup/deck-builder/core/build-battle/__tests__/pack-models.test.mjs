@@ -86,6 +86,16 @@ test('row 10: me02 packs roll DR 25 %, UR 8 %, IR 20 %, SIR 5 %, MHR 1 %', async
   near(rates, 'top', 0.01, 0.005);
 });
 
+test('row 10: me01 packs roll the same profile', async () => {
+  const { cards, setInfo } = await loadBoxData('mega-evolution');
+  const rates = classRates({ cards, setInfo }, 'me');
+  near(rates, 'hit', 0.25, 0.02);
+  near(rates, 'ultra', 0.08, 0.015);
+  near(rates, 'illustration', 0.2, 0.02);
+  near(rates, 'specialIllustration', 0.05, 0.01);
+  near(rates, 'top', 0.01, 0.005);
+});
+
 test('row 10: sv and sv-acespec packs on a synthetic SV set', () => {
   const set = syntheticSet({
     counts: { Common: 60, Uncommon: 40, Rare: 20, 'Double rare': 12, 'ACE SPEC Rare': 6 },

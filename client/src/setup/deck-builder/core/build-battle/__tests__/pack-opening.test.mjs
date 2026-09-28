@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRng } from '../../../../../../../shared/engine/rng.mjs';
-import { getBuildBattleBox } from '../box-catalog.mjs';
+import { BUILD_BATTLE_BOXES, getBuildBattleBox } from '../box-catalog.mjs';
 import { hydrateBoxData, loadBoxData } from '../box-data.mjs';
 import { resolvePackModel } from '../pack-models.mjs';
 import {
@@ -100,6 +100,28 @@ test('row 7: the same seed opens the same box, bit for bit (fixed and Evolution 
   }
   assert.notDeepEqual(openMe02(1), openMe02(2));
   assert.notDeepEqual(openEvo('evolution-pack', 1), openEvo('evolution-pack', 2));
+});
+
+test('row 7: every baked box opens bit for bit, packs of ten from its own set, its pool from its own data', async () => {
+  for (const loaded of await Promise.all(BUILD_BATTLE_BOXES.map((entry) => loadBoxData(entry.key)))) {
+    const setIds = new Set(loaded.cards.map((entry) => entry.id));
+    for (const seed of [3, 99]) {
+      const open = () => openBox({ ...loaded, rng: createRng(seed) });
+      const opened = open();
+      assert.deepEqual(open(), opened, `${loaded.box.key} seed ${seed}`);
+      assert.equal(opened.packs.length, 4);
+      for (const pack of opened.packs) {
+        assert.equal(pack.length, 10, `${loaded.box.key}: ${pack}`);
+        assert.equal(new Set(pack).size, 10);
+        assert.ok(pack.every((id) => setIds.has(id)), `${loaded.box.key}: ${pack}`);
+      }
+      const rows = startingDeckRows({ box: loaded.box, data: loaded.data, opened });
+      const expected = loaded.box.kind === 'evolution-pack' ? opened.evolutionPack.length : 40;
+      assert.equal(rows.reduce((sum, row) => sum + row.qty, 0), expected, loaded.box.key);
+      const pool = poolFromBox({ box: loaded.box, data: loaded.data, cards: loaded.cards, opened });
+      assert.ok(pool.length > 0 && pool.every((entry) => entry.count > 0), loaded.box.key);
+    }
+  }
 });
 
 test('row 8: the same seed in another box draws that box, from its own set', () => {

@@ -37,7 +37,8 @@ const PACK_SOURCES = Object.freeze({
 const BULBAPEDIA_WIKI = 'https://bulbapedia.bulbagarden.net/wiki/';
 
 // Pack count, Energy count and pack art follow from the kind; the skin defaults to procedural art
-// over the four promos.
+// over the four promos. Key art (the box front): an ME box shows the Special Illustration Rare of
+// the Pokémon on its set's first Mega Hyper Rare, as 051 chose me02-125 (TCGdex rarities).
 function defineBox({ key, name, era, kind, decks, skin = {}, page, ...rest }) {
   return Object.freeze({
     key,
@@ -64,6 +65,24 @@ function defineBox({ key, name, era, kind, decks, skin = {}, page, ...rest }) {
 
 /** Every box, in release order. */
 export const BUILD_BATTLE_BOXES = Object.freeze([
+  // ── Mega Evolution: four fixed 40-card decks per box ──
+  defineBox({
+    key: 'mega-evolution',
+    name: 'Mega Evolution Build & Battle Box',
+    page: 'Mega Evolution Build & Battle Box (TCG)',
+    era: 'me',
+    setId: 'me01',
+    promoSetId: 'mep',
+    kind: 'fixed-decks',
+    packModelKey: 'me',
+    skin: { keyArtCardId: 'me01-178' },
+    decks: [
+      { key: 'meganium', name: 'Meganium', promoId: 'mep-001', energy: 'Basic Grass Energy', sprites: ['meganium', 'exeggutor'] },
+      { key: 'inteleon', name: 'Inteleon', promoId: 'mep-002', energy: 'Basic Water Energy', sprites: ['inteleon', 'frosmoth'] },
+      { key: 'alakazam', name: 'Alakazam', promoId: 'mep-003', energy: 'Basic Psychic Energy', sprites: ['alakazam', 'grumpig'] },
+      { key: 'lunatone', name: 'Lunatone', promoId: 'mep-004', energy: 'Basic Fighting Energy', sprites: ['lunatone', 'garganacl'] },
+    ],
+  }),
   defineBox({
     key: 'phantasmal-flames',
     name: 'Phantasmal Flames Build & Battle Box',
@@ -103,6 +122,57 @@ export const BUILD_BATTLE_BOXES = Object.freeze([
         energy: 'Basic Darkness Energy',
         sprites: ['toxtricity', 'krookodile'],
       },
+    ],
+  }),
+  defineBox({
+    key: 'perfect-order',
+    name: 'Perfect Order Build & Battle Box',
+    page: 'Perfect Order Build & Battle Box (TCG)',
+    era: 'me',
+    setId: 'me03',
+    promoSetId: 'mep',
+    kind: 'fixed-decks',
+    packModelKey: 'me',
+    skin: { keyArtCardId: 'me03-120' },
+    decks: [
+      { key: 'serperior', name: 'Serperior', promoId: 'mep-064', energy: 'Basic Grass Energy', sprites: ['serperior', 'shaymin'] },
+      { key: 'barbaracle', name: 'Barbaracle', promoId: 'mep-065', energy: 'Basic Fighting Energy', sprites: ['barbaracle', 'landorus'] },
+      { key: 'tyrantrum', name: 'Tyrantrum', promoId: 'mep-066', energy: 'Basic Fighting Energy', sprites: ['tyrantrum', 'hawlucha'] },
+      { key: 'doublade', name: 'Doublade', promoId: 'mep-067', energy: 'Basic Metal Energy', sprites: ['doublade', 'klefki'] },
+    ],
+  }),
+  defineBox({
+    key: 'chaos-rising',
+    name: 'Chaos Rising Build & Battle Box',
+    page: 'Chaos Rising Build & Battle Box (TCG)',
+    era: 'me',
+    setId: 'me04',
+    promoSetId: 'mep',
+    kind: 'fixed-decks',
+    packModelKey: 'me',
+    skin: { keyArtCardId: 'me04-116' },
+    decks: [
+      { key: 'delphox', name: 'Delphox', promoId: 'mep-074', energy: 'Basic Fire Energy', sprites: ['delphox', 'ninetales'] },
+      { key: 'ampharos', name: 'Ampharos', promoId: 'mep-075', energy: 'Basic Lightning Energy', sprites: ['ampharos', 'emolga'] },
+      { key: 'crobat', name: 'Crobat', promoId: 'mep-076', energy: 'Basic Darkness Energy', sprites: ['crobat', 'qwilfish'] },
+      { key: 'goodra', name: 'Goodra', promoId: 'mep-077', energy: 'Basic Psychic Energy', sprites: ['goodra', 'meowstic'] },
+    ],
+  }),
+  defineBox({
+    key: 'pitch-black',
+    name: 'Pitch Black Build & Battle Box',
+    page: 'Pitch Black Build & Battle Box (TCG)',
+    era: 'me',
+    setId: 'me05',
+    promoSetId: 'mep',
+    kind: 'fixed-decks',
+    packModelKey: 'me',
+    skin: { keyArtCardId: 'me05-116' },
+    decks: [
+      { key: 'miraidon', name: 'Miraidon', promoId: 'mep-082', energy: 'Basic Lightning Energy', sprites: ['miraidon', 'vikavolt'] },
+      { key: 'slowbro', name: 'Slowbro', promoId: 'mep-083', energy: 'Basic Psychic Energy', sprites: ['slowbro', 'silvally'] },
+      { key: 'dhelmise', name: 'Dhelmise', promoId: 'mep-084', energy: 'Basic Psychic Energy', sprites: ['dhelmise', 'banette'] },
+      { key: 'bastiodon', name: 'Bastiodon', promoId: 'mep-085', energy: 'Basic Metal Energy', sprites: ['bastiodon', 'skarmory'] },
     ],
   }),
 ]);
