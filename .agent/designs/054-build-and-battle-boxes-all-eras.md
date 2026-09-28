@@ -650,6 +650,12 @@ Build notes:
   draws except pack 1 card 9, now me02-129 (the art slot's boosted SIR band; row 31). Recorder seed 42: every
   row PASS, tiers `[[…,1,3,0],[…,1,2,1],[…,1,2,0],[…,1,1,0]]`. `pnpm test`: 5092 pass, 0 fail.
   Evolution-session parse tests land with the first Evolution box (slice 5): parseSession reads the catalog.
+- Slice 2: generator = `scripts/build-battle/{box-lines,bake-box,box-sources}.mjs` + the CLI loop; sources are
+  drafted by `scripts/build-battle/import-bulbapedia-box.mjs` (MediaWiki API → lines, TCGdex names, promos from
+  the box list) and reviewed. The Phantasmal Flames source drafted from the page (rev 4531475) equals 051's
+  hand transcription line for line; `--check` reproduces slice 1's modules byte for byte (live, no cache).
+  SET_MAP: 67 codes, every one fetched and name-checked against TCGdex (HIF is `sm115`, not `sm11.5`). A name
+  mismatch keeps 051's message (`<id> is "<name>", decklist says "<name>"`), not § Work plan's wording.
 
 ---
 Self-approval checklist (only when the user is unreachable):
