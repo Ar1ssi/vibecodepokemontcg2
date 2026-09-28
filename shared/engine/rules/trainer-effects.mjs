@@ -1115,6 +1115,18 @@ function parseTrainerStepsInner(lower) {
       return { steps, recognizable: true };
     }
 
+    // Drayton: one Pokémon AND one Trainer, not "a card".
+    if (/reveal a pok[eé]mon and a trainer card you find there/.test(lower)) {
+      steps.push({
+        type: 'lookAtTop',
+        count: m ? Number(m[1]) : 7,
+        pick: 'Pokémon and Trainer',
+        oneEach: ['Pokémon', 'Trainer'],
+        destination: 'hand',
+      });
+      return { steps, recognizable: true };
+    }
+
     let pick = 'any';
     if (lower.includes('discard any number of them')) pick = 'discard';
     else if (lower.includes('supporter card')) pick = 'Supporter';
@@ -2637,7 +2649,9 @@ export function describeStep(step) {
     }
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;
     case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
-    case 'lookAtTop': return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `up to ${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
+    case 'lookAtTop':
+      if (step.oneEach) return `Look at the top ${step.count} cards; take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} to hand, shuffle the rest.`;
+      return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `up to ${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'lookAtBottom': return `Look at the bottom ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';

@@ -526,9 +526,11 @@ async function runLookStep(card, step, fromBottom, done) {
   if (step.pick === 'discard') {
     // Raifort-style "discard any number of them": every viewed card is eligible.
     pool = candidates;
-  } else if (step.pick && step.pick !== 'any') {
+  } else if (step.oneEach || (step.pick && step.pick !== 'any')) {
     await Promise.all(candidates.map((c) => ensureCardData(c)));
-    const filtered = candidates.filter((c) => _matchesSearch(c, step.pick));
+    const filtered = candidates.filter((c) =>
+      step.oneEach ? step.oneEach.some((what) => _matchesSearch(c, what)) : _matchesSearch(c, step.pick)
+    );
     if (filtered.length === 0) {
       msg(`  ${card.name}: no matching cards in the top ${count} — shuffle your deck`);
       shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
@@ -540,6 +542,38 @@ async function runLookStep(card, step, fromBottom, done) {
   const destination = step.destination === 'bench' ? 'bench' : 'hand';
   const sourceText = card.text || card.effect || '';
   const takeUpTo = Number(step.takeUpTo) > 1 ? Number(step.takeUpTo) : 0;
+
+  if (step.oneEach) {
+    // Drayton: one pick per category, so each category gets its own optional picker.
+    const taken = [];
+    const pickCategory = (i) => {
+      if (i >= step.oneEach.length) {
+        maybeAnnounceSearchReveal(_effectOwner, card.name, taken, _appendMessage, { step, sourceText });
+        shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
+        done?.();
+        return;
+      }
+      const what = step.oneEach[i];
+      const options = pool.filter((c) => !taken.includes(c) && _matchesSearch(c, what) && deck.array.includes(c));
+      if (options.length === 0) {
+        pickCategory(i + 1);
+        return;
+      }
+      _openChoicePicker({
+        title: `${card.name} — choose a ${what} to hand (optional)`,
+        candidates: options,
+        zoneFrom: 'deck',
+        destination,
+        onPick: (picked) => {
+          if (picked) taken.push(picked);
+          pickCategory(i + 1);
+        },
+        onCancel: () => pickCategory(i + 1),
+      });
+    };
+    pickCategory(0);
+    return;
+  }
 
   if (takeUpTo) {
     _openChoicePicker({

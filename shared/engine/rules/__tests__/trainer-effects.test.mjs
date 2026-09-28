@@ -1915,6 +1915,13 @@ describe('recurring-wording coverage (batch 6)', () => {
     assert.equal(r.steps[0].count, 2);
   });
 
+  test('Drayton (corpus: Surging Sparks 174): one Pokémon and one Trainer, not any card', () => {
+    const r = parseTrainerEffect('Look at the top 7 cards of your deck. You may reveal a Pokémon and a Trainer card you find there and put them into your hand. Shuffle the other cards back into your deck.');
+    assert.deepEqual(r.steps, [
+      { type: 'lookAtTop', count: 7, pick: 'Pokémon and Trainer', oneEach: ['Pokémon', 'Trainer'], destination: 'hand' },
+    ]);
+  });
+
   test('Master Ball: "look at 7 cards from the top" → lookAtTop count 7', () => {
     const r = parseTrainerEffect('Look at 7 cards from the top of your deck. You may choose a Basic Pokémon or Evolution card from those cards, show it to your opponent, and put it into your hand. Shuffle the rest into your deck.');
     assert.equal(r.steps[0].type, 'lookAtTop');

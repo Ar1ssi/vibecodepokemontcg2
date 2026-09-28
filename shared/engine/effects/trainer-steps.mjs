@@ -593,6 +593,17 @@ function lookAtDeckEnd(ctx, fromBottom) {
         memo: { phase: 'attachTarget', energyId: card.instanceId },
       });
     }
+    if (step.oneEach) {
+      // Drayton: at most one card per category, however many the player ticked.
+      const taken = oneOfEach(chosen, step.oneEach);
+      for (const picked of taken) {
+        removeFromZones(player, picked);
+        player.zones.hand.push(picked);
+        ctx.events.push({ type: 'cardMoved', instanceId: picked.instanceId, from: 'deck', to: 'hand', playerId: player.playerId });
+        ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: picked.instanceId, name: picked.name }] });
+      }
+      return finishLook(ctx, viewed);
+    }
     if (Number(step.takeUpTo) > 1) {
       // "up to N" (Bug Catching Set): take every chosen match, not just the first.
       const toBench = step.destination === 'bench';
@@ -625,10 +636,24 @@ function lookAtDeckEnd(ctx, fromBottom) {
     });
   }
   const benchFull = step.destination === 'bench' && benchRootsOf(player).length >= BENCH_LIMIT;
-  const matches = benchFull ? [] : viewed.filter((card) => lookPickMatches(card, pick));
+  const matches = benchFull
+    ? []
+    : viewed.filter((card) =>
+        step.oneEach ? step.oneEach.some((what) => lookPickMatches(card, what)) : lookPickMatches(card, pick)
+      );
   if (matches.length === 0) {
     ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count });
     return finishLook(ctx, viewed);
+  }
+  if (step.oneEach) {
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: You may take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} from the ${
+        fromBottom ? 'bottom' : 'top'
+      } ${count} cards of your deck`,
+      options: matches,
+      min: 0,
+      max: Math.min(step.oneEach.length, matches.length),
+    });
   }
   const takeMax = Math.max(1, Number(step.takeUpTo) || 1);
   const what = pick.replace(' (bench)', '');
@@ -644,6 +669,16 @@ function lookAtDeckEnd(ctx, fromBottom) {
     min: 0,
     max: Math.min(takeMax, matches.length),
   });
+}
+
+// First chosen card for each category, in category order; a card fills one slot only.
+export function oneOfEach(cards, categories) {
+  const taken = [];
+  for (const what of categories) {
+    const hit = cards.find((c) => !taken.includes(c) && lookPickMatches(c, what));
+    if (hit) taken.push(hit);
+  }
+  return taken;
 }
 
 function lookPickMatches(card, pick) {
