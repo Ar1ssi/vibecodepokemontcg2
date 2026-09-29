@@ -93,6 +93,13 @@ fakes only the card rects, so it needs no game state. Start a worktree server on
 `node .claude/skills/fx-preview/rec/rec-evolve.mjs`. New effect → copy the closest script.
 Frame sheets from a video: ffmpeg (winget `Gyan.FFmpeg`).
 
+`rec/rec-deck-reveal.mjs` (design 059) goes one step further: it pushes server-shaped views and
+events through the real `applyView` with the production advisory hooks, so planning, queueing, hand
+hiding and the scene all run as in a game. It prints each flight's start / spot / landing next to the
+real hand card, writes frames, a video and frozen-time strips (`strip-self.png`, `strip-opp.png`) to
+`.agent/scratch/deck-reveal/`. In the cloud container: `CHROMIUM=/opt/pw-browsers/chromium` and
+`SIO_JS=<node_modules/.pnpm/socket.io@*/node_modules/socket.io/client-dist/socket.io.min.js>`.
+
 ## Builder tab: the Build & Battle unboxing (`rec/rec-unboxing.mjs`)
 
 The unboxing scene (design 052) lives in the builder tab, not on the board, so its recorder drives

@@ -17,13 +17,13 @@ so the card just appears in the hand.
 ## Acceptance
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
-| 1 | "the reveal animation … occur[s] when they reveal cards from their deck through trainers" | engine: Ultra Ball (30th Celebration 128) + Great Ball (Paldea Evolved 183) emit the art-stamped reveal; planner: `reveal` plan for both seats; video |
-| 2 | "… through stadiums" | engine: Town Store (Obsidian Flames 196) |
-| 3 | "… through abilities" | engine: Aromatisse Scent Collection (Perfect Order 036) |
-| 4 | "… through attacks" | engine: Jirachi Charge Energy (Paradox Rift 126) |
-| 5 | "having the card fly out from the deck" | pose: starts on the deck cover at the deck's turn, sleeve up; video frame |
-| 6 | "and into the reveal spot" | pose: holds face up, upright, on the Trainer preview's rect (mat centre); video frame |
-| 7 | "then into the user's hand" | pose: ends on the revealer's hand card (face down for the opponent's hand); video frame |
+| 1 | "the reveal animation … occur[s] when they reveal cards from their deck through trainers" | ✓ engine tests Ultra Ball (30th Celebration 128), Great Ball (Paldea Evolved 183), Pokémon Collector (HGSS 97) → `cardsRevealed` with `src`; planner "engine → planner: Ultra Ball" plans `reveal` for both seats; corpus sweep: 219/219 Trainers that put deck cards in the hand are named-with-art iff printed reveal (main: 41 leaks, 178 without art) |
+| 2 | "… through stadiums" | ✓ Town Store (Obsidian Flames 196) test; sweep 2/2 |
+| 3 | "… through abilities" | ✓ Aromatisse Scent Collection (Perfect Order 036) test (Pidgeot ex Quick Search stays hidden); sweep 77/77 |
+| 4 | "… through attacks" | ✓ Jirachi Charge Energy (Paradox Rift 126) and Detour-borrowed Pokémon Collector tests; sweep 59/59 (main: attack searches never revealed) |
+| 5 | "having the card fly out from the deck" | ✓ e2e trace: yours starts at (718, 429) on your deck cover, the opponent's at (254, 278) on their turned deck; strips 0–260 ms (sleeve on the deck, flip, face up on the mat) |
+| 6 | "and into the reveal spot" | ✓ e2e: yours holds at the mat centre (483, 360) at the 217 px Trainer-preview size; the opponent's two sit side by side at the spot; strips 520–1500 ms |
+| 7 | "then into the user's hand" | ✓ e2e: yours lands on its hand card (614, 720 = hand card 614, 720); the opponent's lands sleeve up on their hand card (308, 1 vs 308, 0); a card whose hand slot moved mid-scene (stack) still lands on it (352, 706 = 352, 706) |
 
 ## Assumptions
 - (assumed) "The reveal animation" is design 043's Trainer preview (`opp-play.mjs`): drop and flip,
