@@ -437,6 +437,40 @@ test('abilityDamagePrevention: self prevention reads plural abilities[]', () => 
   );
 });
 
+// Damage is not an effect: effect-only wordings must not zero the attack's damage.
+// Wordings: corpus pkmn-pokemon-cards.json — Shuppet Pitch Black 033 (me05-033), Celebi θ Stop,
+// Toxicroak G "excluding damage"; "including damage" row from the same corpus sweep.
+test('abilityDamagePrevention: effect-only prevention leaves damage alone', () => {
+  const attacker = mon('Miraidon');
+  const guarded = (name, text, from = attacker) => {
+    const holder = mon(name, { abilities: [ability('Guard', text)] });
+    return abilityDamagePrevention(holder, from, { sideCards: [holder] }).preventAll;
+  };
+  assert.equal(
+    guarded(
+      'Shuppet',
+      "Prevent all effects of your opponent's Pokémon's attacks and Abilities done to this Pokémon. (Damage is not an effect.)"
+    ),
+    false
+  );
+  assert.equal(
+    guarded('Celebi', "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon."),
+    false
+  );
+  assert.equal(
+    guarded('Toxicroak G', 'Prevent all effects of attacks, excluding damage, done to Toxicroak G.'),
+    false
+  );
+  assert.equal(
+    guarded(
+      'Guarded',
+      "Prevent all effects of attacks, including damage, done to this Pokémon by your opponent's Evolution Pokémon.",
+      mon('Raichu', { stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Pikachu' })
+    ),
+    true
+  );
+});
+
 // ── weakness override ────────────────────────────────────────────────────
 
 test('abilityWeaknessOverride: none, multiplier and type replacement', () => {
