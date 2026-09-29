@@ -136,6 +136,7 @@ n/a: no stored data changes. Revert = revert the branch; the generated table is 
 | 5 | M card-filters.mjs + its test | MECHANIC_OPTIONS/TESTS | filter Ancient keeps sv04-124, drops sv01-123 | — | test:changed green |
 
 ## Deviations
+- Slice 1: card-classify.mjs does not re-export the predicates (its header promises no imports); callers import `paradox-tags.mjs`. No `isAncientPokemon`/`isFuturePokemon`: the one caller that needs a Pokémon guard (search-match) already has `isPokemonCard`.
 ---
 Self-approval checklist:
 - [x] Every constraint traceable into the Design section
