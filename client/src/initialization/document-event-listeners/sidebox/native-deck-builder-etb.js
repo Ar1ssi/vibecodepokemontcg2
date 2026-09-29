@@ -448,6 +448,9 @@ export const initializeEliteTrainerBox = ({
     }
     loadState = results.every((result) => result.status === 'fulfilled') ? 'ready' : 'failed';
     session = loadEtbSession(storage, { setIds: new Set(cardsById.keys()) });
+    // With every set in, a stored session that still does not parse can never resume: drop it,
+    // or each builder visit would open on the Shelf for it. After a failed load it may be fine.
+    if (!session && loadState === 'ready') clearEtbSession(storage);
     renderAll();
     // A reload mid-opening lands back on the stage, settled at the saved beat.
     playScene();
