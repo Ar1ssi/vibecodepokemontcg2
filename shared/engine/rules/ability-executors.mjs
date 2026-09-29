@@ -356,11 +356,12 @@ export function parseDamagePrevention(card) {
   const t = textOf(card);
   const out = { preventAll: false, reduce: 0, reduceHp: 0 };
   if (!t) return out;
-  // "Prevent all effects of attacks … (Damage is not an effect.)" (Antique Cover Fossil
-  // Protective Cover) stops effects only; "effects of attacks, including damage" stops both.
+  // Damage is not an effect: an effect-prevention wording blocks damage only
+  // when it says "including damage" (Shuppet/Banette Hide 'n' Sneak, θ Stop and
+  // "except damage" wordings leave damage alone).
   if (
     /prevent (all )?damage/.test(t) ||
-    (/prevent (all )?effect/.test(t) && /including damage/.test(t)) ||
+    /prevent (all )?effects?\b[^.]*including damage/.test(t) ||
     t.includes("can't be damaged")
   ) {
     out.preventAll = true;
