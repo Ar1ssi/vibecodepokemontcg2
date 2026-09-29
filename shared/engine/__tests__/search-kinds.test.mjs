@@ -362,3 +362,91 @@ test('Peony discards the whole hand, then offers the deck’s Trainers', () => {
   assert.ok(result.pendingChoice, 'the Trainer search asks for a choice');
   assert.deepEqual(result.pendingChoice.options.map((c) => c.instanceId).sort(), [1, 2]);
 });
+
+// Sonia, Champion's Path 065; Brigette, BREAKthrough 161 (out/pkmn-trainer-cards.json).
+const EITHER_KIND = {
+  sonia:
+    'Search your deck for up to 2 Basic Pokémon or up to 2 basic Energy cards, reveal them, and put them into your hand. Then, shuffle your deck.',
+  brigette:
+    'Search your deck for 1 Basic Pokémon-EX or 3 Basic Pokémon (except for Pokémon-EX) and put them onto your Bench. Shuffle your deck afterward.',
+};
+
+test('Sonia parses as up to 2 Basic Pokémon or up to 2 Basic Energy', () => {
+  assert.deepEqual(parseTrainerEffect(EITHER_KIND.sonia).steps, [
+    {
+      type: 'searchDeck',
+      what: 'Basic Pokémon or Basic Energy',
+      count: 2,
+      destination: 'hand',
+      upTo: true,
+      alternatives: [
+        { what: 'Basic Pokémon', count: 2 },
+        { what: 'Basic Energy', count: 2 },
+      ],
+      reveal: true,
+    },
+  ]);
+});
+
+test('Brigette parses as 1 Basic Pokémon-EX or 3 Basic Pokémon onto the Bench', () => {
+  assert.deepEqual(parseTrainerEffect(EITHER_KIND.brigette).steps, [
+    {
+      type: 'searchDeck',
+      what: 'Basic Pokémon-EX or Basic Pokémon',
+      count: 3,
+      destination: 'bench',
+      upTo: true,
+      alternatives: [
+        { what: 'Basic Pokémon-EX', count: 1 },
+        { what: 'Basic Pokémon', count: 3 },
+      ],
+    },
+  ]);
+});
+
+test("matchesSearch reads 'Basic Pokémon-EX' as a Basic whose name ends in EX", () => {
+  const ex = createCard({ instanceId: 1, name: 'Shaymin-EX', supertype: 'Pokémon', subtypes: 'Basic', stage: 'Basic' });
+  const oldEx = createCard({ instanceId: 2, name: 'Mewtwo EX', supertype: 'Pokémon', subtypes: 'Basic', stage: 'Basic' });
+  const plain = createCard({ instanceId: 3, name: 'Pikachu', supertype: 'Pokémon', subtypes: 'Basic', stage: 'Basic' });
+  const stage1Ex = createCard({ instanceId: 4, name: 'M Rayquaza-EX', supertype: 'Pokémon', subtypes: 'Stage 1', stage: 'Stage 1' });
+  assert.equal(matchesSearch(ex, 'Basic Pokémon-EX'), true);
+  assert.equal(matchesSearch(oldEx, 'Basic Pokémon-EX'), true);
+  assert.equal(matchesSearch(plain, 'Basic Pokémon-EX'), false);
+  assert.equal(matchesSearch(stage1Ex, 'Basic Pokémon-EX'), false);
+});
+
+function runSonia(selection) {
+  const state = createGameState({ gameId: 'sonia', seed: 1, rulesEnabled: true });
+  state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
+  state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 1, name: 'Pikachu', supertype: 'Pokémon', subtypes: 'Basic' }),
+    createCard({ instanceId: 2, name: 'Charmander', supertype: 'Pokémon', subtypes: 'Basic' }),
+    createCard({ instanceId: 3, name: 'Lightning Energy', supertype: 'Energy', subtypes: 'Basic' }),
+    createCard({ instanceId: 4, name: 'Fire Energy', supertype: 'Energy', subtypes: 'Basic' }),
+    createCard({ instanceId: 5, name: 'Raichu', supertype: 'Pokémon', subtypes: 'Stage 1', stage: 'Stage 1' })
+  );
+  const res = executeSteps(state, {
+    steps: parseTrainerEffect(EITHER_KIND.sonia).steps,
+    fromStepIndex: 0,
+    effectType: 'trainer',
+    sourceCard: { name: 'Sonia' },
+    playerId: 'p1',
+    activeRng: createRng(1),
+    events: [],
+    ...(selection ? { selection } : {}),
+  });
+  return { res, hand: state.players.p1.zones.hand.map((c) => c.instanceId) };
+}
+
+test('Sonia offers Basics and basic Energy, never the Stage 1, capped at 2', () => {
+  const { res } = runSonia(null);
+  assert.equal(res.pendingChoice.max, 2);
+  assert.deepEqual(res.pendingChoice.options.map((c) => c.instanceId).sort(), [1, 2, 3, 4]);
+});
+
+test('Sonia: two Basics are kept; a Basic plus an Energy keeps only the first branch', () => {
+  assert.deepEqual(runSonia([1, 2]).hand, [1, 2]);
+  assert.deepEqual(runSonia([1, 3]).hand, [1]);
+});

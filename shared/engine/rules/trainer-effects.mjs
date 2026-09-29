@@ -539,6 +539,36 @@ function drawUntilBonus(text) {
   };
 }
 
+const BASIC_OR_EVOLUTION_SEARCH_RE =
+  /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/;
+const EITHER_KIND_SEARCH_RE =
+  /search your deck for (?:up to )?(\d+) ([^,.()]+?) or (?:up to )?(\d+) ([^,.()]+?)(?: \(except for [^)]*\))?(?=,|\.| and )/;
+
+// "up to 2 Basic Pokémon or up to 2 basic Energy cards" (Sonia), "1 Basic Pokémon-EX or 3 Basic
+// Pokémon (except for Pokémon-EX)" (Brigette): one branch, not a mixed pick. The "(except for …)"
+// exclusion is not enforced. Brock's Scouting keeps its own hand-only branch.
+function parseEitherKindSearch(lower, destination, reveal) {
+  if (BASIC_OR_EVOLUTION_SEARCH_RE.test(lower)) return null;
+  const m = lower.match(EITHER_KIND_SEARCH_RE);
+  if (!m) return null;
+  const whatA = knownKindWhat(m[2]);
+  const whatB = knownKindWhat(m[4]);
+  if (!whatA || !whatB || whatA === 'card' || whatB === 'card') return null;
+  const countA = Number(m[1]);
+  const countB = Number(m[3]);
+  return {
+    what: `${whatA} or ${whatB}`,
+    count: Math.max(countA, countB),
+    destination,
+    upTo: true,
+    alternatives: [
+      { what: whatA, count: countA },
+      { what: whatB, count: countB },
+    ],
+    ...(reveal ? { reveal: true } : {}),
+  };
+}
+
 // Shared search-deck target parsing — used by the main search branch, coin-flip
 // sub-clauses, and attack search (parseAttackSearchClause in damage-parser.mjs).
 export function parseSearchDeckParams(lower) {
@@ -572,6 +602,8 @@ export function parseSearchDeckParams(lower) {
   if (twoKinds) return twoKinds;
   const nameFiltered = parseNameFilteredSearch(lower, destination, reveal);
   if (nameFiltered) return nameFiltered;
+  const eitherKind = parseEitherKindSearch(lower, destination, reveal);
+  if (eitherKind) return eitherKind;
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
     return {
       type: 'searchDeckSequence',
@@ -684,9 +716,7 @@ export function parseSearchDeckParams(lower) {
   }
 
   // "up to 2 Basic Pokémon or 1 Evolution Pokémon" (Brock's Scouting): one branch, not a mixed pick.
-  const basicOrEvo = lower.match(
-    /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/
-  );
+  const basicOrEvo = lower.match(BASIC_OR_EVOLUTION_SEARCH_RE);
   if (basicOrEvo && !lower.includes('onto your bench')) {
     return {
       what: 'Basic Pokémon or Evolution Pokémon',

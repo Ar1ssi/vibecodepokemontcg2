@@ -148,6 +148,7 @@ export function matchesSearch(card, what = '') {
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
     if (/pok[eé]mon-gx\b/.test(w)) return isGxCard(card);
+    if (/^basic pok[eé]mon-ex$/.test(w)) return normalizeStage(card.stage) === 'Basic' && /(?:-| )EX$/.test(String(card.name || ''));
     const noRuleBox =
       w.includes("doesn't have a rule box") ||
       w.includes("does not have a rule box") ||
