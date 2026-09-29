@@ -980,15 +980,18 @@ import test, { describe } from 'node:test';
         assert.equal(r.steps[0].count, 5);
       });
 
-      test('Great Haul Net: shuffleFromDiscard with choices', () => {
+      test('Great Haul Net: chooseMode of two typed shuffles', () => {
         const r = parseTrainerEffect('Choose 1 or both:\n• Shuffle up to 3 {W} Pokémon from your discard pile into your deck.\n• Shuffle up to 3 Basic {W} Energy cards from your discard pile into your deck.');
         assert.equal(r.recognizable, true);
-        assert.equal(r.steps[0].type, 'shuffleFromDiscard');
-        assert.ok(Array.isArray(r.steps[0].choices));
-        assert.equal(r.steps[0].choices.length, 2);
-        assert.equal(r.steps[0].choices[0].what, '{W} Pokémon');
-        assert.equal(r.steps[0].choices[0].count, 3);
-        assert.equal(r.steps[0].choices[1].what, 'Basic {W} Energy');
+        assert.equal(r.steps[0].type, 'chooseMode');
+        assert.equal(r.steps[0].max, 2);
+        assert.deepEqual(
+          r.steps[0].modes.map((m) => m.steps),
+          [
+            [{ type: 'shuffleFromDiscard', what: '{W} Pokémon', count: 3 }],
+            [{ type: 'shuffleFromDiscard', what: 'Basic {W} Energy', count: 3 }],
+          ],
+        );
         assert.ok(describeStep(r.steps[0]).includes('Choose 1 or both'));
       });
 

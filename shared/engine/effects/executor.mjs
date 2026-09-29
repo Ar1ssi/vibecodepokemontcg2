@@ -524,16 +524,17 @@ export function executeSteps(draft, {
             (step.tagFilter !== 'single-strike' || isSingleStrikeCard(c))
         );
         const count = step.count || 1;
-        // An exact-count discard cost the hand cannot pay must never open a
-        // min=count/max=count choice over fewer options: `resolveChoice`
-        // rejects any selection below `min`, so the choice could never be
-        // resolved and every later command would answer `waiting_for_choice`
-        // (Prism Tower with one card in hand soft-locked the match).
-        if (candidates.length < count) {
+        // "Discard up to 3 cards … (You must discard at least 1 card.)" (Serena): `min` < `count`.
+        const minCount = Math.min(step.min ?? count, count);
+        // A discard cost the hand cannot pay must never open a min/max choice over
+        // fewer options: `resolveChoice` rejects any selection below `min`, so the
+        // choice could never be resolved and every later command would answer
+        // `waiting_for_choice` (Prism Tower with one card in hand soft-locked the match).
+        if (candidates.length < minCount) {
           events.push({
             type: 'effectStepSkipped',
             reason: 'not_enough_cards_to_discard',
-            required: count,
+            required: minCount,
             available: candidates.length,
           });
           // Abort the rest of the effect: the cost is unpayable, and "if you do"
@@ -542,11 +543,11 @@ export function executeSteps(draft, {
         }
         const choice = createPendingChoice({
           player: playerId,
-          prompt: `${sourceCard?.name || 'Trainer'}: Discard ${count} card${count > 1 ? 's' : ''} from your hand`,
+          prompt: `${sourceCard?.name || 'Trainer'}: Discard ${minCount < count ? `up to ${count}` : count} card${count > 1 ? 's' : ''} from your hand`,
           source: sourceCard?.name || '',
           options: candidates,
-          min: count,
-          max: count,
+          min: minCount,
+          max: Math.min(count, candidates.length),
           cancellable: false,
           stateVersion: draft.stateVersion,
           stepIndex: idx,
@@ -902,7 +903,7 @@ export function executeSteps(draft, {
         });
         const count = step.count || 1;
         const actual = Math.min(count, deck.length);
-        const drawn = deck.splice(0, actual);
+        const drawn = step.fromBottom ? deck.splice(deck.length - actual, actual) : deck.splice(0, actual);
         hand.push(...drawn);
         events.push({
           type: 'cardsDrawn',

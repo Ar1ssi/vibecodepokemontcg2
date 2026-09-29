@@ -188,6 +188,12 @@ export function matchesSearch(card, what = '') {
       // must still fall through to the HP-cap checks below.
       if (typeName && !matchesBasicPokemonType(card, typeName)) return false;
     }
+    // "{W} Pokémon" with no stage word (Great Haul Net).
+    const typedSymbol = !typedBasic && !typedEvolution && what.match(/\{([A-Za-z])\}\s+pok[eé]mon/i);
+    if (typedSymbol) {
+      const typeName = SYMBOL_TO_TYPE[typedSymbol[1].toLowerCase()];
+      if (typeName && !pokemonMatchesEnergyType(card, typeName)) return false;
+    }
     if (w.includes('basic') && effectiveStage !== 'Basic') return false;
     // Word-form type qualifier ("Water Pokémon", "Basic Psychic Pokémon");
     // symbol forms ("Basic {W} Pokémon") are handled above.

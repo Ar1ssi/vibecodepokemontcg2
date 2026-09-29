@@ -263,7 +263,9 @@ export function executeTrainer(draft, {
   const text = card.text || card.effect || card.cardText || '';
   const parsed = isToolCard(card) ? { steps: [{ type: 'attachTool' }] } : parseTrainerEffect(text);
 
-  const turnBonus = isToolCard(card) ? null : parseTurnDamageBonus(text);
+  // A "Choose 1:" card queues its damage bonus only when that mode is chosen (turnDamageBonus step).
+  const modal = Boolean(parsed?.steps?.some((s) => s.type === 'chooseMode'));
+  const turnBonus = isToolCard(card) || modal ? null : parseTurnDamageBonus(text);
   if (turnBonus) {
     if (!player.flags) player.flags = {};
     player.flags.turnDamageBonuses = [...(player.flags.turnDamageBonuses || []), turnBonus];

@@ -2460,7 +2460,9 @@
   },
   "Energy Recycle System#vjgu9j": {
    "steps": [
-    "recursion"
+    "chooseMode",
+    "recursion",
+    "shuffleFromDiscard"
    ]
   },
   "Energy Recycler#1tmxpqs": {
@@ -3153,6 +3155,8 @@
   },
   "Fossil Excavation Map#1cd5doo": {
    "steps": [
+    "chooseMode",
+    "recursion",
     "searchDeck"
    ]
   },
@@ -3433,7 +3437,9 @@
   },
   "Giovanni’s Scheme#1i72ude": {
    "steps": [
-    "drawUntil"
+    "chooseMode",
+    "drawUntil",
+    "turnDamageBonus"
    ]
   },
   "Giovanni#huvou": {
@@ -3607,6 +3613,7 @@
   },
   "Great Haul Net#7b1sxy": {
    "steps": [
+    "chooseMode",
     "shuffleFromDiscard"
    ]
   },
@@ -4092,7 +4099,9 @@
   },
   "Ingo & Emmet#1gokqxi": {
    "steps": [
-    "discardHandThenDraw"
+    "chooseMode",
+    "discardHandThenDraw",
+    "lookAtTop"
    ]
   },
   "Interviewer’s Questions#1t2pdrd": {
@@ -4237,6 +4246,7 @@
   },
   "Judge Whistle#1l49951": {
    "steps": [
+    "chooseMode",
     "draw",
     "recursion"
    ]
@@ -4323,11 +4333,10 @@
    ]
   },
   "Kieran#y8flte": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "chooseMode",
+    "switchOwn",
+    "turnDamageBonus"
    ]
   },
   "Kindler#8t4zqf": {
@@ -4337,6 +4346,7 @@
   },
   "Klara#83qh0a": {
    "steps": [
+    "chooseMode",
     "recursion"
    ]
   },
@@ -5860,6 +5870,7 @@
   },
   "Ordinary Rod#4g431i": {
    "steps": [
+    "chooseMode",
     "shuffleFromDiscard"
    ]
   },
@@ -7013,7 +7024,9 @@
   },
   "Rescue Stretcher#1ememv0": {
    "steps": [
-    "recursion"
+    "chooseMode",
+    "recursion",
+    "shuffleFromDiscard"
    ]
   },
   "Research Record#1ahp8hw": {
@@ -7615,6 +7628,8 @@
   },
   "Serena#ah3811": {
    "steps": [
+    "chooseMode",
+    "discardCost",
     "drawUntil",
     "switchOpponent"
    ]
@@ -8330,7 +8345,9 @@
   },
   "Tate & Liza#4gxg0j": {
    "steps": [
-    "shuffleHandThenDraw"
+    "chooseMode",
+    "shuffleHandThenDraw",
+    "switchOwn"
    ]
   },
   "Team Aqua Admin#bs1su9": {

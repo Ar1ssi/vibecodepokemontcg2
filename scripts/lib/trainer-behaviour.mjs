@@ -39,6 +39,11 @@ function stepCount(step) {
     const branches = [step.heads, step.tails, ...outcomeSteps].flat().filter(Boolean);
     return branches.length ? Math.max(...branches.map(stepCount)) : 0;
   }
+  // A modal card carries its picks in its modes (Klara, Ordinary Rod).
+  if (step.type === 'chooseMode') {
+    const modeSteps = (step.modes || []).flatMap((m) => m.steps || []);
+    return modeSteps.length ? Math.max(...modeSteps.map(stepCount)) : 0;
+  }
   return step.count || 1;
 }
 
@@ -78,10 +83,13 @@ export function trainerKey(row) {
   return `${row?.name || '(unnamed)'}#${hash.toString(36)}`;
 }
 
-// Step types with a coin flip's branches and outcomes unfolded, so a step moving into a flip
-// (Old Rod's recovery) is not a lost step.
+// Step types with a coin flip's branches and outcomes, and a modal card's modes, unfolded, so a
+// step moving into a flip or a mode (Old Rod's recovery, Klara's picks) is not a lost step.
 function flattenStepTypes(steps) {
   return steps.flatMap((s) => {
+    if (s.type === 'chooseMode') {
+      return [s.type, ...flattenStepTypes((s.modes || []).flatMap((m) => m.steps || []))];
+    }
     if (s.type !== 'coinFlip') return [s.type];
     const nested = [s.heads, s.tails, ...(s.outcomes || []).map((o) => o.steps)].flat().filter(Boolean);
     return [s.type, ...flattenStepTypes(nested)];

@@ -37,6 +37,7 @@ import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 import { abilityCounterMoveLock } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
+import { parseTurnDamageBonus } from '../rules/turn-damage-bonus.mjs';
 import { isSupporterTrainer } from '../rules/trainer-play-conditions.mjs';
 
 export const BENCH_LIMIT = 5;
@@ -4613,7 +4614,44 @@ function drawBottom(ctx) {
   return null;
 }
 
+// "Choose 1:" / "Choose 1 or both:" (Kieran, Klara, Judge Whistle, …): the player picks the
+// mode(s); each chosen mode's steps then run in printed order, after this step. Options reuse the
+// label-option shape the attack prompts use (instanceId = 1-based mode number).
+function chooseMode(ctx) {
+  const { step } = ctx;
+  const modes = Array.isArray(step.modes) ? step.modes : [];
+  if (modes.length === 0) return skip(ctx, 'no_modes');
+  if (ctx.selection) {
+    const picked = [...new Set(ctx.selection.map(Number))]
+      .filter((n) => Number.isInteger(n) && n >= 1 && n <= modes.length)
+      .sort((a, b) => a - b)
+      .slice(0, step.max || 1);
+    if (picked.length === 0) return skip(ctx, 'no_mode_chosen');
+    ctx.insertSteps(picked.flatMap((n) => modes[n - 1].steps));
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose ${step.max > 1 ? '1 or both' : '1'}`,
+    options: modes.map((mode, i) => ({ instanceId: i + 1, name: mode.label, type: 'option' })),
+    min: 1,
+    max: Math.min(step.max || 1, modes.length),
+  });
+}
+
+// A mode's "During this turn, your Pokémon's attacks do N more damage …": queued only when the
+// mode was chosen. The whole-card scan in playTrainer skips cards with a chooseMode step.
+function turnDamageBonus(ctx) {
+  const bonus = parseTurnDamageBonus(ctx.step.text);
+  if (!bonus) return skip(ctx, 'no_damage_bonus');
+  const { player } = ctx;
+  if (!player.flags) player.flags = {};
+  player.flags.turnDamageBonuses = [...(player.flags.turnDamageBonuses || []), bonus];
+  return null;
+}
+
 export const EXTRA_STEP_HANDLERS = {
+  chooseMode,
+  turnDamageBonus,
   attachTool,
   attachAttackTool,
   clearStatus,
