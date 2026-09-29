@@ -604,11 +604,14 @@ One shot this implementation in the same branch." — the criteria are this desi
 - A3 (assumed) No source says which types an Evolution deck's Basic Energy are (every Bulbapedia page, pokemon.com
   and the Pokémon Center listing only say "17 basic Energy"). Rule: the promo group gets 9 (or its share of
   40 − pack size), the other group 8; each group's share splits over the Energy types its Pokémon's attack costs
-  name (TCGdex `attacks[].cost`, weighted by copies, largest remainder); a group with no typed cost gives its
-  share to the other. Basic Energy is unlimited (D188), so the player can re-split freely.
+  name (TCGdex `attacks[].cost`, weighted by copies, largest remainder); a group with no typed cost takes its page
+  header's type (`groupTypes` in the source) when that type has a Basic Energy, else gives its share to the other
+  (Stellar Crown's Bouffalant: Colorless). Basic Energy is unlimited (D188), so the player can re-split freely.
 - A4 (assumed) Where a page's numbers disagree with the product (a 23-card Evolution pack, a 40-card deck), the
-  product wins: Trainer draws fill the pack to 23 and an Evolution deck takes 40 − pack size Basic Energy. Each
-  case is commented in its box source file and listed in § Deviations.
+  product wins: Trainer draws fill the pack toward 23 but a pool's minimums always come ("1-2" deals at least 1),
+  and an Evolution deck takes 40 − pack size Basic Energy, so its pack may run over (Destined Rivals: 26–28) or
+  under 23 while the deck stays 40. An `evolution-pack` box must come out at exactly 23 for every pairing (the
+  generator refuses it otherwise). Each case is commented in its box source file and listed in § Deviations.
 - A5 (assumed) Rules a page states without a rule to follow are not simulated: Fates Collide's optional Shuckle
   swap, Guardians Rising's "an Item is deducted for each Oricorio [Pa'u Style]". Listed in § Deviations.
 - A6 (assumed) XY kits are in scope (Option 10 A); the user asked for every era.
@@ -644,6 +647,9 @@ Plan-time re-pins (§2 of oneshot-feature, from reading all 42 Bulbapedia pages 
   literals; `packArtCardIds` defaults to the box's four promos.
 - D6 `artIndexes` stay derived from the seed in the scene (052); `openBox` has only the rng stream.
 - D7 `aceSpec` class reveals at tier 2 (the design gave it no tier).
+- D8 An Evolution deck's catalog `energy` is the heaviest type in its group's baked `energyNeeds` (A3; null when it
+  has none, e.g. Stellar Crown's Bouffalant); an `evolution-pack` group's is null (the box deals no Energy). No
+  page names the Energy, so § Data model's "the type the printed box shipped" has no source. Pinned by test.
 Build notes:
 - Slice 1: me02 split from 051's module by a one-off script; hydrated rows equal 051's rows byte for byte
   (JSON order included). `packArtSrc(setId, key)` (vendored files are per set). The seed-42 box keeps 051's
@@ -666,6 +672,14 @@ Build notes:
   Recorder seed 42 PASS for phantasmal-flames and mega-evolution (procedural skin); `bb-box-picker-test.mjs`
   ALL PASS (rows 1, 5, 6, 22, 29); `bb-room-reset-test.mjs` and `room-format-test.mjs` ALL PASS. In this
   sandbox the proxy blocks some TCGdex/Limitless art (ERR_BLOCKED_BY_ORB), so skin screenshots use stand-ins.
+- Slice 5: 10 SV boxes imported (page revisions in each source). Pages vs product: Twilight Masquerade's "1-2"
+  Trainer minimums, and Stellar Crown, Surging Sparks, Journey Together and Destined Rivals groups, give pairings
+  of 22–28 cards (A4 as refined); Ledian's and Bouffalant's attacks cost only Colorless (A3's header fallback;
+  the importer emits `groupTypes`). sv09 and sv10 print no ACE SPEC (TCGdex), so `sv-acespec` gives that weight to
+  the reverse filler there (row 9). Key art = the SIR of the Pokémon on the set's first Hyper rare (sv01-244 …
+  sv10-230), pinned by test with ME's rule. The recorder assumed a box's best card is never a pack's last card
+  (Temporal Forces seed 42's is): `swipeOne` now only swipes a hit the hit strip already turned. Recorder
+  `BOX=temporal-forces` PASS; picker e2e row 14 PASS; `--check` (live, 10 SV boxes) clean.
 
 ---
 Self-approval checklist (only when the user is unreachable):

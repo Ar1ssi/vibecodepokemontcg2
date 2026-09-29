@@ -258,6 +258,7 @@ async function main() {
   };
   const isFixed = blocks.some((block) => /deck$/i.test(block.title));
   const groups = {};
+  const groupTypes = {};
   const common = [];
   const pools = [];
   for (const block of blocks) {
@@ -275,6 +276,7 @@ async function main() {
       const groupKey = groupKeyOf(block);
       if (!groupKey) throw new Error(`No promo for "${block.title}"; pass --map "${block.title}=<promo key>"`);
       groups[groupKey] = lines;
+      if (block.type) groupTypes[groupKey] = block.type;
     } else pools.push({ name: block.title, lines });
   }
   const promoLines = await Promise.all(
@@ -298,6 +300,8 @@ async function main() {
     body.push('  },', '  groups: {');
     for (const promo of promos) body.push(`    ${keyText(promo.key)}: [\n${renderLines(groups[promo.key] || [], '      ')}\n    ],`);
     body.push('  },');
+    body.push('  // The group headers\' type: the Energy fallback when a group\'s attacks name no type (design 054 A3).');
+    body.push(`  groupTypes: { ${promos.map((promo) => `${keyText(promo.key)}: ${quote(groupTypes[promo.key] ?? '')}`).join(', ')} },`);
     if (common.length) body.push(`  common: [\n${renderLines(common, '    ')}\n  ],`);
     if (pools.length) {
       body.push('  trainers: [');

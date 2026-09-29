@@ -126,6 +126,24 @@ try {
   await waitFor(page, () => Boolean(document.getElementById('buildBattleNewBox')), 20000);
   const resumed = await page.evaluate(() => document.querySelector('#buildBattleBoxPanel .bb-title')?.textContent);
   T('a saved box resumes over ?box=', /^Pitch Black Build & Battle Box · /.test(resumed || ''), resumed);
+
+  // Row 14: an Evolution-deck box (Scarlet & Violet) starts the editor at its 23 + 17 = 40.
+  await fresh('&box=temporal-forces');
+  state = await picker(page);
+  T('?box=temporal-forces opens on the Scarlet & Violet era', state.box === 'temporal-forces' && state.era === 'sv', JSON.stringify(state));
+  await page.click('#buildBattleOpenBox');
+  await page.waitForSelector('#bbUnboxing [data-control="skip"]', { timeout: 15000 });
+  await page.click('#bbUnboxing [data-control="skip"]');
+  await waitFor(page, () => !document.getElementById('bbUnboxingStage'), 10000);
+  await page.waitForTimeout(500);
+  const evolution = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
+  const energy = (evolution?.energy || []).reduce((sum, [, qty]) => sum + qty, 0);
+  T(
+    'row 14 the session holds both groups, the Evolution pack and its Energy to 40',
+    evolution?.groupKeys?.[0] === evolution?.deckKey && evolution.evolutionPack.length + energy === 40,
+    JSON.stringify({ groupKeys: evolution?.groupKeys, pack: evolution?.evolutionPack?.length, energy: evolution?.energy })
+  );
+  T('row 14 an Evolution-deck box starts the editor at 40 / 40', (await deckCount(page)) === '40');
 } finally {
   await browser.close();
 }

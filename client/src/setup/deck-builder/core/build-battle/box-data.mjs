@@ -83,7 +83,7 @@ function toLoadedBox(box, setModule, boxModule) {
     throw new Error(`set module ${box.setId} is malformed`);
   }
   const data = hydrateBoxData(boxModule?.default);
-  if (data.kind !== box.kind) throw new Error(`box module ${box.key} is not a ${box.kind} box`);
+  if (data.kind !== box.kind) throw new Error(`box module ${box.key} holds ${data.kind}, not ${box.kind}`);
   return { box, setInfo, cards: hydrateSetCards(setInfo, rows), data };
 }
 

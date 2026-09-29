@@ -327,3 +327,39 @@ test('a design 051 session without `unboxing` resumes at the end of the scene', 
   assert.equal('openedPacks' in parsed, false);
   assert.deepEqual(parsed.packs, opened.packs);
 });
+
+test('rows 2 + 14: an Evolution-deck session round-trips, verifies and pools its 23 cards and 17 Energy', async () => {
+  const evolution = await loadBoxData('temporal-forces');
+  const opened = openBox({ ...evolution, rng: createRng(7) });
+  const session = createSession({ boxKey: 'temporal-forces', seed: 7, ...opened, now: 1000 });
+  assert.equal(session.groupKeys[0], session.deckKey, "the promo's group comes first");
+  assert.equal(session.evolutionPack[0], evolution.box.decks.find((deck) => deck.key === session.deckKey).promoId);
+  assert.deepEqual(parseSession(JSON.stringify(session)), session);
+  assert.equal(verifySessionCards(session, evolution), true);
+  const energy = session.energy.reduce((sum, [, qty]) => sum + qty, 0);
+  assert.equal(session.evolutionPack.length + energy, 40);
+  const pool = poolFromBox({ box: evolution.box, data: evolution.data, cards: evolution.cards, opened: session });
+  const pulls = session.packs.reduce((sum, pack) => sum + pack.length, 0);
+  assert.equal(pool.reduce((sum, entry) => sum + entry.count, 0), session.evolutionPack.length + pulls, 'Basic Energy stays out of the pool');
+  assert.equal(verifySessionCards({ ...session, evolutionPack: [...session.evolutionPack, 'me02-001'] }, evolution), false);
+});
+
+test('parseSession refuses an Evolution session whose groups, pack or Energy do not fit its box', async () => {
+  const evolution = await loadBoxData('temporal-forces');
+  const good = createSession({ boxKey: 'temporal-forces', seed: 7, ...openBox({ ...evolution, rng: createRng(7) }) });
+  const bad = (patch) => parseSession(JSON.stringify({ ...good, ...patch }));
+  const [promoGroup, otherGroup] = good.groupKeys;
+  assert.equal(bad({ groupKeys: undefined }), null, 'an Evolution box names its groups');
+  assert.equal(bad({ groupKeys: [otherGroup, promoGroup] }), null, "the promo's group comes first");
+  assert.equal(bad({ groupKeys: [promoGroup, promoGroup] }), null, 'two different groups');
+  assert.equal(bad({ groupKeys: [promoGroup, 'ceruledge'] }), null, 'groups of this box only');
+  assert.equal(bad({ groupKeys: [promoGroup] }), null);
+  assert.equal(bad({ evolutionPack: [] }), null);
+  assert.equal(bad({ evolutionPack: Array(41).fill('sv05-001') }), null);
+  assert.equal(bad({ evolutionPack: [7] }), null);
+  assert.equal(bad({ energy: null }), null, 'a 40-card Evolution deck carries its Energy');
+  assert.equal(bad({ energy: [['Basic Dragon Energy', 17]] }), null);
+  assert.equal(bad({ energy: [['Basic Fire Energy', 0]] }), null);
+  assert.equal(bad({ energy: [['Basic Fire Energy', 1.5]] }), null);
+  assert.equal(bad({ packs: good.packs.map(() => Array(11).fill('sv05-001')) }), null, 'an SV pack holds 10');
+});

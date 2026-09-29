@@ -293,6 +293,25 @@ test('an Evolution deck adds Basic Energy to 40; a triggered swap takes one Ener
   }
 });
 
+test('Temporal Forces: Luminous Energy (sv02-191) takes a Basic Energy slot when Koraidon or Miraidon is in', async () => {
+  // Bulbapedia "Temporal Forces Build & Battle Box (TCG)" rev 4044848: "One basic Energy card will be
+  // replaced with a Luminous Energy if the Koraidon or Miraidon group is present."
+  const tef = await loadBoxData('temporal-forces');
+  assert.equal(tef.data.cardsById.get('sv02-191')?.name, 'Luminous Energy');
+  const keys = tef.box.decks.map((deck) => deck.key);
+  for (const promoKey of keys) {
+    for (const otherKey of keys.filter((key) => key !== promoKey)) {
+      const groupKeys = [promoKey, otherKey];
+      const pack = drawEvolutionPack({ data: tef.data, groupKeys, rng: createRng(5) });
+      const swapped = groupKeys.includes('koraidon') || groupKeys.includes('miraidon');
+      assert.equal(countOf(pack, 'sv02-191'), swapped ? 1 : 0, groupKeys.join('+'));
+      assert.equal(pack.length, swapped ? 24 : 23, groupKeys.join('+'));
+      const energy = evolutionEnergy({ data: tef.data, groupKeys, packSize: pack.length });
+      assert.equal(pack.length + energy.reduce((sum, [, qty]) => sum + qty, 0), 40, groupKeys.join('+'));
+    }
+  }
+});
+
 test('A3: the promo group takes the larger Energy half, split by its attack costs', () => {
   const plan = (groupKeys, packSize = 23) => evolutionEnergy({ data: evoDeckData, groupKeys, packSize });
   assert.deepEqual(plan(['a', 'b']), [
@@ -314,7 +333,7 @@ test('A3: the promo group takes the larger Energy half, split by its attack cost
   assert.deepEqual(evolutionEnergy({ data: none, groupKeys: ['a', 'b'], packSize: 23 }), []);
 });
 
-test('row 4: every pairing at both ends of every range must fill the pack, else the box is refused', () => {
+test('row 4: an Evolution pack must come out at 23 for every pairing, both ends of every range', () => {
   assert.deepEqual(evolutionPairingProblems({ box: evoBox('evolution-pack'), data: evoPackData }), []);
   assert.deepEqual(evolutionPairingProblems({ box: evoBox('evolution-deck'), data: evoDeckData }), []);
   assert.deepEqual(evolutionPairingProblems({ box, data }), [], 'a fixed-decks box has no pairings');
@@ -324,18 +343,44 @@ test('row 4: every pairing at both ends of every range must fill the pack, else 
     ...evoRaw({ trainers: [{ name: 'Supporter cards', count: null, cards: [{ id: 's1', min: 0, max: 2 }] }] }),
   });
   const problems = evolutionPairingProblems({ box: evoBox('evolution-pack'), data: smallPool });
-  assert.ok(problems.includes('a + c (19 fixed cards): needs 4 Trainers, the pools give 0–2'), problems.join('\n'));
-  assert.ok(problems.includes('a + c (18 fixed cards): needs 5 Trainers, the pools give 0–2'), problems.join('\n'));
+  assert.ok(problems.includes("a + c (19 fixed cards): 21 cards, not the Evolution pack's 23"), problems.join('\n'));
+  assert.ok(problems.includes("a + c (18 fixed cards): 20 cards, not the Evolution pack's 23"), problems.join('\n'));
 
   const oversized = hydrateBoxData({
     kind: 'evolution-pack',
     ...evoRaw({ groups: { ...groups, d: [{ id: 'd-basic', qty: 16 }] } }),
   });
   assert.ok(
-    evolutionPairingProblems({ box: evoBox('evolution-pack'), data: oversized }).some((line) =>
-      line.startsWith('d + c (26 fixed cards): needs -3 Trainers')
+    evolutionPairingProblems({ box: evoBox('evolution-pack'), data: oversized }).includes(
+      "d + c (26 fixed cards): 26 cards, not the Evolution pack's 23"
     )
   );
+});
+
+test('A4: an Evolution deck keeps 40 — oversized groups take Basic Energy slots; "at least one" Trainers always come', () => {
+  const oversized = hydrateBoxData({
+    kind: 'evolution-deck',
+    ...evoRaw({
+      groups: { ...groups, d: [{ id: 'd-basic', qty: 16 }] },
+      energyNeeds: { a: [['Basic Fire Energy', 1]], b: [['Basic Water Energy', 1]], c: [['Basic Grass Energy', 1]], d: [['Basic Psychic Energy', 1]] },
+    }),
+  });
+  assert.deepEqual(evolutionPairingProblems({ box: evoBox('evolution-deck'), data: oversized }), []);
+  const ids = drawEvolutionPack({ data: oversized, groupKeys: ['d', 'c'], rng: createRng(1) });
+  assert.equal(ids.length, 26, 'no Trainers drawn past the fixed rows');
+  assert.equal(evolutionEnergy({ data: oversized, groupKeys: ['d', 'c'], packSize: 26 }).reduce((sum, [, qty]) => sum + qty, 0), 14);
+
+  const mustHave = hydrateBoxData({
+    kind: 'evolution-deck',
+    ...evoRaw({
+      groups: { ...groups, d: [{ id: 'd-basic', qty: 13 }] },
+      trainers: [{ name: 'Trainer cards', count: null, cards: [{ id: 'min1', min: 1, max: 2 }, { id: 's1', min: 0, max: 2 }] }],
+      energyNeeds: { a: [['Basic Fire Energy', 1]], b: [], c: [], d: [['Basic Psychic Energy', 1]] },
+    }),
+  });
+  const withMin = drawEvolutionPack({ data: mustHave, groupKeys: ['d', 'c'], rng: createRng(2) });
+  assert.equal(withMin.length, 24, '1 + 13 + 8 + 1 common = 23 fixed, and the page\'s "1-2" card still comes');
+  assert.equal(countOf(withMin, 'min1'), 1);
 
   const noEnergyType = hydrateBoxData({ kind: 'evolution-deck', ...evoRaw({ energyNeeds: {} }) });
   assert.ok(

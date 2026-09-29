@@ -96,12 +96,16 @@ test('rows 4 + 16: every pairing of every Evolution box fills its pack and its E
     }
     if (box.kind === 'evolution-deck') {
       for (const deck of box.decks) {
-        for (const [label, weight] of data.energyNeeds[deck.key] || []) {
+        const needs = data.energyNeeds[deck.key] || [];
+        for (const [label, weight] of needs) {
           assert.ok(BASIC_ENERGY_LABELS.includes(label) && weight > 0, `${box.key} ${deck.key}: ${label}`);
         }
+        const heaviest = needs.reduce((best, entry) => (!best || entry[1] > best[1] ? entry : best), null);
+        assert.equal(deck.energy, heaviest?.[0] ?? null, `${box.key} ${deck.key}: the catalog label is the heaviest need`);
       }
     } else {
       assert.deepEqual(data.energyNeeds, {}, box.key);
+      assert.ok(box.decks.every((deck) => deck.energy === null), `${box.key}: an Evolution pack deals no Energy`);
     }
   }
   assert.equal(EVOLUTION_PACK_SIZE, 23);
@@ -244,5 +248,19 @@ test('starter decks carry the intended trainers, not their neighbouring ids', ()
     'Dangerous Laser',
   ]) {
     assert.ok(names.has(intended), intended);
+  }
+});
+
+// The box-front rule per era (box-catalog.mjs defineBox): the Special Illustration Rare of the
+// Pokémon on the set's first top-tier card, by TCGdex rarity.
+const KEY_ART_TOP_RARITY = { sv: 'Hyper rare', me: 'Mega Hyper Rare' };
+
+test('key art: the SIR of the Pokémon on the set\'s first top-tier card (SV Hyper rare, ME Mega Hyper Rare)', () => {
+  for (const { box, cards } of loadedBoxes.filter(({ box }) => KEY_ART_TOP_RARITY[box.era])) {
+    const top = cards.find((card) => card.rarity === KEY_ART_TOP_RARITY[box.era] && card.supertype === 'Pokémon');
+    const keyArt = cards.find((card) => card.id === box.skin.keyArtCardId);
+    assert.ok(top, `${box.key}: no top-tier Pokémon`);
+    assert.equal(keyArt?.rarity, 'Special illustration rare', box.key);
+    assert.equal(keyArt?.name, top.name, box.key);
   }
 });

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRng } from '../../../../../../../shared/engine/rng.mjs';
+import { BUILD_BATTLE_BOXES } from '../box-catalog.mjs';
 import { loadBoxData } from '../box-data.mjs';
 import { openPack } from '../pack-opening.mjs';
 import {
@@ -86,14 +87,37 @@ test('row 10: me02 packs roll DR 25 %, UR 8 %, IR 20 %, SIR 5 %, MHR 1 %', async
   near(rates, 'top', 0.01, 0.005);
 });
 
-test('row 10: me01 packs roll the same profile', async () => {
-  const { cards, setInfo } = await loadBoxData('mega-evolution');
-  const rates = classRates({ cards, setInfo }, 'me');
-  near(rates, 'hit', 0.25, 0.02);
-  near(rates, 'ultra', 0.08, 0.015);
-  near(rates, 'illustration', 0.2, 0.02);
-  near(rates, 'specialIllustration', 0.05, 0.01);
-  near(rates, 'top', 0.01, 0.005);
+// Row 10's rate and tolerance per class and model; a class the set does not print rolls 0 (row 9).
+const SV_RATES = {
+  hit: [0.25, 0.02],
+  ultra: [0.08, 0.015],
+  illustration: [0.2, 0.02],
+  specialIllustration: [0.05, 0.01],
+  top: [0.01, 0.005],
+};
+const SWSH_RATES = { hit: [0.25, 0.02], ultra: [0.08, 0.015], top: [0.01, 0.005] };
+const OLD_ERA_RATES = { hit: [0.33, 0.02], top: [0.01, 0.005] };
+const MODEL_RATES = {
+  me: SV_RATES,
+  sv: { ...SV_RATES, aceSpec: [0, 0] },
+  'sv-acespec': { ...SV_RATES, aceSpec: [0.05, 0.01] },
+  swsh: SWSH_RATES,
+  'swsh-tg': { ...SWSH_RATES, illustration: [0.2, 0.02], specialIllustration: [0.05, 0.01] },
+  sm: OLD_ERA_RATES,
+  xy: OLD_ERA_RATES,
+};
+
+test('row 10: every baked set rolls its box model at the boosted profile (sv04 sv, sv05 sv-acespec, …)', async () => {
+  for (const box of BUILD_BATTLE_BOXES) {
+    const { cards, setInfo } = await loadBoxData(box.key);
+    const era = PACK_MODELS[box.packModelKey].era;
+    const printed = new Set(cards.map((card) => cardClass(card, era, setInfo)).filter(Boolean));
+    const rates = classRates({ cards, setInfo }, box.packModelKey);
+    for (const [name, [rate, tolerance]] of Object.entries(MODEL_RATES[box.packModelKey])) {
+      near(rates, name, printed.has(name) ? rate : 0, printed.has(name) ? tolerance : 0);
+    }
+    assert.deepEqual(Object.keys(rates).filter((name) => !(name in MODEL_RATES[box.packModelKey])), [], box.key);
+  }
 });
 
 test('row 10: sv and sv-acespec packs on a synthetic SV set', () => {

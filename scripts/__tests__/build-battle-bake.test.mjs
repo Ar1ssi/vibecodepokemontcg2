@@ -164,13 +164,29 @@ test('bakeBoxData resolves an Evolution box: promos, groups with ranges, pools, 
   assert.match(renderBoxModule({ name: 'Test', source: { url: 'u', revision: 1 } }, data), /^\/\/ AUTO-GENERATED/);
 });
 
-test('row 4: a pairing the pools cannot fill makes the generator refuse the box, naming it', async () => {
+test('row 4: an Evolution pack a pairing cannot fill to 23 makes the generator refuse the box, naming it', async () => {
+  const packBox = { ...evoBox, kind: 'evolution-pack' };
   const tooBig = evoSource({ groups: { ...evoSource().groups, jirachi: ['16 Card 20 TEU 20'] } });
-  await assert.rejects(bakeBoxData(evoBox, tooBig, stub()), (err) => {
+  await assert.rejects(bakeBoxData(packBox, tooBig, stub()), (err) => {
     assert.match(err.message, /test-box cannot open every pairing/);
-    assert.match(err.message, /jirachi \+ nidoqueen \(26 fixed cards\): needs -3 Trainers/);
+    assert.match(err.message, /jirachi \+ nidoqueen \(26 fixed cards\): 26 cards, not the Evolution pack's 23/);
     return true;
   });
+});
+
+test('A3: a group whose attacks name no type takes its page header type for the Energy', async () => {
+  const colorless = evoSource({
+    groupTypes: { charizard: 'Fire', zapdos: 'Lightning', nidoqueen: 'Grass', jirachi: 'Colorless' },
+  });
+  const data = await bakeBoxData(evoBox, colorless, stub());
+  assert.deepEqual(data.energyNeeds.nidoqueen, [['Basic Psychic Energy', 1]], 'the promo names Psychic');
+  const noTypes = stub();
+  const plainPromo = { ...promos[3], attacks: [{ cost: ['Colorless'] }] };
+  noTypes.fetchCard = async (id) => (id === plainPromo.id ? plainPromo : (await stub().fetchCard(id)));
+  const fallback = await bakeBoxData(evoBox, colorless, noTypes);
+  assert.deepEqual(fallback.energyNeeds.jirachi, [], 'Colorless has no Basic Energy: the other group fills it');
+  const grass = await bakeBoxData(evoBox, evoSource({ groupTypes: { jirachi: 'Grass' } }), noTypes);
+  assert.deepEqual(grass.energyNeeds.jirachi, [['Basic Grass Energy', 1]]);
 });
 
 test('the generator refuses a promo line that is not the catalog promo, and keys that differ', async () => {

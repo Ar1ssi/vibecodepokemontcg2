@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { BUILD_BATTLE_BOXES } from '../box-catalog.mjs';
+import { BOX_KINDS, BUILD_BATTLE_BOXES } from '../box-catalog.mjs';
 import { hydrateBoxData, hydrateSetCards, loadBoxData, setIdOfCardId } from '../box-data.mjs';
 
 const CORE = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -116,6 +116,7 @@ test('loadBoxData imports the set and box module once per key and hydrates them'
 test('row 5: an unknown key, a failed import or a malformed module rejects, and a retry imports again', async () => {
   await assert.rejects(loadBoxData('nope'), /unknown box/);
   const box = BUILD_BATTLE_BOXES[0];
+  const otherKind = BOX_KINDS.find((kind) => kind !== box.kind);
   let attempts = 0;
   const flaky = async (path) => {
     attempts += 1;
@@ -133,9 +134,9 @@ test('row 5: an unknown key, a failed import or a malformed module rejects, and 
   await assert.rejects(
     loadBoxData(box.key, {
       importer: async (path) =>
-        path.includes('/sets/') ? { SET: { ...SET, id: box.setId }, default: [] } : { default: { kind: 'evolution-pack' } },
+        path.includes('/sets/') ? { SET: { ...SET, id: box.setId }, default: [] } : { default: { kind: otherKind } },
     }),
-    /is not a fixed-decks box/
+    new RegExp(`holds ${otherKind}, not ${box.kind}`)
   );
 });
 

@@ -166,12 +166,16 @@ const topFaceDown = (page) =>
     return !!flip && new DOMMatrix(getComputedStyle(flip).transform).m33 < 0;
   });
 
+const topFlipped = (page) =>
+  page.evaluate(() => !!document.querySelector('.bb-pcard.is-top')?.classList.contains('is-flipped'));
+
 const hitsFaceDown = [];
 
-// One card: a hit turns over first (and must start face down), then the card is swiped off.
+// One card: a hit turns over first (and must start face down), then the card is swiped off. A hit
+// the hit strip already turned over is only swiped.
 const swipeOne = async (page, packIndex, tiers, { drag = false } = {}) => {
   const k = await topIndex(page);
-  if (tiers[packIndex][k] >= 2) {
+  if (tiers[packIndex][k] >= 2 && !(await topFlipped(page))) {
     hitsFaceDown.push(await topFaceDown(page));
     await press(page, '.bb-pcard.is-top');
     await page.waitForFunction(() => document.querySelector('.bb-pcard.is-top')?.classList.contains('is-flipped'), null, { timeout: 6000 });

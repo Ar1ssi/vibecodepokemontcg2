@@ -92,6 +92,19 @@ function poolBounds(pool) {
   return [Math.max(lo, cardMin), Math.min(hi, cardMax)];
 }
 
+const sumBounds = (bounds) =>
+  bounds.reduce(([lo, hi], [low, high]) => [lo + low, hi + high], [0, 0]);
+
+/**
+ * How many Trainers the pools give when the fixed rows leave `fill` places to 23: the fill, but
+ * never fewer than the cards a page puts in every box ("1-2 Nemona") and never more than the pools
+ * hold (design 054 A4).
+ */
+function trainerTarget(pools, fill) {
+  const [lo, hi] = sumBounds(pools.map(poolBounds));
+  return Math.min(Math.max(fill, lo), hi);
+}
+
 // Splits `total` draws over the pools inside each pool's bounds, first pool first.
 function poolCounts(pools, total, rng) {
   const bounds = pools.map(poolBounds);
@@ -129,8 +142,9 @@ function drawPool(pool, count, rng) {
 }
 
 /**
- * The 23-card Evolution pack as card ids, one per copy, promo first: the promo, both groups, the
- * rows every box has, then Trainers drawn to fill 23, then any Energy swap the pairing triggers.
+ * The Evolution pack as card ids, one per copy, promo first: the promo, both groups, the rows every
+ * box has, then Trainers drawn to fill 23 (`trainerTarget`), then any Energy swap the pairing
+ * triggers. A page whose groups hold more than 23 cards keeps them all (design 054 A4).
  */
 export function drawEvolutionPack({ data, groupKeys, rng }) {
   const [deckKey] = groupKeys;
@@ -140,9 +154,9 @@ export function drawEvolutionPack({ data, groupKeys, rng }) {
   }
   for (const entry of data.common || []) ids.push(...entryIds(entry, rng));
   const pools = data.trainers || [];
-  const fill = Math.max(0, EVOLUTION_PACK_SIZE - ids.length);
-  if (pools.length && fill > 0) {
-    poolCounts(pools, fill, rng).forEach((count, index) => ids.push(...drawPool(pools[index], count, rng)));
+  if (pools.length) {
+    const target = trainerTarget(pools, EVOLUTION_PACK_SIZE - ids.length);
+    poolCounts(pools, target, rng).forEach((count, index) => ids.push(...drawPool(pools[index], count, rng)));
   }
   for (const swap of data.energySwaps || []) {
     if (!swap.when?.some((key) => groupKeys.includes(key))) continue;
@@ -212,9 +226,9 @@ function entryBounds(entry) {
 }
 
 /**
- * Every way a pairing can fall that the box cannot hold (design 054 row 4): its fixed rows, with
- * each range at both ends, must leave a Trainer draw its pools can make exactly — or, with no pool,
- * fit the pack — and an Evolution deck needs room for its Energy and a type to fill it with.
+ * Every way a pairing can fall that the box cannot hold (design 054 row 4, A4): with each range at
+ * both ends, a 23-card Evolution pack must come out at exactly 23; an Evolution deck must fit 40
+ * and have an Energy type for the Basic Energy that fills it.
  * @returns {string[]} one line per problem; [] for a box every pairing of which opens.
  */
 export function evolutionPairingProblems({ box, data }) {
@@ -222,27 +236,25 @@ export function evolutionPairingProblems({ box, data }) {
   const problems = [];
   const keys = box.decks.map((deck) => deck.key);
   const pools = data.trainers || [];
-  const poolRange = pools.map(poolBounds).reduce(([lo, hi], [low, high]) => [lo + low, hi + high], [0, 0]);
   for (const deckKey of keys) {
     if (!data.promos?.[deckKey] || !data.groups?.[deckKey]) problems.push(`${deckKey}: no promo or group`);
     for (const other of keys.filter((key) => key !== deckKey)) {
       const entries = [...(data.groups?.[deckKey] || []), ...(data.groups?.[other] || []), ...(data.common || [])];
-      const [low, high] = entries.map(entryBounds).reduce(([lo, hi], [min, max]) => [lo + min, hi + max], [1, 1]);
+      const [low, high] = sumBounds([[1, 1], ...entries.map(entryBounds)]);
       const swaps = (data.energySwaps || [])
         .filter((swap) => swap.when?.some((key) => key === deckKey || key === other))
         .flatMap((swap) => swap.rows || [])
         .reduce((sum, entry) => sum + (entry.qty ?? 1), 0);
       for (const fixed of new Set([low, high])) {
-        const fill = EVOLUTION_PACK_SIZE - fixed;
+        const trainers = pools.length ? trainerTarget(pools, EVOLUTION_PACK_SIZE - fixed) : 0;
+        const packSize = fixed + trainers + swaps;
         const pair = `${deckKey} + ${other} (${fixed} fixed cards)`;
-        if (pools.length && (fill < poolRange[0] || fill > poolRange[1])) {
-          problems.push(`${pair}: needs ${fill} Trainers, the pools give ${poolRange[0]}–${poolRange[1]}`);
+        if (box.kind === 'evolution-pack') {
+          if (packSize !== EVOLUTION_PACK_SIZE) {
+            problems.push(`${pair}: ${packSize} cards, not the Evolution pack's ${EVOLUTION_PACK_SIZE}`);
+          }
+          continue;
         }
-        const packSize = (pools.length ? Math.max(fixed, EVOLUTION_PACK_SIZE) : fixed) + swaps;
-        if (box.kind === 'evolution-pack' && packSize > EVOLUTION_PACK_SIZE) {
-          problems.push(`${pair}: ${packSize} cards, more than the Evolution pack's ${EVOLUTION_PACK_SIZE}`);
-        }
-        if (box.kind !== 'evolution-deck') continue;
         if (packSize > BUILD_BATTLE_DECK_SIZE) problems.push(`${pair}: ${packSize} cards, more than 40`);
         const energy = evolutionEnergy({ data, groupKeys: [deckKey, other], packSize });
         const energyTotal = energy.reduce((sum, [, qty]) => sum + qty, 0);

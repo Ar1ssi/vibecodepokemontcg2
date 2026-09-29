@@ -10,7 +10,8 @@
  *   pack of the promo's group, one other group and random Trainers (Fates Collide → Fusion Strike);
  *   evolution-deck: the same pack plus Basic Energy to 40 cards (Brilliant Stars → Destined Rivals).
  * @typedef {{key: string, name: string, promoId: string, energy: string|null, sprites: string[]}} BoxDeck
- *   `energy` is the deck's (fixed) or the group's main Basic Energy; null when it has none.
+ *   `energy` is a fixed deck's Basic Energy, or an Evolution deck group's heaviest in its baked
+ *   `energyNeeds` (design 054 A3); null when the group has none or the box deals no Energy.
  * @typedef {{keyArtCardId: string|null, palette: Era, packArtCardIds: string[],
  *   vendored: {box: boolean, packs: boolean}}} BoxSkin
  */
@@ -38,7 +39,8 @@ const BULBAPEDIA_WIKI = 'https://bulbapedia.bulbagarden.net/wiki/';
 
 // Pack count, Energy count and pack art follow from the kind; the skin defaults to procedural art
 // over the four promos. Key art (the box front): an ME box shows the Special Illustration Rare of
-// the Pokémon on its set's first Mega Hyper Rare, as 051 chose me02-125 (TCGdex rarities).
+// the Pokémon on its set's first Mega Hyper Rare, as 051 chose me02-125; an SV box the Special
+// Illustration Rare of the Pokémon on its set's first Hyper rare (TCGdex rarities).
 function defineBox({ key, name, era, kind, decks, skin = {}, page, ...rest }) {
   return Object.freeze({
     key,
@@ -65,6 +67,177 @@ function defineBox({ key, name, era, kind, decks, skin = {}, page, ...rest }) {
 
 /** Every box, in release order. */
 export const BUILD_BATTLE_BOXES = Object.freeze([
+  // ── Scarlet & Violet: 40-card Evolution decks (two groups, Trainers, 17 Basic Energy) ──
+  defineBox({
+    key: 'scarlet-violet',
+    name: 'Scarlet & Violet Build & Battle Box',
+    page: 'Scarlet & Violet Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv01',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv',
+    skin: { keyArtCardId: 'sv01-244' },
+    decks: [
+      { key: 'quaquaval', name: 'Quaquaval', promoId: 'svp-005', energy: 'Basic Water Energy', sprites: ['quaquaval'] },
+      { key: 'pawmot', name: 'Pawmot', promoId: 'svp-006', energy: 'Basic Lightning Energy', sprites: ['pawmot'] },
+      { key: 'hawlucha', name: 'Hawlucha', promoId: 'svp-007', energy: 'Basic Grass Energy', sprites: ['hawlucha'] },
+      { key: 'revavroom', name: 'Revavroom', promoId: 'svp-008', energy: 'Basic Water Energy', sprites: ['revavroom'] },
+    ],
+  }),
+  defineBox({
+    key: 'paldea-evolved',
+    name: 'Paldea Evolved Build & Battle Box',
+    page: 'Paldea Evolved Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv02',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv',
+    skin: { keyArtCardId: 'sv02-256' },
+    decks: [
+      { key: 'baxcalibur', name: 'Baxcalibur', promoId: 'svp-019', energy: 'Basic Water Energy', sprites: ['baxcalibur'] },
+      { key: 'tinkaton', name: 'Tinkaton', promoId: 'svp-020', energy: 'Basic Psychic Energy', sprites: ['tinkaton'] },
+      { key: 'murkrow', name: 'Murkrow', promoId: 'svp-021', energy: 'Basic Darkness Energy', sprites: ['murkrow'] },
+      { key: 'pelipper', name: 'Pelipper', promoId: 'svp-022', energy: 'Basic Grass Energy', sprites: ['pelipper'] },
+    ],
+  }),
+  defineBox({
+    key: 'obsidian-flames',
+    name: 'Obsidian Flames Build & Battle Box',
+    page: 'Obsidian Flames Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv03',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv',
+    skin: { keyArtCardId: 'sv03-223' },
+    decks: [
+      { key: 'palafin', name: 'Palafin', promoId: 'svp-036', energy: 'Basic Water Energy', sprites: ['palafin'] },
+      { key: 'cleffa', name: 'Cleffa', promoId: 'svp-037', energy: 'Basic Fire Energy', sprites: ['cleffa'] },
+      { key: 'togekiss', name: 'Togekiss', promoId: 'svp-038', energy: 'Basic Psychic Energy', sprites: ['togekiss'] },
+      { key: 'mawile', name: 'Mawile', promoId: 'svp-039', energy: 'Basic Lightning Energy', sprites: ['mawile'] },
+    ],
+  }),
+  defineBox({
+    key: 'paradox-rift',
+    name: 'Paradox Rift Build & Battle Box',
+    page: 'Paradox Rift Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv04',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv',
+    skin: { keyArtCardId: 'sv04-245' },
+    decks: [
+      { key: 'chi-yu', name: 'Chi-Yu', promoId: 'svp-057', energy: 'Basic Fire Energy', sprites: ['chi-yu'] },
+      { key: 'iron-bundle', name: 'Iron Bundle', promoId: 'svp-058', energy: 'Basic Water Energy', sprites: ['iron-bundle'] },
+      { key: 'xatu', name: 'Xatu', promoId: 'svp-059', energy: 'Basic Psychic Energy', sprites: ['xatu'] },
+      { key: 'aegislash', name: 'Aegislash', promoId: 'svp-060', energy: 'Basic Metal Energy', sprites: ['aegislash'] },
+    ],
+  }),
+  defineBox({
+    key: 'temporal-forces',
+    name: 'Temporal Forces Build & Battle Box',
+    page: 'Temporal Forces Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv05',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv-acespec',
+    skin: { keyArtCardId: 'sv05-203' },
+    decks: [
+      { key: 'feraligatr', name: 'Feraligatr', promoId: 'svp-089', energy: 'Basic Water Energy', sprites: ['feraligatr'] },
+      { key: 'metang', name: 'Metang', promoId: 'svp-090', energy: 'Basic Metal Energy', sprites: ['metang'] },
+      { key: 'koraidon', name: 'Koraidon', promoId: 'svp-091', energy: 'Basic Fighting Energy', sprites: ['koraidon'] },
+      { key: 'miraidon', name: 'Miraidon', promoId: 'svp-092', energy: 'Basic Lightning Energy', sprites: ['miraidon'] },
+    ],
+  }),
+  defineBox({
+    key: 'twilight-masquerade',
+    name: 'Twilight Masquerade Build & Battle Box',
+    page: 'Twilight Masquerade Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv06',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv-acespec',
+    skin: { keyArtCardId: 'sv06-211' },
+    decks: [
+      { key: 'thwackey', name: 'Thwackey', promoId: 'svp-115', energy: 'Basic Grass Energy', sprites: ['thwackey'] },
+      { key: 'infernape', name: 'Infernape', promoId: 'svp-116', energy: 'Basic Fire Energy', sprites: ['infernape'] },
+      { key: 'froslass', name: 'Froslass', promoId: 'svp-117', energy: 'Basic Water Energy', sprites: ['froslass'] },
+      { key: 'tatsugiri', name: 'Tatsugiri', promoId: 'svp-118', energy: 'Basic Psychic Energy', sprites: ['tatsugiri'] },
+    ],
+  }),
+  defineBox({
+    key: 'stellar-crown',
+    name: 'Stellar Crown Build & Battle Box',
+    page: 'Stellar Crown Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv07',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv-acespec',
+    skin: { keyArtCardId: 'sv07-170' },
+    decks: [
+      { key: 'ledian', name: 'Ledian', promoId: 'svp-133', energy: 'Basic Grass Energy', sprites: ['ledian'] },
+      { key: 'crabominable', name: 'Crabominable', promoId: 'svp-134', energy: 'Basic Water Energy', sprites: ['crabominable'] },
+      { key: 'drifblim', name: 'Drifblim', promoId: 'svp-135', energy: 'Basic Psychic Energy', sprites: ['drifblim'] },
+      { key: 'bouffalant', name: 'Bouffalant', promoId: 'svp-136', energy: null, sprites: ['bouffalant'] },
+    ],
+  }),
+  defineBox({
+    key: 'surging-sparks',
+    name: 'Surging Sparks Build & Battle Box',
+    page: 'Surging Sparks Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv08',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv-acespec',
+    skin: { keyArtCardId: 'sv08-238' },
+    decks: [
+      { key: 'gouging-fire', name: 'Gouging Fire', promoId: 'svp-151', energy: 'Basic Fire Energy', sprites: ['gouging-fire'] },
+      { key: 'chien-pao', name: 'Chien-Pao', promoId: 'svp-152', energy: 'Basic Water Energy', sprites: ['chien-pao'] },
+      { key: 'magneton', name: 'Magneton', promoId: 'svp-153', energy: 'Basic Lightning Energy', sprites: ['magneton'] },
+      { key: 'indeedee', name: 'Indeedee', promoId: 'svp-154', energy: 'Basic Grass Energy', sprites: ['indeedee'] },
+    ],
+  }),
+  defineBox({
+    key: 'journey-together',
+    name: 'Journey Together Build & Battle Box',
+    page: 'Journey Together Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv09',
+    promoSetId: 'svp',
+    kind: 'evolution-deck',
+    packModelKey: 'sv-acespec',
+    skin: { keyArtCardId: 'sv09-183' },
+    decks: [
+      { key: 'ns-darmanitan', name: "N's Darmanitan", promoId: 'svp-181', energy: 'Basic Fire Energy', sprites: ['darmanitan'] },
+      { key: 'ionos-kilowattrel', name: "Iono's Kilowattrel", promoId: 'svp-182', energy: 'Basic Lightning Energy', sprites: ['kilowattrel'] },
+      { key: 'lillies-ribombee', name: "Lillie's Ribombee", promoId: 'svp-183', energy: 'Basic Grass Energy', sprites: ['ribombee'] },
+      { key: 'hops-snorlax', name: "Hop's Snorlax", promoId: 'svp-184', energy: 'Basic Metal Energy', sprites: ['snorlax'] },
+    ],
+  }),
+  defineBox({
+    key: 'destined-rivals',
+    name: 'Destined Rivals Build & Battle Box',
+    page: 'Destined Rivals Build & Battle Box (TCG)',
+    era: 'sv',
+    setId: 'sv10',
+    promoSetId: 'sv10',
+    kind: 'evolution-deck',
+    packModelKey: 'sv-acespec',
+    skin: { keyArtCardId: 'sv10-230' },
+    decks: [
+      { key: 'ethans-typhlosion', name: "Ethan's Typhlosion", promoId: 'sv10-034', energy: 'Basic Fire Energy', sprites: ['typhlosion'] },
+      { key: 'mistys-gyarados', name: "Misty's Gyarados", promoId: 'sv10-049', energy: 'Basic Water Energy', sprites: ['gyarados'] },
+      { key: 'team-rockets-mimikyu', name: "Team Rocket's Mimikyu", promoId: 'sv10-087', energy: 'Basic Darkness Energy', sprites: ['mimikyu'] },
+      { key: 'team-rockets-tyranitar', name: "Team Rocket's Tyranitar", promoId: 'sv10-096', energy: 'Basic Fighting Energy', sprites: ['tyranitar'] },
+    ],
+  }),
   // ── Mega Evolution: four fixed 40-card decks per box ──
   defineBox({
     key: 'mega-evolution',

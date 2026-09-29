@@ -9,6 +9,7 @@ import {
   BUILD_BATTLE_DECK_SIZE,
   evolutionPairingProblems,
 } from '../../client/src/setup/deck-builder/core/build-battle/pack-opening.mjs';
+import { BASIC_ENERGY_LABELS } from '../../client/src/setup/deck-builder/core/build-battle/box-catalog.mjs';
 import { toSetRow } from '../lib/build-battle-modules.mjs';
 import {
   basicEnergyCardRow,
@@ -122,6 +123,14 @@ function poolEntry({ line, parsed, ids }) {
   return { id: ids[0], min: parsed.min, max: parsed.max };
 }
 
+// A group whose attacks name no Energy type takes its page header's type (design 054 A3), when that
+// type has a Basic Energy (Colorless and Dragon have none).
+function groupEnergyNeeds(copies, headerType) {
+  const needs = energyNeeds(copies);
+  const label = `Basic ${headerType} Energy`;
+  return needs.length || !BASIC_ENERGY_LABELS.includes(label) ? needs : [[label, 1]];
+}
+
 function checkKeys(box, keys, what) {
   const expected = box.decks.map((deck) => deck.key).sort();
   if (JSON.stringify([...keys].sort()) !== JSON.stringify(expected)) {
@@ -164,7 +173,7 @@ async function bakeEvolution(box, source, tcgdex, cards, tcgCards) {
     for (const { found, parsed } of resolved) {
       if (found.length === 1) copies.push({ card: found[0], copies: parsed.max });
     }
-    needs[deck.key] = energyNeeds(copies);
+    needs[deck.key] = groupEnergyNeeds(copies, source.groupTypes?.[deck.key]);
   }
   const common = (await resolveLines(source.common || [], tcgdex, cards, tcgCards)).map(groupEntry);
   const trainers = [];
