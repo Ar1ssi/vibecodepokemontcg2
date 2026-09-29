@@ -2023,8 +2023,7 @@ export function executeSteps(draft, {
           context.attachedEnergy = true;
           context.attachedTargetId = target.instanceId;
         };
-        // `optional`: an "up to" attach (Professor Sada's Vitality) may stop with an empty pick.
-        const ask = (prompt, options, memo, optional = false) => {
+        const ask = (prompt, options, memo, optional = false, max = 1) => {
           context[memoKey] = memo;
           return createPendingChoice({
             player: playerId,
@@ -2032,7 +2031,7 @@ export function executeSteps(draft, {
             source: sourceCard?.name || '',
             options,
             min: optional ? 0 : 1,
-            max: 1,
+            max,
             cancellable: false,
             stateVersion: draft.stateVersion,
             stepIndex: idx,
@@ -2047,6 +2046,70 @@ export function executeSteps(draft, {
             },
           });
         };
+
+        // "Choose up to N of your Ancient Pokémon … to each of them" (Professor Sada's Vitality):
+        // the Pokémon are picked first, on the mat, then one required Energy pick each. Optional
+        // Energy picks read a Done on an untapped carousel card as a decline and lost an attach.
+        if (step.upTo && step.distinctTargets) {
+          const memo = context[memoKey];
+          const liveTarget = (id) => targets.find((c) => c.instanceId === id);
+          // Attaches to the queued Pokémon in order; a discard of identical Energy needs no pick.
+          const attachToQueue = (queue) => {
+            while (queue.length > 0) {
+              const target = liveTarget(queue[0]);
+              const energies = (player.zones.discard || []).filter(attachableEnergy);
+              if (energies.length === 0) break;
+              if (!target) {
+                queue.shift();
+                continue;
+              }
+              if (new Set(energies.map((c) => c.name)).size > 1) {
+                return ask(
+                  `${sourceCard?.name || 'Attach'}: Choose a Basic Energy to attach to ${target.name}`,
+                  energies,
+                  { phase: 'energy', queue }
+                );
+              }
+              attachTo(energies[0], target);
+              queue.shift();
+            }
+            delete context[memoKey];
+            return null;
+          };
+
+          if (memo?.phase === 'energy' && stepSelection) {
+            const queue = [...memo.queue];
+            const energyCard = energyCandidates.find((c) => c.instanceId === stepSelection[0]);
+            const target = liveTarget(queue[0]);
+            if (energyCard && target) attachTo(energyCard, target);
+            else events.push({ type: 'effectStepSkipped', reason: 'target_not_found' });
+            queue.shift();
+            const pending = attachToQueue(queue);
+            if (pending) return { pendingChoice: pending, completed: false };
+            break;
+          }
+
+          if (memo?.phase === 'targets' && stepSelection) {
+            const chosen = [...new Set(stepSelection)].filter((id) => liveTarget(id)).slice(0, memo.max);
+            const pending = attachToQueue(chosen);
+            if (pending) return { pendingChoice: pending, completed: false };
+            break;
+          }
+
+          if (energyCandidates.length === 0 || targets.length === 0) {
+            events.push({ type: 'effectStepSkipped', reason: 'no_energy_or_target' });
+            break;
+          }
+          const max = Math.min(step.count || 1, targets.length, energyCandidates.length);
+          const choice = ask(
+            `${sourceCard?.name || 'Attach'}: Choose ${step.target || 'your Pokémon'}`,
+            targets,
+            { phase: 'targets', max },
+            true,
+            max
+          );
+          return { pendingChoice: choice, completed: false };
+        }
 
         if (stepSelection && context[memoKey]?.energyId != null) {
           // Edge Case 10: both the Energy and the target are re-resolved from live state
@@ -2063,6 +2126,7 @@ export function executeSteps(draft, {
           break;
         }
 
+        // An "up to" attach (Dino Cry, Electrode-GX) may stop with an empty Energy pick.
         if (step.upTo && Array.isArray(stepSelection) && stepSelection.length === 0) {
           delete context[memoKey];
           break;

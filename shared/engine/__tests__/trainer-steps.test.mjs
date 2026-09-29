@@ -461,8 +461,10 @@ test('moveEnergy (Energy Switch) and moveEnergyToActive', () => {
   const e = energy();
   e.attachedTo = benched.instanceId;
   game.p1.zones.bench.push(benched, e);
+  // Source Pokémon first (a mat pick), then the target; one Energy on it needs no Energy pick.
   const { res } = play(game, 'Move a Basic Energy from 1 of your Pokémon to another of your Pokémon.');
-  const r2 = resolve(game, res, [e.instanceId]);
+  assert.deepEqual(ids(res.pendingChoice.options), [benched.instanceId], 'only Pokémon with Basic Energy');
+  const r2 = resolve(game, res, [benched.instanceId]);
   assert.deepEqual(ids(r2.pendingChoice.options), [ralts.instanceId]);
   const done = resolve(game, r2, [ralts.instanceId]);
   assert.equal(zone(done, 'p1', 'active').find((c) => c.instanceId === e.instanceId).attachedTo, ralts.instanceId);
@@ -475,6 +477,24 @@ test('moveEnergy (Energy Switch) and moveEnergyToActive', () => {
   const plan = play(game2, 'Move up to 2 Energy from your Benched Pokémon to your Active Pokémon.').res;
   const moved = resolve(game2, plan, [e2.instanceId]);
   assert.ok(zone(moved, 'p1', 'active').some((c) => c.instanceId === e2.instanceId));
+});
+
+// Source: out/pkmn-trainer-cards.json "Energy Switch".
+test('moveEnergy (Energy Switch): different Basic Energy on the source asks which one moves', () => {
+  const game = setup();
+  const ralts = game.p1.zones.active[0];
+  const benched = pokemon('Kirlia');
+  const psychic = energy('Basic Psychic Energy', { attachedTo: benched.instanceId });
+  const fire = energy('Basic Fire Energy', { attachedTo: benched.instanceId });
+  game.p1.zones.bench.push(benched, psychic, fire);
+  const { res } = play(game, 'Move a Basic Energy from 1 of your Pokémon to another of your Pokémon.');
+  const r2 = resolve(game, res, [benched.instanceId]);
+  assert.deepEqual(ids(r2.pendingChoice.options).sort(), [psychic.instanceId, fire.instanceId].sort());
+  const r3 = resolve(game, r2, [fire.instanceId]);
+  assert.deepEqual(ids(r3.pendingChoice.options), [ralts.instanceId]);
+  const done = resolve(game, r3, [ralts.instanceId]);
+  const moved = zone(done, 'p1', 'active').find((c) => c.instanceId === fire.instanceId);
+  assert.equal(moved.attachedTo, ralts.instanceId);
 });
 
 test('devolve (Strange Timepiece): top Evolution card returns to hand', () => {

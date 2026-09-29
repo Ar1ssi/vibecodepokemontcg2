@@ -817,10 +817,20 @@ function evolveStage2(ctx) {
   });
 }
 
-// Energy Switch: move a Basic Energy between your own Pokémon.
+// Energy Switch: move a Basic Energy between your own Pokémon. Both Pokémon are picked on the
+// mat; the Energy is asked for only when the source holds different Basic Energy cards.
 function moveEnergy(ctx) {
   const { player } = ctx;
   const roots = rootsOf(player);
+  const basicEnergyOn = (root) => attachedCards(player, root.instanceId).filter(isBasicEnergy);
+  const askTarget = (energy) =>
+    ctx.ask({
+      prompt: `${sourceName(ctx, 'Energy Switch')}: Choose a Pokémon to move ${energy.name} to`,
+      options: roots.filter((c) => c.instanceId !== energy.attachedTo),
+      min: 1,
+      max: 1,
+      memo: { phase: 'target', energyId: energy.instanceId, fromId: energy.attachedTo },
+    });
 
   if (ctx.memo?.phase === 'target') {
     const energy = attachedCards(player, ctx.memo.fromId).find((c) => c.instanceId === ctx.memo.energyId);
@@ -830,28 +840,35 @@ function moveEnergy(ctx) {
     return null;
   }
 
-  if (ctx.selection) {
-    const energy = roots
-      .flatMap((root) => attachedCards(player, root.instanceId))
-      .find((c) => c.instanceId === ctx.selection[0]);
+  if (ctx.memo?.phase === 'energy') {
+    const source = roots.find((c) => c.instanceId === ctx.memo.fromId);
+    const energy = source && basicEnergyOn(source).find((c) => c.instanceId === ctx.selection?.[0]);
     if (!energy) return skip(ctx, 'target_not_found');
-    const targets = roots.filter((c) => c.instanceId !== energy.attachedTo);
+    return askTarget(energy);
+  }
+
+  if (ctx.memo?.phase === 'source') {
+    const source = roots.find((c) => c.instanceId === ctx.selection?.[0]);
+    const energies = source ? basicEnergyOn(source) : [];
+    if (energies.length === 0) return skip(ctx, 'target_not_found');
+    if (new Set(energies.map((c) => c.name)).size === 1) return askTarget(energies[0]);
     return ctx.ask({
-      prompt: `${sourceName(ctx, 'Energy Switch')}: Choose a Pokémon to move ${energy.name} to`,
-      options: targets,
+      prompt: `${sourceName(ctx, 'Energy Switch')}: Choose a Basic Energy on ${source.name} to move`,
+      options: energies,
       min: 1,
       max: 1,
-      memo: { phase: 'target', energyId: energy.instanceId, fromId: energy.attachedTo },
+      memo: { phase: 'energy', fromId: source.instanceId },
     });
   }
 
-  const energies = roots.flatMap((root) => attachedCards(player, root.instanceId)).filter(isBasicEnergy);
-  if (energies.length === 0 || roots.length < 2) return skip(ctx, 'no_energy_to_move');
+  const sources = roots.filter((root) => basicEnergyOn(root).length > 0);
+  if (sources.length === 0 || roots.length < 2) return skip(ctx, 'no_energy_to_move');
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Energy Switch')}: Choose a Basic Energy to move`,
-    options: energies,
+    prompt: `${sourceName(ctx, 'Energy Switch')}: Choose a Pokémon to move a Basic Energy from`,
+    options: sources,
     min: 1,
     max: 1,
+    memo: { phase: 'source' },
   });
 }
 

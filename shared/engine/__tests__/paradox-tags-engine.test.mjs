@@ -233,36 +233,60 @@ test("Professor Sada's Vitality parses as up to 2 Ancient targets and a conditio
   ]);
 });
 
-test("Professor Sada's Vitality attaches to 2 different Ancient Pokémon (Active and Bench), then draws 3", () => {
+const allUpToMax = (choice) => choice.options.slice(0, choice.max).map((o) => o.instanceId);
+
+test("Professor Sada's Vitality picks up to 2 Ancient Pokémon first, then attaches to each and draws 3", () => {
   const { state, p1, moon, tail, tusk } = sadaBoard();
-  const choices = play(state, SADA, "Professor Sada's Vitality", firstOption);
-  const targetPrompts = choices.filter((c) => /Choose/.test(c.prompt));
+  const choices = play(state, SADA, "Professor Sada's Vitality", allUpToMax);
+  assert.equal(choices.length, 1, 'two identical Energy cards need no Energy pick');
+  const [targets] = choices;
   assert.deepEqual(
-    targetPrompts[0].options.map((o) => o.instanceId).sort(),
+    targets.options.map((o) => o.instanceId).sort(),
     [moon.instanceId, tail.instanceId],
     'only the Ancient printings are offered; sv01 Great Tusk ex is not'
   );
+  assert.equal(targets.min, 0);
+  assert.equal(targets.max, 2);
   assert.deepEqual([moon, tail, tusk].map((root) => attachedTo(p1, root)), [1, 1, 0]);
   assert.equal(p1.zones.discard.length, 0);
   assert.equal(p1.zones.hand.length, 3);
-  assert.ok(choices.every((c) => (c.min === 0) === !/Choose/.test(c.prompt)), 'Energy picks are optional, target picks are not');
 });
 
-test("Professor Sada's Vitality: attach 1, decline the 2nd, still draws 3", () => {
-  const { state, p1 } = sadaBoard();
-  // Picks: Energy 1, its target, then an empty Energy pick declines the second attach.
-  const choices = play(state, SADA, "Professor Sada's Vitality", (choice, n) => (n === 3 ? [] : firstOption(choice)));
+// The reported bug: the second same-type Energy was lost when its optional pick was confirmed
+// without tapping the card. Energy picks are now required, and only asked when the cards differ.
+test("Professor Sada's Vitality with mixed Energy asks a required Energy pick per chosen Pokémon", () => {
+  const { state, p1, moon, tail } = sadaBoard({ energy: 0 });
+  p1.zones.discard.push(basicEnergy(20, 'Fighting'), basicEnergy(21, 'Darkness'), basicEnergy(22, 'Darkness'));
+  const choices = play(state, SADA, "Professor Sada's Vitality", (choice, n) =>
+    n === 1 ? allUpToMax(choice) : [choice.options.at(-1).instanceId]
+  );
   assert.equal(choices.length, 3);
-  assert.equal(choices[2].min, 0, 'the second Energy pick is optional');
+  assert.ok(choices.slice(1).every((c) => c.min === 1 && c.max === 1), 'Energy picks are required');
+  assert.deepEqual([moon, tail].map((root) => attachedTo(p1, root)), [1, 1]);
   assert.equal(p1.zones.discard.length, 1);
   assert.equal(p1.zones.hand.length, 3);
 });
 
-test("Professor Sada's Vitality: declining the first pick attaches nothing and draws nothing", () => {
+test("Professor Sada's Vitality: choosing 1 Pokémon attaches 1 Energy and still draws 3", () => {
+  const { state, p1 } = sadaBoard();
+  play(state, SADA, "Professor Sada's Vitality", firstOption);
+  assert.equal(p1.zones.discard.length, 1);
+  assert.equal(p1.zones.hand.length, 3);
+});
+
+test("Professor Sada's Vitality: choosing no Pokémon attaches nothing and draws nothing", () => {
   const { state, p1 } = sadaBoard();
   play(state, SADA, "Professor Sada's Vitality", () => []);
   assert.equal(p1.zones.discard.length, 2);
   assert.equal(p1.zones.hand.length, 0);
+});
+
+test("Professor Sada's Vitality with 1 Basic Energy offers only 1 Pokémon pick", () => {
+  const { state, p1 } = sadaBoard({ energy: 1 });
+  const [targets] = play(state, SADA, "Professor Sada's Vitality", allUpToMax);
+  assert.equal(targets.max, 1);
+  assert.equal(p1.zones.discard.length, 0);
+  assert.equal(p1.zones.hand.length, 3);
 });
 
 test("Professor Sada's Vitality with no Ancient Pokémon or no Basic Energy does nothing", () => {
