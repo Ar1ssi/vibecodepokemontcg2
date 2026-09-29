@@ -149,21 +149,21 @@ Client scene:
 |---|---|---|---|
 | 1 | `cardsRevealed` with no deck → hand move in the batch (hand reveal, prizes, bench search) | no plan | [x] covered: deck-reveal-plan "hand reveals, peeks, … do not fly" |
 | 2 | malformed entries (no instanceId, bare ids, non-array `cards`) | bare ids read as ids; the rest ignored | [x] covered: deck-reveal-plan "malformed batches" |
-| 3 | 1 card / 7 cards / 12 cards | big preview / 4+3 spread / first 10 fly, 2 shown in hand at once | [ ] |
+| 3 | 1 card / 7 cards / 12 cards | big preview / 4+3 spread / first 10 fly, 2 shown in hand at once | [x] covered: deckRevealTimes clamp test; draw-scene spread tests (shared `drawSpreadRects`); reasoning: `playDeckReveal` shows cards past `MAX_REVEAL_SPREAD` at once |
 | 4 | one card per event (lookAtDeckEnd, Drayton) | one scene with every card, no duplicates | [x] covered: deck-reveal-plan "one reveal per card" |
-| 5 | no deck cover rect / no hand card rect / opponent card without `src` | starts above the spot face down / fades at the spot / shown without a flight | [ ] |
-| 6 | overlay aborted, hand re-rendered, queue cleared | real cards shown by the landing or the backstop | [ ] |
+| 5 | no deck cover rect / no hand card rect / opponent card without `src` | starts above the spot face down / fades at the spot / shown without a flight | [x] covered: opp-play no-from / no-to tests; reasoning: `playDeckReveal` shows a card without `faceSrc`; e2e caught a fresh `<img>` with no width → the scene waits ≤320 ms for layout |
+| 6 | overlay aborted, hand re-rendered, queue cleared | real cards shown by the landing or the backstop | [x] e2e: no overlay and no hidden card after each beat; covered: landing re-aim (landingMoved/retargetAtMs tests, e2e stack beat lands on the moved card); reasoning: revealWhen/removeWhen/9 s held backstops |
 | 7 | hidden search to hand (Quick Search, Cassiopeia, Explorer's Guidance) | no `cardsRevealed` for the hand picks, no scene | [x] covered: deck-reveal-events Cassiopeia / Explorer's Guidance / Quick Search / non-revealing attack |
 | 8 | `peek` / `revealedTo` reveals | never stamped with art, never planned | [x] covered (art): reveal-picks stamp test, Radio Tower test |
-| 9 | both seats | owner and opponent each play it from the same event; the opponent's card lands sleeve up, turned like their board | [ ] |
-| 10 | reconnect, catch-up, hidden tab | no scene, cards shown | [ ] |
-| 11 | effects off / reduced motion | no scene, cards not hidden; sound per the dispatcher rule | [ ] |
+| 9 | both seats | owner and opponent each play it from the same event; the opponent's card lands sleeve up, turned like their board | [x] covered: engine → planner Ultra Ball test (both seats), toFaceDown test; e2e: opponent trace starts on their turned deck, lands on their hand card; strip-opp 2020 ms sleeve up |
+| 10 | reconnect, catch-up, hidden tab | no scene, cards shown | [x] reasoning: reveal plans are queued (and cards hidden) only after the unchanged `shouldAnimateMirror` guard |
+| 11 | effects off / reduced motion | no scene, cards not hidden; sound per the dispatcher rule | [x] reasoning: `holdRevealedCards` hides only when `revealSceneAllowed()`; `playRevealPlan` shows at once with effects off (silent) or reduced motion (sound) |
 | 12 | older "show it to your opponent" printings (Pokémon Collector) | counts as a reveal | [x] covered: Pokémon Collector test, textRevealsPicks test |
 | 13 | Nest Ball (bench search) | its public `cardsRevealed` unchanged; no reveal scene | [x] covered (event): Nest Ball test |
 | 14 | attack search with reveal (Jirachi), staged attack search | `cardsRevealed` per resolved stage → scene | [x] covered: Jirachi Charge Energy test; reasoning: no corpus attack parses to stages, the flag rides the token to each stage |
-| 15 | Trainer preview and reveal in one batch (Gutsy Pickaxe) | preview first, reveal starts on its hold | [ ] |
+| 15 | Trainer preview and reveal in one batch (Gutsy Pickaxe) | preview first, reveal starts on its hold | [x] reasoning: the engine pushes `trainerPlayed` before the step events; fx-queue plays plans in order on the preview's hold |
 | 16 | spectator | no plan | [x] covered: deck-reveal-plan "without a known seat" |
-| 17 | revealed card no longer in the hand after the diff | skipped | [ ] |
+| 17 | revealed card no longer in the hand after the diff | skipped | [x] reasoning: `holdRevealedCards` keeps only registry records in zone `hand` and connected |
 
 ## Test plan
 Unit: `reveal-picks.test.mjs` (text rule, step flag wins, effect text sources, art stamp);
@@ -190,6 +190,14 @@ one new plan kind. Revert = revert the commits; no data touched.
 ## Deviations (Builder appends here during build)
 - Slice 1: Cassiopeia's "up to 2 cards" parses as count 1 (existing `parseSearchDeckParams` bug, not this
   design's) — its test picks one card; ISSUES line at landing.
+- Slice 4 (found by the e2e run): the plan runs in the same tick the view lands, when the new hand
+  card's `<img>` has no width yet, so the scene waits for the deck cover and hand cards to be laid out
+  (polled every 16 ms, at most 320 ms). The hand also re-lays out during the hold (identical cards
+  stack, holo wrappers hydrate), so each card re-measures its hand spot 80 ms before its place phase
+  and swaps its keyframes on the same clock (`playFrames(...).setFrames`, new in image-logic/mat-fx.mjs;
+  `animateFrames` now wraps it). The flip card is 043's DOM, shared through `opp-play.js spawnFlipCard`.
+- Slice 4: recorder `.claude/skills/fx-preview/rec/rec-deck-reveal.mjs` drives the real applyView +
+  advisory hooks (not the effect module alone like the other rec scripts), so planning and queueing run too.
 
 ---
 Self-approval checklist:

@@ -41,7 +41,8 @@ function deckOf(user) {
 // The node that stands for the card in the hand: its holo wrapper, else the <img>.
 const handNodeOf = (card) => card.wrapper ?? imageAnchor(card.image);
 
-function handSpotOf(card) {
+/** A hand card's page rect and board turn (its holo wrapper when it has one), or null. */
+export function handSpotOf(card) {
   const node = handNodeOf(card);
   if (!node?.isConnected) return null;
   const rect = visualRectOf(node);
@@ -178,7 +179,8 @@ export function playOppDrawFlights(user, cards, show) {
   return last;
 }
 
-function revealWhen(card, show, promises, backstopMs) {
+/** Shows `card` once `promises` settle, or after `backstopMs` at the latest — never twice. */
+export function revealWhen(card, show, promises, backstopMs) {
   let shown = false;
   const reveal = () => {
     if (shown) return;

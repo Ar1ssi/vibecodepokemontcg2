@@ -7,6 +7,7 @@ import {
   advisoryAnimationPlan,
   coinFlipRuns,
   dealShuffles,
+  deckRevealRuns,
   drawnCards,
   supersededDeals,
 } from './advisory-animations.mjs';
@@ -23,6 +24,8 @@ import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
 import { afterImpact } from './mat-fx/combat.js';
+import { playDeckReveal } from './mat-fx/deck-reveal.js';
+import { playFxSound } from './mat-fx/fx-audio.js';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
 import { holdFor } from './mat-fx/fx-holds.mjs';
 import { drawSceneHold } from './mat-fx/draw-scene.mjs';
@@ -55,6 +58,8 @@ let prizeSeats = new Map();
 let coinRuns = new Map();
 // The batch's deck shuffles that precede a deal (the opening's only shuffle flight).
 let shufflesBeforeDeals = new Set();
+// Design 059: each player's deck → hand reveals in the batch, keyed by the reveal that plays them.
+let revealRuns = new Map();
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -112,6 +117,59 @@ const playDrawPlan = (plan) => {
   return plan.user === 'self' ? drawSceneHold(played) : 0;
 };
 
+// Design 059: the reveal is a mat effect like the Trainer preview it reuses, so it
+// is skipped with effects off or reduced motion and the cards simply show.
+const revealSceneAllowed = () => !fxDisabled() && !motionReduced();
+
+/**
+ * Design 059: the revealed cards are in the hand as soon as the view applies. Hide
+ * them now, so they do not show while earlier effects play; they fly in when their
+ * plan runs. A card no longer in the hand is left out. The art is the event's
+ * (the opponent's hand shows only their sleeve), else the card's own face.
+ */
+const holdRevealedCards = (plan) => {
+  const registry = getCardRegistry();
+  const held = [];
+  for (const { instanceId, src } of plan.cards) {
+    const record = registry.get(instanceId);
+    if (!record?.element?.isConnected || record.zone !== 'hand') continue;
+    const redacted = !!record.isRedacted;
+    const ownFace = redacted ? null : record.element.currentSrc || record.element.src || null;
+    held.push({ image: record.element, wrapper: record.holoCard?.wrapper, redacted, faceSrc: src || ownFace });
+  }
+  if (!revealSceneAllowed()) return { ...plan, held };
+  held.forEach(hideForFlight);
+  const backstop = setTimeout(() => held.forEach(showAfterFlight), HELD_DRAW_BACKSTOP_MS);
+  return { ...plan, held, backstop };
+};
+
+const playRevealPlan = (plan) => {
+  clearTimeout(plan.backstop);
+  const held = plan.held || [];
+  if (held.length === 0 || fxDisabled()) {
+    held.forEach(showAfterFlight);
+    return 0;
+  }
+  // Sound follows the dispatcher's rule: off with effects off, on under reduced motion.
+  try {
+    playFxSound({ effect: 'deck-reveal', user: plan.user });
+  } catch (err) {
+    console.warn('[mat-fx] deck-reveal sound failed', err);
+  }
+  if (motionReduced()) {
+    held.forEach(showAfterFlight);
+    return 0;
+  }
+  held.forEach(hideForFlight);
+  try {
+    return playDeckReveal(plan.user, held, showAfterFlight);
+  } catch (err) {
+    console.warn('[mat-fx] deck-reveal failed', err);
+    held.forEach(showAfterFlight);
+    return 0;
+  }
+};
+
 /**
  * Called by apply-view.js's `onBeforeApply` hook, BEFORE the DOM diff removes
  * any knocked-out card. Captures a ghost snapshot (rect + image src) for each
@@ -125,6 +183,7 @@ export function handleBeforeApply(events, selfPlayerId) {
   skippedDeals = supersededDeals(events);
   coinRuns = coinFlipRuns(events);
   shufflesBeforeDeals = dealShuffles(events);
+  revealRuns = deckRevealRuns(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
   capturePrizeSeats(events, registry, selfPlayerId);
@@ -161,6 +220,7 @@ function runPlan(plan) {
     return 0;
   }
   if (plan.kind === 'draw') return playDrawPlan(plan);
+  if (plan.kind === 'reveal') return playRevealPlan(plan);
   if (plan.kind === 'knockout') {
     const ghost = pendingKnockoutGhosts.get(plan.instanceId);
     pendingKnockoutGhosts.delete(plan.instanceId);
@@ -219,6 +279,7 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
   if (skippedDeals.has(event)) return;
   const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event), {
     dealShuffle: shufflesBeforeDeals.has(event),
+    revealRun: revealRuns.get(event),
   });
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];
@@ -240,5 +301,12 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
     return;
   }
 
-  for (const plan of plans) fxQueue.push(plan.kind === 'draw' ? holdDrawnCards(plan) : plan);
+  for (const plan of plans) fxQueue.push(queuedPlan(plan));
 }
+
+// Cards a plan flies into the hand are hidden from the moment it is queued.
+const queuedPlan = (plan) => {
+  if (plan.kind === 'draw') return holdDrawnCards(plan);
+  if (plan.kind === 'reveal') return holdRevealedCards(plan);
+  return plan;
+};

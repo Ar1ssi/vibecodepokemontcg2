@@ -51,6 +51,33 @@ export function deckRevealHold(count, holdMs) {
   return n > 0 ? total - PREVIEW_PLACE_MS : 0;
 }
 
+// How long before a card's place phase its landing is measured again (the hand
+// may have re-laid out during the hold: a stack formed, a holo wrapper hydrated).
+export const RETARGET_LEAD_MS = 80;
+
+/** When card `index` re-measures its landing, in ms from the scene start. */
+export function retargetAtMs(times, index) {
+  return Math.max(0, times.start(index) + PREVIEW_GROW_MS + times.holdOf(index) - RETARGET_LEAD_MS);
+}
+
+const centreOf = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+
+/**
+ * Whether a hand card's spot (`{rect, turn}` or null) moved enough to re-aim a
+ * landing: it appeared or went away, or its centre, width or turn changed.
+ */
+export function landingMoved(before, after) {
+  if (!before || !after) return Boolean(before) !== Boolean(after);
+  const a = centreOf(before.rect);
+  const b = centreOf(after.rect);
+  return (
+    Math.abs(a.x - b.x) >= 1 ||
+    Math.abs(a.y - b.y) >= 1 ||
+    Math.abs(before.rect.width - after.rect.width) >= 1 ||
+    (before.turn || 0) !== (after.turn || 0)
+  );
+}
+
 /** One card's shine band keyframes over its `durationMs`. */
 export function revealShineFrames(durationMs) {
   const duration = Math.max(1, Number(durationMs) || 0);

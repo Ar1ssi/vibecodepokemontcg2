@@ -2,11 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_REVEAL_SPREAD,
+  RETARGET_LEAD_MS,
   REVEAL_IN_STAGGER_MS,
   REVEAL_OUT_STAGGER_MS,
   SELF_REVEAL_HOLD_MS,
   deckRevealHold,
   deckRevealTimes,
+  landingMoved,
+  retargetAtMs,
   revealHoldFor,
   revealShineFrames,
 } from '../deck-reveal.mjs';
@@ -68,4 +71,31 @@ test('revealShineFrames: one sweep as the card settles, offsets in order within 
   }
   const trainer = revealShineFrames(OPP_PLAY_MS).map((f) => f.offset);
   assert.ok(Math.abs(trainer[1] - 0.26) < 0.01 && Math.abs(trainer[3] - 0.46) < 0.01, 'the Trainer preview\'s sweep');
+});
+
+test('retargetAtMs: each card re-measures its landing just before its own place phase', () => {
+  const t = deckRevealTimes(2, 1200);
+  for (const i of [0, 1]) {
+    const placeStarts = t.start(i) + PREVIEW_GROW_MS + t.holdOf(i);
+    assert.equal(retargetAtMs(t, i), placeStarts - RETARGET_LEAD_MS);
+  }
+  assert.ok(retargetAtMs(t, 1) > retargetAtMs(t, 0));
+  assert.equal(retargetAtMs(deckRevealTimes(1, 0), 0), PREVIEW_GROW_MS - RETARGET_LEAD_MS);
+});
+
+test('landingMoved: a shifted, resized, turned, appeared or vanished hand card re-aims; a still one does not', () => {
+  const spot = { rect: { left: 100, top: 600, width: 83, height: 115 }, turn: 0 };
+  const moved = (dx, dy, dw = 0, turn = 0) => ({
+    rect: { left: 100 + dx, top: 600 + dy, width: 83 + dw, height: 115 },
+    turn,
+  });
+  assert.equal(landingMoved(spot, moved(0, 0)), false);
+  assert.equal(landingMoved(spot, moved(0.4, -0.4)), false, 'sub-pixel noise');
+  assert.equal(landingMoved(spot, moved(0, -10)), true);
+  assert.equal(landingMoved(spot, moved(12, 0)), true);
+  assert.equal(landingMoved(spot, moved(0, 0, -2)), true);
+  assert.equal(landingMoved(spot, moved(0, 0, 0, 180)), true);
+  assert.equal(landingMoved(spot, null), true);
+  assert.equal(landingMoved(null, spot), true);
+  assert.equal(landingMoved(null, null), false);
 });

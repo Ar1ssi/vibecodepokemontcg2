@@ -124,21 +124,30 @@ const applyFrame = (el, frame) => {
 };
 
 /**
- * Play `frames` on `el`. Resolves when the animation ends or is cancelled.
- * Without WAAPI the final frame is applied at once, so the effect degrades to
- * its end state instead of throwing.
+ * Play `frames` on `el`. `finished` resolves when the animation ends or is
+ * cancelled; `setFrames(next)` swaps the running animation's keyframes on the
+ * same clock (design 059 re-aims a landing whose target moved). Without WAAPI
+ * the final frame is applied at once, so the effect degrades to its end state
+ * instead of throwing.
+ * @returns {{finished: Promise<void>, setFrames: (next: object[]) => void}}
  */
-export const animateFrames = (el, frames, { duration, delay = 0, easing = 'linear' } = {}) => {
+export const playFrames = (el, frames, { duration, delay = 0, easing = 'linear' } = {}) => {
   if (typeof el?.animate !== 'function') {
     applyFrame(el, frames?.at?.(-1));
-    return Promise.resolve();
+    return { finished: Promise.resolve(), setFrames: (next) => applyFrame(el, next?.at?.(-1)) };
   }
   const animation = el.animate(frames, { duration, delay, easing, fill: 'both' });
-  return animation.finished.then(
-    () => undefined,
-    () => undefined
-  );
+  return {
+    finished: animation.finished.then(
+      () => undefined,
+      () => undefined
+    ),
+    setFrames: (next) => animation.effect?.setKeyframes?.(next),
+  };
 };
+
+/** `playFrames` when nothing needs re-aiming: resolves when the animation ends or is cancelled. */
+export const animateFrames = (el, frames, timing = {}) => playFrames(el, frames, timing).finished;
 
 /**
  * Remove `host` once every promise settles, or after `backstopMs` at the

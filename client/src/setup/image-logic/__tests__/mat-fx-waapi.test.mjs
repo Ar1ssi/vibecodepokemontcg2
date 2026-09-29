@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animateFrames, removeWhen, sampleKeyframes } from '../mat-fx.mjs';
+import { animateFrames, playFrames, removeWhen, sampleKeyframes } from '../mat-fx.mjs';
 
 test('sampleKeyframes: n+1 frames, offsets 0..1, pose mapped', () => {
   const frames = sampleKeyframes((t) => ({ v: t * 2 }), (p) => ({ opacity: p.v }), 4);
@@ -23,6 +23,35 @@ test('animateFrames: without WAAPI applies the final frame and resolves (edge 1)
 test('animateFrames: a cancelled animation still resolves', async () => {
   const el = { animate: () => ({ finished: Promise.reject(new Error('AbortError')) }) };
   await animateFrames(el, [], { duration: 10 });
+});
+
+test('playFrames: setFrames swaps the running animation\'s keyframes on the same clock (design 059)', async () => {
+  const calls = [];
+  const effect = { setKeyframes: (frames) => calls.push(['setKeyframes', frames]) };
+  const el = {
+    animate: (frames, timing) => {
+      calls.push(['animate', frames, timing]);
+      return { effect, finished: Promise.resolve() };
+    },
+  };
+  const play = playFrames(el, [{ opacity: 0 }], { duration: 300, delay: 40 });
+  play.setFrames([{ opacity: 1 }]);
+  await play.finished;
+  assert.deepEqual(calls, [
+    ['animate', [{ opacity: 0 }], { duration: 300, delay: 40, easing: 'linear', fill: 'both' }],
+    ['setKeyframes', [{ opacity: 1 }]],
+  ]);
+});
+
+test('playFrames: without WAAPI both the frames and a swap apply their final frame', async () => {
+  const el = { style: {} };
+  const play = playFrames(el, [{ opacity: 0, offset: 0 }, { opacity: 0.5, offset: 1 }], { duration: 100 });
+  assert.equal(el.style.opacity, '0.5');
+  play.setFrames([{ opacity: 0.2, offset: 0 }, { opacity: 0.8, offset: 1 }]);
+  assert.equal(el.style.opacity, '0.8');
+  await play.finished;
+  const bare = playFrames({ animate: () => ({ finished: Promise.resolve() }) }, [], { duration: 1 });
+  assert.doesNotThrow(() => bare.setFrames([]), 'an animation without an effect ignores a swap');
 });
 
 test('removeWhen: removes once after all settle', async () => {

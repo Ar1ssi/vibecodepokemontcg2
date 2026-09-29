@@ -29,8 +29,29 @@ const face = (className, src) => {
   return img;
 };
 
-const boardFrameRects = () =>
+/** The two board iframes' page rects (null for one not laid out). */
+export const boardFrameRects = () =>
   ['oppContainer', 'selfContainer'].map((id) => document.getElementById(id)?.getBoundingClientRect() || null);
+
+/**
+ * The two-faced preview card over `rect`: a host overlay holding a 3D card with
+ * the sleeve behind, the face in front and a clipped shine band. Design 059's
+ * deck reveal builds the same card.
+ * @param {{rect: object, backSrc: string, frontSrc: string, className?: string}} opts
+ * @returns {{host: HTMLElement, card: HTMLElement, band: HTMLElement}}
+ */
+export function spawnFlipCard({ rect, backSrc, frontSrc, className = '' }) {
+  const host = spawnOverlay({ rect, className: `fx-overlay fx-opp-play ${className}`.trim() });
+  const card = document.createElement('div');
+  card.className = 'fx-opp-play__card';
+  const shine = document.createElement('div');
+  shine.className = 'fx-opp-play__shine';
+  const band = document.createElement('i');
+  shine.appendChild(band);
+  card.append(face('fx-opp-play__back', backSrc), face('fx-opp-play__front', frontSrc), shine);
+  host.appendChild(card);
+  return { host, card, band };
+}
 
 // Where the card ends up: its own element when drawn, else the discard pile
 // when it already went there (a Trainer that resolved at once), else nowhere.
@@ -66,19 +87,11 @@ export function playOppTrainer({ instanceId, user, origin, src, registry }) {
     toFade: landing.fade,
   });
 
-  const host = spawnOverlay({ rect: preview, className: 'fx-overlay fx-opp-play' });
-  const card = document.createElement('div');
-  card.className = 'fx-opp-play__card';
-  const shine = document.createElement('div');
-  shine.className = 'fx-opp-play__shine';
-  const band = document.createElement('i');
-  shine.appendChild(band);
-  card.append(
-    face('fx-opp-play__back', origin?.src || resolveCardBackSrc('them')),
-    face('fx-opp-play__front', src),
-    shine
-  );
-  host.appendChild(card);
+  const { host, card, band } = spawnFlipCard({
+    rect: preview,
+    backSrc: origin?.src || resolveCardBackSrc('them'),
+    frontSrc: src,
+  });
 
   const H = preview.height;
   const frames = sampleKeyframes(
