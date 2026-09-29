@@ -10,7 +10,7 @@ import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isUltraBeastCard } from '../rules/card-classify.mjs';
+import { isUltraBeastCard, isRuleBoxPokemon } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -2684,6 +2684,40 @@ function discardAnyThenDraw(ctx) {
   });
 }
 
+// Gwynn — discard up to N (non-Rule-Box) Pokémon from hand, draw drawPer for each one.
+function discardPokemonThenDraw(ctx) {
+  const { player, step } = ctx;
+  const eligible = (player.zones.hand || []).filter(
+    (c) => isPokemon(c) && !(step.noRuleBox && isRuleBoxPokemon(c))
+  );
+
+  if (ctx.selection) {
+    const chosen = pickById(eligible, ctx.selection).slice(0, step.count || 1);
+    for (const card of chosen) {
+      removeFromZones(player, card);
+      discardCardToPlayerZone(player, card);
+    }
+    if (chosen.length > 0) {
+      ctx.events.push({
+        type: 'cardsDiscarded',
+        playerId: player.playerId,
+        cards: chosen.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+      });
+      drawCards(player, chosen.length * (step.drawPer || 1), ctx.events);
+    }
+    return null;
+  }
+  if (eligible.length === 0) return skip(ctx, 'no_eligible_pokemon_in_hand');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Discard up to ${step.count} Pokémon${
+      step.noRuleBox ? " that don't have a Rule Box" : ''
+    } from your hand, then draw ${step.drawPer} cards for each`,
+    options: eligible,
+    min: 0,
+    max: Math.min(step.count || 1, eligible.length),
+  });
+}
+
 // Maintenance / Mary — shuffle chosen cards from hand into the deck, then draw.
 function shuffleHandCardsThenDraw(ctx) {
   const { player, step } = ctx;
@@ -3195,6 +3229,45 @@ function opponentHasStage2(ctx) {
   return rootsOf(ctx.opponent).some(
     (root) => normalizeStage(root.stage) === 'Stage 2'
   );
+}
+
+/**
+ * "Choose 1: • A • B" Supporters (Kieran): the player picks a mode, then its steps run in place.
+ * A mode that cannot do anything now (a Switch with an empty Bench) is not offered; a single
+ * remaining mode runs without a prompt.
+ */
+function chooseMode(ctx) {
+  const { player, step } = ctx;
+  const hasBench = (player.zones.bench || []).some((c) => !c.attachedTo);
+  const modes = (step.modes || []).filter(
+    (mode) => hasBench || !mode.steps.some((s) => s.type === 'switchOwn')
+  );
+  if (modes.length === 0) return skip(ctx, 'no_legal_mode');
+  const run = (mode) => {
+    ctx.insertSteps(mode.steps);
+    return null;
+  };
+  if (ctx.selection) {
+    const mode = modes[Number(ctx.selection[0]) - 1];
+    return mode ? run(mode) : skip(ctx, 'invalid_mode');
+  }
+  if (modes.length === 1) return run(modes[0]);
+  return ctx.ask({
+    prompt: `${ctx.sourceCard?.name || 'Choose 1'}: Choose 1`,
+    options: modes.map((mode, i) => ({ instanceId: i + 1, name: mode.label, type: 'option' })),
+    min: 1,
+    max: 1,
+  });
+}
+
+/** A Supporter mode's "during this turn, attacks do N more damage" boost (parseTurnDamageBonus shape). */
+function turnDamageBonusTrainer(ctx) {
+  const { player, step } = ctx;
+  if (!(step.bonus?.amount > 0)) return skip(ctx, 'no_amount');
+  if (!player.flags) player.flags = {};
+  player.flags.turnDamageBonuses = [...(player.flags.turnDamageBonuses || []), step.bonus];
+  ctx.events.push({ type: 'turnDamageBonus', playerId: player.playerId, amount: step.bonus.amount });
+  return null;
 }
 
 /**
@@ -4706,6 +4779,7 @@ export const EXTRA_STEP_HANDLERS = {
   lookAtOpponentHand,
   opponentHandShuffleDeck,
   discardAnyThenDraw,
+  discardPokemonThenDraw,
   shuffleHandCardsThenDraw,
   revealUntilCard,
   revealTopEnergy,
@@ -4759,6 +4833,8 @@ export const EXTRA_STEP_HANDLERS = {
   selfDamageAbility,
   selfBenchPlacementAbility,
   turnDamageBonusAbility,
+  chooseMode,
+  turnDamageBonusTrainer,
   returnSelfToHandAbility,
   selfLeavesAbility,
   // Design 034 slice 6 one-offs.

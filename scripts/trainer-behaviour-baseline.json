@@ -4304,11 +4304,10 @@
    ]
   },
   "Kieran#y8flte": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "chooseMode",
+    "switchOwn",
+    "turnDamageBonusTrainer"
    ]
   },
   "Kindler#8t4zqf": {

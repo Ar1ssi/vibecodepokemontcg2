@@ -93,6 +93,7 @@ const EXECUTED_STEP_TYPES = new Set([
   'eachPlayerHandToFive',
   'eachPlayerRecoverPokemon',
   'discardAnyThenDraw',
+  'discardPokemonThenDraw',
   'opponentHandShuffleItemsDraw',
   'discardAllTrainerInPlay',
   'returnStadiumToHand',

@@ -15,6 +15,7 @@ import { filterSearchMatches, searchPickerAllCandidates } from '/shared/engine/r
 import { isAncientCard } from '/shared/engine/rules/paradox-tags.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import { countBenchPokemon } from '/shared/engine/zones/active-pokemon.mjs';
+import { isRuleBoxPokemon } from '/shared/engine/rules/card-classify.mjs';
 import { openMatPick } from './mat-picker.js';
 
 const STATUS_KEY = {
@@ -2209,6 +2210,36 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
                 }
               }
               msg(`  auto: discarded ${picks.length} and drew ${picks.length}`);
+            },
+          });
+          break;
+        }
+        case 'discardPokemonThenDraw': {
+          const eligible = zone(_effectOwner, 'hand').array.filter(
+            (c) => c !== card && _isPokemonCard(c) && !(step.noRuleBox && isRuleBoxPokemon(c))
+          );
+          if (!eligible.length) {
+            msg('  no eligible Pokémon in hand');
+            break;
+          }
+          openMultiPickOnly({
+            title: `${card.name} — discard up to ${step.count} Pokémon${step.noRuleBox ? ' without a Rule Box' : ''}, draw ${step.drawPer} each`,
+            candidates: eligible,
+            count: Math.min(step.count, eligible.length),
+            upTo: true,
+            user: _effectOwner,
+            onConfirm: (picks) => {
+              for (const p of picks) {
+                const i = zone(_effectOwner, 'hand').array.indexOf(p);
+                if (i >= 0) moveCardBundle(_effectOwner, _effectOwner, 'hand', 'discard', i, false, 'move');
+              }
+              const draws = picks.length * step.drawPer;
+              for (let k = 0; k < draws; k++) {
+                if (zone(_effectOwner, 'deck').getCount() > 0) {
+                  moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+                }
+              }
+              msg(`  auto: discarded ${picks.length} and drew ${draws}`);
             },
           });
           break;

@@ -8,6 +8,7 @@
 //   { type: 'opponentDraw', count: N }
 //   { type: 'shuffleHandThenDraw', count: N, bonusCount: M, bonusWhen: 'prizes==6' }
 //   { type: 'discardHandThenDraw', count: N }
+//   { type: 'discardPokemonThenDraw', count: N, drawPer: M, noRuleBox: bool }
 //   { type: 'searchDeck', what: 'Item+Tool' | 'Basic Pokemon' | 'Pokemon' | ... , destination: 'hand'|'bench'|'attach', count: N }
 //   { type: 'coinFlip', heads: Step, tails: Step }
 //   { type: 'putHandOnBottom', count: N }
@@ -60,6 +61,7 @@
 
 import { WORD_POKEMON_TYPES } from './search-match.mjs';
 import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
+import { parseTurnDamageBonus } from './turn-damage-bonus.mjs';
 
 const POKEMON_TYPE_WORDS = Object.keys(WORD_POKEMON_TYPES).join('|');
 
@@ -1031,7 +1033,28 @@ function appendMissingOwnSwitch(steps, lower) {
   steps.unshift({ type: 'switchOwn' });
 }
 
+// "Choose 1: • A • B" — each bullet is a mode the player picks at play time (Kieran). Only
+// built when every bullet parses to executable steps; otherwise the caller keeps its fallback.
+function parseModalBullets(lower) {
+  if (!/^choose 1:\s*•/.test(lower)) return null;
+  const bullets = lower.split('•').slice(1).map((b) => b.trim()).filter(Boolean);
+  if (bullets.length < 2) return null;
+  const modes = [];
+  for (const bullet of bullets) {
+    const bonus = parseTurnDamageBonus(bullet);
+    const parsed = bonus ? null : parseTrainerStepsInner(bullet);
+    const steps = bonus
+      ? [{ type: 'turnDamageBonusTrainer', bonus }]
+      : parsed?.steps;
+    if (!steps?.length || steps.some((s) => s.type === 'passive')) return null;
+    modes.push({ label: bullet.replace(/\s*\(before applying[^)]*\)\.?$/, '').replace(/\.$/, ''), steps });
+  }
+  return { steps: [{ type: 'chooseMode', modes }], recognizable: true };
+}
+
 function parseTrainerSteps(lower) {
+  const modal = parseModalBullets(lower);
+  if (modal) return modal;
   const result = parseTrainerStepsInner(lower);
   if (result?.recognizable && Array.isArray(result.steps) && result.steps.length > 0) {
     appendLeadingHandDiscardCost(result.steps, lower);
@@ -1042,6 +1065,20 @@ function parseTrainerSteps(lower) {
 
 function parseTrainerStepsInner(lower) {
   const steps = [];
+
+  // Gwynn — discard up to N Pokémon (without a Rule Box) from hand, draw M per card discarded
+  const pokemonDraw = lower.match(
+    /discard up to (\d+) pok[ée]mon(?: that (?:doesn't|does not|don't|do not) have a rule box)? from your hand, and draw (\d+) cards? for each card you discarded/
+  );
+  if (pokemonDraw) {
+    steps.push({
+      type: 'discardPokemonThenDraw',
+      count: Number(pokemonDraw[1]),
+      drawPer: Number(pokemonDraw[2]),
+      noRuleBox: /have a rule box/.test(pokemonDraw[0]),
+    });
+    return { steps, recognizable: true };
+  }
 
   // Lt. Surge's Bargain — opponent chooses: each player takes a Prize, or you draw
   if (lower.includes('ask your opponent if each player may take a prize card')) {
@@ -2746,6 +2783,8 @@ export function describeStep(step) {
       return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `up to ${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'lookAtBottom': return `Look at the bottom ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
+    case 'chooseMode': return `Choose 1: ${step.modes.map((m) => m.label).join(' / ')}.`;
+    case 'turnDamageBonusTrainer': return `During this turn, attacks do ${step.bonus.amount} more damage to the opponent's Active Pokémon.`;
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';
     case 'discardCost': return `Discard ${step.count} other card${step.count > 1 ? 's' : ''} from your hand (cost).`;
     case 'recursion': return `Put a ${step.what} from your discard pile into your hand.`;
@@ -2840,6 +2879,8 @@ export function describeStep(step) {
       return `Each player draws or discards until they have ${step.count} cards in their hand${step.opponentFirst ? ' (opponent first)' : ''}.`;
     case 'eachPlayerRecoverPokemon':
       return 'Each player puts a Pokémon from their discard pile into their hand.';
+    case 'discardPokemonThenDraw':
+      return `Discard up to ${step.count} Pokémon${step.noRuleBox ? " that don't have a Rule Box" : ''} from your hand, and draw ${step.drawPer} cards for each card discarded.`;
     case 'discardAnyThenDraw':
       return 'Discard any number of cards from your hand, then draw that many.';
     case 'opponentHandShuffleItemsDraw':

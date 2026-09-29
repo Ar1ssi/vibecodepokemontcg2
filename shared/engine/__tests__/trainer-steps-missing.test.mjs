@@ -850,6 +850,27 @@ test('discardAnyThenDraw: Secret Mission discards any number, then draws that ma
   );
 });
 
+test('discardPokemonThenDraw: Gwynn offers only non-Rule-Box Pokémon, draws 3 per discard', () => {
+  const game = setup();
+  const mon = card({ name: 'Pidgey', supertype: 'Pokémon' });
+  const ex = card({ name: 'Charizard ex', supertype: 'Pokémon', subtypes: ['ex'] });
+  const item = card({ name: 'Potion' });
+  game.p1.zones.hand.push(mon, ex, item);
+  game.p1.zones.deck.push(...[1, 2, 3, 4].map((n) => card({ name: `d${n}` })));
+
+  const { res } = play(
+    game,
+    "Discard up to 2 Pokémon that don't have a Rule Box from your hand, and draw 3 cards for each card you discarded in this way.",
+    { name: 'Gwynn', trainerType: 'Supporter' }
+  );
+  assert.equal(res.error, null);
+  assert.deepEqual(res.pendingChoice.options.map((o) => o.instanceId ?? o), [mon.instanceId]);
+  const done = resolve(game, res, [mon.instanceId]);
+  assert.equal(done.error, null);
+  assert.equal(zone(done, 'p1', 'deck').length, 1);
+  assert.equal(zone(done, 'p1', 'hand').length, 5, 'ex + item + 3 drawn');
+});
+
 test('shuffleHandCardsThenDraw: Maintenance shuffles 2 from hand and draws 1', () => {
   const game = setup();
   const hand = [card({ name: 'h1' }), card({ name: 'h2' }), card({ name: 'h3' })];

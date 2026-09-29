@@ -2049,6 +2049,11 @@ describe('each-player and hand-to-bench coverage (batch 9)', () => {
     assert.equal(r.steps[0].type, 'eachPlayerRecoverPokemon');
   });
 
+  test('Gwynn (PBL 119 corpus text): discard up to 2 non-Rule-Box Pokémon, draw 3 each', () => {
+    const r = parseTrainerEffect('Discard up to 2 Pokémon that don’t have a Rule Box from your hand, and draw 3 cards for each card you discarded in this way. (Pokémon ex, Pokémon V, etc. have Rule Boxes.)');
+    assert.deepEqual(r.steps, [{ type: 'discardPokemonThenDraw', count: 2, drawPer: 3, noRuleBox: true }]);
+  });
+
   test("Psychic's Third Eye: look at hand + discard-any-then-draw", () => {
     const r = parseTrainerEffect('Your opponent reveals his or her hand. Discard as many cards as you like from your hand. Then, draw that many cards.');
     assert.equal(r.steps[0].type, 'lookAtOpponentHand');

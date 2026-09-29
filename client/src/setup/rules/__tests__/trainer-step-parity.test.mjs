@@ -41,6 +41,7 @@ const NEW_STEP_TYPES = [
   'eachPlayerHandToFive',
   'eachPlayerRecoverPokemon',
   'discardAnyThenDraw',
+  'discardPokemonThenDraw',
   'opponentHandShuffleItemsDraw',
   'discardAllTrainerInPlay',
   'returnStadiumToHand',

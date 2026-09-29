@@ -18,6 +18,11 @@ export function trainerKey(row) {
   return `${row?.name || '(unnamed)'}#${hash.toString(36)}`;
 }
 
+// A chooseMode step counts as itself plus every step kind inside its modes.
+function stepKinds(steps) {
+  return (steps || []).flatMap((s) => [s.type, ...(s.modes ? s.modes.flatMap((m) => stepKinds(m.steps)) : [])]);
+}
+
 /**
  * @param {{name: string, text: string, subtype?: string}} row A corpus row
  * @returns {{key: string, name: string, subtype: string, gaps: string[], serverMissing: string[],
@@ -25,7 +30,7 @@ export function trainerKey(row) {
  */
 export function classifyTrainer(row) {
   const parsed = parseTrainerEffect(row?.text || '');
-  const steps = (parsed.steps || []).map((s) => s.type);
+  const steps = stepKinds(parsed.steps);
   const gaps = [];
   if (!parsed.recognizable) gaps.push('unrecognizable');
   else if (steps.length === 0) gaps.push('empty');
