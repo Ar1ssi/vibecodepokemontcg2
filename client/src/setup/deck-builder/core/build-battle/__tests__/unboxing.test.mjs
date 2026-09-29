@@ -430,7 +430,6 @@ test('row 10b: pack art is seeded on its own stream and never shifts the pool', 
 test('boxSkin: me02 keeps its vendored faces and packs; a procedural box skins from its set and promos', () => {
   const me02 = boxSkin({ box, setInfo, cards: setCards, data });
   assert.equal(me02.setLogoUrl, 'https://assets.tcgdex.net/en/me/me02/logo.webp');
-  assert.equal(me02.setSymbolUrl, null, 'TCGdex has no me02 symbol');
   assert.equal(me02.keyArtUrl, 'https://assets.tcgdex.net/en/me/me02/125/high.webp');
   assert.equal(me02.palette, 'me');
   assert.equal(me02.faces, BOX_FACE_TEXTURES);
@@ -451,11 +450,11 @@ test('boxSkin: me02 keeps its vendored faces and packs; a procedural box skins f
   });
   const skin = boxSkin({
     box: procedural,
-    setInfo: { logo: 'https://assets.tcgdex.net/en/sm/sm9/logo', symbol: 'https://assets.tcgdex.net/univ/sm/sm9/symbol' },
+    setInfo: { logo: 'https://assets.tcgdex.net/en/sm/sm9/logo' },
     cards: [{ id: 'sm9-20', images: { large: 'https://assets.tcgdex.net/en/sm/sm9/20/high.webp' } }],
     data: promoData,
   });
-  assert.equal(skin.setSymbolUrl, 'https://assets.tcgdex.net/univ/sm/sm9/symbol.webp');
+  assert.equal(skin.setLogoUrl, 'https://assets.tcgdex.net/en/sm/sm9/logo.webp');
   assert.equal(skin.keyArtUrl, 'https://assets.tcgdex.net/en/sm/sm9/20/high.webp');
   assert.equal(skin.palette, 'sm');
   assert.equal(skin.faces, null);

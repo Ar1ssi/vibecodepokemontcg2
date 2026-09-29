@@ -143,6 +143,8 @@ export const initializeBuildBattle = ({
   const energyCards = unlimitedEnergyCards();
   const urlParams = new URLSearchParams(window.location.search);
   const urlSeed = parseSeed(urlParams.get('seed') ?? '');
+  // What the Box # field holds; it outlives the sealed box's re-renders.
+  let typedSeed = urlSeed === null ? '' : String(urlSeed);
 
   // The box on the sealed screen (`?box=`, else the default), or the opened box's; its data once
   // `loadBoxData` settles.
@@ -259,13 +261,22 @@ export const initializeBuildBattle = ({
     if (unboxingDone()) showPool();
   };
 
+  // A saved box waiting for its data: until it resumes, the picker is hidden and the box cannot
+  // change under it.
   let pendingSession = null;
 
+  // A saved box from another room is put away and the player starts a fresh one.
+  const putAwayForNewRoom = () => {
+    clearSession(storage);
+    newRoomNote = true;
+  };
+
   const onBoxLoaded = () => {
-    if (pendingSession) {
-      const saved = pendingSession;
+    const saved = pendingSession;
+    if (saved?.boxKey === loaded.box.key) {
       pendingSession = null;
-      resumeLoadedSession(saved);
+      if (sessionBelongsHere(saved, currentRoomId)) resumeLoadedSession(saved);
+      else putAwayForNewRoom();
     }
     renderAll();
   };
@@ -299,10 +310,7 @@ export const initializeBuildBattle = ({
 
   const resumeSession = () => {
     const saved = loadSession(storage);
-    if (saved && !sessionBelongsHere(saved, currentRoomId)) {
-      clearSession(storage);
-      newRoomNote = true;
-    }
+    if (saved && !sessionBelongsHere(saved, currentRoomId)) putAwayForNewRoom();
     const resumable = saved && sessionBelongsHere(saved, currentRoomId) ? saved : null;
     pendingSession = resumable;
     loadActiveBox(resumable ? getBuildBattleBox(resumable.boxKey) : activeBox);
@@ -413,7 +421,7 @@ export const initializeBuildBattle = ({
   };
 
   const pickBox = (box) => {
-    if (!box || session || box.key === activeBox.key) return;
+    if (!box || session || pendingSession || box.key === activeBox.key) return;
     rememberBoxInUrl(box);
     loadActiveBox(box);
   };
@@ -452,16 +460,24 @@ export const initializeBuildBattle = ({
     return picker;
   };
 
-  // Every re-render replaces the picker; the control the player was on keeps focus (keyboard use).
-  const pickerFocus = () => {
+  // Every re-render replaces the sealed box's controls; the one the player was on keeps focus.
+  const focusedControl = () => {
     const active = document.activeElement;
     if (!boxPanelEl?.contains(active)) return null;
-    if (active.id === 'buildBattleBox') return '#buildBattleBox';
+    if (active.id === 'buildBattleBox' || active.id === 'buildBattleSeed') return `#${active.id}`;
     return active.dataset?.era ? `.bb-era-chip[data-era="${active.dataset.era}"]` : null;
+  };
+
+  const refocus = (selector) => {
+    const control = selector && boxPanelEl.querySelector(selector);
+    if (!control) return;
+    control.focus();
+    if (control.id === 'buildBattleSeed') control.setSelectionRange(control.value.length, control.value.length);
   };
 
   const sealedNote = () => {
     if (loadError) return `Could not load ${activeBox.name}. Reload to try again.`;
+    if (pendingSession) return `Loading your ${activeBox.name}…`;
     if (!isLoaded()) return `Loading ${activeBox.name}…`;
     return boxContentsLine(activeBox, loaded.setInfo.name);
   };
@@ -472,6 +488,11 @@ export const initializeBuildBattle = ({
     note.id = 'buildBattleBoxNote';
     note.setAttribute('role', 'status');
     if (loadError) note.classList.add('is-error');
+    if (pendingSession) {
+      sealed.append(el('h3', 'bb-title', activeBox.name), note);
+      boxPanelEl.append(sealed);
+      return;
+    }
     sealed.append(renderPicker(), el('h3', 'bb-title', activeBox.name), note);
     const seedLabel = el('label', 'bb-seed-label', 'Box #');
     const seedInput = el('input', 'bb-seed-input');
@@ -479,7 +500,10 @@ export const initializeBuildBattle = ({
     seedInput.type = 'text';
     seedInput.inputMode = 'numeric';
     seedInput.placeholder = 'random';
-    seedInput.value = urlSeed === null ? '' : String(urlSeed);
+    seedInput.value = typedSeed;
+    seedInput.addEventListener('input', () => {
+      typedSeed = seedInput.value;
+    });
     seedLabel.append(seedInput);
     const openButton = el('button', 'bb-primary', 'Open box');
     openButton.id = 'buildBattleOpenBox';
@@ -507,9 +531,11 @@ export const initializeBuildBattle = ({
     header.append(actions);
     boxPanelEl.append(header);
 
+    const { setInfo, cards, data } = loaded;
+    const skin = boxSkin({ box: activeBox, setInfo, cards, data });
     const root = el('div', 'bb-scene');
     root.id = 'bbUnboxing';
-    root.dataset.era = activeBox.era;
+    root.dataset.era = skin.palette;
     const stage = unboxingDone() ? null : openStage();
     if (stage) {
       root.classList.add('bb-scene--stage');
@@ -518,7 +544,6 @@ export const initializeBuildBattle = ({
     } else {
       boxPanelEl.append(root);
     }
-    const { setInfo, cards, data } = loaded;
     scene = mountUnboxingScene({
       root,
       getUnboxing: () => session.unboxing,
@@ -527,7 +552,7 @@ export const initializeBuildBattle = ({
       packModel: resolvePackModel(activeBox.packModelKey, cards, setInfo),
       classOf: (card) => cardClass(card, activeBox.era, setInfo),
       look: {
-        skin: boxSkin({ box: activeBox, setInfo, cards, data }),
+        skin,
         labels: unboxingLabels(activeBox, setInfo.name),
         seriesName: BUILD_BATTLE_ERA_NAMES[activeBox.era],
         setName: setInfo.name,
@@ -544,13 +569,13 @@ export const initializeBuildBattle = ({
     scene?.unmount();
     scene = null;
     if (unboxingDone()) closeStage();
-    const focused = pickerFocus();
+    const focused = focusedControl();
     boxPanelEl.replaceChildren();
     if (!resumed) return; // still waiting for the game tab to name its room
     renderBanner(boxPanelEl);
     if (session && isLoaded()) renderOpenedBox();
     else renderSealedBox();
-    if (focused) boxPanelEl.querySelector(focused)?.focus();
+    refocus(focused);
   };
 
   // ── Pool tab ────────────────────────────────────────────────────────────
@@ -676,6 +701,13 @@ export const initializeBuildBattle = ({
     currentRoomId = roomId || null;
     if (!resumed) {
       finishResume();
+      return;
+    }
+    if (pendingSession && !sessionBelongsHere(pendingSession, currentRoomId)) {
+      pendingSession = null;
+      putAwayForNewRoom();
+      renderAll();
+      showBox();
       return;
     }
     if (!session || sessionBelongsHere(session, currentRoomId)) return;

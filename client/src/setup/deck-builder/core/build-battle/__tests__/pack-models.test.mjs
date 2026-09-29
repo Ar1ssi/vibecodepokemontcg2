@@ -120,6 +120,16 @@ test('row 10: every baked set rolls its box model at the boosted profile (sv04 s
   }
 });
 
+test('every card a baked set can put in a pack sits in one of its model\'s slots (a rarity TCGdex renames fails here)', async () => {
+  for (const box of BUILD_BATTLE_BOXES) {
+    const { cards, setInfo } = await loadBoxData(box.key);
+    const packModel = resolvePackModel(box.packModelKey, cards, setInfo);
+    const slotted = new Set(packModel.slots.flatMap((slot) => slot.rows.flatMap((row) => row.ids)));
+    const stray = packModel.allIds.filter((id) => !slotted.has(id));
+    assert.deepEqual(stray, [], `${box.key}: ${stray.map((id) => `${id} ${cards.find((card) => card.id === id)?.rarity}`).join(', ')}`);
+  }
+});
+
 test('row 10: sv and sv-acespec packs on a synthetic SV set', () => {
   const set = syntheticSet({
     counts: { Common: 60, Uncommon: 40, Rare: 20, 'Double rare': 12, 'ACE SPEC Rare': 6 },

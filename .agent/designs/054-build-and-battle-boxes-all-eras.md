@@ -516,7 +516,7 @@ starting rows; PASS/FAIL lines name the box.
 | 3 | random-Trainer draw: pool of 1 card, n = 4 | 2 copies then stop (at most `2·pool` draws), pool is 2 cards | [x] `pack-opening.test.mjs` "row 3: a one-card Trainer pool gives two copies and stops" |
 | 4 | evolution box: `n = 23 − 1 − A − B` < 0 for some pairing | generator refuses to bake the box (throws naming the pairing); catalog test asserts n ≥ 0 for all 12 pairings of every baked box | [x] `build-battle-bake.test.mjs` "row 4: an Evolution pack a pairing cannot fill to 23 makes the generator refuse the box, naming it"; `box-catalog.test.mjs` "rows 4 + 16" on all 37 Evolution boxes (A4: a pack exactly 23, a deck at most 40) |
 | 5 | `import()` of a set module rejects (offline, 404) | sealed screen shows the load error, picker usable, no session created | [x] `box-data.test.mjs` "row 5: an unknown key, a failed import or a malformed module rejects…"; e2e row 5 PASS (module routed to 404) |
-| 6 | box opened, then reload while `loadBoxData` is pending | scene renders only after the promise; a second Open click during load is a no-op | [x] e2e row 6 PASS (Open off while the box loads; the box renders once it settles; a late load for a box left behind is dropped — fixed at close) |
+| 6 | box opened, then reload while `loadBoxData` is pending | scene renders only after the promise; a second Open click during load is a no-op | [x] e2e row 6 PASS (Open off while the box loads; the box renders once it settles; a late load for a box left behind is dropped — fixed at close); `native-deck-builder-build-battle.test.mjs` "row 6: switching back…", "a saved box still loading hides the picker…" |
 | 7 | same seed, same box, twice | identical deckKey, groupKeys, trainerIds, packs, artIndexes | [x] `pack-opening.test.mjs` "row 7: the same seed opens the same box, bit for bit", "row 7: every baked box opens bit for bit…" (42 boxes; D6) |
 | 8 | same seed, different box | independent contents; changing the box before Open re-draws | [x] `pack-opening.test.mjs` "row 8: the same seed in another box draws that box, from its own set" |
 | 9 | a class absent from a set (SM: no `illustration`) | its weight joins the slot filler; `hit`/`top` chances unchanged (25 % / 1 %) | [x] `pack-models.test.mjs` "row 9: a class the set does not print gives its weight to the slot filler only"; the all-set row 10 test expects 0 for an unprinted class (sv09, sv10 ACE SPEC) |
@@ -591,7 +591,7 @@ One shot this implementation in the same branch." — the criteria are this desi
 | 6 | Per-set data modules loaded on demand, ≤ 60 KB each, none eager (Option 2 B) | ✓ `box-data.test.mjs` "row 20: every catalog box has a set and a box module, each at most 60 KB" (largest 46.6 KB), "row 20: only box-data.mjs names the generated modules, and only through import()" |
 | 7 | One seed = one box, bit for bit (D186) | ✓ `pack-opening.test.mjs` "row 7: every baked box opens bit for bit…" (all 42), "row 7: the same seed opens the same box, bit for bit" |
 | 8 | A 051 me02 session still opens (Option 8 B) | ✓ `build-battle-session.test.mjs` "row 13: a session saved by design 051 still parses, verifies and pools as before" |
-| 9 | Builder tab: era chips + box select, `?box=`, load/error states (§ Builder tab) | ✓ `bb-box-picker-test.mjs` ALL PASS (rows 1, 5, 6, 9, 14, 15, 22, 25, 29); `build-battle-view.test.mjs` "row 1: ?box= takes only a catalog box key" |
+| 9 | Builder tab: era chips + box select, `?box=`, load/error states (§ Builder tab) | ✓ `bb-box-picker-test.mjs` ALL PASS (rows 1, 5, 6, 9, 14, 15, 22, 25, 29); `build-battle-view.test.mjs` "row 1: ?box= takes only a catalog box key"; `native-deck-builder-build-battle.test.mjs` 4 pass (load races, pending box, room change, typed seed) |
 | 10 | Unboxing skinned per era, kind-aware labels, procedural pack fronts; me02 keeps its vendored art (Option 6 C) | ✓ in code and tests (`unboxing.test.mjs` "boxSkin: me02 keeps its vendored faces and packs; a procedural box skins from its set and promos", "the unboxing labels follow the box kind…"); recorder PASS in all five eras. The look itself is the user's check on localhost |
 | 11 | Generator bakes every box from TCGdex; `--check` clean (§ Generated data) | ✓ `pnpm test:live` 4 pass, 0 fail ("live: the Build & Battle set and box modules match TCGdex", all 42 boxes, no cache); `build-battle-bake.test.mjs` 11 pass |
 | 12 | Recorder PASS for a fixed, an evolution-pack and an evolution-deck box (§ Recorder) | ✓ fixed: phantasmal-flames seed 42 (slice 4); evolution-pack: sword-shield seed 6, team-up seed 6, evolutions seed 71; evolution-deck: temporal-forces seed 42, brilliant-stars seed 1 — every row PASS |
@@ -656,6 +656,10 @@ Plan-time re-pins (§2 of oneshot-feature, from reading all 42 Bulbapedia pages 
   Battle Styles the same two. Each line keeps the page's number in a comment. Gameplay text is identical.
 - D10 XY, SM and SWSH key art is the box's first promo: no TCGdex rarity marks those sets' cover Pokémon (the
   first and last Secret Rares name different Pokémon per set). Pinned by test.
+- D11 A page's "no more than two copies of a particular card" caps the random Trainer draw, not copies a group
+  already dealt: Silver Tempest's Sunflora group holds a Gloria and its pool may add two more.
+- D12 `boxSkin` returns no `setSymbolUrl` (nothing shows a set symbol); the scene's `data-era` is the skin's
+  `palette`, so a box's palette override takes effect.
 Build notes:
 - Slice 1: me02 split from 051's module by a one-off script; hydrated rows equal 051's rows byte for byte
   (JSON order included). `packArtSrc(setId, key)` (vendored files are per set). The seed-42 box keeps 051's
@@ -714,7 +718,13 @@ Build notes:
   swaps in the procedural front, checked by `bb-box-picker-test.mjs`. The hostile pass found a load race:
   switching back to the loaded box while another box loaded let the late result replace it, leaving the
   picker on "Loading…"; every switch now drops a load in flight (e2e row 6, failing before). Area doc
-  updated. Full `pnpm test`:
+  updated. The independent review (review.md, a fresh agent) found one more live blocker: while a saved box
+  loaded, the sealed screen offered the picker and a pick resumed the saved box against another box's data
+  (put away), and a room change in that window was ignored. The picker now hides until the saved box
+  resumes, only that box resumes, and a room change puts it away; the Box # field keeps a typed seed and its
+  focus through re-renders. `sidebox/__tests__/native-deck-builder-build-battle.test.mjs` covers all four
+  (each fails on the code before its fix). Its nits: D11, D12, a per-set slot-reachability test in
+  `pack-models.test.mjs`, and an ISSUES line for Box #0 = Box #1 (pre-existing). Full `pnpm test`:
   5112 pass, 0 fail, 4 skipped; `pnpm test:live`: 4 pass (all 42 boxes `--check`, no cache).
 
 ## Landing — the harness edits the commit that merges this branch to `main` carries (A1)
@@ -749,6 +759,8 @@ The branch merges cleanly with `main` at 563ff7f. Numbers below are the next fre
     set's cover Pokémon; a per-box keyArtCardId or vendored art would replace it (refs: design 054 D10)`
   - `I210 2026-09-29 P3 [deck-builder] B&B page rules not simulated: Fates Collide's optional Shuckle swap,
     Guardians Rising's optional Oricorio [Pa'u Style] (refs: design 054 A5)`
+  - `I211 2026-09-29 P3 [deck-builder] B&B Box #0 opens the same contents as Box #1: createRng maps seed 0 to
+    1 (shared/engine/rng.mjs:14) while parseSeed accepts 0; reject 0 or remap it (refs: design 051, 054 review)`
 - This design → `Status: shipped`; the NEXTSTEPS ledger → `.agent/archive/NEXTSTEPS-history.md`.
 
 ---

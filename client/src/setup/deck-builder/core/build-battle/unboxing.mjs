@@ -565,11 +565,11 @@ const largeImageOf = (card) => card?.images?.large || card?.image || null;
 
 /**
  * What the unboxing scene dresses the box in (design 054 § Unboxing skin, D5): the set's TCGdex
- * logo and symbol, the key card's art for a procedural front, the era palette, the four pack
- * fronts (vendored files or a procedural front over a card's art) and the vendored box faces.
+ * logo, the key card's art for a procedural front, the palette (the scene's `data-era`), the four
+ * pack fronts (vendored files or a procedural front over a card's art) and the vendored box faces.
  *
  * @param {{box: object, setInfo?: object, cards?: object[], data?: {cardsById?: Map<string, object>}}} args
- * @returns {{setLogoUrl: string|null, setSymbolUrl: string|null, keyArtUrl: string|null,
+ * @returns {{setLogoUrl: string|null, keyArtUrl: string|null,
  *   palette: string, packArts: ({kind: 'vendored', src: string}|{kind: 'procedural', cardId: string,
  *   imageUrl: string|null})[], faces: object|null}}
  */
@@ -585,7 +585,6 @@ export function boxSkin({ box, setInfo = {}, cards = [], data = {} }) {
       }));
   return {
     setLogoUrl: withWebp(setInfo.logo),
-    setSymbolUrl: withWebp(setInfo.symbol),
     keyArtUrl: largeImageOf(cardById(skin.keyArtCardId)),
     palette: skin.palette || box?.era || 'me',
     packArts,
