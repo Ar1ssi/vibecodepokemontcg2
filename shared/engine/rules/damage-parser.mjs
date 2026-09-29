@@ -732,7 +732,7 @@ export function parseAttackDamage(
       components.push('per-each');
       notes.push(`per-${label} scaling — resolve the printed count`);
     }
-  } else if (text && /prize card/.test(text)) {
+  } else if (text && /prize card/.test(text) && !/\b(?:or fewer|or more) prize cards?\b/.test(text)) {
     const per = amount(text, /(\d+) more damage|does (\d+) damage/);
     total = base + per * opponentPrizes;
     components.push('per-prize');
