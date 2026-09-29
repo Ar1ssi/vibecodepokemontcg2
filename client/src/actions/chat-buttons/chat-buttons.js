@@ -7,6 +7,7 @@ import { resetAbilityCounters } from '../counters/reset-counters.js';
 import { discardBoard } from '../general/board-actions.js';
 import { rulesState, canPerformAction, markAttacked, endTurn, ensureCardData, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, getStadium, getTurnAttackBonus, canUsePlayedToBenchTrigger, consumePlayedToBenchTrigger } from '/shared/engine/rules/rules-state.mjs';
 import { classifyAbility, searchTargetType } from '/shared/engine/rules/ability-effects.mjs';
+import { isAncientCard } from '/shared/engine/rules/paradox-tags.mjs';
 import { computeAttackDamage, canPayAttackCost } from '/shared/engine/rules/attack-engine.mjs';
 import { classifyEnergyEffect, effectiveEnergyType, pokemonHasRedirectEnergy, pokemonHasProtectEnergy, applyProtectCap, isEnergyCard, rewriteEnergyDescriptor } from '/shared/engine/rules/energy-effects.mjs';
 import {
@@ -274,12 +275,6 @@ function countBenchStage2Pokemon(player) {
 
 function isTeamRocketPokemon(card) {
   return /team rocket/i.test(String(card?.name || ''));
-}
-
-function isAncientPokemon(card) {
-  const name = String(card?.name || '');
-  if (/\bancient\b/i.test(name)) return true;
-  return (card?.subtypes || []).some((s) => /ancient/i.test(String(s)));
 }
 
 function hasRoundAttack(card) {
@@ -1050,7 +1045,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
             ownPokemonInPlayCount: countPokemonInPlay(user),
             roundAttackCount: countPokemonInPlay(user, hasRoundAttack),
             teamRocketCount: countPokemonInPlay(user, isTeamRocketPokemon),
-            ancientCount: countPokemonInPlay(user, isAncientPokemon),
+            ancientCount: countPokemonInPlay(user, isAncientCard),
             speciesCount: countPokemonInPlay(user, isBeedrillPokemon),
             grassPokemonCount: countPokemonInPlay(user, isGrassPokemon),
             specialEnergyOnSelfCount: countSpecialEnergyOnPokemon(activeZone, active.image),

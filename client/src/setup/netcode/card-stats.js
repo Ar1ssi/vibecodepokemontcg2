@@ -96,8 +96,12 @@ function extractStats(card) {
   // ability fallback and subtypes as a stage fallback.
   if (!isTrainerCard(card) && !isEnergyCard(card)) {
     // Exception: "Ultra Beast" exists only as a subtype, and Beast Energy's provision and
-    // bonus read it server-side (review of audit SE2).
-    if (Array.isArray(card.subtypes) && card.subtypes.some((s) => /ultra beast/i.test(String(s)))) {
+    // bonus read it server-side (review of audit SE2). Same for the Ancient/Future tag
+    // (design 058), which the server also derives from the printing when a card carries an id.
+    if (
+      Array.isArray(card.subtypes) &&
+      card.subtypes.some((s) => /^(?:ultra beast|ancient|future)$/i.test(String(s).trim()))
+    ) {
       stats.subtypes = card.subtypes.map(String);
       hasAny = true;
     }

@@ -3,6 +3,7 @@
     // currently legal. All gating flows through canPerformAction().
     
     import { printedRarity } from './card-classify.mjs';
+    import { withParadoxSubtype } from './paradox-tags.mjs';
     import { createCachedFetchJson } from '../../tcgdex/tcgdex-cache.mjs';
     import { tcgdexApiUrl } from '../../tcgdex/tcgdex-url.mjs';
     import {
@@ -377,6 +378,15 @@
         }
       }
       normalizeTrainerEnrichment(card);
+      addParadoxSubtype(card);
+    }
+
+    // TCGdex has no Ancient/Future field and a merge never replaces a present `subtypes`
+    // array, so the printing's tag is appended here (design 058).
+    function addParadoxSubtype(card) {
+      if (card.subtypes != null && !Array.isArray(card.subtypes)) return;
+      const subtypes = withParadoxSubtype(card.subtypes, card);
+      if (subtypes.length !== (card.subtypes?.length ?? 0)) card.subtypes = subtypes;
     }
 
     /** TCGdex stores Trainer/Stadium/Tool text in `effect`; parsers read `text`. */

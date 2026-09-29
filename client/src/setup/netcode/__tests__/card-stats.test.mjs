@@ -127,3 +127,17 @@ test('attack rules text sent from `effect` when `text` is absent', () => {
   ]);
   assert.equal(stats[0].attacks[0].text, 'Search your deck.');
 });
+
+// Design 058: the Ancient/Future tag rides the Pokémon subtypes carve-out (enrichment appends it).
+test('Ancient/Future Pokémon forward their subtypes; other Pokémon still do not', () => {
+  const { stats } = buildCardStatsPayload([
+    { syncInstance: 0, hp: 230, stage: 'Basic', type: 'Pokémon', subtypes: ['ex', 'Future'] },
+    { syncInstance: 1, hp: 230, stage: 'Basic', type: 'Pokémon', subtypes: ['ex', 'Ancient'] },
+    { syncInstance: 2, hp: 230, stage: 'Basic', type: 'Pokémon', subtypes: ['ex'] },
+    { syncInstance: 3, hp: 90, stage: 'Basic', type: 'Pokémon', subtypes: ['Ancient Trait'] },
+  ]);
+  assert.deepEqual(stats[0].subtypes, ['ex', 'Future']);
+  assert.deepEqual(stats[1].subtypes, ['ex', 'Ancient']);
+  assert.equal(stats[2].subtypes, undefined);
+  assert.equal(stats[3].subtypes, undefined);
+});

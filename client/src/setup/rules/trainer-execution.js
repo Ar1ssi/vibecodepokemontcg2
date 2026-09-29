@@ -12,6 +12,7 @@ import { deckFormatOf } from '../deck-constructor/deck-format-args.mjs';
 import { normalizeStage, isRareCandyJump, canEvolve } from '/shared/engine/rules/evolution.mjs';
 import { isEnergyCard, classifyEnergyEffect } from '/shared/engine/rules/energy-effects.mjs';
 import { filterSearchMatches, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
+import { isAncientCard } from '/shared/engine/rules/paradox-tags.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import { countBenchPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { openMatPick } from './mat-picker.js';
@@ -99,9 +100,7 @@ function countVariableDraw(source) {
   const opp = _effectOwner === 'self' ? 'opp' : 'self';
   switch (source) {
     case 'ancientInPlay':
-      return getInPlayPokemon(_effectOwner).filter((c) =>
-        String(c.name || '').toLowerCase().includes('ancient')
-      ).length;
+      return getInPlayPokemon(_effectOwner).filter(isAncientCard).length;
     case 'opponentBench':
       return getZoneSafe(opp, 'bench').getCount();
     case 'opponentMegaExInPlay':
