@@ -1,13 +1,25 @@
+import { getEnergyTokenFront } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
 import { buildHoloCard, startHoloAnimation } from '../../../setup/deck-builder/core/holo.mjs';
 import { BOX_PROPORTIONS } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
-import { packFlyParams, peelSide } from '../../../setup/deck-builder/core/build-battle/pack3d.mjs';
+import {
+  BOX_MOUTH_Y,
+  FLY_FROM_WIDTH,
+  packFlyParams,
+  peelSide,
+} from '../../../setup/deck-builder/core/build-battle/pack3d.mjs';
+import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
+import { getSleeveById } from '../../../setup/deck-builder/core/sleeves.mjs';
 import {
   CARDS_PER_PACK,
+  COIN_FLIP_MS,
   DECK_UNWRAP_MS,
+  DICE_MS,
   FAN_COLLAPSE_MS,
   HIT_FLIP_MS,
   HIT_HOLD_MS,
+  LID_LIFT_MS,
   LID_OPEN_MS,
+  PACK_COUNT,
   PACK_FLY_MS,
   PACK_FLY_STAGGER_MS,
   PACK_TEAR_MS,
@@ -22,9 +34,12 @@ import {
   TAP_SLOP_PX,
   TRAY_TOTAL_MS,
   WRAP_TEAR_MS,
+  coinFlipPose,
+  dicePose,
   faceMatrix3d,
   hitFlipPose,
   hitTierFor,
+  liftLidPose,
   lidPose,
   nextPackToTear,
   packArtIndexes,
@@ -38,6 +53,7 @@ import {
   swipeAwayPose,
   swipeOutcome,
   tearReleaseOutcome,
+  trayRiseMs,
   trayRisePose,
   unboxingHoloRarity,
   unboxingVoiceFor,
@@ -59,7 +75,9 @@ import { burstParticles } from '../../../setup/netcode/mat-fx/particles.mjs';
  * The Build & Battle unboxing scene (design 052 § DOM twin, Pocket-style rework in § Deviations):
  * a CSS 3D box under shrink-wrap, a hinged lid, the tray (deck, promo, code card, tip sheet); the
  * four packs then fly out of the box and fill the screen, each is swiped open in turn, and its
- * cards are swiped off one at a time (hits turn over first), ending on a ten-card summary. Every beat is `dispatch(event)` (reducer + save)
+ * cards are swiped off one at a time (hits turn over first), ending on a ten-card summary. An Elite
+ * Trainer Box (design 057, `contents` set) lies flat under a lift-off lid; its tray holds the promo
+ * pouch, tappable props and nine fanned packs that fly out when tapped. Every beat is `dispatch(event)` (reducer + save)
  * first, then sound, then the pose sampled from unboxing.mjs; a beat that is refused does nothing.
  * The DOM re-renders the settled state after each beat, so a reload lands on the same picture.
  */
@@ -76,6 +94,13 @@ const SWEEP_MS = 420;
 const SPARK_COUNT = 16;
 const SPARK_MS = 640;
 const COLLAPSE_SCALE = 0.2;
+// The nine-pack spread keeps this much stage on either side of its outermost packs.
+const SPREAD_MARGIN_PX = 16;
+// Elite Trainer Box (design 057): a landscape box lying flat, lid up (§ Product art, proportions
+// UNVERIFIED until a reference render exists); the tray holds seven things before the packs.
+const ETB_PROPORTIONS = Object.freeze({ width: 1, height: 0.76, depth: 0.36 });
+const ETB_PROP_COUNT = 7;
+const PROMO_SETTLE_MS = 360;
 
 const easeOut = (t) => 1 - (1 - t) ** 3;
 const lerp = (from, to, t) => from + (to - from) * t;
@@ -132,6 +157,34 @@ const playPose = (node, poseFn, toFrame, durationMs, { delay = 0, samples = 24 }
 // CSS y points down: the pose's lid angle (y up, negative = swinging up and back) flips sign here.
 const lidTransform = ({ rotateXDeg, translateYPx }) =>
   `translate3d(0, ${-BOX_H / 2 + translateYPx}px, ${-BOX_D / 2}px) rotateX(${-rotateXDeg}deg)`;
+
+// The lift-off lid rises toward the camera (+z) and slides back up the screen (−y); its tilt flips
+// sign for CSS as lidTransform's does.
+const liftLidTransform = ({ translateZPx, translateYPx, rotateXDeg }) =>
+  `translate3d(0, ${translateYPx}px, ${translateZPx}px) rotateX(${-rotateXDeg}deg)`;
+
+const dieTransform = ({ translateXPx, translateYPx, rotateXDeg, rotateYDeg, rotateZDeg }) =>
+  `translate(${translateXPx}px, ${translateYPx}px) rotateX(${rotateXDeg}deg) rotateY(${rotateYDeg}deg) rotateZ(${rotateZDeg}deg)`;
+
+const coinTransform = ({ rotateXDeg, translateYPx }) => `translateY(${translateYPx}px) rotateX(${rotateXDeg}deg)`;
+
+// Catalog art paths are relative to the client root (`src/assets/...`).
+const assetSrc = (path) => (/^(https?:)?\//.test(path) ? path : `/${path}`);
+
+/**
+ * A stand-in "box" rect whose mouth (`packFlyParams`: x centre, `BOX_MOUTH_Y` down, `FLY_FROM_WIDTH`
+ * wide) is `rect`'s centre at `rect`'s width: an Elite Trainer Box pack leaves from its tray fan.
+ */
+const launchRectFrom = (rect) => {
+  const width = rect.width / FLY_FROM_WIDTH;
+  const height = rect.height;
+  return {
+    left: rect.left + rect.width / 2 - width / 2,
+    top: rect.top + rect.height / 2 - height * BOX_MOUTH_Y,
+    width,
+    height,
+  };
+};
 
 const promoTransform = ({ translateYPx, rotateXDeg, rotateYDeg, scale }) =>
   `translateY(${translateYPx}px) rotateX(${rotateXDeg}deg) rotateY(${rotateYDeg}deg) scale(${scale})`;
@@ -344,6 +397,63 @@ const boxFace = (name, { wrapped, textures, look }) => {
   return face;
 };
 
+// ── Elite Trainer Box faces (design 057 § Product art): lying flat, lid up ─
+const energyTotal = (contents) => contents.energy.reduce((sum, [, count]) => sum + count, 0);
+
+const etbPlate = (look) => el('div', 'etb-plate', look.labels.productTitle);
+
+// The lid: the key art on a black field under the slashes, the plate on its top edge, the series
+// pill and the set logo at its foot.
+const etbLidFace = (look) => {
+  const face = el('div', 'bb-pf etb-pf etb-pf--lid');
+  const keyArt = el('div', 'etb-keyart');
+  if (look.skin.keyArtUrl) {
+    const img = el('img', 'etb-keyart__img');
+    img.alt = '';
+    img.draggable = false;
+    img.addEventListener('error', () => img.remove(), { once: true });
+    img.src = look.skin.keyArtUrl;
+    keyArt.append(img);
+  }
+  keyArt.append(el('div', 'bb-keyart__slashes'));
+  face.append(keyArt, etbPlate(look), setLogo(look));
+  return face;
+};
+
+const etbNearFace = (look, packCount) => {
+  const face = el('div', 'bb-pf etb-pf etb-pf--near');
+  face.append(etbPlate(look), el('span', 'etb-pill', `${packCount} booster packs`));
+  return face;
+};
+
+// The far long side: what is inside, typeset from the catalog row, and grey legal lines.
+const etbFarFace = (look) => {
+  const face = el('div', 'bb-pf etb-pf etb-pf--far');
+  const list = el('ul', 'etb-far__list');
+  for (const line of look.labels.backLines) list.append(el('li', '', line));
+  const legal = el('div', 'bb-back__legal');
+  for (let line = 0; line < 3; line += 1) legal.append(el('i'));
+  face.append(el('p', 'bb-back__inside', 'Inside, you’ll find:'), list, legal);
+  return face;
+};
+
+// `lid` is the key-art cover, `near`/`far` the long sides, `under` the base; the short sides and
+// the lid's rim strips are black with the slashes running on.
+const proceduralEtbFace = (name, look, packCount) => {
+  if (name === 'lid') return etbLidFace(look);
+  if (name === 'near') return etbNearFace(look, packCount);
+  if (name === 'far') return etbFarFace(look);
+  if (name === 'under') return el('div', 'bb-pf etb-pf etb-pf--under');
+  return el('div', 'bb-pf etb-pf etb-pf--side');
+};
+
+const etbFace = (name, { wrapped, look, packCount }, extraClass = '') => {
+  const face = el('div', `bb-box__face etb-face etb-face--${name} ${extraClass}`.trim());
+  face.append(proceduralEtbFace(name, look, packCount));
+  if (wrapped) face.append(el('div', 'bb-face__wrap'));
+  return face;
+};
+
 // ── Cards ─────────────────────────────────────────────────────────────────
 const cardBackImg = (className) => {
   const img = el('img', className);
@@ -365,8 +475,7 @@ const cardFallback = (card) => {
 // The end of an Elite Trainer Box opening: everything it held is already in the collection.
 const etbDoneText = (packs, contents) => {
   const cards = packs.reduce((sum, pack) => sum + pack.length, 0) + (contents.promo ? 1 : 0);
-  const energy = contents.energy.reduce((sum, [, count]) => sum + count, 0);
-  return `Everything is in your collection: ${cards} cards · ${energy} Energy · sleeves · coin`;
+  return `Everything is in your collection: ${cards} cards · ${energyTotal(contents)} Energy · sleeves · coin`;
 };
 
 /**
@@ -383,11 +492,13 @@ const etbDoneText = (packs, contents) => {
  * @param {number} options.seed the box seed (pack art, tear edges)
  * @param {object|null} options.promo the deck's foil promo card row
  * @param {object|null} [options.contents] an Elite Trainer Box's non-pack contents (`etbContents`,
- *   design 057); null for a Build & Battle box. With contents the tray holds the promo pouch and
- *   the packs, and the end of the scene points at the collection.
- * @param {(destination: 'collection'|'shelf') => void} options.onFinish
- *   ends the opening: the last summary's button asks for 'collection', Skip scene for 'shelf'
- *   (Build & Battle ignores both and shows its Pool tab)
+ *   design 057); null for a Build & Battle box. With contents the box lifts its lid, the tray holds
+ *   the promo pouch, the props (sleeves, Energy, dice and coin, dividers, guide, code card) and the
+ *   packs, which leave when tapped, and the end of the scene points at the collection.
+ * @param {(destination: 'collection'|'shelf', extra: {wantsGuide: boolean}) => void} options.onFinish
+ *   ends the opening: the last summary's button asks for 'collection', Skip scene and Open another
+ *   for 'shelf' (Build & Battle ignores both and shows its Pool tab); `wantsGuide` is whether the
+ *   guide prop was picked
  * @returns {{unmount: () => void}}
  */
 export const mountUnboxingScene = ({
@@ -405,8 +516,18 @@ export const mountUnboxingScene = ({
 }) => {
   const artIndexes = packArtIndexes(seed, packs.length, look.skin.packArts.length);
   const isEtb = Boolean(contents);
+  // An Elite Trainer Box lifts its lid off (design 057 beat 2); a Build & Battle box's is hinged.
+  const isLift = isEtb;
+  const etbSize = {
+    width: BOX_W,
+    height: Math.round(BOX_W * ETB_PROPORTIONS.height),
+    depth: Math.round(BOX_W * ETB_PROPORTIONS.depth),
+  };
+  const lidSize = { heightPx: etbSize.height, depthPx: etbSize.depth };
+  const trayCount = ETB_PROP_COUNT + packs.length;
+  const flipDieIndex = contents?.props?.damageDice ?? 6;
+  const dieCount = isEtb ? flipDieIndex + (contents.props?.flipDie ?? 1) : 0;
   const doneText = isEtb ? etbDoneText(packs, contents) : 'All four packs are open.';
-  const finish = (destination) => onFinish(destination);
   const textures = new Map();
   const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
   const slotOf = (packIndex, cardIndex) =>
@@ -429,10 +550,16 @@ export const mountUnboxingScene = ({
   let collapsing = false;
   // View state that is never saved, so a reload lands on the settled picture of the state: the
   // packs have left the box, the pack whose ten cards are laid out, the hits already turned over.
+  // An Elite Trainer Box keeps its tray (and props) after the promo until its packs are tapped.
   const initialStage = getUnboxing().stage;
-  let packsOut = initialStage === 'deckShown' || initialStage === 'packs';
+  let packsOut = initialStage === 'packs' || (!isEtb && initialStage === 'deckShown');
   let summaryPack = null;
   const flippedHits = new Set();
+  // The props of an Elite Trainer Box (design 057 beat 5): cosmetic, never saved. `guide` is the
+  // wantsGuide the scene ends with; `rolls` counts dice throws (each lands on its own seeded faces).
+  const propState = { sleeves: false, code: false, guide: false, rolls: 0 };
+  const perPack = () => getUnboxing().cardsPerPack || CARDS_PER_PACK;
+  const finish = (destination) => onFinish(destination, { wantsGuide: propState.guide });
   // The 3D pack stage: `packStage` draws the spread (`data-render='3d'`); a stage that became ready
   // mid-beat waits in `pendingStage` for the next settled picture. Null → the DOM scene (row 1).
   let packStage = null;
@@ -498,7 +625,7 @@ export const mountUnboxingScene = ({
   const viewOf = (u) => {
     if (summaryPack !== null) return 'summary';
     if (u.stage === 'packs') {
-      return u.revealed[lastTorn(u)] < CARDS_PER_PACK ? 'pocket' : 'spread';
+      return u.revealed[lastTorn(u)] < perPack() ? 'pocket' : 'spread';
     }
     if (u.stage === 'deckShown' && packsOut) return 'spread';
     return 'box';
@@ -507,11 +634,35 @@ export const mountUnboxingScene = ({
   // ── Box ───────────────────────────────────────────────────────────────
   const renderBox = (u) => {
     const host = el('div', 'bb-box');
-    host.style.setProperty('--bb-w', `${BOX_W}px`);
-    host.style.setProperty('--bb-h', `${BOX_H}px`);
-    host.style.setProperty('--bb-d', `${BOX_D}px`);
+    const size = isLift ? etbSize : { width: BOX_W, height: BOX_H, depth: BOX_D };
+    host.style.setProperty('--bb-w', `${size.width}px`);
+    host.style.setProperty('--bb-h', `${size.height}px`);
+    host.style.setProperty('--bb-d', `${size.depth}px`);
     const body = el('div', 'bb-box__body');
     const wrapped = !u.wrapTorn;
+    if (isLift) appendLiftBox(body, u, wrapped);
+    else appendHingedBox(body, u, wrapped);
+    host.append(body);
+
+    if (wrapped) {
+      const wrapButton = button('bb-box__wrap', 'Tear off the shrink-wrap');
+      bindTear(wrapButton, {
+        widthOf: () => wrapButton.clientWidth || BOX_W,
+        onProgress: (progress) => setWrapClip(wrapTearPose(progress).clipPath),
+        onSpring: (progress) => springWrap(progress),
+        onTear: (progress) => beatTearWrap(progress),
+      });
+      host.append(wrapButton);
+    } else if (u.stage === 'sealed') {
+      const lidButton = button('bb-box__open', isLift ? 'Lift the lid' : 'Open the lid');
+      lidButton.addEventListener('click', beatOpenLid);
+      host.append(lidButton);
+    }
+    return host;
+  };
+
+  // Build & Battle: a tall box, the lid hinged on the back edge of its top.
+  const appendHingedBox = (body, u, wrapped) => {
     const faceOptions = { wrapped, textures, look };
     for (const name of ['back', 'left', 'right', 'bottom']) body.append(boxFace(name, faceOptions));
     for (const name of ['back', 'left', 'right', 'front']) {
@@ -525,23 +676,23 @@ export const mountUnboxingScene = ({
     lid.append(lidOuter, el('div', 'bb-box__lid-inner'));
     lid.style.transform = lidTransform(lidPose(u.stage === 'sealed' ? 0 : 1));
     body.append(lid);
-    host.append(body);
+  };
 
-    if (wrapped) {
-      const wrapButton = button('bb-box__wrap', 'Tear off the shrink-wrap');
-      bindTear(wrapButton, {
-        widthOf: () => wrapButton.clientWidth || BOX_W,
-        onProgress: (progress) => setWrapClip(wrapTearPose(progress).clipPath),
-        onSpring: (progress) => springWrap(progress),
-        onTear: (progress) => beatTearWrap(progress),
-      });
-      host.append(wrapButton);
-    } else if (u.stage === 'sealed') {
-      const lidButton = button('bb-box__open', 'Open the lid');
-      lidButton.addEventListener('click', beatOpenLid);
-      host.append(lidButton);
+  // Elite Trainer Box: the box lies flat with the key-art lid toward the camera (+z). The lid is
+  // a host carrying its cover and four rim strips; once lifted it is gone and the well shows.
+  const appendLiftBox = (body, u, wrapped) => {
+    const faceOptions = { wrapped, look, packCount: packs.length };
+    for (const name of ['under', 'left', 'right', 'far', 'near']) body.append(etbFace(name, faceOptions));
+    body.append(el('div', 'etb-box__floor'));
+    for (const name of ['near', 'far', 'left', 'right']) body.append(el('div', `etb-box__wall etb-box__wall--${name}`));
+    if (u.stage !== 'sealed') return;
+    const lid = el('div', 'bb-box__lid etb-lid');
+    lid.append(etbFace('lid', faceOptions, 'etb-lid__face'));
+    for (const name of ['near', 'far', 'left', 'right']) {
+      lid.append(etbFace('rim', faceOptions, `etb-lid__face etb-lid__rim etb-lid__rim--${name}`));
     }
-    return host;
+    lid.style.transform = liftLidTransform(liftLidPose(0, lidSize));
+    body.append(lid);
   };
 
   const wrapLayers = () => [...root.querySelectorAll('.bb-face__wrap')];
@@ -571,20 +722,24 @@ export const mountUnboxingScene = ({
     return item;
   };
 
+  const promoWindowImg = () => {
+    const img = el('img', 'bb-deck__promo');
+    img.alt = promo?.name || '';
+    img.draggable = false;
+    img.addEventListener('error', () => img.remove(), { once: true });
+    img.src = cardImage(promo, 'small');
+    return img;
+  };
+
   const renderDeck = (u) => {
-    const deck = button('bb-deck', isEtb ? 'Open the promo pouch' : 'Unwrap the deck');
+    const deck = button('bb-deck', 'Unwrap the deck');
     deck.disabled = u.stage !== 'opened';
     const stack = el('div', 'bb-deck__stack');
     stack.append(cardBackImg('bb-deck__back'));
     deck.append(stack);
     if (u.stage === 'opened') {
       const windowEl = el('div', 'bb-deck__window');
-      const img = el('img', 'bb-deck__promo');
-      img.alt = promo?.name || '';
-      img.draggable = false;
-      img.addEventListener('error', () => img.remove(), { once: true });
-      img.src = cardImage(promo, 'small');
-      windowEl.append(img);
+      windowEl.append(promoWindowImg());
       deck.append(windowEl, el('div', 'bb-deck__wrap'));
     }
     deck.append(el('span', 'bb-tray__label', look.labels.deckLabel));
@@ -592,13 +747,25 @@ export const mountUnboxingScene = ({
     return deck;
   };
 
+  // The Elite Trainer Box promo sealed in its clear pouch; the card back shows if the art fails.
+  const renderPouch = () => {
+    const pouch = button('bb-deck etb-pouch', 'Open the promo pouch');
+    const windowEl = el('div', 'bb-deck__window etb-pouch__card');
+    windowEl.append(cardBackImg('bb-deck__back'), promoWindowImg());
+    pouch.append(windowEl, el('div', 'bb-deck__wrap'), el('span', 'bb-tray__label', look.labels.deckLabel));
+    pouch.addEventListener('click', beatUnwrapDeck);
+    return pouch;
+  };
+
   const renderPromo = () => {
     const host = el('div', 'bb-promo');
     const lift = el('div', 'bb-promo__lift');
-    lift.style.transform = promoTransform(promoLiftPose(1));
+    // Build & Battle holds the promo up until the packs fly; an ETB promo settles into the tray.
+    lift.style.transform = isEtb ? 'none' : promoTransform(promoLiftPose(1));
     if (promo?.id) lift.dataset.previewCardId = promo.id;
     lift.title = promo?.name || '';
     lift.append(cardFace(promo, 'normal'));
+    if (isEtb) lift.append(el('div', 'bb-promo__fx'));
     host.append(lift, el('span', 'bb-tray__label', 'Foil promo'));
     return host;
   };
@@ -623,13 +790,237 @@ export const mountUnboxingScene = ({
   };
 
   const renderTray = (u) => {
+    if (isEtb) return renderEtbTray(u);
     const tray = el('div', 'bb-tray');
     tray.append(trayItem(0, renderDeck(u)));
     if (u.stage !== 'opened') tray.append(renderPromo());
-    if (isEtb) return tray;
     tray.append(
       trayItem(1, renderProp('code', 'Code card', look.labels.codeCardGame)),
       trayItem(2, renderProp('tips', 'How to play', 'Quick-start sheet'))
+    );
+    return tray;
+  };
+
+  // ── Elite Trainer Box props (design 057 beat 5): tapped any time after the tray, no state ──
+  const caption = (text) => el('span', 'bb-tray__label', text);
+
+  const propImage = (className, src) => {
+    const img = el('img', className);
+    img.alt = '';
+    img.draggable = false;
+    // A missing sleeve or coin scan leaves the prop drawn without its art (057 row 8).
+    img.addEventListener('error', () => img.remove(), { once: true });
+    img.src = src;
+    return img;
+  };
+
+  // A prop with two sides that turns over when tapped, and back again on the next tap.
+  const flipProp = ({ kind, key, ariaLabel, front, back, label, shownLabel, voice }) => {
+    const prop = button(`etb-prop etb-prop--${kind}`, ariaLabel);
+    prop.setAttribute('aria-pressed', String(propState[key]));
+    const flip = el('div', 'etb-flip');
+    const frontFace = el('div', 'etb-flip__face etb-flip__front');
+    const backFace = el('div', 'etb-flip__face etb-flip__back');
+    frontFace.append(front);
+    backFace.append(back);
+    flip.append(frontFace, backFace);
+    flip.style.transform = `rotateY(${propState[key] ? 180 : 0}deg)`;
+    const line = caption(propState[key] ? shownLabel : label);
+    prop.append(flip, line);
+    prop.addEventListener('click', () => {
+      if (collapsing) return;
+      const showing = !propState[key];
+      propState[key] = showing;
+      prop.setAttribute('aria-pressed', String(showing));
+      sound(voice);
+      dropPoses(flip);
+      // hitFlipPose turns 180° → 0° with a pop; showing the far side runs it the other way.
+      playPose(
+        flip,
+        (t) => hitFlipPose(t, { tier: 0 }),
+        (pose) => ({
+          transform: `rotateY(${showing ? 180 - pose.rotateYDeg : pose.rotateYDeg}deg) scale(${pose.scale})`,
+        }),
+        HIT_FLIP_MS
+      );
+      later(() => {
+        line.textContent = showing ? shownLabel : label;
+      }, instant() ? 0 : HIT_FLIP_MS / 2);
+    });
+    return prop;
+  };
+
+  const renderSleeves = () => {
+    const pack = el('div', 'etb-sleevepack');
+    pack.append(
+      el('span', 'etb-sleevepack__count', String(contents.sleeveCount)),
+      el('span', 'etb-sleevepack__kind', 'Card sleeves')
+    );
+    const sleeve = el('div', 'etb-sleeve');
+    const src = getSleeveById(contents.sleeveId)?.image;
+    if (src) sleeve.append(propImage('etb-sleeve__art', src));
+    return flipProp({
+      kind: 'sleeves',
+      key: 'sleeves',
+      ariaLabel: 'Open the sleeves',
+      front: pack,
+      back: sleeve,
+      label: `${contents.sleeveCount} sleeves`,
+      shownLabel: `${contents.sleeveCount} sleeves · in your sleeves now`,
+      voice: unboxingVoiceFor('sleeves'),
+    });
+  };
+
+  const renderCodeCard = () => {
+    const front = el('div', 'etb-code');
+    front.append(el('span', 'etb-code__brand', look.labels.codeCardGame), el('span', 'etb-code__kind', 'Code card'));
+    // The back never carries a readable code: a blurred strip only.
+    const back = el('div', 'etb-code etb-code--back');
+    back.append(el('span', 'etb-code__strip'), el('span', 'etb-code__kind', `Redeem in ${look.labels.codeCardGame}`));
+    return flipProp({
+      kind: 'code',
+      key: 'code',
+      ariaLabel: 'Turn the code card over',
+      front,
+      back,
+      label: 'Code card',
+      shownLabel: 'Code card',
+      voice: unboxingVoiceFor('revealCard', 0),
+    });
+  };
+
+  const renderEnergy = () => {
+    const total = energyTotal(contents);
+    const prop = el('div', 'etb-prop etb-prop--energy');
+    prop.setAttribute('role', 'img');
+    prop.setAttribute('aria-label', `${total} Basic Energy cards`);
+    const fan = el('div', 'etb-energy');
+    const middle = (contents.energy.length - 1) / 2;
+    contents.energy.forEach(([label], index) => {
+      const card = el('div', 'etb-energy__card');
+      card.style.setProperty('--etb-fan', String(index - middle));
+      card.style.setProperty('--etb-energy-rgb', rgbCss(fxRgbForCard({ name: label })));
+      const token = getEnergyTokenFront({ name: label });
+      if (token) card.append(propImage('etb-energy__token', token));
+      fan.append(card);
+    });
+    prop.append(fan, caption(`${total} Energy`));
+    return prop;
+  };
+
+  const renderDividers = () => {
+    const prop = el('div', 'etb-prop etb-prop--dividers');
+    const count = contents.props?.dividers ?? 0;
+    prop.setAttribute('role', 'img');
+    prop.setAttribute('aria-label', `${count} card dividers`);
+    const stack = el('div', 'etb-dividers');
+    for (let index = 0; index < count; index += 1) {
+      const divider = el('i', 'etb-dividers__card');
+      divider.style.setProperty('--etb-i', String(index));
+      stack.append(divider);
+    }
+    prop.append(stack, caption(`${count} dividers`));
+    return prop;
+  };
+
+  const guideLine = () => (propState.guide ? 'Opens after the box' : 'Player’s guide');
+
+  const renderGuide = () => {
+    const prop = button('etb-prop etb-prop--guide', 'Show the set list after the box');
+    prop.setAttribute('aria-pressed', String(propState.guide));
+    const book = el('div', 'etb-guide');
+    book.append(el('span', 'etb-guide__kicker', 'Player’s guide'), el('span', 'etb-guide__set', look.setName));
+    const line = caption(guideLine());
+    prop.append(book, line);
+    prop.addEventListener('click', () => {
+      if (collapsing) return;
+      propState.guide = !propState.guide;
+      sound(unboxingVoiceFor('revealCard', 0));
+      prop.setAttribute('aria-pressed', String(propState.guide));
+      line.textContent = guideLine();
+    });
+    return prop;
+  };
+
+  // Each throw lands on its own seeded faces: the box seed, stepped per throw.
+  const diceSeed = () => (seed + Math.max(0, propState.rolls - 1)) >>> 0;
+
+  const renderDice = () => {
+    const prop = button('etb-prop etb-prop--dice', 'Roll the dice and flip the coin');
+    const pouch = el('div', 'etb-dice');
+    const pile = el('div', 'etb-dice__pile');
+    const rest = propState.rolls > 0 ? 1 : 0;
+    for (let index = 0; index < dieCount; index += 1) {
+      const die = el('div', `etb-die${index === flipDieIndex ? ' etb-die--flip' : ''}`);
+      for (let face = 1; face <= 6; face += 1) die.append(el('i', `etb-die__face etb-die__face--${face}`));
+      die.style.transform = dieTransform(dicePose(rest, index, diceSeed()));
+      pile.append(die);
+    }
+    const coin = el('div', 'etb-coin');
+    const coinSrc = getCoinById(contents.coinId)?.url;
+    for (const side of ['front', 'back']) {
+      const face = el('div', `etb-coin__face etb-coin__face--${side}`);
+      if (coinSrc) face.append(propImage('etb-coin__art', assetSrc(coinSrc)));
+      coin.append(face);
+    }
+    coin.style.transform = coinTransform(coinFlipPose(rest));
+    pouch.append(pile, coin, el('div', 'etb-dice__bag'));
+    prop.append(pouch, caption('Dice & coin'));
+    prop.addEventListener('click', () => rollDice(prop));
+    return prop;
+  };
+
+  function rollDice(prop) {
+    if (collapsing) return;
+    propState.rolls += 1;
+    sound(unboxingVoiceFor('dice'));
+    sound(unboxingVoiceFor('coin'));
+    const rollSeed = diceSeed();
+    prop.querySelectorAll('.etb-die').forEach((die, index) => {
+      dropPoses(die);
+      playPose(die, (t) => dicePose(t, index, rollSeed), (pose) => ({ transform: dieTransform(pose) }), DICE_MS);
+    });
+    const coin = prop.querySelector('.etb-coin');
+    dropPoses(coin);
+    playPose(coin, coinFlipPose, (pose) => ({ transform: coinTransform(pose) }), COIN_FLIP_MS, { samples: 36 });
+  }
+
+  // The nine packs stand fanned in the box until tapped; then they fly into the spread.
+  const renderPackFan = (u) => {
+    const ready = u.stage === 'deckShown' && !packsOut;
+    const fan = button('etb-packs', ready ? 'Take out the booster packs' : `${packs.length} booster packs`);
+    fan.disabled = !ready;
+    const pile = el('div', 'etb-packs__fan');
+    const middle = (packs.length - 1) / 2;
+    if (!packsOut) {
+      packs.forEach((_, packIndex) => {
+        const pack = el('div', 'etb-packs__pack');
+        pack.append(packArt('bb-pack__art', packIndex));
+        const item = trayItem(ETB_PROP_COUNT + packIndex, pack);
+        item.dataset.pack = String(packIndex);
+        item.style.setProperty('--etb-fan', String(packIndex - middle));
+        pile.append(item);
+      });
+    }
+    fan.append(pile, caption(`${packs.length} booster packs`));
+    fan.addEventListener('click', () => {
+      if (!busy && !collapsing && getUnboxing().stage === 'deckShown') flyOut();
+    });
+    return fan;
+  };
+
+  // Tray order (§ Scene beat 3): pouch, sleeves, Energy, dice, dividers, guide, code card, packs.
+  const renderEtbTray = (u) => {
+    const tray = el('div', 'bb-tray etb-tray');
+    tray.append(
+      trayItem(0, u.stage === 'opened' ? renderPouch() : renderPromo()),
+      trayItem(1, renderSleeves()),
+      trayItem(2, renderEnergy()),
+      trayItem(3, renderDice()),
+      trayItem(4, renderDividers()),
+      trayItem(5, renderGuide()),
+      trayItem(6, renderCodeCard()),
+      renderPackFan(u)
     );
     return tray;
   };
@@ -698,9 +1089,39 @@ export const mountUnboxingScene = ({
     return spread;
   };
 
+  // How far the last pack of a full queue sits from a focused pack `focusWidth` wide.
+  const queueReach = (focusWidth, availableWidthPx) =>
+    packSpreadSlot(packs.length - 1, 0, { spacingPx: focusWidth, availableWidthPx }, packs.length).xPx;
+
+  /**
+   * The side packs' share of the stage (design 057 pin: stage width less the focused pack). On a
+   * narrow stage the share shrinks until a full queue fits beside the focused pack; `xPx` grows
+   * linearly with it, so two samples find the width.
+   */
+  const spreadWidthFor = (stageWidth, focusWidth) => {
+    const pinned = Math.max(0, stageWidth - focusWidth);
+    const room = stageWidth - focusWidth - 2 * SPREAD_MARGIN_PX;
+    const full = queueReach(focusWidth, pinned);
+    if (full <= room || pinned === 0) return pinned;
+    const base = queueReach(focusWidth, 0);
+    const slope = (full - base) / pinned;
+    return slope > 0 ? Math.min(pinned, Math.max(0, (room - base) / slope)) : 0;
+  };
+
+  // The WebGL packs follow these anchors' rects, so this one layout places both render paths.
   const spreadSlotOf = (node, spread) => {
-    const focusEl = spread.querySelector('.bb-bigpack.is-focus');
-    return packSpreadSlot(Number(node.dataset.pack), Number(spread.dataset.focus), focusEl?.offsetWidth || 200);
+    const index = Number(node.dataset.pack);
+    const focus = Number(spread.dataset.focus);
+    const focusWidth = spread.querySelector('.bb-bigpack.is-focus')?.offsetWidth || 200;
+    if (packs.length <= PACK_COUNT) return packSpreadSlot(index, focus, focusWidth);
+    // More packs than a Build & Battle box: the focused pack and its queue are centred as a group.
+    const spacing = {
+      spacingPx: focusWidth,
+      availableWidthPx: spreadWidthFor(spread.clientWidth || window.innerWidth, focusWidth),
+    };
+    const slot = packSpreadSlot(index, focus, spacing, packs.length);
+    const last = packSpreadSlot(packs.length - 1, focus, spacing, packs.length);
+    return { ...slot, xPx: slot.xPx - last.xPx / 2 };
   };
 
   function layoutSpread(spread) {
@@ -744,9 +1165,9 @@ export const mountUnboxingScene = ({
     const pocket = el('div', 'bb-pocket');
     pocket.dataset.pack = String(packIndex);
     const shown = u.revealed[packIndex];
-    const count = el('p', 'bb-pocket__count', `Pack ${packIndex + 1} · ${shown + 1} / ${CARDS_PER_PACK}`);
+    const count = el('p', 'bb-pocket__count', `Pack ${packIndex + 1} · ${shown + 1} / ${perPack()}`);
     const stack = el('div', 'bb-pocket__stack');
-    const beneath = CARDS_PER_PACK - shown - 1;
+    const beneath = perPack() - shown - 1;
     for (let depth = Math.min(beneath - 1, 4); depth >= 1; depth -= 1) {
       const edge = el('div', 'bb-pocket__edge');
       edge.style.setProperty('--bb-depth', String(depth));
@@ -798,12 +1219,15 @@ export const mountUnboxingScene = ({
     }
     if (view === 'spread') return `Swipe across the top of pack ${nextPackToTear(u) + 1} to open it.`;
     if (u.stage === 'sealed') {
-      return u.wrapTorn ? 'Open the lid.' : 'Drag across the shrink-wrap to tear it off, or press it.';
+      if (!u.wrapTorn) return 'Drag across the shrink-wrap to tear it off, or press it.';
+      return isLift ? 'Lift the lid.' : 'Open the lid.';
     }
     if (u.stage === 'opened') {
-      return isEtb ? 'Open the promo pouch to see your promo.' : 'Unwrap the deck to see its foil promo.';
+      return isEtb
+        ? 'Open the promo pouch. The sleeves, dice, guide and code card can be tapped too.'
+        : 'Unwrap the deck to see its foil promo.';
     }
-    if (u.stage === 'deckShown') return 'Here come your packs…';
+    if (u.stage === 'deckShown') return isEtb ? 'Tap the booster packs to take them out.' : 'Here come your packs…';
     return isEtb ? doneText : `${doneText} Build your deck from your pool.`;
   };
 
@@ -864,6 +1288,7 @@ export const mountUnboxingScene = ({
     root.dataset.stage = u.stage;
     root.dataset.view = view;
     root.dataset.wrap = u.wrapTorn ? 'off' : 'on';
+    if (isLift) root.dataset.lid = 'lift';
 
     // The box stays on screen while the packs fly out of it, then fades.
     if (view === 'box' || entrance?.fly) {
@@ -872,7 +1297,13 @@ export const mountUnboxingScene = ({
       if (u.stage !== 'sealed') top.append(renderTray(u));
       root.append(top);
     }
-    if (view === 'spread') root.append(renderSpread(u));
+    if (view === 'spread') {
+      const spread = renderSpread(u);
+      // An Elite Trainer Box's packs launch from the tray fan: the flights (DOM and WebGL) measure
+      // the anchors once, so the anchors start in their slots instead of easing out to them.
+      if (isEtb && entrance?.fly) spread.classList.add('is-launch');
+      root.append(spread);
+    }
     if (view === 'pocket') root.append(renderPocket(u, lastTorn(u)));
     if (view === 'summary') root.append(renderSummary(summaryPack));
     root.append(renderDock(u, view));
@@ -972,13 +1403,14 @@ export const mountUnboxingScene = ({
         const index = Number(item.dataset.trayIndex);
         playPose(
           item,
-          (t) => trayRisePose(t, index),
+          isEtb ? (t) => trayRisePose(t, index, trayCount) : (t) => trayRisePose(t, index),
           (pose) => ({ transform: `translateY(${pose.translateYPx}px)`, opacity: pose.opacity }),
-          TRAY_TOTAL_MS
+          isEtb ? trayRiseMs(trayCount) : TRAY_TOTAL_MS
         );
       });
     }
-    if (entrance === 'promo') {
+    if (entrance === 'promo' && isEtb) playEtbPromo();
+    else if (entrance === 'promo') {
       playPose(
         root.querySelector('.bb-promo__lift'),
         promoLiftPose,
@@ -987,7 +1419,7 @@ export const mountUnboxingScene = ({
       );
       later(flyOut, instant() ? 0 : PROMO_LIFT_MS + PROMO_HOLD_MS);
     }
-    if (entrance?.fly) playFly(entrance.fly);
+    if (entrance?.fly) playFly(entrance.fly, entrance.from);
     if (entrance?.cut !== undefined) playCut();
     if (entrance?.cut3d !== undefined) playCut3d();
     if (entrance === 'summary') playDeal();
@@ -995,8 +1427,43 @@ export const mountUnboxingScene = ({
     if (entrance === 'sweep') playSweep();
   };
 
-  // The four packs leave the box mouth one after another and land in the spread.
-  const playFly = (boxRect) => {
+  // An Elite Trainer Box promo (design 057 beat 4): it lifts out of the torn pouch; a tier ≥ 2
+  // promo flares inside its own bounds at the lift's peak, holds, then settles into the tray.
+  const playEtbPromo = () => {
+    const lift = root.querySelector('.bb-promo__lift');
+    if (!lift) return;
+    const tier = contents.promoTier || 0;
+    const rise = playPose(lift, promoLiftPose, (pose) => ({ transform: promoTransform(pose) }), PROMO_LIFT_MS);
+    if (tier >= 2) {
+      later(() => {
+        const fx = lift.querySelector('.bb-promo__fx');
+        if (!fx?.isConnected) return;
+        sound(unboxingVoiceFor('revealCard', tier));
+        playHitFlare(fx, promo, tier);
+      }, instant() ? 0 : PROMO_LIFT_MS * 0.5);
+    }
+    holdWhile(rise);
+    const lifted = promoLiftPose(1);
+    later(
+      () =>
+        playPose(
+          lift,
+          (t) => ({
+            ...lifted,
+            translateYPx: lerp(lifted.translateYPx, 0, easeOut(t)),
+            scale: lerp(lifted.scale, 1, easeOut(t)),
+          }),
+          (pose) => ({ transform: promoTransform(pose) }),
+          PROMO_SETTLE_MS,
+          { samples: 12 }
+        ),
+      instant() ? 0 : PROMO_LIFT_MS + PROMO_HOLD_MS
+    );
+  };
+
+  // The packs leave the box one after another and land in the spread: a Build & Battle box's from
+  // its mouth, an Elite Trainer Box's each from its place in the tray fan (`fromRects`).
+  const playFly = (boxRect, fromRects = null) => {
     const top = root.querySelector('.bb-scene__top');
     const fade = playPose(top, (t) => 1 - t, (opacity) => ({ opacity }), FADE_TOP_MS, { samples: 8 }).then(
       () => top?.remove()
@@ -1013,7 +1480,8 @@ export const mountUnboxingScene = ({
     }
     const flights = [...spread.querySelectorAll('.bb-bigpack')].map((node, order) => {
       const slot = spreadSlotOf(node, spread);
-      const params = packFlyParams(boxRect, node.getBoundingClientRect(), slot.scale);
+      const from = fromRects?.[node.dataset.pack] || boxRect;
+      const params = packFlyParams(from, node.getBoundingClientRect(), slot.scale);
       if (!params) return Promise.resolve();
       const delay = order * PACK_FLY_STAGGER_MS;
       later(() => sound('unbox-unwrap'), instant() ? 0 : delay);
@@ -1169,19 +1637,23 @@ export const mountUnboxingScene = ({
       null
     );
 
+  const swingLid = () =>
+    playPose(root.querySelector('.bb-box__lid'), lidPose, (pose) => ({ transform: lidTransform(pose) }), LID_OPEN_MS);
+
+  // The lid host is preserve-3d, so it carries the transform only; its faces fade (house rule).
+  const liftLid = () => {
+    const lid = root.querySelector('.bb-box__lid');
+    const pose = (t) => liftLidPose(t, lidSize);
+    return Promise.all([
+      playPose(lid, pose, (p) => ({ transform: liftLidTransform(p) }), LID_LIFT_MS),
+      ...[...(lid?.querySelectorAll('.etb-lid__face') || [])].map((face) =>
+        playPose(face, pose, (p) => ({ opacity: p.opacity }), LID_LIFT_MS)
+      ),
+    ]);
+  };
+
   const beatOpenLid = () =>
-    runBeat(
-      { type: 'openLid' },
-      unboxingVoiceFor('openLid'),
-      () =>
-        playPose(
-          root.querySelector('.bb-box__lid'),
-          lidPose,
-          (pose) => ({ transform: lidTransform(pose) }),
-          LID_OPEN_MS
-        ),
-      'tray'
-    );
+    runBeat({ type: 'openLid' }, unboxingVoiceFor('openLid'), isLift ? liftLid : swingLid, 'tray');
 
   const beatUnwrapDeck = () =>
     runBeat(
@@ -1199,9 +1671,22 @@ export const mountUnboxingScene = ({
 
   function flyOut() {
     if (packsOut) return;
-    const boxRect = root.querySelector('.bb-box')?.getBoundingClientRect() || null;
+    let boxRect = root.querySelector('.bb-box')?.getBoundingClientRect() || null;
+    // An Elite Trainer Box's packs leave from the tray fan: each its own place on the DOM path; the
+    // WebGL stage takes one launch point, the fan's centre.
+    const fromRects = {};
+    if (isEtb) {
+      root.querySelectorAll('.etb-packs [data-pack]').forEach((item) => {
+        fromRects[item.dataset.pack] = launchRectFrom(item.getBoundingClientRect());
+      });
+      const first = root.querySelector('.etb-packs [data-pack]')?.getBoundingClientRect();
+      const fan = root.querySelector('.etb-packs__fan')?.getBoundingClientRect();
+      if (first && fan) {
+        boxRect = launchRectFrom({ left: fan.left + fan.width / 2 - first.width / 2, top: fan.top, width: first.width, height: fan.height });
+      }
+    }
     packsOut = true;
-    render({ entrance: { fly: boxRect } });
+    render({ entrance: { fly: boxRect, from: isEtb ? fromRects : null } });
   }
 
   const beatTearPack = (packIndex, fromShiftPx = 0, fromProgress = 0) => {
@@ -1337,7 +1822,7 @@ export const mountUnboxingScene = ({
     await withBackstop(gone);
     if (gen !== generation) return;
     const next = getUnboxing();
-    if (next.revealed[packIndex] >= CARDS_PER_PACK) {
+    if (next.revealed[packIndex] >= perPack()) {
       summaryPack = packIndex;
       if (next.stage === 'done') sound(unboxingVoiceFor('finish'));
       render({ entrance: 'summary' });
@@ -1418,7 +1903,7 @@ export const mountUnboxingScene = ({
     const token = (autoToken += 1);
     updateDock();
     const running = () =>
-      token === autoToken && summaryPack === null && getUnboxing().revealed[packIndex] < CARDS_PER_PACK;
+      token === autoToken && summaryPack === null && getUnboxing().revealed[packIndex] < perPack();
     while (running()) {
       await waitIdle(token);
       if (!running()) break;
@@ -1466,7 +1951,7 @@ export const mountUnboxingScene = ({
     let u = getUnboxing();
     if (u.stage === 'done') return;
     u.packsTorn.forEach((torn, packIndex) => {
-      if (torn && u.revealed[packIndex] < CARDS_PER_PACK) {
+      if (torn && u.revealed[packIndex] < perPack()) {
         dispatch({ type: 'revealAll', packIndex });
       }
     });

@@ -225,6 +225,9 @@ export const initializeEliteTrainerBox = ({
     root.addEventListener('contextmenu', onScenePreview);
     stageEl.replaceChildren(root);
     const contents = etbContents(etb, ETB_PROMOS);
+    const look = etbLook(etb, loaded);
+    // The era palette of the box's set (deck-builder-unboxing.css `[data-era]`), as Build & Battle.
+    root.dataset.era = look.skin.palette;
     scene = mountUnboxingScene({
       root,
       getUnboxing: () => session.unboxing,
@@ -232,7 +235,7 @@ export const initializeEliteTrainerBox = ({
       packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
       packModel: resolvePackModel(etb.packModelKey, loaded.cards, loaded.setInfo),
       classOf: (card) => cardClass(card, etb.era, loaded.setInfo),
-      look: etbLook(etb, loaded),
+      look,
       seed: session.seed,
       promo: contents.promo,
       contents,

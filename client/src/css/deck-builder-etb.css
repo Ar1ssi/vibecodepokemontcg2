@@ -2,8 +2,9 @@
  * Elite Trainer Box Shelf and Collection (design 057) in the Standard deck
  * builder tab (`body.etb-host`). Panels, buttons and card tiles come from
  * deck-builder-build-battle.css; this sheet adds the shelf cards, the owned
- * badges and the ETB opening's tray (promo pouch, props, pack fan). The box
- * itself (lift lid, faces) is in deck-builder-unboxing.css. Scoped under
+ * badges, the ETB box's procedural faces (§ Product art) and the opening's
+ * tray (promo pouch, props, pack fan). The lift-lid box geometry
+ * (`[data-lid='lift']`) is in deck-builder-unboxing.css. Scoped under
  * `.db-live` so the Live tokens apply. Only `.etb-flip`, `.etb-die` and
  * `.etb-coin` are preserve-3d; opacity never animates on them.
  */
@@ -89,6 +90,128 @@
 .etb-host .db-live .etb-owned-card.is-over .bb-pool-badge {
   background: #b7791f;
   color: #1b2127;
+}
+
+/* ── The box's procedural faces (design 057 § Product art) ─────────────── */
+.etb-host .db-live .etb-pf {
+  background: var(--bb-black);
+}
+.etb-host .db-live .etb-plate {
+  padding: 3px 0 2px;
+  background: var(--bb-red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  font-stretch: expanded;
+  letter-spacing: 0.16em;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* The lid: the key art on a black field under the slashes, the plate on its top edge. */
+.etb-host .db-live .etb-keyart {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.etb-host .db-live .etb-keyart__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 26%;
+}
+.etb-host .db-live .etb-keyart .bb-keyart__slashes {
+  opacity: 0.32;
+}
+.etb-host .db-live .etb-keyart::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 11, 16, 0.5) 0,
+    transparent 24%,
+    transparent 52%,
+    var(--bb-black) 90%
+  );
+}
+.etb-host .db-live .etb-pf--lid .etb-plate {
+  position: absolute;
+  inset: 0 0 auto;
+}
+.etb-host .db-live .etb-pf--lid .bb-setlogo {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 5px;
+  height: 30%;
+  background: transparent;
+}
+/* The near long side: the plate and the pack count below the lid's rim. */
+.etb-host .db-live .etb-pf--near {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-top: var(--etb-rim, 0px);
+}
+.etb-host .db-live .etb-pf--near .etb-plate {
+  padding: 2px 12px 1px;
+  border-radius: 2px;
+  font-size: 8px;
+}
+.etb-host .db-live .etb-pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b4861d, #f6d65a, #b4861d);
+  color: #2a1b00;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* Sides and lid rims: black with the slashes running on, in the era's palette. */
+.etb-host .db-live .etb-pf--side,
+.etb-host .db-live .etb-pf--near {
+  background:
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 18px,
+      color-mix(in srgb, var(--bb-magenta) 42%, transparent) 18px 21px,
+      transparent 21px 36px,
+      color-mix(in srgb, var(--bb-lime) 32%, transparent) 36px 38px,
+      transparent 38px 52px
+    ),
+    var(--bb-black);
+}
+/* The far long side: what is inside, typeset, and the legal lines. */
+.etb-host .db-live .etb-pf--far {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 8px;
+  font-size: 4.5px;
+}
+.etb-host .db-live .etb-pf--far .bb-back__inside {
+  font-size: 6px;
+}
+.etb-host .db-live .etb-far__list {
+  margin: 0;
+  padding-left: 8px;
+  columns: 2;
+  column-gap: 10px;
+}
+.etb-host .db-live .etb-pf--under {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.03) 0 1px,
+      transparent 1px 9px
+    ),
+    var(--bb-black);
 }
 
 /* ── The opening's tray (design 057 § Scene beats 3–5) ─────────────────── */

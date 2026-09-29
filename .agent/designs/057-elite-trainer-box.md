@@ -1,5 +1,5 @@
 # 057: Elite Trainer Box simulation (shelf, ETB unboxing, collection)
-Status: building — slices 1–3 ✅; slice 4 built on the pre-054 scene (a0dc5dc7), re-port onto PR 199's 3D scene pending (Stage B); slices 5–6 open. Numbered 055 until PR 199 (design 055 = 3D packs) took that number · depends on designs 051/052 (on main) and on design 054
+Status: building — slices 1–3 ✅; slice 4 built on the pre-054 scene (a0dc5dc7) and re-ported onto PR 199's 3D scene (Stage B, user look check pending); slices 5–6 open. Numbered 055 until PR 199 (design 055 = 3D packs) took that number · depends on designs 051/052 (on main) and on design 054
 (the other Build & Battle boxes plan, thread "Plan other Build & Battle boxes": pack-model registry,
 boosted 30th Celebration pull rates, per-set baking). 054 is that thread's number; renumber this file
 at merge if the two collide.
@@ -497,6 +497,26 @@ cosmetic changes to the opening to win):
   Phantasmal Flames (seed 42) and Obsidian Flames; the ETB plays all nine packs to the collection
   hand-off on the DOM fallback. On WebGL the ETB spread draws in 3D, but packs 5–9 queue past the
   right edge (x up to 2063 px at 1280 px): the nine-pack centring pin is Stage B's first item.
+Stage B (S332, fx-designer; slice 4 re-ported onto PR 199's scene, B&B gated off):
+- Spread: the WebGL packs take their home from the `.bb-bigpack` anchors' rects, so the pin lives in
+  `spreadSlotOf` only (no `pack3d.mjs` change). With more than `PACK_COUNT` packs it uses the pin
+  plus slice 4's narrow-stage fit (`spreadWidthFor`, 16 px margin): at 1280 px the pinned
+  `availableWidthPx` is used unchanged; at 390 px the bare pin put pack 1 at −29 px.
+- The lid kind is `isEtb` (PR 199's `look` has no `lid`); the ETB size is a scene constant from
+  § Product art's proportions (1 : 0.76 : 0.36, still UNVERIFIED). Face words come from the look
+  (`productTitle`, `backLines`, `setName`, `codeCardGame`), key art from `look.skin.keyArtUrl`; the
+  side slashes use the era palette. The ETB controller sets the root's `data-era` as B&B does.
+- Floor: the lift host is `--bb-h + 60px` with the body 16 px down, so the flat box's foot meets
+  the floor reflection (slice 4's `+ 110px` / 6 px left it ~40 px above its reflection).
+- Promo flare and its `unbox-hit-2` voice fire at the lift's peak (`PROMO_LIFT_MS / 2`), per the
+  pin; slice 4 fired them at the lift's start.
+- Fly-out: `packFlyParams` takes a stand-in box rect (`launchRectFrom`) whose mouth is a fan pack
+  (DOM, per pack) or the fan's centre (WebGL: the stage takes one `fromBoxRect`). The ETB launch
+  render drops the anchors' 320 ms transition (`.bb-spread.is-launch`): both paths measure the
+  anchors once, and anchors easing out from the centre left the queued 3D packs waiting in a row.
+- CSS: lift geometry under `[data-lid='lift']` in `deck-builder-unboxing.css` (`.bb-box` now sizes
+  from `--bb-host-w/h`; B&B computed size and margins unchanged), face artwork and props in
+  `deck-builder-etb.css`. Tray props have no floor reflection, as B&B's tray items have none.
 
 ## Sources
 1. Bulbapedia, "Elite Trainer Box (TCG)" — per-era packs, sleeves, Energy, dividers, markers, first
