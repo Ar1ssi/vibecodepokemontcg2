@@ -8,6 +8,8 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { executeSteps } from '../effects/executor.mjs';
+import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 
 const art = (id) => `https://img.test/card-${id}.png`;
 
@@ -343,4 +345,157 @@ test('attack: Detour borrowing Cassiopeia keeps the card hidden', () => {
   const res = detourWith('Cassiopeia', CASSIOPEIA);
   assert.deepEqual(movedToHand(res), [31]);
   assert.deepEqual(reveals(res), []);
+});
+
+// ── every trainer-step gate, both ways (review of design 059) ────────────────────────────
+// Reveal direction: the real cards through applyCommand. Hide direction: no printed card hides
+// its picks through these step shapes (the parser reaches them only through "reveal"), so each
+// real card's parsed step runs under a constructed source text without the reveal clause.
+
+const grassMon = (instanceId, name) => pokemon(instanceId, name, { types: ['Grass'] });
+const trainerCard = (instanceId, name) => item(instanceId, name, 'Draw a card.');
+
+/** Plays `card` and answers each of the player's choices with `choose(options)`. */
+function playThrough(state, rng, card, choose) {
+  state.players.p1.zones.hand.push(card);
+  let res = run(state, rng, 'playTrainer', { instanceId: card.instanceId });
+  const events = [...res.events];
+  for (let guard = 0; res.pendingChoice && guard < 6; guard++) {
+    res = pick(res, rng, choose(res.pendingChoice.options.map((o) => o.instanceId)));
+    events.push(...res.events);
+  }
+  return { ...res, events };
+}
+
+/** Runs one parsed step as a Trainer whose printed text is `text`, answering with `choose`. */
+function runStepAs(state, step, text, choose) {
+  const rng = createRng(3);
+  const sourceCard = { instanceId: 900, name: 'Constructed', text };
+  const events = [];
+  const base = { effectType: 'trainer', sourceCard, playerId: 'p1', activeRng: rng, events };
+  let result = executeSteps(state, { ...base, steps: [step] });
+  for (let guard = 0; result.pendingChoice && guard < 6; guard++) {
+    const { resumeToken, options } = result.pendingChoice;
+    result = executeSteps(state, {
+      ...base,
+      steps: resumeToken.steps,
+      fromStepIndex: resumeToken.stepIndex,
+      selection: choose(options.map((o) => o.instanceId)),
+      context: resumeToken.context,
+      budget: { count: resumeToken.budgetCount },
+    });
+  }
+  return { events };
+}
+
+// Drayton (Prismatic Evolutions 172): one Pokémon and one Trainer, each revealed.
+const DRAYTON =
+  'Look at the top 7 cards of your deck. You may reveal a Pokémon and a Trainer card you find there and put them into your hand. Shuffle the other cards back into your deck.';
+
+test('trainer: Drayton reveals the Pokémon and the Trainer it takes, each with art', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.deck.push(pokemon(31, 'Pichu'), trainerCard(32, 'Potion'), basicEnergy(40, 'Fire'));
+  const res = playThrough(state, rng, supporter(20, 'Drayton', DRAYTON), (ids) => ids.filter((id) => id !== 40));
+  assert.deepEqual(movedToHand(res).sort(), [31, 32]);
+  assert.deepEqual(reveals(res).flatMap((e) => e.cards.map((c) => [c.instanceId, c.src])).sort(), [
+    [31, art(31)],
+    [32, art(32)],
+  ]);
+});
+
+test('trainer-step: a one-of-each look whose text does not reveal names nothing', () => {
+  const { state } = setupGame();
+  state.players.p1.zones.deck.push(pokemon(31, 'Pichu'), trainerCard(32, 'Potion'));
+  const hidden = DRAYTON.replace('You may reveal a Pokémon and a Trainer card you find there and put them into your hand.', 'You may put a Pokémon and a Trainer card you find there into your hand.');
+  const { events } = runStepAs(state, parseTrainerEffect(DRAYTON).steps[0], hidden, (ids) => ids);
+  assert.deepEqual(movedToHand({ events }).sort(), [31, 32]);
+  assert.deepEqual(reveals({ events }), []);
+});
+
+// Bug Catching Set (Prismatic Evolutions 102): up to 2 of {G} Pokémon / Basic {G} Energy, revealed.
+const BUG_CATCHING_SET =
+  'Look at the top 7 cards of your deck. You may reveal up to 2 in any combination of {G} Pokémon and Basic {G} Energy cards you find there and put them into your hand. Shuffle the other cards back into your deck.';
+
+test('trainer: Bug Catching Set reveals up to 2 cards it takes, each with art', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.deck.push(grassMon(31, 'Scatterbug'), basicEnergy(41, 'Grass'), basicEnergy(40, 'Fire'));
+  const res = playThrough(state, rng, item(21, 'Bug Catching Set', BUG_CATCHING_SET), (ids) => ids.slice(0, 2));
+  assert.deepEqual(movedToHand(res).sort(), [31, 41]);
+  assert.deepEqual(reveals(res).flatMap((e) => e.cards.map((c) => [c.instanceId, c.src])).sort(), [
+    [31, art(31)],
+    [41, art(41)],
+  ]);
+});
+
+test('trainer-step: an up-to-N look whose text does not reveal names nothing', () => {
+  const { state } = setupGame();
+  state.players.p1.zones.deck.push(grassMon(31, 'Scatterbug'), basicEnergy(41, 'Grass'));
+  const hidden = BUG_CATCHING_SET.replace('You may reveal up to 2', 'You may put up to 2').replace(
+    'you find there and put them into your hand',
+    'you find there into your hand'
+  );
+  const { events } = runStepAs(state, parseTrainerEffect(BUG_CATCHING_SET).steps[0], hidden, (ids) => ids.slice(0, 2));
+  assert.deepEqual(movedToHand({ events }).sort(), [31, 41]);
+  assert.deepEqual(reveals({ events }), []);
+});
+
+// Dawn (Phantasmal Flames 129): a staged search, one stage per choice, all revealed.
+const DAWN =
+  'Search your deck for a Basic Pokémon, a Stage 1 Pokémon, and a Stage 2 Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.';
+const dawnDeck = (state) =>
+  state.players.p1.zones.deck.push(
+    pokemon(31, 'Charmander'),
+    pokemon(32, 'Charmeleon', { stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Charmander' }),
+    pokemon(33, 'Charizard', { stage: 'Stage 2', subtypes: ['Stage 2'], evolvesFrom: 'Charmeleon' })
+  );
+
+test('trainer: Dawn reveals the Pokémon of every stage it takes, each with art', () => {
+  const { state, rng } = setupGame();
+  dawnDeck(state);
+  const res = playThrough(state, rng, supporter(22, 'Dawn', DAWN), (ids) => ids.slice(0, 1));
+  assert.deepEqual(movedToHand(res).sort(), [31, 32, 33]);
+  assert.deepEqual(reveals(res).flatMap((e) => e.cards.map((c) => [c.instanceId, c.src])).sort(), [
+    [31, art(31)],
+    [32, art(32)],
+    [33, art(33)],
+  ]);
+});
+
+test("trainer: Dawn's staged search without its reveal clause names nothing", () => {
+  const { state, rng } = setupGame();
+  dawnDeck(state);
+  // Constructed: Dawn's wording minus ", reveal them," — it parses to the same staged search.
+  const hidden = DAWN.replace('Stage 2 Pokémon, reveal them, and put them', 'Stage 2 Pokémon and put them');
+  assert.equal(parseTrainerEffect(hidden).steps[0].type, 'searchDeckSequence');
+  const res = playThrough(state, rng, supporter(22, 'Hidden Dawn', hidden), (ids) => ids.slice(0, 1));
+  assert.deepEqual(movedToHand(res).sort(), [31, 32, 33]);
+  assert.deepEqual(reveals(res), []);
+});
+
+// Fossil Excavation Map (Forbidden Light 107): the deck mode reveals; the discard mode was public.
+const FOSSIL_EXCAVATION_MAP =
+  'Choose 1: Search your deck for an Unidentified Fossil card, reveal it, and put it into your hand. Then, shuffle your deck. Put an Unidentified Fossil card from your discard pile into your hand.';
+const fossil = (instanceId) => item(instanceId, 'Unidentified Fossil', 'Play this card as if it were a 60-HP Basic {C} Pokémon.');
+
+test('trainer: Fossil Excavation Map reveals the Fossil it takes from the deck, with art', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.deck.push(fossil(31), basicEnergy(40, 'Fire'));
+  const res = playThrough(state, rng, item(23, 'Fossil Excavation Map', FOSSIL_EXCAVATION_MAP), (ids) => ids.slice(0, 1));
+  assert.deepEqual(movedToHand(res), [31]);
+  assert.deepEqual(reveals(res).map((e) => e.cards), [[{ instanceId: 31, name: 'Unidentified Fossil', src: art(31) }]]);
+});
+
+test('trainer-step: a deck-or-discard search whose text does not reveal hides the deck pick only', () => {
+  const step = parseTrainerEffect(FOSSIL_EXCAVATION_MAP).steps[0];
+  const hidden = FOSSIL_EXCAVATION_MAP.replace('card, reveal it, and put it', 'card and put it');
+  const fromDeck = setupGame().state;
+  fromDeck.players.p1.zones.deck.push(fossil(31));
+  const deckRun = runStepAs(fromDeck, step, hidden, (ids) => ids.slice(0, 1));
+  assert.deepEqual(movedToHand(deckRun), [31]);
+  assert.deepEqual(reveals(deckRun), []);
+  const fromDiscard = setupGame().state;
+  fromDiscard.players.p1.zones.discard.push(fossil(32));
+  // The mode choice: the discard pile.
+  const discardRun = runStepAs(fromDiscard, step, hidden, (ids) => (ids.includes(32) ? [32] : ids.filter((id) => id < 0).slice(-1)));
+  assert.deepEqual(reveals(discardRun).map((e) => e.cards.map((c) => c.instanceId)), [[32]], 'a discard-pile card was public');
 });
