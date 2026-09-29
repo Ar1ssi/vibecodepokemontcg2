@@ -98,19 +98,49 @@ const isRect = (rect) =>
  * How far the front face bulges toward the camera at art coordinates `u, v` (v = 0 at the top):
  * 0 on both seals and outside the body columns, `BULGE` at the body's centre. The back uses −z.
  */
-export function pillowZ(u, v) {
+export function pillowZ(u, v, shape = DEFAULT_PACK_SHAPE) {
   if (!Number.isFinite(u) || !Number.isFinite(v)) return 0;
-  if (v < SEAL_TOP_V || v > SEAL_BOTTOM_V) return 0;
-  if (u < BODY_INSET_U || u > 1 - BODY_INSET_U) return 0;
-  const uBody = (u - BODY_INSET_U) / (1 - 2 * BODY_INSET_U);
+  const { sealTopV, sealBottomV, bodyInsetU } = packShape(shape);
+  if (v < sealTopV || v > sealBottomV) return 0;
+  if (u < bodyInsetU || u > 1 - bodyInsetU) return 0;
+  const uBody = (u - bodyInsetU) / (1 - 2 * bodyInsetU);
   const across = Math.sin(Math.PI * uBody) ** 0.6;
   const along = smoothstep(
     0,
     BULGE_RAMP_V,
-    Math.min(v - SEAL_TOP_V, SEAL_BOTTOM_V - v)
+    Math.min(v - sealTopV, sealBottomV - v)
   );
   return BULGE * across * along;
 }
+
+/** The Phantasmal Flames fronts' seals and side inset: every pack without a measured shape. */
+export const DEFAULT_PACK_SHAPE = Object.freeze({
+  sealTopV: SEAL_TOP_V,
+  sealBottomV: SEAL_BOTTOM_V,
+  bodyInsetU: BODY_INSET_U,
+});
+
+/**
+ * A vendored front's measured shape (design 055 § Every box's art), or the default when it has
+ * none or a value is out of range.
+ */
+export function packShape(shape) {
+  const valid =
+    shape &&
+    shape.sealTopV > 0 &&
+    shape.sealTopV < 0.5 &&
+    shape.sealBottomV > 0.5 &&
+    shape.sealBottomV < 1 &&
+    shape.bodyInsetU >= 0 &&
+    shape.bodyInsetU < 0.25;
+  return valid ? shape : DEFAULT_PACK_SHAPE;
+}
+
+/** @returns {string} a cache key for one shape's pillow geometry. */
+export const packShapeKey = (shape) => {
+  const { sealTopV, sealBottomV, bodyInsetU } = packShape(shape);
+  return `${sealTopV}:${sealBottomV}:${bodyInsetU}`;
+};
 
 /**
  * The pack's tear line (`packTearPoints`, the same seeded line the DOM clip-path cuts) in art

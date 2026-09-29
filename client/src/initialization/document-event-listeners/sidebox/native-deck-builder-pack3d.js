@@ -53,6 +53,7 @@ import {
   packTearLine,
   peelAngleDeg,
   peelVertex,
+  packShapeKey,
   pillowZ,
   rectToWorld,
   ripTicksCrossed,
@@ -154,9 +155,10 @@ const makeCanvas = (width, height) => {
 
 /**
  * A plane over art rows `v0..v1` (v = 0 at the top) in pack space (1 wide, centred), UV-mapped to
- * that band of the art and bulged by `sign · pillowZ`: +1 for the front, −1 for the back.
+ * that band of the art and bulged by `sign · pillowZ` for the front's measured `shape`: +1 for the
+ * front, −1 for the back.
  */
-const pillowPlane = ({ v0, v1, rows, sign }) => {
+const pillowPlane = ({ v0, v1, rows, sign, shape }) => {
   const geometry = new PlaneGeometry(1, (v1 - v0) * PACK_ASPECT, GRID_X, rows);
   const position = geometry.attributes.position;
   const uv = geometry.attributes.uv;
@@ -165,7 +167,7 @@ const pillowPlane = ({ v0, v1, rows, sign }) => {
     const v = v0 + (1 - uv.getY(i)) * (v1 - v0);
     uv.setY(i, 1 - v);
     position.setY(i, packSpaceY(v));
-    position.setZ(i, sign * pillowZ(u, v));
+    position.setZ(i, sign * pillowZ(u, v, shape));
   }
   geometry.computeVertexNormals();
   return geometry;
@@ -289,7 +291,8 @@ const loadTexture = (loader, url) =>
  * @param {object} options
  * @param {HTMLElement} options.host `#bbUnboxing`; the canvas and the pointer listener live on it
  * @param {number} options.seed the box seed (tear lines)
- * @param {string[]} options.packArtUrls the art of each pack, in pack order
+ * @param {{url: string, shape: object|null}[]} options.packArts each pack's front and its measured
+ *   seals (design 055 § Every box's art; null: the default shape), in pack order
  * @param {string} [options.cardBackUrl] the card back of the rising stack
  * @param {() => void} [options.onLost] the stage can no longer draw (context lost, FX switched off)
  * @returns {Promise<object|null>} the stage, or null when WebGL or a pack texture is unavailable
@@ -297,17 +300,14 @@ const loadTexture = (loader, url) =>
 export async function createPackStage({
   host,
   seed,
-  packArtUrls,
+  packArts,
   cardBackUrl,
   onLost,
 }) {
-  if (
-    !host ||
-    !Array.isArray(packArtUrls) ||
-    packArtUrls.length === 0 ||
-    fxDisabled()
-  )
+  if (!host || !Array.isArray(packArts) || packArts.length === 0 || fxDisabled()) {
     return null;
+  }
+  const packArtUrls = packArts.map((art) => art.url);
   const canvas = document.createElement('canvas');
   canvas.className = 'bb-gl';
   canvas.setAttribute('aria-hidden', 'true');
@@ -358,6 +358,7 @@ export async function createPackStage({
       host,
       seed,
       packArtUrls,
+      packShapes: packArts.map((art) => art.shape ?? null),
       cardBackUrl,
       onLost,
       canvas,
@@ -376,6 +377,7 @@ function buildStage({
   host,
   seed,
   packArtUrls,
+  packShapes,
   cardBackUrl,
   onLost,
   canvas,
@@ -410,9 +412,19 @@ function buildStage({
   light.position.set(...LIGHT_POSITION);
   scene.add(light);
 
-  // Shared by every pack: the body is never deformed; the strips peel, so they are per pack.
-  const bodyFront = pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: 1 });
-  const bodyBack = pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: -1 });
+  // Shared by every pack of one shape: the body is never deformed; the strips peel, so they are
+  // per pack.
+  const bodies = new Map();
+  const bodyFor = (shape) => {
+    const key = packShapeKey(shape);
+    if (!bodies.has(key)) {
+      bodies.set(key, {
+        front: pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: 1, shape }),
+        back: pillowPlane({ v0: 0, v1: 1, rows: GRID_Y, sign: -1, shape }),
+      });
+    }
+    return bodies.get(key);
+  };
   const shadowGeometry = new PlaneGeometry(
     SHADOW_SIZE,
     SHADOW_SIZE * PACK_ASPECT
@@ -480,6 +492,8 @@ function buildStage({
 
   const buildPack = (packIndex) => {
     const url = packArtUrls[packIndex] ?? packArtUrls[0];
+    const shape = packShapes[packIndex] ?? packShapes[0] ?? null;
+    const body = bodyFor(shape);
     const art = arts.get(url);
     const silver = silvers.get(url);
     const line = packTearLine(seed, packIndex);
@@ -489,12 +503,14 @@ function buildStage({
       v1: STRIP_V,
       rows: STRIP_GRID_Y,
       sign: 1,
+      shape,
     });
     const stripBack = pillowPlane({
       v0: 0,
       v1: STRIP_V,
       rows: STRIP_GRID_Y,
       sign: -1,
+      shape,
     });
     const fronts = [
       frontMaterial(art, masks.body, envMap),
@@ -518,8 +534,8 @@ function buildStage({
     shadow.renderOrder = -1;
     group.add(
       shadow,
-      new Mesh(bodyFront, fronts[0]),
-      new Mesh(bodyBack, backs[0]),
+      new Mesh(body.front, fronts[0]),
+      new Mesh(body.back, backs[0]),
       ...stripMeshes
     );
     group.visible = false;
@@ -1237,8 +1253,11 @@ function buildStage({
       ...cardTextures,
     ])
       texture.dispose();
-    bodyFront.dispose();
-    bodyBack.dispose();
+    for (const body of bodies.values()) {
+      body.front.dispose();
+      body.back.dispose();
+    }
+    bodies.clear();
     shadowGeometry.dispose();
     shadowMaterial.map?.dispose();
     shadowMaterial.dispose();

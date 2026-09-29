@@ -438,3 +438,28 @@ Slice 4 (2026-09-29):
 - The reduced-motion canvas check waits 300 ms after the hand-off: the canvas still holds the
   settled stack for one frame (`clearCards` renders on the next rAF), under the identical DOM
   card, so nothing visible changes; a canvas-only shot at the hand-off is empty.
+
+## Every box's art (2026-09-29, after merging the every-era boxes branch)
+User asks: "Add boxes and packs that [claude/build-battle-boxes-plan-38pf0r] added", then "Check
+bulbapedia and pull the hq box art and booster art if its missing", then pokesymbols.com for
+booster art (artofpkm.com was checked first: Japanese wrappers only, 680 px canvases — not used).
+- Sources (`scripts/build-battle/box-art-sources.mjs`): each box's Bulbapedia product render (its
+  page's image, or `<set code> Prerelease Kit.jpg` for the six kits whose page shows none) and its
+  set's English wrappers from Bulbapedia (`<set code> Booster <name>`) and pokesymbols.com
+  (`<set>-pack-<n>`). `vendor-box-art.mjs` keeps, per box, the source whose narrowest wrapper is
+  widest (Bulbapedia wins ties): pokesymbols for Ultra Prism (144 → ≈ 360 px), Fates Collide,
+  Guardians Rising, Burning Shadows and five more SM sets; Bulbapedia for everything 700–780 px.
+- Processing runs in Playwright's Chromium (no image dependency): a wrapper shot on white (both
+  side edges white at mid height) is keyed from the border; a flat crop is left whole. Every front
+  is trimmed and centred on the 780 : 1426 canvas, never upscaled, and its seals and side inset are
+  measured into `shape` (null → the Phantasmal Flames defaults). `pillowZ(u, v, shape)` and the
+  stage's per-shape body geometry use it.
+- `box-art.generated.mjs` (`BOX_ART`) feeds `boxSkin` (vendored art wins over the catalog flags;
+  `packArtIndexes(seed, count, artCount)` reaches a fifth wrapper) and `boxArt(box)`: the sealed
+  screen shows the product render on a light card. Renders are downscaled only (≤ 1400 px tall).
+- Cuboid faces: the five Mega Evolution renders share Phantasmal Flames's camera (checked on an
+  overlay), so ME1/3/4/5 get front/left faces cut with its corners scaled 1024 → 1428. Other eras'
+  renders differ per box (angle, side, crop); mapping them is design 056 work.
+- Size: 172 wrappers 25 MB, 42 renders + 8 faces 8.4 MB.
+- Recorder: the reload wait is 40 s and the hand-off check polls 2 s (SwiftShader compiles on the
+  CPU); "every hit starts face down" passes with a note when a box and seed open no hit.

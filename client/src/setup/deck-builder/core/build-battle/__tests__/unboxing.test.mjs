@@ -438,8 +438,13 @@ test('boxSkin: me02 keeps its vendored faces and packs; a procedural box skins f
     PACK_ARTS.map((key) => `src/assets/build-battle/packs/me02-${key}.webp`)
   );
 
+  assert.ok(me02.packArts.every((art) => art.shape === null), 'the design-052 fronts use the default shape');
+  assert.equal(me02.render.src, 'src/assets/build-battle/boxes/phantasmal-flames.webp');
+
+  // A box with no vendored art (no BOX_ART entry under its key) keeps the procedural skin.
   const procedural = {
     ...box,
+    key: 'no-art-box',
     era: 'sm',
     setId: 'sm9',
     skin: { keyArtCardId: 'sm9-20', palette: 'sm', packArtCardIds: ['p-1', 'p-2', 'p-3', 'p-4'], vendored: { box: false, packs: false } },
@@ -458,8 +463,35 @@ test('boxSkin: me02 keeps its vendored faces and packs; a procedural box skins f
   assert.equal(skin.keyArtUrl, 'https://assets.tcgdex.net/en/sm/sm9/20/high.webp');
   assert.equal(skin.palette, 'sm');
   assert.equal(skin.faces, null);
+  assert.equal(skin.render, null);
   assert.deepEqual(skin.packArts[1], { kind: 'procedural', cardId: 'p-2', imageUrl: 'p-2-l' });
   assert.equal(boxSkin({ box: { ...procedural, skin: { ...procedural.skin, keyArtCardId: 'gone' } } }).keyArtUrl, null);
+});
+
+test('packArtIndexes: four arts keep the design-052 stream; five-wrapper sets reach the fifth', () => {
+  for (const seed of [1, 18, 42, 999]) {
+    assert.deepEqual(packArtIndexes(seed, 4, 4), packArtIndexes(seed), 'default art count is four');
+  }
+  const five = Array.from({ length: 200 }, (_, seed) => packArtIndexes(seed, 4, 5)).flat();
+  assert.ok(five.every((index) => index >= 0 && index < 5));
+  assert.ok(five.includes(4), 'the fifth wrapper is drawn');
+  assert.deepEqual(packArtIndexes(7, 4, 0), [0, 0, 0, 0], 'no art count still yields valid indexes');
+});
+
+test('boxSkin: a catalog box with Bulbapedia art gets vendored fronts, shapes and its render', () => {
+  const teamUp = boxSkin({ box: { key: 'team-up', setId: 'sm9', era: 'sm', skin: { vendored: {} } } });
+  assert.equal(teamUp.packArts.length, 4);
+  assert.ok(teamUp.packArts.every((art) => art.kind === 'vendored' && art.src.startsWith('src/assets/build-battle/packs/sm9-')));
+  assert.equal(teamUp.render.src, 'src/assets/build-battle/boxes/team-up.webp');
+  assert.equal(teamUp.faces, null, 'only the Mega Evolution camera maps onto the cuboid');
+  const ultraPrism = boxSkin({
+    box: { key: 'ultra-prism', setId: 'sm5', era: 'sm', skin: { packArtCardIds: ['a', 'b', 'c', 'd'], vendored: {} } },
+  });
+  assert.ok(
+    ultraPrism.packArts.every((art) => art.kind === 'vendored' && art.src.startsWith('src/assets/build-battle/packs/sm5-')),
+    'Ultra Prism wears its pokesymbols.com wrappers'
+  );
+  assert.ok(boxSkin({ box: { key: 'mega-evolution', setId: 'me01', era: 'me', skin: { vendored: {} } } }).faces.front);
 });
 
 test('packTearEdge is a seeded jagged strip below the 7 % crimp', () => {

@@ -390,7 +390,7 @@ export const mountUnboxingScene = ({
   promo,
   onBuildDeck,
 }) => {
-  const artIndexes = packArtIndexes(seed);
+  const artIndexes = packArtIndexes(seed, packs.length, look.skin.packArts.length);
   const textures = new Map();
   const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
   const slotOf = (packIndex, cardIndex) =>
@@ -906,7 +906,7 @@ export const mountUnboxingScene = ({
         module.createPackStage({
           host: root,
           seed,
-          packArtUrls: arts.map((art) => `/${art.src}`),
+          packArts: arts.map((art) => ({ url: `/${art.src}`, shape: art.shape ?? null })),
           cardBackUrl: resolveDefaultCardBackSrc(),
           onLost: dropPackStage,
         })

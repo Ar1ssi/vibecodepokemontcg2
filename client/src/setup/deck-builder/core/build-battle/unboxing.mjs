@@ -4,6 +4,7 @@
 
 import { createRng } from '../../../../../../shared/engine/rng.mjs';
 import { resolveHoloEffect } from '../holo.mjs';
+import { BOX_ART } from './box-art.generated.mjs';
 import { BOX_FACE_TEXTURES, packArtSrc } from './box-textures.mjs';
 import { REVERSE_POOL } from './pack-models.mjs';
 
@@ -551,13 +552,24 @@ export function unboxingVoiceFor(event, tier = 0) {
 export const PACK_ARTS = ['charizard', 'gengar', 'heracross', 'lopunny'];
 
 /**
- * One pack-front art per pack, an index into the box skin's four `packArts`. A stream of its own
- * (`seed ^ 0x9e3779b9`), so adding art never shifts the pool `openBox(seed)` draws. Duplicates are
- * allowed, as in real boxes.
+ * One pack-front art per pack, an index into the box skin's `packArts` (`artCount` of them: four,
+ * or five for sets that printed five wrappers). A stream of its own (`seed ^ 0x9e3779b9`), so adding
+ * art never shifts the pool `openBox(seed)` draws. Duplicates are allowed, as in real boxes.
  */
-export function packArtIndexes(seed, count = PACK_COUNT) {
+export function packArtIndexes(seed, count = PACK_COUNT, artCount = PACK_ARTS.length) {
   const rng = createRng(seed ^ 0x9e3779b9);
-  return Array.from({ length: Math.max(0, count | 0) }, () => rng.int(PACK_ARTS.length));
+  const arts = Math.max(1, artCount | 0);
+  return Array.from({ length: Math.max(0, count | 0) }, () => rng.int(arts));
+}
+
+/**
+ * A box's vendored Bulbapedia art (design 055 § Every box's art): its product render, its booster
+ * fronts (null: procedural) and, on the Mega Evolution camera, its cuboid faces.
+ *
+ * @returns {{render: object, packs: object[]|null, faces: object|null, note: string|null}|null}
+ */
+export function boxArt(box) {
+  return box?.key && Object.hasOwn(BOX_ART, box.key) ? BOX_ART[box.key] : null;
 }
 
 const withWebp = (base) => (base ? `${base}.webp` : null);
@@ -569,26 +581,35 @@ const largeImageOf = (card) => card?.images?.large || card?.image || null;
  * pack fronts (vendored files or a procedural front over a card's art) and the vendored box faces.
  *
  * @param {{box: object, setInfo?: object, cards?: object[], data?: {cardsById?: Map<string, object>}}} args
+ * Vendored Bulbapedia art (`boxArt`) wins over the catalog's design-052 flags.
+ *
  * @returns {{setLogoUrl: string|null, keyArtUrl: string|null,
- *   palette: string, packArts: ({kind: 'vendored', src: string}|{kind: 'procedural', cardId: string,
- *   imageUrl: string|null})[], faces: object|null}}
+ *   palette: string, packArts: ({kind: 'vendored', src: string, shape: object|null}|{kind:
+ *   'procedural', cardId: string, imageUrl: string|null})[], faces: object|null, render: object|null}}
  */
 export function boxSkin({ box, setInfo = {}, cards = [], data = {} }) {
   const skin = box?.skin || {};
+  const art = boxArt(box);
   const cardById = (id) => cards.find((card) => card.id === id) || data.cardsById?.get(id) || null;
-  const packArts = skin.vendored?.packs
-    ? PACK_ARTS.map((key) => ({ kind: 'vendored', src: packArtSrc(box.setId, key) }))
-    : (skin.packArtCardIds || []).map((cardId) => ({
-        kind: 'procedural',
-        cardId,
-        imageUrl: largeImageOf(cardById(cardId)),
-      }));
+  let packArts;
+  if (art?.packs) {
+    packArts = art.packs.map((pack) => ({ kind: 'vendored', src: pack.src, shape: pack.shape }));
+  } else if (skin.vendored?.packs) {
+    packArts = PACK_ARTS.map((key) => ({ kind: 'vendored', src: packArtSrc(box.setId, key), shape: null }));
+  } else {
+    packArts = (skin.packArtCardIds || []).map((cardId) => ({
+      kind: 'procedural',
+      cardId,
+      imageUrl: largeImageOf(cardById(cardId)),
+    }));
+  }
   return {
     setLogoUrl: withWebp(setInfo.logo),
     keyArtUrl: largeImageOf(cardById(skin.keyArtCardId)),
     palette: skin.palette || box?.era || 'me',
     packArts,
-    faces: skin.vendored?.box ? BOX_FACE_TEXTURES : null,
+    faces: art?.faces || (skin.vendored?.box ? BOX_FACE_TEXTURES : null),
+    render: art?.render || null,
   };
 }
 

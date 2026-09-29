@@ -86,6 +86,22 @@
 }
 
 /* Box picker (design 054 § Builder tab): era chips over the era's boxes. */
+/* The picked box's Bulbapedia product shot (design 055): most renders sit on a white studio
+   background, so every shot gets a light card rather than a keyed cut-out. */
+.build-battle-window .db-live .bb-boxshot {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(260px, 70%);
+  max-height: 32vh;
+  padding: 1vh;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1.2vh 3vh rgba(0, 0, 0, 0.45);
+  object-fit: contain;
+  user-select: none;
+}
+
 .build-battle-window .db-live .bb-picker {
   width: 100%;
   display: flex;

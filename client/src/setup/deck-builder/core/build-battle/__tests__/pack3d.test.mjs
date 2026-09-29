@@ -19,7 +19,10 @@ import {
   SPREAD_SIDE_Z,
   TILT_MAX_X_DEG,
   TILT_MAX_Y_DEG,
+  DEFAULT_PACK_SHAPE,
   cardsEmergePose,
+  packShape,
+  packShapeKey,
   followTilt,
   packDropPose,
   packFlyParams,
@@ -86,6 +89,18 @@ test('pillowZ peaks at BULGE in the body centre and is symmetric across', () => 
     pillowZ(0.5, SEAL_TOP_V + 0.01) < pillowZ(0.5, SEAL_TOP_V + 0.05),
     'ramps up off the seal'
   );
+});
+
+test('pillowZ follows a measured pack shape; a bad or missing shape falls back to the default', () => {
+  const shape = { sealTopV: 0.06, sealBottomV: 0.95, bodyInsetU: 0.01 };
+  assert.ok(pillowZ(0.5, 0.08, shape) > 0, 'bulges below a thinner top seal');
+  assert.equal(pillowZ(0.5, 0.08), 0, 'the default seal is still flat there');
+  assert.equal(pillowZ(0.5, 0.96, shape), 0);
+  close(pillowZ(0.5, 0.5, shape), BULGE);
+  assert.deepEqual(packShape(null), DEFAULT_PACK_SHAPE);
+  assert.deepEqual(packShape({ sealTopV: 0.7, sealBottomV: 0.9, bodyInsetU: 0.02 }), DEFAULT_PACK_SHAPE);
+  assert.equal(packShapeKey(null), packShapeKey(DEFAULT_PACK_SHAPE));
+  assert.notEqual(packShapeKey(shape), packShapeKey(null));
 });
 
 test('packTearLine is packTearEdge point for point, left to right, in 0..1', () => {

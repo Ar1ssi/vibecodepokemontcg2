@@ -250,9 +250,11 @@ const tearPack = async (page, packIndex, { drag = false } = {}) => {
 };
 
 const renderMode = (page) => page.evaluate(() => document.getElementById('bbUnboxing')?.dataset.render);
+// SwiftShader compiles the pack shaders on the CPU: after a reload that competes with every card
+// image, the stage can take well over 10 s to come up (a GPU takes a fraction of that).
 const waitRender = (page, mode) =>
   page
-    .waitForFunction((m) => document.getElementById('bbUnboxing')?.dataset.render === m, mode, { timeout: 15000 })
+    .waitForFunction((m) => document.getElementById('bbUnboxing')?.dataset.render === m, mode, { timeout: 40000 })
     .then(() => true)
     .catch(() => false);
 
@@ -267,6 +269,15 @@ const canvasDrawsNothing = async (page) => {
   const without = await page.screenshot();
   if (hidden) await page.evaluate(() => (document.querySelector('.bb-gl').style.visibility = ''));
   return withCanvas.equals(without);
+};
+
+// SwiftShader can run the falling pack's last frames late; the canvas must be empty soon after.
+const canvasEmptiesWithin = async (page, ms) => {
+  for (let waited = 0; waited <= ms; waited += 400) {
+    if (await canvasDrawsNothing(page)) return true;
+    await page.waitForTimeout(400);
+  }
+  return false;
 };
 
 // ── Pass 1: the whole box on video ─────────────────────────────────────────────────────
@@ -298,7 +309,7 @@ const recordVideo = async (browser) => {
   for (const packIndex of [0, 1, 2, 3]) {
     await tearPack(page, packIndex, { drag: packIndex === 0 });
     if (packIndex === 0) {
-      check(await canvasDrawsNothing(page), '055 hand-off: the pocket is DOM and the canvas draws nothing');
+      check(await canvasEmptiesWithin(page, 2000), '055 hand-off: the pocket is DOM and the canvas draws nothing');
       for (let k = 0; k < 3; k += 1) await swipeOne(page, 0, tiers, { drag: k === 0 });
       await page.waitForTimeout(300);
       await page.reload();
@@ -337,7 +348,12 @@ const recordVideo = async (browser) => {
       await page.waitForTimeout(700);
     }
   }
-  check(hitsFaceDown.length > 0 && hitsFaceDown.every(Boolean), 'row 14 every hit starts face down until tapped', `${hitsFaceDown.length} hits`);
+  // Some boxes and seeds open no tier-2+ card at all; then there is nothing to check.
+  check(
+    hitsFaceDown.every(Boolean),
+    'row 14 every hit starts face down until tapped',
+    hitsFaceDown.length ? `${hitsFaceDown.length} hits` : 'no hits in this box and seed'
+  );
   await press(page, '[data-control="build"]');
   await page.waitForFunction(() => !document.getElementById('bbUnboxingStage'), null, { timeout: 8000 });
   await page.waitForTimeout(1200);

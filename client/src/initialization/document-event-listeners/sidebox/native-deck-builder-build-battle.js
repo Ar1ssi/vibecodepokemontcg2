@@ -41,7 +41,7 @@ import {
   showsPlayLevel,
   unboxingLabels,
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
-import { advanceUnboxing, boxSkin } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
+import { advanceUnboxing, boxArt, boxSkin } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { fxDisabled, motionReduced } from '../../../setup/image-logic/mat-fx.mjs';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
@@ -482,6 +482,20 @@ export const initializeBuildBattle = ({
     return boxContentsLine(activeBox, loaded.setInfo.name);
   };
 
+  // The picked box's product shot (design 055 § Every box's art); a missing file drops out quietly.
+  const boxShot = (box) => {
+    const render = boxArt(box)?.render;
+    if (!render) return null;
+    const img = el('img', 'bb-boxshot');
+    img.alt = box.name;
+    img.width = render.width;
+    img.height = render.height;
+    img.draggable = false;
+    img.addEventListener('error', () => img.remove(), { once: true });
+    img.src = `/${render.src}`;
+    return img;
+  };
+
   const renderSealedBox = () => {
     const sealed = el('div', 'bb-sealed');
     const note = el('p', 'bb-note', sealedNote());
@@ -493,7 +507,10 @@ export const initializeBuildBattle = ({
       boxPanelEl.append(sealed);
       return;
     }
-    sealed.append(renderPicker(), el('h3', 'bb-title', activeBox.name), note);
+    sealed.append(renderPicker());
+    const shot = boxShot(activeBox);
+    if (shot) sealed.append(shot);
+    sealed.append(el('h3', 'bb-title', activeBox.name), note);
     const seedLabel = el('label', 'bb-seed-label', 'Box #');
     const seedInput = el('input', 'bb-seed-input');
     seedInput.id = 'buildBattleSeed';
