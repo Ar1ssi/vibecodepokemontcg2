@@ -5,7 +5,7 @@
     import { appendMessage } from '../chatbox/append-message.js';
     import { processAction } from '../general/process-action.js';
     import { getZone } from '../zones/get-zone.js';
-    import { openCardPicker, closeCardPicker } from '../image-logic/card-picker.js';
+    import { openCardPicker, closeCardPicker, isCardPickerOpen } from '../image-logic/card-picker.js';
     import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout-flight.js';
     import { shouldAnimateMirror } from '../image-logic/draw-flight-predicate.mjs';
     import {
@@ -164,19 +164,77 @@ import { glowColorFor } from './card-glow-colors.mjs';
     let startingActiveSelectionPending = false;
     let startingActiveFinished = false;
     let startingActiveFirstPlayer = null;
+    // True from the moment promptStartingActiveSelection starts until it has
+    // either mounted its picker or bailed. The prompt awaits hand enrichment,
+    // and those awaits re-enter the watcher events; openCardPicker closes any
+    // prior picker so this cannot stack modals, but without the guard a racing
+    // re-entry churns pickers (mount, teardown, remount) and duplicates the
+    // prompt announcement.
+    let startingActivePromptInFlight = false;
+    // Bounds the watcher's re-arms, so a pick that keeps failing to move the
+    // card announces instead of popping a modal back open forever.
+    let startingActivePromptRetries = 0;
+
+    const STARTING_ACTIVE_MAX_PROMPT_RETRIES = 3;
+    const OPENING_HAND_TIMEOUT_MS = 20000;
+
+    // Events that can bring the opening hand onto the board.
+    const OPENING_VIEW_EVENTS = [
+      'rules-card-moved',
+      'action-processed',
+      'rules-turn-view-applied',
+      'card-moved',
+    ];
+
+    // Resolves true once `user` holds cards, false if they never arrive in time.
+    // The opening deal is asynchronous — under server authority the server deals
+    // only after its own coin call resolves, then broadcasts a view — so the
+    // Starting Active prompt has to wait on the hand itself rather than on a
+    // fixed sleep.
+    const waitForOpeningHand = (user, session, timeoutMs = OPENING_HAND_TIMEOUT_MS) =>
+      new Promise((resolve) => {
+        if (session !== rulesSessionGeneration) {
+          resolve(false);
+          return;
+        }
+        if (liveZoneArray(user, 'hand').length > 0) {
+          resolve(true);
+          return;
+        }
+        const finish = (ok) => {
+          clearTimeout(timer);
+          OPENING_VIEW_EVENTS.forEach((evt) => document.removeEventListener(evt, onEvent));
+          resolve(ok);
+        };
+        const onEvent = () => {
+          if (session !== rulesSessionGeneration) finish(false);
+          else if (liveZoneArray(user, 'hand').length > 0) finish(true);
+        };
+        const timer = setTimeout(() => finish(false), timeoutMs);
+        OPENING_VIEW_EVENTS.forEach((evt) => document.addEventListener(evt, onEvent));
+      });
 
     const hookStartingActiveWatcher = () => {
       const check = () => {
-        if (!startingActiveFinished && (openingStarted || startingActiveSelectionPending)) {
-          checkBothActivesSetAndBegin(startingActiveFirstPlayer, rulesSessionGeneration);
+        if (startingActiveFinished) return;
+        if (!openingStarted && !startingActiveSelectionPending) return;
+        if (checkBothActivesSetAndBegin(startingActiveFirstPlayer, rulesSessionGeneration)) return;
+        if (!startingActiveSelectionPending) return;
+        if (
+          startingActivePromptInFlight ||
+          startingActivePromptRetries >= STARTING_ACTIVE_MAX_PROMPT_RETRIES ||
+          isCardPickerOpen() ||
+          liveZoneArray('self', 'active').length > 0 ||
+          liveZoneArray('self', 'hand').length === 0
+        ) {
+          return;
         }
+        // A hand that lands after the one-shot prompt already gave up would
+        // otherwise strand the game in setup, where every action is denied.
+        startingActivePromptRetries += 1;
+        void promptStartingActiveSelection(startingActiveFirstPlayer, rulesSessionGeneration);
       };
-      [
-        'rules-card-moved',
-        'action-processed',
-        'rules-turn-view-applied',
-        'card-moved',
-      ].forEach((evt) => {
+      OPENING_VIEW_EVENTS.forEach((evt) => {
         document.addEventListener(evt, check);
       });
     };
@@ -654,6 +712,8 @@ import { glowColorFor } from './card-glow-colors.mjs';
       startingActiveSelectionPending = false;
       startingActiveFinished = false;
       startingActiveFirstPlayer = null;
+      startingActivePromptInFlight = false;
+      startingActivePromptRetries = 0;
       closeCardPicker(null, true);
       document.getElementById('rulesCoinCallOverlay')?.remove();
       document.getElementById('rulesChoicePicker')?.remove();
@@ -729,73 +789,102 @@ import { glowColorFor } from './card-glow-colors.mjs';
 
     const promptStartingActiveSelection = async (firstPlayer, session) => {
       if (session !== rulesSessionGeneration) return;
-      if (startingActiveFinished) return;
+      if (startingActiveFinished || startingActivePromptInFlight) return;
 
       startingActiveFirstPlayer = firstPlayer;
       startingActiveSelectionPending = true;
+      startingActivePromptInFlight = true;
 
-      if (checkBothActivesSetAndBegin(firstPlayer, session)) return;
+      try {
+        if (checkBothActivesSetAndBegin(firstPlayer, session)) return;
 
-      appendMessage(
-        '',
-        'Prompt: Both players, choose a Basic Pokémon from your hand for your Active Spot before starting turn 1.',
-        'announcement',
-        false
-      );
-
-      const promptPlayerActive = async (user, title) => {
-        if (session !== rulesSessionGeneration) return;
-        if (liveZoneArray(user, 'active').length > 0) {
-          checkBothActivesSetAndBegin(firstPlayer, session);
-          return;
-        }
-
-        const candidates = await getBasicPokemonFromHand(user);
-        if (!candidates || candidates.length === 0) {
-          appendMessage('', `No cards in ${user === 'self' ? 'your' : "opponent's"} hand for Active Spot.`, 'announcement', false);
-          return;
-        }
-
-        openCardPicker({
-          title,
-          candidates,
-          mode: 'single',
-          zoneFrom: 'hand',
-          destination: 'active',
-          user,
-          onPick: async (card) => {
-            if (session !== rulesSessionGeneration) return;
+        // Gate on the hand, not on a sleep. If the picker opens while the hand
+        // is still empty it has no candidates, and with nothing else able to
+        // re-open it the game stays in setup forever — where canPerformAction
+        // and validateLegality deny every action silently.
+        if (!(await waitForOpeningHand('self', session))) {
+          if (session === rulesSessionGeneration) {
             appendMessage(
               '',
-              `${user === 'self' ? 'You' : 'Opponent'} chose ${card?.name || 'a Pokémon'} as Active Pokémon.`,
+              'Still waiting on your opening hand — the Starting Active picker opens as soon as it arrives.',
               'announcement',
               false
             );
+          }
+          return;
+        }
+        if (session !== rulesSessionGeneration || startingActiveFinished) return;
 
-            if (systemState.isTwoPlayer && rulesSocket) {
-              rulesSocket.emit('rulesEvent', {
-                type: 'startingActiveChosen',
-                data: { player: user, cardName: card?.name },
-              });
-            }
+        const promptPlayerActive = async (user, title) => {
+          if (session !== rulesSessionGeneration) return;
+          if (liveZoneArray(user, 'active').length > 0) {
+            checkBothActivesSetAndBegin(firstPlayer, session);
+            return;
+          }
 
-            if (checkBothActivesSetAndBegin(firstPlayer, session)) {
-              return;
-            }
+          const candidates = await getBasicPokemonFromHand(user);
+          if (session !== rulesSessionGeneration || startingActiveFinished) return;
+          if (!candidates || candidates.length === 0) {
+            // Left pending on purpose: the watcher re-arms this prompt once the
+            // hand is usable again. Announcing and returning is all the old
+            // code did, and it was the dead end.
+            return;
+          }
+          if (liveZoneArray(user, 'active').length > 0) {
+            checkBothActivesSetAndBegin(firstPlayer, session);
+            return;
+          }
 
-            if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
-              setTimeout(() => {
-                promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
-              }, 100);
-            }
-          },
-        });
-      };
+          appendMessage(
+            '',
+            'Prompt: Both players, choose a Basic Pokémon from your hand for your Active Spot before starting turn 1.',
+            'announcement',
+            false
+          );
 
-      if (liveZoneArray('self', 'active').length === 0) {
-        await promptPlayerActive('self', 'Choose your Starting Active Pokémon');
-      } else if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
-        await promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
+          openCardPicker({
+            title,
+            candidates,
+            mode: 'single',
+            zoneFrom: 'hand',
+            destination: 'active',
+            user,
+            onPick: async (card) => {
+              if (session !== rulesSessionGeneration) return;
+              appendMessage(
+                '',
+                `${user === 'self' ? 'You' : 'Opponent'} chose ${card?.name || 'a Pokémon'} as Active Pokémon.`,
+                'announcement',
+                false
+              );
+
+              if (systemState.isTwoPlayer && rulesSocket) {
+                rulesSocket.emit('rulesEvent', {
+                  type: 'startingActiveChosen',
+                  data: { player: user, cardName: card?.name },
+                });
+              }
+
+              if (checkBothActivesSetAndBegin(firstPlayer, session)) {
+                return;
+              }
+
+              if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+                setTimeout(() => {
+                  promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
+                }, 100);
+              }
+            },
+          });
+        };
+
+        if (liveZoneArray('self', 'active').length === 0) {
+          await promptPlayerActive('self', 'Choose your Starting Active Pokémon');
+        } else if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+          await promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
+        }
+      } finally {
+        startingActivePromptInFlight = false;
       }
     };
 
@@ -814,6 +903,22 @@ import { glowColorFor } from './card-glow-colors.mjs';
       startGame(firstPlayer);
       resetPrizes();
       resetStatuses();
+
+      // The server's 'setup' command already did all of it — shuffled, dealt
+      // 7+6, adjudicated mulligans, awarded bonus draws — and only then
+      // broadcast the post-setup view. Re-running the local deal and mulligan
+      // pass on top of that mutated nothing the player can see (the legacy
+      // arrays are suppressed under server authority) and could re-mulligan a
+      // hand the server had already made legal. Its only real effect was to
+      // decide, on a fixed 2.5s sleep, whether the Starting Active picker had
+      // a hand to pick from — which is the softlock.
+      if (isServerOwnedTurnOrder()) {
+        markMulligansResolved();
+        appendMessage('', 'Rules engine active — good luck!', 'announcement', false);
+        void promptStartingActiveSelection(firstPlayer, session);
+        return;
+      }
+
       void (async () => {
         try {
           await drawOpeningHand('self', 'self', true);
