@@ -109,7 +109,10 @@ function enrich(state, costPool) {
     energy('Darkness'),
     energy('Metal'),
     trainer('Deck Item', 'Item'),
-    trainer('Deck Supporter', 'Supporter')
+    trainer('Deck Supporter', 'Supporter'),
+    // Stadium searches (Land Maker, Spacial Rend, Sunshine) need a real Stadium: until S333 the
+    // 'Stadium' filter matched every card, so they passed against a deck with none.
+    trainer('Deck Stadium', 'Stadium')
   );
   z.discard.push(
     ...TYPES.map((t) => energy(t)),
