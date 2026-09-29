@@ -650,6 +650,12 @@ Plan-time re-pins (§2 of oneshot-feature, from reading all 42 Bulbapedia pages 
 - D8 An Evolution deck's catalog `energy` is the heaviest type in its group's baked `energyNeeds` (A3; null when it
   has none, e.g. Stellar Crown's Bouffalant); an `evolution-pack` group's is null (the box deals no Energy). No
   page names the Energy, so § Data model's "the type the printed box shipped" has no source. Pinned by test.
+- D9 Where a page links a Supporter's full-art print (TCGdex Ultra Rare) and the set has a regular print of it, the
+  box takes the regular print: Vivid Voltage's Leon 182 → 154 (its own prose: the box's Leon was the non-holo
+  version of the holo print), Bea 180 → 147, Allister 179 → 146 (Evolving Skies' page lists 146), Opal 184 → 158;
+  Battle Styles the same two. Each line keeps the page's number in a comment. Gameplay text is identical.
+- D10 XY, SM and SWSH key art is the box's first promo: no TCGdex rarity marks those sets' cover Pokémon (the
+  first and last Secret Rares name different Pokémon per set). Pinned by test.
 Build notes:
 - Slice 1: me02 split from 051's module by a one-off script; hydrated rows equal 051's rows byte for byte
   (JSON order included). `packArtSrc(setId, key)` (vendored files are per set). The seed-42 box keeps 051's
@@ -680,6 +686,15 @@ Build notes:
   sv10-230), pinned by test with ME's rule. The recorder assumed a box's best card is never a pack's last card
   (Temporal Forces seed 42's is): `swipeOne` now only swipes a hit the hit strip already turned. Recorder
   `BOX=temporal-forces` PASS; picker e2e row 14 PASS; `--check` (live, 10 SV boxes) clean.
+- Slice 6: 12 SWSH boxes imported (page revisions in each source). The pages' conditional Trainer counts ("four,
+  five if the Flapple or Coalossal group was enclosed") are exactly fill-to-23, so no pool needs a hand count;
+  where a page says a flat "six" (Fusion Strike → Silver Tempest) its groups leave 0–7 places and the pack
+  keeps 23 (A4), Silver Tempest's 15-card Archeops group making 24–25. Silver Tempest's "Gardevoir group" maps
+  to the Kirlia promo by member. Brilliant Stars' Liepard and Silver Tempest's Sunflora groups cost only
+  Colorless (A3 header fallback). The Play Level pill now starts at Lost Origin from the catalog.
+  Recorder: `BOX=sword-shield SEED=6` PASS (seed 42's box holds no tier-2+ card, so row 14 has nothing to
+  check there) and `BOX=brilliant-stars SEED=1`; the recorder now routes images.pokemontcg.io (D4's Trainer
+  Gallery art host) to `CARD_IMG` too. Picker e2e row 15 PASS; `--check` (live, 12 SWSH boxes) clean.
 
 ---
 Self-approval checklist (only when the user is unreachable):

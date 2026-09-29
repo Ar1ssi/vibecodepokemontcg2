@@ -116,7 +116,7 @@ test('row 7: every baked box opens bit for bit, packs of ten from its own set, i
         assert.ok(pack.every((id) => setIds.has(id)), `${loaded.box.key}: ${pack}`);
       }
       const rows = startingDeckRows({ box: loaded.box, data: loaded.data, opened });
-      const expected = loaded.box.kind === 'evolution-pack' ? opened.evolutionPack.length : 40;
+      const expected = loaded.box.kind === 'evolution-pack' ? 23 : 40;
       assert.equal(rows.reduce((sum, row) => sum + row.qty, 0), expected, loaded.box.key);
       const pool = poolFromBox({ box: loaded.box, data: loaded.data, cards: loaded.cards, opened });
       assert.ok(pool.length > 0 && pool.every((entry) => entry.count > 0), loaded.box.key);

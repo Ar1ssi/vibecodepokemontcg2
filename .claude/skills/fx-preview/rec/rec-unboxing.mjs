@@ -11,7 +11,7 @@
 //
 // Env: SEED (42) · BOX (a catalog box key; default phantasmal-flames) · BASE_URL (http://localhost:4100)
 //      OUT (.agent/scratch/unboxing[-<box>][-<seed>])
-//      CARD_IMG: a local image or URL served for every TCGdex card face (sandboxes where TCGdex is blocked)
+//      CARD_IMG: a local image or URL served for every card face (sandboxes where the art hosts are blocked)
 //      SIO_JS: a local socket.io.min.js (default: the server's own /socket.io/socket.io.js)
 //      CHROMIUM: a browser binary (the cloud container has /opt/pw-browsers/chromium)
 import { chromium } from 'playwright';
@@ -30,7 +30,13 @@ const STORAGE_KEY = 'ptcg-sim.build-battle.v1';
 const VIEWPORT = { width: 1280, height: 800 };
 const MODULE = '/src/setup/deck-builder/core/build-battle/unboxing.mjs';
 // Set cards come from TCGdex, the deck promos from Limitless.
-const CARD_HOSTS = ['https://assets.tcgdex.net/**', 'https://limitlesstcg.nyc3.digitaloceanspaces.com/**'];
+// Card art hosts: TCGdex, the Limitless promo host, and images.pokemontcg.io for the Trainer Gallery
+// and SM rows TCGdex has no art for (design 054 D4).
+const CARD_HOSTS = [
+  'https://assets.tcgdex.net/**',
+  'https://limitlesstcg.nyc3.digitaloceanspaces.com/**',
+  'https://images.pokemontcg.io/**',
+];
 
 const failures = [];
 const check = (ok, label, detail = '') => {

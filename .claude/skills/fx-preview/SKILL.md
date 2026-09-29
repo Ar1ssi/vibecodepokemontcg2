@@ -118,8 +118,8 @@ BOX=team-up node .claude/skills/fx-preview/rec/rec-unboxing.mjs # any catalog bo
   `pack-tear`, `flip-t0`, `flip-hit-t<tier>` (the box's best card) and `collapse`. A chained phase
   (promo after the unwrap, collapse after the last card) is timed from its own animation's start.
 - Pass 3 shoots `phone-390.png` mid-pack and checks row 16 (no horizontal scroll).
-- `CARD_IMG=<png|url>` serves one image for every card face (TCGdex and the Limitless promo
-  host). Use it where those hosts are blocked; without it a blocked face shows the card-back
+- `CARD_IMG=<png|url>` serves one image for every card face (TCGdex, the Limitless promo
+  host and images.pokemontcg.io). Use it where those hosts are blocked; without it a blocked face shows the card-back
   fallback and the foil layers have nothing to sit on. The card faces are then a stand-in: judge
   foil, flare and pacing from them, never the card art.
 

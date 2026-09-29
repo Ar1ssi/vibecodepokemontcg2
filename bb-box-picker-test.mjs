@@ -144,6 +144,23 @@ try {
     JSON.stringify({ groupKeys: evolution?.groupKeys, pack: evolution?.evolutionPack?.length, energy: evolution?.energy })
   );
   T('row 14 an Evolution-deck box starts the editor at 40 / 40', (await deckCount(page)) === '40');
+
+  // Row 15: an Evolution-pack box (Sword & Shield) starts the editor at its 23 cards, no Energy.
+  await fresh('&box=sword-shield');
+  state = await picker(page);
+  T('?box=sword-shield opens on the Sword & Shield era', state.box === 'sword-shield' && state.era === 'swsh', JSON.stringify(state));
+  await page.click('#buildBattleOpenBox');
+  await page.waitForSelector('#bbUnboxing [data-control="skip"]', { timeout: 15000 });
+  await page.click('#bbUnboxing [data-control="skip"]');
+  await waitFor(page, () => !document.getElementById('bbUnboxingStage'), 10000);
+  await page.waitForTimeout(500);
+  const pack = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
+  T(
+    'row 15 the session holds both groups and a 23-card Evolution pack, no Energy',
+    pack?.groupKeys?.[0] === pack?.deckKey && pack.evolutionPack.length === 23 && pack.energy === null,
+    JSON.stringify({ groupKeys: pack?.groupKeys, pack: pack?.evolutionPack?.length, energy: pack?.energy })
+  );
+  T('row 15 an Evolution-pack box starts the editor at 23 / 40', (await deckCount(page)) === '23');
 } finally {
   await browser.close();
 }

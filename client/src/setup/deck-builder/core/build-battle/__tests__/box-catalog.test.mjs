@@ -264,3 +264,10 @@ test('key art: the SIR of the Pokémon on the set\'s first top-tier card (SV Hyp
     assert.equal(keyArt?.name, top.name, box.key);
   }
 });
+
+test('key art: an XY, SM or SWSH box shows its first promo, a card of its own data', () => {
+  for (const { box, data } of loadedBoxes.filter(({ box }) => !KEY_ART_TOP_RARITY[box.era])) {
+    assert.equal(box.skin.keyArtCardId, box.decks[0].promoId, box.key);
+    assert.ok(data.cardsById.get(box.skin.keyArtCardId)?.image, box.key);
+  }
+});
