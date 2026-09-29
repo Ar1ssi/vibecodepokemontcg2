@@ -608,7 +608,9 @@ function lookAtDeckEnd(ctx, fromBottom) {
         removeFromZones(player, picked);
         player.zones.hand.push(picked);
         ctx.events.push({ type: 'cardMoved', instanceId: picked.instanceId, from: 'deck', to: 'hand', playerId: player.playerId });
-        ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: picked.instanceId, name: picked.name }] });
+        if (ctx.revealsPicks) {
+          ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: picked.instanceId, name: picked.name }] });
+        }
       }
       return finishLook(ctx, viewed);
     }
@@ -620,7 +622,9 @@ function lookAtDeckEnd(ctx, fromBottom) {
         removeFromZones(player, picked);
         destination.push(picked);
         ctx.events.push({ type: 'cardMoved', instanceId: picked.instanceId, from: 'deck', to: toBench ? 'bench' : 'hand', playerId: player.playerId });
-        ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: picked.instanceId, name: picked.name }] });
+        if (toBench || ctx.revealsPicks) {
+          ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: picked.instanceId, name: picked.name }] });
+        }
       }
       return finishLook(ctx, viewed);
     }
@@ -629,7 +633,10 @@ function lookAtDeckEnd(ctx, fromBottom) {
       const toBench = step.destination === 'bench';
       (toBench ? player.zones.bench : player.zones.hand).push(card);
       ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: toBench ? 'bench' : 'hand', playerId: player.playerId });
-      ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+      // Design 059: Great Ball reveals its pick; Explorer's Guidance puts it in the hand unseen.
+      if (toBench || ctx.revealsPicks) {
+        ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+      }
     }
     return finishLook(ctx, viewed);
   }
@@ -750,7 +757,9 @@ function searchDeckSequence(ctx) {
       removeFromZones(player, card);
       player.zones.hand.push(card);
       ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'hand', playerId: player.playerId });
-      ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+      if (ctx.revealsPicks) {
+        ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+      }
     }
     stageIndex += 1;
   }
@@ -3887,7 +3896,10 @@ function searchOrRecover(ctx) {
     removeFromZones(player, card);
     player.zones.hand.push(card);
     ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from, to: 'hand', playerId: player.playerId });
-    ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+    // A discard-pile card was public already; a deck card is named only when revealed (design 059).
+    if (from !== 'deck' || ctx.revealsPicks) {
+      ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+    }
   };
   const askFrom = (zone) => {
     const options = matching(zone);

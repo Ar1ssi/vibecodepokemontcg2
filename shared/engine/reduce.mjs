@@ -151,6 +151,7 @@ import {
 } from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
 import { settleFossilCards } from './rules/fossil.mjs';
+import { stampRevealedArt, textRevealsPicks } from './rules/reveal-picks.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-steps.mjs';
@@ -5084,7 +5085,7 @@ function promoteTrainerPlay(state, command) {
  */
 function buildAttackSearchChoice(
   draft,
-  { playerId, oppId, attackerId, stages, fromIndex = 0 }
+  { playerId, oppId, attackerId, stages, fromIndex = 0, reveal = false }
 ) {
   const player = draft.players[playerId];
   const deck = player?.zones?.deck || [];
@@ -5126,6 +5127,8 @@ function buildAttackSearchChoice(
         attackerId,
         searchStages: stages,
         searchStageIndex: i,
+        // Design 059: the attack's text reveals what it searches into the hand.
+        reveal,
       },
     });
   }
@@ -7803,6 +7806,9 @@ function finishAttackTail(draft, { tail, activeRng, events }) {
           oppId,
           attackerId: attacker?.instanceId,
           stages,
+          reveal: textRevealsPicks(
+            effectiveAttack?.text || effectiveAttack?.effect || effectiveAttack?.description || ''
+          ),
         });
         if (choice) {
           draft.pendingChoice = choice;
@@ -9680,6 +9686,7 @@ export function applyCommand(state, command, rng = null) {
               : player.zones.active?.find((c) => !c.attachedTo)
             : null;
 
+        const searchedToHand = [];
         for (const sel of selection) {
           const instId = typeof sel === 'object' ? sel.instanceId : sel;
           const idx = player.zones.deck.findIndex(
@@ -9702,6 +9709,7 @@ export function applyCommand(state, command, rng = null) {
               });
             } else {
               player.zones.hand.push(card);
+              searchedToHand.push(card);
               events.push({
                 type: 'cardMoved',
                 instanceId: card.instanceId,
@@ -9712,6 +9720,14 @@ export function applyCommand(state, command, rng = null) {
             }
           }
         }
+        // Design 059: "…reveal them, and put them into your hand" (Jirachi Charge Energy).
+        if (token.reveal === true && searchedToHand.length > 0) {
+          events.push({
+            type: 'cardsRevealed',
+            playerId: initiatorPlayerId,
+            cards: searchedToHand.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+          });
+        }
 
         // A staged search resumes with the next stage that still has a match;
         // only after the final stage does the deck shuffle and the turn end.
@@ -9721,6 +9737,7 @@ export function applyCommand(state, command, rng = null) {
           attackerId: token.attackerId,
           stages,
           fromIndex: currentIndex + 1,
+          reveal: token.reveal === true,
         });
         if (nextChoice) {
           draft.pendingChoice = nextChoice;
@@ -10314,6 +10331,9 @@ export function applyCommand(state, command, rng = null) {
   settleFossilCards(draft);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;
+  // Design 059: a public reveal carries each card's art, so the opponent can draw a card
+  // their view still shows face down (the revealed card is in its owner's hand).
+  stampRevealedArt(events, (instanceId) => findCard(draft, instanceId)?.card?.src);
 
   // Will is consumed by the first flip; clear the marker once it fired.
   if (willPlayerId && willCoinUsed?.value) {

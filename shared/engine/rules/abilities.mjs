@@ -11,6 +11,7 @@
 // and reading `.count`. That step type + property are preserved.
 import { energySearchWhat } from './search-match.mjs';
 import { symbolizeTypeWords } from './attack-text.mjs';
+import { textRevealsPicks } from './reveal-picks.mjs';
 
 // Normalize printed card text before matching.
 //   curly quotes  ' ' `  →  straight '
@@ -654,7 +655,7 @@ export function parseAbility(text = '') {
       destination: dest,
       ...(attachTarget ? { attachTarget, attachDamage, ...(attachEach ? { attachEach } : {}) } : {}),
       upTo: parsed.upTo || false,
-      reveal: lower.includes('reveal'),
+      reveal: textRevealsPicks(lower),
       guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${destLabel}, then shuffle.`,
     });
   }

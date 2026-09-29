@@ -153,14 +153,14 @@ Client scene:
 | 4 | one card per event (lookAtDeckEnd, Drayton) | one scene with every card, no duplicates | [ ] |
 | 5 | no deck cover rect / no hand card rect / opponent card without `src` | starts above the spot face down / fades at the spot / shown without a flight | [ ] |
 | 6 | overlay aborted, hand re-rendered, queue cleared | real cards shown by the landing or the backstop | [ ] |
-| 7 | hidden search to hand (Quick Search, Cassiopeia, Explorer's Guidance) | no `cardsRevealed` for the hand picks, no scene | [ ] |
-| 8 | `peek` / `revealedTo` reveals | never stamped with art, never planned | [ ] |
+| 7 | hidden search to hand (Quick Search, Cassiopeia, Explorer's Guidance) | no `cardsRevealed` for the hand picks, no scene | [x] covered: deck-reveal-events Cassiopeia / Explorer's Guidance / Quick Search / non-revealing attack |
+| 8 | `peek` / `revealedTo` reveals | never stamped with art, never planned | [x] covered (art): reveal-picks stamp test, Radio Tower test |
 | 9 | both seats | owner and opponent each play it from the same event; the opponent's card lands sleeve up, turned like their board | [ ] |
 | 10 | reconnect, catch-up, hidden tab | no scene, cards shown | [ ] |
 | 11 | effects off / reduced motion | no scene, cards not hidden; sound per the dispatcher rule | [ ] |
-| 12 | older "show it to your opponent" printings (Pokémon Collector) | counts as a reveal | [ ] |
-| 13 | Nest Ball (bench search) | its public `cardsRevealed` unchanged; no reveal scene | [ ] |
-| 14 | attack search with reveal (Jirachi), staged attack search | `cardsRevealed` per resolved stage → scene | [ ] |
+| 12 | older "show it to your opponent" printings (Pokémon Collector) | counts as a reveal | [x] covered: Pokémon Collector test, textRevealsPicks test |
+| 13 | Nest Ball (bench search) | its public `cardsRevealed` unchanged; no reveal scene | [x] covered (event): Nest Ball test |
+| 14 | attack search with reveal (Jirachi), staged attack search | `cardsRevealed` per resolved stage → scene | [x] covered: Jirachi Charge Energy test; reasoning: no corpus attack parses to stages, the flag rides the token to each stage |
 | 15 | Trainer preview and reveal in one batch (Gutsy Pickaxe) | preview first, reveal starts on its hold | [ ] |
 | 16 | spectator | no plan | [ ] |
 | 17 | revealed card no longer in the hand after the diff | skipped | [ ] |
@@ -188,6 +188,8 @@ one new plan kind. Revert = revert the commits; no data touched.
 | 4 | create `mat-fx/deck-reveal.js`, `.claude/skills/fx-preview/rec/rec-deck-reveal.mjs`; modify `mat-fx/opp-play.js` (`spawnFlipCard`, export `boardFrameRects`), `mat-fx/draw-scene.js` (export `handSpotOf`), `advisory-animations.js` | `playDeckReveal(user, cards, show) → number`; held card `{image, wrapper?, redacted, faceSrc}` | e2e: self and opp scenes on the e2e board — overlay at the deck at t≈0, face up centred at the hold, landed on the hand card, real card visible after | — | suite green; frames checked |
 
 ## Deviations (Builder appends here during build)
+- Slice 1: Cassiopeia's "up to 2 cards" parses as count 1 (existing `parseSearchDeckParams` bug, not this
+  design's) — its test picks one card; ISSUES line at landing.
 
 ---
 Self-approval checklist:

@@ -147,7 +147,8 @@ export function executeAbility(draft, {
     playerId,
     activeRng,
     events,
-    context: { abilityEndsTurn: endsTurn },
+    // Design 059: the Ability's own text decides whether the cards it takes are revealed.
+    context: { abilityEndsTurn: endsTurn, effectText: text },
   });
 
   if (result.pendingChoice) {

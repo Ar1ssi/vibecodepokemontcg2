@@ -18,6 +18,7 @@ import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import { healLocked } from '../rules/attack-markers.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
@@ -433,6 +434,8 @@ export function executeSteps(draft, {
         sourceCard,
         activeRng,
         events,
+        // Design 059: whether the cards this step takes into the hand may be named in events.
+        revealsPicks: stepRevealsPicks(step, effectTextFor({ effectType, sourceCard, context })),
         selection: stepSelection,
         memo: context[memoKey],
         // Runs `more` right after this step (a Supporter's effect used as an attack's, design
@@ -694,11 +697,15 @@ export function executeSteps(draft, {
             }
           }
 
-          if (step.reveal || pickedCards.length > 0) {
+          // Design 059: a card searched into the hand is named only when the text reveals it
+          // (Quick Search and Computer Search keep it hidden); a benched card is public anyway.
+          const revealsPicks = stepRevealsPicks(step, effectTextFor({ effectType, sourceCard, context }));
+          const shown = dest !== 'hand' || revealsPicks ? pickedCards : [];
+          if (shown.length > 0) {
             events.push({
               type: 'cardsRevealed',
               playerId,
-              cards: pickedCards.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+              cards: shown.map((c) => ({ instanceId: c.instanceId, name: c.name })),
             });
           }
 
