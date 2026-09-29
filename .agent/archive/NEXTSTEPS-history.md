@@ -1367,3 +1367,9 @@ reveal-hand wordings (Zubat/Mandibuzz/Thievul/Hawlucha) remain for 5b.
 oneshot 048-gx-backlog-ii � worktree .claude/worktrees/gx-backlog � branch feature/gx-backlog
 Slices 1-7 all committed; hostile review findings fixed; full pnpm test 4391/0 + 4 audits PASS.
 Evidence: shared/engine/__tests__/gx-backlog-ii.test.mjs (50 tests); GX oracle attacks 390?485/604.
+
+# design 058 - Ancient/Future tags, 2026-09-29
+oneshot 058-ancient-future-tags · worktree .claude/worktrees/paradox-tags · branch feature/paradox-tags · slice 5/5
+  0 design [x] · 1 data+classifier [x] · 2 engine readers [x] · 3 Sada/Radar/Pod [x] · 4 enrichment+cardStats [x] · 5 builder filter [x]
+  Tag source: pokemontcg.io subtypes (TCGdex has none), ids checked on TCGdex.
+  Landed on main; full pnpm test 5284/0; audit:trainers red on main before this branch (I213).

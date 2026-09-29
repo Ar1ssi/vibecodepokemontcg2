@@ -6,12 +6,15 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I212). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I215). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I214 2026-09-29 P3 [rules] Legacy (non-authoritative) client trainer path ignores attach targets: attachFromDiscard offers every in-play Pokémon and one Energy (Sada's Vitality, Reboot Pod, all others) (refs: client/src/setup/rules/trainer-execution.js, design 058 A5)
+- I213 2026-09-29 P2 [tooling] `pnpm audit:trainers` red on main: 21 Fossil/Hilda/Roark rows 'lost step' since the fossil commit e51958aa; confirm each and refresh the baseline (refs: scripts/trainer-behaviour-baseline.json)
+- I212 2026-09-29 P2 [rules] Tool-granted Special Condition immunity/recovery unimplemented (Ancient Booster Energy Capsule, Sparkling Robe): addCondition sees only the Pokémon, not its Tools; the Capsule's +60 HP works (refs: special-conditions.mjs addCondition, design 058)
 - I211 2026-09-29 P3 [rules] Legacy fossil clauses unmodeled: Mysterious/Claw/Root Fossil "KO doesn't count as a Knocked Out Pokémon" (still gives a Prize); Fossil Excavator MD 82 unparsed; Holon Fossil HP 86 / Fossil Egg N4 72 search filters too broad (refs: shared/engine/rules/fossil.mjs, out/pkmn-trainer-cards.json)
 - I210 2026-09-29 P3 [tests] coin-flip-ceremony.test.mjs "several flips toss one after another" failed once under full `pnpm test` load, passes 3/3 alone — same timing-dependent family as I183 (refs: S330)
 - I209 2026-09-29 P3 [deck-builder] B&B box cuboid wears real faces only on the Mega Evolution camera (ME1–ME5); XY/SM/SWSH/SV renders need per-box corners, and the box/lid/wrap are still CSS — design 056 (refs: design 055 § Every box's art)

@@ -3,12 +3,12 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: Elite Trainer Box (design 057, S332) on main: Shelf + Collection tabs in the Standard
-  builder, ETB opening on the 3D scene (lift lid, tray props, nine packs), collection badges (D195).
-Active: design 057 slice 6 (rec-etb recorder + shared recorder lib) not started.
-Next: user look on localhost: /build-and-battle (3D packs) and /deck-builder?etb=phantasmal-flames-etb
-  (ETB scene taste calls in 057 § Deviations; "×n owned" on Search/Browse Sets unseen in the cloud);
-  then 057 slice 6; design 056 (3D box, I209); then top of ISSUES.md.
+Focus: Ancient/Future tags (design 058) on main: per-printing tag table + paradoxTagOf feed Sada's
+  Vitality, Techno Radar, Reboot Pod, Awakening Drum, Booster Capsules, Iron Crown/Thorns ex (D196).
+Active: none. ETB (design 057, D195) slice 6 (rec-etb recorder + shared recorder lib) not started.
+Next: user look on localhost: deck builder Special filter Ancient/Future pills; /build-and-battle and
+  /deck-builder?etb=phantasmal-flames-etb (057 taste calls); then 057 slice 6; design 056 (3D box, I209);
+  then top of ISSUES.md. audit:trainers red on main since the fossil commit (I213).
   Maintenance: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.
 

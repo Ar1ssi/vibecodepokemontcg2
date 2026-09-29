@@ -57,6 +57,7 @@ shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selec
 shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)
 shared/engine/rules/legacy-set-ids.mjs — short set code to TCGdex set id mapping
 shared/engine/rules/card-classify.mjs — single card-classification contract: `isRuleBoxPokemon`, `prizesForKO`, ex/GX/V/VMAX/VSTAR/Tera/Mega/Tag-Team/V-Union/Prism/Radiant/ACE-SPEC/LEGEND/Basic-Energy predicates; ko-flow re-exports, search-match/stadium-effects/tool-combat/reduce use it (rulebook 30c Phase 0); also understands TCGdex `energyType`/`rarity` fallbacks so client deck cards classify without `subtypes` (30c Phase 3); the `cardHasRuleBox` aliases are gone — `isRuleBoxPokemon` is the only rule-box definition (30c 4.2); `isTeamFlareHyperGearCard` is the App. 24 opponent-attaching Tool marker (30c 5.1)
+shared/engine/rules/paradox-tags.mjs — Ancient/Future tag per printing (design 058, D196): `paradoxTagOf` (subtypes, then id/tcgId/image URL/set+number in paradox-tags.generated.mjs, never the name), `isAncientCard`/`isFutureCard`, `withParadoxSubtype`; table baked by scripts/generate-paradox-tags.mjs (`--check` in test:live)
 
 ## Rules engine — DOM-coupled glue (NOT portable; the migration's cost centre)
 client/src/setup/rules/rules-bridge.js — 2324 lines; orchestrates rules via document.dispatchEvent + HUD

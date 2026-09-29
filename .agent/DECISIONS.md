@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D196).
+#   Next id = highest D number in this file and the archive + 1 (next: D197).
 
 ## Active
+- D196 2026-09-29 [rules] Ancient/Future tags are looked up per printing in a generated table (pokemontcg.io subtypes, ids name-checked on TCGdex), never by name; readers call paradoxTagOf. (design 058)
 - D195 2026-09-29 [deck-builder] An Elite Trainer Box is a product, not a format: opening one adds counts to a localStorage collection (`ptcg-sim.collection.v1`) that the Standard builder only badges, never enforces. (design 057)
 - D194 2026-09-29 [deck-builder] Build & Battle box renders and English booster fronts are vendored webp (`client/src/assets/build-battle/{boxes,packs}`), fetched from Bulbapedia or pokesymbols.com (the sharper set per box) and processed in Playwright's Chromium by `scripts/build-battle/vendor-box-art.mjs` — no image library; `box-art.generated.mjs` is the index. (design 055)
 - D193 2026-09-29 [client] New dependency: three.js, pinned devDependency `0.185.0` (the last release with minified builds), vendored byte-identical into `client/src/vendor/three/` by `scripts/vendor-three.mjs` and mapped with an import map in index.ejs; loaded only by `import()` when a box opens. Client-only; the shared engine stays dependency-free (D4). (design 055)

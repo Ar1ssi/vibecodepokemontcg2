@@ -1,5 +1,5 @@
 # 058: Ancient / Future tags
-Status: approved (self — one-shot)
+Status: shipped
 Date: 2026-09-29 · Session: oneshot paradox-tags
 
 ## Problem
@@ -15,16 +15,16 @@ carries only `suffix: "ex"`), so every one of those checks is false in a real ga
 ## Acceptance
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | A tagged printing (by TCGdex id, pokemontcg.io id, image URL, or set code + number) classifies as Ancient/Future; an untagged printing of the same name does not (sv01 Great Tusk ex, sv07 Koraidon) | |
-| 2 | Awakening Drum draws one card per Ancient Pokémon in play on the server | |
-| 3 | Professor Sada's Vitality attaches a Basic Energy from discard to up to 2 different Ancient Pokémon (Active or Bench), then draws 3 only if it attached | |
-| 4 | Techno Radar searches up to 2 Future Pokémon | |
-| 5 | Reboot Pod attaches a Basic Energy from discard to each Future Pokémon | |
-| 6 | Ancient Booster Energy Capsule +60 HP applies only to an Ancient holder; Future Booster Energy Capsule's retreat/damage applies only to a Future holder | |
-| 7 | Iron Crown ex's Cobalt Command (printed text) boosts Future attackers except Iron Crown ex; Iron Thorns ex's Initialization spares Future Pokémon | |
-| 8 | Enriched client cards carry the tag in `subtypes`; `cardStats` forwards it to the server | |
-| 9 | Deck builder "Special" filter offers Ancient and Future | |
-| 10 | Full `pnpm test` green; trainer/ability audits not regressed | |
+| 1 | A tagged printing (by TCGdex id, pokemontcg.io id, image URL, or set code + number) classifies as Ancient/Future; an untagged printing of the same name does not (sv01 Great Tusk ex, sv07 Koraidon) | paradox-tags.test.mjs (id/URL/set+number forms; 'the tag is per printing') |
+| 2 | Awakening Drum draws one card per Ancient Pokémon in play on the server | paradox-tags-engine: 'Awakening Drum draws one card per Ancient Pokémon in play' |
+| 3 | Professor Sada's Vitality attaches a Basic Energy from discard to up to 2 different Ancient Pokémon (Active or Bench), then draws 3 only if it attached | paradox-tags-engine: four Sada tests (2 targets + draw 3; decline 2nd; decline 1st; no targets/Energy) |
+| 4 | Techno Radar searches up to 2 Future Pokémon | paradox-tags-engine: 'Techno Radar searches up to 2 Future Pokémon only' |
+| 5 | Reboot Pod attaches a Basic Energy from discard to each Future Pokémon | paradox-tags-engine: two Reboot Pod execution tests |
+| 6 | Ancient Booster Energy Capsule +60 HP applies only to an Ancient holder; Future Booster Energy Capsule's retreat/damage applies only to a Future holder | paradox-tags-engine: Capsule HP / retreat+damage tests. ✗ partial: Special Condition immunity unimplemented for all Tools (I212) |
+| 7 | Iron Crown ex's Cobalt Command (printed text) boosts Future attackers except Iron Crown ex; Iron Thorns ex's Initialization spares Future Pokémon | paradox-tags-engine: Cobalt Command and Initialization tests |
+| 8 | Enriched client cards carry the tag in `subtypes`; `cardStats` forwards it to the server | paradox-tags-enrich.test.mjs; card-stats.test.mjs 'Ancient/Future Pokémon forward their subtypes' |
+| 9 | Deck builder "Special" filter offers Ancient and Future | card-filters.test.mjs 'Special: Ancient and Future filter by printing' |
+| 10 | Full `pnpm test` green; trainer/ability audits not regressed | pnpm test (rebased) 5289 / pass 5284 / fail 0; audit:trainers red identically on origin/main (I213); audit:abilities/oracle not run (user stopped them) |
 
 ## Assumptions
 - A1 (assumed) The feature is "make the Ancient/Future tag real everywhere the engine and builder
@@ -105,16 +105,16 @@ carries only `suffix: "ex"`), so every one of those checks is false in a real ga
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | card null / no identity fields | `paradoxTagOf` → null, no throw | [ ] |
-| 2 | malformed id / src / number | null | [ ] |
-| 3 | Sada with 0 Ancient Pokémon or 0 Basic Energy in discard | no attach, no draw | [ ] |
-| 4 | Sada attaches 1 then declines the 2nd | draws 3 | [ ] |
-| 5 | Reboot Pod: 3 Future Pokémon, 2 Energy in discard | attaches 2, stops | [ ] |
-| 6 | resume after a pending choice (reconnect) | memo in context re-resolves live state (existing attach memo) | [ ] |
-| 7 | same species, untagged printing (sv01-123 Great Tusk ex) | not Ancient | [ ] |
-| 8 | "Ancient Trait" card | never Ancient-tagged by subtype text | [ ] |
+| 1 | card null / no identity fields | `paradoxTagOf` → null, no throw | [x] |
+| 2 | malformed id / src / number | null | [x] |
+| 3 | Sada with 0 Ancient Pokémon or 0 Basic Energy in discard | no attach, no draw | [x] |
+| 4 | Sada attaches 1 then declines the 2nd | draws 3 | [x] |
+| 5 | Reboot Pod: 3 Future Pokémon, 2 Energy in discard | attaches 2, stops | [x] |
+| 6 | resume after a pending choice (reconnect) | memo in context re-resolves live state (existing attach memo) | [x] |
+| 7 | same species, untagged printing (sv01-123 Great Tusk ex) | not Ancient | [x] |
+| 8 | "Ancient Trait" card | never Ancient-tagged by subtype text | [x] |
 | 9 | hidden info | tag derives from public printing; no new data crosses seats | n/a — no new event/view field |
-| 10 | pokemontcg.io / TCGdex down at generation | generator throws, committed table unchanged; runtime has no network dependency | [ ] |
+| 10 | pokemontcg.io / TCGdex down at generation | generator throws, committed table unchanged; runtime has no network dependency | [x] |
 
 ## Test plan
 Unit: paradox-tags.test.mjs (resolver forms, per-printing negatives, Ancient Trait). Engine:
