@@ -1,8 +1,11 @@
 /*
  * Elite Trainer Box Shelf and Collection (design 055) in the Standard deck
  * builder tab (`body.etb-host`). Panels, buttons and card tiles come from
- * deck-builder-build-battle.css; this sheet adds the shelf cards and the
- * owned badges. Scoped under `.db-live` so the Live tokens apply.
+ * deck-builder-build-battle.css; this sheet adds the shelf cards, the owned
+ * badges and the ETB opening's tray (promo pouch, props, pack fan). The box
+ * itself (lift lid, faces) is in deck-builder-unboxing.css. Scoped under
+ * `.db-live` so the Live tokens apply. Only `.etb-flip`, `.etb-die` and
+ * `.etb-coin` are preserve-3d; opacity never animates on them.
  */
 
 .etb-host .db-live .etb-shelf {
@@ -88,7 +91,531 @@
   color: #1b2127;
 }
 
+/* ── The opening's tray (design 055 § Scene beats 3–5) ─────────────────── */
+.etb-host .db-live .bb-scene--stage .etb-tray {
+  --etb-prop-w: 66px;
+  --etb-prop-h: 92px;
+  align-items: flex-end;
+  gap: 1.8vh 20px;
+}
+.etb-host .db-live .etb-tray .bb-tray__label {
+  max-width: 104px;
+  margin-inline: auto;
+  white-space: normal;
+  line-height: 1.25;
+}
+.etb-host .db-live .etb-prop,
+.etb-host .db-live .etb-packs {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.etb-host .db-live button.etb-prop,
+.etb-host .db-live .etb-packs {
+  cursor: pointer;
+}
+.etb-host .db-live .etb-packs:disabled {
+  cursor: default;
+}
+.etb-host .db-live .etb-prop:focus-visible,
+.etb-host .db-live .etb-packs:focus-visible {
+  outline: 2px solid var(--db-gold);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+/* The promo in its clear pouch, and the promo's flare layer (clipped to the card). */
+.etb-host .db-live .etb-pouch .etb-pouch__card {
+  position: relative;
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.4);
+}
+.etb-host .db-live .etb-pouch .etb-pouch__card > img {
+  position: absolute;
+  inset: 0;
+}
+.etb-host .db-live .etb-pouch .bb-deck__wrap {
+  inset: -5px -5px auto;
+  height: calc(var(--bb-card-h) + 10px);
+  border-radius: 4px;
+}
+.etb-host .db-live .etb-tray .bb-promo__lift {
+  position: relative;
+}
+.etb-host .db-live .bb-promo__fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--bb-card-radius);
+  pointer-events: none;
+}
+
+/* Two-sided props (sleeves, code card) turn over on a preserve-3d flip. */
+.etb-host .db-live .etb-prop--sleeves,
+.etb-host .db-live .etb-prop--code {
+  perspective: 500px;
+}
+.etb-host .db-live .etb-flip {
+  position: relative;
+  width: var(--etb-prop-w);
+  height: var(--etb-prop-h);
+  transform-style: preserve-3d;
+}
+.etb-host .db-live .etb-flip__face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 5px;
+  backface-visibility: hidden;
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.4);
+}
+.etb-host .db-live .etb-flip__back {
+  transform: rotateY(180deg);
+}
+.etb-host .db-live .etb-sleevepack {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+  padding-bottom: 12px;
+  background:
+    linear-gradient(
+      118deg,
+      transparent 0 30%,
+      rgba(255, 255, 255, 0.24) 36%,
+      transparent 44%
+    ),
+    linear-gradient(180deg, var(--bb-red) 0 20%, var(--bb-black) 20%);
+  color: #fff;
+}
+.etb-host .db-live .etb-sleevepack__count {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+.etb-host .db-live .etb-sleevepack__kind {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.etb-host .db-live .etb-sleeve {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      118deg,
+      transparent 0 34%,
+      rgba(255, 255, 255, 0.16) 40%,
+      transparent 48%
+    ),
+    radial-gradient(ellipse at 50% 35%, #2b3a78, var(--bb-black));
+}
+.etb-host .db-live .etb-sleeve__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.etb-host .db-live .etb-code {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px;
+  background: linear-gradient(160deg, #1d4fa8, #0e2554);
+  color: #fff;
+  text-align: center;
+}
+.etb-host .db-live .etb-code__brand {
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+.etb-host .db-live .etb-code__kind {
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  text-transform: uppercase;
+}
+.etb-host .db-live .etb-code--back {
+  background: linear-gradient(160deg, #f4f6fa, #cfd6e2);
+  color: #1b2230;
+}
+/* Never a readable code: a blurred strip. */
+.etb-host .db-live .etb-code__strip {
+  width: 80%;
+  height: 12px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #5b6576 0 3px,
+    #9aa3b2 3px 5px
+  );
+  filter: blur(2.5px);
+}
+
+/* Forty Basic Energy: one card per type, fanned, coloured from fx-colors. */
+.etb-host .db-live .etb-energy {
+  position: relative;
+  width: 92px;
+  height: var(--etb-prop-h);
+}
+.etb-host .db-live .etb-energy__card {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 62px;
+  margin-left: -22px;
+  border: 2px solid #f3efe2;
+  border-radius: 3px;
+  background: radial-gradient(
+    circle at 50% 44%,
+    #fff 0 16%,
+    var(--etb-energy-rgb) 62%
+  );
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.4);
+  transform: rotate(calc(var(--etb-fan) * 7deg));
+  transform-origin: 50% 130%;
+}
+.etb-host .db-live .etb-energy__token {
+  width: 64%;
+}
+
+/* Six damage-counter dice, the flip die and the coin in a clear pouch. */
+.etb-host .db-live .etb-dice {
+  position: relative;
+  width: 88px;
+  height: var(--etb-prop-h);
+  perspective: 420px;
+}
+.etb-host .db-live .etb-dice__bag {
+  position: absolute;
+  inset: 16px 2px 6px;
+  z-index: -1;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px 8px 14px 14px;
+  background:
+    linear-gradient(
+      125deg,
+      transparent 18%,
+      rgba(255, 255, 255, 0.18) 26%,
+      transparent 34%
+    ),
+    rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+.etb-host .db-live .etb-dice__pile {
+  position: absolute;
+  left: 36%;
+  top: 56%;
+  width: 0;
+  height: 0;
+  perspective: 420px;
+}
+.etb-host .db-live .etb-die {
+  --etb-die: 12px;
+  position: absolute;
+  left: calc(var(--etb-dx, 0px) - var(--etb-die) / 2);
+  top: calc(var(--etb-dy, 0px) - var(--etb-die) / 2);
+  width: var(--etb-die);
+  height: var(--etb-die);
+  transform-style: preserve-3d;
+}
+/* Where each die lies in the pouch before a throw; the pose moves it from here. */
+.etb-host .db-live .etb-die:nth-child(1) { --etb-dx: -8px; --etb-dy: -4px; }
+.etb-host .db-live .etb-die:nth-child(2) { --etb-dx: 5px; --etb-dy: -7px; }
+.etb-host .db-live .etb-die:nth-child(3) { --etb-dx: -10px; --etb-dy: 9px; }
+.etb-host .db-live .etb-die:nth-child(4) { --etb-dx: 4px; --etb-dy: 6px; }
+.etb-host .db-live .etb-die:nth-child(5) { --etb-dx: 15px; --etb-dy: 1px; }
+.etb-host .db-live .etb-die:nth-child(6) { --etb-dx: -3px; --etb-dy: -18px; }
+.etb-host .db-live .etb-die:nth-child(7) { --etb-dx: 14px; --etb-dy: -14px; }
+.etb-host .db-live .etb-die__face {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  backface-visibility: hidden;
+  background-color: #c81e2c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+.etb-host .db-live .etb-die__face--1 {
+  transform: translateZ(calc(var(--etb-die) / 2));
+  background-image: radial-gradient(circle at 50% 50%, #fff 0 1.3px, transparent 1.7px);
+}
+.etb-host .db-live .etb-die__face--6 {
+  transform: rotateY(180deg) translateZ(calc(var(--etb-die) / 2));
+  background-image:
+    radial-gradient(circle at 28% 24%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 28% 50%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 28% 76%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 72% 24%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 72% 50%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 72% 76%, #fff 0 1.1px, transparent 1.5px);
+}
+.etb-host .db-live .etb-die__face--2 {
+  transform: rotateX(90deg) translateZ(calc(var(--etb-die) / 2));
+  background-image:
+    radial-gradient(circle at 28% 28%, #fff 0 1.2px, transparent 1.6px),
+    radial-gradient(circle at 72% 72%, #fff 0 1.2px, transparent 1.6px);
+}
+.etb-host .db-live .etb-die__face--5 {
+  transform: rotateX(-90deg) translateZ(calc(var(--etb-die) / 2));
+  background-image:
+    radial-gradient(circle at 26% 26%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 74% 26%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 50% 50%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 26% 74%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 74% 74%, #fff 0 1.1px, transparent 1.5px);
+}
+.etb-host .db-live .etb-die__face--3 {
+  transform: rotateY(90deg) translateZ(calc(var(--etb-die) / 2));
+  background-image:
+    radial-gradient(circle at 26% 26%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 50% 50%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 74% 74%, #fff 0 1.1px, transparent 1.5px);
+}
+.etb-host .db-live .etb-die__face--4 {
+  transform: rotateY(-90deg) translateZ(calc(var(--etb-die) / 2));
+  background-image:
+    radial-gradient(circle at 28% 28%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 72% 28%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 28% 72%, #fff 0 1.1px, transparent 1.5px),
+    radial-gradient(circle at 72% 72%, #fff 0 1.1px, transparent 1.5px);
+}
+/* The coin-flip die: ivory, a red ring on three faces (heads), blank on three (tails). */
+.etb-host .db-live .etb-die--flip .etb-die__face {
+  background-color: #f3efe2;
+  background-image: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.etb-host .db-live .etb-die--flip :is(.etb-die__face--1, .etb-die__face--3, .etb-die__face--5) {
+  background-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 1.6px,
+    var(--bb-red) 1.8px 3.4px,
+    transparent 3.7px
+  );
+}
+.etb-host .db-live .etb-coin {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  margin-top: -14px;
+  transform-style: preserve-3d;
+}
+.etb-host .db-live .etb-coin__face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  backface-visibility: hidden;
+  background: radial-gradient(circle at 40% 35%, #f6d65a, #b4861d);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.etb-host .db-live .etb-coin__face--back {
+  transform: rotateX(180deg);
+  filter: brightness(0.82);
+}
+.etb-host .db-live .etb-coin__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Six card dividers, their tabs stepping across. */
+.etb-host .db-live .etb-dividers {
+  position: relative;
+  width: var(--etb-prop-w);
+  height: var(--etb-prop-h);
+}
+.etb-host .db-live .etb-dividers__card {
+  position: absolute;
+  left: calc(var(--etb-i) * 1px);
+  right: calc(var(--etb-i) * -1px);
+  bottom: calc(var(--etb-i) * 1.5px);
+  height: 82%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #2a2f3d, #151923);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+.etb-host .db-live .etb-dividers__card::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: calc(4% + var(--etb-i) * 13%);
+  width: 26%;
+  height: 8px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, #f6d65a, #b4861d);
+}
+
+/* The player's guide: picked, it opens the set list once the box is done. */
+.etb-host .db-live .etb-guide {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  width: var(--etb-prop-w);
+  height: var(--etb-prop-h);
+  padding: 6px 6px 8px 9px;
+  border-radius: 2px 5px 5px 2px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.4) 0 4px, transparent 4px),
+    linear-gradient(180deg, var(--bb-red) 0 18%, var(--bb-black) 18%);
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  text-align: left;
+}
+.etb-host .db-live .etb-guide__kicker {
+  color: var(--bb-gold);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.etb-host .db-live .etb-guide__set {
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.05;
+}
+.etb-host .db-live .etb-prop--guide[aria-pressed='true'] .etb-guide {
+  outline: 2px solid var(--db-gold);
+  outline-offset: 2px;
+}
+.etb-host .db-live .etb-prop--guide[aria-pressed='true'] .etb-guide::after {
+  content: '✓';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--db-gold);
+  color: #1b2127;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+/* The nine packs stand fanned in the box; a gold glow says they can be taken out. */
+.etb-host .db-live .etb-packs__fan {
+  position: relative;
+  width: 132px;
+  height: 104px;
+}
+.etb-host .db-live .etb-packs .bb-tray__item {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 44px;
+  margin-left: -22px;
+}
+.etb-host .db-live .etb-packs__pack {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1.8;
+  overflow: hidden;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #d9dbe0, #9aa0aa, #d9dbe0);
+  box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.45);
+  transform: translateX(calc(var(--etb-fan) * 6px)) rotate(calc(var(--etb-fan) * 5deg));
+  transform-origin: 50% 140%;
+}
+.etb-host .db-live .etb-packs:not(:disabled) .etb-packs__fan {
+  animation: etb-packs-ready 1.4s ease-in-out infinite alternate;
+}
+@keyframes etb-packs-ready {
+  from {
+    filter: drop-shadow(0 0 0 rgba(255, 214, 90, 0));
+  }
+  to {
+    filter: drop-shadow(0 0 9px rgba(255, 214, 90, 0.7));
+  }
+}
+
+/* The open box sits over its tray a little larger than the Build & Battle box; sealed, it is the whole picture. */
+.etb-host .db-live .bb-scene--stage[data-lid='lift'] .bb-box {
+  --bb-m-t: 10px;
+  --bb-m-x: 26px;
+  --bb-m-b: 10px;
+  --bb-box-scale: 1.2;
+}
+.etb-host .db-live .bb-scene--stage[data-lid='lift'][data-stage='sealed'] .bb-box {
+  --bb-m-t: 70px;
+  --bb-m-x: 90px;
+  --bb-m-b: 70px;
+  --bb-box-scale: 1.6;
+}
+
+body.fx-off.etb-host .db-live .etb-packs .etb-packs__fan {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .etb-host .db-live .etb-packs .etb-packs__fan {
+    animation: none;
+  }
+}
+
 @media (max-width: 520px) {
+  .etb-host .db-live .bb-scene--stage .etb-tray {
+    --etb-prop-w: 56px;
+    --etb-prop-h: 78px;
+    --bb-card-w: 58px;
+    --bb-card-h: 81px;
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    justify-content: center;
+    justify-items: center;
+    gap: 14px 10px;
+  }
+  .etb-host .db-live .etb-tray > .etb-packs {
+    grid-column: 1 / -1;
+  }
+  .etb-host .db-live .etb-energy {
+    width: 74px;
+  }
+  .etb-host .db-live .etb-energy__card {
+    width: 36px;
+    height: 50px;
+    margin-left: -18px;
+  }
+  .etb-host .db-live .etb-dice {
+    width: 76px;
+  }
+  .etb-host .db-live .bb-scene--stage[data-lid='lift'] .bb-box {
+    --bb-m-t: -24px;
+    --bb-m-x: -30px;
+    --bb-m-b: -24px;
+    --bb-box-scale: 0.8;
+  }
+  .etb-host .db-live .bb-scene--stage[data-lid='lift'][data-stage='sealed'] .bb-box {
+    --bb-m-t: -20px;
+    --bb-m-x: -30px;
+    --bb-m-b: -20px;
+    --bb-box-scale: 0.95;
+  }
   .etb-host .db-live .etb-shelf {
     grid-template-columns: 1fr;
   }

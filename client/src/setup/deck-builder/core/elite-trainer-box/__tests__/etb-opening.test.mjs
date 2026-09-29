@@ -47,6 +47,7 @@ test('etbContents gathers the non-pack contents; the promo comes from the rows p
   assert.equal(contents.promo, promo);
   assert.equal(contents.promoTier, 2, 'the Illustration Rare art plays the tier 2 flare');
   assert.equal(contents.sleeveId, etb.sleeveId);
+  assert.equal(contents.sleeveCount, 65);
   assert.equal(contents.coinId, etb.coinId);
   assert.deepEqual(contents.energy, etb.energy);
   assert.notEqual(contents.energy, etb.energy, 'a copy, so callers cannot edit the catalog');

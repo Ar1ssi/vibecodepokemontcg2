@@ -23,7 +23,7 @@ export function openEtb({ etb, cards = [], packModel, rng }) {
  * @param {import('./etb-catalog.mjs').Etb} etb
  * @param {Record<string, object>} promos the generated promo rows by ETB key (`ETB_PROMOS`)
  * @returns {{promo: object|null, promoTier: number, energy: [string, number][], sleeveId: string,
- *   coinId: string, props: object}} `promoTier` is the reveal size of the promo's lift (hitTierFor
+ *   sleeveCount: number, coinId: string, props: object}} `promoTier` is the reveal size of the promo's lift (hitTierFor
  *   scale), 0 without a promo row.
  */
 export function etbContents(etb, promos = {}) {
@@ -33,6 +33,7 @@ export function etbContents(etb, promos = {}) {
     promoTier: promo ? etb.promoTier || 0 : 0,
     energy: etb.energy.map(([label, count]) => [label, count]),
     sleeveId: etb.sleeveId,
+    sleeveCount: etb.sleeveCount,
     coinId: etb.coinId,
     props: { ...etb.props },
   };

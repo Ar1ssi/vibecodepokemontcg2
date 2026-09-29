@@ -54,9 +54,11 @@
 :is(.build-battle-window, .etb-host) .db-live .bb-box {
   position: relative;
   flex: 0 0 auto;
-  width: calc(var(--bb-w) + 100px);
+  --bb-host-w: calc(var(--bb-w) + 100px);
   /* Room above the box for the open lid. */
-  height: calc(var(--bb-h) + 170px);
+  --bb-host-h: calc(var(--bb-h) + 170px);
+  width: var(--bb-host-w);
+  height: var(--bb-host-h);
   perspective: 1000px;
   perspective-origin: 50% 18%;
   display: grid;
@@ -75,15 +77,15 @@
   zoom: var(--bb-box-zoom);
   transform: scale(calc(var(--bb-box-scale) / var(--bb-box-zoom)));
   margin: calc(
-      ((var(--bb-h) + 170px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-t)) /
+      (var(--bb-host-h) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-t)) /
         var(--bb-box-zoom)
     )
     calc(
-      ((var(--bb-w) + 100px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-x)) /
+      (var(--bb-host-w) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-x)) /
         var(--bb-box-zoom)
     )
     calc(
-      ((var(--bb-h) + 170px) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-b)) /
+      (var(--bb-host-h) * (1 - var(--bb-box-zoom)) / 2 + var(--bb-m-b)) /
         var(--bb-box-zoom)
     );
 }
@@ -220,6 +222,150 @@
 :is(.build-battle-window, .etb-host) .db-live .bb-box__lid-inner {
   transform: rotateX(90deg) rotateY(180deg);
   background: linear-gradient(180deg, #4a3d33, #2b231d);
+}
+
+/*
+ * ── Elite Trainer Box (design 055): a landscape box lying flat, lid toward the camera ──
+ * Frame: the lid is the +z face (--bb-w × --bb-h), --bb-d is the box's thickness. `near` is the
+ * long side toward the viewer, `far` the one away from it, `under` the base. The design's −24°
+ * tilt is in the poses' y-up convention; in CSS it is rotateX(24deg) (as lidTransform flips).
+ */
+:is(.build-battle-window, .etb-host) .db-live .bb-scene[data-lid='lift'] .bb-box {
+  --bb-host-h: calc(var(--bb-h) + 110px);
+  --etb-rim: calc(var(--bb-d) * 0.25);
+  perspective: 900px;
+  perspective-origin: 50% 12%;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-scene[data-lid='lift'] .bb-box::after {
+  left: 12%;
+  right: 12%;
+  bottom: 20px;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-scene[data-lid='lift'] .bb-box__body {
+  top: 6px;
+  transform: rotateX(24deg) rotateY(-10deg);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--lid,
+:is(.build-battle-window, .etb-host) .db-live .etb-face--under,
+:is(.build-battle-window, .etb-host) .db-live .etb-box__floor {
+  width: var(--bb-w);
+  height: var(--bb-h);
+  left: calc(var(--bb-w) / -2);
+  top: calc(var(--bb-h) / -2);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--near,
+:is(.build-battle-window, .etb-host) .db-live .etb-face--far,
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--near,
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--far {
+  width: var(--bb-w);
+  height: var(--bb-d);
+  left: calc(var(--bb-w) / -2);
+  top: calc(var(--bb-d) / -2);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--left,
+:is(.build-battle-window, .etb-host) .db-live .etb-face--right,
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--left,
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--right {
+  width: var(--bb-d);
+  height: var(--bb-h);
+  left: calc(var(--bb-d) / -2);
+  top: calc(var(--bb-h) / -2);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--under {
+  transform: rotateY(180deg) translateZ(calc(var(--bb-d) / 2));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--near {
+  transform: rotateX(-90deg) translateZ(calc(var(--bb-h) / 2));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--far {
+  transform: rotateX(90deg) translateZ(calc(var(--bb-h) / 2));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--left {
+  transform: rotateY(-90deg) translateZ(calc(var(--bb-w) / 2));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-face--right {
+  transform: rotateY(90deg) translateZ(calc(var(--bb-w) / 2));
+}
+
+/* The well under the lid: cardboard walls 1 px inside the faces and a floor at the base. */
+:is(.build-battle-window, .etb-host) .db-live .etb-box__floor,
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall {
+  position: absolute;
+  backface-visibility: hidden;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-box__floor {
+  transform: translateZ(calc(var(--bb-d) / -2 + 1px));
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0 64%,
+      rgba(0, 0, 0, 0.5) 64% 65.5%,
+      rgba(255, 255, 255, 0.06) 65.5% 66.5%,
+      transparent 66.5%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 7%,
+      rgba(0, 0, 0, 0.28) 7% 7.6%
+    ),
+    radial-gradient(ellipse 80% 70% at 50% 40%, #262d3f, #10131c);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall {
+  background: linear-gradient(180deg, #3a2f28, #1e1916);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--near {
+  transform: rotateX(90deg) translateZ(calc(var(--bb-h) / -2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--far {
+  transform: rotateX(-90deg) translateZ(calc(var(--bb-h) / -2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--left {
+  transform: rotateY(90deg) translateZ(calc(var(--bb-w) / -2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-box__wall--right {
+  transform: rotateY(-90deg) translateZ(calc(var(--bb-w) / -2 + 1px));
+}
+
+/*
+ * The lid: `.bb-box__lid` is the preserve-3d host the JS moves (liftLidPose); its cover and four
+ * rim strips (0.25 × depth) sit 1 px outside the box and each fades on its own.
+ */
+:is(.build-battle-window, .etb-host) .db-live .etb-face--lid {
+  transform: translateZ(calc(var(--bb-d) / 2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--near,
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--far {
+  width: var(--bb-w);
+  height: var(--etb-rim);
+  left: calc(var(--bb-w) / -2);
+  top: calc(var(--etb-rim) / -2);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--left,
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--right {
+  width: var(--etb-rim);
+  height: var(--bb-h);
+  left: calc(var(--etb-rim) / -2);
+  top: calc(var(--bb-h) / -2);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--near {
+  transform: translateZ(calc(var(--bb-d) / 2 - var(--etb-rim) / 2)) rotateX(-90deg)
+    translateZ(calc(var(--bb-h) / 2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--far {
+  transform: translateZ(calc(var(--bb-d) / 2 - var(--etb-rim) / 2)) rotateX(90deg)
+    translateZ(calc(var(--bb-h) / 2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--left {
+  transform: translateZ(calc(var(--bb-d) / 2 - var(--etb-rim) / 2)) rotateY(-90deg)
+    translateZ(calc(var(--bb-w) / 2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-lid__rim--right {
+  transform: translateZ(calc(var(--bb-d) / 2 - var(--etb-rim) / 2)) rotateY(90deg)
+    translateZ(calc(var(--bb-w) / 2 + 1px));
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-scene[data-lid='lift'] .bb-box__wrap,
+:is(.build-battle-window, .etb-host) .db-live .bb-scene[data-lid='lift'] .bb-box__open {
+  inset: 34px 30px 36px;
 }
 
 /* A face photo squared by faceMatrix3d; the CSS face stays underneath as the fallback. */
@@ -548,6 +694,128 @@
   justify-content: center;
   padding: 4px 0;
   background: linear-gradient(90deg, #d9a92c, #f6d65a, #d9a92c);
+}
+
+/* ── Elite Trainer Box faces (design 055 § Product art) ─────────────────── */
+:is(.build-battle-window, .etb-host) .db-live .etb-pf {
+  background: var(--bb-black);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-plate {
+  padding: 3px 0 2px;
+  background: var(--bb-red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  font-stretch: expanded;
+  letter-spacing: 0.16em;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* The lid: the key art on a black field under the 052 slashes, the plate on its top edge. */
+:is(.build-battle-window, .etb-host) .db-live .etb-keyart {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-keyart__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 26%;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-keyart .bb-keyart__slashes {
+  opacity: 0.32;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-keyart::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(11, 11, 16, 0.5) 0,
+    transparent 24%,
+    transparent 52%,
+    var(--bb-black) 90%
+  );
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--lid .etb-plate {
+  position: absolute;
+  inset: 0 0 auto;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--lid .bb-setlogo {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 5px;
+  height: 30%;
+  background: transparent;
+}
+/* The near long side: the plate and the pack count below the lid's rim. */
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--near {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-top: var(--etb-rim, 0px);
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--near .etb-plate {
+  padding: 2px 12px 1px;
+  border-radius: 2px;
+  font-size: 8px;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b4861d, #f6d65a, #b4861d);
+  color: #2a1b00;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* Sides and lid rims: black with the slashes running on. */
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--side,
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--near {
+  background:
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 18px,
+      rgba(255, 47, 163, 0.42) 18px 21px,
+      transparent 21px 36px,
+      rgba(127, 224, 0, 0.32) 36px 38px,
+      transparent 38px 52px
+    ),
+    var(--bb-black);
+}
+/* The far long side: what is inside, typeset, and the legal lines. */
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--far {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 8px;
+  font-size: 4.5px;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--far .bb-back__inside {
+  font-size: 6px;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-far__list {
+  margin: 0;
+  padding-left: 8px;
+  columns: 2;
+  column-gap: 10px;
+}
+:is(.build-battle-window, .etb-host) .db-live .etb-pf--under {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.03) 0 1px,
+      transparent 1px 9px
+    ),
+    var(--bb-black);
 }
 
 /* Shrink-wrap: a glossy film with two diagonal streaks; clip-path peels it away. */
