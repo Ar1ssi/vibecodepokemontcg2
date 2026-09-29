@@ -39,7 +39,7 @@ export const MAX_EFFECT_STEPS = 200;
 // Step kinds with a case in executeSteps' switch (kept in sync by executor-step-types.test).
 export const EXECUTOR_STEP_TYPES = new Set([
   'discardCost', 'discardCostAbility', 'searchDeck', 'searchAbility', 'search', 'draw',
-  'drawAbility', 'drawUntil', 'millItems', 'discardHandThenDraw', 'shuffleHandThenDraw',
+  'drawAbility', 'drawUntil', 'millItems', 'discardHand', 'discardHandThenDraw', 'shuffleHandThenDraw',
   'ionoShuffle', 'switchOwn', 'switchAbility', 'switch', 'switchOpponent', 'switchOpponentOut',
   'recursion', 'recursionFromDiscardAbility', 'shuffleFromDiscard', 'heal', 'healAmount',
   'healAbility', 'coinFlip', 'coinDraw', 'returnTool', 'shuffleOwnPokemon', 'revealHand',
@@ -859,6 +859,15 @@ export function executeSteps(draft, {
               cards: [{ instanceId: c.instanceId, name: c.name }],
             });
           }
+        }
+        break;
+      }
+
+      case 'discardHand': {
+        const hand = player.zones.hand || [];
+        for (const c of hand.splice(0, hand.length)) {
+          discardCardToPlayerZone(player, c);
+          events.push({ type: 'cardMoved', instanceId: c.instanceId, from: 'hand', to: 'discard', playerId });
         }
         break;
       }

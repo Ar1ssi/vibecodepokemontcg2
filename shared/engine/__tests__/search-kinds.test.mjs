@@ -308,3 +308,57 @@ test('Brilliant Blender moves the chosen deck cards to the discard pile', () => 
   assert.equal(zones.deck.length, 4);
   assert.ok(!events.some((e) => e.type === 'cardsRevealed'));
 });
+
+// "Discard your hand and search your deck" (design 058 slice 3). Texts are out/pkmn-trainer-cards.json rows.
+const HAND_DISCARD = {
+  // Peony, Chilling Reign 220
+  peony:
+    'Discard your hand and search your deck for up to 2 Trainer cards, reveal them, and put them into your hand. Then, shuffle your deck.',
+  // Larry’s Skill, Prismatic Evolutions 139
+  larrysSkill:
+    'Discard your hand and search your deck for a Pokémon, a Supporter card, and a Basic Energy card, reveal them, and put them into your hand. Then, shuffle your deck.',
+};
+
+test('Peony and Larry’s Skill discard the hand before searching', () => {
+  assert.deepEqual(parseTrainerEffect(HAND_DISCARD.peony).steps, [
+    { type: 'discardHand' },
+    { type: 'searchDeck', what: 'Trainer', count: 2, destination: 'hand', upTo: true, reveal: true },
+  ]);
+  const larry = parseTrainerEffect(HAND_DISCARD.larrysSkill).steps;
+  assert.equal(larry.length, 2);
+  assert.deepEqual(larry[0], { type: 'discardHand' });
+  assert.equal(larry[1].type, 'searchDeckSequence');
+  assert.deepEqual(larry[1].stages.map((s) => `${s.what}×${s.count}`), ['Pokémon×1', 'Supporter×1', 'Basic Energy×1']);
+});
+
+test('Peony discards the whole hand, then offers the deck’s Trainers', () => {
+  const state = createGameState({ gameId: 'peony', seed: 1, rulesEnabled: true });
+  state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
+  state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 11, name: 'Pikachu', supertype: 'Pokémon', subtypes: 'Basic' }),
+    createCard({ instanceId: 12, name: 'Eevee', supertype: 'Pokémon', subtypes: 'Basic' }),
+    createCard({ instanceId: 13, name: 'Lightning Energy', supertype: 'Energy', subtypes: 'Basic' })
+  );
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 1, name: 'Ultra Ball', supertype: 'Trainer', trainerType: 'Item' }),
+    createCard({ instanceId: 2, name: 'Iono', supertype: 'Trainer', trainerType: 'Supporter' }),
+    createCard({ instanceId: 3, name: 'Charmander', supertype: 'Pokémon', subtypes: 'Basic' })
+  );
+  const events = [];
+  const result = executeSteps(state, {
+    steps: parseTrainerEffect(HAND_DISCARD.peony).steps,
+    fromStepIndex: 0,
+    effectType: 'trainer',
+    sourceCard: { name: 'Peony' },
+    playerId: 'p1',
+    activeRng: createRng(1),
+    events,
+  });
+  assert.equal(state.players.p1.zones.hand.length, 0);
+  assert.equal(state.players.p1.zones.discard.length, 3);
+  assert.equal(events.filter((e) => e.type === 'cardMoved' && e.to === 'discard').length, 3);
+  assert.ok(result.pendingChoice, 'the Trainer search asks for a choice');
+  assert.deepEqual(result.pendingChoice.options.map((c) => c.instanceId).sort(), [1, 2]);
+});

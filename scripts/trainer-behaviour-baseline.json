@@ -4428,6 +4428,7 @@
   },
   "Larry’s Skill#i56zmu": {
    "steps": [
+    "discardHand",
     "searchDeckSequence"
    ]
   },
@@ -5941,6 +5942,7 @@
   },
   "Peony#1knu88p": {
    "steps": [
+    "discardHand",
     "searchDeck"
    ]
   },

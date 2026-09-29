@@ -1125,8 +1125,15 @@ function parseTrainerSteps(lower) {
   if (result?.recognizable && Array.isArray(result.steps) && result.steps.length > 0) {
     appendLeadingHandDiscardCost(result.steps, lower);
     appendMissingOwnSwitch(result.steps, lower);
+    prependWholeHandDiscard(result.steps, lower);
   }
   return result;
+}
+
+// Peony, Larry's Skill: the whole hand is discarded before the search resolves.
+function prependWholeHandDiscard(steps, lower) {
+  if (!lower.trimStart().startsWith('discard your hand and search your deck')) return;
+  steps.unshift({ type: 'discardHand' });
 }
 
 function parseTrainerStepsInner(lower) {
@@ -2825,6 +2832,7 @@ export function describeStep(step) {
       }.`;
     }
     case 'opponentDraw': return `Your opponent draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
+    case 'discardHand': return 'Discard your hand.';
     case 'discardHandThenDraw': return `Discard your hand, then draw ${step.count} cards.`;
     case 'shuffleHandThenDraw': return `Shuffle your hand into the deck, then draw ${step.count} cards${step.bonusCount ? ` (${step.bonusCount} if 6 prizes left)` : ''}.`;
     case 'searchDeck': {
