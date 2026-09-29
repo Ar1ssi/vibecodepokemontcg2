@@ -37,11 +37,13 @@ export const TCG_DECK_RULES = {
   maxCopiesPerCard: 4,
 };
 
-// Prerelease rules (pokemon.com, design 051): 40 cards; the Standard 4-copy rule still applies.
+// Limited format (Play! Pokémon Rules & Formats 2017; Tournament Rules Handbook 2024 § 5.5;
+// design 054 Option 4): 40 cards and no copy limit beyond card text — ACE SPEC, Radiant, Prism
+// Star and a printed per-deck cap still count.
 export const BUILD_BATTLE_DECK_RULES = {
   formatName: 'Build & Battle',
   deckSize: { min: 40, max: 40 },
-  maxCopiesPerCard: 4,
+  maxCopiesPerCard: null,
 };
 
 // Formats built from the TCG card pool; Pocket cards are refused in them.
@@ -145,11 +147,14 @@ export function validateDeck(decklist = {}, selectedFormat = DECK_FORMATS.POCKET
   }
 
   // Only Basic Energy is exempt from the copy limit (p.22); Special Energy is not.
-  // A printed cap below the format's (Miracle Energy: 1 per deck, audit SE9) wins.
+  // A printed cap below the format's (Miracle Energy: 1 per deck, audit SE9) wins; a format
+  // without a copy limit (Build & Battle) still keeps the printed one.
   for (const entry of byOfficialName.values()) {
     if (isBasicEnergy(entry.card)) continue;
     const printedLimit = specialEnergyDeckLimit(entry.card);
-    const maxCopies = printedLimit == null ? rules.maxCopiesPerCard : Math.min(printedLimit, rules.maxCopiesPerCard);
+    const limits = [printedLimit, rules.maxCopiesPerCard].filter((limit) => limit != null);
+    if (!limits.length) continue;
+    const maxCopies = Math.min(...limits);
     if (entry.count > maxCopies) {
       errors.push(`${entry.name} has ${entry.count} copies (max ${maxCopies}).`);
     }

@@ -4,6 +4,8 @@ import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 import globals from 'globals';
 
 export default [
+  // Vendored third-party builds stay byte-identical to their package (design 055).
+  { ignores: ['client/src/vendor/**'] },
   js.configs.recommended,
   prettier,
   eslintPluginPrettierRecommended,

@@ -6,12 +6,15 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I208). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I211). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I210 2026-09-29 P3 [tests] coin-flip-ceremony.test.mjs "several flips toss one after another" failed once under full `pnpm test` load, passes 3/3 alone — same timing-dependent family as I183 (refs: S330)
+- I209 2026-09-29 P3 [deck-builder] B&B box cuboid wears real faces only on the Mega Evolution camera (ME1–ME5); XY/SM/SWSH/SV renders need per-box corners, and the box/lid/wrap are still CSS — design 056 (refs: design 055 § Every box's art)
+- I208 2026-09-29 P3 [server] Static files go out `Cache-Control: no-store` with no compression (server.js:160), so every B&B opening re-downloads the 733 KB three.js build; gzip would cut it to ~180 KB (refs: D193, design 055)
 - I201 2026-09-28 P3 [client] No UI to attack from the Bench: the engine accepts `attackerInstanceId` (I196, Alakazam ex Dimensional Hand) but chat-buttons.js / dual-run-bridge.js always attack with the Active (refs: S328)
 - I200 2026-09-28 P2 [rules] `atkCountersEach` (effects/attack-steps.mjs) ignores `scope: 'active'`, so "put … damage counters on their Active Pokémon for each card in your opponent's hand" (rules/attack-steps.mjs ~812) hits every opponent Pokémon (refs: S328 I195 review)
 - I199 2026-09-28 P3 [deck-builder] find-type.js, find-old-type.js (+ its database/updater) and tcgdex-image-url.mjs lost their only caller when the text decklist importer was removed (design 050); delete them with their tests or revive them for a new importer

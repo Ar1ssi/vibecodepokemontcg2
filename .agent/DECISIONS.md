@@ -9,6 +9,8 @@
 #   Next id = highest D number in this file and the archive + 1 (next: D193).
 
 ## Active
+- D194 2026-09-29 [deck-builder] Build & Battle box renders and English booster fronts are vendored webp (`client/src/assets/build-battle/{boxes,packs}`), fetched from Bulbapedia or pokesymbols.com (the sharper set per box) and processed in Playwright's Chromium by `scripts/build-battle/vendor-box-art.mjs` — no image library; `box-art.generated.mjs` is the index. (design 055)
+- D193 2026-09-29 [client] New dependency: three.js, pinned devDependency `0.185.0` (the last release with minified builds), vendored byte-identical into `client/src/vendor/three/` by `scripts/vendor-three.mjs` and mapped with an import map in index.ejs; loaded only by `import()` when a box opens. Client-only; the shared engine stays dependency-free (D4). (design 055)
 - D192 2026-09-28 [client] A saved Build & Battle box belongs to the room it was opened in (`session.roomId`); the game tab sends its room to the builder tab (`host-state.roomId`), and a different room starts a fresh box. Reloads and rematches in the same room keep it; outside a room it is kept.
 - D191 2026-09-28 [netcode] The match format is room-level: both seated players must agree (propose/accept) and the server keeps it on roomInfo, mirrored to GameRoom.roomFormat, never in engine state; the deal refuses decks of another format and the choice locks when the coin call opens (design 053).
 - D190 2026-09-28 [netcode] Formats are checked at the deal, not at load: `setup` refuses mixed formats and both Set Ups clear with a chat line, so a restored last-used deck stays replaceable (I202). (Supersedes D187's load refusal.)

@@ -8,7 +8,7 @@ import {
   officialCardName,
   validateDeck,
 } from '../core/deck-validation.mjs';
-import { BUILD_BATTLE_DECKS } from '../core/build-battle/build-battle.generated.mjs';
+import { loadBoxData } from '../core/build-battle/box-data.mjs';
 
 function makeGroup({ name, count, supertype = 'Pokémon', pocket = false, extra = {} }) {
   const image = pocket
@@ -429,7 +429,8 @@ function withCount(deck, name, delta) {
   return next;
 }
 
-const ceruledgeDeck = deckFromBoxRows(BUILD_BATTLE_DECKS['phantasmal-flames'].ceruledge);
+const { data: phantasmalFlames } = await loadBoxData('phantasmal-flames');
+const ceruledgeDeck = deckFromBoxRows(phantasmalFlames.decks.ceruledge);
 
 test('the Ceruledge box deck is a legal 40-card Build & Battle deck (promo + set print share 4 copies)', () => {
   const result = validateDeck(ceruledgeDeck, DECK_FORMATS.BUILD_BATTLE);
@@ -452,11 +453,57 @@ test('Build & Battle wants exactly 40: 39 and 41 fail with the counter total', (
   assert.deepEqual(long.errors, ['Deck must contain exactly 40 cards. Current total: 41.']);
 });
 
-test('Build & Battle counts copies across the promo and the set print (5 Ceruledge)', () => {
+// Design 054 row 12: the Limited format has no copy limit but card text (Play! Pokémon Rules &
+// Formats 2017, "Limited"; Tournament Rules Handbook 2024 § 5.5).
+test('Build & Battle allows a fifth copy (Limited rule); Standard still stops at 4', () => {
   const deck = withCount(withCount(ceruledgeDeck, 'Ceruledge', 1), 'Basic Fire Energy', -1);
   const result = validateDeck(deck, DECK_FORMATS.BUILD_BATTLE);
   assert.equal(result.totalCards, 40);
-  assert.deepEqual(result.errors, ['Ceruledge has 5 copies (max 4).']);
+  assert.deepEqual(result.errors, []);
+  const standard = validateDeck(deck, DECK_FORMATS.TCG);
+  assert.ok(standard.errors.includes('Ceruledge has 5 copies (max 4).'), standard.errors.join('; '));
+});
+
+test('Build & Battle keeps the card-text limits: ACE SPEC, Radiant, Prism Star, printed caps', () => {
+  const filler = (count) => makeGroup({ name: 'Lightning Energy', count, supertype: 'Energy' });
+  const pikachu = makeGroup({ name: 'Pikachu', count: 4, extra: { stage: 'Basic' } });
+  const cases = [
+    [
+      [
+        makeGroup({ name: 'Prime Catcher', count: 1, supertype: 'Trainer', extra: { subtypes: ['Item', 'ACE SPEC'] } }),
+        makeGroup({ name: 'Computer Search', count: 1, supertype: 'Trainer', extra: { rarity: 'ACE SPEC Rare' } }),
+      ],
+      'only 1 ACE SPEC card',
+    ],
+    [
+      [
+        makeGroup({ name: 'Radiant Greninja', count: 1, extra: { stage: 'Basic' } }),
+        makeGroup({ name: 'Radiant Charizard', count: 1, extra: { stage: 'Basic' } }),
+      ],
+      'only 1 Radiant Pokémon',
+    ],
+    [[makeGroup({ name: '◇ Victini', count: 2, extra: { stage: 'Basic' } })], 'Prism Star'],
+    [
+      [
+        makeGroup({
+          name: 'Miracle Energy',
+          count: 2,
+          supertype: 'Energy',
+          extra: {
+            subtypes: ['Special'],
+            text: "You can't have more than 1 Miracle Energy in your deck. Attach Miracle Energy to 1 of your Shining or Light Pokemon.",
+          },
+        }),
+      ],
+      'Miracle Energy has 2 copies (max 1).',
+    ],
+  ];
+  for (const [groups, expected] of cases) {
+    const deck = buildDeck([pikachu, ...groups, filler(34)]);
+    const result = validateDeck(deck, DECK_FORMATS.BUILD_BATTLE);
+    assert.equal(result.totalCards, 40);
+    assert.ok(result.errors.some((error) => error.includes(expected)), `${expected}: ${result.errors.join('; ')}`);
+  }
 });
 
 test('Build & Battle still requires a Basic Pokémon', () => {

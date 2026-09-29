@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Vendored third-party files stay byte-identical to their package (design 055).
+client/src/vendor/** -text

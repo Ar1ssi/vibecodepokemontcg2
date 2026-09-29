@@ -1,0 +1,690 @@
+// Bulbapedia sources of every Build & Battle box's product render and English booster fronts
+// (design 055 § Every box's art). Box renders are the image on the box's own page, or for the six
+// kits whose page shows none, `<set code> Prerelease Kit.jpg`; boosters are the `<set code>
+// Booster <name>` files on the set's page (other languages and "Booster Art" wallpapers left out).
+// Read with the MediaWiki API on 2026-09-29. `pokesymbols` lists the same English wrappers from
+// pokesymbols.com/tcg/booster-pack-art (every set at ≈ 360 px wide; user's pick, 2026-09-29): the
+// vendoring script keeps, per box, whichever source's narrowest wrapper is widest.
+// `scripts/build-battle/vendor-box-art.mjs` fetches them.
+
+export const BOX_ART_SOURCES = Object.freeze({
+  'fates-collide': {
+    setId: 'xy10',
+    render: { file: 'File:XY10 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/56/XY10_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'alakazam', file: 'File:XY10 Booster Alakazam.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/a1/XY10_Booster_Alakazam.jpg' },
+      { key: 'delphox', file: 'File:XY10 Booster Delphox.jpg', url: 'https://archives.bulbagarden.net/media/upload/e/e0/XY10_Booster_Delphox.jpg' },
+      { key: 'lugia', file: 'File:XY10 Booster Lugia.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/3a/XY10_Booster_Lugia.jpg' },
+      { key: 'zygarde', file: 'File:XY10 Booster Zygarde.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/de/XY10_Booster_Zygarde.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'fates-collide-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fates-collide-pack-0.jpg' },
+      { key: 'pack-2', file: 'fates-collide-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fates-collide-pack-1.jpg' },
+      { key: 'pack-3', file: 'fates-collide-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fates-collide-pack-2.jpg' },
+      { key: 'pack-4', file: 'fates-collide-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fates-collide-pack-3.jpg' },
+    ],
+  },
+  'steam-siege': {
+    setId: 'xy11',
+    render: { file: 'File:XY11 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/db/XY11_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'gardevoir', file: 'File:XY11 Booster Gardevoir.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d2/XY11_Booster_Gardevoir.jpg' },
+      { key: 'volcanion', file: 'File:XY11 Booster Volcanion.jpg', url: 'https://archives.bulbagarden.net/media/upload/f/f0/XY11_Booster_Volcanion.jpg' },
+      { key: 'xerneas', file: 'File:XY11 Booster Xerneas.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/dd/XY11_Booster_Xerneas.jpg' },
+      { key: 'yveltal', file: 'File:XY11 Booster Yveltal.jpg', url: 'https://archives.bulbagarden.net/media/upload/e/e0/XY11_Booster_Yveltal.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'steam-siege-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/steam-siege-pack-0.jpg' },
+      { key: 'pack-2', file: 'steam-siege-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/steam-siege-pack-1.jpg' },
+      { key: 'pack-3', file: 'steam-siege-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/steam-siege-pack-2.jpg' },
+      { key: 'pack-4', file: 'steam-siege-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/steam-siege-pack-3.jpg' },
+    ],
+  },
+  'evolutions': {
+    setId: 'xy12',
+    render: { file: 'File:XY12 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/c8/XY12_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'blastoise', file: 'File:XY12 Booster Blastoise.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/77/XY12_Booster_Blastoise.jpg' },
+      { key: 'charizard', file: 'File:XY12 Booster Charizard.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/5c/XY12_Booster_Charizard.jpg' },
+      { key: 'raichu', file: 'File:XY12 Booster Raichu.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/a2/XY12_Booster_Raichu.jpg' },
+      { key: 'venusaur', file: 'File:XY12 Booster Venusaur.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d7/XY12_Booster_Venusaur.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'evolutions-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolutions-pack-0.jpg' },
+      { key: 'pack-2', file: 'evolutions-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolutions-pack-1.jpg' },
+      { key: 'pack-3', file: 'evolutions-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolutions-pack-2.jpg' },
+      { key: 'pack-4', file: 'evolutions-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolutions-pack-3.jpg' },
+    ],
+  },
+  'sun-moon': {
+    setId: 'sm1',
+    render: { file: 'File:SM1 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/9/9c/SM1_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'decidueye', file: 'File:SM1 Booster Decidueye.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/59/SM1_Booster_Decidueye.jpg' },
+      { key: 'incineroar', file: 'File:SM1 Booster Incineroar.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/57/SM1_Booster_Incineroar.jpg' },
+      { key: 'lunala', file: 'File:SM1 Booster Lunala.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d1/SM1_Booster_Lunala.jpg' },
+      { key: 'primarina', file: 'File:SM1 Booster Primarina.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d4/SM1_Booster_Primarina.jpg' },
+      { key: 'solgaleo', file: 'File:SM1 Booster Solgaleo.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/76/SM1_Booster_Solgaleo.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'sun-and-moon-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sun-and-moon-pack-0.jpg' },
+      { key: 'pack-2', file: 'sun-and-moon-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sun-and-moon-pack-1.jpg' },
+      { key: 'pack-3', file: 'sun-and-moon-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sun-and-moon-pack-2.jpg' },
+      { key: 'pack-4', file: 'sun-and-moon-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sun-and-moon-pack-3.jpg' },
+      { key: 'pack-5', file: 'sun-and-moon-pack-4.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sun-and-moon-pack-4.jpg' },
+    ],
+  },
+  'guardians-rising': {
+    setId: 'sm2',
+    render: { file: 'File:SM2 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/2/2b/SM2_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'kommo-o', file: 'File:SM2 Booster Kommo-o.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/68/SM2_Booster_Kommo-o.jpg' },
+      { key: 'lycanroc', file: 'File:SM2 Booster Lycanroc.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/b1/SM2_Booster_Lycanroc.jpg' },
+      { key: 'ninetales', file: 'File:SM2 Booster Ninetales.jpg', url: 'https://archives.bulbagarden.net/media/upload/0/0c/SM2_Booster_Ninetales.jpg' },
+      { key: 'tapu-koko', file: 'File:SM2 Booster Tapu Koko.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/36/SM2_Booster_Tapu_Koko.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'guardians-rising-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/guardians-rising-pack-0.jpg' },
+      { key: 'pack-2', file: 'guardians-rising-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/guardians-rising-pack-1.jpg' },
+      { key: 'pack-3', file: 'guardians-rising-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/guardians-rising-pack-2.jpg' },
+      { key: 'pack-4', file: 'guardians-rising-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/guardians-rising-pack-3.jpg' },
+    ],
+  },
+  'burning-shadows': {
+    setId: 'sm3',
+    render: { file: 'File:SM3 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d6/SM3_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'ho-oh', file: 'File:SM3 Booster Ho-Oh.jpg', url: 'https://archives.bulbagarden.net/media/upload/9/96/SM3_Booster_Ho-Oh.jpg' },
+      { key: 'marshadow', file: 'File:SM3 Booster Marshadow.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/88/SM3_Booster_Marshadow.jpg' },
+      { key: 'necrozma', file: 'File:SM3 Booster Necrozma.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/c3/SM3_Booster_Necrozma.jpg' },
+      { key: 'tapu-fini', file: 'File:SM3 Booster Tapu Fini.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/37/SM3_Booster_Tapu_Fini.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'burning-shadows-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/burning-shadows-pack-0.jpg' },
+      { key: 'pack-2', file: 'burning-shadows-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/burning-shadows-pack-1.jpg' },
+      { key: 'pack-3', file: 'burning-shadows-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/burning-shadows-pack-2.jpg' },
+      { key: 'pack-4', file: 'burning-shadows-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/burning-shadows-pack-3.jpg' },
+    ],
+  },
+  'crimson-invasion': {
+    setId: 'sm4',
+    render: { file: 'File:SM4 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/4/4a/SM4_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'buzzwole', file: 'File:SM4 Booster Buzzwole.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/83/SM4_Booster_Buzzwole.jpg' },
+      { key: 'guzzlord', file: 'File:SM4 Booster Guzzlord.jpg', url: 'https://archives.bulbagarden.net/media/upload/f/f8/SM4_Booster_Guzzlord.jpg' },
+      { key: 'kartana', file: 'File:SM4 Booster Kartana.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d8/SM4_Booster_Kartana.jpg' },
+      { key: 'silvally', file: 'File:SM4 Booster Silvally.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/a8/SM4_Booster_Silvally.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'crimson-invasion-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/crimson-invasion-pack-0.jpg' },
+      { key: 'pack-2', file: 'crimson-invasion-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/crimson-invasion-pack-1.jpg' },
+      { key: 'pack-3', file: 'crimson-invasion-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/crimson-invasion-pack-2.jpg' },
+      { key: 'pack-4', file: 'crimson-invasion-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/crimson-invasion-pack-3.jpg' },
+    ],
+  },
+  'ultra-prism': {
+    setId: 'sm5',
+    render: { file: 'File:SM5 Prerelease Kit.jpg', url: 'https://archives.bulbagarden.net/media/upload/e/e1/SM5_Prerelease_Kit.jpg' },
+    boosters: [
+      { key: 'dawn-wings-necrozma', file: 'File:SM5 Booster Dawn Wings Necrozma.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/c8/SM5_Booster_Dawn_Wings_Necrozma.jpg' },
+      { key: 'dusk-mane-necrozma', file: 'File:SM5 Booster Dusk Mane Necrozma.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/3a/SM5_Booster_Dusk_Mane_Necrozma.jpg' },
+      { key: 'giratina', file: 'File:SM5 Booster Giratina.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/84/SM5_Booster_Giratina.jpg' },
+      { key: 'leafeon', file: 'File:SM5 Booster Leafeon.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/35/SM5_Booster_Leafeon.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'ultra-prism-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/ultra-prism-pack-0.jpg' },
+      { key: 'pack-2', file: 'ultra-prism-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/ultra-prism-pack-1.jpg' },
+      { key: 'pack-3', file: 'ultra-prism-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/ultra-prism-pack-2.jpg' },
+      { key: 'pack-4', file: 'ultra-prism-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/ultra-prism-pack-3.jpg' },
+    ],
+  },
+  'forbidden-light': {
+    setId: 'sm6',
+    render: { file: 'File:SM6 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/0/05/SM6_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'greninja', file: 'File:SM6 Booster Greninja.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/cc/SM6_Booster_Greninja.jpg' },
+      { key: 'naganadel', file: 'File:SM6 Booster Naganadel.jpg', url: 'https://archives.bulbagarden.net/media/upload/9/98/SM6_Booster_Naganadel.jpg' },
+      { key: 'necrozma', file: 'File:SM6 Booster Necrozma.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/a2/SM6_Booster_Necrozma.jpg' },
+      { key: 'zygarde', file: 'File:SM6 Booster Zygarde.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/8e/SM6_Booster_Zygarde.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'forbidden-light-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/forbidden-light-pack-0.jpg' },
+      { key: 'pack-2', file: 'forbidden-light-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/forbidden-light-pack-1.jpg' },
+      { key: 'pack-3', file: 'forbidden-light-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/forbidden-light-pack-2.jpg' },
+      { key: 'pack-4', file: 'forbidden-light-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/forbidden-light-pack-3.jpg' },
+    ],
+  },
+  'celestial-storm': {
+    setId: 'sm7',
+    render: { file: 'File:SM7 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/2/27/SM7_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'blaziken', file: 'File:SM7 Booster Blaziken.jpg', url: 'https://archives.bulbagarden.net/media/upload/f/fc/SM7_Booster_Blaziken.jpg' },
+      { key: 'jirachi', file: 'File:SM7 Booster Jirachi.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d2/SM7_Booster_Jirachi.jpg' },
+      { key: 'rayquaza', file: 'File:SM7 Booster Rayquaza.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/3f/SM7_Booster_Rayquaza.jpg' },
+      { key: 'stakataka', file: 'File:SM7 Booster Stakataka.jpg', url: 'https://archives.bulbagarden.net/media/upload/4/49/SM7_Booster_Stakataka.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'celestial-storm-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/celestial-storm-pack-0.jpg' },
+      { key: 'pack-2', file: 'celestial-storm-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/celestial-storm-pack-1.jpg' },
+      { key: 'pack-3', file: 'celestial-storm-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/celestial-storm-pack-2.jpg' },
+      { key: 'pack-4', file: 'celestial-storm-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/celestial-storm-pack-3.jpg' },
+    ],
+  },
+  'lost-thunder': {
+    setId: 'sm8',
+    render: { file: 'File:SM8 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/5d/SM8_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'blacephalon', file: 'File:SM8 Booster Blacephalon.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d0/SM8_Booster_Blacephalon.jpg' },
+      { key: 'celebi', file: 'File:SM8 Booster Celebi.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/b9/SM8_Booster_Celebi.jpg' },
+      { key: 'lugia', file: 'File:SM8 Booster Lugia.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/6a/SM8_Booster_Lugia.jpg' },
+      { key: 'zeraora', file: 'File:SM8 Booster Zeraora.jpg', url: 'https://archives.bulbagarden.net/media/upload/f/fd/SM8_Booster_Zeraora.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'lost-thunder-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-thunder-pack-0.jpg' },
+      { key: 'pack-2', file: 'lost-thunder-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-thunder-pack-1.jpg' },
+      { key: 'pack-3', file: 'lost-thunder-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-thunder-pack-2.jpg' },
+      { key: 'pack-4', file: 'lost-thunder-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-thunder-pack-3.jpg' },
+    ],
+  },
+  'team-up': {
+    setId: 'sm9',
+    render: { file: 'File:SM9 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/be/SM9_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'eevee-snorlax', file: 'File:SM9 Booster Eevee Snorlax.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/b5/SM9_Booster_Eevee_Snorlax.jpg' },
+      { key: 'gengar-mimikyu', file: 'File:SM9 Booster Gengar Mimikyu.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/66/SM9_Booster_Gengar_Mimikyu.jpg' },
+      { key: 'pikachu-zekrom', file: 'File:SM9 Booster Pikachu Zekrom.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/ae/SM9_Booster_Pikachu_Zekrom.jpg' },
+      { key: 'venusaur-celebi', file: 'File:SM9 Booster Venusaur Celebi.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/8e/SM9_Booster_Venusaur_Celebi.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'team-up-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/team-up-pack-0.jpg' },
+      { key: 'pack-2', file: 'team-up-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/team-up-pack-1.jpg' },
+      { key: 'pack-3', file: 'team-up-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/team-up-pack-2.jpg' },
+      { key: 'pack-4', file: 'team-up-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/team-up-pack-3.jpg' },
+    ],
+  },
+  'unbroken-bonds': {
+    setId: 'sm10',
+    render: { file: 'File:SM10 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/aa/SM10_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'charizard-reshiram', file: 'File:SM10 Booster Charizard Reshiram.jpg', url: 'https://archives.bulbagarden.net/media/upload/e/e9/SM10_Booster_Charizard_Reshiram.jpg' },
+      { key: 'gardevoir-sylveon', file: 'File:SM10 Booster Gardevoir Sylveon.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/10/SM10_Booster_Gardevoir_Sylveon.jpg' },
+      { key: 'lucario-melmetal', file: 'File:SM10 Booster Lucario Melmetal.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/86/SM10_Booster_Lucario_Melmetal.jpg' },
+      { key: 'machamp-marshadow', file: 'File:SM10 Booster Machamp Marshadow.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/59/SM10_Booster_Machamp_Marshadow.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'unbroken-bonds-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unbroken-bonds-pack-0.jpg' },
+      { key: 'pack-2', file: 'unbroken-bonds-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unbroken-bonds-pack-1.jpg' },
+      { key: 'pack-3', file: 'unbroken-bonds-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unbroken-bonds-pack-2.jpg' },
+      { key: 'pack-4', file: 'unbroken-bonds-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unbroken-bonds-pack-3.jpg' },
+    ],
+  },
+  'unified-minds': {
+    setId: 'sm11',
+    render: { file: 'File:SM11 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d7/SM11_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'espeon-deoxys', file: 'File:SM11 Booster Espeon Deoxys.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/a0/SM11_Booster_Espeon_Deoxys.jpg' },
+      { key: 'garchomp-giratina', file: 'File:SM11 Booster Garchomp Giratina.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/aa/SM11_Booster_Garchomp_Giratina.jpg' },
+      { key: 'mewtwo-mew', file: 'File:SM11 Booster Mewtwo Mew.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/aa/SM11_Booster_Mewtwo_Mew.jpg' },
+      { key: 'umbreon-darkrai', file: 'File:SM11 Booster Umbreon Darkrai.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/1f/SM11_Booster_Umbreon_Darkrai.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'unified-minds-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unified-minds-pack-0.jpg' },
+      { key: 'pack-2', file: 'unified-minds-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unified-minds-pack-1.jpg' },
+      { key: 'pack-3', file: 'unified-minds-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unified-minds-pack-2.jpg' },
+      { key: 'pack-4', file: 'unified-minds-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/unified-minds-pack-3.jpg' },
+    ],
+  },
+  'cosmic-eclipse': {
+    setId: 'sm12',
+    render: { file: 'File:SM12 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/2/29/SM12_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'blastoise-piplup', file: 'File:SM12 Booster Blastoise Piplup.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/16/SM12_Booster_Blastoise_Piplup.jpg' },
+      { key: 'cleffa-igglybuff-togepi', file: 'File:SM12 Booster Cleffa Igglybuff Togepi.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/8d/SM12_Booster_Cleffa_Igglybuff_Togepi.jpg' },
+      { key: 'dialga-palkia-arceus', file: 'File:SM12 Booster Dialga Palkia Arceus.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/63/SM12_Booster_Dialga_Palkia_Arceus.jpg' },
+      { key: 'solgaleo-lunala', file: 'File:SM12 Booster Solgaleo Lunala.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/b2/SM12_Booster_Solgaleo_Lunala.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'cosmic-eclipse-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/cosmic-eclipse-pack-0.jpg' },
+      { key: 'pack-2', file: 'cosmic-eclipse-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/cosmic-eclipse-pack-1.jpg' },
+      { key: 'pack-3', file: 'cosmic-eclipse-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/cosmic-eclipse-pack-2.jpg' },
+      { key: 'pack-4', file: 'cosmic-eclipse-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/cosmic-eclipse-pack-3.jpg' },
+    ],
+  },
+  'sword-shield': {
+    setId: 'swsh1',
+    render: { file: 'File:SWSH1 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/ce/SWSH1_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'gigantamax-lapras', file: 'File:SWSH1 Booster Gigantamax Lapras.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/db/SWSH1_Booster_Gigantamax_Lapras.jpg' },
+      { key: 'gigantamax-snorlax', file: 'File:SWSH1 Booster Gigantamax Snorlax.jpg', url: 'https://archives.bulbagarden.net/media/upload/e/ee/SWSH1_Booster_Gigantamax_Snorlax.jpg' },
+      { key: 'zacian', file: 'File:SWSH1 Booster Zacian.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/c7/SWSH1_Booster_Zacian.jpg' },
+      { key: 'zamazenta', file: 'File:SWSH1 Booster Zamazenta.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/ad/SWSH1_Booster_Zamazenta.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'sword-and-shield-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sword-and-shield-pack-0.jpg' },
+      { key: 'pack-2', file: 'sword-and-shield-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sword-and-shield-pack-1.jpg' },
+      { key: 'pack-3', file: 'sword-and-shield-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sword-and-shield-pack-2.jpg' },
+      { key: 'pack-4', file: 'sword-and-shield-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/sword-and-shield-pack-3.jpg' },
+    ],
+  },
+  'rebel-clash': {
+    setId: 'swsh2',
+    render: { file: 'File:SWSH2 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/74/SWSH2_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'cinderace', file: 'File:SWSH2 Booster Cinderace.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/78/SWSH2_Booster_Cinderace.jpg' },
+      { key: 'gigantamax-toxtricity', file: 'File:SWSH2 Booster Gigantamax Toxtricity.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/7f/SWSH2_Booster_Gigantamax_Toxtricity.jpg' },
+      { key: 'inteleon', file: 'File:SWSH2 Booster Inteleon.jpg', url: 'https://archives.bulbagarden.net/media/upload/e/eb/SWSH2_Booster_Inteleon.jpg' },
+      { key: 'rillaboom', file: 'File:SWSH2 Booster Rillaboom.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d7/SWSH2_Booster_Rillaboom.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'rebel-clash-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/rebel-clash-pack-0.jpg' },
+      { key: 'pack-2', file: 'rebel-clash-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/rebel-clash-pack-1.jpg' },
+      { key: 'pack-3', file: 'rebel-clash-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/rebel-clash-pack-2.jpg' },
+      { key: 'pack-4', file: 'rebel-clash-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/rebel-clash-pack-3.jpg' },
+    ],
+  },
+  'darkness-ablaze': {
+    setId: 'swsh3',
+    render: { file: 'File:SWSH3 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/1a/SWSH3_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'eternamax-eternatus', file: 'File:SWSH3 Booster Eternamax Eternatus.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/11/SWSH3_Booster_Eternamax_Eternatus.jpg' },
+      { key: 'gigantamax-centiskorch', file: 'File:SWSH3 Booster Gigantamax Centiskorch.jpg', url: 'https://archives.bulbagarden.net/media/upload/e/e8/SWSH3_Booster_Gigantamax_Centiskorch.jpg' },
+      { key: 'gigantamax-charizard', file: 'File:SWSH3 Booster Gigantamax Charizard.jpg', url: 'https://archives.bulbagarden.net/media/upload/4/4d/SWSH3_Booster_Gigantamax_Charizard.jpg' },
+      { key: 'gigantamax-grimmsnarl', file: 'File:SWSH3 Booster Gigantamax Grimmsnarl.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/aa/SWSH3_Booster_Gigantamax_Grimmsnarl.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'darkness-ablaze-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/darkness-ablaze-pack-0.jpg' },
+      { key: 'pack-2', file: 'darkness-ablaze-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/darkness-ablaze-pack-1.jpg' },
+      { key: 'pack-3', file: 'darkness-ablaze-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/darkness-ablaze-pack-2.jpg' },
+      { key: 'pack-4', file: 'darkness-ablaze-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/darkness-ablaze-pack-3.jpg' },
+    ],
+  },
+  'vivid-voltage': {
+    setId: 'swsh4',
+    render: { file: 'File:SWSH4 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/3d/SWSH4_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'celebi', file: 'File:SWSH4 Booster Celebi.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/68/SWSH4_Booster_Celebi.jpg' },
+      { key: 'gigantamax-orbeetle', file: 'File:SWSH4 Booster Gigantamax Orbeetle.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/15/SWSH4_Booster_Gigantamax_Orbeetle.jpg' },
+      { key: 'gigantamax-pikachu', file: 'File:SWSH4 Booster Gigantamax Pikachu.jpg', url: 'https://archives.bulbagarden.net/media/upload/f/ff/SWSH4_Booster_Gigantamax_Pikachu.jpg' },
+      { key: 'zarude', file: 'File:SWSH4 Booster Zarude.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/ab/SWSH4_Booster_Zarude.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'vivid-voltage-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/vivid-voltage-pack-0.jpg' },
+      { key: 'pack-2', file: 'vivid-voltage-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/vivid-voltage-pack-1.jpg' },
+      { key: 'pack-3', file: 'vivid-voltage-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/vivid-voltage-pack-2.jpg' },
+      { key: 'pack-4', file: 'vivid-voltage-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/vivid-voltage-pack-3.jpg' },
+    ],
+  },
+  'battle-styles': {
+    setId: 'swsh5',
+    render: { file: 'File:SWSH5 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/0/02/SWSH5_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'empoleon', file: 'File:SWSH5 Booster Empoleon.jpg', url: 'https://archives.bulbagarden.net/media/upload/0/01/SWSH5_Booster_Empoleon.jpg' },
+      { key: 'rapid-strike-urshifu', file: 'File:SWSH5 Booster Rapid Strike Urshifu.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/85/SWSH5_Booster_Rapid_Strike_Urshifu.jpg' },
+      { key: 'single-strike-urshifu', file: 'File:SWSH5 Booster Single Strike Urshifu.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/6b/SWSH5_Booster_Single_Strike_Urshifu.jpg' },
+      { key: 'tyranitar', file: 'File:SWSH5 Booster Tyranitar.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/1f/SWSH5_Booster_Tyranitar.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'battle-styles-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/battle-styles-pack-0.jpg' },
+      { key: 'pack-2', file: 'battle-styles-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/battle-styles-pack-1.jpg' },
+      { key: 'pack-3', file: 'battle-styles-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/battle-styles-pack-2.jpg' },
+      { key: 'pack-4', file: 'battle-styles-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/battle-styles-pack-3.jpg' },
+    ],
+  },
+  'chilling-reign': {
+    setId: 'swsh6',
+    render: { file: 'File:SWSH6 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/f/f7/SWSH6_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'galarian-articuno', file: 'File:SWSH6 Booster Galarian Articuno copy.jpg', url: 'https://archives.bulbagarden.net/media/upload/9/99/SWSH6_Booster_Galarian_Articuno_copy.jpg' },
+      { key: 'galarian-moltres', file: 'File:SWSH6 Booster Galarian Moltres copy.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/79/SWSH6_Booster_Galarian_Moltres_copy.jpg' },
+      { key: 'galarian-zapdos', file: 'File:SWSH6 Booster Galarian Zapdos copy.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/16/SWSH6_Booster_Galarian_Zapdos_copy.jpg' },
+      { key: 'ice-rider-calyrex', file: 'File:SWSH6 Booster Ice Rider Calyrex copy.jpg', url: 'https://archives.bulbagarden.net/media/upload/0/0e/SWSH6_Booster_Ice_Rider_Calyrex_copy.jpg' },
+      { key: 'shadow-rider-calyrex', file: 'File:SWSH6 Booster Shadow Rider Calyrex copy.jpg', url: 'https://archives.bulbagarden.net/media/upload/0/04/SWSH6_Booster_Shadow_Rider_Calyrex_copy.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'chilling-reign-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chilling-reign-pack-0.jpg' },
+      { key: 'pack-2', file: 'chilling-reign-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chilling-reign-pack-1.jpg' },
+      { key: 'pack-3', file: 'chilling-reign-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chilling-reign-pack-2.jpg' },
+      { key: 'pack-4', file: 'chilling-reign-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chilling-reign-pack-3.jpg' },
+      { key: 'pack-5', file: 'chilling-reign-pack-4.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chilling-reign-pack-4.jpg' },
+    ],
+  },
+  'evolving-skies': {
+    setId: 'swsh7',
+    render: { file: 'File:SWSH7 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/6f/SWSH7_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'gigantamax-duraludon', file: 'File:SWSH7 Booster Gigantamax Duraludon.jpg', url: 'https://archives.bulbagarden.net/media/upload/2/28/SWSH7_Booster_Gigantamax_Duraludon.jpg' },
+      { key: 'rayquaza', file: 'File:SWSH7 Booster Rayquaza.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/a5/SWSH7_Booster_Rayquaza.jpg' },
+      { key: 'sylveon', file: 'File:SWSH7 Booster Sylveon.jpg', url: 'https://archives.bulbagarden.net/media/upload/9/95/SWSH7_Booster_Sylveon.jpg' },
+      { key: 'umbreon', file: 'File:SWSH7 Booster Umbreon.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/5b/SWSH7_Booster_Umbreon.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'evolving-skies-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolving-skies-pack-0.jpg' },
+      { key: 'pack-2', file: 'evolving-skies-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolving-skies-pack-1.jpg' },
+      { key: 'pack-3', file: 'evolving-skies-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolving-skies-pack-2.jpg' },
+      { key: 'pack-4', file: 'evolving-skies-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/evolving-skies-pack-3.jpg' },
+    ],
+  },
+  'fusion-strike': {
+    setId: 'swsh8',
+    render: { file: 'File:SWSH8 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/13/SWSH8_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'boltund', file: 'File:SWSH8 Booster Boltund.jpg', url: 'https://archives.bulbagarden.net/media/upload/4/4e/SWSH8_Booster_Boltund.jpg' },
+      { key: 'genesect', file: 'File:SWSH8 Booster Genesect.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/1f/SWSH8_Booster_Genesect.jpg' },
+      { key: 'gigantamax-gengar', file: 'File:SWSH8 Booster Gigantamax Gengar.jpg', url: 'https://archives.bulbagarden.net/media/upload/5/50/SWSH8_Booster_Gigantamax_Gengar.jpg' },
+      { key: 'mew', file: 'File:SWSH8 Booster Mew.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d5/SWSH8_Booster_Mew.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'fusion-strike-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fusion-strike-pack-0.jpg' },
+      { key: 'pack-2', file: 'fusion-strike-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fusion-strike-pack-1.jpg' },
+      { key: 'pack-3', file: 'fusion-strike-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fusion-strike-pack-2.jpg' },
+      { key: 'pack-4', file: 'fusion-strike-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/fusion-strike-pack-3.jpg' },
+    ],
+  },
+  'brilliant-stars': {
+    setId: 'swsh9',
+    render: { file: 'File:SWSH9 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/6c/SWSH9_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'arceus', file: 'File:SWSH9 Booster Arceus.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/ce/SWSH9_Booster_Arceus.jpg' },
+      { key: 'charizard', file: 'File:SWSH9 Booster Charizard.jpg', url: 'https://archives.bulbagarden.net/media/upload/4/4f/SWSH9_Booster_Charizard.jpg' },
+      { key: 'shaymin', file: 'File:SWSH9 Booster Shaymin.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/b1/SWSH9_Booster_Shaymin.jpg' },
+      { key: 'whimsicott', file: 'File:SWSH9 Booster Whimsicott.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/8a/SWSH9_Booster_Whimsicott.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'brilliant-stars-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/brilliant-stars-pack-0.jpg' },
+      { key: 'pack-2', file: 'brilliant-stars-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/brilliant-stars-pack-1.jpg' },
+      { key: 'pack-3', file: 'brilliant-stars-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/brilliant-stars-pack-2.jpg' },
+      { key: 'pack-4', file: 'brilliant-stars-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/brilliant-stars-pack-3.jpg' },
+    ],
+  },
+  'astral-radiance': {
+    setId: 'swsh10',
+    render: { file: 'File:SWSH10 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/80/SWSH10_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'hisuian-decidueye', file: 'File:SWSH10 Booster Hisuian Decidueye.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/be/SWSH10_Booster_Hisuian_Decidueye.jpg' },
+      { key: 'hisuian-samurott', file: 'File:SWSH10 Booster Hisuian Samurott.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/ac/SWSH10_Booster_Hisuian_Samurott.jpg' },
+      { key: 'hisuian-typhlosion', file: 'File:SWSH10 Booster Hisuian Typhlosion.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/66/SWSH10_Booster_Hisuian_Typhlosion.jpg' },
+      { key: 'origin-dialga', file: 'File:SWSH10 Booster Origin Dialga.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/b5/SWSH10_Booster_Origin_Dialga.jpg' },
+      { key: 'origin-palkia', file: 'File:SWSH10 Booster Origin Palkia.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/77/SWSH10_Booster_Origin_Palkia.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'astral-radiance-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/astral-radiance-pack-0.jpg' },
+      { key: 'pack-2', file: 'astral-radiance-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/astral-radiance-pack-1.jpg' },
+      { key: 'pack-3', file: 'astral-radiance-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/astral-radiance-pack-2.jpg' },
+      { key: 'pack-4', file: 'astral-radiance-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/astral-radiance-pack-3.jpg' },
+      { key: 'pack-5', file: 'astral-radiance-pack-4.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/astral-radiance-pack-4.jpg' },
+    ],
+  },
+  'lost-origin': {
+    setId: 'swsh11',
+    render: { file: 'File:SWSH11 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/3a/SWSH11_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'enamorus', file: 'File:SWSH11 Booster Enamorus.jpg', url: 'https://archives.bulbagarden.net/media/upload/7/78/SWSH11_Booster_Enamorus.jpg' },
+      { key: 'hisuian-zoroark', file: 'File:SWSH11 Booster Hisuian Zoroark.jpg', url: 'https://archives.bulbagarden.net/media/upload/b/b6/SWSH11_Booster_Hisuian_Zoroark.jpg' },
+      { key: 'origin-forme-giratina', file: 'File:SWSH11 Booster Origin Forme Giratina.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/a1/SWSH11_Booster_Origin_Forme_Giratina.jpg' },
+      { key: 'radiant-gardevoir', file: 'File:SWSH11 Booster Radiant Gardevoir.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/19/SWSH11_Booster_Radiant_Gardevoir.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'lost-origin-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-origin-pack-0.jpg' },
+      { key: 'pack-2', file: 'lost-origin-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-origin-pack-1.jpg' },
+      { key: 'pack-3', file: 'lost-origin-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-origin-pack-2.jpg' },
+      { key: 'pack-4', file: 'lost-origin-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/lost-origin-pack-3.jpg' },
+    ],
+  },
+  'silver-tempest': {
+    setId: 'swsh12',
+    render: { file: 'File:SWSH12 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/d0/SWSH12_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'alolan-vulpix', file: 'File:SWSH12 Booster Alolan Vulpix.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/cf/SWSH12_Booster_Alolan_Vulpix.jpg' },
+      { key: 'lugia', file: 'File:SWSH12 Booster Lugia.jpg', url: 'https://archives.bulbagarden.net/media/upload/2/2b/SWSH12_Booster_Lugia.jpg' },
+      { key: 'regidrago', file: 'File:SWSH12 Booster Regidrago.jpg', url: 'https://archives.bulbagarden.net/media/upload/d/dd/SWSH12_Booster_Regidrago.jpg' },
+      { key: 'regieleki', file: 'File:SWSH12 Booster Regieleki.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/ae/SWSH12_Booster_Regieleki.jpg' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'silver-tempest-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/silver-tempest-pack-0.jpg' },
+      { key: 'pack-2', file: 'silver-tempest-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/silver-tempest-pack-1.jpg' },
+      { key: 'pack-3', file: 'silver-tempest-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/silver-tempest-pack-2.jpg' },
+      { key: 'pack-4', file: 'silver-tempest-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/silver-tempest-pack-3.jpg' },
+    ],
+  },
+  'scarlet-violet': {
+    setId: 'sv01',
+    render: { file: 'File:SV1 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/8f/SV1_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'gyarados', file: 'File:SV1 Booster Gyarados.png', url: 'https://archives.bulbagarden.net/media/upload/a/a5/SV1_Booster_Gyarados.png' },
+      { key: 'koraidon', file: 'File:SV1 Booster Koraidon.png', url: 'https://archives.bulbagarden.net/media/upload/2/2e/SV1_Booster_Koraidon.png' },
+      { key: 'miraidon', file: 'File:SV1 Booster Miraidon.png', url: 'https://archives.bulbagarden.net/media/upload/6/63/SV1_Booster_Miraidon.png' },
+      { key: 'partners', file: 'File:SV1 Booster Partners.png', url: 'https://archives.bulbagarden.net/media/upload/5/58/SV1_Booster_Partners.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'scarlet-and-violet-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/scarlet-and-violet-pack-0.jpg' },
+      { key: 'pack-2', file: 'scarlet-and-violet-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/scarlet-and-violet-pack-1.jpg' },
+      { key: 'pack-3', file: 'scarlet-and-violet-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/scarlet-and-violet-pack-2.jpg' },
+      { key: 'pack-4', file: 'scarlet-and-violet-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/scarlet-and-violet-pack-3.jpg' },
+    ],
+  },
+  'paldea-evolved': {
+    setId: 'sv02',
+    render: { file: 'File:SV2 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/c/ce/SV2_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'chien-pao', file: 'File:SV2 Booster Chien-Pao.png', url: 'https://archives.bulbagarden.net/media/upload/c/c0/SV2_Booster_Chien-Pao.png' },
+      { key: 'meowscarada', file: 'File:SV2 Booster Meowscarada.png', url: 'https://archives.bulbagarden.net/media/upload/0/0b/SV2_Booster_Meowscarada.png' },
+      { key: 'quaquaval', file: 'File:SV2 Booster Quaquaval.png', url: 'https://archives.bulbagarden.net/media/upload/f/f2/SV2_Booster_Quaquaval.png' },
+      { key: 'skeledirge', file: 'File:SV2 Booster Skeledirge.png', url: 'https://archives.bulbagarden.net/media/upload/e/ed/SV2_Booster_Skeledirge.png' },
+      { key: 'ting-lu', file: 'File:SV2 Booster Ting-Lu.png', url: 'https://archives.bulbagarden.net/media/upload/7/72/SV2_Booster_Ting-Lu.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'paldea-evolved-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paldea-evolved-pack-0.jpg' },
+      { key: 'pack-3', file: 'paldea-evolved-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paldea-evolved-pack-2.jpg' },
+      { key: 'pack-4', file: 'paldea-evolved-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paldea-evolved-pack-3.jpg' },
+      { key: 'pack-5', file: 'paldea-evolved-pack-4.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paldea-evolved-pack-4.jpg' },
+    ],
+  },
+  'obsidian-flames': {
+    setId: 'sv03',
+    render: { file: 'File:SV3 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/a/ac/SV3_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'charizard', file: 'File:SV3 Booster Charizard.png', url: 'https://archives.bulbagarden.net/media/upload/5/52/SV3_Booster_Charizard.png' },
+      { key: 'dragonite', file: 'File:SV3 Booster Dragonite.png', url: 'https://archives.bulbagarden.net/media/upload/2/20/SV3_Booster_Dragonite.png' },
+      { key: 'revavroom', file: 'File:SV3 Booster Revavroom.png', url: 'https://archives.bulbagarden.net/media/upload/a/ac/SV3_Booster_Revavroom.png' },
+      { key: 'tyranitar', file: 'File:SV3 Booster Tyranitar.png', url: 'https://archives.bulbagarden.net/media/upload/a/a9/SV3_Booster_Tyranitar.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'obsidian-flames-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/obsidian-flames-pack-0.jpg' },
+      { key: 'pack-2', file: 'obsidian-flames-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/obsidian-flames-pack-1.jpg' },
+      { key: 'pack-3', file: 'obsidian-flames-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/obsidian-flames-pack-2.jpg' },
+      { key: 'pack-4', file: 'obsidian-flames-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/obsidian-flames-pack-3.jpg' },
+    ],
+  },
+  'paradox-rift': {
+    setId: 'sv04',
+    render: { file: 'File:SV4 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/1/1d/SV4_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'armarouge', file: 'File:SV4 Booster Armarouge.png', url: 'https://archives.bulbagarden.net/media/upload/5/51/SV4_Booster_Armarouge.png' },
+      { key: 'garchomp', file: 'File:SV4 Booster Garchomp.png', url: 'https://archives.bulbagarden.net/media/upload/8/8e/SV4_Booster_Garchomp.png' },
+      { key: 'iron-valiant', file: 'File:SV4 Booster Iron Valiant.png', url: 'https://archives.bulbagarden.net/media/upload/3/3d/SV4_Booster_Iron_Valiant.png' },
+      { key: 'roaring-moon', file: 'File:SV4 Booster Roaring Moon.png', url: 'https://archives.bulbagarden.net/media/upload/9/95/SV4_Booster_Roaring_Moon.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'paradox-rift-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paradox-rift-pack-0.jpg' },
+      { key: 'pack-2', file: 'paradox-rift-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paradox-rift-pack-1.jpg' },
+      { key: 'pack-3', file: 'paradox-rift-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paradox-rift-pack-2.jpg' },
+      { key: 'pack-4', file: 'paradox-rift-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/paradox-rift-pack-3.jpg' },
+    ],
+  },
+  'temporal-forces': {
+    setId: 'sv05',
+    render: { file: 'File:SV5 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/3/36/SV5_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'iron-crown', file: 'File:SV5 Booster Iron Crown.png', url: 'https://archives.bulbagarden.net/media/upload/3/3e/SV5_Booster_Iron_Crown.png' },
+      { key: 'iron-leaves', file: 'File:SV5 Booster Iron Leaves.png', url: 'https://archives.bulbagarden.net/media/upload/8/88/SV5_Booster_Iron_Leaves.png' },
+      { key: 'raging-bolt', file: 'File:SV5 Booster Raging Bolt.png', url: 'https://archives.bulbagarden.net/media/upload/3/37/SV5_Booster_Raging_Bolt.png' },
+      { key: 'walking-wake', file: 'File:SV5 Booster Walking Wake.png', url: 'https://archives.bulbagarden.net/media/upload/d/d7/SV5_Booster_Walking_Wake.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'temporal-forces-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/temporal-forces-pack-0.jpg' },
+      { key: 'pack-2', file: 'temporal-forces-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/temporal-forces-pack-1.jpg' },
+      { key: 'pack-3', file: 'temporal-forces-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/temporal-forces-pack-2.jpg' },
+      { key: 'pack-4', file: 'temporal-forces-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/temporal-forces-pack-3.jpg' },
+    ],
+  },
+  'twilight-masquerade': {
+    setId: 'sv06',
+    render: { file: 'File:SV6 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/f/f9/SV6_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'dragapult', file: 'File:SV6 Booster Dragapult.png', url: 'https://archives.bulbagarden.net/media/upload/f/f4/SV6_Booster_Dragapult.png' },
+      { key: 'ogerpon', file: 'File:SV6 Booster Ogerpon.png', url: 'https://archives.bulbagarden.net/media/upload/a/a0/SV6_Booster_Ogerpon.png' },
+      { key: 'sinistcha', file: 'File:SV6 Booster Sinistcha.png', url: 'https://archives.bulbagarden.net/media/upload/8/83/SV6_Booster_Sinistcha.png' },
+      { key: 'ursaluna', file: 'File:SV6 Booster Ursaluna.png', url: 'https://archives.bulbagarden.net/media/upload/c/c6/SV6_Booster_Ursaluna.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'twilight-masquerade-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/twilight-masquerade-pack-0.jpg' },
+      { key: 'pack-2', file: 'twilight-masquerade-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/twilight-masquerade-pack-1.jpg' },
+      { key: 'pack-3', file: 'twilight-masquerade-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/twilight-masquerade-pack-2.jpg' },
+      { key: 'pack-4', file: 'twilight-masquerade-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/twilight-masquerade-pack-3.jpg' },
+    ],
+  },
+  'stellar-crown': {
+    setId: 'sv07',
+    render: { file: 'File:SV7 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/8/81/SV7_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'cinderace', file: 'File:SV7 Booster Cinderace.png', url: 'https://archives.bulbagarden.net/media/upload/a/ac/SV7_Booster_Cinderace.png' },
+      { key: 'galvantula', file: 'File:SV7 Booster Galvantula.png', url: 'https://archives.bulbagarden.net/media/upload/d/d2/SV7_Booster_Galvantula.png' },
+      { key: 'lapras', file: 'File:SV7 Booster Lapras.png', url: 'https://archives.bulbagarden.net/media/upload/4/46/SV7_Booster_Lapras.png' },
+      { key: 'terapagos', file: 'File:SV7 Booster Terapagos.png', url: 'https://archives.bulbagarden.net/media/upload/8/8e/SV7_Booster_Terapagos.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'stellar-crown-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/stellar-crown-pack-0.jpg' },
+      { key: 'pack-2', file: 'stellar-crown-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/stellar-crown-pack-1.jpg' },
+      { key: 'pack-3', file: 'stellar-crown-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/stellar-crown-pack-2.jpg' },
+      { key: 'pack-4', file: 'stellar-crown-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/stellar-crown-pack-3.jpg' },
+    ],
+  },
+  'surging-sparks': {
+    setId: 'sv08',
+    render: { file: 'File:SV8 Build Battle Box.jpg', url: 'https://archives.bulbagarden.net/media/upload/6/6d/SV8_Build_Battle_Box.jpg' },
+    boosters: [
+      { key: 'alolan-exeggutor', file: 'File:SV8 Booster Alolan Exeggutor.png', url: 'https://archives.bulbagarden.net/media/upload/9/96/SV8_Booster_Alolan_Exeggutor.png' },
+      { key: 'archaludon', file: 'File:SV8 Booster Archaludon.png', url: 'https://archives.bulbagarden.net/media/upload/4/4b/SV8_Booster_Archaludon.png' },
+      { key: 'latias', file: 'File:SV8 Booster Latias.png', url: 'https://archives.bulbagarden.net/media/upload/0/08/SV8_Booster_Latias.png' },
+      { key: 'pikachu', file: 'File:SV8 Booster Pikachu.png', url: 'https://archives.bulbagarden.net/media/upload/8/8b/SV8_Booster_Pikachu.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'surging-sparks-pack-0.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/surging-sparks-pack-0.jpg' },
+      { key: 'pack-2', file: 'surging-sparks-pack-1.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/surging-sparks-pack-1.jpg' },
+      { key: 'pack-3', file: 'surging-sparks-pack-2.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/surging-sparks-pack-2.jpg' },
+      { key: 'pack-4', file: 'surging-sparks-pack-3.jpg', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/surging-sparks-pack-3.jpg' },
+    ],
+  },
+  'journey-together': {
+    setId: 'sv09',
+    render: { file: 'File:SV9 Build Battle Box.png', url: 'https://archives.bulbagarden.net/media/upload/3/3f/SV9_Build_Battle_Box.png' },
+    boosters: [
+      { key: 'hop-zacian', file: 'File:SV9 Booster Hop Zacian.png', url: 'https://archives.bulbagarden.net/media/upload/4/40/SV9_Booster_Hop_Zacian.png' },
+      { key: 'iono-bellibolt', file: 'File:SV9 Booster Iono Bellibolt.png', url: 'https://archives.bulbagarden.net/media/upload/b/b3/SV9_Booster_Iono_Bellibolt.png' },
+      { key: 'lillie-clefairy', file: 'File:SV9 Booster Lillie Clefairy.png', url: 'https://archives.bulbagarden.net/media/upload/1/16/SV9_Booster_Lillie_Clefairy.png' },
+      { key: 'n-zoroark', file: 'File:SV9 Booster N Zoroark.png', url: 'https://archives.bulbagarden.net/media/upload/e/e0/SV9_Booster_N_Zoroark.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'journey-together-pack-0.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/journey-together-pack-0.png' },
+      { key: 'pack-2', file: 'journey-together-pack-1.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/journey-together-pack-1.png' },
+      { key: 'pack-3', file: 'journey-together-pack-2.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/journey-together-pack-2.png' },
+      { key: 'pack-4', file: 'journey-together-pack-3.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/journey-together-pack-3.png' },
+    ],
+  },
+  'destined-rivals': {
+    setId: 'sv10',
+    render: { file: 'File:SV10 Build Battle Box.png', url: 'https://archives.bulbagarden.net/media/upload/f/f6/SV10_Build_Battle_Box.png' },
+    boosters: [
+      { key: 'cynthia-garchomp', file: 'File:SV10 Booster Cynthia Garchomp.png', url: 'https://archives.bulbagarden.net/media/upload/e/e2/SV10_Booster_Cynthia_Garchomp.png' },
+      { key: 'ethan-ho-oh', file: 'File:SV10 Booster Ethan Ho-Oh.png', url: 'https://archives.bulbagarden.net/media/upload/3/3b/SV10_Booster_Ethan_Ho-Oh.png' },
+      { key: 'giovanni-mewtwo', file: 'File:SV10 Booster Giovanni Mewtwo.png', url: 'https://archives.bulbagarden.net/media/upload/f/f1/SV10_Booster_Giovanni_Mewtwo.png' },
+      { key: 'team-rocket', file: 'File:SV10 Booster Team Rocket.png', url: 'https://archives.bulbagarden.net/media/upload/2/24/SV10_Booster_Team_Rocket.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'destined-rivals-pack-0.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/destined-rivals-pack-0.png' },
+      { key: 'pack-2', file: 'destined-rivals-pack-1.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/destined-rivals-pack-1.png' },
+      { key: 'pack-3', file: 'destined-rivals-pack-2.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/destined-rivals-pack-2.png' },
+      { key: 'pack-4', file: 'destined-rivals-pack-3.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/destined-rivals-pack-3.png' },
+    ],
+  },
+  'mega-evolution': {
+    setId: 'me01',
+    render: { file: 'File:ME1 Build Battle Box.png', url: 'https://archives.bulbagarden.net/media/upload/b/bb/ME1_Build_Battle_Box.png' },
+    boosters: [
+      { key: 'mega-gardevoir', file: 'File:ME1 Booster Mega Gardevoir.png', url: 'https://archives.bulbagarden.net/media/upload/c/c4/ME1_Booster_Mega_Gardevoir.png' },
+      { key: 'mega-kangaskhan', file: 'File:ME1 Booster Mega Kangaskhan.png', url: 'https://archives.bulbagarden.net/media/upload/b/b6/ME1_Booster_Mega_Kangaskhan.png' },
+      { key: 'mega-lucario', file: 'File:ME1 Booster Mega Lucario.png', url: 'https://archives.bulbagarden.net/media/upload/1/12/ME1_Booster_Mega_Lucario.png' },
+      { key: 'mega-venusaur', file: 'File:ME1 Booster Mega Venusaur.png', url: 'https://archives.bulbagarden.net/media/upload/f/fd/ME1_Booster_Mega_Venusaur.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'mega-evolution-pack-0.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/mega-evolution-pack-0.png' },
+      { key: 'pack-2', file: 'mega-evolution-pack-1.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/mega-evolution-pack-1.png' },
+      { key: 'pack-3', file: 'mega-evolution-pack-2.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/mega-evolution-pack-2.png' },
+      { key: 'pack-4', file: 'mega-evolution-pack-3.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/mega-evolution-pack-3.png' },
+    ],
+  },
+  'phantasmal-flames': {
+    setId: 'me02',
+    render: { file: 'File:ME2 Build Battle Box outer.png', url: 'https://archives.bulbagarden.net/media/upload/1/1b/ME2_Build_Battle_Box_outer.png' },
+    boosters: [
+      { key: 'mega-charizard-x', file: 'File:ME2 Booster Mega Charizard X.png', url: 'https://archives.bulbagarden.net/media/upload/9/99/ME2_Booster_Mega_Charizard_X.png' },
+      { key: 'mega-gengar', file: 'File:ME2 Booster Mega Gengar.png', url: 'https://archives.bulbagarden.net/media/upload/b/b9/ME2_Booster_Mega_Gengar.png' },
+      { key: 'mega-heracross', file: 'File:ME2 Booster Mega Heracross.png', url: 'https://archives.bulbagarden.net/media/upload/8/85/ME2_Booster_Mega_Heracross.png' },
+      { key: 'mega-lopunny', file: 'File:ME2 Booster Mega Lopunny.png', url: 'https://archives.bulbagarden.net/media/upload/c/c7/ME2_Booster_Mega_Lopunny.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'phantasmal-flames-pack-0.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/phantasmal-flames-pack-0.png' },
+      { key: 'pack-2', file: 'phantasmal-flames-pack-1.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/phantasmal-flames-pack-1.png' },
+      { key: 'pack-3', file: 'phantasmal-flames-pack-2.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/phantasmal-flames-pack-2.png' },
+      { key: 'pack-4', file: 'phantasmal-flames-pack-3.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/phantasmal-flames-pack-3.png' },
+    ],
+  },
+  'perfect-order': {
+    setId: 'me03',
+    render: { file: 'File:ME3 Build Battle Box outer.png', url: 'https://archives.bulbagarden.net/media/upload/f/f1/ME3_Build_Battle_Box_outer.png' },
+    boosters: [
+      { key: 'mega-clefable', file: 'File:ME3 Booster Mega Clefable.png', url: 'https://archives.bulbagarden.net/media/upload/9/94/ME3_Booster_Mega_Clefable.png' },
+      { key: 'mega-starmie', file: 'File:ME3 Booster Mega Starmie.png', url: 'https://archives.bulbagarden.net/media/upload/c/c6/ME3_Booster_Mega_Starmie.png' },
+      { key: 'mega-zygarde', file: 'File:ME3 Booster Mega Zygarde.png', url: 'https://archives.bulbagarden.net/media/upload/3/34/ME3_Booster_Mega_Zygarde.png' },
+      { key: 'meowth', file: 'File:ME3 Booster Meowth.png', url: 'https://archives.bulbagarden.net/media/upload/0/03/ME3_Booster_Meowth.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'perfect-order-pack-0.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/perfect-order-pack-0.png' },
+      { key: 'pack-2', file: 'perfect-order-pack-1.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/perfect-order-pack-1.png' },
+      { key: 'pack-3', file: 'perfect-order-pack-2.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/perfect-order-pack-2.png' },
+      { key: 'pack-4', file: 'perfect-order-pack-3.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/perfect-order-pack-3.png' },
+    ],
+  },
+  'chaos-rising': {
+    setId: 'me04',
+    render: { file: 'File:ME4 Build Battle Box outer.png', url: 'https://archives.bulbagarden.net/media/upload/3/37/ME4_Build_Battle_Box_outer.png' },
+    boosters: [
+      { key: 'mega-dragalge', file: 'File:ME4 Booster Mega Dragalge.png', url: 'https://archives.bulbagarden.net/media/upload/8/87/ME4_Booster_Mega_Dragalge.png' },
+      { key: 'mega-floette', file: 'File:ME4 Booster Mega Floette.png', url: 'https://archives.bulbagarden.net/media/upload/2/2c/ME4_Booster_Mega_Floette.png' },
+      { key: 'mega-greninja', file: 'File:ME4 Booster Mega Greninja.png', url: 'https://archives.bulbagarden.net/media/upload/1/19/ME4_Booster_Mega_Greninja.png' },
+      { key: 'mega-pyroar', file: 'File:ME4 Booster Mega Pyroar.png', url: 'https://archives.bulbagarden.net/media/upload/1/10/ME4_Booster_Mega_Pyroar.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'chaos-rising-pack-0.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chaos-rising-pack-0.png' },
+      { key: 'pack-2', file: 'chaos-rising-pack-1.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chaos-rising-pack-1.png' },
+      { key: 'pack-3', file: 'chaos-rising-pack-2.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chaos-rising-pack-2.png' },
+      { key: 'pack-4', file: 'chaos-rising-pack-3.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/chaos-rising-pack-3.png' },
+    ],
+  },
+  'pitch-black': {
+    setId: 'me05',
+    render: { file: 'File:ME5 Build Battle Box outer.png', url: 'https://archives.bulbagarden.net/media/upload/f/f9/ME5_Build_Battle_Box_outer.png' },
+    boosters: [
+      { key: 'mega-chandelure', file: 'File:ME5 Booster Mega Chandelure.png', url: 'https://archives.bulbagarden.net/media/upload/8/8c/ME5_Booster_Mega_Chandelure.png' },
+      { key: 'mega-darkrai', file: 'File:ME5 Booster Mega Darkrai.png', url: 'https://archives.bulbagarden.net/media/upload/a/ae/ME5_Booster_Mega_Darkrai.png' },
+      { key: 'mega-excadrill', file: 'File:ME5 Booster Mega Excadrill.png', url: 'https://archives.bulbagarden.net/media/upload/3/3b/ME5_Booster_Mega_Excadrill.png' },
+      { key: 'mega-zeraora', file: 'File:ME5 Booster Mega Zeraora.png', url: 'https://archives.bulbagarden.net/media/upload/f/f8/ME5_Booster_Mega_Zeraora.png' },
+    ],
+    pokesymbols: [
+      { key: 'pack-1', file: 'pitch-black-pack-0.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/pitch-black-pack-0.png' },
+      { key: 'pack-2', file: 'pitch-black-pack-1.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/pitch-black-pack-1.png' },
+      { key: 'pack-3', file: 'pitch-black-pack-2.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/pitch-black-pack-2.png' },
+      { key: 'pack-4', file: 'pitch-black-pack-3.png', url: 'https://pokesymbols.com/images/tcg/sets/booster-pack-art/pitch-black-pack-3.png' },
+    ],
+  },
+});

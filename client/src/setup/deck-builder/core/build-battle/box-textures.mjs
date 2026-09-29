@@ -41,7 +41,7 @@ export function boxFaceTexture(face) {
   return Object.hasOwn(BOX_FACE_TEXTURES, face) ? BOX_FACE_TEXTURES[face] : null;
 }
 
-/** @returns {string} the pack-front asset for one `PACK_ARTS` key. */
-export function packArtSrc(key) {
-  return `src/assets/build-battle/packs/me02-${key}.webp`;
+/** @returns {string} a vendored pack front: `<setId>-<key>.webp` (me02 ships `PACK_ARTS`). */
+export function packArtSrc(setId, key) {
+  return `src/assets/build-battle/packs/${setId}-${key}.webp`;
 }

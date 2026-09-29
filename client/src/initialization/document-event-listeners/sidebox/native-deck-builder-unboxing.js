@@ -1,9 +1,6 @@
 import { buildHoloCard, startHoloAnimation } from '../../../setup/deck-builder/core/holo.mjs';
-import {
-  BOX_PROPORTIONS,
-  boxFaceTexture,
-  packArtSrc,
-} from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
+import { BOX_PROPORTIONS } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
+import { packFlyParams, peelSide } from '../../../setup/deck-builder/core/build-battle/pack3d.mjs';
 import {
   CARDS_PER_PACK,
   DECK_UNWRAP_MS,
@@ -11,7 +8,6 @@ import {
   HIT_FLIP_MS,
   HIT_HOLD_MS,
   LID_OPEN_MS,
-  PACK_ARTS,
   PACK_FLY_MS,
   PACK_FLY_STAGGER_MS,
   PACK_TEAR_MS,
@@ -73,16 +69,13 @@ const BOX_H = Math.round(BOX_W * BOX_PROPORTIONS.height);
 const BOX_D = Math.round(BOX_W * BOX_PROPORTIONS.depth);
 const SPRING_BACK_MS = 160;
 const FADE_TOP_MS = 320;
-// Where the flying packs start: the box's open mouth, as shares of the box host's rect.
-const BOX_MOUTH_Y = 0.42;
-const FLY_FROM_WIDTH = 0.4;
+// The WebGL pack stage (design 055), loaded only when a box is opened.
+const PACK_STAGE_MODULE = './native-deck-builder-pack3d.js';
 const DRAG_TILT = 0.06;
 const SWEEP_MS = 420;
 const SPARK_COUNT = 16;
 const SPARK_MS = 640;
 const COLLAPSE_SCALE = 0.2;
-const SET_LOGO_URL = 'https://assets.tcgdex.net/en/me/me02/logo.webp';
-const KEY_ART_URL = 'https://assets.tcgdex.net/en/me/me02/125/high.webp';
 
 const easeOut = (t) => 1 - (1 - t) ** 3;
 const lerp = (from, to, t) => from + (to - from) * t;
@@ -171,63 +164,68 @@ const playMark = () => {
   return mark;
 };
 
-const buildBattleTitle = () => {
+// Everything below draws one box's `look` (design 054 § Unboxing skin): `skin` from boxSkin (logo,
+// key art, pack fronts, vendored faces), `labels` from unboxingLabels (words per box kind), the
+// series and set names, and whether the box carries the Play Level pill.
+const buildBattleTitle = (look) => {
   const title = el('div', 'bb-bbtitle');
-  title.append(playMark(), el('span', '', 'Build & Battle'));
+  title.append(playMark(), el('span', '', look.labels.productTitle));
   return title;
 };
 
-const setLogo = () => {
+const setLogo = (look) => {
   const block = el('div', 'bb-setlogo');
-  block.append(el('span', 'bb-setlogo__mega', 'Mega Evolution'), el('span', 'bb-setlogo__name', 'Phantasmal Flames'));
+  block.append(el('span', 'bb-setlogo__mega', look.seriesName), el('span', 'bb-setlogo__name', look.setName));
+  if (!look.skin.setLogoUrl) return block;
   const logo = el('img', 'bb-setlogo__img');
   logo.alt = '';
-  logo.src = SET_LOGO_URL;
+  logo.src = look.skin.setLogoUrl;
   logo.addEventListener('load', () => block.classList.add('has-logo'), { once: true });
   logo.addEventListener('error', () => logo.remove(), { once: true });
   block.append(logo);
   return block;
 };
 
-const proceduralFront = () => {
+const proceduralFront = (look) => {
   const face = el('div', 'bb-pf bb-pf--front');
   const top = el('div', 'bb-pf__strip');
-  const level = el('div', 'bb-level');
-  level.append(el('span', 'bb-level__pill', 'Play level 2'));
-  top.append(wordmark(), level, el('span', 'bb-age', '6+'));
+  top.append(wordmark());
+  if (look.playLevel) {
+    const level = el('div', 'bb-level');
+    level.append(el('span', 'bb-level__pill', 'Play level 2'));
+    top.append(level);
+  }
+  top.append(el('span', 'bb-age', '6+'));
   const art = el('div', 'bb-keyart');
   art.append(el('div', 'bb-keyart__slashes'));
-  face.append(top, art, setLogo(), buildBattleTitle());
+  face.append(top, art, setLogo(look), buildBattleTitle(look));
   return face;
 };
 
-// The key art only matters when the front texture is missing, so it loads on that failure only.
-const mountKeyArt = (face) => {
+// A vendored front hides the key art, so it loads only when the texture is missing; a procedural
+// box shows it at once.
+const mountKeyArt = (face, look) => {
   const art = face.querySelector('.bb-keyart');
-  if (!art || art.querySelector('img')) return;
+  if (!art || art.querySelector('img') || !look.skin.keyArtUrl) return;
   const img = el('img', 'bb-keyart__img');
   img.alt = '';
-  img.src = KEY_ART_URL;
+  img.src = look.skin.keyArtUrl;
   img.addEventListener('error', () => img.remove(), { once: true });
   art.prepend(img);
 };
 
 const proceduralSide = (name) => el('div', `bb-pf bb-pf--side bb-pf--${name}`);
 
-const proceduralBack = () => {
+const proceduralBack = (look) => {
   const face = el('div', 'bb-pf bb-pf--back');
   const list = el('ul', 'bb-back__list');
-  for (const line of [
-    '40-card ready-to-play deck including 1 of 4 unique foil promo cards',
-    '4 Phantasmal Flames booster packs',
-    'A code card for Pokémon TCG Live',
-  ]) {
+  for (const line of look.labels.backLines) {
     list.append(el('li', '', line));
   }
   const legal = el('div', 'bb-back__legal');
   for (let line = 0; line < 4; line += 1) legal.append(el('i'));
   face.append(
-    buildBattleTitle(),
+    buildBattleTitle(look),
     el('div', 'bb-back__rule'),
     el('p', 'bb-back__inside', 'Inside, you’ll find:'),
     list,
@@ -247,11 +245,35 @@ const proceduralTop = (name) => {
   return face;
 };
 
-const proceduralFace = (name) => {
-  if (name === 'front') return proceduralFront();
-  if (name === 'back') return proceduralBack();
+const proceduralFace = (name, look) => {
+  if (name === 'front') return proceduralFront(look);
+  if (name === 'back') return proceduralBack(look);
   if (name === 'top' || name === 'bottom') return proceduralTop(name);
   return proceduralSide(name);
+};
+
+/**
+ * A procedural pack front (design 054 § Unboxing skin): the 052 pack layout — crimped seals, the
+ * wordmark and age badge, the set logo, the "10 additional game cards" band — over a card's art,
+ * in the era palette. Used wherever a box has no vendored pack art.
+ */
+const proceduralPackFront = (className, art, look) => {
+  const front = el('div', `${className} bb-packfront`);
+  const artWindow = el('div', 'bb-packfront__window');
+  if (art?.imageUrl) {
+    const img = el('img', 'bb-packfront__art');
+    img.alt = '';
+    img.draggable = false;
+    img.addEventListener('error', () => img.remove(), { once: true });
+    img.src = art.imageUrl;
+    artWindow.append(img);
+  }
+  const head = el('div', 'bb-packfront__head');
+  head.append(wordmark('bb-wordmark--small'), el('span', 'bb-age', '6+'));
+  const logo = setLogo(look);
+  logo.classList.add('bb-packfront__logo');
+  front.append(artWindow, head, logo, el('div', 'bb-packfront__band', '⑩ Additional game cards'));
+  return front;
 };
 
 const FACE_SIZE = {
@@ -268,9 +290,12 @@ const FACE_SIZE = {
  * A loaded photo is kept in `cache` and moved into the next render's face, so a re-render never
  * flashes the CSS face while the new image decodes.
  */
-const mountTexture = (face, name, cache) => {
-  const texture = boxFaceTexture(name);
-  if (!texture) return;
+const mountTexture = (face, name, cache, look) => {
+  const texture = look.skin.faces?.[name] || null;
+  if (!texture) {
+    if (name === 'front') mountKeyArt(face, look);
+    return;
+  }
   const cached = cache.get(name);
   if (cached) {
     face.classList.add('has-texture');
@@ -282,7 +307,7 @@ const mountTexture = (face, name, cache) => {
   try {
     matrix = faceMatrix3d(texture.quad, width, height);
   } catch {
-    if (name === 'front') mountKeyArt(face);
+    if (name === 'front') mountKeyArt(face, look);
     return;
   }
   const img = el('img', 'bb-box__texture');
@@ -303,7 +328,7 @@ const mountTexture = (face, name, cache) => {
     'error',
     () => {
       img.remove();
-      if (name === 'front') mountKeyArt(face);
+      if (name === 'front') mountKeyArt(face, look);
     },
     { once: true }
   );
@@ -311,10 +336,10 @@ const mountTexture = (face, name, cache) => {
   face.append(img);
 };
 
-const boxFace = (name, { wrapped, textures }) => {
+const boxFace = (name, { wrapped, textures, look }) => {
   const face = el('div', `bb-box__face bb-box__face--${name}`);
-  face.append(proceduralFace(name));
-  mountTexture(face, name, textures);
+  face.append(proceduralFace(name, look));
+  mountTexture(face, name, textures, look);
   if (wrapped) face.append(el('div', 'bb-face__wrap'));
   return face;
 };
@@ -344,7 +369,10 @@ const cardFallback = (card) => {
  * @param {(event: {type: string, packIndex?: number}) => object|null} options.dispatch reduces and
  *   saves; null when the event was refused
  * @param {(object|null)[][]} options.packs the session's packs as card rows, in slot order
- * @param {object} options.packModel the box's pack model (reverse-slot lookup)
+ * @param {object} options.packModel the box's resolved pack model (reverse-slot lookup)
+ * @param {(card: object) => string|null} options.classOf the card's hit class (reveal tier)
+ * @param {{skin: object, labels: object, seriesName: string, setName: string, playLevel: boolean}}
+ *   options.look the box's skin (`boxSkin`) and printed words (`unboxingLabels`)
  * @param {number} options.seed the box seed (pack art, tear edges)
  * @param {object|null} options.promo the deck's foil promo card row
  * @param {() => void} options.onBuildDeck ends the opening: closes the stage, shows the Pool tab
@@ -356,17 +384,21 @@ export const mountUnboxingScene = ({
   dispatch,
   packs,
   packModel,
+  classOf,
+  look,
   seed,
   promo,
   onBuildDeck,
 }) => {
-  const artIndexes = packArtIndexes(seed);
+  const artIndexes = packArtIndexes(seed, packs.length, look.skin.packArts.length);
   const textures = new Map();
   const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
   const slotOf = (packIndex, cardIndex) =>
     packSlotKind(packModel, cardIndex, packs[packIndex]?.[cardIndex]);
-  const tierOf = (packIndex, cardIndex) =>
-    hitTierFor(packs[packIndex]?.[cardIndex], slotOf(packIndex, cardIndex));
+  const tierOf = (packIndex, cardIndex) => {
+    const card = packs[packIndex]?.[cardIndex];
+    return hitTierFor(card, slotOf(packIndex, cardIndex), card ? classOf(card) : null);
+  };
 
   // Bumped by every render: async continuations from an older picture stop touching the DOM.
   let generation = 0;
@@ -385,6 +417,11 @@ export const mountUnboxingScene = ({
   let packsOut = initialStage === 'deckShown' || initialStage === 'packs';
   let summaryPack = null;
   const flippedHits = new Set();
+  // The 3D pack stage: `packStage` draws the spread (`data-render='3d'`); a stage that became ready
+  // mid-beat waits in `pendingStage` for the next settled picture. Null → the DOM scene (row 1).
+  let packStage = null;
+  let pendingStage = null;
+  let unmounted = false;
 
   const later = (fn, ms) => {
     const id = setTimeout(() => {
@@ -459,7 +496,7 @@ export const mountUnboxingScene = ({
     host.style.setProperty('--bb-d', `${BOX_D}px`);
     const body = el('div', 'bb-box__body');
     const wrapped = !u.wrapTorn;
-    const faceOptions = { wrapped, textures };
+    const faceOptions = { wrapped, textures, look };
     for (const name of ['back', 'left', 'right', 'bottom']) body.append(boxFace(name, faceOptions));
     for (const name of ['back', 'left', 'right', 'front']) {
       body.append(el('div', `bb-box__inner bb-box__inner--${name}`));
@@ -534,7 +571,7 @@ export const mountUnboxingScene = ({
       windowEl.append(img);
       deck.append(windowEl, el('div', 'bb-deck__wrap'));
     }
-    deck.append(el('span', 'bb-tray__label', '40-card deck'));
+    deck.append(el('span', 'bb-tray__label', look.labels.deckLabel));
     deck.addEventListener('click', beatUnwrapDeck);
     return deck;
   };
@@ -550,12 +587,16 @@ export const mountUnboxingScene = ({
     return host;
   };
 
+  // A vendored pack front is the whole image; a box without one, or whose file fails to load (design
+  // 054 row 25), gets the procedural front.
   const packArt = (className, packIndex) => {
+    const art = look.skin.packArts[artIndexes[packIndex]];
+    if (art?.kind !== 'vendored') return proceduralPackFront(className, art, look);
     const img = el('img', className);
     img.alt = '';
     img.draggable = false;
-    img.addEventListener('error', () => img.remove(), { once: true });
-    img.src = `/${packArtSrc(PACK_ARTS[artIndexes[packIndex]])}`;
+    img.addEventListener('error', () => img.replaceWith(proceduralPackFront(className, null, look)), { once: true });
+    img.src = `/${art.src}`;
     return img;
   };
 
@@ -570,7 +611,7 @@ export const mountUnboxingScene = ({
     tray.append(trayItem(0, renderDeck(u)));
     if (u.stage !== 'opened') tray.append(renderPromo());
     tray.append(
-      trayItem(1, renderProp('code', 'Code card', 'Pokémon TCG Live')),
+      trayItem(1, renderProp('code', 'Code card', look.labels.codeCardGame)),
       trayItem(2, renderProp('tips', 'How to play', 'Quick-start sheet'))
     );
     return tray;
@@ -596,12 +637,24 @@ export const mountUnboxingScene = ({
       const stripShift = (progress) => widthOf() * progress * 0.5;
       bindTear(top, {
         widthOf,
+        // With the 3D stage the finger peels the WebGL strip; the cut line runs from the grabbed end.
+        onStart: (event) => {
+          if (!packStage) return;
+          const side = peelSide(event.clientX, pack.getBoundingClientRect());
+          cut.style.transformOrigin = side === 1 ? '0 50%' : '100% 50%';
+          packStage.beginTear({ packIndex, side });
+        },
         onProgress: (progress) => {
           cut.style.transform = `scaleX(${Math.min(1, progress / PACK_TORN_AT)})`;
+          if (packStage) {
+            packStage.setTearProgress(progress);
+            return;
+          }
           strip.style.transform = `translateX(${stripShift(progress)}px) rotate(${progress * 6}deg)`;
         },
         onSpring: (progress) => {
           cut.style.transform = 'scaleX(0)';
+          if (packStage) return packStage.springBack(progress);
           return playPose(
             strip,
             (t) => lerp(stripShift(progress), 0, easeOut(t)),
@@ -610,7 +663,7 @@ export const mountUnboxingScene = ({
             { samples: 8 }
           );
         },
-        onTear: (progress) => beatTearPack(packIndex, stripShift(progress)),
+        onTear: (progress) => beatTearPack(packIndex, stripShift(progress), progress),
       });
       fly.append(strip, cut, top);
     }
@@ -776,7 +829,15 @@ export const mountUnboxingScene = ({
     teardown();
     const u = getUnboxing();
     const view = viewOf(u);
+    // A new picture lands every 3D animation, except the rip's own hand-off to the pocket.
+    if (entrance?.cut3d === undefined) {
+      packStage?.jumpToEnd();
+      packStage?.clearCards();
+    }
     root.replaceChildren();
+    adoptPackStage();
+    if (packStage) root.append(packStage.mirror, packStage.canvas);
+    root.dataset.render = packStage ? '3d' : 'dom';
     root.dataset.stage = u.stage;
     root.dataset.view = view;
     root.dataset.wrap = u.wrapTorn ? 'off' : 'on';
@@ -793,8 +854,78 @@ export const mountUnboxingScene = ({
     if (view === 'summary') root.append(renderSummary(summaryPack));
     root.append(renderDock(u, view));
     root.querySelectorAll('.bb-spread').forEach(layoutSpread);
+    // A fly entrance hands the packs to the stage itself, from the box mouth.
+    if (!entrance?.fly) syncPackStage(view);
     updateDock();
     playEntrance(entrance);
+  };
+
+  // ── 3D pack stage (design 055 § Scene integration) ───────────────────
+  const spreadAnchors = () => [...root.querySelectorAll('.bb-spread .bb-bigpack')];
+  const spreadFocus = () => Number(root.querySelector('.bb-spread')?.dataset.focus) || 0;
+
+  // The top card the stack shows when pack `packIndex` is ripped: a hit stays face down (row 16).
+  const topCardOf = (packIndex) => ({
+    imageUrl: cardImage(packs[packIndex]?.[0], 'small') || null,
+    faceDown: isHiddenHit(packIndex, 0),
+  });
+
+  function syncPackStage(view) {
+    if (!packStage) return;
+    if (view === 'spread') {
+      const focus = spreadFocus();
+      packStage.showSpread({ anchors: spreadAnchors(), focus, topCard: topCardOf(focus) });
+    } else packStage.hide();
+  }
+
+  function adoptPackStage() {
+    if (!pendingStage) return;
+    packStage = pendingStage;
+    pendingStage = null;
+  }
+
+  // Context lost or FX switched off: the DOM scene takes over at the same state (row 12).
+  const dropPackStage = () => {
+    pendingStage?.dispose();
+    pendingStage = null;
+    const live = packStage;
+    packStage = null;
+    if (!live) return;
+    live.dispose();
+    if (!unmounted) render();
+  };
+
+  // Any failure (no WebGL, a 404 on three or the pack art) leaves the DOM scene as it is, quietly.
+  const loadPackStage = () => {
+    if (initialStage === 'done' || fxDisabled()) return;
+    const arts = packs.map((_, packIndex) => look.skin.packArts[artIndexes[packIndex]]);
+    // Procedural pack fronts are DOM only until the stage can draw them.
+    if (!arts.every((art) => art?.kind === 'vendored')) return;
+    import(PACK_STAGE_MODULE)
+      .then((module) =>
+        module.createPackStage({
+          host: root,
+          seed,
+          packArts: arts.map((art) => ({ url: `/${art.src}`, shape: art.shape ?? null })),
+          cardBackUrl: resolveDefaultCardBackSrc(),
+          onLost: dropPackStage,
+        })
+      )
+      .catch(() => null)
+      .then((stage) => {
+        if (!stage) return;
+        if (unmounted || fxDisabled()) {
+          stage.dispose();
+          return;
+        }
+        pendingStage = stage;
+        if (busy) return;
+        // Idle: take over the current picture now (a box is not drawn in 3D, so only a spread changes).
+        adoptPackStage();
+        root.append(packStage.mirror, packStage.canvas);
+        root.dataset.render = '3d';
+        syncPackStage(viewOf(getUnboxing()));
+      });
   };
 
   // ── Entrances (played on the freshly rendered picture) ───────────────
@@ -835,6 +966,7 @@ export const mountUnboxingScene = ({
     }
     if (entrance?.fly) playFly(entrance.fly);
     if (entrance?.cut !== undefined) playCut();
+    if (entrance?.cut3d !== undefined) playCut3d();
     if (entrance === 'summary') playDeal();
     if (entrance === 'spread') playSpreadIn();
     if (entrance === 'sweep') playSweep();
@@ -848,20 +980,18 @@ export const mountUnboxingScene = ({
     );
     const spread = root.querySelector('.bb-spread');
     if (!spread || !boxRect) {
+      syncPackStage(viewOf(getUnboxing()));
       holdWhile(fade);
       return;
     }
-    const fromX = boxRect.left + boxRect.width / 2;
-    const fromY = boxRect.top + boxRect.height * BOX_MOUTH_Y;
+    if (packStage) {
+      playFly3d(spread, boxRect, fade);
+      return;
+    }
     const flights = [...spread.querySelectorAll('.bb-bigpack')].map((node, order) => {
       const slot = spreadSlotOf(node, spread);
-      const rect = node.getBoundingClientRect();
-      const width = node.offsetWidth || rect.width || 1;
-      const params = {
-        dxPx: (fromX - (rect.left + rect.width / 2)) / slot.scale,
-        dyPx: (fromY - (rect.top + rect.height / 2)) / slot.scale,
-        fromScale: (boxRect.width * FLY_FROM_WIDTH) / width / slot.scale,
-      };
+      const params = packFlyParams(boxRect, node.getBoundingClientRect(), slot.scale);
+      if (!params) return Promise.resolve();
       const delay = order * PACK_FLY_STAGGER_MS;
       later(() => sound('unbox-unwrap'), instant() ? 0 : delay);
       return playPose(
@@ -875,6 +1005,48 @@ export const mountUnboxingScene = ({
       );
     });
     holdWhile(Promise.all([fade, ...flights]));
+  };
+
+  // The same flight in WebGL: the stage turns each pack in from its silver back as it lands. The
+  // anchors' tear buttons (and their glint) stay hidden until the packs are down.
+  const playFly3d = (spread, boxRect, fade) => {
+    spread.classList.add('is-landing');
+    const focus = spreadFocus();
+    const flights = packStage.showSpread({
+      anchors: spreadAnchors(),
+      focus,
+      fromBoxRect: boxRect,
+      topCard: topCardOf(focus),
+    });
+    holdWhile(Promise.all([fade, flights])).then((current) => {
+      if (!current) return;
+      packStage?.jumpToEnd();
+      spread.classList.remove('is-landing');
+    });
+  };
+
+  // The 3D stack glides onto the pocket's top card, then in one frame the DOM stack shows and the
+  // WebGL stack goes (the pocket renders hidden, layout kept, until then).
+  const playCut3d = () => {
+    const pocket = root.querySelector('.bb-pocket');
+    const top = root.querySelector('.bb-pcard.is-top');
+    if (!packStage || !pocket || !top) {
+      packStage?.jumpToEnd();
+      packStage?.clearCards();
+      return;
+    }
+    pocket.classList.add('is-awaiting-3d');
+    const gen = generation;
+    holdWhile(packStage.settleStackTo(top.getBoundingClientRect())).then(() => {
+      if (gen !== generation) return;
+      // A backstop that won (hidden tab) lands whatever is still playing.
+      packStage?.jumpToEnd();
+      requestAnimationFrame(() => {
+        if (gen !== generation) return;
+        pocket.classList.remove('is-awaiting-3d');
+        packStage?.clearCards();
+      });
+    });
   };
 
   // The torn pack drops away as its cards rise into the centre.
@@ -1009,7 +1181,11 @@ export const mountUnboxingScene = ({
     render({ entrance: { fly: boxRect } });
   }
 
-  const beatTearPack = (packIndex, fromShiftPx = 0) => {
+  const beatTearPack = (packIndex, fromShiftPx = 0, fromProgress = 0) => {
+    if (packStage) {
+      beatTearPack3d(packIndex, fromProgress);
+      return;
+    }
     const focus = root.querySelector(`.bb-bigpack[data-pack="${packIndex}"]`);
     const strip = focus?.querySelector('.bb-pack__strip');
     const cut = focus?.querySelector('.bb-cutline');
@@ -1026,6 +1202,24 @@ export const mountUnboxingScene = ({
           PACK_TEAR_MS
         ),
       { cut: packIndex }
+    );
+  };
+
+  // The WebGL rip: the strip finishes tearing and flies, the cards rise out of the mouth and the
+  // pack drops away; the pocket then takes over (`cut3d`). The cut line gives way to the torn edge.
+  const beatTearPack3d = (packIndex, fromProgress) => {
+    const focus = root.querySelector(`.bb-bigpack[data-pack="${packIndex}"]`);
+    const cut = focus?.querySelector('.bb-cutline');
+    runBeat(
+      { type: 'tearPack', packIndex },
+      unboxingVoiceFor('tearPack'),
+      () => {
+        if (cut) cut.style.transform = 'scaleX(0)';
+        // The tear button's hint, glint and focus ring would float over the flying strip.
+        focus?.classList.add('is-ripping');
+        return packStage ? packStage.rip({ fromProgress, topCard: topCardOf(packIndex) }) : Promise.resolve();
+      },
+      { cut3d: packIndex }
     );
   };
 
@@ -1262,12 +1456,13 @@ export const mountUnboxingScene = ({
   }
 
   // ── Tear input: drag ≥ 40 % across, or press (row 5); Enter/Space on the button ─
-  function bindTear(target, { widthOf, onProgress, onSpring, onTear }) {
+  function bindTear(target, { widthOf, onStart, onProgress, onSpring, onTear }) {
     let drag = null;
     target.addEventListener('pointerdown', (event) => {
       if (target.disabled || busy || event.button !== 0) return;
       drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, dx: 0, moved: 0, fired: false };
       target.setPointerCapture?.(event.pointerId);
+      onStart?.(event);
     });
     target.addEventListener('pointermove', (event) => {
       if (!drag || event.pointerId !== drag.id || drag.fired) return;
@@ -1304,11 +1499,18 @@ export const mountUnboxingScene = ({
   }
 
   render();
+  loadPackStage();
 
   return {
     unmount: () => {
+      unmounted = true;
       autoToken += 1;
       teardown();
+      packStage?.jumpToEnd();
+      packStage?.dispose();
+      packStage = null;
+      pendingStage?.dispose();
+      pendingStage = null;
       window.removeEventListener('resize', onResize);
       root.replaceChildren();
     },
