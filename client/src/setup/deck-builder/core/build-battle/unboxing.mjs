@@ -599,7 +599,7 @@ const TOOTH_MAX_PCT = 5;
 /**
  * The jagged tear line of a pack in its own percent space, ordered right → left: points on the
  * line at 7 % of the pack height, teeth 2–5 % deeper between them. Seeded per pack so a reload
- * shows the same tear; the 3D pack (design 054) reads the same line as numbers.
+ * shows the same tear; the 3D pack (design 055) reads the same line as numbers.
  *
  * @returns {{xPct: number, yPct: number}[]}
  */

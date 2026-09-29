@@ -1,2 +1,2 @@
-# Vendored third-party builds stay byte-identical to their package (design 054).
+# Vendored third-party builds stay byte-identical to their package (design 055).
 client/src/vendor/

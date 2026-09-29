@@ -1,5 +1,5 @@
-# 054: Build & Battle 3D packs — WebGL pillow packs, a real rip, cards out of the mouth
-Status: approved (user, 2026-09-29: "Approved") · built (slices 1–4); box, lid and wrap follow in design 055
+# 055: Build & Battle 3D packs — WebGL pillow packs, a real rip, cards out of the mouth
+Status: approved (user, 2026-09-29: "Approved") · built (slices 1–4); box, lid and wrap follow in design 056
 Date: 2026-09-29 · Session: S330 · depends on design 052 (unboxing scene, Pocket-style rework)
 
 ## Problem
@@ -115,7 +115,7 @@ cards hand off to the current DOM swipe stack.
 12. **Kill switch and motion.** `fxDisabled()` → no WebGL at all (DOM path; the kill switch means no
     FX). `motionReduced()` → WebGL static: no sway/tilt loop, every beat jumps to its end frame,
     render on demand.
-13. **Box, lid, shrink-wrap** (user: later). They stay CSS here. Design 055 moves them to WebGL
+13. **Box, lid, shrink-wrap** (user: later). They stay CSS here. Design 056 moves them to WebGL
     after the user has seen this pack look, since the box must match it (materials, lights, tone).
 
 ## Design

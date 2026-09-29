@@ -1,5 +1,5 @@
 /**
- * Vendor the three.js files the Build & Battle 3D packs load (design 054) from the pinned
+ * Vendor the three.js files the Build & Battle 3D packs load (design 055) from the pinned
  * devDependency into client/src/vendor/three/. The browser has no bundler: it loads these copies
  * through the import map in client/index.ejs.
  * Run: node scripts/vendor-three.mjs          (copies the files)
@@ -9,7 +9,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// 0.185.0 is the last release that ships three.core.min.js / three.module.min.js (design 054 § Options 2).
+// 0.185.0 is the last release that ships three.core.min.js / three.module.min.js (design 055 § Options 2).
 export const THREE_VERSION = '0.185.0';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');

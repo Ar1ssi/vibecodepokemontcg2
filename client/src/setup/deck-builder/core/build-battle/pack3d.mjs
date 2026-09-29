@@ -1,4 +1,4 @@
-// The Build & Battle 3D packs as pure data (design 054 § Pure API). No DOM, no three.js: the
+// The Build & Battle 3D packs as pure data (design 055 § Pure API). No DOM, no three.js: the
 // WebGL stage (`sidebox/native-deck-builder-pack3d.js`) samples these on its animation clock.
 // World units: the pack is 1 wide; y points up; the camera looks down −z at the z = 0 plane.
 

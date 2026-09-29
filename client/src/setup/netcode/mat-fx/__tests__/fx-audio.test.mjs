@@ -258,7 +258,7 @@ test('fx-audio: every unboxing beat (design 052) has a playable voice', () => {
   }
 });
 
-test('fx-audio: the 3D pack rip tick (design 054) is one short band-passed noise', () => {
+test('fx-audio: the 3D pack rip tick (design 055) is one short band-passed noise', () => {
   const voices = voicesFor('unbox-rip-tick');
   assert.equal(voices.length, 1);
   assert.equal(voices[0].type, 'noise');

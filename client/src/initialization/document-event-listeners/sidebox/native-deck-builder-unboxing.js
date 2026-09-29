@@ -69,7 +69,7 @@ const BOX_H = Math.round(BOX_W * BOX_PROPORTIONS.height);
 const BOX_D = Math.round(BOX_W * BOX_PROPORTIONS.depth);
 const SPRING_BACK_MS = 160;
 const FADE_TOP_MS = 320;
-// The WebGL pack stage (design 054), loaded only when a box is opened.
+// The WebGL pack stage (design 055), loaded only when a box is opened.
 const PACK_STAGE_MODULE = './native-deck-builder-pack3d.js';
 const DRAG_TILT = 0.06;
 const SWEEP_MS = 420;
@@ -860,7 +860,7 @@ export const mountUnboxingScene = ({
     playEntrance(entrance);
   };
 
-  // ── 3D pack stage (design 054 § Scene integration) ───────────────────
+  // ── 3D pack stage (design 055 § Scene integration) ───────────────────
   const spreadAnchors = () => [...root.querySelectorAll('.bb-spread .bb-bigpack')];
   const spreadFocus = () => Number(root.querySelector('.bb-spread')?.dataset.focus) || 0;
 

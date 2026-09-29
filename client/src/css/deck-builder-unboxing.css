@@ -1192,7 +1192,7 @@
   }
 }
 
-/* ── 3D packs (design 054): a WebGL canvas draws the packs, the DOM keeps layout and input ── */
+/* ── 3D packs (design 055): a WebGL canvas draws the packs, the DOM keeps layout and input ── */
 .build-battle-window .db-live .bb-gl {
   position: fixed;
   inset: 0;

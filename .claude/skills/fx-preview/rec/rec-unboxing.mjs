@@ -8,7 +8,7 @@
 // Pass 2 (no video) freezes beats at start / peak / settle and writes
 // <OUT>/<beat>-{start,peak,settle}.png for tear, lid, promo, fly, cut, swipe, hit, summary.
 // Pass 3 shoots <OUT>/phone-390-{spread,pocket}.png and checks row 16 (no horizontal scroll).
-// Design 054 (3D packs): Chromium runs WebGL on SwiftShader (GL_ARGS). Pass 1 also checks the spread
+// Design 055 (3D packs): Chromium runs WebGL on SwiftShader (GL_ARGS). Pass 1 also checks the spread
 // draws in WebGL, a reload at the spread returns to it, and the pocket hand-off leaves the canvas
 // empty. The WebGL clock is not WAAPI, so pass 2 cannot freeze the fly or the rip in 3D; pass 4
 // steps Playwright's fake clock instead and writes <OUT>/rip3d-*.png (spread, peel 30 %, rip,
@@ -293,12 +293,12 @@ const recordVideo = async (browser) => {
     tearable: [...document.querySelectorAll('.bb-bigpack .bb-pack__top')].map((node) => node.closest('.bb-bigpack').dataset.pack),
   }));
   check(spread.packs === 4 && spread.tearable.join() === '0', 'the four packs fill the screen and only pack 1 can be opened', JSON.stringify(spread));
-  check(await waitRender(page, '3d'), '054: the spread draws in WebGL (data-render=3d)', await renderMode(page));
+  check(await waitRender(page, '3d'), '055: the spread draws in WebGL (data-render=3d)', await renderMode(page));
 
   for (const packIndex of [0, 1, 2, 3]) {
     await tearPack(page, packIndex, { drag: packIndex === 0 });
     if (packIndex === 0) {
-      check(await canvasDrawsNothing(page), '054 hand-off: the pocket is DOM and the canvas draws nothing');
+      check(await canvasDrawsNothing(page), '055 hand-off: the pocket is DOM and the canvas draws nothing');
       for (let k = 0; k < 3; k += 1) await swipeOne(page, 0, tiers, { drag: k === 0 });
       await page.waitForTimeout(300);
       await page.reload();
@@ -333,7 +333,7 @@ const recordVideo = async (browser) => {
       await waitView(page, 'spread');
       const back3d = await waitRender(page, '3d');
       const focus = await page.evaluate(() => document.querySelector('.bb-spread')?.dataset.focus);
-      check(back3d && focus === '1', '054 row 13 reload at the spread: back in WebGL on pack 2', `${await renderMode(page)} focus ${focus}`);
+      check(back3d && focus === '1', '055 row 13 reload at the spread: back in WebGL on pack 2', `${await renderMode(page)} focus ${focus}`);
       await page.waitForTimeout(700);
     }
   }
@@ -514,7 +514,7 @@ const recordPhone = async (browser) => {
   await context.close();
 };
 
-// ── Pass 4: the 3D rip on a stepped clock (design 054) ──────────────────────────────────
+// ── Pass 4: the 3D rip on a stepped clock (design 055) ──────────────────────────────────
 // Playwright's fake clock drives requestAnimationFrame and performance.now, so a paused clock
 // stepped with runFor lands each WebGL frame exactly where the poses put it.
 const recordRip3d = async (browser) => {
@@ -525,7 +525,7 @@ const recordRip3d = async (browser) => {
   await openFreshBox(page);
   await openToSpread(page);
   if (!(await waitRender(page, '3d'))) {
-    check(false, '054 pass 4: the spread draws in WebGL', await renderMode(page));
+    check(false, '055 pass 4: the spread draws in WebGL', await renderMode(page));
     await context.close();
     return;
   }
@@ -579,13 +579,13 @@ const recordRip3d = async (browser) => {
   }
   await step(32);
   await shoot(page, 'rip3d-handoff-after.png');
-  check(handedOff, '054 pass 4: the stepped rip hands off to the DOM pocket');
-  check(await canvasDrawsNothing(page), '054 pass 4: after the hand-off the canvas draws nothing');
+  check(handedOff, '055 pass 4: the stepped rip hands off to the DOM pocket');
+  check(await canvasDrawsNothing(page), '055 pass 4: after the hand-off the canvas draws nothing');
   console.log('strip', 'rip3d');
   await context.close();
 };
 
-// ── Pass 5: fallbacks (design 054 rows 1, 6, 14) ────────────────────────────────────────
+// ── Pass 5: fallbacks (design 055 rows 1, 6, 14) ────────────────────────────────────────
 // Counts requestAnimationFrame calls made from the stage module.
 const COUNT_STAGE_RAF = () => {
   window.__stageRaf = 0;
@@ -608,16 +608,16 @@ const checkReducedMotion = async (browser) => {
   const before = await page.evaluate(() => window.__stageRaf);
   await page.waitForTimeout(1000);
   const loops = (await page.evaluate(() => window.__stageRaf)) - before;
-  check(gl && loops < 3, '054 row 6 reduced motion: static 3D packs, no stage rAF loop at rest', `${loops} stage rAF calls in 1 s`);
+  check(gl && loops < 3, '055 row 6 reduced motion: static 3D packs, no stage rAF loop at rest', `${loops} stage rAF calls in 1 s`);
   await dragTear(page, '.bb-bigpack.is-focus .bb-pack__top');
   const landed = await page
     .waitForSelector('.bb-pocket:not(.is-awaiting-3d)', { timeout: 1500 })
     .then(() => true)
     .catch(() => false);
-  check(landed, '054 row 6 reduced motion: the rip lands on the pocket at once');
+  check(landed, '055 row 6 reduced motion: the rip lands on the pocket at once');
   await page.waitForTimeout(300);
   await shoot(page, 'reduced-after-rip.png');
-  check(await canvasDrawsNothing(page), '054 row 6 reduced motion: after the hand-off the canvas draws nothing');
+  check(await canvasDrawsNothing(page), '055 row 6 reduced motion: after the hand-off the canvas draws nothing');
   await context.close();
 };
 
@@ -633,9 +633,9 @@ const checkNoWebgl = async () => {
       render: document.getElementById('bbUnboxing')?.dataset.render,
       canvas: !!document.querySelector('.bb-gl'),
     }));
-    check(dom.render === 'dom' && !dom.canvas, '054 row 1 no WebGL: the DOM scene, no canvas', JSON.stringify(dom));
+    check(dom.render === 'dom' && !dom.canvas, '055 row 1 no WebGL: the DOM scene, no canvas', JSON.stringify(dom));
     await tearPack(page, 0, { drag: true });
-    check((await topIndex(page)) === 0, '054 row 1 no WebGL: the DOM tear lands on the pocket');
+    check((await topIndex(page)) === 0, '055 row 1 no WebGL: the DOM tear lands on the pocket');
     await context.close();
   } finally {
     await browser.close();
@@ -701,7 +701,7 @@ const checkMountCycles = async (browser) => {
   }, SCENE_MODULE);
   check(
     result.reached3d === 20 && result.leftover === 0 && warnings.length === 0,
-    '054 row 14: 20 mount/unmount cycles each reach 3D, leave no canvas, no context warning',
+    '055 row 14: 20 mount/unmount cycles each reach 3D, leave no canvas, no context warning',
     JSON.stringify({ ...result, warnings: warnings.length })
   );
   await context.close();

@@ -78,7 +78,7 @@ import { playFxSound } from '../../../setup/netcode/mat-fx/fx-audio.js';
 import { burstParticles } from '../../../setup/netcode/mat-fx/particles.mjs';
 
 /**
- * The Build & Battle 3D packs (design 054 § Stage API): a transparent WebGL canvas over the
+ * The Build & Battle 3D packs (design 055 § Stage API): a transparent WebGL canvas over the
  * unboxing scene draws each sealed pack as a lit pillow where the scene's invisible `.bb-bigpack`
  * anchor sits, so the DOM keeps layout, input and keyboard access. The finger peels the focus
  * pack's strip; the rip flies the strip off, lifts the card stack out of the mouth and drops the
@@ -114,7 +114,7 @@ const FRONT_LOOK = {
   envMapIntensity: 0.35,
 };
 const SILVER_STOPS = ['#d9dbe0', '#9aa0aa', '#d9dbe0'];
-// The rip's flecks: silver foil shards from the far end of the tear line (design 054 § rip).
+// The rip's flecks: silver foil shards from the far end of the tear line (design 055 § rip).
 const FLECK_COUNT = 14;
 const FLECK_MS = 560;
 const FLECK_SIZE_PX = [2, 5];
