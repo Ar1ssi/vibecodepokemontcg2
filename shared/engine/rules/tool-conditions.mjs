@@ -26,6 +26,7 @@ import {
 } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { evolvedView } from './evolved-pokemon.mjs';
+import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import {
   parseHpBonus,
   parseRetreatCostModifier,
@@ -98,9 +99,9 @@ function hasSubtype(card, word) {
     case 'vstar':
       return /vstar/.test(subs) || /vstar/.test(name);
     case 'ancient':
-      return /ancient/.test(subs) || /ancient/.test(name);
+      return isAncientCard(card);
     case 'future':
-      return /future/.test(subs) || /future/.test(name);
+      return isFutureCard(card);
     case 'ultra beast':
       return isUltraBeastCard(card);
     default:

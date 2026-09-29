@@ -3,6 +3,7 @@ import { energyMatchesSearchWhat } from './energy-effects.mjs';
 import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
 import { isGxCard, isRuleBoxPokemon, isUltraBeastCard } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
+import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 
 const SYMBOL_TO_TYPE = {
   c: 'Colorless',
@@ -99,6 +100,9 @@ export function matchesSearch(card, what = '') {
   if (w.includes('ultra beast')) {
     return isUltraBeastCard(card);
   }
+  // Techno Radar is itself a Future Item: the tag alone does not make a card a Pokémon.
+  if (/\bancient pok[eé]mon\b/.test(w)) return isPokemon && isAncientCard(card);
+  if (/\bfuture pok[eé]mon\b/.test(w)) return isPokemon && isFutureCard(card);
   if (w.includes('item') && w.includes('tool')) return isTrainer;
   if (w === 'item' || (w.includes('item') && !w.includes('tool'))) {
     const tt = String(card.trainerType || card.type || '').toLowerCase();

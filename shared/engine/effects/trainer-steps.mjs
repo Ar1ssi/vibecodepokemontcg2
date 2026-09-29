@@ -11,6 +11,7 @@ import { shuffleInPlace } from '../rng.mjs';
 import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isUltraBeastCard } from '../rules/card-classify.mjs';
+import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
@@ -504,9 +505,7 @@ function variableDraw(ctx) {
   const { player, opponent, step } = ctx;
   let count = 0;
   if (step.source === 'ancientInPlay') {
-    count = rootsOf(player).filter((root) =>
-      textOf(topPokemonCard(player, root), 'subtypes').includes('ancient')
-    ).length;
+    count = rootsOf(player).filter((root) => isAncientCard(topPokemonCard(player, root))).length;
   } else if (step.source === 'opponentBench') {
     count = benchRootsOf(opponent).length;
   } else if (step.source === 'opponentHandPokemon') {

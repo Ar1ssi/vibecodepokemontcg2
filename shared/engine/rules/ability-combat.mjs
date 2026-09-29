@@ -68,6 +68,7 @@ import { isBasicPokemon, isPokemon } from '../cards.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
+import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import { normalizeStage } from './evolution.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
@@ -378,9 +379,11 @@ function attackerInCategory(category, attacker, holder) {
   if (/pok[eé]mon-gx|pok[eé]mon gx/.test(c) && !isGxCard(attacker)) return false;
   if (/pok[eé]mon-ex|pok[eé]mon ex/.test(c) && !isExCard(attacker)) return false;
   const subtypes = (attacker?.subtypes || []).map(lower);
-  for (const style of ['rapid strike', 'single strike', 'fusion strike', 'ancient', 'future']) {
+  for (const style of ['rapid strike', 'single strike', 'fusion strike']) {
     if (c.includes(style) && !subtypes.includes(style)) return false;
   }
+  if (/\bancient\b/.test(c) && !isAncientCard(attacker)) return false;
+  if (/\bfuture\b/.test(c) && !isFutureCard(attacker)) return false;
   if (/team plasma/.test(c) && !/plasma/.test(`${lower(attacker?.name)} ${subtypes.join(' ')}`)) {
     return false;
   }
@@ -969,12 +972,7 @@ function suppressionTargets(text, holder, card, ctx) {
     const type = lower(TYPE_LETTER[typeExcept[1]]);
     if (attackerTypes(card).includes(type)) return false;
   }
-  if (
-    /except for future pok[eé]mon/.test(text) &&
-    (card?.subtypes || []).includes('Future')
-  ) {
-    return false;
-  }
+  if (/except for future pok[eé]mon/.test(text) && isFutureCard(card)) return false;
   return true;
 }
 

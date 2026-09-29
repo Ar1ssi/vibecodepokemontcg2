@@ -12,6 +12,7 @@ import { expandEnergyEntries } from './attack-engine.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { evolvedView } from './evolved-pokemon.mjs';
 import { classifyEnergyEffect } from './energy-effects.mjs';
+import { isAncientCard } from './paradox-tags.mjs';
 import { listConditions } from './special-conditions.mjs';
 import {
   isExCard,
@@ -101,10 +102,7 @@ const isTeamRocketPokemon = ({ card, view }) =>
     `${card?.name || ''} ${view?.name || ''} ${card?.subtypes || ''} ${view?.subtypes || ''}`
   );
 
-const isAncientPokemon = ({ card, view }) =>
-  /ancient/i.test(
-    `${card?.subtypes || ''} ${view?.subtypes || ''} ${card?.name || ''} ${view?.name || ''}`
-  );
+const isAncientPokemon = ({ card, view }) => isAncientCard(view || card);
 
 const isBeedrillPokemon = ({ card, view }) =>
   /beedrill/i.test(card?.name || view?.name || '');
