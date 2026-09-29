@@ -474,3 +474,25 @@ test('deriveSetOptions lists each expansion once, newest first', () => {
   ]);
   assert.deepEqual(deriveSetOptions(null), []);
 });
+
+// Design 058: the Ancient/Future tag is per printing (pokemontcg.io subtypes): sv04-124 Roaring
+// Moon ex Ancient, sv01-123 Great Tusk ex untagged, sv04-070 Iron Hands ex Future, sv04-180
+// Techno Radar Future Item. TCGdex search rows carry the id and no tag.
+const PARADOX = [
+  { id: 'sv04-124', name: 'Roaring Moon ex', supertype: 'Pokémon', suffix: 'ex' },
+  { id: 'sv01-123', name: 'Great Tusk ex', supertype: 'Pokémon', suffix: 'ex' },
+  { id: 'sv04-070', name: 'Iron Hands ex', supertype: 'Pokémon', suffix: 'ex' },
+  { id: 'sv04-180', name: 'Techno Radar', supertype: 'Trainer', trainerType: 'Item' },
+];
+
+test('Special: Ancient and Future filter by printing, Trainers included', () => {
+  const pick = (value) =>
+    ids(applyCardFilters(PARADOX, toggleFilter(createEmptyFilters(), 'mechanics', value)));
+  assert.deepEqual(pick('Ancient'), ['sv04-124']);
+  assert.deepEqual(pick('Future'), ['sv04-070', 'sv04-180']);
+  const special = BUILDER_FILTER_GROUPS.find((group) => group.key === 'mechanics');
+  assert.ok(special.options.some((o) => o.value === 'Ancient'));
+  assert.ok(special.options.some((o) => o.value === 'Future'));
+  // TCGdex cannot narrow by tag, so the filter stays client-side.
+  assert.deepEqual(buildTcgdexFilterParams(toggleFilter(createEmptyFilters(), 'mechanics', 'Future')), {});
+});

@@ -24,6 +24,7 @@ import {
   isTagTeamCard,
   isVCard,
 } from '../../../../../shared/engine/rules/card-classify.mjs';
+import { isAncientCard, isFutureCard } from '../../../../../shared/engine/rules/paradox-tags.mjs';
 
 /** The energy types that get an icon, in printed card order. */
 export const FILTER_ENERGY_TYPES = [
@@ -76,6 +77,8 @@ const MECHANIC_OPTIONS = [
   { value: 'Prism Star', label: 'Prism Star' },
   { value: 'ACE SPEC', label: 'ACE SPEC' },
   { value: 'LEGEND', label: 'LEGEND' },
+  { value: 'Ancient', label: 'Ancient' },
+  { value: 'Future', label: 'Future' },
 ];
 
 // The TCG rarities from TCGdex /v2/en/rarities (2026-09-28); the Pocket-only
@@ -263,6 +266,9 @@ const MECHANIC_TESTS = {
   'Prism Star': (card) => isPrismStarCard(card),
   'ACE SPEC': (card) => isAceSpecCard(card),
   LEGEND: (card) => isPokemon(card) && (card.suffix === 'Legend' || isLegendCard(card)),
+  // Printed tags, looked up per printing (design 058); Trainers such as Techno Radar carry them too.
+  Ancient: (card) => isAncientCard(card),
+  Future: (card) => isFutureCard(card),
 };
 
 function matchesEnergyKind(card, kind) {
