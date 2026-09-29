@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-// Design 054 § Builder tab, by hand rows 1, 5, 6, 14, 15, 22 and 29: the box picker, `?box=`, the
+// Design 054 § Builder tab, by hand rows 1, 5, 6, 9, 14, 15, 22, 25 and 29: the box picker, `?box=`, the
 // load and load-error states, and the starting deck of each box kind. Needs a server (PTCG_URL,
 // default :4000). CHROMIUM_PATH picks the browser binary.
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';
@@ -172,6 +172,26 @@ try {
     state.box === 'evolutions' && state.era === 'xy' && JSON.stringify(state.options) === JSON.stringify(['fates-collide', 'steam-siege', 'evolutions']),
     JSON.stringify(state)
   );
+
+  // Row 25: me02's vendored pack files fail to load → each pack shows the procedural front instead.
+  await page.route('**/assets/build-battle/packs/**', (r) => r.fulfill({ status: 404, body: 'nope' }));
+  await fresh('&box=phantasmal-flames');
+  await page.click('#buildBattleOpenBox');
+  await page.waitForSelector('#bbUnboxing .bb-box__wrap', { state: 'visible', timeout: 15000 });
+  const press = (selector) => page.evaluate((sel) => document.querySelector(sel)?.click(), selector);
+  await press('.bb-box__wrap');
+  await page.waitForTimeout(800);
+  await press('.bb-box__open');
+  await page.waitForTimeout(1500);
+  await press('.bb-deck');
+  await waitFor(page, () => document.getElementById('bbUnboxing')?.dataset.view === 'spread', 15000);
+  await page.waitForTimeout(1200);
+  const fronts = await page.evaluate(() => ({
+    procedural: document.querySelectorAll('.bb-pack__art.bb-packfront').length,
+    images: document.querySelectorAll('img.bb-pack__art').length,
+  }));
+  T('row 25 missing vendored pack files fall back to procedural fronts', fronts.procedural > 0 && fronts.images === 0, JSON.stringify(fronts));
+  await page.unroute('**/assets/build-battle/packs/**');
 } finally {
   await browser.close();
 }

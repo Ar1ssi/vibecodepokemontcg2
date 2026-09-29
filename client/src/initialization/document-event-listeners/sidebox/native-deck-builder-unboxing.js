@@ -582,14 +582,15 @@ export const mountUnboxingScene = ({
     return host;
   };
 
-  // A vendored pack front is the whole image; a box without one gets the procedural front.
+  // A vendored pack front is the whole image; a box without one, or whose file fails to load (design
+  // 054 row 25), gets the procedural front.
   const packArt = (className, packIndex) => {
     const art = look.skin.packArts[artIndexes[packIndex]];
     if (art?.kind !== 'vendored') return proceduralPackFront(className, art, look);
     const img = el('img', className);
     img.alt = '';
     img.draggable = false;
-    img.addEventListener('error', () => img.remove(), { once: true });
+    img.addEventListener('error', () => img.replaceWith(proceduralPackFront(className, null, look)), { once: true });
     img.src = `/${art.src}`;
     return img;
   };

@@ -511,37 +511,37 @@ starting rows; PASS/FAIL lines name the box.
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | `?box=` empty / unknown / a set id instead of a key | ignored → `DEFAULT_BOX_KEY` (me02); picker shows its era | [ ] `build-battle-view.test.mjs` "parseBoxKey…" |
-| 2 | stored session names a box whose data fails `verifySessionCards` (pack id not in set, trainer id not in pool) | session cleared, sealed screen, no throw | [ ] `build-battle-session.test.mjs` |
-| 3 | random-Trainer draw: pool of 1 card, n = 4 | 2 copies then stop (at most `2·pool` draws), pool is 2 cards | [ ] `pack-opening.test.mjs` "the Trainer pool caps at two copies" |
-| 4 | evolution box: `n = 23 − 1 − A − B` < 0 for some pairing | generator refuses to bake the box (throws naming the pairing); catalog test asserts n ≥ 0 for all 12 pairings of every baked box | [ ] `box-catalog.test.mjs` |
-| 5 | `import()` of a set module rejects (offline, 404) | sealed screen shows the load error, picker usable, no session created | [ ] controller e2e by hand (route the module to 404 in Playwright) |
-| 6 | box opened, then reload while `loadBoxData` is pending | scene renders only after the promise; a second Open click during load is a no-op | [ ] e2e by hand |
-| 7 | same seed, same box, twice | identical deckKey, groupKeys, trainerIds, packs, artIndexes | [ ] `pack-opening.test.mjs` (fixed + evolution fixtures) |
-| 8 | same seed, different box | independent contents; changing the box before Open re-draws | [ ] `pack-opening.test.mjs` |
-| 9 | a class absent from a set (SM: no `illustration`) | its weight joins the slot filler; `hit`/`top` chances unchanged (25 % / 1 %) | [ ] `pack-models.test.mjs` "an absent class keeps the other rates" |
-| 10 | rate profile: 4,000 packs of a baked set per model | `me`/`sv`: hit 25 % ± 2, UR 8 % ± 1.5, IR 20 % ± 2, SIR 5 % ± 1, top 1 % ± 0.5 (`sv-acespec`: ACE SPEC 5 % ± 1); `swsh`: hit 25 %, UR 8 %, top 1 %; `swsh-tg`: + TG 25 % ± 2 (20 + 5); `sm`/`xy`: `Ultra Rare` non-secret 33 % ± 2, top 1 % | [ ] `pack-models.test.mjs` per model (synthetic set until the era's data lands, then the baked set) |
-| 11 | secret detection: numeric localId > `SET.official`; TG localIds (`TG01`) are never secret; a set with `official` missing | secrets only above the official count; TG rows classed by `subset`; missing `official` → generator throws at bake | [ ] `pack-models.test.mjs`; generator test |
-| 12 | 5 copies of one card in a B&B deck (pool has 5) | valid (Option 4 B); `tcg` still errors at 5; ACE SPEC ×2 / Radiant ×2 / Prism Star same name ×2 still error in B&B | [ ] `deck-validation.test.mjs` |
-| 13 | v1 me02 session (no `groupKeys`/`trainerIds`) after the upgrade | parses; pool and scene as before; deck name unchanged | [ ] `build-battle-session.test.mjs` "a 051 session still opens" |
-| 14 | evolution-deck starting deck | editor holds 23 + 17 Basic Energy = 40 at open; counter 40 / 40; Play enabled when a Basic exists | [ ] `build-battle-view.test.mjs` `startingDeckRows`; e2e by hand |
-| 15 | evolution-pack starting deck | editor holds the 23 cards; counter 23 / 40; Basic Energy tiles add freely | [ ] same |
-| 16 | dual-type group (page names two Energy types) | `energy[deckKey]` carries both rows summing to 17; label null → headline omits the type | [ ] `box-catalog.test.mjs` (every `energy` sums to 17 for evolution-deck boxes, 0 rows otherwise) |
-| 17 | promo id resolution: SM/SWSH promos on TCGdex (`smp-SM158`), set-numbered promos (Evolutions `xy12-11`, Destined Rivals `sv10-034`) | generator resolves by name check; the promo row's `id` is the printed card's TCGdex id; image fallback rule as § Generated data | [ ] generator `--check`; `box-catalog.test.mjs` promo ids present once |
-| 18 | TCGdex renames / renumbers a card | generator throws (name check); committed modules stay the truth | [ ] `--check` live test |
-| 19 | sprite slug for an old-era promo missing (Alolan forms) | `sprites: []` allowed; library shows the default; test checks only listed slugs | [ ] `box-catalog.test.mjs` |
-| 20 | 41 set modules on disk | each ≤ 60 KB; none imported by the eager catalog (grep test: no static import of `sets/` outside `box-data.mjs`) | [ ] `box-data.test.mjs` |
-| 21 | a `swsh-tg` box whose set module has no `subset: 'tg'` rows (TG fetch failed at bake) | generator refuses to bake the box (throws "no Trainer Gallery rows for swsh9tg"); at play an absent class falls to the filler as row 9 | [ ] generator test; `pack-models.test.mjs` |
-| 22 | picker changed after a session exists | picker disabled; "New box" first | [ ] e2e by hand |
-| 23 | two players, different boxes, both B&B | deal proceeds (formats equal); each pool is its own | [ ] `room.test.mjs` unchanged (format only) — reasoning |
-| 24 | skin URL 404 (logo/symbol/key art) | image removed on `error` as 052 does; procedural face still readable | [ ] existing `error` handlers; e2e by hand with the host blocked |
-| 25 | vendored art flag true but file missing | `<img>` error → procedural pack front behind it stays | [ ] e2e by hand |
-| 26 | reduced motion / fx disabled | unchanged from 052 | [ ] existing tests |
-| 27 | Trainer pool card printed in an older set (e.g. Team Up's Copycat is CES) | source line carries the set code; the row's `set.id` ≠ box set is allowed for pool and group rows, never for pack cards | [ ] `box-catalog.test.mjs` (pack cards ∈ set) |
-| 28 | a pulled card's attack/ability the engine does not implement | plays as in Standard (rules-bridge no-op / manual); out of scope, tracked per set by `pnpm audit:oracle` | [ ] reasoning; ISSUES line per gap found during data slices |
-| 29 | box list in the picker: 42 entries | grouped by era chip; keyboard reachable (`<select>`) | [ ] e2e by hand |
-| 30 | Delta Reign (no lists yet) | not in the catalog; adding it later is one source file + regeneration | [ ] reasoning |
-| 31 | rate profile applied to me02 changes `pack-opening.test.mjs` "me02 packs follow the slot model" expectations | slot membership tests unchanged; rate test updated to the profile | [ ] slice 1 |
+| 1 | `?box=` empty / unknown / a set id instead of a key | ignored → `DEFAULT_BOX_KEY` (me02); picker shows its era | [x] `build-battle-view.test.mjs` "row 1: ?box= takes only a catalog box key"; e2e row 1 PASS |
+| 2 | stored session names a box whose data fails `verifySessionCards` (pack id not in set, trainer id not in pool) | session cleared, sealed screen, no throw | [x] `build-battle-session.test.mjs` "row 2: a parsed session whose cards the baked data lacks fails verification", "rows 2 + 14: an Evolution-deck session round-trips…" |
+| 3 | random-Trainer draw: pool of 1 card, n = 4 | 2 copies then stop (at most `2·pool` draws), pool is 2 cards | [x] `pack-opening.test.mjs` "row 3: a one-card Trainer pool gives two copies and stops" |
+| 4 | evolution box: `n = 23 − 1 − A − B` < 0 for some pairing | generator refuses to bake the box (throws naming the pairing); catalog test asserts n ≥ 0 for all 12 pairings of every baked box | [x] `build-battle-bake.test.mjs` "row 4: an Evolution pack a pairing cannot fill to 23 makes the generator refuse the box, naming it"; `box-catalog.test.mjs` "rows 4 + 16" on all 37 Evolution boxes (A4: a pack exactly 23, a deck at most 40) |
+| 5 | `import()` of a set module rejects (offline, 404) | sealed screen shows the load error, picker usable, no session created | [x] `box-data.test.mjs` "row 5: an unknown key, a failed import or a malformed module rejects…"; e2e row 5 PASS (module routed to 404) |
+| 6 | box opened, then reload while `loadBoxData` is pending | scene renders only after the promise; a second Open click during load is a no-op | [x] e2e row 6 PASS (Open off while the box loads; the box renders once it settles) |
+| 7 | same seed, same box, twice | identical deckKey, groupKeys, trainerIds, packs, artIndexes | [x] `pack-opening.test.mjs` "row 7: the same seed opens the same box, bit for bit", "row 7: every baked box opens bit for bit…" (42 boxes; D6) |
+| 8 | same seed, different box | independent contents; changing the box before Open re-draws | [x] `pack-opening.test.mjs` "row 8: the same seed in another box draws that box, from its own set" |
+| 9 | a class absent from a set (SM: no `illustration`) | its weight joins the slot filler; `hit`/`top` chances unchanged (25 % / 1 %) | [x] `pack-models.test.mjs` "row 9: a class the set does not print gives its weight to the slot filler only"; the all-set row 10 test expects 0 for an unprinted class (sv09, sv10 ACE SPEC) |
+| 10 | rate profile: 4,000 packs of a baked set per model | `me`/`sv`: hit 25 % ± 2, UR 8 % ± 1.5, IR 20 % ± 2, SIR 5 % ± 1, top 1 % ± 0.5 (`sv-acespec`: ACE SPEC 5 % ± 1); `swsh`: hit 25 %, UR 8 %, top 1 %; `swsh-tg`: + TG 25 % ± 2 (20 + 5); `sm`/`xy`: `Ultra Rare` non-secret 33 % ± 2, top 1 % | [x] `pack-models.test.mjs` "row 10: every baked set rolls its box model at the boosted profile" (42 sets × 4,000 packs) + the synthetic per-model tests |
+| 11 | secret detection: numeric localId > `SET.official`; TG localIds (`TG01`) are never secret; a set with `official` missing | secrets only above the official count; TG rows classed by `subset`; missing `official` → generator throws at bake | [x] `pack-models.test.mjs` "row 11: secrets are numbered above the official count…"; `build-battle-bake.test.mjs` "bakeSet: … official count required" |
+| 12 | 5 copies of one card in a B&B deck (pool has 5) | valid (Option 4 B); `tcg` still errors at 5; ACE SPEC ×2 / Radiant ×2 / Prism Star same name ×2 still error in B&B | [x] `deck-validation.test.mjs` "Build & Battle allows a fifth copy (Limited rule); Standard still stops at 4", "Build & Battle keeps the card-text limits: ACE SPEC, Radiant, Prism Star, printed caps" |
+| 13 | v1 me02 session (no `groupKeys`/`trainerIds`) after the upgrade | parses; pool and scene as before; deck name unchanged | [x] `build-battle-session.test.mjs` "row 13: a session saved by design 051 still parses, verifies and pools as before" |
+| 14 | evolution-deck starting deck | editor holds 23 + 17 Basic Energy = 40 at open; counter 40 / 40; Play enabled when a Basic exists | [x] `pack-opening.test.mjs` / `build-battle-view.test.mjs` "rows 14 + 15: the starting deck…"; e2e row 14 PASS (temporal-forces, 40 / 40) |
+| 15 | evolution-pack starting deck | editor holds the 23 cards; counter 23 / 40; Basic Energy tiles add freely | [x] same tests; e2e row 15 PASS (sword-shield, 23 / 40) |
+| 16 | dual-type group (page names two Energy types) | `energy[deckKey]` carries both rows summing to 17; label null → headline omits the type | [x] `box-catalog.test.mjs` "rows 4 + 16" (every pairing has an Energy type and fills 40); A3 tests in `pack-opening` and `build-battle-bake`; no page names Energy types, so D8 sets the label from the baked needs |
+| 17 | promo id resolution: SM/SWSH promos on TCGdex (`smp-SM158`), set-numbered promos (Evolutions `xy12-11`, Destined Rivals `sv10-034`) | generator resolves by name check; the promo row's `id` is the printed card's TCGdex id; image fallback rule as § Generated data | [x] `box-catalog.test.mjs` "row 17: every promo is its own card, present once in the box data"; `--check` live for every era |
+| 18 | TCGdex renames / renumbers a card | generator throws (name check); committed modules stay the truth | [x] `build-battle-bake.test.mjs` "a number matches the localId numerically; a wrong name or number throws"; `pnpm test:live` |
+| 19 | sprite slug for an old-era promo missing (Alolan forms) | `sprites: []` allowed; library shows the default; test checks only listed slugs | [x] `box-catalog.test.mjs` "row 19: every listed deck sprite slug exists in the sprite catalog" (every promo has one) |
+| 20 | 41 set modules on disk | each ≤ 60 KB; none imported by the eager catalog (grep test: no static import of `sets/` outside `box-data.mjs`) | [x] `box-data.test.mjs` "row 20: every catalog box has a set and a box module, each at most 60 KB" (largest: swsh8, 46.6 KB), "row 20: only box-data.mjs names the generated modules, and only through import()" |
+| 21 | a `swsh-tg` box whose set module has no `subset: 'tg'` rows (TG fetch failed at bake) | generator refuses to bake the box (throws "no Trainer Gallery rows for swsh9tg"); at play an absent class falls to the filler as row 9 | [x] `build-battle-bake.test.mjs` "row 21: a Trainer Gallery box appends its gallery rows, and refuses to bake without them"; `pack-models.test.mjs` "row 21: … falls back to the reverse filler" |
+| 22 | picker changed after a session exists | picker disabled; "New box" first | [x] e2e row 22 PASS |
+| 23 | two players, different boxes, both B&B | deal proceeds (formats equal); each pool is its own | [x] reasoning: the room still compares formats only (D190, D191); each pool lives in its own tab. A shared box is Option 9 B, a landing ISSUES line |
+| 24 | skin URL 404 (logo/symbol/key art) | image removed on `error` as 052 does; procedural face still readable | [x] logo, symbol and key-art images remove themselves on `error` (052 pattern); recorder runs with TCGdex/Limitless art blocked by this sandbox's proxy PASS (slice 4) |
+| 25 | vendored art flag true but file missing | `<img>` error → procedural pack front behind it stays | [x] fixed at close: a failed vendored pack image is replaced by the procedural front; `bb-box-picker-test.mjs` row 25 (pack files routed to 404) PASS |
+| 26 | reduced motion / fx disabled | unchanged from 052 | [x] reasoning: 054 adds no motion; the reduced-motion paths and their 052 tests are unchanged |
+| 27 | Trainer pool card printed in an older set (e.g. Team Up's Copycat is CES) | source line carries the set code; the row's `set.id` ≠ box set is allowed for pool and group rows, never for pack cards | [x] `box-catalog.test.mjs` "row 27: pack cards are the box set (and its Trainer Gallery); group and pool rows may be older prints" |
+| 28 | a pulled card's attack/ability the engine does not implement | plays as in Standard (rules-bridge no-op / manual); out of scope, tracked per set by `pnpm audit:oracle` | [x] reasoning: pulled cards play through the Standard engine; no per-card audit was run for these sets (`pnpm audit:oracle` tracks gaps by corpus), so no gap was filed |
+| 29 | box list in the picker: 42 entries | grouped by era chip; keyboard reachable (`<select>`) | [x] e2e row 29 PASS (the select moves by keyboard and keeps focus); row 9: 42 boxes behind five era chips |
+| 30 | Delta Reign (no lists yet) | not in the catalog; adding it later is one source file + regeneration | [x] reasoning: not in the catalog; one source file, one catalog row and a regeneration add it |
+| 31 | rate profile applied to me02 changes `pack-opening.test.mjs` "me02 packs follow the slot model" expectations | slot membership tests unchanged; rate test updated to the profile | [x] slice 1: "row 31: me02 packs follow the slot model…" keeps slot membership; the rate test follows the profile |
 
 ## Test plan
 Unit (`node --test`): `pack-models.test.mjs` (rows 9–11, 21; class resolution per era on the baked
@@ -583,18 +583,18 @@ Brief (verbatim, 2026-09-28): "https://github.com/Ar1ssi/vibecodepokemontcg2/blo
 One shot this implementation in the same branch." — the criteria are this design's promises.
 | # | Criterion (the design's words) | Evidence |
 |---|---|---|
-| 1 | "every other Build & Battle Box (and the Prerelease Kits …)": 41 boxes added, 42 in the catalog, release order, five eras | |
-| 2 | "each era's real contents": fixed decks (ME), 23-card Evolution packs (Fates Collide → Fusion Strike), 40-card Evolution decks (Brilliant Stars → Destined Rivals), every line from its Bulbapedia page | |
-| 3 | "and pack structure": per-era pack anatomy (§ Research 5) as pack models | |
-| 4 | "every pack — Phantasmal Flames included — rolling the boosted 30th Celebration pull rates" | |
-| 5 | "the play rules (40 cards, 4 Prizes) are the same in every era"; copy limit = Limited rule (Option 4 B) | |
-| 6 | Per-set data modules loaded on demand, ≤ 60 KB each, none eager (Option 2 B) | |
-| 7 | One seed = one box, bit for bit (D186) | |
-| 8 | A 051 me02 session still opens (Option 8 B) | |
-| 9 | Builder tab: era chips + box select, `?box=`, load/error states (§ Builder tab) | |
-| 10 | Unboxing skinned per era, kind-aware labels, procedural pack fronts; me02 keeps its vendored art (Option 6 C) | |
-| 11 | Generator bakes every box from TCGdex; `--check` clean (§ Generated data) | |
-| 12 | Recorder PASS for a fixed, an evolution-pack and an evolution-deck box (§ Recorder) | |
+| 1 | "every other Build & Battle Box (and the Prerelease Kits …)": 41 boxes added, 42 in the catalog, release order, five eras | ✓ 42 in the catalog (xy 3 · sm 12 · swsh 12 · sv 10 · me 5): `box-catalog.test.mjs` "the eras list every box once, in release order"; e2e "row 9 five era chips in release order" PASS |
+| 2 | "each era's real contents": fixed decks (ME), 23-card Evolution packs (Fates Collide → Fusion Strike), 40-card Evolution decks (Brilliant Stars → Destined Rivals), every line from its Bulbapedia page | ✓ 41 sources in `scripts/build-battle/boxes/` (page + revision each) baked by the generator; `box-catalog.test.mjs` "rows 4 + 16", "fixed decks are exactly the catalog decks, 40 cards each"; departures from a page are commented in its source (A3–A5, D8–D10) |
+| 3 | "and pack structure": per-era pack anatomy (§ Research 5) as pack models | ✓ `pack-models.mjs` PACK_MODELS xy, sm, swsh, swsh-tg, sv, sv-acespec, me; "row 7: every baked box opens bit for bit, packs of ten from its own set"; "cardClass reads each era…" |
+| 4 | "every pack — Phantasmal Flames included — rolling the boosted 30th Celebration pull rates" | ✓ `pack-models.test.mjs` "row 10: every baked set rolls its box model at the boosted profile" (42 sets × 4,000 packs), "row 10: me02 packs roll DR 25 %, UR 8 %, IR 20 %, SIR 5 %, MHR 1 %" |
+| 5 | "the play rules (40 cards, 4 Prizes) are the same in every era"; copy limit = Limited rule (Option 4 B) | ✓ `deck-validation.test.mjs` "Build & Battle wants exactly 40…", "Build & Battle allows a fifth copy (Limited rule)…", "…keeps the card-text limits…"; 4 Prizes from the format (051, D187) |
+| 6 | Per-set data modules loaded on demand, ≤ 60 KB each, none eager (Option 2 B) | ✓ `box-data.test.mjs` "row 20: every catalog box has a set and a box module, each at most 60 KB" (largest 46.6 KB), "row 20: only box-data.mjs names the generated modules, and only through import()" |
+| 7 | One seed = one box, bit for bit (D186) | ✓ `pack-opening.test.mjs` "row 7: every baked box opens bit for bit…" (all 42), "row 7: the same seed opens the same box, bit for bit" |
+| 8 | A 051 me02 session still opens (Option 8 B) | ✓ `build-battle-session.test.mjs` "row 13: a session saved by design 051 still parses, verifies and pools as before" |
+| 9 | Builder tab: era chips + box select, `?box=`, load/error states (§ Builder tab) | ✓ `bb-box-picker-test.mjs` ALL PASS (rows 1, 5, 6, 9, 14, 15, 22, 25, 29); `build-battle-view.test.mjs` "row 1: ?box= takes only a catalog box key" |
+| 10 | Unboxing skinned per era, kind-aware labels, procedural pack fronts; me02 keeps its vendored art (Option 6 C) | ✓ in code and tests (`unboxing.test.mjs` "boxSkin: me02 keeps its vendored faces and packs; a procedural box skins from its set and promos", "the unboxing labels follow the box kind…"); recorder PASS in all five eras. The look itself is the user's check on localhost |
+| 11 | Generator bakes every box from TCGdex; `--check` clean (§ Generated data) | ✓ `pnpm test:live` 4 pass, 0 fail ("live: the Build & Battle set and box modules match TCGdex", all 42 boxes, no cache); `build-battle-bake.test.mjs` 11 pass |
+| 12 | Recorder PASS for a fixed, an evolution-pack and an evolution-deck box (§ Recorder) | ✓ fixed: phantasmal-flames seed 42 (slice 4); evolution-pack: sword-shield seed 6, team-up seed 6, evolutions seed 71; evolution-deck: temporal-forces seed 42, brilliant-stars seed 1 — every row PASS |
 
 ## Assumptions
 - A1 (assumed) "In the same branch" = `claude/build-battle-boxes-plan-38pf0r`, where this design lives: slices commit
@@ -710,6 +710,43 @@ Build notes:
   simulated (A5). Evolutions' promos are its own set cards (xy12-11, -34, -51, -59; `promoSetId: 'xy12'`).
   Picker e2e: five era chips in release order, `?box=evolutions` on the XY era. Recorder `BOX=evolutions
   SEED=71` PASS; `--check` (live, 3 XY kits) clean.
+- Slice 9: walking the edge rows found row 25 unmet (a failed vendored pack image was only removed); it now
+  swaps in the procedural front, checked by `bb-box-picker-test.mjs`. Area doc updated. Full `pnpm test`:
+  5112 pass, 0 fail, 4 skipped; `pnpm test:live`: 4 pass (all 42 boxes `--check`, no cache).
+
+## Landing — the harness edits the commit that merges this branch to `main` carries (A1)
+The branch merges cleanly with `main` at 563ff7f. Numbers below are the next free ones today; renumber if
+`main` moved.
+- STATE.md: Focus → Build & Battle in every era (design 054) landed; Next → the user's localhost checks
+  (§ Close of the final message); drop the 051/052 lines this supersedes.
+- MAP.md, one line after the `scripts/` lines: `scripts/build-battle/ — Build & Battle box sources
+  (boxes/<key>.mjs, one per box, from its Bulbapedia page), importer (import-bulbapedia-box.mjs) and bake
+  (bake-box.mjs, box-lines.mjs); CLI scripts/generate-build-battle-box.mjs (--only, --check) →
+  client/src/setup/deck-builder/core/build-battle/{sets,boxes}/*.generated.mjs (design 054)`.
+- DECISIONS.md:
+  - `- D193 2026-09-29 [deck-builder] Build & Battle covers all 42 boxes and Prerelease Kits (five eras) as
+    three kinds (fixed-decks, evolution-pack, evolution-deck) with one seeded opener; set and box data load
+    per box through import() (≤60 KB a module), the catalog stays eager. (design 054 Options 1, 2, 10)`
+  - `- D194 2026-09-29 [deck-builder] Every B&B pack rolls one boosted profile (30th Celebration per-pack
+    chances) on its era's own 10-card anatomy; a class a set does not print gives its weight to the slot
+    filler. (design 054 Options 3, 5)`
+  - `- D195 2026-09-29 [rules] Build & Battle decks take the Limited copy rule: no 4-copy limit, card-text
+    limits (ACE SPEC, Radiant, Prism Star, printed caps) kept; the pool caps copies. (design 054 Option 4 B,
+    assumed A2)`
+  - `- D196 2026-09-29 [deck-builder] Where a box page disagrees with the product, the product wins:
+    Evolution packs are 23 (pools fill, a pool's minimums always come), Evolution decks 40 with Basic Energy
+    absorbing the difference, Energy types from attack costs with the group header's type as fallback; each
+    case is commented in its source. (design 054 A3, A4, D8–D10)`
+  - `- D197 2026-09-29 [deck-builder] B&B sessions stay version 1: Evolution boxes add optional groupKeys,
+    evolutionPack and energy; a 051 session parses unchanged. (design 054 Option 8 B, D2)`
+- ISSUES.md:
+  - `I208 2026-09-29 P3 [netcode] B&B rooms let each player open any box; a room proposal naming the box so
+    both open the same set is design 054 Option 9 B (a boxKey on the format proposal) (refs: design 054, D191)`
+  - `I209 2026-09-29 P3 [deck-builder] Pre-SV B&B box fronts show the first promo: no data source names a
+    set's cover Pokémon; a per-box keyArtCardId or vendored art would replace it (refs: design 054 D10)`
+  - `I210 2026-09-29 P3 [deck-builder] B&B page rules not simulated: Fates Collide's optional Shuckle swap,
+    Guardians Rising's optional Oricorio [Pa'u Style] (refs: design 054 A5)`
+- This design → `Status: shipped`; the NEXTSTEPS ledger → `.agent/archive/NEXTSTEPS-history.md`.
 
 ---
 Self-approval checklist (only when the user is unreachable):

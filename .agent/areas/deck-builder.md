@@ -20,13 +20,16 @@ client/src/setup/deck-builder/core/builder-window.mjs — the builder runs in it
   side effect goes through `gameLink` (local on the game tab, messages from the builder tab); the game
   tab's library is read-only for deck cards (`allowDeckWrites: false`) and every library write re-reads
   storage first (two tabs share it). Deck tab = slim panel (P1/P2, card back, Open Deck Builder).
-client/src/setup/deck-builder/core/build-battle/ — Build & Battle mode (design 051, D185–D189): /build-and-battle
-  is a third builder-tab mode (`resolveBuilderMode`, `body.build-battle-window`). Pure: box-catalog.mjs (box →
-  4 decks, promos, sprites), build-battle.generated.mjs (me02 set + 4 decks, from
-  scripts/generate-build-battle-box.mjs; `--check` runs in `pnpm test:live`), pack-opening.mjs (seeded slot
-  model: openPack/openBox/poolFromBox), build-battle-session.mjs (localStorage `ptcg-sim.build-battle.v1`,
-  memory-only on throw; validatePoolDeck/canAddFromPool), build-battle-view.mjs (UI strings/helpers).
-  DOM: sidebox/native-deck-builder-build-battle.js (Box + Pool tabs), css/deck-builder-build-battle.css.
+client/src/setup/deck-builder/core/build-battle/ — Build & Battle mode (designs 051, 054; D185–D189): /build-and-battle
+  is a third builder-tab mode (`resolveBuilderMode`, `body.build-battle-window`). Pure: box-catalog.mjs (42 boxes
+  and kits, five eras, kinds fixed-decks / evolution-pack / evolution-deck; eager), box-data.mjs (the only
+  importer of sets/<setId>.generated.mjs and boxes/<boxKey>.generated.mjs, on demand), pack-models.mjs (boosted
+  rates, per-era slots), pack-opening.mjs (seeded openPack/openBox/drawEvolutionPack/poolFromBox),
+  build-battle-session.mjs (localStorage `ptcg-sim.build-battle.v1`, memory-only on throw; validatePoolDeck/
+  canAddFromPool), build-battle-view.mjs (UI strings/helpers). Data: scripts/generate-build-battle-box.mjs bakes
+  each box from scripts/build-battle/boxes/<key>.mjs (drafted from Bulbapedia by import-bulbapedia-box.mjs) and
+  TCGdex; `--check` runs in `pnpm test:live`. DOM: sidebox/native-deck-builder-build-battle.js (era chips + box
+  select, Box + Pool tabs), css/deck-builder-build-battle.css.
   Unboxing scene (design 052): pure unboxing.mjs (reducer `session.unboxing`, poses, tiers, pack art) +
   box-textures.mjs; DOM sidebox/native-deck-builder-unboxing.js (CSS 3D box, tray, pack tears, reveal fan),
   css/deck-builder-unboxing.css, vendored art client/src/assets/build-battle/{box,packs}/.
