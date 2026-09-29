@@ -880,6 +880,17 @@ function parseCoinFlipStep(lower) {
     };
   }
 
+  // Old PC — both heads: put any card from the discard pile into the hand.
+  if (/^flip 2 coins\. if both are heads, put a card from your discard pile into your hand\.$/.test(lower)) {
+    return {
+      type: 'coinFlip',
+      count: 2,
+      headsAtLeast: 2,
+      heads: [{ type: 'recursion', what: 'card', count: 1, from: 'discard' }],
+      tails: [],
+    };
+  }
+
   const headsDraw = lower.match(/if heads,?\s+draw\s+(\d+)\s+cards?/);
   const tailsDraw = lower.match(/if tails,?\s+draw\s+(\d+)\s+cards?/);
   if (headsDraw && tailsDraw) {
@@ -1491,6 +1502,12 @@ function parseTrainerStepsInner(lower) {
       what: discardSearchWhat(lower).replace(' or Basic Energy', ''),
       count: discardSearchCount(lower),
     });
+    return { steps, recognizable: true };
+  }
+
+  // Energy Restore — flip 3 coins, one basic Energy from the discard pile per heads.
+  if (/^flip 3 coins\. for each heads, put a basic energy card from your discard pile into your hand\./.test(lower)) {
+    steps.push({ type: 'recursion', what: 'Basic Energy', from: 'discard', coins: 3, perHeads: 1 });
     return { steps, recognizable: true };
   }
 
@@ -2888,6 +2905,7 @@ export function describeStep(step) {
           if (s.type === 'searchDeck') return `search for ${s.what}`;
           if (s.type === 'discardEnergyFromOpponent') return 'discard Energy from opponent';
           if (s.type === 'damageCounters') return `put ${s.count} damage on ${s.target}`;
+          if (s.type === 'recursion') return `put a ${s.what} from your discard pile into your hand`;
           return s.type;
         }).join('; ');
       };
@@ -2902,7 +2920,11 @@ export function describeStep(step) {
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';
     case 'discardCost': return `Discard ${step.count} other card${step.count > 1 ? 's' : ''} from your hand (cost).`;
-    case 'recursion': return `Put a ${step.what}${describeNameFilter(step)} from your discard pile into your hand.`;
+    case 'recursion':
+      if (step.coins) {
+        return `Flip ${step.coins} coins; put ${step.perHeads || 1} ${step.what}${describeNameFilter(step)} from your discard pile into your hand per heads.`;
+      }
+      return `Put a ${step.what}${describeNameFilter(step)} from your discard pile into your hand.`;
     case 'heal': return `Heal all damage from your ${step.target}${step.returnEnergy ? ', then put all its Energy into your hand' : ''}.`;
     case 'healAmount': return `Heal ${step.amount} damage from ${step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;

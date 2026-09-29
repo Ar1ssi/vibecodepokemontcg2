@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
-import { createRng } from '../rng.mjs';
+import { createRng, flipCoin } from '../rng.mjs';
 import { executeSteps } from '../effects/executor.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 
@@ -449,4 +449,73 @@ test('Sonia offers Basics and basic Energy, never the Stage 1, capped at 2', () 
 test('Sonia: two Basics are kept; a Basic plus an Energy keeps only the first branch', () => {
   assert.deepEqual(runSonia([1, 2]).hand, [1, 2]);
   assert.deepEqual(runSonia([1, 3]).hand, [1]);
+});
+
+// Old PC, Darkness Ablaze 164 (out/pkmn-trainer-cards.json)
+const OLD_PC = 'Flip 2 coins. If both are heads, put a card from your discard pile into your hand.';
+// Energy Restore, Majestic Dawn 81 (out/pkmn-trainer-cards.json)
+const ENERGY_RESTORE =
+  'Flip 3 coins. For each heads, put a basic Energy card from your discard pile into your hand. If you don’t have that many basic Energy cards in your discard pile, put all of them into your hand.';
+
+test('Old PC parses as a both-heads coin flip gating a one-card discard recovery', () => {
+  assert.deepEqual(parseTrainerEffect(OLD_PC).steps, [
+    {
+      type: 'coinFlip',
+      count: 2,
+      headsAtLeast: 2,
+      heads: [{ type: 'recursion', what: 'card', count: 1, from: 'discard' }],
+      tails: [],
+    },
+  ]);
+});
+
+test('Energy Restore parses as a per-heads basic Energy recovery over 3 coins', () => {
+  assert.deepEqual(parseTrainerEffect(ENERGY_RESTORE).steps, [
+    { type: 'recursion', what: 'Basic Energy', from: 'discard', coins: 3, perHeads: 1 },
+  ]);
+});
+
+function runEnergyRestore(seed) {
+  const state = createGameState({ gameId: 'restore', seed: 1, rulesEnabled: true });
+  state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
+  state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  for (let i = 1; i <= 4; i++) {
+    state.players.p1.zones.discard.push(
+      createCard({ instanceId: i, name: 'Fire Energy', supertype: 'Energy', subtypes: 'Basic' })
+    );
+  }
+  const events = [];
+  const res = executeSteps(state, {
+    steps: parseTrainerEffect(ENERGY_RESTORE).steps,
+    fromStepIndex: 0,
+    effectType: 'trainer',
+    sourceCard: { name: 'Energy Restore' },
+    playerId: 'p1',
+    activeRng: createRng(seed),
+    events,
+  });
+  return { res, events };
+}
+
+function headsFor(seed) {
+  const rng = createRng(seed);
+  let heads = 0;
+  for (let i = 0; i < 3; i++) if (flipCoin(rng) === 'heads') heads++;
+  return heads;
+}
+
+test('Energy Restore offers one basic Energy per heads', () => {
+  const seed = [1, 2, 3, 4, 5, 6, 7, 8].find((s) => headsFor(s) >= 1 && headsFor(s) < 3);
+  const heads = headsFor(seed);
+  const { res, events } = runEnergyRestore(seed);
+  assert.equal(events.filter((e) => e.type === 'coinFlipped').length, 3);
+  assert.equal(res.pendingChoice.max, heads);
+});
+
+test('Energy Restore with no heads skips the recovery', () => {
+  const seed = Array.from({ length: 200 }, (_, i) => i + 1).find((s) => headsFor(s) === 0);
+  const { res, events } = runEnergyRestore(seed);
+  assert.equal(res.pendingChoice ?? null, null);
+  assert.ok(events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'no_heads'));
 });

@@ -1282,9 +1282,29 @@ export function executeSteps(draft, {
       case 'shuffleFromDiscard': {
         const discard = player.zones.discard || [];
         const isShuffle = step.type === 'shuffleFromDiscard';
+        // "Flip 3 coins. For each heads, put a basic Energy card …" (Energy Restore): the
+        // coins set the count. Memoized so resuming the pick doesn't re-flip.
+        let coinCount = null;
+        if (step.coins) {
+          const coinKey = `${idx}:recursionCoins`;
+          if (context[coinKey] === undefined) {
+            let heads = 0;
+            for (let i = 0; i < Number(step.coins); i++) {
+              const face = flipCoin(activeRng);
+              if (face === 'heads') heads++;
+              events.push({ type: 'coinFlipped', playerId, face });
+            }
+            context[coinKey] = heads;
+          }
+          coinCount = context[coinKey] * (Number(step.perHeads) || 1);
+          if (coinCount === 0) {
+            events.push({ type: 'effectStepSkipped', reason: 'no_heads', step: step.type });
+            break;
+          }
+        }
         const categories = step.choices?.length
           ? step.choices
-          : [{ what: step.what || 'card', count: step.count || 1 }];
+          : [{ what: step.what || 'card', count: coinCount ?? (step.count || 1) }];
         const what = categories.map((c) => c.what).join(' or ');
         const count = categories.reduce((sum, c) => sum + (c.count || 1), 0);
         // "Pokémon that have “Hisuian” in their names" (Professor Laventon).
