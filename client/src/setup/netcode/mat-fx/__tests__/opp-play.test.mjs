@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {
   OPP_PLAY_HOLD_MS,
   OPP_PLAY_MS,
+  PREVIEW_GROW_MS,
+  PREVIEW_PLACE_MS,
+  previewPlayMs,
   matCenter,
   normalizeTurn,
   oppPlayTrack,
@@ -121,4 +124,38 @@ test('playsOppPreview: only the opponent side', () => {
   assert.equal(playsOppPreview({ user: 'self' }), false);
   assert.equal(playsOppPreview({ user: null }), false);
   assert.equal(playsOppPreview(null), false);
+});
+
+// Design 059: a deck reveal runs the same track with its own hold and, into the
+// opponent's hand, lands sleeve up.
+test('previewPlayMs: in, hold and place; the default is the Trainer play', () => {
+  assert.equal(previewPlayMs(), OPP_PLAY_MS);
+  assert.equal(OPP_PLAY_MS, PREVIEW_GROW_MS + OPP_PLAY_HOLD_MS + PREVIEW_PLACE_MS);
+  assert.equal(previewPlayMs(600), 520 + 600 + 300);
+  assert.equal(previewPlayMs(0), 820);
+  assert.equal(previewPlayMs(-50), 820, 'a negative hold is no hold');
+  assert.equal(previewPlayMs(Number.NaN), 820);
+});
+
+test('oppPlayTrack: a shorter hold places the card sooner', () => {
+  const deck = { left: 900, top: 600, width: 60, height: 84 };
+  const short = oppPlayTrack({ from: deck, preview, to: slot, holdMs: 600 });
+  const total = previewPlayMs(600);
+  const held = short((PREVIEW_GROW_MS + 590) / total);
+  close(held.x, 0, 'still centred at the end of the hold');
+  close(held.scale, 1, 'preview size at the end of the hold');
+  const landed = short(1);
+  close(landed.x, 670 - 500, 'x on the slot');
+  close(landed.y, 342 - 400, 'y on the slot');
+  close(landed.scale, 60 / 200, 'slot size');
+  close(landed.flip, 0, 'face up by default');
+});
+
+test('oppPlayTrack: toFaceDown turns the card back to the sleeve while it is placed', () => {
+  const into = oppPlayTrack({ from: hand, preview, to: slot, fromTurn: 180, toTurn: 180, toFaceDown: true });
+  close(into(at(PREVIEW_GROW_MS + 600)).flip, 0, 'face up while held');
+  const mid = into(at(OPP_PLAY_MS - PREVIEW_PLACE_MS / 2)).flip;
+  assert.ok(mid > 0 && mid < 180, `turning over mid-place: ${mid}`);
+  close(into(1).flip, 180, 'sleeve up on landing');
+  close(into(1).rotate, 180, 'turned like the board');
 });

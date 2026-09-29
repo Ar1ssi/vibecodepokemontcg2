@@ -16,6 +16,7 @@ test('fx-audio: every voice is structurally playable', () => {
     ['game-over', { user: 'self' }],
     ['game-over', { user: 'opp' }],
     ['status', { condition: 'Burned' }],
+    ['deck-reveal', { user: 'opp' }],
     ...Object.keys(HOLD_MS).map((effect) => [effect, {}]),
   ];
   for (const [effect, plan] of plans) {
@@ -293,4 +294,14 @@ test('fx-audio: the Elite Trainer Box props have voices (design 057)', () => {
     { wave: coin.wave, freq: coin.freq, freqTo: coin.freqTo, dur: coin.dur, gain: coin.gain },
     { wave: 'sine', freq: 2600, freqTo: 2200, dur: 0.32, gain: 0.18 }
   );
+});
+
+test('fx-audio: a deck reveal swooshes off the deck, then chimes at the reveal spot (design 059)', () => {
+  const voices = voicesFor('deck-reveal', { user: 'self' });
+  assert.equal(voices[0].type, 'noise');
+  assert.equal(voices[0].delay ?? 0, 0, 'the swoosh starts with the flight');
+  const chime = voices.filter((v) => v.type === 'tone');
+  assert.equal(chime.length, 3);
+  assert.ok(chime.every((v) => v.delay >= 0.3 && v.delay < 0.7), 'the chime lands as the card reaches the spot');
+  assert.deepEqual(voicesFor('deck-reveal', { user: 'opp' }), voices, 'both seats hear the same reveal');
 });

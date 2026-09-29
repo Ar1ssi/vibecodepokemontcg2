@@ -112,6 +112,12 @@ const STATIC_VOICES = Object.freeze({
     noise(0.24, 0.14, { type: 'bandpass', freq: 1200, q: 0.6 }),
     ...arpeggio([523, 659, 784], { step: 0.08, dur: 0.26, gain: 0.13, wave: 'sine', at: 0.26 }),
   ],
+  // Design 059: a lighter swoosh as the card leaves the deck, a brighter chime
+  // as it reaches the reveal spot (deck-reveal.mjs, ~0.52 s).
+  'deck-reveal': [
+    noise(0.2, 0.12, { type: 'bandpass', freq: 1600, q: 0.7 }),
+    ...arpeggio([659, 784, 988], { step: 0.07, dur: 0.24, gain: 0.12, wave: 'sine', at: 0.4 }),
+  ],
   'stadium-play': [
     noise(0.2, 0.18, { type: 'lowpass', freq: 1400, q: 0.8 }),
     ...arpeggio([330, 440], { step: 0.1, dur: 0.3, gain: 0.14, wave: 'triangle' }),

@@ -7,9 +7,14 @@
 export const OPP_PLAY_HOLD_MS = 1200;
 const DROP_END_MS = 260;
 const GROW_END_MS = 520;
-const HOLD_END_MS = GROW_END_MS + OPP_PLAY_HOLD_MS;
 const PLACE_MS = 300;
-export const OPP_PLAY_MS = HOLD_END_MS + PLACE_MS;
+// Design 059: a deck reveal plays this same track with its own hold.
+export const PREVIEW_GROW_MS = GROW_END_MS;
+export const PREVIEW_PLACE_MS = PLACE_MS;
+
+/** The whole preview play for a hold of `holdMs`: in, hold, placed. */
+export const previewPlayMs = (holdMs = OPP_PLAY_HOLD_MS) => GROW_END_MS + Math.max(0, Number(holdMs) || 0) + PLACE_MS;
+export const OPP_PLAY_MS = previewPlayMs();
 
 // Scale (of the preview) where the card lands on the mat before it grows.
 const DROP_SCALE = 0.45;
@@ -57,15 +62,29 @@ export function oppPreviewRect(center, viewport, aspect = 0.716) {
 export const playsOppPreview = (plan) => plan?.user === 'opp';
 
 /**
- * The whole play for one card over OPP_PLAY_MS. x/y are px from the preview's
- * centre, `scale` is of the preview, `rotate` includes the board turn and
- * `flip` is rotateY (180 = the sleeve side facing you).
+ * The whole play for one card over previewPlayMs(holdMs) (OPP_PLAY_MS by
+ * default). x/y are px from the preview's centre, `scale` is of the preview,
+ * `rotate` includes the board turn and `flip` is rotateY (180 = the sleeve
+ * side facing you).
  * @param {{from?: object|null, preview: object, to?: object|null,
- *   fromTurn?: number, toTurn?: number, toFade?: boolean}} opts - rects in
- *   viewport px; `to` null shrinks the card away in the middle
+ *   fromTurn?: number, toTurn?: number, toFade?: boolean, holdMs?: number,
+ *   toFaceDown?: boolean}} opts - rects in viewport px; `to` null shrinks the
+ *   card away in the middle; `toFaceDown` turns it back to the sleeve as it is
+ *   placed (design 059: a revealed card going into the opponent's hand)
  * @returns {(t: number) => {x, y, rotate, tiltX, flip, scale, opacity}}
  */
-export function oppPlayTrack({ from = null, preview, to = null, fromTurn = 0, toTurn = 0, toFade = false }) {
+export function oppPlayTrack({
+  from = null,
+  preview,
+  to = null,
+  fromTurn = 0,
+  toTurn = 0,
+  toFade = false,
+  holdMs = OPP_PLAY_HOLD_MS,
+  toFaceDown = false,
+}) {
+  const totalMs = previewPlayMs(holdMs);
+  const holdEndMs = totalMs - PLACE_MS;
   const pc = rectCenter(preview);
   const PW = preview.width;
   const hasFrom = usable(from);
@@ -80,7 +99,7 @@ export function oppPlayTrack({ from = null, preview, to = null, fromTurn = 0, to
   const fades = toFade || !hasTo;
 
   return (u) => {
-    const ms = clamp01(u) * OPP_PLAY_MS;
+    const ms = clamp01(u) * totalMs;
     const tiltX = PEAK_TILT * Math.sin(Math.PI * span(ms, 0, GROW_END_MS));
     if (ms < DROP_END_MS) {
       const e = easeOutCubic(span(ms, 0, DROP_END_MS));
@@ -106,17 +125,17 @@ export function oppPlayTrack({ from = null, preview, to = null, fromTurn = 0, to
         opacity: 1,
       };
     }
-    if (ms < HOLD_END_MS) {
+    if (ms < holdEndMs) {
       const s = easeOutCubic(span(ms, GROW_END_MS, GROW_END_MS + SETTLE_MS));
       return { x: 0, y: 0, rotate: 0, tiltX: 0, flip: 0, scale: lerp(OVERSHOOT, 1, s), opacity: 1 };
     }
-    const p = easeInOutCubic(span(ms, HOLD_END_MS, OPP_PLAY_MS));
+    const p = easeInOutCubic(span(ms, holdEndMs, totalMs));
     return {
       x: lerp(0, end.x, p),
       y: lerp(0, end.y, p),
       rotate: lerp(0, turn1, p),
       tiltX: 0,
-      flip: 0,
+      flip: toFaceDown ? 180 * p : 0,
       scale: lerp(1, end.scale, p),
       opacity: fades ? 1 - span(p, 0.6, 1) : 1,
     };
