@@ -136,6 +136,9 @@ export function isPokemon(card) {
 export function isEnergy(card) {
   if (!card) return false;
   if (isAttachedAsEnergy(card)) return true;
+  // The name fallback is for bare Energy rows only: "Ancient Booster Energy Capsule" (a Tool) and
+  // "Energy Retrieval" (an Item) are Trainers, and counting them spent the turn's Energy attach.
+  if (isTrainer(card) || card.trainerType) return false;
   return (
     card.supertype === 'Energy' ||
     card.type === 'Energy' ||

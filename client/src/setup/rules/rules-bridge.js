@@ -59,7 +59,7 @@ import { parseAbility } from '/shared/engine/rules/abilities.mjs';
 import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { parseEndOfTurnEffect, parseWhenPlayedEffect, parseOpponentDiscard, isHandProtected, parseCheckupEffect, parseSetupFaceDown, parseOnOpponentEvolve, blocksItemPlay, combinedHandProtected } from '/shared/engine/rules/ability-executors.mjs';
 import { isStadiumCard, isStadiumHandProtect, effectiveHp, getStadiumCheckupPoisonBonus, stadiumBlocksToolEffects, isStadiumEnergyAttachHeal, stadiumExtraAttacksFromZone } from '/shared/engine/rules/stadium-effects.mjs';
-import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMatchesSearchWhat } from '/shared/engine/rules/energy-effects.mjs';
+import { classifyEnergyEffect, describeEnergyEffect, applyEnergyEffect, energyMatchesSearchWhat, isEnergyCard } from '/shared/engine/rules/energy-effects.mjs';
 import { isPokemonCard, matchesSearch, filterSearchMatches, matchesDiscardCost, isEnergyDiscardCost, searchPickerAllCandidates } from '/shared/engine/rules/search-match.mjs';
 import { maybeAnnounceSearchReveal, announceDiscardPick, shuffleDeckAfterSearch } from '/shared/engine/rules/search-reveal.mjs';
 import {
@@ -1321,9 +1321,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
             const img = card.image;
             if (!img || img.__rulesEnergyChecked) continue;
             img.__rulesEnergyChecked = true;
-            const isEnergy = String(card.type || '').toLowerCase().includes('energy') ||
-              String(card.name || '').toLowerCase().includes('energy');
-            if (!isEnergy) continue;
+            if (!isEnergyCard(card)) continue;
             if (rulesState.flags.self?.energyAttached) {
               appendMessage('', '⚠️ Rules: energy already attached this turn (extra attach detected)', 'announcement', false);
             } else {

@@ -91,6 +91,10 @@ const providesTypedEnergy = (card) => {
 const isEnergyCard = (card) => {
   if (!card) return false;
   if (card.asEnergy && card.attachedTo != null) return true;
+  // Trainers named "…Energy…" (Booster Energy Capsules, Energy Retrieval) are never Energy.
+  if (card.trainerType || /^(?:trainer|item|supporter|stadium|tool|pokémon tool)$/.test(lower(card.supertype || card.type))) {
+    return false;
+  }
   const subs = subtypesOf(card);
   if (
     subs.includes('basic') ||

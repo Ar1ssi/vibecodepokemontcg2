@@ -333,3 +333,44 @@ test('Reboot Pod with 3 Future Pokémon and 2 Energy attaches 2 and stops', () =
   assert.equal(roots.slice(0, 3).reduce((n, root) => n + attachedTo(p1, root), 0), 2);
   assert.equal(p1.zones.discard.length, 0);
 });
+
+// ── The Booster Energy Capsules are Pokémon Tools, not Energy ───────────────────────────────
+import { applyCommand } from '../reduce.mjs';
+import { isEnergy } from '../cards.mjs';
+
+test('attaching Ancient Booster Energy Capsule does not use the turn’s Energy attachment', () => {
+  const state = boardState();
+  const p1 = state.players.p1;
+  const moon = pokemon(1, 'Roaring Moon ex', 'sv04-124');
+  p1.zones.active.push(moon);
+  // A server deck row carries type 'Trainer' (loadDeck); cardStats adds trainerType + text.
+  const capsule = createCard({ instanceId: 2, name: 'Ancient Booster Energy Capsule', type: 'Trainer', trainerType: 'Tool', text: ANCIENT_CAPSULE, ownerId: 'p1' });
+  const energy = basicEnergy(3);
+  p1.zones.hand.push(capsule, energy);
+
+  let res = applyCommand(state, { type: 'attachCard', payload: { instanceId: 2, targetInstanceId: 1 }, playerId: 'p1' }, createRng(1));
+  assert.equal(res.state.players.p1.flags.energyAttached ?? false, false);
+  res = applyCommand(res.state, { type: 'attachCard', payload: { instanceId: 3, targetInstanceId: 1 }, playerId: 'p1' }, createRng(1));
+  assert.equal(res.state.players.p1.zones.hand.length, 0, 'the Basic Energy still attaches this turn');
+  assert.equal(res.state.players.p1.flags.energyAttached, true);
+});
+
+test('isEnergy: Trainers with "Energy" in the name are not Energy', () => {
+  for (const name of ['Ancient Booster Energy Capsule', 'Future Booster Energy Capsule', 'Energy Retrieval', 'Energy Switch']) {
+    assert.equal(isEnergy({ name, type: 'Trainer' }), false, name);
+    assert.equal(isEnergy({ name, supertype: 'Trainer' }), false, name);
+    assert.equal(isEnergy({ name, trainerType: 'Tool' }), false, name);
+  }
+  assert.equal(isEnergy({ name: 'Basic Fire Energy' }), true, 'a bare Energy row still classifies by name');
+  assert.equal(isEnergy({ name: 'Jet Energy', type: 'Energy' }), true);
+  assert.equal(isEnergy({ name: 'Scoop Up Net', type: 'Trainer', asEnergy: true, attachedTo: 5 }), true, 'attached as Energy wins');
+});
+
+test('isEnergyCard (client attach observer): Booster Energy Capsules are Tools', async () => {
+  const { isEnergyCard } = await import('../rules/energy-effects.mjs');
+  assert.equal(isEnergyCard({ name: 'Ancient Booster Energy Capsule', type: 'Trainer' }), false);
+  assert.equal(isEnergyCard({ name: 'Future Booster Energy Capsule', trainerType: 'Tool', subtypes: ['Tool'] }), false);
+  assert.equal(isEnergyCard({ name: 'Energy Retrieval', supertype: 'Trainer' }), false);
+  assert.equal(isEnergyCard({ name: 'Basic Fire Energy', type: 'Energy' }), true);
+  assert.equal(isEnergyCard({ name: 'Jet Energy' }), true);
+});
