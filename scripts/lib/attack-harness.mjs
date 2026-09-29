@@ -122,6 +122,7 @@ function enrich(state, costPool) {
     mon('Discard Lightning Basic', { types: ['Lightning'], hp: 60 }),
     trainer('Discard Supporter', 'Supporter'),
     trainer('Discard Item', 'Item'),
+    trainer('Discard Stadium', 'Stadium'),
     mk({ name: 'Discard Tool', supertype: 'Trainer', subtypes: ['Pokémon Tool'], type: 'Pokémon Tool' })
   );
   // Cost pool: attach just enough extra Energy that every printed cost symbol of this card
