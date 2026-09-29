@@ -261,13 +261,18 @@ const waitRender = (page, mode) =>
 // The canvas draws nothing when hiding it leaves the screenshot byte-identical.
 const canvasDrawsNothing = async (page) => {
   const withCanvas = await page.screenshot();
+  // The WebGL canvas and its floor-reflection layer both count.
   const hidden = await page.evaluate(() => {
-    const canvas = document.querySelector('.bb-gl');
-    if (canvas) canvas.style.visibility = 'hidden';
-    return !!canvas;
+    const layers = [...document.querySelectorAll('.bb-gl, .bb-gl-mirror')];
+    layers.forEach((layer) => (layer.style.visibility = 'hidden'));
+    return layers.length > 0;
   });
   const without = await page.screenshot();
-  if (hidden) await page.evaluate(() => (document.querySelector('.bb-gl').style.visibility = ''));
+  if (hidden) {
+    await page.evaluate(() =>
+      document.querySelectorAll('.bb-gl, .bb-gl-mirror').forEach((layer) => (layer.style.visibility = ''))
+    );
+  }
   return withCanvas.equals(without);
 };
 

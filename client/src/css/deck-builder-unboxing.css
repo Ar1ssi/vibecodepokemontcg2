@@ -1041,13 +1041,15 @@
   display: flex;
   overflow: auto;
   padding: 3vh 16px;
+  /* A dark grey floor (design 055 § Floor reflection, user's ask): packs, cards and the box
+     reflect on it; a soft top light keeps it from reading flat. */
   background:
     radial-gradient(
-      ellipse 60% 55% at 50% 42%,
-      rgba(255, 214, 90, 0.1),
+      ellipse 70% 50% at 50% 30%,
+      rgba(255, 255, 255, 0.06),
       transparent 70%
     ),
-    linear-gradient(180deg, var(--db-bg-top), var(--db-bg-bottom));
+    linear-gradient(180deg, #2c2d32 0%, #222327 55%, #19191c 100%);
   color: var(--db-text);
   transition: opacity 360ms ease-out;
 }
@@ -1193,7 +1195,8 @@
 }
 
 /* ── 3D packs (design 055): a WebGL canvas draws the packs, the DOM keeps layout and input ── */
-.build-battle-window .db-live .bb-gl {
+.build-battle-window .db-live .bb-gl,
+.build-battle-window .db-live .bb-gl-mirror {
   position: fixed;
   inset: 0;
   z-index: 2;
@@ -1201,6 +1204,20 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+/* ── Floor reflections (design 055): the DOM objects reflect as the WebGL mirror does —
+   REFLECTION_GAP_VH below, REFLECTION_ALPHA at the floor, gone after REFLECTION_FADE of the
+   object's height (pack3d.mjs). The mask runs in the object's own box, so its opaque end sits at
+   the object's foot, which the reflection starts from. ── */
+.build-battle-window .db-live .bb-pocket__stack,
+.build-battle-window .db-live [data-render='dom'] .bb-bigpack__fly,
+.build-battle-window .db-live .bb-scene--stage .bb-box {
+  -webkit-box-reflect: below 1vh linear-gradient(transparent 70%, rgba(0, 0, 0, 0.28));
+}
+/* The seen cards wait under the stack's reflection, not over it. */
+.build-battle-window .db-live .bb-pocket__stack {
+  margin-bottom: calc(var(--bb-big-card-w) * 88 / 63 * 0.3 + 1vh);
 }
 /* The anchors stay laid out but draw nothing; their tear button, its glint and the cut line sit
    over the canvas. */

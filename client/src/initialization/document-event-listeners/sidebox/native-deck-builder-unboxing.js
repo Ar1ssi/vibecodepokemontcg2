@@ -836,7 +836,7 @@ export const mountUnboxingScene = ({
     }
     root.replaceChildren();
     adoptPackStage();
-    if (packStage) root.append(packStage.canvas);
+    if (packStage) root.append(packStage.mirror, packStage.canvas);
     root.dataset.render = packStage ? '3d' : 'dom';
     root.dataset.stage = u.stage;
     root.dataset.view = view;
@@ -922,7 +922,7 @@ export const mountUnboxingScene = ({
         if (busy) return;
         // Idle: take over the current picture now (a box is not drawn in 3D, so only a spread changes).
         adoptPackStage();
-        root.append(packStage.canvas);
+        root.append(packStage.mirror, packStage.canvas);
         root.dataset.render = '3d';
         syncPackStage(viewOf(getUnboxing()));
       });

@@ -20,7 +20,10 @@ import {
   TILT_MAX_X_DEG,
   TILT_MAX_Y_DEG,
   DEFAULT_PACK_SHAPE,
+  REFLECTION_FADE,
+  REFLECTION_GAP_VH,
   cardsEmergePose,
+  reflectionFloor,
   packShape,
   packShapeKey,
   followTilt,
@@ -322,6 +325,16 @@ test('rectToWorld maps the viewport centre to the origin, y up', () => {
     ),
     null
   );
+});
+
+test('reflectionFloor sits a gap below the object and fades over a share of its height', () => {
+  const floor = reflectionFloor({ left: 100, top: 200, width: 300, height: 500 }, 1000);
+  close(floor.y, 200 + 500 + (REFLECTION_GAP_VH / 100) * 1000);
+  close(floor.fade, 500 * REFLECTION_FADE);
+  assert.ok(floor.x0 < 100 && floor.x1 > 400, 'the column is a little wider than the object');
+  close(floor.x0 + floor.x1, 2 * 250, 1e-9, 'centred on it');
+  assert.equal(reflectionFloor({ left: 0, top: 0, width: 0, height: 10 }, 1000), null);
+  assert.equal(reflectionFloor({ left: 0, top: 0, width: 10, height: 10 }, 0), null);
 });
 
 test('ripTicksCrossed counts whole 10 % marks crossed going up', () => {

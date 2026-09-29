@@ -53,8 +53,10 @@ import {
   packTearLine,
   peelAngleDeg,
   peelVertex,
+  REFLECTION_ALPHA,
   packShapeKey,
   pillowZ,
+  reflectionFloor,
   rectToWorld,
   ripTicksCrossed,
   stackSettlePose,
@@ -719,6 +721,15 @@ function buildStage({
     });
   };
 
+  // The reflection layer, under the WebGL canvas. `floors` (client px of the canvas) are rebuilt
+  // every frame from the packs on screen plus the settling card stack's.
+  const mirror = makeCanvas(1, 1);
+  mirror.className = 'bb-gl-mirror';
+  mirror.setAttribute('aria-hidden', 'true');
+  const mirrorContext = mirror.getContext('2d');
+  let floors = [];
+  let stackFloor = null;
+
   const viewportRect = () => canvas.getBoundingClientRect();
   const viewportWorldH = () => {
     const viewport = viewportRect();
@@ -732,6 +743,7 @@ function buildStage({
   });
 
   const placePacks = (now, dtMs) => {
+    floors = stackFloor ? [stackFloor] : [];
     const viewport = viewportRect();
     const perPx = worldPerPixel(viewport.height);
     const moving = !still();
@@ -757,6 +769,9 @@ function buildStage({
       }
       pack.lastHome = home;
       pack.lastSlot = slot;
+      // Each pack reflects under its resting place; a torn pack keeps the floor it was ripped over.
+      if (rect) pack.floor = reflectionFloor(relativeTo(rect, viewport), viewport.height);
+      if (pack.floor) floors.push(pack.floor);
       const target =
         moving && rect && pack.packIndex === focus
           ? tiltTarget(pointer, rect)
@@ -807,6 +822,42 @@ function buildStage({
     cards.plane.setFromNormalAndCoplanarPoint(mouthNormal, mouthPoint);
   };
 
+  // The floor reflections: for each band, the strip of this frame's picture just above its floor,
+  // flipped below it and faded out, drawn right after the render (the WebGL buffer is only
+  // readable in this task). Only that strip is copied, so the cost stays small.
+  const reflectionFade = (y, fade) => {
+    // destination-out keeps (1 − source alpha): REFLECTION_ALPHA at the floor, nothing at `fade`.
+    const band = mirrorContext.createLinearGradient(0, y, 0, y + fade);
+    band.addColorStop(0, `rgba(0, 0, 0, ${1 - REFLECTION_ALPHA})`);
+    band.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    return band;
+  };
+
+  const drawMirror = () => {
+    const { width, height } = canvas;
+    if (mirror.width !== width || mirror.height !== height) {
+      mirror.width = width;
+      mirror.height = height;
+    }
+    mirrorContext.clearRect(0, 0, width, height);
+    if (!(canvas.clientHeight > 0)) return;
+    const scale = height / canvas.clientHeight;
+    for (const floor of floors) {
+      const y = Math.round(floor.y * scale);
+      const fade = Math.min(Math.round(floor.fade * scale), y, height - y);
+      const x0 = Math.max(0, Math.round(floor.x0 * scale));
+      const x1 = Math.min(width, Math.round(floor.x1 * scale));
+      if (!(fade > 0) || !(x1 > x0)) continue;
+      mirrorContext.setTransform(1, 0, 0, -1, 0, 2 * y);
+      mirrorContext.drawImage(canvas, x0, y - fade, x1 - x0, fade, x0, y - fade, x1 - x0, fade);
+      mirrorContext.setTransform(1, 0, 0, 1, 0, 0);
+      mirrorContext.globalCompositeOperation = 'destination-out';
+      mirrorContext.fillStyle = reflectionFade(y, fade);
+      mirrorContext.fillRect(x0, y, x1 - x0, fade);
+      mirrorContext.globalCompositeOperation = 'source-over';
+    }
+  };
+
   const draw = () => {
     if (
       !canvas.isConnected ||
@@ -815,6 +866,7 @@ function buildStage({
     )
       return;
     renderer.render(scene, camera);
+    drawMirror();
   };
 
   function frame() {
@@ -923,6 +975,9 @@ function buildStage({
     cards.geometry.dispose();
     cards.materials.forEach((material) => material.dispose());
     cards = null;
+    // The DOM stack's CSS reflection takes over from here.
+    floors = floors.filter((floor) => floor !== stackFloor);
+    stackFloor = null;
     // Drawn now, in the same frame the DOM stack appears (the hand-off).
     draw();
     requestRender();
@@ -1197,6 +1252,8 @@ function buildStage({
     const viewport = viewportRect();
     const target = rect && rectToWorld(relativeTo(rect, viewport), viewport);
     if (!target || !stack.group.visible) return Promise.resolve();
+    // The stack lands on the DOM card's floor, where its CSS reflection takes over.
+    stackFloor = reflectionFloor(relativeTo(rect, viewport), viewport.height);
     stack.mesh.updateWorldMatrix(true, false);
     const fromPosition = new Vector3();
     const fromTurn = new Quaternion();
@@ -1266,11 +1323,13 @@ function buildStage({
     // Frees the context now instead of at GC (row 14); a lost context has nothing left to free.
     if (!renderer.getContext().isContextLost()) renderer.forceContextLoss();
     canvas.remove();
+    mirror.remove();
   };
 
   resize();
   return {
     canvas,
+    mirror,
     showSpread,
     hide,
     beginTear,

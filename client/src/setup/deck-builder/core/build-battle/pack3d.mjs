@@ -446,6 +446,32 @@ export function rectToWorld(rect, viewport) {
   };
 }
 
+// ── Floor reflection (the stage is a dark grey floor, as in TCG Pocket) ─────
+// The CSS reflections of DOM objects (`-webkit-box-reflect`) use the same three numbers, so a card
+// stack keeps its reflection when the 3D stack hands over to the DOM one.
+export const REFLECTION_ALPHA = 0.28;
+export const REFLECTION_FADE = 0.3;
+export const REFLECTION_GAP_VH = 1;
+// Sway and tilt swing a pack a little past its anchor; its reflection column allows for that.
+const REFLECTION_SIDE_MARGIN = 0.12;
+
+/**
+ * An object's reflection band in client px: the mirror line `y` under its client `rect`, the
+ * `fade` below it over which the reflection dies out, and the column `x0..x1` it covers.
+ *
+ * @returns {{y: number, fade: number, x0: number, x1: number}|null} null for an empty rect or viewport
+ */
+export function reflectionFloor(rect, viewportHeightPx) {
+  if (!isRect(rect) || !(viewportHeightPx > 0)) return null;
+  const margin = rect.width * REFLECTION_SIDE_MARGIN;
+  return {
+    y: rect.top + rect.height + (REFLECTION_GAP_VH / 100) * viewportHeightPx,
+    fade: rect.height * REFLECTION_FADE,
+    x0: rect.left - margin,
+    x1: rect.left + rect.width + margin,
+  };
+}
+
 /** @returns {number} whole `RIP_TICK_STEP` marks crossed going from `previous` up to `next`. */
 export function ripTicksCrossed(previous, next) {
   if (!(clamp01(next) > clamp01(previous))) return 0;

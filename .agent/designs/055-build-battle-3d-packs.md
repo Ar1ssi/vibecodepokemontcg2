@@ -463,3 +463,16 @@ booster art (artofpkm.com was checked first: Japanese wrappers only, 680 px canv
 - Size: 172 wrappers 25 MB, 42 renders + 8 faces 8.4 MB.
 - Recorder: the reload wait is 40 s and the hand-off check polls 2 s (SwiftShader compiles on the
   CPU); "every hit starts face down" passes with a note when a box and seed open no hit.
+
+## Floor reflection (2026-09-29, user: "make it dark grey with reflections", like TCG Pocket)
+- The stage is a dark grey floor (`#2c2d32 → #19191c`, a faint top light). Objects reflect on it:
+  `REFLECTION_GAP_VH` 1 below their foot, `REFLECTION_ALPHA` 0.28 at the floor, gone after
+  `REFLECTION_FADE` 0.3 of their height (pack3d.mjs; `reflectionFloor(rect, viewportH)` gives the
+  band and its column).
+- WebGL: a 2D `canvas.bb-gl-mirror` under the stage canvas. After every render the stage copies,
+  per band (each pack's anchor; a torn pack keeps its last; the settling stack's target card),
+  the strip just above the floor, flips it below, and fades it with a `destination-out` gradient.
+  It follows sway, tilt, the rip and the fall with no per-object meshes.
+- DOM: `-webkit-box-reflect` with the same numbers on the card stack, the box and the DOM-path
+  packs, so the stack's reflection carries on across the hand-off. The seen-card row moves down
+  by the reflection's height.
