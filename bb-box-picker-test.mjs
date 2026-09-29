@@ -102,6 +102,20 @@ try {
   T('row 6 the box is ready once its data is in', state.box === 'pitch-black' && state.open === false, JSON.stringify(state));
   await page.unroute('**/core/build-battle/boxes/pitch-black.generated.mjs');
 
+  // Row 6: switching back to the loaded box while another still loads keeps the loaded box ready;
+  // the late load is dropped. A fresh page: the browser keeps a failed module import (row 5) failed.
+  await fresh('&box=pitch-black');
+  await page.route('**/core/build-battle/boxes/perfect-order.generated.mjs', async (r) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await r.continue();
+  });
+  await page.selectOption('#buildBattleBox', 'perfect-order');
+  await page.selectOption('#buildBattleBox', 'pitch-black');
+  await page.waitForTimeout(2500);
+  state = await picker(page);
+  T('row 6 a late load for a box left behind is dropped', state.box === 'pitch-black' && state.open === false && !/Loading/.test(state.note), JSON.stringify(state));
+  await page.unroute('**/core/build-battle/boxes/perfect-order.generated.mjs');
+
   // Row 22: once a box is open the picker is gone; New box brings it back on the same box.
   await page.click('#buildBattleOpenBox');
   await page.waitForSelector('#bbUnboxing [data-control="skip"]', { timeout: 15000 });

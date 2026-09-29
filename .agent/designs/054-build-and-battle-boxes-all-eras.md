@@ -516,7 +516,7 @@ starting rows; PASS/FAIL lines name the box.
 | 3 | random-Trainer draw: pool of 1 card, n = 4 | 2 copies then stop (at most `2·pool` draws), pool is 2 cards | [x] `pack-opening.test.mjs` "row 3: a one-card Trainer pool gives two copies and stops" |
 | 4 | evolution box: `n = 23 − 1 − A − B` < 0 for some pairing | generator refuses to bake the box (throws naming the pairing); catalog test asserts n ≥ 0 for all 12 pairings of every baked box | [x] `build-battle-bake.test.mjs` "row 4: an Evolution pack a pairing cannot fill to 23 makes the generator refuse the box, naming it"; `box-catalog.test.mjs` "rows 4 + 16" on all 37 Evolution boxes (A4: a pack exactly 23, a deck at most 40) |
 | 5 | `import()` of a set module rejects (offline, 404) | sealed screen shows the load error, picker usable, no session created | [x] `box-data.test.mjs` "row 5: an unknown key, a failed import or a malformed module rejects…"; e2e row 5 PASS (module routed to 404) |
-| 6 | box opened, then reload while `loadBoxData` is pending | scene renders only after the promise; a second Open click during load is a no-op | [x] e2e row 6 PASS (Open off while the box loads; the box renders once it settles) |
+| 6 | box opened, then reload while `loadBoxData` is pending | scene renders only after the promise; a second Open click during load is a no-op | [x] e2e row 6 PASS (Open off while the box loads; the box renders once it settles; a late load for a box left behind is dropped — fixed at close) |
 | 7 | same seed, same box, twice | identical deckKey, groupKeys, trainerIds, packs, artIndexes | [x] `pack-opening.test.mjs` "row 7: the same seed opens the same box, bit for bit", "row 7: every baked box opens bit for bit…" (42 boxes; D6) |
 | 8 | same seed, different box | independent contents; changing the box before Open re-draws | [x] `pack-opening.test.mjs` "row 8: the same seed in another box draws that box, from its own set" |
 | 9 | a class absent from a set (SM: no `illustration`) | its weight joins the slot filler; `hit`/`top` chances unchanged (25 % / 1 %) | [x] `pack-models.test.mjs` "row 9: a class the set does not print gives its weight to the slot filler only"; the all-set row 10 test expects 0 for an unprinted class (sv09, sv10 ACE SPEC) |
@@ -711,7 +711,10 @@ Build notes:
   Picker e2e: five era chips in release order, `?box=evolutions` on the XY era. Recorder `BOX=evolutions
   SEED=71` PASS; `--check` (live, 3 XY kits) clean.
 - Slice 9: walking the edge rows found row 25 unmet (a failed vendored pack image was only removed); it now
-  swaps in the procedural front, checked by `bb-box-picker-test.mjs`. Area doc updated. Full `pnpm test`:
+  swaps in the procedural front, checked by `bb-box-picker-test.mjs`. The hostile pass found a load race:
+  switching back to the loaded box while another box loaded let the late result replace it, leaving the
+  picker on "Loading…"; every switch now drops a load in flight (e2e row 6, failing before). Area doc
+  updated. Full `pnpm test`:
   5112 pass, 0 fail, 4 skipped; `pnpm test:live`: 4 pass (all 42 boxes `--check`, no cache).
 
 ## Landing — the harness edits the commit that merges this branch to `main` carries (A1)

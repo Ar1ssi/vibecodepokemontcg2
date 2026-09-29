@@ -275,11 +275,12 @@ export const initializeBuildBattle = ({
   const loadActiveBox = (box) => {
     activeBox = box;
     loadError = null;
+    // Every switch drops a load still in flight, even back to the box already loaded.
+    const token = ++loadToken;
     if (isLoaded()) {
       onBoxLoaded();
       return;
     }
-    const token = ++loadToken;
     renderAll();
     loadBoxData(box.key).then(
       (result) => {
