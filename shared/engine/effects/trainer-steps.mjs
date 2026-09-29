@@ -3765,6 +3765,62 @@ function shuffleDeckOnly(ctx) {
   return null;
 }
 
+// Pseudo-option ids for searchOrRecover's Choose 1 (negative: never a card instanceId).
+export const FROM_DECK_OPTION = -201;
+export const FROM_DISCARD_OPTION = -202;
+
+// Fossil Excavation Map: "Choose 1: Search your deck for an <X> card, reveal it, and put it into
+// your hand. Then, shuffle your deck. / Put an <X> card from your discard pile into your hand."
+// The deck mode is always legal (a search may fail to find); the discard mode needs a match.
+function searchOrRecover(ctx) {
+  const { player, step } = ctx;
+  const matching = (zone) => (player.zones[zone] || []).filter((c) => matchesSearch(c, step.what));
+  const toHand = (card, from) => {
+    removeFromZones(player, card);
+    player.zones.hand.push(card);
+    ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from, to: 'hand', playerId: player.playerId });
+    ctx.events.push({ type: 'cardsRevealed', playerId: player.playerId, cards: [{ instanceId: card.instanceId, name: card.name }] });
+  };
+  const askFrom = (zone) => {
+    const options = matching(zone);
+    if (zone === 'deck' && options.length === 0) {
+      shuffleDeck(player, ctx);
+      return null;
+    }
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Choose ${zone === 'deck' ? 'up to 1' : '1'} ${step.what} card from your ${
+        zone === 'deck' ? 'deck' : 'discard pile'
+      } to put into your hand`,
+      options,
+      min: zone === 'deck' ? 0 : 1,
+      max: 1,
+      memo: { phase: zone },
+    });
+  };
+
+  const phase = ctx.memo?.phase;
+  if (ctx.selection && (phase === 'deck' || phase === 'discard')) {
+    const card = pickById(matching(phase), ctx.selection)[0];
+    if (card) toHand(card, phase);
+    if (phase === 'deck') shuffleDeck(player, ctx);
+    return null;
+  }
+  if (ctx.selection && phase === 'mode') {
+    return askFrom(ctx.selection[0] === FROM_DISCARD_OPTION ? 'discard' : 'deck');
+  }
+  if (matching('discard').length === 0) return askFrom('deck');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose 1`,
+    options: [
+      { instanceId: FROM_DECK_OPTION, name: `Search your deck for a ${step.what} card` },
+      { instanceId: FROM_DISCARD_OPTION, name: `Put a ${step.what} card from your discard pile into your hand` },
+    ],
+    min: 1,
+    max: 1,
+    memo: { phase: 'mode' },
+  });
+}
+
 // Buddy-Buddy Rescue: each player takes a Pokémon from their discard; opponent first.
 function eachPlayerRecoverPokemon(ctx) {
   const order = [ctx.opponent, ctx.player].filter(Boolean);
@@ -4699,6 +4755,7 @@ export const EXTRA_STEP_HANDLERS = {
   transformAbility,
   selfAttachEnergyAbility,
   fossilItem,
+  searchOrRecover,
   returnPokemonToHand,
   swapWithDiscard,
   revealOpponentDeckBench,

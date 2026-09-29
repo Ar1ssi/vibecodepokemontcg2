@@ -6,12 +6,13 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I211). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I212). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I211 2026-09-29 P3 [rules] Legacy fossil clauses unmodeled: Mysterious/Claw/Root Fossil "KO doesn't count as a Knocked Out Pokémon" (still gives a Prize); Fossil Excavator MD 82 unparsed; Holon Fossil HP 86 / Fossil Egg N4 72 search filters too broad (refs: shared/engine/rules/fossil.mjs, out/pkmn-trainer-cards.json)
 - I210 2026-09-29 P3 [tests] coin-flip-ceremony.test.mjs "several flips toss one after another" failed once under full `pnpm test` load, passes 3/3 alone — same timing-dependent family as I183 (refs: S330)
 - I209 2026-09-29 P3 [deck-builder] B&B box cuboid wears real faces only on the Mega Evolution camera (ME1–ME5); XY/SM/SWSH/SV renders need per-box corners, and the box/lid/wrap are still CSS — design 056 (refs: design 055 § Every box's art)
 - I208 2026-09-29 P3 [server] Static files go out `Cache-Control: no-store` with no compression (server.js:160), so every B&B opening re-downloads the 733 KB three.js build; gzip would cut it to ~180 KB (refs: D193, design 055)
@@ -19,7 +20,7 @@
 - I200 2026-09-28 P2 [rules] `atkCountersEach` (effects/attack-steps.mjs) ignores `scope: 'active'`, so "put … damage counters on their Active Pokémon for each card in your opponent's hand" (rules/attack-steps.mjs ~812) hits every opponent Pokémon (refs: S328 I195 review)
 - I199 2026-09-28 P3 [deck-builder] find-type.js, find-old-type.js (+ its database/updater) and tcgdex-image-url.mjs lost their only caller when the text decklist importer was removed (design 050); delete them with their tests or revive them for a new importer
 - I191 2026-09-26 P3 [tooling] The ability passive probe asks every reader with the plain opponent Active (V/VMAX/VSTAR sit on the Bench), so attacker rule-box filters read `unconsumed` although they work against a matching attacker (Dauntless Shield / Crystal Veil class) (refs: S325, scripts/lib/ability-passive-probe.mjs)
-- I190 2026-09-26 P3 [rules] Deferred S&M trainer clauses: Bellelba & Brycen-Man CEC 186 and Sabrina's Suggestion TEU 154 unrecognizable; Choose-1 second modes (Rescue Stretcher GRI 130, Energy Recycle System CES 128, Fossil Excavation Map FLI 107, Tate & Liza CES 148); Mallow & Lana CEC 198 optional discard+heal; Missing Clover UPR 129 4-card Prize mode; Cross Switcher BUS 115 2-card play gate (refs: .agent/scratch/sm-trainer-audit/report.md, S325)
+- I190 2026-09-26 P3 [rules] Deferred S&M trainer clauses: Bellelba & Brycen-Man CEC 186 and Sabrina's Suggestion TEU 154 unrecognizable; Choose-1 second modes (Rescue Stretcher GRI 130, Energy Recycle System CES 128, Tate & Liza CES 148); Mallow & Lana CEC 198 optional discard+heal; Missing Clover UPR 129 4-card Prize mode; Cross Switcher BUS 115 2-card play gate (refs: .agent/scratch/sm-trainer-audit/report.md, S325)
 - I183 2026-09-26 P3 [tests] coin-flip-ceremony.test.mjs "ceremony mounts a material-stamped coin" flakes under full `pnpm test` load (message '' vs /Tails! You go first\./); passes 3/3 alone — timing-dependent wait.
 - I181 2026-09-25 P3 [rules] Copy-attack deferrals from design 039: Misty's Psyduck ESP (multi-branch coin), Shiftry ex (opponent-hand pick), Alakazam Star (hand discard then copy), Togetic δ (no δ marker in card data), Smeargle Sketch (needs in-play history) (refs: design 039 Deviations, I168)
 - I180 2026-09-25 P2 [board-ui] Non-zoom card zones (discard/lostZone/viewCards/attachedCards) still use the legacy #fullImage overlay — top document, no z-index, sticks over the board, click-to-close unreachable (same class as the S299 #board fix); repro: move a card to discard, double-click.

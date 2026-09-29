@@ -219,11 +219,58 @@ test('Antique Plume Fossil Plume Protection: no attack damage while on the Bench
   assert.equal(hit.damage, 0);
 });
 
-test('Fossil Excavation Map / Kit: fetch Fossil cards by name, not any card', () => {
-  const map = parseTrainerEffect(
-    'Choose 1: Search your deck for an Unidentified Fossil card, reveal it, and put it into your hand. Then, shuffle your deck. Put an Unidentified Fossil card from your discard pile into your hand.'
-  ).steps[0];
-  assert.deepEqual(map, { type: 'searchDeck', what: 'unidentified fossil', count: 1, destination: 'hand', reveal: true });
+// Fossil Excavation Map FLI 107: corpus wording, and TCGdex sm6-107's bulleted wording.
+const MAP_TEXT =
+  'Choose 1: Search your deck for an Unidentified Fossil card, reveal it, and put it into your hand. Then, shuffle your deck. Put an Unidentified Fossil card from your discard pile into your hand.';
+const MAP_TEXT_TCGDEX =
+  'Choose 1:\n\n•Search your deck for an Unidentified Fossil card, reveal it, and put it into your hand. Then, shuffle your deck.\n•Put an Unidentified Fossil card from your discard pile into your hand.';
+const MAP_OPTIONS = { deck: -201, discard: -202 };
+
+function mapGame() {
+  const game = setup();
+  const inDeck = fossilItem('Unidentified Fossil', UNIDENTIFIED_TEXT);
+  const inDiscard = fossilItem('Unidentified Fossil', UNIDENTIFIED_TEXT);
+  const decoy = fossilItem('Rare Fossil', 'Play this card as if it were a 70-HP Basic {C} Pokémon.');
+  game.state.players.p1.zones.deck.push(inDeck, decoy);
+  game.state.players.p1.zones.discard.push(inDiscard, fossilItem('Rare Fossil', 'x'));
+  const map = card({ name: 'Fossil Excavation Map', type: 'Trainer', trainerType: 'Item', text: MAP_TEXT });
+  return { game, inDeck, inDiscard, map };
+}
+
+test('Fossil Excavation Map: both printings parse to the Choose 1 step', () => {
+  for (const text of [MAP_TEXT, MAP_TEXT_TCGDEX]) {
+    assert.deepEqual(parseTrainerEffect(text).steps, [{ type: 'searchOrRecover', what: 'unidentified fossil' }]);
+  }
+});
+
+test('Fossil Excavation Map: deck mode offers only Unidentified Fossil and shuffles', () => {
+  const { game, inDeck, map } = mapGame();
+  const mode = playFromHand(game, map);
+  assert.deepEqual(mode.pendingChoice.options.map((o) => o.instanceId), [MAP_OPTIONS.deck, MAP_OPTIONS.discard]);
+  const pick = resolve(game, mode, [MAP_OPTIONS.deck]);
+  assert.deepEqual(pick.pendingChoice.options.map((c) => c.instanceId), [inDeck.instanceId]);
+  const done = resolve(game, pick, [inDeck.instanceId]);
+  assert.ok(find(game, 'hand', inDeck.instanceId));
+  assert.ok(done.events.some((e) => e.type === 'deckShuffled'));
+});
+
+test('Fossil Excavation Map: discard mode returns an Unidentified Fossil from the discard pile', () => {
+  const { game, inDiscard, map } = mapGame();
+  const mode = playFromHand(game, map);
+  const pick = resolve(game, mode, [MAP_OPTIONS.discard]);
+  assert.deepEqual(pick.pendingChoice.options.map((c) => c.instanceId), [inDiscard.instanceId]);
+  resolve(game, pick, [inDiscard.instanceId]);
+  assert.ok(find(game, 'hand', inDiscard.instanceId));
+});
+
+test('Fossil Excavation Map: with none in the discard pile it goes straight to the deck search', () => {
+  const { game, inDeck, inDiscard, map } = mapGame();
+  game.state.players.p1.zones.discard = game.state.players.p1.zones.discard.filter((c) => c !== inDiscard);
+  const res = playFromHand(game, map);
+  assert.deepEqual(res.pendingChoice.options.map((c) => c.instanceId), [inDeck.instanceId]);
+});
+
+test('Fossil Excavation Kit: fetches Fossil cards by name, not any card', () => {
   const kit = parseTrainerEffect(
     'Put 2 in any combination of Helix Fossil Omanyte, Dome Fossil Kabuto, or Old Amber Aerodactyl cards from your discard pile into your hand.'
   ).steps[0];

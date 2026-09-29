@@ -32,7 +32,8 @@
 //   { type: 'countShuffleDrawPlus' }
 //   { type: 'shuffleFromDiscard', what: 'Basic Energy'|'Pokémon'|..., count: N, choices?: [...] }
 //   { type: 'applyStatus', target: 'opponentActive'|'bothActiveNonDark', conditions: ['Burned','Confused',...] }
-//   { type: 'fossilItem', hp: 60 }
+//   { type: 'fossilItem', hp?: 60 }
+//   { type: 'searchOrRecover', what: 'unidentified fossil' }   (Choose 1: deck or discard → hand)
 //   { type: 'moveEnergyToActive', count: N }
 //   { type: 'returnPokemonToHand', keepAttached?: boolean }
 //   { type: 'swapWithDiscard', filter: 'Basic Pokémon'|'Pokémon ex (Ogerpon)'|... }
@@ -2741,6 +2742,7 @@ export function describeStep(step) {
       }
       return `Apply ${cond}.`;
     }
+    case 'searchOrRecover': return `Choose 1: search your deck for a ${step.what} card and put it into your hand (then shuffle), or put a ${step.what} card from your discard pile into your hand.`;
     case 'fossilItem': return `Play this card as if it were a ${step.hp ? `${step.hp}-HP ` : ''}Basic {C} Pokémon (can't retreat; discard from play any time during your turn).`;
     case 'returnPokemonToHand': return step.keepAttached
       ? 'Put 1 of your Pokémon and all attached cards into your hand.'

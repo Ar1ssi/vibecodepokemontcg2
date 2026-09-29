@@ -31,14 +31,15 @@ export function parseFossilPlay(text) {
 
 /**
  * Items that fetch Fossil cards by name (normalized lowercase text):
- *   Fossil Excavation Map FLI 107 — deck mode only; its discard mode needs Choose 1 (I190).
+ *   Fossil Excavation Map FLI 107 — Choose 1: from the deck, or from the discard pile.
  *   Fossil Excavation Kit FCO 101 — "Put 2 in any combination of Helix Fossil Omanyte, …".
  */
 export function parseNamedFossilSearch(lower) {
   const map = String(lower || '').match(
-    /^choose 1: search your deck for an? ([a-z' ]+? fossil) card, reveal it, and put it into your hand/
+    // TCGdex bullets the modes ("Choose 1:\n\n•Search …\n•Put …"); the corpus runs them inline.
+    /^choose 1:[\s•]*search your deck for an? ([a-z' ]+? fossil) card, reveal it, and put it into your hand\.\s*then, shuffle your deck\.[\s•]*put an? \1 card from your discard pile into your hand/
   );
-  if (map) return { type: 'searchDeck', what: map[1], count: 1, destination: 'hand', reveal: true };
+  if (map) return { type: 'searchOrRecover', what: map[1] };
   const kit = String(lower || '').match(
     /^put (\d+) in any combination of ([^.]*fossil[^.]*?) cards from your discard pile into your hand/
   );
