@@ -15,6 +15,12 @@ export function isToolTrainer(card) {
   return kindText(card).includes('tool');
 }
 
+// Pokémon Tools and Technical Machines (older TMs are printed as Items but attach like Tools).
+// A lock on "Item cards" (Budew Itchy Pollen) never stops them; only a Tool or Trainer lock does.
+export function isToolOrMachineTrainer(card) {
+  return isToolTrainer(card) || /technical machine/i.test(String(card?.name || ''));
+}
+
 export function isSupporterTrainer(card) {
   return kindText(card).includes('supporter');
 }

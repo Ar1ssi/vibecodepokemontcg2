@@ -706,6 +706,32 @@ test('I184 board: Distort locks Items (not Supporters) for the opponent next tur
   assert.equal(later.allowed, true);
 });
 
+test('Item play lock (Distort, Budew Itchy Pollen wording) leaves Pokémon Tools and Technical Machines playable', () => {
+  const state = game((s, p1, p2) => {
+    p1.zones.active.push(mon('Noivern-GX', { hp: 200, attacks: [atk('Distort', 50, DISTORT)] }));
+    p2.zones.active.push(mon('Defender', { hp: 300 }));
+  }, { rulesEnabled: true });
+  const tool = createCard({ instanceId: nextId++, name: 'Rocky Helmet', supertype: 'Trainer', subtypes: ['Pokémon Tool'] });
+  // Older Technical Machines are printed as Items (corpus: out/pkmn-trainer-cards.json, "Technical Machine TS-1").
+  const machine = item('Technical Machine TS-1');
+  const plainItem = item('Potion');
+  state.players.p2.zones.hand.push(tool, machine, plainItem);
+  const res = runAttack(state);
+  const target = activeRoot(res.state, 'p2').instanceId;
+  const allowed = (command) => validateLegality(res.state, { ...command, playerId: 'p2' }).allowed;
+  assert.equal(allowed({ type: 'playTrainer', payload: { instanceId: plainItem.instanceId } }), false);
+  assert.equal(allowed({ type: 'playTrainer', payload: { instanceId: tool.instanceId } }), true);
+  assert.equal(allowed({ type: 'playTrainer', payload: { instanceId: machine.instanceId } }), true);
+  assert.equal(
+    allowed({ type: 'attachCard', payload: { instanceId: tool.instanceId, targetInstanceId: target } }),
+    true,
+    'dragging a Tool onto a Pokémon works under an Item lock'
+  );
+  // A Tool-naming lock (Chaos Wheel) still stops the Tool.
+  res.state.players.p2.playLocks = [{ untilTurn: 99, kinds: ['tool'] }];
+  assert.equal(allowed({ type: 'playTrainer', payload: { instanceId: tool.instanceId } }), false);
+});
+
 test('I184 board: Heavy Rock-GX locks every card from hand (Trainer, Energy, Basic)', () => {
   const state = game((s, p1, p2) => {
     p1.zones.active.push(mon('Alolan Golem-GX', { hp: 200, attacks: [atk('Heavy Rock-GX', 100, HEAVY_ROCK)] }));

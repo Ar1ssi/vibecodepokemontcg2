@@ -233,7 +233,7 @@ import {
   isBasicEnergy,
   isUltraBeastCard,
 } from './rules/card-classify.mjs';
-import { trainerPlayBlockReason, isToolTrainer } from './rules/trainer-play-conditions.mjs';
+import { trainerPlayBlockReason, isToolOrMachineTrainer } from './rules/trainer-play-conditions.mjs';
 import { trainerEndsTurn } from './rules/trainer-effects.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
 import {
@@ -4265,12 +4265,12 @@ export function validateLegality(state, command) {
           const handLock = playLockReason(player, energyKinds, state.turn?.number || 1);
           if (handLock) return { allowed: false, reason: handLock };
         }
-        // Chaos Wheel / Trick Wind lock Pokémon Tools (Items since Sun & Moon); Evolution
-        // Jammer locks evolving from hand.
+        // Chaos Wheel / Trick Wind lock Pokémon Tools; an Item lock (Itchy Pollen) does not
+        // reach Tools or Technical Machines. Evolution Jammer locks evolving from hand.
         const attachKinds = isPokemon(cardRef.card)
           ? ['evolve']
-          : isToolTrainer(cardRef.card)
-            ? ['tool', 'item', 'trainer']
+          : isToolOrMachineTrainer(cardRef.card)
+            ? ['tool', 'trainer']
             : [];
         const attachLock = attachKinds.length
           ? playLockReason(player, attachKinds, state.turn?.number || 1)
@@ -4859,10 +4859,16 @@ export function validateLegality(state, command) {
         if (blockReason) return { allowed: false, reason: blockReason };
         // Opponent-attack play locks (Distort/Sonic Volume/Heavy Rock/Horror House): Item-only,
         // Special-Energy-only, Trainer-wide, or every card from hand (design 048).
+        const isGear = isToolOrMachineTrainer(cardRef.card);
         const trainerKinds = [
-          isSupporter ? 'supporter' : subStr.includes('stadium') ? 'stadium' : 'item',
+          isGear
+            ? 'tool'
+            : isSupporter
+              ? 'supporter'
+              : subStr.includes('stadium')
+                ? 'stadium'
+                : 'item',
           'trainer',
-          ...(isToolTrainer(cardRef.card) ? ['tool'] : []),
         ];
         const attackPlayLock = playLockReason(player, trainerKinds, state.turn?.number || 1);
         if (attackPlayLock) return { allowed: false, reason: attackPlayLock };
