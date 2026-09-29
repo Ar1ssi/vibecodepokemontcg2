@@ -1395,6 +1395,16 @@ const BLOCKS = [
     /search your deck for an evolution card that evolves from this pokémon and put it onto this pokémon\. shuffle your deck afterward\./g,
     () => ({ type: 'searchEvolve', ontoSource: true }),
   ],
+  // Technical Machine TS-1 Evoluter (Legends Awakened 136): evolves any of your Pokémon.
+  [
+    /search your deck for a card that evolves from 1 of your pokémon and put it onto that pokémon\. shuffle your deck afterward\./g,
+    () => ({ type: 'searchEvolve' }),
+  ],
+  // Technical Machine TS-2 Devoluter (Legends Awakened 137).
+  [
+    /choose 1 of your opponent's evolved pokémon( but not pokémon lv\.x)?\. remove the highest stage evolution card from that pokémon and put that card back into your opponent's hand\./g,
+    (m) => ({ type: 'atkDevolve', scope: 'chooseOpponent', to: 'hand', ...(m[1] ? { excludeLvX: true } : {}) }),
+  ],
   // Raticate Pickup: one card of each kind (its "(or Evolution card)" reminder is stripped).
   [
     /search your discard pile for a basic pokémon, a trainer card, and an energy card\. show them to your opponent and put them into your hand\./g,
@@ -1693,6 +1703,8 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
   let normalized = normalizeAttackText(String(text || '').replace(/Pokémon-ex\b/g, 'Pokémon-ex-era'), selfName)
     // Keeps the Weakness order of timed damage changes as a token each sentence lifts off.
     .replace(/\s*\((before|after) applying weakness and resistance\)/g, ' <wr:$1>')
+    // Devoluter's "(excluding Pokémon LV.X)" limits the target, so it survives the strip below.
+    .replace(/evolved pokémon \(excluding pokémon lv\.x\)/g, 'evolved pokémon but not pokémon lv.x')
     // Reminder text never carries an effect ("(Your opponent chooses the new Active Pokémon.)").
     .replace(/\s*\([^)]*\)/g, '');
   if (!normalized) return result;

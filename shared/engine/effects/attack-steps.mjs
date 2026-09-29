@@ -2460,12 +2460,17 @@ function devolveRoot(ctx, owner, root, to) {
   return true;
 }
 
+const isLvX = (card) => /lv\.?\s*x$/i.test(String(card?.name || ''));
+
 // Unown Hidden Power: 1 evolved Pokémon of either player, its top card to its owner's hand.
-function devolveChosen(ctx) {
-  const sides = [ctx.player, ctx.opponent].filter(Boolean);
-  const candidates = sides.flatMap((owner) =>
+// Technical Machine TS-2 Devoluter: 1 of the opponent's, excluding Pokémon LV.X.
+function devolveChosen(ctx, sides = [ctx.player, ctx.opponent]) {
+  const candidates = sides.filter(Boolean).flatMap((owner) =>
     rootsOf(owner)
-      .filter((root) => topPokemonCard(owner, root) !== root)
+      .filter((root) => {
+        const top = topPokemonCard(owner, root);
+        return top !== root && !(ctx.step.excludeLvX && isLvX(top));
+      })
       .map((root) => ({ owner, root }))
   );
   const devolve = ({ owner, root }) => {
@@ -2519,6 +2524,7 @@ function atkDevolve(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   if (step.scope === 'chooseAny') return devolveChosen(ctx);
+  if (step.scope === 'chooseOpponent') return devolveChosen(ctx, [opponent]);
   const roots = step.scope === 'active' ? [activeOf(opponent)].filter(Boolean) : rootsOf(opponent);
   let devolved = 0;
   for (const root of roots) {

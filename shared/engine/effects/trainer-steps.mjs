@@ -39,6 +39,11 @@ import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 import { abilityCounterMoveLock } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
 import { isSupporterTrainer } from '../rules/trainer-play-conditions.mjs';
+import {
+  mayAttachAnyTechnicalMachine,
+  parseTmAttachRestriction,
+  tmAttachAllowed,
+} from '../rules/tool-attacks.mjs';
 
 export const BENCH_LIMIT = 5;
 
@@ -2859,7 +2864,18 @@ function attachAttackTool(ctx) {
     (player.zones.board || []).find((c) => c.instanceId === sourceCard?.instanceId) ||
     (player.zones.hand || []).find((c) => c.instanceId === sourceCard?.instanceId);
   if (!tool) return skip(ctx, 'card_not_found');
-  const targets = rootsOf(player).filter((root) => rootMatchesTarget(player, root, step.target));
+  const restriction = parseTmAttachRestriction(
+    [tool.text, tool.effect, tool.cardText].find((v) => typeof v === 'string' && v)
+  );
+  const targets = rootsOf(player).filter((root) => {
+    if (!rootMatchesTarget(player, root, step.target)) return false;
+    const top = topPokemonCard(player, root);
+    return tmAttachAllowed(restriction, {
+      top,
+      evolved: top !== root,
+      mayAttachAnyTm: mayAttachAnyTechnicalMachine(top),
+    });
+  });
   const attach = (target) => {
     attachTo(player, tool, target, ctx.events);
     if (step.discardAtEndOfTurn) tool.discardAtEndOfTurn = true;

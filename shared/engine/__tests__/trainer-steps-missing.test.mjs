@@ -990,16 +990,19 @@ test('attachAttackTool: a Technical Machine attaches and its granted attack reso
   const game = setup();
   const text =
     "Attach this card to 1 of your Pokémon that has Team Magma in its name. That Pokémon may use this card's attack instead of its own. At the end of your turn, discard Team Magma Technical Machine 01. {C} → Crushing Magma : 10 Choose an Energy card attached to the Defending Pokémon and put that card at the bottom of your opponent's deck.";
+  // The TM only fits a Team Magma Pokémon: Ralts moves to the Bench and is no target.
+  game.p1.zones.bench.push(game.p1.zones.active.shift());
+  game.p1.zones.active.push(pokemon("Team Magma's Groudon"));
   const { res, trainer } = play(game, text, { name: 'Team Magma Technical Machine 01' });
   assert.equal(res.error, null);
-  assert.equal(res.pendingChoice, null, 'the only own Pokémon auto-attaches');
+  assert.equal(res.pendingChoice, null, 'the only Team Magma Pokémon auto-attaches');
   // Keep both decks non-empty so the post-attack win check does not read a deck-out.
   for (const id of ['p1', 'p2']) res.state.players[id].zones.deck.push(card({ name: 'Deck Card' }));
   const active = game.p1.zones.active[0];
   assert.equal(cardIn(res, trainer.instanceId).attachedTo, active.instanceId);
   assert.equal(cardIn(res, trainer.instanceId).discardAtEndOfTurn, true);
 
-  // A Colorless Energy pays the granted attack's {C} cost; Ralts has no printed
+  // A Colorless Energy pays the granted attack's {C} cost; Groudon has no printed
   // attacks, so the granted attack is index 0 of the server's attack list.
   const colorless = energy('Basic Colorless Energy', { types: ['Colorless'] });
   colorless.attachedTo = active.instanceId;
@@ -1015,6 +1018,119 @@ test('attachAttackTool: a Technical Machine attaches and its granted attack reso
   // Attacking ends the turn, and the end-of-turn sweep discards the flagged tool.
   assert.ok(!zone(attacked, 'p1', 'active').some((c) => c.instanceId === trainer.instanceId));
   assert.ok(zone(attacked, 'p1', 'discard').some((c) => c.instanceId === trainer.instanceId));
+});
+
+test('attachAttackTool: Team Magma Technical Machine 01 never attaches to a non-Team Magma Pokémon', () => {
+  const game = setup();
+  const text =
+    "Attach this card to 1 of your Pokémon that has Team Magma in its name. That Pokémon may use this card's attack instead of its own. At the end of your turn, discard Team Magma Technical Machine 01. {C} → Crushing Magma : 10 Choose an Energy card attached to the Defending Pokémon and put that card at the bottom of your opponent's deck.";
+  const { res, trainer } = play(game, text, { name: 'Team Magma Technical Machine 01' });
+  assert.equal(res.pendingChoice, null);
+  assert.notEqual(cardIn(res, trainer.instanceId).attachedTo, game.p1.zones.active[0].instanceId);
+});
+
+// SV Technical Machines are Pokémon Tools (sv08-188 and corpus rows) attached with attachCard;
+// their "discard it at the end of your turn" clause must fire without an attach-time flag.
+test('Technical Machine: Blindside attached as a Tool is discarded at the end of the turn', () => {
+  const game = setup();
+  for (const id of ['p1', 'p2']) game.state.players[id].zones.deck.push(card({ name: 'Deck Card' }));
+  const tm = card({
+    name: 'Technical Machine: Blindside',
+    supertype: 'Trainer',
+    subtypes: ['Pokémon Tool'],
+    text: 'The Pokémon this card is attached to can use the attack on this card. (You still need the necessary Energy to use this attack.) If this card is attached to 1 of your Pokémon, discard it at the end of your turn. {C}{C}{C} → Blindside This attack does 100 damage to 1 of your opponent’s Pokémon that has any damage counters on it.',
+  });
+  game.p1.zones.hand.push(tm);
+  const ralts = game.p1.zones.active[0];
+  const attached = applyCommand(game.state, {
+    type: 'attachCard',
+    payload: { instanceId: tm.instanceId, targetInstanceId: ralts.instanceId },
+    playerId: 'p1',
+  }, game.rng);
+  assert.equal(attached.error, null);
+  assert.equal(cardIn(attached, tm.instanceId).attachedTo, ralts.instanceId);
+
+  const passed = applyCommand(attached.state, { type: 'pass', payload: {}, playerId: 'p1' }, game.rng);
+  assert.equal(passed.error, null);
+  assert.ok(!zone(passed, 'p1', 'active').some((c) => c.instanceId === tm.instanceId));
+  assert.ok(zone(passed, 'p1', 'discard').some((c) => c.instanceId === tm.instanceId));
+});
+
+// Ancient Technical Machine [Ice] is a Tool in TCGdex (ex5-84): "Attach this card to 1 of your
+// Evolved Pokémon (excluding Pokémon-ex and Pokémon that has an owner in its name) in play."
+test('Ancient Technical Machine [Ice] only attaches to an Evolved non-ex Pokémon', () => {
+  const game = setup();
+  const tm = card({
+    name: 'Ancient Technical Machine [Ice]',
+    supertype: 'Trainer',
+    trainerType: 'Tool',
+    effect:
+      "Attach this card to 1 of your Evolved Pokémon (excluding Pokémon-ex and Pokémon that has an owner in its name) in play. That Pokémon may use this card's attack instead of its own. At the end of your turn, discard Ancient Technical Machine [Ice].",
+    attacks: [{ cost: ['Colorless'], name: 'Ice Generator', effect: "Discard all of your opponent's Trainer cards in play." }],
+  });
+  game.p1.zones.hand.push(tm);
+  const ralts = game.p1.zones.active[0];
+  const attachTo = (state, targetInstanceId) =>
+    applyCommand(state, {
+      type: 'attachCard',
+      payload: { instanceId: tm.instanceId, targetInstanceId },
+      playerId: 'p1',
+    }, game.rng);
+
+  const onBasic = attachTo(game.state, ralts.instanceId);
+  assert.match(String(onBasic.error), /can't be attached/);
+
+  const kirlia = pokemon('Kirlia', { stage: 'Stage 1', evolvesFrom: 'Ralts' });
+  kirlia.attachedTo = ralts.instanceId;
+  game.p1.zones.active.push(kirlia);
+  const onEvolved = attachTo(game.state, kirlia.instanceId);
+  assert.equal(onEvolved.error, null);
+  assert.equal(cardIn(onEvolved, tm.instanceId).attachedTo, ralts.instanceId);
+});
+
+// TCGdex dp6-136/137 carry `attacks: [{}]`; the attacks come from the corpus rows
+// (out/pkmn-trainer-cards.json, Legends Awakened 136/137) and must resolve.
+function playTechnicalMachineTs(game, name) {
+  for (const id of ['p1', 'p2']) game.state.players[id].zones.deck.push(card({ name: 'Deck Card' }));
+  const { res, trainer } = play(game, '', {
+    name,
+    trainerType: 'Technical Machine',
+    attacks: [{}],
+    text: undefined,
+    effect: "Attach this card to 1 of your Pokémon in play. That Pokémon may use this card's attack instead of its own.",
+  });
+  assert.equal(res.error, null);
+  assert.equal(cardIn(res, trainer.instanceId).attachedTo, game.p1.zones.active[0].instanceId);
+  return applyCommand(res.state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' }, game.rng);
+}
+
+test('Technical Machine TS-1 Evoluter evolves 1 of your Pokémon from the deck', () => {
+  const game = setup();
+  const kirlia = pokemon('Kirlia', { stage: 'Stage 1', evolvesFrom: 'Ralts' });
+  game.p1.zones.deck.push(kirlia);
+  const attacked = playTechnicalMachineTs(game, 'Technical Machine TS-1');
+  assert.equal(attacked.error, null);
+  assert.deepEqual(attacked.pendingChoice.options.map((c) => c.name), ['Kirlia']);
+  const done = resolve(game, attacked, [kirlia.instanceId]);
+  assert.equal(cardIn(done, kirlia.instanceId).attachedTo, game.p1.zones.active[0].instanceId);
+});
+
+test('Technical Machine TS-2 Devoluter returns 1 opponent Evolution card, never a LV.X', () => {
+  const game = setup();
+  const riolu = game.p2.zones.active[0];
+  const lucario = pokemon('Lucario', { stage: 'Stage 1', evolvesFrom: 'Riolu' });
+  lucario.attachedTo = riolu.instanceId;
+  game.p2.zones.active.push(lucario);
+  const gible = pokemon('Gible');
+  const garchompLvX = pokemon('Garchomp LV.X', { stage: 'Level-Up', evolvesFrom: 'Gible' });
+  garchompLvX.attachedTo = gible.instanceId;
+  game.p2.zones.bench.push(gible, garchompLvX);
+
+  const attacked = playTechnicalMachineTs(game, 'Technical Machine TS-2');
+  assert.equal(attacked.error, null);
+  assert.equal(attacked.pendingChoice, null, 'Lucario is the only legal target');
+  assert.ok(zone(attacked, 'p2', 'hand').some((c) => c.instanceId === lucario.instanceId));
+  assert.equal(cardIn(attacked, garchompLvX.instanceId).attachedTo, gible.instanceId);
 });
 
 test('revealPrizes: the view shows Prize faces once prizesFaceUp is set', () => {

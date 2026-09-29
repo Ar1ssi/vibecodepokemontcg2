@@ -61,7 +61,13 @@ import {
 import { optionalCostBonusClause } from './rules/optional-cost-bonus.mjs';
 import { countUnit, normalizeUnit } from './rules/scaling-count.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
-import { parseGrantedAttacks } from './rules/tool-attacks.mjs';
+import {
+  mayAttachAnyTechnicalMachine,
+  parseGrantedAttacks,
+  parseTmAttachRestriction,
+  tmAttachAllowed,
+  toolDiscardsAtEndOfTurn,
+} from './rules/tool-attacks.mjs';
 import { prizesForKO } from './rules/ko-flow.mjs';
 import {
   evaluateToolKoPrevention,
@@ -1256,6 +1262,23 @@ function toolGrantedAttacksFor(state, card) {
   return out;
 }
 
+// "Attach this card to 1 of your Evolved Pokémon (excluding Pokémon-ex …)" and similar TM
+// restrictions (Ancient TMs ex5-84..86 are Tools in TCGdex). Null when the attach is legal.
+function tmAttachBlockReason(state, tool, targetInstanceId) {
+  const restriction = parseTmAttachRestriction(cardText(tool));
+  if (!restriction) return null;
+  const hostRef = findCard(state, attachmentHostId(state, targetInstanceId));
+  const zone = hostRef?.player?.zones?.[hostRef.zoneId];
+  if (!hostRef || !Array.isArray(zone)) return null;
+  const top = topPokemonCard(zone, hostRef.card);
+  const allowed = tmAttachAllowed(restriction, {
+    top,
+    evolved: top !== hostRef.card,
+    mayAttachAnyTm: mayAttachAnyTechnicalMachine(top),
+  });
+  return allowed ? null : `${tool.name || 'This card'} can't be attached to that Pokémon.`;
+}
+
 function borrowSourceMatches(card, borrow) {
   if (!isPokemon(card)) return false;
   const name = String(card.name || '').toLowerCase();
@@ -2438,7 +2461,8 @@ function resolveDeferredKnockouts(draft, { events }) {
   }
 }
 
-// TM/Cube Items (design 035 slice 7): "At the end of your turn, discard <tool>."
+// TM/Cube Items (design 035 slice 7): "At the end of your turn, discard <tool>." SV TMs
+// attach as ordinary Tools, so the printed clause is read here, not only the attach-time flag.
 // The sweep runs for the player whose turn is ending, after Pokémon Checkup.
 function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
   const player = draft.players?.[endingPlayerId];
@@ -2446,7 +2470,8 @@ function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
   for (const zoneId of ['active', 'bench']) {
     const zone = player.zones?.[zoneId] || [];
     for (const card of [...zone]) {
-      if (!card.attachedTo || !card.discardAtEndOfTurn) continue;
+      if (!card.attachedTo) continue;
+      if (!card.discardAtEndOfTurn && !toolDiscardsAtEndOfTurn(card)) continue;
       zone.splice(zone.indexOf(card), 1);
       card.attachedTo = null;
       delete card.discardAtEndOfTurn;
@@ -4353,6 +4378,8 @@ export function validateLegality(state, command) {
             };
           }
         }
+        const tmReason = tmAttachBlockReason(state, cardRef.card, payload.targetInstanceId);
+        if (tmReason) return { allowed: false, reason: tmReason };
         const targetZoneCards =
           targetRef.player?.zones?.[targetRef.zoneId] || [];
         const currentTools = attachedTools(targetRef.card, targetZoneCards);
