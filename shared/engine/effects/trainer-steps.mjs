@@ -11,6 +11,7 @@ import { shuffleInPlace } from '../rng.mjs';
 import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isUltraBeastCard } from '../rules/card-classify.mjs';
+import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import {
@@ -1288,14 +1289,7 @@ function fossilItem(ctx) {
   if (!card) return skip(ctx, 'card_not_on_board');
   if (benchRootsOf(player).length >= BENCH_LIMIT) return skip(ctx, 'bench_full');
   removeFromZones(player, card);
-  Object.assign(card, {
-    supertype: 'Pokémon',
-    hp: step.hp || 60,
-    stage: 'Basic',
-    types: ['Colorless'],
-    retreatCost: [],
-    playedAsPokemon: true,
-  });
+  becomeFossilPokemon(card, { hp: step.hp, turnNumber: ctx.draft?.turn?.number ?? null });
   player.zones.bench.push(card);
   ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'board', to: 'bench', playerId: player.playerId });
   return null;

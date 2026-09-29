@@ -82,6 +82,7 @@ import {
   teamNoRetreatCostForActive,
   parsePrizeModify,
   isHandActivatedAbility,
+  cardAbilityText,
 } from './rules/ability-executors.mjs';
 import { parseToolCondition, toolConditionMet } from './rules/tool-conditions.mjs';
 import {
@@ -143,6 +144,7 @@ import {
   parseOnKoAbilities,
 } from './rules/ability-triggers.mjs';
 import { executeTrainer, discardCurrentStadium } from './effects/trainer.mjs';
+import { settleFossilCards } from './rules/fossil.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-steps.mjs';
@@ -368,6 +370,9 @@ function discardCardFromPlayerZone(draft, instanceId, playerId) {
   return null;
 }
 
+const SELF_BENCH_SHIELD =
+  /as long as this pok[eé]mon is on your bench, prevent all damage done to this pok[eé]mon by attacks/;
+
 /**
  * Applies damage to one benched Pokémon: counters, event, and KO through handleKnockout
  * (so the prize entitlement stays server-granted, D43).
@@ -386,6 +391,18 @@ function damageBenchedPokemon(
       attackName,
       reason: 'tera-bench',
     });
+    return;
+  }
+
+  // The same clause printed as the victim's own Ability (Antique Plume Fossil WHT 079
+  // Plume Protection).
+  const victimView = inPlayView(draft, victim);
+  if (
+    !ownAttack &&
+    SELF_BENCH_SHIELD.test(cardAbilityText(victimView)) &&
+    !isAbilitySuppressed(victimView, abilitySideContext(draft, victimPlayerId))
+  ) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'bench-self-shield' });
     return;
   }
 
@@ -4642,6 +4659,10 @@ export function validateLegality(state, command) {
           allowed: false,
           reason: "The Defending Pokémon can't retreat.",
         };
+      }
+      // Fossil Items played as Pokémon: "This card can't retreat."
+      if (active.fossilCantRetreat) {
+        return { allowed: false, reason: `${active.name} can't retreat.` };
       }
       // Boost Energy: "The Pokémon this card is attached to can't retreat."
       if (hasSpecialEnergyCannotRetreat(inPlayView(state, active), player.zones?.active || [])) {
@@ -10248,6 +10269,7 @@ export function applyCommand(state, command, rng = null) {
   stampActivePromotions(state, draft);
   stampHealedPokemon(state, draft);
   clearFaceDownOffBoard(draft);
+  settleFossilCards(draft);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;
 

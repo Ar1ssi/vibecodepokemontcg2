@@ -195,6 +195,7 @@ export function executeStadium(draft, {
         destination: 'bench',
         count: opt.n || 1,
         ...(opt.searchFilter ? { nameFilter: opt.searchFilter } : {}),
+        ...(opt.evolvesFrom ? { evolvesFrom: opt.evolvesFrom } : {}),
       });
     } else if (opt.kind === 'search-hand' || opt.kind === 'search-deck') {
       steps.push({

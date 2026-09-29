@@ -71,8 +71,13 @@ export function energySearchWhat({ basic = false, energyType = null } = {}) {
 // Card rows whose `type` names the Trainer kind instead of "Trainer" (cards.mjs isTrainer).
 const TRAINER_KIND_TYPES = new Set(['item', 'supporter', 'stadium', 'tool', 'pokémon tool']);
 
+// Words that quantify "N cards" rather than name them ("any card", "2 other cards").
+const SEARCH_DETERMINER = /^(?:any|a|an|all|the|that|those|these|other|up to \d+|\d+(?: other)?)$/i;
+
 /** Match a card against a parsed search-step `what` string. */
 export function matchesSearch(card, what = '') {
+  // Fossil Researcher: "up to 2 in any combination of Amaura or Tyrunt".
+  what = String(what).replace(/^\s*in any combination of\s+/i, '');
   const w = what.toLowerCase();
   // "90 HP or less" is a range, not an or-clause: splitting it dropped the cap
   // and matched every card (same class as the typed-Basic HP cap bug below).
@@ -195,6 +200,11 @@ export function matchesSearch(card, what = '') {
   }
   const generic =
     /\b(card|pokémon|pokemon|energy|item|tool|trainer|basic|supporter|stadium|mega|stage|evolution)\b/i;
+  // A card name followed by "card(s)" (Cara Liss: "up to 2 Rare Fossil cards") is a name search.
+  const namedCards = what.trim().match(/^(.+?)\s+cards?$/i);
+  if (namedCards && !generic.test(namedCards[1]) && !SEARCH_DETERMINER.test(namedCards[1])) {
+    return String(card.name || '').toLowerCase().includes(namedCards[1].toLowerCase());
+  }
   if (what.trim() && !generic.test(what)) {
     const needle = what.trim().toLowerCase();
     return String(card.name || '').toLowerCase().includes(needle);

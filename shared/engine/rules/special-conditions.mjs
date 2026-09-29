@@ -53,6 +53,8 @@ export function addCondition(card, condition) {
   // Hoothoot, Pachirisu, Slowpoke, Dachsbun) refuses the write here, the one
   // place every effect path goes through (design 034 slice 3).
   if (abilityStatusImmune(card, condition)) return false;
+  // Rare / Antique Fossils: "This card can't be affected by any Special Conditions."
+  if (card.fossilNoConditions) return false;
   if (isMarker(condition)) {
     normalizeLegacyMarker(card);
     card[MARKER_KEYS[condition]] = true;

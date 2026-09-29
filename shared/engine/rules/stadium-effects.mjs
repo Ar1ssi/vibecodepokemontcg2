@@ -1057,6 +1057,20 @@ export function parseStadiumOncePerTurn(card) {
       ...(types.length ? { types } : {}),
     };
   }
+  // Pokémon Research Lab UNM 205: "search their deck for up to 2 Pokémon that evolve from
+  // Unidentified Fossil, put those Pokémon onto their Bench" — a Bench search, not an evolve.
+  const evolvesFromBench = t.match(
+    /search (?:their|his or her|your) deck for up to (\d+) pok[eé]mon that evolve from ([a-z' ]+?), put those pok[eé]mon onto (?:their|his or her|your) bench/
+  );
+  if (evolvesFromBench) {
+    return {
+      ...base,
+      kind: 'search-bench',
+      n: parseInt(evolvesFromBench[1], 10),
+      searchWhat: 'Pokémon',
+      evolvesFrom: evolvesFromBench[2],
+    };
+  }
   if (/search/.test(t) && /evolv/.test(t)) {
     return {
       ...base,
@@ -1073,7 +1087,8 @@ export function parseStadiumOncePerTurn(card) {
       searchWhat: withRuleBoxQualifier(stadiumSearchWhat(t), t),
     };
   }
-  const fusion = t.match(/search.*up to (\d+) item cards that have "([^"]+)"/);
+  // Printings quote the name with straight or curly quotes (Fossil Quarry: “Antique”).
+  const fusion = t.match(/search.*up to (\d+) item cards that have ["“]([^"”]+)["”]/);
   if (fusion) {
     return {
       ...base,

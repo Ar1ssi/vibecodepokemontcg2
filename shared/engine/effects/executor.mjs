@@ -15,6 +15,7 @@ import { shuffleInPlace, flipCoin } from '../rng.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
+import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { healLocked } from '../rules/attack-markers.mjs';
@@ -556,9 +557,11 @@ export function executeSteps(draft, {
         const nameFilter = step.nameFilter
           ? String(step.nameFilter).toLowerCase()
           : null;
+        const evolvesFrom = step.evolvesFrom ? String(step.evolvesFrom).toLowerCase() : null;
         const cardMatches = (c) =>
           matchesSearch(c, what) &&
-          (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter));
+          (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
+          (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom);
 
         const attachKey = `${idx}:searchAttach`;
         const attachRoots = () =>
@@ -673,6 +676,9 @@ export function executeSteps(draft, {
             if (dIdx >= 0) {
               const [c] = deck.splice(dIdx, 1);
               if (dest === 'bench') {
+                // Fossil Quarry / Cara Liss bench Fossil Items: they arrive as Basic Pokémon.
+                if (isFossilItem(c)) becomeFossilPokemon(c);
+                c.enteredPlayTurn = draft.turn?.number ?? null;
                 player.zones.bench.push(c);
               } else {
                 player.zones.hand.push(c);

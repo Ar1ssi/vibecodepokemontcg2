@@ -58,6 +58,7 @@
 // 'lostZone>=N', 'koedLastTurn:type=p', 'handCount<=N') when the card can only be played under it.
 
 import { WORD_POKEMON_TYPES } from './search-match.mjs';
+import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
 
 const POKEMON_TYPE_WORDS = Object.keys(WORD_POKEMON_TYPES).join('|');
 
@@ -901,6 +902,15 @@ export function trainerEndsTurn(card) {
 
 export function parseTrainerEffect(text = '') {
   const lower = normalizeText(text);
+  // Fossil Items: the "play as a Basic Pokémon" clause is the whole effect; legacy wordings
+  // ("Play Skull Fossil as if it were a Colorless Basic Pokémon … Poké-BODY") would otherwise
+  // fall into the passive or search branches.
+  const fossil = parseFossilPlay(lower);
+  if (fossil) {
+    return { steps: [{ type: 'fossilItem', ...(fossil.hp ? { hp: fossil.hp } : {}) }], recognizable: true };
+  }
+  const fossilSearch = parseNamedFossilSearch(lower);
+  if (fossilSearch) return { steps: [fossilSearch], recognizable: true };
   const playCondition = parsePlayCondition(lower);
   const result = parseTrainerSteps(lower);
   if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower)) {
@@ -1556,13 +1566,6 @@ function parseTrainerStepsInner(lower) {
   // switchOpponent, which switches an opponent's benched Pokémon IN)
   if (lower.includes("switch out your opponent's active pokémon")) {
     steps.push({ type: 'switchOpponentOut' });
-    return { steps, recognizable: true };
-  }
-
-  // Fossil items — played as Basic Pokémon in play
-  if (lower.includes('play this card as if it were') && lower.includes('basic')) {
-    const hpMatch = lower.match(/(\d+)-hp/);
-    steps.push({ type: 'fossilItem', hp: hpMatch ? Number(hpMatch[1]) : 60 });
     return { steps, recognizable: true };
   }
 
@@ -2738,7 +2741,7 @@ export function describeStep(step) {
       }
       return `Apply ${cond}.`;
     }
-    case 'fossilItem': return `Play this card as if it were a ${step.hp}-HP Basic {C} Pokémon (can't retreat; discard from play any time during your turn).`;
+    case 'fossilItem': return `Play this card as if it were a ${step.hp ? `${step.hp}-HP ` : ''}Basic {C} Pokémon (can't retreat; discard from play any time during your turn).`;
     case 'returnPokemonToHand': return step.keepAttached
       ? 'Put 1 of your Pokémon and all attached cards into your hand.'
       : 'Put 1 of your Pokémon in play into your hand (discard all cards attached to that Pokémon).';
