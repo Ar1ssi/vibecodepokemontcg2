@@ -4,13 +4,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 
 import { createRng } from '../../../../../../../shared/engine/rng.mjs';
 import { voicesFor } from '../../../../netcode/mat-fx/fx-audio.mjs';
-import { getBuildBattleBox } from '../box-catalog.mjs';
 import { BOX_FACE_TEXTURES, boxFaceTexture, packArtSrc } from '../box-textures.mjs';
-import {
-  BUILD_BATTLE_DECKS,
-  BUILD_BATTLE_SET_CARDS,
-} from '../build-battle.generated.mjs';
+import { hydrateBoxData, loadBoxData } from '../box-data.mjs';
 import { openBox } from '../pack-opening.mjs';
+import { cardClass, resolvePackModel } from '../pack-models.mjs';
 import {
   CARD_FLIP_MS,
   CARD_LIFT_MS,
@@ -21,6 +18,7 @@ import {
   PACK_ARTS,
   REVEAL_STAGGER_MS,
   advanceUnboxing,
+  boxSkin,
   cardRevealPhases,
   cardRevealPose,
   createUnboxing,
@@ -61,9 +59,10 @@ import {
   trayRiseMs,
 } from '../unboxing.mjs';
 
-const box = getBuildBattleBox('phantasmal-flames');
-const setCards = BUILD_BATTLE_SET_CARDS.me02;
+const { box, cards: setCards, setInfo, data } = await loadBoxData('phantasmal-flames');
 const cardsById = new Map(setCards.map((card) => [card.id, card]));
+const packModel = resolvePackModel(box.packModelKey, setCards, setInfo);
+const openSeed = (seed) => openBox({ box, data, cards: setCards, setInfo, rng: createRng(seed) });
 
 const play = (events, start = createUnboxing()) => events.reduce(advanceUnboxing, start);
 const toPacks = [{ type: 'tearWrap' }, { type: 'openLid' }, { type: 'unwrapDeck' }];
@@ -289,32 +288,58 @@ function styledHoloFamilies() {
 }
 
 test('packSlotKind finds the reverse draws in slot order', () => {
-  const common = { rarity: 'Common' };
-  const kinds = Array.from({ length: 10 }, (_, index) =>
-    packSlotKind(box.packModel, index, common)
-  );
+  const common = setCards.find((card) => card.rarity === 'Common');
+  const byRarity = (rarity) => setCards.find((card) => card.rarity === rarity);
+  const kinds = Array.from({ length: 10 }, (_, index) => packSlotKind(packModel, index, common));
   assert.deepEqual(kinds, [...Array(7).fill('normal'), 'reverse', 'reverse', 'normal']);
-  assert.equal(packSlotKind(box.packModel, 8, { rarity: 'Illustration rare' }), 'normal');
-  assert.equal(packSlotKind(box.packModel, 8, { rarity: 'Special illustration rare' }), 'normal');
-  assert.equal(packSlotKind(box.packModel, 9, { rarity: 'Double rare' }), 'normal');
+  assert.equal(packSlotKind(packModel, 8, byRarity('Illustration rare')), 'normal');
+  assert.equal(packSlotKind(packModel, 8, byRarity('Special illustration rare')), 'normal');
+  assert.equal(packSlotKind(packModel, 9, byRarity('Double rare')), 'normal');
   assert.equal(packSlotKind(undefined, 3, common), 'normal');
 });
 
-test('hitTierFor ranks plain, reverse/Double rare, UR/IR, SIR/MHR', () => {
-  assert.equal(hitTierFor({ rarity: 'Common' }, 'normal'), 0);
-  assert.equal(hitTierFor({ rarity: 'Rare' }, 'normal'), 0);
-  assert.equal(hitTierFor({ rarity: 'Uncommon' }, 'reverse'), 1);
-  assert.equal(hitTierFor({ rarity: 'Double rare' }, 'normal'), 1);
-  assert.equal(hitTierFor({ rarity: 'Ultra Rare' }, 'normal'), 2);
-  assert.equal(hitTierFor({ rarity: 'Illustration rare' }, 'normal'), 2);
-  assert.equal(hitTierFor({ rarity: 'Special illustration rare' }, 'normal'), 3);
-  assert.equal(hitTierFor({ rarity: 'Mega Hyper Rare' }, 'normal'), 3);
-  assert.equal(hitTierFor(undefined, 'normal'), 0);
+test('packSlotKind reads the Trainer Gallery and ACE SPEC slots as hits, not reverses', () => {
+  const tgCard = { id: 'swsh9tg-TG05', rarity: 'Rare', localId: 'TG05', subset: 'tg' };
+  const common = { id: 'swsh9-1', rarity: 'Common', localId: '1' };
+  const swshTg = resolvePackModel('swsh-tg', [tgCard, common], { official: 172 });
+  assert.equal(packSlotKind(swshTg, 8, tgCard), 'normal');
+  assert.equal(packSlotKind(swshTg, 8, common), 'reverse');
+  const aceSpec = { id: 'sv05-144', rarity: 'ACE SPEC Rare', localId: '144' };
+  const svAce = resolvePackModel('sv-acespec', [aceSpec, common], { official: 162 });
+  assert.equal(packSlotKind(svAce, 7, aceSpec), 'normal');
+  assert.equal(packSlotKind(svAce, 7, common), 'reverse');
+});
+
+test('hitTierFor ranks by hit class: plain, reverse/ex-class, full art/illustration/ACE SPEC, SIR/top', () => {
+  const card = {};
+  assert.equal(hitTierFor(card, 'normal', null), 0);
+  assert.equal(hitTierFor(card, 'reverse', null), 1);
+  assert.equal(hitTierFor(card, 'normal', 'hit'), 1);
+  assert.equal(hitTierFor(card, 'normal', 'ultra'), 2);
+  assert.equal(hitTierFor(card, 'normal', 'illustration'), 2);
+  assert.equal(hitTierFor(card, 'normal', 'aceSpec'), 2);
+  assert.equal(hitTierFor(card, 'normal', 'specialIllustration'), 3);
+  assert.equal(hitTierFor(card, 'reverse', 'top'), 3);
+  assert.equal(hitTierFor(undefined, 'normal', 'top'), 0);
+  const tierOf = (rarity) => hitTierFor({ rarity }, 'normal', cardClass(setCards.find((entry) => entry.rarity === rarity), 'me', setInfo));
+  assert.deepEqual(
+    ['Rare', 'Double rare', 'Ultra Rare', 'Illustration rare', 'Special illustration rare', 'Mega Hyper Rare'].map(tierOf),
+    [0, 1, 2, 2, 3, 3]
+  );
+  assert.equal(hitTierFor({}, 'normal', cardClass({ rarity: 'Ultra Rare', localId: '200' }, 'sm', { official: 181 })), 3);
+  assert.equal(hitTierFor({}, 'normal', cardClass({ rarity: 'Ultra Rare', localId: '120' }, 'sm', { official: 181 })), 1);
+});
+
+test('SM and SWSH holo rares foil like the ME Rares do', () => {
+  assert.equal(unboxingHoloRarity({ name: 'Pheromosa', rarity: 'Rare Holo' }, 'normal'), 'rare holo');
+  assert.equal(unboxingHoloRarity({ name: 'Moltres', rarity: 'Holo Rare' }, 'normal'), 'rare holo');
+  assert.equal(unboxingHoloRarity({ name: 'Lucario V', rarity: 'Holo Rare V' }, 'normal'), 'double rare');
+  assert.equal(unboxingHoloRarity({ name: 'Charmander', rarity: 'Common' }, 'reverse'), 'reverse holo');
 });
 
 test('row 11: every me02 card and promo maps to a styled foil family or none', () => {
   const styled = styledHoloFamilies();
-  const promos = Object.values(BUILD_BATTLE_DECKS['phantasmal-flames'])
+  const promos = Object.values(data.decks)
     .flat()
     .filter((row) => row.rarity === 'Promo');
   assert.equal(promos.length, 4, 'one promo per deck (mep-014…mep-017)');
@@ -338,11 +363,11 @@ test('row 11: every me02 card and promo maps to a styled foil family or none', (
 });
 
 test('rows 11 + 13: the seed-42 box reveals the pack ids in order with reverse slots foiled', () => {
-  const opened = openBox({ box, cards: setCards, rng: createRng(42) });
+  const opened = openSeed(42);
   for (const pack of opened.packs) {
     const cards = pack.map((id) => cardsById.get(id));
     assert.deepEqual(cards.map((card) => card.id), pack);
-    assert.match(unboxingHoloRarity(cards[7], packSlotKind(box.packModel, 7, cards[7])), /reverse holo$/);
+    assert.match(unboxingHoloRarity(cards[7], packSlotKind(packModel, 7, cards[7])), /reverse holo$/);
   }
 });
 
@@ -397,15 +422,83 @@ test('row 10b: pack art is seeded on its own stream and never shifts the pool', 
   );
   assert.ok(distinct.size > 1, 'arrays differ across seeds');
 
-  // The seed-42 box as design 051 slice 2 landed it.
-  const opened = openBox({ box, cards: setCards, rng: createRng(42) });
+  // The seed-42 box: design 051 slice 2's draws, except card 9 of pack 1, whose art-slot roll
+  // now lands in the boosted Special Illustration band (design 054 row 31; was me02-086).
+  const opened = openSeed(42);
   assert.equal(opened.deckKey, 'flygon');
   assert.deepEqual(opened.packs[0], [
     'me02-035', 'me02-073', 'me02-057', 'me02-012', 'me02-069',
-    'me02-044', 'me02-082', 'me02-046', 'me02-086', 'me02-017',
+    'me02-044', 'me02-082', 'me02-046', 'me02-129', 'me02-017',
   ]);
   assert.deepEqual(opened.packs[3].at(-1), 'me02-045');
-  assert.equal(packArtSrc(PACK_ARTS[0]), 'src/assets/build-battle/packs/me02-charizard.webp');
+  assert.equal(packArtSrc('me02', PACK_ARTS[0]), 'src/assets/build-battle/packs/me02-charizard.webp');
+});
+
+test('boxSkin: me02 keeps its vendored faces and packs; a procedural box skins from its set and promos', () => {
+  const me02 = boxSkin({ box, setInfo, cards: setCards, data });
+  assert.equal(me02.setLogoUrl, 'https://assets.tcgdex.net/en/me/me02/logo.webp');
+  assert.equal(me02.keyArtUrl, 'https://assets.tcgdex.net/en/me/me02/125/high.webp');
+  assert.equal(me02.palette, 'me');
+  assert.equal(me02.faces, BOX_FACE_TEXTURES);
+  assert.deepEqual(
+    me02.packArts.map((art) => art.src),
+    PACK_ARTS.map((key) => `src/assets/build-battle/packs/me02-${key}.webp`)
+  );
+
+  assert.ok(me02.packArts.every((art) => art.shape === null), 'the design-052 fronts use the default shape');
+  assert.equal(me02.render.src, 'src/assets/build-battle/boxes/phantasmal-flames.webp');
+
+  // A box with no vendored art (no BOX_ART entry under its key) keeps the procedural skin.
+  const procedural = {
+    ...box,
+    key: 'no-art-box',
+    era: 'sm',
+    setId: 'sm9',
+    skin: { keyArtCardId: 'sm9-20', palette: 'sm', packArtCardIds: ['p-1', 'p-2', 'p-3', 'p-4'], vendored: { box: false, packs: false } },
+  };
+  const promoData = hydrateBoxData({
+    kind: 'fixed-decks',
+    cards: ['p-1', 'p-2', 'p-3', 'p-4'].map((id) => ({ id, name: id, images: { small: `${id}-s`, large: `${id}-l` } })),
+  });
+  const skin = boxSkin({
+    box: procedural,
+    setInfo: { logo: 'https://assets.tcgdex.net/en/sm/sm9/logo' },
+    cards: [{ id: 'sm9-20', images: { large: 'https://assets.tcgdex.net/en/sm/sm9/20/high.webp' } }],
+    data: promoData,
+  });
+  assert.equal(skin.setLogoUrl, 'https://assets.tcgdex.net/en/sm/sm9/logo.webp');
+  assert.equal(skin.keyArtUrl, 'https://assets.tcgdex.net/en/sm/sm9/20/high.webp');
+  assert.equal(skin.palette, 'sm');
+  assert.equal(skin.faces, null);
+  assert.equal(skin.render, null);
+  assert.deepEqual(skin.packArts[1], { kind: 'procedural', cardId: 'p-2', imageUrl: 'p-2-l' });
+  assert.equal(boxSkin({ box: { ...procedural, skin: { ...procedural.skin, keyArtCardId: 'gone' } } }).keyArtUrl, null);
+});
+
+test('packArtIndexes: four arts keep the design-052 stream; five-wrapper sets reach the fifth', () => {
+  for (const seed of [1, 18, 42, 999]) {
+    assert.deepEqual(packArtIndexes(seed, 4, 4), packArtIndexes(seed), 'default art count is four');
+  }
+  const five = Array.from({ length: 200 }, (_, seed) => packArtIndexes(seed, 4, 5)).flat();
+  assert.ok(five.every((index) => index >= 0 && index < 5));
+  assert.ok(five.includes(4), 'the fifth wrapper is drawn');
+  assert.deepEqual(packArtIndexes(7, 4, 0), [0, 0, 0, 0], 'no art count still yields valid indexes');
+});
+
+test('boxSkin: a catalog box with Bulbapedia art gets vendored fronts, shapes and its render', () => {
+  const teamUp = boxSkin({ box: { key: 'team-up', setId: 'sm9', era: 'sm', skin: { vendored: {} } } });
+  assert.equal(teamUp.packArts.length, 4);
+  assert.ok(teamUp.packArts.every((art) => art.kind === 'vendored' && art.src.startsWith('src/assets/build-battle/packs/sm9-')));
+  assert.equal(teamUp.render.src, 'src/assets/build-battle/boxes/team-up.webp');
+  assert.equal(teamUp.faces, null, 'only the Mega Evolution camera maps onto the cuboid');
+  const ultraPrism = boxSkin({
+    box: { key: 'ultra-prism', setId: 'sm5', era: 'sm', skin: { packArtCardIds: ['a', 'b', 'c', 'd'], vendored: {} } },
+  });
+  assert.ok(
+    ultraPrism.packArts.every((art) => art.kind === 'vendored' && art.src.startsWith('src/assets/build-battle/packs/sm5-')),
+    'Ultra Prism wears its pokesymbols.com wrappers'
+  );
+  assert.ok(boxSkin({ box: { key: 'mega-evolution', setId: 'me01', era: 'me', skin: { vendored: {} } } }).faces.front);
 });
 
 test('packTearEdge is a seeded jagged strip below the 7 % crimp', () => {
@@ -524,8 +617,8 @@ test('hitFlipPose turns the back away and is edge-on at the midpoint', () => {
   assert.equal(hitFlipPose(0.55, { tier: 1 }).flare, 0);
 });
 
-// ── Elite Trainer Box sizes and props (design 055) ───────────────────────────
-test('design 055: createUnboxing() is the old Build & Battle state plus cardsPerPack 10', () => {
+// ── Elite Trainer Box sizes and props (design 057) ───────────────────────────
+test('design 057: createUnboxing() is the old Build & Battle state plus cardsPerPack 10', () => {
   assert.deepEqual(createUnboxing(), {
     stage: 'sealed',
     wrapTorn: false,

@@ -1,5 +1,5 @@
 /*
- * Elite Trainer Box Shelf and Collection (design 055) in the Standard deck
+ * Elite Trainer Box Shelf and Collection (design 057) in the Standard deck
  * builder tab (`body.etb-host`). Panels, buttons and card tiles come from
  * deck-builder-build-battle.css; this sheet adds the shelf cards, the owned
  * badges and the ETB opening's tray (promo pouch, props, pack fan). The box
@@ -85,13 +85,13 @@
   background: var(--db-panel-2);
 }
 
-/* A deck holding more copies than the boxes gave: amber, never blocking (design 055 row 12). */
+/* A deck holding more copies than the boxes gave: amber, never blocking (design 057 row 12). */
 .etb-host .db-live .etb-owned-card.is-over .bb-pool-badge {
   background: #b7791f;
   color: #1b2127;
 }
 
-/* ── The opening's tray (design 055 § Scene beats 3–5) ─────────────────── */
+/* ── The opening's tray (design 057 § Scene beats 3–5) ─────────────────── */
 .etb-host .db-live .bb-scene--stage .etb-tray {
   --etb-prop-w: 66px;
   --etb-prop-h: 92px;

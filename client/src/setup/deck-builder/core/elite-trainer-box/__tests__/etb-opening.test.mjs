@@ -2,15 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRng } from '../../../../../../../shared/engine/rng.mjs';
-import { getBuildBattleBox, packModelFor } from '../../build-battle/box-catalog.mjs';
-import { BUILD_BATTLE_SET_CARDS } from '../../build-battle/build-battle.generated.mjs';
+import { getBuildBattleBox } from '../../build-battle/box-catalog.mjs';
+import { loadBoxData, loadSetData } from '../../build-battle/box-data.mjs';
+import { resolvePackModel } from '../../build-battle/pack-models.mjs';
 import { openBox } from '../../build-battle/pack-opening.mjs';
 import { getEtb } from '../etb-catalog.mjs';
 import { etbContents, openEtb } from '../etb-opening.mjs';
 
 const etb = getEtb('phantasmal-flames-etb');
-const cards = BUILD_BATTLE_SET_CARDS.me02;
-const packModel = packModelFor(etb.setId);
+const { setInfo, cards } = await loadSetData(etb.setId);
+const packModel = resolvePackModel(etb.packModelKey, cards, setInfo);
 const open = (seed) => openEtb({ etb, cards, packModel, rng: createRng(seed) });
 
 test('openEtb opens nine full packs of set cards, no id twice in a pack', () => {
@@ -24,12 +25,13 @@ test('openEtb opens nine full packs of set cards, no id twice in a pack', () => 
   }
 });
 
-test('row 18: one seed is one box; another seed is another; openBox is unchanged', () => {
+test('row 18: one seed is one box; another seed is another; openBox is unchanged', async () => {
   assert.deepEqual(open(42), open(42));
   assert.notDeepEqual(open(42), open(43));
   const box = getBuildBattleBox('phantasmal-flames');
-  const first = openBox({ box, cards, rng: createRng(42) });
-  const again = openBox({ box, cards, rng: createRng(42) });
+  const { data } = await loadBoxData(box.key);
+  const first = openBox({ box, data, cards, setInfo, rng: createRng(42) });
+  const again = openBox({ box, data, cards, setInfo, rng: createRng(42) });
   assert.deepEqual(first, again);
   assert.notDeepEqual(first.packs[0], open(42).packs[0], 'no shared deck draw, so the streams differ');
 });

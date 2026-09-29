@@ -1,11 +1,9 @@
-// The Elite Trainer Box being opened, kept across reloads (design 055 § Session). One opening at
+// The Elite Trainer Box being opened, kept across reloads (design 057 § Session). One opening at
 // a time. Not bound to a room: an ETB is not a match. Pure apart from the storage object passed
 // in; every storage call is guarded, and a storage that throws means memory only.
 
-import { packModelFor } from '../build-battle/box-catalog.mjs';
-import { BUILD_BATTLE_SET_CARDS } from '../build-battle/build-battle.generated.mjs';
 import { createUnboxing, parseUnboxing } from '../build-battle/unboxing.mjs';
-import { getEtb } from './etb-catalog.mjs';
+import { etbPackSize, getEtb } from './etb-catalog.mjs';
 
 export const ETB_STORAGE_KEY = 'ptcg-sim.etb.v1';
 const SESSION_VERSION = 1;
@@ -31,20 +29,24 @@ export function createEtbSession({ etbKey, seed, packs, packModel, now = Date.no
 
 const isSeed = (value) => Number.isInteger(value) && value >= 0 && value <= MAX_SEED;
 
-function arePacksInSet(packs, etb, packModel) {
+function arePacksInSet(packs, etb, packSize, setIds) {
   if (!Array.isArray(packs) || packs.length !== etb.packCount) return false;
-  const setIds = new Set((BUILD_BATTLE_SET_CARDS[etb.setId] || []).map((card) => card.id));
   return packs.every(
     (pack) =>
       Array.isArray(pack) &&
       pack.length > 0 &&
-      pack.length <= packModel.size &&
+      pack.length <= packSize &&
       pack.every((id) => setIds.has(id))
   );
 }
 
-/** @returns {EtbSession|null} the stored session, or null for anything this version cannot trust. */
-export function parseEtbSession(json) {
+/**
+ * @param {string} json
+ * @param {{setIds?: Set<string>}} context the card ids of the ETB's set (loaded with
+ *   `loadSetData`); without them no pack id can be trusted, so the session is refused.
+ * @returns {EtbSession|null} the stored session, or null for anything this version cannot trust.
+ */
+export function parseEtbSession(json, { setIds = new Set() } = {}) {
   let value;
   try {
     value = JSON.parse(String(json));
@@ -53,14 +55,14 @@ export function parseEtbSession(json) {
   }
   if (!value || typeof value !== 'object' || value.version !== SESSION_VERSION) return null;
   const etb = getEtb(value.etbKey);
-  const packModel = etb && packModelFor(etb.setId);
-  if (!packModel || !isSeed(value.seed)) return null;
-  if (!arePacksInSet(value.packs, etb, packModel)) return null;
+  const packSize = etbPackSize(etb);
+  if (!packSize || !isSeed(value.seed)) return null;
+  if (!arePacksInSet(value.packs, etb, packSize, setIds)) return null;
   const unboxing = parseUnboxing(value.unboxing);
   if (
     !unboxing ||
     unboxing.packsTorn.length !== value.packs.length ||
-    unboxing.cardsPerPack !== packModel.size
+    unboxing.cardsPerPack !== packSize
   ) {
     return null;
   }
@@ -86,11 +88,14 @@ export function saveEtbSession(storage, session) {
   }
 }
 
-/** @returns {EtbSession|null} */
-export function loadEtbSession(storage) {
+/**
+ * @param {{setIds?: Set<string>}} context as `parseEtbSession`
+ * @returns {EtbSession|null}
+ */
+export function loadEtbSession(storage, context) {
   try {
     const json = storage?.getItem?.(ETB_STORAGE_KEY);
-    return json ? parseEtbSession(json) : null;
+    return json ? parseEtbSession(json, context) : null;
   } catch {
     return null;
   }

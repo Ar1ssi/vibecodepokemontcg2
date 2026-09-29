@@ -3,7 +3,7 @@
  * on /build-and-battle. Scoped under the tab's body class and the builder's
  * `.db-live` workspace, so the tokens from deck-builder-live.css (dark and
  * light) apply and nothing here needs !important. `.etb-host` is the Standard
- * builder tab, whose Shelf and Collection (design 055) reuse these panels.
+ * builder tab, whose Shelf and Collection (design 057) reuse these panels.
  */
 
 :is(.build-battle-window, .etb-host) .db-live .native-deck-builder-mode-tab[hidden] {
@@ -84,6 +84,80 @@
   border: 1px solid var(--db-border-strong);
   border-radius: var(--db-radius);
   box-shadow: var(--db-shadow);
+}
+
+/* Box picker (design 054 § Builder tab): era chips over the era's boxes. */
+/* The picked box's Bulbapedia product shot (design 055): most renders sit on a white studio
+   background, so every shot gets a light card rather than a keyed cut-out. */
+:is(.build-battle-window, .etb-host) .db-live .bb-boxshot {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(260px, 70%);
+  max-height: 32vh;
+  padding: 1vh;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1.2vh 3vh rgba(0, 0, 0, 0.45);
+  object-fit: contain;
+  user-select: none;
+}
+
+:is(.build-battle-window, .etb-host) .db-live .bb-picker {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1vh;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-era-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5vh 0.4vw;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-era-chip {
+  padding: 0.4vh 0.8vw;
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius-pill);
+  background: var(--db-raised);
+  color: var(--db-text-dim);
+  font-size: 1.3vh;
+  font-weight: 600;
+  cursor: pointer;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-era-chip[aria-pressed='true'] {
+  border-color: var(--db-gold-dark);
+  background: var(--db-gold);
+  color: #1b2127;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-era-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-era-chip:focus-visible,
+:is(.build-battle-window, .etb-host) .db-live .bb-box-select:focus-visible {
+  outline: 2px solid var(--db-gold);
+  outline-offset: 2px;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-box-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5vw;
+  font-size: 1.4vh;
+  color: var(--db-text-dim);
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-box-select {
+  max-width: 100%;
+  padding: 0.4vh 0.6vw;
+  background: var(--db-input);
+  color: var(--db-text);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius-sm);
+  font-size: 1.4vh;
+}
+:is(.build-battle-window, .etb-host) .db-live .bb-note.is-error {
+  color: var(--db-gold);
 }
 
 :is(.build-battle-window, .etb-host) .db-live .bb-seed-label {

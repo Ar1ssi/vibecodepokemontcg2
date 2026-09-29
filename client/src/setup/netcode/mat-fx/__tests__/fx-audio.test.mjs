@@ -258,6 +258,15 @@ test('fx-audio: every unboxing beat (design 052) has a playable voice', () => {
   }
 });
 
+test('fx-audio: the 3D pack rip tick (design 055) is one short band-passed noise', () => {
+  const voices = voicesFor('unbox-rip-tick');
+  assert.equal(voices.length, 1);
+  assert.equal(voices[0].type, 'noise');
+  assert.equal(voices[0].dur, 0.04);
+  assert.equal(voices[0].gain, 0.12);
+  assert.deepEqual([voices[0].filter.type, voices[0].filter.freq], ['bandpass', 2400]);
+});
+
 test('fx-audio: the unboxing hit chime climbs with the tier', () => {
   const highest = (voices) => Math.max(...voices.map((v) => v.freq || 0));
   const [one, two, three] = [1, 2, 3].map((tier) => voicesFor(`unbox-hit-${tier}`));
@@ -271,7 +280,7 @@ test('fx-audio: the unboxing hit chime climbs with the tier', () => {
   assert.equal(swell?.gain, 0.18);
 });
 
-test('fx-audio: the Elite Trainer Box props have voices (design 055)', () => {
+test('fx-audio: the Elite Trainer Box props have voices (design 057)', () => {
   const dice = voicesFor('unbox-dice');
   assert.deepEqual(dice.map((voice) => voice.delay), [0, 0.07, 0.15], 'three clicks');
   for (const voice of dice) {

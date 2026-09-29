@@ -2,7 +2,7 @@ import { fxDisabled, motionReduced } from '../../../setup/image-logic/mat-fx.mjs
 
 /**
  * The fullscreen stage a box opening plays on (design 052; shared by Build & Battle and the Elite
- * Trainer Box, design 055). The stage is a child of the builder workspace so the Live tokens and
+ * Trainer Box, design 057). The stage is a child of the builder workspace so the Live tokens and
  * the scene CSS apply; while it is open the rest of the builder UI is hidden.
  */
 
@@ -13,14 +13,14 @@ const UI_ENTER_MS = 900;
 
 /**
  * @param {HTMLElement|null} workspaceEl the `.db-live` builder workspace
- * @param {string} label the stage's accessible name
- * @returns {{open: () => HTMLElement|null, close: () => void, readonly el: HTMLElement|null}}
- *   `open` is idempotent and returns null without a workspace.
+ * @returns {{open: (label: string) => HTMLElement|null, close: () => void,
+ *   readonly el: HTMLElement|null}} `open(label)` names the stage for assistive tech; it is
+ *   idempotent and returns null without a workspace.
  */
-export const createStage = (workspaceEl, label) => {
+export const createStage = (workspaceEl) => {
   let stageEl = null;
 
-  const open = () => {
+  const open = (label) => {
     if (stageEl || !workspaceEl) return stageEl;
     stageEl = document.createElement('div');
     stageEl.className = 'bb-stage';

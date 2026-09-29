@@ -1,178 +1,84 @@
 /**
- * Bake the Phantasmal Flames Build & Battle Box (design 051): the me02 set with rarities for pack
- * opening, and the box's four 40-card decks; plus the Elite Trainer Box promos (design 055).
- * Run: node scripts/generate-build-battle-box.mjs          (writes the module)
- *      node scripts/generate-build-battle-box.mjs --check  (re-fetches; exit 1 if the module drifted)
- *
- * Deck lists: Bulbapedia "Phantasmal Flames Build & Battle Box (TCG)", decklist tables (screenshot
- * supplied by the user 2026-09-28). Basic Energy is baked as the SVE print (the box ships MEE 002–007).
- * ETB promos: Charcadet MEP 022 is the Phantasmal Flames ETB promo (Bulbapedia "Charcadet
- * (Phantasmal Flames 19)", PokeBeach Phantasmal Flames set guide); the name check below verifies it.
+ * Bakes the Build & Battle boxes (designs 051, 054): per box, the set its packs draw from
+ * (`sets/<setId>.generated.mjs`) and its contents (`boxes/<boxKey>.generated.mjs`), from the box
+ * sources in scripts/build-battle/boxes/ and TCGdex.
+ * Run: node scripts/generate-build-battle-box.mjs                    (every box)
+ *      node scripts/generate-build-battle-box.mjs --only team-up,phantasmal-flames (some boxes)
+ *      node scripts/generate-build-battle-box.mjs --check            (re-fetch; exit 1 on drift)
+ * TCGDEX_CACHE_DIR=<dir> keeps TCGdex responses between runs (development only).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { fetchCard, fetchSet, normalizeCard, resolveDeck } from './lib/decklist-lines.mjs';
+import { fileURLToPath } from 'node:url';
+import { BUILD_BATTLE_BOXES } from '../client/src/setup/deck-builder/core/build-battle/box-catalog.mjs';
+import { bakeBoxData, bakeSet, bakeSummary } from './build-battle/bake-box.mjs';
+import { loadBoxSource } from './build-battle/box-sources.mjs';
+import { renderBoxModule, renderSetModule } from './lib/build-battle-modules.mjs';
+import { fetchCard, fetchSet } from './lib/decklist-lines.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const OUT = join(
-  __dirname,
-  '../client/src/setup/deck-builder/core/build-battle/build-battle.generated.mjs'
-);
+const CORE = join(__dirname, '../client/src/setup/deck-builder/core/build-battle');
 
-const SET_ID = 'me02';
-const BOX_KEY = 'phantasmal-flames';
-const DECK_SIZE = 40;
-
-const DECK_SOURCES = {
-  ceruledge: [
-    '1 Ceruledge MEP 14',
-    '3 Ceruledge PFL 20',
-    '4 Charcadet PFL 19',
-    '1 Moltres PFL 14',
-    '3 Firebreather',
-    '3 Hilda',
-    "2 Lillie's Determination",
-    '4 Energy Retrieval',
-    '2 Ultra Ball',
-    '1 Switch',
-    '16 Basic Fire Energy',
-  ],
-  zacian: [
-    '1 Zacian MEP 15',
-    '2 Zacian PFL 45',
-    '4 Alcremie PFL 44',
-    '4 Milcery PFL 43',
-    '1 Mimikyu PFL 42',
-    "3 Lillie's Determination",
-    "2 Brock's Scouting",
-    '2 Drayton',
-    '2 Hilda',
-    "1 Iris's Fighting Spirit",
-    '2 Ultra Ball',
-    '2 Wondrous Patch',
-    '1 Switch',
-    '13 Basic Psychic Energy',
-  ],
-  flygon: [
-    '1 Flygon MEP 16',
-    '2 Flygon PFL 53',
-    '2 Vibrava PFL 52',
-    '4 Trapinch PFL 51',
-    '2 Gliscor PFL 50',
-    '2 Gligar PFL 49',
-    "3 Lillie's Determination",
-    '2 Dawn',
-    '2 Hilda',
-    '2 Dusk Ball',
-    '2 Fighting Gong',
-    '2 Premium Power Pro',
-    '2 Rare Candy',
-    '1 Switch',
-    '11 Basic Fighting Energy',
-  ],
-  toxtricity: [
-    '1 Toxtricity MEP 17',
-    '1 Toxtricity PFL 68',
-    '2 Toxel PFL 67',
-    '3 Krookodile PFL 66',
-    '2 Krokorok PFL 65',
-    '3 Sandile PFL 64',
-    '2 Absol PFL 63',
-    "3 Grimsley's Move",
-    "3 Lillie's Determination",
-    "2 Brock's Scouting",
-    '2 Dusk Ball',
-    '2 Rare Candy',
-    '1 Energy Recycler',
-    '1 Switch',
-    '12 Basic Darkness Energy',
-  ],
+const tcgdex = {
+  fetchSet,
+  fetchCard,
+  headOk: async (url) => {
+    const res = await fetch(url, { method: 'HEAD' });
+    return res.ok;
+  },
 };
 
-const ETB_PROMO_SOURCES = {
-  'phantasmal-flames-etb': '1 Charcadet MEP 22',
+function selectedBoxes(argv) {
+  const only = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
+  if (!only) return BUILD_BATTLE_BOXES;
+  const keys = only.split(',').map((key) => key.trim()).filter(Boolean);
+  const unknown = keys.filter((key) => !BUILD_BATTLE_BOXES.some((box) => box.key === key));
+  if (unknown.length) throw new Error(`Unknown box: ${unknown.join(', ')}`);
+  return BUILD_BATTLE_BOXES.filter((box) => keys.includes(box.key));
+}
+
+const readCommitted = (path) => {
+  try {
+    return readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+  } catch {
+    return null;
+  }
 };
 
-/** The pack-opening fields on top of the normalized card; `card` null = baked Basic Energy. */
-function setCardFields(card) {
-  if (!card) return { rarity: null, category: 'Energy', stage: null, types: [], hp: null };
+async function bake(box) {
+  const source = await loadBoxSource(box);
+  const set = await bakeSet(box, tcgdex);
+  const data = await bakeBoxData(box, source, tcgdex);
   return {
-    rarity: card.rarity || null,
-    category: card.category,
-    stage: card.stage || null,
-    types: Array.isArray(card.types) ? card.types : [],
-    hp: Number.isFinite(card.hp) ? card.hp : null,
+    files: [
+      [join(CORE, 'sets', `${box.setId}.generated.mjs`), renderSetModule(set.set, set.rows)],
+      [join(CORE, 'boxes', `${box.key}.generated.mjs`), renderBoxModule({ name: box.name, source: source.source }, data)],
+    ],
+    summary: bakeSummary(box, set, data),
   };
 }
 
-function toSetCard(card) {
-  const { qty: _qty, ...row } = normalizeCard(card, 0);
-  return { ...row, ...setCardFields(card) };
-}
-
-function toDeckRow(row, card) {
-  const { qty, ...rest } = row;
-  return { ...rest, ...setCardFields(card), qty };
-}
-
-async function buildSetCards() {
-  const set = await fetchSet(SET_ID);
-  const cards = [];
-  for (const brief of set.cards) {
-    cards.push(toSetCard(await fetchCard(brief.id, brief.name)));
-  }
-  cards.sort((a, b) => a.localId.localeCompare(b.localId, 'en', { numeric: true }));
-  const missingArt = cards.filter((card) => !card.image).map((card) => card.id);
-  if (missingArt.length) throw new Error(`No image for: ${missingArt.join(', ')}`);
-  return cards;
-}
-
-async function buildDecks() {
-  const decks = {};
-  for (const [key, lines] of Object.entries(DECK_SOURCES)) {
-    decks[key] = await resolveDeck(lines, toDeckRow);
-    const total = decks[key].reduce((n, row) => n + row.qty, 0);
-    if (total !== DECK_SIZE) throw new Error(`${key} deck has ${total} cards, expected ${DECK_SIZE}`);
-  }
-  return decks;
-}
-
-async function buildEtbPromos() {
-  const promos = {};
-  for (const [key, line] of Object.entries(ETB_PROMO_SOURCES)) {
-    [promos[key]] = await resolveDeck([line], toDeckRow);
-  }
-  return promos;
-}
-
-async function renderModule() {
-  const setCards = await buildSetCards();
-  const decks = await buildDecks();
-  const etbPromos = await buildEtbPromos();
-  return `// AUTO-GENERATED by scripts/generate-build-battle-box.mjs — do not edit by hand.
-export const BUILD_BATTLE_SET_CARDS = ${JSON.stringify({ [SET_ID]: setCards }, null, 2)};
-
-export const BUILD_BATTLE_DECKS = ${JSON.stringify({ [BOX_KEY]: decks }, null, 2)};
-
-export const ETB_PROMOS = ${JSON.stringify(etbPromos, null, 2)};
-`;
-}
-
 async function main() {
-  const body = await renderModule();
-  if (process.argv.includes('--check')) {
-    const committed = readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n');
-    if (committed !== body) {
-      console.error(`${OUT} differs from TCGdex; rerun without --check and review the diff.`);
-      process.exitCode = 1;
-      return;
+  const check = process.argv.includes('--check');
+  const drift = [];
+  for (const box of selectedBoxes(process.argv)) {
+    const { files, summary } = await bake(box);
+    console.log(summary);
+    for (const [path, body] of files) {
+      if (check) {
+        if (readCommitted(path) !== body) drift.push(path);
+      } else {
+        writeFileSync(path, body, 'utf8');
+      }
     }
-    console.log('build-battle.generated.mjs matches TCGdex');
+  }
+  if (!check) return;
+  if (drift.length) {
+    console.error(`Differs from TCGdex (rerun without --check and review the diff):\n  ${drift.join('\n  ')}`);
+    process.exitCode = 1;
     return;
   }
-  writeFileSync(OUT, body, 'utf8');
-  console.log(`Wrote ${OUT}`);
+  console.log('Build & Battle modules match TCGdex');
 }
 
 main().catch((err) => {

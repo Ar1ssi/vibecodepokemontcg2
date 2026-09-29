@@ -875,7 +875,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let deckListFilter = null;
   // The Box / Pool controller; null outside Build & Battle, and until it boots below.
   let buildBattle = null;
-  // The Shelf / Collection controller (design 055); null outside the Standard builder tab.
+  // The Shelf / Collection controller (design 057); null outside the Standard builder tab.
   let eliteTrainerBox = null;
   // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
   const currentDeckFormat = () =>

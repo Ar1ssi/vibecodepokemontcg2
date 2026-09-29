@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { getBuildBattleBox } from '../../build-battle/box-catalog.mjs';
+import { loadSetData } from '../../build-battle/box-data.mjs';
+import { boxSkin } from '../../build-battle/unboxing.mjs';
 import { getEtb } from '../etb-catalog.mjs';
 import {
   collectionHeadline,
+  etbInsideLines,
+  etbLook,
   inFlightLine,
   ownedBadge,
   parseEtbQuery,
@@ -56,4 +61,35 @@ test('row 19: parseEtbQuery prefills a known box and ignores an unknown one', ()
   assert.equal(parseEtbQuery('?seed=42'), null);
   assert.equal(parseEtbQuery(''), null);
   assert.equal(parseEtbQuery('?etb=toString'), null);
+});
+
+test('etbInsideLines lists the box contents from the catalog row', async () => {
+  assert.deepEqual(etbInsideLines(etb, 'Phantasmal Flames'), [
+    '9 Phantasmal Flames booster packs',
+    '1 foil promo card featuring Charcadet',
+    '65 card sleeves',
+    '40 Pokémon TCG Energy cards',
+    '6 damage-counter dice',
+    '1 competition-legal coin-flip die',
+    '1 plastic coin',
+    '6 card dividers',
+    'A code card for Pokémon TCG Live',
+  ]);
+  assert.ok(!etbInsideLines(etb, 'X', {}).some((line) => line.includes('promo')));
+});
+
+test('etbLook wears its set box wrappers, the ETB key art and ETB labels', async () => {
+  const loaded = await loadSetData('me02');
+  const look = etbLook(etb, loaded);
+  const setBoxSkin = boxSkin({ box: getBuildBattleBox('phantasmal-flames'), ...loaded });
+  assert.deepEqual(look.skin.packArts, setBoxSkin.packArts, 'the same booster wrappers as the B&B box');
+  assert.equal(look.skin.palette, setBoxSkin.palette);
+  assert.match(look.skin.keyArtUrl, /me02\/013\/high\.webp$/, 'Mega Charizard X ex, the box art');
+  assert.equal(look.skin.faces, null);
+  assert.equal(look.skin.render, null);
+  assert.equal(look.labels.productTitle, 'Elite Trainer Box');
+  assert.equal(look.labels.backLines[0], '9 Phantasmal Flames booster packs');
+  assert.equal(look.setName, 'Phantasmal Flames');
+  assert.equal(look.playLevel, false);
+  assert.ok(look.seriesName);
 });

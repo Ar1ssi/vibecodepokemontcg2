@@ -2,6 +2,8 @@
  * Shared decklist-line parsing and TCGdex resolution for the baked-deck generators
  * (generate-starter-decks.mjs, generate-build-battle-box.mjs).
  */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
   buildModernBasicEnergy,
   isModernBasicEnergyLabel,
@@ -12,7 +14,10 @@ const TCGDEX_SET_URL = 'https://api.tcgdex.net/v2/en/sets';
 // TCGdex ships no art for some promos (MEP); Limitless hosts the same scans.
 const LIMITLESS_IMAGE_BASE = 'https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci';
 
+// Set codes → TCGdex set ids (TCGdex `/v2/en/series/{xy,sm,swsh,sv,me}`, read 2026-09-28). The
+// Build & Battle generator fetches every code it uses, so a wrong id fails at bake time.
 export const SET_MAP = {
+  // Mega Evolution
   MEG: 'me01',
   PFL: 'me02',
   ASC: 'me02.5',
@@ -20,16 +25,70 @@ export const SET_MAP = {
   CRI: 'me04',
   PBL: 'me05',
   MEP: 'mep',
+  // Scarlet & Violet
+  SVI: 'sv01',
+  PAL: 'sv02',
   OBF: 'sv03',
-  SFA: 'sv06.5',
-  TWM: 'sv06',
-  SSP: 'sv08',
-  JTG: 'sv09',
-  BLK: 'sv10.5b',
-  DRI: 'sv10',
   MEW: 'sv03.5',
+  PAR: 'sv04',
+  PAF: 'sv04.5',
+  TEF: 'sv05',
+  TWM: 'sv06',
+  SFA: 'sv06.5',
+  SCR: 'sv07',
+  SSP: 'sv08',
   PRE: 'sv08.5',
+  JTG: 'sv09',
+  DRI: 'sv10',
+  BLK: 'sv10.5b',
+  WHT: 'sv10.5w',
   SVP: 'svp',
+  // Sword & Shield
+  SSH: 'swsh1',
+  RCL: 'swsh2',
+  DAA: 'swsh3',
+  CPA: 'swsh3.5',
+  VIV: 'swsh4',
+  SHF: 'swsh4.5',
+  BST: 'swsh5',
+  CRE: 'swsh6',
+  EVS: 'swsh7',
+  FST: 'swsh8',
+  BRS: 'swsh9',
+  ASR: 'swsh10',
+  PGO: 'swsh10.5',
+  LOR: 'swsh11',
+  SIT: 'swsh12',
+  CRZ: 'swsh12.5',
+  SWSHP: 'swshp',
+  // Sun & Moon
+  SUM: 'sm1',
+  GRI: 'sm2',
+  BUS: 'sm3',
+  SLG: 'sm3.5',
+  CIN: 'sm4',
+  UPR: 'sm5',
+  FLI: 'sm6',
+  CES: 'sm7',
+  DRM: 'sm7.5',
+  LOT: 'sm8',
+  TEU: 'sm9',
+  UNB: 'sm10',
+  UNM: 'sm11',
+  HIF: 'sm115',
+  CEC: 'sm12',
+  SMP: 'smp',
+  // XY
+  XY: 'xy1',
+  PRC: 'xy5',
+  ROS: 'xy6',
+  AOR: 'xy7',
+  BKT: 'xy8',
+  BKP: 'xy9',
+  FCO: 'xy10',
+  STS: 'xy11',
+  EVO: 'xy12',
+  XYP: 'xyp',
 };
 
 /** Trainers/supporters/items without set codes — preferred Standard printings. */
@@ -140,15 +199,54 @@ export function parseLine(line) {
   throw new Error(`Could not parse line: ${line}`);
 }
 
-async function fetchJson(url) {
+// Every response is kept for the run (a box names the same Trainer many times). With
+// TCGDEX_CACHE_DIR set, responses are also read from and written to `<dir>/{cards,sets}/<id>.json`,
+// so a re-bake during development does not refetch thousands of cards; `--check` runs without it.
+const responses = new Map();
+const RETRIES = 3;
+
+const cacheFile = (kind, id) =>
+  process.env.TCGDEX_CACHE_DIR ? join(process.env.TCGDEX_CACHE_DIR, kind, `${id}.json`) : null;
+
+async function fetchJsonOnce(url) {
   const res = await fetch(url);
+  if (res.status === 404) throw new Error(`TCGdex has no ${url} (404)`);
   if (!res.ok) throw new Error(`TCGdex fetch failed (${res.status}) for ${url}`);
   return res.json();
 }
 
+async function fetchJsonWithRetry(url) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await fetchJsonOnce(url);
+    } catch (err) {
+      if (attempt >= RETRIES || /\(404\)$/.test(err.message)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+    }
+  }
+}
+
+function fetchJson(url, kind, id) {
+  if (responses.has(url)) return responses.get(url);
+  const file = cacheFile(kind, id);
+  const pending =
+    file && existsSync(file)
+      ? Promise.resolve(JSON.parse(readFileSync(file, 'utf8')))
+      : fetchJsonWithRetry(url).then((json) => {
+          if (file) {
+            mkdirSync(dirname(file), { recursive: true });
+            writeFileSync(file, JSON.stringify(json));
+          }
+          return json;
+        });
+  responses.set(url, pending);
+  pending.catch(() => responses.delete(url));
+  return pending;
+}
+
 /** Fetches a card by id; throws when `expectedName` is given and TCGdex disagrees (data drift). */
 export async function fetchCard(cardId, expectedName) {
-  const card = await fetchJson(`${TCGDEX_CARD_URL}/${cardId}`);
+  const card = await fetchJson(`${TCGDEX_CARD_URL}/${encodeURIComponent(cardId)}`, 'cards', cardId);
   if (expectedName && card.name !== expectedName) {
     throw new Error(`${cardId} is "${card.name}", decklist says "${expectedName}"`);
   }
@@ -156,10 +254,11 @@ export async function fetchCard(cardId, expectedName) {
 }
 
 export async function fetchSet(setId) {
-  return fetchJson(`${TCGDEX_SET_URL}/${setId}`);
+  return fetchJson(`${TCGDEX_SET_URL}/${encodeURIComponent(setId)}`, 'sets', setId);
 }
 
-function limitlessImage(card) {
+/** Limitless scans for a card TCGdex has no art for (051: the MEP promos). */
+export function limitlessImage(card) {
   const setCode = Object.keys(SET_MAP).find((code) => SET_MAP[code] === card.set?.id);
   if (!setCode || !card.localId) return null;
   const file = `${LIMITLESS_IMAGE_BASE}/${setCode}/${setCode}_${card.localId}_R_EN`;

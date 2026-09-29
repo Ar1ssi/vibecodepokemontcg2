@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import ejs from 'ejs';
 
 // Renders client/index.ejs with the locals server.js passes for each route, so the
-// Elite Trainer Box tabs (design 055 row 13) appear only in the Standard builder tab.
+// Elite Trainer Box tabs (design 057 row 13) appear only in the Standard builder tab.
 const templatePath = fileURLToPath(new URL('../../client/index.ejs', import.meta.url));
 const template = readFileSync(templatePath, 'utf8');
 

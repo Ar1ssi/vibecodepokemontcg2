@@ -1,4 +1,4 @@
-// What the player's opened Elite Trainer Boxes gave them (design 055 § Collection). Counts and
+// What the player's opened Elite Trainer Boxes gave them (design 057 § Collection). Counts and
 // ids only, never card bodies. Pure apart from the storage object passed in; every storage call is
 // guarded, and a storage that throws means the collection lives in memory only.
 

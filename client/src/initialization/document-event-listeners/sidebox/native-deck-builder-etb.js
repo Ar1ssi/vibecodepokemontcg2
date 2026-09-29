@@ -1,10 +1,13 @@
 import { createRng } from '../../../../../shared/engine/rng.mjs';
-import { packModelFor } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
-import { productArt } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
+import { BUILD_BATTLE_BOXES } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
 import {
-  BUILD_BATTLE_SET_CARDS,
-  ETB_PROMOS,
-} from '../../../setup/deck-builder/core/build-battle/build-battle.generated.mjs';
+  loadSetData,
+  setIdOfCardId,
+} from '../../../setup/deck-builder/core/build-battle/box-data.mjs';
+import {
+  cardClass,
+  resolvePackModel,
+} from '../../../setup/deck-builder/core/build-battle/pack-models.mjs';
 import {
   deckCardCounts,
   parseSeed,
@@ -23,16 +26,19 @@ import {
 import { availableEtbs, getEtb } from '../../../setup/deck-builder/core/elite-trainer-box/etb-catalog.mjs';
 import { etbContents, openEtb } from '../../../setup/deck-builder/core/elite-trainer-box/etb-opening.mjs';
 import {
+  ETB_STORAGE_KEY,
   clearEtbSession,
   createEtbSession,
   loadEtbSession,
   saveEtbSession,
 } from '../../../setup/deck-builder/core/elite-trainer-box/etb-session.mjs';
+import { ETB_PROMOS } from '../../../setup/deck-builder/core/elite-trainer-box/etb-promos.generated.mjs';
 import {
   EMPTY_COLLECTION_TEXT,
   MEMORY_ONLY_TEXT,
   RESET_COLLECTION_CONFIRM,
   collectionHeadline,
+  etbLook,
   inFlightLine,
   ownedBadge,
   parseEtbQuery,
@@ -43,12 +49,14 @@ import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
 /**
- * The Shelf and Collection tabs of the Standard deck builder tab (design 055). An Elite Trainer
+ * The Shelf and Collection tabs of the Standard deck builder tab (design 057). An Elite Trainer
  * Box is not a format: opening one adds its contents to the collection at once (the scene is
  * cosmetic), and the collection only badges what the player owns — Standard rules decide the deck.
  *
  * The opening plays on the fullscreen stage (native-deck-builder-stage.js) and hands back to the
- * Collection tab, or to the Shelf for another box.
+ * Collection tab, or to the Shelf for another box. Card data loads per set on demand (design 054,
+ * `loadSetData`): until the ETB sets and the sets of owned cards are in, the tabs say so and Open
+ * waits.
  */
 
 const POOL_GROUPS = [
@@ -75,14 +83,9 @@ const el = (tag, className, text) => {
 const cardImage = (card, size = 'small') =>
   card?.images?.[size] || card?.images?.small || card?.image || '';
 
-// Every card an owned id may name: every baked set plus the ETB promos.
-const knownCardsById = () =>
-  new Map(
-    [...Object.values(BUILD_BATTLE_SET_CARDS).flat(), ...Object.values(ETB_PROMOS)].map((card) => [
-      card.id,
-      card,
-    ])
-  );
+const LOADING_TEXT = 'Loading the card data…';
+const LOAD_FAILED_TEXT = 'The card data could not be loaded. Reload the page to try again.';
+const BAKED_SET_IDS = new Set(BUILD_BATTLE_BOXES.map((box) => box.setId));
 
 const energyCard = (label) => {
   const { qty: _qty, ...card } = buildModernBasicEnergy(label, 1);
@@ -111,10 +114,13 @@ export const initializeEliteTrainerBox = ({
   onPreviewCard,
 }) => {
   const storage = browserStorage();
-  const cardsById = knownCardsById();
   const query = parseEtbQuery(window.location.search);
+  // Loaded sets by id, and every card an owned or opened id may name (those sets plus the promos).
+  const sets = new Map();
+  const cardsById = new Map(Object.values(ETB_PROMOS).map((card) => [card.id, card]));
+  let loadState = 'loading';
 
-  let session = loadEtbSession(storage);
+  let session = null;
   let collection = loadCollection(storage);
   let memoryOnly = false;
   let scene = null;
@@ -131,16 +137,19 @@ export const initializeEliteTrainerBox = ({
 
   const banner = (parent) => {
     if (memoryOnly) parent.append(el('p', 'bb-banner', MEMORY_ONLY_TEXT));
+    if (loadState === 'failed') parent.append(el('p', 'bb-banner', LOAD_FAILED_TEXT));
+    if (loadState === 'loading') parent.append(el('p', 'bb-note', LOADING_TEXT));
   };
 
   // ── Opening ─────────────────────────────────────────────────────────────
   // One atomic step: the box goes into the collection before the scene plays, so a skipped or
-  // abandoned scene still counts (design 055 Options 3).
+  // abandoned scene still counts (design 057 Options 3).
   const openNew = (etb, seedText) => {
-    if (inFlight()) return;
-    const packModel = packModelFor(etb.setId);
-    const cards = BUILD_BATTLE_SET_CARDS[etb.setId] || [];
-    if (!packModel || !cards.length) return;
+    const loaded = sets.get(etb.setId);
+    if (inFlight() || !loaded) return;
+    const { setInfo, cards } = loaded;
+    const packModel = resolvePackModel(etb.packModelKey, cards, setInfo);
+    if (!packModel) return;
     const seed = parseSeed(seedText.trim()) ?? randomSeed();
     const { packs } = openEtb({ etb, cards, packModel, rng: createRng(seed) });
     const contents = etbContents(etb, ETB_PROMOS);
@@ -203,9 +212,10 @@ export const initializeEliteTrainerBox = ({
 
   function playScene() {
     const etb = sessionEtb();
-    if (!etb || !inFlight() || scene) return;
-    stage = createStage(shelfPanelEl?.closest('.db-live') || null, `Opening your ${etb.name}`);
-    const stageEl = stage.open();
+    const loaded = etb && sets.get(etb.setId);
+    if (!loaded || !inFlight() || scene) return;
+    stage = createStage(shelfPanelEl?.closest('.db-live') || null);
+    const stageEl = stage.open(`Opening your ${etb.name}`);
     if (!stageEl) {
       stage = null;
       return;
@@ -220,10 +230,11 @@ export const initializeEliteTrainerBox = ({
       getUnboxing: () => session.unboxing,
       dispatch: dispatchUnboxing,
       packs: session.packs.map((pack) => pack.map((id) => cardsById.get(id) || null)),
-      packModel: packModelFor(etb.setId),
+      packModel: resolvePackModel(etb.packModelKey, loaded.cards, loaded.setInfo),
+      classOf: (card) => cardClass(card, etb.era, loaded.setInfo),
+      look: etbLook(etb, loaded),
       seed: session.seed,
       promo: contents.promo,
-      product: productArt(etb.art),
       contents,
       onFinish: finishOpening,
     });
@@ -261,7 +272,7 @@ export const initializeEliteTrainerBox = ({
     const openButton = el('button', 'bb-primary', 'Open');
     openButton.id = `etbOpen-${etb.key}`;
     openButton.type = 'button';
-    openButton.disabled = inFlight();
+    openButton.disabled = inFlight() || !sets.has(etb.setId);
     openButton.addEventListener('click', () => {
       if (openButton.disabled) return;
       openButton.disabled = true;
@@ -341,6 +352,7 @@ export const initializeEliteTrainerBox = ({
     header.append(actions);
     collectionPanelEl.append(header);
 
+    if (loadState === 'loading') return;
     const pool = collectionPool(collection, cardsById);
     const energy = ownedEnergy();
     if (!pool.length && !energy.length) {
@@ -414,14 +426,48 @@ export const initializeEliteTrainerBox = ({
     renderCollection();
   }
 
+  // The ETB sets and the sets the owned cards come from (promo sets are not baked: their rows
+  // come from ETB_PROMOS). A set that fails to load leaves its cards out and shows the banner.
+  const setsToLoad = () =>
+    new Set(
+      [
+        ...availableEtbs().map((etb) => etb.setId),
+        ...Object.keys(collection.cards).map(setIdOfCardId),
+      ].filter((setId) => BAKED_SET_IDS.has(setId))
+    );
+
+  const loadSets = async () => {
+    const results = await Promise.allSettled(
+      [...setsToLoad()].map(async (setId) => [setId, await loadSetData(setId)])
+    );
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      const [setId, loaded] = result.value;
+      sets.set(setId, loaded);
+      for (const card of loaded.cards) cardsById.set(card.id, card);
+    }
+    loadState = results.every((result) => result.status === 'fulfilled') ? 'ready' : 'failed';
+    session = loadEtbSession(storage, { setIds: new Set(cardsById.keys()) });
+    renderAll();
+    // A reload mid-opening lands back on the stage, settled at the saved beat.
+    playScene();
+  };
+
+  const hasStoredSession = () => {
+    try {
+      return Boolean(storage?.getItem?.(ETB_STORAGE_KEY));
+    } catch {
+      return false;
+    }
+  };
+
   renderAll();
-  // A reload mid-opening lands back on the stage, settled at the saved beat.
-  playScene();
+  loadSets();
 
   return {
     refresh: refreshCounts,
     ownedCounts: () => ({ ...collection.cards }),
     // A box being opened, or a `?etb=` link, opens on the Shelf; otherwise the builder keeps Search.
-    initialMode: () => (inFlight() || query ? 'shelf' : null),
+    initialMode: () => (hasStoredSession() || query ? 'shelf' : null),
   };
 };

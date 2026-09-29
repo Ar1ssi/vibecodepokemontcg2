@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRng } from '../../../../../../../shared/engine/rng.mjs';
-import { packModelFor } from '../../build-battle/box-catalog.mjs';
-import { BUILD_BATTLE_SET_CARDS } from '../../build-battle/build-battle.generated.mjs';
+import { loadSetData } from '../../build-battle/box-data.mjs';
+import { resolvePackModel } from '../../build-battle/pack-models.mjs';
 import {
   COLLECTION_STORAGE_KEY,
   MAX_PRODUCTS,
@@ -22,11 +22,12 @@ import { getEtb } from '../etb-catalog.mjs';
 import { etbContents, openEtb } from '../etb-opening.mjs';
 
 const etb = getEtb('phantasmal-flames-etb');
-const cards = BUILD_BATTLE_SET_CARDS.me02;
+const { setInfo, cards } = await loadSetData(etb.setId);
+const packModel = resolvePackModel(etb.packModelKey, cards, setInfo);
 const promo = { id: 'mep-022', name: 'Charcadet', supertype: 'Pokémon', localId: '022', qty: 1 };
 const contents = etbContents(etb, { [etb.key]: promo });
 const openSeed = (seed) =>
-  openEtb({ etb, cards, packModel: packModelFor(etb.setId), rng: createRng(seed) });
+  openEtb({ etb, cards, packModel, rng: createRng(seed) });
 const add = (collection, seed, now = 1000) =>
   addProduct(collection, { etb, seed, packs: openSeed(seed).packs, contents, now });
 

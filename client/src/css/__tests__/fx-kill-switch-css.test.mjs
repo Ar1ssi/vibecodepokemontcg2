@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const read = (name) =>
@@ -172,7 +172,7 @@ test('parent-page overlays are still killed by the body class', () => {
 });
 
 test('the Elite Trainer Box sheet is loaded and has no unguarded idle loop', () => {
-  // Design 055: the Shelf and Collection live in the builder tab, a parent page (body guard).
+  // Design 057: the Shelf and Collection live in the builder tab, a parent page (body guard).
   const css = read('deck-builder-etb.css');
   const guarded = guardSelectors(css, 'body.fx-off').map(tokensOf);
   for (const selector of idleSelectors(css)) {
@@ -181,9 +181,11 @@ test('the Elite Trainer Box sheet is loaded and has no unguarded idle loop', () 
   assert.ok(read('index.css').includes("@import url('./deck-builder-etb.css')"));
 });
 
-test('the Build & Battle sheets also style the Standard builder tab that hosts the ETB scene', () => {
-  for (const name of ['deck-builder-unboxing.css', 'deck-builder-build-battle.css']) {
-    const css = read(name);
-    assert.ok(!/(?<!:is\()\.build-battle-window(?!, \.etb-host\))/.test(css), `${name}: a rule misses .etb-host`);
+test('every Build & Battle rule also styles the Standard builder tab that hosts the ETB scene', () => {
+  const dir = fileURLToPath(new URL('../', import.meta.url));
+  const sheets = readdirSync(dir).filter((name) => name.endsWith('.css') && read(name).includes('build-battle-window'));
+  assert.ok(sheets.includes('deck-builder-unboxing.css') && sheets.includes('deck-builder-build-battle.css'));
+  for (const name of sheets) {
+    assert.ok(!/(?<!:is\()\.build-battle-window(?!, \.etb-host\))/.test(read(name)), `${name}: a rule misses .etb-host`);
   }
 });

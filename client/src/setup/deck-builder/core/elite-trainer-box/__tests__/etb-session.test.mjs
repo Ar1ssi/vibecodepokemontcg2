@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRng } from '../../../../../../../shared/engine/rng.mjs';
-import { packModelFor } from '../../build-battle/box-catalog.mjs';
-import { BUILD_BATTLE_SET_CARDS } from '../../build-battle/build-battle.generated.mjs';
+import { loadSetData } from '../../build-battle/box-data.mjs';
+import { resolvePackModel } from '../../build-battle/pack-models.mjs';
 import { advanceUnboxing, createUnboxing } from '../../build-battle/unboxing.mjs';
 import { getEtb } from '../etb-catalog.mjs';
 import { openEtb } from '../etb-opening.mjs';
@@ -17,8 +17,10 @@ import {
 } from '../etb-session.mjs';
 
 const etb = getEtb('phantasmal-flames-etb');
-const packModel = packModelFor(etb.setId);
-const { packs } = openEtb({ etb, cards: BUILD_BATTLE_SET_CARDS.me02, packModel, rng: createRng(42) });
+const { setInfo, cards } = await loadSetData(etb.setId);
+const packModel = resolvePackModel(etb.packModelKey, cards, setInfo);
+const context = { setIds: new Set(cards.map((card) => card.id)) };
+const { packs } = openEtb({ etb, cards, packModel, rng: createRng(42) });
 const fresh = () => createEtbSession({ etbKey: etb.key, seed: 42, packs, packModel, now: 1000 });
 
 function memoryStorage() {
@@ -54,16 +56,16 @@ test('createEtbSession starts sealed with a scene sized to the box', () => {
 
 test('a session survives a save/parse round trip at every stage', () => {
   const session = fresh();
-  assert.deepEqual(parseEtbSession(JSON.stringify(session)), session);
+  assert.deepEqual(parseEtbSession(JSON.stringify(session), context), session);
   const events = [{ type: 'tearWrap' }, { type: 'openLid' }, { type: 'unwrapDeck' }];
   events.push({ type: 'tearPack', packIndex: 0 }, { type: 'revealCard', packIndex: 0 });
   const midPack = { ...session, unboxing: events.reduce(advanceUnboxing, session.unboxing) };
-  assert.deepEqual(parseEtbSession(JSON.stringify(midPack)), midPack);
+  assert.deepEqual(parseEtbSession(JSON.stringify(midPack), context), midPack);
 });
 
 test('row 2: parseEtbSession refuses anything this version cannot trust', () => {
   const good = fresh();
-  const bad = (patch) => parseEtbSession(JSON.stringify({ ...good, ...patch }));
+  const bad = (patch) => parseEtbSession(JSON.stringify({ ...good, ...patch }), context);
   assert.equal(parseEtbSession('{'), null);
   assert.equal(parseEtbSession('null'), null);
   assert.equal(bad({ version: 2 }), null);
@@ -82,6 +84,7 @@ test('row 2: parseEtbSession refuses anything this version cannot trust', () => 
   torn.revealed = [11, ...Array(8).fill(0)];
   assert.equal(bad({ unboxing: torn }), null, 'revealed[i] > cardsPerPack');
   assert.equal(bad({ createdAt: 'yesterday' }), null);
+  assert.equal(parseEtbSession(JSON.stringify(good)), null, 'no set loaded, no pack id can be trusted');
 });
 
 test('row 5: a throwing storage reports memory-only and never throws', () => {
@@ -91,9 +94,9 @@ test('row 5: a throwing storage reports memory-only and never throws', () => {
   assert.equal(clearEtbSession(throwingStorage), false);
 
   const storage = memoryStorage();
-  assert.equal(loadEtbSession(storage), null);
+  assert.equal(loadEtbSession(storage, context), null);
   assert.equal(saveEtbSession(storage, fresh()), true);
-  assert.deepEqual(loadEtbSession(storage), fresh());
+  assert.deepEqual(loadEtbSession(storage, context), fresh());
   assert.equal(clearEtbSession(storage), true);
   assert.equal(storage.items.has(ETB_STORAGE_KEY), false);
 });

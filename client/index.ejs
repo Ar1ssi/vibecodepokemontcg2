@@ -24,6 +24,8 @@
         // Classic inline script: runs before the deferred module below, which reads this.
         window.__PTCG_E2E_ALLOWED = <%- JSON.stringify(Boolean(typeof e2eAllowed !== 'undefined' && e2eAllowed)) %>;
     </script>
+    <!-- Must precede every module script. Vendored three.js for the Build & Battle 3D packs (design 055). -->
+    <script type="importmap">{"imports":{"three":"/src/vendor/three/three.module.min.js"}}</script>
     <script type="module" src="src/front-end.js"></script>
     <script>
         window.onload = () => {

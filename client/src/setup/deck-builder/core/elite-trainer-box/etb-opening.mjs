@@ -1,4 +1,4 @@
-// Opening an Elite Trainer Box (design 055 § Opening). Pure: every random choice comes from the
+// Opening an Elite Trainer Box (design 057 § Opening). Pure: every random choice comes from the
 // `rng` passed in (`createRng(seed)`). An ETB has no deck draw, so its stream never lines up with
 // a Build & Battle box's.
 
@@ -6,7 +6,8 @@ import { openPack } from '../build-battle/pack-opening.mjs';
 
 /**
  * @param {{etb: import('./etb-catalog.mjs').Etb, cards: object[], packModel: object|null,
- *   rng: {next: () => number, int: (n: number) => number}}} args `cards` is the set's SetCards.
+ *   rng: {next: () => number, int: (n: number) => number}}} args `cards` is the set's SetCards,
+ *   `packModel` = `resolvePackModel(etb.packModelKey, cards, setInfo)`.
  * @returns {{packs: string[][]}} `etb.packCount` packs as card ids, in opening order.
  */
 export function openEtb({ etb, cards = [], packModel, rng }) {
