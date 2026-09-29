@@ -132,6 +132,42 @@ BOX=team-up node .claude/skills/fx-preview/rec/rec-unboxing.mjs # any catalog bo
   host and images.pokemontcg.io). Use it where those hosts are blocked; without it a blocked face shows the card-back
   fallback and the foil layers have nothing to sit on. The card faces are then a stand-in: judge
   foil, flare and pacing from them, never the card art.
+- Both unboxing recorders share their page helpers (`openFresh`, `press`, the tear and swipe drags,
+  the WAAPI freeze and strips, the clock-stepped rip, the canvas checks) in `rec/lib/unboxing-drive.mjs`.
+
+## Builder tab: the Elite Trainer Box opening (`rec/rec-etb.mjs`)
+
+The ETB (design 057) opens from the Standard builder's Shelf onto the same stage. The recorder opens
+`/deck-builder?etb=<ETB>&seed=<SEED>&e2e=1`, clears `ptcg-sim.collection.v1` and `ptcg-sim.etb.v1`,
+presses `#etbOpen-<ETB>` and drives wrap → lift lid → tray (promo pouch, sleeves, dice and coin,
+guide on and off, code card) → the pack fan → the nine-pack 3D spread → every pack → *See collection*.
+
+```bash
+PORT=4100 pnpm start &
+CARD_IMG=client/src/assets/build-battle/packs/me02-charizard.webp \
+  node .claude/skills/fx-preview/rec/rec-etb.mjs                 # ETB=phantasmal-flames-etb SEED=42
+SEED=18 node .claude/skills/fx-preview/rec/rec-etb.mjs           # files get -18
+```
+
+- Pass 1 records to `out/etb.webm` (`out/etb-<seed>.webm`; another `ETB` adds `-<etb>`) and checks
+  design 057 rows 6 (reload in pack 5 with 3 seen: resumes there in 3D, one canvas, no context
+  warning), 15 (each summary equals `session.packs[i]`; afterwards `ptcg-sim.collection.v1` holds
+  exactly the packs plus the promo, 91 cards, and was not written after Open), 16 (every hit starts
+  face down) and that all nine spread packs sit inside the viewport at focus 0 and focus 4.
+- Pass 2 (skip with `STRIPS=0`, which also skips pass 3) writes `<OUT>/<beat>-{start,peak,settle}.png`
+  (default `.agent/scratch/etb[-<seed>]`) for `wrap`, `lid`, `tray`, `promo` (peak = the crest of
+  the tier 2 flare), `dice`, `coin` (these three cropped to the item), `spread`, `rip` (plus
+  `rip-{peel-30,strip-flight,cards-rising,handoff-before}`), `hit` (the box's best card) and
+  `summary`, plus `tray-promo.png`, `props.png` and `hit-waiting.png`. The `hit` and chained strips
+  are timed from their own animation's start (a tap during an entrance is queued). DOM beats freeze with the WAAPI seeks; the fly and the rip step
+  Playwright's fake clock.
+- Pass 3: 390 px, `scrollWidth === 390` at the tray and the spread (row 14).
+- Pass 4: reduced motion (every beat lands at once, no stage rAF loop, the rip lands at once), FX off
+  (the stored `ptcg-fx-off`: 0 WebGL contexts), row 10 (card hosts answer 404: the promo and pack 1
+  show the card back with the card's name; `row10-*.png`) and `--disable-webgl` (the DOM scene plays
+  to the Collection tab; `cut-{start,peak,settle}.png`). Exit code 1 on any FAIL.
+- `CARD_IMG` stands in for every card face and the sleeve scan, as for 052: judge the flare, props
+  and pacing, never the card art.
 
 ## Done means
 

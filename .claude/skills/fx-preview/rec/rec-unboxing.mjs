@@ -15,6 +15,7 @@
 // strip flight, cards rising, hand-off before/after). Pass 5 (always) checks the fallbacks: reduced
 // motion (no stage rAF loop, the rip lands at once), WebGL disabled (the DOM scene), and 20
 // mount/unmount cycles (no leaked WebGL context).
+// The page helpers are shared with rec-etb.mjs in lib/unboxing-drive.mjs.
 //
 // Env: SEED (42) · BOX (a catalog box key; default phantasmal-flames) · BASE_URL (http://localhost:4100)
 //      OUT (.agent/scratch/unboxing[-<box>][-<seed>])
@@ -22,8 +23,33 @@
 //      SIO_JS: a local socket.io.min.js (default: the server's own /socket.io/socket.io.js)
 //      CHROMIUM: a browser binary (the cloud container has /opt/pw-browsers/chromium)
 import { chromium } from 'playwright';
-import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { mkdirSync, renameSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  COUNT_STAGE_RAF,
+  FREEZE,
+  GL_ARGS,
+  NO_GL_ARGS,
+  PACK3D_MODULE,
+  UNBOXING_MODULE as MODULE,
+  canvasDrawsNothing,
+  canvasEmptiesWithin,
+  dragTear,
+  launchOptions,
+  makeCheck,
+  makeStrips,
+  moduleNumbers,
+  openFresh,
+  preparePage as prepareDrivenPage,
+  press,
+  renderMode,
+  ripOnSteppedClock,
+  summaryIds,
+  swipeOne as swipeDriven,
+  topIndex,
+  waitRender,
+  waitView,
+} from './lib/unboxing-drive.mjs';
 
 const SEED = Number(process.env.SEED ?? 42);
 const BOX = process.env.BOX || 'phantasmal-flames';
@@ -35,87 +61,11 @@ const VIDEO = `out/unboxing${NAME_TAG}.webm`;
 const PAGE_URL = `${BASE_URL}/build-and-battle?seed=${SEED}&e2e=1&box=${encodeURIComponent(BOX)}`;
 const STORAGE_KEY = 'ptcg-sim.build-battle.v1';
 const VIEWPORT = { width: 1280, height: 800 };
-const MODULE = '/src/setup/deck-builder/core/build-battle/unboxing.mjs';
-const PACK3D_MODULE = '/src/setup/deck-builder/core/build-battle/pack3d.mjs';
 const SCENE_MODULE = '/src/initialization/document-event-listeners/sidebox/native-deck-builder-unboxing.js';
-// Headless Chromium has no GPU: WebGL runs on SwiftShader.
-const GL_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
-const NO_GL_ARGS = ['--disable-webgl', '--disable-webgl2'];
-// Set cards come from TCGdex, the deck promos from Limitless.
-// Card art hosts: TCGdex, the Limitless promo host, and images.pokemontcg.io for the Trainer Gallery
-// and SM rows TCGdex has no art for (design 054 D4).
-const CARD_HOSTS = [
-  'https://assets.tcgdex.net/**',
-  'https://limitlesstcg.nyc3.digitaloceanspaces.com/**',
-  'https://images.pokemontcg.io/**',
-];
-
-const failures = [];
-const check = (ok, label, detail = '') => {
-  console.log(`${ok ? 'PASS' : 'FAIL'} [${BOX}] ${label}${detail ? ` — ${detail}` : ''}`);
-  if (!ok) failures.push(label);
-};
-
-const cardImageBody = () => {
-  const src = process.env.CARD_IMG;
-  if (!src || /^https?:/.test(src)) return null;
-  const type = { '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
-  return { body: readFileSync(src), contentType: type[extname(src).toLowerCase()] || 'image/png' };
-};
-
-const preparePage = async (context) => {
-  const page = await context.newPage();
-  page.on('pageerror', (e) => console.log('pageerror', e.message));
-  page.on('console', (m) => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && console.log('console', m.text()));
-  page.on('requestfailed', (r) => console.log('blocked', r.url().slice(0, 100)));
-  await page.route('https://static.cloudflareinsights.com/**', (r) => r.abort());
-  await page.route('https://cdn.socket.io/**', (r) =>
-    process.env.SIO_JS
-      ? r.fulfill({ body: readFileSync(process.env.SIO_JS), contentType: 'text/javascript' })
-      : r.fulfill({ status: 302, headers: { location: `${BASE_URL}/socket.io/socket.io.js` } })
-  );
-  const local = cardImageBody();
-  for (const host of CARD_HOSTS) {
-    if (local) await page.route(host, (r) => r.fulfill(local));
-    else if (process.env.CARD_IMG) {
-      await page.route(host, (r) => r.fulfill({ status: 302, headers: { location: process.env.CARD_IMG } }));
-    }
-  }
-  return page;
-};
-
-const openFreshBox = async (page) => {
-  await page.goto(PAGE_URL);
-  await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
-  await page.reload();
-  await page.waitForSelector('#buildBattleOpenBox:not([disabled])', { state: 'visible', timeout: 30000 });
-  await page.waitForTimeout(400);
-  await page.click('#buildBattleOpenBox');
-  await page.waitForSelector('#bbUnboxing .bb-box__wrap', { state: 'visible' });
-  await page.waitForTimeout(600);
-};
-
-// A scripted click has detail 0, which every beat button accepts (tear buttons included).
-const press = (page, selector) =>
-  page.evaluate((sel) => {
-    const node = document.querySelector(sel);
-    if (!node) throw new Error(`no ${sel}`);
-    node.scrollIntoView({ block: 'nearest' });
-    node.click();
-  }, selector);
-
-// A real pointer drag across 70 % of the target: the tear gesture the scene is built around.
-const dragTear = async (page, selector) => {
-  const box = await page.locator(selector).boundingBox();
-  const y = box.y + box.height / 2;
-  await page.mouse.move(box.x + 4, y);
-  await page.mouse.down();
-  for (let step = 1; step <= 12; step += 1) {
-    await page.mouse.move(box.x + 4 + (box.width * 0.7 * step) / 12, y + step * 0.5);
-    await page.waitForTimeout(16);
-  }
-  await page.mouse.up();
-};
+const { check, failures } = makeCheck(BOX);
+const preparePage = (context) => prepareDrivenPage(context, { baseUrl: BASE_URL });
+const openFreshBox = (page) =>
+  openFresh(page, { url: PAGE_URL, storageKeys: [STORAGE_KEY], openSelector: '#buildBattleOpenBox' });
 
 const session = (page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
 // The saved box's card data, as the tab loads it (design 054: per-box modules on demand).
@@ -139,13 +89,6 @@ const tiersOf = (page) =>
     );
   }, { module: MODULE, key: STORAGE_KEY, boxData: BOX_DATA, packModels: PACK_MODELS_MODULE });
 
-
-const summaryIds = (page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll('.bb-summary__card')]
-      .sort((a, b) => a.dataset.cardIndex - b.dataset.cardIndex)
-      .map((node) => node.dataset.previewCardId)
-  );
 
 // Every summary card wears foil exactly when unboxingHoloRarity says so, in that family.
 const foilMismatches = (page, packIndex) =>
@@ -171,59 +114,9 @@ const foilMismatches = (page, packIndex) =>
     { module: MODULE, key: STORAGE_KEY, i: packIndex, boxData: BOX_DATA, packModels: PACK_MODELS_MODULE }
   );
 
-const topIndex = (page) =>
-  page.evaluate(() => {
-    const top = document.querySelector('.bb-pcard.is-top');
-    return top ? Number(top.dataset.cardIndex) : null;
-  });
-
-// Is the top card showing its back? The flip's z axis points away from the camera (m33 < 0).
-const topFaceDown = (page) =>
-  page.evaluate(() => {
-    const flip = document.querySelector('.bb-pcard.is-top .bb-pcard__flip');
-    return !!flip && new DOMMatrix(getComputedStyle(flip).transform).m33 < 0;
-  });
-
-const topFlipped = (page) =>
-  page.evaluate(() => !!document.querySelector('.bb-pcard.is-top')?.classList.contains('is-flipped'));
-
 const hitsFaceDown = [];
-
-// One card: a hit turns over first (and must start face down), then the card is swiped off. A hit
-// the hit strip already turned over is only swiped.
-const swipeOne = async (page, packIndex, tiers, { drag = false } = {}) => {
-  const k = await topIndex(page);
-  if (tiers[packIndex][k] >= 2 && !(await topFlipped(page))) {
-    hitsFaceDown.push(await topFaceDown(page));
-    await press(page, '.bb-pcard.is-top');
-    await page.waitForFunction(() => document.querySelector('.bb-pcard.is-top')?.classList.contains('is-flipped'), null, { timeout: 6000 });
-    await page.waitForTimeout(500);
-  }
-  if (drag) {
-    const box = await page.locator('.bb-pcard.is-top').boundingBox();
-    const y = box.y + box.height / 2;
-    await page.mouse.move(box.x + box.width / 2, y);
-    await page.mouse.down();
-    for (let step = 1; step <= 10; step += 1) {
-      await page.mouse.move(box.x + box.width / 2 - step * box.width * 0.05, y + step);
-      await page.waitForTimeout(16);
-    }
-    await page.mouse.up();
-  } else {
-    await press(page, '.bb-pcard.is-top');
-  }
-  const last = k === 9;
-  await page.waitForFunction(
-    ([n, done]) =>
-      done ? !!document.querySelector('.bb-summary') : Number(document.querySelector('.bb-pcard.is-top')?.dataset.cardIndex) === n,
-    [k + 1, last],
-    { timeout: 6000 }
-  );
-  await page.waitForTimeout(tiers[packIndex][k + 1] >= 1 ? 420 : 160);
-};
-
-const waitView = (page, view) =>
-  page.waitForFunction((v) => document.getElementById('bbUnboxing')?.dataset.view === v, view, { timeout: 8000 });
+const swipeOne = (page, packIndex, tiers, { drag = false } = {}) =>
+  swipeDriven(page, tiers[packIndex], { drag, hitsFaceDown });
 
 const openToSpread = async (page, { drag = false } = {}) => {
   if (drag) {
@@ -231,8 +124,11 @@ const openToSpread = async (page, { drag = false } = {}) => {
     await page.waitForTimeout(700);
   }
   if ((await session(page)).unboxing.wrapTorn !== true) await press(page, '.bb-box__wrap');
-  await page.waitForTimeout(500);
+  // The lid and deck buttons come with the re-render after the tear / the lid; under SwiftShader
+  // load that can land later than a fixed wait.
+  await page.waitForSelector('.bb-box__open', { timeout: 8000 });
   await press(page, '.bb-box__open');
+  await page.waitForSelector('.bb-deck', { timeout: 8000 });
   await page.waitForTimeout(1300);
   await press(page, '.bb-deck');
   await waitView(page, 'spread');
@@ -247,42 +143,6 @@ const tearPack = async (page, packIndex, { drag = false } = {}) => {
   await waitView(page, 'pocket');
   await page.waitForSelector('.bb-pocket:not(.is-awaiting-3d)', { timeout: 10000 });
   await page.waitForTimeout(900);
-};
-
-const renderMode = (page) => page.evaluate(() => document.getElementById('bbUnboxing')?.dataset.render);
-// SwiftShader compiles the pack shaders on the CPU: after a reload that competes with every card
-// image, the stage can take well over 10 s to come up (a GPU takes a fraction of that).
-const waitRender = (page, mode) =>
-  page
-    .waitForFunction((m) => document.getElementById('bbUnboxing')?.dataset.render === m, mode, { timeout: 40000 })
-    .then(() => true)
-    .catch(() => false);
-
-// The canvas draws nothing when hiding it leaves the screenshot byte-identical.
-const canvasDrawsNothing = async (page) => {
-  const withCanvas = await page.screenshot();
-  // The WebGL canvas and its floor-reflection layer both count.
-  const hidden = await page.evaluate(() => {
-    const layers = [...document.querySelectorAll('.bb-gl, .bb-gl-mirror')];
-    layers.forEach((layer) => (layer.style.visibility = 'hidden'));
-    return layers.length > 0;
-  });
-  const without = await page.screenshot();
-  if (hidden) {
-    await page.evaluate(() =>
-      document.querySelectorAll('.bb-gl, .bb-gl-mirror').forEach((layer) => (layer.style.visibility = ''))
-    );
-  }
-  return withCanvas.equals(without);
-};
-
-// SwiftShader can run the falling pack's last frames late; the canvas must be empty soon after.
-const canvasEmptiesWithin = async (page, ms) => {
-  for (let waited = 0; waited <= ms; waited += 400) {
-    if (await canvasDrawsNothing(page)) return true;
-    await page.waitForTimeout(400);
-  }
-  return false;
 };
 
 // ── Pass 1: the whole box on video ─────────────────────────────────────────────────────
@@ -390,72 +250,7 @@ const recordVideo = async (browser) => {
 };
 
 // ── Pass 2: frozen frames at each beat's start / peak / settle ─────────────────────────
-const FREEZE = () => {
-  window.__beat = {
-    mark() {
-      this.before = new Set(document.getAnimations());
-      this.t0 = document.timeline.currentTime;
-      this.starts = new Map();
-    },
-    // A chained phase (the promo after the unwrap, the fly after the promo) starts on its own
-    // animation's clock: wait for it, then time the strip from it.
-    async startAt(selector) {
-      for (;;) {
-        const animation = document.querySelector(selector)?.getAnimations()[0];
-        if (animation) {
-          await animation.ready.catch(() => {});
-          this.t0 = animation.startTime ?? document.timeline.currentTime;
-          return;
-        }
-        await new Promise((r) => requestAnimationFrame(r));
-      }
-    },
-    async fresh() {
-      const list = document.getAnimations().filter((a) => !this.before.has(a) && !(a instanceof CSSAnimation));
-      await Promise.all(list.map((a) => a.ready.catch(() => {})));
-      for (const a of list) if (!this.starts.has(a)) this.starts.set(a, a.startTime ?? this.t0);
-      return list;
-    },
-    // Every animation this beat started, frozen at `ms` after the trigger.
-    async seek(ms) {
-      for (const a of await this.fresh()) {
-        a.pause();
-        const end = a.effect.getComputedTiming().endTime;
-        a.currentTime = Math.max(0, Math.min(this.t0 + ms - this.starts.get(a), Number.isFinite(end) ? end : Infinity));
-      }
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    },
-    async resume() {
-      const list = await this.fresh();
-      list.forEach((a) => a.playState === 'paused' && a.play());
-      const finite = list.filter((a) => Number.isFinite(a.effect.getComputedTiming().endTime));
-      await Promise.all(finite.map((a) => a.finished.catch(() => {})));
-    },
-  };
-};
-
-const shoot = (page, file) => page.screenshot({ path: join(OUT, file) });
-
-/**
- * Trigger one beat and write its three frames. Real time runs to `peakMs` before the peak seek,
- * so timer-driven steps have happened when it is shot.
- */
-const strip = async (page, name, trigger, { peakMs, settleMs = 300, phase }) => {
-  await page.evaluate(() => window.__beat.mark());
-  await trigger();
-  if (phase) await page.evaluate((sel) => window.__beat.startAt(sel), phase);
-  const started = Date.now();
-  await page.evaluate(() => window.__beat.seek(0));
-  await shoot(page, `${name}-start.png`);
-  const wait = peakMs + 40 - (Date.now() - started);
-  if (wait > 0) await page.waitForTimeout(wait);
-  await page.evaluate((ms) => window.__beat.seek(ms), peakMs);
-  await shoot(page, `${name}-peak.png`);
-  await page.evaluate(() => window.__beat.resume());
-  await page.waitForTimeout(settleMs);
-  await shoot(page, `${name}-settle.png`);
-  console.log('strip', name);
-};
+const { shoot, strip } = makeStrips(OUT);
 
 const recordStrips = async (browser, { tiers }) => {
   mkdirSync(OUT, { recursive: true });
@@ -463,10 +258,7 @@ const recordStrips = async (browser, { tiers }) => {
   await context.addInitScript(FREEZE);
   const page = await preparePage(context);
   await openFreshBox(page);
-  const ms = await page.evaluate(async (module) => {
-    const m = await import(module);
-    return Object.fromEntries(Object.entries(m).filter(([, v]) => typeof v === 'number'));
-  }, MODULE);
+  const ms = await moduleNumbers(page, MODULE);
 
   await strip(page, 'tear', () => press(page, '.bb-box__wrap'), { peakMs: ms.WRAP_TEAR_MS * 0.2 });
   await strip(page, 'lid', () => press(page, '.bb-box__open'), { peakMs: ms.LID_OPEN_MS / 2, settleMs: ms.TRAY_TOTAL_MS + 200 });
@@ -510,7 +302,12 @@ const recordStrips = async (browser, { tiers }) => {
   const hitCard = tiers[hitPack].indexOf(best[hitPack]);
   while ((await topIndex(page)) < hitCard) await swipeOne(page, hitPack, tiers);
   await shoot(page, 'hit-waiting.png');
-  await strip(page, `hit-t${best[hitPack]}`, () => press(page, '.bb-pcard.is-top'), { peakMs: ms.HIT_FLIP_MS * 0.55, settleMs: 400 });
+  // A tap while the card is still settling is queued, so the strip times the flip's own clock.
+  await strip(page, `hit-t${best[hitPack]}`, () => press(page, '.bb-pcard.is-top'), {
+    phase: '.bb-pcard.is-top .bb-pcard__flip',
+    peakMs: ms.HIT_FLIP_MS * 0.55,
+    settleMs: 400,
+  });
   while (!(await page.$('.bb-summary'))) await swipeOne(page, hitPack, tiers);
   await page.waitForTimeout(1200);
   await shoot(page, 'summary.png');
@@ -551,55 +348,8 @@ const recordRip3d = async (browser) => {
     return;
   }
   await page.waitForSelector('.bb-spread:not(.is-landing)', { timeout: 10000 });
-  const ms = await page.evaluate(async (module) => {
-    const m = await import(module);
-    return Object.fromEntries(Object.entries(m).filter(([, v]) => typeof v === 'number'));
-  }, PACK3D_MODULE);
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
-  const step = async (totalMs, frame = 16) => {
-    const total = Math.round(totalMs);
-    for (let run = 0; run < total; run += frame) await page.clock.runFor(Math.min(frame, total - run));
-  };
-  await step(64);
-  await shoot(page, 'rip3d-spread.png');
-
-  // A real drag from the left edge: stop at 30 % for the peel, then on past the 40 % rip point.
-  const box = await page.locator('.bb-bigpack.is-focus .bb-pack__top').boundingBox();
-  const y = box.y + box.height / 2;
-  const x0 = box.x + 4;
-  const dragTo = async (from, to) => {
-    for (let share = from; share <= to + 1e-9; share += 0.05) {
-      await page.mouse.move(x0 + box.width * share, y);
-      await step(16);
-    }
-  };
-  await page.mouse.move(x0, y);
-  await page.mouse.down();
-  await dragTo(0.05, 0.3);
-  await step(ms.GRAB_LEVEL_MS);
-  await shoot(page, 'rip3d-peel-30.png');
-  await dragTo(0.35, 0.5);
-  await page.mouse.up();
-  await step(ms.RIP_FINISH_MS);
-  await shoot(page, 'rip3d-rip.png');
-  await step(ms.STRIP_FLIGHT_MS * 0.5);
-  await shoot(page, 'rip3d-strip-flight.png');
-  await step(ms.STRIP_FLIGHT_MS * (ms.CARDS_RISE_AT - 0.5) + ms.CARDS_RISE_MS * 0.6);
-  await shoot(page, 'rip3d-cards-rising.png');
-
-  // Step until the DOM pocket takes over; the last awaiting frame is "before".
-  let handedOff = false;
-  for (let i = 0; i < 500 && !handedOff; i += 1) {
-    const s = await page.evaluate(() => ({
-      view: document.getElementById('bbUnboxing')?.dataset.view,
-      awaiting: !!document.querySelector('.bb-pocket.is-awaiting-3d'),
-    }));
-    handedOff = s.view === 'pocket' && !s.awaiting;
-    if (s.awaiting) await shoot(page, 'rip3d-handoff-before.png');
-    if (!handedOff) await step(8, 8);
-  }
-  await step(32);
-  await shoot(page, 'rip3d-handoff-after.png');
+  const ms = await moduleNumbers(page, PACK3D_MODULE);
+  const { handedOff } = await ripOnSteppedClock(page, { ms, shoot, file: (key) => `rip3d-${key}.png` });
   check(handedOff, '055 pass 4: the stepped rip hands off to the DOM pocket');
   check(await canvasDrawsNothing(page), '055 pass 4: after the hand-off the canvas draws nothing');
   console.log('strip', 'rip3d');
@@ -607,16 +357,6 @@ const recordRip3d = async (browser) => {
 };
 
 // ── Pass 5: fallbacks (design 055 rows 1, 6, 14) ────────────────────────────────────────
-// Counts requestAnimationFrame calls made from the stage module.
-const COUNT_STAGE_RAF = () => {
-  window.__stageRaf = 0;
-  const raf = window.requestAnimationFrame.bind(window);
-  window.requestAnimationFrame = (callback) => {
-    if (/native-deck-builder-pack3d\.js/.test(new Error().stack || '')) window.__stageRaf += 1;
-    return raf(callback);
-  };
-};
-
 const checkReducedMotion = async (browser) => {
   const context = await browser.newContext({ viewport: VIEWPORT });
   await context.addInitScript(() => localStorage.setItem('ptcg-reduce-motion', '1'));
@@ -727,11 +467,6 @@ const checkMountCycles = async (browser) => {
   );
   await context.close();
 };
-
-function launchOptions(args) {
-  const executablePath = process.env.CHROMIUM || (existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : null);
-  return executablePath ? { executablePath, args } : { args };
-}
 
 const browser = await chromium.launch(launchOptions(GL_ARGS));
 mkdirSync('out', { recursive: true });

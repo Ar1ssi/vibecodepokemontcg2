@@ -20,3 +20,6 @@ client/src/assets/playmats/upscaled/
 # design 004 slice 6: playtest-bot.mjs failure dumps (replayable traces, not source)
 out/playtest/
 .superdesign/tmp/
+
+# Elite Trainer Box recorder video (design 057): ~21 MB per run, re-recorded on demand, never committed.
+out/etb*.webm
