@@ -139,6 +139,22 @@ test('attack context counts Ancient Pokémon in play by printing', () => {
   assert.equal(ctx.ancientCount, 2);
 });
 
+test('attack context lists Future/Ancient kinds of the opposing Pokémon by printing', () => {
+  const state = boardState();
+  const slither = pokemon(1, 'Slither Wing', 'sv06.5-026');
+  state.players.p1.zones.active.push(slither);
+  state.players.p2.zones.active.push(pokemon(9, 'Defender', 'sv01-001'));
+  state.players.p2.zones.bench.push(pokemon(10, 'Iron Hands ex', 'sv04-070'));
+  const ctx = buildServerAttackContext(state, {
+    attackerPlayerId: 'p1',
+    defenderPlayerId: 'p2',
+    attacker: slither,
+    defender: state.players.p2.zones.active[0],
+  });
+  assert.ok(ctx.opponentInPlayKinds.some((kinds) => kinds.includes('future')));
+  assert.ok(!ctx.opponentInPlayKinds.some((kinds) => kinds.includes('ancient')));
+});
+
 test('search "Future Pokémon" / "Ancient Pokémon" matches tagged Pokémon, not tagged Trainers', () => {
   const hands = pokemon(1, 'Iron Hands ex', 'sv04-070');
   const tusk = pokemon(2, 'Great Tusk ex', 'sv01-123');

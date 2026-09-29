@@ -12,7 +12,7 @@ import { expandEnergyEntries } from './attack-engine.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { evolvedView } from './evolved-pokemon.mjs';
 import { classifyEnergyEffect } from './energy-effects.mjs';
-import { isAncientCard } from './paradox-tags.mjs';
+import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import { listConditions } from './special-conditions.mjs';
 import {
   isExCard,
@@ -142,6 +142,8 @@ function ruleBoxKinds(view) {
     ['tera', isTeraCard],
     ['radiant', isRadiantCard],
     ['mega', isMegaCard],
+    ['ancient', isAncientCard],
+    ['future', isFutureCard],
   ];
   const kinds = checks.filter(([, test]) => test(view)).map(([kind]) => kind);
   kinds.push(isBasicPokemon(view) ? 'basic' : 'evolved');

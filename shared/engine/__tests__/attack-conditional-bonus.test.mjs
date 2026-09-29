@@ -114,6 +114,14 @@ const CASES = [
     { opponentInPlayKinds: [['v']] },
   ],
   [
+    'Slither Wing Iron Smasher (Shrouded Fable 026; .agent/scratch/attack-full-audit/rows.json)',
+    'Slither Wing',
+    '20+',
+    'If your opponent has any Future Pokémon in play, this attack does 120 more damage.',
+    { opponentInPlayKinds: [['basic'], ['basic', 'future']] },
+    { opponentInPlayKinds: [['basic']] },
+  ],
+  [
     'Diancie Sensitive Ray (Vivid Voltage 079)',
     'Diancie',
     '50+',

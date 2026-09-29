@@ -123,6 +123,7 @@ const KIND_PHRASES = [
   [/^(?:an? )?basic pokémon$/, () => 'basic'],
   [/^(?:an? )?stage (1|2)(?: evolved)? pokémon$/, (m) => `stage${m[1]}`],
   [/^(?:an? )?(tera|radiant|mega) pokémon$/, (m) => m[1]],
+  [/^(?:an? )?(ancient|future) pokémon$/, (m) => m[1]],
   // Snorlax Teampact ("Team Plasma Pokémon"), Blaziken VMAX ("Rapid Strike Pokémon").
   [
     /^(?:an? )?(single strike|rapid strike|fusion strike|team plasma|team aqua|team magma|team rocket's) pokémon$/,
