@@ -25,6 +25,10 @@
 // Every coin the engine flips plays the full-screen coin ceremony. The engine
 // reports flips in several event shapes; each becomes one `coin-flip` plan whose
 // `faces` lists every flip in order (coin-pose.mjs `coinFlipFaces`).
+//
+// Design 059: cards a player reveals from their deck into their hand play the
+// Trainer reveal (deck → reveal spot → hand) as one `reveal` plan per player and
+// batch; `deckRevealRuns` groups them before the batch is handled.
 import { coinFlipFaces, MAX_CEREMONY_FLIPS } from './mat-fx/coin-pose.mjs';
 
 export const EVENT_FX = {
@@ -116,10 +120,11 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {object} event
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
- * @param {{ dealShuffle?: boolean }} [options] `dealShuffle`: this `deckShuffled`
- *   is in dealShuffles, so it animates (other deck shuffles do not)
+ * @param {{ dealShuffle?: boolean, revealRun?: object[]|null }} [options] `dealShuffle`:
+ *   this `deckShuffled` is in dealShuffles, so it animates (other deck shuffles do not).
+ *   `revealRun`: this event's entry from deckRevealRuns, if any
  */
-export function advisoryAnimationPlan(event, selfPlayerId, coinRun, { dealShuffle = false } = {}) {
+export function advisoryAnimationPlan(event, selfPlayerId, coinRun, { dealShuffle = false, revealRun = null } = {}) {
   if (!event || typeof event !== 'object') return null;
   if (dealShuffle && event.type === 'deckShuffled' && event.playerId != null && selfPlayerId != null) {
     return { kind: 'shuffle', user: event.playerId === selfPlayerId ? 'self' : 'opp', zoneId: 'deck' };
@@ -164,10 +169,79 @@ export function advisoryAnimationPlan(event, selfPlayerId, coinRun, { dealShuffl
       if (event.instanceId == null) return null;
       return { kind: 'knockout', user, instanceId: event.instanceId };
 
+    // Design 059: the group's first reveal plays every card the player revealed
+    // from the deck into the hand in this batch; the others plan nothing.
+    case 'cardsRevealed':
+      if (!Array.isArray(revealRun) || revealRun.length === 0) return null;
+      return { kind: 'reveal', user, cards: revealRun };
+
     default:
       return null;
   }
 }
+
+// A reveal both seats see: not a look only its player had (`peek`), not one shown
+// to a single player (`revealedTo`), not a hand shown where it lies (`hand`).
+const isPublicReveal = (event) =>
+  event?.type === 'cardsRevealed' &&
+  event.playerId != null &&
+  !event.peek &&
+  event.revealedTo == null &&
+  !event.hand;
+
+const movedDeckToHand = (event) =>
+  event?.type === 'cardMoved' &&
+  event.from === 'deck' &&
+  event.to === 'hand' &&
+  event.instanceId != null &&
+  event.playerId != null;
+
+/**
+ * Design 059: the cards each player revealed from their deck into their hand in
+ * one batch. A card counts when the batch both moves it deck → hand
+ * (`cardMoved`) and names it in a public `cardsRevealed` by the same player —
+ * the engine names a hand pick only when its text reveals it. The player's first
+ * such event maps to the whole group (event order, no duplicates); the player's
+ * later reveal events map to [], so one scene plays per player and batch.
+ *
+ * @param {object[]} events
+ * @returns {Map<object, {instanceId: number, name?: string, src?: string}[]>}
+ */
+export function deckRevealRuns(events) {
+  const runs = new Map();
+  if (!Array.isArray(events)) return runs;
+  const drawnFromDeck = new Map();
+  for (const event of events) {
+    if (!movedDeckToHand(event)) continue;
+    if (!drawnFromDeck.has(event.playerId)) drawnFromDeck.set(event.playerId, new Set());
+    drawnFromDeck.get(event.playerId).add(event.instanceId);
+  }
+  const leaders = new Map();
+  for (const event of events) {
+    if (!isPublicReveal(event)) continue;
+    const fromDeck = drawnFromDeck.get(event.playerId);
+    const cards = fromDeck ? drawnCards(event.cards).filter((card) => fromDeck.has(card.instanceId)) : [];
+    if (cards.length === 0) continue;
+    const leader = leaders.get(event.playerId);
+    if (!leader) {
+      leaders.set(event.playerId, event);
+      runs.set(event, dedupeById(cards));
+      continue;
+    }
+    runs.set(leader, dedupeById([...runs.get(leader), ...cards]));
+    runs.set(event, []);
+  }
+  return runs;
+}
+
+const dedupeById = (cards) => {
+  const seen = new Set();
+  return cards.filter((card) => {
+    if (seen.has(card.instanceId)) return false;
+    seen.add(card.instanceId);
+    return true;
+  });
+};
 
 const DEAL_EVENTS = new Set(['openingHandDealt', 'mulliganTaken']);
 

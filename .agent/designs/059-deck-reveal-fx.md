@@ -147,10 +147,10 @@ Client scene:
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | `cardsRevealed` with no deck → hand move in the batch (hand reveal, prizes, bench search) | no plan | [ ] |
-| 2 | malformed entries (no instanceId, bare ids, non-array `cards`) | bare ids read as ids; the rest ignored | [ ] |
+| 1 | `cardsRevealed` with no deck → hand move in the batch (hand reveal, prizes, bench search) | no plan | [x] covered: deck-reveal-plan "hand reveals, peeks, … do not fly" |
+| 2 | malformed entries (no instanceId, bare ids, non-array `cards`) | bare ids read as ids; the rest ignored | [x] covered: deck-reveal-plan "malformed batches" |
 | 3 | 1 card / 7 cards / 12 cards | big preview / 4+3 spread / first 10 fly, 2 shown in hand at once | [ ] |
-| 4 | one card per event (lookAtDeckEnd, Drayton) | one scene with every card, no duplicates | [ ] |
+| 4 | one card per event (lookAtDeckEnd, Drayton) | one scene with every card, no duplicates | [x] covered: deck-reveal-plan "one reveal per card" |
 | 5 | no deck cover rect / no hand card rect / opponent card without `src` | starts above the spot face down / fades at the spot / shown without a flight | [ ] |
 | 6 | overlay aborted, hand re-rendered, queue cleared | real cards shown by the landing or the backstop | [ ] |
 | 7 | hidden search to hand (Quick Search, Cassiopeia, Explorer's Guidance) | no `cardsRevealed` for the hand picks, no scene | [x] covered: deck-reveal-events Cassiopeia / Explorer's Guidance / Quick Search / non-revealing attack |
@@ -162,7 +162,7 @@ Client scene:
 | 13 | Nest Ball (bench search) | its public `cardsRevealed` unchanged; no reveal scene | [x] covered (event): Nest Ball test |
 | 14 | attack search with reveal (Jirachi), staged attack search | `cardsRevealed` per resolved stage → scene | [x] covered: Jirachi Charge Energy test; reasoning: no corpus attack parses to stages, the flag rides the token to each stage |
 | 15 | Trainer preview and reveal in one batch (Gutsy Pickaxe) | preview first, reveal starts on its hold | [ ] |
-| 16 | spectator | no plan | [ ] |
+| 16 | spectator | no plan | [x] covered: deck-reveal-plan "without a known seat" |
 | 17 | revealed card no longer in the hand after the diff | skipped | [ ] |
 
 ## Test plan
