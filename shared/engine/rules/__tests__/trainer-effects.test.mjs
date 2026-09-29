@@ -1915,6 +1915,13 @@ describe('recurring-wording coverage (batch 6)', () => {
     assert.equal(r.steps[0].count, 2);
   });
 
+  test('Drayton (corpus: Surging Sparks 174): one Pokémon and one Trainer, not any card', () => {
+    const r = parseTrainerEffect('Look at the top 7 cards of your deck. You may reveal a Pokémon and a Trainer card you find there and put them into your hand. Shuffle the other cards back into your deck.');
+    assert.deepEqual(r.steps, [
+      { type: 'lookAtTop', count: 7, pick: 'Pokémon and Trainer', oneEach: ['Pokémon', 'Trainer'], destination: 'hand' },
+    ]);
+  });
+
   test('Master Ball: "look at 7 cards from the top" → lookAtTop count 7', () => {
     const r = parseTrainerEffect('Look at 7 cards from the top of your deck. You may choose a Basic Pokémon or Evolution card from those cards, show it to your opponent, and put it into your hand. Shuffle the rest into your deck.');
     assert.equal(r.steps[0].type, 'lookAtTop');
@@ -2194,6 +2201,16 @@ describe('legacy mechanisms coverage (batch 11)', () => {
     assert.equal(er.steps[1].type, 'recursion');
     const ser = parseTrainerEffect('Trade 2 of the other cards in your hand for 4 basic Energy cards from your discard pile. If you have fewer than 4 basic Energy cards there, take all of them.');
     assert.equal(ser.steps[0].count, 2);
+  });
+
+  test('Energy Retrieval (modern wording): counted Basic Energy pick, not every discard card', () => {
+    // Corpus rows: Energy Retrieval (CRI 108 / WHT 082), Superior Energy Retrieval (PAL 277) in out/pkmn-trainer-cards.json.
+    const er = parseTrainerEffect('Put up to 2 Basic Energy cards from your discard pile into your hand.');
+    assert.deepEqual(er.steps, [{ type: 'recursion', what: 'Basic Energy', count: 2, from: 'discard' }]);
+    const ser = parseTrainerEffect('You can use this card only if you discard 2 other cards from your hand. Put up to 4 Basic Energy cards from your discard pile into your hand. (You can\u2019t choose a card you discarded with the effect of this card.)');
+    assert.equal(ser.steps[0].type, 'discardCost');
+    assert.equal(ser.steps[1].what, 'Basic Energy');
+    assert.equal(ser.steps[1].count, 4);
   });
 
   test("Team Rocket's Handiwork: mill 2 per heads", () => {

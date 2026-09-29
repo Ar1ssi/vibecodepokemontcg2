@@ -16,8 +16,9 @@
 // motion (no stage rAF loop, the rip lands at once), WebGL disabled (the DOM scene), and 20
 // mount/unmount cycles (no leaked WebGL context).
 //
-// Env: SEED (42) · BASE_URL (http://localhost:4100) · OUT (.agent/scratch/unboxing[-<seed>])
-//      CARD_IMG: a local image or URL served for every TCGdex card face (sandboxes where TCGdex is blocked)
+// Env: SEED (42) · BOX (a catalog box key; default phantasmal-flames) · BASE_URL (http://localhost:4100)
+//      OUT (.agent/scratch/unboxing[-<box>][-<seed>])
+//      CARD_IMG: a local image or URL served for every card face (sandboxes where the art hosts are blocked)
 //      SIO_JS: a local socket.io.min.js (default: the server's own /socket.io/socket.io.js)
 //      CHROMIUM: a browser binary (the cloud container has /opt/pw-browsers/chromium)
 import { chromium } from 'playwright';
@@ -25,10 +26,13 @@ import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
 const SEED = Number(process.env.SEED ?? 42);
+const BOX = process.env.BOX || 'phantasmal-flames';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:4100';
-const OUT = process.env.OUT || `.agent/scratch/unboxing${SEED === 42 ? '' : `-${SEED}`}`;
-const VIDEO = `out/unboxing${SEED === 42 ? '' : `-${SEED}`}.webm`;
-const PAGE_URL = `${BASE_URL}/build-and-battle?seed=${SEED}&e2e=1`;
+// Design 054 § Recorder: the default box keeps 052's file names; another box names its files.
+const NAME_TAG = `${BOX === 'phantasmal-flames' ? '' : `-${BOX}`}${SEED === 42 ? '' : `-${SEED}`}`;
+const OUT = process.env.OUT || `.agent/scratch/unboxing${NAME_TAG}`;
+const VIDEO = `out/unboxing${NAME_TAG}.webm`;
+const PAGE_URL = `${BASE_URL}/build-and-battle?seed=${SEED}&e2e=1&box=${encodeURIComponent(BOX)}`;
 const STORAGE_KEY = 'ptcg-sim.build-battle.v1';
 const VIEWPORT = { width: 1280, height: 800 };
 const MODULE = '/src/setup/deck-builder/core/build-battle/unboxing.mjs';
@@ -38,11 +42,17 @@ const SCENE_MODULE = '/src/initialization/document-event-listeners/sidebox/nativ
 const GL_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 const NO_GL_ARGS = ['--disable-webgl', '--disable-webgl2'];
 // Set cards come from TCGdex, the deck promos from Limitless.
-const CARD_HOSTS = ['https://assets.tcgdex.net/**', 'https://limitlesstcg.nyc3.digitaloceanspaces.com/**'];
+// Card art hosts: TCGdex, the Limitless promo host, and images.pokemontcg.io for the Trainer Gallery
+// and SM rows TCGdex has no art for (design 054 D4).
+const CARD_HOSTS = [
+  'https://assets.tcgdex.net/**',
+  'https://limitlesstcg.nyc3.digitaloceanspaces.com/**',
+  'https://images.pokemontcg.io/**',
+];
 
 const failures = [];
 const check = (ok, label, detail = '') => {
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${label}${detail ? ` — ${detail}` : ''}`);
+  console.log(`${ok ? 'PASS' : 'FAIL'} [${BOX}] ${label}${detail ? ` — ${detail}` : ''}`);
   if (!ok) failures.push(label);
 };
 
@@ -78,7 +88,7 @@ const openFreshBox = async (page) => {
   await page.goto(PAGE_URL);
   await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
   await page.reload();
-  await page.waitForSelector('#buildBattleOpenBox', { state: 'visible', timeout: 30000 });
+  await page.waitForSelector('#buildBattleOpenBox:not([disabled])', { state: 'visible', timeout: 30000 });
   await page.waitForTimeout(400);
   await page.click('#buildBattleOpenBox');
   await page.waitForSelector('#bbUnboxing .bb-box__wrap', { state: 'visible' });
@@ -108,18 +118,26 @@ const dragTear = async (page, selector) => {
 };
 
 const session = (page) => page.evaluate((key) => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
+// The saved box's card data, as the tab loads it (design 054: per-box modules on demand).
+const BOX_DATA = '/src/setup/deck-builder/core/build-battle/box-data.mjs';
+const PACK_MODELS_MODULE = '/src/setup/deck-builder/core/build-battle/pack-models.mjs';
+
 const tiersOf = (page) =>
-  page.evaluate(async ({ module, key }) => {
+  page.evaluate(async ({ module, key, boxData, packModels }) => {
     const { hitTierFor, packSlotKind } = await import(module);
-    const { BUILD_BATTLE_BOXES } = await import('/src/setup/deck-builder/core/build-battle/box-catalog.mjs');
-    const { BUILD_BATTLE_SET_CARDS } = await import('/src/setup/deck-builder/core/build-battle/build-battle.generated.mjs');
-    const box = BUILD_BATTLE_BOXES[0];
-    const byId = new Map(BUILD_BATTLE_SET_CARDS[box.setId].map((card) => [card.id, card]));
-    const { packs } = JSON.parse(localStorage.getItem(key));
-    return packs.map((pack) =>
-      pack.map((id, index) => hitTierFor(byId.get(id), packSlotKind(box.packModel, index, byId.get(id))))
+    const { loadBoxData } = await import(boxData);
+    const { cardClass, resolvePackModel } = await import(packModels);
+    const saved = JSON.parse(localStorage.getItem(key));
+    const { box, cards, setInfo } = await loadBoxData(saved.boxKey);
+    const byId = new Map(cards.map((card) => [card.id, card]));
+    const packModel = resolvePackModel(box.packModelKey, cards, setInfo);
+    return saved.packs.map((pack) =>
+      pack.map((id, index) => {
+        const card = byId.get(id);
+        return hitTierFor(card, packSlotKind(packModel, index, card), cardClass(card, box.era, setInfo));
+      })
     );
-  }, { module: MODULE, key: STORAGE_KEY });
+  }, { module: MODULE, key: STORAGE_KEY, boxData: BOX_DATA, packModels: PACK_MODELS_MODULE });
 
 
 const summaryIds = (page) =>
@@ -132,23 +150,25 @@ const summaryIds = (page) =>
 // Every summary card wears foil exactly when unboxingHoloRarity says so, in that family.
 const foilMismatches = (page, packIndex) =>
   page.evaluate(
-    async ({ module, key, i }) => {
+    async ({ module, key, i, boxData, packModels }) => {
       const { unboxingHoloRarity, packSlotKind } = await import(module);
-      const { BUILD_BATTLE_BOXES } = await import('/src/setup/deck-builder/core/build-battle/box-catalog.mjs');
-      const { BUILD_BATTLE_SET_CARDS } = await import('/src/setup/deck-builder/core/build-battle/build-battle.generated.mjs');
-      const box = BUILD_BATTLE_BOXES[0];
-      const byId = new Map(BUILD_BATTLE_SET_CARDS[box.setId].map((card) => [card.id, card]));
-      const ids = JSON.parse(localStorage.getItem(key)).packs[i];
+      const { loadBoxData } = await import(boxData);
+      const { resolvePackModel } = await import(packModels);
+      const saved = JSON.parse(localStorage.getItem(key));
+      const { box, cards, setInfo } = await loadBoxData(saved.boxKey);
+      const byId = new Map(cards.map((card) => [card.id, card]));
+      const packModel = resolvePackModel(box.packModelKey, cards, setInfo);
+      const ids = saved.packs[i];
       return [...document.querySelectorAll('.bb-summary__card')].flatMap((node) => {
         const k = Number(node.dataset.cardIndex);
         const card = byId.get(ids[k]);
-        const want = unboxingHoloRarity(card, packSlotKind(box.packModel, k, card));
+        const want = unboxingHoloRarity(card, packSlotKind(packModel, k, card));
         const holo = node.querySelector('.card[data-rarity]');
         const got = holo ? holo.dataset.rarity : null;
         return (want || null)?.toLowerCase() === got?.toLowerCase() ? [] : [`card ${k + 1} ${card?.rarity}: want ${want}, got ${got}`];
       });
     },
-    { module: MODULE, key: STORAGE_KEY, i: packIndex }
+    { module: MODULE, key: STORAGE_KEY, i: packIndex, boxData: BOX_DATA, packModels: PACK_MODELS_MODULE }
   );
 
 const topIndex = (page) =>
@@ -164,12 +184,16 @@ const topFaceDown = (page) =>
     return !!flip && new DOMMatrix(getComputedStyle(flip).transform).m33 < 0;
   });
 
+const topFlipped = (page) =>
+  page.evaluate(() => !!document.querySelector('.bb-pcard.is-top')?.classList.contains('is-flipped'));
+
 const hitsFaceDown = [];
 
-// One card: a hit turns over first (and must start face down), then the card is swiped off.
+// One card: a hit turns over first (and must start face down), then the card is swiped off. A hit
+// the hit strip already turned over is only swiped.
 const swipeOne = async (page, packIndex, tiers, { drag = false } = {}) => {
   const k = await topIndex(page);
-  if (tiers[packIndex][k] >= 2) {
+  if (tiers[packIndex][k] >= 2 && !(await topFlipped(page))) {
     hitsFaceDown.push(await topFaceDown(page));
     await press(page, '.bb-pcard.is-top');
     await page.waitForFunction(() => document.querySelector('.bb-pcard.is-top')?.classList.contains('is-flipped'), null, { timeout: 6000 });
@@ -317,7 +341,11 @@ const recordVideo = async (browser) => {
   await press(page, '[data-control="build"]');
   await page.waitForFunction(() => !document.getElementById('bbUnboxingStage'), null, { timeout: 8000 });
   await page.waitForTimeout(1200);
-  check(JSON.stringify((await session(page)).packs) === packsAtOpen, 'row 13 the scene never rewrote session.packs');
+  const saved = await session(page);
+  check(JSON.stringify(saved.packs) === packsAtOpen, 'row 13 the scene never rewrote session.packs');
+  check(saved.boxKey === BOX, 'the opened box is the one asked for', saved.boxKey);
+  // The editor starts on the box's own deck: 40 cards, or a 23-card Evolution pack (design 054 rows 14–15).
+  const startingDeck = saved.evolutionPack && !saved.energy ? saved.evolutionPack.length : 40;
   const back = await page.evaluate(() => ({
     pool: !document.getElementById('buildBattlePoolPanel')?.hidden,
     ui: getComputedStyle(document.querySelector('.native-deck-builder-inner')).visibility,
@@ -328,8 +356,8 @@ const recordVideo = async (browser) => {
     ),
   }));
   check(
-    back.pool && back.ui === 'visible' && back.deck === '40' && back.left === 40,
-    'UI returns on the Pool tab with the 40-card box deck loaded and the 40 pack cards left to add',
+    back.pool && back.ui === 'visible' && back.deck === String(startingDeck) && back.left === 40,
+    `UI returns on the Pool tab with the ${startingDeck}-card box deck loaded and the 40 pack cards left to add`,
     JSON.stringify(back)
   );
   await page.waitForTimeout(800);
@@ -623,6 +651,19 @@ const checkMountCycles = async (browser) => {
   await page.waitForSelector('#buildBattleOpenBox', { state: 'visible', timeout: 30000 });
   const result = await page.evaluate(async (module) => {
     const { mountUnboxingScene } = await import(module);
+    const core = '/src/setup/deck-builder/core/build-battle';
+    const { getBuildBattleBox } = await import(`${core}/box-catalog.mjs`);
+    const { boxSkin } = await import(`${core}/unboxing.mjs`);
+    const { unboxingLabels } = await import(`${core}/build-battle-view.mjs`);
+    // The vendored Phantasmal Flames box: its packs are image fronts the stage can draw.
+    const box = getBuildBattleBox('phantasmal-flames');
+    const look = {
+      skin: boxSkin({ box }),
+      labels: unboxingLabels(box, 'Phantasmal Flames'),
+      seriesName: 'Mega Evolution',
+      setName: 'Phantasmal Flames',
+      playLevel: true,
+    };
     const unboxing = { stage: 'deckShown', wrapTorn: true, packsTorn: [false, false, false, false], revealed: [0, 0, 0, 0] };
     const host = document.createElement('div');
     host.className = 'build-battle-window';
@@ -641,6 +682,8 @@ const checkMountCycles = async (browser) => {
         dispatch: () => null,
         packs: Array.from({ length: 4 }, () => Array(10).fill(null)),
         packModel: { slots: [] },
+        classOf: () => null,
+        look,
         seed: 42,
         promo: null,
         onBuildDeck: () => {},

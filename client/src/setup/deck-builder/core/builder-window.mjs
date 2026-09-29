@@ -75,7 +75,9 @@ const isDeckRows = (rows) =>
 
 const PAYLOAD_VALIDATORS = {
   ready: () => true,
-  'host-state': (payload) => typeof payload.isTwoPlayer === 'boolean',
+  'host-state': (payload) =>
+    typeof payload.isTwoPlayer === 'boolean' &&
+    (payload.roomId === undefined || isNullableId(payload.roomId)),
   'load-deck': (payload) =>
     isTarget(payload.target) &&
     isNullableId(payload.deckId) &&

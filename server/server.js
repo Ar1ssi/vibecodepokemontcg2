@@ -583,7 +583,8 @@ async function main() {
         if (socket.data.leaveRoom) {
           const leftAsPlayer = room.players.has(username);
           if (leftAsPlayer) {
-            socket.data.seat = null;
+            // Delete, never null: the admin UI's socket.data proxy throws on a null value.
+            delete socket.data.seat;
             room.players.delete(username);
             room.setupActionCache?.delete(socket.id);
             setRoomFormat(roomId, room, clearRoomFormatProposal(room.format));

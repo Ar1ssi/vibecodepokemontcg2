@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D192).
+#   Next id = highest D number in this file and the archive + 1 (next: D193).
 
 ## Active
+- D192 2026-09-28 [client] A saved Build & Battle box belongs to the room it was opened in (`session.roomId`); the game tab sends its room to the builder tab (`host-state.roomId`), and a different room starts a fresh box. Reloads and rematches in the same room keep it; outside a room it is kept.
 - D191 2026-09-28 [netcode] The match format is room-level: both seated players must agree (propose/accept) and the server keeps it on roomInfo, mirrored to GameRoom.roomFormat, never in engine state; the deal refuses decks of another format and the choice locks when the coin call opens (design 053).
 - D190 2026-09-28 [netcode] Formats are checked at the deal, not at load: `setup` refuses mixed formats and both Set Ups clear with a chat line, so a restored last-used deck stays replaceable (I202). (Supersedes D187's load refusal.)
 - D189 2026-09-28 [deck-builder] A built B&B deck is a library record with `format: 'build-battle'`, so restore-on-join reloads it as 40/4; the Standard builder shows it but does not enforce the pool. (design 051)

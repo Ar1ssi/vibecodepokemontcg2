@@ -106,6 +106,7 @@ the wrap and the first pack.
 PORT=4100 pnpm start &                     # worktree server
 node .claude/skills/fx-preview/rec/rec-unboxing.mjs            # SEED=42 by default
 SEED=18 node .claude/skills/fx-preview/rec/rec-unboxing.mjs    # seed 18 holds a tier-3 hit (SIR/MHR)
+BOX=team-up node .claude/skills/fx-preview/rec/rec-unboxing.mjs # any catalog box (design 054); files get -<box>
 ```
 
 - Pass 1 records the whole box at real speed to `out/unboxing.webm` (`out/unboxing-<seed>.webm`
@@ -117,7 +118,7 @@ SEED=18 node .claude/skills/fx-preview/rec/rec-unboxing.mjs    # seed 18 holds a
   `pack-tear`, `flip-t0`, `flip-hit-t<tier>` (the box's best card) and `collapse`. A chained phase
   (promo after the unwrap, collapse after the last card) is timed from its own animation's start.
 - Pass 3 shoots `phone-390.png` mid-pack and checks row 16 (no horizontal scroll).
-- 3D packs (design 054): Chromium launches with `--use-angle=swiftshader --enable-unsafe-swiftshader
+- 3D packs (design 055): Chromium launches with `--use-angle=swiftshader --enable-unsafe-swiftshader
   --ignore-gpu-blocklist`, so WebGL runs headless. Pass 1 also checks the spread draws in WebGL
   (`#bbUnboxing[data-render='3d']`), a reload at the spread returns to it, and the pocket hand-off
   leaves the canvas empty (a screenshot with the `.bb-gl` canvas hidden is byte-identical). The
@@ -127,8 +128,8 @@ SEED=18 node .claude/skills/fx-preview/rec/rec-unboxing.mjs    # seed 18 holds a
   strip-flight,cards-rising,handoff-before,handoff-after}.png` from a real drag. Pass 5 (always)
   checks reduced motion (no stage rAF loop at rest, the rip lands at once), 20 mount/unmount
   cycles (no leaked context), and a browser with `--disable-webgl` (the DOM scene).
-- `CARD_IMG=<png|url>` serves one image for every card face (TCGdex and the Limitless promo
-  host). Use it where those hosts are blocked; without it a blocked face shows the card-back
+- `CARD_IMG=<png|url>` serves one image for every card face (TCGdex, the Limitless promo
+  host and images.pokemontcg.io). Use it where those hosts are blocked; without it a blocked face shows the card-back
   fallback and the foil layers have nothing to sit on. The card faces are then a stand-in: judge
   foil, flare and pacing from them, never the card art.
 

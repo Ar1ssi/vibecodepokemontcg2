@@ -292,6 +292,18 @@ const CLAUSES = [
       printedNegated: false,
     }),
   ],
+  // Sableye Cocky Claw (me02-059): "any Stage 2 {D} Pokémon on your Bench".
+  [
+    /^you have any (stage [12]) (?:\{([a-z])\} )?pokémon on your bench$/,
+    (m) => ({
+      desc: {
+        kind: 'benchHasStage',
+        stage: m[1].replace(/^./, 'S'),
+        ...(m[2] ? { type: ENERGY_LETTER_TYPES[m[2]] } : {}),
+      },
+      printedNegated: false,
+    }),
+  ],
   [
     /^(.+?) (?:is|are) on your bench$/,
     (m) => {
@@ -887,6 +899,10 @@ function damageCounters(damage) {
   return Math.max(0, Math.floor(num(damage) / 10));
 }
 
+// The board stores the Darkness type as 'Dark' or 'Darkness'.
+const canonicalType = (t) => (String(t).toLowerCase() === 'dark' ? 'darkness' : String(t).toLowerCase());
+const sameType = (a, b) => canonicalType(a) === canonicalType(b);
+
 function benchCount(ctx, cond) {
   const names = list(ctx.benchNames);
   const types = list(ctx.benchTypes);
@@ -967,6 +983,12 @@ const CHECKS = {
   handCountVsOpponent: (cond, ctx) => compare(num(ctx.ownHandCount), cond.op, num(ctx.opponentHandCount)),
   sameHandCountAsOpponent: (cond, ctx) => num(ctx.ownHandCount) === num(ctx.opponentHandCount),
   benchCount: (cond, ctx) => compare(benchCount(ctx, cond), cond.op, cond.n),
+  benchHasStage: (cond, ctx) =>
+    list(ctx.benchStages).some(
+      (stage, i) =>
+        stage === cond.stage &&
+        (!cond.type || list(list(ctx.benchTypes)[i]).some((t) => sameType(t, cond.type)))
+    ),
   benchHasName: (cond, ctx) => list(cond.names).every((name) => list(ctx.benchNames).some((actual) => nameMatches(actual, name))),
   inPlayHasName: (cond, ctx) => list(cond.names).every((name) => list(ctx.ownInPlayNames).some((actual) => nameMatches(actual, name))),
   opponentPrizes: (cond, ctx) => compare(num(ctx.opponentPrizes), cond.op, cond.n),

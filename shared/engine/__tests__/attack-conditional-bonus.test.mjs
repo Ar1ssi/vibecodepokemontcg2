@@ -18,6 +18,14 @@ const dealt = (attack, ctx, attacker = {}) => parseAttackDamage(attack, attacker
 // [source, attacker name, printed damage, text, ctx where the bonus applies, ctx where it does not]
 const CASES = [
   [
+    'Sableye Cocky Claw (TCGdex me02-059)',
+    'Sableye',
+    '20+',
+    'If you have any Stage 2 {D} Pokémon on your Bench, this attack does 70 more damage.',
+    { benchNames: ['Tyranitar'], benchStages: ['Stage 2'], benchTypes: [['Darkness']] },
+    { benchNames: ['Pupitar'], benchStages: ['Stage 1'], benchTypes: [['Darkness']] },
+  ],
+  [
     'Keldeo ex Gale Thrust (White Flare 167)',
     'Keldeo ex',
     '30+',
@@ -445,4 +453,19 @@ test('reducer: Diancie Sensitive Ray reads the Supporter played this turn', () =
   played.state.players.p1.flags.supporterNamesThisTurn = ['Marnie'];
   assert.equal(attackDamage(played.state), 120);
   assert.equal(attackDamage(board('Diancie', attack).state), 50);
+});
+
+test('Sableye Cocky Claw ignores a Stage 2 of the wrong type and a Stage 2 Defender', () => {
+  const cocky = {
+    name: 'Cocky Claw',
+    damage: '20+',
+    text: 'If you have any Stage 2 {D} Pokémon on your Bench, this attack does 70 more damage.',
+  };
+  const wrongType = serverCtx({ benchNames: ['Venusaur'], benchStages: ['Stage 2'], benchTypes: [['Grass']] });
+  assert.equal(parseAttackDamage(cocky, { name: 'Sableye' }, {}, wrongType).total, 20);
+  const stage2Defender = { stage: 'Stage 2' };
+  const noBench = serverCtx({ benchNames: ['Pupitar'], benchStages: ['Stage 1'], benchTypes: [['Dark']] });
+  assert.equal(parseAttackDamage(cocky, { name: 'Sableye' }, stage2Defender, noBench).total, 20);
+  const darkBoard = serverCtx({ benchNames: ['Tyranitar'], benchStages: ['Stage 2'], benchTypes: [['Dark']] });
+  assert.equal(parseAttackDamage(cocky, { name: 'Sableye' }, {}, darkBoard).total, 90);
 });

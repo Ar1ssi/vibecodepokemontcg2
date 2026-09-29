@@ -47,15 +47,37 @@ function openBuilderTab(name, path) {
   return builder;
 }
 
+// Game tab: the builder tabs that said hello, so a room change reaches the ones already open.
+const builderTabs = new Set();
+let readHostState = null;
+
+const postHostState = (tab) => {
+  if (!readHostState) return;
+  try {
+    tab.postMessage(buildBuilderMessage('host-state', readHostState()), window.location.origin);
+  } catch {
+    builderTabs.delete(tab);
+  }
+};
+
+/** Game tab: tells every open builder tab the game's current state (a room was joined or left). */
+export const announceHostState = () => {
+  for (const tab of builderTabs) {
+    if (tab.closed) builderTabs.delete(tab);
+    else postHostState(tab);
+  }
+};
+
 /**
  * Game tab: applies messages from the builder tab. Only same-origin messages
  * from another window that parse as builder messages get through.
  *
  * @param {object} options
  * @param {(message: {type: string, payload: object}) => void} options.apply
- * @param {() => {isTwoPlayer: boolean}} options.getHostState
+ * @param {() => {isTwoPlayer: boolean, roomId: string|null}} options.getHostState
  */
 export const installDeckBuilderHost = ({ apply, getHostState }) => {
+  readHostState = getHostState;
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin) return;
     if (!event.source || event.source === window) return;
@@ -63,10 +85,8 @@ export const installDeckBuilderHost = ({ apply, getHostState }) => {
     if (!message) return;
 
     if (message.type === 'ready') {
-      event.source.postMessage(
-        buildBuilderMessage('host-state', getHostState()),
-        window.location.origin
-      );
+      builderTabs.add(event.source);
+      postHostState(event.source);
       return;
     }
     if (message.type === 'host-state') return;
@@ -78,7 +98,7 @@ export const installDeckBuilderHost = ({ apply, getHostState }) => {
  * Builder tab: the channel to the game tab that opened it.
  *
  * @param {object} options
- * @param {(state: {isTwoPlayer: boolean}) => void} options.onHostState
+ * @param {(state: {isTwoPlayer: boolean, roomId?: string|null}) => void} options.onHostState
  * @returns {{post: (type: string, payload: object) => boolean, isConnected: () => boolean}}
  */
 export const connectToHost = ({ onHostState }) => {

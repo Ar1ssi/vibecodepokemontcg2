@@ -29,6 +29,144 @@
   min-width: 0;
 }
 
+/*
+ * Era palettes (design 054 § Unboxing skin): the procedural box and pack faces of each era, picked by
+ * `data-era` on the scene. The block above is the Mega Evolution palette and every era's fallback;
+ * the fx-designer may tune these hues, never the layout.
+ */
+.build-battle-window .db-live .bb-scene[data-era='xy'] {
+  --bb-magenta: #1f6fd6;
+  --bb-lime: #ffd23f;
+  --bb-yellow: #ffe680;
+  --bb-blue: #0b3d91;
+}
+.build-battle-window .db-live .bb-scene[data-era='sm'] {
+  --bb-magenta: #ff8a00;
+  --bb-lime: #16c2b0;
+  --bb-yellow: #ffcf3d;
+  --bb-blue: #0f6f8f;
+}
+.build-battle-window .db-live .bb-scene[data-era='swsh'] {
+  --bb-magenta: #e3263b;
+  --bb-lime: #2f7bff;
+  --bb-yellow: #ffd400;
+  --bb-blue: #1d3a8a;
+}
+.build-battle-window .db-live .bb-scene[data-era='sv'] {
+  --bb-magenta: #e0263a;
+  --bb-lime: #8b3fd9;
+  --bb-yellow: #ffb300;
+  --bb-blue: #5b2a86;
+}
+
+/*
+ * Procedural pack front (design 054 § Unboxing skin): the 052 pack layout — crimped seals top and
+ * bottom (7 % each), the wordmark and age badge, a card's art, the set logo and the red "additional
+ * game cards" band — in the era palette, for boxes without vendored pack art. Sized in `cqw` so the
+ * spread's big packs and the pocket's small one read alike.
+ */
+.build-battle-window .db-live .bb-packfront {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  background: linear-gradient(
+    160deg,
+    var(--bb-black) 0 28%,
+    var(--bb-magenta) 28% 56%,
+    var(--bb-blue) 56% 100%
+  );
+}
+.build-battle-window .db-live .bb-packfront::before,
+.build-battle-window .db-live .bb-packfront::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7%;
+  z-index: 2;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.35) 0 2px, rgba(0, 0, 0, 0.22) 2px 4px),
+    linear-gradient(180deg, #d9dbe0, #9aa0aa);
+}
+.build-battle-window .db-live .bb-packfront::before {
+  top: 0;
+}
+.build-battle-window .db-live .bb-packfront::after {
+  bottom: 0;
+}
+.build-battle-window .db-live .bb-packfront__head {
+  position: absolute;
+  top: 8.5%;
+  left: 5%;
+  right: 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.build-battle-window .db-live .bb-packfront .bb-wordmark__name {
+  font-size: 9cqw;
+}
+.build-battle-window .db-live .bb-packfront .bb-wordmark__sub {
+  font-size: 3cqw;
+}
+.build-battle-window .db-live .bb-packfront .bb-age {
+  font-size: 5cqw;
+}
+.build-battle-window .db-live .bb-packfront__window {
+  position: absolute;
+  top: 20%;
+  left: 6%;
+  right: 6%;
+  bottom: 30%;
+  overflow: hidden;
+  border-radius: 3cqw;
+  background: var(--bb-black);
+  box-shadow: 0 0 0 1cqw rgba(255, 255, 255, 0.55), 0 2cqw 5cqw rgba(0, 0, 0, 0.45);
+}
+/* The card's art window, not its frame: the image is zoomed onto the upper half of the card. */
+.build-battle-window .db-live .bb-packfront__art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  transform: scale(1.85);
+  transform-origin: 50% 23%;
+  user-select: none;
+}
+/* Scoped under .bb-packfront so it outranks the box face's .bb-setlogo rules further down. */
+.build-battle-window .db-live .bb-packfront .bb-packfront__logo {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 17%;
+  height: 12%;
+  background: transparent;
+}
+.build-battle-window .db-live .bb-packfront .bb-packfront__logo .bb-setlogo__mega {
+  font-size: 4.5cqw;
+}
+.build-battle-window .db-live .bb-packfront .bb-packfront__logo .bb-setlogo__name {
+  font-size: 7.5cqw;
+}
+.build-battle-window .db-live .bb-packfront__band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 7%;
+  height: 8.5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bb-red);
+  color: #fff;
+  font-size: 5cqw;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .build-battle-window .db-live .bb-scene__top {
   display: flex;
   flex-wrap: wrap;

@@ -426,6 +426,16 @@ export function parseSearchDeckParams(lower) {
   if (lower.includes('stadium card and an energy card') || lower.includes('stadium card and a energy card')) {
     return { what: 'Stadium + Energy', count: 2, destination: 'hand' };
   }
+  // Hilda: one of each, not two picks from a shared pool.
+  if (/search your deck for an evolution pok[ée]mon and an energy card/.test(lower)) {
+    return {
+      type: 'searchDeckSequence',
+      stages: [
+        { what: 'Evolution Pokémon', count: 1, destination: 'hand' },
+        { what: 'Energy', count: 1, destination: 'hand' },
+      ],
+    };
+  }
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
     return {
       type: 'searchDeckSequence',
@@ -533,6 +543,24 @@ export function parseSearchDeckParams(lower) {
       count: cnt,
       destination: 'hand',
       ...(pkmnHpHand[1] ? { upTo: true } : {}),
+      ...(reveal ? { reveal: true } : {}),
+    };
+  }
+
+  // "up to 2 Basic Pokémon or 1 Evolution Pokémon" (Brock's Scouting): one branch, not a mixed pick.
+  const basicOrEvo = lower.match(
+    /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/
+  );
+  if (basicOrEvo && !lower.includes('onto your bench')) {
+    return {
+      what: 'Basic Pokémon or Evolution Pokémon',
+      count: Math.max(Number(basicOrEvo[1]), Number(basicOrEvo[2])),
+      destination: 'hand',
+      upTo: true,
+      alternatives: [
+        { what: 'Basic Pokémon', count: Number(basicOrEvo[1]) },
+        { what: 'Evolution Pokémon', count: Number(basicOrEvo[2]) },
+      ],
       ...(reveal ? { reveal: true } : {}),
     };
   }
@@ -1115,6 +1143,18 @@ function parseTrainerStepsInner(lower) {
       return { steps, recognizable: true };
     }
 
+    // Drayton: one Pokémon AND one Trainer, not "a card".
+    if (/reveal a pok[eé]mon and a trainer card you find there/.test(lower)) {
+      steps.push({
+        type: 'lookAtTop',
+        count: m ? Number(m[1]) : 7,
+        pick: 'Pokémon and Trainer',
+        oneEach: ['Pokémon', 'Trainer'],
+        destination: 'hand',
+      });
+      return { steps, recognizable: true };
+    }
+
     let pick = 'any';
     if (lower.includes('discard any number of them')) pick = 'discard';
     else if (lower.includes('supporter card')) pick = 'Supporter';
@@ -1277,6 +1317,14 @@ function parseTrainerStepsInner(lower) {
         from: 'discard',
       });
       appendTrailingDraw(steps, lower);
+      return { steps, recognizable: true };
+    }
+    // Energy Retrieval / Superior Energy Retrieval — a counted Basic Energy pick; the plain
+    // branch below would offer every discard card.
+    const basicEnergy = lower.match(/put (?:up to )?(\d+|an?) basic energy cards? from your discard pile into your hand/);
+    if (basicEnergy) {
+      const count = /^\d+$/.test(basicEnergy[1]) ? Number(basicEnergy[1]) : 1;
+      steps.push({ type: 'recursion', what: 'Basic Energy', count, from: 'discard' });
       return { steps, recognizable: true };
     }
     let what = 'card';
@@ -2228,7 +2276,7 @@ function parseTrainerStepsInner(lower) {
     const m = lower.match(/trade\s+(\d+)\s+of the other cards in your hand for (?:up to )?(\d+) basic energy/);
     if (m) {
       steps.push({ type: 'discardCost', count: Number(m[1]) });
-      steps.push({ type: 'recursion', what: 'Basic Energy', from: 'discard' });
+      steps.push({ type: 'recursion', what: 'Basic Energy', count: Number(m[2]), from: 'discard' });
       return { steps, recognizable: true };
     }
   }
@@ -2629,7 +2677,9 @@ export function describeStep(step) {
     }
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;
     case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
-    case 'lookAtTop': return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `up to ${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
+    case 'lookAtTop':
+      if (step.oneEach) return `Look at the top ${step.count} cards; take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} to hand, shuffle the rest.`;
+      return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `up to ${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'lookAtBottom': return `Look at the bottom ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';

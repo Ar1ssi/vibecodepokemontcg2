@@ -15,6 +15,7 @@ import {
 import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { renderRoomFormatPanel } from '../../setup/general/room-format-panel.js';
+import { announceHostState } from '../document-event-listeners/sidebox/deck-builder-window.js';
 import { exchangeData } from '../../setup/deck-constructor/exchange-data.js';
 import { acceptAction } from '../../setup/general/accept-action.js';
 import { processAction } from '../../setup/general/process-action.js';
@@ -348,6 +349,8 @@ export const initializeSocketEventListeners = () => {
     }
     systemState.isTwoPlayer = true;
     renderRoomFormatPanel();
+    // An open Build & Battle tab learns the room, so a box from another room is not reused.
+    announceHostState();
     startSyncCheckHeartbeat();
     forceRulesEnabledForMultiplayer();
     enableSyncLogForMultiplayer();

@@ -222,6 +222,24 @@ test('lookAtTop (Pokégear 3.0): only Supporters in the top 7 are offered; rest 
   assert.equal(zone(done, 'p1', 'deck').length, 2);
 });
 
+test('lookAtTop (Drayton): offers Pokémon and Trainers only; takes at most one of each', () => {
+  const game = setup();
+  const mon1 = pokemon('Chikorita', { types: ['Grass'] });
+  const mon2 = pokemon('Bayleef', { stage: 'Stage 1', types: ['Grass'] });
+  const item1 = card({ name: 'Potion', type: 'Trainer', trainerType: 'Item' });
+  const item2 = card({ name: 'Iono', type: 'Trainer', trainerType: 'Supporter' });
+  const energy = card({ name: 'Basic Grass Energy', type: 'Energy', subtypes: ['Basic'], types: ['Grass'] });
+  game.p1.zones.deck.push(mon1, energy, item1, mon2, item2);
+  const { res } = play(game, 'Look at the top 7 cards of your deck. You may reveal a Pokémon and a Trainer card you find there and put them into your hand. Shuffle the other cards back into your deck.');
+  assert.deepEqual(ids(res.pendingChoice.options).sort(), ids([mon1, mon2, item1, item2]).sort());
+  assert.equal(res.pendingChoice.max, 2);
+  const done = resolve(game, res, [mon1.instanceId, mon2.instanceId]);
+  assert.deepEqual(ids(zone(done, 'p1', 'hand')), [mon1.instanceId]);
+  assert.equal(zone(done, 'p1', 'deck').length, 4);
+  const both = resolve(game, res, [mon2.instanceId, item2.instanceId]);
+  assert.deepEqual(ids(zone(both, 'p1', 'hand')).sort(), ids([mon2, item2]).sort());
+});
+
 test('lookAtTop (Master Ball): "Pokémon or Evolution" offers only Pokémon, not Energy/Trainers', () => {
   const game = setup();
   const basic = pokemon('Chikorita', { types: ['Grass'] });
