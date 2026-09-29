@@ -75,6 +75,12 @@ shared/engine/zones/*.mjs — pure: board-snapshot, card-state, hand-sort, resol
 client/src/setup/deck-constructor/card.js — `Card` class; identity is `card.image` (HTMLImageElement)
 client/src/setup/deck-constructor/own-deck.mjs — `systemState.ownDeck`: the deck this player loaded (set by import.js loadDeckData on emit); leaving a room restores selfDeckData from it (I198)
 
+## Build & Battle opening (designs 051–055)
+client/src/setup/deck-builder/core/build-battle/pack3d.mjs — pure 3D pack math: pillow shape, peel/rip/strip flight, cards out, tilt/sway, screen↔world, floor reflection bands (design 055)
+client/src/initialization/document-event-listeners/sidebox/native-deck-builder-pack3d.js — WebGL pack stage (three.js, lazy `import()`), mirror layer; falls back to the DOM scene
+client/src/setup/deck-builder/core/build-battle/box-art.generated.mjs — `BOX_ART`: every box's vendored render, booster fronts (+ measured shapes), ME cuboid faces; built by scripts/build-battle/vendor-box-art.mjs from box-art-sources.mjs (D194)
+client/src/vendor/three/ — vendored three 0.185.0 (import map in index.ejs); scripts/vendor-three.mjs copies/checks it (D193)
+
 ## Actions (~10,582 lines, ~85% DOM-coupled — every mutation goes through the DOM)
 client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary mutation path
 client/src/actions/zones/ — deck/hand/prize/shuffle operations
