@@ -511,6 +511,18 @@ import test, { describe } from 'node:test';
       assert.match(messages[0], /Revealed \(Firebreather\): Basic Fire Energy/);
     });
 
+    test('maybeAnnounceSearchReveal: an older "show them to your opponent" announces too (design 059)', async () => {
+      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
+      const messages = [];
+      const append = (_user, msg) => { messages.push(msg); };
+      // Pokémon Collector (HeartGold & SoulSilver 97).
+      maybeAnnounceSearchReveal('self', 'Pokémon Collector', [{ name: 'Pichu' }], append, {
+        sourceText: 'Search your deck for up to 3 Basic Pokémon, show them to your opponent, and put them into your hand. Shuffle your deck afterward.',
+      });
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /Revealed \(Pokémon Collector\): Pichu/);
+    });
+
     test('shuffleDeckAfterSearch: shuffles silently and announces in chat', async () => {
       const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
       const messages = [];

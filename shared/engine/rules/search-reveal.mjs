@@ -1,5 +1,7 @@
 // Chat announcements when a search/look effect reveals picked cards to the opponent.
+// The printed-reveal rule is design 059's, shared with the server engine (reveal-picks.mjs).
 
+import { textRevealsPicks } from './reveal-picks.mjs';
 import {
   closeDeckSearchAccess,
   deckSearchAccessReason,
@@ -57,8 +59,7 @@ export function maybeAnnounceSearchReveal(
   appendMessage,
   { step, sourceText } = {}
 ) {
-  const text = String(sourceText || '').toLowerCase();
-  const shouldReveal = step?.reveal === true || /\breveal\b/.test(text);
+  const shouldReveal = step?.reveal === true || textRevealsPicks(String(sourceText || ''));
   if (!shouldReveal) return;
   announceSearchReveal(user, sourceName, picked, appendMessage);
 }

@@ -143,6 +143,16 @@ const holdRevealedCards = (plan) => {
   return { ...plan, held, backstop };
 };
 
+const playRevealSound = (user) => {
+  try {
+    playFxSound({ effect: 'deck-reveal', user });
+  } catch (err) {
+    console.warn('[mat-fx] deck-reveal sound failed', err);
+  }
+};
+
+// Sound follows the dispatcher's rule: off with effects off, on under reduced motion;
+// with the scene it plays as the cards leave the deck.
 const playRevealPlan = (plan) => {
   clearTimeout(plan.backstop);
   const held = plan.held || [];
@@ -150,19 +160,14 @@ const playRevealPlan = (plan) => {
     held.forEach(showAfterFlight);
     return 0;
   }
-  // Sound follows the dispatcher's rule: off with effects off, on under reduced motion.
-  try {
-    playFxSound({ effect: 'deck-reveal', user: plan.user });
-  } catch (err) {
-    console.warn('[mat-fx] deck-reveal sound failed', err);
-  }
   if (motionReduced()) {
+    playRevealSound(plan.user);
     held.forEach(showAfterFlight);
     return 0;
   }
   held.forEach(hideForFlight);
   try {
-    return playDeckReveal(plan.user, held, showAfterFlight);
+    return playDeckReveal(plan.user, held, showAfterFlight, { onStart: () => playRevealSound(plan.user) });
   } catch (err) {
     console.warn('[mat-fx] deck-reveal failed', err);
     held.forEach(showAfterFlight);

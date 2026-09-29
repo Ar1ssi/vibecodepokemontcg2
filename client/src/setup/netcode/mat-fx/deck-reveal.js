@@ -47,7 +47,7 @@ function whenLaidOut(isLaidOut, start) {
     if (isLaidOut() || performance.now() - began >= LAYOUT_WAIT_MS) start();
     else setTimeout(attempt, LAYOUT_POLL_MS);
   };
-  attempt();
+  setTimeout(attempt, LAYOUT_POLL_MS);
 }
 
 function playSpread(user, cards, show, holdMs) {
@@ -109,9 +109,10 @@ function playSpread(user, cards, show, holdMs) {
  *   faceSrc?: string|null}[]} cards - hidden in the hand; `redacted` when the hand
  *   shows the card as a sleeve, `faceSrc` the revealed card's art
  * @param {(card: object) => void} show reveals one real hand card
+ * @param {{onStart?: () => void}} [hooks] `onStart` runs as the cards leave the deck (the sound)
  * @returns {number} how long the FX queue waits (0 when nothing plays)
  */
-export function playDeckReveal(user, cards, show) {
+export function playDeckReveal(user, cards, show, { onStart } = {}) {
   const list = Array.isArray(cards) ? cards : [];
   // Past the spread's slots, or with no art to show, a card is shown in the hand at once.
   const spread = list.slice(0, MAX_REVEAL_SPREAD).filter((card) => card?.faceSrc);
@@ -122,8 +123,18 @@ export function playDeckReveal(user, cards, show) {
     return 0;
   }
   const holdMs = revealHoldFor(user);
+  const hold = deckRevealHold(spread.length, holdMs);
+  const start = () => {
+    onStart?.();
+    playSpread(user, spread, show, holdMs);
+  };
   const laidOut = () =>
     Boolean(pileOf(user, 'deck')) && spread.every((card) => !card.image?.isConnected || landingOf(card));
-  whenLaidOut(laidOut, () => playSpread(user, spread, show, holdMs));
-  return deckRevealHold(spread.length, holdMs);
+  if (laidOut()) {
+    start();
+    return hold;
+  }
+  whenLaidOut(laidOut, start);
+  // The scene starts up to LAYOUT_WAIT_MS late, so what follows waits that much longer.
+  return hold + LAYOUT_WAIT_MS;
 }

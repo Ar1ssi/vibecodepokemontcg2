@@ -8,7 +8,7 @@ oneshot 054-build-and-battle-boxes-all-eras · worktree .claude/worktrees/bb-box
 
 oneshot 059-deck-reveal-fx · primary checkout · branch claude/keen-wright-7i2dps · slice 4/4
   0 design [x] · 1 engine reveal truth + art [x] · 2 client planner [x] · 3 pose/timing/voice [x] · 4 DOM scene + wiring + e2e [x]
-  Review fixes in progress (independent review: no blockers; 1 should, 3 nits).
+  Independent review: no blockers; its should + 3 nits fixed. Branch ready; landing edits listed in design 059.
 
 # Parked — S264 batch leftovers (tracked as issues, not increments)
 #5 "basic prompt gone" → I87 · #6 match logging → I85 (design 028) · #4 30th anniversary → I86 (design 029).

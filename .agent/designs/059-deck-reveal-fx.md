@@ -199,8 +199,32 @@ one new plan kind. Revert = revert the commits; no data touched.
 - Review pass: an attack that borrows a Supporter's effect (Jirachi Detour, Rising Rivals 7) runs the
   Supporter's steps as the attacker's, so `atkUseSupporter` stamps each borrowed step's `reveal` from
   the Supporter's own text (effects/attack-steps.mjs `useSupporterEffect`).
+- Independent review (b3991bf): no blockers. Fixed: every trainer-step gate (one-of-each, up-to-N,
+  single, staged, deck-or-discard) now has a test failing in each direction (mutation-checked); the
+  reveal sound starts with the scene and the queue hold adds LAYOUT_WAIT_MS only when the scene had
+  to wait for layout; the relay-mode chat (`search-reveal.mjs`) uses `textRevealsPicks`;
+  NEXTSTEPS.md regained the content slice 0 overwrote.
+- Pre-existing parser gaps met here (not this design's; ISSUES at landing): Great Ball (Paldea
+  Evolved 183) parses `pick: 'any'`; Explorer's Guidance (Prismatic Evolutions 107), Hassel (Twilight
+  Masquerade 205), Rika (Paradox Rift 258) and Colress's Experiment (Crown Zenith GG59) take one card
+  instead of 2–3; Trekking Shoes (Crown Zenith 145) looks at 7 cards instead of 1. The reveal
+  results cited in Acceptance hold regardless (they test who is named, not how many are taken).
 - Slice 4: recorder `.claude/skills/fx-preview/rec/rec-deck-reveal.mjs` drives the real applyView +
   advisory hooks (not the effect module alone like the other rec scripts), so planning and queueing run too.
+
+## Landing edits (the commit that lands this on `main` carries them; `Land:` was not given)
+- STATE.md: Focus → design 059 on main (deck reveals play the Trainer reveal; `cardsRevealed` names
+  only printed reveals); Next → user look on localhost (checks in the close message).
+- DECISIONS: `D197[mat-fx]` deck → hand reveals replay 043's preview (deck → reveal spot → hand) for
+  both seats, one spread per player per update, holds 600 ms yours / 1200 ms the opponent's, landing
+  re-aimed before the place phase. `D198[rules]` `cardsRevealed` names a deck pick taken into the hand
+  only when the printed text reveals it (`rules/reveal-picks.mjs`); public reveals carry `src`
+  (stamped at the `applyCommand` tail); attack searches reveal when printed.
+- ISSUES: Cassiopeia "up to 2 cards" parses as 1 · look-at-top Supporters take one card (Explorer's
+  Guidance, Hassel, Rika, Colress's Experiment) and Trekking Shoes looks at 7 · Great Ball parses
+  `pick: 'any'` · `audit:abilities` red on main (7 failures, identical before/after this design).
+- MAP.md: a line for `shared/engine/rules/reveal-picks.mjs`.
+- This design → `Status: shipped`; the 059 ledger (and the finished 054 one) → NEXTSTEPS-history.md.
 
 ---
 Self-approval checklist:
