@@ -183,14 +183,31 @@ export function createPendingChoice({
 function pickAlternativeBranch(deck, selection, alternatives) {
   const cardOf = (id) => deck.find((c) => c.instanceId === id);
   const firstCard = cardOf(selection[0]);
-  const branch = firstCard && alternatives.find((alt) => matchesSearch(firstCard, alt.what));
+  const branch = firstCard && alternatives.find((alt) => matchesKind(firstCard, alt));
   if (!branch) return [];
   return selection
     .filter((id) => {
       const card = cardOf(id);
-      return card && matchesSearch(card, branch.what);
+      return card && matchesKind(card, branch);
     })
     .slice(0, branch.count);
+}
+
+// A search kind (`what`) minus an optional `exclude` kind: "3 Basic Pokémon (except for
+// Pokémon-EX)" (Brigette).
+function matchesKind(card, { what, exclude }) {
+  return matchesSearch(card, what) && !(exclude && matchesSearch(card, exclude));
+}
+
+// "up to 3 different Item cards" (Ball Guy): keep the first pick of each name.
+function keepDistinctNames(deck, selection) {
+  const seen = new Set();
+  return selection.filter((id) => {
+    const name = String(deck.find((c) => c.instanceId === id)?.name || '').toLowerCase();
+    if (seen.has(name)) return false;
+    seen.add(name);
+    return true;
+  });
 }
 
 function opponentBenchIsEvolved(player, root) {
@@ -557,7 +574,7 @@ export function executeSteps(draft, {
           ? String(step.nameFilter).toLowerCase()
           : null;
         const cardMatches = (c) =>
-          matchesSearch(c, what) &&
+          matchesKind(c, { what, exclude: step.exclude }) &&
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter));
 
         const attachKey = `${idx}:searchAttach`;
@@ -657,9 +674,10 @@ export function executeSteps(draft, {
           // Resume: move chosen cards to destination
           const deck = player.zones.deck || [];
           const pickedCards = [];
-          const allowedIds = step.alternatives
+          const branchIds = step.alternatives
             ? pickAlternativeBranch(deck, stepSelection, step.alternatives)
             : stepSelection;
+          const allowedIds = step.distinctNames ? keepDistinctNames(deck, branchIds) : branchIds;
           for (const sId of allowedIds) {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
@@ -744,7 +762,7 @@ export function executeSteps(draft, {
 
         const choice = createPendingChoice({
           player: playerId,
-          prompt: `${sourceCard?.name || 'Search'}: Select up to ${effectiveMaxCount} card${effectiveMaxCount > 1 ? 's' : ''} (${what}) from your deck`,
+          prompt: `${sourceCard?.name || 'Search'}: Select up to ${effectiveMaxCount} ${step.distinctNames ? 'different ' : ''}card${effectiveMaxCount > 1 ? 's' : ''} (${what}) from your deck`,
           source: sourceCard?.name || '',
           options: matches,
           min: 0, // In PTCG, private zone searches can fail to find
@@ -1505,7 +1523,14 @@ export function executeSteps(draft, {
           flip = { face: headsCount >= (Number(step.headsAtLeast) || 1) ? 'heads' : 'tails', headsCount };
           context[coinKey] = flip;
         }
-        const branch = normalizeSteps(flip.face === 'heads' ? step.heads : step.tails);
+        // "If both are heads … If both are tails …" (Old Rod): each outcome names an exact
+        // head count; any other result (one head) does nothing.
+        const branchSteps = Array.isArray(step.outcomes)
+          ? step.outcomes.find((o) => o.headsExactly === flip.headsCount)?.steps
+          : flip.face === 'heads'
+            ? step.heads
+            : step.tails;
+        const branch = normalizeSteps(branchSteps);
         if (branch.length > 0) {
           const subResult = executeSteps(draft, {
             steps: branch,

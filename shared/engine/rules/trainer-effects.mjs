@@ -9,7 +9,7 @@
 //   { type: 'shuffleHandThenDraw', count: N, bonusCount: M, bonusWhen: 'prizes==6' }
 //   { type: 'discardHandThenDraw', count: N }
 //   { type: 'searchDeck', what: 'Item+Tool' | 'Basic Pokemon' | 'Pokemon' | ... , destination: 'hand'|'bench'|'attach', count: N }
-//   { type: 'coinFlip', heads: Step, tails: Step }
+//   { type: 'coinFlip', heads: Step, tails: Step }  (or `count` + `outcomes: [{ headsExactly, steps }]`)
 //   { type: 'putHandOnBottom', count: N }
 //   { type: 'opponentShuffleHandDraw', count: N, prizeCondition?: string }
 //   { type: 'lookAtTop', count: N, pick: 'Supporter'|'Dark Pokemon', destination: 'hand'|'bench' }
@@ -335,14 +335,18 @@ function cardKindWhat(phrase) {
 // "cards named Looker": the kind before the clause plus the name needle. The text arrives
 // lowercased, so the needle is title-cased back; the executor compares case-insensitively.
 const NAME_CLAUSE_RE =
-  /^((?:different )?(?:cards?|pokémon|trainer cards?|item cards?|evolution cards?)) (?:that have|with) (?:the word )?["“]?([^"”]+?)["”]? in (?:its|their) names?/;
+  /^((?:different )?(?:cards?|pokémon|trainer cards?|item cards?|evolution cards?|pokémon tool cards?)) (?:that have|with) (?:the word )?["“]?([^"”]+?)["”]? in (?:its|their) names?/;
 const NAMED_CARDS_RE = /^cards? named ([a-z0-9' .-]+?)(?=,|\.| and| that)/;
 
 function nameClause(phrase) {
   const withName = phrase.match(NAME_CLAUSE_RE);
   if (withName) {
     const kind = withName[1].replace(/^different /, '');
-    return { what: knownKindWhat(kind) || 'card', nameFilter: titleCaseKind(withName[2].trim()) };
+    return {
+      what: knownKindWhat(kind) || 'card',
+      nameFilter: titleCaseKind(withName[2].trim()),
+      ...(withName[1].startsWith('different ') ? { distinctNames: true } : {}),
+    };
   }
   const named = phrase.match(NAMED_CARDS_RE);
   if (named) return { what: 'card', nameFilter: titleCaseKind(named[1].trim()) };
@@ -361,6 +365,7 @@ function parseNameFilteredSearch(lower, destination, reveal) {
     destination,
     ...(m[1] ? { upTo: true } : {}),
     nameFilter: clause.nameFilter,
+    ...(clause.distinctNames ? { distinctNames: true } : {}),
     ...(reveal ? { reveal: true } : {}),
   };
 }
@@ -542,11 +547,11 @@ function drawUntilBonus(text) {
 const BASIC_OR_EVOLUTION_SEARCH_RE =
   /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/;
 const EITHER_KIND_SEARCH_RE =
-  /search your deck for (?:up to )?(\d+) ([^,.()]+?) or (?:up to )?(\d+) ([^,.()]+?)(?: \(except for [^)]*\))?(?=,|\.| and )/;
+  /search your deck for (?:up to )?(\d+) ([^,.()]+?) or (?:up to )?(\d+) ([^,.()]+?)(?: \(except for ([^)]*)\))?(?=,|\.| and )/;
 
 // "up to 2 Basic Pokémon or up to 2 basic Energy cards" (Sonia), "1 Basic Pokémon-EX or 3 Basic
 // Pokémon (except for Pokémon-EX)" (Brigette): one branch, not a mixed pick. The "(except for …)"
-// exclusion is not enforced. Brock's Scouting keeps its own hand-only branch.
+// exclusion rides on the second alternative. Brock's Scouting keeps its own hand-only branch.
 function parseEitherKindSearch(lower, destination, reveal) {
   if (BASIC_OR_EVOLUTION_SEARCH_RE.test(lower)) return null;
   const m = lower.match(EITHER_KIND_SEARCH_RE);
@@ -556,6 +561,7 @@ function parseEitherKindSearch(lower, destination, reveal) {
   if (!whatA || !whatB || whatA === 'card' || whatB === 'card') return null;
   const countA = Number(m[1]);
   const countB = Number(m[3]);
+  const exclude = m[5] ? knownKindWhat(m[5]) : null;
   return {
     what: `${whatA} or ${whatB}`,
     count: Math.max(countA, countB),
@@ -563,7 +569,7 @@ function parseEitherKindSearch(lower, destination, reveal) {
     upTo: true,
     alternatives: [
       { what: whatA, count: countA },
-      { what: whatB, count: countB },
+      { what: whatB, count: countB, ...(exclude ? { exclude } : {}) },
     ],
     ...(reveal ? { reveal: true } : {}),
   };
@@ -855,6 +861,32 @@ export function parseSearchDeckParams(lower) {
 // The `what` values the fallbacks above guess from words anywhere in the text.
 const GUESSED_WHATS = new Set(['card', 'Pokémon', 'Supporter', 'Trainer']);
 
+// Old Rod (Neo Revelation 64, Dragon Frontiers 78): two heads recover one kind, two tails
+// another, one head does nothing.
+const BOTH_FLIPS_RECOVERY_RES = [
+  /^flip 2 coins\. if both are heads, put (.+?) from your discard pile into your hand\. if both are tails, put (.+?) from your discard pile into your hand\.$/,
+  /^flip 2 coins\. if both are heads, search your discard pile for (.+?), show it to your opponent, and put it into your hand\. if both are tails, search your discard pile for (.+?), show it to your opponent, and put it into your hand\.$/,
+];
+
+function parseBothFlipsRecovery(lower) {
+  for (const re of BOTH_FLIPS_RECOVERY_RES) {
+    const m = lower.match(re);
+    if (!m) continue;
+    const [heads, tails] = [m[1], m[2]].map((kind) => knownKindWhat(kind.replace(/^an? /, '')));
+    if (!heads || !tails) return null;
+    const recover = (what) => [{ type: 'recursion', what, count: 1, from: 'discard' }];
+    return {
+      type: 'coinFlip',
+      count: 2,
+      outcomes: [
+        { headsExactly: 2, steps: recover(heads) },
+        { headsExactly: 0, steps: recover(tails) },
+      ],
+    };
+  }
+  return null;
+}
+
 function parseCoinFlipStep(lower) {
   if (!lower.includes('flip a coin') && !lower.includes('flip 2 coins')) return null;
 
@@ -890,6 +922,9 @@ function parseCoinFlipStep(lower) {
       tails: [],
     };
   }
+
+  const bothFlips = parseBothFlipsRecovery(lower);
+  if (bothFlips) return bothFlips;
 
   const headsDraw = lower.match(/if heads,?\s+draw\s+(\d+)\s+cards?/);
   const tailsDraw = lower.match(/if tails,?\s+draw\s+(\d+)\s+cards?/);
@@ -2909,6 +2944,11 @@ export function describeStep(step) {
           return s.type;
         }).join('; ');
       };
+      if (Array.isArray(step.outcomes)) {
+        return `Flip ${step.count || 1} coins — ${step.outcomes
+          .map((o) => `${o.headsExactly === 0 ? 'all tails' : `${o.headsExactly} heads`}: ${fmt(o.steps)}`)
+          .join('; ')}.`;
+      }
       return `Flip a coin — heads: ${fmt(step.heads)}; tails: ${fmt(step.tails)}.`;
     }
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;

@@ -186,7 +186,7 @@ test('name-clause searches carry the kind and a nameFilter', () => {
   const search = (fields) => ({ type: 'searchDeck', destination: 'hand', ...fields });
   assert.deepEqual(firstStep(NAMED.apricornCes), search({ what: 'Item', count: 2, upTo: true, nameFilter: 'Ball', reveal: true }));
   assert.deepEqual(firstStep(NAMED.apricornSkyridge), search({ what: 'Trainer', count: 2, upTo: true, nameFilter: 'Ball' }));
-  assert.deepEqual(firstStep(NAMED.ballGuy), search({ what: 'Item', count: 3, upTo: true, nameFilter: 'Ball', reveal: true }));
+  assert.deepEqual(firstStep(NAMED.ballGuy), search({ what: 'Item', count: 3, upTo: true, nameFilter: 'Ball', distinctNames: true, reveal: true }));
   assert.deepEqual(firstStep(NAMED.lookerWhistle), search({ what: 'card', count: 2, upTo: true, nameFilter: 'Looker', reveal: true }));
   assert.deepEqual(firstStep(NAMED.bossWay), search({ what: 'Evolution Pokémon', count: 1, nameFilter: 'Dark' }));
   assert.deepEqual(
@@ -398,7 +398,7 @@ test('Brigette parses as 1 Basic Pokémon-EX or 3 Basic Pokémon onto the Bench'
       upTo: true,
       alternatives: [
         { what: 'Basic Pokémon-EX', count: 1 },
-        { what: 'Basic Pokémon', count: 3 },
+        { what: 'Basic Pokémon', count: 3, exclude: 'Pokémon-EX' },
       ],
     },
   ]);
@@ -413,6 +413,10 @@ test("matchesSearch reads 'Basic Pokémon-EX' as a Basic whose name ends in EX",
   assert.equal(matchesSearch(oldEx, 'Basic Pokémon-EX'), true);
   assert.equal(matchesSearch(plain, 'Basic Pokémon-EX'), false);
   assert.equal(matchesSearch(stage1Ex, 'Basic Pokémon-EX'), false);
+  assert.equal(matchesSearch(stage1Ex, 'Pokémon-EX'), true);
+  assert.equal(matchesSearch(plain, 'Pokémon-EX'), false);
+  const rubyEx = createCard({ instanceId: 5, name: 'Rayquaza ex', supertype: 'Pokémon', subtypes: 'Basic', stage: 'Basic' });
+  assert.equal(matchesSearch(rubyEx, 'Pokémon-ex'), true, 'Absol Legend Maker 15 searches lowercase ex');
 });
 
 function runSonia(selection) {
@@ -518,4 +522,123 @@ test('Energy Restore with no heads skips the recovery', () => {
   const { res, events } = runEnergyRestore(seed);
   assert.equal(res.pendingChoice ?? null, null);
   assert.ok(events.some((e) => e.type === 'effectStepSkipped' && e.reason === 'no_heads'));
+});
+
+// Design 059 slice 1. Texts are out/pkmn-trainer-cards.json rows.
+// Old Rod, Neo Revelation 64 and Dragon Frontiers 78
+const OLD_ROD_NEO =
+  'Flip 2 coins. If both are heads, put a Baby Pokémon, Basic Pokémon, or Evolution card from your discard pile into your hand. If both are tails, put a Trainer card from your discard pile into your hand.';
+const OLD_ROD_DF =
+  'Flip 2 coins. If both are heads, search your discard pile for a Basic Pokémon or Evolution card, show it to your opponent, and put it into your hand. If both are tails, search your discard pile for a Trainer card, show it to your opponent, and put it into your hand.';
+// TM Machine, Destined Rivals 181
+const TM_MACHINE =
+  'Search your deck for up to 3 Pokémon Tool cards that have “Technical Machine” in their name, reveal them, and put them into your hand. Then, shuffle your deck.';
+
+test('Old Rod parses into exact-head-count outcomes (both printings)', () => {
+  for (const text of [OLD_ROD_NEO, OLD_ROD_DF]) {
+    const [step] = parseTrainerEffect(text).steps;
+    assert.equal(step.type, 'coinFlip');
+    assert.equal(step.count, 2);
+    assert.deepEqual(
+      step.outcomes.map((o) => [o.headsExactly, o.steps[0].type]),
+      [[2, 'recursion'], [0, 'recursion']],
+    );
+    assert.equal(step.outcomes[1].steps[0].what, 'Trainer');
+  }
+  assert.equal(
+    parseTrainerEffect(OLD_ROD_DF).steps[0].outcomes[0].steps[0].what,
+    'Basic Pokémon or Evolution Pokémon',
+  );
+});
+
+function runOldRod(seed) {
+  const state = createGameState({ gameId: 'old-rod', seed: 1, rulesEnabled: true });
+  state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
+  state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.discard.push(
+    createCard({ instanceId: 1, name: 'Pikachu', supertype: 'Pokémon', subtypes: 'Basic' }),
+    createCard({ instanceId: 2, name: 'Potion', supertype: 'Trainer', type: 'Item' }),
+    createCard({ instanceId: 3, name: 'Fire Energy', supertype: 'Energy', subtypes: 'Basic' }),
+  );
+  const events = [];
+  const res = executeSteps(state, {
+    steps: parseTrainerEffect(OLD_ROD_DF).steps,
+    fromStepIndex: 0,
+    effectType: 'trainer',
+    sourceCard: { name: 'Old Rod' },
+    playerId: 'p1',
+    activeRng: createRng(seed),
+    events,
+  });
+  return res;
+}
+
+function headsInTwoFlips(seed) {
+  const rng = createRng(seed);
+  return [flipCoin(rng), flipCoin(rng)].filter((face) => face === 'heads').length;
+}
+
+test('Old Rod: two heads offers the Pokémon, two tails the Trainer, one head nothing', () => {
+  const seedFor = (heads) => Array.from({ length: 300 }, (_, i) => i + 1).find((s) => headsInTwoFlips(s) === heads);
+  const ids = (heads) => runOldRod(seedFor(heads)).pendingChoice?.options.map((c) => c.instanceId) ?? null;
+  assert.deepEqual(ids(2), [1]);
+  assert.deepEqual(ids(0), [2]);
+  assert.equal(ids(1), null);
+});
+
+test('TM Machine searches Pokémon Tool cards with Technical Machine in the name', () => {
+  const [step] = parseTrainerEffect(TM_MACHINE).steps;
+  assert.equal(step.what, 'Pokémon Tool');
+  assert.equal(step.nameFilter, 'Technical Machine');
+});
+
+function searchDeckWith(steps, cards, selection) {
+  const state = createGameState({ gameId: 'search', seed: 1, rulesEnabled: true });
+  state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
+  state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  state.players.p1.zones.deck.push(...cards.map((c, i) => createCard({ instanceId: i + 1, ...c })));
+  const res = executeSteps(state, {
+    steps,
+    fromStepIndex: 0,
+    effectType: 'trainer',
+    sourceCard: { name: 'Test' },
+    playerId: 'p1',
+    activeRng: createRng(1),
+    events: [],
+    ...(selection ? { selection } : {}),
+  });
+  return { res, state };
+}
+
+test('Brigette parses the exclusion onto the Basic Pokémon alternative', () => {
+  const [step] = parseTrainerEffect(EITHER_KIND.brigette).steps;
+  assert.deepEqual(step.alternatives[0], { what: 'Basic Pokémon-EX', count: 1 });
+  assert.deepEqual(step.alternatives[1], { what: 'Basic Pokémon', count: 3, exclude: 'Pokémon-EX' });
+});
+
+test('Brigette: three Basics drop a Pokémon-EX picked among them; one EX alone is kept', () => {
+  const steps = parseTrainerEffect(EITHER_KIND.brigette).steps;
+  const basic = { supertype: 'Pokémon', subtypes: 'Basic', stage: 'Basic' };
+  const deck = [
+    { name: 'Pikachu', ...basic },
+    { name: 'Shaymin-EX', ...basic },
+    { name: 'Eevee', ...basic },
+    { name: 'Charmander', ...basic },
+  ];
+  const benched = (selection) =>
+    searchDeckWith(steps, deck, selection).state.players.p1.zones.bench.map((c) => c.name);
+  assert.deepEqual(benched([1, 2, 3]), ['Pikachu', 'Eevee']);
+  assert.deepEqual(benched([2]), ['Shaymin-EX']);
+});
+
+test('Ball Guy keeps one card per name', () => {
+  const steps = parseTrainerEffect(NAMED.ballGuy).steps;
+  assert.equal(steps[0].distinctNames, true);
+  const ball = (name) => ({ name, supertype: 'Trainer', type: 'Item' });
+  const deck = [ball('Nest Ball'), ball('Nest Ball'), ball('Ultra Ball'), ball('Potion')];
+  const { res, state } = searchDeckWith(steps, deck, [1, 2, 3]);
+  assert.equal(res.pendingChoice ?? null, null);
+  assert.deepEqual(state.players.p1.zones.hand.map((c) => c.instanceId), [1, 3]);
 });

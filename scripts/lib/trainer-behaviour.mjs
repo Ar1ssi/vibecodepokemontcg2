@@ -35,7 +35,8 @@ function stepCount(step) {
   if (Array.isArray(step.alternatives)) return Math.max(...step.alternatives.map((a) => a.count || 1));
   // A coin flip carries its picks in its branches (Larry, Energy Amplifier, Poké Ball).
   if (step.type === 'coinFlip') {
-    const branches = [step.heads, step.tails].flat().filter(Boolean);
+    const outcomeSteps = (step.outcomes || []).flatMap((o) => o.steps || []);
+    const branches = [step.heads, step.tails, ...outcomeSteps].flat().filter(Boolean);
     return branches.length ? Math.max(...branches.map(stepCount)) : 0;
   }
   return step.count || 1;
@@ -77,6 +78,16 @@ export function trainerKey(row) {
   return `${row?.name || '(unnamed)'}#${hash.toString(36)}`;
 }
 
+// Step types with a coin flip's branches and outcomes unfolded, so a step moving into a flip
+// (Old Rod's recovery) is not a lost step.
+function flattenStepTypes(steps) {
+  return steps.flatMap((s) => {
+    if (s.type !== 'coinFlip') return [s.type];
+    const nested = [s.heads, s.tails, ...(s.outcomes || []).map((o) => o.steps)].flat().filter(Boolean);
+    return [s.type, ...flattenStepTypes(nested)];
+  });
+}
+
 /**
  * @param {{name: string, text: string, subtype?: string}} row A corpus row
  * @returns {{key: string, name: string, subtype: string, gaps: string[], serverMissing: string[],
@@ -84,7 +95,7 @@ export function trainerKey(row) {
  */
 export function classifyTrainer(row) {
   const parsed = parseTrainerEffect(row?.text || '');
-  const steps = (parsed.steps || []).map((s) => s.type);
+  const steps = flattenStepTypes(parsed.steps || []);
   const gaps = [];
   if (!parsed.recognizable) gaps.push('unrecognizable');
   else if (steps.length === 0) gaps.push('empty');

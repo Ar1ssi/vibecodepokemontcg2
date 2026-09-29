@@ -97,6 +97,9 @@ function deckFor(pfx) {
       evolvesFrom: `${pfx}Basic0`,
     })
   );
+  // "Search your deck for a Pokémon-ex" (Absol Legend Maker) needs a real ex: the bare
+  // 'Pokémon-EX' filter used to match every Pokémon.
+  out.push(mon(`${pfx}Star ex`));
   out.push(
     trainer('Potion', 'Item'),
     trainer('Great Ball', 'Item'),
