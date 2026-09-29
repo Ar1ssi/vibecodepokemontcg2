@@ -10,6 +10,7 @@ import { BUILD_BATTLE_SET_CARDS } from '../build-battle/build-battle.generated.m
 
 /**
  * @typedef {{key: string, name: string, setId: string, packCount: number, promoId: string,
+ *   promoTier: 0|1|2|3,
  *   sleeveId: string, sleeveCount: number, coinId: string, energy: [string, number][],
  *   props: {damageDice: number, flipDie: number, coin: number, dividers: number, guide: number,
  *   codeCard: number}, keyArtCardId: string, art: string}} Etb
@@ -23,6 +24,9 @@ export const ELITE_TRAINER_BOXES = [
     setId: 'me02',
     packCount: 9,
     promoId: 'mep-022',
+    // TCGdex rarity is "Promo" (no reveal flare), but the card is the Illustration Rare art cut
+    // from the English set (design 055 § ETB reference), so its lift plays the tier 2 flare.
+    promoTier: 2,
     sleeveId: '08266b9d-1d37-4ddb-a458-9adc302edb62',
     sleeveCount: 65,
     coinId: 'PFLETB_Mega_Charizard_X_Coin',

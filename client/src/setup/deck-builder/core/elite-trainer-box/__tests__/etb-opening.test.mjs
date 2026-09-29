@@ -45,11 +45,13 @@ test('etbContents gathers the non-pack contents; the promo comes from the rows p
   const promo = { id: 'mep-022', name: 'Charcadet', qty: 1 };
   const contents = etbContents(etb, { 'phantasmal-flames-etb': promo });
   assert.equal(contents.promo, promo);
+  assert.equal(contents.promoTier, 2, 'the Illustration Rare art plays the tier 2 flare');
   assert.equal(contents.sleeveId, etb.sleeveId);
   assert.equal(contents.coinId, etb.coinId);
   assert.deepEqual(contents.energy, etb.energy);
   assert.notEqual(contents.energy, etb.energy, 'a copy, so callers cannot edit the catalog');
   assert.deepEqual(contents.props, etb.props);
   assert.equal(etbContents(etb).promo, null);
+  assert.equal(etbContents(etb).promoTier, 0, 'no promo row, no flare');
   assert.equal(etbContents(etb, null).promo, null);
 });

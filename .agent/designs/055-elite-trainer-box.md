@@ -442,6 +442,22 @@ Slice 3 (S332, same branch):
   re-read from storage (a re-read would drop the unsaved box).
 - Row 11 (Reset while a scene is open) is untested: the stage hides the Collection tab, so Reset is
   unreachable mid-scene. Row 5's banner text is a constant (`MEMORY_ONLY_TEXT`) with no browser run.
+Slice 4 pins (S332, set before the build; the builder follows these where § Scene is silent):
+- Promo flare: the ETB row carries `promoTier: 2` and `etbContents` returns it (TCGdex rarity is
+  "Promo"). When `contents.promoTier >= 2`, beat 4's promo lift plays the hit flare and sparks the
+  pocket hits use (inside the card's own bounds), at the lift's peak; the foil family stays
+  `unboxingHoloRarity(promo, 'normal')`. Build & Battle (no `contents`) is unchanged.
+- Nine-pack spread: with more than `PACK_COUNT` packs, `layoutSpread` calls `packSpreadSlot(index,
+  focus, { spacingPx: focusWidth, availableWidthPx: spreadWidth - focusWidth }, packs.length)` and
+  shifts every slot by `-xPx(last untorn pack) / 2`, so the focused pack and its queue are centred
+  as a group. Four-pack Build & Battle layout is unchanged. At 390 px: `scrollWidth === 390`.
+- Pack size: the scene reads cards per pack from `getUnboxing().cardsPerPack` wherever it used
+  `CARDS_PER_PACK`.
+- Guide: the guide prop sets a scene-local `wantsGuide`; the scene ends with
+  `onFinish(destination, { wantsGuide })`. Slice 5 acts on it; the slice 3 controller ignores it.
+- Lift lid: `liftLidPose(t, { heightPx: size.height, depthPx: size.depth })` on `.bb-box__lid`
+  when `product.lid === 'lift'`; `lidPose` stays for `'hinged'`.
+- Tray rise for the ETB: `trayRisePose(t, index, 16)` over `trayRiseMs(16)`.
 
 ## Sources
 1. Bulbapedia, "Elite Trainer Box (TCG)" — per-era packs, sleeves, Energy, dividers, markers, first
