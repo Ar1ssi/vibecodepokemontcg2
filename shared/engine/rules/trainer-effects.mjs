@@ -356,6 +356,49 @@ function matchesSwitchOpponentIn(lower) {
   );
 }
 
+const PARADOX_TAG_WORD = { ancient: 'Ancient', future: 'Future' };
+
+// Design 058. Professor Sada's Vitality: "Choose up to 2 of your Ancient Pokémon and attach a Basic
+// Energy card from your discard pile to each of them. If you attached any Energy in this way, draw
+// 3 cards." Reboot Pod: "Attach a Basic Energy card from your discard pile to each of your Future
+// Pokémon." One Energy per Pokémon, in play (Active or Bench), picked by the printed tag.
+function parseParadoxDiscardAttach(lower) {
+  const chosen = lower.match(
+    /choose up to (\d+) of your (ancient|future) pok[ée]mon and attach a basic energy card from your discard pile to each of them/
+  );
+  if (chosen) {
+    const count = Number(chosen[1]);
+    const steps = [
+      {
+        type: 'attachFromDiscard',
+        energy: 'Basic Energy',
+        target: `up to ${count} of your ${PARADOX_TAG_WORD[chosen[2]]} Pokémon`,
+        count,
+        distinctTargets: true,
+        upTo: true,
+      },
+    ];
+    const draw = lower.match(/if you attached any energy in this way, draw (\d+) cards?/);
+    if (draw) steps.push({ type: 'draw', count: Number(draw[1]), requiresAttach: true });
+    return steps;
+  }
+  const each = lower.match(
+    /attach a basic energy card from your discard pile to each of your (ancient|future) pok[ée]mon/
+  );
+  if (each) {
+    return [
+      {
+        type: 'attachFromDiscard',
+        energy: 'Basic Energy',
+        target: `each of your ${PARADOX_TAG_WORD[each[1]]} Pokémon`,
+        each: true,
+        distinctTargets: true,
+      },
+    ];
+  }
+  return null;
+}
+
 function appendTrailingDraw(steps, lower) {
   // A trailing draw clause that wasn't consumed by the primary branch.
   // "draw cards until you have N" takes precedence over a bare "draw N".
@@ -420,6 +463,20 @@ export function parseSearchDeckParams(lower) {
     (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
   ) {
     destination = 'attach';
+  }
+
+  // Techno Radar (design 058): "Search your deck for up to 2 Future Pokémon".
+  const paradoxSearch = lower.match(
+    /search your deck for (?:an?|up to\s+(\d+))\s+(ancient|future) pok[ée]mon\b/
+  );
+  if (paradoxSearch) {
+    return {
+      what: `${PARADOX_TAG_WORD[paradoxSearch[2]]} Pokémon`,
+      count: paradoxSearch[1] ? Number(paradoxSearch[1]) : 1,
+      destination,
+      ...(paradoxSearch[1] ? { upTo: true } : {}),
+      ...(reveal ? { reveal: true } : {}),
+    };
   }
 
   if (lower.includes('item card and a pokémon tool card')) {
@@ -1405,6 +1462,9 @@ function parseTrainerStepsInner(lower) {
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }
+
+  const paradoxAttach = parseParadoxDiscardAttach(lower);
+  if (paradoxAttach) return { steps: [...steps, ...paradoxAttach], recognizable: true };
 
   // attach multiple from discard (Philippe — up to N typed Energy to one Pokémon)
   if (

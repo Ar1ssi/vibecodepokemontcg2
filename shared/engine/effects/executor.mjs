@@ -1973,12 +1973,15 @@ export function executeSteps(draft, {
             !(progress.lockedTargetId != null && c.instanceId !== progress.lockedTargetId) &&
             !(progress.usedTargetIds || []).includes(c.instanceId)
         );
+        // `each` (Reboot Pod, design 058): one Energy per matching Pokémon, counted on the first call.
+        const total = progress.total ?? (step.each ? targets.length : step.count || 1);
         // Another attach of a repeated step; returns a pending choice, or null when done.
         const continueAttaching = (target) => {
           const done = (progress.done || 0) + 1;
-          if (done >= (step.count || 1)) return null;
+          if (done >= total) return null;
           const next = {
             done,
+            total,
             lockedTargetId: step.sameTarget ? target.instanceId : null,
             usedTargetIds: step.distinctTargets ? [...(progress.usedTargetIds || []), target.instanceId] : [],
           };
@@ -1991,9 +1994,10 @@ export function executeSteps(draft, {
           );
           if (!moreEnergy || !moreTargets) return null;
           return ask(
-            `${sourceCard?.name || 'Attach'}: Select an Energy card from discard to attach (${done + 1} of ${step.count})`,
+            `${sourceCard?.name || 'Attach'}: Select an Energy card from discard to attach (${done + 1} of ${total})`,
             (player.zones.discard || []).filter((c) => attachableEnergy(c)),
-            next
+            next,
+            step.upTo
           );
         };
         // Magma Basin: attaching in this way puts damage counters on the target.
@@ -2011,14 +2015,23 @@ export function executeSteps(draft, {
           matchesSearch(c, step.energy || 'Basic Energy') &&
           matchesEnergyTypeFilter(c, step.energyType ? [step.energyType] : null);
         const energyCandidates = discard.filter(attachableEnergy);
-        const ask = (prompt, options, memo) => {
+        // Recorded here, not only from the events array: a resume carries fresh events, so an
+        // "if you attached any Energy" draw after a declined second pick would miss the first attach.
+        const attachTo = (energyCard, target) => {
+          attachToRoot(player, energyCard, target, events);
+          applyAttachmentDamage(target);
+          context.attachedEnergy = true;
+          context.attachedTargetId = target.instanceId;
+        };
+        // `optional`: an "up to" attach (Professor Sada's Vitality) may stop with an empty pick.
+        const ask = (prompt, options, memo, optional = false) => {
           context[memoKey] = memo;
           return createPendingChoice({
             player: playerId,
             prompt,
             source: sourceCard?.name || '',
             options,
-            min: 1,
+            min: optional ? 0 : 1,
             max: 1,
             cancellable: false,
             stateVersion: draft.stateVersion,
@@ -2041,13 +2054,17 @@ export function executeSteps(draft, {
           const targetCard = targets.find((c) => c.instanceId === stepSelection[0]);
           delete context[memoKey];
           if (energyCard && targetCard) {
-            attachToRoot(player, energyCard, targetCard, events);
-            applyAttachmentDamage(targetCard);
+            attachTo(energyCard, targetCard);
             const more = continueAttaching(targetCard);
             if (more) return { pendingChoice: more, completed: false };
           } else {
             events.push({ type: 'effectStepSkipped', reason: 'target_not_found' });
           }
+          break;
+        }
+
+        if (step.upTo && Array.isArray(stepSelection) && stepSelection.length === 0) {
+          delete context[memoKey];
           break;
         }
 
@@ -2061,8 +2078,7 @@ export function executeSteps(draft, {
         }
         if (chosenEnergy) {
           if (targets.length === 1) {
-            attachToRoot(player, chosenEnergy, targets[0], events);
-            applyAttachmentDamage(targets[0]);
+            attachTo(chosenEnergy, targets[0]);
             delete context[memoKey];
             const more = continueAttaching(targets[0]);
             if (more) return { pendingChoice: more, completed: false };
@@ -2071,7 +2087,7 @@ export function executeSteps(draft, {
           const choice = ask(
             `${sourceCard?.name || 'Attach'}: Choose ${step.target || 'a Pokémon'} to attach ${chosenEnergy.name} to`,
             targets,
-            { ...progress, energyId: chosenEnergy.instanceId }
+            { ...progress, total, energyId: chosenEnergy.instanceId }
           );
           return { pendingChoice: choice, completed: false };
         }
@@ -2084,7 +2100,8 @@ export function executeSteps(draft, {
         const choice = ask(
           `${sourceCard?.name || 'Attach'}: Select an Energy card from discard to attach`,
           energyCandidates,
-          {}
+          { total },
+          step.upTo
         );
         return { pendingChoice: choice, completed: false };
       }

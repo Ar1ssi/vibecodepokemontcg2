@@ -152,3 +152,184 @@ test('search "Future Pokémon" / "Ancient Pokémon" matches tagged Pokémon, not
   assert.equal(matchesSearch(moon, 'Ancient Pokémon'), true);
   assert.equal(matchesSearch(tusk, 'Ancient Pokémon'), false);
 });
+
+// ── Slice 3: the Trainers that pick by tag ──────────────────────────────────────────────────
+
+const basicEnergy = (instanceId, type = 'Fighting') =>
+  createCard({ instanceId, name: `Basic ${type} Energy`, supertype: 'Energy', type: 'Energy', subtypes: ['Basic'] });
+
+// Plays parsed steps to completion; `pick(choice)` returns each selection. Every resume starts a
+// fresh events array, as a real resolveChoice does.
+function play(state, text, name, pick) {
+  const steps = parseTrainerEffect(text).steps;
+  const base = { steps, effectType: 'trainer', sourceCard: { name }, playerId: 'p1', activeRng: createRng(1) };
+  const choices = [];
+  let res = executeSteps(state, { ...base, fromStepIndex: 0, events: [] });
+  while (res.pendingChoice) {
+    const choice = res.pendingChoice;
+    choices.push(choice);
+    const token = choice.resumeToken;
+    res = executeSteps(state, {
+      ...base,
+      fromStepIndex: token.stepIndex,
+      context: token.context,
+      budget: { count: token.budgetCount || 0 },
+      selection: pick(choice, choices.length),
+      events: [],
+    });
+  }
+  return choices;
+}
+
+const firstOption = (choice) => [choice.options[0].instanceId];
+const attachedTo = (p1, root) =>
+  [...p1.zones.active, ...p1.zones.bench].filter((c) => c.attachedTo === root.instanceId).length;
+
+function sadaBoard({ energy = 2 } = {}) {
+  const state = boardState();
+  const p1 = state.players.p1;
+  const moon = pokemon(1, 'Roaring Moon ex', 'sv04-124');
+  const tail = pokemon(2, 'Scream Tail', 'sv04-086');
+  const tusk = pokemon(3, 'Great Tusk ex', 'sv01-123');
+  p1.zones.active.push(moon);
+  p1.zones.bench.push(tail, tusk);
+  for (let i = 0; i < energy; i += 1) p1.zones.discard.push(basicEnergy(20 + i));
+  for (let i = 0; i < 5; i += 1) p1.zones.deck.push(createCard({ instanceId: 40 + i, name: `Card ${i}` }));
+  return { state, p1, moon, tail, tusk };
+}
+
+// Source: out/pkmn-trainer-cards.json "Professor Sada’s Vitality" (Paradox Rift).
+const SADA =
+  'Choose up to 2 of your Ancient Pokémon and attach a Basic Energy card from your discard pile to each of them. If you attached any Energy in this way, draw 3 cards.';
+
+test("Professor Sada's Vitality parses as up to 2 Ancient targets and a conditional draw", () => {
+  const { steps } = parseTrainerEffect(SADA);
+  assert.deepEqual(steps, [
+    {
+      type: 'attachFromDiscard',
+      energy: 'Basic Energy',
+      target: 'up to 2 of your Ancient Pokémon',
+      count: 2,
+      distinctTargets: true,
+      upTo: true,
+    },
+    { type: 'draw', count: 3, requiresAttach: true },
+  ]);
+});
+
+test("Professor Sada's Vitality attaches to 2 different Ancient Pokémon (Active and Bench), then draws 3", () => {
+  const { state, p1, moon, tail, tusk } = sadaBoard();
+  const choices = play(state, SADA, "Professor Sada's Vitality", firstOption);
+  const targetPrompts = choices.filter((c) => /Choose/.test(c.prompt));
+  assert.deepEqual(
+    targetPrompts[0].options.map((o) => o.instanceId).sort(),
+    [moon.instanceId, tail.instanceId],
+    'only the Ancient printings are offered; sv01 Great Tusk ex is not'
+  );
+  assert.deepEqual([moon, tail, tusk].map((root) => attachedTo(p1, root)), [1, 1, 0]);
+  assert.equal(p1.zones.discard.length, 0);
+  assert.equal(p1.zones.hand.length, 3);
+  assert.ok(choices.every((c) => (c.min === 0) === !/Choose/.test(c.prompt)), 'Energy picks are optional, target picks are not');
+});
+
+test("Professor Sada's Vitality: attach 1, decline the 2nd, still draws 3", () => {
+  const { state, p1 } = sadaBoard();
+  // Picks: Energy 1, its target, then an empty Energy pick declines the second attach.
+  const choices = play(state, SADA, "Professor Sada's Vitality", (choice, n) => (n === 3 ? [] : firstOption(choice)));
+  assert.equal(choices.length, 3);
+  assert.equal(choices[2].min, 0, 'the second Energy pick is optional');
+  assert.equal(p1.zones.discard.length, 1);
+  assert.equal(p1.zones.hand.length, 3);
+});
+
+test("Professor Sada's Vitality: declining the first pick attaches nothing and draws nothing", () => {
+  const { state, p1 } = sadaBoard();
+  play(state, SADA, "Professor Sada's Vitality", () => []);
+  assert.equal(p1.zones.discard.length, 2);
+  assert.equal(p1.zones.hand.length, 0);
+});
+
+test("Professor Sada's Vitality with no Ancient Pokémon or no Basic Energy does nothing", () => {
+  const noEnergy = sadaBoard({ energy: 0 });
+  assert.equal(play(noEnergy.state, SADA, 'Sada', () => []).length, 0);
+  assert.equal(noEnergy.p1.zones.hand.length, 0);
+
+  const state = boardState();
+  const p1 = state.players.p1;
+  p1.zones.active.push(pokemon(3, 'Great Tusk ex', 'sv01-123'));
+  p1.zones.discard.push(basicEnergy(20));
+  p1.zones.deck.push(createCard({ instanceId: 40, name: 'Card' }));
+  assert.equal(play(state, SADA, 'Sada', () => []).length, 0);
+  assert.equal(p1.zones.hand.length, 0);
+  assert.equal(p1.zones.discard.length, 1);
+});
+
+// Source: out/pkmn-trainer-cards.json "Techno Radar" (Paradox Rift).
+const TECHNO_RADAR =
+  'You can use this card only if you discard another card from your hand. Search your deck for up to 2 Future Pokémon, reveal them, and put them into your hand. Then, shuffle your deck.';
+
+test('Techno Radar searches up to 2 Future Pokémon only', () => {
+  const state = boardState();
+  const p1 = state.players.p1;
+  p1.zones.hand.push(createCard({ instanceId: 30, name: 'Discard Fodder' }));
+  p1.zones.deck.push(
+    pokemon(1, 'Iron Hands ex', 'sv04-070'),
+    pokemon(2, 'Iron Crown ex', 'sv05-081'),
+    pokemon(3, 'Iron Thorns ex', 'sv06-077'),
+    pokemon(4, 'Roaring Moon ex', 'sv04-124'),
+    pokemon(5, 'Miraidon ex', 'sv01-081'),
+    createCard({ instanceId: 6, name: 'Techno Radar', id: 'sv04-180', supertype: 'Trainer', type: 'Trainer', trainerType: 'Item' })
+  );
+  const choices = play(state, TECHNO_RADAR, 'Techno Radar', (choice) =>
+    choice.options.slice(0, choice.max).map((o) => o.instanceId)
+  );
+  const search = choices.at(-1);
+  assert.equal(search.max, 2);
+  assert.deepEqual(search.options.map((o) => o.instanceId).sort(), [1, 2, 3], 'sv01 Miraidon ex is untagged');
+  assert.deepEqual(p1.zones.hand.map((c) => c.instanceId).sort(), [1, 2]);
+});
+
+// Source: out/pkmn-trainer-cards.json "Reboot Pod" (Temporal Forces).
+const REBOOT_POD = 'Attach a Basic Energy card from your discard pile to each of your Future Pokémon.';
+
+test('Reboot Pod parses as one Energy to each Future Pokémon', () => {
+  assert.deepEqual(parseTrainerEffect(REBOOT_POD).steps, [
+    {
+      type: 'attachFromDiscard',
+      energy: 'Basic Energy',
+      target: 'each of your Future Pokémon',
+      each: true,
+      distinctTargets: true,
+    },
+  ]);
+});
+
+function podBoard(energy) {
+  const state = boardState();
+  const p1 = state.players.p1;
+  const roots = [
+    pokemon(1, 'Iron Hands ex', 'sv04-070'),
+    pokemon(2, 'Iron Crown ex', 'sv05-081'),
+    pokemon(3, 'Iron Thorns ex', 'sv06-077'),
+    pokemon(4, 'Roaring Moon ex', 'sv04-124'),
+  ];
+  p1.zones.active.push(roots[0]);
+  p1.zones.bench.push(...roots.slice(1));
+  for (let i = 0; i < energy; i += 1) p1.zones.discard.push(basicEnergy(20 + i, 'Lightning'));
+  return { state, p1, roots };
+}
+
+test('Reboot Pod attaches one Energy to each Future Pokémon and none to an Ancient one', () => {
+  const { state, p1, roots } = podBoard(4);
+  const choices = play(state, REBOOT_POD, 'Reboot Pod', firstOption);
+  assert.deepEqual(roots.map((root) => attachedTo(p1, root)), [1, 1, 1, 0]);
+  assert.equal(p1.zones.discard.length, 1);
+  assert.ok(choices.every((c) => c.min === 1), 'each is mandatory');
+});
+
+test('Reboot Pod with 3 Future Pokémon and 2 Energy attaches 2 and stops', () => {
+  const { state, p1, roots } = podBoard(2);
+  play(state, REBOOT_POD, 'Reboot Pod', firstOption);
+  assert.equal(roots.slice(0, 3).reduce((n, root) => n + attachedTo(p1, root), 0), 2);
+  assert.equal(p1.zones.discard.length, 0);
+});

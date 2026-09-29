@@ -267,6 +267,8 @@ export function rootMatchesTarget(player, root, target = '') {
   if (t.includes('stage 2') && stageOf(top) !== 'Stage 2') return false;
   if (t.includes('evolved') && top === root) return false;
   if (t.includes('mega evolution') && !/^mega .* ex$/i.test(top.name || '')) return false;
+  if (/\bancient pok[eé]mon\b/.test(t) && !isAncientCard(top)) return false;
+  if (/\bfuture pok[eé]mon\b/.test(t) && !isFutureCard(top)) return false;
   const typed = t.match(/\{([a-z])\}/);
   if (typed && typed[1] !== 'c') return pokemonHasType(top, typed[1]);
   return true;
