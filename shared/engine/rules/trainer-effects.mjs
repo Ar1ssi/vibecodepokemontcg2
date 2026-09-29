@@ -560,6 +560,9 @@ export function parseSearchDeckParams(lower) {
     (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
   ) {
     destination = 'attach';
+  } else if (/search your deck for [^.]*\band discard (?:it|them)\b/.test(lower)) {
+    // Brilliant Blender, Professor Burnet, Battle Compressor Team Flare Gear
+    destination = 'discard';
   }
 
   // "a X and a Y card" is one card of each kind, never two picks from one shared pool and
@@ -2825,6 +2828,9 @@ export function describeStep(step) {
     case 'discardHandThenDraw': return `Discard your hand, then draw ${step.count} cards.`;
     case 'shuffleHandThenDraw': return `Shuffle your hand into the deck, then draw ${step.count} cards${step.bonusCount ? ` (${step.bonusCount} if 6 prizes left)` : ''}.`;
     case 'searchDeck': {
+      if (step.destination === 'discard') {
+        return `Search your deck for ${step.upTo ? 'up to ' : ''}${step.count} ${step.what === 'card' ? 'cards' : step.what} and discard them.`;
+      }
       const dest =
         step.destination === 'bench' ? 'put on Bench'
         : step.destination === 'attach' ? 'attach to a Pokémon'

@@ -257,3 +257,54 @@ test('Apricorn Maker offers only Items with Ball in their name', () => {
   const result = runCard(state, NAMED.apricornCes, 'Apricorn Maker');
   assert.deepEqual(result.pendingChoice.options.map((c) => c.instanceId).sort(), [1, 2]);
 });
+
+// "search your deck for up to N cards and discard them" (design 058 slice 2). Texts are
+// out/pkmn-trainer-cards.json rows.
+const DISCARD_SEARCH = {
+  // Brilliant Blender, Surging Sparks 164
+  brilliantBlender: 'Search your deck for up to 5 cards and discard them. Then, shuffle your deck.',
+  // Professor Burnet, Silver Tempest TG26
+  burnet: 'Search your deck for up to 2 cards and discard them. Then, shuffle your deck.',
+  // Battle Compressor Team Flare Gear, Phantom Forces 92
+  battleCompressor: 'Search your deck for up to 3 cards and discard them. Shuffle your deck afterward.',
+};
+
+test('discard-search cards parse to searchDeck with destination discard', () => {
+  for (const [key, count] of [['brilliantBlender', 5], ['burnet', 2], ['battleCompressor', 3]]) {
+    const steps = parseTrainerEffect(DISCARD_SEARCH[key]).steps;
+    assert.equal(steps.length, 1, key);
+    assert.deepEqual(
+      { type: steps[0].type, what: steps[0].what, count: steps[0].count, upTo: steps[0].upTo, destination: steps[0].destination },
+      { type: 'searchDeck', what: 'card', count, upTo: true, destination: 'discard' },
+      key
+    );
+  }
+});
+
+test('Brilliant Blender moves the chosen deck cards to the discard pile', () => {
+  const state = namedState('blender');
+  for (let i = 1; i <= 6; i++) {
+    state.players.p1.zones.deck.push(
+      createCard({ instanceId: i, name: `Card ${i}`, supertype: 'Trainer', trainerType: 'Item' })
+    );
+  }
+  const first = runCard(state, DISCARD_SEARCH.brilliantBlender, 'Brilliant Blender');
+  assert.ok(first.pendingChoice);
+  const events = [];
+  executeSteps(state, {
+    steps: parseTrainerEffect(DISCARD_SEARCH.brilliantBlender).steps,
+    fromStepIndex: first.pendingChoice.stepIndex,
+    effectType: 'trainer',
+    sourceCard: { name: 'Brilliant Blender' },
+    playerId: 'p1',
+    activeRng: createRng(1),
+    events,
+    selection: [2, 5],
+    resume: first.pendingChoice.resumeToken,
+  });
+  const zones = state.players.p1.zones;
+  assert.deepEqual(zones.discard.map((c) => c.instanceId).sort(), [2, 5]);
+  assert.equal(zones.hand.length, 0);
+  assert.equal(zones.deck.length, 4);
+  assert.ok(!events.some((e) => e.type === 'cardsRevealed'));
+});

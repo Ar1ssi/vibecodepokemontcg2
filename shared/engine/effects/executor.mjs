@@ -674,6 +674,8 @@ export function executeSteps(draft, {
               const [c] = deck.splice(dIdx, 1);
               if (dest === 'bench') {
                 player.zones.bench.push(c);
+              } else if (dest === 'discard') {
+                player.zones.discard.push(c);
               } else {
                 player.zones.hand.push(c);
               }
@@ -688,7 +690,7 @@ export function executeSteps(draft, {
             }
           }
 
-          if (step.reveal || pickedCards.length > 0) {
+          if (dest !== 'discard' && (step.reveal || pickedCards.length > 0)) {
             events.push({
               type: 'cardsRevealed',
               playerId,
