@@ -2,8 +2,8 @@
 # Cap ~60 lines. A finished ledger moves to .agent/archive/NEXTSTEPS-history.md in the session
 # that finishes it.
 
-oneshot 054-build-and-battle-boxes-all-eras · worktree .claude/worktrees/bb-boxes · branch claude/build-battle-boxes-plan-38pf0r · slice 7/9
-  0 design [x] · 1 core [x] · 2 generator [x] · 3 ME data [x] · 4 UI+skins [x] · 5 SV [x] · 6 SWSH [x] · 7 SM [x] · 8 XY [ ] · 9 close [ ]
+oneshot 054-build-and-battle-boxes-all-eras · worktree .claude/worktrees/bb-boxes · branch claude/build-battle-boxes-plan-38pf0r · slice 8/9
+  0 design [x] · 1 core [x] · 2 generator [x] · 3 ME data [x] · 4 UI+skins [x] · 5 SV [x] · 6 SWSH [x] · 7 SM [x] · 8 XY [x] · 9 close [ ]
   Bulbapedia via /w/api.php (the /wiki/ HTML is Cloudflare-challenged); TCGdex API reachable; dev cache: TCGDEX_CACHE_DIR.
 
 # Parked — S264 batch leftovers (tracked as issues, not increments)

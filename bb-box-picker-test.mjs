@@ -161,6 +161,17 @@ try {
     JSON.stringify({ groupKeys: pack?.groupKeys, pack: pack?.evolutionPack?.length, energy: pack?.energy })
   );
   T('row 15 an Evolution-pack box starts the editor at 23 / 40', (await deckCount(page)) === '23');
+
+  // Row 9: one chip per era, oldest first; `?box=` on an XY kit presses the XY chip.
+  await fresh('&box=evolutions');
+  state = await picker(page);
+  const chips = await page.evaluate(() => [...document.querySelectorAll('#buildBattleEra .bb-era-chip')].map((chip) => chip.dataset.era));
+  T('row 9 five era chips in release order', JSON.stringify(chips) === JSON.stringify(['xy', 'sm', 'swsh', 'sv', 'me']), JSON.stringify(chips));
+  T(
+    '?box=evolutions opens the XY era with its three kits',
+    state.box === 'evolutions' && state.era === 'xy' && JSON.stringify(state.options) === JSON.stringify(['fates-collide', 'steam-siege', 'evolutions']),
+    JSON.stringify(state)
+  );
 } finally {
   await browser.close();
 }

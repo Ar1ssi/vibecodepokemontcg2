@@ -703,6 +703,13 @@ Build notes:
   is not simulated (A5). TCGdex marks Prism Star cards `Rare`, so they roll in the rare slot.
   Recorder `BOX=team-up SEED=6` PASS (an SM box reaches tier 3 only with a secret rare); `--check` (live, 12
   SM boxes) clean.
+- Slice 8: the three XY kits. Their pools take the pages' Supporter/Item counts (Fates Collide 2–3 + 3–4,
+  Steam Siege 3–4 + 3–4, Evolutions 3 Supporters with at least one Tierno). Fates Collide's Zygarde group
+  ("1-2" rows) makes 5–7 Trainers where the page says six; Evolutions' "3 Supporters and 2 Items" with its
+  8-card groups adds to 22, so its Items fill the 23-card pack (A4). Fates Collide's Shuckle swap is not
+  simulated (A5). Evolutions' promos are its own set cards (xy12-11, -34, -51, -59; `promoSetId: 'xy12'`).
+  Picker e2e: five era chips in release order, `?box=evolutions` on the XY era. Recorder `BOX=evolutions
+  SEED=71` PASS; `--check` (live, 3 XY kits) clean.
 
 ---
 Self-approval checklist (only when the user is unreachable):

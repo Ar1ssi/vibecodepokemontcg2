@@ -69,6 +69,59 @@ function defineBox({ key, name, era, kind, decks, skin = {}, page, ...rest }) {
 
 /** Every box, in release order. */
 export const BUILD_BATTLE_BOXES = Object.freeze([
+  // ── XY: Prerelease Kits, 23-card Evolution packs (the Evolutions promos are set-numbered) ──
+  defineBox({
+    key: 'fates-collide',
+    name: 'Fates Collide Prerelease Kit',
+    page: 'Fates Collide Prerelease Kit (TCG)',
+    era: 'xy',
+    setId: 'xy10',
+    promoSetId: 'xyp',
+    kind: 'evolution-pack',
+    packModelKey: 'xy',
+    skin: { keyArtCardId: 'xyp-XY127' },
+    decks: [
+      { key: 'moltres', name: 'Moltres', promoId: 'xyp-XY127', energy: null, sprites: ['moltres'] },
+      { key: 'white-kyurem', name: 'White Kyurem', promoId: 'xyp-XY128', energy: null, sprites: ['kyurem-white'] },
+      { key: 'zygarde', name: 'Zygarde', promoId: 'xyp-XY129', energy: null, sprites: ['zygarde'] },
+      { key: 'tyranitar', name: 'Tyranitar', promoId: 'xyp-XY130', energy: null, sprites: ['tyranitar'] },
+    ],
+  }),
+  defineBox({
+    key: 'steam-siege',
+    name: 'Steam Siege Prerelease Kit',
+    page: 'Steam Siege Prerelease Kit (TCG)',
+    era: 'xy',
+    setId: 'xy11',
+    promoSetId: 'xyp',
+    kind: 'evolution-pack',
+    packModelKey: 'xy',
+    skin: { keyArtCardId: 'xyp-XY144' },
+    decks: [
+      { key: 'yanmega', name: 'Yanmega', promoId: 'xyp-XY144', energy: null, sprites: ['yanmega'] },
+      { key: 'volcanion', name: 'Volcanion', promoId: 'xyp-XY145', energy: null, sprites: ['volcanion'] },
+      { key: 'clawitzer', name: 'Clawitzer', promoId: 'xyp-XY146', energy: null, sprites: ['clawitzer'] },
+      { key: 'hoopa', name: 'Hoopa', promoId: 'xyp-XY147', energy: null, sprites: ['hoopa'] },
+    ],
+  }),
+  defineBox({
+    key: 'evolutions',
+    name: 'Evolutions Prerelease Kit',
+    page: 'Evolutions Prerelease Kit (TCG)',
+    era: 'xy',
+    setId: 'xy12',
+    promoSetId: 'xy12',
+    kind: 'evolution-pack',
+    packModelKey: 'xy',
+    skin: { keyArtCardId: 'xy12-11' },
+    decks: [
+      { key: 'charizard', name: 'Charizard', promoId: 'xy12-11', energy: null, sprites: ['charizard'] },
+      { key: 'gyarados', name: 'Gyarados', promoId: 'xy12-34', energy: null, sprites: ['gyarados'] },
+      { key: 'mewtwo', name: 'Mewtwo', promoId: 'xy12-51', energy: null, sprites: ['mewtwo'] },
+      { key: 'machamp', name: 'Machamp', promoId: 'xy12-59', energy: null, sprites: ['machamp'] },
+    ],
+  }),
+
   // ── Sun & Moon: Prerelease Kits (Sun & Moon → Ultra Prism), then Build & Battle Boxes; 23-card
   // Evolution packs ──
   defineBox({
