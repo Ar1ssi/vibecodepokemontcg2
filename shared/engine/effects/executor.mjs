@@ -1276,6 +1276,9 @@ export function executeSteps(draft, {
           : [{ what: step.what || 'card', count: step.count || 1 }];
         const what = categories.map((c) => c.what).join(' or ');
         const count = categories.reduce((sum, c) => sum + (c.count || 1), 0);
+        // "Pokémon that have “Hisuian” in their names" (Professor Laventon).
+        const nameFilter = step.nameFilter ? String(step.nameFilter).toLowerCase() : '';
+        const nameMatches = (c) => !nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter);
 
         if (stepSelection) {
           const destZone = isShuffle ? player.zones.deck : player.zones.hand;
@@ -1284,7 +1287,11 @@ export function executeSteps(draft, {
           for (const sId of stepSelection) {
             const picked = discard.find((c) => c.instanceId === sId);
             const category = categories.findIndex(
-              (cat, i) => picked && matchesSearch(picked, cat.what) && takenPerCategory[i] < (cat.count || 1)
+              (cat, i) =>
+                picked &&
+                nameMatches(picked) &&
+                matchesSearch(picked, cat.what) &&
+                takenPerCategory[i] < (cat.count || 1)
             );
             if (category < 0) continue;
             takenPerCategory[category] += 1;
@@ -1307,7 +1314,7 @@ export function executeSteps(draft, {
           break;
         }
 
-        const candidates = discard.filter((c) => matchesSearch(c, what));
+        const candidates = discard.filter((c) => nameMatches(c) && matchesSearch(c, what));
         if (candidates.length === 0) {
           // Reported, so an "If you do," half (Banette Puppet Offering) does not follow.
           events.push({ type: 'effectStepSkipped', reason: 'no_matching_cards', step: step.type });

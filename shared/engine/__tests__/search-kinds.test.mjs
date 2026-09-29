@@ -151,3 +151,109 @@ test('Arven fetches one Item and then one Pokémon Tool, never two of one kind',
   assert.ok(second.pendingChoice, 'second stage asks for a Pokémon Tool');
   assert.deepEqual(second.pendingChoice.options.map((c) => c.instanceId), [3]);
 });
+
+// "cards with X in their name" (design 058 slice 1). Texts are out/pkmn-trainer-cards.json rows.
+const NAMED = {
+  // Apricorn Maker, Celestial Storm 161
+  apricornCes:
+    'Search your deck for up to 2 Item cards that have the word “Ball” in their name, reveal them, and put them into your hand. Then, shuffle your deck.',
+  // Apricorn Maker, Skyridge 121
+  apricornSkyridge:
+    'Search your deck for up to 2 Trainer cards with Ball in their names, show them to your opponent, and put them into your hand. Shuffle your deck afterward.',
+  // Ball Guy, Shining Fates 065
+  ballGuy:
+    'Search your deck for up to 3 different Item cards that have the word “Ball” in their name, reveal them, and put them into your hand. Then, shuffle your deck.',
+  // Looker Whistle, Ultra Prism 127
+  lookerWhistle:
+    'Search your deck for up to 2 cards named Looker, reveal them, and put them into your hand. Then, shuffle your deck.',
+  // The Boss’s Way, Legendary Collection 105
+  bossWay:
+    'Search your deck for an Evolution card with Dark in its name. Show it to your opponent and put it into your hand. Shuffle your deck afterward.',
+  // Archie, Team Magma vs Team Aqua 71
+  archie:
+    'Search your deck for a Pokémon with Team Aqua in its name and put it onto your Bench. Shuffle your deck afterward. Treat the new Benched Pokémon as a Basic Pokémon. If it is a Stage 2 Pokémon, put 2 damage counters on that Pokémon.',
+  // Professor Laventon, Silver Tempest 162
+  laventon: 'Put up to 3 Pokémon that have “Hisuian” in their names from your discard pile into your hand.',
+  // Aether Foundation Employee, Lost Thunder SV81
+  aetherEmployee: 'Put 3 Pokémon that have “Alolan” in their names from your discard pile into your hand.',
+};
+
+function firstStep(text) {
+  return parseTrainerEffect(text).steps[0];
+}
+
+test('name-clause searches carry the kind and a nameFilter', () => {
+  const search = (fields) => ({ type: 'searchDeck', destination: 'hand', ...fields });
+  assert.deepEqual(firstStep(NAMED.apricornCes), search({ what: 'Item', count: 2, upTo: true, nameFilter: 'Ball', reveal: true }));
+  assert.deepEqual(firstStep(NAMED.apricornSkyridge), search({ what: 'Trainer', count: 2, upTo: true, nameFilter: 'Ball' }));
+  assert.deepEqual(firstStep(NAMED.ballGuy), search({ what: 'Item', count: 3, upTo: true, nameFilter: 'Ball', reveal: true }));
+  assert.deepEqual(firstStep(NAMED.lookerWhistle), search({ what: 'card', count: 2, upTo: true, nameFilter: 'Looker', reveal: true }));
+  assert.deepEqual(firstStep(NAMED.bossWay), search({ what: 'Evolution Pokémon', count: 1, nameFilter: 'Dark' }));
+  assert.deepEqual(
+    firstStep(NAMED.archie),
+    search({ what: 'Pokémon', count: 1, destination: 'bench', nameFilter: 'Team Aqua' })
+  );
+});
+
+test('name-clause discard recovery carries the kind and a nameFilter', () => {
+  assert.deepEqual(recursion(NAMED.laventon).step, {
+    type: 'recursion',
+    what: 'Pokémon',
+    count: 3,
+    upTo: true,
+    from: 'discard',
+    nameFilter: 'Hisuian',
+  });
+  assert.deepEqual(recursion(NAMED.aetherEmployee).step, {
+    type: 'recursion',
+    what: 'Pokémon',
+    count: 3,
+    from: 'discard',
+    nameFilter: 'Alolan',
+  });
+});
+
+function namedState(gameId) {
+  const state = createGameState({ gameId, seed: 1, rulesEnabled: true });
+  state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
+  state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  return state;
+}
+
+function runCard(state, text, name) {
+  return executeSteps(state, {
+    steps: parseTrainerEffect(text).steps,
+    fromStepIndex: 0,
+    effectType: 'trainer',
+    sourceCard: { name },
+    playerId: 'p1',
+    activeRng: createRng(1),
+    events: [],
+  });
+}
+
+test('Professor Laventon offers only Hisuian Pokémon from the discard', () => {
+  const state = namedState('laventon');
+  state.players.p1.zones.discard.push(
+    createCard({ instanceId: 1, name: 'Hisuian Zoroark', supertype: 'Pokémon', subtypes: 'Stage 1' }),
+    createCard({ instanceId: 2, name: 'Hisuian Arcanine', supertype: 'Pokémon', subtypes: 'Stage 1' }),
+    createCard({ instanceId: 3, name: 'Pikachu', supertype: 'Pokémon', subtypes: 'Basic' }),
+    createCard({ instanceId: 4, name: 'Basic Fire Energy', supertype: 'Energy', type: 'Energy' })
+  );
+  const result = runCard(state, NAMED.laventon, 'Professor Laventon');
+  assert.deepEqual(result.pendingChoice.options.map((c) => c.instanceId).sort(), [1, 2]);
+  assert.equal(result.pendingChoice.max, 2);
+});
+
+test('Apricorn Maker offers only Items with Ball in their name', () => {
+  const state = namedState('apricorn');
+  state.players.p1.zones.deck.push(
+    createCard({ instanceId: 1, name: 'Ultra Ball', supertype: 'Trainer', trainerType: 'Item' }),
+    createCard({ instanceId: 2, name: 'Nest Ball', supertype: 'Trainer', trainerType: 'Item' }),
+    createCard({ instanceId: 3, name: 'Rare Candy', supertype: 'Trainer', trainerType: 'Item' }),
+    createCard({ instanceId: 4, name: 'Pikachu', supertype: 'Pokémon', subtypes: 'Basic' })
+  );
+  const result = runCard(state, NAMED.apricornCes, 'Apricorn Maker');
+  assert.deepEqual(result.pendingChoice.options.map((c) => c.instanceId).sort(), [1, 2]);
+});

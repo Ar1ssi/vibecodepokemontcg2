@@ -331,6 +331,40 @@ function cardKindWhat(phrase) {
   return titleCaseKind(p);
 }
 
+// "Item cards that have the word “Ball” in their name", "a Pokémon with Team Aqua in its name",
+// "cards named Looker": the kind before the clause plus the name needle. The text arrives
+// lowercased, so the needle is title-cased back; the executor compares case-insensitively.
+const NAME_CLAUSE_RE =
+  /^((?:different )?(?:cards?|pokémon|trainer cards?|item cards?|evolution cards?)) (?:that have|with) (?:the word )?["“]?([^"”]+?)["”]? in (?:its|their) names?/;
+const NAMED_CARDS_RE = /^cards? named ([a-z0-9' .-]+?)(?=,|\.| and| that)/;
+
+function nameClause(phrase) {
+  const withName = phrase.match(NAME_CLAUSE_RE);
+  if (withName) {
+    const kind = withName[1].replace(/^different /, '');
+    return { what: knownKindWhat(kind) || 'card', nameFilter: titleCaseKind(withName[2].trim()) };
+  }
+  const named = phrase.match(NAMED_CARDS_RE);
+  if (named) return { what: 'card', nameFilter: titleCaseKind(named[1].trim()) };
+  return null;
+}
+
+const NAME_SEARCH_RE = /search your deck for (up to )?(\d+|an?) ([^.]+)/;
+
+function parseNameFilteredSearch(lower, destination, reveal) {
+  const m = lower.match(NAME_SEARCH_RE);
+  const clause = m && nameClause(m[3]);
+  if (!clause) return null;
+  return {
+    what: clause.what,
+    count: /^\d+$/.test(m[2]) ? Number(m[2]) : 1,
+    destination,
+    ...(m[1] ? { upTo: true } : {}),
+    nameFilter: clause.nameFilter,
+    ...(reveal ? { reveal: true } : {}),
+  };
+}
+
 // "Search your deck for a <kind> [card], a <kind> card, and a <kind> card, …" — two or more
 // kinds, one of each (Arven, Rosa, Larry's Skill, Secret Box).
 const KIND_ITEM = '(?:an?|\\d+|up to \\d+) [^,.]+?';
@@ -533,6 +567,8 @@ export function parseSearchDeckParams(lower) {
   // Steven, Volkner, the Team Magma/Aqua Great Balls). Each stage is its own optional pick.
   const twoKinds = parseTwoKindSearch(lower);
   if (twoKinds) return twoKinds;
+  const nameFiltered = parseNameFilteredSearch(lower, destination, reveal);
+  if (nameFiltered) return nameFiltered;
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
     return {
       type: 'searchDeckSequence',
@@ -1448,12 +1484,14 @@ function parseTrainerStepsInner(lower) {
       if (leadingDraw) {
         steps.push({ type: 'draw', count: /^\d+$/.test(leadingDraw[1]) ? Number(leadingDraw[1]) : 1 });
       }
+      const named = nameClause(kinded[3]);
       steps.push({
         type: 'recursion',
-        what: cardKindWhat(kinded[3]) || 'card',
+        what: named ? named.what : cardKindWhat(kinded[3]) || 'card',
         count,
         from: 'discard',
         ...(kinded[1] ? { upTo: true } : {}),
+        ...(named ? { nameFilter: named.nameFilter } : {}),
       });
       if (!leadingDraw) appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
@@ -2762,6 +2800,11 @@ function parseTrainerStepsInner(lower) {
 }
 
 // Human-readable guidance for each step — this is what gets announced.
+function describeNameFilter(step) {
+  if (!step.nameFilter) return '';
+  return step.what === 'card' ? ` named "${step.nameFilter}"` : ` with "${step.nameFilter}" in its name`;
+}
+
 export function describeStep(step) {
   switch (step.type) {
     case 'draw': return `Draw ${step.count} card${step.count > 1 ? 's' : ''}.`;
@@ -2786,7 +2829,7 @@ export function describeStep(step) {
         step.destination === 'bench' ? 'put on Bench'
         : step.destination === 'attach' ? 'attach to a Pokémon'
         : 'add to hand';
-      return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what} → ${dest}, then shuffle.`;
+      return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what}${describeNameFilter(step)} → ${dest}, then shuffle.`;
     }
     case 'searchDeckSequence':
       return `Search your deck for ${step.stages.map((s) => s.what).join(', ')} (one at a time), reveal them, add to hand, then shuffle.`;
@@ -2815,7 +2858,7 @@ export function describeStep(step) {
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';
     case 'discardCost': return `Discard ${step.count} other card${step.count > 1 ? 's' : ''} from your hand (cost).`;
-    case 'recursion': return `Put a ${step.what} from your discard pile into your hand.`;
+    case 'recursion': return `Put a ${step.what}${describeNameFilter(step)} from your discard pile into your hand.`;
     case 'heal': return `Heal all damage from your ${step.target}${step.returnEnergy ? ', then put all its Energy into your hand' : ''}.`;
     case 'healAmount': return `Heal ${step.amount} damage from ${step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;
