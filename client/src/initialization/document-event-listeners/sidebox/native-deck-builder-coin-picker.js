@@ -4,6 +4,7 @@
       getCoinStats,
       groupCoinsByRelease,
       isPlaceholderCoin,
+      ownedFirst,
     } from '../../../setup/deck-builder/core/coins.mjs';
     import {
       applyCoinEffect,
@@ -25,10 +26,13 @@
      * paint, cardboard = matte; holofoil/mirror descriptions add a foil
      * layer). Filterable by name, material, region, and image availability.
      * Coins flip on click to show the back; clicking a cell selects it.
+     * `getOwnedIds` names the coins the player's Elite Trainer Boxes gave them (design 057): they
+     * are listed first with an "Owned" tag.
      */
     export const initializeDeckBuilderCoinPicker = ({
       panelEl,
       onChange,
+      getOwnedIds = () => [],
     }) => {
       if (!panelEl) return null;
     
@@ -158,12 +162,16 @@
       };
     
       const renderGallery = () => {
-        const visible = filterCoins(coins, {
-          term: filterTerm,
-          material: materialFilter,
-          region: regionFilter,
-          hasImage: hasImageOnly,
-        });
+        const ownedIds = new Set(getOwnedIds());
+        const visible = ownedFirst(
+          filterCoins(coins, {
+            term: filterTerm,
+            material: materialFilter,
+            region: regionFilter,
+            hasImage: hasImageOnly,
+          }),
+          [...ownedIds]
+        );
         if (visible.length === 0) {
           galleryEl.innerHTML = '<div class="native-deck-builder-coin-empty">No coins match.</div>';
           return;
@@ -173,8 +181,10 @@
         galleryEl.innerHTML = visible
           .map((coin) => {
             const isSelected = coin.id === selectedId;
+            const isOwned = ownedIds.has(coin.id);
             return [
-              `<button class="coin-cell${isSelected ? ' selected' : ''}" data-coin-id="${escapeHtml(coin.id)}" title="${escapeHtml(coin.name)}">`,
+              `<button class="coin-cell${isSelected ? ' selected' : ''}${isOwned ? ' is-owned' : ''}" data-coin-id="${escapeHtml(coin.id)}" title="${escapeHtml(coin.name)}${isOwned ? ' · Owned' : ''}">`,
+              isOwned ? '  <span class="native-deck-builder-owned-tag">Owned</span>' : '',
               `  <span class="coin-3d coin-sm">`,
               `    <span class="coin-face coin-front"><img src="${escapeHtml(coin.thumb)}" alt="${escapeHtml(coin.name)}" loading="lazy" />${layers}</span>`,
               `    <span class="coin-face coin-backc"><img src="/src/assets/coins/coin-back.png" alt="" loading="lazy" />${layers}</span>`,
@@ -240,6 +250,8 @@
           renderGallery();
         },
         getSelected: () => coins.find((c) => c.id === selectedId) || null,
+        // A box opened since the gallery was drawn changes what is owned.
+        refreshOwned: () => renderGallery(),
       };
     };
     

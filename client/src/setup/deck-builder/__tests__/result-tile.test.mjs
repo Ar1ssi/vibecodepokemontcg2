@@ -19,13 +19,14 @@ const CARDS = [
   },
 ];
 
-function render({ quantities = {}, onSelect = () => {} } = {}) {
+function render({ quantities = {}, owned = {}, onSelect = () => {} } = {}) {
   const dom = new JSDOM('<div id="results"></div>');
   const el = dom.window.document.getElementById('results');
   renderSearchResults({
     searchResultsEl: el,
     results: CARDS,
     quantities,
+    owned,
     onSelect,
   });
   return { dom, el };
@@ -137,4 +138,12 @@ test('a missing container is a no-op rather than a crash', () => {
       onSelect: () => {},
     })
   );
+});
+
+test('design 057: a card the ETB collection holds wears "×n owned"; one it lacks wears nothing', () => {
+  const { el } = render({ owned: { 'sv03-125': 2 } });
+  const [charizard, pikachu] = el.querySelectorAll('.native-deck-builder-result');
+  assert.equal(charizard.querySelector('.native-deck-builder-owned-badge').textContent, '×2 owned');
+  assert.equal(pikachu.querySelector('.native-deck-builder-owned-badge'), null);
+  assert.equal(render().el.querySelectorAll('.native-deck-builder-owned-badge').length, 0, 'no collection, no badge');
 });

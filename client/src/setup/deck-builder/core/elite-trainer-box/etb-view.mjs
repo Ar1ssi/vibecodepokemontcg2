@@ -50,6 +50,11 @@ export function ownedBadge(owned, inDeck = 0) {
   return { text, over: inDeck > owned };
 }
 
+/** @returns {string} "×2 owned" on a search or Browse Sets tile, or '' when none is owned. */
+export function ownedTileLabel(count) {
+  return Number.isInteger(count) && count > 0 ? `×${count} owned` : '';
+}
+
 /**
  * The `?etb=<key>&seed=<n>` prefill. An unknown key is ignored (row 19); a bad seed prefills none.
  * @returns {{etbKey: string, seed: number|null}|null}

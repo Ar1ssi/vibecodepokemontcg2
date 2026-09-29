@@ -11,6 +11,7 @@ import {
   etbLook,
   inFlightLine,
   ownedBadge,
+  ownedTileLabel,
   parseEtbQuery,
   shelfLine,
 } from '../etb-view.mjs';
@@ -92,4 +93,10 @@ test('etbLook wears its set box wrappers, the ETB key art and ETB labels', async
   assert.equal(look.setName, 'Phantasmal Flames');
   assert.equal(look.playLevel, false);
   assert.ok(look.seriesName);
+});
+
+test('ownedTileLabel names owned copies and stays empty for none', () => {
+  assert.equal(ownedTileLabel(2), '×2 owned');
+  assert.equal(ownedTileLabel(1), '×1 owned');
+  for (const none of [0, undefined, null, -1, 1.5, '2']) assert.equal(ownedTileLabel(none), '', String(none));
 });

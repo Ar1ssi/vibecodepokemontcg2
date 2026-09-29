@@ -1,4 +1,5 @@
 import { cardSpriteFor } from '../../../setup/deck-builder/core/card-sprites.mjs';
+import { ownedTileLabel } from '../../../setup/deck-builder/core/elite-trainer-box/etb-view.mjs';
 
 const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -12,7 +13,18 @@ const escapeHtml = (value = '') => String(value)
       .replaceAll(')', '%29')
       .replaceAll('\\', '%5C');
     
-    export const renderSearchResults = ({ searchResultsEl, results, onSelect, quantities = {} }) => {
+    /**
+     * The "×n owned" badge a result tile wears when the player's Elite Trainer Box collection
+     * holds the card (design 057); '' when it holds none.
+     */
+    export const ownedBadgeHtml = (count) => {
+      const label = ownedTileLabel(count);
+      return label
+        ? `<span class="native-deck-builder-owned-badge" aria-label="${escapeHtml(label)}">${escapeHtml(label)}</span>`
+        : '';
+    };
+
+    export const renderSearchResults = ({ searchResultsEl, results, onSelect, quantities = {}, owned = {} }) => {
       if (!searchResultsEl) return;
     
       if (!results || results.length === 0) {
@@ -35,6 +47,7 @@ const escapeHtml = (value = '') => String(value)
               <span class="native-deck-builder-result-frame">
                 <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" loading="lazy" />
                 ${qty > 0 ? `<span class="native-deck-builder-result-qty" aria-label="${qty} in deck">${qty}</span>` : ''}
+                ${ownedBadgeHtml(owned[card.id])}
                 <span class="native-deck-builder-result-text">
                   <strong>${escapeHtml(card.name)}</strong>
                   <span>${setName}</span>

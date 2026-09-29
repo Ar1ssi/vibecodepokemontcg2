@@ -6,6 +6,7 @@ import {
   filterCoins,
   getCoinStats,
   getCoins,
+  ownedFirst,
   groupCoinsByRelease,
   isPlaceholderCoin,
 } from '../core/coins.mjs';
@@ -98,4 +99,13 @@ test('catalog materials are all declared', () => {
   for (const coin of getCoins()) {
     assert.ok(COIN_MATERIALS.includes(coin.material), coin.id);
   }
+});
+
+test('design 057: ownedFirst puts owned coins first and keeps each group in catalog order', () => {
+  const coins = getCoins();
+  const sorted = ownedFirst(coins, ['PFLETB_Mega_Charizard_X_Coin']);
+  assert.equal(sorted[0].id, 'PFLETB_Mega_Charizard_X_Coin');
+  assert.equal(sorted.length, coins.length);
+  assert.deepEqual(sorted.slice(1), coins.filter((coin) => coin.id !== 'PFLETB_Mega_Charizard_X_Coin'));
+  assert.deepEqual(ownedFirst(coins, []), coins);
 });

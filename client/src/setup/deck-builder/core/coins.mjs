@@ -9621,3 +9621,13 @@ export function getCoinStats(coins = []) {
     placeholders,
   };
 }
+
+/**
+ * The catalog with the ids the player owns first (design 057: the Elite Trainer Box collection),
+ * each group in its original order. Items carry `id`; a missing or empty owned list keeps the order.
+ */
+export function ownedFirst(items = [], ownedIds = []) {
+  const owned = new Set(ownedIds || []);
+  if (!owned.size) return [...items];
+  return [...items.filter((item) => owned.has(item.id)), ...items.filter((item) => !owned.has(item.id))];
+}

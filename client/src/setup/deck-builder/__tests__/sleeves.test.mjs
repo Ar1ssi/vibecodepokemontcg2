@@ -5,6 +5,7 @@ import test from 'node:test';
       getSleeves,
       getSleeveById,
       filterSleevesByName,
+      ownedFirst,
     } from '../core/sleeves.mjs';
     import {
       createDeckInLibrary,
@@ -106,3 +107,16 @@ import test from 'node:test';
       );
     });
     
+test('design 057: ownedFirst puts owned sleeves first and keeps each group in catalog order', () => {
+  const [a, b, c] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  assert.deepEqual(ownedFirst([a, b, c], ['c']), [c, a, b]);
+  assert.deepEqual(ownedFirst([a, b, c], ['c', 'a']), [a, c, b], 'owned keep catalog order');
+  assert.deepEqual(ownedFirst([a, b, c], []), [a, b, c]);
+  assert.deepEqual(ownedFirst([a, b, c], null), [a, b, c]);
+  assert.deepEqual(ownedFirst([a, b, c], ['zz']), [a, b, c], 'unknown ids change nothing');
+  const sleeves = getSleeves();
+  const etbSleeve = '08266b9d-1d37-4ddb-a458-9adc302edb62';
+  const sorted = ownedFirst(sleeves, [etbSleeve]);
+  assert.equal(sorted[0].id, etbSleeve);
+  assert.equal(sorted.length, sleeves.length);
+});

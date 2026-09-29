@@ -749,3 +749,43 @@ body.fx-off.etb-host .db-live .etb-packs .etb-packs__fan {
     width: 100%;
   }
 }
+
+/* ── Owned everywhere (design 057 slice 5): what the player's boxes gave them ─────────── */
+/* "×n owned" on a Search or Browse Sets tile, under the gold in-deck count. */
+.etb-host .db-live .native-deck-builder-owned-badge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 2;
+  padding: 0.2vh 0.6vh;
+  border-radius: var(--db-radius-pill);
+  background: rgba(12, 16, 22, 0.82);
+  color: var(--db-gold);
+  font-size: 1.15vh;
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+/* Owned sleeves and coins lead their picker, with an "Owned" corner tag. */
+.etb-host .db-live .native-deck-builder-sleeve-thumb.is-owned,
+.etb-host .db-live .coin-cell.is-owned {
+  position: relative;
+  box-shadow: 0 0 0 2px var(--db-gold-dark);
+}
+.etb-host .db-live .native-deck-builder-owned-tag {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 2;
+  padding: 1px 5px;
+  border-radius: var(--db-radius-pill);
+  background: var(--db-gold);
+  color: #1b2127;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}

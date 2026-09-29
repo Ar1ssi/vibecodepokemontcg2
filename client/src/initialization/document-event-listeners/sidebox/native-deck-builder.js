@@ -494,6 +494,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const tabPool = document.getElementById('buildBattleTabPool');
       const boxPanel = document.getElementById('buildBattleBoxPanel');
       const poolPanel = document.getElementById('buildBattlePoolPanel');
+      // The Shelf / Collection controller (design 057); null outside the Standard builder tab, and
+      // until it boots at the end. Declared here: the pickers and the set browser read ownership
+      // through it while they are built.
+      let eliteTrainerBox = null;
+      const ownedCardCounts = () => eliteTrainerBox?.ownedCounts() ?? {};
       const tabShelf = document.getElementById('etbTabShelf');
       const tabCollection = document.getElementById('etbTabCollection');
       const shelfPanel = document.getElementById('etbShelfPanel');
@@ -517,6 +522,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           const setBrowser = initializeNativeDeckBuilderSetBrowser({
         panelEl: browserPanel,
         getQuantities: () => cardQuantities(),
+        getOwned: ownedCardCounts,
         onAddCard: (card) => {
           deck = addCard(deck, card);
           deckDirty = true;
@@ -583,6 +589,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             customizeSwitcherEl.hidden = !isCustomize;
             // entering customize resets to the sleeve view
             if (isCustomize) {
+              // A box opened since the pickers were drawn gave new sleeves and coins.
+              sleevePicker?.refreshOwned();
+              coinPicker?.refreshOwned();
               const sleeveBtn = customizeSwitcherEl.querySelector('[data-view="sleeve"]');
               sleeveBtn?.click();
             }
@@ -598,6 +607,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const matPanel = document.getElementById('nativeDeckBuilderMatPanel');
       const sleevePicker = initializeDeckBuilderSleevePicker({
         panelEl: sleevePanel,
+        getOwnedIds: () => eliteTrainerBox?.ownedSleeveIds() ?? [],
         onChange: (sleeve) => {
           deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
               rememberCosmetic(currentLoadTarget, 'sleeveId', sleeve ? sleeve.id : null);
@@ -613,6 +623,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // in localStorage.
           const coinPicker = initializeDeckBuilderCoinPicker({
             panelEl: coinPanel,
+            getOwnedIds: () => eliteTrainerBox?.ownedCoinIds() ?? [],
             onChange: (coin) => {
               deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
               rememberCosmetic(currentLoadTarget, 'coinId', coin ? coin.id : null);
@@ -875,8 +886,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let deckListFilter = null;
   // The Box / Pool controller; null outside Build & Battle, and until it boots below.
   let buildBattle = null;
-  // The Shelf / Collection controller (design 057); null outside the Standard builder tab.
-  let eliteTrainerBox = null;
   // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
   const currentDeckFormat = () =>
     isBuildBattle
@@ -973,6 +982,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       searchResultsEl: searchResults,
       results: currentResults,
       quantities: cardQuantities(),
+      owned: ownedCardCounts(),
       onSelect: (card) => {
         deck = addCard(deck, card);
         deckDirty = true;
@@ -1900,6 +1910,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       },
       showShelf: () => switchMode('shelf'),
       showCollection: () => switchMode('collection'),
+      openSetBrowser: (setId) => {
+        switchMode('browse');
+        setBrowser?.openSet(setId);
+      },
       onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
     });
     const etbMode = eliteTrainerBox.initialMode();

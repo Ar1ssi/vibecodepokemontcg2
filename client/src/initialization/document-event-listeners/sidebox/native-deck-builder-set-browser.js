@@ -17,6 +17,7 @@ import {
       findSetFilterMatches,
       scopeFilterSets,
     } from '../../../setup/deck-builder/core/set-browser-filters.mjs';
+    import { ownedBadgeHtml } from './native-deck-builder-renderers.js';
 
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -40,6 +41,7 @@ import {
      * @param {function} options.onAddCard - called with the clicked card
      * @param {function} options.onPreviewCard - called with the card image url
      * @param {function} [options.getQuantities] - card id -> copies in the deck
+     * @param {function} [options.getOwned] - card id -> copies the ETB collection holds (design 057)
      * @returns {object|null} controller, or null when the panel is missing
      */
     export const initializeNativeDeckBuilderSetBrowser = ({
@@ -47,6 +49,7 @@ import {
       onAddCard,
       onPreviewCard,
       getQuantities,
+      getOwned,
     }) => {
       if (!panelEl) return null;
 
@@ -131,7 +134,7 @@ import {
         return promise;
       };
 
-      const renderCardsGrid = (cards, quantities = {}) => {
+      const renderCardsGrid = (cards, quantities = {}, owned = {}) => {
         return cards
           .map((card) => {
             const thumb = card.images?.small || card.image || '';
@@ -150,6 +153,7 @@ import {
               '  <span class="native-deck-builder-result-frame">',
               `    <img src="${safeThumb}" alt="${safeName}" class="native-deck-builder-result-image" loading="lazy" />`,
               inDeck > 0 ? `    <span class="native-deck-builder-result-qty" aria-label="${inDeck} in deck">${inDeck}</span>` : '',
+              ownedBadgeHtml(owned[card.id]),
               '    <span class="native-deck-builder-result-text">',
               `      <strong>${safeName}</strong>`,
               `      <span>#${escapeHtml(card.localId)}</span>`,
@@ -271,6 +275,7 @@ import {
         const hasNameFilter = String(filterTerm || '').trim() !== '';
         const isFiltering = hasNameFilter || Boolean(supertypeFilter) || filterMatches !== null;
         const quantities = getQuantities ? getQuantities() : {};
+        const owned = getOwned ? getOwned() : {};
         const passesCardFilters = (setId, card) => {
           if (filterMatches === null) return true;
           if (!filterMatches.get(setId)?.has(card.id)) return false;
@@ -295,7 +300,7 @@ import {
                 }
                 if (expanded) {
                   const cardsHtml = filtered.length
-                    ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), quantities)
+                    ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), quantities, owned)
                     : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
                   dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
                 }
@@ -476,9 +481,31 @@ import {
         onPreviewCard?.(target.dataset.previewImage, card, target);
       });
 
+      // Opens one set of the Standard pill, as a click on its tab would (the Elite Trainer Box
+      // guide, design 057). A set the pill does not list stays closed.
+      const openSet = async (setId) => {
+        if (activeCategory !== 'standard') setCategory('standard');
+        expandedSetId = setId;
+        await loadCategory('standard');
+        if (expandedSetId !== setId) return;
+        if (scopeFollowsOpenSet()) {
+          refreshFilterMatches();
+          return;
+        }
+        render();
+        try {
+          await getCardsForSet(setId);
+        } catch (error) {
+          showStatus(`Could not load cards for this set: ${error.message}`);
+          return;
+        }
+        if (expandedSetId === setId) render();
+      };
+
       return {
         load,
         render,
+        openSet,
         refresh: () => {
           categoryState.clear();
           cardsBySet.clear();

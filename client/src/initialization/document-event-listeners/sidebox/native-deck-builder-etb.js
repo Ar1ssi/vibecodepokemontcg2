@@ -100,8 +100,11 @@ const energyCard = (label) => {
  * @param {(card: object) => void} options.addToDeck adds one copy to the editor deck
  * @param {() => void} options.showShelf switches the left pane to the Shelf tab
  * @param {() => void} options.showCollection switches the left pane to the Collection tab
+ * @param {(setId: string) => void} options.openSetBrowser shows Browse Sets with the set open
+ *   (the box's player's guide, tapped during the opening)
  * @param {(imageUrl: string, card: object, sourceEl: Element) => void} options.onPreviewCard
  * @returns {{refresh: () => void, ownedCounts: () => Record<string, number>,
+ *   ownedSleeveIds: () => string[], ownedCoinIds: () => string[],
  *   initialMode: () => 'shelf'|null}}
  */
 export const initializeEliteTrainerBox = ({
@@ -111,6 +114,7 @@ export const initializeEliteTrainerBox = ({
   addToDeck,
   showShelf,
   showCollection,
+  openSetBrowser,
   onPreviewCard,
 }) => {
   const storage = browserStorage();
@@ -191,13 +195,16 @@ export const initializeEliteTrainerBox = ({
   };
 
   // The scene ended: the box is already in the collection, so the session is done with.
-  const finishOpening = (destination) => {
+  // A tapped player's guide wins: the scene hands over to Browse Sets on the box's set.
+  const finishOpening = (destination, { wantsGuide = false } = {}) => {
+    const setId = sessionEtb()?.setId;
     closeScene();
     session = null;
     clearEtbSession(storage);
     reloadCollection();
     renderAll();
-    if (destination === 'collection') handOver(collectionPanelEl, showCollection);
+    if (wantsGuide && setId) openSetBrowser(setId);
+    else if (destination === 'collection') handOver(collectionPanelEl, showCollection);
     else handOver(shelfPanelEl, showShelf);
   };
 
@@ -473,6 +480,8 @@ export const initializeEliteTrainerBox = ({
   return {
     refresh: refreshCounts,
     ownedCounts: () => ({ ...collection.cards }),
+    ownedSleeveIds: () => [...collection.sleeves],
+    ownedCoinIds: () => [...collection.coins],
     // A box being opened, or a `?etb=` link, opens on the Shelf; otherwise the builder keeps Search.
     initialMode: () => (hasStoredSession() || query ? 'shelf' : null),
   };

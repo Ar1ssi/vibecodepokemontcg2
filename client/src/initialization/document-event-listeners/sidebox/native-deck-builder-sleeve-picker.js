@@ -1,6 +1,7 @@
 import {
       filterSleevesByName,
       getSleeves,
+      ownedFirst,
     } from '../../../setup/deck-builder/core/sleeves.mjs';
     import { DEFAULT_CARD_BACK_PATH } from '../../../setup/deck-constructor/default-card-back.mjs';
     
@@ -20,11 +21,14 @@ import {
      * @param {object} options
      * @param {HTMLElement} options.panelEl - container element
      * @param {function} options.onChange - called with the selected sleeve (or null)
+     * @param {() => string[]} [options.getOwnedIds] - sleeve ids the player's Elite Trainer Boxes
+     *   gave them (design 057): listed first with an "Owned" tag
      * @returns {object|null} controller, or null when the panel is missing
      */
     export const initializeDeckBuilderSleevePicker = ({
       panelEl,
       onChange,
+      getOwnedIds = () => [],
     }) => {
       if (!panelEl) return null;
     
@@ -72,7 +76,8 @@ import {
       };
     
       const renderGallery = () => {
-        const visible = filterSleevesByName(sleeves, filterTerm);
+        const ownedIds = new Set(getOwnedIds());
+        const visible = ownedFirst(filterSleevesByName(sleeves, filterTerm), [...ownedIds]);
         const defaultSelected = !selectedId;
         const defaultThumb = [
           `<button class="native-deck-builder-sleeve-thumb${defaultSelected ? ' selected' : ''}" data-sleeve-id="" title="Classic Pokémon card back" aria-pressed="${defaultSelected ? 'true' : 'false'}">`,
@@ -85,9 +90,11 @@ import {
           : visible
             .map((sleeve) => {
               const isSelected = sleeve.id === selectedId;
+              const isOwned = ownedIds.has(sleeve.id);
               return [
-                `<button class="native-deck-builder-sleeve-thumb${isSelected ? ' selected' : ''}" data-sleeve-id="${escapeHtml(sleeve.id)}" title="${escapeHtml(sleeve.name || 'Sleeve')}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
+                `<button class="native-deck-builder-sleeve-thumb${isSelected ? ' selected' : ''}${isOwned ? ' is-owned' : ''}" data-sleeve-id="${escapeHtml(sleeve.id)}" title="${escapeHtml(sleeve.name || 'Sleeve')}${isOwned ? ' · Owned' : ''}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
                 `  <img src="${escapeHtml(sleeve.image)}" alt="${escapeHtml(sleeve.name)}" loading="lazy" />`,
+                isOwned ? '  <span class="native-deck-builder-owned-tag">Owned</span>' : '',
                 `</button>`,
               ].join('');
             })
@@ -122,6 +129,8 @@ import {
           renderGallery();
         },
         getSelected: () => sleeves.find((s) => s.id === selectedId) || null,
+        // A box opened since the gallery was drawn changes what is owned.
+        refreshOwned: () => renderGallery(),
       };
     };
     
