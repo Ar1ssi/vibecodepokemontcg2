@@ -695,6 +695,14 @@ Build notes:
   Recorder: `BOX=sword-shield SEED=6` PASS (seed 42's box holds no tier-2+ card, so row 14 has nothing to
   check there) and `BOX=brilliant-stars SEED=1`; the recorder now routes images.pokemontcg.io (D4's Trainer
   Gallery art host) to `CARD_IMG` too. Picker e2e row 15 PASS; `--check` (live, 12 SWSH boxes) clean.
+- Slice 7: 12 SM kits and boxes imported. The two-pool kits (Sun & Moon, Guardians Rising, Burning Shadows,
+  Crimson Invasion) take the page's Supporter count (4) and Item count (Sun & Moon 2, Crimson Invasion 4) or let
+  the Items fill; the one-pool boxes fill to 23, which is every page's count ("3 if the Zapdos Group is
+  present", Celestial Storm's "2-4", Forbidden Light's "5 if Judge was not obtained") except Unified Minds
+  (page: four Supporters; its 8-card groups leave six, A4). Guardians Rising's optional Oricorio [Pa'u Style]
+  is not simulated (A5). TCGdex marks Prism Star cards `Rare`, so they roll in the rare slot.
+  Recorder `BOX=team-up SEED=6` PASS (an SM box reaches tier 3 only with a secret rare); `--check` (live, 12
+  SM boxes) clean.
 
 ---
 Self-approval checklist (only when the user is unreachable):
