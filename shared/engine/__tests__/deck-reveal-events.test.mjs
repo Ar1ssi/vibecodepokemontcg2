@@ -309,3 +309,38 @@ test('stadium: Radio Tower\'s private look carries no art', () => {
   assert.equal(peeks.length, 1);
   assert.ok(peeks[0].cards.every((c) => c.src === undefined));
 });
+
+// Jirachi Detour (Rising Rivals 7): the Supporter played this turn is the attack's effect, so its
+// steps run as the attacker's — the Supporter's own text still decides the reveal.
+const DETOUR = 'If you have a Supporter card in play, use the effect of that card as the effect of this attack.';
+
+function detourWith(name, text) {
+  const { state, rng } = setupGame({ rulesEnabled: false });
+  state.players.p1.zones.active[0] = pokemon(1, 'Jirachi', {
+    attacks: [{ name: 'Detour', cost: [], damage: '', text: DETOUR }],
+  });
+  state.players.p1.zones.discard.push(supporter(9, name, text));
+  state.players.p1.flags = { supporterPlayed: true, supporterNamesThisTurn: [name] };
+  state.players.p1.zones.deck.push(pokemon(31, 'Pichu'), pokemon(32, 'Cleffa'), basicEnergy(40, 'Fire'));
+  for (let i = 0; i < 6; i++) state.players.p1.zones.prizes.push(pokemon(80 + i, `Prize ${i}`));
+  let res = run(state, rng, 'attack', { attackIndex: 0 });
+  assert.ok(res.events.some((e) => e.type === 'supporterEffectUsed'), 'Detour used the Supporter');
+  const events = [...res.events];
+  while (res.pendingChoice?.player === 'p1' && res.pendingChoice.options?.some((o) => o.instanceId === 31)) {
+    res = pick(res, rng, [31]);
+    events.push(...res.events);
+  }
+  return { ...res, events };
+}
+
+test('attack: Detour borrowing Pokémon Collector reveals the Pokémon it takes', () => {
+  const res = detourWith('Pokémon Collector', POKEMON_COLLECTOR);
+  assert.deepEqual(movedToHand(res), [31]);
+  assert.deepEqual(reveals(res).map((e) => e.cards.map((c) => [c.instanceId, c.src])), [[[31, art(31)]]]);
+});
+
+test('attack: Detour borrowing Cassiopeia keeps the card hidden', () => {
+  const res = detourWith('Cassiopeia', CASSIOPEIA);
+  assert.deepEqual(movedToHand(res), [31]);
+  assert.deepEqual(reveals(res), []);
+});

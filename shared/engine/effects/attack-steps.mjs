@@ -14,6 +14,7 @@ import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { getRetreatCostCount, isBasicPokemon, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
+import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
   addCondition,
   clearConditions,
@@ -3578,7 +3579,13 @@ function useSupporterEffect(ctx, owner, card) {
     discardCards(owner, [card], ctx.events);
   }
   if (ctx.step.source === 'deck') shuffleOwnDeck(owner, ctx);
-  const steps = parseTrainerEffect(card.text || card.effect || card.cardText || '')?.steps || [];
+  const text = card.text || card.effect || card.cardText || '';
+  // Design 059: the steps run as the attacking Pokémon's, whose card says nothing about
+  // revealing, so each carries the Supporter's own answer.
+  const reveals = textRevealsPicks(text);
+  const steps = (parseTrainerEffect(text)?.steps || []).map((step) =>
+    typeof step.reveal === 'boolean' ? step : { ...step, reveal: reveals }
+  );
   ctx.events.push({
     type: 'supporterEffectUsed',
     playerId: ctx.playerId,

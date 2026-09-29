@@ -196,6 +196,9 @@ one new plan kind. Revert = revert the commits; no data touched.
   stack, holo wrappers hydrate), so each card re-measures its hand spot 80 ms before its place phase
   and swaps its keyframes on the same clock (`playFrames(...).setFrames`, new in image-logic/mat-fx.mjs;
   `animateFrames` now wraps it). The flip card is 043's DOM, shared through `opp-play.js spawnFlipCard`.
+- Review pass: an attack that borrows a Supporter's effect (Jirachi Detour, Rising Rivals 7) runs the
+  Supporter's steps as the attacker's, so `atkUseSupporter` stamps each borrowed step's `reveal` from
+  the Supporter's own text (effects/attack-steps.mjs `useSupporterEffect`).
 - Slice 4: recorder `.claude/skills/fx-preview/rec/rec-deck-reveal.mjs` drives the real applyView +
   advisory hooks (not the effect module alone like the other rec scripts), so planning and queueing run too.
 
