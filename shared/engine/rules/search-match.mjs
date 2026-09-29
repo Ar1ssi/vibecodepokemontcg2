@@ -111,6 +111,13 @@ export function matchesSearch(card, what = '') {
   if (w.includes('trainer')) {
     return isTrainer;
   }
+  // A plain "Stadium" kind (Colress's Tenacity's first stage, Lusamine). Before, it fell
+  // through to the generic branch and matched every card.
+  if (w.includes('stadium') && !w.includes('energy')) {
+    const tt = String(card.trainerType || card.type || '').toLowerCase();
+    const st = Array.isArray(card.subtypes) ? card.subtypes.map((s) => String(s).toLowerCase()) : [];
+    return tt.includes('stadium') || st.includes('stadium');
+  }
   if (w.includes('stadium') && w.includes('energy')) {
     const isEnergy =
       String(card.type || '').toLowerCase().includes('energy') ||

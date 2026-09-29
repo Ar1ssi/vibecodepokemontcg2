@@ -257,6 +257,114 @@ function parseEnergyType(lower) {
 
 // Legacy discard-pile wording ("Search your discard pile for X …") names the
 // target loosely; map it to the closest search filter.
+// Energy-type word → symbol, for "a Fire Energy card" / "basic Water Energy" kinds.
+const TYPE_WORD_SYMBOLS = {
+  colorless: 'C', grass: 'G', fire: 'R', water: 'W', lightning: 'L', psychic: 'P',
+  fighting: 'F', darkness: 'D', metal: 'M', dragon: 'N', fairy: 'Y',
+};
+
+function titleCaseKind(phrase) {
+  return phrase
+    .split(' ')
+    .map((word) => {
+      if (/^\{[a-z]\}$/.test(word)) return SYMBOL_TYPE_WORDS[word[1]] || word.toUpperCase();
+      if (word === 'pokémon-gx') return 'Pokémon-GX';
+      if (word === 'pokémon-ex') return 'Pokémon-EX';
+      return word.replace(/^[a-z]/, (ch) => ch.toUpperCase());
+    })
+    .join(' ');
+}
+
+// A printed card kind ("Item card", "Pokémon Tool", "basic {F} Energy", "{W} Pokémon",
+// "Evolution Pokémon") → the `what` string matchesSearch reads. Null for a phrase that names
+// no kind the matcher knows.
+function knownKindWhat(phrase) {
+  const p = String(phrase || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/ and\/or /g, ' or ')
+    .replace(/,\s*$/, '')
+    .replace(/\s+cards?$/, '');
+  if (!p) return null;
+  if (/^cards?$/.test(p)) return 'card';
+  // "Pokémon, each with 90 HP or less" (Rescue Carrier): the kind plus an HP cap.
+  const capped = p.match(/^(.+?),? (?:each )?with (\d+) hp or less$/);
+  if (capped) {
+    const kind = knownKindWhat(capped[1]);
+    return kind ? `${kind} ≤${capped[2]} HP` : null;
+  }
+  // "a Pokémon or a Supporter card" (Crossceiver), "Baby Pokémon, Basic Pokémon, or Evolution
+  // card" (Old Rod): any of the kinds; matchesSearch splits on " or ".
+  const either = p.split(/,? or (?:an? )?|, /);
+  if (either.length > 1) {
+    const whats = either.map(knownKindWhat);
+    return whats.every(Boolean) ? whats.join(' or ') : null;
+  }
+  if (p === 'evolution') return 'Evolution Pokémon';
+  // A clause, not a kind ("card that evolves from that Pokémon", "Basic Pokémon card other
+  // than a Baby Pokémon"): the caller keeps what it already had.
+  if (/\b(?:that|from|which|with|other|than|named|in|and)\b/.test(p)) return null;
+  if (/^(?:pokémon )?tool$/.test(p)) return 'Pokémon Tool';
+  if (p === 'item') return 'Item';
+  if (p === 'supporter') return 'Supporter';
+  if (p === 'stadium') return 'Stadium';
+  if (p === 'trainer') return 'Trainer';
+  if (/^pokémon or (?:a )?basic energy$/.test(p)) return 'Pokémon or Basic Energy';
+  const energy = p.match(/^(basic )?(?:(\{[a-z]\}) |([a-z]+) )?energy$/);
+  if (energy) {
+    const sym = energy[2] ? energy[2][1].toUpperCase() : TYPE_WORD_SYMBOLS[energy[3] || ''];
+    if (energy[3] && !sym) return null;
+    // A typed Energy card ("{R} Energy card") is read as its Basic printing.
+    if (sym) return `Basic {${sym}} Energy`;
+    return energy[1] ? 'Basic Energy' : 'Energy';
+  }
+  if (/pokémon(?:-gx|-ex)?$/.test(p)) return titleCaseKind(p);
+  return null;
+}
+
+// Any kind phrase, falling back to a card-name needle ("Nemona", "Judge", "Team Plasma").
+function cardKindWhat(phrase) {
+  const known = knownKindWhat(phrase);
+  if (known) return known;
+  const p = String(phrase || '').trim().replace(/\s+/g, ' ').replace(/\s+cards?$/, '');
+  if (!p || /^cards?$/.test(p)) return 'card';
+  return titleCaseKind(p);
+}
+
+// "Search your deck for a <kind> [card], a <kind> card, and a <kind> card, …" — two or more
+// kinds, one of each (Arven, Rosa, Larry's Skill, Secret Box).
+const KIND_ITEM = '(?:an?|\\d+|up to \\d+) [^,.]+?';
+const KIND_LIST_SEARCH_RE = new RegExp(
+  `search your deck for (${KIND_ITEM}(?:, ${KIND_ITEM})*,? and ${KIND_ITEM})(?=,|\\.| that you find| and (?:reveal|put|show|attach|switch))`
+);
+
+function kindCount(article) {
+  const n = article.match(/\d+/);
+  return n ? Number(n[0]) : 1;
+}
+
+function parseTwoKindSearch(lower) {
+  const m = lower.match(KIND_LIST_SEARCH_RE);
+  if (!m) return null;
+  const stages = [];
+  for (const item of m[1].split(/,? and |, /)) {
+    const parts = item.match(/^(an?|\d+|up to \d+) (.+)$/);
+    const what = parts && knownKindWhat(parts[2]);
+    if (!what) return null;
+    stages.push({
+      what,
+      count: kindCount(parts[1]),
+      destination: 'hand',
+      ...(parts[1].startsWith('up to') ? { upTo: true } : {}),
+    });
+  }
+  if (stages.length < 2) return null;
+  return { type: 'searchDeckSequence', stages };
+}
+
+// "Put [up to] N <kind> cards from your discard pile into your hand" — a kinded, counted pick.
+const DISCARD_KINDED_RE = /put (up to )?(\d+|an?) ([^.•]+?) from your discard pile into your hand/;
+
 function discardSearchWhat(lower) {
   if (lower.includes('pokémon') && lower.includes('energy')) return 'Pokémon or Basic Energy';
   if (lower.includes('supporter')) return 'Supporter';
@@ -336,7 +444,7 @@ function combinationDiscardWhat(clause) {
     }
     if (part.includes('supporter')) return 'Supporter';
     if (part.includes('trainer')) return 'Trainer';
-    return 'card';
+    return knownKindWhat(part) || 'card';
   });
   return converted.join(' or ');
 }
@@ -420,22 +528,11 @@ export function parseSearchDeckParams(lower) {
     destination = 'attach';
   }
 
-  if (lower.includes('item card and a pokémon tool card')) {
-    return { what: 'Item + Pokémon Tool', count: 1, destination: 'hand' };
-  }
-  if (lower.includes('stadium card and an energy card') || lower.includes('stadium card and a energy card')) {
-    return { what: 'Stadium + Energy', count: 2, destination: 'hand' };
-  }
-  // Hilda: one of each, not two picks from a shared pool.
-  if (/search your deck for an evolution pok[ée]mon and an energy card/.test(lower)) {
-    return {
-      type: 'searchDeckSequence',
-      stages: [
-        { what: 'Evolution Pokémon', count: 1, destination: 'hand' },
-        { what: 'Energy', count: 1, destination: 'hand' },
-      ],
-    };
-  }
+  // "a X and a Y card" is one card of each kind, never two picks from one shared pool and
+  // never the first kind alone (Arven, Colress's Tenacity, Hilda, Irida, Korrina, Piers,
+  // Steven, Volkner, the Team Magma/Aqua Great Balls). Each stage is its own optional pick.
+  const twoKinds = parseTwoKindSearch(lower);
+  if (twoKinds) return twoKinds;
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
     return {
       type: 'searchDeckSequence',
@@ -665,6 +762,18 @@ export function parseSearchDeckParams(lower) {
     what = 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
 
+  // The printed count and kind of a plain search ("up to 2 Basic Pokémon", "3 Pokémon Tool
+  // cards", "up to 2 Supporter and/or Stadium cards"). The branches above each read one
+  // wording; every other wording collapsed to one card of a kind guessed from the whole text.
+  const generic = lower.match(
+    /search your deck for (up to )?(\d+|an?) ([^.]+?)(?=,|\.| and (?:put|discard|reveal|show|shuffle|attach|switch))/
+  );
+  if (generic) {
+    if (/^\d+$/.test(generic[2])) count = Number(generic[2]);
+    const kind = knownKindWhat(generic[3]);
+    if (kind && GUESSED_WHATS.has(what)) what = kind;
+  }
+
   return {
     what,
     count,
@@ -673,6 +782,9 @@ export function parseSearchDeckParams(lower) {
     ...(reveal ? { reveal: true } : {}),
   };
 }
+
+// The `what` values the fallbacks above guess from words anywhere in the text.
+const GUESSED_WHATS = new Set(['card', 'Pokémon', 'Supporter', 'Trainer']);
 
 function parseCoinFlipStep(lower) {
   if (!lower.includes('flip a coin') && !lower.includes('flip 2 coins')) return null;
@@ -905,6 +1017,12 @@ export function parseTrainerEffect(text = '') {
   const result = parseTrainerSteps(lower);
   if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower)) {
     result.turnOnePermission = true;
+  }
+  // A leading "Draw N cards." is its own effect whatever branch reads the rest (Daisy's Help,
+  // Ryme, Roark). A branch that already drew, or draws as part of a bigger step, keeps its own.
+  const leadingDraw = lower.match(/^draw (\d+|an?) cards?\./);
+  if (leadingDraw && result.recognizable && !result.steps.some((s) => /draw/i.test(s.type))) {
+    result.steps.unshift({ type: 'draw', count: /^\d+$/.test(leadingDraw[1]) ? Number(leadingDraw[1]) : 1 });
   }
   return playCondition ? { ...result, playCondition } : result;
 }
@@ -1307,7 +1425,7 @@ function parseTrainerStepsInner(lower) {
     // two-clause filter, which the plain branch below drops (it saw `what:
     // 'card'` and a single-card pick).
     const combo = lower.match(
-      /put up to (\d+) in any combination of (.+?) cards? from your discard pile into your hand/
+      /put (?:up to )?(\d+) in any combination of (.+?) cards? from your discard pile into your hand/
     );
     if (combo) {
       steps.push({
@@ -1319,12 +1437,25 @@ function parseTrainerStepsInner(lower) {
       appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
     }
-    // Energy Retrieval / Superior Energy Retrieval — a counted Basic Energy pick; the plain
-    // branch below would offer every discard card.
-    const basicEnergy = lower.match(/put (?:up to )?(\d+|an?) basic energy cards? from your discard pile into your hand/);
-    if (basicEnergy) {
-      const count = /^\d+$/.test(basicEnergy[1]) ? Number(basicEnergy[1]) : 1;
-      steps.push({ type: 'recursion', what: 'Basic Energy', count, from: 'discard' });
+    // A kinded, counted pick (Energy Retrieval, VS Seeker, Miracle Headset, Fire Crystal,
+    // Nemona's Backpack, Roark). The plain branch below offered every discard card, one at
+    // a time, whatever kind or count the card printed.
+    const kinded = lower.match(DISCARD_KINDED_RE);
+    if (kinded) {
+      const count = /^\d+$/.test(kinded[2]) ? Number(kinded[2]) : 1;
+      // Roark: "Draw 2 cards." leads the recovery, so the draw step comes first.
+      const leadingDraw = lower.match(/^draw (\d+|a|an) cards?\./);
+      if (leadingDraw) {
+        steps.push({ type: 'draw', count: /^\d+$/.test(leadingDraw[1]) ? Number(leadingDraw[1]) : 1 });
+      }
+      steps.push({
+        type: 'recursion',
+        what: cardKindWhat(kinded[3]) || 'card',
+        count,
+        from: 'discard',
+        ...(kinded[1] ? { upTo: true } : {}),
+      });
+      if (!leadingDraw) appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
     }
     let what = 'card';

@@ -23,8 +23,8 @@ import test, { describe } from 'node:test';
     test('Arven: search Item + Tool', () => {
       const r = parseTrainerEffect("Search your deck for an Item card and a Pokémon Tool card, reveal them, and put them into your hand. Then, shuffle your deck.");
       assert.equal(r.recognizable, true);
-      assert.equal(r.steps[0].type, 'searchDeck');
-      assert.equal(r.steps[0].what, 'Item + Pokémon Tool');
+      assert.equal(r.steps[0].type, 'searchDeckSequence');
+      assert.deepEqual(r.steps[0].stages.map((s) => s.what), ['Item', 'Pokémon Tool']);
     });
     
     test('Nest Ball: search Basic to bench', () => {
@@ -466,7 +466,7 @@ import test, { describe } from 'node:test';
       assert.equal(r.recognizable, true);
       assert.equal(r.steps[0].type, 'discardCost');
       assert.equal(r.steps[0].count, 1);
-      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Pokémon' && s.count === 4));
+      assert.ok(r.steps.some((s) => s.type === 'searchDeck' && s.what === 'Lightning Pokémon' && s.count === 4));
     });
 
     test('Firebreather: search up to 7 Basic {R} Energy (not generic "card")', () => {
@@ -821,9 +821,9 @@ import test, { describe } from 'node:test';
           'Search your deck for a Stadium card and an Energy card, reveal them, and put them into your hand. Then, shuffle your deck.'
         );
         assert.equal(r.recognizable, true);
-        assert.equal(r.steps[0].type, 'searchDeck');
-        assert.equal(r.steps[0].what, 'Stadium + Energy');
-        assert.equal(r.steps[0].count, 2);
+        assert.equal(r.steps[0].type, 'searchDeckSequence');
+        assert.deepEqual(r.steps[0].stages.map((s) => s.what), ['Stadium', 'Energy']);
+        assert.deepEqual(r.steps[0].stages.map((s) => s.count), [1, 1]);
       });
 
       test('Poké Ball: coin flip heads search', () => {
@@ -2206,7 +2206,7 @@ describe('legacy mechanisms coverage (batch 11)', () => {
   test('Energy Retrieval (modern wording): counted Basic Energy pick, not every discard card', () => {
     // Corpus rows: Energy Retrieval (CRI 108 / WHT 082), Superior Energy Retrieval (PAL 277) in out/pkmn-trainer-cards.json.
     const er = parseTrainerEffect('Put up to 2 Basic Energy cards from your discard pile into your hand.');
-    assert.deepEqual(er.steps, [{ type: 'recursion', what: 'Basic Energy', count: 2, from: 'discard' }]);
+    assert.deepEqual(er.steps, [{ type: 'recursion', what: 'Basic Energy', count: 2, from: 'discard', upTo: true }]);
     const ser = parseTrainerEffect('You can use this card only if you discard 2 other cards from your hand. Put up to 4 Basic Energy cards from your discard pile into your hand. (You can\u2019t choose a card you discarded with the effect of this card.)');
     assert.equal(ser.steps[0].type, 'discardCost');
     assert.equal(ser.steps[1].what, 'Basic Energy');

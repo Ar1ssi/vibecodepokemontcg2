@@ -332,6 +332,9 @@
    ]
   },
   "Apricorn Maker#irmkz0": {
+   "gaps": [
+    "loose-what"
+   ],
    "steps": [
     "searchDeck"
    ]
@@ -411,7 +414,7 @@
   },
   "Arven#13plb2z": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Aspertia City Gym#13sqxwb": {
@@ -481,6 +484,9 @@
    ]
   },
   "Ball Guy#61824y": {
+   "gaps": [
+    "loose-what"
+   ],
    "steps": [
     "searchDeck"
    ]
@@ -1251,7 +1257,7 @@
   },
   "Castaway#i9a3hd": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Cedric Juniper#8qlq6r": {
@@ -1566,7 +1572,7 @@
   },
   "Colress’s Tenacity#1s6evm4": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Colress#1pibqr": {
@@ -1890,6 +1896,7 @@
   },
   "Daisy’s Help#5va16l": {
    "steps": [
+    "draw",
     "lookAtFaceDownPrize"
    ]
   },
@@ -3860,7 +3867,7 @@
   },
   "Hilda#9mzsg7": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Hisuian Heavy Ball#1sazb3a": {
@@ -4088,7 +4095,7 @@
   },
   "Irida#5yg07o": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Iris’s Fighting Spirit#1v9ifgp": {
@@ -4355,7 +4362,7 @@
   },
   "Korrina#1ljsu62": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Kyogre Spirit Link#emdl3l": {
@@ -4427,7 +4434,7 @@
   },
   "Larry’s Skill#i56zmu": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Larry#n1lxmm": {
@@ -6002,7 +6009,7 @@
   },
   "Piers#fdkl6q": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Plasma Frigate#95whwy": {
@@ -6895,6 +6902,9 @@
    ]
   },
   "Red & Blue#17eykct": {
+   "gaps": [
+    "dropped-count"
+   ],
    "playCondition": "notFirstTurn",
    "steps": [
     "searchEvolve"
@@ -7223,7 +7233,7 @@
   "Rosa#eav4ji": {
    "playCondition": "koedLastTurn",
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Rose Tower#1phk07f": {
@@ -7358,6 +7368,7 @@
   },
   "Ryme#jz26nq": {
    "steps": [
+    "draw",
     "switchOpponentOut"
    ]
   },
@@ -7536,7 +7547,7 @@
   "Secret Box#1o6l2u4": {
    "steps": [
     "discardCost",
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Secret Mission#1yh59vp": {
@@ -7985,7 +7996,7 @@
   },
   "Steven#47g6ju": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Stormy Mountains#u5hw15": {
@@ -8311,7 +8322,7 @@
   },
   "Team Aqua’s Great Ball#wu70gz": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Team Aqua’s Secret Base#1laczxg": {
@@ -8417,7 +8428,7 @@
   },
   "Team Magma’s Great Ball#1iwpvhp": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Team Magma’s Secret Base#1tcsf0s": {
@@ -8642,6 +8653,9 @@
    ]
   },
   "The Boss’s Way#mw1w8m": {
+   "gaps": [
+    "loose-what"
+   ],
    "steps": [
     "searchDeck"
    ]
@@ -9159,7 +9173,7 @@
   },
   "Volkner#foelgo": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Volo#xjyk66": {
