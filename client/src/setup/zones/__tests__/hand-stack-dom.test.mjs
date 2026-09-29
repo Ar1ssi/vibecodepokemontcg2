@@ -336,3 +336,31 @@ test('clearing stack positioning leaves other cards and non-elements alone', () 
   assert.doesNotThrow(() => clearHandStackPositioning(undefined));
   assert.doesNotThrow(() => clearHandStackPositioning({}));
 });
+
+test('reconcileHandStacks: a settled hand emits no #hand childList mutations', () => {
+  const doc = new MockDocument();
+  const hand = doc.registerElement('hand', doc.createElement('div'));
+
+  hand.appendChild(createCardImg(doc, 'Rare Candy'));
+  hand.appendChild(createCardImg(doc, 'Rare Candy'));
+  hand.appendChild(createCardImg(doc, 'Ultra Ball'));
+
+  reconcileHandStacks('self', { document: doc });
+
+  // hand-observer.js re-runs the reconciler on every #hand childList mutation,
+  // and appendChild mutates even when the child is already in place — so a pass
+  // that re-appends a settled hand never stops scheduling itself.
+  let handAppends = 0;
+  const originalAppend = hand.appendChild.bind(hand);
+  hand.appendChild = (child) => {
+    handAppends++;
+    return originalAppend(child);
+  };
+
+  reconcileHandStacks('self', { document: doc });
+  reconcileHandStacks('self', { document: doc });
+
+  assert.equal(handAppends, 0, 'A settled hand must not re-append any child');
+  assert.equal(hand.children.length, 2);
+  assert.equal(hand.querySelector('.hand-card-stack').dataset.stackCount, '2');
+});

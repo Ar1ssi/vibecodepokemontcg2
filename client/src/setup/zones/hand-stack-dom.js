@@ -273,9 +273,20 @@ export function reconcileHandStacks(user = 'self', options = {}) {
       }
     }
 
-    // Reconcile order of children in #hand
-    for (const el of newTopLevelElements) {
-      handElement.appendChild(el);
+    // Reconcile order of children in #hand, but only when the live order is
+    // actually wrong. `appendChild` emits a childList mutation even for a node
+    // that is already last, and hand-observer.js watches #hand for exactly that
+    // — so a blanket re-append on every pass livelocks the main thread.
+    const live = Array.from(handElement.children).filter((el) =>
+      newTopLevelElements.includes(el)
+    );
+    const orderSettled =
+      live.length === newTopLevelElements.length &&
+      live.every((el, i) => el === newTopLevelElements[i]);
+    if (!orderSettled) {
+      for (const el of newTopLevelElements) {
+        handElement.appendChild(el);
+      }
     }
 
     adjustAlignment(handElement);
