@@ -265,6 +265,7 @@ export function rootMatchesTarget(player, root, target = '') {
   }
   const top = topPokemonCard(player, root);
   if (t.includes('stage 2') && stageOf(top) !== 'Stage 2') return false;
+  if (/\bbasic (?:\{[a-z]\} )?pok[eé]mon\b/.test(t) && stageOf(top) !== 'Basic') return false;
   if (t.includes('evolved') && top === root) return false;
   if (t.includes('mega evolution') && !/^mega .* ex$/i.test(top.name || '')) return false;
   if (/\bancient pok[eé]mon\b/.test(t) && !isAncientCard(top)) return false;

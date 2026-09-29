@@ -3487,6 +3487,13 @@ function endTurnAfterTrainer(draft, { card, playerId, activeRng, events }) {
   endTurnFromEffect(draft, { playerId, activeRng, events });
 }
 
+/** "If you use this Ability, your turn ends." — once the Ability has fully resolved. */
+function endTurnAfterAbility(draft, { result, playerId, activeRng, events }) {
+  if (!result?.turnEnds || draft.pendingChoice || isGameConcluded(draft)) return;
+  if (draft.turn?.player !== playerId) return;
+  endTurnFromEffect(draft, { playerId, activeRng, events });
+}
+
 /**
  * Ends the acting player's turn from inside a card effect (Lumiose City: "If a
  * player searches their deck in this way, their turn ends."). Mirrors the `pass`
@@ -9068,7 +9075,7 @@ export function applyCommand(state, command, rng = null) {
         break;
       }
       if (cardRef) {
-        executeAbility(draft, {
+        const result = executeAbility(draft, {
           card: cardRef.card,
           abilityIndex: payload.abilityIndex ?? 0,
           playerId,
@@ -9082,6 +9089,7 @@ export function applyCommand(state, command, rng = null) {
           const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
           settleVacatedActive(draft, { playerId, oppId, events });
         }
+        endTurnAfterAbility(draft, { result, playerId, activeRng, events });
       }
       break;
     }
@@ -9152,7 +9160,7 @@ export function applyCommand(state, command, rng = null) {
         });
         endTurnAfterTrainer(draft, { card: resumeCard, playerId: initiatorPlayerId, activeRng, events });
       } else if (token.effectType === 'ability') {
-        executeAbility(draft, {
+        const result = executeAbility(draft, {
           card: resumeCard,
           playerId: initiatorPlayerId,
           activeRng,
@@ -9161,6 +9169,7 @@ export function applyCommand(state, command, rng = null) {
           resumeToken: token,
         });
         settleAbilityOutcomes(draft, { events });
+        endTurnAfterAbility(draft, { result, playerId: initiatorPlayerId, activeRng, events });
       } else if (token.effectType === CALL_ENERGY_EFFECT) {
         resumeCallEnergy(draft, { token, selection: payload.selection, activeRng, events });
       } else if (token.effectType === PRIZE_ATTACH_EFFECT) {

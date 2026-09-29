@@ -62,7 +62,8 @@ export function executeAbility(draft, {
     }
 
     draft.pendingChoice = null;
-    return { pendingChoice: null, completed: true };
+    // The ability was spent when its first choice opened.
+    return { pendingChoice: null, completed: true, turnEnds: !!resumeToken?.context?.abilityEndsTurn };
   }
 
   // Do not spend the once-per-turn ability before we know it has anything to do:
@@ -96,6 +97,7 @@ export function executeAbility(draft, {
   const text = typeof ability === 'string'
     ? ability
     : ability?.text || card.abilityText || card.text || card.effect || '';
+  const endsTurn = abilityEndsTurn(text);
   const plan = resolveAbilitySteps(text, { selfName: card.name });
   let actionableSteps = plan.steps;
   const holderZone = plan.holderZone;
@@ -118,7 +120,7 @@ export function executeAbility(draft, {
       // Tails on a heads-only effect: the flip was the Ability's use.
       markUsed();
       draft.pendingChoice = null;
-      return { pendingChoice: null, completed: true };
+      return { pendingChoice: null, completed: true, turnEnds: endsTurn };
     }
   } else if (isHeadsGatedAbility(text, actionableSteps)) {
     // "Flip a coin. If heads, …": the flip is the ability's use; tails spends it with no effect.
@@ -127,7 +129,7 @@ export function executeAbility(draft, {
     if (face === 'tails') {
       markUsed();
       draft.pendingChoice = null;
-      return { pendingChoice: null, completed: true };
+      return { pendingChoice: null, completed: true, turnEnds: endsTurn };
     }
   }
 
@@ -145,6 +147,7 @@ export function executeAbility(draft, {
     playerId,
     activeRng,
     events,
+    context: { abilityEndsTurn: endsTurn },
   });
 
   if (result.pendingChoice) {
@@ -164,7 +167,14 @@ export function executeAbility(draft, {
   if (!skippedOnly) markUsed();
 
   draft.pendingChoice = null;
-  return { pendingChoice: null, completed: true };
+  return { pendingChoice: null, completed: true, turnEnds: endsTurn && !skippedOnly };
+}
+
+const ABILITY_ENDS_TURN = /if you use this ability, your turn ends/;
+
+/** "If you use this Ability, your turn ends." (Koraidon ex Dino Cry and others). */
+export function abilityEndsTurn(text) {
+  return ABILITY_ENDS_TURN.test(String(text || '').toLowerCase());
 }
 
 const REPEATABLE_ABILITY = /^as often as you like\b/;

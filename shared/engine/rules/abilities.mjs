@@ -834,7 +834,12 @@ export function parseAbility(text = '') {
     const energyType = parseEnergyTypeHint(lower);
     const triggeredByAttach = /when(?:ever)?\s+you attach an?\s+energy/.test(lower);
     // Executor filters for the discard-attach path (shared with attachFromDiscard).
-    const target = lower.match(/from your discard pile to (?:1|one) of (your [^.]*?pok[eé]mon)/)?.[1] || null;
+    // The target keeps its own type/stage ("…to your Basic {F} Pokémon in any way you like",
+    // Koraidon ex Dino Cry): separate from the Energy's type filter above.
+    const target =
+      lower.match(/from your discard pile to (?:1|one) of (your [^.]*?pok[eé]mon)/)?.[1] ||
+      lower.match(/from your discard pile to (your [^.]*?pok[eé]mon) in any way you like/)?.[1] ||
+      null;
     const handAttach = fromDiscard || triggeredByAttach ? null : parseHandAttach(lower);
     steps.push({
       type: 'attachAbility',
@@ -843,6 +848,8 @@ export function parseAbility(text = '') {
       energy: energySearchWhat({ basic, energyType }),
       target,
       upTo: upTo ? Number(upTo) : mayAttach ? Number(mayAttach) : null,
+      // "attach up to N … from your discard pile": N picks in all (the executor defaults to 1).
+      ...(fromDiscard && upTo ? { count: Number(upTo) } : {}),
       basic,
       energyType,
       triggeredByAttach,
