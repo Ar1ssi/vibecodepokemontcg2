@@ -236,6 +236,7 @@ import {
   isBasicEnergy,
   isUltraBeastCard,
 } from './rules/card-classify.mjs';
+import { isAncientCard, isFutureCard } from './rules/paradox-tags.mjs';
 import { trainerPlayBlockReason, isToolOrMachineTrainer } from './rules/trainer-play-conditions.mjs';
 import { trainerEndsTurn } from './rules/trainer-effects.mjs';
 import { serverEnergyDescriptor } from './rules/server-energy.mjs';
@@ -5283,7 +5284,8 @@ function discardScalingEnergy(draft, { playerId, selection, allowedIds, destinat
 
 /**
  * Reveals the top `reveal.count` cards of the attacker's deck, counts the printed kind,
- * and shuffles the deck. Returns the count (0 for an empty deck).
+ * discards the counted cards when the attack says so (Destructo-Press), and shuffles the
+ * deck. Returns the count (0 for an empty deck).
  */
 function revealDeckTopForAttack(draft, { playerId, reveal, activeRng, events }) {
   const player = draft.players[playerId];
@@ -5294,7 +5296,19 @@ function revealDeckTopForAttack(draft, { playerId, reveal, activeRng, events }) 
     playerId,
     cards: revealed.map((c) => ({ instanceId: c.instanceId, name: c.name })),
   });
-  const matches = revealed.filter((c) => millFilterMatches(c, reveal.filter)).length;
+  const matched = revealed.filter((c) => millFilterMatches(c, reveal.filter));
+  if (reveal.discardMatched && matched.length > 0) {
+    for (const card of matched) {
+      player.zones.deck.splice(player.zones.deck.indexOf(card), 1);
+      discardCardToPlayerZone(player, card);
+    }
+    events.push({
+      type: 'cardsDiscarded',
+      playerId,
+      cards: matched.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+  }
+  const matches = matched.length;
   shuffleDeckWithRng(player, activeRng);
   events.push({ type: 'deckShuffled', playerId });
   return matches;
@@ -5322,6 +5336,10 @@ function millFilterMatches(card, filter) {
       return /supporter/i.test(
         `${card.trainerType || ''} ${[].concat(card.subtypes || []).join(' ')}`
       );
+    case 'ancient':
+      return isAncientCard(card);
+    case 'future':
+      return isFutureCard(card);
     default:
       return String(card.name || '')
         .toLowerCase()

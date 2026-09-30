@@ -433,10 +433,10 @@ export function parseAttackDamage(
     components.push('per-milled');
     notes.push(`${mill.perUnit} × ${counted} discarded from the deck`);
   } else if (text && deckRevealScaling(attack?.text)) {
-    // Swampert-EX Mud Flood: the reducer reveals the top cards and counts the kind.
+    // Mud Flood / Destructo-Press: the reducer reveals the top cards and counts the kind.
     const reveal = deckRevealScaling(attack.text);
     const counted = ctx.revealedMatches ?? 0;
-    total = base + reveal.perUnit * counted;
+    total = (reveal.additive ? base : 0) + reveal.perUnit * counted;
     components.push('per-revealed');
     notes.push(`${reveal.perUnit} × ${counted} revealed from the deck`);
   } else if (
@@ -2134,19 +2134,33 @@ function countedKindFilter(counted) {
   }
   if (/supporter/i.test(kind)) return { kind: 'supporter', energyType: null, basicOnly: false, name: null };
   if (/^pok[ée]mon$/i.test(kind)) return { kind: 'pokemon', energyType: null, basicOnly: false, name: null };
+  // The Paradox tags are printed on the card, never in its name.
+  const tag = /^(ancient|future)$/i.exec(kind);
+  if (tag) return { kind: tag[1].toLowerCase(), energyType: null, basicOnly: false, name: null };
   return { kind: 'name', energyType: null, basicOnly: false, name: kind };
 }
 
-// Swampert-EX Mud Flood: "Reveal the top 4 cards of your deck. This attack does 40 more
-// damage for each {W} Energy you find there. Shuffle the revealed cards back into your
-// deck." Returns null, or { count, perUnit, filter } (filter as deckMillScaling's). Pure.
+// Deck reveal scaling. Returns null, or { count, perUnit, additive, discardMatched, filter }
+// (filter as deckMillScaling's). Pure.
+//   Swampert-EX Mud Flood: "Reveal the top 4 cards of your deck. This attack does 40 more
+//   damage for each {W} Energy you find there. Shuffle the revealed cards back into your
+//   deck." — additive, nothing discarded.
+//   Iron Thorns Destructo-Press (TCGdex sv05-062): "… This attack does 70 damage for each
+//   Future card you find there. Then, discard those Future cards and shuffle the other cards
+//   back into your deck." — replaces the printed base, the counted cards are discarded.
 export function deckRevealScaling(attackText) {
   const m =
-    /reveal the top (\d+) cards of your deck\. this attack does (\d+) more damage for each ([^.]+?) you find there\. shuffle the revealed cards back into your deck/i.exec(
+    /reveal the top (\d+) cards of your deck\. this attack does (\d+) (more )?damage for each ([^.]+?) you find there\. (?:shuffle the revealed cards back into your deck|then, discard those [^.]+? and shuffle the other cards back into your deck)/i.exec(
       String(attackText || '').replace(/\s+/g, ' ')
     );
   if (!m) return null;
-  return { count: parseInt(m[1], 10), perUnit: parseInt(m[2], 10), filter: countedKindFilter(m[3]) };
+  return {
+    count: parseInt(m[1], 10),
+    perUnit: parseInt(m[2], 10),
+    additive: Boolean(m[3]),
+    discardMatched: /then, discard those/i.test(m[0]),
+    filter: countedKindFilter(m[4]),
+  };
 }
 
 // Parse "Attach up to N Basic {T} Energy cards from your discard pile to your Benched

@@ -87,6 +87,8 @@ test('parsers: Mud Flood reveal, Rocket Splash shuffle, Voltage Shoot target and
   assert.deepEqual(deckRevealScaling(MUD_FLOOD), {
     count: 4,
     perUnit: 40,
+    additive: true,
+    discardMatched: false,
     filter: { kind: 'energy', energyType: 'Water', basicOnly: false, name: null },
   });
   assert.equal(deckRevealScaling('Reveal the top 4 cards of your deck.'), null);
@@ -129,6 +131,55 @@ test('Mud Flood: a short deck reveals what is there; an empty deck leaves the ba
   const res = attack(empty);
   assert.equal(damageOn(res, 'p2', 'active', 'Defender'), 40);
   assert.ok(!res.events.some((e) => e.type === 'cardsRevealed'));
+});
+
+// Iron Thorns (TCGdex sv05-062) Destructo-Press, damage "70×".
+const DESTRUCTO_PRESS =
+  'Reveal the top 5 cards of your deck. This attack does 70 damage for each Future card you find there. Then, discard those Future cards and shuffle the other cards back into your deck.';
+const futureMon = (name) => mon(name, { subtypes: ['Basic', 'Future'] });
+
+test('parsers: Destructo-Press counts the Future tag, replaces the base and discards the counted cards', () => {
+  assert.deepEqual(deckRevealScaling(DESTRUCTO_PRESS), {
+    count: 5,
+    perUnit: 70,
+    additive: false,
+    discardMatched: true,
+    filter: { kind: 'future', energyType: null, basicOnly: false, name: null },
+  });
+});
+
+test('Destructo-Press: 70 for each Future card among the top 5; those are discarded, the rest shuffled back', () => {
+  const b = board(DESTRUCTO_PRESS, {
+    name: 'Iron Thorns',
+    attackName: 'Destructo-Press',
+    damage: '70×',
+    setup: ({ p1 }) =>
+      p1.zones.deck.unshift(
+        futureMon('Iron Hands'),
+        mon('Future Sight Fan'),
+        // Tagged by the TCGdex id alone (paradox-tags table), like a real deck card.
+        createCard({ instanceId: nextId++, id: 'sv05-062', name: 'Iron Thorns', supertype: 'Pokémon', stage: 'Basic', hp: 140 }),
+        mon('Roaring Moon', { subtypes: ['Basic', 'Ancient'] }),
+        futureMon('Iron Valiant'),
+        futureMon('Iron Bundle')
+      ),
+  });
+  const res = attack(b);
+  assert.equal(damageOn(res, 'p2', 'active', 'Defender'), 210);
+  assert.deepEqual(zone(res, 'p1', 'discard').map((c) => c.name), ['Iron Hands', 'Iron Thorns', 'Iron Valiant']);
+  assert.equal(res.events.find((e) => e.type === 'cardsRevealed').cards.length, 5);
+  assert.ok(res.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p1'));
+  const deckNames = zone(res, 'p1', 'deck').map((c) => c.name);
+  assert.equal(deckNames.length, 13);
+  assert.ok(['Future Sight Fan', 'Roaring Moon', 'Iron Bundle'].every((n) => deckNames.includes(n)));
+});
+
+test('Destructo-Press: no Future card on top does no damage and discards nothing', () => {
+  const b = board(DESTRUCTO_PRESS, { name: 'Iron Thorns', damage: '70×' });
+  const res = attack(b);
+  assert.equal(damageOn(res, 'p2', 'active', 'Defender'), 0);
+  assert.equal(zone(res, 'p1', 'discard').length, 0);
+  assert.equal(zone(res, 'p1', 'deck').length, 10);
 });
 
 function rocketSplashBoard() {
