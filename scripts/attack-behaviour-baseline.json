@@ -1996,7 +1996,7 @@
    "name": "Volcarona",
    "attack": "Burning Wind",
    "family": "status-burned",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "burrow#1w1tr8l": {
    "name": "Bunnelby",
@@ -3184,7 +3184,7 @@
    "name": "Moltres ex",
    "attack": "Crushing Flames",
    "family": "status-confused",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "crushing ice#9xdpla": {
    "name": "Vanilluxe",
@@ -6940,7 +6940,7 @@
    "name": "Flygon",
    "attack": "Flying Beatdown",
    "family": "status-paralyzed",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "flying press#1ygghtj": {
    "name": "Hawlucha",
@@ -8182,7 +8182,7 @@
    "name": "Ludicolo",
    "attack": "Groovy Dance",
    "family": "status-confused",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "ground burn#2e8bp3": {
    "name": "Magcargo ex",
@@ -10486,7 +10486,7 @@
    "name": "Magcargo",
    "attack": "Lava Plume",
    "family": "status-burned",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "lay the smackdown-gx#1bhpxnr": {
    "name": "Tyranitar-GX",
@@ -12172,7 +12172,7 @@
    "name": "Ampharos",
    "attack": "Miraculous Thunder",
    "family": "dual-status",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "mirage barrage#1ud94cd": {
    "name": "Greninja ex",
@@ -21124,7 +21124,7 @@
    "name": "Galarian Zapdos",
    "attack": "Zapper Kick",
    "family": "status-paralyzed",
-   "verdict": "partial"
+   "verdict": "ok"
   },
   "zen blade#1scc7rn": {
    "name": "Uxie LV.X",

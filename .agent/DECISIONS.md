@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D199).
+#   Next id = highest D number in this file and the archive + 1 (next: D200).
 
 ## Active
+- D199 2026-09-30 [rules] "Choose 1" modes and deck-top order reuse the label-option and one-pick-per-position prompts, not new selectMode/orderCards pendingChoice types: same rules result, no netcode change. (design 061)
 - D198 2026-09-30 [rules] `cardsRevealed` names a deck pick taken into the hand only when the printed text reveals it (reveal-picks.mjs); public reveals carry `src`, stamped at the applyCommand tail; attack searches reveal when printed. (design 059)
 - D197 2026-09-30 [mat-fx] Deck → hand reveals replay 043's preview deck → reveal spot → hand, both seats, one spread per player per update; hold 600 ms yours / 1200 ms theirs; landing re-aimed before placing. (design 059)
 - D196 2026-09-29 [rules] Ancient/Future tags are looked up per printing in a generated table (pokemontcg.io subtypes, ids name-checked on TCGdex), never by name; readers call paradoxTagOf. (design 058)

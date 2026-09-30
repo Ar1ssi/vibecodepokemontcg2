@@ -10,7 +10,7 @@
 //   { type: 'discardHandThenDraw', count: N }
 //   { type: 'discardPokemonThenDraw', count: N, drawPer: M, noRuleBox: bool }
 //   { type: 'searchDeck', what: 'Item+Tool' | 'Basic Pokemon' | 'Pokemon' | ... , destination: 'hand'|'bench'|'attach', count: N }
-//   { type: 'coinFlip', heads: Step, tails: Step }
+//   { type: 'coinFlip', heads: Step, tails: Step }  (or `count` + `outcomes: [{ headsExactly, steps }]`)
 //   { type: 'putHandOnBottom', count: N }
 //   { type: 'opponentShuffleHandDraw', count: N, prizeCondition?: string }
 //   { type: 'lookAtTop', count: N, pick: 'Supporter'|'Dark Pokemon', destination: 'hand'|'bench' }
@@ -18,6 +18,9 @@
 //   { type: 'switchOwn' }
 //   { type: 'switchOpponent' }
 //   { type: 'discardCost', count: N }
+//   { type: 'optionalDiscardCost', count: N }   ("you may discard N other cards. If you do, …": the steps after
+//     it that carry `requiresHandCost` run only when the player discarded; `searchDeck.countIf` and
+//     `searchDeck.attachTarget: 'evolved'` are the other design 061 slice 4 fields)
 //   { type: 'recursion', what: 'Pokemon|Energy', from: 'discard' }
 //   { type: 'heal', target: 'Mega Evolution ex' }
 //   { type: 'healAmount', amount: N, target: 'Active Pokémon'|'1 of your Pokémon', cure?: true }
@@ -261,6 +264,154 @@ function parseEnergyType(lower) {
 
 // Legacy discard-pile wording ("Search your discard pile for X …") names the
 // target loosely; map it to the closest search filter.
+// Energy-type word → symbol, for "a Fire Energy card" / "basic Water Energy" kinds.
+const TYPE_WORD_SYMBOLS = {
+  colorless: 'C', grass: 'G', fire: 'R', water: 'W', lightning: 'L', psychic: 'P',
+  fighting: 'F', darkness: 'D', metal: 'M', dragon: 'N', fairy: 'Y',
+};
+
+function titleCaseKind(phrase) {
+  return phrase
+    .split(' ')
+    .map((word) => {
+      if (/^\{[a-z]\}$/.test(word)) return SYMBOL_TYPE_WORDS[word[1]] || word.toUpperCase();
+      if (word === 'pokémon-gx') return 'Pokémon-GX';
+      if (word === 'pokémon-ex') return 'Pokémon-EX';
+      return word.replace(/^[a-z]/, (ch) => ch.toUpperCase());
+    })
+    .join(' ');
+}
+
+// A printed card kind ("Item card", "Pokémon Tool", "basic {F} Energy", "{W} Pokémon",
+// "Evolution Pokémon") → the `what` string matchesSearch reads. Null for a phrase that names
+// no kind the matcher knows.
+function knownKindWhat(phrase) {
+  const p = String(phrase || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/ and\/or /g, ' or ')
+    .replace(/,\s*$/, '')
+    .replace(/\s+cards?$/, '');
+  if (!p) return null;
+  if (/^cards?$/.test(p)) return 'card';
+  // "Pokémon, each with 90 HP or less" (Rescue Carrier): the kind plus an HP cap.
+  const capped = p.match(/^(.+?),? (?:each )?with (\d+) hp or less$/);
+  if (capped) {
+    const kind = knownKindWhat(capped[1]);
+    return kind ? `${kind} ≤${capped[2]} HP` : null;
+  }
+  // "a Pokémon or a Supporter card" (Crossceiver), "Baby Pokémon, Basic Pokémon, or Evolution
+  // card" (Old Rod): any of the kinds; matchesSearch splits on " or ".
+  const either = p.split(/,? or (?:an? )?|, /);
+  if (either.length > 1) {
+    const whats = either.map(knownKindWhat);
+    return whats.every(Boolean) ? whats.join(' or ') : null;
+  }
+  if (p === 'evolution') return 'Evolution Pokémon';
+  // A clause, not a kind ("card that evolves from that Pokémon", "Basic Pokémon card other
+  // than a Baby Pokémon"): the caller keeps what it already had.
+  if (/\b(?:that|from|which|with|other|than|named|in|and)\b/.test(p)) return null;
+  if (/^(?:pokémon )?tool$/.test(p)) return 'Pokémon Tool';
+  if (p === 'item') return 'Item';
+  if (p === 'supporter') return 'Supporter';
+  if (p === 'stadium') return 'Stadium';
+  if (p === 'trainer') return 'Trainer';
+  if (/^pokémon or (?:a )?basic energy$/.test(p)) return 'Pokémon or Basic Energy';
+  if (p === 'special energy') return 'Special Energy';
+  const energy = p.match(/^(basic )?(?:(\{[a-z]\}) |([a-z]+) )?energy$/);
+  if (energy) {
+    const sym = energy[2] ? energy[2][1].toUpperCase() : TYPE_WORD_SYMBOLS[energy[3] || ''];
+    if (energy[3] && !sym) return null;
+    // A typed Energy card ("{R} Energy card") is read as its Basic printing.
+    if (sym) return `Basic {${sym}} Energy`;
+    return energy[1] ? 'Basic Energy' : 'Energy';
+  }
+  if (/pokémon(?:-gx|-ex)?$/.test(p)) return titleCaseKind(p);
+  return null;
+}
+
+// Any kind phrase, falling back to a card-name needle ("Nemona", "Judge", "Team Plasma").
+function cardKindWhat(phrase) {
+  const known = knownKindWhat(phrase);
+  if (known) return known;
+  const p = String(phrase || '').trim().replace(/\s+/g, ' ').replace(/\s+cards?$/, '');
+  if (!p || /^cards?$/.test(p)) return 'card';
+  return titleCaseKind(p);
+}
+
+// "Item cards that have the word “Ball” in their name", "a Pokémon with Team Aqua in its name",
+// "cards named Looker": the kind before the clause plus the name needle. The text arrives
+// lowercased, so the needle is title-cased back; the executor compares case-insensitively.
+const NAME_CLAUSE_RE =
+  /^((?:different )?(?:cards?|pokémon|trainer cards?|item cards?|evolution cards?|pokémon tool cards?)) (?:that have|with) (?:the word )?["“]?([^"”]+?)["”]? in (?:its|their) names?/;
+const NAMED_CARDS_RE = /^cards? named ([a-z0-9' .-]+?)(?=,|\.| and| that)/;
+
+function nameClause(phrase) {
+  const withName = phrase.match(NAME_CLAUSE_RE);
+  if (withName) {
+    const kind = withName[1].replace(/^different /, '');
+    return {
+      what: knownKindWhat(kind) || 'card',
+      nameFilter: titleCaseKind(withName[2].trim()),
+      ...(withName[1].startsWith('different ') ? { distinctNames: true } : {}),
+    };
+  }
+  const named = phrase.match(NAMED_CARDS_RE);
+  if (named) return { what: 'card', nameFilter: titleCaseKind(named[1].trim()) };
+  return null;
+}
+
+const NAME_SEARCH_RE = /search your deck for (up to )?(\d+|an?) ([^.]+)/;
+
+function parseNameFilteredSearch(lower, destination, reveal) {
+  const m = lower.match(NAME_SEARCH_RE);
+  const clause = m && nameClause(m[3]);
+  if (!clause) return null;
+  return {
+    what: clause.what,
+    count: /^\d+$/.test(m[2]) ? Number(m[2]) : 1,
+    destination,
+    ...(m[1] ? { upTo: true } : {}),
+    nameFilter: clause.nameFilter,
+    ...(clause.distinctNames ? { distinctNames: true } : {}),
+    ...(reveal ? { reveal: true } : {}),
+  };
+}
+
+// "Search your deck for a <kind> [card], a <kind> card, and a <kind> card, …" — two or more
+// kinds, one of each (Arven, Rosa, Larry's Skill, Secret Box).
+const KIND_ITEM = '(?:an?|\\d+|up to \\d+) [^,.]+?';
+const KIND_LIST_SEARCH_RE = new RegExp(
+  `search your deck for (${KIND_ITEM}(?:, ${KIND_ITEM})*,? and ${KIND_ITEM})(?=,|\\.| that you find| and (?:reveal|put|show|attach|switch))`
+);
+
+function kindCount(article) {
+  const n = article.match(/\d+/);
+  return n ? Number(n[0]) : 1;
+}
+
+function parseTwoKindSearch(lower) {
+  const m = lower.match(KIND_LIST_SEARCH_RE);
+  if (!m) return null;
+  const stages = [];
+  for (const item of m[1].split(/,? and |, /)) {
+    const parts = item.match(/^(an?|\d+|up to \d+) (.+)$/);
+    const what = parts && knownKindWhat(parts[2]);
+    if (!what) return null;
+    stages.push({
+      what,
+      count: kindCount(parts[1]),
+      destination: 'hand',
+      ...(parts[1].startsWith('up to') ? { upTo: true } : {}),
+    });
+  }
+  if (stages.length < 2) return null;
+  return { type: 'searchDeckSequence', stages };
+}
+
+// "Put [up to] N <kind> cards from your discard pile into your hand" — a kinded, counted pick.
+const DISCARD_KINDED_RE = /put (up to )?(\d+|an?) ([^.•]+?) from your discard pile into your hand/;
+
 function discardSearchWhat(lower) {
   if (lower.includes('pokémon') && lower.includes('energy')) return 'Pokémon or Basic Energy';
   if (lower.includes('supporter')) return 'Supporter';
@@ -340,7 +491,7 @@ function combinationDiscardWhat(clause) {
     }
     if (part.includes('supporter')) return 'Supporter';
     if (part.includes('trainer')) return 'Trainer';
-    return 'card';
+    return knownKindWhat(part) || 'card';
   });
   return converted.join(' or ');
 }
@@ -444,6 +595,37 @@ function drawUntilBonus(text) {
   };
 }
 
+const BASIC_OR_EVOLUTION_SEARCH_RE =
+  /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/;
+const EITHER_KIND_SEARCH_RE =
+  /search your deck for (?:up to )?(\d+) ([^,.()]+?) or (?:up to )?(\d+) ([^,.()]+?)(?: \(except for ([^)]*)\))?(?=,|\.| and )/;
+
+// "up to 2 Basic Pokémon or up to 2 basic Energy cards" (Sonia), "1 Basic Pokémon-EX or 3 Basic
+// Pokémon (except for Pokémon-EX)" (Brigette): one branch, not a mixed pick. The "(except for …)"
+// exclusion rides on the second alternative. Brock's Scouting keeps its own hand-only branch.
+function parseEitherKindSearch(lower, destination, reveal) {
+  if (BASIC_OR_EVOLUTION_SEARCH_RE.test(lower)) return null;
+  const m = lower.match(EITHER_KIND_SEARCH_RE);
+  if (!m) return null;
+  const whatA = knownKindWhat(m[2]);
+  const whatB = knownKindWhat(m[4]);
+  if (!whatA || !whatB || whatA === 'card' || whatB === 'card') return null;
+  const countA = Number(m[1]);
+  const countB = Number(m[3]);
+  const exclude = m[5] ? knownKindWhat(m[5]) : null;
+  return {
+    what: `${whatA} or ${whatB}`,
+    count: Math.max(countA, countB),
+    destination,
+    upTo: true,
+    alternatives: [
+      { what: whatA, count: countA },
+      { what: whatB, count: countB, ...(exclude ? { exclude } : {}) },
+    ],
+    ...(reveal ? { reveal: true } : {}),
+  };
+}
+
 // Shared search-deck target parsing — used by the main search branch, coin-flip
 // sub-clauses, and attack search (parseAttackSearchClause in damage-parser.mjs).
 export function parseSearchDeckParams(lower) {
@@ -451,7 +633,10 @@ export function parseSearchDeckParams(lower) {
   let count = 1;
   let destination = 'hand';
   const reveal = /\breveal\b/.test(lower);
-  if (
+  if (/shuffle your deck,? (?:then|and) put (?:those cards|that card) on top of (?:it|your deck)/.test(lower)) {
+    // Mallow, Ciphermaniac's Codebreaking, Reserved Ticket: the picks go back on top after the shuffle.
+    destination = 'deckTop';
+  } else if (
     lower.includes('onto your bench') ||
     lower.includes('put it onto your bench') ||
     lower.includes('put them onto your bench')
@@ -465,6 +650,9 @@ export function parseSearchDeckParams(lower) {
     (lower.includes('attach') && lower.includes('energy') && lower.includes('to 1 of your'))
   ) {
     destination = 'attach';
+  } else if (/search your deck for [^.]*\band discard (?:it|them)\b/.test(lower)) {
+    // Brilliant Blender, Professor Burnet, Battle Compressor Team Flare Gear
+    destination = 'discard';
   }
 
   // Techno Radar (design 058): "Search your deck for up to 2 Future Pokémon".
@@ -481,22 +669,15 @@ export function parseSearchDeckParams(lower) {
     };
   }
 
-  if (lower.includes('item card and a pokémon tool card')) {
-    return { what: 'Item + Pokémon Tool', count: 1, destination: 'hand' };
-  }
-  if (lower.includes('stadium card and an energy card') || lower.includes('stadium card and a energy card')) {
-    return { what: 'Stadium + Energy', count: 2, destination: 'hand' };
-  }
-  // Hilda: one of each, not two picks from a shared pool.
-  if (/search your deck for an evolution pok[ée]mon and an energy card/.test(lower)) {
-    return {
-      type: 'searchDeckSequence',
-      stages: [
-        { what: 'Evolution Pokémon', count: 1, destination: 'hand' },
-        { what: 'Energy', count: 1, destination: 'hand' },
-      ],
-    };
-  }
+  // "a X and a Y card" is one card of each kind, never two picks from one shared pool and
+  // never the first kind alone (Arven, Colress's Tenacity, Hilda, Irida, Korrina, Piers,
+  // Steven, Volkner, the Team Magma/Aqua Great Balls). Each stage is its own optional pick.
+  const twoKinds = parseTwoKindSearch(lower);
+  if (twoKinds) return twoKinds;
+  const nameFiltered = parseNameFilteredSearch(lower, destination, reveal);
+  if (nameFiltered) return nameFiltered;
+  const eitherKind = parseEitherKindSearch(lower, destination, reveal);
+  if (eitherKind) return eitherKind;
   if (lower.includes('basic pokémon, a stage 1 pokémon, and a stage 2 pokémon')) {
     return {
       type: 'searchDeckSequence',
@@ -609,9 +790,7 @@ export function parseSearchDeckParams(lower) {
   }
 
   // "up to 2 Basic Pokémon or 1 Evolution Pokémon" (Brock's Scouting): one branch, not a mixed pick.
-  const basicOrEvo = lower.match(
-    /search your deck for up to\s+(\d+)\s+basic pok[ée]mon or\s+(\d+)\s+evolution pok[ée]mon/
-  );
+  const basicOrEvo = lower.match(BASIC_OR_EVOLUTION_SEARCH_RE);
   if (basicOrEvo && !lower.includes('onto your bench')) {
     return {
       what: 'Basic Pokémon or Evolution Pokémon',
@@ -726,10 +905,17 @@ export function parseSearchDeckParams(lower) {
     what = 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
 
-  // Cassiopeia: "Search your deck for up to 2 cards and put them into your hand" — any card, but
-  // the count still applies. Deck-discard searches (Professor Burnet) and named ones stay out.
-  const anyCardsUpTo = lower.match(/search your deck for up to\s+(\d+)\s+cards and put them into your hand/);
-  if (what === 'card' && anyCardsUpTo) count = Number(anyCardsUpTo[1]);
+  // The printed count and kind of a plain search ("up to 2 Basic Pokémon", "3 Pokémon Tool
+  // cards", "up to 2 Supporter and/or Stadium cards"). The branches above each read one
+  // wording; every other wording collapsed to one card of a kind guessed from the whole text.
+  const generic = lower.match(
+    /search your deck for (up to )?(\d+|an?) ([^.]+?)(?=,|\.| and (?:put|discard|reveal|show|shuffle|attach|switch))/
+  );
+  if (generic) {
+    if (/^\d+$/.test(generic[2])) count = Number(generic[2]);
+    const kind = knownKindWhat(generic[3]);
+    if (kind && GUESSED_WHATS.has(what)) what = kind;
+  }
 
   return {
     what,
@@ -738,6 +924,35 @@ export function parseSearchDeckParams(lower) {
     ...(/search your deck for up to\s+\d+/.test(lower) ? { upTo: true } : {}),
     ...(reveal ? { reveal: true } : {}),
   };
+}
+
+// The `what` values the fallbacks above guess from words anywhere in the text.
+const GUESSED_WHATS = new Set(['card', 'Pokémon', 'Supporter', 'Trainer']);
+
+// Old Rod (Neo Revelation 64, Dragon Frontiers 78): two heads recover one kind, two tails
+// another, one head does nothing.
+const BOTH_FLIPS_RECOVERY_RES = [
+  /^flip 2 coins\. if both are heads, put (.+?) from your discard pile into your hand\. if both are tails, put (.+?) from your discard pile into your hand\.$/,
+  /^flip 2 coins\. if both are heads, search your discard pile for (.+?), show it to your opponent, and put it into your hand\. if both are tails, search your discard pile for (.+?), show it to your opponent, and put it into your hand\.$/,
+];
+
+function parseBothFlipsRecovery(lower) {
+  for (const re of BOTH_FLIPS_RECOVERY_RES) {
+    const m = lower.match(re);
+    if (!m) continue;
+    const [heads, tails] = [m[1], m[2]].map((kind) => knownKindWhat(kind.replace(/^an? /, '')));
+    if (!heads || !tails) return null;
+    const recover = (what) => [{ type: 'recursion', what, count: 1, from: 'discard' }];
+    return {
+      type: 'coinFlip',
+      count: 2,
+      outcomes: [
+        { headsExactly: 2, steps: recover(heads) },
+        { headsExactly: 0, steps: recover(tails) },
+      ],
+    };
+  }
+  return null;
 }
 
 function parseCoinFlipStep(lower) {
@@ -764,6 +979,20 @@ function parseCoinFlipStep(lower) {
       tails: [{ type: 'turnEnds' }],
     };
   }
+
+  // Old PC — both heads: put any card from the discard pile into the hand.
+  if (/^flip 2 coins\. if both are heads, put a card from your discard pile into your hand\.$/.test(lower)) {
+    return {
+      type: 'coinFlip',
+      count: 2,
+      headsAtLeast: 2,
+      heads: [{ type: 'recursion', what: 'card', count: 1, from: 'discard' }],
+      tails: [],
+    };
+  }
+
+  const bothFlips = parseBothFlipsRecovery(lower);
+  if (bothFlips) return bothFlips;
 
   const headsDraw = lower.match(/if heads,?\s+draw\s+(\d+)\s+cards?/);
   const tailsDraw = lower.match(/if tails,?\s+draw\s+(\d+)\s+cards?/);
@@ -981,6 +1210,12 @@ export function parseTrainerEffect(text = '') {
   if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower)) {
     result.turnOnePermission = true;
   }
+  // A leading "Draw N cards." is its own effect whatever branch reads the rest (Daisy's Help,
+  // Ryme, Roark). A branch that already drew, or draws as part of a bigger step, keeps its own.
+  const leadingDraw = lower.match(/^draw (\d+|an?) cards?\./);
+  if (leadingDraw && result.recognizable && !result.steps.some((s) => /draw/i.test(s.type))) {
+    result.steps.unshift({ type: 'draw', count: /^\d+$/.test(leadingDraw[1]) ? Number(leadingDraw[1]) : 1 });
+  }
   return playCondition ? { ...result, playCondition } : result;
 }
 
@@ -1038,34 +1273,124 @@ function appendMissingOwnSwitch(steps, lower) {
   steps.unshift({ type: 'switchOwn' });
 }
 
-// "Choose 1: • A • B" — each bullet is a mode the player picks at play time (Kieran). Only
-// built when every bullet parses to executable steps; otherwise the caller keeps its fallback.
-function parseModalBullets(lower) {
-  if (!/^choose 1:\s*•/.test(lower)) return null;
-  const bullets = lower.split('•').slice(1).map((b) => b.trim()).filter(Boolean);
-  if (bullets.length < 2) return null;
+// "Choose 1:" / "Choose 1 or both:" cards (Kieran, Klara, Judge Whistle, …). Modes are the
+// printed bullets, or — where the corpus dropped them — the sentences, a "Then, …" sentence
+// belonging to the mode before it. Ingo & Emmet first looks at the top card.
+const CHOOSE_MODES_RE = /^\s*(look at the top card of your deck, and then )?choose 1( or both)?:\s*/;
+
+function splitModeTexts(body) {
+  if (body.includes('•')) return body.split('•').map((s) => s.trim()).filter(Boolean);
   const modes = [];
-  for (const bullet of bullets) {
-    const bonus = parseTurnDamageBonus(bullet);
-    const parsed = bonus ? null : parseTrainerStepsInner(bullet);
-    const steps = bonus
-      ? [{ type: 'turnDamageBonusTrainer', bonus }]
-      : parsed?.steps;
-    if (!steps?.length || steps.some((s) => s.type === 'passive')) return null;
-    modes.push({ label: bullet.replace(/\s*\(before applying[^)]*\)\.?$/, '').replace(/\.$/, ''), steps });
+  for (const sentence of body.split(/(?<=\.)\s+/).map((s) => s.trim()).filter(Boolean)) {
+    if (modes.length > 0 && /^then[, ]/.test(sentence)) modes[modes.length - 1] += ` ${sentence}`;
+    else modes.push(sentence);
   }
-  return { steps: [{ type: 'chooseMode', modes }], recognizable: true };
+  return modes;
+}
+
+// The corpus text is lowercased for matching; restore the casing the picker shows.
+function modeLabel(text) {
+  const label = text
+    .replace(/\.$/, '')
+    .replace(/\bpokémon\b/g, 'Pokémon')
+    .replace(/\benergy\b/g, 'Energy')
+    .replace(/\{([a-z])\}/g, (_, letter) => `{${letter.toUpperCase()}}`);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function parseModeSteps(text) {
+  if (/^during this turn,.*\bmore damage\b/.test(text)) {
+    const bonus = parseTurnDamageBonus(text);
+    return bonus ? { steps: [{ type: 'turnDamageBonusTrainer', bonus }], recognizable: true } : null;
+  }
+  const plainDraw = text.match(/^draw (\d+|an?) cards?\.?$/);
+  if (plainDraw) return { steps: [{ type: 'draw', count: /^\d+$/.test(plainDraw[1]) ? Number(plainDraw[1]) : 1 }], recognizable: true };
+  return parseTrainerSteps(text);
+}
+
+function parseChooseModes(lower) {
+  const head = lower.match(CHOOSE_MODES_RE);
+  if (!head) return null;
+  const modeTexts = splitModeTexts(lower.slice(head[0].length));
+  const unrecognized = { steps: [], recognizable: false };
+  if (modeTexts.length < 2) return unrecognized;
+  const modes = [];
+  for (const text of modeTexts) {
+    const parsed = parseModeSteps(text);
+    if (!parsed?.recognizable || !Array.isArray(parsed.steps) || parsed.steps.length === 0) return unrecognized;
+    if (parsed.steps.some((s) => s.type === 'passive')) return unrecognized;
+    modes.push({ label: modeLabel(text), steps: parsed.steps });
+  }
+  const steps = [{ type: 'chooseMode', max: head[2] ? 2 : 1, modes }];
+  if (head[1]) steps.unshift({ type: 'lookAtTop', count: 1, lookOnly: true });
+  return { steps, recognizable: true };
+}
+
+// "When you play this card, you may discard N other cards from your hand. If you do, <bonus>."
+// (Guzma & Hala, Red & Blue, Sabrina & Brycen, …): the discard is paid up front and optional;
+// the bonus steps carry `requiresHandCost` so they run only when it was paid. The main effect
+// is the text before the sentence.
+const OPTIONAL_HAND_COST_RE =
+  /\s*when you play this card, you may discard (\d+) other cards? from your hand\.\s*if you do,\s*(.*)$/;
+
+function splitOptionalHandCost(lower) {
+  const m = lower.match(OPTIONAL_HAND_COST_RE);
+  if (!m) return null;
+  return { main: lower.slice(0, m.index).trim(), count: Number(m[1]), tail: m[2].trim() };
+}
+
+// The bonus after "If you do,". Only the printed wordings below are understood; any other
+// bonus yields no steps, so its card keeps just the main effect and the optional discard.
+function parseOptionalCostBonus(tail) {
+  const attach = tail.match(/^search your deck for up to (\d+) basic energy cards and attach them to the pokémon you evolved in this way\.?$/);
+  if (attach) {
+    return [
+      { type: 'searchDeck', what: 'Basic Energy', count: Number(attach[1]), destination: 'attach', upTo: true, attachTarget: 'evolved' },
+    ];
+  }
+  const also = tail.match(/^you may also search for (.+?) in this way\.?$/);
+  const search = also && parseTwoKindSearch(`search your deck for ${also[1]},`);
+  if (search) return [search];
+  return [];
+}
+
+function applyOptionalHandCost(steps, optional) {
+  const bonus = parseOptionalCostBonus(optional.tail);
+  if (bonus.length === 0) return;
+  steps.unshift({ type: 'optionalDiscardCost', count: optional.count });
+  for (const step of bonus) steps.push({ ...step, requiresHandCost: true });
+}
+
+// "If you go second and it's your first turn, search for N X instead of 1." (Jasmine, Energy
+// Spinner): the searchDeck count the executor uses on the second player's first turn.
+const GOING_SECOND_SEARCH_RE = /if you go second and it's your first turn, search for (?:up to )?(\d+) [^.]*? instead of (?:1|a)\b/;
+
+function applyGoingSecondCount(steps, lower) {
+  const m = lower.match(GOING_SECOND_SEARCH_RE);
+  const search = m && steps.find((s) => s.type === 'searchDeck');
+  if (search) search.countIf = { goingSecondFirstTurn: Number(m[1]) };
 }
 
 function parseTrainerSteps(lower) {
-  const modal = parseModalBullets(lower);
-  if (modal) return modal;
-  const result = parseTrainerStepsInner(lower);
+  const chosen = parseChooseModes(lower);
+  if (chosen) return chosen;
+  const optional = splitOptionalHandCost(lower);
+  const main = optional ? optional.main : lower;
+  const result = parseTrainerStepsInner(main);
   if (result?.recognizable && Array.isArray(result.steps) && result.steps.length > 0) {
-    appendLeadingHandDiscardCost(result.steps, lower);
-    appendMissingOwnSwitch(result.steps, lower);
+    appendLeadingHandDiscardCost(result.steps, main);
+    appendMissingOwnSwitch(result.steps, main);
+    prependWholeHandDiscard(result.steps, main);
+    applyGoingSecondCount(result.steps, main);
+    if (optional) applyOptionalHandCost(result.steps, optional);
   }
   return result;
+}
+
+// Peony, Larry's Skill: the whole hand is discarded before the search resolves.
+function prependWholeHandDiscard(steps, lower) {
+  if (!lower.trimStart().startsWith('discard your hand and search your deck')) return;
+  steps.unshift({ type: 'discardHand' });
 }
 
 function parseTrainerStepsInner(lower) {
@@ -1094,7 +1419,11 @@ function parseTrainerStepsInner(lower) {
 
   // Salvatore — search for an Evolution that evolves from 1 of your Pokémon and evolve it
   if (lower.includes('evolves from 1 of your pokémon') && lower.includes('put it onto that pokémon')) {
-    steps.push({ type: 'searchEvolve', ...(lower.includes('no abilities') ? { noAbilities: true } : {}) });
+    steps.push({
+      type: 'searchEvolve',
+      ...(lower.includes('no abilities') ? { noAbilities: true } : {}),
+      ...(lower.includes('a pokémon-gx that evolves') ? { what: 'Pokémon-GX' } : {}),
+    });
     return { steps, recognizable: true };
   }
 
@@ -1113,10 +1442,27 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
-  // discard-hand-then-draw (Professor's Research)
+  // "Discard up to 3 cards from your hand. (You must discard at least 1 card.) If you do, draw
+  // cards until you have 5 cards in your hand." (Serena)
+  const discardSomeDrawUntil = lower.match(
+    /^\s*discard up to (\d+) cards from your hand\. \(you must discard at least 1 card\.\) if you do, draw cards until you have (\d+) cards in your hand/
+  );
+  if (discardSomeDrawUntil) {
+    steps.push(
+      { type: 'discardCost', count: Number(discardSomeDrawUntil[1]), min: 1 },
+      { type: 'drawUntil', target: { kind: 'fixed', n: Number(discardSomeDrawUntil[2]) } }
+    );
+    return { steps, recognizable: true };
+  }
+
+  // discard-hand-then-draw (Professor's Research); Ingo & Emmet draws from the bottom
   if (lower.includes('discard your hand and draw')) {
     const m = lower.match(/draw\s+(\d+)\s+cards?/);
-    steps.push({ type: 'discardHandThenDraw', count: m ? Number(m[1]) : 7 });
+    steps.push({
+      type: 'discardHandThenDraw',
+      count: m ? Number(m[1]) : 7,
+      ...(lower.includes('from the bottom of your deck') ? { fromBottom: true } : {}),
+    });
     return { steps, recognizable: true };
   }
 
@@ -1334,6 +1680,8 @@ function parseTrainerStepsInner(lower) {
       steps.push({
         type: 'switchOpponent',
         ...(lower.includes("opponent's benched basic pokémon") ? { filter: 'Basic' } : {}),
+        // Serena: "Switch 1 of your opponent's Benched Pokémon V with their Active Pokémon."
+        ...(/opponent's benched pok[ée]mon v\b/.test(lower) ? { filter: 'V' } : {}),
         ...(condition ? { thenCondition: condition[1][0].toUpperCase() + condition[1].slice(1) } : {}),
       });
       // Guzma: "If you do, switch your Active Pokémon with 1 of your Benched Pokémon."
@@ -1432,6 +1780,12 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
+  // Energy Restore — flip 3 coins, one basic Energy from the discard pile per heads.
+  if (/^flip 3 coins\. for each heads, put a basic energy card from your discard pile into your hand\./.test(lower)) {
+    steps.push({ type: 'recursion', what: 'Basic Energy', from: 'discard', coins: 3, perHeads: 1 });
+    return { steps, recognizable: true };
+  }
+
   // recursion from discard (Night Stretcher, Lana's Aid)
   if (lower.includes('from your discard pile into your hand')) {
     // "Put up to 4 in any combination of {F} Pokémon and Basic {F} Energy cards
@@ -1439,7 +1793,7 @@ function parseTrainerStepsInner(lower) {
     // two-clause filter, which the plain branch below drops (it saw `what:
     // 'card'` and a single-card pick).
     const combo = lower.match(
-      /put up to (\d+) in any combination of (.+?) cards? from your discard pile into your hand/
+      /put (?:up to )?(\d+) in any combination of (.+?) cards? from your discard pile into your hand/
     );
     if (combo) {
       steps.push({
@@ -1451,12 +1805,27 @@ function parseTrainerStepsInner(lower) {
       appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
     }
-    // Energy Retrieval / Superior Energy Retrieval — a counted Basic Energy pick; the plain
-    // branch below would offer every discard card.
-    const basicEnergy = lower.match(/put (?:up to )?(\d+|an?) basic energy cards? from your discard pile into your hand/);
-    if (basicEnergy) {
-      const count = /^\d+$/.test(basicEnergy[1]) ? Number(basicEnergy[1]) : 1;
-      steps.push({ type: 'recursion', what: 'Basic Energy', count, from: 'discard' });
+    // A kinded, counted pick (Energy Retrieval, VS Seeker, Miracle Headset, Fire Crystal,
+    // Nemona's Backpack, Roark). The plain branch below offered every discard card, one at
+    // a time, whatever kind or count the card printed.
+    const kinded = lower.match(DISCARD_KINDED_RE);
+    if (kinded) {
+      const count = /^\d+$/.test(kinded[2]) ? Number(kinded[2]) : 1;
+      // Roark: "Draw 2 cards." leads the recovery, so the draw step comes first.
+      const leadingDraw = lower.match(/^draw (\d+|a|an) cards?\./);
+      if (leadingDraw) {
+        steps.push({ type: 'draw', count: /^\d+$/.test(leadingDraw[1]) ? Number(leadingDraw[1]) : 1 });
+      }
+      const named = nameClause(kinded[3]);
+      steps.push({
+        type: 'recursion',
+        what: named ? named.what : cardKindWhat(kinded[3]) || 'card',
+        count,
+        from: 'discard',
+        ...(kinded[1] ? { upTo: true } : {}),
+        ...(named ? { nameFilter: named.nameFilter } : {}),
+      });
+      if (!leadingDraw) appendTrailingDraw(steps, lower);
       return { steps, recognizable: true };
     }
     let what = 'card';
@@ -2039,24 +2408,14 @@ function parseTrainerStepsInner(lower) {
   if (lower.includes('from your discard pile') && /(?:back )?into your deck/.test(lower)) {
     const countMatch = lower.match(/shuffle\s+(?:up to\s+)?(\d+)/);
     const count = countMatch ? Number(countMatch[1]) : 5;
-    if (lower.includes('choose 1 or both')) {
-      const choices = [];
-      const pokemonMatch = lower.match(/shuffle\s+up\s+to\s+(\d+)\s+\{[a-z]\}\s+pokémon/);
-      const energyMatch = lower.match(/shuffle\s+up\s+to\s+(\d+)\s+basic\s+\{[a-z]\}\s+energy/);
-      if (pokemonMatch) {
-        choices.push({ what: '{W} Pokémon', count: Number(pokemonMatch[1]) });
-      }
-      if (energyMatch) {
-        choices.push({ what: 'Basic {W} Energy', count: Number(energyMatch[1]) });
-      }
-      steps.push({ type: 'shuffleFromDiscard', choices });
-    } else {
-      let what = 'card';
-      if (lower.includes('pokémon') && lower.includes('basic energy')) what = 'Pokémon or Basic Energy';
-      else if (lower.includes('basic energy')) what = 'Basic Energy';
-      else if (lower.includes('pokémon')) what = 'Pokémon';
-      steps.push({ type: 'shuffleFromDiscard', what, count });
-    }
+    // "up to 3 {W} Pokémon" / "up to 3 Basic {W} Energy cards" (Great Haul Net's modes).
+    const typed = lower.match(/shuffle\s+(?:up to\s+)?\d+\s+(basic\s+)?\{([a-z])\}\s+(pokémon|energy)/);
+    let what = 'card';
+    if (typed) what = typed[3] === 'energy' ? `Basic {${typed[2].toUpperCase()}} Energy` : `{${typed[2].toUpperCase()}} Pokémon`;
+    else if (lower.includes('pokémon') && lower.includes('basic energy')) what = 'Pokémon or Basic Energy';
+    else if (lower.includes('basic energy')) what = 'Basic Energy';
+    else if (lower.includes('pokémon')) what = 'Pokémon';
+    steps.push({ type: 'shuffleFromDiscard', what, count });
     return { steps, recognizable: true };
   }
 
@@ -2767,8 +3126,19 @@ function lookRestText(step) {
   return 'shuffle the rest';
 }
 
+function describeNameFilter(step) {
+  if (!step.nameFilter) return '';
+  return step.what === 'card' ? ` named "${step.nameFilter}"` : ` with "${step.nameFilter}" in its name`;
+}
+
 export function describeStep(step) {
+  const text = describeStepBody(step);
+  return step.requiresHandCost ? `If you discarded the cards: ${text}` : text;
+}
+
+function describeStepBody(step) {
   switch (step.type) {
+    case 'optionalDiscardCost': return `You may discard ${step.count} other cards from your hand (optional cost).`;
     case 'draw': return `Draw ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'drawUntil': {
       const describe = (target) => {
@@ -2784,15 +3154,22 @@ export function describeStep(step) {
       }.`;
     }
     case 'opponentDraw': return `Your opponent draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
+    case 'discardHand': return 'Discard your hand.';
     case 'discardHandThenDraw': return `Discard your hand, then draw ${step.count} cards.`;
     case 'shuffleHandThenDraw': return `Shuffle your hand into the deck, then draw ${step.count} cards${step.bonusCount ? ` (${step.bonusCount} if 6 prizes left)` : ''}.`;
     case 'searchDeck': {
+      if (step.destination === 'discard') {
+        return `Search your deck for ${step.upTo ? 'up to ' : ''}${step.count} ${step.what === 'card' ? 'cards' : step.what} and discard them.`;
+      }
       const dest =
         step.destination === 'bench' ? 'put on Bench'
-        : step.destination === 'attach' ? 'attach to a Pokémon'
+        : step.destination === 'attach' ? (step.attachTarget === 'evolved' ? 'attach to the Pokémon you evolved' : 'attach to a Pokémon')
+        : step.destination === 'deckTop' ? 'put on top of your deck in any order'
         : 'add to hand';
-      return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what} → ${dest}, then shuffle.`;
+      return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what}${describeNameFilter(step)} → ${dest}, then shuffle.`;
     }
+    case 'chooseMode':
+      return `Choose ${step.max > 1 ? '1 or both' : '1'}: ${step.modes.map((m) => m.label).join(' / ')}.`;
     case 'searchDeckSequence':
       return `Search your deck for ${step.stages.map((s) => s.what).join(', ')} (one at a time), reveal them, add to hand, then shuffle.`;
     case 'coinFlip': {
@@ -2806,23 +3183,33 @@ export function describeStep(step) {
           if (s.type === 'searchDeck') return `search for ${s.what}`;
           if (s.type === 'discardEnergyFromOpponent') return 'discard Energy from opponent';
           if (s.type === 'damageCounters') return `put ${s.count} damage on ${s.target}`;
+          if (s.type === 'recursion') return `put a ${s.what} from your discard pile into your hand`;
           return s.type;
         }).join('; ');
       };
+      if (Array.isArray(step.outcomes)) {
+        return `Flip ${step.count || 1} coins — ${step.outcomes
+          .map((o) => `${o.headsExactly === 0 ? 'all tails' : `${o.headsExactly} heads`}: ${fmt(o.steps)}`)
+          .join('; ')}.`;
+      }
       return `Flip a coin — heads: ${fmt(step.heads)}; tails: ${fmt(step.tails)}.`;
     }
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;
     case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'lookAtTop':
+      if (step.lookOnly) return `Look at the top ${step.count} card${step.count > 1 ? 's' : ''} of your deck.`;
       if (step.oneEach) return `Look at the top ${step.count} cards; take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} to hand, shuffle the rest.`;
       return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `${step.takeExact ? '' : 'up to '}${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, ${lookRestText(step)}.`;
     case 'lookAtBottom': return `Look at the bottom ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
-    case 'chooseMode': return `Choose 1: ${step.modes.map((m) => m.label).join(' / ')}.`;
     case 'turnDamageBonusTrainer': return `During this turn, attacks do ${step.bonus.amount} more damage to the opponent's Active Pokémon.`;
     case 'switchOwn': return 'Switch your Active Pokémon with 1 of your Benched Pokémon.';
     case 'discardCost': return `Discard ${step.count} other card${step.count > 1 ? 's' : ''} from your hand (cost).`;
-    case 'recursion': return `Put a ${step.what} from your discard pile into your hand.`;
+    case 'recursion':
+      if (step.coins) {
+        return `Flip ${step.coins} coins; put ${step.perHeads || 1} ${step.what}${describeNameFilter(step)} from your discard pile into your hand per heads.`;
+      }
+      return `Put a ${step.what}${describeNameFilter(step)} from your discard pile into your hand.`;
     case 'heal': return `Heal all damage from your ${step.target}${step.returnEnergy ? ', then put all its Energy into your hand' : ''}.`;
     case 'healAmount': return `Heal ${step.amount} damage from ${step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;

@@ -97,10 +97,15 @@ function deckFor(pfx) {
       evolvesFrom: `${pfx}Basic0`,
     })
   );
+  // "Search your deck for a Pokémon-ex" (Absol Legend Maker) needs a real ex: the bare
+  // 'Pokémon-EX' filter used to match every Pokémon.
+  out.push(mon(`${pfx}Star ex`));
   out.push(
     trainer('Potion', 'Item'),
     trainer('Great Ball', 'Item'),
     trainer('Professor', 'Supporter'),
+    // Stadium searches need a real Stadium: until S333 the 'Stadium' filter matched every card.
+    trainer('Stadium Card', 'Stadium'),
     tool('Tool Card')
   );
   out.push(energy('Fire'), energy('Water'), energy('Lightning'));
@@ -189,6 +194,7 @@ export function buildState(holder, holderZone) {
       mon(`${pid}DiscMon`),
       trainer('Disc Item', 'Item'),
       trainer('Disc Sup', 'Supporter'),
+      trainer('Disc Stadium', 'Stadium'),
       tool('Disc Tool')
     );
     for (let i = 0; i < 6; i++) z.prizes.push(mon(`${pid}Prize${i}`));

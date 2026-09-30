@@ -120,6 +120,13 @@ export function matchesSearch(card, what = '') {
   if (w.includes('trainer')) {
     return isTrainer;
   }
+  // A plain "Stadium" kind (Colress's Tenacity's first stage, Lusamine). Before, it fell
+  // through to the generic branch and matched every card.
+  if (w.includes('stadium') && !w.includes('energy')) {
+    const tt = String(card.trainerType || card.type || '').toLowerCase();
+    const st = Array.isArray(card.subtypes) ? card.subtypes.map((s) => String(s).toLowerCase()) : [];
+    return tt.includes('stadium') || st.includes('stadium');
+  }
   if (w.includes('stadium') && w.includes('energy')) {
     const isEnergy =
       String(card.type || '').toLowerCase().includes('energy') ||
@@ -150,6 +157,8 @@ export function matchesSearch(card, what = '') {
   if (w.includes('basic') || w.includes('pokémon') || w.includes('pokemon')) {
     if (!isPokemon) return false;
     if (/pok[eé]mon-gx\b/.test(w)) return isGxCard(card);
+    if (/^basic pok[eé]mon-ex$/.test(w)) return normalizeStage(card.stage) === 'Basic' && /(?:-| )EX$/.test(String(card.name || ''));
+    if (/^pok[eé]mon-ex$/.test(w)) return /(?:-| )ex$/i.test(String(card.name || ''));
     const noRuleBox =
       w.includes("doesn't have a rule box") ||
       w.includes("does not have a rule box") ||
@@ -187,6 +196,12 @@ export function matchesSearch(card, what = '') {
       // A type match is not enough: "Basic {C} Pokémon with 100 HP or less"
       // must still fall through to the HP-cap checks below.
       if (typeName && !matchesBasicPokemonType(card, typeName)) return false;
+    }
+    // "{W} Pokémon" with no stage word (Great Haul Net).
+    const typedSymbol = !typedBasic && !typedEvolution && what.match(/\{([A-Za-z])\}\s+pok[eé]mon/i);
+    if (typedSymbol) {
+      const typeName = SYMBOL_TO_TYPE[typedSymbol[1].toLowerCase()];
+      if (typeName && !pokemonMatchesEnergyType(card, typeName)) return false;
     }
     if (w.includes('basic') && effectiveStage !== 'Basic') return false;
     // Word-form type qualifier ("Water Pokémon", "Basic Psychic Pokémon");

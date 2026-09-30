@@ -383,11 +383,8 @@
    ]
   },
   "Armor Fossil#1lvipqm": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Aroma Lady#q8ge6t": {
@@ -411,7 +408,7 @@
   },
   "Arven#13plb2z": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Aspertia City Gym#13sqxwb": {
@@ -718,7 +715,8 @@
   },
   "Bill’s Teleporter#omdriy": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "draw"
    ]
   },
   "Bill’s Transfer#29g330": {
@@ -1215,7 +1213,8 @@
   },
   "Capturing Aroma#9f6qdy": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Cara Liss#1fu61h7": {
@@ -1251,7 +1250,7 @@
   },
   "Castaway#i9a3hd": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Cedric Juniper#8qlq6r": {
@@ -1469,35 +1468,23 @@
    ]
   },
   "Claw Fossil#19kwe37": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Claw Fossil#19my7c3": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Claw Fossil#1cjn1c2": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Claw Fossil#51weil": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Clay#134nfrs": {
@@ -1514,11 +1501,8 @@
    ]
   },
   "Clefairy Doll#zed4wn": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Clemont’s Quick Wit#nnss2r": {
@@ -1566,7 +1550,7 @@
   },
   "Colress’s Tenacity#1s6evm4": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Colress#1pibqr": {
@@ -1683,7 +1667,8 @@
   },
   "Cram-o-matic#1iz93l6": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Crasher Wake#o4fz1l": {
@@ -1718,12 +1703,14 @@
   },
   "Crushing Hammer#1ijizak": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "discardEnergyFromOpponent"
    ]
   },
   "Crushing Hammer#tzzqjj": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "discardEnergyFromOpponent"
    ]
   },
   "Crystal Beach#phev3v": {
@@ -1890,6 +1877,7 @@
   },
   "Daisy’s Help#5va16l": {
    "steps": [
+    "draw",
     "lookAtFaceDownPrize"
    ]
   },
@@ -2146,7 +2134,7 @@
   },
   "Dome Fossil#14uval6": {
    "steps": [
-    "searchDeck"
+    "fossilItem"
    ]
   },
   "Double Full Heal#i8oyu": {
@@ -2197,7 +2185,8 @@
   },
   "Drasna#1omcz2y": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "shuffleHandThenDraw"
    ]
   },
   "Drayton#1l25sft": {
@@ -2302,7 +2291,8 @@
   },
   "Egg Incubator#1wfxhbr": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Electric Generator#o3a9k0": {
@@ -2357,7 +2347,8 @@
   },
   "Emcee’s Chatter#186002k": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "draw"
    ]
   },
   "Emcee’s Hype#13fbp4k": {
@@ -2383,7 +2374,8 @@
   },
   "Energy Amplifier#1wxxadt": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Energy Ark#2jwr3b": {
@@ -2431,6 +2423,7 @@
   },
   "Energy Pickup#q0agqe": {
    "steps": [
+    "attachFromDiscard",
     "coinFlip"
    ]
   },
@@ -2449,7 +2442,9 @@
   },
   "Energy Recycle System#vjgu9j": {
    "steps": [
-    "recursion"
+    "chooseMode",
+    "recursion",
+    "shuffleFromDiscard"
    ]
   },
   "Energy Recycler#1tmxpqs": {
@@ -2469,7 +2464,8 @@
   },
   "Energy Removal 2#16sl641": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "discardEnergyFromOpponent"
    ]
   },
   "Energy Removal#imxr3e": {
@@ -3130,7 +3126,8 @@
   },
   "Fossil Egg#17bcb9d": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Fossil Excavation Kit#1j9cry5": {
@@ -3140,7 +3137,7 @@
   },
   "Fossil Excavation Map#1cd5doo": {
    "steps": [
-    "searchDeck"
+    "searchOrRecover"
    ]
   },
   "Fossil Excavator#1cghara": {
@@ -3314,7 +3311,8 @@
   },
   "Gambler#125wxdq": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "shuffleHandThenDraw"
    ]
   },
   "Gapejaw Bog#1tybb59": {
@@ -3419,7 +3417,9 @@
   },
   "Giovanni’s Scheme#1i72ude": {
    "steps": [
-    "drawUntil"
+    "chooseMode",
+    "drawUntil",
+    "turnDamageBonusTrainer"
    ]
   },
   "Giovanni#huvou": {
@@ -3498,7 +3498,8 @@
   },
   "Good Rod#1u3aejr": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "putDiscardOnTop"
    ]
   },
   "Goop Gas Attack#1u88948": {
@@ -3592,6 +3593,7 @@
   },
   "Great Haul Net#7b1sxy": {
    "steps": [
+    "chooseMode",
     "shuffleFromDiscard"
    ]
   },
@@ -3649,8 +3651,9 @@
   },
   "Guzma & Hala#qyqq6a": {
    "steps": [
-    "discardCost",
-    "searchDeck"
+    "optionalDiscardCost",
+    "searchDeck",
+    "searchDeckSequence"
    ]
   },
   "Guzma#ju04ij": {
@@ -3661,7 +3664,7 @@
   },
   "Gwynn#vh6z4y": {
    "steps": [
-    "draw"
+    "discardPokemonThenDraw"
    ]
   },
   "Gyarados Spirit Link#1nvr2c0": {
@@ -3754,7 +3757,9 @@
   },
   "Heal Powder#1f0y2jo": {
    "steps": [
-    "coinFlip"
+    "clearStatus",
+    "coinFlip",
+    "healAmount"
    ]
   },
   "Healing Berry#zece82": {
@@ -3811,7 +3816,7 @@
   },
   "Helix Fossil#11qaq43": {
    "steps": [
-    "searchDeck"
+    "fossilItem"
    ]
   },
   "Here Comes Team Rocket!#1t6a3zu": {
@@ -3860,7 +3865,7 @@
   },
   "Hilda#9mzsg7": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Hisuian Heavy Ball#1sazb3a": {
@@ -3894,7 +3899,8 @@
   },
   "Holon Fossil#b2a1d4": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Holon Lake#f6td9s": {
@@ -3953,7 +3959,8 @@
   },
   "Hooligans Jim & Cas#zuea1a": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "opponentHandShuffleDeck"
    ]
   },
   "Hop’s Bag#1b4s7k8": {
@@ -4073,7 +4080,9 @@
   },
   "Ingo & Emmet#1gokqxi": {
    "steps": [
-    "discardHandThenDraw"
+    "chooseMode",
+    "discardHandThenDraw",
+    "lookAtTop"
    ]
   },
   "Interviewer’s Questions#1t2pdrd": {
@@ -4088,7 +4097,7 @@
   },
   "Irida#5yg07o": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Iris’s Fighting Spirit#1v9ifgp": {
@@ -4218,6 +4227,7 @@
   },
   "Judge Whistle#1l49951": {
    "steps": [
+    "chooseMode",
     "draw",
     "recursion"
    ]
@@ -4317,6 +4327,7 @@
   },
   "Klara#83qh0a": {
    "steps": [
+    "chooseMode",
     "recursion"
    ]
   },
@@ -4354,7 +4365,7 @@
   },
   "Korrina#1ljsu62": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Kyogre Spirit Link#emdl3l": {
@@ -4426,12 +4437,14 @@
   },
   "Larry’s Skill#i56zmu": {
    "steps": [
-    "searchDeck"
+    "discardHand",
+    "searchDeckSequence"
    ]
   },
   "Larry#n1lxmm": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Lass’s Special#xh1ndg": {
@@ -4522,7 +4535,8 @@
   },
   "Level Max#1k3qjgp": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Levincia#1ylzwpt": {
@@ -4551,12 +4565,14 @@
   },
   "Life Herb#12ldi99": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "healAmount"
    ]
   },
   "Life Herb#1uobpz6": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "healAmount"
    ]
   },
   "Life Herb#a3dx7z": {
@@ -4566,7 +4582,8 @@
   },
   "Life Herb#kqi29d": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "healAmount"
    ]
   },
   "Light Ball#1dr2okl": {
@@ -5236,7 +5253,9 @@
   },
   "Minion of Team Rocket#1d5zz9d": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "returnPokemonToHand",
+    "turnEnds"
    ]
   },
   "Miracle Berry#baxx8i": {
@@ -5298,7 +5317,6 @@
   },
   "Misty & Lorelei#xs3g10": {
    "steps": [
-    "discardCost",
     "searchDeck"
    ]
   },
@@ -5498,35 +5516,23 @@
    ]
   },
   "Mysterious Fossil#14qgz1q": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Mysterious Fossil#173hz68": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Mysterious Fossil#19y7j4h": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Mysterious Fossil#1dt5623": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Mysterious Shard#cb6u8k": {
@@ -5679,7 +5685,8 @@
   },
   "Night Teleporter#l3zp3t": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Nightly Garbage Run#14mjn5b": {
@@ -5748,11 +5755,8 @@
    ]
   },
   "Old Amber#1rbxrsm": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Old Cemetery#i8hirs": {
@@ -5765,16 +5769,19 @@
   },
   "Old PC#qlej0x": {
    "steps": [
+    "coinFlip",
     "recursion"
    ]
   },
   "Old Rod#1bqbl4b": {
    "steps": [
+    "coinFlip",
     "recursion"
    ]
   },
   "Old Rod#1g1rflo": {
    "steps": [
+    "coinFlip",
     "recursion"
    ]
   },
@@ -5822,11 +5829,13 @@
   },
   "Order Pad#u2ld9h": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Ordinary Rod#4g431i": {
    "steps": [
+    "chooseMode",
     "shuffleFromDiscard"
    ]
   },
@@ -5939,6 +5948,7 @@
   },
   "Peony#1knu88p": {
    "steps": [
+    "discardHand",
     "searchDeck"
    ]
   },
@@ -5988,7 +5998,8 @@
   },
   "Picnicker#ax8i0r": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "draw"
    ]
   },
   "Pidgeot Spirit Link#2s5hz8": {
@@ -6001,7 +6012,7 @@
   },
   "Piers#fdkl6q": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Plasma Frigate#95whwy": {
@@ -6071,42 +6082,50 @@
   },
   "Poké Ball#1bd75bf": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Poké Ball#1lm6d0b": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Poké Ball#1wwoa0b": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Poké Ball#a7gfnl": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Poké Ball#biop7m": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Poké Ball#c2thlt": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Poké Ball#fw1tb4": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Poké Blower +#6v0q05": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "switchOpponent"
    ]
   },
   "Poké Drawer +#1cnk06n": {
@@ -6384,22 +6403,26 @@
   },
   "Pokémon Reversal#13suyha": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "switchOpponentOut"
    ]
   },
   "Pokémon Reversal#1mdoc13": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "switchOpponent"
    ]
   },
   "Pokémon Reversal#7qtt41": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "switchOpponent"
    ]
   },
   "Pokémon Reversal#m6z954": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "switchOpponent"
    ]
   },
   "Pokémon Tower#eblhvv": {
@@ -6579,7 +6602,8 @@
   },
   "Professor Birch’s Observations#177hlni": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "shuffleHandThenDraw"
    ]
   },
   "Professor Birch#1dyf188": {
@@ -6594,7 +6618,9 @@
   },
   "Professor Cozmo’s Discovery#ma1w9s": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "draw",
+    "drawBottom"
    ]
   },
   "Professor Elm’s Lecture#2vm13u": {
@@ -6885,17 +6911,21 @@
   },
   "Recycle#1ab05ns": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "putDiscardOnTop"
    ]
   },
   "Recycle#w4srpf": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "putDiscardOnTop"
    ]
   },
   "Red & Blue#17eykct": {
    "playCondition": "notFirstTurn",
    "steps": [
+    "optionalDiscardCost",
+    "searchDeck",
     "searchEvolve"
    ]
   },
@@ -6958,7 +6988,9 @@
   },
   "Rescue Stretcher#1ememv0": {
    "steps": [
-    "recursion"
+    "chooseMode",
+    "recursion",
+    "shuffleFromDiscard"
    ]
   },
   "Research Record#1ahp8hw": {
@@ -6968,7 +7000,8 @@
   },
   "Reserved Ticket#a344pn": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Reset Stamp#ty6g39": {
@@ -7126,7 +7159,8 @@
   },
   "Rocket’s Secret Experiment#k7wqu4": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Rocket’s Sneak Attack#3x9d8x": {
@@ -7173,7 +7207,8 @@
   },
   "Roller Skates#1utvcfv": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "draw"
    ]
   },
   "Root Fossil Lileep#7rnasc": {
@@ -7182,35 +7217,23 @@
    ]
   },
   "Root Fossil#1ebuuqs": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Root Fossil#1rgszlr": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Root Fossil#f228fa": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Root Fossil#f511lx": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Rosa’s Encouragement#1ym480p": {
@@ -7222,7 +7245,7 @@
   "Rosa#eav4ji": {
    "playCondition": "koedLastTurn",
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Rose Tower#1phk07f": {
@@ -7357,12 +7380,12 @@
   },
   "Ryme#jz26nq": {
    "steps": [
+    "draw",
     "switchOpponentOut"
    ]
   },
   "Sabrina & Brycen#ukll92": {
    "steps": [
-    "discardCost",
     "searchDeck"
    ]
   },
@@ -7535,7 +7558,7 @@
   "Secret Box#1o6l2u4": {
    "steps": [
     "discardCost",
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Secret Mission#1yh59vp": {
@@ -7556,6 +7579,8 @@
   },
   "Serena#ah3811": {
    "steps": [
+    "chooseMode",
+    "discardCost",
     "drawUntil",
     "switchOpponent"
    ]
@@ -7707,11 +7732,8 @@
    ]
   },
   "Skull Fossil#1687sdy": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "fossilItem"
    ]
   },
   "Sky Field#1szbz0m": {
@@ -7755,6 +7777,7 @@
   },
   "Sleep!#1qhex0l": {
    "steps": [
+    "applyStatus",
     "coinFlip"
    ]
   },
@@ -7984,7 +8007,7 @@
   },
   "Steven#47g6ju": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Stormy Mountains#u5hw15": {
@@ -8066,7 +8089,8 @@
   },
   "Super Energy Removal 2#mfqpef": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "discardAllEnergyFromActive"
    ]
   },
   "Super Energy Removal#1lfs1f4": {
@@ -8097,7 +8121,8 @@
   },
   "Super Rod#14gubcp": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "recursion"
    ]
   },
   "Super Rod#18i1ssv": {
@@ -8122,17 +8147,20 @@
   },
   "Super Scoop Up#1fullix": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "returnPokemonToHand"
    ]
   },
   "Super Scoop Up#4i7v8r": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "returnPokemonToHand"
    ]
   },
   "Super Scoop Up#5v7nnj": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "returnPokemonToHand"
    ]
   },
   "Supereffective Glasses#1b7wxgx": {
@@ -8265,7 +8293,9 @@
   },
   "Tate & Liza#4gxg0j": {
    "steps": [
-    "shuffleHandThenDraw"
+    "chooseMode",
+    "shuffleHandThenDraw",
+    "switchOwn"
    ]
   },
   "Team Aqua Admin#bs1su9": {
@@ -8275,7 +8305,8 @@
   },
   "Team Aqua Ball#giyon8": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Team Aqua Belt#16uj5yo": {
@@ -8310,7 +8341,7 @@
   },
   "Team Aqua’s Great Ball#wu70gz": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Team Aqua’s Secret Base#1laczxg": {
@@ -8378,7 +8409,8 @@
   },
   "Team Magma Ball#19pe5am": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Team Magma Belt#10kew6m": {
@@ -8416,7 +8448,7 @@
   },
   "Team Magma’s Great Ball#1iwpvhp": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Team Magma’s Secret Base#1tcsf0s": {
@@ -8484,7 +8516,8 @@
   },
   "Team Rocket’s Great Ball#12gk4hk": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Team Rocket’s Handiwork#10fbzqp": {
@@ -8522,7 +8555,8 @@
   },
   "Team Rocket’s Venture Bomb#1hy9u06": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "damageCounters"
    ]
   },
   "Team Rocket’s Watchtower#tjr8xn": {
@@ -8657,7 +8691,8 @@
   },
   "The Rocket’s Trap#m7xkt": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "opponentHandShuffleDeck"
    ]
   },
   "Thick Scale#ai2dov": {
@@ -8687,8 +8722,13 @@
    ]
   },
   "Tickling Machine#1blksdo": {
+   "gaps": [
+    "server-missing:opponentHandSetAside"
+   ],
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "opponentHandSetAside",
+    "turnEnds"
    ]
   },
   "Tierno#jj14ok": {
@@ -8886,22 +8926,27 @@
   },
   "Tropical Tidal Wave#1ftqi9i": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "discardAllTrainerInPlay"
    ]
   },
   "Tropical Tidal Wave#1sjp8lt": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "discardAllTrainerInPlay"
    ]
   },
   "Tropical Tidal Wave#pb8tji": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "discardAllTrainerInPlay"
    ]
   },
   "Tropical Wind#n6aqja": {
    "steps": [
-    "coinFlip"
+    "applyStatus",
+    "coinFlip",
+    "healEachActive"
    ]
   },
   "Tulip#1drhxzk": {
@@ -9083,7 +9128,8 @@
   },
   "Venture Bomb#12ta8f6": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "damageCounters"
    ]
   },
   "Venusaur Spirit Link#11ikq13": {
@@ -9104,7 +9150,8 @@
   },
   "Victory Cup#biop7m": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Victory Medal#9zvcfw": {
@@ -9157,7 +9204,7 @@
   },
   "Volkner#foelgo": {
    "steps": [
-    "searchDeck"
+    "searchDeckSequence"
    ]
   },
   "Volo#xjyk66": {
@@ -9369,7 +9416,8 @@
   },
   "Xtransceiver#y6gw6d": {
    "steps": [
-    "coinFlip"
+    "coinFlip",
+    "searchDeck"
    ]
   },
   "Yell Horn#1ej17zf": {
