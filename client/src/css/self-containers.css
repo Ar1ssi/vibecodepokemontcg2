@@ -610,6 +610,15 @@ img.draw-flight-source,
   margin: 0;
   position: relative;
 }
+#prizes > .mat-holo {
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+#prizes > .mat-holo .card__translater {
+  width: min(100cqw, 100cqh * var(--card-aspect));
+  height: min(100cqh, 100cqw / var(--card-aspect));
+}
 #prizes > .mat-holo img {
   width: 100%;
   height: 100%;

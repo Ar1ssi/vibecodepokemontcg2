@@ -2535,8 +2535,9 @@ body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-s
   opacity: 1;
 }
 .discard-pile-slide .mat-holo.discard-pile-holo {
-  width: 100%;
   height: 100%;
+  width: auto;
+  max-width: 100%;
   aspect-ratio: var(--card-aspect);
   /* Visible so the tilted card isn't clipped; .card__rotator still rounds
      and clips the card's own layers. */

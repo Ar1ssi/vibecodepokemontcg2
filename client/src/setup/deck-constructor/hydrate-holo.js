@@ -3,6 +3,8 @@ import { isShowingCardBack } from '../deck-builder/core/card-compare.mjs';
 import {
   resolveHoloEffect,
   buildHoloCard,
+  syncCardAspect,
+  isTrainerCard,
   startHoloAnimation,
   stopHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
@@ -97,7 +99,9 @@ export function hydrateHolo(card) {
         return null;
       }
 
-      const wrapper = buildHoloCard(card.image.src, effect);
+      const wrapper = buildHoloCard(card.image.src, effect, {
+        trainer: isTrainerCard(data),
+      });
       // No inline px size: every zone sizes `.mat-holo` in CSS. A px snapshot
       // taken in the hand (1x) is wrong inside the zoom:2 #playfield, and
       // inline styles outrank those zone rules.
@@ -113,6 +117,7 @@ export function hydrateHolo(card) {
         .forEach((el) => {
           if (el !== card.image) el.remove();
         });
+      syncCardAspect(wrapper, card.image);
       // Place the wrapper where the <img> used to sit in its zone.
       if (nextSibling) parentElement.insertBefore(wrapper, nextSibling);
       else parentElement.appendChild(wrapper);

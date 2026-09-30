@@ -1,5 +1,6 @@
 import {
   buildHoloCard,
+  isTrainerCard,
   MAT_HOLO_OPTIONS,
   resolveHoloEffect,
   startHoloAnimation,
@@ -223,7 +224,7 @@ export const openFloatingCardPreview = ({
   } else {
     const effect = resolveHoloEffect(card || {});
     if (effect) {
-      wrapper = buildHoloCard(hiRes, effect);
+      wrapper = buildHoloCard(hiRes, effect, { trainer: isTrainerCard(card) });
       wrapper.classList.add('card-preview-card', 'mat-holo');
       frontNode = wrapper;
     } else {

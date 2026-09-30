@@ -11,6 +11,8 @@
 // --pointer-x/y, --background-x/y, --pointer-from-center/left/top,
 // --rotate-x/y, --tilt-amount.
 
+import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/legacy-set-ids.mjs';
+
 // Rarity (TCGdex) → simey data-rarity value (per the Bulbapedia rarity guide).
 // Returns null → no holo (plain <img>).
 const RARITY_EFFECTS = {
@@ -62,6 +64,18 @@ const GOLD_STAR_NAME = /\u2605/;
 // Energy cards have no art window, so reverse-holo energy gets its own value.
 // It still ends in "reverse holo", so the shared [data-rarity$="reverse holo"]
 // rules apply and reverse-holo.css only overrides the clip and strength.
+export const isTrainerCard = (card) => {
+  if (!card) return false;
+  const kinds = [
+    card.supertype,
+    card.category,
+    card.type,
+    card?.data?.supertype,
+    card?.data?.category,
+  ];
+  return kinds.some((kind) => /^trainer$/i.test(String(kind || '')));
+};
+
 const isEnergyCard = (card) => {
   const kinds = [
     card.supertype,
@@ -156,12 +170,13 @@ export function foilMaskUrl(src, pageOrigin = globalThis.location?.origin) {
   return INK_MASK_CORS_HOSTS.has(url.hostname) ? url.href : null;
 }
 
-// ── card era ─────────────────────────────────────────────────────────
-// The art window sits at a different place per card layout generation, and
-// reverse holo keeps foil out of it. The era comes from the image URL's
-// series/set segment (tcgdex: /<lang>/<series>/<set>/..., pokemontcg.io:
-// /<set>/...). Unknown hosts or sets return null and use the default window.
-// Keyed by the code's leading letters ("swsh12pt5" -> "swsh", "base1" -> "base").
+// ── card era and layout ──────────────────────────────────────────────
+// Both come from the image URL's series/set segment (tcgdex:
+// /<lang>/<series>/<set>/..., pokemontcg.io: /<set>/...), keyed by the code's
+// leading letters ("swsh12pt5" -> "swsh", "base1" -> "base"). The era picks
+// the foil pattern; the layout picks the art window reverse holo keeps foil
+// out of, since one era can span printed art boxes of different sizes.
+// Unknown hosts or sets return null and use the default pattern and window.
 const ERA_BY_SERIES = {
   sv: 'sv',
   svp: 'sv',
@@ -190,6 +205,58 @@ const ERA_BY_SERIES = {
   hgss: 'classic',
   hsp: 'classic',
   col: 'classic',
+  basep: 'classic',
+  si: 'classic',
+  bp: 'classic',
+  np: 'classic',
+  hgssp: 'classic',
+  g: 'xy',
+  dc: 'xy',
+  det: 'sm',
+  cel: 'swsh',
+  pgo: 'swsh',
+  fut: 'swsh',
+};
+
+const LAYOUT_BY_SERIES = {
+  sv: 'sv',
+  svp: 'sv',
+  sve: 'sv',
+  me: 'sv',
+  mep: 'sv',
+  swsh: 'swsh',
+  swshp: 'swsh',
+  sm: 'sm',
+  smp: 'sm',
+  sma: 'sm',
+  xy: 'xy',
+  xyp: 'xy',
+  bw: 'xy',
+  bwp: 'xy',
+  base: 'wotc',
+  gym: 'wotc',
+  neo: 'wotc',
+  ecard: 'ecard',
+  ex: 'ex',
+  pop: 'ex',
+  dp: 'dp',
+  dpp: 'dp',
+  pl: 'dp',
+  hgss: 'hgss',
+  hsp: 'hgss',
+  col: 'hgss',
+  lc: 'wotc',
+  basep: 'wotc',
+  si: 'wotc',
+  bp: 'wotc',
+  np: 'ex',
+  hgssp: 'hgss',
+  g: 'xy',
+  dc: 'xy',
+  det: 'sm',
+  cel: 'swsh',
+  pgo: 'swsh',
+  fut: 'swsh',
 };
 
 const eraFromCode = (code) => {
@@ -214,11 +281,37 @@ const cardImageParts = (src) => {
     return { series: parts[1], set: parts[2], number: parts[3] };
   if (url.hostname === 'images.pokemontcg.io')
     return { series: parts[0], set: parts[0], number: parts[1] };
+  if (LIMITLESS_HOSTS.has(url.hostname)) return limitlessImageParts(src);
   return null;
+};
+
+const LIMITLESS_HOSTS = new Set([
+  'limitlesstcg.nyc3.digitaloceanspaces.com',
+  'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
+]);
+
+// Limitless names files by printed set code (SVI_001_R_EN.png); map it to the
+// TCGdex id ("sv01-001") and split at the last dash, since set ids can hold one.
+const limitlessImageParts = (src) => {
+  const id = extractTcgdexIdFromImageUrl(src);
+  if (!id) return null;
+  const dash = id.lastIndexOf('-');
+  if (dash <= 0) return null;
+  const set = id.slice(0, dash);
+  return { series: set, set, number: id.slice(dash + 1) };
 };
 
 export function cardEraFromImageUrl(src) {
   return eraFromCode(cardImageParts(src)?.series);
+}
+
+export function cardLayoutFromImageUrl(src) {
+  const series = /^[a-z]+/.exec(
+    String(cardImageParts(src)?.series || '').toLowerCase()
+  )?.[0];
+  return series && Object.hasOwn(LAYOUT_BY_SERIES, series)
+    ? LAYOUT_BY_SERIES[series]
+    : null;
 }
 
 // The leading letters of the series code ("hgss", "dp", "base"), for foil
@@ -249,10 +342,12 @@ export function isTrainerGalleryImageUrl(src) {
 }
 
 // Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2.
-export function buildHoloCard(imageUrl, rarityValue) {
+export function buildHoloCard(imageUrl, rarityValue, { trainer = false } = {}) {
   const card = document.createElement('div');
   card.className = 'card';
   if (rarityValue) card.dataset.rarity = rarityValue;
+  // Trainer art boxes sit lower and narrower than Pokémon ones; base.css keys on this.
+  if (trainer) card.dataset.cardKind = 'trainer';
 
   const inkMask = foilMaskUrl(imageUrl);
   if (inkMask) {
@@ -261,6 +356,8 @@ export function buildHoloCard(imageUrl, rarityValue) {
   }
   const era = cardEraFromImageUrl(imageUrl);
   if (era) card.dataset.cardEra = era;
+  const layout = cardLayoutFromImageUrl(imageUrl);
+  if (layout) card.dataset.cardLayout = layout;
   const series = cardSeriesFromImageUrl(imageUrl);
   if (series) card.dataset.cardSeries = series;
   const set = cardSetFromImageUrl(imageUrl);
@@ -276,6 +373,7 @@ export function buildHoloCard(imageUrl, rarityValue) {
   const img = document.createElement('img');
   img.src = imageUrl;
   img.alt = '';
+  syncCardAspect(card, img);
 
   const shine = document.createElement('div');
   shine.className = 'card__shine';
@@ -294,6 +392,20 @@ export function buildHoloCard(imageUrl, rarityValue) {
   card.appendChild(translater);
 
   return card;
+}
+
+// Scans ship in several aspect ratios (0.707–0.727); the foil box must follow
+// the real image, not the wrapper's fixed default, or the <img> gets cropped.
+export function syncCardAspect(wrapper, img) {
+  if (!wrapper || !img) return;
+  const apply = () => {
+    if (!(img.naturalWidth > 0 && img.naturalHeight > 0)) return false;
+    const aspect = round(img.naturalWidth / img.naturalHeight, 4);
+    wrapper.style.setProperty('--card-aspect', String(aspect));
+    return true;
+  };
+  if (apply()) return;
+  img.addEventListener('load', apply, { once: true });
 }
 
 // ── math helpers (matching simeydotme/pokemon-cards-151 Math.js) ──────

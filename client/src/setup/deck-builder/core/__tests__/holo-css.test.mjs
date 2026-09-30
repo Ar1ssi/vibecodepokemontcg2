@@ -138,15 +138,30 @@ describe('reverse holo foil', () => {
     );
   });
 
-  it('defines the art window for every era holo.mjs can emit', () => {
+  it('defines the art window for every layout holo.mjs can emit', () => {
     const base = normalize(readHoloCss('base.css'));
-    for (const era of ['sv', 'swsh', 'sm', 'xy', 'classic']) {
+    for (const layout of ['sv', 'swsh', 'sm', 'xy', 'wotc', 'ecard', 'ex', 'dp', 'hgss']) {
       assert.match(
         base,
         new RegExp(
-          `\\[data-card-era="${era}"\\] \\{ --art-l: [\\d.]+%; --art-t: [\\d.]+%; --art-r: [\\d.]+%; --art-b: [\\d.]+%; \\}`
+          `\\[data-card-layout="${layout}"\\] \\{ --art-l: [\\d.]+%; --art-t: [\\d.]+%; --art-r: [\\d.]+%; --art-b: [\\d.]+%; \\}`
         ),
-        era
+        layout
+      );
+    }
+    assert.doesNotMatch(base, /\[data-card-era="[^"]+"\] \{ --art-l/);
+    assert.ok(!base.includes('data-card-layout="classic"'));
+  });
+
+  it('defines a Trainer art window for every layout', () => {
+    const base = normalize(readHoloCss('base.css'));
+    for (const layout of ['sv', 'swsh', 'sm', 'xy', 'wotc', 'ecard', 'ex', 'dp', 'hgss']) {
+      assert.match(
+        base,
+        new RegExp(
+          `\\.card\\[data-card-kind="trainer"\\]\\[data-card-layout="${layout}"\\] \\{ --art-l: [\\d.]+%; --art-t: [\\d.]+%; --art-r: [\\d.]+%; --art-b: [\\d.]+%; \\}`
+        ),
+        layout
       );
     }
   });

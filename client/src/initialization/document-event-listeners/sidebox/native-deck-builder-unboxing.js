@@ -1,5 +1,9 @@
 import { getEnergyTokenFront } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
-import { buildHoloCard, startHoloAnimation } from '../../../setup/deck-builder/core/holo.mjs';
+import {
+  buildHoloCard,
+  isTrainerCard,
+  startHoloAnimation,
+} from '../../../setup/deck-builder/core/holo.mjs';
 import { BOX_PROPORTIONS } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
 import {
   BOX_MOUTH_Y,
@@ -608,7 +612,7 @@ export const mountUnboxingScene = ({
       img.src = src;
       return img;
     }
-    const holo = buildHoloCard(src, rarity);
+    const holo = buildHoloCard(src, rarity, { trainer: isTrainerCard(card) });
     holo.classList.add('bb-card-face');
     holo.querySelector('img')?.addEventListener(
       'error',

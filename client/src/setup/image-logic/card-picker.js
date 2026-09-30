@@ -1,6 +1,7 @@
 import { getZone } from '../zones/get-zone.js';
 import {
   buildHoloCard,
+  isTrainerCard,
   MAT_HOLO_OPTIONS,
   resolveHoloEffect,
   startHoloAnimation,
@@ -88,7 +89,9 @@ const buildSlideContent = (card) => {
   const src = cardArtSrc(card);
   const existingRarity = card?.wrapper?.dataset?.rarity;
   if (existingRarity && src) {
-    const wrapper = buildHoloCard(src, existingRarity);
+    const wrapper = buildHoloCard(src, existingRarity, {
+      trainer: isTrainerCard(card),
+    });
     wrapper.classList.add('mat-holo', 'discard-pile-holo');
     disableNativeDrag(wrapper);
     return { node: wrapper, holoWrapper: wrapper };
@@ -96,7 +99,7 @@ const buildSlideContent = (card) => {
 
   const effect = resolveHoloEffect(card);
   if (effect && src) {
-    const wrapper = buildHoloCard(src, effect);
+    const wrapper = buildHoloCard(src, effect, { trainer: isTrainerCard(card) });
     wrapper.classList.add('mat-holo', 'discard-pile-holo');
     disableNativeDrag(wrapper);
     return { node: wrapper, holoWrapper: wrapper };

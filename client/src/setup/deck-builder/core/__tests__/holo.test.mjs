@@ -9,12 +9,16 @@ import {
   DRIFT,
   MAT_HOLO_OPTIONS,
   cardEraFromImageUrl,
+  cardSetFromImageUrl,
+  cardLayoutFromImageUrl,
   foilMaskUrl,
   LIGHT,
   MAX_ROTATE_X,
   Spring,
   resolveHoloEffect,
   buildHoloCard,
+  syncCardAspect,
+  isTrainerCard,
   startHoloAnimation,
   stopHoloAnimation,
 } from '../holo.mjs';
@@ -312,6 +316,16 @@ describe('buildHoloCard', () => {
     );
     assert.equal(card.dataset.inkMask, undefined);
     assert.equal(card.properties['--card-ink-mask'], undefined);
+  });
+
+  it('sets the art-window layout from the image URL', () => {
+    const neo = buildHoloCard(
+      'https://assets.tcgdex.net/en/neo/neo1/9/high.webp',
+      'rare holo'
+    );
+    assert.equal(neo.dataset.cardLayout, 'wotc');
+    const unknown = buildHoloCard('https://unknown.example/card.png', 'rare');
+    assert.equal(unknown.dataset.cardLayout, undefined);
   });
 });
 
@@ -623,5 +637,153 @@ describe('resolveHoloEffect per-generation rarities', () => {
     }
     assert.equal(resolveHoloEffect({ rarity: 'Rare Holo', name: 'Vespiquen' }), 'rare holo');
     assert.equal(resolveHoloEffect({ rarity: 'Reverse Holo', name: 'Zacian V' }), 'reverse holo');
+  });
+});
+
+describe('cardLayoutFromImageUrl', () => {
+  const tcgdex = (series, set) =>
+    `https://assets.tcgdex.net/en/${series}/${set}/9/high.webp`;
+
+  it('maps WotC-era sets to the wotc window', () => {
+    assert.equal(cardLayoutFromImageUrl(tcgdex('neo', 'neo1')), 'wotc');
+    assert.equal(cardLayoutFromImageUrl(tcgdex('base', 'base1')), 'wotc');
+    assert.equal(cardLayoutFromImageUrl(tcgdex('gym', 'gym2')), 'wotc');
+    assert.equal(
+      cardLayoutFromImageUrl('https://images.pokemontcg.io/neo4/1_hires.png'),
+      'wotc'
+    );
+  });
+
+  it('maps modern sets to their own window', () => {
+    assert.equal(cardLayoutFromImageUrl(tcgdex('sv', 'sv01')), 'sv');
+  });
+
+  it('splits the e-Card to Call of Legends sets into their own windows', () => {
+    assert.equal(cardLayoutFromImageUrl(tcgdex('ecard', 'ecard1')), 'ecard');
+    assert.equal(cardLayoutFromImageUrl(tcgdex('ex', 'ex7')), 'ex');
+    assert.equal(
+      cardLayoutFromImageUrl('https://images.pokemontcg.io/pop5/1_hires.png'),
+      'ex'
+    );
+    assert.equal(cardLayoutFromImageUrl(tcgdex('dp', 'dp1')), 'dp');
+    assert.equal(cardLayoutFromImageUrl(tcgdex('pl', 'pl2')), 'dp');
+    assert.equal(cardLayoutFromImageUrl(tcgdex('hgss', 'hgss1')), 'hgss');
+    assert.equal(cardLayoutFromImageUrl(tcgdex('col', 'col1')), 'hgss');
+  });
+
+  it('returns null for unknown hosts', () => {
+    assert.equal(
+      cardLayoutFromImageUrl('https://example.com/neo/neo1/1.png'),
+      null
+    );
+  });
+});
+
+describe('isTrainerCard', () => {
+  it('matches Trainer on any supertype/category/type field', () => {
+    assert.equal(isTrainerCard({ supertype: 'Trainer' }), true);
+    assert.equal(isTrainerCard({ category: 'Trainer' }), true);
+    assert.equal(isTrainerCard({ type: 'Trainer' }), true);
+    assert.equal(isTrainerCard({ data: { category: 'Trainer' } }), true);
+    assert.equal(isTrainerCard({ data: { supertype: 'trainer' } }), true);
+  });
+
+  it('rejects Pokémon and missing cards', () => {
+    assert.equal(isTrainerCard({ supertype: 'Pokémon', type: 'Fire' }), false);
+    assert.equal(isTrainerCard({ category: 'Energy' }), false);
+    assert.equal(isTrainerCard(null), false);
+    assert.equal(isTrainerCard(undefined), false);
+  });
+});
+
+describe('buildHoloCard trainer kind', () => {
+  it('sets data-card-kind only with { trainer: true }', () => {
+    const trainer = buildHoloCard(TCGDEX_URL, 'rare holo', { trainer: true });
+    const pokemon = buildHoloCard(TCGDEX_URL, 'rare holo', { trainer: false });
+    const legacy = buildHoloCard(TCGDEX_URL, 'rare holo');
+    assert.equal(trainer.dataset.cardKind, 'trainer');
+    assert.equal(pokemon.dataset.cardKind, undefined);
+    assert.equal(legacy.dataset.cardKind, undefined);
+  });
+});
+
+describe('image URLs for promo, subset and Limitless cards', () => {
+  const ptcgio = (set) => `https://images.pokemontcg.io/${set}/1_hires.png`;
+
+  it('maps promo and subset pokemontcg.io sets to an era and layout', () => {
+    const expected = {
+      basep: ['classic', 'wotc'],
+      si1: ['classic', 'wotc'],
+      hgssp: ['classic', 'hgss'],
+      g1: ['xy', 'xy'],
+      dc1: ['xy', 'xy'],
+      det1: ['sm', 'sm'],
+      cel25: ['swsh', 'swsh'],
+    };
+    for (const [set, [era, layout]] of Object.entries(expected)) {
+      assert.equal(cardEraFromImageUrl(ptcgio(set)), era, set);
+      assert.equal(cardLayoutFromImageUrl(ptcgio(set)), layout, set);
+    }
+  });
+
+  it('maps Legendary Collection on tcgdex to the wotc window', () => {
+    const lc = 'https://assets.tcgdex.net/en/lc/lc/9/high.webp';
+    assert.equal(cardLayoutFromImageUrl(lc), 'wotc');
+    assert.equal(cardEraFromImageUrl(lc), 'classic');
+  });
+
+  // SVI maps to TCGdex set sv01 in LEGACY_SET_CODE_TO_TCGDEX_ID (legacy-set-ids.mjs).
+  it('resolves Limitless images through the set-code table', () => {
+    for (const host of [
+      'limitlesstcg.nyc3.digitaloceanspaces.com',
+      'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
+    ]) {
+      const src = `https://${host}/tpci/SVI/SVI_001_R_EN.png`;
+      assert.equal(cardEraFromImageUrl(src), 'sv');
+      assert.equal(cardLayoutFromImageUrl(src), 'sv');
+      assert.equal(cardSetFromImageUrl(src), 'sv01');
+    }
+  });
+
+  it('returns null for Limitless images with an unknown set code', () => {
+    const src =
+      'https://limitlesstcg.nyc3.digitaloceanspaces.com/tpci/ZZZ/ZZZ_001_R_EN.png';
+    assert.equal(cardEraFromImageUrl(src), null);
+    assert.equal(cardLayoutFromImageUrl(src), null);
+  });
+});
+
+describe('syncCardAspect', () => {
+  const fakeImage = (naturalWidth, naturalHeight) =>
+    Object.assign(createFakeElement('img'), { naturalWidth, naturalHeight });
+
+  it('sets --card-aspect from a loaded image', () => {
+    const wrapper = createFakeElement();
+    syncCardAspect(wrapper, fakeImage(600, 825));
+    assert.equal(wrapper.properties['--card-aspect'], '0.7273');
+  });
+
+  it('waits for load when the image has no natural size yet', () => {
+    const wrapper = createFakeElement();
+    const img = fakeImage(0, 0);
+    syncCardAspect(wrapper, img);
+    assert.equal(wrapper.properties['--card-aspect'], undefined);
+    img.naturalWidth = 600;
+    img.naturalHeight = 825;
+    img.dispatch('load');
+    assert.equal(wrapper.properties['--card-aspect'], '0.7273');
+  });
+
+  it('sets nothing for a 0x0 image even after load', () => {
+    const wrapper = createFakeElement();
+    const img = fakeImage(0, 0);
+    syncCardAspect(wrapper, img);
+    img.dispatch('load');
+    assert.equal(wrapper.properties['--card-aspect'], undefined);
+  });
+
+  it('ignores null arguments', () => {
+    assert.doesNotThrow(() => syncCardAspect(null, fakeImage(600, 825)));
+    assert.doesNotThrow(() => syncCardAspect(createFakeElement(), null));
   });
 });
