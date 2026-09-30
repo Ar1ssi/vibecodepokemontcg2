@@ -6,15 +6,16 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I220). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I222). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I221 2026-09-30 P2 [rules] Optional hand-cost bonuses unimplemented: Sabrina & Brycen (SM246, 3 Pokémon of different types), Misty & Lorelei (CEC 199, GX reuse), Mallow & Lana (CEC 231, heal 120) run their main effect only (refs: trainer-effects.mjs parseOptionalCostBonus, design 061 Group D)
+- I220 2026-09-30 P3 [rules] Marker-filtered Trainer searches take a wider pool: Single/Rapid/Fusion Strike, Tera, Team Plasma, Hop's, Baby, TAG TEAM, Prism Star, Technical Machine match any Pokémon/Supporter: no marker data (Ancient/Future done, 058) (refs: design 061 Group E, search-match.mjs)
 - I219 2026-09-30 P2 [rules] Effect shields against Items/Supporters, Abilities and Stadiums have no reader (47 rows: Greninja V-UNION, Mega Clefable ex, Thievul, Alakazam MT Power Cancel…); audit rows re-baselined unconsumed, effect-prevent unclaimed (refs: I218, scripts/ability-behaviour-baseline.json)
 - I214 2026-09-29 P3 [rules] Legacy (non-authoritative) client trainer path ignores attach targets: attachFromDiscard offers every in-play Pokémon and one Energy (Sada's Vitality, Reboot Pod, all others) (refs: client/src/setup/rules/trainer-execution.js, design 058 A5)
-- I213 2026-09-29 P2 [tooling] `pnpm audit:trainers` red on main: 21 Fossil/Hilda/Roark rows 'lost step' since the fossil commit e51958aa; confirm each and refresh the baseline (refs: scripts/trainer-behaviour-baseline.json)
 - I212 2026-09-29 P2 [rules] Tool-granted Special Condition immunity/recovery unimplemented (Ancient Booster Energy Capsule, Sparkling Robe): addCondition sees only the Pokémon, not its Tools; the Capsule's +60 HP works (refs: special-conditions.mjs addCondition, design 058)
 - I211 2026-09-29 P3 [rules] Legacy fossil clauses unmodeled: Mysterious/Claw/Root Fossil "KO doesn't count as a Knocked Out Pokémon" (still gives a Prize); Fossil Excavator MD 82 unparsed; Holon Fossil HP 86 / Fossil Egg N4 72 search filters too broad (refs: shared/engine/rules/fossil.mjs, out/pkmn-trainer-cards.json)
 - I210 2026-09-29 P3 [tests] coin-flip-ceremony.test.mjs "several flips toss one after another" failed once under full `pnpm test` load, passes 3/3 alone — same timing-dependent family as I183 (refs: S330)
@@ -66,6 +67,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I213 2026-09-29 P2 [tooling] `pnpm audit:trainers` red on main: 21 Fossil/Hilda/Roark rows 'lost step' since the fossil commit e51958aa; confirm each and refresh the baseline (refs: scripts/trainer-behaviour-baseline.json) → closed 2026-09-30 S334: each row confirmed (fossils parse fossilItem; Dome/Helix Fossil's Poké-Body search no longer runs on play; Hilda/Roark back to baseline) and the baseline refreshed in the PR 200 merge
 - I218 2026-09-30 P2 [tooling] `pnpm audit:abilities` red on main: 7 failures (damage-prevent, effect-prevent, prize-modify, status, damage-reduce baselines), identical before and after design 059 (refs: scripts/audit-ability-behaviour.mjs, design 059) → closed 2026-09-30 S331: cause fa7966b (effect-only shields no longer block damage, correctly); abilityPreventsAttackEffects enforces attack-effect shields and is probed; Flygon ex protector probed; rest re-baselined, effect-prevent claim withdrawn (I219)
 - I217 2026-09-30 P3 [rules] Great Ball (Paldea Evolved 183) parses `pick: 'any'`: the picker offers non-Pokémon from the top 7 (refs: trainer-effects.mjs lookAtTop, design 059) → closed 2026-09-30 S331: "reveal a Pokémon you find there" parses pick 'Pokémon'
 - I216 2026-09-30 P2 [rules] Look-at-top Supporters take one card: Explorer's Guidance (PRE 107), Hassel (TWM 205), Rika (PAR 258), Colress's Experiment (CRZ GG59); Trekking Shoes (CRZ 145) looks at 7 not 1 (refs: trainer-effects.mjs lookAtTop, design 059) → closed 2026-09-30 S331: lookAtTop reads "put (up to) N of them" (takeUpTo/takeExact), restTo discard/lostZone, Trekking Shoes count 1 + drawIfNoneTaken

@@ -3,13 +3,14 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: deck reveals (design 059) on main: a card revealed from the deck into the hand replays the
-  Trainer preview deck → reveal spot → hand for both seats (D197); `cardsRevealed` names only printed reveals (D198).
+Focus: Trainer search residuals (designs 060/061, PR 200) merged onto main: "Choose 1" modes, Old Rod,
+  deck-top order, optional hand cost. Deck reveals (design 059) on main: printed reveals replay the
+  Trainer preview deck → reveal spot → hand for both seats (D197); `cardsRevealed` names only those (D198).
 Active: none. ETB (design 057, D195) slice 6 (rec-etb recorder + shared recorder lib) not started.
 Next: user look on localhost (SERVER_AUTHORITATIVE=1): deck reveals (Ultra Ball, Earthen Vessel, Quick Search
   stays hidden); deck builder Special filter Ancient/Future pills; /build-and-battle and
   /deck-builder?etb=phantasmal-flames-etb (057 taste calls); then 057 slice 6; design 056 (3D box, I209);
-  then top of ISSUES.md. audit:trainers (I213) red on main.
+  then top of ISSUES.md (I221: the three unimplemented optional-cost bonuses).
   Maintenance: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.
 
