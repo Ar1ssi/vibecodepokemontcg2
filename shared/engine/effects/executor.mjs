@@ -178,6 +178,8 @@ export function createPendingChoice({
   };
 }
 
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th'];
+
 // "up to 2 Basic Pokémon or 1 Evolution Pokémon": keep only the picks that fit the branch the
 // first pick chose, up to that branch's count.
 function pickAlternativeBranch(deck, selection, alternatives) {
@@ -616,6 +618,66 @@ export function executeSteps(draft, {
           if (activeRng) shuffleInPlace(activeRng, player.zones.deck || []);
           events.push({ type: 'deckShuffled', playerId });
         };
+        // Mallow / Ciphermaniac's Codebreaking: the picks are already back on top of the deck (see
+        // the deckTop branch below); the player now chooses their order, one position per prompt.
+        const orderKey = `${idx}:searchOrder`;
+        const askDeckTopOrder = (state) => {
+          const deck = player.zones.deck || [];
+          const remaining = state.ids.filter((id) => !state.order.includes(id));
+          return createPendingChoice({
+            player: playerId,
+            prompt: `${sourceCard?.name || 'Search'}: Choose the card to put ${ORDINALS[state.order.length] || `${state.order.length + 1}th`} from the top of your deck`,
+            source: sourceCard?.name || '',
+            options: deck.filter((c) => remaining.includes(c.instanceId)),
+            min: 1,
+            max: 1,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context: { ...context, [orderKey]: state },
+              budgetCount: budget.count,
+            },
+          });
+        };
+        if (stepSelection && context[orderKey]) {
+          const deck = player.zones.deck || [];
+          const { ids } = context[orderKey];
+          const order = [...context[orderKey].order];
+          if (ids.includes(stepSelection[0]) && !order.includes(stepSelection[0])) order.push(stepSelection[0]);
+          const remaining = ids.filter((id) => !order.includes(id));
+          if (remaining.length > 1) {
+            return { pendingChoice: askDeckTopOrder({ ids, order }), completed: false };
+          }
+          const ordered = [...order, ...remaining]
+            .map((id) => deck.find((c) => c.instanceId === id))
+            .filter(Boolean);
+          for (const card of ordered) deck.splice(deck.indexOf(card), 1);
+          deck.unshift(...ordered);
+          events.push({ type: 'deckReordered', playerId, count: ordered.length });
+          delete context[orderKey];
+          break;
+        }
+        if (stepSelection && dest === 'decktop') {
+          // The picks leave the deck, the rest is shuffled, then the picks return on top.
+          const deck = player.zones.deck || [];
+          const pickedIds = [...new Set(stepSelection)]
+            .filter((id) => deck.some((c) => c.instanceId === id && cardMatches(c)))
+            .slice(0, maxCount);
+          const picked = pickedIds.map((id) => deck.find((c) => c.instanceId === id));
+          for (const card of picked) deck.splice(deck.indexOf(card), 1);
+          if (activeRng) shuffleInPlace(activeRng, deck);
+          deck.unshift(...picked);
+          events.push({ type: 'deckShuffled', playerId });
+          if (picked.length > 1) {
+            return { pendingChoice: askDeckTopOrder({ ids: pickedIds, order: [] }), completed: false };
+          }
+          break;
+        }
         if (stepSelection && context[attachKey]) {
           // Resume: the chosen Pokémon receives the searched Energy (or the next one, attachEach)
           const deck = player.zones.deck || [];

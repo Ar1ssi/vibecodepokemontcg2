@@ -582,7 +582,10 @@ export function parseSearchDeckParams(lower) {
   let count = 1;
   let destination = 'hand';
   const reveal = /\breveal\b/.test(lower);
-  if (
+  if (/shuffle your deck,? (?:then|and) put (?:those cards|that card) on top of (?:it|your deck)/.test(lower)) {
+    // Mallow, Ciphermaniac's Codebreaking, Reserved Ticket: the picks go back on top after the shuffle.
+    destination = 'deckTop';
+  } else if (
     lower.includes('onto your bench') ||
     lower.includes('put it onto your bench') ||
     lower.includes('put them onto your bench')
@@ -2985,6 +2988,7 @@ export function describeStep(step) {
       const dest =
         step.destination === 'bench' ? 'put on Bench'
         : step.destination === 'attach' ? 'attach to a Pokémon'
+        : step.destination === 'deckTop' ? 'put on top of your deck in any order'
         : 'add to hand';
       return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what}${describeNameFilter(step)} → ${dest}, then shuffle.`;
     }
