@@ -621,8 +621,10 @@
    ]
   },
   "Bellelba & Brycen-Man#uyqetp": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "eachPlayerDiscardBenchUntil",
+    "millEachPlayer",
+    "optionalDiscardCost"
    ]
   },
   "Bench Shield#5rekbj": {
@@ -1683,13 +1685,17 @@
    ]
   },
   "Cross Switcher#1p2gyb4": {
+   "playCondition": "copiesInHand>=2",
    "steps": [
+    "playCopies",
     "switchOpponent",
     "switchOwn"
    ]
   },
   "Crossceiver#djznrq": {
+   "playCondition": "copiesInHand>=2",
    "steps": [
+    "playCopies",
     "recursion"
    ]
   },
@@ -2214,16 +2220,19 @@
   },
   "Dual Ball#1hdtbi0": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
   "Dual Ball#3al3r": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
   "Dual Ball#n4rr59": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
@@ -2380,6 +2389,7 @@
   },
   "Energy Ark#2jwr3b": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
@@ -4950,6 +4960,8 @@
   },
   "Mallow & Lana#18kdf7o": {
    "steps": [
+    "healAmount",
+    "optionalDiscardCost",
     "switchOwn"
    ]
   },
@@ -5312,11 +5324,13 @@
   },
   "Missing Clover#1gi5u2g": {
    "steps": [
-    "peekReturn"
+    "playCopiesChoice"
    ]
   },
   "Misty & Lorelei#xs3g10": {
    "steps": [
+    "gxReuseTurn",
+    "optionalDiscardCost",
     "searchDeck"
    ]
   },
@@ -7386,6 +7400,7 @@
   },
   "Sabrina & Brycen#ukll92": {
    "steps": [
+    "optionalDiscardCost",
     "searchDeck"
    ]
   },
@@ -7408,8 +7423,8 @@
    ]
   },
   "Sabrina’s Suggestion#10jiyti": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "useOpponentSupporter"
    ]
   },
   "Sabrina#wdzj70": {
@@ -7943,6 +7958,7 @@
   },
   "Stadium Nav#1lsnxh0": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
@@ -8756,6 +8772,7 @@
   },
   "Timer Ball#owct09": {
    "steps": [
+    "coinFlip",
     "searchDeck"
    ]
   },
@@ -8858,7 +8875,9 @@
    ]
   },
   "Transformation Tome#11yfc3r": {
+   "playCondition": "copiesInHand>=2",
    "steps": [
+    "playCopies",
     "swapWithDiscard"
    ]
   },

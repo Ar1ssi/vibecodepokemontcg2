@@ -12,8 +12,11 @@
  * reintroduce a `prizesForKO(card) > 1` heuristic or a second subtype list —
  * the pre-30c duplicates disagreed (Radiant/V-UNION were missed).
  *
- * Pure and dependency-free (no DOM, no imports).
+ * Pure (no DOM, no network). The one import is the printed-marker table (I220): TCGdex has no
+ * Tera field, so `isTeraCard` also looks the printing up there.
  */
+
+import { hasCardMarker } from './card-markers.mjs';
 
 const lower = (value) => String(value ?? '').toLowerCase();
 
@@ -95,6 +98,7 @@ export function isVCard(card = {}) {
 
 export function isTeraCard(card = {}) {
   if (hasSubtype(card, 'tera')) return true;
+  if (hasCardMarker(card, 'Tera')) return true;
   const text = textOf(card);
   if (
     text.includes('tera: as long as this pokémon is on your bench') ||

@@ -6,6 +6,7 @@ const LIVE_TEST_FILES = [
   'shared/engine/rules/__tests__/card-identity-live.test.mjs',
   'scripts/__tests__/build-battle-box-live.test.mjs',
   'scripts/__tests__/paradox-tags-live.test.mjs',
+  'scripts/__tests__/card-markers-live.test.mjs',
 ];
 
 const run = spawnSync(process.execPath, ['--test', ...LIVE_TEST_FILES], {

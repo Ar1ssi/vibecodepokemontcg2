@@ -1298,7 +1298,10 @@ export function pokemonHpThreshold(baseHp, card, stadiumBonus = 0) {
   return applyHpBonus((baseHp || 0) + (stadiumBonus || 0), hpBonus);
 }
 
+// A shield against played Items ("whenever your opponent plays an Item … card, prevent all effects
+// of that card done to this Pokémon": Ninja Body, Unnerve, Bright Veil) is not an Item lock (I219).
 export function blocksItemPlay(card) {
+  if (/prevent all effects of that card/.test(textOf(card))) return false;
   return parseEffectPrevent(card)?.scope === 'items';
 }
 

@@ -294,7 +294,11 @@ export function getAuthoritativeStadiumArray() {
 export function getAuthoritativeOncePerGame() {
   const flags = lastAppliedView?.you?.flags;
   if (!flags || typeof flags !== 'object') return null;
-  return { vstarUsed: Boolean(flags.vstarUsed), gxUsed: Boolean(flags.gxUsed) };
+  return {
+    vstarUsed: Boolean(flags.vstarUsed),
+    gxUsed: Boolean(flags.gxUsed),
+    gxReuseTypes: Array.isArray(flags.gxReuseTypes) ? [...flags.gxReuseTypes] : [],
+  };
 }
 
 /**

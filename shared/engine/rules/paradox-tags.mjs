@@ -52,7 +52,8 @@ function imageSources(card) {
   ].filter((src) => typeof src === 'string' && src);
 }
 
-function candidateIds(card) {
+/** Every TCGdex-style id a card-shaped object may carry (id, tcgId, image URL, set + number). */
+export function printingIds(card) {
   const ids = [card?.id, card?.tcgId];
   for (const src of imageSources(card)) ids.push(extractTcgdexIdFromImageUrl(src));
   const set = card?.set && typeof card.set === 'object' ? card.set.id : card?.set;
@@ -66,7 +67,7 @@ export function paradoxTagOf(card) {
   if (!card || typeof card !== 'object') return null;
   const fromSubtypes = subtypeTag(card);
   if (fromSubtypes) return fromSubtypes;
-  for (const id of candidateIds(card)) {
+  for (const id of printingIds(card)) {
     const tag = PARADOX_TAGS[canonicalCardId(id)];
     if (tag) return tag;
   }

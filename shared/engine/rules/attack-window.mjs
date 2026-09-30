@@ -59,10 +59,17 @@ export function statusAttackBlock(card) {
  *   abilityUsed:  boolean              once-per-turn already used?
  *   rulesEnabled: boolean
  *   blockedReason: string              Asleep/Paralyzed text from statusAttackBlock
- *   oncePerGame:  { vstarUsed, gxUsed } the player's spent once-per-game allowances
+ *   oncePerGame:  { vstarUsed, gxUsed, gxReuseTypes? } the player's spent once-per-game
+ *                 allowances; `gxReuseTypes` (Misty & Lorelei) re-opens GX attacks this turn
  * }
  * @returns {Array<{name, cost, payable, onceUsed, reason}>}
  */
+function gxReuseGranted(card, oncePerGame) {
+  const granted = oncePerGame?.gxReuseTypes;
+  if (!Array.isArray(granted) || granted.length === 0) return false;
+  return (card?.types || []).some((t) => granted.includes(String(t).toLowerCase()));
+}
+
 export function listAttacks(card, opts = {}) {
   const {
     energyTypes = [],
@@ -95,7 +102,7 @@ export function listAttacks(card, opts = {}) {
     // (design 049), so the panel greys it with the same reason.
     const gameUsedReason = !rulesEnabled
       ? ''
-      : isGxAttack(atk) && oncePerGame?.gxUsed
+      : isGxAttack(atk) && oncePerGame?.gxUsed && !gxReuseGranted(card, oncePerGame)
         ? 'Only one GX attack can be used per game.'
         : isVstarPowerAttack(atk) && oncePerGame?.vstarUsed
           ? 'VSTAR Power already used this game.'

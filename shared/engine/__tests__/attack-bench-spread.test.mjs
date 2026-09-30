@@ -60,3 +60,31 @@ test('attack: self-recoil that Knocks Out an own Benched Pokémon discards it (I
   assert.deepEqual(p1.zones.bench.map((c) => c.name), ['Own Bench B']);
   assert.ok(p1.zones.discard.some((c) => c.name === 'Own Bench A'));
 });
+
+test('attack: an evolved Tera Pokémon on the Bench takes no spread damage (its top card is Tera)', () => {
+  nextId = 1;
+  const state = createGameState({ gameId: 'spread-tera', seed: 5, rulesEnabled: true });
+  for (const id of ['p1', 'p2']) {
+    state.players[id] = { playerId: id, username: id, zones: createPlayerZones(), flags: {} };
+    for (let i = 0; i < 6; i++) state.players[id].zones.prizes.push(mon(`${id} prize ${i}`));
+  }
+  state.turn = { player: 'p1', number: 3, phase: 'main' };
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: nextId++,
+      name: 'Spreader',
+      supertype: 'Pokémon',
+      hp: 200,
+      attacks: [{ name: 'Spread', cost: [], damage: '10', text: "This attack also does 20 damage to each of your opponent's Benched Pokémon." }],
+    })
+  );
+  state.players.p2.zones.active.push(mon('Defender', 400));
+  const root = createCard({ instanceId: 50, name: 'Basic Root', supertype: 'Pokémon', stage: 'Basic', hp: 70 });
+  const top = createCard({ instanceId: 51, name: 'Tera Top ex', supertype: 'Pokémon', stage: 'Stage 1', subtypes: ['Stage 1', 'ex', 'Tera'], hp: 260, attachedTo: 50 });
+  state.players.p2.zones.bench.push(root, top, mon('Plain Bench'));
+  const res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(5));
+  assert.equal(res.error, null);
+  const bench = res.state.players.p2.zones.bench;
+  assert.equal(bench.find((c) => c.instanceId === 50).damage || 0, 0);
+  assert.equal(bench.find((c) => c.name === 'Plain Bench').damage, 20);
+});

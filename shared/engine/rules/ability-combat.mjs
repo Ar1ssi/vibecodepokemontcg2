@@ -669,6 +669,118 @@ export function abilityPreventsAttackEffects(defender, attacker, ctx = {}) {
   return false;
 }
 
+// --- card-effect shields (I219) ---------------------------------------------
+
+// Shields against the effects of a card kind rather than an attack:
+//   "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon." (Lustrous Body, θ Stop)
+//   "Whenever your opponent plays an Item or Supporter card from their hand, prevent all effects of
+//    that card done to this Pokémon." (Unnerve; Item only: Ninja Body; Supporter only: Vibrava)
+//   "… a Trainer card (excluding Pokémon Tools and Stadium cards) …" (Ω Barrier)
+//   "If you have Solrock in play, prevent all effects of any Stadium done to your Pokémon in play." (Lunatone)
+// Groups: holder condition, played kind, other source, target.
+const CARD_EFFECT_SHIELD =
+  /^(?:(as long as this pok[eé]mon [^,]+|if [^,]+), )?(?:whenever your opponent plays (an item or supporter card|an item card|a supporter card|a trainer card \(excluding pok[eé]mon tools and stadium cards\))(?: from (?:their|his or her) hand)?, prevent all effects of that card|prevent all effects of (your opponent's pok[eé]mon's abilities|any stadium)) done to ([^.]+)/;
+
+const SHIELD_SOURCES = {
+  'an item or supporter card': ['Item', 'Supporter'],
+  'an item card': ['Item'],
+  'a supporter card': ['Supporter'],
+  'a trainer card (excluding pokémon tools and stadium cards)': ['Item', 'Supporter'],
+  "your opponent's pokémon's abilities": ['Ability'],
+  'any stadium': ['Stadium'],
+};
+
+function abilityTextsOf(card) {
+  const list = Array.isArray(card?.abilities) ? card.abilities : [];
+  const texts = list
+    .map((a) => lower(typeof a === 'string' ? a : a?.text ?? a?.effect ?? ''))
+    .filter(Boolean);
+  return texts.length > 0 ? texts : [cardAbilityText(card)];
+}
+
+function cardEffectShields(holder) {
+  const shields = [];
+  for (const text of abilityTextsOf(holder)) {
+    for (const sentence of text.replace(/[’‘]/g, "'").split(/(?<=\.)\s+/)) {
+      const m = sentence.trim().match(CARD_EFFECT_SHIELD);
+      if (m) shields.push({ condition: m[1], sources: SHIELD_SOURCES[(m[2] || m[3]).replace('pokemon', 'pokémon')] || [], target: m[4] });
+    }
+  }
+  return shields;
+}
+
+// "As long as this Pokémon is in the Active Spot", "If your opponent has 2 or fewer Prize cards
+// remaining" (Thievul; `ctx.opponentPrizesLeft`), "If you have Solrock in play" (Lunatone).
+function cardShieldConditionMet(condition, holder, ctx) {
+  if (!condition) return true;
+  const self = condition.match(/^as long as this pok[eé]mon (.+)$/);
+  if (self) return effectShieldHolderMet(self[1], holder, ctx);
+  const prizes = condition.match(/^if your opponent has (\d+) or fewer prize cards remaining$/);
+  if (prizes) return Number.isFinite(ctx.opponentPrizesLeft) && ctx.opponentPrizesLeft <= Number(prizes[1]);
+  const partner = condition.match(/^if you have (.+) in play$/);
+  if (partner) return sideInPlay(ctx).some((c) => lower(c.name) === partner[1]);
+  return false;
+}
+
+// The target wordings effectShieldCovers does not read: "in play", "your Benched …", "… Pokémon V",
+// ", except any Enamorus V". An unread qualifier still fails closed there.
+function cardShieldCovers(target, holder, defender, ctx) {
+  let t = target.trim();
+  const except = t.match(/, except any (.+)$/);
+  if (except) {
+    if (lower(defender?.name) === except[1]) return false;
+    t = t.slice(0, except.index);
+  }
+  t = t.replace(/ in play$/, '');
+  const benched = t.match(/^your benched (.+)$/);
+  if (benched) {
+    if (holderZone(defender, ctx) !== 'bench') return false;
+    t = `your ${benched[1]}`;
+  }
+  const v = t.match(/^your (.*)pok[eé]mon v$/);
+  if (v) {
+    if (!isVCard(defender)) return false;
+    t = `your ${v[1]}pokémon`;
+  }
+  return effectShieldCovers(t, holder, defender, ctx);
+}
+
+/**
+ * Does an Ability on the defender (or its side) prevent the effects of `source` — 'Item',
+ * 'Supporter' (a card the opponent played from hand), 'Ability' (an opponent's Pokémon's
+ * Ability) or 'Stadium' — done to `defender`? Same arguments as abilityPreventsAttackEffects;
+ * `ctx.opponentPrizesLeft` feeds Thievul's condition.
+ */
+export function abilityPreventsCardEffects(defender, source, ctx = {}) {
+  if (!defender || !source) return false;
+  for (const holder of dedupe([defender, ...sideInPlay(ctx)])) {
+    for (const shield of cardEffectShields(holder)) {
+      if (!shield.sources.includes(source)) continue;
+      if (isAbilitySuppressed(holder, ctx)) continue;
+      if (!cardShieldConditionMet(shield.condition, holder, ctx)) continue;
+      if (cardShieldCovers(shield.target, holder, defender, ctx)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Milotic Dew Guard: "Whenever your opponent plays a Supporter card from their hand, prevent all
+ * effects of that card done to you or your hand." Whether an Ability on the side in `ctx` shields
+ * that player (and their hand) from `source`.
+ */
+export function abilityPreventsCardEffectsOnPlayer(source, ctx = {}) {
+  if (!source) return false;
+  for (const holder of sideInPlay(ctx)) {
+    for (const shield of cardEffectShields(holder)) {
+      if (!shield.sources.includes(source) || !/^you(?: or your hand)?$/.test(shield.target.trim())) continue;
+      if (isAbilitySuppressed(holder, ctx)) continue;
+      if (cardShieldConditionMet(shield.condition, holder, ctx)) return true;
+    }
+  }
+  return false;
+}
+
 // --- weakness override ---------------------------------------------------
 
 /**
