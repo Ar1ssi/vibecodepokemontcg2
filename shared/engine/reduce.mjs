@@ -111,6 +111,8 @@ import {
   abilityDamageReduction,
   abilityHandDiscardProtector,
   abilityDamagePrevention,
+  abilityPreventsAttackEffects,
+  sideContextFor,
   abilityWeaknessOverride,
   abilityHpBonus,
   abilityPrizeModify,
@@ -543,8 +545,16 @@ function counterEffectShielded(draft, victim, zoneCards) {
   if (hasSpecialEnergyEffectShield(inPlayView(draft, victim), zoneCards)) return true;
   const ref = findCard(draft, victim.instanceId);
   const attacker = rootsIn(draft.players[draft.turn?.player]?.zones?.active)[0];
+  const attackerView = attacker ? inPlayView(draft, attacker) : null;
   const markers = ref ? activeAttackMarkers(draft, ref.playerId, victim) : [];
-  return markersPreventEffects(markers, attacker ? inPlayView(draft, attacker) : null);
+  return markersPreventEffects(markers, attackerView) || abilityEffectShield(draft, ref, attackerView);
+}
+
+// An Ability on the defending side ("prevent all effects of attacks used by your opponent's
+// Pokémon done to this Pokémon") shielding the Pokémon at `ref`.
+function abilityEffectShield(draft, ref, attackerView) {
+  if (!ref) return false;
+  return abilityPreventsAttackEffects(inPlayView(draft, ref.card), attackerView, sideContextFor(draft, ref.playerId));
 }
 
 // Chosen-target damage/counters for attacks that let the player pick one or more
@@ -4015,30 +4025,8 @@ function attackCostPayable(state, playerId, active, attack) {
   return canPayAttackCost(energyEntries, effectiveCost);
 }
 
-/**
- * Ability-combat context for the player whose turn/command this is: their
- * in-play cards on `side*` and the other player's on `opponent*`, so the
- * slice-3 readers can scope suppression and locks to the right side.
- */
-function abilitySideContext(state, playerId) {
-  const player = state.players?.[playerId];
-  const opponent = Object.values(state.players || {}).find(
-    (p) => p.playerId !== playerId
-  );
-  const zones = (p) => p?.zones || {};
-  const own = zones(player);
-  const other = zones(opponent);
-  return {
-    sideCards: [...(own.active || []), ...(own.bench || [])],
-    opponentSideCards: [...(other.active || []), ...(other.bench || [])],
-    sideActive: own.active || [],
-    sideBench: own.bench || [],
-    opponentActive: other.active || [],
-    opponentBench: other.bench || [],
-    // Shiftry Seal Off's abilityLock marker is live only inside its window (isAbilitySuppressed).
-    turnNumber: state.turn?.number,
-  };
-}
+// Ability-combat context for the player whose turn/command this is.
+const abilitySideContext = sideContextFor;
 
 /**
  * Validates gameplay legality when rulesEnabled is true (Step 4).
@@ -7281,7 +7269,8 @@ function resolveAttackEffectPhase(draft, ctx) {
         const shielded =
           defRef &&
           (hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone) ||
-            markersPreventEffects(defMarkers, attackerView));
+            markersPreventEffects(defMarkers, attackerView) ||
+            abilityEffectShield(draft, defRef, attackerView));
         if (defRef && defRef.zoneId === 'active' && !shielded) {
           for (const cond of defenderConditions) {
             if (markersBlockCondition(defMarkers, cond)) continue;
@@ -7603,7 +7592,8 @@ function resolveAttackEffectPhase(draft, ctx) {
       // Star Shield-GX / Agility: the Defending Pokémon's effect prevention stops the locks.
       const defenderShielded =
         defenderRef &&
-        markersPreventEffects(activeAttackMarkers(draft, defenderRef.playerId, defenderRef.card), attackerView);
+        (markersPreventEffects(activeAttackMarkers(draft, defenderRef.playerId, defenderRef.card), attackerView) ||
+          abilityEffectShield(draft, defenderRef, attackerView));
       if (locks && defenderShielded) {
         locks.oppCannotRetreat = false;
         locks.oppCannotAttack = false;

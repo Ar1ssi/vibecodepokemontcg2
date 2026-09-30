@@ -433,6 +433,94 @@ test('Latios-EX Light Pulse (XY Promos XY72): damage lands, effects do not', () 
   assert.ok(!hit.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === attacker.instanceId));
 });
 
+// Ability effect shields (I218): the printed Ability, not an attack marker, stops the effects.
+const shieldHolder = (name, text, extra = {}) => mon(name, { abilities: [{ name: 'Shield', type: 'Ability', text }], ...extra });
+
+test("Snorlax Unfazed Fat (corpus: out/pkmn-pokemon-cards.json): damage lands, Paralysis does not", () => {
+  const text = "Prevent all effects of attacks from your opponent's Pokémon done to this Pokémon. (Damage is not an effect.)";
+  let snorlax;
+  const { state } = board('Zapper', PARALYZE.text, {
+    damage: '50',
+    setup: (s) => {
+      snorlax = shieldHolder('Snorlax', text, { hp: 400 });
+      s.players.p2.zones.active = [snorlax];
+    },
+  });
+  const hit = attack(state);
+  assert.equal(hit.error, null);
+  const after = root(hit.state, 'p2', snorlax.instanceId);
+  assert.equal(after.damage, 50);
+  assert.ok(!hit.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === snorlax.instanceId));
+});
+
+test('a "done to this Pokémon" shield on a Benched holder does not cover the Active', () => {
+  const text = "Prevent all effects of your opponent's attacks, except damage, done to this Pokémon.";
+  let plain;
+  const unshielded = board('Zapper', PARALYZE.text, {
+    setup: (s) => {
+      plain = s.players.p2.zones.active[0];
+      s.players.p2.zones.bench.push(shieldHolder('Cosmog', text));
+    },
+  });
+  const hit = attack(unshielded.state);
+  assert.ok(hit.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === plain.instanceId));
+});
+
+test("Galarian Mr. Rime Screen Cleaner (corpus): shields each of your Pokémon that has Energy attached", () => {
+  const text =
+    "Prevent all effects of your opponent's attacks, except damage, done to all of your Pokémon that have Energy attached. (Existing effects are not removed.)";
+  const run = (withEnergy) => {
+    let target;
+    const { state } = board('Zapper', PARALYZE.text, {
+      setup: (s) => {
+        target = s.players.p2.zones.active[0];
+        s.players.p2.zones.bench.push(shieldHolder('Galarian Mr. Rime', text));
+        if (withEnergy) s.players.p2.zones.active.push(energy('Water', target.instanceId));
+      },
+    });
+    const hit = attack(state);
+    return hit.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === target.instanceId);
+  };
+  assert.equal(run(true), false, 'Energy attached: shielded');
+  assert.equal(run(false), true, 'no Energy: Paralyzed');
+});
+
+test('Suicune Wind Charm-style shield works only while the holder is Active', () => {
+  const text =
+    "As long as this Pokémon is your Active Pokémon, prevent all effects of your opponent's attacks, except damage, done to each of your Pokémon. (Existing effects are not removed.)";
+  const activeHolder = board('Zapper', PARALYZE.text, {
+    setup: (s) => (s.players.p2.zones.active = [shieldHolder('Suicune', text)]),
+  });
+  const holder = activeHolder.state.players.p2.zones.active[0];
+  const hit = attack(activeHolder.state);
+  assert.ok(!hit.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === holder.instanceId));
+  let plain;
+  const benchHolder = board('Zapper', PARALYZE.text, {
+    setup: (s) => {
+      plain = s.players.p2.zones.active[0];
+      s.players.p2.zones.bench.push(shieldHolder('Suicune', text));
+    },
+  });
+  const hit2 = attack(benchHolder.state);
+  assert.ok(hit2.events.some((e) => e.type === 'specialConditionUpdated' && e.instanceId === plain.instanceId));
+});
+
+test('Empoleon ex Emperor\'s Stance (corpus): a step-run effect on the Active is skipped', () => {
+  const text = "Prevent all effects of attacks used by your opponent's Pokémon done to this Pokémon. (Damage is not an effect.)";
+  let empoleon;
+  let water;
+  const { state } = board('Discarder', "Discard an Energy from your opponent's Active Pokémon.", {
+    setup: (s) => {
+      empoleon = shieldHolder('Empoleon ex', text, { hp: 400 });
+      water = energy('Water', empoleon.instanceId);
+      s.players.p2.zones.active = [empoleon, water];
+    },
+  });
+  const hit = attack(state);
+  assert.equal(hit.error, null);
+  assert.ok(hit.state.players.p2.zones.active.some((c) => c.instanceId === water.instanceId));
+});
+
 test('Dracozolt VMAX Spark Trap (Evolving Skies 210): 12 counters on the Pokémon that hits it', () => {
   const text =
     "During your opponent's next turn, if this Pokémon is damaged by an attack (even if it is Knocked Out), put 12 damage counters on the Attacking Pokémon.";

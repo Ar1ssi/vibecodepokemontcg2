@@ -79,7 +79,6 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'discard-bench',
   'discard-cost',
   'draw',
-  'effect-prevent',
   'energy-on-ko',
   'energy-redirect',
   'evolve',
@@ -98,6 +97,8 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'switch',
   'tool-cap',
   'weakness',
+  // 'effect-prevent' withdrawn (I218): its rows had read as consumed only through the damage-prevention
+  // misread fa7966b fixed; the Item/Supporter/Ability/Stadium shields that fill it have no reader, 54/151.
   // 'when-played' withdrawn: the clause cross-check (scripts/lib/ability-behaviour.mjs rowFlags)
   // found 6 rows that paid their hand cost but skipped the effect (Crawdaunt Unruly Claw), 17/39.
 ]);
@@ -121,7 +122,6 @@ export const ORACLE_BLIND_FAMILIES = new Map([
   ],
   // Passive ability families: the oracle cannot see them, `pnpm audit:abilities` reads them
   // through the passive-reader probes (D135) and holds their claim (D136).
-  ['ability:effect-prevent', 'passive rule modifier; useAbility rejects it'],
   ['ability:coin-control', 'passive rule modifier; read by the audit:abilities probes'],
   ['ability:copy-attack', 'passive attack borrowing; read by the audit:abilities probes'],
   ['ability:energy-on-ko', 'triggered on a Knock Out; read by the audit:abilities probes'],

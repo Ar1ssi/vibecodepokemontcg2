@@ -7,6 +7,7 @@ const {
   abilityDamageBonus,
   abilityDamageReduction,
   abilityDamagePrevention,
+  abilityPreventsAttackEffects,
   abilityWeaknessOverride,
   abilityHpBonus,
   abilityPrizeModify,
@@ -64,6 +65,56 @@ const tool = (name, extra = {}) => ({
   supertype: 'Trainer',
   trainerType: 'Tool',
   ...extra,
+});
+
+// ── attack effect prevention (I218) ──────────────────────────────────────
+// Wordings: out/pkmn-pokemon-cards.json rows named in each case.
+
+test('abilityPreventsAttackEffects: effect-only shield wordings, scoped to their printed target', () => {
+  const attacker = mon('Attacker');
+  const self = (name, text, extra = {}) => mon(name, { abilities: [ability('Shield', text)], ...extra });
+  const covers = (defender, side = [defender]) =>
+    abilityPreventsAttackEffects(defender, attacker, { sideCards: side, sideActive: [side[0]], sideBench: side.slice(1) });
+
+  // Self-scoped: Toxicroak G (named), Venomoth ("by the Attacking Pokémon"), Machamp, Cosmog.
+  assert.equal(covers(self('Toxicroak G', 'Prevent all effects of attacks, excluding damage, done to Toxicroak G.')), true);
+  assert.equal(covers(self('Venomoth', 'Prevent all effects of attacks, except damage, done to Venomoth by the Attacking Pokémon.')), true);
+  assert.equal(covers(self('Machamp', "Prevent all effects of your opponent's attacks done to Machamp.")), true);
+  const cosmog = self('Cosmog', "Prevent all effects of your opponent's attacks, except damage, done to this Pokémon.");
+  const ally = mon('Ally');
+  assert.equal(covers(ally, [ally, cosmog]), false, 'this-Pokémon shields do not reach allies');
+
+  // Team-scoped: Flygon ({N}), Team Rocket's Articuno (Basic Team Rocket's), Magearna-EX ({M} Energy).
+  const flygon = self('Flygon', "Prevent all effects of your opponent's attacks, except damage, done to your {N} Pokémon. (Existing effects are not removed.)");
+  const dragon = mon('Dragon', { types: ['Dragon'] });
+  assert.equal(covers(dragon, [dragon, flygon]), true);
+  assert.equal(covers(ally, [ally, flygon]), false);
+  const articuno = self("Team Rocket's Articuno", "Prevent all effects of attacks used by your opponent's Pokémon done to your Basic Team Rocket's Pokémon. (Existing effects are not removed. Damage is not an effect.)");
+  const rocket = mon("Team Rocket's Mewtwo");
+  assert.equal(covers(rocket, [rocket, articuno]), true);
+  assert.equal(covers(ally, [ally, articuno]), false);
+  const magearna = self('Magearna-EX', "Prevent all effects of your opponent's attacks, except damage, done to each of your Pokémon that has any {M} Energy attached to it. (Existing effects are not removed.)");
+  const metal = energy('Basic Metal Energy', 'Metal', { attachedTo: ally.instanceId });
+  assert.equal(covers(ally, [ally, magearna, metal]), true);
+  assert.equal(covers(ally, [ally, magearna]), false);
+
+  // Older Poké-Body wordings: Wormadam Sandy Cloak (POP 7), Jynx (Unseen Forces 28), Rayquaza (Deoxys 22).
+  assert.equal(covers(self('Wormadam Sandy Cloak', 'Prevent all effects, excluding damage, done to Wormadam Sandy Cloak.')), true);
+  const jynxText = "As long as Jynx is an Evolved Pokémon, prevent all effects of opponent's attacks, except damage, done to Jynx, and Jynx has no Weakness.";
+  assert.equal(covers(self('Jynx', jynxText, { stage: 'Stage 1', subtypes: ['Stage 1'] })), true);
+  assert.equal(covers(self('Jynx', jynxText)), false, 'a Basic Jynx is not Evolved');
+  const rayText = "As long as Rayquaza has any basic {R} Energy cards and any basic {L} Energy cards attached to it, prevent all effects, except damage, by an opponent's attack done to Rayquaza.";
+  const ray = self('Rayquaza', rayText);
+  const fire = energy('Basic Fire Energy', 'Fire', { attachedTo: ray.instanceId });
+  const lightning = energy('Basic Lightning Energy', 'Lightning', { attachedTo: ray.instanceId });
+  assert.equal(covers(ray, [ray, fire, lightning]), true);
+  assert.equal(covers(ray, [ray, fire]), false, 'both Energy types are required');
+
+  // Not attack-effect shields: Luminous Wing (Abilities only), Marowak Bodyguard (you or your hand),
+  // Keldeo-GX (damage-inclusive, attacker-filtered: abilityDamagePrevention's job).
+  assert.equal(covers(self('Lunala', "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon.")), false);
+  assert.equal(covers(self('Marowak', "Prevent all effects of attacks done to you or your hand by your opponent's Pokémon. Remove any existing effects.")), false);
+  assert.equal(covers(self('Keldeo-GX', "Prevent all effects of attacks, including damage, done to this Pokémon by your opponent's Pokémon-GX or Pokémon-EX.")), false);
 });
 
 // ── damage bonus ─────────────────────────────────────────────────────────

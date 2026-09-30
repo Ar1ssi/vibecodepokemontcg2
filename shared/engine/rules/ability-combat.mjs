@@ -576,6 +576,99 @@ export function abilityDamagePrevention(defender, attacker, ctx = {}) {
   return out;
 }
 
+/**
+ * Ability-combat context for `playerId`: their in-play cards on `side*` and the other player's on
+ * `opponent*`, so the readers scope suppression and locks to the right side.
+ */
+export function sideContextFor(state, playerId) {
+  const player = state.players?.[playerId];
+  const opponent = Object.values(state.players || {}).find((p) => p.playerId !== playerId);
+  const own = player?.zones || {};
+  const other = opponent?.zones || {};
+  return {
+    sideCards: [...(own.active || []), ...(own.bench || [])],
+    opponentSideCards: [...(other.active || []), ...(other.bench || [])],
+    sideActive: own.active || [],
+    sideBench: own.bench || [],
+    opponentActive: other.active || [],
+    opponentBench: other.bench || [],
+    // Shiftry Seal Off's abilityLock marker is live only inside its window (isAbilitySuppressed).
+    turnNumber: state.turn?.number,
+  };
+}
+
+// --- attack effect prevention ----------------------------------------------
+
+// "Prevent all effects of attacks used by your opponent's Pokémon done to this Pokémon. (Damage is
+// not an effect.)" and its older wordings ("your opponent's attacks, except damage", "all effects,
+// excluding damage"). Groups: holder condition, attack clause, damage exclusion, target.
+// Damage-inclusive or attacker-filtered shields ("including damage … by your opponent's
+// Pokémon-EX") stay with abilityDamagePrevention; Item/Supporter/Ability shields are other mechanics.
+const ATTACK_EFFECT_SHIELD =
+  /^(?:as long as this pok[eé]mon ((?:is|has) [^,]+), )?prevent all effects( of (?:your opponent's (?:pok[eé]mon's )?attacks(?: and abilities)?|(?:your )?opponent's attacks|attacks (?:used by|from) your opponent's pok[eé]mon|attacks))?(, (?:except|excluding|other than) damage,)?(?: by an opponent's attack)? done to ([^.(,]+)/;
+
+// The holder's own "As long as this Pokémon …" clause; an unread clause fails closed.
+function effectShieldHolderMet(clause, holder, ctx) {
+  if (!clause) return true;
+  const zone = clause.match(/^is (your active pok[eé]mon|in the active spot|on your bench)$/);
+  if (zone) return holderZone(holder, ctx) === (/bench/.test(zone[1]) ? 'bench' : 'active');
+  if (/^is an evolved pok[eé]mon$/.test(clause)) return isEvolutionCard(holder);
+  if (/^has any .*energy(?: cards)? attached(?: to it)?$/.test(clause)) {
+    const zoneCards = ctx.sideCards || ctx.inPlayCards;
+    const symbols = typeSymbols(clause);
+    if (!symbols.length) return attachedEnergy(holder, zoneCards).length > 0;
+    return symbols.every((type) => hasEnergyOfType(holder, zoneCards, type));
+  }
+  return false;
+}
+
+// The printed target of a team shield ("your Basic Team Rocket's Pokémon", "each of your Pokémon
+// that has any {M} Energy attached to it", "your {N} Pokémon"). An unread qualifier fails closed.
+function effectShieldCovers(target, holder, defender, ctx) {
+  let t = target.trim().replace(/ by the attacking pok[eé]mon$/, '');
+  if (/^this pok[eé]mon$/.test(t)) return sameCard(holder, defender);
+  const team = t.match(/^(?:each of |all of )?your (.+)$/);
+  if (!team) return false;
+  t = team[1];
+  const zoneCards = ctx.sideCards || ctx.inPlayCards;
+  const energy = t.match(/ that (?:has|have) (?:any )?(?:\{([a-z])\} )?energy attached(?: to (?:it|them))?$/);
+  if (energy) {
+    t = t.slice(0, energy.index);
+    const ok = energy[1]
+      ? hasEnergyOfType(defender, zoneCards, TYPE_LETTER[energy[1]])
+      : attachedEnergy(defender, zoneCards).length > 0;
+    if (!ok) return false;
+  }
+  const symbols = typeSymbols(t);
+  if (symbols.length && !symbols.some((ty) => attackerTypes(defender).includes(lower(ty)))) return false;
+  t = t.replace(/\{[a-z]\}\s*/g, '');
+  if (/^basic /.test(t)) {
+    if (!isBasicPokemon(defender)) return false;
+    t = t.slice(6);
+  }
+  const owner = t.match(/^(.+?)'s pok[eé]mon$/);
+  if (owner) return lower(defender?.name).includes(lower(owner[1]));
+  return /^pok[eé]mon$/.test(t);
+}
+
+/**
+ * Does an Ability on the defender (or its side) prevent the effects of `attacker`'s attack done to
+ * `defender`? `defender` is the in-play view (the printed Ability sits on the top card); `ctx` is the
+ * defending player's side context (`sideCards`, `sideActive`, `sideBench`, `turnNumber`).
+ */
+export function abilityPreventsAttackEffects(defender, attacker, ctx = {}) {
+  if (!defender) return false;
+  for (const holder of dedupe([defender, ...sideInPlay(ctx)])) {
+    const shield = selfNamedText(holder).match(ATTACK_EFFECT_SHIELD);
+    // "Prevent all effects done to …" with neither an attack clause nor a damage exclusion is unread.
+    if (!shield || (!shield[2] && !shield[3])) continue;
+    if (isAbilitySuppressed(holder, ctx)) continue;
+    if (!effectShieldHolderMet(shield[1], holder, ctx)) continue;
+    if (effectShieldCovers(shield[4], holder, defender, ctx)) return true;
+  }
+  return false;
+}
+
 // --- weakness override ---------------------------------------------------
 
 /**

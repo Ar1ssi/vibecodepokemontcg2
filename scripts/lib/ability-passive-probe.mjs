@@ -11,6 +11,8 @@ import {
   abilityDamageBonus,
   abilityDamageReduction,
   abilityDamagePrevention,
+  abilityPreventsAttackEffects,
+  abilityHandDiscardProtector,
   abilityWeaknessOverride,
   abilityHpBonus,
   abilityPrizeModify,
@@ -217,6 +219,8 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, ctx));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
+      ask(`effectPrevention:${card.name}`, () => abilityPreventsAttackEffects(card, p2Active, ctx));
+      ask(`handDiscardProtector:${card.name}`, () => abilityHandDiscardProtector(card, ctx));
       ask(`weakness:${card.name}`, () => abilityWeaknessOverride(card, ctx));
       ask(`hp:${card.name}`, () => abilityHpBonus(card, ctx));
       ask(`prize:${card.name}`, () => abilityPrizeModify(card, ctx));

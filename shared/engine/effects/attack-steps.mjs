@@ -44,6 +44,8 @@ import {
   SELF_NAME,
 } from '../rules/attack-markers.mjs';
 import { eachFilterMatches } from '../rules/each-filter.mjs';
+import { abilityPreventsAttackEffects, sideContextFor } from '../rules/ability-combat.mjs';
+import { evolvedView } from '../rules/evolved-pokemon.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 import {
   BENCH_LIMIT,
@@ -74,8 +76,9 @@ export const ATTACK_NO = -12;
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Effect shields on one of the opponent's Pokémon: a shielding Special Energy, or an
- * `effectPrevent` marker ("prevent all effects of attacks … done to this Pokémon").
+ * Effect shields on one of the opponent's Pokémon: a shielding Special Energy, an
+ * `effectPrevent` marker ("prevent all effects of attacks … done to this Pokémon"), or the
+ * same shield printed as an Ability on that side.
  */
 function attackEffectShielded(ctx, owner, root, kind = 'effect') {
   if (specialEnergyShielded(owner, root, kind)) return true;
@@ -83,7 +86,13 @@ function attackEffectShielded(ctx, owner, root, kind = 'effect') {
   const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
   const markers = liveAttackMarkers(root, { turnNumber: ctx.draft.turn?.number || 1, zoneCards: zone });
   const ref = attackerRef(ctx);
-  return markersPreventEffects(markers, ref ? attackingView(ctx, ref.card) : ctx.sourceCard);
+  const attacker = ref ? attackingView(ctx, ref.card) : ctx.sourceCard;
+  return markersPreventEffects(markers, attacker) || abilityShieldsEffects(ctx, owner, root, attacker);
+}
+
+function abilityShieldsEffects(ctx, owner, root, attacker) {
+  const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
+  return abilityPreventsAttackEffects(evolvedView(zone, root), attacker, sideContextFor(ctx.draft, owner.playerId));
 }
 
 /** The attacking Pokémon as marker filters read it: its top card, with the stamped Energy count. */
@@ -3800,7 +3809,8 @@ function oppActiveProtected(ctx) {
     zoneCards: ctx.opponent.zones.active || [],
   });
   const ref = attackerRef(ctx);
-  return markersPreventEffects(markers, ref ? attackingView(ctx, ref.card) : ctx.sourceCard);
+  const attacker = ref ? attackingView(ctx, ref.card) : ctx.sourceCard;
+  return markersPreventEffects(markers, attacker) || abilityShieldsEffects(ctx, ctx.opponent, defender, attacker);
 }
 
 for (const [type, targetsActive] of Object.entries(OPP_ACTIVE_EFFECTS)) {
