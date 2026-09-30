@@ -1947,6 +1947,55 @@ describe('recurring-wording coverage (batch 6)', () => {
     assert.equal(r.steps[0].pick, 'Grass Pokémon or Basic {G} Energy');
     assert.equal(r.steps[0].takeUpTo, 2);
   });
+
+  // Card texts below: out/pkmn-trainer-cards.json rows named in each test (I215-I217).
+  test("Explorer's Guidance (PRE 107): take exactly 2 of the top 6, discard the rest", () => {
+    const r = parseTrainerEffect('Look at the top 6 cards of your deck and put 2 of them into your hand. Discard the other cards.');
+    assert.deepEqual(r.steps, [
+      { type: 'lookAtTop', count: 6, pick: 'any', destination: 'hand', takeUpTo: 2, takeExact: true, restTo: 'discard' },
+    ]);
+  });
+
+  test('Hassel (TWM 205): up to 3 of the top 8, rest shuffled back', () => {
+    const r = parseTrainerEffect('You can use this card only if any of your Pokémon were Knocked Out during your opponent’s last turn. Look at the top 8 cards of your deck and put up to 3 of them into your hand. Shuffle the other cards back into your deck.');
+    assert.deepEqual(r.steps, [{ type: 'lookAtTop', count: 8, pick: 'any', destination: 'hand', takeUpTo: 3 }]);
+  });
+
+  test('Rika (PAR 258): exactly 2 of the top 4, rest to the bottom', () => {
+    const r = parseTrainerEffect('Look at the top 4 cards of your deck and put 2 of them into your hand. Shuffle the other cards and put them on the bottom of your deck.');
+    assert.deepEqual(r.steps, [
+      { type: 'lookAtTop', count: 4, pick: 'any', destination: 'hand', restToBottom: true, takeUpTo: 2, takeExact: true },
+    ]);
+  });
+
+  test("Colress's Experiment (CRZ GG59): exactly 3 of the top 5, rest to the Lost Zone", () => {
+    const r = parseTrainerEffect('Look at the top 5 cards of your deck and put 3 of them into your hand. Put the other cards in the Lost Zone.');
+    assert.deepEqual(r.steps, [
+      { type: 'lookAtTop', count: 5, pick: 'any', destination: 'hand', takeUpTo: 3, takeExact: true, restTo: 'lostZone' },
+    ]);
+  });
+
+  test('Trekking Shoes (CRZ 145): look at 1; if not taken, discard it and draw', () => {
+    const r = parseTrainerEffect('Look at the top card of your deck. You may put that card into your hand. If you don’t, discard that card and draw a card.');
+    assert.deepEqual(r.steps, [
+      { type: 'lookAtTop', count: 1, pick: 'any', destination: 'hand', restTo: 'discard', drawIfNoneTaken: 1 },
+    ]);
+  });
+
+  test('Great Ball (PAL 183): only Pokémon are offered', () => {
+    const r = parseTrainerEffect('Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.');
+    assert.equal(r.steps[0].pick, 'Pokémon');
+  });
+
+  test('Cassiopeia (SFA 094): search for up to 2 cards', () => {
+    const r = parseTrainerEffect('You can use this card only when it is the last card in your hand. Search your deck for up to 2 cards and put them into your hand. Then, shuffle your deck.');
+    assert.deepEqual(r.steps, [{ type: 'searchDeck', what: 'card', count: 2, destination: 'hand', upTo: true }]);
+  });
+
+  test('Professor Burnet (SIT TG26): the any-card count rule does not reach deck-discard searches', () => {
+    const r = parseTrainerEffect('Search your deck for up to 2 cards and discard them. Then, shuffle your deck.');
+    assert.equal(r.steps[0].count, 1);
+  });
 });
 
 describe('opponent-hand and mixed coverage (batch 8)', () => {

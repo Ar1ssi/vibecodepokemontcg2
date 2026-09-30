@@ -542,6 +542,29 @@ async function runLookStep(card, step, fromBottom, done) {
   const destination = step.destination === 'bench' ? 'bench' : 'hand';
   const sourceText = card.text || card.effect || '';
   const takeUpTo = Number(step.takeUpTo) > 1 ? Number(step.takeUpTo) : 0;
+  // Explorer's Guidance / Colress's Experiment / Trekking Shoes: the untaken cards leave the
+  // deck instead of being shuffled back.
+  const restZone = step.restTo === 'discard' || step.restTo === 'lostZone' ? step.restTo : null;
+  const finishRest = async (taken, shuffleMessage) => {
+    if (!restZone) {
+      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, ...shuffleMessage });
+      done?.();
+      return;
+    }
+    const rest = candidates.filter((c) => deck.array.includes(c));
+    for (const c of rest) {
+      const i = deck.array.indexOf(c);
+      if (i >= 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', restZone, i, false, 'move');
+    }
+    if (rest.length) msg(`  ${card.name}: put ${rest.length} card(s) in the ${restZone === 'lostZone' ? 'Lost Zone' : 'discard pile'}`);
+    if (step.drawIfNoneTaken && taken.length === 0) {
+      for (let i = 0; i < step.drawIfNoneTaken; i++) {
+        if (deck.getCount() > 0) await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+      }
+      msg(`  auto: drew ${step.drawIfNoneTaken}`);
+    }
+    done?.();
+  };
 
   if (step.oneEach) {
     // Drayton: one pick per category, so each category gets its own optional picker.
@@ -584,17 +607,15 @@ async function runLookStep(card, step, fromBottom, done) {
       multiSelect: true,
       requiredCount: Math.min(takeUpTo, pool.length),
       maxCount: takeUpTo,
-      upTo: true,
+      upTo: !step.takeExact,
       onConfirm: (picked) => {
         const list = (Array.isArray(picked) ? picked : [picked]).filter(Boolean);
         maybeAnnounceSearchReveal(_effectOwner, card.name, list, _appendMessage, { step, sourceText });
-        shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
-        done?.();
+        finishRest(list, {});
       },
       onCancel: () => {
-        msg('  kept all looked-at cards in deck order — shuffle your deck');
-        shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
-        done?.();
+        msg(`  kept all looked-at cards${restZone ? '' : ' in deck order — shuffle your deck'}`);
+        finishRest([], { message: null });
       },
     });
     return;
@@ -607,13 +628,11 @@ async function runLookStep(card, step, fromBottom, done) {
     destination,
     onPick: (picked) => {
       maybeAnnounceSearchReveal(_effectOwner, card.name, picked, _appendMessage, { step, sourceText });
-      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name });
-      done?.();
+      finishRest([picked].filter(Boolean), {});
     },
     onCancel: () => {
-      msg('  kept all looked-at cards in deck order — shuffle your deck');
-      shuffleDeckAfterSearch(_effectOwner, _appendMessage, _shuffleZone, { sourceName: card.name, message: null });
-      done?.();
+      msg(`  kept all looked-at cards${restZone ? '' : ' in deck order — shuffle your deck'}`);
+      finishRest([], { message: null });
     },
   });
 }

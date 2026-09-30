@@ -681,7 +681,7 @@ function lookAtDeckEnd(ctx, fromBottom) {
           : `a ${what}`
     } from the ${fromBottom ? 'bottom' : 'top'} ${count} cards of your deck`,
     options: matches,
-    min: 0,
+    min: step.takeExact ? Math.min(takeMax, matches.length) : 0,
     max: Math.min(takeMax, matches.length),
   });
 }
@@ -733,6 +733,7 @@ function typeSymbolForWord(word) {
 
 function finishLook(ctx, viewed) {
   const { player, step } = ctx;
+  if (step.restTo === 'discard' || step.restTo === 'lostZone') return disposeLookRest(ctx, viewed);
   if (!step.restToBottom) {
     shuffleDeck(player, ctx);
     return null;
@@ -744,6 +745,32 @@ function finishLook(ctx, viewed) {
   if (ctx.activeRng) shuffleInPlace(ctx.activeRng, rest);
   deck.push(...rest);
   ctx.events.push({ type: 'cardsMovedToDeckBottom', count: rest.length, playerId: player.playerId });
+  return null;
+}
+
+// Explorer's Guidance discards the untaken cards, Colress's Experiment Lost-Zones them; neither
+// shuffles. Trekking Shoes draws when its one card was not taken.
+function disposeLookRest(ctx, viewed) {
+  const { player, step } = ctx;
+  const rest = viewed.filter((card) => player.zones.deck.includes(card));
+  const noneTaken = rest.length === viewed.length;
+  for (const card of rest) {
+    removeFromZones(player, card);
+    if (step.restTo === 'lostZone') {
+      pushToLostZone(player, card);
+      ctx.events.push({ type: 'cardMoved', instanceId: card.instanceId, from: 'deck', to: 'lostZone', playerId: player.playerId });
+    } else {
+      discardCardToPlayerZone(player, card);
+    }
+  }
+  if (step.restTo === 'discard' && rest.length > 0) {
+    ctx.events.push({
+      type: 'cardsDiscarded',
+      playerId: player.playerId,
+      cards: rest.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+  }
+  if (noneTaken && step.drawIfNoneTaken) drawCards(player, step.drawIfNoneTaken, ctx.events);
   return null;
 }
 

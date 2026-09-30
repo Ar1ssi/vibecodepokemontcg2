@@ -726,6 +726,11 @@ export function parseSearchDeckParams(lower) {
     what = 'Basic Energy or Basic Pokémon';
   } else if (lower.includes('pokémon')) what = 'Pokémon';
 
+  // Cassiopeia: "Search your deck for up to 2 cards and put them into your hand" — any card, but
+  // the count still applies. Deck-discard searches (Professor Burnet) and named ones stay out.
+  const anyCardsUpTo = lower.match(/search your deck for up to\s+(\d+)\s+cards and put them into your hand/);
+  if (what === 'card' && anyCardsUpTo) count = Number(anyCardsUpTo[1]);
+
   return {
     what,
     count,
@@ -1228,7 +1233,10 @@ function parseTrainerStepsInner(lower) {
   // look at top N (Pokégear, Grimsley's Move, Master Ball's "look at 7 cards
   // from the top")
   if (lower.includes('look at the top') || /look at \d+ cards? from the top/.test(lower)) {
-    const m = lower.match(/top\s+(\d+)\s+cards?/) || lower.match(/look at (\d+) cards? from the top/);
+    const m =
+      lower.match(/top\s+(\d+)\s+cards?/) ||
+      lower.match(/look at (\d+) cards? from the top/) ||
+      (/look at the top card\b/.test(lower) ? [null, '1'] : null);
 
     // Bug Catching Set: "reveal up to 2 in any combination of {G} Pokémon and
     // Basic {G} Energy cards you find there …". Without this the generic branch
@@ -1266,13 +1274,32 @@ function parseTrainerStepsInner(lower) {
     else if (lower.includes('attach a basic energy')) pick = 'Basic Energy (attach)';
     else if (lower.includes('onto your bench')) pick = benchLookPick(lower);
     else if (lower.includes('basic pokémon or evolution card')) pick = 'Pokémon or Evolution';
+    else if (/reveal an? pok[eé]mon you find there/.test(lower)) pick = 'Pokémon';
+    // Hassel "put up to 3 of them", Rika "put 2 of them", Sage's Training "choose any 2 cards"
+    // (exact counts are mandatory takes).
+    const takeN =
+      lower.match(/put (up to )?(\d+) of them into your hand/) ||
+      lower.match(/choose any ()(\d+) cards you find there and put them into your hand/);
+    // Explorer's Guidance / Acro Bike discard the rest, Colress's Experiment Lost-Zones them.
+    const restTo = /discard the other cards?\b/.test(lower)
+      ? 'discard'
+      : /put the other cards in the lost zone/.test(lower)
+        ? 'lostZone'
+        : null;
+    // Trekking Shoes: "If you don't, discard that card and draw a card."
+    const declineDiscardDraw = /if you don['’]t, discard that card and draw a card/.test(lower);
     steps.push({
       type: 'lookAtTop',
       count: m ? Number(m[1]) : 7,
       pick,
       destination: lower.includes('onto your bench') ? 'bench' : 'hand',
       ...(lower.includes('put them on the bottom of your deck') ? { restToBottom: true } : {}),
+      ...(takeN ? { takeUpTo: Number(takeN[2]) } : {}),
+      ...(takeN && !takeN[1] ? { takeExact: true } : {}),
+      ...(restTo ? { restTo } : {}),
+      ...(declineDiscardDraw ? { restTo: 'discard', drawIfNoneTaken: 1 } : {}),
     });
+    if (declineDiscardDraw) return { steps, recognizable: true };
     // Compound effects: look-then-draw is common
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
@@ -2732,6 +2759,14 @@ function parseTrainerStepsInner(lower) {
 }
 
 // Human-readable guidance for each step — this is what gets announced.
+function lookRestText(step) {
+  if (step.drawIfNoneTaken) return `otherwise discard it and draw ${step.drawIfNoneTaken}`;
+  if (step.restTo === 'discard') return 'discard the rest';
+  if (step.restTo === 'lostZone') return 'put the rest in the Lost Zone';
+  if (step.restToBottom) return 'shuffle the rest onto the bottom of your deck';
+  return 'shuffle the rest';
+}
+
 export function describeStep(step) {
   switch (step.type) {
     case 'draw': return `Draw ${step.count} card${step.count > 1 ? 's' : ''}.`;
@@ -2780,7 +2815,7 @@ export function describeStep(step) {
     case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'lookAtTop':
       if (step.oneEach) return `Look at the top ${step.count} cards; take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} to hand, shuffle the rest.`;
-      return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `up to ${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
+      return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `${step.takeExact ? '' : 'up to '}${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, ${lookRestText(step)}.`;
     case 'lookAtBottom': return `Look at the bottom ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;
     case 'switchOpponent': return "Choose 1 of your opponent's Benched Pokémon to switch into the Active Spot.";
     case 'chooseMode': return `Choose 1: ${step.modes.map((m) => m.label).join(' / ')}.`;

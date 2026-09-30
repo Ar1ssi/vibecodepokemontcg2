@@ -311,6 +311,86 @@ test("lookAtTop (Grimsley's Move): Darkness Basic to Bench, rest to the bottom",
   assert.equal(zone(done, 'p1', 'deck')[0].instanceId, below.instanceId);
 });
 
+// Card texts: out/pkmn-trainer-cards.json (I215-I217).
+test("lookAtTop (Explorer's Guidance): exactly 2 of the top 6 to hand, the rest discarded, no shuffle", () => {
+  const game = setup();
+  const top = Array.from({ length: 6 }, (_, i) => card({ name: `t${i}` }));
+  const below = card({ name: 'below-window' });
+  game.p1.zones.deck.push(...top, below);
+  const { res } = play(game, 'Look at the top 6 cards of your deck and put 2 of them into your hand. Discard the other cards.', { trainerType: 'Supporter' });
+  assert.equal(res.pendingChoice.min, 2);
+  assert.equal(res.pendingChoice.max, 2);
+  const done = resolve(game, res, [top[1].instanceId, top[4].instanceId]);
+  assert.deepEqual(ids(zone(done, 'p1', 'hand')).sort(), ids([top[1], top[4]]).sort());
+  for (const c of [top[0], top[2], top[3], top[5]]) {
+    assert.ok(zone(done, 'p1', 'discard').some((d) => d.instanceId === c.instanceId));
+  }
+  assert.deepEqual(ids(zone(done, 'p1', 'deck')), [below.instanceId]);
+});
+
+test('lookAtTop (Hassel): up to 3 of the top 8 may be taken', () => {
+  const game = setup();
+  const top = Array.from({ length: 8 }, (_, i) => card({ name: `t${i}` }));
+  game.p1.zones.deck.push(...top);
+  const { res } = play(game, 'Look at the top 8 cards of your deck and put up to 3 of them into your hand. Shuffle the other cards back into your deck.', { trainerType: 'Supporter' });
+  assert.equal(res.pendingChoice.min, 0);
+  assert.equal(res.pendingChoice.max, 3);
+  const done = resolve(game, res, ids([top[0], top[3], top[7]]));
+  assert.equal(zone(done, 'p1', 'hand').length, 3);
+  assert.equal(zone(done, 'p1', 'deck').length, 5);
+});
+
+test("lookAtTop (Colress's Experiment): exactly 3 of the top 5 to hand, the rest to the Lost Zone", () => {
+  const game = setup();
+  const top = Array.from({ length: 5 }, (_, i) => card({ name: `t${i}` }));
+  game.p1.zones.deck.push(...top);
+  const { res } = play(game, 'Look at the top 5 cards of your deck and put 3 of them into your hand. Put the other cards in the Lost Zone.', { trainerType: 'Supporter' });
+  assert.equal(res.pendingChoice.min, 3);
+  const done = resolve(game, res, ids([top[0], top[2], top[4]]));
+  assert.equal(zone(done, 'p1', 'hand').length, 3);
+  assert.deepEqual(ids(zone(done, 'p1', 'lostZone')).sort(), ids([top[1], top[3]]).sort());
+  assert.equal(zone(done, 'p1', 'deck').length, 0);
+});
+
+test('lookAtTop (Trekking Shoes): looks at 1; keep it, or discard it and draw', () => {
+  const text = 'Look at the top card of your deck. You may put that card into your hand. If you don’t, discard that card and draw a card.';
+  const setupShoes = () => {
+    const game = setup();
+    const top = card({ name: 'top' });
+    const next = card({ name: 'next' });
+    game.p1.zones.deck.push(top, next);
+    return { game, top, next, res: play(game, text).res };
+  };
+  const kept = setupShoes();
+  assert.deepEqual(ids(kept.res.pendingChoice.options), [kept.top.instanceId]);
+  const keep = resolve(kept.game, kept.res, [kept.top.instanceId]);
+  assert.deepEqual(ids(zone(keep, 'p1', 'hand')), [kept.top.instanceId]);
+  assert.deepEqual(ids(zone(keep, 'p1', 'deck')), [kept.next.instanceId]);
+
+  const declined = setupShoes();
+  const pass = resolve(declined.game, declined.res, []);
+  assert.ok(zone(pass, 'p1', 'discard').some((c) => c.instanceId === declined.top.instanceId));
+  assert.deepEqual(ids(zone(pass, 'p1', 'hand')), [declined.next.instanceId]);
+});
+
+test('lookAtTop (Great Ball): only Pokémon in the top 7 are offered', () => {
+  const game = setup();
+  const mon = pokemon('Sprigatito');
+  game.p1.zones.deck.push(card({ name: 'Potion', type: 'Trainer', trainerType: 'Item' }), mon, energy());
+  const { res } = play(game, 'Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.');
+  assert.deepEqual(ids(res.pendingChoice.options), [mon.instanceId]);
+});
+
+test('searchDeck (Cassiopeia): up to 2 cards of any kind', () => {
+  const game = setup();
+  const deck = [card({ name: 'a' }), card({ name: 'b' }), card({ name: 'c' })];
+  game.p1.zones.deck.push(...deck);
+  const { res } = play(game, 'You can use this card only when it is the last card in your hand. Search your deck for up to 2 cards and put them into your hand. Then, shuffle your deck.', { trainerType: 'Supporter' });
+  assert.equal(res.pendingChoice.max, 2);
+  const done = resolve(game, res, ids([deck[0], deck[2]]));
+  assert.equal(zone(done, 'p1', 'hand').length, 2);
+});
+
 test("notFirstTurn play condition blocks Grimsley's Move on turn 2", () => {
   const game = setup();
   game.state.turn.number = 2;
