@@ -6,12 +6,16 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I215). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I219). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I218 2026-09-30 P2 [tooling] `pnpm audit:abilities` red on main: 7 failures (damage-prevent, effect-prevent, prize-modify, status, damage-reduce baselines), identical before and after design 059 (refs: scripts/audit-ability-behaviour.mjs, design 059)
+- I217 2026-09-30 P3 [rules] Great Ball (Paldea Evolved 183) parses `pick: 'any'`: the picker offers non-Pokémon from the top 7 (refs: trainer-effects.mjs lookAtTop, design 059)
+- I216 2026-09-30 P2 [rules] Look-at-top Supporters take one card: Explorer's Guidance (PRE 107), Hassel (TWM 205), Rika (PAR 258), Colress's Experiment (CRZ GG59); Trekking Shoes (CRZ 145) looks at 7 not 1 (refs: trainer-effects.mjs lookAtTop, design 059)
+- I215 2026-09-30 P3 [rules] Cassiopeia (Shrouded Fable 094) "Search your deck for up to 2 cards" parses count 1 (parseSearchDeckParams) (refs: design 059)
 - I214 2026-09-29 P3 [rules] Legacy (non-authoritative) client trainer path ignores attach targets: attachFromDiscard offers every in-play Pokémon and one Energy (Sada's Vitality, Reboot Pod, all others) (refs: client/src/setup/rules/trainer-execution.js, design 058 A5)
 - I213 2026-09-29 P2 [tooling] `pnpm audit:trainers` red on main: 21 Fossil/Hilda/Roark rows 'lost step' since the fossil commit e51958aa; confirm each and refresh the baseline (refs: scripts/trainer-behaviour-baseline.json)
 - I212 2026-09-29 P2 [rules] Tool-granted Special Condition immunity/recovery unimplemented (Ancient Booster Energy Capsule, Sparkling Robe): addCondition sees only the Pokémon, not its Tools; the Capsule's +60 HP works (refs: special-conditions.mjs addCondition, design 058)

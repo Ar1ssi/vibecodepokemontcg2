@@ -1373,3 +1373,13 @@ oneshot 058-ancient-future-tags · worktree .claude/worktrees/paradox-tags · br
   0 design [x] · 1 data+classifier [x] · 2 engine readers [x] · 3 Sada/Radar/Pod [x] · 4 enrichment+cardStats [x] · 5 builder filter [x]
   Tag source: pokemontcg.io subtypes (TCGdex has none), ids checked on TCGdex.
   Landed on main; full pnpm test 5284/0; audit:trainers red on main before this branch (I213).
+
+# design 054 - Build & Battle boxes, all eras (archived at the 059 landing)
+oneshot 054-build-and-battle-boxes-all-eras · worktree .claude/worktrees/bb-boxes · branch claude/build-battle-boxes-plan-38pf0r · slice 9/9
+  0 design [x] · 1 core [x] · 2 generator [x] · 3 ME data [x] · 4 UI+skins [x] · 5 SV [x] · 6 SWSH [x] · 7 SM [x] · 8 XY [x] · 9 close [x]
+  Bulbapedia via /w/api.php (the /wiki/ HTML is Cloudflare-challenged); TCGdex API reachable; dev cache: TCGDEX_CACHE_DIR.
+
+# design 059 - deck reveals play the Trainer reveal, 2026-09-30
+oneshot 059-deck-reveal-fx · primary checkout · branch claude/keen-wright-7i2dps · slice 4/4
+  0 design [x] · 1 engine reveal truth + art [x] · 2 client planner [x] · 3 pose/timing/voice [x] · 4 DOM scene + wiring + e2e [x]
+  Independent review: no blockers; its should + 3 nits fixed. Landed on main; full pnpm test 5364/0; audits oracle+attacks PASS, trainers/abilities red as on main (I213, I218).

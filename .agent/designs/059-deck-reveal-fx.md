@@ -1,5 +1,5 @@
 # 059: Deck reveals play the Trainer reveal
-Status: approved (self — one-shot)
+Status: shipped (landed on main 2026-09-30)
 Date: 2026-09-29 · Session: S-keen-wright (one-shot, branch claude/keen-wright-7i2dps)
 
 ## Problem
