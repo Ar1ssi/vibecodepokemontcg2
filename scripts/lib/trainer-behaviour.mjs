@@ -11,7 +11,10 @@ import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
 const NON_EXECUTED_OK = new Set(['passive', 'discardCost']);
 
 // A step type may be replaced by a richer one without counting as a lost step.
-const STEP_UPGRADES = { searchDeck: new Set(['searchDeckSequence']) };
+const STEP_UPGRADES = {
+  searchDeck: new Set(['searchDeckSequence']),
+  discardCost: new Set(['optionalDiscardCost']),
+};
 
 const PICK_STEPS = new Set(['searchDeck', 'recursion', 'shuffleFromDiscard']);
 const DRAW_STEPS = new Set(['draw', 'variableDraw', 'drawUntil', 'shuffleHandThenDraw']);

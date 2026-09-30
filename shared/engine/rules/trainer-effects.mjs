@@ -17,6 +17,9 @@
 //   { type: 'switchOwn' }
 //   { type: 'switchOpponent' }
 //   { type: 'discardCost', count: N }
+//   { type: 'optionalDiscardCost', count: N }   ("you may discard N other cards. If you do, …": the steps after
+//     it that carry `requiresHandCost` run only when the player discarded; `searchDeck.countIf` and
+//     `searchDeck.attachTarget: 'evolved'` are the other design 059 slice 4 fields)
 //   { type: 'recursion', what: 'Pokemon|Energy', from: 'discard' }
 //   { type: 'heal', target: 'Mega Evolution ex' }
 //   { type: 'healAmount', amount: N, target: 'Active Pokémon'|'1 of your Pokémon', cure?: true }
@@ -310,6 +313,7 @@ function knownKindWhat(phrase) {
   if (p === 'stadium') return 'Stadium';
   if (p === 'trainer') return 'Trainer';
   if (/^pokémon or (?:a )?basic energy$/.test(p)) return 'Pokémon or Basic Energy';
+  if (p === 'special energy') return 'Special Energy';
   const energy = p.match(/^(basic )?(?:(\{[a-z]\}) |([a-z]+) )?energy$/);
   if (energy) {
     const sym = energy[2] ? energy[2][1].toUpperCase() : TYPE_WORD_SYMBOLS[energy[3] || ''];
@@ -1251,14 +1255,63 @@ function parseChooseModes(lower) {
   return { steps, recognizable: true };
 }
 
+// "When you play this card, you may discard N other cards from your hand. If you do, <bonus>."
+// (Guzma & Hala, Red & Blue, Sabrina & Brycen, …): the discard is paid up front and optional;
+// the bonus steps carry `requiresHandCost` so they run only when it was paid. The main effect
+// is the text before the sentence.
+const OPTIONAL_HAND_COST_RE =
+  /\s*when you play this card, you may discard (\d+) other cards? from your hand\.\s*if you do,\s*(.*)$/;
+
+function splitOptionalHandCost(lower) {
+  const m = lower.match(OPTIONAL_HAND_COST_RE);
+  if (!m) return null;
+  return { main: lower.slice(0, m.index).trim(), count: Number(m[1]), tail: m[2].trim() };
+}
+
+// The bonus after "If you do,". Only the printed wordings below are understood; any other
+// bonus yields no steps, so its card keeps just the main effect and the optional discard.
+function parseOptionalCostBonus(tail) {
+  const attach = tail.match(/^search your deck for up to (\d+) basic energy cards and attach them to the pokémon you evolved in this way\.?$/);
+  if (attach) {
+    return [
+      { type: 'searchDeck', what: 'Basic Energy', count: Number(attach[1]), destination: 'attach', upTo: true, attachTarget: 'evolved' },
+    ];
+  }
+  const also = tail.match(/^you may also search for (.+?) in this way\.?$/);
+  const search = also && parseTwoKindSearch(`search your deck for ${also[1]},`);
+  if (search) return [search];
+  return [];
+}
+
+function applyOptionalHandCost(steps, optional) {
+  const bonus = parseOptionalCostBonus(optional.tail);
+  if (bonus.length === 0) return;
+  steps.unshift({ type: 'optionalDiscardCost', count: optional.count });
+  for (const step of bonus) steps.push({ ...step, requiresHandCost: true });
+}
+
+// "If you go second and it's your first turn, search for N X instead of 1." (Jasmine, Energy
+// Spinner): the searchDeck count the executor uses on the second player's first turn.
+const GOING_SECOND_SEARCH_RE = /if you go second and it's your first turn, search for (?:up to )?(\d+) [^.]*? instead of (?:1|a)\b/;
+
+function applyGoingSecondCount(steps, lower) {
+  const m = lower.match(GOING_SECOND_SEARCH_RE);
+  const search = m && steps.find((s) => s.type === 'searchDeck');
+  if (search) search.countIf = { goingSecondFirstTurn: Number(m[1]) };
+}
+
 function parseTrainerSteps(lower) {
   const chosen = parseChooseModes(lower);
   if (chosen) return chosen;
-  const result = parseTrainerStepsInner(lower);
+  const optional = splitOptionalHandCost(lower);
+  const main = optional ? optional.main : lower;
+  const result = parseTrainerStepsInner(main);
   if (result?.recognizable && Array.isArray(result.steps) && result.steps.length > 0) {
-    appendLeadingHandDiscardCost(result.steps, lower);
-    appendMissingOwnSwitch(result.steps, lower);
-    prependWholeHandDiscard(result.steps, lower);
+    appendLeadingHandDiscardCost(result.steps, main);
+    appendMissingOwnSwitch(result.steps, main);
+    prependWholeHandDiscard(result.steps, main);
+    applyGoingSecondCount(result.steps, main);
+    if (optional) applyOptionalHandCost(result.steps, optional);
   }
   return result;
 }
@@ -1281,7 +1334,11 @@ function parseTrainerStepsInner(lower) {
 
   // Salvatore — search for an Evolution that evolves from 1 of your Pokémon and evolve it
   if (lower.includes('evolves from 1 of your pokémon') && lower.includes('put it onto that pokémon')) {
-    steps.push({ type: 'searchEvolve', ...(lower.includes('no abilities') ? { noAbilities: true } : {}) });
+    steps.push({
+      type: 'searchEvolve',
+      ...(lower.includes('no abilities') ? { noAbilities: true } : {}),
+      ...(lower.includes('a pokémon-gx that evolves') ? { what: 'Pokémon-GX' } : {}),
+    });
     return { steps, recognizable: true };
   }
 
@@ -2962,7 +3019,13 @@ function describeNameFilter(step) {
 }
 
 export function describeStep(step) {
+  const text = describeStepBody(step);
+  return step.requiresHandCost ? `If you discarded the cards: ${text}` : text;
+}
+
+function describeStepBody(step) {
   switch (step.type) {
+    case 'optionalDiscardCost': return `You may discard ${step.count} other cards from your hand (optional cost).`;
     case 'draw': return `Draw ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'drawUntil': {
       const describe = (target) => {
@@ -2987,7 +3050,7 @@ export function describeStep(step) {
       }
       const dest =
         step.destination === 'bench' ? 'put on Bench'
-        : step.destination === 'attach' ? 'attach to a Pokémon'
+        : step.destination === 'attach' ? (step.attachTarget === 'evolved' ? 'attach to the Pokémon you evolved' : 'attach to a Pokémon')
         : step.destination === 'deckTop' ? 'put on top of your deck in any order'
         : 'add to hand';
       return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what}${describeNameFilter(step)} → ${dest}, then shuffle.`;

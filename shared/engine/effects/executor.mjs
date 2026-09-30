@@ -371,6 +371,9 @@ export function executeSteps(draft, {
       context.attachedEnergy = true;
       context.attachedTargetId = lastAttach.targetInstanceId;
     }
+    // "the Pokémon you evolved in this way" (Red & Blue): remember the evolve across resumes.
+    const lastEvolve = events.findLast((e) => e.type === 'pokemonEvolved' && e.playerId === playerId);
+    if (lastEvolve) context.evolvedRootId = lastEvolve.targetInstanceId;
     if (step.requiresAttach && !context.attachedEnergy) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
@@ -572,7 +575,9 @@ export function executeSteps(draft, {
         const what = step.what || step.searchTarget || 'card';
         // Ability parser emits 'Bench' (legacy client contract); trainers emit 'bench'.
         const dest = String(step.destination || 'hand').toLowerCase();
-        const maxCount = step.count || 1;
+        // "If you go second and it's your first turn, search for N … instead of 1" (Jasmine).
+        const goingSecondCount = step.countIf?.goingSecondFirstTurn;
+        const maxCount = goingSecondCount && draft.turn?.number === 2 ? goingSecondCount : step.count || 1;
         const nameFilter = step.nameFilter
           ? String(step.nameFilter).toLowerCase()
           : null;
@@ -584,6 +589,7 @@ export function executeSteps(draft, {
         const attachRoots = () =>
           inPlayRoots(player).filter((c) => {
             if (!step.attachTarget) return true;
+            if (step.attachTarget === 'evolved') return c.instanceId === context.evolvedRootId;
             if (step.attachTarget === 'this pokémon') return c.instanceId === sourceCard?.instanceId;
             return rootMatchesTarget(player, c, step.attachTarget);
           });

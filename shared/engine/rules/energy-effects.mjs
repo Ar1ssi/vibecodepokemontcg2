@@ -272,6 +272,7 @@ function primaryEnergyTypeName(card) {
 export function energyMatchesSearchWhat(card, what = '') {
   if (!isEnergyCard(card)) return false;
   const w = lower(what);
+  if (/\bspecial\b/.test(w)) return classifyEnergyEffect(card) !== 'basic';
   const sym = w.match(/\{([a-z])\}/);
   if (sym) {
     const expected = ENERGY_SYMBOL_TO_TYPE[sym[1]];

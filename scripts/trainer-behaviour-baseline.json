@@ -3671,8 +3671,9 @@
   },
   "Guzma & Hala#qyqq6a": {
    "steps": [
-    "discardCost",
-    "searchDeck"
+    "optionalDiscardCost",
+    "searchDeck",
+    "searchDeckSequence"
    ]
   },
   "Guzma#ju04ij": {
@@ -5336,7 +5337,6 @@
   },
   "Misty & Lorelei#xs3g10": {
    "steps": [
-    "discardCost",
     "searchDeck"
    ]
   },
@@ -6957,11 +6957,10 @@
    ]
   },
   "Red & Blue#17eykct": {
-   "gaps": [
-    "dropped-count"
-   ],
    "playCondition": "notFirstTurn",
    "steps": [
+    "optionalDiscardCost",
+    "searchDeck",
     "searchEvolve"
    ]
   },
@@ -7434,7 +7433,6 @@
   },
   "Sabrina & Brycen#ukll92": {
    "steps": [
-    "discardCost",
     "searchDeck"
    ]
   },

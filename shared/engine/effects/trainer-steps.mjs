@@ -1727,7 +1727,11 @@ function searchEvolve(ctx) {
   }
 
   const candidates = deck.filter(
-    (c) => isPokemon(c) && evolveTargets(c).length > 0 && !(step.noAbilities && hasAbility(c))
+    (c) =>
+      isPokemon(c) &&
+      evolveTargets(c).length > 0 &&
+      !(step.noAbilities && hasAbility(c)) &&
+      (!step.what || matchesSearch(c, step.what))
   );
 
   if (ctx.selection) {
@@ -4649,7 +4653,38 @@ function turnDamageBonus(ctx) {
   return null;
 }
 
+// "When you play this card, you may discard N other cards from your hand. If you do, …" (Guzma &
+// Hala, Red & Blue): the player picks exactly N cards to pay, or declines (any other count). A paid
+// cost tags its `cardsDiscarded` event `handCost`, which opens the later `requiresHandCost` steps.
+function optionalDiscardCost(ctx) {
+  const { player, step } = ctx;
+  const count = step.count || 1;
+  const hand = player.zones.hand.filter((c) => c.instanceId !== ctx.sourceCard?.instanceId);
+  if (ctx.selection) {
+    const picked = pickById(hand, ctx.selection);
+    if (picked.length !== count) return skip(ctx, 'cost_declined');
+    for (const card of picked) removeFromZones(player, card);
+    for (const card of picked) discardCardToPlayerZone(player, card);
+    ctx.events.push({
+      type: 'cardsDiscarded',
+      playerId: player.playerId,
+      handCost: true,
+      cards: picked.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+    return null;
+  }
+  if (hand.length < count) return skip(ctx, 'not_enough_cards_to_discard');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: You may discard ${count} other cards from your hand for the bonus (choose ${count}, or none to skip)`,
+    options: hand,
+    min: 0,
+    max: count,
+    memo: {},
+  });
+}
+
 export const EXTRA_STEP_HANDLERS = {
+  optionalDiscardCost,
   chooseMode,
   turnDamageBonus,
   attachTool,
