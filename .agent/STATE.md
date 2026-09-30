@@ -9,7 +9,7 @@ Active: none. ETB (design 057, D195) slice 6 (rec-etb recorder + shared recorder
 Next: user look on localhost (SERVER_AUTHORITATIVE=1): deck reveals (Ultra Ball, Earthen Vessel, Quick Search
   stays hidden); deck builder Special filter Ancient/Future pills; /build-and-battle and
   /deck-builder?etb=phantasmal-flames-etb (057 taste calls); then 057 slice 6; design 056 (3D box, I209);
-  then top of ISSUES.md. audit:trainers (I213) and audit:abilities (I218) red on main.
+  then top of ISSUES.md. audit:trainers (I213) red on main.
   Maintenance: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.
 

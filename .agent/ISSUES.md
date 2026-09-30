@@ -6,16 +6,13 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I219). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I220). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
-- I218 2026-09-30 P2 [tooling] `pnpm audit:abilities` red on main: 7 failures (damage-prevent, effect-prevent, prize-modify, status, damage-reduce baselines), identical before and after design 059 (refs: scripts/audit-ability-behaviour.mjs, design 059)
-- I217 2026-09-30 P3 [rules] Great Ball (Paldea Evolved 183) parses `pick: 'any'`: the picker offers non-Pokémon from the top 7 (refs: trainer-effects.mjs lookAtTop, design 059)
-- I216 2026-09-30 P2 [rules] Look-at-top Supporters take one card: Explorer's Guidance (PRE 107), Hassel (TWM 205), Rika (PAR 258), Colress's Experiment (CRZ GG59); Trekking Shoes (CRZ 145) looks at 7 not 1 (refs: trainer-effects.mjs lookAtTop, design 059)
-- I215 2026-09-30 P3 [rules] Cassiopeia (Shrouded Fable 094) "Search your deck for up to 2 cards" parses count 1 (parseSearchDeckParams) (refs: design 059)
+- I219 2026-09-30 P2 [rules] Effect shields against Items/Supporters, Abilities and Stadiums have no reader (47 rows: Greninja V-UNION, Mega Clefable ex, Thievul, Alakazam MT Power Cancel…); audit rows re-baselined unconsumed, effect-prevent unclaimed (refs: I218, scripts/ability-behaviour-baseline.json)
 - I214 2026-09-29 P3 [rules] Legacy (non-authoritative) client trainer path ignores attach targets: attachFromDiscard offers every in-play Pokémon and one Energy (Sada's Vitality, Reboot Pod, all others) (refs: client/src/setup/rules/trainer-execution.js, design 058 A5)
 - I213 2026-09-29 P2 [tooling] `pnpm audit:trainers` red on main: 21 Fossil/Hilda/Roark rows 'lost step' since the fossil commit e51958aa; confirm each and refresh the baseline (refs: scripts/trainer-behaviour-baseline.json)
 - I212 2026-09-29 P2 [rules] Tool-granted Special Condition immunity/recovery unimplemented (Ancient Booster Energy Capsule, Sparkling Robe): addCondition sees only the Pokémon, not its Tools; the Capsule's +60 HP works (refs: special-conditions.mjs addCondition, design 058)
@@ -69,6 +66,10 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I218 2026-09-30 P2 [tooling] `pnpm audit:abilities` red on main: 7 failures (damage-prevent, effect-prevent, prize-modify, status, damage-reduce baselines), identical before and after design 059 (refs: scripts/audit-ability-behaviour.mjs, design 059) → closed 2026-09-30 S331: cause fa7966b (effect-only shields no longer block damage, correctly); abilityPreventsAttackEffects enforces attack-effect shields and is probed; Flygon ex protector probed; rest re-baselined, effect-prevent claim withdrawn (I219)
+- I217 2026-09-30 P3 [rules] Great Ball (Paldea Evolved 183) parses `pick: 'any'`: the picker offers non-Pokémon from the top 7 (refs: trainer-effects.mjs lookAtTop, design 059) → closed 2026-09-30 S331: "reveal a Pokémon you find there" parses pick 'Pokémon'
+- I216 2026-09-30 P2 [rules] Look-at-top Supporters take one card: Explorer's Guidance (PRE 107), Hassel (TWM 205), Rika (PAR 258), Colress's Experiment (CRZ GG59); Trekking Shoes (CRZ 145) looks at 7 not 1 (refs: trainer-effects.mjs lookAtTop, design 059) → closed 2026-09-30 S331: lookAtTop reads "put (up to) N of them" (takeUpTo/takeExact), restTo discard/lostZone, Trekking Shoes count 1 + drawIfNoneTaken
+- I215 2026-09-30 P3 [rules] Cassiopeia (Shrouded Fable 094) "Search your deck for up to 2 cards" parses count 1 (parseSearchDeckParams) (refs: design 059) → closed 2026-09-30 S331: "up to N cards and put them into your hand" keeps its count
 - I198 2026-09-28 P2 [deck-builder] Leaving a room repopulates selfDeckData from #selfCurrentDecklistTable (header-buttons.js, room-buttons.js), which only the removed text importer filled — builder-loaded decks are dropped on leave; read the deck from the builder/library instead (refs: design 050) → closed 2026-09-28 S330: loadDeckData remembers the player's own deck (own-deck.mjs); leaving a room restores it; dead table removed
 - I207 2026-09-28 P3 [deck-builder] B&B at the deck limit: every reload rebuilds a fresh unsaved box deck (session.deckId null), pool edits lost with no warning — native-deck-builder-build-battle.js:140,151 (design 051 review) → closed 2026-09-28 S329: the box session keeps the unsaved deck as [cardId, count] pairs and rebuilds it on reload; the Box tab warns until a B&B record is saved, then the session binds to it
 - I206 2026-09-28 P3 [netcode] A `format_mismatch`-refused loadDeck is still broadcast/cached (server.js:905 before :952); peers print "X loaded deck (Build & Battle…)" beside the refusal line. Skip emit+cache on error (design 051 review) → closed 2026-09-28 S329: moot — loadDeck no longer refuses any format (I202), so no refused load is broadcast or cached
