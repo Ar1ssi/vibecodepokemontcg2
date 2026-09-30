@@ -18,6 +18,7 @@ import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
+import { isVCard } from '../rules/card-classify.mjs';
 import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import { healLocked } from '../rules/attack-markers.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -1287,7 +1288,10 @@ export function executeSteps(draft, {
           break;
         }
         const oppBench = (opponent.zones.bench || []).filter(
-          (c) => !c.attachedTo && (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c))
+          (c) =>
+            !c.attachedTo &&
+            (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c)) &&
+            (step.filter !== 'V' || isVCard(c))
         );
         const oppActive = (opponent.zones.active || []).find((c) => !c.attachedTo);
         if (!oppActive || oppBench.length === 0) {

@@ -10,7 +10,7 @@ import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isUltraBeastCard, isRuleBoxPokemon } from '../rules/card-classify.mjs';
+import { isUltraBeastCard, isRuleBoxPokemon, isVCard } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -3289,6 +3289,15 @@ function opponentHasStage2(ctx) {
   );
 }
 
+// False for a switch step with nothing on the Bench it may switch in (Serena's gust takes only a
+// Benched Pokémon V). Every other step counts as able to resolve.
+function switchHasTarget(ctx, step) {
+  const benched = (who) => (who?.zones.bench || []).filter((c) => !c.attachedTo);
+  if (step.type === 'switchOwn') return benched(ctx.player).length > 0;
+  if (step.type !== 'switchOpponent') return true;
+  return benched(ctx.opponent).some((c) => step.filter !== 'V' || isVCard(c));
+}
+
 /** A Supporter mode's "during this turn, attacks do N more damage" boost (parseTurnDamageBonus shape). */
 function turnDamageBonusTrainer(ctx) {
   const { player, step } = ctx;
@@ -4788,16 +4797,15 @@ function drawBottom(ctx) {
 // "Choose 1:" / "Choose 1 or both:" (Kieran, Klara, Judge Whistle, …): the player picks the
 // mode(s); each chosen mode's steps then run in printed order, after this step. Options reuse the
 // label-option shape the attack prompts use (instanceId = 1-based mode number). A mode that cannot
-// do anything now (a Switch with an empty Bench) is not offered; a single remaining mode runs
-// without a prompt.
+// do anything now (a Switch with an empty Bench, a gust with no Benched target) is not offered; a
+// single remaining mode runs without a prompt.
 function chooseMode(ctx) {
-  const { player, step } = ctx;
+  const { step } = ctx;
   const modes = Array.isArray(step.modes) ? step.modes : [];
   if (modes.length === 0) return skip(ctx, 'no_modes');
-  const hasBench = (player.zones.bench || []).some((c) => !c.attachedTo);
   const offered = modes
     .map((mode, i) => ({ mode, n: i + 1 }))
-    .filter(({ mode }) => hasBench || !mode.steps.some((s) => s.type === 'switchOwn'));
+    .filter(({ mode }) => mode.steps.every((s) => switchHasTarget(ctx, s)));
   if (offered.length === 0) return skip(ctx, 'no_legal_mode');
   if (ctx.selection) {
     const legal = new Set(offered.map(({ n }) => n));

@@ -1680,6 +1680,8 @@ function parseTrainerStepsInner(lower) {
       steps.push({
         type: 'switchOpponent',
         ...(lower.includes("opponent's benched basic pokémon") ? { filter: 'Basic' } : {}),
+        // Serena: "Switch 1 of your opponent's Benched Pokémon V with their Active Pokémon."
+        ...(/opponent's benched pok[ée]mon v\b/.test(lower) ? { filter: 'V' } : {}),
         ...(condition ? { thenCondition: condition[1][0].toUpperCase() + condition[1].slice(1) } : {}),
       });
       // Guzma: "If you do, switch your Active Pokémon with 1 of your Benched Pokémon."
@@ -3195,6 +3197,7 @@ function describeStepBody(step) {
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;
     case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'lookAtTop':
+      if (step.lookOnly) return `Look at the top ${step.count} card${step.count > 1 ? 's' : ''} of your deck.`;
       if (step.oneEach) return `Look at the top ${step.count} cards; take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} to hand, shuffle the rest.`;
       return `Look at the top ${step.count} cards; take ${Number(step.takeUpTo) > 1 ? `${step.takeExact ? '' : 'up to '}${step.takeUpTo}` : 'a'} ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, ${lookRestText(step)}.`;
     case 'lookAtBottom': return `Look at the bottom ${step.count} cards; take a ${step.pick} to ${step.destination === 'bench' ? 'Bench' : 'hand'}, shuffle the rest.`;

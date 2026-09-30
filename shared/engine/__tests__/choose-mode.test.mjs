@@ -4,7 +4,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { executeTrainer } from '../effects/trainer.mjs';
-import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
+import { parseTrainerEffect, describeStep } from '../rules/trainer-effects.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { classifyTrainer } from '../../../scripts/lib/trainer-behaviour.mjs';
 
@@ -209,10 +209,18 @@ test('Giovanni’s Scheme: mode 1 draws up to 5 and queues no bonus; mode 2 queu
   assert.equal(bonus.flags.turnDamageBonuses[0].amount, 20);
 });
 
+// The opponent's Active and Bench, so Serena's gust mode has a target (or, for Pikachu alone, none).
+const opponentBench = (...benched) => (s) => {
+  s.players.p2.zones.active.push(createCard(pokemon(60, 'Eevee')));
+  s.players.p2.zones.bench.push(...benched.map((c) => createCard(c)));
+};
+const zacianV = pokemon(61, 'Zacian V', ['Metal']);
+
 test('Serena mode 1 discards 1 to 3 cards, then draws until 5', () => {
   const deck = Array.from({ length: 8 }, (_, i) => trainer(i + 1, `D${i + 1}`));
   const hand = [trainer(20, 'H1'), trainer(21, 'H2'), trainer(22, 'H3'), trainer(23, 'H4')];
-  const { prompts, zones, res } = play(setup(CARDS.serena, { deck, hand }), [[1], [20, 21]]);
+  const env = setup(CARDS.serena, { deck, hand, p1Extra: opponentBench(zacianV) });
+  const { prompts, zones, res } = play(env, [[1], [20, 21]]);
   assert.equal(prompts[1].min, 1);
   assert.equal(prompts[1].max, 3);
   assert.equal(res.pendingChoice, null);
@@ -222,9 +230,31 @@ test('Serena mode 1 discards 1 to 3 cards, then draws until 5', () => {
 
 test('Serena mode 1 with an empty hand cannot pay the cost and draws nothing', () => {
   const deck = Array.from({ length: 4 }, (_, i) => trainer(i + 1, `D${i + 1}`));
-  const { zones, res } = play(setup(CARDS.serena, { deck }), [[1]]);
+  const { zones, res } = play(setup(CARDS.serena, { deck, p1Extra: opponentBench(zacianV) }), [[1]]);
   assert.equal(res.pendingChoice, null);
   assert.equal(zones.hand.length, 0);
+});
+
+// Serena (corpus SIT 207): "Switch 1 of your opponent's Benched Pokémon V with their Active Pokémon."
+test('Serena mode 2 switches in only a Benched Pokémon V', () => {
+  assert.equal(modes(CARDS.serena).modes[1].steps[0].filter, 'V');
+  const env = setup(CARDS.serena, { p1Extra: opponentBench(pokemon(62, 'Pikachu'), zacianV) });
+  const { prompts, res } = play(env, [[2]]);
+  assert.equal(prompts.length, 1, 'the only Benched V needs no pick');
+  assert.equal(res.pendingChoice, null);
+  assert.deepEqual(names(env.state.players.p2.zones.active), ['Zacian V']);
+});
+
+test('Serena with no opponent Benched Pokémon V offers no gust mode: mode 1 runs unprompted', () => {
+  const hand = [trainer(20, 'H1'), trainer(21, 'H2')];
+  const env = setup(CARDS.serena, { hand, deck: [trainer(1, 'D1')], p1Extra: opponentBench(pokemon(62, 'Pikachu')) });
+  const { res } = play(env, []);
+  assert.equal(res.pendingChoice.prompt.includes('Discard'), true, res.pendingChoice.prompt);
+  assert.deepEqual(names(env.state.players.p2.zones.active), ['Eevee']);
+});
+
+test('the lookOnly step describes itself without a pick', () => {
+  assert.equal(describeStep({ type: 'lookAtTop', count: 1, lookOnly: true }), 'Look at the top 1 card of your deck.');
 });
 
 test('Ingo & Emmet: mode 2 draws 5 from the bottom of the deck', () => {

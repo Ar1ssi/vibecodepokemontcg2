@@ -5,6 +5,9 @@ Status: approved (user, S333) — Q1 new `selectMode` prompt · Q2 add an `order
 `pendingChoice { type: 'orderCards' }` over the picks; client renders a drag/number list) ·
 Q3 prompt for the optional cost · Q4 leave Group E over-inclusive, file one ISSUE.
 Build order: F + B → A → C → D; E is an ISSUE line only.
+Built (PR 200, landed S334): Q1 and Q2 reuse existing prompt shapes instead of new pendingChoice
+types: modes are a label-option pick (the attack prompts' shape), deck-top order is one pick per
+position (Gothorita's shape). Same rules result, no netcode change (D199). E filed as I220.
 Follows design 060 (five pinned slices, landed on `claude/parse-audit-fix`). Every card below is
 still parsed wrongly after 060; each group needs a new step shape, a new prompt, or new data,
 so none was pinnable for `slice-builder` without a choice.

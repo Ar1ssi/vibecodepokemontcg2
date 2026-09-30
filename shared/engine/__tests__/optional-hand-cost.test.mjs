@@ -39,7 +39,7 @@ const basicEnergy = (instanceId, name) => ({ instanceId, name, supertype: 'Energ
 const specialEnergy = (instanceId, name) => ({ instanceId, name, supertype: 'Energy', type: 'Energy', subtypes: ['Special'] });
 const filler = (n) => Array.from({ length: n }, (_, i) => mon(500 + i, `Filler ${i + 1}`));
 
-function setup(text, { deck = [], hand = [], active = null, turnNumber = 4 } = {}) {
+function setup(text, { deck = [], hand = [], active = null, bench = [], turnNumber = 4 } = {}) {
   const state = createGameState({ gameId: 'optional-cost', seed: 1, rulesEnabled: true });
   state.players.p1 = { playerId: 'p1', username: 'A', zones: createPlayerZones(), flags: {} };
   state.players.p2 = { playerId: 'p2', username: 'B', zones: createPlayerZones(), flags: {} };
@@ -49,6 +49,7 @@ function setup(text, { deck = [], hand = [], active = null, turnNumber = 4 } = {
   zones.hand.push(card, ...hand.map((c) => createCard(c)));
   zones.deck.push(...deck.map((c) => createCard(c)));
   if (active) zones.active.push(createCard(active));
+  zones.bench.push(...bench.map((c) => createCard(c)));
   return { state, card, rng: createRng(1) };
 }
 
@@ -153,6 +154,8 @@ test('Red & Blue: parses to a GX-only evolve plus the gated Energy attach', () =
 const redBlueSetup = () =>
   setup(TEXTS.redBlue, {
     active: mon(10, 'Ralts'),
+    // A second Pokémon in play: only the evolved one may take the Energy, so no target prompt.
+    bench: [mon(11, 'Pikachu')],
     deck: [
       mon(20, 'Gardevoir-GX', { stage: 'Stage 2', evolvesFrom: 'Ralts', subtypes: ['GX'] }),
       mon(21, 'Kirlia', { stage: 'Stage 1', evolvesFrom: 'Ralts' }),
