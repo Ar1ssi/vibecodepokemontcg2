@@ -1780,7 +1780,11 @@ function searchEvolve(ctx) {
   }
 
   const candidates = deck.filter(
-    (c) => isPokemon(c) && evolveTargets(c).length > 0 && !(step.noAbilities && hasAbility(c))
+    (c) =>
+      isPokemon(c) &&
+      evolveTargets(c).length > 0 &&
+      !(step.noAbilities && hasAbility(c)) &&
+      (!step.what || matchesSearch(c, step.what))
   );
 
   if (ctx.selection) {
@@ -3285,35 +3289,6 @@ function opponentHasStage2(ctx) {
   );
 }
 
-/**
- * "Choose 1: • A • B" Supporters (Kieran): the player picks a mode, then its steps run in place.
- * A mode that cannot do anything now (a Switch with an empty Bench) is not offered; a single
- * remaining mode runs without a prompt.
- */
-function chooseMode(ctx) {
-  const { player, step } = ctx;
-  const hasBench = (player.zones.bench || []).some((c) => !c.attachedTo);
-  const modes = (step.modes || []).filter(
-    (mode) => hasBench || !mode.steps.some((s) => s.type === 'switchOwn')
-  );
-  if (modes.length === 0) return skip(ctx, 'no_legal_mode');
-  const run = (mode) => {
-    ctx.insertSteps(mode.steps);
-    return null;
-  };
-  if (ctx.selection) {
-    const mode = modes[Number(ctx.selection[0]) - 1];
-    return mode ? run(mode) : skip(ctx, 'invalid_mode');
-  }
-  if (modes.length === 1) return run(modes[0]);
-  return ctx.ask({
-    prompt: `${ctx.sourceCard?.name || 'Choose 1'}: Choose 1`,
-    options: modes.map((mode, i) => ({ instanceId: i + 1, name: mode.label, type: 'option' })),
-    min: 1,
-    max: 1,
-  });
-}
-
 /** A Supporter mode's "during this turn, attacks do N more damage" boost (parseTurnDamageBonus shape). */
 function turnDamageBonusTrainer(ctx) {
   const { player, step } = ctx;
@@ -4810,7 +4785,74 @@ function drawBottom(ctx) {
   return null;
 }
 
+// "Choose 1:" / "Choose 1 or both:" (Kieran, Klara, Judge Whistle, …): the player picks the
+// mode(s); each chosen mode's steps then run in printed order, after this step. Options reuse the
+// label-option shape the attack prompts use (instanceId = 1-based mode number). A mode that cannot
+// do anything now (a Switch with an empty Bench) is not offered; a single remaining mode runs
+// without a prompt.
+function chooseMode(ctx) {
+  const { player, step } = ctx;
+  const modes = Array.isArray(step.modes) ? step.modes : [];
+  if (modes.length === 0) return skip(ctx, 'no_modes');
+  const hasBench = (player.zones.bench || []).some((c) => !c.attachedTo);
+  const offered = modes
+    .map((mode, i) => ({ mode, n: i + 1 }))
+    .filter(({ mode }) => hasBench || !mode.steps.some((s) => s.type === 'switchOwn'));
+  if (offered.length === 0) return skip(ctx, 'no_legal_mode');
+  if (ctx.selection) {
+    const legal = new Set(offered.map(({ n }) => n));
+    const picked = [...new Set(ctx.selection.map(Number))]
+      .filter((n) => legal.has(n))
+      .sort((a, b) => a - b)
+      .slice(0, step.max || 1);
+    if (picked.length === 0) return skip(ctx, 'no_mode_chosen');
+    ctx.insertSteps(picked.flatMap((n) => modes[n - 1].steps));
+    return null;
+  }
+  if (offered.length === 1) {
+    ctx.insertSteps(offered[0].mode.steps);
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose ${step.max > 1 ? '1 or both' : '1'}`,
+    options: offered.map(({ mode, n }) => ({ instanceId: n, name: mode.label, type: 'option' })),
+    min: 1,
+    max: Math.min(step.max || 1, offered.length),
+  });
+}
+
+// "When you play this card, you may discard N other cards from your hand. If you do, …" (Guzma &
+// Hala, Red & Blue): the player picks exactly N cards to pay, or declines (any other count). A paid
+// cost tags its `cardsDiscarded` event `handCost`, which opens the later `requiresHandCost` steps.
+function optionalDiscardCost(ctx) {
+  const { player, step } = ctx;
+  const count = step.count || 1;
+  const hand = player.zones.hand.filter((c) => c.instanceId !== ctx.sourceCard?.instanceId);
+  if (ctx.selection) {
+    const picked = pickById(hand, ctx.selection);
+    if (picked.length !== count) return skip(ctx, 'cost_declined');
+    for (const card of picked) removeFromZones(player, card);
+    for (const card of picked) discardCardToPlayerZone(player, card);
+    ctx.events.push({
+      type: 'cardsDiscarded',
+      playerId: player.playerId,
+      handCost: true,
+      cards: picked.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+    return null;
+  }
+  if (hand.length < count) return skip(ctx, 'not_enough_cards_to_discard');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: You may discard ${count} other cards from your hand for the bonus (choose ${count}, or none to skip)`,
+    options: hand,
+    min: 0,
+    max: count,
+    memo: {},
+  });
+}
+
 export const EXTRA_STEP_HANDLERS = {
+  optionalDiscardCost,
   attachTool,
   attachAttackTool,
   clearStatus,

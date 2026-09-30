@@ -41,7 +41,7 @@ export const MAX_EFFECT_STEPS = 200;
 // Step kinds with a case in executeSteps' switch (kept in sync by executor-step-types.test).
 export const EXECUTOR_STEP_TYPES = new Set([
   'discardCost', 'discardCostAbility', 'searchDeck', 'searchAbility', 'search', 'draw',
-  'drawAbility', 'drawUntil', 'millItems', 'discardHandThenDraw', 'shuffleHandThenDraw',
+  'drawAbility', 'drawUntil', 'millItems', 'discardHand', 'discardHandThenDraw', 'shuffleHandThenDraw',
   'ionoShuffle', 'switchOwn', 'switchAbility', 'switch', 'switchOpponent', 'switchOpponentOut',
   'recursion', 'recursionFromDiscardAbility', 'shuffleFromDiscard', 'heal', 'healAmount',
   'healAbility', 'coinFlip', 'coinDraw', 'returnTool', 'shuffleOwnPokemon', 'revealHand',
@@ -180,19 +180,38 @@ export function createPendingChoice({
   };
 }
 
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th'];
+
 // "up to 2 Basic Pokémon or 1 Evolution Pokémon": keep only the picks that fit the branch the
 // first pick chose, up to that branch's count.
 function pickAlternativeBranch(deck, selection, alternatives) {
   const cardOf = (id) => deck.find((c) => c.instanceId === id);
   const firstCard = cardOf(selection[0]);
-  const branch = firstCard && alternatives.find((alt) => matchesSearch(firstCard, alt.what));
+  const branch = firstCard && alternatives.find((alt) => matchesKind(firstCard, alt));
   if (!branch) return [];
   return selection
     .filter((id) => {
       const card = cardOf(id);
-      return card && matchesSearch(card, branch.what);
+      return card && matchesKind(card, branch);
     })
     .slice(0, branch.count);
+}
+
+// A search kind (`what`) minus an optional `exclude` kind: "3 Basic Pokémon (except for
+// Pokémon-EX)" (Brigette).
+function matchesKind(card, { what, exclude }) {
+  return matchesSearch(card, what) && !(exclude && matchesSearch(card, exclude));
+}
+
+// "up to 3 different Item cards" (Ball Guy): keep the first pick of each name.
+function keepDistinctNames(deck, selection) {
+  const seen = new Set();
+  return selection.filter((id) => {
+    const name = String(deck.find((c) => c.instanceId === id)?.name || '').toLowerCase();
+    if (seen.has(name)) return false;
+    seen.add(name);
+    return true;
+  });
 }
 
 function opponentBenchIsEvolved(player, root) {
@@ -354,6 +373,9 @@ export function executeSteps(draft, {
       context.attachedEnergy = true;
       context.attachedTargetId = lastAttach.targetInstanceId;
     }
+    // "the Pokémon you evolved in this way" (Red & Blue): remember the evolve across resumes.
+    const lastEvolve = events.findLast((e) => e.type === 'pokemonEvolved' && e.playerId === playerId);
+    if (lastEvolve) context.evolvedRootId = lastEvolve.targetInstanceId;
     if (step.requiresAttach && !context.attachedEnergy) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
@@ -511,16 +533,17 @@ export function executeSteps(draft, {
             (step.tagFilter !== 'single-strike' || isSingleStrikeCard(c))
         );
         const count = step.count || 1;
-        // An exact-count discard cost the hand cannot pay must never open a
-        // min=count/max=count choice over fewer options: `resolveChoice`
-        // rejects any selection below `min`, so the choice could never be
-        // resolved and every later command would answer `waiting_for_choice`
-        // (Prism Tower with one card in hand soft-locked the match).
-        if (candidates.length < count) {
+        // "Discard up to 3 cards … (You must discard at least 1 card.)" (Serena): `min` < `count`.
+        const minCount = Math.min(step.min ?? count, count);
+        // A discard cost the hand cannot pay must never open a min/max choice over
+        // fewer options: `resolveChoice` rejects any selection below `min`, so the
+        // choice could never be resolved and every later command would answer
+        // `waiting_for_choice` (Prism Tower with one card in hand soft-locked the match).
+        if (candidates.length < minCount) {
           events.push({
             type: 'effectStepSkipped',
             reason: 'not_enough_cards_to_discard',
-            required: count,
+            required: minCount,
             available: candidates.length,
           });
           // Abort the rest of the effect: the cost is unpayable, and "if you do"
@@ -529,11 +552,11 @@ export function executeSteps(draft, {
         }
         const choice = createPendingChoice({
           player: playerId,
-          prompt: `${sourceCard?.name || 'Trainer'}: Discard ${count} card${count > 1 ? 's' : ''} from your hand`,
+          prompt: `${sourceCard?.name || 'Trainer'}: Discard ${minCount < count ? `up to ${count}` : count} card${count > 1 ? 's' : ''} from your hand`,
           source: sourceCard?.name || '',
           options: candidates,
-          min: count,
-          max: count,
+          min: minCount,
+          max: Math.min(count, candidates.length),
           cancellable: false,
           stateVersion: draft.stateVersion,
           stepIndex: idx,
@@ -556,13 +579,15 @@ export function executeSteps(draft, {
         const what = step.what || step.searchTarget || 'card';
         // Ability parser emits 'Bench' (legacy client contract); trainers emit 'bench'.
         const dest = String(step.destination || 'hand').toLowerCase();
-        const maxCount = step.count || 1;
+        // "If you go second and it's your first turn, search for N … instead of 1" (Jasmine).
+        const goingSecondCount = step.countIf?.goingSecondFirstTurn;
+        const maxCount = goingSecondCount && draft.turn?.number === 2 ? goingSecondCount : step.count || 1;
         const nameFilter = step.nameFilter
           ? String(step.nameFilter).toLowerCase()
           : null;
         const evolvesFrom = step.evolvesFrom ? String(step.evolvesFrom).toLowerCase() : null;
         const cardMatches = (c) =>
-          matchesSearch(c, what) &&
+          matchesKind(c, { what, exclude: step.exclude }) &&
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
           (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom);
 
@@ -570,6 +595,7 @@ export function executeSteps(draft, {
         const attachRoots = () =>
           inPlayRoots(player).filter((c) => {
             if (!step.attachTarget) return true;
+            if (step.attachTarget === 'evolved') return c.instanceId === context.evolvedRootId;
             if (step.attachTarget === 'this pokémon') return c.instanceId === sourceCard?.instanceId;
             return rootMatchesTarget(player, c, step.attachTarget);
           });
@@ -604,6 +630,66 @@ export function executeSteps(draft, {
           if (activeRng) shuffleInPlace(activeRng, player.zones.deck || []);
           events.push({ type: 'deckShuffled', playerId });
         };
+        // Mallow / Ciphermaniac's Codebreaking: the picks are already back on top of the deck (see
+        // the deckTop branch below); the player now chooses their order, one position per prompt.
+        const orderKey = `${idx}:searchOrder`;
+        const askDeckTopOrder = (state) => {
+          const deck = player.zones.deck || [];
+          const remaining = state.ids.filter((id) => !state.order.includes(id));
+          return createPendingChoice({
+            player: playerId,
+            prompt: `${sourceCard?.name || 'Search'}: Choose the card to put ${ORDINALS[state.order.length] || `${state.order.length + 1}th`} from the top of your deck`,
+            source: sourceCard?.name || '',
+            options: deck.filter((c) => remaining.includes(c.instanceId)),
+            min: 1,
+            max: 1,
+            stateVersion: draft.stateVersion,
+            stepIndex: idx,
+            resumeToken: {
+              effectType,
+              sourceInstanceId: sourceCard?.instanceId,
+              initiatorPlayerId: playerId,
+              stepIndex: idx,
+              steps,
+              context: { ...context, [orderKey]: state },
+              budgetCount: budget.count,
+            },
+          });
+        };
+        if (stepSelection && context[orderKey]) {
+          const deck = player.zones.deck || [];
+          const { ids } = context[orderKey];
+          const order = [...context[orderKey].order];
+          if (ids.includes(stepSelection[0]) && !order.includes(stepSelection[0])) order.push(stepSelection[0]);
+          const remaining = ids.filter((id) => !order.includes(id));
+          if (remaining.length > 1) {
+            return { pendingChoice: askDeckTopOrder({ ids, order }), completed: false };
+          }
+          const ordered = [...order, ...remaining]
+            .map((id) => deck.find((c) => c.instanceId === id))
+            .filter(Boolean);
+          for (const card of ordered) deck.splice(deck.indexOf(card), 1);
+          deck.unshift(...ordered);
+          events.push({ type: 'deckReordered', playerId, count: ordered.length });
+          delete context[orderKey];
+          break;
+        }
+        if (stepSelection && dest === 'decktop') {
+          // The picks leave the deck, the rest is shuffled, then the picks return on top.
+          const deck = player.zones.deck || [];
+          const pickedIds = [...new Set(stepSelection)]
+            .filter((id) => deck.some((c) => c.instanceId === id && cardMatches(c)))
+            .slice(0, maxCount);
+          const picked = pickedIds.map((id) => deck.find((c) => c.instanceId === id));
+          for (const card of picked) deck.splice(deck.indexOf(card), 1);
+          if (activeRng) shuffleInPlace(activeRng, deck);
+          deck.unshift(...picked);
+          events.push({ type: 'deckShuffled', playerId });
+          if (picked.length > 1) {
+            return { pendingChoice: askDeckTopOrder({ ids: pickedIds, order: [] }), completed: false };
+          }
+          break;
+        }
         if (stepSelection && context[attachKey]) {
           // Resume: the chosen Pokémon receives the searched Energy (or the next one, attachEach)
           const deck = player.zones.deck || [];
@@ -663,9 +749,10 @@ export function executeSteps(draft, {
           // Resume: move chosen cards to destination
           const deck = player.zones.deck || [];
           const pickedCards = [];
-          const allowedIds = step.alternatives
+          const branchIds = step.alternatives
             ? pickAlternativeBranch(deck, stepSelection, step.alternatives)
             : stepSelection;
+          const allowedIds = step.distinctNames ? keepDistinctNames(deck, branchIds) : branchIds;
           for (const sId of allowedIds) {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
@@ -683,6 +770,8 @@ export function executeSteps(draft, {
                 if (isFossilItem(c)) becomeFossilPokemon(c);
                 c.enteredPlayTurn = draft.turn?.number ?? null;
                 player.zones.bench.push(c);
+              } else if (dest === 'discard') {
+                player.zones.discard.push(c);
               } else {
                 player.zones.hand.push(c);
               }
@@ -699,8 +788,9 @@ export function executeSteps(draft, {
 
           // Design 059: a card searched into the hand is named only when the text reveals it
           // (Quick Search and Computer Search keep it hidden); a benched card is public anyway.
+          // A search that discards its picks (Brilliant Blender) shows them in the discard pile.
           const revealsPicks = stepRevealsPicks(step, effectTextFor({ effectType, sourceCard, context }));
-          const shown = dest !== 'hand' || revealsPicks ? pickedCards : [];
+          const shown = dest !== 'discard' && (dest !== 'hand' || revealsPicks) ? pickedCards : [];
           if (shown.length > 0) {
             events.push({
               type: 'cardsRevealed',
@@ -755,7 +845,7 @@ export function executeSteps(draft, {
 
         const choice = createPendingChoice({
           player: playerId,
-          prompt: `${sourceCard?.name || 'Search'}: Select up to ${effectiveMaxCount} card${effectiveMaxCount > 1 ? 's' : ''} (${what}) from your deck`,
+          prompt: `${sourceCard?.name || 'Search'}: Select up to ${effectiveMaxCount} ${step.distinctNames ? 'different ' : ''}card${effectiveMaxCount > 1 ? 's' : ''} (${what}) from your deck`,
           source: sourceCard?.name || '',
           options: matches,
           min: 0, // In PTCG, private zone searches can fail to find
@@ -874,6 +964,15 @@ export function executeSteps(draft, {
         break;
       }
 
+      case 'discardHand': {
+        const hand = player.zones.hand || [];
+        for (const c of hand.splice(0, hand.length)) {
+          discardCardToPlayerZone(player, c);
+          events.push({ type: 'cardMoved', instanceId: c.instanceId, from: 'hand', to: 'discard', playerId });
+        }
+        break;
+      }
+
       case 'discardHandThenDraw': {
         const hand = player.zones.hand || [];
         const deck = player.zones.deck || [];
@@ -886,7 +985,7 @@ export function executeSteps(draft, {
         });
         const count = step.count || 1;
         const actual = Math.min(count, deck.length);
-        const drawn = deck.splice(0, actual);
+        const drawn = step.fromBottom ? deck.splice(deck.length - actual, actual) : deck.splice(0, actual);
         hand.push(...drawn);
         events.push({
           type: 'cardsDrawn',
@@ -1284,11 +1383,34 @@ export function executeSteps(draft, {
       case 'shuffleFromDiscard': {
         const discard = player.zones.discard || [];
         const isShuffle = step.type === 'shuffleFromDiscard';
+        // "Flip 3 coins. For each heads, put a basic Energy card …" (Energy Restore): the
+        // coins set the count. Memoized so resuming the pick doesn't re-flip.
+        let coinCount = null;
+        if (step.coins) {
+          const coinKey = `${idx}:recursionCoins`;
+          if (context[coinKey] === undefined) {
+            let heads = 0;
+            for (let i = 0; i < Number(step.coins); i++) {
+              const face = flipCoin(activeRng);
+              if (face === 'heads') heads++;
+              events.push({ type: 'coinFlipped', playerId, face });
+            }
+            context[coinKey] = heads;
+          }
+          coinCount = context[coinKey] * (Number(step.perHeads) || 1);
+          if (coinCount === 0) {
+            events.push({ type: 'effectStepSkipped', reason: 'no_heads', step: step.type });
+            break;
+          }
+        }
         const categories = step.choices?.length
           ? step.choices
-          : [{ what: step.what || 'card', count: step.count || 1 }];
+          : [{ what: step.what || 'card', count: coinCount ?? (step.count || 1) }];
         const what = categories.map((c) => c.what).join(' or ');
         const count = categories.reduce((sum, c) => sum + (c.count || 1), 0);
+        // "Pokémon that have “Hisuian” in their names" (Professor Laventon).
+        const nameFilter = step.nameFilter ? String(step.nameFilter).toLowerCase() : '';
+        const nameMatches = (c) => !nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter);
 
         if (stepSelection) {
           const destZone = isShuffle ? player.zones.deck : player.zones.hand;
@@ -1297,7 +1419,11 @@ export function executeSteps(draft, {
           for (const sId of stepSelection) {
             const picked = discard.find((c) => c.instanceId === sId);
             const category = categories.findIndex(
-              (cat, i) => picked && matchesSearch(picked, cat.what) && takenPerCategory[i] < (cat.count || 1)
+              (cat, i) =>
+                picked &&
+                nameMatches(picked) &&
+                matchesSearch(picked, cat.what) &&
+                takenPerCategory[i] < (cat.count || 1)
             );
             if (category < 0) continue;
             takenPerCategory[category] += 1;
@@ -1320,7 +1446,7 @@ export function executeSteps(draft, {
           break;
         }
 
-        const candidates = discard.filter((c) => matchesSearch(c, what));
+        const candidates = discard.filter((c) => nameMatches(c) && matchesSearch(c, what));
         if (candidates.length === 0) {
           // Reported, so an "If you do," half (Banette Puppet Offering) does not follow.
           events.push({ type: 'effectStepSkipped', reason: 'no_matching_cards', step: step.type });
@@ -1480,7 +1606,14 @@ export function executeSteps(draft, {
           flip = { face: headsCount >= (Number(step.headsAtLeast) || 1) ? 'heads' : 'tails', headsCount };
           context[coinKey] = flip;
         }
-        const branch = normalizeSteps(flip.face === 'heads' ? step.heads : step.tails);
+        // "If both are heads … If both are tails …" (Old Rod): each outcome names an exact
+        // head count; any other result (one head) does nothing.
+        const branchSteps = Array.isArray(step.outcomes)
+          ? step.outcomes.find((o) => o.headsExactly === flip.headsCount)?.steps
+          : flip.face === 'heads'
+            ? step.heads
+            : step.tails;
+        const branch = normalizeSteps(branchSteps);
         if (branch.length > 0) {
           const subResult = executeSteps(draft, {
             steps: branch,

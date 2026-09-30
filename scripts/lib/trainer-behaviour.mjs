@@ -10,6 +10,74 @@ import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
 // read by tool-combat / tool-conditions), `discardCost` is paid by the playTrainer case.
 const NON_EXECUTED_OK = new Set(['passive', 'discardCost']);
 
+// A step type may be replaced by a richer one without counting as a lost step.
+const STEP_UPGRADES = {
+  searchDeck: new Set(['searchDeckSequence']),
+  discardCost: new Set(['optionalDiscardCost']),
+};
+
+const PICK_STEPS = new Set(['searchDeck', 'recursion', 'shuffleFromDiscard']);
+const DRAW_STEPS = new Set(['draw', 'variableDraw', 'drawUntil', 'shuffleHandThenDraw']);
+const KIND = '(?:supporter|item|stadium|tool|trainer|energy|pok[ée]mon|basic|evolution)';
+const KINDED_SEARCH_RE = new RegExp(`search your deck for (?:an?|\\d+|up to \\d+) [^,.]*?\\b${KIND}\\b`);
+const KINDED_DISCARD_RE = new RegExp(
+  `put (?:up to )?(?:\\d+|an?) [^,.•]*?\\b${KIND}\\b[^,.•]*? from your discard pile`
+);
+const TWO_KIND_RE = /search your deck for (?:an?|\d+|up to \d+) [^,.]+? and (?:an?|\d+|up to \d+) [^,.]+?(?=,|\.)/;
+// Printed counts on a card pick only: "put 2 damage counters" is not a count of cards.
+const COUNTED_RES = [
+  /search your deck for (?:up to )?(\d+) /,
+  /put (?:up to )?(\d+) [^,.•]*? from your discard pile/,
+];
+const LEADING_DRAW_RE = /^draw (?:\d+|an?) cards?\./;
+
+function stepCount(step) {
+  if (!step || typeof step !== 'object') return 0;
+  if (Array.isArray(step.stages)) return step.stages.reduce((n, s) => n + (s.count || 1), 0);
+  if (Array.isArray(step.choices)) return step.choices.reduce((n, c) => n + (c.count || 1), 0);
+  if (Array.isArray(step.alternatives)) return Math.max(...step.alternatives.map((a) => a.count || 1));
+  // A coin flip carries its picks in its branches (Larry, Energy Amplifier, Poké Ball).
+  if (step.type === 'coinFlip') {
+    const outcomeSteps = (step.outcomes || []).flatMap((o) => o.steps || []);
+    const branches = [step.heads, step.tails, ...outcomeSteps].flat().filter(Boolean);
+    return branches.length ? Math.max(...branches.map(stepCount)) : 0;
+  }
+  // A modal card carries its picks in its modes (Klara, Ordinary Rod).
+  if (step.type === 'chooseMode') {
+    const modeSteps = (step.modes || []).flatMap((m) => m.steps || []);
+    return modeSteps.length ? Math.max(...modeSteps.map(stepCount)) : 0;
+  }
+  return step.count || 1;
+}
+
+/**
+ * Gap tags the step types alone cannot show: a pick whose `what` is any card while the
+ * text names a kind, a two-kind search parsed as one pick, a printed count the steps drop,
+ * and a leading "Draw N cards." with no draw step. (Each one was found by hand in S325–S331.)
+ * @param {string} text Printed card text
+ * @param {Array<object>} steps Parsed steps
+ * @returns {string[]}
+ */
+export function semanticGaps(text, steps = []) {
+  const lower = String(text || '').toLowerCase().replace(/\s+/g, ' ');
+  const tags = [];
+  const picks = steps.filter((s) => PICK_STEPS.has(s.type));
+  const loose = picks.some((s) => !s.what || s.what === 'card');
+  if (loose && (KINDED_SEARCH_RE.test(lower) || KINDED_DISCARD_RE.test(lower))) tags.push('loose-what');
+  if (TWO_KIND_RE.test(lower) && !steps.some((s) => s.type === 'searchDeckSequence' || s.oneEach)) {
+    tags.push('merged-kinds');
+  }
+  const counted = COUNTED_RES.map((re) => lower.match(re)).find(Boolean);
+  if (counted && Number(counted[1]) >= 2 && steps.length) {
+    const max = Math.max(...steps.map(stepCount));
+    if (max < Number(counted[1])) tags.push('dropped-count');
+  }
+  if (LEADING_DRAW_RE.test(lower) && steps.length && !steps.some((s) => DRAW_STEPS.has(s.type) || /draw/i.test(s.type))) {
+    tags.push('lost-draw');
+  }
+  return tags;
+}
+
 /** Stable key for a card printing group: reprints with identical text share one key. */
 export function trainerKey(row) {
   const text = String(row?.text || '');
@@ -18,9 +86,17 @@ export function trainerKey(row) {
   return `${row?.name || '(unnamed)'}#${hash.toString(36)}`;
 }
 
-// A chooseMode step counts as itself plus every step kind inside its modes.
-function stepKinds(steps) {
-  return (steps || []).flatMap((s) => [s.type, ...(s.modes ? s.modes.flatMap((m) => stepKinds(m.steps)) : [])]);
+// Step types with a coin flip's branches and outcomes, and a modal card's modes, unfolded, so a
+// step moving into a flip or a mode (Old Rod's recovery, Klara's picks) is not a lost step.
+function flattenStepTypes(steps) {
+  return steps.flatMap((s) => {
+    if (s.type === 'chooseMode') {
+      return [s.type, ...flattenStepTypes((s.modes || []).flatMap((m) => m.steps || []))];
+    }
+    if (s.type !== 'coinFlip') return [s.type];
+    const nested = [s.heads, s.tails, ...(s.outcomes || []).map((o) => o.steps)].flat().filter(Boolean);
+    return [s.type, ...flattenStepTypes(nested)];
+  });
 }
 
 /**
@@ -30,7 +106,7 @@ function stepKinds(steps) {
  */
 export function classifyTrainer(row) {
   const parsed = parseTrainerEffect(row?.text || '');
-  const steps = stepKinds(parsed.steps);
+  const steps = flattenStepTypes(parsed.steps || []);
   const gaps = [];
   if (!parsed.recognizable) gaps.push('unrecognizable');
   else if (steps.length === 0) gaps.push('empty');
@@ -39,6 +115,7 @@ export function classifyTrainer(row) {
     ...new Set(steps.filter((t) => !NON_EXECUTED_OK.has(t) && !isExecutableStepType(t))),
   ].sort();
   for (const t of serverMissing) gaps.push(`server-missing:${t}`);
+  if (parsed.recognizable) gaps.push(...semanticGaps(row?.text || '', parsed.steps || []));
   return {
     key: trainerKey(row),
     name: row?.name || '',
@@ -113,7 +190,10 @@ export function checkTrainerGate(classified, baseline) {
     }
     const nowSteps = new Set(c.steps || []);
     for (const t of before.steps || []) {
-      if (!nowSteps.has(t)) failures.push(`${c.key}: lost step ${t}`);
+      if (nowSteps.has(t)) continue;
+      const upgraded = [...(STEP_UPGRADES[t] || [])].some((u) => nowSteps.has(u));
+      if (upgraded) improvements.push(`${c.key}: step ${t} upgraded`);
+      else failures.push(`${c.key}: lost step ${t}`);
     }
   }
   const corpusKeys = new Set(classified.map((c) => c.key));
