@@ -6,6 +6,7 @@ import {
       filterCardsBySupertype,
       sortCardsWithinGroup,
       GENERATIONS,
+      OTHER_151_SET_ID,
     } from '../../../setup/deck-builder/core/set-browser.mjs';
     import { hasActiveFilters } from '../../../setup/deck-builder/core/card-filters.mjs';
     import {
@@ -300,7 +301,12 @@ import {
                 }
                 if (expanded) {
                   const cardsHtml = filtered.length
-                    ? renderCardsGrid(sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }), quantities, owned)
+                    ? renderCardsGrid(
+                        // The Other tab's 151 arrives in evolution order; number order would undo it.
+                        set.setId === OTHER_151_SET_ID ? filtered : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
+                        quantities,
+                        owned
+                      )
                     : '<div class="native-deck-builder-set-browser-empty">No cards match your filter.</div>';
                   dropdownSections.push(renderDropdownSection(set, { cardsHtml, showLabel: isFiltering }));
                 }

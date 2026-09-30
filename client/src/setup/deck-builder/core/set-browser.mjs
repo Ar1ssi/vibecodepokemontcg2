@@ -325,14 +325,17 @@ const TCGDEX_BASE = tcgdexApiBase();
         LEGAL_SET_REGISTRY.map(async (entry) => {
           try {
             const record = await fetchSetRecord(entry.setId, entry.series);
+            // The Other tab's 151 carries extra cards, so it gets its own id and
+            // cache slot; the Generation 9 tab keeps the plain sv03.5 set.
+            const isOther151 = entry.setId === SET_151_ID && entry.category === 'other';
             return {
-              setId: record.id,
+              setId: isOther151 ? OTHER_151_SET_ID : record.id,
               name: record.name,
               seriesId: entry.series,
               releaseDate: record.releaseDate || '',
               logo: normalizeAssetUrl(record.logo),
               symbol: normalizeAssetUrl(record.symbol),
-              cardCount: (record.cards || []).filter((c) => c.image).length,
+              cardCount: (record.cards || []).filter((c) => c.image).length + (isOther151 ? SET_151_ADDITIONS.length : 0),
               category: entry.category || 'standard',
             };
           } catch {
@@ -573,8 +576,74 @@ const TCGDEX_BASE = tcgdexApiBase();
     }
 
     // Fetch all cards of one legal set (only those with images).
+    export const SET_151_ID = 'sv03.5';
+    export const OTHER_151_SET_ID = '__other_sv03.5__';
+
+    // Evolutions printed outside 151, shown in the Other tab's 151 right after the
+    // card they evolve from (`after`: an sv03.5 id or an earlier addition). Alt and
+    // illustration rares (`rare`) go at the end. Card ids checked against TCGdex 2026-10-01.
+    const SET_151_ADDITIONS = [
+      { id: 'sv01-065', setId: 'sv01', after: 'sv03.5-082' }, // Magnezone ex <- Magneton
+      { id: 'swsh11-032', setId: 'swsh11', series: 'swsh', after: 'sv03.5-061' }, // Politoed <- Poliwhirl
+      { id: 'me04-051', setId: 'me04', series: 'me', after: 'sv03.5-042' }, // Crobat <- Golbat
+      { id: 'sv03-003', setId: 'sv03', after: 'sv03.5-044' }, // Bellossom <- Gloom
+      { id: 'sv02-086', setId: 'sv02', after: 'sv03.5-079' }, // Slowking ex <- Slowpoke
+      { id: 'me01-093', setId: 'me01', series: 'me', after: 'sv03.5-095' }, // Steelix <- Onix
+      { id: 'sv06-134', setId: 'sv06', after: 'sv03.5-113' }, // Blissey ex <- Chansey
+      { id: 'sv06.5-012', setId: 'sv06.5', after: 'sv03.5-117' }, // Kingdra ex <- Seadra
+      { id: 'sv05-111', setId: 'sv05', after: 'sv03.5-123' }, // Scizor ex <- Scyther
+      { id: 'sv10-069', setId: 'sv10', after: 'sv03.5-125' }, // Electivire ex <- Electabuzz
+      { id: 'sv09-021', setId: 'sv09', after: 'sv03.5-126' }, // Magmortar <- Magmar
+      { id: 'sv07-076', setId: 'sv07', after: 'sv03.5-112' }, // Rhyperior <- Rhydon
+      { id: 'sv06-002', setId: 'sv06', after: 'sv03.5-114' }, // Tangrowth <- Tangela
+      { id: 'sv05-125', setId: 'sv05', after: 'sv03.5-108' }, // Lickilicky <- Lickitung
+      { id: 'sv04-143', setId: 'sv04', after: 'sv03.5-137' }, // Porygon2 <- Porygon
+      { id: 'sv04-144', setId: 'sv04', after: 'sv04-143' }, // Porygon-Z <- Porygon2
+      { id: 'sv01-226', setId: 'sv01', rare: true, dex: 462 }, // Magnezone ex (full art)
+      { id: 'sv05-195', setId: 'sv05', rare: true, dex: 212 }, // Scizor ex (full art)
+      { id: 'sv10-212', setId: 'sv10', rare: true, dex: 466 }, // Electivire ex (full art)
+      { id: 'svp-138', setId: 'svp', rare: true, dex: 233 }, // Porygon2 (promo art)
+      { id: 'sv04-214', setId: 'sv04', rare: true, dex: 474 }, // Porygon-Z (illustration rare)
+      { id: 'me04-093', setId: 'me04', series: 'me', rare: true, dex: 169 }, // Crobat (illustration rare)
+      { id: 'sv02-238', setId: 'sv02', rare: true, dex: 199 }, // Slowking ex (full art)
+      { id: 'me01-150', setId: 'me01', series: 'me', rare: true, dex: 208 }, // Steelix (illustration rare)
+      { id: 'sv06-201', setId: 'sv06', rare: true, dex: 242 }, // Blissey ex (full art)
+      { id: 'sv06.5-080', setId: 'sv06.5', rare: true, dex: 230 }, // Kingdra ex (full art)
+    ];
+
+    async function fetchOther151Cards() {
+      const base = await fetchSetCards(SET_151_ID);
+      const extras = new Map();
+      await Promise.all(
+        SET_151_ADDITIONS.map(async (ref) => {
+          try {
+            const record = await fetchSetRecord(ref.setId, ref.series || 'sv');
+            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
+            const card = (record.cards || []).find((c) => c.id === ref.id);
+            if (!card?.name || !card.image) return;
+            extras.set(ref.id, normalizeSetCard(card, set, 'Pokémon'));
+          } catch {
+            // Additions are additive: a failed lookup leaves the rest of 151 intact.
+          }
+        })
+      );
+
+      const followers = new Map();
+      for (const ref of SET_151_ADDITIONS) {
+        if (ref.rare || !extras.has(ref.id)) continue;
+        if (!followers.has(ref.after)) followers.set(ref.after, []);
+        followers.get(ref.after).push(extras.get(ref.id));
+      }
+      const withFollowers = (card) => [card, ...(followers.get(card.id) || []).flatMap(withFollowers)];
+      const rares = SET_151_ADDITIONS.filter((ref) => ref.rare && extras.has(ref.id))
+        .sort((a, b) => a.dex - b.dex)
+        .map((ref) => extras.get(ref.id));
+      return [...base.flatMap(withFollowers), ...rares];
+    }
+
     export async function fetchSetCards(setId) {
       if (setId === ENERGY_SET_ID) return fetchLegalEnergyCards();
+      if (setId === OTHER_151_SET_ID) return fetchOther151Cards();
 
       const generationEnergyMatch = GENERATION_ENERGY_SET_ID_RE.exec(setId);
       if (generationEnergyMatch) return fetchGenerationEnergyCards(Number(generationEnergyMatch[1]));

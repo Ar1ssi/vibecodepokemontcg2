@@ -106,7 +106,8 @@ export async function findSetFilterMatches({
 
   const candidateLists = await Promise.all(
     setIds.map(async (setId) => {
-      const rows = narrowable
+      // Synthetic sets (`__...__` ids) have no TCGdex set.id to query by.
+      const rows = narrowable && !String(setId).startsWith('__')
         ? await fetchSummaries({ ...params, 'set.id': `eq:${setId}` })
         : await loadSetCards(setId);
       return (rows || []).map((row) => row.id).filter(Boolean);
