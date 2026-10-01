@@ -130,7 +130,15 @@ function matchesFirstAbilityOrText(card, clause) {
   return clause.test(textOf(card)) || clause.test(lower(arrText || ''));
 }
 
+// WotC Powers print "When you play Dark Crobat from your hand, …" without saying how it was played:
+// an Evolution card is played to evolve, a Basic onto the Bench (Unown V [Neo Destiny 89]).
+function isLegacyPlayedTrigger(card) {
+  const name = lower(card?.name).trim();
+  return Boolean(name) && textOf(card).startsWith(`when you play ${name} from your hand, `);
+}
+
 export function isEvolvePlayedTrigger(card) {
+  if (isLegacyPlayedTrigger(card) && !isBasicPokemon(card)) return true;
   return matchesFirstAbilityOrText(card, EVOLVE_PLAYED_CLAUSE);
 }
 
@@ -142,6 +150,7 @@ const BENCH_PLAYED_CLAUSE =
   /when you (?:play this pok[eé]mon|put [a-z0-9é' -]+?) from your hand (?:on)?to your bench\b/;
 
 export function isBenchPlayedTrigger(card) {
+  if (isLegacyPlayedTrigger(card) && isBasicPokemon(card)) return true;
   return matchesFirstAbilityOrText(card, BENCH_PLAYED_CLAUSE);
 }
 

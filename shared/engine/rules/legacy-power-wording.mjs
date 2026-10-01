@@ -34,6 +34,12 @@ const LEGACY_PASSIVE_REWRITES = [
     (_m, lead, _name, tens) =>
       `${lead}if this pokémon is damaged by an attack from your opponent's pokémon (even if this pokémon is knocked out), put ${counters(tens)} on the attacking pokémon.`,
   ],
+  // Feraligatr Berserk [Neo Genesis 4] (a Stage 2, so it is played to evolve): Feraligatr
+  // Rowdy [Fusion Strike 057] wording. The coin is not optional in either printing.
+  [
+    /^when you play [^,.]+? from your hand, flip a coin\. if heads, discard the top (\d+) cards from your opponent's deck\. if tails, discard the top \1 cards from your deck\./,
+    "when you play this pokémon from your hand to evolve 1 of your pokémon during your turn, you must flip a coin. if heads, discard the top $1 cards of your opponent's deck. if tails, discard the top $1 cards of your deck.",
+  ],
 ];
 
 export function rewriteLegacyPowerWording(lower) {
