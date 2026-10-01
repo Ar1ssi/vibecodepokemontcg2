@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAttackSteps } from '../attack-steps.mjs';
 import { parseNextTurnLock } from '../attack-effects.mjs';
+import { parseAttackDamage } from '../damage-parser.mjs';
 import { createGameState } from '../../state.mjs';
 import { createCard } from '../../cards.mjs';
 import { createRng } from '../../rng.mjs';
@@ -190,6 +191,31 @@ test('runtime: Scary Face heads stops the Defending Pokémon attacking and retre
   next.players.p2.flags = {};
   assert.ok(applyCommand(structuredClone(next), { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p2' }, createRng(1)).error);
   assert.ok(applyCommand(structuredClone(next), { type: 'retreat', payload: { benchInstanceId: 21 }, playerId: 'p2' }, createRng(1)).error);
+});
+
+// ── half the Defending Pokémon's remaining HP ───────────────────────────────────────────────
+
+const SUPER_FANG = // Raticate [Base Set 40] Super Fang : ?
+  "Does damage to the Defending Pokémon equal to half the Defending Pokémon's remaining HP (rounded up to the nearest 10).";
+const FALSE_SWIPE = // Scizor [Neo Discovery 10] False Swipe : ?
+  "Does damage equal to half the Defending Pokémon's remaining HP (rounded down to the nearest 10).";
+
+test('Super Fang / False Swipe damage: half the remaining HP, rounded as printed', () => {
+  const remaining70 = { defenderRemainingHp: 70 };
+  assert.equal(parseAttackDamage({ damage: '?', text: SUPER_FANG }, { name: 'Raticate' }, {}, remaining70).total, 40);
+  assert.equal(parseAttackDamage({ damage: '?', text: FALSE_SWIPE }, { name: 'Scizor' }, {}, remaining70).total, 30);
+  assert.equal(parseAttackDamage({ damage: '?', text: FALSE_SWIPE }, { name: 'Scizor' }, {}, { defenderRemainingHp: 10 }).total, 0);
+  const unknown = parseAttackDamage({ damage: '?', text: SUPER_FANG }, { name: 'Raticate' }, {}, {});
+  assert.equal(unknown.total, 0);
+  assert.match(unknown.notes.join(' '), /resolve the printed/);
+});
+
+test('runtime: Super Fang on a 90-HP Pokémon with 20 damage does 40; False Swipe does 30', () => {
+  const foe = { ...FOE, hp: 90, damage: 20 };
+  const raticate = { instanceId: 1, name: 'Raticate', hp: 60, attacks: [{ name: 'Super Fang', cost: [], damage: '?', text: SUPER_FANG }] };
+  assert.equal(damageOn(attackOnTurn(duelBoard(raticate, foe), 'p1', 2, 0).state, 'p2', 20), 60);
+  const scizor = { instanceId: 1, name: 'Scizor', hp: 80, attacks: [{ name: 'False Swipe', cost: [], damage: '?', text: FALSE_SWIPE }] };
+  assert.equal(damageOn(attackOnTurn(duelBoard(scizor, foe), 'p1', 2, 0).state, 'p2', 20), 50);
 });
 
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────

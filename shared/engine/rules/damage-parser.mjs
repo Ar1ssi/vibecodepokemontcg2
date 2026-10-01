@@ -70,6 +70,9 @@ const lower = (v) =>
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'");
 
+const HALF_REMAINING_HP =
+  /^does damage (?:to (?:the defending|your opponent's active) pok[\u00e9e]mon )?equal to half (?:of )?(?:the defending|your opponent's active) pok[\u00e9e]mon's remaining hp \(rounded (up|down) to the nearest 10\)/;
+
 // Recognized types for "if the Defending Pokémon is a [type] Pokémon" checks.
 export const TYPES = [
   'grass',
@@ -413,6 +416,21 @@ export function parseAttackDamage(
   const stage2InPlayCount = ctx.stage2InPlayCount;
 
   let total = base;
+
+  // Raticate Super Fang / Scizor False Swipe ("?" damage): "Does damage … equal to half the
+  // Defending Pokémon's remaining HP (rounded up / down to the nearest 10)." Weakness and
+  // Resistance then apply as to any attack damage (none is excluded).
+  const halfHp = text ? HALF_REMAINING_HP.exec(text) : null;
+  if (halfHp) {
+    if (typeof ctx.defenderRemainingHp === 'number') {
+      const round = halfHp[1] === 'up' ? Math.ceil : Math.floor;
+      total = round(ctx.defenderRemainingHp / 2 / 10) * 10;
+      components.push('half-remaining-hp');
+      notes.push(`half of ${ctx.defenderRemainingHp} remaining HP, rounded ${halfHp[1]} = ${total}`);
+    } else {
+      notes.push('half remaining HP — resolve the printed count');
+    }
+  }
 
   // ── Scaling damage ──
   // Discard-to-scale (taxonomy §D damage-scaling family): "Discard up to N
