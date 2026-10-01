@@ -69,6 +69,7 @@ const EXECUTED_STEP_TYPES = new Set([
   'passive',
   ...AUTO_STEP_TYPES,
   'discardCost',
+  'discardOwnAttachedEnergy',
   'coinFlip',
   'putHandOnBottom',
   'searchDeck',

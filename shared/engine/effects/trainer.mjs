@@ -11,7 +11,13 @@ import {
   attachmentHostId,
   discardCardToPlayerZone,
 } from '../state.mjs';
-import { isToolCard, isStadiumCard as isStadium } from './trainer-steps.mjs';
+import {
+  isToolCard,
+  isStadiumCard as isStadium,
+  legacyAttachTargets,
+  attachLegacyTrainerTo,
+} from './trainer-steps.mjs';
+import { legacyAttachedTrainer } from '../rules/legacy-attached-trainer.mjs';
 
 /**
  * Discards the currently active stadium card, moving it to its owner's discard zone.
@@ -253,6 +259,19 @@ export function executeTrainer(draft, {
     }
   }
 
+  // I224: a WotC attach-Trainer aimed at a Pokémon attaches there when its printed target allows.
+  const attachSpec = legacyAttachedTrainer(card);
+  if (attachSpec && targetInstanceId != null) {
+    const hostId = attachmentHostId(draft, targetInstanceId);
+    const host = legacyAttachTargets(player, card).find((root) => root.instanceId === hostId);
+    const boardCard = (player.zones.board || []).find((c) => c.instanceId === card.instanceId);
+    if (host && boardCard) {
+      attachLegacyTrainerTo(draft, player, boardCard, host, events);
+      draft.pendingChoice = null;
+      return { pendingChoice: null, completed: true };
+    }
+  }
+
   // A Stadium's text is a standing effect, used through the stadium-effect command, not on play.
   if (isStadium(card)) {
     draft.pendingChoice = null;
@@ -261,11 +280,15 @@ export function executeTrainer(draft, {
 
   // A Tool's text is a passive modifier; playing it without a target means attaching it.
   const text = card.text || card.effect || card.cardText || '';
-  const parsed = isToolCard(card) ? { steps: [{ type: 'attachTool' }] } : parseTrainerEffect(text);
+  const parsed = isToolCard(card)
+    ? { steps: [{ type: 'attachTool' }] }
+    : attachSpec
+      ? { steps: [{ type: 'attachLegacyTrainer' }] }
+      : parseTrainerEffect(text);
 
   // A "Choose 1:" card queues its damage bonus only when that mode is chosen (turnDamageBonusTrainer step).
   const modal = Boolean(parsed?.steps?.some((s) => s.type === 'chooseMode'));
-  const turnBonus = isToolCard(card) || modal ? null : parseTurnDamageBonus(text);
+  const turnBonus = isToolCard(card) || attachSpec || modal ? null : parseTurnDamageBonus(text);
   if (turnBonus) {
     if (!player.flags) player.flags = {};
     player.flags.turnDamageBonuses = [...(player.flags.turnDamageBonuses || []), turnBonus];

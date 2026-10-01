@@ -220,6 +220,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   let resistance = 0;
   if (
     !ignoreResistance &&
+    // Magnifier (neo4-101): "don't apply Resistance for that attack".
+    !hasMarker(attackerMarkers, 'ignoreResistance') &&
     !resistanceOverride?.ignore &&
     // Holon FF Energy with a basic {F} Energy beside it (audit SE7).
     !hasSpecialEnergyIgnoresResistance(attacker, attackerZoneCards) &&
@@ -256,10 +258,16 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Darkness Energy AQ/EX: "+10 after applying Weakness and Resistance" only when it damages.
   const specialEnergyBonusAfterWR =
     damageAfterWR > 0 ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true }) : 0;
+  // PlusPower (base1-84): "If this Pokémon's attack does damage to the Defending Pokémon (after
+  // applying Weakness and Resistance), the attack does 10 more damage to the Defending Pokémon."
+  const outgoingBonusAfterWR =
+    damageAfterWR > 0 && defenderIsActive
+      ? markerSum(attackerMarkers, (m) => m.kind === 'outgoingBonus' && m.afterWR)
+      : 0;
   damageAfterWR = Math.max(
     0,
-    damageAfterWR + incomingBonusAfterWR + specialEnergyBonusAfterWR - specialEnergyReduction -
-      markerReductionAfterWR - specialEnergyPenaltyAfterWR
+    damageAfterWR + incomingBonusAfterWR + specialEnergyBonusAfterWR + outgoingBonusAfterWR -
+      specialEnergyReduction - markerReductionAfterWR - specialEnergyPenaltyAfterWR
   );
 
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance).
@@ -333,7 +341,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   return {
     total: finalDamage,
     base,
-    attackerBonus,
+    attackerBonus: attackerBonus + outgoingBonusAfterWR,
     specialEnergyBonus: specialEnergyBonus + specialEnergyBonusAfterWR,
     specialEnergyPenalty: specialEnergyPenalty + specialEnergyPenaltyAfterWR,
     abilityBonus: abilityBonusBeforeWR || 0,

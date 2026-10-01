@@ -667,6 +667,8 @@ function discardFromHandUntil(user, count, preferUser = 'self') {
 export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUser) {
   _pickerTriggerCard = card;
   _effectOwner = ownerUser || card?.user || 'self';
+  // The Pokémon whose Energy paid a discardOwnAttachedEnergy cost (WotC Super Potion's heal target).
+  let costHost = null;
   const runAt = async (idx) => {
     if (idx >= steps.length) {
       onComplete?.();
@@ -928,7 +930,45 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           }
           msg(`  auto: milled top ${step.count} to discard`);
           break;
+        case 'discardOwnAttachedEnergy': {
+          // I232: "Discard 1 Energy card attached to (1 of) your (own) Pokémon in order to …"
+          // (WotC Super Potion / Super Energy Removal). Unpaid, the rest of the card does nothing.
+          const entries = collectAttachedForUser(_effectOwner, (att) => isEnergyCard(att));
+          if (entries.length === 0) {
+            msg('  no Energy attached to your Pokémon — cost not paid, effect canceled');
+            onComplete?.();
+            return;
+          }
+          openPickOnly({
+            title: `${card.name} — discard an Energy attached to 1 of your Pokémon to pay the cost`,
+            candidates: entries.map((entry) => entry.card),
+            onPick: async (att) => {
+              const entry = entries.find((e) => e.card === att);
+              const i = entry ? zone(_effectOwner, entry.zoneId).array.indexOf(att) : -1;
+              if (i < 0) {
+                msg('  cost not paid — effect canceled');
+                onComplete?.();
+                return;
+              }
+              await moveCardBundle(_effectOwner, _effectOwner, entry.zoneId, 'discard', i, false, 'move');
+              costHost = entry.parent;
+              msg(`  cost paid: discarded ${att.name} from ${entry.parent.name}`);
+              runAt(idx + 1);
+            },
+            onCancel: () => {
+              msg('  cost not paid — effect canceled');
+              onComplete?.();
+            },
+          });
+          return;
+        }
         case 'healAmount': {
+          if (step.target === 'costHost') {
+            // I232: heal the Pokémon whose Energy paid the cost, not a free pick.
+            if (!costHost || !pokemonZoneEntry(_effectOwner, costHost)) msg('  the cost was not paid on a Pokémon in play — no heal');
+            else _applyHealToCard(costHost, step.amount, step.cure, _effectOwner);
+            break;
+          }
           const isActiveOnly = step.target === 'Active Pokémon';
           const candidates = isActiveOnly
             ? zone(_effectOwner, 'active').array.filter((c) => c?.hp)
