@@ -9,7 +9,7 @@
 import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
-import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
+import { rewriteLegacyPowerWording, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -376,6 +376,9 @@ export function parseDamagePrevention(card) {
   const t = textOf(card);
   const out = { preventAll: false, reduce: 0, reduceHp: 0 };
   if (!t) return out;
+  // WotC thresholds and halving (Invisible Wall, Hard Shell, …) are ability-combat.mjs
+  // abilityLegacyDamageModifiers', not a flat reduction.
+  if (parseLegacyDamageModifier(t)) return out;
   // Damage is not an effect: an effect-prevention wording blocks damage only
   // when it says "including damage" (Shuppet/Banette Hide 'n' Sneak, θ Stop and
   // "except damage" wordings leave damage alone).
@@ -564,7 +567,7 @@ const parseNumber = (m) => (m?.[1] ? parseInt(m[1], 10) || 0 : 0);
 // "takes N less damage", "reduce damage by N"
 export function parseDamageReduction(card) {
   const t = textOf(card);
-  if (!t) return { reduce: 0 };
+  if (!t || parseLegacyDamageModifier(t)) return { reduce: 0 };
   const matches =
     t.includes('less damage') ||
     t.includes('reduce damage') ||

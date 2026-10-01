@@ -60,6 +60,7 @@ import {
 } from './rules/damage-parser.mjs';
 import { optionalCostBonusClause } from './rules/optional-cost-bonus.mjs';
 import { legacyTrainerType } from './rules/legacy-trainer-type.mjs';
+import { applyLegacyDamageModifiers } from './rules/legacy-power-wording.mjs';
 import { countUnit, normalizeUnit } from './rules/scaling-count.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import {
@@ -112,6 +113,7 @@ import {
   abilityDamageReduction,
   abilityHandDiscardProtector,
   abilityDamagePrevention,
+  abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects,
   sideContextFor,
   abilityWeaknessOverride,
@@ -471,6 +473,14 @@ function damageBenchedPokemon(
     return;
   }
 
+  if (!countersPlaced) {
+    dealt = legacyModifiedDamage(draft, { victim, victimPlayerId, amount: dealt });
+    if (dealt <= 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'ability' });
+      return;
+    }
+  }
+
   // Read before the damage lands: the holder may be Knocked Out by it.
   const strikesBack =
     !ownAttack && !countersPlaced ? benchedThornsCounters(draft, victimView, victimPlayerId) : 0;
@@ -732,6 +742,20 @@ const targetPlayerOf = (clause, attackerPlayerId, defenderPlayerId) =>
 // Flat damage to an Active target: no W/R for counter placement, and the printed
 // snipe clause is treated as unmodified. Bench targets go through
 // damageBenchedPokemon (Tera/bench-shield guards + KO).
+// Attack damage that skips computeAttackDamage (fixed-damage targets, Bench damage, recoil) still
+// meets the WotC Powers that change damage after Weakness and Resistance (Invisible Wall, Kabuto
+// Armor, Relaxing Scent, Unown D, …). The Attacking Pokémon is the turn player's Active.
+function legacyModifiedDamage(draft, { victim, victimPlayerId, amount }) {
+  if (!(amount > 0)) return amount;
+  const attacker = rootsIn(draft.players[draft.turn?.player]?.zones?.active)[0];
+  const specs = abilityLegacyDamageModifiers(
+    inPlayView(draft, victim),
+    attacker ? inPlayView(draft, attacker) : null,
+    abilitySideContext(draft, victimPlayerId)
+  );
+  return applyLegacyDamageModifiers(amount, specs);
+}
+
 function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, countersPlaced = false, events }) {
   const victim = ref.card;
   if (!victim || amount <= 0) return 0;
@@ -739,6 +763,13 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, counter
   if (countersPlaced && ref.playerId !== attackerPlayerId && counterEffectShielded(draft, victim, victimZone)) {
     events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'special-energy-effect' });
     return 0;
+  }
+  if (!countersPlaced) {
+    amount = legacyModifiedDamage(draft, { victim, victimPlayerId: ref.playerId, amount });
+    if (amount <= 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'ability' });
+      return 0;
+    }
   }
   victim.damage = (victim.damage || 0) + amount;
   events.push({
@@ -988,6 +1019,8 @@ function attackAbilityReads(
     opponentSideCards: attackerSide,
     sideActive: defenderZones.active || [],
     sideBench: defenderZones.bench || [],
+    opponentActive: attackerZones.active || [],
+    opponentBench: attackerZones.bench || [],
     zone: 'active',
     isActive: defenderIsActive,
     attackerIsActive: true,
@@ -1008,11 +1041,10 @@ function attackAbilityReads(
     ),
     abilityReductionBeforeWR: reduction.beforeWR,
     abilityReductionAfterWR: reduction.afterWR,
-    abilityPrevention: abilityDamagePrevention(
-      defender,
-      attackerView,
-      defenderCtx
-    ),
+    abilityPrevention: {
+      ...abilityDamagePrevention(defender, attackerView, defenderCtx),
+      legacyModifiers: abilityLegacyDamageModifiers(defender, attackerView, defenderCtx),
+    },
     weaknessOverride: abilityWeaknessOverride(defender, defenderCtx),
     ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
   };
@@ -7309,7 +7341,10 @@ function resolveAttackEffectPhase(draft, ctx) {
       // Recoil: printed damage the attack deals to its own Pokémon (plus a
       // Vermilion City Gym tails). A recoil KO hands the prize entitlement to the
       // DEFENDING player.
-      const selfDamage = parsed.selfDamage + stadiumSelfDamage;
+      const recoil = attacker
+        ? legacyModifiedDamage(draft, { victim: attacker, victimPlayerId: playerId, amount: parsed.selfDamage })
+        : parsed.selfDamage;
+      const selfDamage = recoil + stadiumSelfDamage;
       if (selfDamage > 0 && attacker) {
         attacker.damage = (attacker.damage || 0) + selfDamage;
         events.push({

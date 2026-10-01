@@ -11,6 +11,7 @@ import {
   abilityDamageBonus,
   abilityDamageReduction,
   abilityDamagePrevention,
+  abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects,
   abilityPreventsCardEffects,
   abilityPreventsCardEffectsOnPlayer,
@@ -253,6 +254,11 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, ctx));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
+      // WotC after-W/R modifiers; Unown D/M/N name the attacker's type.
+      for (const type of [null, 'Darkness', 'Metal', 'Colorless']) {
+        const attacker = type ? { ...p2Active, types: [type] } : p2Active;
+        ask(`legacyDamage:${type || 'any'}:${card.name}`, () => abilityLegacyDamageModifiers(card, attacker, ctx));
+      }
       ask(`effectPrevention:${card.name}`, () => abilityPreventsAttackEffects(card, p2Active, ctx));
       for (const source of CARD_EFFECT_SOURCES) {
         ask(`cardEffectShield:${source}:${card.name}`, () => abilityPreventsCardEffects(card, source, ctx));

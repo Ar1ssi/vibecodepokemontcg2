@@ -69,7 +69,7 @@ import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
-import { legacyPowerStopCondition } from './legacy-power-wording.mjs';
+import { legacyPowerStopCondition, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 import { normalizeStage } from './evolution.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
@@ -524,7 +524,9 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
   const out = { beforeWR: 0, afterWR: 0 };
   if (!defender) return out;
   for (const holder of nonStackingOnce(dedupe([defender, ...sideInPlay(ctx)]))) {
-    const t = cardAbilityText(holder);
+    // Older prints name the holder ("by attacks to Misty's Cloyster"): read as "this pokémon"
+    // so a self-only reduction is not lent to the team.
+    const t = selfNamedText(holder);
     if (!t || !parseDamageReduction(holder).reduce) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (isSelfScoped(t) && !sameCard(holder, defender)) continue;
@@ -562,7 +564,7 @@ export function abilityDamagePrevention(defender, attacker, ctx = {}) {
   const out = { preventAll: false, reduceHp: 0 };
   if (!defender) return out;
   for (const holder of nonStackingOnce(dedupe([defender, ...sideInPlay(ctx)]))) {
-    const t = cardAbilityText(holder);
+    const t = selfNamedText(holder);
     if (!t) continue;
     const parsed = parseDamagePrevention(holder);
     if (!parsed.preventAll && !parsed.reduceHp) continue;
@@ -573,6 +575,40 @@ export function abilityDamagePrevention(defender, attacker, ctx = {}) {
     const applied = preventionForCard(holder, attacker);
     if (applied.preventAll) out.preventAll = true;
     else out.reduceHp += applied.reduceHp;
+  }
+  return out;
+}
+
+const printedName = (card) => lower(card?.name).replace(/[‘’]/g, "'").trim();
+
+/** Whether a parsed WotC damage modifier on `holder` reaches `defender` hit by `attacker`. */
+function legacyModifierApplies(spec, holder, defender, attacker, ctx) {
+  if (spec.subject !== printedName(holder)) return false;
+  if (spec.scope === 'self' && !sameCard(holder, defender)) return false;
+  if (spec.holderActive && !holderPositionMet(selfNamedText(holder), holder, ctx)) return false;
+  if (spec.scope === 'team') {
+    if (sideOf(holder, ctx) !== sideOf(defender, ctx)) return false;
+    const holderSide = sideOf(holder, ctx) === 'opponent' ? opponentInPlay(ctx) : sideInPlay(ctx);
+    if (spec.unique && holderSide.filter((card) => printedName(card) === spec.subject).length > 1) return false;
+  }
+  if (spec.attackerBasic && !isBasicPokemon(attacker)) return false;
+  if (spec.attackerType && !attackerTypes(attacker).includes(lower(TYPE_LETTER[spec.attackerType]))) return false;
+  return true;
+}
+
+/**
+ * WotC Powers that change an attack's damage after Weakness and Resistance (Invisible Wall,
+ * Kabuto Armor, Hard Shell, Strange Barrier, Relaxing Scent, Unown D/M/N): the parsed modifiers
+ * (legacy-power-wording.mjs) that reach `defender`, in board order. `ctx` is the defender's side
+ * context. Apply them with legacy-power-wording.mjs `applyLegacyDamageModifiers`.
+ */
+export function abilityLegacyDamageModifiers(defender, attacker, ctx = {}) {
+  if (!defender) return [];
+  const out = [];
+  for (const holder of dedupe([defender, ...sideInPlay(ctx), ...opponentInPlay(ctx)])) {
+    const spec = parseLegacyDamageModifier(cardAbilityText(holder));
+    if (!spec || isAbilitySuppressed(holder, ctx)) continue;
+    if (legacyModifierApplies(spec, holder, defender, attacker, ctx)) out.push(spec);
   }
   return out;
 }
