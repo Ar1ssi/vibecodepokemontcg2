@@ -51,6 +51,8 @@ export function isSupporterTrainer(card) {
  *   Pokémon; null when unknown
  * @param {number|null} [params.handEnergyCount] Energy cards in the player's hand; null when unknown
  * @param {number|null} [params.handPokemonCount] Pokémon cards in the player's hand; null when unknown
+ * @param {boolean} [params.evolutionCardsLocked] An in-play Power stops Evolution cards being played
+ *   (ability-combat.mjs abilityEvolutionCardLock)
  * @returns {string|null} Why the card cannot be played, or null when it can
  */
 export function trainerPlayBlockReason({
@@ -74,6 +76,7 @@ export function trainerPlayBlockReason({
   ownAttachedEnergyCount = null,
   handEnergyCount = null,
   handPokemonCount = null,
+  evolutionCardsLocked = false,
 }) {
   if (!card) return null;
   const text = card.text || card.effect || card.cardText || '';
@@ -129,6 +132,9 @@ export function trainerPlayBlockReason({
   const evolvesStage2 = effectSteps.some((step) => step.type === 'evolveStage2');
   if (evolvesStage2 && turnNumber <= 2) {
     return "You can't use this card during your first turn.";
+  }
+  if (evolvesStage2 && evolutionCardsLocked) {
+    return 'A Pokémon Power stops Evolution cards being played.';
   }
   if (evolvesStage2 && rareCandyOptionCount === 0) {
     return 'You need a Stage 2 Pokémon in hand that evolves from a Basic Pokémon you have in play.';

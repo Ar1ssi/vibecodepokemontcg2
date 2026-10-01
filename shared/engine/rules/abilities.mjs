@@ -12,6 +12,9 @@
 import { energySearchWhat } from './search-match.mjs';
 import { symbolizeTypeWords } from './attack-text.mjs';
 import { textRevealsPicks } from './reveal-picks.mjs';
+import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
+
+export { rewriteLegacyPowerWording };
 
 // Normalize printed card text before matching.
 //   curly quotes  ' ' `  →  straight '
@@ -614,38 +617,6 @@ function parseWinCondition(lower) {
   const counters = lower.match(/(\d+) or more damage counters on your benched pok[eé]mon/);
   if (counters) return { kind: 'benchDamageCounters', count: Number(counters[1]) };
   return null;
-}
-
-// WotC Pokémon Powers word hand attaches and Energy moves differently from modern Abilities:
-// Rain Dance omits "from your hand" (only the attachment-rule reminder implies it), and Energy
-// Trans-likes say "take … attached to … and attach it to …" instead of "move … from … to …".
-// Rewrite those clauses to the modern wording so the existing parsers handle them. Both
-// patterns are anchored on WotC-only phrasing, so modern text passes through unchanged.
-const LEGACY_ATTACH_REMINDER = "this doesn't use up your 1 energy card attachment for the turn";
-const LEGACY_TAKE_ENERGY =
-  /you may take ((?:up to )?\d+) ((?:\{[a-z]\} )?energy) cards? attached to (1 of your pokémon|1 of your other pokémon|your other pokémon|1 of your [^.]+?) and attach (?:it|them) to ([^.]+?)\./;
-
-function legacyMoveDestination(destination) {
-  if (destination === 'a different one') return 'another of your pokémon';
-  const differentGroup = destination.match(/^a different (1 of your .+)$/);
-  if (differentGroup) return differentGroup[1];
-  return 'this pokémon';
-}
-
-export function rewriteLegacyPowerWording(lower) {
-  if (!lower) return '';
-  let rewritten = lower;
-  if (rewritten.includes(LEGACY_ATTACH_REMINDER)) {
-    rewritten = rewritten.replace(
-      /\byou may attach (\d+ (?:\{[a-z]\} )?energy cards?) to /,
-      'you may attach $1 from your hand to '
-    );
-  }
-  return rewritten.replace(
-    LEGACY_TAKE_ENERGY,
-    (_match, count, energy, source, destination) =>
-      `you may move ${count} ${energy} from ${source} to ${legacyMoveDestination(destination)}.`
-  );
 }
 
 export function parseAbility(text = '') {

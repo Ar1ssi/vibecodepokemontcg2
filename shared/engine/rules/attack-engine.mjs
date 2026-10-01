@@ -29,6 +29,7 @@ import {
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
 import { mergeDamagePrevention } from './ability-executors.mjs';
+import { applyLegacyDamageModifiers } from './legacy-power-wording.mjs';
 
 /**
  * "During your next turn, this Pokémon's X attack's base damage is N / is doubled" (design
@@ -336,6 +337,13 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   }
   // Deflector: the damage the Pokémon takes, halved and rounded down to the nearest 10.
   if (defenderEffects.some((m) => m.kind === 'incomingHalve')) finalDamage = Math.floor(finalDamage / 20) * 10;
+  // WotC Powers that change the damage after Weakness and Resistance (Invisible Wall, Kabuto
+  // Armor, Relaxing Scent, …): read by the caller (ability-combat.mjs abilityLegacyDamageModifiers).
+  if (!prevented && !ignoreDefenderEffects && abilityPrevention?.legacyModifiers?.length) {
+    const before = finalDamage;
+    finalDamage = applyLegacyDamageModifiers(finalDamage, abilityPrevention.legacyModifiers);
+    if (before > 0 && finalDamage === 0) prevented = true;
+  }
   const markerPrevents = defenderEffects.some(
     (m) =>
       m.kind === 'incomingPrevent' &&

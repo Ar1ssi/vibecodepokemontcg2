@@ -68,6 +68,7 @@ import {
   attachedTrainerTurnEnd,
   hasAttachedTrainerEffect,
 } from './rules/legacy-attached-trainer.mjs';
+import { applyLegacyDamageModifiers } from './rules/legacy-power-wording.mjs';
 import { countUnit, normalizeUnit } from './rules/scaling-count.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import {
@@ -121,6 +122,7 @@ import {
   abilityDamageReduction,
   abilityHandDiscardProtector,
   abilityDamagePrevention,
+  abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects,
   sideContextFor,
   powersOffActive,
@@ -144,6 +146,7 @@ import {
   abilityPlayLocks,
   abilityEvolvePermission,
   abilityEvolveLock,
+  abilityEvolutionCardLock,
   abilityRetreatLock,
   abilitySummonRestricted,
   abilityFirstTurnAttack,
@@ -499,7 +502,17 @@ function damageBenchedPokemon(
       return;
     }
   }
+  if (!countersPlaced) {
+    dealt = legacyModifiedDamage(draft, { victim, victimPlayerId, amount: dealt });
+    if (dealt <= 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'ability' });
+      return;
+    }
+  }
 
+  // Read before the damage lands: the holder may be Knocked Out by it.
+  const strikesBack =
+    !ownAttack && !countersPlaced ? benchedThornsCounters(draft, victimView, victimPlayerId) : 0;
   const prevDamage = victim.damage || 0;
   const koHp = cardEffectiveHp(draft, victim, victimPlayerId);
   const wouldKo = koHp > 0 && prevDamage + dealt >= koHp;
@@ -538,6 +551,7 @@ function damageBenchedPokemon(
           victimPlayerId
         );
       }
+      thornsOnBenchDamage(draft, { counters: strikesBack, victimPlayerId, attackerPlayerId, activeRng, events });
       return;
     }
   }
@@ -567,6 +581,45 @@ function damageBenchedPokemon(
       events,
       byAttack: true,
       byDamage: !countersPlaced,
+    });
+  }
+  thornsOnBenchDamage(draft, { counters: strikesBack, victimPlayerId, attackerPlayerId, activeRng, events });
+}
+
+// Machamp Strikes Back [Base Set 8], read as "If this Pokémon is damaged by an attack from your
+// opponent's Pokémon (even if this Pokémon is Knocked Out), put N damage counters on the Attacking
+// Pokémon." (legacy-power-wording.mjs): no position clause, so a Benched holder hit by an attack
+// strikes back too. Only that exact sentence: other thorns wordings name the Active Spot.
+const UNPOSITIONED_THORNS =
+  /^if this pokémon is damaged by an attack from your opponent's pokémon \(even if this pokémon is knocked out\), put (\d+) damage counters? on the attacking pokémon\.(?: |$)/;
+
+function benchedThornsCounters(draft, victimView, victimPlayerId) {
+  if (!UNPOSITIONED_THORNS.test(cardAbilityText(victimView))) return 0;
+  const thorns = parseOnDamageAbilities(victimView, { ...abilitySideContext(draft, victimPlayerId), isActive: false });
+  return thorns?.count > 0 ? thorns.count : 0;
+}
+
+function thornsOnBenchDamage(draft, { counters, victimPlayerId, attackerPlayerId, activeRng, events }) {
+  if (!(counters > 0)) return;
+  const attacker = rootsIn(draft.players[attackerPlayerId]?.zones?.active)[0];
+  if (!attacker) return;
+  attacker.damage = (attacker.damage || 0) + counters * 10;
+  events.push({
+    type: 'damageUpdated',
+    instanceId: attacker.instanceId,
+    damage: attacker.damage,
+    dealt: counters * 10,
+    reason: 'thorns',
+  });
+  const koHp = cardEffectiveHp(draft, attacker, attackerPlayerId);
+  if (koHp > 0 && attacker.damage >= koHp) {
+    handleKnockout(draft, {
+      victimPlayerId: attackerPlayerId,
+      attackerPlayerId: victimPlayerId,
+      victim: attacker,
+      events,
+      byAttack: true,
+      activeRng,
     });
   }
 }
@@ -718,6 +771,20 @@ const targetPlayerOf = (clause, attackerPlayerId, defenderPlayerId) =>
 // Flat damage to an Active target: no W/R for counter placement, and the printed
 // snipe clause is treated as unmodified. Bench targets go through
 // damageBenchedPokemon (Tera/bench-shield guards + KO).
+// Attack damage that skips computeAttackDamage (fixed-damage targets, Bench damage, recoil) still
+// meets the WotC Powers that change damage after Weakness and Resistance (Invisible Wall, Kabuto
+// Armor, Relaxing Scent, Unown D, …). The Attacking Pokémon is the turn player's Active.
+function legacyModifiedDamage(draft, { victim, victimPlayerId, amount }) {
+  if (!(amount > 0)) return amount;
+  const attacker = rootsIn(draft.players[draft.turn?.player]?.zones?.active)[0];
+  const specs = abilityLegacyDamageModifiers(
+    inPlayView(draft, victim),
+    attacker ? inPlayView(draft, attacker) : null,
+    abilitySideContext(draft, victimPlayerId)
+  );
+  return applyLegacyDamageModifiers(amount, specs);
+}
+
 function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, countersPlaced = false, events }) {
   const victim = ref.card;
   if (!victim || amount <= 0) return 0;
@@ -725,6 +792,13 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, counter
   if (countersPlaced && ref.playerId !== attackerPlayerId && counterEffectShielded(draft, victim, victimZone)) {
     events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'special-energy-effect' });
     return 0;
+  }
+  if (!countersPlaced) {
+    amount = legacyModifiedDamage(draft, { victim, victimPlayerId: ref.playerId, amount });
+    if (amount <= 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'ability' });
+      return 0;
+    }
   }
   victim.damage = (victim.damage || 0) + amount;
   events.push({
@@ -1033,6 +1107,8 @@ function attackAbilityReads(
     opponentSideCards: attackerSide,
     sideActive: defenderZones.active || [],
     sideBench: defenderZones.bench || [],
+    opponentActive: attackerZones.active || [],
+    opponentBench: attackerZones.bench || [],
     zone: 'active',
     isActive: defenderIsActive,
     attackerIsActive: true,
@@ -1054,11 +1130,10 @@ function attackAbilityReads(
     ),
     abilityReductionBeforeWR: reduction.beforeWR,
     abilityReductionAfterWR: reduction.afterWR,
-    abilityPrevention: abilityDamagePrevention(
-      defender,
-      attackerView,
-      defenderCtx
-    ),
+    abilityPrevention: {
+      ...abilityDamagePrevention(defender, attackerView, defenderCtx),
+      legacyModifiers: abilityLegacyDamageModifiers(defender, attackerView, defenderCtx),
+    },
     weaknessOverride: abilityWeaknessOverride(defender, defenderCtx),
     ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
   };
@@ -1843,11 +1918,12 @@ function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'active' 
   });
 
   // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat
-  // Cost is N less" wording and the opponent-side increases (A10).
+  // Cost is N less" wording and the opponent-side increases (A10). The position
+  // lists let "as long as this Pokémon is on your Bench / your Active Pokémon"
+  // holders be read (Dodrio Retreat Aid, Dark Muk Sticky Goo).
   const opponent = opponentPlayer;
   cost += abilityRetreatCost(inPlayView(state, card), {
-    sideCards,
-    opponentSideCards,
+    ...abilitySideContext(state, playerId),
     zone: zoneId,
     isActive,
   });
@@ -4372,7 +4448,8 @@ function attackCostPayable(state, playerId, active, attack) {
   const energyEntries = expandEnergyEntries(
     applyEnergyMultiplier(
       attached.map((c) => serverEnergyDescriptor(c, energyContext)),
-      sideCards
+      sideCards,
+      abilitySideContext(state, playerId)
     )
   );
   // Cost modifiers must be priced exactly as the client and the attack
@@ -4678,6 +4755,12 @@ export function validateLegality(state, command) {
           ? playLockReason(player, attachKinds, state.turn?.number || 1)
           : null;
         if (attachLock) return { allowed: false, reason: attachLock };
+        // A Tool attached from the hand is played, so an Ability play lock reaches it
+        // (Dark Vileplume Hay Fever locks every Trainer card).
+        if (isToolOrMachineTrainer(cardRef.card)) {
+          const toolLock = abilityPlayLocks(cardRef.card, abilitySideContext(state, playerId));
+          if (toolLock) return { allowed: false, reason: toolLock.reason };
+        }
       }
       // "This card can only be attached to …" (Team Rocket's Energy, Shield Energy, …).
       if (cardRef?.zoneId === 'hand' && isEnergy(cardRef.card) && isSpecialEnergyCard(cardRef.card)) {
@@ -5274,6 +5357,7 @@ export function validateLegality(state, command) {
           ).length,
           handEnergyCount: (player.zones?.hand || []).filter((c) => isEnergy(c)).length,
           handPokemonCount: (player.zones?.hand || []).filter((c) => isPokemon(c)).length,
+          evolutionCardsLocked: abilityEvolutionCardLock(abilitySideContext(state, playerId)),
           ...trainerTargetCounts(
             player,
             ownedCards(player),
@@ -7731,7 +7815,11 @@ function resolveAttackEffectPhase(draft, ctx) {
       // DEFENDING player.
       // Defender (base1-80) on the attacker: "Damage done to that Pokémon by attacks" includes its own.
       const recoil = attacker
-        ? Math.max(0, parsed.selfDamage - attachedTrainerDamageReduction(attackerPlayer?.zones?.active || [], attacker))
+        ? legacyModifiedDamage(draft, {
+            victim: attacker,
+            victimPlayerId: playerId,
+            amount: Math.max(0, parsed.selfDamage - attachedTrainerDamageReduction(attackerPlayer?.zones?.active || [], attacker)),
+          })
         : parsed.selfDamage;
       const selfDamage = recoil + stadiumSelfDamage;
       if (selfDamage > 0 && attacker) {
