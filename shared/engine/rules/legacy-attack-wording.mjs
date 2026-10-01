@@ -34,6 +34,12 @@ export const LEGACY_ATTACK_REWRITES = [
     /(^|\. |, )put a number of damage counters on your opponent's active pokémon so that its remaining hp (?:are|is) (\d+)(?=\.|$)/g,
     "$1put damage counters on your opponent's active pokémon until its remaining hp is $2",
   ],
+  // Dark Golduck [Team Rocket 37] Third Eye: the discard is the attack's cost, as in Kadabra
+  // [Base Set 32] Recover's "… in order to use this attack. Remove all damage counters …".
+  [
+    /(^|\. )(discard (?:1|an?) energy cards? attached to this pokémon) in order to draw up to (\d+) cards(?=\.|$)/g,
+    '$1$2 in order to use this attack. draw up to $3 cards',
+  ],
   // Togepi [Neo Destiny 56] Charm.
   [
     /(^|\. )if your opponent's active pokémon attacks during your opponent's next turn, any damage it does is reduced by (\d+)/g,

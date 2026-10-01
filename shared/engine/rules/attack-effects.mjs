@@ -1010,7 +1010,10 @@ export function parseAttackEnergyDiscard(attack) {
     return { all: true, count: Infinity, energyType: null };
   }
 
-  if (/\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(sentence)) return null;
+  // What follows "in order to" is what the cost buys (Dark Golduck Third Eye: "… in order to draw
+  // up to 3 cards"), not part of the count.
+  const costClause = sentence.replace(/\s+in order to\b.*$/, '');
+  if (/\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(costClause)) return null;
 
   // "Discard a {W} and a {L} Energy attached to this Pokémon"; Lugia ex Elemental Blast lists
   // three: "Discard a {R} Energy, {W} Energy, and {L} Energy attached to …".

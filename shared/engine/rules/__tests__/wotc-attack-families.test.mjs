@@ -134,6 +134,28 @@ test('runtime: Hypno Prophecy looks at the 2 cards chosen and reorders only thos
   assert.deepEqual(done.state.players.p2.zones.deck.slice(0, 2).map((c) => c.instanceId), [2050, 2052]);
 });
 
+// Dark Golduck [Team Rocket 37] Third Eye ≡ the Kadabra [Base Set 32] Recover cost wording.
+const THIRD_EYE = 'Discard 1 Energy card attached to Dark Golduck in order to draw up to 3 cards.';
+
+test('Third Eye ≡ "Discard 1 Energy card … in order to use this attack. Draw up to 3 cards."', () => {
+  sameAsModern(
+    THIRD_EYE,
+    'Dark Golduck',
+    'Discard 1 Energy card attached to Dark Golduck in order to use this attack. Draw up to 3 cards.',
+    'Dark Golduck'
+  );
+});
+
+test('runtime: Third Eye discards the Energy and draws the number chosen', () => {
+  const golduck = { instanceId: 1, name: 'Dark Golduck', hp: 60, attacks: [{ name: 'Third Eye', cost: [], damage: '', text: THIRD_EYE }] };
+  const board = duelBoard(golduck, FOE);
+  board.players.p1.zones.active.push(createCard({ instanceId: 5, name: 'Psychic Energy', supertype: 'Energy', type: 'Energy', attachedTo: 1 }));
+  const asked = attackOnTurn(board, 'p1', 2, 0);
+  const drew = resolve(asked, [3]).state.players.p1.zones;
+  assert.equal(drew.hand.length, 3);
+  assert.ok(drew.discard.some((c) => c.instanceId === 5));
+});
+
 // ── Focus Energy ────────────────────────────────────────────────────────────────────────────
 
 // Lt. Surge's Rattata [Gym Heroes 82] / [Gym Challenge 85]: "Lt." is not a sentence end, so the
