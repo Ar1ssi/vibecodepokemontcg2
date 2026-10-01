@@ -590,6 +590,14 @@ import test from 'node:test';
       });
     }
 
+    test('tcgAbilityFromDetail: Base Set 2 "Poke-POWER" is restored to its printed "Pokemon Power"', () => {
+      // TCGdex base4-2 Blastoise; the corpus prints Blastoise [Base Set 2 2] as "Pokémon Power".
+      const entry = { type: 'Poke-POWER', name: 'Rain Dance', effect: 'r' };
+      assert.equal(tcgAbilityFromDetail({ id: 'base4-2', set: { id: 'base4' }, abilities: [entry] }).type, 'Pokemon Power');
+      assert.equal(tcgAbilityFromDetail({ id: 'base4-2', abilities: [entry] }).type, 'Pokemon Power');
+      assert.equal(tcgAbilityFromDetail({ id: 'ecard1-1', set: { id: 'ecard1' }, abilities: [entry] }).type, 'Poke-POWER');
+    });
+
     test('tcgAbilityFromDetail: Ability outranks a Power/Body, which outranks an Ancient Trait; empty entries skipped', () => {
       const power = { type: 'Poke-POWER', name: 'Power', effect: 'p' };
       const body = { type: 'Poke-BODY', name: 'Body', effect: 'b' };

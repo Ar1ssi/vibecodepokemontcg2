@@ -6,18 +6,20 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I239). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I242). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I241 2026-10-01 P3 [rules] Some TCGdex ability entries are empty ({type} only: neo2-49 Unown M, neo3-35 Parasect, ecard2-95a Mr. Mime, ex16-84/86…), so those cards still have no ability live (I233 follow-up)
+- I240 2026-10-01 P2 [client] rules-bridge.js ~2981 announces and auto-runs a played Pokémon's ability steps; now that Powers/Bodies load, old wordings that parse as draw/when-played steps may fire on play — audit (I233 follow-up)
+- I239 2026-10-01 P2 [rules] Modern "has no Abilities" locks (Garbotoxin, Path to the Peak) also stop Pokémon Powers/Poké-Powers/Poké-Bodies (isAbilitySuppressed ignores type); basep promos' Poke-POWER vs printed "Pokémon Power" unsourced, so Toxic Gas skips them — needs rulings (I233 follow-up)
 - I238 2026-10-01 P3 [rules] applyFlatDamageToTarget never applies an Active Defender's −20 to a clause without activeWR ("Don't apply W/R" snipes) — predates 062 (review flag)
 - I237 2026-10-01 P3 [rules] Tapu Storm-GX "If your opponent has no Benched Pokémon, this attack does nothing" seems unparsed; shuffle step has no bench check — unverified (062 group 3 note)
 - I236 2026-10-01 P3 [rules] Baby residue: a Basic evolved from a Baby still counts as Basic for stage effects (ruling: Evolved Pokémon); Celebrations Cleffa cel-20 missing from the Baby marker table
 - I235 2026-10-01 P3 [rules] Lt. Surge's Secret Plan (gym2-107) does nothing: engine can't keep an in-play card face down and flip it on attack/Power/evolve/retreat/damage
 - I234 2026-10-01 P3 [rules] Attach-Trainer residue: legacy client still discards them; drag straight onto a Pokémon refused (board drop works); Defender vs direct Bench snipes; Platinum PlusPower, Undaunted Defender, Weakness Guard uncovered
-- I233 2026-10-01 P1 [rules] Live games drop TCGdex 'Pokemon Power'/'Poke-POWER'/'Poke-BODY' abilities (rules-state.mjs tcgAbilityFromDetail keeps Ability/Ancient Trait only; cardStats drops type) — WotC Power fixes are test-only; fix in progress (user approved)
 - I229 2026-10-01 P2 [rules] 73 WotC passive Powers still unconsumed after 062: Thick Skinned (status immunity can't see Ability locks), Energy Burn, Transform, Clairvoyance, Rebellion, Psylink, Legendary Body, Spikes, Deep Sleep, Miraculous Wind, Transparency coin (062 group 4)
 - I228 2026-10-01 P2 [rules] WotC Powers still half-run: Dark Golbat Sneak Attack/Dark Crobat Surprise Bite (no Power-damage executor), Call the Boss, Evolutionary Light, Unown E/V/H, Light Togetic Gift, Buzzap (062 group 4)
 - I227 2026-10-01 P2 [rules] WotC attacks left after 062 (64 no-effect, 27 partial): Mirror Move, Counter/Mirror Shell/Crosscounter/Reflect Shield, Slime/Dodge/Shadow Images, Endure/Armor Up, Lock-on, Fling gate, Giant Growth, Burning Flame discard, single-printing rows
@@ -74,6 +76,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I233 2026-10-01 P1 [rules] Live games drop TCGdex 'Pokemon Power'/'Poke-POWER'/'Poke-BODY' abilities (rules-state.mjs tcgAbilityFromDetail keeps Ability/Ancient Trait only; cardStats drops type) — WotC Power fixes are test-only; fix in progress (user approved) → closed 2026-10-01 S336: tcgAbilityFromDetail keeps Power/Body types with {type}, cardStats carries type, Base Set 2 restored to "Pokemon Power"; residue I239–I241
 - I232 2026-10-01 P3 [legacy] Legacy (non-authoritative) client trainer path has no discardOwnAttachedEnergy case and ignores healAmount target 'costHost': WotC Super Potion/Super Energy Removal skip their cost there (design 062 review; see I222) → closed 2026-10-01 S336: trainer-execution.js runs discardOwnAttachedEnergy and heals the costHost (design 062 follow-up)
 - I231 2026-10-01 P3 [rules] Reset Stamp (Unified Minds 206) parses as opponentShuffleHandDraw count 4 instead of "a card for each of their remaining Prize cards" — misparse predates 062, which only added the shuffle (design 062 review) → closed 2026-10-01 S336: draws one card per remaining Prize, server and legacy client
 - I230 2026-10-01 P3 [rules] Baby Rule not enforced (attacker flips; tails ends the turn); TCGdex neo1-12 Pichu has no rule text or Baby→Basic evolve link. Rule wording must be sourced first (audit F8; refs: design 062 refs/062-wotc-card-audit) → closed 2026-10-01 S336: baby-rule.mjs — attacker flips vs an Active Baby (pkmncards neo1-12 rules box), Baby → Basic evolution; residue I236

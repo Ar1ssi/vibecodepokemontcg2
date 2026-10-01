@@ -216,6 +216,13 @@
     // through HGSS; TCGdex also types Base Set 2 reprints "Poke-POWER"). The printed type is
     // kept on the result: Toxic Gas, Goop Gas and Seal Off tell Powers from Bodies by it alone.
     const LEGACY_POWER_TYPE = /^pok[eé](?:mon)?[- ](?:power|body)$/i;
+    // Base Set 2 prints "Pokémon Power" (corpus: Blastoise [Base Set 2 2]) but TCGdex types its
+    // 9 Powers "Poke-POWER"; Toxic Gas reads the printed type, so restore it.
+    const POKEMON_POWER_SETS = new Set(['base4']);
+    function printedPowerType(detail, type) {
+      const setId = detail?.set?.id || String(detail?.id || '').split('-')[0];
+      return POKEMON_POWER_SETS.has(setId) && /^pok[eé][- ]power$/i.test(type) ? 'Pokemon Power' : type;
+    }
 
     export function tcgAbilityFromDetail(detail) {
       if (detail?.ability?.text || detail?.ability?.name) return detail.ability;
@@ -230,7 +237,7 @@
         entries.find((a) => LEGACY_POWER_TYPE.test(typeOf(a))) ||
         entries.find((a) => typeOf(a).toLowerCase() === 'ancient trait');
       if (!entry) return null;
-      return { name: entry.name || '', text: entry.effect || entry.text || '', type: typeOf(entry) };
+      return { name: entry.name || '', text: entry.effect || entry.text || '', type: printedPowerType(detail, typeOf(entry)) };
     }
 
     // Network: fetch (and memoize) one raw TCGdex card detail by id. Shared by

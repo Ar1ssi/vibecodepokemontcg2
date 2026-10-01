@@ -5,10 +5,9 @@
 
 Focus: WotC Gen 1/2 card audit fixed on main (S336, design 062, D202): untyped Stadiums/Tools, Trainer
   costs, attach-Trainers, dead/passive Trainers & Gyms, ~105 attack printings, Rain Dance/Toxic Gas/damage
-  Powers, Baby Rule. Process: docs/card-era-audit-and-fix-process.md. Residue: I227–I229, I233–I238.
-Active: I233 (live games drop Pokemon Power/Poke-POWER/Poke-BODY abilities; user approved enabling) —
-  agent branch worktree-agent-a0cdd99c9e69c0f6d, not landed. ETB (design 057) slice 6 not started.
-Next: land I233 (full test + 4 audits), then I227–I229 residue; user look on localhost (SERVER_AUTHORITATIVE=1):
+  Powers, Baby Rule. Process: docs/card-era-audit-and-fix-process.md. Residue: I227–I229, I234–I241.
+Active: none. ETB (design 057) slice 6 not started. Old Powers/Poké-Bodies now load in live games (I233 closed).
+Next: I239–I240 (Power interactions now live), then I227–I229 residue; user look on localhost (SERVER_AUTHORITATIVE=1):
   WotC Gyms/attach-Trainers/Baby flip, holo art windows (D201), deck reveals, 057 taste calls.
   Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
