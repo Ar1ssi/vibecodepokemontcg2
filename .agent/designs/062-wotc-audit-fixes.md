@@ -153,3 +153,5 @@ when-played Powers · F7 90 passive Powers · F8 Baby Rule (wording must be sour
 - Slice A: Tool regex uses `.+?` instead of `[^.]+?` before " to 1 of your Pokémon" — neo4-93 "EXP.ALL" has a dot in its name (row A expects 'Tool').
 - Slice B: modern Red Card ("shuffles their hand into their deck and draws 4") now also gets `shuffle: true` — correct per its printed text; edge row 7 "byte-identical" holds only for Special Red Card.
 - Slice B: an unpayable hand cost is refused by the existing play gate (trainer-play-conditions.mjs) before the executor; the own-Energy cost got the same gate (`ownAttachedEnergyCount`, passed by reduce.mjs) — added inline after review.
+- Slice C: `audit:abilities` flagged Energy Trans/Gather Fire/Soak Up/Energy Charge as "new clause:attach-from-deck" — the audit heuristic (`scripts/lib/attack-behaviour.mjs` MECH) read "take … attached to … and attach it to" as a deck attach; it now skips that form (audit PASSED, Poliwrath Plunge improved).
+- Slice D: one extra rewrite entry first in the list collapses ".." left by a stripped reminder (Metapod [Neo Discovery 42] Harden prints its period after the parenthesis).

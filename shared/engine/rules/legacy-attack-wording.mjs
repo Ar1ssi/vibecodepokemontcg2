@@ -5,6 +5,9 @@
  * on WotC-only phrasing, so modern wordings pass through unchanged.
  */
 export const LEGACY_ATTACK_REWRITES = [
+  // A period printed after a stripped reminder leaves ".." (Metapod [Neo Discovery 42] Harden:
+  // "prevent that damage. (Any other effects of attacks still happen).").
+  [/\.\.(?= |$)/g, '.'],
   [/prevent all damage done to this pokémon during your opponent's next turn/g, "during your opponent's next turn, prevent all damage done to this pokémon by attacks"],
   [/all damage done (?:by attacks )?to this pokémon during your opponent's next turn is reduced by (\d+)/g, "during your opponent's next turn, any damage done to this pokémon by attacks is reduced by $1"],
   [/during your opponent's next turn, whenever (\d+) or less damage is done to this pokémon(?: <wr:after>)?, prevent that damage/g, "during your opponent's next turn, if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon if that damage is $1 or less"],
