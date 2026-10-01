@@ -253,6 +253,7 @@ import {
   pokemonNamesMatch,
   requiresTurnEndOnEvolve,
 } from './rules/evolution.mjs';
+import { isBabyEvolution, isBabyPokemon } from './rules/baby-rule.mjs';
 import {
   addCondition,
   removeCondition,
@@ -992,6 +993,29 @@ function endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events })
   if (isGameConcluded(draft)) return;
   resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
   if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
+}
+
+/**
+ * Baby rule (I230, baby-rule.mjs): when the opponent's Active is a Baby Pokémon, the attacker
+ * flips before anything else — before Confusion (WotC chat Nov 14, 2002, Q8: "Baby rule.") and
+ * before any cost is paid. Tails ends the turn without an attack. True when the attack stops.
+ */
+function babyRuleStopsAttack(draft, { playerId, oppId, attacker, attack, activeRng, events }) {
+  const oppActive = draft.players[oppId]?.zones?.active || [];
+  const root = oppActive.find((c) => !c.attachedTo);
+  if (!isBabyPokemon(topPokemonCard(oppActive, root))) return false;
+  const face = flipCoin(activeRng);
+  events.push({ type: 'coinFlipped', playerId, face, source: 'Baby rule', instanceId: root.instanceId });
+  if (face === 'heads') return false;
+  events.push({
+    type: 'attackPrevented',
+    playerId,
+    attackerId: attacker?.instanceId ?? null,
+    attackName: attack?.name,
+    source: 'Baby rule',
+  });
+  endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+  return true;
 }
 
 /**
@@ -4492,6 +4516,8 @@ export function validateLegality(state, command) {
             ? order[order.indexOf(baseStage) + 1]
             : null;
         const evoStage = normalizeStage(cardRef.card.stage) || inferredStage;
+        // A Basic played onto the Baby it "Evolves into" is an Evolution card (baby-rule.mjs).
+        if (evoStage === 'Basic' && isBabyEvolution(topTarget, cardRef.card)) return { allowed: true };
         if (!evoStage || evoStage === 'Basic') {
           return {
             allowed: false,
@@ -8800,6 +8826,11 @@ export function applyCommand(state, command, rng = null) {
         name: 'Attack',
         damage: 10,
       };
+      const oppId = Object.keys(draft.players || {}).find(
+        (id) => id !== playerId
+      );
+      if (babyRuleStopsAttack(draft, { playerId, oppId, attacker, attack, activeRng, events })) break;
+
       // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
       // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
       if (attacker && !isStadiumToolNegation(draft.stadium?.card || draft.stadium)) {
@@ -8808,9 +8839,6 @@ export function applyCommand(state, command, rng = null) {
         }
       }
 
-      const oppId = Object.keys(draft.players || {}).find(
-        (id) => id !== playerId
-      );
       const defenderPlayer = draft.players[oppId];
       let defender = null;
       let defenderPlayerId = oppId;

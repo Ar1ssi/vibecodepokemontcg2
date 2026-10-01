@@ -15,6 +15,7 @@ import {
   isModernMegaCard,
   isLegacyMegaCard as isLegacyMegaOrPrimalCard,
 } from './card-classify.mjs';
+import { isBabyEvolution } from './baby-rule.mjs';
 
 export const STAGE1_EVOLVES_FROM = new Map([
   ['piloswine', 'swinub'],
@@ -167,7 +168,9 @@ export async function resolveStage1EvolvesFrom(stage1Name) {
           return base;
         }
       }
-    } catch {}
+    } catch {
+      // Offline or TCGdex miss: the caller treats null as "cannot resolve".
+    }
   }
   return null;
 }
@@ -243,6 +246,8 @@ export async function canEvolve(
   const baseName = String(baseCardInPlay.name || '').toLowerCase();
   const rareCandyJump = isRareCandyJump(baseCardInPlay, evolutionCardInHand);
   const isRareCandy = Boolean(options.isRareCandy);
+  // A Basic played onto the Baby it "Evolves into" is an Evolution card (baby-rule.mjs).
+  const babyEvolution = evoStage === 'Basic' && isBabyEvolution(baseCardInPlay, evolutionCardInHand);
 
   if (isRareCandy) {
     if (!rareCandyJump) {
@@ -268,7 +273,7 @@ export async function canEvolve(
         reason: `${evolutionCardInHand.name} evolves from ${evolutionCardInHand.evolvesFrom}${parentLine}, not ${baseCardInPlay.name}.`,
       };
     }
-  } else {
+  } else if (!babyEvolution) {
     // Normal evolution without Rare Candy
     if (evolvesFrom && baseName && !pokemonNamesMatch(evolvesFrom, baseName)) {
       return {
