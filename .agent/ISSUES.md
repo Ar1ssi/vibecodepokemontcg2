@@ -6,12 +6,24 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I224). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I245; I224–I232 are reserved by design 062's unmerged branch). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I244 2026-10-01 P2 [rules] A second Pokémon Tool attaches through playTrainer when targetInstanceId is given (trainer.mjs:231); attachCard and the prompt path refuse it — not era-specific (refs: refs/063-bw-card-audit F9)
+- I243 2026-10-01 P2 [rules] BW Trainer parses: Dark Patch type-word filter, Colress Machine/Heavy Ball search kind, Grunt/Communication/Superior ER/Scramble Switch costs, Pokédex; Eviolite/Dark Claw/Crystal Edge holder gates; G Booster/G Scope/Victory Piece/Crystal Wall unbuilt (refs/063 F9)
+- I242 2026-10-01 P3 [data] BW TCGdex quirks: bwp-BW78 Raichu Stage1 with no evolveFrom evolves onto any Pokémon (reduce.mjs:4508 skips the name check); bw11-RC23, bwp-BW51/76/91 lack a retreat field → free retreat (refs: refs/063-bw-card-audit F10)
+- I241 2026-10-01 P1 [rules] BW Trainer staples misplay: Pokémon Catcher never flips (trainer-effects.mjs:1192), Rocky Helmet/Rock Guard never fire (tool-combat.mjs:641), N doesn't shuffle, Aspertia City Gym −10 HP, Virbank no server effect, Battle City discards 2 (refs/063 F9)
+- I240 2026-10-01 P2 [rules] BW activated Abilities half-run: when-played Aggron Toppling Wind, Salamence Breakwing, Shiftry Giant Fan; Ho-Oh-EX Rebirth (benchFromDiscardAbility), Salamence Scornful Storm, Ninjask Cast-off Shell (refs: refs/063-bw-card-audit F8)
+- I239 2026-10-01 P2 [rules] Wrong reads: Klinklang Plasma Steel shields every type from EX (ability-combat.mjs:560, no "your {M} Pokémon" filter); Silver Bangle +30 to all attacks (tool-combat.mjs:288 lacks the hyphen in "Pokémon-EX") (refs/063 F7)
+- I238 2026-10-01 P2 [rules] 25 BW passive Abilities unenforced (probed with/without text): Heal Block, Badge of Discipline, Allergy Panic, Leaf Tailor, Weak Barrier, Smooth Coat, Craftsmanship, Empty Shell, Aftermath, Final Wish, Dark Aura, Cursed Glare… (refs/063 F6)
+- I237 2026-10-01 P2 [rules] 28 BW attacks partial: 8 condition phrasings parseConditionClause can't read (full HP, fewer HP than defender, no Retreat Cost, Burned or Poisoned…), unresolved counts (Chuck, Vilify), 2-coin both-heads, mill-then-attach (refs/063 F5, App. A)
+- I236 2026-10-01 P2 [rules] 18 BW attacks do nothing beyond damage: Constant Rattle, Doom Decree, Devour/Jet Woofer, discard→deck top, Spit Squall/Strong Breeze, Vengeful Wish, Misinformation, Psyjamming, Fossil Hunt, Picnic Weather (refs/063 F4, App. A)
+- I235 2026-10-01 P2 [rules] No BW ACE SPEC recognised (TCGdex rarity "Rare"; isAceSpecCard card-classify.mjs:143): decks accept several, Spiritomb Sealing Scream misses them — add an ace-spec marker to the D200 generator (refs/063 F3)
+- I234 2026-10-01 P1 [rules] Team Plasma unread in live games: server cards carry no subtypes, only search-match.mjs:92 asks hasCardMarker — Sawk/Houndoom/Haxorus/Teampact, Raiden Knuckle, Power Connect, Freeze Zone, Frozen City, Silver Mirror, Plasma Badge (refs: D200, refs/063 F2)
+- I233 2026-10-01 P1 [rules] TCGdex BW text kills readers: type words ("Darkness Energy", "Colorless more") unread by passive Abilities (Darkrai-EX Dark Cloak, Stickiness, Psychic Mirage, Royal Garden) and Rayquaza-EX Dragon Burst; U+FFFD and typos (refs/063 F1)
 - I223 2026-09-30 P3 [rules] I219 residue: Ability shields cover executor steps and Checkup counters, not passive opponent-Ability modifiers; Lunatone only stops between-turns Stadium damage; Seeker, Cyrus ◇, Bellelba bench cut ignore shields; Power Cancel unmodeled
 - I222 2026-09-30 P3 [legacy] Legacy client trainer path has no chooseMode/optionalDiscardCost/deckTop case and skips requiresHandCost: Kieran, Klara etc. do nothing, Guzma & Hala and Red & Blue get the bonus free, Ingo & Emmet offers the top card (refs: trainer-execution.js, design 061, I84)
 - I214 2026-09-29 P3 [rules] Legacy (non-authoritative) client trainer path ignores attach targets: attachFromDiscard offers every in-play Pokémon and one Energy (Sada's Vitality, Reboot Pod, all others) (refs: client/src/setup/rules/trainer-execution.js, design 058 A5)
