@@ -7,7 +7,8 @@ Focus: rules backlog I219–I221 + I190 closed on main (S335): card-effect shiel
   Lustrous Body, Milotic…), printed-marker table for Tera/Strike/Plasma/Baby/Prism/TAG TEAM searches (D200),
   optional-cost bonuses, Missing Clover/Cross Switcher/Sabrina's Suggestion/Bellelba. Residue: I223.
 Active: none. ETB (design 057, D195) slice 6 (rec-etb recorder + shared recorder lib) not started.
-Next: user look on localhost (SERVER_AUTHORITATIVE=1): deck reveals (Ultra Ball, Earthen Vessel, Quick Search
+Next: user look on localhost (SERVER_AUTHORITATIVE=1): holo art windows (Neo holo, reverse-holo Trainer,
+  holo prize/discard viewer; D201); deck reveals (Ultra Ball, Earthen Vessel, Quick Search
   stays hidden); deck builder Special filter Ancient/Future pills; /build-and-battle and
   /deck-builder?etb=phantasmal-flames-etb (057 taste calls); then 057 slice 6; design 056 (3D box, I209);
   then top of ISSUES.md (I223 shield residue, I222 legacy trainer path).

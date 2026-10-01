@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D201).
+#   Next id = highest D number in this file and the archive + 1 (next: D202).
 
 ## Active
+- D201 2026-10-01 [board-ui] Holo art window (`--art-*`) keys on `data-card-layout` (printed box per layout, Trainers apart); `data-card-era` only picks the foil pattern — one era spans boxes of different sizes.
 - D200 2026-09-30 [rules] Markers TCGdex lacks (Tera, Team Plasma, Strike styles, Baby, Prism Star, TAG TEAM) come from a generated table: pkmncards is:/stage: lists matched to TCGdex by number and name. (I220)
 - D199 2026-09-30 [rules] "Choose 1" modes and deck-top order reuse the label-option and one-pick-per-position prompts, not new selectMode/orderCards pendingChoice types: same rules result, no netcode change. (design 061)
 - D198 2026-09-30 [rules] `cardsRevealed` names a deck pick taken into the hand only when the printed text reveals it (reveal-picks.mjs); public reveals carry `src`, stamped at the applyCommand tail; attack searches reveal when printed. (design 059)
