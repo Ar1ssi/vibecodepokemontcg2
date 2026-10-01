@@ -318,7 +318,10 @@ function amountScale(unit, ctx) {
 function timesAsForEach(text) {
   return text
     .split(/(?<=\.)\s+/)
-    .map((sentence) => {
+    .map((printed) => {
+      // Older prints drop the "more" (Granbull [Neo Genesis 37] Raging Charge: "10 damage plus 10
+      // damage for each damage counter on Granbull").
+      const sentence = printed.replace(/plus (\d+) damage for each/, 'plus $1 more damage for each');
       const unit = /damage times the (?:amount|number) of (.+)/.exec(sentence)?.[1];
       if (!unit || /\benergy\b/.test(unit)) return sentence;
       return sentence

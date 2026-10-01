@@ -541,6 +541,63 @@ test('runtime: Zzzap hits only Pokémon with a Pokémon Power; Dust Devil only n
   assert.deepEqual([20, 21].map((id) => damageOn(dusted, 'p2', id)), [10, 0]);
 });
 
+// ── "N damage plus M damage for each …" (no "more") ─────────────────────────────────────────
+
+const RAGING_CHARGE = // Granbull [Neo Genesis 37] Raging Charge : 10+
+  'This attack does 10 damage plus 10 damage for each damage counter on Granbull. Then, Granbull does 20 damage to itself.';
+const WATER_PUNCH = // Misty's Poliwhirl [Gym Heroes 53] Water Punch : 30+
+  "Flip a number of coins equal to the number of {W} Energy attached to Misty's Poliwhirl. This attack does 30 damage plus 10 damage for each heads.";
+const PSYBURST = // Shining Mewtwo [Neo Destiny 109] Psyburst : 40+
+  'Discard a {R} Energy card attached to Shining Mewtwo or this attack does nothing. This attack does 40 damage plus 10 damage for each Energy attached to the Defending Pokémon.';
+
+test('"plus N damage for each" ≡ "plus N more damage for each"', () => {
+  const ctx = { attackerDamage: 30, attackerDamageCounters: 3, headsCount: 2, defenderPresent: true, opponentEnergyCount: 2 };
+  const parse = (text, name, damage) => {
+    const { total, components, notes, selfDamage } = parseAttackDamage({ damage, text }, { name }, {}, ctx);
+    return { total, components, notes, selfDamage };
+  };
+  for (const [text, name, damage] of [
+    [RAGING_CHARGE, 'Granbull', '10+'],
+    [WATER_PUNCH, "Misty's Poliwhirl", '30+'],
+    [PSYBURST, 'Shining Mewtwo', '40+'],
+  ]) {
+    const old = parse(text, name, damage);
+    assert.doesNotMatch(old.notes.join(' '), /resolve the printed/, text);
+    assert.deepEqual(old, parse(text.replace(/plus (\d+) damage for each/, 'plus $1 more damage for each'), name, damage));
+  }
+});
+
+const attachEnergy = (state, playerId, host, ids, energyType) => {
+  for (const instanceId of ids) {
+    state.players[playerId].zones.active.push(
+      createCard({ instanceId, name: `${energyType} Energy`, supertype: 'Energy', type: 'Energy', energyType, attachedTo: host })
+    );
+  }
+};
+
+test('runtime: Raging Charge, Water Punch and Psyburst add their per-unit damage', () => {
+  const granbull = { instanceId: 1, name: 'Granbull', hp: 100, damage: 30, attacks: [{ name: 'Raging Charge', cost: [], damage: '10+', text: RAGING_CHARGE }] };
+  const charged = attackOnTurn(duelBoard(granbull, { ...FOE, hp: 200 }), 'p1', 2, 0).state;
+  assert.equal(damageOn(charged, 'p2', 20), 40);
+  assert.equal(damageOn(charged, 'p1', 1), 50);
+
+  const poliwhirl = { instanceId: 1, name: "Misty's Poliwhirl", hp: 80, attacks: [{ name: 'Water Punch', cost: [], damage: '30+', text: WATER_PUNCH }] };
+  const punchBoard = duelBoard(poliwhirl, { ...FOE, hp: 200 });
+  attachEnergy(punchBoard, 'p1', 1, [5, 6, 7], 'Water');
+  const punched = attackOnTurn(punchBoard, 'p1', 2, 0);
+  const flips = punched.events.find((e) => e.type === 'attackCoinFlipped');
+  assert.equal(flips.flips.length, 3);
+  assert.equal(damageOn(punched.state, 'p2', 20), 30 + 10 * flips.headsCount);
+
+  const mewtwo = { instanceId: 1, name: 'Shining Mewtwo', hp: 80, attacks: [{ name: 'Psyburst', cost: [], damage: '40+', text: PSYBURST }] };
+  const burstBoard = duelBoard(mewtwo, { ...FOE, hp: 200 });
+  attachEnergy(burstBoard, 'p1', 1, [5], 'Fire');
+  attachEnergy(burstBoard, 'p2', 20, [25, 26], 'Water');
+  const burst = attackOnTurn(burstBoard, 'p1', 2, 0).state;
+  assert.equal(damageOn(burst, 'p2', 20), 60);
+  assert.ok(burst.players.p1.zones.discard.some((c) => c.instanceId === 5));
+});
+
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────
 
 const TAIL_WAG = // Eevee [Jungle 51] Tail Wag
