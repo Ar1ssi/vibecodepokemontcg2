@@ -107,12 +107,18 @@ function coinTierBonuses(text) {
   const flips = /flip (\d+) coins/.exec(text);
   if (!flips) return null;
   const tiers = new Map();
+  // Seaking [Neo Revelation 37] Horn Swipe prints "If both are heads, …".
   const re =
-    /if (?:(\d+|all|both) of them (?:is|are) heads|you get (\d+) heads), this attack does (?:\d+ damage plus )?(\d+) more damage/g;
+    /if (?:(\d+|all|both) of them (?:is|are) heads|(both) are heads|you get (\d+) heads), this attack does (?:\d+ damage plus )?(\d+) more damage/g;
   for (const m of text.matchAll(re)) {
-    const word = m[1] ?? m[2];
+    const word = m[1] ?? m[2] ?? m[3];
     const heads = word === 'all' || word === 'both' ? Number(flips[1]) : Number(word);
-    tiers.set(heads, Number(m[3]));
+    tiers.set(heads, Number(m[4]));
+  }
+  // Scyther [Neo Discovery 46] Fury Cutter: "… 10 more damage if exactly 1 is heads, or 20 more
+  // damage if exactly 2 are heads, … or 80 more damage if all 4 are heads."
+  for (const m of text.matchAll(/(\d+) more damage if (?:exactly (\d+) (?:is|are)|all (?:\d+ )?are) heads/g)) {
+    tiers.set(m[2] ? Number(m[2]) : Number(flips[1]), Number(m[1]));
   }
   return tiers.size > 0 ? tiers : null;
 }

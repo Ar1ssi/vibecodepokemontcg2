@@ -656,6 +656,39 @@ test('runtime: Fin Slap, Splash About and Slap Awake add their bonus only when t
   assert.equal(damageOn(hit(wigglytuff, {}), 'p2', 20), 20);
 });
 
+// ── coin tiers ──────────────────────────────────────────────────────────────────────────────
+
+const FURY_CUTTER = // Scyther [Neo Discovery 46] Fury Cutter : 10+
+  'Flip 4 coins. This attack does 10 damage plus 10 more damage if exactly 1 is heads, or 20 more damage if exactly 2 are heads, or 40 more damage if exactly 3 are heads, or 80 more damage if all 4 are heads.';
+const HORN_SWIPE = // Seaking [Neo Revelation 37] Horn Swipe : 20+
+  'Flip 2 coins. If both are heads, this attack does 20 damage plus 40 more damage. If 1 or both of them are tails, this attack does 20 damage.';
+
+test('Fury Cutter / Horn Swipe coin tiers', () => {
+  const dealt = (text, damage, heads) => parseAttackDamage({ damage, text }, { name: 'Zed' }, {}, { headsCount: heads }).total;
+  assert.deepEqual([0, 1, 2, 3, 4].map((h) => dealt(FURY_CUTTER, '10+', h)), [10, 20, 30, 50, 90]);
+  assert.deepEqual([0, 1, 2].map((h) => dealt(HORN_SWIPE, '20+', h)), [20, 20, 60]);
+  // Horn Swipe ≡ the modern "If both of them are heads, this attack does 40 more damage."
+  assert.equal(dealt('Flip 2 coins. If both of them are heads, this attack does 40 more damage.', '20+', 2), 60);
+});
+
+test('runtime: Fury Cutter and Horn Swipe deal the tier of the coins flipped', () => {
+  const tiers = { FURY: [10, 20, 30, 50, 90], HORN: [20, 20, 60] };
+  for (const [key, text, damage] of [
+    ['FURY', FURY_CUTTER, '10+'],
+    ['HORN', HORN_SWIPE, '20+'],
+  ]) {
+    const seen = new Set();
+    for (let seed = 1; seed <= 12; seed += 1) {
+      const mine = { instanceId: 1, name: 'Zed', hp: 80, attacks: [{ name: 'Hit', cost: [], damage, text }] };
+      const result = attackOnTurn(duelBoard(mine, { ...FOE, hp: 200 }), 'p1', 2, 0, seed);
+      const heads = result.events.find((e) => e.type === 'attackCoinFlipped').headsCount;
+      seen.add(heads);
+      assert.equal(damageOn(result.state, 'p2', 20), tiers[key][heads], `${key} ${heads} heads`);
+    }
+    assert.ok([...seen].some((heads) => tiers[key][heads] > tiers[key][0]), `${key}: no bonus tier seen`);
+  }
+});
+
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────
 
 const TAIL_WAG = // Eevee [Jungle 51] Tail Wag
