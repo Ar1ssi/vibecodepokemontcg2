@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAttackSteps } from '../attack-steps.mjs';
+import { parseNextTurnLock } from '../attack-effects.mjs';
 import { createGameState } from '../../state.mjs';
 import { createCard } from '../../cards.mjs';
 import { createRng } from '../../rng.mjs';
@@ -152,4 +153,41 @@ test("runtime: Lt. Surge's Raticate Double-edge after Focus Energy does 80, and 
   const plain = attackOnTurn(duelBoard(raticate, foe), 'p1', 2, 1).state;
   assert.equal(damageOn(plain, 'p2', 20), 40);
   assert.equal(damageOn(plain, 'p1', 1), 20);
+});
+
+// ── Scary Face ──────────────────────────────────────────────────────────────────────────────
+
+// Spinarak [Neo Genesis 75] Scary Face.
+const SCARY_FACE =
+  "Flip a coin. If heads, until the end of your opponent's next turn, the Defending Pokémon can't attack or retreat.";
+
+test('Scary Face → attack and retreat lock on heads only', () => {
+  const attack = { name: 'Scary Face', text: SCARY_FACE };
+  assert.deepEqual(parseNextTurnLock(attack, { coin: 'heads' }), {
+    selfCannotAttack: false,
+    selfCannotUseAttack: null,
+    oppCannotRetreat: true,
+    oppCannotAttack: true,
+  });
+  assert.equal(parseNextTurnLock(attack, { coin: 'tails' }), null);
+});
+
+/** First seed in 1..60 whose single coin for `playerId`'s attack shows `face`. */
+function attackWithCoin(state, playerId, turnNumber, attackIndex, face) {
+  for (let seed = 1; seed <= 60; seed += 1) {
+    const result = attackOnTurn(structuredClone(state), playerId, turnNumber, attackIndex, seed);
+    if (result.events.find((e) => e.type === 'attackCoinFlipped')?.coin === face) return result;
+  }
+  assert.fail(`no ${face} seed in 1..60`);
+}
+
+test('runtime: Scary Face heads stops the Defending Pokémon attacking and retreating next turn', () => {
+  const spinarak = { instanceId: 1, name: 'Spinarak', hp: 40, attacks: [{ name: 'Scary Face', cost: [], damage: '', text: SCARY_FACE }] };
+  const foe = { instanceId: 20, name: 'Foe', hp: 100, retreatCost: [], attacks: [{ name: 'Hit', cost: [], damage: '10', text: '' }] };
+  const heads = attackWithCoin(duelBoard(spinarak, foe, { p2Bench: [{ instanceId: 21, name: 'Spare', hp: 60 }] }), 'p1', 2, 0, 'heads');
+  const next = heads.state;
+  next.turn = { player: 'p2', number: 3, phase: 'main' };
+  next.players.p2.flags = {};
+  assert.ok(applyCommand(structuredClone(next), { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p2' }, createRng(1)).error);
+  assert.ok(applyCommand(structuredClone(next), { type: 'retreat', payload: { benchInstanceId: 21 }, playerId: 'p2' }, createRng(1)).error);
 });

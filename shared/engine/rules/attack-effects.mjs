@@ -866,6 +866,16 @@ export function parseNextTurnLock(attack, { coin = null, headsCount = 0, conditi
     oppCannotAttack: false,
   };
 
+  // Spinarak [Neo Genesis 75] Scary Face: "until the end of your opponent's next turn, the
+  // Defending Pokémon can't attack or retreat."
+  if (
+    /(?:during|until\s+the\s+end\s+of)\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+attack\s+or\s+retreat/i.test(t) ||
+    /defending\s+pok[ée]mon\s+can(?:'t|not)\s+attack\s+or\s+retreat\s+(?:during|until\s+the\s+end\s+of)\s+your\s+opponent's\s+next\s+turn/i.test(t)
+  ) {
+    out.oppCannotAttack = true;
+    out.oppCannotRetreat = true;
+  }
+
   // Opponent retreat lock
   if (
     /(?:defending pok[ée]mon|it)\s+can(?:'t|not)\s+retreat\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
