@@ -265,6 +265,39 @@ test('runtime: Snivel and Growl cut the next attack on them, not after they leav
   assert.equal(damageOn(attackOnTurn(growled, 'p2', 3, 0).state, 'p1', 1), 30);
 });
 
+// ── Pulse Guard / Deflector ─────────────────────────────────────────────────────────────────
+
+const PULSE_GUARD = // Light Jolteon [Neo Destiny 48] Pulse Guard
+  "During your opponent's next turn, whenever 30 or more damage is done to Light Jolteon (after applying Weakness and Resistance), prevent that damage. (Any other effects of attacks still happen.)";
+const DEFLECTOR = // Chikorita [Neo Genesis 53] Deflector (Erika's Exeggcute [Gym Heroes 43] prints the same)
+  "During your opponent's next turn, whenever Chikorita takes damage, divide that damage in half (rounded down to the nearest 10). (Any other effects still happen.)";
+
+test('Pulse Guard → incomingPrevent minDamage 30; Deflector → incomingHalve', () => {
+  assert.deepEqual(
+    steps(PULSE_GUARD, 'Light Jolteon'),
+    marker('self', 'opponentNextTurn', { kind: 'incomingPrevent', filter: null, minDamage: 30 })
+  );
+  const halve = marker('self', 'opponentNextTurn', { kind: 'incomingHalve' });
+  assert.deepEqual(steps(DEFLECTOR, 'Chikorita'), halve);
+  assert.deepEqual(steps(DEFLECTOR.replace('Chikorita', "Erika's Exeggcute"), "Erika's Exeggcute"), halve);
+});
+
+/** Damage `mine` takes from a `hit`-damage attack on the turn after it used attack 0. */
+function hitAfterGuard(mine, hit) {
+  const foe = { ...FOE, attacks: [{ name: 'Hit', cost: [], damage: String(hit), text: '' }] };
+  const guarded = attackOnTurn(duelBoard(mine, foe), 'p1', 2, 0).state;
+  return damageOn(attackOnTurn(guarded, 'p2', 3, 0).state, 'p1', mine.instanceId);
+}
+
+test('runtime: Pulse Guard stops a 40 hit but not a 20; Deflector halves 50 to 20', () => {
+  const jolteon = { instanceId: 1, name: 'Light Jolteon', hp: 70, attacks: [{ name: 'Pulse Guard', cost: [], damage: '', text: PULSE_GUARD }] };
+  assert.equal(hitAfterGuard(jolteon, 40), 0);
+  assert.equal(hitAfterGuard(jolteon, 20), 20);
+  const chikorita = { instanceId: 1, name: 'Chikorita', hp: 100, attacks: [{ name: 'Deflector', cost: [], damage: '', text: DEFLECTOR }] };
+  assert.equal(hitAfterGuard(chikorita, 50), 20);
+  assert.equal(hitAfterGuard(chikorita, 40), 20);
+});
+
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────
 
 const TAIL_WAG = // Eevee [Jungle 51] Tail Wag

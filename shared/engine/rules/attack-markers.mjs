@@ -306,11 +306,15 @@ const MARKER_BODIES = [
     () => ({ kind: 'incomingPrevent', filter: null }),
   ],
   [
-    /^if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon if that damage is (\d+) or less$/,
+    /^if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon if that damage is (\d+) or (less|more)$/,
     'self',
     null,
-    (m) => ({ kind: 'incomingPrevent', filter: null, maxDamage: Number(m[1]) }),
+    // Light Jolteon [Neo Destiny 48] Pulse Guard prints "30 or more".
+    (m) => ({ kind: 'incomingPrevent', filter: null, [m[2] === 'less' ? 'maxDamage' : 'minDamage']: Number(m[1]) }),
   ],
+  // Chikorita / Erika's Exeggcute Deflector: "whenever Chikorita takes damage, divide that damage
+  // in half (rounded down to the nearest 10)". Halves the attack's final damage.
+  [/^whenever this pokémon takes damage, divide that damage in half$/, 'self', null, () => ({ kind: 'incomingHalve' })],
   // M Diancie-EX: guards the whole side while it stays Active.
   [
     /^prevent all damage done to each of your pokémon from (your opponent's pokémon-ex)$/,

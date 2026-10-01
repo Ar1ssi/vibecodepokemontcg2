@@ -321,11 +321,14 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       finalDamage - (prevention.reduce || 0) * 10 - (prevention.reduceHp || 0)
     );
   }
+  // Deflector: the damage the Pokémon takes, halved and rounded down to the nearest 10.
+  if (defenderEffects.some((m) => m.kind === 'incomingHalve')) finalDamage = Math.floor(finalDamage / 20) * 10;
   const markerPrevents = defenderEffects.some(
     (m) =>
       m.kind === 'incomingPrevent' &&
       incomingApplies(m) &&
-      (m.maxDamage == null || finalDamage <= m.maxDamage)
+      (m.maxDamage == null || finalDamage <= m.maxDamage) &&
+      (m.minDamage == null || finalDamage >= m.minDamage)
   );
   if (!prevented && markerPrevents) {
     prevented = true;
