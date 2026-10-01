@@ -6,12 +6,19 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I224). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I231). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I230 2026-10-01 P3 [rules] Baby Rule not enforced (attacker flips; tails ends the turn); TCGdex neo1-12 Pichu has no rule text or Baby→Basic evolve link. Rule wording must be sourced first (audit F8; refs: design 062 refs/062-wotc-card-audit)
+- I229 2026-10-01 P2 [rules] 90 WotC passive Pokémon Powers parse but nothing reads them: Toxic Gas, Hay Fever, Prehistoric Power, Invisible Wall, Thick Skinned, Kabuto Armor, Strikes Back, Retreat Aid, Energy Burn, Transform… (audit F7, App. C UNCONSUMED; refs: design 062)
+- I228 2026-10-01 P2 [rules] WotC Powers half-run: Buzzap, when-played Powers (Dark Golbat, Dark Crobat, Feraligatr Berserk, Unown E/V, Light Togetic) — whenPlayed/opponentDisrupt/handDeckSwap steps lack executors (audit F6, App. C; Rain Dance/Energy Trans fixed by 062 C)
+- I227 2026-10-01 P2 [rules] ~60 WotC attacks still parse to no steps + 39 partial: scoped locks (Leer, Tail Wag, Mean Look, Spider Web, Scary Face), Snivel/Growl, Deflector/Slime/Endure, Mirror Move/Counter, Focus Energy, Fidget/Vanish/Super Fang (audit F5 App. A–B; 062 D fixed 8)
+- I226 2026-10-01 P2 [rules] WotC Trainers that do nothing: Arcade Game, Blaine's Gamble, Digger, Erika's Maids, Impostor Oak's Invention, Lass, Lt. Surge's Treaty, Misty's Duel/Wish, Pokémon Trader, Sabrina's Psychic Control, Thought Wave Machine, Time Capsule; Tickling Machine (audit F4)
+- I225 2026-10-01 P2 [rules] WotC passive Trainers/Gyms unenforced: Misty, Blaine, Giovanni, Koga, Goop Gas Attack, Transparent Walls, Lt. Surge's Secret Plan; 7 announce-only Gyms (audit App. E); Sabrina [Gym Challenge] ignores its name filter (audit F4)
+- I224 2026-10-01 P2 [rules] WotC non-Tool attach Trainers are discarded on play: PlusPower, Defender, Charity, Magnifier, Sabrina's ESP, Brock's Protection, Koga's Ninja Trick — need an attached-non-Tool lifecycle (audit F1; untyped Stadiums/Tools fixed by design 062 A)
 - I223 2026-09-30 P3 [rules] I219 residue: Ability shields cover executor steps and Checkup counters, not passive opponent-Ability modifiers; Lunatone only stops between-turns Stadium damage; Seeker, Cyrus ◇, Bellelba bench cut ignore shields; Power Cancel unmodeled
 - I222 2026-09-30 P3 [legacy] Legacy client trainer path has no chooseMode/optionalDiscardCost/deckTop case and skips requiresHandCost: Kieran, Klara etc. do nothing, Guzma & Hala and Red & Blue get the bonus free, Ingo & Emmet offers the top card (refs: trainer-execution.js, design 061, I84)
 - I214 2026-09-29 P3 [rules] Legacy (non-authoritative) client trainer path ignores attach targets: attachFromDiscard offers every in-play Pokémon and one Energy (Sada's Vitality, Reboot Pod, all others) (refs: client/src/setup/rules/trainer-execution.js, design 058 A5)

@@ -9,6 +9,7 @@
 #   Next id = highest D number in this file and the archive + 1 (next: D202).
 
 ## Active
+- D202 2026-10-01 [rules] WotC wordings are rewritten to the modern wording the parsers read; untyped WotC Trainers get trainerType from their printed rules line at data entry — one path, no new templates. (design 062)
 - D201 2026-10-01 [board-ui] Holo art window (`--art-*`) keys on `data-card-layout` (printed box per layout, Trainers apart); `data-card-era` only picks the foil pattern — one era spans boxes of different sizes.
 - D200 2026-09-30 [rules] Markers TCGdex lacks (Tera, Team Plasma, Strike styles, Baby, Prism Star, TAG TEAM) come from a generated table: pkmncards is:/stage: lists matched to TCGdex by number and name. (I220)
 - D199 2026-09-30 [rules] "Choose 1" modes and deck-top order reuse the label-option and one-pick-per-position prompts, not new selectMode/orderCards pendingChoice types: same rules result, no netcode change. (design 061)
