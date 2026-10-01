@@ -1,0 +1,1058 @@
+[
+  {
+    "name": "Aspertia City Gym",
+    "set": "Boundaries Crossed",
+    "number": "127",
+    "subtype": "Stadium",
+    "text": "Each {C} Pokémon in play (both yours and your opponent's) gets +20 HP.",
+    "url": "https://pkmncards.com/card/aspertia-city-gym-boundaries-crossed-bcr-127/"
+  },
+  {
+    "name": "Battle City",
+    "set": "Black & White Promos",
+    "number": "BW39",
+    "subtype": "Stadium",
+    "text": "Once during each player's turn, that player may flip a coin. If heads, the player draws a card.",
+    "url": "https://pkmncards.com/card/battle-city-black-white-promos-bwp-bw39/"
+  },
+  {
+    "name": "Bianca",
+    "set": "Boundaries Crossed",
+    "number": "147",
+    "subtype": "Supporter",
+    "text": "Draw cards until you have 6 cards in your hand.",
+    "url": "https://pkmncards.com/card/bianca-boundaries-crossed-bcr-147/"
+  },
+  {
+    "name": "Bianca",
+    "set": "Emerging Powers",
+    "number": "90",
+    "subtype": "Supporter",
+    "text": "Draw cards until you have 6 cards in your hand.",
+    "url": "https://pkmncards.com/card/bianca-emerging-powers-epo-90/"
+  },
+  {
+    "name": "Bianca",
+    "set": "Legendary Treasures",
+    "number": "109",
+    "subtype": "Supporter",
+    "text": "Draw cards until you have 6 cards in your hand.",
+    "url": "https://pkmncards.com/card/bianca-legendary-treasures-ltr-109/"
+  },
+  {
+    "name": "Bicycle",
+    "set": "Plasma Storm",
+    "number": "117",
+    "subtype": "Item",
+    "text": "Draw cards until you have 4 cards in your hand.",
+    "url": "https://pkmncards.com/card/bicycle-plasma-storm-pls-117/"
+  },
+  {
+    "name": "Caitlin",
+    "set": "Plasma Blast",
+    "number": "78",
+    "subtype": "Supporter",
+    "text": "Put as many cards from your hand as you like on the bottom of your deck in any order. Then, draw a card for each card you put on the bottom of your deck.",
+    "url": "https://pkmncards.com/card/caitlin-plasma-blast-plb-78/"
+  },
+  {
+    "name": "Cedric Juniper",
+    "set": "Legendary Treasures",
+    "number": "110",
+    "subtype": "Supporter",
+    "text": "Put a Pokémon from your hand face down in front of you and tell your opponent its name. Your opponent guesses the height of that Pokémon. Reveal that Pokémon. If your opponent guessed right, he or she draws 3 cards. If your opponent guessed wrong, you draw 3 cards. Return the Pokémon to your hand. (You can't choose a Pokémon that doesn't have the height printed on the card.)",
+    "url": "https://pkmncards.com/card/cedric-juniper-legendary-treasures-ltr-110/"
+  },
+  {
+    "name": "Champions Festival",
+    "set": "Black & White Promos",
+    "number": "BW95",
+    "subtype": "Stadium",
+    "text": "Once during each player's turn, if that player has 6 Pokémon in play, he or she may heal 10 damage from each of his or her Pokémon.",
+    "url": "https://pkmncards.com/card/champions-festival-black-white-promos-bwp-bw95/"
+  },
+  {
+    "name": "Cheren",
+    "set": "Boundaries Crossed",
+    "number": "148",
+    "subtype": "Supporter",
+    "text": "Draw 3 cards.",
+    "url": "https://pkmncards.com/card/cheren-boundaries-crossed-bcr-148/"
+  },
+  {
+    "name": "Cheren",
+    "set": "Dark Explorers",
+    "number": "91",
+    "subtype": "Supporter",
+    "text": "Draw 3 cards.",
+    "url": "https://pkmncards.com/card/cheren-dark-explorers-dex-91/"
+  },
+  {
+    "name": "Cheren",
+    "set": "Emerging Powers",
+    "number": "91",
+    "subtype": "Supporter",
+    "text": "Draw 3 cards.",
+    "url": "https://pkmncards.com/card/cheren-emerging-powers-epo-91/"
+  },
+  {
+    "name": "Cilan",
+    "set": "Next Destinies",
+    "number": "86",
+    "subtype": "Supporter",
+    "text": "Search your deck for up to 3 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/cilan-next-destinies-nxd-86/"
+  },
+  {
+    "name": "Colress Machine",
+    "set": "Plasma Storm",
+    "number": "119",
+    "subtype": "Item",
+    "text": "Search your deck for a Plasma Energy card and attach it to 1 of your Team Plasma Pokémon. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/colress-machine-plasma-storm-pls-119/"
+  },
+  {
+    "name": "Colress",
+    "set": "Plasma Storm",
+    "number": "118",
+    "subtype": "Supporter",
+    "text": "Shuffle your hand into your deck. Then, draw a number of cards equal to the number of Benched Pokémon (both yours and your opponent's).",
+    "url": "https://pkmncards.com/card/colress-plasma-storm-pls-118/"
+  },
+  {
+    "name": "Colress",
+    "set": "Plasma Storm",
+    "number": "135",
+    "subtype": "Supporter",
+    "text": "Shuffle your hand into your deck. Then, draw a number of cards equal to the number of Benched Pokémon (both yours and your opponent's).",
+    "url": "https://pkmncards.com/card/colress-plasma-storm-pls-135/"
+  },
+  {
+    "name": "Computer Search",
+    "set": "Boundaries Crossed",
+    "number": "137",
+    "subtype": "Item",
+    "text": "Discard 2 cards from your hand. (If you can't discard 2 cards, you can't play this card.) Search your deck for a card and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/computer-search-boundaries-crossed-bcr-137/"
+  },
+  {
+    "name": "Cover Fossil",
+    "set": "Noble Victories",
+    "number": "90",
+    "subtype": "Item",
+    "text": "Look at the bottom 7 cards of your deck. You may reveal a Tirtouga you find there and put it onto your Bench. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/cover-fossil-noble-victories-nvi-90/"
+  },
+  {
+    "name": "Cover Fossil",
+    "set": "Plasma Blast",
+    "number": "79",
+    "subtype": "Item",
+    "text": "Look at the bottom 7 cards of your deck. You may reveal a Tirtouga you find there and put it onto your Bench. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/cover-fossil-plasma-blast-plb-79/"
+  },
+  {
+    "name": "Crushing Hammer",
+    "set": "Emerging Powers",
+    "number": "92",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, discard an Energy attached to 1 of your opponent's Pokémon.",
+    "url": "https://pkmncards.com/card/crushing-hammer-emerging-powers-epo-92/"
+  },
+  {
+    "name": "Crushing Hammer",
+    "set": "Legendary Treasures",
+    "number": "111",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, discard an Energy attached to 1 of your opponent's Pokémon.",
+    "url": "https://pkmncards.com/card/crushing-hammer-legendary-treasures-ltr-111/"
+  },
+  {
+    "name": "Crystal Edge",
+    "set": "Boundaries Crossed",
+    "number": "138",
+    "subtype": "Pokémon Tool",
+    "text": "If this card is attached to White Kyurem-EX, each of its attacks does 50 more damage to the Active Pokémon (before applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/crystal-edge-boundaries-crossed-bcr-138/"
+  },
+  {
+    "name": "Crystal Wall",
+    "set": "Boundaries Crossed",
+    "number": "139",
+    "subtype": "Pokémon Tool",
+    "text": "If this card is attached to Black Kyurem-EX, its maximum HP is 300.",
+    "url": "https://pkmncards.com/card/crystal-wall-boundaries-crossed-bcr-139/"
+  },
+  {
+    "name": "Dark Claw",
+    "set": "Dark Explorers",
+    "number": "92",
+    "subtype": "Pokémon Tool",
+    "text": "If this card is attached to a {D} Pokémon, each of the attacks of that Pokémon does 20 more damage to the Active Pokémon (before applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/dark-claw-dark-explorers-dex-92/"
+  },
+  {
+    "name": "Dark Patch",
+    "set": "Dark Explorers",
+    "number": "93",
+    "subtype": "Item",
+    "text": "Attach a basic {D} Energy card from your discard pile to 1 of your Benched {D} Pokémon.",
+    "url": "https://pkmncards.com/card/dark-patch-dark-explorers-dex-93/"
+  },
+  {
+    "name": "Devolution Spray",
+    "set": "Dragons Exalted",
+    "number": "113",
+    "subtype": "Item",
+    "text": "Devolve 1 of your evolved Pokémon and put the highest stage Evolution card on it into your hand. (That Pokémon can't evolve this turn.)",
+    "url": "https://pkmncards.com/card/devolution-spray-dragons-exalted-drx-113/"
+  },
+  {
+    "name": "Dowsing Machine",
+    "set": "Plasma Storm",
+    "number": "128",
+    "subtype": "Item",
+    "text": "Discard 2 cards from your hand. (If you can't discard 2 cards, you can't play this card.) Put a Trainer card from your discard pile into your hand.",
+    "url": "https://pkmncards.com/card/dowsing-machine-plasma-storm-pls-128/"
+  },
+  {
+    "name": "Elesa",
+    "set": "Legendary Treasures",
+    "number": "RC20",
+    "subtype": "Supporter",
+    "text": "Search your deck for 3 Pokémon Tool cards, reveal them, and put them into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/elesa-legendary-treasures-ltr-rc20/"
+  },
+  {
+    "name": "Energy Retrieval",
+    "set": "Black & White",
+    "number": "92",
+    "subtype": "Item",
+    "text": "Put 2 basic Energy cards from your discard pile into your hand.",
+    "url": "https://pkmncards.com/card/energy-retrieval-black-white-blw-92/"
+  },
+  {
+    "name": "Energy Retrieval",
+    "set": "Plasma Blast",
+    "number": "80",
+    "subtype": "Item",
+    "text": "Put 2 basic Energy cards from your discard pile into your hand.",
+    "url": "https://pkmncards.com/card/energy-retrieval-plasma-blast-plb-80/"
+  },
+  {
+    "name": "Energy Search",
+    "set": "Black & White",
+    "number": "93",
+    "subtype": "Item",
+    "text": "Search your deck for a basic Energy card, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/energy-search-black-white-blw-93/"
+  },
+  {
+    "name": "Energy Search",
+    "set": "Boundaries Crossed",
+    "number": "128",
+    "subtype": "Item",
+    "text": "Search your deck for a basic Energy card, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/energy-search-boundaries-crossed-bcr-128/"
+  },
+  {
+    "name": "Energy Switch",
+    "set": "Black & White",
+    "number": "94",
+    "subtype": "Item",
+    "text": "Move a basic Energy from 1 of your Pokémon to another of your Pokémon.",
+    "url": "https://pkmncards.com/card/energy-switch-black-white-blw-94/"
+  },
+  {
+    "name": "Energy Switch",
+    "set": "Legendary Treasures",
+    "number": "112",
+    "subtype": "Item",
+    "text": "Move a basic Energy from 1 of your Pokémon to another of your Pokémon.",
+    "url": "https://pkmncards.com/card/energy-switch-legendary-treasures-ltr-112/"
+  },
+  {
+    "name": "Enhanced Hammer",
+    "set": "Dark Explorers",
+    "number": "94",
+    "subtype": "Item",
+    "text": "Discard a Special Energy attached to 1 of your opponent's Pokémon.",
+    "url": "https://pkmncards.com/card/enhanced-hammer-dark-explorers-dex-94/"
+  },
+  {
+    "name": "Escape Rope",
+    "set": "Plasma Storm",
+    "number": "120",
+    "subtype": "Item",
+    "text": "Each player switches his or her Active Pokémon with 1 of his or her Benched Pokémon. (Your opponent switches first. If a player does not have a Benched Pokémon, he or she doesn't switch Pokémon.)",
+    "url": "https://pkmncards.com/card/escape-rope-plasma-storm-pls-120/"
+  },
+  {
+    "name": "Ether",
+    "set": "Plasma Storm",
+    "number": "121",
+    "subtype": "Item",
+    "text": "Reveal the top card of your deck. If that card is a basic Energy card, attach it to 1 of your Pokémon. If it is not a basic Energy card, return it to the top of your deck.",
+    "url": "https://pkmncards.com/card/ether-plasma-storm-pls-121/"
+  },
+  {
+    "name": "Eviolite",
+    "set": "Noble Victories",
+    "number": "91",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is a Basic Pokémon, any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/eviolite-noble-victories-nvi-91/"
+  },
+  {
+    "name": "Eviolite",
+    "set": "Plasma Storm",
+    "number": "122",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is a Basic Pokémon, any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/eviolite-plasma-storm-pls-122/"
+  },
+  {
+    "name": "Exp. Share",
+    "set": "Dragon Vault",
+    "number": "18",
+    "subtype": "Pokémon Tool",
+    "text": "When your Active Pokémon is Knocked Out by damage from an opponent's attack, you may move 1 basic Energy card that was attached to that Pokémon to the Pokémon this card is attached to.",
+    "url": "https://pkmncards.com/card/exp-share-dragon-vault-drv-18/"
+  },
+  {
+    "name": "Exp. Share",
+    "set": "Next Destinies",
+    "number": "87",
+    "subtype": "Pokémon Tool",
+    "text": "When your Active Pokémon is Knocked Out by damage from an opponent's attack, you may move 1 basic Energy card that was attached to that Pokémon to the Pokémon this card is attached to.",
+    "url": "https://pkmncards.com/card/exp-share-next-destinies-nxd-87/"
+  },
+  {
+    "name": "First Ticket",
+    "set": "Dragon Vault",
+    "number": "19",
+    "subtype": "Item",
+    "text": "Before you flip a coin to decide who goes first in a game, you may play this card. Don't flip that coin, and you go first. If both players play First Ticket, flip the coin as normal. (You may play only 1 First Ticket before you flip that coin.)",
+    "url": "https://pkmncards.com/card/first-ticket-dragon-vault-drv-19/"
+  },
+  {
+    "name": "Float Stone",
+    "set": "Plasma Freeze",
+    "number": "99",
+    "subtype": "Pokémon Tool",
+    "text": "The Pokémon this card is attached to has no Retreat Cost.",
+    "url": "https://pkmncards.com/card/float-stone-plasma-freeze-plf-99/"
+  },
+  {
+    "name": "Frozen City",
+    "set": "Plasma Freeze",
+    "number": "100",
+    "subtype": "Stadium",
+    "text": "Whenever any player attaches an Energy from his or her hand to 1 of his or her Pokémon (excluding Team Plasma Pokémon) put 2 damage counters on that Pokémon.",
+    "url": "https://pkmncards.com/card/frozen-city-plasma-freeze-plf-100/"
+  },
+  {
+    "name": "Full Heal",
+    "set": "Black & White",
+    "number": "95",
+    "subtype": "Item",
+    "text": "Remove all Special Conditions from your Active Pokémon.",
+    "url": "https://pkmncards.com/card/full-heal-black-white-blw-95/"
+  },
+  {
+    "name": "G Booster",
+    "set": "Plasma Blast",
+    "number": "92",
+    "subtype": "Pokémon Tool",
+    "text": "The Genesect-EX this card is attached to can also use the attack on this card. (You still need the necessary Energy to use this attack.)\n\n{G}{G}{C} → G Booster : 200\n\nDiscard 2 Energy attached to this Pokémon. This attack's damage isn't affected by any effects on the Defending Pokémon.",
+    "url": "https://pkmncards.com/card/g-booster-plasma-blast-plb-92/"
+  },
+  {
+    "name": "G Scope",
+    "set": "Plasma Blast",
+    "number": "93",
+    "subtype": "Pokémon Tool",
+    "text": "The Genesect-EX this card is attached to can also use the attack on this card. (You still need the necessary Energy to use this attack.)\n\n{G}{G}{C} → G Scope\n\nThis attack does 100 damage to 1 of your opponent's Benched Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+    "url": "https://pkmncards.com/card/g-scope-plasma-blast-plb-93/"
+  },
+  {
+    "name": "Ghetsis",
+    "set": "Plasma Freeze",
+    "number": "101",
+    "subtype": "Supporter",
+    "text": "Your opponent reveals his or her hand and shuffles all Item cards found there into his or her deck. Then, draw a number of cards equal to the number of Item cards your opponent shuffled into his or her deck.",
+    "url": "https://pkmncards.com/card/ghetsis-plasma-freeze-plf-101/"
+  },
+  {
+    "name": "Ghetsis",
+    "set": "Plasma Freeze",
+    "number": "115",
+    "subtype": "Supporter",
+    "text": "Your opponent reveals his or her hand and shuffles all Item cards found there into his or her deck. Then, draw a number of cards equal to the number of Item cards your opponent shuffled into his or her deck.",
+    "url": "https://pkmncards.com/card/ghetsis-plasma-freeze-plf-115/"
+  },
+  {
+    "name": "Giant Cape",
+    "set": "Dragons Exalted",
+    "number": "114",
+    "subtype": "Pokémon Tool",
+    "text": "The Pokémon this card is attached to gets +20 HP.",
+    "url": "https://pkmncards.com/card/giant-cape-dragons-exalted-drx-114/"
+  },
+  {
+    "name": "Gold Potion",
+    "set": "Boundaries Crossed",
+    "number": "140",
+    "subtype": "Item",
+    "text": "Heal 90 damage from your Active Pokémon.",
+    "url": "https://pkmncards.com/card/gold-potion-boundaries-crossed-bcr-140/"
+  },
+  {
+    "name": "Great Ball",
+    "set": "Boundaries Crossed",
+    "number": "129",
+    "subtype": "Item",
+    "text": "Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/great-ball-boundaries-crossed-bcr-129/"
+  },
+  {
+    "name": "Great Ball",
+    "set": "Emerging Powers",
+    "number": "93",
+    "subtype": "Item",
+    "text": "Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/great-ball-emerging-powers-epo-93/"
+  },
+  {
+    "name": "Heavy Ball",
+    "set": "Next Destinies",
+    "number": "88",
+    "subtype": "Item",
+    "text": "Search your deck for a Pokémon with a Retreat Cost of 3 or more, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/heavy-ball-next-destinies-nxd-88/"
+  },
+  {
+    "name": "Hooligans Jim & Cas",
+    "set": "Dark Explorers",
+    "number": "95",
+    "subtype": "Supporter",
+    "text": "Flip a coin. If heads, choose 3 random cards from your opponent's hand. Your opponent reveals those cards and shuffles them into his or her deck.",
+    "url": "https://pkmncards.com/card/hooligans-jim-cas-dark-explorers-dex-95/"
+  },
+  {
+    "name": "Hugh",
+    "set": "Boundaries Crossed",
+    "number": "130",
+    "subtype": "Supporter",
+    "text": "Each player either draws or discard cards until he or she has 5 cards in his or her hand. (Your opponent does this first.)",
+    "url": "https://pkmncards.com/card/hugh-boundaries-crossed-bcr-130/"
+  },
+  {
+    "name": "Hypnotoxic Laser",
+    "set": "Plasma Storm",
+    "number": "123",
+    "subtype": "Item",
+    "text": "Your opponent's Active Pokémon is now Poisoned. Flip a coin. If heads, your opponent's Active Pokémon is also Asleep.",
+    "url": "https://pkmncards.com/card/hypnotoxic-laser-plasma-storm-pls-123/"
+  },
+  {
+    "name": "Iris",
+    "set": "Plasma Blast",
+    "number": "101",
+    "subtype": "Supporter",
+    "text": "During this turn, your Pokémon's attacks do 10 more damage to the Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/iris-plasma-blast-plb-101/"
+  },
+  {
+    "name": "Iris",
+    "set": "Plasma Blast",
+    "number": "81",
+    "subtype": "Supporter",
+    "text": "During this turn, your Pokémon's attacks do 10 more damage to the Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/iris-plasma-blast-plb-81/"
+  },
+  {
+    "name": "Level Ball",
+    "set": "Next Destinies",
+    "number": "89",
+    "subtype": "Item",
+    "text": "Search your deck for a Pokémon with 90 HP or less, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/level-ball-next-destinies-nxd-89/"
+  },
+  {
+    "name": "Life Dew",
+    "set": "Plasma Freeze",
+    "number": "107",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is Knocked Out, your opponent takes 1 fewer Prize card.",
+    "url": "https://pkmncards.com/card/life-dew-plasma-freeze-plf-107/"
+  },
+  {
+    "name": "Master Ball",
+    "set": "Plasma Blast",
+    "number": "94",
+    "subtype": "Item",
+    "text": "Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/master-ball-plasma-blast-plb-94/"
+  },
+  {
+    "name": "Max Potion",
+    "set": "Emerging Powers",
+    "number": "94",
+    "subtype": "Item",
+    "text": "Heal all damage from 1 of your Pokémon. Then, discard all Energy attached to that Pokémon.",
+    "url": "https://pkmncards.com/card/max-potion-emerging-powers-epo-94/"
+  },
+  {
+    "name": "Max Potion",
+    "set": "Plasma Freeze",
+    "number": "121",
+    "subtype": "Item",
+    "text": "Heal all damage from 1 of your Pokémon. Then, discard all Energy attached to that Pokémon.",
+    "url": "https://pkmncards.com/card/max-potion-plasma-freeze-plf-121/"
+  },
+  {
+    "name": "N",
+    "set": "Black & White Promos",
+    "number": "BW100",
+    "subtype": "Supporter",
+    "text": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards.",
+    "url": "https://pkmncards.com/card/n-black-white-promos-bwp-bw100/"
+  },
+  {
+    "name": "N",
+    "set": "Dark Explorers",
+    "number": "96",
+    "subtype": "Supporter",
+    "text": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards.",
+    "url": "https://pkmncards.com/card/n-dark-explorers-dex-96/"
+  },
+  {
+    "name": "N",
+    "set": "Noble Victories",
+    "number": "101",
+    "subtype": "Supporter",
+    "text": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards.",
+    "url": "https://pkmncards.com/card/n-noble-victories-nvi-101/"
+  },
+  {
+    "name": "N",
+    "set": "Noble Victories",
+    "number": "92",
+    "subtype": "Supporter",
+    "text": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards.",
+    "url": "https://pkmncards.com/card/n-noble-victories-nvi-92/"
+  },
+  {
+    "name": "Old Amber Aerodactyl",
+    "set": "Dark Explorers",
+    "number": "97",
+    "subtype": "Item",
+    "text": "Look at the bottom 7 cards of your deck. You may reveal an Aerodactyl you find there and put it onto your Bench. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/old-amber-aerodactyl-dark-explorers-dex-97/"
+  },
+  {
+    "name": "Plasma Frigate",
+    "set": "Plasma Storm",
+    "number": "124",
+    "subtype": "Stadium",
+    "text": "Each Pokémon that has any Plasma Energy attached to it (both yours and your opponent's) has no Weakness.",
+    "url": "https://pkmncards.com/card/plasma-frigate-plasma-storm-pls-124/"
+  },
+  {
+    "name": "Plume Fossil",
+    "set": "Noble Victories",
+    "number": "93",
+    "subtype": "Item",
+    "text": "Look at the bottom 7 cards of your deck. You may reveal an Archen you find there and put it onto your Bench. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/plume-fossil-noble-victories-nvi-93/"
+  },
+  {
+    "name": "Plume Fossil",
+    "set": "Plasma Blast",
+    "number": "82",
+    "subtype": "Item",
+    "text": "Look at the bottom 7 cards of your deck. You may reveal an Archen you find there and put it onto your Bench. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/plume-fossil-plasma-blast-plb-82/"
+  },
+  {
+    "name": "PlusPower",
+    "set": "Black & White",
+    "number": "96",
+    "subtype": "Item",
+    "text": "During this turn, your Pokémon's attacks do 10 more damage to the Active Pokémon (before applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/pluspower-black-white-blw-96/"
+  },
+  {
+    "name": "Poké Ball",
+    "set": "Black & White",
+    "number": "97",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/poke-ball-black-white-blw-97/"
+  },
+  {
+    "name": "Poké Ball",
+    "set": "Boundaries Crossed",
+    "number": "131",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/poke-ball-boundaries-crossed-bcr-131/"
+  },
+  {
+    "name": "Pokédex",
+    "set": "Black & White",
+    "number": "98",
+    "subtype": "Item",
+    "text": "Look at the top 5 cards of your deck and put them back on top of your deck in any order.",
+    "url": "https://pkmncards.com/card/pokedex-black-white-blw-98/"
+  },
+  {
+    "name": "Pokémon Catcher",
+    "set": "Dark Explorers",
+    "number": "111",
+    "subtype": "Item",
+    "text": "Switch your opponent's Active Pokémon with 1 of his or her Benched Pokémon.",
+    "url": "https://pkmncards.com/card/pokemon-catcher-dark-explorers-dex-111/"
+  },
+  {
+    "name": "Pokémon Catcher",
+    "set": "Emerging Powers",
+    "number": "95",
+    "subtype": "Item",
+    "text": "Switch your opponent's Active Pokémon with 1 of his or her Benched Pokémon.",
+    "url": "https://pkmncards.com/card/pokemon-catcher-emerging-powers-epo-95/"
+  },
+  {
+    "name": "Pokémon Catcher",
+    "set": "Plasma Blast",
+    "number": "83",
+    "subtype": "Item",
+    "text": "Switch your opponent's Active Pokémon with 1 of his or her Benched Pokémon.",
+    "url": "https://pkmncards.com/card/pokemon-catcher-plasma-blast-plb-83/"
+  },
+  {
+    "name": "Pokémon Center",
+    "set": "Next Destinies",
+    "number": "90",
+    "subtype": "Stadium",
+    "text": "Once during each player's turn, that player may heal 20 damage from 1 of his or her Benched Pokémon.",
+    "url": "https://pkmncards.com/card/pokemon-center-next-destinies-nxd-90/"
+  },
+  {
+    "name": "Pokémon Communication",
+    "set": "Black & White",
+    "number": "99",
+    "subtype": "Item",
+    "text": "Reveal a Pokémon in your hand and put it on top of your deck. If you do, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/pokemon-communication-black-white-blw-99/"
+  },
+  {
+    "name": "Potion",
+    "set": "Black & White",
+    "number": "100",
+    "subtype": "Item",
+    "text": "Heal 30 damage from 1 of your Pokémon.",
+    "url": "https://pkmncards.com/card/potion-black-white-blw-100/"
+  },
+  {
+    "name": "Potion",
+    "set": "Boundaries Crossed",
+    "number": "132",
+    "subtype": "Item",
+    "text": "Heal 30 damage from 1 of your Pokémon.",
+    "url": "https://pkmncards.com/card/potion-boundaries-crossed-bcr-132/"
+  },
+  {
+    "name": "Professor Juniper",
+    "set": "Black & White",
+    "number": "101",
+    "subtype": "Supporter",
+    "text": "Discard your hand and draw 7 cards.",
+    "url": "https://pkmncards.com/card/professor-juniper-black-white-blw-101/"
+  },
+  {
+    "name": "Professor Juniper",
+    "set": "Dark Explorers",
+    "number": "98",
+    "subtype": "Supporter",
+    "text": "Discard your hand and draw 7 cards.",
+    "url": "https://pkmncards.com/card/professor-juniper-dark-explorers-dex-98/"
+  },
+  {
+    "name": "Professor Juniper",
+    "set": "Plasma Blast",
+    "number": "84",
+    "subtype": "Supporter",
+    "text": "Discard your hand and draw 7 cards.",
+    "url": "https://pkmncards.com/card/professor-juniper-plasma-blast-plb-84/"
+  },
+  {
+    "name": "Professor Juniper",
+    "set": "Plasma Freeze",
+    "number": "116",
+    "subtype": "Supporter",
+    "text": "Discard your hand and draw 7 cards.",
+    "url": "https://pkmncards.com/card/professor-juniper-plasma-freeze-plf-116/"
+  },
+  {
+    "name": "Random Receiver",
+    "set": "Dark Explorers",
+    "number": "99",
+    "subtype": "Item",
+    "text": "Reveal cards from the top of your deck until you reveal a Supporter card. Put it into your hand. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/random-receiver-dark-explorers-dex-99/"
+  },
+  {
+    "name": "Random Receiver",
+    "set": "Plasma Storm",
+    "number": "138",
+    "subtype": "Item",
+    "text": "Reveal cards from the top of your deck until you reveal a Supporter card. Put it into your hand. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/random-receiver-plasma-storm-pls-138/"
+  },
+  {
+    "name": "Rare Candy",
+    "set": "Dark Explorers",
+    "number": "100",
+    "subtype": "Item",
+    "text": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card on the Basic Pokémon. (This counts as evolving that Pokémon.) You can't use this card during your first turn or on a Basic Pokémon that was put into play this turn.",
+    "url": "https://pkmncards.com/card/rare-candy-dark-explorers-dex-100/"
+  },
+  {
+    "name": "Rare Candy",
+    "set": "Plasma Blast",
+    "number": "105",
+    "subtype": "Item",
+    "text": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card on the Basic Pokémon. (This counts as evolving that Pokémon.) You can't use this card during your first turn or on a Basic Pokémon that was put into play this turn.",
+    "url": "https://pkmncards.com/card/rare-candy-plasma-blast-plb-105/"
+  },
+  {
+    "name": "Rare Candy",
+    "set": "Plasma Blast",
+    "number": "85",
+    "subtype": "Item",
+    "text": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card on the Basic Pokémon. (This counts as evolving that Pokémon.) You can't use this card during your first turn or on a Basic Pokémon that was put into play this turn.",
+    "url": "https://pkmncards.com/card/rare-candy-plasma-blast-plb-85/"
+  },
+  {
+    "name": "Recycle",
+    "set": "Emerging Powers",
+    "number": "96",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, put a card from your discard pile on top of your deck.",
+    "url": "https://pkmncards.com/card/recycle-emerging-powers-epo-96/"
+  },
+  {
+    "name": "Rescue Scarf",
+    "set": "Dragons Exalted",
+    "number": "115",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon into your hand. (Discard all cards attached to that Pokémon.)",
+    "url": "https://pkmncards.com/card/rescue-scarf-dragons-exalted-drx-115/"
+  },
+  {
+    "name": "Reversal Trigger",
+    "set": "Plasma Blast",
+    "number": "86",
+    "subtype": "Pokémon Tool",
+    "text": "When the Team Plasma Pokémon this card is attached to is Knocked Out by damage from an opponent's attack, search your deck for a card and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/reversal-trigger-plasma-blast-plb-86/"
+  },
+  {
+    "name": "Revive",
+    "set": "Black & White",
+    "number": "102",
+    "subtype": "Item",
+    "text": "Put a Basic Pokémon from your discard pile onto your Bench.",
+    "url": "https://pkmncards.com/card/revive-black-white-blw-102/"
+  },
+  {
+    "name": "Rock Guard",
+    "set": "Plasma Freeze",
+    "number": "108",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent's attack (even if that Pokémon is Knocked Out), put 6 damage counters on the Attacking Pokémon.",
+    "url": "https://pkmncards.com/card/rock-guard-plasma-freeze-plf-108/"
+  },
+  {
+    "name": "Rocky Helmet",
+    "set": "Boundaries Crossed",
+    "number": "133",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is your Active Pokémon and is damage by an opponent's attack (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+    "url": "https://pkmncards.com/card/rocky-helmet-boundaries-crossed-bcr-133/"
+  },
+  {
+    "name": "Rocky Helmet",
+    "set": "Boundaries Crossed",
+    "number": "153",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent's attack (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+    "url": "https://pkmncards.com/card/rocky-helmet-boundaries-crossed-bcr-153/"
+  },
+  {
+    "name": "Rocky Helmet",
+    "set": "Noble Victories",
+    "number": "94",
+    "subtype": "Pokémon Tool",
+    "text": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent's attack (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+    "url": "https://pkmncards.com/card/rocky-helmet-noble-victories-nvi-94/"
+  },
+  {
+    "name": "Root Fossil Lileep",
+    "set": "Plasma Blast",
+    "number": "87",
+    "subtype": "Item",
+    "text": "Look at the bottom 7 cards of your deck. You may reveal a Lileep you find there and put it onto your Bench. Shuffle the other cards back into your deck.",
+    "url": "https://pkmncards.com/card/root-fossil-lileep-plasma-blast-plb-87/"
+  },
+  {
+    "name": "Scoop Up Cyclone",
+    "set": "Plasma Blast",
+    "number": "95",
+    "subtype": "Item",
+    "text": "Put 1 of your Pokémon and all cards attached to it into your hand.",
+    "url": "https://pkmncards.com/card/scoop-up-cyclone-plasma-blast-plb-95/"
+  },
+  {
+    "name": "Scramble Switch",
+    "set": "Plasma Storm",
+    "number": "129",
+    "subtype": "Item",
+    "text": "Switch your Active Pokémon with 1 of your Benched Pokémon. Then, you may move as many Energy attached to the old Active Pokémon to the new Active Pokémon as you like.",
+    "url": "https://pkmncards.com/card/scramble-switch-plasma-storm-pls-129/"
+  },
+  {
+    "name": "Shadow Triad",
+    "set": "Plasma Freeze",
+    "number": "102",
+    "subtype": "Supporter",
+    "text": "Put a Team Plasma card from your discard pile into your hand.",
+    "url": "https://pkmncards.com/card/shadow-triad-plasma-freeze-plf-102/"
+  },
+  {
+    "name": "Silver Bangle",
+    "set": "Plasma Blast",
+    "number": "88",
+    "subtype": "Pokémon Tool",
+    "text": "The attacks of the Pokémon this card is attached to (excluding Pokémon-EX) do 30 more damage to Active Pokémon-EX (before applying Weakness and Resistance).",
+    "url": "https://pkmncards.com/card/silver-bangle-plasma-blast-plb-88/"
+  },
+  {
+    "name": "Silver Mirror",
+    "set": "Plasma Blast",
+    "number": "89",
+    "subtype": "Pokémon Tool",
+    "text": "Prevent all effects of attacks, including damage, done to the Pokémon this card is attached to (excluding Pokémon-EX) by your opponent's Team Plasma Pokémon.",
+    "url": "https://pkmncards.com/card/silver-mirror-plasma-blast-plb-89/"
+  },
+  {
+    "name": "Skyarrow Bridge",
+    "set": "Next Destinies",
+    "number": "91",
+    "subtype": "Stadium",
+    "text": "The Retreat Cost of each Basic Pokémon in play is {C} less.",
+    "url": "https://pkmncards.com/card/skyarrow-bridge-next-destinies-nxd-91/"
+  },
+  {
+    "name": "Skyla",
+    "set": "Boundaries Crossed",
+    "number": "134",
+    "subtype": "Supporter",
+    "text": "Search your deck for a Trainer card, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/skyla-boundaries-crossed-bcr-134/"
+  },
+  {
+    "name": "Skyla",
+    "set": "Boundaries Crossed",
+    "number": "149",
+    "subtype": "Supporter",
+    "text": "Search your deck for a Trainer card, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/skyla-boundaries-crossed-bcr-149/"
+  },
+  {
+    "name": "Super Rod",
+    "set": "Dragon Vault",
+    "number": "20",
+    "subtype": "Item",
+    "text": "Shuffle 3 in any combination of Pokémon and basic Energy cards from your discard pile back into your deck.",
+    "url": "https://pkmncards.com/card/super-rod-dragon-vault-drv-20/"
+  },
+  {
+    "name": "Super Rod",
+    "set": "Noble Victories",
+    "number": "95",
+    "subtype": "Item",
+    "text": "Shuffle 3 in any combination of Pokémon and basic Energy cards from your discard pile back into your deck.",
+    "url": "https://pkmncards.com/card/super-rod-noble-victories-nvi-95/"
+  },
+  {
+    "name": "Super Scoop Up",
+    "set": "Black & White",
+    "number": "103",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, put 1 of your Pokémon and all cards attached to it into your hand.",
+    "url": "https://pkmncards.com/card/super-scoop-up-black-white-blw-103/"
+  },
+  {
+    "name": "Superior Energy Retrieval",
+    "set": "Plasma Freeze",
+    "number": "103",
+    "subtype": "Item",
+    "text": "Discard 2 cards from your hand. (If you can't discard 2 cards, you can't play this card.) Put 4 basic Energy cards from your discard pile into your hand. (You can't choose a card you discarded with the effect of this card.)",
+    "url": "https://pkmncards.com/card/superior-energy-retrieval-plasma-freeze-plf-103/"
+  },
+  {
+    "name": "Switch",
+    "set": "Black & White",
+    "number": "104",
+    "subtype": "Item",
+    "text": "Switch your Active Pokémon with 1 of your Benched Pokémon.",
+    "url": "https://pkmncards.com/card/switch-black-white-blw-104/"
+  },
+  {
+    "name": "Switch",
+    "set": "Boundaries Crossed",
+    "number": "135",
+    "subtype": "Item",
+    "text": "Switch your Active Pokémon with 1 of your Benched Pokémon.",
+    "url": "https://pkmncards.com/card/switch-boundaries-crossed-bcr-135/"
+  },
+  {
+    "name": "Team Plasma Badge",
+    "set": "Plasma Freeze",
+    "number": "104",
+    "subtype": "Pokémon Tool",
+    "text": "The Pokémon this card is attached to is a Team Plasma Pokémon.",
+    "url": "https://pkmncards.com/card/team-plasma-badge-plasma-freeze-plf-104/"
+  },
+  {
+    "name": "Team Plasma Ball",
+    "set": "Plasma Freeze",
+    "number": "105",
+    "subtype": "Item",
+    "text": "Search your deck for a Team Plasma Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/team-plasma-ball-plasma-freeze-plf-105/"
+  },
+  {
+    "name": "Team Plasma Grunt",
+    "set": "Plasma Storm",
+    "number": "125",
+    "subtype": "Supporter",
+    "text": "Discard a Team Plasma card from your hand. (If you can't discard a Team Plasma card, you can't play this card.) Draw 4 cards.",
+    "url": "https://pkmncards.com/card/team-plasma-grunt-plasma-storm-pls-125/"
+  },
+  {
+    "name": "Tool Scrapper",
+    "set": "Dragons Exalted",
+    "number": "116",
+    "subtype": "Item",
+    "text": "Choose up to 2 Pokémon Tool cards attached to Pokémon in play (yours or your opponent's) and discard them.",
+    "url": "https://pkmncards.com/card/tool-scrapper-dragons-exalted-drx-116/"
+  },
+  {
+    "name": "Town Map",
+    "set": "Boundaries Crossed",
+    "number": "136",
+    "subtype": "Item",
+    "text": "Turn all of your Prize cards face up. (Those Prize cards remain face up for the rest of the game.)",
+    "url": "https://pkmncards.com/card/town-map-boundaries-crossed-bcr-136/"
+  },
+  {
+    "name": "Tropical Beach",
+    "set": "Black & White Promos",
+    "number": "BW28",
+    "subtype": "Stadium",
+    "text": "Once during each player's turn, that player may draw cards until he or she has 7 cards in his or her hand. If he or she does, that player's turn ends.",
+    "url": "https://pkmncards.com/card/tropical-beach-black-white-promos-bwp-bw28/"
+  },
+  {
+    "name": "Tropical Beach",
+    "set": "Black & White Promos",
+    "number": "BW50",
+    "subtype": "Stadium",
+    "text": "Once during each player's turn, that player may draw cards until he or she has 7 cards in his or her hand. If he or she does, that player's turn ends.",
+    "url": "https://pkmncards.com/card/tropical-beach-black-white-promos-bwp-bw50/"
+  },
+  {
+    "name": "Twist Mountain",
+    "set": "Dark Explorers",
+    "number": "101",
+    "subtype": "Stadium",
+    "text": "Once during each player's turn, that player may flip a coin. If heads, that player puts a Restored Pokémon from his or her hand onto his or her Bench.",
+    "url": "https://pkmncards.com/card/twist-mountain-dark-explorers-dex-101/"
+  },
+  {
+    "name": "Ultra Ball",
+    "set": "Dark Explorers",
+    "number": "102",
+    "subtype": "Item",
+    "text": "Discard 2 cards from your hand. (If you can't discard 2 cards, you can't play this card.) Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/ultra-ball-dark-explorers-dex-102/"
+  },
+  {
+    "name": "Ultra Ball",
+    "set": "Plasma Blast",
+    "number": "90",
+    "subtype": "Item",
+    "text": "Discard 2 cards from your hand. (If you can't discard 2 cards, you can't play this card.) Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/ultra-ball-plasma-blast-plb-90/"
+  },
+  {
+    "name": "Ultra Ball",
+    "set": "Plasma Freeze",
+    "number": "122",
+    "subtype": "Item",
+    "text": "Discard 2 cards from your hand. (If you can't discard 2 cards, you can't play this card.) Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/ultra-ball-plasma-freeze-plf-122/"
+  },
+  {
+    "name": "Victory Cup",
+    "set": "Black & White Promos",
+    "number": "BW29",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/victory-cup-black-white-promos-bwp-bw29/"
+  },
+  {
+    "name": "Victory Cup",
+    "set": "Black & White Promos",
+    "number": "BW30",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/victory-cup-black-white-promos-bwp-bw30/"
+  },
+  {
+    "name": "Victory Cup",
+    "set": "Black & White Promos",
+    "number": "BW31",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/victory-cup-black-white-promos-bwp-bw31/"
+  },
+  {
+    "name": "Victory Piece",
+    "set": "Plasma Storm",
+    "number": "130",
+    "subtype": "Pokémon Tool",
+    "text": "If this card is attached to Victini-EX, Victini-EX can use its attacks regardless of the amount or type of Energy attached to it.",
+    "url": "https://pkmncards.com/card/victory-piece-plasma-storm-pls-130/"
+  },
+  {
+    "name": "Virbank City Gym",
+    "set": "Plasma Storm",
+    "number": "126",
+    "subtype": "Stadium",
+    "text": "Put 2 more damage counters on Poisoned Pokémon (both yours and your opponent's) between turns.",
+    "url": "https://pkmncards.com/card/virbank-city-gym-plasma-storm-pls-126/"
+  },
+  {
+    "name": "Xtransceiver",
+    "set": "Noble Victories",
+    "number": "96",
+    "subtype": "Item",
+    "text": "Flip a coin. If heads, search your deck for a Supporter card, reveal it, and put it into your hand. Shuffle your deck afterward.",
+    "url": "https://pkmncards.com/card/xtransceiver-noble-victories-nvi-96/"
+  }
+]
