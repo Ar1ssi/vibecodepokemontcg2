@@ -101,6 +101,7 @@ import {
   stadiumTrainerPlayCoin,
   stadiumAttackCoinModifier,
 } from './rules/stadium-triggers.mjs';
+import { turnDamageBonusAfterWR } from './rules/turn-damage-bonus.mjs';
 import {
   applyStadiumTriggerEffect,
   applyStadiumSwitchTriggers,
@@ -114,6 +115,7 @@ import {
   abilityDamagePrevention,
   abilityPreventsAttackEffects,
   sideContextFor,
+  powersOffActive,
   abilityWeaknessOverride,
   abilityHpBonus,
   abilityPrizeModify,
@@ -393,6 +395,14 @@ function damageBenchedPokemon(
   { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, countersPlaced = false, activeRng = null, events }
 ) {
   if (dealt <= 0) return;
+
+  // Transparent Walls gym2-125: "prevent all damage from attacks done to your Benched Pokémon"
+  // until the end of the opponent's next turn (counters an attack places are not damage).
+  const wallsUntil = draft.players[victimPlayerId]?.benchAttackShieldUntilTurn || 0;
+  if (!countersPlaced && wallsUntil >= (draft.turn?.number || 1)) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'trainer-bench-shield' });
+    return;
+  }
 
   // Check Tera bench damage immunity ("Tera: As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks")
   // The Tera rule is printed on the top card: an evolved Tera Pokémon ex's Basic is not Tera.
@@ -720,7 +730,9 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, counter
 // Chaos Gym: every Trainer card other than a Stadium is coin-gated, whether played
 // or attached from hand as a Pokémon Tool. Tails means it can't be played and goes
 // to the discard pile. Returns true when the card was blocked.
-// (The printed "opponent may use that card instead" clause is not implemented.)
+// "If the card isn't put into play, the player's opponent may use that card instead": the
+// opponent is offered it through the Psychic Control step (trainer-steps useOpponentDiscardTrainer),
+// which leaves out cards that are put in play and cards the opponent could not pay for.
 function chaosGymBlocks(draft, { card, playerId, activeRng, events }) {
   const chaos = stadiumTrainerPlayCoin(draft.stadium?.card || draft.stadium, card);
   if (!chaos) return false;
@@ -742,6 +754,18 @@ function chaosGymBlocks(draft, { card, playerId, activeRng, events }) {
     name: card.name || '',
     source: chaos.source,
   });
+  const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  if (oppId && !isPokemonToolCard(card)) {
+    const offer = executeSteps(draft, {
+      steps: [{ type: 'useOpponentDiscardTrainer', instanceId: card.instanceId }],
+      effectType: 'trainer',
+      sourceCard: card,
+      playerId: oppId,
+      activeRng,
+      events,
+    });
+    if (offer.pendingChoice) draft.pendingChoice = offer.pendingChoice;
+  }
   return true;
 }
 
@@ -858,6 +882,42 @@ function attachLockReason(state, card, targetInstanceId) {
   return null;
 }
 
+const energyOfType = (card, type) =>
+  [card?.energyType, card?.name, ...(Array.isArray(card?.types) ? card.types : [])].some((value) =>
+    String(value || '').toLowerCase().includes(type)
+  );
+
+/**
+ * Blaine gym2-17's attachment plan (trainer-steps energyAttachPlan) as it applies to attaching
+ * `energy` from hand to `targetInstanceId`: `{ plan, hostId }` when the Energy is a basic one of
+ * the plan's type and the target is the player's Pokémon with the plan's name, else null.
+ */
+function energyAttachPlanMatch(state, player, energy, targetInstanceId) {
+  const plan = player?.flags?.energyAttachPlan;
+  if (!plan || !isBasicEnergy(energy) || !energyOfType(energy, plan.energyType)) return null;
+  const hostId = attachmentHostId(state, targetInstanceId);
+  const hostRef = findCard(state, hostId);
+  if (!hostRef || hostRef.playerId !== player.playerId || !['active', 'bench'].includes(hostRef.zoneId)) return null;
+  const name = String(inPlayView(state, hostRef.card)?.name || '').toLowerCase();
+  return name.includes(plan.nameTag) ? { plan, hostId } : null;
+}
+
+/**
+ * "Instead of attaching your free Energy card, you may instead attach 2 Fire Energy cards to 1 of
+ * your Pokémon with Blaine in its name": the turn's first attach, when it fits the plan, picks the
+ * host; each later fitting attach to that host uses up the plan's remaining count.
+ */
+function recordEnergyAttachPlan(draft, player, energy, hostId) {
+  const match = energyAttachPlanMatch(draft, player, energy, hostId);
+  if (!match) return;
+  if (!player.flags.energyAttached) {
+    match.plan.hostId = match.hostId;
+    match.plan.attached = 1;
+  } else if (match.plan.hostId === match.hostId) {
+    match.plan.attached += 1;
+  }
+}
+
 /**
  * Player-scoped play locks an opponent's attack left behind (Distort, Sonic Volume, Heavy Rock,
  * Horror House; design 048). A lock counts on the target's next turn and expires by turn number.
@@ -870,12 +930,14 @@ function attachLockReason(state, card, targetInstanceId) {
 function playLockReason(player, kinds, turnNumber) {
   const locks = (player?.playLocks || []).filter((lock) => (lock.untilTurn || 0) >= turnNumber);
   if (locks.length === 0) return null;
-  const blocked = locks.some((lock) =>
+  const blocking = locks.find((lock) =>
     (lock.kinds || []).some((kind) => kind === 'any' || kinds.includes(kind))
   );
-  return blocked
-    ? "Your opponent's attack stops you playing that card during this turn."
-    : null;
+  if (!blocking) return null;
+  // A Trainer's own lock (Time Capsule neo1-90) names that card.
+  return blocking.source
+    ? `${blocking.source} stops you playing that card during this turn.`
+    : "Your opponent's attack stops you playing that card during this turn.";
 }
 
 /** Printed kind of one of a card's abilities: 'power' (Poké-Power), 'body' (Poké-Body), 'ability'. */
@@ -895,10 +957,12 @@ function abilityKindAt(view, index) {
 function attackAbilityLockReason(state, cardRef, player, abilityIndex) {
   const kind = abilityKindAt(inPlayView(state, cardRef.card), abilityIndex);
   const turnNumber = state.turn?.number || 1;
-  const playerLocked = (player?.playLocks || []).some(
+  const playerLock = (player?.playLocks || []).find(
     (lock) => (lock.untilTurn || 0) >= turnNumber && (lock.kinds || []).includes(`ability:${kind}`)
   );
-  if (playerLocked) return "Your opponent's attack stops you using that Ability this turn.";
+  // Goop Gas Attack base5-78 locks both players' Pokémon Powers and names itself.
+  if (playerLock?.source) return `${playerLock.source} stops Pokémon Powers from working.`;
+  if (playerLock) return "Your opponent's attack stops you using that Ability this turn.";
   const root = cardRef.card.attachedTo != null ? findCard(state, cardRef.card.attachedTo)?.card : cardRef.card;
   const markers = root ? activeAttackMarkers(state, cardRef.playerId, root) : [];
   const cardLocked = markers.some((m) => m.kind === 'abilityLock' && (m.abilityKinds || []).includes(kind));
@@ -938,6 +1002,7 @@ function attackAbilityReads(
     ownHandCount: (attackerZones.hand || []).length,
     ownPrizesLeft: (attackerZones.prizes || []).length,
     opponentPrizesLeft: (defenderZones.prizes || []).length,
+    powersOff: powersOffActive(draft),
   };
   const defenderCtx = {
     sideCards: defenderSide,
@@ -949,6 +1014,7 @@ function attackAbilityReads(
     attackerIsActive: true,
     attackerIsEx: isExCard(attacker),
     turnNumber: draft.turn?.number,
+    powersOff: powersOffActive(draft),
   };
   const extraTypes = abilityExtraTypes(attacker, attackerCtx);
   const attackerView = extraTypes.length
@@ -3419,11 +3485,27 @@ function applyRetreatSwap(
 }
 
 /**
+ * Tickling Machine gym1-119: "At the end of your opponent's next turn, your opponent puts those
+ * cards back into his or her hand." The set-aside hand lives off the zones (trainer-steps
+ * opponentHandSetAside) and comes back when the turn it names ends.
+ */
+function returnSetAsideHands(draft, { endingTurn, events }) {
+  for (const player of Object.values(draft.players || {})) {
+    const setAside = player?.setAsideHand;
+    if (!setAside || (setAside.returnTurn || 0) > endingTurn) continue;
+    player.zones.hand.push(...(setAside.cards || []));
+    delete player.setAsideHand;
+    events.push({ type: 'setAsideHandReturned', playerId: player.playerId, count: (setAside.cards || []).length });
+  }
+}
+
+/**
  * Advances the turn to the next player, reset flags, and performs start-of-turn draw.
  */
 function advanceTurn(draft, { nextPlayerId, events }) {
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
+  returnSetAsideHands(draft, { endingTurn: draft.turn.number || 1, events });
   // The flags object is replaced wholesale below; a Checkup Knockout may have just
   // entitled the incoming player, and that entitlement must survive the reset so the
   // prize choice raised at the end of the command can be settled.
@@ -3466,6 +3548,9 @@ function advanceTurn(draft, { nextPlayerId, events }) {
       delete p.flags.ignoreDefenderEffectsTurn;
       delete p.flags.evolutionAttacksTurn;
       delete p.flags.willFirstCoin;
+      delete p.flags.turnAttackRiders;
+      delete p.flags.freeEvolveRoots;
+      delete p.flags.energyAttachPlan;
     }
   }
 
@@ -4332,7 +4417,9 @@ export function validateLegality(state, command) {
         }
       }
       if (cardRef && isEnergy(cardRef.card)) {
-        if (player.flags?.energyAttached) {
+        const plan = cardRef.zoneId === 'hand' ? energyAttachPlanMatch(state, player, cardRef.card, payload.targetInstanceId) : null;
+        const planAllows = Boolean(plan && plan.plan.hostId === plan.hostId && plan.plan.attached < plan.plan.count);
+        if (player.flags?.energyAttached && !planAllows) {
           // Check for unlimited energy acceleration abilities (Phase 4)
           const inPlayPokemon = [
             ...(player.zones?.active || []),
@@ -4452,7 +4539,12 @@ export function validateLegality(state, command) {
         // "This Pokémon can evolve during your first turn or the turn you play
         // it" (Scatterbug/Eevee/Luxio/Spearow/Shelmet/Karrablast) relaxes the
         // first-turn and just-played gates for that Pokémon.
-        const evolvePermission = abilityEvolvePermission(targetRef.card, evolveCtx);
+        // Giovanni gym2-18: the chosen Pokémon (by stack root) ignores the first-turn, just-played
+        // and once-per-turn gates for the rest of the turn.
+        const freeEvolve = (player.flags?.freeEvolveRoots || []).includes(
+          attachmentHostId(state, payload.targetInstanceId)
+        );
+        const evolvePermission = freeEvolve || abilityEvolvePermission(targetRef.card, evolveCtx);
         if (!evolvePermission && (state.turn?.number || 1) <= 2) {
           return { allowed: false, reason: "Can't evolve on the first turn." };
         }
@@ -4477,7 +4569,7 @@ export function validateLegality(state, command) {
               "That Pokémon was just played this turn — it can't evolve yet.",
           };
         }
-        if (!stadiumRelaxes && player.flags?.evolved?.[payload.targetInstanceId]) {
+        if (!stadiumRelaxes && !freeEvolve && player.flags?.evolved?.[payload.targetInstanceId]) {
           return {
             allowed: false,
             reason: 'Already evolved that Pokémon this turn.',
@@ -4885,6 +4977,7 @@ export function validateLegality(state, command) {
             (c) => c.attachedTo && isEnergy(c)
           ).length,
           handEnergyCount: (player.zones?.hand || []).filter((c) => isEnergy(c)).length,
+          handPokemonCount: (player.zones?.hand || []).filter((c) => isPokemon(c)).length,
           ...trainerTargetCounts(
             player,
             ownedCards(player),
@@ -6930,6 +7023,10 @@ function resolveAttackEffectPhase(draft, ctx) {
           draft.stadium?.card || draft.stadium,
           { attacker: attackerView }
         );
+        // Misty gym1-18: +20 after Weakness/Resistance to an attack by a Pokémon with Misty in its
+        // name that does damage to the Defending Pokémon.
+        const afterWrBonus = turnDamageBonusAfterWR(draft.players[playerId]?.flags?.turnDamageBonuses, attackerView);
+        if (afterWrBonus > 0 && dmgDealt > 0) dmgDealt += afterWrBonus;
         if (vermilion) {
           const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
           events.push({ type: 'coinFlipped', playerId, face, source: vermilion.source });
@@ -7097,6 +7194,16 @@ function resolveAttackEffectPhase(draft, ctx) {
               dealt: dmgDealt,
               ...(weaknessApplied && { weakness: true }),
             });
+          }
+        }
+
+        // Koga gym2-19: "If an attack from a Pokémon with Koga in its name does damage to a
+        // Defending Pokémon this turn, that Pokémon is then Poisoned."
+        if (dmgDealt > 0 && !dmgResult.prevented && !defenderKnockedOut) {
+          const attackerName = String(attackerView?.name || '').toLowerCase();
+          for (const rider of draft.players[playerId]?.flags?.turnAttackRiders || []) {
+            if (!attackerName.includes(rider.nameTag)) continue;
+            if (addCondition(defender, rider.condition)) events.push(conditionsUpdatedEvent(defender, rider.condition));
           }
         }
 
@@ -8435,6 +8542,9 @@ export function applyCommand(state, command, rng = null) {
         if (isEnergy(cardRef.card)) {
           if (!draft.players[playerId].flags) {
             draft.players[playerId].flags = {};
+          }
+          if (cardRef.zoneId === 'hand') {
+            recordEnergyAttachPlan(draft, draft.players[playerId], cardRef.card, hostRef.card.instanceId);
           }
           draft.players[playerId].flags.energyAttached = true;
           // "If you attach a {F} Energy card from your hand to this Pokémon during this turn"

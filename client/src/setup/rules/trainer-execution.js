@@ -916,10 +916,12 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           const oppSide = _effectOwner === 'self' ? 'opp' : 'self';
           const n = zone(oppSide, 'hand').getCount();
           for (let i = 0; i < n; i++) moveToDeckBottom(oppSide, oppSide, 'hand', 0);
-          for (let i = 0; i < step.count; i++) {
+          // Reset Stamp: "a card for each of their remaining Prize cards" (I231).
+          const drawCount = step.perPrize ? zone(oppSide, 'prizes').getCount() : step.count;
+          for (let i = 0; i < drawCount; i++) {
             if (zone(oppSide, 'deck').getCount() > 0) moveCardBundle(oppSide, oppSide, 'deck', 'hand', 0, false, 'move');
           }
-          msg(`  auto: opponent shuffled hand to deck bottom, drew ${step.count}`);
+          msg(`  auto: opponent shuffled hand to deck bottom, drew ${drawCount}`);
           break;
         }
         case 'millSelf':
