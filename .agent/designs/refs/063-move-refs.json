@@ -1,0 +1,5072 @@
+{
+ "about": "Design 063 move references. Sprite-era animations (N2B2 = Black 2/White 2, NB = Black/White; older tags when neither exists) and the newest 3D video (EV = Scarlet/Violet, LPA = Legends Z-A, EB = Sword/Shield, USUL/SL = Sun/Moon, ROSA/XY = Gen VI) as hosted by Poképédia; French names from PokéAPI. Regenerate with scratch fetch-moves.mjs (see the design).",
+ "fetchedOn": "2026-10-01",
+ "moves": [
+  {
+   "slug": "vine-whip",
+   "name": "Vine Whip",
+   "fr": "Fouet Lianes",
+   "vgType": "grass",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Fouet_Lianes",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/0f/Fouet_Lianes_N2B2.gif",
+    "frames": 89,
+    "fps": 33.33,
+    "durationMs": 2670
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/7/7b/Fouet_Lianes_EV.mp4",
+    "frames": 103,
+    "fps": 30,
+    "durationMs": 3433
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PRR",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "razor-leaf",
+   "name": "Razor Leaf",
+   "fr": "Tranch’Herbe",
+   "vgType": "grass",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Tranch'Herbe",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/1b/Tranch%27Herbe_N2B2.gif",
+    "frames": 130,
+    "fps": 33.33,
+    "durationMs": 3900
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/f/fa/Tranch%27Herbe_EV.mp4",
+    "frames": 97,
+    "fps": 30,
+    "durationMs": 3233
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "DP",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "leaf-blade",
+   "name": "Leaf Blade",
+   "fr": "Lame Feuille",
+   "vgType": "grass",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Lame_Feuille",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/6/68/Fendifoglia5.png",
+    "frames": 291,
+    "fps": 40,
+    "durationMs": 7275
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/e1/Lame_Feuille_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "aqua-jet",
+   "name": "Aqua Jet",
+   "fr": "Aqua-Jet",
+   "vgType": "water",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Aqua-Jet",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/25/Aqua-Jet_N2B2.gif",
+    "frames": 134,
+    "fps": 33.33,
+    "durationMs": 4020
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/64/Aqua-Jet_EV.mp4",
+    "frames": 105,
+    "fps": 29.99,
+    "durationMs": 3501
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "waterfall",
+   "name": "Waterfall",
+   "fr": "Cascade",
+   "vgType": "water",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Cascade",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/99/Cascade_N2B2.gif",
+    "frames": 120,
+    "fps": 33.33,
+    "durationMs": 3600
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/94/Cascade_EV.mp4",
+    "frames": 130,
+    "fps": 30,
+    "durationMs": 4333
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "RFVF",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "liquidation",
+   "name": "Liquidation",
+   "fr": "Aqua-Brèche",
+   "vgType": "water",
+   "gameClass": "physical",
+   "introduced": "generation-vii",
+   "page": "https://www.pokepedia.fr/Aqua-Br%C3%A8che",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/6c/Aqua-Br%C3%A8che_EV.mp4",
+    "frames": 135,
+    "fps": 29.78,
+    "durationMs": 4533
+   },
+   "available": [
+    "EV",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "wave-crash",
+   "name": "Wave Crash",
+   "fr": "Aquatacle",
+   "vgType": "water",
+   "gameClass": "physical",
+   "introduced": "generation-viii",
+   "page": "https://www.pokepedia.fr/Aquatacle",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/c/c8/Aquatacle_EV.mp4",
+    "frames": 195,
+    "fps": 30,
+    "durationMs": 6501
+   },
+   "available": [
+    "EV",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "aqua-tail",
+   "name": "Aqua Tail",
+   "fr": "Hydro-Queue",
+   "vgType": "water",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Hydro-Queue",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/8/86/Idrondata5.png",
+    "frames": 152,
+    "fps": 22.75,
+    "durationMs": 6681
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/84/Hydro-Queue_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "flame-charge",
+   "name": "Flame Charge",
+   "fr": "Nitrocharge",
+   "vgType": "fire",
+   "gameClass": "physical",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Nitrocharge",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/8/86/Nitrocharge_N2B2.gif",
+    "frames": 157,
+    "fps": 33.33,
+    "durationMs": 4710
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/48/Nitrocharge_EV.mp4",
+    "frames": 165,
+    "fps": 30,
+    "durationMs": 5500
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "flame-wheel",
+   "name": "Flame Wheel",
+   "fr": "Roue de Feu",
+   "vgType": "fire",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Roue_de_Feu",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/b/b3/Roue_de_Feu_N2B2.gif",
+    "frames": 124,
+    "fps": 33.33,
+    "durationMs": 3720
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/c/c2/Roue_de_Feu_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "fire-punch",
+   "name": "Fire Punch",
+   "fr": "Poing Feu",
+   "vgType": "fire",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Poing_Feu",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/0/0e/Fuocopugno5.png",
+    "frames": 248,
+    "fps": 40,
+    "durationMs": 6200
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/9e/Poing_Feu_EV.mp4",
+    "frames": 105,
+    "fps": 29.99,
+    "durationMs": 3501
+   },
+   "available": [
+    "EV",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "lick",
+   "name": "Lick",
+   "fr": "Léchouille",
+   "vgType": "ghost",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/L%C3%A9chouille",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/90/L%C3%A9chouille_N2B2.gif",
+    "frames": 98,
+    "fps": 33.33,
+    "durationMs": 2940
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/1f/L%C3%A9chouille_EV.mp4",
+    "frames": 117,
+    "fps": 30,
+    "durationMs": 3900
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "astonish",
+   "name": "Astonish",
+   "fr": "Étonnement",
+   "vgType": "ghost",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/%C3%89tonnement",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/0a/%C3%89tonnement_N2B2.gif",
+    "frames": 103,
+    "fps": 33.33,
+    "durationMs": 3090
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/92/%C3%89tonnement_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4001
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "shadow-punch",
+   "name": "Shadow Punch",
+   "fr": "Poing Ombre",
+   "vgType": "ghost",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Poing_Ombre",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/a/a9/Poing_Ombre_N2B2.gif",
+    "frames": 80,
+    "fps": 33.33,
+    "durationMs": 2400
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/dc/Poing_Ombre_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "shadow-claw",
+   "name": "Shadow Claw",
+   "fr": "Griffe Ombre",
+   "vgType": "ghost",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Griffe_Ombre",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/7/72/Griffe_Ombre_N2B2.gif",
+    "frames": 95,
+    "fps": 33.33,
+    "durationMs": 2850
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/a/ad/Griffe_Ombre_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "phantom-force",
+   "name": "Phantom Force",
+   "fr": "Hantise",
+   "vgType": "ghost",
+   "gameClass": "physical",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Hantise",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/8e/Hantise_EV.mp4",
+    "frames": 375,
+    "fps": 30,
+    "durationMs": 12500
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "pursuit",
+   "name": "Pursuit",
+   "fr": "Poursuite",
+   "vgType": "dark",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Poursuite",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/4c/Poursuite_N2B2.gif",
+    "frames": 111,
+    "fps": 33.33,
+    "durationMs": 3330
+   },
+   "modern": {
+    "game": "USUL",
+    "url": "https://www.pokepedia.fr/images/7/7d/Poursuite_USUL.mp4",
+    "frames": 83,
+    "fps": 24.7,
+    "durationMs": 3360
+   },
+   "available": [
+    "USUL",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "feint-attack",
+   "name": "Feint Attack",
+   "fr": "Feinte",
+   "vgType": "dark",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Feinte",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/a/a8/Feinte_N2B2.gif",
+    "frames": 95,
+    "fps": 25,
+    "durationMs": 3800
+   },
+   "modern": {
+    "game": "USUL",
+    "url": "https://www.pokepedia.fr/images/5/5c/Feinte_USUL.mp4",
+    "frames": 81,
+    "fps": 30,
+    "durationMs": 2700
+   },
+   "available": [
+    "USUL",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "bite",
+   "name": "Bite",
+   "fr": "Morsure",
+   "vgType": "dark",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Morsure",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/4d/Morsure_N2B2.gif",
+    "frames": 67,
+    "fps": 33.33,
+    "durationMs": 2010
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/21/Morsure_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "RFVF",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "night-slash",
+   "name": "Night Slash",
+   "fr": "Tranche-Nuit",
+   "vgType": "dark",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Tranche-Nuit",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/c/c5/Tranche-Nuit_N2B2.gif",
+    "frames": 107,
+    "fps": 33.33,
+    "durationMs": 3210
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/2b/Tranche-Nuit_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4001
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "throat-chop",
+   "name": "Throat Chop",
+   "fr": "Exécu-Son",
+   "vgType": "dark",
+   "gameClass": "physical",
+   "introduced": "generation-vii",
+   "page": "https://www.pokepedia.fr/Ex%C3%A9cu-Son",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/b/b4/Ex%C3%A9cu-Son_EV.mp4",
+    "frames": 110,
+    "fps": 30,
+    "durationMs": 3667
+   },
+   "available": [
+    "EV",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "nuzzle",
+   "name": "Nuzzle",
+   "fr": "Frotte-Frimousse",
+   "vgType": "electric",
+   "gameClass": "physical",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Frotte-Frimousse",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/d6/Frotte-Frimousse_EV.mp4",
+    "frames": 210,
+    "fps": 30,
+    "durationMs": 7000
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "PRR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "thunder-fang",
+   "name": "Thunder Fang",
+   "fr": "Crocs Éclair",
+   "vgType": "electric",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Crocs_%C3%89clair",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/05/Crocs_%C3%89clair_N2B2.gif",
+    "frames": 84,
+    "fps": 33.33,
+    "durationMs": 2520
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/da/Crocs_%C3%89clair_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "wild-charge",
+   "name": "Wild Charge",
+   "fr": "Éclair Fou",
+   "vgType": "electric",
+   "gameClass": "physical",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/%C3%89clair_Fou",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/94/%C3%89clair_Fou_N2B2.gif",
+    "frames": 140,
+    "fps": 33.33,
+    "durationMs": 4200
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/1a/%C3%89clair_Fou_EV.mp4",
+    "frames": 165,
+    "fps": 30,
+    "durationMs": 5501
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "ice-shard",
+   "name": "Ice Shard",
+   "fr": "Éclats Glace",
+   "vgType": "ice",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/%C3%89clats_Glace",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/5/55/%C3%89clats_Glace_N2B2.gif",
+    "frames": 172,
+    "fps": 33.33,
+    "durationMs": 5160
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/26/%C3%89clats_Glace_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "avalanche",
+   "name": "Avalanche",
+   "fr": "Avalanche",
+   "vgType": "ice",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Avalanche",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/29/Avalanche_N2B2.gif",
+    "frames": 130,
+    "fps": 33.33,
+    "durationMs": 3900
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/3/33/Avalanche_EV.mp4",
+    "frames": 133,
+    "fps": 30,
+    "durationMs": 4433
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "ice-hammer",
+   "name": "Ice Hammer",
+   "fr": "Marteau de Glace",
+   "vgType": "ice",
+   "gameClass": "physical",
+   "introduced": "generation-vii",
+   "page": "https://www.pokepedia.fr/Marteau_de_Glace",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/8e/Marteau_de_Glace_EV.mp4",
+    "frames": 210,
+    "fps": 30,
+    "durationMs": 7000
+   },
+   "available": [
+    "EV",
+    "USUL"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "ice-spinner",
+   "name": "Ice Spinner",
+   "fr": "Cryo-Pirouette",
+   "vgType": "ice",
+   "gameClass": "physical",
+   "introduced": "generation-ix",
+   "page": "https://www.pokepedia.fr/Cryo-Pirouette",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/83/Cryo-Pirouette_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "arm-thrust",
+   "name": "Arm Thrust",
+   "fr": "Cogne",
+   "vgType": "fighting",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Cogne",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/5/5d/Cogne_N2B2.gif",
+    "frames": 79,
+    "fps": 33.33,
+    "durationMs": 2370
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/88/Cogne_EV.mp4",
+    "frames": 240,
+    "fps": 30,
+    "durationMs": 8000
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "karate-chop",
+   "name": "Karate Chop",
+   "fr": "Poing Karaté",
+   "vgType": "fighting",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Poing_Karat%C3%A9",
+   "sprite": null,
+   "modern": null,
+   "available": [],
+   "status": "no-animation"
+  },
+  {
+   "slug": "low-sweep",
+   "name": "Low Sweep",
+   "fr": "Balayette",
+   "vgType": "fighting",
+   "gameClass": "physical",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Balayette",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/d/dc/Balayette_N2B2.gif",
+    "frames": 96,
+    "fps": 33.33,
+    "durationMs": 2880
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/2d/Balayette_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5001
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "triple-kick",
+   "name": "Triple Kick",
+   "fr": "Triple Pied",
+   "vgType": "fighting",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Triple_Pied",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/05/Triple_Pied_N2B2.gif",
+    "frames": 170,
+    "fps": 33.33,
+    "durationMs": 5100
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/da/Triple_Pied_EV.mp4",
+    "frames": 287,
+    "fps": 30,
+    "durationMs": 9567
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "close-combat",
+   "name": "Close Combat",
+   "fr": "Close Combat",
+   "vgType": "fighting",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Close_Combat",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/39/Close_Combat_N2B2.gif",
+    "frames": 125,
+    "fps": 33.33,
+    "durationMs": 3750
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/8a/Close_Combat_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "meteor-assault",
+   "name": "Meteor Assault",
+   "fr": "Joute Astrale",
+   "vgType": "fighting",
+   "gameClass": "physical",
+   "introduced": "generation-viii",
+   "page": "https://www.pokepedia.fr/Joute_Astrale",
+   "sprite": null,
+   "modern": {
+    "game": "EB",
+    "url": "https://www.pokepedia.fr/images/3/39/Joute_Astrale_EB.mp4",
+    "frames": 257,
+    "fps": 30,
+    "durationMs": 8567
+   },
+   "available": [
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "superpower",
+   "name": "Superpower",
+   "fr": "Surpuissance",
+   "vgType": "fighting",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Surpuissance",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/a/a0/Surpuissance_N2B2.gif",
+    "frames": 165,
+    "fps": 33.33,
+    "durationMs": 4950
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/93/Surpuissance_EV.mp4",
+    "frames": 128,
+    "fps": 30,
+    "durationMs": 4267
+   },
+   "available": [
+    "EV",
+    "E",
+    "DP",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "poison-sting",
+   "name": "Poison Sting",
+   "fr": "Dard-Venin",
+   "vgType": "poison",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Dard-Venin",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/45/Dard-Venin_N2B2.gif",
+    "frames": 76,
+    "fps": 33.33,
+    "durationMs": 2280
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/5/50/Dard-Venin_EV.mp4",
+    "frames": 128,
+    "fps": 30,
+    "durationMs": 4267
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "poison-tail",
+   "name": "Poison Tail",
+   "fr": "Queue-Poison",
+   "vgType": "poison",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Queue-Poison",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/a/a7/Queue-Poison_N2B2.gif",
+    "frames": 115,
+    "fps": 33.33,
+    "durationMs": 3450
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/6d/Queue-Poison_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "poison-jab",
+   "name": "Poison Jab",
+   "fr": "Direct Toxik",
+   "vgType": "poison",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Direct_Toxik",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/0a/Direct_Toxik_N2B2.gif",
+    "frames": 86,
+    "fps": 33.33,
+    "durationMs": 2580
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/ea/Direct_Toxik_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "cross-poison",
+   "name": "Cross Poison",
+   "fr": "Poison Croix",
+   "vgType": "poison",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Poison_Croix",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/3/3b/Velenocroce5.png",
+    "frames": 131,
+    "fps": 22.25,
+    "durationMs": 5888
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/2c/Poison_Croix_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "EB",
+    "DEPS",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "sand-tomb",
+   "name": "Sand Tomb",
+   "fr": "Tourbi-Sable",
+   "vgType": "ground",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Tourbi-Sable",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/36/Tourbi-Sable_N2B2.gif",
+    "frames": 210,
+    "fps": 33.33,
+    "durationMs": 6300
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/5/51/Tourbi-Sable_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "mud-slap",
+   "name": "Mud-Slap",
+   "fr": "Coud’Boue",
+   "vgType": "ground",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Coud'Boue",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/b/b5/Coud%27Boue_N2B2.gif",
+    "frames": 93,
+    "fps": 33.33,
+    "durationMs": 2790
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/2d/Coud%27Boue_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PRR",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "bulldoze",
+   "name": "Bulldoze",
+   "fr": "Piétisol",
+   "vgType": "ground",
+   "gameClass": "physical",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Pi%C3%A9tisol",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/21/Pi%C3%A9tisol_N2B2.gif",
+    "frames": 75,
+    "fps": 33.33,
+    "durationMs": 2250
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/8a/Pi%C3%A9tisol_EV.mp4",
+    "frames": 210,
+    "fps": 30,
+    "durationMs": 7000
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "DEPS",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "stomping-tantrum",
+   "name": "Stomping Tantrum",
+   "fr": "Trépignement",
+   "vgType": "ground",
+   "gameClass": "physical",
+   "introduced": "generation-vii",
+   "page": "https://www.pokepedia.fr/Tr%C3%A9pignement",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/65/Tr%C3%A9pignement_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "earthquake",
+   "name": "Earthquake",
+   "fr": "Séisme",
+   "vgType": "ground",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/S%C3%A9isme",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/e/e9/S%C3%A9isme_N2B2.gif",
+    "frames": 154,
+    "fps": 33.33,
+    "durationMs": 4620
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/96/S%C3%A9isme_EV.mp4",
+    "frames": 173,
+    "fps": 30,
+    "durationMs": 5767
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "high-horsepower",
+   "name": "High Horsepower",
+   "fr": "Cavalerie Lourde",
+   "vgType": "ground",
+   "gameClass": "physical",
+   "introduced": "generation-vii",
+   "page": "https://www.pokepedia.fr/Cavalerie_Lourde",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/45/Cavalerie_Lourde_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "peck",
+   "name": "Peck",
+   "fr": "Picpic",
+   "vgType": "flying",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Picpic",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/a/a9/Picpic_N2B2.gif",
+    "frames": 64,
+    "fps": 25,
+    "durationMs": 2560
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/3/3d/Picpic_EV.mp4",
+    "frames": 75,
+    "fps": 30,
+    "durationMs": 2500
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "aerial-ace",
+   "name": "Aerial Ace",
+   "fr": "Aéropique",
+   "vgType": "flying",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/A%C3%A9ropique",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/f/f0/A%C3%A9ropique_N2B2.gif",
+    "frames": 105,
+    "fps": 33.33,
+    "durationMs": 3150
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/1e/A%C3%A9ropique_EV.mp4",
+    "frames": 105,
+    "fps": 29.72,
+    "durationMs": 3533
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "wing-attack",
+   "name": "Wing Attack",
+   "fr": "Cru-Ailes",
+   "vgType": "flying",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Cru-Ailes",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/6/63/Attacco_d%27Ala5.png",
+    "frames": 215,
+    "fps": 40,
+    "durationMs": 5375
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/f/ff/Cru-Ailes_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "brave-bird",
+   "name": "Brave Bird",
+   "fr": "Rapace",
+   "vgType": "flying",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Rapace",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/e/e5/Rapace_N2B2.gif",
+    "frames": 124,
+    "fps": 33.33,
+    "durationMs": 3720
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/4b/Rapace_EV.mp4",
+    "frames": 135,
+    "fps": 29.78,
+    "durationMs": 4533
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "zen-headbutt",
+   "name": "Zen Headbutt",
+   "fr": "Psykoud’Boul",
+   "vgType": "psychic",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Psykoud'Boul",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/6/6f/Psykoud%27Boul_N2B2.gif",
+    "frames": 151,
+    "fps": 33.33,
+    "durationMs": 4530
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/6e/Psykoud%27Boul_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "psycho-cut",
+   "name": "Psycho Cut",
+   "fr": "Coupe Psycho",
+   "vgType": "psychic",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Coupe_Psycho",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/2c/Coupe_Psycho_N2B2.gif",
+    "frames": 110,
+    "fps": 33.33,
+    "durationMs": 3300
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/12/Coupe_Psycho_EV.mp4",
+    "frames": 102,
+    "fps": 30,
+    "durationMs": 3400
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "fell-stinger",
+   "name": "Fell Stinger",
+   "fr": "Dard Mortel",
+   "vgType": "bug",
+   "gameClass": "physical",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Dard_Mortel",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/e9/Dard_Mortel_EV.mp4",
+    "frames": 323,
+    "fps": 30,
+    "durationMs": 10767
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "fury-cutter",
+   "name": "Fury Cutter",
+   "fr": "Taillade",
+   "vgType": "bug",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Taillade",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/16/Taillade_N2B2.gif",
+    "frames": 121,
+    "fps": 33.33,
+    "durationMs": 3630
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/8f/Taillade_EV.mp4",
+    "frames": 81,
+    "fps": 30,
+    "durationMs": 2700
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "pin-missile",
+   "name": "Pin Missile",
+   "fr": "Dard-Nuée",
+   "vgType": "bug",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Dard-Nu%C3%A9e",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/d/d8/Dard-Nu%C3%A9e_N2B2.gif",
+    "frames": 270,
+    "fps": 33.33,
+    "durationMs": 8100
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/c/c7/Dard-Nu%C3%A9e_EV.mp4",
+    "frames": 180,
+    "fps": 30,
+    "durationMs": 6000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "twineedle",
+   "name": "Twineedle",
+   "fr": "Double Dard",
+   "vgType": "bug",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Double_Dard",
+   "sprite": {
+    "game": "Colo",
+    "url": "https://www.pokepedia.fr/images/b/b1/Double_Dard_Colo.mp4",
+    "frames": 604,
+    "fps": 59.94,
+    "durationMs": 10077
+   },
+   "modern": null,
+   "available": [
+    "Colo"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "x-scissor",
+   "name": "X-Scissor",
+   "fr": "Plaie Croix",
+   "vgType": "bug",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Plaie_Croix",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/9/99/Forbice_X5.png",
+    "frames": 220,
+    "fps": 40,
+    "durationMs": 5500
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/3/3f/Plaie_Croix_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "lunge",
+   "name": "Lunge",
+   "fr": "Furie-Bond",
+   "vgType": "bug",
+   "gameClass": "physical",
+   "introduced": "generation-vii",
+   "page": "https://www.pokepedia.fr/Furie-Bond",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/9f/Furie-Bond_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "megahorn",
+   "name": "Megahorn",
+   "fr": "Mégacorne",
+   "vgType": "bug",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/M%C3%A9gacorne",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/9a/M%C3%A9gacorne_N2B2.gif",
+    "frames": 131,
+    "fps": 33.33,
+    "durationMs": 3930
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/d4/M%C3%A9gacorne_EV.mp4",
+    "frames": 150,
+    "fps": 29.6,
+    "durationMs": 5067
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "DP",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "smack-down",
+   "name": "Smack Down",
+   "fr": "Anti-Air",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Anti-Air",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/7/7c/Anti-Air_N2B2.gif",
+    "frames": 101,
+    "fps": 33.33,
+    "durationMs": 3030
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/93/Anti-Air_EV.mp4",
+    "frames": 99,
+    "fps": 30,
+    "durationMs": 3300
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "rock-throw",
+   "name": "Rock Throw",
+   "fr": "Jet-Pierres",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Jet-Pierres",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/b/b2/Jet-Pierres_N2B2.gif",
+    "frames": 112,
+    "fps": 33.33,
+    "durationMs": 3360
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/9b/Jet-Pierres_EV.mp4",
+    "frames": 114,
+    "fps": 30,
+    "durationMs": 3800
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "rock-blast",
+   "name": "Rock Blast",
+   "fr": "Boule Roc",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Boule_Roc",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/3d/Boule_Roc_N2B2.gif",
+    "frames": 193,
+    "fps": 20,
+    "durationMs": 9650
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/b/bd/Boule_Roc_EV.mp4",
+    "frames": 207,
+    "fps": 30,
+    "durationMs": 6900
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "rock-slide",
+   "name": "Rock Slide",
+   "fr": "Éboulement",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/%C3%89boulement",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/30/%C3%89boulement_N2B2.gif",
+    "frames": 104,
+    "fps": 33.33,
+    "durationMs": 3120
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/13/%C3%89boulement_EV.mp4",
+    "frames": 135,
+    "fps": 30.01,
+    "durationMs": 4499
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "rock-tomb",
+   "name": "Rock Tomb",
+   "fr": "Tomberoche",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Tomberoche",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/d/df/Tomberoche_N2B2.gif",
+    "frames": 82,
+    "fps": 33.33,
+    "durationMs": 2460
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/16/Tomberoche_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "head-smash",
+   "name": "Head Smash",
+   "fr": "Fracass’Tête",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Fracass'T%C3%AAte",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/d/d1/Fracass%27T%C3%AAte_N2B2.gif",
+    "frames": 117,
+    "fps": 33.33,
+    "durationMs": 3510
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/6a/Fracass%27T%C3%AAte_EV.mp4",
+    "frames": 138,
+    "fps": 30,
+    "durationMs": 4600
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "stone-edge",
+   "name": "Stone Edge",
+   "fr": "Lame de Roc",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Lame_de_Roc",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/07/Lame_de_Roc_N2B2.gif",
+    "frames": 96,
+    "fps": 33.33,
+    "durationMs": 2880
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/01/Lame_de_Roc_EV.mp4",
+    "frames": 113,
+    "fps": 30,
+    "durationMs": 3767
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "rock-wrecker",
+   "name": "Rock Wrecker",
+   "fr": "Roc-Boulet",
+   "vgType": "rock",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Roc-Boulet",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/8/8e/Roc-Boulet_N2B2.gif",
+    "frames": 157,
+    "fps": 33.33,
+    "durationMs": 4710
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/84/Roc-Boulet_EV.mp4",
+    "frames": 146,
+    "fps": 30,
+    "durationMs": 4867
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "dual-chop",
+   "name": "Dual Chop",
+   "fr": "Double Baffe",
+   "vgType": "dragon",
+   "gameClass": "physical",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Double_Baffe",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/3b/Double_Baffe_N2B2.gif",
+    "frames": 289,
+    "fps": 33.33,
+    "durationMs": 8670
+   },
+   "modern": {
+    "game": "EB",
+    "url": "https://www.pokepedia.fr/images/c/cd/Double_Baffe_EB.mp4",
+    "frames": 132,
+    "fps": 30,
+    "durationMs": 4400
+   },
+   "available": [
+    "EB",
+    "N2B2",
+    "ROSA",
+    "USUL"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "dragon-claw",
+   "name": "Dragon Claw",
+   "fr": "Draco-Griffe",
+   "vgType": "dragon",
+   "gameClass": "physical",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Draco-Griffe",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/a/a7/Dragartigli5.png",
+    "frames": 140,
+    "fps": 28.58,
+    "durationMs": 4898
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/b/b3/Draco-Griffe_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "outrage",
+   "name": "Outrage",
+   "fr": "Colère",
+   "vgType": "dragon",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Col%C3%A8re",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/c/c8/Col%C3%A8re_N2B2.gif",
+    "frames": 132,
+    "fps": 33.33,
+    "durationMs": 3960
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/10/Col%C3%A8re_EV.mp4",
+    "frames": 165,
+    "fps": 30,
+    "durationMs": 5499
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "DP",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "bullet-punch",
+   "name": "Bullet Punch",
+   "fr": "Pisto-Poing",
+   "vgType": "steel",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Pisto-Poing",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/a/a0/Pisto-Poing_N2B2.gif",
+    "frames": 88,
+    "fps": 33.33,
+    "durationMs": 2640
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/68/Pisto-Poing_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "metal-claw",
+   "name": "Metal Claw",
+   "fr": "Griffe Acier",
+   "vgType": "steel",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Griffe_Acier",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/7/7d/Griffe_Acier_N2B2.gif",
+    "frames": 84,
+    "fps": 33.33,
+    "durationMs": 2520
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/c/cb/Griffe_Acier_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "smart-strike",
+   "name": "Smart Strike",
+   "fr": "Estocorne",
+   "vgType": "steel",
+   "gameClass": "physical",
+   "introduced": "generation-vii",
+   "page": "https://www.pokepedia.fr/Estocorne",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/0b/Estocorne_EV.mp4",
+    "frames": 149,
+    "fps": 30,
+    "durationMs": 4967
+   },
+   "available": [
+    "EV",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "steel-wing",
+   "name": "Steel Wing",
+   "fr": "Ailes d’Acier",
+   "vgType": "steel",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Ailes_d'Acier",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/d/de/Alacciaio5.png",
+    "frames": 230,
+    "fps": 40,
+    "durationMs": 5750
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/0b/Ailes_d%27Acier_EV.mp4",
+    "frames": 90,
+    "fps": 30.01,
+    "durationMs": 2999
+   },
+   "available": [
+    "EV",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "iron-tail",
+   "name": "Iron Tail",
+   "fr": "Queue de Fer",
+   "vgType": "steel",
+   "gameClass": "physical",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Queue_de_Fer",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/c/c2/Queue_de_Fer_N2B2.gif",
+    "frames": 132,
+    "fps": 33.33,
+    "durationMs": 3960
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/dd/Queue_de_Fer_EV.mp4",
+    "frames": 105,
+    "fps": 30.01,
+    "durationMs": 3499
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "iron-head",
+   "name": "Iron Head",
+   "fr": "Tête de Fer",
+   "vgType": "steel",
+   "gameClass": "physical",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/T%C3%AAte_de_Fer",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/40/T%C3%AAte_de_Fer_N2B2.gif",
+    "frames": 85,
+    "fps": 33.33,
+    "durationMs": 2550
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/86/T%C3%AAte_de_Fer_EV.mp4",
+    "frames": 131,
+    "fps": 30,
+    "durationMs": 4367
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "spirit-break",
+   "name": "Spirit Break",
+   "fr": "Choc Émotionnel",
+   "vgType": "fairy",
+   "gameClass": "physical",
+   "introduced": "generation-viii",
+   "page": "https://www.pokepedia.fr/Choc_%C3%89motionnel",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/d5/Choc_%C3%89motionnel_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "play-rough",
+   "name": "Play Rough",
+   "fr": "Câlinerie",
+   "vgType": "fairy",
+   "gameClass": "physical",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/C%C3%A2linerie",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/7/72/C%C3%A2linerie_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "absorb",
+   "name": "Absorb",
+   "fr": "Vole-Vie",
+   "vgType": "grass",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Vole-Vie",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/4/42/Assorbimento5.png",
+    "frames": 302,
+    "fps": 25,
+    "durationMs": 12080
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/2e/Vole-Vie_EV.mp4",
+    "frames": 225,
+    "fps": 30,
+    "durationMs": 7500
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "magical-leaf",
+   "name": "Magical Leaf",
+   "fr": "Feuille Magik",
+   "vgType": "grass",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Feuille_Magik",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/d/df/Fogliamagica5.png",
+    "frames": 277,
+    "fps": 40,
+    "durationMs": 6925
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/e1/Feuille_Magik_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PRR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "leaf-storm",
+   "name": "Leaf Storm",
+   "fr": "Tempête Verte",
+   "vgType": "grass",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Temp%C3%AAte_Verte",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/6/64/Verdebufera5.png",
+    "frames": 622,
+    "fps": 40,
+    "durationMs": 15550
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/0f/Temp%C3%AAte_Verte_EV.mp4",
+    "frames": 137,
+    "fps": 30,
+    "durationMs": 4567
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "solar-beam",
+   "name": "Solar Beam",
+   "fr": "Lance-Soleil",
+   "vgType": "grass",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Lance-Soleil",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/06/Lance-Soleil_N2B2.gif",
+    "frames": 345,
+    "fps": 33.33,
+    "durationMs": 10350
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/c/c0/Lance-Soleil_EV.mp4",
+    "frames": 345,
+    "fps": 29.32,
+    "durationMs": 11766
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "seed-flare",
+   "name": "Seed Flare",
+   "fr": "Fulmigraine",
+   "vgType": "grass",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Fulmigraine",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/46/Fulmigraine_N2B2.gif",
+    "frames": 132,
+    "fps": 33.33,
+    "durationMs": 3960
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/19/Fulmigraine_EV.mp4",
+    "frames": 128,
+    "fps": 30,
+    "durationMs": 4267
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "petal-dance",
+   "name": "Petal Dance",
+   "fr": "Danse Fleurs",
+   "vgType": "grass",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Danse_Fleurs",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/7/7f/Petalodanza5.png",
+    "frames": 282,
+    "fps": 40,
+    "durationMs": 7050
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/f/f5/Danse_Fleurs_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 4999
+   },
+   "available": [
+    "EV",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "energy-ball",
+   "name": "Energy Ball",
+   "fr": "Éco-Sphère",
+   "vgType": "grass",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/%C3%89co-Sph%C3%A8re",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/2d/%C3%89co-Sph%C3%A8re_N2B2.gif",
+    "frames": 136,
+    "fps": 33.33,
+    "durationMs": 4080
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/eb/%C3%89co-Sph%C3%A8re_EV.mp4",
+    "frames": 165,
+    "fps": 30,
+    "durationMs": 5500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "water-gun",
+   "name": "Water Gun",
+   "fr": "Pistolet à O",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Pistolet_%C3%A0_O",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/21/Pistolet_%C3%A0_O_N2B2.gif",
+    "frames": 99,
+    "fps": 33.33,
+    "durationMs": 2970
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/a/a6/Pistolet_%C3%A0_O_EV.mp4",
+    "frames": 105,
+    "fps": 29.99,
+    "durationMs": 3501
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PRR",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "bubble",
+   "name": "Bubble",
+   "fr": "Écume",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/%C3%89cume",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/8/88/%C3%89cume_N2B2.gif",
+    "frames": 167,
+    "fps": 33.33,
+    "durationMs": 5010
+   },
+   "modern": {
+    "game": "LPA",
+    "url": "https://www.pokepedia.fr/images/5/5c/%C3%89cume_LPA.mp4",
+    "frames": 90,
+    "fps": 29.99,
+    "durationMs": 3001
+   },
+   "available": [
+    "LPA",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "Colo",
+    "XD",
+    "PBR",
+    "PRR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "whirlpool",
+   "name": "Whirlpool",
+   "fr": "Siphon",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Siphon",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/97/Siphon_N2B2.gif",
+    "frames": 138,
+    "fps": 33.33,
+    "durationMs": 4140
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/22/Siphon_EV.mp4",
+    "frames": 120,
+    "fps": 30.01,
+    "durationMs": 3999
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "octazooka",
+   "name": "Octazooka",
+   "fr": "Octazooka",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Octazooka",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/48/Octazooka_N2B2.gif",
+    "frames": 85,
+    "fps": 33.33,
+    "durationMs": 2550
+   },
+   "modern": {
+    "game": "LPA",
+    "url": "https://www.pokepedia.fr/images/2/2e/Octazooka_LPA.mp4",
+    "frames": 93,
+    "fps": 30,
+    "durationMs": 3100
+   },
+   "available": [
+    "LPA",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "scald",
+   "name": "Scald",
+   "fr": "Ébullition",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/%C3%89bullition",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/2c/%C3%89bullition_N2B2.gif",
+    "frames": 142,
+    "fps": 33.33,
+    "durationMs": 4260
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/c/c2/%C3%89bullition_EV.mp4",
+    "frames": 257,
+    "fps": 30,
+    "durationMs": 8567
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "water-pledge",
+   "name": "Water Pledge",
+   "fr": "Aire d’Eau",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Aire_d'Eau",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/19/Aire_d%27Eau_N2B2.gif",
+    "frames": 114,
+    "fps": 33.33,
+    "durationMs": 3420
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/03/Aire_d%27Eau_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "hydro-cannon",
+   "name": "Hydro Cannon",
+   "fr": "Hydroblast",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Hydroblast",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/a/a3/Hydroblast_N2B2.gif",
+    "frames": 151,
+    "fps": 33.33,
+    "durationMs": 4530
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/b/bb/Hydroblast_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "RFVF",
+    "DP",
+    "HGSS",
+    "N2B2",
+    "XY",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "hydro-pump",
+   "name": "Hydro Pump",
+   "fr": "Hydrocanon",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Hydrocanon",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/c/ca/Hydrocanon_N2B2.gif",
+    "frames": 120,
+    "fps": 33.33,
+    "durationMs": 3600
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/f/f1/Hydrocanon_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "surf",
+   "name": "Surf",
+   "fr": "Surf",
+   "vgType": "water",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Surf",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/5/5e/Surf_N2B2.gif",
+    "frames": 134,
+    "fps": 33.33,
+    "durationMs": 4020
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/ec/Surf_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "DEPS",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "ember",
+   "name": "Ember",
+   "fr": "Flammèche",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Flamm%C3%A8che",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/e/ec/Flamm%C3%A8che_N2B2.gif",
+    "frames": 89,
+    "fps": 33.33,
+    "durationMs": 2670
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/7/7e/Flamm%C3%A8che_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "DEPS",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "incinerate",
+   "name": "Incinerate",
+   "fr": "Calcination",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Calcination",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/7/7c/Calcination_N2B2.gif",
+    "frames": 169,
+    "fps": 33.33,
+    "durationMs": 5070
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/0c/Calcination_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "mystical-fire",
+   "name": "Mystical Fire",
+   "fr": "Feu Ensorcelé",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Feu_Ensorcel%C3%A9",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/5/59/Feu_Ensorcel%C3%A9_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "lava-plume",
+   "name": "Lava Plume",
+   "fr": "Ébullilave",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/%C3%89bullilave",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/34/%C3%89bullilave_N2B2.gif",
+    "frames": 113,
+    "fps": 33.33,
+    "durationMs": 3390
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/23/%C3%89bullilave_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "flame-burst",
+   "name": "Flame Burst",
+   "fr": "Rebondifeu",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Rebondifeu",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/d/d4/Rebondifeu_N2B2.gif",
+    "frames": 85,
+    "fps": 33.33,
+    "durationMs": 2550
+   },
+   "modern": {
+    "game": "USUL",
+    "url": "https://www.pokepedia.fr/images/5/5a/Rebondifeu_USUL.mp4",
+    "frames": 99,
+    "fps": 24.5,
+    "durationMs": 4040
+   },
+   "available": [
+    "USUL",
+    "N2B2",
+    "ROSA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "blast-burn",
+   "name": "Blast Burn",
+   "fr": "Rafale Feu",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Rafale_Feu",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/e/e0/Rafale_Feu_N2B2.gif",
+    "frames": 218,
+    "fps": 33.33,
+    "durationMs": 6540
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/db/Rafale_Feu_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "RFVF",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "overheat",
+   "name": "Overheat",
+   "fr": "Surchauffe",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Surchauffe",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/5/54/Surchauffe_N2B2.gif",
+    "frames": 171,
+    "fps": 33.33,
+    "durationMs": 5130
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/0b/Surchauffe_EV.mp4",
+    "frames": 165,
+    "fps": 30,
+    "durationMs": 5499
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "flamethrower",
+   "name": "Flamethrower",
+   "fr": "Lance-Flammes",
+   "vgType": "fire",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Lance-Flammes",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/1/1e/Lanciafiamme5.png",
+    "frames": 264,
+    "fps": 40,
+    "durationMs": 6600
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/4c/Lance-Flammes_EV.mp4",
+    "frames": 135,
+    "fps": 29.78,
+    "durationMs": 4533
+   },
+   "available": [
+    "EV",
+    "XY",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "DEPS",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "night-shade",
+   "name": "Night Shade",
+   "fr": "Ombre Nocturne",
+   "vgType": "ghost",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Ombre_Nocturne",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/c/c4/Ombra_Notturna5.png",
+    "frames": 228,
+    "fps": 40,
+    "durationMs": 5700
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/47/Ombre_Nocturne_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "hex",
+   "name": "Hex",
+   "fr": "Châtiment",
+   "vgType": "ghost",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Ch%C3%A2timent",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/10/Ch%C3%A2timent_N2B2.gif",
+    "frames": 87,
+    "fps": 25,
+    "durationMs": 3480
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/7/71/Ch%C3%A2timent_EV.mp4",
+    "frames": 149,
+    "fps": 30,
+    "durationMs": 4967
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "ominous-wind",
+   "name": "Ominous Wind",
+   "fr": "Vent Mauvais",
+   "vgType": "ghost",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Vent_Mauvais",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/96/Vent_Mauvais_N2B2.gif",
+    "frames": 98,
+    "fps": 33.33,
+    "durationMs": 2940
+   },
+   "modern": {
+    "game": "LPA",
+    "url": "https://www.pokepedia.fr/images/f/f9/Vent_Mauvais_LPA.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "LPA",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "shadow-ball",
+   "name": "Shadow Ball",
+   "fr": "Ball’Ombre",
+   "vgType": "ghost",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Ball'Ombre",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/6/65/Ball%27Ombre_N2B2.gif",
+    "frames": 128,
+    "fps": 33.33,
+    "durationMs": 3840
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/62/Ball%27Ombre_EV.mp4",
+    "frames": 180,
+    "fps": 30,
+    "durationMs": 6000
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "snarl",
+   "name": "Snarl",
+   "fr": "Aboiement",
+   "vgType": "dark",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Aboiement",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/c/cf/Aboiement_N2B2.gif",
+    "frames": 104,
+    "fps": 33.33,
+    "durationMs": 3120
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/e8/Aboiement_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 4999
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "dark-pulse",
+   "name": "Dark Pulse",
+   "fr": "Vibrobscur",
+   "vgType": "dark",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Vibrobscur",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/13/Vibrobscur_N2B2.gif",
+    "frames": 145,
+    "fps": 33.33,
+    "durationMs": 4350
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/84/Vibrobscur_EV.mp4",
+    "frames": 120,
+    "fps": 29.99,
+    "durationMs": 4001
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "thunder-shock",
+   "name": "Thunder Shock",
+   "fr": "Éclair",
+   "vgType": "electric",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/%C3%89clair",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/6/67/%C3%89clair_N2B2.gif",
+    "frames": 95,
+    "fps": 33.33,
+    "durationMs": 2850
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/8c/%C3%89clair_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "shock-wave",
+   "name": "Shock Wave",
+   "fr": "Onde de Choc",
+   "vgType": "electric",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Onde_de_Choc",
+   "sprite": null,
+   "modern": null,
+   "available": [],
+   "status": "no-animation"
+  },
+  {
+   "slug": "electro-shot",
+   "name": "Electro Shot",
+   "fr": "Fulgurayon",
+   "vgType": "electric",
+   "gameClass": "special",
+   "introduced": "generation-ix",
+   "page": "https://www.pokepedia.fr/Fulgurayon",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/90/Fulgurayon_EV.mp4",
+    "frames": 434,
+    "fps": 30,
+    "durationMs": 14467
+   },
+   "available": [
+    "EV"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "thunder",
+   "name": "Thunder",
+   "fr": "Fatal-Foudre",
+   "vgType": "electric",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Fatal-Foudre",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/c/cb/Fatal-Foudre_N2B2.gif",
+    "frames": 146,
+    "fps": 33.33,
+    "durationMs": 4380
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/7/71/Fatal-Foudre_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "DP",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "zap-cannon",
+   "name": "Zap Cannon",
+   "fr": "Élecanon",
+   "vgType": "electric",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/%C3%89lecanon",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/35/%C3%89lecanon_N2B2.gif",
+    "frames": 137,
+    "fps": 33.33,
+    "durationMs": 4110
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/3/37/%C3%89lecanon_EV.mp4",
+    "frames": 105,
+    "fps": 29.16,
+    "durationMs": 3601
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "powder-snow",
+   "name": "Powder Snow",
+   "fr": "Poudreuse",
+   "vgType": "ice",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Poudreuse",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/6/6b/Poudreuse_N2B2.gif",
+    "frames": 167,
+    "fps": 33.33,
+    "durationMs": 5010
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/0/09/Poudreuse_EV.mp4",
+    "frames": 105,
+    "fps": 30.01,
+    "durationMs": 3499
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "aurora-beam",
+   "name": "Aurora Beam",
+   "fr": "Onde Boréale",
+   "vgType": "ice",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Onde_Bor%C3%A9ale",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/d/db/Onde_Bor%C3%A9ale_N2B2.gif",
+    "frames": 134,
+    "fps": 33.33,
+    "durationMs": 4020
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/4f/Onde_Bor%C3%A9ale_EV.mp4",
+    "frames": 128,
+    "fps": 30,
+    "durationMs": 4267
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "icy-wind",
+   "name": "Icy Wind",
+   "fr": "Vent Glace",
+   "vgType": "ice",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Vent_Glace",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/41/Vent_Glace_N2B2.gif",
+    "frames": 124,
+    "fps": 33.33,
+    "durationMs": 3720
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/4c/Vent_Glace_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "OA",
+    "RFVF",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "ice-beam",
+   "name": "Ice Beam",
+   "fr": "Laser Glace",
+   "vgType": "ice",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Laser_Glace",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/5/50/Laser_Glace_N2B2.gif",
+    "frames": 92,
+    "fps": 33.33,
+    "durationMs": 2760
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/48/Laser_Glace_EV.mp4",
+    "frames": 135,
+    "fps": 29.78,
+    "durationMs": 4533
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "blizzard",
+   "name": "Blizzard",
+   "fr": "Blizzard",
+   "vgType": "ice",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Blizzard",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/8/88/Blizzard_N2B2.gif",
+    "frames": 117,
+    "fps": 33.33,
+    "durationMs": 3510
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/f/fd/Blizzard_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 3999
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "vacuum-wave",
+   "name": "Vacuum Wave",
+   "fr": "Onde Vide",
+   "vgType": "fighting",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Onde_Vide",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/f/ff/Onde_Vide_N2B2.gif",
+    "frames": 91,
+    "fps": 33.33,
+    "durationMs": 2730
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/92/Onde_Vide_EV.mp4",
+    "frames": 73,
+    "fps": 30,
+    "durationMs": 2433
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "aura-sphere",
+   "name": "Aura Sphere",
+   "fr": "Aurasphère",
+   "vgType": "fighting",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Aurasph%C3%A8re",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/b/ba/Aurasph%C3%A8re_N2B2.gif",
+    "frames": 166,
+    "fps": 33.33,
+    "durationMs": 4980
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/f/f2/Aurasph%C3%A8re_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "DP",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "focus-blast",
+   "name": "Focus Blast",
+   "fr": "Exploforce",
+   "vgType": "fighting",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Exploforce",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/c/c4/Exploforce_N2B2.gif",
+    "frames": 220,
+    "fps": 33.33,
+    "durationMs": 6600
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/a/a1/Exploforce_EV.mp4",
+    "frames": 165,
+    "fps": 30,
+    "durationMs": 5500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "acid",
+   "name": "Acid",
+   "fr": "Acide",
+   "vgType": "poison",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Acide",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/7/7b/Acide_N2B2.gif",
+    "frames": 95,
+    "fps": 33.33,
+    "durationMs": 2850
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/a/a4/Acide_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "sludge",
+   "name": "Sludge",
+   "fr": "Détritus",
+   "vgType": "poison",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/D%C3%A9tritus",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/0a/D%C3%A9tritus_N2B2.gif",
+    "frames": 122,
+    "fps": 33.33,
+    "durationMs": 3660
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/d1/D%C3%A9tritus_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "venoshock",
+   "name": "Venoshock",
+   "fr": "Choc Venin",
+   "vgType": "poison",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Choc_Venin",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/e/e0/Choc_Venin_N2B2.gif",
+    "frames": 155,
+    "fps": 33.33,
+    "durationMs": 4650
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/17/Choc_Venin_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "DEPS",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "sludge-bomb",
+   "name": "Sludge Bomb",
+   "fr": "Bombe Beurk",
+   "vgType": "poison",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Bombe_Beurk",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/0/0b/Fangobomba5.png",
+    "frames": 239,
+    "fps": 40,
+    "durationMs": 5975
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/1e/Bombe_Beurk_EV.mp4",
+    "frames": 90,
+    "fps": 29.99,
+    "durationMs": 3001
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "sludge-wave",
+   "name": "Sludge Wave",
+   "fr": "Cradovague",
+   "vgType": "poison",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Cradovague",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/b/bd/Cradovague_N2B2.gif",
+    "frames": 160,
+    "fps": 33.33,
+    "durationMs": 4800
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/b/b8/Cradovague_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "mud-shot",
+   "name": "Mud Shot",
+   "fr": "Tir de Boue",
+   "vgType": "ground",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Tir_de_Boue",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/1e/Tir_de_Boue_N2B2.gif",
+    "frames": 105,
+    "fps": 33.33,
+    "durationMs": 3150
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/94/Tir_de_Boue_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "mud-bomb",
+   "name": "Mud Bomb",
+   "fr": "Boue-Bombe",
+   "vgType": "ground",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Boue-Bombe",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/b/bf/Boue-Bombe_N2B2.gif",
+    "frames": 113,
+    "fps": 33.33,
+    "durationMs": 3390
+   },
+   "modern": {
+    "game": "USUL",
+    "url": "https://www.pokepedia.fr/images/a/a1/Boue-Bombe_USUL.mp4",
+    "frames": 102,
+    "fps": 24.52,
+    "durationMs": 4160
+   },
+   "available": [
+    "USUL",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "earth-power",
+   "name": "Earth Power",
+   "fr": "Telluriforce",
+   "vgType": "ground",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Telluriforce",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/0/04/Telluriforce_N2B2.gif",
+    "frames": 175,
+    "fps": 33.33,
+    "durationMs": 5250
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/82/Telluriforce_EV.mp4",
+    "frames": 153,
+    "fps": 30,
+    "durationMs": 5100
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "gust",
+   "name": "Gust",
+   "fr": "Tornade",
+   "vgType": "flying",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Tornade",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/4/40/Tornade_N2B2.gif",
+    "frames": 130,
+    "fps": 33.33,
+    "durationMs": 3900
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/27/Tornade_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "air-cutter",
+   "name": "Air Cutter",
+   "fr": "Tranch’Air",
+   "vgType": "flying",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Tranch'Air",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/12/Tranch%27Air_N2B2.gif",
+    "frames": 92,
+    "fps": 33.33,
+    "durationMs": 2760
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/3/34/Tranch%27Air_EV.mp4",
+    "frames": 90,
+    "fps": 29.99,
+    "durationMs": 3001
+   },
+   "available": [
+    "EV",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "hurricane",
+   "name": "Hurricane",
+   "fr": "Vent Violent",
+   "vgType": "flying",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Vent_Violent",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/7/79/Vent_Violent_N2B2.gif",
+    "frames": 182,
+    "fps": 33.33,
+    "durationMs": 5460
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/5/59/Vent_Violent_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "aeroblast",
+   "name": "Aeroblast",
+   "fr": "Aéroblast",
+   "vgType": "flying",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/A%C3%A9roblast",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/8/88/A%C3%A9roblast_N2B2.gif",
+    "frames": 164,
+    "fps": 33.33,
+    "durationMs": 4920
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/ef/A%C3%A9roblast_EV.mp4",
+    "frames": 129,
+    "fps": 30,
+    "durationMs": 4300
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "confusion",
+   "name": "Confusion",
+   "fr": "Choc Mental",
+   "vgType": "psychic",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Choc_Mental",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/8/85/Choc_Mental_N2B2.gif",
+    "frames": 97,
+    "fps": 33.33,
+    "durationMs": 2910
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/9/9e/Choc_Mental_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR",
+    "PRR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "psybeam",
+   "name": "Psybeam",
+   "fr": "Rafale Psy",
+   "vgType": "psychic",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Rafale_Psy",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/2/27/Rafale_Psy_N2B2.gif",
+    "frames": 133,
+    "fps": 33.33,
+    "durationMs": 3990
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/d1/Rafale_Psy_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "psychic",
+   "name": "Psychic",
+   "fr": "Psyko",
+   "vgType": "psychic",
+   "gameClass": "special",
+   "introduced": "generation-i",
+   "page": "https://www.pokepedia.fr/Psyko",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/e/e6/Psyko_N2B2.gif",
+    "frames": 106,
+    "fps": 33.33,
+    "durationMs": 3180
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/2/2a/Psyko_EV.mp4",
+    "frames": 150,
+    "fps": 30,
+    "durationMs": 5000
+   },
+   "available": [
+    "EV",
+    "J",
+    "OA",
+    "E",
+    "DP",
+    "HGSS",
+    "NB",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "future-sight",
+   "name": "Future Sight",
+   "fr": "Prescience",
+   "vgType": "psychic",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Prescience",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/1/1d/Prescience_N2B2.gif",
+    "frames": 155,
+    "fps": 33.33,
+    "durationMs": 4650
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/7/79/Prescience_EV.mp4",
+    "frames": 294,
+    "fps": 30,
+    "durationMs": 9800
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "infestation",
+   "name": "Infestation",
+   "fr": "Harcèlement",
+   "vgType": "bug",
+   "gameClass": "special",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Harc%C3%A8lement",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/e0/Harc%C3%A8lement_EV.mp4",
+    "frames": 316,
+    "fps": 30,
+    "durationMs": 10533
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "struggle-bug",
+   "name": "Struggle Bug",
+   "fr": "Survinsecte",
+   "vgType": "bug",
+   "gameClass": "special",
+   "introduced": "generation-v",
+   "page": "https://www.pokepedia.fr/Survinsecte",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/9f/Survinsecte_N2B2.gif",
+    "frames": 111,
+    "fps": 33.33,
+    "durationMs": 3330
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/e/ec/Survinsecte_EV.mp4",
+    "frames": 165,
+    "fps": 30,
+    "durationMs": 5500
+   },
+   "available": [
+    "EV",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "silver-wind",
+   "name": "Silver Wind",
+   "fr": "Vent Argenté",
+   "vgType": "bug",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Vent_Argent%C3%A9",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/5/5c/Vent_Argent%C3%A9_N2B2.gif",
+    "frames": 110,
+    "fps": 33.33,
+    "durationMs": 3300
+   },
+   "modern": {
+    "game": "LPA",
+    "url": "https://www.pokepedia.fr/images/8/86/Vent_Argent%C3%A9_LPA.mp4",
+    "frames": 89,
+    "fps": 30,
+    "durationMs": 2966
+   },
+   "available": [
+    "LPA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "signal-beam",
+   "name": "Signal Beam",
+   "fr": "Rayon Signal",
+   "vgType": "bug",
+   "gameClass": "special",
+   "introduced": "generation-iii",
+   "page": "https://www.pokepedia.fr/Rayon_Signal",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/30/Rayon_Signal_N2B2.gif",
+    "frames": 104,
+    "fps": 33.33,
+    "durationMs": 3120
+   },
+   "modern": {
+    "game": "USUL",
+    "url": "https://www.pokepedia.fr/images/8/86/Rayon_Signal_USUL.mp4",
+    "frames": 116,
+    "fps": 24.58,
+    "durationMs": 4720
+   },
+   "available": [
+    "USUL",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "bug-buzz",
+   "name": "Bug Buzz",
+   "fr": "Bourdon",
+   "vgType": "bug",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Bourdon",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/9/90/Bourdon_N2B2.gif",
+    "frames": 121,
+    "fps": 33.33,
+    "durationMs": 3630
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/3/3e/Bourdon_EV.mp4",
+    "frames": 135,
+    "fps": 29.99,
+    "durationMs": 4501
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "ancient-power",
+   "name": "Ancient Power",
+   "fr": "Pouvoir Antique",
+   "vgType": "rock",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Pouvoir_Antique",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/4/4f/Forzantica5.png",
+    "frames": 141,
+    "fps": 25,
+    "durationMs": 5640
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/6/65/Pouvoir_Antique_EV.mp4",
+    "frames": 160,
+    "fps": 30,
+    "durationMs": 5333
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "power-gem",
+   "name": "Power Gem",
+   "fr": "Rayon Gemme",
+   "vgType": "rock",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Rayon_Gemme",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/f/f4/Rayon_Gemme_N2B2.gif",
+    "frames": 136,
+    "fps": 33.33,
+    "durationMs": 4080
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/1/15/Rayon_Gemme_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "twister",
+   "name": "Twister",
+   "fr": "Ouragan",
+   "vgType": "dragon",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Ouragan",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/6/63/Ouragan_N2B2.gif",
+    "frames": 107,
+    "fps": 33.33,
+    "durationMs": 3210
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/d1/Ouragan_EV.mp4",
+    "frames": 90,
+    "fps": 30,
+    "durationMs": 3000
+   },
+   "available": [
+    "EV",
+    "OA",
+    "E",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "Colo",
+    "XD",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "dragon-breath",
+   "name": "Dragon Breath",
+   "fr": "Draco-Souffle",
+   "vgType": "dragon",
+   "gameClass": "special",
+   "introduced": "generation-ii",
+   "page": "https://www.pokepedia.fr/Draco-Souffle",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/3/3e/Dragospiro5.png",
+    "frames": 239,
+    "fps": 40,
+    "durationMs": 5975
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/f/f3/Draco-Souffle_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "dragon-pulse",
+   "name": "Dragon Pulse",
+   "fr": "Draco-Choc",
+   "vgType": "dragon",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Draco-Choc",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/9/96/Dragopulsar5.png",
+    "frames": 302,
+    "fps": 40,
+    "durationMs": 7550
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/b/bf/Draco-Choc_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "draco-meteor",
+   "name": "Draco Meteor",
+   "fr": "Draco-Météore",
+   "vgType": "dragon",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Draco-M%C3%A9t%C3%A9ore",
+   "sprite": {
+    "game": "IT5",
+    "url": "https://media.pokemoncentral.it/wiki/0/08/Dragobolide5.png",
+    "frames": 760,
+    "fps": 40,
+    "durationMs": 19000
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/d/d2/Draco-M%C3%A9t%C3%A9ore_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "flash-cannon",
+   "name": "Flash Cannon",
+   "fr": "Luminocanon",
+   "vgType": "steel",
+   "gameClass": "special",
+   "introduced": "generation-iv",
+   "page": "https://www.pokepedia.fr/Luminocanon",
+   "sprite": {
+    "game": "N2B2",
+    "url": "https://www.pokepedia.fr/images/3/39/Luminocanon_N2B2.gif",
+    "frames": 224,
+    "fps": 33.33,
+    "durationMs": 6720
+   },
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/a/a0/Luminocanon_EV.mp4",
+    "frames": 135,
+    "fps": 30,
+    "durationMs": 4500
+   },
+   "available": [
+    "EV",
+    "HGSS",
+    "N2B2",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA",
+    "PBR"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "steel-beam",
+   "name": "Steel Beam",
+   "fr": "Métalaser",
+   "vgType": "steel",
+   "gameClass": "special",
+   "introduced": "generation-viii",
+   "page": "https://www.pokepedia.fr/M%C3%A9talaser",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/3/31/M%C3%A9talaser_EV.mp4",
+    "frames": 216,
+    "fps": 30,
+    "durationMs": 7200
+   },
+   "available": [
+    "EV",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "disarming-voice",
+   "name": "Disarming Voice",
+   "fr": "Voix Enjôleuse",
+   "vgType": "fairy",
+   "gameClass": "special",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Voix_Enj%C3%B4leuse",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/5/50/Voix_Enj%C3%B4leuse_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "fairy-wind",
+   "name": "Fairy Wind",
+   "fr": "Vent Féérique",
+   "vgType": "fairy",
+   "gameClass": "special",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Vent_F%C3%A9%C3%A9rique",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/a/a7/Vent_F%C3%A9%C3%A9rique_EV.mp4",
+    "frames": 105,
+    "fps": 30,
+    "durationMs": 3500
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "draining-kiss",
+   "name": "Draining Kiss",
+   "fr": "Vampibaiser",
+   "vgType": "fairy",
+   "gameClass": "special",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Vampibaiser",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/8/80/Vampibaiser_EV.mp4",
+    "frames": 225,
+    "fps": 30,
+    "durationMs": 7499
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "dazzling-gleam",
+   "name": "Dazzling Gleam",
+   "fr": "Éclat Magique",
+   "vgType": "fairy",
+   "gameClass": "special",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/%C3%89clat_Magique",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/4/41/%C3%89clat_Magique_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4000
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB"
+   ],
+   "status": "ok"
+  },
+  {
+   "slug": "moonblast",
+   "name": "Moonblast",
+   "fr": "Pouvoir Lunaire",
+   "vgType": "fairy",
+   "gameClass": "special",
+   "introduced": "generation-vi",
+   "page": "https://www.pokepedia.fr/Pouvoir_Lunaire",
+   "sprite": null,
+   "modern": {
+    "game": "EV",
+    "url": "https://www.pokepedia.fr/images/a/ad/Pouvoir_Lunaire_EV.mp4",
+    "frames": 120,
+    "fps": 30,
+    "durationMs": 4001
+   },
+   "available": [
+    "EV",
+    "ROSA",
+    "USUL",
+    "LGPE",
+    "EB",
+    "LPA"
+   ],
+   "status": "ok"
+  }
+ ]
+}
