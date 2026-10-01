@@ -49,7 +49,11 @@ const textOf = cardAbilityText;
 const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active|your active pok[eé]mon)\b/;
 
 export function requiresActiveSpot(card) {
-  return ACTIVE_SPOT_CLAUSE.test(textOf(card));
+  const text = textOf(card).replace(/[‘’]/g, "'");
+  if (ACTIVE_SPOT_CLAUSE.test(text)) return true;
+  // WotC Powers name the holder: "if Lt. Surge's Magneton is your Active Pokémon" (Gym Heroes 8).
+  const name = lower(card?.name).replace(/[‘’]/g, "'").trim();
+  return Boolean(name) && text.includes(`if ${name} is your active pokémon`);
 }
 
 // Legacy powers: "This power can't be used if <this Pokémon> is Asleep, Confused, or Paralyzed"

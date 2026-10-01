@@ -1680,8 +1680,8 @@ function parseTrainerStepsInner(lower) {
   }
 
   // Red Card / Imposter Professor Oak — opponent shuffles hand into their deck,
-  // then draws a fixed number (Reset Stamp's "for each Prize card" is variable
-  // and stays unrecognized).
+  // then draws a fixed number. Reset Stamp's "a card for each of their remaining Prize cards"
+  // also lands here and draws the default 4 (I231).
   if (/your opponent shuffles (?:his or her|their) hand into (?:his or her|their) deck/.test(lower)) {
     const drawM = lower.match(/draws?\s+(\d+)\s+cards?/);
     steps.push({ type: 'opponentShuffleHandDraw', count: drawM ? Number(drawM[1]) : 4, prizeCondition: null, shuffle: true });
@@ -3351,7 +3351,7 @@ function describeStepBody(step) {
       return `Flip a coin — heads: ${fmt(step.heads)}; tails: ${fmt(step.tails)}.`;
     }
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;
-    case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
+    case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck${step.shuffle ? '' : ' (on bottom)'}${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'lookAtTop':
       if (step.lookOnly) return `Look at the top ${step.count} card${step.count > 1 ? 's' : ''} of your deck.`;
       if (step.oneEach) return `Look at the top ${step.count} cards; take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} to hand, shuffle the rest.`;
@@ -3374,7 +3374,8 @@ function describeStepBody(step) {
     case 'millEachPlayer': return `Discard ${step.count} cards from the top of each player's deck.`;
     case 'eachPlayerDiscardBenchUntil': return `Each player discards Benched Pokémon until they have ${step.count}${step.opponentFirst ? ' (opponent first)' : ''}.`;
     case 'gxReuseTurn': return `During this turn, your ${step.pokemonType} Pokémon can use their GX attacks even if you have used your GX attack.`;
-    case 'healAmount': return `Heal ${step.amount} damage from ${step.target === 'switchedOut' ? 'the Pokémon you moved to your Bench' : step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
+    case 'discardOwnAttachedEnergy': return step.cost ? 'Discard an Energy attached to 1 of your Pokémon (cost).' : 'Discard an Energy attached to 1 of your Pokémon.';
+    case 'healAmount': return `Heal ${step.amount} damage from ${step.target === 'switchedOut' ? 'the Pokémon you moved to your Bench' : step.target === 'costHost' ? 'that Pokémon' : step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;
     case 'attachMultipleFromDiscard': return `Attach up to ${step.count} ${step.energy} cards from your discard pile to ${step.target}.`;
     case 'ionoShuffle':

@@ -62,7 +62,8 @@ const MECH = [
   ['attach-from-discard', /attach[^.]*from your discard pile/, /^own:discard->attached$/],
   [
     'search-to-bench',
-    /(put (it|them|that card|those cards) (on|onto) your bench|(on|onto|to) your bench(?!ed))/,
+    // "if Mew ex is on your Bench" (Holon Phantoms 100) is a position condition, not a placement.
+    /(put (it|them|that card|those cards) (on|onto) your bench|(?<!\bis )(on|onto|to) your bench(?!ed))/,
     /^own:(deck|discard)->bench$/,
   ],
   ['search-to-hand', /(search your deck for|look through your deck)/, /^own:deck->hand$/],

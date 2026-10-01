@@ -6,12 +6,14 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I231). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I233). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I232 2026-10-01 P3 [legacy] Legacy (non-authoritative) client trainer path has no discardOwnAttachedEnergy case and ignores healAmount target 'costHost': WotC Super Potion/Super Energy Removal skip their cost there (design 062 review; see I222)
+- I231 2026-10-01 P3 [rules] Reset Stamp (Unified Minds 206) parses as opponentShuffleHandDraw count 4 instead of "a card for each of their remaining Prize cards" — misparse predates 062, which only added the shuffle (design 062 review)
 - I230 2026-10-01 P3 [rules] Baby Rule not enforced (attacker flips; tails ends the turn); TCGdex neo1-12 Pichu has no rule text or Baby→Basic evolve link. Rule wording must be sourced first (audit F8; refs: design 062 refs/062-wotc-card-audit)
 - I229 2026-10-01 P2 [rules] 90 WotC passive Pokémon Powers parse but nothing reads them: Toxic Gas, Hay Fever, Prehistoric Power, Invisible Wall, Thick Skinned, Kabuto Armor, Strikes Back, Retreat Aid, Energy Burn, Transform… (audit F7, App. C UNCONSUMED; refs: design 062)
 - I228 2026-10-01 P2 [rules] WotC Powers half-run: Buzzap, when-played Powers (Dark Golbat, Dark Crobat, Feraligatr Berserk, Unown E/V, Light Togetic) — whenPlayed/opponentDisrupt/handDeckSwap steps lack executors (audit F6, App. C; Rain Dance/Energy Trans fixed by 062 C)

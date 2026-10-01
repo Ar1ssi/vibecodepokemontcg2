@@ -4884,6 +4884,7 @@ export function validateLegality(state, command) {
           ownAttachedEnergyCount: [...(player.zones?.active || []), ...(player.zones?.bench || [])].filter(
             (c) => c.attachedTo && isEnergy(c)
           ).length,
+          handEnergyCount: (player.zones?.hand || []).filter((c) => isEnergy(c)).length,
           ...trainerTargetCounts(
             player,
             ownedCards(player),

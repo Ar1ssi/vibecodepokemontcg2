@@ -7,7 +7,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
-import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
+import { describeStep, parseTrainerEffect } from '../rules/trainer-effects.mjs';
 
 // TCGdex base1-71
 const COMPUTER_SEARCH =
@@ -60,6 +60,11 @@ test('parse: own-Energy costs, Super Potion 40 HP on the cost host, Impostor Oak
     { type: 'healAmount', amount: 40, target: 'costHost' },
   ]);
   assert.deepEqual(steps(IMPOSTOR_OAK), [{ type: 'opponentShuffleHandDraw', count: 7, prizeCondition: null, shuffle: true }]);
+  assert.deepEqual(steps(SUPER_POTION).map(describeStep), [
+    'Discard an Energy attached to 1 of your Pokémon (cost).',
+    'Heal 40 damage from that Pokémon.',
+  ]);
+  assert.doesNotMatch(describeStep(steps(IMPOSTOR_OAK)[0]), /on bottom/);
   const red = steps(SPECIAL_RED_CARD);
   assert.equal(red[0].type, 'opponentShuffleHandDraw');
   assert.equal(red[0].shuffle, undefined);
@@ -205,8 +210,18 @@ test('Computer Search with only 1 other card: the cost is unpayable, no search h
   // The play gate (trainer-play-conditions.mjs) sees the leading discardCost and refuses the play.
   assert.match(String(res.error), /discard cost/);
   assert.equal(res.pendingChoice ?? null, null);
-  assert.equal(game.p1.zones.deck.length, deckBefore);
-  assert.ok(game.p1.zones.hand.some((c) => c.name === 'Lonely'));
+  const after = res.state ?? game.state;
+  assert.equal(after.players.p1.zones.deck.length, deckBefore);
+  assert.ok(after.players.p1.zones.hand.some((c) => c.name === 'Lonely'));
+});
+
+test('Max Revive with no Energy in hand: the Energy-only cost refuses the play', () => {
+  const game = setup();
+  game.p1.zones.discard.push(pokemon('Pikachu', { hp: 50, subtypes: ['Basic'] }));
+  game.p1.zones.hand.push(filler('A'), filler('B'));
+  const res = play(game, 'Max Revive', MAX_REVIVE);
+  assert.match(String(res.error), /Not enough Energy cards in hand/);
+  assert.equal(res.pendingChoice ?? null, null);
 });
 
 test('Computer Search with 2 other cards: the cost is payable, then the search opens', () => {

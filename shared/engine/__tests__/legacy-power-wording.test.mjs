@@ -7,6 +7,7 @@ import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { parseAbility, rewriteLegacyPowerWording } from '../rules/abilities.mjs';
+import { requiresActiveSpot } from '../rules/ability-executors.mjs';
 
 const stripGuidance = (parsed) => JSON.parse(JSON.stringify(parsed, (key, value) => (key === 'guidance' ? undefined : value)));
 const assertParsesLike = (legacy, modern) => assert.deepEqual(stripGuidance(parseAbility(legacy)), stripGuidance(parseAbility(modern)));
@@ -64,7 +65,13 @@ test('legacy power: Energy Charge moves Lightning Energy to self, unlimited', ()
   assert.ok(step, JSON.stringify(parseAbility(ENERGY_CHARGE)));
   assert.equal(step.target, 'self');
   assert.equal(step.energyType, 'lightning');
-  assert.equal(parseAbility(ENERGY_CHARGE).oncePerTurn === true, false, 'usable as often as you like');
+  assert.equal(step.unlimited, true, 'usable as often as you like');
+});
+
+test("legacy power: Energy Charge's named Active condition gates it to the Active Spot", () => {
+  const magneton = { name: "Lt. Surge's Magneton", abilities: [{ name: 'Energy Charge', text: ENERGY_CHARGE }] };
+  assert.equal(requiresActiveSpot(magneton), true);
+  assert.equal(requiresActiveSpot({ name: 'Venusaur', abilities: [{ name: 'Energy Trans', text: ENERGY_TRANS }] }), false);
 });
 
 test('legacy power: Electromagnetic Power moves between the tagged Pokémon', () => {
