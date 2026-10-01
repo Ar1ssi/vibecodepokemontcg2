@@ -3412,7 +3412,25 @@ function atkLookDeckReorder(ctx) {
   }
   const owner = side === 'self' ? player : opponent;
   const deck = owner?.zones?.deck || [];
-  const viewed = deck.slice(0, step.count || 1);
+  // Hypno Prophecy: "Look at up to 3 cards from the top of …": the player picks how many.
+  let count = ctx.memo?.count ?? (step.upTo ? null : step.count || 1);
+  if (count == null && ctx.memo?.pickingCount) {
+    count = Number(selection?.[0]) || 0;
+    selection = null;
+  }
+  if (count == null) {
+    const most = Math.min(step.count || 1, deck.length);
+    if (most === 0) return skip(ctx, 'empty_deck');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: How many cards from the top do you want to look at?`,
+      options: Array.from({ length: most + 1 }, (_, n) => ({ instanceId: n, name: String(n), type: 'option' })),
+      min: 1,
+      max: 1,
+      memo: { pickingCount: true, side },
+    });
+  }
+  if (count === 0) return null;
+  const viewed = deck.slice(0, count);
   if (viewed.length === 0) return skip(ctx, 'empty_deck');
   const order = [...(ctx.memo?.order || []), ...(selection || []).slice(0, 1)].filter((id) =>
     viewed.some((c) => c.instanceId === id)
@@ -3425,7 +3443,7 @@ function atkLookDeckReorder(ctx) {
       options: remaining,
       min: 1,
       max: 1,
-      memo: { order, side },
+      memo: { order, side, count },
     });
   }
   const ordered = [...order.map((id) => viewed.find((c) => c.instanceId === id)), ...remaining];

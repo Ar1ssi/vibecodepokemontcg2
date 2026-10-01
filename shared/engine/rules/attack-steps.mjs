@@ -310,6 +310,17 @@ const TEMPLATES = [
       side: m[2] === 'your' ? 'self' : m[2] === 'either player\'s' ? 'either' : 'opponent',
     }),
   ],
+  // Hypno [Fossil 8] Prophecy: "Look at up to 3 cards from the top of either player's deck and
+  // rearrange them as you like."
+  [
+    /^look at up to (\d+) cards from the top of (your|your opponent's|either player's) deck and rearrange them as you like$/,
+    (m) => ({
+      type: 'atkLookDeckReorder',
+      count: Number(m[1]),
+      side: m[2] === 'your' ? 'self' : m[2] === "either player's" ? 'either' : 'opponent',
+      upTo: true,
+    }),
+  ],
   // Per-Bench attach (Mega Gardevoir ex Overflowing Wishes, Mudsdale Mud Stock).
   [
     new RegExp(String.raw`^for each of your benched pokémon, search your deck for an? ${ENERGY_TYPE}energy card and attach it to that pokémon$`),

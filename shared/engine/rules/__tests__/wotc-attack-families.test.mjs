@@ -7,6 +7,7 @@ import { parseAttackSteps } from '../attack-steps.mjs';
 import { parseNextTurnLock } from '../attack-effects.mjs';
 import { parseAttackDamage } from '../damage-parser.mjs';
 import { computeAttackDamage } from '../attack-engine.mjs';
+import { ATTACK_YES, ATTACK_NO } from '../../effects/attack-steps.mjs';
 import { createGameState } from '../../state.mjs';
 import { createCard } from '../../cards.mjs';
 import { createRng } from '../../rng.mjs';
@@ -101,6 +102,36 @@ test('Togepi Charm ≡ "any damage done by attacks from the Defending Pokémon i
     'Togepi',
     "During your opponent's next turn, any damage done by attacks from the Defending Pokémon is reduced by 10 (before applying Weakness and Resistance)."
   );
+});
+
+// Hypno [Fossil 8] Prophecy: "up to 3" — the player picks how many to look at.
+const HYPNO_PROPHECY = "Look at up to 3 cards from the top of either player's deck and rearrange them as you like.";
+
+test('Hypno Prophecy → atkLookDeckReorder up to 3, either deck', () => {
+  assert.deepEqual(steps(HYPNO_PROPHECY, 'Hypno'), [{ type: 'atkLookDeckReorder', count: 3, side: 'either', upTo: true }]);
+});
+
+const resolve = (result, selection) => {
+  const choice = result.state.pendingChoice;
+  assert.ok(choice, 'expected a pending choice');
+  const next = applyCommand(result.state, { type: 'resolveChoice', playerId: choice.player, payload: { choiceId: choice.choiceId, selection } }, createRng(1));
+  assert.ok(!next.error, next.error);
+  return next;
+};
+
+test('runtime: Hypno Prophecy looks at the 2 cards chosen and reorders only those', () => {
+  const hypno = { instanceId: 1, name: 'Hypno', hp: 90, attacks: [{ name: 'Prophecy', cost: [], damage: '', text: HYPNO_PROPHECY }] };
+  const used = attackOnTurn(duelBoard(hypno, FOE), 'p1', 2, 0);
+  const sideAsked = used.state.pendingChoice.options.map((o) => o.instanceId);
+  assert.deepEqual(sideAsked, [ATTACK_YES, ATTACK_NO]);
+  const countAsked = resolve(used, [ATTACK_NO]);
+  assert.deepEqual(countAsked.state.pendingChoice.options.map((o) => o.instanceId), [0, 1, 2, 3]);
+  const orderAsked = resolve(countAsked, [2]);
+  assert.deepEqual(orderAsked.state.pendingChoice.options.map((o) => o.instanceId), [2050, 2051]);
+  const done = resolve(orderAsked, [2051]);
+  // The new top card (2051) is the one p2 draws as its turn starts.
+  assert.ok(done.state.players.p2.zones.hand.some((c) => c.instanceId === 2051));
+  assert.deepEqual(done.state.players.p2.zones.deck.slice(0, 2).map((c) => c.instanceId), [2050, 2052]);
 });
 
 // ── Focus Energy ────────────────────────────────────────────────────────────────────────────
