@@ -4,6 +4,7 @@
     
     import { printedRarity } from './card-classify.mjs';
     import { withParadoxSubtype } from './paradox-tags.mjs';
+    import { legacyTrainerType } from './legacy-trainer-type.mjs';
     import { createCachedFetchJson } from '../../tcgdex/tcgdex-cache.mjs';
     import { tcgdexApiUrl } from '../../tcgdex/tcgdex-url.mjs';
     import {
@@ -480,7 +481,7 @@
           evolvesFrom: detail.evolvesFrom || detail.evolveFrom || null,
           ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || subtypesFromSuffix(detail.suffix),
-          trainerType: detail.trainerType || null,
+          trainerType: detail.trainerType || legacyTrainerType(detail) || null,
           rarity: printedRarity(detail) || card.rarity || '',
           effect: detail.effect || null,
           text: detail.text || detail.effect || null,

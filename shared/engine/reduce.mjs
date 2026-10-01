@@ -59,6 +59,7 @@ import {
   returnEnergyBonusClause,
 } from './rules/damage-parser.mjs';
 import { optionalCostBonusClause } from './rules/optional-cost-bonus.mjs';
+import { legacyTrainerType } from './rules/legacy-trainer-type.mjs';
 import { countUnit, normalizeUnit } from './rules/scaling-count.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import {
@@ -10290,6 +10291,10 @@ export function applyCommand(state, command, rng = null) {
           card.trainerType = entry.trainerType;
         if (Array.isArray(entry.subtypes))
           card.subtypes = entry.subtypes.map(String);
+        if (!card.trainerType) {
+          const derived = legacyTrainerType(card);
+          if (derived) card.trainerType = derived;
+        }
         updated += 1;
       }
 

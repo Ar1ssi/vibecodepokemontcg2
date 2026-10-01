@@ -150,3 +150,4 @@ Move…), Focus Energy family, Fidget/Vanish/Super Fang and the rest of Appendix
 when-played Powers · F7 90 passive Powers · F8 Baby Rule (wording must be sourced).
 
 ## Deviations (Builder appends here during build)
+- Slice A: Tool regex uses `.+?` instead of `[^.]+?` before " to 1 of your Pokémon" — neo4-93 "EXP.ALL" has a dot in its name (row A expects 'Tool').
