@@ -19,6 +19,7 @@ import {
 import { parseEachFilter } from './each-filter.mjs';
 import { normalizeAttackText } from './attack-text.mjs';
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
+import { rewriteLegacyAttackWording } from './legacy-attack-wording.mjs';
 
 const WORD_COUNTS = { a: 1, an: 1, one: 1, two: 2, three: 3 };
 
@@ -1707,6 +1708,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     .replace(/evolved pokémon \(excluding pokémon lv\.x\)/g, 'evolved pokémon but not pokémon lv.x')
     // Reminder text never carries an effect ("(Your opponent chooses the new Active Pokémon.)").
     .replace(/\s*\([^)]*\)/g, '');
+  normalized = rewriteLegacyAttackWording(normalized);
   if (!normalized) return result;
 
   const blockSteps = [];
