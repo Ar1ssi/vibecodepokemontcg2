@@ -2981,6 +2981,7 @@ function atkLockAttack(ctx) {
   const { opponent, step } = ctx;
   const defender = activeOf(opponent);
   if (!defender) return skip(ctx, 'no_opponent_active');
+  if (step.basicOnly && !isBasicPokemon(topPokemonCard(opponent, defender))) return skip(ctx, 'condition_unmet');
   const attacks = (topPokemonCard(opponent, defender)?.attacks || []).filter((a) => a?.name);
   const lock = (attack) =>
     atkAddMarker({

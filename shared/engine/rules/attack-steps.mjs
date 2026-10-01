@@ -1503,6 +1503,11 @@ const BLOCKS = [
     /choose 1 of your opponent's active pokémon's attacks\. (?:during your opponent's next turn, that pokémon (can't use|can use only) that attack|that pokémon (can't use|can use only) that attack during your opponent's next turn)\./g,
     (m) => ({ type: 'atkLockAttack', mode: (m[1] || m[2]) === "can't use" ? 'except' : 'only' }),
   ],
+  // Stantler [Neo Revelation 38] Terrorize: Amnesia behind "If the Defending Pokémon is a Basic Pokémon".
+  [
+    /if your opponent's active pokémon is a basic pokémon, choose 1 of its attacks\. that pokémon can't use that attack during your opponent's next turn\./g,
+    () => ({ type: 'atkLockAttack', mode: 'except', basicOnly: true }),
+  ],
   // Unown T Hidden Power: each player loses 1 hand card to their deck, picked by the other.
   [
     /look at your opponent's hand and choose 1 card, then have your opponent shuffle that card into their deck\. then, show your opponent your hand and (?:they choose|he or she chooses) 1 card\. shuffle that card into your deck\./g,

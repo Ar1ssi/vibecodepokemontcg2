@@ -357,6 +357,30 @@ test('runtime: Vanish shuffles Abra into the deck and discards its Energy', () =
   assert.ok(![...after.active, ...after.bench].some((c) => c.instanceId === 1 || c.instanceId === 5));
 });
 
+// ── Terrorize ───────────────────────────────────────────────────────────────────────────────
+
+const TERRORIZE = // Stantler [Neo Revelation 38] Terrorize
+  "If the Defending Pokémon is a Basic Pokémon, choose 1 of its attacks. That Pokémon can't use that attack during your opponent's next turn.";
+
+test('Terrorize → Amnesia lock gated on a Basic Defending Pokémon', () => {
+  assert.deepEqual(steps(TERRORIZE, 'Stantler'), [{ type: 'atkLockAttack', mode: 'except', basicOnly: true }]);
+});
+
+test('runtime: Terrorize locks the chosen attack of a Basic, and nothing of a Stage 1', () => {
+  const stantler = { instanceId: 1, name: 'Stantler', hp: 70, attacks: [{ name: 'Terrorize', cost: [], damage: '', text: TERRORIZE }] };
+  const twoAttacks = [
+    { name: 'Hit', cost: [], damage: '10', text: '' },
+    { name: 'Bash', cost: [], damage: '20', text: '' },
+  ];
+  const asked = attackOnTurn(duelBoard(stantler, { ...FOE, stage: 'Basic', attacks: twoAttacks }), 'p1', 2, 0);
+  const locked = resolve(asked, [1]).state;
+  assert.match(tryOn(locked, 'p2', 3, ATTACK), /can't use Hit/);
+  assert.equal(tryOn(locked, 'p2', 3, { type: 'attack', payload: { attackIndex: 1 } }), null);
+  const evolved = attackOnTurn(duelBoard(stantler, { ...FOE, stage: 'Stage 1', evolvesFrom: 'Foe Jr', attacks: twoAttacks }), 'p1', 2, 0);
+  assert.equal(evolved.state.pendingChoice, null);
+  assert.equal(tryOn(evolved.state, 'p2', 3, ATTACK), null);
+});
+
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────
 
 const TAIL_WAG = // Eevee [Jungle 51] Tail Wag
