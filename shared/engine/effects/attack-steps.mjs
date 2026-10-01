@@ -557,6 +557,28 @@ function atkDiscardSelfEnergy(ctx) {
   return discardChosen(ctx, energies, { label: energyLabel(step) });
 }
 
+// Moltres Wildfire: "You may discard any number of {R} Energy cards attached to Moltres when you
+// use this attack. If you do, discard that many cards from the top of your opponent's deck."
+function atkDiscardSelfEnergyMillOpp(ctx) {
+  const { player, opponent, step } = ctx;
+  const ref = attackerRef(ctx);
+  const energies = ref ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, step)) : [];
+  if (!ctx.selection) {
+    if (energies.length === 0) return skip(ctx, 'no_energy');
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose any number of ${energyLabel(step)} to discard`,
+      options: energies,
+      min: 0,
+      max: energies.length,
+    });
+  }
+  const picked = pickById(energies, ctx.selection);
+  for (const card of picked) discardCard(ctx.draft, card, ctx.events);
+  if (picked.length === 0 || !opponent) return null;
+  discardCards(opponent, opponent.zones.deck.slice(0, picked.length), ctx.events);
+  return null;
+}
+
 // Reshiram & Zekrom-GX Fabled Flarebolts: "Discard up to 3 in any combination of basic {R} and
 // basic {L} Energy cards from your Benched Pokémon." The damage counts the discard (forDamage).
 function atkDiscardBenchEnergy(ctx) {
@@ -3807,6 +3829,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOppDeck: optional(atkShuffleOppDeck, () => "Have your opponent shuffle their deck"),
   atkShuffleOwnDeck,
   atkChangeType,
+  atkDiscardSelfEnergyMillOpp,
   atkKnockOutChoose,
   atkCountersEach,
   atkCountersEachFiltered,

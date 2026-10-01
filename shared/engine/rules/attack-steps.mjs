@@ -1226,6 +1226,11 @@ const BLOCKS = [
   // Brock's Mankey [Gym Heroes 68] Fidget: "Shuffle your deck." as the whole effect. Anchored on
   // the whole text: the same sentence after a deck search is that search's own shuffle.
   [/^shuffle your deck\.$/g, () => ({ type: 'atkShuffleOwnDeck' })],
+  // Moltres [Fossil 12] Wildfire: as many of the opponent's top cards as {R} Energy discarded.
+  [
+    /you may discard any number of \{([a-z])\} energy cards attached to this pokémon when you use this attack\. if you do, discard that many cards from the top of your opponent's deck\./g,
+    (m) => ({ type: 'atkDiscardSelfEnergyMillOpp', energyType: m[1].toUpperCase() }),
+  ],
   // Delibird Souvenir (Team Rocket Returns 21): one outcome per heads tier of the 3 coins.
   [
     /if 1 of them is heads, put (\d+) damage counters on your opponent's active pokémon\. if 2 of them are heads, remove (\d+|a) damage counters? from your opponent's active pokémon\. if all of them are heads, put (\d+) damage counters on your opponent's active pokémon\. if all of them are tails, remove all damage counters from your opponent's active pokémon\./g,

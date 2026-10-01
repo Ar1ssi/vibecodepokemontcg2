@@ -177,6 +177,33 @@ test('runtime: Damage Shift moves 1 counter from each damaged Pokémon of yours'
   assert.equal(damageOn(shifted, 'p2', 20), 20);
 });
 
+// Moltres [Fossil 12] Wildfire.
+const WILDFIRE =
+  "You may discard any number of {R} Energy cards attached to Moltres when you use this attack. If you do, discard that many cards from the top of your opponent's deck.";
+
+test('Wildfire → atkDiscardSelfEnergyMillOpp', () => {
+  assert.deepEqual(steps(WILDFIRE, 'Moltres'), [{ type: 'atkDiscardSelfEnergyMillOpp', energyType: 'R' }]);
+});
+
+test('runtime: Wildfire discards the {R} Energy chosen and as many of the opponent’s top cards', () => {
+  const moltres = { instanceId: 1, name: 'Moltres', hp: 70, types: ['Fire'], attacks: [{ name: 'Wildfire', cost: [], damage: '', text: WILDFIRE }] };
+  const energy = (instanceId, name, energyType) =>
+    createCard({ instanceId, name, supertype: 'Energy', type: 'Energy', energyType, attachedTo: 1 });
+  const board = () => {
+    const state = duelBoard(moltres, FOE);
+    state.players.p1.zones.active.push(energy(5, 'Fire Energy', 'Fire'), energy(6, 'Fire Energy', 'Fire'), energy(7, 'Water Energy', 'Water'));
+    return state;
+  };
+  const asked = attackOnTurn(board(), 'p1', 2, 0);
+  assert.deepEqual(asked.state.pendingChoice.options.map((o) => o.instanceId), [5, 6]);
+  const done = resolve(asked, [5, 6]).state.players;
+  assert.ok([5, 6].every((id) => done.p1.zones.discard.some((c) => c.instanceId === id)));
+  assert.deepEqual(done.p2.zones.discard.map((c) => c.instanceId), [2050, 2051]);
+  const none = resolve(attackOnTurn(board(), 'p1', 2, 0), []).state.players;
+  assert.equal(none.p2.zones.discard.length, 0);
+  assert.equal(none.p1.zones.discard.length, 0);
+});
+
 // ── Focus Energy ────────────────────────────────────────────────────────────────────────────
 
 // Lt. Surge's Rattata [Gym Heroes 82] / [Gym Challenge 85]: "Lt." is not a sentence end, so the
