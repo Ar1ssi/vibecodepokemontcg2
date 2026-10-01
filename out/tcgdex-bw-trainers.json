@@ -1,0 +1,794 @@
+[
+ {
+  "id": "bw1-92",
+  "name": "Energy Retrieval",
+  "trainerType": "Item",
+  "effect": "Put 2 basic Energy cards from your discard pile into your hand."
+ },
+ {
+  "id": "bw1-93",
+  "name": "Energy Search",
+  "trainerType": "Item",
+  "effect": "Search your deck for a basic Energy card, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw1-94",
+  "name": "Energy Switch",
+  "trainerType": "Item",
+  "effect": "Move a basic Energy from 1 of your Pokémon to another of your Pokémon."
+ },
+ {
+  "id": "bw1-95",
+  "name": "Full Heal",
+  "trainerType": "Item",
+  "effect": "Remove all Special Conditions from your Active Pokémon."
+ },
+ {
+  "id": "bw1-96",
+  "name": "PlusPower",
+  "trainerType": "Item",
+  "effect": "During this turn, your Pokémon’s attacks do 10 more damage to the Active Pokémon (before applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw1-97",
+  "name": "Poké Ball",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw1-98",
+  "name": "Pokédex",
+  "trainerType": "Item",
+  "effect": "Look at the top 5 cards of your deck and put them back on top of your deck in any order."
+ },
+ {
+  "id": "bw1-99",
+  "name": "Pokémon Communication",
+  "trainerType": "Item",
+  "effect": "Reveal a Pokémon in your hand and put it on top of your deck. If you do, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw1-100",
+  "name": "Potion",
+  "trainerType": "Item",
+  "effect": "Heal 30 damage from 1 of your Pokémon."
+ },
+ {
+  "id": "bw1-101",
+  "name": "Professor Juniper",
+  "trainerType": "Supporter",
+  "effect": "Discard your hand and draw 7 cards."
+ },
+ {
+  "id": "bw1-102",
+  "name": "Revive",
+  "trainerType": "Item",
+  "effect": "Put a Basic Pokémon from your discard pile onto your Bench."
+ },
+ {
+  "id": "bw1-103",
+  "name": "Super Scoop Up",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, put 1 of your Pokémon and all cards attached to it into your hand."
+ },
+ {
+  "id": "bw1-104",
+  "name": "Switch",
+  "trainerType": "Item",
+  "effect": "Switch your Active Pokémon with 1 of your Benched Pokémon."
+ },
+ {
+  "id": "bw2-90",
+  "name": "Bianca",
+  "trainerType": "Supporter",
+  "effect": "Draw cards until you have 6 cards in your hand."
+ },
+ {
+  "id": "bw2-91",
+  "name": "Cheren",
+  "trainerType": "Supporter",
+  "effect": "Draw 3 cards."
+ },
+ {
+  "id": "bw2-92",
+  "name": "Crushing Hammer",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, discard an Energy attached to 1 of your opponent’s Pokémon."
+ },
+ {
+  "id": "bw2-93",
+  "name": "Great Ball",
+  "trainerType": "Item",
+  "effect": "Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw2-94",
+  "name": "Max Potion",
+  "trainerType": "Item",
+  "effect": "Heal all damage from 1 of your Pokémon. Then, discard all Energy attached to that Pokémon."
+ },
+ {
+  "id": "bw2-95",
+  "name": "Pokémon Catcher",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, switch 1 of your opponent’s Benched Pokémon with his or her Active Pokémon."
+ },
+ {
+  "id": "bw2-96",
+  "name": "Recycle",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, put a card from your discard pile on top of your deck."
+ },
+ {
+  "id": "bw3-90",
+  "name": "Cover Fossil",
+  "trainerType": "Item",
+  "effect": "Look at the bottom 7 cards of your deck. You may reveal a Tirtouga you find there and put it onto your Bench. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw3-91",
+  "name": "Eviolite",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is a Basic Pokémon, any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw3-92",
+  "name": "N",
+  "trainerType": "Supporter",
+  "effect": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards."
+ },
+ {
+  "id": "bw3-93",
+  "name": "Plume Fossil",
+  "trainerType": "Item",
+  "effect": "Look at the bottom 7 cards of your deck. You may reveal an Archen you find there and put it onto your Bench. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw3-94",
+  "name": "Rocky Helmet",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent’s attack (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon."
+ },
+ {
+  "id": "bw3-95",
+  "name": "Super Rod",
+  "trainerType": "Item",
+  "effect": "Shuffle 3 in any combination of Pokémon and basic Energy cards from your discard pile back into your deck."
+ },
+ {
+  "id": "bw3-96",
+  "name": "Xtransceiver",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, search your deck for a Supporter card, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw3-101",
+  "name": "N",
+  "trainerType": "Supporter",
+  "effect": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards."
+ },
+ {
+  "id": "bw4-86",
+  "name": "Cilan",
+  "trainerType": "Supporter",
+  "effect": "Search your deck for 3 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw4-87",
+  "name": "Exp. Share",
+  "trainerType": "Tool",
+  "effect": "When your Active Pokémon is Knocked Out by damage from an opponent’s attack, you may move 1 basic Energy card that was attached to that Pokémon to the Pokémon this card is attached to."
+ },
+ {
+  "id": "bw4-88",
+  "name": "Heavy Ball",
+  "trainerType": "Item",
+  "effect": "Search your deck for a Pokémon with a Retreat Cost of 3 or more, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw4-89",
+  "name": "Level Ball",
+  "trainerType": "Item",
+  "effect": "Search your deck for a Pokémon with 90 HP or less, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw4-90",
+  "name": "Pokémon Center",
+  "trainerType": "Stadium",
+  "effect": "Once during each player’s turn, that player may heal 20 damage from 1 of his or her Benched Pokémon."
+ },
+ {
+  "id": "bw4-91",
+  "name": "Skyarrow Bridge",
+  "trainerType": "Stadium",
+  "effect": "The Retreat Cost of each Basic Pokémon in play is Colorless less."
+ },
+ {
+  "id": "bw5-91",
+  "name": "Cheren",
+  "trainerType": "Supporter",
+  "effect": "Draw 3 cards."
+ },
+ {
+  "id": "bw5-92",
+  "name": "Dark Claw",
+  "trainerType": "Tool",
+  "effect": "If this card is attached to a Darkness Pokémon, each of the attacks of that Pokémon does 20 more damage to the Active Pokémon (before applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw5-93",
+  "name": "Dark Patch",
+  "trainerType": "Item",
+  "effect": "Attach a basic Darkness Energy card from your discard pile to 1 of your Benched Darkness Pokémon."
+ },
+ {
+  "id": "bw5-94",
+  "name": "Enhanced Hammer",
+  "trainerType": "Item",
+  "effect": "Discard a Special Energy attached to 1 of your opponent’s Pokémon."
+ },
+ {
+  "id": "bw5-95",
+  "name": "Hooligans Jim & Cas",
+  "trainerType": "Supporter",
+  "effect": "Flip a coin. If heads, choose 3 random cards from your opponent’s hand. Your opponent reveals those cards and shuffles them into his or her deck."
+ },
+ {
+  "id": "bw5-96",
+  "name": "N",
+  "trainerType": "Supporter",
+  "effect": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards."
+ },
+ {
+  "id": "bw5-97",
+  "name": "Old Amber Aerodactyl",
+  "trainerType": "Item",
+  "effect": "Look at the bottom 7 cards of your deck. You may reveal an Aerodactyl you find there and put it onto your Bench. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw5-98",
+  "name": "Professor Juniper",
+  "trainerType": "Supporter",
+  "effect": "Discard your hand and draw 7 cards."
+ },
+ {
+  "id": "bw5-99",
+  "name": "Random Receiver",
+  "trainerType": "Item",
+  "effect": "Reveal cards from the top of your deck until you reveal a Supporter card. Put it into your hand. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw5-100",
+  "name": "Rare Candy",
+  "trainerType": "Item",
+  "effect": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card on the Basic Pokémon. (This counts as evolving that Pokémon.) You can’t use this card during your first turn or on a Basic Pokémon that was put into play this turn."
+ },
+ {
+  "id": "bw5-101",
+  "name": "Twist Mountain",
+  "trainerType": "Stadium",
+  "effect": "Once during each player’s turn, that player may flip a coin. If heads, the player puts a Restored Pokémon from his or her hand onto his or her Bench."
+ },
+ {
+  "id": "bw5-102",
+  "name": "Ultra Ball",
+  "trainerType": "Item",
+  "effect": "Discard 2 cards from your hand. (If you can’t discard 2 cards, you can’t play this card.) Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw5-111",
+  "name": "Pokémon Catcher",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, switch 1 of your opponent’s Benched Pokémon with his or her Active Pokémon."
+ },
+ {
+  "id": "bw6-113",
+  "name": "Devolution Spray",
+  "trainerType": "Item",
+  "effect": "Devolve 1 of your evolved Pokémon and put the highest stage Evolution card on it into your hand. (That Pokémon can’t evolve this turn.)"
+ },
+ {
+  "id": "bw6-114",
+  "name": "Giant Cape",
+  "trainerType": "Tool",
+  "effect": "The Pokémon this card is attached to gets +20 HP."
+ },
+ {
+  "id": "bw6-115",
+  "name": "Rescue Scarf",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon into your hand. (Discard all cards attached to that Pokémon.)"
+ },
+ {
+  "id": "bw6-116",
+  "name": "Tool Scrapper",
+  "trainerType": "Item",
+  "effect": "Choose up to 2 Pokémon Tool cards attached to Pokémon in play (yours or your opponent’s) and discard them."
+ },
+ {
+  "id": "bw7-127",
+  "name": "Aspertia City Gym",
+  "trainerType": "Stadium",
+  "effect": "Each Colorless Pokémon in play (both yours and your opponent’s) gets +20 HP."
+ },
+ {
+  "id": "bw7-128",
+  "name": "Energy Search",
+  "trainerType": "Item",
+  "effect": "Search your deck for a basic Energy card, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw7-129",
+  "name": "Great Ball",
+  "trainerType": "Item",
+  "effect": "Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw7-130",
+  "name": "Hugh",
+  "trainerType": "Supporter",
+  "effect": "Each player either draws or discards cards until he or she has 5 cards in his or her hand. (Your opponent does this first.)"
+ },
+ {
+  "id": "bw7-131",
+  "name": "Poké Ball",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw7-132",
+  "name": "Potion",
+  "trainerType": "Item",
+  "effect": "Heal 30 damage from 1 of your Pokémon."
+ },
+ {
+  "id": "bw7-133",
+  "name": "Rocky Helmet",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent’s attack (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon."
+ },
+ {
+  "id": "bw7-134",
+  "name": "Skyla",
+  "trainerType": "Supporter",
+  "effect": "Search your deck for a Trainer card, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw7-135",
+  "name": "Switch",
+  "trainerType": "Item",
+  "effect": "Switch your Active Pokémon with 1 of your Benched Pokémon."
+ },
+ {
+  "id": "bw7-136",
+  "name": "Town Map",
+  "trainerType": "Item",
+  "effect": "Turn all of your Prize cards face up. (Those Prize cards remain face up for the rest of the game.)"
+ },
+ {
+  "id": "bw7-137",
+  "name": "Computer Search",
+  "trainerType": "Item",
+  "effect": "Discard 2 cards from your hand. (If you can’t discard 2 cards, you can’t play this card.) Search your deck for a card and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw7-138",
+  "name": "Crystal Edge",
+  "trainerType": "Tool",
+  "effect": "If this card is attached to White Kyurem-EX, each of its attacks does 50 more damage to the Active Pokémon (before applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw7-139",
+  "name": "Crystal Wall",
+  "trainerType": "Tool",
+  "effect": "If this card is attached to Black Kyurem-EX, its maximum HP is 300."
+ },
+ {
+  "id": "bw7-140",
+  "name": "Gold Potion",
+  "trainerType": "Item",
+  "effect": "Heal 90 damage from your Active Pokémon."
+ },
+ {
+  "id": "bw7-147",
+  "name": "Bianca",
+  "trainerType": "Supporter",
+  "effect": "Draw cards until you have 6 cards in your hand."
+ },
+ {
+  "id": "bw7-148",
+  "name": "Cheren",
+  "trainerType": "Supporter",
+  "effect": "Draw 3 cards."
+ },
+ {
+  "id": "bw7-149",
+  "name": "Skyla",
+  "trainerType": "Supporter",
+  "effect": "Search your deck for a Trainer card, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw7-153",
+  "name": "Rocky Helmet",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent’s attack (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon."
+ },
+ {
+  "id": "bw8-117",
+  "name": "Bicycle",
+  "trainerType": "Item",
+  "effect": "Draw cards until you have 4 cards in your hand."
+ },
+ {
+  "id": "bw8-118",
+  "name": "Colress",
+  "trainerType": "Supporter",
+  "effect": "Shuffle your hand into your deck. Then, draw a number of cards equal to the number of Benched Pokémon (both yours and your opponent’s)."
+ },
+ {
+  "id": "bw8-119",
+  "name": "Colress Machine",
+  "trainerType": "Item",
+  "effect": "Search your deck for a Plasma Energy card and attach it to 1 of your Team Plasma Pokémon. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw8-120",
+  "name": "Escape Rope",
+  "trainerType": "Item",
+  "effect": "Each player switches his or her Active Pokémon with 1 of his or her Benched Pokémon. (Your opponent switches first. If a player does not have a Benched Pokémon, he or she doesn’t switch Pokémon.)"
+ },
+ {
+  "id": "bw8-121",
+  "name": "Ether",
+  "trainerType": "Item",
+  "effect": "Reveal the top card of your deck. If that card is a basic Energy card, attach it to 1 of your Pokémon. If it is not a basic Energy card, return it to the top of your deck."
+ },
+ {
+  "id": "bw8-122",
+  "name": "Eviolite",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is a Basic Pokémon, any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw8-123",
+  "name": "Hypnotoxic Laser",
+  "trainerType": "Item",
+  "effect": "Your opponent’s Active Pokémon is now Poisoned. Flip a coin. If heads, your opponent’s Active Pokémon is also Asleep."
+ },
+ {
+  "id": "bw8-124",
+  "name": "Plasma Frigate",
+  "trainerType": "Stadium",
+  "effect": "Each Pokémon that has any Plasma Energy attached to it (both yours and your opponent’s) has no Weakness."
+ },
+ {
+  "id": "bw8-125",
+  "name": "Team Plasma Grunt",
+  "trainerType": "Supporter",
+  "effect": "Discard a Team Plasma card from your hand. (If you can’t discard a Team Plasma card, you can’t play this card.) Draw 4 cards."
+ },
+ {
+  "id": "bw8-126",
+  "name": "Virbank City Gym",
+  "trainerType": "Stadium",
+  "effect": "Put 2 more damage counters on Poisoned Pokémon (both yours and your opponent’s) between turns."
+ },
+ {
+  "id": "bw8-128",
+  "name": "Dowsing Machine",
+  "trainerType": "Item",
+  "effect": "Discard 2 cards from your hand. (If you can’t discard 2 cards, you can’t play this card.) Put a Trainer card from your discard pile into your hand."
+ },
+ {
+  "id": "bw8-129",
+  "name": "Scramble Switch",
+  "trainerType": "Item",
+  "effect": "Switch your Active Pokémon with 1 of your Benched Pokémon. Then, you may move as many Energy attached to the old Active Pokémon to the new Active Pokémon as you like."
+ },
+ {
+  "id": "bw8-130",
+  "name": "Victory Piece",
+  "trainerType": "Tool",
+  "effect": "If this card is attached to Victini-EX, Victini-EX can use its attacks regardless of the amount or type of Energy attached to it."
+ },
+ {
+  "id": "bw8-135",
+  "name": "Colress",
+  "trainerType": "Supporter",
+  "effect": "Shuffle your hand into your deck. Then, draw a number of cards equal to the number of Benched Pokémon (both yours and your opponent’s)."
+ },
+ {
+  "id": "bw8-138",
+  "name": "Random Receiver",
+  "trainerType": "Item",
+  "effect": "Reveal cards from the top of your deck until you reveal a Supporter card. Put it into your hand. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw9-99",
+  "name": "Float Stone",
+  "trainerType": "Tool",
+  "effect": "The Pokémon this card is attached to has no Retreat Cost."
+ },
+ {
+  "id": "bw9-100",
+  "name": "Frozen City",
+  "trainerType": "Stadium",
+  "effect": "Whenever any player attaches an Energy from his or her hand to 1 of his or her Pokémon (excluding Team Plasma Pokémon), put 2 damage counters on that Pokémon."
+ },
+ {
+  "id": "bw9-101",
+  "name": "Ghetsis",
+  "trainerType": "Supporter",
+  "effect": "Your opponent reveals his or her hand and shuffles all Item cards found there into his or her deck. Then, draw a number of cards equal to the number of Item cards your opponent shuffled into his or her deck."
+ },
+ {
+  "id": "bw9-102",
+  "name": "Shadow Triad",
+  "trainerType": "Supporter",
+  "effect": "Put a Team Plasma card from your discard pile into your hand."
+ },
+ {
+  "id": "bw9-103",
+  "name": "Superior Energy Retrieval",
+  "trainerType": "Item",
+  "effect": "Discard 2 cards from your hand. (If you can’t discard 2 cards, you can’t play this card.) Put 4 basic Energy cards from your discard pile into your hand. (You can’t choose a card you discarded with the effect of this card.)"
+ },
+ {
+  "id": "bw9-104",
+  "name": "Team Plasma Badge",
+  "trainerType": "Tool",
+  "effect": "The Pokémon this card is attached to is a Team Plasma Pokémon."
+ },
+ {
+  "id": "bw9-105",
+  "name": "Team Plasma Ball",
+  "trainerType": "Item",
+  "effect": "Search your deck for a Team Plasma Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw9-107",
+  "name": "Life Dew",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is Knocked Out, your opponent takes 1 fewer Prize card."
+ },
+ {
+  "id": "bw9-108",
+  "name": "Rock Guard",
+  "trainerType": "Tool",
+  "effect": "If the Pokémon this card is attached to is your Active Pokémon and is damaged by an opponent’s attack (even if that Pokémon is Knocked Out), put 6 damage counters on the Attacking Pokémon."
+ },
+ {
+  "id": "bw9-115",
+  "name": "Ghetsis",
+  "trainerType": "Supporter",
+  "effect": "Your opponent reveals his or her hand and shuffles all Item cards found there into his or her deck. Then, draw a number of cards equal to the number of Item cards your opponent shuffled into his or her deck."
+ },
+ {
+  "id": "bw9-116",
+  "name": "Professor Juniper",
+  "trainerType": "Supporter",
+  "effect": "Discard your hand and draw 7 cards."
+ },
+ {
+  "id": "bw9-121",
+  "name": "Max Potion",
+  "trainerType": "Item",
+  "effect": "Heal all damage from 1 of your Pokémon. Then, discard all Energy attached to that Pokémon."
+ },
+ {
+  "id": "bw9-122",
+  "name": "Ultra Ball",
+  "trainerType": "Item",
+  "effect": "Discard 2 cards from your hand. (If you can’t discard 2 cards, you can’t play this card.) Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw10-78",
+  "name": "Caitlin",
+  "trainerType": "Supporter",
+  "effect": "Put as many cards from your hand as you like on the bottom of your deck in any order. Then, draw a card for each card you put on the bottom of your deck."
+ },
+ {
+  "id": "bw10-79",
+  "name": "Cover Fossil",
+  "trainerType": "Item",
+  "effect": "Look at the bottom 7 cards of your deck. You may reveal a Tirtouga you find there and put it onto your Bench. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw10-80",
+  "name": "Energy Retrieval",
+  "trainerType": "Item",
+  "effect": "Put 2 basic Energy cards from your discard pile into your hand."
+ },
+ {
+  "id": "bw10-81",
+  "name": "Iris",
+  "trainerType": "Supporter",
+  "effect": "During this turn, your Pokémon’s attacks do 10 more damage to the Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw10-82",
+  "name": "Plume Fossil",
+  "trainerType": "Item",
+  "effect": "Look at the bottom 7 cards of your deck. You may reveal an Archen you find there and put it onto your Bench. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw10-83",
+  "name": "Pokémon Catcher",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, switch 1 of your opponent’s Benched Pokémon with his or her Active Pokémon."
+ },
+ {
+  "id": "bw10-84",
+  "name": "Professor Juniper",
+  "trainerType": "Supporter",
+  "effect": "Discard your hand and draw 7 cards."
+ },
+ {
+  "id": "bw10-85",
+  "name": "Rare Candy",
+  "trainerType": "Item",
+  "effect": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card on the Basic Pokémon. (This counts as evolving that Pokémon.) You can’t use this card during your first turn or on a Basic Pokémon that was put into play this turn."
+ },
+ {
+  "id": "bw10-86",
+  "name": "Reversal Trigger",
+  "trainerType": "Tool",
+  "effect": "When the Team Plasma Pokémon this card is attached to is Knocked Out by damage from an opponent’s attack, search your deck for a card and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw10-87",
+  "name": "Root Fossil Lileep",
+  "trainerType": "Item",
+  "effect": "Look at the bottom 7 cards of your deck. You may reveal a Lileep you find there and put it onto your Bench. Shuffle the other cards back into your deck."
+ },
+ {
+  "id": "bw10-88",
+  "name": "Silver Bangle",
+  "trainerType": "Tool",
+  "effect": "The attacks of the Pokémon this card is attached to (excluding Pokémon-EX) do 30 more damage to Active Pokémon-EX (before applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw10-89",
+  "name": "Silver Mirror",
+  "trainerType": "Tool",
+  "effect": "Prevent all effects of attacks, including damage, done to the Pokémon this card is attached to (excluding Pokémon-EX) by your opponent’s Team Plasma Pokémon."
+ },
+ {
+  "id": "bw10-90",
+  "name": "Ultra Ball",
+  "trainerType": "Item",
+  "effect": "Discard 2 cards from your hand. (If you can’t discard 2 cards, you can’t play this card.) Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw10-92",
+  "name": "G Booster",
+  "trainerType": "Tool",
+  "effect": "Discard 2 Energy attached to this Pokémon. This attack’s damage isn’t affected by any effects on the Defending Pokémon."
+ },
+ {
+  "id": "bw10-93",
+  "name": "G Scope",
+  "trainerType": "Tool",
+  "effect": "This attack does 100 damage to 1 of your opponent’s Benched Pokémon. (Don’t apply Weakness and Resistance for Benched Pokémon.)"
+ },
+ {
+  "id": "bw10-94",
+  "name": "Master Ball",
+  "trainerType": "Item",
+  "effect": "Search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward."
+ },
+ {
+  "id": "bw10-95",
+  "name": "Scoop Up Cyclone",
+  "trainerType": "Item",
+  "effect": "Put 1 of your Pokémon and all cards attached to it into your hand."
+ },
+ {
+  "id": "bw10-101",
+  "name": "Iris",
+  "trainerType": "Supporter",
+  "effect": "During this turn, your Pokémon’s attacks do 10 more damage to the Active Pokémon for each Prize card your opponent has taken (before applying Weakness and Resistance)."
+ },
+ {
+  "id": "bw10-105",
+  "name": "Rare Candy",
+  "trainerType": "Item",
+  "effect": "Choose 1 of your Basic Pokémon in play. If you have a Stage 2 card in your hand that evolves from that Pokémon, put that card on the Basic Pokémon. (This counts as evolving that Pokémon.) You can’t use this card during your first turn or on a Basic Pokémon that was put into play this turn."
+ },
+ {
+  "id": "bw11-109",
+  "name": "Bianca",
+  "trainerType": "Supporter",
+  "effect": "Draw cards until you have 6 cards in your hand."
+ },
+ {
+  "id": "bw11-110",
+  "name": "Cedric Juniper",
+  "trainerType": "Supporter",
+  "effect": "Put a Pokémon from your hand face down in front of you and tell your opponent its name. Your opponent guesses the height of that Pokémon. Reveal that Pokémon. If your opponent guessed right, he or she draws 3 cards. If your opponent guessed wrong, you draw 3 cards. Return the Pokémon to your hand. (You can’t choose a Pokémon that doesn’t have the height printed on the card.)"
+ },
+ {
+  "id": "bw11-111",
+  "name": "Crushing Hammer",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, discard an Energy attached to 1 of your opponent’s Pokémon."
+ },
+ {
+  "id": "bw11-112",
+  "name": "Energy Switch",
+  "trainerType": "Item",
+  "effect": "Move a basic Energy from 1 of your Pokémon to another of your Pokémon."
+ },
+ {
+  "id": "bw11-RC20",
+  "name": "Elesa",
+  "trainerType": "Supporter",
+  "effect": "Search your deck for 3 Pokémon Tool cards, reveal them, and put them into your hand. Shuffle your deck afterward. You may play only 1 Supporter card during your turn (before your attack)."
+ },
+ {
+  "id": "bwp-BW28",
+  "name": "Tropical Beach",
+  "trainerType": "Stadium",
+  "effect": "Once during each player's turn, that player may draw cards until he or she has 7 cards in his or her hand. If he or she does, that player's turn ends. This card stays in play when you play it. Discard this card if another Stadium card comes into play. If another card with the same name is in play, you can't play this card."
+ },
+ {
+  "id": "bwp-BW29",
+  "name": "Victory Cup",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward. You may play as many Item cards as you like during your turn (before your attack)."
+ },
+ {
+  "id": "bwp-BW30",
+  "name": "Victory Cup",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward. You may play as many Item cards as you like during your turn (before your attack)."
+ },
+ {
+  "id": "bwp-BW31",
+  "name": "Victory Cup",
+  "trainerType": "Item",
+  "effect": "Flip a coin. If heads, search your deck for a Pokémon, reveal it, and put it into your hand. Shuffle your deck afterward. You may play as many Item cards as you like during your turn (before your attack)."
+ },
+ {
+  "id": "bwp-BW39",
+  "name": "Battle City",
+  "trainerType": "Stadium",
+  "effect": "Once during each player's turn, that player may flip a coin. If heads, the player draws a card. This card stays in play when you play it. Discard this card if another Stadium card comes into play. If another card with the same name is in play, you can't play this card."
+ },
+ {
+  "id": "bwp-BW50",
+  "name": "Tropical Beach",
+  "trainerType": "Stadium",
+  "effect": "Once during each player's turn, that player may draw cards until he or she has 7 cards in his or her hand. If he or she does, that player's turn ends. This card stays in play when you play it. Discard this card if another Stadium card comes into play. If another card with the same name is in play, you can't play this card."
+ },
+ {
+  "id": "bwp-BW95",
+  "name": "Champions Festival",
+  "trainerType": "Stadium",
+  "effect": "Once during each player's turn, if that player has 6 Pokémon in play, he or she may heal 10 damage from each of his or her Pokémon. This card stays in play when you play it. Discard this card if another Stadium card comes into play. If another card with the same name is in play, you can't play this card."
+ },
+ {
+  "id": "bwp-BW100",
+  "name": "N",
+  "trainerType": "Supporter",
+  "effect": "Each player shuffles his or her hand into his or her deck. Then, each player draws a card for each of his or her remaining Prize cards. You may play only 1 Supporter card during your turn (before your attack)."
+ },
+ {
+  "id": "dv1-18",
+  "name": "Exp. Share",
+  "trainerType": "Tool",
+  "effect": "Attach a Pokémon Tool to 1 of your Pokémon that doesn't already have a Pokémon Tool attached to it. When your Active Pokémon is Knocked Out by damage from an opponent's attack, you may move 1 basic Energy card that was attached to that Pokémon to the Pokémon this card is attached to. You may play as many Item cards as you like during your turn (before your attack)."
+ },
+ {
+  "id": "dv1-19",
+  "name": "First Ticket",
+  "trainerType": "Item",
+  "effect": "Before you flip a coin to decide who goes first in a game, you may play this card. Don't flip that coin, and you go first. If both players play First Ticket, flip the coin as normal. (You may play only 1 First Ticket before you flip that coin.) You may play as many Item cards as you like during your turn (before your attack)."
+ },
+ {
+  "id": "dv1-20",
+  "name": "Super Rod",
+  "trainerType": "Item",
+  "effect": "Shuffle 3 in any combination of Pokémon and basic Energy cards from your discard pile back into your deck. You may play as many Item cards as you like during your turn (before your attack)."
+ }
+]
