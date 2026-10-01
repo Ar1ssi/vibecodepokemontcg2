@@ -329,6 +329,34 @@ test('runtime: Pulse Guard stops a 40 hit but not a 20; Deflector halves 50 to 2
   assert.equal(hitAfterGuard(chikorita, 40), 20);
 });
 
+// ── Fidget / Vanish ─────────────────────────────────────────────────────────────────────────
+
+const FIDGET = 'Shuffle your deck.'; // Brock's Mankey [Gym Heroes 68] Fidget
+const VANISH = 'Shuffle Abra into your deck. (Discard all cards attached to Abra.)'; // Abra [Team Rocket 49] Vanish
+
+test('Fidget → own deck shuffle only as the whole effect; Vanish → shuffle self, discard attached', () => {
+  assert.deepEqual(steps(FIDGET, "Brock's Mankey"), [{ type: 'atkShuffleOwnDeck' }]);
+  // The same sentence after a search is that search's own shuffle (Banette [Pitch Black 034] Puppet Pull).
+  assert.deepEqual(steps('You may search your deck for a card and put it into your hand. Then, shuffle your deck.', 'Banette'), []);
+  assert.deepEqual(steps(VANISH, 'Abra'), [{ type: 'atkPutSelf', to: 'deck', attached: 'discard' }]);
+});
+
+test('runtime: Fidget shuffles the attacker’s deck', () => {
+  const mankey = { instanceId: 1, name: "Brock's Mankey", hp: 40, attacks: [{ name: 'Fidget', cost: [], damage: '', text: FIDGET }] };
+  const { events } = attackOnTurn(duelBoard(mankey, FOE), 'p1', 2, 0);
+  assert.ok(events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p1'));
+});
+
+test('runtime: Vanish shuffles Abra into the deck and discards its Energy', () => {
+  const abra = { instanceId: 1, name: 'Abra', hp: 30, attacks: [{ name: 'Vanish', cost: [], damage: '', text: VANISH }] };
+  const board = duelBoard(abra, FOE, { p1Bench: [MY_SPARE] });
+  board.players.p1.zones.active.push(createCard({ instanceId: 5, name: 'Psychic Energy', supertype: 'Energy', type: 'Energy', attachedTo: 1 }));
+  const after = attackOnTurn(board, 'p1', 2, 0).state.players.p1.zones;
+  assert.ok(after.deck.some((c) => c.instanceId === 1));
+  assert.ok(after.discard.some((c) => c.instanceId === 5));
+  assert.ok(![...after.active, ...after.bench].some((c) => c.instanceId === 1 || c.instanceId === 5));
+});
+
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────
 
 const TAIL_WAG = // Eevee [Jungle 51] Tail Wag

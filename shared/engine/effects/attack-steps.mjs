@@ -1535,6 +1535,12 @@ function atkShuffleOppDeck(ctx) {
   return null;
 }
 
+// Brock's Mankey Fidget: "Shuffle your deck."
+function atkShuffleOwnDeck(ctx) {
+  shuffleOwnDeck(ctx.player, ctx);
+  return null;
+}
+
 // ── Lost Zone ───────────────────────────────────────────────────────────────
 
 // `forDamage` marks a cost the attack's damage counts ("for each card put in the Lost Zone
@@ -1708,7 +1714,7 @@ function atkPutSelf(ctx) {
   if (!ref || ref.playerId !== player.playerId) return skip(ctx, 'attacker_not_in_play');
   const place = (card, where) => {
     if (where === 'discard') player.zones.discard.push(card);
-    else if (where === 'deckBottom') player.zones.deck.push(card);
+    else if (where === 'deckBottom' || where === 'deck') player.zones.deck.push(card);
     else player.zones.hand.push(card);
   };
   for (const card of [ref.card, ...attachedCards(player, ref.card.instanceId)]) {
@@ -1726,6 +1732,7 @@ function atkPutSelf(ctx) {
     playerId: player.playerId,
     reason: 'attack-put-self',
   });
+  if (step.to === 'deck') shuffleOwnDeck(player, ctx);
   return null;
 }
 
@@ -3742,7 +3749,13 @@ export const ATTACK_STEP_HANDLERS = {
   atkBenchFromDiscard: optional(atkBenchFromDiscard, () => 'Put Pokémon from your discard pile onto your Bench'),
   atkRecover: optional(atkRecover, (step) => `Put ${step.what || 'a card'} from your discard pile into your hand`),
   atkShuffleSelf: optional(atkShuffleSelf, () => 'Shuffle this Pokémon and all attached cards into your deck'),
-  atkPutSelf: optional(atkPutSelf, (step) => (step.to === 'hand' ? 'Put this Pokémon into your hand' : 'Put this Pokémon on the bottom of your deck')),
+  atkPutSelf: optional(atkPutSelf, (step) =>
+    step.to === 'hand'
+      ? 'Put this Pokémon into your hand'
+      : step.to === 'deck'
+        ? 'Shuffle this Pokémon into your deck'
+        : 'Put this Pokémon on the bottom of your deck'
+  ),
   returnSelfToDeckAbility,
   atkLostZoneDeckTop,
   atkLostZoneEnergy,
@@ -3761,6 +3774,7 @@ export const ATTACK_STEP_HANDLERS = {
     () => "Shuffle all Energy from your opponent's Pokémon into their deck"
   ),
   atkShuffleOppDeck: optional(atkShuffleOppDeck, () => "Have your opponent shuffle their deck"),
+  atkShuffleOwnDeck,
   atkKnockOutChoose,
   atkCountersEach,
   atkCountersEachFiltered,

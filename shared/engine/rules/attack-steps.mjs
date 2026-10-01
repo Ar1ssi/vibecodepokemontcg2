@@ -822,6 +822,8 @@ const TEMPLATES = [
   // the attached cards); Revavroom ex / Weezing ("Discard this Pokémon …"); Uxie Psychic Restore.
   [/^return this pokémon and all cards attached to it to your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'hand' })],
   [/^put this pokémon into your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'discard' })],
+  // Abra [Team Rocket 49] Vanish: "Shuffle Abra into your deck. (Discard all cards attached to Abra.)"
+  [/^shuffle this pokémon into your deck$/, () => ({ type: 'atkPutSelf', to: 'deck', attached: 'discard' })],
   [/^discard this pokémon and all (?:attached cards|cards attached to it)$/, () => ({ type: 'atkPutSelf', to: 'discard' })],
   [
     /^put this pokémon and all cards attached to it on the bottom of your deck in any order$/,
@@ -1210,6 +1212,9 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Brock's Mankey [Gym Heroes 68] Fidget: "Shuffle your deck." as the whole effect. Anchored on
+  // the whole text: the same sentence after a deck search is that search's own shuffle.
+  [/^shuffle your deck\.$/g, () => ({ type: 'atkShuffleOwnDeck' })],
   // Delibird Souvenir (Team Rocket Returns 21): one outcome per heads tier of the 3 coins.
   [
     /if 1 of them is heads, put (\d+) damage counters on your opponent's active pokémon\. if 2 of them are heads, remove (\d+|a) damage counters? from your opponent's active pokémon\. if all of them are heads, put (\d+) damage counters on your opponent's active pokémon\. if all of them are tails, remove all damage counters from your opponent's active pokémon\./g,
