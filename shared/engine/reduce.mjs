@@ -863,10 +863,12 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
 function activeAttackMarkers(draft, playerId, card) {
   const active = draft.players[playerId]?.zones?.active || [];
   if (!card || !active.some((c) => c.instanceId === card.instanceId)) return [];
+  const otherId = Object.keys(draft.players || {}).find((id) => id !== playerId);
   return [
     ...liveAttackMarkers(card, {
       turnNumber: draft.turn?.number || 1,
       zoneCards: active,
+      sourceZoneCards: draft.players[otherId]?.zones?.active || [],
     }),
     ...restOfGameMarkers(draft, playerId, card),
     // I224: PlusPower / Defender / Magnifier attached to it, read as the same marker kinds.
@@ -5037,6 +5039,10 @@ export function validateLegality(state, command) {
           reason: `This Pokémon can't use ${attack?.name || whileActive.name} again until it leaves the Active Spot.`,
         };
       }
+      // WotC Leer / Freeze (I227): a lock marker the opponent put on this Pokémon.
+      if (activeAttackMarkers(state, playerId, active).some((m) => m.kind === 'cantAttack')) {
+        return { allowed: false, reason: "This Pokémon can't attack during this turn." };
+      }
       // Encore / Amnesia (design 033): attack locks the opponent put on this Pokémon.
       const chosenName = String(attack?.name || '').toLowerCase();
       for (const lock of activeAttackMarkers(state, playerId, active).filter((m) => m.kind === 'attackLock')) {
@@ -5095,6 +5101,10 @@ export function validateLegality(state, command) {
           allowed: false,
           reason: "The Defending Pokémon can't retreat.",
         };
+      }
+      // WotC Spider Web / Mean Look (I227): a lock marker the opponent put on this Pokémon.
+      if (activeAttackMarkers(state, playerId, active).some((m) => m.kind === 'cantRetreat')) {
+        return { allowed: false, reason: "The Defending Pokémon can't retreat." };
       }
       // Fossil Items played as Pokémon: "This card can't retreat."
       if (active.fossilCantRetreat) {

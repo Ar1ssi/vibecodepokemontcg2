@@ -36,6 +36,7 @@ import { parseSearchDeckParams } from './trainer-effects.mjs';
 import { isBasicPokemon } from '../cards.mjs';
 import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 import { parseEachFilter } from './each-filter.mjs';
+import { TYPE_LETTER } from './tool-combat.mjs';
 import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
 import { normalizeAttackText, replaceSelfName, symbolizeTypeWords } from './attack-text.mjs';
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
@@ -70,6 +71,9 @@ const lower = (v) =>
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'");
 
+const HALF_REMAINING_HP =
+  /^does damage (?:to (?:the defending|your opponent's active) pok[\u00e9e]mon )?equal to half (?:of )?(?:the defending|your opponent's active) pok[\u00e9e]mon's remaining hp \(rounded (up|down) to the nearest 10\)/;
+
 // Recognized types for "if the Defending Pokémon is a [type] Pokémon" checks.
 export const TYPES = [
   'grass',
@@ -103,12 +107,18 @@ function coinTierBonuses(text) {
   const flips = /flip (\d+) coins/.exec(text);
   if (!flips) return null;
   const tiers = new Map();
+  // Seaking [Neo Revelation 37] Horn Swipe prints "If both are heads, …".
   const re =
-    /if (?:(\d+|all|both) of them (?:is|are) heads|you get (\d+) heads), this attack does (?:\d+ damage plus )?(\d+) more damage/g;
+    /if (?:(\d+|all|both) of them (?:is|are) heads|(both) are heads|you get (\d+) heads), this attack does (?:\d+ damage plus )?(\d+) more damage/g;
   for (const m of text.matchAll(re)) {
-    const word = m[1] ?? m[2];
+    const word = m[1] ?? m[2] ?? m[3];
     const heads = word === 'all' || word === 'both' ? Number(flips[1]) : Number(word);
-    tiers.set(heads, Number(m[3]));
+    tiers.set(heads, Number(m[4]));
+  }
+  // Scyther [Neo Discovery 46] Fury Cutter: "… 10 more damage if exactly 1 is heads, or 20 more
+  // damage if exactly 2 are heads, … or 80 more damage if all 4 are heads."
+  for (const m of text.matchAll(/(\d+) more damage if (?:exactly (\d+) (?:is|are)|all (?:\d+ )?are) heads/g)) {
+    tiers.set(m[2] ? Number(m[2]) : Number(flips[1]), Number(m[1]));
   }
   return tiers.size > 0 ? tiers : null;
 }
@@ -314,7 +324,10 @@ function amountScale(unit, ctx) {
 function timesAsForEach(text) {
   return text
     .split(/(?<=\.)\s+/)
-    .map((sentence) => {
+    .map((printed) => {
+      // Older prints drop the "more" (Granbull [Neo Genesis 37] Raging Charge: "10 damage plus 10
+      // damage for each damage counter on Granbull").
+      const sentence = printed.replace(/plus (\d+) damage for each/, 'plus $1 more damage for each');
       const unit = /damage times the (?:amount|number) of (.+)/.exec(sentence)?.[1];
       if (!unit || /\benergy\b/.test(unit)) return sentence;
       return sentence
@@ -413,6 +426,21 @@ export function parseAttackDamage(
   const stage2InPlayCount = ctx.stage2InPlayCount;
 
   let total = base;
+
+  // Raticate Super Fang / Scizor False Swipe ("?" damage): "Does damage … equal to half the
+  // Defending Pokémon's remaining HP (rounded up / down to the nearest 10)." Weakness and
+  // Resistance then apply as to any attack damage (none is excluded).
+  const halfHp = text ? HALF_REMAINING_HP.exec(text) : null;
+  if (halfHp) {
+    if (typeof ctx.defenderRemainingHp === 'number') {
+      const round = halfHp[1] === 'up' ? Math.ceil : Math.floor;
+      total = round(ctx.defenderRemainingHp / 2 / 10) * 10;
+      components.push('half-remaining-hp');
+      notes.push(`half of ${ctx.defenderRemainingHp} remaining HP, rounded ${halfHp[1]} = ${total}`);
+    } else {
+      notes.push('half remaining HP — resolve the printed count');
+    }
+  }
 
   // ── Scaling damage ──
   // Discard-to-scale (taxonomy §D damage-scaling family): "Discard up to N
@@ -1002,6 +1030,8 @@ export function parseAttackDamage(
   // Beldum Metal Charge / Gengar V Pain Explosion: "Put 3 damage counters on this Pokémon."
   const selfCounters = /(?:^|\. )put (\d+) damage counters? on this pok[ée]mon\./.exec(text);
   if (selfCounters) selfDamage += Number(selfCounters[1]) * 10;
+  // Lt. Surge's Raticate Focus Energy doubles the next Double-edge's recoil (attack-damage-context.mjs).
+  if (ctx.selfDamageDoubled) selfDamage *= 2;
   if (selfDamage > 0) {
     if (!components.includes('self-damage')) components.push('self-damage');
     notes.push(`${selfDamage} damage to self`);
@@ -1616,6 +1646,18 @@ export function eachPokemonDamage(attackText) {
       text
     );
   if (perTarget) return { amount: Number(perTarget[1]), activeOnly: false, filter: {}, perTargetCoin: true };
+  // Pichu [Neo Genesis 12] Zzzap: "Does 20 damage to each Pokémon in play that has a Pokémon
+  // Power."; Pupitar [Neo Discovery 45] Dust Devil: "Does 10 damage to each non-{F} Pokémon in
+  // play." Both sides, the attacker too when it matches.
+  const inPlay = /(?:^|\.\s+)does (\d+) damage to each (?:non-\{([a-z])\} )?pokémon in play( that has a pokémon power)?\./.exec(text);
+  if (inPlay) {
+    const [, amount, exceptType, power] = inPlay;
+    const filter = {
+      ...(exceptType ? { excludeTypes: [TYPE_LETTER[exceptType]] } : {}),
+      ...(power ? { hasPokemonPower: true } : {}),
+    };
+    return { amount: Number(amount), activeOnly: false, filter, bothSides: true };
+  }
   const m = /(?:^|\.\s+)(?:if (heads|tails), )?(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon|pokémon)([^.(]*)(\(both yours and your opponent's\))?/.exec(
     text
   );

@@ -95,9 +95,15 @@ function stripGates(sentence) {
   const flags = {};
   // "If exactly N is/are heads, …" (Misty's Psyduck ESP, design 049): runs on exactly N heads.
   const exact = /^if exactly (\d+) (?:is|are) heads, /.exec(rest);
+  // Giovanni's Nidoking Intimidate: "If the Defending Pokémon's maximum HP is 50 or less, it
+  // can't attack …" — read by the marker step (effects/attack-steps.mjs atkAddMarker) only.
+  const maxHp = /^if your opponent's active pokémon's maximum hp is (\d+) or less, (?=it can't attack this pokémon )/.exec(rest);
   if (exact) {
     rest = rest.slice(exact[0].length);
     flags.headsExactly = Number(exact[1]);
+  } else if (maxHp) {
+    rest = rest.slice(maxHp[0].length);
+    flags.defenderMaxHpAtMost = Number(maxHp[1]);
   } else {
     for (const [re, flag] of GATES) {
       if (re.test(rest)) {
@@ -302,6 +308,17 @@ const TEMPLATES = [
       type: 'atkLookDeckReorder',
       count: Number(m[1]),
       side: m[2] === 'your' ? 'self' : m[2] === 'either player\'s' ? 'either' : 'opponent',
+    }),
+  ],
+  // Hypno [Fossil 8] Prophecy: "Look at up to 3 cards from the top of either player's deck and
+  // rearrange them as you like."
+  [
+    /^look at up to (\d+) cards from the top of (your|your opponent's|either player's) deck and rearrange them as you like$/,
+    (m) => ({
+      type: 'atkLookDeckReorder',
+      count: Number(m[1]),
+      side: m[2] === 'your' ? 'self' : m[2] === "either player's" ? 'either' : 'opponent',
+      upTo: true,
     }),
   ],
   // Per-Bench attach (Mega Gardevoir ex Overflowing Wishes, Mudsdale Mud Stock).
@@ -768,6 +785,11 @@ const TEMPLATES = [
     /^heal from this pokémon the same amount of damage you did to your opponent's active pokémon$/,
     () => ({ type: 'atkMirrorHeal' }),
   ],
+  // Dark Wigglytuff [Neo Destiny 40] Slap Awake: "Then, the Defending Pokémon is no longer Asleep or Confused."
+  [
+    /^your opponent's active pokémon is no longer ((?:asleep|burned|confused|paralyzed|poisoned)(?: or (?:asleep|burned|confused|paralyzed|poisoned))*)$/,
+    (m) => ({ type: 'atkCureOppConditions', conditions: conditionList(m[1]) }),
+  ],
 
   // Choose-and-Knock-Out
   [
@@ -797,6 +819,17 @@ const TEMPLATES = [
   ],
 
   [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
+  // Porygon [Base Set 39] Conversion 1 / Conversion 2: a type marker that lasts until the
+  // Pokémon is Benched or evolves.
+  [
+    /^if your opponent's active pokémon has a weakness, you may change it to a type of your choice other than colorless$/,
+    () => ({ type: 'atkChangeType', what: 'weakness', target: 'opponentActive', mayDecline: true }),
+  ],
+  [
+    // The possessive self name stays in place ("porygon's").
+    /^change (?!your opponent's)[^,]+?'s resistance to a type of your choice other than colorless$/,
+    () => ({ type: 'atkChangeType', what: 'resistance', target: 'self' }),
+  ],
 
   // Leave play
   [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],
@@ -805,6 +838,8 @@ const TEMPLATES = [
   // the attached cards); Revavroom ex / Weezing ("Discard this Pokémon …"); Uxie Psychic Restore.
   [/^return this pokémon and all cards attached to it to your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'hand' })],
   [/^put this pokémon into your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'discard' })],
+  // Abra [Team Rocket 49] Vanish: "Shuffle Abra into your deck. (Discard all cards attached to Abra.)"
+  [/^shuffle this pokémon into your deck$/, () => ({ type: 'atkPutSelf', to: 'deck', attached: 'discard' })],
   [/^discard this pokémon and all (?:attached cards|cards attached to it)$/, () => ({ type: 'atkPutSelf', to: 'discard' })],
   [
     /^put this pokémon and all cards attached to it on the bottom of your deck in any order$/,
@@ -1193,6 +1228,14 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Brock's Mankey [Gym Heroes 68] Fidget: "Shuffle your deck." as the whole effect. Anchored on
+  // the whole text: the same sentence after a deck search is that search's own shuffle.
+  [/^shuffle your deck\.$/g, () => ({ type: 'atkShuffleOwnDeck' })],
+  // Moltres [Fossil 12] Wildfire: as many of the opponent's top cards as {R} Energy discarded.
+  [
+    /you may discard any number of \{([a-z])\} energy cards attached to this pokémon when you use this attack\. if you do, discard that many cards from the top of your opponent's deck\./g,
+    (m) => ({ type: 'atkDiscardSelfEnergyMillOpp', energyType: m[1].toUpperCase() }),
+  ],
   // Delibird Souvenir (Team Rocket Returns 21): one outcome per heads tier of the 3 coins.
   [
     /if 1 of them is heads, put (\d+) damage counters on your opponent's active pokémon\. if 2 of them are heads, remove (\d+|a) damage counters? from your opponent's active pokémon\. if all of them are heads, put (\d+) damage counters on your opponent's active pokémon\. if all of them are tails, remove all damage counters from your opponent's active pokémon\./g,
@@ -1481,6 +1524,11 @@ const BLOCKS = [
     /choose 1 of your opponent's active pokémon's attacks\. (?:during your opponent's next turn, that pokémon (can't use|can use only) that attack|that pokémon (can't use|can use only) that attack during your opponent's next turn)\./g,
     (m) => ({ type: 'atkLockAttack', mode: (m[1] || m[2]) === "can't use" ? 'except' : 'only' }),
   ],
+  // Stantler [Neo Revelation 38] Terrorize: Amnesia behind "If the Defending Pokémon is a Basic Pokémon".
+  [
+    /if your opponent's active pokémon is a basic pokémon, choose 1 of its attacks\. that pokémon can't use that attack during your opponent's next turn\./g,
+    () => ({ type: 'atkLockAttack', mode: 'except', basicOnly: true }),
+  ],
   // Unown T Hidden Power: each player loses 1 hand card to their deck, picked by the other.
   [
     /look at your opponent's hand and choose 1 card, then have your opponent shuffle that card into their deck\. then, show your opponent your hand and (?:they choose|he or she chooses) 1 card\. shuffle that card into your deck\./g,
@@ -1706,6 +1754,9 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     .replace(/\s*\((before|after) applying weakness and resistance\)/g, ' <wr:$1>')
     // Devoluter's "(excluding Pokémon LV.X)" limits the target, so it survives the strip below.
     .replace(/evolved pokémon \(excluding pokémon lv\.x\)/g, 'evolved pokémon but not pokémon lv.x')
+    // Lt. Surge's Raticate Focus Energy: the "(base damage and damage to itself)" note widens the
+    // doubling to the recoil, so it survives the strip below.
+    .replace(/attack's damage \(base damage and damage to itself\) is doubled/g, "attack's base damage and damage to itself are doubled")
     // Reminder text never carries an effect ("(Your opponent chooses the new Active Pokémon.)").
     .replace(/\s*\([^)]*\)/g, '');
   normalized = rewriteLegacyAttackWording(normalized);
