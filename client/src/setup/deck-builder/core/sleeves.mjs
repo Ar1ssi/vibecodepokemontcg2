@@ -24,6 +24,15 @@
     "releaseDate": "May 2015"
   },
   {
+    "id": "legacy-sleeve",
+    "image": "src/assets/sleeves/Legacy_Sleeve.jpg",
+    "name": "Legacy Sleeve",
+    "brand": "The Pokémon Company",
+    "region": "Japan",
+    "category": "Card Back",
+    "releaseDate": ""
+  },
+  {
     "id": "56f86004-ae18-4b31-bac1-40299c3d4076",
     "image": "https://pokemon-sleeve-database.com/images/sleeves/japan/pokemon-center/56f86004-ae18-4b31-bac1-40299c3d4076.jpg",
     "name": "Zorua & Zoroark Good Night Pokémon Center",

@@ -1,5 +1,7 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { GENERATED_STARTER_DECKS } from './starter-decks.generated.mjs';
+import { GEN_1_2_ORDER } from './gen-1-2-order.generated.mjs';
+import { BLACK_BOLT_WHITE_FLARE_ORDER } from './black-bolt-white-flare-order.generated.mjs';
 import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 
 const TCGDEX_BASE = tcgdexApiBase();
@@ -346,8 +348,10 @@ const TCGDEX_BASE = tcgdexApiBase();
 
       const sets = entries
         .filter(Boolean)
-        .filter((entry) => entry.cardCount > 0)
-        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+        .filter((entry) => entry.cardCount > 0);
+      const combinedEntries = await Promise.all([buildBlackBoltWhiteFlareEntry(), buildGen12Entry()]);
+      sets.push(...combinedEntries.filter(Boolean));
+      sets.sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
 
       try {
         const energyCards = await fetchLegalEnergyCards();
@@ -581,7 +585,7 @@ const TCGDEX_BASE = tcgdexApiBase();
 
     // Evolutions printed outside 151, shown in the Other tab's 151 right after the
     // card they evolve from (`after`: an sv03.5 id or an earlier addition). Alt and
-    // illustration rares (`rare`) go at the end. Card ids checked against TCGdex 2026-10-01.
+    // illustration rares (`rare`) go at the end. `dex` is the National Pokédex number. Card ids checked against TCGdex 2026-10-01.
     const SET_151_ADDITIONS = [
       { id: 'sv01-065', setId: 'sv01', after: 'sv03.5-082' }, // Magnezone ex <- Magneton
       { id: 'swsh11-032', setId: 'swsh11', series: 'swsh', after: 'sv03.5-061' }, // Politoed <- Poliwhirl
@@ -641,9 +645,131 @@ const TCGDEX_BASE = tcgdexApiBase();
       return [...base.flatMap(withFollowers), ...rares];
     }
 
+    export const GEN_1_2_SET_ID = '__other_gen12__';
+    const GEN_1_2_SET_IDS = ['base1', 'base3', 'base4', 'neo1']; // Base Set, Fossil, Base Set 2, Neo Genesis
+
+    // One Other-tab set holding the four Gen 1-2 core sets. Card order is baked into the
+    // generated order file (Pokémon by Pokédex number, then Trainers, then Energy).
+    async function buildGen12Entry() {
+      try {
+        const records = await Promise.all(GEN_1_2_SET_IDS.map((id) => fetchSetRecord(id, id.startsWith('neo') ? 'neo' : 'base')));
+        return {
+          setId: GEN_1_2_SET_ID,
+          name: '1 + 2 dex',
+          seriesId: 'base',
+          releaseDate: records.map((r) => r.releaseDate || '').sort().pop() || '',
+          logo: '',
+          symbol: '',
+          cardCount: GEN_1_2_ORDER.length + GEN_1_2_HOLO_ENERGY.length + GEN_1_REVERSE_HOLO_ENERGY.ids.length,
+          category: 'other',
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    // Gen 1 Energy with a real Reverse Holo print: Legendary Collection's Full Heal and
+    // Potion Energy (TCGdex variants.reverse, checked 2026-10-01). The Base Set era basics
+    // were never printed reverse, so none are fabricated for them.
+    const GEN_1_REVERSE_HOLO_ENERGY = { setId: 'lc', series: 'lc', ids: ['lc-100', 'lc-101'] };
+
+    async function fetchGen1ReverseHoloEnergyCards() {
+      try {
+        const { setId, series, ids } = GEN_1_REVERSE_HOLO_ENERGY;
+        const record = await fetchSetRecord(setId, series);
+        const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
+        return ids
+          .map((id) => (record.cards || []).find((c) => c.id === id))
+          .filter((card) => card?.name && card.image)
+          .map((card) => buildReverseHoloEnergyCard(normalizeSetCard(card, set, 'Energy')));
+      } catch {
+        return [];
+      }
+    }
+
+    // Holo-effect copies of Base Set / Neo Genesis Energy. The six Base Set basics and Team Rocket's Rainbow stand in
+    // for the WotC "Energize Your Game" League promo holofoil Energy (same Base Set art; the
+    // promo scans are not in TCGdex or pkmncards). Neo Genesis Metal and Darkness get the
+    // same treatment at the user's request. Not real separate prints in TCGdex.
+    const GEN_1_2_HOLO_ENERGY = [
+      { setId: 'base1', series: 'base', id: 'base1-97', label: 'Energize Your Game' }, // Fighting
+      { setId: 'base1', series: 'base', id: 'base1-98', label: 'Energize Your Game' }, // Fire
+      { setId: 'base1', series: 'base', id: 'base1-99', label: 'Energize Your Game' }, // Grass
+      { setId: 'base1', series: 'base', id: 'base1-100', label: 'Energize Your Game' }, // Lightning
+      { setId: 'base1', series: 'base', id: 'base1-101', label: 'Energize Your Game' }, // Psychic
+      { setId: 'base1', series: 'base', id: 'base1-102', label: 'Energize Your Game' }, // Water
+      { setId: 'base5', series: 'base', id: 'base5-80', label: 'Energize Your Game' }, // Rainbow (Team Rocket)
+      { setId: 'neo1', series: 'neo', id: 'neo1-19', label: 'Reverse Holo' }, // Metal
+      { setId: 'neo1', series: 'neo', id: 'neo1-104', label: 'Reverse Holo' }, // Darkness
+    ];
+
+    async function fetchGen12HoloEnergyCards() {
+      const cards = await Promise.all(
+        GEN_1_2_HOLO_ENERGY.map(async ({ setId, series, id, label }) => {
+          try {
+            const record = await fetchSetRecord(setId, series);
+            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
+            const card = (record.cards || []).find((c) => c.id === id);
+            if (!card?.name || !card.image) return null;
+            const holo = buildReverseHoloEnergyCard(normalizeSetCard(card, set, 'Energy'));
+            return { ...holo, localId: `${card.localId} · ${label}` };
+          } catch {
+            return null;
+          }
+        })
+      );
+      return cards.filter(Boolean);
+    }
+
+    async function fetchGen12Cards() {
+      const [setCards, reverseEnergy, holoEnergy] = await Promise.all([
+        Promise.all(GEN_1_2_SET_IDS.map((id) => fetchSetCards(id))),
+        fetchGen1ReverseHoloEnergyCards(),
+        fetchGen12HoloEnergyCards(),
+      ]);
+      const cards = setCards.flat();
+      // Reprints were dropped when the order was baked; only listed cards are shown.
+      const rank = new Map(GEN_1_2_ORDER.map((id, index) => [id, index]));
+      const listed = cards.filter((card) => rank.has(card.id)).sort((a, b) => rank.get(a.id) - rank.get(b.id));
+      return [...listed, ...holoEnergy, ...reverseEnergy];
+    }
+
+    export const BLACK_BOLT_WHITE_FLARE_SET_ID = '__other_bbwf__';
+    const BBWF_SET_IDS = ['sv10.5b', 'sv10.5w'];
+    const BBWF_LOGO = 'src/assets/set-logos/black-bolt-white-flare.jpg';
+
+    // One Other-tab set holding both Unova sets (they stay separate in the Standard
+    // tab). Card order is baked into the generated order file, Unova Pokédex first.
+    async function buildBlackBoltWhiteFlareEntry() {
+      try {
+        const records = await Promise.all(BBWF_SET_IDS.map((id) => fetchSetRecord(id, 'sv')));
+        return {
+          setId: BLACK_BOLT_WHITE_FLARE_SET_ID,
+          name: 'Black Bolt & White Flare',
+          seriesId: 'sv',
+          releaseDate: records.map((r) => r.releaseDate || '').sort().pop() || '',
+          logo: BBWF_LOGO,
+          symbol: '',
+          cardCount: records.reduce((sum, r) => sum + (r.cards || []).filter((c) => c.image).length, 0),
+          category: 'other',
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    async function fetchBlackBoltWhiteFlareCards() {
+      const cards = (await Promise.all(BBWF_SET_IDS.map((id) => fetchSetCards(id)))).flat();
+      const rank = new Map(BLACK_BOLT_WHITE_FLARE_ORDER.map((id, index) => [id, index]));
+      const position = (card) => rank.get(card.id) ?? Infinity;
+      return cards.sort((a, b) => position(a) - position(b));
+    }
+
     export async function fetchSetCards(setId) {
+      if (setId === BLACK_BOLT_WHITE_FLARE_SET_ID) return fetchBlackBoltWhiteFlareCards();
       if (setId === ENERGY_SET_ID) return fetchLegalEnergyCards();
       if (setId === OTHER_151_SET_ID) return fetchOther151Cards();
+      if (setId === GEN_1_2_SET_ID) return fetchGen12Cards();
 
       const generationEnergyMatch = GENERATION_ENERGY_SET_ID_RE.exec(setId);
       if (generationEnergyMatch) return fetchGenerationEnergyCards(Number(generationEnergyMatch[1]));

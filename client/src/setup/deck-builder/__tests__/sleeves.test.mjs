@@ -13,9 +13,9 @@ import test from 'node:test';
       setDeckSleeve,
     } from '../core/deck-library.mjs';
     
-    test('sleeve catalog: all 449 Pokemon sleeves with data', () => {
+    test('sleeve catalog: all 450 Pokemon sleeves with data', () => {
       const sleeves = getSleeves();
-      assert.equal(sleeves.length, 449);
+      assert.equal(sleeves.length, 450);
 
       for (const sleeve of sleeves) {
         assert.ok(sleeve.id, `missing id: ${sleeve.name}`);

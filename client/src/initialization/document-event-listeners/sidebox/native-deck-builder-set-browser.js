@@ -7,6 +7,8 @@ import {
       sortCardsWithinGroup,
       GENERATIONS,
       OTHER_151_SET_ID,
+      BLACK_BOLT_WHITE_FLARE_SET_ID,
+      GEN_1_2_SET_ID,
     } from '../../../setup/deck-builder/core/set-browser.mjs';
     import { hasActiveFilters } from '../../../setup/deck-builder/core/card-filters.mjs';
     import {
@@ -26,6 +28,8 @@ import {
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+
+    const KEEP_FETCH_ORDER_SET_IDS = new Set([OTHER_151_SET_ID, BLACK_BOLT_WHITE_FLARE_SET_ID, GEN_1_2_SET_ID]);
 
     const GENERATION_CATEGORY_PREFIX = 'gen';
     const generationCategoryId = (gen) => `${GENERATION_CATEGORY_PREFIX}${gen}`;
@@ -302,8 +306,8 @@ import {
                 if (expanded) {
                   const cardsHtml = filtered.length
                     ? renderCardsGrid(
-                        // The Other tab's 151 arrives in evolution order; number order would undo it.
-                        set.setId === OTHER_151_SET_ID ? filtered : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
+                        // These Other-tab sets arrive in their own order; number order would undo it.
+                        KEEP_FETCH_ORDER_SET_IDS.has(set.setId) ? filtered : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
                         quantities,
                         owned
                       )
