@@ -26,6 +26,14 @@ function isEnergyCard(card) {
   return /energy/i.test(card.type || card.supertype || '');
 }
 
+// The printed kind ("Pokemon Power", "Poke-POWER", "Poke-BODY", "Ability", ...) is how the
+// server tells a Pokémon Power from a Poké-Body (Toxic Gas, Goop Gas, Seal Off read nothing else).
+function abilityStat(ability) {
+  const stat = { name: String(ability.name || ''), text: String(ability.text || '') };
+  if (typeof ability.type === 'string' && ability.type) stat.type = ability.type;
+  return stat;
+}
+
 function extractStats(card) {
   const stats = { syncInstance: card.syncInstance };
   let hasAny = false;
@@ -80,14 +88,10 @@ function extractStats(card) {
   if (Array.isArray(card.abilities) && card.abilities.length > 0) {
     stats.abilities = card.abilities
       .filter((a) => a && (typeof a === 'string' || typeof a.text === 'string'))
-      .map((a) =>
-        typeof a === 'string'
-          ? { name: '', text: a }
-          : { name: String(a.name || ''), text: String(a.text || '') }
-      );
+      .map((a) => (typeof a === 'string' ? { name: '', text: a } : abilityStat(a)));
     hasAny = true;
   } else if (card.ability?.text) {
-    stats.abilities = [{ name: String(card.ability.name || ''), text: String(card.ability.text) }];
+    stats.abilities = [abilityStat(card.ability)];
     hasAny = true;
   }
   // Trainers and Energy only: playTrainer and the special-Energy triggers/pricing parse this

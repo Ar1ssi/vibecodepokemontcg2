@@ -10843,9 +10843,12 @@ export function applyCommand(state, command, rng = null) {
         if (typeof entry.evolvesFrom === 'string')
           card.evolvesFrom = entry.evolvesFrom;
         if (Array.isArray(entry.abilities)) {
+          // The printed kind tells a Pokémon Power from a Poké-Body (Toxic Gas, Goop Gas).
+          const printedKind = (t) =>
+            typeof t === 'string' && t.trim() && t.length <= 32 ? { type: t.trim() } : {};
           card.abilities = entry.abilities
             .filter((a) => a && typeof a.text === 'string')
-            .map((a) => ({ name: String(a.name || ''), text: a.text }));
+            .map((a) => ({ name: String(a.name || ''), text: a.text, ...printedKind(a.type) }));
         }
         if (typeof entry.text === 'string') card.text = entry.text;
         if (typeof entry.trainerType === 'string')
