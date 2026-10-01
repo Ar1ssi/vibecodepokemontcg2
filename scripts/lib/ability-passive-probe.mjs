@@ -289,6 +289,9 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`opp:prize:${card.name}`, () => abilityPrizeModify(card, ctx));
       ask(`opp:retreat:${card.name}`, () => abilityRetreatCost(card, ctx));
       ask(`opp:suppressed:${card.name}`, () => isAbilitySuppressed(card, ctx));
+      // Toxic Gas ignores only Pokémon Powers, which the probe Ability above is not.
+      const powerHolder = { ...card, abilities: [{ name: 'Probe Power', type: 'Pokémon Power', text: 'Once during your turn, you may draw a card.' }] };
+      ask(`opp:suppressedPower:${card.name}`, () => isAbilitySuppressed(powerHolder, ctx));
     }
     for (const [side, ctx] of [['p1', p1], ['p2', p2]]) {
       for (const card of played) ask(`playLock:${side}:${card.name}`, () => abilityPlayLocks(card, ctx));

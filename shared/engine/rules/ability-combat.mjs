@@ -69,6 +69,7 @@ import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
+import { legacyPowerStopCondition } from './legacy-power-wording.mjs';
 import { normalizeStage } from './evolution.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
@@ -1064,10 +1065,14 @@ export function abilityExtraTypes(card, ctx = {}) {
  * Returns `{ multiplier, energyType }` or null. Non-stacking wording applies
  * once (the first holder wins).
  */
-export function abilityEnergyMultiplier(cards = []) {
-  for (const card of nonStackingOnce(dedupe(cards).filter(isPokemon))) {
+export function abilityEnergyMultiplier(cards = [], ctx = {}) {
+  // In-play views: an evolved holder's Special Conditions sit on its root (Meganium Wild Growth
+  // "stops working while Meganium is Asleep, Confused, or Paralyzed").
+  for (const card of nonStackingOnce(dedupe(inPlayViews(cards)))) {
     const parsed = parseEnergyMultiplier(card);
-    if (parsed.multiplier > 0 && parsed.energyType) return parsed;
+    if (!(parsed.multiplier > 0 && parsed.energyType)) continue;
+    if (isAbilitySuppressed(card, ctx)) continue;
+    return parsed;
   }
   return null;
 }
@@ -1077,8 +1082,8 @@ export function abilityEnergyMultiplier(cards = []) {
  * the printed type provides one extra unit. Entries may be strings or
  * `{ type, family }` objects; unknown shapes pass through untouched.
  */
-export function applyEnergyMultiplier(entries = [], holders = []) {
-  const mult = abilityEnergyMultiplier(holders);
+export function applyEnergyMultiplier(entries = [], holders = [], ctx = {}) {
+  const mult = abilityEnergyMultiplier(holders, ctx);
   if (!mult) return entries;
   const want = lower(mult.energyType);
   return entries.flatMap((entry) => {
@@ -1201,6 +1206,43 @@ function attackLockedAbility(card, turnNumber) {
   );
 }
 
+const ROTATION_CONDITIONS = ['Asleep', 'Confused', 'Paralyzed'];
+
+/**
+ * A WotC Power's own off-switch: "This power stops working while <it> is Asleep, Confused, or
+ * Paralyzed" / "… affected by a Special Condition" (legacy-power-wording.mjs). `card` is the
+ * in-play view, which carries the root's Special Conditions.
+ */
+export function legacyPowerStopped(card) {
+  const stop = legacyPowerStopCondition(cardAbilityText(card));
+  if (!stop) return false;
+  const rotation = ROTATION_CONDITIONS.includes(card.specialCondition);
+  if (stop === 'rotation') return rotation;
+  return Boolean(card.specialCondition) || card.poisoned === true || card.burned === true;
+}
+
+const TOXIC_GAS = /ignore all pok[eé]mon powers other than toxic gases/;
+
+/** The printed kind is the only mark of a Pokémon Power: the WotC texts carry none. */
+function hasPokemonPower(card) {
+  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
+  return entries.some((entry) => /pok[eé]mon power/i.test(String(entry?.type || '')));
+}
+
+/**
+ * Muk Toxic Gas [Fossil 13]: "Ignore all Pokémon Powers other than Toxic Gases." True when a
+ * working Toxic Gas is in play on either side and `card`'s Power is not itself a Toxic Gas.
+ */
+function toxicGasIgnores(card, ctx) {
+  if (!hasPokemonPower(card) || TOXIC_GAS.test(cardAbilityText(card))) return false;
+  const holders = dedupe([
+    ...inPlayViews(ctx.sideCards),
+    ...inPlayViews(ctx.opponentSideCards),
+    ...inPlayViews(ctx.inPlayCards),
+  ]);
+  return holders.some((holder) => TOXIC_GAS.test(cardAbilityText(holder)) && !legacyPowerStopped(holder));
+}
+
 /**
  * "Each Pokémon … has no Abilities" (design 034 slice 3): true when an in-play
  * source suppresses `card`'s Abilities. Sources on either side are scanned;
@@ -1211,6 +1253,9 @@ function attackLockedAbility(card, turnNumber) {
 export function isAbilitySuppressed(card, ctx = {}) {
   if (!card || !isPokemon(card)) return false;
   if (isAncientTraitAbility(card)) return false;
+  // An activated Power's printed condition is its activation gate (abilityActivationBlockReason).
+  if (legacyPowerStopped(card) && !isActivatedAbility(card)) return true;
+  if (toxicGasIgnores(card, ctx)) return true;
   // The marker binds the Defending Pokémon: it lapses once the card leaves the Active Spot.
   const actives = [...(ctx.sideActive || []), ...(ctx.opponentActive || [])];
   const stillActive = actives.some((c) => c.instanceId === card.instanceId || c.instanceId === card.attachedTo);
@@ -1387,6 +1432,8 @@ function playableCategories(card) {
 }
 
 const PLAY_LOCK_CLAUSE = /can'?t play [^.]*from (?:his or her|their) hand/;
+// A lock on "Trainer cards" (Dark Vileplume Hay Fever) covers every Trainer kind.
+const TRAINER_CATEGORIES = ['Item', 'Supporter', 'Stadium', 'Pokémon Tool', 'ACE SPEC'];
 const EACH_PLAYER_LOCK =
   /(?:each player|neither player|each play) can'?t play any/;
 
@@ -1429,7 +1476,9 @@ export function abilityPlayLocks(card, ctx = {}) {
       const locked = parseAbility(t)
         .filter((s) => s.type === 'playLockAbility')
         .flatMap((s) => s.cards || []);
-      const matched = categories.filter((cat) => locked.includes(cat));
+      const matched = categories.filter(
+        (cat) => locked.includes(cat) || (locked.includes('Trainer') && TRAINER_CATEGORIES.includes(cat))
+      );
       if (matched.length === 0) continue;
       if (
         locked.includes('Pokémon') &&
@@ -1451,12 +1500,26 @@ export function abilityPlayLocks(card, ctx = {}) {
 const EVOLVE_LOCK_CLAUSE =
   /can'?t play [^.]*from (?:his or her|their) hand to evolve|neither player can play/;
 
+const EVOLUTION_CARD_LOCK = /(?:^|\. )no more evolution cards can be played\./;
+
+/**
+ * Aerodactyl Prehistoric Power [Fossil 1]: "No more Evolution cards can be played." True while a
+ * working holder is in play on either side: it stops every play of an Evolution card from the
+ * hand, by evolving or through a Trainer (Pokémon Breeder, Rare Candy).
+ */
+export function abilityEvolutionCardLock(ctx = {}) {
+  return dedupe([...sideInPlay(ctx), ...opponentInPlay(ctx)]).some(
+    (holder) => EVOLUTION_CARD_LOCK.test(cardAbilityText(holder)) && !isAbilitySuppressed(holder, ctx)
+  );
+}
+
 /**
  * Evolve locks ("your opponent can't play any Pokémon from their hand to
  * evolve their Pokémon", Primal Law): true when the acting player's evolution
  * play is blocked. `card` is the evolution card being played.
  */
 export function abilityEvolveLock(card, ctx = {}) {
+  if (isEvolutionCard(card) && abilityEvolutionCardLock(ctx)) return true;
   const groups = [
     { cards: opponentInPlay(ctx), own: false },
     { cards: sideInPlay(ctx), own: true },

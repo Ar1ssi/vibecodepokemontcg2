@@ -9,6 +9,7 @@
 import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
+import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -27,13 +28,28 @@ const firstAbilityText = (card) => {
 // `firstAbilityText` fallback every text-driven parser saw an empty string and
 // silently skipped the card's ability (I128), so passive consumers must read
 // text through here rather than off `card.ability` directly.
+// WotC Power wordings are read as their modern Ability wording (legacy-power-wording.mjs);
+// memoized because every passive reader asks for every holder's text.
+const legacyRewriteCache = new Map();
+function modernWording(text) {
+  if (!text) return text;
+  let rewritten = legacyRewriteCache.get(text);
+  if (rewritten === undefined) {
+    rewritten = rewriteLegacyPowerWording(text);
+    legacyRewriteCache.set(text, rewritten);
+  }
+  return rewritten;
+}
+
 export const cardAbilityText = (card) =>
-  lower(
-    card?.ability?.text ??
-      card?.abilityText ??
-      card?.text ??
-      card?.effect ??
-      firstAbilityText(card)
+  modernWording(
+    lower(
+      card?.ability?.text ??
+        card?.abilityText ??
+        card?.text ??
+        card?.effect ??
+        firstAbilityText(card)
+    )
   );
 
 const textOf = cardAbilityText;
