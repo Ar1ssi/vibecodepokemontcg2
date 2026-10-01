@@ -97,6 +97,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     markers.reduce((sum, marker) => sum + (pick(marker) ? marker.amount || 0 : 0), 0);
   const attackNameLower = String(attack?.name || '').toLowerCase();
   const incomingApplies = (marker) => attackerMatchesFilter(marker.filter, attacker);
+  // Chikorita Growl: "any damage done to Chikorita" — not to another Pokémon the attack hits.
+  const outgoingApplies = (marker) => !marker.toSource || marker.sourceId === defender?.instanceId;
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
@@ -146,10 +148,10 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         )
       : 0;
   const markerReductionBeforeWR =
-    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && !m.afterWR) +
+    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && !m.afterWR && outgoingApplies(m)) +
     markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && !m.afterWR && incomingApplies(m));
   const markerReductionAfterWR =
-    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && m.afterWR) +
+    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && m.afterWR && outgoingApplies(m)) +
     markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && m.afterWR && incomingApplies(m));
 
   // "This Pokémon takes N more damage from attacks": only when the attack does damage.

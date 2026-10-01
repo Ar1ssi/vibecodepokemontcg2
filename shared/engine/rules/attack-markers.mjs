@@ -212,6 +212,13 @@ const WINDOW_PHRASES = [
     'opponentNextTurn',
     (body) => `if this pokémon is damaged by an attack, ${body}`,
   ],
+  // Cubone Snivel / Chikorita Growl: "If the Defending Pokémon attacks Cubone during your
+  // opponent's next turn, any damage done by the attack is reduced by 20 …".
+  [
+    /^if your opponent's active pokémon attacks this pokémon during your opponent's next turn, (.+)$/,
+    'opponentNextTurn',
+    (body) => `when it attacks this pokémon, ${body}`,
+  ],
   [/^(.+) during your opponent's next turn$/, 'opponentNextTurn'],
   [/^during your next turn, (.+)$/, 'yourNextTurn'],
   // Marshadow Shadow Flicker: "If the Defending Pokémon is Knocked Out during your next
@@ -322,6 +329,18 @@ const MARKER_BODIES = [
     'opponentActive',
     null,
     (m, { wrOrder }) => outgoingReduce(m[1], wrOrder),
+  ],
+  // Snivel reduces all the attack's damage, Growl only the damage done to Chikorita
+  // (`toSource`). Either holds only while the attacker stays the Active Pokémon it attacks.
+  [
+    /^when it attacks this pokémon, any damage done (by the attack|to this pokémon) is reduced by (\d+)$/,
+    'opponentActive',
+    null,
+    (m, { wrOrder }) => ({
+      ...outgoingReduce(m[2], wrOrder),
+      whileSourceActive: true,
+      ...(m[1] === 'to this pokémon' ? { toSource: true } : {}),
+    }),
   ],
   [
     /^this pokémon's (.+?) attack does (\d+) more damage$/,
@@ -565,7 +584,7 @@ export function parseMarkerSentence(sentence, context = {}) {
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
   [
-    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
+    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
   ],
   // Locks with no turn window. Ariados Spider Web / Piloswine Freeze print "(Benching or evolving

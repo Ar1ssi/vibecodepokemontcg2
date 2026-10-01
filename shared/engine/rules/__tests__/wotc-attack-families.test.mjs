@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { parseAttackSteps } from '../attack-steps.mjs';
 import { parseNextTurnLock } from '../attack-effects.mjs';
 import { parseAttackDamage } from '../damage-parser.mjs';
+import { computeAttackDamage } from '../attack-engine.mjs';
 import { createGameState } from '../../state.mjs';
 import { createCard } from '../../cards.mjs';
 import { createRng } from '../../rng.mjs';
@@ -216,6 +217,52 @@ test('runtime: Super Fang on a 90-HP Pokémon with 20 damage does 40; False Swip
   assert.equal(damageOn(attackOnTurn(duelBoard(raticate, foe), 'p1', 2, 0).state, 'p2', 20), 60);
   const scizor = { instanceId: 1, name: 'Scizor', hp: 80, attacks: [{ name: 'False Swipe', cost: [], damage: '?', text: FALSE_SWIPE }] };
   assert.equal(damageOn(attackOnTurn(duelBoard(scizor, foe), 'p1', 2, 0).state, 'p2', 20), 50);
+});
+
+// ── Snivel / Growl ──────────────────────────────────────────────────────────────────────────
+
+const SNIVEL = // Cubone [Jungle 50] Snivel
+  "If the Defending Pokémon attacks Cubone during your opponent's next turn, any damage done by the attack is reduced by 20 (after applying Weakness and Resistance). (Benching either Pokémon ends this effect.)";
+const GROWL = // Chikorita [Neo Genesis 54] Growl
+  "If the Defending Pokémon attacks Chikorita during your opponent's next turn, any damage done to Chikorita is reduced by 10 (before applying Weakness and Resistance). (Benching or evolving either Pokémon ends this effect.)";
+
+test('Snivel / Growl → presence-scoped outgoingReduce on the Defending Pokémon', () => {
+  assert.deepEqual(
+    steps(SNIVEL, 'Cubone'),
+    marker('opponentActive', 'opponentNextTurn', { kind: 'outgoingReduce', amount: 20, afterWR: true, whileSourceActive: true })
+  );
+  assert.deepEqual(
+    steps(GROWL, 'Chikorita'),
+    marker('opponentActive', 'opponentNextTurn', {
+      kind: 'outgoingReduce',
+      amount: 10,
+      afterWR: false,
+      whileSourceActive: true,
+      toSource: true,
+    })
+  );
+});
+
+test("Growl's reduction reaches only the Pokémon that set it", () => {
+  const growl = { kind: 'outgoingReduce', amount: 10, afterWR: false, toSource: true, sourceId: 1 };
+  const attacker = { instanceId: 20, name: 'Foe', types: ['Colorless'] };
+  const hit = (defenderId) =>
+    computeAttackDamage(attacker, { instanceId: defenderId, name: 'Target', hp: 100, types: ['Grass'] }, { name: 'Hit', damage: '40' }, {
+      attackerMarkers: [growl],
+    }).total;
+  assert.equal(hit(1), 30);
+  assert.equal(hit(2), 40);
+});
+
+test('runtime: Snivel and Growl cut the next attack on them, not after they leave the Active Spot', () => {
+  const foe = { ...FOE, attacks: [{ name: 'Hit', cost: [], damage: '40', text: '' }] };
+  const cubone = { instanceId: 1, name: 'Cubone', hp: 70, attacks: [{ name: 'Snivel', cost: [], damage: '', text: SNIVEL }] };
+  const snivelled = attackOnTurn(duelBoard(cubone, foe, { p1Bench: [MY_SPARE] }), 'p1', 2, 0).state;
+  assert.equal(damageOn(attackOnTurn(structuredClone(snivelled), 'p2', 3, 0).state, 'p1', 1), 20);
+  assert.equal(damageOn(attackOnTurn(benchP1Active(snivelled), 'p2', 3, 0).state, 'p1', 2), 40);
+  const chikorita = { instanceId: 1, name: 'Chikorita', hp: 50, attacks: [{ name: 'Growl', cost: [], damage: '', text: GROWL }] };
+  const growled = attackOnTurn(duelBoard(chikorita, foe), 'p1', 2, 0).state;
+  assert.equal(damageOn(attackOnTurn(growled, 'p2', 3, 0).state, 'p1', 1), 30);
 });
 
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────
