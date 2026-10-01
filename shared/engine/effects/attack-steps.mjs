@@ -3220,6 +3220,36 @@ function atkCountersByRetreat(ctx) {
 const TYPE_CHOICES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal', 'Colorless'];
 const TYPE_SYMBOL = { Grass: 'G', Fire: 'R', Water: 'W', Lightning: 'L', Psychic: 'P', Fighting: 'F', Darkness: 'D', Metal: 'M', Colorless: 'C' };
 
+// "a type of your choice other than Colorless".
+const NON_COLORLESS_TYPES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal', 'Fairy', 'Dragon'];
+
+// Porygon Conversion 1 (the Defending Pokémon's Weakness, optional) / Conversion 2 (this
+// Pokémon's Resistance): the chosen type replaces the printed one until it is Benched or evolves.
+function atkChangeType(ctx) {
+  const { step } = ctx;
+  const onOpponent = step.target === 'opponentActive';
+  const owner = onOpponent ? ctx.opponent : ctx.player;
+  const card = onOpponent ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
+  if (!card) return skip(ctx, 'no_marker_target');
+  if (!(topPokemonCard(owner, card) || card)?.[step.what]?.type) return skip(ctx, `no_${step.what}`);
+  if (!ctx.selection) {
+    return ctx.ask({
+      prompt: `${attackName(ctx)}: Choose the new ${step.what === 'weakness' ? 'Weakness' : 'Resistance'} type`,
+      options: [
+        ...NON_COLORLESS_TYPES.map((name, i) => ({ instanceId: i + 1, name, type: 'option' })),
+        ...(step.mayDecline ? [{ instanceId: ATTACK_NO, name: "Don't change it", type: 'option' }] : []),
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
+  const chosen = NON_COLORLESS_TYPES[Number(ctx.selection[0]) - 1];
+  if (!chosen) return skip(ctx, 'declined');
+  const kind = step.what === 'weakness' ? 'weaknessOverride' : 'resistanceOverride';
+  markCard(ctx, { window: 'whileActive', marker: { kind, type: chosen.toLowerCase() } }, owner, card);
+  return null;
+}
+
 // Spiritomb Color Tag: the player names a type; each opponent Pokémon of that type takes counters.
 function atkCountersEachChosenType(ctx) {
   const { opponent, step } = ctx;
@@ -3776,6 +3806,7 @@ export const ATTACK_STEP_HANDLERS = {
   ),
   atkShuffleOppDeck: optional(atkShuffleOppDeck, () => "Have your opponent shuffle their deck"),
   atkShuffleOwnDeck,
+  atkChangeType,
   atkKnockOutChoose,
   atkCountersEach,
   atkCountersEachFiltered,

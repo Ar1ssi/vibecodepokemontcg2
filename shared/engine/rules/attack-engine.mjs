@@ -229,7 +229,12 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defender?.resistance &&
     !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
   ) {
-    if (attacker.types.includes(defender.resistance.type)) {
+    // Porygon Conversion 2: a resistanceOverride marker swaps the type and keeps the amount.
+    const resistanceType = defenderEffects.findLast((m) => m.kind === 'resistanceOverride')?.type;
+    const resisted = resistanceType
+      ? attacker.types.some((t) => String(t).toLowerCase() === resistanceType)
+      : attacker.types.includes(defender.resistance.type);
+    if (resisted) {
       resistance = Math.abs(defender.resistance.value || 0);
     }
   }

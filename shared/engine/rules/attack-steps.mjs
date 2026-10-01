@@ -814,6 +814,17 @@ const TEMPLATES = [
   ],
 
   [/^have your opponent shuffle their deck$/, () => ({ type: 'atkShuffleOppDeck' })],
+  // Porygon [Base Set 39] Conversion 1 / Conversion 2: a type marker that lasts until the
+  // Pokémon is Benched or evolves.
+  [
+    /^if your opponent's active pokémon has a weakness, you may change it to a type of your choice other than colorless$/,
+    () => ({ type: 'atkChangeType', what: 'weakness', target: 'opponentActive', mayDecline: true }),
+  ],
+  [
+    // The possessive self name stays in place ("porygon's").
+    /^change (?!your opponent's)[^,]+?'s resistance to a type of your choice other than colorless$/,
+    () => ({ type: 'atkChangeType', what: 'resistance', target: 'self' }),
+  ],
 
   // Leave play
   [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],

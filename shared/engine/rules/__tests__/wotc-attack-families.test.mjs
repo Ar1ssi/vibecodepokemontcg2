@@ -381,6 +381,61 @@ test('runtime: Terrorize locks the chosen attack of a Basic, and nothing of a St
   assert.equal(tryOn(evolved.state, 'p2', 3, ATTACK), null);
 });
 
+// ── Conversion 1 / 2 ────────────────────────────────────────────────────────────────────────
+
+const CONVERSION_1 = // Porygon [Base Set 39] / [Team Rocket 48] Conversion 1
+  'If the Defending Pokémon has a Weakness, you may change it to a type of your choice other than Colorless.';
+const CONVERSION_2 = "Change Porygon's Resistance to a type of your choice other than Colorless."; // Porygon [Base Set 39]
+
+test('Conversion 1 / 2 → atkChangeType', () => {
+  assert.deepEqual(steps(CONVERSION_1, 'Porygon'), [
+    { type: 'atkChangeType', what: 'weakness', target: 'opponentActive', mayDecline: true },
+  ]);
+  assert.deepEqual(steps(CONVERSION_2, 'Porygon'), [{ type: 'atkChangeType', what: 'resistance', target: 'self' }]);
+});
+
+test('runtime: Conversion 1 makes the Defending Pokémon weak to the chosen type, past the next turn', () => {
+  // A Psychic-typed holder so its second attack can use the new Weakness.
+  const porygon = {
+    instanceId: 1,
+    name: 'Porygon',
+    hp: 30,
+    types: ['Psychic'],
+    attacks: [
+      { name: 'Conversion 1', cost: [], damage: '', text: CONVERSION_1 },
+      { name: 'Hit', cost: [], damage: '10', text: '' },
+    ],
+  };
+  const foe = { ...FOE, weakness: { type: 'Fighting', value: 2 } };
+  const asked = attackOnTurn(duelBoard(porygon, foe), 'p1', 2, 0);
+  assert.ok(asked.state.pendingChoice.options.some((o) => o.instanceId === ATTACK_NO));
+  assert.ok(!asked.state.pendingChoice.options.some((o) => o.name === 'Colorless'));
+  const psychic = resolve(asked, [5]).state; // Psychic
+  const waited = attackOnTurn(psychic, 'p2', 3, 0).state;
+  const waitedAgain = attackOnTurn(attackOnTurn(waited, 'p1', 4, 1).state, 'p2', 5, 0).state;
+  assert.equal(damageOn(waited, 'p2', 20), 0);
+  const hit = attackOnTurn(waitedAgain, 'p1', 6, 1).state;
+  assert.equal(damageOn(hit, 'p2', 20), 40); // 20 on turn 4, 20 on turn 6
+  const declined = resolve(attackOnTurn(duelBoard(porygon, foe), 'p1', 2, 0), [ATTACK_NO]).state;
+  assert.equal(damageOn(attackOnTurn(attackOnTurn(declined, 'p2', 3, 0).state, 'p1', 4, 1).state, 'p2', 20), 10);
+  // No Weakness: nothing to change, no question.
+  assert.equal(attackOnTurn(duelBoard(porygon, FOE), 'p1', 2, 0).state.pendingChoice, null);
+});
+
+test('runtime: Conversion 2 moves Porygon’s Resistance to the chosen type', () => {
+  const porygon = {
+    instanceId: 1,
+    name: 'Porygon',
+    hp: 60,
+    resistance: { type: 'Psychic', value: -30 },
+    attacks: [{ name: 'Conversion 2', cost: [], damage: '', text: CONVERSION_2 }],
+  };
+  const fighter = (types) => ({ ...FOE, types, attacks: [{ name: 'Hit', cost: [], damage: '40', text: '' }] });
+  const converted = (types) => resolve(attackOnTurn(duelBoard(porygon, fighter(types)), 'p1', 2, 0), [6]).state; // Fighting
+  assert.equal(damageOn(attackOnTurn(converted(['Fighting']), 'p2', 3, 0).state, 'p1', 1), 10);
+  assert.equal(damageOn(attackOnTurn(converted(['Psychic']), 'p2', 3, 0).state, 'p1', 1), 40);
+});
+
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────
 
 const TAIL_WAG = // Eevee [Jungle 51] Tail Wag
