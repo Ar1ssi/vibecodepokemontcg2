@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAttackSteps } from '../attack-steps.mjs';
 import { parseNextTurnLock } from '../attack-effects.mjs';
-import { parseAttackDamage } from '../damage-parser.mjs';
+import { parseAttackDamage, eachPokemonDamage } from '../damage-parser.mjs';
 import { computeAttackDamage } from '../attack-engine.mjs';
 import { ATTACK_YES, ATTACK_NO } from '../../effects/attack-steps.mjs';
 import { createGameState } from '../../state.mjs';
@@ -456,6 +456,41 @@ test('runtime: Conversion 2 moves Porygon’s Resistance to the chosen type', ()
   const converted = (types) => resolve(attackOnTurn(duelBoard(porygon, fighter(types)), 'p1', 2, 0), [6]).state; // Fighting
   assert.equal(damageOn(attackOnTurn(converted(['Fighting']), 'p2', 3, 0).state, 'p1', 1), 10);
   assert.equal(damageOn(attackOnTurn(converted(['Psychic']), 'p2', 3, 0).state, 'p1', 1), 40);
+});
+
+// ── Zzzap / Dust Devil ──────────────────────────────────────────────────────────────────────
+
+const ZZZAP = "Does 20 damage to each Pokémon in play that has a Pokémon Power. Don't apply Weakness and Resistance."; // Pichu [Neo Genesis 12]
+const DUST_DEVIL = "Does 10 damage to each non-{F} Pokémon in play. Don't apply Weakness and Resistance."; // Pupitar [Neo Discovery 45]
+
+test('Zzzap / Dust Devil → damage to each matching Pokémon on both sides', () => {
+  assert.deepEqual(eachPokemonDamage(ZZZAP), { amount: 20, activeOnly: false, filter: { hasPokemonPower: true }, bothSides: true });
+  assert.deepEqual(eachPokemonDamage(DUST_DEVIL), { amount: 10, activeOnly: false, filter: { excludeTypes: ['fighting'] }, bothSides: true });
+});
+
+test('runtime: Zzzap hits only Pokémon with a Pokémon Power; Dust Devil only non-{F} Pokémon', () => {
+  const power = [{ name: 'Rain Dance', type: 'Pokémon Power', text: 'x' }];
+  const pichu = { instanceId: 1, name: 'Pichu', hp: 30, types: ['Lightning'], attacks: [{ name: 'Zzzap', cost: [], damage: '', text: ZZZAP }] };
+  const zapped = attackOnTurn(
+    duelBoard(pichu, { ...FOE, abilities: power, weakness: { type: 'Lightning', value: 2 } }, {
+      p1Bench: [{ ...MY_SPARE, abilities: power }, { instanceId: 3, name: 'Plain', hp: 60 }],
+      p2Bench: [SPARE],
+    }),
+    'p1',
+    2,
+    0
+  ).state;
+  assert.deepEqual([1, 2, 3].map((id) => damageOn(zapped, 'p1', id)), [0, 20, 0]);
+  assert.deepEqual([20, 21].map((id) => damageOn(zapped, 'p2', id)), [20, 0]);
+  const pupitar = { instanceId: 1, name: 'Pupitar', hp: 70, types: ['Fighting'], attacks: [{ name: 'Dust Devil', cost: [], damage: '', text: DUST_DEVIL }] };
+  const dusted = attackOnTurn(
+    duelBoard(pupitar, FOE, { p1Bench: [{ ...MY_SPARE, types: ['Grass'] }], p2Bench: [{ ...SPARE, types: ['Fighting'] }] }),
+    'p1',
+    2,
+    0
+  ).state;
+  assert.deepEqual([1, 2].map((id) => damageOn(dusted, 'p1', id)), [0, 10]);
+  assert.deepEqual([20, 21].map((id) => damageOn(dusted, 'p2', id)), [10, 0]);
 });
 
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────

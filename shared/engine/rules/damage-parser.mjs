@@ -36,6 +36,7 @@ import { parseSearchDeckParams } from './trainer-effects.mjs';
 import { isBasicPokemon } from '../cards.mjs';
 import { isExCard, isGxCard, isMegaCard } from './card-classify.mjs';
 import { parseEachFilter } from './each-filter.mjs';
+import { TYPE_LETTER } from './tool-combat.mjs';
 import { parseConditionClause, attackConditionMet } from './attack-conditions.mjs';
 import { normalizeAttackText, replaceSelfName, symbolizeTypeWords } from './attack-text.mjs';
 import { optionalCostBonusClause } from './optional-cost-bonus.mjs';
@@ -1636,6 +1637,18 @@ export function eachPokemonDamage(attackText) {
       text
     );
   if (perTarget) return { amount: Number(perTarget[1]), activeOnly: false, filter: {}, perTargetCoin: true };
+  // Pichu [Neo Genesis 12] Zzzap: "Does 20 damage to each Pokémon in play that has a Pokémon
+  // Power."; Pupitar [Neo Discovery 45] Dust Devil: "Does 10 damage to each non-{F} Pokémon in
+  // play." Both sides, the attacker too when it matches.
+  const inPlay = /(?:^|\.\s+)does (\d+) damage to each (?:non-\{([a-z])\} )?pokémon in play( that has a pokémon power)?\./.exec(text);
+  if (inPlay) {
+    const [, amount, exceptType, power] = inPlay;
+    const filter = {
+      ...(exceptType ? { excludeTypes: [TYPE_LETTER[exceptType]] } : {}),
+      ...(power ? { hasPokemonPower: true } : {}),
+    };
+    return { amount: Number(amount), activeOnly: false, filter, bothSides: true };
+  }
   const m = /(?:^|\.\s+)(?:if (heads|tails), )?(?:this attack )?does (\d+) damage to each (of your opponent's pokémon|defending pokémon|pokémon)([^.(]*)(\(both yours and your opponent's\))?/.exec(
     text
   );

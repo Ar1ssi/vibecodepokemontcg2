@@ -62,5 +62,11 @@ export function eachFilterMatches(owner, root, filter = {}) {
   if (filter.hasPokePower && !(top.abilities || []).some((a) => /pok[eé]-power/i.test(String(a?.type || '')))) {
     return false;
   }
+  // Pichu Zzzap: a WotC "Pokémon Power" as printed.
+  if (filter.hasPokemonPower && !(top.abilities || []).some((a) => /pok[eé]mon power/i.test(String(a?.type || '')))) {
+    return false;
+  }
+  // Pupitar Dust Devil: "each non-{F} Pokémon".
+  if (filter.excludeTypes?.some((type) => (top.types || []).some((t) => String(t).toLowerCase() === type))) return false;
   return true;
 }
