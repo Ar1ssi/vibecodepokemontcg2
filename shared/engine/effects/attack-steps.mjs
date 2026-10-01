@@ -1996,13 +1996,16 @@ const RULE_BOX_MATCHES = {
 };
 
 /** Remaining HP of an in-play Pokémon, counting Tools, Special Energy and Stadium bonuses. */
-function remainingHp(ctx, owner, root) {
+function maxHp(ctx, owner, root) {
   const base = Number(topPokemonCard(owner, root)?.hp) || 0;
   if (!base) return 0;
   const ref = findCard(ctx.draft, root.instanceId);
   const zoneCards = ref?.player?.zones?.[ref.zoneId] || [];
-  const hp = effectiveHp(base, owner.playerId, root, zoneCards, ctx.draft.stadium);
-  return Math.max(0, hp - (root.damage || 0));
+  return effectiveHp(base, owner.playerId, root, zoneCards, ctx.draft.stadium);
+}
+
+function remainingHp(ctx, owner, root) {
+  return Math.max(0, maxHp(ctx, owner, root) - (root.damage || 0));
 }
 
 function knockOutConditionMet(ctx, owner, card, step) {
@@ -2872,15 +2875,27 @@ function atkAddMarker(ctx) {
   const card =
     step.target === 'opponentActive' ? activeOf(ctx.opponent) : attackerRef(ctx)?.card;
   if (!card) return skip(ctx, 'no_marker_target');
+  if (step.defenderMaxHpAtMost != null && maxHp(ctx, owner, card) > step.defenderMaxHpAtMost) {
+    return skip(ctx, 'condition_unmet');
+  }
   markCard(ctx, step, owner, card);
   return null;
+}
+
+// A presence-scoped marker remembers the attacker (and its top card) that set it.
+function stampSource(marker, ctx) {
+  if (!marker.whileSourceActive) return marker;
+  const { whileSourceActive, ...rest } = marker;
+  const root = attackerRef(ctx)?.card;
+  if (!root) return rest;
+  return { ...rest, sourceId: root.instanceId, sourceTopId: topPokemonCard(ctx.player, root)?.instanceId ?? root.instanceId };
 }
 
 function markCard(ctx, step, owner, card) {
   const turn = ctx.draft.turn?.number || 1;
   for (const marker of [step.marker, ...(step.alsoMarkers || [])]) {
     addAttackMarker(card, {
-      ...resolveSelfName(marker, ctx),
+      ...stampSource(resolveSelfName(marker, ctx), ctx),
       untilTurn: markerUntilTurn(step.window, turn),
       fromTurn: markerFromTurn(step.window, turn),
       topId: topPokemonCard(owner, card)?.instanceId ?? card.instanceId,

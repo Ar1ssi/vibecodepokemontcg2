@@ -95,9 +95,15 @@ function stripGates(sentence) {
   const flags = {};
   // "If exactly N is/are heads, …" (Misty's Psyduck ESP, design 049): runs on exactly N heads.
   const exact = /^if exactly (\d+) (?:is|are) heads, /.exec(rest);
+  // Giovanni's Nidoking Intimidate: "If the Defending Pokémon's maximum HP is 50 or less, it
+  // can't attack …" — read by the marker step (effects/attack-steps.mjs atkAddMarker) only.
+  const maxHp = /^if your opponent's active pokémon's maximum hp is (\d+) or less, (?=it can't attack this pokémon )/.exec(rest);
   if (exact) {
     rest = rest.slice(exact[0].length);
     flags.headsExactly = Number(exact[1]);
+  } else if (maxHp) {
+    rest = rest.slice(maxHp[0].length);
+    flags.defenderMaxHpAtMost = Number(maxHp[1]);
   } else {
     for (const [re, flag] of GATES) {
       if (re.test(rest)) {

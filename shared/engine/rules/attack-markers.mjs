@@ -30,10 +30,12 @@ export function clearAttackMarkers(card) {
 /**
  * Markers still in force on an Active Pokémon. The caller checks the card is Active.
  * @param {object} card In-play root card
- * @param {{ turnNumber: number, zoneCards?: object[] }} options `zoneCards` holds the stack
+ * @param {{ turnNumber: number, zoneCards?: object[], sourceZoneCards?: object[] }} options
+ *   `zoneCards` holds the stack; `sourceZoneCards` is the other player's Active Spot, which a
+ *   presence-scoped marker (`sourceId`) needs its source in
  * @returns {object[]}
  */
-export function liveAttackMarkers(card, { turnNumber, zoneCards = [] } = {}) {
+export function liveAttackMarkers(card, { turnNumber, zoneCards = [], sourceZoneCards = [] } = {}) {
   const markers = card?.attackMarkers;
   if (!Array.isArray(markers) || markers.length === 0) return [];
   const topId = topPokemonCard(zoneCards, card)?.instanceId;
@@ -41,8 +43,21 @@ export function liveAttackMarkers(card, { turnNumber, zoneCards = [] } = {}) {
     (marker) =>
       marker.untilTurn >= turnNumber &&
       (marker.fromTurn == null || marker.fromTurn <= turnNumber) &&
-      (marker.topId == null || marker.topId === topId)
+      (marker.topId == null || marker.topId === topId) &&
+      sourceStillActive(marker, sourceZoneCards)
   );
+}
+
+/**
+ * Leer "can't attack Cyndaquil … (Benching or evolving either Pokémon ends this effect)", Mean
+ * Look "as long as Murkrow remains your Active Pokémon": the marker holds only while the
+ * Pokémon that set it is still that Active Pokémon, unevolved.
+ */
+function sourceStillActive(marker, sourceZoneCards) {
+  if (marker.sourceId == null) return true;
+  const source = sourceZoneCards.find((c) => c.instanceId === marker.sourceId && !c.attachedTo);
+  if (!source) return false;
+  return marker.sourceTopId == null || topPokemonCard(sourceZoneCards, source)?.instanceId === marker.sourceTopId;
 }
 
 export function hasMarker(markers, kind) {
@@ -392,6 +407,16 @@ const MARKER_BODIES = [
     null,
     () => ({ kind: 'evolveLock' }),
   ],
+  // Eevee Tail Wag / Rhyhorn, Cyndaquil, Totodile Leer / Giovanni's Nidoking Intimidate: "the
+  // Defending Pokémon can't attack Eevee during your opponent's next turn. (Benching either
+  // Pokémon ends this effect.)" Every attack is made against the Active Pokémon, so the lock
+  // holds while the attacker stays that Active Pokémon (`whileSourceActive`).
+  [
+    /^(?:it|your opponent's active pokémon) can't attack this pokémon$/,
+    'opponentActive',
+    null,
+    () => ({ kind: 'cantAttack', whileSourceActive: true }),
+  ],
   // Lunala-GX Moongeist Beam: "The Defending Pokémon can't be healed during your opponent's next turn."
   [/^your opponent's active pokémon can't be healed$/, 'opponentActive', null, () => ({ kind: 'healLock' })],
   // Shiftry Seal Off: "The Defending Pokémon can't use any Poké-Powers or Poké-Bodies …";
@@ -542,6 +567,18 @@ export const MARKER_TEMPLATES = [
   [
     /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
+  ],
+  // Locks with no turn window. Ariados Spider Web / Piloswine Freeze print "(Benching or evolving
+  // that Pokémon ends this effect.)": a marker clears on the Bench and tracks the top card.
+  // Murkrow Mean Look adds "as long as Murkrow remains your Active Pokémon".
+  [
+    /^your opponent's active pokémon can't (attack|retreat)( as long as this pokémon remains your active pokémon)?$/,
+    (m) => ({
+      type: 'atkAddMarker',
+      target: 'opponentActive',
+      window: 'whileActive',
+      marker: { kind: m[1] === 'attack' ? 'cantAttack' : 'cantRetreat', ...(m[2] ? { whileSourceActive: true } : {}) },
+    }),
   ],
 ];
 

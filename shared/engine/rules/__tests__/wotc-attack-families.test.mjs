@@ -191,3 +191,110 @@ test('runtime: Scary Face heads stops the Defending Pokémon attacking and retre
   assert.ok(applyCommand(structuredClone(next), { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p2' }, createRng(1)).error);
   assert.ok(applyCommand(structuredClone(next), { type: 'retreat', payload: { benchInstanceId: 21 }, playerId: 'p2' }, createRng(1)).error);
 });
+
+// ── presence-scoped and windowless locks ────────────────────────────────────────────────────
+
+const TAIL_WAG = // Eevee [Jungle 51] Tail Wag
+  "Flip a coin. If heads, the Defending Pokémon can't attack Eevee during your opponent's next turn. (Benching either Pokémon ends this effect.)";
+const LEER = // Cyndaquil [Neo Genesis 56] Leer
+  "Flip a coin. If heads, the Defending Pokémon can't attack Cyndaquil during your opponent's next turn. (Benching or evolving either Pokémon ends this effect.)";
+const INTIMIDATE = // Giovanni's Nidoking [Gym Challenge 7] Intimidate
+  "If the Defending Pokémon's maximum HP is 50 or less, it can't attack Giovanni's Nidoking during your opponent's next turn. (Benching or evolving either Pokémon ends this effect.)";
+const MEAN_LOOK = // Murkrow [Neo Genesis 24] Mean Look
+  "The Defending Pokémon can't retreat as long as Murkrow remains your Active Pokémon. (Benching or evolving either Pokémon ends this effect.)";
+const SPIDER_WEB = // Ariados [Neo Genesis 27] Spider Web
+  "Flip a coin. If heads, the Defending Pokémon can't retreat. (Benching or evolving that Pokémon ends this effect.)";
+const FREEZE = // Piloswine [Neo Genesis 44] Freeze
+  "Flip a coin. If heads, the Defending Pokémon can't attack. (Benching or evolving the Defending Pokémon ends this effect.)";
+
+test('lock wordings → cantAttack / cantRetreat markers', () => {
+  const cantAttackSelf = marker('opponentActive', 'opponentNextTurn', { kind: 'cantAttack', whileSourceActive: true }, { gate: 'heads' });
+  assert.deepEqual(steps(TAIL_WAG, 'Eevee'), cantAttackSelf);
+  assert.deepEqual(steps(LEER, 'Cyndaquil'), cantAttackSelf);
+  // Rhyhorn [Jungle 61] / Totodile [Neo Genesis 81] Leer differ only by name.
+  assert.deepEqual(steps(LEER.replace('Cyndaquil', 'Totodile'), 'Totodile'), cantAttackSelf);
+  assert.deepEqual(
+    steps(INTIMIDATE, "Giovanni's Nidoking"),
+    marker('opponentActive', 'opponentNextTurn', { kind: 'cantAttack', whileSourceActive: true }, { defenderMaxHpAtMost: 50 })
+  );
+  assert.deepEqual(
+    steps(MEAN_LOOK, 'Murkrow'),
+    marker('opponentActive', 'whileActive', { kind: 'cantRetreat', whileSourceActive: true })
+  );
+  assert.deepEqual(steps(SPIDER_WEB, 'Ariados'), marker('opponentActive', 'whileActive', { kind: 'cantRetreat' }, { gate: 'heads' }));
+  assert.deepEqual(steps(FREEZE, 'Piloswine'), marker('opponentActive', 'whileActive', { kind: 'cantAttack' }, { gate: 'heads' }));
+});
+
+const FOE = { instanceId: 20, name: 'Foe', hp: 100, retreatCost: [], attacks: [{ name: 'Hit', cost: [], damage: '10', text: '' }] };
+const SPARE = { instanceId: 21, name: 'Spare', hp: 60 };
+const MY_SPARE = { instanceId: 2, name: 'Backup', hp: 60 };
+
+/** Error (or null) of `command` for `playerId` on turn `turnNumber`, leaving `state` untouched. */
+function tryOn(state, playerId, turnNumber, command) {
+  const copy = structuredClone(state);
+  copy.turn = { player: playerId, number: turnNumber, phase: 'main' };
+  copy.players[playerId].flags = {};
+  return applyCommand(copy, { ...command, playerId }, createRng(1)).error || null;
+}
+const ATTACK = { type: 'attack', payload: { attackIndex: 0 } };
+const RETREAT = { type: 'retreat', payload: { benchInstanceId: 21 } };
+
+/** p1's Active and Bench trade places (the source of a presence-scoped lock leaves the Active Spot). */
+function benchP1Active(state) {
+  const copy = structuredClone(state);
+  const { active, bench } = copy.players.p1.zones;
+  copy.players.p1.zones.active = bench.splice(0, 1);
+  bench.push(...active);
+  return copy;
+}
+
+test('runtime: Leer heads stops the Defending Pokémon attacking only while Cyndaquil stays Active', () => {
+  const cyndaquil = { instanceId: 1, name: 'Cyndaquil', hp: 50, attacks: [{ name: 'Leer', cost: [], damage: '', text: LEER }] };
+  const board = duelBoard(cyndaquil, FOE, { p1Bench: [MY_SPARE], p2Bench: [SPARE] });
+  const locked = attackWithCoin(board, 'p1', 2, 0, 'heads').state;
+  assert.match(tryOn(locked, 'p2', 3, ATTACK), /can't attack/);
+  assert.equal(tryOn(benchP1Active(locked), 'p2', 3, ATTACK), null);
+  assert.equal(tryOn(locked, 'p2', 5, ATTACK), null);
+  assert.equal(tryOn(attackWithCoin(board, 'p1', 2, 0, 'tails').state, 'p2', 3, ATTACK), null);
+});
+
+test('runtime: Intimidate locks a Defending Pokémon with 50 maximum HP, not one with 60', () => {
+  const nidoking = { instanceId: 1, name: "Giovanni's Nidoking", hp: 90, attacks: [{ name: 'Intimidate', cost: [], damage: '', text: INTIMIDATE }] };
+  const small = attackOnTurn(duelBoard(nidoking, { ...FOE, hp: 50 }), 'p1', 2, 0).state;
+  assert.match(tryOn(small, 'p2', 3, ATTACK), /can't attack/);
+  const big = attackOnTurn(duelBoard(nidoking, { ...FOE, hp: 60 }), 'p1', 2, 0).state;
+  assert.equal(tryOn(big, 'p2', 3, ATTACK), null);
+});
+
+test('runtime: Mean Look stops retreat on every later turn while Murkrow stays Active', () => {
+  const murkrow = { instanceId: 1, name: 'Murkrow', hp: 50, attacks: [{ name: 'Mean Look', cost: [], damage: '', text: MEAN_LOOK }] };
+  const looked = attackOnTurn(duelBoard(murkrow, FOE, { p1Bench: [MY_SPARE], p2Bench: [SPARE] }), 'p1', 2, 0).state;
+  assert.match(tryOn(looked, 'p2', 3, RETREAT), /can't retreat/);
+  assert.match(tryOn(looked, 'p2', 5, RETREAT), /can't retreat/);
+  assert.equal(tryOn(benchP1Active(looked), 'p2', 3, RETREAT), null);
+});
+
+test('runtime: Spider Web and Freeze heads last past the next turn', () => {
+  const ariados = { instanceId: 1, name: 'Ariados', hp: 70, attacks: [{ name: 'Spider Web', cost: [], damage: '', text: SPIDER_WEB }] };
+  const webbed = attackWithCoin(duelBoard(ariados, FOE, { p1Bench: [MY_SPARE], p2Bench: [SPARE] }), 'p1', 2, 0, 'heads').state;
+  assert.match(tryOn(webbed, 'p2', 5, RETREAT), /can't retreat/);
+  // Not presence-scoped: Ariados leaving the Active Spot does not end it.
+  assert.match(tryOn(benchP1Active(webbed), 'p2', 3, RETREAT), /can't retreat/);
+  const piloswine = { instanceId: 1, name: 'Piloswine', hp: 80, attacks: [{ name: 'Freeze', cost: [], damage: '10', text: FREEZE }] };
+  const frozen = attackWithCoin(duelBoard(piloswine, FOE, { p2Bench: [SPARE] }), 'p1', 2, 0, 'heads').state;
+  assert.match(tryOn(frozen, 'p2', 5, ATTACK), /can't attack/);
+  // Benching the Defending Pokémon ends it.
+  const retreated = applyCommand(
+    { ...structuredClone(frozen), turn: { player: 'p2', number: 3, phase: 'main' } },
+    { type: 'retreat', payload: { benchInstanceId: 21 }, playerId: 'p2' },
+    createRng(1)
+  );
+  assert.ok(!retreated.error, retreated.error);
+  const back = applyCommand(
+    { ...retreated.state, turn: { player: 'p2', number: 5, phase: 'main' }, players: { ...retreated.state.players, p2: { ...retreated.state.players.p2, flags: {} } } },
+    { type: 'retreat', payload: { benchInstanceId: 20 }, playerId: 'p2' },
+    createRng(1)
+  );
+  assert.ok(!back.error, back.error);
+  assert.equal(tryOn(back.state, 'p2', 5, ATTACK), null);
+});
