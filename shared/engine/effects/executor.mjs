@@ -412,6 +412,9 @@ export function executeSteps(draft, {
       context.attachedEnergy = true;
       context.attachedTargetId = lastAttach.targetInstanceId;
     }
+    // "remove … damage counters from that Pokémon" (Super Potion): the paid cost's host.
+    const lastCostHost = events.findLast((e) => e.type === 'ownEnergyCostPaid' && e.playerId === playerId);
+    if (lastCostHost) context.costHostId = lastCostHost.hostInstanceId;
     // "the Pokémon you evolved in this way" (Red & Blue): remember the evolve across resumes.
     const lastEvolve = events.findLast((e) => e.type === 'pokemonEvolved' && e.playerId === playerId);
     if (lastEvolve) context.evolvedRootId = lastEvolve.targetInstanceId;
@@ -1574,6 +1577,8 @@ export function executeSteps(draft, {
               (c.types || []).some((ty) => typeFilter.includes(String(ty).toLowerCase()))) &&
             (step.target === 'attached Pokémon'
               ? c.instanceId === context.attachedTargetId
+              : step.target === 'costHost'
+              ? c.instanceId === context.costHostId
               : step.target === 'switchedOut'
               ? c.instanceId === context.switchedOutId
               : rootMatchesTarget(player, c, step.target === 'Pokémon' ? '' : step.target))

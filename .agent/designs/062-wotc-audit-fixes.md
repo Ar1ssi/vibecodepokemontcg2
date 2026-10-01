@@ -151,3 +151,5 @@ when-played Powers · F7 90 passive Powers · F8 Baby Rule (wording must be sour
 
 ## Deviations (Builder appends here during build)
 - Slice A: Tool regex uses `.+?` instead of `[^.]+?` before " to 1 of your Pokémon" — neo4-93 "EXP.ALL" has a dot in its name (row A expects 'Tool').
+- Slice B: modern Red Card ("shuffles their hand into their deck and draws 4") now also gets `shuffle: true` — correct per its printed text; edge row 7 "byte-identical" holds only for Special Red Card.
+- Slice B: an unpayable hand cost is refused by the existing play gate (trainer-play-conditions.mjs) before the executor; the own-Energy cost got the same gate (`ownAttachedEnergyCount`, passed by reduce.mjs) — added inline after review.

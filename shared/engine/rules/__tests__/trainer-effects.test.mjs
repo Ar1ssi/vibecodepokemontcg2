@@ -1926,8 +1926,9 @@ describe('recurring-wording coverage (batch 6)', () => {
 
   test('Super Energy Removal: discard up to 2 Energy from an opponent Pokémon', () => {
     const r = parseTrainerEffect("Discard 1 Energy card attached to 1 of your own Pokémon in order to choose 1 of your opponent's Pokémon and up to 2 Energy cards attached to it. Discard those Energy cards.");
-    assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
-    assert.equal(r.steps[0].count, 2);
+    assert.deepEqual(r.steps[0], { type: 'discardOwnAttachedEnergy', cost: true });
+    assert.equal(r.steps[1].type, 'discardEnergyFromOpponent');
+    assert.equal(r.steps[1].count, 2);
   });
 
   test('Drayton (corpus: Surging Sparks 174): one Pokémon and one Trainer, not any card', () => {

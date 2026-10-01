@@ -525,6 +525,16 @@ function opponentShuffleHandDraw(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
+  if (step.shuffle) {
+    // Red Card / Impostor Professor Oak: the hand is shuffled into the deck, and the
+    // opponent draws even when the hand was empty.
+    const hand = opponent.zones.hand.splice(0);
+    opponent.zones.deck.push(...hand);
+    if (hand.length > 0) ctx.events.push({ type: 'cardsShuffledIntoDeck', count: hand.length, playerId: opponent.playerId });
+    shuffleDeck(opponent, ctx);
+    drawCards(opponent, step.count || 3, ctx.events);
+    return null;
+  }
   const moved = handToDeckBottom(opponent, ctx);
   if (moved > 0) drawCards(opponent, step.count || 3, ctx.events);
   return null;
@@ -1131,6 +1141,7 @@ function discardEnergyFromOpponent(ctx) {
     step.scope === 'Active'
       ? (active ? attachedCards(opponent, active.instanceId).filter(matchesEnergy) : [])
       : allAttachedMatching(ctx, [opponent], matchesEnergy);
+  if ((step.count || 1) > 1 && step.scope === '1 Pokémon') return discardEnergiesFromOneHost(ctx, matchesEnergy);
   if (ctx.selection) {
     const energy = energies.find((c) => c.instanceId === ctx.selection[0]);
     if (!energy) return skip(ctx, 'target_not_found');
@@ -1150,6 +1161,40 @@ function discardEnergyFromOpponent(ctx) {
     options: energies,
     min: 1,
     max: 1,
+  });
+}
+
+// Super Energy Removal: choose 1 opponent Pokémon, then up to `count` Energy attached to it.
+function discardEnergiesFromOneHost(ctx, matchesEnergy) {
+  const { opponent, step } = ctx;
+  const energyOn = (root) => attachedCards(opponent, root.instanceId).filter(matchesEnergy);
+  const hosts = targetableRoots(ctx, opponent).filter((root) => energyOn(root).length > 0);
+
+  if (ctx.memo?.stage === 'energy') {
+    const host = hosts.find((root) => root.instanceId === ctx.memo.hostId);
+    if (!host) return skip(ctx, 'target_not_found');
+    for (const energy of pickById(energyOn(host), ctx.selection)) discardCard(ctx.draft, energy, ctx.events);
+    return null;
+  }
+  if (ctx.memo?.stage === 'host') {
+    const host = hosts.find((root) => root.instanceId === ctx.selection?.[0]);
+    if (!host) return skip(ctx, 'target_not_found');
+    const energies = energyOn(host);
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${step.count} Energy attached to ${topPokemonCard(opponent, host)?.name || 'that Pokémon'} to discard`,
+      options: energies,
+      min: 1,
+      max: Math.min(step.count, energies.length),
+      memo: { stage: 'energy', hostId: host.instanceId },
+    });
+  }
+  if (hosts.length === 0) return skip(ctx, 'no_opponent_energy');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your opponent's Pokémon with Energy attached`,
+    options: hosts,
+    min: 1,
+    max: 1,
+    memo: { stage: 'host' },
   });
 }
 
@@ -1214,6 +1259,11 @@ function discardOwnAttachedEnergy(ctx) {
   const applyDiscard = (energy) => {
     const host = hosts.find((root) => root.instanceId === energy.attachedTo);
     discardCard(ctx.draft, energy, ctx.events);
+    // A Trainer's "Discard 1 Energy card attached to your Pokémon in order to …" cost:
+    // the executor keeps the host for "that Pokémon" (Super Potion base1-90).
+    if (step.cost && !step.selfOnly && host) {
+      ctx.events.push({ type: 'ownEnergyCostPaid', playerId: player.playerId, hostInstanceId: host.instanceId });
+    }
     if (step.cure && host && hasAnyCondition(host)) {
       clearConditions(host);
       ctx.events.push({
@@ -1235,6 +1285,8 @@ function discardOwnAttachedEnergy(ctx) {
   return ctx.ask({
     prompt: step.selfOnly
       ? `${sourceName(ctx, 'Ability')}: Choose an Energy to discard from this Pokémon`
+      : step.cost
+      ? `${sourceName(ctx, 'Trainer')}: Choose an Energy attached to 1 of your Pokémon to discard`
       : `${sourceName(ctx, 'Stadium')}: Choose an Energy to discard and cure the Pokémon`,
     options: attached,
     min: 1,

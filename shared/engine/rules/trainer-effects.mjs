@@ -133,6 +133,23 @@ function appendDiscardCost(steps, lower) {
   }
 }
 
+// WotC Trainers lead with "Discard … in order to …": the cost precedes the effect the branch
+// parsed, which never saw it (Computer Search base1-71, Super Potion base1-90).
+const LEADING_TRAINER_COSTS = [
+  [/^discard (\d+) (?:of the )?other cards (?:from|in) your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]) })],
+  [/^discard (\d+) energy cards from your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]), energyOnly: true })],
+  [/^discard a card from your hand in order to/, () => ({ type: 'discardCost', count: 1 })],
+  [/^discard 1 energy card attached to (?:1 of )?your (?:own )?pokémon in order to/, () => ({ type: 'discardOwnAttachedEnergy', cost: true })],
+];
+
+function leadingTrainerCost(lower) {
+  for (const [pattern, build] of LEADING_TRAINER_COSTS) {
+    const m = lower.match(pattern);
+    if (m) return build(m);
+  }
+  return null;
+}
+
 // Short human description for passive/turn-scoped/conditional effects, chosen
 // from the keyword that matched. Falls back to a generic note.
 function passiveDetail(lower) {
@@ -1298,6 +1315,8 @@ export function parseTrainerEffect(text = '') {
   if (fossilSearch) return { steps: [fossilSearch], recognizable: true };
   const playCondition = parsePlayCondition(lower);
   const result = parseTrainerSteps(lower);
+  const leadingCost = result.recognizable && !result.steps.some((s) => s.type === 'discardCost') ? leadingTrainerCost(lower) : null;
+  if (leadingCost) result.steps.unshift(leadingCost);
   // The other copies played together go to the discard pile with this one (Cross Switcher).
   const copies = playCondition?.match(/^copiesInHand>=(\d+)$/);
   if (copies && result.recognizable) result.steps.unshift({ type: 'playCopies', count: Number(copies[1]) - 1 });
@@ -1665,7 +1684,7 @@ function parseTrainerStepsInner(lower) {
   // and stays unrecognized).
   if (/your opponent shuffles (?:his or her|their) hand into (?:his or her|their) deck/.test(lower)) {
     const drawM = lower.match(/draws?\s+(\d+)\s+cards?/);
-    steps.push({ type: 'opponentShuffleHandDraw', count: drawM ? Number(drawM[1]) : 4, prizeCondition: null });
+    steps.push({ type: 'opponentShuffleHandDraw', count: drawM ? Number(drawM[1]) : 4, prizeCondition: null, shuffle: true });
     appendDiscardCost(steps, lower);
     return { steps, recognizable: true };
   }
@@ -2245,11 +2264,11 @@ function parseTrainerStepsInner(lower) {
   }
 
   // Super Potion — discard an own Energy as a cost, then remove damage counters
-  // (the Energy cost is not enforced by the executor)
+  // (the cost step is prepended by leadingTrainerCost; the heal lands on the cost's host)
   {
     const potion = lower.match(/in order to remove (?:up to )?(\d+) damage counters/);
     if (potion) {
-      steps.push({ type: 'healAmount', amount: Number(potion[1]), target: '1 of your Pokémon' });
+      steps.push({ type: 'healAmount', amount: Number(potion[1]) * 10, target: 'costHost' });
       return { steps, recognizable: true };
     }
   }
@@ -2794,7 +2813,7 @@ function parseTrainerStepsInner(lower) {
   {
     const removal = lower.match(/choose 1 of your opponent's pokémon and up to (\d+) energy cards attached to it/);
     if (removal) {
-      steps.push({ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: Number(removal[1]), scope: '1 Pokémon' });
+      steps.push({ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: Number(removal[1]), upTo: true, scope: '1 Pokémon' });
       return { steps, recognizable: true };
     }
   }

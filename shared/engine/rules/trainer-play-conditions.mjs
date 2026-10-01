@@ -47,6 +47,8 @@ export function isSupporterTrainer(card) {
  * @param {boolean|null} [params.koedLastOppTurn] Whether any of the player's Pokémon were Knocked
  *   Out during the opponent's last turn; null when unknown
  * @param {{name: string, types: string[]}[]|null} [params.koedLastOppTurnVictims] Those Pokémon
+ * @param {number|null} [params.ownAttachedEnergyCount] Energy cards attached to the player's
+ *   Pokémon; null when unknown
  * @returns {string|null} Why the card cannot be played, or null when it can
  */
 export function trainerPlayBlockReason({
@@ -67,6 +69,7 @@ export function trainerPlayBlockReason({
   ownActive = undefined,
   koedLastOppTurn = null,
   koedLastOppTurnVictims = null,
+  ownAttachedEnergyCount = null,
 }) {
   if (!card) return null;
   const text = card.text || card.effect || card.cardText || '';
@@ -87,6 +90,10 @@ export function trainerPlayBlockReason({
   const condition = parsed.playCondition;
   const cost = parsed.steps?.[0]?.type === 'discardCost' ? parsed.steps[0].count || 1 : 0;
   if (cost > 0 && handCount - 1 < cost) return 'Not enough cards in hand to pay discard cost.';
+  // WotC "Discard 1 Energy card attached to … your Pokémon in order to …" (Super Potion base1-90).
+  if (parsed.steps?.[0]?.type === 'discardOwnAttachedEnergy' && parsed.steps[0].cost && ownAttachedEnergyCount === 0) {
+    return 'No Energy attached to your Pokémon to pay the cost.';
+  }
   const effectSteps = (parsed.steps || []).filter((step) => step.type !== 'discardCost');
   if (
     effectSteps.length > 0 &&

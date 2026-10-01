@@ -4881,6 +4881,9 @@ export function validateLegality(state, command) {
           ownActive: opponentActiveTop(player),
           koedLastOppTurn: Boolean(player.flags?.koedLastOppTurn),
           koedLastOppTurnVictims: player.flags?.koedLastOppTurnVictims || [],
+          ownAttachedEnergyCount: [...(player.zones?.active || []), ...(player.zones?.bench || [])].filter(
+            (c) => c.attachedTo && isEnergy(c)
+          ).length,
           ...trainerTargetCounts(
             player,
             ownedCards(player),
