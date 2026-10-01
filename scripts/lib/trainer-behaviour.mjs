@@ -5,6 +5,7 @@
 // corpus (a text edit re-hashes its key). Cards new to the corpus are reported, never failed.
 import { parseTrainerEffect } from '../../shared/engine/rules/trainer-effects.mjs';
 import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
+import { legacyAttachedTrainer } from '../../shared/engine/rules/legacy-attached-trainer.mjs';
 
 // Parsed steps with no server handler of their own: `passive` is announced (Tool modifiers are
 // read by tool-combat / tool-conditions), `discardCost` is paid by the playTrainer case.
@@ -14,6 +15,8 @@ const NON_EXECUTED_OK = new Set(['passive', 'discardCost']);
 const STEP_UPGRADES = {
   searchDeck: new Set(['searchDeckSequence']),
   discardCost: new Set(['optionalDiscardCost']),
+  // I224: WotC attach-Trainers (PlusPower, Defender, …) were passive-only before they attached.
+  passive: new Set(['attachLegacyTrainer']),
 };
 
 const PICK_STEPS = new Set(['searchDeck', 'recursion', 'shuffleFromDiscard']);
@@ -105,7 +108,10 @@ function flattenStepTypes(steps) {
  *   playCondition: string|null, steps: string[]}}
  */
 export function classifyTrainer(row) {
-  const parsed = parseTrainerEffect(row?.text || '');
+  // executeTrainer plays a WotC attach-Trainer as one attachLegacyTrainer step (I224).
+  const parsed = legacyAttachedTrainer({ type: 'Trainer', name: row?.name, text: row?.text })
+    ? { recognizable: true, steps: [{ type: 'attachLegacyTrainer' }] }
+    : parseTrainerEffect(row?.text || '');
   const steps = flattenStepTypes(parsed.steps || []);
   const gaps = [];
   if (!parsed.recognizable) gaps.push('unrecognizable');

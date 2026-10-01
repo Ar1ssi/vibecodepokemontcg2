@@ -44,6 +44,7 @@ import {
   SELF_NAME,
 } from '../rules/attack-markers.mjs';
 import { eachFilterMatches } from '../rules/each-filter.mjs';
+import { energyRemovalGuarded } from '../rules/legacy-attached-trainer.mjs';
 import { abilityPreventsAttackEffects, sideContextFor } from '../rules/ability-combat.mjs';
 import { evolvedView } from '../rules/evolved-pokemon.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
@@ -381,6 +382,16 @@ function atkGust(ctx) {
   });
 }
 
+/**
+ * Brock's Protection (gym2-101): "Energy cards attached to that Pokémon can't be removed by your
+ * opponent's attacks" — drops the guarded Energy from what this attack may take off `owner`'s Pokémon.
+ */
+function removableEnergy(ctx, owner, cards) {
+  if (owner !== ctx.opponent) return cards;
+  const zone = [...(owner?.zones?.active || []), ...(owner?.zones?.bench || [])];
+  return cards.filter((c) => !energyRemovalGuarded(zone, c));
+}
+
 // ── move Energy ─────────────────────────────────────────────────────────────
 
 function moveEnergyEnds(ctx) {
@@ -421,23 +432,31 @@ function moveEnergyEnds(ctx) {
       const active = activeOf(opponent);
       return {
         owner: opponent,
-        energies: active ? attachedCards(opponent, active.instanceId).filter(matches) : [],
+        energies: active ? removableEnergy(ctx, opponent, attachedCards(opponent, active.instanceId).filter(matches)) : [],
         targets: benchRootsOf(opponent),
       };
     }
     case 'opponentAny':
       return {
         owner: opponent,
-        energies: rootsOf(opponent).flatMap((root) => attachedCards(opponent, root.instanceId)).filter(matches),
+        energies: removableEnergy(
+          ctx,
+          opponent,
+          rootsOf(opponent).flatMap((root) => attachedCards(opponent, root.instanceId)).filter(matches)
+        ),
         targets: rootsOf(opponent),
       };
     case 'opponentBench': {
       const active = activeOf(opponent);
       return {
         owner: opponent,
-        energies: benchRootsOf(opponent)
-          .flatMap((root) => attachedCards(opponent, root.instanceId))
-          .filter(matches),
+        energies: removableEnergy(
+          ctx,
+          opponent,
+          benchRootsOf(opponent)
+            .flatMap((root) => attachedCards(opponent, root.instanceId))
+            .filter(matches)
+        ),
         targets: active ? [active] : [],
       };
     }
@@ -695,7 +714,7 @@ function discardChosen(ctx, cards, options) {
 function atkDiscardOppEnergy(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const matches = (c) => energyMatches(c, step);
+  const matches = (c) => energyMatches(c, step) && removableEnergy(ctx, opponent, [c]).length > 0;
 
   if (step.scope === 'each') {
     // One Energy from each Pokémon; the attacker picks where a Pokémon has a choice.
@@ -746,7 +765,7 @@ function atkDiscardBothActiveEnergy(ctx) {
   let discarded = 0;
   const drain = (owner, root) => {
     if (!root) return;
-    for (const card of attachedCards(owner, root.instanceId).filter(matches)) {
+    for (const card of removableEnergy(ctx, owner, attachedCards(owner, root.instanceId).filter(matches))) {
       discardCard(ctx.draft, card, ctx.events);
       discarded += 1;
     }
@@ -1508,7 +1527,7 @@ function atkShuffleOppActiveEnergy(ctx) {
   const target = activeOf(opponent);
   if (!target) return skip(ctx, 'no_opponent_active');
   if (!hasCondition(target, step.condition)) return skip(ctx, 'condition_unmet');
-  const energy = attachedCards(opponent, target.instanceId).filter(isEnergy);
+  const energy = removableEnergy(ctx, opponent, attachedCards(opponent, target.instanceId).filter(isEnergy));
   if (energy.length === 0) return skip(ctx, 'no_energy');
   for (const card of energy) moveToZone(opponent, card, 'deck', 'active', ctx.events);
   shuffleOwnDeck(opponent, ctx);
@@ -1520,9 +1539,13 @@ function atkShuffleOppActiveEnergy(ctx) {
 function atkShuffleOppEnergy(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const energy = rootsOf(opponent)
-    .filter((root) => !attackEffectShielded(ctx, opponent, root, 'effect'))
-    .flatMap((root) => attachedCards(opponent, root.instanceId).filter(isEnergy));
+  const energy = removableEnergy(
+    ctx,
+    opponent,
+    rootsOf(opponent)
+      .filter((root) => !attackEffectShielded(ctx, opponent, root, 'effect'))
+      .flatMap((root) => attachedCards(opponent, root.instanceId).filter(isEnergy))
+  );
   if (energy.length === 0) return skip(ctx, 'no_energy');
   for (const card of energy) moveToZone(opponent, card, 'deck', 'inPlay', ctx.events);
   shuffleOwnDeck(opponent, ctx);
@@ -1591,7 +1614,8 @@ function lostZoneChoice(ctx, owner, candidates, label) {
 function atkLostZoneEnergy(ctx) {
   const { player, opponent, step } = ctx;
   const matches = (c) => energyMatches(c, step);
-  const onRoots = (owner, roots) => roots.flatMap((root) => attachedCards(owner, root.instanceId)).filter(matches);
+  const onRoots = (owner, roots) =>
+    removableEnergy(ctx, owner, roots.flatMap((root) => attachedCards(owner, root.instanceId)).filter(matches));
   const ref = attackerRef(ctx);
   switch (step.from) {
     case 'self':

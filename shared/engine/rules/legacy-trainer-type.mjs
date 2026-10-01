@@ -6,13 +6,13 @@ const LEGACY_STADIUM =
 const LEGACY_TOOL =
   /^Attach .+? to 1 of your Pokémon that doesn't have a Pokémon Tool attached to it\./i;
 
-function isTrainer(card) {
+export function isTrainer(card) {
   return [card.category, card.type, card.supertype].some(
     (kind) => String(kind || '').toLowerCase() === 'trainer',
   );
 }
 
-function normalizedText(card) {
+export function normalizedText(card) {
   return String(card.effect || card.text || '')
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')

@@ -29,6 +29,23 @@ test('classifyTrainer: executable card has no gaps; unknown wording is a gap', (
   assert.deepEqual(classifyTrainer(null).gaps.length > 0, true);
 });
 
+// I224: TCGdex base1-84 PlusPower runs as an attachLegacyTrainer step, not passive-only.
+const PLUSPOWER = {
+  name: 'PlusPower',
+  subtype: 'Trainer',
+  text: "Attach PlusPower to your Active Pokémon. At the end of your turn, discard PlusPower. If this Pokémon's attack does damage to the Defending Pokémon (after applying Weakness and Resistance), the attack does 10 more damage to the Defending Pokémon.",
+};
+
+test('classifyTrainer: a WotC attach-Trainer is executed; its old passive step counts as upgraded', () => {
+  const classified = classifyTrainer(PLUSPOWER);
+  assert.deepEqual(classified.gaps, []);
+  assert.deepEqual(classified.steps, ['attachLegacyTrainer']);
+  const baseline = { entries: { [classified.key]: { gaps: ['passive-only'], steps: ['passive'] } } };
+  const { failures, improvements } = checkTrainerGate([classified], baseline);
+  assert.deepEqual(failures, []);
+  assert.ok(improvements.some((line) => /step passive upgraded/.test(line)));
+});
+
 test('checkTrainerGate: new gaps and lost play conditions fail; closures and new cards do not', () => {
   const corpus = classifyCorpus([DRAW, DRAW, MIRAGE]);
   assert.equal(corpus.length, 2);

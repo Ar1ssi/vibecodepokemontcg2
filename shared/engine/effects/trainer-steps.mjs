@@ -44,6 +44,11 @@ import {
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
+import {
+  attachTargetAllowed,
+  energyRemovalGuarded,
+  legacyAttachedTrainer,
+} from '../rules/legacy-attached-trainer.mjs';
 import { isSupporterTrainer } from '../rules/trainer-play-conditions.mjs';
 import { parseTrainerEffect, trainerEndsTurn } from '../rules/trainer-effects.mjs';
 import {
@@ -1036,6 +1041,16 @@ function devolve(ctx) {
   });
 }
 
+/**
+ * Brock's Protection (gym2-101): "Energy cards attached to that Pokémon can't be removed by your
+ * opponent's attacks or Trainer cards." A Pokémon Power (Ability) still can.
+ */
+function energyRemovable(ctx, owner, card) {
+  if (owner !== ctx.opponent || !isEnergy(card) || ctx.effectType === 'ability') return true;
+  const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
+  return !energyRemovalGuarded(zone, card);
+}
+
 function allAttachedMatching(ctx, players, predicate) {
   return players
     .filter(Boolean)
@@ -1060,7 +1075,11 @@ function discardTools(ctx) {
 
 // Blowtorch-style: a Tool or Special Energy on an opponent's Pokémon, or the Stadium in play.
 function discardFromOpponent(ctx) {
-  const options = allAttachedMatching(ctx, [ctx.opponent], (c) => isToolCard(c) || isSpecialEnergy(c));
+  const options = allAttachedMatching(
+    ctx,
+    [ctx.opponent],
+    (c) => isToolCard(c) || (isSpecialEnergy(c) && energyRemovable(ctx, ctx.opponent, c))
+  );
   const includeStadium = /stadium/i.test(ctx.step.target || '') && ctx.draft.stadium;
   if (includeStadium) options.push(ctx.draft.stadium);
 
@@ -1084,7 +1103,11 @@ function discardFromOpponent(ctx) {
 }
 
 function massDiscardAttached(ctx) {
-  const cards = allAttachedMatching(ctx, [ctx.opponent], (c) => isToolCard(c) || isSpecialEnergy(c));
+  const cards = allAttachedMatching(
+    ctx,
+    [ctx.opponent],
+    (c) => isToolCard(c) || (isSpecialEnergy(c) && energyRemovable(ctx, ctx.opponent, c))
+  );
   for (const card of cards) discardCard(ctx.draft, card, ctx.events);
   if (ctx.draft.stadium) discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
   return null;
@@ -1092,14 +1115,15 @@ function massDiscardAttached(ctx) {
 
 function discardToolAndSpecialEnergy(ctx) {
   const { opponent } = ctx;
+  const removableSpecial = (c) => isSpecialEnergy(c) && energyRemovable(ctx, opponent, c);
   const candidates = targetableRoots(ctx, opponent).filter((root) =>
-    attachedCards(opponent, root.instanceId).some((c) => isToolCard(c) || isSpecialEnergy(c))
+    attachedCards(opponent, root.instanceId).some((c) => isToolCard(c) || removableSpecial(c))
   );
 
   const discardFrom = (root) => {
     const attached = attachedCards(opponent, root.instanceId);
     const tool = attached.find(isToolCard);
-    const energy = attached.find(isSpecialEnergy);
+    const energy = attached.find(removableSpecial);
     if (tool) discardCard(ctx.draft, tool, ctx.events);
     if (energy) discardCard(ctx.draft, energy, ctx.events);
   };
@@ -1125,7 +1149,8 @@ function discardToolAndSpecialEnergy(ctx) {
 function discardEnergyFromOpponent(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const matchesEnergy = step.energy === 'Special Energy' ? isSpecialEnergy : isEnergy;
+  const kindMatches = step.energy === 'Special Energy' ? isSpecialEnergy : isEnergy;
+  const matchesEnergy = (c) => kindMatches(c) && energyRemovable(ctx, opponent, c);
 
   if (step.scope === 'each Pokémon') {
     for (const root of targetableRoots(ctx, opponent)) {
@@ -2034,6 +2059,46 @@ function attachTool(ctx) {
   });
 }
 
+/**
+ * I224: the Pokémon a WotC attach-Trainer (PlusPower, Defender, Koga's Ninja Trick, …) may go
+ * on, by its printed target ("your Active Pokémon", "with Koga in its name"). Not a Tool, so
+ * an attached Tool or another attach-Trainer never blocks it.
+ */
+export function legacyAttachTargets(player, card) {
+  const spec = legacyAttachedTrainer(card);
+  if (!spec) return [];
+  const active = activeOf(player);
+  return rootsOf(player).filter((root) =>
+    attachTargetAllowed(spec, { top: topPokemonCard(player, root), isActive: root === active })
+  );
+}
+
+/** Attaches an attach-Trainer and stamps the turn its printed discard timer counts from. */
+export function attachLegacyTrainerTo(draft, player, card, root, events) {
+  attachTo(player, card, root, events);
+  card.attachedTurn = draft?.turn?.number || 1;
+}
+
+function attachLegacyTrainer(ctx) {
+  const { player, sourceCard } = ctx;
+  const card = (player.zones.board || []).find((c) => c.instanceId === sourceCard?.instanceId);
+  if (!card) return skip(ctx, 'card_not_on_board');
+  const targets = legacyAttachTargets(player, card);
+  const target =
+    targets.find((c) => c.instanceId === ctx.selection?.[0]) || (targets.length === 1 ? targets[0] : null);
+  if (target) {
+    attachLegacyTrainerTo(ctx.draft, player, card, target, ctx.events);
+    return null;
+  }
+  if (targets.length === 0) return skip(ctx, 'no_attach_target');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose a Pokémon to attach ${card.name} to`,
+    options: targets,
+    min: 1,
+    max: 1,
+  });
+}
+
 // ── I134a: auto/simple step kinds the executor's core switch never covered ──
 
 // Full Heal / Double Full Heal — remove Special Conditions from the Active (or every own Pokémon).
@@ -2631,7 +2696,9 @@ function opponentActiveEnergyToDeck(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   const active = targetableRoots(ctx, opponent).find((root) => root === activeOf(opponent));
-  const energies = active ? attachedCards(opponent, active.instanceId).filter(isEnergy) : [];
+  const energies = active
+    ? attachedCards(opponent, active.instanceId).filter((c) => isEnergy(c) && energyRemovable(ctx, opponent, c))
+    : [];
 
   if (ctx.selection) {
     const energy = energies.find((c) => c.instanceId === ctx.selection[0]);
@@ -4153,7 +4220,7 @@ function moveEnergyOpponent(ctx) {
   const roots = targetableRoots(ctx, opponent);
   const energies = roots
     .flatMap((root) => attachedCards(opponent, root.instanceId))
-    .filter((c) => attachedEnergyMatches(c, step.energy));
+    .filter((c) => attachedEnergyMatches(c, step.energy) && energyRemovable(ctx, opponent, c));
   if (ctx.memo?.phase === 'target') {
     const energy = energies.find((c) => c.instanceId === ctx.memo.energyId);
     const target = roots.find((c) => c.instanceId === ctx.selection?.[0]);
@@ -4189,7 +4256,7 @@ function sendEnergyToDeckBottom(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   const candidates = targetableRoots(ctx, opponent)
     .flatMap((root) => attachedCards(opponent, root.instanceId))
-    .filter((c) => attachedEnergyMatches(c, step.energy));
+    .filter((c) => attachedEnergyMatches(c, step.energy) && energyRemovable(ctx, opponent, c));
   const send = (energy) => {
     removeFromZones(opponent, energy);
     energy.attachedTo = null;
@@ -4222,7 +4289,7 @@ function sendEnergyToLostZone(ctx) {
   if (!opponent) return skip(ctx, 'no_opponent');
   const candidates = targetableRoots(ctx, opponent)
     .flatMap((root) => attachedCards(opponent, root.instanceId))
-    .filter((c) => attachedEnergyMatches(c, step.energy));
+    .filter((c) => attachedEnergyMatches(c, step.energy) && energyRemovable(ctx, opponent, c));
   const send = (energy) => {
     removeFromZones(opponent, energy);
     energy.attachedTo = null;
@@ -5179,6 +5246,7 @@ export const EXTRA_STEP_HANDLERS = {
   takeFaceDownPrize,
   eachPlayerDiscardBenchUntil,
   attachTool,
+  attachLegacyTrainer,
   attachAttackTool,
   clearStatus,
   healEachActive,

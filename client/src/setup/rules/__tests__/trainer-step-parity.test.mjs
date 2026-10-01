@@ -74,6 +74,8 @@ const NEW_STEP_TYPES = [
   'toolOrStadiumToLostZone',
   'sendEnergyToLostZone',
   'opponentDiscardToLostZonePerPokemon',
+  // I232: WotC Super Potion / Super Energy Removal own-Energy cost (TCGdex base1-90, base1-79).
+  'discardOwnAttachedEnergy',
 ];
 
 for (const type of NEW_STEP_TYPES) {
@@ -94,4 +96,11 @@ test('client executor switch contains no duplicate step-type case', () => {
     seen.add(type);
   }
   assert.deepEqual(dupes, []);
+});
+
+// I232: WotC Super Potion (TCGdex base1-90) parses to healAmount target 'costHost'; the legacy
+// executor must heal the Pokémon whose Energy paid the cost, not offer a free pick.
+test("healAmount: client executor reads target 'costHost'", () => {
+  assert.match(clientSrc, /step\.target === 'costHost'/);
+  assert.match(clientSrc, /costHost = entry\.parent/);
 });
