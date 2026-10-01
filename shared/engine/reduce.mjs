@@ -404,7 +404,19 @@ const SELF_BENCH_SHIELD =
  */
 function damageBenchedPokemon(
   draft,
-  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, countersPlaced = false, activeRng = null, events }
+  {
+    victim,
+    victimPlayerId,
+    attackerPlayerId,
+    attackName,
+    dealt,
+    auto,
+    ownAttack = false,
+    countersPlaced = false,
+    ignoreDefenderEffects = false,
+    activeRng = null,
+    events,
+  }
 ) {
   if (dealt <= 0) return;
 
@@ -493,8 +505,10 @@ function damageBenchedPokemon(
   }
 
   // Defender (base1-80) on a Benched Pokémon: "Damage done to that Pokémon by attacks is reduced
-  // by 20". Counters placed are not damage.
-  const attachedReduction = countersPlaced ? 0 : attachedTrainerDamageReduction(victimBench, victim);
+  // by 20". Counters placed are not damage. Damage "isn't affected by … Pokémon Powers, or any
+  // other effects on the Defending Pokémon" (Feint Attack) skips Defender and the WotC Powers.
+  const legacyApplies = !countersPlaced && !ignoreDefenderEffects;
+  const attachedReduction = legacyApplies ? attachedTrainerDamageReduction(victimBench, victim) : 0;
   if (attachedReduction > 0) {
     dealt = Math.max(0, dealt - attachedReduction);
     if (dealt === 0) {
@@ -502,7 +516,7 @@ function damageBenchedPokemon(
       return;
     }
   }
-  if (!countersPlaced) {
+  if (legacyApplies) {
     dealt = legacyModifiedDamage(draft, { victim, victimPlayerId, amount: dealt });
     if (dealt <= 0) {
       events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'ability' });
@@ -785,7 +799,12 @@ function legacyModifiedDamage(draft, { victim, victimPlayerId, amount }) {
   return applyLegacyDamageModifiers(amount, specs);
 }
 
-function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, countersPlaced = false, events }) {
+// `legacyApplied`: the amount already went through computeAttackDamage, which applies the same
+// Powers (or skips them for damage that ignores effects on the Defending Pokémon).
+function applyFlatDamageToTarget(
+  draft,
+  { ref, amount, attackerPlayerId, countersPlaced = false, legacyApplied = false, events }
+) {
   const victim = ref.card;
   if (!victim || amount <= 0) return 0;
   const victimZone = ref.player?.zones?.[ref.zoneId] || [];
@@ -793,7 +812,7 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, counter
     events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'special-energy-effect' });
     return 0;
   }
-  if (!countersPlaced) {
+  if (!countersPlaced && !legacyApplied) {
     amount = legacyModifiedDamage(draft, { victim, victimPlayerId: ref.playerId, amount });
     if (amount <= 0) {
       events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'ability' });
@@ -891,7 +910,12 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
   const attacker = (draft.players[attackerPlayerId]?.zones?.active || []).find(
     (c) => !c.attachedTo
   );
-  if (!attacker) return clause.amount;
+  // No Attacking Pokémon to compute from: the flat amount, still through the WotC Powers.
+  if (!attacker) {
+    return clause.immunity?.ignoreDefenderEffects
+      ? clause.amount
+      : legacyModifiedDamage(draft, { victim: ref.card, victimPlayerId: ref.playerId, amount: clause.amount });
+  }
   const defenderPlayer = draft.players[ref.playerId];
   const defenderView = inPlayView(draft, ref.card);
   const abilityReads = attackAbilityReads(draft, {
@@ -1568,6 +1592,7 @@ function applyAttackTargets(
     const ref = findCard(draft, id);
     if (!ref || ref.playerId !== defenderPlayerId) continue;
     const clause = targetClauseFor(draft, baseClause, ref.card);
+    const ignoreDefenderEffects = Boolean(clause.immunity?.ignoreDefenderEffects);
     if (ref.zoneId === 'bench') {
       dealt += clause.amount;
       damageBenchedPokemon(draft, {
@@ -1580,6 +1605,7 @@ function applyAttackTargets(
         activeRng,
         countersPlaced: clause.kind === 'counters',
         ownAttack: clause.side === 'own',
+        ignoreDefenderEffects,
         events,
       });
     } else if (ref.zoneId === 'active') {
@@ -1590,6 +1616,7 @@ function applyAttackTargets(
           : clause.amount,
         attackerPlayerId,
         countersPlaced: clause.kind === 'counters',
+        legacyApplied: Boolean(clause.activeWR) || ignoreDefenderEffects,
         events,
       });
     }
@@ -7410,9 +7437,36 @@ function resolveAttackEffectPhase(draft, ctx) {
         }
         const protectorReduction = protector ? (ctx.protectorDiscarded || 0) * protector.perCard : 0;
 
+        // Vermilion City Gym: Lt. Surge's Pokémon flip when attacking. Heads adds
+        // 10 damage after Weakness/Resistance when the attack does damage; tails
+        // deals 10 to the attacker in addition to the attack. The printed "may
+        // flip" is auto-flipped (no optional-coin protocol exists). A Charity pause
+        // re-enters with the face already flipped (`vermilionFace`).
+        const vermilion = stadiumAttackCoinModifier(
+          draft.stadium?.card || draft.stadium,
+          { attacker: attackerView }
+        );
+        // Misty gym1-18: +20 after Weakness/Resistance to an attack by a Pokémon with Misty in its
+        // name that does damage to the Defending Pokémon.
+        const afterWrBonus = turnDamageBonusAfterWR(draft.players[playerId]?.flags?.turnDamageBonuses, attackerView);
+        if (afterWrBonus > 0 && dmgDealt > 0) dmgDealt += afterWrBonus;
+        let vermilionFace = ctx.vermilionFace;
+        if (vermilion) {
+          if (vermilionFace === undefined) {
+            vermilionFace = activeRng.next() < 0.5 ? 'heads' : 'tails';
+            events.push({ type: 'coinFlipped', playerId, face: vermilionFace, source: vermilion.source });
+          }
+          if (vermilionFace === 'heads') {
+            if (dmgDealt > 0) dmgDealt += vermilion.headsBonus;
+          } else {
+            stadiumSelfDamage = vermilion.tailsSelfDamage;
+          }
+        }
+
         // Charity (gym1-99): "If that Pokémon attacks and does damage to the Defending Pokémon,
         // you may reduce that damage by any amount (rounded to the nearest 10)." The attacker picks
-        // before the damage lands; the attack re-enters here with `charityReduction` settled.
+        // before the damage lands, from the damage after every after-W/R bonus above; the attack
+        // re-enters here with `charityReduction` settled.
         const charityMax = dmgResult.prevented ? 0 : Math.max(0, dmgDealt - protectorReduction);
         if (
           charityMax > 0 &&
@@ -7447,32 +7501,11 @@ function resolveAttackEffectPhase(draft, ctx) {
                 lostZoned,
                 preStepsDone: true,
                 ...(ctx.protectorDiscarded !== undefined ? { protectorDiscarded: ctx.protectorDiscarded } : {}),
+                ...(vermilionFace !== undefined ? { vermilionFace } : {}),
               },
             },
           });
           return;
-        }
-
-        // Vermilion City Gym: Lt. Surge's Pokémon flip when attacking. Heads adds
-        // 10 damage after Weakness/Resistance when the attack does damage; tails
-        // deals 10 to the attacker in addition to the attack. The printed "may
-        // flip" is auto-flipped (no optional-coin protocol exists).
-        const vermilion = stadiumAttackCoinModifier(
-          draft.stadium?.card || draft.stadium,
-          { attacker: attackerView }
-        );
-        // Misty gym1-18: +20 after Weakness/Resistance to an attack by a Pokémon with Misty in its
-        // name that does damage to the Defending Pokémon.
-        const afterWrBonus = turnDamageBonusAfterWR(draft.players[playerId]?.flags?.turnDamageBonuses, attackerView);
-        if (afterWrBonus > 0 && dmgDealt > 0) dmgDealt += afterWrBonus;
-        if (vermilion) {
-          const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
-          events.push({ type: 'coinFlipped', playerId, face, source: vermilion.source });
-          if (face === 'heads') {
-            if (dmgDealt > 0) dmgDealt += vermilion.headsBonus;
-          } else {
-            stadiumSelfDamage = vermilion.tailsSelfDamage;
-          }
         }
 
         if (protectorReduction > 0 && dmgDealt > 0) {

@@ -8,6 +8,7 @@ import { createGameState, createPlayerZones, findCard } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
+import { executeSteps } from '../effects/executor.mjs';
 
 const WOTC = JSON.parse(fs.readFileSync(new URL('../../../out/tcgdex-wotc-trainers.json', import.meta.url), 'utf8'));
 const MODERN = JSON.parse(fs.readFileSync(new URL('../../../out/pkmn-trainer-cards.json', import.meta.url), 'utf8'));
@@ -277,6 +278,60 @@ test("Sabrina's Psychic Control gym2-121: heads uses a Trainer from the opponent
   assert.equal(tails.pendingChoice, null);
 });
 
+// pkmn-wotc-cards: Aerodactyl [Fossil 1] Prehistoric Power
+const PREHISTORIC_POWER =
+  'No more Evolution cards can be played. This power stops working while Aerodactyl is Asleep, Confused, or Paralyzed.';
+
+test("Sabrina's Psychic Control gym2-121: Aerodactyl's Prehistoric Power stops Pokémon Breeder base1-76", () => {
+  const breederGame = (withAerodactyl) => {
+    const game = setup();
+    const bulbasaur = pokemon('Bulbasaur', { enteredPlayTurn: 1 });
+    game.p1.zones.active = [bulbasaur];
+    game.p1.zones.hand.push(pokemon('Venusaur', { stage: 'Stage 2', evolvesFrom: 'Ivysaur' }));
+    game.p1.zones.deck.push(pokemon('Ivysaur', { stage: 'Stage 1', evolvesFrom: 'Bulbasaur' }));
+    if (withAerodactyl) {
+      game.p2.zones.bench.push(
+        pokemon('Aerodactyl', { stage: 'Stage 1', abilities: [{ name: 'Prehistoric Power', type: 'Pokémon Power', text: PREHISTORIC_POWER }] })
+      );
+    }
+    const breeder = wotcTrainer('base1-76');
+    const bill = card({ name: 'Bill', type: 'Trainer', text: 'Draw 2 cards.' });
+    game.p2.zones.discard.push(breeder, bill);
+    return { game, breeder, bill, bulbasaur };
+  };
+  const open = breederGame(false);
+  const offered = play(open.game, wotcTrainer('gym2-121'), rngOf(HEADS));
+  assert.ok(ids(offered.pendingChoice.options).includes(open.breeder.instanceId), 'no lock: Breeder is usable');
+
+  const locked = breederGame(true);
+  const ask = play(locked.game, wotcTrainer('gym2-121'), rngOf(HEADS));
+  assert.deepEqual(ids(ask.pendingChoice.options), [locked.bill.instanceId]);
+});
+
+test('evolveStage2 step: no Stage 2 is put in play while Prehistoric Power works', () => {
+  const game = setup();
+  const bulbasaur = pokemon('Bulbasaur', { enteredPlayTurn: 1 });
+  game.p1.zones.active = [bulbasaur];
+  const venusaur = pokemon('Venusaur', { stage: 'Stage 2', evolvesFrom: 'Ivysaur' });
+  game.p1.zones.hand.push(venusaur);
+  game.p1.zones.deck.push(pokemon('Ivysaur', { stage: 'Stage 1', evolvesFrom: 'Bulbasaur' }));
+  game.p2.zones.bench.push(
+    pokemon('Aerodactyl', { stage: 'Stage 1', abilities: [{ name: 'Prehistoric Power', type: 'Pokémon Power', text: PREHISTORIC_POWER }] })
+  );
+  const events = [];
+  const res = executeSteps(game.state, {
+    steps: [{ type: 'evolveStage2' }],
+    effectType: 'trainer',
+    sourceCard: wotcTrainer('base1-76'),
+    playerId: 'p1',
+    activeRng: rngOf(TAILS),
+    events,
+  });
+  assert.equal(res.pendingChoice, null);
+  assert.ok(ids(game.p1.zones.hand).includes(venusaur.instanceId), 'Venusaur stays in hand');
+  assert.ok(!events.some((e) => e.type === 'pokemonEvolved'));
+});
+
 test('Thought Wave Machine neo4-96: each heads returns an Energy from the Active, then the turn ends', () => {
   const game = setup();
   const active = game.p2.zones.active[0];
@@ -298,6 +353,22 @@ test('Thought Wave Machine neo4-96: each heads returns an Energy from the Active
   const auto = play(few, wotcTrainer('neo4-96'), rngOf(HEADS, HEADS, TAILS));
   assert.equal(auto.pendingChoice, null);
   assert.ok(ids(zone(auto, 'p2', 'hand')).includes(lone.instanceId));
+});
+
+test("Thought Wave Machine neo4-96: Brock's Protection gym2-101 keeps the Energy attached", () => {
+  const game = setup();
+  const sandslash = pokemon("Brock's Sandslash");
+  game.p2.zones.active = [sandslash];
+  const guard = wotcTrainer('gym2-101');
+  const guarded = energy('Fighting Energy', 'Fighting');
+  for (const attached of [guard, guarded]) {
+    attached.attachedTo = sandslash.instanceId;
+    game.p2.zones.active.push(attached);
+  }
+  const res = play(game, wotcTrainer('neo4-96'), rngOf(HEADS, TAILS));
+  assert.equal(res.pendingChoice, null);
+  assert.ok(ids(zone(res, 'p2', 'active')).includes(guarded.instanceId), 'Energy stays on the guarded Pokémon');
+  assert.ok(!ids(zone(res, 'p2', 'hand')).includes(guarded.instanceId));
 });
 
 test('Time Capsule neo1-90: opponent then player may shuffle 5 (all or none if fewer) in; no more Trainers', () => {

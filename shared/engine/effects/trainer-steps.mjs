@@ -39,6 +39,7 @@ import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 import {
   abilityCounterMoveLock,
+  abilityEvolutionCardLock,
   abilityPreventsCardEffects,
   abilityPreventsCardEffectsOnPlayer,
   sideContextFor,
@@ -892,8 +893,10 @@ function searchDeckSequence(ctx) {
 }
 
 // Rare Candy: a Stage 2 from hand onto a Basic in play, skipping Stage 1.
+// Aerodactyl Prehistoric Power ("No more Evolution cards can be played") stops it on every path.
 function evolveStage2(ctx) {
   const { player } = ctx;
+  if (abilityEvolutionCardLock(sideContextFor(ctx.draft, player.playerId))) return skip(ctx, 'evolution_cards_locked');
   const turnNumber = ctx.draft?.turn?.number;
   const options = rareCandyOptions(player, ownedCards(player), turnNumber);
   const optionFor = (stage2Id) => options.find((option) => option.stage2.instanceId === stage2Id);
@@ -5479,6 +5482,7 @@ function playableFromHand(ctx, card) {
     ownAttachedEnergyCount: inPlay.filter((c) => c.attachedTo && isEnergy(c)).length,
     handEnergyCount: (player.zones.hand || []).filter(isEnergy).length,
     handPokemonCount: (player.zones.hand || []).filter(isPokemon).length,
+    evolutionCardsLocked: abilityEvolutionCardLock(sideContextFor(ctx.draft, player.playerId)),
   });
 }
 
@@ -5529,7 +5533,9 @@ function flipReturnActiveEnergy(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
   const active = targetableRoots(ctx, opponent).find((root) => root === activeOf(opponent));
-  const energies = active ? attachedCards(opponent, active.instanceId).filter(isEnergy) : [];
+  const energies = active
+    ? attachedCards(opponent, active.instanceId).filter((c) => isEnergy(c) && energyRemovable(ctx, opponent, c))
+    : [];
   const returnToHand = (cards) => {
     for (const energy of cards) {
       removeFromZones(opponent, energy);

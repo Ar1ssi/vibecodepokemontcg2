@@ -220,3 +220,70 @@ test("legacy damage: Shell Armor reduces Misty's Cloyster's damage, not its team
   assert.equal(abilityDamagePrevention(teammate, attacker, ctx).reduceHp, 0);
   assert.equal(hit(cloyster, { damage: '30' }).defender, 20);
 });
+
+// ── one modifier per hit, and attacks that ignore Pokémon Powers ─────────────────────────────
+
+// pkmn-wotc-cards: Pichu [Neo Genesis 12] Zzzap
+const ZZZAP = "Does 20 damage to each Pokémon in play that has a Pokémon Power. Don't apply Weakness and Resistance.";
+// pkmn-pokemon-cards: Kingdra-GX [Dragon Majesty 18] Maelstrom-GX
+const MAELSTROM_GX =
+  "This attack does 40 damage to each of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.) (You can't use more than 1 GX attack in a game.)";
+// pkmn-wotc-cards: Umbreon [Neo Discovery 13] Feint Attack
+const FEINT_ATTACK =
+  "Choose 1 of your opponent's Pokémon. This attack does 30 damage to that Pokémon. This attack's damage isn't affected by Weakness, Resistance, Pokémon Powers, or any other effects on the Defending Pokémon.";
+// TCGdex base1-80
+const DEFENDER =
+  "Attach Defender to 1 of your Pokémon. At the end of your opponent's next turn, discard Defender. Damage done to that Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).";
+
+const kabutoAt = (instanceId) => pokemon({ instanceId, name: 'Kabuto', abilities: [power('Kabuto Armor', KABUTO_ARMOR)] });
+
+test('legacy damage: Zzzap on an Active Kabuto is halved once (20 → 10)', () => {
+  assert.equal(hit(kabutoAt(10), { damage: '', text: ZZZAP }).defender, 10);
+});
+
+test('legacy damage: Maelstrom-GX on an Active Kabuto is halved once (40 → 20)', () => {
+  assert.equal(hit(kabutoAt(10), { damage: '', text: MAELSTROM_GX }).defender, 20);
+});
+
+// p1 uses Feint Attack and picks `targetId` among p2's Pokémon; returns p2's damage by instanceId.
+function feintAttack({ active, activeAttached = [], bench = [], targetId }) {
+  const state = setupGame();
+  state.players.p1.zones.active.push(
+    pokemon({
+      instanceId: 1,
+      name: 'Umbreon',
+      types: ['Darkness'],
+      attacks: [{ name: 'Feint Attack', cost: [], damage: '', text: FEINT_ATTACK }],
+    })
+  );
+  state.players.p2.zones.active.push(active, ...activeAttached);
+  state.players.p2.zones.bench.push(...bench);
+  const offered = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(offered.error, null);
+  // A lone candidate is hit without a prompt.
+  const res = offered.state.pendingChoice
+    ? applyCommand(offered.state, {
+        type: 'resolveChoice',
+        payload: { choiceId: offered.state.pendingChoice.choiceId, selection: [targetId] },
+        playerId: 'p1',
+      })
+    : offered;
+  assert.equal(res.error, null);
+  const p2 = res.state.players.p2.zones;
+  return Object.fromEntries([...p2.active, ...p2.bench].map((c) => [c.instanceId, c.damage || 0]));
+}
+
+test('legacy damage: Feint Attack ignores Kabuto Armor on the Active and on the Bench', () => {
+  assert.equal(feintAttack({ active: kabutoAt(10), targetId: 10 })[10], 30);
+  const opp = pokemon({ instanceId: 10, name: 'Opp' });
+  assert.equal(feintAttack({ active: opp, bench: [kabutoAt(11)], targetId: 11 })[11], 30);
+});
+
+test('legacy damage: Feint Attack ignores Defender on a Benched or Active Pokémon', () => {
+  const defenderOn = (attachedTo) => createCard({ instanceId: 12, name: 'Defender', type: 'Trainer', text: DEFENDER, attachedTo });
+  const benched = pokemon({ instanceId: 11, name: 'Opp Bench' });
+  const opp = pokemon({ instanceId: 10, name: 'Opp' });
+  assert.equal(feintAttack({ active: opp, bench: [benched, defenderOn(11)], targetId: 11 })[11], 30);
+  const lone = pokemon({ instanceId: 10, name: 'Opp' });
+  assert.equal(feintAttack({ active: lone, activeAttached: [defenderOn(10)], targetId: 10 })[10], 30);
+});
