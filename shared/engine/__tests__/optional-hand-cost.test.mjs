@@ -23,11 +23,15 @@ const TEXTS = {
   // Energy Spinner (Trainer corpus row)
   energySpinner:
     'Search your deck for a basic Energy card, reveal it, and put it into your hand. If you go second and it’s your first turn, search for up to 3 basic Energy cards instead of 1. Then, shuffle your deck.',
-  // Sabrina & Brycen (Cosmic Eclipse), Misty & Lorelei, Mallow & Lana: bonus not implemented yet
+  // Sun & Moon Promos SM246
   sabrinaBrycen:
     'Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Then, shuffle your deck. When you play this card, you may discard 5 other cards from your hand. If you do, you may also search for up to 3 Pokémon of different types in this way.',
+  // Cosmic Eclipse 198 / 231
   mallowLana:
     'Switch your Active Pokémon with 1 of your Benched Pokémon. When you play this card, you may discard 2 other cards from your hand. If you do, heal 120 damage from the Pokémon you moved to your Bench.',
+  // Cosmic Eclipse 199
+  mistyLorelei:
+    'Search your deck for up to 3 {W} Energy cards, reveal them, and put them into your hand. Then, shuffle your deck. When you play this card, you may discard 5 other cards from your hand. If you do, during this turn, your {W} Pokémon can use their GX attacks even if you have used your GX attack.',
 };
 
 const mon = (instanceId, name, extra = {}) => ({
@@ -229,9 +233,102 @@ test('Special Energy search kind matches non-basic Energy only', () => {
   assert.equal(matchesSearch(mon(3, 'Aron'), 'Special Energy'), false);
 });
 
-test('bonuses not implemented yet no longer force the discard', () => {
-  for (const key of ['sabrinaBrycen', 'mallowLana']) {
+test('I221: every optional-cost bonus parses to a gated step and leaves no gap', () => {
+  const bonuses = {
+    sabrinaBrycen: { type: 'searchDeck', what: 'Pokémon', count: 3, destination: 'hand', upTo: true, reveal: true, distinctTypes: true, requiresHandCost: true },
+    mallowLana: { type: 'healAmount', amount: 120, target: 'switchedOut', requiresHandCost: true },
+    mistyLorelei: { type: 'gxReuseTurn', pokemonType: 'water', requiresHandCost: true },
+  };
+  for (const [key, bonus] of Object.entries(bonuses)) {
     const steps = parseTrainerEffect(TEXTS[key]).steps;
-    assert.equal(steps.some((s) => s.type === 'discardCost' || s.type === 'optionalDiscardCost'), false, key);
+    assert.equal(steps[0].type, 'optionalDiscardCost', key);
+    assert.deepEqual(steps.at(-1), bonus, key);
+    assert.equal(classifyTrainer({ name: key, text: TEXTS[key] }).gaps.length, 0, key);
+    assert.notEqual(describeStep(steps.at(-1)), '', key);
   }
+});
+
+const typed = (instanceId, name, types) => mon(instanceId, name, { types });
+
+test('Sabrina & Brycen: paying 5 cards adds up to 3 Pokémon of different types', () => {
+  const deck = [
+    basicEnergy(1, 'Basic Psychic Energy'),
+    typed(2, 'Abra', ['Psychic']),
+    typed(3, 'Ralts', ['Psychic']),
+    typed(4, 'Onix', ['Fighting']),
+    typed(5, 'Magnemite', ['Metal']),
+  ];
+  const env = setup(TEXTS.sabrinaBrycen, { deck, hand: filler(6) });
+  // Two Psychic picks: only the first is kept.
+  const { res, prompts, zones } = play(env, [[500, 501, 502, 503, 504], [1], [2, 3, 4]]);
+  assert.equal(res.pendingChoice, null);
+  assert.match(prompts[2].prompt, /different-type/);
+  assert.equal(prompts[2].options.some((c) => c.name === 'Basic Psychic Energy'), false);
+  assert.deepEqual(names(zones.hand).sort(), ['Abra', 'Basic Psychic Energy', 'Filler 6', 'Onix']);
+  assert.equal(paidDiscards(zones).length, 5);
+});
+
+test('Sabrina & Brycen: a dual-type Pokémon takes whichever type is still free', () => {
+  const deck = [
+    typed(2, 'Abra', ['Psychic']),
+    typed(3, 'Dual', ['Psychic', 'Fighting']),
+    typed(4, 'Onix', ['Fighting']),
+  ];
+  const env = setup(TEXTS.sabrinaBrycen, { deck, hand: filler(5) });
+  const { zones } = play(env, [[500, 501, 502, 503, 504], [2, 3, 4]]);
+  // Abra = Psychic, Dual = Fighting, then Onix has no free type left.
+  assert.deepEqual(names(zones.hand).sort(), ['Abra', 'Dual']);
+});
+
+test('Sabrina & Brycen: declining the discard searches the Energy only', () => {
+  const env = setup(TEXTS.sabrinaBrycen, { deck: [basicEnergy(1, 'Basic Psychic Energy'), typed(2, 'Abra', ['Psychic'])], hand: filler(5) });
+  const { res, zones } = play(env, [[], [1]]);
+  assert.equal(res.pendingChoice, null);
+  assert.deepEqual(names(zones.hand).filter((n) => !n.startsWith('Filler')), ['Basic Psychic Energy']);
+});
+
+test('Mallow & Lana: the cost heals 120 from the Pokémon moved to the Bench, not the new Active', () => {
+  const env = setup(TEXTS.mallowLana, {
+    active: mon(10, 'Hurt Active', { damage: 150 }),
+    bench: [mon(11, 'Hurt Bench', { damage: 50 })],
+    hand: filler(2),
+  });
+  const { res, zones } = play(env, [[500, 501]]);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(zones.bench.find((c) => c.instanceId === 10).damage, 30);
+  assert.equal(zones.active.find((c) => c.instanceId === 11).damage, 50);
+});
+
+test('Mallow & Lana: declining the discard switches without healing', () => {
+  const env = setup(TEXTS.mallowLana, {
+    active: mon(10, 'Hurt Active', { damage: 150 }),
+    bench: [mon(11, 'Hurt Bench', { damage: 50 })],
+    hand: filler(2),
+  });
+  const { zones } = play(env, [[]]);
+  assert.equal(zones.bench.find((c) => c.instanceId === 10).damage, 150);
+});
+
+test('Misty & Lorelei: the cost grants this turn’s {W} GX reuse; declining grants nothing', () => {
+  const energy = () => [basicEnergy(1, 'Basic Water Energy')];
+  const paid = play(setup(TEXTS.mistyLorelei, { deck: energy(), hand: filler(5) }), [[500, 501, 502, 503, 504], [1]]);
+  assert.equal(paid.res.pendingChoice, null);
+  assert.deepEqual(paid.events.filter((e) => e.type === 'gxReuseGranted').map((e) => e.pokemonType), ['water']);
+  const declined = setup(TEXTS.mistyLorelei, { deck: energy(), hand: filler(5) });
+  play(declined, [[], [1]]);
+  assert.equal(declined.state.players.p1.flags.gxReuseTypes, undefined);
+});
+
+test('Mallow & Lana: with two Benched Pokémon the switch asks first, then heals the one moved', () => {
+  const env = setup(TEXTS.mallowLana, {
+    active: mon(10, 'Hurt Active', { damage: 150 }),
+    bench: [mon(11, 'Bench A', { damage: 40 }), mon(12, 'Bench B')],
+    hand: filler(2),
+  });
+  const { res, prompts, zones } = play(env, [[500, 501], [12]]);
+  assert.equal(res.pendingChoice, null);
+  assert.match(prompts[1].prompt, /Benched Pokémon to switch/);
+  assert.equal(zones.active.find((c) => !c.attachedTo).instanceId, 12);
+  assert.equal(zones.bench.find((c) => c.instanceId === 10).damage, 30);
+  assert.equal(zones.bench.find((c) => c.instanceId === 11).damage, 40);
 });

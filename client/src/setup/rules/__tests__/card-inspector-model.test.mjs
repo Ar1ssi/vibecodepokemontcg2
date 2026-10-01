@@ -860,3 +860,16 @@ test('049: a spent VSTAR Power / GX attack recedes with the server reason', () =
     [true, null],
   ]);
 });
+
+test('I221: Misty & Lorelei re-opens a spent GX attack for a granted type only', () => {
+  const card = (types) => ({
+    name: 'Test-GX',
+    supertype: 'Pokémon',
+    hp: 200,
+    types,
+    attacks: [{ name: 'Tidal-GX', cost: [], damage: '50', text: '' }],
+  });
+  const oncePerGame = { vstarUsed: false, gxUsed: true, gxReuseTypes: ['water'] };
+  assert.equal(buildInspectorModel(card(['Water']), { energyTypes: [], oncePerGame }).attacks[0].usable, true);
+  assert.equal(buildInspectorModel(card(['Darkness']), { energyTypes: [], oncePerGame }).attacks[0].usable, false);
+});

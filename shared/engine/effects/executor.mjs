@@ -33,6 +33,9 @@ import {
   specialEnergyShielded,
   attachedCards,
   removeFromZones,
+  effectShieldBlocks,
+  cardEffectShielded,
+  playerShieldBlocks,
 } from './trainer-steps.mjs';
 import { ATTACK_STEP_HANDLERS, EXTRA_ENERGY_SELF_GATED, stepExtraEnergySatisfied } from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
@@ -92,10 +95,15 @@ function opponentActiveEffectShielded(opponent) {
   return Boolean(active) && specialEnergyShielded(opponent, active, 'effect');
 }
 
-// Fusion Strike Energy: same shape, for the opponent's Abilities.
-function opponentActiveAbilityShielded(opponent) {
+// Fusion Strike Energy: same shape, for the opponent's Abilities; also an Ability shield on that
+// side ("Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon", I219).
+function opponentActiveAbilityShielded(draft, opponent) {
   const active = (opponent?.zones?.active || []).find((c) => !c.attachedTo);
-  return Boolean(active) && specialEnergyShielded(opponent, active, 'ability');
+  if (!active) return false;
+  return (
+    specialEnergyShielded(opponent, active, 'ability') ||
+    cardEffectShielded(draft, { owner: opponent, root: active, source: 'Ability' })
+  );
 }
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
@@ -215,6 +223,25 @@ function keepDistinctNames(deck, selection) {
   });
 }
 
+// "up to 3 Pokémon of different types" (Sabrina & Brycen): keep each pick that can still be given
+// a type no other kept pick uses (a dual-type Pokémon may count as either of its types).
+function keepDistinctTypes(deck, selection) {
+  const kept = [];
+  for (const id of selection) {
+    const typesOf = (cardId) => (deck.find((c) => c.instanceId === cardId)?.types || []).map((t) => String(t).toLowerCase());
+    // A card whose types have not loaded cannot be checked; it is kept (matchesHpCap's rule).
+    const types = [...kept, id].map(typesOf).filter((list) => list.length > 0);
+    if (canAssignDistinctTypes(types)) kept.push(id);
+  }
+  return kept;
+}
+
+function canAssignDistinctTypes(typeLists, used = new Set()) {
+  if (typeLists.length === 0) return true;
+  const [first, ...rest] = typeLists;
+  return first.some((type) => !used.has(type) && canAssignDistinctTypes(rest, new Set([...used, type])));
+}
+
 function opponentBenchIsEvolved(player, root) {
   const stage = normalizeStage(root.stage);
   if (stage && stage !== 'Basic') return true;
@@ -265,6 +292,17 @@ function drawUntilBonusApplies(when, draft, player) {
     default:
       return false;
   }
+}
+
+// Friend Ball: "a Pokémon with the same type as 1 of your opponent's Pokémon in play" — the types
+// of each in-play Pokémon as it is now (its top card).
+function inPlayTypes(player) {
+  const zone = [...(player?.zones?.active || []), ...(player?.zones?.bench || [])];
+  const types = new Set();
+  for (const root of zone.filter((c) => !c.attachedTo)) {
+    for (const t of (topPokemonCard(zone, root) || root).types || []) types.add(String(t).toLowerCase());
+  }
+  return types;
 }
 
 export function attachToRoot(player, card, root, events) {
@@ -419,7 +457,7 @@ export function executeSteps(draft, {
     if (
       effectType === 'ability' &&
       targetsOpponentActiveAbilityOnly(step) &&
-      opponentActiveAbilityShielded(opponent)
+      opponentActiveAbilityShielded(draft, opponent)
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'ability_shield', step: step.type });
       continue;
@@ -436,6 +474,10 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'no_stadium_discarded', step: step.type });
       continue;
     }
+
+    // I219: an Ability shield on the other side stops this Item/Supporter/Ability/Stadium effect.
+    const shieldedTarget = (side, root) =>
+      effectShieldBlocks({ draft, player, effectType, sourceCard, events }, side, root);
 
     // Handle choice resumption for the current step
     const stepSelection = currentSelection;
@@ -455,6 +497,8 @@ export function executeSteps(draft, {
         opponent,
         playerId,
         sourceCard,
+        // I219: which card-effect shields apply (an Item/Supporter played, an Ability, a Stadium).
+        effectType,
         activeRng,
         events,
         // Design 059: whether the cards this step takes into the hand may be named in events.
@@ -465,6 +509,10 @@ export function executeSteps(draft, {
         // 036 E). The widened list rides on later resume tokens.
         insertSteps: (more) => {
           steps = [...steps.slice(0, idx + 1), ...more, ...steps.slice(idx + 1)];
+        },
+        // Sabrina's Suggestion: the copied Supporter's own text decides what its picks reveal.
+        setEffectText: (text) => {
+          context.effectText = text;
         },
         ask: ({ player: chooser = playerId, prompt, options, min, max, memo = {} }) => {
           context[memoKey] = memo;
@@ -587,10 +635,12 @@ export function executeSteps(draft, {
           ? String(step.nameFilter).toLowerCase()
           : null;
         const evolvesFrom = step.evolvesFrom ? String(step.evolvesFrom).toLowerCase() : null;
+        const opponentTypes = step.sameTypeAsOpponent ? inPlayTypes(opponent) : null;
         const cardMatches = (c) =>
           matchesKind(c, { what, exclude: step.exclude }) &&
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
-          (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom);
+          (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom) &&
+          (!opponentTypes || (c?.types || []).some((t) => opponentTypes.has(String(t).toLowerCase())));
 
         const attachKey = `${idx}:searchAttach`;
         const attachRoots = () =>
@@ -753,7 +803,11 @@ export function executeSteps(draft, {
           const branchIds = step.alternatives
             ? pickAlternativeBranch(deck, stepSelection, step.alternatives)
             : stepSelection;
-          const allowedIds = step.distinctNames ? keepDistinctNames(deck, branchIds) : branchIds;
+          const allowedIds = step.distinctNames
+            ? keepDistinctNames(deck, branchIds)
+            : step.distinctTypes
+            ? keepDistinctTypes(deck, branchIds)
+            : branchIds;
           for (const sId of allowedIds) {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
@@ -846,7 +900,7 @@ export function executeSteps(draft, {
 
         const choice = createPendingChoice({
           player: playerId,
-          prompt: `${sourceCard?.name || 'Search'}: Select up to ${effectiveMaxCount} ${step.distinctNames ? 'different ' : ''}card${effectiveMaxCount > 1 ? 's' : ''} (${what}) from your deck`,
+          prompt: `${sourceCard?.name || 'Search'}: Select up to ${effectiveMaxCount} ${step.distinctNames ? 'different ' : ''}${step.distinctTypes ? 'different-type ' : ''}card${effectiveMaxCount > 1 ? 's' : ''} (${what}) from your deck`,
           source: sourceCard?.name || '',
           options: matches,
           min: 0, // In PTCG, private zone searches can fail to find
@@ -1020,7 +1074,8 @@ export function executeSteps(draft, {
 
       case 'ionoShuffle': {
         const actors = [player];
-        if (opponent) actors.push(opponent);
+        // Milotic Dew Guard (I219): a Supporter's effect does not reach a shielded opponent's hand.
+        if (opponent && !playerShieldBlocks({ draft, player, effectType, sourceCard }, opponent)) actors.push(opponent);
 
         // Judge-style: each player shuffles their hand into their deck and draws a fixed count.
         if (step.drawCount) {
@@ -1112,7 +1167,10 @@ export function executeSteps(draft, {
         if (step.target === 'opponent') {
           if (!opponent) break;
           const oppBench = (opponent.zones.bench || []).filter(
-            (c) => !c.attachedTo && (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c))
+            (c) =>
+              !c.attachedTo &&
+              (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c)) &&
+              !shieldedTarget(opponent, c)
           );
           const oppActive = (opponent.zones.active || []).find((c) => !c.attachedTo);
           if (!oppActive || oppBench.length === 0) {
@@ -1185,6 +1243,10 @@ export function executeSteps(draft, {
           break;
         }
 
+        if (step.afterOpponentSwitch && context.opponentSwitchSkipped) {
+          events.push({ type: 'effectStepSkipped', reason: 'no_opponent_switch', step: step.type });
+          break;
+        }
         // Pecharunt ex Subjugating Chains: "1 of your Benched {D} Pokémon, except any Pecharunt ex".
         const benchAllowed = (c) => {
           const top = topPokemonCard(player.zones.bench || [], c) || c;
@@ -1262,6 +1324,8 @@ export function executeSteps(draft, {
             events,
           });
           clearConditions(active);
+          // Mallow & Lana: "heal 120 damage from the Pokémon you moved to your Bench".
+          context.switchedOutId = active.instanceId;
           events.push({
             type: 'cardSwitched',
             playerId,
@@ -1291,10 +1355,13 @@ export function executeSteps(draft, {
           (c) =>
             !c.attachedTo &&
             (step.filter !== 'Basic' || !opponentBenchIsEvolved(opponent, c)) &&
-            (step.filter !== 'V' || isVCard(c))
+            (step.filter !== 'V' || isVCard(c)) &&
+            !shieldedTarget(opponent, c)
         );
         const oppActive = (opponent.zones.active || []).find((c) => !c.attachedTo);
         if (!oppActive || oppBench.length === 0) {
+          // Guzma, Cross Switcher: "If you do, switch your Active Pokémon …" reads this.
+          context.opponentSwitchSkipped = true;
           events.push({ type: 'effectStepSkipped', reason: 'no_opponent_bench', step: step.type });
           break;
         }
@@ -1507,6 +1574,8 @@ export function executeSteps(draft, {
               (c.types || []).some((ty) => typeFilter.includes(String(ty).toLowerCase()))) &&
             (step.target === 'attached Pokémon'
               ? c.instanceId === context.attachedTargetId
+              : step.target === 'switchedOut'
+              ? c.instanceId === context.switchedOutId
               : rootMatchesTarget(player, c, step.target === 'Pokémon' ? '' : step.target))
         );
 
@@ -2015,6 +2084,10 @@ export function executeSteps(draft, {
           const targetActive = side?.zones?.active?.find((c) => !c.attachedTo);
           if (!targetActive) continue;
           if (statusTarget === 'bothActiveNonDark' && isDark(targetActive)) continue;
+          if (shieldedTarget(side, targetActive)) {
+            events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type, instanceId: targetActive.instanceId });
+            continue;
+          }
           for (const condition of conditions) {
             if (!addCondition(targetActive, condition)) continue;
             events.push({

@@ -157,7 +157,7 @@ import { stampRevealedArt, textRevealsPicks } from './rules/reveal-picks.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-steps.mjs';
-import { pokemonHasType } from './effects/trainer-steps.mjs';
+import { cardEffectShielded, pokemonHasType } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
 import { replaceSelfName } from './rules/attack-text.mjs';
@@ -394,7 +394,8 @@ function damageBenchedPokemon(
   if (dealt <= 0) return;
 
   // Check Tera bench damage immunity ("Tera: As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks")
-  if (isTeraCard(victim)) {
+  // The Tera rule is printed on the top card: an evolved Tera Pokémon ex's Basic is not Tera.
+  if (isTeraCard(inPlayView(draft, victim) || victim)) {
     events.push({
       type: 'damagePrevented',
       instanceId: victim.instanceId,
@@ -1035,19 +1036,29 @@ function spendVstarAttack(draft, { playerId, attacker, attack, events }) {
  * from the opponent, a spent GX attack, or a spent VSTAR Power. Shared by attack legality and
  * every copy-candidate filter so a copied attack obeys the same limits (design 049 O5).
  */
-function onceAttackBlockReason(state, playerId, attack) {
+function onceAttackBlockReason(state, playerId, attack, attacker = null) {
   const player = state.players?.[playerId];
   if (isGxAttack(attack)) {
     const opponentId = Object.keys(state.players || {}).find((id) => id !== playerId);
     if (state.players?.[opponentId]?.restOfGame?.some((e) => e.kind === 'gxLock')) {
       return "Your opponent's attack stops you using GX attacks for the rest of the game.";
     }
-    if (oncePerGameUsed(player, 'gx')) return 'Only one GX attack can be used per game.';
+    if (oncePerGameUsed(player, 'gx') && !gxReuseAllowed(state, player, attacker)) {
+      return 'Only one GX attack can be used per game.';
+    }
   }
   if (isVstarPowerAttack(attack) && oncePerGameUsed(player, 'vstar')) {
     return 'VSTAR Power already used this game.';
   }
   return null;
+}
+
+// Misty & Lorelei (CEC 199): this turn, the player's Pokémon of a granted type ignore a spent GX attack.
+function gxReuseAllowed(state, player, attacker) {
+  const granted = player?.flags?.gxReuseTypes;
+  if (!Array.isArray(granted) || granted.length === 0 || !attacker) return false;
+  const types = (inPlayView(state, attacker)?.types || attacker.types || []).map((t) => String(t).toLowerCase());
+  return types.some((t) => granted.includes(t));
 }
 
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.
@@ -2387,6 +2398,8 @@ function applyBetweenTurnsStadiumDamage(draft, { events }) {
         if (mon.attachedTo) continue;
         const dmg = stadiumBetweenTurnsDamageFor(mon, card);
         if (dmg <= 0) continue;
+        // Lunatone New Moon (I219): "prevent all effects of any Stadium done to your Pokémon in play".
+        if (cardEffectShielded(draft, { owner: player, root: mon, source: 'Stadium' })) continue;
         mon.damage = (mon.damage || 0) + dmg;
         events.push({
           type: 'stadiumBetweenTurnsDamage',
@@ -2506,7 +2519,7 @@ function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
  */
 function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [] }) {
   const entries = inPlayEntries(draft);
-  const effects = parseCheckupAbilities(entries, ctx);
+  const effects = parseCheckupAbilities(entries, ctx).map((effect) => ({ ...effect, fromAbility: true }));
   for (const effect of betweenEffects) {
     if (effect.kind !== 'damage') continue;
     const targets = resolveBetweenTurnsTargets(effect, entries, effect.playerId);
@@ -2515,6 +2528,14 @@ function applyCheckupAbilities(draft, { events, ctx, betweenEffects = [] }) {
   const affected = [];
   for (const effect of effects) {
     for (const target of effect.targets) {
+      // I219: "Prevent all effects of your opponent's Pokémon's Abilities done to this Pokémon."
+      if (
+        effect.fromAbility &&
+        target.playerId !== effect.playerId &&
+        cardEffectShielded(draft, { owner: draft.players[target.playerId], root: target.card, source: 'Ability' })
+      ) {
+        continue;
+      }
       const damage = effect.count * 10;
       target.card.damage = (target.card.damage || 0) + damage;
       events.push({
@@ -3440,6 +3461,7 @@ function advanceTurn(draft, { nextPlayerId, events }) {
     if (p.playerId !== nextPlayerId && p.flags) {
       p.flags.briarActive = false;
       delete p.flags.turnDamageBonuses;
+      delete p.flags.gxReuseTypes;
       delete p.flags.ignoreDefenderEffectsTurn;
       delete p.flags.evolutionAttacksTurn;
       delete p.flags.willFirstCoin;
@@ -3478,6 +3500,17 @@ function advanceTurn(draft, { nextPlayerId, events }) {
       cards: [{ instanceId: card.instanceId }],
     });
   }
+}
+
+/**
+ * A Trainer that took the player's last Prize card (Missing Clover's 4-card mode, I190) wins the
+ * game once its effect has fully resolved: Peonia-style swaps put Prizes back before that.
+ */
+function settleTrainerPrizeWin(draft, { playerId, events }) {
+  if (draft.pendingChoice || isGameConcluded(draft)) return;
+  if (!events.some((e) => e.type === 'prizeTaken' && e.playerId === playerId)) return;
+  if ((draft.players?.[playerId]?.zones?.prizes || []).length > 0) return;
+  setGameEnded(draft, { winner: playerId, reason: 'all prize cards taken', events });
 }
 
 /**
@@ -4580,7 +4613,7 @@ export function validateLegality(state, command) {
       // game-scoped, so this is the cross-turn gate that `attackerAttacked` (per-turn) cannot
       // provide. `oncePerGameUsed` shares the `useVStarGX` guard, so a legacy state whose marker
       // lives on `flags` also blocks it.
-      const onceReason = onceAttackBlockReason(state, playerId, attack);
+      const onceReason = onceAttackBlockReason(state, playerId, attack, active);
       if (onceReason) return { allowed: false, reason: onceReason };
       // Iron Rule-GX (design 048): a player-scoped attack lock from the opponent's last turn,
       // covering Pokémon that came into play after the lock landed.
@@ -6011,7 +6044,7 @@ const RAW_ATTACK_SOURCES = new Set([
  * attack" (Smeargle Sketch) skips the use gate.
  */
 function copyCandidateAllowed(draft, { copy, playerId, attacker, attack }) {
-  if (onceAttackBlockReason(draft, playerId, attack)) return false;
+  if (onceAttackBlockReason(draft, playerId, attack, attacker)) return false;
   if (copy?.ignoreRequirements) return true;
   const gate = parseAttackUseGate(attack?.text, { selfName: inPlayView(draft, attacker)?.name || attacker?.name });
   if (!gate) return true;
@@ -9077,6 +9110,7 @@ export function applyCommand(state, command, rng = null) {
           events,
           targetInstanceId: payload.targetInstanceId,
         });
+        settleTrainerPrizeWin(draft, { playerId, events });
         endTurnAfterTrainer(draft, { card: cardRef.card, playerId, activeRng, events });
       }
       break;
@@ -9172,6 +9206,7 @@ export function applyCommand(state, command, rng = null) {
           selection: payload.selection,
           resumeToken: token,
         });
+        settleTrainerPrizeWin(draft, { playerId: initiatorPlayerId, events });
         endTurnAfterTrainer(draft, { card: resumeCard, playerId: initiatorPlayerId, activeRng, events });
       } else if (token.effectType === 'ability') {
         const result = executeAbility(draft, {

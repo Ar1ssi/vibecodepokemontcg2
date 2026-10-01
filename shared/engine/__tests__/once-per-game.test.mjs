@@ -413,3 +413,26 @@ test('a legacy flags-only spent GX blocks a second GX attack (I75)', () => {
   });
   assert.match(res.error, /one GX attack/i);
 });
+
+// Misty & Lorelei (Cosmic Eclipse 199, corpus row): "If you do, during this turn, your {W} Pokémon
+// can use their GX attacks even if you have used your GX attack."
+test('Misty & Lorelei: a granted type may use a GX attack after the GX attack was spent, this turn only', () => {
+  const state = baseState();
+  addGxAttacker(state);
+  addDefender(state);
+  state.players.p1.oncePerGame.gxUsed = true;
+  state.players.p1.flags.gxReuseTypes = ['water'];
+  const gx = { type: 'attack', payload: { attackIndex: 1 }, playerId: 'p1' };
+
+  state.players.p1.zones.active[0].types = ['Fire'];
+  assert.match(applyCommand(state, gx).error, /one GX attack/i, 'a Fire Pokémon is not covered');
+
+  state.players.p1.zones.active[0].types = ['Water'];
+  const reused = applyCommand(state, gx);
+  assert.equal(reused.error, null);
+  assert.equal(reused.state.players.p2.zones.active[0].damage, 40);
+
+  const nextTurn = pass('p2', pass('p1', state).state).state;
+  assert.equal(nextTurn.players.p1.flags.gxReuseTypes, undefined);
+  assert.match(applyCommand(nextTurn, gx).error, /one GX attack/i);
+});

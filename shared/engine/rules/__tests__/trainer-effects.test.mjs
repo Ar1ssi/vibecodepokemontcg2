@@ -2622,8 +2622,10 @@ describe('Audit S&M compound clauses (S6)', () => {
     const r = parseTrainerEffect(
       'You may play 4 Missing Clover cards at once. If you played 1 card, look at the top card of your deck. If you played 4 cards, take a Prize card. (This effect works one time for 4 cards.)'
     );
-    assert.equal(r.steps[0].type, 'peekReturn');
-    assert.equal(r.steps[0].count, 1);
+    // I190: the 4-card Prize mode is now a choice; the single mode stays a 1-card peek.
+    assert.equal(r.steps[0].type, 'playCopiesChoice');
+    assert.deepEqual(r.steps[0].single, [{ type: 'peekReturn', count: 1 }]);
+    assert.deepEqual(r.steps[0].multi, [{ type: 'takeFaceDownPrize', count: 1 }]);
   });
 
   test('Bug Catcher / heads-only draw flips keep their coin gate', () => {

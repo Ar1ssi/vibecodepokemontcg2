@@ -244,6 +244,14 @@ function playConditionBlockReason(condition, ctx) {
   if (condition === 'lastCardInHand') {
     return ctx.handCount > 1 ? 'This must be the last card in your hand.' : null;
   }
+  // Cross Switcher: "You must play 2 Cross Switcher cards at once."
+  const copies = condition.match(/^copiesInHand>=(\d+)$/);
+  if (copies) {
+    if (!Array.isArray(ctx.handNames)) return null;
+    const own = normalizeName(ctx.cardName);
+    const held = ctx.handNames.filter((name) => normalizeName(name) === own).length;
+    return held < Number(copies[1]) ? `You must play ${copies[1]} ${ctx.cardName} cards at once.` : null;
+  }
   if (condition === 'onlyCopiesInHand') {
     if (!Array.isArray(ctx.handNames)) return null;
     const own = normalizeName(ctx.cardName);

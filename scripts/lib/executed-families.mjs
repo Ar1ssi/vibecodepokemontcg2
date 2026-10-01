@@ -79,6 +79,8 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'discard-bench',
   'discard-cost',
   'draw',
+  // Restored (I219): abilityPreventsCardEffects reads the Item/Supporter/Ability/Stadium shields, 100/151.
+  'effect-prevent',
   'energy-on-ko',
   'energy-redirect',
   'evolve',
@@ -97,8 +99,6 @@ export const EXECUTED_ABILITY_FAMILIES = new Set([
   'switch',
   'tool-cap',
   'weakness',
-  // 'effect-prevent' withdrawn (I218): its rows had read as consumed only through the damage-prevention
-  // misread fa7966b fixed; the Item/Supporter/Ability/Stadium shields that fill it have no reader, 54/151.
   // 'when-played' withdrawn: the clause cross-check (scripts/lib/ability-behaviour.mjs rowFlags)
   // found 6 rows that paid their hand cost but skipped the effect (Crawdaunt Unruly Claw), 17/39.
 ]);
@@ -126,6 +126,7 @@ export const ORACLE_BLIND_FAMILIES = new Map([
   ['ability:copy-attack', 'passive attack borrowing; read by the audit:abilities probes'],
   ['ability:energy-on-ko', 'triggered on a Knock Out; read by the audit:abilities probes'],
   ['ability:extra-supporter', 'passive rule modifier; read by the audit:abilities probes'],
+  ['ability:effect-prevent', 'passive shield against played Trainers/Abilities/Stadiums (I219); read by the audit:abilities probes'],
   [
     'ability:attack-inheritance',
     'passive rule modifier; useAbility rejects it',

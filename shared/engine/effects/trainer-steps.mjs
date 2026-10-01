@@ -37,9 +37,15 @@ import {
 import { discardCurrentStadium } from './trainer.mjs';
 import { resolveSpecialEnergyDiscard } from './special-energy.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
-import { abilityCounterMoveLock } from '../rules/ability-combat.mjs';
+import {
+  abilityCounterMoveLock,
+  abilityPreventsCardEffects,
+  abilityPreventsCardEffectsOnPlayer,
+  sideContextFor,
+} from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
 import { isSupporterTrainer } from '../rules/trainer-play-conditions.mjs';
+import { parseTrainerEffect, trainerEndsTurn } from '../rules/trainer-effects.mjs';
 import {
   mayAttachAnyTechnicalMachine,
   parseTmAttachRestriction,
@@ -138,6 +144,62 @@ export function specialEnergyShielded(player, root, kind = 'effect') {
   return kind === 'ability'
     ? hasSpecialEnergyAbilityShield(view, zone)
     : hasSpecialEnergyEffectShield(view, zone);
+}
+
+/**
+ * I219: the card effect a step runs as, in the words card-effect shields use — the Item or
+ * Supporter the player played from hand, their Pokémon's Ability, or a Stadium — else null
+ * (attacks have their own shields; a Tool's effect is not "played from hand").
+ */
+export function cardEffectSource(effectType, sourceCard) {
+  if (effectType === 'ability') return 'Ability';
+  if (effectType === 'stadium') return 'Stadium';
+  if (effectType !== 'trainer') return null;
+  const kind = `${sourceCard?.trainerType || ''} ${sourceCard?.type || ''} ${(sourceCard?.subtypes || []).join(' ')}`.toLowerCase();
+  if (kind.includes('supporter')) return 'Supporter';
+  if (kind.includes('stadium')) return 'Stadium';
+  if (kind.includes('item')) return 'Item';
+  return null;
+}
+
+/** Whether an Ability on `owner`'s side shields its in-play `root` from `source` (I219). */
+export function cardEffectShielded(draft, { owner, root, source }) {
+  if (!source || !owner || !root) return false;
+  const zone = zoneOfRoot(owner, root);
+  if (!zone) return false;
+  const other = Object.values(draft?.players || {}).find((p) => p && p.playerId !== owner.playerId);
+  const sideCtx = { ...sideContextFor(draft, owner.playerId), opponentPrizesLeft: other?.zones?.prizes?.length };
+  return abilityPreventsCardEffects(evolvedView(zone, root), source, sideCtx);
+}
+
+/**
+ * True when the running Item/Supporter/Ability/Stadium effect may not touch `root`, one of the
+ * other player's Pokémon: an Ability shield (Unnerve, Ninja Body, Lustrous Body, …) or, against
+ * an Ability, Fusion Strike Energy. Target filters call it on every prompt, so it emits nothing.
+ */
+export function effectShieldBlocks(ctx, side, root) {
+  if (!side || !root) return false;
+  const source = cardEffectSource(ctx.effectType, ctx.sourceCard);
+  if (!source) return false;
+  // Card and Ability shields name the opponent's; Lunatone's "any Stadium" includes its own side's.
+  if (side === ctx.player && source !== 'Stadium') return false;
+  if (source === 'Ability' && specialEnergyShielded(side, root, 'ability')) return true;
+  return cardEffectShielded(ctx.draft, { owner: side, root, source });
+}
+
+/**
+ * True when the running card effect may not touch `side` itself or its hand: the other player
+ * has Milotic Dew Guard in play and a Supporter is running (I219).
+ */
+export function playerShieldBlocks(ctx, side) {
+  if (!side || side === ctx.player) return false;
+  const source = cardEffectSource(ctx.effectType, ctx.sourceCard);
+  return Boolean(source) && abilityPreventsCardEffectsOnPlayer(source, sideContextFor(ctx.draft, side.playerId));
+}
+
+// The other player's Pokémon the running effect may target (I219).
+function targetableRoots(ctx, side) {
+  return rootsOf(side).filter((root) => !effectShieldBlocks(ctx, side, root));
 }
 
 function zoneIdOf(player, card) {
@@ -408,6 +470,8 @@ function attachFromHand(ctx) {
 
 function opponentDraw(ctx) {
   if (!ctx.opponent) return skip(ctx, 'no_opponent');
+  // Milotic Dew Guard (Marnie: the shielded player keeps their hand and draws nothing).
+  if (playerShieldBlocks(ctx, ctx.opponent)) return skip(ctx, 'effect_shield');
   drawCards(ctx.opponent, ctx.step.count || 1, ctx.events);
   return null;
 }
@@ -460,6 +524,7 @@ function putHandOnTop(ctx) {
 function opponentShuffleHandDraw(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
   const moved = handToDeckBottom(opponent, ctx);
   if (moved > 0) drawCards(opponent, step.count || 3, ctx.events);
   return null;
@@ -468,6 +533,7 @@ function opponentShuffleHandDraw(ctx) {
 function opponentCountShuffleDraw(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
   const moved = handToDeckBottom(opponent, ctx);
   if (moved > 0) drawCards(opponent, moved, ctx.events);
   return null;
@@ -963,7 +1029,7 @@ function devolve(ctx) {
 function allAttachedMatching(ctx, players, predicate) {
   return players
     .filter(Boolean)
-    .flatMap((p) => rootsOf(p).flatMap((root) => attachedCards(p, root.instanceId)))
+    .flatMap((p) => targetableRoots(ctx, p).flatMap((root) => attachedCards(p, root.instanceId)))
     .filter(predicate);
 }
 
@@ -1016,7 +1082,7 @@ function massDiscardAttached(ctx) {
 
 function discardToolAndSpecialEnergy(ctx) {
   const { opponent } = ctx;
-  const candidates = rootsOf(opponent).filter((root) =>
+  const candidates = targetableRoots(ctx, opponent).filter((root) =>
     attachedCards(opponent, root.instanceId).some((c) => isToolCard(c) || isSpecialEnergy(c))
   );
 
@@ -1052,7 +1118,7 @@ function discardEnergyFromOpponent(ctx) {
   const matchesEnergy = step.energy === 'Special Energy' ? isSpecialEnergy : isEnergy;
 
   if (step.scope === 'each Pokémon') {
-    for (const root of rootsOf(opponent)) {
+    for (const root of targetableRoots(ctx, opponent)) {
       const energy = attachedCards(opponent, root.instanceId).find(matchesEnergy);
       if (energy) discardCard(ctx.draft, energy, ctx.events);
     }
@@ -1060,7 +1126,7 @@ function discardEnergyFromOpponent(ctx) {
   }
 
   // scope 'Active': only the opponent's Active Pokémon (Crawdaunt Unruly Claw).
-  const active = step.scope === 'Active' ? activeOf(opponent) : null;
+  const active = step.scope === 'Active' ? targetableRoots(ctx, opponent).find((r) => r === activeOf(opponent)) : null;
   const energies =
     step.scope === 'Active'
       ? (active ? attachedCards(opponent, active.instanceId).filter(matchesEnergy) : [])
@@ -1197,7 +1263,7 @@ function damageCounters(ctx) {
     return true;
   };
   const targets = (/active/i.test(step.target || '') ? [activeOf(side)].filter(Boolean) : rootsOf(side)).filter(
-    (root) => !shieldBlocks(root)
+    (root) => !shieldBlocks(root) && !effectShieldBlocks(ctx, side, root)
   );
 
   const apply = (card) => {
@@ -1279,7 +1345,7 @@ function moveOwnDamageToOpponent(ctx) {
   // Fusion Strike Energy: the counters an opponent's Ability would place on its host
   // are prevented, so the host is not a legal destination.
   const destinations = rootsOf(opponent).filter((root) => {
-    if (!specialEnergyShielded(opponent, root, 'ability')) return true;
+    if (!specialEnergyShielded(opponent, root, 'ability')) return !effectShieldBlocks(ctx, opponent, root);
     ctx.events.push({
       type: 'damagePrevented',
       instanceId: root.instanceId,
@@ -1362,7 +1428,7 @@ function returnPokemonToHand(ctx) {
   // card go back to the opponent's hand.
   if (step.side === 'opponent') {
     if (!opponent) return skip(ctx, 'no_opponent');
-    const bench = benchRootsOf(opponent);
+    const bench = benchRootsOf(opponent).filter((root) => !effectShieldBlocks(ctx, opponent, root));
     const returnRoot = (root) => {
       for (const card of [root, ...attachedCards(opponent, root.instanceId)]) {
         removeFromZones(opponent, card);
@@ -1575,6 +1641,7 @@ function attachMultipleFromDiscard(ctx) {
 function opponentPrizeHandSwap(ctx) {
   const { opponent, activeRng } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
   const prizes = opponent.zones.prizes;
   const hand = opponent.zones.hand;
   if (prizes.length === 0 || hand.length === 0) return skip(ctx, 'no_prize_or_hand');
@@ -1602,6 +1669,7 @@ function revealOpponentHand(ctx) {
 function revealOpponentHandDiscard(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
   const matches = opponent.zones.hand.filter((c) => matchesSearch(c, step.what || 'Item'));
   if (ctx.selection) {
     for (const card of pickById(matches, ctx.selection)) discardCard(ctx.draft, card, ctx.events);
@@ -1626,6 +1694,7 @@ function revealOpponentHandDiscard(ctx) {
 function opponentHandBottom(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
   const matches = opponent.zones.hand.filter((c) => step.what === 'Energy' ? isEnergy(c) : true);
   if (ctx.selection) {
     const card = matches.find((c) => c.instanceId === ctx.selection[0]);
@@ -1677,6 +1746,7 @@ function discardSelectedFromHand(ctx, target) {
 function opponentDiscardUntil(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
   if (ctx.selection) {
     discardSelectedFromHand(ctx, opponent);
     return null;
@@ -1687,7 +1757,8 @@ function opponentDiscardUntil(ctx) {
 function eachPlayerDiscardUntil(ctx) {
   const { player, opponent, step } = ctx;
   const count = step.count || 5;
-  const order = [opponent, player].filter(Boolean);
+  // Milotic Dew Guard (I219): a shielded opponent's hand sits the Supporter out.
+  const order = [opponent, player].filter((side) => side && !playerShieldBlocks(ctx, side));
   if (!step.opponentFirst) order.reverse();
   let turn = ctx.memo?.turn ?? 0;
 
@@ -2279,10 +2350,12 @@ function moveDamageCountersStep(ctx) {
   if (!fromSide || !toSide) return skip(ctx, 'no_opponent');
 
   const donors = (step.from === 'ownActive' ? [activeOf(player)].filter(Boolean) : rootsOf(fromSide)).filter(
-    (c) => (c.damage || 0) > 0
+    (c) => (c.damage || 0) > 0 && !effectShieldBlocks(ctx, fromSide, c)
   );
   const receivers = () =>
-    step.to === 'opponentActive' ? [activeOf(toSide)].filter(Boolean) : rootsOf(toSide);
+    (step.to === 'opponentActive' ? [activeOf(toSide)].filter(Boolean) : rootsOf(toSide)).filter(
+      (c) => !effectShieldBlocks(ctx, toSide, c)
+    );
   const countersFor = (from) => Math.min(step.count || 1, Math.floor((from.damage || 0) / 10));
 
   const move = (from, to) => {
@@ -2505,7 +2578,7 @@ function opponentHandToBenchBasic(ctx) {
 function opponentActiveEnergyToDeck(ctx) {
   const { opponent } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const active = activeOf(opponent);
+  const active = targetableRoots(ctx, opponent).find((root) => root === activeOf(opponent));
   const energies = active ? attachedCards(opponent, active.instanceId).filter(isEnergy) : [];
 
   if (ctx.selection) {
@@ -3308,6 +3381,16 @@ function turnDamageBonusTrainer(ctx) {
   return null;
 }
 
+/** Misty & Lorelei: this turn, the player's Pokémon of `pokemonType` may use a GX attack after one was used. */
+function gxReuseTurn(ctx) {
+  const { player, step } = ctx;
+  if (!step.pokemonType) return skip(ctx, 'no_type');
+  if (!player.flags) player.flags = {};
+  player.flags.gxReuseTypes = [...new Set([...(player.flags.gxReuseTypes || []), step.pokemonType])];
+  ctx.events.push({ type: 'gxReuseGranted', playerId: player.playerId, pokemonType: step.pokemonType });
+  return null;
+}
+
 /**
  * Turn-scoped attack damage boost from an activated ability (Feraligatr
  * Torrential Heart, Skeledirge ex Incendiary Song). Pushes the same shape
@@ -4015,7 +4098,7 @@ function putHandBottomThenDraw(ctx) {
 function moveEnergyOpponent(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const roots = rootsOf(opponent);
+  const roots = targetableRoots(ctx, opponent);
   const energies = roots
     .flatMap((root) => attachedCards(opponent, root.instanceId))
     .filter((c) => attachedEnergyMatches(c, step.energy));
@@ -4052,7 +4135,7 @@ function moveEnergyOpponent(ctx) {
 function sendEnergyToDeckBottom(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const candidates = rootsOf(opponent)
+  const candidates = targetableRoots(ctx, opponent)
     .flatMap((root) => attachedCards(opponent, root.instanceId))
     .filter((c) => attachedEnergyMatches(c, step.energy));
   const send = (energy) => {
@@ -4085,7 +4168,7 @@ function sendEnergyToDeckBottom(ctx) {
 function sendEnergyToLostZone(ctx) {
   const { opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const candidates = rootsOf(opponent)
+  const candidates = targetableRoots(ctx, opponent)
     .flatMap((root) => attachedCards(opponent, root.instanceId))
     .filter((c) => attachedEnergyMatches(c, step.energy));
   const send = (energy) => {
@@ -4157,7 +4240,8 @@ function flipUntilTailsDraw(ctx) {
 function eachPlayerHandToFive(ctx) {
   const { player, opponent, step } = ctx;
   const target = step.count || 5;
-  const order = [opponent, player].filter(Boolean);
+  // Milotic Dew Guard (I219): a shielded opponent's hand sits the Supporter out.
+  const order = [opponent, player].filter((side) => side && !playerShieldBlocks(ctx, side));
   if (!step.opponentFirst) order.reverse();
   let turn = ctx.memo?.turn ?? 0;
   if (ctx.selection) {
@@ -4181,7 +4265,8 @@ function eachPlayerHandToFive(ctx) {
 function eachPlayerDiscardFromHand(ctx) {
   const { player, opponent, step } = ctx;
   const count = step.count || 2;
-  const order = [opponent, player].filter(Boolean);
+  // Milotic Dew Guard (I219): a shielded opponent's hand sits the Supporter out.
+  const order = [opponent, player].filter((side) => side && !playerShieldBlocks(ctx, side));
   if (!step.opponentFirst) order.reverse();
   let turn = ctx.memo?.turn ?? 0;
   if (ctx.selection) {
@@ -4717,7 +4802,7 @@ function shuffleDiscardThenMill(ctx) {
 
 // Wicke: each player shuffles their hand into their deck and draws that many.
 function eachPlayerShuffleHandDraw(ctx) {
-  for (const side of [ctx.player, ctx.opponent].filter(Boolean)) {
+  for (const side of [ctx.player, ctx.opponent].filter((p) => p && !playerShieldBlocks(ctx, p))) {
     const count = side.zones.hand.length;
     side.zones.deck.push(...side.zones.hand.splice(0));
     shuffleDeck(side, ctx);
@@ -4733,6 +4818,7 @@ function discardAllEnergyFromActive(ctx) {
   if (!side) return skip(ctx, 'no_opponent');
   const active = activeOf(side);
   if (!active) return skip(ctx, 'no_active');
+  if (effectShieldBlocks(ctx, side, active)) return skip(ctx, 'effect_shield');
   const energies = attachedCards(side, active.instanceId).filter(isEnergy);
   if (energies.length === 0) return skip(ctx, 'no_energy');
   for (const energy of energies) {
@@ -4753,7 +4839,7 @@ function discardAllTrainerInPlay(ctx) {
   const { player, opponent, step } = ctx;
   const side = step.side === 'opponent' ? opponent : player;
   if (!side) return skip(ctx, 'no_opponent');
-  const tools = rootsOf(side)
+  const tools = targetableRoots(ctx, side)
     .flatMap((root) => attachedCards(side, root.instanceId))
     .filter(isToolCard);
   for (const tool of tools) {
@@ -4829,6 +4915,179 @@ function chooseMode(ctx) {
   });
 }
 
+// ── I190: multi-copy plays, copied Supporters, each-player mill and bench cut ──────────────
+
+const cardNameKey = (card) => String(card?.name || '').toLowerCase().replace(/[’‘]/g, "'").trim();
+
+/** The other copies of the played card still in hand. */
+function otherCopiesInHand(ctx) {
+  const name = cardNameKey(ctx.sourceCard);
+  return (ctx.player.zones.hand || []).filter(
+    (c) => c !== ctx.sourceCard && c.instanceId !== ctx.sourceCard?.instanceId && cardNameKey(c) === name
+  );
+}
+
+function discardPlayedCopies(ctx, copies) {
+  for (const card of copies) {
+    removeFromZones(ctx.player, card);
+    discardCardToPlayerZone(ctx.player, card);
+  }
+  ctx.events.push({
+    type: 'cardsDiscarded',
+    playerId: ctx.player.playerId,
+    playedWith: ctx.sourceCard?.instanceId,
+    cards: copies.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+  });
+}
+
+// Cross Switcher: "You must play 2 Cross Switcher cards at once." The play gate
+// (copiesInHand>=2) checked the hand; the partner copy is discarded with this one.
+function playCopies(ctx) {
+  const needed = ctx.step.count || 1;
+  const copies = otherCopiesInHand(ctx).slice(0, needed);
+  if (copies.length < needed) return skip(ctx, 'not_enough_copies');
+  discardPlayedCopies(ctx, copies);
+  return null;
+}
+
+// Missing Clover: "You may play 4 Missing Clover cards at once. If you played 1 card, …
+// If you played 4 cards, …". Option 1 plays this card alone, option 2 all N at once.
+function playCopiesChoice(ctx) {
+  const { step } = ctx;
+  const count = step.count || 2;
+  const copies = otherCopiesInHand(ctx);
+  const playAll = () => {
+    discardPlayedCopies(ctx, copies.slice(0, count - 1));
+    ctx.insertSteps(step.multi || []);
+    return null;
+  };
+  if (copies.length < count - 1) {
+    ctx.insertSteps(step.single || []);
+    return null;
+  }
+  if (ctx.selection) {
+    if (ctx.selection.map(Number).includes(2)) return playAll();
+    ctx.insertSteps(step.single || []);
+    return null;
+  }
+  const name = ctx.sourceCard?.name || 'this card';
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Play 1 card, or ${count} at once?`,
+    options: [
+      { instanceId: 1, name: `Play 1 ${name}`, type: 'option' },
+      { instanceId: 2, name: `Play ${count} ${name} cards at once`, type: 'option' },
+    ],
+    min: 1,
+    max: 1,
+  });
+}
+
+// Sabrina's Suggestion: the opponent reveals their hand; the player may pick a Supporter there
+// and this card resolves that Supporter's effect. Another Sabrina's Suggestion is not offered.
+function useOpponentSupporter(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  // Milotic Dew Guard: the reveal is an effect done to that player's hand.
+  if (playerShieldBlocks(ctx, opponent)) return skip(ctx, 'effect_shield');
+  const own = cardNameKey(ctx.sourceCard);
+  const supporters = (opponent.zones.hand || []).filter(
+    (c) => isSupporterTrainer(c) && cardNameKey(c) !== own
+  );
+  if (ctx.selection) {
+    const [chosen] = pickById(supporters, ctx.selection);
+    if (!chosen) return skip(ctx, 'declined');
+    const text = chosen.text || chosen.effect || chosen.cardText || '';
+    const parsed = parseTrainerEffect(text);
+    if (!parsed.recognizable || parsed.steps.length === 0) return skip(ctx, 'unrecognized_supporter');
+    ctx.events.push({
+      type: 'supporterEffectUsed',
+      playerId: ctx.player.playerId,
+      instanceId: chosen.instanceId,
+      name: chosen.name,
+    });
+    // The copied card's text, not this one's, decides what its searches reveal, and its closing
+    // "Your turn ends." still ends the turn once the copied effect has resolved.
+    ctx.setEffectText?.(text);
+    const endsTurn = trainerEndsTurn({ text }) ? [{ type: 'turnEnds' }] : [];
+    ctx.insertSteps([...parsed.steps, ...endsTurn]);
+    return null;
+  }
+  revealOpponentHand(ctx);
+  if (supporters.length === 0) return skip(ctx, 'no_supporter_in_hand');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Supporter')}: You may choose a Supporter from your opponent's hand and use its effect`,
+    options: supporters,
+    min: 0,
+    max: 1,
+  });
+}
+
+// Missing Clover: "take a Prize card". The Prizes are face down, so the player gets a random one
+// rather than a pick from a list that would name them.
+function takeFaceDownPrize(ctx) {
+  const { player, step } = ctx;
+  const prizes = player.zones.prizes || [];
+  const count = Math.min(step.count || 1, prizes.length);
+  if (count === 0) return skip(ctx, 'no_prizes');
+  const taken = [];
+  for (let i = 0; i < count; i++) {
+    const index = Math.floor((ctx.activeRng ? ctx.activeRng.next() : 0) * prizes.length);
+    const [card] = prizes.splice(Math.min(index, prizes.length - 1), 1);
+    delete card.revealed;
+    player.zones.hand.push(card);
+    taken.push(card);
+  }
+  ctx.events.push({ type: 'prizeTaken', playerId: player.playerId, count: taken.length });
+  return null;
+}
+
+// Bellelba & Brycen-Man: "Discard 3 cards from the top of each player's deck."
+function millEachPlayer(ctx) {
+  for (const side of [ctx.player, ctx.opponent].filter((p) => p && !playerShieldBlocks(ctx, p))) {
+    const milled = side.zones.deck.splice(0, ctx.step.count || 1);
+    for (const card of milled) discardCardToPlayerZone(side, card);
+    ctx.events.push({
+      type: 'cardsDiscarded',
+      playerId: side.playerId,
+      cards: milled.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+    });
+  }
+  return null;
+}
+
+// Bellelba & Brycen-Man: "each player discards their Benched Pokémon until they have 3 Benched
+// Pokémon. Your opponent discards first." Each player picks their own.
+function eachPlayerDiscardBenchUntil(ctx) {
+  const { player, opponent, step } = ctx;
+  const keep = step.count ?? 3;
+  const order = [opponent, player].filter(Boolean);
+  if (!step.opponentFirst) order.reverse();
+  let turn = ctx.memo?.turn ?? 0;
+  if (ctx.selection) {
+    const owner = order[turn];
+    const bench = benchRootsOf(owner);
+    for (const root of pickById(bench, ctx.selection).slice(0, Math.max(0, bench.length - keep))) {
+      discardInPlayPokemon(owner, root, ctx.events);
+    }
+    turn += 1;
+  }
+  for (; turn < order.length; turn++) {
+    const owner = order[turn];
+    const bench = benchRootsOf(owner);
+    const excess = bench.length - keep;
+    if (excess <= 0) continue;
+    return ctx.ask({
+      player: owner.playerId,
+      prompt: `${sourceName(ctx, 'Supporter')}: Discard ${excess} Benched Pokémon until you have ${keep}`,
+      options: bench,
+      min: excess,
+      max: excess,
+      memo: { turn },
+    });
+  }
+  return null;
+}
+
 // "When you play this card, you may discard N other cards from your hand. If you do, …" (Guzma &
 // Hala, Red & Blue): the player picks exactly N cards to pay, or declines (any other count). A paid
 // cost tags its `cardsDiscarded` event `handCost`, which opens the later `requiresHandCost` steps.
@@ -4861,6 +5120,12 @@ function optionalDiscardCost(ctx) {
 
 export const EXTRA_STEP_HANDLERS = {
   optionalDiscardCost,
+  playCopies,
+  playCopiesChoice,
+  useOpponentSupporter,
+  millEachPlayer,
+  takeFaceDownPrize,
+  eachPlayerDiscardBenchUntil,
   attachTool,
   attachAttackTool,
   clearStatus,
@@ -4942,6 +5207,7 @@ export const EXTRA_STEP_HANDLERS = {
   turnDamageBonusAbility,
   chooseMode,
   turnDamageBonusTrainer,
+  gxReuseTurn,
   returnSelfToHandAbility,
   selfLeavesAbility,
   // Design 034 slice 6 one-offs.

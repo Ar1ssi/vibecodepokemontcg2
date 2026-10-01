@@ -20,7 +20,15 @@
 //   { type: 'discardCost', count: N }
 //   { type: 'optionalDiscardCost', count: N }   ("you may discard N other cards. If you do, …": the steps after
 //     it that carry `requiresHandCost` run only when the player discarded; `searchDeck.countIf` and
-//     `searchDeck.attachTarget: 'evolved'` are the other design 061 slice 4 fields)
+//     `searchDeck.attachTarget: 'evolved'` are the other design 061 slice 4 fields; I221 adds
+//     `searchDeck.distinctTypes`, `healAmount.target: 'switchedOut'` and the step below)
+//   { type: 'gxReuseTurn', pokemonType: 'water' }   (this turn, that type's GX attacks ignore a spent GX attack)
+//   { type: 'playCopies', count: N }   (N more copies from hand are played with this one: Cross Switcher)
+//   { type: 'playCopiesChoice', count: N, single: [steps], multi: [steps] }   (Missing Clover: 1 or N at once)
+//   { type: 'useOpponentSupporter' }   (Sabrina's Suggestion: run a Supporter from the opponent's revealed hand)
+//   { type: 'takeFaceDownPrize', count: N }   (take N Prize cards blind: no pick among face-down cards)
+//   { type: 'millEachPlayer', count: N }
+//   { type: 'eachPlayerDiscardBenchUntil', count: N, opponentFirst?: true }
 //   { type: 'recursion', what: 'Pokemon|Energy', from: 'discard' }
 //   { type: 'heal', target: 'Mega Evolution ex' }
 //   { type: 'healAmount', amount: N, target: 'Active Pokémon'|'1 of your Pokémon', cure?: true }
@@ -626,9 +634,69 @@ function parseEitherKindSearch(lower, destination, reveal) {
   };
 }
 
+// "other than a Baby Pokémon card" (Dual Ball EXP 139), "(excluding Baby Pokémon)" (Lanette's Net
+// Search): the kind minus Baby Pokémon (I220). Stripped before the kind is read.
+const BABY_EXCLUSION_RE = /\s*(?:other than a baby pokémon card|\(excluding baby pokémon\))/;
+
+// Printed markers a search kind may carry (I220): "up to 3 Basic Rapid Strike Pokémon" (Brawly),
+// "up to 2 TAG TEAM cards" (Tag Call), "up to 2 {*} (Prism Star) cards" (Lisia). Read by
+// matchesSearch through the card-markers table.
+const SEARCH_MARKER_WORDS = {
+  tera: 'Tera',
+  'team plasma': 'Team Plasma',
+  'single strike': 'Single Strike',
+  'rapid strike': 'Rapid Strike',
+  'fusion strike': 'Fusion Strike',
+  'tag team': 'TAG TEAM',
+  '{*} (prism star)': 'Prism Star',
+};
+const MARKER_SEARCH_RE = new RegExp(
+  `search your deck for (?:an?|up to\\s+(\\d+))\\s+(basic\\s+)?(${Object.keys(SEARCH_MARKER_WORDS)
+    .map((w) => w.replace(/[{}*()]/g, '\\$&'))
+    .join('|')})\\s+(pokémon|supporter cards?|cards?)\\b`
+);
+
+function parseMarkerSearch(lower, destination, reveal) {
+  const m = lower.match(MARKER_SEARCH_RE);
+  if (!m) return null;
+  const kind = m[4].startsWith('pokémon') ? 'Pokémon' : m[4].startsWith('supporter') ? 'Supporter' : 'card';
+  return {
+    what: `${m[2] ? 'Basic ' : ''}${SEARCH_MARKER_WORDS[m[3]]} ${kind}`,
+    count: m[1] ? Number(m[1]) : 1,
+    destination,
+    ...(m[1] ? { upTo: true } : {}),
+    ...(reveal ? { reveal: true } : {}),
+  };
+}
+
+// Kinds that need more than a `what` word (I220): Traveling Salesman's two kinds, Friend Ball's
+// "same type as 1 of your opponent's Pokémon", Lanette's Net Search's "different types".
+function parseSpecialKindSearch(lower, destination, reveal) {
+  const base = { destination, ...(reveal ? { reveal: true } : {}) };
+  const tmOrTool = lower.match(/search your deck for up to (\d+) technical machine and\/or pokémon tool cards/);
+  if (tmOrTool) return { what: 'Technical Machine or Pokémon Tool', count: Number(tmOrTool[1]), upTo: true, ...base };
+  if (
+    /search your deck for a pokémon with the same type as 1 of your opponent's pokémon in play/.test(lower) ||
+    /search your deck for a baby pokémon, basic pokémon, or evolution card of the same type \(color\)/.test(lower)
+  ) {
+    return { what: 'Pokémon', count: 1, sameTypeAsOpponent: true, ...base };
+  }
+  const differentTypes = lower.match(/search your deck for up to (\d+) different types of basic pokémon cards/);
+  if (differentTypes) {
+    return { what: 'Basic Pokémon', count: Number(differentTypes[1]), upTo: true, distinctTypes: true, ...base };
+  }
+  return null;
+}
+
 // Shared search-deck target parsing — used by the main search branch, coin-flip
 // sub-clauses, and attack search (parseAttackSearchClause in damage-parser.mjs).
 export function parseSearchDeckParams(lower) {
+  if (!BABY_EXCLUSION_RE.test(lower)) return parseSearchDeckKind(lower);
+  const params = parseSearchDeckKind(lower.replace(BABY_EXCLUSION_RE, ''));
+  return params.type ? params : { ...params, exclude: 'Baby Pokémon' };
+}
+
+function parseSearchDeckKind(lower) {
   let what = 'card';
   let count = 1;
   let destination = 'hand';
@@ -668,6 +736,9 @@ export function parseSearchDeckParams(lower) {
       ...(reveal ? { reveal: true } : {}),
     };
   }
+
+  const marked = parseMarkerSearch(lower, destination, reveal) || parseSpecialKindSearch(lower, destination, reveal);
+  if (marked) return marked;
 
   // "a X and a Y card" is one card of each kind, never two picks from one shared pool and
   // never the first kind alone (Arven, Colress's Tenacity, Hilda, Irida, Korrina, Piers,
@@ -1004,6 +1075,23 @@ function parseCoinFlipStep(lower) {
     };
   }
 
+  // Dual Ball: "Flip 2 coins. For each heads, search your deck for a Basic Pokémon …".
+  const perHeads = lower.match(/^flip (\d+) coins\. for each heads, search your deck for /);
+  if (perHeads) {
+    const search = parseSearchDeckParams(lower);
+    const flips = Number(perHeads[1]);
+    if (!search.type) {
+      return {
+        type: 'coinFlip',
+        count: flips,
+        outcomes: Array.from({ length: flips }, (_, i) => ({
+          headsExactly: i + 1,
+          steps: [{ type: 'searchDeck', ...search, count: i + 1, ...(i > 0 ? { upTo: true } : {}) }],
+        })),
+      };
+    }
+  }
+
   if (lower.includes('search your deck')) {
     const headsMatch = lower.match(/if heads,?\s+(.+?)(?:\.\s*(?:if tails|then, shuffle)|$)/);
     const tailsMatch = lower.match(/if tails,?\s+(.+?)(?:\.\s*(?:then, shuffle)|$)/);
@@ -1164,6 +1252,9 @@ function parsePlayCondition(lower) {
     const symbol = qualifier.match(/^\{([a-z])\}$/);
     return symbol ? `koedLastTurn:type=${symbol[1]}` : `koedLastTurn:name=${qualifier}`;
   }
+  // Cross Switcher: "You must play 2 Cross Switcher cards at once."
+  const copies = lower.match(/you must play (\d+) [^.]+? cards at once/);
+  if (copies) return `copiesInHand>=${copies[1]}`;
   if (/only when it is the last card in your hand/.test(lower)) return 'lastCardInHand';
   if (/can't play this card if you have any cards in your hand other than/.test(lower)) return 'onlyCopiesInHand';
   const fewerOthers = lower.match(/only if you have\s+(\d+)\s+or fewer other cards in your hand/);
@@ -1207,6 +1298,9 @@ export function parseTrainerEffect(text = '') {
   if (fossilSearch) return { steps: [fossilSearch], recognizable: true };
   const playCondition = parsePlayCondition(lower);
   const result = parseTrainerSteps(lower);
+  // The other copies played together go to the discard pile with this one (Cross Switcher).
+  const copies = playCondition?.match(/^copiesInHand>=(\d+)$/);
+  if (copies && result.recognizable) result.steps.unshift({ type: 'playCopies', count: Number(copies[1]) - 1 });
   if (/if you go first, you may (?:use|play) this card during your first turn/.test(lower)) {
     result.turnOnePermission = true;
   }
@@ -1349,8 +1443,26 @@ function parseOptionalCostBonus(tail) {
     ];
   }
   const also = tail.match(/^you may also search for (.+?) in this way\.?$/);
+  // Sabrina & Brycen (SM246): "up to 3 Pokémon of different types".
+  const distinctTypes = also && also[1].match(/^up to (\d+) pokémon of different types$/);
+  if (distinctTypes) {
+    return [
+      { type: 'searchDeck', what: 'Pokémon', count: Number(distinctTypes[1]), destination: 'hand', upTo: true, reveal: true, distinctTypes: true },
+    ];
+  }
   const search = also && parseTwoKindSearch(`search your deck for ${also[1]},`);
   if (search) return [search];
+  // Mallow & Lana (CEC 198/231): the Pokémon the main effect's own switch benched.
+  const heal = tail.match(/^heal (\d+) damage from the pokémon you moved to your bench\.?$/);
+  if (heal) return [{ type: 'healAmount', amount: Number(heal[1]), target: 'switchedOut' }];
+  // Bellelba & Brycen-Man (CEC 186): "each player discards their Benched Pokémon until they have 3
+  // Benched Pokémon. Your opponent discards first."
+  const benchCut = tail.match(/^each player discards their benched pokémon until they have (\d+) benched pokémon\. your opponent discards first\.?$/);
+  if (benchCut) return [{ type: 'eachPlayerDiscardBenchUntil', count: Number(benchCut[1]), opponentFirst: true }];
+  // Misty & Lorelei (CEC 199): a spent GX attack does not stop that type's GX attacks this turn.
+  const gxReuse = tail.match(/^during this turn, your \{([a-z])\} pokémon can use their gx attacks even if you have used your gx attack\.?$/);
+  const gxReuseType = gxReuse && SYMBOL_ENERGY_WORDS[gxReuse[1]];
+  if (gxReuseType) return [{ type: 'gxReuseTurn', pokemonType: gxReuseType }];
   return [];
 }
 
@@ -1568,11 +1680,30 @@ function parseTrainerStepsInner(lower) {
     return { steps, recognizable: true };
   }
 
-  // Missing Clover — the single mode only LOOKS at the top card; the generic
-  // lookAtTop branch let the player take it and shuffled (review finding 7).
-  // The 4-cards-at-once Prize mode needs multi-card play and is deferred.
+  // Missing Clover — "You may play 4 Missing Clover cards at once. If you played 1 card, look at
+  // the top card of your deck. If you played 4 cards, take a Prize card." The single mode only
+  // LOOKS at the top card (review finding 7); the 4-card mode discards 3 more copies (I190).
   if (lower.includes('you may play 4 missing clover cards at once')) {
-    steps.push({ type: 'peekReturn', count: 1 });
+    steps.push({
+      type: 'playCopiesChoice',
+      count: 4,
+      single: [{ type: 'peekReturn', count: 1 }],
+      multi: [{ type: 'takeFaceDownPrize', count: 1 }],
+    });
+    return { steps, recognizable: true };
+  }
+
+  // Sabrina's Suggestion (Hidden Fates 65): "Your opponent reveals their hand. You may choose a
+  // Supporter card you find there and use the effect of that card as the effect of this card."
+  if (/^your opponent reveals their hand\. you may choose a supporter card you find there and use the effect of that card as the effect of this card\.?$/.test(lower.trim())) {
+    steps.push({ type: 'useOpponentSupporter' });
+    return { steps, recognizable: true };
+  }
+
+  // Bellelba & Brycen-Man (Cosmic Eclipse 186): "Discard 3 cards from the top of each player's deck."
+  const millEach = lower.trim().match(/^discard (\d+) cards? from the top of each player's deck\.?$/);
+  if (millEach) {
+    steps.push({ type: 'millEachPlayer', count: Number(millEach[1]) });
     return { steps, recognizable: true };
   }
 
@@ -1686,7 +1817,7 @@ function parseTrainerStepsInner(lower) {
       });
       // Guzma: "If you do, switch your Active Pokémon with 1 of your Benched Pokémon."
       if (/if you do, switch your active pok[ée]mon with 1 of your benched pok[ée]mon/.test(lower)) {
-        steps.push({ type: 'switchOwn' });
+        steps.push({ type: 'switchOwn', afterOpponentSwitch: true });
       }
     }
     appendTrailingDraw(steps, lower);
@@ -3166,7 +3297,13 @@ function describeStepBody(step) {
         : step.destination === 'attach' ? (step.attachTarget === 'evolved' ? 'attach to the Pokémon you evolved' : 'attach to a Pokémon')
         : step.destination === 'deckTop' ? 'put on top of your deck in any order'
         : 'add to hand';
-      return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${step.what}${describeNameFilter(step)} → ${dest}, then shuffle.`;
+      const kind = [
+        step.what,
+        step.distinctTypes ? ' of different types' : '',
+        step.exclude ? ` (not ${step.exclude})` : '',
+        step.sameTypeAsOpponent ? " of the same type as 1 of your opponent's Pokémon" : '',
+      ].join('');
+      return `Search your deck for ${step.count > 1 ? step.count + ' ' : ''}${kind}${describeNameFilter(step)} → ${dest}, then shuffle.`;
     }
     case 'chooseMode':
       return `Choose ${step.max > 1 ? '1 or both' : '1'}: ${step.modes.map((m) => m.label).join(' / ')}.`;
@@ -3211,7 +3348,14 @@ function describeStepBody(step) {
       }
       return `Put a ${step.what}${describeNameFilter(step)} from your discard pile into your hand.`;
     case 'heal': return `Heal all damage from your ${step.target}${step.returnEnergy ? ', then put all its Energy into your hand' : ''}.`;
-    case 'healAmount': return `Heal ${step.amount} damage from ${step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
+    case 'playCopies': return `Play ${step.count} more ${step.count > 1 ? 'copies' : 'copy'} of this card from your hand with it.`;
+    case 'playCopiesChoice': return `Play 1 card, or ${step.count} at once for the bigger effect.`;
+    case 'useOpponentSupporter': return "Your opponent reveals their hand; you may use the effect of a Supporter there.";
+    case 'takeFaceDownPrize': return `Take ${step.count > 1 ? `${step.count} Prize cards` : 'a Prize card'}.`;
+    case 'millEachPlayer': return `Discard ${step.count} cards from the top of each player's deck.`;
+    case 'eachPlayerDiscardBenchUntil': return `Each player discards Benched Pokémon until they have ${step.count}${step.opponentFirst ? ' (opponent first)' : ''}.`;
+    case 'gxReuseTurn': return `During this turn, your ${step.pokemonType} Pokémon can use their GX attacks even if you have used your GX attack.`;
+    case 'healAmount': return `Heal ${step.amount} damage from ${step.target === 'switchedOut' ? 'the Pokémon you moved to your Bench' : step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;
     case 'attachMultipleFromDiscard': return `Attach up to ${step.count} ${step.energy} cards from your discard pile to ${step.target}.`;
     case 'ionoShuffle':

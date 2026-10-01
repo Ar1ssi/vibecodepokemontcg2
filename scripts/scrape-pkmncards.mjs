@@ -63,7 +63,7 @@ function firstMatch(block, re) {
   return m ? htmlToText(m[1]) : '';
 }
 
-function parseCards(html) {
+export function parseCards(html) {
   const out = [];
   const articleRe = /<article class="type-pkmn_card entry"[^>]*>([\s\S]*?)<\/article>/g;
   let m;
@@ -95,7 +95,7 @@ function parseArgs(argv) {
   };
 }
 
-function pageUrl(baseUrl, page) {
+export function pageUrl(baseUrl, page) {
   if (!baseUrl) return null;
   const u = new URL(baseUrl);
   if (page === 1) return u.toString();
@@ -106,7 +106,7 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchText(url) {
+export async function fetchText(url) {
   const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ptcg-audit/1.0)' } });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return res.text();
@@ -137,7 +137,10 @@ async function main() {
   process.stderr.write(`Wrote ${all.length} printings from ${page - 1} page(s) to ${out}\n`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Importable (scripts/generate-card-markers.mjs reads parseCards); runs only as a script.
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

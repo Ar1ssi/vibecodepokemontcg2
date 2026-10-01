@@ -1,7 +1,15 @@
 // Shared deck/discard search filtering (trainers, abilities, attacks).
 import { energyMatchesSearchWhat } from './energy-effects.mjs';
 import { matchesBasicPokemonType, pokemonMatchesEnergyType } from './special-energy-effects.mjs';
-import { isGxCard, isRuleBoxPokemon, isUltraBeastCard } from './card-classify.mjs';
+import {
+  isGxCard,
+  isPrismStarCard,
+  isRuleBoxPokemon,
+  isTagTeamCard,
+  isTeraCard,
+  isUltraBeastCard,
+} from './card-classify.mjs';
+import { hasCardMarker } from './card-markers.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 
@@ -75,6 +83,45 @@ const TRAINER_KIND_TYPES = new Set(['item', 'supporter', 'stadium', 'tool', 'pok
 // Words that quantify "N cards" rather than name them ("any card", "2 other cards").
 const SEARCH_DETERMINER = /^(?:any|a|an|all|the|that|those|these|other|up to \d+|\d+(?: other)?)$/i;
 
+// Printed markers and name prefixes a search kind may carry ("a Tera Pokémon", "a Single Strike
+// Supporter card", "Team Magma Pokémon"). Each test runs on the card; the rest of the kind
+// ("Pokémon", "Supporter", "Basic Pokémon", "card") is then matched as usual (I220).
+const lowerName = (card) => String(card?.name || '').toLowerCase().replace(/[’‘]/g, "'");
+const MARKER_KINDS = [
+  [/\btera\b/, (card) => isTeraCard(card)],
+  [/\bteam plasma\b/, (card) => hasCardMarker(card, 'Team Plasma')],
+  [/\bsingle strike\b/, (card) => hasCardMarker(card, 'Single Strike')],
+  [/\brapid strike\b/, (card) => hasCardMarker(card, 'Rapid Strike')],
+  [/\bfusion strike\b/, (card) => hasCardMarker(card, 'Fusion Strike')],
+  [/\bbaby\b/, (card) => hasCardMarker(card, 'Baby')],
+  [/\bprism star\b/, (card) => hasCardMarker(card, 'Prism Star') || isPrismStarCard(card)],
+  [/\btag team\b/, (card) => hasCardMarker(card, 'TAG TEAM') || isTagTeamCard(card)],
+  [/\btechnical machine\b/, (card) => lowerName(card).includes('technical machine')],
+  // Team Magma Admin: "Team Magma Pokémon" are the "Team Magma's …" cards.
+  [/\bteam (magma|aqua)\b/, (card, m) => lowerName(card).startsWith(`team ${m[1]}'s `)],
+];
+
+// "Basic Team Rocket's Pokémon", "Basic Hop's Pokémon", "Ethan's Pokémon": the card's own name
+// must carry that owner ("Team Rocket's Mewtwo").
+const OWNER_KIND = /^((?:basic|evolution|stage [12]) )?(.+?)'s pok[eé]mon(.*)$/;
+
+function markerKindMatch(card, w) {
+  for (const [re, test] of MARKER_KINDS) {
+    const m = w.match(re);
+    if (!m) continue;
+    if (!test(card, m)) return false;
+    return matchesSearch(card, w.replace(re, ' ').replace(/\s+/g, ' ').trim());
+  }
+  const owned = w.replace(/[’‘]/g, "'").match(OWNER_KIND);
+  if (owned) {
+    // The whole owner must match: "Rocket's Zapdos ex" is not a "Team Rocket's Pokémon".
+    const owner = lowerName(card).match(/^(.+?)'s /)?.[1];
+    if (!owner || owner !== owned[2]) return false;
+    return matchesSearch(card, `${owned[1] || ''}pokémon${owned[3]}`.trim());
+  }
+  return null;
+}
+
 /** Match a card against a parsed search-step `what` string. */
 export function matchesSearch(card, what = '') {
   // Fossil Researcher: "up to 2 in any combination of Amaura or Tyrunt".
@@ -101,6 +148,8 @@ export function matchesSearch(card, what = '') {
     return isUltraBeastCard(card);
   }
   // Techno Radar is itself a Future Item: the tag alone does not make a card a Pokémon.
+  const marked = markerKindMatch(card, w);
+  if (marked !== null) return marked;
   if (/\bancient pok[eé]mon\b/.test(w)) return isPokemon && isAncientCard(card);
   if (/\bfuture pok[eé]mon\b/.test(w)) return isPokemon && isFutureCard(card);
   if (w.includes('item') && w.includes('tool')) return isTrainer;

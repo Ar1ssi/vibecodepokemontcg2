@@ -5,8 +5,8 @@
     "runs": 1590,
     "partial": 354,
     "dead": 56,
-    "consumed": 1144,
-    "unconsumed": 1083,
+    "consumed": 1192,
+    "unconsumed": 1035,
     "unparsed": 1
   },
   "families": {
@@ -168,8 +168,8 @@
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 54,
-      "unconsumed": 97,
+      "consumed": 100,
+      "unconsumed": 51,
       "unparsed": 0
     },
     "end-of-turn": {
@@ -339,8 +339,8 @@
       "runs": 2,
       "partial": 0,
       "dead": 0,
-      "consumed": 23,
-      "unconsumed": 27,
+      "consumed": 25,
+      "unconsumed": 25,
       "unparsed": 0
     },
     "recursion": {

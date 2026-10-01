@@ -12,6 +12,8 @@ import {
   abilityDamageReduction,
   abilityDamagePrevention,
   abilityPreventsAttackEffects,
+  abilityPreventsCardEffects,
+  abilityPreventsCardEffectsOnPlayer,
   abilityHandDiscardProtector,
   abilityWeaknessOverride,
   abilityHpBonus,
@@ -178,6 +180,37 @@ function probeBoard(holder, zone, { bare, partners, stacked }) {
   return { state, holderCard };
 }
 
+// I219 card-effect shields: each own Pokémon, plus a probe Benched Basic Pokémon V of the
+// {W}/{Y}/{P} types with a {P} Energy attached (the team shields name Benched Basic, Benched V,
+// {W}, {Y} and {P}-Energy Pokémon), asked with the opponent at 2 Prizes (Thievul).
+const CARD_EFFECT_SOURCES = ['Item', 'Supporter', 'Ability', 'Stadium'];
+
+function cardShieldAnswers(ask, p1) {
+  const defender = mon('Probe Shielded V', {
+    instanceId: 9200,
+    subtypes: ['Basic', 'V'],
+    types: ['Water', 'Fairy', 'Psychic'],
+  });
+  const energy = createCard({
+    instanceId: 9201,
+    name: 'Basic Psychic Energy',
+    supertype: 'Energy',
+    subtypes: ['Basic'],
+    types: ['Psychic'],
+    attachedTo: 9200,
+  });
+  const ctx = {
+    ...p1,
+    sideCards: [...p1.sideCards, defender, energy],
+    sideBench: [...p1.sideBench, defender, energy],
+    opponentPrizesLeft: 2,
+  };
+  for (const source of CARD_EFFECT_SOURCES) {
+    ask(`cardEffectShield:${source}:probeDefender`, () => abilityPreventsCardEffects(defender, source, ctx));
+    ask(`playerShield:${source}`, () => abilityPreventsCardEffectsOnPlayer(source, ctx));
+  }
+}
+
 /**
  * Every probe question, answered on each probe board (see `probeBoard`). Returns
  * `{ '<board>:<reader>:<case>': answerKey | 'THROW' }`.
@@ -213,6 +246,7 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       }
     };
 
+    cardShieldAnswers(ask, p1);
     for (const root of own) {
       const ctx = at(p1, root);
       const card = viewOf(p1.sideCards, root);
@@ -220,6 +254,9 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
       ask(`effectPrevention:${card.name}`, () => abilityPreventsAttackEffects(card, p2Active, ctx));
+      for (const source of CARD_EFFECT_SOURCES) {
+        ask(`cardEffectShield:${source}:${card.name}`, () => abilityPreventsCardEffects(card, source, ctx));
+      }
       ask(`handDiscardProtector:${card.name}`, () => abilityHandDiscardProtector(card, ctx));
       ask(`weakness:${card.name}`, () => abilityWeaknessOverride(card, ctx));
       ask(`hp:${card.name}`, () => abilityHpBonus(card, ctx));
