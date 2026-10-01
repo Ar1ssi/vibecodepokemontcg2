@@ -1002,6 +1002,8 @@ export function parseAttackDamage(
   // Beldum Metal Charge / Gengar V Pain Explosion: "Put 3 damage counters on this Pokémon."
   const selfCounters = /(?:^|\. )put (\d+) damage counters? on this pok[ée]mon\./.exec(text);
   if (selfCounters) selfDamage += Number(selfCounters[1]) * 10;
+  // Lt. Surge's Raticate Focus Energy doubles the next Double-edge's recoil (attack-damage-context.mjs).
+  if (ctx.selfDamageDoubled) selfDamage *= 2;
   if (selfDamage > 0) {
     if (!components.includes('self-damage')) components.push('self-damage');
     notes.push(`${selfDamage} damage to self`);

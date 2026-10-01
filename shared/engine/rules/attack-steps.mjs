@@ -1706,6 +1706,9 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     .replace(/\s*\((before|after) applying weakness and resistance\)/g, ' <wr:$1>')
     // Devoluter's "(excluding Pokémon LV.X)" limits the target, so it survives the strip below.
     .replace(/evolved pokémon \(excluding pokémon lv\.x\)/g, 'evolved pokémon but not pokémon lv.x')
+    // Lt. Surge's Raticate Focus Energy: the "(base damage and damage to itself)" note widens the
+    // doubling to the recoil, so it survives the strip below.
+    .replace(/attack's damage \(base damage and damage to itself\) is doubled/g, "attack's base damage and damage to itself are doubled")
     // Reminder text never carries an effect ("(Your opponent chooses the new Active Pokémon.)").
     .replace(/\s*\([^)]*\)/g, '');
   normalized = rewriteLegacyAttackWording(normalized);

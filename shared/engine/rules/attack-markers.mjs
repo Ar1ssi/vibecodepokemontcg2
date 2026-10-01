@@ -434,6 +434,13 @@ const MARKER_BODIES = [
     'yourNextTurn',
     (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], value: Number(m[2]) }),
   ],
+  // Lt. Surge's Raticate [Gym Challenge 53] Focus Energy: the recoil doubles too.
+  [
+    /^(?:this pokémon|[^,]+)'s ([^,]+?)(?: attack)?'s base damage and damage to itself are doubled$/,
+    'self',
+    'yourNextTurn',
+    (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], doubled: true, selfDamageDoubled: true }),
+  ],
   [
     /^(?:this pokémon|[^,]+)'s ([^,]+?)(?: attack)?'s (?:base )?damage(?: \([^)]*\))? is doubled$/,
     'self',
