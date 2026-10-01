@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAttackSteps } from '../attack-steps.mjs';
 import { parseNextTurnLock } from '../attack-effects.mjs';
+import { parseConditionClause } from '../attack-conditions.mjs';
 import { parseAttackDamage, eachPokemonDamage } from '../damage-parser.mjs';
 import { computeAttackDamage } from '../attack-engine.mjs';
 import { ATTACK_YES, ATTACK_NO } from '../../effects/attack-steps.mjs';
@@ -596,6 +597,63 @@ test('runtime: Raging Charge, Water Punch and Psyburst add their per-unit damage
   const burst = attackOnTurn(burstBoard, 'p1', 2, 0).state;
   assert.equal(damageOn(burst, 'p2', 20), 60);
   assert.ok(burst.players.p1.zones.discard.some((c) => c.instanceId === 5));
+});
+
+// ── WotC "If …, this attack does N damage plus M more damage" conditions ────────────────────
+
+const FIN_SLAP = // Horsea [Neo Genesis 62] Fin Slap : 20+
+  'If an attack damaged Horsea during your opponent’s last turn, this attack does 20 damage plus 10 more damage. If not, this attack does 20 damage.';
+const SPLASH_ABOUT = // Light Slowbro [Neo Destiny 51] Splash About : 20+
+  'If there are more Energy attached to the Defending Pokémon than to Light Slowbro, this attack does 20 damage plus 20 more damage. If not, this attack does 20 damage.';
+const SLAP_AWAKE = // Dark Wigglytuff [Neo Destiny 40] Slap Awake : 20+
+  'If the Defending Pokémon is Asleep or Confused, this attack does 20 damage plus 20 more damage. Then, the Defending Pokémon is no longer Asleep or Confused.';
+
+test('WotC condition clauses ≡ their modern wordings', () => {
+  assert.deepEqual(
+    parseConditionClause("an attack damaged this pokémon during your opponent's last turn"),
+    parseConditionClause("this pokémon was damaged by an attack during your opponent's last turn")
+  );
+  assert.deepEqual(
+    parseConditionClause("there are more energy attached to your opponent's active pokémon than to this pokémon"),
+    parseConditionClause("this pokémon has less energy attached than your opponent's active pokémon")
+  );
+  assert.deepEqual(parseConditionClause("your opponent's active pokémon is asleep or confused"), {
+    kind: 'defenderStatus',
+    statuses: ['Asleep', 'Confused'],
+    negated: false,
+  });
+  assert.deepEqual(steps(SLAP_AWAKE, 'Dark Wigglytuff'), [{ type: 'atkCureOppConditions', conditions: ['Asleep', 'Confused'] }]);
+});
+
+test('runtime: Fin Slap, Splash About and Slap Awake add their bonus only when the condition holds', () => {
+  const hit = (mine, theirs, energize) => {
+    const board = duelBoard(mine, { ...FOE, hp: 200, ...theirs });
+    energize?.(board);
+    return attackOnTurn(board, 'p1', 2, 0).state;
+  };
+  const horsea = (taken) => ({
+    instanceId: 1,
+    name: 'Horsea',
+    hp: 50,
+    ...(taken ? { attackDamageTaken: { turn: 1, amount: 10 } } : {}),
+    attacks: [{ name: 'Fin Slap', cost: [], damage: '20+', text: FIN_SLAP }],
+  });
+  assert.equal(damageOn(hit(horsea(true)), 'p2', 20), 30);
+  assert.equal(damageOn(hit(horsea(false)), 'p2', 20), 20);
+
+  const slowbro = { instanceId: 1, name: 'Light Slowbro', hp: 80, attacks: [{ name: 'Splash About', cost: [], damage: '20+', text: SPLASH_ABOUT }] };
+  const energies = (mineCount, theirsCount) => (board) => {
+    attachEnergy(board, 'p1', 1, [5, 6, 7].slice(0, mineCount), 'Water');
+    attachEnergy(board, 'p2', 20, [25, 26, 27].slice(0, theirsCount), 'Water');
+  };
+  assert.equal(damageOn(hit(slowbro, {}, energies(1, 2)), 'p2', 20), 40);
+  assert.equal(damageOn(hit(slowbro, {}, energies(2, 2)), 'p2', 20), 20);
+
+  const wigglytuff = { instanceId: 1, name: 'Dark Wigglytuff', hp: 70, attacks: [{ name: 'Slap Awake', cost: [], damage: '20+', text: SLAP_AWAKE }] };
+  const woken = hit(wigglytuff, { specialCondition: 'Asleep' });
+  assert.equal(damageOn(woken, 'p2', 20), 40);
+  assert.equal(woken.players.p2.zones.active.find((c) => c.instanceId === 20).specialCondition, null);
+  assert.equal(damageOn(hit(wigglytuff, {}), 'p2', 20), 20);
 });
 
 // ── presence-scoped and windowless locks ────────────────────────────────────────────────────

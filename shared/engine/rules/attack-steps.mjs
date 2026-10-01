@@ -785,6 +785,11 @@ const TEMPLATES = [
     /^heal from this pokémon the same amount of damage you did to your opponent's active pokémon$/,
     () => ({ type: 'atkMirrorHeal' }),
   ],
+  // Dark Wigglytuff [Neo Destiny 40] Slap Awake: "Then, the Defending Pokémon is no longer Asleep or Confused."
+  [
+    /^your opponent's active pokémon is no longer ((?:asleep|burned|confused|paralyzed|poisoned)(?: or (?:asleep|burned|confused|paralyzed|poisoned))*)$/,
+    (m) => ({ type: 'atkCureOppConditions', conditions: conditionList(m[1]) }),
+  ],
 
   // Choose-and-Knock-Out
   [

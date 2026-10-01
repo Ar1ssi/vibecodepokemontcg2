@@ -21,6 +21,7 @@ import {
   hasAnyCondition,
   hasCondition,
   listConditions,
+  removeCondition,
 } from '../rules/special-conditions.mjs';
 import { effectiveHp, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
@@ -1275,6 +1276,23 @@ function atkCureSelf(ctx) {
   if (!ref || !hasAnyCondition(ref.card)) return skip(ctx, 'no_special_condition');
   clearConditions(ref.card);
   ctx.events.push({ type: 'specialConditionUpdated', instanceId: ref.card.instanceId, condition: null, conditions: [] });
+  return null;
+}
+
+// Dark Wigglytuff Slap Awake: "Then, the Defending Pokémon is no longer Asleep or Confused."
+function atkCureOppConditions(ctx) {
+  const { opponent, step } = ctx;
+  const defender = activeOf(opponent);
+  if (!defender) return skip(ctx, 'no_opponent_active');
+  const present = step.conditions.filter((condition) => hasCondition(defender, condition));
+  if (present.length === 0) return skip(ctx, 'no_special_condition');
+  for (const condition of present) removeCondition(defender, condition);
+  ctx.events.push({
+    type: 'specialConditionUpdated',
+    instanceId: defender.instanceId,
+    condition: defender.specialCondition || null,
+    conditions: listConditions(defender),
+  });
   return null;
 }
 
@@ -3830,6 +3848,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkShuffleOwnDeck,
   atkChangeType,
   atkDiscardSelfEnergyMillOpp,
+  atkCureOppConditions,
   atkKnockOutChoose,
   atkCountersEach,
   atkCountersEachFiltered,

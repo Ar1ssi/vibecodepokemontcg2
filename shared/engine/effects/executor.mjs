@@ -64,6 +64,7 @@ const OPPONENT_ACTIVE_STEPS = new Set([
   'atkChooseCondition',
   'atkGust',
   'atkMoveAllCounters',
+  'atkCureOppConditions',
 ]);
 const OPPONENT_ACTIVE_SCOPED_STEPS = new Set(['atkDiscardOppEnergy', 'atkDiscardOppTools', 'atkDevolve']);
 const OPPONENT_ACTIVE_TARGETED_STEPS = new Set(['atkAddMarker', 'atkHpCap', 'atkChangeType']);
