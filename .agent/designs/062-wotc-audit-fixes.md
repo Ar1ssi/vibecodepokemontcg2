@@ -1,5 +1,5 @@
 # 062: WotC card audit — tranche 1 fixes (I224, I225, I226, I228 part, I229 part)
-Status: building (approved by the user's request to implement with slice builders; gate self-approved)
+Status: shipped (tranche 1 + follow-up groups I224–I232, S336; residue in ISSUES)
 Date: 2026-10-01 · Session: S336
 
 ## Problem
