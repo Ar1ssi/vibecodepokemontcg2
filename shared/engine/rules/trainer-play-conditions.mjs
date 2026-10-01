@@ -50,6 +50,7 @@ export function isSupporterTrainer(card) {
  * @param {number|null} [params.ownAttachedEnergyCount] Energy cards attached to the player's
  *   Pokémon; null when unknown
  * @param {number|null} [params.handEnergyCount] Energy cards in the player's hand; null when unknown
+ * @param {number|null} [params.handPokemonCount] Pokémon cards in the player's hand; null when unknown
  * @returns {string|null} Why the card cannot be played, or null when it can
  */
 export function trainerPlayBlockReason({
@@ -72,6 +73,7 @@ export function trainerPlayBlockReason({
   koedLastOppTurnVictims = null,
   ownAttachedEnergyCount = null,
   handEnergyCount = null,
+  handPokemonCount = null,
 }) {
   if (!card) return null;
   const text = card.text || card.effect || card.cardText || '';
@@ -99,6 +101,10 @@ export function trainerPlayBlockReason({
   // WotC "Discard 1 Energy card attached to … your Pokémon in order to …" (Super Potion base1-90).
   if (parsed.steps?.[0]?.type === 'discardOwnAttachedEnergy' && parsed.steps[0].cost && ownAttachedEnergyCount === 0) {
     return 'No Energy attached to your Pokémon to pay the cost.';
+  }
+  // Pokémon Communication / Pokémon Trader base1-77: a Pokémon from the hand goes into the deck first.
+  if (parsed.steps?.[0]?.type === 'handCardToDeck' && parsed.steps[0].what === 'Pokémon' && handPokemonCount === 0) {
+    return 'You need a Pokémon in your hand to play this card.';
   }
   const effectSteps = (parsed.steps || []).filter((step) => step.type !== 'discardCost');
   if (

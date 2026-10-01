@@ -352,8 +352,8 @@
    ]
   },
   "Arcade Game#7qa6ew": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "revealTopSameName"
    ]
   },
   "Archie’s Ace in the Hole#psp7uf": {
@@ -794,8 +794,8 @@
    ]
   },
   "Blaine’s Gamble#1siar4y": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "discardAnyThenDraw"
    ]
   },
   "Blaine’s Last Resort#23arq": {
@@ -831,11 +831,8 @@
    ]
   },
   "Blaine#330bvu": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "energyAttachPlan"
    ]
   },
   "Blanche#iz8trj": {
@@ -1581,6 +1578,7 @@
   },
   "Computer Search#pc13ww": {
    "steps": [
+    "discardCost",
     "searchDeck"
    ]
   },
@@ -2090,8 +2088,8 @@
    ]
   },
   "Digger#1ryl6uu": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "alternatingFlipDamage"
    ]
   },
   "Digging Duo#xsk712": {
@@ -2642,8 +2640,9 @@
    ]
   },
   "Erika’s Maids#f8g5hv": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "discardCost",
+    "searchDeck"
    ]
   },
   "Erika’s Perfume#1vq244t": {
@@ -3433,11 +3432,8 @@
    ]
   },
   "Giovanni#huvou": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "freeEvolve"
    ]
   },
   "Glacia’s Stadium#17el6dl": {
@@ -3513,11 +3509,8 @@
    ]
   },
   "Goop Gas Attack#1u88948": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "powersOff"
    ]
   },
   "Gordie#lyv7ln": {
@@ -4062,6 +4055,7 @@
   },
   "Imposter Oak’s Revenge#1r9jxxk": {
    "steps": [
+    "discardCost",
     "opponentShuffleHandDraw"
    ]
   },
@@ -4071,8 +4065,8 @@
    ]
   },
   "Impostor Professor Oak’s Invention#71zepj": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "opponentPrizesReshuffle"
    ]
   },
   "Impostor Professor Oak#13zm0qy": {
@@ -4160,6 +4154,7 @@
   },
   "Item Finder#qaalqt": {
    "steps": [
+    "discardCost",
     "recursion"
    ]
   },
@@ -4361,11 +4356,8 @@
    ]
   },
   "Koga#1972i4": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "turnAttackRider"
    ]
   },
   "Korrina’s Focus#131rbje": {
@@ -4463,8 +4455,8 @@
    ]
   },
   "Lass#gixxwt": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "eachPlayerShuffleHandTrainers"
    ]
   },
   "Last Chance Potion#1q0rp6s": {
@@ -4736,8 +4728,8 @@
    ]
   },
   "Lt. Surge’s Treaty#zmvhbx": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "prizeBargain"
    ]
   },
   "Lt. Surge#c4h37k": {
@@ -5090,6 +5082,7 @@
   },
   "Max Revive#1gno7p7": {
    "steps": [
+    "discardCost",
     "reviveFromDiscard"
    ]
   },
@@ -5348,8 +5341,10 @@
    ]
   },
   "Misty’s Duel#1nxgjlm": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "coinFlip",
+    "opponentShuffleHandDraw",
+    "shuffleHandThenDraw"
    ]
   },
   "Misty’s Favor#1i5o8mq": {
@@ -5359,6 +5354,7 @@
   },
   "Misty’s Tears#1a3s0gh": {
    "steps": [
+    "discardCost",
     "searchDeck"
    ]
   },
@@ -5373,8 +5369,8 @@
    ]
   },
   "Misty’s Wish#icd80m": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "prizeWishSwap"
    ]
   },
   "Misty’s Wrath#12c1eda": {
@@ -5383,10 +5379,8 @@
    ]
   },
   "Misty#135vok6": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
+    "discardCost",
     "passive"
    ]
   },
@@ -6300,16 +6294,19 @@
   },
   "Pokémon Communication#10rgdow": {
    "steps": [
+    "handCardToDeck",
     "searchDeck"
    ]
   },
   "Pokémon Communication#1abwjhc": {
    "steps": [
+    "handCardToDeck",
     "searchDeck"
    ]
   },
   "Pokémon Communication#1bapps9": {
    "steps": [
+    "handCardToDeck",
     "searchDeck"
    ]
   },
@@ -6445,8 +6442,9 @@
    ]
   },
   "Pokémon Trader#1u2qxv": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "handCardToDeck",
+    "searchDeck"
    ]
   },
   "PokéNav#1sh0jjn": {
@@ -7418,8 +7416,9 @@
    ]
   },
   "Sabrina’s Psychic Control#1jrfwt6": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "coinFlip",
+    "useOpponentDiscardTrainer"
    ]
   },
   "Sabrina’s Suggestion#10jiyti": {
@@ -7429,7 +7428,7 @@
   },
   "Sabrina#wdzj70": {
    "steps": [
-    "moveEnergy"
+    "moveAllEnergy"
    ]
   },
   "Sacred Ash#15jjy5i": {
@@ -8111,7 +8110,8 @@
   },
   "Super Energy Removal#1lfs1f4": {
    "steps": [
-    "discardEnergyFromOpponent"
+    "discardEnergyFromOpponent",
+    "discardOwnAttachedEnergy"
    ]
   },
   "Super Energy Retrieval#uuc5pl": {
@@ -8127,6 +8127,7 @@
   },
   "Super Potion#m0bxi2": {
    "steps": [
+    "discardOwnAttachedEnergy",
     "healAmount"
    ]
   },
@@ -8725,8 +8726,9 @@
    ]
   },
   "Thought Wave Machine#c7uysp": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "flipReturnActiveEnergy",
+    "turnEnds"
    ]
   },
   "Thunder Mountain Prism Star#fk9w5m": {
@@ -8738,9 +8740,6 @@
    ]
   },
   "Tickling Machine#1blksdo": {
-   "gaps": [
-    "server-missing:opponentHandSetAside"
-   ],
    "steps": [
     "coinFlip",
     "opponentHandSetAside",
@@ -8753,8 +8752,9 @@
    ]
   },
   "Time Capsule#1twymlj": {
-   "gaps": [
-    "unrecognizable"
+   "steps": [
+    "eachPlayerShuffleDiscardCards",
+    "noMoreTrainersThisTurn"
    ]
   },
   "Time Shard#a5zxg4": {
@@ -8882,11 +8882,8 @@
    ]
   },
   "Transparent Walls#8ogqqr": {
-   "gaps": [
-    "passive-only"
-   ],
    "steps": [
-    "passive"
+    "benchAttackShield"
    ]
   },
   "Trash Exchange#1ba6a7e": {

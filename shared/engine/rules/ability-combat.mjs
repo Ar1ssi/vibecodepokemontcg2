@@ -594,7 +594,19 @@ export function sideContextFor(state, playerId) {
     opponentBench: other.bench || [],
     // Shiftry Seal Off's abilityLock marker is live only inside its window (isAbilitySuppressed).
     turnNumber: state.turn?.number,
+    powersOff: powersOffActive(state),
   };
+}
+
+/**
+ * Goop Gas Attack base5-78 ("All Pokémon Powers stop working until the end of your opponent's
+ * next turn"): a live `powersOff` play lock on either player (trainer-steps powersOff).
+ */
+export function powersOffActive(state) {
+  const turn = Number(state?.turn?.number) || 1;
+  return Object.values(state?.players || {}).some((player) =>
+    (player?.playLocks || []).some((lock) => lock.powersOff && (lock.untilTurn || 0) >= turn)
+  );
 }
 
 // --- attack effect prevention ----------------------------------------------
@@ -1211,6 +1223,8 @@ function attackLockedAbility(card, turnNumber) {
 export function isAbilitySuppressed(card, ctx = {}) {
   if (!card || !isPokemon(card)) return false;
   if (isAncientTraitAbility(card)) return false;
+  // Goop Gas Attack: every Pokémon Power stops working (sideContextFor's powersOff).
+  if (ctx.powersOff && (card.abilities || []).some((a) => /power/i.test(String(a?.type || '')))) return true;
   // The marker binds the Defending Pokémon: it lapses once the card leaves the Active Spot.
   const actives = [...(ctx.sideActive || []), ...(ctx.opponentActive || [])];
   const stillActive = actives.some((c) => c.instanceId === card.instanceId || c.instanceId === card.attachedTo);
