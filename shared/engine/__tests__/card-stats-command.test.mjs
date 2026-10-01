@@ -147,3 +147,36 @@ test('I26: cardStats payload shape is validated', () => {
   assert.equal(schema.validate({ stats: [{ hp: 60 }] }).valid, false);
   assert.equal(schema.validate({ stats: [{ syncInstance: -1 }] }).valid, false);
 });
+
+// Toxic Gas / Goop Gas / Seal Off read only the printed kind to tell a Pokémon Power from a
+// Poké-Body; cardStats used to keep {name, text} and drop it.
+test('cardStats keeps each ability printed type, and drops a non-string or oversized one', () => {
+  const state = twoPlayerState();
+  state.players.p1.zones.bench.push(createCard({ instanceId: 1, syncInstance: 0, name: 'Ampharos' }));
+
+  const res = applyCommand(state, {
+    type: 'cardStats',
+    playerId: 'p1',
+    payload: {
+      stats: [
+        {
+          syncInstance: 0,
+          abilities: [
+            { name: 'Jamming', text: 'Put 1 damage counter.', type: 'Poke-BODY' },
+            { name: 'Rain Dance', text: 'Attach a {W}.', type: 'Pokemon Power' },
+            { name: 'Odd', text: 'x', type: { kind: 'power' } },
+            { name: 'Long', text: 'y', type: 'P'.repeat(33) },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(res.error, null);
+  assert.deepEqual(res.state.players.p1.zones.bench[0].abilities, [
+    { name: 'Jamming', text: 'Put 1 damage counter.', type: 'Poke-BODY' },
+    { name: 'Rain Dance', text: 'Attach a {W}.', type: 'Pokemon Power' },
+    { name: 'Odd', text: 'x' },
+    { name: 'Long', text: 'y' },
+  ]);
+});

@@ -91,6 +91,21 @@ test('Pokémon carry evolvesFrom and their Ability text for server-side Salvator
   ]);
 });
 
+// Toxic Gas / Goop Gas / Seal Off tell a Pokémon Power from a Poké-Body by the printed type alone;
+// dropping it here made every Power look like an Ability on the server.
+test('abilities carry their printed type (Pokemon Power, Poke-BODY) to the server', () => {
+  const { stats } = buildCardStatsPayload([
+    { syncInstance: 0, ability: { name: 'Rain Dance', text: 'Attach a {W}.', type: 'Pokemon Power' } },
+    { syncInstance: 1, abilities: [{ name: 'Jamming', text: 'Put 1 damage counter.', type: 'Poke-BODY' }, 'Bare text'] },
+  ]);
+
+  assert.deepEqual(stats[0].abilities, [{ name: 'Rain Dance', text: 'Attach a {W}.', type: 'Pokemon Power' }]);
+  assert.deepEqual(stats[1].abilities, [
+    { name: 'Jamming', text: 'Put 1 damage counter.', type: 'Poke-BODY' },
+    { name: '', text: 'Bare text' },
+  ]);
+});
+
 // Audit B-6: board cards carry retreatCost as the parsed Colorless count, and the payload used to
 // forward arrays only — so the server never learned any Retreat Cost and every retreat was free.
 test('B-6: a numeric retreatCost is sent as that many Colorless symbols', () => {

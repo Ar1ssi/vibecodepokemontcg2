@@ -212,16 +212,25 @@
     // Ancient Traits (type "Ancient Trait") ride the same slot: the engine identifies them by
     // their α/Ω/Δ/θ marker (abilities.mjs isAncientTraitAbility), and dropping them here left
     // every trait invisible to the reducer (α Growth never fired on an attached Energy).
+    // Older printings are typed "Pokemon Power" (WotC), "Poke-POWER" and "Poke-BODY" (e-Card
+    // through HGSS; TCGdex also types Base Set 2 reprints "Poke-POWER"). The printed type is
+    // kept on the result: Toxic Gas, Goop Gas and Seal Off tell Powers from Bodies by it alone.
+    const LEGACY_POWER_TYPE = /^pok[eé](?:mon)?[- ](?:power|body)$/i;
+
     export function tcgAbilityFromDetail(detail) {
       if (detail?.ability?.text || detail?.ability?.name) return detail.ability;
-      // Multiple Ability entries are rare; first match wins (TCGdex order is stable).
-      // A real Ability outranks an Ancient Trait when a card prints both.
-      const entries = detail?.abilities || [];
-      const ofType = (type) =>
-        entries.find((a) => String(a?.type || '').toLowerCase() === type);
-      const entry = ofType('ability') || ofType('ancient trait');
+      // TCGdex carries some typed entries with no name or effect (neo2-49, ex15-10): skip them.
+      const entries = (detail?.abilities || []).filter((a) => a && (a.name || a.effect || a.text));
+      const typeOf = (a) => String(a?.type || '').trim();
+      // First match wins (TCGdex order is stable). A real Ability outranks everything (the eras
+      // never share a card); a Power/Body is the card's actual ability, so it outranks an Ancient
+      // Trait, which the engine treats as a separate, non-Ability mechanic (D72).
+      const entry =
+        entries.find((a) => typeOf(a).toLowerCase() === 'ability') ||
+        entries.find((a) => LEGACY_POWER_TYPE.test(typeOf(a))) ||
+        entries.find((a) => typeOf(a).toLowerCase() === 'ancient trait');
       if (!entry) return null;
-      return { name: entry.name || '', text: entry.effect || entry.text || '' };
+      return { name: entry.name || '', text: entry.effect || entry.text || '', type: typeOf(entry) };
     }
 
     // Network: fetch (and memoize) one raw TCGdex card detail by id. Shared by
