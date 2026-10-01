@@ -98,9 +98,5 @@ test('client executor switch contains no duplicate step-type case', () => {
   assert.deepEqual(dupes, []);
 });
 
-// I232: WotC Super Potion (TCGdex base1-90) parses to healAmount target 'costHost'; the legacy
-// executor must heal the Pokémon whose Energy paid the cost, not offer a free pick.
-test("healAmount: client executor reads target 'costHost'", () => {
-  assert.match(clientSrc, /step\.target === 'costHost'/);
-  assert.match(clientSrc, /costHost = entry\.parent/);
-});
+// healAmount target 'costHost' (WotC Super Potion) is tested by behaviour in
+// trainer-execution-cost-host.test.mjs.

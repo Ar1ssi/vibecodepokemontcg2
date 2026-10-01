@@ -245,6 +245,25 @@ test('Charity (gym1-99): the attacker reduces the damage by a chosen amount; Cha
   assert.ok(has(game, 'p1', 'hand', charity), 'returned to hand at end of turn');
 });
 
+// TCGdex gym1-18
+const MISTY =
+  "Discard 2 of the other cards in your hand in order to play this card. If this turn's attack does damage to the Defending Pokémon (after applying Weakness and Resistance), and if the attacking Pokémon has Misty in its name, the attack does 20 more damage to the Defending Pokémon.";
+
+test("Charity (gym1-99): reduces up to all of the damage, Misty gym1-18's +20 included", () => {
+  const game = setup();
+  game.p1.zones.active.push(pokemon("Misty's Seel"));
+  game.p2.zones.active.push(pokemon('Charmander'));
+  play(game, 'p1', trainer('Charity', CHARITY));
+  zone(game, 'p1', 'hand').push(card({ name: 'Cost 1' }), card({ name: 'Cost 2' }));
+  const paid = play(game, 'p1', trainer('Misty', MISTY));
+  choose(game, paid, paid.pendingChoice.options.slice(0, 2).map((o) => o.instanceId));
+  const res = attack(game, 'p1');
+  const names = res.pendingChoice.options.map((o) => o.name);
+  assert.equal(names.at(-1), 'Reduce by 70', '50 Slash + 20 Misty');
+  choose(game, res, [res.pendingChoice.options.at(-1).instanceId]);
+  assert.equal(zone(game, 'p2', 'active')[0].damage || 0, 0);
+});
+
 test('Magnifier (neo4-101): Resistance is not applied', () => {
   const game = setup();
   game.p1.zones.active.push(pokemon('Kyurem ex'));
