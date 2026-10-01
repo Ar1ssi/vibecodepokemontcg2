@@ -6,12 +6,24 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I242). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I254). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I253 2026-10-01 P2 [rules] A second Pokémon Tool attaches through playTrainer when targetInstanceId is given (trainer.mjs:231); attachCard and the prompt path refuse it — not era-specific (refs: refs/063-bw-card-audit F9)
+- I252 2026-10-01 P2 [rules] BW Trainer parses: Dark Patch type-word filter, Colress Machine/Heavy Ball search kind, Grunt/Communication/Superior ER/Scramble Switch costs, Pokédex; Eviolite/Dark Claw/Crystal Edge holder gates; G Booster/G Scope/Victory Piece/Crystal Wall unbuilt (refs/063 F9)
+- I251 2026-10-01 P3 [data] BW TCGdex quirks: bwp-BW78 Raichu Stage1 with no evolveFrom evolves onto any Pokémon (reduce.mjs:4508 skips the name check); bw11-RC23, bwp-BW51/76/91 lack a retreat field → free retreat (refs: refs/063-bw-card-audit F10)
+- I250 2026-10-01 P1 [rules] BW Trainer staples misplay: Pokémon Catcher never flips (trainer-effects.mjs:1192), Rocky Helmet/Rock Guard never fire (tool-combat.mjs:641), N doesn't shuffle, Aspertia City Gym −10 HP, Virbank no server effect, Battle City discards 2 (refs/063 F9)
+- I249 2026-10-01 P2 [rules] BW activated Abilities half-run: when-played Aggron Toppling Wind, Salamence Breakwing, Shiftry Giant Fan; Ho-Oh-EX Rebirth (benchFromDiscardAbility), Salamence Scornful Storm, Ninjask Cast-off Shell (refs: refs/063-bw-card-audit F8)
+- I248 2026-10-01 P2 [rules] Wrong reads: Klinklang Plasma Steel shields every type from EX (ability-combat.mjs:560, no "your {M} Pokémon" filter); Silver Bangle +30 to all attacks (tool-combat.mjs:288 lacks the hyphen in "Pokémon-EX") (refs/063 F7)
+- I247 2026-10-01 P2 [rules] 25 BW passive Abilities unenforced (probed with/without text): Heal Block, Badge of Discipline, Allergy Panic, Leaf Tailor, Weak Barrier, Smooth Coat, Craftsmanship, Empty Shell, Aftermath, Final Wish, Dark Aura, Cursed Glare… (refs/063 F6)
+- I246 2026-10-01 P2 [rules] 28 BW attacks partial: 8 condition phrasings parseConditionClause can't read (full HP, fewer HP than defender, no Retreat Cost, Burned or Poisoned…), unresolved counts (Chuck, Vilify), 2-coin both-heads, mill-then-attach (refs/063 F5, App. A)
+- I245 2026-10-01 P2 [rules] 18 BW attacks do nothing beyond damage: Constant Rattle, Doom Decree, Devour/Jet Woofer, discard→deck top, Spit Squall/Strong Breeze, Vengeful Wish, Misinformation, Psyjamming, Fossil Hunt, Picnic Weather (refs/063 F4, App. A)
+- I244 2026-10-01 P2 [rules] No BW ACE SPEC recognised (TCGdex rarity "Rare"; isAceSpecCard card-classify.mjs:143): decks accept several, Spiritomb Sealing Scream misses them — add an ace-spec marker to the D200 generator (refs/063 F3)
+- I243 2026-10-01 P1 [rules] Team Plasma unread in live games: server cards carry no subtypes, only search-match.mjs:92 asks hasCardMarker — Sawk/Houndoom/Haxorus/Teampact, Raiden Knuckle, Power Connect, Freeze Zone, Frozen City, Silver Mirror, Plasma Badge (refs: D200, refs/063 F2)
+- I242 2026-10-01 P1 [rules] TCGdex BW text kills readers: type words ("Darkness Energy", "Colorless more") unread by passive Abilities (Darkrai-EX Dark Cloak, Stickiness, Psychic Mirage, Royal Garden) and Rayquaza-EX Dragon Burst; U+FFFD and typos (refs/063 F1)
 - I241 2026-10-01 P3 [rules] Some TCGdex ability entries are empty ({type} only: neo2-49 Unown M, neo3-35 Parasect, ecard2-95a Mr. Mime, ex16-84/86…), so those cards still have no ability live (I233 follow-up)
 - I240 2026-10-01 P2 [client] rules-bridge.js ~2981 announces and auto-runs a played Pokémon's ability steps; now that Powers/Bodies load, old wordings that parse as draw/when-played steps may fire on play — audit (I233 follow-up)
 - I239 2026-10-01 P2 [rules] Modern "has no Abilities" locks (Garbotoxin, Path to the Peak) also stop Pokémon Powers/Poké-Powers/Poké-Bodies (isAbilitySuppressed ignores type); basep promos' Poke-POWER vs printed "Pokémon Power" unsourced, so Toxic Gas skips them — needs rulings (I233 follow-up)
