@@ -156,6 +156,27 @@ test('runtime: Third Eye discards the Energy and draws the number chosen', () =>
   assert.ok(drew.discard.some((c) => c.instanceId === 5));
 });
 
+// Sabrina's Golduck [Gym Challenge 30] Damage Shift ≡ Xerneas-GX [Forbidden Light 139]
+// Sanctuary-GX's wording with 1 counter each.
+const DAMAGE_SHIFT =
+  "Move 1 damage counter from each of your Pokémon that has any on it to the Defending Pokémon. (Don't apply Weakness and Resistance.)";
+
+test('Damage Shift ≡ "Move 1 damage counter from each of your Pokémon to your opponent\'s Active Pokémon"', () => {
+  sameAsModern(DAMAGE_SHIFT, "Sabrina's Golduck", "Move 1 damage counter from each of your Pokémon to your opponent's Active Pokémon.");
+});
+
+test('runtime: Damage Shift moves 1 counter from each damaged Pokémon of yours', () => {
+  const golduck = { instanceId: 1, name: "Sabrina's Golduck", hp: 70, damage: 20, attacks: [{ name: 'Damage Shift', cost: [], damage: '', text: DAMAGE_SHIFT }] };
+  const shifted = attackOnTurn(
+    duelBoard(golduck, FOE, { p1Bench: [{ ...MY_SPARE, damage: 30 }, { instanceId: 3, name: 'Fresh', hp: 60 }] }),
+    'p1',
+    2,
+    0
+  ).state;
+  assert.deepEqual([1, 2, 3].map((id) => damageOn(shifted, 'p1', id)), [10, 20, 0]);
+  assert.equal(damageOn(shifted, 'p2', 20), 20);
+});
+
 // ── Focus Energy ────────────────────────────────────────────────────────────────────────────
 
 // Lt. Surge's Rattata [Gym Heroes 82] / [Gym Challenge 85]: "Lt." is not a sentence end, so the

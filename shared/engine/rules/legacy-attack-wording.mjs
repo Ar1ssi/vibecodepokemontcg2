@@ -40,6 +40,12 @@ export const LEGACY_ATTACK_REWRITES = [
     /(^|\. )(discard (?:1|an?) energy cards? attached to this pokémon) in order to draw up to (\d+) cards(?=\.|$)/g,
     '$1$2 in order to use this attack. draw up to $3 cards',
   ],
+  // Sabrina's Golduck [Gym Challenge 30] Damage Shift: "… from each of your Pokémon that has any
+  // on it …" — a Pokémon with none has nothing to move, as in Xerneas-GX Sanctuary-GX's wording.
+  [
+    /(^|\. )move (\d+) damage counters? from each of your pokémon that has any on it to your opponent's active pokémon(?=\.|$)/g,
+    "$1move $2 damage counter from each of your pokémon to your opponent's active pokémon",
+  ],
   // Togepi [Neo Destiny 56] Charm.
   [
     /(^|\. )if your opponent's active pokémon attacks during your opponent's next turn, any damage it does is reduced by (\d+)/g,
