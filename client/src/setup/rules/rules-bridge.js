@@ -2580,15 +2580,17 @@ import { glowColorFor } from './card-glow-colors.mjs';
           appendMessage('', `  ${card.name}: no opponent Pokémon to damage`, 'announcement', false);
           return false;
         }
-        const amount = promo.count;
+        // `promo.count` is printed damage counters; every counter is 10 damage.
+        const counters = promo.count;
+        const damage = counters * 10;
         const applyDamage = async (pick) => {
           const { card: target, zone, idx } = pick;
           if (target.image?.damageCounter) {
             const current =
               parseInt(target.image.damageCounter.textContent || '0', 10) || 0;
-            updateDamageCounter(oppPlayer, zone, idx, current + amount, true);
+            updateDamageCounter(oppPlayer, zone, idx, current + damage, true);
           } else {
-            addDamageCounter(oppPlayer, zone, idx, amount, true);
+            addDamageCounter(oppPlayer, zone, idx, damage, true);
           }
           appendMessage(
             '',
@@ -2603,7 +2605,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
           return true;
         }
         const result = await awaitChoicePicker({
-          title: `${card.name} — place ${amount} damage counter${amount !== 1 ? 's' : ''}`,
+          title: `${card.name} — place ${counters} damage counter${counters !== 1 ? 's' : ''}`,
           candidates: candidates.map((c) => c.card),
           zoneFrom: 'board',
           destination: null,
@@ -3128,10 +3130,14 @@ if (!isTrainer) {
         ) {
           return;
         }
-        if (!card?.image || card.image.__rulesPokemonInPlay) return;
+        if (!card?.image) return;
+        // The flag marks a one-shot per *entering play* (setup face-down below), but a
+        // card already in play can still move Bench→Active many times — the promotion
+        // trigger must fire on every such move, so it is deliberately outside the guard.
+        const firstTimeInPlay = !card.image.__rulesPokemonInPlay;
         card.image.__rulesPokemonInPlay = true;
         ensureCardData(card).then(() => {
-          if (parseSetupFaceDown(card) && !card.image.__rulesSetupFaceDown) {
+          if (firstTimeInPlay && parseSetupFaceDown(card) && !card.image.__rulesSetupFaceDown) {
             card.image.__rulesSetupFaceDown = true;
             hideCard(user, card);
             appendMessage(

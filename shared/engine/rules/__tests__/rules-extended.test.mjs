@@ -5264,7 +5264,11 @@ import test from 'node:test';
           text: 'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may put 2 damage counters on 1 of your opponent\'s Pokémon.',
         },
       };
+      // Legacy (no server stamp) and a stale window are both excluded.
       assert.equal(isUsableAbilityCard(card), false);
+      assert.equal(isUsableAbilityCard({ ...card, movedToActiveTurn: 4 }, { turnNumber: 4 }), true);
+      assert.equal(isUsableAbilityCard({ ...card, movedToActiveTurn: 4 }, { turnNumber: 5 }), false);
+      assert.equal(isUsableAbilityCard({ ...card, movedToActiveTurn: 4 }), false);
     });
 
     test('parseAbility: effectPreventAbility active-spot aura (Midnight Fluttering)', () => {

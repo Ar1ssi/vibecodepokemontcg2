@@ -41,9 +41,20 @@ export function isUsableAbilityCard(card, opts = {}) {
 
   const steps = parseAbility(cardAbilityText(card));
   const plan = planAbilitySteps(steps, { mode: 'interactive' });
-  const actionable = actionableAbilityPlan(plan, { mode: 'interactive' }).filter(
-    (item) => item.action !== 'promotion'
-  );
+  const actionable = actionableAbilityPlan(plan, { mode: 'interactive' });
+  // A marker-only Bench→Active promotion trigger (Iron Valiant ex Tachyon Bits)
+  // has no other interactive step. Its window is readable only when the
+  // authoritative view stamped `movedToActiveTurn`, so offer it on that turn
+  // alone; legacy cards carry no stamp and the legacy move path auto-runs the
+  // trigger, so the picker must not offer it there.
+  if (actionable.length > 0 && actionable.every((item) => item.action === 'promotion')) {
+    const stamped = card.movedToActiveTurn;
+    return (
+      stamped != null &&
+      ctx.turnNumber != null &&
+      Number(stamped) === Number(ctx.turnNumber)
+    );
+  }
   if (actionable.length > 0) return true;
   // Luxray Swelling Flash / Charjabug Battery (I155): activated from the hand, but their
   // steps have no client-side executor, so the plan reads them as announce-only. They are

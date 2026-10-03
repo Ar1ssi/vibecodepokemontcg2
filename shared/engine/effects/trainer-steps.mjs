@@ -5838,6 +5838,31 @@ export const EXTRA_STEP_HANDLERS = {
         abilityShield: true,
       },
     }),
+  // Bench→Active promotion trigger (Cobalion ex Metal Road, Iron Valiant ex
+  // Tachyon Bits, …). The parser emits the marker alongside a concrete step for
+  // every family except damage, which the marker itself must resolve: place the
+  // counters on 1 of the opponent's Pokémon through the same picker
+  // moveDamageAbility uses. The other effects run their own step, so the marker
+  // stays a no-op for them (reported as skipped, exactly as the unhandled step
+  // did before this handler existed).
+  onPromotionAbility: (ctx) => {
+    if (ctx.step.effect !== 'damage' || !ctx.step.count) {
+      ctx.events.push({
+        type: 'effectStepSkipped',
+        reason: 'unsupported_step',
+        step: ctx.step.type,
+      });
+      return null;
+    }
+    return damageCounters({
+      ...ctx,
+      step: {
+        ...ctx.step,
+        target: "opponent's Pokémon",
+        abilityShield: true,
+      },
+    });
+  },
   // Design 034 slice 5 ability executables.
   moveEnergyAbility,
   moveDamageBetweenAbility: moveDamageBetweenOwn,
