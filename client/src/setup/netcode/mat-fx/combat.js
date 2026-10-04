@@ -63,6 +63,9 @@ const combatSrc = (instanceId, registry) => {
 /** Queue `job(ctx)` to run when the current batch's attack connects. */
 export const afterImpact = (job) => impacts.add(job);
 
+/** Design 063: a move scene announces its own contact moment (ms from now) with its context. */
+export const announceStrike = (ms, ctx = null) => impacts.strikeIn(ms, ctx);
+
 const showDamageNumber = (instanceId, rect, hit) => {
   const index = floatingCount.get(instanceId) || 0;
   floatingCount.set(instanceId, index + 1);

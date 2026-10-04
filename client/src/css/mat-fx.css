@@ -999,3 +999,14 @@ body.fx-off .fx-mega-field {
   background: radial-gradient(circle, rgba(255, 226, 140, 0.45) 0%, rgba(255, 180, 60, 0.18) 45%, rgba(255, 170, 40, 0) 70%);
   will-change: transform, opacity;
 }
+
+/* Design 063: move scenes. One host spans both cards; the canvas is centred in it. */
+.fx-move {
+  overflow: visible;
+}
+
+.fx-move__canvas,
+.fx-move__embers {
+  position: absolute;
+  pointer-events: none;
+}
