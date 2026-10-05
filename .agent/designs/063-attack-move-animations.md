@@ -1,8 +1,10 @@
 # 063: Attack move animations — type × stat class × tier
-Status: draft — awaiting user approval (document only; the user deferred implementation).
-Appendix A filled for Grass, Water, Fire, Electric (the user's test run of the study method,
-43 moves); the other 13 types are pending the same pass.
-Date: 2026-10-01 · Session: S336
+Status: direction approved by the user on the Fire Blast look test (2026-10-05): "Good". This
+revision turns the look test into the implementation plan. Everything in § Design is a pinned
+contract a builder follows without design judgment; § Builder recipe is the step-by-step for one
+move. Appendix A (per-move specs) is filled for Grass, Water, Fire, Electric (43 moves); the other
+13 types are pending the same study pass and their slices start with it.
+Date: 2026-10-01 (draft) · 2026-10-05 (revised after the look test) · Session: S336
 
 ## Problem
 Every attack on the board plays the same beat: the attacker's ghost lunges, the defender flashes,
@@ -13,17 +15,21 @@ by its evolution tier (Basic → Stage 1 → ex/Mega/Stage 2). The look is 3D / 
 Black 2 & White 2 (else Black & White) sprite animations as the reference for each move's read,
 and the Scarlet/Violet video as the cue for the 3D translation.
 
-This document is the plan for the *animations*: selection rules, the data they need, the shared
-primitive library, timing, tests, slices, and one per-move spec (Appendix A). Implementation comes
-later; nothing here changes code.
+One move, Fire Blast, has been built end to end as a look test (it is not in the user's table; it
+was the reference animation the user pointed at). Three takes were judged; the user's two
+corrections ("material quality is poor", "the attacker and defender cards both need more motion
+and weight") are now rules in this document. The accepted take is described in § What the look
+test settled, and its code is the reference implementation every other move is built from.
 
 ## Constraints
 - Cosmetic only (D94). Board state is applied before any plan runs; nothing gates input. Overlays
   self-remove with a backstop timer; `body.fx-off .fx-overlay` hides them. The FX queue budget is
-  2500 ms of committed holds per batch (`fx-queue.mjs`), so a whole attack (banner → move → damage
-  → status → KO) must fit.
+  **3800 ms** of committed holds per batch (`fx-queue.mjs`, raised from 2500 in this design so
+  banner 1600 + tier-3 move hold ≤ 1240 + damage 180 + status 260 + knockout 900 keep their holds).
 - One clock (D103, D118, D119): motion is WAAPI keyframes sampled from pure pose functions; canvas
   layers redraw from a WAAPI animation's `currentTime` via `playCanvasStage`; no free-running rAF.
+- **The move plays after the name banner** (user, 2026-10-05): `HOLD_MS['attack-banner']` is
+  `BANNER_MS` (1600 ms), so the banner is read on its own and the move is watched on its own.
 - Sound before sight (design 024): the dispatcher sounds a plan before the effect runs; a hold
   needs a voice; voices are synthesized (no audio assets).
 - Both seats: the opponent's board iframe is turned 180°; card art in an overlay turns with it
@@ -40,10 +46,42 @@ later; nothing here changes code.
   from the view and the `attackExecuted` event both clients already receive.
 - New dependency or vendored data ⇒ a DECISIONS.md line (CLAUDE.md hard rule).
 - Pure modules test under `node --test` with no jsdom; DOM drivers are the thin `.js` twins.
-- Performance: a scene spawns ≤ 40 DOM nodes, ≤ 24 particles per burst (`MAX_PARTICLES`), ≤ 2
-  canvases, and only `transform`/`opacity` keyframes; the lunge today is 3 `<img>` + 1 host.
+- Rendering: 2D canvas and DOM only, never WebGL. A scene spawns ≤ 2 canvases, 2 ghost cards,
+  ≤ 24 particles per burst (`MAX_PARTICLES`), ≤ 40 DOM nodes, and only `transform`/`opacity`
+  keyframes on DOM.
+- Performance: canvas `filter: blur()` is the costly call in the fire material. Rule: **one blurred
+  pass per tongue, blur radius ≤ 0.12 × width, ≤ 30 tongues on screen in any frame.** The headless
+  software-rendered probe (see § Recording) must report median ≤ 17 ms and p95 ≤ 140 ms for a
+  tier-3 scene; a GPU browser is faster. If a scene cannot meet that, drop the blur pass (keep the
+  grain) rather than cut beats.
 
-## Current state (read this session)
+## What the look test settled (user-approved, 2026-10-05)
+The accepted Fire Blast take (commits `7fbdb05`, `2fb98f4`, and the pacing commit after them) is
+the visual contract. A builder reproduces these qualities for every move:
+1. **Material, not gradients.** Fire is drawn as *tongues*: tapered polygons whose edges wobble
+   with time (three summed sines), filled in two passes (a blurred orange body, a crisp yellow mid)
+   plus a near-white core, composited with `globalCompositeOperation = 'lighter'`, with a scrolling
+   value-noise *grain pass* punched out of the whole fire layer (`destination-out`, alpha 0.28).
+   Fireballs are a glow halo + a fan of tongues streaming behind the direction of travel + a hot
+   sphere + six shed sparks. Flat radial-gradient discs were rejected by the user.
+2. **Cards have weight.** Both cards are replaced by ghost copies for the scene (the real cards
+   hide once the ghost art has decoded) and move: the attacker rears back and lifts through the
+   charge with a rising rim glow, lurches forward on release and springs home with a damped
+   overshoot; the defender trembles as the projectile closes, takes an impulse along the lane at
+   contact with squash and wobble, springs back over ~0.5 s, and carries a heat tint that cools.
+3. **Contact is one moment.** The scene announces `contactMs` to the impact queue; the existing
+   damage number, hit flash, slash, sparks and table shake land exactly there. The scene adds its
+   own dressing at the same instant (core flash, speed lines, the 大 flare, embers).
+4. **Pacing.** Banner 1600 ms, then the move; a tier-3 move is ~1900 ms with contact at ~1000 ms;
+   the move's hold is `contactMs + 40`. A local red darkening (≤ 1.6 card heights, alpha ≤ 0.45)
+   around the defender replaces the sprite games' full-screen tint.
+5. **Geometry fact.** On this board the two Active cards nearly touch: the lane (centre to centre)
+   is about 1.2 card heights, so a "travel" beat is short by nature. Scenes must still read when
+   the projectile has ~0.75 h to cross; they must also read when the lane is long (a bench target).
+6. **Layers.** back canvas (vignette, rings, speed lines, the halves of orbits that pass behind the
+   attacker) < attacker ghost < defender ghost < front canvas (the fire) < CSS particles.
+
+## Current state (read this session; the look-test code is on the branch)
 - `client/src/setup/netcode/advisory-animations.mjs` — `EVENT_FX.attackExecuted = 'attack'` and
   `MULTI_FX.attackExecuted = ['attack-banner', 'attack']`: one event, two plans, each
   `{ kind:'fx', effect, user, attackerId, defenderId, attackName, damage, benchDealt }`.
@@ -60,13 +98,43 @@ later; nothing here changes code.
   `impacts.strikeIn(LUNGE_MS * LUNGE_IMPACT, { direction, attackerCard })`, a ghost `<img>` with two
   lagged trails, `hideDuring` on the real card. `damage(plan)`: `classifyHitOnce`, then
   `impacts.add` → damage number, `strikeTarget` (flash, slash, type-coloured streak sparks),
-  `shakeTable`. `attackBanner(plan)`: name banner + target ring.
-- `mat-fx/combat-pose.mjs` — `LUNGE_MS 560`, `LUNGE_IMPACT 0.36` (contact at 202 ms),
-  `HIT_FLASH_MS 420`, `HIT_SPARKS_MS 520`, `DAMAGE_POP_MS 1100`, `SCREEN_SHAKE_MS 360`,
-  `TARGET_RING_MS 620`; `createImpactQueue({ setTimer })` holds every hit/KO queued in the same
-  synchronous batch until the announced contact (`strikeIn` keeps the max delay and the context).
-- `mat-fx/fx-holds.mjs` — `attack-banner 620`, `attack 240`, `damage 180`, `status 260`,
-  `knockout 900`, `prize-claim 320`; unknown effects pace as 0.
+  `shakeTable`. `attackBanner(plan)`: name banner + target ring. **New:** `announceStrike(ms, ctx)`
+  exports the impact queue's `strikeIn` for move scenes.
+- `mat-fx/combat-pose.mjs` — `LUNGE_MS 560`, `LUNGE_IMPACT 0.36`, `HIT_FLASH_MS 420`,
+  `HIT_SPARKS_MS 520`, `DAMAGE_POP_MS 1100`, `SCREEN_SHAKE_MS 360`, `TARGET_RING_MS 620`;
+  `createImpactQueue({ setTimer })` holds every hit/KO queued in the same synchronous batch until
+  the announced contact (`strikeIn` keeps the max delay and the context).
+- `mat-fx/fx-holds.mjs` — **`attack-banner: BANNER_MS` (1600)**, `attack 240`, `damage 180`,
+  `status 260`, `knockout 900`, `prize-claim 320`; unknown effects pace as 0.
+  `mat-fx/fx-queue.mjs` — **`DEFAULT_MAX_QUEUE_MS 3800`**.
+- `mat-fx/moves/fire-blast-pose.mjs` (pure, 360 lines) — the Fire Blast timing and geometry:
+  `FIRE_BLAST_MS 1900`, `FIRE_BLAST_CONTACT_MS 1000`, `FIRE_BLAST_HOLD_MS 1040`, `PHASES` (charge
+  0–620, rings 560–940, release 620–1000, vignette 820–1850, flash 1000–1180, rays 1000–1320,
+  flare 1000–1750, smoke 1300–1900), `laneGeometry`, `chargeOrbs`, `chargeCore`, `fireballPose`,
+  `releaseRings`, `vignettePose`, `flashPose`, `raysPose`, `flarePose`, `armTongues`, `smokePuffs`,
+  `attackerCardPose`, `defenderCardPose`, `phaseProgress`. Every function is the model for the
+  generic modules in § Design (they are lifted out of here, not rewritten).
+- `mat-fx/moves/fire-material.js` (canvas, 245 lines) — `FIRE` palette, `wobble`, `tonguePath`,
+  `drawTongue`, `drawGlow`, `drawOrb`, `drawFireball`, `getNoiseTile`, `grainPass`. This becomes
+  `materials/fire.js` and the template for every other material.
+- `mat-fx/moves/fire-blast.js` (DOM, 485 lines) — `playFireBlast({ attacker, defender, seed,
+  impacts, attackerCard })`: host spanning both cards (padding 1.7 h), back canvas, two ghosts
+  (`cardGhost` with `.fx-move__rim` and `.fx-move__heat` layers, art turned by `turn`, `ready`
+  promise from `img.decode()` raced against 120 ms), front canvas with the grain pass, embers at
+  contact, `strikeIn(contactMs, { direction, attackerCard, move, family: 'burst' })`,
+  `hideDuring` on both real cards once the ghosts are ready, `removeWhen` backstop
+  `duration + 760 + 400`. This becomes `move-player.js`.
+- `client/src/css/mat-fx.css` — `.fx-move`, `.fx-move__canvas`, `.fx-move__embers`,
+  `.fx-move__ghost` (`will-change: transform; transform-origin: 50% 50%`), `.fx-move__ghost-art`
+  (`object-fit: contain; border-radius: 0.3rem`), `.fx-move__rim` (two orange box-shadows, opacity
+  animated), `.fx-move__heat` (radial pale-yellow→orange→red, `mix-blend-mode: screen`, opacity
+  animated). Plus the older `.fx-overlay` (z 2450), `.fx-particle*`, `.fx-hit*` (z 2455),
+  `.fx-lunge*`, `.fx-target-ring*`.
+- `.claude/skills/fx-preview/rec/rec-fire-blast.mjs` — records the scene as a real attack reads
+  (fake view through `applyView`, banner, hold, scene + `damage` in one batch); writes `rects.json`
+  (`from`, `to`, `bannerAt`, `moveAt`, `bannerHoldMs` in video ms) and prints the frame-time probe.
+  `rec/cut-move.sh <outDir> [name]` cuts `sheet.png` (12.5 fps, 36 tiles from 150 ms before the
+  move), `<name>.mp4` and `<name>-closeup.mp4` from the WebM using `rects.json`.
 - `mat-fx/particles.mjs` — `burstParticles({count, distance, direction, spread, size, aspect,
   gravity, maxDelay, orient, seed})` → ≤ 24 seeded particle rows; `spawnParticles(host, rows,
   {className, color, duration, delay})` in `image-logic/mat-fx.mjs` animates them.
@@ -75,28 +143,27 @@ later; nothing here changes code.
   `animateFrames(el, frames, timing)`, `removeWhen(host, promises, backstopMs)`,
   `hideDuring(el, promise, backstopMs)`, `runPose`, `motionReduced`, `fxDisabled`.
 - `mat-fx/canvas-stage.js` — `playCanvasStage(host, {className, cx, cy, size, duration, draw,
-  before})` → promise; `draw(ctx, t, elapsedMs)` in CSS px, cleared every frame, DPR ≤ 2.
+  before})` → promise; `draw(ctx, t, elapsedMs)` in CSS px, cleared every frame, DPR ≤ 2. The canvas
+  is a square of `size` centred on (cx, cy) in the host; a host-local point (x, y) is drawn at
+  (x + ox, y + oy) with `ox = (size − hostWidth) / 2`, `oy = (size − hostHeight) / 2`.
 - `mat-fx/fx-colors.mjs` — `fxRgbForCard(card)` (first printed type → `TYPE_GLOW`), `brighten`,
   `rgbCss`, `FX_NEUTRAL_RGB`. `mat-fx/evolve-scene.js` — `frameTurnOf(element)`.
+  `mat-fx/flow-pose.mjs` — `BANNER_MS 1600`, `bannerPose` (in 0–20 %, hold, out 80–100 %),
+  `seededRandom(seed)` (mulberry32).
 - `mat-fx/fx-audio.mjs` — `voicesFor(effect, plan)`; voices are frozen `tone`/`noise`/`arpeggio`
   descriptors; `attack` already has a voice set.
-- `mat-fx/status.js` + `status-fx.mjs` — Special Condition apply/clear rings and motes (unchanged
-  by this design; a status attack still gets its status effect from `statusApplied`).
 - `shared/engine/rules/card-classify.mjs` — `isExCard`, `isMegaCard`, `isTeraCard`, `isVCard`,
   `isVmaxCard`, `isVstarCard`, `isGxCard`, `isTagTeamCard`, `isLegendCard`, `isVUnionCard`,
   `isPrismStarCard`, `isRadiantCard`, `isRuleBoxPokemon`. `shared/engine/cards.mjs` —
-  `collapseStage` ("Stage 1" / "Stage1" / "stage-1" agree) and `NON_BASIC_STAGES`.
+  `collapseStage` and `NON_BASIC_STAGES`.
 - Card objects on the client carry `name`, `types` (TCG types), `stage`, `subtypes`, `hp`,
   `evolvesFrom`. They carry **no base stats and no main-series types**.
 - `client/src/setup/deck-builder/core/card-sprites.mjs` — `pokemonSpriteForName(cardName,
-  {types})` → `{ slug, name }`: strips owner prefixes, "ex"/"V"/"VMAX" suffixes, decorations;
-  resolves Mega (`-mega`, `-mega-x`), Primal, regional, named and type forms, Paldean Tauros
-  breeds, against `pokemon-sprite-catalog.generated.mjs` (pokesprite slugs, D97) and the hand-kept
-  gen-9 catalog (D100/D101). It is pure and already the one card-name → species resolver.
-- `client/src/css/mat-fx.css` — `.fx-overlay` (z 2450), `.fx-particle` + `--streak/--shard/
-  --mote/--star/--z`, `.fx-hit*`, `.fx-lunge*`, `.fx-target-ring*`, `.fx-dim`.
-- Tooling: `.claude/skills/fx-preview` (e2e board, `capture-entry.mjs`, `rec/rec-*.mjs` one
-  per shipped scene, stepped WAAPI clock, `CHROMIUM=/opt/pw-browsers/chromium` in the cloud).
+  {types})` → `{ slug, name }`: the one card-name → species resolver (owner prefixes, ex/V/VMAX
+  suffixes, Mega, Primal, regional, named and type forms, Paldean Tauros breeds).
+- Tooling: `.claude/skills/fx-preview` (e2e board, `capture-entry.mjs`, `rec/rec-*.mjs` one per
+  shipped scene, `CHROMIUM=/opt/pw-browsers/chromium` in the cloud, `SIO_JS` for the socket.io
+  client, `CARD_DIR` for card art when `images.pokemontcg.io` is blocked for the browser).
 
 ## References — how they were gathered (so a later session can refetch)
 - The user's pointer (Bulbapedia `File:<Move>_B2W2.png`, else `_BW`) is behind a Cloudflare
@@ -112,12 +179,17 @@ later; nothing here changes code.
   index on every tile); `fetch-italian.mjs` fills the gaps; `trim-manifest.mjs` writes the
   trimmed manifest (slug, names, page, file URLs, frame counts, durations) committed as
   `.agent/designs/refs/063-move-refs.json`; `merge-notes.mjs` splices the study notes in here.
+  Large `.mp4` downloads from Poképédia are cut off by the host over HTTP/2; retry with
+  `curl --http1.1` (that is what fetched the Scarlet/Violet Fire Blast video).
   26 moves have no sprite-era animation anywhere (all Gen VI+ except Karate Chop and Shock Wave,
   which have no animation file at all); their entries cite the 3D video only.
-- Moves newer than Black/White (Gen VI+: Fell Stinger, Infestation, Nuzzle, Phantom Force,
-  Throat Chop, Liquidation, Wave Crash, Ice Hammer, Ice Spinner, Stomping Tantrum, High
-  Horsepower, Smart Strike, Meteor Assault, Spirit Break, Play Rough, Mystical Fire, Electro Shot,
-  Steel Beam, all Fairy specials) have no sprite animation; their entries cite the 3D video only.
+- Fire Blast's own references (not in the table; used for the look test): B2W2
+  `Déflagration_N2B2.gif` (146 frames, 33 fps, effect frames 42–126: five fireballs orbit the
+  attacker 42–59, the screen tints red and a flame cluster crosses the ground 61–85, a yellow
+  radial flash 87, the five-armed 大 flare grows 89–97, holds 98–108, breaks up 110–120, the
+  screen darkens and returns 122–128) and Scarlet/Violet `Déflagration_EV.mp4` (198 frames,
+  30 fps: fireball built at the mouth 33–42, orange rings orbit 45–51, the blast travels 54–63,
+  engulfs the foe 66–87, white core 90, embers and a red tint fade 93–126).
 
 ## Move table — the user's spec, verbatim (1 = Basic unless ex · 2 = Stage 1 unless ex · 3 = ex / Mega / Stage 2)
 | VG type | Physical 1 | Physical 2 | Physical 3 | Special 1 | Special 2 | Special 3 |
@@ -186,23 +258,397 @@ later; nothing here changes code.
 10. **Zero-damage attacks** (status, search, draw attacks; `damage === 0` and no `benchDealt`).
     A: play the move anyway — a Hydro Pump that visibly does nothing. B: banner + a short
     type-coloured aura pulse on the attacker, no contact. **Pick B**; flagged.
-11. **Rendering.** A: DOM overlays + CSS particles (today's stack) for melee, bursts, slashes,
-    simple projectiles. B: `playCanvasStage` for beams, helices, vortices, waves, terrain and any
-    multi-shape volume. C: WebGL (three.js is vendored for the Build & Battle packs only). **Pick
-    A + B per beat, never C** — 154 moves on WebGL is a scope explosion with no reader benefit on a
-    card board.
-12. **Data-driven scores vs. one function per move.** A: each move is a *score* — a validated data
-    table of timed beats over a fixed primitive vocabulary — played by one DOM player. B: 154
-    bespoke drivers. **Pick A**: one player and ~18 primitives to test; a new move is a table row;
-    a schema test enumerates every move against the spec.
-13. **Sound.** A: one voice per move. B: one voice set per *sound family* (`slash, punch, dash,
-    beam, projectile, burst, quake, splash, wind, electric, ghost, chime, roar, charge`), chosen by
-    the score and routed by `soundPlanFor`. **Pick B**.
-14. **Holds.** A: a per-tier entry in `fx-holds`. B: the effect returns its own hold
-    (`contactMs + 40`, mirroring today's 202 ms contact / 240 ms hold), the dispatcher's existing
-    override; `HOLD_MS.attack` stays as the lunge fallback. **Pick B**.
+11. **Rendering.** A: DOM overlays + CSS particles only. B: two canvas stages (back and front)
+    around DOM ghost cards, CSS particles for fragments. C: WebGL. **Pick B** — proven by the look
+    test; never C.
+12. **How a move is described.** A: a pure data *score* played by one player with a fixed, small
+    primitive vocabulary (the first draft). B: 154 bespoke scene modules like the look test's
+    `fire-blast.js`. C: a `MoveSpec` object per move — data (timing, phases, card-motion presets,
+    particle bursts) plus *beats* that name a drawer from a shared library and pass parameters; one
+    generic player; drawers are built on per-type *materials*. **Pick C**: it is exactly what the
+    look test's code becomes once the Fire Blast numbers are moved into a spec, it keeps the pure
+    parts testable, and a new move is a spec file a weaker model can write by copying the recipe.
+13. **Sound.** One voice set per *sound family* (`slash, punch, dash, beam, projectile, burst,
+    quake, splash, wind, electric, ghost, chime, roar, charge`), chosen by the spec's `family` and
+    routed by `soundPlanFor`. **Picked.**
+14. **Holds.** The effect returns its own hold (`contactMs + 40`); `HOLD_MS.attack` stays as the
+    lunge fallback. **Picked** (the look test returns `{ holdMs: 1040 }`).
+15. **Material rendering.** A: radial-gradient discs (take 1, rejected: "material quality is
+    poor"). B: tongue material with blur + grain (take 2, accepted). C: sprite textures. **Pick B**;
+    C would need art assets the repo does not carry.
+16. **Card motion.** A: cards stay put (take 1, rejected: "need more motion and weight"). B: ghost
+    copies of both cards driven by pose presets (take 2, accepted). **Pick B**; the real cards hide
+    only after the ghost art decodes (a blank frame showed otherwise).
+17. **Banner → move.** A: overlap (hold 620 of a 1600 ms banner; the charge played under the
+    banner). B: the move starts when the banner has left (hold = `BANNER_MS`). **Pick B** (user,
+    2026-10-05); the queue budget rises to 3800 so the full chain keeps its holds.
+18. **Blur cost.** A: three blurred passes per tongue. B: one blurred pass (body) + crisp mid and
+    core. **Pick B**: p95 frame time in the software probe fell from 187 to ~125 ms with no visible
+    loss; a GPU browser accelerates the remaining pass.
 
 ## Design
+### File map (what exists → what it becomes)
+```
+client/src/setup/netcode/mat-fx/moves/
+  move-table.mjs            the spec table, verbatim (pure)                       slice 1
+  move-select.mjs           tier / stat class / VG type / move pick (pure)        slice 1
+  species-stats.generated.mjs + scripts/vendor-species-stats.mjs                  slice 0
+  move-spec.mjs             MoveSpec schema + validateSpec (pure)                 slice 2
+  move-geometry.mjs         laneGeometry, lanePoint, unionPadded, phaseProgress   slice 2  (lifted from fire-blast-pose.mjs)
+  card-motion.mjs           attacker/defender pose presets (pure)                 slice 2  (lifted from fire-blast-pose.mjs)
+  move-poses.mjs            the pure beat math: orbits, projectile, rings, flare,
+                            flash, rays, vignette, smoke, beam, splash, pillar …  slice 2  (lifted + extended)
+  move-drawers.js           beat drawers: (ctx, lane, s, info) → draws            slice 2  (lifted from fire-blast.js)
+  move-player.js            playMove({ spec, attacker, defender, … })             slice 2  (fire-blast.js generalised)
+  materials/index.js        MATERIALS registry { fire, water, grass, … }          slice 2
+  materials/fire.js         the look test's fire-material.js, moved               slice 2
+  materials/<type>.js       one per VG type (16 more)                             slices 3–19
+  specs/index.mjs           SPECS: { [moveId]: MoveSpec } merged from per type    slice 2
+  specs/fire.mjs            Fire Blast ported first (the acceptance test), then the Fire table
+  specs/<type>.mjs          one per VG type
+  fire-blast-pose.mjs / fire-blast.js / fire-material.js   deleted at the end of slice 2 once
+                            `specs/fire.mjs: fireBlast` reproduces the accepted take frame for frame
+__tests__/ (pure modules only): move-table, move-select, species-stats, move-spec, move-geometry,
+  card-motion, move-poses, materials (recording-context tests), specs (every spec validates)
+.claude/skills/fx-preview/rec/rec-move.mjs   rec-fire-blast.mjs generalised: MOVE=<id> SIDE=self|opp
+.claude/skills/fx-preview/rec/cut-move.sh    (exists)
+client/src/css/mat-fx.css                    `.fx-move*` (exists; add per-material particle classes)
+```
+Naming rule: `.mjs` = DOM-free, tested under `node --test`; `.js` = touches `document`/canvas.
+
+### Lane geometry and the host (`move-geometry.mjs`, pure; lifted verbatim)
+```
+laneGeometry(fromRect, toRect) → null | {
+  ax, ay, bx, by,        attacker / defender centres (parent-viewport px)
+  ux, uy, nx, ny,        unit direction attacker→defender and its left normal (nx = −uy, ny = ux)
+  angleDeg,              atan2(uy, ux) in degrees (0 = right, 90 = down)
+  length,                centre distance in px; null when < 1
+  h,                     max(fromRect.height, toRect.height, 1) — EVERY size in a scene is a multiple of h
+}
+unionPadded(a, b, pad) → the smallest rect containing both, grown by pad px on every side
+toLocal(rect, hostRect) → rect translated into host-local px
+lanePoint(lane, f, side) → the point a fraction f along the lane from the attacker's leading edge
+  (start = 0.42 h from the attacker centre) to the defender centre, offset `side` px along n
+phaseProgress(ms, [start, end]) → null outside [start, end), else (ms − start) / (end − start)
+```
+Host: `spawnOverlay({ rect: unionPadded(from, to, spec.pad × h), className: 'fx-overlay fx-move
+fx-move--<id>' })`. The local lane is the lane with `hostRect.left/top` subtracted. Both canvases
+are `size = ceil(max(hostWidth, hostHeight))` squares centred in the host; every drawer receives a
+context already translated by `(ox, oy)` so it draws in host-local px. Canvas work is in CSS px;
+`playCanvasStage` handles DPR.
+
+### The scene clock
+One scene has one duration `spec.durationMs`; both canvases run `playCanvasStage` for that
+duration (two WAAPI clocks started in the same task; they never drift visibly) and every ghost
+keyframe set is sampled over the same duration (`GHOST_SAMPLES = 150`, i.e. one sample per ~13 ms
+for a 1900 ms scene; keep ≥ 1 sample per 15 ms so a 60 ms impulse survives sampling). `time =
+seed × 0.37 + elapsedMs / 1000` is the material's turbulence clock (seconds) so two attacks with
+different seeds flicker differently.
+
+### `MoveSpec` (`move-spec.mjs`) — exact schema
+```js
+/** @typedef {object} MoveSpec */
+{
+  id: 'fire-blast',            // kebab-case; the key in SPECS and the CSS modifier
+  name: 'Fire Blast',
+  vgType: 'fire',              // one of the 17 table types (+ 'fire' for the look test)
+  statClass: 'special',        // 'physical' | 'special'
+  tier: 3,                     // 1 | 2 | 3 — durationMs must sit in TIER_BAND[tier]
+  family: 'burst',             // sound + hit family, see § Families
+  material: 'fire',            // key in MATERIALS; drawers get MATERIALS[material]
+  durationMs: 1900,
+  contactMs: 1000,             // CONTACT_BAND: contactMs / durationMs ∈ [0.38, 0.62]; tier 1 may go to 0.70
+  pad: 1.7,                    // host padding in h (default 1.7; beams and terrain use 2.2)
+  attacker: { motion: 'rear-lurch', params: { rear: 0.14, lurch: 0.4, glow: 1 } },
+  defender: { motion: 'knock',      params: { strength: 0.3, heat: 1 } },
+  beats: [
+    // layer: 'back' (behind the ghosts) | 'front' (over them) | 'top' (over the grain pass)
+    { at: 0,    until: 620,  layer: 'back',  drawer: 'orbitCharge', params: { count: 5, half: 'back' } },
+    { at: 0,    until: 620,  layer: 'front', drawer: 'coreCharge',  params: {} },
+    { at: 0,    until: 620,  layer: 'front', drawer: 'orbitCharge', params: { count: 5, half: 'front' } },
+    { at: 560,  until: 940,  layer: 'back',  drawer: 'shockRings',  params: { count: 2 } },
+    { at: 620,  until: 1000, layer: 'front', drawer: 'projectile',  params: { r0: 0.34, r1: 0.56, bow: 0.2, tongues: 9 } },
+    { at: 820,  until: 1850, layer: 'back',  drawer: 'vignette',    params: { target: 'defender' } },
+    { at: 1000, until: 1320, layer: 'back',  drawer: 'speedRays',   params: { count: 28 } },
+    { at: 1000, until: 1750, layer: 'front', drawer: 'starFlare',   params: { arms: 'dai' } },
+    { at: 1000, until: 1180, layer: 'top',   drawer: 'impactFlash', params: {} },
+    { at: 1300, until: 1900, layer: 'front', drawer: 'smoke',       params: { count: 6 } },
+  ],
+  particles: [
+    { at: 1000, anchor: 'defender', count: 22, distance: 1.3, direction: -90, spread: 300,
+      size: [0.05, 0.13], aspect: 0.3, gravity: 0.6, maxDelay: 0.12, durationMs: 760, kind: 'ember' },
+  ],
+  grain: 0.28,                 // 0 disables the grain pass; the material decides the tile
+}
+```
+Units: every length param is in **card heights (h)**, every time in ms on the scene clock,
+angles in degrees in lane space (0 = along the lane toward the defender; the drawer rotates by
+`lane.angleDeg`) *except* `direction` on particles and `arms` angles, which are screen degrees
+(the 大 must stand upright on screen whichever side attacks — see § Both seats).
+
+`validateSpec(spec) → string[]` errors (empty = valid): missing/unknown fields; `id` not
+kebab-case; `tier`/`statClass`/`vgType`/`family`/`material` not in their enums; `durationMs`
+outside `TIER_BAND[tier]`; contact outside `CONTACT_BAND`; a beat with `until ≤ at`, `until >
+durationMs`, an unknown `drawer` or `layer`, or params failing that drawer's `check(params)`;
+more than 2 beats per layer per ms window is fine, but > 30 tongues estimated at any instant
+(each drawer declares `tonguesAt(params)`) fails; a particle burst with `count > 24`; `pad` outside
+[1.2, 2.6]. `TIER_BAND = { 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200] }`.
+
+### Drawers (`move-drawers.js`) — the shared beat library
+Signature for every drawer: `draw(ctx, lane, s, info)` where `s ∈ [0, 1)` is the beat's progress,
+and `info = { elapsedMs, time, seed, material, params, spec }`. Each drawer also exports
+`check(params) → string[]` and `tonguesAt(params) → number`. Pure math lives in `move-poses.mjs`
+(one function per drawer, returning plain objects; this is what the unit tests cover); the drawer
+only maps that object to material calls. The first ten are the look test's, lifted:
+
+| drawer | pose fn (pure) | what it draws | params (defaults = Fire Blast) |
+|---|---|---|---|
+| `orbitCharge` | `chargeOrbs(s, h, count)` | `count` bodies orbit the attacker on a tilted ellipse (radius 0.85 h → 0.25 h, spin `2π(0.9s + 1.6s²)`, y squashed × 0.42, lifted 0.04 h); `half` draws only the bodies whose `depth` sign matches ('back' = sin θ < 0) so the orbit passes behind the ghost | `count 5`, `half`, `r0 0.16`, `r1 0.24`, `tongues 4` |
+| `coreCharge` | `chargeCore(s, h)` | a growing body at the attacker's leading edge (0.42 h along the lane), radius 0.18 h → 0.56 h, building from 30 % of the beat | `lead 0.42`, `r0 0.18`, `r1 0.56` |
+| `shockRings` | `releaseRings(s, h)` | `count` ellipses (y × 0.45) leaving the attacker, radius 0.3 h → 1.3 h, second one 30 % later, width 0.07 h, fading `(1−s)^1.5` | `count 2`, `delay 0.3` |
+| `projectile` | `fireballPose(s, h)` | the material's `projectile` travelling `lanePoint(f, side)`, `f = s²` (accelerating), `side = sin(πs) × bow × h`, radius `r0 → r1`; `path: 'arc'` uses `bow`, `'straight'` sets bow 0, `'spiral'` adds `0.12 h × sin(6πs)` on n | `r0 0.34`, `r1 0.56`, `bow 0.2`, `tongues 9`, `path 'arc'` |
+| `vignette` | `vignettePose(s, h)` | local darkening (`SHADE [70,6,0]`, or the material's `shade`) around `target`, ring from 0.55 h to 1.6 h, alpha 0 → 0.45 over 20 %, hold to 70 %, out; drawn `source-over` on the back canvas before the additive pass | `target 'defender'`, `maxAlpha 0.45` |
+| `speedRays` | `raysPose(s, h)` | `count` thin lines from 0.3 h to 1.1 h → 1.7 h around the defender, alpha `0.5(1−s)²`, slowly rotating; the only sunburst allowed and it is local | `count 28` |
+| `starFlare` | `flarePose(s, h)` + `armTongues` | arms grow out of a core (0.46 h) over the first 30 %, hold and flicker, break into 3 fragments that drift 0.4 h outward from 60 %; each arm = a main tongue (width 0.46 h) + two side tongues at ±14° (0.6 length, 0.55 width). `arms: 'dai'` = `[{-90, 1.25}, {-160, 1.0}, {-20, 1.0}, {125, 1.1}, {55, 1.1}]` (screen degrees, reach in h); `'cross'` = 4 arms at 90°; `'ring'` = 8 arms at 45°, reach 0.8; or an explicit array | `arms 'dai'`, `width 0.46` |
+| `impactFlash` | `flashPose(s, h)` | white → pale → transparent disc at the defender, alpha up over 12 %, out `(1−s)²`, radius 0.6 h → 1.3 h; always `layer: 'top'` so the grain does not pit it | — |
+| `smoke` | `smokePuffs(s, h, count)` | `count` grey puffs (`SMOKE [120,96,84]` or the material's `smoke`) rising 0.9 h off the defender, alternating sides, radius 0.18 → 0.5 h, alpha ≤ 0.32, drawn `source-over` | `count 6` |
+| `embers` (particles) | `burstParticles` | CSS streaks from the anchor; `kind` picks `material.particle` (className, colour, aspect) | see spec |
+
+Drawers the table needs beyond Fire Blast (each gets its pose fn and tests in slice 2; the
+materials make them look right per type):
+
+| drawer | draws | params |
+|---|---|---|
+| `beam` | a lane-aligned strip from the attacker's leading edge to the defender: `kind: 'solid'` (one wide tongue from A to B, width `w`), `'pulse-train'` (bodies every `gap` h travelling at `speed` lane/s), `'helix'` (two sine-offset tongues twisting around the lane, `turns`), `'segmented'` (dashes), `'widening'` (width 0.3 → 1.0 w). Grows from A over the first 25 %, holds, retracts from A over the last 20 % | `kind`, `w 0.5`, `gap 0.4`, `turns 3`, `speed 2.5` |
+| `splash` | `count` tongues leaving the defender in a fan of `arc` degrees centred on `direction` (screen deg), each `0.6–1.1 h` long, launched with stagger `0.05` and falling under `gravity` (material: water sheets, mud globs, rock shards, leaves) | `count 10`, `arc 140`, `direction -90`, `gravity 0.5` |
+| `pillar` | a vertical (screen) column under/over the target: width `w`, rising from 0 to `height` h over 30 %, holding, dissolving upward (fire pillar, water spout, light beam from above for Solar Beam, earth spike) | `height 1.8`, `w 0.6`, `from 'below'`/`'above'` |
+| `slashArc` | an arc-shaped tongue sweeping `sweep` degrees across the defender over the beat, tip leading; two or three with `count` and `gapDeg`; the material's `tongue` with `hot` high; a thin white edge line | `sweep 120`, `radius 0.7`, `count 1`, `gapDeg 30`, `angle 45` |
+| `terrain` | the table layer under both footprints: `kind: 'crack'` (branching dark lines growing from the target, material `deep` colour), `'wave'` (concentric ellipses rolling from the attacker to the defender), `'dust'` (low wide puffs), `'quake'` (the whole host jitters ±`amp` h for the beat) | `kind`, `radius 1.4`, `amp 0.03` |
+| `cloud` | `count` overlapping bodies drifting `drift` h in `direction`, alpha ≤ `alpha`, for gas, mist, spore, sandstorm, dark aura | `count 8`, `radius 0.35`, `drift 0.6`, `alpha 0.5` |
+| `spiral` | `turns` of tongues along an Archimedean spiral around the target, radius `r0 → r1`, rotating `rpm` (whirlpool, Fire Spin-like, Twister, vortex) | `turns 2.5`, `r0 0.2`, `r1 1.1`, `rpm 90` |
+| `volley` | `count` projectiles staggered `stagger` ms along slightly different `bow` values; the last one defines contact | `count 3`, `stagger 90`, `r0 0.14`, `r1 0.2`, `bow 0.3` |
+| `aura` | a pulsing glow hugging a card: radius 0.7 h → 0.9 h at `hz`, rim-coloured; zero-damage attacks play only this on the attacker | `target`, `hz 2`, `alpha 0.6` |
+| `rain` | `count` bodies falling from above the defender (screen) into its footprint over the beat, each a short vertical tongue, impacting with a 0.2 h splash | `count 12`, `height 1.6`, `spread 0.9` |
+| `shards` | `count` angular fragments bursting from the target along `arc`, rotating as they fly (ice, rock, gem, steel) — the material's `tongue` with `jag: 1` | `count 8`, `arc 360`, `distance 1.1` |
+| `bolt` | a jagged polyline from a point to the target (`from: 'attacker'` or `'sky'` = 1.6 h above the defender on screen), `jag` h displacement at `segments` joints re-rolled every `rerollMs`, with `branches` short forks; material `electric` draws the core/glow; others may use it for cracks | `from`, `segments 9`, `jag 0.12`, `branches 2`, `rerollMs 45` |
+| `ring` | expanding rings around the target (shockwave on the floor, Sonic-like for sound moves: `kind: 'floor'` y × 0.45, `'face'` circular) | `count 3`, `r0 0.3`, `r1 1.5`, `kind` |
+| `glyph` | a material-specific sigil over the target for Psychic (concentric rings + a lens), Fairy (a five-point star outline), Ghost (an eye pair), drawn with the material's `sigil(ctx, x, y, r, s)` | `r 0.9` |
+
+Every drawer: no `ctx.save/restore` leaks (balanced), sets `ctx.filter = 'none'` when done, draws
+nothing when `s` is out of range, and never touches `globalCompositeOperation` (the player sets it:
+`source-over` for vignette/smoke/terrain-crack, `lighter` for everything else).
+
+### Materials (`materials/<type>.js`) — the look of each type
+Interface (every material exports a frozen object; `materials/index.js` maps `vgType → material`,
+and `MATERIALS.default = fire` until a type's material lands):
+```js
+export const fire = {
+  key: 'fire',
+  palette: { deep: [210,41,8], body: [235,108,6], hot: [241,175,13], core: [255,246,214], white: [255,255,255] },
+  shade: [70, 6, 0],            // vignette colour
+  smoke: [120, 96, 84],         // aftermath puff colour (null = no smoke)
+  particle: { className: 'fx-particle--streak', color: 'rgb(241, 175, 13)', aspect: 0.3 },
+  glow(ctx, x, y, r, alpha),                     // soft halo: body → deep → 0
+  body(ctx, x, y, r, alpha, hot = 1),            // the round unit (drawOrb)
+  tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}),   // the elongated unit (drawTongue)
+  projectile(ctx, { x, y, r, headingDeg, time, seed, alpha, tongues, hot }),  // (drawFireball)
+  grain(ctx, size, time, strength),              // grainPass with this material's tile; may be a no-op
+};
+```
+`spec` for `tongue` is `{ x, y, angleDeg, length, width, time, seed }` in px / screen degrees.
+Shared helpers in `materials/_shared.js` (lifted from `fire-material.js`): `wobble(s, time, seed)`,
+`tonguePath(ctx, spec, scale)`, `getNoiseTile()`, `grainPass(ctx, size, time, strength)`,
+`sphere(ctx, x, y, r, stops)`. A material is ~120 lines; it never reads the DOM beyond the
+noise tile.
+
+Per-type recipes (each is a contract; a builder implements the body/tongue/projectile exactly as
+described, then tunes only alpha and sizes against the reference sheet). Hex palettes are the
+sprite-era colours sampled from the B2W2 sheets (the per-move entries in Appendix A list the
+move's own accents; a material uses its type palette unless the entry overrides it).
+
+- **fire** (done): tongues as above; `body` = hot sphere with the highlight offset up-left 15 %;
+  projectile = glow 2.4 r + 7–9 trailing tongues over ±50° + sphere + 6 sparks; grain 0.28.
+- **water** — `#2E7CE6 #52B4FF #B9E8FF #FFFFFF`. `body` = a droplet: sphere with a bright
+  specular dot at 30 % up-left (white, alpha 0.9, r × 0.18) and a darker rim (deep, alpha 0.5,
+  2 px stroke); `tongue` = a *sheet*: the same tapered polygon but with a smooth edge (wobble
+  amplitude × 0.4), filled body alpha 0.55 with a 1.5 px white edge stroke along the leading side,
+  no blur, plus 3–5 small droplets (`body`, r 0.06 h) shed from the tip; `projectile` = a bulging
+  sheet head (sphere r) with 5 trailing sheets and 8 droplets; grain 0.12 (soft). Splashes use
+  `splash` with gravity 0.7. Smoke = mist `[190, 215, 235]` alpha ≤ 0.25. Particle: droplet
+  (`.fx-particle` round, colour `#B9E8FF`, aspect 1, gravity high).
+- **grass** — `#3FA34D #7ED957 #C9F27A #FFFFFF`. `body` = a seed/spore: sphere with a leaf-green
+  rim; `tongue` = a *leaf*: the tapered polygon with a pointed base too (half-width 0 at s = 0 and
+  s = 1, max at s = 0.45), a mid-vein line (deep, 1 px) and two side veins, filled body with a
+  lighter half (hot) on the sunlit side; leaves rotate about their centre as they travel (`spin`
+  360°/s); no blur; `projectile` = a tight spinning cluster of 5 leaves + a core sphere; grain 0.
+  Particle: leaf fragments (`.fx-particle--shard` tinted `#7ED957`, aspect 0.5, orient true).
+  Energy Ball / Solar Beam override palette to `#F2E96B #FFF8B0` (light), using fire's tongue code
+  path with `hot` 1 and no grain (declare `palette.override` in the spec).
+- **electric** — `#F7D21E #FFF27A #FFFFFF`, deep `#B98A00`, with a blue edge `#9FD5FF` at 0.3.
+  `tongue` = a *jag*: the polygon's centre line is a polyline with `segments` joints displaced
+  ±`jag` on n, re-rolled every 45 ms from `seededRandom(seed + floor(time × 22))` (so it flickers
+  rather than slides); three passes: wide pale-blue glow (blur 0.1 w), yellow core 0.45 w, white
+  centre 0.15 w; `body` = a crackling ball: sphere + 6 short jags radiating; `projectile` =
+  body + 3 trailing jags; grain 0. `bolt` drawer uses `tongue` with `jag: 1`. Particle: spark
+  (`.fx-particle--streak` white, aspect 0.2, no gravity). Smoke null.
+- **ice** — `#8FD3FF #D6F3FF #FFFFFF`, deep `#3E8FD1`. `tongue` = a *crystal*: straight-edged
+  polygon (no wobble), 5–6 vertices, hexagonal cross-section suggested by a lighter facet
+  (hot, alpha 0.6) on one side and a 1 px white edge; `body` = a snowflake: 6 thin spokes with
+  3 branches each (strokes), slowly rotating; `projectile` = a crystal head with 4 trailing
+  crystals and a faint mist glow; grain 0.1. Shatters use `shards`. Particle: shard
+  (`.fx-particle--shard`, `#D6F3FF`). Smoke = mist `[200, 230, 245]`.
+- **fighting** — `#D9643A #F2A66B #FFE6C2`, deep `#8C3A1F`. No elongated element: `tongue` is a
+  *shock streak* (short, straight, blur 0.08 w, used in fans at contact); `body` = an impact
+  disc with concentric rings (3 strokes); `projectile` (Aura Sphere, Focus Blast, Vacuum Wave) =
+  a blue-white sphere `#7FB7FF #E6F2FF` with a swirling inner ring. The weight is in card motion:
+  physical fighting moves use `attacker.motion: 'dash'` or `'lunge'` and `defender.motion:
+  'knock'` with strength 0.4–0.5. Grain 0. Particle: streak white. Smoke = dust `[150, 130, 110]`.
+- **poison** — `#9B4DCA #C77DFF #F0D6FF`, deep `#4B1E6B`. `body` = a *glob*: sphere with a
+  wobbling outline (the circle's radius modulated by `wobble`) and a dark highlight ring,
+  drippy: a small tail body below it; `tongue` = a *stream* of 5–7 globs along the axis with
+  decreasing radius; `projectile` = a big glob with 3 trailing drips; bubbles (small bodies with a
+  hollow centre) rise from any poison pool; grain 0.15. Particle: glob (`.fx-particle` round,
+  `#C77DFF`, gravity high). Smoke = fume `[120, 70, 150]` alpha 0.3.
+- **ground** — `#B5793C #D9A066 #F0D9B5`, deep `#5C3A17`. `body` = a *clod*: an irregular
+  polygon (7 vertices, radius × `0.8 + 0.4 rand`), flat-shaded with a darker bottom half;
+  `tongue` = a *spike* of earth (straight polygon with a jagged top, drawn from the floor
+  upward); `terrain` `'crack'` and `'dust'` are this material's signature; `projectile` = a clod
+  with a dust trail (cloud bodies); grain 0.2. Particle: shard `#D9A066`. Smoke = dust.
+- **rock** — `#8A8F99 #B8BEC9 #E8ECF2`, deep `#3E434C`. Like ground's clod but angular (5–6
+  vertices, sharp) with two facet tones; `shards` is the signature; `projectile` = one boulder
+  (r 0.5 h) with a short dust trail; cracks on the floor at contact; grain 0.1. Particle: shard
+  `#B8BEC9`. Smoke = dust.
+- **steel** — `#9AA7B8 #D5DEEA #FFFFFF`, deep `#4A5563`. `tongue` = a *blade*: straight, very
+  thin at the tip, with a specular line (white, 1 px) running its length and a cool blue tint at
+  the edges; `body` = a metal sphere with a hard highlight; `projectile` (Flash Cannon, Steel
+  Beam) = a tight white-blue beam core with `beam 'solid'` and sparks; contact uses a
+  `speedRays` with count 16 in white; grain 0. Particle: spark white. Smoke null.
+- **flying** — `#CFE3F7 #EAF3FF #FFFFFF`, deep `#8FB3D9`. `tongue` = a *wind blade*: long,
+  thin, crescent-curved (the centre line bows `0.3 w`), alpha 0.45 with a bright edge; `body` =
+  a feather: a thin leaf with a vein and a soft tip; `spiral` and `cloud` (gust lines) are the
+  signatures; `projectile` = a cluster of 3 wind blades; grain 0. Particle: feather
+  (`.fx-particle--shard` white, aspect 0.35, gravity low). Smoke null.
+- **psychic** — `#C85CDB #F0A5FF #FFE1FF`, deep `#5B1E7A`. `tongue` = a *ribbon*: smooth
+  (wobble × 0.3), semi-transparent (0.45) with a brighter centre line, often two interleaved
+  (`helix`); `body` = a lens: a disc with concentric rings (3 strokes, alternating hot/deep) that
+  rotate; `glyph` = rings + lens; `projectile` = a lens with a ribbon tail; the screen-warp of the
+  sprite games is replaced by the defender's `defender.motion: 'float'` (lifted 0.15 h, tilting);
+  grain 0. Particle: mote (`.fx-particle--mote` `#F0A5FF`). Smoke null.
+- **ghost** — `#6B4FA8 #9D7CF2 #D9CCFF`, deep `#1E1238`. `tongue` = a *wisp*: blurred (0.14 w),
+  alpha 0.5, with a dark core line (deep) — the only material whose inner pass is darker than its
+  outer; `body` = a shadow ball: a dark sphere (deep → black centre) with a violet rim glow;
+  `cloud` with alpha 0.6 in deep for shadows; `glyph` = two slit eyes; `vignette` max alpha may
+  rise to 0.55 for ghost; grain 0.2 (violet). Particle: mote `#9D7CF2`. Smoke = `[60, 40, 90]`.
+- **dark** — `#3B3B4F #6E6E8C #B9B9D6`, deep `#101018`, accent `#FF3D6E` (crimson edge).
+  `tongue` = a *shadow slash*: a thin dark blade with a crimson edge line; `body` = a dark pulse
+  ring (concentric dark rings expanding, with crimson gaps); `projectile` = dark pulse rings
+  travelling; physical dark moves rely on `slashArc` + `defender.motion: 'knock'`; grain 0.15.
+  Particle: streak crimson. Smoke = `[40, 40, 60]`.
+- **bug** — `#8CBF26 #BFE34D #F0F7B0`, deep `#4A6B10`. `tongue` = a *needle*: straight, thin,
+  with a dark tip; `body` = a bug-wing disc: two translucent ovals (alpha 0.35) with vein lines,
+  beating at 12 Hz; `volley` is the signature (Pin Missile, Twineedle); `beam 'pulse-train'`
+  (Bug Buzz) draws rings; grain 0. Particle: shard `#BFE34D`. Smoke null.
+- **dragon** — `#5A47C9 #8F7CF5 #D2C8FF`, deep `#2A1F6B`, accent `#FF9B3D` (ember edge).
+  `tongue` = fire's tongue in the dragon palette with an orange core (`hot` colour override);
+  `body` = a dragon orb: sphere with a swirling helix inside (two sine strokes); `projectile` =
+  the orb with 5 trailing tongues; `volley` from above (Draco Meteor: `from 'sky'`, each meteor
+  a body with a long tongue tail and a crack on landing); grain 0.25. Particle: ember orange.
+  Smoke = `[90, 70, 120]`.
+- **fairy** — `#F48FB1 #FFC2DA #FFF0F7`, deep `#B83A72`, accent `#FFE066` (gold). `body` = a
+  twinkle: a 4-point star (two thin crossed tongues) with a soft sphere behind it, scale pulsing
+  at 3 Hz; `tongue` = a *sparkle trail*: a smooth ribbon with twinkles along it; `glyph` = a
+  five-point star outline; `projectile` (Moonblast) = a large pale sphere with a crescent
+  highlight and twinkles; grain 0. Particle: star (`.fx-particle--star` `#FFC2DA`). Smoke null.
+
+Contact dressing by **family** (what `strikeTarget` adds beyond today's flash/slash/sparks once
+`ctx.family` is read — slice 2 changes `combat.js strikeTarget`): `slash` keeps the streak;
+`punch`/`dash` draw a 0.9 h impact ring; `beam`/`burst`/`projectile` widen the flash to 1.2 h;
+`quake` calls `shakeTable` with amplitude × 1.5; `splash`/`wind`/`electric`/`ghost`/`chime`/
+`roar`/`charge` keep the default.
+
+### Card motion (`card-motion.mjs`, pure) — presets lifted from Fire Blast
+Every preset is `(ms, { contactMs, durationMs, params }) → pose`. Attacker pose =
+`{ along, across, scale, tilt, glow }`; defender pose = `{ along, across, scaleAlong,
+scaleAcross, wobble, heat }`. `along`/`across` are in h along u / n (positive `along` = toward the
+other card). The player maps a pose to
+`translate3d(x, y, 0) [rotate(lane) scale(sAlong, sAcross) rotate(−lane)] rotate(tilt|wobble) scale(scale)`
+and animates `.fx-move__rim` opacity from `glow`, `.fx-move__heat` opacity from `heat`.
+`springHome(p, cycles = 1.5, decay = 3) = cos(πp·cycles) · e^(−decay·p)` is the shared settle.
+
+Attacker presets (times as fractions of `contactMs`, written c):
+| preset | beats | numbers | use |
+|---|---|---|---|
+| `rear-lurch` (Fire Blast) | wind-up 0 → 0.56 c · thrust 0.56 c → 0.70 c · recoil 0.70 c → 1.20 c | wind-up: along −`rear`(0.14)·easeOutCubic, scale 1 → 1.05, tilt −4°, glow 0 → 0.7; thrust: along → +0.26, tilt → +3°, glow → 1 then 0.7; recoil: along 0.26·springHome(1.5, 3.5), tilt 3·spring, glow (1−p)² | special ranged, tier 2–3 |
+| `brace` | wind-up 0 → 0.7 c · settle 0.7 c → 1.1 c | along −0.08, scale 1.03, tilt −2°, glow 0.6; settle by spring | special tier 1, status-like |
+| `lunge` | wind 0 → 0.4 c · strike 0.4 c → 1.0 c · recoil 1.0 c → 1.5 c | wind: along −0.2, lift scale 1.06; strike: along → `reach` = min(0.9 h, length − 0.9 h) (the ghost's leading edge touches the defender at contact), scale 1.06; recoil: spring; glow 0 | physical contact, tier 1–2 |
+| `dash` | wind 0 → 0.3 c · dash 0.3 c → 1.0 c · pass 1.0 c → 1.15 c · return 1.15 c → 1.7 c | like `lunge` but with 2 trail ghosts at lags 0.035/0.07 (today's `TRAILS`) and alpha 0.38/0.2 during the dash, overshoot past the defender by 0.3 h, return along an arc (across +0.4 h) | physical fast, tier 2–3 (Aqua Jet, Flame Charge, Brave Bird, Wild Charge) |
+| `rise` | lift 0 → 0.6 c · hover → 1.2 c · land → 1.6 c | scale 1 → 1.12, across +0.1 h bob at 2 Hz, tilt ±3° sway, glow 0.5 | flying / wind specials |
+| `stomp` | lift 0 → 0.8 c · slam 0.8 c → 1.0 c · settle → 1.4 c | scale 1 → 1.15 then 0.98 at contact (hits the table), tilt 0, no along; pairs with `terrain 'quake'` | ground physicals |
+| `spin` | 0 → 1.3 c | tilt 0 → 360° × `turns` (1 or 2) with scale 1.05 at the middle | Rapid-Spin-like (Ice Spinner, Flame Wheel, Petal Dance) |
+| `none` | — | identity; glow may still pulse (`glow` param) | — |
+
+Defender presets (fractions of the time after contact, `k = (ms − contactMs) / knockMs`):
+| preset | numbers | use |
+|---|---|---|
+| `tremble` (pre-contact, all presets) | from 0.82 c to c: across ±0.012 h · sin(0.11 ms), wobble ±1.5° · sin(0.07 ms), growing linearly | every hit |
+| `knock` (Fire Blast) | knockMs 520: along `strength`(0.3) × easeOutCubic(min 1, k/0.14) × (k < 0.14 ? 1 : springHome((k−0.14)/0.86, 1.5, 3)); squash: impulse = k < 0.1 ? k/0.1 : max(0, 1 − (k−0.1)/0.3), scaleAlong 1 − 0.14·impulse, scaleAcross 1 + 0.09·impulse; wobble 8°·sin(3πk)·(1−k)²; heat (1 − t)^1.5 over 650 ms | single hit; strength 0.2 tier 1, 0.3 tier 2–3, 0.45 heavy physical |
+| `stagger` | `hits` knocks of strength/`hits` spaced `gapMs`, each with the squash; the last with the spring | multi-hit (Fury Cutter, Pin Missile, Triple Kick, Arm Thrust, Rock Blast, Dual Chop, Bullet Punch, Twineedle) |
+| `float` | lift across −0.15 h (screen-up is handled by the player: `across` sign flips for the opp seat), tilt ±4° at 1.5 Hz, held through the beat, drop with a 0.06 bounce | psychic, Hurricane, Gust |
+| `sink` | scaleAlong 0.94 (pressed), across jitter ±0.02 h at 18 Hz for 300 ms, no travel | ground / quake |
+| `freeze` | no motion; `heat` replaced by a cyan tint (`.fx-move__heat--cold` modifier) 0.8 → 0 over 900 ms | ice |
+
+### The player (`move-player.js`) — `playMove`
+```
+playMove({ spec, attacker, defender, seed = 1, impacts = null, attackerCard = null })
+  → { holdMs: spec.contactMs + 40, durationMs, contactMs } | null
+attacker / defender = { rect, src, turn, element }   (rect in parent-viewport px; turn from frameTurnOf)
+```
+Order of operations (the look test's, verbatim; keep it):
+1. `lane = laneGeometry(attacker.rect, defender.rect)`; null → return null (caller falls back).
+2. `hostRect = unionPadded(from, to, spec.pad × lane.h)`; `host = spawnOverlay(...)`; local lane.
+3. `material = MATERIALS[spec.material] ?? MATERIALS.default`; `time0 = seed × 0.37`.
+4. `impacts?.strikeIn(spec.contactMs, { direction: lane.angleDeg, attackerCard, move: spec.id,
+   family: spec.family })` — before any drawing, in the same task as the caller's `damage` plans.
+5. Back canvas: `playCanvasStage(host, { className: 'fx-move__canvas', cx, cy, size, duration,
+   draw: drawBack })`. `drawBack`: translate (ox, oy); `source-over`: beats with `layer 'back'`
+   whose drawer is `vignette`/`terrain crack`; then `lighter`: the other back beats.
+6. Ghosts: `cardGhost(host, toLocal(rect), src, turn, modifier)` for attacker then defender
+   (defender drawn over the attacker). Each returns `{ ghost, rim, heat, ready }`.
+7. Front canvas (`fx-move__canvas--front`): `source-over` beats (`smoke`); `lighter` beats
+   (`front`); reset transform; `material.grain(ctx, canvas.width, time, spec.grain)`; translate
+   again; `lighter` beats with `layer 'top'`; `source-over`. Particle bursts whose `at` has passed
+   and are not yet spawned are spawned here (one flag per burst).
+8. Ghost keyframes: `sampleKeyframes` over `durationMs` with `GHOST_SAMPLES`, three animations per
+   ghost (transform, rim opacity, heat opacity).
+9. `removeWhen(host, [back, front, ...ghostAnimations], durationMs + maxParticleDuration + 400)`.
+10. `Promise.all([attackerGhost.ready, defenderGhost.ready]).then(() => host.isConnected &&
+    hideDuring(each real element, Promise.all([back, front]), backstop))`.
+11. Return the hold.
+
+Failure handling: no `ctx` or no WAAPI → `playCanvasStage` resolves at once and the host is removed
+by the backstop (the ghosts show their end frame); a missing `src` → return null; a drawer that
+throws is caught per frame (`try { draw } catch {}` around each beat, once per beat logged at
+debug level) so one bad spec never blanks the scene.
+
+### Wiring (`combat.js attack(plan)`, unchanged otherwise)
+```
+card = registry.get(plan.attackerId)?.card
+pick = moveFor(card, { instanceId: plan.attackerId, attackName: plan.attackName, species:
+  speciesFor(card), damage: plan.damage, benchDealt: plan.benchDealt, specs: SPECS })
+to = combatRect(plan.defenderId) ?? opponentActiveRect(plan.user) ?? null
+if (pick?.spec && from && to && src) {
+  const played = playMove({ spec: pick.spec, attacker: { rect: from, src, turn:
+    frameTurnOf(attackerEl), element: attackerEl }, defender: {...}, seed: hashString(`${plan.
+    attackerId}|${plan.attackName}|${plan.damage}`), impacts, attackerCard: card })
+  if (played) return played.holdMs
+}
+if (pick === null && zeroDamage) return playAuraPulse(from, rgb)   // hold 240
+…today's lunge…                                                      // hold HOLD_MS.attack
+```
+`index.js soundPlanFor`: for `effect === 'attack'`, `{ ...plan, family: pick?.family }` from the
+same pure `moveFor` call; `fx-audio.mjs voicesFor('attack', plan)` → the family's voice set, else
+today's `attack` voice. `fx-holds.mjs`: `attack 240` stays the lunge/aura hold.
+
 ### Selection — `mat-fx/moves/move-select.mjs` (pure)
 ```
 MOVE_TABLE[vgType][statClass][tierIndex] : string[] | null        // move-table.mjs, the spec verbatim
@@ -225,10 +671,11 @@ vgTypeFor(card, species|null) → string
   family = TCG_FAMILY[normalizeEnergyType(card.types?.[0])] ?? ['normal']
   first t in family with species?.types.includes(t), else TCG_DEFAULT[tcgType] ?? 'normal'
 cellLookup(vgType, statClass, tier) → string[]|null, walking the option-8 order
-moveFor(card, { instanceId, attackName, species, damage, benchDealt })
-  → { move, vgType, statClass, tier, family, score } | null
+moveFor(card, { instanceId, attackName, species, damage, benchDealt, specs })
+  → { move, vgType, statClass, tier, family, spec } | null
   null when: damage === 0 && !(benchDealt > 0) (option 10 → aura pulse) · vgType has no table
-  (normal) · cell chain empty · no score for the move (schema test makes this unreachable).
+  (normal) · cell chain empty · no spec for the move (the specs test makes this unreachable once a
+  type ships; until then the lunge plays).
   move = candidates[hashString(`${instanceId}|${attackName}`) % candidates.length]
 hashString(s) → uint32 (FNV-1a) · seededRandom is flow-pose.mjs's.
 ```
@@ -248,87 +695,48 @@ Species lookup: `speciesFor(card)` = `SPECIES_STATS[SPECIES_ID[pokemonSpriteForN
   nothing fails the script.
 - Licence line in the file header (Showdown data, MIT) and a DECISIONS.md line at close.
 
-### Scores — `mat-fx/moves/scores/<vgType>.mjs` (17 files, pure data) + `score-schema.mjs`
-```
-score = { move, family, tier, durationMs, contactMs, beats: Beat[] }
-Beat  = { at, dur, primitive, target: 'attacker'|'defender'|'lane'|'table', params }
-TIER_BAND = { 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200] }      // durationMs bounds
-CONTACT_BAND = [0.38, 0.62]                                            // contactMs / durationMs
-PRIMITIVES = lunge · dash · cardMotion · projectile · beam · burst · slash · impactFlash · shake
-             · aura · charge · orb · ring · pillar · terrain · cloud · vignette · canvas
-SHAPES = leaf petal seed vine droplet bubble wave icicle snowflake flame ember spark bolt star orb
-         ring shard rock boulder mud-glob sand feather wind-blade gust-line skull ghost-wisp
-         shadow-claw fist foot note heart crescent gem metal-slash meteor dragon-fang sludge-glob
-         needle pin bug-wing eye fang horn hoof fairy-light
-validateScore(score) → string[] errors: unknown primitive/shape/target; beats unsorted; a beat
-  past durationMs; duration outside its tier band; contact outside CONTACT_BAND; particle count
-  > MAX_PARTICLES; > 2 canvas beats; > 40 nodes estimated; multi-hit without a final contact.
-```
-Multi-hit moves (Fury Cutter, Pin Missile, Twineedle, Triple Kick, Arm Thrust, Rock Blast, Dual
-Chop, Bullet Punch…) list each hit as an `impactFlash` beat; `contactMs` is the *last* hit, where
-the damage number pops (one number per `damageUpdated`, as today).
+### Timing by tier (every spec fits these; the per-move numbers are in Appendix A)
+| Tier | Duration | Contact | Hold returned | Read | Card motion |
+|---|---|---|---|---|---|
+| 1 | 900–1100 ms | 45–70 % | contact + 40 | one gesture, one hit | attacker `brace`/`lunge`, defender `knock 0.2` |
+| 2 | 1200–1500 ms | ~50 % | contact + 40 | wind-up, travel, hit, settle | `rear-lurch`/`dash`, `knock 0.3` |
+| 3 | 1600–2200 ms | ~55 % | contact + 40 | charge, release, sustained hit, aftermath | `rear-lurch`/`dash`/`stomp`, `knock 0.3–0.45`, smoke/aftermath beat |
 
-### Primitives — `moves/move-primitives.mjs` (pure poses) + `moves/move-player.js` (DOM)
-- `laneGeometry(fromRect, toRect)` → `{ ax, ay, bx, by, angleDeg, length, unit }` in parent px
-  (the attacker/defender rect centres; `attackAngleDeg` already exists for the direction).
-- One pose function per primitive, `t ∈ [0,1]` → `{x, y, scale, rotate, opacity, …}` with the
-  same clamping conventions as `combat-pose.mjs` (`clamp01`, out-of-range t equals the end frame).
-  `dashPose` and `cardMotionPose` drive a ghost `<img>` of the attacker (today's lunge host);
-  `projectilePose` positions a shape node along the lane (`straight | arc | homing | spiral |
-  scatter | volley`), `beamPose` scales a lane-aligned strip from the attacker to the defender
-  (`solid | segmented | helix | pulse-train | widening`), `auraPose`/`chargePose`/`ringPose`/
-  `orbPose`/`pillarPose`/`cloudPose`/`vignettePose` size and fade one host over a card,
-  `terrainPose` the table layer under it.
-- `moves/move-shapes.mjs` — `drawShape(ctx, shape, { size, rgb, t, seed })`, DOM-free, tested
-  on a recording ctx like `evolve-scene.test.mjs`. Simple shapes (droplet, leaf, spark, shard,
-  streak) are CSS `.fx-move__shape--<shape>` nodes; anything with a silhouette (skull, fist,
-  feather, meteor, crescent, bolt, wave) is drawn on a canvas beat.
-- `playMoveScore({ score, from, to, src, turn, rgb, seed, impacts })`:
-  one `fx-overlay fx-move` host sized to the union of both rects (so lane beats are one
-  coordinate space), child layers per beat, every animation `removeWhen` + backstop
-  `durationMs + 400`; the attacker's real card is hidden only while a `dash`/`cardMotion`/`lunge`
-  beat runs its ghost. Calls `impacts.strikeIn(score.contactMs, { direction, attackerCard, move,
-  family })` — `strikeTarget` reads `ctx.family` to shape the hit (`slash` keeps the streak; `punch`
-  a ring; `beam` a wider flash; `quake` extra `shakeTable`). Returns `holdMs = contactMs + 40`.
-- Palette: `rgb = brighten(fxRgbForCard(attackerCard), 0.3)` as today, plus per-score accents
-  from the reference (Appendix A) exposed as CSS custom properties on the host
-  (`--fx-move-rgb`, `--fx-move-accent`).
-
-### Wiring
-- `combat.js attack(plan)`: resolve rects/src as today; `card = registry.get(attackerId)?.card`;
-  `pick = moveFor(card, {...})`; `pick` → `playMoveScore` (return its hold); `pick === null` and
-  zero damage → `playAuraPulse(from, rgb)` (hold 240); otherwise today's lunge, unchanged.
-  Missing `defenderId` (resume path, bench-only attacks): `to` = the opponent's Active rect when
-  one exists, else aura pulse.
-- `index.js soundPlanFor`: for `effect === 'attack'`, `{ ...plan, family }` from `moveFor` (the
-  same pure call; cheap, deterministic). `fx-audio.mjs voicesFor('attack', plan)` → the family's
-  voice set, default today's `attack` voice.
-- `fx-holds.mjs`: unchanged (`attack 240` remains the lunge/aura hold; scores return theirs).
-- CSS: `.fx-move`, `.fx-move__ghost`, `.fx-move__lane`, `.fx-move__shape--*`, `.fx-move__aura--*`,
-  `.fx-move__terrain--*`, `.fx-move__vignette` in `mat-fx.css`; colours only via custom properties.
-- Budget check (worst case, tier 3): banner 620 + score hold 1240 + damage 180 + status 260 =
-  2300 < 2500; a KO after that collapses holds past the budget exactly as today.
-
-### Timing by tier (every score fits these; the per-move numbers are in Appendix A)
-| Tier | Duration | Contact | Hold returned | Read |
-|---|---|---|---|---|
-| 1 | 900–1100 ms | ~45 % | contact + 40 | one gesture, one hit |
-| 2 | 1200–1500 ms | ~50 % | contact + 40 | wind-up, travel, hit, settle |
-| 3 | 1600–2200 ms | ~55 % | contact + 40 | charge, release, sustained hit, aftermath |
+Chain budget (worst case): banner 1600 + tier-3 hold 1240 + damage 180 + status 260 + knockout
+900 = 4180 > 3800, so only what follows a knockout (prize-claim) collapses — acceptable and the
+same as today's behaviour for that last item. Without a knockout the chain is 3280 < 3800.
 
 ### Both seats, geometry and layers
-- All beats are lane-relative; `turn = frameTurnOf(attackerElement)` rotates ghost art only.
-- Layers (z within the host): `terrain` (under both cards' footprints) < `lane` < `attacker`
-  ghost < `defender` overlays < `vignette` (local darkening around one card, ≤ 1.6 card
-  heights, max alpha 0.45) — the only allowed descendant of the sprite games' full-screen tints.
+- All lane-space params are mirrored automatically by `laneGeometry` (u points at the defender
+  whichever seat attacks). Params documented as *screen degrees* (`arms`, particle `direction`,
+  `pillar from`, `bolt from 'sky'`, `float`'s lift) are not mirrored: a 大 stands upright and
+  meteors fall from the top of the screen for both players. `across` in defender presets is in
+  lane space; `float` is the one preset that converts "up" to screen space (`screenUp(lane)` =
+  the lane normal whose y is negative).
+- `turn = frameTurnOf(element)` rotates ghost art only (`.fx-move__ghost-art { transform:
+  rotate(turn) }`), never the ghost box, so transforms compose in parent space.
+- Layers (z within the host, in DOM order): back canvas < attacker ghost < defender ghost < front
+  canvas < particle layers. The host is `z-index 2450`; `.fx-hit` (today's flash/slash) is 2455
+  and lands on the real card's rect, which the knocked ghost has left by up to 0.3 h — accepted
+  (it reads as the strike point).
 - Contact: the defender's existing `strikeTarget` flash/slash/sparks still land at `contactMs`
-  through the impact queue; scores add their own impact dressing (rings, shards, pillars) and
-  never duplicate the damage number.
+  through the impact queue; specs add their own dressing and never a second damage number.
+
+### CSS (`mat-fx.css`, exists; add per material)
+`.fx-move` (overflow visible) · `.fx-move__canvas`, `.fx-move__embers`, `.fx-move__ghost`
+(absolute) · `.fx-move__ghost { will-change: transform; transform-origin: 50% 50% }` ·
+`.fx-move__ghost-art` (inset 0, object-fit contain, radius 0.3rem) · `.fx-move__rim` (opacity 0,
+box-shadows `0 0 10px 2px rgba(hot, .85), 0 0 28px 8px rgba(body, .55)`) · `.fx-move__heat`
+(opacity 0, radial core→hot→deep, `mix-blend-mode: screen`). Per material, a modifier sets the
+custom properties the rim and heat read: `.fx-move--m-<material> { --fx-move-hot: r,g,b;
+--fx-move-body: r,g,b; --fx-move-deep: r,g,b }` and the rim/heat rules switch to
+`rgba(var(--fx-move-hot), …)` (slice 2 does this refactor; fire's literal colours become the
+defaults). `.fx-move__heat--cold` for ice.
 
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | attacker or defender rect missing (card gone, collapsed, hidden tab) | `attack` returns 0 (no scene, no strikeIn), `damage` still pops its number as today | [ ] |
+| 1 | attacker or defender rect missing (card gone, collapsed, hidden tab) | `attack` falls through to today's lunge (which itself returns 0 without rects); `damage` still pops its number | [ ] |
 | 2 | `defenderId` absent (resume path) or bench-only attack | target = opponent's Active rect if any, else aura pulse; bench hits land at contact as today | [ ] |
 | 3 | zero-damage attack (`damage === 0`, no `benchDealt`) | aura pulse on the attacker, hold 240, no contact flash | [ ] |
 | 4 | species unresolved (`pokemonSpriteForName` null, unknown slug, fan-art Mega without stats) | stats null → seeded coin; a Z-A Mega uses its base species' stats (listed in `SPECIES_FALLBACKS`) | [ ] |
@@ -339,65 +747,154 @@ the damage number pops (one number per `damageUpdated`, as today).
 | 9 | card with no `stage`, GX with `evolvesFrom`, `subtypes` carrying the stage | rule-box check first, then `collapseStage` of `stage || subtypes[0]`; GX/V/ex → 3 regardless | [ ] |
 | 10 | multi-move cell | candidate seeded by `(instanceId, attackName)`; same attack → same move all game | [ ] |
 | 11 | two attacks in one batch (copy attacks, "attack twice") | FX queue serialises the plans; the impact queue keeps the max contact per macrotask batch, as today | [ ] |
-| 12 | attacker KO'd by its own attack / discarded mid-scene | rects from `peekCombatOrigin`; ghost art from the snapshot; overlays self-remove | [ ] |
-| 13 | fx turned off mid-scene | `body.fx-off .fx-overlay` hides every layer; backstops clean up | [ ] |
+| 12 | attacker KO'd by its own attack / discarded mid-scene | rects from `peekCombatOrigin`; ghost art from the snapshot; `hideDuring` on a detached element is a no-op; overlays self-remove | [ ] |
+| 13 | fx turned off mid-scene | `body.fx-off .fx-overlay` hides every layer; backstops clean up; the real cards are restored by `hideDuring`'s backstop | [ ] |
 | 14 | reduced motion | dispatcher plays `STATIC_FALLBACKS` (no `attack` entry) → no scene; voice still plays (sound ≠ motion) | [ ] |
 | 15 | no WAAPI / no 2D context | `animateFrames` applies the end frame; `playCanvasStage` resolves; host removed by backstop | [ ] |
-| 16 | opponent is the attacker (180° frame) | ghost art turned by `frameTurnOf`; lane math unchanged | [ ] |
-| 17 | narrow viewport (phone width, cards ~90 px) | sizes are fractions of the card rect; particle counts unchanged; vignette clamps to the viewport | [ ] |
-| 18 | FX queue flood (catch-up burst) | holds collapse past 2500 ms; scenes still self-remove; dropped batches play nothing (queue `clear`) | [ ] |
-| 19 | score table drift (a spec move without a score, a score outside its band) | `score-schema.test.mjs` enumerates `MOVE_TABLE` × `scores` both ways and runs `validateScore` on every score | [ ] |
+| 16 | opponent is the attacker (180° frame) | ghost art turned by `frameTurnOf`; lane math unchanged; screen-space params unmirrored | [ ] |
+| 17 | narrow viewport (phone width, cards ~90 px) | sizes are fractions of h; particle counts unchanged; vignette clamps to the viewport; tongue blur ≥ 1 px | [ ] |
+| 18 | FX queue flood (catch-up burst) | holds collapse past 3800 ms; scenes still self-remove; dropped batches play nothing (queue `clear`) | [ ] |
+| 19 | spec table drift (a table move without a spec, a spec outside its band) | `specs.test.mjs` enumerates `MOVE_TABLE` × `SPECS` both ways and runs `validateSpec` on every spec | [ ] |
 | 20 | data drift (new catalog slug, Showdown rename) | `vendor-species-stats` fails on an unmapped slug; `species-stats.test.mjs` pins known forms (Charizard-Mega-X 130/130 → coin; Gardevoir 65/125 → special; Machamp 130/65 → physical) | [ ] |
 | 21 | `attackName` missing or empty | banner skips as today; `moveFor` seeds with `''` and still picks deterministically | [ ] |
-| 22 | hidden-information card as attacker (never: an Active is always face up) | struck — the Active Spot is always revealed; no sleeve case exists | [x] struck |
+| 22 | ghost art slow to decode (cold cache) | real cards hide only after `img.decode()` or 120 ms, whichever first; both visible briefly rather than both blank | [x] look test |
+| 23 | lane shorter than 1 h (Actives nearly touching) | `lanePoint` still spans leading edge → defender centre; projectile beats read as a short hop; no division by zero (length ≥ 1 px) | [x] look test |
+| 24 | lane long (bench target, 4–6 h) | projectile `f = s²` covers it in the same beat; beams stretch; `pad` keeps the host inside the viewport (clamp host to the viewport rect) | [ ] |
+| 25 | a drawer throws (bad params at runtime) | caught per beat per frame; the rest of the scene plays; the ghosts and hold are unaffected | [ ] |
+| 26 | a second move starts before the first ended (fast double attack) | each scene owns its host and ghosts; `hideDuring` nests (last restore wins); accepted overlap | [ ] |
 
 ## Test plan
 - Unit (`node --test`, pure): `move-table.test.mjs` (table equals the spec; 154 distinct moves;
   every cell non-null after fallback), `move-select.test.mjs` (tier for every classifier and stage
-  literal seen in the engine tests — 'Basic', 'Stage 1', 'Stage1', 'Stage 2', 'break', 'Stage 2
-  ex'; stat class around the gap; family resolution per TCG type incl. Colorless/Tera/unknown;
-  determinism of both seeds; zero-damage null), `species-stats.test.mjs`, `score-schema.test.mjs`
-  (every score valid; every spec move scored; durations and contacts in band), `move-primitives.
-  test.mjs` (pose ranges, clamping, lane geometry on both orientations), `move-shapes.test.mjs`
-  (every shape draws ≤ N calls, uses only the palette, no throw on bad input), `fx-audio.test.mjs`
-  (every family has voices; gains clamped), `combat-pose.test.mjs` (impact ctx carries `family`).
-- Existing suites must stay green: `dispatcher`, `fx-holds`, `fx-queue`, `origins`.
-- Visual: `.claude/skills/fx-preview/rec/rec-attack.mjs MOVE=<slug> SIDE=self|opp TIER=<n>` records
-  one score on the e2e board (fake rects, real `playMoveScore`), writes frames + a WebM to
-  `.agent/scratch/attack/<slug>/`; a frozen-time strip at wind-up / contact / settle. Each type slice
-  ships its strips; the user judges on localhost (visual-only changes are exempt from a failing test).
+  literal seen in the engine tests; stat class around the gap; family resolution per TCG type incl.
+  Colorless/Tera/unknown; determinism of both seeds; zero-damage null), `species-stats.test.mjs`,
+  `move-spec.test.mjs` (`validateSpec` on good and bad fixtures: every error message exercised),
+  `specs.test.mjs` (every shipped spec valid; every table move of a shipped type has a spec; the
+  Fire Blast spec has `contactMs 1000`, `durationMs 1900`, 10 beats, 1 particle burst),
+  `move-geometry.test.mjs` (lane both orientations; `lanePoint` ends; `unionPadded`; degenerate
+  rects), `card-motion.test.mjs` (every preset: identity at ms 0 and after its last beat; `knock`
+  peaks at `strength` within 80 ms of contact; `tremble` is zero before 0.82 c; monotone fade of
+  heat; `stagger` hit count), `move-poses.test.mjs` (every pose fn clamps t, returns finite
+  numbers, obeys its stated ranges — e.g. `chargeOrbs` radius 0.85 h → 0.25 h, `flarePose` arms
+  reach × grow, `smokePuffs` alpha ≤ 0.32), `materials.test.mjs` (each material's five calls on a
+  recording context like `evolve-scene.test.mjs`: finite coordinates, `filter` reset to `'none'`,
+  ≤ 3 fills per tongue, palette-only colours), `fx-holds.test.mjs` (banner hold = `BANNER_MS`),
+  `fx-queue.test.mjs` (budget 3800 via the default).
+- Existing suites must stay green: `dispatcher`, `fx-holds`, `fx-queue`, `origins`, `combat-pose`.
+- Visual (the user's gate, visual-only changes are exempt from a failing test):
+  `rec-move.mjs` per move on both seats, cut with `cut-move.sh`, reviewed against the six key
+  frames in § Builder recipe step 7.
 - Manual: one real game turn per seat with `SERVER_AUTHORITATIVE=1`: banner → move → number → KO
   reads in order and the queue never stalls.
 
+## Recording and review procedure (exact; the look test's)
+```bash
+pnpm install --prefer-offline --frozen-lockfile          # once per worktree
+PORT=4100 pnpm start > /tmp/server-4100.log 2>&1 &        # look for "e2e bridge: ARMED"
+# card art for the fake board: the cloud browser cannot reach images.pokemontcg.io (proxy CA),
+# but curl can — download once and serve by basename:
+mkdir -p "$SCRATCH/cards" && curl -sS -o "$SCRATCH/cards/6_hires.png" https://images.pokemontcg.io/sv3pt5/6_hires.png \
+  && curl -sS -o "$SCRATCH/cards/3_hires.png" https://images.pokemontcg.io/sv3pt5/3_hires.png
+CARD_DIR="$SCRATCH/cards" CHROMIUM=/opt/pw-browsers/chromium \
+SIO_JS=$(ls node_modules/.pnpm/socket.io@*/node_modules/socket.io/client-dist/socket.io.min.js | head -1) \
+MOVE=fire-blast SIDE=self SEED=7 OUT=.agent/scratch/moves/fire-blast \
+node .claude/skills/fx-preview/rec/rec-move.mjs             # prints played {...} and "frame ms: median p95 max"
+.claude/skills/fx-preview/rec/cut-move.sh .agent/scratch/moves/fire-blast fire-blast   # sheet.png, .mp4, -closeup.mp4
+```
+`rec-move.mjs` (slice 2; `rec-fire-blast.mjs` generalised) pushes a fake view through
+`applyView` (attacker instance 101 on `you.active`, defender 201 on `them.active`, `SIDE=opp`
+swaps them), waits 900 ms and for both card images to decode, then: `attackBanner`, wait
+`holdFor('attack-banner')`, then in ONE `page.evaluate`: `playMove(...)` with `impacts: {
+strikeIn: announceStrike }` and `damage({ instanceId, damage: 180, dealt: 180, weakness: true })`
+so the number lands on contact; it writes `rects.json` (`from`, `to`, `bannerAt`, `moveAt`,
+`bannerHoldMs`) and prints the frame-time probe (140 rAF deltas from the move start). The server
+dies between cloud turns; restart it before recording. `pkill -f server/server.js` also kills the
+shell that runs it — stop the server by PID.
+
+Review = read `sheet.png` (36 tiles at 12.5 fps from 150 ms before the move) and six key frames
+(`ffmpeg -ss <moveAt + offset>` at offsets 0.30 (wind-up), 0.66 (thrust / release), contact − 0.05
+(arrival), contact + 0.05 (impact), contact + 0.3 (knock-back / sustained hit), contact + 0.6
+(aftermath)) cropped to `5.2 h × (lane + 4.4 h)` around the cards, as `cut-move.sh` does.
+
+## Builder recipe — how to add one move (no design judgment needed)
+1. Open the move's Appendix A entry. Note: tier, class, `contact at`, `total`, the Board-mapping
+   lines, Palette, Flags. Open its reference sheets if they are on disk (`refs/063-move-refs.json`
+   has the URLs; the fetch scripts rebuild them).
+2. Copy the closest existing spec from `specs/<type>.mjs` (same type and class; Fire Blast for any
+   special tier 3 burst). Rename `id`/`name`, set `vgType`, `statClass`, `tier`, `family`,
+   `material`.
+3. Set `durationMs` = the entry's `total` (clamped into `TIER_BAND[tier]`) and `contactMs` = the
+   entry's `contact at`.
+4. Translate each Board-mapping line into a beat with the vocabulary map below; keep the entry's
+   times; sizes in h: "1 card" = 1.0, "½ card" = 0.5; "wide" beam = 0.6 w, "narrow" = 0.3 w.
+5. Pick card motion from the Timing-by-tier table: specials `rear-lurch` (tier 1 `brace`),
+   contact physicals `lunge` (tier 1) or `dash` (tier 2–3), multi-hit → defender `stagger` with
+   `hits` = the entry's hit count, ground/quake → `stomp` + `sink`, psychic/wind → `float`, ice →
+   `freeze`.
+6. Run `node --test client/src/setup/netcode/mat-fx/moves/__tests__/specs.test.mjs` (it runs
+   `validateSpec`); fix every error message literally.
+7. Record on both seats (§ Recording). Check the six key frames against the entry: the right
+   material, the contact beat at `contactMs`, the defender moves at contact, nothing board-wide,
+   the probe's median ≤ 17 ms / p95 ≤ 140 ms. Attach `sheet.png` paths to the commit message.
+8. Commit `feature: design 063 <type> - <move>` with a `flag:` line for any deviation from the
+   entry, and append the deviation under § Deviations.
+
+Vocabulary map (Appendix A Board-mapping → drawer):
+| entry word | drawer / preset |
+|---|---|
+| `charge(attacker, …)` | `coreCharge` (+ `orbitCharge` when the entry says orbs/orbit) and attacker `rear-lurch` wind-up |
+| `projectile(shape, path, …)` | `projectile` with `path`; `volley` when "×N" or "stream of N" |
+| `beam(…, solid/segmented/helix/pulse-train/widening, …)` | `beam` with that `kind` |
+| `burst(target, shape, N, radius, ring/up/fan)` | `shards` (angular shapes) or `splash` (soft shapes) with `count N`, `distance`/`arc` from the words; `ring` = arc 360 |
+| `slash(…)` | `slashArc` (count from "×2", "cross" = 2 at 90°) |
+| `impactFlash(target, colour, strength)` | `impactFlash` (`strong` → r1 1.3, `soft` → r1 0.9) on layer `top` |
+| `shake(table/defender, amp)` | defender `knock` strength (`light` 0.2, `medium` 0.3, `heavy` 0.45) and `terrain 'quake'` for table |
+| `aura(target, …)` | `aura` |
+| `orb(…)` | `coreCharge` or `projectile` with `path 'straight'` |
+| `ring(…)` | `ring` or `shockRings` (at release) |
+| `pillar(…)` | `pillar` |
+| `terrain(…)` | `terrain` with `kind` |
+| `cloud(…)` | `cloud` |
+| `vignette(…)` | `vignette` |
+| `canvas(…custom…)` | the named drawer if one exists; else add a drawer to `move-drawers.js` with a pose fn + test (one per slice at most; note it under Deviations) |
+| `lunge`/`dash`/`cardMotion` | attacker preset `lunge`/`dash`/`spin` |
+
 ## Migration / rollout
 - No data migration, no protocol change. The generic lunge remains the fallback for every card
-  whose move is not yet scored, so types ship one slice at a time with the rest unchanged.
+  whose move has no spec, so types ship one slice at a time with the rest unchanged.
 - Revert = revert the slice's commit; the generated stats module and the vendor script are
-  self-contained.
+  self-contained. The pacing change (banner hold, queue budget) is one commit on its own.
 - Reference assets (sheets, GIFs, videos) stay out of the repo; only `refs/063-move-refs.json`
   (URLs and timings) is committed so a later session can refetch.
+- Decisions to record in DECISIONS.md at landing: the vendored Showdown stats; `HOLD_MS['attack-
+  banner'] = BANNER_MS`; `DEFAULT_MAX_QUEUE_MS = 3800`; "move scenes draw with the tongue material
+  and ghost-card motion (design 063 look test)".
 
 ## Work plan — slices ≤1 session, each leaving the repo green
-Slices 0–2 are infrastructure and ship no new look (every attack still lunges). Slices 3–19 each
-score one VG type's moves from Appendix A via `fx-designer` with `rec-attack` strips; slice 20 is
-the user's pass. Every row below is a pinned contract once Appendix A is approved.
-| Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
-|---|---|---|---|---|---|
-| 0 | create `scripts/vendor-species-stats.mjs`, `client/src/setup/netcode/mat-fx/moves/species-stats.generated.mjs`, `mat-fx/__tests__/species-stats.test.mjs`; modify `package.json` (`vendor:species-stats`), `.agent/DECISIONS.md` (at landing) | `SPECIES_STATS: Record<id,[atk,spa,...types]>`, `SPECIES_ID: Record<slug,id>`, `SPECIES_FALLBACKS: string[]`; script exits 1 on an unmapped slug | every slug of both sprite catalogs ∈ `SPECIES_ID`; `charizardmegax → [130,130,'fire','dragon']`; `gardevoir → [65,125,…]`; `machamp → [130,65,…]`; `SPECIES_FALLBACKS` lists only `-mega` fan slugs | n/a (no card text) | script + tests green; module < 120 KB |
-| 1 | create `mat-fx/moves/move-table.mjs`, `move-select.mjs`, `__tests__/move-table.test.mjs`, `__tests__/move-select.test.mjs` | as in § Selection; `moveFor` returns `{move,vgType,statClass,tier,family,score}` or null (score may be undefined until slice 2 — `moveFor` takes `scores` as a parameter) | table = spec (154 moves); 7 N/A cells resolve; tiers for 11 classifier kinds + 6 stage literals; gap 10 → coin, 11 → fixed; Colorless+Snorlax → null; Colorless+Pidgeot → flying; Darkness+Charizard → dark; same seeds → same results ×100 | n/a | tests green; lint green |
-| 2 | create `mat-fx/moves/score-schema.mjs`, `move-primitives.mjs`, `move-shapes.mjs`, `move-player.js`, `scores/index.mjs` (empty maps per type), `__tests__/score-schema.test.mjs`, `__tests__/move-primitives.test.mjs`, `__tests__/move-shapes.test.mjs`, `.claude/skills/fx-preview/rec/rec-attack.mjs`; modify `combat.js`, `combat-pose.mjs` (impact ctx), `index.js` (`soundPlanFor`), `fx-audio.mjs` (14 family voice sets), `fx-audio.test.mjs`, `css/mat-fx.css` | `validateScore(score) → string[]`; `playMoveScore(opts) → {holdMs}`; `laneGeometry`; one pose fn per primitive; `drawShape(ctx, shape, opts)`; `voicesFor('attack', {family})` | empty scores → every attack still lunges (snapshot of today's behaviour); a fixture score of each primitive validates and plays in jsdom-free unit tests of the pure parts; `rec-attack` renders the fixture on both seats | n/a | full `pnpm test` green; strips of the fixture score attached to the slice commit |
-| 3–19 | one VG type each (order: fire, water, grass, electric, fighting, psychic, dark, steel, dragon, fairy, ghost, poison, ground, rock, flying, ice, bug): create `scores/<type>.mjs`; add shapes/canvas drawers the type needs to `move-shapes.mjs`; CSS variants | scores per Appendix A rows for that type | `validateScore` passes for each; spec ↔ scores cross-check for the type; shapes test; strips (wind-up / contact / settle, self + opp) per move | n/a | tests green; strips reviewed by the Reviewer agent against Appendix A |
-| 20 | user pass on localhost; timing/palette corrections appended under Deviations | — | — | — | user sign-off per type |
+Slice 2 is the pivot: it ports the accepted Fire Blast into the generic player and deletes the
+look-test files once the port matches. Slices 3–19 each ship one VG type (material + specs) via
+`fx-designer` with recordings; slice 20 is the user's pass.
+| Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Green when |
+|---|---|---|---|---|
+| 0 | create `scripts/vendor-species-stats.mjs`, `mat-fx/moves/species-stats.generated.mjs`, `__tests__/species-stats.test.mjs`; modify `package.json` (`vendor:species-stats`) | `SPECIES_STATS: Record<id,[atk,spa,...types]>`, `SPECIES_ID: Record<slug,id>`, `SPECIES_FALLBACKS: string[]`; script exits 1 on an unmapped slug | every slug of both sprite catalogs ∈ `SPECIES_ID`; `charizardmegax → [130,130,'fire','dragon']`; `gardevoir → [65,125,…]`; `machamp → [130,65,…]` | script + tests green; module < 120 KB |
+| 1 | create `moves/move-table.mjs`, `move-select.mjs`, tests | § Selection; `moveFor` returns `{move,vgType,statClass,tier,family,spec}` or null (`spec` from the `specs` argument) | table = spec (154 moves); 7 N/A cells resolve; tiers for 11 classifier kinds + 6 stage literals; gap 10 → coin, 11 → fixed; Colorless+Snorlax → null; Colorless+Pidgeot → flying; Darkness+Charizard → dark; same seeds → same results ×100 | tests green |
+| 2 | create `move-spec.mjs`, `move-geometry.mjs`, `card-motion.mjs`, `move-poses.mjs`, `move-drawers.js`, `move-player.js`, `materials/_shared.js`, `materials/fire.js` (moved), `materials/index.js`, `specs/index.mjs`, `specs/fire.mjs` (Fire Blast only), tests for every pure module, `rec/rec-move.mjs`; modify `combat.js` (wiring + `strikeTarget` reads `ctx.family`), `index.js` (`soundPlanFor`), `fx-audio.mjs` (14 family voice sets), `mat-fx.css` (material custom properties); delete `fire-blast-pose.mjs`, `fire-blast.js`, `fire-material.js`, `rec/rec-fire-blast.mjs` | as in § Design | `validateSpec(fireBlast) → []`; `playMove` on the e2e board reproduces take 3 (sheet compared side by side; same contact, same key frames); with empty `SPECS` every attack still lunges; `moveFor` + `SPECS` → Charizard ex's attack plays Fire Blast only when `MOVE_TABLE` is temporarily pointed at it in the test; both seats recorded | full `pnpm test` green; the two sheets attached to the commit |
+| 3 | `materials/fire.js` tuned per Fire entries, `specs/fire.mjs` all 11 Fire moves | Appendix A Fire rows | each spec valid; recordings per move | tests green; sheets reviewed |
+| 4–19 | one VG type each in this order: water, grass, electric, fighting, psychic, dark, steel, dragon, fairy, ghost, poison, ground, rock, flying, ice, bug. Each: `materials/<type>.js` per its recipe, `specs/<type>.mjs`, new drawers only if the recipe names them, CSS modifier | § Materials recipe + Appendix A rows (types without rows first get the study pass: `refs/063-study/STUDY-BRIEF.md`, Haiku agents, `merge-notes.mjs ONLY=<type>`) | `materials.test.mjs` for the type; every spec valid; recordings on both seats | tests green; sheets reviewed against the entries |
+| 20 | user pass on localhost; timing/palette corrections appended under Deviations | — | — | user sign-off per type |
 
 ## Deviations (Builder appends here during build)
-—
+- 2026-10-05 look test: Fire Blast built outside the table as the acceptance reference (three takes;
+  take 3 accepted). Its numbers are now the defaults in § Design.
 
 ## Appendix A — per-move animation specs
 One entry per move, in the spec's order by type, physical then special. Each entry names its
 reference (sprite game, 3D game, durations), the beats seen in the reference, its palette, what the
-3D version adds, the board score (beats over the primitive vocabulary, lane-relative, with the
-contact time), and flags (missing references, house-rule translations, open calls). The scores
-here are the contract for slices 3–19; a builder adjusts numbers only inside the tier bands.
+3D version adds, the board score (beats over the first draft's primitive vocabulary — translate
+with the vocabulary map in § Builder recipe — lane-relative, with the contact time), and flags
+(missing references, house-rule translations, open calls). The entries are the contract for slices
+3–19; a builder adjusts numbers only inside the tier bands and records any other change under
+Deviations.
 
 How the entries were made: one study agent per type family read every contact sheet (sprite era
 first, then the 3D video) and wrote the entry in the schema of `refs/063-study/STUDY-BRIEF.md`;
@@ -407,6 +904,19 @@ tiers 2–3, Electric except Nuzzle) sometimes measure sprite beats from the GIF
 than its first effect frame; their "effect frames" range on the Refs line is the ground truth.
 Every "house-rule conflict" flag marks a full-screen tint, flash or sunburst in the reference that
 the board score replaces with a local vignette or aura, per the house rules.
+
+Worked example — Fire Blast (not in the table; the accepted look test), in the entry schema:
+Refs: sprite N2B2 (4380 ms, effect frames 42–126) · modern EV (6600 ms, effect frames 33–126)
+Sprite beats: 1260–1770 five fireballs orbit the attacker, growing · 1830–2550 red tint, a flame
+cluster crosses the ground to the defender · 2610 yellow radial flash · 2670–2910 the 大 flare
+grows · 2940–3240 holds · 3300–3600 breaks up · 3660–3840 dark, then normal.
+Screen: full-screen red tint 1.8 s, black-out 0.2 s (both replaced by the local vignette).
+Palette: #D22908, #EB6C06, #F1AF0D, #FFF6D6.
+Modern cue: ball built at the mouth, two rings on release, white core at contact, embers after.
+Board mapping (= the MoveSpec in § MoveSpec): 0 orbitCharge+coreCharge · 560 shockRings · 620
+projectile(arc) · 820 vignette · 1000 impactFlash + speedRays + starFlare('dai') + embers ·
+1300 smoke · attacker `rear-lurch`, defender `knock 0.3` · contact 1000 · total 1900.
+Flags: house-rule conflict (tint, black-out) → vignette; blur cost → one blurred pass.
 
 <!-- APPENDIX-A -->
 
