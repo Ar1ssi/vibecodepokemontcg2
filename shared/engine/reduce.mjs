@@ -60,6 +60,7 @@ import {
 } from './rules/damage-parser.mjs';
 import { optionalCostBonusClause } from './rules/optional-cost-bonus.mjs';
 import { legacyTrainerType } from './rules/legacy-trainer-type.mjs';
+import { normalizeTcgdexEntry, normalizeTcgdexText } from './rules/tcgdex-text.mjs';
 import {
   legacyAttachedTrainer,
   attachedLegacyTrainers,
@@ -10832,8 +10833,10 @@ export function applyCommand(state, command, rng = null) {
         const card = bySyncInstance.get(entry.syncInstance);
         if (!card) continue;
         if (entry.hp != null) card.hp = Number(entry.hp);
+        // TCGdex text enters the engine here: type words and encoding damage become the
+        // notation every reader is tested on (design 063, D202).
         if (Array.isArray(entry.attacks))
-          card.attacks = entry.attacks.map((a) => ({ ...a }));
+          card.attacks = entry.attacks.map((a) => normalizeTcgdexEntry(a));
         if (Array.isArray(entry.types)) card.types = [...entry.types];
         if (entry.weakness !== undefined) card.weakness = entry.weakness;
         if (entry.resistance !== undefined) card.resistance = entry.resistance;
@@ -10848,9 +10851,9 @@ export function applyCommand(state, command, rng = null) {
             typeof t === 'string' && t.trim() && t.length <= 32 ? { type: t.trim() } : {};
           card.abilities = entry.abilities
             .filter((a) => a && typeof a.text === 'string')
-            .map((a) => ({ name: String(a.name || ''), text: a.text, ...printedKind(a.type) }));
+            .map((a) => ({ name: String(a.name || ''), text: normalizeTcgdexText(a.text), ...printedKind(a.type) }));
         }
-        if (typeof entry.text === 'string') card.text = entry.text;
+        if (typeof entry.text === 'string') card.text = normalizeTcgdexText(entry.text);
         if (typeof entry.trainerType === 'string')
           card.trainerType = entry.trainerType;
         if (Array.isArray(entry.subtypes))

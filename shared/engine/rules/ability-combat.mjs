@@ -57,6 +57,7 @@ import {
   attackerTypes,
 } from './tool-combat.mjs';
 import {
+  isAceSpecCard,
   isRuleBoxPokemon,
   isExCard,
   isGxCard,
@@ -1477,7 +1478,8 @@ function playableCategories(card) {
   else if (/supporter/.test(kind)) out.push('Supporter');
   else if (/tool/.test(kind)) out.push('Pokémon Tool');
   else if (/item/.test(kind) || /trainer/.test(kind)) out.push('Item');
-  if (/ace spec/.test(kind)) out.push('ACE SPEC');
+  // BW ACE SPEC carry no subtype on a live card; the printed-marker table knows them (design 063).
+  if (/ace spec/.test(kind) || isAceSpecCard(card)) out.push('ACE SPEC');
   return out;
 }
 

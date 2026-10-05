@@ -5,6 +5,7 @@
     import { printedRarity } from './card-classify.mjs';
     import { withParadoxSubtype } from './paradox-tags.mjs';
     import { legacyTrainerType } from './legacy-trainer-type.mjs';
+    import { normalizeTcgdexText } from './tcgdex-text.mjs';
     import { createCachedFetchJson } from '../../tcgdex/tcgdex-cache.mjs';
     import { tcgdexApiUrl } from '../../tcgdex/tcgdex-url.mjs';
     import {
@@ -237,7 +238,11 @@
         entries.find((a) => LEGACY_POWER_TYPE.test(typeOf(a))) ||
         entries.find((a) => typeOf(a).toLowerCase() === 'ancient trait');
       if (!entry) return null;
-      return { name: entry.name || '', text: entry.effect || entry.text || '', type: printedPowerType(detail, typeOf(entry)) };
+      return {
+        name: entry.name || '',
+        text: normalizeTcgdexText(entry.effect || entry.text || ''),
+        type: printedPowerType(detail, typeOf(entry)),
+      };
     }
 
     // Network: fetch (and memoize) one raw TCGdex card detail by id. Shared by
@@ -294,7 +299,7 @@
         name: a.name,
         cost: a.cost || [],
         damage: parseDamage(a.damage),
-        text: a.effect || a.text || '',
+        text: normalizeTcgdexText(a.effect || a.text || ''),
       }));
     }
 
@@ -375,6 +380,31 @@
       }
       // Lookup failed: it is still an Evolution; Stage 1 is the common case.
       return 'Stage1';
+    }
+
+    // TCGdex leaves evolveFrom off a few Evolution printings (bwp-BW78 Raichu is Stage1 with none),
+    // and the server's evolve check skips the name test without it, so the card evolved onto any
+    // Pokémon. Another printing of the same name and stage names it (bw4-40 Raichu → Pikachu)
+    // (design 063, audit F10). Null when nothing can be found: the caller keeps the old behaviour.
+    export async function inferMissingEvolveFrom(detail) {
+      const own = detail?.evolveFrom || detail?.evolvesFrom;
+      if (own) return own;
+      if (String(detail?.category || '').toLowerCase() !== 'pokemon' || !detail?.name) return null;
+      const stage = collapseStageName(detail.stage);
+      if (stage !== 'stage1' && stage !== 'stage2') return null;
+      let summaries = [];
+      try {
+        summaries = await fetchSummariesByName(detail.name);
+      } catch {
+        return null;
+      }
+      for (const summary of summaries.slice(0, 6)) {
+        if (!summary?.id || summary.id === detail.id) continue;
+        const other = await fetchCardDetail(summary.id);
+        if (!other || other.name !== detail.name || collapseStageName(other.stage) !== stage) continue;
+        if (other.evolveFrom) return other.evolveFrom;
+      }
+      return null;
     }
 
     // TCGdex carries the rule-box marker in `suffix` ("GX", "TAG TEAM-GX", "EX") and has
@@ -494,13 +524,13 @@
           retreatCost: parseRetreatCost(detail),
           attacks: mapDetailAttacks(detail.attacks),
           stage: (await inferMissingStage(detail)) || null,
-          evolvesFrom: detail.evolvesFrom || detail.evolveFrom || null,
+          evolvesFrom: (await inferMissingEvolveFrom(detail)) || null,
           ability: tcgAbilityFromDetail(detail),
           subtypes: detail.subtypes || subtypesFromSuffix(detail.suffix),
           trainerType: detail.trainerType || legacyTrainerType(detail) || null,
           rarity: printedRarity(detail) || card.rarity || '',
-          effect: detail.effect || null,
-          text: detail.text || detail.effect || null,
+          effect: normalizeTcgdexText(detail.effect) || null,
+          text: normalizeTcgdexText(detail.text || detail.effect) || null,
         };
         cardDataCache.set(card.id, data);
         applyEnrichedData(card, data);

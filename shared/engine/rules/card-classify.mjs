@@ -142,8 +142,9 @@ export function isPrismStarCard(card = {}) {
 
 export function isAceSpecCard(card = {}) {
   if (hasSubtype(card, 'acespec')) return true;
-  // TCGdex prints no `subtypes`; ACE SPEC cards carry the "ACE SPEC Rare" rarity.
-  return lower(card?.rarity).includes('ace spec');
+  // TCGdex prints no `subtypes`; SV ACE SPEC cards carry the "ACE SPEC Rare" rarity, BW ones only
+  // "Rare" (bw7-137 Computer Search), so the printed-marker table answers for those (design 063).
+  return lower(card?.rarity).includes('ace spec') || hasCardMarker(card, 'ACE SPEC');
 }
 
 export function isRadiantCard(card = {}) {

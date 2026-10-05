@@ -1,7 +1,7 @@
 /**
  * Bakes shared/engine/rules/card-markers.generated.mjs (I220, design 061 Group E): every printing
  * that carries a marker TCGdex has no field for — Tera, Team Plasma, Single/Rapid/Fusion Strike,
- * Baby, Prism Star, TAG TEAM — keyed by TCGdex card id. The printings come from pkmncards.com's
+ * Baby, Prism Star, TAG TEAM, ACE SPEC — keyed by TCGdex card id. The printings come from pkmncards.com's
  * `is:` / `stage:` searches (the same site as the out/ corpora); each is matched to a TCGdex card
  * of its set by collector number AND name; a printing that does not match is skipped and reported
  * (reprint collections TCGdex numbers differently), never tagged onto another card.
@@ -30,6 +30,9 @@ export const MARKER_QUERIES = {
   Baby: 'stage:baby',
   'Prism Star': 'is:prism-star',
   'TAG TEAM': 'is:tag-team',
+  // BW ACE SPEC printings carry rarity "Rare" on TCGdex (bw7-137 Computer Search), so the
+  // rarity check in isAceSpecCard misses them (design 063, audit F3).
+  'ACE SPEC': 'is:ace-spec',
 };
 
 // pkmncards set names TCGdex spells differently.
