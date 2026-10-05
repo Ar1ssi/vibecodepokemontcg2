@@ -10,7 +10,10 @@
 // rather than stall, so committed holds are capped by `maxQueueMs` — past that
 // budget every hold collapses to 0 until the queue goes idle and the budget
 // resets. `schedule` and `now` are injected so tests run on a fake clock.
-const DEFAULT_MAX_QUEUE_MS = 2500;
+// Design 063: a full attack is banner 1600 + a tier-3 move's hold ≤ 1240 + damage
+// 180 + status 260 + knockout 900; the budget covers that chain so only what
+// follows a knockout collapses.
+const DEFAULT_MAX_QUEUE_MS = 3800;
 
 const holdOf = (value) =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;

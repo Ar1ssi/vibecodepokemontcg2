@@ -20,7 +20,6 @@ const {
 } = process.env;
 const ATTACKER = 'https://images.pokemontcg.io/sv3pt5/6_hires.png';
 const DEFENDER = 'https://images.pokemontcg.io/sv3pt5/3_hires.png';
-const BANNER_HOLD_MS = 620;
 
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch(
@@ -75,6 +74,7 @@ const info = await page.evaluate(
       await import('/src/setup/netcode/mat-fx/moves/fire-blast.js');
     const { frameTurnOf } =
       await import('/src/setup/netcode/mat-fx/evolve-scene.js');
+    const { holdFor } = await import('/src/setup/netcode/mat-fx/fx-holds.mjs');
     const card = (instanceId, name, src, types, subtypes, hp) => ({
       instanceId,
       name,
@@ -176,7 +176,7 @@ const info = await page.evaluate(
         return played;
       },
     };
-    return { from, to };
+    return { from, to, bannerHoldMs: holdFor('attack-banner') };
   },
   [ATTACKER, DEFENDER, SEED]
 );
@@ -184,7 +184,7 @@ console.log(JSON.stringify(info));
 await page.waitForTimeout(700);
 const bannerAt = Date.now() - videoStart;
 await page.evaluate(() => window.__fireBlast.banner());
-await page.waitForTimeout(BANNER_HOLD_MS);
+await page.waitForTimeout(info.bannerHoldMs);
 const moveAt = Date.now() - videoStart;
 const played = await page.evaluate(() => window.__fireBlast.move());
 console.log('played', JSON.stringify(played));

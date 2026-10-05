@@ -49,6 +49,7 @@ const BACKSTOP_PAD_MS = 400;
 const EMBER_MS = 760;
 const EMBER_COUNT = 22;
 const GHOST_SAMPLES = 150;
+const GHOST_DECODE_WAIT_MS = 120;
 const TAU = Math.PI * 2;
 const SHADE = [70, 6, 0];
 const SMOKE = [120, 96, 84];
@@ -252,7 +253,13 @@ const cardGhost = (host, rect, src, turn, className) => {
   heat.className = 'fx-move__heat';
   ghost.append(img, rim, heat);
   host.appendChild(ghost);
-  return { ghost, rim, heat };
+  // The real card hides only once the ghost's art has decoded, else both are
+  // blank for a frame (Chromium decodes a freshly inserted <img> asynchronously).
+  const ready = Promise.race([
+    (img.decode?.() ?? Promise.resolve()).catch(() => undefined),
+    new Promise((resolve) => setTimeout(resolve, GHOST_DECODE_WAIT_MS)),
+  ]);
+  return { ghost, rim, heat, ready };
 };
 
 const ghostTransform = (
@@ -465,8 +472,11 @@ export function playFireBlast({
   const backstop = FIRE_BLAST_MS + EMBER_MS + BACKSTOP_PAD_MS;
   removeWhen(host, [back, front, ...ghosts], backstop);
   const cardsDone = Promise.all([back, front]);
-  hideDuring(attacker.element, cardsDone, backstop);
-  hideDuring(defender.element, cardsDone, backstop);
+  Promise.all([attackerGhost.ready, defenderGhost.ready]).then(() => {
+    if (!host.isConnected) return;
+    hideDuring(attacker.element, cardsDone, backstop);
+    hideDuring(defender.element, cardsDone, backstop);
+  });
   return {
     holdMs: FIRE_BLAST_HOLD_MS,
     durationMs: FIRE_BLAST_MS,

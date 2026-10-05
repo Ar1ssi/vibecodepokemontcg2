@@ -4,10 +4,14 @@
 // same: the damage number is still rising while the KO burst begins).
 // Keeping every value in one table is the point: the pacing of a whole attack
 // is reviewable here without reading six effect modules.
+import { BANNER_MS } from './flow-pose.mjs';
+
 export const DEFAULT_HOLD_MS = 0;
 
 export const HOLD_MS = {
-  'attack-banner': 620,
+  // Design 063: the move scene starts once the attack's name banner has left the
+  // screen, so the banner is read on its own and the move is watched on its own.
+  'attack-banner': BANNER_MS,
   attack: 240,
   damage: 180,
   status: 260,
