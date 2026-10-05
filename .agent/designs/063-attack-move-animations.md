@@ -1,9 +1,9 @@
 # 063: Attack move animations — type × stat class × tier
-Status: direction approved by the user on the Fire Blast look test (2026-10-05): "Good". This
-revision turns the look test into the implementation plan. Everything in § Design is a pinned
-contract a builder follows without design judgment; § Builder recipe is the step-by-step for one
-move. Appendix A (per-move specs) is filled for Grass, Water, Fire, Electric (43 moves); the other
-13 types are pending the same study pass and their slices start with it.
+Status: **approved** (user, 2026-10-05) — implementation plan; every Work-plan row is a pinned
+contract. The Fire Blast look test (three takes, the third accepted: "Good") fixed the visual
+contract; § Pinned contracts for slice 2 closes the gaps a builder raised against the first draft.
+Appendix A is filled for Grass, Water, Fire, Electric (43 moves); a pending type's entries are
+produced by the study pass at the start of its slice (see § Pinned contracts A).
 Date: 2026-10-01 (draft) · 2026-10-05 (revised after the look test) · Session: S336
 
 ## Problem
@@ -268,6 +268,7 @@ the visual contract. A builder reproduces these qualities for every move:
     generic player; drawers are built on per-type *materials*. **Pick C**: it is exactly what the
     look test's code becomes once the Fire Blast numbers are moved into a spec, it keeps the pure
     parts testable, and a new move is a spec file a weaker model can write by copying the recipe.
+    The first draft's `drawShape` shape list and `rec-attack` are withdrawn (§ Pinned contracts D).
 13. **Sound.** One voice set per *sound family* (`slash, punch, dash, beam, projectile, burst,
     quake, splash, wind, electric, ghost, chime, roar, charge`), chosen by the spec's `family` and
     routed by `soundPlanFor`. **Picked.**
@@ -733,6 +734,199 @@ custom properties the rim and heat read: `.fx-move--m-<material> { --fx-move-hot
 `rgba(var(--fx-move-hot), …)` (slice 2 does this refactor; fire's literal colours become the
 defaults). `.fx-move__heat--cold` for ice.
 
+## Pinned contracts for slice 2 (answers to the builder's review, 2026-10-05)
+A builder raised six gaps against the first draft. Four still applied to this revision; all six are
+closed here. Nothing in this section is optional: it is what `move-spec.mjs`, `move-drawers.js`,
+`fx-audio.mjs` and `combat.js` implement in slice 2.
+
+### A. Approval
+Approved by the user on 2026-10-05 ("update the plan and set it as approved"). Every Work-plan row
+is a pinned contract. Appendix A entries for Grass, Water, Fire and Electric are approved as the
+per-move contracts; a pending type's entries are produced by the study pass at the start of its
+slice (`refs/063-study/STUDY-BRIEF.md`, Haiku agents, `merge-notes.mjs ONLY=<type>`) and are
+approved by construction unless the user objects at that slice's close. A builder never waits on
+approval again; deviations go under § Deviations.
+
+### B. Drawer parameter schemas, pose signatures and the cost rule
+`move-spec.mjs` exports one generic checker and one table; drawers do not hand-write validators:
+```js
+// kind: 'num' [min, max, default] · 'int' [min, max, default] · 'enum' [values, default]
+// · 'deg' [default] (screen degrees, any finite) · 'arms' [default] ('dai'|'cross'|'ring'|array of {angle, reach})
+// · 'target' [default] ('attacker'|'defender') · 'pair' [min, max, [d0, d1]] (two numbers, d0 ≤ d1)
+export const DRAWER_PARAMS = { orbitCharge: { count: ['int', 1, 8, 5], half: ['enum', ['back', 'front', 'both'], 'both'], r0: ['num', 0.05, 0.4, 0.16], r1: ['num', 0.05, 0.5, 0.24], tongues: ['int', 0, 6, 4] }, … };
+export function checkParams(drawer, params) → string[]   // unknown drawer; unknown key; wrong type; out of range
+export function withDefaults(drawer, params) → object     // what the player hands the drawer
+```
+Full table (every drawer, every key; units h / ms / degrees as stated in § MoveSpec):
+
+| drawer | params (kind [range] default) | pose fn signature → return shape | tonguesAt(p) |
+|---|---|---|---|
+| `orbitCharge` | count int [1,8] 5 · half enum back/front/both · r0 num [.05,.4] .16 · r1 num [.05,.5] .24 · tongues int [0,6] 4 · tilt num [.2,1] .42 | `chargeOrbs(s, h, { count, r0, r1, tilt }) → [{ dx, dy, r, alpha, depth, heading }]` | count × tongues |
+| `coreCharge` | lead num [0,1] .42 · r0 num [.05,.5] .18 · r1 num [.1,1] .56 · from num [0,.9] .3 | `chargeCore(s, h, { lead, r0, r1, from }) → { x, y, r, alpha }` (x, y relative to the attacker centre) | 0 |
+| `shockRings` | count int [1,4] 2 · delay num [0,.8] .3 · r0 num [.1,1] .3 · r1 num [.5,2.5] 1.3 · squash num [.2,1] .45 | `releaseRings(s, h, { count, delay, r0, r1 }) → [{ r, alpha, width }]` | 0 |
+| `projectile` | path enum straight/arc/spiral arc · r0 num [.05,1] .34 · r1 num [.05,1.2] .56 · bow num [0,.6] .2 · tongues int [0,12] 9 · ease enum in/linear/out in | `projectilePose(s, h, { path, r0, r1, bow, ease }) → { f, side, r, alpha, headingDeg }` | tongues |
+| `vignette` | target · maxAlpha num [0,.55] .45 · inner num [.2,1] .55 · outer num [.8,1.6] 1.6 | `vignettePose(s, h, { maxAlpha, inner, outer }) → { alpha, inner, outer }` | 0 |
+| `speedRays` | count int [8,40] 28 · inner num [.1,.6] .3 · outer num [.8,2] 1.7 · target | `raysPose(s, h, { count, inner, outer }) → { alpha, inner, outer, count, spin }` | 0 |
+| `starFlare` | arms 'dai' · width num [.2,.7] .46 · core num [.2,.7] .46 · grow num [.15,.5] .3 · breakAt num [.4,.9] .6 · target | `flarePose(s, h, { arms, width, core, grow, breakAt }) → { core: { r, alpha }, breakUp, arms: [{ angle, length, width, drift, alpha }] }`; `armTongues(arm, breakUp) → [{ angleDeg, from, length, width, alpha }]` | arms × (breakUp < .35 ? 3 : 5) |
+| `impactFlash` | r0 num [.2,1] .6 · r1 num [.5,2] 1.3 · target | `flashPose(s, h, { r0, r1 }) → { alpha, r }` | 0 |
+| `smoke` | count int [1,10] 6 · rise num [.3,1.5] .9 · target | `smokePuffs(s, h, { count, rise }) → [{ dx, dy, r, alpha }]` | 0 |
+| `beam` | kind enum solid/pulse-train/helix/segmented/widening solid · w num [.1,1] .5 · gap num [.2,1] .4 · turns num [1,5] 3 · speed num [.5,5] 2.5 · growIn num [.1,.4] .25 · retract num [.1,.4] .2 | `beamPose(s, lane, { kind, w, gap, turns, speed, growIn, retract }) → { from, to (0..1 along the lane), width, segments: [{ f0, f1, side, alpha }] }` | kind === 'helix' ? 2 : segments.length (≤ 8) |
+| `splash` | count int [1,16] 10 · arc deg 140 · direction deg −90 · gravity num [0,1.5] .5 · len pair [.3,1.5] [.6,1.1] · stagger num [0,.1] .05 · target | `splashPose(s, h, seed, { … }) → [{ x, y, angleDeg, length, width, alpha }]` | count |
+| `pillar` | height num [.8,2.5] 1.8 · w num [.2,1] .6 · from enum below/above below · target | `pillarPose(s, h, { height, w, from }) → { x, y, angleDeg, length, width, alpha, hot }` | 1 + 2 (two side tongues) |
+| `slashArc` | sweep deg 120 · radius num [.3,1.2] .7 · count int [1,3] 1 · gapDeg deg 30 · angle deg 45 · thick num [.05,.3] .12 · target | `slashPose(s, h, { … }) → [{ x, y, angleDeg, length, width, alpha, edge }]` (one per count; `edge` 0..1 = the leading tip's progress) | count |
+| `terrain` | kind enum crack/wave/dust/quake crack · radius num [.5,2.5] 1.4 · amp num [0,.08] .03 · target | `terrainPose(s, h, seed, { kind, radius, amp }) → { cracks: [[x,y]…][], waves: [{ r, alpha }], dust: [{ dx, dy, r, alpha }], jitter: { x, y } }` (unused arrays empty) | 0 |
+| `cloud` | count int [1,12] 8 · radius num [.1,.8] .35 · drift num [0,1.5] .6 · direction deg −90 · alpha num [.1,.8] .5 · target | `cloudPose(s, h, seed, { … }) → [{ dx, dy, r, alpha }]` | 0 |
+| `spiral` | turns num [1,5] 2.5 · r0 num [.05,.6] .2 · r1 num [.4,1.6] 1.1 · rpm num [20,240] 90 · tongues int [4,16] 10 · target | `spiralPose(s, h, { … }) → [{ x, y, angleDeg, length, width, alpha }]` | tongues |
+| `volley` | count int [2,8] 3 · stagger num [30,200] 90 (ms) · r0 num [.05,.6] .14 · r1 num [.05,.8] .2 · bow num [0,.6] .3 · tongues int [0,6] 3 | `volleyPose(s, h, { … }) → [{ f, side, r, alpha, headingDeg }]` (one per launched body) | count × tongues |
+| `aura` | target · hz num [.5,6] 2 · alpha num [.1,1] .6 · r0 num [.5,1] .7 · r1 num [.6,1.3] .9 | `auraPose(s, h, { hz, alpha, r0, r1 }) → { r, alpha }` | 0 |
+| `rain` | count int [2,16] 12 · height num [.8,2] 1.6 · spread num [.3,1.5] .9 · target | `rainPose(s, h, seed, { … }) → [{ x, y, length, width, alpha, splash }]` | count |
+| `shards` | count int [2,16] 8 · arc deg 360 · direction deg −90 · distance num [.3,1.8] 1.1 · spin num [0,720] 360 · target | `shardsPose(s, h, seed, { … }) → [{ x, y, angleDeg, length, width, alpha }]` | count |
+| `bolt` | from enum attacker/sky attacker · segments int [3,16] 9 · jag num [.02,.3] .12 · branches int [0,4] 2 · rerollMs num [20,120] 45 · width num [.03,.3] .1 | `boltPose(s, lane, seed, elapsedMs, { … }) → { points: [[x,y]…], branches: [[[x,y]…]], alpha, width }` | 1 + branches |
+| `ring` | count int [1,5] 3 · r0 num [.1,.8] .3 · r1 num [.6,2.5] 1.5 · kind enum floor/face floor · width num [.02,.15] .06 · target | `ringPose(s, h, { … }) → [{ r, alpha, width }]` | 0 |
+| `glyph` | r num [.4,1.4] .9 · target | `glyphPose(s, h, { r }) → { r, alpha, spin }`; drawing is `material.sigil(ctx, x, y, r, s)` | 0 |
+
+`sigil` is optional on a material; `glyph` draws nothing when absent. Pose functions take `s ∈
+[0, 1)` (clamped), `h` in px, lane-space sizes in h × h px; `seed` is the spec seed, `lane` the
+local lane for lane-wide beats. Every returned coordinate is host-local px, already offset from the
+beat's `target` centre by the drawer (pose functions return offsets; the drawer adds the centre).
+
+Cost rule (`validateSpec`): at every ms of the scene, Σ `tonguesAt` over active beats ≤ 30;
+Σ particle `count` over all bursts ≤ 28 and ≤ 2 bursts; DOM nodes = 1 host + 2 canvases + 2 ghosts
+× 4 + bursts × (1 + count) ≤ 40 (satisfied by the particle rule). Blur: only materials blur; a
+material's `tongue` makes at most one `filter: blur()` fill.
+
+### C. Voice sets for the 14 families (`fx-audio.mjs`, `FAMILY_VOICES`)
+The dispatcher sounds the `attack` plan when the scene starts, and the `damage` plan (today's hit
+voices, unchanged) when the hold ends at contact + 40 ms, so a family voice is the *body* of the
+move up to contact and never exceeds 0.6 s. `voicesFor('attack', plan)` returns
+`FAMILY_VOICES[plan.family]` when present, else today's `attack` voices. Descriptors use the file's
+`tone(freq, dur, gain, over)`, `noise(dur, gain, filter, over)` and `arpeggio(freqs, opts)`:
+```js
+const FAMILY_VOICES = Object.freeze({
+  slash: [noise(0.14, 0.22, { type: 'bandpass', freq: 2600, q: 1.2 }),
+          tone(1800, 0.1, 0.1, { wave: 'sine', freqTo: 900, delay: 0.04 })],
+  punch: [noise(0.12, 0.3, { type: 'lowpass', freq: 600, q: 0.8 }),
+          tone(110, 0.16, 0.2, { wave: 'sine', freqTo: 55 })],
+  dash: [noise(0.32, 0.22, { type: 'bandpass', freq: 700, freqTo: 2400, q: 0.8 }),
+         tone(200, 0.3, 0.1, { wave: 'sawtooth', freqTo: 420 })],
+  beam: [tone(220, 0.5, 0.14, { wave: 'sawtooth', freqTo: 880, attack: 0.3 }),
+         noise(0.5, 0.12, { type: 'bandpass', freq: 1500, freqTo: 5000, q: 1.2 }, { attack: 0.3 }),
+         tone(1760, 0.2, 0.06, { wave: 'sine', delay: 0.4 })],
+  projectile: [noise(0.22, 0.16, { type: 'bandpass', freq: 1200, freqTo: 400, q: 1 }),
+               tone(600, 0.2, 0.1, { wave: 'triangle', freqTo: 300, delay: 0.05 })],
+  burst: [noise(0.4, 0.2, { type: 'bandpass', freq: 400, freqTo: 3200, q: 1.3 }, { attack: 0.3 }),
+          tone(80, 0.5, 0.12, { wave: 'sine', attack: 0.4 }),
+          tone(1200, 0.12, 0.08, { wave: 'square', delay: 0.5 })],
+  quake: [noise(0.5, 0.3, { type: 'lowpass', freq: 300, q: 0.9 }),
+          tone(55, 0.5, 0.25, { wave: 'sine', freqTo: 35 }),
+          noise(0.2, 0.15, { type: 'lowpass', freq: 500, q: 0.8 }, { delay: 0.25 })],
+  splash: [noise(0.3, 0.22, { type: 'highpass', freq: 1800, q: 0.7 }),
+           noise(0.25, 0.14, { type: 'bandpass', freq: 900, freqTo: 300, q: 1 }, { delay: 0.08 }),
+           tone(1200, 0.12, 0.06, { wave: 'sine', freqTo: 2400, delay: 0.12 })],
+  wind: [noise(0.55, 0.2, { type: 'bandpass', freq: 600, freqTo: 1800, q: 0.5 }, { attack: 0.25 }),
+         tone(300, 0.5, 0.05, { wave: 'sine', freqTo: 500, attack: 0.3 })],
+  electric: [noise(0.3, 0.22, { type: 'highpass', freq: 2500, q: 1 }),
+             tone(2200, 0.08, 0.12, { wave: 'square', freqTo: 1400 }),
+             tone(1900, 0.08, 0.1, { wave: 'square', freqTo: 2600, delay: 0.1 }),
+             tone(2400, 0.1, 0.1, { wave: 'square', freqTo: 1200, delay: 0.2 })],
+  ghost: [tone(180, 0.6, 0.12, { wave: 'sine', freqTo: 90, attack: 0.3 }),
+          tone(270, 0.6, 0.08, { wave: 'sine', freqTo: 135, attack: 0.3, delay: 0.05 }),
+          noise(0.5, 0.08, { type: 'bandpass', freq: 400, q: 2 }, { attack: 0.3 })],
+  chime: [...arpeggio([1047, 1319, 1568, 2093], { step: 0.06, dur: 0.3, gain: 0.1, wave: 'sine' }),
+          tone(523, 0.4, 0.06, { wave: 'triangle' })],
+  roar: [tone(90, 0.5, 0.2, { wave: 'sawtooth', freqTo: 140 }),
+         noise(0.45, 0.18, { type: 'lowpass', freq: 900, q: 0.6 }),
+         tone(180, 0.4, 0.1, { wave: 'square', freqTo: 260, delay: 0.05 })],
+  charge: [tone(160, 0.55, 0.12, { wave: 'triangle', freqTo: 640, attack: 0.45 }),
+           noise(0.55, 0.1, { type: 'bandpass', freq: 300, freqTo: 3000, q: 1.2 }, { attack: 0.45 }),
+           tone(1280, 0.12, 0.08, { wave: 'sine', delay: 0.5 })],
+});
+```
+Tests (`fx-audio.test.mjs`): all 14 keys present; every voice `gain ≤ MAX_GAIN`; every set's
+`max(delay + dur) ≤ 0.6`; `voicesFor('attack', { family: 'nope' })` and `voicesFor('attack', {})`
+equal today's `attack` set. Tier-1 scenes (contact ≈ 450 ms) use the same sets; the driver does not
+truncate, and a 0.6 s voice under a 1 s scene is fine.
+
+How a spec picks its `family` (deterministic; `validateSpec` checks the result against this rule
+so a builder cannot guess): take the beat active at `contactMs` on the `front` layer with the
+highest `at` (ties: the last listed); map its drawer: `slashArc → slash`, `beam → beam`,
+`projectile`/`volley`/`rain` → `projectile`, `starFlare`/`shards`/`impactFlash` → `burst`,
+`splash` → `splash`, `terrain`/`pillar` → `quake`, `spiral`/`cloud` → `wind`, `bolt` → `electric`,
+`glyph`/`aura`/`ring` → `chime`; then type overrides: `electric` type → `electric`; `ghost`/`dark`
+type and `family === 'chime'` → `ghost`; `water` type and `family === 'burst'` → `splash`; `dragon`
+tier 3 and `family ∈ {burst, beam}` → `roar`; physical specs whose attacker preset is `dash` and
+family `burst` → `dash`; physical `lunge` with family `burst` → `punch`; a spec with no front beat
+at contact (charge-only) → `charge`.
+
+### D. Shapes: withdrawn, replaced by materials and particle classes
+The first draft's `drawShape` list (47 names) is withdrawn. Every former shape maps to a material
+unit plus a drawer: leaf/petal/seed/vine → `grass.tongue`/`grass.body` via `splash`/`projectile`/
+`beam helix`; droplet/bubble/wave → `water` via `splash`/`rain`/`terrain wave`; icicle/snowflake →
+`ice` via `shards`/`rain`; flame/ember/spark → `fire`; bolt → `electric` via `bolt`; star/orb/ring →
+`body`/`ring`/`glyph`; shard/rock/boulder/mud-glob/sand → `rock`/`ground` via `shards`/`projectile`
+/`cloud`; feather/wind-blade/gust-line → `flying` via `splash`/`spiral`/`cloud`; skull/ghost-wisp/
+shadow-claw → `ghost`/`dark` via `cloud`/`slashArc`/`glyph`; fist/foot → `fighting` via
+`impactFlash` + `ring` + card motion; note/heart/crescent/gem/fairy-light → `fairy`/`psychic`/`rock`
+via `glyph`/`body`; metal-slash/meteor/dragon-fang → `steel`/`dragon` via `slashArc`/`volley`;
+sludge-glob/needle/pin/bug-wing/eye/fang/horn/hoof → `poison`/`bug`/`dark`/`ground` via `projectile`
+/`volley`/`glyph`/`slashArc`. Nothing is a bespoke silhouette; a move that seems to need one uses
+the nearest material unit (Deviations line if it reads wrong).
+
+CSS particle classes (`mat-fx.css`): existing `.fx-particle` (round, glow), `--streak`, `--shard`,
+`--mote`, `--star`, `--z`. Add, each 4–6 lines on the `--streak`/`--shard` pattern:
+`--ember` (= streak, colour from the material), `--droplet` (round, `background:
+radial-gradient(circle at 35% 30%, #fff 0 20%, var(--fx-p-color) 60%, rgba(…,0) 100%)`), `--leaf`
+(shard with `border-radius: 60% 0 60% 0`), `--glob` (round, darker rim via `box-shadow: inset 0 0 0
+1px rgba(0,0,0,.35)`), `--feather` (streak with `border-radius: 50% 50% 50% 50% / 80% 80% 20% 20%`,
+no glow), `--flake` (star, 6-point via `clip-path`). A material's `particle.className` names one.
+
+### E. Fixture specs for slice 2
+`specs/__fixtures__/kitchen-sink.mjs` exports `kitchenSink`: `tier 3`, `durationMs 2200`,
+`contactMs 1100`, `material 'fire'`, `family 'burst'`, attacker `rear-lurch`, defender `knock`, and
+one beat per drawer, all params defaulted: `orbitCharge` back+front 0–700 · `coreCharge` 0–700 ·
+`shockRings` 640–1000 · `aura` (attacker) 0–700 · `beam solid` 700–1100 · `projectile` 700–1100 ·
+`volley` 700–1100 · `bolt from attacker` 900–1100 · `vignette` 900–2000 · `terrain crack` 1100–1700
+· `ring floor` 1100–1500 · `speedRays` 1100–1400 · `starFlare` 1100–1850 · `shards` 1100–1600 ·
+`splash` 1100–1600 · `slashArc` 1100–1300 · `pillar` 1100–1700 · `spiral` 1100–1700 · `rain`
+1100–1600 · `cloud` 1300–2100 · `smoke` 1400–2200 · `glyph` 1100–1600 · `impactFlash` (top)
+1100–1280; one particle burst (`ember`, 20) at 1100. It deliberately exceeds the tongue cost rule, so
+`specs.test.mjs` asserts `validateSpec(kitchenSink)` returns exactly the cost error and nothing
+else, and `validateSpec({ ...kitchenSink, beats: kitchenSink.beats.slice(0, 12) })` returns `[]`.
+`rec-move.mjs MOVE=kitchen-sink` records it (the player ignores validation) so every drawer is seen
+once on both seats; the Fire Blast spec (`specs/fire.mjs`) is the second fixture and must match
+take 3.
+
+### F. Impact context through `strikeTarget`
+`createImpactQueue` is unchanged. `strikeIn(ms, ctx)` receives `{ direction, attackerCard, move,
+family }` (the lunge passes no `move`/`family`). `combat-pose.mjs` gains one pure function:
+```js
+export const HIT_DRESSING = Object.freeze({
+  default:    { ring: false, flashScale: 1.0, shakeMul: 1.0, slash: true  },
+  slash:      { ring: false, flashScale: 1.0, shakeMul: 1.0, slash: true  },
+  punch:      { ring: true,  flashScale: 1.0, shakeMul: 1.2, slash: false },
+  dash:       { ring: true,  flashScale: 1.0, shakeMul: 1.1, slash: true  },
+  beam:       { ring: false, flashScale: 1.2, shakeMul: 1.0, slash: false },
+  projectile: { ring: false, flashScale: 1.1, shakeMul: 1.0, slash: false },
+  burst:      { ring: false, flashScale: 1.2, shakeMul: 1.1, slash: false },
+  quake:      { ring: true,  flashScale: 0.9, shakeMul: 1.5, slash: false },
+  splash:     { ring: false, flashScale: 1.1, shakeMul: 0.9, slash: false },
+  wind:       { ring: false, flashScale: 1.0, shakeMul: 0.8, slash: false },
+  electric:   { ring: false, flashScale: 1.2, shakeMul: 1.0, slash: true  },
+  ghost:      { ring: false, flashScale: 0.9, shakeMul: 0.8, slash: false },
+  chime:      { ring: false, flashScale: 1.0, shakeMul: 0.8, slash: false },
+  roar:       { ring: true,  flashScale: 1.2, shakeMul: 1.3, slash: false },
+  charge:     { ring: false, flashScale: 1.0, shakeMul: 1.0, slash: false },
+});
+export const hitDressingFor = (family) => Object.hasOwn(HIT_DRESSING, family) ? HIT_DRESSING[family] : HIT_DRESSING.default;
+```
+`strikeTarget(rect, hit, ctx)` reads `d = hitDressingFor(ctx?.family)`: the slash node is created
+only when `d.slash`; the flash host gets `transform: scale(d.flashScale)` (its own keyframes stay
+on opacity); when `d.ring` a `.fx-hit__ring` div (1 px border, `--fx-hit-rgb`) is appended and
+animated `scale 0.6 → 1.4`, `opacity 1 → 0` over `HIT_FLASH_MS`; `shakeTable(hit.amount ×
+d.shakeMul)`. Weakness keeps its gold colour and larger spark count regardless of family. Tests:
+`hitDressingFor` for all 14 families + unknown + undefined → `default`; `screenShakeAmplitude(amount
+× 1.5)` still clamps at `SCREEN_SHAKE_MAX_PX`.
+
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
@@ -768,7 +962,9 @@ defaults). `.fx-move__heat--cold` for ice.
   every cell non-null after fallback), `move-select.test.mjs` (tier for every classifier and stage
   literal seen in the engine tests; stat class around the gap; family resolution per TCG type incl.
   Colorless/Tera/unknown; determinism of both seeds; zero-damage null), `species-stats.test.mjs`,
-  `move-spec.test.mjs` (`validateSpec` on good and bad fixtures: every error message exercised),
+  `move-spec.test.mjs` (`checkParams` for every drawer's table: defaults applied, each kind's
+  range rejected, unknown keys rejected; `validateSpec` on good and bad fixtures: every error
+  message exercised; the family rule of § Pinned contracts C),
   `specs.test.mjs` (every shipped spec valid; every table move of a shipped type has a spec; the
   Fire Blast spec has `contactMs 1000`, `durationMs 1900`, 10 beats, 1 particle burst),
   `move-geometry.test.mjs` (lane both orientations; `lanePoint` ends; `unionPadded`; degenerate
@@ -878,7 +1074,7 @@ look-test files once the port matches. Slices 3–19 each ship one VG type (mate
 |---|---|---|---|---|
 | 0 | create `scripts/vendor-species-stats.mjs`, `mat-fx/moves/species-stats.generated.mjs`, `__tests__/species-stats.test.mjs`; modify `package.json` (`vendor:species-stats`) | `SPECIES_STATS: Record<id,[atk,spa,...types]>`, `SPECIES_ID: Record<slug,id>`, `SPECIES_FALLBACKS: string[]`; script exits 1 on an unmapped slug | every slug of both sprite catalogs ∈ `SPECIES_ID`; `charizardmegax → [130,130,'fire','dragon']`; `gardevoir → [65,125,…]`; `machamp → [130,65,…]` | script + tests green; module < 120 KB |
 | 1 | create `moves/move-table.mjs`, `move-select.mjs`, tests | § Selection; `moveFor` returns `{move,vgType,statClass,tier,family,spec}` or null (`spec` from the `specs` argument) | table = spec (154 moves); 7 N/A cells resolve; tiers for 11 classifier kinds + 6 stage literals; gap 10 → coin, 11 → fixed; Colorless+Snorlax → null; Colorless+Pidgeot → flying; Darkness+Charizard → dark; same seeds → same results ×100 | tests green |
-| 2 | create `move-spec.mjs`, `move-geometry.mjs`, `card-motion.mjs`, `move-poses.mjs`, `move-drawers.js`, `move-player.js`, `materials/_shared.js`, `materials/fire.js` (moved), `materials/index.js`, `specs/index.mjs`, `specs/fire.mjs` (Fire Blast only), tests for every pure module, `rec/rec-move.mjs`; modify `combat.js` (wiring + `strikeTarget` reads `ctx.family`), `index.js` (`soundPlanFor`), `fx-audio.mjs` (14 family voice sets), `mat-fx.css` (material custom properties); delete `fire-blast-pose.mjs`, `fire-blast.js`, `fire-material.js`, `rec/rec-fire-blast.mjs` | as in § Design | `validateSpec(fireBlast) → []`; `playMove` on the e2e board reproduces take 3 (sheet compared side by side; same contact, same key frames); with empty `SPECS` every attack still lunges; `moveFor` + `SPECS` → Charizard ex's attack plays Fire Blast only when `MOVE_TABLE` is temporarily pointed at it in the test; both seats recorded | full `pnpm test` green; the two sheets attached to the commit |
+| 2 | create `move-spec.mjs` (`DRAWER_PARAMS`, `checkParams`, `withDefaults`, `validateSpec`), `move-geometry.mjs`, `card-motion.mjs`, `move-poses.mjs`, `move-drawers.js`, `move-player.js`, `materials/_shared.js`, `materials/fire.js` (moved), `materials/index.js`, `specs/index.mjs`, `specs/fire.mjs` (Fire Blast only), `specs/__fixtures__/kitchen-sink.mjs`, tests for every pure module, `rec/rec-move.mjs`; modify `combat.js` (wiring + `strikeTarget` per § Pinned contracts F), `combat-pose.mjs` (`HIT_DRESSING`, `hitDressingFor`), `index.js` (`soundPlanFor`), `fx-audio.mjs` (`FAMILY_VOICES`, § Pinned contracts C), `mat-fx.css` (material custom properties, particle classes § D); delete `fire-blast-pose.mjs`, `fire-blast.js`, `fire-material.js`, `rec/rec-fire-blast.mjs` | as in § Design and § Pinned contracts B–F | `validateSpec(fireBlast) → []`; `playMove` on the e2e board reproduces take 3 (sheet compared side by side; same contact, same key frames); with empty `SPECS` every attack still lunges; `moveFor` + `SPECS` → Charizard ex's attack plays Fire Blast only when `MOVE_TABLE` is temporarily pointed at it in the test; both seats recorded | full `pnpm test` green; the two sheets attached to the commit |
 | 3 | `materials/fire.js` tuned per Fire entries, `specs/fire.mjs` all 11 Fire moves | Appendix A Fire rows | each spec valid; recordings per move | tests green; sheets reviewed |
 | 4–19 | one VG type each in this order: water, grass, electric, fighting, psychic, dark, steel, dragon, fairy, ghost, poison, ground, rock, flying, ice, bug. Each: `materials/<type>.js` per its recipe, `specs/<type>.mjs`, new drawers only if the recipe names them, CSS modifier | § Materials recipe + Appendix A rows (types without rows first get the study pass: `refs/063-study/STUDY-BRIEF.md`, Haiku agents, `merge-notes.mjs ONLY=<type>`) | `materials.test.mjs` for the type; every spec valid; recordings on both seats | tests green; sheets reviewed against the entries |
 | 20 | user pass on localhost; timing/palette corrections appended under Deviations | — | — | user sign-off per type |
