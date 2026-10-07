@@ -21,5 +21,3 @@ client/src/assets/playmats/upscaled/
 out/playtest/
 .superdesign/tmp/
 
-# design 064: sampled battle SFX transcoded from the TCG Live extract (rights: not redistributable)
-client/src/assets/sfx/

@@ -10,7 +10,7 @@
 
 ## Active
 - D204 2026-10-07 [tooling] ffmpeg/ffprobe on PATH are a dev-time system tool for `pnpm sfx:import` only, not an npm dependency; the game never needs them. (design 064)
-- D203 2026-10-07 [render] Audio = sampled TCG Live cues (sfx-cues → sample-bank), synth palette as fallback; samples gitignored, never committed (public repo); not gated by reduced motion. (Supersedes D147; design 064)
+- D203 2026-10-07 [render] Audio = sampled TCG Live cues (sfx-cues → sample-bank), synth as fallback; samples committed in assets/sfx (user's call); not gated by reduced motion. (Supersedes D147; design 064)
 - D202 2026-10-01 [rules] WotC wordings are rewritten to the modern wording the parsers read; untyped WotC Trainers get trainerType from their printed rules line at data entry — one path, no new templates. (design 062)
 - D201 2026-10-01 [board-ui] Holo art window (`--art-*`) keys on `data-card-layout` (printed box per layout, Trainers apart); `data-card-era` only picks the foil pattern — one era spans boxes of different sizes.
 - D200 2026-09-30 [rules] Markers TCGdex lacks (Tera, Team Plasma, Strike styles, Baby, Prism Star, TAG TEAM) come from a generated table: pkmncards is:/stage: lists matched to TCGdex by number and name. (I220)

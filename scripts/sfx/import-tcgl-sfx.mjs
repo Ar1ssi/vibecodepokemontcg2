@@ -1,8 +1,8 @@
 /**
  * Design 064 § Contract: transcode the TCG Live battle SFX extract into the sampled-SFX assets the
- * client loads. The audio is The Pokémon Company's, so the output directory is gitignored: only
- * this importer and source-map.mjs are committed, and a clone without the extract plays the
- * synthesized palette.
+ * client loads. The output (client/src/assets/sfx/) is committed (user's call, D203); rerun this
+ * after the extract or source-map.mjs changes. Without the folder the client plays the synthesized
+ * palette.
  * Run: node scripts/sfx/import-tcgl-sfx.mjs --src <extract dir>          (writes assets + manifest)
  *      node scripts/sfx/import-tcgl-sfx.mjs --src <extract dir> --check  (exit 1 on drift, writes nothing)
  * Needs ffmpeg (with libopus) and ffprobe on PATH.

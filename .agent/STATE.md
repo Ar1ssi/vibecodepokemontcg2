@@ -5,7 +5,7 @@
 
 Focus: Sampled battle SFX shipped (S337, design 064, D203/D204): TCG Live non-attack cues over the synth
   palette — fx plans, draw/shuffle/KO/enter, UI chrome, status loops, card signatures, crowd bus.
-  Samples are local only: `pnpm sfx:import -- --src <extract dir>` (ffmpeg), output gitignored.
+  Samples (6.7 MB Ogg Opus) are committed in client/src/assets/sfx; regenerate with `pnpm sfx:import`.
 Active: design 063 (attack move scenes + jumbotron set) uncommitted on the primary folder; it overlaps
   mat-fx/index.js (soundPlanFor) with 064 — rebase on main before landing. ETB (057) slice 6 not started.
 Next: user listening pass on localhost (SERVER_AUTHORITATIVE=1) for 064 mix gains; I239–I240, then I227–I229;

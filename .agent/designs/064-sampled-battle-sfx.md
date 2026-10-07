@@ -328,6 +328,8 @@ D147's "not sampled" clause; one line for ffmpeg as a dev-time system tool (not 
 Slices 3–8 are independent after 2; 2 and 3 rebase on design 063 once it lands (shared files).
 
 ## Deviations (Builder appends here during build)
+- Post-ship 2026-10-07: user reversed Q1 — transcoded samples are committed (`client/src/assets/sfx/`
+  removed from .gitignore), accepting the rights risk. The importer stays for regeneration.
 - Slice 1: the 4 unbound files (`cant_draw_that`, `cards_match`, `marne_special`,
   `rainier_lightning`) are EXCLUDED, not transcoded: 165 files → 106 cue keys, not ~169.
 - Slice 2: `manifest.json` stays `no-store` (unhashed; a re-import must not leave browsers on
