@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   getTurnOrderResult,
+  getTurnOrderStarter,
   normalizeTurnOrderResult,
+  normalizeTurnOrderStarter,
   registerTurnOrderCallListeners,
   resetTurnOrderCall,
 } from '../turn-order-call.js';
@@ -47,15 +49,26 @@ test('normalizeTurnOrderResult accepts a well-formed payload', () => {
       caller: 'opp',
       call: 'tails',
       result: 'heads',
-      starter: 'self',
+      winner: 'self',
+      choiceId: 'room-1:1',
+      choiceTimeoutMs: 20000,
       auto: 1,
     }),
-    { caller: 'opp', call: 'tails', result: 'heads', starter: 'self', coinId: null, auto: true }
+    {
+      caller: 'opp',
+      call: 'tails',
+      result: 'heads',
+      winner: 'self',
+      choiceId: 'room-1:1',
+      choiceTimeoutMs: 20000,
+      coinId: null,
+      auto: true,
+    }
   );
 });
 
 test('normalizeTurnOrderResult passes a bounded coinId and drops a bad one', () => {
-  const base = { caller: 'self', call: 'heads', result: 'heads', starter: 'self' };
+  const base = { caller: 'self', call: 'heads', result: 'heads', winner: 'self' };
   assert.equal(
     normalizeTurnOrderResult({ ...base, coinId: 'SVC_Gold_Pikachu_Coin' }).coinId,
     'SVC_Gold_Pikachu_Coin'
@@ -66,11 +79,11 @@ test('normalizeTurnOrderResult passes a bounded coinId and drops a bad one', () 
 });
 
 test('normalizeTurnOrderResult rejects a half-valid payload', () => {
-  const good = { caller: 'self', call: 'heads', result: 'heads', starter: 'self' };
+  const good = { caller: 'self', call: 'heads', result: 'heads', winner: 'self' };
   assert.equal(normalizeTurnOrderResult(null), null);
   assert.equal(normalizeTurnOrderResult(undefined), null);
   assert.equal(normalizeTurnOrderResult({}), null);
-  for (const key of ['caller', 'call', 'result', 'starter']) {
+  for (const key of ['caller', 'call', 'result', 'winner']) {
     assert.equal(
       normalizeTurnOrderResult({ ...good, [key]: 'nonsense' }),
       null,
@@ -157,7 +170,8 @@ test('turnOrderResult is dispatched and cached for a late reader', () => {
     caller: 'self',
     call: 'heads',
     result: 'tails',
-    starter: 'opp',
+    winner: 'opp',
+    choiceId: null,
     coinId: 'SVC_Gold_Pikachu_Coin',
     auto: false,
   });
@@ -166,7 +180,9 @@ test('turnOrderResult is dispatched and cached for a late reader', () => {
     caller: 'self',
     call: 'heads',
     result: 'tails',
-    starter: 'opp',
+    winner: 'opp',
+    choiceId: null,
+    choiceTimeoutMs: null,
     coinId: 'SVC_Gold_Pikachu_Coin',
     auto: false,
   };
@@ -184,7 +200,7 @@ test('a malformed turnOrderResult is neither dispatched nor cached', () => {
   const doc = fakeDoc();
   registerTurnOrderCallListeners(socket, doc);
 
-  socket.emitInbound('turnOrderResult', { caller: 'self', starter: 'nobody' });
+  socket.emitInbound('turnOrderResult', { caller: 'self', winner: 'nobody' });
 
   assert.equal(doc.events.length, 0);
   assert.equal(getTurnOrderResult(), null);
@@ -205,4 +221,44 @@ test('a rejected call is surfaced with its reason', () => {
       ['rules-turn-order-call-rejected', 'unknown'],
     ]
   );
+});
+
+test('normalizeTurnOrderResult gives a choiceId only to the winning seat', () => {
+  const base = { caller: 'self', call: 'heads', result: 'heads', choiceId: 'room-1:1' };
+  assert.equal(normalizeTurnOrderResult({ ...base, winner: 'self' }).choiceId, 'room-1:1');
+  assert.equal(normalizeTurnOrderResult({ ...base, winner: 'opp' }).choiceId, null);
+  assert.equal(normalizeTurnOrderResult({ ...base, winner: 'self', choiceId: 7 }).choiceId, null);
+});
+
+test('normalizeTurnOrderStarter accepts a choice and rejects a half-valid one', () => {
+  const good = { winner: 'opp', choice: 'second', starter: 'self' };
+  assert.deepEqual(normalizeTurnOrderStarter(good), { ...good, auto: false });
+  assert.equal(normalizeTurnOrderStarter(null), null);
+  for (const key of ['winner', 'choice', 'starter']) {
+    assert.equal(normalizeTurnOrderStarter({ ...good, [key]: 'nonsense' }), null, `bad ${key}`);
+  }
+});
+
+test('turnOrderStarter is dispatched and cached until reset', () => {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc);
+
+  socket.emitInbound('turnOrderStarter', { roomId: 'r', winner: 'self', choice: 'second', starter: 'opp', auto: false });
+  socket.emitInbound('turnOrderStarter', { winner: 'self', choice: 'maybe', starter: 'opp' });
+
+  const expected = { winner: 'self', choice: 'second', starter: 'opp', auto: false };
+  assert.deepEqual(doc.events.map((e) => [e.type, e.detail]), [['rules-turn-order-starter', expected]]);
+  assert.deepEqual(getTurnOrderStarter(), expected);
+  resetTurnOrderCall();
+  assert.equal(getTurnOrderStarter(), null);
+});
+
+test('a rejected choice is surfaced with its reason', () => {
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc);
+  socket.emitInbound('turnOrderChoiceRejected', { reason: 'not_winner' });
+  assert.deepEqual(doc.events.map((e) => [e.type, e.detail.reason]), [['rules-turn-order-choice-rejected', 'not_winner']]);
 });

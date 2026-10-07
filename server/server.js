@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { GameRoom } from './game/room.mjs';
+import { GameRoom, TURN_ORDER_CHOICE_TIMEOUT_MS } from './game/room.mjs';
 import { ShadowSession, extractDeckData, extractDeckFormat } from './game/shadow.mjs';
 import {
   findFirstDivergentZone,
@@ -455,10 +455,6 @@ async function main() {
     }
   };
 
-  /**
-   * Tells both seats how the coin landed (each from its own 'self'/'opp'
-   * perspective), then deals with the called winner going first.
-   */
   // Answer timeouts for open coin calls, keyed by roomId. Owned here rather than
   // on GameRoom so the pure-ish room module stays free of transport timers.
   const turnOrderTimers = new Map();
@@ -469,20 +465,58 @@ async function main() {
     turnOrderTimers.delete(roomId);
   };
 
+  const armTurnOrderTimer = (roomId, timeoutMs, onTimeout) => {
+    clearTurnOrderTimer(roomId);
+    const timer = setTimeout(() => {
+      turnOrderTimers.delete(roomId);
+      onTimeout();
+    }, timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+    turnOrderTimers.set(roomId, timer);
+  };
+
+  /**
+   * Tells both seats how the coin landed (each from its own 'self'/'opp'
+   * perspective) and asks the winner to choose first or second. Only the
+   * winner is handed the choiceId; the deal waits on their answer.
+   */
   const finishTurnOrder = (gameRoom, roomId, resolution) => {
     clearTurnOrderTimer(roomId);
     for (const pid of Object.keys(gameRoom.state.players)) {
       const pSocketId = gameRoom.playerToSocket.get(pid);
       if (!pSocketId) continue;
+      const isWinner = resolution.winnerPlayerId === pid;
       io.to(pSocketId).emit('turnOrderResult', {
         roomId,
         caller: resolution.callerPlayerId === pid ? 'self' : 'opp',
         call: resolution.call,
         result: resolution.result,
-        starter: resolution.starterPlayerId === pid ? 'self' : 'opp',
+        winner: isWinner ? 'self' : 'opp',
+        choiceId: isWinner ? gameRoom.turnOrder.callId : null,
+        choiceTimeoutMs: TURN_ORDER_CHOICE_TIMEOUT_MS,
         // Display-only: the caller's chosen coin art, so both mat screens show
         // the same coin. Never used to decide the flip.
         coinId: resolution.coinId ?? null,
+        auto: Boolean(resolution.auto),
+      });
+    }
+    // A winner who never answers must not hang the match: they go first.
+    armTurnOrderTimer(roomId, TURN_ORDER_CHOICE_TIMEOUT_MS, () =>
+      autoFinishTurnOrderChoice(gameRoom, roomId)
+    );
+  };
+
+  /** Tells both seats who goes first, then deals. */
+  const finishTurnOrderChoice = (gameRoom, roomId, resolution) => {
+    clearTurnOrderTimer(roomId);
+    for (const pid of Object.keys(gameRoom.state.players)) {
+      const pSocketId = gameRoom.playerToSocket.get(pid);
+      if (!pSocketId) continue;
+      io.to(pSocketId).emit('turnOrderStarter', {
+        roomId,
+        winner: resolution.winnerPlayerId === pid ? 'self' : 'opp',
+        choice: resolution.choice,
+        starter: resolution.starterPlayerId === pid ? 'self' : 'opp',
         auto: Boolean(resolution.auto),
       });
     }
@@ -494,6 +528,13 @@ async function main() {
     const resolution = gameRoom.resolveTurnOrderCallAutomatically();
     if (!resolution.ok) return;
     finishTurnOrder(gameRoom, roomId, resolution);
+  };
+
+  /** Seats a silent coin winner first (timeout, disconnect). */
+  const autoFinishTurnOrderChoice = (gameRoom, roomId) => {
+    const resolution = gameRoom.resolveTurnOrderChoiceAutomatically();
+    if (!resolution.ok) return;
+    finishTurnOrderChoice(gameRoom, roomId, resolution);
   };
 
   /**
@@ -522,13 +563,8 @@ async function main() {
     }
 
     // A caller who never answers (tab closed, dialog ignored) must not hang the
-    // match: the server calls for them and deals.
-    const timer = setTimeout(() => {
-      turnOrderTimers.delete(roomId);
-      autoFinishTurnOrder(gameRoom, roomId);
-    }, opened.timeoutMs);
-    if (typeof timer.unref === 'function') timer.unref();
-    turnOrderTimers.set(roomId, timer);
+    // match: the server calls for them.
+    armTurnOrderTimer(roomId, opened.timeoutMs, () => autoFinishTurnOrder(gameRoom, roomId));
   };
 
   // Design 053: the format both seated players agreed on lives on roomInfo (both server modes)
@@ -566,13 +602,19 @@ async function main() {
         // Design 013 row 6: if the coin caller drops before answering, the server
         // calls for them — otherwise the remaining player waits on a seat that is
         // never coming back.
+        // Likewise a coin winner who drops before choosing goes first.
+        const leavingPlayerId = gameRoom.socketToPlayer.get(socket.id);
         const wasPendingCaller =
           gameRoom.isAwaitingTurnOrderCall() &&
-          gameRoom.socketToPlayer.get(socket.id) ===
-            gameRoom.turnOrder.callerPlayerId;
+          leavingPlayerId === gameRoom.turnOrder.callerPlayerId;
+        const wasPendingWinner =
+          gameRoom.isAwaitingTurnOrderChoice() &&
+          leavingPlayerId === gameRoom.turnOrder.winnerPlayerId;
         gameRoom.removeSocket(socket.id);
         if (wasPendingCaller) {
           autoFinishTurnOrder(gameRoom, roomId);
+        } else if (wasPendingWinner) {
+          autoFinishTurnOrderChoice(gameRoom, roomId);
         }
       }
       if (SHADOW_MODE && shadowSessions.has(roomId)) {
@@ -1081,6 +1123,27 @@ async function main() {
           return;
         }
         finishTurnOrder(gameRoom, roomId, resolution);
+      });
+
+      socket.on('turnOrderChoice', (data) => {
+        const roomId =
+          data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
+        const gameRoom = gameRooms.get(roomId);
+        if (!gameRoom) return;
+        gameRoom.touchActivity();
+
+        const resolution = gameRoom.submitTurnOrderChoice(socket.id, {
+          callId: data?.choiceId ?? null,
+          choice: data?.choice ?? null,
+        });
+        if (!resolution.ok) {
+          socket.emit('turnOrderChoiceRejected', {
+            roomId,
+            reason: resolution.reason,
+          });
+          return;
+        }
+        finishTurnOrderChoice(gameRoom, roomId, resolution);
       });
     }
 

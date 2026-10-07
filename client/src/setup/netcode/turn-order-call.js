@@ -12,35 +12,56 @@
  * `dealOrder`, before the bridge's own setup path runs.
  */
 
-/** @type {{caller: string, call: string, result: string, starter: string, coinId: string|null, auto: boolean}|null} */
+/**
+ * @typedef {{caller: string, call: string, result: string, winner: string,
+ *   choiceId: string|null, choiceTimeoutMs: number|null, coinId: string|null,
+ *   auto: boolean}} TurnOrderResult
+ * @typedef {{winner: string, choice: string, starter: string, auto: boolean}} TurnOrderStarter
+ */
+
+/** @type {TurnOrderResult|null} */
 let lastResult = null;
+/** @type {TurnOrderStarter|null} */
+let lastStarter = null;
 
 /**
  * The server's resolved flip, if it has already arrived this game.
  *
- * @returns {{caller: string, call: string, result: string, starter: string, coinId: string|null, auto: boolean}|null}
+ * @returns {TurnOrderResult|null}
  */
 export function getTurnOrderResult() {
   return lastResult;
 }
 
-/** Drops the cached result — call on room change, reset or restart. */
+/**
+ * The coin winner's go-first/go-second choice, if it has already arrived.
+ *
+ * @returns {TurnOrderStarter|null}
+ */
+export function getTurnOrderStarter() {
+  return lastStarter;
+}
+
+/** Drops the cached result and choice — call on room change, reset or restart. */
 export function resetTurnOrderCall() {
   lastResult = null;
+  lastStarter = null;
 }
 
 const isSide = (value) => value === 'self' || value === 'opp';
 const isCoinFace = (value) => value === 'heads' || value === 'tails';
 
+const isChoice = (value) => value === 'first' || value === 'second';
+
 /**
  * Normalizes a `turnOrderResult` payload, or null when it is malformed — a
- * half-valid flip must not start a game on a guessed starter.
+ * half-valid flip must not name a guessed winner.
  *
  * @param {object} data
- * @returns {{caller: string, call: string, result: string, starter: string, coinId: string|null, auto: boolean}|null}
+ * @returns {TurnOrderResult|null}
  */
 export function normalizeTurnOrderResult(data) {
-  if (!data || !isSide(data.starter) || !isSide(data.caller)) return null;
+  if (!data || !isSide(data.winner) || !isSide(data.caller)) return null;
   if (!isCoinFace(data.call) || !isCoinFace(data.result)) return null;
   const coinId =
     typeof data.coinId === 'string' && data.coinId.length > 0 && data.coinId.length <= 128
@@ -50,14 +71,28 @@ export function normalizeTurnOrderResult(data) {
     caller: data.caller,
     call: data.call,
     result: data.result,
-    starter: data.starter,
+    winner: data.winner,
+    // Only the winner is handed a choiceId; it answers the server's choice prompt.
+    choiceId: data.winner === 'self' && typeof data.choiceId === 'string' ? data.choiceId : null,
+    choiceTimeoutMs: Number.isFinite(data.choiceTimeoutMs) ? data.choiceTimeoutMs : null,
     coinId,
     auto: Boolean(data.auto),
   };
 }
 
 /**
- * Wires the two inbound turn-order messages onto `document` events.
+ * Normalizes a `turnOrderStarter` payload, or null when it is malformed.
+ *
+ * @param {object} data
+ * @returns {TurnOrderStarter|null}
+ */
+export function normalizeTurnOrderStarter(data) {
+  if (!data || !isSide(data.winner) || !isSide(data.starter) || !isChoice(data.choice)) return null;
+  return { winner: data.winner, choice: data.choice, starter: data.starter, auto: Boolean(data.auto) };
+}
+
+/**
+ * Wires the inbound turn-order messages onto `document` events.
  *
  * @param {object} socket Socket.IO client socket.
  * @param {Document} [doc=document] Injected for tests.
@@ -87,6 +122,23 @@ export function registerTurnOrderCallListeners(socket, doc = document) {
     lastResult = result;
     doc.dispatchEvent(
       new CustomEvent('rules-turn-order-result', { detail: result })
+    );
+  });
+
+  socket.on('turnOrderStarter', (data) => {
+    const starter = normalizeTurnOrderStarter(data);
+    if (!starter) return;
+    lastStarter = starter;
+    doc.dispatchEvent(
+      new CustomEvent('rules-turn-order-starter', { detail: starter })
+    );
+  });
+
+  socket.on('turnOrderChoiceRejected', (data) => {
+    doc.dispatchEvent(
+      new CustomEvent('rules-turn-order-choice-rejected', {
+        detail: { reason: data?.reason || 'unknown' },
+      })
     );
   });
 

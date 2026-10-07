@@ -187,7 +187,7 @@ export const playCoinFlipCeremony = ({
       const face = faces[index];
       const isLast = index === faces.length - 1;
       if (tallyEl) tallyEl.textContent = coinTallyText(faces, index + 1);
-      showResult(isLast && winnerLabel ? `${faceName(face)}! ${winnerLabel} first.` : `${faceName(face)}!`);
+      showResult(isLast && winnerLabel ? `${faceName(face)}! ${winnerLabel}.` : `${faceName(face)}!`);
       if (isLast) {
         setTimeout(finish, timeline.holdMs);
         return;

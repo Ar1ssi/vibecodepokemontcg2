@@ -75,6 +75,9 @@ export function deckFormatMismatch(state, roomFormat = null) {
  * 3. Evaluates mulligans, redrawing hands without Basic Pokémon and awarding opponent bonus draws.
  * 4. Resolves turn order via rng (or options.firstPlayerId).
  * 5. Sets turn to { player: starter, number: 1, phase: 'main' } and initializes player flags.
+ * 6. Draws the starter's turn-1 card — or, with deferStarterDraw, leaves it to
+ *    `settleOpeningDraw` once both Active Spots are filled (rules 1.3: players place
+ *    their Basics before the first turn's draw).
  *
  * @param {object} state GameState (or cloned draft)
  * @param {object} [options]
@@ -83,13 +86,18 @@ export function deckFormatMismatch(state, roomFormat = null) {
  * @param {number} [options.maxMulligans=10] Guard against infinite loops on decks with no basics
  * @param {boolean} [options.firstPrizeWins=false] Sudden-death tiebreaker: the first
  *   player to take a Prize card wins (sets `state.firstPrizeWins`)
+ * @param {boolean} [options.deferStarterDraw=false] Hold the starter's turn-1 draw
+ *   until both players have an Active Pokémon (sets `state.openingDrawPending`)
  * @returns {{
  *   state: object,
  *   events: object[],
  *   mulligans: Record<string, number>
  * }}
  */
-export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligans = 10, firstPrizeWins = false } = {}) {
+export function setupGame(
+  state,
+  { firstPlayerId = null, rng = null, maxMulligans = 10, firstPrizeWins = false, deferStarterDraw = false } = {}
+) {
   if (!state || typeof state !== 'object') {
     throw new Error('setupGame requires a valid GameState');
   }
@@ -229,19 +237,11 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     };
   }
 
-  if (starter) {
-    const starterDeck = state.players[starter].zones.deck;
-    const starterHand = state.players[starter].zones.hand;
-    if (starterDeck.length > 0) {
-      const [card] = starterDeck.splice(0, 1);
-      starterHand.push(card);
-      events.push({
-        type: 'cardsDrawn',
-        playerId: starter,
-        count: 1,
-        cards: [{ instanceId: card.instanceId }],
-      });
-    }
+  delete state.openingDrawPending;
+  if (starter && deferStarterDraw) {
+    state.openingDrawPending = starter;
+  } else if (starter) {
+    drawOpeningTurnCard(state, starter, events);
   }
 
   events.push({
@@ -268,4 +268,39 @@ export function setupGame(state, { firstPlayerId = null, rng = null, maxMulligan
     events,
     mulligans,
   };
+}
+
+function drawOpeningTurnCard(state, playerId, events) {
+  const player = state.players[playerId];
+  if (!player?.zones?.deck?.length) return;
+  const [card] = player.zones.deck.splice(0, 1);
+  player.zones.hand.push(card);
+  events.push({
+    type: 'cardsDrawn',
+    playerId,
+    count: 1,
+    cards: [{ instanceId: card.instanceId }],
+  });
+}
+
+/**
+ * Draws the starter's deferred turn-1 card (setupGame `deferStarterDraw`) as soon
+ * as every player has an Active Pokémon. Run after each command; a no-op otherwise.
+ * If turn 1 ends first (a flow that skipped the opening placement), the card is
+ * still drawn then, so the starter is never a card short.
+ *
+ * @param {object} state GameState draft
+ * @param {object[]} events Event list the draw is appended to
+ * @returns {boolean} true when the draw was settled this call
+ */
+export function settleOpeningDraw(state, events) {
+  const starter = state?.openingDrawPending;
+  if (!starter) return false;
+  const players = Object.values(state.players || {});
+  const activesPlaced = players.every((player) => (player?.zones?.active?.length || 0) > 0);
+  const turnOneOver = state.turn?.player !== starter || (state.turn?.number || 1) > 1;
+  if (!activesPlaced && !turnOneOver) return false;
+  delete state.openingDrawPending;
+  drawOpeningTurnCard(state, starter, events);
+  return true;
 }

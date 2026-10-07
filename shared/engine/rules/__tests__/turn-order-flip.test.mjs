@@ -7,7 +7,8 @@ import {
   flipCoinFace,
   isCoinFace,
   pickCoinCaller,
-  resolveStarterPlayerId,
+  resolveCoinWinnerPlayerId,
+  resolveStarterFromChoice,
 } from '../turn-order-flip.mjs';
 
 /** Rng stub that yields the supplied draws in order, then repeats the last one. */
@@ -85,51 +86,66 @@ test('pickCoinCaller falls back to the low id without a usable rng', () => {
   assert.equal(pickCoinCaller(['p2', 'p1'], {}), 'p1');
 });
 
-test('resolveStarterPlayerId gives the caller the first turn only on a matching face', () => {
+test('resolveCoinWinnerPlayerId gives the caller the win only on a matching face', () => {
   const base = { playerIds: ['p1', 'p2'], callerPlayerId: 'p2' };
   assert.equal(
-    resolveStarterPlayerId({ ...base, call: 'heads', result: 'heads' }),
+    resolveCoinWinnerPlayerId({ ...base, call: 'heads', result: 'heads' }),
     'p2'
   );
   assert.equal(
-    resolveStarterPlayerId({ ...base, call: 'tails', result: 'tails' }),
+    resolveCoinWinnerPlayerId({ ...base, call: 'tails', result: 'tails' }),
     'p2'
   );
   assert.equal(
-    resolveStarterPlayerId({ ...base, call: 'heads', result: 'tails' }),
+    resolveCoinWinnerPlayerId({ ...base, call: 'heads', result: 'tails' }),
     'p1'
   );
   assert.equal(
-    resolveStarterPlayerId({ ...base, call: 'tails', result: 'heads' }),
+    resolveCoinWinnerPlayerId({ ...base, call: 'tails', result: 'heads' }),
     'p1'
   );
 });
 
-test('resolveStarterPlayerId treats an invalid call or result as a caller loss', () => {
+test('resolveCoinWinnerPlayerId treats an invalid call or result as a caller loss', () => {
   const base = { playerIds: ['p1', 'p2'], callerPlayerId: 'p1' };
   for (const bad of [null, undefined, '', 'HEADS', 0, {}]) {
     assert.equal(
-      resolveStarterPlayerId({ ...base, call: bad, result: 'heads' }),
+      resolveCoinWinnerPlayerId({ ...base, call: bad, result: 'heads' }),
       'p2',
       `expected call ${String(bad)} to lose`
     );
     assert.equal(
-      resolveStarterPlayerId({ ...base, call: 'heads', result: bad }),
+      resolveCoinWinnerPlayerId({ ...base, call: 'heads', result: bad }),
       'p2',
       `expected result ${String(bad)} to lose`
     );
   }
 });
 
-test('resolveStarterPlayerId returns null when it cannot name both players', () => {
+test('resolveCoinWinnerPlayerId returns null when it cannot name both players', () => {
   const call = { call: 'heads', result: 'heads' };
   assert.equal(
-    resolveStarterPlayerId({ playerIds: ['p1'], callerPlayerId: 'p1', ...call }),
+    resolveCoinWinnerPlayerId({ playerIds: ['p1'], callerPlayerId: 'p1', ...call }),
     null
   );
   assert.equal(
-    resolveStarterPlayerId({ playerIds: ['p1', 'p2'], callerPlayerId: 'p3', ...call }),
+    resolveCoinWinnerPlayerId({ playerIds: ['p1', 'p2'], callerPlayerId: 'p3', ...call }),
     null
   );
-  assert.equal(resolveStarterPlayerId(), null);
+  assert.equal(resolveCoinWinnerPlayerId(), null);
+});
+
+test('resolveStarterFromChoice seats the winner first or second as they chose', () => {
+  const base = { playerIds: ['p2', 'p1'], winnerPlayerId: 'p2' };
+  assert.equal(resolveStarterFromChoice({ ...base, choice: 'first' }), 'p2');
+  assert.equal(resolveStarterFromChoice({ ...base, choice: 'second' }), 'p1');
+});
+
+test('resolveStarterFromChoice returns null for a bad choice or an unseated winner', () => {
+  const ids = ['p1', 'p2'];
+  for (const bad of [undefined, null, '', 'FIRST', 'last', 1]) {
+    assert.equal(resolveStarterFromChoice({ playerIds: ids, winnerPlayerId: 'p1', choice: bad }), null);
+  }
+  assert.equal(resolveStarterFromChoice({ playerIds: ids, winnerPlayerId: 'p3', choice: 'first' }), null);
+  assert.equal(resolveStarterFromChoice({ playerIds: ['p1'], winnerPlayerId: 'p1', choice: 'first' }), null);
 });

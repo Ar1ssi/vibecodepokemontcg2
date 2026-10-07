@@ -57,7 +57,7 @@ shared/engine/rules/attack-copy.mjs - copy-attack parser (`parseCopyAttack`: sou
 shared/engine/rules/each-filter.mjs - "each of your opponent's Pokémon that …" filters shared by counter-spread steps and reduce damage-each (design 036 A9)
 shared/engine/rules/turn-damage-bonus.mjs - Trainer/Ability "during this turn, your … attacks do N more damage" bonuses (`turnDamageBonusTotal`; possessive, per-Prize, Basic-only, instance-scoped)
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
-shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)
+shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveCoinWinnerPlayerId`, `resolveStarterFromChoice` (winner picks first/second); the server authority's side of the coin call (D50)
 shared/engine/rules/baby-rule.mjs — Baby Rule (attacker flips vs an Active Baby, tails ends the turn) and Baby → Basic evolution table; read by reduce 'attack'/evolve legality and evolution.mjs canEvolve (I230)
 shared/engine/rules/legacy-attached-trainer.mjs — WotC non-Tool attach Trainers (PlusPower, Defender, Charity, Magnifier, Sabrina's ESP, Brock's Protection, Koga's Ninja Trick): attach target, discard timer, damage markers (I224)
 shared/engine/rules/legacy-attack-wording.mjs — WotC attack phrasing → modern phrasing before parseAttackSteps templates (design 062 D, D202)

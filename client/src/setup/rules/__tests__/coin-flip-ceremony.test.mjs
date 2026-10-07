@@ -38,7 +38,7 @@ test('the ceremony mounts a material-stamped coin and removes itself', async () 
   const done = playCoinFlipCeremony({
     coin: COIN,
     result: 'tails',
-    winnerLabel: 'You go',
+    winnerLabel: 'You go first',
     revealMs: 5,
     // Wide hold so the 40 ms probe below lands mid-reveal even when the full suite starves timers.
     holdMs: 500,

@@ -22,7 +22,7 @@ import {
 } from './cards.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { DECK_FORMAT_TCG, isDeckFormat } from './formats.mjs';
-import { deckFormatMismatch, setupGame } from './setup.mjs';
+import { deckFormatMismatch, settleOpeningDraw, setupGame } from './setup.mjs';
 import {
   createRng,
   shuffleInPlace,
@@ -9384,6 +9384,7 @@ export function applyCommand(state, command, rng = null) {
       const setupResult = setupGame(draft, {
         firstPlayerId: payload?.firstPlayerId,
         rng: activeRng,
+        deferStarterDraw: true,
       });
       events.push(...setupResult.events);
       break;
@@ -10936,6 +10937,7 @@ export function applyCommand(state, command, rng = null) {
     settleSpecialEnergyPassives(draft, { events });
     discardBenchedAttachedTrainers(draft, { events });
   }
+  settleOpeningDraw(draft, events);
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
   settleKoEnergyMoves(draft, { events });

@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
-import { setupGame, mulliganBonusDraws } from '../setup.mjs';
+import { setupGame, mulliganBonusDraws, settleOpeningDraw } from '../setup.mjs';
+import { applyCommand } from '../reduce.mjs';
+import { createRng } from '../rng.mjs';
 
 function createTestDeck(hasBasics = true) {
   const cards = [];
@@ -293,4 +295,81 @@ test('setupGame: a 3-card Build & Battle deck deals what is left after the hand'
 test('createGameState: an unknown deck format reads as Standard', () => {
   const state = createGameState({ players: { p1: { username: 'Ash', deckFormat: 'pocket' } } });
   assert.equal(state.players.p1.deckFormat, 'tcg');
+});
+
+function twoPlayerState(seed = 42) {
+  return createGameState({
+    players: {
+      p1: { username: 'Ash', zones: { deck: createTestDeck(true) } },
+      p2: {
+        username: 'Gary',
+        zones: { deck: createTestDeck(true).map((card) => ({ ...card, instanceId: card.instanceId + 100 })) },
+      },
+    },
+    seed,
+  });
+}
+
+const basicInHand = (state, pid) => state.players[pid].zones.hand.find((card) => card.supertype === 'Pokémon');
+
+test('setupGame: deferStarterDraw holds the turn-1 draw until both Actives are placed', () => {
+  const state = twoPlayerState();
+  const { events } = setupGame(state, { firstPlayerId: 'p1', deferStarterDraw: true });
+  assert.equal(state.players.p1.zones.hand.length, 7);
+  assert.equal(state.openingDrawPending, 'p1');
+  assert.equal(events.some((event) => event.type === 'cardsDrawn'), false);
+
+  const later = [];
+  state.players.p1.zones.active.push(...state.players.p1.zones.hand.splice(0, 1));
+  assert.equal(settleOpeningDraw(state, later), false, 'one Active is not enough');
+
+  state.players.p2.zones.active.push(...state.players.p2.zones.hand.splice(0, 1));
+  const topCard = state.players.p1.zones.deck[0];
+  assert.equal(settleOpeningDraw(state, later), true);
+  assert.deepEqual(later, [{ type: 'cardsDrawn', playerId: 'p1', count: 1, cards: [{ instanceId: topCard.instanceId }] }]);
+  assert.equal(state.players.p1.zones.hand.at(-1), topCard);
+  assert.equal('openingDrawPending' in state, false);
+  assert.equal(settleOpeningDraw(state, later), false, 'draws once');
+});
+
+test('setup command: the starter draws in the batch that fills the last Active Spot', () => {
+  const rng = createRng(7);
+  let state = twoPlayerState(7);
+  let res = applyCommand(state, { type: 'setup', payload: { firstPlayerId: 'p2' }, playerId: 'p1' }, rng);
+  state = res.state;
+  assert.equal(state.players.p2.zones.hand.length, 7);
+  assert.equal(res.events.some((event) => event.type === 'cardsDrawn'), false);
+
+  for (const pid of ['p2', 'p1']) {
+    res = applyCommand(state, {
+      type: 'moveCard',
+      payload: { instanceId: basicInHand(state, pid).instanceId, from: 'hand', to: 'active' },
+      playerId: pid,
+    }, rng);
+    assert.equal(res.error, null);
+    state = res.state;
+  }
+  const drawn = res.events.filter((event) => event.type === 'cardsDrawn');
+  assert.deepEqual(drawn.map((event) => event.playerId), ['p2']);
+  assert.equal(state.players.p2.zones.hand.length, 7);
+  assert.equal(state.openingDrawPending, undefined);
+});
+
+test('setup command: a starter who ends turn 1 before the opponent places still gets the card', () => {
+  const rng = createRng(7);
+  let state = applyCommand(twoPlayerState(7), { type: 'setup', payload: { firstPlayerId: 'p1' }, playerId: 'p1' }, rng).state;
+  const handBefore = state.players.p1.zones.hand.length;
+  const res = applyCommand(state, { type: 'pass', payload: {}, playerId: 'p1' }, rng);
+  assert.equal(res.error, null);
+  assert.ok(res.events.some((event) => event.type === 'cardsDrawn' && event.playerId === 'p1'));
+  assert.equal(res.state.players.p1.zones.hand.length, handBefore + 1);
+  assert.equal(res.state.openingDrawPending, undefined);
+});
+
+test('setupGame: a normal setup draws at once and clears a stale openingDrawPending', () => {
+  const state = twoPlayerState();
+  state.openingDrawPending = 'p2';
+  setupGame(state, { firstPlayerId: 'p1' });
+  assert.equal(state.players.p1.zones.hand.length, 8);
+  assert.equal('openingDrawPending' in state, false);
 });

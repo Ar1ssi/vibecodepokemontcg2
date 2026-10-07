@@ -17,12 +17,17 @@ import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
 import {
   flipCoinFace,
   isCoinFace,
+  isTurnOrderChoice,
   pickCoinCaller,
-  resolveStarterPlayerId,
+  resolveCoinWinnerPlayerId,
+  resolveStarterFromChoice,
 } from '../../shared/engine/rules/turn-order-flip.mjs';
 
 /** How long the designated caller has to answer before the server calls for them. */
 export const TURN_ORDER_CALL_TIMEOUT_MS = 15000;
+
+/** How long the coin winner has to pick first/second before the server picks 'first'. */
+export const TURN_ORDER_CHOICE_TIMEOUT_MS = 20000;
 
 export class GameRoom {
   /**
@@ -70,8 +75,8 @@ export class GameRoom {
 
     // Opening turn-order coin call (design 013). Transient handshake state, kept
     // outside `state` so it never reaches hashState/commandLog/undo replay.
-    // null | { phase: 'awaiting-call'|'resolved', callerPlayerId, callId,
-    //          call, result, starterPlayerId, auto }
+    // null | { phase: 'awaiting-call'|'awaiting-choice'|'resolved', callerPlayerId,
+    //          callId, call, result, winnerPlayerId, choice, starterPlayerId, auto }
     this.turnOrder = null;
     this.turnOrderCallCounter = 0;
 
@@ -454,6 +459,8 @@ export class GameRoom {
       call: null,
       coinId: null,
       result: null,
+      winnerPlayerId: null,
+      choice: null,
       starterPlayerId: null,
       auto: false,
     };
@@ -476,7 +483,7 @@ export class GameRoom {
    * @param {string} [payload.call] 'heads' | 'tails'
    * @param {string} [payload.coinId] The caller's chosen coin art id (display only)
    * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
-   *             starterPlayerId: string, auto: false }
+   *             winnerPlayerId: string, coinId: string|null, auto: false }
    *          |{ ok: false, reason: string }}
    */
   submitTurnOrderCall(socketId, { callId = null, call = null, coinId = null } = {}) {
@@ -500,7 +507,7 @@ export class GameRoom {
    * disconnect, so a silent seat can never hang the match.
    *
    * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
-   *             starterPlayerId: string, auto: true }|{ ok: false, reason: string }}
+   *             winnerPlayerId: string, auto: true }|{ ok: false, reason: string }}
    */
   resolveTurnOrderCallAutomatically() {
     if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
@@ -511,8 +518,8 @@ export class GameRoom {
   }
 
   /**
-   * Shared tail of both resolution paths: flip, decide the starter, freeze the
-   * handshake.
+   * Shared tail of both call paths: flip, name the winner, and wait for the
+   * winner to choose first or second.
    *
    * @param {string} call
    * @param {boolean} auto
@@ -520,18 +527,18 @@ export class GameRoom {
    *   Echoed back so both clients render the same coin; never trusted for the
    *   flip itself (D10), so a malformed/oversize value is simply dropped.
    * @returns {{ ok: true, callerPlayerId: string, call: string, result: string,
-   *             starterPlayerId: string, coinId: string|null, auto: boolean }
+   *             winnerPlayerId: string, coinId: string|null, auto: boolean }
    *          |{ ok: false, reason: string }}
    */
   #resolveTurnOrder(call, auto, coinId = null) {
     const result = flipCoinFace(this.rng);
-    const starterPlayerId = resolveStarterPlayerId({
+    const winnerPlayerId = resolveCoinWinnerPlayerId({
       playerIds: Object.keys(this.state.players || {}),
       callerPlayerId: this.turnOrder.callerPlayerId,
       call,
       result,
     });
-    if (!starterPlayerId) return { ok: false, reason: 'no_starter' };
+    if (!winnerPlayerId) return { ok: false, reason: 'no_winner' };
 
     const safeCoinId =
       typeof coinId === 'string' && coinId.length > 0 && coinId.length <= 128
@@ -540,11 +547,11 @@ export class GameRoom {
 
     this.turnOrder = {
       ...this.turnOrder,
-      phase: 'resolved',
+      phase: 'awaiting-choice',
       call,
       result,
       coinId: safeCoinId,
-      starterPlayerId,
+      winnerPlayerId,
       auto,
     };
     this.touchActivity();
@@ -553,8 +560,76 @@ export class GameRoom {
       callerPlayerId: this.turnOrder.callerPlayerId,
       call,
       result,
-      starterPlayerId,
+      winnerPlayerId,
       coinId: safeCoinId,
+      auto,
+    };
+  }
+
+  /** True while the coin has landed and its winner has not yet chosen. */
+  isAwaitingTurnOrderChoice() {
+    return this.turnOrder?.phase === 'awaiting-choice';
+  }
+
+  /**
+   * Records the coin winner's choice to go first or second.
+   *
+   * @param {string} socketId The socket that sent the choice.
+   * @param {object} [payload]
+   * @param {string} [payload.callId] The call this choice answers.
+   * @param {string} [payload.choice] 'first' | 'second'
+   * @returns {{ ok: true, winnerPlayerId: string, choice: string,
+   *             starterPlayerId: string, auto: false }|{ ok: false, reason: string }}
+   */
+  submitTurnOrderChoice(socketId, { callId = null, choice = null } = {}) {
+    if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
+    if (this.turnOrder.phase !== 'awaiting-choice') {
+      return { ok: false, reason: 'not_awaiting_choice' };
+    }
+    const playerId = this.socketToPlayer.get(socketId);
+    if (!playerId || playerId !== this.turnOrder.winnerPlayerId) {
+      return { ok: false, reason: 'not_winner' };
+    }
+    if (callId !== this.turnOrder.callId) {
+      return { ok: false, reason: 'stale_call' };
+    }
+    if (!isTurnOrderChoice(choice)) return { ok: false, reason: 'invalid_choice' };
+    return this.#resolveTurnOrderChoice(choice, false);
+  }
+
+  /**
+   * Chooses 'first' for a winner who timed out or disconnected, so a silent
+   * seat can never hang the match.
+   *
+   * @returns {{ ok: true, winnerPlayerId: string, choice: 'first',
+   *             starterPlayerId: string, auto: true }|{ ok: false, reason: string }}
+   */
+  resolveTurnOrderChoiceAutomatically() {
+    if (!this.isAwaitingTurnOrderChoice()) {
+      return { ok: false, reason: 'not_awaiting_choice' };
+    }
+    return this.#resolveTurnOrderChoice('first', true);
+  }
+
+  #resolveTurnOrderChoice(choice, auto) {
+    const starterPlayerId = resolveStarterFromChoice({
+      playerIds: Object.keys(this.state.players || {}),
+      winnerPlayerId: this.turnOrder.winnerPlayerId,
+      choice,
+    });
+    if (!starterPlayerId) return { ok: false, reason: 'no_starter' };
+    this.turnOrder = {
+      ...this.turnOrder,
+      phase: 'resolved',
+      choice,
+      starterPlayerId,
+    };
+    this.touchActivity();
+    return {
+      ok: true,
+      winnerPlayerId: this.turnOrder.winnerPlayerId,
+      choice,
+      starterPlayerId,
       auto,
     };
   }
