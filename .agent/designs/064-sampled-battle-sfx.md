@@ -1,5 +1,5 @@
 # 064: Sampled battle SFX (TCG Live extract, non-attack)
-Status: building — approved (user) 2026-10-07; Q1–Q4 resolved to the recommended picks (see Questions)
+Status: shipped 2026-10-07 — approved (user); Q1–Q4 resolved to the recommended picks (see Questions)
 Date: 2026-10-07 · Session: S337
 
 ## Problem
