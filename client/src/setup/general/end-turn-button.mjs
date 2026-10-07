@@ -1,3 +1,5 @@
+import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
+
 /**
  * The board's End Turn button. It clicks the Pass button rather than calling pass()
  * directly: rules mode ends the turn from a capture-phase hook on that button
@@ -5,14 +7,18 @@
  * bubble handler — the same route as the Alt+T shortcut (keybinds.js).
  *
  * @param {Document} doc
+ * @param {(key: string) => void} [play] UI sound player (tests inject one)
  * @returns {boolean} whether the button was wired
  */
-export function wireEndTurnButton(doc = document) {
+export function wireEndTurnButton(doc = document, play = uiCue) {
   const endTurnButton = doc.getElementById('endTurnButton');
   const passButton = doc.getElementById('p2PassButton');
   if (!endTurnButton || !passButton) return false;
   if (endTurnButton.dataset.endTurnWired) return true;
   endTurnButton.dataset.endTurnWired = '1';
-  endTurnButton.addEventListener('click', () => passButton.click());
+  endTurnButton.addEventListener('click', () => {
+    play('end-turn');
+    passButton.click();
+  });
   return true;
 }

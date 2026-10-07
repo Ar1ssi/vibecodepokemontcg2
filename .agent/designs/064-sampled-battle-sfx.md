@@ -1,5 +1,5 @@
 # 064: Sampled battle SFX (TCG Live extract, non-attack)
-Status: draft — awaiting user answers on Q1–Q4 (end of Options)
+Status: building — approved (user) 2026-10-07; Q1–Q4 resolved to the recommended picks (see Questions)
 Date: 2026-10-07 · Session: S337
 
 ## Problem
@@ -123,11 +123,11 @@ cheer→disappoint, surprise, misc reactions.
 **O8 — Variants.** Files with `_01.._NN` / `_1/_2` suffixes form one cue; pick = random without
 immediate repeat (shuffle-bag). Deterministic under test via injected `rng`.
 
-### Questions for the user (block slice 1 only on Q1)
-- Q1 (O1): keep audio out of git (B, recommended) or commit it (A)?
-- Q2 (O7): crowd default on or off?
-- Q3: jumbotron set (74 files) — attack-adjacent. Hand to the attack agent (recommended) or plan here?
-- Q4 (O6): status loops while held (B) or intro/outro only (A)?
+### Questions for the user — answered by "Approved" (recommended picks taken)
+- Q1 (O1): **B** — audio stays out of git; importer + gitignored output.
+- Q2 (O7): **on** by default (faithful to TCG Live); the Crowd toggle turns it off.
+- Q3: **jumbotron handed to the attack agent** (design 063); excluded here.
+- Q4 (O6): **B** — loops while held, behind the "Status ambience" toggle (default on).
 
 ## Design
 
@@ -147,23 +147,48 @@ scripts/sfx/import-tcgl-sfx.mjs --src <dir> [--check]
 client/src/setup/netcode/mat-fx/sfx-cues.mjs   (pure)
   CUES: { [key]: { gain: number, preload: boolean, bus: 'sfx'|'ui'|'crowd'|'status',
                    loop?: boolean, delayMs?: number } }
-  cueFor(effect, plan, ctx?) -> { key, gain, delayMs, at?: number[] } | null
-     ctx = { cardOf(instanceId) }  // registry lookup injected for type/energy/tool reads
+  cuesFor(effect, plan) -> CuePlay[]   // frozen; [] = no sample, caller uses synth
+     CuePlay = { key: string, gain: number, delayMs: number }
+     Card/coin context is read from the plan (index.js soundPlanFor enriches it; see Deviations):
+     plan.soundCard, plan.coinMaterial ('metal'|'plastic'), plan.coinReducedMotion (boolean)
   UI_CUES: frozen set of keys playUiCue accepts.
 
 client/src/setup/netcode/mat-fx/sample-bank.js   (browser)
   initSampleBank(ctx, master) -> void      // fetch manifest; preload; never throws
   hasSample(key) -> boolean                // decoded and ready now
+  warmSample(key) -> void                  // start a lazy load if not loaded/dead; never throws
   playSample(key, { gain, delayMs, bus }) -> boolean   // false = not ready; caller falls back
   startLoop(key, { gain, bus }) -> handle | null ; handle.stop({ outroKey? })
   stopAllLoops()                            // game end, tab hidden, mute
 
 fx-audio.js
-  playFxSound(plan): cue = cueFor(...); if cue && playSample(...) return; else voicesFor fallback.
+  playFxSound(plan): cues = cuesFor(...); if cues.length && playCues(cues) return; else voicesFor.
+  playCues(cues) -> boolean   // all-or-nothing: every key hasSample → play each at its delayMs,
+                              // return true; else warmSample every key, return false (synth plays).
   playUiCue(key): mute-checked; samples only (no synth fallback for UI chrome — silence matches today).
 ```
 Effects owned by 063 (`attack`, `attack-banner`, `damage` with hit kind) return `null` from
 `cueFor` — they keep their synthesized voices.
+
+Concurrency cap (MAX_CONCURRENT = 2 per cue) applies only to plays with `delayMs === 0`. A
+scheduled play (delayMs > 0) belongs to a multi-cue sequence and is never dropped by the cap.
+
+### Multi-cue timings (pinned for slice 3b; constants imported, never copied)
+| Plan | CuePlay list (key @ delayMs) |
+|---|---|
+| `opp-trainer-play` | `card-flip` @0, `opp-card-played` @`PREVIEW_DROP_MS` (260; new export of `DROP_END_MS` from `opp-play.mjs`, same moment the synth chime uses) |
+| `discard` self, no `sweep` | `discard-whoosh` @0, `discard-finished` @`FLIGHT_MS` (620, `card-flight.mjs`) |
+| `discard` self, `sweep` set | `discard-whoosh` @0, `discard-deposit` @`FLIGHT_MS` |
+| `discard` opp, no `sweep` | `opp-pending-discard` @0 |
+| `discard` opp, `sweep` set | `opp-pending-discard` @0, `discard-deposit` @`FLIGHT_MS` |
+| `discard` user null | [] (synth) |
+| `retreat` | `card-swoosh` @0, `active-<type of soundCard>` @`RETREAT_SLIDE_MS` (520, `lifecycle-pose.mjs`) |
+| `coin-flip` | `coin-appear` @0; per flip i with `t = coinCeremonyTimeline(n, { reducedMotion: plan.coinReducedMotion === true })`: toss cue @`t.landsAt[i] - t.tossMs` only when `t.tossMs > 0` — `coin-toss-<mat>` when `t.tossMs >= 1500`, else `coin-spin-<mat>`; then `coin-win` (heads) / `coin-loss` (tails) @`t.landsAt[i]`. Faces read like `coinVoices` (`plan.faces`, else `[plan.face]`). `<mat>` = `plan.coinMaterial`, missing → `metal` |
+Coin material: `coinSoundMaterial(material)` in sfx-cues.mjs maps `gold`/`silver`/`metal` →
+`metal`, `enamel`/`cardboard`/unknown → `plastic`. index.js reads the coin like `coin.js:28`
+(`getSelectedCoin(side) || pickDefaultCoin()`, side = `opp` when `plan.user === 'opp'` else
+`self`) and `resolveCoinEffect(coin).material` (`deck-builder/core/coin-effects.mjs`).
+`coin-spin-*` is no longer a loop: it is the short toss for fast multi-flip pacing.
 
 ### Cue map — fx plans (dispatcher path)
 | effect / condition | Cue (source files) |
@@ -292,11 +317,47 @@ D147's "not sampled" clause; one line for ffmpeg as a dev-time system tool (not 
 | 1 | `scripts/sfx/source-map.mjs`, `scripts/sfx/import-tcgl-sfx.mjs`, tests, `.gitignore`, `package.json` script `sfx:import` | Importer + manifest; rows 13–15 | importer run on the extract writes ~169 cue files; tests green |
 | 2 | `mat-fx/sfx-cues.mjs`, `mat-fx/sample-bank.js`, `fx-audio.js`, `server/server.js` cache rule, tests | Engine + fallback; rows 1–5, 12, 16, 17. No cue mapped yet except one (`turn-banner`) as proof | `pnpm test:changed`; turn prompt audible on localhost |
 | 3 | `sfx-cues.mjs`, `index.js` `soundPlanFor` (tool split) | fx-plan cue map rows | cue tests per row |
+| 3b | `sfx-cues.mjs` (`cueFor` → `cuesFor`, `coinSoundMaterial`, CUES rows `card-flip`, `opp-card-played`, `discard-whoosh`, `discard-finished`, `discard-deposit`, `opp-pending-discard`, `card-swoosh`, `coin-appear`, `coin-toss-metal`, `coin-toss-plastic`, `coin-spin-metal`, `coin-spin-plastic`, `coin-win`, `coin-loss`, all bus `sfx`, gain 0.7, preload true), `opp-play.mjs` (export `PREVIEW_DROP_MS`), `sample-bank.js` (`warmSample`, cap only at delayMs 0), `fx-audio.js` (`playCues`), `index.js` (`coinMaterial`, `coinReducedMotion` on `coin-flip` plans), tests | Multi-cue table above. Tests: every table row → exact list (keys + delayMs) incl. 1 flip (tossMs 2200 → toss @0, win @2200), 3 flips (tossMs 1500), 6 flips (tossMs 1000 → spin), reduced motion (no toss cues, landings @0/700/1400), unknown material → plastic, missing → metal; existing single-cue rows unchanged as 1-element lists; attack-owned → []; bank: 2 scheduled plays of one cue at delayMs > 0 both start while a 3rd at 0 is capped; playCues with one key not ready → false + warmSample called for it, nothing played | `pnpm test:changed` green; lint clean |
 | 4 | `advisory-animations.mjs/.js`, `draw-scene.js`, `shuffle-flight.js`, `rules-bridge.js` | Non-fx plans + sound-only events | event→cue tests |
+| 4b | create `netcode/mat-fx/retreat-lock-watch.mjs` (pure) + `__tests__/retreat-lock-watch.test.mjs`; modify `apply-view.js` `applyView` (after zones reconcile, before return) and `sfx-cues.mjs` (`retreat-lock-applied` → `retreat-lock-intro`, CUES row gain 0.7, preload true, bus sfx) | `newlyRetreatLocked(prevIds: Set<number>, actives: object[], turnNumber: number) -> { next: Set<number>, added: number[] }`; a card is locked when `Number.isFinite(card.cannotRetreatUntilTurn) && card.cannotRetreatUntilTurn >= turnNumber`. applyView keeps a module-level `retreatLockedIds` Set; `actives` = `[...view.you?.zones?.active ?? [], ...view.them?.zones?.active ?? []]` (same `view[side].zones` shape `getAuthoritativeZoneArray` reads); for each `added` id → `playFxSound({ effect: 'retreat-lock-applied', instanceId })`. `resetRenderState()` clears the Set. Spectator views included (sound is side-neutral). | `(∅, [{instanceId:1, cannotRetreatUntilTurn:5}], 5)` → added `[1]`; same call with prev `{1}` → added `[]`, next `{1}`; lock expired (`until 4`, turn 5) → added `[]`, next `∅`; field missing / `null` / `'5'` → not locked; two actives, one locked → added only that id; empty actives → next `∅`. sfx-cues: `cuesFor('retreat-lock-applied', {})` → `[{key:'retreat-lock-intro', gain:0.7, delayMs:0}]` | No engine change: board cards reach the client whole (`shared/engine/view.mjs` `boardCard` → `cloneCard`), so `cannotRetreatUntilTurn` (set at `reduce.mjs:8273`, `:9518`) is already in the view. | `pnpm test:changed` green; lint clean on touched files |
 | 5 | `sample-bank.js`, `apply-view.js` reconcile hook, `index.ejs` + `settings.js` toggle | Status intro/loop/outro; rows 8–11 | loop lifecycle tests |
 | 6 | button/inspector/picker/drag files listed in UI table | `playUiCue` hooks | hook smoke tests where a module test exists |
 | 7 | `sfx-cues.mjs` signature table, `entry.js`/events | Card signatures (after lookups) | per-card tests citing corpus/TCGdex ids |
+| 7b | `advisory-animations.mjs` (EVENT_FX/SOUND_ONLY_FX + explicit `attackMarkerAdded` branch + batch helper), `advisory-animations.js` (pass the batch's effect-KO ids to the planner), `sfx-cues.mjs` (rows + resolvers), `index.js` `withSoundCard` (`enter` carries `soundCard`), `cmd-emitter.js` (lock refusal cue), tests in the matching `__tests__/` files | Bindings use engine events that already exist, so the engine is untouched. **(a) Item lock:** `playLockApplied` {playerId, kinds, untilTurn} (`shared/engine/effects/attack-steps.mjs` atkOppPlayLock) → sound-only effect `play-lock`, plan copies `kinds`; `cuesFor('play-lock', {kinds})` → `[itchy-pollen-hand @0]` when `kinds` includes `item`, `trainer` or `any`, else `[]`. **(b) Locked Item refused:** `handleCmdRejected` plays `itchy-pollen-hand-card` instead of `card-no-match` when `reason` matches `/^Your opponent's attack stops you playing that card during this turn\.$/` (reduce.mjs `playLockReason`). **(c) Deferred KO marker:** `attackMarkerAdded` {kind, instanceId, playerId} → explicit branch building `{ kind: 'fx', effect: 'attack-marker', user, instanceId, markerKind: event.kind }` (never via `fxPlan`: its `...fields` spread would overwrite plan `kind` with the event's `kind`); `cuesFor('attack-marker', {markerKind:'deferredKnockOut'})` → `[doom-curse-1 @0]`, other markerKind → `[]`. **(d) Deferred KO resolves:** `deferredKnockOut` (reduce.mjs:2893) → sound-only `deferred-ko` → `[doom-curse-2 @0]`. **(e) Effect KO:** pure `effectKnockoutIds(events) -> Set<number>` = ids of `pokemonKnockedOut` with no earlier `damageUpdated` for the same `instanceId` in the batch and no `deferredKnockOut` for it; the knockout plan gets `effectKo: true` for those ids; `cuesFor('knockout', {effectKo:true, ...})` → `[instant-ko-impact @0]` in place of `knocked-out` (rival ding/whistle rows unchanged). **(f) Darkrai ex:** `enter` plans carry `soundCard`; `soundCard.name === 'Darkrai ex'` (exact, case-sensitive) → `[darkrai-ex-entrance @0]` replacing every `place-*` cue. CUES rows: `itchy-pollen-hand`, `doom-curse-1`, `doom-curse-2`, `instant-ko-impact`, `darkrai-ex-entrance` bus `sfx`; `itchy-pollen-hand-card` bus `ui`; all gain 0.7, preload false (all > 2 s except `instant-ko-impact` 1.75 s → preload true). | `cuesFor('play-lock',{kinds:['item']})` → itchy-pollen-hand; `{kinds:['any']}` → same; `{kinds:['supporter']}` → []; `{}` → []. Rejection with the exact attack-lock text → `itchy-pollen-hand-card` played, `card-no-match` not; `"Time Capsule stops you playing that card during this turn."` → card-no-match. `attackMarkerAdded` {kind:'deferredKnockOut', instanceId:7, playerId:p2} with self p1 → plan `{kind:'fx', effect:'attack-marker', user:'opp', instanceId:7, markerKind:'deferredKnockOut'}`. `effectKnockoutIds([{type:'damageUpdated',instanceId:3},{type:'pokemonKnockedOut',instanceId:3}])` → ∅; `[{type:'pokemonKnockedOut',instanceId:4}]` → {4}; `[{type:'deferredKnockOut',instanceId:5},{type:'pokemonKnockedOut',instanceId:5}]` → ∅; `[]` → ∅. Darkrai: soundCard `{name:'Darkrai ex'}` → [darkrai-ex-entrance]; `{name:'Mega Darkrai ex'}` → normal place cue; no soundCard → normal place cue. | Engine events read from source this session: `playLockApplied`, `attackMarkerAdded`, `deferredKnockOut`, `playLockReason` text. Darkrai ex: corpus `out/pkmn-pokemon-cards.json` name row. | `pnpm test:changed` green; lint clean on touched files |
 | 8 | `sample-bank.js` crowd bus, `sfx-cues.mjs` crowd table, settings toggle | Crowd | reaction-selection tests |
 Slices 3–8 are independent after 2; 2 and 3 rebase on design 063 once it lands (shared files).
 
 ## Deviations (Builder appends here during build)
+- Slice 1: the 4 unbound files (`cant_draw_that`, `cards_match`, `marne_special`,
+  `rainier_lightning`) are EXCLUDED, not transcoded: 165 files → 106 cue keys, not ~169.
+- Slice 2: `manifest.json` stays `no-store` (unhashed; a re-import must not leave browsers on
+  deleted files). Only hashed `.ogg` files get `public, max-age=86400` (`server/sfx-cache.mjs`).
+- Slice 3: `cueFor(effect, plan, ctx)` replaced by plan enrichment: index.js `soundPlanFor` calls
+  `withSoundCard(plan, cardOf)` — Tool `attach` → `tool-attach`, promote/retreat carry
+  `soundCard` (`promotedId ?? instanceId`). Matches the existing soundPlanFor pattern.
+- Slice 3 gap → 3b (architect, 2026-10-07): one-cue return could not express multi-cue rows.
+  Contract changed to `cuesFor → CuePlay[]` + all-or-nothing `playCues`; timings pinned above.
+- Slice 4 (builder choices, accepted): setup vs mid-game Active = `!rulesState.startingActiveDone` at
+  batch start; the shuffle-flight sound plays from `advisory-animations.js` `runPlan` (image-logic
+  must not import mat-fx); `prizesSet` sounds once per seat. Retreat-lock-applied had no hook →
+  slice 4b (view diff on `cannotRetreatUntilTurn`, no engine event).
+- Slice 4b: `applyView` reaches `playFxSound` through `options.playFxSound`, defaulting to a dynamic
+  `import('./mat-fx/fx-audio.js')` (a static import pulls `window` into node tests). Known edge: the
+  first view after a page reload sounds any lock already on an Active once (prev set starts empty).
+- Slice 7 gap → 7b (architect, 2026-10-07): bound to existing engine events, no engine change.
+  Itchy Pollen → any Item lock (`playLockApplied`), so Banette ex / other Item-lock attacks share it;
+  Doom Curse → any deferred-KO marker. Effect-KO is inferred per batch (KO with no damage event).
+  Dropped (moved to unbound): `itchy-pollen-activate` and `instant-ko-activate` (attack moments,
+  design 063's domain); `v-union` (engine cannot put V-UNION into play, reduce.mjs:4712);
+  `pikachu-enter` (no confident binding). Darkrai cue: exact name "Darkrai ex" only.
+- Slice 5: status loops preloaded (architect fix after build): a lazy first load left the loop
+  silent until the next view. Toggle label "Status condition ambience", key `ptcg-status-ambience-off`.
+- Slice 6 (builder choices, accepted): `mat-fx/ui-cue.mjs` lazy-loads fx-audio.js; Pass is not
+  wired (End Turn clicks it); `search-to-hand` sounds only when the picker itself moves cards to hand.
+- Slice 8 (builder choices, accepted): large bed + swell at 2 prizes left, `crowd-crazy` at 1
+  (`LARGE_BED_PRIZES`, `GAME_POINT_PRIZES` in crowd.mjs); bed starts when prize piles exist (no
+  setup hook); small→large is a 50 ms fade then start, not a crossfade; crowd gains unmeasured
+  (listening pass). `vstarUsed`/`gxAttackUsed` → sound-only `vstar-used`/`gx-used` with explicit
+  `kind:'fx'` (same `kind` spread hazard as 7b).
+- Slice 3b: `playCues` lives in `sample-bank.js` as `playSequence(cues)` (same behavior) so it is
+  node-testable; `fx-audio.js` cannot be imported under node (`window is not defined`).

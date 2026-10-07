@@ -3,11 +3,13 @@
 // `applyView` in socket-event-listeners.js, so both players — originator
 // included — animate from the SAME server event: one source, no double-play.
 import { systemState } from '../../state.js';
+import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
   advisoryAnimationPlan,
   coinFlipRuns,
   dealShuffles,
   deckRevealRuns,
+  effectKnockoutIds,
   drawnCards,
   supersededDeals,
 } from './advisory-animations.mjs';
@@ -60,6 +62,10 @@ let coinRuns = new Map();
 let shufflesBeforeDeals = new Set();
 // Design 059: each player's deck → hand reveals in the batch, keyed by the reveal that plays them.
 let revealRuns = new Map();
+// Design 064: the batch being applied arrived before the opening Active placement finished.
+let batchInSetup = false;
+// Design 064: the batch's knockouts no damage caused.
+let effectKnockouts = new Set();
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -143,13 +149,16 @@ const holdRevealedCards = (plan) => {
   return { ...plan, held, backstop };
 };
 
-const playRevealSound = (user) => {
+// Sound for a plan that never reaches the fx dispatcher. Audio is best-effort: it never breaks the plan.
+const soundPlan = (plan) => {
   try {
-    playFxSound({ effect: 'deck-reveal', user });
+    playFxSound(plan);
   } catch (err) {
-    console.warn('[mat-fx] deck-reveal sound failed', err);
+    console.warn(`[mat-fx] ${plan.effect} sound failed`, err);
   }
 };
+
+const playRevealSound = (user) => soundPlan({ effect: 'deck-reveal', user });
 
 // Sound follows the dispatcher's rule: off with effects off, on under reduced motion;
 // with the scene it plays as the cards leave the deck.
@@ -189,6 +198,8 @@ export function handleBeforeApply(events, selfPlayerId) {
   coinRuns = coinFlipRuns(events);
   shufflesBeforeDeals = dealShuffles(events);
   revealRuns = deckRevealRuns(events);
+  batchInSetup = !rulesState.startingActiveDone;
+  effectKnockouts = effectKnockoutIds(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
   capturePrizeSeats(events, registry, selfPlayerId);
@@ -222,6 +233,7 @@ export function handleBeforeApply(events, selfPlayerId) {
 function runPlan(plan) {
   if (plan.kind === 'shuffle') {
     playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
+    soundPlan({ effect: 'shuffle-flight', user: plan.user });
     return 0;
   }
   if (plan.kind === 'draw') return playDrawPlan(plan);
@@ -229,6 +241,7 @@ function runPlan(plan) {
   if (plan.kind === 'knockout') {
     const ghost = pendingKnockoutGhosts.get(plan.instanceId);
     pendingKnockoutGhosts.delete(plan.instanceId);
+    soundPlan({ effect: 'knockout', user: plan.user, ruleBoxes: plan.ruleBoxes, effectKo: plan.effectKo });
     if (!ghost) return 0;
     playKnockoutGhost(ghost, { deferStart: afterImpact });
     return holdFor('knockout');
@@ -285,6 +298,8 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
   const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event), {
     dealShuffle: shufflesBeforeDeals.has(event),
     revealRun: revealRuns.get(event),
+    setup: batchInSetup,
+    effectKo: effectKnockouts,
   });
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];

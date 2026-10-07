@@ -15,6 +15,7 @@
  * and only the carousel can carry attached-Energy slides (013 C3/C5).
  */
 
+import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { glowHexForType } from './card-glow-colors.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
@@ -539,6 +540,7 @@ const wirePanelClicks = (state) => {
       const attack =
         state.model.attacks[Number(attackPanel.dataset.ptcgAttack)];
       if (!attack?.usable) return;
+      uiCue('attack-button');
       event.stopPropagation();
       state.actions?.onAttack?.(attack.index);
       return;
@@ -744,6 +746,7 @@ export function openCardInspector({
     initialIndex: mainIndex,
     decorate,
   });
+  uiCue('big-card-in');
   return true;
 }
 
@@ -780,6 +783,7 @@ const useAbility = (card, zone) => {
 };
 
 export const closeCardInspector = () => {
+  if (states.size > 0) uiCue('big-card-out');
   teardownAll();
   // Tearing down the state alone leaves the carousel open, and a modal over the board is exactly
   // how a dispatched attack looks like it never happened. The attack path closes before it fires;

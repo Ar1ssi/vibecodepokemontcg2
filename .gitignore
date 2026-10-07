@@ -20,3 +20,6 @@ client/src/assets/playmats/upscaled/
 # design 004 slice 6: playtest-bot.mjs failure dumps (replayable traces, not source)
 out/playtest/
 .superdesign/tmp/
+
+# design 064: sampled battle SFX transcoded from the TCG Live extract (rights: not redistributable)
+client/src/assets/sfx/

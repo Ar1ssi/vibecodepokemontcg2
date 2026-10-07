@@ -6,6 +6,8 @@
 export const FX_OFF_KEY = 'ptcg-fx-off';
 export const SFX_OFF_KEY = 'ptcg-sfx-off';
 export const VOLUME_KEY = 'ptcg-fx-volume';
+export const AMBIENCE_OFF_KEY = 'ptcg-status-ambience-off';
+export const CROWD_OFF_KEY = 'ptcg-crowd-off';
 export const DEFAULT_VOLUME = 0.6;
 
 export const FX_OFF_CLASS = 'fx-off';
@@ -26,11 +28,13 @@ const readKey = (storage, key) => {
   }
 };
 
-/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number}} defaults when unreadable. */
+/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean}} defaults when unreadable. */
 export function readSettings(storage) {
   return {
     fxOff: readKey(storage, FX_OFF_KEY) === '1',
     sfxOff: readKey(storage, SFX_OFF_KEY) === '1',
+    ambienceOff: readKey(storage, AMBIENCE_OFF_KEY) === '1',
+    crowdOff: readKey(storage, CROWD_OFF_KEY) === '1',
     volume: normalizeVolume(readKey(storage, VOLUME_KEY)),
   };
 }

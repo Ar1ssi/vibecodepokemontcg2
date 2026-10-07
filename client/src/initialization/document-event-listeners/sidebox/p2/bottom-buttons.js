@@ -1,6 +1,7 @@
 import { reset } from '../../../../actions/general/reset.js';
 import { readyUp, updateReadyButtons } from '../../../../actions/general/ready.js';
 import { systemState } from '../../../../state.js';
+import { wireButtonCues } from '../../../../setup/netcode/mat-fx/ui-cue.mjs';
 import { hideOptionsContextMenu } from '../../../../setup/chatbox/hide-options-context-menu.js';
 
 export const initializeP2BottomButtons = () => {
@@ -13,6 +14,7 @@ export const initializeP2BottomButtons = () => {
   );
 
   updateReadyButtons();
+  wireButtonCues(['p2SetupButton', 'p2ResetButton', 'p2OptionsButton']);
 
   const p2ResetButton = document.getElementById('p2ResetButton');
   p2ResetButton.addEventListener('click', () => reset(systemState.initiator));

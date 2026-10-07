@@ -96,6 +96,7 @@ import {
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
 import { holdFxQueue } from '../netcode/advisory-animations.js';
+import { playFxSound, playUiCue } from '../netcode/mat-fx/fx-audio.js';
 import {
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
@@ -899,6 +900,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
       // rewrites to 'main' before this ever runs (design 013).
       if (openingStarted) return;
       openingStarted = true;
+      playFxSound({ effect: 'setup-begin' });
       const session = rulesSessionGeneration;
       startGame(firstPlayer);
       resetPrizes();
@@ -1305,6 +1307,7 @@ import { glowColorFor } from './card-glow-colors.mjs';
       overlay.appendChild(box);
       box.querySelectorAll('button[data-coin-call]').forEach((btn) => {
         btn.addEventListener('click', () => {
+          playUiCue('choose-first-second');
           overlay.remove();
           onCall(btn.dataset.coinCall);
         });

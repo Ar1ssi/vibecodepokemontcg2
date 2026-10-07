@@ -2,6 +2,7 @@ import { flipBoard } from '../../../actions/general/flip-board.js';
 import { flipCoin } from '../../../actions/general/flip-coin.js';
 import { systemState } from '../../../state.js';
 import { refreshBoardImages } from '../../../setup/sizing/refresh-board.js';
+import { wireButtonCues } from '../../../setup/netcode/mat-fx/ui-cue.mjs';
 
 // Lets the player drag the Pass/Coin/Flip/Refresh/Fullscreen row anywhere
 // on screen. Position persists across reloads via localStorage so it stays
@@ -118,6 +119,7 @@ const initializeBoardButtonDrag = () => {
 
 export const initializeBoardButtons = () => {
   initializeBoardButtonDrag();
+  wireButtonCues(['flipCoinButton', 'flipBoardButton', 'refreshButton']);
 
   const flipCoinButton = document.getElementById('flipCoinButton');
   flipCoinButton.addEventListener('click', () =>

@@ -2543,3 +2543,109 @@ test('Card blink: an unchanged zone keeps its card nodes in place across views',
     ['12', '11']
   );
 });
+
+test('design 064 4b: a new retreat lock sounds once; resetRenderState re-arms it', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const played = [];
+  const opts = { document: doc, getZone: mockGetZone, playFxSound: (plan) => played.push(plan) };
+  const view = (stateVersion) => ({
+    stateVersion,
+    turn: { number: 5 },
+    you: { playerId: 'p1', zones: { hand: [] } },
+    them: { playerId: 'p2', zones: { hand: [], active: [] } },
+  });
+  const locked = (stateVersion) => {
+    const v = view(stateVersion);
+    v.them.zones.active = [{ instanceId: 201, cannotRetreatUntilTurn: 5, name: 'X', src: 'x.png' }];
+    return v;
+  };
+
+  applyView(locked(1), [], opts);
+  applyView(locked(2), [], opts);
+  assert.deepEqual(played, [{ effect: 'retreat-lock-applied', instanceId: 201 }]);
+
+  applyView(view(3), [], opts);
+  applyView(locked(4), [], opts);
+  assert.equal(played.length, 2);
+});
+
+test('design 064 5: held conditions reach the ambience seam; clearing the last one syncs empty once', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const synced = [];
+  const opts = { document: doc, getZone: mockGetZone, syncStatusAmbience: (keys) => synced.push(keys) };
+  const view = (stateVersion, active) => ({
+    stateVersion,
+    turn: { number: 2 },
+    you: { playerId: 'p1', zones: { hand: [], active } },
+    them: { playerId: 'p2', zones: { hand: [], active: [] } },
+  });
+  const card = (extra) => [{ instanceId: 301, name: 'X', src: 'x.png', ...extra }];
+
+  applyView(view(1, card({})), [], opts);
+  assert.deepEqual(synced, [], 'no condition and no loop running: nothing to sync');
+
+  applyView(view(2, card({ poisoned: true, specialCondition: 'Asleep' })), [], opts);
+  assert.deepEqual(synced, [['poison', 'sleep']]);
+
+  applyView(view(3, card({})), [], opts);
+  assert.deepEqual(synced, [['poison', 'sleep'], []]);
+
+  applyView(view(4, card({})), [], opts);
+  assert.equal(synced.length, 2, 'already empty: no further sync');
+});
+
+test('choice: menu-pop-in sounds once per prompt the local player must answer', () => {
+  resetRenderState();
+  const { doc, mockGetZone } = setupMockDom();
+  const cues = [];
+  const opts = {
+    document: doc,
+    getZone: mockGetZone,
+    choicePicker: fakeChoicePicker(),
+    playUiCue: (key) => cues.push(key),
+  };
+
+  applyView(choiceView(1, NEST_BALL_CHOICE), [], opts);
+  applyView(choiceView(2, NEST_BALL_CHOICE), [], opts);
+  assert.deepEqual(cues, ['menu-pop-in'], 're-applied view does not chime again');
+
+  applyView(choiceView(3, null), [], opts);
+  applyView(choiceView(4, NEST_BALL_CHOICE), [], opts);
+  assert.deepEqual(cues, ['menu-pop-in', 'menu-pop-in'], 'a new prompt chimes again');
+});
+
+test('choice: no menu-pop-in while the opponent is the one choosing', () => {
+  resetRenderState();
+  const { doc, mockGetZone } = setupMockDom();
+  const cues = [];
+  const opts = { document: doc, getZone: mockGetZone, playUiCue: (key) => cues.push(key) };
+
+  applyView(choiceView(1, { ...NEST_BALL_CHOICE, player: 'p2' }), [], opts);
+  assert.deepEqual(cues, []);
+});
+
+test('design 064 O7: the crowd bed follows prize piles and syncs only when its state changes', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const synced = [];
+  const opts = { document: doc, getZone: mockGetZone, syncCrowdBed: (state) => synced.push(state) };
+  const pile = (n) => Array.from({ length: n }, (_, i) => ({ instanceId: 900 + i, name: 'Prize', src: 'p.png' }));
+  const view = (stateVersion, mine, theirs) => ({
+    stateVersion,
+    turn: { number: 2 },
+    you: { playerId: 'p1', zones: { hand: [], active: [], prizes: pile(mine) } },
+    them: { playerId: 'p2', zones: { hand: [], active: [], prizes: pile(theirs) } },
+  });
+
+  applyView(view(1, 0, 0), [], opts);
+  assert.deepEqual(synced, [], 'no prize piles: no battle, nothing to sync');
+  applyView(view(2, 6, 6), [], opts);
+  applyView(view(3, 5, 6), [], opts);
+  assert.deepEqual(synced, [{ bed: 'small', crazy: false }]);
+  applyView(view(4, 5, 2), [], opts);
+  applyView(view(5, 1, 2), [], opts);
+  assert.deepEqual(synced.slice(1), [
+    { bed: 'large', crazy: false },
+    { bed: 'large', crazy: true },
+  ]);
+  resetRenderState();
+});

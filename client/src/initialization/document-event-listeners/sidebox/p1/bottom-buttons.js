@@ -25,6 +25,7 @@ import {
 import { acceptAction } from '../../../../setup/general/accept-action.js';
 import { cleanActionData } from '../../../../setup/general/clean-action-data.js';
 import { refreshBoardImages } from '../../../../setup/sizing/refresh-board.js';
+import { wireButtonCues } from '../../../../setup/netcode/mat-fx/ui-cue.mjs';
 
 export const initializeP1BottomButtons = () => {
   const setupButton = document.getElementById('setupButton');
@@ -39,6 +40,16 @@ export const initializeP1BottomButtons = () => {
   setupBothButton.addEventListener('click', setupBothFunction);
 
   updateReadyButtons();
+  wireButtonCues([
+    'setupButton',
+    'setupBothButton',
+    'resetButton',
+    'resetBothButton',
+    'restartButton',
+    'optionsButton',
+    'clearLog',
+    'exportLog',
+  ]);
 
   const resetButton = document.getElementById('resetButton');
   const resetFunction = () => reset(systemState.initiator);
