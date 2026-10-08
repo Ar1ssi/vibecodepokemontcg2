@@ -201,3 +201,104 @@ test('every drawer plays on the dark material; its shadow passes switch to sourc
     }
   }
 });
+
+test('design 065: the player resolves a beat tint and hues into materials; drawers never see them', async () => {
+  const { resolveBeatColours, tintCache } = await import('../move-player.js');
+  const { MATERIALS } = await import('../materials/index.js');
+  const fire = MATERIALS.fire;
+  const cachedTint = tintCache();
+  const plain = resolveBeatColours(fire, { r0: 0.2, tint: null, hues: null }, cachedTint);
+  assert.equal(plain.material, fire);
+  assert.equal(plain.materialAt(3), fire);
+  assert.deepEqual(plain.params, { r0: 0.2 });
+  const blue = resolveBeatColours(fire, { tint: { body: '#0000ff' }, hues: null }, cachedTint);
+  assert.deepEqual(blue.material.palette.body, [0, 0, 255]);
+  assert.equal(blue.material.key, 'fire');
+  assert.equal(resolveBeatColours(fire, { tint: { body: '#0000ff' } }, cachedTint).material, blue.material, 'memoised');
+  assert.ok(!('tint' in blue.params) && !('hues' in blue.params));
+  const hued = resolveBeatColours(fire, { hues: ['#ff0000', '#00ff00'] }, cachedTint);
+  assert.deepEqual(hued.materialAt(0).palette.body, [255, 0, 0]);
+  assert.deepEqual(hued.materialAt(1).palette.body, [0, 255, 0]);
+  assert.deepEqual(hued.materialAt(2).palette.body, [255, 0, 0]);
+  assert.deepEqual(hued.materialAt(1).palette.hot, [89, 255, 89]);
+  assert.equal(hued.material, fire);
+});
+
+// ---- design 065 slice 4 ----------------------------------------------------------
+
+const drawAll = (name, over, extra = {}) => {
+  const rec = recordingContext();
+  for (const s of [0.1, 0.3, 0.5, 0.7, 0.9]) DRAWERS[name].draw(rec.ctx, lane, s, { ...info(name, over), ...extra });
+  return rec;
+};
+const balanced = (rec, label) => {
+  assert.ok(callsAreFinite(rec.calls), label);
+  assert.equal(rec.state.depth, 0, label);
+  assert.equal(rec.target.filter, 'none', label);
+  assert.deepEqual(rec.state.composite, [], label);
+};
+
+test('design 065: every new param value draws finite and balanced', () => {
+  const cases = [
+    ['coreCharge', { target: 'sky', rings: 2 }],
+    ['coreCharge', { target: 'sky-attacker', dx: 0.3, dy: -0.2, rings: 1 }],
+    ['orbitCharge', { target: 'defender', unit: 'rings' }],
+    ['shockRings', { target: 'defender', dx: 0.2 }],
+    ['projectile', { from: 'defender', unit: 'spiked' }],
+    ['projectile', { from: 'sky', unit: 'facet' }],
+    ['projectile', { from: 'sky-attacker', unit: 'wheel' }],
+    ['volley', { unit: 'fist' }],
+    ['shards', { mode: 'cluster' }],
+    ['shards', { unit: 'hex' }],
+    ['pillar', { count: 4, spread: 2, stagger: 60, dx: 0.4 }],
+    ['ring', { kind: 'fins', count: 5 }],
+    ['bolt', { count: 5, spread: 1, curve: 0.3 }],
+    ['glyph', { kind: 'lattice' }],
+    ['glyph', { kind: 'hex' }],
+    ['glyph', { kind: 'heart', target: 'attacker' }],
+    ['starFlare', { target: 'sky', dx: 0.5 }],
+    ['fan', { count: 12, spread: 360, spin: 40, flap: 12 }],
+    ...['disc', 'dome', 'giant', 'sphere'].map((kind) => ['shade', { kind, eyes: kind === 'giant', fill: 'body', fillAlpha: 0.35 }]),
+    ['chain', {}],
+    ['grip', {}],
+  ];
+  for (const [name, over] of cases) {
+    assert.deepEqual(DRAWERS[name].check(over), [], `${name} ${JSON.stringify(over)}`);
+    const rec = drawAll(name, over);
+    balanced(rec, `${name} ${JSON.stringify(over)}`);
+    assert.ok(rec.calls.some(([key]) => key !== 'save' && key !== 'restore'), `${name} ${JSON.stringify(over)} draws`);
+  }
+});
+
+test('design 065: the glyph kinds draw without a material sigil; the material kind still needs one', () => {
+  assert.equal(drawAll('glyph', {}).calls.filter(([k]) => k !== 'save' && k !== 'restore').length, 0);
+  for (const kind of ['lattice', 'hex', 'heart']) assert.ok(drawAll('glyph', { kind }).calls.some(([k]) => k === 'stroke'), kind);
+});
+
+test('design 065: the multi-item drawers ask materialAt for each item', () => {
+  for (const [name, over, min] of [
+    ['fan', { count: 5 }, 5],
+    ['pillar', { count: 3 }, 3],
+    ['ring', {}, 2],
+    ['ring', { kind: 'fins', count: 4 }, 4],
+    ['orbitCharge', {}, 5],
+    ['volley', {}, 1],
+    ['shards', {}, 8],
+    ['splash', {}, 2],
+    ['spiral', {}, 10],
+  ]) {
+    const asked = new Set();
+    drawAll(name, over, { materialAt: (i) => (asked.add(i), MATERIALS.water) });
+    assert.ok(asked.size >= min, `${name}: ${asked.size} items`);
+  }
+});
+
+test('design 065: a non-body unit draws in the material palette instead of the material projectile', () => {
+  let projectiles = 0;
+  const counting = { ...MATERIALS.fire, projectile: (...args) => ((projectiles += 1), MATERIALS.fire.projectile(...args)) };
+  drawAll('projectile', {}, { material: counting });
+  assert.ok(projectiles > 0);
+  projectiles = 0;
+  drawAll('projectile', { unit: 'facet' }, { material: counting });
+  assert.equal(projectiles, 0);
+});

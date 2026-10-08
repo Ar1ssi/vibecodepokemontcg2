@@ -41,7 +41,7 @@ const AURORA_RINGS = Object.freeze([
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const rad = (deg) => (deg * Math.PI) / 180;
 
-const palette = Object.freeze({
+const ICE_PALETTE = Object.freeze({
   deep: Object.freeze([62, 143, 209]),
   body: Object.freeze([143, 211, 255]),
   hot: Object.freeze([214, 243, 255]),
@@ -50,13 +50,13 @@ const palette = Object.freeze({
 });
 
 const AURORA_PALETTE = Object.freeze({
-  deep: palette.deep,
-  body: palette.body,
+  deep: ICE_PALETTE.deep,
+  body: ICE_PALETTE.body,
   mint: Object.freeze([168, 240, 214]),
   lilac: Object.freeze([200, 180, 255]),
-  hot: palette.hot,
-  core: palette.core,
-  white: palette.white,
+  hot: ICE_PALETTE.hot,
+  core: ICE_PALETTE.core,
+  white: ICE_PALETTE.white,
 });
 
 /** Map (f along, side across) in units of `length` / `width` from the base (x, y) along `angleDeg`. */
@@ -223,89 +223,101 @@ function crystalVolley(ctx, pal, { x, y, r, headingDeg, seed, alpha, tongues, ho
 }
 
 // ---- ice -------------------------------------------------------------------------------
+/** The ice material drawn in `palette` (any palette with the same keys). */
+function iceKit(palette) {
 
-const iceGlow = mistOf(palette);
+  const iceGlow = mistOf(palette);
 
-function iceBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  snowflake(ctx, palette, x, y, r, alpha, hot, restingPhase(x, y, r));
-}
-
-function iceTongue(ctx, spec, opts) {
-  crystal(ctx, palette, spec, opts);
-}
-
-function iceProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 4, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  iceGlow(ctx, x, y, r * 2.2, 0.45 * alpha);
-  if (!(tongues > 0)) {
-    snowflake(ctx, palette, x, y, r, alpha, hot, time * FLAKE_SPIN + seed);
-    return;
+  function iceBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    snowflake(ctx, palette, x, y, r, alpha, hot, restingPhase(x, y, r));
   }
-  crystalVolley(ctx, palette, { x, y, r, headingDeg, seed, alpha, tongues, hot });
-}
 
-export const ice = Object.freeze({
-  key: 'ice',
-  palette,
-  // A deep winter navy, kept local to a card, so pale ice reads against it.
-  shade: Object.freeze([6, 24, 50]),
-  // Cold mist (the recipe's smoke).
-  smoke: Object.freeze([200, 230, 245]),
-  particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
-  glow: iceGlow,
-  body: iceBody,
-  tongue: iceTongue,
-  projectile: iceProjectile,
-  grain: grainPass,
-});
+  function iceTongue(ctx, spec, opts) {
+    crystal(ctx, palette, spec, opts);
+  }
 
-// ---- aurora ----------------------------------------------------------------------------
+  function iceProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 4, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    iceGlow(ctx, x, y, r * 2.2, 0.45 * alpha);
+    if (!(tongues > 0)) {
+      snowflake(ctx, palette, x, y, r, alpha, hot, time * FLAKE_SPIN + seed);
+      return;
+    }
+    crystalVolley(ctx, palette, { x, y, r, headingDeg, seed, alpha, tongues, hot });
+  }
 
-const auroraGlow = mistOf({ core: AURORA_PALETTE.core, body: AURORA_PALETTE.lilac, deep: AURORA_PALETTE.deep });
-
-/** Three concentric rings, cyan outside to lilac inside, in a faint mist, breathing with `phase`. */
-function auroraRing(ctx, x, y, r, alpha, hot, phase) {
-  auroraGlow(ctx, x, y, r * 1.15, 0.5 * alpha);
-  const alphas = auroraAlphas(phase);
-  ctx.lineWidth = Math.max(1, r * 0.12);
-  AURORA_RINGS.forEach(([key, scale], k) => {
-    ctx.strokeStyle = rgbCss(AURORA_PALETTE[key], alpha * alphas[k] * (0.6 + 0.4 * clamp01(hot)));
-    ctx.beginPath();
-    ctx.arc(x, y, r * scale, 0, TAU);
-    ctx.stroke();
+  return Object.freeze({
+    key: 'ice',
+    palette,
+    // A deep winter navy, kept local to a card, so pale ice reads against it.
+    shade: Object.freeze([6, 24, 50]),
+    // Cold mist (the recipe's smoke).
+    smoke: Object.freeze([200, 230, 245]),
+    particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
+    glow: iceGlow,
+    body: iceBody,
+    tongue: iceTongue,
+    projectile: iceProjectile,
+    grain: grainPass,
+    withPalette: (p) => iceKit(p),
   });
 }
 
-function auroraBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  auroraRing(ctx, x, y, r, alpha, hot, restingPhase(x, y, r));
-}
+export const ice = iceKit(ICE_PALETTE);
 
-function auroraTongue(ctx, spec, opts) {
-  crystal(ctx, AURORA_PALETTE, spec, opts);
-}
+// ---- aurora ----------------------------------------------------------------------------
+/** The aurora material drawn in `palette` (any palette with the same keys). */
+function auroraKit(palette) {
 
-/** A ring flying along `headingDeg`, trailing `tongues` fainter, smaller rings. */
-function auroraProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const a = rad(headingDeg);
-  for (let k = tongues; k >= 1; k -= 1) {
-    const back = r * 0.9 * k;
-    auroraRing(ctx, x - Math.cos(a) * back, y - Math.sin(a) * back, r * (1 - 0.15 * k), alpha * (0.8 - 0.15 * k), hot * 0.6, time * 4 + seed + k);
+  const auroraGlow = mistOf({ core: palette.core, body: palette.lilac, deep: palette.deep });
+
+  /** Three concentric rings, cyan outside to lilac inside, in a faint mist, breathing with `phase`. */
+  function auroraRing(ctx, x, y, r, alpha, hot, phase) {
+    auroraGlow(ctx, x, y, r * 1.15, 0.5 * alpha);
+    const alphas = auroraAlphas(phase);
+    ctx.lineWidth = Math.max(1, r * 0.12);
+    AURORA_RINGS.forEach(([key, scale], k) => {
+      ctx.strokeStyle = rgbCss(palette[key], alpha * alphas[k] * (0.6 + 0.4 * clamp01(hot)));
+      ctx.beginPath();
+      ctx.arc(x, y, r * scale, 0, TAU);
+      ctx.stroke();
+    });
   }
-  auroraRing(ctx, x, y, r, alpha, hot, time * 4 + seed);
+
+  function auroraBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    auroraRing(ctx, x, y, r, alpha, hot, restingPhase(x, y, r));
+  }
+
+  function auroraTongue(ctx, spec, opts) {
+    crystal(ctx, palette, spec, opts);
+  }
+
+  /** A ring flying along `headingDeg`, trailing `tongues` fainter, smaller rings. */
+  function auroraProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const a = rad(headingDeg);
+    for (let k = tongues; k >= 1; k -= 1) {
+      const back = r * 0.9 * k;
+      auroraRing(ctx, x - Math.cos(a) * back, y - Math.sin(a) * back, r * (1 - 0.15 * k), alpha * (0.8 - 0.15 * k), hot * 0.6, time * 4 + seed + k);
+    }
+    auroraRing(ctx, x, y, r, alpha, hot, time * 4 + seed);
+  }
+
+  return Object.freeze({
+    key: 'aurora',
+    palette,
+    shade: Object.freeze([10, 18, 46]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.lilac), aspect: 1 }),
+    glow: auroraGlow,
+    body: auroraBody,
+    tongue: auroraTongue,
+    projectile: auroraProjectile,
+    grain: grainPass,
+    withPalette: (p) => auroraKit(p),
+  });
 }
 
-export const aurora = Object.freeze({
-  key: 'aurora',
-  palette: AURORA_PALETTE,
-  shade: Object.freeze([10, 18, 46]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(AURORA_PALETTE.lilac), aspect: 1 }),
-  glow: auroraGlow,
-  body: auroraBody,
-  tongue: auroraTongue,
-  projectile: auroraProjectile,
-  grain: grainPass,
-});
+export const aurora = auroraKit(AURORA_PALETTE);

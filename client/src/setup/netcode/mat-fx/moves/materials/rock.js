@@ -38,7 +38,7 @@ const SHADOW_ALPHA = 0.45;
 const SPIRE_SHOULDER = 0.55;
 const CRYSTAL_WAIST = 0.32;
 
-const palette = Object.freeze({
+const ROCK_PALETTE = Object.freeze({
   deep: Object.freeze([62, 67, 76]),
   body: Object.freeze([138, 143, 153]),
   hot: Object.freeze([184, 190, 201]),
@@ -47,13 +47,13 @@ const palette = Object.freeze({
 });
 
 const ANCIENT_PALETTE = Object.freeze({
-  deep: palette.deep,
-  body: palette.body,
+  deep: ROCK_PALETTE.deep,
+  body: ROCK_PALETTE.body,
   // The stone's lit facet stays rock-pale; `hot` is the aura's violet.
-  lit: palette.hot,
+  lit: ROCK_PALETTE.hot,
   hot: Object.freeze([196, 112, 232]),
   core: Object.freeze([240, 214, 255]),
-  white: palette.white,
+  white: ROCK_PALETTE.white,
 });
 
 const GEM_PALETTE = Object.freeze({
@@ -269,158 +269,178 @@ function spire(ctx, pal, rim, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
   strokeLine(ctx, outline.left);
 }
 
-// The interface's `body` carries no seed, so every lone stone has the one stable shape (a
-// position-derived seed would boil the outline as it moves).
-function rockBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  stone(ctx, palette, palette.core, x, y, r, alpha, hot, 0, 0);
+/** The rock material drawn in `palette` (any palette with the same keys). */
+function rockKit(palette) {
+  // The interface's `body` carries no seed, so every lone stone has the one stable shape (a
+  // position-derived seed would boil the outline as it moves).
+  function rockBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    stone(ctx, palette, palette.core, x, y, r, alpha, hot, 0, 0);
+  }
+
+  function rockTongue(ctx, spec, opts) {
+    spire(ctx, palette, palette.core, spec, opts);
+  }
+
+  /** A boulder tumbling along `headingDeg` with the scene clock, trailing `tongues` dust puffs. */
+  function rockProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    puffTrail(ctx, palette.body, palette.deep, { x, y, r, headingDeg, time, seed, alpha, count: tongues });
+    stone(ctx, palette, palette.core, x, y, r, alpha, hot, FLIGHT_SHAPE, time * 4 + seed);
+  }
+
+  return Object.freeze({
+    key: 'rock',
+    palette,
+    // The vignette's tint: a slate-black kept local to a card.
+    shade: Object.freeze([22, 24, 30]),
+    // Stone dust: the recipe's "smoke = dust", greyed to the stone.
+    smoke: Object.freeze([150, 146, 138]),
+    particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
+    glow: haloOf(palette),
+    body: rockBody,
+    tongue: rockTongue,
+    projectile: rockProjectile,
+    grain: grainPass,
+    withPalette: (p) => rockKit(p),
+  });
 }
 
-function rockTongue(ctx, spec, opts) {
-  spire(ctx, palette, palette.core, spec, opts);
-}
-
-/** A boulder tumbling along `headingDeg` with the scene clock, trailing `tongues` dust puffs. */
-function rockProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  puffTrail(ctx, palette.body, palette.deep, { x, y, r, headingDeg, time, seed, alpha, count: tongues });
-  stone(ctx, palette, palette.core, x, y, r, alpha, hot, FLIGHT_SHAPE, time * 4 + seed);
-}
-
-export const rock = Object.freeze({
-  key: 'rock',
-  palette,
-  // The vignette's tint: a slate-black kept local to a card.
-  shade: Object.freeze([22, 24, 30]),
-  // Stone dust: the recipe's "smoke = dust", greyed to the stone.
-  smoke: Object.freeze([150, 146, 138]),
-  particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
-  glow: haloOf(palette),
-  body: rockBody,
-  tongue: rockTongue,
-  projectile: rockProjectile,
-  grain: grainPass,
-});
+export const rock = rockKit(ROCK_PALETTE);
 
 // ---- ancient ---------------------------------------------------------------------------
+/** The ancient material drawn in `palette` (any palette with the same keys). */
+function ancientKit(palette) {
+  const glow = haloOf(palette, 0.5);
 
-/** A stone in its violet aura: the halo behind (additive), the stone, a violet rim. */
-function ancientBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  ancient.glow(ctx, x, y, r * 1.7, alpha);
-  stone(ctx, ANCIENT_PALETTE, ANCIENT_PALETTE.hot, x, y, r, alpha, hot, 0, 0);
+  /** A stone in its violet aura: the halo behind (additive), the stone, a violet rim. */
+  function ancientBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    glow(ctx, x, y, r * 1.7, alpha);
+    stone(ctx, palette, palette.hot, x, y, r, alpha, hot, 0, 0);
+  }
+
+  function ancientTongue(ctx, spec, opts) {
+    spire(ctx, palette, palette.hot, spec, opts);
+  }
+
+  /** A stone in its aura tumbling along `headingDeg`, trailing `tongues` violet wisps of aura. */
+  function ancientProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    puffTrail(ctx, palette.hot, palette.deep, { x, y, r, headingDeg, time, seed, alpha, count: tongues });
+    glow(ctx, x, y, r * 1.7, alpha);
+    stone(ctx, palette, palette.hot, x, y, r, alpha, hot, FLIGHT_SHAPE, time * 2.5 + seed);
+  }
+
+  return Object.freeze({
+    key: 'ancient',
+    palette,
+    shade: Object.freeze([26, 16, 34]),
+    smoke: rock.smoke,
+    particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
+    glow,
+    body: ancientBody,
+    tongue: ancientTongue,
+    projectile: ancientProjectile,
+    grain: grainPass,
+    withPalette: (p) => ancientKit(p),
+  });
 }
 
-function ancientTongue(ctx, spec, opts) {
-  spire(ctx, ANCIENT_PALETTE, ANCIENT_PALETTE.hot, spec, opts);
-}
-
-/** A stone in its aura tumbling along `headingDeg`, trailing `tongues` violet wisps of aura. */
-function ancientProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  puffTrail(ctx, ANCIENT_PALETTE.hot, ANCIENT_PALETTE.deep, { x, y, r, headingDeg, time, seed, alpha, count: tongues });
-  ancient.glow(ctx, x, y, r * 1.7, alpha);
-  stone(ctx, ANCIENT_PALETTE, ANCIENT_PALETTE.hot, x, y, r, alpha, hot, FLIGHT_SHAPE, time * 2.5 + seed);
-}
-
-export const ancient = Object.freeze({
-  key: 'ancient',
-  palette: ANCIENT_PALETTE,
-  shade: Object.freeze([26, 16, 34]),
-  smoke: rock.smoke,
-  particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(ANCIENT_PALETTE.hot), aspect: 0.6 }),
-  glow: haloOf(ANCIENT_PALETTE, 0.5),
-  body: ancientBody,
-  tongue: ancientTongue,
-  projectile: ancientProjectile,
-  grain: grainPass,
-});
+export const ancient = ancientKit(ANCIENT_PALETTE);
 
 // ---- gem -------------------------------------------------------------------------------
+/** The gem material drawn in `palette` (any palette with the same keys). */
+function gemKit(palette) {
+  const glow = haloOf(palette, 0.55);
 
-/** A crystal of light: the body fill, a bright facet up-left when hot, a pale rim. */
-function crystal(ctx, x, y, r, alpha, hot, angleDeg) {
-  const points = crystalOutline(x, y, r, angleDeg);
-  ctx.fillStyle = rgbCss(GEM_PALETTE.body, 0.75 * alpha);
-  tracePoints(ctx, points);
-  ctx.fill();
-  const lit = alpha * clamp01(hot);
-  if (lit > 0) {
-    // The facet between the top point, the upper-left shoulder and the centre.
-    ctx.fillStyle = rgbCss(GEM_PALETTE.core, 0.8 * lit);
-    tracePoints(ctx, [points[0], points[5], points[4], [x, y]]);
+  /** A crystal of light: the body fill, a bright facet up-left when hot, a pale rim. */
+  function crystal(ctx, x, y, r, alpha, hot, angleDeg) {
+    const points = crystalOutline(x, y, r, angleDeg);
+    ctx.fillStyle = rgbCss(palette.body, 0.75 * alpha);
+    tracePoints(ctx, points);
     ctx.fill();
+    const lit = alpha * clamp01(hot);
+    if (lit > 0) {
+      // The facet between the top point, the upper-left shoulder and the centre.
+      ctx.fillStyle = rgbCss(palette.core, 0.8 * lit);
+      tracePoints(ctx, [points[0], points[5], points[4], [x, y]]);
+      ctx.fill();
+    }
+    ctx.strokeStyle = rgbCss(palette.hot, 0.85 * alpha);
+    ctx.lineWidth = Math.max(1, r * 0.08);
+    ctx.lineJoin = 'miter';
+    tracePoints(ctx, points);
+    ctx.stroke();
   }
-  ctx.strokeStyle = rgbCss(GEM_PALETTE.hot, 0.85 * alpha);
-  ctx.lineWidth = Math.max(1, r * 0.08);
-  ctx.lineJoin = 'miter';
-  tracePoints(ctx, points);
-  ctx.stroke();
-}
 
-function gemBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  crystal(ctx, x, y, r, alpha, hot, -90);
-}
+  function gemBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    crystal(ctx, x, y, r, alpha, hot, -90);
+  }
 
-/**
- * A crystal streak: a straight spindle of light along the heading (its body, a narrower
- * bright core), then a white centre line (dropped at `hot` 0). `jag` makes it a crystal chip.
- */
-function gemTongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
-  if (jag) {
-    ctx.fillStyle = rgbCss(GEM_PALETTE.body, 0.8 * alpha);
-    traceOutline(ctx, shardOutline(spec));
+  /**
+   * A crystal streak: a straight spindle of light along the heading (its body, a narrower
+   * bright core), then a white centre line (dropped at `hot` 0). `jag` makes it a crystal chip.
+   */
+  function gemTongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+    if (jag) {
+      ctx.fillStyle = rgbCss(palette.body, 0.8 * alpha);
+      traceOutline(ctx, shardOutline(spec));
+      ctx.fill();
+      ctx.fillStyle = rgbCss(palette.core, 0.7 * alpha);
+      traceOutline(ctx, shardOutline({ ...spec, width: spec.width * 0.45 }));
+      ctx.fill();
+      return;
+    }
+    const a = rad(spec.angleDeg);
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    const at = (f, side) => [spec.x + ux * spec.length * f - uy * spec.width * side, spec.y + uy * spec.length * f + ux * spec.width * side];
+    const spindle = (scale) => [at(0, 0), at(0.3, 0.5 * scale), at(1, 0), at(0.3, -0.5 * scale)];
+    ctx.fillStyle = rgbCss(palette.body, 0.6 * alpha);
+    tracePoints(ctx, spindle(1));
     ctx.fill();
-    ctx.fillStyle = rgbCss(GEM_PALETTE.core, 0.7 * alpha);
-    traceOutline(ctx, shardOutline({ ...spec, width: spec.width * 0.45 }));
+    ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
+    tracePoints(ctx, spindle(0.45));
     ctx.fill();
-    return;
+    const lit = alpha * clamp01(hot);
+    if (!(lit > 0)) return;
+    ctx.strokeStyle = rgbCss(palette.white, 0.85 * lit);
+    ctx.lineWidth = Math.max(1, spec.width * 0.08);
+    strokeLine(ctx, [at(0.05, 0), at(0.95, 0)]);
   }
-  const a = rad(spec.angleDeg);
-  const ux = Math.cos(a);
-  const uy = Math.sin(a);
-  const at = (f, side) => [spec.x + ux * spec.length * f - uy * spec.width * side, spec.y + uy * spec.length * f + ux * spec.width * side];
-  const spindle = (scale) => [at(0, 0), at(0.3, 0.5 * scale), at(1, 0), at(0.3, -0.5 * scale)];
-  ctx.fillStyle = rgbCss(GEM_PALETTE.body, 0.6 * alpha);
-  tracePoints(ctx, spindle(1));
-  ctx.fill();
-  ctx.fillStyle = rgbCss(GEM_PALETTE.hot, 0.8 * alpha);
-  tracePoints(ctx, spindle(0.45));
-  ctx.fill();
-  const lit = alpha * clamp01(hot);
-  if (!(lit > 0)) return;
-  ctx.strokeStyle = rgbCss(GEM_PALETTE.white, 0.85 * lit);
-  ctx.lineWidth = Math.max(1, spec.width * 0.08);
-  strokeLine(ctx, [at(0.05, 0), at(0.95, 0)]);
+
+  /** A crystal turning slowly with the clock in its halo, trailing `tongues` crystal streaks. */
+  function gemProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    glow(ctx, x, y, r * 2.2, alpha);
+    const back = headingDeg + 180;
+    for (let k = 0; k < tongues; k += 1) {
+      const spread = (k - (tongues - 1) / 2) * 16;
+      gemTongue(
+        ctx,
+        { x, y, angleDeg: back + spread, length: r * (2.4 - 0.3 * Math.abs(spread / 16)), width: r * 0.55, time, seed: seed + k },
+        { alpha: alpha * 0.8, hot: hot * 0.6 }
+      );
+    }
+    crystal(ctx, x, y, r, alpha, hot, headingDeg + 30 * Math.sin(time * 3 + seed));
+  }
+
+  return Object.freeze({
+    key: 'gem',
+    palette,
+    shade: Object.freeze([18, 14, 36]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(palette.hot), aspect: 1 }),
+    glow,
+    body: gemBody,
+    tongue: gemTongue,
+    projectile: gemProjectile,
+    grain: grainPass,
+    withPalette: (p) => gemKit(p),
+  });
 }
 
-/** A crystal turning slowly with the clock in its halo, trailing `tongues` crystal streaks. */
-function gemProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  gem.glow(ctx, x, y, r * 2.2, alpha);
-  const back = headingDeg + 180;
-  for (let k = 0; k < tongues; k += 1) {
-    const spread = (k - (tongues - 1) / 2) * 16;
-    gemTongue(
-      ctx,
-      { x, y, angleDeg: back + spread, length: r * (2.4 - 0.3 * Math.abs(spread / 16)), width: r * 0.55, time, seed: seed + k },
-      { alpha: alpha * 0.8, hot: hot * 0.6 }
-    );
-  }
-  crystal(ctx, x, y, r, alpha, hot, headingDeg + 30 * Math.sin(time * 3 + seed));
-}
-
-export const gem = Object.freeze({
-  key: 'gem',
-  palette: GEM_PALETTE,
-  shade: Object.freeze([18, 14, 36]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--twinkle', color: rgbCss(GEM_PALETTE.hot), aspect: 1 }),
-  glow: haloOf(GEM_PALETTE, 0.55),
-  body: gemBody,
-  tongue: gemTongue,
-  projectile: gemProjectile,
-  grain: grainPass,
-});
+export const gem = gemKit(GEM_PALETTE);

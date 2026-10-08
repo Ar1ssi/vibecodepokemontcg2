@@ -50,6 +50,8 @@ import { peekCombatOrigin, zoneCardIds } from './origins.mjs';
 import { playMove } from './moves/move-player.js';
 import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
 import { SPECS } from './moves/specs/index.mjs';
+import { signatureFor, slugFor, withSignatureSpec } from './moves/signature/signature-select.mjs';
+import { SIGNATURE_SPECS } from './moves/signature/specs/index.mjs';
 import { burstParticles } from './particles.mjs';
 
 const BACKSTOP_PAD_MS = 400;
@@ -243,7 +245,20 @@ const pickMove = (plan, card) =>
     : null;
 
 /** Sound family of the move this attack plays, or undefined (the generic lunge or aura). */
-export const attackFamilyFor = (plan) => pickMove(plan, getCardRegistry().get(plan.attackerId)?.card)?.family;
+/**
+ * Design 065: the signature move this attack plays (name match, else the legendary's strongest
+ * attack), with the card's material; null when none or its spec has not shipped. Pure.
+ */
+const pickSignature = (plan, card) => {
+  if (!card) return null;
+  const sig = signatureFor(card, { attackName: plan.attackName, slug: slugFor(card) });
+  return withSignatureSpec(sig, SIGNATURE_SPECS);
+};
+
+export const attackFamilyFor = (plan) => {
+  const card = getCardRegistry().get(plan.attackerId)?.card;
+  return pickSignature(plan, card)?.spec.family ?? pickMove(plan, card)?.family;
+};
 
 /** The opponent's Active card id (the target when the plan names no defender), else null. */
 const opponentActiveId = (user, registry) => {
@@ -308,6 +323,20 @@ export const attack = (plan) => {
   if (!from || !src) return 0;
   const defenderId = combatRect(plan.defenderId, registry) ? plan.defenderId : opponentActiveId(plan.user, registry);
   const to = defenderId == null ? null : combatRect(defenderId, registry);
+  // Design 065: a signature plays before the zero-damage check (a status move by name still plays).
+  const sig = to ? pickSignature(plan, card) : null;
+  const sigDefenderSrc = sig ? combatSrc(defenderId, registry) : null;
+  if (sig && sigDefenderSrc) {
+    const played = playMove({
+      spec: sig.spec,
+      attacker: moveSide(plan.attackerId, from, src, registry),
+      defender: moveSide(defenderId, to, sigDefenderSrc, registry),
+      seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
+      impacts: { strikeIn: announceStrike },
+      attackerCard: card,
+    });
+    if (played) return played.holdMs;
+  }
   if (isZeroDamage(plan) || !to) {
     playAuraPulse(from, card ? brighten(fxRgbForCard(card), 0.3) : FX_NEUTRAL_RGB);
     return;

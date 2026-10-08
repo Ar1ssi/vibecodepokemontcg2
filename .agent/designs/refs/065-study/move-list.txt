@@ -1,0 +1,87 @@
+dark-void|Trou Noir|dark|status
+fiery-wrath|Fureur Ardente|dark|special
+hyperspace-fury|Furie Dimension|dark|physical
+ruination|Cataclysme|dark|special
+wicked-blow|Poing Obscur|dark|physical
+core-enforcer|Sanction Suprême|dragon|special
+dragon-energy|Draco-Énergie|dragon|special
+dynamax-cannon|Canon Dynamax|dragon|special
+eternabeam|Laser Infinimax|dragon|special
+nihil-light|Lux Nihilum|dragon|special
+roar-of-time|Hurle-Temps|dragon|special
+spacial-rend|Spatio-Rift|dragon|special
+bolt-strike|Charge Foudre|electric|physical
+electro-drift|Turbo Volt|electric|special
+fusion-bolt|Éclair Croix|electric|physical
+plasma-fists|Plasma Punch|electric|physical
+thunder-cage|Voltageôle|electric|special
+thunderclap|Vif Éclair|electric|special
+wildbolt-storm|Typhon Fulgurant|electric|special
+fleur-cannon|Canon Floral|fairy|special
+geomancy|Géo-Contrôle|fairy|status
+natures-madness|Ire de la Nature|fairy|special
+springtide-storm|Typhon Passionné|fairy|special
+collision-course|Nitro Crash|fighting|physical
+secret-sword|Lame Ointe|fighting|special
+thunderous-kick|Coup Fulgurant|fighting|physical
+blue-flare|Flamme Bleue|fire|special
+burning-bulwark|Rempart Brûlant|fire|status
+fusion-flare|Flamme Croix|fire|special
+magma-storm|Vortex Magma|fire|special
+searing-shot|Incendie (capacité)|fire|special
+v-create|Coup Victoire|fire|physical
+aeroblast|Aéroblast|flying|special
+bleakwind-storm|Typhon Hivernal|flying|special
+dragon-ascent|Draco-Ascension|flying|physical
+oblivion-wing|Mort'Ailes|flying|special
+astral-barrage|Éclat Spectral|ghost|special
+moongeist-beam|Rayon Spectral|ghost|special
+shadow-force|Revenant|ghost|physical
+spectral-thief|Clepto-Mânes|ghost|physical
+ivy-cudgel|Massue Liane|grass|physical
+jungle-healing|Selve Salvatrice|grass|status
+seed-flare|Fulmigraine|grass|special
+lands-wrath|Force Chtonienne|ground|physical
+precipice-blades|Lame Pangéenne|ground|physical
+sandsear-storm|Typhon Pyrosable|ground|special
+thousand-arrows|Myria-Flèches|ground|physical
+thousand-waves|Myria-Vagues|ground|physical
+freeze-shock|Éclair Gelé|ice|physical
+glacial-lance|Lance de Glace|ice|physical
+glaciate|Ère Glaciaire|ice|special
+ice-burn|Feu Glacé|ice|special
+crush-grip|Presse|normal|physical
+judgment|Jugement|normal|special
+multi-attack|Coup Varia-Type|normal|physical
+relic-song|Chant Antique|normal|special
+techno-blast|Techno-Buster|normal|special
+tera-starstorm|Pluie Térastrale|normal|special
+malignant-chain|Chaîne Malsaine|poison|special
+freezing-glare|Regard Glaçant|psychic|special
+hyperspace-hole|TrouDimensionnel|psychic|special
+lunar-blessing|Prière Lunaire|psychic|status
+lunar-dance|Danse Lune|psychic|status
+luster-purge|Lumi-Éclat|psychic|special
+mist-ball|Ball'Brume|psychic|special
+mystical-power|Force Mystique|psychic|special
+photon-geyser|Photo-Geyser|psychic|special
+prismatic-laser|Laser Prisme|psychic|special
+psyblade|Lame Psychique|psychic|physical
+psystrike|Frappe Psy|psychic|special
+take-heart|Extravaillance|psychic|status
+diamond-storm|Orage Adamantin|rock|physical
+mighty-cleave|Lame Puissante|rock|physical
+doom-desire|Vœu Destructeur|steel|special
+double-iron-bash|Écrous d'Poing|steel|physical
+sunsteel-strike|Choc Météore|steel|physical
+tachyon-cutter|Lame Tachyonique|steel|special
+hydro-steam|Hydrovapeur|water|special
+origin-pulse|Onde Originelle|water|special
+steam-eruption|Jet de Vapeur|water|special
+surging-strikes|Torrent de Coups|water|physical
+sacred-fire|Feu Sacré|fire|physical
+psycho-boost|Psycho-Boost|psychic|special
+heart-swap|Permucœur|psychic|status
+sacred-sword|Lame Sainte|fighting|physical
+behemoth-blade|Gladius Maximus|steel|physical
+behemoth-bash|Aegis Maxima|steel|physical

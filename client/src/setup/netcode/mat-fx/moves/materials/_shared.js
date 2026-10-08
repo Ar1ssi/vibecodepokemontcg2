@@ -186,3 +186,24 @@ export function grainPass(ctx, size, time, strength = 0.3) {
   ctx.fillRect(-NOISE_SIZE, -NOISE_SIZE, size + NOISE_SIZE * 2, size + NOISE_SIZE * 2);
   ctx.restore();
 }
+
+// ---- design 065: palette tints -------------------------------------------------------
+
+/** '#RRGGBB' → [r, g, b]. */
+export function parseHex(hex) {
+  const n = Number.parseInt(String(hex).slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** '#RRGGBB' mixed with white by `f` (0 = unchanged, 1 = white), as '#rrggbb'. */
+export function lighten(hex, f) {
+  const toHex = (v) => Math.round(v + (255 - v) * f).toString(16).padStart(2, '0');
+  return `#${parseHex(hex).map(toHex).join('')}`;
+}
+
+/** `palette` with every key present in `tint` ('#RRGGBB' values) replaced; frozen like a material palette. */
+export function tintedPalette(palette, tint) {
+  const out = { ...palette };
+  for (const [key, hex] of Object.entries(tint ?? {})) out[key] = Object.freeze(parseHex(hex));
+  return Object.freeze(out);
+}

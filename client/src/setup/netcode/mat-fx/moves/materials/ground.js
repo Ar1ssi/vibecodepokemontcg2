@@ -37,7 +37,7 @@ const SEAM_GROW = 0.35;
 const POOL_DROP = 0.32;
 const POOL_SQUASH = 0.42;
 
-const palette = Object.freeze({
+const GROUND_PALETTE = Object.freeze({
   deep: Object.freeze([92, 58, 23]),
   body: Object.freeze([181, 121, 60]),
   hot: Object.freeze([217, 160, 102]),
@@ -169,219 +169,231 @@ const dustTrail = (ctx, pal, { x, y, r, headingDeg, time, seed, alpha, count }) 
 };
 
 // ---- ground ------------------------------------------------------------------------
+/** The ground material drawn in `palette` (any palette with the same keys). */
+function groundKit(palette) {
 
-/**
- * One clod: the lump flat-shaded (body above, deep below, a hard terminator through the
- * centre, so the light stays overhead however it tumbles), then a lit chip up-left when hot.
- */
-function clod(ctx, x, y, r, alpha, hot, seed, spin) {
-  inShadow(ctx, () => {
-    const g = ctx.createLinearGradient(x, y - r, x, y + r);
-    g.addColorStop(0, rgbCss(palette.body, alpha));
-    g.addColorStop(0.5, rgbCss(palette.body, alpha));
-    g.addColorStop(0.5, rgbCss(palette.deep, alpha));
-    g.addColorStop(1, rgbCss(palette.deep, alpha));
-    ctx.fillStyle = g;
-    tracePoints(ctx, clodOutline(x, y, r, seed, spin));
-    ctx.fill();
-  });
-  const lit = alpha * clamp01(hot);
-  if (!(lit > 0)) return;
-  ctx.fillStyle = rgbCss(palette.core, 0.5 * lit);
-  ctx.beginPath();
-  ctx.arc(x - r * 0.28, y - r * 0.32, r * 0.16, 0, TAU);
-  ctx.fill();
-}
-
-// The interface's `body` carries no seed, so every lone clod has the one stable shape (a
-// position-derived seed would boil the outline as the clod moves).
-/** A clod of radius `r`; `hot` lights its chip. */
-function body(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  clod(ctx, x, y, r, alpha, hot, 0, 0);
-}
-
-/**
- * A spike of earth (or with `jag`, a thrown chip): the solid fill, the shaded facet on its
- * right side, then a lit edge down its left side (dropped at `hot` 0).
- */
-function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
-  const outline = jag ? shardOutline(spec) : spikeOutline(spec);
-  const tip = outline.left.at(-1);
-  inShadow(ctx, () => {
-    ctx.fillStyle = rgbCss(palette.body, 0.95 * alpha);
-    traceOutline(ctx, outline);
-    ctx.fill();
-    ctx.fillStyle = rgbCss(palette.deep, FACET_ALPHA * alpha);
-    traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
-    ctx.fill();
-  });
-  const lit = alpha * clamp01(hot);
-  if (!(lit > 0)) return;
-  ctx.strokeStyle = rgbCss(palette.hot, EDGE_ALPHA * lit);
-  ctx.lineWidth = Math.max(1, spec.width * 0.06);
-  ctx.lineJoin = 'round';
-  strokeLine(ctx, outline.left);
-}
-
-/** A clod tumbling along `headingDeg` with the scene clock, trailing `tongues` dust puffs. */
-function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  dustTrail(ctx, palette, { x, y, r, headingDeg, time, seed, alpha, count: tongues });
-  clod(ctx, x, y, r, alpha, hot, seed, time * 5 + seed);
-}
-
-/**
- * The ground splitting under a card at glyph progress `s`: a glowing pool low on the card and
- * jagged seams growing out of it, the glow breathing at 3 beats over the sigil.
- */
-function sigil(ctx, x, y, r, s) {
-  const { spread, seams } = fissureSeams(s, r);
-  if (!(spread > 0)) return;
-  const px = x;
-  const py = y + r * POOL_DROP;
-  const rx = r * 0.85 * spread;
-  const pulse = 0.75 + 0.25 * Math.sin(clamp01(s) * TAU * 3);
-  const g = ctx.createRadialGradient(px, py, 0, px, py, rx);
-  g.addColorStop(0, rgbCss(palette.core, 0.55 * pulse));
-  g.addColorStop(0.45, rgbCss(palette.hot, 0.35 * pulse));
-  g.addColorStop(1, rgbCss(palette.body, 0));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.ellipse(px, py, rx, rx * POOL_SQUASH, 0, 0, TAU);
-  ctx.fill();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  const passes = [
-    [palette.hot, 0.7, 0.05],
-    [palette.core, 0.6 * pulse, 0.02],
-  ];
-  for (const [rgb, a, w] of passes) {
-    ctx.strokeStyle = rgbCss(rgb, a);
-    ctx.lineWidth = Math.max(1, r * w);
+  /**
+   * One clod: the lump flat-shaded (body above, deep below, a hard terminator through the
+   * centre, so the light stays overhead however it tumbles), then a lit chip up-left when hot.
+   */
+  function clod(ctx, x, y, r, alpha, hot, seed, spin) {
+    inShadow(ctx, () => {
+      const g = ctx.createLinearGradient(x, y - r, x, y + r);
+      g.addColorStop(0, rgbCss(palette.body, alpha));
+      g.addColorStop(0.5, rgbCss(palette.body, alpha));
+      g.addColorStop(0.5, rgbCss(palette.deep, alpha));
+      g.addColorStop(1, rgbCss(palette.deep, alpha));
+      ctx.fillStyle = g;
+      tracePoints(ctx, clodOutline(x, y, r, seed, spin));
+      ctx.fill();
+    });
+    const lit = alpha * clamp01(hot);
+    if (!(lit > 0)) return;
+    ctx.fillStyle = rgbCss(palette.core, 0.5 * lit);
     ctx.beginPath();
-    for (const line of seams) {
-      line.forEach(([dx, dy], i) => (i === 0 ? ctx.moveTo(px + dx, py + dy) : ctx.lineTo(px + dx, py + dy)));
-    }
-    ctx.stroke();
+    ctx.arc(x - r * 0.28, y - r * 0.32, r * 0.16, 0, TAU);
+    ctx.fill();
   }
+
+  // The interface's `body` carries no seed, so every lone clod has the one stable shape (a
+  // position-derived seed would boil the outline as the clod moves).
+  /** A clod of radius `r`; `hot` lights its chip. */
+  function body(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    clod(ctx, x, y, r, alpha, hot, 0, 0);
+  }
+
+  /**
+   * A spike of earth (or with `jag`, a thrown chip): the solid fill, the shaded facet on its
+   * right side, then a lit edge down its left side (dropped at `hot` 0).
+   */
+  function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+    const outline = jag ? shardOutline(spec) : spikeOutline(spec);
+    const tip = outline.left.at(-1);
+    inShadow(ctx, () => {
+      ctx.fillStyle = rgbCss(palette.body, 0.95 * alpha);
+      traceOutline(ctx, outline);
+      ctx.fill();
+      ctx.fillStyle = rgbCss(palette.deep, FACET_ALPHA * alpha);
+      traceOutline(ctx, { left: [[spec.x, spec.y], tip], right: outline.right });
+      ctx.fill();
+    });
+    const lit = alpha * clamp01(hot);
+    if (!(lit > 0)) return;
+    ctx.strokeStyle = rgbCss(palette.hot, EDGE_ALPHA * lit);
+    ctx.lineWidth = Math.max(1, spec.width * 0.06);
+    ctx.lineJoin = 'round';
+    strokeLine(ctx, outline.left);
+  }
+
+  /** A clod tumbling along `headingDeg` with the scene clock, trailing `tongues` dust puffs. */
+  function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    dustTrail(ctx, palette, { x, y, r, headingDeg, time, seed, alpha, count: tongues });
+    clod(ctx, x, y, r, alpha, hot, seed, time * 5 + seed);
+  }
+
+  /**
+   * The ground splitting under a card at glyph progress `s`: a glowing pool low on the card and
+   * jagged seams growing out of it, the glow breathing at 3 beats over the sigil.
+   */
+  function sigil(ctx, x, y, r, s) {
+    const { spread, seams } = fissureSeams(s, r);
+    if (!(spread > 0)) return;
+    const px = x;
+    const py = y + r * POOL_DROP;
+    const rx = r * 0.85 * spread;
+    const pulse = 0.75 + 0.25 * Math.sin(clamp01(s) * TAU * 3);
+    const g = ctx.createRadialGradient(px, py, 0, px, py, rx);
+    g.addColorStop(0, rgbCss(palette.core, 0.55 * pulse));
+    g.addColorStop(0.45, rgbCss(palette.hot, 0.35 * pulse));
+    g.addColorStop(1, rgbCss(palette.body, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(px, py, rx, rx * POOL_SQUASH, 0, 0, TAU);
+    ctx.fill();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const passes = [
+      [palette.hot, 0.7, 0.05],
+      [palette.core, 0.6 * pulse, 0.02],
+    ];
+    for (const [rgb, a, w] of passes) {
+      ctx.strokeStyle = rgbCss(rgb, a);
+      ctx.lineWidth = Math.max(1, r * w);
+      ctx.beginPath();
+      for (const line of seams) {
+        line.forEach(([dx, dy], i) => (i === 0 ? ctx.moveTo(px + dx, py + dy) : ctx.lineTo(px + dx, py + dy)));
+      }
+      ctx.stroke();
+    }
+  }
+
+  return Object.freeze({
+    key: 'ground',
+    palette,
+    // The vignette's tint: an umber-black kept local to a card.
+    shade: Object.freeze([38, 22, 8]),
+    // Dust (the recipe's "smoke = dust", fighting's dust tone).
+    smoke: Object.freeze([150, 130, 110]),
+    particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
+    glow: haloOf(palette),
+    body,
+    tongue,
+    projectile,
+    sigil,
+    grain: grainPass,
+    withPalette: (p) => groundKit(p),
+  });
 }
 
-export const ground = Object.freeze({
-  key: 'ground',
-  palette,
-  // The vignette's tint: an umber-black kept local to a card.
-  shade: Object.freeze([38, 22, 8]),
-  // Dust (the recipe's "smoke = dust", fighting's dust tone).
-  smoke: Object.freeze([150, 130, 110]),
-  particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
-  glow: haloOf(palette),
-  body,
-  tongue,
-  projectile,
-  sigil,
-  grain: grainPass,
-});
+export const ground = groundKit(GROUND_PALETTE);
 
 // ---- mud ---------------------------------------------------------------------------
+/** The mud material drawn in `palette` (any palette with the same keys). */
+function mudKit(palette) {
 
-/** A wet glob: a glossy sphere (hot up-left through body to deep) and a sheen dot when hot. */
-function mudGlob(ctx, x, y, r, alpha, hot) {
-  inShadow(ctx, () => {
-    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
-    g.addColorStop(0, rgbCss(MUD_PALETTE.hot, alpha));
-    g.addColorStop(0.55, rgbCss(MUD_PALETTE.body, alpha));
-    g.addColorStop(1, rgbCss(MUD_PALETTE.deep, alpha));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
-  });
-  const lit = alpha * clamp01(hot);
-  if (!(lit > 0)) return;
-  ctx.fillStyle = rgbCss(MUD_PALETTE.core, 0.7 * lit);
-  ctx.beginPath();
-  ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.18, 0, TAU);
-  ctx.fill();
-}
-
-function mudBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  mudGlob(ctx, x, y, r, alpha, hot);
-}
-
-/**
- * A stream of mud: a dark smooth band (wobble x 0.4) with globs riding it, shrinking toward
- * the tip (poison's stream geometry), and a wet glint on each glob (dropped at `hot` 0). Globs,
- * not a smooth streak: a fan of smooth streaks off a hit reads as rays of light. `jag` makes
- * it a chunk: two straight-edged fills.
- */
-function mudTongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
-  if (jag) {
+  /** A wet glob: a glossy sphere (hot up-left through body to deep) and a sheen dot when hot. */
+  function mudGlob(ctx, x, y, r, alpha, hot) {
     inShadow(ctx, () => {
-      ctx.fillStyle = rgbCss(MUD_PALETTE.deep, 0.9 * alpha);
-      traceOutline(ctx, shardOutline(spec));
-      ctx.fill();
-      ctx.fillStyle = rgbCss(MUD_PALETTE.body, 0.9 * alpha);
-      traceOutline(ctx, shardOutline({ ...spec, width: spec.width * 0.5 }));
-      ctx.fill();
-    });
-    return;
-  }
-  const globs = streamGlobs(spec);
-  inShadow(ctx, () => {
-    ctx.fillStyle = rgbCss(MUD_PALETTE.deep, 0.6 * alpha);
-    traceOutline(ctx, tongueOutline({ ...spec, amp: 0.4 }, 0.7));
-    ctx.fill();
-    ctx.fillStyle = rgbCss(MUD_PALETTE.body, 0.95 * alpha);
-    ctx.beginPath();
-    for (const g of globs) addCircle(ctx, g.x, g.y, g.r);
-    ctx.fill();
-  });
-  const lit = alpha * clamp01(hot);
-  if (!(lit > 0)) return;
-  ctx.fillStyle = rgbCss(MUD_PALETTE.core, 0.7 * lit);
-  ctx.beginPath();
-  for (const g of globs) addCircle(ctx, g.x - g.r * 0.3, g.y - g.r * 0.3, g.r * 0.28);
-  ctx.fill();
-}
-
-/** A glob of mud along `headingDeg` trailing `tongues` drips (one covering fill), quivering. */
-function mudProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  if (tongues > 0) {
-    const back = rad(headingDeg + 180);
-    inShadow(ctx, () => {
-      ctx.fillStyle = rgbCss(MUD_PALETTE.body, 0.9 * alpha);
+      const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+      g.addColorStop(0, rgbCss(palette.hot, alpha));
+      g.addColorStop(0.55, rgbCss(palette.body, alpha));
+      g.addColorStop(1, rgbCss(palette.deep, alpha));
+      ctx.fillStyle = g;
       ctx.beginPath();
-      for (let k = 0; k < tongues; k += 1) {
-        const d = r * (1.1 + 0.7 * k);
-        const sway = r * 0.22 * Math.sin(time * 5 + seed + k * 2.1);
-        const dr = r * Math.max(0.14, 0.45 - 0.1 * k);
-        const dx = x + Math.cos(back) * d - Math.sin(back) * sway;
-        const dy = y + Math.sin(back) * d + Math.cos(back) * sway;
-        ctx.moveTo(dx + dr, dy);
-        ctx.arc(dx, dy, dr, 0, TAU);
-      }
+      ctx.arc(x, y, r, 0, TAU);
       ctx.fill();
     });
+    const lit = alpha * clamp01(hot);
+    if (!(lit > 0)) return;
+    ctx.fillStyle = rgbCss(palette.core, 0.7 * lit);
+    ctx.beginPath();
+    ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.18, 0, TAU);
+    ctx.fill();
   }
-  const squish = 1 + 0.06 * Math.sin(time * 9 + seed);
-  mudGlob(ctx, x, y, r * squish, alpha, hot);
+
+  function mudBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    mudGlob(ctx, x, y, r, alpha, hot);
+  }
+
+  /**
+   * A stream of mud: a dark smooth band (wobble x 0.4) with globs riding it, shrinking toward
+   * the tip (poison's stream geometry), and a wet glint on each glob (dropped at `hot` 0). Globs,
+   * not a smooth streak: a fan of smooth streaks off a hit reads as rays of light. `jag` makes
+   * it a chunk: two straight-edged fills.
+   */
+  function mudTongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+    if (jag) {
+      inShadow(ctx, () => {
+        ctx.fillStyle = rgbCss(palette.deep, 0.9 * alpha);
+        traceOutline(ctx, shardOutline(spec));
+        ctx.fill();
+        ctx.fillStyle = rgbCss(palette.body, 0.9 * alpha);
+        traceOutline(ctx, shardOutline({ ...spec, width: spec.width * 0.5 }));
+        ctx.fill();
+      });
+      return;
+    }
+    const globs = streamGlobs(spec);
+    inShadow(ctx, () => {
+      ctx.fillStyle = rgbCss(palette.deep, 0.6 * alpha);
+      traceOutline(ctx, tongueOutline({ ...spec, amp: 0.4 }, 0.7));
+      ctx.fill();
+      ctx.fillStyle = rgbCss(palette.body, 0.95 * alpha);
+      ctx.beginPath();
+      for (const g of globs) addCircle(ctx, g.x, g.y, g.r);
+      ctx.fill();
+    });
+    const lit = alpha * clamp01(hot);
+    if (!(lit > 0)) return;
+    ctx.fillStyle = rgbCss(palette.core, 0.7 * lit);
+    ctx.beginPath();
+    for (const g of globs) addCircle(ctx, g.x - g.r * 0.3, g.y - g.r * 0.3, g.r * 0.28);
+    ctx.fill();
+  }
+
+  /** A glob of mud along `headingDeg` trailing `tongues` drips (one covering fill), quivering. */
+  function mudProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    if (tongues > 0) {
+      const back = rad(headingDeg + 180);
+      inShadow(ctx, () => {
+        ctx.fillStyle = rgbCss(palette.body, 0.9 * alpha);
+        ctx.beginPath();
+        for (let k = 0; k < tongues; k += 1) {
+          const d = r * (1.1 + 0.7 * k);
+          const sway = r * 0.22 * Math.sin(time * 5 + seed + k * 2.1);
+          const dr = r * Math.max(0.14, 0.45 - 0.1 * k);
+          const dx = x + Math.cos(back) * d - Math.sin(back) * sway;
+          const dy = y + Math.sin(back) * d + Math.cos(back) * sway;
+          ctx.moveTo(dx + dr, dy);
+          ctx.arc(dx, dy, dr, 0, TAU);
+        }
+        ctx.fill();
+      });
+    }
+    const squish = 1 + 0.06 * Math.sin(time * 9 + seed);
+    mudGlob(ctx, x, y, r * squish, alpha, hot);
+  }
+
+  return Object.freeze({
+    key: 'mud',
+    palette,
+    shade: Object.freeze([30, 18, 6]),
+    // A grey-brown dust (Mud Bomb's lingering cloud).
+    smoke: Object.freeze([128, 108, 88]),
+    particle: Object.freeze({ className: 'fx-particle--glob', color: rgbCss(palette.body), aspect: 1 }),
+    glow: haloOf(palette),
+    body: mudBody,
+    tongue: mudTongue,
+    projectile: mudProjectile,
+    grain: grainPass,
+    withPalette: (p) => mudKit(p),
+  });
 }
 
-export const mud = Object.freeze({
-  key: 'mud',
-  palette: MUD_PALETTE,
-  shade: Object.freeze([30, 18, 6]),
-  // A grey-brown dust (Mud Bomb's lingering cloud).
-  smoke: Object.freeze([128, 108, 88]),
-  particle: Object.freeze({ className: 'fx-particle--glob', color: rgbCss(MUD_PALETTE.body), aspect: 1 }),
-  glow: haloOf(MUD_PALETTE),
-  body: mudBody,
-  tongue: mudTongue,
-  projectile: mudProjectile,
-  grain: grainPass,
-});
+export const mud = mudKit(MUD_PALETTE);

@@ -3,6 +3,7 @@
 // moment through the impact queue. Both cards are pushed through the real applyView so the
 // registry resolves them exactly as in a game.
 // env: MOVE (a spec id from specs/index.mjs, or 'kitchen-sink'; default fire-blast),
+//      SIGNATURE (design 065: a signature spec id from signature/specs/index.mjs; overrides MOVE),
 //      SIDE (self = your Active attacks, opp = the opponent's does; default self),
 //      BASE_URL (default http://localhost:4100), CHROMIUM, OUT (default .agent/scratch/moves/<MOVE>),
 //      SIO_JS (local socket.io.min.js when cdn.socket.io is unreachable), SEED,
@@ -19,8 +20,10 @@ const {
   SIO_JS,
   SEED = '7',
   CARD_DIR,
+  SIGNATURE,
 } = process.env;
-const OUT = process.env.OUT || `.agent/scratch/moves/${MOVE}`;
+const MOVE_ID = SIGNATURE || MOVE;
+const OUT = process.env.OUT || `.agent/scratch/moves/${SIGNATURE ? `signature-${SIGNATURE}` : MOVE}`;
 const ATTACKER = 'https://images.pokemontcg.io/sv3pt5/6_hires.png';
 const DEFENDER = 'https://images.pokemontcg.io/sv3pt5/3_hires.png';
 
@@ -66,7 +69,7 @@ await page.waitForFunction(() => window.__ptcg?.ready === true, null, {
 await page.waitForTimeout(800);
 
 const info = await page.evaluate(
-  async ([attackerSrc, defenderSrc, seed, moveId, side]) => {
+  async ([attackerSrc, defenderSrc, seed, moveId, side, signature]) => {
     const { applyView, getCardRegistry } =
       await import('/src/setup/netcode/apply-view.js');
     const { rectForInstance } =
@@ -78,8 +81,10 @@ const info = await page.evaluate(
     const { SPECS } = await import('/src/setup/netcode/mat-fx/moves/specs/index.mjs');
     const { kitchenSink } =
       await import('/src/setup/netcode/mat-fx/moves/specs/__fixtures__/kitchen-sink.mjs');
-    const spec = moveId === 'kitchen-sink' ? kitchenSink : SPECS[moveId];
-    if (!spec) throw new Error(`no spec for MOVE=${moveId}`);
+    const { SIGNATURE_SPECS } =
+      await import('/src/setup/netcode/mat-fx/moves/signature/specs/index.mjs');
+    const spec = signature ? SIGNATURE_SPECS[moveId] : moveId === 'kitchen-sink' ? kitchenSink : SPECS[moveId];
+    if (!spec) throw new Error(`no spec for ${signature ? 'SIGNATURE' : 'MOVE'}=${moveId}`);
     const { frameTurnOf } =
       await import('/src/setup/netcode/mat-fx/evolve-scene.js');
     const { holdFor } = await import('/src/setup/netcode/mat-fx/fx-holds.mjs');
@@ -190,7 +195,7 @@ const info = await page.evaluate(
     };
     return { from, to, bannerHoldMs: holdFor('attack-banner') };
   },
-  [ATTACKER, DEFENDER, SEED, MOVE, SIDE]
+  [ATTACKER, DEFENDER, SEED, MOVE_ID, SIDE, Boolean(SIGNATURE)]
 );
 console.log(JSON.stringify(info));
 await page.waitForTimeout(700);
@@ -219,7 +224,7 @@ console.log(
 );
 const video = page.video();
 await ctx.close();
-const target = path.join(OUT, `${MOVE}.webm`);
+const target = path.join(OUT, `${MOVE_ID}.webm`);
 renameSync(await video.path(), target);
 await browser.close();
 console.log('wrote', target);

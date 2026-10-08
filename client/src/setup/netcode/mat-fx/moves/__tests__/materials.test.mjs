@@ -17,6 +17,9 @@ import { crescentOutline, featherOutline } from '../materials/flying.js';
 import { auroraAlphas, icicleFacet, icicleOutline, snowflakeSegments } from '../materials/ice.js';
 import { needleOutline, needleTip, soundAlphas, wingOpen } from '../materials/bug.js';
 import { MATERIAL_KEYS } from '../move-spec.mjs';
+import { lighten, parseHex, tintedPalette } from '../materials/_shared.js';
+import { UNITS } from '../materials/_units.js';
+import { STELLAR_ACCENTS } from '../materials/stellar.js';
 import { callsAreFinite, recordingContext, rgbOf } from './recording-context.mjs';
 
 const PROJECTILE = { x: 100, y: 120, r: 30, headingDeg: 20, time: 1.3, seed: 4, alpha: 0.9, tongues: 5, hot: 1 };
@@ -2152,4 +2155,115 @@ test('silver: a silver-white palette, a slate shade, no smoke, powder motes; a s
   const gust = recordingContext();
   silver.projectile(gust.ctx, { ...PROJECTILE, tongues: 2 });
   assert.equal(gust.fills.count, 1 + 2 + 1, 'halo, two streaks, the scale');
+});
+
+// ---- design 065 slice 2: withPalette ----------------------------------------------------
+
+const drawAll = (material) => {
+  const rec = recordingContext();
+  material.glow(rec.ctx, 10, 20, 40, 0.8);
+  material.body(rec.ctx, 10, 20, 40, 0.8, 0.9);
+  material.tongue(rec.ctx, TONGUE, { alpha: 0.9, hot: 1 });
+  material.projectile(rec.ctx, PROJECTILE);
+  return rec;
+};
+
+test('withPalette over a material\'s own palette draws the identical recording', () => {
+  assert.equal(Object.keys(MATERIALS).filter((k) => k !== 'default').length, 28);
+  for (const [name, material] of Object.entries(MATERIALS)) {
+    assert.equal(typeof material.withPalette, 'function', name);
+    const same = material.withPalette(material.palette);
+    assert.ok(Object.isFrozen(same), name);
+    for (const key of REQUIRED) assert.ok(key in same, `${name}.${key}`);
+    assert.equal(same.key, material.key, name);
+    const a = drawAll(material);
+    const b = drawAll(same);
+    assert.equal(JSON.stringify(b.calls), JSON.stringify(a.calls), `${name} calls`);
+    assert.deepEqual(b.colours, a.colours, `${name} colours`);
+  }
+});
+
+test('withPalette with a red body draws red exactly where the material drew its body colour', () => {
+  const RED = [255, 0, 0];
+  const drewBody = [];
+  for (const [name, material] of Object.entries(MATERIALS)) {
+    const red = material.withPalette(tintedPalette(material.palette, { body: '#ff0000' }));
+    assert.deepEqual(red.palette.body, RED, name);
+    const a = drawAll(material);
+    const b = drawAll(red);
+    assert.equal(JSON.stringify(b.calls), JSON.stringify(a.calls), `${name} geometry`);
+    assert.equal(b.colours.length, a.colours.length, name);
+    const body = material.palette.body;
+    let swapped = 0;
+    a.colours.forEach((css, i) => {
+      const rgb = rgbOf(css);
+      const isBody = rgb && rgb.every((v, k) => v === body[k]);
+      const want = isBody ? css.replace(/^rgba?\(\d+,\s*\d+,\s*\d+/, 'rgba(255, 0, 0') : css;
+      if (isBody) swapped += 1;
+      assert.equal(b.colours[i], want, `${name} colour ${i}`);
+    });
+    if (swapped > 0) drewBody.push(name);
+  }
+  // Dark's body key is its mid-grey, which these four calls never draw (its pulse is shadow
+  // and crimson); every other material draws its body colour somewhere.
+  assert.ok(drewBody.length >= 24, drewBody.join());
+});
+
+test('palette helpers: parseHex, lighten, tintedPalette', () => {
+  assert.deepEqual(parseHex('#ff0000'), [255, 0, 0]);
+  assert.deepEqual(parseHex('#12AbEf'), [0x12, 0xab, 0xef]);
+  assert.equal(lighten('#000000', 0.5), '#808080');
+  assert.equal(lighten('#ff0000', 0), '#ff0000');
+  assert.equal(lighten('#123456', 1), '#ffffff');
+  const fire = MATERIALS.fire.palette;
+  const tinted = tintedPalette(fire, { hot: '#0000ff' });
+  assert.deepEqual(tinted.hot, [0, 0, 255]);
+  assert.equal(tinted.body, fire.body);
+  assert.ok(Object.isFrozen(tinted) && Object.isFrozen(tinted.hot));
+  assert.deepEqual(fire.hot, [241, 175, 13], 'the source palette is untouched');
+});
+
+// ---- design 065 slice 3: normal, stellar and units ---------------------------------------
+
+test('MATERIAL_KEYS is exactly the registry keys minus default', () => {
+  assert.deepEqual([...MATERIAL_KEYS].sort(), Object.keys(MATERIALS).filter((k) => k !== 'default').sort());
+});
+
+test('normal and stellar draw only their palettes (stellar: plus its accents)', () => {
+  const NORMAL = ['#E8552B', '#F2C230', '#FFF5B0', '#FFFFFF'].map(parseHex);
+  const STELLAR = ['#0F2A55', '#2FB8FF', '#5FF2E0', '#E6FFFF', ...STELLAR_ACCENTS].map(parseHex);
+  for (const [key, allowed] of [['normal', NORMAL], ['stellar', STELLAR]]) {
+    const material = MATERIALS[key];
+    assert.equal(material.key, key);
+    const rec = drawAll(material);
+    for (let seed = 0; seed < 5; seed += 1) material.tongue(rec.ctx, { ...TONGUE, seed }, { alpha: 1, hot: 1 });
+    assert.ok(rec.colours.length > 10, key);
+    for (const css of rec.colours) {
+      const rgb = rgbOf(css);
+      assert.ok(allowed.some((c) => c.every((v, i) => v === rgb?.[i])), `${key}: ${css}`);
+    }
+  }
+  const fringe = recordingContext();
+  for (let seed = 0; seed < 5; seed += 1) MATERIALS.stellar.tongue(fringe.ctx, { ...TONGUE, seed });
+  const used = new Set(fringe.colours.map((css) => rgbOf(css).join()));
+  for (const accent of STELLAR_ACCENTS) assert.ok(used.has(parseHex(accent).join()), `fringe ${accent}`);
+});
+
+test('every unit draws finitely, in palette colours, with balanced save/restore', () => {
+  const palette = MATERIALS.normal.palette;
+  assert.deepEqual(Object.keys(UNITS), ['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+  for (const [name, unit] of Object.entries(UNITS)) {
+    for (const s of [0, 0.5, 0.99]) {
+      const rec = recordingContext();
+      assert.doesNotThrow(() => unit(rec.ctx, 40, 50, 20, 30, s, palette), `${name} @ ${s}`);
+      assert.ok(rec.calls.length > 3, `${name} drew`);
+      assert.ok(callsAreFinite(rec.calls), `${name} finite`);
+      assert.equal(rec.state.depth, 0, `${name} save/restore @ ${s}`);
+      assert.ok(rec.state.maxDepth >= 1, `${name} saved`);
+      for (const css of rec.colours) assert.ok(inPalette(MATERIALS.normal, css), `${name}: ${css}`);
+    }
+    const none = recordingContext();
+    unit(none.ctx, 40, 50, 0, 30, 0.5, palette);
+    assert.equal(none.calls.length, 0, `${name} r 0`);
+  }
 });

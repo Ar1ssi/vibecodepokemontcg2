@@ -44,7 +44,7 @@ const STREAK_ALPHA = 0.45;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const rad = (deg) => (deg * Math.PI) / 180;
 
-const palette = Object.freeze({
+const BUG_PALETTE = Object.freeze({
   deep: Object.freeze([74, 107, 16]),
   body: Object.freeze([140, 191, 38]),
   hot: Object.freeze([191, 227, 77]),
@@ -236,173 +236,192 @@ const projectileOf = (pal, glow, round) =>
   };
 
 // ---- bug -------------------------------------------------------------------------------
+/** The bug material drawn in `palette` (any palette with the same keys). */
+function bugKit(palette) {
 
-const bugGlow = haloOf(palette, 0.45, 0.25);
+  const bugGlow = haloOf(palette, 0.45, 0.25);
 
-function bugBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  wingDisc(ctx, palette, x, y, r, alpha, hot, restingPhase(x, y, r));
-}
+  function bugBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    wingDisc(ctx, palette, x, y, r, alpha, hot, restingPhase(x, y, r));
+  }
 
-function bugTongue(ctx, spec, opts) {
-  needle(ctx, palette, spec, opts);
-}
+  function bugTongue(ctx, spec, opts) {
+    needle(ctx, palette, spec, opts);
+  }
 
-const bugParticle = Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 });
-// A deep forest black, kept local to a card, so the yellow-green reads against it.
-const bugShade = Object.freeze([14, 22, 4]);
+  const bugParticle = Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 });
+  // A deep forest black, kept local to a card, so the yellow-green reads against it.
+  const bugShade = Object.freeze([14, 22, 4]);
 
-export const bug = Object.freeze({
-  key: 'bug',
-  palette,
-  shade: bugShade,
-  smoke: null,
-  particle: bugParticle,
-  glow: bugGlow,
-  body: bugBody,
-  tongue: bugTongue,
-  projectile: projectileOf(palette, bugGlow, (ctx, x, y, r, alpha, hot, phase) => wingDisc(ctx, palette, x, y, r, alpha, hot, phase)),
-  grain: grainPass,
-});
-
-// ---- buzz ------------------------------------------------------------------------------
-
-/** A sound disc: a faint halo, then three concentric rings (hot, body, core) breathing with `phase`. */
-function soundDisc(ctx, x, y, r, alpha, hot, phase) {
-  bugGlow(ctx, x, y, r * 1.1, 0.6 * alpha);
-  const alphas = soundAlphas(phase);
-  ctx.lineWidth = Math.max(1, r * 0.1);
-  SOUND_RINGS.forEach(([key, scale], k) => {
-    ctx.strokeStyle = rgbCss(palette[key], alpha * alphas[k] * (0.6 + 0.4 * clamp01(hot)));
-    ctx.beginPath();
-    ctx.arc(x, y, r * scale, 0, TAU);
-    ctx.stroke();
+  return Object.freeze({
+    key: 'bug',
+    palette,
+    shade: bugShade,
+    smoke: null,
+    particle: bugParticle,
+    glow: bugGlow,
+    body: bugBody,
+    tongue: bugTongue,
+    projectile: projectileOf(palette, bugGlow, (ctx, x, y, r, alpha, hot, phase) => wingDisc(ctx, palette, x, y, r, alpha, hot, phase)),
+    grain: grainPass,
+    withPalette: (p) => bugKit(p),
   });
 }
 
-function buzzBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  soundDisc(ctx, x, y, r, alpha, hot, restingPhase(x, y, r));
-}
+export const bug = bugKit(BUG_PALETTE);
 
-/** A sound disc flying along `headingDeg`, trailing `tongues` fainter, smaller discs. */
-function buzzProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const a = rad(headingDeg);
-  for (let k = tongues; k >= 1; k -= 1) {
-    const back = r * 0.85 * k;
-    const scale = Math.max(0.3, 1 - 0.15 * k);
-    soundDisc(ctx, x - Math.cos(a) * back, y - Math.sin(a) * back, r * scale, alpha * Math.max(0.1, 0.8 - 0.15 * k), hot * 0.6, time * 9 + seed + k);
+// ---- buzz ------------------------------------------------------------------------------
+/** The buzz material drawn in `palette` (any palette with the same keys). */
+function buzzKit(palette, base = bugKit(palette)) {
+  const { glow: bugGlow, tongue: bugTongue, particle: bugParticle, shade: bugShade } = base;
+
+  /** A sound disc: a faint halo, then three concentric rings (hot, body, core) breathing with `phase`. */
+  function soundDisc(ctx, x, y, r, alpha, hot, phase) {
+    bugGlow(ctx, x, y, r * 1.1, 0.6 * alpha);
+    const alphas = soundAlphas(phase);
+    ctx.lineWidth = Math.max(1, r * 0.1);
+    SOUND_RINGS.forEach(([key, scale], k) => {
+      ctx.strokeStyle = rgbCss(palette[key], alpha * alphas[k] * (0.6 + 0.4 * clamp01(hot)));
+      ctx.beginPath();
+      ctx.arc(x, y, r * scale, 0, TAU);
+      ctx.stroke();
+    });
   }
-  soundDisc(ctx, x, y, r, alpha, hot, time * 9 + seed);
+
+  function buzzBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    soundDisc(ctx, x, y, r, alpha, hot, restingPhase(x, y, r));
+  }
+
+  /** A sound disc flying along `headingDeg`, trailing `tongues` fainter, smaller discs. */
+  function buzzProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const a = rad(headingDeg);
+    for (let k = tongues; k >= 1; k -= 1) {
+      const back = r * 0.85 * k;
+      const scale = Math.max(0.3, 1 - 0.15 * k);
+      soundDisc(ctx, x - Math.cos(a) * back, y - Math.sin(a) * back, r * scale, alpha * Math.max(0.1, 0.8 - 0.15 * k), hot * 0.6, time * 9 + seed + k);
+    }
+    soundDisc(ctx, x, y, r, alpha, hot, time * 9 + seed);
+  }
+
+  return Object.freeze({
+    key: 'buzz',
+    palette,
+    shade: bugShade,
+    smoke: null,
+    particle: bugParticle,
+    glow: bugGlow,
+    body: buzzBody,
+    tongue: bugTongue,
+    projectile: buzzProjectile,
+    grain: grainPass,
+    withPalette: (p) => buzzKit(p),
+  });
 }
 
-export const buzz = Object.freeze({
-  key: 'buzz',
-  palette,
-  shade: bugShade,
-  smoke: null,
-  particle: bugParticle,
-  glow: bugGlow,
-  body: buzzBody,
-  tongue: bugTongue,
-  projectile: buzzProjectile,
-  grain: grainPass,
-});
+export const buzz = buzzKit(BUG_PALETTE, bug);
 
 // ---- silver ----------------------------------------------------------------------------
+/** The silver material drawn in `palette` (any palette with the same keys). */
+function silverKit(palette) {
 
-const silverGlow = haloOf(SILVER_PALETTE, 0.5, 0.28);
+  const silverGlow = haloOf(palette, 0.5, 0.28);
 
-/** A powder scale: a pearly sphere and a four-point glint (one stroke) turned `phase`; hot 0 drops the glint. */
-function scaleMote(ctx, x, y, r, alpha, hot, phase) {
-  const lit = clamp01(hot);
-  sphere(ctx, x, y, r, [
-    [0, SILVER_PALETTE.white, alpha * 0.85 * lit],
-    [0.35, SILVER_PALETTE.hot, alpha * 0.55],
-    [0.75, SILVER_PALETTE.body, alpha * 0.18],
-    [1, SILVER_PALETTE.deep, 0],
-  ]);
-  const glint = 0.8 * alpha * lit;
-  if (!(glint > 0)) return;
-  ctx.strokeStyle = rgbCss(SILVER_PALETTE.white, glint);
-  ctx.lineWidth = Math.max(1, r * 0.06);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  for (const turn of [0, Math.PI / 2]) {
-    const dx = Math.cos(phase + turn) * r * 0.75;
-    const dy = Math.sin(phase + turn) * r * 0.75;
-    ctx.moveTo(x - dx, y - dy);
-    ctx.lineTo(x + dx, y + dy);
-  }
-  ctx.stroke();
-}
-
-function silverBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  scaleMote(ctx, x, y, r, alpha, hot, restingPhase(x, y, r));
-}
-
-/**
- * A silver streak: a soft translucent tongue (a third of fire's wobble) and a white centre line
- * (`hot` 0 drops it); `jag` makes it a flake of powder scale (a pale chip with a white edge).
- */
-function silverTongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
-  if (jag) {
-    const flake = shardOutline(spec);
-    ctx.fillStyle = rgbCss(SILVER_PALETTE.hot, 0.75 * alpha);
-    traceOutline(ctx, flake);
-    ctx.fill();
-    ctx.strokeStyle = rgbCss(SILVER_PALETTE.white, 0.6 * alpha);
-    ctx.lineWidth = 1;
-    traceOutline(ctx, flake);
+  /** A powder scale: a pearly sphere and a four-point glint (one stroke) turned `phase`; hot 0 drops the glint. */
+  function scaleMote(ctx, x, y, r, alpha, hot, phase) {
+    const lit = clamp01(hot);
+    sphere(ctx, x, y, r, [
+      [0, palette.white, alpha * 0.85 * lit],
+      [0.35, palette.hot, alpha * 0.55],
+      [0.75, palette.body, alpha * 0.18],
+      [1, palette.deep, 0],
+    ]);
+    const glint = 0.8 * alpha * lit;
+    if (!(glint > 0)) return;
+    ctx.strokeStyle = rgbCss(palette.white, glint);
+    ctx.lineWidth = Math.max(1, r * 0.06);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (const turn of [0, Math.PI / 2]) {
+      const dx = Math.cos(phase + turn) * r * 0.75;
+      const dy = Math.sin(phase + turn) * r * 0.75;
+      ctx.moveTo(x - dx, y - dy);
+      ctx.lineTo(x + dx, y + dy);
+    }
     ctx.stroke();
-    return;
   }
-  ctx.fillStyle = rgbCss(SILVER_PALETTE.body, STREAK_ALPHA * alpha);
-  traceOutline(ctx, tongueOutline({ ...spec, time: spec.time ?? 0, seed: spec.seed ?? 0, amp: STREAK_AMP }));
-  ctx.fill();
-  const line = 0.8 * alpha * clamp01(hot);
-  if (!(line > 0)) return;
-  const at = framer(spec);
-  const [x0, y0] = at(0.05, 0);
-  const [x1, y1] = at(0.8, 0);
-  ctx.strokeStyle = rgbCss(SILVER_PALETTE.white, line);
-  ctx.lineWidth = Math.max(1, spec.width * 0.08);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
+
+  function silverBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    scaleMote(ctx, x, y, r, alpha, hot, restingPhase(x, y, r));
+  }
+
+  /**
+   * A silver streak: a soft translucent tongue (a third of fire's wobble) and a white centre line
+   * (`hot` 0 drops it); `jag` makes it a flake of powder scale (a pale chip with a white edge).
+   */
+  function silverTongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+    if (jag) {
+      const flake = shardOutline(spec);
+      ctx.fillStyle = rgbCss(palette.hot, 0.75 * alpha);
+      traceOutline(ctx, flake);
+      ctx.fill();
+      ctx.strokeStyle = rgbCss(palette.white, 0.6 * alpha);
+      ctx.lineWidth = 1;
+      traceOutline(ctx, flake);
+      ctx.stroke();
+      return;
+    }
+    ctx.fillStyle = rgbCss(palette.body, STREAK_ALPHA * alpha);
+    traceOutline(ctx, tongueOutline({ ...spec, time: spec.time ?? 0, seed: spec.seed ?? 0, amp: STREAK_AMP }));
+    ctx.fill();
+    const line = 0.8 * alpha * clamp01(hot);
+    if (!(line > 0)) return;
+    const at = framer(spec);
+    const [x0, y0] = at(0.05, 0);
+    const [x1, y1] = at(0.8, 0);
+    ctx.strokeStyle = rgbCss(palette.white, line);
+    ctx.lineWidth = Math.max(1, spec.width * 0.08);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  }
+
+  /** A powder scale in a halo trailing `tongues` silver streaks behind its heading. */
+  function silverProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    silverGlow(ctx, x, y, r * 2.2, 0.45 * alpha);
+    const a = rad(headingDeg);
+    for (let k = 1; k <= tongues; k += 1) {
+      const side = r * 0.35 * k * (k % 2 ? 1 : -1);
+      silverTongue(
+        ctx,
+        { x: x - Math.sin(a) * side, y: y + Math.cos(a) * side, angleDeg: headingDeg + 180, length: r * 2.2 * Math.max(0.4, 1 - 0.1 * k), width: r * 0.8, time, seed: seed + k },
+        { alpha: alpha * Math.max(0.1, 0.7 - 0.1 * k), hot: 0 }
+      );
+    }
+    scaleMote(ctx, x, y, r, alpha, hot, time * 4 + seed);
+  }
+
+  return Object.freeze({
+    key: 'silver',
+    palette,
+    // A slate night, kept local to a card, so the pale powder reads against it.
+    shade: Object.freeze([10, 14, 22]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(palette.hot), aspect: 1 }),
+    glow: silverGlow,
+    body: silverBody,
+    tongue: silverTongue,
+    projectile: silverProjectile,
+    grain: grainPass,
+    withPalette: (p) => silverKit(p),
+  });
 }
 
-/** A powder scale in a halo trailing `tongues` silver streaks behind its heading. */
-function silverProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 2, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  silverGlow(ctx, x, y, r * 2.2, 0.45 * alpha);
-  const a = rad(headingDeg);
-  for (let k = 1; k <= tongues; k += 1) {
-    const side = r * 0.35 * k * (k % 2 ? 1 : -1);
-    silverTongue(
-      ctx,
-      { x: x - Math.sin(a) * side, y: y + Math.cos(a) * side, angleDeg: headingDeg + 180, length: r * 2.2 * Math.max(0.4, 1 - 0.1 * k), width: r * 0.8, time, seed: seed + k },
-      { alpha: alpha * Math.max(0.1, 0.7 - 0.1 * k), hot: 0 }
-    );
-  }
-  scaleMote(ctx, x, y, r, alpha, hot, time * 4 + seed);
-}
-
-export const silver = Object.freeze({
-  key: 'silver',
-  palette: SILVER_PALETTE,
-  // A slate night, kept local to a card, so the pale powder reads against it.
-  shade: Object.freeze([10, 14, 22]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(SILVER_PALETTE.hot), aspect: 1 }),
-  glow: silverGlow,
-  body: silverBody,
-  tongue: silverTongue,
-  projectile: silverProjectile,
-  grain: grainPass,
-});
+export const silver = silverKit(SILVER_PALETTE);

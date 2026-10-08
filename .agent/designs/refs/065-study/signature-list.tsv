@@ -1,0 +1,88 @@
+slug	english	french	type	class	power	owners	group	generation	source	notes
+dark-void	Dark Void	Trou Noir	dark	status	-	darkrai	mythical	generation-iv	PokéAPI	status move
+fiery-wrath	Fiery Wrath	Fureur Ardente	dark	special	90	moltres	legendary	generation-viii	PokéAPI	form-only: moltres-galar
+hyperspace-fury	Hyperspace Fury	Furie Dimension	dark	physical	100	hoopa	mythical	generation-vi	PokéAPI	form-only: hoopa-unbound
+ruination	Ruination	Cataclysme	dark	special	1	chi-yu,chien-pao,ting-lu,wo-chien	legendary	generation-ix	PokéAPI	-
+wicked-blow	Wicked Blow	Poing Obscur	dark	physical	75	urshifu	legendary	generation-viii	PokéAPI	-
+core-enforcer	Core Enforcer	Sanction Suprême	dragon	special	100	zygarde	legendary	generation-vii	PokéAPI	-
+dragon-energy	Dragon Energy	Draco-Énergie	dragon	special	150	regidrago	legendary	generation-viii	PokéAPI	-
+dynamax-cannon	Dynamax Cannon	Canon Dynamax	dragon	special	100	eternatus	legendary	generation-viii	PokéAPI	-
+eternabeam	Eternabeam	Laser Infinimax	dragon	special	160	eternatus	legendary	generation-viii	PokéAPI	-
+nihil-light	Nihil Light	Lux Nihilum	dragon	special	200	zygarde	legendary	generation-ix	Z-A (Poképédia)	form-only: zygarde-mega; Z-A (Poképédia): Mega-Zygarde signature
+roar-of-time	Roar of Time	Hurle-Temps	dragon	special	150	dialga	legendary	generation-iv	PokéAPI	-
+spacial-rend	Spacial Rend	Spatio-Rift	dragon	special	100	palkia	legendary	generation-iv	PokéAPI	-
+bolt-strike	Bolt Strike	Charge Foudre	electric	physical	130	zekrom	legendary	generation-v	PokéAPI	-
+electro-drift	Electro Drift	Turbo Volt	electric	special	100	miraidon	legendary	generation-ix	PokéAPI	-
+fusion-bolt	Fusion Bolt	Éclair Croix	electric	physical	100	kyurem,zekrom	legendary	generation-v	PokéAPI	form-only: kyurem-black
+plasma-fists	Plasma Fists	Plasma Punch	electric	physical	100	zeraora	mythical	generation-vii	PokéAPI	-
+thunder-cage	Thunder Cage	Voltageôle	electric	special	80	regieleki	legendary	generation-viii	PokéAPI	-
+thunderclap	Thunderclap	Vif Éclair	electric	special	70	raging-bolt	paradox	generation-ix	PokéAPI	-
+wildbolt-storm	Wildbolt Storm	Typhon Fulgurant	electric	special	100	thundurus	legendary	generation-viii	PokéAPI	-
+fleur-cannon	Fleur Cannon	Canon Floral	fairy	special	130	magearna	mythical	generation-vii	PokéAPI	-
+geomancy	Geomancy	Géo-Contrôle	fairy	status	-	xerneas	legendary	generation-vi	PokéAPI	status move
+natures-madness	Nature’s Madness	Ire de la Nature	fairy	special	-	tapu-bulu,tapu-fini,tapu-koko,tapu-lele	legendary	generation-vii	PokéAPI	-
+springtide-storm	Springtide Storm	Typhon Passionné	fairy	special	100	enamorus	legendary	generation-viii	PokéAPI	-
+collision-course	Collision Course	Nitro Crash	fighting	physical	100	koraidon	legendary	generation-ix	PokéAPI	-
+secret-sword	Secret Sword	Lame Ointe	fighting	special	85	keldeo	mythical	generation-v	PokéAPI	-
+thunderous-kick	Thunderous Kick	Coup Fulgurant	fighting	physical	90	zapdos	legendary	generation-viii	PokéAPI	form-only: zapdos-galar
+blue-flare	Blue Flare	Flamme Bleue	fire	special	130	reshiram	legendary	generation-v	PokéAPI	-
+burning-bulwark	Burning Bulwark	Rempart Brûlant	fire	status	0	gouging-fire	paradox	generation-ix	PokéAPI	status move
+fusion-flare	Fusion Flare	Flamme Croix	fire	special	100	kyurem,reshiram	legendary	generation-v	PokéAPI	form-only: kyurem-white
+magma-storm	Magma Storm	Vortex Magma	fire	special	100	heatran	legendary	generation-iv	PokéAPI	-
+searing-shot	Searing Shot	Incendie (capacité)	fire	special	100	victini	mythical	generation-v	PokéAPI	-
+v-create	V-create	Coup Victoire	fire	physical	180	victini	mythical	generation-v	PokéAPI	-
+aeroblast	Aeroblast	Aéroblast	flying	special	100	lugia	legendary	generation-ii	PokéAPI	-
+bleakwind-storm	Bleakwind Storm	Typhon Hivernal	flying	special	100	tornadus	legendary	generation-viii	PokéAPI	-
+dragon-ascent	Dragon Ascent	Draco-Ascension	flying	physical	120	rayquaza	legendary	generation-vi	PokéAPI	-
+oblivion-wing	Oblivion Wing	Mort'Ailes	flying	special	80	yveltal	legendary	generation-vi	PokéAPI	-
+astral-barrage	Astral Barrage	Éclat Spectral	ghost	special	120	calyrex	legendary	generation-viii	PokéAPI	form-only: calyrex-shadow
+moongeist-beam	Moongeist Beam	Rayon Spectral	ghost	special	100	lunala	legendary	generation-vii	PokéAPI	-
+shadow-force	Shadow Force	Revenant	ghost	physical	120	giratina	legendary	generation-iv	PokéAPI	-
+spectral-thief	Spectral Thief	Clepto-Mânes	ghost	physical	90	marshadow	mythical	generation-vii	PokéAPI	-
+ivy-cudgel	Ivy Cudgel	Massue Liane	grass	physical	100	ogerpon	legendary	generation-ix	PokéAPI	-
+jungle-healing	Jungle Healing	Selve Salvatrice	grass	status	-	zarude	mythical	generation-viii	PokéAPI	status move
+seed-flare	Seed Flare	Fulmigraine	grass	special	120	shaymin	mythical	generation-iv	PokéAPI	-
+lands-wrath	Land’s Wrath	Force Chtonienne	ground	physical	90	zygarde	legendary	generation-vi	PokéAPI	-
+precipice-blades	Precipice Blades	Lame Pangéenne	ground	physical	120	groudon	legendary	generation-vi	PokéAPI	-
+sandsear-storm	Sandsear Storm	Typhon Pyrosable	ground	special	100	landorus	legendary	generation-viii	PokéAPI	-
+thousand-arrows	Thousand Arrows	Myria-Flèches	ground	physical	90	zygarde	legendary	generation-vi	PokéAPI	-
+thousand-waves	Thousand Waves	Myria-Vagues	ground	physical	90	zygarde	legendary	generation-vi	PokéAPI	-
+freeze-shock	Freeze Shock	Éclair Gelé	ice	physical	140	kyurem	legendary	generation-v	PokéAPI	form-only: kyurem-black
+glacial-lance	Glacial Lance	Lance de Glace	ice	physical	120	calyrex	legendary	generation-viii	PokéAPI	form-only: calyrex-ice
+glaciate	Glaciate	Ère Glaciaire	ice	special	65	kyurem	legendary	generation-v	PokéAPI	-
+ice-burn	Ice Burn	Feu Glacé	ice	special	140	kyurem	legendary	generation-v	PokéAPI	form-only: kyurem-white
+crush-grip	Crush Grip	Presse	normal	physical	-	regigigas	legendary	generation-iv	PokéAPI	-
+judgment	Judgment	Jugement	normal	special	100	arceus	mythical	generation-iv	PokéAPI	-
+multi-attack	Multi-Attack	Coup Varia-Type	normal	physical	120	silvally	legendary	generation-vii	PokéAPI	-
+relic-song	Relic Song	Chant Antique	normal	special	75	meloetta	mythical	generation-v	PokéAPI	-
+techno-blast	Techno Blast	Techno-Buster	normal	special	120	genesect	mythical	generation-v	PokéAPI	-
+tera-starstorm	Tera Starstorm	Pluie Térastrale	normal	special	120	terapagos	legendary	generation-ix	PokéAPI	-
+malignant-chain	Malignant Chain	Chaîne Malsaine	poison	special	100	pecharunt	mythical	generation-ix	PokéAPI	-
+freezing-glare	Freezing Glare	Regard Glaçant	psychic	special	90	articuno	legendary	generation-viii	PokéAPI	form-only: articuno-galar
+hyperspace-hole	Hyperspace Hole	TrouDimensionnel	psychic	special	80	hoopa	mythical	generation-vi	PokéAPI	-
+lunar-blessing	Lunar Blessing	Prière Lunaire	psychic	status	0	cresselia	legendary	generation-viii	PokéAPI	status move
+lunar-dance	Lunar Dance	Danse Lune	psychic	status	-	cresselia	legendary	generation-iv	PokéAPI	status move
+luster-purge	Luster Purge	Lumi-Éclat	psychic	special	95	latios	legendary	generation-iii	PokéAPI	-
+mist-ball	Mist Ball	Ball'Brume	psychic	special	95	latias	legendary	generation-iii	PokéAPI	-
+mystical-power	Mystical Power	Force Mystique	psychic	special	70	azelf,mesprit,uxie	legendary	generation-viii	PokéAPI	-
+photon-geyser	Photon Geyser	Photo-Geyser	psychic	special	100	necrozma	legendary	generation-vii	PokéAPI	-
+prismatic-laser	Prismatic Laser	Laser Prisme	psychic	special	160	necrozma	legendary	generation-vii	PokéAPI	-
+psyblade	Psyblade	Lame Psychique	psychic	physical	80	iron-leaves	paradox	generation-ix	PokéAPI	-
+psystrike	Psystrike	Frappe Psy	psychic	special	100	mewtwo	legendary	generation-v	PokéAPI	-
+take-heart	Take Heart	Extravaillance	psychic	status	0	manaphy,phione	mythical	generation-viii	PokéAPI	status move
+diamond-storm	Diamond Storm	Orage Adamantin	rock	physical	100	diancie	mythical	generation-vi	PokéAPI	-
+mighty-cleave	Mighty Cleave	Lame Puissante	rock	physical	95	iron-boulder	paradox	generation-ix	PokéAPI	-
+doom-desire	Doom Desire	Vœu Destructeur	steel	special	140	jirachi	mythical	generation-iii	PokéAPI	-
+double-iron-bash	Double Iron Bash	Écrous d'Poing	steel	physical	60	melmetal	mythical	generation-vii	PokéAPI	-
+sunsteel-strike	Sunsteel Strike	Choc Météore	steel	physical	100	solgaleo	legendary	generation-vii	PokéAPI	-
+tachyon-cutter	Tachyon Cutter	Lame Tachyonique	steel	special	50	iron-crown	paradox	generation-ix	PokéAPI	-
+hydro-steam	Hydro Steam	Hydrovapeur	water	special	80	walking-wake	paradox	generation-ix	PokéAPI	-
+origin-pulse	Origin Pulse	Onde Originelle	water	special	110	kyogre	legendary	generation-vi	PokéAPI	-
+steam-eruption	Steam Eruption	Jet de Vapeur	water	special	110	volcanion	mythical	generation-vi	PokéAPI	-
+surging-strikes	Surging Strikes	Torrent de Coups	water	physical	25	urshifu	legendary	generation-viii	PokéAPI	form-only: urshifu-rapid-strike
+sacred-fire	Sacred Fire	Feu Sacré	fire	physical	100	ho-oh	legendary	gen-ii	PokéAPI	added by lead: Ho-Oh's signature; Entei learns it only by event
+psycho-boost	Psycho Boost	Psycho-Boost	psychic	special	140	deoxys	mythical	gen-iii	PokéAPI	added by lead: Deoxys' signature; Lugia learns it only by event
+heart-swap	Heart Swap	Permucœur	psychic	status	-	manaphy	mythical	gen-iv	PokéAPI	added by lead: Manaphy's signature; status move
+sacred-sword	Sacred Sword	Lame Sainte	fighting	physical	90	cobalion,terrakion,virizion,keldeo	legendary	gen-v	PokéAPI	added by lead: Swords of Justice signature at introduction; now also learned by Gallade, Samurott and others
+behemoth-blade	Behemoth Blade	Gladius Maximus	steel	physical	100	zacian	legendary	gen-viii	PokéAPI	added by lead: PokéAPI has no learners; Zacian-Crowned's Iron Head becomes this
+behemoth-bash	Behemoth Bash	Aegis Maxima	steel	physical	100	zamazenta	legendary	gen-viii	PokéAPI	added by lead: PokéAPI has no learners; Zamazenta-Crowned's Iron Head becomes this

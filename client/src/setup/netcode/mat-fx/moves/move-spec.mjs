@@ -29,7 +29,7 @@ export const FAMILIES = Object.freeze([
 ]);
 export const LAYERS = Object.freeze(['back', 'front', 'top']);
 /** Keys of MATERIALS (materials/index.js); materials.test.mjs keeps the two in step. */
-export const MATERIAL_KEYS = Object.freeze(['fire', 'water', 'grass', 'petal', 'solar', 'electric', 'fighting', 'aura', 'psychic', 'dark', 'steel', 'dragon', 'fairy', 'ghost', 'poison', 'ground', 'mud', 'rock', 'ancient', 'gem', 'flying', 'ice', 'aurora', 'bug', 'buzz', 'silver']);
+export const MATERIAL_KEYS = Object.freeze(['fire', 'water', 'grass', 'petal', 'solar', 'electric', 'fighting', 'aura', 'psychic', 'dark', 'steel', 'dragon', 'fairy', 'ghost', 'poison', 'ground', 'mud', 'rock', 'ancient', 'gem', 'flying', 'ice', 'aurora', 'bug', 'buzz', 'silver', 'normal', 'stellar']);
 export const PARTICLE_KINDS = Object.freeze([
   'ember',
   'droplet',
@@ -43,8 +43,13 @@ export const PARTICLE_KINDS = Object.freeze([
   'star',
   // A four-point sparkle in the material's particle colour (fairy); `star` is the gold KO star.
   'twinkle',
+  // Design 065 § F: a Z (Dark Void's sleep motes) and an eighth note (Relic Song).
+  'zzz',
+  'note',
 ]);
-export const TIER_BAND = Object.freeze({ 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200] });
+export const TIER_BAND = Object.freeze({ 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200], S: [1800, 2600] });
+/** Design 065: tier S (signature moves) contact window, on top of the ratio band. */
+export const S_CONTACT = Object.freeze([900, 1200]);
 export const CONTACT_BAND = Object.freeze({ min: 0.38, max: 0.62, tier1Max: 0.7 });
 export const PAD_RANGE = Object.freeze([1.2, 2.6]);
 export const DEFAULT_PAD = 1.7;
@@ -54,8 +59,17 @@ export const MAX_BURSTS = 2;
 export const MAX_NODES = 40;
 
 const TARGET = (fallback = 'defender') => ['target', fallback];
+/** Design 065 § New pieces B: an anchored drawer's place plus its offsets (h). */
+const ANCHORED = (fallback = 'defender') => ({
+  target: ['anchor', fallback],
+  dx: ['num', -2, 2, 0],
+  dy: ['num', -2, 2, 0],
+});
+/** Design 065 § New pieces C: the bodies a travelling / orbiting drawer can draw (materials/_units.js). */
+export const UNIT_NAMES = Object.freeze(['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+const UNIT = ['enum', UNIT_NAMES, 'body'];
 
-export const DRAWER_PARAMS = Object.freeze({
+const BASE_DRAWER_PARAMS = {
   orbitCharge: {
     count: ['int', 1, 8, 5],
     half: ['enum', ['back', 'front', 'both'], 'both'],
@@ -63,12 +77,16 @@ export const DRAWER_PARAMS = Object.freeze({
     r1: ['num', 0.05, 0.5, 0.24],
     tongues: ['int', 0, 6, 4],
     tilt: ['num', 0.2, 1, 0.42],
+    ...ANCHORED('attacker'),
+    unit: UNIT,
   },
   coreCharge: {
     lead: ['num', 0, 1, 0.42],
     r0: ['num', 0.05, 0.5, 0.18],
     r1: ['num', 0.1, 1, 0.56],
     from: ['num', 0, 0.9, 0.3],
+    ...ANCHORED('attacker'),
+    rings: ['int', 0, 2, 0],
   },
   shockRings: {
     count: ['int', 1, 4, 2],
@@ -76,6 +94,7 @@ export const DRAWER_PARAMS = Object.freeze({
     r0: ['num', 0.1, 1, 0.3],
     r1: ['num', 0.5, 2.5, 1.3],
     squash: ['num', 0.2, 1, 0.45],
+    ...ANCHORED('attacker'),
   },
   projectile: {
     path: ['enum', ['straight', 'arc', 'spiral'], 'arc'],
@@ -84,6 +103,8 @@ export const DRAWER_PARAMS = Object.freeze({
     bow: ['num', 0, 0.6, 0.2],
     tongues: ['int', 0, 12, 9],
     ease: ['enum', ['in', 'linear', 'out'], 'in'],
+    from: ['enum', ['attacker', 'defender', 'sky', 'sky-attacker'], 'attacker'],
+    unit: UNIT,
   },
   vignette: {
     target: TARGET(),
@@ -95,7 +116,7 @@ export const DRAWER_PARAMS = Object.freeze({
     count: ['int', 8, 40, 28],
     inner: ['num', 0.1, 0.6, 0.3],
     outer: ['num', 0.8, 2, 1.7],
-    target: TARGET(),
+    ...ANCHORED(),
   },
   starFlare: {
     arms: ['arms', 'dai'],
@@ -103,7 +124,7 @@ export const DRAWER_PARAMS = Object.freeze({
     core: ['num', 0.2, 0.7, 0.46],
     grow: ['num', 0.15, 0.5, 0.3],
     breakAt: ['num', 0.4, 0.9, 0.6],
-    target: TARGET(),
+    ...ANCHORED(),
   },
   impactFlash: {
     r0: ['num', 0.2, 1, 0.6],
@@ -137,7 +158,10 @@ export const DRAWER_PARAMS = Object.freeze({
     height: ['num', 0.8, 2.5, 1.8],
     w: ['num', 0.2, 1, 0.6],
     from: ['enum', ['below', 'above'], 'below'],
-    target: TARGET(),
+    ...ANCHORED(),
+    count: ['int', 1, 4, 1],
+    spread: ['num', 0, 3, 0],
+    stagger: ['num', 0, 400, 0],
   },
   slashArc: {
     sweep: ['deg', 120],
@@ -160,7 +184,7 @@ export const DRAWER_PARAMS = Object.freeze({
     drift: ['num', 0, 1.5, 0.6],
     direction: ['deg', -90],
     alpha: ['num', 0.1, 0.8, 0.5],
-    target: TARGET(),
+    ...ANCHORED(),
   },
   spiral: {
     turns: ['num', 1, 5, 2.5],
@@ -180,6 +204,7 @@ export const DRAWER_PARAMS = Object.freeze({
     // Where the bodies leave from: 'defender' flies them back up the lane (drains: Absorb);
     // 'sky' drops them onto the defender from above it on screen (meteors: Draco Meteor).
     from: ['enum', ['attacker', 'defender', 'sky'], 'attacker'],
+    unit: UNIT,
   },
   aura: {
     target: TARGET('attacker'),
@@ -201,6 +226,8 @@ export const DRAWER_PARAMS = Object.freeze({
     distance: ['num', 0.3, 1.8, 1.1],
     spin: ['num', 0, 720, 360],
     target: TARGET(),
+    unit: UNIT,
+    mode: ['enum', ['burst', 'cluster'], 'burst'],
   },
   bolt: {
     from: ['enum', ['attacker', 'sky'], 'attacker'],
@@ -209,20 +236,69 @@ export const DRAWER_PARAMS = Object.freeze({
     branches: ['int', 0, 4, 2],
     rerollMs: ['num', 20, 120, 45],
     width: ['num', 0.03, 0.3, 0.1],
+    count: ['int', 1, 12, 1],
+    spread: ['num', 0, 3, 0.8],
+    curve: ['num', -1, 1, 0],
   },
   ring: {
     count: ['int', 1, 5, 3],
     r0: ['num', 0.1, 0.8, 0.3],
     r1: ['num', 0.6, 2.5, 1.5],
-    kind: ['enum', ['floor', 'face'], 'floor'],
+    kind: ['enum', ['floor', 'face', 'fins'], 'floor'],
     width: ['num', 0.02, 0.15, 0.06],
-    target: TARGET(),
+    ...ANCHORED(),
+    rpm: ['num', 0, 240, 60],
   },
   glyph: {
     r: ['num', 0.4, 1.4, 0.9],
-    target: TARGET(),
+    ...ANCHORED(),
+    kind: ['enum', ['material', 'lattice', 'hex', 'heart'], 'material'],
   },
+  // ---- design 065 § New pieces D ----
+  fan: {
+    ...ANCHORED('attacker'),
+    count: ['int', 1, 12, 6],
+    spread: ['num', 0, 360, 110],
+    direction: ['deg', 180],
+    lenMin: ['num', 0.1, 2, 0.6],
+    lenMax: ['num', 0.1, 2.5, 1.0],
+    width: ['num', 0.05, 0.6, 0.22],
+    grow: ['num', 0.05, 0.8, 0.3],
+    flap: ['num', 0, 45, 0],
+    spin: ['num', -360, 360, 0],
+  },
+  shade: {
+    ...ANCHORED('defender'),
+    kind: ['enum', ['disc', 'dome', 'giant', 'sphere'], 'disc'],
+    r: ['num', 0.3, 2, 0.9],
+    fill: ['enum', ['deep', 'body', 'hot', 'core'], 'deep'],
+    fillAlpha: ['num', 0, 1, 1],
+    rimAlpha: ['num', 0, 1, 0.6],
+    swirl: ['num', 0, 240, 20],
+    eyes: ['enum', [false, true], false],
+  },
+  chain: {
+    links: ['int', 3, 16, 9],
+    r: ['num', 0.03, 0.3, 0.09],
+  },
+  grip: {
+    size: ['num', 0.5, 2, 1.2],
+  },
+};
+
+/**
+ * Design 065 § New pieces A: every drawer also takes `tint` (palette keys replaced for the
+ * beat) and `hues` (per-item body colours on the multi-item drawers). The player resolves
+ * both into a material before the drawer runs, so drawers never read them.
+ */
+export const BEAT_COLOUR_PARAMS = Object.freeze({
+  tint: ['palette', null],
+  hues: ['hexes', 1, 6, null],
 });
+
+export const DRAWER_PARAMS = Object.freeze(
+  Object.fromEntries(Object.entries(BASE_DRAWER_PARAMS).map(([name, schema]) => [name, { ...schema, ...BEAT_COLOUR_PARAMS }]))
+);
 
 /** Errors for one drawer's params: unknown drawer, unknown key, wrong type, out of range. */
 export function checkParams(drawer, params) {
@@ -254,13 +330,19 @@ export function tonguesAt(drawer, params) {
     case 'shards':
       return p.count;
     case 'pillar':
-      return 3;
+      return 3 * p.count;
+    case 'fan':
+      return p.count;
+    case 'ring':
+      return p.kind === 'fins' ? p.count : 0;
+    case 'coreCharge':
+      return p.rings;
     case 'spiral':
       return p.tongues;
     case 'volley':
       return p.count * p.tongues;
     case 'bolt':
-      return 1 + p.branches;
+      return p.count * (1 + p.branches);
     default:
       return 0;
   }
@@ -291,6 +373,10 @@ const DRAWER_FAMILY = Object.freeze({
   glyph: 'chime',
   aura: 'chime',
   ring: 'chime',
+  fan: 'burst',
+  shade: 'chime',
+  chain: 'projectile',
+  grip: 'punch',
 });
 
 /**
@@ -310,7 +396,7 @@ export function deriveFamily(spec) {
   if (spec.vgType === 'electric') return 'electric';
   if ((spec.vgType === 'ghost' || spec.vgType === 'dark') && base === 'chime') return 'ghost';
   if (spec.vgType === 'water' && base === 'burst') return 'splash';
-  if (spec.vgType === 'dragon' && spec.tier === 3 && (base === 'burst' || base === 'beam')) return 'roar';
+  if (spec.vgType === 'dragon' && (spec.tier === 3 || spec.tier === 'S') && (base === 'burst' || base === 'beam')) return 'roar';
   if (physical && spec.attacker?.motion === 'dash' && base === 'burst') return 'dash';
   if (physical && spec.attacker?.motion === 'lunge' && base === 'burst') return 'punch';
   return base;
@@ -367,6 +453,13 @@ const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
+/** Design 065 § New pieces E: the optional attacker echo ghost (a fused or departing copy). */
+export const ECHO_PARAMS = Object.freeze({
+  alpha: ['num', 0.1, 0.6, 0.35],
+  offset: ['num', 0, 1, 0.5],
+  fadeMs: ['int', 100, 1500, 400],
+});
+
 const checkMotion = (side, motion, errors) => {
   if (!isObject(motion)) {
     errors.push(`${side}: must be { motion, params }`);
@@ -378,6 +471,11 @@ const checkMotion = (side, motion, errors) => {
     return;
   }
   errors.push(...checkAgainst(table[motion.motion], motion.params, `${side} ${motion.motion}`));
+  if (motion.echo !== undefined) {
+    if (side !== 'attacker') errors.push(`${side}: echo is an attacker field`);
+    else if (!isObject(motion.echo)) errors.push('attacker echo: must be an object');
+    else errors.push(...checkAgainst(ECHO_PARAMS, motion.echo, 'attacker echo'));
+  }
 };
 
 const checkBeat = (beat, index, spec, errors) => {
@@ -430,7 +528,8 @@ const costErrors = (spec) => {
   if (particles > PARTICLE_BUDGET) errors.push(`cost: ${particles} particles exceeds ${PARTICLE_BUDGET}`);
   // Two dash trails are a ghost + its art each.
   const trails = spec.attacker?.motion === 'dash' ? 4 : 0;
-  const nodes = 1 + 2 + 2 * 4 + trails + bursts.reduce((sum, b) => sum + 1 + (isNum(b.count) ? b.count : 0), 0);
+  const echo = spec.attacker?.echo !== undefined ? 1 : 0;
+  const nodes = 1 + 2 + 2 * 4 + trails + echo + bursts.reduce((sum, b) => sum + 1 + (isNum(b.count) ? b.count : 0), 0);
   if (nodes > MAX_NODES) errors.push(`cost: ${nodes} DOM nodes exceeds ${MAX_NODES}`);
   return errors;
 };
@@ -448,11 +547,14 @@ export function validateSpec(spec) {
 
   if (spec.id !== undefined && !(typeof spec.id === 'string' && KEBAB.test(spec.id))) errors.push(`id '${spec.id}' is not kebab-case`);
   if (spec.name !== undefined && !(typeof spec.name === 'string' && spec.name.trim())) errors.push('name must be a non-empty string');
-  if (spec.vgType !== undefined && !VG_TYPES.includes(spec.vgType)) errors.push(`unknown vgType '${spec.vgType}'`);
-  if (spec.statClass !== undefined && spec.statClass !== 'physical' && spec.statClass !== 'special') {
-    errors.push(`unknown statClass '${spec.statClass}'`);
+  const signature = spec.tier === 'S';
+  if (spec.vgType !== undefined && !VG_TYPES.includes(spec.vgType) && !(signature && spec.vgType === 'normal')) {
+    errors.push(`unknown vgType '${spec.vgType}'${spec.vgType === 'normal' ? ' (normal only with tier S)' : ''}`);
   }
-  if (spec.tier !== undefined && ![1, 2, 3].includes(spec.tier)) errors.push(`tier must be 1, 2 or 3 (got ${spec.tier})`);
+  if (spec.statClass !== undefined && spec.statClass !== 'physical' && spec.statClass !== 'special' && !(signature && spec.statClass === 'status')) {
+    errors.push(`unknown statClass '${spec.statClass}'${spec.statClass === 'status' ? ' (status only with tier S)' : ''}`);
+  }
+  if (spec.tier !== undefined && ![1, 2, 3, 'S'].includes(spec.tier)) errors.push(`tier must be 1, 2, 3 or 'S' (got ${spec.tier})`);
   if (spec.family !== undefined && !FAMILIES.includes(spec.family)) errors.push(`unknown family '${spec.family}'`);
   if (spec.material !== undefined && !MATERIAL_KEYS.includes(spec.material)) errors.push(`unknown material '${spec.material}'`);
 
@@ -465,7 +567,10 @@ export function validateSpec(spec) {
   }
   if (spec.contactMs !== undefined) {
     if (!isNum(spec.contactMs) || spec.contactMs <= 0) errors.push('contactMs must be a positive number');
-    else if (isNum(spec.durationMs) && spec.durationMs > 0) {
+    else if (signature && (spec.contactMs < S_CONTACT[0] || spec.contactMs > S_CONTACT[1])) {
+      errors.push(`contactMs ${spec.contactMs} outside tier S contact [${S_CONTACT[0]}, ${S_CONTACT[1]}]`);
+    }
+    if (isNum(spec.contactMs) && spec.contactMs > 0 && isNum(spec.durationMs) && spec.durationMs > 0) {
       const ratio = spec.contactMs / spec.durationMs;
       const max = spec.tier === 1 ? CONTACT_BAND.tier1Max : CONTACT_BAND.max;
       if (ratio < CONTACT_BAND.min || ratio > max) {

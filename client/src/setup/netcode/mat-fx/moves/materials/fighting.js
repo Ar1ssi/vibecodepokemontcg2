@@ -164,123 +164,135 @@ function trailStreaks(tongue, ctx, { x, y, r, headingDeg, time, seed, alpha, ton
 }
 
 // ---- fighting --------------------------------------------------------------------
+/** The fighting material drawn in `palette` (any palette with the same keys). */
+function fightingKit(palette) {
 
-/** An impact disc: a white-hot disc ringed by three concentric strokes (hot, body, deep). */
-function impactDisc(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const p = fightingPalette;
-  sphere(
-    ctx,
-    x,
-    y,
-    r,
-    [
-      [0, p.white, alpha * clamp01(hot)],
-      [0.35, p.core, alpha * 0.9],
-      [0.7, p.hot, alpha * 0.6],
-      [1, p.body, 0],
-    ],
-    0
-  );
-  ctx.lineWidth = Math.max(1, r * 0.07);
-  for (const [scale, tone, strength] of DISC_RINGS) {
-    ctx.strokeStyle = rgbCss(p[tone], strength * alpha);
-    ctx.beginPath();
-    ctx.arc(x, y, r * scale, 0, TAU);
-    ctx.stroke();
+  /** An impact disc: a white-hot disc ringed by three concentric strokes (hot, body, deep). */
+  function impactDisc(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const p = palette;
+    sphere(
+      ctx,
+      x,
+      y,
+      r,
+      [
+        [0, p.white, alpha * clamp01(hot)],
+        [0.35, p.core, alpha * 0.9],
+        [0.7, p.hot, alpha * 0.6],
+        [1, p.body, 0],
+      ],
+      0
+    );
+    ctx.lineWidth = Math.max(1, r * 0.07);
+    for (const [scale, tone, strength] of DISC_RINGS) {
+      ctx.strokeStyle = rgbCss(p[tone], strength * alpha);
+      ctx.beginPath();
+      ctx.arc(x, y, r * scale, 0, TAU);
+      ctx.stroke();
+    }
   }
+
+  const fightingGlow = makeGlow(palette);
+  const fightingTongue = makeTongue(palette);
+
+  /** An impact disc in flight with shock streaks streaming behind it (0 tongues = a bare disc). */
+  function fightingProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    fightingGlow(ctx, x, y, r * 2, 0.35 * alpha);
+    trailStreaks(fightingTongue, ctx, { x, y, r, headingDeg, time, seed, alpha, tongues, hot });
+    impactDisc(ctx, x, y, r, alpha, hot);
+  }
+
+  /** The Close Combat barrage: impact stamps landing over (x, y) as the glyph beat runs. */
+  function barrageSigil(ctx, x, y, r, s) {
+    for (const stamp of barrageStamps(s, r)) impactDisc(ctx, x + stamp.dx, y + stamp.dy, stamp.r, stamp.alpha, stamp.hot);
+  }
+
+  return Object.freeze({
+    key: 'fighting',
+    palette,
+    // A dark umber: the strike reads against it without tinting the board.
+    shade: Object.freeze([36, 16, 10]),
+    smoke: Object.freeze([150, 130, 110]),
+    particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.white), aspect: 0.25 }),
+    glow: fightingGlow,
+    body: impactDisc,
+    tongue: fightingTongue,
+    projectile: fightingProjectile,
+    sigil: barrageSigil,
+    grain: grainPass,
+    withPalette: (p) => fightingKit(p),
+  });
 }
 
-const fightingGlow = makeGlow(fightingPalette);
-const fightingTongue = makeTongue(fightingPalette);
-
-/** An impact disc in flight with shock streaks streaming behind it (0 tongues = a bare disc). */
-function fightingProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  fightingGlow(ctx, x, y, r * 2, 0.35 * alpha);
-  trailStreaks(fightingTongue, ctx, { x, y, r, headingDeg, time, seed, alpha, tongues, hot });
-  impactDisc(ctx, x, y, r, alpha, hot);
-}
-
-/** The Close Combat barrage: impact stamps landing over (x, y) as the glyph beat runs. */
-function barrageSigil(ctx, x, y, r, s) {
-  for (const stamp of barrageStamps(s, r)) impactDisc(ctx, x + stamp.dx, y + stamp.dy, stamp.r, stamp.alpha, stamp.hot);
-}
-
-export const fighting = Object.freeze({
-  key: 'fighting',
-  palette: fightingPalette,
-  // A dark umber: the strike reads against it without tinting the board.
-  shade: Object.freeze([36, 16, 10]),
-  smoke: Object.freeze([150, 130, 110]),
-  particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(fightingPalette.white), aspect: 0.25 }),
-  glow: fightingGlow,
-  body: impactDisc,
-  tongue: fightingTongue,
-  projectile: fightingProjectile,
-  sigil: barrageSigil,
-  grain: grainPass,
-});
+export const fighting = fightingKit(fightingPalette);
 
 // ---- aura (the ki specials) ------------------------------------------------------
+/** The aura material drawn in `palette` (any palette with the same keys). */
+function auraKit(palette) {
 
-/** Two arcs swirling inside a ki sphere, turned `phase` radians. */
-function swirl(ctx, x, y, r, alpha, phase) {
-  const p = auraPalette;
-  const ring = r * SWIRL_RADIUS;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(1, r * 0.12);
-  ctx.strokeStyle = rgbCss(p.body, 0.75 * alpha);
-  ctx.beginPath();
-  ctx.arc(x, y, ring, phase, phase + SWIRL_SPAN);
-  ctx.stroke();
-  ctx.strokeStyle = rgbCss(p.hot, 0.6 * alpha);
-  ctx.beginPath();
-  ctx.arc(x, y, ring * 0.8, phase + Math.PI, phase + Math.PI + SWIRL_SPAN * 0.8);
-  ctx.stroke();
+  /** Two arcs swirling inside a ki sphere, turned `phase` radians. */
+  function swirl(ctx, x, y, r, alpha, phase) {
+    const p = palette;
+    const ring = r * SWIRL_RADIUS;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1, r * 0.12);
+    ctx.strokeStyle = rgbCss(p.body, 0.75 * alpha);
+    ctx.beginPath();
+    ctx.arc(x, y, ring, phase, phase + SWIRL_SPAN);
+    ctx.stroke();
+    ctx.strokeStyle = rgbCss(p.hot, 0.6 * alpha);
+    ctx.beginPath();
+    ctx.arc(x, y, ring * 0.8, phase + Math.PI, phase + Math.PI + SWIRL_SPAN * 0.8);
+    ctx.stroke();
+  }
+
+  /** The ki sphere: white core, pale blue, the blue rim fading out, a swirl inside. */
+  function kiSphere(ctx, x, y, r, alpha, hot, phase) {
+    const p = palette;
+    sphere(ctx, x, y, r, [
+      [0, p.white, alpha * (0.6 + 0.4 * clamp01(hot))],
+      [0.4, p.core, alpha * 0.95],
+      [0.75, p.body, alpha * 0.7],
+      [1, p.deep, 0],
+    ]);
+    swirl(ctx, x, y, r, alpha, phase);
+  }
+
+  // The interface's `body` carries no clock, so a charging sphere's swirl turns with where it
+  // is and how big it has grown: it spins as it swells, and holds still once it rests.
+  /** A ki sphere of radius `r`; `hot` whitens its core. */
+  function auraBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    kiSphere(ctx, x, y, r, alpha, hot, x * 0.02 + y * 0.03 + r * 0.15);
+  }
+
+  const auraGlow = makeGlow(palette);
+  const auraTongue = makeTongue(palette);
+
+  /** A ki sphere in flight: a blue halo, streaks behind it, its swirl turning on the scene clock. */
+  function auraProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    auraGlow(ctx, x, y, r * 2.2, 0.4 * alpha);
+    trailStreaks(auraTongue, ctx, { x, y, r, headingDeg, time, seed, alpha, tongues, hot });
+    kiSphere(ctx, x, y, r, alpha, hot, time * TAU * SWIRL_HZ + seed);
+  }
+
+  return Object.freeze({
+    key: 'aura',
+    palette,
+    // A deep navy: the sprite games' dark backdrop, kept local to the struck card.
+    shade: Object.freeze([8, 18, 52]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.hot), aspect: 0.25 }),
+    glow: auraGlow,
+    body: auraBody,
+    tongue: auraTongue,
+    projectile: auraProjectile,
+    grain: grainPass,
+    withPalette: (p) => auraKit(p),
+  });
 }
 
-/** The ki sphere: white core, pale blue, the blue rim fading out, a swirl inside. */
-function kiSphere(ctx, x, y, r, alpha, hot, phase) {
-  const p = auraPalette;
-  sphere(ctx, x, y, r, [
-    [0, p.white, alpha * (0.6 + 0.4 * clamp01(hot))],
-    [0.4, p.core, alpha * 0.95],
-    [0.75, p.body, alpha * 0.7],
-    [1, p.deep, 0],
-  ]);
-  swirl(ctx, x, y, r, alpha, phase);
-}
-
-// The interface's `body` carries no clock, so a charging sphere's swirl turns with where it
-// is and how big it has grown: it spins as it swells, and holds still once it rests.
-/** A ki sphere of radius `r`; `hot` whitens its core. */
-function auraBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  kiSphere(ctx, x, y, r, alpha, hot, x * 0.02 + y * 0.03 + r * 0.15);
-}
-
-const auraGlow = makeGlow(auraPalette);
-const auraTongue = makeTongue(auraPalette);
-
-/** A ki sphere in flight: a blue halo, streaks behind it, its swirl turning on the scene clock. */
-function auraProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  auraGlow(ctx, x, y, r * 2.2, 0.4 * alpha);
-  trailStreaks(auraTongue, ctx, { x, y, r, headingDeg, time, seed, alpha, tongues, hot });
-  kiSphere(ctx, x, y, r, alpha, hot, time * TAU * SWIRL_HZ + seed);
-}
-
-export const aura = Object.freeze({
-  key: 'aura',
-  palette: auraPalette,
-  // A deep navy: the sprite games' dark backdrop, kept local to the struck card.
-  shade: Object.freeze([8, 18, 52]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(auraPalette.hot), aspect: 0.25 }),
-  glow: auraGlow,
-  body: auraBody,
-  tongue: auraTongue,
-  projectile: auraProjectile,
-  grain: grainPass,
-});
+export const aura = auraKit(auraPalette);

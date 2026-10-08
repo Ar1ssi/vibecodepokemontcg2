@@ -5,10 +5,25 @@
 //   'enum'   [values, default]          'deg'  [default]   (screen degrees, any finite)
 //   'arms'   [default]                  'target' [default] ('attacker' | 'defender')
 //   'pair'   [min, max, [d0, d1]]       (two numbers, d0 <= d1)
+//   'palette' [default]                 (design 065: an object whose keys are a subset of
+//                                         PALETTE_KEYS, each a '#RRGGBB' string)
+//   'hexes'  [min, max, default]        (design 065: min..max '#RRGGBB' strings)
+//   'anchor' [default]                  (design 065: one of ANCHORS)
 // DOM-free.
 
 export const ARM_PRESETS = Object.freeze(['dai', 'cross', 'ring']);
 export const TARGETS = Object.freeze(['attacker', 'defender']);
+/**
+ * Design 065 § New pieces B: where an anchored drawer sits. 'sky' is skyLane's start point
+ * (1.7 h above, 0.5 h left of the defender on screen); 'sky-attacker' the same over the attacker.
+ * Every TARGETS value is an anchor.
+ */
+export const ANCHORS = Object.freeze(['attacker', 'defender', 'sky', 'sky-attacker']);
+/** Design 065: the palette keys a beat `tint` may replace. */
+export const PALETTE_KEYS = Object.freeze(['deep', 'body', 'hot', 'core']);
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const isHex = (v) => typeof v === 'string' && HEX.test(v);
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -16,7 +31,7 @@ const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 /** The default a schema entry declares. */
 export function defaultOf(entry) {
   const [kind] = entry;
-  if (kind === 'num' || kind === 'int' || kind === 'pair') return entry[3];
+  if (kind === 'num' || kind === 'int' || kind === 'pair' || kind === 'hexes') return entry[3];
   if (kind === 'enum') return entry[2];
   return entry[1];
 }
@@ -37,7 +52,18 @@ function checkEntry(entry, value) {
   if (kind === 'enum') return entry[1].includes(value) ? null : `one of ${entry[1].join('/')}`;
   if (kind === 'deg') return isNum(value) ? null : 'a finite number of degrees';
   if (kind === 'target') return TARGETS.includes(value) ? null : 'attacker or defender';
+  if (kind === 'anchor') return ANCHORS.includes(value) ? null : `one of ${ANCHORS.join('/')}`;
   if (kind === 'arms') return checkArms(value);
+  // `null` is the 'none' default of both colour kinds.
+  if ((kind === 'palette' || kind === 'hexes') && value === null) return null;
+  if (kind === 'palette') {
+    const ok = isObject(value) && Object.entries(value).every(([k, v]) => PALETTE_KEYS.includes(k) && isHex(v));
+    return ok ? null : `an object of ${PALETTE_KEYS.join('/')} '#RRGGBB' colours`;
+  }
+  if (kind === 'hexes') {
+    const ok = Array.isArray(value) && value.length >= entry[1] && value.length <= entry[2] && value.every(isHex);
+    return ok ? null : `${entry[1]}-${entry[2]} '#RRGGBB' colours`;
+  }
   if (kind === 'pair') {
     const ok =
       Array.isArray(value) &&
