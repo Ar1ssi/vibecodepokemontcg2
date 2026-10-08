@@ -57,7 +57,7 @@ export const MAX_NODES = 40;
 
 const TARGET = (fallback = 'defender') => ['target', fallback];
 
-export const DRAWER_PARAMS = Object.freeze({
+const BASE_DRAWER_PARAMS = {
   orbitCharge: {
     count: ['int', 1, 8, 5],
     half: ['enum', ['back', 'front', 'both'], 'both'],
@@ -224,7 +224,21 @@ export const DRAWER_PARAMS = Object.freeze({
     r: ['num', 0.4, 1.4, 0.9],
     target: TARGET(),
   },
+};
+
+/**
+ * Design 065 § New pieces A: every drawer also takes `tint` (palette keys replaced for the
+ * beat) and `hues` (per-item body colours on the multi-item drawers). The player resolves
+ * both into a material before the drawer runs, so drawers never read them.
+ */
+export const BEAT_COLOUR_PARAMS = Object.freeze({
+  tint: ['palette', null],
+  hues: ['hexes', 1, 6, null],
 });
+
+export const DRAWER_PARAMS = Object.freeze(
+  Object.fromEntries(Object.entries(BASE_DRAWER_PARAMS).map(([name, schema]) => [name, { ...schema, ...BEAT_COLOUR_PARAMS }]))
+);
 
 /** Errors for one drawer's params: unknown drawer, unknown key, wrong type, out of range. */
 export function checkParams(drawer, params) {

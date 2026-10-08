@@ -201,3 +201,25 @@ test('every drawer plays on the dark material; its shadow passes switch to sourc
     }
   }
 });
+
+test('design 065: the player resolves a beat tint and hues into materials; drawers never see them', async () => {
+  const { resolveBeatColours, tintCache } = await import('../move-player.js');
+  const { MATERIALS } = await import('../materials/index.js');
+  const fire = MATERIALS.fire;
+  const cachedTint = tintCache();
+  const plain = resolveBeatColours(fire, { r0: 0.2, tint: null, hues: null }, cachedTint);
+  assert.equal(plain.material, fire);
+  assert.equal(plain.materialAt(3), fire);
+  assert.deepEqual(plain.params, { r0: 0.2 });
+  const blue = resolveBeatColours(fire, { tint: { body: '#0000ff' }, hues: null }, cachedTint);
+  assert.deepEqual(blue.material.palette.body, [0, 0, 255]);
+  assert.equal(blue.material.key, 'fire');
+  assert.equal(resolveBeatColours(fire, { tint: { body: '#0000ff' } }, cachedTint).material, blue.material, 'memoised');
+  assert.ok(!('tint' in blue.params) && !('hues' in blue.params));
+  const hued = resolveBeatColours(fire, { hues: ['#ff0000', '#00ff00'] }, cachedTint);
+  assert.deepEqual(hued.materialAt(0).palette.body, [255, 0, 0]);
+  assert.deepEqual(hued.materialAt(1).palette.body, [0, 255, 0]);
+  assert.deepEqual(hued.materialAt(2).palette.body, [255, 0, 0]);
+  assert.deepEqual(hued.materialAt(1).palette.hot, [89, 255, 89]);
+  assert.equal(hued.material, fire);
+});

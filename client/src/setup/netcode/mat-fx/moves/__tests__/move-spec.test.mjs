@@ -294,3 +294,18 @@ test('the Dragon roar rule also holds for tier S', () => {
   assert.equal(deriveFamily(beatAtContact('beam', { vgType: 'dragon', tier: 'S' })), 'roar');
   assert.equal(deriveFamily(beatAtContact('starFlare', { vgType: 'dragon', tier: 'S' })), 'roar');
 });
+
+test('design 065: every drawer accepts a beat tint and hues', () => {
+  for (const drawer of Object.keys(DRAWER_PARAMS)) {
+    assert.deepEqual(checkParams(drawer, { tint: { body: '#123456', hot: '#ABCDEF' } }), [], drawer);
+    assert.deepEqual(checkParams(drawer, { hues: ['#ff0000', '#00ff00'] }), [], drawer);
+    assert.equal(withDefaults(drawer, {}).tint, null, drawer);
+    assert.equal(withDefaults(drawer, {}).hues, null, drawer);
+  }
+  assert.equal(checkParams('beam', { tint: { body: '#12345' } }).length, 1);
+  assert.equal(checkParams('beam', { tint: { glow: '#123456' } }).length, 1);
+  assert.equal(checkParams('beam', { tint: '#123456' }).length, 1);
+  assert.equal(checkParams('beam', { hues: [] }).length, 1);
+  assert.equal(checkParams('beam', { hues: Array(7).fill('#ffffff') }).length, 1);
+  assert.equal(checkParams('beam', { hues: ['red'] }).length, 1);
+});

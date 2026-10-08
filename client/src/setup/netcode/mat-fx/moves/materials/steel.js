@@ -27,7 +27,7 @@ const RETICLE_TURN = 90;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const rad = (deg) => (deg * Math.PI) / 180;
 
-const palette = Object.freeze({
+const PALETTE = Object.freeze({
   deep: Object.freeze([74, 85, 99]),
   body: Object.freeze([154, 167, 184]),
   hot: Object.freeze([213, 222, 234]),
@@ -74,156 +74,162 @@ export function reticleTicks(s, r) {
   return ticks;
 }
 
-/** A cool haze: the bright steel at the centre fading through the blue edge to clear. */
-function glow(ctx, x, y, r, alpha) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, rgbCss(palette.hot, alpha * 0.5));
-  g.addColorStop(0.5, rgbCss(palette.edge, alpha * 0.2));
-  g.addColorStop(1, rgbCss(palette.edge, 0));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-}
-
-/** A metal sphere: a hard white highlight up-left, steel shading to deep, a cool blue rim. */
-function body(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const shine = alpha * clamp01(hot);
-  sphere(
-    ctx,
-    x,
-    y,
-    r,
-    [
-      [0, palette.white, shine],
-      [0.16, palette.white, shine * 0.9],
-      [0.22, palette.hot, alpha],
-      [0.62, palette.body, alpha * 0.95],
-      [1, palette.deep, alpha * 0.9],
-    ],
-    0.35
-  );
-  ctx.strokeStyle = rgbCss(palette.edge, 0.6 * alpha);
-  ctx.lineWidth = Math.max(1, r * 0.06);
-  ctx.beginPath();
-  ctx.arc(x, y, r * 0.97, 0, TAU);
-  ctx.stroke();
-}
-
-/**
- * A blade: a blurred cool halo, the brushed steel body (bright edge to dark edge across its
- * width), one white specular line along its axis. `jag` makes it an angular splinter; `hot` 0
- * drops the specular line.
- */
-function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
-  const shape = (widthScale) =>
-    jag ? shardOutline({ ...spec, width: spec.width * widthScale }) : bladeOutline({ ...spec, width: spec.width * widthScale });
-  ctx.filter = `blur(${Math.max(1, spec.width * HALO_BLUR).toFixed(2)}px)`;
-  ctx.fillStyle = rgbCss(palette.edge, HALO_ALPHA * alpha);
-  traceOutline(ctx, shape(HALO_WIDTH));
-  ctx.fill();
-  ctx.filter = 'none';
-
-  const blade = shape(1);
-  const a = rad(spec.angleDeg);
-  const nx = -Math.sin(a);
-  const ny = Math.cos(a);
-  const half = spec.width * 0.5;
-  const sx = spec.x + Math.cos(a) * spec.length * SHOULDER_AT;
-  const sy = spec.y + Math.sin(a) * spec.length * SHOULDER_AT;
-  const brush = ctx.createLinearGradient(sx + nx * half, sy + ny * half, sx - nx * half, sy - ny * half);
-  brush.addColorStop(0, rgbCss(palette.hot, 0.95 * alpha));
-  brush.addColorStop(0.5, rgbCss(palette.body, 0.9 * alpha));
-  brush.addColorStop(1, rgbCss(palette.deep, 0.85 * alpha));
-  ctx.fillStyle = brush;
-  traceOutline(ctx, blade);
-  ctx.fill();
-
-  const shine = alpha * clamp01(hot);
-  if (!(shine > 0)) return;
-  const lift = spec.width * 0.08;
-  ctx.strokeStyle = rgbCss(palette.white, 0.9 * shine);
-  ctx.lineWidth = 1;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(spec.x + nx * lift, spec.y + ny * lift);
-  ctx.lineTo(
-    spec.x + Math.cos(a) * spec.length * SPECULAR_REACH + nx * lift * 0.3,
-    spec.y + Math.sin(a) * spec.length * SPECULAR_REACH + ny * lift * 0.3
-  );
-  ctx.stroke();
-}
-
-/**
- * The beam core in flight along `headingDeg`: a cool haze, one long streak behind it, then
- * `tongues - 1` short spark blades flickering either side of the streak, and the hard sphere.
- * 0 tongues = a bare sphere in its haze.
- */
-function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  glow(ctx, x, y, r * 2.2, 0.5 * alpha);
-  const back = headingDeg + 180;
-  if (tongues > 0) {
-    tongue(ctx, { x, y, angleDeg: back, length: r * TRAIL_LENGTH, width: r * 1.1, time, seed }, { alpha: alpha * 0.85, hot });
+/** The steel material drawn in `palette` (any palette with the same keys). */
+function steelKit(palette) {
+  /** A cool haze: the bright steel at the centre fading through the blue edge to clear. */
+  function glow(ctx, x, y, r, alpha) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgbCss(palette.hot, alpha * 0.5));
+    g.addColorStop(0.5, rgbCss(palette.edge, alpha * 0.2));
+    g.addColorStop(1, rgbCss(palette.edge, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.fill();
   }
-  for (let k = 1; k < tongues; k += 1) {
-    const side = k % 2 ? 1 : -1;
-    const angleDeg = back + side * (SPARK_SPREAD + 6 * Math.ceil(k / 2)) + 5 * Math.sin(time * 9 + k * 1.7 + seed);
-    const ar = rad(angleDeg);
-    tongue(
+
+  /** A metal sphere: a hard white highlight up-left, steel shading to deep, a cool blue rim. */
+  function body(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const shine = alpha * clamp01(hot);
+    sphere(
       ctx,
-      {
-        x: x + Math.cos(ar) * r * 0.5,
-        y: y + Math.sin(ar) * r * 0.5,
-        angleDeg,
-        length: r * (1.2 + 0.6 * Math.abs(Math.sin(seed * 1.3 + k * 2.1))),
-        width: r * 0.3,
-        time,
-        seed: seed + k * 1.9,
-      },
-      { alpha: alpha * 0.8, hot, jag: k % 2 }
+      x,
+      y,
+      r,
+      [
+        [0, palette.white, shine],
+        [0.16, palette.white, shine * 0.9],
+        [0.22, palette.hot, alpha],
+        [0.62, palette.body, alpha * 0.95],
+        [1, palette.deep, alpha * 0.9],
+      ],
+      0.35
     );
+    ctx.strokeStyle = rgbCss(palette.edge, 0.6 * alpha);
+    ctx.lineWidth = Math.max(1, r * 0.06);
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.97, 0, TAU);
+    ctx.stroke();
   }
-  body(ctx, x, y, r, alpha, hot);
+
+  /**
+   * A blade: a blurred cool halo, the brushed steel body (bright edge to dark edge across its
+   * width), one white specular line along its axis. `jag` makes it an angular splinter; `hot` 0
+   * drops the specular line.
+   */
+  function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+    const shape = (widthScale) =>
+      jag ? shardOutline({ ...spec, width: spec.width * widthScale }) : bladeOutline({ ...spec, width: spec.width * widthScale });
+    ctx.filter = `blur(${Math.max(1, spec.width * HALO_BLUR).toFixed(2)}px)`;
+    ctx.fillStyle = rgbCss(palette.edge, HALO_ALPHA * alpha);
+    traceOutline(ctx, shape(HALO_WIDTH));
+    ctx.fill();
+    ctx.filter = 'none';
+
+    const blade = shape(1);
+    const a = rad(spec.angleDeg);
+    const nx = -Math.sin(a);
+    const ny = Math.cos(a);
+    const half = spec.width * 0.5;
+    const sx = spec.x + Math.cos(a) * spec.length * SHOULDER_AT;
+    const sy = spec.y + Math.sin(a) * spec.length * SHOULDER_AT;
+    const brush = ctx.createLinearGradient(sx + nx * half, sy + ny * half, sx - nx * half, sy - ny * half);
+    brush.addColorStop(0, rgbCss(palette.hot, 0.95 * alpha));
+    brush.addColorStop(0.5, rgbCss(palette.body, 0.9 * alpha));
+    brush.addColorStop(1, rgbCss(palette.deep, 0.85 * alpha));
+    ctx.fillStyle = brush;
+    traceOutline(ctx, blade);
+    ctx.fill();
+
+    const shine = alpha * clamp01(hot);
+    if (!(shine > 0)) return;
+    const lift = spec.width * 0.08;
+    ctx.strokeStyle = rgbCss(palette.white, 0.9 * shine);
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(spec.x + nx * lift, spec.y + ny * lift);
+    ctx.lineTo(
+      spec.x + Math.cos(a) * spec.length * SPECULAR_REACH + nx * lift * 0.3,
+      spec.y + Math.sin(a) * spec.length * SPECULAR_REACH + ny * lift * 0.3
+    );
+    ctx.stroke();
+  }
+
+  /**
+   * The beam core in flight along `headingDeg`: a cool haze, one long streak behind it, then
+   * `tongues - 1` short spark blades flickering either side of the streak, and the hard sphere.
+   * 0 tongues = a bare sphere in its haze.
+   */
+  function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    glow(ctx, x, y, r * 2.2, 0.5 * alpha);
+    const back = headingDeg + 180;
+    if (tongues > 0) {
+      tongue(ctx, { x, y, angleDeg: back, length: r * TRAIL_LENGTH, width: r * 1.1, time, seed }, { alpha: alpha * 0.85, hot });
+    }
+    for (let k = 1; k < tongues; k += 1) {
+      const side = k % 2 ? 1 : -1;
+      const angleDeg = back + side * (SPARK_SPREAD + 6 * Math.ceil(k / 2)) + 5 * Math.sin(time * 9 + k * 1.7 + seed);
+      const ar = rad(angleDeg);
+      tongue(
+        ctx,
+        {
+          x: x + Math.cos(ar) * r * 0.5,
+          y: y + Math.sin(ar) * r * 0.5,
+          angleDeg,
+          length: r * (1.2 + 0.6 * Math.abs(Math.sin(seed * 1.3 + k * 2.1))),
+          width: r * 0.3,
+          time,
+          seed: seed + k * 1.9,
+        },
+        { alpha: alpha * 0.8, hot, jag: k % 2 }
+      );
+    }
+    body(ctx, x, y, r, alpha, hot);
+  }
+
+  /** A targeting reticle of radius `r` at progress `s`: a ring, four locking ticks, a pip. */
+  function sigil(ctx, x, y, r, s) {
+    if (!(r > 0)) return;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    ctx.strokeStyle = rgbCss(palette.hot, 0.85);
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.86, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = rgbCss(palette.edge, 0.9);
+    ctx.beginPath();
+    for (const tick of reticleTicks(s, r)) {
+      const a = rad(tick.angleDeg);
+      ctx.moveTo(x + Math.cos(a) * tick.from, y + Math.sin(a) * tick.from);
+      ctx.lineTo(x + Math.cos(a) * tick.to, y + Math.sin(a) * tick.to);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = rgbCss(palette.white, 0.9);
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.18, 0, TAU);
+    ctx.stroke();
+  }
+
+  return Object.freeze({
+    key: 'steel',
+    palette,
+    // A cool blue-black, kept local to a card.
+    shade: Object.freeze([6, 10, 20]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.white), aspect: 0.2 }),
+    glow,
+    body,
+    tongue,
+    projectile,
+    sigil,
+    grain: grainPass,
+    withPalette: (p) => steelKit(p),
+  });
 }
 
-/** A targeting reticle of radius `r` at progress `s`: a ring, four locking ticks, a pip. */
-function sigil(ctx, x, y, r, s) {
-  if (!(r > 0)) return;
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(1, r * 0.05);
-  ctx.strokeStyle = rgbCss(palette.hot, 0.85);
-  ctx.beginPath();
-  ctx.arc(x, y, r * 0.86, 0, TAU);
-  ctx.stroke();
-  ctx.strokeStyle = rgbCss(palette.edge, 0.9);
-  ctx.beginPath();
-  for (const tick of reticleTicks(s, r)) {
-    const a = rad(tick.angleDeg);
-    ctx.moveTo(x + Math.cos(a) * tick.from, y + Math.sin(a) * tick.from);
-    ctx.lineTo(x + Math.cos(a) * tick.to, y + Math.sin(a) * tick.to);
-  }
-  ctx.stroke();
-  ctx.strokeStyle = rgbCss(palette.white, 0.9);
-  ctx.beginPath();
-  ctx.arc(x, y, r * 0.18, 0, TAU);
-  ctx.stroke();
-}
-
-export const steel = Object.freeze({
-  key: 'steel',
-  palette,
-  // A cool blue-black, kept local to a card.
-  shade: Object.freeze([6, 10, 20]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--streak', color: rgbCss(palette.white), aspect: 0.2 }),
-  glow,
-  body,
-  tongue,
-  projectile,
-  sigil,
-  grain: grainPass,
-});
+export const steel = steelKit(PALETTE);

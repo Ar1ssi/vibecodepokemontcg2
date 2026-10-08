@@ -210,102 +210,117 @@ function leafKit(palette, shape, { veins }) {
   return { glow, body, tongue, projectile };
 }
 
-const grassKit = leafKit(GRASS_PALETTE, LEAF_SHAPE, { veins: true });
-const petalKit = leafKit(PETAL_PALETTE, PETAL_SHAPE, { veins: true });
+/** The grass material drawn in `palette` (any palette with the same keys). */
+function grassKit(palette) {
+  return Object.freeze({
+    key: 'grass',
+    palette,
+    shade: Object.freeze([15, 42, 16]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--leaf', color: rgbCss(palette.body), aspect: 0.5 }),
+    ...leafKit(palette, LEAF_SHAPE, { veins: true }),
+    grain: grainPass,
+    withPalette: (p) => grassKit(p),
+  });
+}
 
-export const grass = Object.freeze({
-  key: 'grass',
-  palette: GRASS_PALETTE,
-  shade: Object.freeze([15, 42, 16]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--leaf', color: rgbCss(GRASS_PALETTE.body), aspect: 0.5 }),
-  ...grassKit,
-  grain: grainPass,
-});
+export const grass = grassKit(GRASS_PALETTE);
 
-export const petal = Object.freeze({
-  key: 'petal',
-  palette: PETAL_PALETTE,
-  shade: Object.freeze([42, 10, 36]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--leaf', color: rgbCss(PETAL_PALETTE.body), aspect: 0.6 }),
-  ...petalKit,
-  grain: grainPass,
-});
+/** The petal material drawn in `palette` (any palette with the same keys). */
+function petalKit(palette) {
+  return Object.freeze({
+    key: 'petal',
+    palette,
+    shade: Object.freeze([42, 10, 36]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--leaf', color: rgbCss(palette.body), aspect: 0.6 }),
+    ...leafKit(palette, PETAL_SHAPE, { veins: true }),
+    grain: grainPass,
+    withPalette: (p) => petalKit(p),
+  });
+}
+
+export const petal = petalKit(PETAL_PALETTE);
 
 // ---- solar: the light override (fire's tongue code path) ----------------------------------
+/** The solar material drawn in `palette` (any palette with the same keys). */
+function solarKit(palette) {
 
-function solarGlow(ctx, x, y, r, alpha) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, rgbCss(SOLAR_PALETTE.hot, alpha * 0.55));
-  g.addColorStop(0.5, rgbCss(SOLAR_PALETTE.body, alpha * 0.3));
-  g.addColorStop(1, rgbCss(SOLAR_PALETTE.deep, 0));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-}
-
-// The light palette is near-white, so under the additive pass it washes a card out far
-// sooner than fire does: the sphere keeps a small white point and a yellow body.
-/** A sun sphere: a small white point through pale yellow to a green-gold rim. */
-function solarBody(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  sphere(ctx, x, y, r, [
-    [0, SOLAR_PALETTE.white, 0.7 * alpha * clamp01(hot)],
-    [0.22, SOLAR_PALETTE.core, alpha * 0.8],
-    [0.55, SOLAR_PALETTE.hot, alpha * 0.7],
-    [0.85, SOLAR_PALETTE.body, alpha * 0.45],
-    [1, SOLAR_PALETTE.deep, 0],
-  ]);
-}
-
-/** Three-pass light tongue: one blurred yellow body, a pale mid, a near-white core. */
-function solarTongue(ctx, spec, { alpha = 1, hot = 1 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
-  ctx.filter = `blur(${Math.max(1, spec.width * 0.12).toFixed(1)}px)`;
-  ctx.fillStyle = rgbCss(SOLAR_PALETTE.body, 0.6 * alpha);
-  tonguePath(ctx, spec, 1);
-  ctx.fill();
-  ctx.filter = 'none';
-  ctx.fillStyle = rgbCss(SOLAR_PALETTE.hot, 0.8 * alpha);
-  tonguePath(ctx, spec, 0.66);
-  ctx.fill();
-  if (hot > 0) {
-    ctx.fillStyle = rgbCss(SOLAR_PALETTE.core, 0.9 * alpha * hot);
-    tonguePath(ctx, { ...spec, seed: spec.seed + 0.5 }, 0.4);
+  function solarGlow(ctx, x, y, r, alpha) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgbCss(palette.hot, alpha * 0.55));
+    g.addColorStop(0.5, rgbCss(palette.body, alpha * 0.3));
+    g.addColorStop(1, rgbCss(palette.deep, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
   }
-}
 
-/** A ball of light along `headingDeg`: halo, a short fan of light tongues behind, the sphere. */
-function solarProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 4, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  solarGlow(ctx, x, y, r * 2.2, 0.35 * alpha);
-  const back = headingDeg + 180;
-  for (let k = 0; k < tongues; k += 1) {
-    const spread = tongues > 1 ? -35 + (70 * k) / (tongues - 1) : 0;
-    const jitter = 6 * wobble(k * 0.37, time, seed + k);
-    const len = r * (1.2 + 0.6 * Math.abs(Math.sin(seed * 3.1 + k * 1.9)));
-    solarTongue(
-      ctx,
-      { x, y, angleDeg: back + spread + jitter, length: len, width: r * 0.8, time, seed: seed + k * 2.1 },
-      { alpha: alpha * 0.8, hot: hot * 0.6 }
-    );
+  // The light palette is near-white, so under the additive pass it washes a card out far
+  // sooner than fire does: the sphere keeps a small white point and a yellow body.
+  /** A sun sphere: a small white point through pale yellow to a green-gold rim. */
+  function solarBody(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    sphere(ctx, x, y, r, [
+      [0, palette.white, 0.7 * alpha * clamp01(hot)],
+      [0.22, palette.core, alpha * 0.8],
+      [0.55, palette.hot, alpha * 0.7],
+      [0.85, palette.body, alpha * 0.45],
+      [1, palette.deep, 0],
+    ]);
   }
-  solarBody(ctx, x, y, r, alpha, hot);
+
+  /** Three-pass light tongue: one blurred yellow body, a pale mid, a near-white core. */
+  function solarTongue(ctx, spec, { alpha = 1, hot = 1 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+    ctx.filter = `blur(${Math.max(1, spec.width * 0.12).toFixed(1)}px)`;
+    ctx.fillStyle = rgbCss(palette.body, 0.6 * alpha);
+    tonguePath(ctx, spec, 1);
+    ctx.fill();
+    ctx.filter = 'none';
+    ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
+    tonguePath(ctx, spec, 0.66);
+    ctx.fill();
+    if (hot > 0) {
+      ctx.fillStyle = rgbCss(palette.core, 0.9 * alpha * hot);
+      tonguePath(ctx, { ...spec, seed: spec.seed + 0.5 }, 0.4);
+      ctx.fill();
+    }
+  }
+
+  /** A ball of light along `headingDeg`: halo, a short fan of light tongues behind, the sphere. */
+  function solarProjectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 4, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    solarGlow(ctx, x, y, r * 2.2, 0.35 * alpha);
+    const back = headingDeg + 180;
+    for (let k = 0; k < tongues; k += 1) {
+      const spread = tongues > 1 ? -35 + (70 * k) / (tongues - 1) : 0;
+      const jitter = 6 * wobble(k * 0.37, time, seed + k);
+      const len = r * (1.2 + 0.6 * Math.abs(Math.sin(seed * 3.1 + k * 1.9)));
+      solarTongue(
+        ctx,
+        { x, y, angleDeg: back + spread + jitter, length: len, width: r * 0.8, time, seed: seed + k * 2.1 },
+        { alpha: alpha * 0.8, hot: hot * 0.6 }
+      );
+    }
+    solarBody(ctx, x, y, r, alpha, hot);
+  }
+
+  return Object.freeze({
+    key: 'solar',
+    palette,
+    shade: Object.freeze([30, 40, 8]),
+    smoke: null,
+    particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(palette.hot), aspect: 1 }),
+    glow: solarGlow,
+    body: solarBody,
+    tongue: solarTongue,
+    projectile: solarProjectile,
+    grain: grainPass,
+    withPalette: (p) => solarKit(p),
+  });
 }
 
-export const solar = Object.freeze({
-  key: 'solar',
-  palette: SOLAR_PALETTE,
-  shade: Object.freeze([30, 40, 8]),
-  smoke: null,
-  particle: Object.freeze({ className: 'fx-particle--mote', color: rgbCss(SOLAR_PALETTE.hot), aspect: 1 }),
-  glow: solarGlow,
-  body: solarBody,
-  tongue: solarTongue,
-  projectile: solarProjectile,
-  grain: grainPass,
-});
+export const solar = solarKit(SOLAR_PALETTE);

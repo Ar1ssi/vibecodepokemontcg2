@@ -39,7 +39,7 @@ const BUBBLE_SPAWN = 0.55;
 const BUBBLE_POP = 0.15;
 const BUBBLE_RISE = 1.15;
 
-const palette = Object.freeze({
+const PALETTE = Object.freeze({
   deep: Object.freeze([75, 30, 107]),
   body: Object.freeze([155, 77, 202]),
   hot: Object.freeze([199, 125, 255]),
@@ -120,179 +120,185 @@ export function bubbleRise(s, r) {
   return out;
 }
 
-const tracePoints = (ctx, points) => {
-  ctx.beginPath();
-  points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
-  ctx.closePath();
-};
-
-/** Adds one circle to the current path as its own sub-path. */
-const addCircle = (ctx, x, y, r) => {
-  ctx.moveTo(x + r, y);
-  ctx.arc(x, y, r, 0, TAU);
-};
-
-/** A soft violet halo: body -> deep -> 0 (additive). */
-function glow(ctx, x, y, r, alpha) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, rgbCss(palette.body, alpha * 0.6));
-  g.addColorStop(0.5, rgbCss(palette.deep, alpha * 0.35));
-  g.addColorStop(1, rgbCss(palette.deep, 0));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-}
-
-/** The glob's lit fill: lilac up-left through violet to deep at the edge. */
-const globFill = (ctx, x, y, r, alpha) => {
-  const g = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, 0, x, y, r * 1.1);
-  g.addColorStop(0, rgbCss(palette.hot, 0.9 * alpha));
-  g.addColorStop(0.55, rgbCss(palette.body, 0.85 * alpha));
-  g.addColorStop(1, rgbCss(palette.deep, 0.7 * alpha));
-  return g;
-};
-
-/**
- * One glob turned to `phase`: the wobbling lit sphere, a drip under it (screen-down) when
- * `drip`, the dark rim just inside the edge, and a glint up-left when hot.
- */
-function glob(ctx, x, y, r, alpha, hot, phase, { drip = true } = {}) {
-  ctx.fillStyle = globFill(ctx, x, y, r, alpha);
-  tracePoints(ctx, globOutline(x, y, r, phase));
-  ctx.fill();
-  if (drip) {
-    const dr = r * DRIP_R;
-    const dy = y + r * DRIP_DROP;
-    ctx.fillStyle = globFill(ctx, x, dy, dr, alpha);
+/** The poison material drawn in `palette` (any palette with the same keys). */
+function poisonKit(palette) {
+  const tracePoints = (ctx, points) => {
     ctx.beginPath();
-    ctx.arc(x, dy, dr, 0, TAU);
+    points.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+    ctx.closePath();
+  };
+
+  /** Adds one circle to the current path as its own sub-path. */
+  const addCircle = (ctx, x, y, r) => {
+    ctx.moveTo(x + r, y);
+    ctx.arc(x, y, r, 0, TAU);
+  };
+
+  /** A soft violet halo: body -> deep -> 0 (additive). */
+  function glow(ctx, x, y, r, alpha) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgbCss(palette.body, alpha * 0.6));
+    g.addColorStop(0.5, rgbCss(palette.deep, alpha * 0.35));
+    g.addColorStop(1, rgbCss(palette.deep, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
     ctx.fill();
   }
-  inShadow(ctx, () => {
-    ctx.strokeStyle = rgbCss(palette.deep, RIM_ALPHA * alpha);
-    ctx.lineWidth = Math.max(1, r * 0.08);
-    ctx.lineJoin = 'round';
-    tracePoints(ctx, globOutline(x, y, r * RIM_INSET, phase));
-    ctx.stroke();
-  });
-  const glint = alpha * clamp01(hot);
-  if (!(glint > 0)) return;
-  ctx.fillStyle = rgbCss(palette.core, GLINT_ALPHA * glint);
-  ctx.beginPath();
-  ctx.arc(x - r * 0.32, y - r * 0.32, r * 0.18, 0, TAU);
-  ctx.fill();
-}
 
-// The interface's `body` carries no clock, so the wobble turns with where the glob is and how
-// big it has grown (it quivers as it swells or travels), as ghost's shadow ball does.
-/** A glob of radius `r` with a drip under it; `hot` lights its glint. */
-function body(ctx, x, y, r, alpha, hot = 1) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  glob(ctx, x, y, r, alpha, hot, x * 0.02 + y * 0.03 + r * 0.15);
-}
+  /** The glob's lit fill: lilac up-left through violet to deep at the edge. */
+  const globFill = (ctx, x, y, r, alpha) => {
+    const g = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, 0, x, y, r * 1.1);
+    g.addColorStop(0, rgbCss(palette.hot, 0.9 * alpha));
+    g.addColorStop(0.55, rgbCss(palette.body, 0.85 * alpha));
+    g.addColorStop(1, rgbCss(palette.deep, 0.7 * alpha));
+    return g;
+  };
 
-/**
- * A stream: a translucent ooze band, the globs riding it in one fill, and their glints in one
- * fill (dropped at `hot` 0). `jag` makes it a barb: a violet spine with a lilac core.
- */
-function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
-  if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
-  if (jag) {
-    ctx.fillStyle = rgbCss(palette.body, 0.85 * alpha);
-    traceOutline(ctx, shardOutline(spec));
+  /**
+   * One glob turned to `phase`: the wobbling lit sphere, a drip under it (screen-down) when
+   * `drip`, the dark rim just inside the edge, and a glint up-left when hot.
+   */
+  function glob(ctx, x, y, r, alpha, hot, phase, { drip = true } = {}) {
+    ctx.fillStyle = globFill(ctx, x, y, r, alpha);
+    tracePoints(ctx, globOutline(x, y, r, phase));
     ctx.fill();
-    ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
-    traceOutline(ctx, shardOutline({ ...spec, width: spec.width * 0.45 }));
+    if (drip) {
+      const dr = r * DRIP_R;
+      const dy = y + r * DRIP_DROP;
+      ctx.fillStyle = globFill(ctx, x, dy, dr, alpha);
+      ctx.beginPath();
+      ctx.arc(x, dy, dr, 0, TAU);
+      ctx.fill();
+    }
+    inShadow(ctx, () => {
+      ctx.strokeStyle = rgbCss(palette.deep, RIM_ALPHA * alpha);
+      ctx.lineWidth = Math.max(1, r * 0.08);
+      ctx.lineJoin = 'round';
+      tracePoints(ctx, globOutline(x, y, r * RIM_INSET, phase));
+      ctx.stroke();
+    });
+    const glint = alpha * clamp01(hot);
+    if (!(glint > 0)) return;
+    ctx.fillStyle = rgbCss(palette.core, GLINT_ALPHA * glint);
+    ctx.beginPath();
+    ctx.arc(x - r * 0.32, y - r * 0.32, r * 0.18, 0, TAU);
     ctx.fill();
-    return;
   }
-  ctx.fillStyle = rgbCss(palette.body, OOZE_ALPHA * alpha);
-  traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
-  ctx.fill();
-  const globs = streamGlobs(spec);
-  ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
-  ctx.beginPath();
-  for (const g of globs) addCircle(ctx, g.x, g.y, g.r);
-  ctx.fill();
-  const lit = alpha * clamp01(hot);
-  if (!(lit > 0)) return;
-  ctx.fillStyle = rgbCss(palette.core, GLINT_ALPHA * lit);
-  ctx.beginPath();
-  for (const g of globs) addCircle(ctx, g.x - g.r * 0.3, g.y - g.r * 0.3, g.r * 0.28);
-  ctx.fill();
-}
 
-/**
- * A big glob in flight along `headingDeg`: a violet haze, `tongues` drips trailing behind it
- * (shrinking, swaying out of step) in one fill, and the glob, its outline quivering on the
- * scene clock. 0 tongues = a bare glob.
- */
-function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
-  if (!(r > 0) || !(alpha > 0)) return;
-  glow(ctx, x, y, r * 2.2, 0.75 * alpha);
-  if (tongues > 0) {
-    const back = rad(headingDeg + 180);
+  // The interface's `body` carries no clock, so the wobble turns with where the glob is and how
+  // big it has grown (it quivers as it swells or travels), as ghost's shadow ball does.
+  /** A glob of radius `r` with a drip under it; `hot` lights its glint. */
+  function body(ctx, x, y, r, alpha, hot = 1) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    glob(ctx, x, y, r, alpha, hot, x * 0.02 + y * 0.03 + r * 0.15);
+  }
+
+  /**
+   * A stream: a translucent ooze band, the globs riding it in one fill, and their glints in one
+   * fill (dropped at `hot` 0). `jag` makes it a barb: a violet spine with a lilac core.
+   */
+  function tongue(ctx, spec, { alpha = 1, hot = 1, jag = 0 } = {}) {
+    if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
+    if (jag) {
+      ctx.fillStyle = rgbCss(palette.body, 0.85 * alpha);
+      traceOutline(ctx, shardOutline(spec));
+      ctx.fill();
+      ctx.fillStyle = rgbCss(palette.hot, 0.8 * alpha);
+      traceOutline(ctx, shardOutline({ ...spec, width: spec.width * 0.45 }));
+      ctx.fill();
+      return;
+    }
+    ctx.fillStyle = rgbCss(palette.body, OOZE_ALPHA * alpha);
+    traceOutline(ctx, tongueOutline({ ...spec, amp: 0.5 }, 0.8));
+    ctx.fill();
+    const globs = streamGlobs(spec);
     ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
     ctx.beginPath();
-    for (let k = 0; k < tongues; k += 1) {
-      const d = r * (1.15 + DRIP_SPACING * k * 0.9);
-      const sway = r * 0.25 * Math.sin(time * 5 + seed + k * 2.1);
-      const dr = r * Math.max(0.14, 0.42 - 0.09 * k);
-      addCircle(ctx, x + Math.cos(back) * d - Math.sin(back) * sway, y + Math.sin(back) * d + Math.cos(back) * sway, dr);
-    }
+    for (const g of globs) addCircle(ctx, g.x, g.y, g.r);
     ctx.fill();
-  }
-  glob(ctx, x, y, r, alpha, hot, time * 4 + seed, { drip: false });
-}
-
-/**
- * The poisoned foe at glyph progress `s`: a pool of venom spreading on the lower card (its
- * outline wobbling, a lilac rim) and hollow bubbles rising out of it and popping.
- */
-function sigil(ctx, x, y, r, s) {
-  const spread = poolSpread(s);
-  if (!(r > 0) || !(spread > 0)) return;
-  const px = x;
-  const py = y + r * POOL_DROP;
-  const rx = r * spread;
-  const outline = globOutline(0, 0, rx, s * 6, 0.1).map(([ox, oy]) => [px + ox, py + oy * POOL_SQUASH]);
-  const g = ctx.createRadialGradient(px, py, 0, px, py, rx);
-  g.addColorStop(0, rgbCss(palette.hot, 0.5));
-  g.addColorStop(0.6, rgbCss(palette.body, 0.45));
-  g.addColorStop(1, rgbCss(palette.deep, 0.3));
-  ctx.fillStyle = g;
-  tracePoints(ctx, outline);
-  ctx.fill();
-  ctx.strokeStyle = rgbCss(palette.hot, 0.7);
-  ctx.lineWidth = Math.max(1, r * 0.03);
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-  // Hollow bubbles: a faint violet inside and a lilac skin, each fading as it pops.
-  ctx.lineWidth = Math.max(1, r * 0.025);
-  for (const b of bubbleRise(s, r)) {
+    const lit = alpha * clamp01(hot);
+    if (!(lit > 0)) return;
+    ctx.fillStyle = rgbCss(palette.core, GLINT_ALPHA * lit);
     ctx.beginPath();
-    ctx.arc(px + b.dx, py + b.dy, b.radius, 0, TAU);
-    ctx.fillStyle = rgbCss(palette.body, 0.25 * b.alpha);
+    for (const g of globs) addCircle(ctx, g.x - g.r * 0.3, g.y - g.r * 0.3, g.r * 0.28);
     ctx.fill();
-    ctx.strokeStyle = rgbCss(palette.hot, 0.9 * b.alpha);
-    ctx.stroke();
   }
+
+  /**
+   * A big glob in flight along `headingDeg`: a violet haze, `tongues` drips trailing behind it
+   * (shrinking, swaying out of step) in one fill, and the glob, its outline quivering on the
+   * scene clock. 0 tongues = a bare glob.
+   */
+  function projectile(ctx, { x, y, r, headingDeg, time, seed, alpha = 1, tongues = 3, hot = 1 }) {
+    if (!(r > 0) || !(alpha > 0)) return;
+    glow(ctx, x, y, r * 2.2, 0.75 * alpha);
+    if (tongues > 0) {
+      const back = rad(headingDeg + 180);
+      ctx.fillStyle = rgbCss(palette.body, GLOB_ALPHA * alpha);
+      ctx.beginPath();
+      for (let k = 0; k < tongues; k += 1) {
+        const d = r * (1.15 + DRIP_SPACING * k * 0.9);
+        const sway = r * 0.25 * Math.sin(time * 5 + seed + k * 2.1);
+        const dr = r * Math.max(0.14, 0.42 - 0.09 * k);
+        addCircle(ctx, x + Math.cos(back) * d - Math.sin(back) * sway, y + Math.sin(back) * d + Math.cos(back) * sway, dr);
+      }
+      ctx.fill();
+    }
+    glob(ctx, x, y, r, alpha, hot, time * 4 + seed, { drip: false });
+  }
+
+  /**
+   * The poisoned foe at glyph progress `s`: a pool of venom spreading on the lower card (its
+   * outline wobbling, a lilac rim) and hollow bubbles rising out of it and popping.
+   */
+  function sigil(ctx, x, y, r, s) {
+    const spread = poolSpread(s);
+    if (!(r > 0) || !(spread > 0)) return;
+    const px = x;
+    const py = y + r * POOL_DROP;
+    const rx = r * spread;
+    const outline = globOutline(0, 0, rx, s * 6, 0.1).map(([ox, oy]) => [px + ox, py + oy * POOL_SQUASH]);
+    const g = ctx.createRadialGradient(px, py, 0, px, py, rx);
+    g.addColorStop(0, rgbCss(palette.hot, 0.5));
+    g.addColorStop(0.6, rgbCss(palette.body, 0.45));
+    g.addColorStop(1, rgbCss(palette.deep, 0.3));
+    ctx.fillStyle = g;
+    tracePoints(ctx, outline);
+    ctx.fill();
+    ctx.strokeStyle = rgbCss(palette.hot, 0.7);
+    ctx.lineWidth = Math.max(1, r * 0.03);
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    // Hollow bubbles: a faint violet inside and a lilac skin, each fading as it pops.
+    ctx.lineWidth = Math.max(1, r * 0.025);
+    for (const b of bubbleRise(s, r)) {
+      ctx.beginPath();
+      ctx.arc(px + b.dx, py + b.dy, b.radius, 0, TAU);
+      ctx.fillStyle = rgbCss(palette.body, 0.25 * b.alpha);
+      ctx.fill();
+      ctx.strokeStyle = rgbCss(palette.hot, 0.9 * b.alpha);
+      ctx.stroke();
+    }
+  }
+
+  return Object.freeze({
+    key: 'poison',
+    palette,
+    // The vignette's tint: a violet-black kept local to a card.
+    shade: Object.freeze([28, 8, 42]),
+    // Toxic fumes (the recipe's [120, 70, 150]).
+    smoke: Object.freeze([120, 70, 150]),
+    particle: Object.freeze({ className: 'fx-particle--glob', color: rgbCss(palette.hot), aspect: 1 }),
+    glow,
+    body,
+    tongue,
+    projectile,
+    sigil,
+    grain: grainPass,
+    withPalette: (p) => poisonKit(p),
+  });
 }
 
-export const poison = Object.freeze({
-  key: 'poison',
-  palette,
-  // The vignette's tint: a violet-black kept local to a card.
-  shade: Object.freeze([28, 8, 42]),
-  // Toxic fumes (the recipe's [120, 70, 150]).
-  smoke: Object.freeze([120, 70, 150]),
-  particle: Object.freeze({ className: 'fx-particle--glob', color: rgbCss(palette.hot), aspect: 1 }),
-  glow,
-  body,
-  tongue,
-  projectile,
-  sigil,
-  grain: grainPass,
-});
+export const poison = poisonKit(PALETTE);

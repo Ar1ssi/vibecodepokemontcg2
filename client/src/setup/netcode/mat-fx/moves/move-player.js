@@ -21,6 +21,7 @@ import { laneGeometry, localLane, phaseProgress, toLocal, unionPadded } from './
 import { terrainPose } from './move-poses.mjs';
 import { DEFAULT_PAD, withDefaults } from './move-spec.mjs';
 import { materialFor } from './materials/index.js';
+import { lighten, tintedPalette } from './materials/_shared.js';
 
 const BACKSTOP_PAD_MS = 400;
 const GHOST_SAMPLES = 150;
@@ -32,6 +33,40 @@ const TRAILS = Object.freeze([
 
 const isSourceOver = (beat) =>
   beat.drawer === 'vignette' || beat.drawer === 'smoke' || (beat.drawer === 'terrain' && beat.params.kind === 'crack');
+
+// ---- beat colours (design 065 § New pieces A) ----------------------------------
+
+/**
+ * A per-scene memo of tinted materials: `cachedTint(material, tint)` is `material` redrawn
+ * over its palette with `tint`'s keys replaced, built once per material key and tint.
+ */
+export function tintCache() {
+  const cache = new Map();
+  return function cachedTint(material, tint) {
+    const key = `${material.key}|${JSON.stringify(tint)}`;
+    if (!cache.has(key)) cache.set(key, material.withPalette(tintedPalette(material.palette, tint)));
+    return cache.get(key);
+  };
+}
+
+/**
+ * Resolve a beat's `tint` and `hues` against the scene material: `material` is what the
+ * drawer draws with; `materialAt(i)` is item `i`'s material (hues[i % n] as its body, a
+ * lighter hot), or the beat material without hues. The returned params drop both keys, so
+ * drawers never see them.
+ */
+export function resolveBeatColours(material, params, cachedTint) {
+  const { tint = null, hues = null, ...rest } = params ?? {};
+  const beatMaterial = tint ? cachedTint(material, tint) : material;
+  const materialAt =
+    hues && hues.length > 0
+      ? (i) => {
+          const hue = hues[((i % hues.length) + hues.length) % hues.length];
+          return cachedTint(material, { ...tint, body: hue, hot: lighten(hue, 0.35) });
+        }
+      : () => beatMaterial;
+  return { material: beatMaterial, materialAt, params: rest };
+}
 
 // ---- ghost cards ---------------------------------------------------------------
 
@@ -144,7 +179,13 @@ const spawnBurst = (host, anchorRect, burst, material, seed) => {
 const warned = new Set();
 const runBeat = (beat, index, ctx, local, progress, info) => {
   try {
-    DRAWERS[beat.drawer]?.draw(ctx, local, progress, { ...info, params: beat.params, beatMs: beat.until - beat.at });
+    DRAWERS[beat.drawer]?.draw(ctx, local, progress, {
+      ...info,
+      material: beat.material,
+      materialAt: beat.materialAt,
+      params: beat.params,
+      beatMs: beat.until - beat.at,
+    });
   } catch (error) {
     // One bad spec must never blank the scene: log once per beat, keep drawing the rest.
     const key = `${info.spec.id}:${index}`;
@@ -183,7 +224,11 @@ export function playMove({ spec, attacker, defender, seed = 1, impacts = null, a
   const oy = (size - hostRect.height) / 2;
   const anchors = { attacker: toLocal(from, hostRect), defender: toLocal(to, hostRect) };
   const time0 = seed * 0.37;
-  const beats = spec.beats.map((beat) => ({ ...beat, params: withDefaults(beat.drawer, beat.params) }));
+  const cachedTint = tintCache();
+  const beats = spec.beats.map((beat) => ({
+    ...beat,
+    ...resolveBeatColours(material, withDefaults(beat.drawer, beat.params), cachedTint),
+  }));
   const quakes = beats.filter((beat) => beat.drawer === 'terrain' && beat.params.kind === 'quake');
   const pendingBursts = (spec.particles ?? []).map((burst, index) => ({ burst, index, spawned: false }));
 

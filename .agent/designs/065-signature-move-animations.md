@@ -659,6 +659,17 @@ beat `tint`/`hues`, the `anchor` param kind, `unit`s and the fan/shade/chain/gri
 dependency.
 
 ## Deviations (Builder appends here during build)
+- Slice 2: `hues` hand-off is `info.materialAt(i)` (item i's hued material; the beat material
+  when no hues), resolved by `resolveBeatColours` in `move-player.js`; no 063 drawer reads it
+  yet — the multi-item drawers adopt it in slice 4, which owns `move-drawers.js`. A hued item
+  keeps the beat's `tint` for the keys it does not set.
+- Slice 2: kinds `'palette'` / `'hexes'` accept `null` (the "none" default `withDefaults` fills
+  in); the schema entries are `tint: ['palette', null]`, `hues: ['hexes', 1, 6, null]`.
+- Slice 2: `buzzKit(palette, base)` reuses `bug`'s glow/tongue/particle/shade objects for the
+  untinted `buzz` (063's test pins `buzz.tongue === bug.tongue`); a tinted buzz builds its own.
+- Slice 2: the red-body test asserts per-colour substitution for every material, and that ≥ 24
+  of 26 draw their body colour in glow/body/tongue/projectile (dark's body grey is not drawn by
+  those four calls).
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
