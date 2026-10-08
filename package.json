@@ -19,6 +19,7 @@
     "audit:abilities": "node scripts/audit-ability-behaviour.mjs",
     "audit:trainers": "node scripts/audit-trainer-behaviour.mjs",
     "audit:attacks": "node scripts/audit-attack-behaviour.mjs",
+    "vendor:species-stats": "node scripts/vendor-species-stats.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,json,md}\""
   },

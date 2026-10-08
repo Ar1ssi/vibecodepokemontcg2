@@ -11,6 +11,7 @@ export const HIT_SPARKS_MS = 520;
 export const SCREEN_SHAKE_MIN_DAMAGE = 30;
 export const SCREEN_SHAKE_MAX_PX = 6;
 export const TARGET_RING_MS = 620;
+export const AURA_PULSE_MS = 600;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -37,6 +38,32 @@ export function classifyDamagePlan(plan, lastSeen) {
   if (amount > 0) return { kind: 'hit', amount, weakness: !!plan.weakness };
   return { kind: 'heal', amount: -amount, weakness: false };
 }
+
+/**
+ * Design 063: what a hit adds beyond the flash and sparks, by the attacking move's sound
+ * family: a ring, a flash scale, a table-shake multiplier, and whether the slash streak shows.
+ */
+export const HIT_DRESSING = Object.freeze({
+  default: { ring: false, flashScale: 1.0, shakeMul: 1.0, slash: true },
+  slash: { ring: false, flashScale: 1.0, shakeMul: 1.0, slash: true },
+  punch: { ring: true, flashScale: 1.0, shakeMul: 1.2, slash: false },
+  dash: { ring: true, flashScale: 1.0, shakeMul: 1.1, slash: true },
+  beam: { ring: false, flashScale: 1.2, shakeMul: 1.0, slash: false },
+  projectile: { ring: false, flashScale: 1.1, shakeMul: 1.0, slash: false },
+  burst: { ring: false, flashScale: 1.2, shakeMul: 1.1, slash: false },
+  quake: { ring: true, flashScale: 0.9, shakeMul: 1.5, slash: false },
+  splash: { ring: false, flashScale: 1.1, shakeMul: 0.9, slash: false },
+  wind: { ring: false, flashScale: 1.0, shakeMul: 0.8, slash: false },
+  electric: { ring: false, flashScale: 1.2, shakeMul: 1.0, slash: true },
+  ghost: { ring: false, flashScale: 0.9, shakeMul: 0.8, slash: false },
+  chime: { ring: false, flashScale: 1.0, shakeMul: 0.8, slash: false },
+  roar: { ring: true, flashScale: 1.2, shakeMul: 1.3, slash: false },
+  charge: { ring: false, flashScale: 1.0, shakeMul: 1.0, slash: false },
+});
+
+/** The hit dressing for a family; an unknown or missing family is the default (today's hit). */
+export const hitDressingFor = (family) =>
+  Object.hasOwn(HIT_DRESSING, family) ? HIT_DRESSING[family] : HIT_DRESSING.default;
 
 /** Amplitude (px) of the whole-table shake for a hit; 0 below the threshold. */
 export function screenShakeAmplitude(amount) {
@@ -198,6 +225,18 @@ export function createImpactQueue({ setTimer }) {
       context = ctx;
       schedule();
     },
+  };
+}
+
+/**
+ * Design 063: the pulse a zero-damage attack plays on its attacker: a ring that swells off the
+ * card, bright at the start of its life and fading out.
+ */
+export function auraPulsePose(t) {
+  const c = clamp01(t);
+  return {
+    scale: 0.92 + 0.38 * easeOutCubic(c),
+    opacity: c < 0.2 ? c / 0.2 : (1 - (c - 0.2) / 0.8) ** 1.5,
   };
 }
 

@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  AURA_PULSE_MS,
+  HIT_DRESSING,
   LUNGE_IMPACT,
+  SCREEN_SHAKE_MAX_PX,
+  auraPulsePose,
+  hitDressingFor,
   attackAngleDeg,
   createImpactQueue,
   hitFlashPose,
@@ -220,4 +225,38 @@ test('targetRingPose: pulses rather than shrinking monotonically', () => {
   for (let t = 0; t <= 1; t += 0.05) scales.push(targetRingPose(t).scale);
   const rises = scales.filter((s, i) => i > 0 && s > scales[i - 1]).length;
   assert.ok(rises >= 2, 'the ring grows again at least twice');
+});
+
+test('hitDressingFor: every family has a dressing, unknown or missing falls back to the default', () => {
+  const families = ['slash', 'punch', 'dash', 'beam', 'projectile', 'burst', 'quake', 'splash', 'wind', 'electric', 'ghost', 'chime', 'roar', 'charge'];
+  assert.equal(Object.keys(HIT_DRESSING).length, families.length + 1);
+  for (const family of families) {
+    assert.equal(hitDressingFor(family), HIT_DRESSING[family], family);
+    assert.notEqual(hitDressingFor(family), HIT_DRESSING.default, family);
+  }
+  for (const family of [undefined, null, 'nope', 'toString', '']) {
+    assert.equal(hitDressingFor(family), HIT_DRESSING.default, String(family));
+  }
+});
+
+test('hitDressingFor: the default is the current hit and punch / quake / roar add a ring', () => {
+  assert.deepEqual(HIT_DRESSING.default, { ring: false, flashScale: 1, shakeMul: 1, slash: true });
+  for (const family of ['punch', 'dash', 'quake', 'roar']) assert.equal(hitDressingFor(family).ring, true, family);
+  assert.equal(hitDressingFor('beam').slash, false);
+});
+
+test('hitDressingFor: a heavier shake multiplier still clamps at the table-shake maximum', () => {
+  const amount = 400 * hitDressingFor('quake').shakeMul;
+  assert.equal(screenShakeAmplitude(amount), SCREEN_SHAKE_MAX_PX);
+  assert.ok(screenShakeAmplitude(60 * 1.5) > screenShakeAmplitude(60));
+});
+
+test('auraPulsePose: a ring that swells off the attacker and fades out', () => {
+  assert.equal(auraPulsePose(0).opacity, 0);
+  assert.ok(auraPulsePose(0.2).opacity > 0.99);
+  assert.ok(auraPulsePose(1).opacity < 0.01);
+  assert.ok(auraPulsePose(1).scale > auraPulsePose(0).scale);
+  assert.deepEqual(auraPulsePose(-4), auraPulsePose(0));
+  assert.deepEqual(auraPulsePose(9), auraPulsePose(1));
+  assert.ok(AURA_PULSE_MS > 0);
 });

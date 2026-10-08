@@ -21,6 +21,7 @@ import {
 import { playBanner } from './banner.js';
 import { classifyHitOnce } from './damage-hit.mjs';
 import {
+  AURA_PULSE_MS,
   DAMAGE_POP_MS,
   HIT_FLASH_MS,
   HIT_SPARKS_MS,
@@ -30,8 +31,10 @@ import {
   TARGET_RING_MS,
   attackAngleDeg,
   attackBannerText,
+  auraPulsePose,
   createImpactQueue,
   damagePopPose,
+  hitDressingFor,
   hitFlashPose,
   lungePoseFor,
   screenShakeAmplitude,
@@ -42,7 +45,11 @@ import {
   targetRingPose,
 } from './combat-pose.mjs';
 import { brighten, fxRgbForCard, FX_NEUTRAL_RGB, rgbCss } from './fx-colors.mjs';
-import { peekCombatOrigin } from './origins.mjs';
+import { frameTurnOf } from './evolve-scene.js';
+import { peekCombatOrigin, zoneCardIds } from './origins.mjs';
+import { playMove } from './moves/move-player.js';
+import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
+import { SPECS } from './moves/specs/index.mjs';
 import { burstParticles } from './particles.mjs';
 
 const BACKSTOP_PAD_MS = 400;
@@ -62,6 +69,9 @@ const combatSrc = (instanceId, registry) => {
 
 /** Queue `job(ctx)` to run when the current batch's attack connects. */
 export const afterImpact = (job) => impacts.add(job);
+
+/** Design 063: a move scene announces its own contact moment (ms from now) with its context. */
+export const announceStrike = (ms, ctx = null) => impacts.strikeIn(ms, ctx);
 
 const showDamageNumber = (instanceId, rect, hit) => {
   const index = floatingCount.get(instanceId) || 0;
@@ -104,7 +114,8 @@ const hitRgbFor = (ctx, hit) => {
   return ctx?.attackerCard ? brighten(fxRgbForCard(ctx.attackerCard), 0.3) : FX_NEUTRAL_RGB;
 };
 
-const strikeTarget = (rect, hit, ctx) => {
+// Design 063: the attacking move's family decides what the hit adds (`hitDressingFor`).
+const strikeTarget = (rect, hit, ctx, dressing) => {
   const rgb = hitRgbFor(ctx, hit);
   const direction = ctx?.direction ?? -90;
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-hit' });
@@ -112,12 +123,19 @@ const strikeTarget = (rect, hit, ctx) => {
 
   const flash = document.createElement('div');
   flash.className = 'fx-hit__flash';
+  if (dressing.flashScale !== 1) flash.style.transform = `scale(${dressing.flashScale})`;
   const slash = document.createElement('div');
   slash.className = 'fx-hit__slash';
   slash.style.rotate = `${direction + 90 + (Math.random() - 0.5) * 30}deg`;
   const sparkLayer = document.createElement('div');
   sparkLayer.className = 'fx-hit__sparks';
-  host.append(flash, slash, sparkLayer);
+  host.append(flash, sparkLayer);
+  if (dressing.slash) host.insertBefore(slash, sparkLayer);
+  const impactRing = dressing.ring ? document.createElement('div') : null;
+  if (impactRing) {
+    impactRing.className = 'fx-hit__ring';
+    host.appendChild(impactRing);
+  }
 
   const amplitude = Math.min(10, 3 + hit.amount / 20);
   const jitter = sampleKeyframes(
@@ -131,6 +149,10 @@ const strikeTarget = (rect, hit, ctx) => {
     (p) => ({ transform: `scale(${p.scaleX}, ${p.scaleY})`, opacity: p.opacity }),
     12
   );
+  const ringFrames = [
+    { transform: 'scale(0.6)', opacity: 1 },
+    { transform: 'scale(1.4)', opacity: 0 },
+  ];
   const sparks = burstParticles({
     count: hit.weakness ? 22 : Math.min(18, 8 + Math.round(hit.amount / 20)),
     distance: rect.width * (hit.weakness ? 0.95 : 0.75),
@@ -145,7 +167,8 @@ const strikeTarget = (rect, hit, ctx) => {
   const done = [
     animateFrames(host, jitter, { duration: HIT_FLASH_MS }),
     animateFrames(flash, flashFrames, { duration: HIT_FLASH_MS }),
-    animateFrames(slash, slashFrames, { duration: HIT_FLASH_MS }),
+    ...(dressing.slash ? [animateFrames(slash, slashFrames, { duration: HIT_FLASH_MS })] : []),
+    ...(impactRing ? [animateFrames(impactRing, ringFrames, { duration: HIT_FLASH_MS })] : []),
     ...spawnParticles(sparkLayer, sparks, {
       className: 'fx-particle--streak',
       color: rgbCss(rgb),
@@ -175,8 +198,9 @@ export const damage = (plan) => {
   impacts.add((ctx) => {
     showDamageNumber(plan.instanceId, rect, hit);
     if (hit.kind !== 'hit') return;
-    strikeTarget(rect, hit, ctx);
-    shakeTable(hit.amount);
+    const dressing = hitDressingFor(ctx?.family);
+    strikeTarget(rect, hit, ctx, dressing);
+    shakeTable(hit.amount * dressing.shakeMul);
   });
 };
 
@@ -200,17 +224,57 @@ const strikeWindow = (t) => {
   return Math.max(0, 1 - d / 0.14);
 };
 
-export const attack = (plan) => {
-  const registry = getCardRegistry();
-  const from = combatRect(plan.attackerId, registry);
-  const to = combatRect(plan.defenderId, registry);
-  const src = combatSrc(plan.attackerId, registry);
-  if (!from || !to || !src) return 0;
+const isZeroDamage = (plan) => plan.damage === 0 && !(plan.benchDealt > 0);
+
+/** The move an attack plays: pure, so `soundPlanFor` and `attack` agree on it. */
+const pickMove = (plan, card) =>
+  card
+    ? moveFor(
+        card,
+        {
+          instanceId: plan.attackerId,
+          attackName: plan.attackName,
+          species: speciesFor(card),
+          damage: plan.damage,
+          benchDealt: plan.benchDealt,
+        },
+        SPECS
+      )
+    : null;
+
+/** Sound family of the move this attack plays, or undefined (the generic lunge or aura). */
+export const attackFamilyFor = (plan) => pickMove(plan, getCardRegistry().get(plan.attackerId)?.card)?.family;
+
+/** The opponent's Active card id (the target when the plan names no defender), else null. */
+const opponentActiveId = (user, registry) => {
+  const opponent = user === 'self' ? 'opp' : user === 'opp' ? 'self' : null;
+  if (!opponent) return null;
+  return zoneCardIds(registry, opponent, 'active').find((id) => combatRect(id, registry)) ?? null;
+};
+
+// Design 063: a zero-damage attack has nothing to hit; a type-coloured pulse hugs the attacker.
+const playAuraPulse = (rect, rgb) => {
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-aura-pulse' });
+  host.style.setProperty('--fx-aura-rgb', rgb.join(', '));
+  const ring = document.createElement('div');
+  ring.className = 'fx-aura-pulse__ring';
+  host.appendChild(ring);
+  const frames = sampleKeyframes(auraPulsePose, (p) => ({ transform: `scale(${p.scale})`, opacity: p.opacity }), 16);
+  removeWhen(host, [animateFrames(ring, frames, { duration: AURA_PULSE_MS })], AURA_PULSE_MS + BACKSTOP_PAD_MS);
+};
+
+const moveSide = (instanceId, rect, src, registry) => {
+  const element = registry.get(instanceId)?.element || null;
+  return { rect, src, turn: frameTurnOf(element), element };
+};
+
+/** The generic lunge: the attacker's ghost rears back, strikes the defender and recoils. */
+const playLunge = (plan, registry, card, from, to, src) => {
   const pose = lungePoseFor(from, to);
   if (!pose) return 0;
   impacts.strikeIn(LUNGE_MS * LUNGE_IMPACT, {
     direction: attackAngleDeg(from, to),
-    attackerCard: registry.get(plan.attackerId)?.card || null,
+    attackerCard: card,
   });
 
   const host = spawnOverlay({ rect: from, className: 'fx-overlay fx-lunge' });
@@ -234,6 +298,35 @@ export const attack = (plan) => {
   const mainDone = animateFrames(main, mainFrames, { duration: LUNGE_MS });
   removeWhen(host, [mainDone, ...layers], LUNGE_MS + BACKSTOP_PAD_MS);
   hideDuring(registry.get(plan.attackerId)?.element, mainDone, LUNGE_MS + BACKSTOP_PAD_MS);
+};
+
+export const attack = (plan) => {
+  const registry = getCardRegistry();
+  const card = registry.get(plan.attackerId)?.card || null;
+  const from = combatRect(plan.attackerId, registry);
+  const src = combatSrc(plan.attackerId, registry);
+  if (!from || !src) return 0;
+  const defenderId = combatRect(plan.defenderId, registry) ? plan.defenderId : opponentActiveId(plan.user, registry);
+  const to = defenderId == null ? null : combatRect(defenderId, registry);
+  if (isZeroDamage(plan) || !to) {
+    playAuraPulse(from, card ? brighten(fxRgbForCard(card), 0.3) : FX_NEUTRAL_RGB);
+    return;
+  }
+
+  const pick = pickMove(plan, card);
+  const defenderSrc = combatSrc(defenderId, registry);
+  if (pick?.score && defenderSrc) {
+    const played = playMove({
+      spec: pick.score,
+      attacker: moveSide(plan.attackerId, from, src, registry),
+      defender: moveSide(defenderId, to, defenderSrc, registry),
+      seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
+      impacts: { strikeIn: announceStrike },
+      attackerCard: card,
+    });
+    if (played) return played.holdMs;
+  }
+  return playLunge(plan, registry, card, from, to, src);
 };
 
 const showTargetRing = (rect) => {

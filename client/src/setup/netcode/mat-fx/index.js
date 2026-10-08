@@ -8,7 +8,7 @@ import { signatureEntryKind } from './entry-kind.mjs';
 import { playFxSound } from './fx-audio.js';
 import { holdFor } from './fx-holds.mjs';
 import { playsOppPreview } from './opp-play.mjs';
-import { attack, attackBanner, damage } from './combat.js';
+import { attack, attackBanner, attackFamilyFor, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
 import { enter } from './entry.js';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
@@ -55,8 +55,10 @@ const STATIC_FALLBACKS = { 'coin-flip': coinFlip };
 // signature entry; any other plays the evolution scene's score. The dispatcher
 // sounds before the effect runs, so the evolved card is read here.
 // Design 043: the opponent's Trainer sounds with its preview's timing.
+// Design 063: an attack sounds with its move's family (the same pure pick the scene plays).
 const soundPlanFor = (plan) => {
   if (plan?.effect === 'trainer-play' && playsOppPreview(plan)) return { ...plan, effect: 'opp-trainer-play' };
+  if (plan?.effect === 'attack') return { ...plan, family: attackFamilyFor(plan) };
   if (plan?.effect !== 'evolve') return plan;
   const evolved = getCardRegistry().get(plan.instanceId)?.card;
   return signatureEntryKind(evolved) ? plan : { ...plan, effect: 'evolve-scene' };
