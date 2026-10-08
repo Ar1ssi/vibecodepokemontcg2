@@ -324,7 +324,11 @@ const playLunge = (plan, registry, card, from, to, src) => {
   const mainDone = animateFrames(main, mainFrames, { duration: LUNGE_MS });
   removeWhen(host, [mainDone, ...layers], LUNGE_MS + BACKSTOP_PAD_MS);
   hideDuring(registry.get(plan.attackerId)?.element, mainDone, LUNGE_MS + BACKSTOP_PAD_MS);
+  return { settle: LUNGE_MS };
 };
+
+// The queue moves on at contact; the scene itself stays up for its whole duration.
+const sceneTiming = (played) => ({ hold: played.holdMs, settle: played.durationMs });
 
 export const attack = (plan) => {
   const registry = getCardRegistry();
@@ -346,11 +350,11 @@ export const attack = (plan) => {
       impacts: { strikeIn: announceStrike },
       attackerCard: card,
     });
-    if (played) return played.holdMs;
+    if (played) return sceneTiming(played);
   }
   if (isZeroDamage(plan) || !to) {
     playAuraPulse(from, card ? brighten(fxRgbForCard(card), 0.3) : FX_NEUTRAL_RGB);
-    return;
+    return { settle: AURA_PULSE_MS };
   }
 
   const pick = pickMove(plan, card);
@@ -364,7 +368,7 @@ export const attack = (plan) => {
       impacts: { strikeIn: announceStrike },
       attackerCard: card,
     });
-    if (played) return played.holdMs;
+    if (played) return sceneTiming(played);
   }
   return playLunge(plan, registry, card, from, to, src);
 };

@@ -181,6 +181,16 @@ test('dispatcher: a void or junk return falls back to the table hold', () => {
   }
 });
 
+test('dispatcher: a scene that outlasts its hold passes { hold, settle } to the queue', () => {
+  const { dispatch } = makeWithSound({ effects: { attack: () => ({ hold: 700, settle: 1300 }) } });
+  assert.deepEqual(dispatch({ kind: 'fx', effect: 'attack' }), { hold: 700, settle: 1300 });
+});
+
+test('dispatcher: a scene reporting only its settle paces by the table hold', () => {
+  const { dispatch } = makeWithSound({ effects: { damage: () => ({ settle: 560 }) } });
+  assert.deepEqual(dispatch({ kind: 'fx', effect: 'damage' }), { hold: 180, settle: 560 });
+});
+
 test('dispatcher: a negative override cannot rewind the queue', () => {
   const { dispatch } = makeWithSound({ effects: { damage: () => -500 } });
   assert.equal(dispatch({ kind: 'fx', effect: 'damage' }), 0);

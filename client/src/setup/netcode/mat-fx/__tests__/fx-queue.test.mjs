@@ -230,3 +230,93 @@ test('fx-queue: the default budget (design 063) fits banner + tier-3 move + dama
   // which then crosses the budget, so the prize claim's own hold collapses to nothing.
   assert.deepEqual(clock.delays, [1600, 1240, 180, 260, 900, 0]);
 });
+
+// A fake clock whose `now` follows the waits it has fired.
+const timedClock = () => {
+  const clock = fakeClock();
+  let elapsed = 0;
+  const tick = clock.tick.bind(clock);
+  clock.tick = () => {
+    if (clock.armed) elapsed += clock.delays[clock.delays.length - 1];
+    return tick();
+  };
+  clock.now = () => elapsed;
+  return clock;
+};
+
+test('fx-queue: the turn banner waits for an attack move still on screen past its hold', () => {
+  const clock = timedClock();
+  const started = [];
+  const run = (p) => {
+    started.push([p.id, clock.now()]);
+    return p.timing;
+  };
+  const queue = createFxQueue({ run, schedule: clock.schedule, cancel: clock.cancel, now: clock.now });
+  queue.push({ id: 'attack-banner', timing: 1600 });
+  // The move hands over at contact (700) but stays up until 1300.
+  queue.push({ id: 'attack', timing: { hold: 700, settle: 1300 } });
+  queue.push({ id: 'turn-banner', timing: 260, awaitScenes: true });
+  queue.push({ id: 'draw', timing: 0 });
+  clock.drain();
+  assert.deepEqual(started, [
+    ['attack-banner', 0],
+    ['attack', 1600],
+    ['turn-banner', 2900],
+    ['draw', 3160],
+  ]);
+});
+
+test('fx-queue: a plan that does not await scenes still starts at the hold (contact overlap kept)', () => {
+  const clock = timedClock();
+  const started = [];
+  const run = (p) => {
+    started.push([p.id, clock.now()]);
+    return p.timing;
+  };
+  const queue = createFxQueue({ run, schedule: clock.schedule, cancel: clock.cancel, now: clock.now });
+  queue.push({ id: 'attack', timing: { hold: 700, settle: 1300 } });
+  queue.push({ id: 'status', timing: 260 });
+  clock.drain();
+  assert.deepEqual(started, [
+    ['attack', 0],
+    ['status', 700],
+  ]);
+});
+
+test('fx-queue: waiting out a scene survives a collapsed budget and does not spend it', () => {
+  const clock = timedClock();
+  const started = [];
+  const run = (p) => {
+    started.push([p.id, clock.now()]);
+    return p.timing;
+  };
+  const queue = createFxQueue({ run, schedule: clock.schedule, cancel: clock.cancel, now: clock.now, maxQueueMs: 1000 });
+  queue.push({ id: 'banner', timing: 1600 });
+  queue.push({ id: 'attack', timing: { hold: 700, settle: 1300 } });
+  queue.push({ id: 'turn-banner', timing: 260, awaitScenes: true });
+  clock.drain();
+  // The banner spent the budget, so the move's hold collapses to 0, yet the turn banner
+  // still waits for the move to leave the screen.
+  assert.deepEqual(started, [
+    ['banner', 0],
+    ['attack', 1600],
+    ['turn-banner', 2900],
+  ]);
+});
+
+test('fx-queue: clear forgets scenes still on screen', () => {
+  const clock = timedClock();
+  const started = [];
+  const run = (p) => {
+    started.push([p.id, clock.now()]);
+    return p.timing;
+  };
+  const queue = createFxQueue({ run, schedule: clock.schedule, cancel: clock.cancel, now: clock.now });
+  queue.push({ id: 'attack', timing: { hold: 0, settle: 5000 } });
+  queue.clear();
+  queue.push({ id: 'turn-banner', timing: 0, awaitScenes: true });
+  assert.deepEqual(started, [
+    ['attack', 0],
+    ['turn-banner', 0],
+  ]);
+});

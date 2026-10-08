@@ -4,7 +4,8 @@
 //
 // Design 024: the dispatcher is also the choke point for SOUND, so visuals and
 // audio can never drift into disagreeing about whether an event happened. It
-// now returns the plan's hold (fx-holds.mjs) for the FX queue to pace on.
+// now returns the plan's hold (fx-holds.mjs) for the FX queue to pace on, or
+// `{ hold, settle }` when the effect reports how long its scene stays up.
 // Audio is gated by the kill switch and the mute, but deliberately NOT by
 // reduced motion: motion sensitivity and sound preference are separate axes,
 // and a reduced-motion player still wants to hear the game.
@@ -44,6 +45,12 @@ export const createFxDispatcher = ({
   }
   if (typeof override === 'number' && Number.isFinite(override)) {
     return Math.max(0, override);
+  }
+  // A scene that outlasts its hold reports `{ hold?, settle }` (fx-queue.mjs);
+  // without its own hold it paces by the table.
+  if (Number.isFinite(override?.settle) && override.settle > 0) {
+    const hold = Number.isFinite(override.hold) ? Math.max(0, override.hold) : holdFor(plan.effect);
+    return { hold, settle: override.settle };
   }
   return holdFor(plan.effect);
 };

@@ -86,6 +86,10 @@ const COIN_EVENTS = new Set([
 // An attack fans into a banner (+ target ring) and then the lunge itself.
 const MULTI_FX = { attackExecuted: ['attack-banner', 'attack'] };
 
+// The turn passing and the game ending wait for every scene already on screen
+// (fx-queue.mjs `awaitScenes`): an attack's move must finish before the next turn.
+const AFTER_SCENES = new Set(['turnStarted', 'gameEnded']);
+
 const sideOf = (playerId, selfPlayerId) =>
   playerId == null || selfPlayerId == null ? null : playerId === selfPlayerId ? 'self' : 'opp';
 
@@ -97,6 +101,7 @@ const fxPlan = (event, selfPlayerId, effect = EVENT_FX[event.type]) => {
   const base = { kind: 'fx', user: sideOf(actor, selfPlayerId), ...fields };
   const effects = MULTI_FX[type];
   if (effects) return effects.map((effect) => ({ ...base, effect }));
+  if (AFTER_SCENES.has(type)) return { ...base, effect, awaitScenes: true };
   return { ...base, effect };
 };
 

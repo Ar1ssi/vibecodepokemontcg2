@@ -13,20 +13,35 @@
 // Design 063: a full attack is banner 1600 + a tier-3 move's hold ≤ 1240 + damage
 // 180 + status 260 + knockout 900; the budget covers that chain so only what
 // follows a knockout collapses.
+//
+// A hold ends before its scene does (a move hands over at contact), so `run` may
+// return `{ hold, settle }`: `settle` is how long the scene stays on screen. A plan
+// marked `awaitScenes` (the turn banner) waits until every scene started before it
+// has settled, so a move never plays under the next turn's transition.
 const DEFAULT_MAX_QUEUE_MS = 3800;
 
-const holdOf = (value) =>
+const msOf = (value) =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+
+const timingOf = (result) =>
+  result !== null && typeof result === 'object'
+    ? { hold: msOf(result.hold), settle: msOf(result.settle) }
+    : { hold: msOf(result), settle: 0 };
+
+const defaultNow = () => globalThis.performance?.now?.() ?? Date.now();
 
 export const createFxQueue = ({
   run,
   schedule,
   cancel = () => {},
+  now = defaultNow,
   maxQueueMs = DEFAULT_MAX_QUEUE_MS,
 }) => {
   const queue = [];
   let timer = null;
   let committedMs = 0;
+  // When the last scene started so far leaves the screen, on the `now` clock.
+  let settledAt = 0;
   // Bumped by clear(); `step` checks it after `run` so an effect that clears
   // the queue synchronously (one that dispatches `game-restarted`, say) cannot
   // have a fresh timer armed on top of the stop it just requested.
@@ -42,15 +57,24 @@ export const createFxQueue = ({
   // hold, and it is what makes a plan pushed mid-hold wait its turn instead of
   // jumping the one still playing. `run` is the dispatcher, which already
   // try/catches every effect — but a hold that comes back NaN or from a thrown
-  // call must still not wedge the chain, hence holdOf + try.
+  // call must still not wedge the chain, hence timingOf + try.
   const step = () => {
     timer = null;
     const plan = queue.shift();
     if (!plan) return idle();
+    // Waiting out a scene is not choreography, so it does not spend the budget.
+    const unsettledMs = plan.awaitScenes ? settledAt - now() : 0;
+    if (unsettledMs > 0) {
+      queue.unshift(plan);
+      timer = schedule(step, unsettledMs);
+      return;
+    }
     const startedIn = epoch;
     let hold = 0;
     try {
-      hold = holdOf(run(plan));
+      const timing = timingOf(run(plan));
+      hold = timing.hold;
+      if (timing.settle > 0) settledAt = Math.max(settledAt, now() + timing.settle);
     } catch {
       hold = 0;
     }
@@ -88,6 +112,7 @@ export const createFxQueue = ({
       }
       queue.length = 0;
       committedMs = 0;
+      settledAt = 0;
     },
 
     pending: () => queue.length,

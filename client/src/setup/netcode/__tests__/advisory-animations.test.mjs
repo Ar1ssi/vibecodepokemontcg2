@@ -237,7 +237,22 @@ test('advisoryAnimationPlan: payload fields survive the fan-out and the new even
 
 test('advisoryAnimationPlan: turnStarted resolves the acting side from `player`', () => {
   const plan = advisoryAnimationPlan({ type: 'turnStarted', player: 'p2', number: 3 }, 'p1');
-  assert.deepEqual(plan, { kind: 'fx', effect: 'turn-banner', user: 'opp', player: 'p2', number: 3 });
+  assert.deepEqual(plan, {
+    kind: 'fx',
+    effect: 'turn-banner',
+    user: 'opp',
+    player: 'p2',
+    number: 3,
+    awaitScenes: true,
+  });
+});
+
+test('advisoryAnimationPlan: the turn passing and the game ending wait for scenes on screen', () => {
+  assert.equal(advisoryAnimationPlan({ type: 'turnStarted', player: 'p2' }, 'p1').awaitScenes, true);
+  assert.equal(advisoryAnimationPlan({ type: 'gameEnded', winner: 'p1' }, 'p1').awaitScenes, true);
+  const [banner, move] = advisoryAnimationPlan({ type: 'attackExecuted', playerId: 'p1' }, 'p1');
+  assert.equal(banner.awaitScenes, undefined);
+  assert.equal(move.awaitScenes, undefined);
 });
 
 test('advisoryAnimationPlan: gameEnded user is the winner side; no winner -> null', () => {
