@@ -1629,7 +1629,17 @@ function searchEnergyParams(body) {
   return { what: `${basic}${type}Energy`, ...attachCount(m[1]) };
 }
 
+// "… up to 2 Basic {G} Energy cards and up to 2 Basic {L} Energy cards and attach them …"
+// (Joltik, Jolting Charge) is one search per Energy type; the single-type reader sees only the first.
+const MULTI_TYPE_SEARCH = /^(search your deck for )(up to \d+ [^.]*?energy cards?) and (up to \d+ [^.]*?energy cards?)( and attach (?:it|them) to [^.]*)$/;
+
 function searchAttachStep(clause, gate, optional) {
+  const multi = MULTI_TYPE_SEARCH.exec(clause.replace(/^(?:if heads|for each heads), /, '').replace(/^you may /, '').replace(/\.(?: then,? shuffle your deck\.)?$/, ''));
+  if (multi) {
+    const [, lead, first, second, tail] = multi;
+    const steps = [`${lead}${first}${tail}.`, `${lead}${second}${tail}.`].map((part) => searchAttachStep(part, gate, optional));
+    return steps.every(Boolean) ? steps : null;
+  }
   const body = clause.replace(/^(?:if heads|for each heads), /, '').replace(/^you may /, '');
   const parsed = parseAbility(body);
   const steps = Array.isArray(parsed) ? parsed : parsed?.steps || [];
@@ -1765,11 +1775,15 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
   const blockSteps = [];
   for (const [re, build] of ALL_BLOCKS) {
     normalized = normalized.replace(re, (...args) => {
-      const step = build(args);
-      if (!step) return args[0];
-      blockSteps.push(step);
-      if (step.type === 'searchAbility' || step.type === 'searchEvolve') result.handlesSearch = true;
-      return ` @block${blockSteps.length - 1}. `;
+      const built = build(args);
+      if (!built) return args[0];
+      const placeholders = [];
+      for (const step of [].concat(built)) {
+        blockSteps.push(step);
+        if (step.type === 'searchAbility' || step.type === 'searchEvolve') result.handlesSearch = true;
+        placeholders.push(`@block${blockSteps.length - 1}.`);
+      }
+      return ` ${placeholders.join(' ')} `;
     });
   }
 
