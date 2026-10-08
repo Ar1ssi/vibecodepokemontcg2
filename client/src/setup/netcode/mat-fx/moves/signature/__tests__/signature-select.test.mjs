@@ -3,13 +3,16 @@ import assert from 'node:assert/strict';
 import {
   baseDamage,
   normalizeAttackName,
+  pickFromPool,
   signatureFor,
   signatureForSlug,
   signatureMaterial,
+  signaturePoolForSlug,
   slugFor,
   strongestAttackName,
 } from '../signature-select.mjs';
-import { SIGNATURE_BY_SLUG } from '../signature-moves.mjs';
+import { SIGNATURE_BY_SLUG, SIGNATURE_MOVES, SIGNATURE_POOL_BY_SLUG } from '../signature-moves.mjs';
+import { hashString } from '../../move-select.mjs';
 import { SIGNATURE_SPECS } from '../specs/index.mjs';
 import { SPECS } from '../../specs/index.mjs';
 
@@ -239,4 +242,55 @@ test('ids shared with 063 stay separate registries (edge 21)', () => {
   assert.ok(SPECS.aeroblast && SPECS['seed-flare']);
   assert.notEqual(SIGNATURE_SPECS.aeroblast, SPECS.aeroblast);
   assert.notEqual(SIGNATURE_SPECS['seed-flare'], SPECS['seed-flare']);
+});
+
+test('signaturePoolForSlug: forms with several signatures share a pool; others one move', () => {
+  assert.deepEqual(signaturePoolForSlug('kyurem-black'), ['freeze-shock', 'fusion-bolt']);
+  assert.deepEqual(signaturePoolForSlug('kyurem-white'), ['ice-burn', 'fusion-flare']);
+  assert.deepEqual(signaturePoolForSlug('kyurem'), ['glaciate']);
+  assert.equal(signaturePoolForSlug('zygarde-complete'), SIGNATURE_POOL_BY_SLUG.zygarde);
+  assert.deepEqual(signaturePoolForSlug('lugia'), ['aeroblast']);
+  assert.deepEqual(signaturePoolForSlug('pikachu'), []);
+  for (const pool of Object.values(SIGNATURE_POOL_BY_SLUG)) {
+    assert.ok(pool.length >= 2);
+    for (const id of pool) assert.ok(SIGNATURE_MOVES[id], id);
+  }
+});
+
+test('pickFromPool: uniform over the seed, deterministic, empty → null', () => {
+  const pool = ['a', 'b'];
+  assert.equal(pickFromPool(pool, 0), 'a');
+  assert.equal(pickFromPool(pool, 1), 'b');
+  assert.equal(pickFromPool(pool, 7), pickFromPool(pool, 7));
+  assert.equal(pickFromPool([], 3), null);
+  const counts = { a: 0, b: 0 };
+  for (let i = 0; i < 1000; i++) counts[pickFromPool(pool, hashString(`k|${i}`))]++;
+  assert.ok(counts.a > 400 && counts.b > 400, JSON.stringify(counts));
+});
+
+test('signatureFor: a multi-signature legendary’s strongest attack is a 50/50 by seed', () => {
+  const blackKyurem = {
+    name: 'Black Kyurem',
+    types: ['Dragon'],
+    attacks: [
+      { name: 'Ice Edge', damage: '30' },
+      { name: 'Black Frost', damage: '250' },
+    ],
+  };
+  const seen = new Set();
+  for (let seed = 0; seed < 8; seed++) {
+    const sig = signatureFor(blackKyurem, { attackName: 'Black Frost', slug: 'kyurem-black', seed });
+    assert.equal(sig.reason, 'strongest');
+    seen.add(sig.move);
+  }
+  assert.deepEqual([...seen].sort(), ['freeze-shock', 'fusion-bolt']);
+  assert.equal(
+    signatureFor(blackKyurem, { attackName: 'Ice Edge', slug: 'kyurem-black', seed: 1 }),
+    null
+  );
+  // A name match still wins over the pool.
+  assert.equal(
+    signatureFor(blackKyurem, { attackName: 'Fusion Bolt', slug: 'kyurem-black', seed: 0 })?.move,
+    'fusion-bolt'
+  );
 });

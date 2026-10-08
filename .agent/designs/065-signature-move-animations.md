@@ -231,10 +231,14 @@ the scripts rebuild them in a scratch folder):
    damage = the first integer in the printed string (`'120+' → 120`, `'30×' → 30`, `'' → 0`).
 3. **Which signature when a species owns several** (Zygarde 5, Kyurem 3 forms, Necrozma 4 forms,
    Hoopa 2, Victini 2, Eternatus 2, Reshiram/Zekrom 2, Calyrex 2 riders, Urshifu 2 styles): a
-   pinned slug table (§ Data) — form first, then the species' own move over a group move, then
-   the highest power. The remaining moves (Dynamax Cannon, Fusion Bolt, Fusion Flare, Searing
-   Shot, Thousand Waves) play by name match only. Rejected: random per instance (two Zygarde
-   cards would disagree with the banner's weight for no reason).
+   pinned slug table (§ Data) gives each form its one move, form first. **Revised by the user:**
+   when a form still owns several signatures, its strongest attack plays one of them uniformly at
+   random (a 50/50 for two) — `SIGNATURE_POOL_BY_SLUG`: Black Kyurem (Freeze Shock, Fusion Bolt),
+   White Kyurem (Ice Burn, Fusion Flare), Reshiram (Blue Flare, Fusion Flare), Zekrom (Bolt
+   Strike, Fusion Bolt), Victini (V-create, Searing Shot), Eternatus (Eternabeam, Dynamax Cannon),
+   every Zygarde form (its five). The pick is seeded by the attack (`hashString(attackerId |
+   attackName | damage)`, the seed `playMove` already uses), so both clients agree. Forms with one
+   move (Necrozma's, Calyrex's riders, Urshifu's styles, Hoopa's, base Kyurem) are unchanged.
 4. **Type-changing moves** (Judgment, Multi-Attack, Techno Blast follow a plate/memory/drive;
    Ivy Cudgel follows Ogerpon's mask): the material follows the card — Judgment, Multi-Attack and
    Techno Blast take the card's TCG type (`colorless → normal`), Ivy Cudgel the mask slug.
@@ -361,9 +365,10 @@ signatureMaterial(moveId, { slug, card }) → material key
   CARD_TYPED.has(moveId) → TCG_TO_MATERIAL[normalizeEnergyType(card?.types?.[0])] ?? SIGNATURE_MOVES[moveId].material
   moveId === 'ivy-cudgel' → walk slug through MASK_MATERIAL like signatureForSlug, default 'grass'
   else SIGNATURE_MOVES[moveId].material
-signatureFor(card, { attackName, slug }) → { move, reason: 'name'|'strongest', material } | null
+signatureFor(card, { attackName, slug, seed }) → { move, reason: 'name'|'strongest', material } | null
   1. named = SIGNATURE_BY_NAME.get(normalizeAttackName(attackName)); named → { move: named, reason: 'name' }
-  2. move = signatureForSlug(slug); !move → null
+  2. move = pickFromPool(signaturePoolForSlug(slug), seed); !move → null
+     // pool = SIGNATURE_POOL_BY_SLUG walk, else [signatureForSlug(slug)]; pick = pool[seed % length]
   3. strongest = strongestAttackName(card?.attacks); !strongest → null
   4. normalizeAttackName(strongest) !== normalizeAttackName(attackName) → null
   5. → { move, reason: 'strongest' }   (material added by signatureMaterial in both branches)

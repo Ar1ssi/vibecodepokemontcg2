@@ -251,7 +251,11 @@ const pickMove = (plan, card) =>
  */
 const pickSignature = (plan, card) => {
   if (!card) return null;
-  const sig = signatureFor(card, { attackName: plan.attackName, slug: slugFor(card) });
+  const sig = signatureFor(card, {
+    attackName: plan.attackName,
+    slug: slugFor(card),
+    seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
+  });
   const spec = sig && SIGNATURE_SPECS[sig.move];
   return spec ? { ...sig, spec: { ...spec, material: sig.material } } : null;
 };

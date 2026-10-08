@@ -684,6 +684,21 @@ export const MASK_MATERIAL = Object.freeze({
   'ogerpon-cornerstone-mask': 'rock',
 });
 
+/**
+ * Forms that own several signature moves: the strongest attack plays one of them, chosen
+ * uniformly per attack from a seed (design 065 § Options 3). Walked like SIGNATURE_BY_SLUG, so
+ * every Zygarde form shares the Zygarde pool.
+ */
+export const SIGNATURE_POOL_BY_SLUG = Object.freeze({
+  eternatus: ['eternabeam', 'dynamax-cannon'],
+  'kyurem-black': ['freeze-shock', 'fusion-bolt'],
+  'kyurem-white': ['ice-burn', 'fusion-flare'],
+  reshiram: ['blue-flare', 'fusion-flare'],
+  victini: ['v-create', 'searing-shot'],
+  zekrom: ['bolt-strike', 'fusion-bolt'],
+  zygarde: ['lands-wrath', 'thousand-arrows', 'thousand-waves', 'core-enforcer', 'nihil-light'],
+});
+
 /** Species/form slug → signature move id; null = this form has no signature (stops the walk). */
 export const SIGNATURE_BY_SLUG = Object.freeze({
   arceus: 'judgment',
