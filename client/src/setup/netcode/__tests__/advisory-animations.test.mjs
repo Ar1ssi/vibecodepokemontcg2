@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   advisoryAnimationPlan,
+  attackLeads,
   coinFlipRuns,
   dealShuffles,
   effectKnockoutIds,
@@ -10,6 +11,9 @@ import {
   supersededDeals,
 } from '../advisory-animations.mjs';
 import { HOLD_MS } from '../mat-fx/fx-holds.mjs';
+import { createGameState } from '../../../../../shared/engine/state.mjs';
+import { createCard } from '../../../../../shared/engine/cards.mjs';
+import { applyCommand } from '../../../../../shared/engine/reduce.mjs';
 
 test('advisoryAnimationPlan: zoneShuffled -> shuffle plan for the shuffling side', () => {
   const event = { type: 'zoneShuffled', zoneId: 'deck', playerId: 'p1' };
@@ -493,4 +497,54 @@ test('design 064: GX and VSTAR use become sound-only crowd plans that keep their
   assert.equal(vstar.effect, 'vstar-used');
   assert.equal(vstar.user, 'opp');
   for (const effect of ['gx-used', 'vstar-used']) assert.ok(SOUND_ONLY_FX.has(effect), effect);
+});
+
+// Arrival order with each attack moved ahead of the hit it leads, as handleAdvisoryEvent plays it.
+const playOrder = (events) => {
+  const leads = attackLeads(events);
+  const moved = new Set(leads.values());
+  return events.flatMap((event) => (moved.has(event) ? [] : leads.has(event) ? [leads.get(event), event] : [event]));
+};
+
+test('attackLeads: the engine emits the hit and knockout before attackExecuted; the attack plays first', () => {
+  const state = createGameState({ players: { p1: { username: 'Ash' }, p2: { username: 'Gary' } }, rulesEnabled: true });
+  state.turn = { player: 'p1', number: 2, phase: 'main' };
+  const pokemon = (props) => createCard({ supertype: 'Pokémon', type: 'Pokémon', ...props });
+  state.players.p1.zones.active.push(
+    pokemon({ instanceId: 1, name: 'Pikachu', hp: 60, attacks: [{ name: 'Gnaw', cost: [], damage: 60, text: '' }] })
+  );
+  state.players.p2.zones.active.push(pokemon({ instanceId: 20, name: 'Magikarp', hp: 30 }));
+  state.players.p2.zones.bench.push(pokemon({ instanceId: 21, name: 'Feebas', hp: 30 }));
+  for (const playerId of ['p1', 'p2']) {
+    for (let i = 0; i < 6; i += 1) {
+      state.players[playerId].zones.prizes.push(createCard({ instanceId: `${playerId}-prize-${i}`, name: 'Prize' }));
+    }
+  }
+
+  const { events, error } = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+
+  assert.equal(error, null);
+  const arrival = events.map((event) => event.type);
+  assert.ok(arrival.indexOf('damageUpdated') < arrival.indexOf('attackExecuted'), arrival.join(' > '));
+  const played = playOrder(events).map((event) => event.type);
+  assert.deepEqual(played.slice(0, 3), ['attackExecuted', 'damageUpdated', 'pokemonKnockedOut']);
+  assert.equal(played.length, events.length);
+});
+
+test('attackLeads: coin flips that decide the attack still play before it', () => {
+  const flip = { type: 'attackCoinFlipped', playerId: 'p1', results: ['heads'] };
+  const hit = { type: 'damageUpdated', instanceId: 20, dealt: 30 };
+  const status = { type: 'statusApplied', instanceId: 20, status: 'paralyzed' };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1, defenderId: 20 };
+  assert.deepEqual(playOrder([flip, hit, status, attack]), [flip, attack, hit, status]);
+});
+
+test('attackLeads: hits after the attack (checkup, next turn) and attacks with no hit stay put', () => {
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1, defenderId: 20, damage: 0 };
+  const checkup = { type: 'damageUpdated', instanceId: 20, dealt: 10 };
+  const turn = { type: 'turnStarted', player: 'p2' };
+  assert.equal(attackLeads([attack, checkup, turn]).size, 0);
+  const earlier = { type: 'damageUpdated', instanceId: 5, dealt: 10 };
+  assert.equal(attackLeads([earlier, turn, attack]).size, 0);
+  assert.equal(attackLeads(null).size, 0);
 });

@@ -399,3 +399,27 @@ export function coinFlipRuns(events) {
   }
   return runs;
 }
+
+// What an attack does to the board: these play after its banner and scene, not before.
+const ATTACK_HIT_EVENTS = new Set(['damageUpdated', 'pokemonKnockedOut', 'statusApplied']);
+const ATTACK_SEGMENT_BOUNDS = new Set(['attackExecuted', 'turnStarted']);
+
+/**
+ * The engine emits `attackExecuted` after the damage, knockout and status it resolved, so in
+ * arrival order the hit would land before the attack's banner and scene. Each attack is moved
+ * to just before its first hit in the batch (coin flips that decided it still play first).
+ *
+ * @param {object[]} events
+ * @returns {Map<object, object>} the hit event -> the `attackExecuted` to play before it
+ */
+export function attackLeads(events) {
+  const leads = new Map();
+  if (!Array.isArray(events)) return leads;
+  let firstHit = null;
+  for (const event of events) {
+    if (event?.type === 'attackExecuted' && firstHit) leads.set(firstHit, event);
+    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) firstHit = null;
+    else if (!firstHit && ATTACK_HIT_EVENTS.has(event?.type)) firstHit = event;
+  }
+  return leads;
+}

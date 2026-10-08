@@ -6,6 +6,7 @@ import { systemState } from '../../state.js';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
   advisoryAnimationPlan,
+  attackLeads,
   coinFlipRuns,
   dealShuffles,
   deckRevealRuns,
@@ -66,6 +67,9 @@ let revealRuns = new Map();
 let batchInSetup = false;
 // Design 064: the batch's knockouts no damage caused.
 let effectKnockouts = new Set();
+// The batch's attacks, keyed by the first hit each one plays ahead of (attackLeads).
+let leadingAttacks = new Map();
+let movedAttacks = new Set();
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -200,6 +204,8 @@ export function handleBeforeApply(events, selfPlayerId) {
   revealRuns = deckRevealRuns(events);
   batchInSetup = !rulesState.startingActiveDone;
   effectKnockouts = effectKnockoutIds(events);
+  leadingAttacks = attackLeads(events);
+  movedAttacks = new Set(leadingAttacks.values());
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
   capturePrizeSeats(events, registry, selfPlayerId);
@@ -288,12 +294,20 @@ export function holdFxQueue(ms) {
  * Handles one server advisory event: builds the plan (pure), then — unless
  * catch-up replay or a hidden tab (edge cases 5, 6) — queues the animation.
  * An event may produce several plans (an attack is a banner then a lunge);
- * they are queued in order.
+ * they are queued in order. An attack is queued ahead of the hits it caused,
+ * which the engine emits before it (attackLeads).
  *
  * @param {object} event
  * @param {string|null} selfPlayerId
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
+  if (movedAttacks.has(event)) return;
+  const attack = leadingAttacks.get(event);
+  if (attack) queueEvent(attack, selfPlayerId);
+  queueEvent(event, selfPlayerId);
+}
+
+function queueEvent(event, selfPlayerId) {
   if (skippedDeals.has(event)) return;
   const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event), {
     dealShuffle: shufflesBeforeDeals.has(event),
