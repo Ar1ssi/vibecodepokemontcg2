@@ -4,8 +4,6 @@
 // Design 026: combat snapshots (attacker, defender, damage target) live in a
 // second map, rebuilt every batch and only peeked — a KO'd defender is gone
 // from the DOM by the time its hit plays, so the hit falls back to these.
-// Design 041: an evolution snapshots the card it evolves FROM — by the time the
-// scene plays, the evolved card is already drawn on top of the stack.
 // Design 042: a discard snapshots each card where it was (hand or board), so it
 // can fly from there to the pile; a card with nothing on screen (deck, prizes)
 // is remembered as `{ hidden: true }`. A `cardMoved` into the pile counts as
@@ -106,14 +104,6 @@ export function knockoutStack(registry, instanceId) {
   return { shown, rest: members.filter((member) => member && member !== shown) };
 }
 
-// Keyed by the evolved card's id (`event.instanceId`), which is what the plan names.
-const captureEvolution = (event, registry, capture, sideOf) => {
-  if (event?.type !== 'pokemonEvolved' || event.instanceId == null) return;
-  const record = visibleStackRecord(registry, event.targetInstanceId);
-  const ghost = record?.element && capture(sideOf(event), record.element);
-  if (ghost) remember(event.instanceId, ghost);
-};
-
 const captureSweep = (event, registry, capture, sideOf) => {
   if (!sweepsToDiscard(event)) return;
   const user = sideOf(event);
@@ -143,7 +133,6 @@ export function captureOrigins(events, registry, capture, sideOf) {
       if (ghost) remember(id, ghost);
       else if (isDiscard(event)) remember(id, { hidden: true });
     }
-    captureEvolution(event, registry, capture, sideOf);
   }
 }
 
@@ -171,7 +160,6 @@ export const discardOrigins = (event) => {
       for (const id of takeZoneSweep(user, event.from)) origins.delete(id);
     }
   }
-  if (event?.type === 'pokemonEvolved') origins.delete(event.instanceId);
 };
 
 /** Pre-diff snapshot of a combat card from the current batch (not consumed). */

@@ -43,8 +43,9 @@ const noise = (dur, gain, filter, over = {}) =>
 const arpeggio = (freqs, { step = 0.07, dur = 0.16, gain = 0.2, wave = 'triangle', at = 0 } = {}) =>
   Object.freeze(freqs.map((freq, i) => tone(freq, dur, gain, { wave, delay: at + i * step })));
 
-// Design 041: the evolution scene's score, timed to its 3.5 s picture
-// (evolve-scene.mjs): a twinkling intro over a swelling pad, a riser and a
+// Design 041: the evolution scene's synthesized score, the fallback when the
+// evolve-card sample is not ready (design 064). Design 066 replaced the picture
+// and left the sound alone: a twinkling intro over a swelling pad, a riser and a
 // quickening run into the flare (~2.0 s), a bright chord and a boom at its
 // peak, then a short fanfare and sparkles as the evolved Pokémon appears.
 const FLARE_S = 2.0;

@@ -1,4 +1,4 @@
-// Design 022 slice 4: lifecycle effects — evolution (design 041), energy attach snap,
+// Design 022 slice 4: lifecycle effects — evolution and devolution (design 066), energy attach snap,
 // retreat/switch slide, trainer/stadium card presentation, discards flying to
 // the pile (design 042). All are detached overlays; every one no-ops when its
 // card or rect cannot be resolved.
@@ -15,17 +15,15 @@ import {
 } from '../../image-logic/mat-fx.mjs';
 import { signatureEntryKind } from './entry-kind.mjs';
 import { playSignatureEntry } from './entry.js';
-import { frameTurnOf, playEvolveScene } from './evolve-scene.js';
+import { frameTurnOf, playDevolveScene, playEvolveScene } from './evolve-scene.js';
 import { brighten, fxRgbForCard, rgbCss } from './fx-colors.mjs';
 import { burstParticles } from './particles.mjs';
 import {
   CARD_PRESENT_MS,
-  DEVOLVE_BURST_MS,
   DISCARD_PUFF_MS,
   ENERGY_SNAP_MS,
   PROMOTE_MS,
   RETREAT_SLIDE_MS,
-  devolveBurstPose,
   discardPuffPose,
   energySnapPose,
   moveIdsForEvent,
@@ -55,44 +53,27 @@ const buildImage = (src, className) => {
 
 const BACKSTOP_PAD_MS = 400;
 
-const cardSrc = (element) => element?.currentSrc || element?.src || null;
-
 export const evolve = (plan) => {
   const registry = getCardRegistry();
-  // Taken first so a snapshot never outlives its evolution.
-  const origin = takeOrigin(plan.instanceId);
   const id = rectForInstance(plan.instanceId, registry) ? plan.instanceId : plan.targetInstanceId;
   const rect = rectForInstance(id, registry);
   if (!rect) return 0;
   // Design 027: a Mega or Tera evolution plays its signature entry instead.
   const evolved = registry.get(plan.instanceId)?.card;
   if (playSignatureEntry(signatureEntryKind(evolved), rect, plan.instanceId, evolved)) return;
-  // Design 041: every other evolution plays the Scarlet/Violet scene.
-  playEvolveScene({
-    rect,
-    turn: frameTurnOf(registry.get(id)?.element),
-    fromSrc: origin?.src || null,
-    toSrc: cardSrc(registry.get(plan.instanceId)?.element),
-  });
+  // Design 066: every other evolution plays TCG Live's Card_Evolution over the evolved card.
+  playEvolveScene({ rect, turn: frameTurnOf(registry.get(id)?.element) });
   return holdFor('evolve-scene');
 };
 
-// Devolving: the ring collapses inward and the card shrinks.
+// Design 066: TCG Live's Card_Devolution over the card left in the slot.
 export const devolve = (plan) => {
   const registry = getCardRegistry();
-  const rect = rectForInstance(plan.instanceId, registry) || rectForInstance(plan.targetInstanceId, registry);
+  const id = rectForInstance(plan.instanceId, registry) ? plan.instanceId : plan.targetInstanceId;
+  const rect = rectForInstance(id, registry);
   if (!rect) return 0;
-  const host = spawnOverlay({ rect, className: 'fx-overlay fx-evolve-burst fx-devolve-burst' });
-  const ring = document.createElement('div');
-  ring.className = 'fx-evolve-burst__ring';
-  host.appendChild(ring);
-  runPose(host, DEVOLVE_BURST_MS, (t) => {
-    const pose = devolveBurstPose(t);
-    host.style.transform = `scale(${pose.scale})`;
-    host.style.opacity = String(pose.opacity);
-    ring.style.transform = `scale(${pose.ringScale})`;
-    ring.style.opacity = String(pose.ringOpacity);
-  });
+  playDevolveScene({ rect, turn: frameTurnOf(registry.get(id)?.element) });
+  return holdFor('devolve');
 };
 
 export const attach = (plan) => {

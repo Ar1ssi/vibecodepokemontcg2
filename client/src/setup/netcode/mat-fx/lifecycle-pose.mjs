@@ -1,8 +1,8 @@
 // Design 022 slice 4: pure math + id helpers for the lifecycle effects
-// (devolve burst, energy snap, retreat slide, trainer/stadium card present).
-// DOM-free; lifecycle.js drives the overlays. Evolution: evolve-scene.mjs.
+// (energy snap, retreat slide, trainer/stadium card present). DOM-free;
+// lifecycle.js drives the overlays. Evolution and devolution: evolve-scene.mjs,
+// devolve-scene.mjs (design 066).
 
-export const DEVOLVE_BURST_MS = 1150;
 export const ENERGY_SNAP_MS = 560;
 export const RETREAT_SLIDE_MS = 520;
 export const CARD_PRESENT_MS = 1700;
@@ -141,21 +141,6 @@ export function discardPuffPose(t) {
     y: -18 * out,
     scale: 1 + 0.35 * out,
     opacity: c < 0.2 ? c / 0.2 : Math.max(0, 1 - (c - 0.2) / 0.8),
-  };
-}
-
-/**
- * Design 024 slice 4: devolution — the ring collapses inward and the card
- * shrinks, a burst run backwards.
- */
-export function devolveBurstPose(t) {
-  const c = clamp01(t);
-  const bell = Math.sin(c * Math.PI);
-  return {
-    scale: 1 - 0.12 * bell,
-    opacity: bell,
-    ringScale: 1.7 - 0.9 * easeOutCubic(c),
-    ringOpacity: 1 - c,
   };
 }
 

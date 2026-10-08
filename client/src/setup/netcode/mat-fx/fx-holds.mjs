@@ -20,9 +20,11 @@ export const HOLD_MS = {
   knockout: 900,
   'prize-claim': 320,
   evolve: 240,
-  // Design 041: the next effect lands as the evolved Pokémon emerges from the flare.
-  'evolve-scene': 2000,
-  devolve: 240,
+  // Design 066: TCG Live moves damage and attachments across 1 s in (the pop); the
+  // next effect lands as the pop's light shafts fade, over the outro dissolve.
+  'evolve-scene': 1300,
+  // Design 066: after the devolve pop (0.35 s) and its shards, as the card glow ripples away.
+  devolve: 700,
   attach: 140,
   'tool-attach': 120,
   retreat: 200,

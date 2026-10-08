@@ -54,61 +54,8 @@ test('visibleStackRecord: the top Pokémon of the stack, from the root or any at
   assert.equal(visibleStackRecord(null, 1), null);
 });
 
-test('origins: an evolution snapshots the visible pre-evolution card under the NEW id', () => {
-  const registry = board();
-  // Beedrill (7) evolves the Weedle stack; the client sent the root as target.
-  captureOrigins(
-    [{ type: 'pokemonEvolved', playerId: 'p2', instanceId: 7, targetInstanceId: 1 }],
-    registry,
-    capture,
-    () => 'opp'
-  );
-  const origin = takeOrigin(7);
-  assert.equal(origin.src, 'kakuna.png', 'the top of the stack, not the root Basic');
-  assert.equal(origin.user, 'opp');
-  assert.equal(takeOrigin(7), undefined, 'consumed');
-});
-
-test('origins: two evolutions in one batch are captured separately', () => {
-  const registry = board();
-  captureOrigins(
-    [
-      { type: 'pokemonEvolved', playerId: 'p1', instanceId: 7, targetInstanceId: 2 },
-      { type: 'pokemonEvolved', playerId: 'p1', instanceId: 8, targetInstanceId: 5 },
-    ],
-    registry,
-    capture,
-    () => 'self'
-  );
-  assert.equal(takeOrigin(8).src, 'makuhita.png');
-  assert.equal(takeOrigin(7).src, 'kakuna.png');
-});
-
-test('origins: an unknown evolution target or a failed capture stores nothing', () => {
-  const registry = board();
-  captureOrigins(
-    [
-      { type: 'pokemonEvolved', playerId: 'p1', instanceId: 7, targetInstanceId: 99 },
-      { type: 'pokemonEvolved', playerId: 'p1', targetInstanceId: 1 },
-    ],
-    registry,
-    capture,
-    () => 'self'
-  );
-  assert.equal(takeOrigin(7), undefined);
-  captureOrigins(
-    [{ type: 'pokemonEvolved', playerId: 'p1', instanceId: 7, targetInstanceId: 1 }],
-    registry,
-    () => null,
-    () => 'self'
-  );
-  assert.equal(takeOrigin(7), undefined);
-});
-
-test('origins: discard drops a skipped evolution snapshot', () => {
-  const event = { type: 'pokemonEvolved', playerId: 'p1', instanceId: 7, targetInstanceId: 5 };
-  captureOrigins([event], board(), capture, () => 'self');
-  discardOrigins(event);
+test('origins: an evolution is not snapshotted (design 066 plays over the evolved card only)', () => {
+  captureOrigins([{ type: 'pokemonEvolved', playerId: 'p2', instanceId: 7, targetInstanceId: 1 }], board(), capture, () => 'opp');
   assert.equal(takeOrigin(7), undefined);
 });
 
