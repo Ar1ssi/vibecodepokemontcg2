@@ -7,6 +7,7 @@ export const FX_OFF_KEY = 'ptcg-fx-off';
 export const SFX_OFF_KEY = 'ptcg-sfx-off';
 export const VOLUME_KEY = 'ptcg-fx-volume';
 export const AMBIENCE_OFF_KEY = 'ptcg-status-ambience-off';
+// The crowd is off unless a player opted in (stored '0'), unlike the other toggles.
 export const CROWD_OFF_KEY = 'ptcg-crowd-off';
 export const DEFAULT_VOLUME = 0.6;
 
@@ -34,7 +35,7 @@ export function readSettings(storage) {
     fxOff: readKey(storage, FX_OFF_KEY) === '1',
     sfxOff: readKey(storage, SFX_OFF_KEY) === '1',
     ambienceOff: readKey(storage, AMBIENCE_OFF_KEY) === '1',
-    crowdOff: readKey(storage, CROWD_OFF_KEY) === '1',
+    crowdOff: readKey(storage, CROWD_OFF_KEY) !== '0',
     volume: normalizeVolume(readKey(storage, VOLUME_KEY)),
   };
 }
