@@ -125,3 +125,15 @@ test('slice 13: the Dragon signatures ship, material per § Options 4', () => {
     assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
   }
 });
+
+test('slice 15: the Normal signatures ship, material per § Options 4 (Tera Starstorm stellar)', () => {
+  const ids = ['crush-grip', 'judgment', 'multi-attack', 'relic-song', 'techno-blast', 'tera-starstorm'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+  assert.equal(SIGNATURE_SPECS['tera-starstorm'].material, 'stellar');
+});

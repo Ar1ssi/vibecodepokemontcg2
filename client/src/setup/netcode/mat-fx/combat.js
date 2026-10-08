@@ -50,7 +50,7 @@ import { peekCombatOrigin, zoneCardIds } from './origins.mjs';
 import { playMove } from './moves/move-player.js';
 import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
 import { SPECS } from './moves/specs/index.mjs';
-import { signatureFor, slugFor } from './moves/signature/signature-select.mjs';
+import { signatureFor, slugFor, withSignatureSpec } from './moves/signature/signature-select.mjs';
 import { SIGNATURE_SPECS } from './moves/signature/specs/index.mjs';
 import { burstParticles } from './particles.mjs';
 
@@ -252,8 +252,7 @@ const pickMove = (plan, card) =>
 const pickSignature = (plan, card) => {
   if (!card) return null;
   const sig = signatureFor(card, { attackName: plan.attackName, slug: slugFor(card) });
-  const spec = sig && SIGNATURE_SPECS[sig.move];
-  return spec ? { ...sig, spec: { ...spec, material: sig.material } } : null;
+  return withSignatureSpec(sig, SIGNATURE_SPECS);
 };
 
 export const attackFamilyFor = (plan) => {

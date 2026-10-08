@@ -1049,6 +1049,40 @@ dependency.
   carry the ring of arcs; Dark Void's Zs are small. No bench target (rec-move has none). Probe:
   median 16.8–17.6 ms on all; p95 65–158 ms, over 140 for Fiery Wrath (141–152), Wicked Blow
   self (144) and Ruination (140–158) (software-GL blur cost, as earlier slices); re-probe on GPU.
+- Slice 15: `family` follows `deriveFamily`: Crush Grip and Multi-Attack `punch` (physical lunge
+  + front shards at contact), Judgment, Relic Song, Techno Blast and Tera Starstorm `burst`. Defender
+  `knock` follows § E (specials 0.35 over Tera Starstorm's 0.3).
+- Slice 15: Crush Grip's glove is `grip size 1.5` on the top layer 300–1200, tinted white with a
+  `cross` star at contact for the yellow burst. Judgment's orb is `coreCharge target 'sky-attacker'`
+  450–750 and `projectile from 'sky-attacker', ease 'linear', bow 0.5` 700–1100 (the vocabulary
+  map's "orb dropped from over the attacker", replacing the entry's lane `straight` approximation);
+  the gold ring is a 2-ring `face` ring plus both orbit halves (tongues 0), shards 5 (cross 20 + 5 +
+  projectile 5 = 30). Multi-Attack's crescents are `orbitCharge unit 'crescent'` (r 0.26–0.34) and
+  its three vertical bursts `pillar count 3, spread 0.8, stagger 220` 580–1300, with `lunge strikes
+  3` and `stagger lead 440`.
+- Slice 15: Relic Song's notes are particle `kind 'note'` bursts (10 on the attacker at 100, 10 on
+  the defender at contact, size 0.22–0.32 — 0.12–0.18 were specks); they take the normal
+  particle colour (gold), not the pastel rainbow (slice 5 rule). The pastel rings are a 3-ring
+  `face` ring with `hues`, the flying notes a pastel-`hues` `volley` 650–1100 (r 0.2–0.28), the
+  pink-violet burst a `RING5` star plus a pink `face` ring.
+- Slice 15: Techno Blast's beams are `w 0.6` / `0.7` (0.5 is short on Actives, as Blue Flare) with a
+  `cross` star at contact. Tera Starstorm's three tilted rings sit round the pillar on the attacker
+  (`face` count 3, `hues` white/cyan/gold, 700–1300) as its signature read says, and a second
+  3-ring set on the defender at contact; the pillar is `target 'attacker'` to 1300, shards `unit
+  'facet'`, twinkle particles.
+- Slice 15: every `SIGNATURE_MOVES` id now has a spec. `signature-select.test.mjs` edge 11 now
+  injects the missing spec: `pickSignature`'s spec lookup moved into the pure
+  `withSignatureSpec(sig, specs)` (`signature-select.mjs`, used by `combat.js`), and the test
+  passes a registry without Crush Grip and expects null; a new test pins full coverage.
+- Slice 15 (slice 5 follow-up): stellar's accent fringe was 1 px and invisible at board scale; it
+  is now `max(1.5, 0.16 w)` at full alpha, 1.12 w out. In the Tera Starstorm recording the facet
+  units and some tongue edges now show pink/gold/green, but the crystals still read mostly cyan.
+- Slice 15 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not committed):
+  every signature read shows at its moment. Weak spots: Techno Blast's beam is short on Actives (as
+  Blue Flare) and reads as a violet orb-to-burst; Judgment's drop on the self seat is a short
+  sideways arc (the slice 5 Fusion Flare `sky-attacker` geometry); Relic Song's notes are gold, not
+  pastel; Tera Starstorm's stellar fringe is still subtle. No bench target (rec-move has none).
+  Probe: median 16.8–17.3 ms on all; p95 53–127 ms.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the

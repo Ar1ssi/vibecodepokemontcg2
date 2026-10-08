@@ -8,8 +8,9 @@ import {
   signatureMaterial,
   slugFor,
   strongestAttackName,
+  withSignatureSpec,
 } from '../signature-select.mjs';
-import { SIGNATURE_BY_SLUG } from '../signature-moves.mjs';
+import { SIGNATURE_BY_SLUG, SIGNATURE_MOVES } from '../signature-moves.mjs';
 import { SIGNATURE_SPECS } from '../specs/index.mjs';
 import { SPECS } from '../../specs/index.mjs';
 
@@ -231,11 +232,20 @@ test('Tag Team card resolves to its partner: no slug signature, name match still
 });
 
 test('a selected signature with no shipped spec falls through to 063 (edge 11)', () => {
-  // Dark Void shipped in slice 14; Crush Grip (normal) ships in slice 15 — drop or invert this
-  // test then, once every move has a spec.
+  // Every SIGNATURE_MOVES id has a spec since slice 15, so the missing spec is injected: a
+  // registry without Crush Grip yields null (combat.js then plays 063's moveFor / the lunge).
   const sig = signatureFor({ name: 'Regigigas', attacks: [] }, { attackName: 'Crush Grip', slug: 'regigigas' });
   assert.equal(sig.move, 'crush-grip');
-  assert.equal(SIGNATURE_SPECS[sig.move], undefined);
+  const { 'crush-grip': _dropped, ...withoutCrushGrip } = SIGNATURE_SPECS;
+  assert.equal(withSignatureSpec(sig, withoutCrushGrip), null);
+  assert.equal(withSignatureSpec(null, SIGNATURE_SPECS), null);
+  const played = withSignatureSpec(sig, SIGNATURE_SPECS);
+  assert.equal(played.spec.id, 'crush-grip');
+  assert.equal(played.spec.material, sig.material);
+});
+
+test('every signature move has a shipped spec (slice 15)', () => {
+  for (const id of Object.keys(SIGNATURE_MOVES)) assert.ok(SIGNATURE_SPECS[id], id);
 });
 
 test('ids shared with 063 stay separate registries (edge 21)', () => {

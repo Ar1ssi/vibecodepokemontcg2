@@ -16,6 +16,7 @@ import { STEEL_SIGNATURE_SPECS } from './steel.mjs';
 import { DRAGON_SIGNATURE_SPECS } from './dragon.mjs';
 import { GHOST_SIGNATURE_SPECS } from './ghost.mjs';
 import { DARK_SIGNATURE_SPECS } from './dark.mjs';
+import { NORMAL_SIGNATURE_SPECS } from './normal.mjs';
 
 export const SIGNATURE_SPECS = Object.freeze({
   ...FIRE_SIGNATURE_SPECS,
@@ -34,4 +35,5 @@ export const SIGNATURE_SPECS = Object.freeze({
   ...DRAGON_SIGNATURE_SPECS,
   ...GHOST_SIGNATURE_SPECS,
   ...DARK_SIGNATURE_SPECS,
+  ...NORMAL_SIGNATURE_SPECS,
 });

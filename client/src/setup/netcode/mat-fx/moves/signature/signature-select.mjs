@@ -91,3 +91,12 @@ export const signatureFor = (card, { attackName, slug } = {}) => {
     material: signatureMaterial(move, { slug, card }),
   };
 };
+
+/**
+ * The signature `sig` plays as `{ ...sig, spec }` (the spec in the card's material), or null
+ * when `sig` is null or `specs` has no spec for its move (edge 11: the shipped 063 path then).
+ */
+export const withSignatureSpec = (sig, specs) => {
+  const spec = sig && specs[sig.move];
+  return spec ? { ...sig, spec: { ...spec, material: sig.material } } : null;
+};

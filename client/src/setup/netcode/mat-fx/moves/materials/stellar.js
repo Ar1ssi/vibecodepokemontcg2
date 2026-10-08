@@ -1,6 +1,6 @@
 // Design 065 § New pieces G: the stellar material, Tera Starstorm (EV: cyan crystal with a
 // prismatic fringe). The round unit is the `'facet'` unit (a hexagon-faceted sphere); a tongue
-// is the ice recipe's crystal tongue plus a 1 px fringe stroke 0.04 w outside it in one of five
+// is the ice recipe's crystal tongue plus a fringe stroke (0.16 w, ≥ 1.5 px) just outside it in one of five
 // accent hues (picked by the tongue's seed); a projectile is a faceted head in a cyan mist
 // trailing fringed crystals. No grain. The accents live in the palette (`accent0`…`accent4`)
 // so a tint can replace them like any other key.
@@ -56,9 +56,10 @@ function stellarKit(palette) {
     const alpha = opts.alpha ?? 1;
     if (!(spec.length > 0) || !(spec.width > 0) || !(alpha > 0)) return;
     crystalTongue(ctx, spec, opts);
-    ctx.strokeStyle = rgbCss(palette[accentKeyFor(spec.seed ?? 0)], 0.9 * alpha);
-    ctx.lineWidth = 1;
-    traceOutline(ctx, icicleOutline({ ...spec, width: spec.width * 1.08 }));
+    // A 1 px fringe vanished at board scale (slice 15 review): it scales with the tongue.
+    ctx.strokeStyle = rgbCss(palette[accentKeyFor(spec.seed ?? 0)], alpha);
+    ctx.lineWidth = Math.max(1.5, spec.width * 0.16);
+    traceOutline(ctx, icicleOutline({ ...spec, width: spec.width * 1.12 }));
     ctx.stroke();
   }
 
