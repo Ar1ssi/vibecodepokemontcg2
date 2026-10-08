@@ -8,6 +8,7 @@ import {
   statClassFor,
   tierFor,
   vgTypeFor,
+  vgTypesFor,
 } from '../move-select.mjs';
 
 test('tierFor: 12 rule-box name forms are tier 3 even when printed Basic', () => {
@@ -76,17 +77,11 @@ test('hashString: FNV-1a vectors', () => {
 
 test('vgTypeFor: family resolution per TCG type', () => {
   const typed = (tcg, ...types) => vgTypeFor({ types: [tcg] }, { types });
-  assert.equal(typed('Colorless', 'normal', 'flying'), 'flying');
   assert.equal(typed('Colorless', 'normal'), 'normal');
-  assert.equal(typed('Colorless', 'dragon', 'flying'), 'dragon');
   assert.equal(vgTypeFor({ types: ['Colorless'] }, null), 'normal');
-  assert.equal(typed('Darkness', 'fire', 'flying'), 'dark');
-  assert.equal(typed('Grass', 'bug', 'flying'), 'bug');
-  assert.equal(typed('Grass', 'poison', 'bug'), 'bug');
   assert.equal(typed('Grass', 'normal'), 'grass');
   assert.equal(typed('Water', 'ice'), 'ice');
   assert.equal(typed('Psychic', 'ghost'), 'ghost');
-  assert.equal(typed('Fighting', 'rock', 'ground'), 'rock');
   assert.equal(typed('Fire', 'water'), 'fire');
   assert.equal(vgTypeFor({ types: ['Lightning'] }, null), 'electric');
   assert.equal(vgTypeFor({ types: ['Metal'] }, null), 'steel');
@@ -94,6 +89,37 @@ test('vgTypeFor: family resolution per TCG type', () => {
   assert.equal(vgTypeFor({ types: ['Bogus'] }, null), 'normal');
   assert.equal(vgTypeFor({}, null), 'normal');
   assert.equal(vgTypeFor(null, null), 'normal');
+});
+
+test('vgTypesFor: a dual type flips 50/50 between its two types, the other one next', () => {
+  const both = (tcg, types) => [0, 1].map((seed) => vgTypesFor({ types: [tcg] }, { types }, seed));
+  // M Gardevoir-EX: printed Fairy, species psychic/fairy.
+  assert.deepEqual(both('Fairy', ['psychic', 'fairy']), [['psychic', 'fairy'], ['fairy', 'psychic']]);
+  assert.deepEqual(both('Fighting', ['dragon', 'ground']), [['dragon', 'ground'], ['ground', 'dragon']]);
+  assert.deepEqual(both('Colorless', ['normal', 'flying']), [['normal', 'flying'], ['flying', 'normal']]);
+  assert.deepEqual(both('Grass', ['poison', 'bug']), [['poison', 'bug'], ['bug', 'poison']]);
+  assert.deepEqual(both('Bogus', ['fire', 'flying']), [['fire', 'flying'], ['flying', 'fire']]);
+  // A printed type whose family holds neither (Tera Darkness Charizard ex) keeps the printed type.
+  assert.deepEqual(both('Darkness', ['fire', 'flying']), [['dark'], ['dark']]);
+  assert.deepEqual(both('Psychic', ['ghost', 'ghost']), [['ghost'], ['ghost']]);
+});
+
+test('moveFor: a dual type plays each of its types across attacks', () => {
+  const card = { name: 'M Gardevoir-EX', types: ['Fairy'], subtypes: ['MEGA'] };
+  const species = { atk: 85, spa: 165, types: ['psychic', 'fairy'] };
+  const seen = new Set();
+  for (let id = 0; id < 40; id += 1) {
+    seen.add(moveFor(card, { instanceId: id, attackName: 'Brilliant Arrow', damage: 210, species }).vgType);
+  }
+  assert.deepEqual([...seen].sort(), ['fairy', 'psychic']);
+});
+
+test('moveFor: a dual type whose picked type has no move falls through to the other', () => {
+  const colorless = { name: 'X', types: ['Colorless'], stage: 'Basic' };
+  const pidgeot = { atk: 80, spa: 70, types: ['normal', 'flying'] };
+  for (let id = 0; id < 20; id += 1) {
+    assert.equal(moveFor(colorless, { instanceId: id, attackName: 'Tackle', damage: 30, species: pidgeot }).vgType, 'flying');
+  }
 });
 
 const attack = { instanceId: 7, attackName: 'Tackle', damage: 30 };

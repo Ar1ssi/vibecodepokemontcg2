@@ -132,7 +132,8 @@ export function captureOrigins(events, registry, capture, sideOf) {
     captureSweep(event, registry, capture, sideOf);
     for (const id of combatIdsFor(event)) {
       if (combatOrigins.has(id)) continue;
-      const element = registry.get(id)?.element;
+      // An evolved Pokémon is snapshotted as the card on top of its stack, not its Basic.
+      const element = (visibleStackRecord(registry, id) || registry.get(id))?.element;
       const ghost = element && capture(sideOf(event), element);
       if (ghost) combatOrigins.set(id, ghost);
     }
