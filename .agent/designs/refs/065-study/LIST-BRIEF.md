@@ -1,6 +1,6 @@
 # Signature moves of legendary Pokémon — brief for the list agent
 
-You build the list of signature moves that design 064 (signature move animations for a Pokémon
+You build the list of signature moves that design 065 (signature move animations for a Pokémon
 TCG simulator) will animate, then fetch their reference videos with the provided script. You do
 NOT touch the repository. Work only inside this folder (`sig/`); put your own scripts and caches
 in `sig/tools/`.

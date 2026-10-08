@@ -1,4 +1,4 @@
-// Signature-move reference pipeline (design 064), adapted from refs/063-study/fetch-moves.mjs.
+// Signature-move reference pipeline (design 065), adapted from refs/063-study/fetch-moves.mjs.
 // move-list.txt line: `slug|French name|vg type|class` (the last three optional; they override
 // PokéAPI, which may lack Legends Z-A moves). For each move: Poképédia page -> the Scarlet/Violet
 // video (EV); else the newest 3D video (LPZA, LPA, EB, USUL, SL, ROSA, XY, LGPE); else the

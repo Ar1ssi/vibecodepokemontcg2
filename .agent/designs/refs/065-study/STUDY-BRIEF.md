@@ -1,7 +1,7 @@
 # Signature move study — brief for one study agent
 
 You study the reference animations of legendary Pokémon signature moves and write observational
-notes that feed design 064 (signature move animations for a 2-player Pokémon TCG board that
+notes that feed design 065 (signature move animations for a 2-player Pokémon TCG board that
 imitates Pokémon TCG Live). You do NOT write code and you do NOT touch the repository except to
 READ design 063 (path below). Your deliverable is one markdown file in the schema below.
 

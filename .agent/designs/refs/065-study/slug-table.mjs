@@ -1,4 +1,4 @@
-// Builds the pinned slug → signature table for design 064 from the study list and the sprite catalogs.
+// Builds the pinned slug → signature table for design 065 from the study list and the sprite catalogs.
 import { readFileSync } from 'node:fs';
 const [tsv] = process.argv.slice(2);
 const SKIP = new Set(['burning-bulwark', 'jungle-healing', 'geomancy', 'lunar-dance', 'lunar-blessing', 'take-heart']);

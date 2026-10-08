@@ -1,6 +1,8 @@
-# 064: Signature move animations for legendary Pokémon
+# 065: Signature move animations for legendary Pokémon
 Status: approved (user, 2026-10-08)
-Date: 2026-10-08 · Builds on design 063 (approved 2026-10-05), which it extends and never replaces.
+Date: 2026-10-08 · Builds on design 063 (shipped on main, D205), which it extends and never replaces.
+Numbering: drafted and approved as "064"; renumbered 065 because main's 064 is the sampled
+battle SFX design (D203/D204). Commits before the renumber say "design 064".
 
 ## Problem
 Design 063 gives every attack a generic animation chosen from 154 main-series moves by VG type,
@@ -40,14 +42,48 @@ animation, studied from the Scarlet/Violet battle videos, played when that card 
 - Data stays derived on the client from the card in the registry and the attack name the
   `attackExecuted` plan already carries (D104 precedent); both clients compute the same pick.
 
-## Current state (read this session)
-- Design 063 is approved, not built. On this branch the look-test files exist:
-  `client/src/setup/netcode/mat-fx/moves/fire-blast-pose.mjs`, `fire-blast.js`,
-  `fire-material.js`; 063 slice 2 turns them into `move-spec.mjs`, `move-player.js`,
-  `move-drawers.js`, `move-poses.mjs`, `card-motion.mjs`, `materials/`.
-- `combat.js attack(plan)` (`client/src/setup/netcode/mat-fx/combat.js:206`) still plays the
-  generic lunge; 063 § Wiring inserts `moveFor` + `playMove` there. The plan carries
-  `attackerId`, `defenderId`, `attackName`, `damage`, `user`.
+## Current state (read this session, on main after design 063 shipped — commit b804638, D205)
+Paths below are under `client/src/setup/netcode/mat-fx/` unless absolute.
+- `combat.js attack(plan)`: resolves `card`, `from`, `src`, then the defender (`plan.defenderId`
+  or the opponent's Active); **a zero-damage plan or a missing defender returns
+  `playAuraPulse` before any move is picked** (`isZeroDamage = damage === 0 && !(benchDealt >
+  0)`); else `pickMove(plan, card)` = `moveFor(card, { instanceId, attackName, species:
+  speciesFor(card), damage, benchDealt }, SPECS)` → `{ score: MoveSpec, family, … }`, and
+  `playMove({ spec: pick.score, attacker: moveSide(…), defender: moveSide(…), seed:
+  hashString(…), impacts: { strikeIn: announceStrike }, attackerCard: card })`; null → the lunge.
+  `attackFamilyFor(plan)` (exported) is the same pick's `family`; `index.js soundPlanFor` adds it
+  to the `attack` plan, and `fx-audio.mjs` sounds `FAMILY_VOICES[family]` (the sampled-SFX bank
+  of main's design 064 leaves `attack` to these voices: `sfx-cues.mjs:224`).
+- `moves/move-spec.mjs`: `TIER_BAND = { 1, 2, 3 }`, `CONTACT_BAND { min 0.38, max 0.62,
+  tier1Max 0.7 }`, the cost constants (`TONGUE_BUDGET 30`, `PARTICLE_BUDGET 28`, `MAX_BURSTS 2`,
+  `MAX_NODES 40`), `FAMILIES` (14), `MATERIAL_KEYS` (26: the 17 types plus the variants `petal`,
+  `solar`, `aura`, `mud`, `ancient`, `gem`, `aurora`, `buzz`, `silver`; **no `normal`**),
+  `PARTICLE_KINDS` (`ember droplet leaf shard glob feather flake streak mote star twinkle`),
+  `DRAWER_PARAMS` (24 drawers), `tonguesAt`, `deriveFamily` (the family must equal it; Dragon
+  `roar` only when `tier === 3`), `validateSpec` (tier ∈ {1, 2, 3}, `statClass` ∈ physical/special,
+  `vgType` ∈ `VG_TYPES` = the move table's keys, **no `normal`**). Particle `gravity` ∈ [0, 2].
+- `moves/param-kinds.mjs`: param kinds `num int enum deg arms target pair`; `TARGETS =
+  ['attacker', 'defender']`. Already in `DRAWER_PARAMS`: a `target` on `vignette`, `speedRays`,
+  `starFlare`, `impactFlash`, `smoke`, `splash`, `pillar`, `slashArc`, `terrain`, `cloud`,
+  `spiral`, `aura`, `rain`, `shards`, `ring`, `glyph`; `volley.from ∈ attacker|defender|sky`;
+  `bolt.from ∈ attacker|sky`. `move-geometry.mjs skyLane(lane)` starts `SKY_HEIGHT` 1.7 h above
+  and `SKY_LEAN` 0.5 h left of the defender (screen terms). `coreCharge`, `orbitCharge`,
+  `shockRings`, `projectile`, `beam` have no target (attacker → defender only).
+- `moves/card-motion.mjs`: attacker `rear-lurch {rear, lurch, glow}`, `brace`, `lunge {wind,
+  reach, glow}`, `dash`, `rise`, `stomp`, `spin`, `none`; defender `knock {strength ≤ 0.6, heat}`,
+  `stagger {strength, hits 2–6, gapMs, heat}`, `float`, `sink`, `freeze`. `validateSpec` accepts
+  `{ motion, params }` only on `attacker`/`defender`.
+- `moves/move-player.js playMove(…)` as 063 § Player; `isSourceOver(beat)` = `vignette`, `smoke`,
+  `terrain 'crack'`.
+- `moves/materials/`: one file per type, variants beside their type (`grass.js` exports `grass`,
+  `petal`, `solar`). Some build from a palette kit (`grass.js leafKit(palette, …)`, ice's
+  functions take `pal`); others close over a module palette (`fire.js`). `materials/index.js
+  MATERIALS`, `materialFor(key)` (default fire).
+- `moves/specs/index.mjs SPECS` (17 type files) + `REFERENCE_SPEC_IDS = ['fire-blast']`. 063's
+  table already has generic specs named `aeroblast` and `seed-flare` (Flying/Grass special tier 3).
+- `.claude/skills/fx-preview/rec/rec-move.mjs`: `MOVE=<id>` looks only in `SPECS` (or
+  `kitchen-sink`); `cut-move.sh` cuts the sheet.
+- The plan carries `attackerId`, `defenderId`, `attackName`, `damage`, `benchDealt`, `user`.
 - Client card objects carry `attacks: [{ name, damage, text, cost }]` with `damage` a printed
   string (`'120+'`, `'30×'`, `''`) (`client/src/setup/netcode/card-stats.js:40`,
   `client/src/setup/general/e2e-mode.mjs:37`).
@@ -70,7 +106,7 @@ animation, studied from the Scarlet/Violet battle videos, played when that card 
   of Time and Spacial Rend; by rule 4 they play Dialga's and Palkia's moves.
 
 ## References — how they were gathered (so a later session can refetch)
-Pipeline committed under `.agent/designs/refs/064-study/` (media and sheets are not committed;
+Pipeline committed under `.agent/designs/refs/065-study/` (media and sheets are not committed;
 the scripts rebuild them in a scratch folder):
 1. **List** (`LIST-BRIEF.md`, one Haiku agent): PokéAPI species flags (`is_legendary`,
    `is_mythical`) + the six Paradox names → 100 species in scope; every PokéAPI move's
@@ -206,33 +242,49 @@ the scripts rebuild them in a scratch folder):
 5. **Where the specs live**: (a) inside 063's `specs/<type>.mjs`; (b) a separate
    `signature/specs/<type>.mjs` registry. Pick **(b)**: 063's spec tests assert table
    coverage per type; signature specs have their own tier and their own coverage test, and a
-   signature slice never edits a generic type file.
+   signature slice never edits a generic type file. 063's table already ships generic specs with
+   the ids `aeroblast` and `seed-flare`; the two registries never merge, so the ids may repeat
+   (`SPECS.aeroblast` is the generic Flying move, `SIGNATURE_SPECS.aeroblast` Lugia's).
 6. **Timing**: (a) reuse tier 3; (b) a new tier `S` (1800–2600 ms, contact 900–1200). Pick
    **(b)**: the SV references run 4–7 s; 2.2 s is too short for a charge + a signature image +
    an aftermath, while 2.6 s with contact ≤ 1200 keeps every hold and the queue budget unchanged.
 7. **Status moves aimed at the opponent** (Dark Void, Heart Swap): (a) skip; (b) animate with a
    "contact" that is the effect landing. Pick **(b)** (the user kept them); they play only by name
    match or as the owner's strongest attack, so a damage number may or may not follow.
-8. **New materials**: 063 has 17 type materials and no `normal`. Signature moves of Normal type
-   (Crush Grip, Judgment, Multi-Attack, Relic Song, Techno Blast default, Tera Starstorm) need
-   `normal` (pale gold-white pressure light) and `stellar` (prismatic). Pinned in § Materials.
+8. **New materials**: 063 ships 26 materials (17 types + 9 variants) and no `normal`. Signature
+   moves of Normal type (Crush Grip, Judgment, Multi-Attack, Relic Song, Techno Blast default, Tera
+   Starstorm) need `normal` (pale gold-white pressure light) and `stellar` (prismatic). Pinned in
+   § New pieces G.
+9. **Per-move colours** (~25 entries record colours off their type's palette: Blue Flare's blue
+   fire, Thousand Arrows' lime, Mighty Cleave's gold, …): (a) one named variant material per move,
+   063's precedent (`petal`, `solar`, `gem` …); (b) every material gains `withPalette(palette)` and
+   a beat may carry `tint`. Pick **(b)**: (a) would add ~25 materials that differ only in colour,
+   while (b) is one mechanical refactor (several materials are already palette kits: `grass.js
+   leafKit`, ice's `pal` functions) and makes any later colour fix a data change.
+10. **Where the signature check runs**: (a) inside `moveFor`; (b) in `combat.js attack(plan)`
+   ahead of the zero-damage check. Pick **(b)**: `moveFor` is 063's pure table pick and returns
+   null for zero damage; a name-matched status move (Dark Void) must still play (Options 7), so the
+   signature check has to come before `isZeroDamage`.
 
 ## Design
 ### File map
 ```
 client/src/setup/netcode/mat-fx/moves/signature/
-  signature-moves.mjs       SIGNATURE_MOVES, SIGNATURE_BY_SLUG, CARD_TYPED, MASK_MATERIAL (pure data)   slice 1
-  signature-select.mjs      normalizeAttackName, baseDamage, strongestAttackName, signatureForSlug,
-                            signatureFor, signatureMaterial (pure)                                        slice 1
-  specs/<vgType>.mjs        one MoveSpec (tier 'S') per signature move of that type                       slices 4–11
+  signature-moves.mjs       SIGNATURE_MOVES, SIGNATURE_BY_SLUG, CARD_TYPED, TCG_TO_MATERIAL, MASK_MATERIAL   slice 1
+  signature-select.mjs      slugFor, normalizeAttackName, baseDamage, strongestAttackName, signatureForSlug,
+                            signatureMaterial, signatureFor (pure)                                         slice 1
   specs/index.mjs           SIGNATURE_SPECS = { [moveId]: MoveSpec } merged from the type files            slice 1 (empty)
-  __tests__/signature-moves.test.mjs · signature-select.test.mjs · signature-specs.test.mjs
-client/src/setup/netcode/mat-fx/moves/move-spec.mjs        TIER_BAND.S, the S contact rule, statClass 'status'  slice 1
-client/src/setup/netcode/mat-fx/moves/materials/normal.js, stellar.js                         slice 2
-client/src/setup/netcode/mat-fx/moves/move-drawers.js + move-poses.mjs   the new pieces (§ New pieces)     slice 3
-client/src/setup/netcode/mat-fx/combat.js   attack(plan): signature first (§ Wiring)                         slice 1
-client/src/css/mat-fx.css                   .fx-move__heat--<material> modifiers for normal/stellar             slice 2
-.claude/skills/fx-preview/rec/rec-move.mjs  MOVE=<id> also finds SIGNATURE_SPECS                              slice 1
+  specs/<vgType>.mjs        one MoveSpec (tier 'S') per signature move of that type                       slices 5–15
+  __tests__/signature-moves.test.mjs · signature-select.test.mjs · signature-specs.test.mjs                slice 1
+client/src/setup/netcode/mat-fx/moves/move-spec.mjs        tier S, status, normal, new kinds/drawers (§ move-spec changes)  slices 1, 4
+client/src/setup/netcode/mat-fx/moves/param-kinds.mjs      the 'anchor' kind                                  slice 4
+client/src/setup/netcode/mat-fx/moves/materials/*.js       withPalette on every material                      slice 2
+client/src/setup/netcode/mat-fx/moves/materials/normal.js, stellar.js, _units.js                            slice 3
+client/src/setup/netcode/mat-fx/moves/move-player.js       tint resolution per beat; shade in the source-over group; echo ghost  slices 2, 4
+client/src/setup/netcode/mat-fx/moves/move-drawers.js + move-poses.mjs + card-motion.mjs   § New pieces B–E   slice 4
+client/src/setup/netcode/mat-fx/combat.js                  attack(plan) + attackFamilyFor: signature first (§ Wiring)  slice 1
+client/src/css/mat-fx.css                                  .fx-move--m-normal/-stellar, .fx-particle--zzz/--note  slice 3
+.claude/skills/fx-preview/rec/rec-move.mjs                 SIGNATURE=<id> plays SIGNATURE_SPECS[id]            slice 1
 ```
 
 ### Data (`signature-moves.mjs`, pure, frozen)
@@ -289,6 +341,9 @@ Complete and Mega cards distinct.
 
 ### Selection (`signature-select.mjs`, pure)
 ```js
+slugFor(card) → string | null
+  pokemonSpriteForName(card?.name, { types: card?.types })?.slug ?? null
+  // import path from moves/signature/: '../../../../deck-builder/core/card-sprites.mjs' (move-select.mjs uses the same resolver)
 normalizeAttackName(s) → string
   String(s ?? '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 SIGNATURE_BY_NAME = new Map(Object.entries(SIGNATURE_MOVES).map(([id, m]) => [normalizeAttackName(m.name), id]))
@@ -302,6 +357,7 @@ signatureForSlug(slug) → moveId | null
   const cut = s.lastIndexOf('-'); s = cut > 0 ? s.slice(0, cut) : '' } ; return null
   // 'arceus-fire' → 'arceus' → judgment; 'ogerpon-wellspring-mask' → 'ogerpon'; 'mewtwo' never → 'mew'
 signatureMaterial(moveId, { slug, card }) → material key
+  // normalizeEnergyType from '../../../../../actions/move-card-bundle/energy-token-assets.mjs'
   CARD_TYPED.has(moveId) → TCG_TO_MATERIAL[normalizeEnergyType(card?.types?.[0])] ?? SIGNATURE_MOVES[moveId].material
   moveId === 'ivy-cudgel' → walk slug through MASK_MATERIAL like signatureForSlug, default 'grass'
   else SIGNATURE_MOVES[moveId].material
@@ -313,65 +369,109 @@ signatureFor(card, { attackName, slug }) → { move, reason: 'name'|'strongest',
   5. → { move, reason: 'strongest' }   (material added by signatureMaterial in both branches)
 ```
 
-### Wiring (`combat.js attack(plan)`; 063 § Wiring with one step in front)
-```
-card = registry.get(plan.attackerId)?.card
-slug = pokemonSpriteForName(card?.name, { types: card?.types })?.slug ?? null
-sig  = signatureFor(card, { attackName: plan.attackName, slug })
-spec = sig && SIGNATURE_SPECS[sig.move]
-if (spec && from && to && src) {
-  played = playMove({ spec: { ...spec, material: sig.material }, attacker, defender, seed, impacts, attackerCard: card })
-  if (played) return played.holdMs
-}
-…063's moveFor path, unchanged…
-```
-`index.js soundPlanFor` uses the same pure call: `family = spec?.family ?? pick?.family`. A
-signature whose spec has not shipped yet falls through to 063 (then to the lunge), so slices ship
-one type at a time with nothing broken. Reduced motion skips it like every transient attack scene.
+### Wiring (`combat.js`; the shipped `attack(plan)` with one step in front of the zero-damage check)
+```js
+// beside pickMove: pure, so attack() and attackFamilyFor() agree
+const pickSignature = (plan, card) => {
+  if (!card) return null;
+  const sig = signatureFor(card, { attackName: plan.attackName, slug: slugFor(card) });
+  const spec = sig && SIGNATURE_SPECS[sig.move];
+  return spec ? { ...sig, spec: { ...spec, material: sig.material } } : null;
+};
 
-### `move-spec.mjs` changes (063's validator, extended)
-- `TIER_BAND.S = [1800, 2600]`; for tier `'S'`: `contactMs ∈ [900, 1200]` and
-  `contactMs / durationMs ∈ [0.38, 0.62]`; `statClass` may be `'status'` (only with tier `'S'`).
-- `vgType` enum gains `'normal'` (063's 17 + normal); `material` enum gains `'normal'`, `'stellar'`.
-- Everything else (beats, layers, drawer params, cost rule ≤ 30 tongues, particles ≤ 24 per burst,
-  ≤ 2 bursts, ≤ 28 total, nodes ≤ 40, `pad ∈ [1.2, 2.6]`) is 063's, unchanged.
+export const attack = (plan) => {
+  …card, from, src, defenderId, to exactly as shipped…
+  const sig = to ? pickSignature(plan, card) : null;          // NEW, before isZeroDamage
+  const sigDefenderSrc = sig ? combatSrc(defenderId, registry) : null;
+  if (sig && sigDefenderSrc) {
+    const played = playMove({ spec: sig.spec, attacker: moveSide(plan.attackerId, from, src, registry),
+      defender: moveSide(defenderId, to, sigDefenderSrc, registry),
+      seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
+      impacts: { strikeIn: announceStrike }, attackerCard: card });
+    if (played) return played.holdMs;
+  }
+  if (isZeroDamage(plan) || !to) { …aura pulse, as shipped… }
+  …pickMove / playMove / playLunge, as shipped…
+};
+
+export const attackFamilyFor = (plan) => {
+  const card = getCardRegistry().get(plan.attackerId)?.card;
+  return pickSignature(plan, card)?.spec.family ?? pickMove(plan, card)?.family;
+};
+```
+Imports added to `combat.js`: `signatureFor`, `slugFor` (`./moves/signature/signature-select.mjs`),
+`SIGNATURE_SPECS` (`./moves/signature/specs/index.mjs`). `index.js soundPlanFor` is unchanged (it already calls
+`attackFamilyFor`). A signature whose spec has not shipped yet returns null from `pickSignature`
+and the shipped path runs, so slices ship one type at a time with nothing broken. Reduced motion
+skips it like every transient attack scene. A zero-damage attack that is not a signature still
+gets the aura pulse.
+
+### `move-spec.mjs` changes (063's validator, extended; every change is additive)
+- `TIER_BAND.S = [1800, 2600]`; new `S_CONTACT = [900, 1200]`. `validateSpec`: `tier ∈ {1, 2, 3,
+  'S'}`; for `'S'` the contact must sit in `S_CONTACT` **and** the 0.38–0.62 ratio.
+- `statClass` may be `'status'` only when `tier === 'S'`; `vgType` may be `'normal'` only when
+  `tier === 'S'` (`VG_TYPES` stays the move table's keys).
+- `MATERIAL_KEYS` gains `'normal'`, `'stellar'` (materials.test keeps it equal to `MATERIALS`).
+- `PARTICLE_KINDS` gains `'zzz'`, `'note'`.
+- `deriveFamily`: the Dragon `roar` rule reads `(spec.tier === 3 || spec.tier === 'S')`; nothing
+  else changes, so every signature spec declares the family the rule derives.
+- `DRAWER_PARAMS` gains the § New pieces entries; `DRAWER_FAMILY` gains `fan: 'burst'`,
+  `shade: 'chime'` (→ `ghost` for Ghost/Dark by the existing override), `chain: 'projectile'`,
+  `grip: 'punch'`; `tonguesAt` gains `fan → count`, `shade`/`chain`/`grip → 0`, and changes
+  `pillar → 3 × count` and `bolt → count × (1 + branches)` (both default to 063's values).
+- `checkMotion('attacker', …)` accepts an optional `echo` validated against
+  `ECHO_PARAMS = { alpha: ['num', 0.1, 0.6, 0.35], offset: ['num', 0, 1, 0.5], fadeMs: ['int', 100, 1500, 400] }`.
+- Everything else (beats, layers, cost rule ≤ 30 tongues, particles ≤ 24 per burst, ≤ 2 bursts,
+  ≤ 28 total, nodes ≤ 40, `pad ∈ [1.2, 2.6]`) is 063's, unchanged.
 
 ### New pieces (the study's `New pieces` lines, consolidated; each is pinned)
 The four study batches asked for ~40 missing pieces. Almost all are the same few gaps, so they
 become a handful of general extensions instead of one drawer per move. Every extension defaults
-to 063's behaviour, so no 063 spec changes. Each gets a pure pose fn in `move-poses.mjs` and a
-test (slice 3).
+to 063's behaviour, so no 063 spec changes (the 063 specs test stays green unedited). Each gets a
+pure pose fn in `move-poses.mjs` and a test (slices 2–4).
 
 **A. Two params on every drawer** (`check` accepts them on all 24 + the new ones):
 - `tint: { deep?, body?, hot?, core? }` — hex strings that replace the material's palette keys
-  for this beat only. Mechanism: every material function takes a final optional `palette`
-  argument (same keys as `material.palette`, rgb arrays); `tintedPalette(palette, tint)` in
-  `materials/_shared.js` parses `#RRGGBB` → `[r,g,b]` and returns a merged copy; drawers pass it
-  through. Used by every entry whose `Palette` differs from its type (Blue Flare's blue fire,
-  Thousand Arrows' lime, Mighty Cleave's gold, Bolt Strike's dark wisps, Core Enforcer's green, …).
-- `hues: string[]` — on drawers that draw several tongues/bodies/rings, item `i` is drawn with
-  `tintedPalette(palette, { body: hues[i % n], hot: lighten(hues[i % n], 0.35) })`, where
-  `lighten(hex, f)` mixes with white by `f`. Sacred Fire's rainbow fountain, Prismatic Laser's
-  prism column, Luster Purge's rainbow halo, Relic Song's rings.
+  for this beat only (Options 9). Mechanism (slice 2): every material object gains
+  `withPalette(palette) → material` — the same frozen interface built over `palette` (a kit
+  factory per file: `grass.js leafKit` and ice's `pal` functions already are; `fire.js` and the
+  others that close over a module palette are wrapped the same way, `fire = fireKit(FIRE_PALETTE)`).
+  `materials/_shared.js` gains `parseHex('#RRGGBB') → [r, g, b]`, `lighten(hex, f)` (mix with
+  white by f) and `tintedPalette(palette, tint) → palette` (keys present in `tint` replaced).
+  The player resolves a beat's material as `tint ? cachedTint(material, tint) : material`
+  (`cachedTint` memoises per material key + `JSON.stringify(tint)` for the scene) and hands it to
+  the drawer, so drawers never see `tint`. Used by every entry whose `Palette` differs from its
+  type (Blue Flare's blue fire, Thousand Arrows' lime, Mighty Cleave's gold, Bolt Strike's dark
+  wisps, Core Enforcer's green, …).
+- `hues: string[]` (≤ 6 hex) — on drawers that draw several tongues/bodies/rings (`fan`,
+  `pillar`, `ring`, `orbitCharge`, `volley`, `shards`, `splash`, `spiral`), item `i` uses
+  `cachedTint(material, { body: hues[i % n], hot: lighten(hues[i % n], 0.35) })`. Sacred Fire's
+  rainbow fountain, Prismatic Laser's prism column, Luster Purge's rainbow halo, Relic Song's rings.
 
-**B. Placement (`anchor`)** on `coreCharge`, `orbitCharge`, `starFlare`, `speedRays`, `ring`,
-`shockRings`, `pillar`, `glyph`, `cloud`, `fan`, `shade`:
-`anchor: 'attacker' | 'defender' | 'sky-attacker' | 'sky-defender'` plus `dx`, `dy` in h.
-`sky-*` is 1.6 h above the card on screen (the same point as 063's `bolt from 'sky'`); `dx`/`dy`
-are screen offsets for `sky-*` and lane offsets (along, across) otherwise. Each drawer's default
-anchor is the one 063 fixed (starFlare/speedRays/pillar → defender; coreCharge/orbitCharge →
-attacker). Origin Pulse's star on Kyogre, Plasma Fists' spokes round Zeraora, Thunder Cage's sky
-orb, Fusion Flare's overhead orb, Judgment's orb over Arceus.
+**B. Placement.** 063 already gives most drawers a `target` (`'attacker' | 'defender'`, param
+kind `target`) and lets `volley`/`bolt` come `from: 'sky'` (`skyLane`: 1.7 h above, 0.5 h left of
+the defender on screen). Signatures need two more things:
+- a new param kind `'anchor'` in `param-kinds.mjs`: `ANCHORS = ['attacker', 'defender', 'sky',
+  'sky-attacker']`, where `'sky'` is `skyLane`'s start point and `'sky-attacker'` the same
+  construction over the attacker (1.7 h above, 0.5 h left on screen). The `target` entry of
+  `starFlare`, `speedRays`, `pillar`, `ring`, `glyph`, `cloud`, `shade`, `fan` switches from kind
+  `target` to kind `anchor` (every existing value stays valid).
+- a `target` (kind `anchor`, default `'attacker'`) on `coreCharge`, `orbitCharge`, `shockRings`,
+  which 063 pins to the attacker, plus `dx`, `dy` (num, −2…2, default 0) on every drawer with an
+  anchor: screen offsets for the `sky*` anchors, lane offsets (along, across) otherwise.
+Uses: Origin Pulse's star on Kyogre (`starFlare target 'attacker'`), Plasma Fists' spokes round
+Zeraora, Thunder Cage's sky orb (`coreCharge target 'sky'`), Fusion Flare's and Judgment's orb
+over the attacker (`coreCharge target 'sky-attacker'`).
 
 **C. Extended params on 063 drawers**
 | drawer | new params (default = 063) | used by |
 |---|---|---|
-| `coreCharge` | `lift` h above the attacker on screen (0) · `rings` 0–2 rotating tongue arcs round the body, radius 1.25 r, 1 turn/s (0) | Fusion Flare, Judgment, Techno Blast |
-| `projectile` | `from: 'attacker' \| 'defender' \| 'sky-defender' \| 'lift'` ('attacker') · `to: 'defender' \| 'attacker'` ('defender') · `path` gains `'drop'` (from `sky-defender`, straight, `f = s²`) · `unit` (below, 'body') | Heart Swap and Oblivion Wing drain (`from 'defender'`, `to 'attacker'`), Dragon Ascent and Judgment (`'drop'`), Fusion Flare (`from 'lift'`) |
+| `coreCharge` | `target`, `dx`, `dy` (B) · `rings` 0–2 rotating tongue arcs round the body, radius 1.25 r, 1 turn/s (0) | Fusion Flare, Judgment, Techno Blast |
+| `projectile` | `from: 'attacker' \| 'defender' \| 'sky' \| 'sky-attacker'` ('attacker'; the same lanes as `volley.from`: `'defender'` flies back up the lane to the attacker, `'sky'` drops onto the defender along `skyLane`, `'sky-attacker'` drops from over the attacker onto the defender) · `unit` (below, 'body') | Heart Swap and Oblivion Wing drain (`from 'defender'`), Dragon Ascent and Judgment (`from 'sky'`), Fusion Flare (`from 'sky-attacker'`) |
 | `orbitCharge`, `volley`, `shards` | `unit` ('body') · `shards.mode: 'burst' \| 'cluster'` ('burst'; `cluster` = the fragments sit still at the anchor's base, lit on the upper edge, held to the beat's end) | Hyperspace Fury hands, Roar of Time hex plates, Magma Storm rock mounds |
 | `pillar` | `count` 1–4 (1) · `spread` h, columns evenly over ±spread/2 (0) · `stagger` ms between columns (0) · `dx` h (0) | Magma Storm, Searing Shot, Land's Wrath, Precipice Blades, Doom Desire |
 | `ring` | `kind` gains `'fins'` (`count` short tongue spokes round the anchor, spinning at `rpm`) | Hydro Steam |
-| `bolt` | `count` 1–12 bolts fanned across the target footprint (1) · `spread` h (0.8) · `curve` bow in h (0) · `from` takes an anchor | Thunder Cage strands, Thunderclap |
+| `bolt` | `count` 1–12 bolts fanned across the defender's footprint (1) · `spread` h (0.8) · `curve` bow in h (0); `from` keeps 063's `attacker \| sky` | Thunder Cage strands, Thunderclap |
 | `glyph` | `kind: 'material' \| 'lattice' \| 'hex' \| 'heart'` ('material' = 063's sigil); `lattice` = a 4 × 3 grid of 1 px strokes at `r`, rotating 20°/s; `hex` = a flat hexagon plate (fill body, 1 px core edge); `heart` = a heart outline of height 2 r, fill `body` at alpha 0.5, 0.03 h rim in `deep`, pulsing ±6 % at 2 Hz | Ice Burn's red lattice, Roar of Time, Springtide Storm's heart shield (on the attacker) |
 
 `unit` — the body a travelling or orbiting drawer draws, each a function in
@@ -390,38 +490,47 @@ outward, the whole unit rotating `720·s`°; Collision Course's rolling flame ri
 **D. New drawers**
 | drawer | pose fn | draws | params (default) | used by |
 |---|---|---|---|---|
-| `fan` | `fanPose(s, h, p)` → `{ tongues: [{ x, y, angleDeg, length, width }], alpha }` | `count` tapered tongues from the anchor, spread evenly over `spread` degrees centred on `direction` (lane degrees; 180 = away from the defender), lengths in `[lenMin, lenMax]` h alternating, growing over the first `grow` of the beat, flapping ±`flap`° at 3 Hz, spinning `spin`°/s, fading over the last 20 % | `anchor 'attacker'`, `count 6`, `spread 110`, `direction 180`, `lenMin 0.6`, `lenMax 1.0`, `width 0.22`, `grow 0.3`, `flap 0`, `spin 0` | V-create (two beats, `direction ±125`, `flap 12`), Land's Wrath fronds, Behemoth Bash blade fan, Eternabeam blade star (`count 4`, `spread 360`, `spin 40`), Plasma Fists spokes (`count 12`, `spread 360`), Dragon Energy radial burst |
-| `shade` | `shadePose(s, h, p)` → `{ x, y, rx, ry, rimAlpha, swirl, alpha }` | a volume drawn `source-over`: `kind 'disc'` (flat ellipse, ry = 0.45 rx, a portal), `'dome'` (upper half-ellipse rising from the anchor's floor), `'giant'` (a tall rounded silhouette 2.2 h high behind the anchor with two `#FFD23F` eye ovals when `eyes`), `'sphere'` (a full circle round the anchor card, the sealed-in bubble); fill = material `fill` key (`'deep'` default, `'body'` for a translucent bubble) at `fillAlpha` with value-noise mottling (the grain tile at alpha 0.25), rim = 0.04 h stroke in `body` at `rimAlpha`; grows over 25 %, holds, shrinks over the last 25 %; `swirl` rpm turns the mottling | `anchor 'defender'`, `kind 'disc'`, `r 0.9`, `fill 'deep'`, `fillAlpha 1`, `rimAlpha 0.6`, `swirl 20`, `eyes false` | Hyperspace Hole/Fury portals, Dark Void and Astral Barrage domes, Spectral Thief's shadow giant, Nature's Madness's sphere (`kind 'sphere'`, `fill 'body'`, `fillAlpha 0.35`) |
+| `fan` | `fanPose(s, h, p)` → `{ tongues: [{ x, y, angleDeg, length, width }], alpha }` | `count` tapered tongues from the anchor, spread evenly over `spread` degrees centred on `direction` (lane degrees; 180 = away from the defender), lengths in `[lenMin, lenMax]` h alternating, growing over the first `grow` of the beat, flapping ±`flap`° at 3 Hz, spinning `spin`°/s, fading over the last 20 % | `target 'attacker'`, `count 6`, `spread 110`, `direction 180`, `lenMin 0.6`, `lenMax 1.0`, `width 0.22`, `grow 0.3`, `flap 0`, `spin 0` | V-create (two beats, `direction ±125`, `flap 12`), Land's Wrath fronds, Behemoth Bash blade fan, Eternabeam blade star (`count 4`, `spread 360`, `spin 40`), Plasma Fists spokes (`count 12`, `spread 360`), Dragon Energy radial burst |
+| `shade` | `shadePose(s, h, p)` → `{ x, y, rx, ry, rimAlpha, swirl, alpha }` | a volume drawn `source-over`: `kind 'disc'` (flat ellipse, ry = 0.45 rx, a portal), `'dome'` (upper half-ellipse rising from the anchor's floor), `'giant'` (a tall rounded silhouette 2.2 h high behind the anchor with two `#FFD23F` eye ovals when `eyes`), `'sphere'` (a full circle round the anchor card, the sealed-in bubble); fill = material `fill` key (`'deep'` default, `'body'` for a translucent bubble) at `fillAlpha` with value-noise mottling (the grain tile at alpha 0.25), rim = 0.04 h stroke in `body` at `rimAlpha`; grows over 25 %, holds, shrinks over the last 25 %; `swirl` rpm turns the mottling | `target 'defender'`, `kind 'disc'`, `r 0.9`, `fill 'deep'`, `fillAlpha 1`, `rimAlpha 0.6`, `swirl 20`, `eyes false` | Hyperspace Hole/Fury portals, Dark Void and Astral Barrage domes, Spectral Thief's shadow giant, Nature's Madness's sphere (`kind 'sphere'`, `fill 'body'`, `fillAlpha 0.35`) |
 | `chain` | `chainPose(s, h, p)` → `{ links: [{ x, y, rotDeg }], alpha }` | `links` linked rings: over the first 60 % they string out along the lane from the attacker's leading edge to the head at `f = s'²` (s' = s / 0.6); over the last 40 % they slide onto an ellipse round the defender (rx 0.55 h, ry 0.75 h), wrapping it; each link a stroked ellipse 1.2 : 1 of radius `r`, alternating 0°/90° in-plane rotation, stroke 0.025 h in `body` with a `hot` core line | `links 9`, `r 0.09` | Malignant Chain |
-| `grip` | `gripPose(s)` → `{ y, curl, alpha }` | a five-fingered glove (normal material body fill, 1 px `#1E1B1F` outline) descending from `sky-defender` to the defender over 40 %, fingers curling 0 → 70° over 40–70 %, holding to the end | `size 1.2` | Crush Grip |
+| `grip` | `gripPose(s)` → `{ y, curl, alpha }` | a five-fingered glove (normal material body fill, 1 px `#1E1B1F` outline) descending from the `'sky'` point to the defender over 40 %, fingers curling 0 → 70° over 40–70 %, holding to the end | `size 1.2` | Crush Grip |
 
 The player draws `shade` in the `source-over` group with `vignette`, `smoke` and
 `terrain 'crack'` (063 § Player step 5/7).
 
-**E. Card motion additions** (`card-motion.mjs`)
-- attacker `rear-lurch.hold` ms (0): the wind-up pose holds that long before the thrust; thrust
+**E. Card motion additions** (`card-motion.mjs`; each new param is a `MOTION_PARAMS` schema entry)
+- attacker `rear-lurch.hold` (`['num', 0, 600, 0]`) ms: the wind-up pose holds that long before the thrust; thrust
   and recoil shift by `hold`. For the long charges (Roar of Time, Prismatic Laser, Eternabeam,
   Origin Pulse, Psystrike).
-- attacker `lunge.strikes` 1–3 (1): the strike window `[0.4 c, c]` splits evenly into `strikes`
+- attacker `lunge.strikes` (`['int', 1, 3, 1]`): the strike window `[0.4 c, c]` splits evenly into `strikes`
   rewind-and-strike pairs (rewind 60 % of each part to along −0.1, strike 40 % to `reach`);
   contact is the last. Double Iron Bash (2), Hyperspace Fury (3).
-- attacker preset `warp`: 0 → 0.3 c scale 1 → 0.15 while `along` moves to 0.3 of the lane;
-  hidden (scale 0.15, rim 0) to 0.85 c; reappears at `along = length − 0.9 h` scaling to 1 by c
-  (the strike); then `springHome` back over c → 1.5 c. Hyperspace Hole, Spectral Thief.
-- attacker `echo: { alpha, offset, fadeMs }` (none): one extra ghost image of the attacker art
-  behind it, `offset` h back along the lane, at `alpha`, fading over `fadeMs` from 0 ms (a fused
-  or departing copy). Fusion Bolt, Fusion Flare, Bolt Strike. Counts toward the 40-node limit.
-- defender `stagger.lead` ms (0): the first knock lands `lead` ms before contact, the last at
+- attacker preset `warp` (`params: {}`, `endC: 1.5`): 0 → 0.3 c scale 1 → 0.15 while `along`
+  moves to 0.3 of the lane; hidden (scale 0.15, glow 0) to 0.85 c; reappears at
+  `along = length − 0.9 h` scaling to 1 by c (the strike); then `springHome` back over
+  c → 1.5 c. Hyperspace Hole, Spectral Thief.
+- `spec.attacker.echo: { alpha, offset, fadeMs }` (optional, `ECHO_PARAMS` in § move-spec
+  changes): the player adds one more ghost image of the attacker art (`.fx-move__ghost
+  .fx-move__ghost--echo`) behind the attacker ghost, `offset` h back along the lane, at `alpha`,
+  fading to 0 over `fadeMs` from 0 ms (a fused or departing copy). Fusion Bolt, Fusion Flare,
+  Bolt Strike. It counts toward the 40-node limit (`costErrors` adds 1 node when present).
+- defender `stagger.lead` (`['num', 0, 600, 0]`) ms: the first knock lands `lead` ms before contact, the last at
   contact. Surging Strikes (`hits 3`, `lead 450`).
 - defender `knock` strength: signature physicals 0.45, specials 0.35 (unchanged cap).
 
-**F. CSS particle classes** (`mat-fx.css`, beside 063 § D's six): `.fx-particle--zzz` (a `::before`
-`content: 'Z'`, 700 weight, 0.18 h font size via `--fx-particle-size`, colour from
-`--fx-particle-color`; Dark Void's sleep motes, rising: `direction -90`, `gravity -0.2`) and
-`.fx-particle--note` (`content: '♪'`, same rules; Relic Song, two bursts in two colours).
+**F. Particle kinds `zzz` and `note`** (`PARTICLE_KINDS`; `mat-fx.css` beside 063's kinds, added
+to the shared `position: absolute … background: var(--fx-p-color)` rule): each is the particle
+div filled with `--fx-p-color` and cut by an SVG mask, `mask: url("data:image/svg+xml,…")
+center / contain no-repeat` (with the `-webkit-mask` twin) —
+`zzz`: viewBox `0 0 16 16`, path `M2 2h12v3L6 13h8v3H2v-3l8-8H2z` (a Z);
+`note`: viewBox `0 0 16 16`, path `M6 2h7v4H8v7a3 3 0 1 1-2-2.83z` (an eighth note).
+Dark Void's sleep motes: `kind 'zzz'`, `direction -90`, `spread 40`, `gravity 0`, `aspect 1`,
+`size [0.12, 0.2]`; Relic Song: two `note` bursts in two colours.
 
 **G. Materials `normal` and `stellar`** (`materials/normal.js`, `materials/stellar.js`; the
-interface of 063 § Materials)
+shipped material interface, with `withPalette`; registered in `materials/index.js` and
+`MATERIAL_KEYS`; CSS `.fx-move--m-normal` and `.fx-move--m-stellar` set `--fx-move-hot/-body/
+-deep/-core` from the palettes below, as `.fx-move--m-fire` does)
 - **normal** — "pressure light", sampled from Judgment, Crush Grip and Multi-Attack (EV):
   `deep #E8552B`, `body #F2C230`, `hot #FFF5B0`, `core #FFFFFF`, `shade [40, 30, 10]`,
   `smoke null`, particle streak `rgb(255, 224, 102)`. `body` = sphere hot → body → transparent
@@ -446,13 +555,15 @@ interface of 063 § Materials)
 | aftermath | contact → 1800–2600 | the signature's afterimage (fragments, smoke, lingering glyph) |
 
 ### Sound
-Signature specs use 063's 14 families (`FAMILY_VOICES`, 063 § C) — no new voices. Each entry's
-board mapping names its family in the spec; the family rule of 063 § C applies.
+Signature specs use 063's 14 families (`FAMILY_VOICES`, `fx-audio.mjs`) — no new voices.
+`validateSpec` requires `spec.family === deriveFamily(spec)` (with the tier-S Dragon rule above),
+so the family follows from the beats; `attackFamilyFor` returns it (§ Wiring) and the shipped
+`soundPlanFor` sounds it. Main's sampled-SFX bank (design 064, D203) does not own `attack`.
 
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | `card` missing from the registry | `slug` null → name match only; no name match → 063 path | [ ] select test |
+| 1 | `card` missing from the registry | `pickSignature` → null → the shipped path | [ ] select test |
 | 2 | `attackName` empty/undefined | `normalizeAttackName` → `''` → no name match; strongest rule compares `''` → null | [ ] select test |
 | 3 | `card.attacks` missing / not an array / all damage `''` | `strongestAttackName` → null → only name match plays | [ ] select test |
 | 4 | tie on base damage | the later printed attack is the strongest | [ ] select test |
@@ -462,8 +573,8 @@ board mapping names its family in the spec; the family rule of 063 § C applies.
 | 8 | a slug whose walk would cross species (`mewtwo`, `ho-oh`, `tapu-koko`) | exact keys win; `mewtwo` never walks to `mew` (no `-`) | [ ] select test |
 | 9 | an explicit `null` form (`calyrex`, `moltres`) | null — no signature, no further walk | [ ] select test |
 | 10 | name match on a non-owner (Darkrai DP24 "Roar of Time") | plays Roar of Time (Options 1) | [ ] select test |
-| 11 | signature selected but its spec not shipped | falls through to 063's `moveFor`, then the lunge | [ ] wiring (manual) |
-| 12 | zero damage dealt (prevented, or a status move by name) | the signature still plays; contact announced; no number | [ ] recording |
+| 11 | signature selected but its spec not shipped | `pickSignature` → null; the shipped `moveFor` path, then the lunge | [ ] select test (`SIGNATURE_SPECS` empty in slice 1) |
+| 12 | zero damage (prevented, or a status move by name) | a signature still plays (its check precedes `isZeroDamage`); contact announced; no number. A non-signature zero-damage attack keeps the aura pulse | [ ] recording |
 | 13 | Tag Team card (`Reshiram & Charizard-GX`) | resolver slug is `charizard` → no slug signature; name match still works | [ ] select test |
 | 14 | attack against a Benched Pokémon (long lane) | geometry from 063: the scene reads on a long lane; recorded once per spec on a bench target | [ ] recording |
 | 15 | opponent's seat (board turned 180°) | 063 § Both seats; recorded on both seats | [ ] recording |
@@ -472,78 +583,88 @@ board mapping names its family in the spec; the family rule of 063 § C applies.
 | 18 | reduced motion | skipped like every transient attack scene (063 D105) | [ ] existing |
 | 19 | a spec over the cost rule | `validateSpec` fails the specs test | [ ] specs test |
 | 20 | two attacks in one batch | 063 queue: each scene plays in order inside the 3800 ms budget | [ ] existing |
+| 21 | id shared by both registries (`aeroblast`, `seed-flare`) | `SPECS` and `SIGNATURE_SPECS` never merge; Lugia/Shaymin play the signature, every other Flying/Grass card the generic; the recorder takes `SIGNATURE=<id>` for the signature | [ ] select test + recorder |
+| 22 | a `tint` with a malformed hex | `checkParams` rejects it (`#RRGGBB` only); the player never sees it | [ ] move-spec test |
+| 23 | no defender art (`combatSrc` null) | the signature is skipped; the shipped path decides (lunge) | [ ] wiring (manual) |
 
 ## Test plan
 - `signature-moves.test.mjs`: 81 rows; every `owners` entry, `vgType`, `statClass`, `material`
   valid; every `SIGNATURE_BY_SLUG` value is null or a key of `SIGNATURE_MOVES`; the six skipped
-  self-status ids are absent; every move id reachable by slug or by name (all are by name).
-- `signature-select.test.mjs`: rows 1–10, 13, 16, 17 of the edge table, plus one assertion per
-  form override in `SIGNATURE_BY_SLUG` (`kyurem-black → freeze-shock`, …).
+  self-status ids are absent; every move id reachable by name.
+- `signature-select.test.mjs`: rows 1–11, 13, 16, 17, 21 of the edge table, plus one assertion
+  per form override in `SIGNATURE_BY_SLUG` (`kyurem-black → freeze-shock`, …).
 - `signature-specs.test.mjs`: every `SIGNATURE_SPECS` entry passes `validateSpec`, has tier `'S'`,
-  its id is a `SIGNATURE_MOVES` key and its `vgType` matches; per shipped type file, every move of
-  that type has a spec (the coverage grows slice by slice).
-- `move-spec.test.mjs` (063's): tier `S` bands and the `status` class.
-- Visual: 063 § Recording procedure per spec (both seats, one bench target), key frames checked
-  against the Appendix S entry; probe median ≤ 17 ms, p95 ≤ 140 ms.
+  its key equals its `id`, its id is a `SIGNATURE_MOVES` key and its `vgType` matches; per shipped
+  type file, every move of that type has a spec (the coverage grows slice by slice).
+- `move-spec.test.mjs` (063's): tier `S` bands, `status`/`normal` only with `S`, the new kinds,
+  drawers, `tonguesAt` values and `ECHO_PARAMS`; every 063 spec still valid.
+- `materials.test.mjs` (063's): for every material, `withPalette(p)` draws only `p`'s colours (the
+  recording context); `normal`/`stellar` registered and in `MATERIAL_KEYS`.
+- Visual: 063 § Recording procedure per spec (both seats, one bench target) with
+  `SIGNATURE=<id>`, key frames checked against the Appendix S entry; probe median ≤ 17 ms,
+  p95 ≤ 140 ms.
 
 ## Builder recipe — one signature spec
 1. Open the move's Appendix S entry: `Signature read`, `Video beats`, `Palette`, `Board mapping`,
-   `New pieces`, `Flags`. Open its sheets if on disk (refetch with `refs/064-study/fetch-sig.mjs`).
-2. Copy the closest spec in `signature/specs/<type>.mjs`, else 063's `specs/<type>.mjs` entry
-   named by `Closest generic`; set `id`, `name`, `vgType`, `statClass`, `tier: 'S'`, `family`,
-   `material`.
+   `New pieces`, `Flags`. Open its sheets if on disk (refetch with `refs/065-study/fetch-sig.mjs`).
+2. Copy the closest spec in `signature/specs/<type>.mjs`, else the shipped 063 spec named by
+   `Closest generic` (`moves/specs/<type>.mjs`); set `id`, `name`, `vgType`, `statClass`,
+   `tier: 'S'`, `material`; set `family` to what `deriveFamily` returns (the specs test prints it).
 3. `durationMs` = the entry's total clamped into `[1800, 2600]`; `contactMs` = its contact clamped
    into `[900, 1200]`, then into the 0.38–0.62 ratio.
-4. Translate the board mapping beat by beat (063's vocabulary map, then Appendix S's vocabulary map). The
-   `Signature read` image must be the largest shape on screen at its moment.
+4. Translate the board mapping beat by beat with the shipped `DRAWER_PARAMS` names, then Appendix
+   S's vocabulary map for the new pieces. The `Signature read` image must be the largest shape on
+   screen at its moment.
 5. Colours: the material's palette; when the entry's palette differs from the type palette (Blue
-   Flare is blue fire, Sacred Fire is rainbow-tinged gold, Freeze Shock is ice + electric), pass
-   the entry's hex values as the drawer's `tint` param (§ New pieces) — never a new material.
-6. Run the specs test; record both seats + a bench target; compare with the entry; commit
-   `feature: design 064 <type> - <move>` with `flag:` lines for deviations.
+   Flare is blue fire, Sacred Fire is rainbow-tinged gold, Freeze Shock is ice + electric), put
+   the entry's hex values in that beat's `tint` (or `hues`) — never a new material.
+6. Run the specs test; record both seats + a bench target with `SIGNATURE=<id>`; compare with the
+   entry; commit `feature: design 065 <type> - <move>` with `flag:` lines for deviations.
 
 ## Migration / rollout
 No data migration and no protocol change. Until a type's signature specs ship, its legendaries
 play 063's generic move (or the lunge), so every slice is independently safe. Revert path: delete
-the `signature/` folder and the three wiring lines; 063 is untouched.
+`moves/signature/`, the `pickSignature` step and its imports in `combat.js` (and `attackFamilyFor`'s
+first operand); every other change is additive and defaults to 063's behaviour.
 
 ## Work plan — slices ≤1 session, each leaving the repo green
 Approval (user, 2026-10-08): every row below is a pinned contract, and every Appendix S entry is the
 per-move contract for its slice. Nihil Light's entry stays a flagged placeholder until a reference
 video exists; building it as written is approved.
-Prerequisite: 063 slices 1–2 landed (selection, generic player, `move-spec.mjs`, materials index,
-fire). A signature type slice also needs that type's material; if 063 has not shipped it yet, the
-slice builds `materials/<type>.js` first exactly per 063 § Materials (that is 063's row for the
-type, done early — note it under 063 § Deviations).
+Prerequisite: none — design 063 is shipped on main (D205) with all 17 type materials and the
+generic player. Every slice starts from this branch merged with the latest main.
 
 | Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
 |---|---|---|---|---|---|
-| 1 | create `moves/signature/signature-moves.mjs`, `signature-select.mjs`, `specs/index.mjs` (`SIGNATURE_SPECS = Object.freeze({})`), `__tests__/signature-moves.test.mjs`, `signature-select.test.mjs`, `signature-specs.test.mjs`; modify `move-spec.mjs` (tier S, `status`, `normal`/`stellar` enums), `combat.js attack` (§ Wiring), `index.js soundPlanFor`, `rec-move.mjs` (`MOVE` looks in `SIGNATURE_SPECS` too) | § Data, § Selection, § Wiring exactly | `strongestAttackName([{name:'A',damage:'60'},{name:'B',damage:'120+'}]) → 'B'` · `([{name:'A',damage:'90'},{name:'B',damage:'90'}]) → 'B'` · `([{name:'A',damage:''}]) → null` · `baseDamage('30×') → 30` · `signatureForSlug('arceus-fire') → 'judgment'` · `('mewtwo') → 'psystrike'` · `('calyrex') → null` · `('kyurem-black') → 'freeze-shock'` · `('ogerpon-wellspring-mask') → 'ivy-cudgel'` · `('charizard') → null` · `signatureFor({name:'Darkrai',attacks:[]}, {attackName:'Roar of Time', slug:'darkrai'}) → {move:'roar-of-time', reason:'name'}` · `signatureFor({attacks:[{name:'Read the Wind',damage:''},{name:'Aero Dive',damage:'130'}]}, {attackName:'Aero Dive', slug:'lugia'}) → {move:'aeroblast', reason:'strongest'}` · same card, `attackName:'Read the Wind'` → null · `signatureMaterial('ivy-cudgel', {slug:'ogerpon-hearthflame-mask'}) → 'fire'` · `signatureMaterial('judgment', {card:{types:['Colorless']}}) → 'normal'` · `normalizeAttackName('Nature’s Madness') === normalizeAttackName("Nature's Madness")` · validateSpec: tier S 1800/900 ok, 2700 → error, contact 1300 → error, statClass 'status' with tier 3 → error | user's trigger rule (2026-10-08); Lugia V (Sword & Shield Promos) attacks from `out/pkmn-pokemon-cards.json` (Read the Wind, Aero Dive 130); Darkrai DP24 (corpus) | `node --test` on the three new tests + `move-spec.test.mjs`; `pnpm test:changed` green; a Lugia V Aero Dive still plays 063's path (no spec yet) |
-| 2 | create `materials/normal.js`, `materials/stellar.js`, `materials/_units.js`; modify `materials/_shared.js` (`tintedPalette`, `lighten`), every existing `materials/<type>.js` (final optional `palette` arg), `materials/index.js`, `mat-fx.css` (`.fx-particle--zzz`, `.fx-particle--note`) | § New pieces A (tint/hues mechanism), C (`unit` list), F, G | materials test (063's recording-context pattern): each of normal/stellar draws ≥ 1 fill per function with only its palette colours; `tintedPalette({body:[1,2,3]}, {body:'#FF0000'}).body → [255,0,0]`; `lighten('#000000', 0.5) → '#808080'`; every unit draws without throwing at s ∈ {0, 0.5, 0.99}, balanced save/restore | Appendix S palettes of Judgment, Crush Grip, Multi-Attack, Tera Starstorm | tests green; a stub spec per material recorded once (sheets reviewed) |
-| 3 | modify `move-poses.mjs`, `move-drawers.js`, `card-motion.mjs`, `move-player.js` (shade in the source-over group); tests `move-poses.test.mjs`, `card-motion.test.mjs` | § New pieces B, C, D, E | `fanPose(0.5, 100, {count:4, spread:360})` → 4 tongues 90° apart · `shadePose(0.1, 100, {r:0.9})` rx < 90 (growing) · `gripPose(0.7).curl ≈ 70` · `chainPose(0.3, 100, {links:9})` → 9 links on the lane segment, `chainPose(0.99, …)` → 9 links within 0.56 h × 0.76 h of the defender centre · `lunge` with `strikes 2`: two local maxima of `along` in [0.4 c, c], the last at c · `warp` scale 0.15 at 0.5 c · `stagger.lead 450`: first knock impulse at contact − 450 · `rear-lurch.hold 200` thrust starts 200 ms later than without · every drawer's `check` accepts `tint`, `hues`, `anchor`, rejects `anchor 'nowhere'` | 063 § Drawers conventions | tests green; 063's Fire Blast spec still matches its recording (no regression) |
-| 4 | create `signature/specs/fire.mjs`, `grass.mjs`; modify `specs/index.mjs` | one MoveSpec per move: blue-flare, fusion-flare, magma-storm, sacred-fire, searing-shot, v-create, ivy-cudgel, seed-flare | specs test: 8 specs valid, tier S, material per § Options 4 | Appendix S Fire, Grass | recordings both seats + bench reviewed against each entry; probe within limits |
-| 5 | create `specs/water.mjs`, `ice.mjs` | hydro-steam, origin-pulse, steam-eruption, surging-strikes, freeze-shock, glacial-lance, glaciate, ice-burn | same pattern | Appendix S Water, Ice | same |
-| 6 | create `specs/electric.mjs` | bolt-strike, electro-drift, fusion-bolt, plasma-fists, thunder-cage, thunderclap, wildbolt-storm | same | Appendix S Electric | same |
-| 7 | create `specs/ground.mjs`, `rock.mjs` | lands-wrath, precipice-blades, sandsear-storm, thousand-arrows, thousand-waves, diamond-storm, mighty-cleave | same | Appendix S Ground, Rock | same |
-| 8 | create `specs/fighting.mjs`, `poison.mjs`, `fairy.mjs` | collision-course, sacred-sword, secret-sword, thunderous-kick, malignant-chain, fleur-cannon, natures-madness, springtide-storm | same | Appendix S Fighting, Poison, Fairy | same |
-| 9 | create `specs/psychic.mjs` (first half) | freezing-glare, heart-swap, hyperspace-hole, luster-purge, mist-ball, mystical-power | same | Appendix S Psychic | same |
-| 10 | modify `specs/psychic.mjs` (second half) | photon-geyser, prismatic-laser, psyblade, psycho-boost, psystrike | same; Psychic coverage complete | Appendix S Psychic | same |
-| 11 | create `specs/flying.mjs`, `steel.mjs` | aeroblast, bleakwind-storm, dragon-ascent, oblivion-wing, behemoth-bash, behemoth-blade, doom-desire, double-iron-bash, sunsteel-strike, tachyon-cutter | same | Appendix S Flying, Steel | same |
-| 12 | create `specs/dragon.mjs` | core-enforcer, dragon-energy, dynamax-cannon, eternabeam, nihil-light, roar-of-time, spacial-rend | same | Appendix S Dragon (Nihil Light's entry is from memory: build it as written, flag it) | same |
-| 13 | create `specs/dark.mjs`, `ghost.mjs`, `normal.mjs` | dark-void, fiery-wrath, hyperspace-fury, ruination, wicked-blow, astral-barrage, moongeist-beam, shadow-force, spectral-thief, crush-grip, judgment, multi-attack, relic-song, techno-blast, tera-starstorm | same; every `SIGNATURE_MOVES` id now has a spec | Appendix S Dark, Ghost, Normal | same; then the user's look pass over all 81 (one sheet each) and the DECISIONS lines below |
+| 1 | create `moves/signature/signature-moves.mjs`, `signature-select.mjs`, `specs/index.mjs` (`SIGNATURE_SPECS = Object.freeze({})`), `__tests__/signature-moves.test.mjs`, `signature-select.test.mjs`, `signature-specs.test.mjs`; modify `move-spec.mjs` (tier S, `S_CONTACT`, `status`/`normal` with S, `deriveFamily` S rule), `combat.js` (`pickSignature`, `attack`, `attackFamilyFor` per § Wiring), `rec-move.mjs` (`SIGNATURE=<id>` plays `SIGNATURE_SPECS[id]`) | § Data, § Selection, § Wiring, § move-spec changes (tier/status/normal/family lines) exactly | `strongestAttackName([{name:'A',damage:'60'},{name:'B',damage:'120+'}]) → 'B'` · `([{name:'A',damage:'90'},{name:'B',damage:'90'}]) → 'B'` · `([{name:'A',damage:''}]) → null` · `baseDamage('30×') → 30` · `signatureForSlug('arceus-fire') → 'judgment'` · `('mewtwo') → 'psystrike'` · `('calyrex') → null` · `('kyurem-black') → 'freeze-shock'` · `('ogerpon-wellspring-mask') → 'ivy-cudgel'` · `('charizard') → null` · `signatureFor({name:'Darkrai',attacks:[]}, {attackName:'Roar of Time', slug:'darkrai'}) → {move:'roar-of-time', reason:'name', material:'dragon'}` · `signatureFor({attacks:[{name:'Read the Wind',damage:''},{name:'Aero Dive',damage:'130'}]}, {attackName:'Aero Dive', slug:'lugia'}) → {move:'aeroblast', reason:'strongest', material:'flying'}` · same card, `attackName:'Read the Wind'` → null · `signatureMaterial('ivy-cudgel', {slug:'ogerpon-hearthflame-mask'}) → 'fire'` · `signatureMaterial('judgment', {card:{types:['Colorless']}}) → 'normal'` · `normalizeAttackName('Nature’s Madness') === normalizeAttackName("Nature's Madness")` · validateSpec: tier S 1800/900 ok, 2700 → error, contact 1300 → error, `statClass 'status'` with tier 3 → error, `vgType 'normal'` with tier 3 → error | user's trigger rule (2026-10-08); Lugia V (Sword & Shield Promos) attacks from `out/pkmn-pokemon-cards.json` (Read the Wind, Aero Dive 130); Darkrai DP24 (corpus) | the three new tests + `move-spec.test.mjs` green; `pnpm test:changed` green; a Lugia V Aero Dive still plays 063's path (no spec yet) |
+| 2 | modify every `materials/<file>.js` (each material gains `withPalette`, built from a palette kit), `materials/_shared.js` (`parseHex`, `lighten`, `tintedPalette`), `move-spec.mjs` (`tint`, `hues` accepted on every drawer: a new param kind `'palette'` in `param-kinds.mjs` = an object whose keys ⊆ deep/body/hot/core with `#RRGGBB` values; `hues` = kind `'hexes'`, 1–6 `#RRGGBB`), `move-player.js` (`cachedTint`, per-beat material resolution, `hues` hand-off) | § New pieces A | for each of the 26 materials: `m.withPalette(m.palette)` draws the same recording as `m` (byte-equal command log for one glow/body/tongue/projectile call); `withPalette({…, body:[255,0,0]})` draws red where `m` drew its body colour; `parseHex('#ff0000') → [255,0,0]`; `lighten('#000000', 0.5) → '#808080'`; `checkParams('beam', {tint:{body:'#12345'}})` → 1 error; `({hues:[]})` → 1 error | 063 materials as shipped | `materials.test.mjs`, `move-spec.test.mjs`, `move-drawers.test.mjs` green; Fire Blast recording unchanged (no regression) |
+| 3 | create `materials/normal.js`, `materials/stellar.js`, `materials/_units.js`; modify `materials/index.js`, `move-spec.mjs` (`MATERIAL_KEYS` + normal/stellar, `PARTICLE_KINDS` + zzz/note), `mat-fx.css` (`.fx-move--m-normal`, `.fx-move--m-stellar`, `.fx-particle--zzz`, `.fx-particle--note`) | § New pieces C (`unit` functions), F, G | materials test: normal/stellar draw only their palettes (+ stellar's accents); every unit draws without throwing at s ∈ {0, 0.5, 0.99} with balanced save/restore; `MATERIAL_KEYS` equals `Object.keys(MATERIALS)` minus `default` | Appendix S palettes of Judgment, Crush Grip, Multi-Attack, Tera Starstorm | tests green; one stub spec per material recorded once (sheets reviewed) |
+| 4 | modify `param-kinds.mjs` (`'anchor'` kind, `ANCHORS`), `move-spec.mjs` (new/extended `DRAWER_PARAMS`, `DRAWER_FAMILY`, `tonguesAt`, `ECHO_PARAMS`), `move-poses.mjs`, `move-drawers.js`, `card-motion.mjs`, `move-player.js` (`shade` in `isSourceOver`, echo ghost, `unit` hand-off); tests `move-poses.test.mjs`, `move-drawers.test.mjs`, `card-motion.test.mjs`, `move-spec.test.mjs` | § New pieces B, C, D, E | `fanPose(0.5, 100, {count:4, spread:360})` → 4 tongues 90° apart · `shadePose(0.1, 100, {r:0.9})` rx < 90 (growing) · `gripPose(0.7).curl ≈ 70` · `chainPose(0.3, 100, {links:9})` → 9 links on the lane segment, `chainPose(0.99, …)` → 9 links within 0.56 h × 0.76 h of the defender centre · `lunge` with `strikes 2`: two local maxima of `along` in [0.4 c, c], the last at c · `warp` scale 0.15 at 0.5 c · `stagger.lead 450`: first knock impulse at contact − 450 · `rear-lurch.hold 200`: thrust starts 200 ms later than without · `tonguesAt('pillar', {count:2}) → 6` · `tonguesAt('bolt', {count:3, branches:2}) → 9` · `checkParams('starFlare', {target:'sky'}) → []`, `({target:'nowhere'})` → 1 error · `checkParams('coreCharge', {target:'sky-attacker', dx:0.2}) → []` | 063 drawer conventions (`move-drawers.js` header) | tests green; every 063 spec still valid and Fire Blast's recording unchanged |
+| 5 | create `signature/specs/fire.mjs`, `grass.mjs`; modify `signature/specs/index.mjs` | one MoveSpec per move: blue-flare, fusion-flare, magma-storm, sacred-fire, searing-shot, v-create, ivy-cudgel, seed-flare | specs test: 8 specs valid, tier S, material per § Options 4 | Appendix S Fire, Grass | recordings both seats + bench reviewed against each entry; probe within limits |
+| 6 | create `specs/water.mjs`, `ice.mjs` | hydro-steam, origin-pulse, steam-eruption, surging-strikes, freeze-shock, glacial-lance, glaciate, ice-burn | same pattern | Appendix S Water, Ice | same |
+| 7 | create `specs/electric.mjs` | bolt-strike, electro-drift, fusion-bolt, plasma-fists, thunder-cage, thunderclap, wildbolt-storm | same | Appendix S Electric | same |
+| 8 | create `specs/ground.mjs`, `rock.mjs` | lands-wrath, precipice-blades, sandsear-storm, thousand-arrows, thousand-waves, diamond-storm, mighty-cleave | same | Appendix S Ground, Rock | same |
+| 9 | create `specs/fighting.mjs`, `poison.mjs`, `fairy.mjs` | collision-course, sacred-sword, secret-sword, thunderous-kick, malignant-chain, fleur-cannon, natures-madness, springtide-storm | same | Appendix S Fighting, Poison, Fairy | same |
+| 10 | create `specs/psychic.mjs` (first half) | freezing-glare, heart-swap, hyperspace-hole, luster-purge, mist-ball, mystical-power | same | Appendix S Psychic | same |
+| 11 | modify `specs/psychic.mjs` (second half) | photon-geyser, prismatic-laser, psyblade, psycho-boost, psystrike | same; Psychic coverage complete | Appendix S Psychic | same |
+| 12 | create `specs/flying.mjs`, `steel.mjs` | aeroblast, bleakwind-storm, dragon-ascent, oblivion-wing, behemoth-bash, behemoth-blade, doom-desire, double-iron-bash, sunsteel-strike, tachyon-cutter | same | Appendix S Flying, Steel | same |
+| 13 | create `specs/dragon.mjs` | core-enforcer, dragon-energy, dynamax-cannon, eternabeam, nihil-light, roar-of-time, spacial-rend | same | Appendix S Dragon (Nihil Light's entry is from memory: build it as written, flag it) | same |
+| 14 | create `specs/dark.mjs`, `ghost.mjs` | dark-void, fiery-wrath, hyperspace-fury, ruination, wicked-blow, astral-barrage, moongeist-beam, shadow-force, spectral-thief | same | Appendix S Dark, Ghost | same |
+| 15 | create `specs/normal.mjs` | crush-grip, judgment, multi-attack, relic-song, techno-blast, tera-starstorm | same; every `SIGNATURE_MOVES` id now has a spec | Appendix S Normal | same; then the user's look pass over all 81 (one sheet each) and the DECISIONS lines below |
 
 DECISIONS lines at landing (D-numbers assigned then): signature trigger = name match, else the
 legendary's strongest attack (user, 2026-10-08); tier S 1800–2600 ms with contact ≤ 1200 ms
-(hold and queue budget unchanged); `normal` and `stellar` materials; drawer `tint`/`hues`/
-`anchor`/`unit` extensions. No new dependency.
+(hold and queue budget unchanged); `normal` and `stellar` materials; material `withPalette` +
+beat `tint`/`hues`, the `anchor` param kind, `unit`s and the fan/shade/chain/grip drawers. No new
+dependency.
 
 ## Deviations (Builder appends here during build)
 
 ## Appendix S — per-move study entries
-One entry per move, by type, in the schema of `refs/064-study/STUDY-BRIEF.md`. The entries are the
-contract for slices 4–13; a builder adjusts numbers only inside the tier-S band and records any
-other change under Deviations. Raw notes: `refs/064-study/notes/`; reference URLs, frame counts
-and durations: `refs/064-study/move-refs.json`.
+One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
+contract for slices 5–15; a builder adjusts numbers only inside the tier-S band and records any
+other change under Deviations. Raw notes: `refs/065-study/notes/`; reference URLs, frame counts
+and durations: `refs/065-study/move-refs.json`.
 
 How the entries were made and what to trust: four Haiku agents read every primary contact sheet
 (Scarlet/Violet, or Sword/Shield for the 15 moves without one) and the Gen 7 sheets where the shape
@@ -562,10 +683,10 @@ Vocabulary map — entry wording → the pinned piece (§ New pieces):
 |---|---|
 | palette override / `palette.override` / "X palette needs a per-move override" | `tint` on that beat |
 | per-tongue hue, prism hue cycle, rainbow fringe | `hues` |
-| `target` param on starFlare/speedRays, "sky orb", "over its head", `lift` | `anchor` (`'attacker'`, `'sky-defender'`, …) / `coreCharge.lift` |
-| projectile reverse, drain orb, defender→attacker | `projectile from 'defender', to 'attacker'` |
-| comet drop, vertical drop, "drops onto the defender" | `projectile path 'drop'` |
-| projectile `from lift` | `projectile from 'lift'` |
+| `target`/`anchor` param on starFlare/speedRays, "sky orb", "over its head", `lift` | the drawer's `target` (kind `anchor`: `'attacker'`, `'defender'`, `'sky'`, `'sky-attacker'`) + `dx`/`dy` |
+| projectile reverse, drain orb, defender→attacker | `projectile from 'defender'` (or `volley from 'defender'`) |
+| comet drop, vertical drop, "drops onto the defender" | `projectile from 'sky'` (or `volley from 'sky'`) |
+| projectile `from lift`, orb dropped from over the attacker | `projectile from 'sky-attacker'` |
 | pillar `dx`, side columns, falling-column field | `pillar dx` / `count` + `spread` + `stagger` |
 | mound, rock cluster | `shards mode 'cluster'` |
 | fins halo | `ring kind 'fins'` |
@@ -2619,7 +2740,7 @@ Board mapping (proposed, consistent with core-enforcer; unverified):
 - attacker brace, defender knock 0.3
 - contact at 1100; total 2200
 New pieces: none
-Flags: missing refs · uncertainty: the entire entry is from memory (unverified); the palette, beat order and the lattice image all need a reference before design 064 uses them; the mapping copies core-enforcer's Zygarde structure as a placeholder
+Flags: missing refs · uncertainty: the entire entry is from memory (unverified); the palette, beat order and the lattice image all need a reference before design 065 uses them; the mapping copies core-enforcer's Zygarde structure as a placeholder
 
 #### Roar of Time — Dialga · dragon · special · power 150
 Refs: video EV (6000 ms, 30 fps, effect frames 24–165) · gen7 USUL (used for: shape/path/count/angle)

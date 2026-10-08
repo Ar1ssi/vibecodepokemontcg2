@@ -1,6 +1,7 @@
 # 063: Attack move animations — type × stat class × tier
-Status: **approved** (user, 2026-10-05) — implementation plan; every Work-plan row is a pinned
-contract. The Fire Blast look test (three takes, the third accepted: "Good") fixed the visual
+Status: **shipped** on main (commit b804638, D205; slice 20, the user's look pass, open) —
+approved (user, 2026-10-05) as an implementation plan; every Work-plan row is a pinned
+contract. Design 065 (signature moves) extends it. The Fire Blast look test (three takes, the third accepted: "Good") fixed the visual
 contract; § Pinned contracts for slice 2 closes the gaps a builder raised against the first draft.
 Appendix A is filled for Grass, Water, Fire, Electric (43 moves); a pending type's entries are
 produced by the study pass at the start of its slice (see § Pinned contracts A).

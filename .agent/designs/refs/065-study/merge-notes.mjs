@@ -1,4 +1,4 @@
-// Validates the study notes against STUDY-BRIEF.md's schema and splices two blocks into design 064:
+// Validates the study notes against STUDY-BRIEF.md's schema and splices two blocks into design 065:
 // the signature list table at <!-- SIGNATURE-LIST --> and Appendix S at <!-- APPENDIX-S -->.
 // usage (from sig/): node merge-notes.mjs <design.md> <coverage.txt>
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
