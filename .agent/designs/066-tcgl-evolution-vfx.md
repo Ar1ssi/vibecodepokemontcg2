@@ -77,14 +77,14 @@ light shafts · `Rays_2` 1.0·0.3 flash fan · `sparkles (1)` + `Spectrum_Motes`
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | no rect for card | effect returns 0, nothing drawn | [ ] |
-| 2 | texture fails to load | that layer skips; scene still completes and removes itself | [ ] |
-| 3 | t outside [0,1] / NaN | poses clamp | [ ] |
-| 4 | two evolutions in one batch | each plays on its own card; paced by hold | [ ] |
-| 5 | opp-side card | layers turned 180° with the frame | [ ] |
-| 6 | Mega/Tera evolution | signature entry unchanged | [ ] |
-| 7 | fx off mid-scene | `body.fx-off .fx-overlay` hides every layer | [ ] |
-| 8 | no WAAPI / no 2D context | end frame applied; host removed by backstop | [ ] |
+| 1 | no rect for card | effect returns 0, nothing drawn | [x] lifecycle.js `evolve`/`devolve` return 0; `playScene` rejects a bad rect |
+| 2 | texture fails to load | that layer skips; scene still completes and removes itself | [x] tcgl-canvas.js `textureOf` → null skips the op; the clock still ends |
+| 3 | t outside [0,1] / NaN | poses clamp | [x] evolve-scene/devolve-scene/tcgl-fx tests (finite ops at −1, NaN, past the end) |
+| 4 | two evolutions in one batch | each plays on its own card; paced by hold | [x] one overlay per plan; hold 1300 (fx-holds test) |
+| 5 | opp-side card | layers turned 180° with the frame | [x] host `rotate(turn)` from `frameTurnOf`; capture opp-active |
+| 6 | Mega/Tera evolution | signature entry unchanged | [x] lifecycle.js `evolve` signature branch untouched |
+| 7 | fx off mid-scene | `body.fx-off .fx-overlay` hides every layer | [x] the host is an `.fx-overlay` (fx-kill-switch-css test) |
+| 8 | no WAAPI / no 2D context | end frame applied; host removed by backstop | [x] `playCanvasStage` resolves at once; `removeWhen` + backstop (scene ms + 400) |
 
 ## Test plan
 Unit tests for the pure timeline/pose module (ranges, ordering, determinism, clamp) and holds.
@@ -101,3 +101,63 @@ n/a: client cosmetic only; revert = revert the commit (041 scene returns with it
 | 2 | devolve: same for Card_Devolution | same |
 
 ## Deviations (Builder appends here during build)
+- Rendering: one Canvas 2D stage per card (`playCanvasStage`, 5 card heights square, rim fades
+  from 72 % of its radius), every layer drawn additively ('lighter'); the overlay host is
+  `mix-blend-mode: screen` so light only ever adds to the card and mat. Pure ops come from
+  `evolve-scene.mjs` / `devolve-scene.mjs` (kinds: sprite, dissolve, polar, ribbon, frame,
+  cutout); `tcgl-canvas.js` draws them; `tcgl-fx.mjs` holds the Unity maths (curves, gradients,
+  rate births, 60 fps limit-velocity damping, dissolve, polar UVs). No WebGL.
+- Scale: CARD_UNITS = 11 prefab units per card height, not 13. Card_Sharp's card silhouette
+  (devolve glow card 12.79 × 0.934 × 0.922 = 11.0), the CardHighlightRing mesh (8.8 × 11) and the
+  visible core of Square_Pop's rounded-blur texture (0.8 × 13 = 10.4) all agree on ~11; 7.9 × 11
+  is the card's 0.716 aspect, so one isotropic unit (card height / 11) maps the prefab.
+- Materials read as: the custom-curve value is the dissolve amount (texels darker than it are
+  eaten: ≤ 0 shows all, ≥ 1 none), which makes `Square intro dissolve` (1 → −1) fill the card
+  in and every outro (−0.25 → 0.82 etc.) eat it away. Radial shaders sample their texture in
+  polar UVs (u = angle, v = radius) with the material's tiling and RadialPannerSpeed. Helix
+  vertex colours (pure blue → red) are read as shader data, not tint. `sparkles (1)` and
+  `Spectrum_Motes` reference no texture in the dump ([None]); they draw
+  TEX_VFX_Star_Variants_SubUV_2x2_Blur (a 2×2 sheet matching their 2×2 flipbook).
+- Back/front: the big glows (smokes, glow core, wisps, radial rays, big softy beams, sparkles)
+  draw before a card-shaped cutout, so they glow around the card and never over its art; the
+  card layers, helix, trails, beams, pop and outro draw after it.
+- Meshes (`.agent/scratch/evolve/project.py` → `emit.py` → `emit-geometry.mjs`, data in
+  `evolve-geometry.mjs`): each particle's size, ZXY start rotation and parent transforms are
+  applied, then projected onto the card plane. Helix001/004–007 → ribbons (rails u = 0/1);
+  Spiral3 ×3 → tube centreline + half-width ribbons with Debris_Glow star dots; Lightbeam002 →
+  8 light-shaft blades; Oval_ring01 → ellipse bands (inner 0.785 of the rim). Approximated:
+  SM_VFX_Evolution_Flash (`Rays_2`) as a 4-spoke prismatic flash; SM_VFX_Hemisphere_2
+  (`shockwave`, squashed to z 0.001) as a flat Radial_Line_Circle disc; pCylinder1 (flat) as a
+  polar spark disc; Card_Aura_Flare_More_Combo as flame bands on the card's four edges
+  (`fillFrame`); the devolve `shards` flake mesh as the flake_glow02 sprite. Spin over
+  lifetime turns the projected 2D rails (−spin: the projection mirrors). Perspective is dropped
+  (our board is top-down), so TCG Live's camera-facing depth (BoxEdge particles flying at the
+  camera) shows as a short outward drift.
+- Shape scales: the dump wrote every shape `scale` as 0 (dump_vfx.py reads `m_Scale`, which
+  this bundle stores). Read again from the bundle (`.agent/scratch/evolve/probe_shape.py`):
+  evolve motes box 10 × 14, debris/sparks ring = highlight-ring mesh × (1.29, 0.76) turned 90°,
+  devolve clusters box 10.2 × 7.4 turned 90°, shards box 6.39 × 7.74, devolve motes circle
+  scaled 10.1 × 14.07.
+- Taste (house rule 1 vs the TCG Live copy): TCG Live tone-maps HDR glows; a canvas clips at
+  white, so the wide glows are scaled down (`LEVEL` in evolve-scene.mjs: glow core 0.4, wisps
+  0.45, radial rays 0.8, refraction 0.51, shockwave 0.55, shafts 0.75, flash 0.6) to keep the
+  card silhouette the brightest thing. At the pop (1.0–1.15 s) the light around the card is
+  still near-white out to ~1.5 card heights: local, but the user should judge it. Light shafts
+  taper toward hub and tip (LightRay_Prismatic has no fade along its length).
+- Timing: evolve 3.0 s (charge 0–1.0, pop 0.95–1.0, outro to 3.0), hold `evolve-scene` 1300
+  (TCG Live moves damage/attachments 1 s in; the next effect lands as the shafts fade). Devolve
+  1.4 s (pop 0.35 s), hold `devolve` 700. Sound unchanged (`evolve-scene` → evolve-card cue).
+- Removed (041 superseded): the SV scene code in evolve-scene.mjs/.js, its CSS
+  (`.fx-evolve-scene*`, `.fx-evolve-burst*`, `.fx-devolve-burst`), `devolveBurstPose` /
+  `DEVOLVE_BURST_MS`, and the pre-evolution snapshot in origins.mjs (only the 041 scene read it).
+- Textures (31, client/src/assets/fx/evolution/*.webp, 2.2 MB PNG → 416 KB lossless WebP):
+  every file's ALPHA carries the value the shader read (masks/noise: alpha = R or A, RGB white;
+  additive colour textures: alpha = max(RGB), RGB = colour / alpha; Rays_Prismatic02,
+  Prismatic_Vert, Prismatic_Blurry_Tile, Spectrum_Light kept as RGBA), downscaled to ≤ 256 px
+  (Victory rays 256 × 512). Command:
+  `E:\TCGLive_Extract\tools\venv\Scripts\python.exe -I .agent/scratch/evolve/convert_textures.py E:/TCGLive_Extract/vfx_dump/evolution/textures client/src/assets/fx/evolution`
+  (the script's LIST names each texture, its mode and size). Loaded on idle (`requestIdleCallback`)
+  and again on first play.
+- Capture: `.agent/scratch/evolve/capture-evolve.mjs [evolve|devolve|both]` (stepped WAAPI
+  clock, long backstop timers stubbed while stepping; `STEP_ONLY=1` skips the videos),
+  `sheet_frames.py` contact sheets, `layers.mjs` per-layer debug sheets.

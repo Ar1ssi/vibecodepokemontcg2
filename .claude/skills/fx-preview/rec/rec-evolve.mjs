@@ -21,7 +21,9 @@ await page.evaluate(async ([from, to]) => {
   Object.assign(img.style, { position: 'fixed', left: rect.left + 'px', top: rect.top + 'px', width: w + 'px', height: h + 'px', zIndex: 2400, borderRadius: '4px' });
   document.body.appendChild(img);
   await Promise.all([img.decode(), new Image().decode.call(Object.assign(new Image(), { src: to }))]);
-  window.__go = () => { playEvolveScene({ rect, fromSrc: from, toSrc: to }); setTimeout(() => (img.src = to), 2048); };
+  // Design 066: the board already shows the evolved card when TCG Live's scene plays over it.
+  img.src = to;
+  window.__go = () => playEvolveScene({ rect });
 }, [FROM, TO]);
 await page.waitForTimeout(700);
 await page.evaluate(() => window.__go());
