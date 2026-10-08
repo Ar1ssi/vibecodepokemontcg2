@@ -782,6 +782,36 @@ dependency.
   committed): every signature read shows. Weak spots: Glaciate's `terrain 'wave'` ice field
   barely reads at board scale; Hydro Steam's beam is short on Actives (as Blue Flare). No bench
   target (rec-move has none). Probe: median 16.8–17.1 ms, p95 58–87 ms on all eight.
+- Slice 7: every Electric spec's `family` is `electric` (the type override in `deriveFamily`);
+  defender `knock` follows § E (physicals 0.45, specials 0.35) over the entries' 0.2–0.3.
+- Slice 7: Bolt Strike's projectile runs 620–1100 (entry 1060) so the sphere lands at contact;
+  the wisps are both orbit halves tinted dark (`deep #0F2B33`, `body #1F4A4F`), not one.
+- Slice 7: Electro Drift's hoop is `projectile unit 'hoop'` (gold `body` rim, `#DFF9FF` `hot`
+  dots); the orbitCharge stand-in is dropped as the entry's New piece says. Added a violet
+  attacker aura (the dive's violet body) and a gold floor ring (the ground glow); the beam is on
+  the back layer so the hoop stays on top.
+- Slice 7: Fusion Bolt's fused ghost is the attacker `echo` (alpha 0.35, 0.5 h, 400 ms) on a
+  `brace`; the projectile runs to contact (1100) and the sky column holds to 1400; the defender
+  star is `cross` (entry 'ring' = 40, over budget with the column and bolts), the halo is
+  `coreCharge rings 1`, and `shockRings` anchor on the defender.
+- Slice 7: Plasma Fists' spokes are `fan target 'attacker', count 12, spread 360, lenMin 0.6,
+  lenMax 1.1, width 0.1` tinted white-yellow; clods are the cloud tinted `#E9D3A0` to 1700.
+- Slice 7: Thunder Cage's cage strands are `bolt from 'sky', count 10, branches 0, spread 0.9,
+  curve 0.4` (450–1000) replacing the entry's `rain`; the sky orb is `coreCharge target 'sky'`
+  with a ring, flared by a small `impactFlash` 900–1100; the star is `cross` (budget).
+- Slice 7: Thunderclap's shards are 6 (entry 8): cross 20 + bolt 3 + shards 8 = 31 tongues.
+- Slice 7: Wildbolt Storm's tornado is `spiral tongues 16` ending at contact (cross 20 + beam 1 +
+  16 > 30), tinted lighter than the entry (`body #7B5CD0`, `hot #B89CFF`) because `#2B1D4D` /
+  `#5B3FA0` vanished on the mat; the falling sparks (`rain`) move to 1300–1800 after the star;
+  a second spark burst (12) lands at contact besides the entry's base sparks at 500.
+- Slice 7 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment. Weak spots: Wildbolt Storm's tornado
+  reads as scattered violet wisps round the defender, not a climbing column (spiral drawer
+  limit); Thunder Cage's sky orb only shows from ~850 ms and sits small at the top while the
+  strands carry the read; Fusion Bolt's echo ghost is faint at board scale. No bench target
+  (rec-move has none). Probe: median 16.8–16.9 ms on all (one opp run 29.8 ms, a cold start);
+  p95 57–150 ms, over 140 for Wildbolt Storm (150–222 ms after `tongues 16`) and near it for
+  Plasma Fists (117–137) — same software-GL blur cost as slice 5's fire specs; re-probe on GPU.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the

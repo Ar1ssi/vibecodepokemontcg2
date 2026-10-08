@@ -59,3 +59,14 @@ test('slice 6: the Water and Ice signatures ship, material per § Options 4', ()
     assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
   }
 });
+
+test('slice 7: the Electric signatures ship, material per § Options 4', () => {
+  const ids = ['bolt-strike', 'electro-drift', 'fusion-bolt', 'plasma-fists', 'thunder-cage', 'thunderclap', 'wildbolt-storm'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+});
