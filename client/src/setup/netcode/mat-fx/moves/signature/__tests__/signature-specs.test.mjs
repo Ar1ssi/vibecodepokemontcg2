@@ -114,3 +114,14 @@ test('slice 12: the Flying and Steel signatures ship, material per § Options 4'
     assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
   }
 });
+
+test('slice 13: the Dragon signatures ship, material per § Options 4', () => {
+  const ids = ['core-enforcer', 'dragon-energy', 'dynamax-cannon', 'eternabeam', 'nihil-light', 'roar-of-time', 'spacial-rend'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+});

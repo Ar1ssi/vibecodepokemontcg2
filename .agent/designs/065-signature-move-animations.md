@@ -981,6 +981,41 @@ dependency.
 - Slice 12: `signature-select.test.mjs` edge 11 ("a selected signature with no shipped spec falls
   through to 063") used Lugia V's Aeroblast as its unshipped example; it now uses Roar of Time
   (Darkrai by name, slice 13) and needs another unshipped move until slice 15 ships the last ones.
+- Slice 13: `family` follows `deriveFamily`: every Dragon tier-S burst/beam is `roar` (Core
+  Enforcer, Dragon Energy, Dynamax Cannon, Roar of Time, Spacial Rend), Eternabeam `quake` (the
+  `pillar from 'above'`), Nihil Light `electric` (its bolt is the latest front beat at contact).
+  Defender `knock` 0.35 (§ E, specials) over the entries' 0.2–0.45. Particle `spark` is not a
+  kind: `streak`.
+- Slice 13: Core Enforcer's and Nihil Light's Z-bolt is `bolt segments 3, jag 0.3` (entry 0.5 is
+  over the 0.3 maximum), width 0.16–0.18 tinted green-white; Core Enforcer's orb sits on the card
+  (`lead 0`, as the entry says): a `sky-attacker` orb hung off the board by the top bench on the
+  opp seat and read as a separate object. Same for Roar of Time's time orb (`lead 0.42`).
+- Slice 13: Dragon Energy's radial orb-burst is `fan target 'attacker', count 10, spread 360`
+  (the vocabulary map's "radial orb-burst") 600–1000 beside the entry's speedRays; its orbit orbs
+  carry `tongues 0`; a `RING5` white-pink star at contact.
+- Slice 13: Eternabeam's blade-star is `fan count 4, spread 360, spin 90, width 0.3` tinted
+  silver-black over a small red-pink `coreCharge lead 0`, 100–900; the white column the
+  signature read names is `pillar from 'above'` 850–1400 (the entry's mapping has none).
+- Slice 13: Roar of Time's hexagon plates are `shards unit 'hex'` tinted blue; contact star
+  `cross`; beam `widening w 0.8` (0.6 barely showed between the Actives).
+- Slice 13: Spacial Rend's vortex adds a gold aura and a 2-ring gold `face` ring 300–1000 under
+  the spiral (the spiral alone read as flecks); the rift lines are a front `segmented` beam w 0.5;
+  the crescent is `slashArc radius 1.1, thick 0.3` on the top layer 950–1350 with a smaller
+  impactFlash after it (the full flash hid the slash).
+- Slice 13: Nihil Light is built from its from-memory entry (approved placeholder; no reference
+  exists) plus one addition: the "light lattice" its signature read names is `glyph kind
+  'lattice'` on the attacker 0–700 (the entry's mapping had no lattice beat). Palette is Core
+  Enforcer's, unverified. Restudy when a reference video appears.
+- Slice 13: `signature-select.test.mjs` edge 11 now uses Dark Void (Darkrai by name, slice 14);
+  slice 14 must switch it to a Normal move, and slice 15 drop or invert it.
+- Slice 13 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment. Weak spots: Roar of Time's and Dynamax
+  Cannon's beams are short on Actives (as Blue Flare); Eternabeam's magenta vortex reads as pink
+  flecks (spiral limit) while the blade-star carries it; Spacial Rend's crescent lands beside the
+  defender rather than across it and its rift lines are faint. No bench target (rec-move has
+  none). Probe: median 16.8–17.0 ms on all; p95 56–179 ms, over 140 for Dragon Energy self (179),
+  Eternabeam self (144) and Spacial Rend self (149) (software-GL blur cost, as earlier slices);
+  re-probe on GPU.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
