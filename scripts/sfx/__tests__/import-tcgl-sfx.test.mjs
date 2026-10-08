@@ -13,7 +13,19 @@ import {
   parseArgs,
   parseLufs,
   parseProbe,
+  peakMsFromPcm,
 } from '../import-tcgl-sfx.mjs';
+
+/** Mono s16le at 8 kHz: `ms` of quiet with one loud 10 ms burst starting at `peakAt`. */
+function pcmWithBurst(ms, peakAt, { quiet = 100, loud = 20000 } = {}) {
+  const samples = (ms * 8000) / 1000;
+  const pcm = Buffer.alloc(samples * 2);
+  for (let i = 0; i < samples; i++) {
+    const t = (i * 1000) / 8000;
+    pcm.writeInt16LE(t >= peakAt && t < peakAt + 10 ? loud : quiet, i * 2);
+  }
+  return pcm;
+}
 
 const EBUR_SUMMARY = `  Integrated loudness:\n    I:         -23.4 LUFS\n    Threshold: -36.1 LUFS\n\n  Loudness range:\n    LRA:        20.1 LU`;
 
@@ -27,6 +39,7 @@ function fakeRun({ missing = [], channels = 2, failEncodeOn = null } = {}) {
     if (command === 'ffprobe')
       return { status: 0, stdout: JSON.stringify({ streams: [{ channels }], format: { duration: '1.23456' } }) };
     if (args.includes('ebur128=framelog=quiet')) return { status: 0, stderr: EBUR_SUMMARY };
+    if (args.includes('s16le')) return { status: 0, stdout: pcmWithBurst(500, 250), stderr: '' };
     const input = args[args.indexOf('-i') + 1];
     if (failEncodeOn && input.endsWith(failEncodeOn)) return { status: 1, stderr: 'encoder exploded' };
     writeFileSync(args.at(-1), 'ogg');
@@ -47,7 +60,7 @@ const FILES = {
   'sfx_rain_victory.wav': 'victory-bytes',
   'sfx_rainier_shuffle_01.wav': 'shuffle-1',
   'sfx_rainier_shuffle_02.wav': 'shuffle-2',
-  'sfx_rain_fire_attack_small.wav': 'excluded',
+  'sfx_rain_fire_jumbotron_intro.wav': 'excluded',
   'notes.txt': 'ignored',
 };
 
@@ -77,14 +90,29 @@ test('hashed names change with the audio and the channel layout', () => {
   assert.equal(outputName('victory', undefined, a), `victory.${a}.ogg`);
 });
 
-test('buildManifest groups variants and sorts keys', () => {
+test('peakMsFromPcm finds the loudest 10 ms window; silence and empty audio read 0', () => {
+  assert.equal(peakMsFromPcm(pcmWithBurst(500, 250)), 250);
+  assert.equal(peakMsFromPcm(pcmWithBurst(500, 0)), 0);
+  assert.equal(peakMsFromPcm(pcmWithBurst(1000, 780)), 780);
+  assert.equal(peakMsFromPcm(pcmWithBurst(300, 100, { quiet: 0, loud: 0 })), 0);
+  assert.equal(peakMsFromPcm(Buffer.alloc(0)), 0);
+  assert.equal(peakMsFromPcm(undefined), 0);
+});
+
+test('buildManifest groups variants and sorts keys; peaks stay per file', () => {
   const manifest = buildManifest([
-    { key: 'shuffle', variant: 2, file: 'shuffle-2.b.ogg', dur: 2, channels: 1, lufs: -20 },
-    { key: 'shuffle', variant: 1, file: 'shuffle-1.a.ogg', dur: 1, channels: 2, lufs: -21 },
-    { key: 'defeat', file: 'defeat.c.ogg', dur: 3, channels: 2, lufs: -18 },
+    { key: 'shuffle', variant: 2, file: 'shuffle-2.b.ogg', dur: 2, channels: 1, lufs: -20, peakMs: 40 },
+    { key: 'shuffle', variant: 1, file: 'shuffle-1.a.ogg', dur: 1, channels: 2, lufs: -21, peakMs: 10 },
+    { key: 'defeat', file: 'defeat.c.ogg', dur: 3, channels: 2, lufs: -18, peakMs: 300 },
   ]);
   assert.deepEqual(Object.keys(manifest.cues), ['defeat', 'shuffle']);
-  assert.deepEqual(manifest.cues.shuffle, { files: ['shuffle-1.a.ogg', 'shuffle-2.b.ogg'], dur: 2, channels: 2, lufs: -20.5 });
+  assert.deepEqual(manifest.cues.shuffle, {
+    files: ['shuffle-1.a.ogg', 'shuffle-2.b.ogg'],
+    dur: 2,
+    channels: 2,
+    lufs: -20.5,
+    peaks: [10, 40],
+  });
   assert.equal(manifest.version, 1);
 });
 
@@ -129,6 +157,7 @@ test('imports mapped files only, writes hashed names and a manifest', () => {
     assert.deepEqual(Object.keys(manifest.cues), ['shuffle', 'victory']);
     assert.equal(manifest.cues.shuffle.files.length, 2);
     assert.deepEqual([manifest.cues.victory.dur, manifest.cues.victory.channels, manifest.cues.victory.lufs], [1.235, 2, -23.4]);
+    assert.deepEqual(manifest.cues.victory.peaks, [250]);
   } finally {
     ws.cleanup();
   }

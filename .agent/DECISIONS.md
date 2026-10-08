@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D205).
+#   Next id = highest D number in this file and the archive + 1 (next: D207).
 
 ## Active
+- D206 2026-10-08 [render] Attack audio = sampled hit per type × size (tier), started so its measured peak (manifest `peaks`) lands on the move's contact; signature moves add the type sting. (design 064 Addendum A)
 - D205 2026-10-08 [board-ui] Attack scenes play a main-series move chosen by type, species stats and tier; species stats are vendored from Showdown pokedex (MIT) by `pnpm vendor:species-stats`, not fetched at runtime. (design 063)
 - D204 2026-10-07 [tooling] ffmpeg/ffprobe on PATH are a dev-time system tool for `pnpm sfx:import` only, not an npm dependency; the game never needs them. (design 064)
 - D203 2026-10-07 [render] Audio = sampled TCG Live cues (sfx-cues → sample-bank), synth as fallback; samples committed in assets/sfx (user's call); not gated by reduced motion. (Supersedes D147; design 064)

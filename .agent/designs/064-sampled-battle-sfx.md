@@ -277,6 +277,34 @@ Unused by design: `to_medium_*`, `to_moderate_*`, `cheer_small_*` (spare pool fo
   on `sfxOff`/`fxOff` toggled on, on `visibilitychange` hidden, and on room leave.
 - Volume: every bus routes into the existing master gain, so the slider keeps working unchanged.
 
+### Addendum A — attack cues over designs 063/065 (slice 9, user request 2026-10-08)
+The user asked to wire the attack audio after 063 (generic moves) and 065 (signature moves) shipped.
+- **Files.** 33 `<type>_attack_{small,medium,large}` → keys `attack-<type>-<size>` (types as
+  `active-<type>`: `electric` for Lightning). 11 `<type>_jumbotron_reduced` → `sting-<type>`
+  (`lightning_*` → `sting-electric`). Still EXCLUDED: jumbotron `intro`/`loop`/`outro`/`flash_*`
+  (63 files) — the long-form arena cinematic this game has no scene for.
+- **Peaks.** The importer measures each file's loudest 10 ms window (mono, 8 kHz decode) and writes
+  `peaks: number[]` (ms, parallel to `files`) on every manifest cue. Measured attack peaks run
+  10–780 ms; scene contacts run ~200–1200 ms, so starting at 0 would land most hits early.
+- **Alignment.** `CuePlay.alignMs` (optional): the bank starts the variant so its peak lands
+  `alignMs` after the request — `lead = alignMs − peakMs`; `lead ≥ 0` delays the start, `lead < 0`
+  starts now at buffer offset `−lead` (skips the wind-up). No peak or no alignMs → `delayMs` as before.
+- **What the plan carries.** `combat.js attackSoundFor(plan)` (same picks `attack()` makes) →
+  `{ family, attackTier, contactMs, attackType }`, built by pure `moves/attack-sound.mjs
+  attackSoundFields({ signatureSpec, zeroDamage, pick, card })`:
+  signature → tier `'S'`, `contactMs = spec.contactMs` · zero damage → tier `'aura'`, contact 0 ·
+  generic move → `pick.tier`, `pick.score.contactMs` · lunge (no spec) → `tierFor(card)`,
+  `round(LUNGE_MS × LUNGE_IMPACT)` = 202. `attackType = card.types[0]` (raw; cues normalize).
+  `soundPlanFor` spreads these onto the `attack` plan (replaces the `family`-only spread).
+- **Cue rows.** size: tier 1 → small, 2 → medium, 3 and `'S'` → large, `'aura'` → small.
+  generic/lunge → `[attack-<type>-<size> @0 align contactMs]`; aura → `[attack-<type>-small @0]`
+  (no alignment: nothing hits); signature → `[sting-<type> @0, attack-<type>-large @0 align
+  contactMs]`. Unknown type → `colorless`. Gains: attack 0.8, sting 0.6; preload true for attack
+  cues (≤ 3.1 s, every attack needs one), false for stings.
+- **Synth.** Samples replace `FAMILY_VOICES` all-or-nothing (playSequence); the `damage` plan's
+  synth hit at contact is unchanged (it carries amount and Weakness) — listening pass decides
+  whether it stays under the sampled hit. `attack-banner` keeps its synth voice (no file).
+
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
@@ -324,6 +352,7 @@ D147's "not sampled" clause; one line for ffmpeg as a dev-time system tool (not 
 | 6 | button/inspector/picker/drag files listed in UI table | `playUiCue` hooks | hook smoke tests where a module test exists |
 | 7 | `sfx-cues.mjs` signature table, `entry.js`/events | Card signatures (after lookups) | per-card tests citing corpus/TCGdex ids |
 | 7b | `advisory-animations.mjs` (EVENT_FX/SOUND_ONLY_FX + explicit `attackMarkerAdded` branch + batch helper), `advisory-animations.js` (pass the batch's effect-KO ids to the planner), `sfx-cues.mjs` (rows + resolvers), `index.js` `withSoundCard` (`enter` carries `soundCard`), `cmd-emitter.js` (lock refusal cue), tests in the matching `__tests__/` files | Bindings use engine events that already exist, so the engine is untouched. **(a) Item lock:** `playLockApplied` {playerId, kinds, untilTurn} (`shared/engine/effects/attack-steps.mjs` atkOppPlayLock) → sound-only effect `play-lock`, plan copies `kinds`; `cuesFor('play-lock', {kinds})` → `[itchy-pollen-hand @0]` when `kinds` includes `item`, `trainer` or `any`, else `[]`. **(b) Locked Item refused:** `handleCmdRejected` plays `itchy-pollen-hand-card` instead of `card-no-match` when `reason` matches `/^Your opponent's attack stops you playing that card during this turn\.$/` (reduce.mjs `playLockReason`). **(c) Deferred KO marker:** `attackMarkerAdded` {kind, instanceId, playerId} → explicit branch building `{ kind: 'fx', effect: 'attack-marker', user, instanceId, markerKind: event.kind }` (never via `fxPlan`: its `...fields` spread would overwrite plan `kind` with the event's `kind`); `cuesFor('attack-marker', {markerKind:'deferredKnockOut'})` → `[doom-curse-1 @0]`, other markerKind → `[]`. **(d) Deferred KO resolves:** `deferredKnockOut` (reduce.mjs:2893) → sound-only `deferred-ko` → `[doom-curse-2 @0]`. **(e) Effect KO:** pure `effectKnockoutIds(events) -> Set<number>` = ids of `pokemonKnockedOut` with no earlier `damageUpdated` for the same `instanceId` in the batch and no `deferredKnockOut` for it; the knockout plan gets `effectKo: true` for those ids; `cuesFor('knockout', {effectKo:true, ...})` → `[instant-ko-impact @0]` in place of `knocked-out` (rival ding/whistle rows unchanged). **(f) Darkrai ex:** `enter` plans carry `soundCard`; `soundCard.name === 'Darkrai ex'` (exact, case-sensitive) → `[darkrai-ex-entrance @0]` replacing every `place-*` cue. CUES rows: `itchy-pollen-hand`, `doom-curse-1`, `doom-curse-2`, `instant-ko-impact`, `darkrai-ex-entrance` bus `sfx`; `itchy-pollen-hand-card` bus `ui`; all gain 0.7, preload false (all > 2 s except `instant-ko-impact` 1.75 s → preload true). | `cuesFor('play-lock',{kinds:['item']})` → itchy-pollen-hand; `{kinds:['any']}` → same; `{kinds:['supporter']}` → []; `{}` → []. Rejection with the exact attack-lock text → `itchy-pollen-hand-card` played, `card-no-match` not; `"Time Capsule stops you playing that card during this turn."` → card-no-match. `attackMarkerAdded` {kind:'deferredKnockOut', instanceId:7, playerId:p2} with self p1 → plan `{kind:'fx', effect:'attack-marker', user:'opp', instanceId:7, markerKind:'deferredKnockOut'}`. `effectKnockoutIds([{type:'damageUpdated',instanceId:3},{type:'pokemonKnockedOut',instanceId:3}])` → ∅; `[{type:'pokemonKnockedOut',instanceId:4}]` → {4}; `[{type:'deferredKnockOut',instanceId:5},{type:'pokemonKnockedOut',instanceId:5}]` → ∅; `[]` → ∅. Darkrai: soundCard `{name:'Darkrai ex'}` → [darkrai-ex-entrance]; `{name:'Mega Darkrai ex'}` → normal place cue; no soundCard → normal place cue. | Engine events read from source this session: `playLockApplied`, `attackMarkerAdded`, `deferredKnockOut`, `playLockReason` text. Darkrai ex: corpus `out/pkmn-pokemon-cards.json` name row. | `pnpm test:changed` green; lint clean on touched files |
+| 9 | `scripts/sfx/source-map.mjs`, `import-tcgl-sfx.mjs` (peaks), `moves/attack-sound.mjs` (new), `combat.js` `attackSoundFor`, `index.js`, `sfx-cues.mjs`, `sample-bank.js` (alignMs), tests, re-import | Addendum A | source map: 209 mapped, 67 excluded; peak fn on synthetic PCM; bank lead ≥ 0 / < 0 / no peak; cue rows per tier and type; attackSoundFields per branch | `pnpm test` green; importer `--check` exit 0 |
 | 8 | `sample-bank.js` crowd bus, `sfx-cues.mjs` crowd table, settings toggle | Crowd | reaction-selection tests |
 Slices 3–8 are independent after 2; 2 and 3 rebase on design 063 once it lands (shared files).
 

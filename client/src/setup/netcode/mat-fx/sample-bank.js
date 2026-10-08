@@ -19,6 +19,19 @@ export const BUS_GAIN = Object.freeze({ sfx: 1, ui: 1, status: 1, crowd: 0.5 });
 const finiteGain = (gain) => (typeof gain === 'number' && Number.isFinite(gain) ? Math.max(0, gain) : 1);
 
 /**
+ * When a one-shot starts (ms from now) and where in the buffer (ms). With `alignMs` and a measured
+ * `peakMs` (design 064 Addendum A) the peak lands `alignMs` after the request: a late peak delays
+ * the start, an early-enough one skips the lead-in. Otherwise the plain `delayMs` start.
+ */
+export function startTiming(delayMs, alignMs, peakMs) {
+  if (Number.isFinite(alignMs) && Number.isFinite(peakMs)) {
+    const lead = alignMs - peakMs;
+    return { startMs: Math.max(0, lead), offsetMs: Math.max(0, -lead) };
+  }
+  return { startMs: Math.max(0, Number.isFinite(delayMs) ? delayMs : 0), offsetMs: 0 };
+}
+
+/**
  * Builds a bank bound to one AudioContext. Exported for tests (fake context/fetch); the module
  * singleton below is what the game uses.
  * @param {{fetch?: Function, MediaCtor?: Function, rng?: () => number, log?: (m: string) => void}} deps
@@ -64,7 +77,8 @@ export function createSampleBank(deps = {}) {
   const loadCue = (key) => {
     if (dead.has(key) || !cues[key] || isStreamed(key)) return Promise.resolve();
     if (loading.has(key)) return loading.get(key);
-    const entries = cues[key].files.map((name) => ({ url: BASE_URL + name, buffer: null }));
+    const peaks = Array.isArray(cues[key].peaks) ? cues[key].peaks : [];
+    const entries = cues[key].files.map((name, i) => ({ url: BASE_URL + name, buffer: null, peakMs: peaks[i] }));
     const job = Promise.all(
       entries.map(async (entry) => {
         try {
@@ -124,7 +138,7 @@ export function createSampleBank(deps = {}) {
   const hasSample = (key) => ready && !dead.has(key) && files.has(key);
 
   /** @returns {boolean} false = not played (not ready / dead / unknown): the caller falls back */
-  const playSample = (key, { gain = 1, delayMs = 0, bus = 'sfx' } = {}) => {
+  const playSample = (key, { gain = 1, delayMs = 0, alignMs, bus = 'sfx' } = {}) => {
     if (!ready || dead.has(key) || !cues[key]) return false;
     const variants = files.get(key);
     if (!variants) {
@@ -133,16 +147,17 @@ export function createSampleBank(deps = {}) {
     }
     // A scheduled play belongs to a multi-cue sequence and is never dropped by the cap.
     if (delayMs === 0 && (active.get(key) ?? 0) >= MAX_CONCURRENT) return true; // dropped on purpose: already sounding
-    return startOneShot(key, variants, { gain, delayMs, bus }) !== null;
+    return startOneShot(key, variants, { gain, delayMs, alignMs, bus }) !== null;
   };
 
   // One buffer source -> gain -> bus. Returns the running pieces, or null when the graph refused.
-  const startOneShot = (key, variants, { gain, delayMs, bus }) => {
+  const startOneShot = (key, variants, { gain, delayMs, alignMs, bus }) => {
     try {
       const index = pickVariant(variants.length, lastPick.get(key) ?? -1, rng);
       lastPick.set(key, index);
+      const variant = variants[index];
       const source = ctx.createBufferSource();
-      source.buffer = variants[index].buffer;
+      source.buffer = variant.buffer;
       const level = ctx.createGain();
       level.gain.value = finiteGain(gain);
       source.connect(level);
@@ -157,7 +172,8 @@ export function createSampleBank(deps = {}) {
           /* already torn down */
         }
       };
-      source.start(ctx.currentTime + Math.max(0, delayMs) / 1000);
+      const { startMs, offsetMs } = startTiming(delayMs, alignMs, variant.peakMs);
+      source.start(ctx.currentTime + startMs / 1000, offsetMs / 1000);
       return { source, level };
     } catch {
       return null;
@@ -219,7 +235,7 @@ export function createSampleBank(deps = {}) {
       return false;
     }
     for (const cue of sequence) {
-      playSample(cue.key, { gain: cue.gain, delayMs: cue.delayMs, bus: CUES[cue.key]?.bus });
+      playSample(cue.key, { gain: cue.gain, delayMs: cue.delayMs, alignMs: cue.alignMs, bus: CUES[cue.key]?.bus });
     }
     return true;
   };

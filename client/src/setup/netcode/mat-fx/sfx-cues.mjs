@@ -50,6 +50,14 @@ export const STATUS_CONDITION_KEYS = Object.freeze({
 const activeCues = Object.fromEntries(
   Object.values(POKEMON_TYPE_KEYS).map((type) => [`active-${type}`, sfx(0.7, false)])
 );
+// Design 064 Addendum A: one sampled hit per type and size, and the signature-move sting.
+const ATTACK_SIZE_FOR_TIER = Object.freeze({ 1: 'small', 2: 'medium', 3: 'large', S: 'large', aura: 'small' });
+const attackCues = Object.fromEntries(
+  Object.values(POKEMON_TYPE_KEYS).flatMap((type) => [
+    ...['small', 'medium', 'large'].map((size) => [`attack-${type}-${size}`, sfx(0.8, true)]),
+    [`sting-${type}`, sfx(0.6, false)],
+  ])
+);
 const statusCues = Object.fromEntries(
   Object.values(STATUS_CONDITION_KEYS).flatMap((condition) => [
     [`${condition}-intro`, sfx(0.7, condition !== 'sleep')],
@@ -139,6 +147,7 @@ export const CUES = Object.freeze({
   'additional-reactions': crowd(1),
   'small-reactions': crowd(0.8),
   ...activeCues,
+  ...attackCues,
   ...statusCues,
 });
 
@@ -147,7 +156,14 @@ export const UI_CUES = Object.freeze(
   new Set(Object.keys(CUES).filter((key) => CUES[key].bus === 'ui'))
 );
 
-const cueRow = (key, delayMs = CUES[key].delayMs ?? 0) => ({ key, gain: CUES[key].gain, delayMs });
+// `alignMs` (Addendum A): the bank starts the sample so its measured peak lands that long after the
+// request — an attack's hit on the scene's contact frame.
+const cueRow = (key, delayMs = CUES[key].delayMs ?? 0, alignMs) => ({
+  key,
+  gain: CUES[key].gain,
+  delayMs,
+  ...(Number.isFinite(alignMs) && { alignMs }),
+});
 
 /** `active-<type>` for the Pokémon that becomes Active; unknown or missing card is colorless. */
 const activeCueKey = (card) => {
@@ -209,6 +225,22 @@ function placePlays(plan) {
   return [[plan.user === 'opp' ? 'opp-place-active' : 'place-active-opening', 0]];
 }
 
+/** The attack's type key; unknown or missing type is colorless (Addendum A). */
+const attackTypeKey = (type) => POKEMON_TYPE_KEYS[normalizeEnergyType(type)] ?? 'colorless';
+
+// Addendum A: the sized hit lands on contact; a signature adds its type's sting at the start; an
+// aura (zero damage) hits nothing, so its small hit plays unaligned.
+function attackPlays(plan) {
+  const size = ATTACK_SIZE_FOR_TIER[plan?.attackTier];
+  if (!size) return [];
+  const type = attackTypeKey(plan.attackType);
+  const hit = `attack-${type}-${size}`;
+  if (plan.attackTier === 'aura') return [[hit, 0]];
+  const contact = Number.isFinite(plan.contactMs) && plan.contactMs >= 0 ? plan.contactMs : 0;
+  const aligned = [hit, 0, contact];
+  return plan.attackTier === 'S' ? [[`sting-${type}`, 0], aligned] : [aligned];
+}
+
 const DARKRAI_EX = 'Darkrai ex';
 const ITEM_LOCK_KINDS = ['item', 'trainer', 'any'];
 
@@ -220,9 +252,11 @@ const playLockPlays = (plan) =>
 
 const single = (key) => (key ? [[key, undefined]] : []);
 
-// Each resolver returns [key, delayMs] pairs (delayMs undefined = the cue's default). Effects
-// owned by design 063 (`attack`, `attack-banner`) are absent; `damage` resolves only its heal kind.
+// Each resolver returns [key, delayMs, alignMs?] (delayMs undefined = the cue's default).
+// `attack-banner` has no file and keeps its synth voice; `damage` resolves only its heal kind (the
+// hit's synth voice carries amount and Weakness).
 const CUE_PLAYS_FOR_EFFECT = {
+  attack: attackPlays,
   'turn-banner': (plan) => single(sideKey(plan, { self: 'your-turn', opp: 'opp-turn' })),
   attach: (plan) => single(sideKey(plan, { self: 'attach-energy', opp: 'attach-energy-opp' })),
   'tool-attach': () => single('tool-attach'),
@@ -267,11 +301,13 @@ const CUE_PLAYS_FOR_EFFECT = {
 /**
  * The sampled cues one fx plan sounds, each with its start offset; [] means no sample and the
  * caller uses the synthesized voices.
- * @returns {ReadonlyArray<{key: string, gain: number, delayMs: number}>}
+ * @returns {ReadonlyArray<{key: string, gain: number, delayMs: number, alignMs?: number}>}
  */
 export function cuesFor(effect, plan) {
   if (!Object.hasOwn(CUE_PLAYS_FOR_EFFECT, effect)) return EMPTY;
-  const plays = CUE_PLAYS_FOR_EFFECT[effect](plan).map(([key, delayMs]) => Object.freeze(cueRow(key, delayMs)));
+  const plays = CUE_PLAYS_FOR_EFFECT[effect](plan).map(([key, delayMs, alignMs]) =>
+    Object.freeze(cueRow(key, delayMs, alignMs))
+  );
   return Object.freeze(plays);
 }
 

@@ -563,7 +563,9 @@ shipped material interface, with `withPalette`; registered in `materials/index.j
 Signature specs use 063's 14 families (`FAMILY_VOICES`, `fx-audio.mjs`) — no new voices.
 `validateSpec` requires `spec.family === deriveFamily(spec)` (with the tier-S Dragon rule above),
 so the family follows from the beats; `attackFamilyFor` returns it (§ Wiring) and the shipped
-`soundPlanFor` sounds it. Main's sampled-SFX bank (design 064, D203) does not own `attack`.
+`soundPlanFor` sounds it. Since design 064 Addendum A (2026-10-08) `attackFamilyFor` is
+`attackSoundFor` (adds tier, contact and type) and a sampled `sting-<type>` + large hit replace the
+family voice when the samples are loaded; the family voice is the fallback.
 
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |

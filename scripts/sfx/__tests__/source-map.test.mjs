@@ -27,16 +27,26 @@ test('no SOURCE_MAP entry points at a file the extract lacks', () => {
   for (const name of Object.keys(SOURCE_MAP)) assert.ok(names.has(name), `${name} is not in the extract`);
 });
 
-test('attack and jumbotron audio is excluded (design 063 / Q3)', () => {
+test('the long-form jumbotron parts and four unbound files are excluded (Addendum A)', () => {
   const excluded = EXTRACT_NAMES.filter(isExcluded);
-  assert.equal(excluded.filter((n) => /_attack_(small|medium|large)\.wav$/.test(n)).length, 33);
-  assert.equal(excluded.filter((n) => n.includes('_jumbotron_')).length, 74);
-  assert.equal(excluded.length, 33 + 74 + 4);
-  assert.equal(EXCLUDED.length, 6);
+  assert.equal(excluded.filter((n) => /_jumbotron_(intro|loop|outro|flash_\d+)\.wav$/.test(n)).length, 63);
+  assert.equal(excluded.length, 63 + 4);
+  assert.equal(EXCLUDED.length, 5);
+  assert.equal(EXTRACT_NAMES.filter((n) => /_attack_(small|medium|large)\.wav$/.test(n) && isExcluded(n)).length, 0);
 });
 
-test('165 files map; same-key files are numbered variants, single-file keys have none', () => {
-  assert.equal(Object.keys(SOURCE_MAP).length, 165);
+test('attack hits map per type and size; every reduced jumbotron maps to a sting', () => {
+  const keys = new Set(Object.values(SOURCE_MAP).map((e) => e.key));
+  for (const type of ['colorless', 'dark', 'dragon', 'electric', 'fairy', 'fighting', 'fire', 'grass', 'metal', 'psychic', 'water']) {
+    for (const size of ['small', 'medium', 'large']) assert.ok(keys.has(`attack-${type}-${size}`), `attack-${type}-${size}`);
+    assert.ok(keys.has(`sting-${type}`), `sting-${type}`);
+  }
+  assert.deepEqual(keyForFile('sfx_rain_lightning_jumbotron_reduced.wav'), { key: 'sting-electric' });
+  assert.deepEqual(keyForFile('sfx_rain_electric_attack_large.wav'), { key: 'attack-electric-large' });
+});
+
+test('209 files map; same-key files are numbered variants, single-file keys have none', () => {
+  assert.equal(Object.keys(SOURCE_MAP).length, 209);
   const byKey = new Map();
   for (const { key, variant } of Object.values(SOURCE_MAP)) byKey.set(key, [...(byKey.get(key) ?? []), variant]);
   for (const [key, variants] of byKey) {

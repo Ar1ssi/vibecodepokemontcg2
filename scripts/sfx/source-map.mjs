@@ -7,6 +7,7 @@
 
 const STATUS_CONDITIONS = ['burn', 'poison', 'sleep', 'paralyze', 'confusion'];
 const STATUS_PHASES = ['intro', 'loop', 'outro'];
+const ATTACK_SIZES = ['small', 'medium', 'large'];
 const POKEMON_TYPES = [
   'colorless',
   'dark',
@@ -120,17 +121,26 @@ for (const condition of STATUS_CONDITIONS)
     SOURCE_MAP[`sfx_rain_${condition}_${phase}.wav`] = { key: `${condition}-${phase}` };
 for (const type of POKEMON_TYPES)
   SOURCE_MAP[`sfx_rain_${type}_pokemon_active.wav`] = { key: `active-${type}` };
+// Design 064 Addendum A: the attack hits and the signature sting. The jumbotron files name
+// Lightning `lightning`; the keys use `electric` like every other per-type key.
+for (const type of POKEMON_TYPES)
+  for (const size of ATTACK_SIZES)
+    SOURCE_MAP[`sfx_rain_${type}_attack_${size}.wav`] = { key: `attack-${type}-${size}` };
+for (const type of POKEMON_TYPES) {
+  const fileType = type === 'electric' ? 'lightning' : type;
+  SOURCE_MAP[`sfx_rain_${fileType}_jumbotron_reduced.wav`] = { key: `sting-${type}` };
+}
 for (const { prefix, key, numbers, pad } of VARIANT_GROUPS)
   for (const variant of numbers)
     SOURCE_MAP[`${prefix}_${String(variant).padStart(pad, '0')}.wav`] = { key, variant };
 
 /**
- * Files the importer skips on purpose. Attack and jumbotron audio belongs to design 063 (Q3 open);
- * the four named files have no confident game hook (design 064 § Card signatures).
+ * Files the importer skips on purpose. The jumbotron's long-form parts score an arena cinematic
+ * this game has no scene for (design 064 Addendum A); the four named files have no confident game
+ * hook (design 064 § Card signatures).
  */
 export const EXCLUDED = [
-  /_attack_(small|medium|large)\.wav$/,
-  /_jumbotron_/,
+  /_jumbotron_(intro|loop|outro|flash_\d+)\.wav$/,
   /^sfx_rain_cant_draw_that\.wav$/,
   /^sfx_rain_cards_match\.wav$/,
   /^sfx_rain_marne_special\.wav$/,

@@ -25,6 +25,9 @@ export const REQUIRED_TOOLS = ['ffmpeg', 'ffprobe'];
 const ENCODE = { 1: { bitrate: '64k' }, 2: { bitrate: '96k' } };
 const SAMPLE_RATE = 48000;
 const SILENT_LUFS = -70;
+/** Peak search (design 064 Addendum A): mono decode rate and RMS window. */
+export const PEAK_SAMPLE_RATE = 8000;
+export const PEAK_WINDOW_MS = 10;
 
 /** @returns {{ src: string|null, out: string, check: boolean, error?: string }} */
 export function parseArgs(argv, outDefault = DEFAULT_OUT_DIR) {
@@ -78,6 +81,30 @@ export function parseLufs(stderr) {
 }
 
 /**
+ * Start of the loudest PEAK_WINDOW_MS window (RMS) in mono s16le PCM, in ms; 0 for empty or silent
+ * audio. The client lines a sample's peak up with the moment it scores (an attack's contact).
+ * @param {Buffer} pcm
+ */
+export function peakMsFromPcm(pcm, sampleRate = PEAK_SAMPLE_RATE, windowMs = PEAK_WINDOW_MS) {
+  const window = Math.max(1, Math.round((sampleRate * windowMs) / 1000));
+  const samples = Math.floor((pcm?.length ?? 0) / 2);
+  let best = 0;
+  let bestStart = 0;
+  for (let start = 0; start + window <= samples; start += window) {
+    let energy = 0;
+    for (let i = start; i < start + window; i++) {
+      const v = pcm.readInt16LE(i * 2);
+      energy += v * v;
+    }
+    if (energy > best) {
+      best = energy;
+      bestStart = start;
+    }
+  }
+  return Math.round((bestStart * 1000) / sampleRate);
+}
+
+/**
  * Splits the extract's file names into mapped, deliberately excluded, and unknown.
  * Non-.wav entries are ignored.
  */
@@ -98,8 +125,8 @@ export function classifyFiles(names) {
 
 /**
  * Manifest cues from the per-file results. A cue with variants reports its longest duration, widest
- * channel count and mean loudness.
- * @param {{ key: string, variant?: number, file: string, dur: number, channels: number, lufs: number }[]} entries
+ * channel count and mean loudness; `peaks` stays per file, parallel to `files`.
+ * @param {{ key: string, variant?: number, file: string, dur: number, channels: number, lufs: number, peakMs: number }[]} entries
  */
 export function buildManifest(entries) {
   const byKey = new Map();
@@ -113,13 +140,16 @@ export function buildManifest(entries) {
       dur: Math.max(...group.map((e) => e.dur)),
       channels: Math.max(...group.map((e) => e.channels)),
       lufs: Math.round(lufs * 10) / 10,
+      peaks: group.map((e) => e.peakMs),
     };
   }
   return { version: MANIFEST_VERSION, cues };
 }
 
-export function realRun(command, args) {
-  return spawnSync(command, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+/** `binary: true` keeps stdout a Buffer (raw PCM); stderr is still text. */
+export function realRun(command, args, { binary = false } = {}) {
+  const result = spawnSync(command, args, { encoding: binary ? 'buffer' : 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  return binary ? { ...result, stderr: result.stderr?.toString('utf8') ?? '' } : result;
 }
 
 function failure(...messages) {
@@ -131,7 +161,9 @@ function probeAndMeasure(run, srcPath) {
   if (probe.status !== 0) throw new Error(`ffprobe failed on ${srcPath}: ${(probe.stderr || '').trim()}`);
   const loudness = run('ffmpeg', ['-hide_banner', '-nostats', '-i', srcPath, '-af', 'ebur128=framelog=quiet', '-f', 'null', '-']);
   if (loudness.status !== 0) throw new Error(`ffmpeg loudness pass failed on ${srcPath}: ${(loudness.stderr || '').trim()}`);
-  return { ...parseProbe(probe.stdout), lufs: parseLufs(loudness.stderr) };
+  const pcm = run('ffmpeg', ['-v', 'error', '-i', srcPath, '-ac', '1', '-ar', String(PEAK_SAMPLE_RATE), '-f', 's16le', '-'], { binary: true });
+  if (pcm.status !== 0) throw new Error(`ffmpeg peak pass failed on ${srcPath}: ${String(pcm.stderr || '').trim()}`);
+  return { ...parseProbe(probe.stdout), lufs: parseLufs(loudness.stderr), peakMs: peakMsFromPcm(pcm.stdout) };
 }
 
 function transcode(run, srcPath, destPath, channels) {

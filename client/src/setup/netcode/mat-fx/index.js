@@ -11,7 +11,7 @@ import { playFxSound } from './fx-audio.js';
 import { coinSoundMaterial, withSoundCard } from './sfx-cues.mjs';
 import { holdFor } from './fx-holds.mjs';
 import { playsOppPreview } from './opp-play.mjs';
-import { attack, attackBanner, attackFamilyFor, damage } from './combat.js';
+import { attack, attackBanner, attackSoundFor, damage } from './combat.js';
 import { createFxDispatcher } from './dispatcher.mjs';
 import { enter } from './entry.js';
 import { abilityBanner, gameOver, turnBanner } from './flow.js';
@@ -74,7 +74,7 @@ const withCoinSound = (plan) => {
 const soundPlanFor = (plan) => {
   if (plan?.effect === 'coin-flip') return withCoinSound(plan);
   if (plan?.effect === 'trainer-play' && playsOppPreview(plan)) return { ...plan, effect: 'opp-trainer-play' };
-  if (plan?.effect === 'attack') return { ...plan, family: attackFamilyFor(plan) };
+  if (plan?.effect === 'attack') return { ...plan, ...attackSoundFor(plan) };
   if (plan?.effect !== 'evolve') return withSoundCard(plan, cardOf);
   const evolved = getCardRegistry().get(plan.instanceId)?.card;
   return signatureEntryKind(evolved) ? plan : { ...plan, effect: 'evolve-scene' };

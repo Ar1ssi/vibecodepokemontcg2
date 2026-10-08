@@ -3,12 +3,11 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: Sampled battle SFX shipped (S337, design 064, D203/D204): TCG Live non-attack cues over the synth
-  palette — fx plans, draw/shuffle/KO/enter, UI chrome, status loops, card signatures, crowd bus.
-  Samples (6.7 MB Ogg Opus) are committed in client/src/assets/sfx; regenerate with `pnpm sfx:import`.
-Active: design 063 (attack move scenes + jumbotron set) uncommitted on the primary folder; it overlaps
-  mat-fx/index.js (soundPlanFor) with 064 — rebase on main before landing. ETB (057) slice 6 not started.
-Next: user listening pass on localhost (SERVER_AUTHORITATIVE=1) for 064 mix gains; I239–I240, then I227–I229;
+Focus: Sampled battle SFX (design 064, D203/D204/D206): TCG Live cues over the synth palette — fx plans,
+  draw/shuffle/KO/enter, UI, status loops, signatures, crowd, and attack hits aligned to the 063/065 move
+  contact (Addendum A). Samples committed in client/src/assets/sfx; regenerate with `pnpm sfx:import`.
+Active: none. 063/065 move scenes are on main. ETB (057) slice 6 not started.
+Next: user listening pass on localhost (SERVER_AUTHORITATIVE=1) for 064 mix gains (attack hit vs synth damage thud); I239–I240, then I227–I229;
   WotC Gyms/attach-Trainers/Baby flip, holo art windows (D201), deck reveals, 057 taste calls.
   Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.

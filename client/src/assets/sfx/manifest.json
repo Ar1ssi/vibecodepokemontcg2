@@ -7,7 +7,10 @@
       ],
       "dur": 2.506,
       "channels": 2,
-      "lufs": -19.6
+      "lufs": -19.6,
+      "peaks": [
+        150
+      ]
     },
     "active-dark": {
       "files": [
@@ -15,7 +18,10 @@
       ],
       "dur": 3.094,
       "channels": 2,
-      "lufs": -19.1
+      "lufs": -19.1,
+      "peaks": [
+        2050
+      ]
     },
     "active-dragon": {
       "files": [
@@ -23,7 +29,10 @@
       ],
       "dur": 4.672,
       "channels": 2,
-      "lufs": -17.7
+      "lufs": -17.7,
+      "peaks": [
+        1100
+      ]
     },
     "active-electric": {
       "files": [
@@ -31,7 +40,10 @@
       ],
       "dur": 3.606,
       "channels": 2,
-      "lufs": -18.8
+      "lufs": -18.8,
+      "peaks": [
+        150
+      ]
     },
     "active-fairy": {
       "files": [
@@ -39,7 +51,10 @@
       ],
       "dur": 4.667,
       "channels": 2,
-      "lufs": -19.2
+      "lufs": -19.2,
+      "peaks": [
+        1090
+      ]
     },
     "active-fighting": {
       "files": [
@@ -47,7 +62,10 @@
       ],
       "dur": 3.216,
       "channels": 2,
-      "lufs": -15.2
+      "lufs": -15.2,
+      "peaks": [
+        250
+      ]
     },
     "active-fire": {
       "files": [
@@ -55,7 +73,10 @@
       ],
       "dur": 3.396,
       "channels": 2,
-      "lufs": -14.8
+      "lufs": -14.8,
+      "peaks": [
+        160
+      ]
     },
     "active-grass": {
       "files": [
@@ -63,7 +84,10 @@
       ],
       "dur": 3.914,
       "channels": 2,
-      "lufs": -19.5
+      "lufs": -19.5,
+      "peaks": [
+        1230
+      ]
     },
     "active-metal": {
       "files": [
@@ -71,7 +95,10 @@
       ],
       "dur": 3.431,
       "channels": 2,
-      "lufs": -10.7
+      "lufs": -10.7,
+      "peaks": [
+        1210
+      ]
     },
     "active-psychic": {
       "files": [
@@ -79,7 +106,10 @@
       ],
       "dur": 3.467,
       "channels": 2,
-      "lufs": -19.8
+      "lufs": -19.8,
+      "peaks": [
+        70
+      ]
     },
     "active-water": {
       "files": [
@@ -87,7 +117,10 @@
       ],
       "dur": 3.167,
       "channels": 2,
-      "lufs": -18.2
+      "lufs": -18.2,
+      "peaks": [
+        460
+      ]
     },
     "additional-reactions": {
       "files": [
@@ -105,7 +138,20 @@
       ],
       "dur": 8.25,
       "channels": 2,
-      "lufs": -14.2
+      "lufs": -14.2,
+      "peaks": [
+        1450,
+        2850,
+        2520,
+        880,
+        930,
+        1430,
+        2140,
+        2620,
+        930,
+        3960,
+        720
+      ]
     },
     "attach-energy": {
       "files": [
@@ -113,7 +159,10 @@
       ],
       "dur": 1.38,
       "channels": 1,
-      "lufs": -22.2
+      "lufs": -22.2,
+      "peaks": [
+        130
+      ]
     },
     "attach-energy-opp": {
       "files": [
@@ -121,7 +170,10 @@
       ],
       "dur": 1.38,
       "channels": 1,
-      "lufs": -22.3
+      "lufs": -22.3,
+      "peaks": [
+        130
+      ]
     },
     "attack-button": {
       "files": [
@@ -129,7 +181,373 @@
       ],
       "dur": 0.316,
       "channels": 1,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        30
+      ]
+    },
+    "attack-colorless-large": {
+      "files": [
+        "attack-colorless-large.1678e749.ogg"
+      ],
+      "dur": 1.269,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        10
+      ]
+    },
+    "attack-colorless-medium": {
+      "files": [
+        "attack-colorless-medium.0e1bcf9b.ogg"
+      ],
+      "dur": 0.99,
+      "channels": 2,
+      "lufs": -14.3,
+      "peaks": [
+        10
+      ]
+    },
+    "attack-colorless-small": {
+      "files": [
+        "attack-colorless-small.98f8a308.ogg"
+      ],
+      "dur": 0.99,
+      "channels": 2,
+      "lufs": -14.3,
+      "peaks": [
+        10
+      ]
+    },
+    "attack-dark-large": {
+      "files": [
+        "attack-dark-large.f3bd3b6d.ogg"
+      ],
+      "dur": 3.11,
+      "channels": 2,
+      "lufs": -14.1,
+      "peaks": [
+        600
+      ]
+    },
+    "attack-dark-medium": {
+      "files": [
+        "attack-dark-medium.9e0c6da0.ogg"
+      ],
+      "dur": 1.843,
+      "channels": 2,
+      "lufs": -14.1,
+      "peaks": [
+        300
+      ]
+    },
+    "attack-dark-small": {
+      "files": [
+        "attack-dark-small.f06aa293.ogg"
+      ],
+      "dur": 1.534,
+      "channels": 2,
+      "lufs": -13.7,
+      "peaks": [
+        480
+      ]
+    },
+    "attack-dragon-large": {
+      "files": [
+        "attack-dragon-large.a325831e.ogg"
+      ],
+      "dur": 1.44,
+      "channels": 2,
+      "lufs": -13.8,
+      "peaks": [
+        390
+      ]
+    },
+    "attack-dragon-medium": {
+      "files": [
+        "attack-dragon-medium.e1fe4f34.ogg"
+      ],
+      "dur": 1.397,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        90
+      ]
+    },
+    "attack-dragon-small": {
+      "files": [
+        "attack-dragon-small.a42d67bc.ogg"
+      ],
+      "dur": 1.219,
+      "channels": 2,
+      "lufs": -13.5,
+      "peaks": [
+        100
+      ]
+    },
+    "attack-electric-large": {
+      "files": [
+        "attack-electric-large.7106d794.ogg"
+      ],
+      "dur": 3,
+      "channels": 2,
+      "lufs": -14.3,
+      "peaks": [
+        780
+      ]
+    },
+    "attack-electric-medium": {
+      "files": [
+        "attack-electric-medium.65e9d2f2.ogg"
+      ],
+      "dur": 1.747,
+      "channels": 2,
+      "lufs": -13.6,
+      "peaks": [
+        540
+      ]
+    },
+    "attack-electric-small": {
+      "files": [
+        "attack-electric-small.19d11a57.ogg"
+      ],
+      "dur": 1.721,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        200
+      ]
+    },
+    "attack-fairy-large": {
+      "files": [
+        "attack-fairy-large.edcb6cd1.ogg"
+      ],
+      "dur": 1.755,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        270
+      ]
+    },
+    "attack-fairy-medium": {
+      "files": [
+        "attack-fairy-medium.1fe91c4d.ogg"
+      ],
+      "dur": 1.61,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        260
+      ]
+    },
+    "attack-fairy-small": {
+      "files": [
+        "attack-fairy-small.443aa507.ogg"
+      ],
+      "dur": 1.621,
+      "channels": 2,
+      "lufs": -14.3,
+      "peaks": [
+        80
+      ]
+    },
+    "attack-fighting-large": {
+      "files": [
+        "attack-fighting-large.aff0f262.ogg"
+      ],
+      "dur": 1.894,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        580
+      ]
+    },
+    "attack-fighting-medium": {
+      "files": [
+        "attack-fighting-medium.cefc3013.ogg"
+      ],
+      "dur": 1.894,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        270
+      ]
+    },
+    "attack-fighting-small": {
+      "files": [
+        "attack-fighting-small.8b20e365.ogg"
+      ],
+      "dur": 0.936,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        110
+      ]
+    },
+    "attack-fire-large": {
+      "files": [
+        "attack-fire-large.16058d7b.ogg"
+      ],
+      "dur": 2.133,
+      "channels": 2,
+      "lufs": -14.1,
+      "peaks": [
+        160
+      ]
+    },
+    "attack-fire-medium": {
+      "files": [
+        "attack-fire-medium.b2665ea9.ogg"
+      ],
+      "dur": 2.009,
+      "channels": 2,
+      "lufs": -14.1,
+      "peaks": [
+        290
+      ]
+    },
+    "attack-fire-small": {
+      "files": [
+        "attack-fire-small.a0b6bd38.ogg"
+      ],
+      "dur": 1.406,
+      "channels": 2,
+      "lufs": -14.7,
+      "peaks": [
+        200
+      ]
+    },
+    "attack-grass-large": {
+      "files": [
+        "attack-grass-large.79a0c8d7.ogg"
+      ],
+      "dur": 1.716,
+      "channels": 2,
+      "lufs": -14,
+      "peaks": [
+        340
+      ]
+    },
+    "attack-grass-medium": {
+      "files": [
+        "attack-grass-medium.1998b09b.ogg"
+      ],
+      "dur": 1.185,
+      "channels": 2,
+      "lufs": -14.9,
+      "peaks": [
+        260
+      ]
+    },
+    "attack-grass-small": {
+      "files": [
+        "attack-grass-small.14efd535.ogg"
+      ],
+      "dur": 1.067,
+      "channels": 2,
+      "lufs": -14.7,
+      "peaks": [
+        110
+      ]
+    },
+    "attack-metal-large": {
+      "files": [
+        "attack-metal-large.67cf6005.ogg"
+      ],
+      "dur": 1.128,
+      "channels": 2,
+      "lufs": -14.1,
+      "peaks": [
+        110
+      ]
+    },
+    "attack-metal-medium": {
+      "files": [
+        "attack-metal-medium.666e5510.ogg"
+      ],
+      "dur": 0.896,
+      "channels": 2,
+      "lufs": -14.1,
+      "peaks": [
+        110
+      ]
+    },
+    "attack-metal-small": {
+      "files": [
+        "attack-metal-small.44387ea6.ogg"
+      ],
+      "dur": 0.896,
+      "channels": 2,
+      "lufs": -14.8,
+      "peaks": [
+        110
+      ]
+    },
+    "attack-psychic-large": {
+      "files": [
+        "attack-psychic-large.1a6cd9bb.ogg"
+      ],
+      "dur": 1.792,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        400
+      ]
+    },
+    "attack-psychic-medium": {
+      "files": [
+        "attack-psychic-medium.2f04a1ec.ogg"
+      ],
+      "dur": 1.525,
+      "channels": 2,
+      "lufs": -13.8,
+      "peaks": [
+        220
+      ]
+    },
+    "attack-psychic-small": {
+      "files": [
+        "attack-psychic-small.9b660baf.ogg"
+      ],
+      "dur": 1.46,
+      "channels": 2,
+      "lufs": -14.2,
+      "peaks": [
+        420
+      ]
+    },
+    "attack-water-large": {
+      "files": [
+        "attack-water-large.942c1bfa.ogg"
+      ],
+      "dur": 1.847,
+      "channels": 2,
+      "lufs": -14.3,
+      "peaks": [
+        150
+      ]
+    },
+    "attack-water-medium": {
+      "files": [
+        "attack-water-medium.ce999d9b.ogg"
+      ],
+      "dur": 1.692,
+      "channels": 2,
+      "lufs": -17.3,
+      "peaks": [
+        150
+      ]
+    },
+    "attack-water-small": {
+      "files": [
+        "attack-water-small.54ce231d.ogg"
+      ],
+      "dur": 0.859,
+      "channels": 2,
+      "lufs": -13.6,
+      "peaks": [
+        130
+      ]
     },
     "big-card-in": {
       "files": [
@@ -137,7 +555,10 @@
       ],
       "dur": 1.585,
       "channels": 2,
-      "lufs": -20.3
+      "lufs": -20.3,
+      "peaks": [
+        360
+      ]
     },
     "big-card-out": {
       "files": [
@@ -145,7 +566,10 @@
       ],
       "dur": 0.8,
       "channels": 2,
-      "lufs": -19
+      "lufs": -19,
+      "peaks": [
+        230
+      ]
     },
     "burn-intro": {
       "files": [
@@ -153,7 +577,10 @@
       ],
       "dur": 0.987,
       "channels": 2,
-      "lufs": -15.9
+      "lufs": -15.9,
+      "peaks": [
+        480
+      ]
     },
     "burn-loop": {
       "files": [
@@ -161,7 +588,10 @@
       ],
       "dur": 3.308,
       "channels": 2,
-      "lufs": -14
+      "lufs": -14,
+      "peaks": [
+        2500
+      ]
     },
     "burn-outro": {
       "files": [
@@ -169,7 +599,10 @@
       ],
       "dur": 1.406,
       "channels": 2,
-      "lufs": -14.1
+      "lufs": -14.1,
+      "peaks": [
+        540
+      ]
     },
     "button-click": {
       "files": [
@@ -177,7 +610,10 @@
       ],
       "dur": 0.125,
       "channels": 2,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        30
+      ]
     },
     "card-drawn": {
       "files": [
@@ -185,7 +621,10 @@
       ],
       "dur": 0.21,
       "channels": 1,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        20
+      ]
     },
     "card-flip": {
       "files": [
@@ -193,7 +632,10 @@
       ],
       "dur": 0.463,
       "channels": 2,
-      "lufs": -17.7
+      "lufs": -17.7,
+      "peaks": [
+        430
+      ]
     },
     "card-from-hand": {
       "files": [
@@ -201,7 +643,10 @@
       ],
       "dur": 0.189,
       "channels": 2,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        60
+      ]
     },
     "card-no-match": {
       "files": [
@@ -209,7 +654,10 @@
       ],
       "dur": 2.013,
       "channels": 2,
-      "lufs": -11.1
+      "lufs": -11.1,
+      "peaks": [
+        920
+      ]
     },
     "card-place": {
       "files": [
@@ -218,7 +666,11 @@
       ],
       "dur": 0.183,
       "channels": 2,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        0,
+        0
+      ]
     },
     "card-reveal": {
       "files": [
@@ -226,7 +678,10 @@
       ],
       "dur": 1.428,
       "channels": 1,
-      "lufs": -30.9
+      "lufs": -30.9,
+      "peaks": [
+        390
+      ]
     },
     "card-slot-drop": {
       "files": [
@@ -234,7 +689,10 @@
       ],
       "dur": 0.625,
       "channels": 2,
-      "lufs": -27.3
+      "lufs": -27.3,
+      "peaks": [
+        80
+      ]
     },
     "card-swoosh": {
       "files": [
@@ -242,7 +700,10 @@
       ],
       "dur": 0.421,
       "channels": 1,
-      "lufs": -31.2
+      "lufs": -31.2,
+      "peaks": [
+        240
+      ]
     },
     "card-to-board": {
       "files": [
@@ -250,7 +711,10 @@
       ],
       "dur": 0.173,
       "channels": 1,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        80
+      ]
     },
     "card-view": {
       "files": [
@@ -258,7 +722,10 @@
       ],
       "dur": 0.515,
       "channels": 1,
-      "lufs": -31.8
+      "lufs": -31.8,
+      "peaks": [
+        270
+      ]
     },
     "cards-to-prizes": {
       "files": [
@@ -267,7 +734,11 @@
       ],
       "dur": 1.056,
       "channels": 2,
-      "lufs": -29
+      "lufs": -29,
+      "peaks": [
+        140,
+        220
+      ]
     },
     "cheer-disappoint": {
       "files": [
@@ -282,7 +753,17 @@
       ],
       "dur": 6.977,
       "channels": 2,
-      "lufs": -14
+      "lufs": -14,
+      "peaks": [
+        750,
+        1180,
+        780,
+        670,
+        2160,
+        330,
+        2000,
+        990
+      ]
     },
     "cheer-large": {
       "files": [
@@ -295,7 +776,15 @@
       ],
       "dur": 9.208,
       "channels": 2,
-      "lufs": -14.1
+      "lufs": -14.1,
+      "peaks": [
+        1920,
+        2280,
+        2140,
+        1410,
+        1060,
+        530
+      ]
     },
     "cheer-medium": {
       "files": [
@@ -308,7 +797,15 @@
       ],
       "dur": 5.579,
       "channels": 2,
-      "lufs": -14.1
+      "lufs": -14.1,
+      "peaks": [
+        1250,
+        650,
+        1970,
+        2220,
+        3290,
+        380
+      ]
     },
     "cheer-small": {
       "files": [
@@ -322,7 +819,16 @@
       ],
       "dur": 5.685,
       "channels": 2,
-      "lufs": -14.2
+      "lufs": -14.2,
+      "peaks": [
+        1580,
+        840,
+        1690,
+        560,
+        3710,
+        1600,
+        690
+      ]
     },
     "choose-first-second": {
       "files": [
@@ -330,7 +836,10 @@
       ],
       "dur": 0.235,
       "channels": 1,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        40
+      ]
     },
     "coin-appear": {
       "files": [
@@ -338,7 +847,10 @@
       ],
       "dur": 0.581,
       "channels": 2,
-      "lufs": -26.3
+      "lufs": -26.3,
+      "peaks": [
+        90
+      ]
     },
     "coin-loss": {
       "files": [
@@ -346,7 +858,10 @@
       ],
       "dur": 0.741,
       "channels": 1,
-      "lufs": -22.9
+      "lufs": -22.9,
+      "peaks": [
+        80
+      ]
     },
     "coin-spin-metal": {
       "files": [
@@ -354,7 +869,10 @@
       ],
       "dur": 0.616,
       "channels": 2,
-      "lufs": -22.1
+      "lufs": -22.1,
+      "peaks": [
+        140
+      ]
     },
     "coin-spin-plastic": {
       "files": [
@@ -362,7 +880,10 @@
       ],
       "dur": 0.667,
       "channels": 2,
-      "lufs": -20.4
+      "lufs": -20.4,
+      "peaks": [
+        370
+      ]
     },
     "coin-toss-metal": {
       "files": [
@@ -370,7 +891,10 @@
       ],
       "dur": 1.38,
       "channels": 2,
-      "lufs": -19.2
+      "lufs": -19.2,
+      "peaks": [
+        600
+      ]
     },
     "coin-toss-plastic": {
       "files": [
@@ -378,7 +902,10 @@
       ],
       "dur": 1.14,
       "channels": 2,
-      "lufs": -20.8
+      "lufs": -20.8,
+      "peaks": [
+        0
+      ]
     },
     "coin-win": {
       "files": [
@@ -386,7 +913,10 @@
       ],
       "dur": 1.707,
       "channels": 1,
-      "lufs": -21.1
+      "lufs": -21.1,
+      "peaks": [
+        130
+      ]
     },
     "confusion-intro": {
       "files": [
@@ -394,7 +924,10 @@
       ],
       "dur": 1.12,
       "channels": 2,
-      "lufs": -13.8
+      "lufs": -13.8,
+      "peaks": [
+        570
+      ]
     },
     "confusion-loop": {
       "files": [
@@ -402,7 +935,10 @@
       ],
       "dur": 3,
       "channels": 2,
-      "lufs": -13.5
+      "lufs": -13.5,
+      "peaks": [
+        2630
+      ]
     },
     "confusion-outro": {
       "files": [
@@ -410,7 +946,10 @@
       ],
       "dur": 1.077,
       "channels": 2,
-      "lufs": -12.8
+      "lufs": -12.8,
+      "peaks": [
+        500
+      ]
     },
     "crowd-amb-large": {
       "files": [
@@ -418,7 +957,10 @@
       ],
       "dur": 45.74,
       "channels": 2,
-      "lufs": -12
+      "lufs": -12,
+      "peaks": [
+        9280
+      ]
     },
     "crowd-amb-small": {
       "files": [
@@ -426,7 +968,10 @@
       ],
       "dur": 56.941,
       "channels": 2,
-      "lufs": -24.7
+      "lufs": -24.7,
+      "peaks": [
+        44790
+      ]
     },
     "crowd-crazy": {
       "files": [
@@ -434,7 +979,10 @@
       ],
       "dur": 16.599,
       "channels": 2,
-      "lufs": -14.1
+      "lufs": -14.1,
+      "peaks": [
+        9710
+      ]
     },
     "darkrai-ex-entrance": {
       "files": [
@@ -442,7 +990,10 @@
       ],
       "dur": 4.469,
       "channels": 2,
-      "lufs": -11.6
+      "lufs": -11.6,
+      "peaks": [
+        1300
+      ]
     },
     "deck-to-hand": {
       "files": [
@@ -450,7 +1001,10 @@
       ],
       "dur": 0.418,
       "channels": 2,
-      "lufs": -27
+      "lufs": -27,
+      "peaks": [
+        120
+      ]
     },
     "defeat": {
       "files": [
@@ -458,7 +1012,10 @@
       ],
       "dur": 3.71,
       "channels": 1,
-      "lufs": -22.2
+      "lufs": -22.2,
+      "peaks": [
+        410
+      ]
     },
     "discard-deposit": {
       "files": [
@@ -466,7 +1023,10 @@
       ],
       "dur": 4.4,
       "channels": 2,
-      "lufs": -30.5
+      "lufs": -30.5,
+      "peaks": [
+        130
+      ]
     },
     "discard-finished": {
       "files": [
@@ -474,7 +1034,10 @@
       ],
       "dur": 0.833,
       "channels": 2,
-      "lufs": -21.7
+      "lufs": -21.7,
+      "peaks": [
+        260
+      ]
     },
     "discard-whoosh": {
       "files": [
@@ -482,7 +1045,10 @@
       ],
       "dur": 1,
       "channels": 2,
-      "lufs": -16.6
+      "lufs": -16.6,
+      "peaks": [
+        260
+      ]
     },
     "doom-curse-1": {
       "files": [
@@ -490,7 +1056,10 @@
       ],
       "dur": 3.816,
       "channels": 2,
-      "lufs": -20
+      "lufs": -20,
+      "peaks": [
+        1430
+      ]
     },
     "doom-curse-2": {
       "files": [
@@ -498,7 +1067,10 @@
       ],
       "dur": 5.052,
       "channels": 2,
-      "lufs": -20.1
+      "lufs": -20.1,
+      "peaks": [
+        2650
+      ]
     },
     "end-turn": {
       "files": [
@@ -506,7 +1078,10 @@
       ],
       "dur": 0.9,
       "channels": 2,
-      "lufs": -22.3
+      "lufs": -22.3,
+      "peaks": [
+        150
+      ]
     },
     "evolve-card": {
       "files": [
@@ -514,7 +1089,10 @@
       ],
       "dur": 5.135,
       "channels": 1,
-      "lufs": -22.5
+      "lufs": -22.5,
+      "peaks": [
+        1350
+      ]
     },
     "heal-card": {
       "files": [
@@ -522,7 +1100,10 @@
       ],
       "dur": 1.833,
       "channels": 2,
-      "lufs": -21.6
+      "lufs": -21.6,
+      "peaks": [
+        140
+      ]
     },
     "instant-ko-activate": {
       "files": [
@@ -530,7 +1111,10 @@
       ],
       "dur": 1.593,
       "channels": 2,
-      "lufs": -11.6
+      "lufs": -11.6,
+      "peaks": [
+        260
+      ]
     },
     "instant-ko-impact": {
       "files": [
@@ -538,7 +1122,10 @@
       ],
       "dur": 1.749,
       "channels": 2,
-      "lufs": -11
+      "lufs": -11,
+      "peaks": [
+        300
+      ]
     },
     "itchy-pollen-activate": {
       "files": [
@@ -546,7 +1133,10 @@
       ],
       "dur": 4.799,
       "channels": 2,
-      "lufs": -22.6
+      "lufs": -22.6,
+      "peaks": [
+        100
+      ]
     },
     "itchy-pollen-hand": {
       "files": [
@@ -554,7 +1144,10 @@
       ],
       "dur": 5.507,
       "channels": 2,
-      "lufs": -29.6
+      "lufs": -29.6,
+      "peaks": [
+        150
+      ]
     },
     "itchy-pollen-hand-card": {
       "files": [
@@ -562,7 +1155,10 @@
       ],
       "dur": 6.307,
       "channels": 2,
-      "lufs": -23.6
+      "lufs": -23.6,
+      "peaks": [
+        450
+      ]
     },
     "knocked-out": {
       "files": [
@@ -570,7 +1166,10 @@
       ],
       "dur": 2.881,
       "channels": 1,
-      "lufs": -18.5
+      "lufs": -18.5,
+      "peaks": [
+        170
+      ]
     },
     "menu-pop-in": {
       "files": [
@@ -578,7 +1177,10 @@
       ],
       "dur": 2.656,
       "channels": 2,
-      "lufs": -28.4
+      "lufs": -28.4,
+      "peaks": [
+        530
+      ]
     },
     "opp-card-played": {
       "files": [
@@ -587,7 +1189,11 @@
       ],
       "dur": 3.551,
       "channels": 2,
-      "lufs": -11.1
+      "lufs": -11.1,
+      "peaks": [
+        410,
+        420
+      ]
     },
     "opp-deck-to-hand": {
       "files": [
@@ -595,7 +1201,10 @@
       ],
       "dur": 1.825,
       "channels": 2,
-      "lufs": -26.9
+      "lufs": -26.9,
+      "peaks": [
+        160
+      ]
     },
     "opp-pending-discard": {
       "files": [
@@ -603,7 +1212,10 @@
       ],
       "dur": 2.013,
       "channels": 2,
-      "lufs": -13.9
+      "lufs": -13.9,
+      "peaks": [
+        190
+      ]
     },
     "opp-place-active": {
       "files": [
@@ -611,7 +1223,10 @@
       ],
       "dur": 1.432,
       "channels": 2,
-      "lufs": -18.9
+      "lufs": -18.9,
+      "peaks": [
+        40
+      ]
     },
     "opp-turn": {
       "files": [
@@ -619,7 +1234,10 @@
       ],
       "dur": 1.572,
       "channels": 1,
-      "lufs": -28.9
+      "lufs": -28.9,
+      "peaks": [
+        120
+      ]
     },
     "paralyze-intro": {
       "files": [
@@ -627,7 +1245,10 @@
       ],
       "dur": 1.16,
       "channels": 2,
-      "lufs": -11.7
+      "lufs": -11.7,
+      "peaks": [
+        390
+      ]
     },
     "paralyze-loop": {
       "files": [
@@ -635,7 +1256,10 @@
       ],
       "dur": 3.169,
       "channels": 2,
-      "lufs": -10.9
+      "lufs": -10.9,
+      "peaks": [
+        930
+      ]
     },
     "paralyze-outro": {
       "files": [
@@ -643,7 +1267,10 @@
       ],
       "dur": 0.888,
       "channels": 2,
-      "lufs": -13.4
+      "lufs": -13.4,
+      "peaks": [
+        130
+      ]
     },
     "pikachu-enter": {
       "files": [
@@ -651,7 +1278,10 @@
       ],
       "dur": 3.655,
       "channels": 2,
-      "lufs": -11.1
+      "lufs": -11.1,
+      "peaks": [
+        1330
+      ]
     },
     "pile-search": {
       "files": [
@@ -659,7 +1289,10 @@
       ],
       "dur": 0.296,
       "channels": 1,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        10
+      ]
     },
     "place-active": {
       "files": [
@@ -667,7 +1300,10 @@
       ],
       "dur": 0.694,
       "channels": 1,
-      "lufs": -27.1
+      "lufs": -27.1,
+      "peaks": [
+        90
+      ]
     },
     "place-active-opening": {
       "files": [
@@ -675,7 +1311,10 @@
       ],
       "dur": 1.655,
       "channels": 2,
-      "lufs": -19.7
+      "lufs": -19.7,
+      "peaks": [
+        320
+      ]
     },
     "place-bench": {
       "files": [
@@ -684,7 +1323,11 @@
       ],
       "dur": 0.367,
       "channels": 2,
-      "lufs": -70
+      "lufs": -70,
+      "peaks": [
+        0,
+        0
+      ]
     },
     "poison-intro": {
       "files": [
@@ -692,7 +1335,10 @@
       ],
       "dur": 0.96,
       "channels": 2,
-      "lufs": -16.2
+      "lufs": -16.2,
+      "peaks": [
+        0
+      ]
     },
     "poison-loop": {
       "files": [
@@ -700,7 +1346,10 @@
       ],
       "dur": 2.83,
       "channels": 2,
-      "lufs": -13.7
+      "lufs": -13.7,
+      "peaks": [
+        2580
+      ]
     },
     "poison-outro": {
       "files": [
@@ -708,7 +1357,10 @@
       ],
       "dur": 0.859,
       "channels": 2,
-      "lufs": -16
+      "lufs": -16,
+      "peaks": [
+        130
+      ]
     },
     "prize-card": {
       "files": [
@@ -716,7 +1368,10 @@
       ],
       "dur": 1.072,
       "channels": 1,
-      "lufs": -24.8
+      "lufs": -24.8,
+      "peaks": [
+        50
+      ]
     },
     "retreat-lock-flare": {
       "files": [
@@ -724,7 +1379,10 @@
       ],
       "dur": 1.057,
       "channels": 2,
-      "lufs": -39.9
+      "lufs": -39.9,
+      "peaks": [
+        350
+      ]
     },
     "retreat-lock-intro": {
       "files": [
@@ -732,7 +1390,10 @@
       ],
       "dur": 1.638,
       "channels": 2,
-      "lufs": -27.4
+      "lufs": -27.4,
+      "peaks": [
+        460
+      ]
     },
     "rival-ko-ding": {
       "files": [
@@ -740,7 +1401,10 @@
       ],
       "dur": 1.493,
       "channels": 2,
-      "lufs": -20.2
+      "lufs": -20.2,
+      "peaks": [
+        10
+      ]
     },
     "rival-ko-whistle": {
       "files": [
@@ -748,7 +1412,10 @@
       ],
       "dur": 1.01,
       "channels": 2,
-      "lufs": -20.6
+      "lufs": -20.6,
+      "peaks": [
+        300
+      ]
     },
     "search-to-hand": {
       "files": [
@@ -756,7 +1423,10 @@
       ],
       "dur": 2.773,
       "channels": 2,
-      "lufs": -13.5
+      "lufs": -13.5,
+      "peaks": [
+        790
+      ]
     },
     "setup-phase": {
       "files": [
@@ -764,7 +1434,10 @@
       ],
       "dur": 3.791,
       "channels": 2,
-      "lufs": -19.3
+      "lufs": -19.3,
+      "peaks": [
+        1570
+      ]
     },
     "shuffle": {
       "files": [
@@ -773,7 +1446,11 @@
       ],
       "dur": 0.731,
       "channels": 2,
-      "lufs": -29.6
+      "lufs": -29.6,
+      "peaks": [
+        270,
+        180
+      ]
     },
     "shuffle-deck": {
       "files": [
@@ -781,7 +1458,10 @@
       ],
       "dur": 0.902,
       "channels": 1,
-      "lufs": -22.1
+      "lufs": -22.1,
+      "peaks": [
+        270
+      ]
     },
     "sleep-intro": {
       "files": [
@@ -789,7 +1469,10 @@
       ],
       "dur": 2.293,
       "channels": 2,
-      "lufs": -14.7
+      "lufs": -14.7,
+      "peaks": [
+        140
+      ]
     },
     "sleep-loop": {
       "files": [
@@ -797,7 +1480,10 @@
       ],
       "dur": 3,
       "channels": 2,
-      "lufs": -11
+      "lufs": -11,
+      "peaks": [
+        30
+      ]
     },
     "sleep-outro": {
       "files": [
@@ -805,7 +1491,10 @@
       ],
       "dur": 1.457,
       "channels": 2,
-      "lufs": -11.2
+      "lufs": -11.2,
+      "peaks": [
+        510
+      ]
     },
     "small-reactions": {
       "files": [
@@ -819,7 +1508,137 @@
       ],
       "dur": 5.493,
       "channels": 2,
-      "lufs": -14.1
+      "lufs": -14.1,
+      "peaks": [
+        1000,
+        820,
+        720,
+        890,
+        950,
+        630,
+        940
+      ]
+    },
+    "sting-colorless": {
+      "files": [
+        "sting-colorless.53660f9b.ogg"
+      ],
+      "dur": 3.706,
+      "channels": 2,
+      "lufs": -18.6,
+      "peaks": [
+        320
+      ]
+    },
+    "sting-dark": {
+      "files": [
+        "sting-dark.2a48a752.ogg"
+      ],
+      "dur": 3.543,
+      "channels": 2,
+      "lufs": -22,
+      "peaks": [
+        60
+      ]
+    },
+    "sting-dragon": {
+      "files": [
+        "sting-dragon.5cb9b405.ogg"
+      ],
+      "dur": 4.461,
+      "channels": 2,
+      "lufs": -16.8,
+      "peaks": [
+        320
+      ]
+    },
+    "sting-electric": {
+      "files": [
+        "sting-electric.bac0e41a.ogg"
+      ],
+      "dur": 4,
+      "channels": 2,
+      "lufs": -20.8,
+      "peaks": [
+        3100
+      ]
+    },
+    "sting-fairy": {
+      "files": [
+        "sting-fairy.c5b7b698.ogg"
+      ],
+      "dur": 3.652,
+      "channels": 2,
+      "lufs": -18.2,
+      "peaks": [
+        470
+      ]
+    },
+    "sting-fighting": {
+      "files": [
+        "sting-fighting.3e7093da.ogg"
+      ],
+      "dur": 3.931,
+      "channels": 2,
+      "lufs": -14.9,
+      "peaks": [
+        2630
+      ]
+    },
+    "sting-fire": {
+      "files": [
+        "sting-fire.3b765ecd.ogg"
+      ],
+      "dur": 4.973,
+      "channels": 2,
+      "lufs": -28.1,
+      "peaks": [
+        1980
+      ]
+    },
+    "sting-grass": {
+      "files": [
+        "sting-grass.1dcb8f2b.ogg"
+      ],
+      "dur": 4.71,
+      "channels": 2,
+      "lufs": -15.4,
+      "peaks": [
+        1020
+      ]
+    },
+    "sting-metal": {
+      "files": [
+        "sting-metal.a3ccf05b.ogg"
+      ],
+      "dur": 4.152,
+      "channels": 2,
+      "lufs": -12,
+      "peaks": [
+        1210
+      ]
+    },
+    "sting-psychic": {
+      "files": [
+        "sting-psychic.b7a7adc8.ogg"
+      ],
+      "dur": 4.11,
+      "channels": 2,
+      "lufs": -23.4,
+      "peaks": [
+        200
+      ]
+    },
+    "sting-water": {
+      "files": [
+        "sting-water.c7baf234.ogg"
+      ],
+      "dur": 3.871,
+      "channels": 2,
+      "lufs": -19.8,
+      "peaks": [
+        300
+      ]
     },
     "surprise": {
       "files": [
@@ -837,7 +1656,20 @@
       ],
       "dur": 5.245,
       "channels": 2,
-      "lufs": -14.8
+      "lufs": -14.8,
+      "peaks": [
+        640,
+        830,
+        850,
+        500,
+        320,
+        740,
+        550,
+        730,
+        1090,
+        710,
+        820
+      ]
     },
     "to-large": {
       "files": [
@@ -848,7 +1680,13 @@
       ],
       "dur": 7.899,
       "channels": 2,
-      "lufs": -10.4
+      "lufs": -10.4,
+      "peaks": [
+        1580,
+        1350,
+        2080,
+        600
+      ]
     },
     "to-medium": {
       "files": [
@@ -857,7 +1695,11 @@
       ],
       "dur": 5.475,
       "channels": 2,
-      "lufs": -12.6
+      "lufs": -12.6,
+      "peaks": [
+        940,
+        2130
+      ]
     },
     "to-moderate": {
       "files": [
@@ -866,7 +1708,11 @@
       ],
       "dur": 5,
       "channels": 2,
-      "lufs": -13.3
+      "lufs": -13.3,
+      "peaks": [
+        2200,
+        2380
+      ]
     },
     "tool-attach": {
       "files": [
@@ -874,7 +1720,10 @@
       ],
       "dur": 1.701,
       "channels": 2,
-      "lufs": -15
+      "lufs": -15,
+      "peaks": [
+        30
+      ]
     },
     "trainer-to-board": {
       "files": [
@@ -882,7 +1731,10 @@
       ],
       "dur": 1.419,
       "channels": 2,
-      "lufs": -9.6
+      "lufs": -9.6,
+      "peaks": [
+        170
+      ]
     },
     "v-union": {
       "files": [
@@ -890,7 +1742,10 @@
       ],
       "dur": 3.953,
       "channels": 2,
-      "lufs": -10
+      "lufs": -10,
+      "peaks": [
+        200
+      ]
     },
     "victory": {
       "files": [
@@ -898,7 +1753,10 @@
       ],
       "dur": 3.365,
       "channels": 1,
-      "lufs": -23.4
+      "lufs": -23.4,
+      "peaks": [
+        560
+      ]
     },
     "your-turn": {
       "files": [
@@ -906,7 +1764,10 @@
       ],
       "dur": 1.131,
       "channels": 1,
-      "lufs": -20.2
+      "lufs": -20.2,
+      "peaks": [
+        240
+      ]
     }
   }
 }

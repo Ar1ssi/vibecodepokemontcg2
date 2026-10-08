@@ -19,9 +19,45 @@ test('turn-banner with no side, or no plan, has no cue', () => {
   assert.deepEqual(cuesFor('turn-banner', undefined), []);
 });
 
-test('attack-owned effects (design 063) have no cue (row 17)', () => {
+test('attack-banner and damage hits keep their synth voices; an attack plan with no tier has no cue', () => {
   for (const effect of ['attack', 'attack-banner', 'damage']) {
     assert.deepEqual(cuesFor(effect, { user: 'self', dealt: 90, healed: 0 }), [], effect);
+  }
+});
+
+test('attack hits are sized by tier and land on contact (Addendum A)', () => {
+  const hit = (key, alignMs) => ({ key, gain: 0.8, delayMs: 0, alignMs });
+  assert.deepEqual(cuesFor('attack', { attackTier: 1, contactMs: 620, attackType: 'Fire' }), [hit('attack-fire-small', 620)]);
+  assert.deepEqual(cuesFor('attack', { attackTier: 2, contactMs: 700, attackType: 'Water' }), [hit('attack-water-medium', 700)]);
+  assert.deepEqual(cuesFor('attack', { attackTier: 3, contactMs: 1000, attackType: 'Lightning' }), [hit('attack-electric-large', 1000)]);
+  assert.deepEqual(cuesFor('attack', { attackTier: 3, contactMs: 202, attackType: 'Darkness' }), [hit('attack-dark-large', 202)]);
+});
+
+test('a signature move adds its type sting at the start, then the large hit on contact', () => {
+  assert.deepEqual(cuesFor('attack', { attackTier: 'S', contactMs: 1100, attackType: 'Psychic' }), [
+    { key: 'sting-psychic', gain: 0.6, delayMs: 0 },
+    { key: 'attack-psychic-large', gain: 0.8, delayMs: 0, alignMs: 1100 },
+  ]);
+});
+
+test('a zero-damage aura plays the small hit unaligned; unknown types are colorless', () => {
+  assert.deepEqual(cuesFor('attack', { attackTier: 'aura', contactMs: 0, attackType: 'Grass' }), [
+    { key: 'attack-grass-small', gain: 0.8, delayMs: 0 },
+  ]);
+  assert.deepEqual(cuesFor('attack', { attackTier: 1, contactMs: 500, attackType: null }), [
+    { key: 'attack-colorless-small', gain: 0.8, delayMs: 0, alignMs: 500 },
+  ]);
+  assert.deepEqual(cuesFor('attack', { attackTier: 2, contactMs: Number.NaN, attackType: 'Metal' }), [
+    { key: 'attack-metal-medium', gain: 0.8, delayMs: 0, alignMs: 0 },
+  ]);
+});
+
+test('every attack and sting cue exists on the sfx bus; hits preload, stings load on demand', () => {
+  for (const type of ['colorless', 'dark', 'dragon', 'electric', 'fairy', 'fighting', 'fire', 'grass', 'metal', 'psychic', 'water']) {
+    for (const size of ['small', 'medium', 'large']) {
+      assert.deepEqual(CUES[`attack-${type}-${size}`], { gain: 0.8, preload: true, bus: 'sfx' });
+    }
+    assert.deepEqual(CUES[`sting-${type}`], { gain: 0.6, preload: false, bus: 'sfx' });
   }
 });
 

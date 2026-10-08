@@ -52,6 +52,7 @@ import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
 import { SPECS } from './moves/specs/index.mjs';
 import { signatureFor, slugFor, withSignatureSpec } from './moves/signature/signature-select.mjs';
 import { SIGNATURE_SPECS } from './moves/signature/specs/index.mjs';
+import { attackSoundFields } from './moves/attack-sound.mjs';
 import { burstParticles } from './particles.mjs';
 
 const BACKSTOP_PAD_MS = 400;
@@ -244,7 +245,6 @@ const pickMove = (plan, card) =>
       )
     : null;
 
-/** Sound family of the move this attack plays, or undefined (the generic lunge or aura). */
 /**
  * Design 065: the signature move this attack plays (name match, else the legendary's strongest
  * attack), with the card's material; null when none or its spec has not shipped. Pure.
@@ -259,9 +259,16 @@ const pickSignature = (plan, card) => {
   return withSignatureSpec(sig, SIGNATURE_SPECS);
 };
 
-export const attackFamilyFor = (plan) => {
-  const card = getCardRegistry().get(plan.attackerId)?.card;
-  return pickSignature(plan, card)?.spec.family ?? pickMove(plan, card)?.family;
+/**
+ * What the attack's sound needs (design 064 Addendum A): sound family, tier, contact time and the
+ * attacker's type, from the same signature / move picks `attack()` makes.
+ */
+export const attackSoundFor = (plan) => {
+  const card = getCardRegistry().get(plan.attackerId)?.card || null;
+  const signatureSpec = pickSignature(plan, card)?.spec ?? null;
+  const zeroDamage = isZeroDamage(plan);
+  const pick = signatureSpec || zeroDamage ? null : pickMove(plan, card);
+  return attackSoundFields({ signatureSpec, zeroDamage, pick, card });
 };
 
 /** The opponent's Active card id (the target when the plan names no defender), else null. */

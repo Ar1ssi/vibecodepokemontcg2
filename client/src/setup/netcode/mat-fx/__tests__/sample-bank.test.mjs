@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_CONCURRENT, createSampleBank } from '../sample-bank.js';
+import { MAX_CONCURRENT, createSampleBank, startTiming } from '../sample-bank.js';
 
 const manifest = (cues) => ({ version: 1, cues });
 const cue = (...files) => ({ files, dur: 1, channels: 2, lufs: -20 });
@@ -26,8 +26,9 @@ function fakeContext(state = 'running') {
       const source = {
         connect() {},
         disconnect() {},
-        start: (when) => {
+        start: (when, offset) => {
           source.startedAt = when ?? 0;
+          source.offset = offset ?? 0;
         },
         stop: (when) => {
           source.stopped = true;
@@ -337,4 +338,42 @@ test('a streamed loop is paused once its fade has run, not at once', async () =>
   assert.equal(elements[0].paused, false);
   await new Promise((resolve) => setTimeout(resolve, 120));
   assert.equal(elements[0].paused, true);
+});
+
+test('startTiming lands the peak on alignMs: late peak skips the lead-in, early peak waits', () => {
+  assert.deepEqual(startTiming(0, 500, 300), { startMs: 200, offsetMs: 0 });
+  assert.deepEqual(startTiming(0, 100, 300), { startMs: 0, offsetMs: 200 });
+  assert.deepEqual(startTiming(0, 300, 300), { startMs: 0, offsetMs: 0 });
+  assert.deepEqual(startTiming(250, undefined, 300), { startMs: 250, offsetMs: 0 });
+  assert.deepEqual(startTiming(250, 500, undefined), { startMs: 250, offsetMs: 0 });
+  assert.deepEqual(startTiming(-5, undefined, undefined), { startMs: 0, offsetMs: 0 });
+  assert.deepEqual(startTiming(undefined, undefined, undefined), { startMs: 0, offsetMs: 0 });
+});
+
+test('an aligned cue starts from its manifest peak; a cue without peaks ignores alignMs', async () => {
+  const bank = createSampleBank({
+    fetch: fakeFetch({
+      [manifestUrl]: {
+        json: manifest({
+          'attack-fire-small': { ...cue('hit.aaaaaaaa.ogg'), peaks: [300] },
+          'attack-fire-medium': cue('mid.bbbbbbbb.ogg'),
+        }),
+      },
+      [fileUrl('hit.aaaaaaaa.ogg')]: {},
+      [fileUrl('mid.bbbbbbbb.ogg')]: {},
+    }),
+  });
+  const { ctx, sources } = fakeContext();
+  await bank.init(ctx, master);
+  assert.equal(bank.playSequence([{ key: 'attack-fire-small', gain: 0.8, delayMs: 0, alignMs: 500 }]), true);
+  assert.equal(bank.playSequence([{ key: 'attack-fire-small', gain: 0.8, delayMs: 0, alignMs: 100 }]), true);
+  assert.equal(bank.playSequence([{ key: 'attack-fire-medium', gain: 0.8, delayMs: 0, alignMs: 500 }]), true);
+  assert.deepEqual(
+    sources.map((source) => [source.startedAt, source.offset]),
+    [
+      [0.2, 0],
+      [0, 0.2],
+      [0, 0],
+    ]
+  );
 });
