@@ -4,6 +4,7 @@ import { undo } from '../../../../actions/general/undo.js';
 import { systemState } from '../../../../state.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../../../setup/general/determine-username.js';
+import { wireButtonCues } from '../../../../setup/netcode/mat-fx/ui-cue.mjs';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { getZone } from '../../../../setup/zones/get-zone.js';
 import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
@@ -87,4 +88,18 @@ export const initializeP1ChatButtons = () => {
   FREEBUTTON.addEventListener('click', () => {
     appendMessage(systemState.initiator, FREEBUTTON.textContent, 'player');
   });
+
+  wireButtonCues(['attackButton'], { key: 'attack-button' });
+  wireButtonCues([
+    'retreatButton',
+    'healButton',
+    'switchButton',
+    'attachButton',
+    'searchButton',
+    'abilityButton',
+    'stadiumButton',
+    'energyRedirectButton',
+    'undoButton',
+    'FREEBUTTON',
+  ]);
 };

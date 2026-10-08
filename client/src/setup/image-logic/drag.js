@@ -17,6 +17,7 @@ import { retreat } from '../../actions/chat-buttons/chat-buttons.js';
 import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 import { playsOntoBoard, zoneOf } from './drop-zone.mjs';
 import { endDragAvatar, startDragAvatar } from './drag-avatar.js';
+import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
 const popupContainers = [
   'lostZone',
@@ -91,6 +92,7 @@ export const dragStart = (event) => {
     mouseClick.playContainerParent = dragHost.parentElement;
     mouseClick.playContainer.style.opacity = '0';
   }
+  uiCue('card-from-hand');
   startDragAvatar(event);
 };
 
@@ -305,6 +307,7 @@ export const drop = (event) => {
       // belongs to — you can't manually fling the opponent's card into your
       // Lost Zone.
       if (explicitDrop.dataset.dropUser !== mouseClick.cardUser) {
+        uiCue('card-no-match');
         event.stopPropagation();
         return;
       }
@@ -364,6 +367,7 @@ export const drop = (event) => {
         // Gate the manual deck drop through the rules layer.
         const deckCheck = manualDeckActionAllowed('moveToDeck');
         if (!deckCheck.allowed) {
+          uiCue('card-no-match');
           appendMessage(
             systemState.initiator,
             '⛔ ' + deckCheck.reason,
@@ -371,6 +375,7 @@ export const drop = (event) => {
             false
           );
         } else {
+        uiCue('card-place');
         moveToDeckTop(
           mouseClick.cardUser,
           systemState.initiator,
@@ -386,6 +391,7 @@ export const drop = (event) => {
         ) {
           const drawCheck = manualDeckActionAllowed('draw');
           if (!drawCheck.allowed) {
+            uiCue('card-no-match');
             appendMessage(
               systemState.initiator,
               '⛔ ' + drawCheck.reason,
@@ -402,6 +408,7 @@ export const drop = (event) => {
         ) {
           const deckToBenchCheck = manualDeckActionAllowed('deckToBench');
           if (!deckToBenchCheck.allowed) {
+            uiCue('card-no-match');
             appendMessage(
               systemState.initiator,
               '⛔ ' + deckToBenchCheck.reason,
@@ -415,6 +422,7 @@ export const drop = (event) => {
         if (dZoneId === 'hand' && fromZone === 'bench') {
           const benchToHandCheck = manualDeckActionAllowed('benchToHand');
           if (!benchToHandCheck.allowed) {
+            uiCue('card-no-match');
             appendMessage(
               systemState.initiator,
               '⛔ ' + benchToHandCheck.reason,
@@ -425,6 +433,7 @@ export const drop = (event) => {
             return;
           }
         }
+        uiCue('card-place');
         moveCardBundle(
           mouseClick.cardUser,
           systemState.initiator,

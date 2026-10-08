@@ -9,6 +9,10 @@
  */
 
 import { diffViews } from './view-diff.mjs';
+import { newlyRetreatLocked } from './mat-fx/retreat-lock-watch.mjs';
+import { heldStatusKeys } from './mat-fx/status-ambience.mjs';
+import { bedStateFor } from './mat-fx/crowd.mjs';
+import { uiCue } from './mat-fx/ui-cue.mjs';
 import { buildMatPickerRequest } from './mat-pick-request.mjs';
 import { clearInFlightAffordances, emitResolveChoice } from './cmd-emitter.js';
 import { buildCardImage } from '../image-logic/build-card-image.js';
@@ -44,6 +48,16 @@ const coverRegistry = new Map(); // "side:zoneId" -> HTMLImageElement
 // API) read through `getAuthoritativeZoneArray`/`getAuthoritativeStadiumArray`
 // below instead, which are backed by this cache.
 let lastAppliedView = null;
+
+// instanceIds of Actives under a retreat lock, so the lock's start sounds once (design 064 4b).
+let retreatLockedIds = new Set();
+let statusAmbienceActive = false;
+// Design 064 O7: the last crowd bed state synced (`bed/crazy`); `null/false` = no battle.
+const NO_CROWD = 'null/false';
+let lastCrowdState = NO_CROWD;
+
+// fx-audio.js needs a browser (`window`), so it loads on demand and node tests inject a seam.
+const loadFxAudio = () => import('./mat-fx/fx-audio.js');
 
 let defaultNetcodeContext = {
   socket: null,
@@ -81,6 +95,8 @@ let openPickerChoiceId = null;
 let openPrizeChoiceId = null;
 // Same guard for the mat picker.
 let openMatChoiceId = null;
+// choiceId whose prompt already sounded `menu-pop-in`, so each prompt chimes once.
+let announcedChoiceId = null;
 
 // Options of the last applied view, reused when overlays re-measure on resize.
 let lastOverlayOptions = null;
@@ -199,10 +215,17 @@ export function resetRenderState() {
   cardRegistry.clear();
   coverRegistry.clear();
   lastAppliedView = null;
+  retreatLockedIds = new Set();
+  statusAmbienceActive = false;
+  lastCrowdState = NO_CROWD;
+  loadFxAudio().then((m) => m.resetCrowdBed()).catch(() => {});
+  // Unconditional: a game-over halt must be re-armed even when no condition was held at the end.
+  loadFxAudio().then((m) => m.resetStatusAmbience()).catch(() => {});
   clearInFlightAffordances();
   openPickerChoiceId = null;
   openPrizeChoiceId = null;
   openMatChoiceId = null;
+  announcedChoiceId = null;
   lastOverlayOptions = null;
   defaultNetcodeContext = {
     socket: null,
@@ -1495,6 +1518,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
     : null;
 
   if (!pendingChoice) {
+    announcedChoiceId = null;
     closePrizePicker(options);
     closeMatPicker(options);
     closeChoicePicker(options);
@@ -1524,6 +1548,11 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
     }
     banner.textContent = `Opponent is making a choice: ${pendingChoice.prompt || '...'}`;
     return;
+  }
+
+  if (pendingChoice.choiceId !== announcedChoiceId) {
+    announcedChoiceId = pendingChoice.choiceId;
+    (options.playUiCue ?? uiCue)('menu-pop-in');
   }
 
   // Local player must make a choice: mount interactive picker
@@ -2175,6 +2204,42 @@ export function applyView(view, events = [], options = {}) {
   }
   lastOverlayOptions = options;
   bindOverlayResize();
+
+  const lockWatch = newlyRetreatLocked(
+    retreatLockedIds,
+    [...(view.you?.zones?.active ?? []), ...(view.them?.zones?.active ?? [])],
+    view.turn?.number
+  );
+  retreatLockedIds = lockWatch.next;
+  if (lockWatch.added.length > 0) {
+    // fx-audio.js needs a browser (`window`), so it loads on demand and node tests inject a seam.
+    const play =
+      options.playFxSound ||
+      ((plan) => import('./mat-fx/fx-audio.js').then((m) => m.playFxSound(plan)).catch(() => {}));
+    for (const instanceId of lockWatch.added) {
+      play({ effect: 'retreat-lock-applied', instanceId });
+    }
+  }
+
+  // Design 064 O6: one status loop per held condition; a loop ends when the last marker goes.
+  const heldStatuses = heldStatusKeys([view.you, view.them]);
+  if (heldStatuses.length > 0 || statusAmbienceActive) {
+    statusAmbienceActive = heldStatuses.length > 0;
+    const sync =
+      options.syncStatusAmbience ||
+      ((keys) => loadFxAudio().then((m) => m.syncStatusAmbience(keys)).catch(() => {}));
+    sync(heldStatuses);
+  }
+
+  // Design 064 O7: the crowd bed follows the prize piles; sync only when the state changes.
+  const crowdState = bedStateFor([view.you, view.them]);
+  const crowdKey = `${crowdState.bed}/${crowdState.crazy}`;
+  if (crowdKey !== lastCrowdState) {
+    lastCrowdState = crowdKey;
+    const syncCrowd =
+      options.syncCrowdBed || ((state) => loadFxAudio().then((m) => m.syncCrowdBed(state)).catch(() => {}));
+    syncCrowd(crowdState);
+  }
 
   // Clean up removed cards from registry and DOM
   const liveInstanceIds = new Set();

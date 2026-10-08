@@ -41,6 +41,12 @@ export const fxDisabled = () => {
 /** Sound is off when the whole layer is off, or the sound-only mute is set. */
 export const soundDisabled = () => fxDisabled() || settings().sfxOff;
 
+/** Design 064 O6: the status-condition loops have their own toggle (default on). */
+export const ambienceDisabled = () => settings().ambienceOff;
+
+/** Design 064 O7: the crowd (beds and reactions) has its own toggle (default on). */
+export const crowdDisabled = () => settings().crowdOff;
+
 /** Master audio gain in [0, 1]. */
 export const fxVolume = () => settings().volume;
 

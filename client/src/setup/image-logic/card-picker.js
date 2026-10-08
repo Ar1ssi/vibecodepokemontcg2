@@ -20,6 +20,7 @@ import {
 } from './card-picker-hitbox.mjs';
 import { movePicksInOrder } from './card-picker-moves.mjs';
 import { cardArtSrc } from './card-art-src.mjs';
+import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
 /** @type {object | null} */
 let pickerState = null;
@@ -502,6 +503,7 @@ export const assignCardToSlot = (state, card, slotIndex = -1) => {
   });
   if (target < 0 || target >= state.slotAssignments.length) return;
   state.slotAssignments[target] = card;
+  uiCue('card-slot-drop');
   if (!state.multiSelect) state.slotCard = card;
   updateSelectionUI(state);
   focusNextAvailableCard(state);
@@ -691,6 +693,7 @@ const confirmPicker = async (state) => {
   // they run and move the same picks twice.
   if (state.confirming) return;
   state.confirming = true;
+  if (destination === 'hand' && picks.some((pick) => pick != null)) uiCue('search-to-hand');
 
   try {
     if (!pickOnly && zoneFrom && destination) {
@@ -1096,6 +1099,9 @@ export const openCardPicker = async ({
     onCancel?.();
     return;
   }
+
+  // Also covers deck-peek and every search pile: they all open through this picker.
+  uiCue('pile-search');
 
   const overlay = document.createElement('div');
   overlay.className = 'card-picker-overlay discard-pile-overlay';

@@ -4,6 +4,7 @@ import { wireEndTurnButton } from '../../../../setup/general/end-turn-button.mjs
 import { systemState } from '../../../../state.js';
 import { appendMessage } from '../../../../setup/chatbox/append-message.js';
 import { determineUsername } from '../../../../setup/general/determine-username.js';
+import { wireButtonCues } from '../../../../setup/netcode/mat-fx/ui-cue.mjs';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { getZone } from '../../../../setup/zones/get-zone.js';
 import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
@@ -102,4 +103,17 @@ export const initializeP2ChatButtons = () => {
     const type = isSpectator ? 'spectator-message' : 'player';
     appendMessage(systemState.initiator, p2FREEBUTTON.textContent, type);
   });
+
+  wireButtonCues(['p2AttackButton'], { key: 'attack-button' });
+  wireButtonCues([
+    'p2RetreatButton',
+    'p2HealButton',
+    'p2SwitchButton',
+    'p2AttachButton',
+    'p2SearchButton',
+    'p2AbilityButton',
+    'p2StadiumButton',
+    'p2EnergyRedirectButton',
+    'p2FREEBUTTON',
+  ]);
 };

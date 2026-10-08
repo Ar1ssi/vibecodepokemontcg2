@@ -4,8 +4,11 @@
 // effect has no entry there, which skips it under `prefers-reduced-motion`.
 import { fxDisabled, motionReduced, soundDisabled } from '../../image-logic/mat-fx.mjs';
 import { getCardRegistry } from '../apply-view.js';
+import { resolveCoinEffect } from '../../deck-builder/core/coin-effects.mjs';
+import { getSelectedCoin, pickDefaultCoin } from '../../rules/mat-coin.js';
 import { signatureEntryKind } from './entry-kind.mjs';
 import { playFxSound } from './fx-audio.js';
+import { coinSoundMaterial, withSoundCard } from './sfx-cues.mjs';
 import { holdFor } from './fx-holds.mjs';
 import { playsOppPreview } from './opp-play.mjs';
 import { attack, attackBanner, attackFamilyFor, damage } from './combat.js';
@@ -55,11 +58,24 @@ const STATIC_FALLBACKS = { 'coin-flip': coinFlip };
 // signature entry; any other plays the evolution scene's score. The dispatcher
 // sounds before the effect runs, so the evolved card is read here.
 // Design 043: the opponent's Trainer sounds with its preview's timing.
+const cardOf = (instanceId) => getCardRegistry().get(instanceId)?.card;
+
+// The coin ceremony's sound follows the coin the player flips with and the motion setting.
+const withCoinSound = (plan) => {
+  const coin = getSelectedCoin(plan.user === 'opp' ? 'opp' : 'self') || pickDefaultCoin();
+  return {
+    ...plan,
+    coinMaterial: coinSoundMaterial(resolveCoinEffect(coin).material),
+    coinReducedMotion: motionReduced(),
+  };
+};
+
 // Design 063: an attack sounds with its move's family (the same pure pick the scene plays).
 const soundPlanFor = (plan) => {
+  if (plan?.effect === 'coin-flip') return withCoinSound(plan);
   if (plan?.effect === 'trainer-play' && playsOppPreview(plan)) return { ...plan, effect: 'opp-trainer-play' };
   if (plan?.effect === 'attack') return { ...plan, family: attackFamilyFor(plan) };
-  if (plan?.effect !== 'evolve') return plan;
+  if (plan?.effect !== 'evolve') return withSoundCard(plan, cardOf);
   const evolved = getCardRegistry().get(plan.instanceId)?.card;
   return signatureEntryKind(evolved) ? plan : { ...plan, effect: 'evolve-scene' };
 };

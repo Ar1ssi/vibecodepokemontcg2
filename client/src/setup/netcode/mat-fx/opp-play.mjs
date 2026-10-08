@@ -6,6 +6,8 @@
 // The reference holds the preview ~600 ms; the user asked for twice that.
 export const OPP_PLAY_HOLD_MS = 1200;
 const DROP_END_MS = 260;
+// The moment the dropped card lands face up; sampled audio times its "played" cue here.
+export const PREVIEW_DROP_MS = DROP_END_MS;
 const GROW_END_MS = 520;
 const PLACE_MS = 300;
 // Design 059: a deck reveal plays this same track with its own hold.

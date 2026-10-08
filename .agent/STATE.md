@@ -3,11 +3,12 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: WotC Gen 1/2 card audit fixed on main (S336, design 062, D202): untyped Stadiums/Tools, Trainer
-  costs, attach-Trainers, dead/passive Trainers & Gyms, ~105 attack printings, Rain Dance/Toxic Gas/damage
-  Powers, Baby Rule. Process: docs/card-era-audit-and-fix-process.md. Residue: I227–I229, I234–I241.
-Active: none. ETB (design 057) slice 6 not started. Old Powers/Poké-Bodies now load in live games (I233 closed).
-Next: I239–I240 (Power interactions now live), then I227–I229 residue; user look on localhost (SERVER_AUTHORITATIVE=1):
+Focus: Sampled battle SFX shipped (S337, design 064, D203/D204): TCG Live non-attack cues over the synth
+  palette — fx plans, draw/shuffle/KO/enter, UI chrome, status loops, card signatures, crowd bus.
+  Samples (6.7 MB Ogg Opus) are committed in client/src/assets/sfx; regenerate with `pnpm sfx:import`.
+Active: design 063 (attack move scenes + jumbotron set) uncommitted on the primary folder; it overlaps
+  mat-fx/index.js (soundPlanFor) with 064 — rebase on main before landing. ETB (057) slice 6 not started.
+Next: user listening pass on localhost (SERVER_AUTHORITATIVE=1) for 064 mix gains; I239–I240, then I227–I229;
   WotC Gyms/attach-Trainers/Baby flip, holo art windows (D201), deck reveals, 057 taste calls.
   Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.

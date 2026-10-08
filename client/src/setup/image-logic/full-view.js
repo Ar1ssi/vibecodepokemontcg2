@@ -1,3 +1,4 @@
+import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import {
   buildHoloCard,
   isTrainerCard,
@@ -156,6 +157,7 @@ export const openAttachedCardsPanel = (targetImage, card) => {
 export const openCardPreview = (targetImage, card) => {
   const anchor = cardNode(card) ?? imageAnchor(targetImage);
   if (!anchor) return;
+  uiCue('card-view');
   hideCardCounters(targetImage);
   // Attached Energy/Tool tokens are small and bottom-anchored on the mat card,
   // so they sit outside the enlarged popup's footprint and would otherwise

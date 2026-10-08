@@ -24,6 +24,7 @@ import {
 } from '../shared/engine/room-format.mjs';
 import { roomFormatLocked, roomFormatSeatRefusal } from './game/room-format-seat.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
+import { cacheControlFor } from './sfx-cache.mjs';
 
 const SERVER_AUTHORITATIVE =
   process.env.SERVER_AUTHORITATIVE === '1' ||
@@ -157,8 +158,9 @@ async function main() {
   app.set('views', clientDir);
   app.use(cors());
   // demo: never cache static assets so tunnel visitors always get fresh builds
+  // (except content-hashed sampled SFX, design 064)
   app.use((req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', cacheControlFor(req.path));
     next();
   });
 

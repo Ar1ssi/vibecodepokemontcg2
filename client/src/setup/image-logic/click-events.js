@@ -34,6 +34,7 @@ import {
   retreat,
   stadiumEffect,
 } from '../../actions/chat-buttons/chat-buttons.js';
+import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { resolvePreviewCard } from './preview-card.mjs';
 import { isDoubleClickZoomZone } from './double-click-zoom.mjs';
 
@@ -181,14 +182,14 @@ export const openCardContextMenu = (event) => {
   );
 
   // Set the display property based on the visibility of buttons
-  cardContextMenu.style.display =
+  const menuShown =
     atLeastOneButtonVisible &&
     !(
       document.getElementById('spectatorModeCheckbox').checked &&
       systemState.isTwoPlayer
-    )
-      ? 'block'
-      : 'none';
+    );
+  cardContextMenu.style.display = menuShown ? 'block' : 'none';
+  if (menuShown) uiCue('card-to-board');
 
   // get the position of the context menu
   const targetRect = event.target.getBoundingClientRect();

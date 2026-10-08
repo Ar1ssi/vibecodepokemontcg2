@@ -6,9 +6,12 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D202).
+#   Next id = highest D number in this file and the archive + 1 (next: D205).
 
 ## Active
+- D205 2026-10-08 [board-ui] Attack scenes play a main-series move chosen by type, species stats and tier; species stats are vendored from Showdown pokedex (MIT) by `pnpm vendor:species-stats`, not fetched at runtime. (design 063)
+- D204 2026-10-07 [tooling] ffmpeg/ffprobe on PATH are a dev-time system tool for `pnpm sfx:import` only, not an npm dependency; the game never needs them. (design 064)
+- D203 2026-10-07 [render] Audio = sampled TCG Live cues (sfx-cues → sample-bank), synth as fallback; samples committed in assets/sfx (user's call); not gated by reduced motion. (Supersedes D147; design 064)
 - D202 2026-10-01 [rules] WotC wordings are rewritten to the modern wording the parsers read; untyped WotC Trainers get trainerType from their printed rules line at data entry — one path, no new templates. (design 062)
 - D201 2026-10-01 [board-ui] Holo art window (`--art-*`) keys on `data-card-layout` (printed box per layout, Trainers apart); `data-card-era` only picks the foil pattern — one era spans boxes of different sizes.
 - D200 2026-09-30 [rules] Markers TCGdex lacks (Tera, Team Plasma, Strike styles, Baby, Prism Star, TAG TEAM) come from a generated table: pkmncards is:/stage: lists matched to TCGdex by number and name. (I220)
@@ -61,7 +64,6 @@
 - D152[deck-builder] 2026-09-25 Transform + type forms ship as generated catalog rows; cards resolve them by exact form name/aliases, Arceus/Silvally by card `types` (design 040). (S304)
 - D149[tooling] 2026-09-25 `pnpm audit:attacks` ratchets each unique corpus attack's verdict (ok/partial/ran-no-effect/engine-error) vs scripts/attack-behaviour-baseline.json; a regression fails by name (design 036 slice 16). (S300)
 - D148[render] 2026-09-22 FX kill switch reaches inside the playmat iframes: image-logic/fx-settings owns fx-off/sfx-off/volume and mirrors fx-off/fx-reduced onto each iframe <html> (design 024 O4). (S252) (PR #181 branch id D97)
-- D147[render] 2026-09-22 Game audio is synthesized (mat-fx/fx-audio.mjs voice table, one lazy AudioContext), not sampled; dispatched from dispatcher.mjs with visuals; not gated by reduced motion. (S252) (PR #181 branch id D96)
 - D146[render] 2026-09-22 FX pacing is data: fx-holds.mjs table + fx-queue.mjs drains plans in engine order, budget-capped; an effect returning a number overrides its hold (design 024). (S252) (PR #181 branch id D95)
 - D145[drag] 2026-09-24 Dragged card = body-level avatar that rolls into horizontal motion (design 038); native DnD still drops, ghost blanked via setDragImage, pointer from dragover in all frames; no resize (user). (S287) (PR #186 branch id D124)
 - D144[rules] 2026-09-25 Special-Energy KO effects need a KO by attack damage (not Poison/Burn/Ability or attack-placed counters); each step's `source` sets whether it must be the opponent's attack (Gift/Legacy/Splash) or any (Rescue). (S295)
