@@ -103,3 +103,14 @@ test('slice 10: the first half of the Psychic signatures ships, material per § 
     assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
   }
 });
+
+test('slice 12: the Flying and Steel signatures ship, material per § Options 4', () => {
+  const ids = ['aeroblast', 'bleakwind-storm', 'dragon-ascent', 'oblivion-wing', 'behemoth-bash', 'behemoth-blade', 'doom-desire', 'double-iron-bash', 'sunsteel-strike', 'tachyon-cutter'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+});

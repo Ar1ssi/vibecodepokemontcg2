@@ -231,7 +231,9 @@ test('Tag Team card resolves to its partner: no slug signature, name match still
 });
 
 test('a selected signature with no shipped spec falls through to 063 (edge 11)', () => {
-  const sig = signatureFor(lugiaV, { attackName: 'Aero Dive', slug: 'lugia' });
+  // Aeroblast shipped in slice 12; Roar of Time (dragon) ships in slice 13.
+  const sig = signatureFor({ name: 'Darkrai', attacks: [] }, { attackName: 'Roar of Time', slug: 'darkrai' });
+  assert.equal(sig.move, 'roar-of-time');
   assert.equal(SIGNATURE_SPECS[sig.move], undefined);
 });
 

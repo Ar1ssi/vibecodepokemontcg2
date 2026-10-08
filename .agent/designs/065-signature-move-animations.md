@@ -943,6 +943,44 @@ dependency.
   crescents are thin magenta lines (slashArc shape limit, as Mighty Cleave); Psycho Boost's orb
   is cyan-cored more than violet-white. No bench target (rec-move has none). Probe: median
   16.8–17.0 ms on all; p95 59–88 ms.
+- Slice 12: `family` follows `deriveFamily`: Aeroblast, Dragon Ascent and Sunsteel Strike `burst`,
+  Bleakwind Storm `wind`, Oblivion Wing `splash`, Doom Desire `quake`, Behemoth Bash, Behemoth Blade
+  and Double Iron Bash `punch`, Tachyon Cutter `slash`. Defender `knock` follows § E (physicals
+  0.45, specials 0.35; Oblivion Wing and Tachyon Cutter over the entries' 0.3 / 0.2); Aeroblast and
+  Bleakwind Storm keep the entries' float as `lift 0.15` (screen-up positive).
+- Slice 12: every "starFlare arms 'ring'/'dai'" is `cross` (spiral 10 + 20; shards 8 + 20 + a
+  pillar). Bleakwind Storm has no star (spiral 14 + helix 2; a 'dai' made 41). Aeroblast's orb is
+  `projectile unit 'rings'` ending at contact 1050; its vortex `spiral` runs 1000–1700.
+- Slice 12: Dragon Ascent's comet drop is `projectile from 'sky'` 550–1000 (no stand-in arc); the
+  gold chain-rings are `orbitCharge unit 'rings', tongues 0` 370–1000; leaf particles; smoke for the
+  rock dust.
+- Slice 12: Oblivion Wing's drain orb is `projectile from 'defender'` 1200–1800 (r 0.36–0.48); the
+  crimson column is `pillar w 0.9, height 2.2` to 1650 and the beam `w 0.75` (0.6 / 0.5 did not
+  read); the black-out is an attacker `vignette` 0–900 tinted near-black.
+- Slice 12: Behemoth Bash's crown-shield is `fan count 6, spread 120, direction 180, spin 30` on
+  the front layer 0–950 (it stays at home while the lunge ghost leaves, as V-create); shards 6 so
+  cross 20 + 6 + pillar 3 = 29. Double Iron Bash's two hits are `stagger lead 500, hits 2` (`gapMs`
+  max 250) with `lunge strikes 2`; the fists are `orbitCharge unit 'fist'` 0–500, the first hit's
+  sparks `shards unit 'hex'`. Behemoth Blade's sword is a `solid` beam 300–1000 tinted cream.
+- Slice 12: Doom Desire's falling-column field is `pillar from 'above', count 3, spread 0.9,
+  stagger 100` 1000–1500 (after the first column 700–1000); the cyan ground column and shards move
+  to 1300–1800 (cross 20 + field 9 = 29); the gold star on the attacker is a `cross target
+  'attacker'` 0–550 beside the coreCharge; the violet glints use `unit 'spiked'`.
+- Slice 12: Sunsteel Strike's sun is `projectile unit 'spiked', tongues 6`; the rainbow streaks are
+  two solid beams tinted green / magenta 700–1050. Tachyon Cutter's blades are `volley unit
+  'crescent'` (r 0.26–0.34, the slice 5 Seed Flare finding), slashArc `radius 0.9, thick 0.2`.
+- Slice 12 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not committed):
+  every signature read shows at its moment except Bleakwind Storm, whose helix tornado reads as
+  faint grey flecks round the defender (spiral drawer limit, as Wildbolt / Sandsear) with only the
+  floor rings clear. Other weak spots: Aeroblast's vortex after contact is faint blue crescents (the
+  ring-orb and white burst carry it); Behemoth Blade's violet storm barely shows (the contact is a
+  white cross) and its sword is a short cream crystal on Actives; Oblivion Wing's beam is short (as
+  Blue Flare). No bench target (rec-move has none). Probe: median 16.7–16.9 ms on all; p95
+  54–185 ms, over 140 for Behemoth Bash (172–174) and Doom Desire (168–185) (software-GL blur cost,
+  as slices 5, 7 and 9); re-probe on GPU.
+- Slice 12: `signature-select.test.mjs` edge 11 ("a selected signature with no shipped spec falls
+  through to 063") used Lugia V's Aeroblast as its unshipped example; it now uses Roar of Time
+  (Darkrai by name, slice 13) and needs another unshipped move until slice 15 ships the last ones.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
