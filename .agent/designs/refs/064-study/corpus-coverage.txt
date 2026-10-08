@@ -1,0 +1,88 @@
+1	dark-void	darkrai	Darkrai V (Astral Radiance 098) 130
+3	fiery-wrath	moltres	Galarian Moltres (Sword & Shield Promos SWSH284) 20+; Galarian Moltres (Sword & Shield Promos SWSH125) 20+; Galarian Moltres (Evolving Skies 093) 20+
+3	hyperspace-fury	hoopa	Hoopa-EX (XY Promos XY71) ; Hoopa-EX (Ancient Origins 89) ; Hoopa-EX (Ancient Origins 36) 
+0	ruination	chi-yu,chien-pao,ting-lu,wo-chien	
+0	wicked-blow	urshifu	
+0	core-enforcer	zygarde	
+0	dragon-energy	regidrago	
+5	dynamax-cannon	eternatus	Eternatus V (Lost Origin TG21) 120+; Eternatus V (Shining Fates SV121) 120+; Eternatus V (Sword & Shield Promos SWSH064) 120+; Eternatus V (Sword & Shield Promos SWSH044) 120+; Eternatus V (Darkness Ablaze 116) 120+
+0	eternabeam	eternatus	
+0	nihil-light	zygarde	
+1	roar-of-time	dialga	Darkrai (Diamond & Pearl Promos DP24) 80
+1	spacial-rend	palkia	Darkrai (Diamond & Pearl Promos DP24) 10
+0	bolt-strike	zekrom	
+0	electro-drift	miraidon	
+0	fusion-bolt	kyurem,zekrom	
+3	plasma-fists	zeraora	Zeraora-GX (Lost Thunder 221) 160; Zeraora-GX (Lost Thunder 201) 160; Zeraora-GX (Lost Thunder 86) 160
+0	thunder-cage	regieleki	
+0	thunderclap	raging-bolt	
+0	wildbolt-storm	thundurus	
+0	fleur-cannon	magearna	
+0	geomancy	xerneas	
+0	natures-madness	tapu-bulu,tapu-fini,tapu-koko,tapu-lele	
+0	springtide-storm	enamorus	
+0	collision-course	koraidon	
+5	secret-sword	keldeo	Keldeo V (Sword & Shield 053) 50+; Keldeo-EX (Legendary Treasures 45) 50+; Keldeo-EX (Black & White Promos BW61) 50+; Keldeo-EX (Boundaries Crossed 142) 50+; Keldeo-EX (Boundaries Crossed 49) 50+
+5	thunderous-kick	zapdos	Galarian Zapdos V (Astral Radiance TG19) 170; Galarian Zapdos V (Brilliant Stars 182) 170; Galarian Zapdos V (Chilling Reign 174) 170; Galarian Zapdos V (Chilling Reign 173) 170; Galarian Zapdos V (Chilling Reign 080) 170
+0	blue-flare	reshiram	
+0	burning-bulwark	gouging-fire	
+0	fusion-flare	kyurem,reshiram	
+1	magma-storm	heatran	Heatran (Legends Awakened 6) 40+
+0	searing-shot	victini	
+0	v-create	victini	
+0	aeroblast	lugia	
+0	bleakwind-storm	tornadus	
+1	dragon-ascent	rayquaza	M Rayquaza-EX (Roaring Skies 61) 300
+0	oblivion-wing	yveltal	
+4	astral-barrage	calyrex	Shadow Rider Calyrex V (Astral Radiance TG17) ; Shadow Rider Calyrex V (Chilling Reign 172) ; Shadow Rider Calyrex V (Chilling Reign 171) ; Shadow Rider Calyrex V (Chilling Reign 074) 
+5	moongeist-beam	lunala	Lunala-GX (Ultra Prism 172) 120; Lunala-GX (Sun & Moon Promos SM17) 120; Lunala-GX (Sun & Moon 153) 120; Lunala-GX (Sun & Moon 141) 120; Lunala-GX (Sun & Moon 66) 120
+0	shadow-force	giratina	
+0	spectral-thief	marshadow	
+0	ivy-cudgel	ogerpon	
+0	jungle-healing	zarude	
+1	seed-flare	shaymin	Shaymin LV.X (Platinum 126) 40+
+7	lands-wrath	zygarde	Zygarde-GX (Forbidden Light SV65) 130; Zygarde-GX (Forbidden Light 136) 130; Zygarde-GX (Forbidden Light 123) 130; Zygarde-GX (Forbidden Light 73) 130; Zygarde-EX (Fates Collide 54a) 100; Zygarde-EX (XY Promos XY151) 100 …
+0	precipice-blades	groudon	
+0	sandsear-storm	landorus	
+0	thousand-arrows	zygarde	
+0	thousand-waves	zygarde	
+4	freeze-shock	kyurem	Black Kyurem-EX (Legendary Treasures 100) 150; Black Kyurem-EX (Black & White Promos BW62) 150; Black Kyurem-EX (Boundaries Crossed 145) 150; Black Kyurem-EX (Boundaries Crossed 101) 150
+4	glacial-lance	calyrex	Ice Rider Calyrex V (Astral Radiance TG14) 200; Ice Rider Calyrex V (Chilling Reign 164) 200; Ice Rider Calyrex V (Chilling Reign 163) 200; Ice Rider Calyrex V (Chilling Reign 045) 200
+2	glaciate	kyurem	Kyurem-EX (Ancient Origins 86) ; Kyurem-EX (Ancient Origins 25) 
+4	ice-burn	kyurem	White Kyurem-EX (Legendary Treasures 101) 150; White Kyurem-EX (Black & White Promos BW63) 150; White Kyurem-EX (Boundaries Crossed 146) 150; White Kyurem-EX (Boundaries Crossed 103) 150
+1	crush-grip	regigigas	Regigigas (Legends Awakened 15) 120
+0	judgment	arceus	
+0	multi-attack	silvally	
+0	relic-song	meloetta	
+3	techno-blast	genesect	Genesect V (Fusion Strike 255) 210; Genesect V (Fusion Strike 254) 210; Genesect V (Fusion Strike 185) 210
+0	tera-starstorm	terapagos	
+0	malignant-chain	pecharunt	
+0	freezing-glare	articuno	
+0	hyperspace-hole	hoopa	
+0	lunar-blessing	cresselia	
+0	lunar-dance	cresselia	
+3	luster-purge	latios	Latios (Fusion Strike 194) 210; Latios-EX (Plasma Freeze 113) 150; Latios-EX (Plasma Freeze 86) 150
+0	mist-ball	latias	
+0	mystical-power	azelf,mesprit,uxie	
+5	photon-geyser	necrozma	Ultra Necrozma-GX (Sun & Moon Promos SM126) 20+; Ultra Necrozma-GX (Dragon Majesty 78) 20+; Ultra Necrozma-GX (Forbidden Light 140) 20+; Ultra Necrozma-GX (Forbidden Light 127) 20+; Ultra Necrozma-GX (Forbidden Light 95) 20+
+0	prismatic-laser	necrozma	
+0	psyblade	iron-leaves	
+0	psystrike	mewtwo	
+0	take-heart	manaphy,phione	
+0	diamond-storm	diancie	
+0	mighty-cleave	iron-boulder	
+0	doom-desire	jirachi	
+0	double-iron-bash	melmetal	
+7	sunsteel-strike	solgaleo	Solgaleo-GX (30th Celebration 89) 230; Solgaleo (30th Celebration 105) 220; Solgaleo-GX (Ultra Prism 173) 230; Solgaleo-GX (Sun & Moon Promos SM16) 230; Solgaleo-GX (Sun & Moon 155) 230; Solgaleo-GX (Sun & Moon 143) 230 …
+0	tachyon-cutter	iron-crown	
+0	hydro-steam	walking-wake	
+0	origin-pulse	kyogre	
+0	steam-eruption	volcanion	
+0	surging-strikes	urshifu	
+5	sacred-fire	ho-oh,entei	Ho-Oh-GX (Burning Shadows SV50) ; Ho-Oh-GX (Sun & Moon Promos SM80) ; Ho-Oh-GX (Sun & Moon Promos SM57) ; Ho-Oh-GX (Burning Shadows 131) ; Ho-Oh-GX (Burning Shadows 21) 
+1	psycho-boost	deoxys,lugia	Deoxys (Sun & Moon Promos SM164) 100
+0	heart-swap	manaphy,magearna	
+2	sacred-sword	cobalion,terrakion,virizion,keldeo	Keldeo (XY Promos XY191) 100; Keldeo (XY Promos XY118) 100
+1	behemoth-blade	zacian	Zacian V (Crown Zenith 095) 100+
+0	behemoth-bash	zamazenta	
+moves with ≥1 card: 28 / 87 · cards: 88
