@@ -849,6 +849,43 @@ dependency.
   crescent (slashArc shape limit); Land's Wrath's frond fan is thin dark rays, the lime tips
   faint; Thousand Arrows' three-arm star barely shows under the impact flash. No bench target
   (rec-move has none). Probe: median 16.8–16.9 ms on all; p95 61–103 ms.
+- Slice 9: `family` follows `deriveFamily`: Collision Course, Sacred Sword and Thunderous Kick
+  are `dash` (physical dash + front burst at contact), Secret Sword, Fleur Cannon and Springtide
+  Storm `burst` (Fleur Cannon's beam starts before the contact star), Malignant Chain
+  `projectile` (the `chain` beat), Nature's Madness `electric` (its sky `bolt` is the latest front
+  beat at contact). Defender `knock` follows § E (physicals 0.45, specials 0.35).
+- Slice 9: every entry's "starFlare arms 'ring'" is `cross` (fighting, poison: shards 8 share the
+  moment) or `RING5` (fairy); Thunderous Kick's shards are 6 (cross 20 + bolt 3 + 6 = 29).
+- Slice 9: Collision Course's flame ring is `projectile unit 'wheel'` (§ New pieces C) 450–1000,
+  tongues 8, tinted gold-orange; the crest loops are both orbit halves tinted violet-white; two
+  short `pillar`s 1100–1900 and smoke carry the reference's fire columns and dust (the entry's
+  mapping stops at the burst).
+- Slice 9: Sacred Sword's slashes use radius 0.9, thick 0.2 (0.7 / 0.12 read as hairlines); the
+  crest flecks are `shards target 'attacker'` tinted pale green.
+- Slice 9: Secret Sword's rainbow ring is `ring kind 'face', count 3` on the attacker with `hues`
+  cyan / magenta / gold, not the aura; its flare projectile ends at contact (entry 900).
+- Slice 9: Thunderous Kick's kick flame is the red aura (alpha 1, r 0.8–1.2) plus red
+  `speedRays target 'attacker'` 450–1000 (the aura alone read as a thin ring); a yellow `pillar`
+  1450–2100 is the reference's flame column; the vignette on the kick path is tinted red.
+- Slice 9: Malignant Chain's shot and wrap are one `chain` beat (links 12, r 0.13) 300–1700: the
+  chain strings down the lane to ~1000 and wraps the defender after; the cage is a 3-ring `face`
+  ring plus the `spiral` moved to 1350–2150 (after the star; cross 20 + shards 8 + spiral 10 > 30);
+  the contact star is at contact (entry 800) on the back layer so the chain stays on top.
+- Slice 9: Fleur Cannon's dome is `shade kind 'dome'` on the attacker 0–1000 (the signature read
+  names it; the entry lists no new piece); the beam carries a pink `tint`.
+- Slice 9: Nature's Madness's dome is `shade kind 'sphere'` (r 0.95, fill cyan alpha 0.3, pink
+  rim) 1050–2200 on the front layer, the pad a `floor` ring tinted violet-pink; the green arcs are
+  the aura tinted green. Particle `gravity` has no negative range, so rising motes use 0.
+- Slice 9: Springtide Storm's heart shield is `glyph kind 'heart'` on the attacker (r 1.0)
+  300–1200, over a pink aura.
+- Slice 9 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment. Weak spots: Springtide Storm's tornado
+  reads as scattered flecks round the defender (spiral drawer limit, as Wildbolt / Sandsear);
+  Collision Course's flame wheel barely travels on Actives (short lane) and reads as a gold sun;
+  Thunderous Kick's kick flame is an orange ring with rays rather than flame, and its shock bolt
+  is short; Fleur Cannon's beam is short (as Blue Flare). No bench target (rec-move has none).
+  Probe: median 16.7–17.0 ms on all; p95 59–201 ms, over 140 for Collision Course, Fleur Cannon
+  and Springtide Storm (software-GL blur cost, as slices 5 and 7); re-probe on GPU.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the

@@ -81,3 +81,14 @@ test('slice 8: the Ground and Rock signatures ship, material per § Options 4', 
     assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
   }
 });
+
+test('slice 9: the Fighting, Poison and Fairy signatures ship, material per § Options 4', () => {
+  const ids = ['collision-course', 'sacred-sword', 'secret-sword', 'thunderous-kick', 'malignant-chain', 'fleur-cannon', 'natures-madness', 'springtide-storm'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+});
