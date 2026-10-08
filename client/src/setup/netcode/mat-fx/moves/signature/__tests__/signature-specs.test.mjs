@@ -23,8 +23,11 @@ test('every signature spec is valid, tier S, keyed by its id, and matches its mo
   }
 });
 
+// Types shipped over two slices: coverage is checked once the second half lands (slice 11).
+const PARTIAL_TYPES = new Set(['psychic']);
+
 test('per shipped type, every move of that type has a spec', () => {
-  for (const type of SHIPPED_TYPES) {
+  for (const type of SHIPPED_TYPES.filter((t) => !PARTIAL_TYPES.has(t))) {
     for (const [id, m] of Object.entries(SIGNATURE_MOVES)) {
       if (m.vgType === type)
         assert.ok(SIGNATURE_SPECS[id], `${type}: missing ${id}`);
@@ -84,6 +87,17 @@ test('slice 8: the Ground and Rock signatures ship, material per § Options 4', 
 
 test('slice 9: the Fighting, Poison and Fairy signatures ship, material per § Options 4', () => {
   const ids = ['collision-course', 'sacred-sword', 'secret-sword', 'thunderous-kick', 'malignant-chain', 'fleur-cannon', 'natures-madness', 'springtide-storm'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+});
+
+test('slice 10: the first half of the Psychic signatures ships, material per § Options 4', () => {
+  const ids = ['freezing-glare', 'heart-swap', 'hyperspace-hole', 'luster-purge', 'mist-ball', 'mystical-power'];
   for (const id of ids) {
     const spec = SIGNATURE_SPECS[id];
     assert.ok(spec, id);

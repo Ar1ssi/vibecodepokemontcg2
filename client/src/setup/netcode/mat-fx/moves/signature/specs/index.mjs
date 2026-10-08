@@ -10,6 +10,7 @@ import { ROCK_SIGNATURE_SPECS } from './rock.mjs';
 import { FIGHTING_SIGNATURE_SPECS } from './fighting.mjs';
 import { POISON_SIGNATURE_SPECS } from './poison.mjs';
 import { FAIRY_SIGNATURE_SPECS } from './fairy.mjs';
+import { PSYCHIC_SIGNATURE_SPECS } from './psychic.mjs';
 
 export const SIGNATURE_SPECS = Object.freeze({
   ...FIRE_SIGNATURE_SPECS,
@@ -22,4 +23,5 @@ export const SIGNATURE_SPECS = Object.freeze({
   ...FIGHTING_SIGNATURE_SPECS,
   ...POISON_SIGNATURE_SPECS,
   ...FAIRY_SIGNATURE_SPECS,
+  ...PSYCHIC_SIGNATURE_SPECS,
 });

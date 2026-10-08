@@ -887,6 +887,36 @@ dependency.
   Probe: median 16.7–17.0 ms on all; p95 59–201 ms, over 140 for Collision Course, Fleur Cannon
   and Springtide Storm (software-GL blur cost, as slices 5 and 7); re-probe on GPU.
 
+- Slice 10: `psychic.mjs` ships its first half, so `signature-specs.test.mjs` exempts `psychic`
+  from the per-type coverage test (`PARTIAL_TYPES`) until slice 11 adds the rest. `family`
+  follows `deriveFamily`: Freezing Glare `beam`, Heart Swap `chime` (the heart glyph), Hyperspace
+  Hole, Luster Purge, Mist Ball and Mystical Power `burst`. Defender `knock` 0.35 (§ E, specials)
+  over the entries' 0.3; the entries' float `lift −0.15` is `lift 0.15` (screen-up positive).
+- Slice 10: Heart Swap (status, no hit) keeps the board's contact for the queue at 1100 of 2000
+  (entry 1900 total, no contact): the reverse orb (`projectile from 'defender'`) 450–900, the
+  attacker dome 850–1300, the return orb 1050–1500, the defender dome 1450–2000; the entry's
+  `aura` domes are `shade kind 'dome'` (the vocabulary map) with a small aura kept on the
+  defender, plus a heart glyph and twinkles at contact. The rig still shows a damage number.
+- Slice 10: Hyperspace Hole's portal has no lane-midpoint anchor: it is two `shade kind 'disc'`
+  portals, one on the attacker (0–650, the sink, with a violet floor ring) and one on the
+  defender (350–1000, the exit), with attacker `warp`; the star is `RING5` and the shards 5
+  (25 + 5 = 30).
+- Slice 10: Luster Purge's `bow 1.2` is over `projectile.bow`'s 0.6 maximum: `arc, bow 0.6`; the
+  rainbow halo is a 3-ring `face` ring with `hues` red/yellow/green/blue plus white `shockRings`;
+  the dark orange cracks are `terrain 'crack'` tinted; the blue haze aura runs 1200–2100.
+- Slice 10: Mist Ball's orb is `arc, bow 0.6` (entry 0.5) ending at contact; its star is a `cross`
+  on the front layer (the entry names none; without it no front beat is live at contact and the
+  family is `charge`); the spiral has 8 tongues (6 + 20 + 8 = 34 otherwise).
+- Slice 10: Mystical Power's closing rings are a front `face` ring with `hues` magenta/cyan, rpm
+  120, 600–1050; the star is `RING5`; Freezing Glare's beams carry the sampled cyan/blue tint and
+  its splinters are `shards` tinted grey (particle colour stays the material's, slice 5 rule).
+- Slice 10 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment. Weak spots: Hyperspace Hole's portals
+  read as violet ring outlines — the dark disc fill barely shows on the dark mat; Freezing
+  Glare's beam is thin and short on Actives (as Blue Flare) and the grey splinters are faint;
+  Mist Ball's after-mist is faint. No bench target (rec-move has none). Probe: median
+  16.8–17.0 ms on all; p95 54–79 ms.
+
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
 contract for slices 5–15; a builder adjusts numbers only inside the tier-S band and records any
