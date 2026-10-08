@@ -35,3 +35,16 @@ test('per shipped type, every move of that type has a spec', () => {
 test('slice 1 ships the registry empty and frozen', () => {
   assert.ok(Object.isFrozen(SIGNATURE_SPECS));
 });
+
+test('slice 5: the Fire and Grass signatures ship, material per § Options 4', () => {
+  const ids = ['blue-flare', 'fusion-flare', 'magma-storm', 'sacred-fire', 'searing-shot', 'v-create', 'ivy-cudgel', 'seed-flare'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    // The spec's own material is the move row's; Ivy Cudgel's mask material is applied at play time.
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+  assert.equal(SIGNATURE_SPECS['ivy-cudgel'].material, 'grass');
+});

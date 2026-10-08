@@ -713,6 +713,51 @@ dependency.
   `SIO_JS` from node_modules, `CARD_DIR` of stand-in PNGs since the CDNs are blocked), but the
   per-material stub recordings are still not made: they need temporary stub specs registered.
   Still due before landing.
+- Slice 5: 063's `starFlare arms 'ring'` is 8 arms = 40 tongues, over the 30 budget on its own,
+  so every entry that names it uses `RING5` (five arms 72° apart, reach 0.85 = 25 tongues) in
+  `specs/fire.mjs`, or `'cross'` (20) where other beats share the contact moment (Sacred Fire,
+  Ivy Cudgel, Seed Flare).
+- Slice 5: particles have no colour param — a burst takes the spec material's particle colour,
+  untinted. Blue Flare's cyan embers use `kind 'flake'` (still fire-coloured); Ivy Cudgel's
+  `#7FFFD4` and Seed Flare's `#7CFF5B` shards stay the grass particle colour. A per-burst
+  `tint` would need a `PARTICLE_PARAMS` entry (not in this slice's files).
+- Slice 5: defender `knock` strength follows § New pieces E (physicals 0.45, specials 0.35)
+  where the entry differs: Ivy Cudgel 0.45 (entry 0.3), Seed Flare 0.35 (entry 0.45).
+- Slice 5: Fusion Flare's "lift 1.0" orb is `coreCharge target 'sky-attacker'` with no offset,
+  so the `projectile from 'sky-attacker'` leaves exactly where the orb hung (a dx/dy on the
+  charge would make the drop start 0.9 h away; `projectile` has no dx/dy). Ease `linear` so
+  the drop reads; carries the § E echo (alpha 0.35, 0.5 h, 500 ms). On the self seat the
+  sky-attacker point sits level with the defender (cards stack vertically), so the drop is a
+  short sideways arc there; on the opp seat it is a long drop.
+- Slice 5: Magma Storm's "mound at each column base" is one `shards mode 'cluster'` (6) at the
+  defender (shards has no dx); the columns run 600/650 → 1300 (entry 600–1000, too short to
+  read) and the golden spiral to 2100 so it shows after the columns; splash 4, spiral 8
+  tongues to stay inside 30.
+- Slice 5: Sacred Fire's rainbow fountain is `pillar count 3, spread 1.0, w 0.6` with five
+  `hues` (one pillar has one hue, so the entry's single w 1.6 column could not be multicoloured).
+- Slice 5: V-create's vwings are two `fan` beats (`direction ±125`, `count 4`, `spread 36`,
+  `lenMin 0.9`, `lenMax 1.4`, `width 0.32`, `flap 12`) on the front layer: on the back layer
+  at 3 × 1.0 h they hid behind the card. They hold to 900 ms at the attacker's home while the
+  dash ghost leaves (fan anchors to the card, not the ghost).
+- Slice 5: Searing Shot's particles are 15 + 12 (entry 18 + 12) for the 28-particle and
+  40-node limits; Seed Flare's orbit charges carry 3 tongues each and its shards are 8 (entry
+  10), its crescents `r0 0.26, r1 0.34` (entry 0.14–0.2 read as specks), its vortex spiral on
+  the front layer. Aftermath beats the entries run past `durationMs` are clamped to it.
+- Slice 5 review (recordings, both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment except two weak spots — Magma Storm's
+  golden spiral is mostly hidden by the columns until ~1300 ms, and Seed Flare's white-cyan
+  vortex barely reads on the dark mat. Blue Flare's stream is short on Actives (the lane is
+  ~0.75 h) and reads as a blue tongue rather than a long beam. Bench targets were not
+  recorded: `rec-move.mjs` places both cards on Actives and has no bench option (not in this
+  slice's files). Probe: median 16.7–17.3 ms on all; p95 60–70 ms for the grass and stellar
+  specs but 100–190 ms for the fire ones — the accepted Fire Blast measures p95 192 ms in the
+  same run (headless Chromium, software GL), so the fire overrun is the environment's blur
+  cost, not these specs; re-probe on GPU hardware.
+- Slice 3 follow-up (slice 5): one stub per new material recorded (Fire Blast's spec with
+  `material 'normal'` / `'stellar'`, registered temporarily and removed): normal draws gold-white
+  pressure light with ringed projectile bodies; stellar draws faceted cyan crystal bodies and
+  crystal tongues, but its accent fringe is not visible at board scale (all cyan) — revisit
+  with Tera Starstorm (slice 15). The slice 3 recording debt is closed.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
