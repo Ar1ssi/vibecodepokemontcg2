@@ -473,89 +473,18 @@ body.fx-off .fx-overlay.fx-draw {
   will-change: transform, opacity;
 }
 
-.fx-evolve-burst {
+/* Design 066: TCG Live's evolution / devolution. One canvas stage per card
+   (tcgl-canvas.js draws it additively); screening the host onto the board
+   lets the light add to the card and mat without ever darkening them. */
+.fx-tcgl-scene {
   overflow: visible;
   z-index: 2470;
-  --fx-p-color: #bfe3ff;
-}
-
-.fx-evolve-burst__ring {
-  position: absolute;
-  inset: 0;
-  border: 3px solid #fff;
-  border-radius: 0.45rem;
-  box-shadow: 0 0 20px 5px rgba(160, 210, 255, 0.85), inset 0 0 12px 2px rgba(160, 210, 255, 0.6);
-  opacity: 0;
-}
-
-/* Design 041: the Scarlet/Violet evolution scene. Two canvas stages (nebula,
-   halo and far beads behind; near beads, bokeh and glitter in front)
-   sandwich the old and new card images, over a screen dim. Every white is the
-   scene's blue-tinted white (EVOLVE_PALETTE in evolve-scene.mjs). */
-.fx-evolve-scene {
-  overflow: visible;
-  z-index: 2470;
-}
-
-.fx-evolve-scene__stage {
-  position: absolute;
-  display: block;
-}
-
-.fx-evolve-scene__card {
-  position: absolute;
-  inset: 0;
-  border-radius: 0.35rem;
-  overflow: hidden;
-  opacity: 0;
-  will-change: transform, opacity;
-  /* A rim of frost light and a soft drop shadow lift the card off the board. */
-  box-shadow:
-    0 0 0.8rem rgba(150, 205, 255, 0.55),
-    0 0.7rem 1.4rem rgba(0, 8, 26, 0.6);
-}
-
-.fx-evolve-scene__card img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
-}
-
-/* Pearly, not flat: a faint icy sheen over the blue-tinted white. */
-.fx-evolve-scene__white {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(160deg, rgb(238, 246, 255) 0%, rgb(226, 238, 255) 50%, rgb(214, 232, 255) 100%);
-  box-shadow: inset 0 0 0.6rem rgba(190, 216, 255, 0.9);
-  opacity: 0;
-}
-
-.fx-evolve-scene__shade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(8, 24, 64, 0) 20%, rgba(8, 24, 64, 0.85) 100%);
-  opacity: 0;
-}
-
-.fx-evolve-scene__sheen {
-  position: absolute;
-  inset: -20% 0;
-  background: linear-gradient(
-    105deg,
-    rgba(255, 255, 255, 0) 30%,
-    rgba(236, 246, 255, 0.75) 48%,
-    rgba(200, 228, 255, 0.35) 55%,
-    rgba(255, 255, 255, 0) 70%
-  );
   mix-blend-mode: screen;
-  opacity: 0;
 }
 
-.fx-evolve-scene__dim {
-  z-index: 2465;
-  opacity: 0;
-  background: radial-gradient(circle at var(--fx-cx, 50%) var(--fx-cy, 50%), rgba(4, 12, 30, 0.1) 0, rgba(4, 12, 30, 0.5) 45vmax);
+.fx-tcgl-scene__stage {
+  position: absolute;
+  display: block;
 }
 
 .fx-energy-snap {
@@ -1064,13 +993,6 @@ body.fx-off .fx-mega-field {
 }
 
 /* ── Design 024 slice 4: remaining lifecycle beats ────────────────────── */
-
-/* Devolution reuses the evolve burst's ring, tinted cooler so the two are
-   distinguishable at a glance (the ring's direction does the rest). */
-.fx-devolve-burst .fx-evolve-burst__ring {
-  border-color: rgba(150, 190, 255, 0.9);
-  box-shadow: 0 0 1.4em 0.2em rgba(120, 170, 255, 0.5);
-}
 
 /* A Tool attaching is real but minor: a soft ring, no token snap. */
 .fx-tool-attach {

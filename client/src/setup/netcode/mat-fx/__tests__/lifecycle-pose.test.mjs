@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  devolveBurstPose,
   discardPuffPose,
   energySnapPose,
   moveIdsForEvent,
@@ -131,7 +130,7 @@ test('presentDimPose: eases to the peak, holds, clears', () => {
   assert.equal(presentDimPose(1).opacity, 0);
 });
 
-// ── Design 024 slice 4: promote, discard, devolve ──────────────────────────
+// ── Design 024 slice 4: promote, discard ──────────────────────────────────
 
 test('promotePose: rises into the slot and settles at full size', () => {
   const start = promotePose(0);
@@ -156,18 +155,8 @@ test('discardPuffPose: drifts up, swells and fades to nothing', () => {
   assert.ok(discardPuffPose(1).scale > discardPuffPose(0).scale);
 });
 
-test('devolveBurstPose: the ring collapses inward', () => {
-  assert.ok(devolveBurstPose(1).ringScale < devolveBurstPose(0).ringScale);
-});
-
-test('devolveBurstPose: shrinks the card mid-way, invisible at both ends', () => {
-  assert.ok(devolveBurstPose(0.5).scale < 1);
-  assert.ok(Math.abs(devolveBurstPose(0).opacity) < 1e-9);
-  assert.ok(Math.abs(devolveBurstPose(1).opacity) < 1e-9);
-});
-
 test('slice-4 poses stay finite and bounded outside [0,1]', () => {
-  for (const pose of [promotePose, discardPuffPose, devolveBurstPose]) {
+  for (const pose of [promotePose, discardPuffPose]) {
     for (const t of [-1, -0.01, 1.01, 4]) {
       const out = pose(t);
       for (const [key, value] of Object.entries(out)) {

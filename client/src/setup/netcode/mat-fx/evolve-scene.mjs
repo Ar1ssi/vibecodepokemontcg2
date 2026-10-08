@@ -1,182 +1,120 @@
-// Design 041: the evolution scene for every evolution that is not Mega or Tera,
-// after Scarlet/Violet. A light-blue nebula irises open round the Pokémon, which
-// glows pearly white as pairs of light beads rise past it and bokeh drifts out;
-// at the surge's peak the pearl card becomes the evolved one, which drains from
-// white as glitter twinkles, still inside the nebula. The whole scene stays in
-// the nebula's blue and frost: no whiteout, no starburst, no change of backdrop.
-// DOM-free: the timeline, scene and layer poses are pure, and the two draw
-// functions only use the 2D context passed in, so it all runs under node --test.
-// The scene is drawn on two canvases that sandwich the card images
-// (evolve-scene.js): beads behind the card go on the back one.
+// Design 066: TCG Live's Card_Evolution prefab, as data and pose functions.
+// The game spawns it on the evolved card when the card lands (charge 0–1 s,
+// pop at 1 s, outro dissolve to 3 s). Every emitter below keeps the extract's
+// delay, lifetime, counts, size and colour-over-life keys (Card_Evolution.spec.md),
+// in prefab units on the card plane (CARD_UNITS per card height, x right, y up).
+// `evolveOps(scene, t)` returns the frame as draw ops for tcgl-canvas.js:
+//   sprite   – a texture quad (flipbook frame optional), additive
+//   dissolve – a mask texture eaten by a noise texture (the card materials)
+//   polar    – a noise texture in polar UVs (radial rays, wisps, spark disc)
+//   ribbon   – a strip between two rails (helix whorls, trails, light shafts)
+//   cutout   – the card's face is cleared: emitters drawn before it glow
+//              around the card, never over its art.
+import { HELIX_RIBBONS, LIGHT_SHAFTS, SPIRAL_TRAILS } from './evolve-geometry.mjs';
 import { seededRandom } from './flow-pose.mjs';
+import {
+  TAU,
+  ageOf,
+  between,
+  clamp01,
+  curveAt,
+  gradientAt,
+  lerp,
+  limitedTravel,
+  pointOnRectEdge,
+  railsAround,
+  rateBirths,
+  smoothstep,
+  spinAngle,
+  turnPoints,
+} from './tcgl-fx.mjs';
 
-// The glow hold: once the evolved card has flipped front, still white, the card,
-// halo and nebula stay put for GLOW_HOLD_MS before it drops back onto its slot.
-// The rest plays on a 3.2 s clock, so the flare still peaks 2.05 s in (the
-// score's FLARE_S) however long the hold is.
-const GLOW_HOLD_MS = 300;
-const CARD_CLOCK_MS = 3200;
-export const EVOLVE_SCENE_MS = CARD_CLOCK_MS + GLOW_HOLD_MS;
-// The surge's peak: the pearl-white old card hands over to the pearl-white new one.
-export const EVOLVE_REVEAL_AT = 2048 / EVOLVE_SCENE_MS;
-const HOLD_SHARE = GLOW_HOLD_MS / EVOLVE_SCENE_MS;
-const SCENE_SPEED = 1 / (1 - HOLD_SHARE);
-// Where the hold sits on the card clock: after the flip.
-const HOLD_AT = 0.77;
-const HOLD_START = HOLD_AT / SCENE_SPEED;
-const CARD_REVEAL_AT = EVOLVE_REVEAL_AT * SCENE_SPEED;
-// The canvas stages' side, in card heights: room for the bokeh and glow.
-export const EVOLVE_STAGE = 4.2;
+export const EVOLVE_SCENE_MS = 3000;
+/** Scene time (s) of the pop: Square_Pop at 0.95, everything else at 1.0. */
+export const EVOLVE_POP_S = 1.0;
+/** Canvas side in card heights; the soft edge keeps every layer local to the card. */
+export const EVOLVE_STAGE = 5;
 
-// Every light in the scene — glow, beads, glitter — is one family of
-// slightly blue-tinted whites, as in the clip; nothing is pure white.
-export const EVOLVE_PALETTE = {
-  ink: [6, 16, 40],
-  indigo: [22, 60, 132],
-  violet: [58, 128, 214],
-  magenta: [104, 186, 240],
-  blue: [76, 150, 246],
-  frost: [190, 214, 255],
-  pearl: [226, 238, 255],
-  white: [238, 246, 255],
+const WHITE = [1, 1, 1];
+// TCG Live adds these glows in HDR and tone-maps them; a canvas clips at white,
+// so the wide glows are scaled down to keep the card silhouette the brightest
+// thing on screen (house rule: no whiteout beyond the card).
+const LEVEL = { glowCore: 0.4, wisps: 0.45, raysRad: 0.8, refraction: 0.51, shockwave: 0.55, shafts: 0.75, flash: 0.6 };
+const POP_TINT = [1, 0.823, 0.684];
+const fade = (alpha) => ({ color: [[0, WHITE]], alpha });
+
+// ---- colour-over-life (extract keys) ----
+const RAINBOW = [
+  [0.036, [1, 0.942, 0.222]],
+  [0.141, [0.005, 0.758, 1]],
+  [0.246, [1, 0.307, 0.307]],
+  [0.364, [0.67, 1, 0.175]],
+  [0.528, [1, 0.231, 0.823]],
+  [0.629, [0.664, 1, 0.127]],
+  [0.829, [0.222, 0.9, 1]],
+];
+const GRADIENTS = {
+  smokes: [
+    { color: [[0.118, [1, 0.923, 0.769]], [0.32, [0.09, 1, 0.691]], [0.644, [0.693, 0, 1]], [1, [0.194, 0.066, 0.736]]], alpha: [[0, 0], [0.154, 1], [0.926, 1], [1, 0]] },
+    { color: [[0.11, [1, 0.688, 0.665]], [0.352, [0, 0.881, 1]], [0.638, [0.259, 0, 1]], [1, [0.43, 0.283, 0.689]]], alpha: [[0, 0], [0.16, 1], [0.907, 1], [1, 0]] },
+  ],
+  glowCore: { color: [[0.198, [1, 0.402, 0]], [0.756, [0.674, 0.975, 1]], [0.893, WHITE], [1, [0.672, 0.975, 1]]], alpha: [[0, 0], [0.221, 1], [0.8, 1], [1, 0]] },
+  wisp: { color: [[0.036, [1, 0.942, 0.222]], [0.181, [0.005, 0.758, 1]], [0.366, [0.67, 1, 0.175]], [0.596, [1, 0.231, 0.823]], [0.829, [0.222, 0.9, 1]]], alpha: [[0, 0], [0.248, 0.737], [0.45, 1], [0.825, 1], [1, 0]] },
+  raysRad: { color: RAINBOW, alpha: [[0, 1], [0.722, 1], [1, 0]] },
+  beam: fade([[0, 0], [0.221, 1], [0.657, 1], [1, 0]]),
+  softy: fade([[0, 0], [0.162, 1], [0.53, 0.331], [0.756, 0.228], [1, 0]]),
+  sparkles: [
+    { color: [[0.036, [1, 0.986, 0.844]], [0.141, [0.58, 0.898, 1]], [0.246, [1, 0.788, 0.788]], [0.364, [0.842, 1, 0.608]], [0.524, [1, 0.693, 0.928]], [0.629, [0.883, 1, 0.693]], [0.829, [0.222, 0.9, 1]]], alpha: [[0, 0], [0.13, 1], [0.722, 1], [1, 0]] },
+    { color: RAINBOW, alpha: [[0, 0], [0.124, 1], [0.722, 1], [1, 0]] },
+  ],
+  refraction: { color: [[0, WHITE], [0.399, [0.738, 0.972, 0.969]]], alpha: [[0, 0.078], [0.125, 1], [0.391, 1], [1, 0]] },
+  motes: [
+    { color: [[0, WHITE], [0.036, [1, 0.982, 0.788]], [0.089, [0.854, 0.963, 1]], [0.163, [1, 0.808, 0.807]], [0.257, [0.835, 1, 0.855]], [0.367, [1, 0.807, 0.953]], [0.699, [0.984, 0.894, 0.824]], [0.947, WHITE]], alpha: [[0, 1], [0.493, 1], [1, 0]] },
+    { color: [[0, WHITE], [0.036, [1, 0.986, 0.844]], [0.089, [0.825, 0.956, 1]], [0.163, [1, 0.817, 0.816]], [0.257, [0.873, 1, 0.888]], [0.367, [1, 0.882, 0.971]], [0.699, [0.984, 0.894, 0.824]], [0.947, WHITE]], alpha: [[0, 1], [0.108, 0.318], [0.263, 1], [0.346, 0.667], [0.493, 1], [1, 0]] },
+  ],
+  introDissolve: { color: [[0.305, [1, 0.857, 0.788]], [0.478, [0.647, 0.916, 1]], [0.657, WHITE]], alpha: [[0.048, 1], [0.937, 1], [1, 0]] },
+  introFlash: { color: [[0.124, WHITE], [0.998, [1, 0.647, 0.849]]], alpha: [[0, 1], [0.24, 1], [0.51, 0.835], [0.743, 0.617], [1, 0]] },
+  pop: { color: [[0.316, WHITE], [0.998, [0.647, 0.916, 1]]], alpha: [[0, 1], [0.739, 1], [1, 0]] },
+  shockwave: { color: [[0.115, WHITE], [0.374, [0.825, 0.561, 1]], [0.685, [0.421, 0.271, 0.784]], [0.853, [0.344, 0.584, 1]]], alpha: [[0.2, 1], [0.553, 1], [0.8, 0.197], [1, 0]] },
+  outro: { color: [[0, WHITE], [0.2, [0.524, 0.944, 1]], [0.766, [0, 0.883, 1]]], alpha: [[0.048, 1], [0.97, 1], [1, 0]] },
+  disc: fade([[0.143, 0], [0.173, 1], [0.88, 1], [1, 0]]),
+  debris: [
+    { color: [[0, WHITE], [0.144, [0.399, 0.718, 0.821]], [0.353, [1, 0.847, 0.533]], [0.726, [0.646, 0.943, 1]], [1, [0.821, 0.283, 0.283]]], alpha: [[0, 1], [0.493, 1], [1, 0]] },
+    { color: [[0, [1, 0.844, 0.946]], [1, [1, 0.552, 0.957]]], alpha: [[0.091, 1], [0.663, 1], [1, 0]] },
+  ],
+  helix: fade([[0, 0], [0.087, 0.055], [0.405, 1], [0.767, 1], [1, 0]]),
+  spiral: { color: [[0, [0.269, 0.231, 1]], [0.352, [0.325, 0.923, 1]], [0.611, WHITE]], alpha: [[0, 0], [0.087, 0.055], [0.405, 1], [0.966, 1], [1, 0]] },
+  spiralLate: { color: [[0.299, [0.269, 0.231, 1]], [0.512, [0.325, 0.923, 1]], [0.754, WHITE]], alpha: [[0, 0], [0.087, 0.055], [0.405, 1], [0.767, 1], [1, 0]] },
+  shafts: fade([[0.399, 1], [1, 0]]),
 };
 
-const TAU = Math.PI * 2;
-const CARD_ASPECT = 0.716;
-// The old card's lift (card heights) and swell as it shines and surges; the
-// new card starts from exactly there, so the hand-over shows no jump.
-const CARD_LIFT = -0.05;
-const CARD_SWELL = 0.06;
-const SURGE_SWELL = 0.05;
-// Depth: the lifted card leans back (degrees about X) and rocks side to side
-// (about Y), then flips edge-on through the white hand-over so it reads as a
-// solid card turning in space, not a flat sprite.
-const CARD_LEAN = 12;
-const CARD_ROCK = 10;
-// How much pearl-blue glow stays over the evolved art once it clears.
-const CARD_GLOW_REST = 0.45;
-const clamp01 = (t) => (Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : 0);
-const span = (t, a, b) => clamp01((t - a) / (b - a));
-const easeOutCubic = (t) => 1 - (1 - t) ** 3;
-const easeInCubic = (t) => t ** 3;
-const easeInOutSine = (t) => (1 - Math.cos(Math.PI * t)) / 2;
-const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
-const plateau = (t, a, b, c, d) => {
-  if (t <= a || t >= d) return 0;
-  if (t < b) return easeOutCubic(span(t, a, b));
-  if (t <= c) return 1;
-  return 1 - easeInCubic(span(t, c, d));
+// ---- the timeline (delay s · life s) — the order the frame is drawn in ----
+export const EVOLVE_TIMELINE = {
+  smokes: { delay: 0, life: 0.8 },
+  glowCore: { delay: 0, life: 1.257 },
+  wisps: { delay: 0.1, life: 1.15 },
+  raysRad: { delay: 0.2, life: 1.0 },
+  softy: { delay: 0.3, life: 0.6 },
+  sparkles: { delay: 1.0, life: 1.0 },
+  introFlash: { delay: 0, life: 0.3 },
+  introDissolve: { delay: 0, life: 1.0 },
+  helix: { delay: 0.1, life: 1.0 },
+  spirals: { delay: 0.1, life: 0.9 },
+  debris: { delay: 0.2, life: 0.6 },
+  prismaticSet: { delay: 0.2, life: 0.4 },
+  prismaticThin: { delay: 0.2, life: 0.4 },
+  pop: { delay: 0.95, life: 0.08 },
+  refraction: { delay: 1.0, life: 0.35 },
+  shockwave: { delay: 1.0, life: 0.25 },
+  disc: { delay: 1.0, life: 0.3 },
+  shafts: { delay: 1.0, life: 0.7 },
+  flash: { delay: 1.0, life: 0.3 },
+  motes: { delay: 1.0, life: 0.8 },
+  outro: { delay: 1.0, life: 2.0 },
 };
-const lerp = (a, b, t) => a + (b - a) * t;
-const rgba = ([r, g, b], a) => `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a))})`;
+const T = EVOLVE_TIMELINE;
 
-// ---- timeline ----
-
-/**
- * The card clock for scene fraction t: runs at SCENE_SPEED, stops at HOLD_AT
- * for HOLD_SHARE of the scene, then runs on to 1 at the end.
- */
-export function cardClock(t) {
-  const c = clamp01(t);
-  if (c <= HOLD_START) return c * SCENE_SPEED;
-  if (c <= HOLD_START + HOLD_SHARE) return HOLD_AT;
-  return Math.min(1, HOLD_AT + (c - HOLD_START - HOLD_SHARE) * SCENE_SPEED);
-}
-
-/** Every layer's strength (0..1) and motion at t in [0, 1] of the scene. */
-export function evolveScenePose(t) {
-  const s = clamp01(t);
-  const c = cardClock(s);
-  // Flying layers never stop: beads and bokeh keep the unheld pace.
-  const f = clamp01(s * SCENE_SPEED);
-  return {
-    nebula: plateau(c, 0, 0.07, 0.82, 0.98),
-    iris: easeOutCubic(span(c, 0, 0.09)),
-    stars: plateau(c, 0.02, 0.1, 0.8, 0.95),
-    halo: plateau(c, 0.04, 0.24, 0.8, 0.96),
-    beads: plateau(f, 0.12, 0.18, 0.58, 0.68),
-    beadRise: span(f, 0.12, 0.68),
-    bokeh: plateau(f, 0.4, 0.46, 0.74, 0.86),
-    bokehTravel: span(f, 0.4, 0.86),
-    glitter: plateau(s, 0.55, 0.62, 0.92, 1),
-    glitterTime: span(s, 0.55, 1),
-  };
-}
-
-/** Side-to-side rock (degrees about Y), fading out as the new card settles. */
-const cardRock = (c) => {
-  const u = span(c, 0.06, 0.86);
-  return CARD_ROCK * Math.sin(TAU * u) * Math.sqrt(1 - u);
-};
-
-/** A band of light sweeping across the face: x in card widths, 0 when idle. */
-const sheenPose = (c, from, to) => {
-  const p = span(c, from, to);
-  return { sheenX: lerp(-1.2, 1.2, easeInOutCubic(p)), sheen: Math.sin(Math.PI * p) };
-};
-
-/** Side shading from the turn: darker as the card faces away from the light. */
-const shadeOf = (tiltY) => Math.min(1, Math.abs(Math.sin((tiltY * Math.PI) / 180)));
-
-/**
- * The pre-evolution card: glows to pearl white, lifts and swells, and hands
- * over to the new card at the surge's peak. Without its art (no pre-diff
- * snapshot) it is a pearl card from the first frames, so the new art is never
- * spoiled.
- */
-export function oldCardPose(t, { hasArt = true } = {}) {
-  const c = cardClock(t);
-  const lift = easeInOutCubic(span(c, 0.04, 0.5));
-  const tiltY = cardRock(c) + 180 * easeInCubic(span(c, 0.5, CARD_REVEAL_AT));
-  return {
-    opacity: c < CARD_REVEAL_AT ? 1 : 0,
-    white: hasArt ? easeInOutCubic(span(c, 0.06, 0.3)) : easeOutCubic(span(c, 0, 0.04)),
-    scale: 1 + CARD_SWELL * lift + SURGE_SWELL * easeInCubic(span(c, 0.36, 0.62)),
-    x: 0,
-    y: CARD_LIFT * lift,
-    tiltX: CARD_LEAN * lift,
-    tiltY,
-    shade: shadeOf(tiltY),
-    ...sheenPose(c, 0.14, 0.4),
-  };
-}
-
-/**
- * The evolved card: takes over, pearl white, from where the old card stood,
- * keeps its size through the flip (one settle, no second drop), clears to a
- * pale blue glow over its art, and dissolves into the real card as it drops
- * back onto its slot.
- */
-export function newCardPose(t) {
-  const c = cardClock(t);
-  // Stays lifted through the hold, then eases slowly back down as it dissolves
-  // into the real card: a gentle settle, never a fall.
-  const settle = easeInOutSine(span(c, HOLD_AT, 1));
-  // Finishes the flip from its back (-180deg, same as the old card's 180deg) to
-  // face front while still white, so the swap and the mirrored back never show.
-  const tiltY = cardRock(c) - 180 * (1 - easeOutCubic(span(c, CARD_REVEAL_AT, 0.74)));
-  return {
-    opacity: c < CARD_REVEAL_AT ? 0 : 1 - easeInCubic(span(c, 0.84, 1)),
-    // Clears only part-way: the art shows through a pale blue glow to the end.
-    white: 1 - (1 - CARD_GLOW_REST) * easeInOutCubic(span(c, HOLD_AT, 0.9)),
-    scale: lerp(1 + CARD_SWELL + SURGE_SWELL, 1, settle),
-    x: 0,
-    y: lerp(CARD_LIFT, 0, settle),
-    tiltX: lerp(CARD_LEAN, 0, settle),
-    tiltY,
-    shade: shadeOf(tiltY),
-    ...sheenPose(c, 0.8, 0.94),
-  };
-}
-
-/** Darkening of the rest of the screen while the nebula is up. */
-export const stageDimPose = (t) => plateau(cardClock(t), 0, 0.1, 0.82, 0.98);
-
-/**
- * Degrees a 2D CSS matrix turns its content, so card art in the overlay can
- * match a rotated board (the opponent's frame is turned 180°). A mirror is
- * not a turn: it reads as 0.
- */
+/** Degrees a 2D matrix turns its content (the opponent's board frame is 180°); mirrors are not turns. */
 export function turnOfMatrix(matrix) {
   const { a = 1, b = 0, c = 0, d = 1 } = matrix || {};
   if (![a, b, c, d].every(Number.isFinite) || a * d - b * c <= 0) return 0;
@@ -184,258 +122,359 @@ export function turnOfMatrix(matrix) {
   return degrees === -180 ? 180 : degrees;
 }
 
-// ---- scene ----
+// ---- scene: every random pick of one play-through ----
 
-const between = (rand, lo, hi) => lo + rand() * (hi - lo);
-const pick = (rand, list) => list[Math.floor(rand() * list.length)];
+const pick = (rand, list) => list[Math.floor(rand() * list.length) % list.length];
 
-/** Every random placement of one play-through, from `seed` (deterministic). */
+// Particles leaving the edge of a cone of `radius` (thickness 0 → on the rim) straight outward.
+const conePoint = (rand, radius, thickness) => {
+  const angle = rand() * TAU;
+  const r = radius * (1 - thickness * rand());
+  return { x: Math.cos(angle) * r, y: Math.sin(angle) * r, dir: angle };
+};
+
+const streaks = (rand, { birthsAt, life, place }) =>
+  birthsAt.map((birth) => ({ birth, life: between(rand, life[0], life[1]), row: Math.floor(rand() * 4), tint: rand(), ...place(rand) }));
+
+const ringBirths = (rate, curve) => rateBirths({ burst: 1, rate, curve, duration: 4, until: 1 });
+
+/** Every random placement of one evolution, from `seed` (deterministic). */
 export function buildEvolveScene(seed = 1) {
   const rand = seededRandom(seed);
-  const P = EVOLVE_PALETTE;
-  const cloudTints = [P.violet, P.indigo, P.magenta, P.blue, P.frost];
-  const clouds = Array.from({ length: 22 }, () => ({
-    angle: rand() * TAU,
-    radius: Math.sqrt(rand()) * 0.95,
-    size: between(rand, 0.25, 0.55),
-    tint: pick(rand, cloudTints),
-    alpha: between(rand, 0.22, 0.5),
-    drift: between(rand, 0.08, 0.22) * (rand() < 0.75 ? 1 : -1),
-  }));
-  const stars = Array.from({ length: 36 }, () => ({
-    angle: rand() * TAU,
-    radius: between(rand, 0.3, 0.98),
-    size: between(rand, 0.025, 0.07),
-    phase: rand() * TAU,
-    rate: between(rand, 3, 7),
-  }));
-  const beads = Array.from({ length: 16 }, () => ({
-    x: between(rand, -0.8, 0.8),
-    y: between(rand, 0.3, 0.65),
-    rise: between(rand, 0.6, 1.05),
-    start: rand() * 0.55,
-    size: between(rand, 0.026, 0.05),
-    gap: between(rand, 0.05, 0.09),
-    phase: rand() * TAU,
-    front: rand() < 0.55,
-  }));
-  const bokeh = Array.from({ length: 22 }, () => ({
-    angle: rand() * TAU,
-    delay: rand(),
-    distance: between(rand, 0.45, 0.95),
-    size: between(rand, 0.05, 0.14),
-    tint: rand() < 0.5 ? P.frost : P.white,
-  }));
-  const glitter = Array.from({ length: 26 }, () => ({
-    x: between(rand, -0.75, 0.75),
-    y: between(rand, -0.65, 0.6),
-    start: rand() * 0.7,
-    life: between(rand, 0.18, 0.32),
-    size: between(rand, 0.07, 0.18),
-    turn: rand() * Math.PI,
-  }));
-  return { clouds, stars, beads, bokeh, glitter };
+  return {
+    smoke: { size: between(rand, 33, 45), rot: between(rand, -Math.PI, Math.PI), gradient: pick(rand, GRADIENTS.smokes) },
+    wisps: [0, 1].map(() => ({ size: between(rand, 18, 21), rot: rand() * TAU })),
+    raysRad: [0, 1].map(() => ({ size: between(rand, 28, 33), rot: between(rand, -Math.PI, Math.PI), spin: between(rand, -0.262, 0.262) })),
+    softy: streaks(rand, {
+      birthsAt: ringBirths(15, [[0, 1], [0.123, 1], [0.135, 0]]),
+      life: [0.4, 0.6],
+      place: (r) => ({ ...conePoint(r, 24.7, 0.58), speed: between(r, 0.5, 3), w: between(r, 7, 8), h: between(r, 7, 9) }),
+    }),
+    prismaticSet: streaks(rand, {
+      birthsAt: ringBirths(22, [[0, 1], [0.162, 1], [0.164, 0]]),
+      life: [0.2, 0.4],
+      place: (r) => ({ ...conePoint(r, 5.98 * 1.435, 0), w: between(r, 0.45, 1.2), h: between(r, 5, 11) }),
+    }),
+    prismaticThin: streaks(rand, {
+      birthsAt: ringBirths(11, [[0, 1], [0.164, 1], [0.171, 0]]),
+      life: [0.2, 0.4],
+      place: (r) => ({ ...conePoint(r, 4.14 * 1.287, 0), w: between(r, 1, 3), h: between(r, 8, 11) }),
+    }),
+    debris: rateBirths({ burst: 14, rate: 150, curve: [[0, 0.171], [0.245, 1], [0.309, 0]], duration: 4 }).map((birth) => {
+      const [x, y] = pointOnRectEdge(rand, 0.76 * 11, 1.29 * 8.8);
+      const out = Math.hypot(x, y) || 1;
+      const reach = between(rand, 0.25, 1);
+      return {
+        birth,
+        life: 0.6 * curveAt([[0, 0.721], [0.261, 0.392], [1, 0.162]], birth / 4),
+        x,
+        y,
+        dx: (x / out) * reach,
+        dy: (y / out) * reach,
+        speed: between(rand, 0.5, 3),
+        size: between(rand, 0.3, 0.75),
+        gradient: pick(rand, GRADIENTS.debris),
+      };
+    }),
+    sparkles: Array.from({ length: 22 }, () => {
+      const angle = rand() * TAU;
+      const r = 15.64 * Math.sqrt(rand());
+      return {
+        life: between(rand, 0.5, 1),
+        x: Math.cos(angle) * r,
+        y: Math.sin(angle) * r,
+        dir: angle,
+        speed: between(rand, 1, 5),
+        size: between(rand, 0.5, 1),
+        rot: between(rand, -Math.PI, Math.PI),
+        frame: Math.floor(rand() * 4),
+        gradient: pick(rand, GRADIENTS.sparkles),
+      };
+    }),
+    motes: Array.from({ length: 22 }, () => {
+      const [x, y] = pointOnRectEdge(rand, 10 - 0.25 * rand(), 14 - 0.25 * rand());
+      return {
+        life: between(rand, 0.4, 0.8),
+        x,
+        y,
+        size: between(rand, 0.4, 1.2),
+        rot: rand() * TAU,
+        frame: rand(),
+        drift: rand() * TAU,
+        gradient: pick(rand, GRADIENTS.motes),
+      };
+    }),
+    spiralDots: Object.fromEntries(
+      Object.keys(SPIRAL_TRAILS).map((key) => [
+        key,
+        Array.from({ length: 26 }, () => ({ at: rand(), side: between(rand, -1, 1), size: between(rand, 0.25, 0.7), frame: rand() < 0.5 ? 0 : 1 })),
+      ])
+    ),
+  };
 }
 
-// ---- drawing ----
+// ---- pose helpers ----
 
-const geometryOf = ({ cx, cy, unit, card, scene, time, palette = EVOLVE_PALETTE }) => ({
-  cx,
-  cy,
-  unit,
-  cardW: card?.width > 0 ? card.width : unit * CARD_ASPECT,
-  cardH: card?.height > 0 ? card.height : unit,
-  scene,
-  time: Number.isFinite(time) ? time : 0,
-  palette,
-});
+const timeOk = (t) => (Number.isFinite(t) ? t : 0);
+const local = (t, beat) => ageOf(timeOk(t), beat.delay, beat.life);
+const scaleRgb = (rgb, tint) => rgb.map((c, i) => c * tint[i]);
+const along = (x, y, dir, distance) => [x + Math.cos(dir) * distance, y + Math.sin(dir) * distance];
 
-const drawable = (g) =>
-  g && g.unit > 0 && Number.isFinite(g.cx) && Number.isFinite(g.cy) && Boolean(g.scene);
+/** A stretched billboard: its quad trails the head back along `dir`. */
+const streakOp = (tex, frame, x, y, dir, width, length, rgb, alpha) => {
+  const [cx, cy] = along(x, y, dir, -length / 2);
+  return { kind: 'sprite', tex, x: cx, y: cy, w: length, h: width, rot: dir, rgb, alpha, frame };
+};
 
-/**
- * The layers behind the card at t in [0, 1]: nebula, stars, halo, and the
- * beads that pass behind it. `g` is
- * `{cx, cy, unit, card, scene, time}` in the canvas's CSS pixels: (cx, cy) the
- * card centre, `unit` the card height, `time` seconds (for twinkling).
- */
-export function drawEvolveBack(ctx, t, g) {
-  if (!ctx || !drawable(g)) return;
-  const pose = evolveScenePose(t);
-  const k = geometryOf(g);
-  ctx.save();
-  drawNebula(ctx, pose, k);
-  drawHalo(ctx, pose, k);
-  drawBeads(ctx, pose, k, false);
-  ctx.restore();
-}
-
-/** The layers over the card: near beads, bokeh, glitter. */
-export function drawEvolveFront(ctx, t, g) {
-  if (!ctx || !drawable(g)) return;
-  const pose = evolveScenePose(t);
-  const k = geometryOf(g);
-  ctx.save();
-  drawBeads(ctx, pose, k, true);
-  drawBokeh(ctx, pose, k);
-  drawGlitter(ctx, pose, k);
-  ctx.restore();
-}
-
-function fillCircle(ctx, x, y, radius, style) {
-  if (!(radius > 0)) return;
-  ctx.fillStyle = style;
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, TAU);
-  ctx.fill();
-}
-
-/** A radial glow of `rgb` fading from `alpha` at the centre to nothing. */
-function glow(ctx, x, y, radius, rgb, alpha) {
-  if (!(radius > 0) || !(alpha > 0)) return;
-  const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
-  grad.addColorStop(0, rgba(rgb, alpha));
-  grad.addColorStop(0.45, rgba(rgb, alpha * 0.4));
-  grad.addColorStop(1, rgba(rgb, 0));
-  fillCircle(ctx, x, y, radius, grad);
-}
-
-/** A thin diamond along the x axis, centred on the origin. */
-function traceDiamond(ctx, length, width) {
-  ctx.beginPath();
-  ctx.moveTo(-length, 0);
-  ctx.lineTo(0, -width);
-  ctx.lineTo(length, 0);
-  ctx.lineTo(0, width);
-  ctx.closePath();
-}
-
-/** A four-point star with long rays and a soft core. */
-function drawStar(ctx, x, y, size, alpha, turn, core) {
-  if (!(alpha > 0) || !(size > 0)) return;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(turn);
-  ctx.globalAlpha *= Math.min(1, alpha);
-  glow(ctx, 0, 0, size * 0.45, core, 0.9);
-  ctx.fillStyle = rgba(EVOLVE_PALETTE.white, 1);
-  traceDiamond(ctx, size, size * 0.05);
-  ctx.fill();
-  ctx.rotate(Math.PI / 2);
-  traceDiamond(ctx, size * 0.7, size * 0.05);
-  ctx.fill();
-  ctx.restore();
-}
-
-/** The violet nebula disc and its twinkling stars. */
-function drawNebula(ctx, pose, k) {
-  if (!(pose.nebula > 0)) return;
-  const { cx, cy, unit, palette: P, scene, time } = k;
-  const R = unit * 1.3 * (0.15 + 0.85 * pose.iris);
-  const a = pose.nebula;
-  ctx.save();
-  const base = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-  base.addColorStop(0, rgba(P.violet, 0.9 * a));
-  base.addColorStop(0.35, rgba(P.indigo, 0.92 * a));
-  base.addColorStop(0.72, rgba(P.ink, 0.85 * a));
-  base.addColorStop(1, rgba(P.ink, 0));
-  fillCircle(ctx, cx, cy, R, base);
-
-  ctx.globalCompositeOperation = 'lighter';
-  for (const cloud of scene.clouds) {
-    const angle = cloud.angle + cloud.drift * time;
-    const r = cloud.radius * R * 0.85;
-    const x = cx + Math.cos(angle) * r;
-    const y = cy + Math.sin(angle) * r * 0.8;
-    const fade = 1 - cloud.radius ** 3;
-    glow(ctx, x, y, cloud.size * unit, cloud.tint, cloud.alpha * a * fade);
+function cardLayerOps(t) {
+  const ops = [];
+  const flash = local(t, T.introFlash);
+  if (flash != null) {
+    const g = gradientAt(GRADIENTS.introFlash, flash);
+    ops.push({ kind: 'dissolve', mask: 'squareRounded', noise: 'tileCell', x: 0, y: 0, w: 10, h: 13, amount: lerp(-1, 1, flash), rgb: scaleRgb(g.rgb, POP_TINT), alpha: g.a });
   }
-  if (pose.stars > 0) {
-    for (const star of scene.stars) {
-      const twinkle = 0.55 + 0.45 * Math.sin(time * star.rate + star.phase);
-      const x = cx + Math.cos(star.angle) * star.radius * R;
-      const y = cy + Math.sin(star.angle) * star.radius * R * 0.85;
-      drawStar(ctx, x, y, star.size * unit, pose.stars * twinkle, 0, P.frost);
+  const intro = local(t, T.introDissolve);
+  if (intro != null) {
+    const g = gradientAt(GRADIENTS.introDissolve, intro);
+    ops.push({
+      kind: 'dissolve',
+      mask: 'squareRounded',
+      noise: 'diamondSwirl',
+     
+      x: 0,
+      y: 0,
+      w: 9.54,
+      h: 12.72,
+      amount: curveAt([[0, 1], [0.239, 0.562], [0.761, -0.168], [1, -1]], intro),
+      noiseRot: -intro * T.introDissolve.life,
+      rgb: g.rgb,
+      alpha: g.a,
+    });
+  }
+  const pop = local(t, T.pop);
+  if (pop != null) {
+    const g = gradientAt(GRADIENTS.pop, pop);
+    ops.push({ kind: 'sprite', tex: 'squareRounded', x: 0, y: 0, w: 10, h: 13, rot: 0, rgb: scaleRgb(g.rgb, POP_TINT), alpha: g.a });
+  }
+  const outro = local(t, T.outro);
+  if (outro != null) {
+    const g = gradientAt(GRADIENTS.outro, outro);
+    ops.push({ kind: 'dissolve', mask: 'squareRounded', noise: 'tileCell', x: 0, y: 0, w: 9.54, h: 12.72, amount: lerp(-0.252, 0.82, outro), rgb: g.rgb, alpha: g.a });
+  }
+  return ops;
+}
+
+function backOps(scene, t) {
+  const ops = [];
+  const smoke = local(t, T.smokes);
+  if (smoke != null) {
+    const g = gradientAt(scene.smoke.gradient, smoke);
+    const size = scene.smoke.size;
+    ops.push({ kind: 'dissolve', mask: 'cloudRound', noise: 'renderClouds', x: 0, y: 0, w: size, h: size, rot: scene.smoke.rot, amount: lerp(-1, 0.622, smoke), soft: 0.2, detail: 0.4, rgb: g.rgb, alpha: 0.561 * 0.58 * g.a });
+  }
+  const core = local(t, T.glowCore);
+  if (core != null) {
+    const g = gradientAt(GRADIENTS.glowCore, core);
+    const size = 20.15 * 2 * lerp(0.462, 0.954, core);
+    ops.push({ kind: 'sprite', tex: 'gradRadial', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: LEVEL.glowCore * g.a });
+  }
+  const wisp = local(t, T.wisps);
+  if (wisp != null) {
+    const g = gradientAt(GRADIENTS.wisp, wisp);
+    const elapsed = wisp * T.wisps.life;
+    for (const w of scene.wisps) {
+      const size = w.size * 2 * lerp(0.66, 1, wisp);
+      ops.push({ kind: 'polar', noise: 'tileClouds', mask: 'glowSquare', shape: 'disc', x: 0, y: 0, size, rot: w.rot, tileU: 2.14, tileV: 0.25, offU: 0, offV: -2 * elapsed, levels: [0.25, 1], detail: 0.5, rgb: g.rgb, alpha: LEVEL.wisps * g.a });
     }
   }
-  ctx.restore();
-}
-
-/** Frost-white glow behind the card while it shines and the new one settles. */
-function drawHalo(ctx, pose, k) {
-  if (!(pose.halo > 0)) return;
-  const { cx, cy, unit, palette: P } = k;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  glow(ctx, cx, cy, unit * 0.85, P.frost, 0.75 * pose.halo);
-  glow(ctx, cx, cy, unit * 0.7, P.white, 0.5 * pose.halo);
-  ctx.restore();
-}
-
-/** Pairs of glowing beads floating up past the card. */
-function drawBeads(ctx, pose, k, front) {
-  if (!(pose.beads > 0)) return;
-  const { cx, cy, unit, palette: P, scene } = k;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const bead of scene.beads) {
-    if (bead.front !== front) continue;
-    const p = span(pose.beadRise, bead.start, bead.start + 0.45);
-    if (!(p > 0 && p < 1)) continue;
-    const alpha = pose.beads * Math.sin(p * Math.PI);
-    const x = cx + bead.x * unit + Math.sin(p * TAU + bead.phase) * unit * 0.05;
-    const y = cy + bead.y * unit - bead.rise * unit * easeOutCubic(p);
-    // Near beads are bigger and brighter than far ones: parallax, not a flat layer.
-    const depth = front ? 1.2 : 0.7;
-    const r = bead.size * unit * depth;
-    const shine = alpha * (front ? 1 : 0.55);
-    for (const [dx, dy] of [
-      [0, 0],
-      [bead.gap * unit, bead.gap * unit * 0.4],
-    ]) {
-      glow(ctx, x + dx, y + dy, r * 3.2, P.frost, 0.6 * shine);
-      fillCircle(ctx, x + dx, y + dy, r, rgba(P.white, shine));
+  const rays = local(t, T.raysRad);
+  if (rays != null) {
+    const g = gradientAt(GRADIENTS.raysRad, rays);
+    const elapsed = rays * T.raysRad.life;
+    for (const r of scene.raysRad) {
+      const size = r.size * 2 * lerp(0.462, 0.954, rays);
+      ops.push({ kind: 'polar', noise: 'streaks', mask: 'gradRadial', shape: 'open', x: 0, y: 0, size, rot: r.rot + r.spin * elapsed, tileU: 1, tileV: 1, offU: 0.15 * elapsed, offV: elapsed, levels: [0, 0.5], detail: 1.2, rgb: g.rgb, alpha: LEVEL.raysRad * g.a });
     }
   }
-  ctx.restore();
+  for (const p of scene.softy) {
+    const age = ageOf(timeOk(t) - T.softy.delay, p.birth, p.life);
+    if (age == null) continue;
+    const [x, y] = along(p.x, p.y, p.dir, p.speed * age * p.life);
+    const s = 1.2 * lerp(1, 0.694, age);
+    const alpha = lerp(0.298, 0.325, p.tint) * gradientAt(GRADIENTS.softy, age).a;
+    ops.push(streakOp('raysPrismatic', [1, 4, p.row], x, y, p.dir, p.w * s, p.h * s, [lerp(1, 0.325, p.tint), lerp(1, 0.893, p.tint), 1], alpha));
+  }
+  const sparkT = timeOk(t) - T.sparkles.delay;
+  for (const p of scene.sparkles) {
+    const age = ageOf(sparkT, 0, p.life);
+    if (age == null) continue;
+    const g = gradientAt(p.gradient, age);
+    const [x, y] = along(p.x, p.y, p.dir, limitedTravel(p.speed, { limit: 4, limitCurve: [[0, 1], [1, 0]], dampen: 0.05 }, sparkT, p.life));
+    const size = p.size * 2 * lerp(0.462, 0.621, age);
+    ops.push({ kind: 'sprite', tex: 'starVariants', frame: [2, 2, p.frame], x, y, w: size, h: size, rot: p.rot, rgb: g.rgb, alpha: Math.min(1, 1.28 * g.a) });
+  }
+  return ops;
 }
 
-/** Soft out-of-focus discs thrown outward by the surge. */
-function drawBokeh(ctx, pose, k) {
-  if (!(pose.bokeh > 0)) return;
-  const { cx, cy, unit, scene } = k;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const disc of scene.bokeh) {
-    const from = disc.delay * 0.5;
-    const p = easeOutCubic(span(pose.bokehTravel, from, from + 0.5));
-    if (!(p > 0 && p < 1)) continue;
-    const reach = (0.25 + disc.distance * p) * unit;
-    const x = cx + Math.cos(disc.angle) * reach;
-    const y = cy + Math.sin(disc.angle) * reach;
-    const r = disc.size * unit * (0.6 + 0.6 * p);
-    const alpha = pose.bokeh * (1 - p) ** 0.7;
-    fillCircle(ctx, x, y, r, rgba(disc.tint, 0.3 * alpha));
-    ctx.strokeStyle = rgba(disc.tint, 0.6 * alpha);
-    ctx.lineWidth = Math.max(0.5, r * 0.12);
-    ctx.stroke();
+const SPIN = {
+  helix1: { scalar: 10.472, curve: [[0, -0.315], [0.822, -1]], life: 0.81, shrink: 0.559 },
+  helix4: { scalar: 10.472, curve: [[0, -0.034], [0.853, -1]], life: 1.0, shrink: 0.09 },
+  helix5: { scalar: 10.472, curve: [[0, -0.034], [0.853, -1]], life: 1.0, shrink: 0.126 },
+  helix6: { scalar: 10.472, curve: [[0, -0.034], [0.853, -1]], life: 1.0, shrink: 0.054 },
+  helix7: { scalar: 10.472, curve: [[0, -0.034], [0.636, -1]], life: 1.0, shrink: 0.306 },
+};
+// Each helix shrinks toward the card while it spins: the mesh turns about its
+// own axis, which the card-plane projection mirrors, so the 2D turn is −spin.
+function helixOps(t) {
+  const ops = [];
+  for (const [key, spin] of Object.entries(SPIN)) {
+    const age = ageOf(timeOk(t), T.helix.delay, spin.life);
+    if (age == null) continue;
+    const angle = -spinAngle(spin.scalar, spin.curve, age, spin.life);
+    const scale = lerp(1, spin.shrink, age);
+    const ribbon = HELIX_RIBBONS[key];
+    ops.push({
+      kind: 'ribbon',
+      a: turnPoints(ribbon.a, angle, scale),
+      b: turnPoints(ribbon.b, angle, scale),
+      lut: 'lightShaft',
+      pan: lerp(0, key === 'helix1' ? 0.495 : 1, age),
+      rgb: WHITE,
+      alpha: gradientAt(GRADIENTS.helix, age).a,
+    });
   }
-  ctx.restore();
+  return ops;
 }
 
-/** Twinkling glitter round the evolved Pokémon. */
-function drawGlitter(ctx, pose, k) {
-  if (!(pose.glitter > 0)) return;
-  const { cx, cy, unit, palette: P, scene } = k;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const bit of scene.glitter) {
-    const p = span(pose.glitterTime, bit.start, bit.start + bit.life);
-    if (!(p > 0 && p < 1)) continue;
-    const bloom = Math.sin(p * Math.PI);
-    const x = cx + bit.x * unit;
-    const y = cy + bit.y * unit - p * unit * 0.12;
-    drawStar(ctx, x, y, bit.size * unit * (0.4 + 0.6 * bloom), pose.glitter * bloom, bit.turn + p * 0.8, P.frost);
+// Projected spin/scale origins of the three trails (their parent offsets).
+const SPIRALS = {
+  spiral1: { origin: [0.16, -3.92], scalar: 2.618, curve: [[0, -0.034], [0.872, -1]], dissolve: [[0, 0.477], [0.405, -0.004], [0.73, 0.025], [1, 0.45]], gradient: 'spiral' },
+  spiral2: { origin: [0.16, 2.64], scalar: 4.538, curve: [[0.214, 0.02], [0.86, 1]], dissolve: [[0.467, 0.468], [1, 1]], gradient: 'spiralLate' },
+  spiral3: { origin: [4.08, -3.92], scalar: 2.618, curve: [[0, -0.034], [0.872, -1]], dissolve: [[0, 0.477], [0.405, -0.004], [0.73, 0.025], [1, 0.45]], gradient: 'spiral' },
+};
+const TRAIL_GROUND = 0.3;
+const shiftPoints = (points, [ox, oy], back = false) => points.map(([x, y]) => (back ? [x + ox, y + oy] : [x - ox, y - oy]));
+
+function spiralOps(scene, t) {
+  const ops = [];
+  const age = local(t, T.spirals);
+  if (age == null) return ops;
+  for (const [key, cfg] of Object.entries(SPIRALS)) {
+    const trail = SPIRAL_TRAILS[key];
+    const angle = -spinAngle(cfg.scalar, cfg.curve, age, T.spirals.life);
+    const scale = curveAt([[0.475, 1], [1, 0.757]], age);
+    const centre = shiftPoints(turnPoints(shiftPoints(trail.c, cfg.origin), angle, scale), cfg.origin, true);
+    const half = trail.w.map((w) => w * scale);
+    const g = gradientAt(GRADIENTS[cfg.gradient], age);
+    // The trail dissolves through its Debris_Glow dots: the dots stay bright, the
+    // texture's dim ground between them shows only mid-life (TRAIL_GROUND).
+    const solid = TRAIL_GROUND * (1 - smoothstep(0, 0.45, curveAt(cfg.dissolve, age)));
+    const { a, b } = railsAround(centre, half);
+    ops.push({ kind: 'ribbon', a, b, lut: 'prismaticVert', band: 'gradBeamH', rgb: g.rgb, alpha: g.a * solid });
+    for (const dot of scene.spiralDots[key]) {
+      const i = Math.min(centre.length - 1, Math.floor(dot.at * centre.length));
+      const side = (dot.side + 1) / 2;
+      const x = lerp(a[i][0], b[i][0], side);
+      const y = lerp(a[i][1], b[i][1], side);
+      const band = Math.sin(Math.PI * dot.at);
+      ops.push({ kind: 'sprite', tex: 'starsSubUV', frame: [2, 1, dot.frame], x, y, w: dot.size * 2, h: dot.size * 2, rot: angle, rgb: g.rgb, alpha: g.a * band });
+    }
   }
-  ctx.restore();
+  return ops;
+}
+
+function chargeParticleOps(scene, t) {
+  const ops = [];
+  const debrisT = timeOk(t) - T.debris.delay;
+  for (const p of scene.debris) {
+    const age = ageOf(debrisT, p.birth, p.life);
+    if (age == null) continue;
+    const g = gradientAt(p.gradient, age);
+    const travel = limitedTravel(p.speed, { limit: 7, limitCurve: [[0, 1], [0.336, 0.064], [1, 0]], dampen: 0.1 }, age * p.life, p.life);
+    const x = p.x + p.dx * travel;
+    const y = p.y + p.dy * travel;
+    const size = p.size * lerp(1, 0.523, age);
+    // Spark_Lerp blends the round glow into the four-point star by its custom curve.
+    const star = clamp01(curveAt([[0, 0.013], [0.276, 1], [0.508, -0.035], [0.75, 1], [1, -0.12]], age));
+    ops.push({ kind: 'sprite', tex: 'starsSubUV', frame: [2, 1, 0], x, y, w: size, h: size, rot: 0, rgb: g.rgb, alpha: g.a * (1 - star) });
+    ops.push({ kind: 'sprite', tex: 'starsSubUV', frame: [2, 1, 1], x, y, w: size * 1.6, h: size * 1.6, rot: 0, rgb: g.rgb, alpha: g.a * star });
+  }
+  for (const p of scene.prismaticSet) {
+    const age = ageOf(timeOk(t) - T.prismaticSet.delay, p.birth, p.life);
+    if (age == null) continue;
+    const [x, y] = along(p.x, p.y, p.dir, 33 * 1.435 * age * p.life);
+    const s = 1.435 * 1.2 * lerp(0.541, 1, age);
+    ops.push(streakOp('raysPrismatic', [1, 4, p.row], x, y, p.dir, p.w * s, p.h * s, [lerp(1, 0.325, p.tint), lerp(1, 0.893, p.tint), 1], gradientAt(GRADIENTS.beam, age).a));
+  }
+  for (const p of scene.prismaticThin) {
+    const age = ageOf(timeOk(t) - T.prismaticThin.delay, p.birth, p.life);
+    if (age == null) continue;
+    const travel = limitedTravel(-2 * 1.287, { limit: 22, limitCurve: [[0, 1], [1, 0.441]], dampen: 0.1 }, age * p.life, p.life);
+    const [x, y] = along(p.x, p.y, p.dir, travel);
+    const s = 1.287 * 5 * lerp(0.198, 0.405, age);
+    ops.push(streakOp('victoryRays', [1, 4, p.row], x, y, p.dir + Math.PI, p.w * s, p.h * s, WHITE, gradientAt(GRADIENTS.beam, age).a));
+  }
+  return ops;
+}
+
+function popOps(scene, t) {
+  const ops = [];
+  const ring = local(t, T.refraction);
+  if (ring != null) {
+    const g = gradientAt(GRADIENTS.refraction, ring);
+    const size = 31.08 * curveAt([[0, 0.709], [0.152, 0.964], [1, 0.955]], ring);
+    ops.push({ kind: 'sprite', tex: 'spectrumRing', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: LEVEL.refraction * g.a });
+  }
+  const wave = local(t, T.shockwave);
+  if (wave != null) {
+    const g = gradientAt(GRADIENTS.shockwave, wave);
+    const size = 2 * 95.69 * 0.1 * 4 * curveAt([[0, 0.153], [0.81, 0.835]], wave);
+    ops.push({ kind: 'sprite', tex: 'radialLine', x: 0, y: 0, w: size, h: size, rot: 2.592 + 0.6 * wave * T.shockwave.life, rgb: g.rgb, alpha: LEVEL.shockwave * g.a });
+  }
+  const disc = local(t, T.disc);
+  if (disc != null) {
+    const size = 2 * 13.59 * 1.06 * 3 * lerp(0.144, 0.423, disc);
+    ops.push({ kind: 'polar', noise: 'debrisGlow', band: 'gradBeamH', lut: 'prismaticVert', x: 0, y: 0, size, rot: 0, tileU: 3, tileV: 1, offU: 0, offV: 0, amount: lerp(-0.514, 0.207, disc), soft: 0.12, detail: 0.7, rgb: WHITE, alpha: gradientAt(GRADIENTS.disc, disc).a });
+  }
+  const shafts = ageOf(timeOk(t), T.shafts.delay, 0.6);
+  if (shafts != null) {
+    const boost = curveAt([[0, 1], [0.442, 0.029]], shafts);
+    const alpha = LEVEL.shafts * gradientAt(GRADIENTS.shafts, shafts).a * (0.55 + 0.45 * boost);
+    for (const blade of LIGHT_SHAFTS) ops.push({ kind: 'ribbon', a: blade.a, b: blade.b, lut: 'lightRay', taper: true, rgb: WHITE, alpha });
+  }
+  const flash = local(t, T.flash);
+  if (flash != null) {
+    const alpha = LEVEL.flash * gradientAt(GRADIENTS.shafts, flash).a;
+    for (let i = 0; i < 4; i += 1) {
+      const angle = (i * Math.PI) / 2;
+      const { a, b } = railsAround([[0, 0], [Math.cos(angle) * 15.75, Math.sin(angle) * 15.75]], [0.9, 0.1]);
+      ops.push({ kind: 'ribbon', a, b, lut: 'lightRay', taper: true, rgb: WHITE, alpha });
+    }
+  }
+  const moteT = timeOk(t) - T.motes.delay;
+  for (const p of scene.motes) {
+    const age = ageOf(moteT, 0, p.life);
+    if (age == null) continue;
+    const g = gradientAt(p.gradient, age);
+    // Noise (strength 3, frequency 0.1) as a slow seeded drift.
+    const drift = 3 * 0.35 * moteT;
+    const size = p.size * 2 * curveAt([[0, 0.833], [0.689, 0.962], [1, 0.225]], age);
+    const frame = Math.floor((p.frame + age) * 4) % 4;
+    ops.push({ kind: 'sprite', tex: 'starVariants', frame: [2, 2, frame], x: p.x + Math.cos(p.drift) * drift, y: p.y + Math.sin(p.drift) * drift, w: size, h: size, rot: p.rot, rgb: g.rgb, alpha: Math.min(1, 1.28 * g.a) });
+  }
+  return ops;
+}
+
+/** The frame at scene time `t` (s): back layers, the card cutout, then the front layers. */
+export function evolveOps(scene, t) {
+  if (!scene) return [];
+  return [
+    ...backOps(scene, t),
+    { kind: 'cutout' },
+    ...chargeParticleOps(scene, t),
+    ...spiralOps(scene, t),
+    ...helixOps(t),
+    ...popOps(scene, t),
+    ...cardLayerOps(t),
+  ];
 }
