@@ -573,3 +573,32 @@ test('evolve-played trigger: a named Pokémon is one, "a Pokémon" and "to evolv
     false
   );
 });
+// Dusclops, Shrouded Fable 019 (pkmncards row in out/pkmn-pokemon-cards.json).
+const CURSED_BLAST =
+  "Once during your turn, you may put 5 damage counters on 1 of your opponent's Pokémon. If you use this Ability, this Pokémon is Knocked Out.";
+
+test('ability: Cursed Blast Knocks Out its user and the opponent chooses a Prize card', () => {
+  const { state, rng } = board(CURSED_BLAST, { name: 'Dusclops', ownBench: [81], oppBench: [91] });
+  for (const [playerId, base] of [['p1', 200], ['p2', 210]]) {
+    for (let i = 0; i < 3; i++) state.players[playerId].zones.prizes.push(mon(base + i, 'Prize'));
+  }
+  const picked = resolveWith(use70(state, rng), [91], rng);
+  const { p1, p2 } = picked.state.players;
+  assert.equal(p1.zones.discard.some((c) => c.instanceId === 70), true);
+  assert.equal(p2.flags.prizesOwed, 1);
+  assert.equal(picked.pendingChoice?.player, 'p2');
+  assert.equal(picked.pendingChoice?.source, 'Prize cards');
+});
+
+test('ability: Cursed Blast lethal on the target gives both players a Prize choice in turn', () => {
+  const { state, rng } = board(CURSED_BLAST, { name: 'Dusclops', ownBench: [81], oppBench: [91] });
+  for (const [playerId, base] of [['p1', 200], ['p2', 210]]) {
+    for (let i = 0; i < 3; i++) state.players[playerId].zones.prizes.push(mon(base + i, 'Prize'));
+  }
+  state.players.p2.zones.bench.find((c) => c.instanceId === 91).damage = 60;
+  const first = resolveWith(use70(state, rng), [91], rng);
+  assert.equal(first.pendingChoice?.player, 'p1');
+  const second = resolveWith(first, [first.pendingChoice.options[0].instanceId], rng);
+  assert.equal(second.pendingChoice?.player, 'p2');
+  assert.equal(second.pendingChoice?.source, 'Prize cards');
+});

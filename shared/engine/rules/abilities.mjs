@@ -594,6 +594,12 @@ function withIfYouDoHalves(lower, parsed) {
     steps = [...steps, { type: 'selfLeavesAbility', to: 'knockOut', guidance: 'This Pokémon is Knocked Out.' }];
   }
 
+  // Dusclops/Dusknoir Cursed Blast: "put N damage counters on 1 of your opponent's Pokémon. If you
+  // use this Ability, this Pokémon is Knocked Out." The reducer's KO flow awards the Prizes.
+  if (steps.some((step) => step.type === 'moveDamageAbility' && step.selfKnockOut)) {
+    steps = [...steps, { type: 'selfLeavesAbility', to: 'knockOut', guidance: 'This Pokémon is Knocked Out.' }];
+  }
+
   // Iron Bundle Hyper Blower: "If you do, discard this Pokémon and all attached cards."
   if (new RegExp(`if you do, discard ${SELF} and all attached cards`).test(lower)) {
     markCosts();
