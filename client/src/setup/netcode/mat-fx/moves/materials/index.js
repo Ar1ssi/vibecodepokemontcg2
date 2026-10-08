@@ -15,6 +15,8 @@ import { aurora, ice } from './ice.js';
 import { poison } from './poison.js';
 import { psychic } from './psychic.js';
 import { ancient, gem, rock } from './rock.js';
+import { normal } from './normal.js';
+import { stellar } from './stellar.js';
 import { steel } from './steel.js';
 import { water } from './water.js';
 
@@ -45,6 +47,8 @@ export const MATERIALS = Object.freeze({
   bug,
   buzz,
   silver,
+  normal,
+  stellar,
   default: fire,
 });
 

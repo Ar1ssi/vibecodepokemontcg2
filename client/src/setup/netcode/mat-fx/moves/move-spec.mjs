@@ -29,7 +29,7 @@ export const FAMILIES = Object.freeze([
 ]);
 export const LAYERS = Object.freeze(['back', 'front', 'top']);
 /** Keys of MATERIALS (materials/index.js); materials.test.mjs keeps the two in step. */
-export const MATERIAL_KEYS = Object.freeze(['fire', 'water', 'grass', 'petal', 'solar', 'electric', 'fighting', 'aura', 'psychic', 'dark', 'steel', 'dragon', 'fairy', 'ghost', 'poison', 'ground', 'mud', 'rock', 'ancient', 'gem', 'flying', 'ice', 'aurora', 'bug', 'buzz', 'silver']);
+export const MATERIAL_KEYS = Object.freeze(['fire', 'water', 'grass', 'petal', 'solar', 'electric', 'fighting', 'aura', 'psychic', 'dark', 'steel', 'dragon', 'fairy', 'ghost', 'poison', 'ground', 'mud', 'rock', 'ancient', 'gem', 'flying', 'ice', 'aurora', 'bug', 'buzz', 'silver', 'normal', 'stellar']);
 export const PARTICLE_KINDS = Object.freeze([
   'ember',
   'droplet',
@@ -43,6 +43,9 @@ export const PARTICLE_KINDS = Object.freeze([
   'star',
   // A four-point sparkle in the material's particle colour (fairy); `star` is the gold KO star.
   'twinkle',
+  // Design 065 § F: a Z (Dark Void's sleep motes) and an eighth note (Relic Song).
+  'zzz',
+  'note',
 ]);
 export const TIER_BAND = Object.freeze({ 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200], S: [1800, 2600] });
 /** Design 065: tier S (signature moves) contact window, on top of the ratio band. */

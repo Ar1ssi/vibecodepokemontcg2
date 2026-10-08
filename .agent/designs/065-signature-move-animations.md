@@ -670,6 +670,18 @@ dependency.
 - Slice 2: the red-body test asserts per-colour substitution for every material, and that ≥ 24
   of 26 draw their body colour in glow/body/tongue/projectile (dark's body grey is not drawn by
   those four calls).
+- Slice 3: the `'body'` unit in `_units.js` is a palette-only fallback sphere (units take a
+  palette, not a material); slice 4's drawers should call the material's own `body`/`projectile`
+  for `unit 'body'` and use `UNITS[unit]` for the rest.
+- Slice 3: units have only `s` (beat progress), no clock, so `'spiked'`'s "30°/s" is `60·s`°
+  (a ~2 s tier-S beat) and `'facet'` turns `60·s`°.
+- Slice 3: stellar's accents are palette keys `accent0`…`accent4` (plus `white` = its core, the
+  edge key ice's crystal draws), so `withPalette`/`tint` cover them; its tongue reuses
+  `ice.withPalette(palette).tongue`. Stellar `grain` is a no-op; normal's 0.12 is the spec's
+  `grain` value (the player passes `spec.grain`), not baked into the material.
+- Slice 3: no recordings / sheet review — no Playwright browser is installed in this build
+  environment (`~/.cache/ms-playwright` absent). Record one stub spec per material with
+  `rec-move.mjs` on a machine with the fx-preview tooling before landing.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the

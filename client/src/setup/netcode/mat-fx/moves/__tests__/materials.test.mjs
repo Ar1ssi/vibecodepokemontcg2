@@ -18,6 +18,8 @@ import { auroraAlphas, icicleFacet, icicleOutline, snowflakeSegments } from '../
 import { needleOutline, needleTip, soundAlphas, wingOpen } from '../materials/bug.js';
 import { MATERIAL_KEYS } from '../move-spec.mjs';
 import { lighten, parseHex, tintedPalette } from '../materials/_shared.js';
+import { UNITS } from '../materials/_units.js';
+import { STELLAR_ACCENTS } from '../materials/stellar.js';
 import { callsAreFinite, recordingContext, rgbOf } from './recording-context.mjs';
 
 const PROJECTILE = { x: 100, y: 120, r: 30, headingDeg: 20, time: 1.3, seed: 4, alpha: 0.9, tongues: 5, hot: 1 };
@@ -2167,7 +2169,7 @@ const drawAll = (material) => {
 };
 
 test('withPalette over a material\'s own palette draws the identical recording', () => {
-  assert.equal(Object.keys(MATERIALS).filter((k) => k !== 'default').length, 26);
+  assert.equal(Object.keys(MATERIALS).filter((k) => k !== 'default').length, 28);
   for (const [name, material] of Object.entries(MATERIALS)) {
     assert.equal(typeof material.withPalette, 'function', name);
     const same = material.withPalette(material.palette);
@@ -2219,4 +2221,49 @@ test('palette helpers: parseHex, lighten, tintedPalette', () => {
   assert.equal(tinted.body, fire.body);
   assert.ok(Object.isFrozen(tinted) && Object.isFrozen(tinted.hot));
   assert.deepEqual(fire.hot, [241, 175, 13], 'the source palette is untouched');
+});
+
+// ---- design 065 slice 3: normal, stellar and units ---------------------------------------
+
+test('MATERIAL_KEYS is exactly the registry keys minus default', () => {
+  assert.deepEqual([...MATERIAL_KEYS].sort(), Object.keys(MATERIALS).filter((k) => k !== 'default').sort());
+});
+
+test('normal and stellar draw only their palettes (stellar: plus its accents)', () => {
+  const NORMAL = ['#E8552B', '#F2C230', '#FFF5B0', '#FFFFFF'].map(parseHex);
+  const STELLAR = ['#0F2A55', '#2FB8FF', '#5FF2E0', '#E6FFFF', ...STELLAR_ACCENTS].map(parseHex);
+  for (const [key, allowed] of [['normal', NORMAL], ['stellar', STELLAR]]) {
+    const material = MATERIALS[key];
+    assert.equal(material.key, key);
+    const rec = drawAll(material);
+    for (let seed = 0; seed < 5; seed += 1) material.tongue(rec.ctx, { ...TONGUE, seed }, { alpha: 1, hot: 1 });
+    assert.ok(rec.colours.length > 10, key);
+    for (const css of rec.colours) {
+      const rgb = rgbOf(css);
+      assert.ok(allowed.some((c) => c.every((v, i) => v === rgb?.[i])), `${key}: ${css}`);
+    }
+  }
+  const fringe = recordingContext();
+  for (let seed = 0; seed < 5; seed += 1) MATERIALS.stellar.tongue(fringe.ctx, { ...TONGUE, seed });
+  const used = new Set(fringe.colours.map((css) => rgbOf(css).join()));
+  for (const accent of STELLAR_ACCENTS) assert.ok(used.has(parseHex(accent).join()), `fringe ${accent}`);
+});
+
+test('every unit draws finitely, in palette colours, with balanced save/restore', () => {
+  const palette = MATERIALS.normal.palette;
+  assert.deepEqual(Object.keys(UNITS), ['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+  for (const [name, unit] of Object.entries(UNITS)) {
+    for (const s of [0, 0.5, 0.99]) {
+      const rec = recordingContext();
+      assert.doesNotThrow(() => unit(rec.ctx, 40, 50, 20, 30, s, palette), `${name} @ ${s}`);
+      assert.ok(rec.calls.length > 3, `${name} drew`);
+      assert.ok(callsAreFinite(rec.calls), `${name} finite`);
+      assert.equal(rec.state.depth, 0, `${name} save/restore @ ${s}`);
+      assert.ok(rec.state.maxDepth >= 1, `${name} saved`);
+      for (const css of rec.colours) assert.ok(inPalette(MATERIALS.normal, css), `${name}: ${css}`);
+    }
+    const none = recordingContext();
+    unit(none.ctx, 40, 50, 0, 30, 0.5, palette);
+    assert.equal(none.calls.length, 0, `${name} r 0`);
+  }
 });
