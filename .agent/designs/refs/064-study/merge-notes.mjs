@@ -7,7 +7,9 @@ import path from 'node:path';
 const [designPath, coveragePath] = process.argv.slice(2);
 const SKIP = new Set(['burning-bulwark', 'jungle-healing', 'geomancy', 'lunar-dance', 'lunar-blessing', 'take-heart']);
 const TYPE_ORDER = ['normal', 'fire', 'water', 'grass', 'electric', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
-const REQUIRED = ['Refs:', 'Signature read:', 'Video beats', 'Pokémon:', 'Camera & screen:', 'Palette:', 'Closest generic:', 'Board mapping:', 'New pieces:', 'Flags:'];
+// A field may carry a qualifier before its colon ("Board mapping (proposed, unverified):").
+const REQUIRED = ['Refs', 'Signature read', 'Video beats', 'Pokémon', 'Camera & screen', 'Palette', 'Closest generic', 'Board mapping', 'New pieces', 'Flags'];
+const hasField = (part, key) => new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( \\(.*\\))?:`, 'm').test(part);
 
 const norm = (s) => s.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const rows = readFileSync('signature-list.tsv', 'utf8').trim().split('\n').slice(1).map((l) => l.split('\t'))
@@ -34,7 +36,7 @@ for (const file of readdirSync('notes').filter((f) => f.endsWith('.md')).sort())
       if (!SKIP.has(name.toLowerCase().replace(/\s+/g, '-'))) problems.push(`${file}: unknown move heading "${name}"`);
       continue;
     }
-    const missing = REQUIRED.filter((k) => !part.includes(k));
+    const missing = REQUIRED.filter((k) => !hasField(part, k));
     if (missing.length) problems.push(`${row.slug}: missing ${missing.join(', ')}`);
     if (entries.has(row.slug)) problems.push(`${row.slug}: duplicate entry (kept the first)`);
     else entries.set(row.slug, part.trimEnd());

@@ -1,0 +1,2209 @@
+{
+ "aeroblast": {
+  "en": "Aeroblast",
+  "fr": "Aéroblast",
+  "type": "flying",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/A%C3%A9roblast",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/ef/A%C3%A9roblast_EV.mp4",
+   "frames": 129,
+   "fps": 30,
+   "durationMs": 4300
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 122,
+   "fps": 25,
+   "durationMs": 4880
+  },
+  "available": [
+   "Colo.mp4",
+   "E.gif",
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "N2B2.gif",
+   "NB.gif",
+   "OA.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4",
+   "XD.mp4"
+  ]
+ },
+ "astral-barrage": {
+  "en": "Astral Barrage",
+  "fr": "Éclat Spectral",
+  "type": "ghost",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/%C3%89clat_Spectral",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/3/35/%C3%89clat_Spectral_EV.mp4",
+   "frames": 240,
+   "fps": 29.88,
+   "durationMs": 8032
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "behemoth-bash": {
+  "en": "Behemoth Bash",
+  "fr": "Aegis Maxima",
+  "type": "steel",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Aegis_Maxima",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/b5/Aegis_Maxima_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "behemoth-blade": {
+  "en": "Behemoth Blade",
+  "fr": "Gladius Maximus",
+  "type": "steel",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Gladius_Maximus",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/0/08/Gladius_Maximus_EV.mp4",
+   "frames": 195,
+   "fps": 30,
+   "durationMs": 6500
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "bleakwind-storm": {
+  "en": "Bleakwind Storm",
+  "fr": "Typhon Hivernal",
+  "type": "flying",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Typhon_Hivernal",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/4/4d/Typhon_Hivernal_EV.mp4",
+   "frames": 165,
+   "fps": 30,
+   "durationMs": 5500
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4",
+   "LPA.mp4"
+  ]
+ },
+ "blue-flare": {
+  "en": "Blue Flare",
+  "fr": "Flamme Bleue",
+  "type": "fire",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Flamme_Bleue",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/be/Flamme_Bleue_EV.mp4",
+   "frames": 164,
+   "fps": 30,
+   "durationMs": 5467
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 129,
+   "fps": 24.43,
+   "durationMs": 5280
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "NB.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "bolt-strike": {
+  "en": "Bolt Strike",
+  "fr": "Charge Foudre",
+  "type": "electric",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Charge_Foudre",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/f/fc/Charge_Foudre_EV.mp4",
+   "frames": 223,
+   "fps": 30,
+   "durationMs": 7433
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 226,
+   "fps": 24.57,
+   "durationMs": 9198
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "burning-bulwark": {
+  "en": "Burning Bulwark",
+  "fr": "Rempart Brûlant",
+  "type": "fire",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/Rempart_Br%C3%BBlant",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/b0/Rempart_Br%C3%BBlant_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "collision-course": {
+  "en": "Collision Course",
+  "fr": "Nitro Crash",
+  "type": "fighting",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Nitro_Crash",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/a/ac/Nitro_Crash_EV.mp4",
+   "frames": 225,
+   "fps": 29.35,
+   "durationMs": 7666
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "core-enforcer": {
+  "en": "Core Enforcer",
+  "fr": "Sanction Suprême",
+  "type": "dragon",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Sanction_Supr%C3%AAme",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/f/f6/Sanction_Supr%C3%AAme_EB.mp4",
+   "frames": 232,
+   "fps": 30,
+   "durationMs": 7733
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 280,
+   "fps": 24.65,
+   "durationMs": 11359
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "crush-grip": {
+  "en": "Crush Grip",
+  "fr": "Presse",
+  "type": "normal",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Presse",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/2/26/Presse_EV.mp4",
+   "frames": 89,
+   "fps": 30,
+   "durationMs": 2967
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 139,
+   "fps": 25,
+   "durationMs": 5560
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "LPA.mp4",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "dark-void": {
+  "en": "Dark Void",
+  "fr": "Trou Noir",
+  "type": "dark",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/Trou_Noir",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/4/49/Trou_Noir_EV.mp4",
+   "frames": 310,
+   "fps": 30,
+   "durationMs": 10333
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 335,
+   "fps": 24.63,
+   "durationMs": 13601
+  },
+  "available": [
+   "DP.gif",
+   "EV.mp4",
+   "HGSS.gif",
+   "LPA.mp4",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "diamond-storm": {
+  "en": "Diamond Storm",
+  "fr": "Orage Adamantin",
+  "type": "rock",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Orage_Adamantin",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/d/d6/Orage_Adamantin_EV.mp4",
+   "frames": 150,
+   "fps": 30,
+   "durationMs": 5000
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 134,
+   "fps": 24.63,
+   "durationMs": 5441
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "doom-desire": {
+  "en": "Doom Desire",
+  "fr": "Vœu Destructeur",
+  "type": "steel",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/V%C5%93u_Destructeur",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/ba/V%C5%93u_Destructeur_EV.mp4",
+   "frames": 308,
+   "fps": 30,
+   "durationMs": 10267
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 216,
+   "fps": 24.55,
+   "durationMs": 8798
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "double-iron-bash": {
+  "en": "Double Iron Bash",
+  "fr": "Écrous d'Poing",
+  "type": "steel",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/%C3%89crous_d'Poing",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/3/3d/%C3%89crous_d%27Poing_EB.mp4",
+   "frames": 249,
+   "fps": 30,
+   "durationMs": 8300
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "LGPE.mp4"
+  ]
+ },
+ "dragon-ascent": {
+  "en": "Dragon Ascent",
+  "fr": "Draco-Ascension",
+  "type": "flying",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Draco-Ascension",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/1/1f/Draco-Ascension_EV.mp4",
+   "frames": 315,
+   "fps": 30,
+   "durationMs": 10500
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 239,
+   "fps": 24.49,
+   "durationMs": 9759
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "dragon-energy": {
+  "en": "Dragon Energy",
+  "fr": "Draco-Énergie",
+  "type": "dragon",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Draco-%C3%89nergie",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/5/50/Draco-%C3%89nergie_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "dynamax-cannon": {
+  "en": "Dynamax Cannon",
+  "fr": "Canon Dynamax",
+  "type": "dragon",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Canon_Dynamax",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/f/f9/Canon_Dynamax_EV.mp4",
+   "frames": 210,
+   "fps": 30,
+   "durationMs": 7000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "electro-drift": {
+  "en": "Electro Drift",
+  "fr": "Turbo Volt",
+  "type": "electric",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Turbo_Volt",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/6/6f/Turbo_Volt_EV.mp4",
+   "frames": 255,
+   "fps": 29.88,
+   "durationMs": 8534
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "eternabeam": {
+  "en": "Eternabeam",
+  "fr": "Laser Infinimax",
+  "type": "dragon",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Laser_Infinimax",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/2/25/Laser_Infinimax_EB.mp4",
+   "frames": 597,
+   "fps": 30,
+   "durationMs": 19900
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4"
+  ]
+ },
+ "fiery-wrath": {
+  "en": "Fiery Wrath",
+  "fr": "Fureur Ardente",
+  "type": "dark",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Fureur_Ardente",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/7/73/Fureur_Ardente_EV.mp4",
+   "frames": 165,
+   "fps": 30,
+   "durationMs": 5500
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "fleur-cannon": {
+  "en": "Fleur Cannon",
+  "fr": "Canon Floral",
+  "type": "fairy",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Canon_Floral",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/2/26/Canon_Floral_EV.mp4",
+   "frames": 162,
+   "fps": 30,
+   "durationMs": 5400
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 186,
+   "fps": 24.6,
+   "durationMs": 7561
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "freeze-shock": {
+  "en": "Freeze Shock",
+  "fr": "Éclair Gelé",
+  "type": "ice",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/%C3%89clair_Gel%C3%A9",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/9/98/%C3%89clair_Gel%C3%A9_EV.mp4",
+   "frames": 326,
+   "fps": 30,
+   "durationMs": 10867
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 286,
+   "fps": 24.57,
+   "durationMs": 11640
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "NB.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "freezing-glare": {
+  "en": "Freezing Glare",
+  "fr": "Regard Glaçant",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Regard_Gla%C3%A7ant",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/f/f9/Regard_Gla%C3%A7ant_EV.mp4",
+   "frames": 210,
+   "fps": 29.72,
+   "durationMs": 7066
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "fusion-bolt": {
+  "en": "Fusion Bolt",
+  "fr": "Éclair Croix",
+  "type": "electric",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/%C3%89clair_Croix",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/b0/%C3%89clair_Croix_EV.mp4",
+   "frames": 177,
+   "fps": 30,
+   "durationMs": 5900
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 175,
+   "fps": 30,
+   "durationMs": 5833
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "fusion-flare": {
+  "en": "Fusion Flare",
+  "fr": "Flamme Croix",
+  "type": "fire",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Flamme_Croix",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/4/4d/Flamme_Croix_EV.mp4",
+   "frames": 177,
+   "fps": 30,
+   "durationMs": 5900
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 173,
+   "fps": 24.44,
+   "durationMs": 7079
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "geomancy": {
+  "en": "Geomancy",
+  "fr": "Géo-Contrôle",
+  "type": "fairy",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/G%C3%A9o-Contr%C3%B4le",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/9/95/G%C3%A9o-Contr%C3%B4le_EB.mp4",
+   "frames": 685,
+   "fps": 30,
+   "durationMs": 22833
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 495,
+   "fps": 24.5,
+   "durationMs": 20204
+  },
+  "available": [
+   "EB.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "glacial-lance": {
+  "en": "Glacial Lance",
+  "fr": "Lance de Glace",
+  "type": "ice",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Lance_de_Glace",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/e7/Lance_de_Glace_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "glaciate": {
+  "en": "Glaciate",
+  "fr": "Ère Glaciaire",
+  "type": "ice",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/%C3%88re_Glaciaire",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/c/ce/%C3%88re_Glaciaire_EV.mp4",
+   "frames": 229,
+   "fps": 30,
+   "durationMs": 7633
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 156,
+   "fps": 24.53,
+   "durationMs": 6360
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "heart-swap": {
+  "en": "Heart Swap",
+  "fr": "Permucœur",
+  "type": "psychic",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/Permuc%C5%93ur",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/3/3d/Permuc%C5%93ur_EV.mp4",
+   "frames": 193,
+   "fps": 30,
+   "durationMs": 6433
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 131,
+   "fps": 24.62,
+   "durationMs": 5321
+  },
+  "available": [
+   "EV.mp4",
+   "HGSS.gif",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "hydro-steam": {
+  "en": "Hydro Steam",
+  "fr": "Hydrovapeur",
+  "type": "water",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Hydrovapeur",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/3/36/Hydrovapeur_EV.mp4",
+   "frames": 189,
+   "fps": 30,
+   "durationMs": 6300
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "hyperspace-fury": {
+  "en": "Hyperspace Fury",
+  "fr": "Furie Dimension",
+  "type": "dark",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Furie_Dimension",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/f/f3/Furie_Dimension_EV.mp4",
+   "frames": 195,
+   "fps": 30,
+   "durationMs": 6500
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 223,
+   "fps": 25,
+   "durationMs": 8920
+  },
+  "available": [
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "hyperspace-hole": {
+  "en": "Hyperspace Hole",
+  "fr": "TrouDimensionnel",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/TrouDimensionnel",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/2/26/TrouDimensionnel_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 165,
+   "fps": 25,
+   "durationMs": 6600
+  },
+  "available": [
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "ice-burn": {
+  "en": "Ice Burn",
+  "fr": "Feu Glacé",
+  "type": "ice",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Feu_Glac%C3%A9",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/b2/Feu_Glac%C3%A9_EV.mp4",
+   "frames": 334,
+   "fps": 30,
+   "durationMs": 11133
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 273,
+   "fps": 24.55,
+   "durationMs": 11120
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "NB.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "ivy-cudgel": {
+  "en": "Ivy Cudgel",
+  "fr": "Massue Liane",
+  "type": "grass",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Massue_Liane",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/7/77/Massue_Liane_EV.mp4",
+   "frames": 152,
+   "fps": 30,
+   "durationMs": 5067
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "judgment": {
+  "en": "Judgment",
+  "fr": "Jugement",
+  "type": "normal",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Jugement",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/1/11/Jugement_EV.mp4",
+   "frames": 158,
+   "fps": 30,
+   "durationMs": 5267
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 165,
+   "fps": 24.55,
+   "durationMs": 6721
+  },
+  "available": [
+   "EV.mp4",
+   "HGSS.gif",
+   "LPA.mp4",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "jungle-healing": {
+  "en": "Jungle Healing",
+  "fr": "Selve Salvatrice",
+  "type": "grass",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/Selve_Salvatrice",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/6/67/Selve_Salvatrice_EV.mp4",
+   "frames": 240,
+   "fps": 30,
+   "durationMs": 8000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "lands-wrath": {
+  "en": "Land’s Wrath",
+  "fr": "Force Chtonienne",
+  "type": "ground",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Force_Chtonienne",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/8/8a/Force_Chtonienne_EB.mp4",
+   "frames": 153,
+   "fps": 30,
+   "durationMs": 5100
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 140,
+   "fps": 24.65,
+   "durationMs": 5680
+  },
+  "available": [
+   "EB.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "lunar-blessing": {
+  "en": "Lunar Blessing",
+  "fr": "Prière Lunaire",
+  "type": "psychic",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/Pri%C3%A8re_Lunaire",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/ef/Pri%C3%A8re_Lunaire_EV.mp4",
+   "frames": 255,
+   "fps": 30,
+   "durationMs": 8500
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4",
+   "LPA.mp4"
+  ]
+ },
+ "lunar-dance": {
+  "en": "Lunar Dance",
+  "fr": "Danse Lune",
+  "type": "psychic",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/Danse_Lune",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/0/07/Danse_Lune_EV.mp4",
+   "frames": 487,
+   "fps": 30,
+   "durationMs": 16233
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 177,
+   "fps": 25,
+   "durationMs": 7080
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "luster-purge": {
+  "en": "Luster Purge",
+  "fr": "Lumi-Éclat",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Lumi-%C3%89clat",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/7/73/Lumi-%C3%89clat_EV.mp4",
+   "frames": 262,
+   "fps": 30,
+   "durationMs": 8733
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 147,
+   "fps": 24.5,
+   "durationMs": 6000
+  },
+  "available": [
+   "Colo.mp4",
+   "E.gif",
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4",
+   "XD.mp4"
+  ]
+ },
+ "magma-storm": {
+  "en": "Magma Storm",
+  "fr": "Vortex Magma",
+  "type": "fire",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Vortex_Magma",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/7/71/Vortex_Magma_EV.mp4",
+   "frames": 186,
+   "fps": 30,
+   "durationMs": 6200
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 569,
+   "fps": 25,
+   "durationMs": 22760
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "malignant-chain": {
+  "en": "Malignant Chain",
+  "fr": "Chaîne Malsaine",
+  "type": "poison",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Cha%C3%AEne_Malsaine",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/a/a0/Cha%C3%AEne_Malsaine_EV.mp4",
+   "frames": 181,
+   "fps": 30,
+   "durationMs": 6033
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "mighty-cleave": {
+  "en": "Mighty Cleave",
+  "fr": "Lame Puissante",
+  "type": "rock",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Lame_Puissante",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/2/20/Lame_Puissante_EV.mp4",
+   "frames": 151,
+   "fps": 30,
+   "durationMs": 5033
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "mist-ball": {
+  "en": "Mist Ball",
+  "fr": "Ball'Brume",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Ball'Brume",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/8/82/Ball%27Brume_EV.mp4",
+   "frames": 140,
+   "fps": 30,
+   "durationMs": 4667
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 137,
+   "fps": 24.64,
+   "durationMs": 5560
+  },
+  "available": [
+   "Colo.mp4",
+   "E.gif",
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4",
+   "XD.mp4"
+  ]
+ },
+ "moongeist-beam": {
+  "en": "Moongeist Beam",
+  "fr": "Rayon Spectral",
+  "type": "ghost",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Rayon_Spectral",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/b5/Rayon_Spectral_EV.mp4",
+   "frames": 258,
+   "fps": 30,
+   "durationMs": 8600
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 281,
+   "fps": 25,
+   "durationMs": 11240
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "multi-attack": {
+  "en": "Multi-Attack",
+  "fr": "Coup Varia-Type",
+  "type": "normal",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Coup_Varia-Type",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/7/74/Coup_Varia-Type_EB.mp4",
+   "frames": 150,
+   "fps": 30,
+   "durationMs": 5000
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 118,
+   "fps": 24.58,
+   "durationMs": 4801
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "mystical-power": {
+  "en": "Mystical Power",
+  "fr": "Force Mystique",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Force_Mystique",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/5/56/Force_Mystique_EV.mp4",
+   "frames": 165,
+   "fps": 29.82,
+   "durationMs": 5533
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4",
+   "LPA.mp4"
+  ]
+ },
+ "natures-madness": {
+  "en": "Nature’s Madness",
+  "fr": "Ire de la Nature",
+  "type": "fairy",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Ire_de_la_Nature",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/c/cd/Ire_de_la_Nature_EB.mp4",
+   "frames": 195,
+   "fps": 30,
+   "durationMs": 6500
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 159,
+   "fps": 25,
+   "durationMs": 6360
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "nihil-light": {
+  "en": "Nihil Light",
+  "fr": "Lux Nihilum",
+  "type": "dragon",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Lux_Nihilum",
+  "status": "no-animation",
+  "video": null,
+  "sprite": null,
+  "gen7": null,
+  "available": []
+ },
+ "oblivion-wing": {
+  "en": "Oblivion Wing",
+  "fr": "Mort'Ailes",
+  "type": "flying",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Mort'Ailes",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/0/00/Mort%27Ailes_EB.mp4",
+   "frames": 384,
+   "fps": 30.08,
+   "durationMs": 12766
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 266,
+   "fps": 24.54,
+   "durationMs": 10839
+  },
+  "available": [
+   "EB.mp4"
+  ]
+ },
+ "origin-pulse": {
+  "en": "Origin Pulse",
+  "fr": "Onde Originelle",
+  "type": "water",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Onde_Originelle",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/e2/Onde_Originelle_EV.mp4",
+   "frames": 135,
+   "fps": 30,
+   "durationMs": 4500
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 146,
+   "fps": 24.66,
+   "durationMs": 5921
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "photon-geyser": {
+  "en": "Photon Geyser",
+  "fr": "Photo-Geyser",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Photo-Geyser",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/a/ac/Photo-Geyser_EV.mp4",
+   "frames": 175,
+   "fps": 30,
+   "durationMs": 5833
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 178,
+   "fps": 25,
+   "durationMs": 7120
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "plasma-fists": {
+  "en": "Plasma Fists",
+  "fr": "Plasma Punch",
+  "type": "electric",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Plasma_Punch",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/2/2e/Plasma_Punch_EB.mp4",
+   "frames": 255,
+   "fps": 30,
+   "durationMs": 8500
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 204,
+   "fps": 24.52,
+   "durationMs": 8320
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "precipice-blades": {
+  "en": "Precipice Blades",
+  "fr": "Lame Pangéenne",
+  "type": "ground",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Lame_Pang%C3%A9enne",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/7/71/Lame_Pang%C3%A9enne_EV.mp4",
+   "frames": 160,
+   "fps": 30,
+   "durationMs": 5333
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 153,
+   "fps": 24.52,
+   "durationMs": 6240
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "prismatic-laser": {
+  "en": "Prismatic Laser",
+  "fr": "Laser Prisme",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Laser_Prisme",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/4/43/Laser_Prisme_EV.mp4",
+   "frames": 145,
+   "fps": 30,
+   "durationMs": 4833
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 156,
+   "fps": 24.53,
+   "durationMs": 6360
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "psyblade": {
+  "en": "Psyblade",
+  "fr": "Lame Psychique",
+  "type": "psychic",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Lame_Psychique",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/9/98/Lame_Psychique_EV.mp4",
+   "frames": 150,
+   "fps": 30,
+   "durationMs": 5000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "psycho-boost": {
+  "en": "Psycho Boost",
+  "fr": "Psycho-Boost",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Psycho-Boost",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/ec/Psycho-Boost_EV.mp4",
+   "frames": 164,
+   "fps": 30,
+   "durationMs": 5467
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 110,
+   "fps": 24.55,
+   "durationMs": 4481
+  },
+  "available": [
+   "Colo.mp4",
+   "EV.mp4"
+  ]
+ },
+ "psystrike": {
+  "en": "Psystrike",
+  "fr": "Frappe Psy",
+  "type": "psychic",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Frappe_Psy",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/5/55/Frappe_Psy_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 176,
+   "fps": 25,
+   "durationMs": 7040
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "NB.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "relic-song": {
+  "en": "Relic Song",
+  "fr": "Chant Antique",
+  "type": "normal",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Chant_Antique",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/e7/Chant_Antique_EV.mp4",
+   "frames": 405,
+   "fps": 30,
+   "durationMs": 13500
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 333,
+   "fps": 24.56,
+   "durationMs": 13559
+  },
+  "available": [
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "roar-of-time": {
+  "en": "Roar of Time",
+  "fr": "Hurle-Temps",
+  "type": "dragon",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Hurle-Temps",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/b2/Hurle-Temps_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 163,
+   "fps": 25,
+   "durationMs": 6520
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "LPA.mp4",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "ruination": {
+  "en": "Ruination",
+  "fr": "Cataclysme",
+  "type": "dark",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Cataclysme",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/5/55/Cataclysme_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "sacred-fire": {
+  "en": "Sacred Fire",
+  "fr": "Feu Sacré",
+  "type": "fire",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Feu_Sacr%C3%A9",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/9/9d/Feu_Sacr%C3%A9_EV.mp4",
+   "frames": 129,
+   "fps": 30,
+   "durationMs": 4300
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 109,
+   "fps": 25,
+   "durationMs": 4360
+  },
+  "available": [
+   "Colo.mp4",
+   "DP.gif",
+   "E.gif",
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "N2B2.gif",
+   "NB.gif",
+   "OA.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4",
+   "XD.mp4"
+  ]
+ },
+ "sacred-sword": {
+  "en": "Sacred Sword",
+  "fr": "Lame Sainte",
+  "type": "fighting",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Lame_Sainte",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/8/84/Lame_Sainte_EV.mp4",
+   "frames": 105,
+   "fps": 30,
+   "durationMs": 3500
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 90,
+   "fps": 24.73,
+   "durationMs": 3639
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "sandsear-storm": {
+  "en": "Sandsear Storm",
+  "fr": "Typhon Pyrosable",
+  "type": "ground",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Typhon_Pyrosable",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/6/63/Typhon_Pyrosable_EV.mp4",
+   "frames": 165,
+   "fps": 30,
+   "durationMs": 5500
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4",
+   "LPA.mp4"
+  ]
+ },
+ "searing-shot": {
+  "en": "Searing Shot",
+  "fr": "Incendie (capacité)",
+  "type": "fire",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Incendie_(capacit%C3%A9)",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/3/3f/Incendie_EB.mp4",
+   "frames": 173,
+   "fps": 30,
+   "durationMs": 5767
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 134,
+   "fps": 24.63,
+   "durationMs": 5441
+  },
+  "available": [
+   "EB.mp4",
+   "N2B2.gif",
+   "NB.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "secret-sword": {
+  "en": "Secret Sword",
+  "fr": "Lame Ointe",
+  "type": "fighting",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Lame_Ointe",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/e2/Lame_Ointe_EV.mp4",
+   "frames": 124,
+   "fps": 30,
+   "durationMs": 4133
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 106,
+   "fps": 24.77,
+   "durationMs": 4279
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "N2B2.gif",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "seed-flare": {
+  "en": "Seed Flare",
+  "fr": "Fulmigraine",
+  "type": "grass",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Fulmigraine",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/1/19/Fulmigraine_EV.mp4",
+   "frames": 128,
+   "fps": 30,
+   "durationMs": 4267
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 132,
+   "fps": 24.63,
+   "durationMs": 5359
+  },
+  "available": [
+   "EV.mp4",
+   "HGSS.gif",
+   "LPA.mp4",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "shadow-force": {
+  "en": "Shadow Force",
+  "fr": "Revenant",
+  "type": "ghost",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Revenant",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/ea/Revenant_EV.mp4",
+   "frames": 299,
+   "fps": 30,
+   "durationMs": 9967
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 373,
+   "fps": 25,
+   "durationMs": 14920
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "N2B2.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "spacial-rend": {
+  "en": "Spacial Rend",
+  "fr": "Spatio-Rift",
+  "type": "dragon",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Spatio-Rift",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/f/f3/Spatio-Rift_EV.mp4",
+   "frames": 209,
+   "fps": 30,
+   "durationMs": 6967
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 214,
+   "fps": 25,
+   "durationMs": 8560
+  },
+  "available": [
+   "DEPS.mp4",
+   "DP.gif",
+   "EB.mp4",
+   "EV.mp4",
+   "HGSS.gif",
+   "LPA.mp4",
+   "N2B2.gif",
+   "NB.gif",
+   "PBR.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "spectral-thief": {
+  "en": "Spectral Thief",
+  "fr": "Clepto-Mânes",
+  "type": "ghost",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Clepto-M%C3%A2nes",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/3/3b/Clepto-M%C3%A2nes_EB.mp4",
+   "frames": 183,
+   "fps": 30,
+   "durationMs": 6100
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 174,
+   "fps": 25,
+   "durationMs": 6960
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "springtide-storm": {
+  "en": "Springtide Storm",
+  "fr": "Typhon Passionné",
+  "type": "fairy",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Typhon_Passionn%C3%A9",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/bd/Typhon_Passionn%C3%A9_EV.mp4",
+   "frames": 150,
+   "fps": 30,
+   "durationMs": 5000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "steam-eruption": {
+  "en": "Steam Eruption",
+  "fr": "Jet de Vapeur",
+  "type": "water",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Jet_de_Vapeur",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/ef/Jet_de_Vapeur_EV.mp4",
+   "frames": 135,
+   "fps": 29.99,
+   "durationMs": 4502
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 128,
+   "fps": 24.62,
+   "durationMs": 5199
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "sunsteel-strike": {
+  "en": "Sunsteel Strike",
+  "fr": "Choc Météore",
+  "type": "steel",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Choc_M%C3%A9t%C3%A9ore",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/3/38/Choc_M%C3%A9t%C3%A9ore_EV.mp4",
+   "frames": 281,
+   "fps": 30,
+   "durationMs": 9367
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 313,
+   "fps": 25,
+   "durationMs": 12520
+  },
+  "available": [
+   "EB.mp4",
+   "EV.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "surging-strikes": {
+  "en": "Surging Strikes",
+  "fr": "Torrent de Coups",
+  "type": "water",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Torrent_de_Coups",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/5/5b/Torrent_de_Coups_EV.mp4",
+   "frames": 400,
+   "fps": 30,
+   "durationMs": 13333
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "tachyon-cutter": {
+  "en": "Tachyon Cutter",
+  "fr": "Lame Tachyonique",
+  "type": "steel",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Lame_Tachyonique",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/0/01/Lame_Tachyonique_EV.mp4",
+   "frames": 351,
+   "fps": 30,
+   "durationMs": 11700
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "take-heart": {
+  "en": "Take Heart",
+  "fr": "Extravaillance",
+  "type": "psychic",
+  "damageClass": "status",
+  "page": "https://www.pokepedia.fr/Extravaillance",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/9/9c/Extravaillance_EV.mp4",
+   "frames": 325,
+   "fps": 30,
+   "durationMs": 10833
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4",
+   "LPA.mp4"
+  ]
+ },
+ "techno-blast": {
+  "en": "Techno Blast",
+  "fr": "Techno-Buster",
+  "type": "normal",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Techno-Buster",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/f/f6/Techno-Buster_EB.mp4",
+   "frames": 156,
+   "fps": 30,
+   "durationMs": 5200
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 130,
+   "fps": 24.44,
+   "durationMs": 5319
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "tera-starstorm": {
+  "en": "Tera Starstorm",
+  "fr": "Pluie Térastrale",
+  "type": "normal",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Pluie_T%C3%A9rastrale",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/c/c3/Pluie_T%C3%A9rastrale_EV.mp4",
+   "frames": 217,
+   "fps": 29.59,
+   "durationMs": 7334
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "thousand-arrows": {
+  "en": "Thousand Arrows",
+  "fr": "Myria-Flèches",
+  "type": "ground",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Myria-Fl%C3%A8ches",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/f/fa/Myria-Fl%C3%A8ches_EB.mp4",
+   "frames": 187,
+   "fps": 30,
+   "durationMs": 6233
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 136,
+   "fps": 24.64,
+   "durationMs": 5519
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4",
+   "XY.mp4"
+  ]
+ },
+ "thousand-waves": {
+  "en": "Thousand Waves",
+  "fr": "Myria-Vagues",
+  "type": "ground",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Myria-Vagues",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/e/e1/Myria-Vagues_EB.mp4",
+   "frames": 236,
+   "fps": 30,
+   "durationMs": 7867
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 158,
+   "fps": 24.53,
+   "durationMs": 6441
+  },
+  "available": [
+   "EB.mp4",
+   "USUL.mp4",
+   "XY.mp4"
+  ]
+ },
+ "thunder-cage": {
+  "en": "Thunder Cage",
+  "fr": "Voltageôle",
+  "type": "electric",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Voltage%C3%B4le",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/5/52/Voltage%C3%B4le_EV.mp4",
+   "frames": 195,
+   "fps": 30,
+   "durationMs": 6500
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "thunderclap": {
+  "en": "Thunderclap",
+  "fr": "Vif Éclair",
+  "type": "electric",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Vif_%C3%89clair",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/b/bc/Vif_%C3%89clair_EV.mp4",
+   "frames": 105,
+   "fps": 30.01,
+   "durationMs": 3499
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4"
+  ]
+ },
+ "thunderous-kick": {
+  "en": "Thunderous Kick",
+  "fr": "Coup Fulgurant",
+  "type": "fighting",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Coup_Fulgurant",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/e/e1/Coup_Fulgurant_EV.mp4",
+   "frames": 195,
+   "fps": 29.85,
+   "durationMs": 6533
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "v-create": {
+  "en": "V-create",
+  "fr": "Coup Victoire",
+  "type": "fire",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Coup_Victoire",
+  "status": "ok",
+  "video": {
+   "gen": "EB",
+   "source": "https://www.pokepedia.fr/images/8/88/Coup_Victoire_EB.mp4",
+   "frames": 194,
+   "fps": 30,
+   "durationMs": 6467
+  },
+  "sprite": null,
+  "gen7": {
+   "gen": "USUL",
+   "frames": 165,
+   "fps": 24.55,
+   "durationMs": 6721
+  },
+  "available": [
+   "EB.mp4",
+   "ROSA.mp4",
+   "USUL.mp4"
+  ]
+ },
+ "wicked-blow": {
+  "en": "Wicked Blow",
+  "fr": "Poing Obscur",
+  "type": "dark",
+  "damageClass": "physical",
+  "page": "https://www.pokepedia.fr/Poing_Obscur",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/1/13/Poing_Obscur_EV.mp4",
+   "frames": 120,
+   "fps": 30,
+   "durationMs": 4000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EB.mp4",
+   "EV.mp4"
+  ]
+ },
+ "wildbolt-storm": {
+  "en": "Wildbolt Storm",
+  "fr": "Typhon Fulgurant",
+  "type": "electric",
+  "damageClass": "special",
+  "page": "https://www.pokepedia.fr/Typhon_Fulgurant",
+  "status": "ok",
+  "video": {
+   "gen": "EV",
+   "source": "https://www.pokepedia.fr/images/2/28/Typhon_Fulgurant_EV.mp4",
+   "frames": 180,
+   "fps": 30,
+   "durationMs": 6000
+  },
+  "sprite": null,
+  "gen7": null,
+  "available": [
+   "EV.mp4",
+   "LPA.mp4"
+  ]
+ }
+}

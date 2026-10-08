@@ -80,9 +80,9 @@ hydro-steam	Hydro Steam	Hydrovapeur	water	special	80	walking-wake	paradox	genera
 origin-pulse	Origin Pulse	Onde Originelle	water	special	110	kyogre	legendary	generation-vi	PokéAPI	-
 steam-eruption	Steam Eruption	Jet de Vapeur	water	special	110	volcanion	mythical	generation-vi	PokéAPI	-
 surging-strikes	Surging Strikes	Torrent de Coups	water	physical	25	urshifu	legendary	generation-viii	PokéAPI	form-only: urshifu-rapid-strike
-sacred-fire	Sacred Fire	Feu Sacré	fire	physical	100	ho-oh,entei	legendary	gen-ii	PokéAPI	added by lead: Ho-Oh's signature; Entei learns it only by event
-psycho-boost	Psycho Boost	Psycho-Boost	psychic	special	140	deoxys,lugia	mythical	gen-iii	PokéAPI	added by lead: Deoxys' signature; Lugia learns it only by event
-heart-swap	Heart Swap	Permucœur	psychic	status	-	manaphy,magearna	mythical	gen-iv	PokéAPI	added by lead: Manaphy's signature; status move
+sacred-fire	Sacred Fire	Feu Sacré	fire	physical	100	ho-oh	legendary	gen-ii	PokéAPI	added by lead: Ho-Oh's signature; Entei learns it only by event
+psycho-boost	Psycho Boost	Psycho-Boost	psychic	special	140	deoxys	mythical	gen-iii	PokéAPI	added by lead: Deoxys' signature; Lugia learns it only by event
+heart-swap	Heart Swap	Permucœur	psychic	status	-	manaphy	mythical	gen-iv	PokéAPI	added by lead: Manaphy's signature; status move
 sacred-sword	Sacred Sword	Lame Sainte	fighting	physical	90	cobalion,terrakion,virizion,keldeo	legendary	gen-v	PokéAPI	added by lead: Swords of Justice signature at introduction; now also learned by Gallade, Samurott and others
 behemoth-blade	Behemoth Blade	Gladius Maximus	steel	physical	100	zacian	legendary	gen-viii	PokéAPI	added by lead: PokéAPI has no learners; Zacian-Crowned's Iron Head becomes this
 behemoth-bash	Behemoth Bash	Aegis Maxima	steel	physical	100	zamazenta	legendary	gen-viii	PokéAPI	added by lead: PokéAPI has no learners; Zamazenta-Crowned's Iron Head becomes this
