@@ -3258,3 +3258,9 @@ Board mapping:
 New pieces: heart shield: a heart-shaped translucent body on the fairy material (a heart outline, pink fill alpha 0.5, magenta rim, sparks inside); the aura drawer draws a round glow, so a heart needs its own shape. Needed for the attacker's shield.
 Flags: house-rule translations (none needed; the reference has no screen tint or flash); the reference's contact (f104, ~2.6 s) is compressed to the 1.0 s window, as in prismatic-laser; palette override on the fairy material (heart magenta, yellow-green burst); the defender is a small pink fairy (species not confirmed); no Gen 7 reference; the palette is partly eyeballed.
 <!-- /APPENDIX-S -->
+- Slice 1: `signature-moves.test.mjs` accepts `normal`/`stellar` as materials ahead of slice 3
+  (`MATERIAL_KEYS` gains them there); `SIGNATURE_BY_NAME` is exported from `signature-select.mjs`
+  so the moves test can check name reachability. `rec-move.mjs` writes signature recordings to
+  `.agent/scratch/moves/signature-<id>/` so they never overwrite 063's same-id recordings
+  (`aeroblast`, `seed-flare`). `pnpm test:changed` could not run in this checkout (no `main`
+  ref for `git merge-base`); `pnpm test` is fully green instead.

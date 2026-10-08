@@ -5,6 +5,7 @@ import {
   FAMILIES,
   MAX_NODES,
   PARTICLE_BUDGET,
+  S_CONTACT,
   TIER_BAND,
   TONGUE_BUDGET,
   checkParams,
@@ -258,4 +259,38 @@ test('validateSpec rejects a family that does not follow the rule', () => {
   const errors = validateSpec({ ...clone(fireBlast), family: 'beam' });
   assert.ok(has(errors, "family 'beam' does not follow the family rule (expected 'burst')"));
   assert.ok(FAMILIES.includes(deriveFamily(fireBlast)));
+});
+
+// Design 065 slice 1: the signature tier 'S'.
+const tierS = (durationMs, contactMs) => {
+  const spec = { ...clone(fireBlast), tier: 'S', durationMs, contactMs };
+  spec.beats = spec.beats.map((b) => ({ ...b, until: Math.min(b.until, durationMs) })).filter((b) => b.at < b.until);
+  spec.particles = (spec.particles ?? []).filter((p) => p.at < durationMs);
+  return { ...spec, family: deriveFamily(spec) };
+};
+
+test('tier S: 1800–2600 ms, contact 900–1200 and within the ratio band', () => {
+  assert.deepEqual(TIER_BAND.S, [1800, 2600]);
+  assert.deepEqual(S_CONTACT, [900, 1200]);
+  assert.deepEqual(validateSpec(tierS(1800, 900)), []);
+  assert.deepEqual(validateSpec(tierS(1900, 1000)), []);
+  assert.ok(has(validateSpec({ ...tierS(1900, 1000), durationMs: 2700 }), 'outside tier S band'));
+  assert.ok(has(validateSpec({ ...tierS(1900, 1000), durationMs: 1700 }), 'outside tier S band'));
+  assert.ok(has(validateSpec({ ...tierS(1900, 1000), durationMs: 2600, contactMs: 1300 }), 'outside tier S contact'));
+  assert.ok(has(validateSpec({ ...tierS(1900, 1000), contactMs: 850 }), 'outside tier S contact'));
+  // In the contact window but outside the 0.38–0.62 ratio.
+  assert.ok(has(validateSpec({ ...tierS(1900, 1000), durationMs: 2600, contactMs: 950 }), 'contactMs/durationMs'));
+  assert.ok(has(validateSpec({ ...tierS(1900, 1000), tier: 4 }), 'tier must be'));
+});
+
+test("statClass 'status' and vgType 'normal' only with tier S", () => {
+  assert.ok(!has(validateSpec({ ...tierS(1900, 1000), statClass: 'status' }), 'statClass'));
+  assert.ok(!has(validateSpec({ ...tierS(1900, 1000), vgType: 'normal' }), 'vgType'));
+  assert.ok(has(validateSpec({ ...clone(fireBlast), statClass: 'status' }), "unknown statClass 'status'"));
+  assert.ok(has(validateSpec({ ...clone(fireBlast), vgType: 'normal' }), "unknown vgType 'normal'"));
+});
+
+test('the Dragon roar rule also holds for tier S', () => {
+  assert.equal(deriveFamily(beatAtContact('beam', { vgType: 'dragon', tier: 'S' })), 'roar');
+  assert.equal(deriveFamily(beatAtContact('starFlare', { vgType: 'dragon', tier: 'S' })), 'roar');
 });

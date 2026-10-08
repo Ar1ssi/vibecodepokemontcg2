@@ -44,7 +44,9 @@ export const PARTICLE_KINDS = Object.freeze([
   // A four-point sparkle in the material's particle colour (fairy); `star` is the gold KO star.
   'twinkle',
 ]);
-export const TIER_BAND = Object.freeze({ 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200] });
+export const TIER_BAND = Object.freeze({ 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200], S: [1800, 2600] });
+/** Design 065: tier S (signature moves) contact window, on top of the ratio band. */
+export const S_CONTACT = Object.freeze([900, 1200]);
 export const CONTACT_BAND = Object.freeze({ min: 0.38, max: 0.62, tier1Max: 0.7 });
 export const PAD_RANGE = Object.freeze([1.2, 2.6]);
 export const DEFAULT_PAD = 1.7;
@@ -310,7 +312,7 @@ export function deriveFamily(spec) {
   if (spec.vgType === 'electric') return 'electric';
   if ((spec.vgType === 'ghost' || spec.vgType === 'dark') && base === 'chime') return 'ghost';
   if (spec.vgType === 'water' && base === 'burst') return 'splash';
-  if (spec.vgType === 'dragon' && spec.tier === 3 && (base === 'burst' || base === 'beam')) return 'roar';
+  if (spec.vgType === 'dragon' && (spec.tier === 3 || spec.tier === 'S') && (base === 'burst' || base === 'beam')) return 'roar';
   if (physical && spec.attacker?.motion === 'dash' && base === 'burst') return 'dash';
   if (physical && spec.attacker?.motion === 'lunge' && base === 'burst') return 'punch';
   return base;
@@ -448,11 +450,14 @@ export function validateSpec(spec) {
 
   if (spec.id !== undefined && !(typeof spec.id === 'string' && KEBAB.test(spec.id))) errors.push(`id '${spec.id}' is not kebab-case`);
   if (spec.name !== undefined && !(typeof spec.name === 'string' && spec.name.trim())) errors.push('name must be a non-empty string');
-  if (spec.vgType !== undefined && !VG_TYPES.includes(spec.vgType)) errors.push(`unknown vgType '${spec.vgType}'`);
-  if (spec.statClass !== undefined && spec.statClass !== 'physical' && spec.statClass !== 'special') {
-    errors.push(`unknown statClass '${spec.statClass}'`);
+  const signature = spec.tier === 'S';
+  if (spec.vgType !== undefined && !VG_TYPES.includes(spec.vgType) && !(signature && spec.vgType === 'normal')) {
+    errors.push(`unknown vgType '${spec.vgType}'${spec.vgType === 'normal' ? ' (normal only with tier S)' : ''}`);
   }
-  if (spec.tier !== undefined && ![1, 2, 3].includes(spec.tier)) errors.push(`tier must be 1, 2 or 3 (got ${spec.tier})`);
+  if (spec.statClass !== undefined && spec.statClass !== 'physical' && spec.statClass !== 'special' && !(signature && spec.statClass === 'status')) {
+    errors.push(`unknown statClass '${spec.statClass}'${spec.statClass === 'status' ? ' (status only with tier S)' : ''}`);
+  }
+  if (spec.tier !== undefined && ![1, 2, 3, 'S'].includes(spec.tier)) errors.push(`tier must be 1, 2, 3 or 'S' (got ${spec.tier})`);
   if (spec.family !== undefined && !FAMILIES.includes(spec.family)) errors.push(`unknown family '${spec.family}'`);
   if (spec.material !== undefined && !MATERIAL_KEYS.includes(spec.material)) errors.push(`unknown material '${spec.material}'`);
 
@@ -465,7 +470,10 @@ export function validateSpec(spec) {
   }
   if (spec.contactMs !== undefined) {
     if (!isNum(spec.contactMs) || spec.contactMs <= 0) errors.push('contactMs must be a positive number');
-    else if (isNum(spec.durationMs) && spec.durationMs > 0) {
+    else if (signature && (spec.contactMs < S_CONTACT[0] || spec.contactMs > S_CONTACT[1])) {
+      errors.push(`contactMs ${spec.contactMs} outside tier S contact [${S_CONTACT[0]}, ${S_CONTACT[1]}]`);
+    }
+    if (isNum(spec.contactMs) && spec.contactMs > 0 && isNum(spec.durationMs) && spec.durationMs > 0) {
       const ratio = spec.contactMs / spec.durationMs;
       const max = spec.tier === 1 ? CONTACT_BAND.tier1Max : CONTACT_BAND.max;
       if (ratio < CONTACT_BAND.min || ratio > max) {
