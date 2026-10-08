@@ -23,7 +23,8 @@ import { SPECIES_ID, SPECIES_STATS } from './species-stats.generated.mjs';
 /** Base Attack and Special Attack within this many points read as "either": a seeded coin. */
 export const CLOSE_STAT_GAP = 10;
 
-// A printed TCG type names a family of main-series types; the first one the species has wins.
+// A printed TCG type names a family of main-series types; the first one the species has wins
+// (a dual type that has one of them flips between its two types instead: vgTypesFor).
 export const TCG_FAMILY = Object.freeze({
   grass: ['grass', 'bug', 'poison'],
   fire: ['fire'],
@@ -115,18 +116,34 @@ export function statClassFor(stats, coin) {
   return stats.atk > stats.spa ? 'physical' : 'special';
 }
 
-/** Main-series type for the move: the first family type the species has, else the family default. */
-export function vgTypeFor(card, species) {
+/**
+ * Main-series types to try for the move, in order. A dual-type species plays either of its two
+ * types 50/50 on `seed`, the other one next. The exception is a printed type whose family holds
+ * neither (a Tera card such as Darkness Charizard ex), which plays the printed type. Any other
+ * species plays the first family type it has, else the family default.
+ */
+export function vgTypesFor(card, species, seed = 0) {
   const tcgType = normalizeEnergyType(card?.types?.[0]);
-  const family = TCG_FAMILY[tcgType] ?? ['normal'];
+  const family = TCG_FAMILY[tcgType];
   const speciesTypes = Array.isArray(species?.types) ? species.types : [];
-  const owned = family.find((type) => speciesTypes.includes(type));
-  return owned ?? TCG_DEFAULT[tcgType] ?? 'normal';
+  const [first, second] = speciesTypes;
+  const dual = first && second && first !== second;
+  if (dual && (!family || family.includes(first) || family.includes(second))) {
+    return (Math.trunc(Number(seed) || 0) >>> 0) % 2 ? [second, first] : [first, second];
+  }
+  const owned = (family ?? ['normal']).find((type) => speciesTypes.includes(type));
+  return [owned ?? TCG_DEFAULT[tcgType] ?? 'normal'];
+}
+
+/** Main-series type for the move: the first of `vgTypesFor`. */
+export function vgTypeFor(card, species, seed = 0) {
+  return vgTypesFor(card, species, seed)[0];
 }
 
 /**
  * The move an attack plays, or null when the generic lunge (or aura pulse) applies.
  * `scores` maps move slug to its score; when given, a move without a score yields null.
+ * A dual type whose coin-picked type has no move falls through to its other type.
  * @returns {{move:string, vgType:string, statClass:string, tier:number, family:string|undefined, score:object|undefined}|null}
  */
 export function moveFor(
@@ -135,14 +152,17 @@ export function moveFor(
   scores = null
 ) {
   if (damage === 0 && !(benchDealt > 0)) return null;
-  const vgType = vgTypeFor(card, species);
   const tier = tierFor(card);
   const statClass = statClassFor(species ?? null, coinFor(instanceId));
-  const candidates = cellLookup(vgType, statClass, tier);
-  if (!candidates?.length) return null;
   const seed = hashString(`${instanceId ?? ''}|${attackName ?? ''}`);
-  const move = candidates[seed % candidates.length];
-  const score = scores ? scores[move] : undefined;
-  if (scores && !score) return null;
-  return { move, vgType, statClass, tier, family: score?.family, score };
+  const typeSeed = hashString(`${instanceId ?? ''}|${attackName ?? ''}|type`);
+  for (const vgType of vgTypesFor(card, species, typeSeed)) {
+    const candidates = cellLookup(vgType, statClass, tier);
+    if (!candidates?.length) continue;
+    const move = candidates[seed % candidates.length];
+    const score = scores ? scores[move] : undefined;
+    if (scores && !score) continue;
+    return { move, vgType, statClass, tier, family: score?.family, score };
+  }
+  return null;
 }

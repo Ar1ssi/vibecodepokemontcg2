@@ -46,7 +46,7 @@ import {
 } from './combat-pose.mjs';
 import { brighten, fxRgbForCard, FX_NEUTRAL_RGB, rgbCss } from './fx-colors.mjs';
 import { frameTurnOf } from './evolve-scene.js';
-import { peekCombatOrigin, zoneCardIds } from './origins.mjs';
+import { peekCombatOrigin, visibleStackRecord, zoneCardIds } from './origins.mjs';
 import { playMove } from './moves/move-player.js';
 import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
 import { SPECS } from './moves/specs/index.mjs';
@@ -61,12 +61,24 @@ const impacts = createImpactQueue({ setTimer: (fn, ms) => setTimeout(fn, ms) });
 // The tilt owns `transform` on these; WAAPI `translate` composes without clobbering it.
 const SHAKE_TARGET_IDS = ['battleMat', 'selfContainer', 'oppContainer', 'stadium'];
 
+/**
+ * The record of the card drawn on top of `instanceId`'s stack: an evolved Pokémon's id is its
+ * Basic's, but the evolution on top is what fights (M Gardevoir-EX, not the Ralts under it).
+ */
+const shownRecord = (instanceId, registry) =>
+  visibleStackRecord(registry, instanceId) || registry.get(instanceId) || null;
+
+/** The shown card's data, or null. */
+const combatCard = (instanceId, registry) => shownRecord(instanceId, registry)?.card || null;
+
 /** Live rect, else the pre-diff snapshot (a KO'd card is already gone). */
 const combatRect = (instanceId, registry) =>
-  rectForInstance(instanceId, registry) || peekCombatOrigin(instanceId)?.rect || null;
+  rectForInstance(shownRecord(instanceId, registry)?.instanceId ?? instanceId, registry) ||
+  peekCombatOrigin(instanceId)?.rect ||
+  null;
 
 const combatSrc = (instanceId, registry) => {
-  const element = registry.get(instanceId)?.element;
+  const element = shownRecord(instanceId, registry)?.element;
   return element?.currentSrc || element?.src || peekCombatOrigin(instanceId)?.src || null;
 };
 
@@ -264,7 +276,7 @@ const pickSignature = (plan, card) => {
  * attacker's type, from the same signature / move picks `attack()` makes.
  */
 export const attackSoundFor = (plan) => {
-  const card = getCardRegistry().get(plan.attackerId)?.card || null;
+  const card = combatCard(plan.attackerId, getCardRegistry());
   const signatureSpec = pickSignature(plan, card)?.spec ?? null;
   const zeroDamage = isZeroDamage(plan);
   const pick = signatureSpec || zeroDamage ? null : pickMove(plan, card);
@@ -290,7 +302,7 @@ const playAuraPulse = (rect, rgb) => {
 };
 
 const moveSide = (instanceId, rect, src, registry) => {
-  const element = registry.get(instanceId)?.element || null;
+  const element = shownRecord(instanceId, registry)?.element || null;
   return { rect, src, turn: frameTurnOf(element), element };
 };
 
@@ -323,12 +335,12 @@ const playLunge = (plan, registry, card, from, to, src) => {
   );
   const mainDone = animateFrames(main, mainFrames, { duration: LUNGE_MS });
   removeWhen(host, [mainDone, ...layers], LUNGE_MS + BACKSTOP_PAD_MS);
-  hideDuring(registry.get(plan.attackerId)?.element, mainDone, LUNGE_MS + BACKSTOP_PAD_MS);
+  hideDuring(shownRecord(plan.attackerId, registry)?.element, mainDone, LUNGE_MS + BACKSTOP_PAD_MS);
 };
 
 export const attack = (plan) => {
   const registry = getCardRegistry();
-  const card = registry.get(plan.attackerId)?.card || null;
+  const card = combatCard(plan.attackerId, registry);
   const from = combatRect(plan.attackerId, registry);
   const src = combatSrc(plan.attackerId, registry);
   if (!from || !src) return 0;
@@ -383,12 +395,12 @@ const showTargetRing = (rect) => {
 
 export const attackBanner = (plan) => {
   const registry = getCardRegistry();
-  const attackerName = registry.get(plan.attackerId)?.card?.name;
+  const attackerName = combatCard(plan.attackerId, registry)?.name;
   const text = attackBannerText(plan.attackName, attackerName);
   if (!text) return 0;
   playBanner(text, plan.user, 'attack');
   // A bench-wide or fizzled attack has no single defender; the banner still
   // plays, there is just nothing to ring (edge 9).
-  const defenderRect = rectForInstance(plan.defenderId, registry);
+  const defenderRect = rectForInstance(shownRecord(plan.defenderId, registry)?.instanceId ?? plan.defenderId, registry);
   if (defenderRect) showTargetRing(defenderRect);
 };

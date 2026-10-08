@@ -5,6 +5,7 @@ import {
   discardOrigins,
   discardedIds,
   knockoutStack,
+  peekCombatOrigin,
   takeOrigin,
   takeZoneSweep,
   visibleStackRecord,
@@ -183,4 +184,10 @@ test('captureOrigins: a zone swept into the pile snapshots every card in it, per
   discardOrigins(sweep);
   assert.deepEqual(takeZoneSweep('self', 'board'), []);
   assert.equal(takeOrigin(10), undefined, 'a skipped sweep leaves nothing behind');
+});
+
+test('captureOrigins: an evolved attacker is snapshotted as the card on top, under its Basic id', () => {
+  captureOrigins([{ type: 'attackExecuted', attackerId: 1, defenderId: 5 }], board(), capture, () => 'self');
+  assert.equal(peekCombatOrigin(1).src, 'kakuna.png');
+  assert.equal(peekCombatOrigin(5).src, 'makuhita.png');
 });
