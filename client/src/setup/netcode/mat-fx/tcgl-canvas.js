@@ -3,7 +3,7 @@
 // alpha carries the value the shader read (design 066 Deviations). Everything
 // is drawn additively ('lighter'); the overlay host screens the canvas onto the
 // board. A texture that has not loaded (or failed to) skips its ops.
-import { fillDissolve, fillFrame, fillPolar } from './tcgl-fx.mjs';
+import { fillDissolve, fillFrame, fillPolar, resampleRail } from './tcgl-fx.mjs';
 
 const BASE_URL = '/src/assets/fx/evolution/';
 const TEXTURE_FILES = {
@@ -247,23 +247,32 @@ function drawPolar(ctx, view, state, op) {
   placeQuad(ctx, view, op, sizePx, sizePx, (x, y, w, h) => ctx.drawImage(buf.canvas, x, y, w, h));
 }
 
+// LightRay_Prismatic has no fade along its length (the shader's custom data did
+// that); a tapered ribbon fades in from its hub and out toward its tip.
+const taperAt = (t) => Math.min(1, t / 0.2) * (1 - Math.max(0, (t - 0.45) / 0.55)) ** 1.5;
+
 function alongAlpha(op, lut, band, column, t) {
   if (band) return columnAlpha(band, 0.5, Math.min(0.999, t));
   if (column) return 1;
-  return columnAlpha(lut, 0.5, Math.min(0.999, t) + (op.pan || 0));
+  const along = columnAlpha(lut, 0.5, Math.min(0.999, t) + (op.pan || 0));
+  return op.taper ? along * taperAt(t) : along;
 }
 
 const rgba = (rgb, a) => `rgba(${Math.round(rgb[0] * 255)}, ${Math.round(rgb[1] * 255)}, ${Math.round(rgb[2] * 255)}, ${Math.max(0, Math.min(1, a))})`;
 
 // A ribbon is drawn quad by quad onto its own scratch canvas (no additive seams
 // where quads meet), then added to the stage in one draw.
+const RIBBON_MIN_POINTS = 28;
+
 function drawRibbon(ctx, view, state, op) {
   const lut = textureOf(op.lut);
   const band = op.band ? textureOf(op.band) : null;
   if (!lut || (op.band && !band) || !(op.alpha > 0.003) || op.a.length < 2) return;
   const toPx = ([x, y]) => [view.cx + x * view.unit, view.cy - y * view.unit];
-  const a = op.a.map(toPx);
-  const b = op.b.map(toPx);
+  // Short rails (a light shaft has 6 rings) are subdivided so the fade along them is smooth.
+  const count = Math.max(op.a.length, RIBBON_MIN_POINTS);
+  const a = resampleRail(op.a, count).map(toPx);
+  const b = resampleRail(op.b, count).map(toPx);
   const xs = [...a, ...b].map((p) => p[0]);
   const ys = [...a, ...b].map((p) => p[1]);
   const left = Math.floor(Math.min(...xs)) - 2;
@@ -297,6 +306,10 @@ function drawRibbon(ctx, view, state, op) {
     rctx.lineTo(b[i][0] - left, b[i][1] - top);
     rctx.closePath();
     rctx.fill();
+    // Stroking the same quad closes the anti-aliasing seam with its neighbour.
+    rctx.strokeStyle = gradient;
+    rctx.lineWidth = 1;
+    rctx.stroke();
   }
   ctx.save();
   ctx.globalAlpha = Math.max(0, Math.min(1, op.alpha));

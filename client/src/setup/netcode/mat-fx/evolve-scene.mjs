@@ -36,6 +36,10 @@ export const EVOLVE_POP_S = 1.0;
 export const EVOLVE_STAGE = 5;
 
 const WHITE = [1, 1, 1];
+// TCG Live adds these glows in HDR and tone-maps them; a canvas clips at white,
+// so the wide glows are scaled down to keep the card silhouette the brightest
+// thing on screen (house rule: no whiteout beyond the card).
+const LEVEL = { glowCore: 0.4, wisps: 0.45, raysRad: 0.8, refraction: 0.51, shockwave: 0.55, shafts: 0.75, flash: 0.6 };
 const POP_TINT = [1, 0.823, 0.684];
 const fade = (alpha) => ({ color: [[0, WHITE]], alpha });
 
@@ -272,7 +276,7 @@ function backOps(scene, t) {
   if (core != null) {
     const g = gradientAt(GRADIENTS.glowCore, core);
     const size = 20.15 * 2 * lerp(0.462, 0.954, core);
-    ops.push({ kind: 'sprite', tex: 'gradRadial', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: g.a });
+    ops.push({ kind: 'sprite', tex: 'gradRadial', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: LEVEL.glowCore * g.a });
   }
   const wisp = local(t, T.wisps);
   if (wisp != null) {
@@ -280,7 +284,7 @@ function backOps(scene, t) {
     const elapsed = wisp * T.wisps.life;
     for (const w of scene.wisps) {
       const size = w.size * 2 * lerp(0.66, 1, wisp);
-      ops.push({ kind: 'polar', noise: 'tileClouds', mask: 'glowSquare', shape: 'open', x: 0, y: 0, size, rot: w.rot, tileU: 2.14, tileV: 0.25, offU: 0, offV: -2 * elapsed, levels: [0.25, 1], detail: 0.5, rgb: g.rgb, alpha: Math.min(1, 1.3 * g.a) });
+      ops.push({ kind: 'polar', noise: 'tileClouds', mask: 'glowSquare', shape: 'disc', x: 0, y: 0, size, rot: w.rot, tileU: 2.14, tileV: 0.25, offU: 0, offV: -2 * elapsed, levels: [0.25, 1], detail: 0.5, rgb: g.rgb, alpha: LEVEL.wisps * g.a });
     }
   }
   const rays = local(t, T.raysRad);
@@ -289,7 +293,7 @@ function backOps(scene, t) {
     const elapsed = rays * T.raysRad.life;
     for (const r of scene.raysRad) {
       const size = r.size * 2 * lerp(0.462, 0.954, rays);
-      ops.push({ kind: 'polar', noise: 'streaks', mask: 'gradRadial', shape: 'open', x: 0, y: 0, size, rot: r.rot + r.spin * elapsed, tileU: 1, tileV: 1, offU: 0.15 * elapsed, offV: elapsed, levels: [0, 0.5], detail: 1.2, rgb: g.rgb, alpha: g.a });
+      ops.push({ kind: 'polar', noise: 'streaks', mask: 'gradRadial', shape: 'open', x: 0, y: 0, size, rot: r.rot + r.spin * elapsed, tileU: 1, tileV: 1, offU: 0.15 * elapsed, offV: elapsed, levels: [0, 0.5], detail: 1.2, rgb: g.rgb, alpha: LEVEL.raysRad * g.a });
     }
   }
   for (const p of scene.softy) {
@@ -348,6 +352,7 @@ const SPIRALS = {
   spiral2: { origin: [0.16, 2.64], scalar: 4.538, curve: [[0.214, 0.02], [0.86, 1]], dissolve: [[0.467, 0.468], [1, 1]], gradient: 'spiralLate' },
   spiral3: { origin: [4.08, -3.92], scalar: 2.618, curve: [[0, -0.034], [0.872, -1]], dissolve: [[0, 0.477], [0.405, -0.004], [0.73, 0.025], [1, 0.45]], gradient: 'spiral' },
 };
+const TRAIL_GROUND = 0.3;
 const shiftPoints = (points, [ox, oy], back = false) => points.map(([x, y]) => (back ? [x + ox, y + oy] : [x - ox, y - oy]));
 
 function spiralOps(scene, t) {
@@ -361,10 +366,11 @@ function spiralOps(scene, t) {
     const centre = shiftPoints(turnPoints(shiftPoints(trail.c, cfg.origin), angle, scale), cfg.origin, true);
     const half = trail.w.map((w) => w * scale);
     const g = gradientAt(GRADIENTS[cfg.gradient], age);
-    // The trail dissolves through its Debris_Glow dots: solid mid-life, stars at both ends.
-    const solid = 1 - smoothstep(0, 0.45, curveAt(cfg.dissolve, age));
+    // The trail dissolves through its Debris_Glow dots: the dots stay bright, the
+    // texture's dim ground between them shows only mid-life (TRAIL_GROUND).
+    const solid = TRAIL_GROUND * (1 - smoothstep(0, 0.45, curveAt(cfg.dissolve, age)));
     const { a, b } = railsAround(centre, half);
-    ops.push({ kind: 'ribbon', a, b, lut: 'prismaticVert', band: 'gradBeamH', rgb: g.rgb, alpha: g.a * solid * 0.85 });
+    ops.push({ kind: 'ribbon', a, b, lut: 'prismaticVert', band: 'gradBeamH', rgb: g.rgb, alpha: g.a * solid });
     for (const dot of scene.spiralDots[key]) {
       const i = Math.min(centre.length - 1, Math.floor(dot.at * centre.length));
       const side = (dot.side + 1) / 2;
@@ -417,13 +423,13 @@ function popOps(scene, t) {
   if (ring != null) {
     const g = gradientAt(GRADIENTS.refraction, ring);
     const size = 31.08 * curveAt([[0, 0.709], [0.152, 0.964], [1, 0.955]], ring);
-    ops.push({ kind: 'sprite', tex: 'spectrumRing', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: Math.min(1, 0.51 * 1.6 * g.a) });
+    ops.push({ kind: 'sprite', tex: 'spectrumRing', x: 0, y: 0, w: size, h: size, rot: 0, rgb: g.rgb, alpha: LEVEL.refraction * g.a });
   }
   const wave = local(t, T.shockwave);
   if (wave != null) {
     const g = gradientAt(GRADIENTS.shockwave, wave);
     const size = 2 * 95.69 * 0.1 * 4 * curveAt([[0, 0.153], [0.81, 0.835]], wave);
-    ops.push({ kind: 'sprite', tex: 'radialLine', x: 0, y: 0, w: size, h: size, rot: 2.592 + 0.6 * wave * T.shockwave.life, rgb: g.rgb, alpha: g.a });
+    ops.push({ kind: 'sprite', tex: 'radialLine', x: 0, y: 0, w: size, h: size, rot: 2.592 + 0.6 * wave * T.shockwave.life, rgb: g.rgb, alpha: LEVEL.shockwave * g.a });
   }
   const disc = local(t, T.disc);
   if (disc != null) {
@@ -433,16 +439,16 @@ function popOps(scene, t) {
   const shafts = ageOf(timeOk(t), T.shafts.delay, 0.6);
   if (shafts != null) {
     const boost = curveAt([[0, 1], [0.442, 0.029]], shafts);
-    const alpha = gradientAt(GRADIENTS.shafts, shafts).a * (0.55 + 0.45 * boost);
-    for (const blade of LIGHT_SHAFTS) ops.push({ kind: 'ribbon', a: blade.a, b: blade.b, lut: 'lightRay', rgb: WHITE, alpha });
+    const alpha = LEVEL.shafts * gradientAt(GRADIENTS.shafts, shafts).a * (0.55 + 0.45 * boost);
+    for (const blade of LIGHT_SHAFTS) ops.push({ kind: 'ribbon', a: blade.a, b: blade.b, lut: 'lightRay', taper: true, rgb: WHITE, alpha });
   }
   const flash = local(t, T.flash);
   if (flash != null) {
-    const alpha = gradientAt(GRADIENTS.shafts, flash).a;
+    const alpha = LEVEL.flash * gradientAt(GRADIENTS.shafts, flash).a;
     for (let i = 0; i < 4; i += 1) {
       const angle = (i * Math.PI) / 2;
-      const { a, b } = railsAround([[0, 0], [Math.cos(angle) * 15.75, Math.sin(angle) * 15.75]], [1.4, 0.15]);
-      ops.push({ kind: 'ribbon', a, b, lut: 'lightRay', rgb: WHITE, alpha });
+      const { a, b } = railsAround([[0, 0], [Math.cos(angle) * 15.75, Math.sin(angle) * 15.75]], [0.9, 0.1]);
+      ops.push({ kind: 'ribbon', a, b, lut: 'lightRay', taper: true, rgb: WHITE, alpha });
     }
   }
   const moteT = timeOk(t) - T.motes.delay;

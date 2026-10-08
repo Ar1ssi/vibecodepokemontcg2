@@ -13,6 +13,7 @@ import {
   pointOnRectEdge,
   railsAround,
   rateBirths,
+  resampleRail,
   sampleField,
   sampleMask,
   spinAngle,
@@ -148,4 +149,13 @@ test('pointOnRectEdge: every point lies on the rectangle', () => {
     const onY = close(Math.abs(y), 6, 1e-9) && Math.abs(x) <= 4 + 1e-9;
     assert.ok(onX || onY, `${x},${y}`);
   }
+});
+
+test('resampleRail: keeps the ends, spaces points evenly, passes short input through', () => {
+  const out = resampleRail([[0, 0], [10, 0]], 6);
+  assert.equal(out.length, 6);
+  assert.deepEqual(out[0], [0, 0]);
+  assert.deepEqual(out[5], [10, 0]);
+  assert.ok(close(out[1][0], 2));
+  assert.deepEqual(resampleRail([[1, 1]], 5), [[1, 1]]);
 });

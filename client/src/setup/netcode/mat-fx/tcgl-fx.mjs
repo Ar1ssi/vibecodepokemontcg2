@@ -276,6 +276,18 @@ export function turnPoints(points, angle, scale = 1) {
   return points.map(([x, y]) => [x * cos - y * sin, x * sin + y * cos]);
 }
 
+/** `count` points evenly spaced by index along a polyline (≥ 2 points in, ≥ 2 out). */
+export function resampleRail(points, count) {
+  if (!Array.isArray(points) || points.length < 2) return points || [];
+  const n = Math.max(2, Math.floor(count));
+  return Array.from({ length: n }, (_, i) => {
+    const x = (i / (n - 1)) * (points.length - 1);
+    const i0 = Math.min(points.length - 2, Math.floor(x));
+    const f = x - i0;
+    return [lerp(points[i0][0], points[i0 + 1][0], f), lerp(points[i0][1], points[i0 + 1][1], f)];
+  });
+}
+
 /** Two rails (left/right) either side of a centreline, `half[i]` wide at point i. */
 export function railsAround(centre, half) {
   const a = [];
