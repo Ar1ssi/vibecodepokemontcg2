@@ -54,6 +54,7 @@ const hideCardCounters = (image) => {
   if (image.specialCondition) image.specialCondition.style.display = 'none';
   if (image.poisonMarker) image.poisonMarker.style.display = 'none';
   if (image.burnMarker) image.burnMarker.style.display = 'none';
+  if (image.statusLoop) image.statusLoop.style.display = 'none';
   if (image.abilityCounter) image.abilityCounter.style.display = 'none';
 };
 
@@ -62,6 +63,7 @@ const showCardCounters = (image) => {
   if (image.specialCondition) image.specialCondition.style.display = '';
   if (image.poisonMarker) image.poisonMarker.style.display = '';
   if (image.burnMarker) image.burnMarker.style.display = '';
+  if (image.statusLoop) image.statusLoop.style.display = '';
   if (image.abilityCounter) image.abilityCounter.style.display = '';
 };
 

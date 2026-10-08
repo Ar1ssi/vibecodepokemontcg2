@@ -1,7 +1,7 @@
-/** Front-face images cropped from the user-provided official token sheet. */
+/** Front faces: TCG Live HUD badges (pnpm fx:import-status). */
 export const STATUS_TOKEN_FRONT = {
-  'status-poison': '/src/assets/status-markers/poison-token.png',
-  'status-burn': '/src/assets/status-markers/burn-token.png',
+  'status-poison': '/src/assets/status-markers/poison-badge.webp',
+  'status-burn': '/src/assets/status-markers/burn-badge.webp',
 };
 
 /** Bulbapedia Coin_Back_TM.png — shared back for all status tokens. */

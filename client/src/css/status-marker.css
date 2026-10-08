@@ -1,4 +1,6 @@
-/* 3D status tokens: user-provided burn/poison faces + Bulbapedia coin back. */
+@import url('./status-fx-palette.css');
+
+/* 3D status tokens: TCG Live burn/poison badge faces + Bulbapedia coin back. */
 
 .self-circle.status-token-wrap,
 .opp-circle.status-token-wrap {
@@ -164,6 +166,254 @@
   animation: fx-status-confused 1.5s ease-in-out infinite;
 }
 
+/* Held-condition loop (status-loop.mjs / status-loop.js): TCG Live's status
+   textures on an overlay beside the card, under its markers. Part sizes are
+   `em` of the card width (the overlay's font-size). `__card` parts turn with
+   the card; `__sky` parts stay screen-upright (the far seat's frame is turned,
+   see --status-fx-upright in opp-containers.css). Flipbook sheets step with two
+   animations: columns on `translate`, rows on `transform`. */
+.status-fx-loop {
+  position: absolute;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+}
+
+.status-fx-loop__card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+}
+
+.status-fx-loop__sky {
+  position: absolute;
+  inset: 0;
+  rotate: var(--status-fx-upright, 0deg);
+}
+
+.status-fx-loop__group {
+  position: absolute;
+  inset: 0;
+}
+
+.status-fx-loop__part,
+.status-fx-loop__sheet {
+  position: absolute;
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+.status-fx-loop__part {
+  overflow: hidden;
+}
+
+.status-fx-loop__sheet {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes status-fx-step-x {
+  to { translate: -100% 0; }
+}
+@keyframes status-fx-step-y {
+  to { transform: translateY(-100%); }
+}
+@keyframes status-fx-breathe {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
+
+/* An edge glow is its texture minus a card-sized rectangle (the second mask
+   layer, sized as card / glow box), so the glow rims the card and never
+   washes the art. */
+.status-fx-loop__glow {
+  mask-composite: subtract;
+}
+
+/* Poison: a goopy purple rim, and globs that swell and burst on the card. */
+.status-fx-loop .status-fx-loop__group--poison .status-fx-loop__glow {
+  inset: -6% -8%;
+  background-color: rgb(var(--status-poison-rgb));
+  mask-image: url('../assets/status-fx/poison/T_VFX_Poison_Mask.webp'), linear-gradient(#000, #000);
+  mask-mode: luminance, alpha;
+  mask-size: 100% 100%, 86.2% 89.3%;
+  animation: status-fx-breathe 1.8s ease-in-out infinite;
+}
+.status-fx-loop__group--poison .status-fx-loop__glob {
+  width: 0.5em;
+  height: 0.5em;
+}
+.status-fx-loop__group--poison .status-fx-loop__glob:nth-child(1) {
+  left: 4%;
+  top: 50%;
+}
+.status-fx-loop__group--poison .status-fx-loop__glob:nth-child(2) {
+  right: 2%;
+  top: 14%;
+}
+/* The glob sheet is grey: multiplied into the poison colour, cut to its own alpha. */
+.status-fx-loop .status-fx-loop__group--poison .status-fx-loop__glob .status-fx-loop__sheet {
+  width: 400%;
+  height: 400%;
+  background-image: url('../assets/status-fx/poison/Poison_Glob_highlighted_Flipbook_4x4_15.webp');
+  background-color: rgb(var(--status-poison-rgb));
+  background-blend-mode: multiply;
+  mask-image: url('../assets/status-fx/poison/Poison_Glob_highlighted_Flipbook_4x4_15.webp');
+  animation:
+    status-fx-step-x 0.4s steps(4) infinite,
+    status-fx-step-y 1.6s steps(4) infinite;
+}
+.status-fx-loop .status-fx-loop__group--poison .status-fx-loop__glob:nth-child(2) .status-fx-loop__sheet {
+  animation-duration: 0.5s, 2s;
+  animation-delay: -1s, -1s;
+}
+
+/* Burn: singed edges, an ember glow flickering along them, and flames licking
+   up from the bottom corners. */
+@keyframes status-fx-flicker {
+  0%, 100% { opacity: 0.35; }
+  20% { opacity: 0.75; }
+  35% { opacity: 0.5; }
+  60% { opacity: 0.85; }
+  80% { opacity: 0.4; }
+}
+.status-fx-loop__group--burn .status-fx-loop__singed {
+  inset: -7% -29%;
+  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Singed_Card_Brown.webp');
+  opacity: 0.85;
+}
+.status-fx-loop .status-fx-loop__group--burn .status-fx-loop__edge {
+  inset: -7% -29%;
+  background-color: rgb(var(--status-burn-rgb));
+  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Embers_Card_Alpha_7.webp');
+  mask-mode: luminance;
+  animation: status-fx-flicker 1.3s linear infinite;
+}
+.status-fx-loop__group--burn .status-fx-loop__flame {
+  bottom: -0.1em;
+  width: 0.46em;
+  height: 0.46em;
+}
+.status-fx-loop__group--burn .status-fx-loop__flame:nth-child(1) {
+  left: -4%;
+}
+.status-fx-loop__group--burn .status-fx-loop__flame:nth-child(2) {
+  right: -4%;
+  scale: -1 1;
+}
+.status-fx-loop .status-fx-loop__group--burn .status-fx-loop__flame .status-fx-loop__sheet {
+  width: 300%;
+  height: 300%;
+  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_MainFire_3x3.webp');
+  animation:
+    status-fx-step-x 0.27s steps(3) infinite,
+    status-fx-step-y 0.81s steps(3) infinite;
+}
+.status-fx-loop .status-fx-loop__group--burn .status-fx-loop__flame:nth-child(2) .status-fx-loop__sheet {
+  animation-duration: 0.3s, 0.9s;
+  animation-delay: -0.3s, -0.3s;
+}
+
+/* Asleep: TCG Live's cloud Zs drifting up off the card's top corner. */
+@keyframes status-fx-z-rise {
+  0% { translate: 0 0; scale: 0.55; opacity: 0; }
+  15% { opacity: 1; }
+  70% { opacity: 0.9; }
+  100% { translate: 0.2em -0.35em; scale: 1.05; opacity: 0; }
+}
+.status-fx-loop__group--sleep .status-fx-loop__z {
+  width: 0.3em;
+  height: 0.3em;
+  opacity: 0.9;
+}
+.status-fx-loop .status-fx-loop__group--sleep .status-fx-loop__z {
+  animation: status-fx-z-rise 3.3s ease-out infinite;
+}
+.status-fx-loop__group--sleep .status-fx-loop__z:nth-child(1) {
+  left: 52%;
+  top: 22%;
+}
+.status-fx-loop .status-fx-loop__group--sleep .status-fx-loop__z:nth-child(2) {
+  left: 62%;
+  top: 10%;
+  animation-delay: -1.1s;
+}
+.status-fx-loop .status-fx-loop__group--sleep .status-fx-loop__z:nth-child(3) {
+  left: 72%;
+  top: -2%;
+  animation-delay: -2.2s;
+}
+.status-fx-loop__group--sleep .status-fx-loop__z .status-fx-loop__sheet {
+  width: 200%;
+  height: 200%;
+  background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_Zs_2x2.webp');
+}
+.status-fx-loop__group--sleep .status-fx-loop__z:nth-child(2) .status-fx-loop__sheet {
+  translate: -50% 0;
+}
+.status-fx-loop__group--sleep .status-fx-loop__z:nth-child(3) .status-fx-loop__sheet {
+  translate: 0 -50%;
+}
+
+/* Paralyzed: bursts of yellow crackle over the card, then a beat of stillness.
+   The zap is additive on black, so its brightness is its own mask. */
+@keyframes status-fx-zap-burst {
+  0%, 30% { opacity: 1; }
+  32%, 100% { opacity: 0; }
+}
+.status-fx-loop .status-fx-loop__group--paralyze .status-fx-loop__zap {
+  inset: -10%;
+  animation: status-fx-zap-burst 1.6s linear infinite;
+}
+.status-fx-loop .status-fx-loop__group--paralyze .status-fx-loop__zap .status-fx-loop__sheet {
+  width: 200%;
+  height: 200%;
+  background-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_LoopZap_2x2.webp');
+  mask-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_LoopZap_2x2.webp');
+  mask-mode: luminance;
+  animation:
+    status-fx-step-x 0.2s steps(2) infinite,
+    status-fx-step-y 0.4s steps(2) infinite;
+}
+
+/* Confused: a pink edge glow and a wobbling dizzy ring over the card's head. */
+@keyframes status-fx-dizzy {
+  0%, 100% { rotate: -7deg; }
+  50% { rotate: 7deg; }
+}
+.status-fx-loop .status-fx-loop__group--confusion .status-fx-loop__glow {
+  inset: -26% -58%;
+  background-color: rgb(var(--status-confusion-rgb));
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Confusion_CardGlow.webp'), linear-gradient(#000, #000);
+  mask-mode: luminance, alpha;
+  mask-size: 100% 100%, 46.3% 65.8%;
+  animation: status-fx-breathe 2.2s ease-in-out infinite;
+}
+.status-fx-loop .status-fx-loop__group--confusion .status-fx-loop__ring {
+  left: 50%;
+  top: 0;
+  width: 0.8em;
+  height: 0.34em;
+  translate: -50% -55%;
+  animation: status-fx-dizzy 1.4s ease-in-out infinite;
+}
+.status-fx-loop .status-fx-loop__group--confusion .status-fx-loop__ring .status-fx-loop__sheet {
+  width: 200%;
+  height: 200%;
+  background-color: color-mix(in srgb, rgb(var(--status-confusion-rgb)) 70%, #fff);
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Ring_flipbook_2x2_4.webp');
+  animation:
+    status-fx-step-x 0.25s steps(2) infinite,
+    status-fx-step-y 0.5s steps(2) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .self-circle.status-marker,
   .opp-circle.status-marker {
@@ -180,5 +430,14 @@
 :root.fx-off .opp-circle.status-marker,
 :root.fx-reduced .self-circle.status-marker,
 :root.fx-reduced .opp-circle.status-marker {
+  animation: none;
+}
+
+/* Effects off hides the loop; reduced motion holds it still. */
+:root.fx-off .status-fx-loop {
+  display: none;
+}
+:root.fx-off .status-fx-loop *,
+:root.fx-reduced .status-fx-loop * {
   animation: none;
 }

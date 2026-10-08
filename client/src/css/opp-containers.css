@@ -1163,6 +1163,12 @@ body.mat-active .outline {
   --fx-active-glow: 230, 130, 130;
 }
 
+/* This frame is turned 180deg (index.css .opp): the status loop's flames and Zs
+   (status-marker.css) counter-turn so they still rise up the screen. */
+:root {
+  --status-fx-upright: 180deg;
+}
+
 /* Zone counts stay in the DOM (the deck stack reads #deckCount) but are not
    drawn on the mat. */
 #deckText,

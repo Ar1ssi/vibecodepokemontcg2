@@ -7,9 +7,9 @@ import {
 } from '../status-token-assets.mjs';
 
 describe('status token assets', () => {
-  it('points poison and burn at cropped sheet images', () => {
-    assert.match(STATUS_TOKEN_FRONT['status-poison'], /poison-token\.png$/);
-    assert.match(STATUS_TOKEN_FRONT['status-burn'], /burn-token\.png$/);
+  it('points poison and burn at the TCG Live badges', () => {
+    assert.match(STATUS_TOKEN_FRONT['status-poison'], /poison-badge\.webp$/);
+    assert.match(STATUS_TOKEN_FRONT['status-burn'], /burn-badge\.webp$/);
   });
 
   it('uses Bulbapedia Coin_Back_TM as the shared back', () => {

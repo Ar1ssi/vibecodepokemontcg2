@@ -326,6 +326,11 @@ img.has-usable-ability {
     rgba(var(--drop-deep-rgb), 0.08)
   );
 }
+/* Mirror of opp-containers.css: this frame is upright, so the status loop's
+   flames and Zs (status-marker.css) need no counter-turn. */
+:root {
+  --status-fx-upright: 0deg;
+}
 @keyframes highlight-pulse {
   0%, 100% { box-shadow: var(--drop-ring), 0 0 6px 2px rgba(var(--drop-rgb), 0.35); }
   50% { box-shadow: var(--drop-ring), 0 0 18px 6px rgba(var(--drop-rgb), 0.6); }

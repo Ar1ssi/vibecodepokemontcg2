@@ -11,6 +11,8 @@
 import { diffViews } from './view-diff.mjs';
 import { newlyRetreatLocked } from './mat-fx/retreat-lock-watch.mjs';
 import { heldStatusKeys } from './mat-fx/status-ambience.mjs';
+import { STATUS_LOOP_SLOT, statusLoopBox, statusLoopKeys } from './mat-fx/status-loop.mjs';
+import { createStatusLoop, placeStatusLoop, syncStatusLoop } from './mat-fx/status-loop.js';
 import { bedStateFor } from './mat-fx/crowd.mjs';
 import { uiCue } from './mat-fx/ui-cue.mjs';
 import { buildMatPickerRequest } from './mat-pick-request.mjs';
@@ -788,6 +790,50 @@ function reconcileSpecialConditionOverlay(
 }
 
 /**
+ * The held-condition idle loop (status-loop.mjs): one overlay per card carrying a
+ * group per held condition, kept in the zone like the markers and inserted before
+ * them so the markers stay on top. Its CSS animations keep running across views
+ * because the node only moves when its zone changes.
+ *
+ * @param {object} cardData
+ * @param {object} img
+ * @param {object|null} zoneElement
+ * @param {object} options
+ */
+function reconcileStatusLoopOverlay(cardData, img, zoneElement, options = {}, rectImg = img) {
+  const keys = statusLoopKeys(cardData);
+  if (keys.length === 0) {
+    removeOverlaySlot(img, STATUS_LOOP_SLOT);
+    return;
+  }
+  const doc =
+    img.ownerDocument ||
+    options.document ||
+    (typeof document !== 'undefined' ? document : null);
+  let loop = img[STATUS_LOOP_SLOT];
+  if (!loop) {
+    if (!doc || typeof doc.createElement !== 'function') return;
+    loop = createStatusLoop(doc);
+    img[STATUS_LOOP_SLOT] = loop;
+  }
+  syncStatusLoop(loop, keys, doc);
+
+  if (zoneElement && loop.parentNode !== zoneElement) {
+    const firstMarker = Object.values(CONDITION_MARKER_SLOTS)
+      .map((slot) => img[slot])
+      .find((marker) => marker?.parentNode === zoneElement);
+    zoneElement.insertBefore(loop, firstMarker || null);
+  }
+
+  const box = statusLoopBox({
+    rect: getRect(rectImg),
+    zoneRect: getRect(zoneElement),
+    rotation: cardData.rotation,
+  });
+  if (box) placeStatusLoop(loop, box);
+}
+
+/**
  * Reconciles both counter overlays for one card. Called after `placeCardInZone` so the
  * image has already been inserted into its final zone (position math reads the live rect).
  *
@@ -806,6 +852,7 @@ function reconcileCardOverlays(
   rectImg = img
 ) {
   reconcileDamageOverlay(cardData, img, zoneElement, side, options, rectImg);
+  reconcileStatusLoopOverlay(cardData, img, zoneElement, options, rectImg);
   reconcileSpecialConditionOverlay(
     cardData,
     img,
@@ -2266,7 +2313,7 @@ export function applyView(view, events = [], options = {}) {
           record.element.damageCounter
         );
       }
-      for (const slot of Object.values(CONDITION_MARKER_SLOTS)) {
+      for (const slot of [...Object.values(CONDITION_MARKER_SLOTS), STATUS_LOOP_SLOT]) {
         if (record.element?.[slot]?.parentNode) {
           record.element[slot].parentNode.removeChild(record.element[slot]);
         }

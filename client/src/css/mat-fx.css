@@ -1,3 +1,5 @@
+@import url('./status-fx-palette.css');
+
 /* Design 022: mat cosmetic effects. Every class and keyframe here is prefixed
    `fx-`. Overlays are detached body children and never take pointer events. */
 .fx-overlay {
@@ -261,23 +263,83 @@ body.fx-off .fx-overlay.fx-draw {
   filter: blur(2px) brightness(1.25);
 }
 
-.fx-status-apply {
+/* Special conditions: TCG Live's status VFX flipbooks (status-fx.mjs lays them
+   out). A sprite is a one-cell window over its sheet; the sheet steps through
+   the cells. `--fx-status-rgb` tints the white sheets in the condition colour. */
+.fx-status-apply,
+.fx-status-clear {
   overflow: visible;
-  --fx-p-color: var(--fx-status-color, #fff);
 }
 
-.fx-status-apply__ring {
+.fx-status--poison { --fx-status-rgb: var(--status-poison-rgb); --fx-status-edge: var(--status-poison-edge); }
+.fx-status--burn { --fx-status-rgb: var(--status-burn-rgb); --fx-status-edge: var(--status-burn-edge); }
+.fx-status--sleep { --fx-status-rgb: var(--status-sleep-rgb); --fx-status-edge: var(--status-sleep-edge); }
+.fx-status--paralyze { --fx-status-rgb: var(--status-paralyze-rgb); --fx-status-edge: var(--status-paralyze-edge); }
+.fx-status--confusion { --fx-status-rgb: var(--status-confusion-rgb); --fx-status-edge: var(--status-confusion-edge); }
+
+.fx-status-sprite {
   position: absolute;
-  inset: -4%;
-  border-radius: 0.45rem;
-  border: 3px solid var(--fx-status-color, #fff);
-  box-shadow: 0 0 22px 6px var(--fx-status-color, #fff), inset 0 0 18px 4px var(--fx-status-color, #fff);
+  overflow: hidden;
+  opacity: 0;
   will-change: transform, opacity;
 }
 
-.fx-status-apply__motes {
+.fx-status-sprite__sheet {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  will-change: transform;
+}
+
+/* White poof on black: its brightness is the mask, the condition colour the paint. */
+.fx-status-sprite--poof .fx-status-sprite__sheet {
+  background-color: rgb(var(--fx-status-rgb));
+  mask-image: url('../assets/status-fx/apply/T_VFX_Status_Apply_Poof_White.webp');
+  mask-mode: luminance;
+}
+
+.fx-status-sprite--poisonSplat .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/poison/Poison_Enh2_Splat_4x3.webp');
+}
+
+.fx-status-sprite--burnFlare .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Full_Card_Burn_Flipbook_4x4_16.webp');
+}
+
+.fx-status-sprite--sleepCloud .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_PopClouds_2x2.webp');
+}
+
+.fx-status-sprite--sleepZ .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_Zs_2x2.webp');
+}
+
+/* Additive zap on black: the sheet masks itself by brightness, so it glows
+   without a blend mode (the overlay's stacking context would isolate one). */
+.fx-status-sprite--paralyzeZap .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_IntroZap_2x2.webp');
+  mask-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_IntroZap_2x2.webp');
+  mask-mode: luminance;
+}
+
+/* Grey shaded smoke: multiplied into the condition colour, cut to its own alpha. */
+.fx-status-sprite--confusionSmoke .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Smoke_Flipbook_4x4_16_SoftEdges.webp');
+  background-color: rgb(var(--fx-status-rgb));
+  background-blend-mode: multiply;
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Smoke_Flipbook_4x4_16_SoftEdges.webp');
+}
+
+.fx-status-sprite--sparkle .fx-status-sprite__sheet {
+  background-color: color-mix(in srgb, rgb(var(--fx-status-rgb)) 45%, #fff);
+  mask-image: url('../assets/status-fx/remove/T_Status_VFX_Remove_Sparkle.webp');
+  mask-mode: luminance;
 }
 
 .fx-status-apply__label {
@@ -293,42 +355,8 @@ body.fx-off .fx-overlay.fx-draw {
   color: #fff;
   -webkit-text-stroke: 0.16em var(--fx-status-edge, #000);
   paint-order: stroke fill;
-  text-shadow: 0 0 0.5em var(--fx-status-color, #fff), 0 0.1em 0.2em rgba(0, 0, 0, 0.6);
+  text-shadow: 0 0 0.5em rgb(var(--fx-status-rgb, 255, 255, 255)), 0 0.1em 0.2em rgba(0, 0, 0, 0.6);
   will-change: transform, opacity;
-}
-
-.fx-status-apply--poison { --fx-status-color: #b76ce0; --fx-status-edge: #2c0a3d; }
-.fx-status-apply--burn { --fx-status-color: #ff7a2f; --fx-status-edge: #3d1000; }
-.fx-status-apply--asleep { --fx-status-color: #5fb4dd; --fx-status-edge: #06263a; }
-.fx-status-apply--paralyzed { --fx-status-color: #f4d03f; --fx-status-edge: #3a2c00; }
-.fx-status-apply--confused { --fx-status-color: #e07bd0; --fx-status-edge: #3a0a33; }
-
-.fx-status-apply--poison .fx-particle--mote {
-  background: radial-gradient(circle at 35% 35%, #fff 0 12%, rgba(215, 150, 255, 0.9) 25%, rgba(140, 60, 200, 0.55) 60%, rgba(140, 60, 200, 0) 72%);
-}
-
-.fx-status-apply--burn .fx-particle--mote {
-  background: radial-gradient(circle, #fff6c0 0 25%, #ffb040 45%, rgba(255, 80, 20, 0) 72%);
-}
-
-.fx-particle--z {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  display: block;
-  font: 900 1em var(--fx-font);
-  line-height: 1;
-  will-change: transform, opacity;
-}
-
-.fx-particle--z::before {
-  content: 'Z';
-  display: block;
-  font-size: 2.6em;
-  color: #eaf7ff;
-  -webkit-text-stroke: 0.08em #0b3350;
-  paint-order: stroke fill;
-  text-shadow: 0 0 0.3em var(--fx-p-color, #5fb4dd);
 }
 
 .fx-evolve-burst {
@@ -949,9 +977,15 @@ body.fx-off .fx-mega-field {
 
 .fx-status-clear {
   z-index: 2460;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+}
+
+.fx-status-clear__ring {
+  position: absolute;
+  inset: -4%;
+  border-radius: 0.45rem;
+  border: 3px solid rgb(var(--fx-status-rgb));
+  box-shadow: 0 0 22px 6px rgb(var(--fx-status-rgb)), inset 0 0 18px 4px rgb(var(--fx-status-rgb));
+  will-change: transform, opacity;
 }
 
 .fx-promote {

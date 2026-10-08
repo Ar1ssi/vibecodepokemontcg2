@@ -1,0 +1,15 @@
+/* One colour per special condition, shared by the apply/clear pops (mat-fx.css,
+   parent page) and the held-condition loops (status-marker.css, both playmat
+   iframes). Keys match the condition sound keys (sfx-cues.mjs). */
+:root {
+  --status-poison-rgb: 183, 108, 224;
+  --status-poison-edge: #2c0a3d;
+  --status-burn-rgb: 255, 122, 47;
+  --status-burn-edge: #3d1000;
+  --status-sleep-rgb: 95, 180, 221;
+  --status-sleep-edge: #06263a;
+  --status-paralyze-rgb: 244, 208, 63;
+  --status-paralyze-edge: #3a2c00;
+  --status-confusion-rgb: 224, 123, 208;
+  --status-confusion-edge: #3a0a33;
+}

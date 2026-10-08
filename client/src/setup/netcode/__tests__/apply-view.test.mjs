@@ -86,6 +86,14 @@ class MockElement {
     return child;
   }
 
+  insertBefore(child, reference) {
+    if (!reference) return this.appendChild(child);
+    if (child.parentNode) child.parentNode.removeChild(child);
+    child.parentNode = this;
+    this.children.splice(this.children.indexOf(reference), 0, child);
+    return child;
+  }
+
   removeChild(child) {
     const idx = this.children.indexOf(child);
     if (idx >= 0) {
@@ -1129,6 +1137,53 @@ test('Row 21: stacked conditions draw one marker each, stacked down the card, an
   assert.equal(selfActive.children.includes(burnMarker), false);
   assert.ok(img.specialCondition);
   assert.ok(img.poisonMarker);
+});
+
+test('status loop: one overlay per card, a group per held condition, under the markers and turned with the card', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const selfActive = doc.getElementById('selfMat').querySelector('#active');
+  const card = (extra) => ({ instanceId: 27, name: 'Pikachu', src: '/a.png', ...extra });
+  const options = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, extra) => ({
+    stateVersion,
+    you: { playerId: 'p1', zones: { active: [card(extra)] } },
+    them: { playerId: 'p2', zones: {} },
+  });
+  const groupKeys = (layer) =>
+    layer.children.map((g) => [...g.classList.classes].find((c) => c.startsWith('status-fx-loop__group--')));
+
+  applyView(view(1, { poisoned: true }), [], options);
+  const img = getCardRegistry().get(27).element;
+  img.getBoundingClientRect = () => ({ left: 0, top: 0, width: 126, height: 90 });
+  applyView(view(2, { poisoned: true, specialCondition: 'Asleep', rotation: -90 }), [], options);
+  const loop = img.statusLoop;
+  assert.ok(loop, 'a held condition gets a loop overlay');
+  assert.equal(loop.parentNode, selfActive);
+  assert.ok(
+    selfActive.children.indexOf(loop) < selfActive.children.indexOf(img.poisonMarker),
+    'the loop sits under the markers'
+  );
+  assert.deepEqual(groupKeys(loop.card), ['status-fx-loop__group--poison', 'status-fx-loop__group--sleep']);
+  assert.deepEqual(groupKeys(loop.sky), ['status-fx-loop__group--poison', 'status-fx-loop__group--sleep']);
+  assert.equal(loop.style.width, '126px', 'the box is the sideways footprint');
+  assert.equal(loop.card.style.width, '90px', 'the card frame is the card, turned with it');
+  assert.equal(loop.card.style.rotate, '-90deg');
+  const poisonGroup = loop.sky.children[0];
+
+  applyView(view(3, { poisoned: true, burned: true }), [], options);
+  assert.equal(img.statusLoop, loop, 'the same overlay survives a re-render');
+  assert.equal(loop.sky.children[0], poisonGroup, 'a still-held condition keeps its running loop');
+  assert.deepEqual(groupKeys(loop.sky), ['status-fx-loop__group--poison', 'status-fx-loop__group--burn']);
+  assert.equal(loop.card.style.rotate, '0deg');
+
+  applyView(view(4, {}), [], options);
+  assert.equal(img.statusLoop, null, 'recovery removes the overlay');
+  assert.equal(selfActive.children.includes(loop), false);
+
+  applyView(view(5, { burned: true }), [], options);
+  const burnLoop = img.statusLoop;
+  applyView({ stateVersion: 6, you: { playerId: 'p1', zones: { active: [] } }, them: { playerId: 'p2', zones: {} } }, [], options);
+  assert.equal(selfActive.children.includes(burnLoop), false, 'a card leaving play takes its loop with it');
 });
 
 // A window resize moves the card without a new view; the Poison/Burn markers must follow it
