@@ -23,11 +23,8 @@ test('every signature spec is valid, tier S, keyed by its id, and matches its mo
   }
 });
 
-// Types shipped over two slices: coverage is checked once the second half lands (slice 11).
-const PARTIAL_TYPES = new Set(['psychic']);
-
 test('per shipped type, every move of that type has a spec', () => {
-  for (const type of SHIPPED_TYPES.filter((t) => !PARTIAL_TYPES.has(t))) {
+  for (const type of SHIPPED_TYPES) {
     for (const [id, m] of Object.entries(SIGNATURE_MOVES)) {
       if (m.vgType === type)
         assert.ok(SIGNATURE_SPECS[id], `${type}: missing ${id}`);

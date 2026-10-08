@@ -916,6 +916,33 @@ dependency.
   Glare's beam is thin and short on Actives (as Blue Flare) and the grey splinters are faint;
   Mist Ball's after-mist is faint. No bench target (rec-move has none). Probe: median
   16.8–17.0 ms on all; p95 54–79 ms.
+- Slice 11: `psychic.mjs` is complete, so the `PARTIAL_TYPES` exemption is removed from
+  `signature-specs.test.mjs`. `family` follows `deriveFamily`: Photon Geyser, Prismatic Laser,
+  Psycho Boost and Psystrike `burst`, Psyblade `dash` (physical dash + front shards at contact).
+  Defender `knock` follows § E (Psyblade 0.45, specials 0.35) over the entries' 0.3/0.4; Psycho
+  Boost's float `lift −0.15` is `lift 0.15`.
+- Slice 11: Photon Geyser's contact star is `cross` and its rock chunks are 5 `shards unit
+  'body'` tinted grey-black (cross 20 + shards 5 + pillar 3 = 28; ring 40 + 8 over budget); a
+  red aura joins the red-black charge; the column runs 1100–2000 tinted cyan-green.
+- Slice 11: Prismatic Laser's five-hue column is `pillar count 3, spread 0.5, w 0.4` with the
+  five `hues` (one pillar draws one hue — the slice 5 Sacred Fire finding — so the entry's single
+  w 0.5 pillar recorded as a plain pink column); its contact star is `cross` and the entry's
+  shards are dropped (cross 20 + 9 = 29); the prism ring is a 3-ring `face` ring with `hues`, the
+  release flare `RING5 target 'attacker'` 600–850; orbit tongues carry the prism `hues`.
+- Slice 11: Psyblade's crescents are `slashArc radius 1.0, thick 0.25` (0.7 reads as hairlines,
+  slice 9); the violet burst adds pink/cyan `face` rings; spiral 10 tongues.
+- Slice 11: Psycho Boost's star is `RING5`, its rings carry `hues` magenta/cyan; a violet cloud
+  on the attacker stands for the purple haze. Psystrike's thrown cluster is `projectile unit
+  'rings'` (§ New pieces C) 500–1000 (entry 1000, the contact itself), `arc, bow 0.5`, so the
+  release shockRings move to 350–650 and the charge to 200–600; its star is `RING5` tinted
+  orange-white, the defender rings a 3-ring `face` ring with the gold/pink/violet `hues`; the
+  attacker `lunge` is `wind 0.4, reach 0.6`.
+- Slice 11 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment. Weak spots: Photon Geyser's red-black
+  sphere reads as a red ring outline round the attacker rather than a filled sphere; Psyblade's
+  crescents are thin magenta lines (slashArc shape limit, as Mighty Cleave); Psycho Boost's orb
+  is cyan-cored more than violet-white. No bench target (rec-move has none). Probe: median
+  16.8–17.0 ms on all; p95 59–88 ms.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
