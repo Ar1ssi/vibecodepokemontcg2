@@ -264,8 +264,8 @@ body.fx-off .fx-overlay.fx-draw {
 }
 
 /* Special conditions: TCG Live's status VFX flipbooks (status-fx.mjs lays them
-   out). A sprite is a one-cell window over its sheet; the sheet steps through
-   the cells. `--fx-status-rgb` tints the white sheets in the condition colour. */
+   out from the game's prefabs). A sprite is a one-cell window over its sheet;
+   the sheet steps through the cells. */
 .fx-status-apply,
 .fx-status-clear {
   overflow: visible;
@@ -297,49 +297,163 @@ body.fx-off .fx-overlay.fx-draw {
   will-change: transform;
 }
 
-/* White poof on black: its brightness is the mask, the condition colour the paint. */
-.fx-status-sprite--poof .fx-status-sprite__sheet {
-  background-color: rgb(var(--fx-status-rgb));
+/* Paint per sheet. `--fx-sprite-rgb` is the particle's Unity start/over-life
+   colour (status-fx.mjs `tint`); multiplied sheets keep their own shading under
+   it, flat ones are the tint cut to the sheet's alpha or brightness. */
+.fx-status-sprite {
+  --fx-tint: rgb(var(--fx-sprite-rgb, var(--fx-status-rgb, 255, 255, 255)));
+}
+
+/* Status_Apply: the coloured puff and swipe, each dissolved by its white twin. */
+.fx-status-sprite--puff .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/apply/T_VFX_Status_Apply_Poof_Color.webp');
   mask-image: url('../assets/status-fx/apply/T_VFX_Status_Apply_Poof_White.webp');
   mask-mode: luminance;
 }
 
-.fx-status-sprite--poisonSplat .fx-status-sprite__sheet {
-  background-image: url('../assets/status-fx/poison/Poison_Enh2_Splat_4x3.webp');
+.fx-status-sprite--swipe .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/apply/T_VFX_Status_Apply_Swipe_Color.webp');
+  mask-image: url('../assets/status-fx/apply/T_VFX_Status_Apply_Swipe_White.webp');
+  mask-mode: luminance;
 }
 
-.fx-status-sprite--burnFlare .fx-status-sprite__sheet {
+/* Multiplied: the sheet's own shading times the tint, cut to its alpha. */
+.fx-status-sprite--burnFire .fx-status-sprite__sheet,
+.fx-status-sprite--glob .fx-status-sprite__sheet,
+.fx-status-sprite--glob2 .fx-status-sprite__sheet,
+.fx-status-sprite--cloud .fx-status-sprite__sheet,
+.fx-status-sprite--dramaCloud .fx-status-sprite__sheet,
+.fx-status-sprite--smoke .fx-status-sprite__sheet {
+  background-color: var(--fx-tint);
+  background-blend-mode: multiply;
+}
+
+.fx-status-sprite--burnFire .fx-status-sprite__sheet {
   background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Full_Card_Burn_Flipbook_4x4_16.webp');
+  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Full_Card_Burn_Flipbook_4x4_16.webp');
 }
 
-.fx-status-sprite--sleepCloud .fx-status-sprite__sheet {
+.fx-status-sprite--glob .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/poison/Poison_Glob_highlighted_Flipbook_4x4_15.webp');
+  mask-image: url('../assets/status-fx/poison/Poison_Glob_highlighted_Flipbook_4x4_15.webp');
+}
+
+.fx-status-sprite--glob2 .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/poison/Poison_Glob_2_highlighted_Flipbook_4x4_15.webp');
+  mask-image: url('../assets/status-fx/poison/Poison_Glob_2_highlighted_Flipbook_4x4_15.webp');
+}
+
+.fx-status-sprite--cloud .fx-status-sprite__sheet {
   background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_PopClouds_2x2.webp');
+  mask-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_PopClouds_2x2.webp');
 }
 
-.fx-status-sprite--sleepZ .fx-status-sprite__sheet {
-  background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_Zs_2x2.webp');
+.fx-status-sprite--dramaCloud .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_DramaClouds_2x2.webp');
+  mask-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_DramaClouds_2x2.webp');
 }
 
-/* Additive zap on black: the sheet masks itself by brightness, so it glows
-   without a blend mode (the overlay's stacking context would isolate one). */
-.fx-status-sprite--paralyzeZap .fx-status-sprite__sheet {
+.fx-status-sprite--smoke .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Smoke_Flipbook_4x4_16_SoftEdges.webp');
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Smoke_Flipbook_4x4_16_SoftEdges.webp');
+}
+
+.fx-status-sprite--singed .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Singed_Card_Brown.webp');
+}
+
+/* Flat: the tint cut to the sheet (alpha sheets by default, luminance where the
+   sheet is white on black). */
+.fx-status-sprite--burnPop .fx-status-sprite__sheet,
+.fx-status-sprite--emberEdge .fx-status-sprite__sheet,
+.fx-status-sprite--poisonRim .fx-status-sprite__sheet,
+.fx-status-sprite--confusionGlow .fx-status-sprite__sheet,
+.fx-status-sprite--doubleRing .fx-status-sprite__sheet,
+.fx-status-sprite--sparkle .fx-status-sprite__sheet,
+.fx-status-sprite--shockwave .fx-status-sprite__sheet {
+  background-color: var(--fx-tint);
+}
+
+.fx-status-sprite--burnPop .fx-status-sprite__sheet {
+  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Pop_Flipbook_2x2.webp');
+}
+
+.fx-status-sprite--emberEdge .fx-status-sprite__sheet {
+  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Embers_Card_Alpha_7.webp');
+  mask-mode: luminance;
+}
+
+.fx-status-sprite--doubleRing .fx-status-sprite__sheet {
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Confusion_DoubleRing.webp');
+  mask-mode: luminance;
+}
+
+.fx-status-sprite--sparkle .fx-status-sprite__sheet {
+  mask-image: url('../assets/status-fx/remove/T_Status_VFX_Remove_Sparkle.webp');
+  mask-mode: luminance;
+}
+
+/* Bright_Pop_Wave lies at -90deg in the prefab. */
+.fx-status-sprite--shockwave {
+  rotate: -90deg;
+}
+
+.fx-status-sprite--shockwave .fx-status-sprite__sheet {
+  mask-image: url('../assets/status-fx/remove/T_Status_VFX_Remove_Shockwave_Flipbook_2x2.webp');
+}
+
+/* Rims: the edge glow minus the card (second mask layer, sized by --fx-cut), so
+   the outline never washes the art. */
+.fx-status-sprite--poisonRim .fx-status-sprite__sheet,
+.fx-status-sprite--confusionGlow .fx-status-sprite__sheet {
+  mask-mode: luminance, alpha;
+  mask-size: 100% 100%, var(--fx-cut, 0 0);
+  mask-composite: subtract;
+}
+
+.fx-status-sprite--poisonRim .fx-status-sprite__sheet {
+  mask-image: url('../assets/status-fx/poison/T_VFX_Poison_Mask.webp'), linear-gradient(#000, #000);
+}
+
+.fx-status-sprite--confusionGlow .fx-status-sprite__sheet {
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Confusion_CardGlow.webp'), linear-gradient(#000, #000);
+}
+
+/* Self-masked: additive bolts on black glow by their own brightness (the
+   overlay's stacking context would isolate a blend mode). */
+.fx-status-sprite--zap .fx-status-sprite__sheet {
   background-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_IntroZap_2x2.webp');
   mask-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_IntroZap_2x2.webp');
   mask-mode: luminance;
 }
 
-/* Grey shaded smoke: multiplied into the condition colour, cut to its own alpha. */
-.fx-status-sprite--confusionSmoke .fx-status-sprite__sheet {
-  background-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Smoke_Flipbook_4x4_16_SoftEdges.webp');
-  background-color: rgb(var(--fx-status-rgb));
-  background-blend-mode: multiply;
-  mask-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Smoke_Flipbook_4x4_16_SoftEdges.webp');
+.fx-status-sprite--collapse .fx-status-sprite__sheet {
+  background-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_Collapse_4x4.webp');
+  mask-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_Collapse_4x4.webp');
+  mask-mode: luminance;
 }
 
-.fx-status-sprite--sparkle .fx-status-sprite__sheet {
-  background-color: color-mix(in srgb, rgb(var(--fx-status-rgb)) 45%, #fff);
-  mask-image: url('../assets/status-fx/remove/T_Status_VFX_Remove_Sparkle.webp');
-  mask-mode: luminance;
+/* Status_Remove's untextured particles (ring, square, lime glow) as CSS shapes. */
+.fx-status-shape {
+  position: absolute;
+  opacity: 0;
+  will-change: transform, opacity;
+  --fx-tint: rgb(var(--fx-sprite-rgb, 255, 255, 255));
+}
+
+.fx-status-shape--ring {
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px var(--fx-tint), 0 0 10px 2px var(--fx-tint);
+}
+
+.fx-status-shape--square {
+  border-radius: 8%;
+  box-shadow: inset 0 0 0 3px var(--fx-tint), inset 0 0 14px 2px var(--fx-tint), 0 0 14px 3px var(--fx-tint);
+}
+
+.fx-status-shape--glow {
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--fx-tint) 0, rgb(var(--fx-sprite-rgb, 255, 255, 255), 0) 70%);
 }
 
 .fx-status-apply__label {
@@ -977,15 +1091,6 @@ body.fx-off .fx-mega-field {
 
 .fx-status-clear {
   z-index: 2460;
-}
-
-.fx-status-clear__ring {
-  position: absolute;
-  inset: -4%;
-  border-radius: 0.45rem;
-  border: 3px solid rgb(var(--fx-status-rgb));
-  box-shadow: 0 0 22px 6px rgb(var(--fx-status-rgb)), inset 0 0 18px 4px rgb(var(--fx-status-rgb));
-  will-change: transform, opacity;
 }
 
 .fx-promote {

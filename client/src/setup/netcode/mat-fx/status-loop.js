@@ -1,7 +1,7 @@
 // DOM twin of status-loop.mjs: builds and syncs the held-condition loop overlay.
 // Only groups whose condition came or went are touched, so a card that gains
 // Burn while Poisoned keeps its poison loop running instead of restarting it.
-import { STATUS_LOOP_PARTS } from './status-loop.mjs';
+import { STATUS_LOOP_PARTS, loopPartStyle } from './status-loop.mjs';
 
 function div(doc, className) {
   const el = doc.createElement('div');
@@ -9,11 +9,16 @@ function div(doc, className) {
   return el;
 }
 
-function buildGroup(doc, key, names) {
+/** One condition's parts on one layer ('card' or 'sky'), styled from their specs. */
+function buildGroup(doc, key, parts) {
   const group = div(doc, `status-fx-loop__group status-fx-loop__group--${key}`);
-  for (const name of names) {
-    const part = div(doc, `status-fx-loop__part status-fx-loop__${name}`);
-    part.appendChild(div(doc, 'status-fx-loop__sheet'));
+  for (const spec of parts) {
+    const style = loopPartStyle(spec);
+    const part = div(doc, `status-fx-loop__part status-fx-part--${spec.sprite}`);
+    part.style.cssText = style.part;
+    const sheet = div(doc, 'status-fx-loop__sheet');
+    sheet.style.cssText = style.sheet;
+    part.appendChild(sheet);
     group.appendChild(part);
   }
   return group;
@@ -41,8 +46,8 @@ export function syncStatusLoop(loop, keys, doc) {
   for (const key of keys) {
     const parts = STATUS_LOOP_PARTS[key];
     if (!parts || loop.groups.has(key)) continue;
-    const cardGroup = buildGroup(doc, key, parts.card);
-    const skyGroup = buildGroup(doc, key, parts.sky);
+    const cardGroup = buildGroup(doc, key, parts.filter((p) => p.layer === 'card'));
+    const skyGroup = buildGroup(doc, key, parts.filter((p) => p.layer === 'sky'));
     loop.card.appendChild(cardGroup);
     loop.sky.appendChild(skyGroup);
     loop.groups.set(key, [cardGroup, skyGroup]);
@@ -50,8 +55,8 @@ export function syncStatusLoop(loop, keys, doc) {
 }
 
 /**
- * Places the overlay on the footprint from `statusLoopBox`. Part sizes in the
- * sheet are `em` of the card width, so one font size scales every part.
+ * Places the overlay on the footprint from `statusLoopBox`. Part sizes are `em`
+ * of the card width, so one font size scales every part.
  */
 export function placeStatusLoop(loop, box) {
   loop.style.left = `${box.left}px`;

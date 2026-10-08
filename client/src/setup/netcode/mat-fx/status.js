@@ -1,6 +1,6 @@
 // Design 022 slice 3 / design 026: one-shot pop when a special condition
-// lands — TCG Live's apply poof in the condition colour, the condition's own
-// flipbook (poison splat, flare, sleep clouds and Zs, zap, dizzy smoke) and a
+// lands — TCG Live's Status_Apply puff and swipe with the condition's own intro
+// (status-fx.mjs holds the layers, converted from the game's prefabs) and a
 // bouncing label scaled to the card. The held-condition loop is status-loop.js.
 import { getCardRegistry } from '../apply-view.js';
 import {
@@ -14,49 +14,50 @@ import {
   STATUS_APPLY_MS,
   STATUS_CLEAR_LAYERS,
   STATUS_CLEAR_MS,
+  STATUS_LABEL_MS,
   STATUS_SPRITES,
   flipbookKeyframes,
-  spriteLayerPose,
+  spriteLayerKeyframes,
   statusApplyPose,
-  statusClearPose,
   statusFxFor,
 } from './status-fx.mjs';
 
 /**
- * One flipbook layer: a window one cell big (scaled, drifted and faded on the
- * effect clock) over the whole sheet, which steps cell to cell inside it.
- * Sizes are in the card's short side so a sideways card gets the same burst.
+ * One layer: a window (scaled, drifted and faded on the effect clock) over a
+ * flipbook sheet that steps cell to cell inside it — or, for `shape` layers, a
+ * plain CSS ring/square/glow. Sizes are in the card's short side, so a sideways
+ * card gets the same burst. `tint` and the rim cut-out ride on custom properties.
  */
-function playSpriteLayer(host, layer, rect, durationMs) {
-  const sheet = STATUS_SPRITES[layer.sprite];
+function playLayer(host, layer, rect, durationMs) {
   const unit = Math.min(rect.width, rect.height);
-  const sprite = document.createElement('div');
-  sprite.className = `fx-status-sprite fx-status-sprite--${layer.sprite}`;
+  const el = document.createElement('div');
+  el.className = layer.shape
+    ? `fx-status-shape fx-status-shape--${layer.shape}`
+    : `fx-status-sprite fx-status-sprite--${layer.sprite}`;
   const w = layer.w * unit;
   const h = layer.h * unit;
-  sprite.style.width = `${w}px`;
-  sprite.style.height = `${h}px`;
-  sprite.style.left = `${rect.width / 2 + (layer.x ?? 0) * unit - w / 2}px`;
-  sprite.style.top = `${rect.height / 2 + (layer.y ?? 0) * unit - h / 2}px`;
+  el.style.width = `${w}px`;
+  el.style.height = `${h}px`;
+  el.style.left = `${rect.width / 2 + layer.x * unit - w / 2}px`;
+  el.style.top = `${rect.height / 2 + layer.y * unit - h / 2}px`;
+  if (layer.tint) el.style.setProperty('--fx-sprite-rgb', layer.tint);
+  host.appendChild(el);
+
+  const done = [animateFrames(el, spriteLayerKeyframes(layer, unit), { duration: durationMs })];
+  if (layer.shape) return done;
+
+  const sheet = STATUS_SPRITES[layer.sprite];
   const cells = document.createElement('div');
   cells.className = 'fx-status-sprite__sheet';
   cells.style.width = `${sheet.cols * 100}%`;
   cells.style.height = `${sheet.rows * 100}%`;
-  sprite.appendChild(cells);
-  host.appendChild(sprite);
-
-  const windowFrames = sampleKeyframes(
-    (t) => spriteLayerPose(layer, t),
-    (p) => ({
-      transform: `translate(${p.dx * unit}px, ${p.dy * unit}px) scale(${p.scale})`,
-      opacity: p.opacity,
-    }),
-    24
-  );
-  return [
-    animateFrames(sprite, windowFrames, { duration: durationMs }),
-    animateFrames(cells, flipbookKeyframes(layer, sheet), { duration: durationMs }),
-  ];
+  if (layer.cut) {
+    // The rim's second mask layer is the card, sized as a share of the glow quad.
+    cells.style.setProperty('--fx-cut', `${layer.cut[0]}% ${layer.cut[1]}%`);
+  }
+  el.appendChild(cells);
+  done.push(animateFrames(cells, flipbookKeyframes(layer, sheet), { duration: durationMs }));
+  return done;
 }
 
 export const status = (plan) => {
@@ -68,7 +69,7 @@ export const status = (plan) => {
     rect,
     className: `fx-overlay fx-status-apply fx-status--${fx.key}`,
   });
-  const done = fx.layers.flatMap((layer) => playSpriteLayer(host, layer, rect, STATUS_APPLY_MS));
+  const done = fx.layers.flatMap((layer) => playLayer(host, layer, rect, STATUS_APPLY_MS));
 
   const label = document.createElement('div');
   label.className = 'fx-status-apply__label';
@@ -80,14 +81,13 @@ export const status = (plan) => {
     (p) => ({ transform: `translateY(${p.labelY}px) scale(${p.labelScale})`, opacity: p.labelOpacity }),
     20
   );
-  done.push(animateFrames(label, labelFrames, { duration: STATUS_APPLY_MS }));
+  done.push(animateFrames(label, labelFrames, { duration: STATUS_LABEL_MS }));
   removeWhen(host, done, STATUS_APPLY_MS + 400);
 };
 
 /**
- * Design 024 slice 4: recovery from a special condition. Deliberately quieter
- * than the apply pop — TCG Live's remove sparkles over an inward ring in the
- * condition's colour, and no label.
+ * Design 024 slice 4: recovery from a special condition — TCG Live's
+ * Status_Remove, a green heal of square, ring, shockwave and thrown stars. No label.
  */
 export const statusClear = (plan) => {
   const fx = statusFxFor(plan.condition);
@@ -98,17 +98,6 @@ export const statusClear = (plan) => {
     rect,
     className: `fx-overlay fx-status-clear fx-status--${fx.key}`,
   });
-  const ring = document.createElement('div');
-  ring.className = 'fx-status-clear__ring';
-  host.appendChild(ring);
-  const ringFrames = sampleKeyframes(
-    statusClearPose,
-    (p) => ({ transform: `scale(${p.ringScale})`, opacity: p.ringOpacity }),
-    16
-  );
-  const done = [
-    animateFrames(ring, ringFrames, { duration: STATUS_CLEAR_MS * 0.75 }),
-    ...STATUS_CLEAR_LAYERS.flatMap((layer) => playSpriteLayer(host, layer, rect, STATUS_CLEAR_MS)),
-  ];
+  const done = STATUS_CLEAR_LAYERS.flatMap((layer) => playLayer(host, layer, rect, STATUS_CLEAR_MS));
   removeWhen(host, done, STATUS_CLEAR_MS + 400);
 };

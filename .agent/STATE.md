@@ -6,8 +6,8 @@
 Focus: Sampled battle SFX (design 064, D203/D204/D206): TCG Live cues over the synth palette — fx plans,
   draw/shuffle/KO/enter, UI, status loops, signatures, crowd, and attack hits aligned to the 063/065 move
   contact (Addendum A). Samples committed in client/src/assets/sfx; regenerate with `pnpm sfx:import`.
-Active: TCG Live status FX first pass on main; retune to the Unity prefab dump (E:/TCGLive_Extract/vfx_dump,
-  README there) in progress on claude/tcgl-status-fx. ETB (057) slice 6 not started.
+Active: TCG Live status FX (retuned to the Unity prefab dump, E:/TCGLive_Extract/vfx_dump) on main; awaiting
+  user localhost check (Burn/Sleep up-direction). ETB (057) slice 6 not started.
 Next: user listening pass on localhost (SERVER_AUTHORITATIVE=1) for 064 mix gains (attack hit vs synth damage thud); I239–I240, then I227–I229;
   WotC Gyms/attach-Trainers/Baby flip, holo art windows (D201), deck reveals, 057 taste calls.
   Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).

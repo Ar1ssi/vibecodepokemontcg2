@@ -166,12 +166,13 @@
   animation: fx-status-confused 1.5s ease-in-out infinite;
 }
 
-/* Held-condition loop (status-loop.mjs / status-loop.js): TCG Live's status
-   textures on an overlay beside the card, under its markers. Part sizes are
-   `em` of the card width (the overlay's font-size). `__card` parts turn with
-   the card; `__sky` parts stay screen-upright (the far seat's frame is turned,
-   see --status-fx-upright in opp-containers.css). Flipbook sheets step with two
-   animations: columns on `translate`, rows on `transform`. */
+/* Held-condition loop (status-loop.mjs / status-loop.js): TCG Live's Small
+   idle prefabs as parts beside the card, under its markers. Each part's place,
+   size, tint and timing come inline from status-loop.mjs; this sheet holds the
+   textures, how each is painted, and the keyframes. Sizes are `em` of the card
+   width (the overlay's font-size). `__card` parts turn with the card; `__sky`
+   parts stay screen-upright (the far seat's frame is turned, see
+   --status-fx-upright in opp-containers.css). */
 .status-fx-loop {
   position: absolute;
   z-index: 1;
@@ -197,9 +198,19 @@
   inset: 0;
 }
 
-.status-fx-loop__part,
+/* Always-on parts rest at their peak; windowed ones are hidden between particles. */
+.status-fx-loop__part {
+  position: absolute;
+  overflow: hidden;
+  opacity: var(--rest, 0);
+  rotate: var(--turn, 0deg);
+  --tint: rgb(var(--fx-tint, 255, 255, 255));
+}
+
 .status-fx-loop__sheet {
   position: absolute;
+  left: 0;
+  top: 0;
   background-position: center;
   background-size: 100% 100%;
   background-repeat: no-repeat;
@@ -208,210 +219,194 @@
   mask-repeat: no-repeat;
 }
 
-.status-fx-loop__part {
-  overflow: hidden;
-}
-
-.status-fx-loop__sheet {
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-}
-
+/* A flipbook run steps columns on `translate` and rows on `transform`, over the
+   top-left block of the sheet that --x-end / --y-end bound. */
 @keyframes status-fx-step-x {
-  to { translate: -100% 0; }
+  to { translate: var(--x-end, -100%) 0; }
 }
 @keyframes status-fx-step-y {
-  to { transform: translateY(-100%); }
-}
-@keyframes status-fx-breathe {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 0.9; }
+  to { transform: translateY(var(--y-end, -100%)); }
 }
 
-/* An edge glow is its texture minus a card-sized rectangle (the second mask
-   layer, sized as card / glow box), so the glow rims the card and never
-   washes the art. */
-.status-fx-loop__glow {
-  mask-composite: subtract;
+/* One particle per cycle: shown for the first 1/k of it (status-loop.mjs
+   LOOP_WINDOWS), fading in and out, drifting by (--dx, --dy), growing --s0 to --s1. */
+@keyframes status-fx-life-1 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  15%, 75% { opacity: var(--peak, 1); }
+  100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-2 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  7.5%, 37.5% { opacity: var(--peak, 1); }
+  50%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-3 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  5%, 25% { opacity: var(--peak, 1); }
+  33.333%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-4 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  3.75%, 18.75% { opacity: var(--peak, 1); }
+  25%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-5 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  3%, 15% { opacity: var(--peak, 1); }
+  20%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-6 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  2.5%, 12.5% { opacity: var(--peak, 1); }
+  16.667%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-8 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  1.875%, 9.375% { opacity: var(--peak, 1); }
+  12.5%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-10 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  1.5%, 7.5% { opacity: var(--peak, 1); }
+  10%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-12 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  1.25%, 6.25% { opacity: var(--peak, 1); }
+  8.333%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-16 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  0.938%, 4.688% { opacity: var(--peak, 1); }
+  6.25%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-20 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  0.75%, 3.75% { opacity: var(--peak, 1); }
+  5%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
+}
+@keyframes status-fx-life-40 {
+  0% { opacity: 0; translate: 0 0; scale: var(--s0, 1); }
+  0.375%, 1.875% { opacity: var(--peak, 1); }
+  2.5%, 100% { opacity: 0; translate: var(--dx, 0) var(--dy, 0); scale: var(--s1, 1); }
 }
 
-/* Poison: a goopy purple rim, and globs that swell and burst on the card. */
-.status-fx-loop .status-fx-loop__group--poison .status-fx-loop__glow {
-  inset: -6% -8%;
-  background-color: rgb(var(--status-poison-rgb));
-  mask-image: url('../assets/status-fx/poison/T_VFX_Poison_Mask.webp'), linear-gradient(#000, #000);
-  mask-mode: luminance, alpha;
-  mask-size: 100% 100%, 86.2% 89.3%;
-  animation: status-fx-breathe 1.8s ease-in-out infinite;
+@keyframes status-fx-rock {
+  0%, 100% { rotate: var(--turn, 0deg); }
+  25% { rotate: calc(var(--turn, 0deg) + var(--rock, 0deg)); }
+  75% { rotate: calc(var(--turn, 0deg) - var(--rock, 0deg)); }
 }
-.status-fx-loop__group--poison .status-fx-loop__glob {
-  width: 0.5em;
-  height: 0.5em;
-}
-.status-fx-loop__group--poison .status-fx-loop__glob:nth-child(1) {
-  left: 4%;
-  top: 50%;
-}
-.status-fx-loop__group--poison .status-fx-loop__glob:nth-child(2) {
-  right: 2%;
-  top: 14%;
-}
-/* The glob sheet is grey: multiplied into the poison colour, cut to its own alpha. */
-.status-fx-loop .status-fx-loop__group--poison .status-fx-loop__glob .status-fx-loop__sheet {
-  width: 400%;
-  height: 400%;
-  background-image: url('../assets/status-fx/poison/Poison_Glob_highlighted_Flipbook_4x4_15.webp');
-  background-color: rgb(var(--status-poison-rgb));
+
+/* Multiplied: the sheet's shading times the particle colour, cut to its alpha. */
+.status-fx-part--glob .status-fx-loop__sheet,
+.status-fx-part--glob2 .status-fx-loop__sheet,
+.status-fx-part--mainFire .status-fx-loop__sheet,
+.status-fx-part--fireSet .status-fx-loop__sheet,
+.status-fx-part--lick .status-fx-loop__sheet,
+.status-fx-part--cloud .status-fx-loop__sheet,
+.status-fx-part--dramaCloud .status-fx-loop__sheet,
+.status-fx-part--z .status-fx-loop__sheet {
+  background-color: var(--tint);
   background-blend-mode: multiply;
+}
+
+.status-fx-part--glob .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/poison/Poison_Glob_highlighted_Flipbook_4x4_15.webp');
   mask-image: url('../assets/status-fx/poison/Poison_Glob_highlighted_Flipbook_4x4_15.webp');
-  animation:
-    status-fx-step-x 0.4s steps(4) infinite,
-    status-fx-step-y 1.6s steps(4) infinite;
 }
-.status-fx-loop .status-fx-loop__group--poison .status-fx-loop__glob:nth-child(2) .status-fx-loop__sheet {
-  animation-duration: 0.5s, 2s;
-  animation-delay: -1s, -1s;
+.status-fx-part--glob2 .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/poison/Poison_Glob_2_highlighted_Flipbook_4x4_15.webp');
+  mask-image: url('../assets/status-fx/poison/Poison_Glob_2_highlighted_Flipbook_4x4_15.webp');
 }
-
-/* Burn: singed edges, an ember glow flickering along them, and flames licking
-   up from the bottom corners. */
-@keyframes status-fx-flicker {
-  0%, 100% { opacity: 0.35; }
-  20% { opacity: 0.75; }
-  35% { opacity: 0.5; }
-  60% { opacity: 0.85; }
-  80% { opacity: 0.4; }
+.status-fx-part--fireSet .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_FireSet_5_5_4.webp');
+  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_FireSet_5_5_4.webp');
 }
-.status-fx-loop__group--burn .status-fx-loop__singed {
-  inset: -7% -29%;
-  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Singed_Card_Brown.webp');
-  opacity: 0.85;
+.status-fx-part--lick .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Flame_Lick_R_6x2_12.webp');
+  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Flame_Lick_R_6x2_12.webp');
 }
-.status-fx-loop .status-fx-loop__group--burn .status-fx-loop__edge {
-  inset: -7% -29%;
-  background-color: rgb(var(--status-burn-rgb));
-  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_Embers_Card_Alpha_7.webp');
-  mask-mode: luminance;
-  animation: status-fx-flicker 1.3s linear infinite;
+.status-fx-part--cloud .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_PopClouds_2x2.webp');
+  mask-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_PopClouds_2x2.webp');
 }
-.status-fx-loop__group--burn .status-fx-loop__flame {
-  bottom: -0.1em;
-  width: 0.46em;
-  height: 0.46em;
+.status-fx-part--dramaCloud .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_DramaClouds_2x2.webp');
+  mask-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_DramaClouds_2x2.webp');
 }
-.status-fx-loop__group--burn .status-fx-loop__flame:nth-child(1) {
-  left: -4%;
-}
-.status-fx-loop__group--burn .status-fx-loop__flame:nth-child(2) {
-  right: -4%;
-  scale: -1 1;
-}
-.status-fx-loop .status-fx-loop__group--burn .status-fx-loop__flame .status-fx-loop__sheet {
-  width: 300%;
-  height: 300%;
-  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_MainFire_3x3.webp');
-  animation:
-    status-fx-step-x 0.27s steps(3) infinite,
-    status-fx-step-y 0.81s steps(3) infinite;
-}
-.status-fx-loop .status-fx-loop__group--burn .status-fx-loop__flame:nth-child(2) .status-fx-loop__sheet {
-  animation-duration: 0.3s, 0.9s;
-  animation-delay: -0.3s, -0.3s;
-}
-
-/* Asleep: TCG Live's cloud Zs drifting up off the card's top corner. */
-@keyframes status-fx-z-rise {
-  0% { translate: 0 0; scale: 0.55; opacity: 0; }
-  15% { opacity: 1; }
-  70% { opacity: 0.9; }
-  100% { translate: 0.2em -0.35em; scale: 1.05; opacity: 0; }
-}
-.status-fx-loop__group--sleep .status-fx-loop__z {
-  width: 0.3em;
-  height: 0.3em;
-  opacity: 0.9;
-}
-.status-fx-loop .status-fx-loop__group--sleep .status-fx-loop__z {
-  animation: status-fx-z-rise 3.3s ease-out infinite;
-}
-.status-fx-loop__group--sleep .status-fx-loop__z:nth-child(1) {
-  left: 52%;
-  top: 22%;
-}
-.status-fx-loop .status-fx-loop__group--sleep .status-fx-loop__z:nth-child(2) {
-  left: 62%;
-  top: 10%;
-  animation-delay: -1.1s;
-}
-.status-fx-loop .status-fx-loop__group--sleep .status-fx-loop__z:nth-child(3) {
-  left: 72%;
-  top: -2%;
-  animation-delay: -2.2s;
-}
-.status-fx-loop__group--sleep .status-fx-loop__z .status-fx-loop__sheet {
-  width: 200%;
-  height: 200%;
+.status-fx-part--z .status-fx-loop__sheet {
   background-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_Zs_2x2.webp');
-}
-.status-fx-loop__group--sleep .status-fx-loop__z:nth-child(2) .status-fx-loop__sheet {
-  translate: -50% 0;
-}
-.status-fx-loop__group--sleep .status-fx-loop__z:nth-child(3) .status-fx-loop__sheet {
-  translate: 0 -50%;
+  mask-image: url('../assets/status-fx/sleep/T_VFX_Status_Sleep_Zs_2x2.webp');
 }
 
-/* Paralyzed: bursts of yellow crackle over the card, then a beat of stillness.
-   The zap is additive on black, so its brightness is its own mask. */
-@keyframes status-fx-zap-burst {
-  0%, 30% { opacity: 1; }
-  32%, 100% { opacity: 0; }
+/* Flat: the particle colour cut to the sheet (alpha, or brightness for sheets
+   drawn white on black). */
+.status-fx-part--sparkle .status-fx-loop__sheet,
+.status-fx-part--ring .status-fx-loop__sheet,
+.status-fx-part--pop .status-fx-loop__sheet,
+.status-fx-part--wisp .status-fx-loop__sheet,
+.status-fx-part--sleepGlow .status-fx-loop__sheet,
+.status-fx-part--paralyzeGlow .status-fx-loop__sheet {
+  background-color: var(--tint);
 }
-.status-fx-loop .status-fx-loop__group--paralyze .status-fx-loop__zap {
-  inset: -10%;
-  animation: status-fx-zap-burst 1.6s linear infinite;
+
+/* TCG Live layers each main flame as pink, orange and a white core, all from this sheet. */
+.status-fx-part--mainFire .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_MainFire_3x3.webp');
+  mask-image: url('../assets/status-fx/burned/T_VFX_Status_Burned_MainFire_3x3.webp');
 }
-.status-fx-loop .status-fx-loop__group--paralyze .status-fx-loop__zap .status-fx-loop__sheet {
-  width: 200%;
-  height: 200%;
+.status-fx-part--pop .status-fx-loop__sheet {
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Pop_Flipbook_2x2_3.webp');
+}
+.status-fx-part--sparkle .status-fx-loop__sheet {
+  mask-image: url('../assets/status-fx/remove/T_Status_VFX_Remove_Sparkle.webp');
+  mask-mode: luminance;
+}
+.status-fx-part--ring .status-fx-loop__sheet {
+  mask-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Ring_flipbook_2x2_4_black.webp');
+  mask-mode: luminance;
+}
+
+/* Poison's smoke-dissolve wisp: bright cloud noise, faded out toward its edge. */
+.status-fx-part--wisp .status-fx-loop__sheet {
+  mask-image: url('../assets/status-fx/poison/T_CloudNoise_Bright.webp'), radial-gradient(closest-side, #000, transparent);
+  mask-mode: luminance, alpha;
+  mask-composite: intersect;
+}
+
+/* Self-masked: additive bolts on black glow by their own brightness. */
+.status-fx-part--zap .status-fx-loop__sheet {
   background-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_LoopZap_2x2.webp');
   mask-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_LoopZap_2x2.webp');
   mask-mode: luminance;
-  animation:
-    status-fx-step-x 0.2s steps(2) infinite,
-    status-fx-step-y 0.4s steps(2) infinite;
+}
+.status-fx-part--collapse .status-fx-loop__sheet {
+  background-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_Collapse_4x4.webp');
+  mask-image: url('../assets/status-fx/paralyze/T_VFX_Status_Paralyze_Collapse_4x4.webp');
+  mask-mode: luminance;
 }
 
-/* Confused: a pink edge glow and a wobbling dizzy ring over the card's head. */
-@keyframes status-fx-dizzy {
-  0%, 100% { rotate: -7deg; }
-  50% { rotate: 7deg; }
+/* Glows behind the card (Behind_Card_Pulse, glow_Loop, Glow_Big): our overlay
+   sits over the card, so each is its glow minus the card (second mask layer,
+   sized by --fx-cut) and never washes the art. */
+.status-fx-part--sleepGlow .status-fx-loop__sheet,
+.status-fx-part--paralyzeGlow .status-fx-loop__sheet,
+.status-fx-part--burnGlow .status-fx-loop__sheet {
+  mask-size: 100% 100%, var(--fx-cut, 0 0);
+  mask-composite: subtract;
 }
-.status-fx-loop .status-fx-loop__group--confusion .status-fx-loop__glow {
-  inset: -26% -58%;
-  background-color: rgb(var(--status-confusion-rgb));
-  mask-image: url('../assets/status-fx/confusion/T_VFX_Confusion_CardGlow.webp'), linear-gradient(#000, #000);
+.status-fx-part--sleepGlow .status-fx-loop__sheet {
+  mask-image: url('../assets/status-fx/sleep/t_vfx_match_card_glow.webp'), linear-gradient(#000, #000);
   mask-mode: luminance, alpha;
-  mask-size: 100% 100%, 46.3% 65.8%;
-  animation: status-fx-breathe 2.2s ease-in-out infinite;
 }
-.status-fx-loop .status-fx-loop__group--confusion .status-fx-loop__ring {
-  left: 50%;
-  top: 0;
-  width: 0.8em;
-  height: 0.34em;
-  translate: -50% -55%;
-  animation: status-fx-dizzy 1.4s ease-in-out infinite;
+.status-fx-part--paralyzeGlow .status-fx-loop__sheet {
+  mask-image: url('../assets/status-fx/sleep/t_vfx_match_card_glow.webp'), linear-gradient(#000, #000);
+  mask-mode: luminance, alpha;
 }
-.status-fx-loop .status-fx-loop__group--confusion .status-fx-loop__ring .status-fx-loop__sheet {
-  width: 200%;
-  height: 200%;
-  background-color: color-mix(in srgb, rgb(var(--status-confusion-rgb)) 70%, #fff);
-  mask-image: url('../assets/status-fx/confusion/T_VFX_Status_Confusion_Ring_flipbook_2x2_4.webp');
-  animation:
-    status-fx-step-x 0.25s steps(2) infinite,
-    status-fx-step-y 0.5s steps(2) infinite;
+/* Glow_Big is an untextured soft particle: a radial falloff in its colour. */
+.status-fx-part--burnGlow .status-fx-loop__sheet {
+  background-image: radial-gradient(closest-side, var(--tint), rgb(var(--fx-tint, 255, 255, 255), 0));
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -433,11 +428,12 @@
   animation: none;
 }
 
-/* Effects off hides the loop; reduced motion holds it still. */
+/* Effects off hides the loop; reduced motion holds it still. `!important`
+   because each part's animation is set inline from status-loop.mjs. */
 :root.fx-off .status-fx-loop {
   display: none;
 }
 :root.fx-off .status-fx-loop *,
 :root.fx-reduced .status-fx-loop * {
-  animation: none;
+  animation: none !important;
 }
