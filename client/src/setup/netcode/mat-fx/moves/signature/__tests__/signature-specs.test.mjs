@@ -48,3 +48,14 @@ test('slice 5: the Fire and Grass signatures ship, material per § Options 4', (
   }
   assert.equal(SIGNATURE_SPECS['ivy-cudgel'].material, 'grass');
 });
+
+test('slice 6: the Water and Ice signatures ship, material per § Options 4', () => {
+  const ids = ['hydro-steam', 'origin-pulse', 'steam-eruption', 'surging-strikes', 'freeze-shock', 'glacial-lance', 'glaciate', 'ice-burn'];
+  for (const id of ids) {
+    const spec = SIGNATURE_SPECS[id];
+    assert.ok(spec, id);
+    assert.deepEqual(validateSpec(spec), [], id);
+    assert.equal(spec.tier, 'S', id);
+    assert.equal(spec.material, SIGNATURE_MOVES[id].material, id);
+  }
+});

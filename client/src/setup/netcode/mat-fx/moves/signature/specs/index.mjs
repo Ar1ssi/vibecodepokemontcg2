@@ -2,8 +2,12 @@
 // ship them. Never merged with 063's SPECS (ids such as `aeroblast` exist in both).
 import { FIRE_SIGNATURE_SPECS } from './fire.mjs';
 import { GRASS_SIGNATURE_SPECS } from './grass.mjs';
+import { WATER_SIGNATURE_SPECS } from './water.mjs';
+import { ICE_SIGNATURE_SPECS } from './ice.mjs';
 
 export const SIGNATURE_SPECS = Object.freeze({
   ...FIRE_SIGNATURE_SPECS,
   ...GRASS_SIGNATURE_SPECS,
+  ...WATER_SIGNATURE_SPECS,
+  ...ICE_SIGNATURE_SPECS,
 });

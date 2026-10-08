@@ -758,6 +758,30 @@ dependency.
   pressure light with ringed projectile bodies; stellar draws faceted cyan crystal bodies and
   crystal tongues, but its accent fringe is not visible at board scale (all cyan) — revisit
   with Tera Starstorm (slice 15). The slice 3 recording debt is closed.
+- Slice 6: `family` follows `deriveFamily` (recipe step 2), not the entry's motion: Hydro Steam,
+  Origin Pulse and Freeze Shock are `wind`, Steam Eruption and Surging Strikes `splash`, Glaciate
+  `quake`, Ice Burn `burst`.
+- Slice 6: `ring kind 'fins'` takes `count` 1–5 (slice 4), so Hydro Steam's halo is 5 fins (entry 6).
+- Slice 6: Origin Pulse's 16 orbs carry `tongues 0` (orbs only) so the attacker-anchored `RING5`
+  star (25) fits the budget; the dive is the dash motion alone (no second projectile).
+- Slice 6: Surging Strikes' hits are 500–700 / 700–950 (`cross`) and 950–1250 (`RING5`), cut so
+  no two stars overlap (cross + ring = 45 tongues); splash is 5 at 1100–1700 (entry 6 at 1000).
+  Attacker lunge carries `strikes 3`; the opening aura uses a gold `hot` for the claw sparks.
+- Slice 6: Freeze Shock's six-point crystal is `SIX` (6 arms, reach 1 = 30 tongues), so its
+  shard burst moves to 1500–2000, after the crystal breaks (entry 1000–1500); the frost sphere is
+  `projectile unit 'facet'`; particles are 16 `flake`s (the entry names none).
+- Slice 6: Glacial Lance's spires (flags: pillar) are `pillar count 2, spread 1.2, height 2.0` on
+  the back layer at 1320–2100, after the contact stars (cross 20 + shards 8 already at 1000);
+  the contact star is `cross` (entry 'ring' = 40 tongues).
+- Slice 6: Glaciate's ice column is `pillar 800–1400, w 0.9` (the board mapping names only ring
+  and shards; the signature read needs the column), plus an `impactFlash` at contact (flags).
+- Slice 6: Ice Burn's red lattice is `glyph kind 'lattice'` on the attacker card (0–1000), not a
+  ghost overlay: it stays at home while the lunge ghost leaves. The eight-petal flower is `SIX`
+  at 1500–2300, width 0.32 (8 arms = 40 tongues; width 0.46 hid the defender and the number).
+- Slice 6 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows. Weak spots: Glaciate's `terrain 'wave'` ice field
+  barely reads at board scale; Hydro Steam's beam is short on Actives (as Blue Flare). No bench
+  target (rec-move has none). Probe: median 16.8–17.1 ms, p95 58–87 ms on all eight.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
