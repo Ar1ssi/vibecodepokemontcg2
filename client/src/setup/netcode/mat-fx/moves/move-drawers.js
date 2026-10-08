@@ -9,7 +9,7 @@
 // anchored drawers place themselves with `anchorPoint`, and travelling / orbiting drawers draw
 // their `unit` (materials/_units.js; 'body' is the material's own body / projectile).
 import { rgbCss } from '../fx-colors.mjs';
-import { lanePoint, skyLane } from './move-geometry.mjs';
+import { LEAD_H, lanePoint, skyLane } from './move-geometry.mjs';
 import { getNoiseTile } from './materials/_shared.js';
 import { UNITS } from './materials/_units.js';
 import { DRAWER_PARAMS, checkParams, tonguesAt } from './move-spec.mjs';
@@ -264,23 +264,68 @@ const smoke = (ctx, lane, s, info) => {
   }
 };
 
+// A beam is a column of light, not a stretched tongue: a tongue tapers to a tip, so drawn
+// lane-long it read as a short spike (an icicle on ice), and the lane from the attacker's
+// leading edge is under 0.8 h when both cards are Active. The column starts BEAM_ORIGIN_H in
+// from that edge (it leaves the attacker's face), keeps its width to the head, and carries the
+// material in its colours and in BEAM_MOTES bodies streaming down it.
+const BEAM_ORIGIN_H = 0.3;
+const BEAM_MOTES = 4;
+/** Glow, body, hot and core passes: [palette key, width factor, alpha]. */
+const BEAM_PASSES = [
+  ['deep', 1.7, 0.22],
+  ['body', 1.1, 0.5],
+  ['hot', 0.62, 0.8],
+  ['white', 0.26, 1],
+];
+
+/** The lane point `f` along a beam that starts BEAM_ORIGIN_H back inside the attacker. */
+const beamPoint = (lane, f, side = 0) => {
+  const run = Math.max(lane.length - lane.h * LEAD_H, 1);
+  const back = (lane.h * BEAM_ORIGIN_H) / run;
+  return lanePoint(lane, -back + (1 + back) * f, side);
+};
+
+/** One straight column of light from a to b, round-capped, `width` wide. */
+const beamColumn = (ctx, palette, a, b, width, alpha, time, dashed = false) => {
+  if (!(width > 0) || !(alpha > 0) || (a.x === b.x && a.y === b.y)) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const [key, factor, passAlpha] of BEAM_PASSES) {
+    ctx.strokeStyle = rgbCss(palette[key] ?? palette.core, passAlpha * alpha);
+    ctx.lineWidth = width * factor;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+  // Energy streaks racing down the core, so a held beam still reads as flowing.
+  const streak = width * (dashed ? 0.9 : 1.6);
+  ctx.setLineDash([streak, streak * 1.4]);
+  ctx.lineDashOffset = -time * width * 9;
+  ctx.strokeStyle = rgbCss(palette.white ?? palette.core, 0.7 * alpha);
+  ctx.lineWidth = width * 0.42;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+};
+
 const beam = (ctx, lane, s, info) => {
   const pose = beamPose(s, lane, info.params);
   const { material, params: p } = info;
-  const toPoint = (f) => lanePoint(lane, f, 0);
-  const strip = (f0, f1, width, alpha = 1) => {
-    const a = toPoint(f0);
-    const b = toPoint(f1);
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    if (length > 0) drawTongueAt(ctx, info, a.x, a.y, lane.angleDeg, length, width, f0 * 7, { alpha });
-  };
+  const toPoint = (f) => beamPoint(lane, f, 0);
+  if (pose.to <= pose.from) return;
   if (p.kind === 'helix') {
+    beamColumn(ctx, material.palette, toPoint(pose.from), toPoint(pose.to), pose.width * 0.3, 0.55, info.time);
     for (const strand of pose.segments) {
       for (let i = 0; i <= HELIX_SAMPLES; i += 1) {
         const u = i / HELIX_SAMPLES;
         const f = strand.f0 + (strand.f1 - strand.f0) * u;
         const side = strand.side * Math.sin(strand.turns * TAU * u + strand.phase);
-        const at = lanePoint(lane, f, side);
+        const at = beamPoint(lane, f, side);
         material.body(ctx, at.x, at.y, pose.width * 0.22, 0.9, 0.8);
       }
     }
@@ -293,9 +338,21 @@ const beam = (ctx, lane, s, info) => {
     }
     return;
   }
-  for (const seg of pose.segments) strip(seg.f0, seg.f1, pose.width * (p.kind === 'segmented' ? 0.8 : 1), seg.alpha);
+  const segmented = p.kind === 'segmented';
+  const tail = toPoint(pose.from);
   const head = toPoint(pose.to);
-  material.glow(ctx, head.x, head.y, pose.width * 1.2, 0.35);
+  material.glow(ctx, tail.x, tail.y, pose.width * 1.1, 0.4);
+  for (const seg of pose.segments) {
+    beamColumn(ctx, material.palette, toPoint(seg.f0), toPoint(seg.f1), pose.width * (segmented ? 0.8 : 1), seg.alpha, info.time, segmented);
+  }
+  const reach = pose.to - pose.from;
+  for (let i = 0; i < BEAM_MOTES; i += 1) {
+    const f = pose.from + reach * ((i / BEAM_MOTES + info.time * 1.3) % 1);
+    const at = beamPoint(lane, f, Math.sin(info.time * 7 + i * 2.1) * pose.width * 0.18);
+    material.body(ctx, at.x, at.y, pose.width * 0.3, 0.85, 0.9);
+  }
+  material.glow(ctx, head.x, head.y, pose.width * 1.8, 0.5);
+  material.body(ctx, head.x, head.y, pose.width * 0.55, 0.9, 1);
 };
 
 const splash = (ctx, lane, s, info) => {
