@@ -231,10 +231,10 @@ test('Tag Team card resolves to its partner: no slug signature, name match still
 });
 
 test('a selected signature with no shipped spec falls through to 063 (edge 11)', () => {
-  // Roar of Time shipped in slice 13; Dark Void (dark) ships in slice 14 — switch to a Normal
-  // move (slice 15) then, and drop this test once every move has a spec.
-  const sig = signatureFor({ name: 'Darkrai', attacks: [] }, { attackName: 'Dark Void', slug: 'darkrai' });
-  assert.equal(sig.move, 'dark-void');
+  // Dark Void shipped in slice 14; Crush Grip (normal) ships in slice 15 — drop or invert this
+  // test then, once every move has a spec.
+  const sig = signatureFor({ name: 'Regigigas', attacks: [] }, { attackName: 'Crush Grip', slug: 'regigigas' });
+  assert.equal(sig.move, 'crush-grip');
   assert.equal(SIGNATURE_SPECS[sig.move], undefined);
 });
 

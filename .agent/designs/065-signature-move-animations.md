@@ -1016,6 +1016,39 @@ dependency.
   none). Probe: median 16.8–17.0 ms on all; p95 56–179 ms, over 140 for Dragon Energy self (179),
   Eternabeam self (144) and Spacial Rend self (149) (software-GL blur cost, as earlier slices);
   re-probe on GPU.
+- Slice 14: `family` follows `deriveFamily`: Astral Barrage and Dark Void `ghost` (the front
+  `shade` dome at contact), Moongeist Beam, Fiery Wrath and Ruination `burst`, Shadow Force and
+  Wicked Blow `dash`, Spectral Thief `quake` (the `pillar from 'above'`), Hyperspace Fury `punch`.
+  Defender `knock` follows § E (Moongeist Beam and Fiery Wrath 0.35 over the entries' 0.3).
+- Slice 14: the domes (Astral Barrage, Dark Void) are `shade kind 'dome'` on the front layer
+  (fillAlpha 0.85–0.9) so they swallow the defender; Spectral Thief's giant is `shade kind
+  'giant', eyes true` on the back layer 500–1800; Shadow Force's and Ruination's pits add a
+  `shade kind 'disc'` on the attacker beside the entry's cloud/crack; Hyperspace Fury's hands are
+  `orbitCharge unit 'fist', half 'both'` 0–700 plus a `volley unit 'fist'` count 3 450–1050 (the
+  hands extending down the lane), with `stagger lead 440` so its three hits land at 610/830/1050
+  under the early shards; Ruination's spike field is `shards mode 'cluster'` (count 7, default
+  unit — `unit 'spiked'` read as pink balls) 1050–1900 and its pillar is `count 2`.
+- Slice 14: Dark Void (status) has no defender `none` motion: it uses `sink heat 0` (the
+  defender falls asleep); contact is the nominal 1000 of 2000 (the rig still shows a damage
+  number). Its Z motes are `kind 'zzz'` per § F; particles take the material colour (slice 5
+  rule), so the Zs are dark-material magenta, not the entry's blue.
+- Slice 14: Fiery Wrath adds a front `shards` beat at contact (without one no front beat is live
+  at 1100 and the family is `charge`), a magenta attacker aura 300–1100 for the fireball and a
+  floor ring for the defender's ground circle; its projectile runs to contact. Moongeist Beam's
+  crescent crest is `orbitCharge unit 'crescent'` tinted gold; impactFlash at contact (entry
+  900–1150). Shadow Force's and Wicked Blow's slashArcs are `radius 1.0, thick 0.25` (0.7 reads
+  as hairlines, slice 9); Wicked Blow's starburst is `cross` (cross 20 + shards 6 + slash 3 +
+  beam 1 = 30) and its slash runs 1250–2100.
+- Slice 13's note on `signature-select.test.mjs` edge 11 is done: it now uses Crush Grip
+  (Regigigas by name, normal, slice 15); slice 15 must drop or invert it.
+- Slice 14 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment. Weak spots: Shadow Force's shadow pool
+  and Spectral Thief's giant are dark-on-dark and read mainly by their rims (the giant's eyes are
+  small); Fiery Wrath's magenta spiral fireball barely shows (spiral limit) — the tongued orb and
+  the ring carry it; Wicked Blow's crimson spiral reads as flecks while the white face rings
+  carry the ring of arcs; Dark Void's Zs are small. No bench target (rec-move has none). Probe:
+  median 16.8–17.6 ms on all; p95 65–158 ms, over 140 for Fiery Wrath (141–152), Wicked Blow
+  self (144) and Ruination (140–158) (software-GL blur cost, as earlier slices); re-probe on GPU.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
