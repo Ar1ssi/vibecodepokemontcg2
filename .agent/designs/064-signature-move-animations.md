@@ -1,5 +1,5 @@
 # 064: Signature move animations for legendary Pokémon
-Status: draft (awaiting the user's approval)
+Status: approved (user, 2026-10-08)
 Date: 2026-10-08 · Builds on design 063 (approved 2026-10-05), which it extends and never replaces.
 
 ## Problem
@@ -508,6 +508,9 @@ play 063's generic move (or the lunge), so every slice is independently safe. Re
 the `signature/` folder and the three wiring lines; 063 is untouched.
 
 ## Work plan — slices ≤1 session, each leaving the repo green
+Approval (user, 2026-10-08): every row below is a pinned contract, and every Appendix S entry is the
+per-move contract for its slice. Nihil Light's entry stays a flagged placeholder until a reference
+video exists; building it as written is approved.
 Prerequisite: 063 slices 1–2 landed (selection, generic player, `move-spec.mjs`, materials index,
 fire). A signature type slice also needs that type's material; if 063 has not shipped it yet, the
 slice builds `materials/<type>.js` first exactly per 063 § Materials (that is 063's row for the
