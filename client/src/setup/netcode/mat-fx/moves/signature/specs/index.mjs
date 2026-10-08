@@ -5,6 +5,8 @@ import { GRASS_SIGNATURE_SPECS } from './grass.mjs';
 import { WATER_SIGNATURE_SPECS } from './water.mjs';
 import { ICE_SIGNATURE_SPECS } from './ice.mjs';
 import { ELECTRIC_SIGNATURE_SPECS } from './electric.mjs';
+import { GROUND_SIGNATURE_SPECS } from './ground.mjs';
+import { ROCK_SIGNATURE_SPECS } from './rock.mjs';
 
 export const SIGNATURE_SPECS = Object.freeze({
   ...FIRE_SIGNATURE_SPECS,
@@ -12,4 +14,6 @@ export const SIGNATURE_SPECS = Object.freeze({
   ...WATER_SIGNATURE_SPECS,
   ...ICE_SIGNATURE_SPECS,
   ...ELECTRIC_SIGNATURE_SPECS,
+  ...GROUND_SIGNATURE_SPECS,
+  ...ROCK_SIGNATURE_SPECS,
 });

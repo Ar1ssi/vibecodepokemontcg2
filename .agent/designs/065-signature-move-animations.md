@@ -812,6 +812,43 @@ dependency.
   (rec-move has none). Probe: median 16.8–16.9 ms on all (one opp run 29.8 ms, a cold start);
   p95 57–150 ms, over 140 for Wildbolt Storm (150–222 ms after `tongues 16`) and near it for
   Plasma Fists (117–137) — same software-GL blur cost as slice 5's fire specs; re-probe on GPU.
+- Slice 8: `family` follows `deriveFamily`: Precipice Blades and Mighty Cleave are `punch`
+  (physical lunge + front `shards` at contact; Mighty Cleave would be `slash` only with its burst
+  moved off the front layer), Sandsear Storm `wind`, Thousand Arrows `projectile` (the rain),
+  Land's Wrath / Thousand Waves / Diamond Storm `burst`. Defender `knock` follows § E (physicals
+  0.45, specials 0.35) over the entries' 0.3–0.4.
+- Slice 8: particle bursts stay the material's colour (slice 5 rule): the entries' `colour`
+  values on Sandsear Storm, Thousand Arrows, Thousand Waves, Diamond Storm and Mighty Cleave are
+  not applied; Diamond Storm uses `kind 'twinkle'`, Mighty Cleave `ember`, the rest `shard`.
+- Slice 8: Land's Wrath's three columns are one `pillar count 3, spread 1.2` (= dx −0.6/0/0.6),
+  held 700–1400 (entry 700–1000) so they stand at contact; fan `count 9, spread 120` toward
+  the back of the lane, 0–900, tinted black with lime `hot`; smoke 1400–2200 for the slabs' dust.
+- Slice 8: Precipice Blades' four-spire rings are `pillar count 4, spread 1.4` (12 tongues each);
+  the defender ring is on the back layer to 1200 so the central column stays on top.
+- Slice 8: Sandsear Storm's starburst is `cross` 1500–1800 (entry 'ring' = 40; with the spiral's
+  10 tongues the budget allows 20); the attacker cloud is radius 0.5, alpha 0.75 (0.35/0.5 did
+  not read); fire arcs are `terrain 'crack'` tinted orange.
+- Slice 8: Thousand Arrows: the rain starts at 800 (falls onto the defender into contact) and
+  the contact star is a three-arm `TRIAD` (15) on the back layer, because ring 40 / cross 20 +
+  rain 12 exceed 30; the defender shards move to 1350–1900; the radial arrows off the attacker
+  are `shards spin 0` 300–800.
+- Slice 8: Thousand Waves' contact star is `cross` (cross 20 + shards 10 = 30); hex shards use
+  `unit 'hex'`; the swarm roll is `terrain 'wave'` anchored on the attacker, radius 1.6.
+- Slice 8: Diamond Storm: the diamond halo (`orbitCharge unit 'facet', tongues 0`, r 0.1–0.14 —
+  the entry's 0.35–0.5 are orbit-sized, which drew facets larger than the card) runs 250–850,
+  before contact (entry 1000–1700, after the hit), then a 6-diamond `volley` 650–1000 carries
+  them down the lane; the pink cross, then the gold cross at 1350–1700 and the sparkle `rain`
+  1350–1950 run in sequence (two stars + shards + rain together = 50 tongues).
+- Slice 8: Mighty Cleave's crescent is `slashArc` at its maximum `radius 1.2`, `thick 0.3`,
+  750–1250 (entry 800–1200); the contact star and speed rays are on the back layer; smoke
+  1300–2000 for the aftermath.
+- Slice 8 review (recordings both seats, `.agent/scratch/moves/sig-<id>-<seat>/`, not
+  committed): every signature read shows at its moment. Weak spots: Sandsear Storm's sand
+  tornado reads as scattered tan flecks round the defender, not a funnel (spiral drawer limit,
+  as Wildbolt Storm); Mighty Cleave's blade is two thin gold wedges rather than one broad
+  crescent (slashArc shape limit); Land's Wrath's frond fan is thin dark rays, the lime tips
+  faint; Thousand Arrows' three-arm star barely shows under the impact flash. No bench target
+  (rec-move has none). Probe: median 16.8–16.9 ms on all; p95 61–103 ms.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the
