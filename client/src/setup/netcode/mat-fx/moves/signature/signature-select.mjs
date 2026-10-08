@@ -7,6 +7,7 @@ import {
   MASK_MATERIAL,
   SIGNATURE_BY_SLUG,
   SIGNATURE_MOVES,
+  SIGNATURE_POOL_BY_SLUG,
   TCG_TO_MATERIAL,
 } from './signature-moves.mjs';
 
@@ -61,6 +62,18 @@ const walk = (table, slug) => {
 /** Signature move id of a species/form slug, or null. */
 export const signatureForSlug = (slug) => walk(SIGNATURE_BY_SLUG, slug) ?? null;
 
+/** Every signature move of a slug's form: its pool when it owns several, else [its one move]. */
+export const signaturePoolForSlug = (slug) => {
+  const pool = walk(SIGNATURE_POOL_BY_SLUG, slug);
+  if (pool) return pool;
+  const move = signatureForSlug(slug);
+  return move ? [move] : [];
+};
+
+/** One move of `pool`, uniform over an unsigned integer seed (deterministic on both clients). */
+export const pickFromPool = (pool, seed) =>
+  pool.length ? pool[(Math.abs(Math.trunc(Number(seed) || 0)) >>> 0) % pool.length] : null;
+
 /** Material key the signature plays in (§ Options 4). */
 export const signatureMaterial = (moveId, { slug, card } = {}) => {
   const fallback = SIGNATURE_MOVES[moveId]?.material;
@@ -70,8 +83,11 @@ export const signatureMaterial = (moveId, { slug, card } = {}) => {
   return fallback;
 };
 
-/** { move, reason: 'name'|'strongest', material } for this attack, or null. */
-export const signatureFor = (card, { attackName, slug } = {}) => {
+/**
+ * { move, reason: 'name'|'strongest', material } for this attack, or null. The strongest attack
+ * of a form with several signatures plays one of them, picked from `seed`.
+ */
+export const signatureFor = (card, { attackName, slug, seed = 0 } = {}) => {
   const key = normalizeAttackName(attackName);
   const named = key ? SIGNATURE_BY_NAME.get(key) : undefined;
   if (named)
@@ -80,7 +96,7 @@ export const signatureFor = (card, { attackName, slug } = {}) => {
       reason: 'name',
       material: signatureMaterial(named, { slug, card }),
     };
-  const move = signatureForSlug(slug);
+  const move = pickFromPool(signaturePoolForSlug(slug), seed);
   if (!move) return null;
   const strongest = strongestAttackName(card?.attacks);
   if (!strongest) return null;
