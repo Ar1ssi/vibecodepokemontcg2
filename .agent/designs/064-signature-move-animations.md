@@ -252,13 +252,103 @@ one type at a time with nothing broken. Reduced motion skips it like every trans
 - Everything else (beats, layers, drawer params, cost rule ≤ 30 tongues, particles ≤ 24 per burst,
   ≤ 2 bursts, ≤ 28 total, nodes ≤ 40, `pad ∈ [1.2, 2.6]`) is 063's, unchanged.
 
-### Card motion for signatures
-063's presets cover every entry; two parameters are new and pinned:
-- attacker `rear-lurch` gains `hold` (ms, default 0): the wind-up pose is held that long before
-  the thrust, for the charge-heavy moves (Roar of Time, Prismatic Laser, Eternabeam, Origin Pulse,
-  Psystrike); the thrust/recoil shift by `hold`.
-- defender `knock` keeps `strength ≤ 0.45`; signature physicals use 0.45, specials 0.35.
-<!-- NEW-PIECES -->
+### New pieces (the study's `New pieces` lines, consolidated; each is pinned)
+The four study batches asked for ~40 missing pieces. Almost all are the same few gaps, so they
+become a handful of general extensions instead of one drawer per move. Every extension defaults
+to 063's behaviour, so no 063 spec changes. Each gets a pure pose fn in `move-poses.mjs` and a
+test (slice 3).
+
+**A. Two params on every drawer** (`check` accepts them on all 24 + the new ones):
+- `tint: { deep?, body?, hot?, core? }` — hex strings that replace the material's palette keys
+  for this beat only. Mechanism: every material function takes a final optional `palette`
+  argument (same keys as `material.palette`, rgb arrays); `tintedPalette(palette, tint)` in
+  `materials/_shared.js` parses `#RRGGBB` → `[r,g,b]` and returns a merged copy; drawers pass it
+  through. Used by every entry whose `Palette` differs from its type (Blue Flare's blue fire,
+  Thousand Arrows' lime, Mighty Cleave's gold, Bolt Strike's dark wisps, Core Enforcer's green, …).
+- `hues: string[]` — on drawers that draw several tongues/bodies/rings, item `i` is drawn with
+  `tintedPalette(palette, { body: hues[i % n], hot: lighten(hues[i % n], 0.35) })`, where
+  `lighten(hex, f)` mixes with white by `f`. Sacred Fire's rainbow fountain, Prismatic Laser's
+  prism column, Luster Purge's rainbow halo, Relic Song's rings.
+
+**B. Placement (`anchor`)** on `coreCharge`, `orbitCharge`, `starFlare`, `speedRays`, `ring`,
+`shockRings`, `pillar`, `glyph`, `cloud`, `fan`, `shade`:
+`anchor: 'attacker' | 'defender' | 'sky-attacker' | 'sky-defender'` plus `dx`, `dy` in h.
+`sky-*` is 1.6 h above the card on screen (the same point as 063's `bolt from 'sky'`); `dx`/`dy`
+are screen offsets for `sky-*` and lane offsets (along, across) otherwise. Each drawer's default
+anchor is the one 063 fixed (starFlare/speedRays/pillar → defender; coreCharge/orbitCharge →
+attacker). Origin Pulse's star on Kyogre, Plasma Fists' spokes round Zeraora, Thunder Cage's sky
+orb, Fusion Flare's overhead orb, Judgment's orb over Arceus.
+
+**C. Extended params on 063 drawers**
+| drawer | new params (default = 063) | used by |
+|---|---|---|
+| `coreCharge` | `lift` h above the attacker on screen (0) · `rings` 0–2 rotating tongue arcs round the body, radius 1.25 r, 1 turn/s (0) | Fusion Flare, Judgment, Techno Blast |
+| `projectile` | `from: 'attacker' \| 'defender' \| 'sky-defender' \| 'lift'` ('attacker') · `to: 'defender' \| 'attacker'` ('defender') · `path` gains `'drop'` (from `sky-defender`, straight, `f = s²`) · `unit` (below, 'body') | Heart Swap and Oblivion Wing drain (`from 'defender'`, `to 'attacker'`), Dragon Ascent and Judgment (`'drop'`), Fusion Flare (`from 'lift'`) |
+| `orbitCharge`, `volley`, `shards` | `unit` ('body') · `shards.mode: 'burst' \| 'cluster'` ('burst'; `cluster` = the fragments sit still at the anchor's base, lit on the upper edge, held to the beat's end) | Hyperspace Fury hands, Roar of Time hex plates, Magma Storm rock mounds |
+| `pillar` | `count` 1–4 (1) · `spread` h, columns evenly over ±spread/2 (0) · `stagger` ms between columns (0) · `dx` h (0) | Magma Storm, Searing Shot, Land's Wrath, Precipice Blades, Doom Desire |
+| `ring` | `kind` gains `'fins'` (`count` short tongue spokes round the anchor, spinning at `rpm`) | Hydro Steam |
+| `bolt` | `count` 1–12 bolts fanned across the target footprint (1) · `spread` h (0.8) · `curve` bow in h (0) · `from` takes an anchor | Thunder Cage strands, Thunderclap |
+| `glyph` | `kind: 'material' \| 'lattice' \| 'hex'` ('material' = 063's sigil); `lattice` = a 4 × 3 grid of 1 px strokes at `r`, rotating 20°/s; `hex` = a flat hexagon plate (fill body, 1 px core edge) | Ice Burn's red lattice, Roar of Time |
+
+`unit` — the body a travelling or orbiting drawer draws, each a function in
+`materials/_units.js` taking `(ctx, x, y, r, angleDeg, s, palette)`:
+`'body'` (the material's own body/projectile, 063), `'rings'` (three 0.1 r-wide rings at 0°/60°/120°
+tilt, rotating; Psystrike), `'spiked'` (body + 14 triangular spikes 0.45 r long, rotating 30°/s;
+Sunsteel Strike), `'facet'` (a hexagon-faceted sphere: 6 triangles shaded hot→deep by angle;
+Freeze Shock, Tera Starstorm), `'hoop'` (an upright ellipse 0.65 r × r of tongues on its rim,
+spinning about the vertical axis by scaling x with `cos(2π·2s)`; Electro Drift), `'crescent'`
+(a tongue bent along a circular arc of 0.3 w bow, with a 1 px `core` edge line; Tachyon Cutter,
+Mighty Cleave), `'fist'` (a rounded-square silhouette 0.8 r with a 0.25 r cuff band in `hot`;
+Hyperspace Fury), `'hex'` (the glyph hexagon plate, tumbling: rotate `360·s`; Roar of Time).
+
+**D. New drawers**
+| drawer | pose fn | draws | params (default) | used by |
+|---|---|---|---|---|
+| `fan` | `fanPose(s, h, p)` → `{ tongues: [{ x, y, angleDeg, length, width }], alpha }` | `count` tapered tongues from the anchor, spread evenly over `spread` degrees centred on `direction` (lane degrees; 180 = away from the defender), lengths in `[lenMin, lenMax]` h alternating, growing over the first `grow` of the beat, flapping ±`flap`° at 3 Hz, spinning `spin`°/s, fading over the last 20 % | `anchor 'attacker'`, `count 6`, `spread 110`, `direction 180`, `lenMin 0.6`, `lenMax 1.0`, `width 0.22`, `grow 0.3`, `flap 0`, `spin 0` | V-create (two beats, `direction ±125`, `flap 12`), Land's Wrath fronds, Behemoth Bash blade fan, Eternabeam blade star (`count 4`, `spread 360`, `spin 40`), Plasma Fists spokes (`count 12`, `spread 360`), Dragon Energy radial burst |
+| `shade` | `shadePose(s, h, p)` → `{ x, y, rx, ry, rimAlpha, swirl, alpha }` | a dark volume drawn `source-over`: `kind 'disc'` (flat ellipse, ry = 0.45 rx, a portal), `'dome'` (upper half-ellipse rising from the anchor's floor), `'giant'` (a tall rounded silhouette 2.2 h high behind the anchor with two `#FFD23F` eye ovals when `eyes`); fill = material `deep` with value-noise mottling (the grain tile at alpha 0.25), rim = 0.04 h stroke in `body` at `rimAlpha`; grows over 25 %, holds, shrinks over the last 25 %; `swirl` rpm turns the mottling | `anchor 'defender'`, `kind 'disc'`, `r 0.9`, `rimAlpha 0.6`, `swirl 20`, `eyes false` | Hyperspace Hole/Fury portals, Dark Void and Astral Barrage domes, Spectral Thief's shadow giant |
+| `grip` | `gripPose(s)` → `{ y, curl, alpha }` | a five-fingered glove (normal material body fill, 1 px `#1E1B1F` outline) descending from `sky-defender` to the defender over 40 %, fingers curling 0 → 70° over 40–70 %, holding to the end | `size 1.2` | Crush Grip |
+
+The player draws `shade` in the `source-over` group with `vignette`, `smoke` and
+`terrain 'crack'` (063 § Player step 5/7).
+
+**E. Card motion additions** (`card-motion.mjs`)
+- attacker `rear-lurch.hold` ms (0): the wind-up pose holds that long before the thrust; thrust
+  and recoil shift by `hold`. For the long charges (Roar of Time, Prismatic Laser, Eternabeam,
+  Origin Pulse, Psystrike).
+- attacker `lunge.strikes` 1–3 (1): the strike window `[0.4 c, c]` splits evenly into `strikes`
+  rewind-and-strike pairs (rewind 60 % of each part to along −0.1, strike 40 % to `reach`);
+  contact is the last. Double Iron Bash (2), Hyperspace Fury (3).
+- attacker preset `warp`: 0 → 0.3 c scale 1 → 0.15 while `along` moves to 0.3 of the lane;
+  hidden (scale 0.15, rim 0) to 0.85 c; reappears at `along = length − 0.9 h` scaling to 1 by c
+  (the strike); then `springHome` back over c → 1.5 c. Hyperspace Hole, Spectral Thief.
+- attacker `echo: { alpha, offset, fadeMs }` (none): one extra ghost image of the attacker art
+  behind it, `offset` h back along the lane, at `alpha`, fading over `fadeMs` from 0 ms (a fused
+  or departing copy). Fusion Bolt, Fusion Flare, Bolt Strike. Counts toward the 40-node limit.
+- defender `stagger.lead` ms (0): the first knock lands `lead` ms before contact, the last at
+  contact. Surging Strikes (`hits 3`, `lead 450`).
+- defender `knock` strength: signature physicals 0.45, specials 0.35 (unchanged cap).
+
+**F. CSS particle classes** (`mat-fx.css`, beside 063 § D's six): `.fx-particle--zzz` (a `::before`
+`content: 'Z'`, 700 weight, 0.18 h font size via `--fx-particle-size`, colour from
+`--fx-particle-color`; Dark Void's sleep motes, rising: `direction -90`, `gravity -0.2`) and
+`.fx-particle--note` (`content: '♪'`, same rules; Relic Song, two bursts in two colours).
+
+**G. Materials `normal` and `stellar`** (`materials/normal.js`, `materials/stellar.js`; the
+interface of 063 § Materials)
+- **normal** — "pressure light", sampled from Judgment, Crush Grip and Multi-Attack (EV):
+  `deep #E8552B`, `body #F2C230`, `hot #FFF5B0`, `core #FFFFFF`, `shade [40, 30, 10]`,
+  `smoke null`, particle streak `rgb(255, 224, 102)`. `body` = sphere hot → body → transparent
+  with a white core at 0.35 r; `tongue` = 063's shared tongue, body pass in `hot` blurred 0.08 w,
+  crisp pass in `core` at 0.6 scale (light, not flame: no orange body pass); `projectile` =
+  `body` + two thin `hot` rings at 1.3 r tilted 60°, rotating; `grain` strength 0.12.
+- **stellar** — Tera Starstorm (EV is cyan crystal with a prismatic fringe):
+  `deep #0F2A55`, `body #2FB8FF`, `hot #5FF2E0`, `core #E6FFFF`, accent hues
+  `['#FF6FB5', '#FFE07A', '#7CFFB2', '#7FD8FF', '#C59BFF']`; `body` = the `'facet'` unit; `tongue`
+  = the ice recipe's crystal tongue plus a 1 px fringe stroke offset 0.04 w outward in
+  `accent[seed % 5]`; `grain` none.
+
+**H. Card-typed and form materials** — § Options 4 (`signatureMaterial`).
+
 
 ### Timing (tier S)
 | Part | ms | Rule |
@@ -335,7 +425,27 @@ Prerequisite: 063 slices 1–2 landed (selection, generic player, `move-spec.mjs
 fire). A signature type slice also needs that type's material; if 063 has not shipped it yet, the
 slice builds `materials/<type>.js` first exactly per 063 § Materials (that is 063's row for the
 type, done early — note it under 063 § Deviations).
-<!-- WORK-PLAN -->
+
+| Slice | Files (create / modify) | Signatures & data shapes | Test cases: input → expected | Rulings used (source) | Green when |
+|---|---|---|---|---|---|
+| 1 | create `moves/signature/signature-moves.mjs`, `signature-select.mjs`, `specs/index.mjs` (`SIGNATURE_SPECS = Object.freeze({})`), `__tests__/signature-moves.test.mjs`, `signature-select.test.mjs`, `signature-specs.test.mjs`; modify `move-spec.mjs` (tier S, `status`, `normal`/`stellar` enums), `combat.js attack` (§ Wiring), `index.js soundPlanFor`, `rec-move.mjs` (`MOVE` looks in `SIGNATURE_SPECS` too) | § Data, § Selection, § Wiring exactly | `strongestAttackName([{name:'A',damage:'60'},{name:'B',damage:'120+'}]) → 'B'` · `([{name:'A',damage:'90'},{name:'B',damage:'90'}]) → 'B'` · `([{name:'A',damage:''}]) → null` · `baseDamage('30×') → 30` · `signatureForSlug('arceus-fire') → 'judgment'` · `('mewtwo') → 'psystrike'` · `('calyrex') → null` · `('kyurem-black') → 'freeze-shock'` · `('ogerpon-wellspring-mask') → 'ivy-cudgel'` · `('charizard') → null` · `signatureFor({name:'Darkrai',attacks:[]}, {attackName:'Roar of Time', slug:'darkrai'}) → {move:'roar-of-time', reason:'name'}` · `signatureFor({attacks:[{name:'Read the Wind',damage:''},{name:'Aero Dive',damage:'130'}]}, {attackName:'Aero Dive', slug:'lugia'}) → {move:'aeroblast', reason:'strongest'}` · same card, `attackName:'Read the Wind'` → null · `signatureMaterial('ivy-cudgel', {slug:'ogerpon-hearthflame-mask'}) → 'fire'` · `signatureMaterial('judgment', {card:{types:['Colorless']}}) → 'normal'` · `normalizeAttackName('Nature’s Madness') === normalizeAttackName("Nature's Madness")` · validateSpec: tier S 1800/900 ok, 2700 → error, contact 1300 → error, statClass 'status' with tier 3 → error | user's trigger rule (2026-10-08); Lugia V (Sword & Shield Promos) attacks from `out/pkmn-pokemon-cards.json` (Read the Wind, Aero Dive 130); Darkrai DP24 (corpus) | `node --test` on the three new tests + `move-spec.test.mjs`; `pnpm test:changed` green; a Lugia V Aero Dive still plays 063's path (no spec yet) |
+| 2 | create `materials/normal.js`, `materials/stellar.js`, `materials/_units.js`; modify `materials/_shared.js` (`tintedPalette`, `lighten`), every existing `materials/<type>.js` (final optional `palette` arg), `materials/index.js`, `mat-fx.css` (`.fx-particle--zzz`, `.fx-particle--note`) | § New pieces A (tint/hues mechanism), C (`unit` list), F, G | materials test (063's recording-context pattern): each of normal/stellar draws ≥ 1 fill per function with only its palette colours; `tintedPalette({body:[1,2,3]}, {body:'#FF0000'}).body → [255,0,0]`; `lighten('#000000', 0.5) → '#808080'`; every unit draws without throwing at s ∈ {0, 0.5, 0.99}, balanced save/restore | Appendix S palettes of Judgment, Crush Grip, Multi-Attack, Tera Starstorm | tests green; a stub spec per material recorded once (sheets reviewed) |
+| 3 | modify `move-poses.mjs`, `move-drawers.js`, `card-motion.mjs`, `move-player.js` (shade in the source-over group); tests `move-poses.test.mjs`, `card-motion.test.mjs` | § New pieces B, C, D, E | `fanPose(0.5, 100, {count:4, spread:360})` → 4 tongues 90° apart · `shadePose(0.1, 100, {r:0.9})` rx < 90 (growing) · `gripPose(0.7).curl ≈ 70` · `lunge` with `strikes 2`: two local maxima of `along` in [0.4 c, c], the last at c · `warp` scale 0.15 at 0.5 c · `stagger.lead 450`: first knock impulse at contact − 450 · `rear-lurch.hold 200` thrust starts 200 ms later than without · every drawer's `check` accepts `tint`, `hues`, `anchor`, rejects `anchor 'nowhere'` | 063 § Drawers conventions | tests green; 063's Fire Blast spec still matches its recording (no regression) |
+| 4 | create `signature/specs/fire.mjs`, `grass.mjs`; modify `specs/index.mjs` | one MoveSpec per move: blue-flare, fusion-flare, magma-storm, sacred-fire, searing-shot, v-create, ivy-cudgel, seed-flare | specs test: 8 specs valid, tier S, material per § Options 4 | Appendix S Fire, Grass | recordings both seats + bench reviewed against each entry; probe within limits |
+| 5 | create `specs/water.mjs`, `ice.mjs` | hydro-steam, origin-pulse, steam-eruption, surging-strikes, freeze-shock, glacial-lance, glaciate, ice-burn | same pattern | Appendix S Water, Ice | same |
+| 6 | create `specs/electric.mjs` | bolt-strike, electro-drift, fusion-bolt, plasma-fists, thunder-cage, thunderclap, wildbolt-storm | same | Appendix S Electric | same |
+| 7 | create `specs/ground.mjs`, `rock.mjs` | lands-wrath, precipice-blades, sandsear-storm, thousand-arrows, thousand-waves, diamond-storm, mighty-cleave | same | Appendix S Ground, Rock | same |
+| 8 | create `specs/fighting.mjs`, `poison.mjs`, `fairy.mjs` | collision-course, sacred-sword, secret-sword, thunderous-kick, malignant-chain, fleur-cannon, natures-madness, springtide-storm | same | Appendix S Fighting, Poison, Fairy | same |
+| 9 | create `specs/psychic.mjs` (first half) | freezing-glare, heart-swap, hyperspace-hole, luster-purge, mist-ball, mystical-power | same | Appendix S Psychic | same |
+| 10 | modify `specs/psychic.mjs` (second half) | photon-geyser, prismatic-laser, psyblade, psycho-boost, psystrike | same; Psychic coverage complete | Appendix S Psychic | same |
+| 11 | create `specs/flying.mjs`, `steel.mjs` | aeroblast, bleakwind-storm, dragon-ascent, oblivion-wing, behemoth-bash, behemoth-blade, doom-desire, double-iron-bash, sunsteel-strike, tachyon-cutter | same | Appendix S Flying, Steel | same |
+| 12 | create `specs/dragon.mjs` | core-enforcer, dragon-energy, dynamax-cannon, eternabeam, nihil-light, roar-of-time, spacial-rend | same | Appendix S Dragon (Nihil Light's entry is from memory: build it as written, flag it) | same |
+| 13 | create `specs/dark.mjs`, `ghost.mjs`, `normal.mjs` | dark-void, fiery-wrath, hyperspace-fury, ruination, wicked-blow, astral-barrage, moongeist-beam, shadow-force, spectral-thief, crush-grip, judgment, multi-attack, relic-song, techno-blast, tera-starstorm | same; every `SIGNATURE_MOVES` id now has a spec | Appendix S Dark, Ghost, Normal | same; then the user's look pass over all 81 (one sheet each) and the DECISIONS lines below |
+
+DECISIONS lines at landing (D-numbers assigned then): signature trigger = name match, else the
+legendary's strongest attack (user, 2026-10-08); tier S 1800–2600 ms with contact ≤ 1200 ms
+(hold and queue budget unchanged); `normal` and `stellar` materials; drawer `tint`/`hues`/
+`anchor`/`unit` extensions. No new dependency.
 
 ## Deviations (Builder appends here during build)
 
