@@ -20,6 +20,12 @@ const USED_BY_RE =
 const POSSESSIVE_RE =
   /during this turn, (?:each of )?your (?:\{\s*([a-z])\s*\}\s*)?(?:(fusion strike|single strike|rapid strike) )?(?:active )?pok[eé]mon[’']s attacks (?:do|does) (\d+) more damage to (?:your opponent[’']s |the )active pok[eé]mon( ex( and active pok[eé]mon v)?)?( for each prize card your opponent has taken)?/i;
 
+// Misty gym1-18 (WotC): "If this turn's attack does damage to the Defending Pokémon (after applying
+// Weakness and Resistance), and if the attacking Pokémon has Misty in its name, the attack does 20
+// more damage to the Defending Pokémon." Groups: 1 name, 2 amount.
+const NAMED_AFTER_WR_RE =
+  /if this turn[’']s attack does damage to the defending pok[eé]mon \(after applying weakness and resistance\), and if the attacking pok[eé]mon has ([a-z.’' ]+?) in its name, the attack does (\d+) more damage to the defending pok[eé]mon/i;
+
 const BATTLE_STYLES = {
   'fusion strike': ['fusion strike', 'fusionstrike'],
   'single strike': ['single strike', 'singlestrike'],
@@ -31,6 +37,17 @@ const BATTLE_STYLES = {
 // turn-scoped damage boost. defenderFilter: null | 'ex' | 'exOrV'.
 export function parseTurnDamageBonus(text) {
   const raw = String(text || '');
+  const named = raw.match(NAMED_AFTER_WR_RE);
+  if (named) {
+    return {
+      amount: Number(named[2]),
+      type: null,
+      attackerNoRuleBox: false,
+      defenderFilter: null,
+      attackerName: named[1].toLowerCase().replace(/’/g, "'"),
+      afterWR: true,
+    };
+  }
   const usedBy = raw.match(USED_BY_RE);
   if (usedBy) {
     const letter = usedBy[1]?.toLowerCase();
@@ -89,6 +106,8 @@ export function turnDamageBonusTotal(
   let total = 0;
   for (const bonus of bonuses) {
     if (!bonus || !(bonus.amount > 0)) continue;
+    // After-Weakness bonuses are the reducer's (turnDamageBonusAfterWR).
+    if (bonus.afterWR) continue;
     // "attacks used by this Pokémon": scoped to the granting card's instance.
     if (
       bonus.attackerInstanceId != null &&
@@ -104,4 +123,19 @@ export function turnDamageBonusTotal(
     total += bonus.perPrizeTaken ? bonus.amount * prizesTaken : bonus.amount;
   }
   return total;
+}
+
+/**
+ * The named after-Weakness/Resistance boosts (Misty gym1-18) for this attacker: the reducer adds
+ * them to an attack that did damage to the Defending Pokémon.
+ * @param {object[]} bonuses the attacking player's turnDamageBonuses
+ * @param {object} attacker in-play view of the Attacking Pokémon
+ * @returns {number}
+ */
+export function turnDamageBonusAfterWR(bonuses, attacker) {
+  if (!Array.isArray(bonuses)) return 0;
+  const name = String(attacker?.name || '').toLowerCase().replace(/’/g, "'");
+  return bonuses
+    .filter((bonus) => bonus?.afterWR && bonus.amount > 0 && (!bonus.attackerName || name.includes(bonus.attackerName)))
+    .reduce((total, bonus) => total + bonus.amount, 0);
 }

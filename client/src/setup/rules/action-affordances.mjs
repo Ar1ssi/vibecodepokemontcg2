@@ -83,6 +83,9 @@ export async function computeActionAffordances({
   // False when the player had no Pokémon Knocked Out during the opponent's last
   // turn; gates Fezandipiti ex-style abilities exactly as the server does.
   koedLastOppTurn = true,
+  // Current turn number, so the on-promotion window can be read against the
+  // card's `movedToActiveTurn` stamp (callers without it fail open, as before).
+  turnNumber = null,
 } = {}) {
   let attackAvailable = false;
   if (activeCard) {
@@ -132,6 +135,7 @@ export async function computeActionAffordances({
     rulesEnabled: true,
     isUsed: isAbilityUsed,
     koedLastOppTurn,
+    turnNumber,
   });
 
   return {

@@ -12,6 +12,9 @@
 import { energySearchWhat } from './search-match.mjs';
 import { symbolizeTypeWords } from './attack-text.mjs';
 import { textRevealsPicks } from './reveal-picks.mjs';
+import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
+
+export { rewriteLegacyPowerWording };
 
 // Normalize printed card text before matching.
 //   curly quotes  ' ' `  →  straight '
@@ -617,7 +620,7 @@ function parseWinCondition(lower) {
 }
 
 export function parseAbility(text = '') {
-  const lower = normalizeText(text);
+  const lower = rewriteLegacyPowerWording(normalizeText(text));
   let steps = [];
 
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────

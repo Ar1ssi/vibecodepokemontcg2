@@ -1900,3 +1900,48 @@ test('ability: Melmetal costs a typed {M} Pokémon discard and filters other typ
   assert.ok(res.pendingChoice, 'the discard cost opens a picker');
   assert.deepEqual(res.pendingChoice.options.map((c) => c.instanceId), [95], 'only the {M} Pokémon is offered');
 });
+
+const TACHYON_BITS =
+  "Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may put 2 damage counters on 1 of your opponent's Pokémon.";
+
+test('ability: Iron Valiant ex Tachyon Bits places 2 counters on a lone opponent (PAR 089)', () => {
+  const { state, rng } = setupGame();
+  const { holder } = holderWithAbility(state, TACHYON_BITS);
+  holder.movedToActiveTurn = state.turn.number;
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null, 'a lone target needs no picker');
+  assert.equal(res.state.players.p2.zones.active[0].damage, 20);
+  assert.equal(res.state.players.p1.flags.abilitiesUsed[70], true);
+});
+
+test('ability: Tachyon Bits asks which opponent Pokémon takes the counters', () => {
+  const { state, rng } = setupGame();
+  const { holder } = holderWithAbility(state, TACHYON_BITS);
+  holder.movedToActiveTurn = state.turn.number;
+  state.players.p2.zones.bench.push(benchMon(72, 'Opp Bench'));
+
+  const res = use70(state, rng);
+  assert.equal(res.error, null);
+  assert.ok(res.pendingChoice, 'two opponent Pokémon open a picker');
+  assert.deepEqual(
+    res.pendingChoice.options.map((c) => c.instanceId).sort(),
+    [71, 72]
+  );
+
+  const done = resolveWith(res, [72], rng);
+  assert.equal(done.error, null);
+  assert.equal(done.state.players.p2.zones.bench.find((c) => c.instanceId === 72).damage, 20);
+  assert.equal(done.state.players.p2.zones.active[0].damage || 0, 0, 'the Active is untouched');
+});
+
+test('ability: Tachyon Bits is refused outside the promotion turn', () => {
+  const { state, rng } = setupGame();
+  const { holder } = holderWithAbility(state, TACHYON_BITS);
+  holder.movedToActiveTurn = state.turn.number - 1;
+
+  const res = use70(state, rng);
+  assert.match(res.error, /moved to the Active Spot/);
+  assert.equal(res.state.players.p2.zones.active[0].damage || 0, 0);
+});

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_GAIN, clampGain, voicesFor } from '../fx-audio.mjs';
+import { FAMILY_VOICES, MAX_GAIN, clampGain, voicesFor } from '../fx-audio.mjs';
 import { HOLD_MS } from '../fx-holds.mjs';
 import { resetDamageBaselines } from '../damage-hit.mjs';
 
@@ -304,4 +304,26 @@ test('fx-audio: a deck reveal swooshes off the deck, then chimes at the reveal s
   assert.equal(chime.length, 3);
   assert.ok(chime.every((v) => v.delay >= 0.3 && v.delay < 0.7), 'the chime lands as the card reaches the spot');
   assert.deepEqual(voicesFor('deck-reveal', { user: 'opp' }), voices, 'both seats hear the same reveal');
+});
+
+test('fx-audio: all 14 move families have a voice set, within the gain and 0.6 s limits (design 063)', () => {
+  const families = ['slash', 'punch', 'dash', 'beam', 'projectile', 'burst', 'quake', 'splash', 'wind', 'electric', 'ghost', 'chime', 'roar', 'charge'];
+  assert.deepEqual(Object.keys(FAMILY_VOICES).sort(), [...families].sort());
+  for (const family of families) {
+    const voices = FAMILY_VOICES[family];
+    assert.ok(voices.length > 0, family);
+    for (const voice of voices) assert.ok(voice.gain <= MAX_GAIN, `${family} gain`);
+    const end = Math.max(...voices.map((v) => (v.delay ?? 0) + v.dur));
+    assert.ok(end <= 0.6 + 1e-9, `${family} ends at ${end}`);
+  }
+});
+
+test('fx-audio: an attack plan sounds its family, an unknown or missing family keeps the generic attack voice', () => {
+  const today = voicesFor('attack', {});
+  assert.ok(today.length > 0);
+  assert.equal(voicesFor('attack', { family: 'beam' }), FAMILY_VOICES.beam);
+  assert.equal(voicesFor('attack', { family: 'nope' }), today);
+  assert.equal(voicesFor('attack', { family: 'toString' }), today);
+  assert.equal(voicesFor('attack', undefined), today);
+  assert.deepEqual(voicesFor('attack-banner', { family: 'beam' }), voicesFor('attack-banner', {}));
 });

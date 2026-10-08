@@ -866,6 +866,16 @@ export function parseNextTurnLock(attack, { coin = null, headsCount = 0, conditi
     oppCannotAttack: false,
   };
 
+  // Spinarak [Neo Genesis 75] Scary Face: "until the end of your opponent's next turn, the
+  // Defending Pokémon can't attack or retreat."
+  if (
+    /(?:during|until\s+the\s+end\s+of)\s+your\s+opponent's\s+next\s+turn,\s+the\s+defending\s+pok[ée]mon\s+can(?:'t|not)\s+attack\s+or\s+retreat/i.test(t) ||
+    /defending\s+pok[ée]mon\s+can(?:'t|not)\s+attack\s+or\s+retreat\s+(?:during|until\s+the\s+end\s+of)\s+your\s+opponent's\s+next\s+turn/i.test(t)
+  ) {
+    out.oppCannotAttack = true;
+    out.oppCannotRetreat = true;
+  }
+
   // Opponent retreat lock
   if (
     /(?:defending pok[ée]mon|it)\s+can(?:'t|not)\s+retreat\s+during\s+your\s+opponent's\s+next\s+turn/i.test(
@@ -1000,7 +1010,10 @@ export function parseAttackEnergyDiscard(attack) {
     return { all: true, count: Infinity, energyType: null };
   }
 
-  if (/\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(sentence)) return null;
+  // What follows "in order to" is what the cost buys (Dark Golduck Third Eye: "… in order to draw
+  // up to 3 cards"), not part of the count.
+  const costClause = sentence.replace(/\s+in order to\b.*$/, '');
+  if (/\bor (?:all|up to|any amount|an?|\d+)\b|as many|any amount|up to/.test(costClause)) return null;
 
   // "Discard a {W} and a {L} Energy attached to this Pokémon"; Lugia ex Elemental Blast lists
   // three: "Discard a {R} Energy, {W} Energy, and {L} Energy attached to …".

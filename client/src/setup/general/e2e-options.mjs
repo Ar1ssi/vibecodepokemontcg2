@@ -294,7 +294,11 @@ export async function enumerateOptions({
   if (canMove) {
     const usable = filterUsableAbilities(
       collectUsableAbilityCandidates(active, benchCards, handCards),
-      { rulesEnabled: rulesState.enabled, isUsed: isAbilityUsed }
+      {
+        rulesEnabled: rulesState.enabled,
+        isUsed: isAbilityUsed,
+        turnNumber: rulesState.turnNumber,
+      }
     );
     for (const entry of usable) {
       options.push({

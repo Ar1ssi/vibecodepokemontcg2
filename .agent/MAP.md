@@ -19,6 +19,8 @@ tools/ — internal dev tools, sync log comparison, asset mappings
 client/src/setup/deck-builder/ — deck builder (themes, filters, counter, sprites, wallpapers, coins) → .agent/areas/deck-builder.md
 client/src/setup/netcode/ — client transport, authoritative view renderer (apply-view.js), pickers/adapters, battle log → .agent/areas/netcode.md
 client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]; evolution scene D153–D154) → .agent/areas/netcode.md § Mat FX
+client/src/setup/netcode/mat-fx/sfx-cues.mjs + sample-bank.js + ui-cue.mjs + status-ambience.mjs + crowd.mjs + retreat-lock-watch.mjs — sampled SFX (D203, design 064): cue map, buffer bank, UI chrome cues, status loops, crowd bus
+scripts/sfx/ (`pnpm sfx:import -- --src <extract dir>`) — transcodes the TCG Live SFX extract to committed client/src/assets/sfx/*.ogg + manifest.json (D203/D204); server/sfx-cache.mjs caches only hashed .ogg
 
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
 shared/engine/rules/rules-state.mjs — `rulesState` + `canPerformAction()` legality gate (line 597)
@@ -56,7 +58,13 @@ shared/engine/rules/each-filter.mjs - "each of your opponent's Pokémon that …
 shared/engine/rules/turn-damage-bonus.mjs - Trainer/Ability "during this turn, your … attacks do N more damage" bonuses (`turnDamageBonusTotal`; possessive, per-Prize, Basic-only, instance-scoped)
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
 shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveStarterPlayerId`; the server authority's side of the coin call (D50)
+shared/engine/rules/baby-rule.mjs — Baby Rule (attacker flips vs an Active Baby, tails ends the turn) and Baby → Basic evolution table; read by reduce 'attack'/evolve legality and evolution.mjs canEvolve (I230)
+shared/engine/rules/legacy-attached-trainer.mjs — WotC non-Tool attach Trainers (PlusPower, Defender, Charity, Magnifier, Sabrina's ESP, Brock's Protection, Koga's Ninja Trick): attach target, discard timer, damage markers (I224)
+shared/engine/rules/legacy-attack-wording.mjs — WotC attack phrasing → modern phrasing before parseAttackSteps templates (design 062 D, D202)
 shared/engine/rules/legacy-set-ids.mjs — short set code to TCGdex set id mapping
+shared/engine/rules/legacy-power-wording.mjs — WotC Pokémon Power phrasing → modern (applied in parseAbility and cardAbilityText), legacy damage modifiers (Invisible Wall, Kabuto Armor…), Power stop clauses (D202)
+shared/engine/rules/legacy-trainer-wording.mjs — WotC Trainer phrasing → modern twins (Pokémon Trader, Erika's Maids, Lt. Surge's Treaty) before parseTrainerEffect (D202)
+shared/engine/rules/legacy-trainer-type.mjs — `legacyTrainerType`: untyped WotC Trainer → 'Stadium'/'Tool' from its printed rules line (design 062 A)
 shared/engine/rules/card-classify.mjs — single card-classification contract: `isRuleBoxPokemon`, `prizesForKO`, ex/GX/V/VMAX/VSTAR/Tera/Mega/Tag-Team/V-Union/Prism/Radiant/ACE-SPEC/LEGEND/Basic-Energy predicates; ko-flow re-exports, search-match/stadium-effects/tool-combat/reduce use it (rulebook 30c Phase 0); also understands TCGdex `energyType`/`rarity` fallbacks so client deck cards classify without `subtypes` (30c Phase 3); the `cardHasRuleBox` aliases are gone — `isRuleBoxPokemon` is the only rule-box definition (30c 4.2); `isTeamFlareHyperGearCard` is the App. 24 opponent-attaching Tool marker (30c 5.1)
 shared/engine/rules/paradox-tags.mjs — Ancient/Future tag per printing (design 058, D196): `paradoxTagOf` (subtypes, then id/tcgId/image URL/set+number in paradox-tags.generated.mjs, never the name), `isAncientCard`/`isFutureCard`, `withParadoxSubtype`; table baked by scripts/generate-paradox-tags.mjs (`--check` in test:live)
 shared/engine/rules/card-markers.mjs — printed markers TCGdex lacks (I220, D200): Tera, Team Plasma, Single/Rapid/Fusion Strike, Baby, Prism Star, TAG TEAM; `cardMarkersOf`/`hasCardMarker` (subtypes, then paradox-tags `printingIds` in card-markers.generated.mjs); read by search-match and isTeraCard; table baked by scripts/generate-card-markers.mjs (pkmncards is:/stage:, TCGdex number+name check; `--check` in test:live)

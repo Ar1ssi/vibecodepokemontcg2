@@ -10,6 +10,7 @@ import {
   isCardPickerOpen,
   openCarouselViewer,
 } from './card-picker.js';
+import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { resolveViewerIndex, toViewerCards } from './discard-pile-source.mjs';
 
 export const isDiscardPileViewerOpen = () =>
@@ -51,6 +52,7 @@ export const openDiscardPileViewer = async (
   const initialIndex = resolveViewerIndex(cards, { startIndex, instanceId });
   if (initialIndex < 0) return;
 
+  uiCue('pile-search');
   await openCarouselViewer({
     title: 'Discard Pile',
     candidates: cards,

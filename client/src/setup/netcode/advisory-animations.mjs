@@ -51,8 +51,30 @@ export const EVENT_FX = {
   pokemonDevolved: 'devolve',
   statusCleared: 'status-clear',
   cardsDiscarded: 'discard',
+  // Design 064: sound-only effects (no visual): they exist so the dispatcher sounds them.
+  // `deckShuffled` reaches here only when no deal animates it (a search effect's shuffle).
+  deckShuffled: 'search-shuffle',
+  prizesSet: 'prizes-set',
+  retreatBlocked: 'retreat-blocked',
+  playLockApplied: 'play-lock',
+  deferredKnockOut: 'deferred-ko',
+  // Crowd cheers for the once-per-game GX attack and VSTAR Power (no visual, no synth voice).
+  gxAttackUsed: 'gx-used',
+  vstarUsed: 'vstar-used',
   // Coin events (COIN_EVENTS below) plan the `coin-flip` ceremony with their faces.
 };
+
+// Effects with no visual: the registry and hold table have no entry for them, only a sound.
+export const SOUND_ONLY_FX = new Set([
+  'search-shuffle',
+  'prizes-set',
+  'retreat-blocked',
+  'play-lock',
+  'deferred-ko',
+  'attack-marker',
+  'gx-used',
+  'vstar-used',
+]);
 
 const COIN_EVENTS = new Set([
   'coinFlipped',
@@ -83,6 +105,9 @@ const fxPlan = (event, selfPlayerId, effect = EVENT_FX[event.type]) => {
 // (retreat, switch, promote) are not an entry.
 const ENTRY_SOURCES = new Set(['hand', 'deck', 'discard']);
 const ENTRY_TARGETS = new Set(['active', 'bench']);
+
+// Design 064: the opening placement is sounded differently from a mid-game entry.
+const withSetup = (plan, setup) => (setup ? { ...plan, setup: true } : plan);
 
 // Draw events carry `[{instanceId}]`; a few engine sites emit bare ids.
 export const drawnCards = (cards) => {
@@ -120,15 +145,34 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {object} event
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
- * @param {{ dealShuffle?: boolean, revealRun?: object[]|null }} [options] `dealShuffle`:
- *   this `deckShuffled` is in dealShuffles, so it animates (other deck shuffles do not).
- *   `revealRun`: this event's entry from deckRevealRuns, if any
+ * @param {{ dealShuffle?: boolean, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number> }} [options]
+ *   `dealShuffle`: this `deckShuffled` is in dealShuffles, so it animates (other deck shuffles
+ *   only sound). `revealRun`: this event's entry from deckRevealRuns, if any. `setup`: the batch
+ *   arrived while the opening placement was unfinished (tags `enter` plans). `effectKo`: the batch's
+ *   effectKnockoutIds (tags those `knockout` plans)
  */
-export function advisoryAnimationPlan(event, selfPlayerId, coinRun, { dealShuffle = false, revealRun = null } = {}) {
+export function advisoryAnimationPlan(
+  event,
+  selfPlayerId,
+  coinRun,
+  { dealShuffle = false, revealRun = null, setup = false, effectKo = null } = {}
+) {
   if (!event || typeof event !== 'object') return null;
   if (dealShuffle && event.type === 'deckShuffled' && event.playerId != null && selfPlayerId != null) {
     return { kind: 'shuffle', user: event.playerId === selfPlayerId ? 'self' : 'opp', zoneId: 'deck' };
   }
+  // Explicit, never via fxPlan: its `...fields` spread would replace the plan `kind` with the marker's.
+  if (event.type === 'attackMarkerAdded') {
+    return {
+      kind: 'fx',
+      effect: 'attack-marker',
+      user: sideOf(event.playerId, selfPlayerId),
+      instanceId: event.instanceId,
+      markerKind: event.kind,
+    };
+  }
+  // `vstarUsed` carries its own `kind: 'vstar'`, which the spread would turn into the plan kind.
+  if (event.type === 'vstarUsed') return { ...fxPlan(event, selfPlayerId), kind: 'fx' };
   if (COIN_EVENTS.has(event.type)) return coinPlan(event, selfPlayerId, coinRun);
   if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
@@ -136,7 +180,7 @@ export function advisoryAnimationPlan(event, selfPlayerId, coinRun, { dealShuffl
     if (event.to === 'discard' && event.instanceId != null) {
       return { ...fxPlan(event, selfPlayerId, 'discard'), cards: [event.instanceId] };
     }
-    return entersPlay(event) ? fxPlan(event, selfPlayerId, 'enter') : null;
+    return entersPlay(event) ? withSetup(fxPlan(event, selfPlayerId, 'enter'), setup) : null;
   }
   if (event.type === 'zoneMoved') {
     return event.to === 'discard' && event.from ? { ...fxPlan(event, selfPlayerId, 'discard'), sweep: event.from } : null;
@@ -167,7 +211,13 @@ export function advisoryAnimationPlan(event, selfPlayerId, coinRun, { dealShuffl
 
     case 'pokemonKnockedOut':
       if (event.instanceId == null) return null;
-      return { kind: 'knockout', user, instanceId: event.instanceId };
+      return {
+        kind: 'knockout',
+        user,
+        instanceId: event.instanceId,
+        ruleBoxes: Array.isArray(event.ruleBoxes) ? event.ruleBoxes.length : 0,
+        ...(effectKo?.has(event.instanceId) ? { effectKo: true } : {}),
+      };
 
     // Design 059: the group's first reveal plays every card the player revealed
     // from the deck into the hand in this batch; the others plan nothing.
@@ -242,6 +292,27 @@ const dedupeById = (cards) => {
     return true;
   });
 };
+
+/**
+ * Design 064: Pokémon knocked out by an effect rather than damage. A knockout counts when the
+ * batch has no earlier `damageUpdated` for it and no `deferredKnockOut` (a marker resolving).
+ *
+ * @param {object[]} events
+ * @returns {Set<number>} instanceIds
+ */
+export function effectKnockoutIds(events) {
+  const ids = new Set();
+  if (!Array.isArray(events)) return ids;
+  const damaged = new Set();
+  const deferred = new Set(events.filter((event) => event?.type === 'deferredKnockOut').map((event) => event.instanceId));
+  for (const event of events) {
+    if (event?.type === 'damageUpdated') damaged.add(event.instanceId);
+    else if (event?.type === 'pokemonKnockedOut' && !damaged.has(event.instanceId) && !deferred.has(event.instanceId)) {
+      ids.add(event.instanceId);
+    }
+  }
+  return ids;
+}
 
 const DEAL_EVENTS = new Set(['openingHandDealt', 'mulliganTaken']);
 

@@ -3,6 +3,7 @@
  * Manages monotonic clientSeq generation (Edge Case 4) and applies .cmd-pending
  * affordances to interacting elements during server round-trips.
  */
+import { uiCue } from './mat-fx/ui-cue.mjs';
 
 let clientSeq = 0;
 const pendingElements = new Set();
@@ -271,6 +272,9 @@ export function emitRequestView({ socket, roomId }) {
   return true;
 }
 
+// reduce.mjs `playLockReason` for an attack's lock (a Trainer's own lock names its card instead).
+const PLAY_LOCK_REFUSAL = /^Your opponent's attack stops you playing that card during this turn\.$/;
+
 /**
  * Handles incoming cmdRejected event from server.
  * Clears in-flight affordances and surfaces the error.
@@ -278,9 +282,11 @@ export function emitRequestView({ socket, roomId }) {
  * @param {object} rejectionData { clientSeq, reason, details }
  * @param {object} [options={}]
  * @param {Function} [options.onRejected] Optional callback
+ * @param {(key: string) => void} [options.playUiCue] UI sound player (tests inject one)
  */
 export function handleCmdRejected(rejectionData = {}, options = {}) {
   clearInFlightAffordances();
+  (options.playUiCue ?? uiCue)(PLAY_LOCK_REFUSAL.test(rejectionData.reason) ? 'itchy-pollen-hand-card' : 'card-no-match');
 
   const reason = rejectionData.reason || 'command_rejected';
   const details = rejectionData.details || '';

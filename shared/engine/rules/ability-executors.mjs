@@ -9,6 +9,7 @@
 import { isBasicPokemon, isPokemon, isEnergy } from '../cards.mjs';
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
+import { rewriteLegacyPowerWording, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -27,13 +28,28 @@ const firstAbilityText = (card) => {
 // `firstAbilityText` fallback every text-driven parser saw an empty string and
 // silently skipped the card's ability (I128), so passive consumers must read
 // text through here rather than off `card.ability` directly.
+// WotC Power wordings are read as their modern Ability wording (legacy-power-wording.mjs);
+// memoized because every passive reader asks for every holder's text.
+const legacyRewriteCache = new Map();
+function modernWording(text) {
+  if (!text) return text;
+  let rewritten = legacyRewriteCache.get(text);
+  if (rewritten === undefined) {
+    rewritten = rewriteLegacyPowerWording(text);
+    legacyRewriteCache.set(text, rewritten);
+  }
+  return rewritten;
+}
+
 export const cardAbilityText = (card) =>
-  lower(
-    card?.ability?.text ??
-      card?.abilityText ??
-      card?.text ??
-      card?.effect ??
-      firstAbilityText(card)
+  modernWording(
+    lower(
+      card?.ability?.text ??
+        card?.abilityText ??
+        card?.text ??
+        card?.effect ??
+        firstAbilityText(card)
+    )
   );
 
 const textOf = cardAbilityText;
@@ -49,7 +65,11 @@ const textOf = cardAbilityText;
 const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active|your active pok[eé]mon)\b/;
 
 export function requiresActiveSpot(card) {
-  return ACTIVE_SPOT_CLAUSE.test(textOf(card));
+  const text = textOf(card).replace(/[‘’]/g, "'");
+  if (ACTIVE_SPOT_CLAUSE.test(text)) return true;
+  // WotC Powers name the holder: "if Lt. Surge's Magneton is your Active Pokémon" (Gym Heroes 8).
+  const name = lower(card?.name).replace(/[‘’]/g, "'").trim();
+  return Boolean(name) && text.includes(`if ${name} is your active pokémon`);
 }
 
 // Legacy powers: "This power can't be used if <this Pokémon> is Asleep, Confused, or Paralyzed"
@@ -110,7 +130,15 @@ function matchesFirstAbilityOrText(card, clause) {
   return clause.test(textOf(card)) || clause.test(lower(arrText || ''));
 }
 
+// WotC Powers print "When you play Dark Crobat from your hand, …" without saying how it was played:
+// an Evolution card is played to evolve, a Basic onto the Bench (Unown V [Neo Destiny 89]).
+function isLegacyPlayedTrigger(card) {
+  const name = lower(card?.name).trim();
+  return Boolean(name) && textOf(card).startsWith(`when you play ${name} from your hand, `);
+}
+
 export function isEvolvePlayedTrigger(card) {
+  if (isLegacyPlayedTrigger(card) && !isBasicPokemon(card)) return true;
   return matchesFirstAbilityOrText(card, EVOLVE_PLAYED_CLAUSE);
 }
 
@@ -122,6 +150,7 @@ const BENCH_PLAYED_CLAUSE =
   /when you (?:play this pok[eé]mon|put [a-z0-9é' -]+?) from your hand (?:on)?to your bench\b/;
 
 export function isBenchPlayedTrigger(card) {
+  if (isLegacyPlayedTrigger(card) && isBasicPokemon(card)) return true;
   return matchesFirstAbilityOrText(card, BENCH_PLAYED_CLAUSE);
 }
 
@@ -356,6 +385,9 @@ export function parseDamagePrevention(card) {
   const t = textOf(card);
   const out = { preventAll: false, reduce: 0, reduceHp: 0 };
   if (!t) return out;
+  // WotC thresholds and halving (Invisible Wall, Hard Shell, …) are ability-combat.mjs
+  // abilityLegacyDamageModifiers', not a flat reduction.
+  if (parseLegacyDamageModifier(t)) return out;
   // Damage is not an effect: an effect-prevention wording blocks damage only
   // when it says "including damage" (Shuppet/Banette Hide 'n' Sneak, θ Stop and
   // "except damage" wordings leave damage alone).
@@ -544,7 +576,7 @@ const parseNumber = (m) => (m?.[1] ? parseInt(m[1], 10) || 0 : 0);
 // "takes N less damage", "reduce damage by N"
 export function parseDamageReduction(card) {
   const t = textOf(card);
-  if (!t) return { reduce: 0 };
+  if (!t || parseLegacyDamageModifier(t)) return { reduce: 0 };
   const matches =
     t.includes('less damage') ||
     t.includes('reduce damage') ||

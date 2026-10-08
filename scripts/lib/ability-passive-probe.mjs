@@ -11,6 +11,7 @@ import {
   abilityDamageBonus,
   abilityDamageReduction,
   abilityDamagePrevention,
+  abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects,
   abilityPreventsCardEffects,
   abilityPreventsCardEffectsOnPlayer,
@@ -253,6 +254,11 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, ctx));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
+      // WotC after-W/R modifiers; Unown D/M/N name the attacker's type.
+      for (const type of [null, 'Darkness', 'Metal', 'Colorless']) {
+        const attacker = type ? { ...p2Active, types: [type] } : p2Active;
+        ask(`legacyDamage:${type || 'any'}:${card.name}`, () => abilityLegacyDamageModifiers(card, attacker, ctx));
+      }
       ask(`effectPrevention:${card.name}`, () => abilityPreventsAttackEffects(card, p2Active, ctx));
       for (const source of CARD_EFFECT_SOURCES) {
         ask(`cardEffectShield:${source}:${card.name}`, () => abilityPreventsCardEffects(card, source, ctx));
@@ -289,6 +295,9 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`opp:prize:${card.name}`, () => abilityPrizeModify(card, ctx));
       ask(`opp:retreat:${card.name}`, () => abilityRetreatCost(card, ctx));
       ask(`opp:suppressed:${card.name}`, () => isAbilitySuppressed(card, ctx));
+      // Toxic Gas ignores only Pokémon Powers, which the probe Ability above is not.
+      const powerHolder = { ...card, abilities: [{ name: 'Probe Power', type: 'Pokémon Power', text: 'Once during your turn, you may draw a card.' }] };
+      ask(`opp:suppressedPower:${card.name}`, () => isAbilitySuppressed(powerHolder, ctx));
     }
     for (const [side, ctx] of [['p1', p1], ['p2', p2]]) {
       for (const card of played) ask(`playLock:${side}:${card.name}`, () => abilityPlayLocks(card, ctx));

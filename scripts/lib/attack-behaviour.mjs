@@ -53,14 +53,17 @@ const MECH = [
   ],
   [
     'attach-from-deck',
-    /(search your deck for[^.]*energy[^.]*attach|attach[^.]*from your deck|attach (it|them) to)/,
+    // "take 1 {G} Energy card attached to 1 of your Pokémon and attach it to …" (Energy Trans) moves
+    // Energy already in play, so it is not a deck attach.
+    /(search your deck for[^.]*energy[^.]*attach|attach[^.]*from your deck|(?<!attached to [^.]* and )attach (it|them) to)/,
     /^own:(deck|discard)->attached$/,
   ],
   ['attach-from-hand', /attach[^.]*from your hand/, /^own:hand->attached$/],
   ['attach-from-discard', /attach[^.]*from your discard pile/, /^own:discard->attached$/],
   [
     'search-to-bench',
-    /(put (it|them|that card|those cards) (on|onto) your bench|(on|onto|to) your bench(?!ed))/,
+    // "if Mew ex is on your Bench" (Holon Phantoms 100) is a position condition, not a placement.
+    /(put (it|them|that card|those cards) (on|onto) your bench|(?<!\bis )(on|onto|to) your bench(?!ed))/,
     /^own:(deck|discard)->bench$/,
   ],
   ['search-to-hand', /(search your deck for|look through your deck)/, /^own:deck->hand$/],

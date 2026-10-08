@@ -87,6 +87,9 @@ export async function collectUsableAbilities(user) {
     // Fezandipiti ex-style KO-window abilities are refused by the server when
     // the flag is unset; do not offer them.
     koedLastOppTurn: !!rulesState.flags?.[user]?.koedLastOppTurn,
+    // The on-promotion window reads the card's `movedToActiveTurn` stamp against
+    // the current turn, so a promoted Pokémon is offered only on that turn.
+    turnNumber: rulesState.turnNumber,
     // Board context for the suppression gate (design 034 slice 3) — the server
     // refuses a suppressed ability, so the picker must not offer it.
     sideCards: zoneCards(user),

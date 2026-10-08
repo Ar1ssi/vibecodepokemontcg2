@@ -27,9 +27,25 @@ import {
   isUltraBeastCard,
 } from './card-classify.mjs';
 import { priorEvolutionCards } from './evolved-pokemon.mjs';
+import { liveAttackMarkers } from './attack-markers.mjs';
 
 const zoneOf = (player, zoneId) =>
   Array.isArray(player?.zones?.[zoneId]) ? player.zones[zoneId] : [];
+
+// Lt. Surge's Raticate [Gym Challenge 53] Focus Energy: "During your next turn, … Double-edge
+// attack's damage (base damage and damage to itself) is doubled." The base half is
+// attack-engine.mjs overrideBaseDamage's; this reads the recoil half.
+function selfDamageDoubled(own, attacker, attack, turnNumber) {
+  const active = zoneOf(own, 'active');
+  if (!attacker || !active.some((card) => card.instanceId === attacker.instanceId)) return false;
+  const name = String(attack?.name || '').toLowerCase();
+  return liveAttackMarkers(attacker, { turnNumber, zoneCards: active }).some(
+    (marker) =>
+      marker.kind === 'nextTurnBaseDamage' &&
+      marker.selfDamageDoubled &&
+      (marker.attackName === name || `${marker.attackName} attack` === name)
+  );
+}
 
 // In-play Pokémon of a zone: roots only, never the cards attached to them. The server models
 // an evolution as the Evolution card attached UNDER the Basic, so the root still carries the
@@ -352,6 +368,7 @@ export function buildServerAttackContext(
       attacker != null && Number(attacker.movedToActiveTurn) === turnNumber,
     attackerEvolvedThisTurn: Boolean(attacker && own?.flags?.evolved?.[attacker.instanceId]),
     attackerRemainingHp: Math.max(0, (Number(attackerCard.hp) || 0) - (attacker?.damage || 0)),
+    selfDamageDoubled: selfDamageDoubled(own, attacker, attack, turnNumber),
     coin,
     // Conditional-bonus reads (attack-conditions.mjs): what happened this turn and what the
     // board holds beyond the counts above.

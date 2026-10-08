@@ -70,6 +70,9 @@ export async function computeCardGlows({
   yourTurn = rulesState.turnPlayer === user,
   stadiumUsedThisTurn = stadiumUsedFlagFor(user),
   flags = rulesState.flags?.[user] || {},
+  // The on-promotion window compares a card's `movedToActiveTurn` stamp with the
+  // current turn, so the authoritative glow only lights on the promotion turn.
+  turnNumber = rulesState.turnNumber,
 } = {}) {
   // 1. Attack + in-play abilities reuse the exact affordability path the sidebox uses.
   //    Gated on the turn so a direct call for the other player returns no glows
@@ -92,6 +95,7 @@ export async function computeCardGlows({
         // The view's flag is authoritative when present; without it the
         // Fezandipiti-style KO-window ability must not glow (server refuses it).
         koedLastOppTurn: !!flags.koedLastOppTurn,
+        turnNumber,
       })
     : { attackAvailable: false, usableAbilities: [] };
 

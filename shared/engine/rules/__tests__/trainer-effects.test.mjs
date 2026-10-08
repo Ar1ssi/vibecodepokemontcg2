@@ -1919,15 +1919,16 @@ describe('recurring-wording coverage (batch 6)', () => {
     assert.equal(r.steps[0].source, 'opponentHandTrainer');
   });
 
-  test('Sabrina: move all Energy between two of your Pokémon → moveEnergy', () => {
+  test('Sabrina: move all Energy between two of your Pokémon with Sabrina in their names → moveAllEnergy', () => {
     const r = parseTrainerEffect('Take all Energy cards attached to 1 of your Pokémon with Sabrina in its name and attach them to another 1 of your Pokémon with Sabrina in its name.');
-    assert.equal(r.steps[0].type, 'moveEnergy');
+    assert.deepEqual(r.steps, [{ type: 'moveAllEnergy', nameTag: 'sabrina' }]);
   });
 
   test('Super Energy Removal: discard up to 2 Energy from an opponent Pokémon', () => {
     const r = parseTrainerEffect("Discard 1 Energy card attached to 1 of your own Pokémon in order to choose 1 of your opponent's Pokémon and up to 2 Energy cards attached to it. Discard those Energy cards.");
-    assert.equal(r.steps[0].type, 'discardEnergyFromOpponent');
-    assert.equal(r.steps[0].count, 2);
+    assert.deepEqual(r.steps[0], { type: 'discardOwnAttachedEnergy', cost: true });
+    assert.equal(r.steps[1].type, 'discardEnergyFromOpponent');
+    assert.equal(r.steps[1].count, 2);
   });
 
   test('Drayton (corpus: Surging Sparks 174): one Pokémon and one Trainer, not any card', () => {
@@ -2426,10 +2427,10 @@ describe('legacy mechanisms coverage (batch 12)', () => {
     assert.equal(r.steps[1].type, 'discardHandThenDraw');
   });
 
-  test('Koga / Giovanni / Blaine: turn-scoped passives', () => {
-    assert.equal(parseTrainerEffect('If an attack from a Pok\u00e9mon with Koga in its name does damage to a Defending Pok\u00e9mon this turn, that Pok\u00e9mon is then Poisoned.').steps[0].type, 'passive');
-    assert.equal(parseTrainerEffect('Choose 1 of your Pok\u00e9mon in play with Giovanni in its name. For the rest of your turn, you may evolve that Pok\u00e9mon even if you just played or evolved it this turn or if this is your first turn.').steps[0].type, 'passive');
-    assert.equal(parseTrainerEffect('During this turn, instead of attaching your free Energy card, you may instead attach 2 {R} Energy cards to 1 of your Pok\u00e9mon with Blaine in its name.').steps[0].type, 'passive');
+  test('Koga / Giovanni / Blaine: turn-scoped effects (I225)', () => {
+    assert.deepEqual(parseTrainerEffect('If an attack from a Pok\u00e9mon with Koga in its name does damage to a Defending Pok\u00e9mon this turn, that Pok\u00e9mon is then Poisoned.').steps, [{ type: 'turnAttackRider', nameTag: 'koga', condition: 'Poisoned' }]);
+    assert.deepEqual(parseTrainerEffect('Choose 1 of your Pok\u00e9mon in play with Giovanni in its name. For the rest of your turn, you may evolve that Pok\u00e9mon even if you just played or evolved it this turn or if this is your first turn.').steps, [{ type: 'freeEvolve', nameTag: 'giovanni' }]);
+    assert.deepEqual(parseTrainerEffect('During this turn, instead of attaching your free Energy card, you may instead attach 2 {R} Energy cards to 1 of your Pok\u00e9mon with Blaine in its name.').steps, [{ type: 'energyAttachPlan', count: 2, energyType: 'fire', nameTag: 'blaine' }]);
   });
 });
 

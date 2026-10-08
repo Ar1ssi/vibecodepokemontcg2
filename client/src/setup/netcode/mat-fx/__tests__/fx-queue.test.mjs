@@ -219,3 +219,14 @@ test('fx-queue: a blocking plan (coin ceremony) keeps its hold past the budget a
   fresh.clock.drain();
   assert.deepEqual(fresh.clock.delays, [3500, 600], 'the wait left the budget for what follows it');
 });
+
+test('fx-queue: the default budget (design 063) fits banner + tier-3 move + damage + status; only what follows a knockout collapses', () => {
+  const holds = [1600, 1240, 180, 260, 900, 320];
+  let next = 0;
+  const { queue, clock } = make(() => holds[next++]);
+  for (let i = 0; i < holds.length; i += 1) queue.push({ id: i });
+  clock.drain();
+  // Waits are the PREVIOUS plan's hold: 1600 + 1240 + 180 + 260 = 3280 < 3800 keeps the knockout's 900,
+  // which then crosses the budget, so the prize claim's own hold collapses to nothing.
+  assert.deepEqual(clock.delays, [1600, 1240, 180, 260, 900, 0]);
+});

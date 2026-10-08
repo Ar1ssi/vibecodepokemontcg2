@@ -47,6 +47,12 @@ export function isSupporterTrainer(card) {
  * @param {boolean|null} [params.koedLastOppTurn] Whether any of the player's Pokémon were Knocked
  *   Out during the opponent's last turn; null when unknown
  * @param {{name: string, types: string[]}[]|null} [params.koedLastOppTurnVictims] Those Pokémon
+ * @param {number|null} [params.ownAttachedEnergyCount] Energy cards attached to the player's
+ *   Pokémon; null when unknown
+ * @param {number|null} [params.handEnergyCount] Energy cards in the player's hand; null when unknown
+ * @param {number|null} [params.handPokemonCount] Pokémon cards in the player's hand; null when unknown
+ * @param {boolean} [params.evolutionCardsLocked] An in-play Power stops Evolution cards being played
+ *   (ability-combat.mjs abilityEvolutionCardLock)
  * @returns {string|null} Why the card cannot be played, or null when it can
  */
 export function trainerPlayBlockReason({
@@ -67,6 +73,10 @@ export function trainerPlayBlockReason({
   ownActive = undefined,
   koedLastOppTurn = null,
   koedLastOppTurnVictims = null,
+  ownAttachedEnergyCount = null,
+  handEnergyCount = null,
+  handPokemonCount = null,
+  evolutionCardsLocked = false,
 }) {
   if (!card) return null;
   const text = card.text || card.effect || card.cardText || '';
@@ -87,6 +97,18 @@ export function trainerPlayBlockReason({
   const condition = parsed.playCondition;
   const cost = parsed.steps?.[0]?.type === 'discardCost' ? parsed.steps[0].count || 1 : 0;
   if (cost > 0 && handCount - 1 < cost) return 'Not enough cards in hand to pay discard cost.';
+  // Max Revive gym2-117: "Discard 2 Energy cards from your hand in order to …".
+  if (cost > 0 && parsed.steps[0].energyOnly && handEnergyCount != null && handEnergyCount < cost) {
+    return 'Not enough Energy cards in hand to pay discard cost.';
+  }
+  // WotC "Discard 1 Energy card attached to … your Pokémon in order to …" (Super Potion base1-90).
+  if (parsed.steps?.[0]?.type === 'discardOwnAttachedEnergy' && parsed.steps[0].cost && ownAttachedEnergyCount === 0) {
+    return 'No Energy attached to your Pokémon to pay the cost.';
+  }
+  // Pokémon Communication / Pokémon Trader base1-77: a Pokémon from the hand goes into the deck first.
+  if (parsed.steps?.[0]?.type === 'handCardToDeck' && parsed.steps[0].what === 'Pokémon' && handPokemonCount === 0) {
+    return 'You need a Pokémon in your hand to play this card.';
+  }
   const effectSteps = (parsed.steps || []).filter((step) => step.type !== 'discardCost');
   if (
     effectSteps.length > 0 &&
@@ -110,6 +132,9 @@ export function trainerPlayBlockReason({
   const evolvesStage2 = effectSteps.some((step) => step.type === 'evolveStage2');
   if (evolvesStage2 && turnNumber <= 2) {
     return "You can't use this card during your first turn.";
+  }
+  if (evolvesStage2 && evolutionCardsLocked) {
+    return 'A Pokémon Power stops Evolution cards being played.';
   }
   if (evolvesStage2 && rareCandyOptionCount === 0) {
     return 'You need a Stage 2 Pokémon in hand that evolves from a Basic Pokémon you have in play.';

@@ -364,6 +364,11 @@ const CLAUSES = [
     new RegExp(`^(?:your opponent's active pokémon|the defending pokémon) is (${STATUS_RE})$`),
     (m) => ({ desc: { kind: 'defenderStatus', status: STATUS_WORDS[m[1]] }, printedNegated: false }),
   ],
+  // Dark Wigglytuff [Neo Destiny 40] Slap Awake: "If the Defending Pokémon is Asleep or Confused".
+  [
+    new RegExp(`^(?:your opponent's active pokémon|the defending pokémon) is (${STATUS_RE}) or (${STATUS_RE})$`),
+    (m) => ({ desc: { kind: 'defenderStatus', statuses: [STATUS_WORDS[m[1]], STATUS_WORDS[m[2]]] }, printedNegated: false }),
+  ],
   [
     new RegExp(`^this pokémon (?:isn't|is not) (${STATUS_RE})$`),
     (m) => ({ desc: { kind: 'attackerStatus', status: STATUS_WORDS[m[1]] }, printedNegated: true }),
@@ -516,7 +521,8 @@ const CLAUSES = [
     (m) => (discardedPhraseMatcher(m[1]) ? { desc: { kind: 'discardedCardIs', phrase: m[1] }, printedNegated: false } : null),
   ],
   [
-    /^this pokémon was damaged by an attack during your opponent's last turn$/,
+    // Horsea [Neo Genesis 62] Fin Slap prints "an attack damaged Horsea during …".
+    /^(?:this pokémon was damaged by an attack|an attack damaged this pokémon) during your opponent's last turn$/,
     () => ({ desc: { kind: 'damagedLastOpponentTurn' }, printedNegated: false }),
   ],
   [
@@ -701,6 +707,12 @@ const CLAUSES = [
   ],
   [
     /^this pokémon has (?:less|fewer) energy attached(?: to it)? than (?:your opponent's active pokémon|the defending pokémon)$/,
+    () => ({ desc: { kind: 'energyVsDefender', op: 'lt' }, printedNegated: false }),
+  ],
+  // Light Slowbro [Neo Destiny 51] Splash About: "there are more Energy attached to the Defending
+  // Pokémon than to Light Slowbro".
+  [
+    /^there (?:are|is) more energy attached to (?:your opponent's active pokémon|the defending pokémon) than to this pokémon$/,
     () => ({ desc: { kind: 'energyVsDefender', op: 'lt' }, printedNegated: false }),
   ],
   [
@@ -977,7 +989,7 @@ function extraEnergyCount(ctx, type) {
 
 const CHECKS = {
   optionalCostPaid: (cond, ctx) => ctx.optionalCostPaid === true,
-  defenderStatus: (cond, ctx) => list(ctx.defenderConditions).includes(cond.status),
+  defenderStatus: (cond, ctx) => (cond.statuses || [cond.status]).some((status) => list(ctx.defenderConditions).includes(status)),
   attackerStatus: (cond, ctx) => list(ctx.attackerConditions).includes(cond.status),
   noStadium: (cond, ctx) => !ctx.stadiumInPlay,
   handCount: (cond, ctx) => compare(num(ctx.ownHandCount), cond.op, cond.n),

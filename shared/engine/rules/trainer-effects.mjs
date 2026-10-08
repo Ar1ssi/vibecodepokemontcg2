@@ -73,6 +73,7 @@
 import { WORD_POKEMON_TYPES } from './search-match.mjs';
 import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
 import { parseTurnDamageBonus } from './turn-damage-bonus.mjs';
+import { rewriteLegacyTrainerWording } from './legacy-trainer-wording.mjs';
 
 const POKEMON_TYPE_WORDS = Object.keys(WORD_POKEMON_TYPES).join('|');
 
@@ -131,6 +132,23 @@ function appendDiscardCost(steps, lower) {
   } else if (lower.includes('discard another card')) {
     steps.unshift({ type: 'discardCost', count: 1 });
   }
+}
+
+// WotC Trainers lead with "Discard … in order to …": the cost precedes the effect the branch
+// parsed, which never saw it (Computer Search base1-71, Super Potion base1-90).
+const LEADING_TRAINER_COSTS = [
+  [/^discard (\d+) (?:of the )?other cards (?:from|in) your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]) })],
+  [/^discard (\d+) energy cards from your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]), energyOnly: true })],
+  [/^discard a card from your hand in order to/, () => ({ type: 'discardCost', count: 1 })],
+  [/^discard 1 energy card attached to (?:1 of )?your (?:own )?pokémon in order to/, () => ({ type: 'discardOwnAttachedEnergy', cost: true })],
+];
+
+function leadingTrainerCost(lower) {
+  for (const [pattern, build] of LEADING_TRAINER_COSTS) {
+    const m = lower.match(pattern);
+    if (m) return build(m);
+  }
+  return null;
 }
 
 // Short human description for passive/turn-scoped/conditional effects, chosen
@@ -1286,7 +1304,7 @@ export function trainerEndsTurn(card) {
 }
 
 export function parseTrainerEffect(text = '') {
-  const lower = normalizeText(text);
+  const lower = rewriteLegacyTrainerWording(normalizeText(text));
   // Fossil Items: the "play as a Basic Pokémon" clause is the whole effect; legacy wordings
   // ("Play Skull Fossil as if it were a Colorless Basic Pokémon … Poké-BODY") would otherwise
   // fall into the passive or search branches.
@@ -1298,6 +1316,8 @@ export function parseTrainerEffect(text = '') {
   if (fossilSearch) return { steps: [fossilSearch], recognizable: true };
   const playCondition = parsePlayCondition(lower);
   const result = parseTrainerSteps(lower);
+  const leadingCost = result.recognizable && !result.steps.some((s) => s.type === 'discardCost') ? leadingTrainerCost(lower) : null;
+  if (leadingCost) result.steps.unshift(leadingCost);
   // The other copies played together go to the discard pile with this one (Cross Switcher).
   const copies = playCondition?.match(/^copiesInHand>=(\d+)$/);
   if (copies && result.recognizable) result.steps.unshift({ type: 'playCopies', count: Number(copies[1]) - 1 });
@@ -1505,8 +1525,104 @@ function prependWholeHandDiscard(steps, lower) {
   steps.unshift({ type: 'discardHand' });
 }
 
+// Status words a WotC Trainer can attach to an attack this turn (Koga gym2-19).
+const RIDER_CONDITIONS = { poisoned: 'Poisoned', burned: 'Burned', confused: 'Confused', asleep: 'Asleep', paralyzed: 'Paralyzed' };
+
+// WotC Trainers with no modern twin (I225/I226): each pattern is anchored on the TCGdex wording
+// (out/tcgdex-wotc-trainers.json), so no modern card reaches these branches. Null when none match.
+function parseWotcTrainerSteps(lower) {
+  const text = lower.trim();
+  // Lass base1-75
+  if (/^you and your opponent show each other your hands, then shuffle all the trainer cards from your hands into your decks\./.test(text)) {
+    return [{ type: 'eachPlayerShuffleHandTrainers' }];
+  }
+  // Arcade Game neo1-83
+  const arcade = text.match(/^shuffle your deck, then reveal the top (\d+) cards of it\. if at least 2 of those cards share the same name, put all (?:of )?the ones with that name into your hand/);
+  if (arcade) return [{ type: 'revealTopSameName', count: Number(arcade[1]) }];
+  // Blaine's Gamble gym1-121
+  if (/^discard any number of other cards from your hand, then flip a coin\. if heads, draw twice that many cards\./.test(text)) {
+    return [{ type: 'discardAnyThenDraw', coin: true, drawPer: 2 }];
+  }
+  // Digger base5-75
+  const digger = text.match(/^flip a coin\. if tails, do (\d+) damage to your active pokémon\. if heads, your opponent flips a coin\. if tails, your opponent does \1 damage to (?:his or her|their) active pokémon\. if heads, you flip a coin\. keep doing this until a player gets tails\./);
+  if (digger) return [{ type: 'alternatingFlipDamage', amount: Number(digger[1]) }];
+  // Impostor Professor Oak's Invention neo4-94
+  if (/^look at your opponent's prize cards\. you may have your opponent shuffle them into (?:his or her|their) deck\. if you do, your opponent takes that many cards from the top of (?:his or her|their) deck and sets them aside as (?:his or her|their) new prize cards/.test(text)) {
+    return [{ type: 'opponentPrizesReshuffle' }];
+  }
+  // Misty's Duel gym1-123: the printed fallback ("flip a coin to decide who's the winner") stands
+  // in for Rock-Paper-Scissors; heads, the player who played it wins.
+  const duel = text.match(/^you and your opponent play a game of rock-paper-scissors\. the winner shuffles (?:his or her|their) hand into (?:his or her|their) deck and draws a new hand of (\d+) cards\./);
+  if (duel) {
+    const count = Number(duel[1]);
+    return [{
+      type: 'coinFlip',
+      heads: [{ type: 'shuffleHandThenDraw', count }],
+      tails: [{ type: 'opponentShuffleHandDraw', count, prizeCondition: null, shuffle: true }],
+    }];
+  }
+  // Misty's Wish gym2-108
+  if (/^look at 1 of your prize cards\. then, ask your opponent if you may switch that card with 1 of the cards in your hand\./.test(text)) {
+    return [{ type: 'prizeWishSwap' }];
+  }
+  // Sabrina's Psychic Control gym2-121
+  if (/^flip a coin\. if heads, choose a trainer card in your opponent's discard pile that isn't put in play .*you may use that card as if it were in your hand/.test(text)) {
+    return [{ type: 'coinFlip', heads: [{ type: 'useOpponentDiscardTrainer' }], tails: [] }];
+  }
+  // Thought Wave Machine neo4-96: "Your turn is over now" ends the turn once the effect resolves.
+  if (/^flip a coin until you get tails\. for each heads, return an energy card attached to your opponent's active pokémon to your opponent's hand\./.test(text)) {
+    const steps = [{ type: 'flipReturnActiveEnergy' }];
+    if (/your turn is over now/.test(text)) steps.push({ type: 'turnEnds' });
+    return steps;
+  }
+  // Time Capsule neo1-90
+  const capsule = text.match(/^your opponent may choose (\d+) basic pokémon, evolution, and\/or basic energy cards in (?:his or her|their) discard pile\./);
+  if (capsule) {
+    const steps = [{ type: 'eachPlayerShuffleDiscardCards', count: Number(capsule[1]), opponentFirst: true }];
+    if (/you can't play any more trainer cards this turn/.test(text)) steps.push({ type: 'noMoreTrainersThisTurn' });
+    return steps;
+  }
+  // Sabrina gym2-20: every Energy card moves, and both Pokémon carry the printed name.
+  const sabrina = text.match(/^take all energy cards attached to 1 of your pokémon with ([a-z.' ]+?) in its name and attach them to another 1 of your pokémon with \1 in its name\./);
+  if (sabrina) return [{ type: 'moveAllEnergy', nameTag: sabrina[1] }];
+  // Goop Gas Attack base5-78
+  if (/^all pokémon powers stop working until the end of your opponent's next turn\./.test(text)) {
+    return [{ type: 'powersOff' }];
+  }
+  // Transparent Walls gym2-125
+  if (/^until the end of your opponent's next turn, prevent all damage from attacks done to your benched pokémon\./.test(text)) {
+    return [{ type: 'benchAttackShield' }];
+  }
+  // Koga gym2-19
+  const koga = text.match(/^if an attack from a pokémon with ([a-z.' ]+?) in its name does damage to a defending pokémon this turn, that pokémon is then (poisoned|burned|confused|asleep|paralyzed)\./);
+  if (koga) return [{ type: 'turnAttackRider', nameTag: koga[1], condition: RIDER_CONDITIONS[koga[2]] }];
+  // Giovanni gym2-18
+  const giovanni = text.match(/^choose 1 of your pokémon in play with ([a-z.' ]+?) in its name\. for the rest of your turn, you may evolve that pokémon even if you just played or evolved it this turn or if this is your first turn\./);
+  if (giovanni) return [{ type: 'freeEvolve', nameTag: giovanni[1] }];
+  // Blaine gym2-17
+  // (pkmncards prints "2 {R} Energy cards", TCGdex "2 Fire Energy cards".)
+  const blaine = text.match(/^during this turn, instead of attaching your free energy card, you may instead attach (\d+) (?:\{([a-z])\}|([a-z]+)) energy cards to 1 of your pokémon with ([a-z.' ]+?) in its name\./);
+  if (blaine) {
+    const energyType = blaine[2] ? SYMBOL_ENERGY_WORDS[blaine[2]] : blaine[3];
+    return [{ type: 'energyAttachPlan', count: Number(blaine[1]), energyType, nameTag: blaine[4] }];
+  }
+  return null;
+}
+
 function parseTrainerStepsInner(lower) {
   const steps = [];
+
+  const wotc = parseWotcTrainerSteps(lower);
+  if (wotc) return { steps: wotc, recognizable: true };
+
+  // Pokémon Communication (Team Up 152, Black & White Trainer Kit 24, HeartGold & SoulSilver 98)
+  // and Pokémon Trader (via legacy-trainer-wording): the Pokémon from hand goes into the deck
+  // first, and is the cost — without one the search does not happen.
+  if (/^(?:reveal a pokémon (?:from|in) your hand and put it (?:into|on top of) your deck|choose 1 pokémon in your hand, show it to your opponent, and put it on top of your deck)\. if you do, search your deck for a pokémon/.test(lower.trim())) {
+    steps.push({ type: 'handCardToDeck', what: 'Pokémon', cost: true });
+    steps.push({ type: 'searchDeck', what: 'Pokémon', count: 1, destination: 'hand', reveal: true });
+    return { steps, recognizable: true };
+  }
 
   // Gwynn — discard up to N Pokémon (without a Rule Box) from hand, draw M per card discarded
   const pokemonDraw = lower.match(
@@ -1661,11 +1777,18 @@ function parseTrainerStepsInner(lower) {
   }
 
   // Red Card / Imposter Professor Oak — opponent shuffles hand into their deck,
-  // then draws a fixed number (Reset Stamp's "for each Prize card" is variable
-  // and stays unrecognized).
+  // then draws a fixed number. Reset Stamp (Unified Minds 206) draws "a card for each of their
+  // remaining Prize cards" instead (I231).
   if (/your opponent shuffles (?:his or her|their) hand into (?:his or her|their) deck/.test(lower)) {
     const drawM = lower.match(/draws?\s+(\d+)\s+cards?/);
-    steps.push({ type: 'opponentShuffleHandDraw', count: drawM ? Number(drawM[1]) : 4, prizeCondition: null });
+    const perPrize = /draws? a card for each of (?:his or her|their) remaining prize cards/.test(lower);
+    steps.push({
+      type: 'opponentShuffleHandDraw',
+      count: drawM ? Number(drawM[1]) : perPrize ? 0 : 4,
+      prizeCondition: null,
+      shuffle: true,
+      ...(perPrize ? { perPrize: true } : {}),
+    });
     appendDiscardCost(steps, lower);
     return { steps, recognizable: true };
   }
@@ -2245,11 +2368,11 @@ function parseTrainerStepsInner(lower) {
   }
 
   // Super Potion — discard an own Energy as a cost, then remove damage counters
-  // (the Energy cost is not enforced by the executor)
+  // (the cost step is prepended by leadingTrainerCost; the heal lands on the cost's host)
   {
     const potion = lower.match(/in order to remove (?:up to )?(\d+) damage counters/);
     if (potion) {
-      steps.push({ type: 'healAmount', amount: Number(potion[1]), target: '1 of your Pokémon' });
+      steps.push({ type: 'healAmount', amount: Number(potion[1]) * 10, target: 'costHost' });
       return { steps, recognizable: true };
     }
   }
@@ -2794,7 +2917,7 @@ function parseTrainerStepsInner(lower) {
   {
     const removal = lower.match(/choose 1 of your opponent's pokémon and up to (\d+) energy cards attached to it/);
     if (removal) {
-      steps.push({ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: Number(removal[1]), scope: '1 Pokémon' });
+      steps.push({ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: Number(removal[1]), upTo: true, scope: '1 Pokémon' });
       return { steps, recognizable: true };
     }
   }
@@ -3332,7 +3455,9 @@ function describeStepBody(step) {
       return `Flip a coin — heads: ${fmt(step.heads)}; tails: ${fmt(step.tails)}.`;
     }
     case 'putHandOnBottom': return `Put ${step.count} card${step.count > 1 ? 's' : ''} from your hand on the bottom of your deck.`;
-    case 'opponentShuffleHandDraw': return `Your opponent shuffles their hand into their deck (on bottom)${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
+    case 'opponentShuffleHandDraw':
+      if (step.perPrize) return 'Your opponent shuffles their hand into their deck, then draws a card for each of their remaining Prize cards.';
+      return `Your opponent shuffles their hand into their deck${step.shuffle ? '' : ' (on bottom)'}${step.prizeCondition ? ` (${step.prizeCondition})` : ''}, then draws ${step.count} card${step.count > 1 ? 's' : ''}.`;
     case 'lookAtTop':
       if (step.lookOnly) return `Look at the top ${step.count} card${step.count > 1 ? 's' : ''} of your deck.`;
       if (step.oneEach) return `Look at the top ${step.count} cards; take ${step.oneEach.map((w) => `a ${w}`).join(' and ')} to hand, shuffle the rest.`;
@@ -3355,7 +3480,8 @@ function describeStepBody(step) {
     case 'millEachPlayer': return `Discard ${step.count} cards from the top of each player's deck.`;
     case 'eachPlayerDiscardBenchUntil': return `Each player discards Benched Pokémon until they have ${step.count}${step.opponentFirst ? ' (opponent first)' : ''}.`;
     case 'gxReuseTurn': return `During this turn, your ${step.pokemonType} Pokémon can use their GX attacks even if you have used your GX attack.`;
-    case 'healAmount': return `Heal ${step.amount} damage from ${step.target === 'switchedOut' ? 'the Pokémon you moved to your Bench' : step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
+    case 'discardOwnAttachedEnergy': return step.cost ? 'Discard an Energy attached to 1 of your Pokémon (cost).' : 'Discard an Energy attached to 1 of your Pokémon.';
+    case 'healAmount': return `Heal ${step.amount} damage from ${step.target === 'switchedOut' ? 'the Pokémon you moved to your Bench' : step.target === 'costHost' ? 'that Pokémon' : step.target}${step.cure ? ', and it recovers from Special Conditions' : ''}.`;
     case 'attachFromDiscard': return `Attach a ${step.energy} from your discard pile to ${step.target}.`;
     case 'attachMultipleFromDiscard': return `Attach up to ${step.count} ${step.energy} cards from your discard pile to ${step.target}.`;
     case 'ionoShuffle':
@@ -3448,7 +3574,42 @@ function describeStepBody(step) {
     case 'discardPokemonThenDraw':
       return `Discard up to ${step.count} Pokémon${step.noRuleBox ? " that don't have a Rule Box" : ''} from your hand, and draw ${step.drawPer} cards for each card discarded.`;
     case 'discardAnyThenDraw':
+      if (step.coin) return `Discard any number of other cards from your hand, then flip a coin. If heads, draw ${step.drawPer || 1}× that many cards.`;
       return 'Discard any number of cards from your hand, then draw that many.';
+    case 'eachPlayerShuffleHandTrainers':
+      return 'Both players reveal their hands, then shuffle the Trainer cards from them into their decks.';
+    case 'handCardToDeck':
+      return `Reveal a ${step.what || 'card'} from your hand and put it into your deck (cost).`;
+    case 'revealTopSameName':
+      return `Shuffle your deck and reveal the top ${step.count} cards; if 2 or more share a name, put those into your hand. Shuffle the rest back.`;
+    case 'alternatingFlipDamage':
+      return `Players take turns flipping coins (you first); the first player to flip tails does ${step.amount} damage to their own Active Pokémon.`;
+    case 'opponentPrizesReshuffle':
+      return "Look at your opponent's Prize cards; you may have them shuffled into their deck and replaced from its top.";
+    case 'prizeWishSwap':
+      return 'Look at 1 of your Prize cards; if your opponent agrees, swap it with a card from your hand, otherwise draw a card.';
+    case 'useOpponentDiscardTrainer':
+      return "Use the effect of a Trainer card in your opponent's discard pile that isn't put into play.";
+    case 'flipReturnActiveEnergy':
+      return "Flip coins until tails; for each heads, return an Energy card attached to your opponent's Active Pokémon to their hand.";
+    case 'eachPlayerShuffleDiscardCards':
+      return `Each player (your opponent first) may shuffle ${step.count} Pokémon and basic Energy cards from their discard pile into their deck.`;
+    case 'noMoreTrainersThisTurn':
+      return "You can't play any more Trainer cards this turn.";
+    case 'moveAllEnergy':
+      return `Move all Energy cards from 1 of your Pokémon with ${step.nameTag} in its name to another.`;
+    case 'powersOff':
+      return "All Pokémon Powers stop working until the end of your opponent's next turn.";
+    case 'benchAttackShield':
+      return "Until the end of your opponent's next turn, prevent all damage from attacks done to your Benched Pokémon.";
+    case 'turnAttackRider':
+      return `This turn, an attack from a Pokémon with ${step.nameTag} in its name that damages the Defending Pokémon leaves it ${step.condition}.`;
+    case 'freeEvolve':
+      return `Choose 1 of your Pokémon with ${step.nameTag} in its name: it may evolve again this turn.`;
+    case 'energyAttachPlan':
+      return `Instead of your Energy attachment this turn, you may attach ${step.count} ${step.energyType} Energy cards to 1 of your Pokémon with ${step.nameTag} in its name.`;
+    case 'opponentHandSetAside':
+      return "Your opponent sets their hand aside face down until the end of their next turn.";
     case 'opponentHandShuffleItemsDraw':
       return 'Your opponent shuffles all Item cards from their hand into their deck; you draw that many cards.';
     case 'discardAllTrainerInPlay':
@@ -3559,7 +3720,7 @@ function describeStepBody(step) {
     case 'shuffleDiscardIntoDeck': return "Each player shuffles the cards in their discard pile into their deck.";
     case 'passive': return step.detail || 'Passive effect — stays in play.';
     case 'searchEvolve': return 'Search your deck for a card that evolves from 1 of your Pokémon and evolve it, then shuffle.';
-    case 'prizeBargain': return `Your opponent chooses: each player takes a Prize card, or you draw ${step.drawCount} cards.`;
+    case 'prizeBargain': return `Your opponent chooses: each player takes a Prize card, or you draw ${step.drawCount} card${step.drawCount === 1 ? '' : 's'}.`;
     case 'searchAttachEach': return `Choose up to ${step.count} of your Pokémon; attach a ${step.energy} from your deck to each, then shuffle.`;
     default: return '';
   }

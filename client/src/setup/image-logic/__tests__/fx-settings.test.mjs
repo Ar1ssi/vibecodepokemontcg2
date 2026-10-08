@@ -6,6 +6,8 @@ import {
   SFX_OFF_KEY,
   VOLUME_KEY,
   normalizeVolume,
+  AMBIENCE_OFF_KEY,
+  CROWD_OFF_KEY,
   readSettings,
   writeSetting,
 } from '../fx-settings.mjs';
@@ -35,6 +37,8 @@ test('fx-settings: defaults when nothing is stored', () => {
     fxOff: false,
     sfxOff: false,
     volume: DEFAULT_VOLUME,
+    ambienceOff: false,
+    crowdOff: false,
   });
 });
 
@@ -44,7 +48,19 @@ test('fx-settings: reads each stored flag', () => {
     [SFX_OFF_KEY]: '1',
     [VOLUME_KEY]: '0.25',
   });
-  assert.deepEqual(readSettings(storage), { fxOff: true, sfxOff: true, volume: 0.25 });
+  assert.deepEqual(readSettings(storage), {
+    fxOff: true,
+    sfxOff: true,
+    volume: 0.25,
+    ambienceOff: false,
+    crowdOff: false,
+  });
+});
+
+test('fx-settings: status ambience is on by default and off only for the stored "1"', () => {
+  assert.equal(readSettings(fakeStorage()).ambienceOff, false);
+  assert.equal(readSettings(fakeStorage({ [AMBIENCE_OFF_KEY]: '1' })).ambienceOff, true);
+  assert.equal(readSettings(fakeStorage({ [AMBIENCE_OFF_KEY]: 'yes' })).ambienceOff, false);
 });
 
 test('fx-settings: only the exact "1" string means off', () => {
@@ -53,12 +69,20 @@ test('fx-settings: only the exact "1" string means off', () => {
 });
 
 test('fx-settings: a missing or throwing storage yields defaults, not a throw', () => {
-  assert.deepEqual(readSettings(null), { fxOff: false, sfxOff: false, volume: DEFAULT_VOLUME });
+  assert.deepEqual(readSettings(null), {
+    fxOff: false,
+    sfxOff: false,
+    volume: DEFAULT_VOLUME,
+    ambienceOff: false,
+    crowdOff: false,
+  });
   assert.deepEqual(readSettings(undefined).volume, DEFAULT_VOLUME);
   assert.deepEqual(readSettings(throwingStorage), {
     fxOff: false,
     sfxOff: false,
     volume: DEFAULT_VOLUME,
+    ambienceOff: false,
+    crowdOff: false,
   });
 });
 
@@ -87,7 +111,7 @@ test('fx-settings: writeSetting stores flags as 1/0 and volume as a number', () 
   assert.equal(storage.data[FX_OFF_KEY], '0');
   writeSetting(storage, VOLUME_KEY, 3);
   assert.equal(storage.data[VOLUME_KEY], '1');
-  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, volume: 1 });
+  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: false, volume: 1 });
 });
 
 test('fx-settings: writeSetting reports failure instead of throwing', () => {
@@ -95,4 +119,11 @@ test('fx-settings: writeSetting reports failure instead of throwing', () => {
   assert.equal(writeSetting(null, FX_OFF_KEY, true), false, 'nowhere to write');
   assert.equal(writeSetting(undefined, FX_OFF_KEY, true), false);
   assert.equal(writeSetting({}, FX_OFF_KEY, true), false, 'not a storage at all');
+});
+
+test('fx-settings: the crowd is on by default and off only for the stored "1"', () => {
+  assert.equal(readSettings(fakeStorage()).crowdOff, false);
+  assert.equal(readSettings(fakeStorage({ [CROWD_OFF_KEY]: '1' })).crowdOff, true);
+  assert.equal(readSettings(fakeStorage({ [CROWD_OFF_KEY]: 'yes' })).crowdOff, false);
+  assert.equal(readSettings(throwingStorage).crowdOff, false);
 });

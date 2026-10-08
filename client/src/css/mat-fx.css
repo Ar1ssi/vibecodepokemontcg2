@@ -32,7 +32,14 @@ body.fx-off .fx-overlay.fx-draw {
 .fx-particle,
 .fx-particle--streak,
 .fx-particle--shard,
-.fx-particle--mote {
+.fx-particle--mote,
+.fx-particle--ember,
+.fx-particle--droplet,
+.fx-particle--leaf,
+.fx-particle--glob,
+.fx-particle--feather,
+.fx-particle--flake,
+.fx-particle--twinkle {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -46,7 +53,8 @@ body.fx-off .fx-overlay.fx-draw {
   box-shadow: 0 0 6px 1px var(--fx-p-color, #fff);
 }
 
-.fx-particle--streak {
+.fx-particle--streak,
+.fx-particle--ember {
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 55%, var(--fx-p-color, #fff));
   box-shadow: 0 0 6px var(--fx-p-color, #fff);
@@ -60,6 +68,36 @@ body.fx-off .fx-overlay.fx-draw {
 .fx-particle--mote {
   border-radius: 50%;
   background: radial-gradient(circle, #fff 0 30%, var(--fx-p-color, #fff) 60%, rgba(255, 255, 255, 0) 72%);
+}
+
+/* Design 063: move-scene particle kinds, picked by a spec's `particles[].kind`. */
+.fx-particle--droplet {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff 0 20%, var(--fx-p-color, #fff) 60%, rgba(255, 255, 255, 0) 100%);
+}
+
+.fx-particle--leaf {
+  border-radius: 60% 0 60% 0;
+  filter: drop-shadow(0 0 3px var(--fx-p-color, #fff));
+}
+
+.fx-particle--glob {
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.fx-particle--feather {
+  border-radius: 50% 50% 50% 50% / 80% 80% 20% 20%;
+}
+
+.fx-particle--flake {
+  clip-path: polygon(50% 0, 62% 30%, 94% 25%, 72% 50%, 94% 75%, 62% 70%, 50% 100%, 38% 70%, 6% 75%, 28% 50%, 6% 25%, 38% 30%);
+}
+
+/* A four-point sparkle in the material's colour (fairy); `--star` stays the gold KO star. */
+.fx-particle--twinkle {
+  clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+  background: radial-gradient(circle, #fff 0 14%, var(--fx-p-color, #fff) 40%, rgba(255, 255, 255, 0) 75%);
 }
 
 .fx-damage-pop {
@@ -155,6 +193,33 @@ body.fx-off .fx-overlay.fx-draw {
 .fx-hit__sparks {
   position: absolute;
   inset: 0;
+}
+
+/* Design 063: punch / dash / quake / roar moves add a ring at the strike point. */
+.fx-hit__ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(var(--fx-hit-rgb), 0.9);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Design 063: a zero-damage attack pulses a type-coloured ring off its attacker. */
+.fx-aura-pulse {
+  z-index: 2450;
+  overflow: visible;
+  --fx-aura-rgb: 255, 214, 120;
+}
+
+.fx-aura-pulse__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.35rem;
+  opacity: 0;
+  box-shadow:
+    0 0 12px 3px rgba(var(--fx-aura-rgb), 0.85),
+    inset 0 0 18px 2px rgba(var(--fx-aura-rgb), 0.45);
+  will-change: transform, opacity;
 }
 
 .fx-lunge {
@@ -1004,6 +1069,11 @@ body.fx-off .fx-mega-field {
    ghost copies of the cards carry the motion between the back and front canvas. */
 .fx-move {
   overflow: visible;
+  /* Ice frost, shared by the ice materials and the freeze preset's cold tint. */
+  --fx-ice-core: 236, 249, 255;
+  --fx-ice-hot: 214, 243, 255;
+  --fx-ice-body: 143, 211, 255;
+  --fx-ice-deep: 62, 143, 209;
 }
 
 .fx-move__canvas,
@@ -1033,18 +1103,287 @@ body.fx-off .fx-mega-field {
   object-fit: contain;
 }
 
+.fx-move__ghost--trail {
+  filter: blur(2px) brightness(1.25);
+}
+
+/* The rim and heat layers read the material's colours (fire's are the defaults); a scene's
+   host carries `fx-move--m-<material>` and sets them. */
 .fx-move__rim {
   opacity: 0;
   box-shadow:
-    0 0 10px 2px rgba(241, 175, 13, 0.85),
-    0 0 28px 8px rgba(235, 108, 6, 0.55);
+    0 0 10px 2px rgba(var(--fx-move-hot, 241, 175, 13), 0.85),
+    0 0 28px 8px rgba(var(--fx-move-body, 235, 108, 6), 0.55);
   will-change: opacity;
 }
 
 .fx-move__heat {
   opacity: 0;
   background:
-    radial-gradient(ellipse at 50% 40%, rgba(255, 246, 214, 0.75) 0 18%, rgba(241, 175, 13, 0.6) 48%, rgba(210, 41, 8, 0.35) 100%);
+    radial-gradient(ellipse at 50% 40%, rgba(var(--fx-move-core, 255, 246, 214), 0.75) 0 18%, rgba(var(--fx-move-hot, 241, 175, 13), 0.6) 48%, rgba(var(--fx-move-deep, 210, 41, 8), 0.35) 100%);
   mix-blend-mode: screen;
   will-change: opacity;
+}
+
+.fx-move--m-fire {
+  --fx-move-hot: 241, 175, 13;
+  --fx-move-body: 235, 108, 6;
+  --fx-move-deep: 210, 41, 8;
+  --fx-move-core: 255, 246, 214;
+}
+
+/* Water: a cyan rim and a wet sheen instead of heat (materials/water.js palette). */
+.fx-move--m-water {
+  --fx-move-hot: 185, 232, 255;
+  --fx-move-body: 82, 180, 255;
+  --fx-move-deep: 46, 124, 230;
+  --fx-move-core: 228, 247, 255;
+}
+
+/* Grass: a leaf-green rim and sheen (materials/grass.js); Petal Dance's pink; the solar
+   light override (Energy Ball, Solar Beam). */
+.fx-move--m-grass {
+  --fx-move-hot: 201, 242, 122;
+  --fx-move-body: 126, 217, 87;
+  --fx-move-deep: 63, 163, 77;
+  --fx-move-core: 233, 250, 196;
+}
+
+.fx-move--m-petal {
+  --fx-move-hot: 231, 184, 247;
+  --fx-move-body: 247, 112, 208;
+  --fx-move-deep: 196, 46, 150;
+  --fx-move-core: 255, 236, 250;
+}
+
+.fx-move--m-solar {
+  --fx-move-hot: 255, 248, 176;
+  --fx-move-body: 242, 233, 107;
+  --fx-move-deep: 63, 163, 77;
+  --fx-move-core: 255, 252, 228;
+}
+
+/* Electric (materials/electric.js): a yellow rim whose outer halo is the material's pale-blue
+   edge (the rim's second shadow reads --fx-move-body; the heat sheen does not). The sheen is
+   one step more saturated than the palette's (core = hot, hot = body) so a struck card glows
+   yellow instead of washing out white. */
+.fx-move--m-electric {
+  --fx-move-hot: 247, 210, 30;
+  --fx-move-body: 159, 213, 255;
+  --fx-move-deep: 185, 138, 0;
+  --fx-move-core: 255, 242, 122;
+}
+
+/* Fighting (materials/fighting.js): a warm orange rim and a cream impact sheen on the struck
+   card; `aura` is the blue-white of the ki specials (Vacuum Wave, Aura Sphere, Focus Blast). */
+.fx-move--m-fighting {
+  --fx-move-hot: 242, 166, 107;
+  --fx-move-body: 217, 100, 58;
+  --fx-move-deep: 140, 58, 31;
+  --fx-move-core: 255, 230, 194;
+}
+
+.fx-move--m-aura {
+  --fx-move-hot: 184, 216, 255;
+  --fx-move-body: 127, 183, 255;
+  --fx-move-deep: 47, 95, 184;
+  --fx-move-core: 230, 242, 255;
+}
+
+/* Psychic (materials/psychic.js): a lilac rim and a pale-pink sheen on the struck card, the
+   sprite games' wash of light on a foe held by the wave. */
+.fx-move--m-psychic {
+  --fx-move-hot: 240, 165, 255;
+  --fx-move-body: 200, 92, 219;
+  --fx-move-deep: 91, 30, 122;
+  --fx-move-core: 255, 225, 255;
+}
+
+/* Dark (materials/dark.js): a crimson rim with a slate halo; the struck card is not lit but
+   shadowed: the sheen multiplies a slate-black core out to a crimson edge (screen could only
+   lighten it). */
+.fx-move--m-dark {
+  --fx-move-hot: 255, 61, 110;
+  --fx-move-body: 110, 110, 140;
+  --fx-move-deep: 16, 16, 24;
+  --fx-move-core: 185, 185, 214;
+  --fx-move-shadow: 59, 59, 79;
+}
+
+.fx-move--m-dark .fx-move__heat {
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(var(--fx-move-shadow), 0.8) 0 28%, rgba(var(--fx-move-body), 0.55) 62%, rgba(var(--fx-move-hot), 0.45) 100%);
+  mix-blend-mode: multiply;
+}
+
+/* Steel (materials/steel.js): a bright steel rim whose outer halo is the material's cool blue
+   edge (the rim's second shadow reads --fx-move-body), and a pale steel sheen on the struck card
+   (core = the palette's core, not white, so the card is lit, not washed out). */
+.fx-move--m-steel {
+  --fx-move-hot: 213, 222, 234;
+  --fx-move-body: 159, 197, 240;
+  --fx-move-deep: 74, 85, 99;
+  --fx-move-core: 236, 242, 250;
+}
+
+/* Dragon (materials/dragon.js): a lilac rim with a violet halo and a violet sheen on the struck
+   card; its ember accent stays in the flames and embers (core = the palette's lavender core, so
+   the card is lit violet, not washed orange or white). */
+.fx-move--m-dragon {
+  --fx-move-hot: 143, 124, 245;
+  --fx-move-body: 90, 71, 201;
+  --fx-move-deep: 42, 31, 107;
+  --fx-move-core: 210, 200, 255;
+}
+
+/* Fairy (materials/fairy.js): a pale-pink rim with a pink halo and a pink sheen on the struck
+   card (core = the palette's blush core, so the card is lit pink, not washed white); the gold
+   accent stays in the stars and twinkles. */
+.fx-move--m-fairy {
+  --fx-move-hot: 255, 194, 218;
+  --fx-move-body: 244, 143, 177;
+  --fx-move-deep: 184, 58, 114;
+  --fx-move-core: 255, 240, 247;
+}
+
+/* Ghost (materials/ghost.js): a violet rim with a dusky halo; like dark, the struck card is
+   shadowed, not lit: the sheen multiplies a violet-black core out to a violet edge (the sprite
+   games' foe turning to a purple silhouette under Night Shade and Shadow Ball). */
+.fx-move--m-ghost {
+  --fx-move-hot: 157, 124, 242;
+  --fx-move-body: 107, 79, 168;
+  --fx-move-deep: 30, 18, 56;
+  --fx-move-core: 217, 204, 255;
+}
+
+.fx-move--m-ghost .fx-move__heat {
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(var(--fx-move-deep), 0.85) 0 30%, rgba(var(--fx-move-body), 0.6) 65%, rgba(var(--fx-move-hot), 0.45) 100%);
+  mix-blend-mode: multiply;
+}
+
+/* Poison (materials/poison.js): a lilac rim with a violet halo; the struck card is lit, not
+   shadowed, but in saturated violet rather than a pale wash (the sprite games' foe turning
+   purple when poisoned): the sheen screens lilac at the centre out to deep violet. */
+.fx-move--m-poison {
+  --fx-move-hot: 199, 125, 255;
+  --fx-move-body: 155, 77, 202;
+  --fx-move-deep: 75, 30, 107;
+  --fx-move-core: 240, 214, 255;
+}
+
+.fx-move--m-poison .fx-move__heat {
+  background:
+    radial-gradient(ellipse at 50% 55%, rgba(var(--fx-move-hot), 0.7) 0 24%, rgba(var(--fx-move-body), 0.6) 60%, rgba(var(--fx-move-deep), 0.45) 100%);
+}
+
+/* Ground (materials/ground.js): a sand rim with an umber halo and a dusty tan sheen on the
+   struck card (core = the palette's pale sand, so the card is lit by dust, not washed white). */
+.fx-move--m-ground {
+  --fx-move-hot: 217, 160, 102;
+  --fx-move-body: 181, 121, 60;
+  --fx-move-deep: 92, 58, 23;
+  --fx-move-core: 240, 217, 181;
+}
+
+/* Mud (materials/ground.js, the wet twin): the struck card is spattered, not lit: the sheen
+   multiplies a mud-brown centre out to a tan edge (screen could only lighten it). */
+.fx-move--m-mud {
+  --fx-move-hot: 181, 121, 60;
+  --fx-move-body: 138, 96, 52;
+  --fx-move-deep: 72, 46, 20;
+  --fx-move-core: 217, 160, 102;
+}
+
+.fx-move--m-mud .fx-move__heat {
+  background:
+    radial-gradient(ellipse at 50% 60%, rgba(var(--fx-move-body), 0.75) 0 26%, rgba(var(--fx-move-hot), 0.55) 62%, rgba(var(--fx-move-core), 0.35) 100%);
+  mix-blend-mode: multiply;
+}
+
+/* Rock (materials/rock.js): a pale stone rim with a slate halo and a stone-dust sheen on the
+   struck card (core = the palette's pale core, so the card is dusted, not washed white). */
+.fx-move--m-rock {
+  --fx-move-hot: 184, 190, 201;
+  --fx-move-body: 138, 143, 153;
+  --fx-move-deep: 62, 67, 76;
+  --fx-move-core: 232, 236, 242;
+}
+
+/* Ancient (Ancient Power's stones in their aura): a violet rim with a slate halo; the struck
+   card glows violet at its centre out to stone grey. */
+.fx-move--m-ancient {
+  --fx-move-hot: 196, 112, 232;
+  --fx-move-body: 138, 143, 153;
+  --fx-move-deep: 62, 67, 76;
+  --fx-move-core: 240, 214, 255;
+}
+
+/* Gem (Power Gem's crystals of light): a lilac-white rim with a lilac halo and a crystal
+   sheen on the struck card (core = the palette's near-white, not pure white). */
+.fx-move--m-gem {
+  --fx-move-hot: 226, 224, 255;
+  --fx-move-body: 186, 180, 240;
+  --fx-move-deep: 110, 100, 170;
+  --fx-move-core: 248, 247, 255;
+}
+
+/* Flying (materials/flying.js): a white rim with a sky-blue halo; the struck card takes a cool
+   sky wash, not a white one: the sheen screens the palette's pale blue at the centre out to the
+   deep sky blue (the default sheen's white-hot middle would wash the card out). */
+.fx-move--m-flying {
+  --fx-move-hot: 234, 243, 255;
+  --fx-move-body: 143, 179, 217;
+  --fx-move-deep: 143, 179, 217;
+  --fx-move-core: 207, 227, 247;
+}
+
+.fx-move--m-flying .fx-move__heat,
+.fx-move--m-silver .fx-move__heat {
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(var(--fx-move-core), 0.6) 0 22%, rgba(var(--fx-move-body), 0.5) 60%, rgba(var(--fx-move-deep), 0.3) 100%);
+}
+
+/* Ice (materials/ice.js): a white rim with an ice-blue halo. The struck card is frosted, not
+   heated, whether it is knocked (physical) or frozen (special): the sheen screens a pale frost
+   centre out to the deep ice blue. `--fx-ice-*` also serve the freeze preset's cold tint under
+   any other material. Aurora (Aurora Beam) shares the frost; its rim halo is the aurora lilac. */
+.fx-move--m-ice {
+  --fx-move-hot: var(--fx-ice-hot);
+  --fx-move-body: var(--fx-ice-body);
+  --fx-move-deep: var(--fx-ice-deep);
+  --fx-move-core: var(--fx-ice-core);
+}
+
+.fx-move--m-aurora {
+  --fx-move-hot: var(--fx-ice-hot);
+  --fx-move-body: 200, 180, 255;
+  --fx-move-deep: var(--fx-ice-deep);
+  --fx-move-core: var(--fx-ice-core);
+}
+
+.fx-move__heat--cold,
+.fx-move--m-ice .fx-move__heat,
+.fx-move--m-aurora .fx-move__heat {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(var(--fx-ice-core), 0.75) 0 18%, rgba(var(--fx-ice-body), 0.6) 48%, rgba(var(--fx-ice-deep), 0.35) 100%);
+}
+
+/* Bug (materials/bug.js): a yellow-green rim with a leaf-green halo and a chartreuse sheen on the
+   struck card (core = the palette's pale lime, so the card is lit green, not washed white). Buzz
+   (Bug Buzz's sound discs) is the same palette. Silver (Silver Wind's powder) takes flying's cool
+   wash in silver: a white rim with a slate halo. */
+.fx-move--m-bug,
+.fx-move--m-buzz {
+  --fx-move-hot: 191, 227, 77;
+  --fx-move-body: 140, 191, 38;
+  --fx-move-deep: 74, 107, 16;
+  --fx-move-core: 240, 247, 176;
+}
+
+.fx-move--m-silver {
+  --fx-move-hot: 232, 238, 242;
+  --fx-move-body: 124, 138, 150;
+  --fx-move-deep: 124, 138, 150;
+  --fx-move-core: 200, 210, 218;
 }

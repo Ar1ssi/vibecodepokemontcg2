@@ -76,8 +76,8 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
 - Models: judgment work inherits Opus 5.5 · grunt work → `sonnet`/`haiku` · `fable` only on request.
   Agents: `caveman:cavecrew-investigator` (search), `-builder` (1–2 files), `-reviewer` (diffs).
 - Effort (Opus 5.5 default `medium`): `high` for design/planning, debugging, review, and rules
-  interpretation (`xhigh` for schema/netcode/engine designs) · `medium` for patch work · `low` only
-  for a pinned slice (TEMPLATE Work-plan row) → `slice-builder` agent. Visual work → `fx-designer`
+  interpretation (`xhigh` for schema/netcode/engine designs) · `medium` for patch work · a pinned
+  slice (TEMPLATE Work-plan row) → `slice-builder` agent (Sonnet 5.5, `medium`). Visual work → `fx-designer`
   agent (`high`). A session can't change its own effort; the user sets it with `/effort` (`s` = this session only).
 - Subagents never write harness state. Their "done" is a claim: rerun the tests, read the diff.
 

@@ -1,0 +1,912 @@
+{
+  "version": 1,
+  "cues": {
+    "active-colorless": {
+      "files": [
+        "active-colorless.14f80390.ogg"
+      ],
+      "dur": 2.506,
+      "channels": 2,
+      "lufs": -19.6
+    },
+    "active-dark": {
+      "files": [
+        "active-dark.0a38551f.ogg"
+      ],
+      "dur": 3.094,
+      "channels": 2,
+      "lufs": -19.1
+    },
+    "active-dragon": {
+      "files": [
+        "active-dragon.71b54306.ogg"
+      ],
+      "dur": 4.672,
+      "channels": 2,
+      "lufs": -17.7
+    },
+    "active-electric": {
+      "files": [
+        "active-electric.47626982.ogg"
+      ],
+      "dur": 3.606,
+      "channels": 2,
+      "lufs": -18.8
+    },
+    "active-fairy": {
+      "files": [
+        "active-fairy.6454b8da.ogg"
+      ],
+      "dur": 4.667,
+      "channels": 2,
+      "lufs": -19.2
+    },
+    "active-fighting": {
+      "files": [
+        "active-fighting.648cc9ba.ogg"
+      ],
+      "dur": 3.216,
+      "channels": 2,
+      "lufs": -15.2
+    },
+    "active-fire": {
+      "files": [
+        "active-fire.cd67baa1.ogg"
+      ],
+      "dur": 3.396,
+      "channels": 2,
+      "lufs": -14.8
+    },
+    "active-grass": {
+      "files": [
+        "active-grass.9decf1df.ogg"
+      ],
+      "dur": 3.914,
+      "channels": 2,
+      "lufs": -19.5
+    },
+    "active-metal": {
+      "files": [
+        "active-metal.457e4136.ogg"
+      ],
+      "dur": 3.431,
+      "channels": 2,
+      "lufs": -10.7
+    },
+    "active-psychic": {
+      "files": [
+        "active-psychic.ad51f951.ogg"
+      ],
+      "dur": 3.467,
+      "channels": 2,
+      "lufs": -19.8
+    },
+    "active-water": {
+      "files": [
+        "active-water.41fe64b1.ogg"
+      ],
+      "dur": 3.167,
+      "channels": 2,
+      "lufs": -18.2
+    },
+    "additional-reactions": {
+      "files": [
+        "additional-reactions-1.c9978f3c.ogg",
+        "additional-reactions-2.a481320c.ogg",
+        "additional-reactions-3.ea0a71b9.ogg",
+        "additional-reactions-4.784c5155.ogg",
+        "additional-reactions-5.4601fa3f.ogg",
+        "additional-reactions-6.f73de97b.ogg",
+        "additional-reactions-7.9ad4d7a9.ogg",
+        "additional-reactions-8.d3b7f574.ogg",
+        "additional-reactions-9.a4efc72c.ogg",
+        "additional-reactions-10.6b291726.ogg",
+        "additional-reactions-11.2b0818da.ogg"
+      ],
+      "dur": 8.25,
+      "channels": 2,
+      "lufs": -14.2
+    },
+    "attach-energy": {
+      "files": [
+        "attach-energy.01a96984.ogg"
+      ],
+      "dur": 1.38,
+      "channels": 1,
+      "lufs": -22.2
+    },
+    "attach-energy-opp": {
+      "files": [
+        "attach-energy-opp.4714840d.ogg"
+      ],
+      "dur": 1.38,
+      "channels": 1,
+      "lufs": -22.3
+    },
+    "attack-button": {
+      "files": [
+        "attack-button.977dee8f.ogg"
+      ],
+      "dur": 0.316,
+      "channels": 1,
+      "lufs": -70
+    },
+    "big-card-in": {
+      "files": [
+        "big-card-in.6406dc43.ogg"
+      ],
+      "dur": 1.585,
+      "channels": 2,
+      "lufs": -20.3
+    },
+    "big-card-out": {
+      "files": [
+        "big-card-out.243fae90.ogg"
+      ],
+      "dur": 0.8,
+      "channels": 2,
+      "lufs": -19
+    },
+    "burn-intro": {
+      "files": [
+        "burn-intro.d014c894.ogg"
+      ],
+      "dur": 0.987,
+      "channels": 2,
+      "lufs": -15.9
+    },
+    "burn-loop": {
+      "files": [
+        "burn-loop.18c69110.ogg"
+      ],
+      "dur": 3.308,
+      "channels": 2,
+      "lufs": -14
+    },
+    "burn-outro": {
+      "files": [
+        "burn-outro.9e741e11.ogg"
+      ],
+      "dur": 1.406,
+      "channels": 2,
+      "lufs": -14.1
+    },
+    "button-click": {
+      "files": [
+        "button-click.f1a94cd1.ogg"
+      ],
+      "dur": 0.125,
+      "channels": 2,
+      "lufs": -70
+    },
+    "card-drawn": {
+      "files": [
+        "card-drawn.49ab96f0.ogg"
+      ],
+      "dur": 0.21,
+      "channels": 1,
+      "lufs": -70
+    },
+    "card-flip": {
+      "files": [
+        "card-flip.ab952195.ogg"
+      ],
+      "dur": 0.463,
+      "channels": 2,
+      "lufs": -17.7
+    },
+    "card-from-hand": {
+      "files": [
+        "card-from-hand.f6ffa860.ogg"
+      ],
+      "dur": 0.189,
+      "channels": 2,
+      "lufs": -70
+    },
+    "card-no-match": {
+      "files": [
+        "card-no-match.9c7cec12.ogg"
+      ],
+      "dur": 2.013,
+      "channels": 2,
+      "lufs": -11.1
+    },
+    "card-place": {
+      "files": [
+        "card-place-1.3bcdb804.ogg",
+        "card-place-2.3bd846dc.ogg"
+      ],
+      "dur": 0.183,
+      "channels": 2,
+      "lufs": -70
+    },
+    "card-reveal": {
+      "files": [
+        "card-reveal.fe055ccf.ogg"
+      ],
+      "dur": 1.428,
+      "channels": 1,
+      "lufs": -30.9
+    },
+    "card-slot-drop": {
+      "files": [
+        "card-slot-drop.2880a9cc.ogg"
+      ],
+      "dur": 0.625,
+      "channels": 2,
+      "lufs": -27.3
+    },
+    "card-swoosh": {
+      "files": [
+        "card-swoosh.fe6fdbc8.ogg"
+      ],
+      "dur": 0.421,
+      "channels": 1,
+      "lufs": -31.2
+    },
+    "card-to-board": {
+      "files": [
+        "card-to-board.12cf7fb0.ogg"
+      ],
+      "dur": 0.173,
+      "channels": 1,
+      "lufs": -70
+    },
+    "card-view": {
+      "files": [
+        "card-view.fa48e3a6.ogg"
+      ],
+      "dur": 0.515,
+      "channels": 1,
+      "lufs": -31.8
+    },
+    "cards-to-prizes": {
+      "files": [
+        "cards-to-prizes-1.36ffb5d1.ogg",
+        "cards-to-prizes-2.aa3d9e37.ogg"
+      ],
+      "dur": 1.056,
+      "channels": 2,
+      "lufs": -29
+    },
+    "cheer-disappoint": {
+      "files": [
+        "cheer-disappoint-1.772f90ba.ogg",
+        "cheer-disappoint-2.10b562af.ogg",
+        "cheer-disappoint-3.615f3eaa.ogg",
+        "cheer-disappoint-4.fcabcc56.ogg",
+        "cheer-disappoint-5.1795206d.ogg",
+        "cheer-disappoint-6.c0a23516.ogg",
+        "cheer-disappoint-7.b4d9deb1.ogg",
+        "cheer-disappoint-8.066d5720.ogg"
+      ],
+      "dur": 6.977,
+      "channels": 2,
+      "lufs": -14
+    },
+    "cheer-large": {
+      "files": [
+        "cheer-large-1.62ef242a.ogg",
+        "cheer-large-2.821c20aa.ogg",
+        "cheer-large-3.04583ddc.ogg",
+        "cheer-large-4.0d8fb472.ogg",
+        "cheer-large-5.daef17f8.ogg",
+        "cheer-large-6.13c7b132.ogg"
+      ],
+      "dur": 9.208,
+      "channels": 2,
+      "lufs": -14.1
+    },
+    "cheer-medium": {
+      "files": [
+        "cheer-medium-1.c1fcfed5.ogg",
+        "cheer-medium-2.2877e5df.ogg",
+        "cheer-medium-3.23d9f1a5.ogg",
+        "cheer-medium-4.2ee0cecf.ogg",
+        "cheer-medium-5.193f6a23.ogg",
+        "cheer-medium-6.252d574f.ogg"
+      ],
+      "dur": 5.579,
+      "channels": 2,
+      "lufs": -14.1
+    },
+    "cheer-small": {
+      "files": [
+        "cheer-small-1.18ad3bf0.ogg",
+        "cheer-small-2.c81f9164.ogg",
+        "cheer-small-3.fdb9eea3.ogg",
+        "cheer-small-4.052f6033.ogg",
+        "cheer-small-5.7c57ae8a.ogg",
+        "cheer-small-6.ccc6a047.ogg",
+        "cheer-small-7.aeef8790.ogg"
+      ],
+      "dur": 5.685,
+      "channels": 2,
+      "lufs": -14.2
+    },
+    "choose-first-second": {
+      "files": [
+        "choose-first-second.54250759.ogg"
+      ],
+      "dur": 0.235,
+      "channels": 1,
+      "lufs": -70
+    },
+    "coin-appear": {
+      "files": [
+        "coin-appear.61c4e4c1.ogg"
+      ],
+      "dur": 0.581,
+      "channels": 2,
+      "lufs": -26.3
+    },
+    "coin-loss": {
+      "files": [
+        "coin-loss.9334488d.ogg"
+      ],
+      "dur": 0.741,
+      "channels": 1,
+      "lufs": -22.9
+    },
+    "coin-spin-metal": {
+      "files": [
+        "coin-spin-metal.c17038df.ogg"
+      ],
+      "dur": 0.616,
+      "channels": 2,
+      "lufs": -22.1
+    },
+    "coin-spin-plastic": {
+      "files": [
+        "coin-spin-plastic.98549c7e.ogg"
+      ],
+      "dur": 0.667,
+      "channels": 2,
+      "lufs": -20.4
+    },
+    "coin-toss-metal": {
+      "files": [
+        "coin-toss-metal.09558e26.ogg"
+      ],
+      "dur": 1.38,
+      "channels": 2,
+      "lufs": -19.2
+    },
+    "coin-toss-plastic": {
+      "files": [
+        "coin-toss-plastic.e31df458.ogg"
+      ],
+      "dur": 1.14,
+      "channels": 2,
+      "lufs": -20.8
+    },
+    "coin-win": {
+      "files": [
+        "coin-win.75d29d04.ogg"
+      ],
+      "dur": 1.707,
+      "channels": 1,
+      "lufs": -21.1
+    },
+    "confusion-intro": {
+      "files": [
+        "confusion-intro.b12063bf.ogg"
+      ],
+      "dur": 1.12,
+      "channels": 2,
+      "lufs": -13.8
+    },
+    "confusion-loop": {
+      "files": [
+        "confusion-loop.4051597e.ogg"
+      ],
+      "dur": 3,
+      "channels": 2,
+      "lufs": -13.5
+    },
+    "confusion-outro": {
+      "files": [
+        "confusion-outro.b20965b6.ogg"
+      ],
+      "dur": 1.077,
+      "channels": 2,
+      "lufs": -12.8
+    },
+    "crowd-amb-large": {
+      "files": [
+        "crowd-amb-large.40982663.ogg"
+      ],
+      "dur": 45.74,
+      "channels": 2,
+      "lufs": -12
+    },
+    "crowd-amb-small": {
+      "files": [
+        "crowd-amb-small.81772ebe.ogg"
+      ],
+      "dur": 56.941,
+      "channels": 2,
+      "lufs": -24.7
+    },
+    "crowd-crazy": {
+      "files": [
+        "crowd-crazy.53b2c9be.ogg"
+      ],
+      "dur": 16.599,
+      "channels": 2,
+      "lufs": -14.1
+    },
+    "darkrai-ex-entrance": {
+      "files": [
+        "darkrai-ex-entrance.7142b0f1.ogg"
+      ],
+      "dur": 4.469,
+      "channels": 2,
+      "lufs": -11.6
+    },
+    "deck-to-hand": {
+      "files": [
+        "deck-to-hand.862ae71a.ogg"
+      ],
+      "dur": 0.418,
+      "channels": 2,
+      "lufs": -27
+    },
+    "defeat": {
+      "files": [
+        "defeat.6be40935.ogg"
+      ],
+      "dur": 3.71,
+      "channels": 1,
+      "lufs": -22.2
+    },
+    "discard-deposit": {
+      "files": [
+        "discard-deposit.33b1def6.ogg"
+      ],
+      "dur": 4.4,
+      "channels": 2,
+      "lufs": -30.5
+    },
+    "discard-finished": {
+      "files": [
+        "discard-finished.89bcf104.ogg"
+      ],
+      "dur": 0.833,
+      "channels": 2,
+      "lufs": -21.7
+    },
+    "discard-whoosh": {
+      "files": [
+        "discard-whoosh.6d2a0ca2.ogg"
+      ],
+      "dur": 1,
+      "channels": 2,
+      "lufs": -16.6
+    },
+    "doom-curse-1": {
+      "files": [
+        "doom-curse-1.09219439.ogg"
+      ],
+      "dur": 3.816,
+      "channels": 2,
+      "lufs": -20
+    },
+    "doom-curse-2": {
+      "files": [
+        "doom-curse-2.4a220604.ogg"
+      ],
+      "dur": 5.052,
+      "channels": 2,
+      "lufs": -20.1
+    },
+    "end-turn": {
+      "files": [
+        "end-turn.1c00467f.ogg"
+      ],
+      "dur": 0.9,
+      "channels": 2,
+      "lufs": -22.3
+    },
+    "evolve-card": {
+      "files": [
+        "evolve-card.7e88839e.ogg"
+      ],
+      "dur": 5.135,
+      "channels": 1,
+      "lufs": -22.5
+    },
+    "heal-card": {
+      "files": [
+        "heal-card.9e12972d.ogg"
+      ],
+      "dur": 1.833,
+      "channels": 2,
+      "lufs": -21.6
+    },
+    "instant-ko-activate": {
+      "files": [
+        "instant-ko-activate.161aa427.ogg"
+      ],
+      "dur": 1.593,
+      "channels": 2,
+      "lufs": -11.6
+    },
+    "instant-ko-impact": {
+      "files": [
+        "instant-ko-impact.b584eae6.ogg"
+      ],
+      "dur": 1.749,
+      "channels": 2,
+      "lufs": -11
+    },
+    "itchy-pollen-activate": {
+      "files": [
+        "itchy-pollen-activate.7606f163.ogg"
+      ],
+      "dur": 4.799,
+      "channels": 2,
+      "lufs": -22.6
+    },
+    "itchy-pollen-hand": {
+      "files": [
+        "itchy-pollen-hand.503711a9.ogg"
+      ],
+      "dur": 5.507,
+      "channels": 2,
+      "lufs": -29.6
+    },
+    "itchy-pollen-hand-card": {
+      "files": [
+        "itchy-pollen-hand-card.878c9f7c.ogg"
+      ],
+      "dur": 6.307,
+      "channels": 2,
+      "lufs": -23.6
+    },
+    "knocked-out": {
+      "files": [
+        "knocked-out.41370d58.ogg"
+      ],
+      "dur": 2.881,
+      "channels": 1,
+      "lufs": -18.5
+    },
+    "menu-pop-in": {
+      "files": [
+        "menu-pop-in.5289dad4.ogg"
+      ],
+      "dur": 2.656,
+      "channels": 2,
+      "lufs": -28.4
+    },
+    "opp-card-played": {
+      "files": [
+        "opp-card-played-1.ff581f3e.ogg",
+        "opp-card-played-2.16953a9b.ogg"
+      ],
+      "dur": 3.551,
+      "channels": 2,
+      "lufs": -11.1
+    },
+    "opp-deck-to-hand": {
+      "files": [
+        "opp-deck-to-hand.9385f44d.ogg"
+      ],
+      "dur": 1.825,
+      "channels": 2,
+      "lufs": -26.9
+    },
+    "opp-pending-discard": {
+      "files": [
+        "opp-pending-discard.a2248889.ogg"
+      ],
+      "dur": 2.013,
+      "channels": 2,
+      "lufs": -13.9
+    },
+    "opp-place-active": {
+      "files": [
+        "opp-place-active.ed6fa8b6.ogg"
+      ],
+      "dur": 1.432,
+      "channels": 2,
+      "lufs": -18.9
+    },
+    "opp-turn": {
+      "files": [
+        "opp-turn.c779c910.ogg"
+      ],
+      "dur": 1.572,
+      "channels": 1,
+      "lufs": -28.9
+    },
+    "paralyze-intro": {
+      "files": [
+        "paralyze-intro.6bcfe50c.ogg"
+      ],
+      "dur": 1.16,
+      "channels": 2,
+      "lufs": -11.7
+    },
+    "paralyze-loop": {
+      "files": [
+        "paralyze-loop.2d8ac248.ogg"
+      ],
+      "dur": 3.169,
+      "channels": 2,
+      "lufs": -10.9
+    },
+    "paralyze-outro": {
+      "files": [
+        "paralyze-outro.6b14ac10.ogg"
+      ],
+      "dur": 0.888,
+      "channels": 2,
+      "lufs": -13.4
+    },
+    "pikachu-enter": {
+      "files": [
+        "pikachu-enter.e2caffdf.ogg"
+      ],
+      "dur": 3.655,
+      "channels": 2,
+      "lufs": -11.1
+    },
+    "pile-search": {
+      "files": [
+        "pile-search.f2ead8d2.ogg"
+      ],
+      "dur": 0.296,
+      "channels": 1,
+      "lufs": -70
+    },
+    "place-active": {
+      "files": [
+        "place-active.54799019.ogg"
+      ],
+      "dur": 0.694,
+      "channels": 1,
+      "lufs": -27.1
+    },
+    "place-active-opening": {
+      "files": [
+        "place-active-opening.90e13312.ogg"
+      ],
+      "dur": 1.655,
+      "channels": 2,
+      "lufs": -19.7
+    },
+    "place-bench": {
+      "files": [
+        "place-bench-1.1eda05d5.ogg",
+        "place-bench-2.589477f2.ogg"
+      ],
+      "dur": 0.367,
+      "channels": 2,
+      "lufs": -70
+    },
+    "poison-intro": {
+      "files": [
+        "poison-intro.ebb16b52.ogg"
+      ],
+      "dur": 0.96,
+      "channels": 2,
+      "lufs": -16.2
+    },
+    "poison-loop": {
+      "files": [
+        "poison-loop.2822220a.ogg"
+      ],
+      "dur": 2.83,
+      "channels": 2,
+      "lufs": -13.7
+    },
+    "poison-outro": {
+      "files": [
+        "poison-outro.f973477a.ogg"
+      ],
+      "dur": 0.859,
+      "channels": 2,
+      "lufs": -16
+    },
+    "prize-card": {
+      "files": [
+        "prize-card.a7126a05.ogg"
+      ],
+      "dur": 1.072,
+      "channels": 1,
+      "lufs": -24.8
+    },
+    "retreat-lock-flare": {
+      "files": [
+        "retreat-lock-flare.099258c8.ogg"
+      ],
+      "dur": 1.057,
+      "channels": 2,
+      "lufs": -39.9
+    },
+    "retreat-lock-intro": {
+      "files": [
+        "retreat-lock-intro.d09cd979.ogg"
+      ],
+      "dur": 1.638,
+      "channels": 2,
+      "lufs": -27.4
+    },
+    "rival-ko-ding": {
+      "files": [
+        "rival-ko-ding.1863d859.ogg"
+      ],
+      "dur": 1.493,
+      "channels": 2,
+      "lufs": -20.2
+    },
+    "rival-ko-whistle": {
+      "files": [
+        "rival-ko-whistle.962400d3.ogg"
+      ],
+      "dur": 1.01,
+      "channels": 2,
+      "lufs": -20.6
+    },
+    "search-to-hand": {
+      "files": [
+        "search-to-hand.2a1b5dec.ogg"
+      ],
+      "dur": 2.773,
+      "channels": 2,
+      "lufs": -13.5
+    },
+    "setup-phase": {
+      "files": [
+        "setup-phase.84a1637c.ogg"
+      ],
+      "dur": 3.791,
+      "channels": 2,
+      "lufs": -19.3
+    },
+    "shuffle": {
+      "files": [
+        "shuffle-1.d03a6874.ogg",
+        "shuffle-2.52807c5d.ogg"
+      ],
+      "dur": 0.731,
+      "channels": 2,
+      "lufs": -29.6
+    },
+    "shuffle-deck": {
+      "files": [
+        "shuffle-deck.3644c074.ogg"
+      ],
+      "dur": 0.902,
+      "channels": 1,
+      "lufs": -22.1
+    },
+    "sleep-intro": {
+      "files": [
+        "sleep-intro.9ba397c9.ogg"
+      ],
+      "dur": 2.293,
+      "channels": 2,
+      "lufs": -14.7
+    },
+    "sleep-loop": {
+      "files": [
+        "sleep-loop.87de9d9a.ogg"
+      ],
+      "dur": 3,
+      "channels": 2,
+      "lufs": -11
+    },
+    "sleep-outro": {
+      "files": [
+        "sleep-outro.e4ed4ba4.ogg"
+      ],
+      "dur": 1.457,
+      "channels": 2,
+      "lufs": -11.2
+    },
+    "small-reactions": {
+      "files": [
+        "small-reactions-2.0ed570bf.ogg",
+        "small-reactions-4.d8dcfb54.ogg",
+        "small-reactions-5.c6db6d87.ogg",
+        "small-reactions-6.4bedc1de.ogg",
+        "small-reactions-7.b67e29c2.ogg",
+        "small-reactions-8.67e2d8d7.ogg",
+        "small-reactions-9.dc50c41c.ogg"
+      ],
+      "dur": 5.493,
+      "channels": 2,
+      "lufs": -14.1
+    },
+    "surprise": {
+      "files": [
+        "surprise-1.644fe9a7.ogg",
+        "surprise-2.6137fbce.ogg",
+        "surprise-3.2ed96026.ogg",
+        "surprise-4.87e21941.ogg",
+        "surprise-5.f049a1ce.ogg",
+        "surprise-6.603a1452.ogg",
+        "surprise-7.1bed6e96.ogg",
+        "surprise-8.9ed1b54e.ogg",
+        "surprise-9.6f9c8fb9.ogg",
+        "surprise-10.49e28f9f.ogg",
+        "surprise-11.a22865b6.ogg"
+      ],
+      "dur": 5.245,
+      "channels": 2,
+      "lufs": -14.8
+    },
+    "to-large": {
+      "files": [
+        "to-large-1.c220c182.ogg",
+        "to-large-2.0d1fdb5f.ogg",
+        "to-large-3.64b3a858.ogg",
+        "to-large-4.03ea1dbd.ogg"
+      ],
+      "dur": 7.899,
+      "channels": 2,
+      "lufs": -10.4
+    },
+    "to-medium": {
+      "files": [
+        "to-medium-3.7ea3253f.ogg",
+        "to-medium-4.76ecc703.ogg"
+      ],
+      "dur": 5.475,
+      "channels": 2,
+      "lufs": -12.6
+    },
+    "to-moderate": {
+      "files": [
+        "to-moderate-1.b1e338e0.ogg",
+        "to-moderate-2.82fa968c.ogg"
+      ],
+      "dur": 5,
+      "channels": 2,
+      "lufs": -13.3
+    },
+    "tool-attach": {
+      "files": [
+        "tool-attach.d1a51342.ogg"
+      ],
+      "dur": 1.701,
+      "channels": 2,
+      "lufs": -15
+    },
+    "trainer-to-board": {
+      "files": [
+        "trainer-to-board.7e4c4aeb.ogg"
+      ],
+      "dur": 1.419,
+      "channels": 2,
+      "lufs": -9.6
+    },
+    "v-union": {
+      "files": [
+        "v-union.9a403bd1.ogg"
+      ],
+      "dur": 3.953,
+      "channels": 2,
+      "lufs": -10
+    },
+    "victory": {
+      "files": [
+        "victory.16b6b6a4.ogg"
+      ],
+      "dur": 3.365,
+      "channels": 1,
+      "lufs": -23.4
+    },
+    "your-turn": {
+      "files": [
+        "your-turn.86e738be.ogg"
+      ],
+      "dur": 1.131,
+      "channels": 1,
+      "lufs": -20.2
+    }
+  }
+}

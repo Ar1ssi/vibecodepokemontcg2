@@ -4,7 +4,7 @@
  */
 
 import { findCard } from '../state.mjs';
-import { parseAbility } from '../rules/abilities.mjs';
+import { parseAbility, rewriteLegacyPowerWording } from '../rules/abilities.mjs';
 import { planAbilitySteps } from '../rules/ability-step-plan.mjs';
 import { parseAbilityEffectSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { executeSteps, isExecutableStepType } from './executor.mjs';
@@ -185,13 +185,22 @@ export function isRepeatableAbility(text) {
   return REPEATABLE_ABILITY.test(String(text || '').trim().toLowerCase());
 }
 
+// A WotC Power read in its modern wording (legacy-power-wording.mjs) so the effect templates see
+// the same text the parser does (Feraligatr Berserk → Rowdy). Other texts pass through untouched.
+function modernPowerText(text) {
+  const lowered = String(text || '').toLowerCase().replace(/[\u2018\u2019]/g, "'");
+  const rewritten = rewriteLegacyPowerWording(lowered);
+  return rewritten === lowered ? text : rewritten;
+}
+
 /**
  * The steps an activated ability runs: the parser's actionable (non-passive) steps, or the
  * shared effect templates when the parser reads none or leaves one without an executor (I89)
  * or reads the effect as passive only (I95). `source` is 'parser' | 'template'; `holderZone`
  * is the template's position clause. Pure — the ability-behaviour audit reads the same plan.
  */
-export function resolveAbilitySteps(text, { selfName } = {}) {
+export function resolveAbilitySteps(rawText, { selfName } = {}) {
+  const text = modernPowerText(rawText);
   const parsedSteps = parseAbility(text);
   const steps = Array.isArray(parsedSteps) ? parsedSteps : (parsedSteps?.steps || []);
   const actionable = planAbilitySteps(steps, { mode: 'interactive' })

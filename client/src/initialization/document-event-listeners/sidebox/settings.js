@@ -16,6 +16,8 @@ import {
   applyFxSettings,
   setFxOff,
   setFxVolume,
+  setAmbienceOff,
+  setCrowdOff,
   setSfxOff,
 } from '../../../setup/image-logic/fx-settings.js';
 
@@ -69,6 +71,24 @@ export const initializeSettings = () => {
     sfxOffCheckbox.checked = fx.sfxOff;
     sfxOffCheckbox.addEventListener('change', () => {
       setSfxOff(sfxOffCheckbox.checked);
+    });
+  }
+
+  const statusAmbienceCheckbox = document.getElementById(
+    'statusAmbienceCheckbox'
+  );
+  if (statusAmbienceCheckbox) {
+    statusAmbienceCheckbox.checked = !fx.ambienceOff;
+    statusAmbienceCheckbox.addEventListener('change', () => {
+      setAmbienceOff(!statusAmbienceCheckbox.checked);
+    });
+  }
+
+  const crowdCheckbox = document.getElementById('crowdCheckbox');
+  if (crowdCheckbox) {
+    crowdCheckbox.checked = !fx.crowdOff;
+    crowdCheckbox.addEventListener('change', () => {
+      setCrowdOff(!crowdCheckbox.checked);
     });
   }
 

@@ -74,6 +74,8 @@ const NEW_STEP_TYPES = [
   'toolOrStadiumToLostZone',
   'sendEnergyToLostZone',
   'opponentDiscardToLostZonePerPokemon',
+  // I232: WotC Super Potion / Super Energy Removal own-Energy cost (TCGdex base1-90, base1-79).
+  'discardOwnAttachedEnergy',
 ];
 
 for (const type of NEW_STEP_TYPES) {
@@ -95,3 +97,6 @@ test('client executor switch contains no duplicate step-type case', () => {
   }
   assert.deepEqual(dupes, []);
 });
+
+// healAmount target 'costHost' (WotC Super Potion) is tested by behaviour in
+// trainer-execution-cost-host.test.mjs.

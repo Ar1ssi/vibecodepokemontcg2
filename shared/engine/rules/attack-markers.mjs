@@ -30,10 +30,12 @@ export function clearAttackMarkers(card) {
 /**
  * Markers still in force on an Active Pokémon. The caller checks the card is Active.
  * @param {object} card In-play root card
- * @param {{ turnNumber: number, zoneCards?: object[] }} options `zoneCards` holds the stack
+ * @param {{ turnNumber: number, zoneCards?: object[], sourceZoneCards?: object[] }} options
+ *   `zoneCards` holds the stack; `sourceZoneCards` is the other player's Active Spot, which a
+ *   presence-scoped marker (`sourceId`) needs its source in
  * @returns {object[]}
  */
-export function liveAttackMarkers(card, { turnNumber, zoneCards = [] } = {}) {
+export function liveAttackMarkers(card, { turnNumber, zoneCards = [], sourceZoneCards = [] } = {}) {
   const markers = card?.attackMarkers;
   if (!Array.isArray(markers) || markers.length === 0) return [];
   const topId = topPokemonCard(zoneCards, card)?.instanceId;
@@ -41,8 +43,21 @@ export function liveAttackMarkers(card, { turnNumber, zoneCards = [] } = {}) {
     (marker) =>
       marker.untilTurn >= turnNumber &&
       (marker.fromTurn == null || marker.fromTurn <= turnNumber) &&
-      (marker.topId == null || marker.topId === topId)
+      (marker.topId == null || marker.topId === topId) &&
+      sourceStillActive(marker, sourceZoneCards)
   );
+}
+
+/**
+ * Leer "can't attack Cyndaquil … (Benching or evolving either Pokémon ends this effect)", Mean
+ * Look "as long as Murkrow remains your Active Pokémon": the marker holds only while the
+ * Pokémon that set it is still that Active Pokémon, unevolved.
+ */
+function sourceStillActive(marker, sourceZoneCards) {
+  if (marker.sourceId == null) return true;
+  const source = sourceZoneCards.find((c) => c.instanceId === marker.sourceId && !c.attachedTo);
+  if (!source) return false;
+  return marker.sourceTopId == null || topPokemonCard(sourceZoneCards, source)?.instanceId === marker.sourceTopId;
 }
 
 export function hasMarker(markers, kind) {
@@ -197,6 +212,13 @@ const WINDOW_PHRASES = [
     'opponentNextTurn',
     (body) => `if this pokémon is damaged by an attack, ${body}`,
   ],
+  // Cubone Snivel / Chikorita Growl: "If the Defending Pokémon attacks Cubone during your
+  // opponent's next turn, any damage done by the attack is reduced by 20 …".
+  [
+    /^if your opponent's active pokémon attacks this pokémon during your opponent's next turn, (.+)$/,
+    'opponentNextTurn',
+    (body) => `when it attacks this pokémon, ${body}`,
+  ],
   [/^(.+) during your opponent's next turn$/, 'opponentNextTurn'],
   [/^during your next turn, (.+)$/, 'yourNextTurn'],
   // Marshadow Shadow Flicker: "If the Defending Pokémon is Knocked Out during your next
@@ -284,11 +306,15 @@ const MARKER_BODIES = [
     () => ({ kind: 'incomingPrevent', filter: null }),
   ],
   [
-    /^if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon if that damage is (\d+) or less$/,
+    /^if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon if that damage is (\d+) or (less|more)$/,
     'self',
     null,
-    (m) => ({ kind: 'incomingPrevent', filter: null, maxDamage: Number(m[1]) }),
+    // Light Jolteon [Neo Destiny 48] Pulse Guard prints "30 or more".
+    (m) => ({ kind: 'incomingPrevent', filter: null, [m[2] === 'less' ? 'maxDamage' : 'minDamage']: Number(m[1]) }),
   ],
+  // Chikorita / Erika's Exeggcute Deflector: "whenever Chikorita takes damage, divide that damage
+  // in half (rounded down to the nearest 10)". Halves the attack's final damage.
+  [/^whenever this pokémon takes damage, divide that damage in half$/, 'self', null, () => ({ kind: 'incomingHalve' })],
   // M Diancie-EX: guards the whole side while it stays Active.
   [
     /^prevent all damage done to each of your pokémon from (your opponent's pokémon-ex)$/,
@@ -307,6 +333,18 @@ const MARKER_BODIES = [
     'opponentActive',
     null,
     (m, { wrOrder }) => outgoingReduce(m[1], wrOrder),
+  ],
+  // Snivel reduces all the attack's damage, Growl only the damage done to Chikorita
+  // (`toSource`). Either holds only while the attacker stays the Active Pokémon it attacks.
+  [
+    /^when it attacks this pokémon, any damage done (by the attack|to this pokémon) is reduced by (\d+)$/,
+    'opponentActive',
+    null,
+    (m, { wrOrder }) => ({
+      ...outgoingReduce(m[2], wrOrder),
+      whileSourceActive: true,
+      ...(m[1] === 'to this pokémon' ? { toSource: true } : {}),
+    }),
   ],
   [
     /^this pokémon's (.+?) attack does (\d+) more damage$/,
@@ -392,6 +430,16 @@ const MARKER_BODIES = [
     null,
     () => ({ kind: 'evolveLock' }),
   ],
+  // Eevee Tail Wag / Rhyhorn, Cyndaquil, Totodile Leer / Giovanni's Nidoking Intimidate: "the
+  // Defending Pokémon can't attack Eevee during your opponent's next turn. (Benching either
+  // Pokémon ends this effect.)" Every attack is made against the Active Pokémon, so the lock
+  // holds while the attacker stays that Active Pokémon (`whileSourceActive`).
+  [
+    /^(?:it|your opponent's active pokémon) can't attack this pokémon$/,
+    'opponentActive',
+    null,
+    () => ({ kind: 'cantAttack', whileSourceActive: true }),
+  ],
   // Lunala-GX Moongeist Beam: "The Defending Pokémon can't be healed during your opponent's next turn."
   [/^your opponent's active pokémon can't be healed$/, 'opponentActive', null, () => ({ kind: 'healLock' })],
   // Shiftry Seal Off: "The Defending Pokémon can't use any Poké-Powers or Poké-Bodies …";
@@ -433,6 +481,13 @@ const MARKER_BODIES = [
     'self',
     'yourNextTurn',
     (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], value: Number(m[2]) }),
+  ],
+  // Lt. Surge's Raticate [Gym Challenge 53] Focus Energy: the recoil doubles too.
+  [
+    /^(?:this pokémon|[^,]+)'s ([^,]+?)(?: attack)?'s base damage and damage to itself are doubled$/,
+    'self',
+    'yourNextTurn',
+    (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], doubled: true, selfDamageDoubled: true }),
   ],
   [
     /^(?:this pokémon|[^,]+)'s ([^,]+?)(?: attack)?'s (?:base )?damage(?: \([^)]*\))? is doubled$/,
@@ -533,8 +588,20 @@ export function parseMarkerSentence(sentence, context = {}) {
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
   [
-    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
+    /^(?:during your|at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
+  ],
+  // Locks with no turn window. Ariados Spider Web / Piloswine Freeze print "(Benching or evolving
+  // that Pokémon ends this effect.)": a marker clears on the Bench and tracks the top card.
+  // Murkrow Mean Look adds "as long as Murkrow remains your Active Pokémon".
+  [
+    /^your opponent's active pokémon can't (attack|retreat)( as long as this pokémon remains your active pokémon)?$/,
+    (m) => ({
+      type: 'atkAddMarker',
+      target: 'opponentActive',
+      window: 'whileActive',
+      marker: { kind: m[1] === 'attack' ? 'cantAttack' : 'cantRetreat', ...(m[2] ? { whileSourceActive: true } : {}) },
+    }),
   ],
 ];
 

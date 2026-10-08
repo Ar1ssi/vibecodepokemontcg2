@@ -240,7 +240,8 @@ export function stadiumWeaknessOverrides(stadiumCard, { attacker, defender } = {
     const excluded = /-ex$/.test(name) || /'s /.test(name);
     return { ignore: !excluded };
   }
-  if (/ignore weakness when a \{w\} pokémon does damage to a pokémon with blaine in its name/.test(t)) {
+  // Cinnabar City Gym: pkmncards prints "{W} Pokémon", TCGdex gym2-113 "Water Pokémon".
+  if (/ignore weakness when a (?:\{w\}|water) pokémon does damage to a pokémon with blaine in its name/.test(t)) {
     return { ignore: hasType(attacker, 'water') && nameOf(defender).includes('blaine') };
   }
   return null;

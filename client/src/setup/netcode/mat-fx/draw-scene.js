@@ -16,6 +16,7 @@ import { playCardTrack } from './card-flight.js';
 import { FLIGHT_MS, FLIGHT_STAGGER_MS, flightPose, planFlight, rectFlightEnds } from './card-flight.mjs';
 import { drawCardTrack, drawSceneTimes, drawSpreadRects } from './draw-scene.mjs';
 import { frameTurnOf } from './evolve-scene.js';
+import { playFxSound } from './fx-audio.js';
 import { matCenter } from './opp-play.mjs';
 import { docForSide } from './side-doc.mjs';
 
@@ -67,6 +68,19 @@ const releaseAt = (card, delay) => {
   else card.from.release();
 };
 
+// Design 064: the draw's sounds are best-effort and never break the scene.
+const sound = (effect, user, delayMs = 0) => {
+  const play = () => {
+    try {
+      playFxSound({ effect, user });
+    } catch (err) {
+      console.warn(`[mat-fx] ${effect} sound failed`, err);
+    }
+  };
+  if (delayMs > 0) setTimeout(play, delayMs);
+  else play();
+};
+
 const startOf = (card, deck) => (usable(card.from?.rect) ? card.from : deck);
 
 /**
@@ -105,6 +119,7 @@ export function playDrawScene(user, cards, show) {
       return;
     }
     played += 1;
+    sound('draw-card', user, track.delay);
     const box = slots[index] || spot.rect;
     const host = spawnOverlay({ rect: box, className: 'fx-overlay fx-draw fx-draw-scene' });
     const flip = document.createElement('div');
@@ -138,6 +153,7 @@ export function playDrawScene(user, cards, show) {
     releaseAt(card, track.delay);
     revealWhen(card, show, done, backstop);
   });
+  if (played > 0) sound('draw-start', user);
   return played > 0 ? drawSceneTimes(cards.length).total : 0;
 }
 
@@ -176,6 +192,7 @@ export function playOppDrawFlights(user, cards, show) {
     revealWhen(card, show, [landed], delay + FLIGHT_MS + BACKSTOP_PAD_MS);
     last = delay + FLIGHT_MS;
   });
+  if (flown > 0) sound('opp-draw', user);
   return last;
 }
 

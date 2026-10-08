@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { BANNER_MS } from '../flow-pose.mjs';
 import { DEFAULT_HOLD_MS, HOLD_MS, holdFor } from '../fx-holds.mjs';
 
 test('fx-holds: every hold is a non-negative finite number', () => {
@@ -23,4 +24,9 @@ test('fx-holds: the banner leads the lunge, which leads the damage pop', () => {
 test('fx-holds: a table entry inherited from Object.prototype is not a hold', () => {
   assert.equal(holdFor('toString'), DEFAULT_HOLD_MS);
   assert.equal(holdFor('constructor'), DEFAULT_HOLD_MS);
+});
+
+test('fx-holds: the move scene starts after the name banner has left (design 063)', () => {
+  assert.equal(holdFor('attack-banner'), BANNER_MS);
+  assert.equal(BANNER_MS, 1600);
 });

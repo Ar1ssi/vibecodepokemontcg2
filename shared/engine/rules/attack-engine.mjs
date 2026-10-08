@@ -29,6 +29,7 @@ import {
 import { turnDamageBonusTotal } from './turn-damage-bonus.mjs';
 import { attackerMatchesFilter, hasMarker } from './attack-markers.mjs';
 import { mergeDamagePrevention } from './ability-executors.mjs';
+import { applyLegacyDamageModifiers } from './legacy-power-wording.mjs';
 
 /**
  * "During your next turn, this Pokémon's X attack's base damage is N / is doubled" (design
@@ -97,6 +98,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     markers.reduce((sum, marker) => sum + (pick(marker) ? marker.amount || 0 : 0), 0);
   const attackNameLower = String(attack?.name || '').toLowerCase();
   const incomingApplies = (marker) => attackerMatchesFilter(marker.filter, attacker);
+  // Chikorita Growl: "any damage done to Chikorita" — not to another Pokémon the attack hits.
+  const outgoingApplies = (marker) => !marker.toSource || marker.sourceId === defender?.instanceId;
 
   // Printed damage arrives as a string ('30', '30+', '20×'); arithmetic on the raw
   // string yields NaN, which makes the defender un-KO-able (audit A-4).
@@ -146,10 +149,10 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
         )
       : 0;
   const markerReductionBeforeWR =
-    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && !m.afterWR) +
+    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && !m.afterWR && outgoingApplies(m)) +
     markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && !m.afterWR && incomingApplies(m));
   const markerReductionAfterWR =
-    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && m.afterWR) +
+    markerSum(attackerMarkers, (m) => m.kind === 'outgoingReduce' && m.afterWR && outgoingApplies(m)) +
     markerSum(defenderEffects, (m) => m.kind === 'incomingReduce' && m.afterWR && incomingApplies(m));
 
   // "This Pokémon takes N more damage from attacks": only when the attack does damage.
@@ -220,6 +223,8 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   let resistance = 0;
   if (
     !ignoreResistance &&
+    // Magnifier (neo4-101): "don't apply Resistance for that attack".
+    !hasMarker(attackerMarkers, 'ignoreResistance') &&
     !resistanceOverride?.ignore &&
     // Holon FF Energy with a basic {F} Energy beside it (audit SE7).
     !hasSpecialEnergyIgnoresResistance(attacker, attackerZoneCards) &&
@@ -227,7 +232,12 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
     defender?.resistance &&
     !(stadiumCard && stadiumIgnoresResistance(stadiumCard, attacker))
   ) {
-    if (attacker.types.includes(defender.resistance.type)) {
+    // Porygon Conversion 2: a resistanceOverride marker swaps the type and keeps the amount.
+    const resistanceType = defenderEffects.findLast((m) => m.kind === 'resistanceOverride')?.type;
+    const resisted = resistanceType
+      ? attacker.types.some((t) => String(t).toLowerCase() === resistanceType)
+      : attacker.types.includes(defender.resistance.type);
+    if (resisted) {
       resistance = Math.abs(defender.resistance.value || 0);
     }
   }
@@ -256,10 +266,16 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   // Darkness Energy AQ/EX: "+10 after applying Weakness and Resistance" only when it damages.
   const specialEnergyBonusAfterWR =
     damageAfterWR > 0 ? getSpecialEnergyAttackBonus(attacker, attackerZoneCards, { defenderIsActive, afterWR: true }) : 0;
+  // PlusPower (base1-84): "If this Pokémon's attack does damage to the Defending Pokémon (after
+  // applying Weakness and Resistance), the attack does 10 more damage to the Defending Pokémon."
+  const outgoingBonusAfterWR =
+    damageAfterWR > 0 && defenderIsActive
+      ? markerSum(attackerMarkers, (m) => m.kind === 'outgoingBonus' && m.afterWR)
+      : 0;
   damageAfterWR = Math.max(
     0,
-    damageAfterWR + incomingBonusAfterWR + specialEnergyBonusAfterWR - specialEnergyReduction -
-      markerReductionAfterWR - specialEnergyPenaltyAfterWR
+    damageAfterWR + incomingBonusAfterWR + specialEnergyBonusAfterWR + outgoingBonusAfterWR -
+      specialEnergyReduction - markerReductionAfterWR - specialEnergyPenaltyAfterWR
   );
 
   // Step 5: Defender damage reduction (tools + abilities, applied AFTER Weakness and Resistance).
@@ -319,11 +335,21 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
       finalDamage - (prevention.reduce || 0) * 10 - (prevention.reduceHp || 0)
     );
   }
+  // Deflector: the damage the Pokémon takes, halved and rounded down to the nearest 10.
+  if (defenderEffects.some((m) => m.kind === 'incomingHalve')) finalDamage = Math.floor(finalDamage / 20) * 10;
+  // WotC Powers that change the damage after Weakness and Resistance (Invisible Wall, Kabuto
+  // Armor, Relaxing Scent, …): read by the caller (ability-combat.mjs abilityLegacyDamageModifiers).
+  if (!prevented && !ignoreDefenderEffects && abilityPrevention?.legacyModifiers?.length) {
+    const before = finalDamage;
+    finalDamage = applyLegacyDamageModifiers(finalDamage, abilityPrevention.legacyModifiers);
+    if (before > 0 && finalDamage === 0) prevented = true;
+  }
   const markerPrevents = defenderEffects.some(
     (m) =>
       m.kind === 'incomingPrevent' &&
       incomingApplies(m) &&
-      (m.maxDamage == null || finalDamage <= m.maxDamage)
+      (m.maxDamage == null || finalDamage <= m.maxDamage) &&
+      (m.minDamage == null || finalDamage >= m.minDamage)
   );
   if (!prevented && markerPrevents) {
     prevented = true;
@@ -333,7 +359,7 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   return {
     total: finalDamage,
     base,
-    attackerBonus,
+    attackerBonus: attackerBonus + outgoingBonusAfterWR,
     specialEnergyBonus: specialEnergyBonus + specialEnergyBonusAfterWR,
     specialEnergyPenalty: specialEnergyPenalty + specialEnergyPenaltyAfterWR,
     abilityBonus: abilityBonusBeforeWR || 0,

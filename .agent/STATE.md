@@ -3,17 +3,15 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: rules backlog I219–I221 + I190 closed on main (S335): card-effect shields (Unnerve, Ninja Body,
-  Lustrous Body, Milotic…), printed-marker table for Tera/Strike/Plasma/Baby/Prism/TAG TEAM searches (D200),
-  optional-cost bonuses, Missing Clover/Cross Switcher/Sabrina's Suggestion/Bellelba. Residue: I223.
-Active: none. ETB (design 057, D195) slice 6 (rec-etb recorder + shared recorder lib) not started.
-Next: user look on localhost (SERVER_AUTHORITATIVE=1): holo art windows (Neo holo, reverse-holo Trainer,
-  holo prize/discard viewer; D201); deck reveals (Ultra Ball, Earthen Vessel, Quick Search
-  stays hidden); deck builder Special filter Ancient/Future pills; /build-and-battle and
-  /deck-builder?etb=phantasmal-flames-etb (057 taste calls); then 057 slice 6; design 056 (3D box, I209);
-  then top of ISSUES.md (I223 shield residue, I222 legacy trainer path).
-  Maintenance: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
-Blocked: I85/I86 need design approval (028/029); I87 needs the user's description.
+Focus: Sampled battle SFX shipped (S337, design 064, D203/D204): TCG Live non-attack cues over the synth
+  palette — fx plans, draw/shuffle/KO/enter, UI chrome, status loops, card signatures, crowd bus.
+  Samples (6.7 MB Ogg Opus) are committed in client/src/assets/sfx; regenerate with `pnpm sfx:import`.
+Active: design 063 (attack move scenes + jumbotron set) uncommitted on the primary folder; it overlaps
+  mat-fx/index.js (soundPlanFor) with 064 — rebase on main before landing. ETB (057) slice 6 not started.
+Next: user listening pass on localhost (SERVER_AUTHORITATIVE=1) for 064 mix gains; I239–I240, then I227–I229;
+  WotC Gyms/attach-Trainers/Baby flip, holo art windows (D201), deck reveals, 057 taste calls.
+  Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
+Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 
 ## Watch-outs (≤5)
 - Gates after engine changes: `pnpm audit:oracle`, `audit:abilities`, `audit:trainers`,

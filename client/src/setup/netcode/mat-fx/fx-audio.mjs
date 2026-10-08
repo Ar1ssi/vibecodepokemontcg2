@@ -153,6 +153,79 @@ const STATIC_VOICES = Object.freeze({
   'unbox-coin': [tone(2600, 0.32, 0.18, { wave: 'sine', freqTo: 2200 })],
 });
 
+// Design 063 § Pinned contracts C: one voice set per sound family of a move scene, chosen by
+// the spec's `family` (soundPlanFor adds it to the `attack` plan). The dispatcher sounds the
+// plan when the scene starts and the `damage` plan at contact, so a family voice is the body of
+// the move up to contact and never exceeds 0.6 s. The last tone of `burst` and `charge` and the
+// second tone of `ghost` are shortened from the first draft so every set ends by 0.6 s.
+export const FAMILY_VOICES = Object.freeze({
+  slash: [
+    noise(0.14, 0.22, { type: 'bandpass', freq: 2600, q: 1.2 }),
+    tone(1800, 0.1, 0.1, { wave: 'sine', freqTo: 900, delay: 0.04 }),
+  ],
+  punch: [
+    noise(0.12, 0.3, { type: 'lowpass', freq: 600, q: 0.8 }),
+    tone(110, 0.16, 0.2, { wave: 'sine', freqTo: 55 }),
+  ],
+  dash: [
+    noise(0.32, 0.22, { type: 'bandpass', freq: 700, freqTo: 2400, q: 0.8 }),
+    tone(200, 0.3, 0.1, { wave: 'sawtooth', freqTo: 420 }),
+  ],
+  beam: [
+    tone(220, 0.5, 0.14, { wave: 'sawtooth', freqTo: 880, attack: 0.3 }),
+    noise(0.5, 0.12, { type: 'bandpass', freq: 1500, freqTo: 5000, q: 1.2 }, { attack: 0.3 }),
+    tone(1760, 0.2, 0.06, { wave: 'sine', delay: 0.4 }),
+  ],
+  projectile: [
+    noise(0.22, 0.16, { type: 'bandpass', freq: 1200, freqTo: 400, q: 1 }),
+    tone(600, 0.2, 0.1, { wave: 'triangle', freqTo: 300, delay: 0.05 }),
+  ],
+  burst: [
+    noise(0.4, 0.2, { type: 'bandpass', freq: 400, freqTo: 3200, q: 1.3 }, { attack: 0.3 }),
+    tone(80, 0.5, 0.12, { wave: 'sine', attack: 0.4 }),
+    tone(1200, 0.1, 0.08, { wave: 'square', delay: 0.5 }),
+  ],
+  quake: [
+    noise(0.5, 0.3, { type: 'lowpass', freq: 300, q: 0.9 }),
+    tone(55, 0.5, 0.25, { wave: 'sine', freqTo: 35 }),
+    noise(0.2, 0.15, { type: 'lowpass', freq: 500, q: 0.8 }, { delay: 0.25 }),
+  ],
+  splash: [
+    noise(0.3, 0.22, { type: 'highpass', freq: 1800, q: 0.7 }),
+    noise(0.25, 0.14, { type: 'bandpass', freq: 900, freqTo: 300, q: 1 }, { delay: 0.08 }),
+    tone(1200, 0.12, 0.06, { wave: 'sine', freqTo: 2400, delay: 0.12 }),
+  ],
+  wind: [
+    noise(0.55, 0.2, { type: 'bandpass', freq: 600, freqTo: 1800, q: 0.5 }, { attack: 0.25 }),
+    tone(300, 0.5, 0.05, { wave: 'sine', freqTo: 500, attack: 0.3 }),
+  ],
+  electric: [
+    noise(0.3, 0.22, { type: 'highpass', freq: 2500, q: 1 }),
+    tone(2200, 0.08, 0.12, { wave: 'square', freqTo: 1400 }),
+    tone(1900, 0.08, 0.1, { wave: 'square', freqTo: 2600, delay: 0.1 }),
+    tone(2400, 0.1, 0.1, { wave: 'square', freqTo: 1200, delay: 0.2 }),
+  ],
+  ghost: [
+    tone(180, 0.6, 0.12, { wave: 'sine', freqTo: 90, attack: 0.3 }),
+    tone(270, 0.5, 0.08, { wave: 'sine', freqTo: 135, attack: 0.3, delay: 0.05 }),
+    noise(0.5, 0.08, { type: 'bandpass', freq: 400, q: 2 }, { attack: 0.3 }),
+  ],
+  chime: [
+    ...arpeggio([1047, 1319, 1568, 2093], { step: 0.06, dur: 0.3, gain: 0.1, wave: 'sine' }),
+    tone(523, 0.4, 0.06, { wave: 'triangle' }),
+  ],
+  roar: [
+    tone(90, 0.5, 0.2, { wave: 'sawtooth', freqTo: 140 }),
+    noise(0.45, 0.18, { type: 'lowpass', freq: 900, q: 0.6 }),
+    tone(180, 0.4, 0.1, { wave: 'square', freqTo: 260, delay: 0.05 }),
+  ],
+  charge: [
+    tone(160, 0.55, 0.12, { wave: 'triangle', freqTo: 640, attack: 0.45 }),
+    noise(0.55, 0.1, { type: 'bandpass', freq: 300, freqTo: 3000, q: 1.2 }, { attack: 0.45 }),
+    tone(1280, 0.1, 0.08, { wave: 'sine', delay: 0.5 }),
+  ],
+});
+
 // ── Per-condition status motifs ────────────────────────────────────────────
 const STATUS_VOICES = Object.freeze({
   Poisoned: [tone(180, 0.28, 0.16, { wave: 'sine', freqTo: 120 })],
@@ -243,6 +316,7 @@ export function voicesFor(effect, plan = {}) {
   if (effect === 'damage') return damageVoices(plan);
   if (effect === 'coin-flip') return coinVoices(plan);
   if (effect === 'game-over') return gameOverVoices(plan);
+  if (effect === 'attack' && Object.hasOwn(FAMILY_VOICES, plan?.family)) return FAMILY_VOICES[plan.family];
   if (effect === 'status') {
     return Object.freeze(
       Object.hasOwn(STATUS_VOICES, plan.condition)

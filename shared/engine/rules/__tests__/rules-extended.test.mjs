@@ -543,7 +543,7 @@ import test from 'node:test';
             { type: 'Ability', name: 'Solid Shell', effect: 'This Pokémon takes 20 less damage from attacks.' },
           ],
         }),
-        { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage from attacks.' }
+        { name: 'Solid Shell', text: 'This Pokémon takes 20 less damage from attacks.', type: 'Ability' }
       );
     });
 
@@ -555,7 +555,7 @@ import test from 'node:test';
             { type: 'Ability', name: 'Second', effect: 'Second effect' },
           ],
         }),
-        { name: 'First', text: 'First effect' }
+        { name: 'First', text: 'First effect', type: 'ability' }
       );
     });
 
@@ -564,14 +564,50 @@ import test from 'node:test';
         tcgAbilityFromDetail({
           abilities: [{ type: 'Ability', name: 'Draw Power', text: 'Draw a card.' }],
         }),
-        { name: 'Draw Power', text: 'Draw a card.' }
+        { name: 'Draw Power', text: 'Draw a card.', type: 'Ability' }
       );
     });
 
     test('tcgAbilityFromDetail: returns null when no ability present', () => {
       assert.equal(tcgAbilityFromDetail(null), null);
       assert.equal(tcgAbilityFromDetail({}), null);
-      assert.equal(tcgAbilityFromDetail({ abilities: [{ type: 'Pokémon Power', name: 'X', effect: 'y' }] }), null);
+      assert.equal(tcgAbilityFromDetail({ abilities: [{ type: 'Attack', name: 'X', effect: 'y' }] }), null);
+      // TCGdex ships typed entries with no name or effect (neo2-49 Unown [M], ex16-84 Claw Fossil).
+      assert.equal(tcgAbilityFromDetail({ abilities: [{ type: 'Pokemon Power' }] }), null);
+    });
+
+    // TCGdex type strings checked live: base1-2 / base3-13 "Pokemon Power", base4-1 and ecard1-1
+    // "Poke-POWER", dp3-1 / pl1-1 "Poke-BODY". Before, every one of these was dropped here, so no
+    // Pokémon Power, Poké-Power or Poké-Body ever reached a live game.
+    for (const [type, name, effect] of [
+      ['Pokemon Power', 'Rain Dance', 'As often as you like during your turn (before your attack), you may attach 1 {W} Energy card to 1 of your {W} Pokémon. (This doesn\'t use up your 1 Energy card attachment for the turn.) This power can\'t be used if Blastoise is Asleep, Confused, or Paralyzed.'],
+      ['Pokémon Power', 'Toxic Gas', 'Ignore all Pokémon Powers other than Toxic Gases. This power stops working while Muk is Asleep, Confused, or Paralyzed.'],
+      ['Poke-POWER', 'Damage Swap', 'As often as you like during your turn (before your attack), you may move 1 damage counter from 1 of your Pokémon to another as long as you don\'t Knock Out that Pokémon.'],
+      ['Poke-BODY', 'Jamming', 'After your opponent plays a Supporter card from his or her hand, put 1 damage counter on each of your opponent\'s Pokémon. You can\'t use more than 1 Jamming Poké-Body each turn.'],
+    ]) {
+      test(`tcgAbilityFromDetail: carries a ${type} entry with its printed type`, () => {
+        assert.deepEqual(tcgAbilityFromDetail({ abilities: [{ type, name, effect }] }), { name, text: effect, type });
+      });
+    }
+
+    test('tcgAbilityFromDetail: Base Set 2 "Poke-POWER" is restored to its printed "Pokemon Power"', () => {
+      // TCGdex base4-2 Blastoise; the corpus prints Blastoise [Base Set 2 2] as "Pokémon Power".
+      const entry = { type: 'Poke-POWER', name: 'Rain Dance', effect: 'r' };
+      assert.equal(tcgAbilityFromDetail({ id: 'base4-2', set: { id: 'base4' }, abilities: [entry] }).type, 'Pokemon Power');
+      assert.equal(tcgAbilityFromDetail({ id: 'base4-2', abilities: [entry] }).type, 'Pokemon Power');
+      assert.equal(tcgAbilityFromDetail({ id: 'ecard1-1', set: { id: 'ecard1' }, abilities: [entry] }).type, 'Poke-POWER');
+    });
+
+    test('tcgAbilityFromDetail: Ability outranks a Power/Body, which outranks an Ancient Trait; empty entries skipped', () => {
+      const power = { type: 'Poke-POWER', name: 'Power', effect: 'p' };
+      const body = { type: 'Poke-BODY', name: 'Body', effect: 'b' };
+      const trait = { type: 'Ancient Trait', name: 'θ Stop', effect: 't' };
+      const ability = { type: 'Ability', name: 'Ability', effect: 'a' };
+      assert.equal(tcgAbilityFromDetail({ abilities: [power, ability] }).name, 'Ability');
+      assert.equal(tcgAbilityFromDetail({ abilities: [trait, body] }).name, 'Body');
+      assert.equal(tcgAbilityFromDetail({ abilities: [body, power] }).name, 'Body');
+      // ex15-10 Snorlax δ: TCGdex lists a real Poké-Body after an empty Poké-Power entry.
+      assert.deepEqual(tcgAbilityFromDetail({ abilities: [{ type: 'Poke-POWER' }, body] }), { name: 'Body', text: 'b', type: 'Poke-BODY' });
     });
 
     // Ancient Traits ride the ability slot so the reducer can identify them (D72); without
@@ -591,6 +627,7 @@ import test from 'node:test';
         {
           name: 'α Growth',
           text: 'When you attach an Energy card from your hand to this Pokémon (except with an attack, Ability, or Trainer card), you may attach 2 Energy cards.',
+          type: 'Ancient Trait',
         }
       );
     });
@@ -603,7 +640,7 @@ import test from 'node:test';
             { type: 'Ability', name: 'Solid Shell', effect: 'Takes 20 less damage.' },
           ],
         }),
-        { name: 'Solid Shell', text: 'Takes 20 less damage.' }
+        { name: 'Solid Shell', text: 'Takes 20 less damage.', type: 'Ability' }
       );
     });
 
@@ -5227,7 +5264,11 @@ import test from 'node:test';
           text: 'Once during your turn, when this Pokémon moves from your Bench to the Active Spot, you may put 2 damage counters on 1 of your opponent\'s Pokémon.',
         },
       };
+      // Legacy (no server stamp) and a stale window are both excluded.
       assert.equal(isUsableAbilityCard(card), false);
+      assert.equal(isUsableAbilityCard({ ...card, movedToActiveTurn: 4 }, { turnNumber: 4 }), true);
+      assert.equal(isUsableAbilityCard({ ...card, movedToActiveTurn: 4 }, { turnNumber: 5 }), false);
+      assert.equal(isUsableAbilityCard({ ...card, movedToActiveTurn: 4 }), false);
     });
 
     test('parseAbility: effectPreventAbility active-spot aura (Midnight Fluttering)', () => {

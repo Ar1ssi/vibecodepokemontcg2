@@ -31,12 +31,12 @@ What a spawn saves:
    output, lint, failed attempts) stays in the agent. Inline, it stays in your context and is
    re-sent on every later turn: at cache rates (~0.1× input) that is ≈ 0.1 × its size × the turns
    you have left. It also pulls the next compaction closer, and compaction costs quality.
-2. **Cheaper thinking.** `slice-builder` runs at `low` effort; your session runs at `medium`/`high`.
+2. **Cheaper thinking.** `slice-builder` runs on Sonnet 5.5 at `medium`; your session runs Opus at `medium`/`high`.
    On a big slice, thinking and output tokens dominate the bill.
 3. **Parallelism.** Independent agents launched in one message run at the same time.
 
 Break-even, as one rule: **delegate when the work would add ≥ ~25k tokens to your context and
-you still have work to do after it**, or when it is a pinned slice big enough that low-effort
+you still have work to do after it**, or when it is a pinned slice big enough that cheaper-model
 thinking pays (≥ ~3 files or ≥ ~150 changed lines). Below that, the cold start and re-reads cost
 more than they save — do it inline.
 
@@ -54,7 +54,7 @@ Count before deciding; it takes one `wc -c` call.
 | 2 | Fewer than ~3 reads and one or two small edits | Inline | Cold start alone (~17k) exceeds the work |
 | 3 | 1–2 files, mechanical (rename, extract, typo sweep), and you already hold them | Inline | Re-reads would double the cost |
 | 3b | 1–2 files, mechanical, and you have NOT read them, with a long session ahead | `caveman:cavecrew-builder` | Keeps the file bodies out of your context |
-| 4 | Pinned slice (TEMPLATE Work-plan row passes its check), ≥ ~3 files or ≥ ~150 lines, and more work follows | `slice-builder` | Low effort + context kept lean |
+| 4 | Pinned slice (TEMPLATE Work-plan row passes its check), ≥ ~3 files or ≥ ~150 lines, and more work follows | `slice-builder` | Cheaper model + context kept lean |
 | 5 | Pinned slice, small, or the LAST thing before close | Inline | Nothing later benefits from the lean context |
 | 6 | Slice row not pinned (vague words, missing test cases, unsourced ruling) | Pin it first (row 1), then re-run this table | `slice-builder` would stop and return anyway |
 | 7 | New or reworked FX scene, or CSS across several sheets with a capture-and-compare loop | `fx-designer` | Image-heavy iteration stays out of your context |

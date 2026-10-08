@@ -59,6 +59,16 @@ import {
   returnEnergyBonusClause,
 } from './rules/damage-parser.mjs';
 import { optionalCostBonusClause } from './rules/optional-cost-bonus.mjs';
+import { legacyTrainerType } from './rules/legacy-trainer-type.mjs';
+import {
+  legacyAttachedTrainer,
+  attachedLegacyTrainers,
+  attachedTrainerMarkers,
+  attachedTrainerDamageReduction,
+  attachedTrainerTurnEnd,
+  hasAttachedTrainerEffect,
+} from './rules/legacy-attached-trainer.mjs';
+import { applyLegacyDamageModifiers } from './rules/legacy-power-wording.mjs';
 import { countUnit, normalizeUnit } from './rules/scaling-count.mjs';
 import { buildServerAttackContext } from './rules/attack-damage-context.mjs';
 import {
@@ -100,6 +110,7 @@ import {
   stadiumTrainerPlayCoin,
   stadiumAttackCoinModifier,
 } from './rules/stadium-triggers.mjs';
+import { turnDamageBonusAfterWR } from './rules/turn-damage-bonus.mjs';
 import {
   applyStadiumTriggerEffect,
   applyStadiumSwitchTriggers,
@@ -111,8 +122,10 @@ import {
   abilityDamageReduction,
   abilityHandDiscardProtector,
   abilityDamagePrevention,
+  abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects,
   sideContextFor,
+  powersOffActive,
   abilityWeaknessOverride,
   abilityHpBonus,
   abilityPrizeModify,
@@ -133,6 +146,7 @@ import {
   abilityPlayLocks,
   abilityEvolvePermission,
   abilityEvolveLock,
+  abilityEvolutionCardLock,
   abilityRetreatLock,
   abilitySummonRestricted,
   abilityFirstTurnAttack,
@@ -157,7 +171,7 @@ import { stampRevealedArt, textRevealsPicks } from './rules/reveal-picks.mjs';
 import { executeAbility } from './effects/ability.mjs';
 import { createPendingChoice, attachToRoot, executeSteps } from './effects/executor.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from './effects/attack-steps.mjs';
-import { cardEffectShielded, pokemonHasType } from './effects/trainer-steps.mjs';
+import { cardEffectShielded, pokemonHasType, legacyAttachTargets } from './effects/trainer-steps.mjs';
 import { eachFilterMatches } from './rules/each-filter.mjs';
 import { parseAttackSteps, resolveCoinGates, normalizeAttackText } from './rules/attack-steps.mjs';
 import { replaceSelfName } from './rules/attack-text.mjs';
@@ -252,6 +266,7 @@ import {
   pokemonNamesMatch,
   requiresTurnEndOnEvolve,
 } from './rules/evolution.mjs';
+import { isBabyEvolution, isBabyPokemon } from './rules/baby-rule.mjs';
 import {
   addCondition,
   removeCondition,
@@ -389,9 +404,29 @@ const SELF_BENCH_SHIELD =
  */
 function damageBenchedPokemon(
   draft,
-  { victim, victimPlayerId, attackerPlayerId, attackName, dealt, auto, ownAttack = false, countersPlaced = false, activeRng = null, events }
+  {
+    victim,
+    victimPlayerId,
+    attackerPlayerId,
+    attackName,
+    dealt,
+    auto,
+    ownAttack = false,
+    countersPlaced = false,
+    ignoreDefenderEffects = false,
+    activeRng = null,
+    events,
+  }
 ) {
   if (dealt <= 0) return;
+
+  // Transparent Walls gym2-125: "prevent all damage from attacks done to your Benched Pokémon"
+  // until the end of the opponent's next turn (counters an attack places are not damage).
+  const wallsUntil = draft.players[victimPlayerId]?.benchAttackShieldUntilTurn || 0;
+  if (!countersPlaced && wallsUntil >= (draft.turn?.number || 1)) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'trainer-bench-shield' });
+    return;
+  }
 
   // Check Tera bench damage immunity ("Tera: As long as this Pokémon is on your Bench, prevent all damage done to this Pokémon by attacks")
   // The Tera rule is printed on the top card: an evolved Tera Pokémon ex's Basic is not Tera.
@@ -469,6 +504,29 @@ function damageBenchedPokemon(
     return;
   }
 
+  // Defender (base1-80) on a Benched Pokémon: "Damage done to that Pokémon by attacks is reduced
+  // by 20". Counters placed are not damage. Damage "isn't affected by … Pokémon Powers, or any
+  // other effects on the Defending Pokémon" (Feint Attack) skips Defender and the WotC Powers.
+  const legacyApplies = !countersPlaced && !ignoreDefenderEffects;
+  const attachedReduction = legacyApplies ? attachedTrainerDamageReduction(victimBench, victim) : 0;
+  if (attachedReduction > 0) {
+    dealt = Math.max(0, dealt - attachedReduction);
+    if (dealt === 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'attached-trainer' });
+      return;
+    }
+  }
+  if (legacyApplies) {
+    dealt = legacyModifiedDamage(draft, { victim, victimPlayerId, amount: dealt });
+    if (dealt <= 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'ability' });
+      return;
+    }
+  }
+
+  // Read before the damage lands: the holder may be Knocked Out by it.
+  const strikesBack =
+    !ownAttack && !countersPlaced ? benchedThornsCounters(draft, victimView, victimPlayerId) : 0;
   const prevDamage = victim.damage || 0;
   const koHp = cardEffectiveHp(draft, victim, victimPlayerId);
   const wouldKo = koHp > 0 && prevDamage + dealt >= koHp;
@@ -507,6 +565,7 @@ function damageBenchedPokemon(
           victimPlayerId
         );
       }
+      thornsOnBenchDamage(draft, { counters: strikesBack, victimPlayerId, attackerPlayerId, activeRng, events });
       return;
     }
   }
@@ -536,6 +595,45 @@ function damageBenchedPokemon(
       events,
       byAttack: true,
       byDamage: !countersPlaced,
+    });
+  }
+  thornsOnBenchDamage(draft, { counters: strikesBack, victimPlayerId, attackerPlayerId, activeRng, events });
+}
+
+// Machamp Strikes Back [Base Set 8], read as "If this Pokémon is damaged by an attack from your
+// opponent's Pokémon (even if this Pokémon is Knocked Out), put N damage counters on the Attacking
+// Pokémon." (legacy-power-wording.mjs): no position clause, so a Benched holder hit by an attack
+// strikes back too. Only that exact sentence: other thorns wordings name the Active Spot.
+const UNPOSITIONED_THORNS =
+  /^if this pokémon is damaged by an attack from your opponent's pokémon \(even if this pokémon is knocked out\), put (\d+) damage counters? on the attacking pokémon\.(?: |$)/;
+
+function benchedThornsCounters(draft, victimView, victimPlayerId) {
+  if (!UNPOSITIONED_THORNS.test(cardAbilityText(victimView))) return 0;
+  const thorns = parseOnDamageAbilities(victimView, { ...abilitySideContext(draft, victimPlayerId), isActive: false });
+  return thorns?.count > 0 ? thorns.count : 0;
+}
+
+function thornsOnBenchDamage(draft, { counters, victimPlayerId, attackerPlayerId, activeRng, events }) {
+  if (!(counters > 0)) return;
+  const attacker = rootsIn(draft.players[attackerPlayerId]?.zones?.active)[0];
+  if (!attacker) return;
+  attacker.damage = (attacker.damage || 0) + counters * 10;
+  events.push({
+    type: 'damageUpdated',
+    instanceId: attacker.instanceId,
+    damage: attacker.damage,
+    dealt: counters * 10,
+    reason: 'thorns',
+  });
+  const koHp = cardEffectiveHp(draft, attacker, attackerPlayerId);
+  if (koHp > 0 && attacker.damage >= koHp) {
+    handleKnockout(draft, {
+      victimPlayerId: attackerPlayerId,
+      attackerPlayerId: victimPlayerId,
+      victim: attacker,
+      events,
+      byAttack: true,
+      activeRng,
     });
   }
 }
@@ -687,13 +785,39 @@ const targetPlayerOf = (clause, attackerPlayerId, defenderPlayerId) =>
 // Flat damage to an Active target: no W/R for counter placement, and the printed
 // snipe clause is treated as unmodified. Bench targets go through
 // damageBenchedPokemon (Tera/bench-shield guards + KO).
-function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, countersPlaced = false, events }) {
+// Attack damage that skips computeAttackDamage (fixed-damage targets, Bench damage, recoil) still
+// meets the WotC Powers that change damage after Weakness and Resistance (Invisible Wall, Kabuto
+// Armor, Relaxing Scent, Unown D, …). The Attacking Pokémon is the turn player's Active.
+function legacyModifiedDamage(draft, { victim, victimPlayerId, amount }) {
+  if (!(amount > 0)) return amount;
+  const attacker = rootsIn(draft.players[draft.turn?.player]?.zones?.active)[0];
+  const specs = abilityLegacyDamageModifiers(
+    inPlayView(draft, victim),
+    attacker ? inPlayView(draft, attacker) : null,
+    abilitySideContext(draft, victimPlayerId)
+  );
+  return applyLegacyDamageModifiers(amount, specs);
+}
+
+// `legacyApplied`: the amount already went through computeAttackDamage, which applies the same
+// Powers (or skips them for damage that ignores effects on the Defending Pokémon).
+function applyFlatDamageToTarget(
+  draft,
+  { ref, amount, attackerPlayerId, countersPlaced = false, legacyApplied = false, events }
+) {
   const victim = ref.card;
   if (!victim || amount <= 0) return 0;
   const victimZone = ref.player?.zones?.[ref.zoneId] || [];
   if (countersPlaced && ref.playerId !== attackerPlayerId && counterEffectShielded(draft, victim, victimZone)) {
     events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'special-energy-effect' });
     return 0;
+  }
+  if (!countersPlaced && !legacyApplied) {
+    amount = legacyModifiedDamage(draft, { victim, victimPlayerId: ref.playerId, amount });
+    if (amount <= 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, reason: 'ability' });
+      return 0;
+    }
   }
   victim.damage = (victim.damage || 0) + amount;
   events.push({
@@ -719,7 +843,9 @@ function applyFlatDamageToTarget(draft, { ref, amount, attackerPlayerId, counter
 // Chaos Gym: every Trainer card other than a Stadium is coin-gated, whether played
 // or attached from hand as a Pokémon Tool. Tails means it can't be played and goes
 // to the discard pile. Returns true when the card was blocked.
-// (The printed "opponent may use that card instead" clause is not implemented.)
+// "If the card isn't put into play, the player's opponent may use that card instead": the
+// opponent is offered it through the Psychic Control step (trainer-steps useOpponentDiscardTrainer),
+// which leaves out cards that are put in play and cards the opponent could not pay for.
 function chaosGymBlocks(draft, { card, playerId, activeRng, events }) {
   const chaos = stadiumTrainerPlayCoin(draft.stadium?.card || draft.stadium, card);
   if (!chaos) return false;
@@ -741,6 +867,18 @@ function chaosGymBlocks(draft, { card, playerId, activeRng, events }) {
     name: card.name || '',
     source: chaos.source,
   });
+  const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
+  if (oppId && !isPokemonToolCard(card)) {
+    const offer = executeSteps(draft, {
+      steps: [{ type: 'useOpponentDiscardTrainer', instanceId: card.instanceId }],
+      effectType: 'trainer',
+      sourceCard: card,
+      playerId: oppId,
+      activeRng,
+      events,
+    });
+    if (offer.pendingChoice) draft.pendingChoice = offer.pendingChoice;
+  }
   return true;
 }
 
@@ -772,7 +910,12 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
   const attacker = (draft.players[attackerPlayerId]?.zones?.active || []).find(
     (c) => !c.attachedTo
   );
-  if (!attacker) return clause.amount;
+  // No Attacking Pokémon to compute from: the flat amount, still through the WotC Powers.
+  if (!attacker) {
+    return clause.immunity?.ignoreDefenderEffects
+      ? clause.amount
+      : legacyModifiedDamage(draft, { victim: ref.card, victimPlayerId: ref.playerId, amount: clause.amount });
+  }
   const defenderPlayer = draft.players[ref.playerId];
   const defenderView = inPlayView(draft, ref.card);
   const abilityReads = attackAbilityReads(draft, {
@@ -818,12 +961,16 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
 function activeAttackMarkers(draft, playerId, card) {
   const active = draft.players[playerId]?.zones?.active || [];
   if (!card || !active.some((c) => c.instanceId === card.instanceId)) return [];
+  const otherId = Object.keys(draft.players || {}).find((id) => id !== playerId);
   return [
     ...liveAttackMarkers(card, {
       turnNumber: draft.turn?.number || 1,
       zoneCards: active,
+      sourceZoneCards: draft.players[otherId]?.zones?.active || [],
     }),
     ...restOfGameMarkers(draft, playerId, card),
+    // I224: PlusPower / Defender / Magnifier attached to it, read as the same marker kinds.
+    ...attachedTrainerMarkers(active, card),
   ];
 }
 
@@ -857,6 +1004,42 @@ function attachLockReason(state, card, targetInstanceId) {
   return null;
 }
 
+const energyOfType = (card, type) =>
+  [card?.energyType, card?.name, ...(Array.isArray(card?.types) ? card.types : [])].some((value) =>
+    String(value || '').toLowerCase().includes(type)
+  );
+
+/**
+ * Blaine gym2-17's attachment plan (trainer-steps energyAttachPlan) as it applies to attaching
+ * `energy` from hand to `targetInstanceId`: `{ plan, hostId }` when the Energy is a basic one of
+ * the plan's type and the target is the player's Pokémon with the plan's name, else null.
+ */
+function energyAttachPlanMatch(state, player, energy, targetInstanceId) {
+  const plan = player?.flags?.energyAttachPlan;
+  if (!plan || !isBasicEnergy(energy) || !energyOfType(energy, plan.energyType)) return null;
+  const hostId = attachmentHostId(state, targetInstanceId);
+  const hostRef = findCard(state, hostId);
+  if (!hostRef || hostRef.playerId !== player.playerId || !['active', 'bench'].includes(hostRef.zoneId)) return null;
+  const name = String(inPlayView(state, hostRef.card)?.name || '').toLowerCase();
+  return name.includes(plan.nameTag) ? { plan, hostId } : null;
+}
+
+/**
+ * "Instead of attaching your free Energy card, you may instead attach 2 Fire Energy cards to 1 of
+ * your Pokémon with Blaine in its name": the turn's first attach, when it fits the plan, picks the
+ * host; each later fitting attach to that host uses up the plan's remaining count.
+ */
+function recordEnergyAttachPlan(draft, player, energy, hostId) {
+  const match = energyAttachPlanMatch(draft, player, energy, hostId);
+  if (!match) return;
+  if (!player.flags.energyAttached) {
+    match.plan.hostId = match.hostId;
+    match.plan.attached = 1;
+  } else if (match.plan.hostId === match.hostId) {
+    match.plan.attached += 1;
+  }
+}
+
 /**
  * Player-scoped play locks an opponent's attack left behind (Distort, Sonic Volume, Heavy Rock,
  * Horror House; design 048). A lock counts on the target's next turn and expires by turn number.
@@ -869,12 +1052,14 @@ function attachLockReason(state, card, targetInstanceId) {
 function playLockReason(player, kinds, turnNumber) {
   const locks = (player?.playLocks || []).filter((lock) => (lock.untilTurn || 0) >= turnNumber);
   if (locks.length === 0) return null;
-  const blocked = locks.some((lock) =>
+  const blocking = locks.find((lock) =>
     (lock.kinds || []).some((kind) => kind === 'any' || kinds.includes(kind))
   );
-  return blocked
-    ? "Your opponent's attack stops you playing that card during this turn."
-    : null;
+  if (!blocking) return null;
+  // A Trainer's own lock (Time Capsule neo1-90) names that card.
+  return blocking.source
+    ? `${blocking.source} stops you playing that card during this turn.`
+    : "Your opponent's attack stops you playing that card during this turn.";
 }
 
 /** Printed kind of one of a card's abilities: 'power' (Poké-Power), 'body' (Poké-Body), 'ability'. */
@@ -894,10 +1079,12 @@ function abilityKindAt(view, index) {
 function attackAbilityLockReason(state, cardRef, player, abilityIndex) {
   const kind = abilityKindAt(inPlayView(state, cardRef.card), abilityIndex);
   const turnNumber = state.turn?.number || 1;
-  const playerLocked = (player?.playLocks || []).some(
+  const playerLock = (player?.playLocks || []).find(
     (lock) => (lock.untilTurn || 0) >= turnNumber && (lock.kinds || []).includes(`ability:${kind}`)
   );
-  if (playerLocked) return "Your opponent's attack stops you using that Ability this turn.";
+  // Goop Gas Attack base5-78 locks both players' Pokémon Powers and names itself.
+  if (playerLock?.source) return `${playerLock.source} stops Pokémon Powers from working.`;
+  if (playerLock) return "Your opponent's attack stops you using that Ability this turn.";
   const root = cardRef.card.attachedTo != null ? findCard(state, cardRef.card.attachedTo)?.card : cardRef.card;
   const markers = root ? activeAttackMarkers(state, cardRef.playerId, root) : [];
   const cardLocked = markers.some((m) => m.kind === 'abilityLock' && (m.abilityKinds || []).includes(kind));
@@ -937,17 +1124,21 @@ function attackAbilityReads(
     ownHandCount: (attackerZones.hand || []).length,
     ownPrizesLeft: (attackerZones.prizes || []).length,
     opponentPrizesLeft: (defenderZones.prizes || []).length,
+    powersOff: powersOffActive(draft),
   };
   const defenderCtx = {
     sideCards: defenderSide,
     opponentSideCards: attackerSide,
     sideActive: defenderZones.active || [],
     sideBench: defenderZones.bench || [],
+    opponentActive: attackerZones.active || [],
+    opponentBench: attackerZones.bench || [],
     zone: 'active',
     isActive: defenderIsActive,
     attackerIsActive: true,
     attackerIsEx: isExCard(attacker),
     turnNumber: draft.turn?.number,
+    powersOff: powersOffActive(draft),
   };
   const extraTypes = abilityExtraTypes(attacker, attackerCtx);
   const attackerView = extraTypes.length
@@ -963,14 +1154,210 @@ function attackAbilityReads(
     ),
     abilityReductionBeforeWR: reduction.beforeWR,
     abilityReductionAfterWR: reduction.afterWR,
-    abilityPrevention: abilityDamagePrevention(
-      defender,
-      attackerView,
-      defenderCtx
-    ),
+    abilityPrevention: {
+      ...abilityDamagePrevention(defender, attackerView, defenderCtx),
+      legacyModifiers: abilityLegacyDamageModifiers(defender, attackerView, defenderCtx),
+    },
     weaknessOverride: abilityWeaknessOverride(defender, defenderCtx),
     ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
   };
+}
+
+/**
+ * Charity's choices for `damage`: no reduction, every multiple of 10 below it, and all of it
+ * ("reduce that damage by any amount (rounded to the nearest 10)").
+ */
+function charityReductionAmounts(damage) {
+  const amounts = [];
+  for (let amount = 0; amount < damage; amount += 10) amounts.push(amount);
+  amounts.push(damage);
+  return amounts;
+}
+
+const NINJA_TRICK_EFFECT = 'ninjaTrick';
+
+/**
+ * Koga's Ninja Trick (gym2-115): "When your opponent attacks, you may switch this Pokémon with 1
+ * of your Benched Pokémon (before damage or other effects of attacks)." The defending player
+ * chooses (none = keep) before the attack resolves; returns true when the attack suspended.
+ */
+function offerNinjaTrick(draft, declared) {
+  const { oppId, playerId, attacker, attack, atkIdx, targetInstanceId } = declared;
+  const side = draft.players[oppId];
+  const active = (side?.zones?.active || []).find((c) => !c.attachedTo);
+  if (!active || !hasAttachedTrainerEffect(side.zones.active, active, 'switchWhenAttacked')) return false;
+  const bench = benchTargets(side);
+  if (bench.length === 0) return false;
+  draft.pendingChoice = createPendingChoice({
+    player: oppId,
+    source: 'trainer',
+    prompt: `${attack.name}: Koga's Ninja Trick lets you switch ${inPlayView(draft, active)?.name || 'your Active Pokémon'} with 1 of your Benched Pokémon first (choose none to stay).`,
+    options: bench,
+    min: 0,
+    max: 1,
+    resumeToken: {
+      effectType: NINJA_TRICK_EFFECT,
+      initiatorPlayerId: playerId,
+      attackerId: attacker?.instanceId ?? null,
+      attackIndex: atkIdx,
+      switchedOutId: active.instanceId,
+      targetInstanceId,
+    },
+  });
+  return true;
+}
+
+/** Swaps the defending side's Active for the chosen Benched Pokémon, attachments following. */
+function ninjaTrickSwitch(draft, player, benchRoot, events) {
+  const active = player.zones.active.find((c) => !c.attachedTo);
+  if (!active || !benchRoot) return;
+  const moveStack = (root, from, to) => {
+    for (const card of player.zones[from].filter((c) => c === root || c.attachedTo === root.instanceId)) {
+      player.zones[from].splice(player.zones[from].indexOf(card), 1);
+      player.zones[to].push(card);
+    }
+  };
+  moveStack(active, 'active', 'bench');
+  moveStack(benchRoot, 'bench', 'active');
+  benchRoot.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
+  clearConditions(active);
+  events.push({ type: 'cardSwitched', playerId: player.playerId, activeId: active.instanceId, benchId: benchRoot.instanceId });
+}
+
+/** Resumes an attack after the Ninja Trick choice, against whichever Pokémon is now Active. */
+function resumeNinjaTrick(draft, { token, selection, choicePlayerId, activeRng, events }) {
+  const side = draft.players[choicePlayerId];
+  const picked = benchTargets(side).find((c) => c.instanceId === (selection || [])[0]);
+  if (picked) ninjaTrickSwitch(draft, side, picked, events);
+  const playerId = token.initiatorPlayerId;
+  const attackerPlayer = draft.players[playerId];
+  const attackerRef = findCard(draft, token.attackerId);
+  const attacker = attackerRef?.playerId === playerId ? attackerRef.card : null;
+  const attackerView = attackViewFor(draft, attacker);
+  const attack = attackerView?.attacks?.[token.attackIndex ?? 0];
+  if (!attacker || !attack) {
+    endTurnAfterFailedAttack(draft, { playerId, oppId: choicePlayerId, activeRng, events });
+    return;
+  }
+  const keepTarget = token.targetInstanceId != null && token.targetInstanceId !== token.switchedOutId;
+  const targetRef = keepTarget ? findCard(draft, token.targetInstanceId) : null;
+  resolveDeclaredAttack(draft, {
+    playerId,
+    activeRng,
+    events,
+    attacker,
+    defender: targetRef ? targetRef.card : (side.zones.active || []).find((c) => !c.attachedTo) || null,
+    defenderPlayerId: targetRef?.playerId || choicePlayerId,
+    oppId: choicePlayerId,
+    attack,
+    attackerPlayer,
+    attackerView,
+    atkIdx: token.attackIndex ?? 0,
+    targetInstanceId: keepTarget ? token.targetInstanceId : null,
+  });
+}
+
+/**
+ * The attack after its declaration gates (Confusion, Smokescreen, Pattern Distraction) and the
+ * defending side's Koga's Ninja Trick: copy-attack selection, then coins and the effect phase.
+ */
+function resolveDeclaredAttack(draft, ctx) {
+  const {
+    playerId,
+    activeRng,
+    events,
+    attacker,
+    defender,
+    defenderPlayerId,
+    oppId,
+    attack,
+    attackerPlayer,
+    attackerView,
+    atkIdx,
+    targetInstanceId,
+  } = ctx;
+  // A copy attack (design 031) picks the attack it uses before any coin is flipped.
+  const copy = parseCopyAttack(attack?.text);
+  // Misty's Psyduck ESP (design 049): all 3 heads copies; otherwise the attack's own text
+  // resolves with these same coins (1 heads draws, 2 heads does 20 damage).
+  let presetCoinResult = null;
+  if (copy?.coinGateFlips > 1) {
+    const flips = Array.from({ length: copy.coinGateFlips }, () => flipCoin(activeRng));
+    const headsCount = flips.filter((f) => f === 'heads').length;
+    const allMatch = flips.every((f) => f === copy.coinGate);
+    const coin = headsCount === flips.length ? 'heads' : headsCount === 0 ? 'tails' : null;
+    events.push({ type: 'attackCoinFlipped', playerId, attackName: attack.name, coin, headsCount, flips });
+    if (!allMatch && !copy.ownTextOnMiss) {
+      endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+      return;
+    }
+    if (copy.ownTextOnMiss) presetCoinResult = { coin, headsCount, flips };
+    if (!allMatch) {
+      flipAndResolveAttack(draft, {
+        playerId,
+        activeRng,
+        events,
+        attacker,
+        defender,
+        defenderPlayerId,
+        oppId,
+        attack,
+        attackerPlayer,
+        attackerView,
+        atkIdx,
+        targetInstanceId,
+        presetCoinResult,
+      });
+      return;
+    }
+  } else if (copy?.coinGate) {
+    // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
+    const coin = flipCoin(activeRng);
+    events.push({
+      type: 'attackCoinFlipped',
+      playerId,
+      attackName: attack.name,
+      coin,
+      headsCount: coin === 'heads' ? 1 : 0,
+      flips: [coin],
+    });
+    if (coin !== copy.coinGate) {
+      endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+      return;
+    }
+  }
+  if (
+    copy &&
+    offerCopiedAttack(draft, {
+      copy,
+      playerId,
+      oppId,
+      defenderPlayerId,
+      attacker,
+      defender,
+      atkIdx,
+      targetInstanceId,
+      activeRng,
+      events,
+    })
+  ) {
+    return;
+  }
+  flipAndResolveAttack(draft, {
+    playerId,
+    activeRng,
+    events,
+    attacker,
+    defender,
+    defenderPlayerId,
+    oppId,
+    attack,
+    attackerPlayer,
+    attackerView,
+    atkIdx,
+    targetInstanceId,
+    presetCoinResult,
+  });
 }
 
 /** The defending player's flip for a surviveKnockOutCoin marker: true on heads. */
@@ -991,6 +1378,29 @@ function endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events })
   if (isGameConcluded(draft)) return;
   resolveCheckup(draft, { rng: activeRng, events, endingPlayerId: playerId });
   if (!isGameConcluded(draft)) advanceTurn(draft, { nextPlayerId: oppId, events });
+}
+
+/**
+ * Baby rule (I230, baby-rule.mjs): when the opponent's Active is a Baby Pokémon, the attacker
+ * flips before anything else — before Confusion (WotC chat Nov 14, 2002, Q8: "Baby rule.") and
+ * before any cost is paid. Tails ends the turn without an attack. True when the attack stops.
+ */
+function babyRuleStopsAttack(draft, { playerId, oppId, attacker, attack, activeRng, events }) {
+  const oppActive = draft.players[oppId]?.zones?.active || [];
+  const root = oppActive.find((c) => !c.attachedTo);
+  if (!isBabyPokemon(topPokemonCard(oppActive, root))) return false;
+  const face = flipCoin(activeRng);
+  events.push({ type: 'coinFlipped', playerId, face, source: 'Baby rule', instanceId: root.instanceId });
+  if (face === 'heads') return false;
+  events.push({
+    type: 'attackPrevented',
+    playerId,
+    attackerId: attacker?.instanceId ?? null,
+    attackName: attack?.name,
+    source: 'Baby rule',
+  });
+  endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
+  return true;
 }
 
 /**
@@ -1182,6 +1592,7 @@ function applyAttackTargets(
     const ref = findCard(draft, id);
     if (!ref || ref.playerId !== defenderPlayerId) continue;
     const clause = targetClauseFor(draft, baseClause, ref.card);
+    const ignoreDefenderEffects = Boolean(clause.immunity?.ignoreDefenderEffects);
     if (ref.zoneId === 'bench') {
       dealt += clause.amount;
       damageBenchedPokemon(draft, {
@@ -1194,6 +1605,7 @@ function applyAttackTargets(
         activeRng,
         countersPlaced: clause.kind === 'counters',
         ownAttack: clause.side === 'own',
+        ignoreDefenderEffects,
         events,
       });
     } else if (ref.zoneId === 'active') {
@@ -1204,6 +1616,7 @@ function applyAttackTargets(
           : clause.amount,
         attackerPlayerId,
         countersPlaced: clause.kind === 'counters',
+        legacyApplied: Boolean(clause.activeWR) || ignoreDefenderEffects,
         events,
       });
     }
@@ -1532,11 +1945,12 @@ function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'active' 
   });
 
   // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat
-  // Cost is N less" wording and the opponent-side increases (A10).
+  // Cost is N less" wording and the opponent-side increases (A10). The position
+  // lists let "as long as this Pokémon is on your Bench / your Active Pokémon"
+  // holders be read (Dodrio Retreat Aid, Dark Muk Sticky Goo).
   const opponent = opponentPlayer;
   cost += abilityRetreatCost(inPlayView(state, card), {
-    sideCards,
-    opponentSideCards,
+    ...abilitySideContext(state, playerId),
     zone: zoneId,
     isActive,
   });
@@ -2512,6 +2926,47 @@ function discardEndOfTurnTools(draft, { endingPlayerId, events }) {
   }
 }
 
+/** Takes an attached attach-Trainer off its Pokémon to its owner's discard pile or hand. */
+function detachLegacyTrainer(player, zoneId, card, outcome, events) {
+  const zone = player.zones[zoneId];
+  zone.splice(zone.indexOf(card), 1);
+  card.attachedTo = null;
+  delete card.attachedTurn;
+  delete card.reflipUsed;
+  let to = 'hand';
+  if (outcome === 'return') player.zones.hand.push(card);
+  else to = discardCardToPlayerZone(player, card);
+  events.push({ type: 'cardMoved', instanceId: card.instanceId, from: zoneId, to, playerId: player.playerId });
+}
+
+/**
+ * I224: the printed timers of WotC attach-Trainers at the end of a turn — PlusPower, Magnifier
+ * and Sabrina's ESP at the end of their owner's turn, Defender at the end of the opponent's next
+ * turn, Charity back to the hand (a Knock Out has already discarded it with its Pokémon).
+ */
+function settleAttachedTrainersAtTurnEnd(draft, { events }) {
+  const turnNumber = draft.turn?.number || 1;
+  for (const player of Object.values(draft.players || {})) {
+    for (const zoneId of ['active', 'bench']) {
+      for (const card of [...(player.zones?.[zoneId] || [])]) {
+        if (card.attachedTo == null) continue;
+        const outcome = attachedTrainerTurnEnd(card, turnNumber);
+        if (outcome) detachLegacyTrainer(player, zoneId, card, outcome, events);
+      }
+    }
+  }
+}
+
+/** Koga's Ninja Trick (gym2-115): "If this Pokémon goes to your Bench, discard this card." */
+function discardBenchedAttachedTrainers(draft, { events }) {
+  for (const player of Object.values(draft.players || {})) {
+    for (const card of [...(player.zones?.bench || [])]) {
+      if (card.attachedTo == null || legacyAttachedTrainer(card)?.discard !== 'whenBenched') continue;
+      detachLegacyTrainer(player, 'bench', card, 'discard', events);
+    }
+  }
+}
+
 /**
  * Pokémon Checkup damage from abilities (design 034 slice 4): Froslass, Magmortar,
  * Pecharunt, Team Rocket's Tyranitar, Trevenant. Applied after the per-condition
@@ -2757,6 +3212,7 @@ function resolveCheckup(
 
   // "At the end of your turn, discard …" Tools (TM/Cube Items).
   discardEndOfTurnTools(draft, { endingPlayerId, events });
+  settleAttachedTrainersAtTurnEnd(draft, { events });
 
   // Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition).
   applyEndOfTurnAbilities(draft, { events, ctx: triggerCtx, endingPlayerId });
@@ -3418,11 +3874,27 @@ function applyRetreatSwap(
 }
 
 /**
+ * Tickling Machine gym1-119: "At the end of your opponent's next turn, your opponent puts those
+ * cards back into his or her hand." The set-aside hand lives off the zones (trainer-steps
+ * opponentHandSetAside) and comes back when the turn it names ends.
+ */
+function returnSetAsideHands(draft, { endingTurn, events }) {
+  for (const player of Object.values(draft.players || {})) {
+    const setAside = player?.setAsideHand;
+    if (!setAside || (setAside.returnTurn || 0) > endingTurn) continue;
+    player.zones.hand.push(...(setAside.cards || []));
+    delete player.setAsideHand;
+    events.push({ type: 'setAsideHandReturned', playerId: player.playerId, count: (setAside.cards || []).length });
+  }
+}
+
+/**
  * Advances the turn to the next player, reset flags, and performs start-of-turn draw.
  */
 function advanceTurn(draft, { nextPlayerId, events }) {
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
+  returnSetAsideHands(draft, { endingTurn: draft.turn.number || 1, events });
   // The flags object is replaced wholesale below; a Checkup Knockout may have just
   // entitled the incoming player, and that entitlement must survive the reset so the
   // prize choice raised at the end of the command can be settled.
@@ -3465,6 +3937,9 @@ function advanceTurn(draft, { nextPlayerId, events }) {
       delete p.flags.ignoreDefenderEffectsTurn;
       delete p.flags.evolutionAttacksTurn;
       delete p.flags.willFirstCoin;
+      delete p.flags.turnAttackRiders;
+      delete p.flags.freeEvolveRoots;
+      delete p.flags.energyAttachPlan;
     }
   }
 
@@ -4000,7 +4475,8 @@ function attackCostPayable(state, playerId, active, attack) {
   const energyEntries = expandEnergyEntries(
     applyEnergyMultiplier(
       attached.map((c) => serverEnergyDescriptor(c, energyContext)),
-      sideCards
+      sideCards,
+      abilitySideContext(state, playerId)
     )
   );
   // Cost modifiers must be priced exactly as the client and the attack
@@ -4306,6 +4782,12 @@ export function validateLegality(state, command) {
           ? playLockReason(player, attachKinds, state.turn?.number || 1)
           : null;
         if (attachLock) return { allowed: false, reason: attachLock };
+        // A Tool attached from the hand is played, so an Ability play lock reaches it
+        // (Dark Vileplume Hay Fever locks every Trainer card).
+        if (isToolOrMachineTrainer(cardRef.card)) {
+          const toolLock = abilityPlayLocks(cardRef.card, abilitySideContext(state, playerId));
+          if (toolLock) return { allowed: false, reason: toolLock.reason };
+        }
       }
       // "This card can only be attached to …" (Team Rocket's Energy, Shield Energy, …).
       if (cardRef?.zoneId === 'hand' && isEnergy(cardRef.card) && isSpecialEnergyCard(cardRef.card)) {
@@ -4331,7 +4813,9 @@ export function validateLegality(state, command) {
         }
       }
       if (cardRef && isEnergy(cardRef.card)) {
-        if (player.flags?.energyAttached) {
+        const plan = cardRef.zoneId === 'hand' ? energyAttachPlanMatch(state, player, cardRef.card, payload.targetInstanceId) : null;
+        const planAllows = Boolean(plan && plan.plan.hostId === plan.hostId && plan.plan.attached < plan.plan.count);
+        if (player.flags?.energyAttached && !planAllows) {
           // Check for unlimited energy acceleration abilities (Phase 4)
           const inPlayPokemon = [
             ...(player.zones?.active || []),
@@ -4451,7 +4935,12 @@ export function validateLegality(state, command) {
         // "This Pokémon can evolve during your first turn or the turn you play
         // it" (Scatterbug/Eevee/Luxio/Spearow/Shelmet/Karrablast) relaxes the
         // first-turn and just-played gates for that Pokémon.
-        const evolvePermission = abilityEvolvePermission(targetRef.card, evolveCtx);
+        // Giovanni gym2-18: the chosen Pokémon (by stack root) ignores the first-turn, just-played
+        // and once-per-turn gates for the rest of the turn.
+        const freeEvolve = (player.flags?.freeEvolveRoots || []).includes(
+          attachmentHostId(state, payload.targetInstanceId)
+        );
+        const evolvePermission = freeEvolve || abilityEvolvePermission(targetRef.card, evolveCtx);
         if (!evolvePermission && (state.turn?.number || 1) <= 2) {
           return { allowed: false, reason: "Can't evolve on the first turn." };
         }
@@ -4476,7 +4965,7 @@ export function validateLegality(state, command) {
               "That Pokémon was just played this turn — it can't evolve yet.",
           };
         }
-        if (!stadiumRelaxes && player.flags?.evolved?.[payload.targetInstanceId]) {
+        if (!stadiumRelaxes && !freeEvolve && player.flags?.evolved?.[payload.targetInstanceId]) {
           return {
             allowed: false,
             reason: 'Already evolved that Pokémon this turn.',
@@ -4491,6 +4980,8 @@ export function validateLegality(state, command) {
             ? order[order.indexOf(baseStage) + 1]
             : null;
         const evoStage = normalizeStage(cardRef.card.stage) || inferredStage;
+        // A Basic played onto the Baby it "Evolves into" is an Evolution card (baby-rule.mjs).
+        if (evoStage === 'Basic' && isBabyEvolution(topTarget, cardRef.card)) return { allowed: true };
         if (!evoStage || evoStage === 'Basic') {
           return {
             allowed: false,
@@ -4658,6 +5149,10 @@ export function validateLegality(state, command) {
           reason: `This Pokémon can't use ${attack?.name || whileActive.name} again until it leaves the Active Spot.`,
         };
       }
+      // WotC Leer / Freeze (I227): a lock marker the opponent put on this Pokémon.
+      if (activeAttackMarkers(state, playerId, active).some((m) => m.kind === 'cantAttack')) {
+        return { allowed: false, reason: "This Pokémon can't attack during this turn." };
+      }
       // Encore / Amnesia (design 033): attack locks the opponent put on this Pokémon.
       const chosenName = String(attack?.name || '').toLowerCase();
       for (const lock of activeAttackMarkers(state, playerId, active).filter((m) => m.kind === 'attackLock')) {
@@ -4716,6 +5211,10 @@ export function validateLegality(state, command) {
           allowed: false,
           reason: "The Defending Pokémon can't retreat.",
         };
+      }
+      // WotC Spider Web / Mean Look (I227): a lock marker the opponent put on this Pokémon.
+      if (activeAttackMarkers(state, playerId, active).some((m) => m.kind === 'cantRetreat')) {
+        return { allowed: false, reason: "The Defending Pokémon can't retreat." };
       }
       // Fossil Items played as Pokémon: "This card can't retreat."
       if (active.fossilCantRetreat) {
@@ -4880,6 +5379,12 @@ export function validateLegality(state, command) {
           ownActive: opponentActiveTop(player),
           koedLastOppTurn: Boolean(player.flags?.koedLastOppTurn),
           koedLastOppTurnVictims: player.flags?.koedLastOppTurnVictims || [],
+          ownAttachedEnergyCount: [...(player.zones?.active || []), ...(player.zones?.bench || [])].filter(
+            (c) => c.attachedTo && isEnergy(c)
+          ).length,
+          handEnergyCount: (player.zones?.hand || []).filter((c) => isEnergy(c)).length,
+          handPokemonCount: (player.zones?.hand || []).filter((c) => isPokemon(c)).length,
+          evolutionCardsLocked: abilityEvolutionCardLock(abilitySideContext(state, playerId)),
           ...trainerTargetCounts(
             player,
             ownedCards(player),
@@ -4887,6 +5392,10 @@ export function validateLegality(state, command) {
           ),
         });
         if (blockReason) return { allowed: false, reason: blockReason };
+        // I224: a WotC attach-Trainer needs a Pokémon its printed target allows.
+        if (legacyAttachedTrainer(cardRef.card) && legacyAttachTargets(player, cardRef.card).length === 0) {
+          return { allowed: false, reason: `${cardRef.card.name} has no Pokémon it can be attached to.` };
+        }
         // Opponent-attack play locks (Distort/Sonic Volume/Heavy Rock/Horror House): Item-only,
         // Special-Energy-only, Trainer-wide, or every card from hand (design 048).
         const isGear = isToolOrMachineTrainer(cardRef.card);
@@ -5954,11 +6463,21 @@ function flipAndResolveAttack(draft, ctx) {
     !glimwood &&
     !attackerPlayer?.flags?.victoryStarUsedThisTurn &&
     abilityVictoryStar(abilitySideContext(draft, playerId));
-  if (flips.length > 0 && !preset && (glimwood || victoryStar)) {
+  // Sabrina's ESP (gym1-117): "If that Pokémon uses and attack that involves flipping coins,
+  // Sabrina's ESP lets you re-flip those coins once. If you do, re-flip all the coins."
+  const esp =
+    !glimwood && !victoryStar
+      ? attachedLegacyTrainers(attackerPlayer?.zones?.active || [], ctx.attacker).find(
+          ({ card, spec }) => spec.effect.kind === 'reflipAttackCoins' && !card.reflipUsed
+        )?.card || null
+      : null;
+  if (flips.length > 0 && !preset && (glimwood || victoryStar || esp)) {
+    const reflipSource = glimwood ? 'glimwood' : victoryStar ? 'victoryStar' : 'sabrinasEsp';
+    const sourceLabel = glimwood ? 'Glimwood Tangle' : victoryStar ? 'Victory Star' : esp.name;
     draft.pendingChoice = createPendingChoice({
       player: playerId,
-      source: glimwood ? 'stadium' : 'ability',
-      prompt: `${attack.name}: keep the coin results or re-flip them (${glimwood ? 'Glimwood Tangle' : 'Victory Star'})?`,
+      source: glimwood ? 'stadium' : victoryStar ? 'ability' : 'trainer',
+      prompt: `${attack.name}: keep the coin results or re-flip them (${sourceLabel})?`,
       // Numeric sentinels: the choice validator only accepts integer
       // instanceIds. 1 = keep, 2 = re-flip.
       options: [
@@ -5969,7 +6488,8 @@ function flipAndResolveAttack(draft, ctx) {
       max: 1,
       resumeToken: {
         effectType: 'glimwood',
-        reflipSource: glimwood ? 'glimwood' : 'victoryStar',
+        reflipSource,
+        ...(esp ? { reflipCardId: esp.instanceId } : {}),
         initiatorPlayerId: playerId,
         attackIndex: atkIdx,
         targetInstanceId,
@@ -6920,19 +7440,72 @@ function resolveAttackEffectPhase(draft, ctx) {
         // Vermilion City Gym: Lt. Surge's Pokémon flip when attacking. Heads adds
         // 10 damage after Weakness/Resistance when the attack does damage; tails
         // deals 10 to the attacker in addition to the attack. The printed "may
-        // flip" is auto-flipped (no optional-coin protocol exists).
+        // flip" is auto-flipped (no optional-coin protocol exists). A Charity pause
+        // re-enters with the face already flipped (`vermilionFace`).
         const vermilion = stadiumAttackCoinModifier(
           draft.stadium?.card || draft.stadium,
           { attacker: attackerView }
         );
+        // Misty gym1-18: +20 after Weakness/Resistance to an attack by a Pokémon with Misty in its
+        // name that does damage to the Defending Pokémon.
+        const afterWrBonus = turnDamageBonusAfterWR(draft.players[playerId]?.flags?.turnDamageBonuses, attackerView);
+        if (afterWrBonus > 0 && dmgDealt > 0) dmgDealt += afterWrBonus;
+        let vermilionFace = ctx.vermilionFace;
         if (vermilion) {
-          const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
-          events.push({ type: 'coinFlipped', playerId, face, source: vermilion.source });
-          if (face === 'heads') {
+          if (vermilionFace === undefined) {
+            vermilionFace = activeRng.next() < 0.5 ? 'heads' : 'tails';
+            events.push({ type: 'coinFlipped', playerId, face: vermilionFace, source: vermilion.source });
+          }
+          if (vermilionFace === 'heads') {
             if (dmgDealt > 0) dmgDealt += vermilion.headsBonus;
           } else {
             stadiumSelfDamage = vermilion.tailsSelfDamage;
           }
+        }
+
+        // Charity (gym1-99): "If that Pokémon attacks and does damage to the Defending Pokémon,
+        // you may reduce that damage by any amount (rounded to the nearest 10)." The attacker picks
+        // before the damage lands, from the damage after every after-W/R bonus above; the attack
+        // re-enters here with `charityReduction` settled.
+        const charityMax = dmgResult.prevented ? 0 : Math.max(0, dmgDealt - protectorReduction);
+        if (
+          charityMax > 0 &&
+          ctx.charityReduction === undefined &&
+          hasAttachedTrainerEffect(attackerZoneCards, attacker, 'optionalDamageReduction')
+        ) {
+          draft.pendingChoice = createPendingChoice({
+            player: playerId,
+            source: 'trainer',
+            prompt: `${attack.name}: Charity lets you reduce the ${charityMax} damage to ${defenderView.name || 'the Defending Pokémon'}. Reduce it by how much?`,
+            options: charityReductionAmounts(charityMax).map((amount, index) => ({
+              instanceId: index + 1,
+              name: amount === 0 ? 'Do not reduce' : `Reduce by ${amount}`,
+              type: 'option',
+            })),
+            min: 1,
+            max: 1,
+            resumeToken: {
+              ...resumeBase,
+              effectType: 'attackCharityReduction',
+              charityAmounts: charityReductionAmounts(charityMax),
+              targetInstanceId: defender.instanceId,
+              values: {
+                energyDiscarded,
+                milledMatches,
+                revealedMatches,
+                energyReturned,
+                optionalCostPaid,
+                optionalCostCount,
+                discardFlipHeads,
+                handDiscarded,
+                lostZoned,
+                preStepsDone: true,
+                ...(ctx.protectorDiscarded !== undefined ? { protectorDiscarded: ctx.protectorDiscarded } : {}),
+                ...(vermilionFace !== undefined ? { vermilionFace } : {}),
+              },
+            },
+          });
+          return;
         }
 
         if (protectorReduction > 0 && dmgDealt > 0) {
@@ -6943,6 +7516,18 @@ function resolveAttackEffectPhase(draft, ctx) {
             playerId: defenderPlayerId,
             discarded: ctx.protectorDiscarded,
             reduction: protectorReduction,
+          });
+        }
+
+        if (ctx.charityReduction > 0 && dmgDealt > 0) {
+          const reduction = Math.min(dmgDealt, ctx.charityReduction);
+          dmgDealt -= reduction;
+          events.push({
+            type: 'damageReducedByAttacker',
+            instanceId: defender.instanceId,
+            playerId,
+            reduction,
+            source: 'Charity',
           });
         }
 
@@ -7092,6 +7677,16 @@ function resolveAttackEffectPhase(draft, ctx) {
               dealt: dmgDealt,
               ...(weaknessApplied && { weakness: true }),
             });
+          }
+        }
+
+        // Koga gym2-19: "If an attack from a Pokémon with Koga in its name does damage to a
+        // Defending Pokémon this turn, that Pokémon is then Poisoned."
+        if (dmgDealt > 0 && !dmgResult.prevented && !defenderKnockedOut) {
+          const attackerName = String(attackerView?.name || '').toLowerCase();
+          for (const rider of draft.players[playerId]?.flags?.turnAttackRiders || []) {
+            if (!attackerName.includes(rider.nameTag)) continue;
+            if (addCondition(defender, rider.condition)) events.push(conditionsUpdatedEvent(defender, rider.condition));
           }
         }
 
@@ -7251,7 +7846,15 @@ function resolveAttackEffectPhase(draft, ctx) {
       // Recoil: printed damage the attack deals to its own Pokémon (plus a
       // Vermilion City Gym tails). A recoil KO hands the prize entitlement to the
       // DEFENDING player.
-      const selfDamage = parsed.selfDamage + stadiumSelfDamage;
+      // Defender (base1-80) on the attacker: "Damage done to that Pokémon by attacks" includes its own.
+      const recoil = attacker
+        ? legacyModifiedDamage(draft, {
+            victim: attacker,
+            victimPlayerId: playerId,
+            amount: Math.max(0, parsed.selfDamage - attachedTrainerDamageReduction(attackerPlayer?.zones?.active || [], attacker)),
+          })
+        : parsed.selfDamage;
+      const selfDamage = recoil + stadiumSelfDamage;
       if (selfDamage > 0 && attacker) {
         attacker.damage = (attacker.damage || 0) + selfDamage;
         events.push({
@@ -8431,6 +9034,9 @@ export function applyCommand(state, command, rng = null) {
           if (!draft.players[playerId].flags) {
             draft.players[playerId].flags = {};
           }
+          if (cardRef.zoneId === 'hand') {
+            recordEnergyAttachPlan(draft, draft.players[playerId], cardRef.card, hostRef.card.instanceId);
+          }
           draft.players[playerId].flags.energyAttached = true;
           // "If you attach a {F} Energy card from your hand to this Pokémon during this turn"
           // (Flygon Sand Sonic): the turn-scoped record the attack condition reads.
@@ -8795,6 +9401,11 @@ export function applyCommand(state, command, rng = null) {
         name: 'Attack',
         damage: 10,
       };
+      const oppId = Object.keys(draft.players || {}).find(
+        (id) => id !== playerId
+      );
+      if (babyRuleStopsAttack(draft, { playerId, oppId, attacker, attack, activeRng, events })) break;
+
       // Memory Berry (Aquapolis 128, Crystal Guardians 80): "discard this card at the end of any
       // turn the Pokémon attacks" — the end-of-turn Tool sweep discards it (design 049).
       if (attacker && !isStadiumToolNegation(draft.stadium?.card || draft.stadium)) {
@@ -8803,9 +9414,6 @@ export function applyCommand(state, command, rng = null) {
         }
       }
 
-      const oppId = Object.keys(draft.players || {}).find(
-        (id) => id !== playerId
-      );
       const defenderPlayer = draft.players[oppId];
       let defender = null;
       let defenderPlayerId = oppId;
@@ -8877,75 +9485,7 @@ export function applyCommand(state, command, rng = null) {
         }
       }
 
-      // A copy attack (design 031) picks the attack it uses before any coin is flipped.
-      const targetInstanceId = payload?.targetInstanceId ?? null;
-      const copy = parseCopyAttack(attack?.text);
-      // Misty's Psyduck ESP (design 049): all 3 heads copies; otherwise the attack's own text
-      // resolves with these same coins (1 heads draws, 2 heads does 20 damage).
-      let presetCoinResult = null;
-      if (copy?.coinGateFlips > 1) {
-        const flips = Array.from({ length: copy.coinGateFlips }, () => flipCoin(activeRng));
-        const headsCount = flips.filter((f) => f === 'heads').length;
-        const allMatch = flips.every((f) => f === copy.coinGate);
-        const coin = headsCount === flips.length ? 'heads' : headsCount === 0 ? 'tails' : null;
-        events.push({ type: 'attackCoinFlipped', playerId, attackName: attack.name, coin, headsCount, flips });
-        if (!allMatch && !copy.ownTextOnMiss) {
-          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
-          break;
-        }
-        if (copy.ownTextOnMiss) presetCoinResult = { coin, headsCount, flips };
-        if (!allMatch) {
-          flipAndResolveAttack(draft, {
-            playerId,
-            activeRng,
-            events,
-            attacker,
-            defender,
-            defenderPlayerId,
-            oppId,
-            attack,
-            attackerPlayer,
-            attackerView,
-            atkIdx,
-            targetInstanceId,
-            presetCoinResult,
-          });
-          break;
-        }
-      } else if (copy?.coinGate) {
-        // Togetic Mini-Metronome: the attack's own coin decides whether there is a copy at all.
-        const coin = flipCoin(activeRng);
-        events.push({
-          type: 'attackCoinFlipped',
-          playerId,
-          attackName: attack.name,
-          coin,
-          headsCount: coin === 'heads' ? 1 : 0,
-          flips: [coin],
-        });
-        if (coin !== copy.coinGate) {
-          endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
-          break;
-        }
-      }
-      if (
-        copy &&
-        offerCopiedAttack(draft, {
-          copy,
-          playerId,
-          oppId,
-          defenderPlayerId,
-          attacker,
-          defender,
-          atkIdx,
-          targetInstanceId,
-          activeRng,
-          events,
-        })
-      ) {
-        break;
-      }
-      flipAndResolveAttack(draft, {
+      const declared = {
         playerId,
         activeRng,
         events,
@@ -8957,9 +9497,10 @@ export function applyCommand(state, command, rng = null) {
         attackerPlayer,
         attackerView,
         atkIdx,
-        targetInstanceId,
-        presetCoinResult,
-      });
+        targetInstanceId: payload?.targetInstanceId ?? null,
+      };
+      if (offerNinjaTrick(draft, declared)) break;
+      resolveDeclaredAttack(draft, declared);
       break;
     }
 
@@ -9255,6 +9796,9 @@ export function applyCommand(state, command, rng = null) {
         // Victory Star is spent only by a re-flip ("you may"); Glimwood by the offer.
         if (token.reflipSource === 'victoryStar') {
           if (wantsReflip) resumer.flags.victoryStarUsedThisTurn = true;
+        } else if (token.reflipSource === 'sabrinasEsp') {
+          const espCard = wantsReflip ? findCard(draft, token.reflipCardId)?.card : null;
+          if (espCard) espCard.reflipUsed = true;
         } else {
           resumer.flags.glimwoodUsedThisTurn = true;
         }
@@ -9406,6 +9950,24 @@ export function applyCommand(state, command, rng = null) {
             events,
           });
           resolveAttackEffectPhase(draft, { ...resumeCtx, ...(token.values || {}), protectorDiscarded });
+        }
+      } else if (token.effectType === NINJA_TRICK_EFFECT) {
+        draft.pendingChoice = null;
+        resumeNinjaTrick(draft, {
+          token,
+          selection: payload.selection,
+          choicePlayerId: choice.player,
+          activeRng,
+          events,
+        });
+      } else if (token.effectType === 'attackCharityReduction') {
+        // Charity: the attack re-enters its damage step with the chosen reduction.
+        draft.pendingChoice = null;
+        const resumeCtx = attackResumeContext(draft, token, { activeRng, events });
+        if (resumeCtx) {
+          const pick = Number((payload.selection || [])[0]);
+          const charityReduction = (token.charityAmounts || [])[pick - 1] || 0;
+          resolveAttackEffectPhase(draft, { ...resumeCtx, ...(token.values || {}), charityReduction });
         }
       } else if (token.effectType === 'attackOptionalCostBonus') {
         // "You may <cost>. If you do, …": pay the accepted cost, then resume with the answer.
@@ -10281,15 +10843,22 @@ export function applyCommand(state, command, rng = null) {
         if (typeof entry.evolvesFrom === 'string')
           card.evolvesFrom = entry.evolvesFrom;
         if (Array.isArray(entry.abilities)) {
+          // The printed kind tells a Pokémon Power from a Poké-Body (Toxic Gas, Goop Gas).
+          const printedKind = (t) =>
+            typeof t === 'string' && t.trim() && t.length <= 32 ? { type: t.trim() } : {};
           card.abilities = entry.abilities
             .filter((a) => a && typeof a.text === 'string')
-            .map((a) => ({ name: String(a.name || ''), text: a.text }));
+            .map((a) => ({ name: String(a.name || ''), text: a.text, ...printedKind(a.type) }));
         }
         if (typeof entry.text === 'string') card.text = entry.text;
         if (typeof entry.trainerType === 'string')
           card.trainerType = entry.trainerType;
         if (Array.isArray(entry.subtypes))
           card.subtypes = entry.subtypes.map(String);
+        if (!card.trainerType) {
+          const derived = legacyTrainerType(card);
+          if (derived) card.trainerType = derived;
+        }
         updated += 1;
       }
 
@@ -10363,7 +10932,10 @@ export function applyCommand(state, command, rng = null) {
       break;
   }
 
-  if (draft.rulesEnabled) settleSpecialEnergyPassives(draft, { events });
+  if (draft.rulesEnabled) {
+    settleSpecialEnergyPassives(draft, { events });
+    discardBenchedAttachedTrainers(draft, { events });
+  }
   resolveDamageCounterKnockouts(draft, { events });
   settlePromotionChoices(draft, { events });
   settleKoEnergyMoves(draft, { events });

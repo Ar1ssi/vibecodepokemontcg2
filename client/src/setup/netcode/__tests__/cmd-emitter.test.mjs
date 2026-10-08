@@ -220,3 +220,17 @@ test('emitResolveChoice does not stamp protocolVersion (server negotiates it onl
   assert.equal('protocolVersion' in socket.emitted[0].data, false);
 });
 
+
+test('handleCmdRejected sounds the card-no-match cue', () => {
+  const cues = [];
+  handleCmdRejected({ reason: 'not_your_turn' }, { playUiCue: (key) => cues.push(key) });
+  assert.deepEqual(cues, ['card-no-match']);
+});
+
+test('handleCmdRejected sounds the Item-lock cue for an attack play lock only', () => {
+  const cues = [];
+  const playUiCue = (key) => cues.push(key);
+  handleCmdRejected({ reason: "Your opponent's attack stops you playing that card during this turn." }, { playUiCue });
+  handleCmdRejected({ reason: 'Time Capsule stops you playing that card during this turn.' }, { playUiCue });
+  assert.deepEqual(cues, ['itchy-pollen-hand-card', 'card-no-match']);
+});

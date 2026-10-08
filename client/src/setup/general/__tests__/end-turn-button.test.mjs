@@ -33,3 +33,12 @@ test('End Turn is wired once even if initialisation runs twice', () => {
   doc.getElementById('endTurnButton').click();
   assert.equal(passes, 1);
 });
+
+test('End Turn sounds the end-turn cue before it passes', () => {
+  const doc = board();
+  const seen = [];
+  doc.getElementById('p2PassButton').addEventListener('click', () => seen.push('pass'));
+  wireEndTurnButton(doc, (key) => seen.push(key));
+  doc.getElementById('endTurnButton').click();
+  assert.deepEqual(seen, ['end-turn', 'pass']);
+});

@@ -1,8 +1,8 @@
 ---
 name: slice-builder
-description: Implements ONE slice of an approved design whose contract is pinned (files, signatures, data, test cases). Opus 5.5 at low effort - mechanical execution, no design judgment. Refuses slices that need a design decision.
-model: opus
-effort: low
+description: Implements ONE slice of an approved design whose contract is pinned (files, signatures, data, test cases). Sonnet 5.5 at medium effort - mechanical execution, no design judgment. Refuses slices that need a design decision.
+model: claude-sonnet-5-5
+effort: medium
 tools: Read, Edit, Write, Bash, PowerShell, Grep, Glob, LSP
 ---
 You implement exactly one slice of an approved design in this repo. The brief gives you the design
