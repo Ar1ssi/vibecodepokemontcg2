@@ -682,6 +682,37 @@ dependency.
 - Slice 3: no recordings / sheet review — no Playwright browser is installed in this build
   environment (`~/.cache/ms-playwright` absent). Record one stub spec per material with
   `rec-move.mjs` on a machine with the fx-preview tooling before landing.
+- Slice 4: `anchorPoint(lane, target, dx, dy)` and `laneFromPoint(lane, x, y)` live in
+  `move-poses.mjs` (pure; `move-geometry.mjs` is not in the slice's file list). Card anchors
+  with dx = dy = 0 return the centre untouched, so every 063 drawer draws byte-identically: a
+  node harness hashing every 063 spec's drawer command log (7 progress points per beat) and
+  card-motion poses was equal before and after; a Chromium recording of Fire Blast
+  (`rec-move.mjs`, stand-in card art) plays the accepted beats.
+- Slice 4: a sky anchor on `coreCharge` hangs the orb at the point (no `lead` up the lane); on a
+  card the 063 `lead` offset still applies on top of dx / dy.
+- Slice 4: `ring kind 'fins'` needed a spin rate the design names but never declares: new
+  `rpm` (['num', 0, 240, 60]); fins use 063's `count` (1–5) and sit at `r0`. `tonguesAt` also
+  counts fins (`count`) and `coreCharge.rings` (`rings`), which the cost rule would otherwise miss.
+- Slice 4: ranges the design left open: `pillar.spread` 0–3 h, `stagger` 0–400 ms;
+  `bolt.spread` 0–3 h, `curve` −1…1 h; `fan` count 1–12, spread 0–360, lenMin 0.1–2,
+  lenMax 0.1–2.5, width 0.05–0.6, grow 0.05–0.8, flap 0–45, spin −360…360; `shade` r 0.3–2,
+  swirl 0–240, eyes enum [false, true]; `chain` links 3–16, r 0.03–0.3; `grip` size 0.5–2.
+  Pillar columns spread on screen x; bolts fan their end points on screen x.
+- Slice 4: `chainPose` works in the lane frame relative to the defender centre (x along, y
+  across) and takes the lane length as `params.length` (default 3 h); the wrap ellipse is
+  0.75 h along × 0.55 h across, so on the usual vertical lane it has the card's tall shape.
+- Slice 4: `grip` fills with the beat material's `body` (Crush Grip's spec is `normal`) rather
+  than importing `normal` itself; `shade` mottling uses the shared noise tile, absent in node, so
+  tests cover fill + rim only.
+- Slice 4: `UNIT_NAMES` in `move-spec.mjs` duplicates `UNIT_KEYS` (keeps the validator free of
+  canvas code); `move-spec.test.mjs` pins them equal. `shards` with a non-body unit draws the
+  unit at each fragment (r = half its length).
+- Slice 4: the echo ghost is `.fx-move__ghost--echo`, inserted before the attacker ghost (so
+  behind it), no new CSS; its opacity comes from WAAPI keyframes.
+- Slice 3 follow-up (slice 4): Chromium works here (`CHROMIUM=/opt/pw-browsers/chromium`,
+  `SIO_JS` from node_modules, `CARD_DIR` of stand-in PNGs since the CDNs are blocked), but the
+  per-material stub recordings are still not made: they need temporary stub specs registered.
+  Still due before landing.
 
 ## Appendix S — per-move study entries
 One entry per move, by type, in the schema of `refs/065-study/STUDY-BRIEF.md`. The entries are the

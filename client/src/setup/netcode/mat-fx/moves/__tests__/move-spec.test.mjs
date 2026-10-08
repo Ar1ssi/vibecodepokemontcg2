@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DRAWER_PARAMS,
+  ECHO_PARAMS,
+  UNIT_NAMES,
   FAMILIES,
   MAX_NODES,
   PARTICLE_BUDGET,
@@ -23,7 +25,7 @@ const has = (errors, text) => errors.some((message) => message.includes(text));
 // ---- checkParams / withDefaults -------------------------------------------------
 
 test('every drawer has a table, and its defaults are valid params', () => {
-  assert.equal(Object.keys(DRAWER_PARAMS).length, 23);
+  assert.equal(Object.keys(DRAWER_PARAMS).length, 27); // 063's 23 + design 065's fan, shade, chain, grip
   for (const drawer of Object.keys(DRAWER_PARAMS)) {
     assert.deepEqual(checkParams(drawer, {}), [], drawer);
     assert.deepEqual(checkParams(drawer, withDefaults(drawer, {})), [], `${drawer} defaults`);
@@ -308,4 +310,75 @@ test('design 065: every drawer accepts a beat tint and hues', () => {
   assert.equal(checkParams('beam', { hues: [] }).length, 1);
   assert.equal(checkParams('beam', { hues: Array(7).fill('#ffffff') }).length, 1);
   assert.equal(checkParams('beam', { hues: ['red'] }).length, 1);
+});
+
+// ---- design 065 slice 4: anchors, new drawers, tonguesAt, echo ------------------------
+
+test('design 065: the anchor kind takes the sky points and rejects anything else', () => {
+  assert.deepEqual(checkParams('starFlare', { target: 'sky' }), []);
+  assert.equal(checkParams('starFlare', { target: 'nowhere' }).length, 1);
+  assert.deepEqual(checkParams('coreCharge', { target: 'sky-attacker', dx: 0.2 }), []);
+  for (const drawer of ['starFlare', 'speedRays', 'pillar', 'ring', 'glyph', 'cloud', 'shade', 'fan', 'coreCharge', 'orbitCharge', 'shockRings']) {
+    for (const target of ['attacker', 'defender', 'sky', 'sky-attacker']) assert.deepEqual(checkParams(drawer, { target }), [], `${drawer} ${target}`);
+    assert.equal(checkParams(drawer, { dx: 3 }).length, 1, `${drawer} dx range`);
+  }
+  assert.equal(withDefaults('coreCharge', {}).target, 'attacker');
+  assert.equal(withDefaults('starFlare', {}).target, 'defender');
+});
+
+test('design 065: extended params on the 063 drawers', () => {
+  assert.deepEqual(checkParams('projectile', { from: 'sky-attacker', unit: 'facet' }), []);
+  assert.equal(checkParams('projectile', { unit: 'cube' }).length, 1);
+  assert.deepEqual(checkParams('shards', { mode: 'cluster', unit: 'hex' }), []);
+  assert.deepEqual(checkParams('pillar', { count: 4, spread: 1.5, stagger: 120, dx: 0.3 }), []);
+  assert.deepEqual(checkParams('ring', { kind: 'fins', rpm: 90 }), []);
+  assert.deepEqual(checkParams('bolt', { count: 12, spread: 1.2, curve: -0.3 }), []);
+  assert.deepEqual(checkParams('glyph', { kind: 'heart' }), []);
+  assert.deepEqual(checkParams('coreCharge', { rings: 2 }), []);
+  assert.equal(checkParams('coreCharge', { rings: 3 }).length, 1);
+});
+
+test('design 065: tonguesAt for the new and changed drawers', () => {
+  assert.equal(tonguesAt('pillar', {}), 3);
+  assert.equal(tonguesAt('pillar', { count: 2 }), 6);
+  assert.equal(tonguesAt('bolt', {}), 3);
+  assert.equal(tonguesAt('bolt', { count: 3, branches: 2 }), 9);
+  assert.equal(tonguesAt('fan', {}), 6);
+  assert.equal(tonguesAt('fan', { count: 12 }), 12);
+  for (const drawer of ['shade', 'chain', 'grip']) assert.equal(tonguesAt(drawer, {}), 0, drawer);
+  assert.equal(tonguesAt('ring', { kind: 'fins', count: 4 }), 4);
+  assert.equal(tonguesAt('ring', {}), 0);
+});
+
+test('design 065: the new drawers sound as their families', () => {
+  const beat = (drawer) => ({ ...clone(fireBlast), beats: [{ at: 0, until: 1500, layer: 'front', drawer, params: {} }] });
+  assert.equal(deriveFamily(beat('fan')), 'burst');
+  assert.equal(deriveFamily(beat('shade')), 'chime');
+  assert.equal(deriveFamily({ ...beat('shade'), vgType: 'ghost' }), 'ghost');
+  assert.equal(deriveFamily(beat('chain')), 'projectile');
+  assert.equal(deriveFamily(beat('grip')), 'punch');
+});
+
+test('design 065: attacker echo is validated against ECHO_PARAMS and costs one node', () => {
+  const spec = clone(fireBlast);
+  spec.attacker.echo = { alpha: 0.4, offset: 0.3, fadeMs: 600 };
+  assert.deepEqual(validateSpec(spec), []);
+  assert.deepEqual(ECHO_PARAMS.alpha, ['num', 0.1, 0.6, 0.35]);
+  assert.ok(has(validateSpec({ ...spec, attacker: { ...spec.attacker, echo: { alpha: 0.9 } } }), "attacker echo: param 'alpha'"));
+  assert.ok(has(validateSpec({ ...spec, attacker: { ...spec.attacker, echo: { ghost: 1 } } }), "unknown param 'ghost'"));
+  assert.ok(has(validateSpec({ ...spec, defender: { ...spec.defender, echo: {} } }), 'echo is an attacker field'));
+  // 40 nodes with no echo: 11 base + bursts of 1 + count; an echo tips it over.
+  const full = clone(fireBlast);
+  full.particles = [
+    { ...full.particles[0], count: 14 },
+    { ...(full.particles[1] ?? full.particles[0]), count: 13 },
+  ];
+  assert.ok(!has(validateSpec(full), 'DOM nodes'));
+  full.attacker.echo = {};
+  assert.ok(has(validateSpec(full), 'DOM nodes'));
+});
+
+test('design 065: the unit names are the units of materials/_units.js', async () => {
+  const { UNIT_KEYS } = await import('../materials/_units.js');
+  assert.deepEqual([...UNIT_NAMES], [...UNIT_KEYS]);
 });

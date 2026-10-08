@@ -188,3 +188,60 @@ test('motion param schemas reject bad values and unknown keys', () => {
   assert.equal(checkAgainst(MOTION_PARAMS.defender.stagger, { hits: 1 }, 'd').length, 1);
   assert.equal(checkAgainst(MOTION_PARAMS.defender.knock, { nope: 1 }, 'd').length, 1);
 });
+
+// ---- design 065 slice 4 ----------------------------------------------------------
+
+test('lunge strikes 2: two local maxima of along in [0.4 c, c], the last at c', () => {
+  const c = SCENE.contactMs;
+  const opts = { ...SCENE, params: { strikes: 2 }, laneH: 2.4 };
+  const series = [];
+  for (let ms = 0.4 * c; ms <= c; ms += 5) series.push(attackerPose('lunge', ms, opts).along);
+  const peaks = [];
+  for (let i = 0; i < series.length; i += 1) {
+    const left = i === 0 ? -Infinity : series[i - 1];
+    const right = i === series.length - 1 ? -Infinity : series[i + 1];
+    if (series[i] > left && series[i] >= right) peaks.push(i);
+  }
+  assert.equal(peaks.length, 2, JSON.stringify(peaks));
+  assert.equal(peaks[1], series.length - 1, 'the last strike lands at contact');
+  // strikes 1 is 063's lunge.
+  for (let ms = 0; ms <= 1600; ms += 10) {
+    assert.deepEqual(attackerPose('lunge', ms, { ...SCENE, params: { strikes: 1 }, laneH: 2.4 }), attackerPose('lunge', ms, { ...SCENE, params: {}, laneH: 2.4 }));
+  }
+});
+
+test('warp shrinks to 0.15 by 0.3 c, hides, reappears short of the defender at contact, then springs home', () => {
+  const c = SCENE.contactMs;
+  const opts = { ...SCENE, params: {}, laneH: 2.4 };
+  assert.equal(attackerPose('warp', 0.5 * c, opts).scale, 0.15);
+  assert.equal(attackerPose('warp', 0.5 * c, opts).glow, 0);
+  const strike = attackerPose('warp', c, opts);
+  assert.ok(Math.abs(strike.along - 1.5) < 1e-9 && strike.scale === 1);
+  assert.equal(attackerEndMs('warp', SCENE), 1.5 * c);
+});
+
+test('rear-lurch hold delays the thrust by hold ms', () => {
+  const c = SCENE.contactMs;
+  const thrustStart = (hold) => {
+    const opts = { ...SCENE, params: { hold } };
+    const rest = attackerPose('rear-lurch', 0.56 * c - 1, opts).along;
+    for (let ms = 0.56 * c; ms < 2 * c; ms += 1) if (attackerPose('rear-lurch', ms, opts).along > rest + 1e-6) return ms;
+    return null;
+  };
+  assert.equal(thrustStart(200) - thrustStart(0), 200);
+  assert.equal(attackerEndMs('rear-lurch', { ...SCENE, params: { hold: 200 } }), 1.2 * c + 200);
+  assert.deepEqual(norm(attackerPose('rear-lurch', 1.2 * c + 201, { ...SCENE, params: { hold: 200 } })), ATTACKER_REST);
+});
+
+test('stagger lead 450: the first knock lands 450 ms before contact, the last at contact', () => {
+  const c = SCENE.contactMs;
+  const opts = { ...SCENE, params: { hits: 3, lead: 450 } };
+  const before = defenderPose('stagger', c - 452, opts);
+  const first = defenderPose('stagger', c - 440, opts);
+  assert.ok(before.scaleAlong === 1 && before.along === 0, 'nothing before the first knock');
+  assert.ok(first.along > 0 && first.scaleAlong < 1, 'the first knock is landing');
+  const last = defenderPose('stagger', c + 50, opts);
+  assert.ok(last.along > first.along, 'the last knock lands at contact');
+  assert.equal(defenderEndMs('stagger', { ...SCENE, params: { hits: 3, lead: 450 } }), c + 650);
+  assert.deepEqual(checkAgainst(MOTION_PARAMS.defender.stagger, { lead: 450 }, 'x'), []);
+});

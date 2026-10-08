@@ -19,7 +19,7 @@ import { attackerPose, defenderPose } from './card-motion.mjs';
 import { DRAWERS } from './move-drawers.js';
 import { laneGeometry, localLane, phaseProgress, toLocal, unionPadded } from './move-geometry.mjs';
 import { terrainPose } from './move-poses.mjs';
-import { DEFAULT_PAD, withDefaults } from './move-spec.mjs';
+import { DEFAULT_PAD, ECHO_PARAMS, fillDefaults, withDefaults } from './move-spec.mjs';
 import { materialFor } from './materials/index.js';
 import { lighten, tintedPalette } from './materials/_shared.js';
 
@@ -32,7 +32,10 @@ const TRAILS = Object.freeze([
 ]);
 
 const isSourceOver = (beat) =>
-  beat.drawer === 'vignette' || beat.drawer === 'smoke' || (beat.drawer === 'terrain' && beat.params.kind === 'crack');
+  beat.drawer === 'vignette' ||
+  beat.drawer === 'smoke' ||
+  beat.drawer === 'shade' ||
+  (beat.drawer === 'terrain' && beat.params.kind === 'crack');
 
 // ---- beat colours (design 065 § New pieces A) ----------------------------------
 
@@ -140,6 +143,23 @@ const animateTrail = (parts, lane, spec, lag, alpha, poseAt) => {
       return { pose: poseAt(Math.max(0, ms - lag * durationMs)), opacity: ms >= 0.3 * c && ms <= 1.15 * c ? alpha * window : 0 };
     },
     ({ pose, opacity }) => ({ transform: ghostTransform(lane, pose), opacity }),
+    GHOST_SAMPLES
+  );
+  return animateFrames(parts.ghost, frames, { duration: durationMs });
+};
+
+/**
+ * Design 065 § New pieces E: one more copy of the attacker art behind its ghost, `offset` h
+ * back along the lane, at `alpha`, fading to 0 over `fadeMs` from the scene's start (a fused
+ * or departing copy). It follows the attacker's motion.
+ */
+const animateEcho = (parts, lane, durationMs, echo, poseAt) => {
+  const frames = sampleKeyframes(
+    (t) => {
+      const ms = t * durationMs;
+      return { pose: poseAt(ms), opacity: echo.alpha * Math.max(0, 1 - ms / echo.fadeMs) };
+    },
+    ({ pose, opacity }) => ({ transform: ghostTransform(lane, { ...pose, along: pose.along - echo.offset }), opacity }),
     GHOST_SAMPLES
   );
   return animateFrames(parts.ghost, frames, { duration: durationMs });
@@ -310,6 +330,11 @@ export function playMove({ spec, attacker, defender, seed = 1, impacts = null, a
     spec.attacker.motion === 'dash'
       ? TRAILS.map(() => trailGhost(host, anchors.attacker, attacker.src, attacker.turn || 0))
       : [];
+  const echo = spec.attacker.echo ? fillDefaults(ECHO_PARAMS, spec.attacker.echo) : null;
+  const echoGhost = echo
+    ? cardGhost(host, anchors.attacker, attacker.src, attacker.turn || 0, 'fx-move__ghost--echo', { layers: false })
+    : null;
+  if (echoGhost) echoGhost.ghost.style.opacity = String(echo.alpha);
   const attackerGhost = cardGhost(host, anchors.attacker, attacker.src, attacker.turn || 0, 'fx-move__ghost--attacker');
   const defenderGhost = cardGhost(host, anchors.defender, defender.src, defender.turn || 0, 'fx-move__ghost--defender');
   if (spec.defender.motion === 'freeze') defenderGhost.heat.classList.add('fx-move__heat--cold');
@@ -319,6 +344,7 @@ export function playMove({ spec, attacker, defender, seed = 1, impacts = null, a
     ...animateGhost(attackerGhost, local, durationMs, attackerAt),
     ...animateGhost(defenderGhost, local, durationMs, defenderAt),
     ...trails.map((trail, index) => animateTrail(trail, local, spec, TRAILS[index].lag, TRAILS[index].alpha, attackerAt)),
+    ...(echoGhost ? [animateEcho(echoGhost, local, durationMs, echo, attackerAt)] : []),
   ];
   const burstMs = Math.max(0, ...(spec.particles ?? []).map((burst) => burst.durationMs));
   const backstop = durationMs + burstMs + BACKSTOP_PAD_MS;

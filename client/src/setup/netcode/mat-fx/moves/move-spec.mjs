@@ -59,6 +59,15 @@ export const MAX_BURSTS = 2;
 export const MAX_NODES = 40;
 
 const TARGET = (fallback = 'defender') => ['target', fallback];
+/** Design 065 § New pieces B: an anchored drawer's place plus its offsets (h). */
+const ANCHORED = (fallback = 'defender') => ({
+  target: ['anchor', fallback],
+  dx: ['num', -2, 2, 0],
+  dy: ['num', -2, 2, 0],
+});
+/** Design 065 § New pieces C: the bodies a travelling / orbiting drawer can draw (materials/_units.js). */
+export const UNIT_NAMES = Object.freeze(['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+const UNIT = ['enum', UNIT_NAMES, 'body'];
 
 const BASE_DRAWER_PARAMS = {
   orbitCharge: {
@@ -68,12 +77,16 @@ const BASE_DRAWER_PARAMS = {
     r1: ['num', 0.05, 0.5, 0.24],
     tongues: ['int', 0, 6, 4],
     tilt: ['num', 0.2, 1, 0.42],
+    ...ANCHORED('attacker'),
+    unit: UNIT,
   },
   coreCharge: {
     lead: ['num', 0, 1, 0.42],
     r0: ['num', 0.05, 0.5, 0.18],
     r1: ['num', 0.1, 1, 0.56],
     from: ['num', 0, 0.9, 0.3],
+    ...ANCHORED('attacker'),
+    rings: ['int', 0, 2, 0],
   },
   shockRings: {
     count: ['int', 1, 4, 2],
@@ -81,6 +94,7 @@ const BASE_DRAWER_PARAMS = {
     r0: ['num', 0.1, 1, 0.3],
     r1: ['num', 0.5, 2.5, 1.3],
     squash: ['num', 0.2, 1, 0.45],
+    ...ANCHORED('attacker'),
   },
   projectile: {
     path: ['enum', ['straight', 'arc', 'spiral'], 'arc'],
@@ -89,6 +103,8 @@ const BASE_DRAWER_PARAMS = {
     bow: ['num', 0, 0.6, 0.2],
     tongues: ['int', 0, 12, 9],
     ease: ['enum', ['in', 'linear', 'out'], 'in'],
+    from: ['enum', ['attacker', 'defender', 'sky', 'sky-attacker'], 'attacker'],
+    unit: UNIT,
   },
   vignette: {
     target: TARGET(),
@@ -100,7 +116,7 @@ const BASE_DRAWER_PARAMS = {
     count: ['int', 8, 40, 28],
     inner: ['num', 0.1, 0.6, 0.3],
     outer: ['num', 0.8, 2, 1.7],
-    target: TARGET(),
+    ...ANCHORED(),
   },
   starFlare: {
     arms: ['arms', 'dai'],
@@ -108,7 +124,7 @@ const BASE_DRAWER_PARAMS = {
     core: ['num', 0.2, 0.7, 0.46],
     grow: ['num', 0.15, 0.5, 0.3],
     breakAt: ['num', 0.4, 0.9, 0.6],
-    target: TARGET(),
+    ...ANCHORED(),
   },
   impactFlash: {
     r0: ['num', 0.2, 1, 0.6],
@@ -142,7 +158,10 @@ const BASE_DRAWER_PARAMS = {
     height: ['num', 0.8, 2.5, 1.8],
     w: ['num', 0.2, 1, 0.6],
     from: ['enum', ['below', 'above'], 'below'],
-    target: TARGET(),
+    ...ANCHORED(),
+    count: ['int', 1, 4, 1],
+    spread: ['num', 0, 3, 0],
+    stagger: ['num', 0, 400, 0],
   },
   slashArc: {
     sweep: ['deg', 120],
@@ -165,7 +184,7 @@ const BASE_DRAWER_PARAMS = {
     drift: ['num', 0, 1.5, 0.6],
     direction: ['deg', -90],
     alpha: ['num', 0.1, 0.8, 0.5],
-    target: TARGET(),
+    ...ANCHORED(),
   },
   spiral: {
     turns: ['num', 1, 5, 2.5],
@@ -185,6 +204,7 @@ const BASE_DRAWER_PARAMS = {
     // Where the bodies leave from: 'defender' flies them back up the lane (drains: Absorb);
     // 'sky' drops them onto the defender from above it on screen (meteors: Draco Meteor).
     from: ['enum', ['attacker', 'defender', 'sky'], 'attacker'],
+    unit: UNIT,
   },
   aura: {
     target: TARGET('attacker'),
@@ -206,6 +226,8 @@ const BASE_DRAWER_PARAMS = {
     distance: ['num', 0.3, 1.8, 1.1],
     spin: ['num', 0, 720, 360],
     target: TARGET(),
+    unit: UNIT,
+    mode: ['enum', ['burst', 'cluster'], 'burst'],
   },
   bolt: {
     from: ['enum', ['attacker', 'sky'], 'attacker'],
@@ -214,18 +236,53 @@ const BASE_DRAWER_PARAMS = {
     branches: ['int', 0, 4, 2],
     rerollMs: ['num', 20, 120, 45],
     width: ['num', 0.03, 0.3, 0.1],
+    count: ['int', 1, 12, 1],
+    spread: ['num', 0, 3, 0.8],
+    curve: ['num', -1, 1, 0],
   },
   ring: {
     count: ['int', 1, 5, 3],
     r0: ['num', 0.1, 0.8, 0.3],
     r1: ['num', 0.6, 2.5, 1.5],
-    kind: ['enum', ['floor', 'face'], 'floor'],
+    kind: ['enum', ['floor', 'face', 'fins'], 'floor'],
     width: ['num', 0.02, 0.15, 0.06],
-    target: TARGET(),
+    ...ANCHORED(),
+    rpm: ['num', 0, 240, 60],
   },
   glyph: {
     r: ['num', 0.4, 1.4, 0.9],
-    target: TARGET(),
+    ...ANCHORED(),
+    kind: ['enum', ['material', 'lattice', 'hex', 'heart'], 'material'],
+  },
+  // ---- design 065 § New pieces D ----
+  fan: {
+    ...ANCHORED('attacker'),
+    count: ['int', 1, 12, 6],
+    spread: ['num', 0, 360, 110],
+    direction: ['deg', 180],
+    lenMin: ['num', 0.1, 2, 0.6],
+    lenMax: ['num', 0.1, 2.5, 1.0],
+    width: ['num', 0.05, 0.6, 0.22],
+    grow: ['num', 0.05, 0.8, 0.3],
+    flap: ['num', 0, 45, 0],
+    spin: ['num', -360, 360, 0],
+  },
+  shade: {
+    ...ANCHORED('defender'),
+    kind: ['enum', ['disc', 'dome', 'giant', 'sphere'], 'disc'],
+    r: ['num', 0.3, 2, 0.9],
+    fill: ['enum', ['deep', 'body', 'hot', 'core'], 'deep'],
+    fillAlpha: ['num', 0, 1, 1],
+    rimAlpha: ['num', 0, 1, 0.6],
+    swirl: ['num', 0, 240, 20],
+    eyes: ['enum', [false, true], false],
+  },
+  chain: {
+    links: ['int', 3, 16, 9],
+    r: ['num', 0.03, 0.3, 0.09],
+  },
+  grip: {
+    size: ['num', 0.5, 2, 1.2],
   },
 };
 
@@ -273,13 +330,19 @@ export function tonguesAt(drawer, params) {
     case 'shards':
       return p.count;
     case 'pillar':
-      return 3;
+      return 3 * p.count;
+    case 'fan':
+      return p.count;
+    case 'ring':
+      return p.kind === 'fins' ? p.count : 0;
+    case 'coreCharge':
+      return p.rings;
     case 'spiral':
       return p.tongues;
     case 'volley':
       return p.count * p.tongues;
     case 'bolt':
-      return 1 + p.branches;
+      return p.count * (1 + p.branches);
     default:
       return 0;
   }
@@ -310,6 +373,10 @@ const DRAWER_FAMILY = Object.freeze({
   glyph: 'chime',
   aura: 'chime',
   ring: 'chime',
+  fan: 'burst',
+  shade: 'chime',
+  chain: 'projectile',
+  grip: 'punch',
 });
 
 /**
@@ -386,6 +453,13 @@ const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
+/** Design 065 § New pieces E: the optional attacker echo ghost (a fused or departing copy). */
+export const ECHO_PARAMS = Object.freeze({
+  alpha: ['num', 0.1, 0.6, 0.35],
+  offset: ['num', 0, 1, 0.5],
+  fadeMs: ['int', 100, 1500, 400],
+});
+
 const checkMotion = (side, motion, errors) => {
   if (!isObject(motion)) {
     errors.push(`${side}: must be { motion, params }`);
@@ -397,6 +471,11 @@ const checkMotion = (side, motion, errors) => {
     return;
   }
   errors.push(...checkAgainst(table[motion.motion], motion.params, `${side} ${motion.motion}`));
+  if (motion.echo !== undefined) {
+    if (side !== 'attacker') errors.push(`${side}: echo is an attacker field`);
+    else if (!isObject(motion.echo)) errors.push('attacker echo: must be an object');
+    else errors.push(...checkAgainst(ECHO_PARAMS, motion.echo, 'attacker echo'));
+  }
 };
 
 const checkBeat = (beat, index, spec, errors) => {
@@ -449,7 +528,8 @@ const costErrors = (spec) => {
   if (particles > PARTICLE_BUDGET) errors.push(`cost: ${particles} particles exceeds ${PARTICLE_BUDGET}`);
   // Two dash trails are a ghost + its art each.
   const trails = spec.attacker?.motion === 'dash' ? 4 : 0;
-  const nodes = 1 + 2 + 2 * 4 + trails + bursts.reduce((sum, b) => sum + 1 + (isNum(b.count) ? b.count : 0), 0);
+  const echo = spec.attacker?.echo !== undefined ? 1 : 0;
+  const nodes = 1 + 2 + 2 * 4 + trails + echo + bursts.reduce((sum, b) => sum + 1 + (isNum(b.count) ? b.count : 0), 0);
   if (nodes > MAX_NODES) errors.push(`cost: ${nodes} DOM nodes exceeds ${MAX_NODES}`);
   return errors;
 };

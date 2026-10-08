@@ -5,6 +5,7 @@
 // px, params are the drawer's (defaults filled here). Returned lengths are px; offsets are
 // from the beat's target centre unless stated (lane-frame ones say so). DOM-free.
 import { seededRandom } from '../flow-pose.mjs';
+import { LEAD_H, SKY_HEIGHT, SKY_LEAN } from './move-geometry.mjs';
 import { withDefaults } from './move-spec.mjs';
 
 const TAU = Math.PI * 2;
@@ -599,4 +600,243 @@ export function glyphPose(s, h, params) {
   const c = clamp01(s);
   const envelope = c < 0.2 ? c / 0.2 : c > 0.75 ? (1 - c) / 0.25 : 1;
   return { r: h * r * (0.7 + 0.3 * easeOutCubic(c)), alpha: envelope, spin: 120 * c };
+}
+
+// ---- design 065 § New pieces B–D -----------------------------------------------------
+
+/**
+ * Where an anchored beat sits (host-local px): the attacker / defender centre moved `dx` h
+ * along the lane and `dy` h along its normal, or a sky point (`'sky'` over the defender,
+ * `'sky-attacker'` over the attacker: 1.7 h up, 0.5 h left on screen) moved `dx`, `dy` h on
+ * screen. Offsets of 0 give the centre untouched.
+ */
+export function anchorPoint(lane, target, dx = 0, dy = 0) {
+  const h = lane.h;
+  if (target === 'sky' || target === 'sky-attacker') {
+    const base = target === 'sky' ? { x: lane.bx, y: lane.by } : { x: lane.ax, y: lane.ay };
+    return { x: base.x - SKY_LEAN * h + dx * h, y: base.y - SKY_HEIGHT * h + dy * h };
+  }
+  const c = target === 'attacker' ? { x: lane.ax, y: lane.ay } : { x: lane.bx, y: lane.by };
+  if (!dx && !dy) return c;
+  return { x: c.x + (lane.ux * dx + lane.nx * dy) * h, y: c.y + (lane.uy * dx + lane.ny * dy) * h };
+}
+
+/**
+ * A lane from the screen point (sx, sy) onto the defender, shaped like `skyLane`'s:
+ * `lanePoint(l, 0)` is the point and `lanePoint(l, 1)` the defender centre.
+ */
+export function laneFromPoint(lane, sx, sy) {
+  const drop = Math.max(Math.hypot(lane.bx - sx, lane.by - sy), 1);
+  const ux = (lane.bx - sx) / drop;
+  const uy = (lane.by - sy) / drop;
+  const lead = lane.h * LEAD_H;
+  return {
+    ...lane,
+    ax: sx - ux * lead,
+    ay: sy - uy * lead,
+    ux,
+    uy,
+    nx: -uy,
+    ny: ux,
+    angleDeg: (Math.atan2(uy, ux) * 180) / Math.PI,
+    length: drop + lead,
+  };
+}
+
+const beatMsOf = (params, fallback) => (Number.isFinite(params?.beatMs) && params.beatMs > 0 ? params.beatMs : fallback);
+
+/**
+ * Pillar columns: `count` columns spread evenly over ±spread/2 h across the screen, each
+ * `stagger` ms after the last; `s` is each column's own progress (null before it starts).
+ * One column with no spread is 063's pillar.
+ */
+export function pillarColumns(s, h, params) {
+  const { count, spread, stagger } = withDefaults('pillar', params);
+  const beatMs = beatMsOf(params, 600);
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const x = count > 1 ? (-spread / 2 + (spread * i) / (count - 1)) * h : 0;
+    const delay = (i * stagger) / beatMs;
+    if (delay === 0) out.push({ x, s });
+    else out.push({ x, s: s < delay || delay >= 1 ? null : (s - delay) / (1 - delay) });
+  }
+  return out;
+}
+
+/**
+ * Fins: `count` short tongue spokes round the anchor spinning at `rpm` (ring kind 'fins').
+ * Offsets from the anchor, screen degrees.
+ */
+export function finsPose(s, h, params) {
+  const { count, r0, rpm } = withDefaults('ring', params);
+  const beatMs = beatMsOf(params, 600);
+  const c = clamp01(s);
+  const turn = (rpm / 60) * 360 * c * (beatMs / 1000);
+  const env = Math.sin(Math.PI * c) ** 0.6;
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const angleDeg = (i * 360) / count + turn;
+    out.push({
+      x: Math.cos(rad(angleDeg)) * r0 * h,
+      y: Math.sin(rad(angleDeg)) * r0 * h * 0.6,
+      angleDeg,
+      length: h * 0.3 * env,
+      width: h * 0.12,
+      alpha: env,
+    });
+  }
+  return out;
+}
+
+/** Shards in `cluster` mode: still fragments at the anchor's base, fading in and held to the end. */
+export function clusterPose(s, h, seed, params) {
+  const { count } = withDefaults('shards', params);
+  const rand = seededRandom(seed);
+  const c = clamp01(s);
+  const grow = easeOutCubic(clamp01(c / 0.2));
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const u = count > 1 ? i / (count - 1) - 0.5 : 0;
+    const length = h * (0.22 + 0.2 * rand()) * grow;
+    out.push({
+      x: u * h * 0.9,
+      y: 0.5 * h - h * 0.02 * rand(),
+      angleDeg: -90 + (rand() - 0.5) * 50,
+      length,
+      width: h * 0.14,
+      alpha: clamp01(c / 0.15),
+    });
+  }
+  return out;
+}
+
+/**
+ * Bolts: `count` jagged polylines (boltPose each), their ends fanned over `spread` h across
+ * the defender's footprint on screen, bowed `curve` h along each bolt's normal. One bolt with
+ * no curve is 063's bolt.
+ */
+export function boltPoses(s, lane, seed, elapsedMs, params) {
+  const p = withDefaults('bolt', params);
+  if (p.count === 1 && p.curve === 0) return [boltPose(s, lane, seed, elapsedMs, p)];
+  const out = [];
+  for (let i = 0; i < p.count; i += 1) {
+    const shift = p.count > 1 ? (-p.spread / 2 + (p.spread * i) / (p.count - 1)) * lane.h : 0;
+    const shifted = { ...lane, bx: lane.bx + shift };
+    const pose = boltPose(s, shifted, seed + i * 31, elapsedMs, p);
+    if (p.curve !== 0) {
+      const [x0, y0] = pose.points[0];
+      const [x1, y1] = pose.points[pose.points.length - 1];
+      const len = Math.hypot(x1 - x0, y1 - y0) || 1;
+      const nx = -(y1 - y0) / len;
+      const ny = (x1 - x0) / len;
+      const n = pose.points.length - 1;
+      pose.points = pose.points.map(([x, y], k) => {
+        const bow = Math.sin((Math.PI * k) / n) * p.curve * lane.h;
+        return [x + nx * bow, y + ny * bow];
+      });
+    }
+    out.push(pose);
+  }
+  return out;
+}
+
+/**
+ * Fan: `count` tapered tongues from the anchor, spread evenly over `spread` degrees about
+ * `direction` (lane degrees, 180 = away from the defender; 360 = all round), lengths
+ * alternating lenMin / lenMax h, growing over the first `grow`, flapping ±flap° at 3 Hz,
+ * spinning `spin`°/s, fading over the last 20 %. Angles are lane degrees.
+ */
+export function fanPose(s, h, params) {
+  const { count, spread, direction, lenMin, lenMax, width, grow, flap, spin } = withDefaults('fan', params);
+  const beatMs = beatMsOf(params, 600);
+  const c = clamp01(s);
+  const t = (c * beatMs) / 1000;
+  const g = easeOutCubic(clamp01(c / grow));
+  const alpha = c > 0.8 ? Math.max(0, (1 - c) / 0.2) : 1;
+  const turn = spin * t + flap * Math.sin(TAU * 3 * t);
+  const tongues = [];
+  for (let i = 0; i < count; i += 1) {
+    let offset = 0;
+    if (spread >= 360) offset = (i * 360) / count;
+    else if (count > 1) offset = -spread / 2 + (spread * i) / (count - 1);
+    tongues.push({
+      x: 0,
+      y: 0,
+      angleDeg: direction + offset + turn,
+      length: h * (i % 2 ? lenMax : lenMin) * g,
+      width: h * width * (0.5 + 0.5 * g),
+    });
+  }
+  return { tongues, alpha };
+}
+
+/**
+ * Shade: a volume round the anchor growing over the first 25 %, holding, shrinking over the
+ * last 25 %. `x, y` the centre (offset from the anchor), `rx, ry` its radii, `swirl` the
+ * mottling's turn in radians.
+ */
+export function shadePose(s, h, params) {
+  const { kind, r, rimAlpha, swirl } = withDefaults('shade', params);
+  const beatMs = beatMsOf(params, 800);
+  const c = clamp01(s);
+  const env = c < 0.25 ? easeOutCubic(c / 0.25) : c > 0.75 ? 1 - easeInQuad((c - 0.75) / 0.25) : 1;
+  const rx = h * r * env;
+  let ry = rx;
+  let y = 0;
+  if (kind === 'disc') {
+    ry = rx * 0.45;
+    y = 0.5 * h;
+  } else if (kind === 'dome') {
+    ry = rx * 1.1;
+    y = 0.5 * h;
+  } else if (kind === 'giant') {
+    ry = 1.1 * h * env;
+    y = 0.5 * h - ry;
+  }
+  return {
+    x: 0,
+    y,
+    rx: kind === 'giant' ? rx * 0.55 : rx,
+    ry,
+    rimAlpha: rimAlpha * env,
+    swirl: (swirl / 60) * TAU * c * (beatMs / 1000),
+    alpha: env,
+  };
+}
+
+const CHAIN_STRING = 0.6;
+
+/**
+ * Chain: `links` rings string out along the lane (leading edge -> a head at f = s'²) over the
+ * first 60 %, then slide onto an ellipse round the defender (0.75 h along, 0.55 h across)
+ * over the last 40 %. Lane frame: `x` along the lane, `y` along its normal, both px from the
+ * defender centre; `rotDeg` in lane degrees. `length` (the lane length, px) defaults to 3 h.
+ */
+export function chainPose(s, h, params) {
+  const { links } = withDefaults('chain', params);
+  const length = Number.isFinite(params?.length) && params.length > 0 ? params.length : 3 * h;
+  const c = clamp01(s);
+  const run = length - LEAD_H * h;
+  const head = clamp01(c / CHAIN_STRING) ** 2;
+  const wrap = easeOutCubic(clamp01((c - CHAIN_STRING) / (1 - CHAIN_STRING)));
+  const out = [];
+  for (let i = 0; i < links; i += 1) {
+    const f = (head * (i + 0.5)) / links;
+    const sx = -run * (1 - f);
+    const theta = Math.PI + (i / links) * TAU;
+    const ex = Math.cos(theta) * 0.75 * h;
+    const ey = Math.sin(theta) * 0.55 * h;
+    out.push({ x: sx + (ex - sx) * wrap, y: ey * wrap, rotDeg: i % 2 ? 90 : 0 });
+  }
+  return { links: out, alpha: c > 0.92 ? (1 - c) / 0.08 : 1 };
+}
+
+/** Grip: `y` 0 (the sky point) -> 1 (the defender) over 40 %, fingers curling 0 -> 70° over 40–70 %. */
+export function gripPose(s) {
+  const c = clamp01(s);
+  return {
+    y: easeOutCubic(clamp01(c / 0.4)),
+    curl: 70 * easeOutCubic(clamp01((c - 0.4) / 0.3)),
+    alpha: clamp01(c / 0.1),
+  };
 }

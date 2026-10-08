@@ -27,8 +27,18 @@ import {
   terrainPose,
   vignettePose,
   volleyPose,
+  anchorPoint,
+  boltPoses,
+  chainPose,
+  clusterPose,
+  fanPose,
+  finsPose,
+  gripPose,
+  laneFromPoint,
+  pillarColumns,
+  shadePose,
 } from '../move-poses.mjs';
-import { laneGeometry } from '../move-geometry.mjs';
+import { lanePoint, laneGeometry, skyLane } from '../move-geometry.mjs';
 
 const H = 200;
 const SEED = 7;
@@ -288,4 +298,86 @@ test('ringPose staggers rings and ringPose / glyphPose obey their ranges', () =>
   const g = glyphPose(0.5, H, { r: 0.9 });
   assert.ok(g.r <= 0.9 * H + 1e-9 && g.alpha === 1);
   assert.equal(glyphPose(0, H, {}).alpha, 0);
+});
+
+// ---- design 065 slice 4 ----------------------------------------------------------
+
+const close = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
+
+test('anchorPoint: card centres untouched at 0 offset, lane offsets on cards, screen offsets in the sky', () => {
+  assert.deepEqual(anchorPoint(lane, 'attacker'), { x: lane.ax, y: lane.ay });
+  assert.deepEqual(anchorPoint(lane, 'defender', 0, 0), { x: lane.bx, y: lane.by });
+  const along = anchorPoint(lane, 'defender', 0.5, 0);
+  assert.ok(close(along.x, lane.bx + lane.ux * 0.5 * H) && close(along.y, lane.by + lane.uy * 0.5 * H));
+  const sky = anchorPoint(lane, 'sky');
+  const drop = lanePoint(skyLane(lane), 0);
+  assert.ok(close(sky.x, drop.x) && close(sky.y, drop.y), 'sky = skyLane start');
+  assert.deepEqual(anchorPoint(lane, 'sky-attacker', 0.1, -0.2), { x: lane.ax - 0.5 * H + 0.1 * H, y: lane.ay - 1.7 * H - 0.2 * H });
+  const fromSky = laneFromPoint(lane, sky.x, sky.y);
+  const end = lanePoint(fromSky, 1);
+  assert.ok(close(end.x, lane.bx) && close(end.y, lane.by));
+});
+
+test('fanPose: count tongues evenly over the spread, growing then fading', () => {
+  const ring = fanPose(0.5, 100, { count: 4, spread: 360 });
+  assert.equal(ring.tongues.length, 4);
+  for (let i = 1; i < 4; i += 1) assert.ok(close(ring.tongues[i].angleDeg - ring.tongues[i - 1].angleDeg, 90));
+  const wing = fanPose(0.5, 100, { count: 3, spread: 100, direction: 180 });
+  assert.deepEqual(wing.tongues.map((t) => t.angleDeg), [130, 180, 230]);
+  assert.ok(fanPose(0.05, 100, {}).tongues[1].length < fanPose(0.5, 100, {}).tongues[1].length);
+  assert.ok(close(fanPose(0.5, 100, {}).tongues[1].length, 100));
+  assert.ok(fanPose(0.95, 100, {}).alpha < 1);
+  assert.ok(allFinite(fanPose(0.3, 100, { flap: 12, spin: 40 })));
+});
+
+test('shadePose grows over 25 %, holds, then shrinks; kinds shape it', () => {
+  const early = shadePose(0.1, 100, { r: 0.9 });
+  assert.ok(early.rx < 90 && early.rx > 0);
+  assert.ok(close(shadePose(0.5, 100, { r: 0.9 }).rx, 90));
+  assert.ok(shadePose(0.95, 100, { r: 0.9 }).rx < 90);
+  const disc = shadePose(0.5, 100, {});
+  assert.ok(close(disc.ry, disc.rx * 0.45));
+  const sphere = shadePose(0.5, 100, { kind: 'sphere' });
+  assert.equal(sphere.rx, sphere.ry);
+  assert.ok(close(shadePose(0.5, 100, { kind: 'giant' }).ry * 2, 220));
+});
+
+test('chainPose strings links along the lane, then wraps the defender', () => {
+  const length = 3 * 100;
+  const out = chainPose(0.3, 100, { links: 9 });
+  assert.equal(out.links.length, 9);
+  for (const link of out.links) {
+    assert.equal(link.y + 0, 0);
+    assert.ok(link.x <= 0 && link.x >= -(length - 0.42 * 100), `on the lane segment: ${link.x}`);
+  }
+  const wrapped = chainPose(0.99, 100, { links: 9 });
+  assert.equal(wrapped.links.length, 9);
+  for (const link of wrapped.links) {
+    assert.ok(Math.abs(link.y) <= 0.56 * 100 && Math.abs(link.x) <= 0.76 * 100, JSON.stringify(link));
+  }
+  assert.deepEqual(out.links.slice(0, 2).map((l) => l.rotDeg), [0, 90]);
+});
+
+test('gripPose descends over 40 % and curls to 70° by 70 %', () => {
+  assert.equal(gripPose(0).y, 0);
+  assert.ok(close(gripPose(0.4).y, 1));
+  assert.equal(gripPose(0.3).curl, 0);
+  assert.ok(close(gripPose(0.7).curl, 70));
+  assert.ok(close(gripPose(0.95).curl, 70));
+});
+
+test('pillarColumns, finsPose, clusterPose and boltPoses', () => {
+  assert.deepEqual(pillarColumns(0.4, 100, {}), [{ x: 0, s: 0.4 }]);
+  const cols = pillarColumns(0.1, 100, { count: 3, spread: 2, stagger: 100, beatMs: 1000 });
+  assert.deepEqual(cols.map((c) => c.x), [-100, 0, 100]);
+  assert.equal(cols[0].s, 0.1);
+  assert.equal(cols[2].s, null);
+  assert.equal(finsPose(0.5, 100, { kind: 'fins', count: 5 }).length, 5);
+  const cluster = clusterPose(0.9, 100, SEED, { count: 6 });
+  assert.equal(cluster.length, 6);
+  assert.ok(cluster.every((t) => t.alpha === 1 && t.y > 40));
+  assert.deepEqual(boltPoses(0.5, lane, SEED, 100, {}), [boltPose(0.5, lane, SEED, 100, {})]);
+  const cage = boltPoses(0.5, lane, SEED, 100, { count: 4, spread: 1, curve: 0.2 });
+  assert.equal(cage.length, 4);
+  assert.ok(allFinite(cage.map((b) => b.points)));
 });

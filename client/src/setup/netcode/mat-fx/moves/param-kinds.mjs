@@ -8,10 +8,17 @@
 //   'palette' [default]                 (design 065: an object whose keys are a subset of
 //                                         PALETTE_KEYS, each a '#RRGGBB' string)
 //   'hexes'  [min, max, default]        (design 065: min..max '#RRGGBB' strings)
+//   'anchor' [default]                  (design 065: one of ANCHORS)
 // DOM-free.
 
 export const ARM_PRESETS = Object.freeze(['dai', 'cross', 'ring']);
 export const TARGETS = Object.freeze(['attacker', 'defender']);
+/**
+ * Design 065 § New pieces B: where an anchored drawer sits. 'sky' is skyLane's start point
+ * (1.7 h above, 0.5 h left of the defender on screen); 'sky-attacker' the same over the attacker.
+ * Every TARGETS value is an anchor.
+ */
+export const ANCHORS = Object.freeze(['attacker', 'defender', 'sky', 'sky-attacker']);
 /** Design 065: the palette keys a beat `tint` may replace. */
 export const PALETTE_KEYS = Object.freeze(['deep', 'body', 'hot', 'core']);
 
@@ -45,6 +52,7 @@ function checkEntry(entry, value) {
   if (kind === 'enum') return entry[1].includes(value) ? null : `one of ${entry[1].join('/')}`;
   if (kind === 'deg') return isNum(value) ? null : 'a finite number of degrees';
   if (kind === 'target') return TARGETS.includes(value) ? null : 'attacker or defender';
+  if (kind === 'anchor') return ANCHORS.includes(value) ? null : `one of ${ANCHORS.join('/')}`;
   if (kind === 'arms') return checkArms(value);
   // `null` is the 'none' default of both colour kinds.
   if ((kind === 'palette' || kind === 'hexes') && value === null) return null;

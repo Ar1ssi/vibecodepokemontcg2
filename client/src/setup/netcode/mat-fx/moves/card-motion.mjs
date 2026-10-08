@@ -54,6 +54,12 @@ const rearLurch = (ms, { contactMs: c, params: p }) => {
     const w = easeOutCubic(windup);
     return attackerPose0({ along: -p.rear * w, scale: 1 + 0.05 * w, tilt: -4 * w, glow: 0.7 * w * p.glow });
   }
+  // Design 065: `hold` keeps the wind-up pose before the thrust; thrust and recoil shift by it.
+  const hold = p.hold ?? 0;
+  if (hold > 0 && ms >= 0.56 * c && ms < 0.56 * c + hold) {
+    return attackerPose0({ along: -p.rear, scale: 1.05, tilt: -4, glow: 0.7 * p.glow });
+  }
+  ms -= hold;
   const thrust = span(ms, 0.56 * c, 0.7 * c);
   if (thrust !== null) {
     const f = easeInQuad(thrust);
@@ -107,6 +113,19 @@ const lunge = (ms, { contactMs: c, params: p, laneH }) => {
     const w = easeOutCubic(wind);
     return attackerPose0({ along: -p.wind * w, scale: 1 + 0.06 * w, glow: p.glow * w });
   }
+  const strikes = p.strikes ?? 1;
+  if (strikes > 1 && ms >= 0.4 * c && ms < c) {
+    // Design 065: the strike window splits into `strikes` rewind-and-strike pairs; contact is the last.
+    const part = (0.6 * c) / strikes;
+    const k = Math.min(strikes - 1, Math.floor((ms - 0.4 * c) / part));
+    const local = (ms - 0.4 * c - k * part) / part;
+    const startAlong = k === 0 ? -p.wind : reach;
+    if (local < 0.6) {
+      const r = easeOutCubic(local / 0.6);
+      return attackerPose0({ along: startAlong + (-0.1 - startAlong) * r, scale: 1.06, glow: p.glow });
+    }
+    return attackerPose0({ along: -0.1 + (reach + 0.1) * easeInQuad((local - 0.6) / 0.4), scale: 1.06, glow: p.glow });
+  }
   const strike = span(ms, 0.4 * c, c);
   if (strike !== null) {
     return attackerPose0({
@@ -153,6 +172,32 @@ const dash = (ms, { contactMs: c, params: p, laneH }) => {
   return ATTACKER_REST;
 };
 
+const WARP_SCALE = 0.15;
+
+/**
+ * Design 065: the attacker sinks away (scale 1 -> 0.15 while moving 0.3 of the lane), stays
+ * hidden to 0.85 c, reappears 0.9 h short of the defender growing back by contact (the
+ * strike), then springs home over c -> 1.5 c.
+ */
+const warp = (ms, { contactMs: c, laneH }) => {
+  const lane = Number.isFinite(laneH) ? laneH : 1.2;
+  const out = 0.3 * lane;
+  const strikeAt = Math.max(0, lane - 0.9);
+  const sinkSpan = span(ms, 0, 0.3 * c);
+  if (sinkSpan !== null) {
+    const e = easeInOutCubic(sinkSpan);
+    return attackerPose0({ along: out * e, scale: 1 - (1 - WARP_SCALE) * e });
+  }
+  if (span(ms, 0.3 * c, 0.85 * c) !== null) return attackerPose0({ along: out, scale: WARP_SCALE, glow: 0 });
+  const back = span(ms, 0.85 * c, c);
+  if (back !== null) {
+    return attackerPose0({ along: strikeAt, scale: WARP_SCALE + (1 - WARP_SCALE) * easeOutCubic(back) });
+  }
+  const home = span(ms, c, 1.5 * c);
+  if (home !== null) return attackerPose0({ along: strikeAt * springHome(home, 1.5, 3.5) });
+  return ATTACKER_REST;
+};
+
 const rise = (ms, { contactMs: c }) => {
   const lift = span(ms, 0, 0.6 * c);
   const hover = span(ms, 0.6 * c, 1.2 * c);
@@ -195,7 +240,12 @@ const idle = (ms, { durationMs, params: p }) => {
 
 export const ATTACKER_MOTIONS = Object.freeze({
   'rear-lurch': {
-    params: { rear: ['num', 0, 0.4, 0.14], lurch: ['num', 0, 0.8, 0.4], glow: ['num', 0, 1, 1] },
+    params: {
+      rear: ['num', 0, 0.4, 0.14],
+      lurch: ['num', 0, 0.8, 0.4],
+      glow: ['num', 0, 1, 1],
+      hold: ['num', 0, 600, 0],
+    },
     endC: 1.2,
     pose: rearLurch,
   },
@@ -205,7 +255,12 @@ export const ATTACKER_MOTIONS = Object.freeze({
     pose: brace,
   },
   lunge: {
-    params: { wind: ['num', 0, 0.4, 0.2], reach: ['num', 0.2, 1.2, 0.9], glow: ['num', 0, 1, 0] },
+    params: {
+      wind: ['num', 0, 0.4, 0.2],
+      reach: ['num', 0.2, 1.2, 0.9],
+      glow: ['num', 0, 1, 0],
+      strikes: ['int', 1, 3, 1],
+    },
     endC: 1.5,
     pose: lunge,
   },
@@ -219,6 +274,7 @@ export const ATTACKER_MOTIONS = Object.freeze({
     endC: 1.7,
     pose: dash,
   },
+  warp: { params: {}, endC: 1.5, pose: warp },
   rise: { params: {}, endC: 1.6, pose: rise },
   stomp: { params: {}, endC: 1.4, pose: stomp },
   spin: { params: { turns: ['int', 1, 2, 1] }, endC: 1.3, pose: spin },
@@ -259,12 +315,16 @@ const knock = (ms, { contactMs: c, params: p }) => {
 };
 
 const stagger = (ms, { contactMs: c, params: p }) => {
-  const pre = tremble(ms, c);
+  // Design 065: with `lead`, the first knock lands `lead` ms before contact and the last at it.
+  const lead = p.lead ?? 0;
+  const first = lead > 0 ? c - lead : c;
+  const gap = lead > 0 ? lead / (p.hits - 1) : p.gapMs;
+  const pre = tremble(ms, first);
   if (pre) return pre;
   const heat = heatAt(ms, c, p.heat);
   const step = p.strength / p.hits;
   const last = p.hits - 1;
-  const lastStart = c + last * p.gapMs;
+  const lastStart = first + last * gap;
   if (ms >= lastStart) {
     const k = span(ms, lastStart, lastStart + KNOCK_MS);
     if (k === null) return defenderPose0({ heat });
@@ -281,9 +341,9 @@ const stagger = (ms, { contactMs: c, params: p }) => {
       heat,
     });
   }
-  const hit = Math.floor((ms - c) / p.gapMs);
+  const hit = Math.floor((ms - first) / gap);
   if (!(hit >= 0)) return defenderPose0({ heat });
-  const kw = clamp01((ms - c - hit * p.gapMs) / p.gapMs);
+  const kw = clamp01((ms - first - hit * gap) / gap);
   return defenderPose0({
     along: step * hit + step * easeOutCubic(clamp01(kw / 0.5)),
     ...squashOf(Math.sin(Math.PI * kw)),
@@ -344,8 +404,9 @@ export const DEFENDER_MOTIONS = Object.freeze({
       hits: ['int', 2, 6, 3],
       gapMs: ['num', 40, 250, 90],
       heat: ['num', 0, 1, 1],
+      lead: ['num', 0, 600, 0],
     },
-    endMs: (c, p) => c + (p.hits - 1) * p.gapMs + HEAT_MS,
+    endMs: (c, p) => (p.lead > 0 ? c : c + (p.hits - 1) * p.gapMs) + HEAT_MS,
     pose: stagger,
   },
   float: {
@@ -395,9 +456,12 @@ export function defenderPose(name, ms, opts) {
 }
 
 /** Scene-clock ms after which the attacker pose is the rest pose. */
-export function attackerEndMs(name, { contactMs, durationMs }) {
+export function attackerEndMs(name, { contactMs, durationMs, params }) {
   if (!Object.hasOwn(ATTACKER_MOTIONS, name)) return 0;
-  return name === 'none' ? durationMs : ATTACKER_MOTIONS[name].endC * contactMs;
+  if (name === 'none') return durationMs;
+  // Design 065: a rear-lurch `hold` shifts the thrust and recoil.
+  const hold = name === 'rear-lurch' ? (params?.hold ?? 0) : 0;
+  return ATTACKER_MOTIONS[name].endC * contactMs + hold;
 }
 
 /** Scene-clock ms after which the defender pose is the rest pose. */
