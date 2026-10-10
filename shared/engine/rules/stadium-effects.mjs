@@ -1117,10 +1117,13 @@ export function parseStadiumOncePerTurn(card) {
   // Mt. Coronet ("2 {M} Energy"), Training Court ("a basic Energy card"), etc.
   // Not a deck search — must precede the generic search fallback.
   const recoverEnergy = t.match(
-    /puts? (?:up to )?(?:an? )?(\d+ )?(basic )?(\{([a-z])\}\s*)?energy cards? from (?:their|your|his or her) discard pile into (?:their|your|his or her) hand/
+    /puts? (?:up to )?(?:an? )?(\d+ )?(basic )?(?:\{([a-z])\}|(grass|fire|water|lightning|psychic|fighting|darkness|metal|fairy))?\s*energy cards? from (?:their|your|his or her) discard pile into (?:their|your|his or her) hand/
   );
   if (recoverEnergy) {
-    const type = recoverEnergy[4] ? HEAL_TYPE_SYMBOLS[recoverEnergy[4]] : null;
+    // TCGdex prints the type as a word ("2 Metal Energy cards"), pkmncards as {M}.
+    const type = recoverEnergy[3]
+      ? HEAL_TYPE_SYMBOLS[recoverEnergy[3]]
+      : recoverEnergy[4] || null;
     return {
       ...base,
       kind: 'recover-energy',

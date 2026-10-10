@@ -604,6 +604,28 @@ test('stadium: Mt. Coronet recovers 2 {M} Energy from discard to hand', () => {
   assert.equal(res2.state.players.p1.zones.discard.length, 1);
 });
 
+test('stadium: Mt. Coronet in TCGdex wording (type word, curly apostrophe, `effect`) opens the picker', () => {
+  // TCGdex sm5-130 effect text: no {M} symbol, so the type word must parse.
+  const { state, rng } = setupGame();
+  state.stadium = createCard({
+    instanceId: 63,
+    name: 'Mt. Coronet',
+    supertype: 'Trainer',
+    subtypes: ['Stadium'],
+    effect:
+      'Once during each player’s turn, that player may put 2 Metal Energy cards from their discard pile into their hand.',
+  });
+  state.players.p1.zones.discard.push(
+    energyCard(90, 'Metal Energy', ['Metal']),
+    energyCard(91, 'Water Energy', ['Water']),
+    energyCard(92, 'Metal Energy', ['Metal'])
+  );
+
+  const res = activate(state, rng);
+  assert.ok(res.pendingChoice);
+  assert.deepEqual(optionIds(res).sort((a, b) => a - b), [90, 92]);
+});
+
 test('stadium: Training Court recovers a basic Energy from discard', () => {
   const { state, rng } = setupGame();
   state.stadium = createCard({
