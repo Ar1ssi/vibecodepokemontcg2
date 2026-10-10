@@ -52,3 +52,25 @@ test('Farewell Bell fires only on a Pokémon VMAX', () => {
   assert.equal(attachedToolOnKoEffects(player(vmax, 10), vmax).length, 1);
   assert.equal(attachedToolOnKoEffects(player(plain, 11), plain).length, 0);
 });
+
+// Source: out/pkmn-trainer-cards.json, Tremendous Bomb (Pitch Black 082/113).
+const TREMENDOUS_BOMB =
+  'If the Pokémon this card is attached to isn’t a Mega Evolution Pokémon ex, is in the Active Spot, and takes 240 or more damage from an attack from your opponent’s Mega Evolution Pokémon ex (even if this Pokémon is Knocked Out), place 12 damage counters on the Attacking Pokémon. If you placed any damage counters in this way, discard this card.';
+
+test('Tremendous Bomb needs a non-Mega holder, a Mega ex attacker and 240+ damage', () => {
+  const holder = mon(1, { name: 'Pikachu' });
+  const zone = [holder, tool(10, 'Tremendous Bomb', TREMENDOUS_BOMB, 1)];
+  const megaEx = mon(9, { name: 'Mega Darkrai ex', subtypes: ['Basic', 'MEGA', 'ex'] });
+  const plainEx = mon(8, { name: 'Morpeko ex', subtypes: ['Basic', 'ex'] });
+  const fire = (attacker, damage) => attachedToolOnDamageEffects(holder, zone, { attacker, damage });
+
+  const [hit] = fire(megaEx, 240);
+  assert.equal(hit.damageAttacker, 12);
+  assert.equal(hit.discardTool, true);
+  assert.equal(fire(megaEx, 230).length, 0);
+  assert.equal(fire(plainEx, 300).length, 0);
+
+  const megaHolder = mon(2, { name: 'Mega Zeraora ex', subtypes: ['Basic', 'MEGA', 'ex'] });
+  const megaZone = [megaHolder, tool(11, 'Tremendous Bomb', TREMENDOUS_BOMB, 2)];
+  assert.equal(attachedToolOnDamageEffects(megaHolder, megaZone, { attacker: megaEx, damage: 300 }).length, 0);
+});

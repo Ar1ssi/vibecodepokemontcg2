@@ -7558,6 +7558,7 @@ function resolveAttackEffectPhase(draft, ctx) {
                 isActive: true,
                 phase,
                 attacker: inPlayView(draft, attacker),
+                damage: dmgDealt,
               })
             : [];
         const reactiveToolEffects = reactiveTools('damage');

@@ -10,6 +10,7 @@
 //     attacker — the attacking Pokémon view (damage/prevention consumers)
 //     defender — the defending Pokémon view (damage bonus consumers)
 //     flags    — { trailingPrizes, prizesRemaining } from the caller's state
+//     damage   — damage the attack dealt (reactive "takes N or more damage" Tools)
 //
 // `parseToolCondition` returns null when the card prints no condition; a null
 // descriptor is always true, so unconditional tools keep working unchanged.
@@ -108,6 +109,10 @@ function hasSubtype(card, word) {
       // Strike / Team tags: subtype when present, name fragment otherwise.
       return subs.includes(w) || name.includes(w);
   }
+}
+
+function isMegaEx(card) {
+  return hasSubtype(card, 'mega') && hasSubtype(card, 'ex');
 }
 
 function pokemonHasTypeWord(card, word) {
@@ -231,6 +236,11 @@ export function parseToolCondition(card) {
   if (/has weakness to your opponent'?s active pok[eé]mon'?s type/.test(t)) {
     out.holderWeakToAttacker = true;
   }
+  // Tremendous Bomb: "isn't a Mega Evolution Pokémon ex" / "damage from … a Mega Evolution Pokémon ex".
+  if (/isn'?t a mega evolution pok[eé]mon ex/.test(t)) out.holderNotMegaEx = true;
+  if (/attack from your opponent'?s mega evolution pok[eé]mon ex/.test(t)) out.attackerMegaEx = true;
+  const minDamage = t.match(/takes (\d+) or more damage/);
+  if (minDamage) out.damageAtLeast = Number(minDamage[1]);
   const exceptSub = t.match(/except pok[eé]mon[-\s]?(gx|ex|vmax|vstar|v)\b/);
   if (exceptSub) out.holderExcludeSubtypes = [exceptSub[1]];
   // "…has “Leafeon” or “Glaceon” in its name" (Snow Leaf Badge, Ribbon Badge).
@@ -339,6 +349,7 @@ export function toolConditionMet(cond, ctx = {}) {
   ) {
     return false;
   }
+  if (cond.holderNotMegaEx && isMegaEx(holder)) return false;
   if (cond.holderNoRuleBox && isRuleBoxPokemon(holder)) return false;
   if (cond.holderNoAbility && hasAbility(holder)) return false;
   if (cond.holderPoisoned && !isPoisoned(holder)) return false;
@@ -372,6 +383,8 @@ export function toolConditionMet(cond, ctx = {}) {
   ) {
     return false;
   }
+  if (cond.attackerMegaEx && !isMegaEx(attacker)) return false;
+  if (cond.damageAtLeast != null && !(ctx.damage >= cond.damageAtLeast)) return false;
   if (cond.attackerAbility && !hasAbility(attacker)) return false;
   if (cond.attackerUltraBeast && !isUltraBeastCard(attacker)) return false;
   if (cond.attackerHpAtMost != null) {

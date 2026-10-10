@@ -639,12 +639,13 @@ export function parseToolOnDamageEffect(tool) {
   const t = cardAbilityText(tool);
   if (
     !t.includes('damaged by an attack') &&
-    !t.includes('knocked out by damage')
+    !t.includes('knocked out by damage') &&
+    !/damage from an attack from your opponent/.test(t)
   ) {
     return null;
   }
   const out = {
-    phase: t.includes('damaged by an attack') ? 'damage' : 'ko',
+    phase: t.includes('knocked out by damage') ? 'ko' : 'damage',
     draw: 0,
     drawUntil: 0,
     damageAttacker: 0,
@@ -665,7 +666,7 @@ export function parseToolOnDamageEffect(tool) {
   if (dm) out.draw = parseInt(dm[1], 10) || 2;
   const drawUntil = t.match(/draw cards until you have (\d+) cards?/);
   if (drawUntil) out.drawUntil = parseInt(drawUntil[1], 10) || 7;
-  const atk = t.match(/put (\d+) damage counters on the attacking pokémon/);
+  const atk = t.match(/(?:put|place) (\d+) damage counters on the attacking pokémon/);
   if (atk) {
     out.damageAttacker = parseInt(atk[1], 10) || 0;
     out.discardTool = /discard this card/.test(t);
@@ -769,9 +770,9 @@ export function attachedToolOnKoEffects(
 
 // The Tool's printed holder/attacker condition (I151): Punk Helmet {D}, Box of Disaster full-HP V,
 // Heavy Baton Retreat 4, Farewell Bell VMAX, Adversity Policy Weakness.
-function reactiveToolConditionMet(tool, holder, zoneCards, attacker) {
+function reactiveToolConditionMet(tool, holder, zoneCards, attacker, damage) {
   const zone = zoneCards || [];
-  const ctx = { holder: holderView(holder, zone), attacker, zoneCards: zone };
+  const ctx = { holder: holderView(holder, zone), attacker, zoneCards: zone, damage };
   const cond = parseToolCondition(tool);
   if (!attacker && cond && (cond.attackerTypes || cond.attackerSubtypes || cond.holderWeakToAttacker)) return true;
   return toolConditionMet(cond, ctx);
@@ -781,7 +782,7 @@ function reactiveToolConditionMet(tool, holder, zoneCards, attacker) {
 export function attachedToolOnDamageEffects(
   defender,
   zoneCards,
-  { blockTools = false, stadium = null, isActive = true, phase = 'damage', attacker = null } = {}
+  { blockTools = false, stadium = null, isActive = true, phase = 'damage', attacker = null, damage = 0 } = {}
 ) {
   if (toolBlocked(blockTools, stadium) || !defender) return [];
   const effects = [];
@@ -789,7 +790,7 @@ export function attachedToolOnDamageEffects(
     const parsed = parseToolOnDamageEffect(tool);
     if (!parsed || parsed.phase !== phase) continue;
     if (parsed.requiresActive && !isActive) continue;
-    if (!reactiveToolConditionMet(tool, defender, zoneCards, attacker)) continue;
+    if (!reactiveToolConditionMet(tool, defender, zoneCards, attacker, damage)) continue;
     effects.push({ tool, ...parsed });
   }
   return effects;
