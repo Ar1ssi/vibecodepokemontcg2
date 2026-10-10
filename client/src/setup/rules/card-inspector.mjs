@@ -16,8 +16,11 @@
  */
 
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
-import { getEnergyTokenSrcForType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
-import { glowHexForType } from './card-glow-colors.mjs';
+import {
+  getEnergyTokenSrcForType,
+  normalizeEnergyType,
+} from '../../actions/move-card-bundle/energy-token-assets.mjs';
+import { TYPE_GLOW } from './card-glow-colors.mjs';
 import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-effects.mjs';
 import {
   isStadiumCard,
@@ -84,8 +87,14 @@ const TYPE_GLYPHS = {
   Fairy: '✨',
 };
 
-// Banner colour keyed to the attack's dominant cost type. Shares card-glow-colors'
-// palette (design 023, C7) so the inspector banner and a card's glow cannot disagree.
+// The titlebar, damage tab and Retreat button are TCG Live's own sprites, keyed by the Pokémon's
+// type (AttackEntryAssetRegistry indexes by cardTyping.First()). `data-ptcg-type` selects the set
+// in index.css; a type with no sprites falls back to Colorless, as the game's NONE entry does.
+const barTypeKey = (type) => {
+  const key = normalizeEnergyType(type);
+  return Object.hasOwn(TYPE_GLOW, key) ? key : 'colorless';
+};
+
 const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -144,11 +153,6 @@ const textWithOrbs = (target, text, className) => {
   }
 };
 
-// The ability banner is deliberately not the Pokémon's type colour: on the card the ability
-// name prints beside a red "Ability" badge that is the same on every card, and keying it to
-// type would make an ability panel look like an attack panel of a different cost.
-const ABILITY_BANNER = '#a52834';
-
 // A Stadium prints no type, so its panel uses one fixed green banner regardless of card.
 const STADIUM_BANNER = '#2e8b57';
 
@@ -181,16 +185,20 @@ const stadiumEl = (model) => {
   return section;
 };
 
-const abilityEl = (ability) => {
+// TCG Live's ability entry: a type-coloured titlebar with the name above an "Ability" tag sprite.
+// A passive ability is a flat tinted bar, a spent one a plain bar with the tag switched off.
+const abilityEl = (ability, cardType) => {
   const section = el(
     'section',
-    `ptcg-ability${ability.recede ? ' ptcg-ability--recede' : ''}`
+    `ptcg-ability${ability.recede ? ' ptcg-ability--recede' : ''}${
+      ability.passive ? ' ptcg-ability--passive' : ''
+    }`
   );
-  section.style.setProperty('--ptcg-banner', ABILITY_BANNER);
+  section.dataset.ptcgType = barTypeKey(cardType);
 
   const head = el('div', 'ptcg-atk__head');
-  head.appendChild(el('span', 'ptcg-atk__badge', 'Ability'));
   head.appendChild(el('span', 'ptcg-atk__name', ability.name));
+  head.appendChild(el('span', 'ptcg-atk__badge', 'Ability'));
   section.appendChild(head);
 
   if (ability.text) {
@@ -203,27 +211,27 @@ const abilityEl = (ability) => {
 };
 
 const attackEl = (attack, cardType) => {
-  const section = el(
-    'section',
-    `ptcg-atk${attack.recede ? ' ptcg-atk--recede' : ''}`
-  );
+  const classes = ['ptcg-atk'];
+  if (attack.recede) classes.push('ptcg-atk--recede');
+  // TCG Live swaps in a shorter titlebar and damage tab when the attack prints effect text.
+  if (attack.text) classes.push('ptcg-atk--text');
+  if (attack.gx) classes.push('ptcg-atk--gx');
+  const section = el('section', classes.join(' '));
   // The delegated click handler resolves which attack was hit from this, so the panel stays
   // addressable across re-renders that replace the whole chrome subtree.
   section.dataset.ptcgAttack = String(attack.index);
-  section.style.setProperty(
-    '--ptcg-banner',
-    glowHexForType(cardType)
-  );
+  section.dataset.ptcgType = barTypeKey(cardType);
 
+  // Name over the cost row on the left, the damage tab on the right (AttackOption's layout).
   const head = el('div', 'ptcg-atk__head');
   head.appendChild(el('span', 'ptcg-atk__name', attack.name));
-  const right = el('span', 'ptcg-atk__right');
+  const cost = el('span', 'ptcg-atk__right');
   for (const symbol of attack.cost)
-    right.appendChild(orb(symbol, 'ptcg-orb ptcg-orb--cost'));
+    cost.appendChild(orb(symbol, 'ptcg-orb ptcg-orb--cost'));
+  head.appendChild(cost);
   if (attack.damageLabel != null) {
-    right.appendChild(el('span', 'ptcg-atk__dmg', attack.damageLabel));
+    head.appendChild(el('span', 'ptcg-atk__dmg', attack.damageLabel));
   }
-  head.appendChild(right);
   section.appendChild(head);
   if (attack.from) section.appendChild(el('p', 'ptcg-atk__from', `from ${attack.from}`));
 
@@ -260,6 +268,7 @@ const retreatTile = (model) => {
     }
   });
   tile.dataset.ptcgRetreat = '1';
+  tile.dataset.ptcgType = barTypeKey(model.type);
   // Greyed when the retreat is not available (cost unpaid, already retreated, not your turn);
   // the reason rides on the tooltip. Only this tile greys — never the card or its HP.
   tile.classList.toggle('ptcg-stat--recede', Boolean(model.retreatRecede));
@@ -314,7 +323,8 @@ const buildChrome = (model) => {
     if (model.blockBottomPct != null) stack.style.bottom = `${model.blockBottomPct}%`;
     else stack.style.top = `${model.blockTopPct}%`;
     if (model.compactStack) stack.classList.add('ptcg-stack--compact');
-    if (model.ability) stack.appendChild(abilityEl(model.ability));
+    if (model.ability)
+      stack.appendChild(abilityEl(model.ability, model.type));
     const atks = el('div', 'ptcg-atks');
     model.attacks.forEach((attack, i) => {
       const row = attackEl(attack, model.type);

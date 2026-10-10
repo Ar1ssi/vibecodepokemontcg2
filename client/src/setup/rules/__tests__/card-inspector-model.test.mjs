@@ -421,6 +421,35 @@ test('model: a passive ability is neither usable nor greyed', () => {
   assert.equal(m.ability.recede, false);
 });
 
+test('model: ability.passive marks printed-only abilities, not ones the player triggers', () => {
+  const passive = buildInspectorModel(CHARMANDER, { energyTypes: ['Fire'] });
+  assert.equal(passive.ability.passive, true);
+
+  const activated = buildInspectorModel(
+    {
+      ...CHARMANDER,
+      ability: { name: 'Ember', text: 'Once during your turn, you may do this.' },
+    },
+    { energyTypes: ['Fire'] }
+  );
+  assert.equal(activated.ability.passive, false);
+});
+
+test('model: attack.gx follows the GX name marker', () => {
+  const card = {
+    ...ARCANINE,
+    attacks: [
+      { name: 'Blaze Burn GX', cost: ['Fire', 'Fire'], damage: '200', text: '' },
+      { name: 'Raging Claws', cost: ['Fire'], damage: '30', text: '' },
+    ],
+  };
+  const m = buildInspectorModel(card, { energyTypes: THREE_FIRE });
+  assert.deepEqual(
+    m.attacks.map((a) => a.gx),
+    [true, false]
+  );
+});
+
 test('model: no ability leaves the field null rather than an empty object', () => {
   const m = buildInspectorModel(ARCANINE, { energyTypes: THREE_FIRE });
   assert.equal(m.ability, null);

@@ -21,7 +21,10 @@ import {
   listAbilities,
   statusAttackBlock,
 } from '../../../../shared/engine/rules/attack-window.mjs';
-import { parseAttackDamage } from '../../../../shared/engine/rules/damage-parser.mjs';
+import {
+  parseAttackDamage,
+  isGxAttack,
+} from '../../../../shared/engine/rules/damage-parser.mjs';
 import { parseTypeValue } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
   isStadiumCard,
@@ -485,6 +488,8 @@ export function buildInspectorModel(card, ctx = {}) {
       from: raw?.copiedFrom || raw?.grantedBy || null,
       cost: cost.map(String),
       text: String(raw?.text ?? raw?.effect ?? ''),
+      // TCG Live gives GX attacks their own titlebar.
+      gx: isGxAttack(raw),
       damageLabel: damageLabel == null ? null : damageLabel,
       printedLabel: printed,
       payable,
@@ -519,6 +524,7 @@ export function buildInspectorModel(card, ctx = {}) {
     ? {
         name: abilityInfo.name,
         text: String(rawAbility.text ?? ''),
+        passive: !activated,
         usable: activated && Boolean(abilityInfo.usable) && interactive,
         reason: abilityInfo.reason ?? null,
         recede: activated && interactive && !abilityInfo.usable,

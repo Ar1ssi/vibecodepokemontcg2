@@ -1,0 +1,1444 @@
+{
+  "source": "sharedassets6.assets AttackEntryAssetRegistry_AttackOverlay",
+  "types": {
+    "colorless": {
+      "bar": "#d1d0cf",
+      "ink": "#000000",
+      "titlebar": "atkOv_Titlebar_Colorless",
+      "titlebarShort": "atkOv_Titlebar_Colorless_Short",
+      "retreat": "atkOv_RetreatBtn_Colorless"
+    },
+    "fire": {
+      "bar": "#d8223b",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Fire",
+      "titlebarShort": "atkOv_Titlebar_Fire_Short",
+      "retreat": "atkOv_RetreatBtn_Fire"
+    },
+    "grass": {
+      "bar": "#13a748",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Grass",
+      "titlebarShort": "atkOv_Titlebar_Grass_Short",
+      "retreat": "atkOv_RetreatBtn_Grass"
+    },
+    "water": {
+      "bar": "#00a8d8",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Water",
+      "titlebarShort": "atkOv_Titlebar_Water_Short",
+      "retreat": "atkOv_RetreatBtn_Water"
+    },
+    "fighting": {
+      "bar": "#b26232",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Fighting",
+      "titlebarShort": "atkOv_Titlebar_Fighting_Short",
+      "retreat": "atkOv_RetreatBtn_Fighting"
+    },
+    "fairy": {
+      "bar": "#d6467e",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Fariy",
+      "titlebarShort": "atkOv_Titlebar_Fairy_Short",
+      "retreat": "atkOv_RetreatBtn_Fairy"
+    },
+    "darkness": {
+      "bar": "#307179",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Darkness",
+      "titlebarShort": "atkOv_Titlebar_Darkness_Short",
+      "retreat": "atkOv_RetreatBtn_Dark"
+    },
+    "lightning": {
+      "bar": "#fbcf1f",
+      "ink": "#000000",
+      "titlebar": "atkOv_Titlebar_Lightning",
+      "titlebarShort": "atkOv_Titlebar_Lightning_Short",
+      "retreat": "atkOv_RetreatBtn_Lightning"
+    },
+    "dragon": {
+      "bar": "#938f31",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Dragon",
+      "titlebarShort": "atkOv_Titlebar_Dragon_Short",
+      "retreat": "atkOv_RetreatBtn_Dragon"
+    },
+    "metal": {
+      "bar": "#afb39d",
+      "ink": "#000000",
+      "titlebar": "atkOv_Titlebar_Metal",
+      "titlebarShort": "atkOv_Titlebar_Metal_Short",
+      "retreat": "atkOv_RetreatBtn_Metal"
+    },
+    "psychic": {
+      "bar": "#957ead",
+      "ink": "#ffffff",
+      "titlebar": "atkOv_Titlebar_Psychic",
+      "titlebarShort": "atkOv_Titlebar_Psychic_Short",
+      "retreat": "atkOv_RetreatBtn_Psychic"
+    }
+  },
+  "cantUse": {
+    "bar": "#d4d4d4",
+    "ink": "#000000"
+  },
+  "gx": {
+    "ink": "#ffffff",
+    "inkOff": "#000000"
+  },
+  "borders": {
+    "atkOV_AbilityTag_Off": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 256,
+      "height": 64
+    },
+    "atkOV_AbilityTag_On": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 256,
+      "height": 64
+    },
+    "atkOV_CardShadow": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOV_Titlebar_VStar": {
+      "left": 28,
+      "bottom": 0,
+      "right": 878,
+      "top": 0,
+      "width": 908,
+      "height": 173
+    },
+    "atkOV_Titlebar_VStar_Modal": {
+      "left": 38,
+      "bottom": 0,
+      "right": 1165,
+      "top": 0,
+      "width": 1205,
+      "height": 240
+    },
+    "atkOV_Titlebar_VStar_Modal_L": {
+      "left": 38,
+      "bottom": 0,
+      "right": 1165,
+      "top": 0,
+      "width": 1205,
+      "height": 240
+    },
+    "atkOV_Titlebar_VStar_Short": {
+      "left": 28,
+      "bottom": 0,
+      "right": 878,
+      "top": 0,
+      "width": 908,
+      "height": 173
+    },
+    "atkOV_Titlebar_VStar_Short_Modal": {
+      "left": 39,
+      "bottom": 0,
+      "right": 1165,
+      "top": 0,
+      "width": 1205,
+      "height": 240
+    },
+    "atkOV_Titlebar_VStar_Short_Modal_L": {
+      "left": 39,
+      "bottom": 0,
+      "right": 1165,
+      "top": 0,
+      "width": 1205,
+      "height": 240
+    },
+    "atkOv_Ability_BG": {
+      "left": 16,
+      "bottom": 3,
+      "right": 16,
+      "top": 13,
+      "width": 32,
+      "height": 16
+    },
+    "atkOv_Ability_BG_Modal": {
+      "left": 20,
+      "bottom": 5,
+      "right": 20,
+      "top": 19,
+      "width": 40,
+      "height": 25
+    },
+    "atkOv_Ability_BG_Modal_L": {
+      "left": 20,
+      "bottom": 6,
+      "right": 20,
+      "top": 20,
+      "width": 40,
+      "height": 26
+    },
+    "atkOv_Action_BG": {
+      "left": 16,
+      "bottom": 16,
+      "right": 16,
+      "top": 16,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_Action_BG_Disabled": {
+      "left": 16,
+      "bottom": 16,
+      "right": 16,
+      "top": 16,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_Action_BG_Modal": {
+      "left": 39,
+      "bottom": 39,
+      "right": 39,
+      "top": 39,
+      "width": 80,
+      "height": 80
+    },
+    "atkOv_Action_BG_Modal_L": {
+      "left": 20,
+      "bottom": 20,
+      "right": 20,
+      "top": 20,
+      "width": 40,
+      "height": 40
+    },
+    "atkOv_Action_Shadow": {
+      "left": 16,
+      "bottom": 16,
+      "right": 16,
+      "top": 16,
+      "width": 38,
+      "height": 38
+    },
+    "atkOv_BG": {
+      "left": 31,
+      "bottom": 31,
+      "right": 31,
+      "top": 31,
+      "width": 64,
+      "height": 64
+    },
+    "atkOv_Brdr_B1": {
+      "left": 24,
+      "bottom": 24,
+      "right": 24,
+      "top": 0,
+      "width": 49,
+      "height": 24
+    },
+    "atkOv_Brdr_B2": {
+      "left": 24,
+      "bottom": 23,
+      "right": 24,
+      "top": 7,
+      "width": 49,
+      "height": 32
+    },
+    "atkOv_Brdr_T": {
+      "left": 23,
+      "bottom": 0,
+      "right": 19,
+      "top": 0,
+      "width": 44,
+      "height": 24
+    },
+    "atkOv_DmgBG": {
+      "left": 33,
+      "bottom": 0,
+      "right": 24,
+      "top": 0,
+      "width": 59,
+      "height": 106
+    },
+    "atkOv_DmgBG_Empty": {
+      "left": 37,
+      "bottom": 0,
+      "right": 20,
+      "top": 0,
+      "width": 59,
+      "height": 106
+    },
+    "atkOv_DmgBG_Empty_Modal": {
+      "left": 34,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 56,
+      "height": 100
+    },
+    "atkOv_DmgBG_Empty_Modal_L": {
+      "left": 34,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 56,
+      "height": 100
+    },
+    "atkOv_DmgBG_Empty_Short": {
+      "left": 37,
+      "bottom": 0,
+      "right": 27,
+      "top": 0,
+      "width": 65,
+      "height": 106
+    },
+    "atkOv_DmgBG_Empty_Short_Modal": {
+      "left": 34,
+      "bottom": 0,
+      "right": 20,
+      "top": 0,
+      "width": 56,
+      "height": 100
+    },
+    "atkOv_DmgBG_Empty_Short_Modal_L": {
+      "left": 34,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 56,
+      "height": 100
+    },
+    "atkOv_DmgBG_Empty_VStar": {
+      "left": 32,
+      "bottom": 0,
+      "right": 26,
+      "top": 0,
+      "width": 59,
+      "height": 106
+    },
+    "atkOv_DmgBG_Empty_VStar_Modal": {
+      "left": 32,
+      "bottom": 0,
+      "right": 26,
+      "top": 0,
+      "width": 62,
+      "height": 120
+    },
+    "atkOv_DmgBG_Empty_VStar_Modal_L": {
+      "left": 32,
+      "bottom": 0,
+      "right": 26,
+      "top": 0,
+      "width": 62,
+      "height": 120
+    },
+    "atkOv_DmgBG_Empty_VStar_Short": {
+      "left": 32,
+      "bottom": 0,
+      "right": 32,
+      "top": 0,
+      "width": 65,
+      "height": 106
+    },
+    "atkOv_DmgBG_Empty_VStar_Short_Modal": {
+      "left": 32,
+      "bottom": 0,
+      "right": 32,
+      "top": 0,
+      "width": 68,
+      "height": 120
+    },
+    "atkOv_DmgBG_Empty_VStar_Short_Modal_L": {
+      "left": 32,
+      "bottom": 0,
+      "right": 32,
+      "top": 0,
+      "width": 68,
+      "height": 120
+    },
+    "atkOv_DmgBG_Modal": {
+      "left": 34,
+      "bottom": 0,
+      "right": 19,
+      "top": 0,
+      "width": 54,
+      "height": 100
+    },
+    "atkOv_DmgBG_Modal_L": {
+      "left": 34,
+      "bottom": 0,
+      "right": 19,
+      "top": 0,
+      "width": 54,
+      "height": 100
+    },
+    "atkOv_DmgBG_Short": {
+      "left": 34,
+      "bottom": 0,
+      "right": 24,
+      "top": 0,
+      "width": 67,
+      "height": 106
+    },
+    "atkOv_DmgBG_Short_Modal": {
+      "left": 34,
+      "bottom": 0,
+      "right": 22,
+      "top": 0,
+      "width": 59,
+      "height": 100
+    },
+    "atkOv_DmgBG_Short_Modal_L": {
+      "left": 34,
+      "bottom": 0,
+      "right": 22,
+      "top": 0,
+      "width": 59,
+      "height": 100
+    },
+    "atkOv_DmgBG_VStar": {
+      "left": 41,
+      "bottom": 0,
+      "right": 22,
+      "top": 0,
+      "width": 64,
+      "height": 106
+    },
+    "atkOv_DmgBG_VStar_Modal": {
+      "left": 41,
+      "bottom": 0,
+      "right": 22,
+      "top": 0,
+      "width": 66,
+      "height": 120
+    },
+    "atkOv_DmgBG_VStar_Modal_L": {
+      "left": 41,
+      "bottom": 0,
+      "right": 22,
+      "top": 0,
+      "width": 66,
+      "height": 120
+    },
+    "atkOv_DmgBG_VStar_Short": {
+      "left": 44,
+      "bottom": 0,
+      "right": 22,
+      "top": 0,
+      "width": 68,
+      "height": 106
+    },
+    "atkOv_DmgBG_VStar_Short_Modal": {
+      "left": 39,
+      "bottom": 0,
+      "right": 20,
+      "top": 0,
+      "width": 60,
+      "height": 120
+    },
+    "atkOv_DmgBG_VStar_Short_Modal_L": {
+      "left": 39,
+      "bottom": 0,
+      "right": 20,
+      "top": 0,
+      "width": 60,
+      "height": 120
+    },
+    "atkOv_DmgMod_Bg": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 64,
+      "height": 69
+    },
+    "atkOv_RetreatBtn_Colorless": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Colorless_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Colorless_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Dark": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Dark_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Dark_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Disable": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Disable_Modal": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Disable_Modal_L": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Dragon": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Dragon_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Dragon_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fairy": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fairy_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fairy_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fighting": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fighting_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fighting_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fire": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fire_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Fire_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Grass": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Grass_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Grass_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Lightning": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Lightning_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Lightning_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Metal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Metal_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Metal_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Modal_Disable": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Modal_Disable_Modal": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Modal_Disable_Modal_L": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Psychic": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Psychic_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Psychic_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Shadow": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Shadow_Modal": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Shadow_Modal_L": {
+      "left": 15,
+      "bottom": 15,
+      "right": 15,
+      "top": 15,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Water": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Water_Modal": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_RetreatBtn_Water_Modal_L": {
+      "left": 15,
+      "bottom": 12,
+      "right": 15,
+      "top": 12,
+      "width": 32,
+      "height": 32
+    },
+    "atkOv_Textbox": {
+      "left": 19,
+      "bottom": 18,
+      "right": 19,
+      "top": 20,
+      "width": 41,
+      "height": 40
+    },
+    "atkOv_TitlebarGX": {
+      "left": 480,
+      "bottom": 0,
+      "right": 19,
+      "top": 0,
+      "width": 500,
+      "height": 106
+    },
+    "atkOv_TitlebarGX_Modal": {
+      "left": 478,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 500,
+      "height": 100
+    },
+    "atkOv_TitlebarGX_Modal_L": {
+      "left": 478,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 500,
+      "height": 100
+    },
+    "atkOv_TitlebarGX_Off": {
+      "left": 480,
+      "bottom": 0,
+      "right": 18,
+      "top": 0,
+      "width": 500,
+      "height": 106
+    },
+    "atkOv_TitlebarGX_Off_Modal": {
+      "left": 479,
+      "bottom": 0,
+      "right": 20,
+      "top": 0,
+      "width": 500,
+      "height": 100
+    },
+    "atkOv_TitlebarGX_Off_Modal_L": {
+      "left": 479,
+      "bottom": 0,
+      "right": 20,
+      "top": 0,
+      "width": 500,
+      "height": 100
+    },
+    "atkOv_Titlebar_Colorless": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Colorless_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Colorless_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Colorless_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Colorless_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Colorless_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Darkness": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Darkness_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Darkness_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Darkness_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Darkness_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Darkness_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Dragon": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Dragon_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Dragon_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Dragon_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Dragon_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Dragon_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fairy_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Fairy_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fairy_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fariy": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Fariy_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fariy_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fighting": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Fighting_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fighting_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fighting_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Fighting_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fighting_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fire": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Fire_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fire_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fire_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Fire_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Fire_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Grass": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Grass_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Grass_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Grass_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Grass_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Grass_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Lightning": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Lightning_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Lightning_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Lightning_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Lightning_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Lightning_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Metal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Metal_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Metal_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Metal_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Metal_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Metal_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Psychic": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Psychic_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Psychic_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Psychic_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Psychic_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Psychic_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_VPowerBar_Center": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 3,
+      "height": 30
+    },
+    "atkOv_Titlebar_VPowerBar_Center_L": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 3,
+      "height": 30
+    },
+    "atkOv_Titlebar_VPowerBar_Disabled_Center": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 3,
+      "height": 30
+    },
+    "atkOv_Titlebar_VPowerBar_Disabled_Center_L": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 3,
+      "height": 30
+    },
+    "atkOv_Titlebar_VPowerBar_Disabled_End": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 175,
+      "height": 30
+    },
+    "atkOv_Titlebar_VPowerBar_Disabled_End_L": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 175,
+      "height": 30
+    },
+    "atkOv_Titlebar_VPowerBar_End": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 175,
+      "height": 30
+    },
+    "atkOv_Titlebar_VPowerBar_End_L": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 175,
+      "height": 30
+    },
+    "atkOv_Titlebar_Water": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Water_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Water_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Water_Short": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 106
+    },
+    "atkOv_Titlebar_Water_Short_Modal": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    },
+    "atkOv_Titlebar_Water_Short_Modal_L": {
+      "left": 278,
+      "bottom": 0,
+      "right": 21,
+      "top": 0,
+      "width": 300,
+      "height": 100
+    }
+  }
+}

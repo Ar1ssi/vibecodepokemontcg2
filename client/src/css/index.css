@@ -5344,14 +5344,230 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   font-style: italic;
   opacity: 0.8;
 }
+/* The damage tab is AttackOption's AttackDamageBG sprite (slanted left edge) with the number on
+   it in black. Its edges scale with the titlebar height; --atk-dmg-l/-r are the sprite's 9-slice
+   borders, which differ per variant (see the --text/--recede rules below). */
 .ptcg-atk__dmg {
-  font-size: calc(var(--u) * 4.5);
+  grid-area: dmg;
+  align-self: stretch;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: calc(var(--bar-h) * 1.65);
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 calc(var(--bar-h) * var(--atk-dmg-r) / 106) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 106);
+  border-image: var(--atk-dmg) 0 var(--atk-dmg-r) 0 var(--atk-dmg-l) fill / 0
+    calc(var(--bar-h) * var(--atk-dmg-r) / 106) 0 calc(var(--bar-h) * var(--atk-dmg-l) / 106) stretch;
+  font-size: min(calc(var(--u) * 4.8), calc(var(--bar-h) * 0.46));
   font-weight: 900;
-  color: #fff;
-  margin-left: calc(var(--u) * 1.4);
-  min-width: calc(var(--u) * 6.4);
-  text-align: right;
+  line-height: 1;
+  color: #000;
+  white-space: nowrap;
 }
+/* ── TCG Live attack-overlay skin ──────────────────────────────────────────────
+   Sprites and colours are the game's own (AttackEntryAssetRegistry_AttackOverlay), copied by
+   scripts/attack-ui/import-attack-ui.mjs; the table is client/src/assets/attack-ui/attack-ui.json.
+   `data-ptcg-type` picks the per-type set: titlebar, Retreat button, bar colour, text ink.
+   --bar-h is the titlebar height; every sprite edge is a fraction of it (the sprites are 106px
+   tall), so the bar tracks --u at any zoom. */
+.ptcg-chrome [data-ptcg-type='colorless'] {
+  --atk-bar: url('../assets/attack-ui/bar-colorless.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-colorless-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-colorless.png');
+  --atk-color: #d1d0cf;
+  --atk-ink: #000000;
+}
+.ptcg-chrome [data-ptcg-type='fire'] {
+  --atk-bar: url('../assets/attack-ui/bar-fire.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-fire-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-fire.png');
+  --atk-color: #d8223b;
+  --atk-ink: #ffffff;
+}
+.ptcg-chrome [data-ptcg-type='grass'] {
+  --atk-bar: url('../assets/attack-ui/bar-grass.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-grass-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-grass.png');
+  --atk-color: #13a748;
+  --atk-ink: #ffffff;
+}
+.ptcg-chrome [data-ptcg-type='water'] {
+  --atk-bar: url('../assets/attack-ui/bar-water.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-water-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-water.png');
+  --atk-color: #00a8d8;
+  --atk-ink: #ffffff;
+}
+.ptcg-chrome [data-ptcg-type='fighting'] {
+  --atk-bar: url('../assets/attack-ui/bar-fighting.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-fighting-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-fighting.png');
+  --atk-color: #b26232;
+  --atk-ink: #ffffff;
+}
+.ptcg-chrome [data-ptcg-type='fairy'] {
+  --atk-bar: url('../assets/attack-ui/bar-fairy.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-fairy-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-fairy.png');
+  --atk-color: #d6467e;
+  --atk-ink: #ffffff;
+}
+.ptcg-chrome [data-ptcg-type='darkness'] {
+  --atk-bar: url('../assets/attack-ui/bar-darkness.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-darkness-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-darkness.png');
+  --atk-color: #307179;
+  --atk-ink: #ffffff;
+}
+.ptcg-chrome [data-ptcg-type='lightning'] {
+  --atk-bar: url('../assets/attack-ui/bar-lightning.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-lightning-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-lightning.png');
+  --atk-color: #fbcf1f;
+  --atk-ink: #000000;
+}
+.ptcg-chrome [data-ptcg-type='dragon'] {
+  --atk-bar: url('../assets/attack-ui/bar-dragon.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-dragon-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-dragon.png');
+  --atk-color: #938f31;
+  --atk-ink: #ffffff;
+}
+.ptcg-chrome [data-ptcg-type='metal'] {
+  --atk-bar: url('../assets/attack-ui/bar-metal.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-metal-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-metal.png');
+  --atk-color: #afb39d;
+  --atk-ink: #000000;
+}
+.ptcg-chrome [data-ptcg-type='psychic'] {
+  --atk-bar: url('../assets/attack-ui/bar-psychic.png');
+  --atk-bar-short: url('../assets/attack-ui/bar-psychic-short.png');
+  --atk-retreat: url('../assets/attack-ui/retreat-psychic.png');
+  --atk-color: #957ead;
+  --atk-ink: #ffffff;
+}
+
+/* The head is a two-row grid, as AttackOption lays it out: name over the cost row on the left,
+   the damage tab on the right. The sprite sits on ::before, behind the text. */
+.ptcg-atk > .ptcg-atk__head,
+.ptcg-ability > .ptcg-atk__head {
+  --bar-h: calc(var(--u) * 11);
+  --atk-dmg: url('../assets/attack-ui/dmg.png');
+  --atk-dmg-l: 33;
+  --atk-dmg-r: 24;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas: 'name dmg' 'cost dmg';
+  gap: 0;
+  min-height: var(--bar-h);
+  padding: 0 0 0 calc(var(--bar-h) * 0.25);
+  background: none;
+  box-shadow: none;
+  color: var(--atk-ink, #fff);
+}
+.ptcg-ability > .ptcg-atk__head {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'name' 'cost';
+}
+.ptcg-atk > .ptcg-atk__head::before,
+.ptcg-ability > .ptcg-atk__head::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 calc(var(--bar-h) * 21 / 106) 0 calc(var(--bar-h) * 278 / 106);
+  border-image: var(--atk-bar) 0 21 0 278 fill / 0 calc(var(--bar-h) * 21 / 106) 0
+    calc(var(--bar-h) * 278 / 106) stretch;
+}
+/* An attack with effect text, and every ability, use the shorter titlebar and damage tab. */
+.ptcg-atk--text > .ptcg-atk__head::before,
+.ptcg-ability > .ptcg-atk__head::before { border-image-source: var(--atk-bar-short); }
+.ptcg-atk--text > .ptcg-atk__head { --atk-dmg: url('../assets/attack-ui/dmg-short.png'); --atk-dmg-l: 34; --atk-dmg-r: 24; }
+/* GX attacks have their own, wider titlebar (480px of art before the stretch column). */
+.ptcg-atk--gx > .ptcg-atk__head { --atk-ink: #ffffff; }
+.ptcg-atk--gx > .ptcg-atk__head::before {
+  border-width: 0 calc(var(--bar-h) * 19 / 106) 0 calc(var(--bar-h) * 480 / 106);
+  border-image: url('../assets/attack-ui/bar-gx.png') 0 19 0 480 fill / 0 calc(var(--bar-h) * 19 / 106) 0
+    calc(var(--bar-h) * 480 / 106) stretch;
+}
+/* An attack the player cannot use loses its sprite: the game draws a plain light bar (its cantUse
+   grey, #d4d4d4) with black ink and an empty damage tab. The panel's recede filter dims what is
+   drawn by brightness .84 / contrast .94, so white here lands on that grey. */
+.ptcg-atk--recede > .ptcg-atk__head {
+  --atk-ink: #000000;
+  --atk-dmg: url('../assets/attack-ui/dmg-empty.png');
+  --atk-dmg-l: 37;
+  --atk-dmg-r: 20;
+  background: #ffffff;
+}
+.ptcg-atk--text.ptcg-atk--recede > .ptcg-atk__head {
+  --atk-dmg: url('../assets/attack-ui/dmg-empty-short.png');
+  --atk-dmg-r: 27;
+}
+.ptcg-atk--recede > .ptcg-atk__head::before { display: none; }
+.ptcg-atk--gx.ptcg-atk--recede > .ptcg-atk__head { background: none; }
+.ptcg-atk--gx.ptcg-atk--recede > .ptcg-atk__head::before {
+  display: block;
+  border-width: 0 calc(var(--bar-h) * 18 / 106) 0 calc(var(--bar-h) * 480 / 106);
+  border-image: url('../assets/attack-ui/bar-gx-off.png') 0 18 0 480 fill / 0 calc(var(--bar-h) * 18 / 106) 0
+    calc(var(--bar-h) * 480 / 106) stretch;
+}
+.ptcg-atk--usable:hover > .ptcg-atk__head,
+.ptcg-ability--usable:hover > .ptcg-atk__head { filter: brightness(1.12) saturate(1.08); }
+
+.ptcg-atk > .ptcg-atk__head > .ptcg-atk__name,
+.ptcg-ability > .ptcg-atk__head > .ptcg-atk__name {
+  grid-area: name;
+  align-self: end;
+  padding-bottom: calc(var(--bar-h) * 0.03);
+  color: var(--atk-ink, #fff);
+  font-size: min(calc(var(--u) * 3.5), calc(var(--bar-h) * 0.34));
+  line-height: 1.2;
+}
+.ptcg-atk > .ptcg-atk__head > .ptcg-atk__right {
+  grid-area: cost;
+  align-self: start;
+  padding-top: calc(var(--bar-h) * 0.03);
+  gap: calc(var(--bar-h) * 0.04);
+}
+.ptcg-atk__right .ptcg-orb--cost {
+  width: calc(var(--bar-h) * 0.38);
+  height: calc(var(--bar-h) * 0.38);
+}
+/* Abilities show the game's "Ability" tag sprite where an attack shows its cost; the badge text is
+   kept for screen readers. A passive ability is a flat bar tinted with the type colour. */
+.ptcg-ability > .ptcg-atk__head > .ptcg-atk__badge {
+  grid-area: cost;
+  justify-self: start;
+  align-self: start;
+  width: calc(var(--bar-h) * 2);
+  height: calc(var(--bar-h) * 0.44);
+  padding: 0;
+  border-radius: 0;
+  background: url('../assets/attack-ui/ability-tag-on.png') left center / contain no-repeat;
+  color: transparent;
+  font-size: 0;
+}
+.ptcg-ability--passive > .ptcg-atk__head {
+  background: var(--atk-color);
+  border-radius: calc(var(--bar-h) * 0.12);
+}
+.ptcg-ability--passive > .ptcg-atk__head::before { display: none; }
+.ptcg-ability--recede > .ptcg-atk__head { --atk-ink: #000000; }
+.ptcg-ability--recede > .ptcg-atk__head::before { display: none; }
+.ptcg-ability--recede > .ptcg-atk__head > .ptcg-atk__badge {
+  background-image: url('../assets/attack-ui/ability-tag-off.png');
+}
+.ptcg-stack--compact .ptcg-atk > .ptcg-atk__head,
+.ptcg-stack--compact .ptcg-ability > .ptcg-atk__head { --bar-h: calc(var(--u) * 9.4); }
+
 /* Natural height — the panel is as tall as its text, so the card shows in whatever is left
    below the stack rather than being covered by an opaque void. */
 .ptcg-atk__text {
@@ -5433,7 +5649,7 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   padding-bottom: calc(var(--u) * 0.8);
   line-height: 1.3;
 }
-.ptcg-stack--compact .ptcg-atk__head { padding-top: calc(var(--u) * 0.9); padding-bottom: calc(var(--u) * 0.9); }
+.ptcg-stack--compact .ptcg-stadium > .ptcg-atk__head { padding-top: calc(var(--u) * 0.9); padding-bottom: calc(var(--u) * 0.9); }
 .ptcg-atk__text--short { font-size: calc(var(--u) * 3.4); }
 .ptcg-atk--recede,
 .ptcg-ability--recede,
@@ -5496,6 +5712,34 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 .ptcg-stat__n--none { color: #a3adb8; font-weight: 600; }
 /* The BW/XY corner button sits below the printed Weakness/Resistance row, so it stays short. */
 .ptcg-stats--corner .ptcg-stat { padding-top: calc(var(--u) * 0.4); padding-bottom: calc(var(--u) * 0.4); border-radius: calc(var(--u) * 2.1); }
+
+/* The Retreat tile is TCG Live's Retreat button: the type-coloured octagon sprite (grey once the
+   retreat is unavailable) with its ink from the same table as the attack bars. The sprite is
+   opaque in the middle, so the frosted fill steps aside and the octagon's cut corners show the
+   card. */
+.ptcg-chrome .ptcg-stat[data-ptcg-retreat] {
+  --atk-retreat-slice: 12 15 12 15;
+  background: none;
+  backdrop-filter: none;
+  border-style: solid;
+  border-color: transparent;
+  border-width: calc(var(--u) * 1.5) calc(var(--u) * 1.8);
+  border-image: var(--atk-retreat) var(--atk-retreat-slice) fill / calc(var(--u) * 1.5) calc(var(--u) * 1.8) stretch;
+  padding: calc(var(--u) * 0.2) calc(var(--u) * 0.4);
+  color: var(--atk-ink, #fff);
+}
+.ptcg-chrome .ptcg-stat--recede[data-ptcg-retreat] {
+  --atk-retreat: url('../assets/attack-ui/retreat-disable.png');
+  --atk-retreat-slice: 15;
+  --atk-ink: #000000;
+}
+.ptcg-chrome .ptcg-stat[data-ptcg-retreat]::after { display: none; }
+.ptcg-chrome .ptcg-stat[data-ptcg-retreat] .ptcg-stat__k {
+  color: var(--atk-ink, #fff);
+  text-transform: capitalize;
+}
+.ptcg-chrome .ptcg-stat[data-ptcg-retreat] .ptcg-stat__n { color: var(--atk-ink, #fff); }
+.ptcg-chrome .ptcg-stat--usable[data-ptcg-retreat]:hover { box-shadow: none; filter: brightness(1.12) saturate(1.08); }
 
 .ptcg-dmg {
   position: absolute;
