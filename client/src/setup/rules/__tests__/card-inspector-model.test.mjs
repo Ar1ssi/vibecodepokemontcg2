@@ -11,6 +11,7 @@ const {
   bandsForFrame,
   frameKeyFor,
   finishFor,
+  formatWeakResist,
 } = await import('../card-inspector-model.mjs');
 
 const { listAttacks } = await import(
@@ -946,4 +947,19 @@ test('model: a Benched Latias ex (Skyliner) makes an unpaid Basic Active retreat
     rulesState.enabled = wasEnabled;
     rulesState.turnPlayer = wasTurnPlayer;
   }
+});
+
+test('formatWeakResist: modern ×2, older +20, resistance always a minus', () => {
+  assert.equal(formatWeakResist('weakness', { type: 'Water', value: 2 }), '×2');
+  assert.equal(formatWeakResist('weakness', { type: 'Water', value: 20 }), '+20');
+  // parseTypeValue keeps an ASCII minus but drops a Unicode one, so both arrive here.
+  assert.equal(formatWeakResist('resistance', { type: 'Fighting', value: -30 }), '−30');
+  assert.equal(formatWeakResist('resistance', { type: 'Fighting', value: 30 }), '−30');
+});
+
+test('formatWeakResist: nothing printed means no modifier text', () => {
+  assert.equal(formatWeakResist('weakness', null), '');
+  assert.equal(formatWeakResist('resistance', undefined), '');
+  assert.equal(formatWeakResist('weakness', { type: 'Water', value: 0 }), '');
+  assert.equal(formatWeakResist('weakness', { type: 'Water', value: NaN }), '');
 });

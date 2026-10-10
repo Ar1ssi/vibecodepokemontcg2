@@ -88,11 +88,44 @@ describe('067 — card-focus.css', () => {
     );
   });
 
-  it('the list reveal is a clip-path on the chrome, driven by --focus-reveal', () => {
-    const decls = focus('.card-focus__card--revealing .ptcg-chrome');
+  it('the list grows upward from its bottom anchor: a clip-path on the stack driven by --focus-reveal', () => {
+    const decls = focus('.card-focus__card--revealing .ptcg-stack');
     assert.ok(decls, 'reveal rule is missing');
-    assert.ok(decls.includes('clip-path: inset(0 0 calc(100% - var(--focus-reveal)) 0);'));
+    assert.ok(decls.includes('clip-path: inset(calc(100% - var(--focus-reveal)) -4% -4% -4%);'));
     assert.doesNotMatch(decls, /(^|[;\s])opacity\s*:/i);
+  });
+
+  it('the backdrop is a light dim with no blur: the game keeps the board readable', () => {
+    const decls = focus('.card-focus__backdrop');
+    assert.ok(decls, '.card-focus__backdrop is missing');
+    assert.doesNotMatch(decls, /backdrop-filter/i);
+  });
+
+  it('the list is bottom-anchored, 105u wide from 2.5u in, and never anchored from the top', () => {
+    const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus');
+    assert.ok(decls, 'focus stack rule is missing');
+    assert.match(decls, /left: calc\(var\(--u\) \* 2\.5\);/);
+    assert.match(decls, /right: calc\(var\(--u\) \* -7\.5\);/);
+    assert.match(decls, /bottom: calc\(var\(--u\) \* 20\);/);
+    assert.doesNotMatch(decls, /(^|[;\s])top\s*:/i);
+  });
+
+  it('the Weakness / Resistance / Retreat strip sits under the list on the same 2.5u / -7.5u span', () => {
+    const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-stats--focus');
+    assert.ok(decls, 'focus strip rule is missing');
+    assert.match(decls, /left: calc\(var\(--u\) \* 2\.5\);/);
+    assert.match(decls, /right: calc\(var\(--u\) \* -7\.5\);/);
+    assert.match(decls, /bottom: calc\(var\(--u\) \* 6\.4\);/);
+    assert.match(decls, /height: calc\(var\(--u\) \* 11\.5\);/);
+    assert.doesNotMatch(decls, /(^|[;\s])top\s*:/i);
+  });
+
+  it('the HUD derives from the card pose, left of the card, and the energies from its width', () => {
+    const hud = focus('.card-focus__hud');
+    assert.match(hud, /left: calc\(var\(--focus-left\) - var\(--focus-w\) \* 0\.13\);/);
+    assert.match(hud, /transform: translateY\(-100%\);/);
+    assert.doesNotMatch(hud, /(^|[;\s])right\s*:/i);
+    assert.match(focus('.card-focus__energy'), /width: calc\(var\(--focus-w\) \* 0\.246\);/);
   });
 
   it('the pointer tilt lives on its own wrapper, so the flight transform is not overwritten', () => {

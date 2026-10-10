@@ -359,6 +359,21 @@ export function rawAbilityOf(card) {
  * `holo`, `ultra` (rule-box Pokémon and the ultra/double rares) or `secret` (gold-tier rarities).
  * Unknown or missing rarity is `plain`.
  */
+/**
+ * The modifier text on a Weakness or Resistance tile. Modern cards print Weakness as "×2" and older
+ * ones as "+20"; Resistance is always a subtraction. `parseTypeValue` keeps only the digits (and an
+ * ASCII minus), so the sign is rebuilt here. Empty when the card has none.
+ *
+ * @param {'weakness'|'resistance'} kind
+ * @param {{ value: number }|null} typeValue the model's `weakness` / `resistance`
+ */
+export function formatWeakResist(kind, typeValue) {
+  const amount = Math.abs(Number(typeValue?.value));
+  if (!Number.isFinite(amount) || amount === 0) return '';
+  if (kind === 'resistance') return `−${amount}`;
+  return amount >= 10 ? `+${amount}` : `×${amount}`;
+}
+
 export function finishFor(card) {
   const rarity = String(card?.rarity ?? '').toLowerCase();
   if (/secret|hyper|illustration|special|rainbow|gold|shiny ultra|black white/.test(rarity)) return 'secret';

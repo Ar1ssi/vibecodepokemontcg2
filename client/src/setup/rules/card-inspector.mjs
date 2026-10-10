@@ -52,7 +52,10 @@ import {
 } from '../netcode/apply-view.js';
 import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
-import { buildInspectorModel } from './card-inspector-model.mjs';
+import {
+  buildInspectorModel,
+  formatWeakResist,
+} from './card-inspector-model.mjs';
 import {
   openCarouselViewer,
   closeCarouselViewer,
@@ -288,7 +291,8 @@ const retreatTile = (model) => {
  * `blockTopPct` is null when there is nothing to lay out (no attacks and no ability), in which
  * case no stack is drawn at all.
  */
-const buildChrome = (model) => {
+const buildChrome = (model, layout = 'print') => {
+  if (layout === 'focus' && model.kind !== 'stadium') return buildFocusChrome(model);
   const chrome = el('div', 'ptcg-chrome');
   chrome.dataset.finish = model.finish ?? 'plain';
   chrome.style.setProperty('--ptcg-inset-left', `${model.sideInsetLeftPct ?? 0}%`);
@@ -363,6 +367,56 @@ const buildChrome = (model) => {
     stats.appendChild(retreatTile(model));
     chrome.appendChild(stats);
   }
+
+  if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
+  return chrome;
+};
+
+// One Weakness / Resistance line of the focus strip: the label, then the type orb and modifier when
+// the card prints one. An absent weakness or resistance keeps its label (the game does the same).
+const weakResistRow = (label, kind, typeValue) => {
+  const row = el('div', 'ptcg-wr__row');
+  row.appendChild(el('span', 'ptcg-wr__k', label));
+  const text = formatWeakResist(kind, typeValue);
+  if (typeValue?.type && text) {
+    row.appendChild(orb(typeValue.type, 'ptcg-orb ptcg-orb--sm'));
+    row.appendChild(el('span', 'ptcg-wr__n', text));
+  }
+  return row;
+};
+
+/**
+ * The chrome for the card-focus view (design 067), laid out as TCG Live's attack overlay is rather
+ * than over the printed bands: the list is anchored to the bottom of the card, a little wider than
+ * it, with a Weakness / Resistance / Retreat strip beneath. It covers the printed text, so the
+ * strip repeats the weakness and resistance the print would have shown. Geometry is in card-focus.css.
+ */
+const buildFocusChrome = (model) => {
+  const chrome = el('div', 'ptcg-chrome ptcg-chrome--focus');
+  chrome.dataset.finish = model.finish ?? 'plain';
+
+  const hp = el('div', 'ptcg-hp');
+  hp.appendChild(el('span', 'ptcg-hp__num', model.hp));
+  if (model.type) hp.appendChild(orb(model.type, 'ptcg-orb ptcg-hp__orb'));
+  hp.title = model.damage
+    ? `${model.hp} HP · ${model.damage} damage on it`
+    : `${model.hp} HP`;
+  chrome.appendChild(hp);
+
+  const stack = el('div', 'ptcg-stack ptcg-stack--focus');
+  if (model.ability) stack.appendChild(abilityEl(model.ability, model.type));
+  const atks = el('div', 'ptcg-atks');
+  model.attacks.forEach((attack) => atks.appendChild(attackEl(attack, model.type)));
+  stack.appendChild(atks);
+  chrome.appendChild(stack);
+
+  const strip = el('footer', 'ptcg-stats ptcg-stats--focus');
+  const weakResist = el('div', 'ptcg-wr');
+  weakResist.appendChild(weakResistRow('weakness', 'weakness', model.weakness));
+  weakResist.appendChild(weakResistRow('resistance', 'resistance', model.resistance));
+  strip.appendChild(weakResist);
+  strip.appendChild(retreatTile(model));
+  chrome.appendChild(strip);
 
   if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
   return chrome;
@@ -454,7 +508,7 @@ const rerender = (state) => {
     state.card,
     state.context || state.getContext()
   );
-  const next = buildChrome(model);
+  const next = buildChrome(model, state.layout);
   state.wrap.replaceChild(next, state.chrome);
   state.chrome = next;
   // The delegated handler reads state.model, so refreshing it here is what keeps a click after
@@ -473,7 +527,8 @@ export const decorateInspectorSlide = (
   built,
   card,
   getContext,
-  actions = null
+  actions = null,
+  { layout = 'print' } = {}
 ) => {
   const model = buildInspectorModel(card, getContext());
   // A non-Pokémon (or unresolved card) gets the bare scan: wrapping it would change the slide's
@@ -482,7 +537,7 @@ export const decorateInspectorSlide = (
 
   const wrap = el('div', 'ptcg-inspector');
   wrap.appendChild(built.node);
-  const chrome = buildChrome(model);
+  const chrome = buildChrome(model, layout);
   wrap.appendChild(chrome);
 
   const state = {
@@ -493,6 +548,7 @@ export const decorateInspectorSlide = (
     actions,
     context: null,
     model,
+    layout,
   };
   state.refresh = () => rerender(state);
   // The chrome is sized from the slide's layout box, so a resize (window, or the focus card's
@@ -838,12 +894,13 @@ export const buildInspectorCard = ({
   onAbility = () => useAbility(card, zone),
   onRetreat = null,
 }) =>
-  decorateInspectorSlide(built, card, getContext, {
-    onAttack,
-    onAbility,
-    onRetreat,
-    onUse: null,
-  });
+  decorateInspectorSlide(
+    built,
+    card,
+    getContext,
+    { onAttack, onAbility, onRetreat, onUse: null },
+    { layout: 'focus' }
+  );
 
 /**
  * Drop the refresh listener and resize observer of ONE card built by buildInspectorCard, leaving

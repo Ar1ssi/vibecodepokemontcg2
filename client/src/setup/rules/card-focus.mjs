@@ -15,6 +15,10 @@ import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { selfContainerDocument } from '../../state.js';
 import { buildSlideContent } from '../image-logic/card-picker.js';
 import { viewportRectOf } from '../image-logic/card-pop.mjs';
+import {
+  energyTypeKeyFor,
+  getEnergyTokenSrcForType,
+} from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { DEFAULT_TILT_DEG } from '../sizing/table-tilt.mjs';
 import {
   MAT_HOLO_OPTIONS,
@@ -84,13 +88,19 @@ const decodeWithin = (root, capMs) => {
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
-const applyHostRect = (host, rect) => {
-  Object.assign(host.style, {
+// The card's pose in px, on the host and on the root: the HUD and the Energy row position themselves
+// from the root's copy (card-focus.css), so they follow a resize with no JS layout of their own.
+const applyPose = (state, rect) => {
+  Object.assign(state.host.style, {
     left: `${rect.left}px`,
     top: `${rect.top}px`,
     width: `${rect.width}px`,
     height: `${rect.height}px`,
   });
+  state.root.style.setProperty('--focus-left', `${rect.left}px`);
+  state.root.style.setProperty('--focus-top', `${rect.top}px`);
+  state.root.style.setProperty('--focus-w', `${rect.width}px`);
+  state.root.style.setProperty('--focus-h', `${rect.height}px`);
 };
 
 const lowerHand = (state) => {
@@ -114,12 +124,19 @@ const restoreSource = (state) => {
   state.hidden = null;
 };
 
-const hudButton = (className, label, text, onClick) => {
+const HUD_ICONS = {
+  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>',
+  // Cards with a magnifier over them: the game's "stack view" button.
+  stack:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3" width="10" height="14" rx="1.6"/><circle cx="14.5" cy="14.5" r="4.2"/><path d="M17.6 17.6l3.2 3.2"/></svg>',
+};
+
+const hudButton = (className, label, icon, onClick) => {
   const button = el('button', className);
   button.type = 'button';
   button.setAttribute('aria-label', label);
   button.title = label;
-  button.textContent = text;
+  button.innerHTML = icon;
   button.addEventListener('click', (event) => {
     event.stopPropagation();
     onClick();
@@ -204,15 +221,42 @@ const startOpenAnimations = (state, from, to) => {
   state.opened = true;
 };
 
+// Stack above, Close at the bottom of the column (the game's order).
 const buildHud = ({ attachedCount, onClose, onStack }) => {
   const hud = el('div', 'card-focus__hud');
-  hud.appendChild(hudButton('card-focus__close', 'Close', '✕', onClose));
   if (attachedCount > 0 && onStack) {
-    hud.appendChild(
-      hudButton('card-focus__stack', 'Attached cards', String(attachedCount), onStack)
-    );
+    const stack = hudButton('card-focus__stack', 'Attached cards', HUD_ICONS.stack, onStack);
+    const count = el('span', 'card-focus__stack-count');
+    count.textContent = String(attachedCount);
+    stack.appendChild(count);
+    hud.appendChild(stack);
   }
+  hud.appendChild(hudButton('card-focus__close', 'Close', HUD_ICONS.close, onClose));
   return hud;
+};
+
+// The attached Energy as big tokens under the card, like the game draws it. Anything that is not an
+// Energy with a token (a Tool, a Special Energy with no type) stays reachable behind the Stack button.
+const isEnergyCard = (attached) =>
+  attached?.type === 'Energy' || /energy/i.test(String(attached?.name ?? ''));
+
+const buildEnergyRow = (card) => {
+  const row = el('div', 'card-focus__energies');
+  for (const attached of card.attachedCards || []) {
+    if (!isEnergyCard(attached)) continue;
+    const key = energyTypeKeyFor({
+      types: attached.types ?? (attached.energyType ? [attached.energyType] : undefined),
+      name: attached.name,
+    });
+    const src = key ? getEnergyTokenSrcForType(key) : null;
+    if (!src) continue;
+    const img = el('img', 'card-focus__energy');
+    img.src = src;
+    img.alt = String(attached.name ?? 'Energy');
+    img.draggable = false;
+    row.appendChild(img);
+  }
+  return row.childElementCount > 0 ? row : null;
 };
 
 const onResize = () => {
@@ -223,7 +267,7 @@ const onResize = () => {
   if (!(rect.width > 0)) return;
   state.to = rect;
   state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
-  applyHostRect(state.host, rect);
+  applyPose(state, rect);
 };
 
 const watchForPickers = () => {
@@ -300,12 +344,14 @@ export function openCardFocus({
     state.stage = el('div', 'card-focus__stage');
     state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
     state.host = el('div', 'card-focus__card');
-    applyHostRect(state.host, to);
+    applyPose(state, to);
     // Hidden until the flight starts, so the card never shows at its resting pose first.
     state.host.style.visibility = 'hidden';
     state.inspectorWrap = content;
     state.tiltEl = el('div', 'card-focus__tilt');
     state.tiltEl.appendChild(content);
+    const energies = buildEnergyRow(card);
+    if (energies) state.tiltEl.appendChild(energies);
     state.host.appendChild(state.tiltEl);
     state.stage.appendChild(state.host);
 

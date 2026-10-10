@@ -19,6 +19,11 @@
   --focus-expand-ease: cubic-bezier(0.11, 0, 0.5, 0);
   --focus-collapse-ms: 150ms;
   --focus-collapse-ease: cubic-bezier(0.5, 1, 0.89, 1);
+  /* Pose of the focus card in px, written by card-focus.mjs; the HUD and energies derive from it. */
+  --focus-left: 0px;
+  --focus-top: 0px;
+  --focus-w: 400px;
+  --focus-h: 556px;
   position: fixed;
   inset: 0;
   z-index: 2400;
@@ -29,8 +34,8 @@
 .card-focus__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(4, 8, 14, 0.62);
-  backdrop-filter: blur(3px);
+  /* The game keeps the board crisp and readable behind the card: a dim, no blur. */
+  background: rgba(2, 6, 12, 0.42);
   opacity: 0;
   transition: opacity var(--focus-flight-ms) var(--focus-flight-ease);
 }
@@ -103,43 +108,200 @@
   pointer-events: none;
 }
 
-/* The list opens from the top edge down while `--focus-reveal` runs 7% to 100% (AttackOverlay's
-   closedWindowHeight to maxWindowHeight). The clip sits on the chrome, so a re-render mid-reveal
-   keeps the reveal; the class is dropped once it ends so no shadow stays clipped. */
-.card-focus__card--revealing .ptcg-chrome {
-  clip-path: inset(0 0 calc(100% - var(--focus-reveal)) 0);
+/* The list is anchored to the bottom of the card and grows upward while `--focus-reveal` runs 7% to
+   100% (AttackOverlay's closedWindowHeight to maxWindowHeight). The clip is a class rule on the
+   stack, so a re-render mid-reveal keeps the reveal; the class is dropped once it ends so no
+   shadow stays clipped. Negative side insets keep the list's overhang past the card visible. */
+.card-focus__card--revealing .ptcg-stack {
+  clip-path: inset(calc(100% - var(--focus-reveal)) -4% -4% -4%);
 }
 
-/* HUD: buttons stand to the right of the card, as AttackOverlayHUD's do under it. */
+/* HUD: a column of ring buttons standing left of the card, bottom-aligned just above its lower edge,
+   as AttackOverlayHUD's are in the game. Sizes and offsets are fractions of the card (--focus-*, set
+   by card-focus.mjs). Close is the bottom button, Stack above it. */
 .card-focus__hud {
   position: absolute;
-  right: 4vw;
-  top: 50%;
+  left: calc(var(--focus-left) - var(--focus-w) * 0.13);
+  top: calc(var(--focus-top) + var(--focus-h) * 0.97);
   display: flex;
   flex-direction: column;
-  gap: 1.4vh;
-  transform: translateY(-50%);
+  gap: calc(var(--focus-w) * 0.021);
+  transform: translateY(-100%);
   pointer-events: none;
 }
 .card-focus__close,
 .card-focus__stack {
-  width: 6vh;
-  height: 6vh;
-  min-width: 40px;
-  min-height: 40px;
+  position: relative;
+  width: calc(var(--focus-w) * 0.103);
+  height: calc(var(--focus-w) * 0.103);
+  min-width: 34px;
+  min-height: 34px;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: max(2px, calc(var(--focus-w) * 0.0075)) solid #fff;
   border-radius: 50%;
-  background: rgba(16, 22, 32, 0.78);
+  background: rgba(14, 22, 36, 0.52);
   color: #fff;
-  font: 700 2.4vh/1 'Segoe UI', system-ui, sans-serif;
   cursor: pointer;
   pointer-events: auto;
-  backdrop-filter: blur(6px);
+}
+.card-focus__close svg,
+.card-focus__stack svg {
+  width: 58%;
+  height: 58%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.card-focus__stack-count {
+  position: absolute;
+  right: -18%;
+  top: -18%;
+  min-width: 1.5em;
+  padding: 0 0.3em;
+  border-radius: 1em;
+  background: #fff;
+  color: #16202b;
+  font: 800 max(11px, calc(var(--focus-w) * 0.03)) / 1.5 'Segoe UI', system-ui, sans-serif;
+  text-align: center;
 }
 .card-focus__close:hover,
-.card-focus__stack:hover { background: rgba(48, 60, 80, 0.9); }
+.card-focus__stack:hover { background: rgba(60, 76, 104, 0.8); }
 .card-focus__close:focus-visible,
 .card-focus__stack:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; }
+
+/* Attached Energy stands under the card as large tokens overlapping its lower edge, in the game's
+   proportions (each 24.6% of the card width, overlapping by 4.5%). They ride the card's tilt. */
+.card-focus__tilt { position: relative; }
+.card-focus__energies {
+  position: absolute;
+  left: calc(var(--focus-w) * -0.01);
+  bottom: calc(var(--focus-w) * -0.125);
+  display: flex;
+  align-items: center;
+  max-width: calc(100% + var(--focus-w) * 0.08);
+  z-index: 3;
+  pointer-events: none;
+}
+.card-focus__energy {
+  flex: 0 1 auto;
+  min-width: 0;
+  width: calc(var(--focus-w) * 0.246);
+  height: calc(var(--focus-w) * 0.246);
+  margin-right: calc(var(--focus-w) * -0.045);
+  object-fit: contain;
+  filter: drop-shadow(0 0.5vh 0.8vh rgba(0, 0, 0, 0.5));
+}
+
+/* ── Focus layout (design 067): TCG Live's overlay proportions, measured off the game's own
+   screenshot. Lengths are in u (1% of the card's width), which card-inspector.mjs sets on the chrome.
+   The list is anchored to the bottom of the card, 105u wide starting 2.5u in (so it overhangs the right
+   edge by 7.5u), with the Weakness / Resistance / Retreat strip beneath it. */
+.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus {
+  left: calc(var(--u) * 2.5);
+  right: calc(var(--u) * -7.5);
+  bottom: calc(var(--u) * 20);
+  max-height: calc(var(--u) * 92);
+  overflow: hidden auto;
+  scrollbar-width: none;
+  border-radius: calc(var(--u) * 1.6) calc(var(--u) * 3.6) calc(var(--u) * 1.6) calc(var(--u) * 1.6);
+}
+.card-focus__card .ptcg-chrome--focus .ptcg-atk > .ptcg-atk__head,
+.card-focus__card .ptcg-chrome--focus .ptcg-ability > .ptcg-atk__head { --bar-h: calc(var(--u) * 12); }
+/* The game's panels are plain white over the card; the print under them is not meant to show. */
+.card-focus__card .ptcg-chrome--focus .ptcg-atk,
+.card-focus__card .ptcg-chrome--focus .ptcg-ability {
+  background: linear-gradient(#ffffff, #f2f4f7);
+  backdrop-filter: none;
+}
+.card-focus__card .ptcg-chrome--focus .ptcg-atk__text { font-size: calc(var(--u) * 3.1); }
+/* The game's cost icons fill almost half the bar's height. */
+.card-focus__card .ptcg-chrome--focus .ptcg-atk__right .ptcg-orb--cost {
+  width: calc(var(--bar-h) * 0.44);
+  height: calc(var(--bar-h) * 0.44);
+}
+
+.card-focus__card .ptcg-chrome--focus .ptcg-stats--focus {
+  left: calc(var(--u) * 2.5);
+  right: calc(var(--u) * -7.5);
+  bottom: calc(var(--u) * 6.4);
+  height: calc(var(--u) * 11.5);
+  box-sizing: border-box;
+  align-items: center;
+  gap: calc(var(--u) * 1.5);
+  padding: 0 calc(var(--u) * 1.5) 0 calc(var(--u) * 2.4);
+  border-radius: calc(var(--u) * 1.6);
+  background: linear-gradient(#ffffff, #eef1f5);
+  box-shadow: 0 calc(var(--u) * 0.8) calc(var(--u) * 2.4) rgba(0, 0, 0, 0.35);
+}
+.ptcg-wr {
+  flex: 0 0 calc(var(--u) * 52);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--u) * 0.6);
+  min-width: 0;
+}
+.ptcg-wr__row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  min-height: calc(var(--u) * 4.4);
+}
+.ptcg-wr__k {
+  flex: 1 1 auto;
+  font-size: calc(var(--u) * 2.9);
+  color: #4b5a6e;
+}
+.ptcg-wr__n {
+  min-width: calc(var(--u) * 6);
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 800;
+  color: #16202b;
+}
+.card-focus__card .ptcg-chrome--focus .ptcg-stat[data-ptcg-retreat] {
+  flex: 1 1 auto;
+  height: calc(var(--u) * 9.6);
+  flex-direction: row;
+  justify-content: space-between;
+  gap: calc(var(--u) * 1.2);
+  padding: 0 calc(var(--u) * 1.2);
+}
+.card-focus__card .ptcg-chrome--focus .ptcg-stat[data-ptcg-retreat] .ptcg-stat__k {
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 700;
+  text-transform: none;
+}
+.card-focus__card .ptcg-chrome--focus .ptcg-orb--sm {
+  width: calc(var(--u) * 4.2);
+  height: calc(var(--u) * 4.2);
+}
+
+/* The HP pill and the damage counter are drawn about 1.5x and 2x the print's size and spill past the
+   card's right edge. */
+.card-focus__card .ptcg-chrome--focus .ptcg-hp {
+  top: calc(var(--u) * -1.6);
+  right: calc(var(--u) * -2.5);
+  gap: calc(var(--u) * 1.4);
+  padding: calc(var(--u) * 1) calc(var(--u) * 2.4) calc(var(--u) * 1) calc(var(--u) * 4.4);
+  border-radius: calc(var(--u) * 5.5);
+  box-shadow:
+    0 0 0 calc(var(--u) * 0.45) #232b38,
+    0 calc(var(--u) * 0.8) calc(var(--u) * 2.4) rgba(0, 0, 0, 0.45);
+}
+.card-focus__card .ptcg-chrome--focus .ptcg-hp__num { font-size: calc(var(--u) * 12.5); }
+.card-focus__card .ptcg-chrome--focus .ptcg-hp__orb {
+  width: calc(var(--u) * 11);
+  height: calc(var(--u) * 11);
+}
+.card-focus__card .ptcg-chrome--focus .ptcg-dmg {
+  top: 17%;
+  right: calc(var(--u) * -4.4);
+  width: calc(var(--u) * 26);
+  height: calc(var(--u) * 26);
+  font-size: calc(var(--u) * 11.5);
+  border-width: calc(var(--u) * 1.2);
+}
