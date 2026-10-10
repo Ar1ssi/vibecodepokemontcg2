@@ -177,13 +177,41 @@ try {
   T('5d. The hand is lowered in the self frame', await handLowered());
   T('5e. The source card is hidden while focused', await sourceHidden());
 
-  // 5f. A double-click (click, click, dblclick) keeps one focus view and never opens the carousel
+  // 5f. A human-paced double-click: two REAL clicks 250 ms apart. The first lands in the mat's iframe
+  // and the second in the main document, so the browser reports a click count of 1 for each: only
+  // timing can tell them apart. The second click must not close the view.
   await actor.page.keyboard.press('Escape');
   T('5f-pre. Escape closes the focus view', await waitGone());
+  // The fixture game leaves a server choice picker (`card-picker-choose`) open over the mat, which
+  // would take real mouse clicks meant for the Active. Hide it for the real-input steps.
+  await actor.page.evaluate(() =>
+    document.querySelector('#cardPickerOverlay.card-picker-choose')?.style.setProperty('display', 'none', 'important')
+  );
+  const box = await actorFrame.locator('#active img').boundingBox();
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await actor.page.mouse.click(cx, cy);
+  await actor.page.waitForTimeout(250);
+  await actor.page.mouse.click(cx, cy);
+  await actor.page.waitForTimeout(700);
+  const dblCount = await actor.page.locator('.card-focus').count();
+  const dblCarousel = await carouselVisible();
+  T(
+    '5f. A real double-click on own active leaves exactly one focus view and no carousel',
+    dblCount === 1 && !dblCarousel,
+    `focus=${dblCount} carousel=${dblCarousel}`
+  );
+  // A single real click on the backdrop after the double-click window still closes it.
+  await actor.page.waitForTimeout(600);
+  await actor.page.mouse.click(8, 8);
+  T('5f-post. A later single click on the backdrop closes it', await waitGone());
+
+  // 5g. Synthetic click, click, dblclick events reach the card itself: the already-open guard must
+  // keep the focus and never fall through to the old carousel route.
   await clickActive(['click', 'click', 'dblclick']);
   await actor.page.waitForTimeout(800);
   T(
-    '5f. Double-click on own active leaves exactly one focus view and no carousel',
+    '5g. Synthetic double-click events leave one focus view and no carousel',
     (await actor.page.locator('.card-focus').count()) === 1 && !(await carouselVisible())
   );
 
@@ -282,6 +310,25 @@ try {
 
   await actor.page.screenshot({ path: 'out/e2e-focus-payable.png' });
   console.log('Screenshot saved: out/e2e-focus-payable.png');
+
+  // 10c. With a payable attack under the cursor, a real double-click on the Active must not fire it:
+  // the Active's slot is under the landed card, so the second click lands on an attack panel.
+  await actor.page.keyboard.press('Escape');
+  await waitGone();
+  const payBox = await actorFrame.locator('#active img').boundingBox();
+  const px = payBox.x + payBox.width / 2;
+  const py = payBox.y + payBox.height / 2;
+  await actor.page.mouse.click(px, py);
+  // A slow double-click: the list has finished revealing, the 500 ms guard has not passed.
+  await actor.page.waitForTimeout(350);
+  const onUsablePanel = await actor.page.evaluate(
+    ([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.ptcg-atk--usable')),
+    [px, py]
+  );
+  T('10c-pre. The second click of the double-click would land on a payable attack panel', onUsablePanel);
+  await actor.page.mouse.click(px, py);
+  await actor.page.waitForTimeout(700);
+  T('10c. ...and it does not fire the attack: the focus view is still open', await focusOpen());
 
   await actor.page.locator('.card-focus__stack').click();
   await actor.page.waitForTimeout(800);

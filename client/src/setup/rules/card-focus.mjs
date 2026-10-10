@@ -23,7 +23,7 @@ import {
 } from '../deck-builder/core/holo.mjs';
 import {
   buildInspectorCard,
-  releaseInspectorStates,
+  releaseInspectorCard,
 } from './card-inspector.mjs';
 import {
   COLLAPSED_FRACTION,
@@ -41,8 +41,12 @@ import {
 
 const HAND_LOWERED_CLASS = 'hand-lowered';
 const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
-// A double-click's second click lands on the backdrop; ignore it for one double-click interval.
-const BACKDROP_ARM_MS = 120;
+// Clicks on the backdrop and on the card's panels are ignored for this long after the view opens, so
+// the second click of a double-click cannot close it or fire an attack: the Active's slot sits under
+// the landed card, and `event.detail` cannot tell (the two clicks land in different frames, so the
+// browser reports a click count of 1 for each). 500 ms is the usual OS double-click interval; it
+// outlasts the flight (250 ms) and the list reveal (300 ms).
+const CLICK_GUARD_MS = 500;
 const DECODE_CAP_MS = 1500;
 const TILT_MAX_DEG = 6;
 const TILT_EASE_PER_FRAME = 0.18;
@@ -171,12 +175,14 @@ const startOpenAnimations = (state, from, to) => {
   const { host, root } = state;
   host.style.visibility = '';
   root.classList.add('card-focus--open');
+  // A source with no box (hidden, collapsed) has nowhere to fly from: grow in place instead.
+  const fromStart =
+    from.width > 0 && from.height > 0
+      ? transformString(flightTransform(from, to, { tiltDeg: DEFAULT_TILT_DEG }))
+      : 'scale(0.85)';
   state.flight = host.animate(
     [
-      {
-        transform: transformString(flightTransform(from, to, { tiltDeg: DEFAULT_TILT_DEG })),
-        boxShadow: LIFT_SHADOW_FROM,
-      },
+      { transform: fromStart, boxShadow: LIFT_SHADOW_FROM },
       { transform: 'none', boxShadow: LIFT_SHADOW_TO },
     ],
     { duration: FLIGHT_MS, easing: FLIGHT_EASE, fill: 'both' }
@@ -273,7 +279,7 @@ export function openCardFocus({
     to,
     closing: false,
     opened: false,
-    armed: false,
+    openedAt: performance.now(),
   };
   focusState = state;
 
@@ -297,6 +303,7 @@ export function openCardFocus({
     applyHostRect(state.host, to);
     // Hidden until the flight starts, so the card never shows at its resting pose first.
     state.host.style.visibility = 'hidden';
+    state.inspectorWrap = content;
     state.tiltEl = el('div', 'card-focus__tilt');
     state.tiltEl.appendChild(content);
     state.host.appendChild(state.tiltEl);
@@ -314,13 +321,25 @@ export function openCardFocus({
     });
     state.root.append(backdrop, state.stage, hud);
 
+    // Capture phase, before the inspector's delegated click handler on the card: panels only see
+    // clicks once the guard window has passed.
+    state.host.addEventListener(
+      'click',
+      (event) => {
+        if (isArmed(state)) return;
+        event.stopPropagation();
+        event.preventDefault();
+      },
+      true
+    );
+
     backdrop.addEventListener('click', (event) => {
       event.stopPropagation();
-      if (state.armed) closeCardFocus();
+      if (isArmed(state)) closeCardFocus();
     });
     backdrop.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      if (state.armed) closeCardFocus();
+      if (isArmed(state)) closeCardFocus();
     });
 
     document.body.appendChild(state.root);
@@ -348,20 +367,24 @@ export function openCardFocus({
 
 const closeImmediately = () => closeCardFocus({ immediate: true });
 
+const isArmed = (state) => performance.now() - state.openedAt >= CLICK_GUARD_MS;
+
 // Runs after the card is mounted: wait for the art and for the inspector's first chrome
 // placement (its own rAF), so the chrome is sized on the unscaled box before the flight scales it.
 const start = async (state, from) => {
-  await decodeWithin(state.root, DECODE_CAP_MS);
-  await nextFrame();
-  if (focusState !== state || state.closing) return;
-  startOpenAnimations(state, from, state.to);
-  setTimeout(() => {
-    state.armed = true;
-  }, BACKDROP_ARM_MS);
+  try {
+    await decodeWithin(state.root, DECODE_CAP_MS);
+    await nextFrame();
+    if (focusState !== state || state.closing) return;
+    startOpenAnimations(state, from, state.to);
+  } catch (error) {
+    console.error('card focus failed to start', error);
+    closeCardFocus({ immediate: true });
+  }
 };
 
 const teardown = (state) => {
-  releaseInspectorStates();
+  releaseInspectorCard(state.inspectorWrap);
   state.cleanups?.forEach((cleanup) => cleanup());
   state.cleanups = null;
   window.removeEventListener('resize', onResize);
@@ -400,7 +423,7 @@ export function closeCardFocus({ immediate = false } = {}) {
   }
 
   // Everything but the visuals stops now: no more inspector refreshes, tilt, or backdrop clicks.
-  releaseInspectorStates();
+  releaseInspectorCard(state.inspectorWrap);
   state.cleanups?.forEach((cleanup) => cleanup());
   state.cleanups = null;
   raiseHand(state);

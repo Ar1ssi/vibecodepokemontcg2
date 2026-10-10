@@ -410,13 +410,24 @@ const placeChrome = (chrome, wrap) => {
 const states = new Set();
 let boundaryWired = false;
 
-const teardownAll = () => {
-  states.forEach((state) => {
-    REFRESH_EVENTS.forEach((name) =>
-      document.removeEventListener(name, state.refresh)
+const detachState = (state) => {
+  REFRESH_EVENTS.forEach((name) =>
+    document.removeEventListener(name, state.refresh)
+  );
+  state.observer?.disconnect();
+};
+
+const unwireBoundaryIfIdle = () => {
+  if (boundaryWired && states.size === 0) {
+    CLOSE_EVENTS.forEach((name) =>
+      document.removeEventListener(name, teardownAll)
     );
-    state.observer?.disconnect();
-  });
+    boundaryWired = false;
+  }
+};
+
+const teardownAll = () => {
+  states.forEach(detachState);
   states.clear();
   if (boundaryWired) {
     CLOSE_EVENTS.forEach((name) =>
@@ -488,7 +499,11 @@ export const decorateInspectorSlide = (
   // viewport-derived size) must re-place it.
   if (typeof ResizeObserver !== 'undefined') {
     state.observer = new ResizeObserver(() => {
-      if (state.wrap.isConnected) placeChrome(state.chrome, state.wrap);
+      if (!state.wrap.isConnected) {
+        state.observer.disconnect();
+        return;
+      }
+      placeChrome(state.chrome, state.wrap);
     });
     state.observer.observe(wrap);
   }
@@ -821,8 +836,18 @@ export const buildInspectorCard = ({
     onUse: null,
   });
 
-/** Drop every mounted inspector's refresh listeners and observers without touching the carousel. */
-export const releaseInspectorStates = () => teardownAll();
+/**
+ * Drop the refresh listener and resize observer of ONE card built by buildInspectorCard, leaving
+ * any other mounted inspector (a carousel's) alone. A no-op for a card with no state.
+ */
+export const releaseInspectorCard = (wrap) => {
+  for (const state of states) {
+    if (state.wrap !== wrap) continue;
+    detachState(state);
+    states.delete(state);
+  }
+  unwireBoundaryIfIdle();
+};
 
 export const closeCardInspector = () => {
   if (states.size > 0) uiCue('big-card-out');
