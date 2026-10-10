@@ -92,7 +92,7 @@ describe('067 — card-focus.css', () => {
     const decls = focus('.card-focus__card--revealing .ptcg-chrome');
     assert.ok(decls, 'reveal rule is missing');
     assert.ok(decls.includes('clip-path: inset(0 0 calc(100% - var(--focus-reveal)) 0);'));
-    assert.doesNotMatch(decls, /(^|[;s])opacitys*:/i);
+    assert.doesNotMatch(decls, /(^|[;\s])opacity\s*:/i);
   });
 
   it('the pointer tilt lives on its own wrapper, so the flight transform is not overwritten', () => {
@@ -102,7 +102,7 @@ describe('067 — card-focus.css', () => {
     assert.ok(
       decls.includes('rotateX(var(--focus-tilt-x, 0deg)) rotateY(var(--focus-tilt-y, 0deg))')
     );
-    assert.doesNotMatch(focus('.card-focus__card'), /(^|[;s])transforms*:/i);
+    assert.doesNotMatch(focus('.card-focus__card'), /(^|[;\s])transform\s*:/i);
   });
 
   it('plain scans use object-fit: contain, the letterbox the inspector sizes its chrome on', () => {
