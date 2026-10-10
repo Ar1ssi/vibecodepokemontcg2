@@ -24,6 +24,7 @@ client/src/setup/netcode/mat-fx/sfx-cues.mjs + sample-bank.js + ui-cue.mjs + sta
 scripts/sfx/ (`pnpm sfx:import -- --src <extract dir>`) — transcodes the TCG Live SFX extract to committed client/src/assets/sfx/*.ogg + manifest.json (D203/D204); server/sfx-cache.mjs caches only hashed .ogg
 scripts/fx/import-tcgl-status-fx.mjs (`pnpm fx:import-status -- --src <extract dir>`) — copies TCG Live status VFX textures, damage-counter coin and Poison/Burn badges (WebApp/assets/ui WebP) to committed client/src/assets/status-fx/, damage-counter/, status-markers/
 scripts/attack-ui/ — `import-attack-ui.mjs --src <extract dir>` copies TCG Live's AttackOverlay sprites (titlebars, damage tabs, ability tag, Retreat button, GX bar) to committed client/src/assets/attack-ui/; `dump-registry.py` (UnityPy) writes attack-ui.json (per-type colour/ink + 9-slice borders from AttackEntryAssetRegistry_AttackOverlay). index.css pins both: setup/rules/__tests__/attack-ui-assets.test.mjs
+client/src/setup/rules/card-focus.mjs — TCG Live Active-card popup (design 067, D208): CSS-3D flight from the slot to the game's focus pose, hand lowered via `.hand-lowered` on the self iframe, 500 ms click guard (D209), reuses the 013 inspector (`buildInspectorCard`); card-focus-geometry.mjs (pure: pose, flight, curves, tilt), card-focus-routing.mjs (`shouldOpenCardFocus`), css/card-focus.css; routed from click-events.js, Escape in keybinds.js
 client/src/setup/netcode/mat-fx/status-fx.mjs + status.js — condition apply pop / clear sparkle from TCG Live sprites; status-loop.mjs + status-loop.js — held-condition loop overlay, reconciled per card in apply-view.js `reconcileStatusLoopOverlay`; palette in client/src/css/status-fx-palette.css; status-units.mjs — Unity prefab units → card widths (tables keep E:/TCGLive_Extract/vfx_dump numbers)
 
 ## Rules engine — pure, DOM-free, headless-tested (~8,900 lines; portable to Node)
@@ -111,7 +112,7 @@ client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native
 two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
 flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
-test-card-inspector-e2e.mjs — Playwright two-browser design-013 card-inspector gate
+test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
   (`pnpm test:inspector`; needs a hand-started authoritative server on PTCG_URL). Step 9 clicks the
   attack panel with REAL input (locator.click), so it catches pointer-capture regressions el.click() hides
 *-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits

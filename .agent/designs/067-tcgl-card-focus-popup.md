@@ -1,5 +1,5 @@
 # 067: TCG Live card focus — the 3D Active-card popup
-Status: approved (user)
+Status: shipped
 Date: 2026-10-11 · Session: S—
 
 ## Problem

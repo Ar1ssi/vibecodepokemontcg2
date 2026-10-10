@@ -6,9 +6,11 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D208).
+#   Next id = highest D number in this file and the archive + 1 (next: D210).
 
 ## Active
+- D209 2026-10-11 [board-ui] Card focus ignores card/backdrop clicks for 500 ms after opening: a double-click's clicks land in two frames (count 1 each) and the 2nd hits an attack panel. (design 067)
+- D208 2026-10-11 [rules-ui] Single-click on your own Active opens the TCG Live card focus (CSS-3D lift on the game's 20° camera pose, hand drops, 013 panels on it); narrows D53 to Bench/Stadium. (user, design 067)
 - D207 2026-10-08 [mat-fx] Evolutions (non-Mega/Tera) and devolutions play TCG Live's Card_Evolution / Card_Devolution prefabs rebuilt from the UnityPy dump: pure timelines (evolve-scene.mjs, devolve-scene.mjs, tcgl-fx.mjs Unity curve maths) drawn additively on one canvas per card (tcgl-canvas.js); textures committed as WebP in assets/fx/evolution; holds 1300/700. (Supersedes D153; design 066)
 - D206 2026-10-08 [render] Attack audio = sampled hit per type × size (tier), started so its measured peak (manifest `peaks`) lands on the move's contact; signature moves add the type sting. (design 064 Addendum A)
 - D205 2026-10-08 [board-ui] Attack scenes play a main-series move chosen by type, species stats and tier; species stats are vendored from Showdown pokedex (MIT) by `pnpm vendor:species-stats`, not fetched at runtime. (design 063)
@@ -156,7 +158,7 @@
 - D56 2026-09-19 [board-ui] Holofoil drift ignores prefers-reduced-motion; no holo opt-out (user decision). (S188)
 - D55 2026-09-19 [board-ui] Holofoil drifts on every surface while not held by the cursor (user decision). (S186)
 - D54 2026-09-19 [rules] Ability position gate is in the ENGINE: `requiresActiveSpot` + `listAbilities({zone})` + `validateLegality`; matches only the restrictive conditional wording (design 015). (S182)
-- D53 2026-09-19 [rules-ui] Card inspection and attack/ability selection live on double-click in one inspector; single-click = select-to-move (design 013). (S174)
+- D53 2026-09-19 [rules-ui] Card inspection and attack/ability selection live on double-click in one inspector; single-click = select-to-move (design 013). Own Active: D208. (S174)
 - D52 2026-09-18 [netcode] Client opening sequence is guarded by an `openingStarted` latch, never `rulesState.phase === 'setup'`. (S173)
 - D51 2026-09-18 [netcode] Opening turn order is a server-owned coin call on GameRoom (not GameState); silent caller for 15 s is called for by the server. (S173)
 - D50 2026-09-18 [rules] Grand Tree search-evolve (incl. chained Stage 2) runs in the SERVER engine via `searchEvolve` `step.chainStage2`, not a client exemption. (S173)
