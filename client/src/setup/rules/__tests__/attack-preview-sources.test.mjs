@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   attachedEnergiesFor,
+  stampEnergyTypes,
   stadiumCardFor,
   abilityUsedFor,
 } from '../attack-preview-sources.mjs';
@@ -45,4 +46,12 @@ test('ability used: legacy flag, stamped card flag, or server flags by instanceI
   assert.equal(abilityUsedFor(card, false, { Mew: true }), true);
   assert.equal(abilityUsedFor(card, false, { 8: true }), false);
   assert.equal(abilityUsedFor(card, false), false);
+});
+
+test('stamp energy types: untyped basic Energy still prices from its name before card data loads', () => {
+  const mon = { image: 'img-1', attachedCards: [{ type: 'Energy', name: 'Water Energy' }] };
+  assert.deepEqual(
+    stampEnergyTypes(mon).map((d) => d.type),
+    ['Water']
+  );
 });

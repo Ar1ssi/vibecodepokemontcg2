@@ -33,6 +33,7 @@ import { resolveAttackContext } from '../../../../shared/engine/rules/resolve-at
 import { specialEnergyBoard } from '../../../../shared/engine/rules/special-energy-parse.mjs';
 import {
   attachedEnergiesFor,
+  stampEnergyTypes,
   stadiumCardFor,
   abilityUsedFor,
 } from './attack-preview-sources.mjs';
@@ -562,18 +563,13 @@ const wirePanelClicks = (state) => {
   });
 };
 
-const energyTypesFor = (card) =>
-  attachedEnergiesFor(card, [])
-    .map((energy) => energy?.types?.[0] || null)
-    .filter(Boolean);
-
 /**
  * First paint only. The card stamp carries attached Energy and damage but not the Stadium cost
  * modifier or the once-per-turn flags, so it over-reports unpayable attacks.
  * `resolveLiveContext` replaces it as soon as the async data lands.
  */
 const stampContextFor = (card, zone = 'active') => ({
-  energyTypes: energyTypesFor(card),
+  energyTypes: stampEnergyTypes(card),
   attacker: card,
   zone,
   damageCtx: {

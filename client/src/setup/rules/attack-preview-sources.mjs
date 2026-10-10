@@ -11,6 +11,11 @@
  */
 
 import { isEnergy } from '../../../../shared/engine/cards.mjs';
+import {
+  classifyEnergyEffect,
+  resolveAttachedEnergyType,
+  rewriteEnergyDescriptor,
+} from '../../../../shared/engine/rules/energy-effects.mjs';
 
 /**
  * @param {object} card the previewed active Pokémon
@@ -24,6 +29,24 @@ export function attachedEnergiesFor(card, legacyActiveCards = []) {
   );
   if (legacy.length > 0) return legacy;
   return (Array.isArray(card.attachedCards) ? card.attachedCards : []).filter(isEnergy);
+}
+
+/**
+ * Synchronous energy pricing for the inspector's first paint, before card data has loaded.
+ * Reads `types[0]` only when present; otherwise the name/effect hints, as the live path does —
+ * dropping an unresolved Energy made every attack read "unusable" until the async fetch landed.
+ * @param {object} card the previewed Pokémon
+ * @param {object[]} legacyActiveCards `getZone('self', 'active').array`
+ * @returns {object[]} Energy descriptors for `canPayAttackCost`
+ */
+export function stampEnergyTypes(card, legacyActiveCards = []) {
+  const attached = attachedEnergiesFor(card, legacyActiveCards);
+  return attached.map((energy) =>
+    rewriteEnergyDescriptor(
+      { type: resolveAttachedEnergyType(energy), family: classifyEnergyEffect(energy) },
+      { card: energy, hostPokemon: card, attachedCards: attached }
+    )
+  );
 }
 
 /**
