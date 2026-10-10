@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
@@ -6,6 +7,7 @@ import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { addCondition, hasAnyCondition, hasCondition } from '../rules/special-conditions.mjs';
 import { parseAbility } from '../rules/abilities.mjs';
+import { rootMatchesTarget } from '../effects/trainer-steps.mjs';
 
 function setupGame() {
   const rng = createRng(42);
@@ -1133,6 +1135,60 @@ test('ability: "attach them to your Pokémon in any way you like" picks a target
   assert.equal(res4.error, null);
   assert.deepEqual(attachedTo(res4.state, 'p1', 70), [81]);
   assert.deepEqual(attachedTo(res4.state, 'p1', 72), [82]);
+});
+
+test("ability: search-attach to your Marnie's Pokémon only offers Marnie's Pokémon (Marnie's Grimmsnarl ex Punk Up, pkmn corpus)", () => {
+  const { state, rng } = setupGame();
+  holderWithAbility(state, "Once during your turn, you may search your deck for up to 1 Basic {D} Energy card and attach it to your Marnie's Pokémon in any way you like. Then, shuffle your deck.");
+  state.players.p1.zones.bench.push(
+    createCard({ instanceId: 72, name: "Marnie's Impidimp", hp: 60, supertype: 'Pokémon' }),
+    createCard({ instanceId: 73, name: "Steven's Beldum", hp: 60, supertype: 'Pokémon' }),
+  );
+  state.players.p1.zones.deck.push(energyCard(81, 'Darkness'));
+  const res1 = applyCommand(state, { type: 'useAbility', payload: { instanceId: 70 }, playerId: 'p1' }, rng);
+  const res2 = resolveWith(res1, [81], rng);
+  assert.equal(res2.error, null);
+  assert.deepEqual(attachedTo(res2.state, 'p1', 72), [81], "the only Marnie's Pokémon receives it");
+  assert.deepEqual(attachedTo(res2.state, 'p1', 73), []);
+});
+
+test("rootMatchesTarget: owned-name targets (Marnie's, Steven's, Team Rocket's) match by card-name prefix", () => {
+  const { state } = setupGame();
+  const p = state.players.p1;
+  const cards = [
+    createCard({ instanceId: 1, name: "Marnie's Grimmsnarl ex", hp: 300, supertype: 'Pokémon' }),
+    createCard({ instanceId: 2, name: "Steven's Metagross ex", hp: 300, supertype: 'Pokémon' }),
+    createCard({ instanceId: 3, name: "Team Rocket's Crobat ex", hp: 300, supertype: 'Pokémon' }),
+    createCard({ instanceId: 4, name: 'Pikachu', hp: 60, supertype: 'Pokémon' }),
+  ];
+  p.zones.active.push(cards[0]);
+  p.zones.bench.push(...cards.slice(1));
+  const match = (target) => cards.filter((c) => rootMatchesTarget(p, c, target)).map((c) => c.instanceId);
+  assert.deepEqual(match("your Marnie's Pokémon"), [1]);
+  assert.deepEqual(match("1 of your Benched Steven's Pokémon"), [2]);
+  assert.deepEqual(match("1 of your Team Rocket's Pokémon"), [3]);
+  assert.deepEqual(match('your Pokémon'), [1, 2, 3, 4]);
+});
+
+test("rootMatchesTarget: every owned-name target printed in out/pkmn-pokemon-cards.json keys on that owner", () => {
+  const corpus = JSON.parse(readFileSync(new URL('../../../out/pkmn-pokemon-cards.json', import.meta.url), 'utf8'));
+  const targets = new Map();
+  for (const card of corpus) {
+    for (const m of String(card.text || '').matchAll(/((?:1 of )?your (?:Benched |Active )?([A-Z][\w.-]*(?: [A-Z][\w.-]*)?)'s Pok[eé]mon)/g)) {
+      targets.set(m[1], m[2]);
+    }
+  }
+  assert.ok(targets.size >= 8, `expected the corpus to print many owned-name targets, got ${targets.size}`);
+  for (const [phrase, owner] of targets) {
+    const { state } = setupGame();
+    const p = state.players.p1;
+    const owned = createCard({ instanceId: 1, name: `${owner}'s Testmon ex`, hp: 100, supertype: 'Pokémon' });
+    const other = createCard({ instanceId: 2, name: 'Pikachu', hp: 60, supertype: 'Pokémon' });
+    p.zones.active.push(owned);
+    p.zones.bench.push(other);
+    assert.equal(rootMatchesTarget(p, owned, phrase), !phrase.includes('Benched'), `${phrase}: owner Pokémon`);
+    assert.equal(rootMatchesTarget(p, other, phrase), false, `${phrase}: non-owner Pokémon`);
+  }
 });
 
 test('ability: once-per-turn hand attach moves the Energy onto the chosen Pokémon (I90)', () => {

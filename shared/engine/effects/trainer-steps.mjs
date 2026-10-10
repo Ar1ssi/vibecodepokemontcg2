@@ -325,6 +325,20 @@ export function sourceName(ctx, fallback) {
   return ctx.sourceCard?.name || fallback;
 }
 
+const TARGET_QUALIFIER_WORDS = new Set([
+  '1', 'one', 'of', 'your', 'active', 'benched', 'basic', 'evolved', 'stage', '2', 'each', 'all', 'any', 'opponent',
+]);
+
+// Owned-name qualifier of a target phrase: "your Marnie's Pokémon" → "marnie",
+// "1 of your Benched Team Rocket's Pokémon" → "team rocket", "Steven's Pokémon" → "steven".
+export function ownerQualifier(target = '') {
+  const m = String(target).toLowerCase().match(/([^{}]*?)['’]s pok/);
+  if (!m) return null;
+  const words = m[1].split(/\s+/).filter(Boolean);
+  while (words.length && TARGET_QUALIFIER_WORDS.has(words[0])) words.shift();
+  return words.length ? words.join(' ') : null;
+}
+
 // "1 of your Benched {D} Pokémon", "1 of your Stage 2 Pokémon", ... → root filter.
 export function rootMatchesTarget(player, root, target = '') {
   const t = String(target).toLowerCase();
@@ -333,6 +347,8 @@ export function rootMatchesTarget(player, root, target = '') {
     return false;
   }
   const top = topPokemonCard(player, root);
+  const owner = ownerQualifier(t);
+  if (owner && !String(top?.name || '').toLowerCase().startsWith(`${owner}'s`)) return false;
   if (t.includes('stage 2') && stageOf(top) !== 'Stage 2') return false;
   if (/\bbasic (?:\{[a-z]\} )?pok[eé]mon\b/.test(t) && stageOf(top) !== 'Basic') return false;
   if (t.includes('evolved') && top === root) return false;
@@ -379,14 +395,12 @@ function handAttachTargets(ctx) {
   const { player, step, sourceCard } = ctx;
   const phrase = String(step.handTarget || '');
   if (/^this pok/.test(phrase)) return rootsOf(player).filter((c) => c.instanceId === sourceCard?.instanceId);
-  const owner = phrase.match(/([a-z]+)'s pok/)?.[1];
   const attackName = phrase.match(/that has the (.+?) attack/)?.[1];
   const bareName = phrase.match(/^(?:1|one) of your ([^{}]+)$/)?.[1];
   return rootsOf(player).filter((root) => {
     if (!rootMatchesTarget(player, root, phrase)) return false;
     const top = topPokemonCard(player, root);
     const name = String(top?.name || '').toLowerCase();
-    if (owner && !name.startsWith(`${owner}'s`)) return false;
     if (/doesn't have a rule box/.test(phrase) && RULE_BOX_NAME.test(name)) return false;
     if (attackName && !(top?.attacks || []).some((a) => String(a?.name || '').toLowerCase() === attackName)) {
       return false;
