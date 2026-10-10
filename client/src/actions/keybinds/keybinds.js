@@ -38,6 +38,7 @@ import {
   deselectCard,
   hideZoneElements,
 } from '../general/close-popups.js';
+import { closeCardFocus, isCardFocusOpen } from '../../setup/rules/card-focus.mjs';
 import { flipBoard } from '../general/flip-board.js';
 import { flipCoin } from '../general/flip-coin.js';
 import { reset } from '../general/reset.js';
@@ -128,6 +129,12 @@ export const keyDown = (event) => {
     return;
   }
   if (event.key === 'Escape' || event.code === 'Escape') {
+    // The card focus closes with its own fly-back; closePopups() would not (it must not close the
+    // focus at all: it also runs on every card move and document click).
+    if (isCardFocusOpen()) {
+      closeCardFocus();
+      return;
+    }
     hideZoneElements();
     closePopups();
     document.getElementById('keybindModal').style.display = 'none';

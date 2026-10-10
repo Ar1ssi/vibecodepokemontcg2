@@ -78,3 +78,15 @@ export const expandDurationMs = (fromFraction, toFraction) =>
 
 export const collapseDurationMs = (fromFraction, toFraction) =>
   scaledDuration(fromFraction, toFraction, COLLAPSE_MS);
+
+// Rigid pointer tilt for the whole focus card (art and chrome together). Positive rotateY turns the
+// card's right edge away, positive rotateX its top edge away, so the face turns toward the cursor.
+export const tiltFromPointer = (rect, clientX, clientY, maxDeg) => {
+  if (!rect || !isPositive(rect.width) || !isPositive(rect.height) || !isPositive(maxDeg)) {
+    return { rotateX: 0, rotateY: 0 };
+  }
+  const unit = (offset, half) => Math.max(-1, Math.min(1, offset / half));
+  const nx = unit(clientX - (rect.left + rect.width / 2), rect.width / 2);
+  const ny = unit(clientY - (rect.top + rect.height / 2), rect.height / 2);
+  return { rotateX: -ny * maxDeg || 0, rotateY: nx * maxDeg || 0 };
+};

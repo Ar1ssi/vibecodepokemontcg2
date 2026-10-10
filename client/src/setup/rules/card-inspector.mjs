@@ -374,7 +374,9 @@ const buildChrome = (model) => {
  * the slide box — the same correction design 008 R4 made for its zones.
  */
 const contentBoxFor = (wrap) => {
-  const rect = wrap.getBoundingClientRect();
+  // Layout size, not getBoundingClientRect(): the rect includes transforms, and the chrome is a
+  // child of `wrap`, so a scaled ancestor (the card-focus flight, design 067) would be applied twice.
+  const rect = { width: wrap.offsetWidth, height: wrap.offsetHeight };
   const fallback = { left: 0, top: 0, width: rect.width, height: rect.height };
   const img =
     wrap.querySelector('img.discard-pile-card') ||
@@ -413,6 +415,7 @@ const teardownAll = () => {
     REFRESH_EVENTS.forEach((name) =>
       document.removeEventListener(name, state.refresh)
     );
+    state.observer?.disconnect();
   });
   states.clear();
   if (boundaryWired) {
@@ -481,6 +484,14 @@ export const decorateInspectorSlide = (
     model,
   };
   state.refresh = () => rerender(state);
+  // The chrome is sized from the slide's layout box, so a resize (window, or the focus card's
+  // viewport-derived size) must re-place it.
+  if (typeof ResizeObserver !== 'undefined') {
+    state.observer = new ResizeObserver(() => {
+      if (state.wrap.isConnected) placeChrome(state.chrome, state.wrap);
+    });
+    state.observer.observe(wrap);
+  }
   states.add(state);
   wireBoundary();
   applyAffordances(state, model);
@@ -787,6 +798,31 @@ const useAbility = (card, zone) => {
   }
   runAbilitySteps('self', card);
 };
+
+/**
+ * Decorate a built slide for the card-focus view (design 067): the same chrome, affordances and
+ * live-context hydration the carousel inspector uses, without opening the carousel.
+ *
+ * @param {{ node: Node, holoWrapper: Node|null }} options.built result of buildSlideContent
+ */
+export const buildInspectorCard = ({
+  built,
+  card,
+  zone = 'active',
+  getContext = () => stampContextFor(card, zone),
+  onAttack = null,
+  onAbility = () => useAbility(card, zone),
+  onRetreat = null,
+}) =>
+  decorateInspectorSlide(built, card, getContext, {
+    onAttack,
+    onAbility,
+    onRetreat,
+    onUse: null,
+  });
+
+/** Drop every mounted inspector's refresh listeners and observers without touching the carousel. */
+export const releaseInspectorStates = () => teardownAll();
 
 export const closeCardInspector = () => {
   if (states.size > 0) uiCue('big-card-out');

@@ -81,6 +81,38 @@ describe('067 — card-focus.css', () => {
     }
   });
 
+  it('registers --focus-reveal so the Web Animation can tween it', () => {
+    assert.match(
+      normalize(FOCUS_CSS),
+      /@property --focus-reveal { syntax: '<percentage>'; inherits: true; initial-value: 100%; }/
+    );
+  });
+
+  it('the list reveal is a clip-path on the chrome, driven by --focus-reveal', () => {
+    const decls = focus('.card-focus__card--revealing .ptcg-chrome');
+    assert.ok(decls, 'reveal rule is missing');
+    assert.ok(decls.includes('clip-path: inset(0 0 calc(100% - var(--focus-reveal)) 0);'));
+    assert.doesNotMatch(decls, /(^|[;s])opacitys*:/i);
+  });
+
+  it('the pointer tilt lives on its own wrapper, so the flight transform is not overwritten', () => {
+    const decls = focus('.card-focus__tilt');
+    assert.ok(decls, '.card-focus__tilt is missing');
+    assert.match(decls, /transform-style: preserve-3d;/);
+    assert.ok(
+      decls.includes('rotateX(var(--focus-tilt-x, 0deg)) rotateY(var(--focus-tilt-y, 0deg))')
+    );
+    assert.doesNotMatch(focus('.card-focus__card'), /(^|[;s])transforms*:/i);
+  });
+
+  it('plain scans use object-fit: contain, the letterbox the inspector sizes its chrome on', () => {
+    assert.ok(
+      normalize(FOCUS_CSS).includes(
+        '.card-focus__card .discard-pile-card { display: block; width: 100%; height: 100%; object-fit: contain;'
+      )
+    );
+  });
+
   it('defines the HUD buttons the module builds', () => {
     for (const selector of ['.card-focus__hud', '.card-focus__close', '.card-focus__stack']) {
       assert.ok(focus(selector), `${selector} is missing`);

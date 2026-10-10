@@ -11,6 +11,7 @@ import {
   flightTransform,
   expandDurationMs,
   collapseDurationMs,
+  tiltFromPointer,
 } from '../card-focus-geometry.mjs';
 
 const near = (actual, expected, tolerance, label) =>
@@ -137,5 +138,32 @@ describe('list window durations', () => {
   it('collapse uses the shorter base duration', () => {
     near(collapseDurationMs(1, COLLAPSED_FRACTION), 150, 1e-9, 'full collapse');
     assert.equal(collapseDurationMs(0.5, 0.5), 0);
+  });
+});
+
+describe('tiltFromPointer', () => {
+  const rect = { left: 100, top: 100, width: 200, height: 300 };
+
+  it('is flat with the pointer on the centre', () => {
+    assert.deepEqual(tiltFromPointer(rect, 200, 250, 6), { rotateX: 0, rotateY: 0 });
+  });
+
+  it('turns the face toward the pointer: right edge cursor is +rotateY, top edge cursor is +rotateX', () => {
+    assert.deepEqual(tiltFromPointer(rect, 300, 250, 6), { rotateX: 0, rotateY: 6 });
+    assert.deepEqual(tiltFromPointer(rect, 200, 100, 6), { rotateX: 6, rotateY: 0 });
+    assert.deepEqual(tiltFromPointer(rect, 100, 400, 6), { rotateX: -6, rotateY: -6 });
+  });
+
+  it('scales linearly and clamps outside the card', () => {
+    assert.deepEqual(tiltFromPointer(rect, 250, 250, 6), { rotateX: 0, rotateY: 3 });
+    assert.deepEqual(tiltFromPointer(rect, 900, 250, 6), { rotateX: 0, rotateY: 6 });
+  });
+
+  it('returns flat for a missing, empty or non-finite input', () => {
+    const flat = { rotateX: 0, rotateY: 0 };
+    assert.deepEqual(tiltFromPointer(null, 1, 1, 6), flat);
+    assert.deepEqual(tiltFromPointer({ ...rect, width: 0 }, 1, 1, 6), flat);
+    assert.deepEqual(tiltFromPointer(rect, 300, 250, 0), flat);
+    assert.deepEqual(tiltFromPointer(rect, NaN, 250, 6), flat);
   });
 });

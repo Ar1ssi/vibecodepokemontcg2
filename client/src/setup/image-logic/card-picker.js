@@ -86,7 +86,8 @@ const disableNativeDrag = (node) => {
   });
 };
 
-const buildSlideContent = (card) => {
+// Exported for the card-focus view (design 067), which mounts the same holo card outside the carousel.
+export const buildSlideContent = (card) => {
   const src = cardArtSrc(card);
   const existingRarity = card?.wrapper?.dataset?.rarity;
   if (existingRarity && src) {

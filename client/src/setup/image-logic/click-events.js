@@ -29,6 +29,8 @@ import {
   closeCardInspector,
   stadiumContextFor,
 } from '../rules/card-inspector.mjs';
+import { openCardFocus, closeCardFocus } from '../rules/card-focus.mjs';
+import { shouldOpenCardFocus } from '../rules/card-focus-routing.mjs';
 import {
   attack,
   retreat,
@@ -239,6 +241,42 @@ export const openCardContextMenu = (event) => {
   }
 };
 
+// Attached Energy is rendered on the mat as a small round token (attach-card.js swaps image.src to
+// the icon and stashes the full card art in dataset.energyCardSrc) — show the real card art in the
+// carousel slide, then revert automatically since we never touch the board's own <img>, just a
+// read-only stand-in object here.
+const attachedSlidesOf = (card) =>
+  (card.attachedCards || []).map((attached) => {
+    const fullArtSrc = attached.image?.dataset?.energyCardSrc;
+    return fullArtSrc ? { ...attached, image: { src: fullArtSrc } } : attached;
+  });
+
+// Design 067: your own Active opens the TCG Live focus view. The attached cards the old inspector
+// carried as carousel slides sit behind the HUD's Stack button. An attack or retreat closes the
+// focus at once, because it fires at the slot the card would otherwise be flying back to.
+const openOwnActiveFocus = (card) => {
+  const attachedSlides = attachedSlidesOf(card);
+  return openCardFocus({
+    card,
+    zone: 'active',
+    attachedCount: attachedSlides.length,
+    onAttack: (index) => {
+      closeCardFocus({ immediate: true });
+      attack(rulesState.turnPlayer, true, index);
+    },
+    onRetreat: () => {
+      closeCardFocus({ immediate: true });
+      retreat(systemState.initiator);
+    },
+    onOpenStack: () =>
+      openCarouselViewer({
+        title: card.name || 'Attached Cards',
+        candidates: [...orderAttachedForCarousel(attachedSlides), card],
+        initialIndex: attachedSlides.length,
+      }),
+  });
+};
+
 export const imageClick = (event) => {
   event.stopPropagation();
   identifyCard(event);
@@ -276,6 +314,19 @@ export const imageClick = (event) => {
     // clicks first, popping, re-popping and then tearing down the overlay before the carousel
     // replaced it. Selection of your own active is also what 008 made unreachable (its R3).
     closePopups(event); //need both because of highlights condition in the if block above
+    // D50/D53 superseded for your own Active (design 067): a single click opens the focus view.
+    // Select-to-move for the Active is drag or the right-click menu.
+    const focusCard = resolvePreviewCard(mouseClick.card, event.target);
+    if (
+      shouldOpenCardFocus({
+        zoneId: mouseClick.zoneId,
+        cardUser: mouseClick.cardUser,
+        card: focusCard,
+      }) &&
+      openOwnActiveFocus(focusCard)
+    ) {
+      return;
+    }
     // Select-to-move resolves the card through the legacy zone arrays, which a
     // server-authoritative game never populates — nothing to select there.
     if (!mouseClick.card?.image) return;
@@ -306,6 +357,17 @@ export const doubleClick = (event) => {
     });
     return;
   }
+  // The second click of a double-click on your own Active: open (or keep) the same focus view.
+  if (
+    shouldOpenCardFocus({
+      zoneId: mouseClick.zoneId,
+      cardUser: mouseClick.cardUser,
+      card,
+    }) &&
+    openOwnActiveFocus(card)
+  ) {
+    return;
+  }
   const targetImage = card.image;
   targetImage.classList.remove('highlight');
   // Zones routed to the dismissible zoom path. The raw #fullImage branch below
@@ -326,12 +388,7 @@ export const doubleClick = (event) => {
       // Carousel slide N sits to the right of slide N+1 (higher index = further left, see
       // computeSlideLayout's `virtualIndex - slideIndex`), so the attached cards go BEFORE the
       // main card in the array to land on its right, with initialIndex on the main card's slot.
-      const attachedSlides = (card.attachedCards || []).map((attached) => {
-        const fullArtSrc = attached.image?.dataset?.energyCardSrc;
-        return fullArtSrc
-          ? { ...attached, image: { src: fullArtSrc } }
-          : attached;
-      });
+      const attachedSlides = attachedSlidesOf(card);
 
       // Design 018: the shared in-play Stadium opens the same module — the effect text as a
       // content-sized panel, clicked to run the Stadium effect. It has no cardUser (`#stadium`

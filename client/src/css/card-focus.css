@@ -5,6 +5,13 @@
    Animations the module runs, and card-focus-css.test.mjs pins the two against each other.
    JS sets the stage perspective and the card's left/top/width/height inline: they come from
    the viewport, not from this sheet. */
+/* Registered so the Web Animation can tween it: it is how far the list has been revealed. */
+@property --focus-reveal {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 100%;
+}
+
 .card-focus {
   --focus-flight-ms: 250ms;
   --focus-flight-ease: cubic-bezier(0.32, 0, 0.67, 0);
@@ -51,6 +58,14 @@
   box-shadow: 0 0.6vh 1.2vh rgba(0, 0, 0, 0.4);
   pointer-events: auto;
 }
+/* Pointer tilt turns the art and the chrome as one rigid body: tilting only the holo art would leave
+   the panels flat on a card that has turned under them. Angles are set from JS. */
+.card-focus__tilt {
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--focus-tilt-x, 0deg)) rotateY(var(--focus-tilt-y, 0deg));
+}
 .card-focus__card .ptcg-inspector,
 .card-focus__card .mat-holo,
 .card-focus__card .discard-pile-card {
@@ -72,19 +87,28 @@
   width: 100%;
   height: 100%;
 }
-.card-focus__card .mat-holo.discard-pile-holo img,
-.card-focus__card .discard-pile-card {
+.card-focus__card .mat-holo.discard-pile-holo img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   pointer-events: none;
 }
+/* contain, not cover: card-inspector.mjs sizes the chrome on a contain letterbox for plain scans. */
+.card-focus__card .discard-pile-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
 
-/* The list is revealed from its top edge by a clip-path the module animates; the sheet only keeps
-   it clear of the card's own rounding. */
-.card-focus__card .ptcg-stack,
-.card-focus__card .ptcg-stats { will-change: clip-path; }
+/* The list opens from the top edge down while `--focus-reveal` runs 7% to 100% (AttackOverlay's
+   closedWindowHeight to maxWindowHeight). The clip sits on the chrome, so a re-render mid-reveal
+   keeps the reveal; the class is dropped once it ends so no shadow stays clipped. */
+.card-focus__card--revealing .ptcg-chrome {
+  clip-path: inset(0 0 calc(100% - var(--focus-reveal)) 0);
+}
 
 /* HUD: buttons stand to the right of the card, as AttackOverlayHUD's do under it. */
 .card-focus__hud {
