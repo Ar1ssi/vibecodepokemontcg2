@@ -144,20 +144,20 @@ A second `openCardFocus` while open returns `false`. `closeCardFocus` is idempot
 ## Edge cases & failure modes — the completeness contract; Builder ticks every row
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Card unresolved, face-down, or no `image` | `openCardFocus` returns false; old click path (no-op under server authority) | [ ] |
-| 2 | Click on an own Active while rules are disabled or it is not your turn | Focus opens read-only: model gives no `usable` panels, no affordances | [ ] |
-| 3 | Viewport ≤ 320 px wide or portrait (900×1200) | `focusRect` keeps ≥ 16 px margin, width ≤ 90 % of viewport, still 0.71876 aspect | [ ] |
-| 4 | Double-click on the Active | One focus, never a flash: second click lands on the backdrop inside the arm delay and is ignored; `dblclick` routes to the same idempotent open | [ ] |
-| 5 | Open while a carousel/preview/picker is up | `closePopups()` first, then open | [ ] |
-| 6 | Source card removed or moved mid-focus (attack, board event) | Focus stays; on close no unhide target → fade out instead of fly-back | [ ] |
-| 7 | Image decode fails or exceeds 1.5 s | Open with the plain `<img>` and no tilt; chrome placed on `load` | [ ] |
-| 8 | Close pressed mid-flight | Reverse the running animation from its current progress, not restart | [ ] |
-| 9 | Window resize while open | `--u`/perspective/focus rect recomputed; chrome re-placed (existing `placeChrome`) | [ ] |
-| 10 | Turn changes or session resets while open | Existing CLOSE_EVENTS tear down the chrome state; focus closes immediately | [ ] |
-| 11 | Ability opens a server `pendingChoice` picker | Focus closes immediately so the picker is not hidden under z-index 2400 | [ ] |
-| 12 | Opponent Active / Bench / hand / Stadium click | Unchanged (013 inspector or plain preview) | [ ] |
-| 13 | Hand class never removed (crash mid-close) | `closeCardFocus` always runs `finally` removing `hand-lowered`; `rules-session-reset` also clears it | [ ] |
-| 14 | Attached cards present | HUD Stack button opens `openCarouselViewer` with the same ordered `attachedSlides`; focus closes first | [ ] |
+| 1 | Card unresolved, face-down, or no `image` | `openCardFocus` returns false; old click path (no-op under server authority) | [x] covered: card-focus-routing.test.mjs (no card / no image / no HP → false); `openCardFocus` returns false without a connected `card.image` |
+| 2 | Click on an own Active while rules are disabled or it is not your turn | Focus opens read-only: model gives no `usable` panels, no affordances | [x] covered: card-inspector-model.test.mjs (rules off / off-turn → no `usable` panels); the focus mounts the same model through `decorateInspectorSlide` |
+| 3 | Viewport ≤ 320 px wide or portrait (900×1200) | `focusRect` keeps ≥ 16 px margin, width ≤ 90 % of viewport, still 0.71876 aspect | [x] covered: card-focus-geometry.test.mjs (900×1200 and 320×1000 clamps) |
+| 4 | Double-click on the Active | One focus, never a flash: second click lands on the backdrop inside the arm delay and is ignored; `dblclick` routes to the same idempotent open | [x] covered: e2e 5f (click, click, dblclick → one `.card-focus`, no carousel); `isCardFocusOpen()` guards both routes; backdrop armed after 120 ms |
+| 5 | Open while a carousel/preview/picker is up | `closePopups()` first, then open | [x] covered by reasoning: `imageClick` calls `closePopups(event)` before the focus route |
+| 6 | Source card removed or moved mid-focus (attack, board event) | Focus stays; on close no unhide target → fade out instead of fly-back | [x] covered by reasoning: `sourceIsReachable` false → `scale(0.85)` at the collapse timing, plus a 450 ms backstop `finish` |
+| 7 | Image decode fails or exceeds 1.5 s | Open with the plain `<img>` and no tilt; chrome placed on `load` | [x] covered by reasoning: `decodeWithin` caps at 1.5 s and swallows a decode rejection; the flight starts regardless |
+| 8 | Close pressed mid-flight | Reverse the running animation from its current progress, not restart | [x] covered: e2e 14f (Escape 60 ms after the click) — running animations are reversed, not restarted |
+| 9 | Window resize while open | `--u`/perspective/focus rect recomputed; chrome re-placed (existing `placeChrome`) | [x] covered: e2e 14, 14b (resize 1440×900 → 1100×700 re-fits the card and `--u`) |
+| 10 | Turn changes or session resets while open | Existing CLOSE_EVENTS tear down the chrome state; focus closes immediately | [x] covered: e2e 14c (`rules-turn-began` closes immediately, hand raised) |
+| 11 | Ability opens a server `pendingChoice` picker | Focus closes immediately so the picker is not hidden under z-index 2400 | [x] covered: e2e 14e (a `.mat-pick-banner` appearing closes it); `#cardPickerOverlay` uses the same observer selector |
+| 12 | Opponent Active / Bench / hand / Stadium click | Unchanged (013 inspector or plain preview) | [x] covered: card-focus-routing.test.mjs (bench, hand, stadium, discard, prizes, opponent → false) |
+| 13 | Hand class never removed (crash mid-close) | `closeCardFocus` always runs `finally` removing `hand-lowered`; `rules-session-reset` also clears it | [x] covered: e2e 8b, 13b, 14d, 14g (`hand-lowered` removed on every close path); `teardown` always calls `raiseHand` |
+| 14 | Attached cards present | HUD Stack button opens `openCarouselViewer` with the same ordered `attachedSlides`; focus closes first | [x] covered: e2e 10b, 11, 12 (Stack shows the count, closes the focus, opens the carousel; the Energy slide has no chrome) |
 | 15 | `prefers-reduced-motion` | Not gated (user decision, memory) | struck: policy |
 | 16 | Legacy (non-authoritative) mode | Same path via `resolvePreviewCard`; not verified (legacy untested) | struck: out of verification scope |
 

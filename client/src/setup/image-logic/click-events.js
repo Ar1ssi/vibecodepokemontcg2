@@ -29,7 +29,11 @@ import {
   closeCardInspector,
   stadiumContextFor,
 } from '../rules/card-inspector.mjs';
-import { openCardFocus, closeCardFocus } from '../rules/card-focus.mjs';
+import {
+  openCardFocus,
+  closeCardFocus,
+  isCardFocusOpen,
+} from '../rules/card-focus.mjs';
 import { shouldOpenCardFocus } from '../rules/card-focus-routing.mjs';
 import {
   attack,
@@ -323,7 +327,7 @@ export const imageClick = (event) => {
         cardUser: mouseClick.cardUser,
         card: focusCard,
       }) &&
-      openOwnActiveFocus(focusCard)
+      (isCardFocusOpen() || openOwnActiveFocus(focusCard))
     ) {
       return;
     }
@@ -364,7 +368,7 @@ export const doubleClick = (event) => {
       cardUser: mouseClick.cardUser,
       card,
     }) &&
-    openOwnActiveFocus(card)
+    (isCardFocusOpen() || openOwnActiveFocus(card))
   ) {
     return;
   }

@@ -136,92 +136,122 @@ try {
 
   const actorFrame = actor.page.frames().find((f) => /self-containers/.test(f.url()));
 
-  // 5. Test Double-click Active -> Inspector Opens with Chrome and Dim
-  console.log('Testing double-click on active card...');
-  await actorFrame.evaluate(() => {
-    const img = document.querySelector('#active img');
-    const r = img.getBoundingClientRect();
-    const opts = { bubbles: true, cancelable: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
-    img.dispatchEvent(new MouseEvent('click', opts));
-    img.dispatchEvent(new MouseEvent('click', opts));
-    img.dispatchEvent(new MouseEvent('dblclick', opts));
-  });
+  // Design 067: a click on your own Active opens the TCG Live focus view, not the carousel.
+  const clickActive = (events) =>
+    actorFrame.evaluate((names) => {
+      const img = document.querySelector('#active img');
+      const r = img.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+      for (const name of names) img.dispatchEvent(new MouseEvent(name, opts));
+    }, events);
+  const focusOpen = () => actor.page.evaluate(() => Boolean(document.querySelector('.card-focus')));
+  // A browse carousel only: the fixture game can already have a server choice picker
+  // (`card-picker-choose`) open, which is not what these steps are about.
+  const carouselVisible = () =>
+    actor.page.evaluate(() => {
+      const overlay = document.querySelector('#cardPickerOverlay:not(.card-picker-choose)');
+      return Boolean(overlay && getComputedStyle(overlay).display !== 'none');
+    });
+  const handLowered = () => actorFrame.evaluate(() => document.documentElement.classList.contains('hand-lowered'));
+  const sourceHidden = () =>
+    actorFrame.evaluate(() => {
+      const img = document.querySelector('#active img');
+      const target = img.closest('.mat-holo') ?? img;
+      return getComputedStyle(target).visibility === 'hidden';
+    });
+  const waitGone = async () => {
+    for (let i = 0; i < 20; i += 1) {
+      if (!(await focusOpen())) return true;
+      await actor.page.waitForTimeout(50);
+    }
+    return false;
+  };
 
+  // 5. Single click opens the focus view
+  console.log('Testing single click on own active card...');
+  await clickActive(['click']);
   await actor.page.waitForTimeout(800);
-  const inspectorVisible = await actor.page.locator('.ptcg-inspector').isVisible().catch(() => false);
-  T('5. Double-click active opens card inspector', inspectorVisible);
+  T('5. Click on own active opens the focus view', await focusOpen());
+  T('5b. ...and not the carousel', !(await carouselVisible()));
+  T('5c. Flight finished: backdrop open class set', await actor.page.evaluate(() => document.querySelector('.card-focus')?.classList.contains('card-focus--open')));
+  T('5d. The hand is lowered in the self frame', await handLowered());
+  T('5e. The source card is hidden while focused', await sourceHidden());
+
+  // 5f. A double-click (click, click, dblclick) keeps one focus view and never opens the carousel
+  await actor.page.keyboard.press('Escape');
+  T('5f-pre. Escape closes the focus view', await waitGone());
+  await clickActive(['click', 'click', 'dblclick']);
+  await actor.page.waitForTimeout(800);
+  T(
+    '5f. Double-click on own active leaves exactly one focus view and no carousel',
+    (await actor.page.locator('.card-focus').count()) === 1 && !(await carouselVisible())
+  );
+
+  // 6. Pose: the card sits on the pose derived from the game's camera, with chrome sized to it
+  const pose = await actor.page.evaluate(async () => {
+    const { focusRect, perspectiveFor } = await import('./src/setup/rules/card-focus-geometry.mjs');
+    const host = document.querySelector('.card-focus__card');
+    const chrome = document.querySelector('.card-focus .ptcg-chrome');
+    const rect = host.getBoundingClientRect();
+    const expected = focusRect({ width: window.innerWidth, height: window.innerHeight });
+    return {
+      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      expected,
+      perspective: parseFloat(getComputedStyle(document.querySelector('.card-focus__stage')).perspective),
+      expectedPerspective: perspectiveFor(window.innerHeight),
+      u: parseFloat(chrome?.style.getPropertyValue('--u')),
+      chromeWidth: chrome ? parseFloat(chrome.style.width) : 0,
+    };
+  });
+  console.log('Pose:', JSON.stringify(pose));
+  const within = (a, b, tol) => Math.abs(a - b) <= tol;
+  T(
+    '6. Card rect equals the derived focus pose',
+    ['left', 'top', 'width', 'height'].every((k) => within(pose.rect[k], pose.expected[k], 2))
+  );
+  T('6b. Stage perspective follows the 20-degree camera', within(pose.perspective, pose.expectedPerspective, 1));
+  T('6c. Chrome is sized to the unscaled card (--u = width / 100)', within(pose.u * 100, pose.rect.width, 2) && within(pose.chromeWidth, pose.rect.width, 3));
 
   const inspectorData = await actor.page.evaluate(() => {
-    const insp = document.querySelector('.ptcg-inspector');
+    const insp = document.querySelector('.card-focus .ptcg-inspector');
     if (!insp) return null;
-    const hp = insp.querySelector('.ptcg-hp')?.textContent;
-    const atks = [...insp.querySelectorAll('.ptcg-atk')].map((el) => ({
-      name: el.querySelector('.ptcg-atk__name')?.textContent,
-      receded: el.classList.contains('ptcg-atk--recede'),
-      usable: el.classList.contains('ptcg-atk--usable'),
-      className: el.className,
-    }));
-    const stats = insp.querySelector('.ptcg-stats')?.textContent;
-    const isLocked = insp.classList.contains('ptcg-inspector--locked');
-    const rect = insp.getBoundingClientRect();
-    return { hp, atks, stats, isLocked, inspClass: insp.className, rect: { w: rect.width, h: rect.height, x: rect.left, y: rect.top } };
+    return {
+      hp: insp.querySelector('.ptcg-hp')?.textContent,
+      atks: [...insp.querySelectorAll('.ptcg-atk')].map((el) => ({
+        name: el.querySelector('.ptcg-atk__name')?.textContent,
+        receded: el.classList.contains('ptcg-atk--recede'),
+        usable: el.classList.contains('ptcg-atk--usable'),
+        type: el.dataset.ptcgType,
+        hasDmg: Boolean(el.querySelector('.ptcg-atk__dmg')),
+      })),
+      stats: insp.querySelector('.ptcg-stats')?.textContent,
+      retreatType: insp.querySelector('.ptcg-stat[data-ptcg-retreat]')?.dataset.ptcgType,
+    };
   });
-  console.log('Inspector data (0 energy):', JSON.stringify(inspectorData));
-  T('6. Chrome anchored with non-zero geometry', inspectorData && inspectorData.rect.w > 0 && inspectorData.rect.h > 0);
-  T('7. Full dim applied when 0 energy attached (all attacks locked)', inspectorData && inspectorData.isLocked === true && inspectorData.atks.every((a) => a.receded && !a.usable));
+  console.log('Focus data (0 energy):', JSON.stringify(inspectorData));
+  T('7. Every attack panel is greyed and unusable with 0 energy', inspectorData && inspectorData.atks.length === 2 && inspectorData.atks.every((a) => a.receded && !a.usable));
+  T('7b. Panels carry the Fire sprite set (data-ptcg-type)', inspectorData && inspectorData.atks.every((a) => a.type === 'fire') && inspectorData.retreatType === 'fire');
 
-  await actor.page.screenshot({ path: 'out/e2e-inspector-dimmed.png' });
-  console.log('Screenshot saved: out/e2e-inspector-dimmed.png');
+  await actor.page.screenshot({ path: 'out/e2e-focus-open.png' });
+  console.log('Screenshot saved: out/e2e-focus-open.png');
 
-  // 7b. Holo flow (D58): the enlarged inspector carousel is a mat card enlarged
-  // in place, so its foil must keep flowing with the cursor parked over it —
-  // never hold the light or tilt to the pointer. Skipped if the card is not holo.
-  const holoCenter = await actor.page.evaluate(() => {
-    const visible = [...document.querySelectorAll('.card-picker-overlay .mat-holo')].find((w) => {
-      const r = w.getBoundingClientRect();
-      return r.width > 0 && r.left < window.innerWidth && r.right > 0;
-    });
-    if (!visible) return null;
-    const r = visible.getBoundingClientRect();
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  });
-  if (holoCenter) {
-    await actor.page.mouse.move(holoCenter.x, holoCenter.y);
-    const readHolo = () =>
-      actor.page.evaluate(() => {
-        const el = [...document.querySelectorAll('.card-picker-overlay .mat-holo')].find((w) =>
-          w.style.getPropertyValue('--pointer-x')
-        );
-        return el
-          ? {
-              px: el.style.getPropertyValue('--pointer-x'),
-              rx: el.style.getPropertyValue('--rotate-x'),
-            }
-          : null;
-      });
-    const holoBefore = await readHolo();
-    await actor.page.waitForTimeout(1200);
-    const holoAfter = await readHolo();
-    T(
-      '7b. Inspector foil keeps flowing under the cursor',
-      holoBefore && holoAfter && holoBefore.px !== holoAfter.px,
-      `${holoBefore?.px} -> ${holoAfter?.px}`
-    );
-    T(
-      '7c. Inspector foil does not tilt to the cursor',
-      holoAfter && parseFloat(holoAfter.rx) === 0,
-      `rotate-x=${holoAfter?.rx}`
-    );
-  }
-
-  // 6. Test Escape Closes Inspector
-  console.log('Testing Escape key to close inspector...');
+  // 8. Escape closes with fly-back; the hand and the source card come back
   await actor.page.keyboard.press('Escape');
-  await actor.page.waitForTimeout(400);
-  const closedAfterEsc = !(await actor.page.locator('#cardPickerOverlay').isVisible().catch(() => false));
-  T('8. Escape closes card inspector', closedAfterEsc);
+  T('8. Escape closes the focus view', await waitGone());
+  T('8b. The hand is raised again', !(await handLowered()));
+  T('8c. The source card is visible again', !(await sourceHidden()));
 
-  // 7. Attach 1 Fire Energy -> Test Dim Lifts
+  // 9. Backdrop click closes (after the double-click arm delay); the close button closes
+  await clickActive(['click']);
+  await actor.page.waitForTimeout(800);
+  await actor.page.mouse.click(8, 8);
+  T('9. Clicking the backdrop closes the focus view', await waitGone());
+  await clickActive(['click']);
+  await actor.page.waitForTimeout(800);
+  await actor.page.locator('.card-focus__close').click();
+  T('9b. The close button closes the focus view', await waitGone());
+
+  // 10. Attach 1 Fire Energy -> attacks become payable; the Stack button opens the carousel
   console.log('Attaching 1 Fire Energy to active...');
   await actor.page.evaluate(() => {
     const fr = document.querySelector('iframe[src*="self-containers"]')?.contentDocument;
@@ -237,61 +267,95 @@ try {
       stamped.attachedCards.push(energyCard);
     }
   });
-
-  // Double click active again with energy attached
-  await actorFrame.evaluate(() => {
-    const img = document.querySelector('#active img');
-    const r = img.getBoundingClientRect();
-    const opts = { bubbles: true, cancelable: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
-    img.dispatchEvent(new MouseEvent('click', opts));
-    img.dispatchEvent(new MouseEvent('click', opts));
-    img.dispatchEvent(new MouseEvent('dblclick', opts));
-  });
-
+  await clickActive(['click']);
   await actor.page.waitForTimeout(800);
-  const inspectorWithEnergy = await actor.page.evaluate(() => {
-    const insp = document.querySelector('.ptcg-inspector');
-    if (!insp) return null;
-    const isLocked = insp.classList.contains('ptcg-inspector--locked');
-    const atks = [...insp.querySelectorAll('.ptcg-atk')].map((el) => ({
-      name: el.querySelector('.ptcg-atk__name')?.textContent,
+  const withEnergy = await actor.page.evaluate(() => ({
+    atks: [...document.querySelectorAll('.card-focus .ptcg-atk')].map((el) => ({
       receded: el.classList.contains('ptcg-atk--recede'),
       usable: el.classList.contains('ptcg-atk--usable'),
-      className: el.className,
-    }));
-    return { isLocked, atks, inspClass: insp.className };
-  });
-  console.log('Inspector data (1 Fire Energy attached):', JSON.stringify(inspectorWithEnergy));
-  T('9. Dim lifts on attach (payable attack unlocks)', inspectorWithEnergy && inspectorWithEnergy.isLocked === false);
-  T('10. Ember and Scratch are payable', inspectorWithEnergy && inspectorWithEnergy.atks.every((a) => a.usable && !a.receded));
+    })),
+    stack: document.querySelector('.card-focus__stack')?.textContent ?? null,
+  }));
+  console.log('Focus data (1 Fire Energy attached):', JSON.stringify(withEnergy));
+  T('10. Ember and Scratch are payable once Fire Energy is attached', withEnergy.atks.length === 2 && withEnergy.atks.every((a) => a.usable && !a.receded));
+  T('10b. The HUD shows the Stack button with the attached count', withEnergy.stack === '1');
 
-  await actor.page.screenshot({ path: 'out/e2e-inspector-payable.png' });
-  console.log('Screenshot saved: out/e2e-inspector-payable.png');
+  await actor.page.screenshot({ path: 'out/e2e-focus-payable.png' });
+  console.log('Screenshot saved: out/e2e-focus-payable.png');
 
-  // 8. Test Carousel slides: Attached card slide carries NO inspector chrome
+  await actor.page.locator('.card-focus__stack').click();
+  await actor.page.waitForTimeout(800);
   const slideCount = await actor.page.locator('.card-picker-stage .card-picker-slide').count();
-  console.log('Carousel slide count:', slideCount);
-  T('11. Carousel contains multiple slides (main card + attached energy)', slideCount >= 2);
-
-  // Check the attached Energy slide (slide index 0)
+  T('11. Stack closes the focus and opens the carousel with the attached card', !(await focusOpen()) && slideCount >= 2, `slides=${slideCount}`);
   const energySlideHasChrome = await actor.page.evaluate(() => {
     const slides = document.querySelectorAll('.card-picker-stage .card-picker-slide');
-    const attachedSlide = slides[0];
-    return !!attachedSlide?.querySelector('.ptcg-inspector');
+    return !!slides[0]?.querySelector('.ptcg-inspector');
   });
-  T('12. Energy slide has no inspector chrome', energySlideHasChrome === false);
+  T('12. The attached Energy slide has no inspector chrome', energySlideHasChrome === false);
+  await actor.page.keyboard.press('Escape');
+  await actor.page.waitForTimeout(500);
 
-  // 9. Click payable attack -> Executes and closes.
-  // Real input (locator.click), NOT el.click(): a programmatic click dispatches
-  // no pointerdown, so the carousel never sets pointer capture and the click
-  // bubbles normally. A real press captures the pointer and the browser then
-  // delivers the click to the capturing stage — the bug this step guards.
+  // 13. Click a payable attack with REAL input (locator.click), not el.click(): a programmatic click
+  // dispatches no pointerdown, so pointer-capture regressions hide. The focus closes at once.
   console.log('Testing attack click execution...');
+  await clickActive(['click']);
+  await actor.page.waitForTimeout(800);
   await actor.page.locator('.ptcg-atk.ptcg-atk--usable').first().click();
-  await actor.page.waitForTimeout(600);
+  T('13. Clicking a payable attack closes the focus view at once', await waitGone());
+  T('13b. ...and the hand is raised again', !(await handLowered()));
 
-  const closedAfterAttack = !(await actor.page.locator('#cardPickerOverlay').isVisible().catch(() => false));
-  T('13. Clicking attack panel closes inspector', closedAfterAttack);
+  // 14. Edge rows: resize, close mid-flight, a picker appearing, turn change. The attack in step 13
+  // may have ended the turn, so each case opens its own focus when it can.
+  const reopen = async () => {
+    await clickActive(['click']);
+    await actor.page.waitForTimeout(700);
+    return focusOpen();
+  };
+  if (await reopen()) {
+    await actor.page.setViewportSize({ width: 1100, height: 700 });
+    await actor.page.waitForTimeout(400);
+    const resized = await actor.page.evaluate(async () => {
+      const { focusRect } = await import('./src/setup/rules/card-focus-geometry.mjs');
+      const r = document.querySelector('.card-focus__card').getBoundingClientRect();
+      const e = focusRect({ width: window.innerWidth, height: window.innerHeight });
+      const chrome = document.querySelector('.card-focus .ptcg-chrome');
+      return {
+        ok: ['left', 'top', 'width', 'height'].every((k, i) => Math.abs([r.left, r.top, r.width, r.height][i] - e[k]) <= 2),
+        uMatches: Math.abs(parseFloat(chrome.style.getPropertyValue('--u')) * 100 - r.width) <= 2,
+      };
+    });
+    T('14. Resize while open re-fits the card to the new pose', resized.ok);
+    T('14b. ...and re-places the chrome (--u follows the new width)', resized.uMatches);
+    await actor.page.setViewportSize({ width: 1440, height: 900 });
+    await actor.page.waitForTimeout(300);
+    await actor.page.keyboard.press('Escape');
+    await waitGone();
+  } else {
+    T('14. Edge rows skipped: focus did not reopen', false);
+  }
+
+  if (await reopen()) {
+    await actor.page.evaluate(() => document.dispatchEvent(new CustomEvent('rules-turn-began')));
+    T('14c. A turn change closes the focus view at once', await waitGone());
+    T('14d. ...and the hand is raised again', !(await handLowered()));
+  }
+
+  if (await reopen()) {
+    await actor.page.evaluate(() => {
+      const banner = document.createElement('div');
+      banner.className = 'mat-pick-banner';
+      document.body.appendChild(banner);
+      setTimeout(() => banner.remove(), 600);
+    });
+    T('14e. A mat-pick banner appearing closes the focus view (the picker must stay reachable)', await waitGone());
+  }
+
+  // Close while the flight is still running: no error, nothing left behind.
+  await clickActive(['click']);
+  await actor.page.waitForTimeout(60);
+  await actor.page.keyboard.press('Escape');
+  T('14f. Escape mid-flight closes cleanly', await waitGone());
+  T('14g. ...and restores the hand and the source card', !(await handLowered()) && !(await sourceHidden()));
 
 } catch (err) {
   failed += 1;
