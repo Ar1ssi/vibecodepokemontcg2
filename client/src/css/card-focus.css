@@ -1,0 +1,121 @@
+/* Card focus (design 067): the TCG Live Active-card popup.
+   The card lifts in perspective to a fixed pose, the board dims, and the 013 inspector chrome
+   (.ptcg-chrome) rides on the card. Timings are TCG Live's own (ZeroMover 0.25 s, AttackOverlay
+   0.3 s open / 0.15 s close); card-focus-geometry.mjs holds the same numbers for the Web
+   Animations the module runs, and card-focus-css.test.mjs pins the two against each other.
+   JS sets the stage perspective and the card's left/top/width/height inline: they come from
+   the viewport, not from this sheet. */
+.card-focus {
+  --focus-flight-ms: 250ms;
+  --focus-flight-ease: cubic-bezier(0.32, 0, 0.67, 0);
+  --focus-expand-ms: 300ms;
+  --focus-expand-ease: cubic-bezier(0.11, 0, 0.5, 0);
+  --focus-collapse-ms: 150ms;
+  --focus-collapse-ease: cubic-bezier(0.5, 1, 0.89, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+}
+
+/* The only thing here that fades. The card and its panels never use opacity: it would flatten the
+   card's preserve-3d tilt and let the printed text ghost through the panels (013 C2). */
+.card-focus__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 14, 0.62);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity var(--focus-flight-ms) var(--focus-flight-ease);
+}
+.card-focus--open .card-focus__backdrop { opacity: 1; }
+.card-focus--closing .card-focus__backdrop {
+  transition: opacity var(--focus-collapse-ms) var(--focus-collapse-ease);
+  opacity: 0;
+}
+
+/* perspective is set inline from the viewport height (card-focus-geometry `perspectiveFor`). */
+.card-focus__stage {
+  position: absolute;
+  inset: 0;
+  perspective-origin: 50% 50%;
+  pointer-events: none;
+}
+
+.card-focus__card {
+  position: absolute;
+  transform-style: preserve-3d;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  border-radius: 4.5% / 3.2%;
+  /* box-shadow, not filter: a filter would flatten the holo tilt. The lift grows it in JS. */
+  box-shadow: 0 0.6vh 1.2vh rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+.card-focus__card .ptcg-inspector,
+.card-focus__card .mat-holo,
+.card-focus__card .discard-pile-card {
+  width: 100%;
+  height: 100%;
+}
+.card-focus__card .mat-holo.discard-pile-holo {
+  aspect-ratio: var(--card-aspect);
+  overflow: visible;
+  border-radius: 4.5% / 3.2%;
+}
+.card-focus__card .mat-holo.discard-pile-holo .card__rotator {
+  overflow: hidden;
+  border-radius: 4.5% / 3.2%;
+}
+.card-focus__card .mat-holo.discard-pile-holo .card__translater,
+.card-focus__card .mat-holo.discard-pile-holo .card__rotator,
+.card-focus__card .mat-holo.discard-pile-holo .card__rotator > * {
+  width: 100%;
+  height: 100%;
+}
+.card-focus__card .mat-holo.discard-pile-holo img,
+.card-focus__card .discard-pile-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* The list is revealed from its top edge by a clip-path the module animates; the sheet only keeps
+   it clear of the card's own rounding. */
+.card-focus__card .ptcg-stack,
+.card-focus__card .ptcg-stats { will-change: clip-path; }
+
+/* HUD: buttons stand to the right of the card, as AttackOverlayHUD's do under it. */
+.card-focus__hud {
+  position: absolute;
+  right: 4vw;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4vh;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.card-focus__close,
+.card-focus__stack {
+  width: 6vh;
+  height: 6vh;
+  min-width: 40px;
+  min-height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: rgba(16, 22, 32, 0.78);
+  color: #fff;
+  font: 700 2.4vh/1 'Segoe UI', system-ui, sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+.card-focus__close:hover,
+.card-focus__stack:hover { background: rgba(48, 60, 80, 0.9); }
+.card-focus__close:focus-visible,
+.card-focus__stack:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; }

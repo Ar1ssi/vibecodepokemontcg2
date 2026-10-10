@@ -184,3 +184,4 @@ Decision (supersedes D50/D53 for the own Active) lands with the last slice.
 | 5 | modify `.agent/DECISIONS.md`, `.agent/MAP.md`; mark designs 008/013 notes | one Decision line (supersedes D50/D53 for own Active) | n/a — docs | | full `pnpm test` green; Review pass (`review.md`) on the diff |
 
 ## Deviations (Builder appends here during build)
+- Slice 2 (cosmetic): the hand is lowered by moving `bottom` (`.hand-lowered #hand { bottom: calc(-3.2 * var(--hand-crop-height)) }` + the fixed `#hand::before` strip), not `transform: translateY(105%)`. A transform on `#hand` would make it the containing block of the fixed strip and the strip would jump. The CSS test pins `bottom` and forbids a transform on `#hand`.

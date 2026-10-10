@@ -436,6 +436,16 @@ body.mat-active :is(.highlight, .highlightBox):is(#active, #bench, #deck, #disca
   z-index: 5;
   align-items: flex-end;
   pointer-events: none;
+  /* Card focus (design 067) drops the hand while the popup is up; the class rides on this
+     iframe's documentElement. Same 250 ms in-cubic as the card's flight. It moves `bottom`, not
+     `transform`: a transform would make #hand the containing block of the fixed ::before strip. */
+  transition: bottom 250ms cubic-bezier(0.32, 0, 0.67, 0);
+}
+.hand-lowered #hand {
+  bottom: calc(-3.2 * var(--hand-crop-height));
+}
+.hand-lowered #hand::before {
+  bottom: calc(-1 * var(--hand-crop-height));
 }
 #hand::before {
   content: '';
@@ -448,6 +458,7 @@ body.mat-active :is(.highlight, .highlightBox):is(#active, #bench, #deck, #disca
   border-top: 3px solid rgba(90, 110, 188, 0.864);
   pointer-events: auto;
   z-index: -1;
+  transition: bottom 250ms cubic-bezier(0.32, 0, 0.67, 0);
 }
 #hand > * {
   pointer-events: auto;
