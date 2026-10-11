@@ -205,6 +205,11 @@
   right: calc(var(--u) * -7.5);
   bottom: calc(var(--u) * 20);
   max-height: calc(var(--u) * 92);
+  /* Tall enough to cover the print's own attack text (it starts ~55% down the card) even for a
+     one-line list; the extra is the list's white backing, with the entries kept at the bottom. */
+  min-height: calc(var(--u) * 50);
+  justify-content: flex-end;
+  background: linear-gradient(#ffffff, #f2f4f7);
   overflow: hidden auto;
   scrollbar-width: none;
   border-radius: calc(var(--u) * 1.6) calc(var(--u) * 3.6) calc(var(--u) * 1.6) calc(var(--u) * 1.6);
