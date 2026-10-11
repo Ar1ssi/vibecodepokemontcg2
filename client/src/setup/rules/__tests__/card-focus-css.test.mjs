@@ -101,22 +101,42 @@ describe('067 — card-focus.css', () => {
     assert.doesNotMatch(decls, /backdrop-filter/i);
   });
 
-  it('the list is bottom-anchored, 105u wide from 2.5u in, and never anchored from the top', () => {
+  // Numbers are TCG Live's own: level6 AttackOverlay/CardSize/ExpandingRegion and the
+  // AttackActionOption_L prefab (sharedassets6), in game units (--tu, card mesh 6.397 wide).
+  it('lengths are in game units and the list floats 1.6 units in front of the card', () => {
+    const chrome = focus('.card-focus__card .ptcg-chrome--focus');
+    assert.ok(chrome, 'focus chrome rule is missing');
+    assert.match(chrome, /--tu: calc\(var\(--u\) \* 15\.632\);/);
+    assert.match(chrome, /--focus-lift: calc\(var\(--tu\) \* 1\.6\);/);
+    assert.match(chrome, /transform-style: preserve-3d;/);
+    assert.ok(normalize(FOCUS_CSS).includes('.card-focus__card .ptcg-inspector { transform-style: preserve-3d; }'));
+  });
+
+  it('the list is the 6.3-unit window anchored 1.05 units above the card bottom, content-sized up to 4.25', () => {
     const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus');
     assert.ok(decls, 'focus stack rule is missing');
-    assert.match(decls, /left: calc\(var\(--u\) \* 2\.5\);/);
-    assert.match(decls, /right: calc\(var\(--u\) \* -7\.5\);/);
-    assert.match(decls, /bottom: calc\(var\(--u\) \* 20\);/);
+    assert.match(decls, /left: calc\(var\(--tu\) \* 0\.1485\);/);
+    assert.match(decls, /width: calc\(var\(--tu\) \* 6\.3\);/);
+    assert.match(decls, /bottom: calc\(var\(--tu\) \* 1\.05\);/);
+    assert.match(decls, /max-height: calc\(var\(--tu\) \* 4\.25\);/);
+    assert.match(decls, /transform: translateZ\(var\(--focus-lift\)\);/);
+    assert.doesNotMatch(decls, /min-height/i);
     assert.doesNotMatch(decls, /(^|[;\s])top\s*:/i);
   });
 
-  it('the Weakness / Resistance / Retreat strip sits under the list on the same 2.5u / -7.5u span', () => {
+  it('rows are the prefab at scale 0.75: a 0.75-unit titlebar', () => {
+    const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk > .ptcg-atk__head');
+    assert.match(decls, /--bar-h: calc\(var\(--tu\) \* 0\.75\);/);
+  });
+
+  it('the Weakness / Resistance / Retreat bar is 0.7 units tall, hung under the list on the same lift', () => {
     const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-stats--focus');
     assert.ok(decls, 'focus strip rule is missing');
-    assert.match(decls, /left: calc\(var\(--u\) \* 2\.5\);/);
-    assert.match(decls, /right: calc\(var\(--u\) \* -7\.5\);/);
-    assert.match(decls, /bottom: calc\(var\(--u\) \* 6\.4\);/);
-    assert.match(decls, /height: calc\(var\(--u\) \* 11\.5\);/);
+    assert.match(decls, /left: calc\(var\(--tu\) \* 0\.1185\);/);
+    assert.match(decls, /width: calc\(var\(--tu\) \* 6\.48\);/);
+    assert.match(decls, /bottom: calc\(var\(--tu\) \* 0\.43\);/);
+    assert.match(decls, /height: calc\(var\(--tu\) \* 0\.7\);/);
+    assert.match(decls, /transform: translateZ\(var\(--focus-lift\)\);/);
     assert.doesNotMatch(decls, /(^|[;\s])top\s*:/i);
   });
 

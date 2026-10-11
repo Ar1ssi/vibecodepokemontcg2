@@ -277,23 +277,31 @@ try {
       strip: box('.card-focus .ptcg-stats--focus'),
       hp: box('.card-focus .ptcg-hp'),
       hud: box('.card-focus__hud'),
+      viewport: { width: window.innerWidth, height: window.innerHeight },
       stripText: document.querySelector('.card-focus .ptcg-stats--focus')?.textContent ?? '',
       weakness: document.querySelector('.card-focus .ptcg-wr__row .ptcg-wr__n')?.textContent ?? null,
     };
   });
   const W = layout.host.width;
   console.log('Layout:', JSON.stringify({ W, stack: layout.stack, strip: layout.strip }));
+  // TCG Live's own layout, in game units (card mesh 6.397 wide): the list and the bar float 1.6 units
+  // in front of the card, so their on-screen boxes are their layout boxes scaled about the viewport
+  // centre by the camera perspective (FOV 20 degrees). The chrome box is what the CSS anchors to (it
+  // follows the scan's own box; a real card's chrome box equals the host's).
+  const tu = layout.chrome.width / 6.397;
+  const perspective = layout.viewport.height / 2 / Math.tan((10 * Math.PI) / 180);
+  const lift = perspective / (perspective - 1.6 * tu);
+  const liftX = (x) => layout.viewport.width / 2 + (x - layout.viewport.width / 2) * lift;
+  const liftY = (y) => layout.viewport.height / 2 + (y - layout.viewport.height / 2) * lift;
   T(
-    '7c. The list is 105% of the card wide, starting 2.5% in',
-    within(layout.stack.left, layout.host.left + 0.025 * W, 3) &&
-      within(layout.stack.right, layout.host.right + 0.075 * W, 3)
+    '7c. The list is the 6.3-unit window, 0.1485 units in from the card edge, lifted off the card',
+    within(layout.stack.left, liftX(layout.chrome.left + 0.1485 * tu), 3) &&
+      within(layout.stack.right, liftX(layout.chrome.left + 6.4485 * tu), 3)
   );
-  // The chrome box is what the CSS anchors to (it follows the scan's own box; the fixture scan is not
-  // card-shaped, a real card's chrome box equals the host's).
-  T('7d. The list is anchored to the chrome bottom (20% of the card width above it)', within(layout.stack.bottom, layout.chrome.bottom - 0.2 * W, 3));
+  T('7d. The list is anchored 1.05 units above the chrome bottom', within(layout.stack.bottom, liftY(layout.chrome.bottom - 1.05 * tu), 3));
   T(
-    '7e. The strip sits under the list: 6.4% above the card bottom, 11.5% tall',
-    within(layout.strip.bottom, layout.chrome.bottom - 0.064 * W, 3) && within(layout.strip.height, 0.115 * W, 3)
+    '7e. The bar hangs under the list: 0.43 units above the card bottom, 0.7 tall',
+    within(layout.strip.bottom, liftY(layout.chrome.bottom - 0.43 * tu), 3) && within(layout.strip.height, 0.7 * tu * lift, 3)
   );
   T('7f. The strip repeats weakness and resistance (the print is covered)', /weakness/.test(layout.stripText) && /resistance/.test(layout.stripText) && layout.weakness === '×2', layout.stripText.trim().replace(/\s+/g, ' '));
   T('7g. The HP pill overhangs the card edge, the HUD stands left of it', layout.hp.right > layout.host.right + 0.01 * W && layout.hud.right < layout.host.left);
