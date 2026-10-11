@@ -255,9 +255,9 @@ const ACTIVATED_ABILITY_TEXT =
  * whether the attached Energy covers the cost). The engine reads a numeric `retreatCost`, so the
  * printed symbols are reduced to a count. A gate that throws must not blank the tile.
  */
-function retreatGateFor({ card, cost, energyTypes, user }) {
+function retreatGateFor({ card, cost, energyTypes, user, zoneCards, benchCards }) {
   try {
-    const verdict = canRetreat(user, { ...card, retreatCost: cost }, energyTypes, []);
+    const verdict = canRetreat(user, { ...card, retreatCost: cost }, energyTypes, zoneCards, benchCards);
     return { allowed: Boolean(verdict.allowed), reason: verdict.reason ?? null };
   } catch {
     return { allowed: true, reason: null };
@@ -539,6 +539,9 @@ export function buildInspectorModel(card, ctx = {}) {
         cost: retreatSymbols.length,
         energyTypes,
         user: ctx.user ?? 'self',
+        // Benched team abilities (Latias ex Skyliner) free the Active's retreat.
+        zoneCards: ctx.zoneCards ?? [],
+        benchCards: ctx.benchCards ?? [],
       })
     : { allowed: true, reason: null };
 

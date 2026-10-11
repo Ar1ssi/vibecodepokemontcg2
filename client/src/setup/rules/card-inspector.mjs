@@ -604,10 +604,18 @@ const wirePanelClicks = (state) => {
  * modifier or the once-per-turn flags, so it over-reports unpayable attacks.
  * `resolveLiveContext` replaces it as soon as the async data lands.
  */
+// The Active zone and the Bench the retreat gate reads, so a Benched team ability (Latias ex
+// Skyliner) frees the Active's retreat in the panel exactly as it does for the Retreat button.
+const retreatBoardContext = () => ({
+  zoneCards: getZone('self', 'active').array,
+  benchCards: getZone('self', 'bench').array,
+});
+
 const stampContextFor = (card, zone = 'active') => ({
   energyTypes: stampEnergyTypes(card),
   attacker: card,
   zone,
+  ...retreatBoardContext(),
   damageCtx: {
     attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
   },
@@ -700,6 +708,7 @@ async function resolveLiveContext(card, zone = 'active') {
     oncePerGame: getAuthoritativeOncePerGame(),
     attacker: card,
     zone,
+    ...retreatBoardContext(),
     damageCtx: {
       attackerDamage: Math.max(0, Math.round(Number(card?.damage) || 0) / 10),
       energyCount: energyTypes.length,

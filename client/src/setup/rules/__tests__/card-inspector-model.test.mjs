@@ -902,3 +902,48 @@ test('I221: Misty & Lorelei re-opens a spent GX attack for a granted type only',
   assert.equal(buildInspectorModel(card(['Water']), { energyTypes: [], oncePerGame }).attacks[0].usable, true);
   assert.equal(buildInspectorModel(card(['Darkness']), { energyTypes: [], oncePerGame }).attacks[0].usable, false);
 });
+
+// ── retreat under a Benched team ability ───────────────────────────────────
+// Latias ex "Skyliner" (TCGdex sv08-076): "Your Basic Pokémon in play have no Retreat Cost."
+// The inspector's gate has to read the Bench, as the sidebox Retreat button does.
+
+const { rulesState } = await import('../../../../../shared/engine/rules/rules-state.mjs');
+
+const DREEPY = {
+  name: 'Dreepy',
+  supertype: 'Pokémon',
+  type: 'Dragon',
+  types: ['Dragon'],
+  hp: 70,
+  stage: 'Basic',
+  retreatCost: ['Colorless'],
+  attacks: [],
+};
+const LATIAS_EX = {
+  instanceId: 2,
+  name: 'Latias ex',
+  supertype: 'Pokémon',
+  types: ['Psychic'],
+  hp: 210,
+  stage: 'Basic',
+  retreatCost: ['Colorless', 'Colorless'],
+  ability: { name: 'Skyliner', text: 'Your Basic Pokémon in play have no Retreat Cost.' },
+  attacks: [],
+};
+
+test('model: a Benched Latias ex (Skyliner) makes an unpaid Basic Active retreat usable', () => {
+  const wasEnabled = rulesState.enabled;
+  const wasTurnPlayer = rulesState.turnPlayer;
+  rulesState.enabled = true;
+  rulesState.turnPlayer = 'self';
+  try {
+    const bare = buildInspectorModel(DREEPY, { energyTypes: [] });
+    assert.equal(bare.retreatUsable, false);
+    const covered = buildInspectorModel(DREEPY, { energyTypes: [], benchCards: [LATIAS_EX] });
+    assert.equal(covered.retreatUsable, true);
+    assert.equal(covered.retreatRecede, false);
+  } finally {
+    rulesState.enabled = wasEnabled;
+    rulesState.turnPlayer = wasTurnPlayer;
+  }
+});
