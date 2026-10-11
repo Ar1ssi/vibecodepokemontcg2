@@ -3,8 +3,8 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: Card focus (design 067, D208/D209): clicking your own Active opens TCG Live's 3D popup — CSS-3D
-  flight to the game's camera pose, hand drops, 013 panels on the card. Sampled battle SFX (064) and the
+Focus: Card focus (design 067, D208-D210): clicking your own Active opens TCG Live's 3D popup — CSS-3D
+  flight to the game's camera pose, hand drops, the overlay's own layout (bottom list, strip, HUD). Sampled battle SFX (064) and the
   TCG Live attack-bar sprites (scripts/attack-ui, rerun against the extract) are on main too.
 Active: Card focus (067) on main, awaiting user localhost check (flight ease `--focus-flight-ease`, list
   reveal, HUD/Stack). Status FX awaiting check (Burn/Sleep up-direction). ETB (057) slice 6 not started.

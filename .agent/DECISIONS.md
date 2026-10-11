@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D210).
+#   Next id = highest D number in this file and the archive + 1 (next: D211).
 
 ## Active
+- D210 2026-10-11 [board-ui] Card focus lays the 013 chrome out as the game's overlay (`layout:'focus'`): bottom-anchored list, weakness/resistance/retreat strip, HUD left, Energy tokens; reverses 067 O2. (user)
 - D209 2026-10-11 [board-ui] Card focus ignores card/backdrop clicks for 500 ms after opening: a double-click's clicks land in two frames (count 1 each) and the 2nd hits an attack panel. (design 067)
 - D208 2026-10-11 [rules-ui] Single-click on your own Active opens the TCG Live card focus (CSS-3D lift on the game's 20° camera pose, hand drops, 013 panels on it); narrows D53 to Bench/Stadium. (user, design 067)
 - D207 2026-10-08 [mat-fx] Evolutions (non-Mega/Tera) and devolutions play TCG Live's Card_Evolution / Card_Devolution prefabs rebuilt from the UnityPy dump: pure timelines (evolve-scene.mjs, devolve-scene.mjs, tcgl-fx.mjs Unity curve maths) drawn additively on one canvas per card (tcgl-canvas.js); textures committed as WebP in assets/fx/evolution; holds 1300/700. (Supersedes D153; design 066)
