@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeAttackText, symbolizeTypeWords } from '../attack-text.mjs';
 import { parseAbility } from '../abilities.mjs';
+import { parseAttackSteps } from '../attack-steps.mjs';
 
 test('symbolizeTypeWords: type words that name a type become symbols', () => {
   assert.equal(symbolizeTypeWords('Attach a Fire Energy card to it.'), 'Attach a {R} Energy card to it.');
@@ -55,4 +56,20 @@ test('parseAbility: the TCGdex word spelling parses like the symbol spelling', (
     ],
   ];
   for (const [symbols, words] of pairs) assert.deepEqual(parseAbility(words), parseAbility(symbols));
+});
+
+// TCGdex 30th-109 / 30th-156 Salamence ex "Booming Call" (live API 2026-10-11) wraps the symbol in markup.
+const BOOMING_CALL_MARKUP =
+  'Put up to 3 <span class="energy-symbol Dragon" title="Dragon">Dragon</span> Pokémon from your discard pile onto your Bench.';
+
+test('symbolizeTypeWords: an energy-symbol span becomes its symbol', () => {
+  assert.equal(
+    symbolizeTypeWords(BOOMING_CALL_MARKUP),
+    'Put up to 3 {N} Pokémon from your discard pile onto your Bench.'
+  );
+});
+
+test('parseAttackSteps: Booming Call markup parses like the symbol spelling', () => {
+  const steps = parseAttackSteps(BOOMING_CALL_MARKUP);
+  assert.deepEqual(steps.after, [{ type: 'atkBenchFromDiscard', count: 3, upTo: true, pokemonType: 'n' }]);
 });

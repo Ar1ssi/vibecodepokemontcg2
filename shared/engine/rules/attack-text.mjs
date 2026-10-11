@@ -60,6 +60,9 @@ const TYPE_WORD_LIST = new RegExp(
 );
 // "Rotom's type is Water until …" (Type Shift), "can use the Double-Edge attack for Psychic".
 const TYPE_WORD_AFTER = new RegExp(`(?<=\\b(?:type is|type becomes|attack for) )(?:${TYPE_WORD})\\b`, 'gi');
+// Newer TCGdex printings (30th-109 Salamence ex) wrap each symbol in markup:
+// `<span class="energy-symbol Dragon" title="Dragon">Dragon</span>`.
+const ENERGY_SYMBOL_SPAN = new RegExp(`<span[^>]*energy-symbol[^>]*>\\s*(${TYPE_WORD})\\s*</span>`, 'gi');
 const symbolOf = (word) => `{${TYPE_WORD_SYMBOLS[word.toLowerCase()]}}`;
 
 /**
@@ -70,6 +73,7 @@ const symbolOf = (word) => `{${TYPE_WORD_SYMBOLS[word.toLowerCase()]}}`;
 export function symbolizeTypeWords(text) {
   const each = new RegExp(`(?:${TYPE_WORD})`, 'gi');
   return String(text || '')
+    .replace(ENERGY_SYMBOL_SPAN, (_, word) => symbolOf(word))
     .replace(TYPE_WORD_RUN, (run) => run.replace(each, symbolOf))
     .replace(TYPE_WORD_LIST, (list) => list.replace(each, symbolOf))
     .replace(TYPE_WORD_AFTER, symbolOf);

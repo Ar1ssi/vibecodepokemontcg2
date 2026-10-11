@@ -377,6 +377,18 @@
       return 'Stage1';
     }
 
+    // TCGdex lists these printings as Basic with no evolveFrom, but the cards are printed
+    // Stage 2 (live API 2026-10-11: 30th-109 and 30th-156 Salamence ex; sv09-114 is correct).
+    const PRINTED_STAGE_FIXES = {
+      '30th-109': { stage: 'Stage2', evolveFrom: 'Shelgon' },
+      '30th-156': { stage: 'Stage2', evolveFrom: 'Shelgon' },
+    };
+
+    export function withPrintedStageFix(detail) {
+      const fix = PRINTED_STAGE_FIXES[detail?.id];
+      return fix ? { ...detail, ...fix } : detail;
+    }
+
     // TCGdex carries the rule-box marker in `suffix` ("GX", "TAG TEAM-GX", "EX") and has
     // no `subtypes`; card-classify predicates read subtypes first.
     export function subtypesFromSuffix(suffix) {
@@ -484,8 +496,9 @@
         return card;
       }
       try {
-        const detail = await fetchCardDetail(card.id);
-        if (!detail) throw new Error(`no detail for ${card.id}`);
+        const fetched = await fetchCardDetail(card.id);
+        if (!fetched) throw new Error(`no detail for ${card.id}`);
+        const detail = withPrintedStageFix(fetched);
         const data = {
           hp: detail.hp ? Number(detail.hp) : null,
           types: detail.types || [],
