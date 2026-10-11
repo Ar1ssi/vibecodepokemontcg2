@@ -110,9 +110,10 @@
 
 /* The list is anchored to the bottom of the card and grows upward while `--focus-reveal` runs 7% to
    100% (AttackOverlay's closedWindowHeight to maxWindowHeight). The clip is a class rule on the
-   stack, so a re-render mid-reveal keeps the reveal; the class is dropped once it ends so no
-   shadow stays clipped. Negative side insets keep the list's overhang past the card visible. */
-.card-focus__card--revealing .ptcg-stack {
+   frame, so a re-render mid-reveal keeps the reveal; the class is dropped once it ends so neither
+   the shadow nor the cap over the top edge stays clipped. Negative side insets keep the list's
+   overhang past the card visible. */
+.card-focus__card--revealing .ptcg-frame {
   clip-path: inset(calc(100% - var(--focus-reveal)) -4% -4% -4%);
 }
 
@@ -221,23 +222,53 @@
   transform-style: preserve-3d;
 }
 /* The list window: bottom edge 3.4 units below the card's centre, as tall as its rows up to
-   maxWindowHeight 4.25, on the grey atkOv_BG backing. A 0.05 spacer and the 0.05 row spacing pad
-   each end. */
-.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus {
+   maxWindowHeight 4.25. The frame is the window; the list scrolls inside it on the atkOv_BG backing.
+   Sprite edges: the overlay canvas draws 25 sprite px per unit (CanvasScaler referencePixelsPerUnit 4),
+   times each Image's pixelsPerUnitMultiplier (1 for the backing, 6 for the cap and the bar). */
+.card-focus__card .ptcg-chrome--focus .ptcg-frame--focus {
+  position: absolute;
   left: calc(var(--tu) * 0.1485);
-  right: auto;
   width: calc(var(--tu) * 6.3);
   bottom: calc(var(--tu) * 1.05);
+  display: flex;
+  flex-direction: column;
+  box-shadow: calc(var(--tu) * -0.27) calc(var(--tu) * 0.45) calc(var(--tu) * 0.5) rgba(24, 24, 26, 0.55);
+  transform: translateZ(var(--focus-lift));
+}
+/* TopBorder (atkOv_Brdr_T): 0.16 units tall, 0.05 of it over the list, 0.03 wider on the left and
+   0.15 on the right. Its 23px / 19px ends are 0.1533 / 0.1267 units. */
+.card-focus__card .ptcg-chrome--focus .ptcg-frame--focus::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--tu) * -0.03);
+  right: calc(var(--tu) * -0.15);
+  top: calc(var(--tu) * -0.11);
+  height: calc(var(--tu) * 0.16);
+  pointer-events: none;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 0 calc(var(--tu) * 0.1267) 0 calc(var(--tu) * 0.1533);
+  border-image: url('../assets/attack-ui/list-cap.png') 0 19 0 23 fill / 0 calc(var(--tu) * 0.1267) 0
+    calc(var(--tu) * 0.1533) stretch;
+}
+/* A 0.05 spacer and the 0.05 row spacing pad each end of the list. The backing's 31px edges are
+   1.24 units; the border is only there to carry the sprite, so it takes no room. */
+.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus {
+  position: relative;
+  left: auto;
+  right: auto;
   max-height: calc(var(--tu) * 4.25);
   box-sizing: border-box;
   padding: calc(var(--tu) * 0.1) 0;
   gap: calc(var(--tu) * 0.05);
   background: #d9d9d9;
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/list-bg.png') 31 fill / calc(var(--tu) * 1.24) stretch;
   overflow: hidden auto;
   scrollbar-width: none;
-  border-radius: calc(var(--tu) * 0.08) calc(var(--tu) * 0.08) 0 0;
-  box-shadow: calc(var(--tu) * -0.27) calc(var(--tu) * 0.45) calc(var(--tu) * 0.5) rgba(24, 24, 26, 0.55);
-  transform: translateZ(var(--focus-lift));
+  border-radius: 0;
+  box-shadow: none;
 }
 .card-focus__card .ptcg-chrome--focus .ptcg-atks { gap: calc(var(--tu) * 0.05); }
 /* A row is a white atkOv_Action_BG tile under its titlebar; rows never shrink to fit, the list scrolls. */
@@ -270,8 +301,9 @@
   box-shadow: none;
 }
 
-/* BottomBorderInfo: the 0.7-unit Weakness / Resistance / Retreat bar hung under the list, 0.03 wider
-   on the left and 0.15 on the right, overlapping its bottom edge by 0.08. Same lift as the list. */
+/* BottomBorderInfo (atkOv_Brdr_B2): the 0.7-unit Weakness / Resistance / Retreat bar hung under the
+   list, 0.03 wider on the left and 0.15 on the right, overlapping its bottom edge by 0.08. Same lift
+   as the list, whose shadow it shares. Sprite edges 7 / 24 / 23 / 24 px at 150 px per unit. */
 .card-focus__card .ptcg-chrome--focus .ptcg-stats--focus {
   left: calc(var(--tu) * 0.1185);
   right: auto;
@@ -282,9 +314,12 @@
   align-items: center;
   gap: calc(var(--tu) * 0.4);
   padding: 0 calc(var(--tu) * 0.1) 0 calc(var(--tu) * 0.15);
-  border-radius: 0 0 calc(var(--tu) * 0.08) calc(var(--tu) * 0.08);
-  background: #ffffff;
-  box-shadow: calc(var(--tu) * -0.27) calc(var(--tu) * 0.45) calc(var(--tu) * 0.5) rgba(24, 24, 26, 0.55);
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/list-bar.png') 7 24 23 24 fill / calc(var(--tu) * 0.0467)
+    calc(var(--tu) * 0.16) calc(var(--tu) * 0.1533) calc(var(--tu) * 0.16) stretch;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   transform: translateZ(var(--focus-lift));
 }
 /* WeakResistInfo: two 0.29-unit rows of 0.2 label, 0.28 icons and a 0.25 amount in a 0.35 column. */

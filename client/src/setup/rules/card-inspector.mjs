@@ -403,12 +403,16 @@ const buildFocusChrome = (model) => {
     : `${model.hp} HP`;
   chrome.appendChild(hp);
 
+  // The frame is the game's ExpandingRegion: it holds the scrolling list and carries the cap sprite
+  // over its top edge, which the list's own overflow clip would cut off.
+  const frame = el('div', 'ptcg-frame ptcg-frame--focus');
   const stack = el('div', 'ptcg-stack ptcg-stack--focus');
   if (model.ability) stack.appendChild(abilityEl(model.ability, model.type));
   const atks = el('div', 'ptcg-atks');
   model.attacks.forEach((attack) => atks.appendChild(attackEl(attack, model.type)));
   stack.appendChild(atks);
-  chrome.appendChild(stack);
+  frame.appendChild(stack);
+  chrome.appendChild(frame);
 
   const strip = el('footer', 'ptcg-stats ptcg-stats--focus');
   const weakResist = el('div', 'ptcg-wr');

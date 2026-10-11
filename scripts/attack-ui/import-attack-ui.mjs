@@ -50,6 +50,10 @@ export function spriteMap() {
   ui('dmg-empty.png', 'atkOv_DmgBG_Empty.png');
   ui('dmg-empty-short.png', 'atkOv_DmgBG_Empty_Short.png');
   ui('ability-bg.png', 'atkOv_Ability_BG.png');
+  // The list frame: backing, the cap over its top edge, and the Weakness / Resistance / Retreat bar.
+  ui('list-bg.png', 'atkOv_BG.png');
+  ui('list-cap.png', 'atkOv_Brdr_T.png');
+  ui('list-bar.png', 'atkOv_Brdr_B2.png');
   rows.push({ out: 'ability-tag-on.png', from: 'badge', source: 'atkOV_AbilityTag_On_EN.png' });
   rows.push({ out: 'ability-tag-off.png', from: 'badge', source: 'atkOV_AbilityTag_Off_EN.png' });
   return rows;

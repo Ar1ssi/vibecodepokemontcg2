@@ -88,8 +88,8 @@ describe('067 — card-focus.css', () => {
     );
   });
 
-  it('the list grows upward from its bottom anchor: a clip-path on the stack driven by --focus-reveal', () => {
-    const decls = focus('.card-focus__card--revealing .ptcg-stack');
+  it('the list grows upward from its bottom anchor: a clip-path on the frame driven by --focus-reveal', () => {
+    const decls = focus('.card-focus__card--revealing .ptcg-frame');
     assert.ok(decls, 'reveal rule is missing');
     assert.ok(decls.includes('clip-path: inset(calc(100% - var(--focus-reveal)) -4% -4% -4%);'));
     assert.doesNotMatch(decls, /(^|[;\s])opacity\s*:/i);
@@ -112,16 +112,50 @@ describe('067 — card-focus.css', () => {
     assert.ok(normalize(FOCUS_CSS).includes('.card-focus__card .ptcg-inspector { transform-style: preserve-3d; }'));
   });
 
-  it('the list is the 6.3-unit window anchored 1.05 units above the card bottom, content-sized up to 4.25', () => {
+  it('the frame is the 6.3-unit window anchored 1.05 units above the card bottom; the list is content-sized up to 4.25', () => {
+    const frame = focus('.card-focus__card .ptcg-chrome--focus .ptcg-frame--focus');
+    assert.ok(frame, 'focus frame rule is missing');
+    assert.ok(frame.includes('left: calc(var(--tu) * 0.1485);'));
+    assert.ok(frame.includes('width: calc(var(--tu) * 6.3);'));
+    assert.ok(frame.includes('bottom: calc(var(--tu) * 1.05);'));
+    assert.ok(frame.includes('transform: translateZ(var(--focus-lift));'));
+    assert.doesNotMatch(frame, /(^|[;\s])top\s*:/i);
+    // An overflow clip on the frame would cut the cap sprite that overhangs its top edge.
+    assert.doesNotMatch(frame, /overflow/i);
     const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus');
     assert.ok(decls, 'focus stack rule is missing');
-    assert.match(decls, /left: calc\(var\(--tu\) \* 0\.1485\);/);
-    assert.match(decls, /width: calc\(var\(--tu\) \* 6\.3\);/);
-    assert.match(decls, /bottom: calc\(var\(--tu\) \* 1\.05\);/);
-    assert.match(decls, /max-height: calc\(var\(--tu\) \* 4\.25\);/);
-    assert.match(decls, /transform: translateZ\(var\(--focus-lift\)\);/);
+    assert.ok(decls.includes('max-height: calc(var(--tu) * 4.25);'));
     assert.doesNotMatch(decls, /min-height/i);
-    assert.doesNotMatch(decls, /(^|[;\s])top\s*:/i);
+  });
+
+  it('the frame sprites are sliced at the game canvas scale (25 px per unit x the Image multiplier)', () => {
+    const { borders } = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../../assets/attack-ui/attack-ui.json', import.meta.url)), 'utf8')
+    );
+    const unit = (px, multiplier) => String(Math.round((px / (25 * multiplier)) * 10000) / 10000);
+    const bg = borders.atkOv_BG;
+    assert.deepEqual([bg.top, bg.right, bg.bottom, bg.left], [31, 31, 31, 31]);
+    assert.ok(
+      focus('.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus').includes(
+        `list-bg.png') 31 fill / calc(var(--tu) * ${unit(31, 1)}) stretch;`
+      )
+    );
+    const cap = borders.atkOv_Brdr_T;
+    assert.deepEqual([cap.left, cap.right, cap.height], [23, 19, 24]);
+    const capRule = focus('.card-focus__card .ptcg-chrome--focus .ptcg-frame--focus::before');
+    assert.ok(capRule.includes(`height: calc(var(--tu) * ${unit(24, 6)});`));
+    assert.ok(
+      capRule.includes(
+        `list-cap.png') 0 19 0 23 fill / 0 calc(var(--tu) * ${unit(19, 6)}) 0 calc(var(--tu) * ${unit(23, 6)}) stretch;`
+      )
+    );
+    const bar = borders.atkOv_Brdr_B2;
+    assert.deepEqual([bar.top, bar.right, bar.bottom, bar.left], [7, 24, 23, 24]);
+    assert.ok(
+      focus('.card-focus__card .ptcg-chrome--focus .ptcg-stats--focus').includes(
+        `list-bar.png') 7 24 23 24 fill / calc(var(--tu) * ${unit(7, 6)}) calc(var(--tu) * ${unit(24, 6)}) calc(var(--tu) * ${unit(23, 6)}) calc(var(--tu) * ${unit(24, 6)}) stretch;`
+      )
+    );
   });
 
   it('rows are the prefab at scale 0.75: a 0.75-unit titlebar', () => {
