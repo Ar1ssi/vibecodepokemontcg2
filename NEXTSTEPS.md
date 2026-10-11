@@ -5,4 +5,4 @@
 # Parked — S264 batch leftovers (tracked as issues, not increments)
 #5 "basic prompt gone" → I87 · #6 match logging → I85 (design 028) · #4 30th anniversary → I86 (design 029).
 
-# oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 0/N (design)
+# oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 0/6 done (design); next: slice 1 importer
