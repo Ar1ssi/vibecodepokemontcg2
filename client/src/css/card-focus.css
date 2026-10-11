@@ -134,8 +134,8 @@
   position: relative;
   width: calc(var(--focus-w) * 0.103);
   height: calc(var(--focus-w) * 0.103);
-  min-width: 34px;
-  min-height: 34px;
+  min-width: 44px;
+  min-height: 44px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -145,6 +145,14 @@
   color: #fff;
   cursor: pointer;
   pointer-events: auto;
+}
+/* Hit area reaches past the ring so the button stays easy to hit on a small card. */
+.card-focus__close::after,
+.card-focus__stack::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
 }
 .card-focus__close svg,
 .card-focus__stack svg {
@@ -269,7 +277,8 @@
 }
 .card-focus__card .ptcg-chrome--focus .ptcg-stat[data-ptcg-retreat] {
   flex: 1 1 auto;
-  height: calc(var(--u) * 9.6);
+  align-self: stretch;
+  height: auto;
   flex-direction: row;
   justify-content: space-between;
   gap: calc(var(--u) * 1.2);
