@@ -4,7 +4,7 @@ import { curveAt } from '../../../../client/src/setup/netcode/mat-fx/tcgl-fx.mjs
 import { bakeCurve, evaluateUnityCurve, hermite } from '../lib/bake-curve.mjs';
 import { builtinMesh, BUILTIN_PLANE, BUILTIN_QUAD, BUILTIN_SPHERE } from '../lib/builtin-meshes.mjs';
 import { gradient, isZero, minMax, minMaxGradient, normalizePrefab } from '../lib/normalize-system.mjs';
-import { globalValue, pickVariant, queueFromTag } from '../lib/shader-variant.mjs';
+import { checkStageLink, globalValue, pickVariant, queueFromTag } from '../lib/shader-variant.mjs';
 
 const key = (time, value, inSlope = 0, outSlope = inSlope) => ({ time, value, inSlope, outSlope });
 const unityCurve = (...keys) => ({ m_Curve: keys });
@@ -216,6 +216,18 @@ test('globalValue resolves a shader constant from the material, then the shader 
   assert.deepEqual(globalValue('_texcoord_ST', 4, material, props, () => null), [1, 1, 0, 0]);
   assert.deepEqual(globalValue('_MainTex_TexelSize', 4, material, props, () => ({ width: 256, height: 128 })), [1 / 256, 1 / 128, 256, 128]);
   assert.equal(globalValue('_Unknown', 1, material, props, () => null), null);
+});
+
+test('checkStageLink refuses a pixel input the vertex shader wrote to another register', () => {
+  const signature = (kind, rows) => [`// ${kind} signature:`, '//', '// Name                 Index   Mask Register SysValue  Format   Used', '// -------------------- ----- ------ -------- -------- ------- ------', ...rows, '//'].join('\n');
+  const row = (name, index, register, sys, used) => `// ${name.padEnd(20)} ${String(index).padStart(5)}   xyzw ${String(register).padStart(8)} ${sys.padStart(8)}   float   ${used}`;
+  const vertex = signature('Output', [row('SV_POSITION', 0, 0, 'POS', 'xyzw'), row('TEXCOORD', 0, 1, 'NONE', 'xyzw'), row('COLOR', 0, 2, 'NONE', 'xyzw')]);
+  const good = signature('Input', [row('SV_POSITION', 0, 0, 'POS', ''), row('TEXCOORD', 0, 1, 'NONE', 'xy  '), row('COLOR', 0, 2, 'NONE', 'xyzw')]);
+  const swapped = signature('Input', [row('SV_POSITION', 0, 0, 'POS', ''), row('COLOR', 0, 1, 'NONE', 'xyzw')]);
+  const unread = signature('Input', [row('COLOR', 0, 1, 'NONE', '')]);
+  assert.doesNotThrow(() => checkStageLink('S', vertex, good));
+  assert.doesNotThrow(() => checkStageLink('S', vertex, unread));
+  assert.throws(() => checkStageLink('S', vertex, swapped), /reads COLOR0 from register 1, the vertex shader writes it to 2/);
 });
 
 test('pickVariant takes the variant whose keywords the game has on', () => {

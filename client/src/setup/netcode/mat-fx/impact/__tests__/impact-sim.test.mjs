@@ -74,6 +74,23 @@ test('rate over time, the particle cap and the start delay', () => {
   assert.deepEqual([0.05, 0.2, 0.4, 0.9].map((t) => alive(play(repeat, t)).length), [0, 2, 4, 6]);
 });
 
+test('a bad number in the emission ends nothing and hangs nothing', () => {
+  const burst = (t, interval) => ({ t, n: 2, cycles: 0, interval, p: 1 });
+  const broken = node('Broken', system({ life: 10, em: { rate: Infinity, dist: 0, bursts: [burst(NaN, 0.1), burst(0, NaN), burst(0.1, 0.1)] } }));
+  // A burst whose time or interval is not a number never fires; the one every 0.1 s keeps going
+  // (at 0.1, 0.2 and 0.3 s), and the endless rate emits nothing.
+  assert.equal(alive(play(broken, 0.35)).length, 3 * 2);
+});
+
+test('a sub-emitter may feed its own system', () => {
+  const self = node('Self', system({ life: 0.2, max: 50, em: { rate: 0, dist: 0, bursts: [{ t: 0, n: 1, cycles: 1, interval: 0.01, p: 1 }] }, sub: [{ id: 's', type: 0, props: 0, p: 1 }] }), { subId: 's' });
+  const root = { n: 'Root', p: [0, 0, 0], q: [0, 0, 0, 1], s: [1, 1, 1], c: [node('Seed', system({ life: 0.2, sub: [{ id: 's', type: 0, props: 0, p: 1 }], em: { rate: 0, dist: 0, bursts: [{ t: 0, n: 1, cycles: 1, interval: 0.01, p: 1 }] } })), self] };
+  const effect = play(root, 0.1);
+  // Each birth in the fed system starts another emitter there; none is dropped mid-step.
+  assert.ok(alive(effect, 1).length >= 3, `${alive(effect, 1).length} particles`);
+  assert.ok(alive(effect, 1).length <= 50);
+});
+
 test('speed, gravity and the node transform move a particle as Unity would', () => {
   const forward = node('Forward', system({ speed: 2 }));
   const [moved] = alive(play(forward, 0.5));

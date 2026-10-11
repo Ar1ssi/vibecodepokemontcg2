@@ -214,6 +214,32 @@ const readyImpactType = (card, vgType) => {
   return impactReady(type) ? type : null;
 };
 
+const WARMUP_DELAY_MS = 600;
+let warmupInstalled = false;
+
+/**
+ * Design 068: once the board settles, load the impact prefabs of both Active Pokémon's printed
+ * types, so the first hit of a game already has its prefab. Safe to call more than once.
+ */
+export function installImpactWarmup() {
+  if (warmupInstalled || typeof document === 'undefined') return;
+  warmupInstalled = true;
+  let timer = 0;
+  const warm = () => {
+    const registry = getCardRegistry();
+    for (const user of ['self', 'opp']) {
+      for (const id of zoneCardIds(registry, user, 'active')) {
+        const card = combatCard(id, registry);
+        if (card) prepareImpact(impactTypeFor(card));
+      }
+    }
+  };
+  document.addEventListener('board-view-applied', () => {
+    clearTimeout(timer);
+    timer = setTimeout(warm, WARMUP_DELAY_MS);
+  });
+}
+
 /** Design 068: what the prefab needs of a damaged card, read while the card is still on the board. */
 const impactTargetFor = (instanceId, rect, hit, registry) => {
   const record = shownRecord(instanceId, registry);
@@ -228,9 +254,25 @@ const impactTargetFor = (instanceId, rect, hit, registry) => {
   };
 };
 
-/** Design 068: play the prefab on a hit card; false when the attack's scene did not make room for it. */
-const playImpactPrefab = (ctx, target, hit) =>
-  Boolean(ctx?.impactType && playImpact({ type: ctx.impactType, variant: impactVariant(hit.amount, target.bench), ...target }));
+/**
+ * Design 068: play the prefab on a hit card; false when the attack's scene did not make room
+ * for it, or when it could not play — the caller then shows today's dressing.
+ */
+const playImpactPrefab = (ctx, target, hit) => {
+  if (!ctx?.impactType) return false;
+  try {
+    return Boolean(playImpact({ type: ctx.impactType, variant: impactVariant(hit.amount, target.bench), ...target }));
+  } catch (error) {
+    console.debug('impact prefab failed', ctx.impactType, error);
+    return false;
+  }
+};
+
+/**
+ * Design 068: the scene leaves its contact dressing to the prefab only when its defender takes
+ * a hit. A status move by name, or an attack that only hurts the Bench, keeps its own.
+ */
+const sceneSpecFor = (spec, impactType, plan) => (impactType && plan.damage > 0 ? withoutImpactBeats(spec) : spec);
 
 const shakeTable = (amount) => {
   const amplitude = screenShakeAmplitude(amount);
@@ -395,8 +437,7 @@ export const attack = (plan) => {
   if (sig && sigDefenderSrc) {
     const impactType = readyImpactType(card, sig.spec.vgType);
     const played = playMove({
-      // Design 068: the prefab is the hit's dressing, so the scene leaves its own out.
-      spec: impactType ? withoutImpactBeats(sig.spec) : sig.spec,
+      spec: sceneSpecFor(sig.spec, impactType, plan),
       attacker: moveSide(plan.attackerId, from, src, registry),
       defender: moveSide(defenderId, to, sigDefenderSrc, registry),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
@@ -420,7 +461,7 @@ export const attack = (plan) => {
   if (pick?.score && defenderSrc) {
     const impactType = readyImpactType(card, pick.vgType);
     const played = playMove({
-      spec: impactType ? withoutImpactBeats(pick.score) : pick.score,
+      spec: sceneSpecFor(pick.score, impactType, plan),
       attacker: moveSide(plan.attackerId, from, src, registry),
       defender: moveSide(defenderId, to, defenderSrc, registry),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),

@@ -100,6 +100,20 @@ real hand card, writes frames, a video and frozen-time strips (`strip-self.png`,
 `.agent/scratch/deck-reveal/`. In the cloud container: `CHROMIUM=/opt/pw-browsers/chromium` and
 `SIO_JS=<node_modules/.pnpm/socket.io@*/node_modules/socket.io/client-dist/socket.io.min.js>`.
 
+## Attack impact prefabs (design 068, WebGL)
+
+TCG Live's impact prefabs draw on a WebGL2 canvas, so both recorders launch Chromium on
+SwiftShader. Worktree server on :4100 first.
+
+- `rec/rec-attack-impact.mjs` — contact sheets from the lab page
+  (`/src/dev/attack-fx-lab.html?sheet=1`): one card per time, each effect frozen there, to
+  `.agent/scratch/impact/<type>-<variant>.png`. `TYPES=fire,water`, `VARIANT=Large_C`,
+  `TIMES=0.05,0.2`, `LIGHT=1` (light table), `FAR=1` (far seat). Exit 1 on a shader or page error.
+- `rec/rec-attack-hit.mjs` — one real attack through combat.js on the e2e board: banner, move
+  scene, hits on the impact queue. `BENCH=1` adds a Bench hit, `SIDE=opp` swaps the attacker,
+  `WEBGL=0` checks the fallback to the DOM hit dressing. Frames to `.agent/scratch/attack-hit/`.
+- By hand: open `/src/dev/attack-fx-lab.html`, pick a type and size, scrub the time slider.
+
 ## Builder tab: the Build & Battle unboxing (`rec/rec-unboxing.mjs`)
 
 The unboxing scene (design 052) lives in the builder tab, not on the board, so its recorder drives

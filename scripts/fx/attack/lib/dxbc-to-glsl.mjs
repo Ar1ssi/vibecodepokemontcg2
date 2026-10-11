@@ -174,7 +174,8 @@ export function transpile(asm, { stage, prefix = stage === 'vertex' ? 'v' : 'f' 
       throw new Error(`operand is not a value: ${operand.kind}`);
     }
     if (operand.absolute) expr = `abs(${expr})`;
-    if (operand.negate) expr = `(-${expr})`;
+    // A literal may already carry its sign: `--0.5` would not parse.
+    if (operand.negate) expr = expr.startsWith('-') ? `(-(${expr}))` : `(-${expr})`;
     return expr;
   };
 
@@ -196,6 +197,13 @@ export function transpile(asm, { stage, prefix = stage === 'vertex' ? 'v' : 'f' 
     }
     return operand.negate ? `(-${expr})` : expr;
   };
+
+  /**
+   * The bits a `mov` / `movc` carries. Those two copy any type, and Direct3D reads a negate or
+   * abs on their sources as float (`mov o3.z, -r0.x` flips a sign bit, it is not 0 − bits).
+   */
+  const readBits = (operand, maskIndexes) =>
+    operand.negate || operand.absolute ? `floatBitsToInt(${readFloat(operand, maskIndexes)})` : readInt(operand, maskIndexes);
 
   const maskOf = (operand) => ({ swizzle: operand.swizzle, indexes: [...operand.swizzle].map((c) => COMPONENTS.indexOf(c)) });
 
@@ -241,12 +249,13 @@ export function transpile(asm, { stage, prefix = stage === 'vertex' ? 'v' : 'f' 
     const count = mask?.indexes.length ?? 0;
     const f = (index) => readFloat(operands[index], mask.indexes);
     const i = (index) => readInt(operands[index], mask.indexes);
+    const bits = (index) => readBits(operands[index], mask.indexes);
 
     if (opcode in FLOAT_BINARY) return writeFloat(dest, saturate(`${f(1)} ${FLOAT_BINARY[opcode]} ${f(2)}`, saturated));
     if (opcode in FLOAT_CALL_2) return writeFloat(dest, saturate(`${FLOAT_CALL_2[opcode]}(${f(1)}, ${f(2)})`, saturated));
     if (opcode in FLOAT_CALL_1) return writeFloat(dest, saturate(`${FLOAT_CALL_1[opcode]}(${f(1)})`, saturated));
     if (opcode === 'mad') return writeFloat(dest, saturate(`${f(1)} * ${f(2)} + ${f(3)}`, saturated));
-    if (opcode === 'mov') return saturated ? writeFloat(dest, saturate(f(1), true)) : writeInt(dest, i(1));
+    if (opcode === 'mov') return saturated ? writeFloat(dest, saturate(f(1), true)) : writeInt(dest, bits(1));
     if (opcode in DOT) {
       const width = firstIndexes(DOT[opcode]);
       const dot = `dot(${readFloat(operands[1], width)}, ${readFloat(operands[2], width)})`;
@@ -268,9 +277,9 @@ export function transpile(asm, { stage, prefix = stage === 'vertex' ? 'v' : 'f' 
     if (opcode === 'itof') return writeFloat(dest, `${floatType(count)}(${i(1)})`);
     if (opcode === 'ftoi') return writeInt(dest, `${intType(count)}(${f(1)})`);
     if (opcode === 'movc') {
-      if (count === 1) return writeInt(dest, `(${i(1)} != 0) ? ${i(2)} : ${i(3)}`);
+      if (count === 1) return writeInt(dest, `(${i(1)} != 0) ? ${bits(2)} : ${bits(3)}`);
       const zero = `${intType(count)}(0)`;
-      return writeInt(dest, `${intType(count)}(notEqual(${i(1)}, ${zero})) * ${i(2)} + ${intType(count)}(equal(${i(1)}, ${zero})) * ${i(3)}`);
+      return writeInt(dest, `${intType(count)}(notEqual(${i(1)}, ${zero})) * ${bits(2)} + ${intType(count)}(equal(${i(1)}, ${zero})) * ${bits(3)}`);
     }
     if (opcode === 'sincos') {
       const [sinDest, cosDest, source] = operands;
@@ -365,7 +374,7 @@ export function transpile(asm, { stage, prefix = stage === 'vertex' ? 'v' : 'f' 
     if (input.system === 'position') {
       usesFragCoord = true;
       header.push('uniform float uTargetHeight;');
-      // D3D pixel centres count down from the top; w carries the interpolated 1 / w.
+      // D3D pixel centres count down from the top, and its w is the clip-space w (GL keeps 1 / w).
       setup.push(`vec4 v${input.register} = vec4(gl_FragCoord.x, uTargetHeight - gl_FragCoord.y, gl_FragCoord.z, 1.0 / gl_FragCoord.w);`);
     } else if (input.system === 'is_front_face') {
       setup.push(`vec4 v${input.register} = vec4(intBitsToFloat(gl_FrontFacing ? -1 : 0));`);

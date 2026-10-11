@@ -91,6 +91,7 @@
       fill($('variant'), VARIANTS, params.get('variant') || 'Medium');
       if (params.has('seed')) $('seed').value = params.get('seed');
       if (params.get('light') === '1') $('light').checked = true;
+      if (params.get('far') === '1') $('far').checked = true;
       const applyTable = () => document.body.classList.toggle('lab--light', $('light').checked);
       $('light').addEventListener('change', applyTable);
       applyTable();

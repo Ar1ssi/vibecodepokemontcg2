@@ -27,7 +27,11 @@ const GAME_ACTIVE_CARD_UNITS = 8.9 * 1.615;
 /** The game's Bench card against its Active card (design 068 S5): a `_C` prefab is sized for it. */
 const GAME_BENCH_CARD_SCALE = 0.7;
 const MAX_PIXEL_RATIO = 1.5;
+/** The stage's framebuffers cover the viewport; past this many pixels the pixel ratio gives way. */
+const MAX_STAGE_PIXELS = 3.2e6;
 const GROUND_HALF_SIZE = 2000;
+/** How far from its card an effect is read back for a GrabPass, in card heights each way. */
+const GRAB_REACH_CARDS = 3;
 const VIEW_HEIGHT_UNITS = 2 * CAMERA_HEIGHT * Math.tan((CAMERA_FOV_DEG * DEG) / 2);
 const GRAB = '#grab';
 // Unity's default textures by name: what a sampler with nothing bound reads (RGBA bytes).
@@ -235,6 +239,9 @@ function programFor(assets, shaderIndex) {
       targetHeight: gl.getUniformLocation(program, 'uTargetHeight'),
     };
   };
+  if (shader.grab && !(shader.blend.src === BLEND_SRC_ALPHA && shader.blend.dst === BLEND_ONE_MINUS_SRC_ALPHA)) {
+    throw new Error(`${shader.name}: a GrabPass shader is drawn as SrcAlpha / OneMinusSrcAlpha only`);
+  }
   const entry = { shader, blend: blendFor(gl, shader.blend), color: build(shader.fs), coverage: null };
   // A GrabPass shader draws twice: its colour, then how much of the card it covers (see drawItem).
   if (shader.grab) entry.coverage = build(shader.fs.replace('  fragColor = o0;', '  fragColor = vec4(0.0, 0.0, 0.0, o0.r * o0.a);'));
@@ -279,18 +286,23 @@ function materialsFor(type, assets) {
 
 function resizeTargets() {
   const { gl, canvas } = stage;
-  const ratio = Math.min(MAX_PIXEL_RATIO, window.devicePixelRatio || 1);
+  const area = Math.max(1, window.innerWidth * window.innerHeight);
+  const ratio = Math.min(MAX_PIXEL_RATIO, window.devicePixelRatio || 1, Math.sqrt(MAX_STAGE_PIXELS / area));
   const width = Math.max(1, Math.round(window.innerWidth * ratio));
   const height = Math.max(1, Math.round(window.innerHeight * ratio));
   if (stage.targets && canvas.width === width && canvas.height === height) return;
   canvas.width = width;
   canvas.height = height;
   for (const target of Object.values(stage.targets ?? {})) deleteTarget(gl, target);
-  stage.targets = {
-    scene: createTarget(gl, width, height, gl.SRGB8_ALPHA8, true),
-    grab: createTarget(gl, width, height, gl.SRGB8_ALPHA8, false),
-    coverage: createTarget(gl, width, height, gl.RGBA8, false),
-  };
+  // The two GrabPass targets are made when a refraction material first draws (grabTargets).
+  stage.targets = { scene: createTarget(gl, width, height, gl.SRGB8_ALPHA8, true), grab: null, coverage: null };
+}
+
+function grabTargets() {
+  const { gl, canvas, targets } = stage;
+  targets.grab ??= createTarget(gl, canvas.width, canvas.height, gl.SRGB8_ALPHA8, false);
+  targets.coverage ??= createTarget(gl, canvas.width, canvas.height, gl.RGBA8, false);
+  return targets;
 }
 
 function drawUtility({ vertices, matrix = IDENTITY, texture = null, mode }) {
@@ -350,12 +362,18 @@ function cardQuad(effect) {
 
 /**
  * What a GrabPass shader reads as "the screen": the card's art under everything drawn so far,
- * top row first as Direct3D has it, plus the same picture's coverage.
+ * top row first as Direct3D has it, plus the same picture's coverage. Only the patch of the
+ * canvas the effect can reach is copied. Returns the two targets.
  */
 function captureGrab(effect) {
-  const { gl, targets } = stage;
+  const { gl, canvas } = stage;
+  const targets = grabTargets();
+  const [x, y, width, height] = effect.region;
   gl.disable(gl.DEPTH_TEST);
   gl.disable(gl.CULL_FACE);
+  gl.enable(gl.SCISSOR_TEST);
+  // The copy is upside down, so the patch is mirrored too.
+  gl.scissor(x, canvas.height - (y + height), width, height);
   for (const [target, artMode, sceneMode] of [[targets.grab, 1, 1], [targets.coverage, 3, 2]]) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
     gl.clearColor(0, 0, 0, 0);
@@ -366,8 +384,10 @@ function captureGrab(effect) {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     drawUtility({ vertices: FULLSCREEN_FLIPPED, texture: targets.scene.texture, mode: sceneMode });
   }
+  gl.disable(gl.SCISSOR_TEST);
   gl.bindFramebuffer(gl.FRAMEBUFFER, targets.scene.framebuffer);
   gl.enable(gl.DEPTH_TEST);
+  return targets;
 }
 
 function bindAttribute(location, buffer, data, size, fallback) {
@@ -430,9 +450,11 @@ function drawGeometry(program, geometry) {
 }
 
 function drawItem(effect, item) {
-  const { gl, targets } = stage;
+  const { gl } = stage;
   const { material, geometry } = item;
   const { entry } = material;
+  // The capture sets its own state; the shader's follows it.
+  const targets = entry.shader.grab ? captureGrab(effect) : null;
   const cull = entry.shader.cull;
   if (cull === CULL_OFF) gl.disable(gl.CULL_FACE);
   else {
@@ -440,7 +462,7 @@ function drawItem(effect, item) {
     gl.cullFace(cull === CULL_FRONT ? gl.FRONT : gl.BACK);
   }
   gl.enable(gl.BLEND);
-  if (!entry.shader.grab) {
+  if (!targets) {
     gl.blendFuncSeparate(...entry.blend);
     gl.useProgram(entry.color.program);
     uploadUniforms(entry.color, material, effect, entry.shader.buffers, null);
@@ -449,7 +471,6 @@ function drawItem(effect, item) {
   }
   // The shader's colour is the bent picture: it replaces what is under it by its alpha. The
   // second pass does the same for coverage, so bent card art hides the card it came from.
-  captureGrab(effect);
   gl.colorMask(true, true, true, false);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   gl.useProgram(entry.color.program);
@@ -464,7 +485,13 @@ function drawItem(effect, item) {
 }
 
 function drawEffect(effect) {
-  const { gl } = stage;
+  const { gl, targets } = stage;
+  // Every effect starts from the same state, whatever the one before it left (it may have stopped mid-draw).
+  gl.bindFramebuffer(gl.FRAMEBUFFER, targets.scene.framebuffer);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.colorMask(true, true, true, true);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthMask(true);
   gl.clear(gl.DEPTH_BUFFER_BIT);
   drawGround(effect);
   const items = [];
@@ -496,17 +523,20 @@ function placeEffect(effect) {
   post[13] = 1 - ((rect.top + rect.height / 2) / height) * 2;
   const camera = topDownViewProjection({ target: [0, 0, 0], height: CAMERA_HEIGHT, fovDeg: CAMERA_FOV_DEG, aspect: 1, near: CAMERA_NEAR, far: CAMERA_FAR });
   effect.viewProjection = mat4Mul(post, camera);
+  // The patch of the drawing buffer around the card (x, y from the bottom-left) a GrabPass copies.
+  const reach = GRAB_REACH_CARDS * (rect.height / (bench ? GAME_BENCH_CARD_SCALE : 1));
+  const scaleX = stage.canvas.width / width;
+  const scaleY = stage.canvas.height / height;
+  effect.region = [
+    Math.floor((rect.left + rect.width / 2 - reach) * scaleX),
+    Math.floor((height - (rect.top + rect.height / 2) - reach) * scaleY),
+    Math.ceil(2 * reach * scaleX),
+    Math.ceil(2 * reach * scaleY),
+  ];
 }
 
-function renderFrame() {
-  const target = stage;
-  if (!target || target.lost) return;
+function drawFrame(target) {
   const { gl } = target;
-  target.effects = target.effects.filter((effect) => effect.clock.playState !== 'finished' && effect.clock.playState !== 'idle');
-  if (target.effects.length === 0) {
-    target.canvas.style.display = 'none';
-    return;
-  }
   resizeTargets();
   gl.viewport(0, 0, target.canvas.width, target.canvas.height);
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.targets.scene.framebuffer);
@@ -517,14 +547,13 @@ function renderFrame() {
   gl.enable(gl.DEPTH_TEST);
   gl.frontFace(gl.CW);
   for (const effect of target.effects) {
-    const seconds = (Number(effect.clock.currentTime) || 0) / 1000;
-    effect.simulation.advanceTo(seconds);
-    effect.shaderTime = effect.timeOffset + effect.simulation.time;
-    placeEffect(effect);
     try {
+      effect.simulation.advanceTo((Number(effect.clock.currentTime) || 0) / 1000);
+      effect.shaderTime = effect.timeOffset + effect.simulation.time;
+      placeEffect(effect);
       drawEffect(effect);
     } catch (error) {
-      // One bad material must not take the frame loop down: this effect ends, the rest play on.
+      // One bad effect must not take the frame down: it ends, the rest play on.
       warnOnce(`${effect.type} impact stopped`, error);
       effect.clock.cancel();
     }
@@ -535,6 +564,27 @@ function renderFrame() {
   gl.disable(gl.BLEND);
   gl.clear(gl.COLOR_BUFFER_BIT);
   drawUtility({ vertices: FULLSCREEN, texture: target.targets.scene.texture, mode: 0 });
+}
+
+function renderFrame() {
+  const target = stage;
+  if (!target || target.lost) return;
+  target.effects = target.effects.filter((effect) => effect.clock.playState !== 'finished' && effect.clock.playState !== 'idle');
+  if (target.effects.length === 0) {
+    target.canvas.style.display = 'none';
+    return;
+  }
+  try {
+    drawFrame(target);
+  } catch (error) {
+    // The stage itself failed (a framebuffer, the resolve). A loop that died quietly would keep
+    // `playImpact` answering yes with nothing on screen, so the stage goes and hits take
+    // today's dressing for the rest of the session.
+    warnOnce('the stage stopped', error);
+    stageFailed = true;
+    discardStage(target);
+    return;
+  }
   target.frame = requestAnimationFrame(renderFrame);
 }
 
@@ -600,10 +650,14 @@ export function playImpact({ type, variant, rect, bench = false, turn = 0, cardS
     timeOffset: seed % 97,
     shaderTime: 0,
     viewProjection: null,
-    clock: stage.canvas.animate([{ opacity: 1 }, { opacity: 1 }], { duration: durationMs, fill: 'forwards' }),
+    clock: stage.canvas.animate([{ opacity: 1 }, { opacity: 1 }], { duration: durationMs }),
   };
+  // A cancelled clock (an effect cut short, a lost context) rejects `finished`; that is not an error.
+  effect.clock.finished.catch(() => undefined);
   const host = stage;
-  loadCardArt(cardSrc).then((bitmap) => {
+  // Only a type with a refraction material reads the card's art.
+  const refracts = effect.materials.some((material) => material.textures.includes(GRAB));
+  loadCardArt(refracts ? cardSrc : null).then((bitmap) => {
     if (!bitmap || stage !== host || !host.effects.includes(effect)) return;
     const { gl } = host;
     const texture = gl.createTexture();

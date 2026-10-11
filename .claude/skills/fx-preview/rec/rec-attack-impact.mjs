@@ -30,8 +30,8 @@ page.on('console', (message) => {
 for (const type of TYPES) {
   const query = new URLSearchParams({ sheet: '1', type, variant: VARIANT, times: TIMES, seed: SEED });
   if (LIGHT === '1') query.set('light', '1');
+  if (FAR === '1') query.set('far', '1');
   await page.goto(`${BASE_URL}/src/dev/attack-fx-lab.html?${query}`);
-  if (FAR === '1') await page.evaluate(() => undefined);
   const outcome = await page
     .waitForFunction(() => window.__impactLab && (window.__impactLab.sheetReady || window.__impactLab.sheetError), null, { timeout: 60000 })
     .then(() => page.evaluate(() => window.__impactLab.sheetError || 'ok'))
@@ -41,7 +41,7 @@ for (const type of TYPES) {
     continue;
   }
   await page.waitForTimeout(250);
-  const file = path.join(OUT, `${type}-${VARIANT}${LIGHT === '1' ? '-light' : ''}.png`);
+  const file = path.join(OUT, `${type}-${VARIANT}${LIGHT === '1' ? '-light' : ''}${FAR === '1' ? '-far' : ''}.png`);
   await page.screenshot({ path: file });
   console.log(file);
 }

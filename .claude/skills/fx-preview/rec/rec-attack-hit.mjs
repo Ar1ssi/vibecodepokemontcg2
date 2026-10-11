@@ -22,6 +22,9 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const problems = [];
 page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
+page.on('console', (message) => {
+  if (message.text().includes('attack impact FX') || message.text().includes('impact prefab failed')) problems.push(`${message.type()}: ${message.text().slice(0, 600)}`);
+});
 if (SIO_JS) await page.route('https://cdn.socket.io/**', (route) => route.fulfill({ path: SIO_JS, contentType: 'application/javascript' }));
 await page.route('https://static.cloudflareinsights.com/**', (route) => route.abort());
 
@@ -55,25 +58,38 @@ const setup = await page.evaluate(
     const plan = { attackerId: 101, defenderId: 201, attackName: 'Burning Darkness', damage: damageAmount, benchDealt: withBench ? 30 : 0, user: attackerSide };
     combat.attackBanner(plan);
     // The banner starts loading the type its move will hit with (the move's type, not always
-    // the card's printed one); wait it out as the banner's hold does in a game.
+    // the card's printed one). Wait, as the banner's hold does in a game, until no further type
+    // has become ready for a while.
     const started = performance.now();
-    const readyType = () => select.IMPACT_TYPES.find((entry) => stage.impactReady(entry)) ?? null;
-    while (!readyType() && performance.now() - started < 15000) await new Promise((resolve) => setTimeout(resolve, 50));
+    const readyTypes = () => select.IMPACT_TYPES.filter((entry) => stage.impactReady(entry));
+    let known = -1;
+    let stableSince = performance.now();
+    while (performance.now() - stableSince < 600 && performance.now() - started < 15000) {
+      if (readyTypes().length !== known) {
+        known = readyTypes().length;
+        stableSince = performance.now();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    // What showed, watched from inside the page: a screenshot can take longer than the hit lasts.
+    const seen = { stageShown: false, dressing: 0, moveScene: 0, numbers: 0 };
+    const watch = () => {
+      seen.stageShown ||= [...document.querySelectorAll('canvas.fx-impact-stage')].some((canvas) => getComputedStyle(canvas).display !== 'none');
+      seen.dressing = Math.max(seen.dressing, document.querySelectorAll('.fx-hit').length);
+      seen.moveScene = Math.max(seen.moveScene, document.querySelectorAll('.fx-move').length);
+      seen.numbers = Math.max(seen.numbers, document.querySelectorAll('.fx-damage-pop').length);
+    };
     window.__hit = {
+      seen,
       play: () => {
         const holdMs = combat.attack(plan);
         combat.damage({ instanceId: 201, damage: damageAmount, dealt: damageAmount });
         if (withBench) combat.damage({ instanceId: 202, damage: 30, dealt: 30 });
+        setInterval(watch, 16);
         return holdMs;
       },
-      state: () => ({
-        stageShown: [...document.querySelectorAll('canvas.fx-impact-stage')].some((canvas) => getComputedStyle(canvas).display !== 'none'),
-        dressing: document.querySelectorAll('.fx-hit').length,
-        moveScene: document.querySelectorAll('.fx-move').length,
-        numbers: document.querySelectorAll('.fx-damage-pop').length,
-      }),
     };
-    return { impactType: readyType(), ready: Boolean(readyType()), waitedMs: Math.round(performance.now() - started) };
+    return { readyTypes: readyTypes(), waitedMs: Math.round(performance.now() - started) };
   },
   [TYPE, Number(DAMAGE), BENCH === '1', SIDE, CARD_IMG]
 );
@@ -81,28 +97,21 @@ console.log('setup', JSON.stringify(setup));
 
 const holdMs = await page.evaluate(() => window.__hit.play());
 console.log('contact after', holdMs, 'ms');
-const seen = { stageShown: false, dressing: 0, moveScene: 0, numbers: 0 };
-let elapsed = 0;
-await page.screenshot({ path: path.join(OUT, 'f0-scene.png') });
+// Frames are a best effort at these offsets after the contact (a screenshot is not instant).
+const playedAt = Date.now();
 for (const [index, offset] of FRAME_OFFSETS_MS.entries()) {
-  const target = (holdMs || 0) + offset;
-  await page.waitForTimeout(Math.max(0, target - elapsed));
-  const state = await page.evaluate(() => window.__hit.state());
-  seen.stageShown ||= state.stageShown;
-  seen.dressing = Math.max(seen.dressing, state.dressing);
-  seen.moveScene = Math.max(seen.moveScene, state.moveScene);
-  seen.numbers = Math.max(seen.numbers, state.numbers);
-  const started = Date.now();
+  await page.waitForTimeout(Math.max(0, (holdMs || 0) + offset - (Date.now() - playedAt)));
   await page.screenshot({ path: path.join(OUT, `f${index + 1}-contact+${offset}.png`) });
-  elapsed = target + (Date.now() - started);
 }
+await page.waitForTimeout(Math.max(0, (holdMs || 0) + 1500 - (Date.now() - playedAt)));
+const seen = await page.evaluate(() => window.__hit.seen);
 console.log('seen', JSON.stringify(seen));
 await browser.close();
 
 const wantPrefab = WEBGL !== '0';
-if (wantPrefab && (!setup.ready || !seen.stageShown)) problems.push('the impact prefab did not play');
+if (wantPrefab && !seen.stageShown) problems.push('the impact prefab did not play');
 if (wantPrefab && seen.dressing > 0) problems.push('the old hit dressing played beside the prefab');
-if (!wantPrefab && (setup.ready || seen.stageShown)) problems.push('the prefab played without WebGL');
+if (!wantPrefab && (setup.readyTypes.length > 0 || seen.stageShown)) problems.push('the prefab played without WebGL');
 if (!wantPrefab && seen.dressing === 0) problems.push('no hit dressing without WebGL');
 if (seen.numbers === 0) problems.push('no damage number');
 for (const problem of problems) console.log(problem);

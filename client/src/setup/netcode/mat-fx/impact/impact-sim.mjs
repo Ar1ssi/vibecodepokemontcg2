@@ -365,7 +365,8 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
         // A repeat needs an interval to wait out.
         if (cycle > 0 && !(burst.interval > 0)) return;
         const at = burst.t + cycle * burst.interval;
-        if (at >= to || at > spec.dur) return;
+        // Written so a time that is not a number ends the loop too.
+        if (!(at < to) || !(at <= spec.dur)) return;
         emitter.cycles[index] = cycle + 1;
         if (random.next() > burst.p) continue;
         const count = Math.round(evalMinMax(burst.n, spec.dur > 0 ? at / spec.dur : 0, random.next()));
@@ -380,7 +381,7 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
   function emitRate(system, emitter, from, to, time) {
     const { spec, random } = system;
     const rate = evalMinMax(spec.em.rate, spec.dur > 0 ? from / spec.dur : 0, Array.isArray(spec.em.rate) ? random.next() : 0);
-    if (rate > 0) {
+    if (rate > 0 && Number.isFinite(rate)) {
       emitter.acc += rate * (to - from);
       // A whole particle is owed once the sum is within rounding of 1 (120 steps of 1/120 fall short).
       while (emitter.acc >= 1 - RATE_EPSILON) {
@@ -391,7 +392,7 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
       }
     }
     const perUnit = evalMinMax(spec.em.dist, 0, 0);
-    if (perUnit > 0 && emitter.follow) {
+    if (perUnit > 0 && Number.isFinite(perUnit) && emitter.follow) {
       emitter.accDistance += perUnit * length(sub(emitter.follow.pos, emitter.last));
       emitter.last = [...emitter.follow.pos];
       while (emitter.accDistance >= 1) {
@@ -435,7 +436,10 @@ export function createEffect(prefab, { seed = 1, rootMatrix = mat4Identity(), ro
         }
       }
       system.particles = survivors;
-      system.emitters = system.emitters.filter((emitter) => emit(system, emitter, time, dt));
+      // A birth sub-emitter may add to this very list while it is walked: start the new list first.
+      const emitters = system.emitters;
+      system.emitters = [];
+      for (const emitter of emitters) if (emit(system, emitter, time, dt)) system.emitters.push(emitter);
     }
   }
 

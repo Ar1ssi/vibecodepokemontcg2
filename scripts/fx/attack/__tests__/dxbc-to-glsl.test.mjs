@@ -156,6 +156,19 @@ test('a vertex shader names its attributes by semantic and its varyings by regis
   assert.ok(glsl.includes('gl_Position = o0;'));
 });
 
+test('mov and movc read a negate or abs as float; integer opcodes negate as integers', () => {
+  const body = (lines) => FRAGMENT.replace('rsq r0.w, r0.w', lines.join('\n'));
+  const { glsl } = transpile(body(['mov r0.w, -r0.x', 'mov r0.z, |r0.y|', 'movc r0.y, r0.y, -r0.z, r0.z', 'iadd r0.x, r0.x, -r1.x', 'add r0.x, r0.x, -l(-0.500000)']), { stage: 'fragment' });
+  const has = (line) => assert.ok(glsl.includes(line), `missing: ${line}\n${glsl}`);
+  // Colorless_Rainbow_Nova's `movc r0.y, r0.y, -r0.z, r0.z` flips a sign bit: 0 − bits is another number.
+  has('r0.w = floatBitsToInt((-intBitsToFloat(r0.x)));');
+  has('r0.z = floatBitsToInt(abs(intBitsToFloat(r0.y)));');
+  has('r0.y = (r0.y != 0) ? floatBitsToInt((-intBitsToFloat(r0.z))) : r0.z;');
+  has('r0.x = r0.x + (-r1.x);');
+  // A signed literal under a negate keeps its parentheses (`--0.5` would not parse).
+  has('(-(-0.5))');
+});
+
 test('an opcode the translator does not know throws, naming it', () => {
   const asm = FRAGMENT.replace('rsq r0.w, r0.w', 'bfrev r0.w, r0.w');
   assert.throws(() => transpile(asm, { stage: 'fragment' }), /unsupported opcode: bfrev/);

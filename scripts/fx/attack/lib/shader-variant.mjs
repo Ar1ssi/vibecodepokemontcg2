@@ -1,7 +1,7 @@
 // Design 068: pick the pass and compiled variant a Unity shader draws a particle with, translate
 // both stages, and bake each material's constant buffers. The dump holds the reflection tables
 // in two places (the program's common table and the variant's own); both are merged here.
-import { constantReads, transpile } from './dxbc-to-glsl.mjs';
+import { constantReads, parseSignatures, transpile } from './dxbc-to-glsl.mjs';
 
 const PASS_NORMAL = 0;
 const PASS_GRAB = 2;
@@ -105,8 +105,24 @@ const translateStage = (shader, pass, stage) => {
     if (!name) throw new Error(`${shader.name} ${stage}: texture t${texture.slot} has no name`);
     return { uniform: texture.uniform, type: texture.type, name };
   });
-  return { ...translated, buffers, textures };
+  return { ...translated, buffers, textures, asm: variant.asm };
 };
+
+/**
+ * The two stages are joined by register number (`io3` out, `io3` in). Direct3D joins them by
+ * semantic, so check that each semantic the pixel shader reads sits in the register the vertex
+ * shader wrote it to.
+ */
+export function checkStageLink(name, vertexAsm, fragmentAsm) {
+  const written = new Map(parseSignatures(vertexAsm).output.map((row) => [`${row.semantic}${row.index}`, row.register]));
+  for (const row of parseSignatures(fragmentAsm).input) {
+    if (row.systemValue !== 'NONE' || !row.used) continue;
+    const key = `${row.semantic}${row.index}`;
+    if (written.get(key) !== row.register) {
+      throw new Error(`${name}: the pixel shader reads ${key} from register ${row.register}, the vertex shader writes it to ${written.get(key) ?? 'none'}`);
+    }
+  }
+}
 
 /**
  * @returns {{name:string, grab:boolean, queue:number, blend:{src:number,dst:number,srcAlpha:number,dstAlpha:number},
@@ -124,6 +140,7 @@ export function buildShader(shader) {
   const vertex = translateStage(shader, pass, 'vertex');
   const fragment = translateStage(shader, pass, 'fragment');
   if (vertex.textures.length > 0) throw new Error(`${shader.name}: vertex textures are not supported`);
+  checkStageLink(shader.name, vertex.asm, fragment.asm);
   return {
     name: shader.name,
     grab: shader.passes.some((entry) => entry.type === PASS_GRAB),
