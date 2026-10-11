@@ -40,7 +40,6 @@ import {
   flightTransform,
   focusRect,
   perspectiveFor,
-  tiltFromPointer,
 } from './card-focus-geometry.mjs';
 
 const HAND_LOWERED_CLASS = 'hand-lowered';
@@ -52,9 +51,6 @@ const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 // outlasts the flight (250 ms) and the list reveal (300 ms).
 const CLICK_GUARD_MS = 500;
 const DECODE_CAP_MS = 1500;
-const TILT_MAX_DEG = 6;
-const TILT_EASE_PER_FRAME = 0.18;
-const TILT_REST_DEG = 0.02;
 // A picker opened by an ability must not sit under this popup (z-index 2400 > the picker's 410).
 const PICKER_SELECTOR = '#cardPickerOverlay, .mat-pick-banner';
 const LIFT_SHADOW_FROM = '0 0.6vh 1.2vh rgba(0, 0, 0, 0.4)';
@@ -142,50 +138,6 @@ const hudButton = (className, label, icon, onClick) => {
     onClick();
   });
   return button;
-};
-
-/** Rigid pointer tilt: eases the tilt element toward the cursor and back to rest on leave. */
-const wireTilt = (state) => {
-  const target = { x: 0, y: 0 };
-  const current = { x: 0, y: 0 };
-  let raf = null;
-
-  const frame = () => {
-    current.x += (target.x - current.x) * TILT_EASE_PER_FRAME;
-    current.y += (target.y - current.y) * TILT_EASE_PER_FRAME;
-    state.tiltEl.style.setProperty('--focus-tilt-x', `${current.x.toFixed(3)}deg`);
-    state.tiltEl.style.setProperty('--focus-tilt-y', `${current.y.toFixed(3)}deg`);
-    const settled =
-      Math.abs(target.x - current.x) < TILT_REST_DEG &&
-      Math.abs(target.y - current.y) < TILT_REST_DEG;
-    raf = settled ? null : requestAnimationFrame(frame);
-  };
-  const kick = () => {
-    if (raf == null) raf = requestAnimationFrame(frame);
-  };
-  const onMove = (event) => {
-    const { rotateX, rotateY } = tiltFromPointer(
-      state.host.getBoundingClientRect(),
-      event.clientX,
-      event.clientY,
-      TILT_MAX_DEG
-    );
-    target.x = rotateX;
-    target.y = rotateY;
-    kick();
-  };
-  const onLeave = () => {
-    target.x = 0;
-    target.y = 0;
-    kick();
-  };
-  state.host.addEventListener('pointermove', onMove, { passive: true });
-  state.host.addEventListener('pointerleave', onLeave, { passive: true });
-  return () => {
-    state.host.removeEventListener('pointermove', onMove);
-    state.host.removeEventListener('pointerleave', onLeave);
-    if (raf != null) cancelAnimationFrame(raf);
-  };
 };
 
 const startOpenAnimations = (state, from, to) => {
@@ -392,7 +344,6 @@ export function openCardFocus({
     lowerHand(state);
     hideSource(state);
     state.cleanups = [
-      wireTilt(state),
       watchForPickers(),
     ];
     window.addEventListener('resize', onResize);

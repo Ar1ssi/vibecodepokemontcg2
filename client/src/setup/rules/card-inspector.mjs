@@ -619,8 +619,31 @@ const applyAffordances = (state, model) => {
  * once-per-turn, rules-off and "a benched Pokémon cannot attack" — the model is the only place
  * that decision is made, so nothing is re-derived here.
  */
+const ACTION_PANEL_SELECTOR =
+  '.ptcg-stadium[data-ptcg-stadium], .ptcg-atk[data-ptcg-attack], .ptcg-ability, .ptcg-stat[data-ptcg-retreat]';
+
 const wirePanelClicks = (state) => {
-  state.wrap.addEventListener('click', (event) => {
+  // A press and release that land on different children (cursor drift, hover repaint) make the
+  // browser dispatch the click on their common ancestor, where `closest` finds no panel. Fall back
+  // to the panel the press started on.
+  let pressedTarget = null;
+  state.wrap.addEventListener(
+    'pointerdown',
+    (event) => {
+      pressedTarget = event.target;
+    },
+    true
+  );
+  state.wrap.addEventListener('click', (rawEvent) => {
+    const event = {
+      target: rawEvent.target.closest?.(ACTION_PANEL_SELECTOR)
+        ? rawEvent.target
+        : pressedTarget?.closest?.(ACTION_PANEL_SELECTOR)
+          ? pressedTarget
+          : rawEvent.target,
+      stopPropagation: () => rawEvent.stopPropagation(),
+    };
+    pressedTarget = null;
     const stadiumPanel = event.target.closest?.('.ptcg-stadium[data-ptcg-stadium]');
     if (stadiumPanel) {
       if (!state.model.usable) return;
