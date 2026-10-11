@@ -158,6 +158,37 @@ describe('067 — card-focus.css', () => {
     );
   });
 
+  it('rows and both shadows are the game sprites, behind the row content', () => {
+    const { borders } = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../../assets/attack-ui/attack-ui.json', import.meta.url)), 'utf8')
+    );
+    for (const sprite of ['atkOv_Action_BG', 'atkOv_Action_BG_Disabled', 'atkOv_Action_Shadow']) {
+      const b = borders[sprite];
+      assert.deepEqual([b.top, b.right, b.bottom, b.left], [16, 16, 16, 16], sprite);
+    }
+    const tile = focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk::before');
+    assert.ok(tile.includes("row-bg.png') 16 fill / calc(var(--tu) * 0.24) stretch;"));
+    assert.ok(tile.includes('z-index: -1;'));
+    const shadow = focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk::after');
+    assert.ok(shadow.includes("row-shadow.png') 16 fill / calc(var(--tu) * 0.24) stretch;"));
+    assert.ok(shadow.includes('z-index: -2;'));
+    assert.ok(shadow.includes('opacity: 0.502;'));
+    assert.ok(
+      focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk--recede::before').includes('row-bg-off.png')
+    );
+    // The row must be its own stacking context, or the negative z-index sprites fall behind the list backing.
+    assert.ok(focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk').includes('isolation: isolate;'));
+
+    const card = borders.atkOV_CardShadow;
+    assert.deepEqual([card.top, card.right, card.bottom, card.left], [15, 15, 15, 15]);
+    const listShadow = focus('.card-focus__card .ptcg-chrome--focus .ptcg-frame--focus::after');
+    assert.ok(listShadow.includes("list-shadow.png') 15 fill / calc(var(--tu) * 0.6) stretch;"));
+    assert.ok(listShadow.includes('transform: translateZ(calc(var(--tu) * -1.5));'));
+    assert.ok(
+      focus('.card-focus__card .ptcg-chrome--focus .ptcg-frame--focus').includes('transform-style: preserve-3d;')
+    );
+  });
+
   it('rows are the prefab at scale 0.75: a 0.75-unit titlebar', () => {
     const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk > .ptcg-atk__head');
     assert.match(decls, /--bar-h: calc\(var\(--tu\) \* 0\.75\);/);

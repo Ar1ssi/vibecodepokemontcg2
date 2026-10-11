@@ -54,6 +54,12 @@ export function spriteMap() {
   ui('list-bg.png', 'atkOv_BG.png');
   ui('list-cap.png', 'atkOv_Brdr_T.png');
   ui('list-bar.png', 'atkOv_Brdr_B2.png');
+  // A row's tile (plain white once it cannot be used) and the two shadow masks; the game tints the
+  // masks, so they are white with the shape in alpha.
+  ui('row-bg.png', 'atkOv_Action_BG.png');
+  ui('row-bg-off.png', 'atkOv_Action_BG_Disabled.png');
+  ui('row-shadow.png', 'atkOv_Action_Shadow.png');
+  ui('list-shadow.png', 'atkOV_CardShadow.png');
   rows.push({ out: 'ability-tag-on.png', from: 'badge', source: 'atkOV_AbilityTag_On_EN.png' });
   rows.push({ out: 'ability-tag-off.png', from: 'badge', source: 'atkOV_AbilityTag_Off_EN.png' });
   return rows;
