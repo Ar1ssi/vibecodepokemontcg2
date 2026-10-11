@@ -45,6 +45,18 @@ export function spriteMap() {
   ui('retreat-disable.png', 'atkOv_RetreatBtn_Disable.png');
   ui('bar-gx.png', 'atkOv_TitlebarGX.png');
   ui('bar-gx-off.png', 'atkOv_TitlebarGX_Off.png');
+  // VSTAR Power entries: their own titlebar and damage tabs, and the "VSTAR Power" strip over the bar
+  // (an end sprite on each side of a centre tile, each with a greyed variant).
+  ui('bar-vstar.png', 'atkOV_Titlebar_VStar.png');
+  ui('bar-vstar-short.png', 'atkOV_Titlebar_VStar_Short.png');
+  ui('dmg-vstar.png', 'atkOv_DmgBG_VStar.png');
+  ui('dmg-vstar-short.png', 'atkOv_DmgBG_VStar_Short.png');
+  ui('dmg-vstar-empty.png', 'atkOv_DmgBG_Empty_VStar.png');
+  ui('dmg-vstar-empty-short.png', 'atkOv_DmgBG_Empty_VStar_Short.png');
+  ui('vpower-end.png', 'atkOv_Titlebar_VPowerBar_End.png');
+  ui('vpower-center.png', 'atkOv_Titlebar_VPowerBar_Center.png');
+  ui('vpower-end-off.png', 'atkOv_Titlebar_VPowerBar_Disabled_End.png');
+  ui('vpower-center-off.png', 'atkOv_Titlebar_VPowerBar_Disabled_Center.png');
   ui('dmg.png', 'atkOv_DmgBG.png');
   ui('dmg-short.png', 'atkOv_DmgBG_Short.png');
   ui('dmg-empty.png', 'atkOv_DmgBG_Empty.png');

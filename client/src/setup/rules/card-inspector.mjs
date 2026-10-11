@@ -188,18 +188,23 @@ const stadiumEl = (model) => {
   return section;
 };
 
+// AttackOption's VPowerBar: the gold strip that titles a VSTAR Power entry.
+const vstarPowerStrip = () => el('span', 'ptcg-atk__vpower', 'VSTAR Power');
+
 // TCG Live's ability entry: a type-coloured titlebar with the name above an "Ability" tag sprite.
-// A passive ability is a flat tinted bar, a spent one a plain bar with the tag switched off.
+// A passive ability is the ability header tinted with the type colour, a spent one a plain bar with
+// the tag switched off, a VSTAR Power the VSTAR titlebar under its strip.
 const abilityEl = (ability, cardType) => {
   const section = el(
     'section',
     `ptcg-ability${ability.recede ? ' ptcg-ability--recede' : ''}${
       ability.passive ? ' ptcg-ability--passive' : ''
-    }`
+    }${ability.vstar ? ' ptcg-ability--vstar' : ''}`
   );
   section.dataset.ptcgType = barTypeKey(cardType);
 
   const head = el('div', 'ptcg-atk__head');
+  if (ability.vstar) head.appendChild(vstarPowerStrip());
   head.appendChild(el('span', 'ptcg-atk__name', ability.name));
   head.appendChild(el('span', 'ptcg-atk__badge', 'Ability'));
   section.appendChild(head);
@@ -219,6 +224,7 @@ const attackEl = (attack, cardType) => {
   // TCG Live swaps in a shorter titlebar and damage tab when the attack prints effect text.
   if (attack.text) classes.push('ptcg-atk--text');
   if (attack.gx) classes.push('ptcg-atk--gx');
+  if (attack.vstar) classes.push('ptcg-atk--vstar');
   const section = el('section', classes.join(' '));
   // The delegated click handler resolves which attack was hit from this, so the panel stays
   // addressable across re-renders that replace the whole chrome subtree.
@@ -227,6 +233,7 @@ const attackEl = (attack, cardType) => {
 
   // Name over the cost row on the left, the damage tab on the right (AttackOption's layout).
   const head = el('div', 'ptcg-atk__head');
+  if (attack.vstar) head.appendChild(vstarPowerStrip());
   head.appendChild(el('span', 'ptcg-atk__name', attack.name));
   const cost = el('span', 'ptcg-atk__right');
   for (const symbol of attack.cost)

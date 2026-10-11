@@ -24,6 +24,7 @@ import {
 import {
   parseAttackDamage,
   isGxAttack,
+  isVstarPowerAttack,
 } from '../../../../shared/engine/rules/damage-parser.mjs';
 import { parseTypeValue } from '../../../../shared/engine/rules/rules-state.mjs';
 import {
@@ -505,6 +506,8 @@ export function buildInspectorModel(card, ctx = {}) {
       text: String(raw?.text ?? raw?.effect ?? ''),
       // TCG Live gives GX attacks their own titlebar.
       gx: isGxAttack(raw),
+      // ...and VSTAR Power attacks theirs, under a "VSTAR Power" strip.
+      vstar: isVstarPowerAttack(raw),
       damageLabel: damageLabel == null ? null : damageLabel,
       printedLabel: printed,
       payable,
@@ -540,6 +543,7 @@ export function buildInspectorModel(card, ctx = {}) {
         name: abilityInfo.name,
         text: String(rawAbility.text ?? ''),
         passive: !activated,
+        vstar: isVstarPowerAttack(rawAbility),
         usable: activated && Boolean(abilityInfo.usable) && interactive,
         reason: abilityInfo.reason ?? null,
         recede: activated && interactive && !abilityInfo.usable,

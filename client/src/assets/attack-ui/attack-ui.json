@@ -87,6 +87,16 @@
     "ink": "#ffffff",
     "inkOff": "#000000"
   },
+  "vstar": {
+    "ink": "#ffffff",
+    "inkOff": "#000000",
+    "titlebar": "atkOV_Titlebar_VStar",
+    "titlebarShort": "atkOV_Titlebar_VStar_Short",
+    "dmg": "atkOv_DmgBG_VStar",
+    "dmgShort": "atkOv_DmgBG_VStar_Short",
+    "dmgEmpty": "atkOv_DmgBG_Empty_VStar",
+    "dmgEmptyShort": "atkOv_DmgBG_Empty_VStar_Short"
+  },
   "borders": {
     "atkOV_AbilityTag_Off": {
       "left": 0,

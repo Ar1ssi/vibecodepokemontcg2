@@ -13,7 +13,7 @@
 
 ## Open (newest first)
 - I244 2026-10-11 P3 [tests] coin-flip-ceremony.test.mjs "several flips toss one after another..." is load-sensitive: failed 2 of 3 full `pnpm test` runs (1.5 s), passes 7/7 alone; no shared files with design 067
-- I243 2026-10-11 P3 [board-ui] attack-ui sprites not ported: VSTAR bars, passive-ability atkOv_Ability_BG mask, weak/resist tiles, atkOv_Brdr_B1, buff/debuff arrows, modal-drawer set (refs: scripts/attack-ui, design 067)
+- I243 2026-10-11 P3 [board-ui] attack-ui sprites not ported, each blocked on something other than the sprite: buff/debuff arrows + weakness/resistance damage tint (statusArrow_Up/Down, atkOv_DmgMod_Bg) need the attack's damage split into printed base / bonus / reduction / weakness — the model only has the pre-weakness total; atkOv_Brdr_B1 and the `_Modal` set have no consumer until the action-list drawer exists (I242). VSTAR layout inferred, not traced: strip ink, VSTAR ability height, mask scale (refs: scripts/attack-ui, design 067)
 - I242 2026-10-11 P3 [board-ui] Card focus covers own Active only: Bench abilities, opponent Active (scene pose y=14 scale 3 tilted), buff/debuff HUD buttons and the action-list drawer are not built (refs: D208, design 067)
 - I241 2026-10-01 P3 [rules] Some TCGdex ability entries are empty ({type} only: neo2-49 Unown M, neo3-35 Parasect, ecard2-95a Mr. Mime, ex16-84/86…), so those cards still have no ability live (I233 follow-up)
 - I240 2026-10-01 P2 [client] rules-bridge.js ~2981 announces and auto-runs a played Pokémon's ability steps; now that Powers/Bodies load, old wordings that parse as draw/when-played steps may fire on play — audit (I233 follow-up)

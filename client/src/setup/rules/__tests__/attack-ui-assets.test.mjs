@@ -100,6 +100,58 @@ describe('attack-ui palette', () => {
     assert.match(normalized, /bar-gx-off\.png'\) 0 18 0 480 fill/);
   });
 
+  it('VSTAR bars and damage tabs are the registry sprites, sliced on their borders', () => {
+    const { vstar, borders } = TABLE;
+    assert.deepEqual(
+      [vstar.titlebar, vstar.titlebarShort, vstar.dmg, vstar.dmgShort, vstar.dmgEmpty, vstar.dmgEmptyShort],
+      [
+        'atkOV_Titlebar_VStar',
+        'atkOV_Titlebar_VStar_Short',
+        'atkOv_DmgBG_VStar',
+        'atkOv_DmgBG_VStar_Short',
+        'atkOv_DmgBG_Empty_VStar',
+        'atkOv_DmgBG_Empty_VStar_Short',
+      ]
+    );
+    for (const name of [vstar.titlebar, vstar.titlebarShort]) {
+      const b = borders[name];
+      assert.deepEqual([b.left, b.right, b.height], [28, 878, 173], name);
+    }
+    assert.match(normalized, /bar-vstar\.png'\) 0 878 0 28 fill/);
+    assert.equal(vstar.ink, '#ffffff');
+    assert.equal(vstar.inkOff, '#000000');
+
+    // [sprite, rule selector, left, right, whether the rule restates the left border]
+    const tabs = [
+      [vstar.dmg, '.ptcg-atk--vstar > .ptcg-atk__head, .ptcg-ability--vstar > .ptcg-atk__head', 41, 22, true],
+      [vstar.dmgShort, '.ptcg-atk--vstar.ptcg-atk--text > .ptcg-atk__head', 44, 22, true],
+      [
+        vstar.dmgEmpty,
+        '.ptcg-atk--vstar.ptcg-atk--recede > .ptcg-atk__head, .ptcg-ability--vstar.ptcg-ability--recede > .ptcg-atk__head',
+        32,
+        26,
+        true,
+      ],
+      [vstar.dmgEmptyShort, '.ptcg-atk--vstar.ptcg-atk--text.ptcg-atk--recede > .ptcg-atk__head', 32, 32, false],
+    ];
+    for (const [sprite, selector, left, right, restatesLeft] of tabs) {
+      const b = borders[sprite];
+      assert.deepEqual([b.left, b.right], [left, right], sprite);
+      const decls = ruleFor(selector);
+      assert.ok(decls, `no rule for ${selector}`);
+      assert.match(decls, new RegExp(`--atk-dmg-r: ${right};`), selector);
+      if (restatesLeft) assert.match(decls, new RegExp(`--atk-dmg-l: ${left};`), selector);
+    }
+  });
+
+  it('the passive ability header masks on the atkOv_Ability_BG borders', () => {
+    const b = TABLE.borders.atkOv_Ability_BG;
+    assert.deepEqual([b.top, b.right, b.bottom, b.left], [13, 16, 3, 16]);
+    const decls = ruleFor('.ptcg-ability--passive > .ptcg-atk__head::before');
+    assert.ok(decls, 'no passive ability header rule');
+    assert.match(decls, /mask-border: url\('\.\.\/assets\/attack-ui\/ability-bg\.png'\) 13 16 3 16 fill/);
+  });
+
   it('an unusable attack bar is the white that the recede filter turns into the game cantUse grey', () => {
     assert.equal(TABLE.cantUse.bar, '#d4d4d4');
     assert.match(ruleFor('.ptcg-atk--recede > .ptcg-atk__head'), /background: #ffffff;/);

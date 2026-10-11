@@ -451,6 +451,26 @@ test('model: attack.gx follows the GX name marker', () => {
   );
 });
 
+// Marker wording: corpus out/pkmn-*-cards.json VSTAR rows, as read by isVstarPowerAttack.
+test('model: vstar follows the VSTAR Power marker on an attack and on an ability', () => {
+  const marker = "(You can't use more than 1 VSTAR Power in a game.)";
+  const card = {
+    ...ARCANINE,
+    ability: { name: 'Star Portal', text: `During your turn, you may do this. ${marker}` },
+    attacks: [
+      { name: 'Star Requiem', cost: ['Fire'], damage: '', text: marker },
+      { name: 'Raging Claws', cost: ['Fire'], damage: '30', text: '' },
+    ],
+  };
+  const m = buildInspectorModel(card, { energyTypes: THREE_FIRE });
+  assert.deepEqual(
+    m.attacks.map((a) => a.vstar),
+    [true, false]
+  );
+  assert.equal(m.ability.vstar, true);
+  assert.equal(buildInspectorModel(CHARMANDER, { energyTypes: ['Fire'] }).ability.vstar, false);
+});
+
 test('model: no ability leaves the field null rather than an empty object', () => {
   const m = buildInspectorModel(ARCANINE, { energyTypes: THREE_FIRE });
   assert.equal(m.ability, null);

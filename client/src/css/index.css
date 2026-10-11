@@ -5498,6 +5498,88 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   border-image: url('../assets/attack-ui/bar-gx.png') 0 19 0 480 fill / 0 calc(var(--bar-h) * 19 / 106) 0
     calc(var(--bar-h) * 480 / 106) stretch;
 }
+/* A VSTAR Power attack or ability: the bar is 230 units tall instead of 200 (titleBarHeight_V), the
+   extra 30 holding the "VSTAR Power" strip, and wears its own titlebar and damage tabs. The titlebar
+   art sits in the 878px right border of a 908 x 173 sprite, so the bar stretches on the left. */
+.ptcg-atk--vstar > .ptcg-atk__head,
+.ptcg-ability--vstar > .ptcg-atk__head {
+  --bar-h-v: calc(var(--bar-h) * 1.15);
+  --atk-ink: #ffffff;
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar.png');
+  --atk-dmg-l: 41;
+  --atk-dmg-r: 22;
+  --atk-vpower-end: url('../assets/attack-ui/vpower-end.png');
+  --atk-vpower-center: url('../assets/attack-ui/vpower-center.png');
+  grid-template-rows: calc(var(--bar-h) * 0.15) 1fr 1fr;
+  grid-template-areas: 'vpower dmg' 'name dmg' 'cost dmg';
+  min-height: var(--bar-h-v);
+}
+.ptcg-ability--vstar > .ptcg-atk__head { grid-template-areas: 'vpower' 'name' 'cost'; }
+.ptcg-atk--vstar.ptcg-atk--text > .ptcg-atk__head {
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar-short.png');
+  --atk-dmg-l: 44;
+  --atk-dmg-r: 22;
+}
+.ptcg-atk--vstar > .ptcg-atk__head::before,
+.ptcg-ability--vstar > .ptcg-atk__head::before {
+  border-width: 0 calc(var(--bar-h-v) * 878 / 173) 0 calc(var(--bar-h-v) * 28 / 173);
+  border-image: url('../assets/attack-ui/bar-vstar.png') 0 878 0 28 fill / 0 calc(var(--bar-h-v) * 878 / 173) 0
+    calc(var(--bar-h-v) * 28 / 173) stretch;
+}
+.ptcg-atk--vstar.ptcg-atk--text > .ptcg-atk__head::before,
+.ptcg-ability--vstar > .ptcg-atk__head::before {
+  border-image-source: url('../assets/attack-ui/bar-vstar-short.png');
+}
+/* The tab runs the bar's full height, so its edges scale with the taller bar. */
+.ptcg-atk--vstar > .ptcg-atk__head > .ptcg-atk__dmg {
+  border-width: 0 calc(var(--bar-h-v) * var(--atk-dmg-r) / 106) 0 calc(var(--bar-h-v) * var(--atk-dmg-l) / 106);
+  border-image-width: 0 calc(var(--bar-h-v) * var(--atk-dmg-r) / 106) 0
+    calc(var(--bar-h-v) * var(--atk-dmg-l) / 106);
+}
+/* The game draws a usable VSTAR Power's name outlined. */
+.ptcg-atk--vstar:not(.ptcg-atk--recede) > .ptcg-atk__head > .ptcg-atk__name,
+.ptcg-ability--vstar:not(.ptcg-ability--recede) > .ptcg-atk__head > .ptcg-atk__name {
+  text-shadow:
+    0 0 calc(var(--bar-h) * 0.03) #000,
+    0 calc(var(--bar-h) * 0.015) calc(var(--bar-h) * 0.02) #000;
+}
+/* VPowerBar: 40 of the 230 units, over the top of the bar and stopping at the damage tab. An end
+   sprite 300 units wide closes each side (the right one mirrored) around the centre tile, which
+   spans the middle 80%. */
+.ptcg-atk__vpower {
+  grid-area: vpower;
+  position: relative;
+  isolation: isolate;
+  align-self: start;
+  display: grid;
+  place-items: center;
+  height: calc(var(--bar-h) * 0.2);
+  margin-left: calc(var(--bar-h) * -0.25);
+  background: var(--atk-vpower-center) center / 80% 100% no-repeat;
+  color: #2b1d00;
+  font-size: calc(var(--bar-h) * 0.13);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ptcg-atk__vpower::before,
+.ptcg-atk__vpower::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(calc(var(--bar-h) * 1.5), 50%);
+  background: var(--atk-vpower-end) center / 100% 100% no-repeat;
+}
+.ptcg-atk__vpower::after {
+  left: auto;
+  right: 0;
+  transform: scaleX(-1);
+}
 /* An attack the player cannot use loses its sprite: the game draws a plain light bar (its cantUse
    grey, #d4d4d4) with black ink and an empty damage tab. The panel's recede filter dims what is
    drawn by brightness .84 / contrast .94, so white here lands on that grey. */
@@ -5519,6 +5601,19 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   border-width: 0 calc(var(--bar-h) * 18 / 106) 0 calc(var(--bar-h) * 480 / 106);
   border-image: url('../assets/attack-ui/bar-gx-off.png') 0 18 0 480 fill / 0 calc(var(--bar-h) * 18 / 106) 0
     calc(var(--bar-h) * 480 / 106) stretch;
+}
+/* A spent or unpayable VSTAR Power keeps the VSTAR tab shape, emptied, under the greyed strip. */
+.ptcg-atk--vstar.ptcg-atk--recede > .ptcg-atk__head,
+.ptcg-ability--vstar.ptcg-ability--recede > .ptcg-atk__head {
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty.png');
+  --atk-dmg-l: 32;
+  --atk-dmg-r: 26;
+  --atk-vpower-end: url('../assets/attack-ui/vpower-end-off.png');
+  --atk-vpower-center: url('../assets/attack-ui/vpower-center-off.png');
+}
+.ptcg-atk--vstar.ptcg-atk--text.ptcg-atk--recede > .ptcg-atk__head {
+  --atk-dmg: url('../assets/attack-ui/dmg-vstar-empty-short.png');
+  --atk-dmg-r: 32;
 }
 .ptcg-atk--usable:hover > .ptcg-atk__head,
 .ptcg-ability--usable:hover > .ptcg-atk__head { filter: brightness(1.12) saturate(1.08); }
@@ -5543,7 +5638,8 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   height: calc(var(--bar-h) * 0.38);
 }
 /* Abilities show the game's "Ability" tag sprite where an attack shows its cost; the badge text is
-   kept for screen readers. A passive ability is a flat bar tinted with the type colour. */
+   kept for screen readers. A passive ability is the game's ability header (atkOv_Ability_BG, a
+   white round-topped mask) tinted with the type colour. */
 .ptcg-ability > .ptcg-atk__head > .ptcg-atk__badge {
   grid-area: cost;
   justify-self: start;
@@ -5556,11 +5652,15 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
   color: transparent;
   font-size: 0;
 }
-.ptcg-ability--passive > .ptcg-atk__head {
+/* The mask's 16px sides, 13px top and 3px bottom are drawn at the row tile's 50 px per unit; where
+   no mask-border is supported the header stays a plain tinted bar. */
+.ptcg-ability--passive > .ptcg-atk__head::before {
+  border-width: calc(var(--bar-h) * 0.26) calc(var(--bar-h) * 0.32) calc(var(--bar-h) * 0.06);
+  border-image: none;
   background: var(--atk-color);
-  border-radius: calc(var(--bar-h) * 0.12);
+  -webkit-mask-box-image: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
+  mask-border: url('../assets/attack-ui/ability-bg.png') 13 16 3 16 fill stretch;
 }
-.ptcg-ability--passive > .ptcg-atk__head::before { display: none; }
 .ptcg-ability--recede > .ptcg-atk__head { --atk-ink: #000000; }
 .ptcg-ability--recede > .ptcg-atk__head::before { display: none; }
 .ptcg-ability--recede > .ptcg-atk__head > .ptcg-atk__badge {

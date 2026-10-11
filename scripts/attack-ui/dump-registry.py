@@ -77,7 +77,10 @@ retreat = r.sprites()
 cant_use, cant_use_ink = r.color(), r.color()
 r.pptr(), r.pptr()  # GX headers
 gx_ink, gx_off_ink = r.color(), r.color()
-assert r.pos == len(r.raw) - 6 * 12 - 32, "registry layout drifted from the C# field order"
+vstar_bar, vstar_bar_short = r.pptr(), r.pptr()
+vstar_dmg, vstar_dmg_short, vstar_dmg_empty, vstar_dmg_empty_short = r.pptr(), r.pptr(), r.pptr(), r.pptr()
+vstar_ink, vstar_off_ink = r.color(), r.color()
+assert r.pos == len(r.raw), "registry layout drifted from the C# field order"
 
 borders = {}
 for sprite in sprites1.values():
@@ -96,6 +99,12 @@ result = {
     },
     "cantUse": {"bar": cant_use, "ink": cant_use_ink},
     "gx": {"ink": gx_ink, "inkOff": gx_off_ink},
+    "vstar": {
+        "ink": vstar_ink, "inkOff": vstar_off_ink,
+        "titlebar": vstar_bar, "titlebarShort": vstar_bar_short,
+        "dmg": vstar_dmg, "dmgShort": vstar_dmg_short,
+        "dmgEmpty": vstar_dmg_empty, "dmgEmptyShort": vstar_dmg_empty_short,
+    },
     "borders": dict(sorted(borders.items())),
 }
 with open(out, "w", encoding="utf-8", newline="\n") as handle:
