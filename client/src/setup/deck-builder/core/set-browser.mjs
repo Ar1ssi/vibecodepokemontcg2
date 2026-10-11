@@ -16,9 +16,9 @@ const TCGDEX_BASE = tcgdexApiBase();
     "category": "other"
   },
   {
-    "series": "sv",
-    "setId": "sv05",
-    "name": "Temporal Forces"
+    "series": "me",
+    "setId": "30th",
+    "name": "30th Celebration"
   },
   {
     "series": "sv",

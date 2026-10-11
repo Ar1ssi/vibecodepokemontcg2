@@ -17,11 +17,11 @@ import test from 'node:test';
     
       const ids = registry.map((entry) => entry.setId);
       // Scarlet & Violet sets
-      for (const id of ['sv03.5', 'sv05', 'sv06', 'sv06.5', 'sv07', 'sv08', 'sv08.5', 'sv09', 'sv10', 'sv10.5b', 'sv10.5w', 'svp']) {
+      for (const id of ['sv03.5', 'sv06', 'sv06.5', 'sv07', 'sv08', 'sv08.5', 'sv09', 'sv10', 'sv10.5b', 'sv10.5w', 'svp']) {
         assert.ok(ids.includes(id), `missing ${id}`);
       }
       // Mega Evolution series — all sets post September 2025 are legal
-      for (const id of ['me01', 'me02', 'me02.5', 'me03', 'me04', 'me05', 'mee', 'mep']) {
+      for (const id of ['me01', 'me02', 'me02.5', 'me03', 'me04', 'me05', 'mee', 'mep', '30th']) {
         assert.ok(ids.includes(id), `missing ${id}`);
       }
       // McDonald's Collection
