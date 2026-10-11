@@ -5,4 +5,4 @@
 # Parked — S264 batch leftovers (tracked as issues, not increments)
 #5 "basic prompt gone" → I87 · #6 match logging → I85 (design 028) · #4 30th anniversary → I86 (design 029).
 
-# oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 4/6 done (WebGL stage, lab page /src/dev/attack-fx-lab.html, rec-attack-impact.mjs); next: slice 5 combat integration
+# oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 5/6 done (combat integration, rec-attack-hit.mjs e2e); next: slice 6 visual pass, full tests, review, close

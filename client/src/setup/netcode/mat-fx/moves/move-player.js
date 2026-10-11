@@ -219,13 +219,14 @@ const runBeat = (beat, index, ctx, local, progress, info) => {
 /**
  * Play `spec` from `attacker` to `defender` (`rect` in parent-viewport px, `src` the card
  * art, `turn` the board's rotation in degrees, `element` the real card to hide while its
- * ghost moves). Announces the contact moment on `impacts` (combat.js's queue) when given.
+ * ghost moves). Announces the contact moment on `impacts` (combat.js's queue) when given;
+ * `strikeContext` rides along on that announcement (design 068: the impact prefab's type).
  * @param {{spec: object, attacker: {rect: object, src: string, turn?: number, element?: Element|null},
  *   defender: {rect: object, src: string, turn?: number, element?: Element|null},
- *   seed?: number, impacts?: {strikeIn: Function}|null, attackerCard?: object|null}} opts
+ *   seed?: number, impacts?: {strikeIn: Function}|null, attackerCard?: object|null, strikeContext?: object|null}} opts
  * @returns {{holdMs:number, durationMs:number, contactMs:number}|null} null when nothing could play
  */
-export function playMove({ spec, attacker, defender, seed = 1, impacts = null, attackerCard = null }) {
+export function playMove({ spec, attacker, defender, seed = 1, impacts = null, attackerCard = null, strikeContext = null }) {
   const from = attacker?.rect;
   const to = defender?.rect;
   if (!spec || !from || !to || !attacker.src || !defender.src) return null;
@@ -303,6 +304,7 @@ export function playMove({ spec, attacker, defender, seed = 1, impacts = null, a
     attackerCard,
     move: spec.id,
     family: spec.family,
+    ...strikeContext,
   });
 
   const stageOpts = { cx: hostRect.width / 2, cy: hostRect.height / 2, size, duration: durationMs };
