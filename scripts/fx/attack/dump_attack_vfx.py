@@ -466,6 +466,8 @@ class Dumper:
                 tree.pop("m_GameObject", None)
                 self.resolve_shape_refs(cab, tree)
                 entry["particleSystem"] = tree
+                # Path ids are 64-bit: as strings they survive a JSON round trip through JS.
+                entry["particleSystemId"] = str(component_id)
             elif kind == "ParticleSystemRenderer":
                 tree.pop("m_GameObject", None)
                 tree["m_Materials"] = [self.material(cab, m) for m in tree.get("m_Materials", [])]
@@ -497,6 +499,8 @@ class Dumper:
         for slot in ("m_MeshRenderer", "m_SkinnedMeshRenderer", "m_SpriteRenderer", "m_Sprite"):
             if slot in shape:
                 shape[slot] = bool((shape[slot] or {}).get("m_PathID"))
+        for sub in tree.get("SubModule", {}).get("subEmitters", []):
+            sub["emitter"] = str((sub.get("emitter") or {}).get("m_PathID", 0))
         sprites = tree.get("UVModule", {}).get("sprites")
         if sprites is not None:
             tree["UVModule"]["sprites"] = len([s for s in sprites if (s.get("sprite") or {}).get("m_PathID")])
