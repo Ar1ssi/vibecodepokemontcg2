@@ -1478,3 +1478,13 @@ body.fx-off .fx-mega-field {
   --fx-move-deep: 124, 138, 150;
   --fx-move-core: 200, 210, 218;
 }
+
+/* Design 068: the WebGL canvas TCG Live's attack-impact prefabs draw on. One canvas over the
+   viewport, above the move scene and the hit dressing, under the damage number. */
+.fx-impact-stage {
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2456;
+}

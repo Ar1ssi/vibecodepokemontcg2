@@ -134,10 +134,12 @@ const lookups = { materialIndex: (id) => (id === 'mat-a' ? 0 : 1), meshId: (id) 
 
 test('normalizePrefab keeps what can show and drops the rest', () => {
   const root = node('Root', {
+    position: [0, 0, -7.18],
+    scale: [2, 2, 2],
     particleSystem: particleSystem({ EmissionModule: moduleOff }),
     particleRenderer: renderer({ m_Enabled: false }),
     children: [
-      node('Shown', { particleSystem: particleSystem(), particleRenderer: renderer() }),
+      node('Shown', { position: [0, 1, 0], particleSystem: particleSystem(), particleRenderer: renderer() }),
       node('Hidden', { active: false, particleSystem: particleSystem(), particleRenderer: renderer() }),
       node('NoRenderer', { particleSystem: particleSystem(), particleRenderer: renderer({ m_Enabled: false }) }),
       node('Mesh', { particleSystem: particleSystem(), particleRenderer: renderer({ m_RenderMode: 4, m_UseCustomVertexStreams: true }) }),
@@ -145,6 +147,9 @@ test('normalizePrefab keeps what can show and drops the rest', () => {
   });
   const prefab = normalizePrefab(root, lookups);
   assert.equal(prefab.ps, undefined);
+  // The game clears the root's saved transform on spawn; children keep theirs.
+  assert.deepEqual([prefab.p, prefab.s], [[0, 0, 0], [1, 1, 1]]);
+  assert.deepEqual(prefab.c[0].p, [0, 1, 0]);
   assert.deepEqual(prefab.c.map((child) => child.n), ['Shown', 'NoRenderer', 'Mesh']);
   const [shown, bare, mesh] = prefab.c;
   assert.equal(shown.ps.em.bursts[0].n, 3);

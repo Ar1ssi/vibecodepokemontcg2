@@ -265,7 +265,8 @@ export function normalizeRenderer(renderer, { materialIndex, meshId }) {
 /**
  * A prefab root → the node tree the runtime plays. Inactive subtrees are dropped; a system that
  * can never show anything (no emission and not a sub-emitter, or no enabled renderer and no
- * sub-emitters of its own) keeps its transform only.
+ * sub-emitters of its own) keeps its transform only. The root's own transform is dropped: the
+ * game resets it when it spawns the prefab (`_CoreUtils.ParentAndClear`), whatever was saved.
  */
 export function normalizePrefab(root, lookups) {
   const subEmitters = new Set();
@@ -277,7 +278,10 @@ export function normalizePrefab(root, lookups) {
   collect(root);
 
   const build = (node) => {
-    const out = { n: node.name, p: node.position.map((v) => round(v)), q: node.rotation.map((v) => round(v, 6)), s: node.scale.map((v) => round(v)) };
+    const out =
+      node === root
+        ? { n: node.name, p: [0, 0, 0], q: [0, 0, 0, 1], s: [1, 1, 1] }
+        : { n: node.name, p: node.position.map((v) => round(v)), q: node.rotation.map((v) => round(v, 6)), s: node.scale.map((v) => round(v)) };
     const system = node.particleSystem;
     const renderer = node.particleRenderer;
     const isSub = subEmitters.has(node.particleSystemId);

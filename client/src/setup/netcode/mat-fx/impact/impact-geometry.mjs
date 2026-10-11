@@ -83,14 +83,14 @@ function baseRotation(system, particle, camera, align) {
 }
 
 /**
- * A billboard turns clockwise on screen for a positive angle (the opposite of a Transform),
- * so its Z angle is negated; a mesh particle takes its Euler angles as they are, and with a
- * single angle spins about its Y axis.
+ * A particle's own rotation in its alignment frame: Euler angles, or one angle about Z (the
+ * axis a quad or a flat mesh faces along). Facing the camera, a positive angle turns it
+ * clockwise on screen — the opposite of a Transform — so the Z angle is negated there.
  */
-function particleRotation(particle, mesh) {
+function particleRotation(particle, align) {
   const [x, y, z] = particle.rot;
-  if (mesh) return particle.threeAxis ? quatEuler(x, y, z) : quatAxisAngle(UP, z);
-  return particle.threeAxis ? quatEuler(x, y, -z) : quatAxisAngle([0, 0, 1], -z);
+  const roll = align === ALIGN.VIEW || align === ALIGN.FACING ? -z : z;
+  return particle.threeAxis ? quatEuler(x, y, roll) : quatAxisAngle([0, 0, 1], roll);
 }
 
 /** Scale that keeps a billboard between the renderer's min / max share of the view height. */
@@ -167,9 +167,9 @@ const quadUvs = (rect) => QUAD_CORNERS.map(([x, y]) => [rect[0] + (x + 0.5) * re
 function billboard(writer, system, particle, camera, streams) {
   const { renderer, spec } = system;
   let rotation;
-  if (renderer.mode === RENDER.HORIZONTAL) rotation = quatMul(quatEuler(90 * DEG, 0, 0), particleRotation(particle, false));
-  else if (renderer.mode === RENDER.VERTICAL) rotation = quatMul(quatLook([0, 0, -1], UP), particleRotation(particle, false));
-  else rotation = quatMul(baseRotation(system, particle, camera, renderer.align), particleRotation(particle, false));
+  if (renderer.mode === RENDER.HORIZONTAL) rotation = quatMul(quatEuler(90 * DEG, 0, 0), particleRotation(particle, ALIGN.VIEW));
+  else if (renderer.mode === RENDER.VERTICAL) rotation = quatMul(quatLook([0, 0, -1], UP), particleRotation(particle, ALIGN.VIEW));
+  else rotation = quatMul(baseRotation(system, particle, camera, renderer.align), particleRotation(particle, renderer.align));
   const fit = screenSizeScale(renderer, particle, camera);
   const width = particle.size[0] * fit;
   const height = particle.size[1] * fit;
@@ -199,7 +199,7 @@ function stretched(writer, system, particle, camera, streams) {
 
 function meshParticle(writer, system, particle, camera, streams, mesh) {
   const { renderer, spec } = system;
-  const rotation = quatMul(baseRotation(system, particle, camera, renderer.align), particleRotation(particle, true));
+  const rotation = quatMul(baseRotation(system, particle, camera, renderer.align), particleRotation(particle, renderer.align));
   const rect = frameRect(spec.uv, particle.frame);
   const tint = particle.color;
   const first = writer.vertex;
