@@ -36,6 +36,7 @@ import {
   setDefaultNetcodeContext,
   resetRenderState,
   getLastRenderedVersion,
+  claimGameEndChat,
 } from '../../setup/netcode/apply-view.js';
 import {
   handleAdvisoryEvent,
@@ -542,8 +543,8 @@ export const initializeSocketEventListeners = () => {
       (reason === 'server_restart'
         ? 'Game session terminated due to server restart.'
         : 'The game has ended.');
-    appendMessage('', msg, 'announcement', false);
     if (reason === 'server_restart') {
+      appendMessage('', msg, 'announcement', false);
       const connectedRoom = document.getElementById('connectedRoom');
       const lobby = document.getElementById('lobby');
       if (connectedRoom) connectedRoom.style.display = 'none';
@@ -552,25 +553,12 @@ export const initializeSocketEventListeners = () => {
       systemState.roomId = null;
       removeSyncIntervals();
       document.dispatchEvent(new CustomEvent('room-changed'));
-    } else {
-      const rulesEndScreen = document.getElementById('rulesEndScreen');
-      if (rulesEndScreen) {
-        const titleEl = rulesEndScreen.querySelector('.rules-end-title');
-        const reasonEl = rulesEndScreen.querySelector('.rules-end-reason');
-        if (titleEl) titleEl.textContent = 'Game Over';
-        if (reasonEl) reasonEl.textContent = reason || msg;
-        rulesEndScreen.hidden = false;
-      }
-      document.dispatchEvent(
-        new CustomEvent('rules-game-ended', {
-          detail: {
-            winner: data?.winner,
-            reason: data?.reason,
-            message: msg,
-          },
-        })
-      );
+      return;
     }
+    // The server re-sends this with every resync of an ended game. The end screen
+    // and its 'rules-game-ended' event belong to applyView (reconcileGameEnded),
+    // which shows them once; this handler only adds the server's chat line, once.
+    if (claimGameEndChat()) appendMessage('', msg, 'announcement', false);
   });
 
   socket.on('requestAction', (data) => {

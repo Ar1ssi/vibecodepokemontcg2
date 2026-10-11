@@ -104,6 +104,12 @@ let announcedChoiceId = null;
 let lastOverlayOptions = null;
 let resizeListenerBound = false;
 
+// An ended game is announced once. Later views of the same ended game (a manual
+// card tool, a rejected-then-resent command) and the server's `gameEnded`, which
+// it re-sends with every resync, must not bring the end screen or its chat line back.
+let gameEndAnnounced = false;
+let gameEndChatClaimed = false;
+
 const PLAY_ZONES = ['active', 'bench'];
 
 // Zones legacy move-card.js gives a holofoil wrapper; stadium and attached cards
@@ -229,6 +235,8 @@ export function resetRenderState() {
   openMatChoiceId = null;
   announcedChoiceId = null;
   lastOverlayOptions = null;
+  gameEndAnnounced = false;
+  gameEndChatClaimed = false;
   defaultNetcodeContext = {
     socket: null,
     roomId: null,
@@ -1974,7 +1982,22 @@ export function reconcileTurnState(view, options = {}) {
 }
 
 /**
+ * Claims the one chat announcement an ended game gets. The server re-sends
+ * `gameEnded` with every resync of an ended game (tab focus, visibility change,
+ * desync recovery); only the first may post to chat. Re-armed by the next view
+ * of a game that is not over, and by `resetRenderState`.
+ *
+ * @returns {boolean} True the first time per ended game
+ */
+export function claimGameEndChat() {
+  if (gameEndChatClaimed) return false;
+  gameEndChatClaimed = true;
+  return true;
+}
+
+/**
  * Renders or removes the Game Ended modal and dispatches win/loss announcements.
+ * Once per ended game: a modal the player closed stays closed.
  *
  * @param {object} view Authoritative redacted view
  * @param {object} [options={}]
@@ -1992,6 +2015,8 @@ export function reconcileGameEnded(view, options = {}) {
     : null;
 
   if (!view || view.turn?.phase !== 'ended') {
+    gameEndAnnounced = false;
+    gameEndChatClaimed = false;
     if (existingModal?.parentNode) {
       existingModal.parentNode.removeChild(existingModal);
     }
@@ -2013,6 +2038,9 @@ export function reconcileGameEnded(view, options = {}) {
   if (existingChoiceBanner?.parentNode)
     existingChoiceBanner.parentNode.removeChild(existingChoiceBanner);
   closeChoicePicker(options);
+
+  if (gameEndAnnounced) return;
+  gameEndAnnounced = true;
 
   const localPlayerId = view.you?.playerId || null;
   const isWinner = Boolean(
@@ -2036,13 +2064,10 @@ export function reconcileGameEnded(view, options = {}) {
     ? `Reason: ${view.winReason}`
     : 'The game has ended.';
 
-  // If rulesEndScreen exists from HTML/EJS, synchronize and display it
+  // The legacy rules end screen is a second full-screen overlay. Under the
+  // server this modal is the end screen, so one Close uncovers the board.
   if (rulesEndScreen) {
-    const title = rulesEndScreen.querySelector?.('.rules-end-title');
-    const reason = rulesEndScreen.querySelector?.('.rules-end-reason');
-    if (title) title.textContent = titleText;
-    if (reason) reason.textContent = reasonText;
-    rulesEndScreen.hidden = false;
+    rulesEndScreen.hidden = true;
   }
 
   // Mount or update netcodeEndModal

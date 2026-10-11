@@ -2363,6 +2363,9 @@ import { glowColorFor } from './card-glow-colors.mjs';
     
       const showEnd = (event) => {
         if (!rulesState.enabled || rulesState.phase !== 'ended') return;
+        // Under the server, applyView's #netcodeEndModal is the end screen; this
+        // one on top of it is a second overlay to close before Reset is reachable.
+        if (systemState.isTwoPlayer && systemState.serverAuthoritative) return;
         const reason = el.querySelector('.rules-end-reason');
         const customReason = event?.detail?.reason;
         if (reason) {

@@ -9,6 +9,7 @@ import {
   setDefaultNetcodeContext,
   getDefaultNetcodeContext,
   reconcileGameEnded,
+  claimGameEndChat,
   reconcileTurnState,
   hasAuthoritativeView,
   getAuthoritativeZoneArray,
@@ -805,7 +806,7 @@ test('Finding 12: applyView mounts Victory modal and dispatches rules-game-ended
   assert.equal(doc.getElementById('netcodeEndModal'), null);
 });
 
-test('Finding 12: applyView mounts Defeat modal and synchronizes rulesEndScreen when opponent wins', () => {
+test('Finding 12: applyView mounts Defeat modal as the only end overlay when opponent wins', () => {
   const { doc, mockGetZone } = setupMockDom();
   const rulesEndScreen = doc.registerElement('rulesEndScreen', doc.createElement('div'));
   rulesEndScreen.hidden = true;
@@ -837,10 +838,8 @@ test('Finding 12: applyView mounts Defeat modal and synchronizes rulesEndScreen 
   assert.equal(title.textContent, 'Defeat');
   assert.ok(title.classList.contains('loser'));
 
-  // Existing rulesEndScreen should also be synchronized
-  assert.equal(rulesEndScreen.hidden, false);
-  assert.equal(rulesTitle.textContent, 'Defeat');
-  assert.equal(rulesReason.textContent, 'Reason: deck-out');
+  // The legacy end screen would be a second full-screen overlay over the Reset button.
+  assert.equal(rulesEndScreen.hidden, true);
 
   // Next non-ended view should clean up the end modals
   const activeView = {
@@ -857,6 +856,86 @@ test('Finding 12: applyView mounts Defeat modal and synchronizes rulesEndScreen 
 
   assert.equal(doc.getElementById('netcodeEndModal'), null);
   assert.equal(rulesEndScreen.hidden, true);
+});
+
+test('an ended game is announced once: later views of it leave a closed end screen closed', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const endEvents = [];
+  doc.dispatchEvent = (event) => {
+    if (event.type === 'rules-game-ended') endEvents.push(event);
+    return true;
+  };
+  let callbacks = 0;
+  const options = { document: doc, getZone: mockGetZone, onGameEnded: () => (callbacks += 1) };
+  const endedView = (stateVersion) => ({
+    gameId: 'room-once',
+    stateVersion,
+    turn: { phase: 'ended', player: 'p1' },
+    winner: 'p1',
+    winReason: 'all prize cards taken',
+    you: { playerId: 'p1', username: 'Ash', zones: {} },
+    them: { playerId: 'p2', username: 'Gary', zones: {} },
+  });
+
+  applyView(endedView(20), [], options);
+  doc.getElementById('netcodeEndModal').querySelector('#netcodeEndCloseBtn').dispatchEvent({ type: 'click' });
+  assert.equal(doc.getElementById('netcodeEndModal'), null);
+
+  // A manual card tool used after the game ended bumps stateVersion on the same ended game.
+  assert.equal(applyView(endedView(21), [], options).applied, true);
+  assert.equal(applyView(endedView(22), [], options).applied, true);
+
+  assert.equal(doc.getElementById('netcodeEndModal'), null, 'closed end screen must stay closed');
+  assert.equal(endEvents.length, 1, 'rules-game-ended fires once per ended game');
+  assert.equal(callbacks, 1, 'onGameEnded fires once per ended game');
+});
+
+test('the end screen is re-armed by a reset, so the next game announces its own ending', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const options = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, phase) => ({
+    gameId: 'room-rematch',
+    stateVersion,
+    turn: { phase, player: 'p1' },
+    winner: phase === 'ended' ? 'p2' : null,
+    winReason: phase === 'ended' ? 'deck-out' : null,
+    you: { playerId: 'p1', username: 'Ash', zones: {} },
+    them: { playerId: 'p2', username: 'Gary', zones: {} },
+  });
+
+  applyView(view(30, 'ended'), [], options);
+  assert.ok(doc.getElementById('netcodeEndModal'));
+
+  // Reset: the server sends a fresh setup view while the old end screen is still up.
+  applyView(view(31, 'setup'), [], options);
+  assert.equal(doc.getElementById('netcodeEndModal'), null, 'reset takes the end screen down');
+
+  applyView(view(32, 'ended'), [], options);
+  assert.ok(doc.getElementById('netcodeEndModal'), 'the rematch shows its own end screen');
+});
+
+test('claimGameEndChat: the server re-sends gameEnded on every resync, the chat line posts once per ended game', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const options = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, phase) => ({
+    gameId: 'room-chat',
+    stateVersion,
+    turn: { phase, player: 'p1' },
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  });
+
+  applyView(view(40, 'ended'), [], options);
+  assert.equal(claimGameEndChat(), true, 'first gameEnded posts');
+  assert.equal(claimGameEndChat(), false, 'resync after tab focus must not post again');
+  assert.equal(claimGameEndChat(), false);
+
+  // The identical view a resync returns is dropped by the version guard and re-arms nothing.
+  assert.equal(applyView(view(40, 'ended'), [], options).applied, false);
+  assert.equal(claimGameEndChat(), false);
+
+  applyView(view(41, 'setup'), [], options);
+  assert.equal(claimGameEndChat(), true, 'the game after a reset gets its own line');
 });
 
 test('Finding 12: reconcileGameEnded export directly handles spectator view', () => {

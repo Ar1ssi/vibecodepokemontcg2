@@ -13,6 +13,7 @@ import { removeImages } from '../../setup/image-logic/remove-images.js';
 import { getZone } from '../../setup/zones/get-zone.js';
 import { hideZoneElements } from './close-popups.js';
 import { cancelPrizeTake } from '../zones/prize-take-prompt.js';
+import { clearBoardCounters } from '../counters/clear-board-counters.mjs';
 import { updateCount } from './count.js';
 import { clearReady } from './ready.js';
 import { resetDealOrder } from '../../setup/netcode/deal-order.js';
@@ -47,24 +48,14 @@ export const reset = (
     removeImages(stadium.element);
   }
   if (user === 'self') {
-    selfContainerDocument
-      .querySelectorAll('.self-circle, .opp-circle, .self-tab, .opp-tab')
-      .forEach((element) => {
-        element.textContent = '0';
-        element.handleRemove(false);
-      });
+    clearBoardCounters(selfContainerDocument);
     selfContainerDocument
       .querySelectorAll('.used-special-move')
       .forEach((element) => {
         element.classList.remove('used-special-move');
       });
   } else {
-    oppContainerDocument
-      .querySelectorAll('.self-circle, .opp-circle, .self-tab, .opp-tab')
-      .forEach((element) => {
-        element.textContent = '0';
-        element.handleRemove(false);
-      });
+    clearBoardCounters(oppContainerDocument);
     oppContainerDocument
       .querySelectorAll('.used-special-move')
       .forEach((element) => {
