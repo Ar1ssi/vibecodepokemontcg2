@@ -10,7 +10,7 @@
 // rather than stall, so committed holds are capped by `maxQueueMs` — past that
 // budget every hold collapses to 0 until the queue goes idle and the budget
 // resets. `schedule` and `now` are injected so tests run on a fake clock.
-// Design 063: a full attack is banner 1600 + a tier-3 move's hold ≤ 1240 + damage
+// Design 063: a full attack is banner 2000 + a tier-3 move's hold ≤ 1240 + damage
 // 180 + status 260 + knockout 900; the budget covers that chain so only what
 // follows a knockout collapses.
 const DEFAULT_MAX_QUEUE_MS = 3800;
@@ -23,18 +23,41 @@ export const createFxQueue = ({
   schedule,
   cancel = () => {},
   maxQueueMs = DEFAULT_MAX_QUEUE_MS,
+  // ms the head plan must still wait before it starts, asked once per plan when its
+  // turn comes (the turn banner waiting out an attack scene that outlasts its hold).
+  leadIn = () => 0,
 }) => {
   const queue = [];
   let timer = null;
   let committedMs = 0;
+  let headLed = false;
+  let idleWaiters = [];
   // Bumped by clear(); `step` checks it after `run` so an effect that clears
   // the queue synchronously (one that dispatches `game-restarted`, say) cannot
   // have a fresh timer armed on top of the stop it just requested.
   let epoch = 0;
 
+  const releaseIdleWaiters = () => {
+    const waiters = idleWaiters;
+    idleWaiters = [];
+    for (const resolve of waiters) resolve();
+  };
+
   const idle = () => {
     timer = null;
     committedMs = 0;
+    releaseIdleWaiters();
+  };
+
+  // A lead is not a hold: it does not spend the flood budget, and a throwing or
+  // NaN `leadIn` must not wedge the chain.
+  const leadOf = (plan) => {
+    if (headLed) return 0;
+    try {
+      return holdOf(leadIn(plan));
+    } catch {
+      return 0;
+    }
   };
 
   // Runs one plan, then arms the wait for whatever comes next. The timer is
@@ -45,8 +68,15 @@ export const createFxQueue = ({
   // call must still not wedge the chain, hence holdOf + try.
   const step = () => {
     timer = null;
+    if (queue.length === 0) return idle();
+    const lead = leadOf(queue[0]);
+    if (lead > 0) {
+      headLed = true;
+      timer = schedule(step, lead);
+      return;
+    }
+    headLed = false;
     const plan = queue.shift();
-    if (!plan) return idle();
     const startedIn = epoch;
     let hold = 0;
     try {
@@ -88,7 +118,16 @@ export const createFxQueue = ({
       }
       queue.length = 0;
       committedMs = 0;
+      headLed = false;
+      releaseIdleWaiters();
     },
+
+    /** Resolves once nothing is queued and the last plan's hold has run out (or on clear). */
+    whenIdle: () =>
+      new Promise((resolve) => {
+        if (timer === null && queue.length === 0) resolve();
+        else idleWaiters.push(resolve);
+      }),
 
     pending: () => queue.length,
   };

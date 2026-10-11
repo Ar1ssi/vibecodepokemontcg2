@@ -8,10 +8,15 @@ import { BANNER_MS } from './flow-pose.mjs';
 
 export const DEFAULT_HOLD_MS = 0;
 
+// The beat between the attack's name banner leaving and its move scene starting.
+export const ATTACK_SCENE_GAP_MS = 400;
+// The beat between the move scene ending and the next turn's banner.
+export const TURN_AFTER_ATTACK_GAP_MS = 700;
+
 export const HOLD_MS = {
   // Design 063: the move scene starts once the attack's name banner has left the
   // screen, so the banner is read on its own and the move is watched on its own.
-  'attack-banner': BANNER_MS,
+  'attack-banner': BANNER_MS + ATTACK_SCENE_GAP_MS,
   attack: 240,
   damage: 180,
   status: 260,
@@ -41,6 +46,21 @@ export const HOLD_MS = {
   'coin-flip': 2250,
   'game-over': 0,
 };
+
+/**
+ * How long the turn banner still waits at the head of the queue: an attack's hold ends at
+ * contact, so its scene outlasts it and the banner would otherwise play over the scene.
+ *
+ * @param {object} plan
+ * @param {number} sceneEndsAt when the last attack scene ends (same clock as `now`)
+ * @param {number} now
+ * @returns {number} ms
+ */
+export function turnBannerLead(plan, sceneEndsAt, now) {
+  if (plan?.kind !== 'fx' || plan.effect !== 'turn-banner') return 0;
+  if (!Number.isFinite(sceneEndsAt) || !Number.isFinite(now)) return 0;
+  return Math.max(0, sceneEndsAt + TURN_AFTER_ATTACK_GAP_MS - now);
+}
 
 /** Hold for an effect name; unknown names pace as 0 (play immediately). */
 export const holdFor = (effect) =>

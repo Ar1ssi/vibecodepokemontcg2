@@ -221,12 +221,97 @@ test('fx-queue: a blocking plan (coin ceremony) keeps its hold past the budget a
 });
 
 test('fx-queue: the default budget (design 063) fits banner + tier-3 move + damage + status; only what follows a knockout collapses', () => {
-  const holds = [1600, 1240, 180, 260, 900, 320];
+  const holds = [2000, 1240, 180, 260, 900, 320];
   let next = 0;
   const { queue, clock } = make(() => holds[next++]);
   for (let i = 0; i < holds.length; i += 1) queue.push({ id: i });
   clock.drain();
-  // Waits are the PREVIOUS plan's hold: 1600 + 1240 + 180 + 260 = 3280 < 3800 keeps the knockout's 900,
+  // Waits are the PREVIOUS plan's hold: 2000 + 1240 + 180 + 260 = 3680 < 3800 keeps the knockout's 900,
   // which then crosses the budget, so the prize claim's own hold collapses to nothing.
-  assert.deepEqual(clock.delays, [1600, 1240, 180, 260, 900, 0]);
+  assert.deepEqual(clock.delays, [2000, 1240, 180, 260, 900, 0]);
+});
+
+test('fx-queue: a lead-in delays the head plan once, without spending the budget', () => {
+  const ran = [];
+  const asked = [];
+  const { queue, clock } = make(
+    (p) => {
+      ran.push(p.id);
+      return p.hold;
+    },
+    {
+      maxQueueMs: 1000,
+      leadIn: (p) => {
+        asked.push(p.id);
+        return p.lead;
+      },
+    }
+  );
+  queue.push({ id: 'attack', hold: 300 });
+  queue.push({ id: 'turn', hold: 200, lead: 900 });
+  queue.push({ id: 'draw', hold: 100 });
+  assert.deepEqual(ran, ['attack']);
+  clock.tick();
+  assert.deepEqual(ran, ['attack'], 'the turn banner waits its lead instead of starting');
+  assert.equal(queue.pending(), 2);
+  clock.tick();
+  assert.deepEqual(ran, ['attack', 'turn']);
+  clock.drain();
+  assert.deepEqual(ran, ['attack', 'turn', 'draw']);
+  assert.deepEqual(clock.delays, [300, 900, 200, 100]);
+  assert.deepEqual(asked, ['attack', 'turn', 'draw'], 'each plan is asked for its lead once');
+});
+
+test('fx-queue: a lead-in that throws or is not a number starts the plan at once', () => {
+  const ran = [];
+  const { queue, clock } = make((p) => ran.push(p.id) && 0, {
+    leadIn: (p) => {
+      if (p.id === 'a') throw new Error('boom');
+      return NaN;
+    },
+  });
+  queue.push({ id: 'a' });
+  queue.push({ id: 'b' });
+  clock.drain();
+  assert.deepEqual(ran, ['a', 'b']);
+});
+
+test('fx-queue: clear during a lead-in drops the waiting plan and the next plan is asked afresh', () => {
+  const ran = [];
+  const { queue, clock } = make((p) => ran.push(p.id) && 0, { leadIn: (p) => p.lead });
+  queue.push({ id: 'turn', lead: 500 });
+  assert.deepEqual(ran, []);
+  queue.clear();
+  assert.equal(clock.armed, null);
+  queue.push({ id: 'next', lead: 400 });
+  assert.deepEqual(ran, [], 'the new head still waits its own lead');
+  clock.tick();
+  assert.deepEqual(ran, ['next']);
+});
+
+test('fx-queue: whenIdle resolves at once when idle, else after the last hold runs out', async () => {
+  const { queue, clock } = make((p) => p.hold);
+  let settled = 0;
+  await queue.whenIdle();
+  queue.push({ id: 'wait', hold: 3900 });
+  queue.push({ id: 'draw', hold: 1200 });
+  const idle = queue.whenIdle().then(() => {
+    settled += 1;
+  });
+  clock.tick();
+  await Promise.resolve();
+  assert.equal(settled, 0, 'the draw is still holding');
+  clock.tick();
+  await idle;
+  assert.equal(settled, 1);
+});
+
+test('fx-queue: whenIdle resolves when the queue is cleared', async () => {
+  const { queue } = make(() => 5000);
+  queue.push({ id: 'a' });
+  queue.push({ id: 'b' });
+  const idle = queue.whenIdle();
+  queue.clear();
+  await idle;
+  assert.equal(queue.pending(), 0);
 });

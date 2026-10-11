@@ -26,11 +26,11 @@ import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
-import { afterImpact } from './mat-fx/combat.js';
+import { afterImpact, attackSceneEndsAt } from './mat-fx/combat.js';
 import { playDeckReveal } from './mat-fx/deck-reveal.js';
 import { playFxSound } from './mat-fx/fx-audio.js';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
-import { holdFor } from './mat-fx/fx-holds.mjs';
+import { holdFor, turnBannerLead } from './mat-fx/fx-holds.mjs';
 import { drawSceneHold } from './mat-fx/draw-scene.mjs';
 import { flightSrcOf } from './mat-fx/card-flight.mjs';
 import { captureOrigins, discardOrigins, knockoutStack } from './mat-fx/origins.mjs';
@@ -264,6 +264,7 @@ const fxQueue = createFxQueue({
   run: runPlan,
   schedule: (fn, ms) => setTimeout(fn, ms),
   cancel: (id) => clearTimeout(id),
+  leadIn: (plan) => turnBannerLead(plan, attackSceneEndsAt(), performance.now()),
 });
 
 // Two ways choreography must stop mid-chain (edge 11):
@@ -288,6 +289,23 @@ if (typeof document !== 'undefined') {
 export function holdFxQueue(ms) {
   if (!(ms > 0)) return;
   fxQueue.push({ kind: 'wait', ms, blocking: true });
+}
+
+/**
+ * Resolves once every queued effect has played out its hold (the opening deal, so the
+ * Starting Active picker opens after it instead of over it). The backstop keeps a caller
+ * that gates input on this from waiting forever.
+ *
+ * @returns {Promise<void>}
+ */
+export function whenFxQueueIdle() {
+  return new Promise((resolve) => {
+    const backstop = setTimeout(resolve, HELD_DRAW_BACKSTOP_MS);
+    fxQueue.whenIdle().then(() => {
+      clearTimeout(backstop);
+      resolve();
+    });
+  });
 }
 
 /**

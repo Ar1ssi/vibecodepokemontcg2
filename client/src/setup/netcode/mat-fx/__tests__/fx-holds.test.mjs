@@ -1,7 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BANNER_MS } from '../flow-pose.mjs';
-import { DEFAULT_HOLD_MS, HOLD_MS, holdFor } from '../fx-holds.mjs';
+import {
+  ATTACK_SCENE_GAP_MS,
+  DEFAULT_HOLD_MS,
+  HOLD_MS,
+  TURN_AFTER_ATTACK_GAP_MS,
+  holdFor,
+  turnBannerLead,
+} from '../fx-holds.mjs';
 
 test('fx-holds: every hold is a non-negative finite number', () => {
   for (const [effect, ms] of Object.entries(HOLD_MS)) {
@@ -26,7 +33,24 @@ test('fx-holds: a table entry inherited from Object.prototype is not a hold', ()
   assert.equal(holdFor('constructor'), DEFAULT_HOLD_MS);
 });
 
-test('fx-holds: the move scene starts after the name banner has left (design 063)', () => {
-  assert.equal(holdFor('attack-banner'), BANNER_MS);
+test('fx-holds: the move scene starts a beat after the name banner has left (design 063)', () => {
+  assert.ok(ATTACK_SCENE_GAP_MS > 0);
+  assert.equal(holdFor('attack-banner'), BANNER_MS + ATTACK_SCENE_GAP_MS);
   assert.equal(BANNER_MS, 1600);
+});
+
+test('fx-holds: the turn banner waits out a running attack scene plus a beat', () => {
+  const banner = { kind: 'fx', effect: 'turn-banner' };
+  assert.equal(turnBannerLead(banner, 5000, 4200), 800 + TURN_AFTER_ATTACK_GAP_MS);
+  assert.equal(turnBannerLead(banner, 5000, 5000), TURN_AFTER_ATTACK_GAP_MS);
+  assert.equal(turnBannerLead(banner, 5000, 5000 + TURN_AFTER_ATTACK_GAP_MS), 0);
+  assert.equal(turnBannerLead(banner, 0, 90000), 0, 'no attack scene played');
+});
+
+test('fx-holds: only the turn banner takes a lead, and a bad clock gives none', () => {
+  assert.equal(turnBannerLead({ kind: 'fx', effect: 'damage' }, 5000, 4200), 0);
+  assert.equal(turnBannerLead({ kind: 'draw' }, 5000, 4200), 0);
+  assert.equal(turnBannerLead(null, 5000, 4200), 0);
+  assert.equal(turnBannerLead({ kind: 'fx', effect: 'turn-banner' }, NaN, 4200), 0);
+  assert.equal(turnBannerLead({ kind: 'fx', effect: 'turn-banner' }, 5000, undefined), 0);
 });

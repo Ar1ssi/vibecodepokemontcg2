@@ -82,6 +82,15 @@ const combatSrc = (instanceId, registry) => {
   return element?.currentSrc || element?.src || peekCombatOrigin(instanceId)?.src || null;
 };
 
+// When the last attack scene ends (performance.now clock); its queue hold ends earlier, at contact.
+let attackSceneEnd = 0;
+const markAttackScene = (durationMs) => {
+  attackSceneEnd = performance.now() + durationMs;
+};
+
+/** When the last attack scene ends, on the `performance.now()` clock (0 before any attack). */
+export const attackSceneEndsAt = () => attackSceneEnd;
+
 /** Queue `job(ctx)` to run when the current batch's attack connects. */
 export const afterImpact = (job) => impacts.add(job);
 
@@ -310,6 +319,7 @@ const moveSide = (instanceId, rect, src, registry) => {
 const playLunge = (plan, registry, card, from, to, src) => {
   const pose = lungePoseFor(from, to);
   if (!pose) return 0;
+  markAttackScene(LUNGE_MS);
   impacts.strikeIn(LUNGE_MS * LUNGE_IMPACT, {
     direction: attackAngleDeg(from, to),
     attackerCard: card,
@@ -358,9 +368,13 @@ export const attack = (plan) => {
       impacts: { strikeIn: announceStrike },
       attackerCard: card,
     });
-    if (played) return played.holdMs;
+    if (played) {
+      markAttackScene(played.durationMs);
+      return played.holdMs;
+    }
   }
   if (isZeroDamage(plan) || !to) {
+    markAttackScene(AURA_PULSE_MS);
     playAuraPulse(from, card ? brighten(fxRgbForCard(card), 0.3) : FX_NEUTRAL_RGB);
     return;
   }
@@ -376,7 +390,10 @@ export const attack = (plan) => {
       impacts: { strikeIn: announceStrike },
       attackerCard: card,
     });
-    if (played) return played.holdMs;
+    if (played) {
+      markAttackScene(played.durationMs);
+      return played.holdMs;
+    }
   }
   return playLunge(plan, registry, card, from, to, src);
 };

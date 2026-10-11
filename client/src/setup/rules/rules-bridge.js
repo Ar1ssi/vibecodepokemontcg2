@@ -95,7 +95,7 @@ import {
 } from './mat-coin.js';
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
-import { holdFxQueue } from '../netcode/advisory-animations.js';
+import { holdFxQueue, whenFxQueueIdle } from '../netcode/advisory-animations.js';
 import { playFxSound, playUiCue } from '../netcode/mat-fx/fx-audio.js';
 import {
   hasAuthoritativeView,
@@ -178,6 +178,8 @@ import { glowColorFor } from './card-glow-colors.mjs';
 
     const STARTING_ACTIVE_MAX_PROMPT_RETRIES = 3;
     const OPENING_HAND_TIMEOUT_MS = 20000;
+    // The beat between the turn-order coin leaving the screen and the opening deal.
+    const OPENING_DEAL_GAP_MS = 300;
 
     // Events that can bring the opening hand onto the board.
     const OPENING_VIEW_EVENTS = [
@@ -816,6 +818,11 @@ import { glowColorFor } from './card-glow-colors.mjs';
         }
         if (session !== rulesSessionGeneration || startingActiveFinished) return;
 
+        // The hand is in state before its deal has played: the picker opens once
+        // the coin ceremony and the opening draw are off the screen, not over them.
+        await whenFxQueueIdle();
+        if (session !== rulesSessionGeneration || startingActiveFinished) return;
+
         const promptPlayerActive = async (user, title) => {
           if (session !== rulesSessionGeneration) return;
           if (liveZoneArray(user, 'active').length > 0) {
@@ -1074,9 +1081,9 @@ import { glowColorFor } from './card-glow-colors.mjs';
         isRemote: false,
       });
       // The server deals right after this result: the opening hands fly in once
-      // the ceremony starts to fade, not underneath it.
+      // the ceremony has faded out, not underneath it.
       const opening = coinCeremonyTimeline(1);
-      holdFxQueue(e2eDelayMs(opening.totalMs - opening.fadeMs));
+      holdFxQueue(e2eDelayMs(opening.totalMs + OPENING_DEAL_GAP_MS));
 
       serverTurnOrderStarter = starter;
       const session = rulesSessionGeneration;
