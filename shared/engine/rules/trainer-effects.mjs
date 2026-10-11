@@ -803,6 +803,13 @@ function parseSearchDeckKind(lower) {
   if (/search your deck for a basic energy card/.test(lower) && lower.includes('into your hand')) {
     return { what: 'Basic Energy', count: 1, destination: 'hand' };
   }
+  // Crispin (Prismatic Evolutions 171): 1 pick goes to the hand, the other onto a Pokémon.
+  const splitEnergy = lower.match(
+    /search your deck for up to (\d+) basic energy cards of different types, reveal them, and put 1 of them into your hand\. attach the other to 1 of your pokémon/
+  );
+  if (splitEnergy) {
+    return { what: 'Basic Energy', count: Number(splitEnergy[1]), destination: 'hand', upTo: true, reveal: true, distinctTypes: true, attachRest: true };
+  }
   const basicEnergyHand = lower.match(/search your deck for up to\s+(\d+)\s+basic energy cards/);
   if (basicEnergyHand && lower.includes('into your hand')) {
     return { what: 'Basic Energy', count: Number(basicEnergyHand[1]), destination: 'hand', upTo: true };
@@ -3419,6 +3426,7 @@ function describeStepBody(step) {
         step.destination === 'bench' ? 'put on Bench'
         : step.destination === 'attach' ? (step.attachTarget === 'evolved' ? 'attach to the Pokémon you evolved' : 'attach to a Pokémon')
         : step.destination === 'deckTop' ? 'put on top of your deck in any order'
+        : step.attachRest ? 'add 1 to hand, attach the other to a Pokémon'
         : 'add to hand';
       const kind = [
         step.what,

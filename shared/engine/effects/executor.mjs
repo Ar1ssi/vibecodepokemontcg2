@@ -21,7 +21,7 @@ import { matchesSearch } from '../rules/search-match.mjs';
 import { isVCard } from '../rules/card-classify.mjs';
 import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import { healLocked } from '../rules/attack-markers.mjs';
-import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
+import { classifyEnergyEffect, resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import {
   isSingleStrikeCard,
   isEvolutionCard,
@@ -229,7 +229,13 @@ function keepDistinctNames(deck, selection) {
 function keepDistinctTypes(deck, selection) {
   const kept = [];
   for (const id of selection) {
-    const typesOf = (cardId) => (deck.find((c) => c.instanceId === cardId)?.types || []).map((t) => String(t).toLowerCase());
+    const typesOf = (cardId) => {
+      const card = deck.find((c) => c.instanceId === cardId);
+      // A Basic Energy card's type is the Energy it provides (Crispin); its `types` is often empty.
+      // 'Colorless' is the resolver's "unknown" answer: no Basic Energy provides it.
+      const types = isEnergy(card) ? [resolveAttachedEnergyType(card)].filter((t) => t !== 'Colorless') : card?.types || [];
+      return types.map((t) => String(t).toLowerCase());
+    };
     // A card whose types have not loaded cannot be checked; it is kept (matchesHpCap's rule).
     const types = [...kept, id].map(typesOf).filter((list) => list.length > 0);
     if (canAssignDistinctTypes(types)) kept.push(id);
@@ -745,6 +751,65 @@ export function executeSteps(draft, {
           }
           break;
         }
+        // Crispin: "put 1 of them into your hand. Attach the other to 1 of your Pokémon."
+        // With 2 picks the player names the hand card; a single pick goes to the hand.
+        const splitKey = `${idx}:searchSplit`;
+        if (stepSelection && context[splitKey]) {
+          const deck = player.zones.deck || [];
+          const splitCards = context[splitKey].map((id) => deck.find((c) => c.instanceId === id)).filter(Boolean);
+          delete context[splitKey];
+          const handCard = splitCards.find((c) => c.instanceId === stepSelection[0]) || splitCards[0];
+          const rest = splitCards.filter((c) => c !== handCard);
+          if (handCard) {
+            deck.splice(deck.indexOf(handCard), 1);
+            player.zones.hand.push(handCard);
+            events.push({ type: 'cardMoved', instanceId: handCard.instanceId, from: 'deck', to: 'hand', playerId });
+            events.push({
+              type: 'cardsRevealed',
+              playerId,
+              cards: splitCards.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+            });
+          }
+          const roots = attachRoots();
+          if (rest.length > 0 && roots.length > 1) {
+            return { pendingChoice: askAttachTarget(rest.map((c) => c.instanceId)), completed: false };
+          }
+          if (roots.length === 1) {
+            for (const card of rest) attachToRoot(player, card, roots[0], events);
+          }
+          finishSearch();
+          break;
+        }
+        if (stepSelection && step.attachRest && !context[attachKey]) {
+          const deck = player.zones.deck || [];
+          const validIds = [...new Set(stepSelection)].filter((id) => deck.some((c) => c.instanceId === id && cardMatches(c)));
+          const splitIds = keepDistinctTypes(deck, validIds).slice(0, maxCount);
+          if (splitIds.length > 1 && attachRoots().length > 0) {
+            context[splitKey] = splitIds;
+            return {
+              pendingChoice: createPendingChoice({
+                player: playerId,
+                prompt: `${sourceCard?.name || 'Search'}: Choose the Energy to put into your hand (the other is attached to 1 of your Pokémon)`,
+                source: sourceCard?.name || '',
+                options: deck.filter((c) => splitIds.includes(c.instanceId)),
+                min: 1,
+                max: 1,
+                stateVersion: draft.stateVersion,
+                stepIndex: idx,
+                resumeToken: {
+                  effectType,
+                  sourceInstanceId: sourceCard?.instanceId,
+                  initiatorPlayerId: playerId,
+                  stepIndex: idx,
+                  steps,
+                  context,
+                  budgetCount: budget.count,
+                },
+              }),
+              completed: false,
+            };
+          }
+        }
         if (stepSelection && context[attachKey]) {
           // Resume: the chosen Pokémon receives the searched Energy (or the next one, attachEach)
           const deck = player.zones.deck || [];
@@ -812,7 +877,9 @@ export function executeSteps(draft, {
             : step.distinctTypes
             ? keepDistinctTypes(deck, branchIds)
             : branchIds;
-          for (const sId of allowedIds) {
+          // Crispin with nothing to attach to: only the hand card leaves the deck.
+          const movedIds = step.attachRest ? allowedIds.slice(0, 1) : allowedIds;
+          for (const sId of movedIds) {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
               const benchCount = currentBench.filter((b) => !b.attachedTo).length;
