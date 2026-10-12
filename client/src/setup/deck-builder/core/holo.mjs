@@ -12,6 +12,9 @@
 // --rotate-x/y, --tilt-amount.
 
 import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/legacy-set-ids.mjs';
+import { foilCoverage, foilRecordFor } from '../../foil/tcgl-foil-manifest.mjs';
+import { foilManifestNow } from '../../foil/tcgl-foil-store.js';
+import { mountTcglFoil } from '../../foil/tcgl-foil-view.js';
 
 // Rarity (TCGdex) → simey data-rarity value (per the Bulbapedia rarity guide).
 // Returns null → no holo (plain <img>).
@@ -98,6 +101,38 @@ export function resolveHoloEffect(card = {}) {
   if (effect === 'rare holo' && /(?:^|\s)vmax$/i.test(name)) return 'vmax rare';
   if (effect === 'rare holo' && RULE_BOX_NAME.test(name)) return 'double rare';
   return effect;
+}
+
+// ── TCG Live foil (design 069) ──────────────────────────────────────
+// A card TCG Live prints decides its own foil: its base printing's foil (`'tcgl'`, the game's shader and
+// masks) or none (`null`, a NonFoil printing), whatever the TCGdex rarity says. Cards TCG Live does not
+// cover — or every card while the manifest is not loaded — keep the CSS holo above.
+export const TCGL_FOIL_RARITY = 'tcgl';
+
+const cardIdCandidates = (card) =>
+  [
+    card?.id,
+    card?.data?.id,
+    extractTcgdexIdFromImageUrl(card?.image?.src ?? card?.imageUrl ?? card?.src),
+  ].filter(Boolean);
+
+/** The TCGdex id the foil manifest knows this card by (else the first id it has, else null). */
+export function foilCardId(card, manifest = foilManifestNow()) {
+  const ids = cardIdCandidates(card);
+  return ids.find((id) => foilCoverage(manifest, id)) ?? ids[0] ?? null;
+}
+
+/** 'foil' | 'flat' | null — see foilCoverage; null for a card without any id. */
+export function tcglFoilCoverage(card, manifest = foilManifestNow()) {
+  if (!card || !manifest) return null;
+  return foilCoverage(manifest, foilCardId(card, manifest));
+}
+
+export function resolveFoilEffect(card = {}, manifest = foilManifestNow()) {
+  const coverage = tcglFoilCoverage(card, manifest);
+  if (coverage === 'foil') return TCGL_FOIL_RARITY;
+  if (coverage === 'flat') return null;
+  return resolveHoloEffect(card);
 }
 
 function resolveRarityEffect(card) {
@@ -341,8 +376,13 @@ export function isTrainerGalleryImageUrl(src) {
   );
 }
 
-// Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2.
-export function buildHoloCard(imageUrl, rarityValue, { trainer = false } = {}) {
+// Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2. Rarity 'tcgl' also
+// mounts the TCG Live foil canvas for `cardId` (else the id in the image URL); its simey layers stay hidden.
+export function buildHoloCard(
+  imageUrl,
+  rarityValue,
+  { trainer = false, cardId = null, manifest = foilManifestNow() } = {}
+) {
   const card = document.createElement('div');
   card.className = 'card';
   if (rarityValue) card.dataset.rarity = rarityValue;
@@ -391,6 +431,11 @@ export function buildHoloCard(imageUrl, rarityValue, { trainer = false } = {}) {
   translater.appendChild(rotator);
   card.appendChild(translater);
 
+  if (rarityValue === TCGL_FOIL_RARITY) {
+    const record = foilRecordFor(manifest, cardId ?? extractTcgdexIdFromImageUrl(imageUrl));
+    if (record) mountTcglFoil(card, record);
+    else card.dataset.tcglFoil = 'fallback';
+  }
   return card;
 }
 
@@ -644,8 +689,11 @@ export function startHoloAnimation(
     if (!auto && !hovering && flat) {
       lightTilt = driftTilt(now + driftOffsetMs, driftAmplitude);
     }
+    // The TCG Live foil view (design 069) shades its mesh at this same angle.
+    const foilTilt = lightTilt ?? rotateTilt;
+    card.__foilTilt = foilTilt;
     applyVars(
-      computeLightVars(lightTilt ?? rotateTilt),
+      computeLightVars(foilTilt),
       springRotate.current.x,
       springRotate.current.y,
       tiltAmountOf(rotateTilt.tiltX, rotateTilt.tiltY)
