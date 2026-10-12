@@ -48,7 +48,7 @@ export const TCGL_TO_TCGDEX_SETS = Object.freeze({
   'swsh3-5': [segment('swsh3.5')],
   'swsh4-5': [segment('swsh4.5'), segment('swsh4.5sv', 'SV')],
   'swsh7-5': [segment('cel25')],
-  'swsh7-5r': [segment('cel25cc')],
+  'swsh7-5r': [segment('cel25cc', 'CC')],
   swsh9a: [segment('swsh9tg', 'TG')],
   swsh10a: [segment('swsh10tg', 'TG')],
   swsh11a: [segment('swsh11tg', 'TG')],
@@ -64,12 +64,15 @@ export const TCGL_TO_TCGDEX_SETS = Object.freeze({
   'sv4-5': [segment('sv04.5')],
   'sv6-5': [segment('sv06.5')],
   'sv8-5': [segment('sv08.5')],
-  'rsv10-5': [segment('sv10.5b')],
-  'zsv10-5': [segment('sv10.5w')],
+  // TCG Live's "r" set ends with Reshiram ex (White Flare), its "z" set with Zekrom ex (Black Bolt).
+  'rsv10-5': [segment('sv10.5w')],
+  'zsv10-5': [segment('sv10.5b')],
   svbsp: [segment('svp')],
   sve: [segment('sve')],
   ...Object.fromEntries(['me1', 'me2', 'me3', 'me4', 'me5'].map((c) => [c, padded(c)])),
   'me2-5': [segment('me02.5')],
+  'me5-5': [segment('30th')],
+  'me5-5c': [segment('30th-c')],
   mebsp: [segment('mep')],
   mee: [segment('mee')],
 });
@@ -105,22 +108,46 @@ export function materialName(field) {
 }
 
 // Name spellings differ in punctuation, accents and symbols between TCG Live and TCGdex
-// ("Pikachu-EX" / "Pikachu EX", "Flabébé", "Ultra Necrozma ◇" / "Prism Star").
+// ("Pikachu-EX" / "Pikachu EX", "Flabébé", "Giratina {*}" / "Giratina ◇", "Basic {G} Energy" / "Grass Energy").
 const SYMBOL_WORDS = [
-  [/◇/g, 'prismstar'],
+  [/◇|\{\*\}/g, 'prismstar'],
   [/[★☆]/g, 'star'],
   [/δ/g, 'deltaspecies'],
 ];
+const ENERGY_SYMBOLS = {
+  G: 'grass',
+  R: 'fire',
+  W: 'water',
+  L: 'lightning',
+  P: 'psychic',
+  F: 'fighting',
+  D: 'darkness',
+  M: 'metal',
+  Y: 'fairy',
+  N: 'dragon',
+  C: 'colorless',
+};
 
 export function canonicalName(name) {
   let value = String(name ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '');
   for (const [pattern, word] of SYMBOL_WORDS) value = value.replace(pattern, word);
+  value = value.replace(/\{([A-Z])\}/g, (match, letter) => ` ${ENERGY_SYMBOLS[letter] ?? match} `);
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// Spellings of one card that differ only by a qualifier: TCGdex adds the pictured person
+// ("Professor's Research (Professor Magnolia)") and "LV.X" to Level-Up names; basic Energy may drop "Basic".
+const looseName = (name) => {
+  const withoutQualifier = String(name ?? '').replace(/\s*\([^)]*\)\s*$/, '');
+  return canonicalName(withoutQualifier).replace(/lvx$/, '').replace(/^basic(?=\w+energy$)/, '');
+};
+
 export function namesMatch(a, b) {
   const left = canonicalName(a);
-  return left.length > 0 && left === canonicalName(b);
+  if (!left) return false;
+  if (left === canonicalName(b)) return true;
+  const loose = looseName(a);
+  return loose.length > 0 && loose === looseName(b);
 }
 
 const localNumber = (localId, prefix) => {
@@ -131,6 +158,14 @@ const localNumber = (localId, prefix) => {
 const numericRun = (localId) => {
   const match = /(\d+)/.exec(String(localId ?? ''));
   return match ? Number(match[1]) : null;
+};
+
+// Last resort for a set TCG Live numbers in its own order (30th Classic Collection): a name printed exactly
+// once in the TCG Live set and exactly once in the mapped TCGdex sets is the same card.
+const uniqueNameMatch = (card, tcglCards, everyCard) => {
+  if (tcglCards.filter((other) => namesMatch(card.name, other.name)).length !== 1) return null;
+  const candidates = everyCard.filter((candidate) => namesMatch(card.name, candidate.name));
+  return candidates.length === 1 ? candidates[0] : null;
 };
 
 /**
@@ -162,9 +197,10 @@ export function matchSetCards(tcglCards, segments) {
       matched.set(card.tcglId, ordinal.id);
       continue;
     }
-    const retry = everyCard.find(
-      (candidate) => numericRun(candidate.localId) === card.number && namesMatch(card.name, candidate.name)
-    );
+    const retry =
+      everyCard.find(
+        (candidate) => numericRun(candidate.localId) === card.number && namesMatch(card.name, candidate.name)
+      ) ?? uniqueNameMatch(card, tcglCards, everyCard);
     if (retry) matched.set(card.tcglId, retry.id);
     else unmapped.push(card.tcglId);
   }

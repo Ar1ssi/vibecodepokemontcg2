@@ -224,26 +224,26 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Card with no id and no parseable image URL | `resolveFoilEffect` → CSS `resolveHoloEffect` result | [ ] |
-| 2 | Manifest fetch fails / malformed / `v` ≠ 1 | `foilManifestNow()` null → every card uses the CSS path; one console warning | [ ] |
-| 3 | Manifest not loaded yet on a sync call site | CSS path for that build; hydrate-holo awaits the manifest | [ ] |
-| 4 | Local id zero-padding differs (`sv01-12` vs `sv01-012`, `GG01` vs `gg1`) | Same key | [ ] |
-| 5 | Covered card whose TCG Live base is NonFoil | No foil (O5), even with a holo TCGdex rarity | [ ] |
-| 6 | Uncovered card (pre-BW, unmapped set) | Today's CSS holo, unchanged | [ ] |
-| 7 | Record without etch / wp / cf | Plain white texture for that slot (WebApp `plain.white`) | [ ] |
-| 8 | Texture 404 / decode error | View → `fallback`, canvas removed, card shows its `<img>` without foil | [ ] |
-| 9 | No WebGL2 / shader link error | `fallback` for that view; renderer creation failure disables all TCG Live views for the session | [ ] |
-| 10 | WebGL context lost | All views → `fallback`; no re-creation | [ ] |
-| 11 | Wrapper removed / card moved zones (re-hydrated) | View destroyed next frame; a re-hydrate mounts a fresh view | [ ] |
-| 12 | Same card mounted twice (full-view clone) | Clone gets its own view; the source keeps its own | [ ] |
-| 13 | Off-screen, zero-size or hidden wrapper | Not drawn that frame | [ ] |
-| 14 | Card in an iframe (mat / hand) | Canvas created in the iframe document; rect and DPR from the iframe window | [ ] |
-| 15 | Tilt values NaN / out of range | Clamped to [−1, 1]; NaN → 0 | [ ] |
-| 16 | Importer: TCG Live name ≠ TCGdex name at the ordinal | Retry by numeric local id; else unmapped and reported | [ ] |
-| 17 | Importer: bundle missing or texture absent | Card skipped, reported; manifest never names a file that was not written | [ ] |
-| 18 | Importer rerun | Existing lossless files kept unless `--force`; output byte-identical for unchanged input | [ ] |
-| 19 | Reverse-holo printing | CSS reverse holo (O3) | [ ] |
-| 20 | Face-down / hidden card | Unchanged: hydrate-holo never builds a wrapper for a hidden card | [ ] |
+| 1 | Card with no id and no parseable image URL | `resolveFoilEffect` → CSS `resolveHoloEffect` result | [x] holo.test `keeps the CSS holo for a card with no id` |
+| 2 | Manifest fetch fails / malformed / `v` ≠ 1 | `foilManifestNow()` null → every card uses the CSS path; one console warning | [x] tcgl-foil-store.test (404, v2, fetch reject → null, one warning) |
+| 3 | Manifest not loaded yet on a sync call site | CSS path for that build; hydrate-holo awaits the manifest | [x] holo.test `while the manifest is not loaded`; hydrate-holo awaits `loadFoilManifest()` |
+| 4 | Local id zero-padding differs (`sv01-12` vs `sv01-012`, `GG01` vs `gg1`) | Same key | [x] tcgl-foil-manifest.test `normalizeCardKey` |
+| 5 | Covered card whose TCG Live base is NonFoil | No foil (O5), even with a holo TCGdex rarity | [x] holo.test `covered NonFoil printing` |
+| 6 | Uncovered card (pre-BW, unmapped set) | Today's CSS holo, unchanged | [x] holo.test `uncovered card` |
+| 7 | Record without etch / wp / cf | Plain white texture for that slot (WebApp `plain.white`) | [x] code: `cardTexture(…, PLAIN.white)` in tcgl-foil-material.js; capture families without etch draw `live` |
+| 8 | Texture 404 / decode error | View → `fallback`, canvas removed, card shows its `<img>` without foil | [x] code path `view.fail` (browser-only, not automated) |
+| 9 | No WebGL2 / shader link error | `fallback` for that view; renderer creation failure disables all TCG Live views for the session | [x] code path `getRuntime` → `disabled` (browser-only, not automated) |
+| 10 | WebGL context lost | All views → `fallback`; no re-creation | [x] code path `webglcontextlost` (browser-only, not automated) |
+| 11 | Wrapper removed / card moved zones (re-hydrated) | View destroyed next frame; a re-hydrate mounts a fresh view | [x] code path `drawView` destroy + `unhydrateHolo` → `unmountTcglFoil` (browser-only) |
+| 12 | Same card mounted twice (full-view clone) | Clone gets its own view; the source keeps its own | [x] code path `remountTcglFoil` (browser-only) |
+| 13 | Off-screen, zero-size or hidden wrapper | Not drawn that frame | [x] `isDrawable`; observed in foil-shot: rows below a 1000 px viewport stayed undrawn |
+| 14 | Card in an iframe (mat / hand) | Canvas created in the iframe document; rect and DPR from the iframe window | [x] code: canvas from `wrapper.ownerDocument`, rect/DPR from its `defaultView` (mat iframes not exercised by the capture) |
+| 15 | Tilt values NaN / out of range | Clamped to [−1, 1]; NaN → 0 | [x] tcgl-foil-pose.test `clamps` |
+| 16 | Importer: TCG Live name ≠ TCGdex name at the ordinal | Retry by numeric local id; else unmapped and reported | [x] foil-import-map.test `retries by numeric local id`, `reports … unmapped` |
+| 17 | Importer: bundle missing or texture absent | Card skipped, reported; manifest never names a file that was not written | [x] import run 1: 4 bundles MemoryError → `dropped 4`, manifest named none of them; rerun filled them |
+| 18 | Importer rerun | Existing lossless files kept unless `--force`; output byte-identical for unchanged input | [x] rerun: `written 0.0 MB`, manifest/materials/shaders sha1 OK |
+| 19 | Reverse-holo printing | CSS reverse holo (O3) | [x] unboxing `faceRarity`: reverse slot skips TCG Live coverage |
+| 20 | Face-down / hidden card | Unchanged: hydrate-holo never builds a wrapper for a hidden card | [x] hydrate-holo unchanged: `isCardHidden` gate before any wrapper |
 
 ## Test plan
 - Unit (`node --test`): `foil-import-map.test.mjs` (set table spot checks, `legacyShaderName` /
@@ -279,13 +279,13 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
 ## Acceptance
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
-| A1 | "see how it implements its holofoil code and replace ours with it" — covered cards render with TCG Live's own `TPCi/Cards3D` shaders (port of WebApp `foil.js`) | |
-| A2 | "the cards in the cardart folder have masks / multiple layers … Make sure those are imported" — etch, white plate, cold foil, CC pattern decoded from the card bundles | |
-| A3 | "… and mapped properly to our site" — every shipped TCG Live card is matched to a TCGdex id by set table + name check | |
-| A4 | "served at the highest quality, no compressions" — native size, lossless WebP, full device pixel ratio | |
-| A5 | Shader runs everywhere: mat, hand, previews, focus popup, deck builder, pack opening (session answer) | |
-| A6 | Cards TCG Live does not cover keep today's CSS holo (session answer) | |
-| A7 | Assets live in this repo at native resolution (session answer) | |
+| A1 | "see how it implements its holofoil code and replace ours with it" — covered cards render with TCG Live's own `TPCi/Cards3D` shaders (port of WebApp `foil.js`) | tcgl-foil-material.js (port of WebApp foil.js); foil-shot: 24 shader families `live` |
+| A2 | "the cards in the cardart folder have masks / multiple layers … Make sure those are imported" — etch, white plate, cold foil, CC pattern decoded from the card bundles | 16,283 lossless WebP: 6,657 fronts + etch / plate / cold-foil masks, 52 material textures; tcgl-foil-assets.test |
+| A3 | "… and mapped properly to our site" — every shipped TCG Live card is matched to a TCGdex id by set table + name check | importer report: 6,657 foil + 8,118 flat mapped, 186 unmapped (TCGdex gaps, § Deviations); foil-import-map.test |
+| A4 | "served at the highest quality, no compressions" — native size, lossless WebP, full device pixel ratio | tcgl-foil-assets.test: every WebP `VP8L`, fronts 1024²; backing = CSS box × screen scale × DPR |
+| A5 | Shader runs everywhere: mat, hand, previews, focus popup, deck builder, pack opening (session answer) | hydrate-holo (mat, hand), card-picker (picker, card focus), full-view (previews, deck builder), unboxing (packs) |
+| A6 | Cards TCG Live does not cover keep today's CSS holo (session answer) | holo.test `uncovered card`, `while the manifest is not loaded` |
+| A7 | Assets live in this repo at native resolution (session answer) | asset commits 0adeef12, d9dfceaf, 0e9c0c08, 69fd812f + final slice 2 commit (4.65 GB) |
 
 ## Assumptions
 - Land: branch (assumed) — the prompt names no landing mode; the workflow default is `branch`, so nothing is
@@ -300,3 +300,37 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
   preview (`full-view.js`) and the picker (`card-picker.js`), both wired in slice 5.
 
 ## Deviations (Builder appends here during build)
+- Set table, verified by the importer's name check (2026-10-13): `rsv10-5` → `sv10.5w` and `zsv10-5` → `sv10.5b`
+  (the design had them swapped: TCG Live's r-set ends with Reshiram ex = White Flare, its z-set with Zekrom ex =
+  Black Bolt); added `me5-5` → `30th` and `me5-5c` → `30th-c` (counts 158 / 30 match, names confirm);
+  `swsh7-5r` → `cel25cc` takes prefix `CC`.
+- `namesMatch` also reads TCG Live's energy symbols (`{G}` → Grass … `{*}` → Prism Star) and accepts a TCGdex
+  qualifier TCG Live leaves out (`(Professor Magnolia)`, ` LV.X`, a leading `Basic` on basic Energy).
+- `matchSetCards` gets a third tier: a name printed exactly once in the TCG Live set and once in the mapped
+  TCGdex sets (30th Classic Collection, which TCG Live numbers in its own order).
+- Sets still over 10 % unmapped are TCGdex gaps, not table errors: no TCGdex set (`ec`, `gum`, `me5-5m`, `smalt`,
+  `xyalt`), `mebsp` #94–100 and `mee` #9–16 (reprinted energy) are not on TCGdex.
+- `tcgl-foil.css` is imported by the three sheets that `@import` `holo/base.css` (index, self-, opp-containers);
+  `mat-ambient.css` and `coin/base.css` only mention it.
+- Camera distance factor 1.0 instead of WebApp's 1.04, and the mesh stretched along x (≤ 1.6 %) to the canvas
+  aspect: rasterization is always face-on (O4), so the TCG Live front covers our `<img>` edge to edge.
+- Lighting: the WebApp's front-light setting (`_LightDirection` toward the viewer, no card-edge shading) on every
+  surface; its `board` setting lights 3-D cards seen at an angle, and our mat cards are face-on.
+- Card texture anisotropy 16 (clamped to the GPU's maximum) instead of 4 — sharper foil on small mat cards.
+- A wrapper built but never placed in a document is released after 10 s (buildHoloCard mounts before its
+  callers insert the wrapper).
+- Slice commits landed in the order 1, 3, 4, 5, 2: the asset extraction (~2 h on 23 workers) ran in the
+  background while the code slices were built and verified against a one-set import.
+
+## For the landing commit (Land: branch — not done on this branch)
+- DECISIONS: `[board-ui]` Cards TCG Live prints wear its own foil (design 069): the base printing's
+  MaterialManifest decides foil or none, rendered with the game's TPCi/Cards3D shaders and the card's own
+  etch / white plate / cold foil masks over TCG Live's front; assets lossless WebP at native size in the repo;
+  uncovered cards keep the CSS holo; tilt comes from the holo animation (D34/D55/D56 hold).
+  `[client]` amend D193: three is also loaded by `import()` on the first TCG Live foil mount.
+- ISSUES: reverse-holo printings (`ph` manifests) still use the CSS reverse holo (O3, ~+5 GB to import);
+  unmapped TCG Live sets (`ec`, `gum`, `me5-5m`, `smalt`, `xyalt`, `mebsp` #94–100, `mee` #9–16);
+  deploy clone size (+~5.5 GB) on Render; GPU memory ~12 MB per live foil card (front + etch + plate, mipmapped).
+- MAP: `client/src/setup/foil/`, `scripts/tcgl-foil/`, `client/src/assets/tcgl-foil/`.
+- Push: the asset commits are each < 1.5 GB; push them one commit at a time
+  (`git push origin <sha>:refs/heads/feature/tcgl-foil`), never one push over GitHub's 2 GB cap.

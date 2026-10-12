@@ -31,10 +31,16 @@ describe('TCGL_TO_TCGDEX_SETS', () => {
     ]);
     assert.deepEqual(TCGL_TO_TCGDEX_SETS['swsh12-5a'], [{ set: 'swsh12.5gg', prefix: 'GG' }]);
     assert.deepEqual(TCGL_TO_TCGDEX_SETS.bwbsp, [{ set: 'bwp', prefix: 'BW' }]);
+    assert.deepEqual(TCGL_TO_TCGDEX_SETS['swsh7-5r'], [{ set: 'cel25cc', prefix: 'CC' }]);
+  });
+
+  it('maps the two SV 10.5 sets by their last card (Reshiram ex = White Flare, Zekrom ex = Black Bolt)', () => {
+    assert.deepEqual(TCGL_TO_TCGDEX_SETS['rsv10-5'], [{ set: 'sv10.5w', prefix: '' }]);
+    assert.deepEqual(TCGL_TO_TCGDEX_SETS['zsv10-5'], [{ set: 'sv10.5b', prefix: '' }]);
   });
 
   it('leaves sets with no confirmed TCGdex set unmapped', () => {
-    for (const code of ['me5-5', 'ec', 'gum', 'smalt', 'xyalt']) {
+    for (const code of ['me5-5m', 'ec', 'gum', 'smalt', 'xyalt']) {
       assert.equal(TCGL_TO_TCGDEX_SETS[code], undefined, code);
     }
   });
@@ -74,6 +80,18 @@ describe('namesMatch', () => {
   it('spells symbols out', () => {
     assert.equal(canonicalName('Ultra Necrozma ◇'), 'ultranecrozmaprismstar');
     assert.ok(namesMatch('Ultra Necrozma ◇', 'Ultra Necrozma Prism Star'));
+  });
+  it('reads TCG Live energy and Prism Star symbols', () => {
+    assert.ok(namesMatch('Basic {G} Energy', 'Grass Energy'), 'xy1-132');
+    assert.ok(namesMatch('Basic {L} Energy', 'Basic Lightning Energy'), 'sv01-257');
+    assert.ok(namesMatch('Growing {G} Energy', 'Growing Grass Energy'), 'me03-086');
+    assert.ok(namesMatch('Blend Energy {G}{R}{P}{D}', 'Blend Energy Grass Fire Psychic Darkness'), 'bw6-117');
+    assert.ok(namesMatch('Giratina {*}', 'Giratina ◇'), 'sm5-58');
+  });
+  it('accepts a TCGdex qualifier TCG Live leaves out', () => {
+    assert.ok(namesMatch("Professor's Research", "Professor's Research (Professor Magnolia)"), 'swsh1-178');
+    assert.ok(namesMatch('Luxray GL', 'Luxray GL LV.X'), 'cel25cc-CC017');
+    assert.equal(namesMatch('Basic {G} Energy', 'Fire Energy'), false);
   });
   it('rejects different or empty names', () => {
     assert.equal(namesMatch('Snivy', 'Servine'), false);
@@ -121,6 +139,35 @@ describe('matchSetCards', () => {
     // Ordinal #2 is Yanmega (name check fails); the retry finds SV002: numeric run 2, same name.
     const { matched } = matchSetCards([{ tcglId: 'x_2', number: 2, name: 'Dartrix' }], segments);
     assert.equal(matched.get('x_2'), 'swsh4.5sv-SV002');
+  });
+
+  it('falls back to a name printed once on both sides (30th Classic Collection order)', () => {
+    const tcgl = [
+      { tcglId: 'me5-5c_1', number: 1, name: 'Pikachu' },
+      { tcglId: 'me5-5c_2', number: 2, name: 'Charizard' },
+    ];
+    const classic = [
+      {
+        set: '30th-c',
+        prefix: '',
+        cards: [
+          { id: '30th-c-001', localId: '001', name: 'Charizard' },
+          { id: '30th-c-009', localId: '009', name: 'Pikachu' },
+        ],
+      },
+    ];
+    const { matched } = matchSetCards(tcgl, classic);
+    assert.equal(matched.get('me5-5c_1'), '30th-c-009');
+    assert.equal(matched.get('me5-5c_2'), '30th-c-001');
+  });
+
+  it('never name-matches a name printed twice in the TCG Live set', () => {
+    const tcgl = [
+      { tcglId: 'a_7', number: 7, name: 'Yanma' },
+      { tcglId: 'a_8', number: 8, name: 'Yanma' },
+    ];
+    const { unmapped } = matchSetCards(tcgl, segments);
+    assert.deepEqual(unmapped, ['a_7', 'a_8']);
   });
 
   it('reports a card with no name match as unmapped', () => {
