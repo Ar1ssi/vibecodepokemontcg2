@@ -22,7 +22,7 @@ import {
   hasAnyCondition,
 } from '../rules/special-conditions.mjs';
 import { clearAttackMarkers, healLocked } from '../rules/attack-markers.mjs';
-import { stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
+import { stadiumAllowsSameTurnEvolution, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
   evolvedView,
   topPokemonCard as topOfStack,
@@ -1890,9 +1890,17 @@ function searchEvolve(ctx) {
   // No evolving on the first turn of either player (turns 1–2), whatever searches the evolution.
   const gameTurn = ctx.draft?.turn?.number;
   const onFirstTurns = gameTurn != null && gameTurn <= 2;
+  // The just-played and once-per-turn gates from canEvolve; an evolution-speed Stadium lifts them.
+  const evolvedOrPlayedThisTurn = (root) =>
+    gameTurn != null && (root.enteredPlayTurn === gameTurn || Boolean(player.flags?.evolved?.[root.instanceId]));
   const evolveTargets = (card) => {
     if (onFirstTurns) return [];
-    return evolvesFromTop(player, card).filter((root) => !step.ontoSource || root.instanceId === ctx.sourceCard?.instanceId);
+    return evolvesFromTop(player, card).filter(
+      (root) =>
+        (!step.ontoSource || root.instanceId === ctx.sourceCard?.instanceId) &&
+        (!evolvedOrPlayedThisTurn(root) ||
+          stadiumAllowsSameTurnEvolution(ctx.draft?.stadium, { playerId: player.playerId, pokemon: root, evolution: card }))
+    );
   };
 
   const evolveOnto = (card, root) => {

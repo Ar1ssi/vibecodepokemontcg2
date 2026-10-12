@@ -473,6 +473,39 @@ test('stadium: Grand Tree offers no evolution on turn 2, the second player\'s fi
   assert.equal(res.state.players.p1.zones.deck.length, 1);
 });
 
+test('stadium: Grand Tree does not evolve a Pokémon played this turn', () => {
+  const charmeleon = stage1Card(71, 'Charmeleon', 'Charmander');
+  const { state, rng } = grandTreeGame({ deck: [charmeleon] });
+  state.players.p1.zones.active[0].enteredPlayTurn = 3;
+
+  const res = activate(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(cardInPlay(res.state, 71), undefined);
+  assert.equal(res.state.players.p1.zones.deck.length, 1);
+});
+
+test('stadium: Grand Tree does not evolve a Pokémon already evolved this turn', () => {
+  const charmeleon = stage1Card(71, 'Charmeleon', 'Charmander');
+  const { state, rng } = grandTreeGame({ deck: [charmeleon] });
+  state.players.p1.flags.evolved = { 60: true };
+
+  const res = activate(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.deck.length, 1);
+});
+
+test('stadium: Grand Tree evolves a Pokémon played on an earlier turn', () => {
+  const charmeleon = stage1Card(71, 'Charmeleon', 'Charmander');
+  const { state, rng } = grandTreeGame({ deck: [charmeleon] });
+  state.players.p1.zones.active[0].enteredPlayTurn = 2;
+
+  const res = activate(state, rng);
+  assert.equal(res.error, null);
+  assert.deepEqual(optionIds(res), [71]);
+});
+
 test('stadium: Grand Tree declined at the first pick evolves nothing and still consumes the activation', () => {
   const charmeleon = stage1Card(71, 'Charmeleon', 'Charmander');
   const { state, rng } = grandTreeGame({ deck: [charmeleon] });
