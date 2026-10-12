@@ -364,6 +364,33 @@ test('attack: "Put up to 3 {N} Pokémon from your discard pile onto your Bench" 
   assert.ok(zone(res2, 'p1', 'bench').some((c) => c.instanceId === dragon.instanceId));
 });
 
+test('attack: "{N} Pokémon" from discard benches a Stage 1 Dragon with no Basic in discard (Booming Call)', () => {
+  let shelgon;
+  const b = board('Put up to 3 {N} Pokémon from your discard pile onto your Bench.', {
+    name: 'Salamence ex',
+    setup: ({ p1 }) => {
+      shelgon = mon('Shelgon', { types: ['Dragon'], stage: 'Stage 1', evolvesFrom: 'Bagon' });
+      p1.zones.discard.push(shelgon, mon('Charmander', { types: ['Fire'] }));
+    },
+  });
+  const res1 = attack(b);
+  assert.deepEqual(ids(res1.state.pendingChoice.options), [shelgon.instanceId]);
+  const res2 = choose(res1, [shelgon.instanceId], b.rng);
+  assert.ok(zone(res2, 'p1', 'bench').some((c) => c.instanceId === shelgon.instanceId));
+});
+
+test('attack: "Basic {N} Pokémon" from discard still skips a Stage 1 Dragon', () => {
+  const b = board('Put up to 3 Basic {N} Pokémon from your discard pile onto your Bench.', {
+    name: 'Salamence ex',
+    setup: ({ p1 }) => {
+      p1.zones.discard.push(mon('Shelgon', { types: ['Dragon'], stage: 'Stage 1', evolvesFrom: 'Bagon' }));
+    },
+  });
+  const res = attack(b);
+  assert.ok(!res.state.pendingChoice, 'no Basic Dragon in discard, nothing to bench');
+  assert.equal(zone(res, 'p1', 'bench').length, 0);
+});
+
 // ── I108 search and attach ─────────────────────────────────────────────────
 
 test('attack: Mew ex Power Move attaches the searched Energy to Mew ex, then may switch (I108)', () => {

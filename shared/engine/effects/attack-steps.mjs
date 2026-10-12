@@ -1184,15 +1184,15 @@ function atkBenchFromDeckTop(ctx) {
   });
 }
 
-// Basic Pokémon by default; design 048 adds the typed GX/EX combination (Eternal Flame-GX,
-// Dark Union-GX) and the Fossil-evolution filter (Stone Age-GX) plus the extra-Energy attach.
+// Any stage unless the text says "Basic" (step.basic). Design 048 adds the typed GX/EX combination
+// (Eternal Flame-GX, Dark Union-GX) and the Fossil-evolution filter (Stone Age-GX) plus the extra-Energy attach.
 function benchDiscardCandidates(player, step) {
   return (player.zones.discard || []).filter((c) => {
     if (!isPokemon(c)) return false;
     if (step.evolvesFrom) {
       const from = String(c.evolvesFrom || c.evolvesFromName || '').toLowerCase();
       if (from !== String(step.evolvesFrom).toLowerCase()) return false;
-    } else if (stageOf(c) !== 'Basic') {
+    } else if (step.basic && stageOf(c) !== 'Basic') {
       return false;
     }
     if (step.pokemonType && !pokemonHasType(c, step.pokemonType)) return false;
@@ -1231,8 +1231,10 @@ function atkBenchFromDiscard(ctx) {
     : step.ruleBoxes
       ? `{${String(step.pokemonType || '').toUpperCase()}} Pokémon-GX/-EX`
       : step.pokemonType
-        ? `Basic {${step.pokemonType.toUpperCase()}} Pokémon`
-        : 'Basic Pokémon';
+        ? `${step.basic ? 'Basic ' : ''}{${step.pokemonType.toUpperCase()}} Pokémon`
+        : step.basic
+          ? 'Basic Pokémon'
+          : 'Pokémon';
   const space = benchSpace(player);
   const place = (picked) => {
     putOnBench(player, picked, 'discard', ctx.events);

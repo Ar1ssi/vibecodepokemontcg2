@@ -641,6 +641,8 @@ const TEMPLATES = [
     (m) => ({
       type: 'atkBenchFromDiscard',
       ...attachCount(m[1]),
+      // Booming Call / King's Order ("{N} Pokémon"): no "Basic" word, so any stage qualifies.
+      ...(m[2] ? { basic: true } : {}),
       ...(m[3] ? { pokemonType: m[3] } : {}),
       ...(m[4] ? { maxHp: Number(m[4]) } : {}),
     }),
