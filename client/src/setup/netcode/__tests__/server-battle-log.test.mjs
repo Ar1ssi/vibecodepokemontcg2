@@ -195,6 +195,24 @@ test('attack events delegate to attackAnnouncementLines', () => {
   );
 });
 
+test('mulligans and their bonus draws are announced to both seats', () => {
+  assert.deepEqual(lines({ type: 'mulliganTaken', playerId: SELF, mulliganCount: 1 }), [
+    'You mulliganed (mulligan 1).',
+  ]);
+  assert.deepEqual(lines({ type: 'mulliganTaken', playerId: OTHER, mulliganCount: 2 }), [
+    'Your opponent mulliganed (mulligan 2).',
+  ]);
+  // The bonus draw goes to the player who did not mulligan.
+  assert.deepEqual(
+    lines({ type: 'bonusDrawAwarded', playerId: SELF, sourcePlayerId: OTHER, cards: [{ instanceId: 3 }] }),
+    ['You drew a bonus card (opponent mulliganed).']
+  );
+  assert.deepEqual(
+    lines({ type: 'bonusDrawAwarded', playerId: OTHER, sourcePlayerId: SELF, cards: [{ instanceId: 3 }] }),
+    ['Your opponent drew a bonus card (you mulliganed).']
+  );
+});
+
 test('unknown names fall back to generic nouns', () => {
   assert.deepEqual(lines({ type: 'pokemonKnockedOut', playerId: SELF, instanceId: 999 }), [
     '💀 Your Pokémon was Knocked Out.',

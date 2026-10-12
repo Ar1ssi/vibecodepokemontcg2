@@ -127,6 +127,22 @@ export function serverBattleLogLines(event, selfPlayerId, resolveName) {
       return [`${you} drew ${plural(count, 'card')}.`];
     }
 
+    case 'mulliganTaken': {
+      const count = Number.isFinite(event.mulliganCount) ? ` (mulligan ${event.mulliganCount})` : '';
+      return [`${you} mulliganed${count}.`];
+    }
+
+    case 'bonusDrawAwarded': {
+      // The event's actor is the drawer; `sourcePlayerId` is whoever mulliganed.
+      const cause =
+        event.sourcePlayerId == null
+          ? 'a mulligan'
+          : event.sourcePlayerId === selfPlayerId
+            ? 'you mulliganed'
+            : 'opponent mulliganed';
+      return [`${you} drew a bonus card (${cause}).`];
+    }
+
     case 'cardsDiscarded': {
       const cards = Array.isArray(event.cards) ? event.cards : [];
       const names = cards.map((c) => c?.name).filter(Boolean);
