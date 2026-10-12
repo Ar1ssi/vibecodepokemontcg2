@@ -1,0 +1,208 @@
+<!doctype html>
+<!-- Design 068: a bench for TCG Live's attack-impact prefabs. Open /src/dev/attack-fx-lab.html
+     with the game server running. Pick a type and size and play it on a card, or freeze a row
+     of them at set times (?sheet=1&type=fire&variant=Medium&times=0.05,0.2,0.5), which is what
+     .claude/skills/fx-preview/rec/rec-attack-impact.mjs screenshots. Not linked from the game. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Attack impact FX lab</title>
+    <link rel="stylesheet" href="/src/css/mat-fx.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #18212b;
+        color: #dfe7ee;
+        font: 14px/1.4 system-ui, sans-serif;
+        overflow: hidden;
+      }
+      body.lab--light {
+        background: #c9d4dc;
+        color: #18212b;
+      }
+      .lab__bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 3000;
+      }
+      .lab__bar label {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .lab__bar input[type='range'] {
+        width: 260px;
+      }
+      .lab__card {
+        position: absolute;
+        border-radius: 4.5% / 3.2%;
+        background: #2d4a6b center / cover no-repeat;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+      }
+      .lab__label {
+        position: absolute;
+        font: 600 13px/1 ui-monospace, monospace;
+        opacity: 0.8;
+      }
+      .lab__status {
+        margin-left: auto;
+        font-family: ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="lab__bar" id="bar">
+      <label>Type <select id="type"></select></label>
+      <label>Size <select id="variant"></select></label>
+      <label>Seed <input id="seed" type="number" value="7" style="width: 5em" /></label>
+      <label><input id="far" type="checkbox" /> far seat</label>
+      <label><input id="loop" type="checkbox" checked /> loop</label>
+      <label><input id="light" type="checkbox" /> light table</label>
+      <button id="play" type="button">Play</button>
+      <label>Scrub <input id="scrub" type="range" min="0" max="4000" step="10" value="0" /></label>
+      <span class="lab__status" id="status">loading</span>
+    </div>
+    <div id="table"></div>
+    <script type="module">
+      import { playImpact, prepareImpact } from '/src/setup/netcode/mat-fx/impact/impact-stage.js';
+
+      const TYPES = ['fire', 'water', 'grass', 'lightning', 'psychic', 'fighting', 'darkness', 'metal', 'dragon', 'fairy', 'colorless'];
+      const VARIANTS = ['Small', 'Medium', 'Large', 'Small_C', 'Medium_C', 'Large_C'];
+      const CARD_ASPECT = 0.716;
+      const params = new URLSearchParams(location.search);
+      const cardSrc = params.get('card') || '/src/assets/cardback.png';
+      const $ = (id) => document.getElementById(id);
+      const table = $('table');
+      const status = $('status');
+      const fill = (select, values, chosen) => {
+        for (const value of values) select.add(new Option(value, value, false, value === chosen));
+      };
+      fill($('type'), TYPES, params.get('type') || 'fire');
+      fill($('variant'), VARIANTS, params.get('variant') || 'Medium');
+      if (params.has('seed')) $('seed').value = params.get('seed');
+      if (params.get('light') === '1') $('light').checked = true;
+      if (params.get('far') === '1') $('far').checked = true;
+      const applyTable = () => document.body.classList.toggle('lab--light', $('light').checked);
+      $('light').addEventListener('change', applyTable);
+      applyTable();
+
+      const addCard = (centreX, centreY, height, label) => {
+        const card = document.createElement('div');
+        card.className = 'lab__card';
+        card.style.height = `${height}px`;
+        card.style.width = `${height * CARD_ASPECT}px`;
+        card.style.left = `${centreX - (height * CARD_ASPECT) / 2}px`;
+        card.style.top = `${centreY - height / 2}px`;
+        card.style.backgroundImage = `url("${cardSrc}")`;
+        if ($('far').checked) card.style.rotate = '180deg';
+        table.appendChild(card);
+        if (label) {
+          const text = document.createElement('div');
+          text.className = 'lab__label';
+          text.textContent = label;
+          text.style.left = `${centreX - 60}px`;
+          text.style.top = `${centreY + height / 2 + 6}px`;
+          table.appendChild(text);
+        }
+        const box = card.getBoundingClientRect();
+        // A rotated card's box is the same box; the stage takes the turn separately.
+        return { left: box.left, top: box.top, width: box.width, height: box.height };
+      };
+
+      const options = (rect, extra = {}) => {
+        const variant = extra.variant ?? $('variant').value;
+        return { type: extra.type ?? $('type').value, variant, bench: variant.endsWith('_C'), rect, turn: $('far').checked ? 180 : 0, cardSrc, seed: Number($('seed').value) || 1 };
+      };
+
+      let current = null;
+      let scrubbing = false;
+      const playOne = async () => {
+        table.replaceChildren();
+        current?.clock.cancel();
+        const picked = options(null);
+        status.textContent = `loading ${picked.type}`;
+        if (!(await prepareImpact(picked.type))) {
+          status.textContent = `${picked.type}: not ready (see the console)`;
+          return;
+        }
+        const height = picked.bench ? 150 : 210;
+        const rect = addCard(innerWidth / 2, innerHeight / 2 + 20, height, `${picked.type} ${picked.variant}`);
+        current = playImpact({ ...picked, rect });
+        if (!current) {
+          status.textContent = 'playImpact returned null';
+          return;
+        }
+        $('scrub').max = String(current.durationMs);
+        scrubbing = false;
+        const mine = current;
+        mine.clock.finished.then(
+          () => $('loop').checked && current === mine && !scrubbing && playOne(),
+          () => undefined
+        );
+      };
+
+      const tick = () => {
+        if (current && !scrubbing) {
+          const time = Number(current.clock.currentTime) || 0;
+          $('scrub').value = String(time);
+          status.textContent = `${(time / 1000).toFixed(2)} / ${(current.durationMs / 1000).toFixed(2)} s`;
+        }
+        requestAnimationFrame(tick);
+      };
+
+      $('play').addEventListener('click', playOne);
+      for (const id of ['type', 'variant', 'far']) $(id).addEventListener('change', playOne);
+      $('scrub').addEventListener('input', () => {
+        if (!current) return;
+        scrubbing = true;
+        current.clock.pause();
+        current.clock.currentTime = Number($('scrub').value);
+        status.textContent = `${(Number($('scrub').value) / 1000).toFixed(2)} s (held)`;
+      });
+
+      /** Freeze one prefab at each of `times` (seconds), a card per time, in a grid. */
+      const sheet = async ({ type, variant, times, columns = 4, cardHeight = 120 }) => {
+        $('bar').style.display = 'none';
+        table.replaceChildren();
+        if (!(await prepareImpact(type))) throw new Error(`${type}: not ready`);
+        const rows = Math.ceil(times.length / columns);
+        const cellWidth = innerWidth / columns;
+        const cellHeight = innerHeight / rows;
+        times.forEach((time, index) => {
+          const centreX = (index % columns) * cellWidth + cellWidth / 2;
+          const centreY = Math.floor(index / columns) * cellHeight + cellHeight / 2;
+          const height = variant.endsWith('_C') ? cardHeight * 0.75 : cardHeight;
+          const rect = addCard(centreX, centreY, height, `${type} ${variant} @ ${time.toFixed(2)} s`);
+          const played = playImpact({ ...options(rect, { type, variant }), rect });
+          if (!played) throw new Error(`${type} ${variant}: playImpact returned null`);
+          played.clock.pause();
+          played.clock.currentTime = time * 1000;
+        });
+        // Two frames: one to simulate and draw, one for the compositor to show it.
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      };
+
+      window.__impactLab = { sheet, playOne, TYPES, VARIANTS };
+      if (params.get('sheet') === '1') {
+        const times = (params.get('times') || '0.03,0.1,0.2,0.35,0.55,0.8,1.2,1.8').split(',').map(Number);
+        sheet({ type: $('type').value, variant: $('variant').value, times, columns: Number(params.get('columns')) || 4 }).then(
+          () => (window.__impactLab.sheetReady = true),
+          (error) => (window.__impactLab.sheetError = String(error))
+        );
+      } else {
+        playOne();
+        tick();
+      }
+    </script>
+  </body>
+</html>

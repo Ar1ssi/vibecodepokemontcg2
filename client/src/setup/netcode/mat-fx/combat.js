@@ -46,6 +46,8 @@ import {
 } from './combat-pose.mjs';
 import { brighten, fxRgbForCard, FX_NEUTRAL_RGB, rgbCss } from './fx-colors.mjs';
 import { frameTurnOf } from './evolve-scene.js';
+import { impactTypeFor, impactVariant, withoutImpactBeats } from './impact/impact-select.mjs';
+import { impactReady, playImpact, prepareImpact } from './impact/impact-stage.js';
 import { peekCombatOrigin, visibleStackRecord, zoneCardIds } from './origins.mjs';
 import { playMove } from './moves/move-player.js';
 import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
@@ -202,6 +204,76 @@ const strikeTarget = (rect, hit, ctx, dressing) => {
   removeWhen(host, done, HIT_SPARKS_MS + BACKSTOP_PAD_MS);
 };
 
+/**
+ * Design 068: the TCG Live impact prefab an attack's hits play, or null while its assets are
+ * still loading — that attack keeps today's dressing, and the load goes on for the next one.
+ */
+const readyImpactType = (card, vgType) => {
+  const type = impactTypeFor(card, vgType);
+  prepareImpact(type);
+  return impactReady(type) ? type : null;
+};
+
+const WARMUP_DELAY_MS = 600;
+let warmupInstalled = false;
+
+/**
+ * Design 068: once the board settles, load the impact prefabs of both Active Pokémon's printed
+ * types, so the first hit of a game already has its prefab. Safe to call more than once.
+ */
+export function installImpactWarmup() {
+  if (warmupInstalled || typeof document === 'undefined') return;
+  warmupInstalled = true;
+  let timer = 0;
+  const warm = () => {
+    const registry = getCardRegistry();
+    for (const user of ['self', 'opp']) {
+      for (const id of zoneCardIds(registry, user, 'active')) {
+        const card = combatCard(id, registry);
+        if (card) prepareImpact(impactTypeFor(card));
+      }
+    }
+  };
+  document.addEventListener('board-view-applied', () => {
+    clearTimeout(timer);
+    timer = setTimeout(warm, WARMUP_DELAY_MS);
+  });
+}
+
+/** Design 068: what the prefab needs of a damaged card, read while the card is still on the board. */
+const impactTargetFor = (instanceId, rect, hit, registry) => {
+  const record = shownRecord(instanceId, registry);
+  const benched = [...zoneCardIds(registry, 'self', 'bench'), ...zoneCardIds(registry, 'opp', 'bench')];
+  return {
+    rect,
+    // The game plays the condensed (`_C`) prefab on a Bench card.
+    bench: benched.includes(instanceId) || benched.includes(record?.instanceId),
+    turn: frameTurnOf(record?.element || null),
+    cardSrc: combatSrc(instanceId, registry),
+    seed: hashString(`${instanceId}|${hit.amount}|impact`),
+  };
+};
+
+/**
+ * Design 068: play the prefab on a hit card; false when the attack's scene did not make room
+ * for it, or when it could not play — the caller then shows today's dressing.
+ */
+const playImpactPrefab = (ctx, target, hit) => {
+  if (!ctx?.impactType) return false;
+  try {
+    return Boolean(playImpact({ type: ctx.impactType, variant: impactVariant(hit.amount, target.bench), ...target }));
+  } catch (error) {
+    console.debug('impact prefab failed', ctx.impactType, error);
+    return false;
+  }
+};
+
+/**
+ * Design 068: the scene leaves its contact dressing to the prefab only when its defender takes
+ * a hit. A status move by name, or an attack that only hurts the Bench, keeps its own.
+ */
+const sceneSpecFor = (spec, impactType, plan) => (impactType && plan.damage > 0 ? withoutImpactBeats(spec) : spec);
+
 const shakeTable = (amount) => {
   const amplitude = screenShakeAmplitude(amount);
   if (amplitude === 0) return 0;
@@ -217,13 +289,15 @@ const shakeTable = (amount) => {
 export const damage = (plan) => {
   const hit = classifyHitOnce(plan);
   if (!hit) return 0;
-  const rect = combatRect(plan.instanceId, getCardRegistry());
+  const registry = getCardRegistry();
+  const rect = combatRect(plan.instanceId, registry);
   if (!rect) return 0;
+  const target = impactTargetFor(plan.instanceId, rect, hit, registry);
   impacts.add((ctx) => {
     showDamageNumber(plan.instanceId, rect, hit);
     if (hit.kind !== 'hit') return;
     const dressing = hitDressingFor(ctx?.family);
-    strikeTarget(rect, hit, ctx, dressing);
+    if (!playImpactPrefab(ctx, target, hit)) strikeTarget(rect, hit, ctx, dressing);
     shakeTable(hit.amount * dressing.shakeMul);
   });
 };
@@ -323,6 +397,7 @@ const playLunge = (plan, registry, card, from, to, src) => {
   impacts.strikeIn(LUNGE_MS * LUNGE_IMPACT, {
     direction: attackAngleDeg(from, to),
     attackerCard: card,
+    impactType: readyImpactType(card, null),
   });
 
   const host = spawnOverlay({ rect: from, className: 'fx-overlay fx-lunge' });
@@ -360,13 +435,15 @@ export const attack = (plan) => {
   const sig = to ? pickSignature(plan, card) : null;
   const sigDefenderSrc = sig ? combatSrc(defenderId, registry) : null;
   if (sig && sigDefenderSrc) {
+    const impactType = readyImpactType(card, sig.spec.vgType);
     const played = playMove({
-      spec: sig.spec,
+      spec: sceneSpecFor(sig.spec, impactType, plan),
       attacker: moveSide(plan.attackerId, from, src, registry),
       defender: moveSide(defenderId, to, sigDefenderSrc, registry),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
       impacts: { strikeIn: announceStrike },
       attackerCard: card,
+      strikeContext: { impactType },
     });
     if (played) {
       markAttackScene(played.durationMs);
@@ -382,13 +459,15 @@ export const attack = (plan) => {
   const pick = pickMove(plan, card);
   const defenderSrc = combatSrc(defenderId, registry);
   if (pick?.score && defenderSrc) {
+    const impactType = readyImpactType(card, pick.vgType);
     const played = playMove({
-      spec: pick.score,
+      spec: sceneSpecFor(pick.score, impactType, plan),
       attacker: moveSide(plan.attackerId, from, src, registry),
       defender: moveSide(defenderId, to, defenderSrc, registry),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
       impacts: { strikeIn: announceStrike },
       attackerCard: card,
+      strikeContext: { impactType },
     });
     if (played) {
       markAttackScene(played.durationMs);
@@ -412,7 +491,10 @@ const showTargetRing = (rect) => {
 
 export const attackBanner = (plan) => {
   const registry = getCardRegistry();
-  const attackerName = combatCard(plan.attackerId, registry)?.name;
+  const attacker = combatCard(plan.attackerId, registry);
+  const attackerName = attacker?.name;
+  // Design 068: the banner leads the hit by its hold; start loading the impact it will play.
+  if (attacker) prepareImpact(impactTypeFor(attacker, pickSignature(plan, attacker)?.spec.vgType ?? pickMove(plan, attacker)?.vgType ?? null));
   const text = attackBannerText(plan.attackName, attackerName);
   if (!text) return 0;
   playBanner(text, plan.user, 'attack');
