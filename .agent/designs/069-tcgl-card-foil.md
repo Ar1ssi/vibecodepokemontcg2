@@ -1,5 +1,5 @@
 # 069: TCG Live card holofoil — the game's own shaders and per-card masks
-Status: draft
+Status: approved (self — one-shot)
 Date: 2026-10-13 · Session: S-069 (worktree `feature/tcgl-foil`)
 
 ## Problem
@@ -275,5 +275,28 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
 | 3 Pose math | create `tcgl-foil-pose.mjs` + test | as § Design | `poseAngles({tiltX:1,tiltY:0}).ry`≈0.2443; NaN→0; `multiply(R, transposeRotation(R))`≈I; rasterVP corner check | — | tests pass |
 | 4 Renderer + view | create `tcgl-foil-material.js`, `tcgl-foil-view.js`, `tcgl-foil-store.js`, `client/src/css/holo/tcgl-foil.css`; modify the five CSS importers, `front-end.js` (preload) | as § Design | capture script: 27 families draw, silhouette equal across tilt | — | capture exit 0, no console error |
 | 5 Wiring | modify `holo.mjs`, `hydrate-holo.js`, `card-picker.js`, `full-view.js`, `native-deck-builder-unboxing.js` + tests | as § Design | `resolveFoilEffect` cases rows 1, 3, 5, 6 | — | `pnpm test` green |
+
+## Acceptance
+| # | Criterion (the brief's words) | Evidence |
+|---|---|---|
+| A1 | "see how it implements its holofoil code and replace ours with it" — covered cards render with TCG Live's own `TPCi/Cards3D` shaders (port of WebApp `foil.js`) | |
+| A2 | "the cards in the cardart folder have masks / multiple layers … Make sure those are imported" — etch, white plate, cold foil, CC pattern decoded from the card bundles | |
+| A3 | "… and mapped properly to our site" — every shipped TCG Live card is matched to a TCGdex id by set table + name check | |
+| A4 | "served at the highest quality, no compressions" — native size, lossless WebP, full device pixel ratio | |
+| A5 | Shader runs everywhere: mat, hand, previews, focus popup, deck builder, pack opening (session answer) | |
+| A6 | Cards TCG Live does not cover keep today's CSS holo (session answer) | |
+| A7 | Assets live in this repo at native resolution (session answer) | |
+
+## Assumptions
+- Land: branch (assumed) — the prompt names no landing mode; the workflow default is `branch`, so nothing is
+  pushed. Asset commits are still split per set group (< 1.5 GB each) so a later push can go commit by commit.
+- Python runs as `python -P` with the script dir as cwd (assumed) — UnityPy lives in user site-packages,
+  which `-I` hides; `-P` still keeps the extract's folders off `sys.path`.
+- Extraction runs on a process pool, one worker per core minus one (assumed) — lossless `method=6` on
+  ~17k textures is hours single-threaded; the output bytes do not depend on the worker count.
+- Slice order 1 → 3 → 2 → 4 → 5 (assumed) — the asset extraction (slice 2) runs in the background while the
+  pure pose math is built; slices 4 and 5 need the assets to verify.
+- The deck builder has no foil call site of its own (assumed, grep `buildHoloCard`): its card views are the
+  preview (`full-view.js`) and the picker (`card-picker.js`), both wired in slice 5.
 
 ## Deviations (Builder appends here during build)
