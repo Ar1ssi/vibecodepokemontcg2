@@ -354,6 +354,8 @@ const GRAND_TREE_TEXT =
 
 function grandTreeGame({ hosts = ['Charmander'], deck = [] } = {}) {
   const { state, rng } = setupGame();
+  // Turns 1 and 2 are both players' first turns, where evolving is barred.
+  state.turn.number = 3;
   state.stadium = createCard({
     instanceId: 51,
     name: 'Grand Tree',
@@ -446,6 +448,29 @@ test('stadium: Grand Tree with an empty deck completes without a choice', () => 
   assert.equal(res.error, null);
   assert.equal(res.pendingChoice, null);
   assert.equal(res.state.players.p1.flags.stadiumUsedThisTurn, true);
+});
+
+test('stadium: Grand Tree offers no evolution on the first turn of the game', () => {
+  const charmeleon = stage1Card(71, 'Charmeleon', 'Charmander');
+  const { state, rng } = grandTreeGame({ deck: [charmeleon] });
+  state.turn.number = 1;
+
+  const res = activate(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(cardInPlay(res.state, 71), undefined);
+  assert.equal(res.state.players.p1.zones.deck.length, 1);
+});
+
+test('stadium: Grand Tree offers no evolution on turn 2, the second player\'s first turn', () => {
+  const charmeleon = stage1Card(71, 'Charmeleon', 'Charmander');
+  const { state, rng } = grandTreeGame({ deck: [charmeleon] });
+  state.turn.number = 2;
+
+  const res = activate(state, rng);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  assert.equal(res.state.players.p1.zones.deck.length, 1);
 });
 
 test('stadium: Grand Tree declined at the first pick evolves nothing and still consumes the activation', () => {

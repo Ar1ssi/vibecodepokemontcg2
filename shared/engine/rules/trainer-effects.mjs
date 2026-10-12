@@ -755,6 +755,12 @@ function parseSearchDeckKind(lower) {
     };
   }
 
+  // Precious Trolley: "any number of Basic Pokémon … onto your Bench". The executor caps picks at
+  // the open Bench slots, so a count of 5 (the full Bench) means "as many as fit".
+  if (/search your deck for any number of basic pok[ée]mon\b/.test(lower) && destination === 'bench') {
+    return { what: 'Basic Pokémon', count: 5, destination, upTo: true };
+  }
+
   const marked = parseMarkerSearch(lower, destination, reveal) || parseSpecialKindSearch(lower, destination, reveal);
   if (marked) return marked;
 

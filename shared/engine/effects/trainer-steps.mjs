@@ -1887,8 +1887,13 @@ function evolvesFromTop(player, card) {
 function searchEvolve(ctx) {
   const { player, step } = ctx;
   const deck = player.zones.deck;
-  const evolveTargets = (card) =>
-    evolvesFromTop(player, card).filter((root) => !step.ontoSource || root.instanceId === ctx.sourceCard?.instanceId);
+  // No evolving on the first turn of either player (turns 1–2), whatever searches the evolution.
+  const gameTurn = ctx.draft?.turn?.number;
+  const onFirstTurns = gameTurn != null && gameTurn <= 2;
+  const evolveTargets = (card) => {
+    if (onFirstTurns) return [];
+    return evolvesFromTop(player, card).filter((root) => !step.ontoSource || root.instanceId === ctx.sourceCard?.instanceId);
+  };
 
   const evolveOnto = (card, root) => {
     attachTo(player, card, root, ctx.events);
