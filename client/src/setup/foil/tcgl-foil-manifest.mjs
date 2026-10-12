@@ -4,6 +4,9 @@
 //                    cards: { key: [tcglId, shaderIdx, materialIdx, front, etch, wp, cf, cc] }, flat: [key] }
 
 export const FOIL_MANIFEST_VERSION = 1;
+// manifest.json, shaders.json and materials.json are in git and always served by our server from here. The
+// textures (~4.7 GB) are not: they live under a texture base the server names (/api/tcgl-foil/config) — an
+// object-storage URL in production, or this same folder when a developer has imported them locally.
 export const FOIL_ASSET_ROOT = '/src/assets/tcgl-foil';
 
 // TCG Live's card mesh samples the card from this window of the square 1024² front (WebApp foil.js).
@@ -70,8 +73,14 @@ export function foilCoverage(parsed, cardId) {
 }
 
 /** URL of a card texture by its Unity name; the folder is the TCG Live set (the name up to its first `_`). */
-export function textureUrl(texName) {
+export function textureUrl(texName, base = FOIL_ASSET_ROOT) {
   if (!isNonEmptyString(texName) || !/^[a-z0-9-]+_[a-z0-9_-]+$/i.test(texName)) return null;
   const set = texName.slice(0, texName.indexOf('_'));
-  return `${FOIL_ASSET_ROOT}/cards/${set}/${texName}.webp`;
+  return `${base}/cards/${set}/${texName}.webp`;
+}
+
+/** URL of a shared material texture from its materials.json path (`tex/<name>.webp`, relative to the base). */
+export function materialTextureUrl(relativePath, base = FOIL_ASSET_ROOT) {
+  if (!isNonEmptyString(relativePath) || !/^tex\/[a-z0-9_-]+\.webp$/i.test(relativePath)) return null;
+  return `${base}/${relativePath}`;
 }

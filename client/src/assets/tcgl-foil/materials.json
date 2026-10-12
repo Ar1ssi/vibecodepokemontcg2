@@ -3943,364 +3943,364 @@
  },
  "textures": {
   "FX_T_Celeb_Confetti": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Celeb_Confetti.webp",
+   "url": "tex/FX_T_Celeb_Confetti.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Distort": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Distort.webp",
+   "url": "tex/FX_T_Distort.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Gradient_Shine": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Gradient_Shine.webp",
+   "url": "tex/FX_T_Gradient_Shine.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Gradient_Shine_Dull": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Gradient_Shine_Dull.webp",
+   "url": "tex/FX_T_Gradient_Shine_Dull.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Highlight_Gold_Band": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Highlight_Gold_Band.webp",
+   "url": "tex/FX_T_Highlight_Gold_Band.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Highlight_Over": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Highlight_Over.webp",
+   "url": "tex/FX_T_Highlight_Over.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Noise_Dim": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Noise_Dim.webp",
+   "url": "tex/FX_T_Noise_Dim.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_SVUltra_Glitter": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_SVUltra_Glitter.webp",
+   "url": "tex/FX_T_SVUltra_Glitter.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum.webp",
+   "url": "tex/FX_T_Spectrum.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Bands_Angled": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Bands_Angled.webp",
+   "url": "tex/FX_T_Spectrum_Bands_Angled.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Bands_Rainbow": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Bands_Rainbow.webp",
+   "url": "tex/FX_T_Spectrum_Bands_Rainbow.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Bands_Rainbow_Bright": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Bands_Rainbow_Bright.webp",
+   "url": "tex/FX_T_Spectrum_Bands_Rainbow_Bright.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Bands_Vertical": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Bands_Vertical.webp",
+   "url": "tex/FX_T_Spectrum_Bands_Vertical.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_BlackSide": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_BlackSide.webp",
+   "url": "tex/FX_T_Spectrum_BlackSide.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Celebration": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Celebration.webp",
+   "url": "tex/FX_T_Spectrum_Celebration.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_FlatSilver": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_FlatSilver.webp",
+   "url": "tex/FX_T_Spectrum_FlatSilver.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Rainbow": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Rainbow.webp",
+   "url": "tex/FX_T_Spectrum_Rainbow.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_SVHolo2": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_SVHolo2.webp",
+   "url": "tex/FX_T_Spectrum_SVHolo2.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_SVHolo3": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_SVHolo3.webp",
+   "url": "tex/FX_T_Spectrum_SVHolo3.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_SunLava": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_SunLava.webp",
+   "url": "tex/FX_T_Spectrum_SunLava.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Sunbeam": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Sunbeam.webp",
+   "url": "tex/FX_T_Spectrum_Sunbeam.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Sunpillar": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Sunpillar.webp",
+   "url": "tex/FX_T_Spectrum_Sunpillar.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Spectrum_Sunpillar3": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Spectrum_Sunpillar3.webp",
+   "url": "tex/FX_T_Spectrum_Sunpillar3.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "FX_T_Tinsel_Bars": {
-   "url": "/src/assets/tcgl-foil/tex/FX_T_Tinsel_Bars.webp",
+   "url": "tex/FX_T_Tinsel_Bars.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "point",
    "srgb": true
   },
   "TEX_CompositeMask": {
-   "url": "/src/assets/tcgl-foil/tex/TEX_CompositeMask.webp",
+   "url": "tex/TEX_CompositeMask.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "point",
    "srgb": true
   },
   "TEX_SVMasterBall": {
-   "url": "/src/assets/tcgl-foil/tex/TEX_SVMasterBall.webp",
+   "url": "tex/TEX_SVMasterBall.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "TEX_SVPokeBall": {
-   "url": "/src/assets/tcgl-foil/tex/TEX_SVPokeBall.webp",
+   "url": "tex/TEX_SVPokeBall.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "TEX_SouthernCross": {
-   "url": "/src/assets/tcgl-foil/tex/TEX_SouthernCross.webp",
+   "url": "tex/TEX_SouthernCross.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "TEX_StitchedRings": {
-   "url": "/src/assets/tcgl-foil/tex/TEX_StitchedRings.webp",
+   "url": "tex/TEX_StitchedRings.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "point",
    "srgb": true
   },
   "T_CloudNoise": {
-   "url": "/src/assets/tcgl-foil/tex/T_CloudNoise.webp",
+   "url": "tex/T_CloudNoise.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_CloudNoise_Bright": {
-   "url": "/src/assets/tcgl-foil/tex/T_CloudNoise_Bright.webp",
+   "url": "tex/T_CloudNoise_Bright.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Direction_RGB_Random_3": {
-   "url": "/src/assets/tcgl-foil/tex/T_Direction_RGB_Random_3.webp",
+   "url": "tex/T_Direction_RGB_Random_3.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "point",
    "srgb": false
   },
   "T_Direction_RG_Thatch": {
-   "url": "/src/assets/tcgl-foil/tex/T_Direction_RG_Thatch.webp",
+   "url": "tex/T_Direction_RG_Thatch.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "point",
    "srgb": false
   },
   "T_HoloFoil_Bars_Mask": {
-   "url": "/src/assets/tcgl-foil/tex/T_HoloFoil_Bars_Mask.webp",
+   "url": "tex/T_HoloFoil_Bars_Mask.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Cosmos_Dots_RGBA_Gradient": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Cosmos_Dots_RGBA_Gradient.webp",
+   "url": "tex/T_Holofoil_Cosmos_Dots_RGBA_Gradient.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Distortion_Sun_Pillar": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Distortion_Sun_Pillar.webp",
+   "url": "tex/T_Holofoil_Distortion_Sun_Pillar.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Galaxy_Stars": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Galaxy_Stars.webp",
+   "url": "tex/T_Holofoil_Galaxy_Stars.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Mask_BWBars": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Mask_BWBars.webp",
+   "url": "tex/T_Holofoil_Mask_BWBars.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Mask_Bar_Thin_Single": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Mask_Bar_Thin_Single.webp",
+   "url": "tex/T_Holofoil_Mask_Bar_Thin_Single.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Mask_Bar_Wide_Single": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Mask_Bar_Wide_Single.webp",
+   "url": "tex/T_Holofoil_Mask_Bar_Wide_Single.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Mask_Cracked_Ice_RGB": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Mask_Cracked_Ice_RGB.webp",
+   "url": "tex/T_Holofoil_Mask_Cracked_Ice_RGB.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": false
   },
   "T_Holofoil_Mask_Gradient_LightSheen": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Mask_Gradient_LightSheen.webp",
+   "url": "tex/T_Holofoil_Mask_Gradient_LightSheen.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "point",
    "srgb": true
   },
   "T_Holofoil_Mask_RadiantHolo_RG_X_Grad_5": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Mask_RadiantHolo_RG_X_Grad_5.webp",
+   "url": "tex/T_Holofoil_Mask_RadiantHolo_RG_X_Grad_5.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Noise_Pixel": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Noise_Pixel.webp",
+   "url": "tex/T_Holofoil_Noise_Pixel.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Pikachu_Dot": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Pikachu_Dot.webp",
+   "url": "tex/T_Holofoil_Pikachu_Dot.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Pikachu_Spectrum": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Pikachu_Spectrum.webp",
+   "url": "tex/T_Holofoil_Pikachu_Spectrum.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Holofoil_Squares_Direction": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Squares_Direction.webp",
+   "url": "tex/T_Holofoil_Squares_Direction.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": false
   },
   "T_Holofoil_Star_Classic": {
-   "url": "/src/assets/tcgl-foil/tex/T_Holofoil_Star_Classic.webp",
+   "url": "tex/T_Holofoil_Star_Classic.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_Noise_Random": {
-   "url": "/src/assets/tcgl-foil/tex/T_Noise_Random.webp",
+   "url": "tex/T_Noise_Random.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "point",
    "srgb": false
   },
   "T_Normal_BumpRandom": {
-   "url": "/src/assets/tcgl-foil/tex/T_Normal_BumpRandom.webp",
+   "url": "tex/T_Normal_BumpRandom.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": false
   },
   "T_Stamped_HighlightPan": {
-   "url": "/src/assets/tcgl-foil/tex/T_Stamped_HighlightPan.webp",
+   "url": "tex/T_Stamped_HighlightPan.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",
    "srgb": true
   },
   "T_SunLava_Distortion_1": {
-   "url": "/src/assets/tcgl-foil/tex/T_SunLava_Distortion_1.webp",
+   "url": "tex/T_SunLava_Distortion_1.webp",
    "wrapU": "repeat",
    "wrapV": "repeat",
    "filter": "bilinear",

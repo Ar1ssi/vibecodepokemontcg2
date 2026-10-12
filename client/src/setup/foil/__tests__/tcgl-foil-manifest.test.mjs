@@ -4,6 +4,7 @@ import {
   DEFAULT_FOIL_UV,
   foilCoverage,
   foilRecordFor,
+  materialTextureUrl,
   normalizeCardKey,
   parseFoilManifest,
   textureUrl,
@@ -99,5 +100,20 @@ describe('textureUrl', () => {
     assert.equal(textureUrl(null), null);
     assert.equal(textureUrl('../x_y'), null);
     assert.equal(textureUrl('nounderscore'), null);
+  });
+  it('resolves against a remote texture base', () => {
+    assert.equal(textureUrl('sv1_wp_en_001', 'https://pub-abc.r2.dev'), 'https://pub-abc.r2.dev/cards/sv1/sv1_wp_en_001.webp');
+  });
+});
+
+describe('materialTextureUrl', () => {
+  it('joins a materials.json path to the texture base', () => {
+    assert.equal(materialTextureUrl('tex/FX_T_Spectrum.webp'), '/src/assets/tcgl-foil/tex/FX_T_Spectrum.webp');
+    assert.equal(materialTextureUrl('tex/T_Noise_Random.webp', 'https://pub-abc.r2.dev'), 'https://pub-abc.r2.dev/tex/T_Noise_Random.webp');
+  });
+  it('rejects anything outside tex/', () => {
+    for (const bad of [undefined, '', '/src/assets/tcgl-foil/tex/x.webp', 'tex/../x.webp', 'cards/sv1/x.webp', 'https://evil/tex/x.webp']) {
+      assert.equal(materialTextureUrl(bad), null, String(bad));
+    }
   });
 });

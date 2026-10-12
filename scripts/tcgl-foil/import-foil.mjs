@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Design 069: builds the committed TCG Live card foil assets from the TCG Live extract.
+// Design 069: builds the TCG Live card foil assets from the TCG Live extract.
 //
 //   pnpm foil:import -- --src E:/TCGLive_Extract [--unity-cache <dir>] [--sets sv1,sv2] [--dry-run] [--force]
 //
@@ -7,7 +7,8 @@
 // (TCG Live card names) and the TCGdex set endpoints (cached under .cache/tcgdex-sets/), maps every TCG Live
 // card to its TCGdex id, then has extract-textures.py decode the card textures and the MAT_Cards3D material
 // textures as lossless WebP at native size. Writes client/src/assets/tcgl-foil/: manifest.json, materials.json,
-// shaders.json (byte copy of the WebApp's translated shaders), tex/*.webp and cards/<set>/*.webp.
+// shaders.json (byte copy of the WebApp's translated shaders), tex/*.webp and cards/<set>/*.webp. The three JSON
+// files are committed; the textures are gitignored and go to object storage with `pnpm foil:upload`.
 // --dry-run prints the mapping report only. --sets limits the run, and the manifest, to those TCG Live sets.
 // Rerun after the game updates its card bundles; existing files of the same size are kept unless --force.
 import { spawnSync } from 'node:child_process';
@@ -27,7 +28,8 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
 const OUT_DIR = path.join(REPO_ROOT, 'client', 'src', 'assets', 'tcgl-foil');
 const TCGDEX_CACHE = path.join(REPO_ROOT, '.cache', 'tcgdex-sets');
-const TEX_URL_PREFIX = '/src/assets/tcgl-foil/tex/';
+// materials.json texture paths are relative to the texture base (tcgl-foil-manifest materialTextureUrl)
+const TEX_URL_PREFIX = 'tex/';
 const DEFAULT_UNITY_CACHE = path.join(
   process.env.USERPROFILE || os.homedir(),
   'AppData',

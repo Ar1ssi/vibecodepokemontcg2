@@ -40,6 +40,7 @@ import {
 import { issueSeatToken } from './lobby/seat-token.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
+import { resolveFoilTextureBase } from './tcgl-foil-config.mjs';
 
 const SERVER_AUTHORITATIVE =
   process.env.SERVER_AUTHORITATIVE === '1' ||
@@ -257,6 +258,16 @@ async function main() {
   // Card data goes through the server: browsers calling TCGdex directly got
   // Cloudflare-blocked (CORS errors), leaving every card without stage/attacks.
   app.get('/api/tcgdex/*', tcgdexProxyHandler(createTcgdexProxy()));
+
+  // Design 069: where the client fetches TCG Live foil textures (object storage, or a local import).
+  const foilTextures = resolveFoilTextureBase({
+    envUrl: process.env.FOIL_TEXTURE_URL,
+    localTexturesPresent: fs.existsSync(path.join(clientDir, 'src', 'assets', 'tcgl-foil', 'tex')),
+  });
+  if (foilTextures.error) console.error(foilTextures.error);
+  app.get('/api/tcgl-foil/config', (_, res) => {
+    res.json({ textureBase: foilTextures.textureBase });
+  });
 
   app.use('/shared', express.static(sharedDir));
   app.use(express.static(clientDir));

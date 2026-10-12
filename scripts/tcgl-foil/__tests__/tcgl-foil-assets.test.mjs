@@ -1,16 +1,19 @@
-// Design 069: the committed TCG Live foil assets are complete and lossless. Reads only file headers.
+// Design 069: the committed foil JSON is consistent, and the imported textures (gitignored, on object storage)
+// are complete and lossless. Texture checks skip on a checkout that has not run `pnpm foil:import`. Reads only
+// file headers.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseFoilManifest, textureUrl } from '../../../client/src/setup/foil/tcgl-foil-manifest.mjs';
+import { materialTextureUrl, parseFoilManifest, textureUrl } from '../../../client/src/setup/foil/tcgl-foil-manifest.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const ASSET_DIR = path.join(REPO_ROOT, 'client', 'src', 'assets', 'tcgl-foil');
 const readJson = (file) => JSON.parse(fs.readFileSync(path.join(ASSET_DIR, file), 'utf8'));
 const urlToPath = (url) => path.join(REPO_ROOT, 'client', ...url.split('/').filter(Boolean));
 
+const TEXTURES_SKIP = fs.existsSync(path.join(ASSET_DIR, 'tex')) ? false : 'textures not imported (pnpm foil:import)';
 const manifestJson = readJson('manifest.json');
 const manifest = parseFoilManifest(manifestJson);
 const { shaders } = readJson('shaders.json');
@@ -66,7 +69,12 @@ describe('TCG Live foil assets', () => {
     for (const name of manifestJson.materials) assert.ok(materials.materials[name], `material ${name}`);
   });
 
-  it('names only textures that exist', () => {
+  it('names material textures by base-relative tex/ paths', () => {
+    const bad = Object.entries(materials.textures).filter(([, meta]) => !materialTextureUrl(meta.url));
+    assert.deepEqual(bad.map(([name]) => name), []);
+  });
+
+  it('names only textures that exist', { skip: TEXTURES_SKIP }, () => {
     const missing = [];
     for (const [key, record] of manifest.records) {
       for (const texName of [record.front, record.etch, record.wp, record.cf].filter(Boolean)) {
@@ -75,17 +83,17 @@ describe('TCG Live foil assets', () => {
       if (record.cc && !materials.textures[record.cc]) missing.push(`${key}: cc ${record.cc}`);
     }
     for (const [name, meta] of Object.entries(materials.textures)) {
-      if (!fs.existsSync(urlToPath(meta.url))) missing.push(`material texture ${name}`);
+      if (!fs.existsSync(urlToPath(materialTextureUrl(meta.url)))) missing.push(`material texture ${name}`);
     }
     assert.deepEqual(missing.slice(0, 20), []);
   });
 
-  it('stores every texture as lossless WebP', () => {
+  it('stores every texture as lossless WebP', { skip: TEXTURES_SKIP }, () => {
     const lossy = listWebp(ASSET_DIR).filter((file) => webpImageInfo(file).kind !== 'VP8L');
     assert.deepEqual(lossy.slice(0, 20).map((file) => path.relative(ASSET_DIR, file)), []);
   });
 
-  it('keeps card fronts at the native 1024 x 1024', () => {
+  it('keeps card fronts at the native 1024 x 1024', { skip: TEXTURES_SKIP }, () => {
     const resized = [];
     for (const record of manifest.records.values()) {
       const { width, height } = webpImageInfo(urlToPath(textureUrl(record.front)));

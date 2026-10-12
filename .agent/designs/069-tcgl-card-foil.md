@@ -15,6 +15,8 @@ Answers given in this session (AskUserQuestion): assets live in **this repo** at
 resolution, lossless** (~4.7 GB, accepted after the size and push-cap costs were stated); cards TCG Live
 does not cover **keep today's CSS holo**; the TCG Live shader runs **everywhere** (mat, hand, previews,
 focus popup, deck builder, pack opening).
+Later the user reversed the storage answer ("I have made a mistake. We need an alternative way of streaming
+the cards") and chose **Cloudflare R2** (AskUserQuestion): the textures leave git and stream from a bucket.
 
 ## Constraints
 - No build step, native ESM (PROJECT.md). three.js is already a client dependency (D193, vendored,
@@ -28,8 +30,8 @@ focus popup, deck builder, pack opening).
   the card bundles / shaders bundle — that is the ceiling) and stored as **lossless** WebP
   (`lossless=True, exact=True`) at **native size**. No downscale, no lossy step, and the views render
   at the full device pixel ratio.
-- Repo weight: the user accepted ~4.7 GB in this repo. GitHub rejects one push over 2 GB, so the asset
-  commits are split per set group and pushed one commit at a time (§ Migration).
+- Repo weight: the ~4.7 GB of textures are not in git (gitignored). They stream from Cloudflare R2; git holds
+  only the importer and the three JSON files (~460 KB).
 - The extract (`E:/TCGLive_Extract`) and the Unity cache are not in the repo; the importer is
   rerunnable (`pnpm foil:import -- --src E:/TCGLive_Extract`), like `fx:import-attack` (068).
 - Hard rule 7 (card text looked up): the TCG Live ↔ TCGdex mapping is verified against TCGdex names
@@ -105,11 +107,11 @@ the bottom-left `w×h` viewport (scissor on) and copies that rect. **Pick B.**
 cards matched by ordinal and verified by name through the TCGdex API. **Pick B** (data, not guesses).
 
 ## Design
-### Data (all committed, under `client/src/assets/tcgl-foil/`)
+### Data (under `client/src/assets/tcgl-foil/`: JSON committed, textures gitignored and on R2)
 - `shaders.json` — byte copy of `WebApp/web/data/foil/shaders.json` (GLSL source, not imagery).
 - `materials.json` — `{ materials: { <MAT name>: {shader, tex: {<prop>: {name, scale, offset}}, floats,
   colors} }, textures: { <name>: {url, wrapU, wrapV, filter, srgb} } }` regenerated from the shaders
-  bundle; `url` = `/src/assets/tcgl-foil/tex/<name>.webp`.
+  bundle; `url` = `tex/<name>.webp`, relative to the texture base.
 - `tex/<name>.webp` — material textures, native size, lossless.
 - `cards/<tcglSet>/<texName>.webp` — card fronts and masks, native size, lossless. `tcglSet` = the
   bundle's set (`sv1`, `swsh12-5a`), `texName` = the Unity texture name (`sv1_en_258`,
@@ -259,11 +261,15 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
   error. Look at the sheet for defects only; the look is the user's localhost check.
 
 ## Migration / rollout
-- Asset commits: one commit per set group, each under 1.5 GB, pushed one commit at a time
-  (`git push origin <sha>:refs/heads/feature/tcgl-foil`), never one push over GitHub's 2 GB cap.
-- Render clones the full repo on deploy (+4.7 GB). If the free plan rejects the size, the revert is
-  removing `client/src/assets/tcgl-foil/` in one commit (history still holds it; a history rewrite would be
-  needed to shrink clones — out of scope, user decision).
+- Texture base: the server answers `GET /api/tcgl-foil/config` with `{ textureBase }` (`server/tcgl-foil-config.mjs`):
+  `FOIL_TEXTURE_URL` (the R2 bucket's public URL) when set and valid; else `/src/assets/tcgl-foil` when a local
+  import exists (`tex/` present); else null, and the client keeps the CSS holo on every card. The JSON files are
+  always same-origin, so shaders and manifest stay versioned with the code.
+- Upload: `pnpm foil:upload -- --remote <rclone remote:bucket>` (rclone `copy`, never `sync`; `cards/**` + `tex/**`,
+  MD5 skip of unchanged files, `Content-Type: image/webp`, `Cache-Control: public, max-age=604800`). Bytes are
+  uploaded as imported — lossless, native size. The bucket needs `scripts/tcgl-foil/r2-cors.json` (WebGL reads
+  textures cross-origin) and public access (r2.dev or a custom domain).
+- Render: `FOIL_TEXTURE_URL` is declared `sync: false` on both services; the deploy clone does not grow.
 - Revert path (code): `resolveFoilEffect` falls back to CSS when the manifest is absent, so deleting
   `manifest.json` disables the feature without code changes.
 
@@ -285,11 +291,11 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
 | A4 | "served at the highest quality, no compressions" — native size, lossless WebP, full device pixel ratio | tcgl-foil-assets.test: every WebP `VP8L`, fronts 1024²; backing = CSS box × screen scale × DPR |
 | A5 | Shader runs everywhere: mat, hand, previews, focus popup, deck builder, pack opening (session answer) | hydrate-holo (mat, hand), card-picker (picker, card focus), full-view (previews, deck builder), unboxing (packs) |
 | A6 | Cards TCG Live does not cover keep today's CSS holo (session answer) | holo.test `uncovered card`, `while the manifest is not loaded` |
-| A7 | Assets live in this repo at native resolution (session answer) | asset commits 0adeef12, d9dfceaf, 0e9c0c08, 69fd812f + final slice 2 commit (4.65 GB) |
+| A7 | Textures stream from Cloudflare R2 at native resolution, not from git (later session answer) | `.gitignore`; server/tcgl-foil-config.test; tcgl-foil-store.test; foil-shot against a separate CORS origin: 24/24 families `live`, every texture fetched from that origin |
 
 ## Assumptions
 - Land: branch (assumed) — the prompt names no landing mode; the workflow default is `branch`, so nothing is
-  pushed. Asset commits are still split per set group (< 1.5 GB each) so a later push can go commit by commit.
+  pushed.
 - Python runs as `python -P` with the script dir as cwd (assumed) — UnityPy lives in user site-packages,
   which `-I` hides; `-P` still keeps the extract's folders off `sys.path`.
 - Extraction runs on a process pool, one worker per core minus one (assumed) — lossless `method=6` on
@@ -321,16 +327,21 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
   callers insert the wrapper).
 - Slice commits landed in the order 1, 3, 4, 5, 2: the asset extraction (~2 h on 23 workers) ran in the
   background while the code slices were built and verified against a one-set import.
+- Storage moved to Cloudflare R2 after the build (user reversal, § Problem): the five texture commits were
+  dropped from the unpushed branch (old head e59a623e, in the reflog) and replaced by one commit without
+  textures; materials.json texture paths became base-relative (`tex/…`). No new npm dependency: rclone is an
+  external CLI the uploader calls. The asset test skips its texture checks on a checkout without an import.
 
 ## For the landing commit (Land: branch — not done on this branch)
 - DECISIONS: `[board-ui]` Cards TCG Live prints wear its own foil (design 069): the base printing's
   MaterialManifest decides foil or none, rendered with the game's TPCi/Cards3D shaders and the card's own
-  etch / white plate / cold foil masks over TCG Live's front; assets lossless WebP at native size in the repo;
+  etch / white plate / cold foil masks over TCG Live's front; textures lossless WebP at native size, streamed
+  from Cloudflare R2 (`FOIL_TEXTURE_URL`), never committed;
   uncovered cards keep the CSS holo; tilt comes from the holo animation (D34/D55/D56 hold).
   `[client]` amend D193: three is also loaded by `import()` on the first TCG Live foil mount.
 - ISSUES: reverse-holo printings (`ph` manifests) still use the CSS reverse holo (O3, ~+5 GB to import);
   unmapped TCG Live sets (`ec`, `gum`, `me5-5m`, `smalt`, `xyalt`, `mebsp` #94–100, `mee` #9–16);
-  deploy clone size (+~5.5 GB) on Render; GPU memory ~12 MB per live foil card (front + etch + plate, mipmapped).
+  GPU memory ~12 MB per live foil card (front + etch + plate, mipmapped).
 - MAP: `client/src/setup/foil/`, `scripts/tcgl-foil/`, `client/src/assets/tcgl-foil/`.
-- Push: the asset commits are each < 1.5 GB; push them one commit at a time
-  (`git push origin <sha>:refs/heads/feature/tcgl-foil`), never one push over GitHub's 2 GB cap.
+- Before deploy: create the R2 bucket, apply `r2-cors.json`, enable public access, `pnpm foil:upload`, then set
+  `FOIL_TEXTURE_URL` on both Render services. Until then the site keeps the CSS holo (no breakage).
