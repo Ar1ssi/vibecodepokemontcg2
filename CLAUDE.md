@@ -46,6 +46,9 @@ END — whenever you changed anything:
 - Tick your workflow's Done checklist in your final message.
 - Maintenance due when ≥30 commits landed on `main` since the last `maintain:` commit
   (`git rev-list --count $(git log -1 --format=%h --grep='^maintain' main)..main`).
+- **"Push to main"** (the user's phrase) means push to GitHub's `main`: `git fetch origin main`, merge or
+  rebase onto `origin/main`, run `pnpm test` green, then `git push origin HEAD:main`. This rule is the
+  user's standing authorization for that push; don't ask again. Never force-push.
 
 ## Routing
 | Request looks like | Route |
