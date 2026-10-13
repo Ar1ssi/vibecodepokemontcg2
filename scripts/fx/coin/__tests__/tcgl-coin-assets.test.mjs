@@ -44,6 +44,16 @@ test('every texture a material binds is imported, and every imported texture fil
   }
 });
 
+test('every cube sampler, the reflection probes included, gets an imported cube map', () => {
+  for (const material of materials) {
+    shaders[material.shader].textures.forEach((sampler, index) => {
+      if (sampler.type !== 'samplerCube') return;
+      const name = material.tex[index];
+      assert.ok(textures[name]?.cube, `${material.n}: ${sampler.uniform} is bound to ${name}, not a cube map`);
+    });
+  }
+});
+
 test('the coin disc indexes only its own vertices and its submeshes cover every triangle', () => {
   const vertexCount = mesh.p.length / 3;
   assert.equal(mesh.n.length / 3, vertexCount);

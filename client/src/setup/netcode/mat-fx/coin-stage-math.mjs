@@ -20,16 +20,18 @@ export const COIN_CAMERA = Object.freeze({ fovDeg: 20, discFill: 0.7 });
 /** How far the coin rises at the top of its arc, in object units (the disc radius is ~1.7). */
 export const COIN_LIFT_UNITS = 0.6;
 
-/** Light for the Surface shaders. Unity's `_WorldSpaceLightPos0` (direction toward the light) and `_LightColor0`. */
+/**
+ * The stage's one directional light: Unity's `_LightColor0` (linear colour × intensity) and
+ * `_WorldSpaceLightPos0` (unit direction toward the light, w 0). It stays put while the coin
+ * tumbles, so highlights and the foil's spectrum sweep across the face.
+ */
 export const COIN_LIGHT = Object.freeze({ color: [1, 1, 1], direction: normalizeVector([-0.4, 0.6, 0.7]) });
 
-/** Shaders whose light sits in a constant buffer, with the importer's value zeroed. Slot = [block, vec4 index, component]. */
-const LIGHT_SLOTS = Object.freeze({
-  'TPCi/Surface/BumpSpec Relective': Object.freeze({
-    color: Object.freeze({ block: 'fcb0', index: 2 }),
-    direction: Object.freeze({ block: 'fcb2', index: 0 }),
-  }),
-});
+/**
+ * Flat ambient, linear RGB: Unity's light-probe SH reduced to its constant band (`unity_SHAr/g/b.w`).
+ * It keeps a face turned away from the light from going black mid-tumble.
+ */
+export const COIN_AMBIENT = Object.freeze([0.3, 0.3, 0.3]);
 
 function normalizeVector([x, y, z]) {
   const length = Math.hypot(x, y, z) || 1;
@@ -188,8 +190,7 @@ export function posedCoin(mesh, tangents, angleDeg, lift) {
 
 /**
  * The constant-buffer arrays one material's shader reads: each `buffers.v` / `buffers.f` entry filled
- * from the material's own values, then the per-frame dynamic slots (view-projection, camera, time)
- * and the light the importer left at zero.
+ * from the material's own values, then the per-frame dynamic slots (view-projection, camera, time, light).
  *
  * @param {{ name: string, buffers: { v: object[], f: object[] } }} shader
  * @param {{ v: number[][], f: number[][] }} material
@@ -198,37 +199,31 @@ export function posedCoin(mesh, tangents, angleDeg, lift) {
  */
 export function shaderUniformBlocks(shader, material, frame) {
   const blocks = {};
-  const blockOf = (block) => blocks[block];
   for (const [group, buffers] of [
     ['v', shader.buffers.v],
     ['f', shader.buffers.f],
   ]) {
     buffers.forEach((buffer, index) => {
       const values = Float32Array.from(material[group][index] ?? []);
-      for (const slot of buffer.dynamic ?? []) writeDynamic(values, slot, frame);
+      for (const slot of buffer.dynamic ?? []) writeDynamic(values, slot, frame, shader.name);
       blocks[buffer.uniform] = values;
     });
-  }
-  const slots = LIGHT_SLOTS[shader.name];
-  if (slots) {
-    writeVec3(blockOf(slots.color.block), slots.color.index, COIN_LIGHT.color);
-    writeVec3(blockOf(slots.direction.block), slots.direction.index, COIN_LIGHT.direction);
   }
   return blocks;
 }
 
-function writeDynamic(values, { at, kind }, frame) {
+const AMBIENT_CHANNELS = Object.freeze({ ambientRed: 0, ambientGreen: 1, ambientBlue: 2 });
+
+function writeDynamic(values, { at, kind }, frame, shaderName) {
   if (kind === 'viewProjection') values.set(frame.viewProjection, at);
   else if (kind === 'cameraPosition') values.set(frame.cameraPosition, at);
   else if (kind === 'time') {
     const seconds = frame.timeSeconds;
     values.set([seconds / 20, seconds, seconds * 2, seconds * 3], at);
-  }
-}
-
-function writeVec3(values, vec4Index, [x, y, z]) {
-  if (!values) throw new Error('coin shader has no light block');
-  values.set([x, y, z], vec4Index * 4);
+  } else if (kind === 'lightColor') values.set([...COIN_LIGHT.color, 1], at);
+  else if (kind === 'lightDirection') values.set([...COIN_LIGHT.direction, 0], at);
+  else if (kind in AMBIENT_CHANNELS) values.set([0, 0, 0, COIN_AMBIENT[AMBIENT_CHANNELS[kind]]], at);
+  else throw new Error(`coin shader ${shaderName} asks for the built-in "${kind}", which the coin stage does not fill`);
 }
 
 /**

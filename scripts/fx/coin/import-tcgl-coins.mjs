@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GRAB_TEXTURE, bakeMaterial, buildShader, runtimeShader } from '../attack/lib/shader-variant.mjs';
+import { DYNAMIC_PARAMS, GRAB_TEXTURE, STATIC_PARAMS, bakeMaterial, buildShader, runtimeShader } from '../attack/lib/shader-variant.mjs';
 import { packCoinMesh, parseCoinObj } from './lib/coin-mesh.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -21,6 +21,53 @@ const DEFAULT_OUT = path.join(REPO_ROOT, 'client', 'src', 'assets', 'coins', 'tc
 export const BACK_MATERIAL = 'Back';
 /** A sampler nothing is bound to reads Unity's default texture of that name ('' is gray). */
 const DEFAULT_TEXTURES = new Set(['white', 'black', 'gray', 'bump', 'red']);
+
+/** Unity's forward base pass for a lit, non-lightmapped object: one directional light plus probe ambient. */
+export const COIN_KEYWORDS = new Set(['DIRECTIONAL', 'LIGHTPROBE_SH']);
+
+/** The coin stage's light and flat ambient (the constant SH band), filled per frame (coin-stage-math.mjs). */
+export const COIN_DYNAMIC_PARAMS = Object.freeze({
+  ...DYNAMIC_PARAMS,
+  _LightColor0: 'lightColor',
+  _WorldSpaceLightPos0: 'lightDirection',
+  unity_SHAr: 'ambientRed',
+  unity_SHAg: 'ambientGreen',
+  unity_SHAb: 'ambientBlue',
+});
+
+const ZERO = [0, 0, 0, 0];
+const IDENTITY = STATIC_PARAMS.unity_ObjectToWorld;
+/**
+ * Unity's per-draw lighting state for a lone coin: no lightmap or shadow mask (the occlusion selector
+ * picks the always-1 channel, else direct light is multiplied by 0), positive scale (bitangent sign 1),
+ * one reflection probe without box projection whose cube is not HDR-encoded, no light probe volume,
+ * and ambient without direction (only the SH constant band, which the stage fills).
+ */
+export const COIN_STATIC_PARAMS = Object.freeze({
+  ...STATIC_PARAMS,
+  unity_SHBr: ZERO,
+  unity_SHBg: ZERO,
+  unity_SHBb: ZERO,
+  unity_SHC: ZERO,
+  unity_WorldTransformParams: [0, 0, 0, 1],
+  unity_OcclusionMaskSelector: [1, 0, 0, 0],
+  unity_SpecCube0_HDR: [1, 1, 0, 0],
+  unity_SpecCube0_BoxMin: [0, 0, 0, 1],
+  unity_SpecCube0_BoxMax: ZERO,
+  unity_SpecCube0_ProbePosition: ZERO,
+  unity_SpecCube1_HDR: [1, 1, 0, 0],
+  unity_SpecCube1_BoxMin: ZERO,
+  unity_SpecCube1_BoxMax: ZERO,
+  unity_SpecCube1_ProbePosition: ZERO,
+  unity_ProbeVolumeParams: ZERO,
+  unity_ProbeVolumeWorldToObject: IDENTITY,
+  unity_ProbeVolumeSizeInv: ZERO,
+  unity_ProbeVolumeMin: ZERO,
+});
+
+/** Unity's reflection-probe samplers. The overlay scene's probe is not in the extract, so the coins' own cube stands in. */
+const REFLECTION_PROBES = new Set(['unity_SpecCube0', 'unity_SpecCube1']);
+export const ENVIRONMENT_CUBE = 'T_Coins_Cubemap';
 
 const parseArgs = (argv) => {
   const args = { src: null, obj: null, out: DEFAULT_OUT };
@@ -54,8 +101,8 @@ export function buildCoinAssets(raw) {
     if (shaderIndexByKey.has(key)) return shaderIndexByKey.get(key);
     const rawShader = raw.shaders[key];
     if (!rawShader || rawShader.builtin) throw new Error(`shader ${key} is not in the dump`);
-    const built = buildShader(rawShader);
-    const runtime = runtimeShader(built);
+    const built = buildShader(rawShader, { enabledKeywords: COIN_KEYWORDS });
+    const runtime = runtimeShader(built, { dynamicParams: COIN_DYNAMIC_PARAMS });
     const source = JSON.stringify(runtime);
     if (!shaderIndexBySource.has(source)) {
       shaderIndexBySource.set(source, shaders.length);
@@ -81,6 +128,8 @@ export function buildCoinAssets(raw) {
     return texture.name;
   };
 
+  const environmentKey = Object.keys(raw.textures).find((key) => raw.textures[key].name === ENVIRONMENT_CUBE && raw.textures[key].cube);
+
   const materialIndex = (key) => {
     if (materialIndexByKey.has(key)) return materialIndexByKey.get(key);
     const material = raw.materials[key];
@@ -92,6 +141,10 @@ export function buildCoinAssets(raw) {
       material.textures[name]?.texture ?? (rawShader.nonModifiableTextures ?? []).find(([entry]) => entry === name)?.[1] ?? null;
     const resolveTexture = (name) => {
       if (name === GRAB_TEXTURE) return '#grab';
+      if (REFLECTION_PROBES.has(name)) {
+        if (!environmentKey) throw new Error(`${material.name}: ${name} needs the cube map ${ENVIRONMENT_CUBE}, which is not in the dump`);
+        return textureId(environmentKey);
+      }
       const textureKey = boundTexture(name);
       if (textureKey) return textureId(textureKey);
       const fallback = props.get(name)?.m_DefTexture?.m_DefaultName || 'gray';
@@ -102,7 +155,12 @@ export function buildCoinAssets(raw) {
       const textureKey = boundTexture(name);
       return textureKey ? { width: raw.textures[textureKey].width, height: raw.textures[textureKey].height } : null;
     };
-    const baked = bakeMaterial(material, builtShaders[index], rawShader, { resolveTexture, textureSize });
+    const baked = bakeMaterial(material, builtShaders[index], rawShader, {
+      resolveTexture,
+      textureSize,
+      dynamicParams: COIN_DYNAMIC_PARAMS,
+      staticParams: COIN_STATIC_PARAMS,
+    });
     for (const name of baked.missing) warnings.add(`${rawShader.name}: no value for ${name} (reads 0)`);
     materials.push({
       n: material.name,

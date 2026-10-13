@@ -20,7 +20,7 @@ export const DYNAMIC_PARAMS = Object.freeze({
   _WorldSpaceCameraPos: 'cameraPosition',
   _ProjectionParams: 'projection',
 });
-const STATIC_PARAMS = { unity_ObjectToWorld: IDENTITY, unity_WorldToObject: IDENTITY };
+export const STATIC_PARAMS = Object.freeze({ unity_ObjectToWorld: IDENTITY, unity_WorldToObject: IDENTITY });
 export const GRAB_TEXTURE = '_GrabTexture';
 
 const tagsOf = (tagMap) => Object.fromEntries(tagMap?.tags ?? []);
@@ -39,9 +39,9 @@ const isShadowPass = (shader, pass) =>
   (pass.fragment?.variants ?? []).every((variant) => keywordNames(shader, variant).includes('UNITY_PASS_SHADOWCASTER'));
 
 /** The variant whose keywords are all on in the game, the one with the most of them. */
-export function pickVariant(shader, program) {
+export function pickVariant(shader, program, enabledKeywords = ENABLED_KEYWORDS) {
   const usable = program.variants
-    .filter((variant) => variant.asm && keywordNames(shader, variant).every((keyword) => ENABLED_KEYWORDS.has(keyword)))
+    .filter((variant) => variant.asm && keywordNames(shader, variant).every((keyword) => enabledKeywords.has(keyword)))
     .sort((a, b) => b.keywords.length - a.keywords.length);
   if (usable.length === 0) throw new Error(`${shader.name}: no variant for the enabled keywords`);
   if (usable[0].params.error) throw new Error(`${shader.name}: parameter table unread (${usable[0].params.error})`);
@@ -80,9 +80,9 @@ export function mergeParameters(pass, program, variant) {
   return { buffers, slots, textures };
 }
 
-const translateStage = (shader, pass, stage) => {
+const translateStage = (shader, pass, stage, enabledKeywords) => {
   const program = pass[stage];
-  const variant = pickVariant(shader, program);
+  const variant = pickVariant(shader, program, enabledKeywords);
   const translated = transpile(variant.asm, { stage });
   const merged = mergeParameters(pass, program, variant);
   const buffers = translated.buffers.map((buffer) => {
@@ -128,8 +128,9 @@ export function checkStageLink(name, vertexAsm, fragmentAsm) {
  * @returns {{name:string, grab:boolean, queue:number, blend:{src:number,dst:number,srcAlpha:number,dstAlpha:number},
  *   cull:number, vs:string, fs:string, attributes:object[], buffers:{v:object[], f:object[]}, textures:object[],
  *   usesFragCoord:boolean}}
+ * `enabledKeywords` replaces the keywords the game has on, for a draw that is not a particle.
  */
-export function buildShader(shader) {
+export function buildShader(shader, { enabledKeywords = ENABLED_KEYWORDS } = {}) {
   const pass = shader.passes.find((entry) => entry.type === PASS_NORMAL && !isShadowPass(shader, entry));
   if (!pass) throw new Error(`${shader.name}: no drawable pass`);
   const state = pass.state;
@@ -137,8 +138,8 @@ export function buildShader(shader) {
   for (const [label, value] of [['srcBlend', blend.srcBlend], ['destBlend', blend.destBlend], ['culling', state.culling]]) {
     if (value.name && value.name !== '<noninit>') throw new Error(`${shader.name}: ${label} is driven by the property ${value.name}`);
   }
-  const vertex = translateStage(shader, pass, 'vertex');
-  const fragment = translateStage(shader, pass, 'fragment');
+  const vertex = translateStage(shader, pass, 'vertex', enabledKeywords);
+  const fragment = translateStage(shader, pass, 'fragment', enabledKeywords);
   if (vertex.textures.length > 0) throw new Error(`${shader.name}: vertex textures are not supported`);
   checkStageLink(shader.name, vertex.asm, fragment.asm);
   return {
@@ -187,8 +188,14 @@ export function globalValue(name, floats, material, props, textureSize) {
  * One material's uniforms for `shader` (a `buildShader` result): each buffer's floats, where the
  * stage patches the per-frame built-ins, and the texture bound to each sampler.
  * `resolveTexture(name) → string` maps a sampler name to a texture key or a default's name.
+ * `dynamicParams` / `staticParams` replace the built-in tables for a stage that fills more of them.
  */
-export function bakeMaterial(material, shader, rawShader, { resolveTexture, textureSize }) {
+export function bakeMaterial(
+  material,
+  shader,
+  rawShader,
+  { resolveTexture, textureSize, dynamicParams = DYNAMIC_PARAMS, staticParams = STATIC_PARAMS }
+) {
   const props = new Map(rawShader.props.map((prop) => [prop.m_Name, prop]));
   const missing = [];
   const bake = (stage) =>
@@ -196,9 +203,9 @@ export function bakeMaterial(material, shader, rawShader, { resolveTexture, text
       const data = new Array(buffer.length * 4).fill(0);
       for (const param of buffer.params) {
         const at = param.offset / 4;
-        if (at >= data.length || param.name in DYNAMIC_PARAMS) continue;
+        if (at >= data.length || param.name in dynamicParams) continue;
         let value = null;
-        if (param.name in STATIC_PARAMS) value = STATIC_PARAMS[param.name];
+        if (param.name in staticParams) value = staticParams[param.name];
         else if (buffer.name === '$Globals') value = globalValue(param.name, param.floats, material, props, textureSize);
         if (value === null) missing.push(`${buffer.name}.${param.name}`);
         (value ?? []).forEach((number, index) => {
@@ -216,14 +223,14 @@ export function bakeMaterial(material, shader, rawShader, { resolveTexture, text
 }
 
 /** What the stage needs of a `buildShader` result: sources, state, and where the per-frame built-ins go. */
-export function runtimeShader(shader) {
+export function runtimeShader(shader, { dynamicParams = DYNAMIC_PARAMS } = {}) {
   const slim = (buffers) =>
     buffers.map((buffer) => ({
       uniform: buffer.uniform,
       length: buffer.length,
       dynamic: buffer.params
-        .filter((param) => param.name in DYNAMIC_PARAMS && param.offset / 4 < buffer.length * 4)
-        .map((param) => ({ at: param.offset / 4, kind: DYNAMIC_PARAMS[param.name] })),
+        .filter((param) => param.name in dynamicParams && param.offset / 4 < buffer.length * 4)
+        .map((param) => ({ at: param.offset / 4, kind: dynamicParams[param.name] })),
     }));
   return {
     name: shader.name,

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  COIN_AMBIENT,
   COIN_BACK_SUBMESH,
   COIN_CAMERA,
   COIN_FRONT_SUBMESH,
@@ -108,32 +109,58 @@ test('multiplyMatrices follows column-major order', () => {
   assert.equal(product[0], 2);
 });
 
-test('shaderUniformBlocks fills the dynamic slots and the light the importer left at zero', () => {
-  const coin = coins.cn_absolmega_slvi ?? Object.values(coins).find((entry) => entry.front !== null);
-  const material = materials[coin.front];
-  const shader = shaders[material.shader];
-  const viewProjection = coinViewProjection({ width: 200, height: 100, radius: 1.7 });
-  const blocks = shaderUniformBlocks(shader, material, { viewProjection, cameraPosition: [1, 2, 3], timeSeconds: 4 });
+const frameFor = () => ({
+  viewProjection: coinViewProjection({ width: 200, height: 100, radius: 1.7 }),
+  cameraPosition: [1, 2, 3],
+  timeSeconds: 4,
+});
 
-  const vcb2 = blocks.vcb2;
-  assert.deepEqual(Array.from(vcb2.slice(68, 84)), Array.from(viewProjection), 'view-projection in vcb2 at float 68');
-
-  const fcb1 = blocks.fcb1;
-  assert.deepEqual(Array.from(fcb1.slice(16, 19)), [1, 2, 3], 'camera position at float 16');
-
-  if (shader.name === 'TPCi/Surface/BumpSpec Relective') {
-    assert.deepEqual(Array.from(blocks.fcb0.slice(8, 11)), COIN_LIGHT.color, 'light colour in fcb0[2]');
-    assert.deepEqual(Array.from(blocks.fcb2.slice(0, 3)), COIN_LIGHT.direction, 'light direction in fcb2[0]');
+/** The floats a dynamic slot of `kind` received, from the first block of `shader` that has one. */
+const dynamicValues = (shader, blocks, kind, count) => {
+  for (const buffer of [...shader.buffers.v, ...shader.buffers.f]) {
+    const slot = buffer.dynamic.find((entry) => entry.kind === kind);
+    if (slot) return Array.from(blocks[buffer.uniform].slice(slot.at, slot.at + count));
   }
+  return null;
+};
+
+test('shaderUniformBlocks fills view-projection, camera, light and ambient', () => {
+  const material = materials[coins.cn_absolmega_slvi.front];
+  const shader = shaders[material.shader];
+  const frame = frameFor();
+  const blocks = shaderUniformBlocks(shader, material, frame);
+
+  assert.deepEqual(dynamicValues(shader, blocks, 'viewProjection', 16), Array.from(frame.viewProjection), 'view-projection');
+  assert.deepEqual(dynamicValues(shader, blocks, 'cameraPosition', 3), [1, 2, 3], 'camera position');
+  const close = (actual, expected) => actual.every((value, index) => Math.abs(value - expected[index]) < 1e-6);
+  assert.ok(close(dynamicValues(shader, blocks, 'lightColor', 4), [...COIN_LIGHT.color, 1]), 'light colour');
+  assert.ok(close(dynamicValues(shader, blocks, 'lightDirection', 4), [...COIN_LIGHT.direction, 0]), 'light direction, w 0');
+  assert.ok(close(dynamicValues(shader, blocks, 'ambientGreen', 4), [0, 0, 0, COIN_AMBIENT[1]]), 'ambient only in the constant band');
   assert.equal(material.v[0].length, blocks.vcb0.length, 'material constants keep their length');
 });
 
-test('shaderUniformBlocks: the light sits in a block the shader has', () => {
-  const surface = shaders.find((shader) => shader.name === 'TPCi/Surface/BumpSpec Relective');
-  const badShader = { ...surface, buffers: { v: surface.buffers.v, f: surface.buffers.f.filter((block) => block.uniform !== 'fcb0') } };
-  const material = materials.find((entry) => entry.shader === shaders.indexOf(surface));
-  const frame = { viewProjection: new Float32Array(16), cameraPosition: [0, 0, 0], timeSeconds: 0 };
-  assert.throws(() => shaderUniformBlocks(badShader, material, frame), /light block/);
+test('every committed coin shader asks only for built-ins the stage fills', () => {
+  for (const shader of shaders) {
+    const material = materials.find((entry) => entry.shader === shaders.indexOf(shader));
+    assert.doesNotThrow(() => shaderUniformBlocks(shader, material, frameFor()), shader.name);
+  }
+});
+
+test('every committed coin shader is lit: a light colour and direction slot', () => {
+  for (const shader of shaders) {
+    const kinds = [...shader.buffers.v, ...shader.buffers.f].flatMap((buffer) => buffer.dynamic.map((slot) => slot.kind));
+    assert.ok(kinds.includes('lightColor') && kinds.includes('lightDirection'), shader.name);
+  }
+});
+
+test('shaderUniformBlocks refuses a built-in the stage does not fill', () => {
+  const shader = shaders[0];
+  const material = materials.find((entry) => entry.shader === 0);
+  const unknown = {
+    ...shader,
+    buffers: { v: shader.buffers.v, f: [{ ...shader.buffers.f[0], dynamic: [{ at: 0, kind: 'projection' }] }, ...shader.buffers.f.slice(1)] },
+  };
+  assert.throws(() => shaderUniformBlocks(unknown, material, frameFor()), /"projection"/);
 });
 
 test('glslBody drops the version line three.js writes itself', () => {

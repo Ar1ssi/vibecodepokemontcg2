@@ -108,7 +108,10 @@ const applySampling = (texture, entry) => {
 /** A sampler's texture: a built-in, an imported 2D or cube map, or a real-world scan (`{ url }`). */
 async function loadSource(assets, sampler) {
   const { source, type } = sampler;
-  if (source.builtin) return builtinTexture(`#${source.builtin}`);
+  if (source.builtin) {
+    if (type === 'samplerCube') throw new Error(`TCG Live coin sampler ${sampler.uniform} is a cube map bound to the 2D default #${source.builtin}`);
+    return builtinTexture(`#${source.builtin}`);
+  }
   if (source.url) {
     return cached(source.url, async () => {
       const texture = await textureLoader.loadAsync(source.url);
