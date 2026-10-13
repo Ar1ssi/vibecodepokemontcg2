@@ -159,21 +159,45 @@ export function coinTangents(mesh) {
   return out;
 }
 
+/** The picker preview's tilt at the edge of the coin, in degrees about each axis. */
+export const COIN_TILT_MAX_DEG = 28;
+
 /**
- * The disc at `angleDeg` (coinFlipAngle, plus COIN_REST_DEG) lifted `lift` (0–1) of the arc. Returns
- * new arrays, so the stage can upload them each frame.
+ * The picker preview's pose for a pointer at (`x`, `y`), each -1…1 across the coin (0 = centre). The side
+ * under the pointer leans away from the viewer, as the physical coins' CSS tilt does; outside the coin
+ * clamps to the edge. A missing or non-finite coordinate reads as centre.
+ *
+ * @returns {{ angle: number, yaw: number, lift: number }} degrees, for posedCoin
+ */
+export function coinTiltFromPointer(x, y) {
+  const unit = (value) => (Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0);
+  return { angle: unit(y) * COIN_TILT_MAX_DEG, yaw: unit(x) * COIN_TILT_MAX_DEG, lift: 0 };
+}
+
+/**
+ * The disc at `angleDeg` (coinFlipAngle, plus COIN_REST_DEG) lifted `lift` (0–1) of the arc, then turned
+ * `yawDeg` about the vertical axis (positive turns the face toward +X). Returns new arrays, so the stage
+ * can upload them each frame.
  *
  * @param {{ p: number[], n: number[] }} mesh
  * @param {Float32Array} tangents from coinTangents
  * @param {number} angleDeg
  * @param {number} lift
+ * @param {number} [yawDeg]
  */
-export function posedCoin(mesh, tangents, angleDeg, lift) {
+export function posedCoin(mesh, tangents, angleDeg, lift, yawDeg = 0) {
   const radians = ((angleDeg + COIN_REST_DEG) * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
+  const yawRadians = ((Number.isFinite(yawDeg) ? yawDeg : 0) * Math.PI) / 180;
+  const yawCos = Math.cos(yawRadians);
+  const yawSin = Math.sin(yawRadians);
   const rise = (Number.isFinite(lift) ? lift : 0) * COIN_LIFT_UNITS;
-  const rotate = (x, y, z) => [x, y * cos - z * sin, y * sin + z * cos];
+  const rotate = (x, y, z) => {
+    const tumbledY = y * cos - z * sin;
+    const tumbledZ = y * sin + z * cos;
+    return [x * yawCos + tumbledZ * yawSin, tumbledY, -x * yawSin + tumbledZ * yawCos];
+  };
   const positions = new Float32Array(mesh.p.length);
   const normals = new Float32Array(mesh.n.length);
   const tangentsOut = new Float32Array(tangents.length);

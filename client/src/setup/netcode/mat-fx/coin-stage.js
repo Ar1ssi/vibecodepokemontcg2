@@ -192,7 +192,7 @@ const submeshNamed = (mesh, name) => {
  * caller keeps the CSS ceremony. `onLost` runs once if the browser drops the context mid-flip.
  *
  * @param {{ host: HTMLElement, onLost?: () => void }} options
- * @returns {Promise<{ setCoin: (coin: { id: string, artUrl?: string }) => Promise<void>, draw: (pose: { angle: number, lift: number }, elapsedMs: number) => void, dispose: () => void }>}
+ * @returns {Promise<{ setCoin: (coin: { id: string, artUrl?: string }) => Promise<void>, draw: (pose: { angle: number, lift: number, yaw?: number }, elapsedMs: number) => void, resize: () => void, dispose: () => void }>}
  */
 export async function createCoinStage({ host, onLost = () => {} }) {
   const assets = await loadAssets();
@@ -234,9 +234,10 @@ export async function createCoinStage({ host, onLost = () => {} }) {
   };
   canvas.addEventListener('webglcontextlost', onContextLost);
 
+  // The canvas's own CSS box: a host may let it overhang (the picker preview does, so a tilted coin is not clipped).
   const resize = () => {
-    const width = Math.max(1, host.clientWidth);
-    const height = Math.max(1, host.clientHeight);
+    const width = Math.max(1, canvas.clientWidth || host.clientWidth);
+    const height = Math.max(1, canvas.clientHeight || host.clientHeight);
     renderer.setSize(width, height, false);
     state.viewProjection = coinViewProjection({ width, height, radius: assets.radius });
   };
@@ -254,9 +255,9 @@ export async function createCoinStage({ host, onLost = () => {} }) {
     mesh.material = built.map(({ material }) => material);
   };
 
-  const draw = ({ angle, lift }, elapsedMs) => {
+  const draw = ({ angle, lift, yaw = 0 }, elapsedMs) => {
     if (state.closed || state.lost || state.materials.length === 0) return;
-    const posed = posedCoin(assets.mesh, assets.tangents, angle, lift);
+    const posed = posedCoin(assets.mesh, assets.tangents, angle, lift, yaw);
     positions.set(posed.positions);
     normals.set(posed.normals);
     tangents.set(posed.tangents);
@@ -282,5 +283,5 @@ export async function createCoinStage({ host, onLost = () => {} }) {
     canvas.remove();
   };
 
-  return { setCoin, draw, dispose };
+  return { setCoin, draw, resize, dispose };
 }

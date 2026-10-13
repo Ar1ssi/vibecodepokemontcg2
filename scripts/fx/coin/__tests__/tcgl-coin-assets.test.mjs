@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { textureFiles } from '../import-tcgl-coins.mjs';
+import { pickerCatalog, plainName, textureFiles } from '../import-tcgl-coins.mjs';
 
 // The committed output of import-tcgl-coins.mjs: every reference in it must resolve.
 const ASSETS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'client', 'src', 'assets', 'coins', 'tcgl');
@@ -52,6 +52,30 @@ test('every cube sampler, the reflection probes included, gets an imported cube 
       assert.ok(textures[name]?.cube, `${material.n}: ${sampler.uniform} is bound to ${name}, not a cube map`);
     });
   }
+});
+
+test('plainName drops loc markup and squeezes spaces', () => {
+  assert.equal(plainName('<i>30th Celebration</i>  Elite Trainer Box'), '30th Celebration Elite Trainer Box');
+  assert.equal(plainName('Mega Absol: Silver Ice'), 'Mega Absol: Silver Ice');
+});
+
+test('pickerCatalog lists named coins by name, maps metal and foil, and needs every thumbnail', () => {
+  const assets = {
+    coins: { cn_b_mtl: { front: 0, back: null }, cn_a_slv: { front: 1, back: null }, cn_wip: { front: 1, back: null } },
+    materials: [{ shader: 0 }, { shader: 1 }],
+    shaders: [{ name: 'TPCi/Surface/BumpSpec Relective' }, { name: 'TPCi/Coins/Foil/Flat_Silver' }],
+  };
+  const names = { cn_b_mtl: 'Beta', cn_a_slv: '<i>Alpha</i>' };
+  const catalog = pickerCatalog(assets, names, new Set(['cn_b_mtl', 'cn_a_slv']));
+  assert.deepEqual(
+    catalog.map(({ id, name, material, family }) => ({ id, name, material, family })),
+    [
+      { id: 'cn_a_slv', name: 'Alpha', material: 'silver', family: 'Flat Silver' },
+      { id: 'cn_b_mtl', name: 'Beta', material: 'metal', family: 'Metal' },
+    ]
+  );
+  assert.equal(catalog[0].thumb, 'src/assets/coins/tcgl/thumbs/cn_a_slv.webp');
+  assert.throws(() => pickerCatalog(assets, names, new Set(['cn_b_mtl'])), /cn_a_slv: named, but no thumbnail/);
 });
 
 test('the coin disc indexes only its own vertices and its submeshes cover every triangle', () => {

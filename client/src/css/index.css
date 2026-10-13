@@ -4613,11 +4613,16 @@ body.side-menu-collapsed #oppResizer {
       user-select: none;
     }
     .native-deck-builder-coin-empty { grid-column: 1 / -1; text-align: center; opacity: 0.6; padding: 3vh 0; font-style: italic; }
-    .coin-material-filter {
+    .coin-material-filter,
+    .coin-source-switch {
       display: flex;
       gap: 4px;
     }
-    .coin-material-filter button {
+    .coin-material-filter[hidden],
+    .coin-region-filter[hidden],
+    .coin-image-toggle[hidden] { display: none; }
+    .coin-material-filter button,
+    .coin-source-switch button {
       font-size: 1.2vh;
       padding: 0.4vh 0.7vw;
       border-radius: 999px;
@@ -4626,10 +4631,17 @@ body.side-menu-collapsed #oppResizer {
       color: inherit;
       cursor: pointer;
     }
-    .coin-material-filter button.active {
+    .coin-material-filter button.active,
+    .coin-source-switch button.active {
       background: rgba(65, 91, 168, 0.3);
       border-color: rgba(120, 144, 214, 0.7);
     }
+    /* TCG Live coins (design 069): the game's own thumbnail, then its live 3D coin over it */
+    .coin-cell .coin-cell-thumb { width: 84px; height: 84px; object-fit: contain; }
+    .coin-stage-preview { position: relative; width: 120px; height: 120px; flex: 0 0 auto; }
+    .coin-stage-preview img { width: 100%; height: 100%; object-fit: contain; }
+    .coin-stage-preview .coin-stage-canvas { position: absolute; inset: -20%; width: 140%; height: 140%; }
+    .coin-stage-preview.is-live img { visibility: hidden; }
     
     /* coin picker panel: shares the customize pane with sleeves */
     .native-deck-builder-coin-picker {

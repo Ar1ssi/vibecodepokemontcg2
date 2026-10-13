@@ -8,7 +8,9 @@ import {
   COIN_FRONT_SUBMESH,
   COIN_LIFT_UNITS,
   COIN_LIGHT,
+  COIN_TILT_MAX_DEG,
   coinTangents,
+  coinTiltFromPointer,
   coinViewProjection,
   discRadius,
   glslBody,
@@ -68,6 +70,32 @@ test('lift raises the whole disc by COIN_LIFT_UNITS at the top of the arc', () =
   const high = posedCoin(mesh, tangents, 40, 1);
   for (let vertex = 0; vertex < mesh.p.length / 3; vertex += 11) {
     assert.ok(Math.abs(high.positions[vertex * 3 + 1] - low.positions[vertex * 3 + 1] - COIN_LIFT_UNITS) < 1e-5);
+  }
+});
+
+test('coinTiltFromPointer: centre is flat; the side under the pointer leans away from the viewer', () => {
+  assert.deepEqual(coinTiltFromPointer(0, 0), { angle: 0, yaw: 0, lift: 0 });
+  const front = (pose) => normalAfter(COIN_FRONT_SUBMESH, posedCoin(mesh, tangents, pose.angle, pose.lift, pose.yaw));
+  assert.ok(front(coinTiltFromPointer(0, -1))[1] > 0.4, 'pointer at the top: the face turns up, its top edge away');
+  assert.ok(front(coinTiltFromPointer(0, 1))[1] < -0.4, 'pointer at the bottom: the face turns down');
+  assert.ok(front(coinTiltFromPointer(1, 0))[0] > 0.4, 'pointer at the right: the face turns right, its right edge away');
+  assert.ok(front(coinTiltFromPointer(-1, 0))[0] < -0.4, 'pointer at the left: the face turns left');
+});
+
+test('coinTiltFromPointer clamps outside the coin and reads a missing coordinate as centre', () => {
+  assert.deepEqual(coinTiltFromPointer(3, -7), { angle: -COIN_TILT_MAX_DEG, yaw: COIN_TILT_MAX_DEG, lift: 0 });
+  assert.deepEqual(coinTiltFromPointer(Number.NaN, undefined), { angle: 0, yaw: 0, lift: 0 });
+});
+
+test('yaw turns the disc about the vertical axis without moving it up or down', () => {
+  const flat = posedCoin(mesh, tangents, 15, 0);
+  const turned = posedCoin(mesh, tangents, 15, 0, 30);
+  for (let vertex = 0; vertex < mesh.p.length / 3; vertex += 7) {
+    const at = vertex * 3;
+    assert.ok(Math.abs(turned.positions[at + 1] - flat.positions[at + 1]) < 1e-6, `vertex ${vertex} keeps its height`);
+    const radiusFlat = Math.hypot(flat.positions[at], flat.positions[at + 2]);
+    const radiusTurned = Math.hypot(turned.positions[at], turned.positions[at + 2]);
+    assert.ok(Math.abs(radiusFlat - radiusTurned) < 1e-5, `vertex ${vertex} stays on its circle about Y`);
   }
 });
 

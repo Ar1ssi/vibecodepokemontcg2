@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// Design 069: build the committed TCG Live coin assets from the dump that
-// scripts/fx/coin/dump_coin_vfx.py writes, and from the extract's coin_model.obj.
+// Design 069: build the committed TCG Live coin assets from the dumps that
+// scripts/fx/coin/dump_coin_vfx.py and dump_coin_thumbs.py write, and from the extract's coin_model.obj.
 //
 //   pnpm fx:import-coins -- --src E:/TCGLive_Extract/vfx_dump/coin_raw \
 //     --obj "E:/TCGLive_Extract/Pokemon TCG Live_Data/resources.assets/Mesh/coin_model.obj"
 //
-// Reads <src>/coin-raw.json and <src>/textures/*.webp, writes client/src/assets/coins/tcgl/:
-// coins.json (each coin's front and back material, baked), shaders.json (the coin shaders translated
-// to GLSL), textures.json and textures/*.webp (cube maps as six faces), coin-mesh.json (the disc).
+// Reads <src>/coin-raw.json, <src>/textures/*.webp, <src>/thumbs/*.webp and <src>/coin-names.json,
+// writes client/src/assets/coins/tcgl/: coins.json (each coin's front and back material, baked),
+// shaders.json (the coin shaders translated to GLSL), textures.json and textures/*.webp (cube maps as
+// six faces), coin-mesh.json (the disc), thumbs/*.webp; and the picker's catalog module (--catalog).
 // Rerun after the game updates its bundles.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +18,11 @@ import { packCoinMesh, parseCoinObj } from './lib/coin-mesh.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const DEFAULT_OUT = path.join(REPO_ROOT, 'client', 'src', 'assets', 'coins', 'tcgl');
+const DEFAULT_CATALOG = path.join(REPO_ROOT, 'client', 'src', 'setup', 'deck-builder', 'core', 'tcgl-coins.generated.mjs');
+/** Where the picker loads a coin's thumbnail, relative to the client root like the physical catalog's paths. */
+const THUMB_URL_DIR = 'src/assets/coins/tcgl/thumbs/';
+/** The plain metal shader; every other coin shader is a holofoil. */
+const METAL_SHADER = 'TPCi/Surface/BumpSpec Relective';
 /** The material TCG Live puts on a coin's reverse; every other material on a coin is its front. */
 export const BACK_MATERIAL = 'Back';
 /** A sampler nothing is bound to reads Unity's default texture of that name ('' is gray). */
@@ -70,17 +76,54 @@ const REFLECTION_PROBES = new Set(['unity_SpecCube0', 'unity_SpecCube1']);
 export const ENVIRONMENT_CUBE = 'T_Coins_Cubemap';
 
 const parseArgs = (argv) => {
-  const args = { src: null, obj: null, out: DEFAULT_OUT };
+  const args = { src: null, obj: null, out: DEFAULT_OUT, catalog: DEFAULT_CATALOG };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--src') args.src = argv[(index += 1)];
     else if (argv[index] === '--obj') args.obj = argv[(index += 1)];
     else if (argv[index] === '--out') args.out = path.resolve(argv[(index += 1)]);
+    else if (argv[index] === '--catalog') args.catalog = path.resolve(argv[(index += 1)]);
   }
   return args;
 };
 
 /** The file names a texture entry writes: one for a 2D texture, six for a cube map. */
 export const textureFiles = (texture) => (texture.cube ? texture.faces : [texture.file]);
+
+/** A loc string as plain text: TCG Live marks titles up with `<i>` and similar tags. */
+export const plainName = (text) => String(text).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+
+/** `TPCi/Coins/Foil/Cracked_Ice` → `Cracked Ice`; the metal shader reads `Metal`. */
+const familyLabel = (shaderName) => (shaderName === METAL_SHADER ? 'Metal' : shaderName.split('/').pop().replaceAll('_', ' '));
+
+/**
+ * The deck-builder picker's TCG Live coins, sorted by name: `{id, name, thumb, url, material, family}`.
+ * `material` picks the physical catalog's CSS finish for the flat token (metal for plain metal coins,
+ * silver for holofoils). A coin the game gives no English name (a work-in-progress bundle) is left out.
+ *
+ * @param {{ coins: object, materials: object[], shaders: object[] }} assets buildCoinAssets output
+ * @param {Record<string, string>} names coin id → loc_en string
+ * @param {Set<string>} thumbIds coins with a dumped thumbnail
+ */
+export function pickerCatalog(assets, names, thumbIds) {
+  const entries = [];
+  for (const [id, { front }] of Object.entries(assets.coins)) {
+    const name = typeof names[id] === 'string' ? plainName(names[id]) : '';
+    if (!name) continue;
+    if (!thumbIds.has(id)) throw new Error(`${id}: named, but no thumbnail was dumped`);
+    const shaderName = assets.shaders[assets.materials[front].shader].name;
+    const thumb = `${THUMB_URL_DIR}${id}.webp`;
+    entries.push({ id, name, thumb, url: thumb, material: shaderName === METAL_SHADER ? 'metal' : 'silver', family: familyLabel(shaderName) });
+  }
+  return entries.sort((a, b) => a.name.localeCompare(b.name, 'en') || a.id.localeCompare(b.id));
+}
+
+const catalogModule = (entries) =>
+  [
+    '// TCG Live coins for the deck-builder picker (design 069). Generated by',
+    '// scripts/fx/coin/import-tcgl-coins.mjs from the extract; do not edit by hand.',
+    `export const TCGL_COINS = ${JSON.stringify(entries, null, 1)};`,
+    '',
+  ].join('\n');
 
 /**
  * The whole coin import as data: `{coins, materials, shaders, textures, warnings}`. `coins` maps a
@@ -194,17 +237,29 @@ const writeJson = (file, value) => fs.writeFileSync(file, `${JSON.stringify(valu
 const main = () => {
   const args = parseArgs(process.argv.slice(2));
   if (!args.src || !args.obj) {
-    console.error('usage: import-tcgl-coins.mjs --src <dir with coin-raw.json> --obj <coin_model.obj> [--out <dir>]');
+    console.error('usage: import-tcgl-coins.mjs --src <dir with coin-raw.json> --obj <coin_model.obj> [--out <dir>] [--catalog <file>]');
     process.exit(2);
   }
   const rawPath = path.join(args.src, 'coin-raw.json');
-  if (!fs.existsSync(rawPath)) {
-    console.error(`not found: ${rawPath} (run scripts/fx/coin/dump_coin_vfx.py first)`);
-    process.exit(2);
+  const namesPath = path.join(args.src, 'coin-names.json');
+  const thumbSourceDir = path.join(args.src, 'thumbs');
+  for (const [needed, dumper] of [[rawPath, 'dump_coin_vfx.py'], [namesPath, 'dump_coin_thumbs.py'], [thumbSourceDir, 'dump_coin_thumbs.py']]) {
+    if (!fs.existsSync(needed)) {
+      console.error(`not found: ${needed} (run scripts/fx/coin/${dumper} first)`);
+      process.exit(2);
+    }
   }
   const raw = JSON.parse(fs.readFileSync(rawPath, 'utf8'));
   const assets = buildCoinAssets(raw);
   const mesh = packCoinMesh(parseCoinObj(fs.readFileSync(args.obj, 'utf8')));
+  const thumbIds = new Set(fs.readdirSync(thumbSourceDir).filter((file) => file.endsWith('.webp')).map((file) => file.slice(0, -'.webp'.length)));
+  const catalog = pickerCatalog(assets, JSON.parse(fs.readFileSync(namesPath, 'utf8')), thumbIds);
+
+  const thumbDir = path.join(args.out, 'thumbs');
+  fs.rmSync(thumbDir, { recursive: true, force: true });
+  fs.mkdirSync(thumbDir, { recursive: true });
+  for (const { id } of catalog) fs.copyFileSync(path.join(thumbSourceDir, `${id}.webp`), path.join(thumbDir, `${id}.webp`));
+  fs.writeFileSync(args.catalog, catalogModule(catalog));
 
   const textureDir = path.join(args.out, 'textures');
   fs.rmSync(textureDir, { recursive: true, force: true });
@@ -225,7 +280,8 @@ const main = () => {
   for (const warning of assets.warnings) console.warn(`warning: ${warning}`);
   console.log(
     `${Object.keys(assets.coins).length} coins, ${assets.materials.length} materials, ${assets.shaders.length} shaders, ` +
-      `${Object.keys(assets.textures).length} textures (${(textureBytes / 1e6).toFixed(1)} MB) -> ${path.relative(REPO_ROOT, args.out)}`
+      `${Object.keys(assets.textures).length} textures (${(textureBytes / 1e6).toFixed(1)} MB) -> ${path.relative(REPO_ROOT, args.out)}; ` +
+      `${catalog.length} picker coins -> ${path.relative(REPO_ROOT, args.catalog)}`
   );
 };
 
