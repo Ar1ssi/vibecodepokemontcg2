@@ -64,6 +64,10 @@ describe('TCG Live foil assets', () => {
     assert.ok(manifest.flat.size > 7000, `only ${manifest.flat.size} flat cards`);
   });
 
+  it('ships thousands of reverse-holo printings', () => {
+    assert.ok(manifest.reverse.size > 8500, `only ${manifest.reverse.size} reverse printings`);
+  });
+
   it('names only shaders and materials that exist', () => {
     for (const name of manifestJson.shaders) assert.ok(shaders[name], `shader ${name}`);
     for (const name of manifestJson.materials) assert.ok(materials.materials[name], `material ${name}`);
@@ -76,7 +80,7 @@ describe('TCG Live foil assets', () => {
 
   it('names only textures that exist', { skip: TEXTURES_SKIP }, () => {
     const missing = [];
-    for (const [key, record] of manifest.records) {
+    for (const [key, record] of [...manifest.records, ...manifest.reverse]) {
       for (const texName of [record.front, record.etch, record.wp, record.cf].filter(Boolean)) {
         if (!fs.existsSync(urlToPath(textureUrl(texName)))) missing.push(`${key}: ${texName}`);
       }
@@ -95,7 +99,7 @@ describe('TCG Live foil assets', () => {
 
   it('keeps card fronts at the native 1024 x 1024', { skip: TEXTURES_SKIP }, () => {
     const resized = [];
-    for (const record of manifest.records.values()) {
+    for (const record of [...manifest.records.values(), ...manifest.reverse.values()]) {
       const { width, height } = webpImageInfo(urlToPath(textureUrl(record.front)));
       if (width !== 1024 || height !== 1024) resized.push(`${record.front} ${width}x${height}`);
     }

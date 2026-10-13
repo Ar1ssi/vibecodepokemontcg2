@@ -603,10 +603,10 @@ export const mountUnboxingScene = ({
     return holder;
   };
 
-  // A card TCG Live prints wears its base printing's foil (or none); the reverse slot keeps the CSS
-  // reverse holo, since only base printings are imported (design 069, O3).
+  // A card TCG Live prints wears its base printing's foil (or none); a reverse-slot card wears TCG Live's
+  // reverse-holo printing, else the CSS reverse holo (design 069).
   const faceRarity = (card, slot) => {
-    const coverage = slot === 'reverse' ? null : tcglFoilCoverage(card);
+    const coverage = tcglFoilCoverage(card, undefined, { reverse: slot === 'reverse' });
     if (coverage === 'foil') return TCGL_FOIL_RARITY;
     if (coverage === 'flat') return null;
     return unboxingHoloRarity(card, slot);
@@ -624,7 +624,12 @@ export const mountUnboxingScene = ({
       img.src = src;
       return img;
     }
-    const holo = buildHoloCard(src, rarity, { trainer: isTrainerCard(card), cardId: foilCardId(card) });
+    const reverse = slot === 'reverse';
+    const holo = buildHoloCard(src, rarity, {
+      trainer: isTrainerCard(card),
+      cardId: foilCardId(card, undefined, { reverse }),
+      reverse,
+    });
     holo.classList.add('bb-card-face');
     holo.querySelector('img')?.addEventListener(
       'error',

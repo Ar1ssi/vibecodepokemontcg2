@@ -105,30 +105,43 @@ export function resolveHoloEffect(card = {}) {
 
 // ── TCG Live foil (design 069) ──────────────────────────────────────
 // A card TCG Live prints decides its own foil: its base printing's foil (`'tcgl'`, the game's shader and
-// masks) or none (`null`, a NonFoil printing), whatever the TCGdex rarity says. Cards TCG Live does not
-// cover — or every card while the manifest is not loaded — keep the CSS holo above.
+// masks) or none (`null`, a NonFoil printing), whatever the TCGdex rarity says. A reverse-holo card wears TCG
+// Live's reverse printing (MaterialManifest_ph) when the game has one. Cards TCG Live does not cover — or
+// every card while the manifest is not loaded — keep the CSS holo above.
 export const TCGL_FOIL_RARITY = 'tcgl';
+
+// The set browser's reverse-holo copies carry `<tcgdex id>-reverse` (set-browser buildReverseHoloEnergyCard).
+const REVERSE_ID_SUFFIX = /-reverse$/i;
 
 const cardIdCandidates = (card) =>
   [
     card?.id,
     card?.data?.id,
     extractTcgdexIdFromImageUrl(card?.image?.src ?? card?.imageUrl ?? card?.src),
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .map((id) => String(id).replace(REVERSE_ID_SUFFIX, ''));
 
-/** The TCGdex id the foil manifest knows this card by (else the first id it has, else null). */
-export function foilCardId(card, manifest = foilManifestNow()) {
+/** A card whose rarity names a reverse-holo printing (set browser copies, rarity "Reverse Holo"). */
+export const isReverseHoloCard = (card) => !!card && resolveRarityEffect(card) === 'reverse holo';
+
+/**
+ * The TCGdex id the foil manifest knows this card by (else the first id it has, else null). `reverse` looks in
+ * the reverse-holo printings; it defaults to the card's own rarity.
+ */
+export function foilCardId(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card) } = {}) {
   const ids = cardIdCandidates(card);
-  return ids.find((id) => foilCoverage(manifest, id)) ?? ids[0] ?? null;
+  return ids.find((id) => foilCoverage(manifest, id, { reverse })) ?? ids[0] ?? null;
 }
 
 /** 'foil' | 'flat' | null — see foilCoverage; null for a card without any id. */
-export function tcglFoilCoverage(card, manifest = foilManifestNow()) {
+export function tcglFoilCoverage(card, manifest = foilManifestNow(), { reverse = isReverseHoloCard(card) } = {}) {
   if (!card || !manifest) return null;
-  return foilCoverage(manifest, foilCardId(card, manifest));
+  return foilCoverage(manifest, foilCardId(card, manifest, { reverse }), { reverse });
 }
 
 export function resolveFoilEffect(card = {}, manifest = foilManifestNow()) {
+  // A reverse printing TCG Live lacks is never 'flat': the card falls through to the CSS reverse holo.
   const coverage = tcglFoilCoverage(card, manifest);
   if (coverage === 'foil') return TCGL_FOIL_RARITY;
   if (coverage === 'flat') return null;
@@ -377,11 +390,12 @@ export function isTrainerGalleryImageUrl(src) {
 }
 
 // Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2. Rarity 'tcgl' also
-// mounts the TCG Live foil canvas for `cardId` (else the id in the image URL); its simey layers stay hidden.
+// mounts the TCG Live foil canvas for `cardId` (else the id in the image URL) — its reverse-holo printing when
+// `reverse` — and its simey layers stay hidden.
 export function buildHoloCard(
   imageUrl,
   rarityValue,
-  { trainer = false, cardId = null, manifest = foilManifestNow() } = {}
+  { trainer = false, cardId = null, reverse = false, manifest = foilManifestNow() } = {}
 ) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -432,7 +446,7 @@ export function buildHoloCard(
   card.appendChild(translater);
 
   if (rarityValue === TCGL_FOIL_RARITY) {
-    const record = foilRecordFor(manifest, cardId ?? extractTcgdexIdFromImageUrl(imageUrl));
+    const record = foilRecordFor(manifest, cardId ?? extractTcgdexIdFromImageUrl(imageUrl), { reverse });
     if (record) mountTcglFoil(card, record);
     else card.dataset.tcglFoil = 'fallback';
   }

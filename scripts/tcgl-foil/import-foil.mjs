@@ -5,7 +5,8 @@
 //
 // Reads <src>/cardart/manifests.jsonl (each card bundle's MaterialManifest records), <src>/card_database_rows.tsv
 // (TCG Live card names) and the TCGdex set endpoints (cached under .cache/tcgdex-sets/), maps every TCG Live
-// card to its TCGdex id, then has extract-textures.py decode the card textures and the MAT_Cards3D material
+// card to its TCGdex id, then has extract-textures.py decode the card textures (base printing, plus the reverse-holo
+// printing's MaterialManifest_ph: same front, its own `_wp_ph_` white plate) and the MAT_Cards3D material
 // textures as lossless WebP at native size. Writes client/src/assets/tcgl-foil/: manifest.json, materials.json,
 // shaders.json (byte copy of the WebApp's translated shaders), tex/*.webp and cards/<set>/*.webp. The three JSON
 // files are committed; the textures are gitignored and go to object storage with `pnpm foil:upload`.
@@ -53,15 +54,18 @@ const parseArgs = (argv) => {
 };
 
 /** bundle → its base MaterialManifest record. */
-function readBaseManifests(file) {
-  const byBundle = new Map();
+/** bundle → its base printing's MaterialManifest; reverse-holo MaterialManifest_ph records by bundle beside it. */
+function readManifests(file) {
+  const base = new Map();
+  const reverse = new Map();
   for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     for (const record of JSON.parse(line)) {
-      if (record.manifest === 'MaterialManifest') byBundle.set(record.bundle, record);
+      if (record.manifest === 'MaterialManifest') base.set(record.bundle, record);
+      else if (record.manifest === 'MaterialManifest_ph') reverse.set(record.bundle, record);
     }
   }
-  return byBundle;
+  return { base, reverse };
 }
 
 /** TCG Live card id (`sv1_258`) → English name, base printings only. */
@@ -95,11 +99,30 @@ async function tcgdexSet(id, tcgdexDir) {
 
 const bundleNumber = (bundle) => Number(/_en_(\d+)$/.exec(bundle)?.[1] ?? NaN);
 const setOfBundle = (bundle) => bundle.replace(/_en_\d+$/, '');
-const textureNames = (entry) => [entry.front, entry.etch, entry.wp, entry.cf].filter(Boolean);
+const printingTextures = (printing) =>
+  printing ? [printing.front, printing.etch, printing.wp, printing.cf].filter(Boolean) : [];
+/** Every texture the bundle must yield: the foil base printing's and the reverse printing's. */
+const bundleTextures = (entry) => [...new Set([...printingTextures(entry.foil ? entry : null), ...printingTextures(entry.reverse)])];
+
+/** The fields a foil printing ships with, from one MaterialManifest record; null for a NonFoil record. */
+function printingOf(record, bundle) {
+  if (!record) return null;
+  const shader = legacyShaderName(record._s);
+  if (shader.endsWith('NonFoil')) return null;
+  return {
+    shader,
+    material: materialName(record._f),
+    front: record._c || bundle,
+    etch: record._e || '',
+    wp: record._w || '',
+    cf: record._cf || '',
+    cc: record._cc || '',
+  };
+}
 
 async function mapCards({ manifests, names, sets, tcgdexDir }) {
   const bundlesBySet = new Map();
-  for (const bundle of manifests.keys()) {
+  for (const bundle of manifests.base.keys()) {
     const set = setOfBundle(bundle);
     if (!bundlesBySet.has(set)) bundlesBySet.set(set, []);
     bundlesBySet.get(set).push(bundle);
@@ -110,7 +133,7 @@ async function mapCards({ manifests, names, sets, tcgdexDir }) {
     if (sets && !sets.has(code)) continue;
     const segmentsDef = TCGL_TO_TCGDEX_SETS[code];
     if (!segmentsDef) {
-      report.push({ code, total: bundles.length, foil: 0, flat: 0, unmapped: bundles.length, note: 'no TCGdex set' });
+      report.push({ code, total: bundles.length, foil: 0, flat: 0, reverse: 0, unmapped: bundles.length, note: 'no TCGdex set' });
       continue;
     }
     const segments = [];
@@ -126,26 +149,29 @@ async function mapCards({ manifests, names, sets, tcgdexDir }) {
     }
     const { matched, unmapped } = matchSetCards(tcglCards, segments);
     let foil = 0;
+    let reverse = 0;
     for (const card of tcglCards) {
       const tcgdexId = matched.get(card.tcglId);
       if (!tcgdexId) continue;
-      const record = manifests.get(card.bundle);
-      const shader = legacyShaderName(record._s);
-      const isFoil = !shader.endsWith('NonFoil');
-      if (isFoil) foil += 1;
+      const baseRecord = manifests.base.get(card.bundle);
+      const base = printingOf(baseRecord, card.bundle);
+      const reversePrinting = printingOf(manifests.reverse.get(card.bundle), card.bundle);
+      if (base) foil += 1;
+      if (reversePrinting) reverse += 1;
       entries.push({
         tcgdexId,
         tcglId: card.tcglId,
         code,
         bundle: card.bundle,
-        foil: isFoil,
-        shader,
-        material: materialName(record._f),
-        front: record._c || card.bundle,
-        etch: record._e || '',
-        wp: record._w || '',
-        cf: record._cf || '',
-        cc: record._cc || '',
+        foil: !!base,
+        shader: base?.shader ?? legacyShaderName(baseRecord._s),
+        material: base?.material ?? materialName(baseRecord._f),
+        front: base?.front ?? (baseRecord._c || card.bundle),
+        etch: base?.etch ?? '',
+        wp: base?.wp ?? '',
+        cf: base?.cf ?? '',
+        cc: base?.cc ?? '',
+        reverse: reversePrinting,
       });
     }
     const missed = [...unmapped, ...nameless];
@@ -154,6 +180,7 @@ async function mapCards({ manifests, names, sets, tcgdexDir }) {
       total: bundles.length,
       foil,
       flat: matched.size - foil,
+      reverse,
       unmapped: missed.length,
       examples: missed.slice(0, 4).map((id) => `${id} ${names.get(id) ?? '(no name)'}`),
     });
@@ -166,10 +193,15 @@ function printReport(report) {
     const share = row.total ? Math.round((100 * row.unmapped) / row.total) : 0;
     const flag = share > 10 ? '  <-- over 10% unmapped' : '';
     const detail = row.note ?? (row.examples?.length ? `e.g. ${row.examples.join('; ')}` : '');
-    console.log(`${row.code.padEnd(10)} total ${row.total} foil ${row.foil} flat ${row.flat} unmapped ${row.unmapped}${flag} ${detail}`);
+    console.log(
+      `${row.code.padEnd(10)} total ${row.total} foil ${row.foil} flat ${row.flat} reverse ${row.reverse} ` +
+        `unmapped ${row.unmapped}${flag} ${detail}`
+    );
   }
   const sum = (key) => report.reduce((n, row) => n + row[key], 0);
-  console.log(`ALL total ${sum('total')} foil ${sum('foil')} flat ${sum('flat')} unmapped ${sum('unmapped')}`);
+  console.log(
+    `ALL total ${sum('total')} foil ${sum('foil')} flat ${sum('flat')} reverse ${sum('reverse')} unmapped ${sum('unmapped')}`
+  );
 }
 
 function runExtraction(job) {
@@ -199,14 +231,14 @@ const dirBytes = (dir) =>
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.src) throw new Error('usage: import-foil.mjs --src <TCG Live extract> [--unity-cache <dir>] [--sets a,b] [--dry-run] [--force]');
-  const manifests = readBaseManifests(path.join(args.src, 'cardart', 'manifests.jsonl'));
+  const manifests = readManifests(path.join(args.src, 'cardart', 'manifests.jsonl'));
   const names = readCardNames(path.join(args.src, 'card_database_rows.tsv'));
   const { entries, report } = await mapCards({ manifests, names, sets: args.sets, tcgdexDir: args.tcgdexDir });
   printReport(report);
   if (args.dryRun) return;
 
-  const foils = entries.filter((e) => e.foil);
-  const misfiled = foils.filter((e) => textureNames(e).some((name) => !name.startsWith(`${e.code}_`)));
+  const foils = entries.filter((e) => e.foil || e.reverse);
+  const misfiled = foils.filter((e) => bundleTextures(e).some((name) => !name.startsWith(`${e.code}_`)));
   const job = {
     bundlesDir: path.join(args.src, 'cardart', 'bundles'),
     shadersBundle: path.join(args.unityCache, 'shadersbundle'),
@@ -218,7 +250,7 @@ async function main() {
     workers: Math.max(1, os.cpus().length - 1),
     cards: foils
       .filter((e) => !misfiled.includes(e))
-      .map((e) => ({ bundle: e.bundle, set: e.code, textures: textureNames(e) })),
+      .map((e) => ({ bundle: e.bundle, set: e.code, textures: bundleTextures(e) })),
   };
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const result = runExtraction(job);
@@ -229,26 +261,38 @@ async function main() {
   const materials = JSON.parse(fs.readFileSync(job.materialsOut, 'utf8'));
 
   const dropped = [];
-  const shipped = entries.filter((e) => {
-    if (!e.foil) return true;
+  const unshippable = (e, printing) => {
     const present = new Set(result.present[e.bundle] ?? []);
-    const why = misfiled.includes(e)
-      ? 'texture outside its set folder'
-      : !textureNames(e).every((name) => present.has(name))
-        ? 'texture missing or undecodable'
-        : !shaders[e.shader]
-          ? `shader ${e.shader} not exported`
-          : null;
+    if (misfiled.includes(e)) return 'texture outside its set folder';
+    if (!printingTextures(printing).every((name) => present.has(name))) return 'texture missing or undecodable';
+    if (!shaders[printing.shader]) return `shader ${printing.shader} not exported`;
+    return null;
+  };
+  // A reverse printing that cannot ship leaves the card on the CSS reverse holo; its base printing still ships.
+  for (const e of entries) {
+    const why = e.reverse ? unshippable(e, e.reverse) : null;
+    if (why) {
+      dropped.push(`${e.tcglId} reverse: ${why}`);
+      e.reverse = null;
+    }
+  }
+  const shipped = entries.filter((e) => {
+    const why = e.foil ? unshippable(e, e) : null;
     if (why) dropped.push(`${e.tcglId}: ${why}`);
     return !why;
   });
-  for (const e of shipped) {
-    if (!e.foil) continue;
-    if (!materials.materials[e.material]) {
-      const sameShader = Object.keys(materials.materials).find((name) => materials.materials[name].shader === e.shader);
-      if (sameShader) e.material = sameShader;
+  const settleMaterial = (printing) => {
+    if (!materials.materials[printing.material]) {
+      const sameShader = Object.keys(materials.materials).find(
+        (name) => materials.materials[name].shader === printing.shader
+      );
+      if (sameShader) printing.material = sameShader;
     }
-    if (e.cc && !materials.textures[e.cc]) e.cc = '';
+    if (printing.cc && !materials.textures[printing.cc]) printing.cc = '';
+  };
+  for (const e of shipped) {
+    if (e.foil) settleMaterial(e);
+    if (e.reverse) settleMaterial(e.reverse);
   }
   const manifest = buildManifest(shipped);
   fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), `${JSON.stringify(manifest)}\n`);
@@ -256,7 +300,8 @@ async function main() {
   for (const failure of result.failed) console.warn(`failed ${failure.bundle}: ${failure.error}`);
   for (const line of dropped.slice(0, 40)) console.warn(`dropped ${line}`);
   console.log(
-    `manifest: ${Object.keys(manifest.cards).length} foil, ${manifest.flat.length} flat; dropped ${dropped.length}; ` +
+    `manifest: ${Object.keys(manifest.cards).length} foil, ${manifest.flat.length} flat, ` +
+      `${Object.keys(manifest.reverse).length} reverse; dropped ${dropped.length}; ` +
       `materials ${result.materials}, material textures ${result.textures}; ` +
       `written ${(result.bytes / 1e6).toFixed(1)} MB; assets ${(dirBytes(OUT_DIR) / 1e9).toFixed(2)} GB`
   );

@@ -224,6 +224,29 @@ describe('buildManifest', () => {
     assert.equal(manifest.flat.includes('sv01-258'), false);
   });
 
+  it('lists reverse-holo printings beside the base, sharing the shader and material index', () => {
+    const reverseOf = (set, number) => ({
+      shader: 'TPCi/Cards3D/HoloFoil/FlatSilver',
+      material: 'MAT_Cards3D_FlatSilver',
+      front: `${set}_en_${number}`,
+      wp: `${set}_wp_ph_en_${number}`,
+    });
+    const manifest = buildManifest([
+      { ...entries[0], reverse: null },
+      { ...entries[1], reverse: reverseOf('bw1', '113') },
+      { ...entries[2], reverse: reverseOf('swsh9', '100') },
+    ]);
+    assert.deepEqual(manifest.shaders, [
+      'TPCi/Cards3D/HoloFoil/FlatSilver',
+      'TPCi/Cards3D/HoloFoil/Rainbow',
+      'TPCi/Cards3D/HoloFoil/SvUltra',
+    ]);
+    assert.deepEqual(Object.keys(manifest.reverse), ['bw1-113', 'swsh9-100']);
+    assert.deepEqual(manifest.reverse['swsh9-100'], ['swsh9_100', 0, 0, 'swsh9_en_100', '', 'swsh9_wp_ph_en_100', '', '']);
+    assert.deepEqual(manifest.cards['bw1-113'], ['bw1_113', 1, 1, 'bw1_en_113', 'bw1_etch_en_113', 'bw1_wp_std_en_113', '', '']);
+    assert.deepEqual(manifest.flat, ['swsh9-100'], 'a flat base with a reverse printing stays flat');
+  });
+
   it('uses the same key as the client', () => {
     assert.equal(normalizeCardKey('swsh12.5-GG01'), 'swsh12.5-gg1');
   });

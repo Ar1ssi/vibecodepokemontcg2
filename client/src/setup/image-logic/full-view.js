@@ -4,6 +4,7 @@ import {
   isTrainerCard,
   MAT_HOLO_OPTIONS,
   foilCardId,
+  isReverseHoloCard,
   resolveFoilEffect,
   startHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
@@ -237,6 +238,7 @@ export const openFloatingCardPreview = ({
       wrapper = buildHoloCard(hiRes, effect, {
         trainer: isTrainerCard(card),
         cardId: foilCardId(card || {}),
+        reverse: isReverseHoloCard(card),
       });
       wrapper.classList.add('card-preview-card', 'mat-holo');
       frontNode = wrapper;

@@ -1,4 +1,5 @@
-// Design 069: contact sheet of the TCG Live card foil, one card per shader family, each drawn at three
+// Design 069: contact sheet of the TCG Live card foil, one card per shader family (base printings, then the
+// reverse-holo printings, preferring cards whose base is NonFoil), each drawn at three
 // virtual tilts (−1, 0, +1 on both axes) through the real buildHoloCard → mountTcglFoil path on the app page.
 // Checks: every view reaches `live` (none `fallback`), the silhouette (alpha) is identical across tilts (the
 // mesh is shaded tilted but rasterized face-on, O4), and no foil error reaches the console.
@@ -39,6 +40,15 @@ const families = await page.evaluate(
     if (!parsed) throw new Error('foil manifest did not load');
     const firstPerShader = new Map();
     for (const [key, record] of parsed.records) if (!firstPerShader.has(record.shader)) firstPerShader.set(record.shader, key);
+    const firstPerReverseShader = new Map();
+    for (const [key, record] of parsed.reverse) {
+      const known = firstPerReverseShader.get(record.shader);
+      if (!known || (parsed.records.has(known) && parsed.flat.has(key))) firstPerReverseShader.set(record.shader, key);
+    }
+    const samples = [
+      ...[...firstPerShader].sort().map(([shader, key]) => ({ shader, key, reverse: false })),
+      ...[...firstPerReverseShader].sort().map(([shader, key]) => ({ shader, key, reverse: true })),
+    ];
     const sheet = document.createElement('div');
     sheet.id = 'tcgl-foil-sheet';
     sheet.style.cssText =
@@ -48,16 +58,16 @@ const families = await page.evaluate(
     // A blank image with the 63 × 88 card shape stands in for our scan; the foil canvas draws the TCG Live front.
     const blank = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="630" height="880"/>')}`;
     const families = [];
-    for (const [shader, key] of [...firstPerShader].sort()) {
+    for (const { shader, key, reverse } of samples) {
       for (const tilt of tilts) {
-        const wrapper = holo.buildHoloCard(blank, holo.TCGL_FOIL_RARITY, { cardId: key, manifest: parsed });
+        const wrapper = holo.buildHoloCard(blank, holo.TCGL_FOIL_RARITY, { cardId: key, reverse, manifest: parsed });
         wrapper.classList.add('tcgl-foil-shot');
         wrapper.style.cssText = `width:${width}px;--card-aspect:0.7159;`;
         wrapper.__foilTilt = { tiltX: tilt, tiltY: tilt };
-        wrapper.title = `${shader.split('/').pop()} ${key} tilt ${tilt}`;
+        wrapper.title = `${reverse ? 'reverse ' : ''}${shader.split('/').pop()} ${key} tilt ${tilt}`;
         sheet.appendChild(wrapper);
       }
-      families.push({ shader, key });
+      families.push({ shader, key, reverse });
     }
     return families;
   },

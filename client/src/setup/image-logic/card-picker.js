@@ -5,6 +5,7 @@ import {
   MAT_HOLO_OPTIONS,
   resolveFoilEffect,
   foilCardId,
+  isReverseHoloCard,
   startHoloAnimation,
   stopHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
@@ -95,6 +96,7 @@ export const buildSlideContent = (card) => {
     const wrapper = buildHoloCard(src, existingRarity, {
       trainer: isTrainerCard(card),
       cardId: foilCardId(card),
+      reverse: isReverseHoloCard(card),
     });
     wrapper.classList.add('mat-holo', 'discard-pile-holo');
     disableNativeDrag(wrapper);
@@ -106,6 +108,7 @@ export const buildSlideContent = (card) => {
     const wrapper = buildHoloCard(src, effect, {
       trainer: isTrainerCard(card),
       cardId: foilCardId(card),
+      reverse: isReverseHoloCard(card),
     });
     wrapper.classList.add('mat-holo', 'discard-pile-holo');
     disableNativeDrag(wrapper);

@@ -213,30 +213,41 @@ export function matchSetCards(tcglCards, segments) {
  * @returns the manifest.json object (keys sorted, so reruns on unchanged input are byte-identical)
  */
 export function buildManifest(entries, uv = DEFAULT_FOIL_UV) {
-  const foils = entries.filter((e) => e.foil).sort((a, b) => compareKeys(a, b));
-  const shaders = [...new Set(foils.map((e) => e.shader))].sort();
-  const materials = [...new Set(foils.map((e) => e.material))].sort();
+  const sorted = [...entries].sort((a, b) => compareKeys(a, b));
+  const foils = sorted.filter((e) => e.foil);
+  const reverses = sorted.filter((e) => e.reverse);
+  const printings = [...foils, ...reverses.map((e) => e.reverse)];
+  const shaders = [...new Set(printings.map((p) => p.shader))].sort();
+  const materials = [...new Set(printings.map((p) => p.material))].sort();
+  const row = (tcglId, p) => [
+    tcglId,
+    shaders.indexOf(p.shader),
+    materials.indexOf(p.material),
+    p.front,
+    p.etch || '',
+    p.wp || '',
+    p.cf || '',
+    p.cc || '',
+  ];
   const cards = {};
   for (const e of foils) {
     const key = normalizeCardKey(e.tcgdexId);
     if (!key || Object.hasOwn(cards, key)) continue;
-    cards[key] = [
-      e.tcglId,
-      shaders.indexOf(e.shader),
-      materials.indexOf(e.material),
-      e.front,
-      e.etch || '',
-      e.wp || '',
-      e.cf || '',
-      e.cc || '',
-    ];
+    cards[key] = row(e.tcglId, e);
+  }
+  // The reverse-holo printing (MaterialManifest_ph), keyed like `cards` and independent of the base's foil.
+  const reverse = {};
+  for (const e of reverses) {
+    const key = normalizeCardKey(e.tcgdexId);
+    if (!key || Object.hasOwn(reverse, key)) continue;
+    reverse[key] = row(e.tcglId, e.reverse);
   }
   const flat = entries
     .filter((e) => !e.foil)
     .map((e) => normalizeCardKey(e.tcgdexId))
     .filter((key) => key && !Object.hasOwn(cards, key))
     .sort();
-  return { v: FOIL_MANIFEST_VERSION, uv: { ...uv }, shaders, materials, cards, flat: [...new Set(flat)] };
+  return { v: FOIL_MANIFEST_VERSION, uv: { ...uv }, shaders, materials, cards, flat: [...new Set(flat)], reverse };
 }
 
 const compareKeys = (a, b) => {

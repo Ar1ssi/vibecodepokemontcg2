@@ -17,6 +17,7 @@ does not cover **keep today's CSS holo**; the TCG Live shader runs **everywhere*
 focus popup, deck builder, pack opening).
 Later the user reversed the storage answer ("I have made a mistake. We need an alternative way of streaming
 the cards") and chose **Cloudflare R2** (AskUserQuestion): the textures leave git and stream from a bucket.
+Then: "make sure you add the reverse holos from tcg live as well" — O3 moves to B.
 
 ## Constraints
 - No build step, native ESM (PROJECT.md). three.js is already a client dependency (D193, vendored,
@@ -86,6 +87,8 @@ TCG Live WebApp (`E:/TCGLive_Extract/WebApp`):
 **O3 · Which printings.** A: base printing only (6,782 cards). B: also the reverse-holo `ph` variant —
 needs fronts for the 8,686 non-foil-base cards too (~+5 GB). **Pick A.** Reverse-holo cards (pack
 opening's reverse slot, set browser "Reverse Holo") keep the CSS reverse holo. Filed as an issue.
+**Superseded: B** (user request after the build, § Problem). A reverse-holo card wears TCG Live's `_ph` printing;
+one TCG Live lacks keeps the CSS reverse holo.
 
 **O4 · How a tilted card renders on a flat surface.** Mat and hand cards never rotate visibly; the
 foil must still react to the virtual angle.
@@ -121,9 +124,13 @@ cards matched by ordinal and verified by name through the TCGdex API. **Pick B**
   { "v": 1, "uv": {u0, u1, v0, v1},
     "shaders": [<TPCi/Cards3D/... names>], "materials": [<MAT_Cards3D_... names>],
     "cards": { "<key>": [tcglId, shaderIdx, materialIdx, frontTex, etchTex|"", wpTex|"", cfTex|"", cc|""] },
-    "flat": ["<key>", ...] }
+    "flat": ["<key>", ...],
+    "reverse": { "<key>": [same row, from the card's MaterialManifest_ph] } }
   ```
-  `key` = `normalizeCardKey(tcgdexId)`; `flat` = covered cards whose base printing is NonFoil.
+  `key` = `normalizeCardKey(tcgdexId)`; `flat` = covered cards whose base printing is NonFoil. `reverse` = the
+  reverse-holo printing: same front as the base, its own `_wp_ph_` white plate, one of 6 shipped shaders (FlatSilver,
+  Rainbow, SunBeam, Cosmos, Tinsel, SunPillar; AngledPillars is only in the unmapped `ec` set); independent of the
+  base (a flat base can have one). Import: 9,129 reverse printings, 0 dropped; textures 8.87 GB in all.
 
 ### Card key
 `normalizeCardKey(id)`: lowercase; split at the last `-`; strip leading zeros from the local id's
@@ -291,6 +298,7 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
 | A4 | "served at the highest quality, no compressions" — native size, lossless WebP, full device pixel ratio | tcgl-foil-assets.test: every WebP `VP8L`, fronts 1024²; backing = CSS box × screen scale × DPR |
 | A5 | Shader runs everywhere: mat, hand, previews, focus popup, deck builder, pack opening (session answer) | hydrate-holo (mat, hand), card-picker (picker, card focus), full-view (previews, deck builder), unboxing (packs) |
 | A6 | Cards TCG Live does not cover keep today's CSS holo (session answer) | holo.test `uncovered card`, `while the manifest is not loaded` |
+| A8 | "add the reverse holos from tcg live as well" — reverse-holo cards (pack reverse slot, set browser "Reverse Holo") render TCG Live's `_ph` printing | holo.test `reverse-holo printings`; tcgl-foil-manifest.test; foil-import-map.test; importer report `reverse 9129`; foil-shot: 6 reverse families `live`, silhouette diff 0 |
 | A7 | Textures stream from Cloudflare R2 at native resolution, not from git (later session answer) | `.gitignore`; server/tcgl-foil-config.test; tcgl-foil-store.test; foil-shot against a separate CORS origin: 24/24 families `live`, every texture fetched from that origin |
 
 ## Assumptions
@@ -331,16 +339,22 @@ slice 2; a row with >10 % unmapped is fixed in the table before the assets are c
   dropped from the unpushed branch (old head e59a623e, in the reflog) and replaced by one commit without
   textures; materials.json texture paths became base-relative (`tex/…`). No new npm dependency: rclone is an
   external CLI the uploader calls. The asset test skips its texture checks on a checkout without an import.
+- Reverse holos added after the build (O3 → B): the manifest gains an optional `reverse` map (still `v: 1`; an
+  older client ignores it). A reverse-holo card is one whose rarity resolves to `reverse holo` (set browser copies,
+  whose `-reverse` id suffix is stripped) or a pack's reverse slot (explicit flag). Fixed in passing: a set-browser
+  reverse copy of a card with a NonFoil base used to lose its CSS reverse holo (coverage `flat` → no foil).
+  Only `MaterialManifest_ph` is imported; `_ph2`, `_mph` (Master Ball), `_sph` (Poké Ball) are pattern variants
+  our app has no printing for.
 
 ## For the landing commit (Land: branch — not done on this branch)
 - DECISIONS: `[board-ui]` Cards TCG Live prints wear its own foil (design 069): the base printing's
   MaterialManifest decides foil or none, rendered with the game's TPCi/Cards3D shaders and the card's own
   etch / white plate / cold foil masks over TCG Live's front; textures lossless WebP at native size, streamed
   from Cloudflare R2 (`FOIL_TEXTURE_URL`), never committed;
-  uncovered cards keep the CSS holo; tilt comes from the holo animation (D34/D55/D56 hold).
+  reverse-holo cards wear TCG Live's `_ph` printing when it has one; uncovered cards keep the CSS holo; tilt comes from the holo animation (D34/D55/D56 hold).
   `[client]` amend D193: three is also loaded by `import()` on the first TCG Live foil mount.
-- ISSUES: reverse-holo printings (`ph` manifests) still use the CSS reverse holo (O3, ~+5 GB to import);
-  unmapped TCG Live sets (`ec`, `gum`, `me5-5m`, `smalt`, `xyalt`, `mebsp` #94–100, `mee` #9–16);
+- ISSUES: Poké Ball / Master Ball reverse patterns (`_sph`, `_mph`, `_ph2`, ~600 cards) not imported — no such
+  printing in our app; unmapped TCG Live sets (`ec`, `gum`, `me5-5m`, `smalt`, `xyalt`, `mebsp` #94–100, `mee` #9–16);
   GPU memory ~12 MB per live foil card (front + etch + plate, mipmapped).
 - MAP: `client/src/setup/foil/`, `scripts/tcgl-foil/`, `client/src/assets/tcgl-foil/`.
 - Before deploy: create the R2 bucket, apply `r2-cors.json`, enable public access, `pnpm foil:upload`, then set

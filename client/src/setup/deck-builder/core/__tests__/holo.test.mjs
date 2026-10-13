@@ -23,6 +23,7 @@ import {
   stopHoloAnimation,
   resolveFoilEffect,
   foilCardId,
+  isReverseHoloCard,
   tcglFoilCoverage,
   TCGL_FOIL_RARITY,
 } from '../holo.mjs';
@@ -832,6 +833,49 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
   it('prefers the id the manifest knows when the card id is not a TCGdex id', () => {
     const card = { id: 'e2e-7', image: { src: 'https://assets.tcgdex.net/en/sv/sv01/258/high.webp' } };
     assert.equal(foilCardId(card, manifest), 'sv01-258');
+  });
+
+  describe('reverse-holo printings', () => {
+    const withReverse = parseFoilManifest({
+      v: 1,
+      shaders: ['TPCi/Cards3D/HoloFoil/SvUltra', 'TPCi/Cards3D/HoloFoil/FlatSilver'],
+      materials: ['MAT_Cards3D_SvUltra', 'MAT_Cards3D_FlatSilver'],
+      cards: { 'sv01-258': ['sv1_258', 0, 0, 'sv1_en_258', 'sv1_etch_en_258', 'sv1_wp_en_258', '', ''] },
+      flat: ['sv01-1', 'sv01-2'],
+      reverse: { 'sv01-1': ['sv1_1', 1, 1, 'sv1_en_001', '', 'sv1_wp_ph_en_001', '', ''] },
+    });
+
+    it('a reverse-holo card wears TCG Live reverse printing, even over a flat base', () => {
+      const card = { id: 'sv01-001', rarity: 'Reverse Holo' };
+      assert.equal(isReverseHoloCard(card), true);
+      assert.equal(resolveFoilEffect(card, withReverse), TCGL_FOIL_RARITY);
+      assert.equal(tcglFoilCoverage(card, withReverse), 'foil');
+      assert.equal(resolveFoilEffect({ id: 'sv01-001', rarity: 'Common' }, withReverse), null, 'base stays flat');
+    });
+
+    it('keeps the CSS reverse holo when TCG Live has no reverse printing', () => {
+      assert.equal(resolveFoilEffect({ id: 'sv01-2', rarity: 'Reverse Holo' }, withReverse), 'reverse holo');
+      assert.equal(resolveFoilEffect({ id: 'sv01-258', rarity: 'Reverse Holo' }, withReverse), 'reverse holo');
+      assert.equal(resolveFoilEffect({ id: 'base1-4', rarity: 'Reverse Holo' }, withReverse), 'reverse holo');
+    });
+
+    it('reads through the set browser `-reverse` id suffix', () => {
+      const card = { id: 'sv01-1-reverse', rarity: 'Reverse Holo' };
+      assert.equal(foilCardId(card, withReverse), 'sv01-1');
+      assert.equal(resolveFoilEffect(card, withReverse), TCGL_FOIL_RARITY);
+    });
+
+    it('an explicit reverse flag overrides the rarity (pack reverse slot)', () => {
+      assert.equal(tcglFoilCoverage({ id: 'sv01-1', rarity: 'Common' }, withReverse, { reverse: true }), 'foil');
+      assert.equal(tcglFoilCoverage({ id: 'sv01-258', rarity: 'Common' }, withReverse, { reverse: true }), null);
+    });
+
+    it('buildHoloCard looks the reverse printing up only when asked', () => {
+      const base = buildHoloCard(TCGDEX_URL, TCGL_FOIL_RARITY, { cardId: 'sv01-258', reverse: true, manifest: withReverse });
+      assert.equal(base.dataset.tcglFoil, 'fallback', 'sv01-258 has no reverse printing');
+      const flat = buildHoloCard(TCGDEX_URL, TCGL_FOIL_RARITY, { cardId: 'sv01-1', manifest: withReverse });
+      assert.equal(flat.dataset.tcglFoil, 'fallback', 'sv01-1 has no base foil record');
+    });
   });
 
   it('tags the wrapper tcgl and marks it fallback when no record exists', () => {

@@ -42,6 +42,10 @@ const manifestJson = () => ({
     'bad-1': ['x', 5, 0, 'x_en_001', '', '', '', ''],
   },
   flat: ['sv01-2'],
+  reverse: {
+    'sv01-2': ['sv1_2', 0, 0, 'sv1_en_002', '', 'sv1_wp_ph_en_002', '', ''],
+    'sv01-258': ['sv1_258', 0, 0, 'sv1_en_258', '', 'sv1_wp_ph_en_258', '', ''],
+  },
 });
 
 describe('parseFoilManifest', () => {
@@ -61,6 +65,12 @@ describe('parseFoilManifest', () => {
     assert.equal(parsed.records.has('bad-1'), false, 'out-of-range shader index is dropped');
     assert.deepEqual(parsed.uv, { u0: 0.1, u1: 0.9, v0: 0, v1: 1 });
     assert.ok(parsed.flat.has('sv01-2'));
+  });
+  it('reads reverse-holo printings into their own map', () => {
+    const parsed = parseFoilManifest(manifestJson());
+    assert.equal(parsed.reverse.get('sv01-2').wp, 'sv1_wp_ph_en_002');
+    assert.equal(parsed.reverse.get('sv01-258').etch, null);
+    assert.equal(parseFoilManifest({ ...manifestJson(), reverse: undefined }).reverse.size, 0, 'older manifests have none');
   });
   it('throws on a wrong version or a non-object', () => {
     assert.throws(() => parseFoilManifest({ ...manifestJson(), v: 2 }), /version/);
@@ -82,6 +92,13 @@ describe('foilCoverage / foilRecordFor', () => {
     assert.equal(foilCoverage(parsed, 'sv01-002'), 'flat');
     assert.equal(foilRecordFor(parsed, 'sv01-002'), null);
     assert.equal(foilCoverage(parsed, 'base1-4'), null);
+  });
+  it('looks reverse-holo printings up in their own map', () => {
+    assert.equal(foilCoverage(parsed, 'sv01-002', { reverse: true }), 'foil', 'flat base, foil reverse');
+    assert.equal(foilRecordFor(parsed, 'sv01-002', { reverse: true })?.wp, 'sv1_wp_ph_en_002');
+    assert.equal(foilRecordFor(parsed, 'sv01-258', { reverse: true })?.wp, 'sv1_wp_ph_en_258', 'not the base record');
+    assert.equal(foilCoverage(parsed, 'sv01-001', { reverse: true }), null, 'foil base without a reverse printing');
+    assert.equal(foilRecordFor(parsed, 'sv01-001', { reverse: true }), null);
   });
   it('returns null without a manifest or id', () => {
     assert.equal(foilCoverage(null, 'sv01-258'), null);
