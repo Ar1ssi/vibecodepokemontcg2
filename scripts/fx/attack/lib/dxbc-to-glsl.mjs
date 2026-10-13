@@ -124,6 +124,13 @@ const FLOAT_CALL_1 = {
   round_pi: 'ceil',
   round_z: 'trunc',
   round_ne: 'roundEven',
+  // GLSL ES 3.00 has one dFdx/dFdy; the coarse and fine forms of DXBC's derivatives map onto it.
+  deriv_rtx: 'dFdx',
+  deriv_rtx_coarse: 'dFdx',
+  deriv_rtx_fine: 'dFdx',
+  deriv_rty: 'dFdy',
+  deriv_rty_coarse: 'dFdy',
+  deriv_rty_fine: 'dFdy',
 };
 const COMPARE = { lt: ['lessThan', '<'], ge: ['greaterThanEqual', '>='], eq: ['equal', '=='], ne: ['notEqual', '!='] };
 const INT_COMPARE = { ilt: ['lessThan', '<'], ige: ['greaterThanEqual', '>='], ieq: ['equal', '=='], ine: ['notEqual', '!='] };
