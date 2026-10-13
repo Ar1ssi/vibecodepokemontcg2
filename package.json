@@ -13,6 +13,7 @@
     "test:inspector": "node test-card-inspector-e2e.mjs",
     "test:reset-choice": "node reset-during-choice-test.mjs",
     "test:changed": "node scripts/test-changed.mjs",
+    "gates": "node scripts/gates-needed.mjs",
     "test:live": "node scripts/test-live.mjs",
     "test": "node --test \"shared/**/*.test.mjs\" \"client/**/*.test.mjs\" \"server/**/*.test.mjs\" \"bot/**/*.test.mjs\" \"scripts/**/*.test.mjs\"",
     "sfx:import": "node scripts/sfx/import-tcgl-sfx.mjs",

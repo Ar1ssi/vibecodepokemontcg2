@@ -125,10 +125,10 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
 ## Project facts
 - What: web 2-player Pokémon TCG simulator — board mats, deck builder, rules engine, Socket.IO sync, SQLite.
 - Stack: Node.js ES modules, Express 4, Socket.IO 4, SQLite3, EJS, Playwright, `node --test`, ESLint 9 + Prettier.
-- Commands: run `pnpm start` · full tests `pnpm test` (~4260, all green; live TCGdex tests
+- Commands: run `pnpm start` · full tests `pnpm test` (~6470, all green; live TCGdex tests
   opt-in via `pnpm test:live`) · changed-only `pnpm test:changed` (tests for files this branch touched) · one file `node --test <path>` · lint touched files `npx eslint --quiet <files>`
   (repo-wide `pnpm lint` is noisy with prettier/CRLF warnings) · engine gate `pnpm audit:oracle` (~2 min,
-  after attack/ability engine changes) · build n/a.
+  after attack/ability engine changes) · `pnpm gates` says which of `pnpm test` / `pnpm audit:oracle` this diff needs · build n/a.
 - Entry points: `server/server.js`, `server/game/room.mjs`, `client/index.ejs`, `client/src/front-end.js`.
 - Deeper facts: `.agent/PROJECT.md` (architecture, constraints, landmines).
 
