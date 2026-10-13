@@ -17,6 +17,14 @@ function lines(text) {
   return text ? text.split('\n').filter(Boolean) : [];
 }
 
+// File text at a revision, or null when the file does not exist there.
+export function fileAt(revision, file) {
+  const result = spawnSync('git', ['show', `${revision}:${file}`], {
+    encoding: 'utf8',
+  });
+  return result.status === 0 ? result.stdout : null;
+}
+
 export function changedFiles(baseBranch) {
   const base = git(['merge-base', 'HEAD', baseBranch]);
   return [
