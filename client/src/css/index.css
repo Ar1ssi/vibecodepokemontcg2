@@ -4666,6 +4666,14 @@ body.side-menu-collapsed #oppResizer {
     }
     #turnOrderCoinFlipOverlay.fading { opacity: 0; }
     #turnOrderCoinFlipOverlay .coin-3d { width: clamp(150px, 24vh, 260px); height: clamp(150px, 24vh, 260px); }
+    /* TCG Live coin stage (design 069): the WebGL disc sits in the host; the shadow and landing sprites are DOM. */
+    #turnOrderCoinFlipOverlay.stage-mode .coin-toss-wrap { display: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-host { position: relative; width: clamp(180px, 30vh, 330px); height: clamp(180px, 30vh, 330px); }
+    #turnOrderCoinFlipOverlay .coin-stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #turnOrderCoinFlipOverlay .coin-stage-shadow { position: absolute; left: 50%; top: 88%; width: 70%; transform: translate(-50%, 0); pointer-events: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-ring,
+    #turnOrderCoinFlipOverlay .coin-stage-impact { position: absolute; left: 50%; top: 50%; width: 100%; opacity: 0; transform: translate(-50%, -50%); pointer-events: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-impact { width: 80%; }
     .turn-order-coin-flip-label {
       color: #f2f4ff;
       font-size: 1.9vh;

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_CEREMONY_FLIPS, coinCeremonyTimeline, coinFlipAngle } from '../coin-pose.mjs';
-import { TCGL_TOSS_MS, coinPoseAt, tcglCeremonyTimeline, tcglTossMs } from '../coin-flip-anim.mjs';
+import { MAX_CEREMONY_FLIPS, TCGL_TOSS_MS, coinCeremonyTimeline, coinFlipAngle, tcglTossMs } from '../coin-pose.mjs';
+import { coinPoseAt } from '../coin-flip-anim.mjs';
 
 // CoinFlipOverlay.cs GetEstimatedRuntimeForFlip sums flipCountDurations per flip, the last entry repeating.
 const GAME_RUNTIME_MS = { 1: 2000, 2: 3000, 3: 4000, 4: 4500, 5: 5000, 6: 5500 };
@@ -13,35 +13,28 @@ test('tosses use the game durations, the last one repeating', () => {
 
 test('the ceremony length matches the game estimate for each flip count', () => {
   for (const [count, runtimeMs] of Object.entries(GAME_RUNTIME_MS)) {
-    const { landsAt } = tcglCeremonyTimeline(Number(count));
+    const { landsAt } = coinCeremonyTimeline(Number(count));
     assert.equal(landsAt.at(-1), runtimeMs, `${count} flips`);
   }
 });
 
 test('tosses run back to back and each landing is the end of its toss', () => {
-  const { tossesMs, landsAt, holdMs, fadeMs, totalMs } = tcglCeremonyTimeline(3);
+  const { tossesMs, landsAt, holdMs, fadeMs, totalMs } = coinCeremonyTimeline(3);
   assert.deepEqual(tossesMs, [2000, 1000, 1000]);
   assert.deepEqual(landsAt, [2000, 3000, 4000]);
   assert.equal(totalMs, 4000 + holdMs + fadeMs);
 });
 
-test('hold and fade match the existing ceremony', () => {
-  const { holdMs, fadeMs } = coinCeremonyTimeline(1);
-  const { holdMs: tcglHold, fadeMs: tcglFade } = tcglCeremonyTimeline(1);
-  assert.equal(tcglHold, holdMs);
-  assert.equal(tcglFade, fadeMs);
-});
-
 test('an invalid flip count plays one toss; a huge one is capped', () => {
   for (const count of [0, -4, Number.NaN, 2.5, undefined]) {
-    assert.equal(tcglCeremonyTimeline(count).tossesMs.length, 1, `count ${count}`);
+    assert.equal(coinCeremonyTimeline(count).tossesMs.length, 1, `count ${count}`);
   }
-  assert.equal(tcglCeremonyTimeline(10_000).tossesMs.length, MAX_CEREMONY_FLIPS);
+  assert.equal(coinCeremonyTimeline(10_000).tossesMs.length, MAX_CEREMONY_FLIPS);
 });
 
 test('each landing shows its own face: heads at a multiple of 360, tails at 180 past one', () => {
   const faces = ['heads', 'tails', 'heads', 'tails', 'tails'];
-  const { landsAt } = tcglCeremonyTimeline(faces.length);
+  const { landsAt } = coinCeremonyTimeline(faces.length);
   landsAt.forEach((landAt, index) => {
     const pose = coinPoseAt(faces, landAt);
     assert.equal(pose.index, Math.min(index + 1, faces.length - 1));
@@ -53,7 +46,7 @@ test('each landing shows its own face: heads at a multiple of 360, tails at 180 
 
 test('the last toss holds on its landing after the ceremony ends', () => {
   const faces = ['tails', 'heads'];
-  const { totalMs } = tcglCeremonyTimeline(faces.length);
+  const { totalMs } = coinCeremonyTimeline(faces.length);
   const pose = coinPoseAt(faces, totalMs);
   assert.equal(pose.index, 1);
   assert.equal(pose.angle, coinFlipAngle(1, 'heads'));
@@ -69,7 +62,7 @@ test('a toss arcs up and comes down, reaching the top at mid-toss', () => {
 
 test('just before a landing the coin is almost at the landing angle', () => {
   const faces = ['tails', 'heads'];
-  const { landsAt } = tcglCeremonyTimeline(faces.length);
+  const { landsAt } = coinCeremonyTimeline(faces.length);
   const pose = coinPoseAt(faces, landsAt[0] - 1);
   assert.equal(pose.index, 0);
   assert.ok(Math.abs(pose.angle - coinFlipAngle(0, 'tails')) < 0.01);
@@ -77,7 +70,7 @@ test('just before a landing the coin is almost at the landing angle', () => {
 
 test('the coin never turns backwards across the whole ceremony', () => {
   const faces = ['heads', 'tails', 'tails', 'heads', 'tails', 'heads'];
-  const { totalMs } = tcglCeremonyTimeline(faces.length);
+  const { totalMs } = coinCeremonyTimeline(faces.length);
   let previous = -Infinity;
   for (let elapsedMs = 0; elapsedMs <= totalMs; elapsedMs += 25) {
     const { angle } = coinPoseAt(faces, elapsedMs);

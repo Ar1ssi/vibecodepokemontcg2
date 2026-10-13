@@ -178,17 +178,17 @@ export function coinSoundMaterial(material) {
   return ['gold', 'silver', 'metal'].includes(material) ? 'metal' : 'plastic';
 }
 
-// A toss at least this long is the full throw; shorter ones (fast multi-flip pacing) spin.
+// A toss at least this long is the full throw; shorter ones (the game's quicker repeat tosses) spin.
 const FULL_TOSS_MS = 1500;
 
 function coinPlays(plan) {
   const faces = Array.isArray(plan?.faces) && plan.faces.length > 0 ? plan.faces : [plan?.face];
-  const { tossMs, landsAt } = coinCeremonyTimeline(faces.length, { reducedMotion: plan?.coinReducedMotion === true });
+  const { tossesMs, landsAt } = coinCeremonyTimeline(faces.length, { reducedMotion: plan?.coinReducedMotion === true });
   const material = plan?.coinMaterial === undefined ? 'metal' : coinSoundMaterial(plan.coinMaterial);
-  const toss = tossMs >= FULL_TOSS_MS ? `coin-toss-${material}` : `coin-spin-${material}`;
   const plays = [['coin-appear', 0]];
   landsAt.forEach((landedAt, i) => {
-    if (tossMs > 0) plays.push([toss, landedAt - tossMs]);
+    const tossMs = tossesMs[i];
+    if (tossMs > 0) plays.push([tossMs >= FULL_TOSS_MS ? `coin-toss-${material}` : `coin-spin-${material}`, landedAt - tossMs]);
     plays.push([faces[i] === 'heads' ? 'coin-win' : 'coin-loss', landedAt]);
   });
   return plays;

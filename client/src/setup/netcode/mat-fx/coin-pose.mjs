@@ -46,32 +46,42 @@ export function coinFlipFaces(event) {
   return faces.slice(0, MAX_CEREMONY_FLIPS);
 }
 
-/** Toss length and the pause that lets each result read, shorter as the count grows. */
-const pacingFor = (count, reducedMotion) => {
-  if (reducedMotion) return { tossMs: 0, gapMs: REDUCED_STEP_MS };
-  if (count <= 1) return { tossMs: 2200, gapMs: 0 };
-  if (count <= 4) return { tossMs: 1500, gapMs: 700 };
-  return { tossMs: 1000, gapMs: 450 };
-};
+/** Toss length per flip in ms (CoinFlipOverlay.cs `flipCountDurations`). Flip i uses entry min(i, last). */
+export const TCGL_TOSS_MS = [2000, 1000, 1000, 500, 500];
+
+/** Toss length of flip `index` (0-based), the entry the game plays for that flip. */
+export function tcglTossMs(index) {
+  return TCGL_TOSS_MS[Math.min(index, TCGL_TOSS_MS.length - 1)];
+}
 
 /**
- * The ceremony's schedule for `count` flips. `landsAt[i]` is when toss i shows
- * its face (ms from the first toss); the overlay holds after the last landing,
- * then fades. `totalMs` is the whole ceremony including the fade.
+ * The ceremony's schedule for `count` flips, paced as TCG Live paces them: tosses run back to
+ * back with no gap. `landsAt[i]` is when toss i shows its face (ms from the first toss); the
+ * overlay holds after the last landing, then fades. `totalMs` is the whole ceremony including the
+ * fade. Reduced motion has no tumble: each face shows for REDUCED_STEP_MS. `options.tossMs`
+ * overrides every toss's length (tests).
  *
  * @param {number} count
  * @param {{ reducedMotion?: boolean, tossMs?: number, holdMs?: number, fadeMs?: number }} [options]
  */
 export function coinCeremonyTimeline(count, options = {}) {
   const flips = Math.max(1, Math.min(MAX_CEREMONY_FLIPS, Number.isInteger(count) ? count : 1));
-  const pacing = pacingFor(flips, options.reducedMotion === true);
-  const tossMs = Number.isFinite(options.tossMs) && !options.reducedMotion ? options.tossMs : pacing.tossMs;
-  const { gapMs } = pacing;
+  const reducedMotion = options.reducedMotion === true;
+  const overrideMs = Number.isFinite(options.tossMs) && !reducedMotion ? options.tossMs : null;
+  const gapMs = reducedMotion ? REDUCED_STEP_MS : 0;
+  const tossesMs = Array.from({ length: flips }, (_, index) => {
+    if (reducedMotion) return 0;
+    return overrideMs ?? tcglTossMs(index);
+  });
+  let startMs = 0;
+  const landsAt = tossesMs.map((tossMs) => {
+    const landAt = startMs + tossMs;
+    startMs = landAt + gapMs;
+    return landAt;
+  });
   const holdMs = Number.isFinite(options.holdMs) ? options.holdMs : HOLD_MS;
   const fadeMs = Number.isFinite(options.fadeMs) ? options.fadeMs : FADE_MS;
-  const landsAt = Array.from({ length: flips }, (_, i) => i * (tossMs + gapMs) + tossMs);
-  const lastLanding = landsAt[flips - 1];
-  return { tossMs, gapMs, holdMs, fadeMs, landsAt, totalMs: lastLanding + holdMs + fadeMs };
+  return { tossMs: tossesMs[0], tossesMs, gapMs, holdMs, fadeMs, landsAt, totalMs: landsAt[flips - 1] + holdMs + fadeMs };
 }
 
 /**
