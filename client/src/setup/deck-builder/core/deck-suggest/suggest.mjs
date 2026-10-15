@@ -13,6 +13,9 @@ const DISMISS_PENALTY = 0.6;
 const LOCKED_ALPHA = 2;
 const ACCEPTED_ALPHA = 1.5;
 const MIN_GLOBAL_FOR_GOAL = 0.005;
+// Pokémon belong to archetypes: one your similar lists never play only counts as a goal pick when
+// it is a widely played support Pokémon (Fezandipiti ex-style), not another deck's attacker line.
+const MIN_GLOBAL_FOR_OFF_ARCHETYPE_POKEMON = 0.1;
 const BUDGET_MIN_INCLUSION = 0.1;
 
 const sameNames = (a = [], b = []) => {
@@ -260,7 +263,11 @@ function goalPicks(goal, items, index, counts, dismissed) {
   return open
     .filter((item) => item.tags.includes(goal))
     .map((item) => ({ ...item, metaInclusion: index.globalInclusion[item.idx], score: 0 }))
-    .filter((item) => item.inclusion > 0 || item.metaInclusion >= MIN_GLOBAL_FOR_GOAL)
+    .filter((item) => {
+      if (item.inclusion > 0) return true;
+      const floor = item.kind === 'pokemon' ? MIN_GLOBAL_FOR_OFF_ARCHETYPE_POKEMON : MIN_GLOBAL_FOR_GOAL;
+      return item.metaInclusion >= floor;
+    })
     .map((item) => ({ ...item, score: 0.7 * item.inclusion + 0.3 * item.metaInclusion }))
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
     .slice(0, GOAL_LIMIT);
@@ -299,4 +306,17 @@ export function describeList(index, listIdx) {
   const event = index.dataset.events[list.e];
   const suffix = [11, 12, 13].includes(list.p % 100) ? 'th' : ['th', 'st', 'nd', 'rd'][list.p % 10] || 'th';
   return `${list.p}${suffix} · ${event.name} · ${event.date}`;
+}
+
+/** The deck card (its `data`) that a steering key stands for, for Cut buttons; null when absent. */
+export function findDeckCardForKey(deck, index, key) {
+  for (const group of Object.values(deck || {})) {
+    for (const variant of group?.cards || []) {
+      if (!(Number(variant?.count) > 0)) continue;
+      const idx = resolveDeckCard(variant.data, index);
+      const variantKey = idx === null ? `x:${nameKey(variant.data?.name)}` : index.dataset.cards[idx].key;
+      if (variantKey === key) return variant.data;
+    }
+  }
+  return null;
 }

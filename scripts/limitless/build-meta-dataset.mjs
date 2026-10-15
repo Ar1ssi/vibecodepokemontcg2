@@ -177,6 +177,7 @@ export async function assembleDataset({ events, resolvePrint, generatedAt, rotat
       print: print[0],
       set: source.set,
       number: source.number,
+      image: source.record.image || null,
       abilities: (source.record.abilities || []).map((ability) => ability?.name).filter(Boolean),
       tags: tagsForText(cardText(source.record)),
       price: medians.length ? round2(Math.min(...medians)) : null,

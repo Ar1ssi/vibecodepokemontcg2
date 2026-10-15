@@ -44,7 +44,7 @@ test('joinEvent joins on placing + player and counts both kinds of mismatch', ()
 // TCGdex records named by real ids (sv06-128 Dreepy, sv02-185 / sv04.5-080 Iono, mee-010 Fire Energy).
 const RECORDS = {
   'TWM 128': { id: 'sv06-128', name: 'Dreepy', category: 'Pokemon', attacks: [{ name: 'Petty Grudge' }, { name: 'Bite' }] },
-  'PAL 185': { id: 'sv02-185', name: 'Iono', category: 'Trainer', effect: 'Each player shuffles their hand and puts it on the bottom of their deck. If either player put any cards on the bottom of their deck in this way, each player draws a card for each of their remaining Prize cards.' },
+  'PAL 185': { id: 'sv02-185', name: 'Iono', category: 'Trainer', image: 'https://assets.tcgdex.net/en/sv/sv02/185', effect: 'Each player shuffles their hand and puts it on the bottom of their deck. If either player put any cards on the bottom of their deck in this way, each player draws a card for each of their remaining Prize cards.' },
   'PAF 80': { id: 'sv04.5-080', name: 'Iono', category: 'Trainer', effect: 'Each player shuffles their hand.' },
   'MEE 10': { id: 'mee-010', name: 'Fire Energy', category: 'Energy' },
 };
@@ -87,6 +87,8 @@ test('assembleDataset merges reprints into one card and builds compact lists', a
     { print: iono.print, set: iono.set, number: iono.number, price: iono.price, tags: iono.tags, kind: iono.kind },
     { print: 'sv02-185', set: 'PAL', number: '185', price: 0.4, tags: ['draw', 'disruption'], kind: 'trainer' }
   );
+  assert.equal(iono.image, 'https://assets.tcgdex.net/en/sv/sv02/185');
+  assert.equal(dataset.cards[0].image, null);
   assert.equal(dataset.cards[0].price, null);
   assert.deepEqual(dataset.printIndex, { 'mee-010': 0, 'sv06-128': 1, 'sv02-185': 2, 'sv04.5-080': 2 });
   assert.deepEqual(dataset.lists, [

@@ -185,3 +185,25 @@ test('metaOverview: archetype shares and the best (highest placing) list of each
   assert.equal(describeList(index, 4), '5th · Regional Louisville, KY · 2026-10-10');
   assert.equal(describeList(index, 0), '1st · Regional Louisville, KY · 2026-10-10');
 });
+
+test('findDeckCardForKey finds the deck card behind a steering key', async () => {
+  const { findDeckCardForKey } = await import('../suggest.mjs');
+  const deck = deckOf([
+    { id: 'sv04.5-080', name: 'Iono', count: 2 },
+    { name: 'Homebrew Card', count: 1 },
+  ]);
+  assert.equal(findDeckCardForKey(deck, index, 't:iono').id, 'sv04.5-080');
+  assert.equal(findDeckCardForKey(deck, index, 'x:homebrew card').name, 'Homebrew Card');
+  assert.equal(findDeckCardForKey(deck, index, 't:switch'), null);
+  assert.equal(findDeckCardForKey(null, index, 't:iono'), null);
+});
+
+test('goals: an off-archetype Pokémon needs ≥10% of all lists; a Trainer only needs to be played', () => {
+  const dataset = fixtureDataset();
+  dataset.cards.push({ ...dataset.cards[CARD.pikachu], key: 'p:dwebble|ram|', name: 'Dwebble', print: 'zz-2', tags: ['setup'], abilities: [] });
+  const dwebble = dataset.cards.length - 1;
+  // Ten filler lists drop Rare Candy to 1/16 of the meta; Dwebble appears in one of them (1/16 < 10%).
+  for (let i = 0; i < 10; i += 1) dataset.lists.push({ e: 0, p: 7, a: 1, c: i === 0 ? [CARD.lightning, 10, dwebble, 2] : [CARD.lightning, 10] });
+  const result = suggestCards(DRAGAPULT_DECK, indexDataset(dataset), { ...OPTS, prefs: toggleGoal(EMPTY_PREFS, 'setup') });
+  assert.deepEqual(names(result.goals.setup), ['Ultra Ball', 'Rare Candy']);
+});
