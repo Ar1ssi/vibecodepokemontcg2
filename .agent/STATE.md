@@ -3,20 +3,20 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: Card focus (design 067, D208-D210): clicking your own Active opens TCG Live's 3D popup — CSS-3D
-  flight to the game's camera pose, hand drops, the overlay's own layout (bottom list, strip, HUD). Sampled battle SFX (064) and the
-  TCG Live attack-bar sprites (scripts/attack-ui, rerun against the extract) are on main too.
-Active: Card focus (067) on main, awaiting user localhost check (flight ease `--focus-flight-ease`, list
-  reveal, HUD/Stack). Status FX awaiting check (Burn/Sleep up-direction). ETB (057) slice 6 not started.
-Next: user passes on localhost (SERVER_AUTHORITATIVE=1): 072 opening coin prompts, 069 hover preview / multi-target hits / public lobby, Special Energy tokens, B&B run flow (#211–#218), 3D coins + deck customization preview (#219), 067 feel, 064 mix gains; I242–I243 (Bench/opponent
-  focus, remaining attack-ui sprites); I239–I240, then I227–I229; WotC Gyms/attach-Trainers/Baby flip,
-  holo art windows (D201), deck reveals, 057 taste calls.
-  Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md). Code-health audit filed I249–I253, plan in design 073.
+Focus: Code-health cleanup (design 073, I249–I253): batches 1–3 landed (junk deleted, e2e harnesses in scripts/e2e/, rules-extended
+  fetch stub, harness caps restored + `pnpm harness:check`). Batches 4–6 remain: reduce.mjs split (I250, refactor.md, oracle baseline
+  byte-for-byte), data-as-JSON (I252, picker loads async), legacy layer gate (I251, feature.md).
+Active: Card focus (067) on main, awaiting user localhost check (flight ease `--focus-flight-ease`, list reveal, HUD/Stack). Status FX
+  awaiting check (Burn/Sleep up-direction). ETB (057) slice 6 not started.
+Next: user decides design 073 § "Decisions the user owns" (B&B flow `run` vs `legacy`; SERVER_AUTHORITATIVE default; pruning 279 remote
+  branches), then batch 4. User passes on localhost (SERVER_AUTHORITATIVE=1): 072 opening coin prompts, 069 hover preview / multi-target
+  hits / public lobby, Special Energy tokens, B&B run flow (#211–#218), 3D coins + deck customization preview (#219), 067 feel, 064 mix
+  gains; I242 (Bench/opponent focus, attack-ui sprites); I239, then I227; WotC Gyms/attach-Trainers/Baby flip, D201 holo art, deck reveals, 057 taste calls.
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 
 ## Watch-outs (≤5)
 - Gates after engine changes: `pnpm audit:oracle`, `audit:abilities`, `audit:trainers`,
-  `audit:attacks`; GX scope: `node scripts/audit-gx-oracle.mjs` (~25 s). Live TCGdex: `pnpm test:live`.
+  `audit:attacks`; GX scope: `node scripts/audit-gx-oracle.mjs` (~25 s). Live TCGdex: `pnpm test:live`. Harness caps: `pnpm harness:check`.
 - FX video checks: `.claude/skills/fx-preview/rec/rec-*.mjs` (worktree server `PORT=4100 pnpm start`;
   preview_start reuses the primary's :4000). rec-unboxing runs WebGL on SwiftShader (`BOX=<key>`).
 - three.js is vendored, never imported in node tests: pure math lives in pack3d.mjs; bump only via

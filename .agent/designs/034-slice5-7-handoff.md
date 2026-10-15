@@ -1,7 +1,7 @@
 # Handoff — design 034 slices 5b / 6 / 7 (ability behaviour)
 
 Written S281 (2026-09-24) on branch `feature/ability-behaviour`, after slice 5a. Read
-`.agent/designs/034-ability-behaviour-implementation.md` first, then this. Slices 1-5a are done
+`.agent/designs/archive/034-ability-behaviour-implementation.md` first, then this. Slices 1-5a are done
 and green; this branch also carries an **uncommitted slice-5b work-in-progress** (see below).
 
 ## State (trust git over prose)

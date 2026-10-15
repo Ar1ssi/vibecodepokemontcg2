@@ -16,6 +16,7 @@
     "test:opening-coin": "node scripts/e2e/opening-coin-choice-test.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "gates": "node scripts/gates-needed.mjs",
+    "harness:check": "node scripts/harness-check.mjs",
     "test:live": "node scripts/test-live.mjs",
     "test": "node --test \"shared/**/*.test.mjs\" \"client/**/*.test.mjs\" \"server/**/*.test.mjs\" \"bot/**/*.test.mjs\" \"scripts/**/*.test.mjs\" && node scripts/record-green-tree.mjs",
     "sfx:import": "node scripts/sfx/import-tcgl-sfx.mjs",

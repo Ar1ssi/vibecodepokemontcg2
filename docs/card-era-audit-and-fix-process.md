@@ -4,7 +4,7 @@ How to audit every card effect of one printing era (a block of sets), turn the f
 fixes, and land them using parallel agents without losing correctness. Written after the
 2026-10-01 WotC Gen 1/2 run (Base Set → Neo Destiny, Southern Islands, Legendary Collection).
 That run is the worked example throughout; its records are on branch
-`claude/friendly-davinci-oy3ko5`: design `.agent/designs/062-wotc-audit-fixes.md`, the audit
+`claude/friendly-davinci-oy3ko5`: design `.agent/designs/archive/062-wotc-audit-fixes.md`, the audit
 report `.agent/designs/refs/062-wotc-card-audit-2026-10-01.md`, and issues I224–I232.
 
 For the parsers and audit scripts themselves, see `docs/card-parsing-and-audit-guide.md`. This

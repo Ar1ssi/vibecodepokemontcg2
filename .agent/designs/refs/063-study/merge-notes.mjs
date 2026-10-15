@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
-const DESIGN = '/home/user/vibecodepokemontcg2/.agent/designs/063-attack-move-animations.md';
+const DESIGN = '/home/user/vibecodepokemontcg2/.agent/designs/archive/063-attack-move-animations.md';
 const manifest = JSON.parse(readFileSync('moves/manifest.json', 'utf8'));
 
 // The user's table, in display order. [vgType, physical tiers[3], special tiers[3]]
