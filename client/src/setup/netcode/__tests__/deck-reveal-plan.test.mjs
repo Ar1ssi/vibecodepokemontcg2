@@ -3,7 +3,7 @@
 // the planner is checked against the events a server actually sends.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { advisoryAnimationPlan, deckRevealRuns } from '../advisory-animations.mjs';
+import { advisoryAnimationPlan, deckRevealRuns, deckShuffles } from '../advisory-animations.mjs';
 import { createGameState, createPlayerZones } from '../../../../../shared/engine/state.mjs';
 import { createCard } from '../../../../../shared/engine/cards.mjs';
 import { createRng } from '../../../../../shared/engine/rng.mjs';
@@ -155,4 +155,20 @@ test('engine → planner: Ultra Ball\'s search plays the reveal for the revealer
   const card = { instanceId: 31, name: 'Raichu', src: '/img/raichu.png' };
   assert.deepEqual(planFor(events, 'p1'), [{ kind: 'reveal', user: 'self', cards: [card] }]);
   assert.deepEqual(planFor(events, 'p2'), [{ kind: 'reveal', user: 'opp', cards: [card] }]);
+});
+
+test('engine → planner: after Ultra Ball\'s reveal the deck shuffle plays, queued behind it', () => {
+  const events = ultraBallSearchEvents();
+  const runs = deckRevealRuns(events);
+  const sounds = deckShuffles(events);
+  const plans = events
+    .map((event) =>
+      advisoryAnimationPlan(event, 'p1', undefined, { revealRun: runs.get(event), shuffleSound: sounds.get(event) })
+    )
+    .filter((plan) => plan?.kind === 'reveal' || plan?.kind === 'shuffle');
+  assert.deepEqual(
+    plans.map((plan) => plan.kind),
+    ['reveal', 'shuffle']
+  );
+  assert.deepEqual(plans[1], { kind: 'shuffle', user: 'self', zoneId: 'deck', sound: 'search-shuffle' });
 });

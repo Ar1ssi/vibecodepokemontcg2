@@ -4,7 +4,7 @@ import {
   advisoryAnimationPlan,
   attackLeads,
   coinFlipRuns,
-  dealShuffles,
+  deckShuffles,
   effectKnockoutIds,
   EVENT_FX,
   SOUND_ONLY_FX,
@@ -396,7 +396,7 @@ test('coinFlipRuns: back-to-back single flips by one player and source play as o
   assert.equal(coinFlipRuns(null).size, 0);
 });
 
-test('the opening deal shuffles animate; a search effect deck shuffle does not', () => {
+test('deckShuffles: the opening deal and every effect shuffle animate, each with its sound', () => {
   // shared/engine/setup.mjs emits, per player: deckShuffled, openingHandDealt, prizesSet.
   const shuffleA = { type: 'deckShuffled', playerId: 'A' };
   const shuffleB = { type: 'deckShuffled', playerId: 'B' };
@@ -410,22 +410,68 @@ test('the opening deal shuffles animate; a search effect deck shuffle does not',
     searchShuffle,
     { type: 'cardsDrawn', playerId: 'A', cards: [] },
   ];
-  const shuffles = dealShuffles(events);
-  assert.deepEqual([...shuffles], [shuffleA, shuffleB]);
+  const sounds = deckShuffles(events);
+  assert.deepEqual(
+    [...sounds],
+    [
+      [shuffleA, 'shuffle-flight'],
+      [searchShuffle, 'search-shuffle'],
+      [shuffleB, 'shuffle-flight'],
+    ]
+  );
 
-  assert.deepEqual(advisoryAnimationPlan(shuffleA, 'A', undefined, { dealShuffle: true }), {
+  assert.deepEqual(advisoryAnimationPlan(shuffleA, 'A', undefined, { shuffleSound: sounds.get(shuffleA) }), {
     kind: 'shuffle',
     user: 'self',
     zoneId: 'deck',
+    sound: 'shuffle-flight',
   });
-  assert.equal(advisoryAnimationPlan(shuffleB, 'A', undefined, { dealShuffle: true }).user, 'opp');
-  // Not a deal: no flight, only the shuffle sound (design 064).
-  assert.deepEqual(advisoryAnimationPlan(searchShuffle, 'A'), {
-    kind: 'fx',
+  assert.equal(advisoryAnimationPlan(shuffleB, 'A', undefined, { shuffleSound: sounds.get(shuffleB) }).user, 'opp');
+  // A search's shuffle used to be sound-only: it now flies the deck too.
+  assert.deepEqual(advisoryAnimationPlan(searchShuffle, 'A', undefined, { shuffleSound: sounds.get(searchShuffle) }), {
+    kind: 'shuffle',
     user: 'self',
-    effect: 'search-shuffle',
+    zoneId: 'deck',
+    sound: 'search-shuffle',
   });
-  assert.deepEqual([...dealShuffles(null)], []);
+  assert.equal(advisoryAnimationPlan(searchShuffle, 'A'), null, 'no batch entry plans nothing');
+  assert.equal(deckShuffles(null).size, 0);
+});
+
+test('deckShuffles: a shuffle an effect reports twice animates once; a lone hand shuffle animates', () => {
+  // trainer-steps.mjs (Red Card): cardsShuffledIntoDeck then deckShuffled for the opponent.
+  const redCardIn = { type: 'cardsShuffledIntoDeck', count: 5, playerId: 'B' };
+  const redCardShuffle = { type: 'deckShuffled', playerId: 'B' };
+  // executor.mjs shuffle-recover: deckShuffled first, then cardsShuffledIntoDeck.
+  const recoverShuffle = { type: 'deckShuffled', playerId: 'A' };
+  const recoverIn = { type: 'cardsShuffledIntoDeck', count: 2, playerId: 'A' };
+  // executor.mjs Judge-style and reduce.mjs shuffleAndDraw report no deckShuffled.
+  const judgeIn = { type: 'cardsShuffledIntoDeck', count: 4, playerId: 'B' };
+  const shuffleDraw = { type: 'handShuffledIntoDeckAndDrawn', count: 6, playerId: 'A' };
+  const events = [
+    redCardIn,
+    redCardShuffle,
+    recoverShuffle,
+    recoverIn,
+    { type: 'cardsDrawn', playerId: 'B', cards: [] },
+    judgeIn,
+    { type: 'cardsDrawn', playerId: 'A', cards: [] },
+    shuffleDraw,
+  ];
+  const sounds = deckShuffles(events);
+  assert.equal(sounds.has(redCardIn), false);
+  assert.equal(sounds.get(redCardShuffle), 'search-shuffle');
+  assert.equal(sounds.get(recoverShuffle), 'search-shuffle');
+  assert.equal(sounds.has(recoverIn), false);
+  assert.equal(sounds.get(judgeIn), 'search-shuffle');
+  assert.equal(sounds.get(shuffleDraw), 'search-shuffle');
+  assert.deepEqual(advisoryAnimationPlan(judgeIn, 'A', undefined, { shuffleSound: sounds.get(judgeIn) }), {
+    kind: 'shuffle',
+    user: 'opp',
+    zoneId: 'deck',
+    sound: 'search-shuffle',
+  });
+  assert.equal(advisoryAnimationPlan(redCardIn, 'A', undefined, { shuffleSound: sounds.get(redCardIn) }), null);
 });
 
 test('design 064: prizesSet and retreatBlocked plan as sound-only fx for their player', () => {
@@ -438,7 +484,7 @@ test('design 064: prizesSet and retreatBlocked plan as sound-only fx for their p
   const blocked = advisoryAnimationPlan({ type: 'retreatBlocked', playerId: 'p1', instanceId: 7 }, 'p1');
   assert.equal(blocked.effect, 'retreat-blocked');
   assert.equal(blocked.user, 'self');
-  for (const effect of ['search-shuffle', 'prizes-set', 'retreat-blocked']) {
+  for (const effect of ['prizes-set', 'retreat-blocked']) {
     assert.ok(SOUND_ONLY_FX.has(effect), effect);
   }
 });

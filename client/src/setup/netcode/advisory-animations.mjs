@@ -52,8 +52,6 @@ export const EVENT_FX = {
   statusCleared: 'status-clear',
   cardsDiscarded: 'discard',
   // Design 064: sound-only effects (no visual): they exist so the dispatcher sounds them.
-  // `deckShuffled` reaches here only when no deal animates it (a search effect's shuffle).
-  deckShuffled: 'search-shuffle',
   prizesSet: 'prizes-set',
   retreatBlocked: 'retreat-blocked',
   playLockApplied: 'play-lock',
@@ -66,7 +64,6 @@ export const EVENT_FX = {
 
 // Effects with no visual: the registry and hold table have no entry for them, only a sound.
 export const SOUND_ONLY_FX = new Set([
-  'search-shuffle',
   'prizes-set',
   'retreat-blocked',
   'play-lock',
@@ -145,9 +142,9 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {object} event
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
- * @param {{ dealShuffle?: boolean, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number> }} [options]
- *   `dealShuffle`: this `deckShuffled` is in dealShuffles, so it animates (other deck shuffles
- *   only sound). `revealRun`: this event's entry from deckRevealRuns, if any. `setup`: the batch
+ * @param {{ shuffleSound?: string, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number> }} [options]
+ *   `shuffleSound`: this event's entry from deckShuffles; a deck-shuffle event without one plans
+ *   nothing. `revealRun`: this event's entry from deckRevealRuns, if any. `setup`: the batch
  *   arrived while the opening placement was unfinished (tags `enter` plans). `effectKo`: the batch's
  *   effectKnockoutIds (tags those `knockout` plans)
  */
@@ -155,11 +152,13 @@ export function advisoryAnimationPlan(
   event,
   selfPlayerId,
   coinRun,
-  { dealShuffle = false, revealRun = null, setup = false, effectKo = null } = {}
+  { shuffleSound = null, revealRun = null, setup = false, effectKo = null } = {}
 ) {
   if (!event || typeof event !== 'object') return null;
-  if (dealShuffle && event.type === 'deckShuffled' && event.playerId != null && selfPlayerId != null) {
-    return { kind: 'shuffle', user: event.playerId === selfPlayerId ? 'self' : 'opp', zoneId: 'deck' };
+  if (DECK_SHUFFLE_EVENTS.has(event.type)) {
+    if (!shuffleSound || event.playerId == null || selfPlayerId == null) return null;
+    const user = event.playerId === selfPlayerId ? 'self' : 'opp';
+    return { kind: 'shuffle', user, zoneId: 'deck', sound: shuffleSound };
   }
   // Explicit, never via fxPlan: its `...fields` spread would replace the plan `kind` with the marker's.
   if (event.type === 'attackMarkerAdded') {
@@ -336,27 +335,42 @@ export function supersededDeals(events) {
   return superseded;
 }
 
+// Engine events that shuffle a player's deck outside a manual `zoneShuffled`.
+const DECK_SHUFFLE_EVENTS = new Set(['deckShuffled', 'cardsShuffledIntoDeck', 'handShuffledIntoDeckAndDrawn']);
+
 /**
- * The deck shuffles that precede a deal: a player's `deckShuffled` whose next
- * event for that player is their opening hand or mulligan redeal. Under server
- * authority these are the opening's only shuffle, so they animate (queued behind
- * the coin ceremony with the deal); a search effect's shuffle does not.
+ * The deck shuffles a batch animates, each mapped to its sound (design 064): a
+ * `deckShuffled` whose next event for that player is their opening hand or
+ * mulligan redeal sounds `shuffle-flight`; every other shuffle an effect makes
+ * (a search, a hand shuffled back in) sounds `search-shuffle`. An effect that
+ * reports one shuffle twice — the cards it put in, beside the `deckShuffled` —
+ * animates once, on the `deckShuffled`.
  *
  * @param {object[]} events
- * @returns {Set<object>} the `deckShuffled` events to animate
+ * @returns {Map<object, string>} shuffle event -> sound effect
  */
-export function dealShuffles(events) {
-  const shuffles = new Set();
-  if (!Array.isArray(events)) return shuffles;
-  const pending = new Map();
+export function deckShuffles(events) {
+  const sounds = new Map();
+  if (!Array.isArray(events)) return sounds;
+  const byPlayer = new Map();
   for (const event of events) {
     if (event?.playerId == null) continue;
-    const shuffle = pending.get(event.playerId);
-    pending.delete(event.playerId);
-    if (event.type === 'deckShuffled') pending.set(event.playerId, event);
-    else if (shuffle && DEAL_EVENTS.has(event.type)) shuffles.add(shuffle);
+    if (!byPlayer.has(event.playerId)) byPlayer.set(event.playerId, []);
+    byPlayer.get(event.playerId).push(event);
   }
-  return shuffles;
+  for (const own of byPlayer.values()) {
+    own.forEach((event, i) => {
+      if (!DECK_SHUFFLE_EVENTS.has(event.type)) return;
+      const next = own[i + 1];
+      if (event.type === 'deckShuffled') {
+        sounds.set(event, DEAL_EVENTS.has(next?.type) ? 'shuffle-flight' : 'search-shuffle');
+        return;
+      }
+      if ([own[i - 1], next].some((neighbour) => neighbour?.type === 'deckShuffled')) return;
+      sounds.set(event, 'search-shuffle');
+    });
+  }
+  return sounds;
 }
 
 const singleFlipFace = (event) => {
