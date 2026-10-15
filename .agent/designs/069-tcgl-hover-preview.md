@@ -240,3 +240,20 @@ No data migration: one new `localStorage` key, absent = on. To revert, remove th
 | 4 | modify `full-view.js`, `card-focus.mjs`, `card-inspector.mjs` (modal suppress); extend `test-card-inspector-e2e.mjs` | none new | rows 1, 2, 4, 6, 8, 18, 20 in e2e | `pnpm test:inspector` green; user localhost pass |
 
 ## Deviations (Builder appends here during build)
+- D1 (user, mid-build) Top-card rule (A5): `previewImageOf` resolves any `.play-container` member to the
+  top Pokémon via the engine's own `topPokemonCard`. This replaced the attached-Energy art handling that
+  was being added.
+- D2 The DOM layer split into `hover-preview-dom.mjs` (collaborators injected, jsdom-tested) and
+  `hover-preview.js` (browser wiring, booted from `front-end.js` rather than inline in `index.ejs`).
+  Why: the modal flags and card backs import `state.js`, which can't load in node.
+- D3 Modal suppression goes through the import-free `hover-preview-bus.mjs`, so full-view, card-focus
+  and card-inspector take no dependency on the hover layer and there's no import cycle. The modal
+  hooks landed in slice 3, not slice 4.
+- D4 Re-render detection uses one MutationObserver on the shown card's own document body (childList +
+  `src`), connected only while armed or shown. `REFRESH_EVENTS` is not exported or used, because the
+  observer also catches a card flipping face down or getting re-stacked in place.
+- D5 The main document previews only inside `#stadium` (`install(doc, { within })`). Why: the legacy
+  `Card` class stamps `.card` on images outside the board.
+- D6 Content: a fresh `buildHoloCard` from the mat wrapper's `data-rarity` (else a plain `<img>`), never
+  a clone of the board node, which carries stack/tilt inline styles. Face-down guard: redacted, any
+  `cardback` src, or the user's sleeve src.
