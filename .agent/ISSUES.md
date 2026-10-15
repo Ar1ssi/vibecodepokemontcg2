@@ -6,12 +6,17 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I249). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I254). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I249 2026-10-15 P2 [repo] ~90 MB of tracked junk: npm CLI under tools/ (44.7 MB, 1317 files, 0 refs), out/unboxing*.webm 16 MB, playmats/custom/*.png 30 MB served raw, 2 server.log, 2 .bak, package-lock.json, 17 dead root *-audit/*-test.mjs, 7 stray root docs (refs: design 073 A, I67, I72)
+- I250 2026-10-15 P2 [engine] reduce.mjs is 10,976 lines, 186 commits in 2 months (top hotspot): applyCommand 2,322 lines, resolveAttackEffectPhase 1,420, 123 case labels behind 3 exports; every engine edit re-lints and re-tests the whole file — split by command domain (refs: design 073 B)
+- I251 2026-10-15 P2 [legacy] Client rules layer loaded under authority: rules-bridge.js 3,527 + trainer-execution.js 2,939 + chat-buttons.js 5,421 lines, 55 authority guards in 23 files, 4 legacy/server rule twins, shadow.mjs live; lint: dmg undefined, chat-buttons.js:2168 (refs: design 073 C)
+- I252 2026-10-15 P3 [deck-builder] Data shipped as code: coins.mjs 9,647 lines imported at boot by rules-bridge.js, set-browser.mjs 720 JSON lines with a 143-line block duplicated at :984/:1445; bnb-run.js and build-battle.js share 160 verbatim lines across both B&B flows (refs: design 073 D)
+- I253 2026-10-15 P3 [harness] Over every cap, 453 commits since last maintain (trigger 30): DECISIONS 199 lines/47 KB (cap 90/20), ISSUES 69 open (cap 40), designs root 91 (46 shipped), MAP 131 (cap 120); rules-extended.test.mjs 24 s wall/1.4 s CPU on live TCGdex retries (refs: design 073 E, D161)
 - I248 2026-10-15 P3 [netcode] A caller or coin winner whose socket blips is answered for at once (go first / auto call) — no reconnect grace before handleSeatLost (refs: design 072, 013 row 6)
 - I247 2026-10-15 P3 [netcode] A seat that rejoins after the opening deal gets no dealOrder/turnOrderResult replay; a Set Up on that client would fall back to a local shuffle after 45 s (refs: design 072 review)
 - I246 2026-10-15 P2 [netcode] room-change-reset-test.mjs fails on main: "coin call overlay never opened" — it waits for the legacy picker the e2e bridge auto-answers under server authority (refs: reproduced on main during design 072 verification)

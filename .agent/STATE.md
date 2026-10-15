@@ -11,7 +11,7 @@ Active: Card focus (067) on main, awaiting user localhost check (flight ease `--
 Next: user passes on localhost (SERVER_AUTHORITATIVE=1): 072 opening coin prompts, 069 hover preview / multi-target hits / public lobby, Special Energy tokens, B&B run flow (#211–#218), 3D coins + deck customization preview (#219), 067 feel, 064 mix gains; I242–I243 (Bench/opponent
   focus, remaining attack-ui sprites); I239–I240, then I227–I229; WotC Gyms/attach-Trainers/Baby flip,
   holo art windows (D201), deck reveals, 057 taste calls.
-  Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
+  Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md). Code-health audit filed I249–I253, plan in design 073.
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 
 ## Watch-outs (≤5)
