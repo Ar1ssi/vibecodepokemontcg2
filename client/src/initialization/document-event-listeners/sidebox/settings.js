@@ -18,6 +18,7 @@ import {
   setFxVolume,
   setAmbienceOff,
   setCrowdOff,
+  setHoverPreviewOff,
   setSfxOff,
 } from '../../../setup/image-logic/fx-settings.js';
 
@@ -89,6 +90,15 @@ export const initializeSettings = () => {
     crowdCheckbox.checked = !fx.crowdOff;
     crowdCheckbox.addEventListener('change', () => {
       setCrowdOff(!crowdCheckbox.checked);
+    });
+  }
+
+  // Design 069: on by default; hover-preview.js hears the change through onFxSettingsChanged.
+  const hoverPreviewCheckbox = document.getElementById('hoverPreviewCheckbox');
+  if (hoverPreviewCheckbox) {
+    hoverPreviewCheckbox.checked = !fx.hoverPreviewOff;
+    hoverPreviewCheckbox.addEventListener('change', () => {
+      setHoverPreviewOff(!hoverPreviewCheckbox.checked);
     });
   }
 

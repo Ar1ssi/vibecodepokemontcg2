@@ -1272,3 +1272,16 @@ html.spectator-broadcast body :is(#deck, #discard, #lostZone, #active, #bench, #
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03) !important;
 }
+
+/* Design 069: the hover preview measures this to find the blurred band left of the mat art. It sits
+   on the same --mat-offset-x / --mat-width the zones use, so it follows the letterbox, mat scale and
+   table tilt, and measures even while no mat art is shown. */
+.hover-gutter-probe {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--mat-offset-x, 0px);
+  width: var(--mat-width, 100%);
+  visibility: hidden;
+  pointer-events: none;
+}
