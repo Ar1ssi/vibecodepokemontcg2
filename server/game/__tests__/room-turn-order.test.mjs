@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GameRoom, TURN_ORDER_CALL_TIMEOUT_MS } from '../room.mjs';
+import {
+  GameRoom,
+  TURN_ORDER_CALL_TIMEOUT_MS,
+  TURN_ORDER_CHOICE_TIMEOUT_MS,
+} from '../room.mjs';
 import { createCard } from '../../../shared/engine/cards.mjs';
 
 // Design 013: the opening coin call is a server-owned handshake living on GameRoom,
@@ -37,6 +41,21 @@ function nonCallerSocket(room) {
 
 function callerSocket(room) {
   return room.playerToSocket.get(room.turnOrder.callerPlayerId);
+}
+
+function winnerSocket(room) {
+  return room.playerToSocket.get(room.turnOrder.winnerPlayerId);
+}
+
+const otherPlayer = (playerId) => (playerId === 'p1' ? 'p2' : 'p1');
+
+/** A room whose coin has landed, waiting on the winner's first/second answer. */
+function flippedRoom({ seed = 7 } = {}) {
+  const room = readyRoom({ seed });
+  const { callId } = room.beginTurnOrderCall();
+  const flip = room.submitTurnOrderCall(callerSocket(room), { callId, call: 'heads' });
+  assert.equal(flip.ok, true);
+  return { room, flip };
 }
 
 test('beginTurnOrderCall opens a call naming one of the two seated players', () => {
@@ -86,8 +105,8 @@ test('beginTurnOrderCall picks the caller deterministically from the room seed',
   assert.ok(callers.includes('p1') && callers.includes('p2'), 'both seats must be reachable');
 });
 
-// Row 11: the coin actually decides, and the caller wins only on a matching face.
-test('submitTurnOrderCall resolves the starter from the call and the server flip', () => {
+// Design 072 row 1: the coin names a winner, who then chooses; nothing is seated yet.
+test('submitTurnOrderCall flips and hands the choice to the winner', () => {
   const room = readyRoom();
   const { callId } = room.beginTurnOrderCall();
   const caller = room.turnOrder.callerPlayerId;
@@ -100,9 +119,14 @@ test('submitTurnOrderCall resolves the starter from the call and the server flip
   assert.ok(['heads', 'tails'].includes(res.result));
   assert.equal(res.auto, false);
   assert.equal(res.callerPlayerId, caller);
-  assert.equal(res.starterPlayerId, res.result === 'heads' ? caller : other);
-  assert.equal(room.turnOrder.phase, 'resolved');
+  assert.equal(res.winnerPlayerId, res.result === 'heads' ? caller : other);
+  assert.equal(res.choiceId, `${callId}:choice`);
+  assert.equal(res.timeoutMs, TURN_ORDER_CHOICE_TIMEOUT_MS);
+  assert.equal('starterPlayerId' in res, false, 'the call alone must not seat a starter');
+  assert.equal(room.turnOrder.phase, 'awaiting-choice');
+  assert.equal(room.turnOrder.starterPlayerId, null);
   assert.equal(room.isAwaitingTurnOrderCall(), false);
+  assert.equal(room.isAwaitingTurnOrderChoice(), true);
 });
 
 test('submitTurnOrderCall echoes the caller coin id, echoing null when absent', () => {
@@ -137,7 +161,7 @@ test('submitTurnOrderCall drops a malformed or oversize coin id', () => {
   }
 });
 
-test('a losing call hands the first turn to the other player', () => {
+test('a losing call hands the toss to the other player', () => {
   // Drive both faces by scanning seeds until each outcome appears, so neither
   // branch depends on one lucky seed.
   const outcomes = new Set();
@@ -148,7 +172,7 @@ test('a losing call hands the first turn to the other player', () => {
     const other = caller === 'p1' ? 'p2' : 'p1';
     const res = room.submitTurnOrderCall(callerSocket(room), { callId, call: 'tails' });
     assert.equal(res.ok, true);
-    assert.equal(res.starterPlayerId, res.result === 'tails' ? caller : other);
+    assert.equal(res.winnerPlayerId, res.result === 'tails' ? caller : other);
     outcomes.add(res.result === 'tails' ? 'won' : 'lost');
   }
   assert.deepEqual([...outcomes].sort(), ['lost', 'won']);
@@ -213,7 +237,7 @@ test('a second call from the caller is rejected as already resolved', () => {
   assert.equal(first.ok, true);
   assert.deepEqual(second, { ok: false, reason: 'already_resolved' });
   assert.equal(room.turnOrder.call, 'heads');
-  assert.equal(room.turnOrder.starterPlayerId, first.starterPlayerId);
+  assert.equal(room.turnOrder.winnerPlayerId, first.winnerPlayerId);
 });
 
 test('submitTurnOrderCall before any call is open is rejected', () => {
@@ -263,8 +287,8 @@ test('resolveTurnOrderCallAutomatically calls for a silent caller', () => {
   assert.equal(res.auto, true);
   assert.ok(['heads', 'tails'].includes(res.call));
   assert.ok(['heads', 'tails'].includes(res.result));
-  assert.equal(res.starterPlayerId, res.result === res.call ? caller : other);
-  assert.equal(room.turnOrder.phase, 'resolved');
+  assert.equal(res.winnerPlayerId, res.result === res.call ? caller : other);
+  assert.equal(room.turnOrder.phase, 'awaiting-choice');
 });
 
 test('resolveTurnOrderCallAutomatically is refused once the caller has answered', () => {
@@ -301,13 +325,19 @@ test('clearTurnOrderCall drops the handshake, open or resolved', () => {
   assert.equal(resolvedRoom.turnOrder, null);
 });
 
-// Row 11, end to end: the resolved starter is what `setup` actually seats first.
-test('the resolved starter is the player the setup command seats first', () => {
-  for (const call of ['heads', 'tails']) {
-    const room = readyRoom({ seed: call === 'heads' ? 5 : 9 });
-    const { callId } = room.beginTurnOrderCall();
-    const res = room.submitTurnOrderCall(callerSocket(room), { callId, call });
+// Design 072 row 2, end to end: the chosen starter is what `setup` actually seats first.
+test('the chosen starter is the player the setup command seats first', () => {
+  for (const goFirst of [true, false]) {
+    const { room, flip } = flippedRoom({ seed: goFirst ? 5 : 9 });
+    const res = room.submitTurnOrderChoice(winnerSocket(room), {
+      choiceId: flip.choiceId,
+      goFirst,
+    });
     assert.equal(res.ok, true);
+    assert.equal(
+      res.starterPlayerId,
+      goFirst ? flip.winnerPlayerId : otherPlayer(flip.winnerPlayerId)
+    );
 
     const setupResult = room.handleCommand(callerSocket(room), {
       type: 'setup',
@@ -327,4 +357,156 @@ test('the coin call never leaks into GameState', () => {
 
   assert.equal('turnOrder' in room.state, false);
   assert.equal(JSON.stringify(room.state).includes(callId), false);
+});
+
+// Design 072 row 2: the winner may hand the first turn away.
+test('a winner going second seats the other player first', () => {
+  const { room, flip } = flippedRoom();
+  const res = room.submitTurnOrderChoice(winnerSocket(room), {
+    choiceId: flip.choiceId,
+    goFirst: false,
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.goFirst, false);
+  assert.equal(res.choiceAuto, false);
+  assert.equal(res.auto, false);
+  assert.equal(res.winnerPlayerId, flip.winnerPlayerId);
+  assert.equal(res.starterPlayerId, otherPlayer(flip.winnerPlayerId));
+  assert.equal(res.call, flip.call);
+  assert.equal(res.result, flip.result);
+  assert.equal(room.turnOrder.phase, 'resolved');
+  assert.equal(room.isAwaitingTurnOrderChoice(), false);
+});
+
+test('a winner going first is seated first', () => {
+  const { room, flip } = flippedRoom();
+  const res = room.submitTurnOrderChoice(winnerSocket(room), {
+    choiceId: flip.choiceId,
+    goFirst: true,
+  });
+
+  assert.equal(res.ok, true);
+  assert.equal(res.goFirst, true);
+  assert.equal(res.starterPlayerId, flip.winnerPlayerId);
+});
+
+// Design 072 row 3.
+test('submitTurnOrderChoice rejects the loser and spectators', () => {
+  const { room, flip } = flippedRoom();
+  room.addSpectator('sock-spectator');
+  const loserSocket = room.playerToSocket.get(otherPlayer(flip.winnerPlayerId));
+
+  for (const socketId of [loserSocket, 'sock-spectator', 'sock-unknown']) {
+    assert.deepEqual(
+      room.submitTurnOrderChoice(socketId, { choiceId: flip.choiceId, goFirst: true }),
+      { ok: false, reason: 'not_winner' }
+    );
+  }
+  assert.equal(room.turnOrder.phase, 'awaiting-choice');
+});
+
+// Design 072 row 4.
+test('a choice before the coin is flipped is refused', () => {
+  const room = readyRoom();
+  assert.deepEqual(room.submitTurnOrderChoice('sock1', { choiceId: 'x', goFirst: true }), {
+    ok: false,
+    reason: 'no_pending_choice',
+  });
+  assert.deepEqual(room.resolveTurnOrderChoiceAutomatically(), {
+    ok: false,
+    reason: 'no_pending_choice',
+  });
+
+  const { callId } = room.beginTurnOrderCall();
+  for (const socketId of ['sock1', 'sock2']) {
+    assert.deepEqual(
+      room.submitTurnOrderChoice(socketId, { choiceId: `${callId}:choice`, goFirst: true }),
+      { ok: false, reason: 'no_pending_choice' }
+    );
+  }
+  assert.equal(room.turnOrder.phase, 'awaiting-call');
+});
+
+// Design 072 row 5.
+test('a second choice is rejected as already resolved', () => {
+  const { room, flip } = flippedRoom();
+  const first = room.submitTurnOrderChoice(winnerSocket(room), {
+    choiceId: flip.choiceId,
+    goFirst: false,
+  });
+  const second = room.submitTurnOrderChoice(winnerSocket(room), {
+    choiceId: flip.choiceId,
+    goFirst: true,
+  });
+
+  assert.equal(first.ok, true);
+  assert.deepEqual(second, { ok: false, reason: 'already_resolved' });
+  assert.deepEqual(room.resolveTurnOrderChoiceAutomatically(), {
+    ok: false,
+    reason: 'already_resolved',
+  });
+  assert.equal(room.turnOrder.starterPlayerId, first.starterPlayerId);
+});
+
+// Design 072 row 6.
+test('malformed and stale choices are rejected', () => {
+  const { room, flip } = flippedRoom();
+  for (const bad of [undefined, null, 'yes', 'first', 1, 0, {}]) {
+    assert.deepEqual(
+      room.submitTurnOrderChoice(winnerSocket(room), { choiceId: flip.choiceId, goFirst: bad }),
+      { ok: false, reason: 'invalid_choice' },
+      `expected goFirst ${JSON.stringify(bad)} to be refused`
+    );
+  }
+  assert.deepEqual(
+    room.submitTurnOrderChoice(winnerSocket(room), { choiceId: 'other', goFirst: true }),
+    { ok: false, reason: 'stale_choice' }
+  );
+  assert.deepEqual(room.submitTurnOrderChoice(winnerSocket(room)), {
+    ok: false,
+    reason: 'stale_choice',
+  });
+  assert.equal(room.turnOrder.phase, 'awaiting-choice');
+});
+
+// Design 072 row 7: the timeout and a dropped winner share this path.
+test('resolveTurnOrderChoiceAutomatically sends a silent winner first', () => {
+  const { room, flip } = flippedRoom();
+  const res = room.resolveTurnOrderChoiceAutomatically();
+
+  assert.equal(res.ok, true);
+  assert.equal(res.goFirst, true);
+  assert.equal(res.choiceAuto, true);
+  assert.equal(res.auto, false);
+  assert.equal(res.starterPlayerId, flip.winnerPlayerId);
+  assert.equal(room.turnOrder.phase, 'resolved');
+});
+
+// Design 072 row 10.
+test('a choiceId from before resetGame is stale', () => {
+  const { room, flip } = flippedRoom();
+  room.resetGame({ seed: 11 });
+  assert.equal(room.turnOrder, null, 'resetGame must clear the pending choice');
+
+  room.state.players.p1.zones.deck.push(...deckOf('p1'));
+  room.state.players.p2.zones.deck.push(...deckOf('p2'));
+  room.markReady('p1');
+  room.markReady('p2');
+  const { callId } = room.beginTurnOrderCall();
+  const fresh = room.submitTurnOrderCall(callerSocket(room), { callId, call: 'heads' });
+  assert.notEqual(fresh.choiceId, flip.choiceId);
+
+  assert.deepEqual(
+    room.submitTurnOrderChoice(winnerSocket(room), { choiceId: flip.choiceId, goFirst: false }),
+    { ok: false, reason: 'stale_choice' }
+  );
+  assert.equal(room.turnOrder.phase, 'awaiting-choice');
+});
+
+test('the first/second choice never leaks into GameState', () => {
+  const { room, flip } = flippedRoom();
+  room.submitTurnOrderChoice(winnerSocket(room), { choiceId: flip.choiceId, goFirst: false });
+
+  assert.equal(JSON.stringify(room.state).includes(flip.choiceId), false);
 });
