@@ -21,9 +21,10 @@ const escapeHtml = (value = '') => String(value)
  * @param {object} options
  * @param {HTMLElement} options.panelEl
  * @param {(box: object|null) => void} options.onChange - the picked box, or null for the default
+ * @param {() => void} [options.onCatalog] - the catalog finished loading (a stage can now name the box)
  * @returns {{ setSelected: (id: string|null) => void, getSelected: () => object|null, catalog: () => object|null } | null}
  */
-export const initializeDeckBuilderBoxPicker = ({ panelEl, onChange }) => {
+export const initializeDeckBuilderBoxPicker = ({ panelEl, onChange, onCatalog }) => {
   if (!panelEl) return null;
 
   let catalog = null;
@@ -74,14 +75,17 @@ export const initializeDeckBuilderBoxPicker = ({ panelEl, onChange }) => {
   });
 
   loadBoxCatalog()
-    .then((loaded) => {
-      catalog = loaded;
-      render();
-    })
-    .catch((error) => {
-      galleryEl.innerHTML = '<div class="native-deck-builder-sleeve-empty">Deck boxes are unavailable.</div>';
-      console.warn('[deck box picker] catalog unavailable.', error);
-    });
+    .then(
+      (loaded) => {
+        catalog = loaded;
+        render();
+        onCatalog?.();
+      },
+      (error) => {
+        galleryEl.innerHTML = '<div class="native-deck-builder-sleeve-empty">Deck boxes are unavailable.</div>';
+        console.warn('[deck box picker] catalog unavailable.', error);
+      }
+    );
 
   return {
     setSelected: (id) => {

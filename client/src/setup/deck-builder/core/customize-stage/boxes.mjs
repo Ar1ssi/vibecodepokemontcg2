@@ -1,5 +1,6 @@
 // The TCG Live deck box catalog (design 071): lookup and filtering over assets/deckbox/boxes.json.
 // Pure over a catalog value; `loadBoxCatalog` is the only fetch.
+import { nextIndex } from './stage-math.mjs';
 
 export const BOX_ASSET_DIR = '/src/assets/deckbox/';
 
@@ -25,9 +26,6 @@ export const defaultBox = (catalog) => catalog.boxes.find((box) => box.id === ca
 /** The box with `id`, or the default for null, undefined and an id the catalog does not list. */
 export const boxById = (catalog, id) => catalog.boxes.find((box) => box.id === id) ?? defaultBox(catalog);
 
-/** True when `id` names a box in the catalog. */
-export const hasBox = (catalog, id) => catalog.boxes.some((box) => box.id === id);
-
 export const boxAtlasUrl = (box) => `${BOX_ASSET_DIR}${box.atlas}`;
 export const boxThumbUrl = (box) => `${BOX_ASSET_DIR}${box.thumb}`;
 
@@ -48,5 +46,5 @@ export function filterBoxes(boxes, term = '') {
 export function stepBoxId(catalog, currentId, dir) {
   const ids = [null, ...catalog.boxes.filter((box) => box.id !== catalog.default).map((box) => box.id)];
   const at = Math.max(0, ids.indexOf(currentId ?? null));
-  return ids[(((at + dir) % ids.length) + ids.length) % ids.length];
+  return ids[nextIndex(at, dir, ids.length)];
 }

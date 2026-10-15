@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { importDeckBoxes } from '../import-tcgl-deckbox.mjs';
+import { importDeckBoxes, swapIn } from '../import-tcgl-deckbox.mjs';
 import {
   DEFAULT_BOX_ID,
   buildBoxCatalog,
@@ -145,6 +145,58 @@ test('the importer names the missing file and leaves the output directory alone'
     assert.throws(() => importDeckBoxes({ src: path.join(dir, 'no-extract'), out }), /missing source file: .*index\.json/);
     assert.equal(fs.readFileSync(path.join(out, 'keep.txt'), 'utf8'), 'x');
     assert.deepEqual(fs.readdirSync(dir), ['out']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('swapIn replaces the output and removes the old copy', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deckbox-swap-'));
+  try {
+    const out = path.join(dir, 'out');
+    const staging = path.join(dir, 'out.tmp');
+    fs.mkdirSync(out);
+    fs.writeFileSync(path.join(out, 'old.txt'), 'old');
+    fs.mkdirSync(staging);
+    fs.writeFileSync(path.join(staging, 'new.txt'), 'new');
+    swapIn({ staging, out });
+    assert.deepEqual(fs.readdirSync(out), ['new.txt']);
+    assert.deepEqual(fs.readdirSync(dir), ['out']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('swapIn puts the old output back when the final rename fails', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deckbox-swap-'));
+  try {
+    const out = path.join(dir, 'out');
+    const staging = path.join(dir, 'out.tmp');
+    fs.mkdirSync(out);
+    fs.writeFileSync(path.join(out, 'old.txt'), 'old');
+    fs.mkdirSync(staging);
+    fs.writeFileSync(path.join(staging, 'new.txt'), 'new');
+    const failing = (from, to) => {
+      if (from === staging) throw new Error('EBUSY');
+      fs.renameSync(from, to);
+    };
+    assert.throws(() => swapIn({ staging, out, rename: failing }), /EBUSY/);
+    assert.equal(fs.readFileSync(path.join(out, 'old.txt'), 'utf8'), 'old');
+    assert.deepEqual(fs.readdirSync(dir), ['out'], 'staging and the aside copy are gone');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('swapIn works when there is no previous output', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'deckbox-swap-'));
+  try {
+    const out = path.join(dir, 'out');
+    const staging = path.join(dir, 'out.tmp');
+    fs.mkdirSync(staging);
+    fs.writeFileSync(path.join(staging, 'new.txt'), 'new');
+    swapIn({ staging, out });
+    assert.deepEqual(fs.readdirSync(out), ['new.txt']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

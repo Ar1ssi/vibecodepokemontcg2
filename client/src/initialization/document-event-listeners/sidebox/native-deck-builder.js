@@ -106,6 +106,11 @@ import {
   stepBoxId,
 } from '../../../setup/deck-builder/core/customize-stage/boxes.mjs';
 import { nextIndex } from '../../../setup/deck-builder/core/customize-stage/stage-math.mjs';
+import {
+  deckBoxIdForSave,
+  effectiveCosmeticId,
+  importedDeckBoxId,
+} from '../../../setup/deck-builder/core/customize-stage/cosmetic-state.mjs';
 import { getMatById } from '../../../setup/deck-builder/core/mats.mjs';
 import { getDeckFromLibrary, hasUnsavedDraft } from '../../../setup/deck-builder/core/deck-library.mjs';
 import {
@@ -677,11 +682,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // ── Deck box + 3D preview (design 071) ─────────────────────────────
           // The deck box is builder-only: no game-side announcement. The stage reads the three picks from
           // the loaded deck (or the mirror, with none loaded) and shows them as TCG Live's 3D trio.
-          const currentCosmeticId = (key, readActive) => {
-            const loaded = deckLibrary?.getActiveDeckId?.(currentLoadTarget);
-            if (loaded) return readActive?.(currentLoadTarget) ?? null;
-            return chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'][key] ?? null;
-          };
+          const currentCosmeticId = (key, readActive) =>
+            effectiveCosmeticId({
+              loadedDeckId: deckLibrary?.getActiveDeckId?.(currentLoadTarget),
+              activeId: readActive?.(currentLoadTarget),
+              mirrored: chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'][key],
+            });
           const currentDeckBoxId = () =>
             currentCosmeticId('deckBoxId', deckLibrary?.getActiveDeckBox);
           const applyDeckBox = (box) => {
@@ -702,7 +708,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             gameLink.announceCoin(currentLoadTarget, coin);
             customizeStage?.refresh();
           };
-          const boxPicker = initializeDeckBuilderBoxPicker({ panelEl: deckBoxPanel, onChange: applyDeckBox });
+          const boxPicker = initializeDeckBuilderBoxPicker({
+            panelEl: deckBoxPanel,
+            onChange: applyDeckBox,
+            // The stage draws the default box until the catalog names the deck's own.
+            onCatalog: () => customizeStage?.refresh(),
+          });
           const refreshDeckBoxSelection = () => {
             boxPicker?.setSelected(currentDeckBoxId());
             customizeStage?.refresh();
@@ -1749,11 +1760,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         coinPicker?.setSelected(coinId);
         gameLink.announceCoin(currentLoadTarget, getCoinById(coinId) || null);
       }
-      // An id this build's catalog does not list is ignored rather than stored.
+      // The default box is stored as null; an id this build's catalog does not list is ignored.
       const importedCatalog = boxPicker?.catalog();
-      if (deckBoxId !== null && importedCatalog && importedCatalog.boxes.some((box) => box.id === deckBoxId)) {
-        boxPicker.setSelected(deckBoxId);
-        applyDeckBox(boxById(importedCatalog, deckBoxId));
+      const importedBoxId = importedDeckBoxId(importedCatalog, deckBoxId);
+      if (importedBoxId !== undefined) {
+        boxPicker.setSelected(importedBoxId);
+        applyDeckBox(importedBoxId ? boxById(importedCatalog, importedBoxId) : null);
       }
 
       render();
@@ -1774,7 +1786,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       coinId:
         chosen.coinId ?? deckLibrary?.getActiveCoin?.(currentLoadTarget) ?? null,
       matId: chosen.matId ?? deckLibrary?.getActiveMat?.(currentLoadTarget) ?? null,
-      deckBoxId: currentDeckBoxId(),
+      deckBoxId: deckBoxIdForSave({
+        loadedDeckId: deckLibrary?.getActiveDeckId?.(currentLoadTarget),
+        mirrored: chosen.deckBoxId,
+      }),
       wallpaperId:
         chosen.wallpaperId ?? deckLibrary?.getActiveWallpaper?.(currentLoadTarget) ?? null,
       sprites: currentDeckSprites(),
@@ -1796,6 +1811,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // wipes a saved deck from the library.
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
         rememberCosmetic(currentLoadTarget, 'sprites', []);
+        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
+        refreshDeckBoxSelection();
         deck = createEmptyDeck();
         syncedDecks[currentLoadTarget] = deck;
         deckDirty = true;
@@ -1986,6 +2003,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       },
       showUnsavedDeck: (cards) => {
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
+        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
+        refreshDeckBoxSelection();
         deck = cards;
         syncedDecks[currentLoadTarget] = cards;
         deckDirty = true;
@@ -1994,6 +2013,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       detachEditor: () => {
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
         rememberCosmetic(currentLoadTarget, 'sprites', []);
+        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
+        refreshDeckBoxSelection();
         deck = createEmptyDeck();
         syncedDecks[currentLoadTarget] = deck;
         deckDirty = false;

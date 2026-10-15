@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
-import { boxAtlasUrl, boxById, boxThumbUrl, defaultBox, filterBoxes, hasBox, stepBoxId } from '../boxes.mjs';
+import { boxAtlasUrl, boxById, boxThumbUrl, defaultBox, filterBoxes, stepBoxId } from '../boxes.mjs';
 
 const catalog = {
   default: 'db_default',
@@ -21,12 +21,6 @@ test('boxById returns the box, and the default for null, undefined or an unknown
 
 test('defaultBox falls back to the first box when the catalog names no default', () => {
   assert.equal(defaultBox({ default: 'nope', boxes: catalog.boxes }).id, 'db_a');
-});
-
-test('hasBox is true only for listed ids', () => {
-  assert.equal(hasBox(catalog, 'db_a'), true);
-  assert.equal(hasBox(catalog, null), false);
-  assert.equal(hasBox(catalog, 'db_gone'), false);
 });
 
 test('urls point under the deckbox asset directory', () => {

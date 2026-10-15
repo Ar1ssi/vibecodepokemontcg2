@@ -11,13 +11,15 @@ import { HIDDEN_SCALE } from './stage-math.mjs';
 
 const ASSET_DIR = '/src/assets/deckbox/';
 const DEFAULT_CARD_BACK = '/src/assets/cardback.png';
-/** The game's two lights, in three's physical units (intensity x pi of the legacy values the web port used). */
+/** Light levels tuned by eye against the game's box thumbnails (white boxes stay just under clipping). */
 const AMBIENT_INTENSITY = 1.8;
 const KEY_INTENSITY = 1.6;
 const KEY_POSITION = [-400, 900, 1200];
-/** `deckbox_interior`'s `_Color` and the shadow planes' base size in Unity's built-in Plane. */
+/** `deckbox_interior`'s `_Color` (sRGB, as authored) and the shadow planes' base size in Unity's built-in Plane. */
 const INTERIOR_TINT = 0.915;
 const SHADOW_PLANE_SIZE = 10;
+/** What an exterior with no atlas (catalog not loaded, atlas missing) shows: a plain dark box, not a hole. */
+const BOX_FALLBACK_COLOR = 0x4a5068;
 
 const fetchJson = async (name) => {
   const response = await fetch(`${ASSET_DIR}${name}`);
@@ -36,6 +38,9 @@ const loadAssets = () => {
     });
   return assetsPromise;
 };
+
+/** scene.json, shared with customize-stage.js so one fetch serves both. */
+export const loadScene = async () => (await loadAssets()).scene;
 
 const geometryOf = (mesh) => {
   const geometry = new THREE.BufferGeometry();
@@ -60,9 +65,32 @@ const loadTexture = async (url) => {
   return texture;
 };
 
+const staticTextures = new Map();
+/**
+ * The stage's fixed textures (interior, shadows, default back), decoded once for every stage: the server
+ * sends no-store, so without this each show() would fetch them again. Never disposed; a failed load is
+ * retried next time.
+ */
+const staticTexture = (url) => {
+  if (!staticTextures.has(url)) {
+    staticTextures.set(
+      url,
+      loadTexture(url).catch((error) => {
+        staticTextures.delete(url);
+        throw error;
+      })
+    );
+  }
+  return staticTextures.get(url);
+};
+
+/** A colour given as display (sRGB) channels in 0..1, as the game's material data and the CSS use. */
+const displayColor = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
+
 /**
  * A box-and-sleeve stage drawn into `host`. Rejects when WebGL2 is missing or the assets fail to
- * load, so the caller shows the picker alone. `onLost` runs once if the browser drops the context.
+ * load, so the caller shows the picker alone; nothing is left in `host` then. `onLost` runs once if
+ * the browser drops the context.
  *
  * @param {{ host: HTMLElement, onLost?: () => void }} options
  * @returns {Promise<{
@@ -73,78 +101,106 @@ const loadTexture = async (url) => {
  * }>}
  */
 export async function createObjectStage({ host, onLost = () => {} }) {
-  const { scene: layout, boxMesh, cardMesh } = await loadAssets();
+  // Everything that can fail on the network comes first: a rejection leaves no canvas or context behind.
+  const [{ scene: layout, boxMesh, cardMesh }, interiorTexture, boxShadowTexture, cardShadowTexture, backTexture] =
+    await Promise.all([
+      loadAssets(),
+      staticTexture(`${ASSET_DIR}interior.webp`),
+      staticTexture(`${ASSET_DIR}shadow-box.webp`),
+      staticTexture(`${ASSET_DIR}shadow-card.webp`),
+      staticTexture(DEFAULT_CARD_BACK),
+    ]);
+
   const canvas = document.createElement('canvas');
   canvas.className = 'customize-object-canvas';
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  host.append(canvas);
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-
-  const scene = new THREE.Scene();
-  scene.add(new THREE.AmbientLight(0xffffff, AMBIENT_INTENSITY));
-  const key = new THREE.DirectionalLight(0xffffff, KEY_INTENSITY);
-  key.position.set(...KEY_POSITION);
-  scene.add(key);
-  const camera = new THREE.PerspectiveCamera(layout.fov, 1, 10, layout.distance * 4);
-  const holder = new THREE.Group();
-  holder.position.set(0, 0, -layout.distance);
-  holder.quaternion.set(...layout.holder.q);
-  scene.add(holder);
 
   const state = { closed: false, lost: false, boxToken: 0, sleeveToken: 0, defaultSleeve: null, owned: new Set() };
   const own = (disposable) => {
     state.owned.add(disposable);
     return disposable;
   };
-
-  const shadowOf = (texture, slotLayout) => {
-    const plane = own(new THREE.PlaneGeometry(SHADOW_PLANE_SIZE, SHADOW_PLANE_SIZE));
-    plane.rotateX(-Math.PI / 2);
-    const [r, g, b, a] = slotLayout.shadow.tint;
-    const material = own(
-      new THREE.MeshBasicMaterial({ map: texture, color: new THREE.Color(r, g, b), opacity: a, transparent: true, depthWrite: false, side: THREE.DoubleSide })
-    );
-    const mesh = new THREE.Mesh(plane, material);
-    mesh.renderOrder = -1;
-    place(mesh, slotLayout.shadow);
-    return mesh;
+  const release = () => {
+    for (const disposable of state.owned) disposable.dispose();
+    state.owned.clear();
+    renderer.dispose();
+    if (!state.lost) renderer.forceContextLoss();
+    canvas.remove();
   };
 
-  const exterior = own(new THREE.MeshLambertMaterial({ color: 0x000000 }));
-  const interior = own(new THREE.MeshLambertMaterial({ color: new THREE.Color(INTERIOR_TINT, INTERIOR_TINT, INTERIOR_TINT) }));
-  const sleeveFace = own(new THREE.MeshBasicMaterial({ color: 0xffffff }));
-  const cardBack = own(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  let onContextLost = null;
+  let slots;
+  let scene;
+  let camera;
+  let exterior;
+  let sleeveFace;
+  try {
+    scene = new THREE.Scene();
+    scene.add(new THREE.AmbientLight(0xffffff, AMBIENT_INTENSITY));
+    const key = new THREE.DirectionalLight(0xffffff, KEY_INTENSITY);
+    key.position.set(...KEY_POSITION);
+    scene.add(key);
+    camera = new THREE.PerspectiveCamera(layout.fov, 1, 10, layout.distance * 4);
+    const holder = new THREE.Group();
+    holder.position.set(0, 0, -layout.distance);
+    holder.quaternion.set(...layout.holder.q);
+    scene.add(holder);
 
-  const slots = {
-    box: new THREE.Group(),
-    sleeve: new THREE.Group(),
-  };
-  const boxMeshObject = new THREE.Mesh(own(geometryOf(boxMesh)), [exterior, interior]);
-  place(boxMeshObject, layout.slots.box.mesh);
-  slots.box.add(boxMeshObject);
-  const cardMeshObject = new THREE.Mesh(own(geometryOf(cardMesh)), [sleeveFace, cardBack, cardBack]);
-  place(cardMeshObject, layout.slots.sleeve.mesh);
-  slots.sleeve.add(cardMeshObject);
-  holder.add(slots.box, slots.sleeve);
+    const shadowOf = (texture, slotLayout) => {
+      const plane = own(new THREE.PlaneGeometry(SHADOW_PLANE_SIZE, SHADOW_PLANE_SIZE));
+      plane.rotateX(-Math.PI / 2);
+      const [r, g, b, a] = slotLayout.shadow.tint;
+      const material = own(
+        new THREE.MeshBasicMaterial({ map: texture, color: displayColor(r, g, b), opacity: a, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+      );
+      const mesh = new THREE.Mesh(plane, material);
+      mesh.renderOrder = -1;
+      place(mesh, slotLayout.shadow);
+      return mesh;
+    };
+
+    exterior = own(new THREE.MeshLambertMaterial({ color: BOX_FALLBACK_COLOR }));
+    const interior = own(new THREE.MeshLambertMaterial({ color: displayColor(INTERIOR_TINT, INTERIOR_TINT, INTERIOR_TINT), map: interiorTexture }));
+    sleeveFace = own(new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    const cardBack = own(new THREE.MeshBasicMaterial({ color: 0xffffff, map: backTexture }));
+    state.defaultSleeve = own(backTexture.clone());
+    state.defaultSleeve.needsUpdate = true;
+    sleeveFace.map = state.defaultSleeve;
+
+    slots = { box: new THREE.Group(), sleeve: new THREE.Group() };
+    const boxMeshObject = new THREE.Mesh(own(geometryOf(boxMesh)), [exterior, interior]);
+    place(boxMeshObject, layout.slots.box.mesh);
+    slots.box.add(boxMeshObject, shadowOf(boxShadowTexture, layout.slots.box));
+    const cardMeshObject = new THREE.Mesh(own(geometryOf(cardMesh)), [sleeveFace, cardBack, cardBack]);
+    place(cardMeshObject, layout.slots.sleeve.mesh);
+    slots.sleeve.add(cardMeshObject, shadowOf(cardShadowTexture, layout.slots.sleeve));
+    holder.add(slots.box, slots.sleeve);
+
+    onContextLost = (event) => {
+      event.preventDefault();
+      state.lost = true;
+      onLost();
+    };
+    canvas.addEventListener('webglcontextlost', onContextLost);
+    host.append(canvas);
+  } catch (error) {
+    release();
+    throw error;
+  }
 
   const yawAxis = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
   const setPose = (slot, pose, yaw = 0) => {
     const group = slots[slot];
     if (!group) return;
-    yawAxis.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Number.isFinite(yaw) ? yaw : 0);
+    yawAxis.setFromAxisAngle(up, Number.isFinite(yaw) ? yaw : 0);
     group.position.set(...pose.p);
     group.quaternion.set(...pose.q).premultiply(yawAxis);
     group.scale.set(...pose.s);
     group.visible = pose.s[0] > HIDDEN_SCALE * 10;
   };
-
-  const onContextLost = (event) => {
-    event.preventDefault();
-    state.lost = true;
-    onLost();
-  };
-  canvas.addEventListener('webglcontextlost', onContextLost);
 
   const resize = () => {
     const width = Math.max(1, canvas.clientWidth || host.clientWidth);
@@ -156,16 +212,20 @@ export async function createObjectStage({ host, onLost = () => {} }) {
   resize();
 
   /**
-   * Swaps `material.map` to `url` once it loads, or back to `fallback` (null = black) for no url or a
-   * load that fails. A newer request for the same slot wins. `fallback` is never disposed here.
+   * Swaps `material.map` to `url` once it loads, or to `fallback` (null = none, shown as
+   * `fallbackColor`) for no url or a load that fails. A newer request for the same slot wins.
+   * `fallback` is owned by the stage and never disposed here.
    */
-  const swapMap = async (material, url, tokenKey, fallback) => {
+  const swapMap = async (material, url, tokenKey, fallback, fallbackColor) => {
     state[tokenKey] += 1;
     const token = state[tokenKey];
     const show = (map) => {
-      if (material.map && material.map !== fallback && material.map !== map) material.map.dispose();
+      if (material.map && material.map !== fallback && material.map !== map) {
+        state.owned.delete(material.map);
+        material.map.dispose();
+      }
       material.map = map;
-      material.color.set(map ? 0xffffff : 0x000000);
+      material.color.set(map ? 0xffffff : fallbackColor);
       material.needsUpdate = true;
     };
     if (!url) {
@@ -184,33 +244,12 @@ export async function createObjectStage({ host, onLost = () => {} }) {
       return;
     }
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    state.owned.add(texture);
     show(texture);
   };
 
-  const ready = Promise.all([
-    loadTexture(`${ASSET_DIR}interior.webp`),
-    loadTexture(`${ASSET_DIR}shadow-box.webp`),
-    loadTexture(`${ASSET_DIR}shadow-card.webp`),
-    loadTexture(DEFAULT_CARD_BACK),
-  ]).then(([interiorTexture, boxShadowTexture, cardShadowTexture, backTexture]) => {
-    if (state.closed) {
-      for (const texture of [interiorTexture, boxShadowTexture, cardShadowTexture, backTexture]) texture.dispose();
-      return;
-    }
-    interior.map = own(interiorTexture);
-    interior.needsUpdate = true;
-    cardBack.map = own(backTexture);
-    cardBack.needsUpdate = true;
-    state.defaultSleeve = own(backTexture.clone());
-    state.defaultSleeve.needsUpdate = true;
-    if (!sleeveFace.map) sleeveFace.map = state.defaultSleeve;
-    slots.box.add(shadowOf(own(boxShadowTexture), layout.slots.box));
-    slots.sleeve.add(shadowOf(own(cardShadowTexture), layout.slots.sleeve));
-  });
-  await ready;
-
-  const setBoxAtlas = (url) => swapMap(exterior, url, 'boxToken', null);
-  const setSleeveTexture = (url) => swapMap(sleeveFace, url, 'sleeveToken', state.defaultSleeve);
+  const setBoxAtlas = (url) => swapMap(exterior, url, 'boxToken', null, BOX_FALLBACK_COLOR);
+  const setSleeveTexture = (url) => swapMap(sleeveFace, url, 'sleeveToken', state.defaultSleeve, 0xffffff);
 
   const render = () => {
     if (state.closed || state.lost) return;
@@ -221,12 +260,7 @@ export async function createObjectStage({ host, onLost = () => {} }) {
     if (state.closed) return;
     state.closed = true;
     canvas.removeEventListener('webglcontextlost', onContextLost);
-    for (const disposable of state.owned) disposable.dispose();
-    for (const material of [exterior, interior, sleeveFace, cardBack]) material.map?.dispose();
-    state.owned.clear();
-    renderer.dispose();
-    if (!state.lost) renderer.forceContextLoss();
-    canvas.remove();
+    release();
   };
 
   return { setBoxAtlas, setSleeveTexture, setPose, render, resize, dispose };

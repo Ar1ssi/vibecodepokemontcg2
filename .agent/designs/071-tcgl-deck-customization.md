@@ -50,47 +50,41 @@ concept here at all. User asked for TCG Live's deck boxes rendered in 3D plus th
 
 ## Design
 ### Assets (slice 1) — `client/src/assets/deckbox/`
-- `boxes.json`: `{ default: 'db_pc_pokeballs', boxes: [{ id, name, atlas, thumb }] }`, sorted by name.
-  `name` = loc_en text with TMP tags stripped and U+FFFD replaced by `—`; falls back to the humanised id.
-  `atlas` = `atlases/<id>.webp`, `thumb` = `thumbs/<id>.webp` (relative to the directory).
-- `scene.json`: `{ fov, distance, tilt: [x,y,z,w], grouped: {box,sleeve,coin}, focused: {box,sleeve,coin} }`, each pose
-  `{ p: [x,y,z], q: [x,y,z,w], s: [x,y,z] }` copied from `level4.json` `RendertoTextureCamera` children, plus
-  `models: { box: {p,q,s}, card: {p,q,s}, shadowBox, shadowCard, shadowCoin }` from `CustomizationObjects`.
-- `deck-box.mesh.json`, `card.mesh.json`: `packCoinMesh` output (`p,n,uv,i,submeshes`).
+- `boxes.json`: `{ default, boxes: [{ id, name, atlas, thumb }] }`, sorted by name. `name` = loc_en text with TMP
+  tags stripped and U+FFFD replaced by `—`; falls back to the humanised id. `atlas` = `atlases/<id>.webp`,
+  `thumb` = `thumbs/<id>.webp`.
+- `scene.json` (already in three's space): `{ fov, distance, holder: { q }, slots: { box|sleeve|coin: { grouped,
+  focused, mesh?, shadow, pivot? } } }`, poses `{ p, q, s }`; the coin also has `pivot` and `mesh` (the disc sits
+  at pivot × mesh). `shadow` carries `tint` (rgba).
+- `deck-box.mesh.json`, `card.mesh.json`: `packCoinMesh` output turned a half turn about y (`toThreeMesh`).
 - `interior.webp`, `shadow-box.webp`, `shadow-card.webp`, `shadow-coin.webp`.
-- Importer: `scripts/fx/deckbox/import-tcgl-deckbox.mjs --src <extract dir>` (`pnpm fx:import-deckbox`).
-  Refuses a missing source file with the path named; writes nothing partial (build into a temp dir, then rename).
+- Importer `scripts/fx/deckbox/import-tcgl-deckbox.mjs --src <extract dir>` (`pnpm fx:import-deckbox`):
+  builds in `<out>.tmp-<pid>`, swaps in with `swapIn` (old copy renamed aside, restored if the swap fails).
 
-### Pure math — `client/src/setup/deck-builder/core/customize-stage/stage-math.mjs`
-- `poseFor(scene, mode, slot)` → pose; `blendPose(a, b, t)` → pose (lerp p/s, slerp q).
-- `focusLayout(selectedSlot)` → `{ box, sleeve, coin }` each `{ visible, pose }` for Focused: selected takes
-  `scene.focused[slot]` with x forced to 0; others `visible:false`.
-- `groupedLayout()` → all three `scene.grouped[slot]` visible.
-- `passiveYaw(elapsedS)` → radians at 10°/s; `dragYaw(startYaw, dx)` → `startYaw + dx * 0.01`.
-- `nextIndex(i, dir, length)` → wraps; length 0 → 0.
+### Pure modules — `client/src/setup/deck-builder/core/customize-stage/`
+- `stage-math.mjs`: `layoutFor(scene, focus|null)` → `{ box|sleeve|coin: { visible, pose } }`, `blendPose`,
+  `composePoint`, `projectPoint`, `coinFrame`, `coinShadowFrame`, `yawDegrees`, `passiveYaw`, `dragYaw`,
+  `nextIndex`.
+- `boxes.mjs`: `loadBoxCatalog`, `boxById`, `defaultBox`, `boxAtlasUrl`, `boxThumbUrl`, `filterBoxes`, `stepBoxId`.
+- `cosmetic-state.mjs`: `effectiveCosmeticId` (loaded deck's record, else the mirror), `deckBoxIdForSave`
+  (undefined with a deck loaded), `importedDeckBoxId` (default → null, unknown → ignored).
 
 ### Runtime
-- `object-stage.js` (lazy three): `createObjectStage({ host, kind: 'box'|'sleeve' })` →
-  `{ setTexture(url), setPose(pose), setYaw(rad), resize(), dispose() }`. Box: `MeshLambertMaterial[2]`
-  (exterior atlas, colour white; interior `interior.webp`, colour 0.915); sleeve: three `MeshBasicMaterial`
-  (submesh 0 sleeve texture, rest the default card back). Shadow quad under each, tinted per `scene.json`.
-  z mirrored and winding flipped as in the WebApp port (OBJ is Unity left-handed).
-- `customize-stage.js`: builds stage DOM (three slot hosts), mounts box + sleeve object stages and
-  `createCoinStage` (069), runs one `requestAnimationFrame` loop while visible, owns Preview All / Focused
-  toggle, prev/next arrows, drag-to-rotate on the focused slot, "Currently showing" caption.
-  API: `initializeCustomizeStage({ panelEl, getSelection, onPick })` →
-  `{ show(), hide(), setSelection({ boxId, sleeveImage, coin }), setFocus(slot|null), dispose() }`.
-  `hide()` disposes all three stages (no idle contexts); `show()` rebuilds from the last selection.
-- `native-deck-builder-box-picker.js`: grid of boxes (thumb + name), filter, `onChange(box|null)`;
-  mirrors `initializeDeckBuilderSleevePicker` shape.
-- Wiring in `native-deck-builder.js`: switcher gains `data-view="box"` (first); entering Customize defaults to
-  box. Stage sits above the active picker grid (`#nativeDeckBuilderCustomizeStage`). Picking in any picker calls
-  `stage.setSelection` and focuses that slot; Preview All shows all three.
+- `object-stage.js` (lazy three): `createObjectStage({ host, onLost })` → `{ setBoxAtlas, setSleeveTexture,
+  setPose(slot, pose, yaw), render, resize, dispose }` and `loadScene()`. Everything fetchable is loaded before
+  the renderer exists, so a rejection leaves nothing behind. Fixed textures are cached module-wide.
+- `customize-stage.js`: `initializeCustomizeStage({ panelEl, getSelection, onStep, loadStages? })` →
+  `{ show, hide, setView, refresh }`. Builds the object stage and the 069 coin stage on show, disposes both on
+  hide, coin swaps are serialised, an exception in a frame or a lost context marks the panel unavailable.
+  Omitted from the game's screen: the selection "pop" clips, the rim point light.
+- `native-deck-builder-box-picker.js`: `initializeDeckBuilderBoxPicker({ panelEl, onChange, onCatalog })`.
+- Wiring in `native-deck-builder.js`: `applyDeckBox/applySleeve/applyCoin` are the one write path for the
+  pickers, the arrows and CSV import; switcher gains `data-view="box"`; every editor detach also drops the
+  mirrored `deckBoxId`.
 - Persistence: `deck-library.mjs` `deckBoxId` (+ `setDeckBox`, snapshot and create options); library wrapper
-  `setActiveDeckBox` / `getActiveDeckBox`; `rememberCosmetic(target, 'deckBoxId', …)`; CSV meta `#DECKBOX,`;
-  `builder-window.mjs` accepts `deckBoxId` as nullable id. No game-side effect (box is builder-only).
-- Fallback: WebGL2 missing, context lost, or asset fetch failure → stage hidden, pickers work as today;
-  logged once.
+  `setActiveDeckBox` / `getActiveDeckBox`; CSV meta `#DECKBOX,`. No game-side effect.
+- Fallback: WebGL2 missing, context lost, or asset fetch failure → panel gets `is-unavailable`, pickers work
+  as today; logged once.
 
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
@@ -134,6 +128,9 @@ records keep an ignored extra field. Stacked on `feature/tcgl-coins`; lands afte
 - Meshes: the extract's OBJ already has Unity's x negated, so the importer turns meshes a half turn about y
   (x and z negate, winding kept) instead of the design's z mirror. Verified against the game's box thumbnails
   and `scene.json` poses (mirrored z, quaternion x/y negated).
+- Review fixes (hostile pass): coin swaps serialised; object stage fetches before it creates a context; fixed
+  textures cached; `deckBoxId` mirror cleared on every detach; Save leaves a loaded deck's box to its own
+  record; CSV default box imports as null; spun objects settle on retarget; sRGB shadow/interior tints.
 - Rendering: box and sleeve share one three scene and canvas; only the coin has its own canvas, placed by
   `coinFrame` (projected pose). The design's "three slot canvases" is superseded; coin shadow is a CSS mask.
 - `builder-window.mjs` is untouched: the deck box has no game-side message, so no payload to validate.

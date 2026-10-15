@@ -88,6 +88,25 @@ function build({ src, dir }) {
   writeJson(path.join(dir, 'card.mesh.json'), packMesh(path.join(src, ...CARD_OBJ)));
 }
 
+/**
+ * Replaces `out` with `staging`. The old directory is renamed aside first and put back when the swap
+ * fails, so a failed rename (a dev server holding files on Windows) never leaves `out` missing.
+ */
+export function swapIn({ staging, out, rename = fs.renameSync }) {
+  const aside = `${out}.old-${process.pid}`;
+  fs.rmSync(aside, { recursive: true, force: true });
+  const hadOld = fs.existsSync(out);
+  try {
+    if (hadOld) rename(out, aside);
+    rename(staging, out);
+  } catch (error) {
+    if (hadOld && !fs.existsSync(out) && fs.existsSync(aside)) fs.renameSync(aside, out);
+    fs.rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+  fs.rmSync(aside, { recursive: true, force: true });
+}
+
 /** Throws (naming the missing file) without touching `out` when any source is absent or malformed. */
 export function importDeckBoxes({ src, out }) {
   const staging = `${out}.tmp-${process.pid}`;
@@ -98,8 +117,7 @@ export function importDeckBoxes({ src, out }) {
     fs.rmSync(staging, { recursive: true, force: true });
     throw error;
   }
-  fs.rmSync(out, { recursive: true, force: true });
-  fs.renameSync(staging, out);
+  swapIn({ staging, out });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -17,7 +17,6 @@ import {
   yawDegrees,
 } from './stage-math.mjs';
 
-const SCENE_URL = '/src/assets/deckbox/scene.json';
 const COIN_MESH_URL = '/src/assets/coins/tcgl/coin-mesh.json';
 const HIDDEN_PX_SCALE = 0.01;
 const VIEWS = ['box', 'sleeve', 'coin'];
@@ -29,10 +28,35 @@ const warnOnce = (error) => {
   console.warn('[customize stage] 3D preview unavailable; the pickers still work.', error);
 };
 
-const fetchJson = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  return response.json();
+let radiusPromise = null;
+/** The coin disc's radius from its mesh, fetched once; a failed fetch is retried next time. */
+const loadCoinRadius = () => {
+  radiusPromise ??= fetch(COIN_MESH_URL)
+    .then((response) => {
+      if (!response.ok) throw new Error(`${COIN_MESH_URL}: HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((mesh) => discRadius(mesh.p))
+    .catch((error) => {
+      radiusPromise = null;
+      throw error;
+    });
+  return radiusPromise;
+};
+
+/** The real stages, imported on first show so three stays off the page until Customize opens. */
+const loadRealStages = async () => {
+  const [objectModule, coinModule, radius] = await Promise.all([
+    import('./object-stage.js'),
+    import('../../../netcode/mat-fx/coin-stage.js'),
+    loadCoinRadius(),
+  ]);
+  return {
+    createObjectStage: objectModule.createObjectStage,
+    createCoinStage: coinModule.createCoinStage,
+    loadScene: objectModule.loadScene,
+    radius,
+  };
 };
 
 const clonePose = (pose) => ({ p: [...pose.p], q: [...pose.q], s: [...pose.s] });
@@ -61,9 +85,11 @@ const MARKUP = [
  *   coin: { id: string, artUrl?: string }|null, coinName: string }} options.getSelection
  *   current picks; read on show(), refresh() and every step
  * @param {(slot: 'box'|'sleeve'|'coin', dir: number) => void} options.onStep an arrow was pressed
+ * @param {() => Promise<{ createObjectStage: Function, createCoinStage: Function, loadScene: () => Promise<object>, radius: number }>} [options.loadStages]
+ *   where the stage factories come from; tests inject fakes, the default imports the real ones
  * @returns {{ show: () => void, hide: () => void, setView: (view: string) => void, refresh: () => void } | null}
  */
-export const initializeCustomizeStage = ({ panelEl, getSelection, onStep }) => {
+export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadStages = loadRealStages }) => {
   if (!panelEl) return null;
   panelEl.innerHTML = MARKUP;
   const viewportEl = panelEl.querySelector('.customize-stage-viewport');
@@ -90,6 +116,7 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep }) => {
     drag: null,
     applied: { box: undefined, sleeve: undefined, coin: undefined },
     coinSide: 0,
+    coinChain: Promise.resolve(),
   };
 
   const focusSlot = () => (state.mode === 'focused' ? state.view : null);
@@ -127,13 +154,19 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep }) => {
     const coinKey = selection.coin ? `${selection.coin.id}|${selection.coin.artUrl ?? ''}` : '';
     if (coin && applied.coin !== coinKey) {
       applied.coin = coinKey;
-      coin.setCoin(selection.coin ?? null).catch(warnOnce);
+      // coin-stage's setCoin has no ordering guard: swaps run one after another, so the last pick wins.
+      const wanted = selection.coin ?? null;
+      state.coinChain = state.coinChain
+        .then(() => (state.coin === coin ? coin.setCoin(wanted) : undefined))
+        .catch(warnOnce);
     }
   };
 
   /** Moves every slot toward the layout for the current view and mode, sliding unless motion is reduced. */
   const retarget = (now) => {
     if (!state.scene || !state.current) return;
+    // A spun object settles back to its layout's orientation, as the game's own tween does.
+    state.yaw = { box: 0, sleeve: 0, coin: 0 };
     const layout = layoutFor(state.scene, focusSlot());
     const to = {};
     for (const slot of VIEWS) to[slot] = layout[slot].pose;
@@ -178,8 +211,30 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep }) => {
     coin.draw({ angle: 0, lift: 0, yaw: yawDegrees(pose.q) + yawExtraDeg }, performance.now());
   };
 
+  const stopLoop = () => {
+    if (state.frameId) cancelAnimationFrame(state.frameId);
+    state.frameId = 0;
+  };
+
+  /** The preview is gone for this show(): stop drawing, leave the pickers working. */
+  const markUnavailable = (error) => {
+    stopLoop();
+    panelEl.classList.add('is-unavailable');
+    if (error) warnOnce(error);
+  };
+
   const frame = (now) => {
     if (!state.shown || !state.objects || !state.coin) return;
+    try {
+      drawFrame(now);
+    } catch (error) {
+      markUnavailable(error);
+      return;
+    }
+    state.frameId = requestAnimationFrame(frame);
+  };
+
+  const drawFrame = (now) => {
     const dt = Math.min(0.05, Math.max(0, (now - state.lastFrameAt) / 1000));
     state.lastFrameAt = now;
 
@@ -201,12 +256,10 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep }) => {
     state.objects.setPose('sleeve', state.current.sleeve, state.yaw.sleeve);
     state.objects.render();
     placeCoin(state.current.coin, (state.yaw.coin * 180) / Math.PI);
-    state.frameId = requestAnimationFrame(frame);
   };
 
   const teardown = () => {
-    if (state.frameId) cancelAnimationFrame(state.frameId);
-    state.frameId = 0;
+    stopLoop();
     state.objects?.dispose();
     state.coin?.dispose();
     state.objects = null;
@@ -219,21 +272,17 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep }) => {
   const build = async () => {
     const token = state.token;
     try {
-      const [scene, coinMesh, objectModule, coinModule] = await Promise.all([
-        fetchJson(SCENE_URL),
-        fetchJson(COIN_MESH_URL),
-        import('./object-stage.js'),
-        import('../../../netcode/mat-fx/coin-stage.js'),
-      ]);
+      const stages = await loadStages();
+      const scene = await stages.loadScene();
       if (token !== state.token) return;
-      const objects = await objectModule.createObjectStage({ host: objectsHost, onLost: () => panelEl.classList.add('is-unavailable') });
+      const objects = await stages.createObjectStage({ host: objectsHost, onLost: () => markUnavailable() });
       if (token !== state.token) {
         objects.dispose();
         return;
       }
       let coin;
       try {
-        coin = await coinModule.createCoinStage({ host: coinHost, onLost: () => panelEl.classList.add('is-unavailable') });
+        coin = await stages.createCoinStage({ host: coinHost, onLost: () => markUnavailable() });
       } catch (error) {
         objects.dispose();
         throw error;
@@ -244,7 +293,7 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep }) => {
         return;
       }
       state.scene = scene;
-      state.radius = discRadius(coinMesh.p);
+      state.radius = stages.radius;
       state.objects = objects;
       state.coin = coin;
       const layout = layoutFor(scene, focusSlot());
