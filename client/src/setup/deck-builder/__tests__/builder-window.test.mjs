@@ -4,11 +4,14 @@ import assert from 'node:assert/strict';
 import {
   BUILDER_MESSAGE_SOURCE,
   BUILDER_WINDOW_PATH,
+  BUILD_BATTLE_DEFAULT_FLOW,
+  BUILD_BATTLE_LEGACY_PATH,
   BUILD_BATTLE_WINDOW_NAME,
   BUILD_BATTLE_WINDOW_PATH,
   DECK_FORMAT_VALUES,
   buildBuilderMessage,
   parseBuilderMessage,
+  resolveBuildBattleFlow,
   resolveBuilderMode,
   resolveBuilderRole,
 } from '../core/builder-window.mjs';
@@ -107,6 +110,16 @@ test('the Build & Battle path is an editor tab in build-battle mode', () => {
   assert.equal(resolveBuilderMode(BUILDER_WINDOW_PATH), 'standard');
   assert.equal(resolveBuilderMode('/'), 'standard');
   assert.equal(resolveBuilderMode(undefined), 'standard');
+});
+
+test('the legacy path is the same editor tab and picks the legacy flow', () => {
+  assert.equal(BUILD_BATTLE_LEGACY_PATH, '/build-and-battle-legacy');
+  assert.equal(resolveBuilderRole(BUILD_BATTLE_LEGACY_PATH), 'editor');
+  assert.equal(resolveBuilderMode(BUILD_BATTLE_LEGACY_PATH), 'build-battle');
+  assert.equal(resolveBuildBattleFlow('/build-and-battle-legacy/'), 'legacy');
+  assert.equal(resolveBuildBattleFlow('/build-and-battle'), BUILD_BATTLE_DEFAULT_FLOW);
+  assert.equal(BUILD_BATTLE_DEFAULT_FLOW, 'run');
+  assert.equal(resolveBuildBattleFlow(undefined), 'run');
 });
 
 test('load-deck format: missing and tcg are Standard, build-battle passes, anything else is refused', () => {
