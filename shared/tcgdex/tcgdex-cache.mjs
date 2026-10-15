@@ -61,17 +61,34 @@ export function createIndexedDbStore(indexedDbFactory = globalThis.indexedDB) {
   };
 }
 
+// Concurrent calls for one URL share one lookup: overlapping searches, Browse Sets
+// passes and in-game enrichment would otherwise each read IndexedDB and hit the
+// network. Callers get the same object, so they must not mutate it.
+function shareInFlight(load) {
+  const pending = new Map();
+  return function cachedFetchJson(url) {
+    const key = String(url);
+    if (pending.has(key)) return pending.get(key);
+    const request = Promise.resolve()
+      .then(() => load(url))
+      .finally(() => pending.delete(key));
+    pending.set(key, request);
+    return request;
+  };
+}
+
 // Returns fetchJson(url). Fresh entry → cached value. Missing or stale →
 // network, then store. Network failure with a stale entry → stale value
 // (better an old set list than an empty Browse Sets panel). Storage errors
-// never fail a request; they only cost a cache miss.
+// never fail a request; they only cost a cache miss. Concurrent calls for one
+// URL share one lookup.
 export function createCachedFetchJson({
   store = createIndexedDbStore(),
   now = () => Date.now(),
   fetchNetwork = fetchJsonFromNetwork,
   ttlFor = ttlForUrl,
 } = {}) {
-  if (!store) return fetchNetwork;
+  if (!store) return shareInFlight(fetchNetwork);
 
   async function readEntry(key) {
     try {
@@ -90,7 +107,7 @@ export function createCachedFetchJson({
     }
   }
 
-  return async function cachedFetchJson(url) {
+  return shareInFlight(async function loadCached(url) {
     const key = KEY_VERSION + String(url);
     const entry = await readEntry(key);
     if (entry && now() - entry.savedAt < ttlFor(url)) return entry.data;
@@ -103,7 +120,7 @@ export function createCachedFetchJson({
       if (entry) return entry.data;
       throw error;
     }
-  };
+  });
 }
 
 export const cachedFetchJson = createCachedFetchJson();
