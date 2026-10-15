@@ -109,3 +109,13 @@ test('design 051: extractDeckFormat reads the format after matId (exchangeData) 
   assert.equal(extractDeckFormat('loadDeckData', null), 'tcg');
   assert.equal(extractDeckFormat('unknownAction', [deck, 'build-battle']), 'tcg');
 });
+
+test('Design 073: a deck box id after the format leaves the deck and the format where the server reads them', () => {
+  const deck = fixtureDeck('Boxed');
+  const exchange = ['Alice', deck, 'sleeve.png', false, false, 'mat-1', 'build-battle', 'db_151_sv3-5_etb'];
+  assert.deepEqual(extractDeckData('exchangeData', exchange), deck);
+  assert.equal(extractDeckFormat('exchangeData', exchange), 'build-battle');
+  const load = [deck, 'build-battle', null];
+  assert.deepEqual(extractDeckData('loadDeckData', load), deck);
+  assert.equal(extractDeckFormat('loadDeckData', load), 'build-battle');
+});

@@ -17,6 +17,7 @@ import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { renderRoomFormatPanel } from '../../setup/general/room-format-panel.js';
 import { announceHostState } from '../document-event-listeners/sidebox/deck-builder-window.js';
 import { exchangeData } from '../../setup/deck-constructor/exchange-data.js';
+import { deckBoxes } from '../../setup/netcode/mat-fx/deck-box-state.mjs';
 import { acceptAction } from '../../setup/general/accept-action.js';
 import { processAction } from '../../setup/general/process-action.js';
 import { setAuthoritativeDispatchContext } from '../../setup/netcode/authoritative-dispatch.js';
@@ -390,6 +391,7 @@ export const initializeSocketEventListeners = () => {
       false,
       getStoredMatId('self'),
       systemState.deckFormat.self,
+      deckBoxes.idFor('self'),
       true
     );
     socket.emit('rulesEvent', {

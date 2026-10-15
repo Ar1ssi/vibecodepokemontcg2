@@ -139,7 +139,7 @@ test('Edge Case 16: TCGdex API failure degrades gracefully to decklist data', ()
 });
 
 test('Edge Case 17: Protocol version negotiation and mismatch rejection', () => {
-  assert.equal(PROTOCOL_VERSION, '2.1.0');
+  assert.equal(PROTOCOL_VERSION, '2.2.0');
 
   const room = new GameRoom({ roomId: 'room-version-test', rulesEnabled: false });
   room.addPlayer('socket-ash', 'p1', 'Ash');

@@ -216,6 +216,10 @@ const createLocalGameLink = () => ({
     document.dispatchEvent(
       new CustomEvent('rules-coin-changed', { detail: { target, coin: coinPayload(coin) } })
     ),
+  announceDeckBox: (target, deckBoxId) =>
+    document.dispatchEvent(
+      new CustomEvent('deck-box-changed', { detail: { target, deckBoxId: deckBoxId ?? null } })
+    ),
   play: () => showGameSidebox(),
   isTwoPlayer: () => systemState.isTwoPlayer,
   isConnected: () => true,
@@ -238,6 +242,7 @@ const createRemoteGameLink = ({ onHostState }) => {
     announceMat: (target, mat, emit = false) =>
       host.post('mat', { target, matId: mat?.id ?? null, emit: Boolean(emit) }),
     announceCoin: (target, coin) => host.post('coin', { target, coinId: coin?.id ?? null }),
+    announceDeckBox: (target, deckBoxId) => host.post('deck-box', { target, deckBoxId: deckBoxId ?? null }),
     play: (target) => {
       host.post('play', { target });
       window.close();
@@ -762,8 +767,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           });
 
           // ── Deck box + 3D preview (design 071) ─────────────────────────────
-          // The deck box is builder-only: no game-side announcement. The stage reads the three picks from
-          // the loaded deck (or the mirror, with none loaded) and shows them as TCG Live's 3D trio.
+          // The stage reads the three picks from the loaded deck (or the mirror, with none loaded) and
+          // shows them as TCG Live's 3D trio. The board shows the box beside the mat (design 073).
           const currentCosmeticId = (key, readActive) =>
             effectiveCosmeticId({
               loadedDeckId: deckLibrary?.getActiveDeckId?.(currentLoadTarget),
@@ -775,6 +780,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           const applyDeckBox = (box) => {
             deckLibrary?.setActiveDeckBox?.(currentLoadTarget, box ? box.id : null);
             rememberCosmetic(currentLoadTarget, 'deckBoxId', box ? box.id : null);
+            gameLink.announceDeckBox(currentLoadTarget, box ? box.id : null);
             customizeStage?.refresh();
           };
           const applySleeve = (sleeve) => {
@@ -1692,6 +1698,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     syncedDecks[currentLoadTarget] = deck;
     const deckRows = deckToSimRows(deck);
     if (deckRows.length > 0) {
+      // Design 073: the board learns the box first, so the deck packet names it.
+      gameLink.announceDeckBox(currentLoadTarget, currentDeckBoxId());
       gameLink.loadDeck(
         currentLoadTarget,
         deckRows,
@@ -2058,6 +2066,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         const coin = payload.coinId ? getCoinById(payload.coinId) : null;
         if (payload.coinId && !coin) return;
         link.announceCoin(payload.target, coin);
+      } else if (type === 'deck-box') {
+        link.announceDeckBox(payload.target, payload.deckBoxId);
       } else if (type === 'play') {
         link.play(payload.target);
         window.focus();

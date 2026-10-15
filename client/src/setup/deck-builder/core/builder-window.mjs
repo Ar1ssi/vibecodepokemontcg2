@@ -103,6 +103,8 @@ const PAYLOAD_VALIDATORS = {
   mat: (payload) =>
     isTarget(payload.target) && isNullableId(payload.matId) && typeof payload.emit === 'boolean',
   coin: (payload) => isTarget(payload.target) && isNullableId(payload.coinId),
+  // Design 073: the deck box the board shows beside the mat and deals the opening deck from.
+  'deck-box': (payload) => isTarget(payload.target) && isNullableId(payload.deckBoxId),
   play: (payload) => isTarget(payload.target),
 };
 

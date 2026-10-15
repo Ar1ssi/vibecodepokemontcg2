@@ -10,7 +10,9 @@ import { processAction } from '../general/process-action.js';
 import { resolveDefaultCardBackSrc } from './default-card-back.mjs';
 import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../shared/engine/formats.mjs';
-import { deckFormatSlot, resolveFormatAndEmit } from './deck-format-args.mjs';
+import { deckFormatSlot } from './deck-format-args.mjs';
+import { resolveDeckPacketTail } from './deck-box-args.mjs';
+import { deckBoxes } from '../netcode/mat-fx/deck-box-state.mjs';
 import { rememberOwnDeck } from './own-deck.mjs';
 
 // Decks are built and loaded in the deck builder's own tab (design 050); this
@@ -18,9 +20,9 @@ import { rememberOwnDeck } from './own-deck.mjs';
 const changeCardBackButton = document.getElementById('changeCardBackButton');
 const mainImportHeaderButton = document.getElementById('mainImportHeaderButton');
 
-// Wire parameters are [deckData, format]; see deck-format-args.mjs for the argument order.
-export const loadDeckData = (user, deckData, format, emitArg) => {
-  const { format: deckFormat, emit } = resolveFormatAndEmit(format, emitArg);
+// Wire parameters are [deckData, format, deckBoxId]; see deck-box-args.mjs for the argument order.
+export const loadDeckData = (user, deckData, format, deckBoxArg, emitArg) => {
+  const { format: deckFormat, emit, deckBoxId } = resolveDeckPacketTail(format, deckBoxArg, emitArg);
   systemState.deckFormat[deckFormatSlot(user, systemState.isTwoPlayer)] = deckFormat;
   if (user === 'self') {
     systemState.selfDeckData = deckData;
@@ -34,6 +36,9 @@ export const loadDeckData = (user, deckData, format, emitArg) => {
   if (shouldResetBoardOnDeckData(user, systemState)) {
     reset(user, true, true, false, false);
   }
+  // Design 073: a new deck goes back into its box; the opponent's packet names the box it comes in.
+  if (user === 'opp' && !emit && deckBoxId !== undefined) deckBoxes.setId('opp', deckBoxId);
+  deckBoxes.clearDealt([user]);
   if (deckData) {
     appendMessage(
       '',
@@ -50,7 +55,7 @@ export const loadDeckData = (user, deckData, format, emitArg) => {
       detail: { user, deckData },
     })
   );
-  processAction(user, emit, 'loadDeckData', [deckData, deckFormat]);
+  processAction(user, emit, 'loadDeckData', [deckData, deckFormat, deckBoxes.idFor(user)]);
 };
 
 // ************ logic for changing cardbacks********************//

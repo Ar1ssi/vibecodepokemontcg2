@@ -52,3 +52,6 @@ export function createDeckBoxState() {
     },
   };
 }
+
+/** The page's boxes: the deck packets write the opponent's, the deck builder this player's. */
+export const deckBoxes = createDeckBoxState();
