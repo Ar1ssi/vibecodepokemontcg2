@@ -46,6 +46,11 @@ END — whenever you changed anything:
 - Tick your workflow's Done checklist in your final message.
 - Maintenance due when ≥30 commits landed on `main` since the last `maintain:` commit
   (`git rev-list --count $(git log -1 --format=%h --grep='^maintain' main)..main`).
+- **"Push to main"** (the user's phrase) means push to GitHub's `main`: `git fetch origin main`, merge or
+  rebase onto `origin/main`, run `TEST_BASE=origin/main pnpm gates`, run the full `pnpm test` only if it
+  says REQUIRED (a green run records the tree, so an identical landing skips it), then
+  `git push origin HEAD:main`. This rule is the user's standing authorization for that push; don't ask
+  again. Never force-push.
 
 ## Routing
 | Request looks like | Route |
@@ -108,9 +113,11 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
   Visual-only changes (CSS, mat FX, animation, layout) are exempt — the user checks those on localhost.
 - Verification is never a question. The PostToolUse hook (`scripts/hooks/post-edit-check.mjs`) lints
   each edited JS file and runs its own `__tests__/<name>.test.mjs`; fix what it reports. Iterate with
-  `node --test <file>`. Before commit: `pnpm test:changed` for patch work; full `pnpm test` before
-  landing on `main` and after any engine, rules or netcode change.
+  `node --test <file>`. Before commit: `pnpm test:changed` for patch work; full `pnpm test` when
+  `pnpm gates` says REQUIRED (engine, netcode, dependency or lockfile changes).
 - Comments only for constraints and whys. No dead or commented-out code. Match the file's local style.
+- Board animations play one after another, never on top of each other: each goes through the FX
+  queue (`netcode/advisory-animations.js`) and its plan returns a hold that lasts until its scene ends.
 
 ## Hard rules
 - Never: commit secrets · force-push · delete/overwrite content you haven't read · edit the frozen
@@ -122,10 +129,10 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
 ## Project facts
 - What: web 2-player Pokémon TCG simulator — board mats, deck builder, rules engine, Socket.IO sync, SQLite.
 - Stack: Node.js ES modules, Express 4, Socket.IO 4, SQLite3, EJS, Playwright, `node --test`, ESLint 9 + Prettier.
-- Commands: run `pnpm start` · full tests `pnpm test` (~4260, all green; live TCGdex tests
+- Commands: run `pnpm start` · full tests `pnpm test` (~6470, all green; live TCGdex tests
   opt-in via `pnpm test:live`) · changed-only `pnpm test:changed` (tests for files this branch touched) · one file `node --test <path>` · lint touched files `npx eslint --quiet <files>`
   (repo-wide `pnpm lint` is noisy with prettier/CRLF warnings) · engine gate `pnpm audit:oracle` (~2 min,
-  after attack/ability engine changes) · build n/a.
+  after attack/ability engine changes) · `pnpm gates` says which of `pnpm test` / `pnpm audit:oracle` this diff needs · build n/a.
 - Entry points: `server/server.js`, `server/game/room.mjs`, `client/index.ejs`, `client/src/front-end.js`.
 - Deeper facts: `.agent/PROJECT.md` (architecture, constraints, landmines).
 

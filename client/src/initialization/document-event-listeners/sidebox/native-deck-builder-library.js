@@ -17,6 +17,8 @@ import {
       setDeckBox,
       setDeckSprites,
       setDeckWallpaper,
+      setDeckSuggestPrefs,
+      getDeckSuggestPrefs,
       MAX_LIBRARY_DECKS,
     } from '../../../setup/deck-builder/core/deck-library.mjs';
     import {
@@ -425,6 +427,12 @@ import {
           setActiveField(target, sprites, setDeckSprites, { silent: false }),
         setActiveWallpaper: (target, wallpaperId) =>
           setActiveField(target, wallpaperId, setDeckWallpaper),
+        // Suggest-tab steering (design 069); false when no saved deck is loaded.
+        setActiveSuggestPrefs: (target, prefs) => setActiveField(target, prefs, setDeckSuggestPrefs),
+        getActiveSuggestPrefs: (target) => {
+          const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+          return activeId && library?.decks?.[activeId] ? getDeckSuggestPrefs(library, activeId) : null;
+        },
         getActiveWallpaper: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId]

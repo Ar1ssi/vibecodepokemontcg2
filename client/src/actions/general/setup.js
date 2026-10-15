@@ -8,7 +8,7 @@ import { getZone } from '../../setup/zones/get-zone.js';
 import { drawHand, setOpeningPrizes } from '../zones/hand-actions.js';
 import { shuffleZone } from '../zones/shuffle-zone.js';
 import { reset } from './reset.js';
-import { waitForDealOrder } from '../../setup/netcode/deal-order.js';
+import { OPENING_DEAL_WAIT_MS, waitForDealOrder } from '../../setup/netcode/deal-order.js';
 import { setupShuffleAnimates } from './setup-deal.mjs';
 
 export const setup = async (user, indices, emit = true) => {
@@ -66,7 +66,9 @@ export const setupPrizes = async (user, indices, emit = true) => {
     systemState.isTwoPlayer &&
     systemState.serverAuthoritative
   ) {
-    const serverOrder = await waitForDealOrder();
+    // The deal waits behind the opening coin call and the winner's first/second
+    // choice (design 072), so the default 5 s would fall back on every real game.
+    const serverOrder = await waitForDealOrder(OPENING_DEAL_WAIT_MS);
     // A 0-length order means the server dealt before this player's own deck had
     // loaded (see server.js's allDecksLoaded guard) — never usable as `indices`
     // (an empty array is truthy but is not a deal order — rearrangeArray would

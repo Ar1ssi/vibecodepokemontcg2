@@ -1,0 +1,211 @@
+/*
+ * Build & Battle run flow (design 071): the Run tab's buy-in, lobby and summary, plus the dialogs.
+ * Scoped under `body.bb-flow-run` and the builder's `.db-live` workspace, so the tokens from
+ * deck-builder-live.css apply; the Box/Pool panel chrome (.bb-panel, .bb-primary, .bb-era-chip, …)
+ * comes from deck-builder-build-battle.css. No idle animation: nothing here needs a kill switch.
+ */
+
+body.bb-flow-run .db-live .bnb-screen {
+  align-self: center;
+  width: min(560px, 100%);
+  padding: 2.2vh 1.6vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4vh;
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius-lg, 12px);
+  background: var(--db-panel-2);
+  text-align: center;
+}
+
+body.bb-flow-run .db-live .bnb-title {
+  margin: 0;
+  font-size: 2.4vh;
+  color: var(--db-text);
+}
+
+/* ── Carousel ─────────────────────────────────────────────────────────── */
+body.bb-flow-run .db-live .bnb-carousel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8vh;
+}
+body.bb-flow-run .db-live .bnb-carousel-art {
+  width: min(320px, 70%);
+  aspect-ratio: 2 / 1;
+  object-fit: contain;
+}
+body.bb-flow-run .db-live .bnb-carousel-caption {
+  margin: 0;
+  min-height: 2.6em;
+  font-size: 1.5vh;
+  color: var(--db-text);
+}
+body.bb-flow-run .db-live .bnb-carousel-dots {
+  display: flex;
+  gap: 0.6vw;
+}
+body.bb-flow-run .db-live .bnb-carousel-dot {
+  width: 1.1vh;
+  height: 1.1vh;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--db-border-strong);
+  background: var(--db-raised);
+  cursor: pointer;
+}
+body.bb-flow-run .db-live .bnb-carousel-dot[aria-pressed='true'] {
+  background: var(--db-gold);
+  border-color: var(--db-gold-dark);
+}
+
+body.bb-flow-run .db-live .bnb-legacy-link {
+  font-size: 1.3vh;
+  color: var(--db-text-dim);
+}
+
+/* ── Lobby: meter and match nodes ─────────────────────────────────────── */
+body.bb-flow-run .db-live .bnb-meter {
+  position: relative;
+  width: 100%;
+  height: 3.4vh;
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius-pill);
+  background: var(--db-raised);
+  overflow: hidden;
+}
+body.bb-flow-run .db-live .bnb-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--db-gold);
+  opacity: 0.55;
+}
+body.bb-flow-run .db-live .bnb-meter-label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  line-height: 3.4vh;
+  font-size: 1.5vh;
+  font-weight: 700;
+  color: var(--db-text);
+}
+
+body.bb-flow-run .db-live .bnb-map {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.8vw;
+}
+body.bb-flow-run .db-live .bnb-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4vh;
+  aspect-ratio: 8 / 5;
+  background: url('/src/assets/build-battle/run/node-frame.webp') center / 100% 100% no-repeat;
+  color: var(--db-text-dim);
+}
+body.bb-flow-run .db-live .bnb-node-index {
+  font-size: 2vh;
+  font-weight: 800;
+}
+body.bb-flow-run .db-live .bnb-node-label {
+  font-size: 1.1vh;
+}
+body.bb-flow-run .db-live .bnb-node[data-state='current'] {
+  color: var(--db-text);
+  filter: drop-shadow(0 0 0.8vh var(--db-gold));
+}
+body.bb-flow-run .db-live .bnb-node[data-state='win'],
+body.bb-flow-run .db-live .bnb-node[data-state='loss'] {
+  background-image: url('/src/assets/build-battle/run/node-frame-complete.webp');
+  color: #fff;
+}
+body.bb-flow-run .db-live .bnb-node[data-state='loss'] {
+  filter: grayscale(1) brightness(0.75);
+}
+body.bb-flow-run .db-live .bnb-node[data-state='upcoming'] {
+  opacity: 0.6;
+}
+
+body.bb-flow-run .db-live .bnb-deck-invalid {
+  margin: 0;
+  padding: 0.7vh 0.9vw;
+  border: 1px solid var(--db-gold-dark);
+  border-radius: var(--db-radius-sm);
+  background: var(--db-panel-2);
+  color: var(--db-gold);
+  font-size: 1.4vh;
+}
+body.bb-flow-run .db-live .bnb-deck-invalid[hidden] {
+  display: none;
+}
+
+body.bb-flow-run .db-live .bnb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.8vw;
+}
+body.bb-flow-run .db-live .bnb-play {
+  min-width: 8em;
+}
+
+body.bb-flow-run .db-live .bnb-manual {
+  width: 100%;
+  font-size: 1.3vh;
+  color: var(--db-text-dim);
+}
+body.bb-flow-run .db-live .bnb-manual button {
+  margin: 0.6vh 0.4vw 0;
+}
+
+/* ── Summary ──────────────────────────────────────────────────────────── */
+body.bb-flow-run .db-live .bnb-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 1.4vh;
+  color: var(--db-text);
+}
+
+/* ── Dialogs ──────────────────────────────────────────────────────────── */
+body.bb-flow-run .db-live .bnb-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 55%);
+}
+body.bb-flow-run .db-live .bnb-dialog {
+  width: min(460px, 90vw);
+  padding: 2.4vh 1.8vw;
+  border: 1px solid var(--db-border-strong);
+  border-radius: var(--db-radius-lg, 12px);
+  background: var(--db-panel);
+  color: var(--db-text);
+}
+body.bb-flow-run .db-live .bnb-dialog-title {
+  margin: 0 0 1vh;
+  font-size: 2vh;
+}
+body.bb-flow-run .db-live .bnb-dialog-body {
+  margin: 0 0 1vh;
+  font-size: 1.45vh;
+  line-height: 1.45;
+}
+body.bb-flow-run .db-live .bnb-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8vw;
+  margin-top: 1.4vh;
+}

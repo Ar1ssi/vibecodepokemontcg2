@@ -1,4 +1,5 @@
 import { normalizeDeckSprites } from './deck-sprites.mjs';
+import { normalizeSuggestPrefs } from './deck-suggest/prefs.mjs';
 import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/formats.mjs';
 
     const DECK_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -58,6 +59,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
         wallpaperId: options.wallpaperId ?? null,
         sprites: normalizeDeckSprites(options.sprites),
         format: normalizeDeckFormat(options.format),
+        suggestPrefs: normalizeSuggestPrefs(options.suggestPrefs),
       };
       nextLibrary.order = [...(nextLibrary.order || []), deckId];
       return { library: nextLibrary, deckId };
@@ -146,6 +148,20 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
           return nextLibrary;
         }
 
+        /** Stores the deck's Suggest-tab steering (design 069); anything malformed normalizes. */
+        export function setDeckSuggestPrefs(library = {}, deckId, prefs = null) {
+          if (!library?.decks?.[deckId]) return structuredClone(library);
+          const nextLibrary = structuredClone(library);
+          nextLibrary.decks[deckId].suggestPrefs = normalizeSuggestPrefs(prefs);
+          nextLibrary.decks[deckId].updatedAt = Date.now();
+          return nextLibrary;
+        }
+
+        /** The deck's steering; decks saved before design 069 read as empty. */
+        export function getDeckSuggestPrefs(library = {}, deckId) {
+          return normalizeSuggestPrefs(library?.decks?.[deckId]?.suggestPrefs);
+        }
+
     export function saveDeckToLibrary(library = {}, deckId, cards = {}, now = Date.now()) {
       if (!library?.decks?.[deckId]) return structuredClone(library);
       const nextLibrary = structuredClone(library);
@@ -168,7 +184,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
      */
     export function saveDeckSnapshot(
       library = {},
-      { deckId, name, cards = {}, sleeveId, coinId, matId, deckBoxId, wallpaperId, sprites, format } = {},
+      { deckId, name, cards = {}, sleeveId, coinId, matId, deckBoxId, wallpaperId, sprites, format, suggestPrefs } = {},
       now = Date.now()
     ) {
       if (!deckId || !library?.decks?.[deckId]) {
@@ -180,6 +196,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
           wallpaperId: wallpaperId ?? null,
           sprites,
           format,
+          suggestPrefs,
         });
         return { library: created.library, deckId: created.deckId, created: true };
       }
@@ -194,6 +211,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       if (wallpaperId !== undefined) deck.wallpaperId = wallpaperId;
       if (sprites !== undefined) deck.sprites = normalizeDeckSprites(sprites);
       if (format !== undefined) deck.format = normalizeDeckFormat(format);
+      if (suggestPrefs !== undefined) deck.suggestPrefs = normalizeSuggestPrefs(suggestPrefs);
       deck.updatedAt = now;
       return { library: nextLibrary, deckId, created: false };
     }
@@ -248,6 +266,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
             // hand-edited one may have nonsense. Both normalize to [].
             sprites: normalizeDeckSprites(deck.sprites),
             format: normalizeDeckFormat(deck.format),
+            suggestPrefs: normalizeSuggestPrefs(deck.suggestPrefs),
           };
         }
       }

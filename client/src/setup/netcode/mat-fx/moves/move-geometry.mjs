@@ -46,6 +46,14 @@ export function unionPadded(a, b, pad) {
   return { left, top, width: right - left, height: bottom - top };
 }
 
+/** Design 069: the smallest rect containing every rect, grown by `pad` px once; null for none. */
+export function unionAllPadded(rects, pad) {
+  const list = (rects ?? []).filter(Boolean);
+  if (list.length === 0) return null;
+  const union = list.reduce((acc, rect) => unionPadded(acc, rect, 0));
+  return unionPadded(union, union, pad);
+}
+
 /** `rect` translated into `hostRect`-local px. */
 export function toLocal(rect, hostRect) {
   return {

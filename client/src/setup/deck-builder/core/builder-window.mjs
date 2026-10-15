@@ -17,6 +17,11 @@ export const BUILDER_WINDOW_PATH = '/deck-builder';
 // Build & Battle (design 051) is the same editor tab in another mode.
 export const BUILD_BATTLE_WINDOW_NAME = 'ptcgBuildBattle';
 export const BUILD_BATTLE_WINDOW_PATH = '/build-and-battle';
+// The one-shot box flow of designs 051-055, kept beside the TCG Live run flow (design 071). A
+// sibling path, not a child: the page's asset URLs are relative and break one level down.
+export const BUILD_BATTLE_LEGACY_PATH = '/build-and-battle-legacy';
+// The flow `/build-and-battle` runs. Point this at 'legacy' to bring the old flow back there.
+export const BUILD_BATTLE_DEFAULT_FLOW = 'run';
 export const BUILDER_MESSAGE_SOURCE = 'ptcg-deck-builder';
 const PROTOCOL_VERSION = 1;
 
@@ -29,15 +34,23 @@ const MAX_ROW_LENGTH = 7;
 
 const trimPath = (pathname) => String(pathname ?? '').replace(/\/+$/, '');
 
-/** `'editor'` on either builder tab path, `'host'` everywhere else. */
+const isBuildBattlePath = (path) =>
+  path === BUILD_BATTLE_WINDOW_PATH || path === BUILD_BATTLE_LEGACY_PATH;
+
+/** `'editor'` on every builder tab path, `'host'` everywhere else. */
 export function resolveBuilderRole(pathname = '') {
   const path = trimPath(pathname);
-  return path === BUILDER_WINDOW_PATH || path === BUILD_BATTLE_WINDOW_PATH ? 'editor' : 'host';
+  return path === BUILDER_WINDOW_PATH || isBuildBattlePath(path) ? 'editor' : 'host';
 }
 
-/** `'build-battle'` on the Build & Battle path, `'standard'` everywhere else. */
+/** `'build-battle'` on the Build & Battle paths, `'standard'` everywhere else. */
 export function resolveBuilderMode(pathname = '') {
-  return trimPath(pathname) === BUILD_BATTLE_WINDOW_PATH ? 'build-battle' : 'standard';
+  return isBuildBattlePath(trimPath(pathname)) ? 'build-battle' : 'standard';
+}
+
+/** Which Build & Battle flow a path runs: `'legacy'` on its own path, else the default flow. */
+export function resolveBuildBattleFlow(pathname = '') {
+  return trimPath(pathname) === BUILD_BATTLE_LEGACY_PATH ? 'legacy' : BUILD_BATTLE_DEFAULT_FLOW;
 }
 
 export function buildBuilderMessage(type, payload = {}) {

@@ -91,6 +91,13 @@
         </div>
     </div>
 
+    <div id="spectatorViewSwitch" role="group" aria-label="Spectator view" hidden>
+        <span class="spectator-view-switch__label">Watching</span>
+        <button type="button" data-mode="p1" aria-pressed="true">Player 1</button>
+        <button type="button" data-mode="p2" aria-pressed="false">Player 2</button>
+        <button type="button" data-mode="broadcast" aria-pressed="false">Both</button>
+    </div>
+
     <div id="topButtonContainer">
         <button id="p1Button" class="selected-page">Solo</button>
         <button id="p2Button" class="not-selected-page">Multiplayer</button>
@@ -142,26 +149,30 @@
         <div id="p2ExplanationBox">
             <strong>Online Multiplayer Mode</strong>
             <div style="margin-top: 0.5em;"></div>
-            Enter or generate a unique room ID to share with your friends. Players must enter the same ID (case-sensitive) to join.
+            Pick a room to play in, or watch a full one. To play with a friend privately, open "Private room" and share its ID.
         </div>
         <div id="lobby">
             <input id="nameInput" type="text" placeholder="Username" autocomplete="off" name="username">
-            <div id="roomId">
-                <input id="roomIdInput" type="text" placeholder="Room ID">
-                <button id="copyButton">
-                    <img src="https://www.svgrepo.com/show/309480/copy.svg" alt="Copy">
-                </button>                
-                <button id="generateIdButton">Generate</button>
-            </div>
             <div id="coachingModeLabel">
                 <input type="checkbox" id="coachingModeCheckbox">
                 <label style="cursor: pointer;" for="coachingModeCheckbox">Enable board flip <span style="font-style: italic; font-size: smaller;">(both players must enable)</span></label>
             </div>
-            <div id="spectatorModeLabel">
-                <input type="checkbox" id="spectatorModeCheckbox">
-                <label style="cursor: pointer;" for="spectatorModeCheckbox">Join as spectator</label>
-            </div>
-            <div id="joinRoomButton"> Join Room </div>
+            <ul id="publicRoomList" aria-label="Rooms" aria-live="polite"></ul>
+            <details id="privateRoomDetails">
+                <summary>Private room (with code)</summary>
+                <div id="roomId">
+                    <input id="roomIdInput" type="text" placeholder="Room ID">
+                    <button id="copyButton">
+                        <img src="https://www.svgrepo.com/show/309480/copy.svg" alt="Copy">
+                    </button>
+                    <button id="generateIdButton">Generate</button>
+                </div>
+                <div id="spectatorModeLabel">
+                    <input type="checkbox" id="spectatorModeCheckbox">
+                    <label style="cursor: pointer;" for="spectatorModeCheckbox">Join as spectator</label>
+                </div>
+                <div id="joinRoomButton"> Join Room </div>
+            </details>
         </div>
         <div id="connectedRoom">
             <div id="roomHeader">
@@ -260,6 +271,7 @@
                             <button id="buildBattleTabBox" class="native-deck-builder-mode-tab" type="button">Box</button>
                             <button id="buildBattleTabPool" class="native-deck-builder-mode-tab" type="button">Pool</button>
                             <% } else if (isBuilderWindow) { %>
+                            <button id="nativeDeckBuilderTabSuggest" class="native-deck-builder-mode-tab" type="button" title="Card suggestions from tournament decklists">Suggest</button>
                             <button id="etbTabShelf" class="native-deck-builder-mode-tab" type="button">Shelf</button>
                             <button id="etbTabCollection" class="native-deck-builder-mode-tab" type="button">Collection</button>
                             <% } %>
@@ -298,6 +310,9 @@
                     </div>
                     <div id="nativeDeckBuilderSetBrowserPanel" class="native-deck-builder-set-browser" hidden>
                     </div>
+                    <% if (isBuilderWindow && !isBuildBattle) { %>
+                    <div id="nativeDeckBuilderSuggestPanel" class="native-deck-builder-suggest" hidden></div>
+                    <% } %>
                     <% if (isBuildBattle) { %>
                     <div id="buildBattleBoxPanel" class="bb-panel" hidden></div>
                     <div id="buildBattlePoolPanel" class="bb-panel" hidden></div>
@@ -433,6 +448,10 @@
             <div>
                 <input type="checkbox" id="showLostZoneCheckbox">
                 <label for="showLostZoneCheckbox">Show Lost Zone</label>
+            </div>
+            <div>
+                <input type="checkbox" id="hoverPreviewCheckbox">
+                <label for="hoverPreviewCheckbox">Card hover preview</label>
             </div>
             <div>
                 <input type="checkbox" id="fxOffCheckbox">

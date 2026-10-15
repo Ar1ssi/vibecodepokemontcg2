@@ -14,6 +14,7 @@ import {
   FX_REDUCED_CLASS,
   AMBIENCE_OFF_KEY,
   CROWD_OFF_KEY,
+  HOVER_PREVIEW_OFF_KEY,
   SFX_OFF_KEY,
   VOLUME_KEY,
   readSettings,
@@ -51,7 +52,7 @@ export const onFxSettingsChanged = (listener) => {
 /**
  * Push the stored settings onto the page. Safe to call before the iframes
  * exist (they are simply skipped) — call it again once they do.
- * @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean}} the applied settings
+ * @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean}} the applied settings
  */
 export function applyFxSettings() {
   const stored = readSettings(storage());
@@ -85,6 +86,7 @@ export const setSfxOff = (off) => setFxSetting(SFX_OFF_KEY, off);
 export const setFxVolume = (volume) => setFxSetting(VOLUME_KEY, volume);
 export const setAmbienceOff = (off) => setFxSetting(AMBIENCE_OFF_KEY, off);
 export const setCrowdOff = (off) => setFxSetting(CROWD_OFF_KEY, off);
+export const setHoverPreviewOff = (off) => setFxSetting(HOVER_PREVIEW_OFF_KEY, off);
 
 // The iframes are built after boot, so re-apply when the mats report ready.
 // `systemState` is imported for that hook's existence check only.

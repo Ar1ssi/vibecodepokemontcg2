@@ -44,6 +44,8 @@ export const spectatorJoin = () => {
 };
 
 socket.on('spectatorActionData', (data) => {
+  // Design 069: an authoritative room's spectator draws server views; a replay would fight them.
+  if (systemState.serverAuthoritative) return;
   const isSpectator =
     document.getElementById('spectatorModeCheckbox').checked &&
     systemState.isTwoPlayer;
