@@ -4739,6 +4739,16 @@ body.side-menu-collapsed #oppResizer {
     .coin-stage-preview .coin-stage-canvas { position: absolute; inset: -20%; width: 140%; height: 140%; }
     .coin-stage-preview.is-live img { visibility: hidden; }
     
+    /* With the 3D stage above, the picker's own preview card is a compact readout: the stage owns the
+       big coin, so the toss headroom and 120px disc would only push the tile grid out of view. */
+    .customize-stage:not([hidden]):not(.is-unavailable) ~ .native-deck-builder-coin-picker .native-deck-builder-coin-preview {
+      padding: 2.6vh 1vw 1vh;
+      margin-bottom: 0.6vh;
+    }
+    .customize-stage:not([hidden]):not(.is-unavailable) ~ .native-deck-builder-coin-picker .native-deck-builder-coin-preview .coin-stage-preview {
+      width: 9vh;
+      height: 9vh;
+    }
     /* coin picker panel: shares the customize pane with sleeves */
     .native-deck-builder-coin-picker {
       flex: 1 1 0;
