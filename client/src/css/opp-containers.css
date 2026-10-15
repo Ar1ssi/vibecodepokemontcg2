@@ -843,6 +843,10 @@ img.draw-flight-source,
   text-align: center;
   transform: scaleX(-1) scaleY(-1);
 }
+/* The opponent board is mirrored (.opp-view); keep the Energy count readable. */
+.energy-token-count {
+  transform: scaleX(-1) scaleY(-1);
+}
 .opp-tab {
   position: absolute;
   border-radius: 10%;

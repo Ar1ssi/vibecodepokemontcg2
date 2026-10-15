@@ -6,6 +6,10 @@ import {
 import { syncRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
 import { getEnergyTokenFront, isEnergyCard } from './energy-token-assets.mjs';
+import {
+  relayoutLegacyEnergyTokens,
+  stampEnergyAttachOrder,
+} from './energy-token-row.mjs';
 
 export const attachCard = (
   user,
@@ -65,6 +69,7 @@ export const attachCard = (
       }
       movingCard.image.src = tokenFront;
       movingCard.image.classList.add('energy-token-3d');
+      stampEnergyAttachOrder(movingCard.image);
       // Token sits ON the card's face (unlike the old side-cascading flat
       // card), so it must outrank the target Pokémon's own z-index instead
       // of being decremented below it.
@@ -93,6 +98,8 @@ export const attachCard = (
   // so the energy lands inside `.play-container`, not inside the overflow-hidden
   // `.card__rotator`. `movingCard.image.relative` stays the target's <img>.
   imageAnchor(targetCard.image).after(movingCard.image);
+  // Past four tokens the row would run off the card: re-plan it (piles per type).
+  if (tokenFront) relayoutLegacyEnergyTokens(targetCard.image);
   //rotate tool/energy to the same orientation of card
   syncRotation(movingCard, targetCard.image);
 

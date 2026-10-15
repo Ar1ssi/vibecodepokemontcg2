@@ -30,6 +30,11 @@ import {
   getEnergyTokenFront,
   isEnergyCard,
 } from '../../actions/move-card-bundle/energy-token-assets.mjs';
+import {
+  ENERGY_TOKEN_BOTTOM,
+  planEnergyTokenRow,
+  renderEnergyCountBadges,
+} from '../../actions/move-card-bundle/energy-token-row.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { isPokemon } from '../../../../shared/engine/cards.mjs';
 import { createViewBoardButton } from '../image-logic/view-board-toggle.mjs';
@@ -124,10 +129,6 @@ const HOLO_ZONES = [
   'bench',
 ];
 
-// Legacy attach-card.js token geometry, as fractions of the parent card.
-const ENERGY_TOKEN_SIZE = 0.24;
-const ENERGY_TOKEN_SPACING = 1.15;
-const ENERGY_TOKEN_BOTTOM = 0.03;
 // Legacy attach-card.js / evolve-card.js offsets, as fractions of the visible card's width.
 const ATTACHED_CARD_SHIFT = 1 / 6;
 const UNDER_POKEMON_SHIFT = 1 / 15;
@@ -1154,28 +1155,42 @@ function setStackStyle(img, styles) {
 /**
  * Draws an attached Energy as the same small round type token legacy
  * attach-card.js uses: full card art stashed in `data-energy-card-src` (the
- * double-click carousel shows it), a row along the visible card's bottom
- * edge, layered above its face.
- *
- * @returns {boolean} whether a token was drawn
+ * double-click carousel shows it), layered above the visible card's face at
+ * the spot its row plan gives it.
  */
-function applyEnergyToken(img, cardData, cardWidth, cardHeight, layer) {
-  const tokenSrc = getEnergyTokenFront(cardData);
-  if (!tokenSrc || !img.dataset || !img.style) return false;
-  const tokenSize = cardWidth * ENERGY_TOKEN_SIZE;
+function applyEnergyToken(img, tokenSrc, tokenSize, slot, bottom) {
   const cardArt = img.getAttribute('src');
   setStackStyle(img, {
     width: `${tokenSize}px`,
     height: `${tokenSize}px`,
-    left: `${(layer - 1) * tokenSize * ENERGY_TOKEN_SPACING}px`,
-    bottom: `${cardHeight * ENERGY_TOKEN_BOTTOM}px`,
-    zIndex: String(100 + layer),
+    left: `${slot.left}px`,
+    bottom: `${bottom}px`,
+    zIndex: String(slot.zIndex),
   });
   img.dataset.energyCardSrc = cardArt;
   img.setAttribute('src', tokenSrc);
   img.classList.add('energy-token-3d');
-  img.energyLayer = layer;
-  return true;
+  img.energyLayer = slot.zIndex - 100;
+}
+
+/**
+ * The token row along the visible card's bottom edge (energy-token-row.mjs):
+ * side by side up to four, past that one token per type with an "Nx" badge.
+ *
+ * @param {object} rootRecord owns the badges
+ * @param {{ img: object, tokenSrc: string }[]} tokens in attach order
+ */
+function layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight) {
+  const plan = planEnergyTokenRow(
+    tokens.map((token) => token.tokenSrc),
+    cardWidth
+  );
+  const bottom = cardHeight * ENERGY_TOKEN_BOTTOM;
+  tokens.forEach(({ img, tokenSrc }, i) =>
+    applyEnergyToken(img, tokenSrc, plan.tokenSize, plan.tokens[i], bottom)
+  );
+  const parent = rootRecord.container || tokens[0]?.img.parentNode || null;
+  renderEnergyCountBadges(rootRecord, parent, plan.badges, bottom);
 }
 
 /**
@@ -1218,16 +1233,14 @@ function layoutCardStack(rootRecord, attached) {
     });
   });
 
-  let tokenLayer = 0;
+  const tokens = [];
   let shiftLayer = 0;
   for (const { cardData, record } of attached) {
     if (record === displayRecord || isPokemon(cardData)) continue;
     const img = record.element;
-    if (
-      isEnergyCard(cardData) &&
-      applyEnergyToken(img, cardData, cardWidth, cardHeight, tokenLayer + 1)
-    ) {
-      tokenLayer += 1;
+    const tokenSrc = isEnergyCard(cardData) ? getEnergyTokenFront(cardData) : null;
+    if (tokenSrc && img.dataset && img.style) {
+      tokens.push({ img, tokenSrc });
       continue;
     }
     shiftLayer += 1;
@@ -1236,6 +1249,7 @@ function layoutCardStack(rootRecord, attached) {
       zIndex: String(-shiftLayer),
     });
   }
+  layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight);
   if (rootRecord.container?.style) {
     rootRecord.container.style.width =
       shiftLayer > 0 && cardWidth
