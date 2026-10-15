@@ -12,15 +12,9 @@ import { HIDDEN_SCALE } from './stage-math.mjs';
 const ASSET_DIR = '/src/assets/deckbox/';
 const DEFAULT_CARD_BACK = '/src/assets/cardback.png';
 /** Light levels tuned by eye against the game's box thumbnails (white boxes stay just under clipping). */
-const AMBIENT_INTENSITY = 1.0;
-const KEY_INTENSITY = 2.6;
+const AMBIENT_INTENSITY = 1.8;
+const KEY_INTENSITY = 1.6;
 const KEY_POSITION = [-400, 900, 1200];
-/** A cool low fill from the opposite side keeps the shaded faces readable while the key carves the form. */
-const FILL_INTENSITY = 0.7;
-const FILL_POSITION = [900, 150, 500];
-const FILL_COLOR = 0xdce8ff;
-/** The box rests turned 20 degrees clockwise (seen from above) from the game's authored pose. */
-const BOX_BASE_YAW = -Math.PI / 9;
 /** `deckbox_interior`'s `_Color` (sRGB, as authored) and the shadow planes' base size in Unity's built-in Plane. */
 const INTERIOR_TINT = 0.915;
 const SHADOW_PLANE_SIZE = 10;
@@ -171,9 +165,6 @@ export async function createObjectStage({ host, onLost = () => {} }) {
     const key = new THREE.DirectionalLight(0xffffff, KEY_INTENSITY);
     key.position.set(...KEY_POSITION);
     scene.add(key);
-    const fill = new THREE.DirectionalLight(FILL_COLOR, FILL_INTENSITY);
-    fill.position.set(...FILL_POSITION);
-    scene.add(fill);
     camera = new THREE.PerspectiveCamera(layout.fov, 1, 10, layout.distance * 4);
     const holder = new THREE.Group();
     holder.position.set(0, 0, -layout.distance);
@@ -230,7 +221,7 @@ export async function createObjectStage({ host, onLost = () => {} }) {
   const setPose = (slot, pose, yaw = 0) => {
     const group = slots[slot];
     if (!group) return;
-    yawAxis.setFromAxisAngle(up, (Number.isFinite(yaw) ? yaw : 0) + (slot === 'box' ? BOX_BASE_YAW : 0));
+    yawAxis.setFromAxisAngle(up, Number.isFinite(yaw) ? yaw : 0);
     group.position.set(...pose.p);
     group.quaternion.set(...pose.q).premultiply(yawAxis);
     group.scale.set(...pose.s);
