@@ -22,6 +22,12 @@ import { processAction } from '../../setup/general/process-action.js';
 import { setAuthoritativeDispatchContext } from '../../setup/netcode/authoritative-dispatch.js';
 import { cleanActionData } from '../../setup/general/clean-action-data.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
+import {
+  applySpectatorView,
+  endSpectatorSession,
+  isSpectatingAuthoritative,
+  startSpectatorSession,
+} from '../../setup/spectator/spectator-session.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
@@ -96,6 +102,8 @@ const requestActionQueue = createRequestActionQueue();
 let requestActionStaleTimer = null;
 
 export const sendSpectatorData = () => {
+  // Design 069: an authoritative room's spectators render server views, not this replay.
+  if (systemState.serverAuthoritative) return;
   if (systemState.isTwoPlayer && systemState.roomId) {
     const data = {
       selfUsername: systemState.p2SelfUsername,
@@ -382,8 +390,16 @@ export const initializeSocketEventListeners = () => {
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
   });
-  socket.on('spectatorJoin', () => {
+  socket.on('spectatorJoin', (data) => {
+    systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
+    resetNetcodeForRoomChange();
     spectatorJoin();
+    if (systemState.serverAuthoritative) {
+      // Design 069: the server's spectator view is the whole board; ask for it now.
+      startSpectatorSession();
+      emitRequestView({ socket, roomId: systemState.roomId });
+      return;
+    }
     if (systemState.roomId) {
       socket.emit('requestSpectatorData', { roomId: systemState.roomId });
     }
@@ -446,6 +462,8 @@ export const initializeSocketEventListeners = () => {
         } else {
           requestPeerLogCatchup();
         }
+      } else if (isSpectatingAuthoritative()) {
+        emitRequestView({ socket, roomId: systemState.roomId });
       }
     }
   });
@@ -487,7 +505,7 @@ export const initializeSocketEventListeners = () => {
       seedClientSeq(data.lastClientSeq);
     }
     if (data?.view) {
-      applyView(data.view, data.events || [], {
+      const options = {
         socket,
         roomId: systemState.roomId,
         onBeforeApply: handleBeforeApply,
@@ -495,7 +513,12 @@ export const initializeSocketEventListeners = () => {
           handleAdvisoryEvent(event, selfPlayerId);
           handleServerBattleLog(event, selfPlayerId);
         },
-      });
+      };
+      if (isSpectatingAuthoritative()) {
+        applySpectatorView(data.view, data.events || [], options);
+      } else {
+        applyView(data.view, data.events || [], options);
+      }
     }
   });
 
@@ -552,6 +575,7 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer = false;
       systemState.roomId = null;
       removeSyncIntervals();
+      endSpectatorSession();
       document.dispatchEvent(new CustomEvent('room-changed'));
       return;
     }

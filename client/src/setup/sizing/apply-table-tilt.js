@@ -12,7 +12,12 @@
  * strips) and rotates about the seam, so the mat art stays under the zones.
  */
 
-import { battleMatBox, stadiumTilt, tiltTransforms } from './table-tilt.mjs';
+import {
+  UNMEASURED_PLAYFIELD,
+  battleMatBox,
+  stadiumTilt,
+  tiltTransforms,
+} from './table-tilt.mjs';
 
 const FRAME_IDS = ['selfContainer', 'oppContainer'];
 const DEFAULT_CROP_FRAC = 0.16;
@@ -81,6 +86,9 @@ const writeStadium = (mat, box, matHalf) => {
 const writeBattleMat = (box, matHalf) => {
   const mat = document.getElementById('battleMat');
   if (!mat || !box) return;
+  // The broadcast layout (below) sizes the mat on both axes; the tilted table only on one.
+  mat.style.left = '';
+  mat.style.width = '';
   mat.style.top = `${box.top}px`;
   mat.style.height = `${box.height}px`;
   // Mat halves size their art from this; each half is one playfield tall.
@@ -90,9 +98,48 @@ const writeBattleMat = (box, matHalf) => {
   writeStadium(mat, box, matHalf);
 };
 
+const isBroadcastLayout = () =>
+  Boolean(document.body?.classList.contains('spectator-broadcast'));
+
+/**
+ * Design 069: the spectator broadcast layout turns the boards 90° side by side (index.css), so
+ * the table lies flat and the mat, turned with them, spans both playfields across the seam.
+ */
+const writeBroadcastLayout = (frames) => {
+  for (const entry of frames) writeHalf(entry, UNMEASURED_PLAYFIELD);
+  // A turned board's length runs down the screen: fit it to the height, and keep the two
+  // boards' combined depth within the board area's width.
+  const boardWidth = frames[0]?.frame.offsetWidth || 0;
+  const boardDepth = frames[0]?.frame.offsetHeight || 0;
+  if (boardWidth > 0 && boardDepth > 0) {
+    const scale = Math.min(1, window.innerHeight / boardWidth, boardWidth / (2 * boardDepth));
+    document.body.style.setProperty('--bc-scale', String(Math.round(scale * 1000) / 1000));
+  }
+  const near = frames.find((entry) => !entry.isFar) || frames[0];
+  const mat = document.getElementById('battleMat');
+  const stadium = document.getElementById('stadium');
+  stadium?.style.setProperty('--tilt-transform', 'none');
+  if (!mat || !near) return;
+  const nearRect = near.frame.getBoundingClientRect();
+  const depth = nearRect.width * (1 - cropFraction(near.doc));
+  const seamX = nearRect.right;
+  const height = window.innerHeight;
+  mat.style.left = `${seamX - height / 2}px`;
+  mat.style.top = `${height / 2 - depth}px`;
+  mat.style.width = `${height}px`;
+  mat.style.height = `${depth * 2}px`;
+  mat.style.setProperty('--mat-half-height', `${depth}px`);
+  mat.style.setProperty('--tilt-transform', 'rotate(90deg)');
+  mat.style.setProperty('--tilt-origin', '50% 50%');
+};
+
 /** @param {{ tiltDeg?: number, perspectivePx?: number }} [params] */
 export const applyTableTilt = (params) => {
   const frames = FRAME_IDS.map(readFrame).filter(Boolean);
+  if (isBroadcastLayout()) {
+    writeBroadcastLayout(frames);
+    return;
+  }
   const near = frames.find((entry) => !entry.isFar) || null;
   const far = frames.find((entry) => entry.isFar) || null;
   const box = measureBoard(near, far);
@@ -126,4 +173,6 @@ export const initializeTableTilt = (params) => {
   if (typeof ResizeObserver !== 'function')
     window.addEventListener('resize', reapply);
   document.addEventListener('mat-layout-applied', reapply);
+  // The spectator broadcast layout turns the frames without resizing them (design 069).
+  document.addEventListener('board-layout-changed', reapply);
 };

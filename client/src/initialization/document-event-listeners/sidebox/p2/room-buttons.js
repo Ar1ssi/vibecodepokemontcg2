@@ -4,6 +4,7 @@ import { cleanActionData } from '../../../../setup/general/clean-action-data.js'
 import { processAction } from '../../../../setup/general/process-action.js';
 import { restoreOwnDeck } from '../../../../setup/deck-constructor/own-deck.mjs';
 import { handleSpectatorButtons } from '../../../../setup/spectator/handle-spectator-buttons.js';
+import { endSpectatorSession } from '../../../../setup/spectator/spectator-session.js';
 import {
   removeSyncIntervals,
   resetNetcodeForRoomChange,
@@ -140,6 +141,7 @@ export const initializeRoomButtons = () => {
       p2Chatbox.innerHTML = '';
       systemState.coachingMode = false;
       handleSpectatorButtons();
+      endSpectatorSession();
       removeSyncIntervals();
       // Design 002 slice 3.10: leaving must clear the renderer's registries
       // and client-seq counter, not just the sync intervals, so the next
