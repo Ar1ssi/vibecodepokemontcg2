@@ -696,3 +696,30 @@ test('053 row 8: an agreed room format refuses two matching decks of the other f
   room.markReady('p2');
   assert.equal(room.isReadyToDeal(), true, 'the same decks deal once the room plays Standard');
 });
+
+// Design 069: spectator views show both hands, so only registered sockets may read one, and a
+// spectator that leaves stops receiving the room's broadcasts.
+test('GameRoom: canView admits seated and spectator sockets only', () => {
+  const room = new GameRoom({ roomId: 'test-room-069-view', rulesEnabled: false });
+  room.addPlayer('socket-p1', 'p1', 'Ash');
+  room.addSpectator('socket-spec');
+  assert.equal(room.canView('socket-p1'), true);
+  assert.equal(room.canView('socket-spec'), true);
+  assert.equal(room.canView('socket-stranger'), false);
+});
+
+test('GameRoom: removeSpectator drops the socket from broadcasts and leaves seats alone', () => {
+  const room = new GameRoom({ roomId: 'test-room-069-leave', rulesEnabled: false });
+  room.addPlayer('socket-p1', 'p1', 'Ash');
+  room.addPlayer('socket-p2', 'p2', 'Gary');
+  room.addSpectator('socket-spec');
+  room.state.players.p1.zones.deck.push(createCard({ instanceId: 201, name: 'Potion' }));
+
+  room.removeSpectator('socket-spec');
+  room.removeSpectator('socket-p1');
+  const res = room.handleCommand('socket-p1', { type: 'draw', payload: { count: 1 }, clientSeq: 1 });
+
+  assert.equal(res.success, true);
+  assert.deepEqual(res.broadcasts.map((b) => b.socketId).sort(), ['socket-p1', 'socket-p2']);
+  assert.equal(room.canView('socket-spec'), false);
+});

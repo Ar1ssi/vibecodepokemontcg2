@@ -234,3 +234,31 @@ test('malformed, identity-less and out-of-scope events say nothing', () => {
   assert.deepEqual(serverBattleLogLines({ type: 'turnStarted', number: 1 }, null, resolveName), []);
   assert.deepEqual(lines({ type: 'somethingElse', playerId: SELF }), []);
 });
+
+// Design 069: a spectator plays neither side, so its lines name the players.
+test('069: with seat names, lines name the player instead of You/Your opponent', () => {
+  const seats = { p1: 'Ash', p2: 'Gary' };
+  assert.deepEqual(
+    serverBattleLogLines({ type: 'cardsDrawn', playerId: OTHER, count: 2 }, null, null, seats),
+    ['Gary drew 2 cards.']
+  );
+  assert.deepEqual(
+    serverBattleLogLines({ type: 'turnStarted', player: SELF, number: 3 }, null, null, seats),
+    ["Turn 3 — Ash's turn."]
+  );
+  assert.deepEqual(
+    serverBattleLogLines(
+      { type: 'bonusDrawAwarded', playerId: SELF, sourcePlayerId: OTHER },
+      null,
+      null,
+      seats
+    ),
+    ['Ash drew a bonus card (Gary mulliganed).']
+  );
+  assert.deepEqual(
+    serverBattleLogLines({ type: 'zoneShuffled', playerId: SELF, zoneId: 'deck' }, null, null, seats),
+    ['🔀 Ash shuffled their deck.']
+  );
+  // Without names and without a seat there is still nothing to say.
+  assert.deepEqual(serverBattleLogLines({ type: 'cardsDrawn', playerId: OTHER, count: 2 }, null), []);
+});

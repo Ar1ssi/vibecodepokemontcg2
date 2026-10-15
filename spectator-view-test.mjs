@@ -1,6 +1,7 @@
 // Design 069 e2e: a third browser spectates a server-authoritative game and switches between
 // P1 POV, P2 POV and the side-by-side broadcast layout. Needs a server started with
-// SERVER_AUTHORITATIVE=1 (PTCG_URL, default :4000). SHOTS=<dir> saves a screenshot per view.
+// SERVER_AUTHORITATIVE=1 (PTCG_URL, default :4000); `pnpm test:spectator`. SHOTS=<dir> saves a
+// screenshot per view.
 import { chromium } from 'playwright';
 
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';
@@ -194,6 +195,38 @@ try {
     ['selfContainer', 'oppContainer'].every((id) =>
       document.getElementById(id).contentDocument.querySelectorAll('img.card-image[data-zone="hand"]').length === 0), undefined, 8000);
   T('13. a player\'s Reset clears the spectator board', Boolean(cleared));
+
+  // A socket that never joined gets no view (a spectator view shows both hands).
+  const strangerView = await s.page.evaluate(async (room) => {
+    const stranger = window.io({ forceNew: true });
+    return new Promise((resolve) => {
+      stranger.on('view', () => resolve(true));
+      stranger.on('connect', () => stranger.emit('requestView', { roomId: room }));
+      setTimeout(() => {
+        stranger.disconnect();
+        resolve(false);
+      }, 2000);
+    });
+  }, ROOM);
+  T('14. an unregistered socket cannot read the room\'s view', strangerView === false);
+
+  // A spectator that leaves stops receiving the room's views and loses the spectator chrome.
+  await s.page.evaluate(async () => {
+    const { socket } = await import('/src/state.js');
+    window.__viewsAfterLeave = 0;
+    socket.on('view', () => (window.__viewsAfterLeave += 1));
+    document.getElementById('leaveRoomButton').click();
+  });
+  // The fresh deal after the Reset is broadcast to every registered socket.
+  T('15a. the game is dealt again', Boolean(await playSetup(a, b)));
+  await a.page.waitForTimeout(1000);
+  const afterLeave = await s.page.evaluate(() => ({
+    views: window.__viewsAfterLeave,
+    spectating: document.body.classList.contains('spectating'),
+    switchHidden: document.getElementById('spectatorViewSwitch').hidden,
+  }));
+  T('15b. a spectator that left gets no more views and no spectator chrome',
+    afterLeave.views === 0 && !afterLeave.spectating && afterLeave.switchHidden, JSON.stringify(afterLeave));
 } finally {
   await browser.close();
 }

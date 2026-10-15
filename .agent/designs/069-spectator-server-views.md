@@ -59,7 +59,9 @@ Server
   `prizeCards`, face-down board cards hidden). The hand becomes an array; its length is the count.
 - `server.js` `joinGame` (spectator): emit `spectatorJoin` with `{ serverAuthoritative, protocolVersion }`; send
   `requestSpectatorData` to peers only when not authoritative. `userReconnected` (spectator) same.
-- `server.js` `broadcastFreshGame`: also emit a fresh spectator view to each `spectatorSockets` id.
+- `server.js` `broadcastFreshGame`: also emit `gameReset` + a fresh spectator view to each `spectatorSockets` id.
+- `room.mjs` `canView(socketId)` / `removeSpectator(socketId)`: `requestView` answers registered sockets only; a
+  spectator's Leave or disconnect drops it from `spectatorSockets` (it used to linger and keep receiving views).
 
 Client — `client/src/setup/spectator/spectator-view.mjs` (pure, node-tested)
 - `SPECTATOR_MODES = ['p1','p2','broadcast']`; `seatIds(view)` → sorted player ids.
@@ -92,13 +94,15 @@ Client — wiring
 | 2 | malformed / non-spectator view into adapter | returns null; the session reports `not_spectator_view` and renders nothing | [x] spectator-view.test: 'a non-spectator or malformed view is refused' |
 | 3 | one seat only | `them: null`; P2 POV with one seat shows that seat | [x] spectator-view.test: 'one seat only' |
 | 4 | repeated swap clicks / swap before first view | no cached view → mode stored, nothing rendered; same mode again = no-op | [x] spectator-session.js `setSpectatorMode` early returns; apply-view.test '069: clearRenderedBoard…' |
-| 5 | reset / player leaves | spectators get a fresh view | [x] spectator-view-test.mjs step 13 |
+| 5 | reset / player leaves | spectators get `gameReset` + a fresh view | [x] spectator-view-test.mjs step 13 |
 | 6 | spectator reconnect | re-registered as spectator, requests view, re-renders in current mode | [x] spectator-view-test.mjs step 12 |
 | 7 | revealed card in hand in POV mode | stays face up on the off-POV side | [x] spectator-view.test: 'p1 POV…' (Rare Candy) |
 | 8 | pending choice | spectator sees a non-interactive "<name> is making a choice" banner, never a picker | [x] apply-view.test '069: a spectator gets a named waiting banner…' |
 | 9 | game over | modal says "<name> Wins!", never Victory/Defeat | [x] apply-view.test '069: the end screen names the winner…' |
 | 10 | seated player's views | unchanged (owner/opponent redaction untouched) | [x] view.test 'Invariant 5…' + room.test redaction asserts unchanged and green |
 | 11 | legacy (non-authoritative) room | old replay path untouched; switch hidden | [x] manual: legacy server, spectator join — same zone counts as main, switch hidden, no page errors |
+| 13 | spectator leaves; stranger socket asks for a view | no further views to the leaver; stranger gets nothing; client drops views stamped with another room | [x] spectator-view-test.mjs 14, 15b; room.test '069…'; rejoin-view.test '069…' |
+| 14 | leave via either button, then join as a player | spectator session ends in resetNetcodeForRoomChange | [x] spectator-view-test.mjs 15b (leave button); code path shared by the Solo header button |
 | 12 | FX on rotated boards | rect mapping uses the layout box, not the AABB | [x] iframe-rect.test 'a card on a 90°-turned board…' |
 
 ## Test plan
@@ -122,6 +126,9 @@ No data. Revert = revert the commits; the spectator wire shape change is server+
 - The parent mat's art and zone-outline svg cannot follow a 90° board (their geometry is measured from frame AABBs),
   so broadcast hides the mat art and each board draws its own zone plates (`html.spectator-broadcast` in
   self/opp-containers.css). Mat art is not shown in broadcast.
-- Turn banner and HUD name the player for spectators ("Bravo's Turn"), not "Your/Opponent's".
+- Turn banner, HUD and battle log name the player for spectators ("Bravo's Turn", "Bravo drew 2 cards."), not
+  "Your/Opponent's" (`serverBattleLogLines` / `attackAnnouncementLines` take an optional `names` map).
+- Review (fresh agent) fixes: lingering spectator sockets, `requestView` from unregistered sockets, session not ended
+  by the Solo header Leave, spectator reconnect sending the watched seat's username.
 - `board-layout-changed` document event re-runs the table tilt: entering broadcast does not resize the frames, so
   the tilt's ResizeObserver never fires.

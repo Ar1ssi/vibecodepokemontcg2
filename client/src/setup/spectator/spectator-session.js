@@ -21,6 +21,15 @@ let switchWired = false;
 export const isSpectatingAuthoritative = () => active;
 export const getSpectatorMode = () => mode;
 
+/** `{ playerId: username }` for every seat of the last spectator view (battle-log lines). */
+export const spectatorPlayerNames = () => {
+  const names = {};
+  for (const [id, player] of Object.entries(lastRawView?.players || {})) {
+    names[id] = player?.username || id;
+  }
+  return names;
+};
+
 /**
  * The username of the watched seat on a board side, so turn banners and the HUD can say whose
  * turn it is instead of "your"/"opponent's". Null when not spectating.
@@ -105,6 +114,10 @@ export function startSpectatorSession() {
 
 export function endSpectatorSession() {
   const wasBroadcast = active && mode === 'broadcast';
+  // syncUsernames lent this client the watched seat's name; give its own back.
+  if (active && systemState.spectatorUsername) {
+    systemState.p2SelfUsername = systemState.spectatorUsername;
+  }
   active = false;
   mode = DEFAULT_SPECTATOR_MODE;
   lastRawView = null;

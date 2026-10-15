@@ -17,13 +17,14 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
  * @param {object} event One server event (`type` plus its payload)
  * @param {string|null} selfPlayerId This client's absolute player id
  * @param {(instanceId: number) => string|null} [resolveName] Card name lookup for bench events
+ * @param {Record<string, string>|null} [names] Design 069: a spectator's `{ playerId: username }`;
+ *   lines then name the player instead of "your"/"the opponent's"
  * @returns {string[]} Lines to append, in order; empty for events with nothing to say
  */
-export function attackAnnouncementLines(event, selfPlayerId, resolveName) {
-  if (!event || typeof event !== 'object' || event.playerId == null || selfPlayerId == null) {
-    return [];
-  }
-  const mine = event.playerId === selfPlayerId;
+export function attackAnnouncementLines(event, selfPlayerId, resolveName, names = null) {
+  if (!event || typeof event !== 'object' || event.playerId == null) return [];
+  if (selfPlayerId == null && !names) return [];
+  const mine = !names && event.playerId === selfPlayerId;
   const attackName = event.attackName || 'That attack';
 
   switch (event.type) {
@@ -60,7 +61,8 @@ export function attackAnnouncementLines(event, selfPlayerId, resolveName) {
     case 'benchDamaged': {
       // event.playerId is the OWNER of the damaged Pokémon, not the attacker.
       const target = nameOf(event, resolveName);
-      const where = mine ? 'your benched' : "the opponent's benched";
+      const owner = names ? `${names[event.playerId] || 'A player'}'s` : null;
+      const where = owner ? `${owner} benched` : mine ? 'your benched' : "the opponent's benched";
       const lines = [`💥 ${event.dealt} damage to ${where} ${target || 'Pokémon'}.`];
       if (event.auto) {
         lines.push(

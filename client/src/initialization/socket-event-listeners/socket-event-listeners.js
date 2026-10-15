@@ -1,6 +1,6 @@
 import { flipBoard } from '../../actions/general/flip-board.js';
 import { reset } from '../../actions/general/reset.js';
-import { shouldRequestViewOnJoin } from '../../setup/netcode/rejoin-view.mjs';
+import { isViewForRoom, shouldRequestViewOnJoin } from '../../setup/netcode/rejoin-view.mjs';
 import { clearReady } from '../../actions/general/ready.js';
 import {
   hideCards,
@@ -26,6 +26,7 @@ import {
   applySpectatorView,
   endSpectatorSession,
   isSpectatingAuthoritative,
+  spectatorPlayerNames,
   startSpectatorSession,
 } from '../../setup/spectator/spectator-session.js';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
@@ -295,6 +296,9 @@ const seedNetcodeContext = () => {
 // registries and the client-seq counter so a new room starts from a clean
 // slate, then immediately re-seed the netcode context.
 export const resetNetcodeForRoomChange = () => {
+  // Every room change (join, either Leave button) ends a spectator session; spectatorJoin
+  // starts a new one after this.
+  endSpectatorSession();
   resetRenderState();
   seedNetcodeContext();
   resetClientSeq(0);
@@ -442,7 +446,10 @@ export const initializeSocketEventListeners = () => {
     if (systemState.isTwoPlayer) {
       const data = {
         roomId: systemState.roomId,
-        username: systemState.p2SelfUsername,
+        // A spectator's p2SelfUsername names the watched seat (spectator-session.js).
+        username: notSpectator
+          ? systemState.p2SelfUsername
+          : systemState.spectatorUsername,
         notSpectator: notSpectator,
       };
       socket.emit('userReconnected', data);
@@ -501,6 +508,7 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('view', (data) => {
+    if (!isViewForRoom(data, systemState.roomId)) return;
     if (typeof data?.lastClientSeq === 'number') {
       seedClientSeq(data.lastClientSeq);
     }
@@ -511,7 +519,11 @@ export const initializeSocketEventListeners = () => {
         onBeforeApply: handleBeforeApply,
         onAdvisoryEvent: (event, selfPlayerId) => {
           handleAdvisoryEvent(event, selfPlayerId);
-          handleServerBattleLog(event, selfPlayerId);
+          if (isSpectatingAuthoritative()) {
+            handleServerBattleLog(event, null, spectatorPlayerNames());
+          } else {
+            handleServerBattleLog(event, selfPlayerId);
+          }
         },
       };
       if (isSpectatingAuthoritative()) {
