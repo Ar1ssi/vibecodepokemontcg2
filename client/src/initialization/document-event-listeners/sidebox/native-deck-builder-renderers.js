@@ -133,6 +133,13 @@ const escapeHtml = (value = '') => String(value)
     }) => {
       if (!drawerEl) return;
 
+      // Every toggle redraws the drawer. Without carrying the body's scroll
+      // position and the focused control over, each click below the fold jumps
+      // the list back to the top and drops keyboard focus.
+      const controlsOf = () => [...drawerEl.querySelectorAll('button, input')];
+      const focusIndex = controlsOf().indexOf(drawerEl.ownerDocument?.activeElement);
+      const scrollTop = drawerEl.querySelector('.native-deck-builder-fdrawer-body')?.scrollTop || 0;
+
       const sections = groups
         .map((group) => {
           const options = group.dynamic === 'sets' ? setOptions : group.options;
@@ -163,6 +170,10 @@ const escapeHtml = (value = '') => String(value)
           <button type="button" class="native-deck-builder-fdrawer-reset" data-fdrawer-reset>Reset</button>
           <button type="button" class="native-deck-builder-fdrawer-apply" data-fdrawer-apply>Apply filters</button>
         </div>`;
+
+      const drawerBody = drawerEl.querySelector('.native-deck-builder-fdrawer-body');
+      if (drawerBody) drawerBody.scrollTop = scrollTop;
+      if (focusIndex >= 0) controlsOf()[focusIndex]?.focus({ preventScroll: true });
 
       drawerEl.querySelectorAll('[data-filter-value]').forEach((control) => {
         control.addEventListener('click', () => {

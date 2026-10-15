@@ -227,8 +227,12 @@ import {
         const scope = scopeFilterSets({ filters: cardFilters, setIds, expandedSetId });
         if (!scope.length) {
           filterMatches = new Map();
+          const picked = cardFilters.sets || [];
+          const pickedElsewhere = picked.length > 0 && !setIds.some((setId) => picked.includes(setId));
           showStatus(
-            'Open a set to apply these filters, or add a Card type, Pokémon type, Stage, HP, Rarity, Format or Regulation mark filter to filter every set.'
+            pickedElsewhere
+              ? 'None of the picked expansions are in this tab.'
+              : 'Open a set to apply these filters, or add a Card type, Pokémon type, Stage, HP, Rarity, Format or Regulation mark filter to filter every set.'
           );
           render();
           return;

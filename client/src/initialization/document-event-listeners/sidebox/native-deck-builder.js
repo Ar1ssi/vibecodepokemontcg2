@@ -1720,6 +1720,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const searchId = ++latestSearchId;
 
     if (!term && Object.keys(params).length === 0) {
+      // This run supersedes any search in flight, whose finally will not re-enable the button.
+      searchButton.disabled = false;
       clearSearchResults();
       searchStatus.textContent = hasActiveFilters(cardFilters)
         ? 'Add a card name, or a Format, Type, Stage, HP, Rarity or Regulation mark filter, to search.'

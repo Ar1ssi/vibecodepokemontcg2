@@ -47,10 +47,23 @@ export function filtersCoverEverySet(filters = {}) {
   return narrowable || !filtersNeedCardDetails(filters);
 }
 
-/** Which sets one filter pass covers (see filtersCoverEverySet); none when no set is open. */
+// Here a picked Expansion is one of the tab's sets, and some of those are
+// synthetic (the Energy tab, Black Bolt / White Flare) with cards from other
+// set ids. So picked sets choose which sets are scanned; a card's own set.id
+// is never compared with them.
+function pickedTabSets(filters, setIds) {
+  const picked = Array.isArray(filters?.sets) ? filters.sets : [];
+  return picked.length ? setIds.filter((setId) => picked.includes(setId)) : [...setIds];
+}
+
+/**
+ * Which sets one filter pass covers (see filtersCoverEverySet), narrowed to the
+ * picked Expansions; none when no set is open.
+ */
 export function scopeFilterSets({ filters = {}, setIds = [], expandedSetId = null } = {}) {
-  if (filtersCoverEverySet(filters)) return [...setIds];
-  return expandedSetId && setIds.includes(expandedSetId) ? [expandedSetId] : [];
+  const candidates = pickedTabSets(filters, setIds);
+  if (filtersCoverEverySet(filters)) return candidates;
+  return expandedSetId && candidates.includes(expandedSetId) ? [expandedSetId] : [];
 }
 
 async function mapWithLimit(items, limit, task) {
@@ -69,6 +82,7 @@ async function mapWithLimit(items, limit, task) {
 
 /**
  * Finds the cards of `setIds` that pass `filters` (except "In current deck").
+ * Picked Expansions narrow `setIds` (see pickedTabSets); unpicked sets get no entry.
  *
  * @param {object} options
  * @param {string[]} options.setIds
@@ -88,15 +102,16 @@ export async function findSetFilterMatches({
   fetchDetail,
   detailLimit = BROWSE_DETAIL_LIMIT,
 }) {
-  const active = withoutInDeck(filters);
+  const scanned = pickedTabSets(filters, setIds);
+  const active = { ...withoutInDeck(filters), sets: [] };
   const params = buildTcgdexFilterParams(active);
   const narrowable = Object.keys(params).length > 0;
   const matches = new Map();
 
   if (!filtersNeedCardDetails(active)) {
-    const lists = await Promise.all(setIds.map((setId) => loadSetCards(setId)));
+    const lists = await Promise.all(scanned.map((setId) => loadSetCards(setId)));
     let count = 0;
-    setIds.forEach((setId, index) => {
+    scanned.forEach((setId, index) => {
       const kept = applyCardFilters(lists[index] || [], active).map((card) => card.id);
       count += kept.length;
       matches.set(setId, new Set(kept));
@@ -105,7 +120,7 @@ export async function findSetFilterMatches({
   }
 
   const candidateLists = await Promise.all(
-    setIds.map(async (setId) => {
+    scanned.map(async (setId) => {
       // Synthetic sets (`__...__` ids) have no TCGdex set.id to query by.
       const rows = narrowable && !String(setId).startsWith('__')
         ? await fetchSummaries({ ...params, 'set.id': `eq:${setId}` })
@@ -115,7 +130,7 @@ export async function findSetFilterMatches({
   );
 
   const candidates = [];
-  setIds.forEach((setId, index) => {
+  scanned.forEach((setId, index) => {
     matches.set(setId, new Set());
     for (const cardId of candidateLists[index]) candidates.push({ setId, cardId });
   });
