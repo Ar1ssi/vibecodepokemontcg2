@@ -12,6 +12,7 @@ import { initializeRoomFormatPanel } from './setup/general/room-format-panel.js'
 import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-settings.js';
 import { initializeHoverPreview } from './setup/image-logic/hover-preview.js';
 import { loadFoilManifest } from './setup/foil/tcgl-foil-store.js';
+import { installDeckBoxes } from './setup/netcode/mat-fx/deck-box.js';
 
 applyFxSettings();
 loadFoilManifest();
@@ -28,5 +29,6 @@ import('./setup/board3d/board3d.js')
   .then((board3d) => board3d.initializeBoard3d())
   .catch((error) => console.error('board3d failed to start', error));
 initializeHoverPreview();
+installDeckBoxes();
 loadImportData();
 installE2eApi();
