@@ -54,6 +54,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
         sleeveId: options.sleeveId ?? null,
         coinId: options.coinId ?? null,
         matId: options.matId ?? null,
+        deckBoxId: options.deckBoxId ?? null,
         wallpaperId: options.wallpaperId ?? null,
         sprites: normalizeDeckSprites(options.sprites),
         format: normalizeDeckFormat(options.format),
@@ -113,6 +114,15 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
           nextLibrary.decks[deckId].updatedAt = Date.now();
           return nextLibrary;
         }
+
+        /** Stores the deck's TCG Live deck box (design 071); null is the default box. */
+        export function setDeckBox(library = {}, deckId, deckBoxId = null) {
+          if (!library?.decks?.[deckId]) return structuredClone(library);
+          const nextLibrary = structuredClone(library);
+          nextLibrary.decks[deckId].deckBoxId = deckBoxId || null;
+          nextLibrary.decks[deckId].updatedAt = Date.now();
+          return nextLibrary;
+        }
     
         /**
          * Writes the deck's Pokémon sprite slots (design 024). Anything the
@@ -146,7 +156,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
     
     /**
      * Writes the builder's current state — cards plus the chosen sleeve, coin,
-     * mat, Pokémon sprites and deck format — over one saved deck, creating it when `deckId`
+     * mat, deck box, Pokémon sprites and deck format — over one saved deck, creating it when `deckId`
      * names no deck in the library (the "Untitled Deck" case, where nothing is
      * loaded yet).
      *
@@ -158,7 +168,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
      */
     export function saveDeckSnapshot(
       library = {},
-      { deckId, name, cards = {}, sleeveId, coinId, matId, wallpaperId, sprites, format } = {},
+      { deckId, name, cards = {}, sleeveId, coinId, matId, deckBoxId, wallpaperId, sprites, format } = {},
       now = Date.now()
     ) {
       if (!deckId || !library?.decks?.[deckId]) {
@@ -166,6 +176,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
           sleeveId: sleeveId ?? null,
           coinId: coinId ?? null,
           matId: matId ?? null,
+          deckBoxId: deckBoxId ?? null,
           wallpaperId: wallpaperId ?? null,
           sprites,
           format,
@@ -179,6 +190,7 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../../../../shared/engine/form
       if (sleeveId !== undefined) deck.sleeveId = sleeveId;
       if (coinId !== undefined) deck.coinId = coinId;
       if (matId !== undefined) deck.matId = matId;
+      if (deckBoxId !== undefined) deck.deckBoxId = deckBoxId;
       if (wallpaperId !== undefined) deck.wallpaperId = wallpaperId;
       if (sprites !== undefined) deck.sprites = normalizeDeckSprites(sprites);
       if (format !== undefined) deck.format = normalizeDeckFormat(format);
