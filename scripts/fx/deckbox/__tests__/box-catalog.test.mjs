@@ -33,7 +33,7 @@ const level4 = () => ({
           ch: [
             { n: 'Deck_Box', ch: [{ n: 'Sleeve_Deck_Box', lq: [0, 0.7071, 0.7071, 0], ls: [35, 35, 35], ...mat('t:interior') }, { n: 'Shadow', ...{ c: { mr: { mats: [{ main: 't:sb', cols: { _Color: [0.1, 0.2, 0.3, 0.9] } }] } } } }] },
             { n: 'CardSleeve', ch: [{ n: 'cardModel', lp: [0, 5, 349], ...mat('t:card') }, { n: 'Shadow', c: { mr: { mats: [{ main: 't:sc', cols: { _Color: [0.1, 0.2, 0.3, 0.9] } }] } } }] },
-            { n: 'SM_Coin', ch: [{ n: 'Shadow', c: { mr: { mats: [{ main: 't:sn', cols: { _Color: [0.1, 0.2, 0.3, 0.9] } }] } } }] },
+            { n: 'SM_Coin', ch: [{ n: 'Shadow', c: { mr: { mats: [{ main: 't:sn', cols: { _Color: [0.1, 0.2, 0.3, 0.9] } }] } } }, { n: 'SM_Coin', lp: [0, 0, -90], ch: [{ n: 'Coin_model', lp: [0, 250, 0], ls: [150, 150, 150] }] }] },
           ],
         },
         pose('Deckbox_Grouped', [-200, -500, 130], [0, -0.2588, 0, 0.9659], [2.5, 2.5, 2.5]),
@@ -101,6 +101,9 @@ test('extractScene returns grouped and focused poses for every slot in three spa
   assert.deepEqual(scene.slots.coin.grouped.q, [-0, -0, 0, 1]);
   assert.deepEqual(scene.slots.box.shadow.tint, [0.1, 0.2, 0.3, 0.9]);
   assert.deepEqual(scene.slots.sleeve.mesh.p, [0, 5, -349]);
+  assert.deepEqual(scene.slots.coin.pivot.p, [0, 0, 90]);
+  assert.deepEqual(scene.slots.coin.mesh.p, [0, 250, -0]);
+  assert.deepEqual(scene.slots.coin.mesh.s, [150, 150, 150]);
 });
 
 test('extractScene names the missing node', () => {

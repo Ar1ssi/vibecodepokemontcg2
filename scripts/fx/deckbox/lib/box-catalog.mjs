@@ -76,7 +76,11 @@ const requireNode = (root, name) => {
   return node;
 };
 
-const childNamed = (node, name) => requireNode(node, name);
+const childNamed = (node, name) => {
+  const child = (node.ch ?? []).find((entry) => entry.n === name);
+  if (!child) throw new Error(`deck customization scene: "${node.n}" has no child "${name}"`);
+  return child;
+};
 
 /** `main` texture key of material `index` of the node's renderer. */
 const materialTextureKey = (node, index) => {
@@ -106,7 +110,8 @@ const shadowTint = (node) => {
 
 /**
  * `scene.json` from level4: the camera, the three slots' grouped and focused poses, and each slot's
- * mesh and shadow local transforms. Everything is already in three's space.
+ * mesh and shadow local transforms (the coin also its pivot: the disc sits at pivot × mesh).
+ * Everything is already in three's space.
  */
 export function extractScene(level4) {
   const root = level4.roots.map((entry) => findNode(entry, 'RendertoTextureCamera')).find(Boolean);
@@ -134,6 +139,9 @@ export function extractScene(level4) {
   slots.sleeve.mesh = toThreePose(cardMesh);
   slots.sleeve.shadow = { ...toThreePose(cardShadow), tint: shadowTint(cardShadow) };
   slots.coin.shadow = { ...toThreePose(coinShadow), tint: shadowTint(coinShadow) };
+  const coinPivot = childNamed(requireNode(objects, 'SM_Coin'), 'SM_Coin');
+  slots.coin.pivot = toThreePose(coinPivot);
+  slots.coin.mesh = toThreePose(childNamed(coinPivot, 'Coin_model'));
 
   return {
     fov: camera.fov,
