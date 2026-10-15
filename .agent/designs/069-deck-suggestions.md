@@ -26,15 +26,15 @@ fed by every Masters decklist from Standard official events in the current rotat
 ## Acceptance
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
-| A1 | Suggest tab in the deck builder suggesting cards from Limitless decklists | |
-| A2 | Data = scraped decklists from Limitless regionals and championships | |
-| A3 | Adult (Masters) division only, Standard only, current rotation | |
-| A4 | Importing whole lists | |
-| A5 | Suggestor adapts to your choices, per deck (accept / dismiss / lock reshape suggestions) | |
-| A6 | Pick what's needed, e.g. "faster setup", and get suggestions for it | |
-| A7 | Goal "cheaper" (budget) | |
-| A8 | Goal "answer to <deck>" (matchup data) | |
-| A9 | Hostile review run and its findings fixed | |
+| A1 | Suggest tab in the deck builder suggesting cards from Limitless decklists | ✓ Chromium smoke run (scratch smoke.mjs): tab → meta view → import → "Looks like Dragapult (100%) · 50 similar lists"; suggest.test.mjs buckets |
+| A2 | Data = scraped decklists from Limitless regionals and championships | ✓ `pnpm meta:refresh` → 17 events, 5139 lists, 526 cards; parse-limitless + build-meta-dataset tests |
+| A3 | Adult (Masters) division only, Standard only, current rotation | ✓ Masters standings page only (JR/SR are separate pages); `data-format="standard"` filter; selectRotationEvents test (rotation TEF, Prague 2026-04-25 → Louisville 2026-10-10) |
+| A4 | Importing whole lists | ✓ resolve.test "listToEntries + importDeckEntries…"; smoke run "Imported 60 cards", counter 60/60 |
+| A5 | Suggestor adapts to your choices, per deck | ✓ suggest.test steering (dismiss penalty, lock pull), prefs.test, deck-library-suggest.test; smoke: Dismiss → "1 dismissed" |
+| A6 | Pick what's needed, e.g. "faster setup" | ✓ six tag goals; card-key-tags corpus tests; suggest.test goals; smoke: "For Faster setup 10" |
+| A7 | Goal "cheaper" (budget) | ✓ Budget goal (≤ $1, Limitless TCGplayer prices); suggest.test budget; deck price line |
+| A8 | Goal "answer to <deck>" (matchup data) | ✗ cut (Option 11): card-level matchup data needs ~550 Labs requests per event; ISSUES line at landing |
+| A9 | Hostile review run and its findings fixed | see Deviations / review log |
 
 ## Assumptions
 - (assumed) "Regionals and championships" = every Standard event on limitlesstcg.com/tournaments
@@ -199,29 +199,29 @@ with the dataset resolver. Footer credit + `generatedAt`. Recompute debounced 15
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Empty deck | `confidence: 'none'`; meta overview shown | [ ] |
-| 2 | Limitless markup changed | parser yields 0 rows → bake throws naming event id + URL | [ ] |
-| 3 | Card line TCGdex can't resolve | bake throws listing every unresolved `SET NUM name` | [ ] |
-| 4 | Deck of only Basic Energy | low confidence banner, no crash | [ ] |
-| 5 | Rogue deck | top 10 used, `confidence: 'low'`, best similarity % shown | [ ] |
-| 6 | Dataset fetch fails / invalid / wrong version | "Suggestions unavailable: <reason>", builder unaffected | [ ] |
-| 7 | Add breaks 4-copy / ACE SPEC | normal `addCard` path; counter/validation show it | [ ] |
-| 8 | Same card, different prints in deck | one dataset card via printIndex/name | [ ] |
-| 9 | Deck card not in dataset at all | `x:` key; lowers containment; listed as a cut candidate | [ ] |
-| 10 | Rapid deck edits | debounced; last result wins | [ ] |
-| 11 | Event with standings but no lists yet | skipped with a warning | [ ] |
-| 12 | Build & Battle mode | no Suggest tab | [ ] |
-| 13 | Old record / corrupt `suggestPrefs` | normalizes to `EMPTY_PREFS` | [ ] |
-| 14 | Dismiss then accept same key | latest wins, one list | [ ] |
-| 15 | Accepted card removed | moves to dismissed | [ ] |
-| 16 | Everything dismissed | "Nothing left to suggest — restore dismissed cards or reset steering" | [ ] |
-| 17 | Locked card never in lists | never a cut; containment counts it | [ ] |
-| 18 | Two builder tabs steering one deck | write re-reads storage first; last write wins | [ ] |
-| 19 | Unsaved draft steered then saved | Save writes the in-memory prefs | [ ] |
-| 20 | Goal with no tagged candidates | "No picks for <goal> in lists like yours" | [ ] |
-| 21 | Budget with no price data | Budget rows skip null prices; deck price hidden | [ ] |
-| 22 | Standings row whose list is missing on the decklists page (or vice versa) | dropped with a count in the bake log | [ ] |
-| 23 | Import list while a card fails to resolve | imported anyway; failures listed like Import List | [ ] |
+| 1 | Empty deck | `confidence: 'none'`; meta overview shown | [x] suggest.test "empty deck…"; smoke 1-meta.png |
+| 2 | Limitless markup changed | parser yields 0 rows → bake throws naming event id + URL | [x] parsers return [] (parse-limitless tests); loadEventPage/loadDecklists/main throw with URL |
+| 3 | Card line TCGdex can't resolve | bake throws listing every unresolved `SET NUM name` | [x] build-meta-dataset.test "throws listing every unresolved line"; seen live (MEE) |
+| 4 | Deck of only Basic Energy | low confidence banner, no crash | [x] same path as row 5 (containment over Energy keys); findNeighbors low-confidence test |
+| 5 | Rogue deck | top 10 used, `confidence: 'low'`, best similarity % shown | [x] suggest.test "fewer lists than minNeighbors…"; view.test lowConfidenceText |
+| 6 | Dataset fetch fails / invalid / wrong version | "Suggestions unavailable: <reason>", builder unaffected | [x] dataset.test loadMetaDataset + validateDataset; controller renders reason + Try again |
+| 7 | Add breaks 4-copy / ACE SPEC | normal `addCard` path; counter/validation show it | [x] smoke: Add on a 60-card deck → "61 / 60, 1 card over the limit" |
+| 8 | Same card, different prints in deck | one dataset card via printIndex/name | [x] suggest.test "deckToCounts sums prints of one card" |
+| 9 | Deck card not in dataset at all | `x:` key; lowers containment; listed as a cut candidate | [x] suggest.test cuts (Homebrew Card) |
+| 10 | Rapid deck edits | debounced; last result wins | [x] controller `schedule()` clears the pending timer (150 ms); untestable without a DOM |
+| 11 | Event with standings but no lists yet | skipped with a warning | [x] main(): `skip <id>: no decklists published yet`, page not cached |
+| 12 | Build & Battle mode | no Suggest tab | [x] index.ejs: tab in the `isBuilderWindow` (non-B&B) branch, panel `isBuilderWindow && !isBuildBattle`; controller only when `isEditor && !isBuildBattle` |
+| 13 | Old record / corrupt `suggestPrefs` | normalizes to `EMPTY_PREFS` | [x] deck-library-suggest.test; prefs.test garbage |
+| 14 | Dismiss then accept same key | latest wins, one list | [x] prefs.test "latest action wins" |
+| 15 | Accepted card removed | moves to dismissed | [x] prefs.test prunePrefs; controller prunes on render |
+| 16 | Everything dismissed | "Nothing left to suggest — restore dismissed cards or reset steering" | [x] controller resultHtml; engine excludes dismissed (suggest.test) |
+| 17 | Locked card never in lists | never a cut; containment counts it | [x] suggest.test "cuts… locked card is never a cut" |
+| 18 | Two builder tabs steering one deck | write re-reads storage first; last write wins | [x] uses `setActiveField` (reload() before commit), same as sprites/wallpaper |
+| 19 | Unsaved draft steered then saved | Save writes the in-memory prefs | [x] deck-library-suggest.test saveDeckSnapshot; Save passes `currentSuggestPrefs()` |
+| 20 | Goal with no tagged candidates | "No picks for <goal> in lists like yours" | [x] suggest.test "goal with nothing to offer" |
+| 21 | Budget with no price data | Budget rows skip null prices; deck price hidden | [x] goalPicks filters `price !== null`; deckPrice null → line hidden |
+| 22 | Standings row whose list is missing on the decklists page (or vice versa) | dropped with a count in the bake log | [x] build-meta-dataset.test joinEvent dropped/missing |
+| 23 | Import list while a card fails to resolve | imported anyway; failures listed like Import List | [x] resolve.test (Counter Catcher failure listed) |
 
 ## Test plan
 Parsers on trimmed fixture HTML; card-key + card-tags on corpus texts (cited); dataset validate/index;
@@ -243,3 +243,14 @@ remove the tab markup, the files above and the `suggestPrefs` plumbing (records 
 | 6 UI | suggest controller, CSS, index.ejs, native-deck-builder(.js, -library.js) | `initializeNativeDeckBuilderSuggest({ panelEl, getDeck, getPrefs, setPrefs, onAddCard, onRemoveCard, onReplaceDeck, onPreviewCard, fetchCardDetail, searchByName })` → `{ open(), refresh() }` | browser smoke run | — | renders on localhost |
 
 ## Deviations (Builder appends here during build)
+- prefs.mjs landed in slice 3 (the engine reads it), not slice 4. Cosmetic.
+- Bake resolver: Limitless MEE numbers (9-16) ≠ TCGdex mee-001..008 → same-set unique-name fallback
+  (`resolvePrintOnTcgdex`), tested.
+- Dataset cards gained `image` (TCGdex image base) so rows show thumbnails without per-card fetches.
+- Goal picks: a Pokémon your similar lists never play needs ≥ 10% meta share (`MIN_GLOBAL_FOR_OFF_ARCHETYPE_POKEMON`);
+  the smoke run showed other decks' attackers (Genesect ex, Dwebble) as "Faster setup" picks otherwise.
+- Tag rules widened after the first bake: generic deck search ("a Supporter card") counts as Draw &
+  search, Crispin-style "Attach the other" counts as acceleration, "Retreat Cost is 0" as Switching.
+- `findDeckCardForKey` (suggest.mjs) and `view.mjs` (strings) added for the Cut button and testable wording.
+- The Suggest tab exists only in the Standard builder window (`isBuilderWindow && !isBuildBattle`), not
+  on the game tab's slim panel.
