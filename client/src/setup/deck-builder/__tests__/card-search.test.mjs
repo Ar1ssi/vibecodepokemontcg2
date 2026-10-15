@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 
 import {
   buildSummaryQuery,
+  newestSummariesFirst,
   normalizeSearchQuery,
   normalizeTcgdexCard,
   queryCards,
   resolveSearchPlan,
+  setIdOfCardId,
 } from '../core/card-search.mjs';
+import { SET_RELEASE_DATES } from '../core/set-release-dates.generated.mjs';
 
 // ---------------------------------------------------------------------------
 // normalizeSearchQuery
@@ -263,28 +266,30 @@ async function until(ready) {
   return ready();
 }
 
-// TCGdex sv08-057 Pikachu ex (Surging Sparks, 2024-11-08) and sv05-051 Pikachu (Temporal Forces,
-// 2024-03-22), 2026-10-15.
+// Set ids absent from the generated release-date table, so their dates come from /sets/<id>.
+// 2026-10-15.
 test('queryCards looks up a set as soon as its first card arrives, not after every card', async () => {
-  const sets = { sv08: '2024-11-08', sv05: '2024-03-22' };
+  assert.ok(!Object.hasOwn(SET_RELEASE_DATES, 'zz98'));
+  assert.ok(!Object.hasOwn(SET_RELEASE_DATES, 'zz99'));
+  const sets = { zz98: '2030-01-02', zz99: '2030-01-01' };
   let lookupStartedEarly = false;
   const card = (id, setId, name) => ({
     id,
     name,
     category: 'Pokemon',
-    image: `https://assets.tcgdex.net/en/sv/${setId}/${id.split('-')[1]}`,
+    image: `https://assets.tcgdex.net/en/zz/${setId}/${id.split('-')[1]}`,
     set: { id: setId, name: setId },
   });
   const stub = stubFetch(async (url, requested) => {
     const path = url.pathname;
-    if (path.endsWith('/cards')) return [{ id: 'sv08-057' }, { id: 'sv05-051' }];
-    if (path.endsWith('/cards/sv08-057')) return card('sv08-057', 'sv08', 'Pikachu ex');
-    if (path.endsWith('/cards/sv05-051')) {
+    if (path.endsWith('/cards')) return [{ id: 'zz98-001' }, { id: 'zz99-001' }];
+    if (path.endsWith('/cards/zz98-001')) return card('zz98-001', 'zz98', 'Pikachu ex');
+    if (path.endsWith('/cards/zz99-001')) {
       // Held until the first card's set lookup is under way.
       lookupStartedEarly = await until(() =>
-        requested.some((entry) => entry.pathname.endsWith('/sets/sv08'))
+        requested.some((entry) => entry.pathname.endsWith('/sets/zz98'))
       );
-      return card('sv05-051', 'sv05', 'Pikachu');
+      return card('zz99-001', 'zz99', 'Pikachu');
     }
     const setId = path.split('/').pop();
     if (sets[setId]) return { id: setId, releaseDate: sets[setId] };
@@ -292,13 +297,76 @@ test('queryCards looks up a set as soon as its first card arrives, not after eve
   });
   try {
     const response = await queryCards({ term: 'Pikachu' });
-    assert.ok(lookupStartedEarly, 'the sv08 lookup waited for every card record');
+    assert.ok(lookupStartedEarly, 'the zz98 lookup waited for every card record');
     assert.deepEqual(
       response.results.map((entry) => [entry.id, entry.set.releaseDate]),
       [
-        ['sv08-057', '2024-11-08'],
-        ['sv05-051', '2024-03-22'],
+        ['zz98-001', '2030-01-02'],
+        ['zz99-001', '2030-01-01'],
       ]
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+test('setIdOfCardId finds the set id even when the set id contains dashes', () => {
+  assert.equal(setIdOfCardId('sv03.5-006'), 'sv03.5');
+  assert.equal(setIdOfCardId('P-A-050'), 'P-A');
+  assert.equal(setIdOfCardId('tk-hs-r-2'), 'tk-hs-r');
+  assert.equal(setIdOfCardId('30th-c-008'), '30th-c');
+  assert.equal(setIdOfCardId('30th-023'), '30th');
+});
+
+test('setIdOfCardId returns empty for unknown sets and bad input', () => {
+  assert.equal(setIdOfCardId('nope-1'), '');
+  assert.equal(setIdOfCardId(''), '');
+  assert.equal(setIdOfCardId(undefined), '');
+  assert.equal(setIdOfCardId(42), '');
+});
+
+test('newestSummariesFirst orders by printing date, unknown sets last, without mutating its input', () => {
+  assert.ok(SET_RELEASE_DATES.sv08 > SET_RELEASE_DATES.sv05);
+  assert.ok(SET_RELEASE_DATES.sv05 > SET_RELEASE_DATES.base1);
+  const input = [{ id: 'base1-4' }, { id: 'sv08-057' }, { id: 'unknown-1' }, { id: 'sv05-051' }];
+  const snapshot = [...input];
+  const ordered = newestSummariesFirst(input);
+  assert.deepEqual(
+    ordered.map((summary) => summary.id),
+    ['sv08-057', 'sv05-051', 'base1-4', 'unknown-1']
+  );
+  assert.notEqual(ordered, input);
+  assert.deepEqual(input, snapshot);
+});
+
+test('queryCards keeps the newest printings when the list exceeds the detail cap', async () => {
+  const summaries = [];
+  for (let n = 1; n <= 150; n += 1) summaries.push({ id: `base1-${n}` });
+  summaries.push({ id: 'sv08-057' });
+  const stub = stubFetch(async (url) => {
+    const path = url.pathname;
+    if (path.endsWith('/cards')) return summaries;
+    const cardMatch = path.match(/\/cards\/(.+)$/);
+    if (cardMatch) {
+      const id = decodeURIComponent(cardMatch[1]);
+      return {
+        id,
+        name: 'Pikachu',
+        category: 'Pokemon',
+        image: 'https://assets.tcgdex.net/en/x/y/1',
+        set: { id: setIdOfCardId(id), name: 'x' },
+      };
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+  try {
+    const response = await queryCards({ term: 'Pikachu' });
+    assert.ok(response.results.some((entry) => entry.id === 'sv08-057'));
+    assert.equal(response.detailedCount, 150);
+    assert.equal(response.totalSummaries, 151);
+    assert.ok(
+      !stub.requested.some((entry) => entry.pathname.includes('/sets/')),
+      'dates should come from the table, not /sets/ requests'
     );
   } finally {
     stub.restore();

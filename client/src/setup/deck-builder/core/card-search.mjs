@@ -1,6 +1,7 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { tcgdexApiUrl } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
+import { SET_RELEASE_DATES } from './set-release-dates.generated.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
 // set id -> Promise<release date>; overlapping searches share one lookup.
@@ -261,9 +262,39 @@ export function normalizeTcgdexCard(card) {
 }
 
 
+// TCGdex card ids are `<setId>-<localId>`, and set ids may contain '-' themselves
+// (tk-hs-r, P-A, 30th-c), so try each dash from the right until a known set matches.
+export function setIdOfCardId(cardId) {
+  if (typeof cardId !== 'string' || !cardId) return '';
+  for (let dash = cardId.lastIndexOf('-'); dash > 0; dash = cardId.lastIndexOf('-', dash - 1)) {
+    const setId = cardId.slice(0, dash);
+    if (Object.hasOwn(SET_RELEASE_DATES, setId)) return setId;
+  }
+  return '';
+}
+
+export function releaseDateOfCardId(cardId) {
+  return SET_RELEASE_DATES[setIdOfCardId(cardId)] || '';
+}
+
+// Newest printing first, unknown dates last. Returns a new array; the input is left alone.
+export function newestSummariesFirst(summaries = []) {
+  return [...summaries].sort((a, b) => {
+    const dateA = releaseDateOfCardId(a?.id);
+    const dateB = releaseDateOfCardId(b?.id);
+    if (dateA === dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateB.localeCompare(dateA);
+  });
+}
+
 // A card record names its set but not the set's release date, which the
-// default sort needs. Never rejects: an unknown date sorts last.
+// default sort needs. Sets in the generated table are answered without a
+// request; a set newer than the table is fetched. Never rejects: an unknown
+// date sorts last.
 function setReleaseDate(setId) {
+  if (Object.hasOwn(SET_RELEASE_DATES, setId)) return Promise.resolve(SET_RELEASE_DATES[setId]);
   if (!tcgdexSetReleaseDateCache.has(setId)) {
     const lookup = fetchJson(tcgdexApiUrl(`/sets/${setId}`)).then(
       (setData) => setData?.releaseDate || '',
@@ -334,7 +365,9 @@ export async function queryCards({ term = '', params = {} } = {}) {
     };
   }
 
-  const summariesToFetch = allSummaries.slice(0, DETAIL_FETCH_LIMIT);
+  // TCGdex answers in collector-number order and cannot sort by date, so the cap
+  // keeps the newest printings rather than an arbitrary slice.
+  const summariesToFetch = newestSummariesFirst(allSummaries).slice(0, DETAIL_FETCH_LIMIT);
 
   // Each card's set lookup starts as soon as its record arrives, while the
   // other records are still loading, rather than in a second round after them.

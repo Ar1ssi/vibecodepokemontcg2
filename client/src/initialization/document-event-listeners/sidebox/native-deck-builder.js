@@ -1134,7 +1134,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     }
     if (currentResults.length === 0) return 'No matching cards found.';
     if (currentDetailedCount < currentTotalSummaries) {
-      return `Showing ${currentResults.length} card(s) from the first ${currentDetailedCount} of ${currentTotalSummaries} matches. Add filters to narrow it down.`;
+      return `Showing ${currentResults.length} card(s) from the newest ${currentDetailedCount} of ${currentTotalSummaries} matches. Add filters to narrow it down.`;
     }
     return `Showing ${currentResults.length} card(s). Click a card to add it.`;
   };
