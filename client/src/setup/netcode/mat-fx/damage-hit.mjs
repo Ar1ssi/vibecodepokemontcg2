@@ -29,6 +29,18 @@ export function classifyHitOnce(plan) {
   return hit;
 }
 
+/**
+ * Design 069: what `classifyHitOnce` will make of `plan`, without recording its total, so the
+ * attack scene can read its hits before their damage plans run.
+ * @param {object} plan - a `damage` fx plan (or an attackHitIds entry)
+ * @returns {{kind:'hit'|'heal', amount:number, weakness:boolean}|null}
+ */
+export function peekHit(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  if (classified.has(plan)) return classified.get(plan);
+  return classifyDamagePlan(plan, new Map(lastSeenDamage));
+}
+
 /** Test seam: drops the per-card damage baselines. */
 export function resetDamageBaselines() {
   lastSeenDamage.clear();
