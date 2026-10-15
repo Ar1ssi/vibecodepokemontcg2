@@ -12,3 +12,5 @@
 # oneshot 069-tcgl-hover-preview · branch claude/hopeful-darwin-wciasr (primary folder) · slice 4/4 done · review pending
 
 # oneshot 069-multi-target-attack-hits · branch claude/great-wozniak-hwz8xu · slice 5/5 · review fixed · branch ready, not landed
+
+# oneshot 071-tcgl-build-and-battle-run · worktree .claude/worktrees/bnb-run · branch feature/bnb-run · slice 5/5 done, hostile review fixed · branch ready, not landed · landing checklist in design 071 § For the landing commit
