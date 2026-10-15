@@ -8,7 +8,7 @@ Focus: Card focus (design 067, D208-D210): clicking your own Active opens TCG Li
   TCG Live attack-bar sprites (scripts/attack-ui, rerun against the extract) are on main too.
 Active: Card focus (067) on main, awaiting user localhost check (flight ease `--focus-flight-ease`, list
   reveal, HUD/Stack). Status FX awaiting check (Burn/Sleep up-direction). ETB (057) slice 6 not started.
-Next: user passes on localhost (SERVER_AUTHORITATIVE=1): 072 opening coin prompts, 069 hover preview / multi-target hits / public lobby, Special Energy tokens, B&B run flow (#211–#218), 067 feel, 064 mix gains; I242–I243 (Bench/opponent
+Next: user passes on localhost (SERVER_AUTHORITATIVE=1): 072 opening coin prompts, 069 hover preview / multi-target hits / public lobby, Special Energy tokens, B&B run flow (#211–#218), 3D coins + deck customization preview (#219), 067 feel, 064 mix gains; I242–I243 (Bench/opponent
   focus, remaining attack-ui sprites); I239–I240, then I227–I229; WotC Gyms/attach-Trainers/Baby flip,
   holo art windows (D201), deck reveals, 057 taste calls.
   Maintenance due: DECISIONS/designs root over cap; ISSUES open over 40 (maintain.md).
