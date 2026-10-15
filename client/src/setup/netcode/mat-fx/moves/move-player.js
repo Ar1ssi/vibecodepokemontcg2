@@ -17,7 +17,7 @@ import { playCanvasStage } from '../canvas-stage.js';
 import { burstParticles } from '../particles.mjs';
 import { attackerPose, defenderPose } from './card-motion.mjs';
 import { DRAWERS } from './move-drawers.js';
-import { laneGeometry, localLane, phaseProgress, toLocal, unionPadded } from './move-geometry.mjs';
+import { laneGeometry, localLane, phaseProgress, toLocal, unionAllPadded, unionPadded } from './move-geometry.mjs';
 import { terrainPose } from './move-poses.mjs';
 import { DEFAULT_PAD, ECHO_PARAMS, fillDefaults, travelBeats, withDefaults } from './move-spec.mjs';
 import { materialFor } from './materials/index.js';
@@ -232,7 +232,7 @@ const playBranches = ({ beats, attackerRect, branches, spec, seed, cachedTint, m
     ...resolveBeatColours(material, withDefaults(beat.drawer, beat.params), cachedTint),
   }));
   const pad = Math.max(...lanes.map(({ lane }) => lane.h)) * (spec.pad ?? DEFAULT_PAD);
-  const hostRect = lanes.reduce((union, { branch }) => unionPadded(union, branch.rect, pad), unionPadded(attackerRect, attackerRect, pad));
+  const hostRect = unionAllPadded([attackerRect, ...lanes.map(({ branch }) => branch.rect)], pad);
   const host = spawnOverlay({
     rect: hostRect,
     className: `fx-overlay fx-move fx-move--branches fx-move--${spec.id} fx-move--m-${material.key}`,

@@ -80,3 +80,53 @@ export function recoilVector(fromRect, toRect, turnDeg = 0, magnitude = 0) {
   const sin = Math.sin(turn);
   return { x: (ux * cos - uy * sin) * magnitude, y: (ux * sin + uy * cos) * magnitude };
 }
+
+/**
+ * Design 069: each attack's contact and context, by its strike key (the `attackExecuted` event
+ * its plans share, advisory-animations `attackStrikes`). The FX queue holds an attack until its
+ * contact, so its damage and knockout plans run after the impact queue flushed (and dropped the
+ * context); they find the attack here instead, and land at `contactAt + their ripple delay`.
+ * `now` and `setTimer` are injected so the timing is testable on a fake clock.
+ */
+export function createStrikeBook({ now, setTimer }) {
+  const strikes = new WeakMap();
+  const entryOf = (plan) => (plan?.strike && typeof plan.strike === 'object' ? strikes.get(plan.strike) : undefined);
+  return {
+    /** Record that the attack keyed `key` connects `ms` from now with `ctx`. */
+    announce(key, ms, ctx = null) {
+      if (key && typeof key === 'object') strikes.set(key, { ctx, contactAt: now() + ms });
+    },
+    /** The strike context of `plan`'s attack, or null. */
+    contextOf: (plan) => entryOf(plan)?.ctx ?? null,
+    /** True when `plan` belongs to an attack whose hits ripple (more than one target). */
+    isRipple: (plan) => Object.keys(entryOf(plan)?.ctx?.hitDelays ?? {}).length > 0,
+    /** ms from now until `plan`'s card is hit (0 when already due or unknown). */
+    waitMs(plan) {
+      const entry = entryOf(plan);
+      return entry ? hitWaitMs(entry.contactAt, hitDelayFor(entry.ctx, plan.instanceId), now()) : 0;
+    },
+    /**
+     * Run `job(ctx)` on `impacts` (combat-pose `createImpactQueue`) when `plan`'s hit lands, with
+     * its attack's context; without a known attack, at the queue's contact with its context.
+     */
+    afterHit(impacts, plan, job) {
+      impacts.add((queued) => {
+        const entry = entryOf(plan);
+        const ctx = entry?.ctx ?? queued ?? null;
+        const wait = hitWaitMs(entry?.contactAt ?? null, hitDelayFor(ctx, plan?.instanceId), now());
+        if (wait > 0) setTimer(() => job(ctx), wait);
+        else job(ctx);
+      });
+    },
+  };
+}
+
+/**
+ * Design 069: a knockout's FX-queue hold. A ripple attack's knockouts play back to back (each
+ * ghost waits for its own hit), so only the last holds — its usual hold counted from its hit.
+ */
+export function knockoutHoldMs({ ripple = false, moreKnockouts = false, waitMs = 0, holdMs = 0 } = {}) {
+  if (!ripple) return holdMs;
+  if (moreKnockouts) return 0;
+  return holdMs + Math.max(0, Number.isFinite(waitMs) ? waitMs : 0);
+}

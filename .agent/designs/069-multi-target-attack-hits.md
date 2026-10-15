@@ -22,8 +22,8 @@ worse: the move flies at the opponent's Active, which takes no damage, while the
 |---|---|---|
 | A1 | "for atacks that damage multiple pokemon … the attack animation also hits those pokemon" — each damaged Pokémon gets the move's travel, its hit and a reaction | ✓ `rec-attack-hit SPREAD=3`: `branch canvas 1 · recoiled [204,203,202]`, numbers at +50/+67/+149/+233 ms (live queue order); tests `attackHitIds …`, `layoutHits …`, `travelBeats …`; engine-fed: Kyurem ex BLK 165 → `[20, 21, 22]`, Mewtwo ex 30C 157 → `[20, 22]`. Look: user check on localhost |
 | A2 | Bench-only attacks hit the Bench, not the undamaged Active | ✓ test "layoutHits: an undamaged defender is never primary…"; engine-fed Buzzwole-GX 30C 57 Jet Punch resume batch → `[22]` |
-| A3 | "have a hostile review done" | |
-| A4 | "then fix the issues it finds" | |
+| A3 | "have a hostile review done" | ✓ independent agent ran review.md on `c091777..HEAD`: 2 blockers, 2 should, 3 nits, each verified with node scripts (§ Review findings) |
+| A4 | "then fix the issues it finds" | ✓ all 7 fixed (D7); each with a test that fails without it where it is logic: "Kyurem ex Blizzard Burst with Knock Outs…" (fails with the reorder disabled: 3 pass / 1 fail), "unionAllPadded…", "seedDamageBaselines…", "createStrikeBook…", "attackStrikes: the attacker’s own…", "travelBeats keeps…" |
 
 ## Assumptions
 | # | Gap | Decided (assumed) | Why |
@@ -191,6 +191,8 @@ with the scene's backstop (`removeWhen`), recoil animations are fire-and-forget 
 | 13 | 068 prefab not loaded yet | secondaries fall back to `strikeTarget` as today, on the ripple | [x] |
 | 14 | reduced motion / fx-off | unchanged (attack and damage scenes skipped / nothing) | [x] |
 | 15 | two attacks in one batch (extra-attack Abilities) | each `attackExecuted` gets only its own segment's ids | [x] |
+| 17 | a spread attack Knocks Out the Active before the Bench damage (engine order) | its knockouts play after the attack's last damage; each ghost starts on its own hit; only the last holds (900 ms from its hit) | [x] |
+| 18 | an attack that only places damage counters (no `dealt`) on undamaged cards | the first total is diffed against the card's pre-apply counter, so it is a hit with a number and a lane | [x] |
 | 16 | a damage job throws | the error stays inside that job; others keep their delays (jobs are independent timers) | [x] |
 
 ## Test plan
@@ -246,6 +248,29 @@ n/a: client cosmetic. Revert = revert the slice commits; no data or protocol tou
   by `main` on the same scene (main: median 50 / p95 150–333; this branch: median 17–50 / p95
   200–400, SPREAD=3, two runs each). No regression shown beyond the noise; `MAX_BRANCH_LANES` stays 5.
   The user's GPU browser is the real check.
+- D7 (hostile review, all fixed).
+  1. [blocker] Knockouts sat between the Bench hits (`damageUpdated:20 > pokemonKnockedOut:20 >
+     damageUpdated:21 …`), and their 900 ms hold pushed later hits up to ~1.8 s late.
+     `strikeKnockouts(events)` moves each attack's knockouts after its last damage, and marks all but
+     the last; `knockoutHoldMs` lets those hold 0 and the last hold 900 from its own hit
+     (`knockoutHoldFor` in combat.js).
+  2. [blocker] The branch canvas padded its union once per lane (3238 px square for 5 lanes).
+     `unionAllPadded` pads once (1176 px).
+  3. [should] Counter-only attacks (Mismagius SIT 064 Eerie Voice) read as no hit on cards with no
+     recorded total. `seedDamageBaselines` takes each card's pre-apply counter from the board
+     (`img.dataset.damage`) in `handleBeforeApply`; recorded totals are kept. This also restores
+     their damage numbers, which were already missing before this design.
+  4. [should] The strike logic had no failing-without test. It now lives in the pure
+     `createStrikeBook` (multi-hit.mjs), tested on a fake clock against the real `createImpactQueue`,
+     and end to end with `createFxQueue` and real reduce events.
+  5. [nit] The attacker's own recoil was tagged with its attack's strike. `attackStrikes` now skips
+     the attacker's damage and knockout.
+  6. [nit] Recoil moved only the top card. It now moves the whole stack (`knockoutStack`).
+  7. [nit] The travelBeats test restated the filter. Added a hand-built spec with expected beats.
+- D8 (found while testing D7.1, not fixed: engine, out of scope). Kyurem ex BLK 165 Blizzard Burst
+  deals a flat 10 to each Benched Pokémon, whatever the Prize count (probe: opponent with 6, 4 or
+  3 Prizes left → `21:10` every time). Printed: "10 damage … for each Prize card your opponent has
+  taken". ISSUES line in the landing commit.
 - D6 (environment). The 068 prefab does not show under this container's SwiftShader on `main` either
   (`rec-attack-hit BENCH=1` on an origin/main worktree: `stageShown: false`), so the prefab half of
   the hits is checked by tests and the user's localhost pass, not by the recording here.

@@ -1,16 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createStrikeBook,
   HIT_SPREAD_MAX_MS,
   HIT_STEP_MS,
   MAX_BRANCH_LANES,
   hitDelayFor,
   hitDelaysOf,
   hitWaitMs,
+  knockoutHoldMs,
   recoilVector,
   layoutHits,
 } from '../multi-hit.mjs';
-import { classifyHitOnce, peekHit, resetDamageBaselines } from '../damage-hit.mjs';
+import { classifyHitOnce, peekHit, resetDamageBaselines, seedDamageBaselines } from '../damage-hit.mjs';
+import { createImpactQueue } from '../combat-pose.mjs';
 
 const card = (left, top = 0) => ({ left, top, width: 60, height: 84 });
 
@@ -110,4 +113,64 @@ test('recoilVector: away from the attacker, turned into a rotated frame, null wh
   assert.equal(recoilVector(attacker, attacker, 0, 10), null);
   assert.equal(recoilVector(null, below, 0, 10), null);
   assert.equal(recoilVector(attacker, below, 0, 0), null);
+});
+
+test('seedDamageBaselines: a counter-only first event reads as a hit; recorded totals are kept', () => {
+  resetDamageBaselines();
+  assert.equal(peekHit({ instanceId: 30, damage: 30 }), null, 'unknown baseline');
+  seedDamageBaselines([{ instanceId: 30, damage: 0 }, { instanceId: 31, damage: 50 }, { instanceId: 32, damage: Number.NaN }]);
+  assert.deepEqual(peekHit({ instanceId: 30, damage: 30 }), { kind: 'hit', amount: 30, weakness: false });
+  assert.deepEqual(peekHit({ instanceId: 31, damage: 80 }), { kind: 'hit', amount: 30, weakness: false });
+  assert.equal(peekHit({ instanceId: 32, damage: 30 }), null);
+  seedDamageBaselines([{ instanceId: 31, damage: 0 }]);
+  assert.deepEqual(peekHit({ instanceId: 31, damage: 80 }), { kind: 'hit', amount: 30, weakness: false });
+  seedDamageBaselines(null);
+  resetDamageBaselines();
+});
+
+test('knockoutHoldMs: a ripple attack’s knockouts hold once, at the last, from its hit', () => {
+  assert.equal(knockoutHoldMs({ ripple: false, moreKnockouts: true, waitMs: 200, holdMs: 900 }), 900);
+  assert.equal(knockoutHoldMs({ ripple: true, moreKnockouts: true, waitMs: 200, holdMs: 900 }), 0);
+  assert.equal(knockoutHoldMs({ ripple: true, waitMs: 200, holdMs: 900 }), 1100);
+  assert.equal(knockoutHoldMs({ ripple: true, waitMs: Number.NaN, holdMs: 900 }), 900);
+  assert.equal(knockoutHoldMs(), 0);
+});
+
+test('createStrikeBook: a hit queued after the impact queue flushed still gets its attack’s context', () => {
+  let now = 0;
+  const timers = [];
+  const setTimer = (fn, ms) => timers.push({ at: now + ms, fn });
+  const book = createStrikeBook({ now: () => now, setTimer });
+  const impacts = createImpactQueue({ setTimer: (fn, ms) => setTimer(fn, ms) });
+  const runUntil = (t) => {
+    for (;;) {
+      timers.sort((a, b) => a.at - b.at);
+      if (!timers[0] || timers[0].at > t) break;
+      const next = timers.shift();
+      now = next.at;
+      next.fn();
+    }
+    now = t;
+  };
+  const strike = {};
+  const ctx = { impactType: 'fire', hitDelays: { 21: 80 } };
+  book.announce(strike, 200, ctx);
+  impacts.strikeIn(200, ctx);
+  runUntil(240);
+  const landed = [];
+  book.afterHit(impacts, { instanceId: 20, strike }, (got) => landed.push([20, now, got]));
+  book.afterHit(impacts, { instanceId: 21, strike }, (got) => landed.push([21, now, got]));
+  book.afterHit(impacts, { instanceId: 9 }, (got) => landed.push([9, now, got]));
+  runUntil(1000);
+  assert.deepEqual(landed, [
+    [20, 240, ctx],
+    [9, 240, null],
+    [21, 280, ctx],
+  ]);
+  assert.equal(book.isRipple({ strike }), true);
+  assert.equal(book.isRipple({ strike: {} }), false);
+  assert.equal(book.contextOf({ strike }), ctx);
+  assert.equal(book.contextOf({}), null);
+  book.announce(null, 10, ctx);
+  assert.equal(book.waitMs({ instanceId: 21 }), 0);
 });

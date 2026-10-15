@@ -41,6 +41,20 @@ export function peekHit(plan) {
   return classifyDamagePlan(plan, new Map(lastSeenDamage));
 }
 
+/**
+ * Design 069: the totals cards had before the batch now being applied, read off the board. A card
+ * with no recorded total takes it, so a cumulative-only first event (an attack that places damage
+ * counters) still reads as a hit. Totals already recorded are kept: they track plans still queued.
+ * @param {{instanceId: *, damage: number}[]} entries
+ */
+export function seedDamageBaselines(entries) {
+  if (!Array.isArray(entries)) return;
+  for (const entry of entries) {
+    if (entry?.instanceId == null || !Number.isFinite(entry.damage)) continue;
+    if (!lastSeenDamage.has(entry.instanceId)) lastSeenDamage.set(entry.instanceId, entry.damage);
+  }
+}
+
 /** Test seam: drops the per-card damage baselines. */
 export function resetDamageBaselines() {
   lastSeenDamage.clear();

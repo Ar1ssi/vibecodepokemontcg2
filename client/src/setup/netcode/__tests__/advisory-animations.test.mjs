@@ -10,6 +10,7 @@ import {
   effectKnockoutIds,
   EVENT_FX,
   SOUND_ONLY_FX,
+  strikeKnockouts,
   supersededDeals,
 } from '../advisory-animations.mjs';
 import { HOLD_MS } from '../mat-fx/fx-holds.mjs';
@@ -636,4 +637,50 @@ test('advisoryAnimationPlan: the strike tags fx and knockout plans, never other 
   const shuffle = advisoryAnimationPlan({ type: 'zoneShuffled', zoneId: 'deck', playerId: 'p1' }, 'p1', undefined, { strike });
   assert.equal(shuffle.strike, undefined);
   assert.equal(advisoryAnimationPlan({ type: 'damageUpdated', instanceId: 21, damage: 30 }, 'p1').strike, undefined);
+});
+
+test('attackStrikes: the attacker’s own damage and knockout are not hits of its attack', () => {
+  const recoil = { type: 'damageUpdated', instanceId: 1, damage: 30, dealt: 30 };
+  const selfKo = { type: 'pokemonKnockedOut', instanceId: 1, playerId: 'p1' };
+  const hit = { type: 'damageUpdated', instanceId: 20, damage: 30, dealt: 30 };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const strikes = attackStrikes([hit, recoil, selfKo, attack]);
+  assert.equal(strikes.get(hit), attack);
+  assert.equal(strikes.has(recoil), false);
+  assert.equal(strikes.has(selfKo), false);
+});
+
+test('strikeKnockouts: knockouts move after the attack’s last damage; all but the last are marked', () => {
+  const d20 = { type: 'damageUpdated', instanceId: 20, damage: 130, dealt: 130 };
+  const ko20 = { type: 'pokemonKnockedOut', instanceId: 20 };
+  const d21 = { type: 'damageUpdated', instanceId: 21, damage: 20, dealt: 20 };
+  const ko21 = { type: 'pokemonKnockedOut', instanceId: 21 };
+  const d22 = { type: 'damageUpdated', instanceId: 22, damage: 20, dealt: 20 };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const { after, moved, notLast } = strikeKnockouts([d20, ko20, d21, ko21, d22, attack]);
+  assert.deepEqual(after.get(d22), [ko20, ko21]);
+  assert.deepEqual([...moved], [ko20, ko21]);
+  assert.deepEqual([...notLast], [ko20]);
+});
+
+test('strikeKnockouts: a knockout already after the last damage stays; checkup knockouts are not touched', () => {
+  const d20 = { type: 'damageUpdated', instanceId: 20, damage: 130, dealt: 130 };
+  const ko20 = { type: 'pokemonKnockedOut', instanceId: 20 };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const single = strikeKnockouts([d20, ko20, attack]);
+  assert.equal(single.after.size, 0);
+  assert.equal(single.moved.size, 0);
+  assert.equal(single.notLast.size, 0);
+  const checkupKo = { type: 'pokemonKnockedOut', instanceId: 21 };
+  const checkup = strikeKnockouts([attack, { type: 'damageUpdated', instanceId: 21, damage: 60 }, checkupKo]);
+  assert.equal(checkup.moved.size + checkup.notLast.size, 0);
+  assert.equal(strikeKnockouts(null).after.size, 0);
+});
+
+test('advisoryAnimationPlan: moreKnockouts marks a struck knockout plan only', () => {
+  const strike = { type: 'attackExecuted' };
+  const ko = { type: 'pokemonKnockedOut', instanceId: 21, playerId: 'p2' };
+  assert.equal(advisoryAnimationPlan(ko, 'p1', undefined, { strike, moreKnockouts: true }).moreKnockouts, true);
+  assert.equal(advisoryAnimationPlan(ko, 'p1', undefined, { strike }).moreKnockouts, undefined);
+  assert.equal(advisoryAnimationPlan(ko, 'p1', undefined, { moreKnockouts: true }).moreKnockouts, undefined);
 });

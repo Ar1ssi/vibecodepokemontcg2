@@ -965,3 +965,18 @@ test('design 069: travelBeats are each shipped move’s pre-contact lane travell
   assert.ok(travelBeats(SPECS.absorb).every((beat) => beat.params?.from !== 'defender'));
   assert.deepEqual(travelBeats(null), []);
 });
+
+test('design 069: travelBeats keeps what flies to the defender before contact, nothing else', () => {
+  const beat = (drawer, at, params = {}) => ({ drawer, at, until: at + 200, layer: 'front', params });
+  const charge = beat('coreCharge', 0, { target: 'attacker' });
+  const shot = beat('projectile', 200);
+  const skyBolt = beat('bolt', 300, { from: 'sky' });
+  const beam = beat('beam', 350);
+  const volley = beat('volley', 100);
+  const drain = beat('volley', 250, { from: 'defender' });
+  const afterContact = beat('projectile', 600);
+  const payoff = beat('starFlare', 560, { target: 'defender' });
+  const spec = { id: 'synthetic', contactMs: 560, beats: [charge, shot, skyBolt, beam, volley, drain, afterContact, payoff] };
+  assert.deepEqual(travelBeats(spec), [shot, skyBolt, beam, volley]);
+  assert.deepEqual(travelBeats({ id: 'empty', contactMs: 500 }), []);
+});

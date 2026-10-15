@@ -50,7 +50,7 @@ import { brighten, fxRgbForCard, FX_NEUTRAL_RGB, rgbCss } from './fx-colors.mjs'
 import { frameTurnOf } from './evolve-scene.js';
 import { impactTypeFor, impactVariant, withoutImpactBeats } from './impact/impact-select.mjs';
 import { impactReady, playImpact, prepareImpact } from './impact/impact-stage.js';
-import { peekCombatOrigin, visibleStackRecord, zoneCardIds } from './origins.mjs';
+import { knockoutStack, peekCombatOrigin, visibleStackRecord, zoneCardIds } from './origins.mjs';
 import { playMove } from './moves/move-player.js';
 import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
 import { SPECS } from './moves/specs/index.mjs';
@@ -58,7 +58,7 @@ import { signatureFor, slugFor, withSignatureSpec } from './moves/signature/sign
 import { SIGNATURE_SPECS } from './moves/signature/specs/index.mjs';
 import { attackSoundFields } from './moves/attack-sound.mjs';
 import { burstParticles } from './particles.mjs';
-import { hitDelayFor, hitDelaysOf, hitWaitMs, layoutHits, recoilVector } from './multi-hit.mjs';
+import { createStrikeBook, hitDelayFor, hitDelaysOf, knockoutHoldMs, layoutHits, recoilVector } from './multi-hit.mjs';
 
 const BACKSTOP_PAD_MS = 400;
 const floatingCount = new Map();
@@ -99,17 +99,12 @@ export const attackSceneEndsAt = () => attackSceneEnd;
 /** Design 063: a move scene announces its own contact moment (ms from now) with its context. */
 export const announceStrike = (ms, ctx = null) => impacts.strikeIn(ms, ctx);
 
-// Design 069: each attack's contact (performance.now clock) and context, by its strike key — the
-// `attackExecuted` event its plans share (advisory-animations `attackStrikes`). The queue holds an
-// attack until contact, so its damage and knockout plans arrive after the impact queue flushed;
-// they find the attack's context here instead.
-const strikes = new WeakMap();
-
-const strikeOf = (plan) => (plan?.strike && typeof plan.strike === 'object' ? strikes.get(plan.strike) : undefined);
+// Design 069: each attack's contact and context, by the strike key its plans share.
+const strikes = createStrikeBook({ now: () => performance.now(), setTimer: (fn, ms) => setTimeout(fn, ms) });
 
 /** Announce a contact for the impact queue, and under `key` for the hits that arrive after it. */
 const announceFor = (key) => (ms, ctx = null) => {
-  if (key && typeof key === 'object') strikes.set(key, { ctx, contactAt: performance.now() + ms });
+  strikes.announce(key, ms, ctx);
   impacts.strikeIn(ms, ctx);
 };
 
@@ -118,13 +113,15 @@ const announceFor = (key) => (ms, ctx = null) => {
  * delay — with that attack's context. Without a known attack it runs when the current batch's
  * attack connects (the impact queue), as every hit did before.
  */
-export const afterHit = (plan, job) =>
-  impacts.add((queued) => {
-    const strike = strikeOf(plan);
-    const ctx = strike?.ctx ?? queued ?? null;
-    const wait = hitWaitMs(strike?.contactAt ?? null, hitDelayFor(ctx, plan?.instanceId), performance.now());
-    if (wait > 0) setTimeout(() => job(ctx), wait);
-    else job(ctx);
+export const afterHit = (plan, job) => strikes.afterHit(impacts, plan, job);
+
+/** Design 069: a knockout plan's FX-queue hold (`holdMs` is the table's knockout hold). */
+export const knockoutHoldFor = (plan, holdMs) =>
+  knockoutHoldMs({
+    ripple: strikes.isRipple(plan),
+    moreKnockouts: Boolean(plan?.moreKnockouts),
+    waitMs: strikes.waitMs(plan),
+    holdMs,
   });
 
 const showDamageNumber = (instanceId, rect, hit) => {
@@ -320,19 +317,24 @@ const shakeTable = (amount) => {
  * (WAAPI `translate`, added onto whatever the card already plays).
  */
 const recoilCard = (instanceId, rect, ctx, registry) => {
-  const element = shownRecord(instanceId, registry)?.element;
-  if (!element?.isConnected || typeof element.animate !== 'function') return;
-  const push = recoilVector(ctx?.attackerRect, rect, frameTurnOf(element), element.offsetHeight || rect.height);
+  // The whole stack moves together: attached Energy, Tools and lower Stages are their own elements.
+  const { shown, rest } = knockoutStack(registry, instanceId);
+  const top = shown?.element;
+  if (!top?.isConnected) return;
+  const push = recoilVector(ctx?.attackerRect, rect, frameTurnOf(top), top.offsetHeight || rect.height);
   if (!push) return;
   const frames = sampleKeyframes(
     hitRecoilPose,
     (p) => ({ translate: `${(push.x * p.along).toFixed(2)}px ${(push.y * p.along).toFixed(2)}px` }),
     16
   );
-  try {
-    element.animate(frames, { duration: HIT_RECOIL_MS, composite: 'add' });
-  } catch (error) {
-    console.debug('hit recoil failed', error);
+  for (const element of [top, ...rest.map((member) => member?.element)]) {
+    if (!element?.isConnected || typeof element.animate !== 'function') continue;
+    try {
+      element.animate(frames, { duration: HIT_RECOIL_MS, composite: 'add' });
+    } catch (error) {
+      console.debug('hit recoil failed', error);
+    }
   }
 };
 
@@ -349,7 +351,7 @@ export const damage = (plan) => {
   const target = impactTargetFor(plan.instanceId, rect, hit, registry);
   // Design 069: every hit of a multi-target attack lands on that attack's clock, so none holds
   // the FX queue — a held primary would dispatch the ripple hits after their own times.
-  const ripple = Object.keys(strikeOf(plan)?.ctx?.hitDelays ?? {}).length > 0;
+  const ripple = strikes.isRipple(plan);
   afterHit(plan, (strikeCtx) => {
     const secondary = hitDelayFor(strikeCtx, plan.instanceId) > 0;
     const ctx = secondary ? hitContextFor(strikeCtx, rect) : strikeCtx;
