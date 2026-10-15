@@ -231,20 +231,28 @@ test('a silent caller is called for, and the deal still waits on the winner', ()
   assert.deepEqual(h.timers.pendingDelays(), [TURN_ORDER_CHOICE_TIMEOUT_MS]);
 });
 
-// Design 072 row 8.
-test('a winner who drops is chosen for at once', () => {
+// Design 072 row 8: chosen for at once, but dealt only when the winner's seat is bound
+// again, so their dealOrder is not lost (review: a seat dealt to while away desyncs).
+test('a winner who drops is chosen for at once and dealt to on their return', () => {
   const h = harness();
   const flip = callAndFlip(h);
   const winnerSocket = h.socketOf(flip.winnerPlayerId);
+  const loserSocket = winnerSocket === 'sock1' ? 'sock2' : 'sock1';
 
   h.room.removeSocket(winnerSocket);
   h.transport.handleSeatLost(h.room, 'r1', flip.winnerPlayerId);
 
-  assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId: flip.winnerPlayerId }]);
+  assert.equal(h.room.turnOrder.phase, 'resolved');
   assert.deepEqual(h.timers.pendingDelays(), []);
-  const loserSocket = winnerSocket === 'sock1' ? 'sock2' : 'sock1';
   assert.equal(h.to('turnOrderResult', loserSocket).choiceAuto, true);
   assert.equal(h.to('turnOrderResult', winnerSocket), undefined, 'a dropped socket gets nothing');
+  assert.deepEqual(h.deals, [], 'no deal while a seat is away');
+
+  h.room.addPlayer('sock-back', flip.winnerPlayerId, flip.winnerPlayerId === 'p1' ? 'Ash' : 'Gary');
+  h.transport.replayTo(h.room, 'r1', flip.winnerPlayerId);
+
+  assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId: flip.winnerPlayerId }]);
+  assert.equal(h.to('turnOrderResult', 'sock-back').starter, 'self');
 });
 
 test('the loser dropping mid-choice changes nothing', () => {
@@ -275,7 +283,8 @@ test('a dropped caller is called for; if they won the toss the choice is made at
     if (flip.winnerPlayerId === callerPlayerId) {
       outcomes.add('caller won');
       assert.equal(flip.phase, 'resolved');
-      assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId: callerPlayerId }]);
+      assert.equal(flip.starterPlayerId, callerPlayerId);
+      assert.deepEqual(h.deals, [], 'dealt only once the caller is back');
       assert.deepEqual(h.timers.pendingDelays(), []);
     } else {
       outcomes.add('caller lost');
@@ -354,8 +363,9 @@ test('replayTo leaves a dealt game alone', () => {
   assert.equal(h.deals.length, 1);
 });
 
-// Review fix: both seats gone when the choice resolves must not leave the match undealt forever.
-test('a result that could not be dealt is dealt once a seat is back', () => {
+// Review fixes: both seats gone when the choice resolves must not leave the match undealt
+// forever, and the first seat back must not be dealt to while the other is still away.
+test('a result that could not be dealt is dealt once every seat is back', () => {
   const h = harness({ dealSucceeds: (gameRoom) => gameRoom.playerToSocket.size > 0 });
   h.transport.open(h.room, 'r1');
   const callerPlayerId = h.room.turnOrder.callerPlayerId;
@@ -373,12 +383,15 @@ test('a result that could not be dealt is dealt once a seat is back', () => {
 
   h.room.addPlayer('sock1b', 'p1', 'Ash');
   h.transport.replayTo(h.room, 'r1', 'p1');
-
-  assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId }]);
+  assert.deepEqual(h.deals, [], 'p2 is still away');
   assert.equal(h.to('turnOrderResult', 'sock1b').starter, starterPlayerId === 'p1' ? 'self' : 'opp');
 
   h.room.addPlayer('sock2b', 'p2', 'Gary');
   h.transport.replayTo(h.room, 'r1', 'p2');
+  assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId }]);
+  assert.equal(h.to('turnOrderResult', 'sock2b').starter, starterPlayerId === 'p2' ? 'self' : 'opp');
+
+  h.transport.replayTo(h.room, 'r1', 'p1');
   assert.equal(h.transport.open(h.room, 'r1'), false);
   assert.equal(h.deals.length, 1, 'dealt exactly once');
 });

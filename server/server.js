@@ -525,10 +525,13 @@ async function main() {
         // choose first or second) is answered for, so the other seat never waits
         // on a player who is not coming back.
         // An explicit Leave is not answered for: it resets (or deletes) the game
-        // below, and answering first would deal a game that is about to end.
+        // below, and answering first would deal a game that is about to end. The
+        // reset finds the seat by username; if it cannot, answer as for a drop.
+        const resetFollows =
+          socket.data.leaveRoom && Boolean(gameRoom.getPlayerIdByUsername(username));
         const lostPlayerId = gameRoom.socketToPlayer.get(socket.id);
         gameRoom.removeSocket(socket.id);
-        if (!socket.data.leaveRoom) {
+        if (!resetFollows) {
           turnOrderTransport.handleSeatLost(gameRoom, roomId, lostPlayerId);
         }
       }

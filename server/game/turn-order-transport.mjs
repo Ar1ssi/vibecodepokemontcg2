@@ -62,6 +62,9 @@ export function createTurnOrderTransport({
     }
   };
 
+  const allSeatsBound = (gameRoom) =>
+    Object.keys(gameRoom.state.players).every((playerId) => gameRoom.playerToSocket.has(playerId));
+
   const sideOf = (playerId, recipientId) => (playerId === recipientId ? 'self' : 'opp');
 
   const finish = (gameRoom, roomId, resolution) => {
@@ -81,6 +84,10 @@ export function createTurnOrderTransport({
         choiceAuto: Boolean(resolution.choiceAuto),
       });
     });
+    // Every seat must be bound to get its dealOrder: a seat dealt to while away
+    // would fall back to a local shuffle and desync its hand. The result stays
+    // undealt and replayTo deals it once the last seat is back.
+    if (!allSeatsBound(gameRoom)) return;
     if (deal(gameRoom, roomId, resolution.starterPlayerId)) gameRoom.markTurnOrderDealt();
   };
 

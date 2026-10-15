@@ -93,15 +93,15 @@ Client:
 | 5 | Duplicate choice | `already_resolved`, deal once | [x] room + transport "a duplicate choice deals once" |
 | 6 | `goFirst` not boolean, stale `choiceId` | `invalid_choice` / `stale_choice` | [x] room "malformed and stale choices are rejected" |
 | 7 | Winner silent | after `TURN_ORDER_CHOICE_TIMEOUT_MS` server picks go-first, `choiceAuto: true`, deals | [x] transport "a silent winner goes first when the choice times out" |
-| 8 | Winner disconnects mid-choice | auto go-first at once, deal | [x] transport "a winner who drops is chosen for at once" |
-| 9 | Caller disconnects mid-call | auto call → flip; if the dropped caller won, auto choice at once | [x] transport "a dropped caller who wins the toss…" |
-| 10 | Reset / leave mid-choice | `clearTurnOrderCall` + timer cleared; old `choiceId` stale; an explicit Leave is not answered for (the reset follows) | [x] room "a choiceId from before resetGame is stale"; Leave: server.js disconnectHandler skips `handleSeatLost` when `leaveRoom` (e2e room-rejoin-reset-test) |
+| 8 | Winner disconnects mid-choice | auto go-first at once; dealt when their seat is bound again | [x] transport "a winner who drops is chosen for at once and dealt to on their return" |
+| 9 | Caller disconnects mid-call | auto call → flip; if the dropped caller won, auto choice at once, dealt on their return | [x] transport "a dropped caller is called for…" |
+| 10 | Reset / leave mid-choice | `clearTurnOrderCall` + timer cleared; old `choiceId` stale; an explicit Leave is not answered for (the reset follows) | [x] room "a choiceId from before resetGame is stale"; Leave: server.js disconnectHandler skips `handleSeatLost` when the reset will find the seat — not automated (server.js closure), traced by the independent re-review |
 | 11 | Hidden info | `choiceId` only reaches the winner's socket | [x] transport "only the winner receives a choiceId" |
-| 12 | Result arrives while the ceremony still plays (auto paths, e2e) | starter cached; game starts after the animation and after the deal (dealOrder) | [x] turn-order-call "turnOrderResult is dispatched and cached"; bridge order: `opening-coin-choice-test.mjs` (real prompts, both answers) + room-rejoin-reset-test 3/3 — the bridge has no unit harness |
+| 12 | Result arrives while the ceremony still plays (auto paths, e2e) | starter cached; game starts after the animation and after the deal (dealOrder) | [x] turn-order-call "turnOrderResult is dispatched and cached"; bridge order: `opening-coin-choice-test.mjs` (real prompts; one answer per run, run with CHOICE=first and CHOICE=second) + room-rejoin-reset-test 3/3 — the bridge has no unit harness |
 | 13 | E2E / rules off | the winner answers go-first at once; same starter distribution as before | [x] flip-gate-test step 2 (deal + starter draw), room-format-test, reset-during-choice-test |
 | 14 | Legacy flag-off 2P, 1P | unchanged flows | n/a — not touched |
 | 15 | A seat rebinds its socket mid-handshake (reconnect, rejoin) | its pending call/flip prompt is re-sent (choiceId only to the winner) | [x] transport "replayTo re-sends the pending call…", "a winner whose socket was replaced…" |
-| 16 | Choice resolves with no seated socket (both dropped) | result stays undealt; dealt once a seat is back or on the next ready | [x] transport "a result that could not be dealt…", "open retries an undealt result…" |
+| 16 | Choice resolves while any seat is unbound | result stays undealt; dealt once every seat is bound (rejoin replay or next ready) — no seat misses its dealOrder | [x] transport "a result that could not be dealt…", "open retries an undealt result…" |
 | 17 | Set Up waits on the deal | `waitForDealOrder(OPENING_DEAL_WAIT_MS)` 45 s ≥ call + choice timeouts (was 5 s: local-shuffle fallback) | [x] deal-order "the opening wait outlasts the call and choice timeouts" |
 
 ## Test plan
@@ -133,5 +133,6 @@ the message set changes in both).
 - Transport dep is `onCallOpened`, not `onOpened`; `deal` returns a boolean so an undealt result can be retried (review).
 - Added in build/review: `OPENING_DEAL_WAIT_MS` (Set Up gave up on the deal after 5 s), the bridge waits for `dealOrder` before starting
   (`deal-order-received` event), seat replay on (re)join, Leave no longer auto-answers, undealt-result retry.
+- Re-review: the deal waits until every seat has a socket (a first-back seat was dealt to while the other was away).
 - Reviewer finding "result lines print mid-ceremony" rejected: `maybeBeginServerTurnOrder` returns before announcing until the ceremony
   timer sets `serverTurnOrderAnimationDone`, and that timer prints "won the coin toss" first.
