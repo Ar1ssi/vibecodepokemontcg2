@@ -27,7 +27,7 @@ test('design 069 rows 5-6: a seated name without its token is refused, connected
   markSeatConnected(room, 'Ash', 's1');
   const join = () => decideJoin({ room, username: 'Ash', token: null, isSpectator: false, seatsFull: false });
   assert.deepEqual(join(), { action: 'reject', reason: 'name_taken', issueToken: false });
-  markSeatDisconnected(room, 'Ash', 0);
+  markSeatDisconnected(room, 'Ash', null, 0);
   assert.deepEqual(join(), { action: 'reject', reason: 'name_taken', issueToken: false });
 });
 
@@ -71,11 +71,11 @@ test('design 069: reconnect needs the token; with it the seat is kept', () => {
 
 test('design 069 rows 3, 9, 12, 20: the sweep frees due public seats only', () => {
   const setUpRoom = roomWith('Ash', 'Misty');
-  markSeatDisconnected(setUpRoom, 'Ash', 0);
+  markSeatDisconnected(setUpRoom, 'Ash', null, 0);
   const notSetUpRoom = roomWith('Brock');
-  markSeatDisconnected(notSetUpRoom, 'Brock', 0);
+  markSeatDisconnected(notSetUpRoom, 'Brock', null, 0);
   const codeRoom = roomWith('Oak');
-  markSeatDisconnected(codeRoom, 'Oak', 0);
+  markSeatDisconnected(codeRoom, 'Oak', null, 0);
   const roomInfo = new Map([
     ['public:1', setUpRoom],
     ['public:2', notSetUpRoom],

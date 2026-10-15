@@ -4,7 +4,9 @@
  * Code rooms never get presence state; their seats are kept until an explicit leave.
  */
 
-/** @typedef {{ socketId: string|null, disconnectedAt: number|null }} SeatPresence */
+/** @typedef {{ socketId: string|null, disconnectedAt: number|null }} SeatPresence
+ * `socketId` is the seat's last socket, kept after a drop so a release can clear what that
+ * socket left behind (its cached deck exchange). */
 
 const presenceOf = (room) => {
   if (!room.presence) room.presence = new Map();
@@ -21,13 +23,20 @@ export function markSeatConnected(room, username, socketId) {
 }
 
 /**
+ * A no-op unless `socketId` is the seat's current socket: an old socket's disconnect can arrive
+ * after the player already came back on a new one.
  * @param {{ players: Set<string>, presence?: Map<string, SeatPresence> }} room
  * @param {string} username
+ * @param {string} socketId the socket that dropped
  * @param {number} now
+ * @returns {boolean} whether the seat is now marked dropped
  */
-export function markSeatDisconnected(room, username, now) {
-  if (!room.players.has(username)) return;
-  presenceOf(room).set(username, { socketId: null, disconnectedAt: now });
+export function markSeatDisconnected(room, username, socketId, now) {
+  if (!room.players.has(username)) return false;
+  const current = room.presence?.get(username);
+  if (current && current.socketId !== socketId) return false;
+  presenceOf(room).set(username, { socketId, disconnectedAt: now });
+  return true;
 }
 
 /**

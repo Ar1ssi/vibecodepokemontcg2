@@ -36,7 +36,8 @@ test('design 069 row 14: spectators count, format and connection show through', 
   const room = roomWith(['Ash', 'Misty'], ['Brock', 'Oak']);
   room.format = { format: 'build-battle', proposal: null };
   markSeatConnected(room, 'Ash', 's1');
-  markSeatDisconnected(room, 'Misty', 10);
+  markSeatConnected(room, 'Misty', 's2');
+  markSeatDisconnected(room, 'Misty', 's2', 10);
   const summary = describePublicRoom({ id: 'public:2', name: 'Room 2', room });
   assert.equal(summary.spectators, 2);
   assert.equal(summary.format, 'build-battle');
