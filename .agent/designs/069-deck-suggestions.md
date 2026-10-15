@@ -1,280 +1,245 @@
 # 069: Deck suggestions tab (tournament data from Limitless)
-Status: draft — user calls folded in 2026-10-15; awaiting approval of the steering design
+Status: approved (user — "set the plan as approved, one shot it", 2026-10-15) · building
 Date: 2026-10-15 · Session: cloud, branch claude/jolly-edison-bm3xkm
 
 ## Problem
-The Standard deck builder only finds cards you already know to search for. Players building a
-meta deck (or brewing around one Pokémon) want to see what strong players actually run next to
-their cards: the missing staples, normal counts, common techs, and odd picks worth cutting.
-Limitless TCG publishes every Regional, International, Special Event and Worlds decklist, so the
-data exists. Nothing in the repo reads it yet.
+User brief, verbatim:
+> Draft a plan for a deck suggestions tab in the deckbuilder, which suggests cards for your deck
+> based off of information from limitlesstcg decks. Maybe scrape all the decklists from limitless for
+> regionals and championships and feed it data to decide? This is very vague, so walk me through it.
+
+> adult division only, standard only, current rotation for now
+> importing whole lists would be good
+> I want to make the suggestor actually adapt to your implementations and suggestions thoough
+(Clarified via question: "Steer per deck".)
+
+> Also add the other feature, the one where you could pick whats needed, such as faster setup. once
+> youre done, set the plan as approved, one shot it, run a hostile review, then fix what the hostile
+> review finds.
+("The other feature" = the "Suggest around a goal" option offered in the question: "You say what
+you're going for (e.g. 'faster setup', 'answer to Dragapult', 'cheaper'), and suggestions are
+filtered and re-ranked for it, using the card corpus and price or matchup data.")
+
+The Standard deck builder only finds cards you already know to search for. This adds a Suggest tab
+fed by every Masters decklist from Standard official events in the current rotation.
+
+## Acceptance
+| # | Criterion (the brief's words) | Evidence |
+|---|---|---|
+| A1 | Suggest tab in the deck builder suggesting cards from Limitless decklists | |
+| A2 | Data = scraped decklists from Limitless regionals and championships | |
+| A3 | Adult (Masters) division only, Standard only, current rotation | |
+| A4 | Importing whole lists | |
+| A5 | Suggestor adapts to your choices, per deck (accept / dismiss / lock reshape suggestions) | |
+| A6 | Pick what's needed, e.g. "faster setup", and get suggestions for it | |
+| A7 | Goal "cheaper" (budget) | |
+| A8 | Goal "answer to <deck>" (matchup data) | |
+| A9 | Hostile review run and its findings fixed | |
+
+## Assumptions
+- (assumed) "Regionals and championships" = every Standard event on limitlesstcg.com/tournaments
+  (Regionals, Special Events, Internationals, Worlds, and the official Premier Ball / Korean leagues
+  it lists); placement weights keep small events from dominating. Japanese-format events
+  (`standard-jp`) are excluded: different card pool timing.
+- (assumed) "Current rotation" = events whose Limitless format label starts with the same set as the
+  newest event's label ("Temporal Forces - …" since Regional Prague, 25 Apr 2026). Auto-detected at
+  bake, so the next rotation needs no code change.
+- (assumed) Refresh is manual (`pnpm meta:refresh`); Limitless Play online events are not used.
+- (assumed) Goals in v1: Faster setup, More draw, Disruption, Energy acceleration, Recovery &
+  healing, Switching, Budget. Card goal tags come from regex rules over TCGdex card text at bake.
+- (assumed) Removing a card you accepted from Suggest counts as a dismiss (restorable).
+- (assumed) "Start from this list" builds the list from each card's most-played print, not the
+  player's exact prints (same card, different art is functionally identical).
 
 ## Constraints
-- No build step, native ESM in the browser, no bundler (PROJECT.md). Small, private scale: pick
-  the simple mechanism (PROJECT.md).
-- Pure logic in `core/`, DOM in `sidebox/native-deck-builder-*.js` (D96). Pure modules get
-  `node --test` coverage with stub cards, no jsdom (PROJECT.md).
-- The builder runs in its own tab; deck writes go through `gameLink` and the library rules of
-  D183. A new tab is a panel controller like the Browse Sets panel. It does not touch the game tab.
-- Card identity: the builder's deck is `{ [name]: { cards: [{ data, count }], totalCount } }` with
-  TCGdex records as `data` (core/deck-state.mjs). The 4-copy rule groups by `officialCardName` (D64).
-- Card text and set mappings are looked up, never recalled (CLAUDE.md directive 7). Limitless set
-  codes map to TCGdex through `resolveTcgdexSetId` / `buildSetCardIdCandidates`
-  (shared/engine/rules/legacy-set-ids.mjs). That table already holds MEE and 30C, which the smaller
-  `SET_MAP` in scripts/lib/decklist-lines.mjs lacks.
-- Being a polite client of Limitless: robots.txt is `Disallow:` (nothing blocked, read
-  2026-10-15). The legal notice says nothing about scraping. Their public API
-  (docs.limitlesstcg.com/developer.html) covers only online Limitless Play events, not
-  Regionals. We fetch rarely and slowly, cache the raw pages, never hotlink their images, and
-  credit "Tournament data: Limitless TCG" in the tab.
+- No build step, native ESM in the browser (PROJECT.md). Small, private scale: the simple mechanism.
+- Pure logic in `core/`, DOM in `sidebox/native-deck-builder-*.js` (D96). Pure tests run under
+  `node --test` with stub cards, no jsdom.
+- Builder runs in its own tab; the game tab never writes deck cards (D183). Library writes re-read
+  storage first (`setActiveField` / `commit` in native-deck-builder-library.js).
+- Deck shape `{ [name]: { cards: [{ data, count }], totalCount } }`; `data` is a
+  `normalizeTcgdexCard` record (id, name, supertype, abilities = names only, **no attacks**).
+- Card text is looked up, never recalled (directive 7): goal tags come from TCGdex text at bake;
+  tag tests cite `out/pkmn-*-cards.json` rows.
+- Polite client of Limitless: robots.txt `Disallow:` (empty), legal notice silent on scraping, public
+  API covers only Limitless Play. Sequential fetches 2 s apart, identifying UA, parsed results cached
+  per event (raw HTML never kept), no image hotlinking, credit line in the tab.
 
 ## Current state (read this session)
-- `client/src/setup/deck-builder/core/deck-state.mjs`: deck shape and `addCard`/`removeCard`.
-- `client/src/setup/deck-builder/core/deck-validation.mjs:82`: `officialCardName(card)`.
-- `client/src/initialization/document-event-listeners/sidebox/native-deck-builder.js`:
-  `switchMode(mode)` (~line 537) toggles the Search, Browse and Customize tabs and panels. The
-  Browse Sets controller `initializeNativeDeckBuilderSetBrowser({ panelEl, getQuantities,
-  getOwned, onAddCard, onPreviewCard })` is the pattern to copy (`onAddCard` calls `addCard`,
-  sets `deckDirty`, then `render()`).
-- `client/index.ejs:257-266`: the mode-tab buttons (`nativeDeckBuilderTabSearch` … `TabCustomize`).
-- `client/src/setup/deck-builder/core/tcgdex-cache.mjs`: IndexedDB cache for TCGdex records (D102).
-- `scripts/lib/decklist-lines.mjs`: bake-time TCGdex fetch and `normalizeCard` for decklist lines
-  (used by the starter-deck and B&B generators). It throws on name drift.
-- Limitless HTML, probed 2026-10-15:
-  - `/tournaments?time=2526&show=100` has one `<tr>` per event (date, name, players, winner) and
-    a `data-format` attribute (`standard` | `standard-jp` | `expanded-jp`). The 2025-26 season has
-    53 events: 26 Regionals, 7 Special Events, 5 Champions League, NAIC/EUIC/LAIC/OCIC and Worlds.
-  - `/tournaments/<id>` holds the standings. Each row links `/players/<n>`, the archetype
-    `/decks/<archetypeId>[?variant=n]` and the list `/decks/list/<listId>`.
-  - `/tournaments/<id>/decklists` holds all lists on one page (Louisville: 21 MB, 547 lists,
-    14 003 card rows). Each list opens with `<div class="decklist-toggle" data-target="decklist-N">1st
-    Riley McKay</div>`, and each card is
-    `<div class="decklist-card" data-set="TWM" data-number="130">…card-count">3<…card-name">Dragapult ex<`.
-    Basic Energy shows up as `MEE <n>` rows. So each event costs two requests.
-
-## Walk-through (the idea in plain words)
-1. **Collect.** A script downloads the standings and decklists pages for each official Standard
-   event in the window, about 2 requests per event. The raw HTML is cached locally (gitignored).
-2. **Normalize.** Each card line (`TWM 130 Dragapult ex`) resolves to a TCGdex print, then to a
-   *functional key*, so reprints and alt arts of the same card count as one card.
-3. **Bake.** One compact JSON file goes into the repo (about 1 MB for a rotation), the way starter
-   decks and B&B boxes are baked today. The app never calls Limitless at runtime.
-4. **Match.** When you open the Suggest tab, the browser finds the tournament lists that contain
-   the most of your deck (nearest neighbours), weighting better placings and more recent events
-   more heavily.
-5. **Explain.** Across those neighbours it counts how often each card appears, and how many
-   copies, then sorts the results into buckets: *missing staples*, *count tweaks*, *tech options*
-   and *unusual picks*. Each row carries its evidence ("in 92% of 214 similar lists, usually 4").
-   An empty deck shows the meta instead: top archetypes by share, with one-click "start from this list".
-6. **Steer.** You answer the suggestions, and the suggestor adapts to that deck. Adding a
-   suggestion marks it *accepted*, Dismiss hides it, and locking a deck card marks it as a card
-   you're keeping. Locked and accepted cards count more when choosing similar lists. Dismissed
-   cards stop appearing and quietly down-weight the lists built around them, so their partner
-   cards fade too. All of this is saved with the deck.
+- `core/deck-state.mjs` `addCard/removeCard`; `core/deck-validation.mjs:82` `officialCardName`.
+- `core/card-search.mjs:214` `normalizeTcgdexCard`, `:372` `fetchCardDetail(id)` → normalized record.
+- `core/deck-text-import.mjs`: `basicEnergyLabel(name)`, `resolveEntry`, `importDeckEntries(entries,
+  { deck, addCard, deps, onProgress, concurrency })` (Import List popup).
+- `core/deck-library.mjs`: per-deck fields (`sprites`, `wallpaperId`, `format`) normalized by
+  `parseLibrary`/`listDecks`, set via `setDeck<Field>`; `saveDeckSnapshot` takes cosmetics.
+- `sidebox/native-deck-builder-library.js`: `setActiveField(target, value, setField)`, getters
+  `getActive<Field>`, `saveCurrentDeck(cards, cosmetics)`.
+- `sidebox/native-deck-builder.js:537` `switchMode`; Browse Sets controller contract
+  `initializeNativeDeckBuilderSetBrowser({ panelEl, getQuantities, getOwned, onAddCard, onPreviewCard })`.
+- `client/index.ejs:257-267` mode tabs; `#nativeDeckBuilderSetBrowserPanel` panel.
+- `scripts/lib/decklist-lines.mjs`: `fetchCard(id)` with `TCGDEX_CACHE_DIR` disk cache.
+- `shared/engine/rules/legacy-set-ids.mjs`: `buildSetCardIdCandidates(setCode, number)` (knows MEE, 30C).
+- Limitless HTML (probed 2026-10-15): `/tournaments` and `/tournaments?time=2526&show=100` → `<tr
+  data-format="standard">` rows linking `/tournaments/<id>`; event page → "N Players • <Format label>"
+  and standings rows (placing, `/players/n`, `/decks/<archetypeId>`, `/decks/list/<listId>`);
+  `/tournaments/<id>/decklists` → every Masters list, `decklist-toggle … data-target="decklist-N">1st
+  Riley McKay<`, cards `decklist-card data-set data-number` + `card-count` + `card-name` + `card-price usd`.
+  Labs (labs.limitlesstcg.com) has archetype-level matchups only; per-card matchup data needs every
+  player's round page (~550 requests per event).
 
 ## Options
-1. **Data source.**
-   A) Scrape limitlesstcg.com official events: exactly what was asked (Regionals and above). It
-      means HTML parsing, which can break when their markup changes.
-   B) Limitless Play API: JSON, no key, but only online grassroots events. Higher volume, weaker
-      signal, and not what was asked.
-   C) Both.
-   **Pick A**, keeping B as a possible later addition behind the same dataset schema. HTML drift
-   fails loudly at bake time (parser tests run on fixtures, and the bake refuses a page that
-   yields 0 lists). It never breaks the app.
-2. **Where the data lives.**
-   A) Baked JSON committed to the repo, refreshed by running a script: no runtime dependency,
-      works offline, matches the starter-deck and B&B pattern (D186). Data goes stale until someone
-      reruns it.
-   B) The server scrapes on a schedule and stores results in SQLite: always fresh, but adds a cron,
-      a failure mode on Render's ephemeral disk, and load on Limitless from every deploy.
-   C) The client scrapes in the browser: blocked by CORS and impolite.
-   **Pick A.** A refresh is one command, and a weekly GitHub Action that opens a PR can come later
-   (open question 3).
-3. **How suggestions are computed.**
-   A) Archetype-first: classify the deck into a Limitless archetype, then report that
-      archetype's card rates. Easy to explain, but Limitless's archetype rules are behind an API
-      key, and hybrid or rogue decks fit badly.
-   B) Nearest-neighbour lists: score every list by how much of *your* deck it contains, keep the top
-      K, and aggregate card rates over them. Handles partial decks ("4 Dreepy" already finds
-      Dragapult lists), variants and hybrids, needs no training, and stays explainable.
-   C) A trained model (embeddings or association rules): opaque, needs tuning infrastructure, and
-      gives no real gain at about 10k lists.
-   **Pick B.** We still record each list's Limitless archetype id, which supplies the "Looks like:
-   Dragapult" label and the empty-deck meta view.
-4. **Card identity across prints.**
-   A) Exact print (set+number): splits Iono PAL from Iono PAF, so counts come out wrong.
-   B) Name only: merges different Pokémon that share a name (e.g. two "Pikachu ex" with different attacks).
-   C) Functional key: Trainers and Energy use `officialCardName` (the D64 rule). Pokémon use name plus
-      sorted attack names plus sorted ability names from the TCGdex record.
-   **Pick C.** The key comes from one pure function shared by the bake script and the client.
-5. **Which lists count, and how much.**
-   Masters division only (the strongest signal). Standard format only (`data-format="standard"`;
-   Japanese events run a different card pool). The window is events since the current rotation
-   date, set in the script config. Placement weight: 1st-8th 1.0, 9-16 0.85, 17-32 0.7, 33-64 0.55,
-   65+ 0.4. Recency weight: `0.5 ** (ageDays / 28)`, with age measured from the newest event in the
-   dataset (so a stale file doesn't distort anything).
-6. **What "adapt to the user" means** (user call 2026-10-15: per-deck steering only).
-   A) Per-deck steering: accept, dismiss and lock signals reshape that deck's neighbour set.
-   B) Taste learned across decks: a browser-wide accept/dismiss history re-ranks everything.
-   C) Learning from games played here: needs a game log the server deliberately doesn't keep (PROJECT.md).
-   **Pick A** (user). B and C are out of scope. B could be added later on top of the same signals.
-7. **Where steering state lives.**
-   A) On the deck library record (`suggestPrefs`), normalized by `parseLibrary`, the same way as
-      `sprites` and `wallpaperId`: it travels with the deck and its save path already exists.
-   B) A separate localStorage key indexed by deck id: no library change, but it orphans when a
-      deck is deleted and an unsaved draft has no id to index by.
-   **Pick A.** An unsaved draft keeps its prefs in memory, and `saveDeckSnapshot` writes them.
-8. **How signals enter the maths.**
-   A) Weight the similarity: per-key weights in containment, plus a per-list penalty for every
-      dismissed card it plays. Explainable, and one place to tune.
-   B) Post-filter only: hide dismissed rows and pin locked ones. Simple, but the neighbour set
-      never changes, so the suggestor doesn't actually adapt (rejected against the user's ask).
-   **Pick A**, with B's hiding applied on top.
+1. **Data source.** A) limitlesstcg.com official events (HTML) · B) Limitless Play API (online only) ·
+   C) both. **Pick A** — what was asked; drift fails loudly at bake (0 rows → throw), never in the app.
+2. **Where data lives.** A) baked JSON committed, manual refresh (D186 pattern) · B) server cron +
+   SQLite (ephemeral disk on Render, load per deploy) · C) browser scraping (CORS). **Pick A.**
+3. **Suggestion maths.** A) archetype rates (rules behind an API key, rogue decks fit badly) ·
+   B) nearest-neighbour lists by containment · C) trained model (opaque, no gain at ~5k lists).
+   **Pick B**; the archetype id still labels "Looks like …" and drives the meta view.
+4. **Card identity.** A) exact print · B) name only · C) functional key: Trainer/Energy
+   `t:<officialCardName lc>`, Pokémon `p:<name lc>|<attack names sorted>|<ability names sorted>`.
+   **Pick C**, computed at bake (needs attacks). The client resolves a deck card to a dataset card by
+   TCGdex id (`printIndex`), else by name (single match; several → the one whose `abilities` equal
+   the deck card's, else the most-played), else a synthetic `x:<name lc>` that matches no list.
+5. **Which lists, how much.** Masters standings only; placement weight 1–8 1.0, 9–16 0.85, 17–32
+   0.7, 33–64 0.55, 65+ 0.4; recency `0.5 ** (ageDays / 28)` from the newest event in the dataset.
+6. **Adapting to the user** (user: per-deck steering). A) per-deck steering · B) cross-deck taste ·
+   C) game-result learning (no game log by design). **Pick A.**
+7. **Steering storage.** A) `suggestPrefs` on the library record · B) separate localStorage key
+   (orphans, drafts have no id). **Pick A**; drafts hold prefs in memory, Save writes them.
+8. **Signals in the maths.** A) weighted containment + dismiss penalty · B) post-filter only (no real
+   adaptation). **Pick A**, with hiding on top.
+9. **Goal tagging.** A) regex rules over TCGdex text at bake, stored as `tags` per card · B) client
+   regex at runtime (needs full text the deck records lack) · C) hand-curated lists (stale, recall).
+   **Pick A.**
+10. **Goal ranking.** A) separate "For <goal>" section per active goal: tagged candidates ranked by
+    0.7·neighbour inclusion + 0.3·meta-wide inclusion · B) re-weight neighbours toward goal-heavy lists
+    (subtle, hard to explain). **Pick A**, plus goal badges on rows in the other sections.
+11. **"Answer to <deck>" goal.** A) scrape Labs per-player rounds (~550 requests/event; Labs flags its
+    standings as possibly wrong) · B) archetype-level matchups (names decks, not cards) · C) cut from
+    v1. **Pick C** — honest ✗ on A8 + ISSUES line; revisit if Limitless offers matchup data in bulk.
 
 ## Design
 ### Files
-- `scripts/limitless/parse-limitless.mjs`: pure parsers (HTML string to rows).
-- `scripts/limitless/fetch-limitless.mjs`: polite fetcher. Sequential, 2 s between requests, UA
-  `ptcg-sim-deck-suggest (+https://github.com/Ar1ssi/vibecodepokemontcg2)`, cache in
-  `.cache/limitless/<eventId>/{standings,decklists}.html` (gitignored), and `--refresh` refetches
-  only events newer than the newest cached one.
-- `scripts/limitless/build-meta-dataset.mjs`: joins standings and lists, resolves cards through
-  TCGdex (reusing `decklist-lines.mjs` fetch and cache), computes keys and writes the dataset.
-  `pnpm meta:refresh` runs fetch then build.
-- `client/src/assets/meta/limitless-standard.json`: the baked dataset (committed).
-- `client/src/setup/deck-builder/core/deck-suggest/card-key.mjs`: `cardKeyOf`.
-- `client/src/setup/deck-builder/core/deck-suggest/suggest.mjs`: the pure engine.
-- `client/src/setup/deck-builder/core/deck-suggest/dataset.mjs`: `loadMetaDataset()` (fetch and
-  validate, memoized).
-- `client/src/initialization/document-event-listeners/sidebox/native-deck-builder-suggest.js`: DOM panel.
-- `client/src/css/deck-builder-suggest.css`, scoped under `.db-live` (D95).
-- `client/index.ejs`: a `Suggest` mode tab and its panel (Standard builder only. B&B is pool-bound, so it gets no tab).
+- `scripts/limitless/parse-limitless.mjs` — pure parsers.
+- `scripts/limitless/card-key.mjs` — `cardKeyOf(tcgdexCard)`, `kindOf(tcgdexCard)`.
+- `scripts/limitless/card-tags.mjs` — `GOAL_RULES`, `tagsForText(text)`, `cardText(tcgdexCard)`.
+- `scripts/limitless/build-meta-dataset.mjs` — CLI: fetch (or read cache) → join → resolve → write.
+  `pnpm meta:refresh`. Cache: `.cache/limitless/events/<id>.json` (parsed event), TCGdex via
+  `TCGDEX_CACHE_DIR=.cache/tcgdex`.
+- `client/src/assets/meta/limitless-standard.json` — dataset (committed).
+- `client/src/setup/deck-builder/core/deck-suggest/goals.mjs` — `GOALS` (ids, labels), `BUDGET_MAX_USD = 1`.
+- `.../deck-suggest/dataset.mjs` — `validateDataset(json)`, `indexDataset(dataset)`, `loadMetaDataset(fetchJson)`.
+- `.../deck-suggest/suggest.mjs` — engine.
+- `.../deck-suggest/prefs.mjs` — steering transitions.
+- `.../deck-suggest/resolve.mjs` — `resolveDatasetCard(card, deps)`, `listToEntries(list, index)`.
+- `core/deck-library.mjs` — `suggestPrefs` field.
+- `core/deck-text-import.mjs` — `importDeckEntries` gains an optional `resolve` dep (default `resolveEntry`).
+- `sidebox/native-deck-builder-suggest.js` — DOM controller; `css/deck-builder-suggest.css`.
+- `sidebox/native-deck-builder-library.js`, `sidebox/native-deck-builder.js`, `client/index.ejs` — wiring.
 
 ### Dataset schema v1
 ```
 { version: 1, generatedAt: ISO, source: "limitlesstcg.com", format: "standard",
-  window: { from: "YYYY-MM-DD", to: "YYYY-MM-DD" },
-  events:     [ { id: 581, name: "Regional Louisville, KY", date: "2026-10-10", players: 2927 } ],
-  archetypes: [ { id: 284, name: "Dragapult" } ],
-  cards:      [ { key, name, kind: "pokemon"|"trainer"|"energy", print: "sv06-130" } ],
-  lists:      [ { e: eventIdx, p: placing, a: archetypeIdx|-1, c: [[cardIdx, count], ...] } ] }
+  rotation: "Temporal Forces", window: { from: "YYYY-MM-DD", to: "YYYY-MM-DD" },
+  events:     [ { id, name, date: "YYYY-MM-DD", players } ],
+  archetypes: [ { id, name } ],
+  cards:      [ { key, name, kind: "pokemon"|"trainer"|"energy", print: "<tcgdex id>",
+                  set: "<limitless code>", number: "<n>", abilities: [names], tags: [goalId], price: number|null } ],
+  printIndex: { "<tcgdex id>": cardIdx },
+  lists:      [ { e: eventIdx, p: placing, a: archetypeIdx|-1, c: [cardIdx, count, cardIdx, count, ...] } ] }
 ```
-`print` is the most-played TCGdex id for that key inside the window. It is the print the Add
-button fetches.
+`print` = most-played print of the key; `price` = cheapest per-print median USD seen; `tags` ⊆ goal ids
+except `budget`.
 
-### Engine API (pure)
-- `cardKeyOf(card) → string`. Trainer or Energy: `t:<officialCardName lowercased>`. Pokémon:
-  `p:<name lc>|<attack names sorted, joined by ;>|<ability names sorted>`.
-- `deckToKeyCounts(deck) → Map<key, count>`, which sums prints that share a key.
-- `findNeighbors(keyCounts, dataset, { k = 50, minSimilarity = 0.5, prefs = EMPTY_PREFS }) → [{ list, similarity, weight }]`.
-  Similarity = weighted containment = Σ α_k·min(you_k, list_k) / Σ α_k·you_k, where α_k = 2 for a
-  locked key, 1.5 for an accepted key, and 1 otherwise. Weight = similarity² × placementWeight ×
-  recencyWeight × 0.6^(number of dismissed keys the list plays). If fewer than 10 lists reach
-  `minSimilarity`, take the 10 best anyway and set `confidence: 'low'`.
-- `suggestCards(deck, dataset, { prefs }) → { confidence: 'high'|'low'|'none', archetype: { name, share } | null,
-  neighbors: n, missingCore: Item[], countTweaks: Item[], techs: Item[], cuts: Item[] }`, where
-  `Item = { key, name, print, inclusion, typicalCount, yourCount }`.
-  - inclusion = Σ w·[list has key] / Σ w. typicalCount = the weighted median count among lists that run the key.
-  - missingCore: inclusion ≥ 0.75 and yourCount = 0. countTweaks: inclusion ≥ 0.75, yourCount > 0,
-    |typicalCount − yourCount| ≥ 1. techs: 0.2 ≤ inclusion < 0.75 and yourCount = 0.
-    cuts: yourCount > 0 and inclusion < 0.1.
-  - Each bucket is sorted by inclusion (descending), then name. Empty deck → `confidence: 'none'`
-    and empty buckets.
-  - Steering filters: dismissed keys appear in no add bucket (missingCore, countTweaks, techs).
-    Locked keys never appear in cuts. A locked key with a different typical count still shows in
-    countTweaks, marked `locked: true`, so the count advice stays visible.
+### Engine (pure)
+- `indexDataset(ds)` → `{ ds, byName: Map<name lc, idx[]>, listCounts: Map<idx,count>[], listWeights: number[], globalInclusion: Float64Array }`;
+  listWeights = placement × recency; globalInclusion[i] = Σ w·[list has i] / Σ w.
+- `deckToCounts(deck, index) → { counts: Map<idx|'x:name', n>, unresolved: string[] }` (rules in Option 4).
+- `findNeighbors(counts, index, { prefs, k = 50, minSimilarity = 0.5, minNeighbors = 10 })` →
+  `{ neighbors: [{ listIdx, similarity, weight }], confidence }`. Containment with α (locked 2,
+  accepted 1.5, else 1); weight = similarity² × listWeight × 0.6^(dismissed keys in list). Lists sorted
+  by weight-free similarity desc, ties by listWeight desc. Empty deck → `confidence: 'none'`, `[]`.
+  Fewer than `minNeighbors` at ≥ min → best `minNeighbors` by similarity, `confidence: 'low'`.
+- `suggestCards(deck, index, { prefs }) → { confidence, archetype: { name, share }|null, neighbors: n,
+  bestSimilarity, missingCore, countTweaks, techs, cuts, goals: { [goalId]: Item[] }, deckPrice }`.
+  `Item = { idx, key, name, print, kind, inclusion, typicalCount, yourCount, price, tags, locked? }`.
+  inclusion = Σ w·[has] / Σ w over neighbours; typicalCount = weighted median of counts where present.
+  Buckets as before (missingCore ≥ 0.75 & you 0; countTweaks ≥ 0.75 & you > 0 & |Δ| ≥ 1; techs
+  0.2–0.75 & you 0; cuts you > 0 & < 0.1 & not locked; unresolved deck cards are cuts candidates with
+  inclusion 0). Dismissed never in add buckets or goals. Sort: inclusion desc, name asc.
+  Goals (for each id in `prefs.goals`): tag goals → cards tagged id, you 0, not dismissed, globalInclusion
+  ≥ 0.005 or inclusion > 0; score 0.7·inclusion + 0.3·globalInclusion; top 12. Budget → price ≤
+  `BUDGET_MAX_USD`, inclusion ≥ 0.1, you 0, not dismissed, sorted inclusion desc, top 12.
+  `deckPrice` = Σ count × price over resolved cards with a price (null when none).
+  archetype = the archetype with the highest neighbour weight share.
+- `metaOverview(index) → [{ archetype, share, lists, bestListIdx }]` — weighted share, desc; top 12.
 
 ### Steering state (per deck)
-- `prefs = { locked: key[], accepted: key[], dismissed: key[] }`. `EMPTY_PREFS` has three empty
-  arrays. A key is in at most one of the three lists, and the latest action wins.
-- Pure transitions in `core/deck-suggest/prefs.mjs`: `normalizeSuggestPrefs(raw)` (drops
-  non-strings, duplicates and cross-list overlaps; caps each list at 200; anything invalid becomes
-  `EMPTY_PREFS`), `acceptKey`, `dismissKey`, `lockKey`, `unlockKey`, `restoreKey`, and
-  `prunePrefs(prefs, keyCounts)`.
-- `prunePrefs` runs when the deck changes. A locked or accepted key no longer in the deck is
-  dropped. **An accepted key that you remove moves to dismissed**: you tried it and took it out,
-  which is a signal. Dismissed keys are never pruned.
-- Storage: `deck-library.mjs` gains `suggestPrefs` on records. `parseLibrary` and `listDecks` run
-  `normalizeSuggestPrefs`, so older records read as empty. New `setDeckSuggestPrefs(library,
-  deckId, prefs)`, and `saveDeckSnapshot` accepts `suggestPrefs`. Only the builder tab writes it
-  (D183). Like every library write, the write re-reads storage first.
-- "Start from this list" resets the prefs to `EMPTY_PREFS`, since it is a new deck.
-- `metaOverview(dataset) → [{ archetype, share, lists, bestList }]`: weighted share per archetype.
-  `bestList` is the highest-weight list, which feeds "Start from this list".
+`prefs = { locked: key[], accepted: key[], dismissed: key[], goals: goalId[] }`; keys are dataset
+`key`s (or `x:` keys for locks). A key lives in at most one of locked/accepted/dismissed (latest wins).
+`prefs.mjs`: `EMPTY_PREFS`, `normalizeSuggestPrefs(raw)` (non-arrays → [], non-strings and duplicates
+dropped, cross-list overlap resolved locked > accepted > dismissed, unknown goals dropped, each list
+capped at 200), `acceptKey`, `dismissKey`, `lockKey`, `unlockKey`, `restoreKey`, `toggleGoal`,
+`prunePrefs(prefs, presentKeys)` (locked/accepted not present dropped; accepted not present →
+dismissed). Library: `suggestPrefs` on records, normalized in `parseLibrary`/`listDecks`/
+`getDeckSuggestPrefs`; `setDeckSuggestPrefs(library, deckId, prefs)`; `saveDeckSnapshot` takes
+`suggestPrefs`. Import of a list → `EMPTY_PREFS` (goals kept).
 
-### UI (Suggest tab)
-Header: "Looks like **Dragapult** · 214 similar lists · Regionals Aug 2026 – Oct 2026", with a
-low-confidence banner when one applies. There are four collapsible sections of card tiles, each
-showing its evidence line, an **Add** button and a **Dismiss** button. Add goes through the same
-`onAddCard` path as Browse Sets (the TCGdex record for `print` comes through tcgdex-cache) and
-marks the key accepted. Cut rows get **Cut** (`onRemoveCard`) and **Keep** (lock). A "Your core"
-strip lists the deck's cards with a lock toggle each. A "Dismissed (n)" fold at the bottom
-restores any of them. A one-line "Steering: 3 locked · 2 accepted · 4 dismissed · Reset" control
-undoes everything. An empty
-deck shows the meta overview. "Start from this list" replaces the open deck only after a confirm,
-and only when the deck is empty or the user accepts. Footer: "Tournament data: Limitless TCG ·
-updated <generatedAt>". Results recompute on every deck change (debounced 150 ms; a 10k-list
-scan is a few ms).
-
-## User calls (2026-10-15)
-1. Events: **Masters only, Standard only, current rotation**.
-2. "Start from this list" (import an entire tournament list): **in v1**.
-3. Refresh: not answered → default, manual `pnpm meta:refresh`.
-4. Limitless Play online events: not answered → default, not in v1.
-5. Adapt to the user: **per-deck steering** (Options 6–8). Cross-deck taste and game-result learning are out of scope.
+### UI (Suggest tab; not in Build & Battle)
+Tab `#nativeDeckBuilderTabSuggest` after Browse Sets; panel `#nativeDeckBuilderSuggestPanel`.
+Lazy-loads the dataset on first open ("Loading tournament data…"; failure → "Suggestions unavailable:
+<reason>"). Top: goal chips (toggle, persisted in prefs). Header "Looks like **<archetype>** · N similar
+lists · <window>" + low-confidence banner. Sections: For <goal> (one per active goal), Missing staples,
+Count tweaks, Tech options, Unusual picks, each row: name, evidence ("in 92% of similar lists · usually
+4"), goal badges, price when Budget is on, buttons Add/Dismiss (cuts: Cut/Keep). "Your core" strip:
+deck keys with lock toggles. "Dismissed (n)" fold with Restore. "Steering: … · Reset". Empty deck →
+meta overview with "Start from this list" (confirm when the deck is non-empty) → `importDeckEntries`
+with the dataset resolver. Footer credit + `generatedAt`. Recompute debounced 150 ms on deck/prefs change.
 
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | Empty deck | `confidence: 'none'`; the tab shows the meta overview | [ ] |
-| 2 | Malformed or changed Limitless HTML | A parser yields 0 rows → the bake throws with the event id and URL; no dataset is written | [ ] |
-| 3 | Card line whose set code TCGdex can't resolve | The bake throws, listing every unresolved `SET NUM name` (like decklist-lines name drift) | [ ] |
-| 4 | Deck of only Basic Energy | Containment matches nearly everything → `confidence: 'low'` banner; still no crash | [ ] |
-| 5 | Rogue deck (<10 lists ≥ 0.5) | Top 10 used, low-confidence banner shows the best similarity % | [ ] |
-| 6 | Dataset fetch fails, or the JSON is invalid / the wrong version | Panel shows "Suggestions unavailable" plus the reason; the builder keeps working | [ ] |
-| 7 | Add would break the 4-copy / ACE SPEC rule | Uses the existing `addCard` path; the deck counter and validation show it, as with Search | [ ] |
-| 8 | Same card, different prints in the deck | Counted once via `cardKeyOf` | [ ] |
-| 9 | List placing missing (unranked) | Placement weight 0.4 | [ ] |
-| 10 | Rapid deck edits | Debounced recompute; the last result wins | [ ] |
-| 11 | Event in window with lists not yet published | Standings without a decklists page → event skipped with a warning, not a failure | [ ] |
-| 12 | Builder opened in B&B mode | No Suggest tab rendered | [ ] |
-| 13 | Old library record without `suggestPrefs`, or a corrupt value | Reads as `EMPTY_PREFS`; deck loads unchanged | [ ] |
-| 14 | Same key dismissed, then accepted | Latest action wins; the key is in exactly one list | [ ] |
-| 15 | Accepted card removed from the deck | Key moves to dismissed; restorable from "Dismissed (n)" | [ ] |
-| 16 | Every candidate dismissed | Buckets empty; panel says "Nothing left to suggest — restore dismissed cards or reset steering" | [ ] |
-| 17 | Locked card that tournament lists never play | Never offered as a cut; similarity still counts it (lowers containment honestly) | [ ] |
-| 18 | Builder open in two tabs, both steering one deck | The library write re-reads storage first; the last write wins per record, as for other deck fields | [ ] |
-| 19 | Unsaved draft deck steered, then saved | `saveDeckSnapshot` writes the in-memory prefs | [ ] |
+| 1 | Empty deck | `confidence: 'none'`; meta overview shown | [ ] |
+| 2 | Limitless markup changed | parser yields 0 rows → bake throws naming event id + URL | [ ] |
+| 3 | Card line TCGdex can't resolve | bake throws listing every unresolved `SET NUM name` | [ ] |
+| 4 | Deck of only Basic Energy | low confidence banner, no crash | [ ] |
+| 5 | Rogue deck | top 10 used, `confidence: 'low'`, best similarity % shown | [ ] |
+| 6 | Dataset fetch fails / invalid / wrong version | "Suggestions unavailable: <reason>", builder unaffected | [ ] |
+| 7 | Add breaks 4-copy / ACE SPEC | normal `addCard` path; counter/validation show it | [ ] |
+| 8 | Same card, different prints in deck | one dataset card via printIndex/name | [ ] |
+| 9 | Deck card not in dataset at all | `x:` key; lowers containment; listed as a cut candidate | [ ] |
+| 10 | Rapid deck edits | debounced; last result wins | [ ] |
+| 11 | Event with standings but no lists yet | skipped with a warning | [ ] |
+| 12 | Build & Battle mode | no Suggest tab | [ ] |
+| 13 | Old record / corrupt `suggestPrefs` | normalizes to `EMPTY_PREFS` | [ ] |
+| 14 | Dismiss then accept same key | latest wins, one list | [ ] |
+| 15 | Accepted card removed | moves to dismissed | [ ] |
+| 16 | Everything dismissed | "Nothing left to suggest — restore dismissed cards or reset steering" | [ ] |
+| 17 | Locked card never in lists | never a cut; containment counts it | [ ] |
+| 18 | Two builder tabs steering one deck | write re-reads storage first; last write wins | [ ] |
+| 19 | Unsaved draft steered then saved | Save writes the in-memory prefs | [ ] |
+| 20 | Goal with no tagged candidates | "No picks for <goal> in lists like yours" | [ ] |
+| 21 | Budget with no price data | Budget rows skip null prices; deck price hidden | [ ] |
+| 22 | Standings row whose list is missing on the decklists page (or vice versa) | dropped with a count in the bake log | [ ] |
+| 23 | Import list while a card fails to resolve | imported anyway; failures listed like Import List | [ ] |
 
 ## Test plan
-- Parsers: trimmed fixture HTML (one event row, three standings rows, two decklists) → exact rows.
-- card-key: Iono PAL vs Iono PAF → same key. Two Pokémon that share a name but have different
-  attacks → different keys. The fixture card records come from the TCGdex ids named in the test.
-- suggest: a hand-built 6-list fixture dataset. Assert neighbours, inclusion, weighted median,
-  each bucket's contents, and the low-confidence path.
-- prefs: each transition, `normalizeSuggestPrefs` on garbage, and `prunePrefs` moving a removed
-  accepted key to dismissed.
-- Steering in the 6-list fixture: locking a key that only lists A and B play makes A and B the
-  heaviest neighbours. Dismissing a key ×0.6s every list that plays it, and a partner card that
-  appears only in those lists drops out of techs.
-- deck-library: a record round-trips with `suggestPrefs`, and an old record parses to `EMPTY_PREFS`.
-- Manual: open /deck-builder, add 4 Dreepy, and check that the tab shows Dragapult staples.
-  Dismiss one tech and watch its partner cards fade. Lock a card and confirm it never shows under cuts.
+Parsers on trimmed fixture HTML; card-key + card-tags on corpus texts (cited); dataset validate/index;
+engine on a hand-built fixture dataset (neighbours, buckets, goals, budget, steering); prefs
+transitions; deck-library round-trip; resolve. Manual (user, localhost): the tab, goal chips, steering.
 
 ## Migration / rollout
-New files and one new tab, with no schema change to stored decks. Revert = delete the tab markup
-and the files above. The dataset is a static asset. Licence and courtesy: the footer credit, no
-image hotlinking, and a refresh at most weekly.
+New files + one tab; `suggestPrefs` is additive and optional (old records read as empty). Revert:
+remove the tab markup, the files above and the `suggestPrefs` plumbing (records keep an ignored field).
 
 ## Work plan
 | Slice | Files | Signatures & data | Test cases | Rulings | Green when |
 |---|---|---|---|---|---|
-| 0 spike | scratch only | — | Bake Louisville (id 581): 100% of card lines resolve to TCGdex | — | Resolution report in `.agent/scratch/069/` |
-| 1 parsers + fetch | `scripts/limitless/{parse,fetch}-limitless.mjs`, fixtures, `.gitignore` | `parseEventIndex(html) → [{id,name,date,players,format}]`, `parseStandings(html) → [{placing,player,archetypeId,listId}]`, `parseDecklists(html) → [{placing,player,cards:[{count,name,set,number}]}]` | Fixtures → exact arrays; 0-row page → throws | — | `node --test scripts/limitless/__tests__` |
-| 2 bake | `build-meta-dataset.mjs`, `card-key.mjs`, `package.json` script, dataset JSON | Schema v1 above | card-key cases; bake on the fixture event → schema-valid JSON | TCGdex ids cited in the test | `pnpm meta:refresh` writes a valid file |
-| 3 engine | `deck-suggest/{suggest,dataset}.mjs` | Engine API above | 6-list fixture → pinned buckets | — | `pnpm test:changed` |
-| 4 steering | `deck-suggest/prefs.mjs`, `deck-library.mjs`, `suggest.mjs` (α and dismiss penalty) | Steering state + `findNeighbors` prefs above | prefs and steering cases in the Test plan; rows 13–15, 17, 19 | — | `pnpm test:changed` |
-| 5 UI | `native-deck-builder-suggest.js`, `index.ejs`, `native-deck-builder.js` (`switchMode('suggest')`), CSS | `initializeNativeDeckBuilderSuggest({ panelEl, getDeck, getPrefs, setPrefs, onAddCard, onRemoveCard, onReplaceDeck, onPreviewCard })` | Visual: user localhost check | — | Tab works on localhost |
+| 1 parsers | `scripts/limitless/parse-limitless.mjs`, `__tests__/parse-limitless.test.mjs`, fixtures | `parseEventIndex(html) → [{id, format}]`, `parseEventPage(html) → {name, date, players, formatLabel, standings:[{placing, player, archetypeId, archetypeName, listId}]}`, `parseDecklists(html) → [{placing, player, cards:[{count, name, set, number, priceUsd}]}]` | fixtures → exact rows; empty html → [] ; `ordinalToPlacing('548th') = 548` | — | test file green |
+| 2 keys + tags + bake | `card-key.mjs`, `card-tags.mjs`, `build-meta-dataset.mjs`, tests, `package.json`, dataset JSON | schema v1 | Iono PAL/PAF same key; tags on corpus rows (Ultra Ball 30C 128 → setup; Mega Dragonite ex MEP 091 → mobility) | corpus rows cited in tests | `pnpm meta:refresh` writes a valid dataset |
+| 3 engine | `deck-suggest/{dataset,suggest,goals}.mjs`, tests | engine above | fixture dataset → pinned buckets, low/none confidence, goals, budget | — | tests green |
+| 4 steering | `deck-suggest/prefs.mjs`, `deck-library.mjs`, tests | steering above | transitions, normalize garbage, prune, round-trip, α/penalty effect | — | tests green |
+| 5 resolve + import | `deck-suggest/resolve.mjs`, `deck-text-import.mjs`, tests | `resolveDatasetCard`, `listToEntries`, `importDeckEntries({ resolve })` | basic energy → energy card; print fetch name mismatch → name search | — | tests green |
+| 6 UI | suggest controller, CSS, index.ejs, native-deck-builder(.js, -library.js) | `initializeNativeDeckBuilderSuggest({ panelEl, getDeck, getPrefs, setPrefs, onAddCard, onRemoveCard, onReplaceDeck, onPreviewCard, fetchCardDetail, searchByName })` → `{ open(), refresh() }` | browser smoke run | — | renders on localhost |
 
 ## Deviations (Builder appends here during build)
