@@ -30,6 +30,7 @@ import {
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
 import { initializeBuildBattle } from './native-deck-builder-build-battle.js';
+import { initializeBuildBattleRun } from './native-deck-builder-bnb-run.js';
 import { initializeEliteTrainerBox } from './native-deck-builder-etb.js';
 import { systemState } from '../../../state.js';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
@@ -235,10 +236,17 @@ const createRemoteGameLink = ({ onHostState }) => {
  *   tab, 'host' on the game tab (see builder-window.mjs resolveBuilderRole).
  * @param {'standard'|'build-battle'} [options.mode] - 'build-battle' on the
  *   Build & Battle tab (design 051): Box and Pool replace Search and Browse.
+ * @param {'run'|'legacy'} [options.flow] - which Build & Battle flow the tab runs (design 071):
+ *   'run' is TCG Live's run (Run and Pool tabs), 'legacy' the one-shot box flow.
  */
-export const initializeNativeDeckBuilder = ({ role = 'host', mode = 'standard' } = {}) => {
+export const initializeNativeDeckBuilder = ({
+  role = 'host',
+  mode = 'standard',
+  flow = 'legacy',
+} = {}) => {
   const isEditor = role === 'editor';
   const isBuildBattle = isEditor && mode === 'build-battle';
+  const isBuildBattleRun = isBuildBattle && flow === 'run';
   const targetMainButton = document.getElementById(
     'nativeDeckBuilderTargetMain'
   );
@@ -365,6 +373,8 @@ export const initializeNativeDeckBuilder = ({ role = 'host', mode = 'standard' }
 
   playButton.addEventListener('click', () => {
     const target = currentLoadTarget;
+    // A Build & Battle run claims the result of the game this Play starts (design 071).
+    buildBattle?.onPlay?.();
     // Play always loads what is on screen, even if nothing changed since the
     // last load, then shows the active deck's sleeve on the playmat.
     deckDirty = true;
@@ -1380,7 +1390,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const isConnected = gameLink.isConnected();
     // Build & Battle only plays a legal deck from the pool; the standard builder
     // leaves legality to the player.
-    const buildBattleBlock = isBuildBattle && !result.isValid ? result.errors[0] || '' : '';
+    const buildBattleBlock =
+      (isBuildBattle && !result.isValid ? result.errors[0] || '' : '') ||
+      (buildBattle?.playBlock?.() ?? '');
     playButton.disabled = !hasDeckCards || !isConnected || Boolean(buildBattleBlock);
     playButton.title = !isConnected
       ? 'Open the deck builder from the game tab to play'
@@ -1860,8 +1872,28 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     if (tabBrowse) tabBrowse.hidden = true;
     tabBox?.addEventListener('click', () => switchMode('box'));
     tabPool?.addEventListener('click', () => switchMode('pool'));
-    buildBattle = initializeBuildBattle({
-      boxPanelEl: boxPanel,
+    // The Run flow (design 071) drives the same Play button: its lobby Play presses it.
+    const buildBattleController = isBuildBattleRun
+      ? (options) =>
+          initializeBuildBattleRun({
+            ...options,
+            runPanelEl: boxPanel,
+            showRun: () => switchMode('box'),
+            getPlayState: () => ({ disabled: playButton.disabled, reason: playButton.title }),
+            requestPlay: () => playButton.click(),
+          })
+      : (options) =>
+          initializeBuildBattle({
+            ...options,
+            boxPanelEl: boxPanel,
+            showBox: () => switchMode('box'),
+            waitForRoom: isEditor && gameLink.isConnected(),
+          });
+    if (isBuildBattleRun) {
+      if (tabBox) tabBox.textContent = 'Run';
+      document.body.classList.add('bb-flow-run');
+    }
+    buildBattle = buildBattleController({
       poolPanelEl: poolPanel,
       deckLibrary,
       getTarget: () => currentLoadTarget,
@@ -1888,11 +1920,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         render();
       },
       showPool: () => switchMode('pool'),
-      showBox: () => switchMode('box'),
       onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
-      waitForRoom: isEditor && gameLink.isConnected(),
     });
     switchMode(buildBattle.initialMode());
+    // Play was last drawn before the run controller existed to block it.
+    if (isBuildBattleRun) render();
   }
 
   if (isEditor && !isBuildBattle && shelfPanel) {
