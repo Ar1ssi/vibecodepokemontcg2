@@ -5,7 +5,12 @@ import {
 } from '../../setup/deck-constructor/hydrate-holo.js';
 import { syncRotation } from '../general/rotate-card.js';
 import { moveCard } from './move-card.js';
-import { getEnergyTokenFront, isEnergyCard } from './energy-token-assets.mjs';
+import {
+  ENERGY_TOKEN_DOUBLE_CLASS,
+  getEnergyTokenFront,
+  isDoubleEnergyToken,
+  isEnergyCard,
+} from './energy-token-assets.mjs';
 import {
   relayoutLegacyEnergyTokens,
   stampEnergyAttachOrder,
@@ -70,6 +75,7 @@ export const attachCard = (
       movingCard.image.src = tokenFront;
       movingCard.image.classList.add('energy-token-3d');
       stampEnergyAttachOrder(movingCard.image);
+      if (isDoubleEnergyToken(movingCard)) movingCard.image.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
       // Token sits ON the card's face (unlike the old side-cascading flat
       // card), so it must outrank the target Pokémon's own z-index instead
       // of being decremented below it.

@@ -1,3 +1,5 @@
+import { ENERGY_TOKEN_DOUBLE_CLASS } from '../../actions/move-card-bundle/energy-token-assets.mjs';
+
 export const resetImage = (image, zoneId = '') => {
   if (!['active', 'bench'].includes(zoneId)) {
     // Board zones (active/bench) size cards via inline px snapshots (energy
@@ -19,7 +21,7 @@ export const resetImage = (image, zoneId = '') => {
   if (image.dataset?.energyCardSrc) {
     image.src = image.dataset.energyCardSrc;
     delete image.dataset.energyCardSrc;
-    image.classList.remove('energy-token-3d');
+    image.classList.remove('energy-token-3d', ENERGY_TOKEN_DOUBLE_CLASS);
   }
   image.style.opacity = 1;
   image.style.position = 'relative';

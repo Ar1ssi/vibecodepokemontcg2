@@ -27,7 +27,9 @@ import {
 import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
 import { resetImage } from '../image-logic/reset-image.js';
 import {
+  ENERGY_TOKEN_DOUBLE_CLASS,
   getEnergyTokenFront,
+  isDoubleEnergyToken,
   isEnergyCard,
 } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import {
@@ -1141,7 +1143,7 @@ function clearStackStyle(img) {
   if (!img.dataset?.stackStyled || !img.style) return;
   delete img.dataset.stackStyled;
   delete img.dataset.energyCardSrc;
-  img.classList.remove('energy-token-3d');
+  img.classList.remove('energy-token-3d', ENERGY_TOKEN_DOUBLE_CLASS);
   for (const key of STACK_STYLE_KEYS) img.style[key] = '';
 }
 
@@ -1158,7 +1160,7 @@ function setStackStyle(img, styles) {
  * double-click carousel shows it), layered above the visible card's face at
  * the spot its row plan gives it.
  */
-function applyEnergyToken(img, tokenSrc, tokenSize, slot, bottom) {
+function applyEnergyToken(img, { tokenSrc, double }, tokenSize, slot, bottom) {
   const cardArt = img.getAttribute('src');
   setStackStyle(img, {
     width: `${tokenSize}px`,
@@ -1170,6 +1172,7 @@ function applyEnergyToken(img, tokenSrc, tokenSize, slot, bottom) {
   img.dataset.energyCardSrc = cardArt;
   img.setAttribute('src', tokenSrc);
   img.classList.add('energy-token-3d');
+  if (double) img.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
   img.energyLayer = slot.zIndex - 100;
 }
 
@@ -1178,7 +1181,7 @@ function applyEnergyToken(img, tokenSrc, tokenSize, slot, bottom) {
  * side by side up to four, past that one token per type with an "Nx" badge.
  *
  * @param {object} rootRecord owns the badges
- * @param {{ img: object, tokenSrc: string }[]} tokens in attach order
+ * @param {{ img: object, tokenSrc: string, double: boolean }[]} tokens in attach order
  */
 function layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight) {
   const plan = planEnergyTokenRow(
@@ -1186,8 +1189,8 @@ function layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight) {
     cardWidth
   );
   const bottom = cardHeight * ENERGY_TOKEN_BOTTOM;
-  tokens.forEach(({ img, tokenSrc }, i) =>
-    applyEnergyToken(img, tokenSrc, plan.tokenSize, plan.tokens[i], bottom)
+  tokens.forEach((token, i) =>
+    applyEnergyToken(token.img, token, plan.tokenSize, plan.tokens[i], bottom)
   );
   const parent = rootRecord.container || tokens[0]?.img.parentNode || null;
   renderEnergyCountBadges(rootRecord, parent, plan.badges, bottom);
@@ -1240,7 +1243,7 @@ function layoutCardStack(rootRecord, attached) {
     const img = record.element;
     const tokenSrc = isEnergyCard(cardData) ? getEnergyTokenFront(cardData) : null;
     if (tokenSrc && img.dataset && img.style) {
-      tokens.push({ img, tokenSrc });
+      tokens.push({ img, tokenSrc, double: isDoubleEnergyToken(cardData) });
       continue;
     }
     shiftLayer += 1;
