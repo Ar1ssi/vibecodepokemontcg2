@@ -46,18 +46,18 @@ export function pickCoinCaller(playerIds, rng) {
 }
 
 /**
- * Decides who goes first: the caller wins iff the coin landed on the face they
- * called. An invalid call or result is treated as a loss for the caller, so a
- * malformed client payload can never hand its sender the first turn.
+ * Decides who won the opening toss: the caller wins iff the coin landed on the
+ * face they called. An invalid call or result is treated as a loss for the
+ * caller, so a malformed client payload can never hand its sender the win.
  *
  * @param {object} options
  * @param {string[]} options.playerIds
  * @param {string} options.callerPlayerId
  * @param {unknown} options.call
  * @param {unknown} options.result
- * @returns {string|null} the starting playerId, or null when the inputs cannot name one.
+ * @returns {string|null} the winning playerId, or null when the inputs cannot name one.
  */
-export function resolveStarterPlayerId({
+export function resolveCoinWinnerPlayerId({
   playerIds,
   callerPlayerId,
   call,
@@ -68,4 +68,21 @@ export function resolveStarterPlayerId({
   const otherPlayerId = ids.find((id) => id !== callerPlayerId);
   if (!isCoinFace(call) || !isCoinFace(result)) return otherPlayerId;
   return result === call ? callerPlayerId : otherPlayerId;
+}
+
+/**
+ * The toss winner decides the order (design 072, TCG Live's `pl_calling_turn`
+ * "Do you want to go first?"): yes seats the winner, no seats the other player.
+ *
+ * @param {object} options
+ * @param {string[]} options.playerIds
+ * @param {string} options.winnerPlayerId
+ * @param {unknown} options.goFirst Must be a boolean.
+ * @returns {string|null} the starting playerId, or null when the inputs cannot name one.
+ */
+export function resolveStarterFromChoice({ playerIds, winnerPlayerId, goFirst } = {}) {
+  const ids = [...new Set((playerIds || []).filter(Boolean))].sort();
+  if (ids.length < 2 || !ids.includes(winnerPlayerId)) return null;
+  if (typeof goFirst !== 'boolean') return null;
+  return goFirst ? winnerPlayerId : ids.find((id) => id !== winnerPlayerId);
 }

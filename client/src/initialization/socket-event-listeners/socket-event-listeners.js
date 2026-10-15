@@ -561,8 +561,10 @@ export const initializeSocketEventListeners = () => {
   registerTurnOrderCallListeners(socket);
 
   socket.on('dealOrder', (data) => {
-    if (Array.isArray(data?.order))
-      setDealOrder(data.order, data?.starter ?? null);
+    if (!Array.isArray(data?.order)) return;
+    setDealOrder(data.order, data?.starter ?? null);
+    // Design 072: the opening waits for the deal; tell the rules bridge it is in.
+    document.dispatchEvent(new CustomEvent('deal-order-received'));
   });
 
   // Either player's Reset restarted the server game. The peer that didn't click

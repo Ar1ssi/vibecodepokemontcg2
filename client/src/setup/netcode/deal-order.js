@@ -38,6 +38,15 @@ export function resetDealOrder() {
 }
 
 /**
+ * How long the opening Set Up waits for the server's deal. The server deals only
+ * once the coin is called (TURN_ORDER_CALL_TIMEOUT_MS, 15 s) and its winner has
+ * chosen first or second (TURN_ORDER_CHOICE_TIMEOUT_MS, 25 s; design 072), so
+ * this covers both timeouts plus a margin for the ceremony and the network.
+ * Pinned against server/game/room.mjs by deal-order.test.mjs.
+ */
+export const OPENING_DEAL_WAIT_MS = 45000;
+
+/**
  * Resolves with the server's deal order once it arrives, or null after timeoutMs if
  * it never does. Callers must treat null as "fall back to local behavior", never guess.
  *
