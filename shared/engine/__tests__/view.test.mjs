@@ -138,7 +138,7 @@ test('viewFor redacts PendingChoice options for opponent so secret deck searches
   assert.equal(serializedP2.includes('Secret Archeops'), false);
 });
 
-test('viewFor formats spectator view with hand and deck counts only', () => {
+test('viewFor formats spectator view with both hands and deck counts only (design 069)', () => {
   const state = setupSampleGame();
   const specView = viewFor(state, null);
   const serialized = JSON.stringify(specView);
@@ -149,14 +149,17 @@ test('viewFor formats spectator view with hand and deck counts only', () => {
   assert.ok(specView.players.p1);
   assert.ok(specView.players.p2);
 
-  // Spectator sees hand count only, not card list
-  assert.equal(specView.players.p1.zones.hand.count, 2);
-  assert.equal(Array.isArray(specView.players.p1.zones.hand), false);
+  // Spectator sees both hands, so either POV or the broadcast layout can be drawn
+  assert.equal(specView.players.p1.zones.hand.length, 2);
+  assert.equal(specView.players.p1.zones.hand[0].name, 'Secret Ultra Ball');
+  assert.ok(serialized.includes('Opponent Secret Iono'));
 
-  // Spectator serialized payload does not leak secret hand or deck cards
-  assert.equal(serialized.includes('Secret Ultra Ball'), false);
-  assert.equal(serialized.includes('Opponent Secret Iono'), false);
+  // ...but never a deck or an unrevealed prize
+  assert.equal(specView.players.p1.zones.deck.count, 2);
   assert.equal(serialized.includes('Secret Lugia V'), false);
+  assert.equal(serialized.includes('Opponent Secret Charizard'), false);
+  assert.equal(serialized.includes('Secret Double Turbo'), false);
+  assert.equal(serialized.includes('Opponent Secret Rare Candy'), false);
 
   // Spectator does see public active Pokémon
   assert.ok(serialized.includes('Public Raichu'));

@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AURA_PULSE_MS,
+  HIT_RECOIL_MS,
+  hitRecoilPose,
   HIT_DRESSING,
   LUNGE_IMPACT,
   SCREEN_SHAKE_MAX_PX,
@@ -259,4 +261,16 @@ test('auraPulsePose: a ring that swells off the attacker and fades out', () => {
   assert.deepEqual(auraPulsePose(-4), auraPulsePose(0));
   assert.deepEqual(auraPulsePose(9), auraPulsePose(1));
   assert.ok(AURA_PULSE_MS > 0);
+});
+
+test('hitRecoilPose: rests at both ends and peaks at 0.12 card heights early', () => {
+  assert.equal(hitRecoilPose(0).along, 0);
+  assert.ok(Math.abs(hitRecoilPose(1).along) < 1e-9);
+  assert.ok(Math.abs(hitRecoilPose(0.18).along - 0.12) < 1e-9);
+  for (let t = 0; t <= 1; t += 0.05) {
+    const { along } = hitRecoilPose(t);
+    assert.ok(along >= 0 && along <= 0.12 + 1e-9, `t=${t} along=${along}`);
+  }
+  assert.equal(hitRecoilPose(-1).along, 0);
+  assert.ok(HIT_RECOIL_MS > 0);
 });

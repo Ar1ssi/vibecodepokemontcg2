@@ -14,11 +14,18 @@ const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const easeInCubic = (t) => t ** 3;
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 
-/** @returns {{title:string, sub:string}|null} null when the side is unknown. */
-export function turnBannerText(user, number) {
+/**
+ * @param {'self'|'opp'} user
+ * @param {number} [number]
+ * @param {string|null} [playerName] whose turn it is, for a spectator (design 069), who has
+ *   no "your" or "opponent's" turn
+ * @returns {{title:string, sub:string}|null} null when the side is unknown.
+ */
+export function turnBannerText(user, number, playerName = null) {
   if (user !== 'self' && user !== 'opp') return null;
+  const ownTitle = user === 'self' ? 'Your Turn' : "Opponent's Turn";
   return {
-    title: user === 'self' ? 'Your Turn' : "Opponent's Turn",
+    title: playerName ? `${playerName}'s Turn` : ownTitle,
     sub: Number.isFinite(number) ? `Turn ${number}` : '',
   };
 }

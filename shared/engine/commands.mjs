@@ -16,7 +16,7 @@ export const SPECIAL_CONDITIONS = [
   'Poisoned',
 ];
 
-export const PROTOCOL_VERSION = '2.0.0';
+export const PROTOCOL_VERSION = '2.1.0';
 
 /**
  * Command schema definitions.

@@ -256,6 +256,31 @@ describe('team-wide no Retreat Cost abilities', () => {
     assert.equal(res.error, null);
   });
 
+  it('server: a Benched Latias ex makes a Basic Mega Latias ex active retreat free', () => {
+    const state = makeState();
+    const megaLatias = createCard({
+      instanceId: 1,
+      id: 'me01-181',
+      name: 'Mega Latias ex',
+      stage: 'Basic',
+      types: ['Dragon'],
+      retreatCost: 2,
+    });
+    const benchedLatias = latiasEx(2);
+    const benchedEevee = createCard({ instanceId: 3, id: 'eevee', name: 'Eevee', stage: 'Basic' });
+    state.players.p1.zones.active = [megaLatias];
+    state.players.p1.zones.bench = [benchedLatias, benchedEevee];
+
+    const res = applyCommand(state, {
+      type: 'retreat',
+      playerId: 'p1',
+      payload: { benchInstanceId: benchedEevee.instanceId },
+    });
+
+    assert.equal(res.error, null);
+    assert.equal(res.state.players.p1.zones.active[0].instanceId, benchedEevee.instanceId);
+  });
+
   describe('client path', () => {
     beforeEach(() => {
       rulesState.enabled = true;

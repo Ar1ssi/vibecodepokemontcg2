@@ -481,6 +481,23 @@ export function installE2eApi() {
       if (roomInput) roomInput.value = roomId;
       document.getElementById('joinRoomButton')?.click();
     },
+    // Design 069: clicks a public room's Join or Watch button, as a player would.
+    joinPublicRoom(roomId, username, { spectate = false } = {}) {
+      const nameInput = document.getElementById('nameInput');
+      if (nameInput) nameInput.value = username;
+      const button = document.querySelector(
+        `#publicRoomList [data-room-id="${CSS.escape(roomId)}"] .public-room-${spectate ? 'watch' : 'join'}`
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    },
+    publicRoomText(roomId) {
+      return (
+        document.querySelector(`#publicRoomList [data-room-id="${CSS.escape(roomId)}"]`)
+          ?.textContent ?? null
+      );
+    },
     loadFixtureDeck(prefix = 'E2E') {
       loadDeckData('self', e2eFixtureDeck(prefix));
     },

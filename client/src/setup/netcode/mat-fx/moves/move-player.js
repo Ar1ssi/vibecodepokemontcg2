@@ -17,9 +17,9 @@ import { playCanvasStage } from '../canvas-stage.js';
 import { burstParticles } from '../particles.mjs';
 import { attackerPose, defenderPose } from './card-motion.mjs';
 import { DRAWERS } from './move-drawers.js';
-import { laneGeometry, localLane, phaseProgress, toLocal, unionPadded } from './move-geometry.mjs';
+import { laneGeometry, localLane, phaseProgress, toLocal, unionAllPadded, unionPadded } from './move-geometry.mjs';
 import { terrainPose } from './move-poses.mjs';
-import { DEFAULT_PAD, ECHO_PARAMS, fillDefaults, withDefaults } from './move-spec.mjs';
+import { DEFAULT_PAD, ECHO_PARAMS, fillDefaults, travelBeats, withDefaults } from './move-spec.mjs';
 import { materialFor } from './materials/index.js';
 import { lighten, tintedPalette } from './materials/_shared.js';
 
@@ -217,16 +217,87 @@ const runBeat = (beat, index, ctx, local, progress, info) => {
 };
 
 /**
+ * Design 069: the move's travel beats replayed on a lane from the attacker to each extra card the
+ * attack damages, each lane `delayMs` behind the main one so it arrives on that card's own hit.
+ * One canvas over the attacker and every branch. Returns the stage's promise and its length, or
+ * null when nothing travels.
+ */
+const playBranches = ({ beats, attackerRect, branches, spec, seed, cachedTint, material, durationMs }) => {
+  const lanes = branches
+    .map((branch, index) => ({ branch, index, lane: laneGeometry(attackerRect, branch.rect) }))
+    .filter(({ lane }) => lane);
+  if (beats.length === 0 || lanes.length === 0) return null;
+  const resolved = beats.map((beat) => ({
+    ...beat,
+    ...resolveBeatColours(material, withDefaults(beat.drawer, beat.params), cachedTint),
+  }));
+  const pad = Math.max(...lanes.map(({ lane }) => lane.h)) * (spec.pad ?? DEFAULT_PAD);
+  const hostRect = unionAllPadded([attackerRect, ...lanes.map(({ branch }) => branch.rect)], pad);
+  const host = spawnOverlay({
+    rect: hostRect,
+    className: `fx-overlay fx-move fx-move--branches fx-move--${spec.id} fx-move--m-${material.key}`,
+  });
+  const size = Math.ceil(Math.max(hostRect.width, hostRect.height));
+  const ox = (size - hostRect.width) / 2;
+  const oy = (size - hostRect.height) / 2;
+  const locals = lanes.map(({ branch, index, lane }) => ({
+    local: localLane(lane, hostRect),
+    delayMs: Math.max(0, branch.delayMs || 0),
+    seed: seed + index + 1,
+  }));
+  const lengthMs = durationMs + Math.max(...locals.map((entry) => entry.delayMs));
+  const draw = (ctx, _t, elapsedMs) => {
+    ctx.translate(ox, oy);
+    for (const composite of ['source-over', 'lighter']) {
+      ctx.globalCompositeOperation = composite;
+      for (const { local, delayMs, seed: laneSeed } of locals) {
+        const laneMs = elapsedMs - delayMs;
+        const info = { elapsedMs: laneMs, time: laneSeed * 0.37 + laneMs / 1000, seed: laneSeed, material, spec };
+        resolved.forEach((beat, index) => {
+          if (isSourceOver(beat) !== (composite === 'source-over')) return;
+          const progress = phaseProgress(laneMs, [beat.at, beat.until]);
+          if (progress !== null) runBeat(beat, index, ctx, local, progress, info);
+        });
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  };
+  const done = playCanvasStage(host, {
+    cx: hostRect.width / 2,
+    cy: hostRect.height / 2,
+    size,
+    duration: lengthMs,
+    className: 'fx-move__canvas fx-move__canvas--branch',
+    draw,
+  });
+  removeWhen(host, [done], lengthMs + BACKSTOP_PAD_MS);
+  return { done, lengthMs };
+};
+
+/**
  * Play `spec` from `attacker` to `defender` (`rect` in parent-viewport px, `src` the card
  * art, `turn` the board's rotation in degrees, `element` the real card to hide while its
  * ghost moves). Announces the contact moment on `impacts` (combat.js's queue) when given;
  * `strikeContext` rides along on that announcement (design 068: the impact prefab's type).
+ * `branches` (design 069): more cards the attack damages, `{rect, delayMs}` each; the move's travel
+ * beats also fly to them, `delayMs` after the main contact.
  * @param {{spec: object, attacker: {rect: object, src: string, turn?: number, element?: Element|null},
  *   defender: {rect: object, src: string, turn?: number, element?: Element|null},
- *   seed?: number, impacts?: {strikeIn: Function}|null, attackerCard?: object|null, strikeContext?: object|null}} opts
- * @returns {{holdMs:number, durationMs:number, contactMs:number}|null} null when nothing could play
+ *   seed?: number, impacts?: {strikeIn: Function}|null, attackerCard?: object|null, strikeContext?: object|null,
+ *   branches?: {rect: object, delayMs: number}[]}} opts
+ * @returns {{holdMs:number, durationMs:number, contactMs:number, branchEndMs:number}|null} null when
+ *   nothing could play; `branchEndMs` is when the branch lanes end (0 without any)
  */
-export function playMove({ spec, attacker, defender, seed = 1, impacts = null, attackerCard = null, strikeContext = null }) {
+export function playMove({
+  spec,
+  attacker,
+  defender,
+  seed = 1,
+  impacts = null,
+  attackerCard = null,
+  strikeContext = null,
+  branches = [],
+}) {
   const from = attacker?.rect;
   const to = defender?.rect;
   if (!spec || !from || !to || !attacker.src || !defender.src) return null;
@@ -351,11 +422,23 @@ export function playMove({ spec, attacker, defender, seed = 1, impacts = null, a
   const burstMs = Math.max(0, ...(spec.particles ?? []).map((burst) => burst.durationMs));
   const backstop = durationMs + burstMs + BACKSTOP_PAD_MS;
   removeWhen(host, [back, front, ...ghosts], backstop);
+  const branchPlay = Array.isArray(branches)
+    ? playBranches({
+        beats: travelBeats(spec),
+        attackerRect: from,
+        branches: branches.filter((branch) => branch?.rect),
+        spec,
+        seed,
+        cachedTint,
+        material,
+        durationMs,
+      })
+    : null;
   const cardsDone = Promise.all([back, front]);
   Promise.all([attackerGhost.ready, defenderGhost.ready]).then(() => {
     if (!host.isConnected) return;
     hideDuring(attacker.element, cardsDone, backstop);
     hideDuring(defender.element, cardsDone, backstop);
   });
-  return { holdMs: contactMs + 40, durationMs, contactMs };
+  return { holdMs: contactMs + 40, durationMs, contactMs, branchEndMs: branchPlay?.lengthMs ?? 0 };
 }

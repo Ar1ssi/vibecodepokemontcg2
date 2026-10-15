@@ -12,11 +12,25 @@ export const SCREEN_SHAKE_MIN_DAMAGE = 30;
 export const SCREEN_SHAKE_MAX_PX = 6;
 export const TARGET_RING_MS = 620;
 export const AURA_PULSE_MS = 600;
+export const HIT_RECOIL_MS = 320;
 
 const clamp01 = (t) => Math.max(0, Math.min(1, t));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 const easeInOutCubic = (t) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+const RECOIL_PEAK = 0.12;
+const RECOIL_PEAK_AT = 0.18;
+
+/**
+ * Design 069: a card the attack reaches after its main target is knocked back along the
+ * attacker -> card direction: `along` is the push in card heights, 0 at both ends.
+ */
+export function hitRecoilPose(t) {
+  const c = clamp01(t);
+  if (c <= RECOIL_PEAK_AT) return { along: RECOIL_PEAK * easeOutCubic(c / RECOIL_PEAK_AT) };
+  return { along: RECOIL_PEAK * (1 - easeInOutCubic((c - RECOIL_PEAK_AT) / (1 - RECOIL_PEAK_AT))) };
+}
 
 /**
  * Classify one `damageUpdated` fx plan. The engine's `dealt` / `healed` fields

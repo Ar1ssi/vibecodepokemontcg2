@@ -1,0 +1,51 @@
+/* Design 069: TCG Live hover preview. One host in the main document, placed by hover-preview-model.mjs
+   in the blurred band left of the mat art. It never takes pointer input (C4) and sits under the
+   2400 modal overlays. Only the host fades: opacity on the preserve-3d holo card would flatten it
+   (043). The fade durations mirror HOVER_FADE_IN_MS / HOVER_FADE_OUT_MS; hover-preview-css.test.mjs
+   pins the two together. */
+#hoverPreview {
+  --hover-preview-fade-in: 120ms;
+  --hover-preview-fade-out: 80ms;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2300;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.96);
+  transform-origin: center;
+  transition:
+    opacity var(--hover-preview-fade-out) ease-in,
+    transform var(--hover-preview-fade-out) ease-in;
+}
+#hoverPreview.is-shown {
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity var(--hover-preview-fade-in) ease-out,
+    transform var(--hover-preview-fade-in) ease-out;
+}
+#hoverPreview > img.hover-preview-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0.3rem;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+}
+#hoverPreview > .card {
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+}
+#hoverPreview > .card .card__translater,
+#hoverPreview > .card .card__rotator,
+#hoverPreview > .card .card__rotator > * {
+  width: 100%;
+  height: 100%;
+}
+#hoverPreview > .card img {
+  display: block;
+  object-fit: cover;
+}

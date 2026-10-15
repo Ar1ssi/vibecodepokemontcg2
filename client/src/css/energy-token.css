@@ -26,6 +26,26 @@ img.energy-token-3d {
     inset 0 0 0 0.05em rgba(0, 0, 0, 0.35);
 }
 
+/* "Nx" pill after a pile of same-type tokens (energy-token-row.mjs). left,
+   bottom, font-size and z-index are inline per layout; font-size is half a
+   token, so the 0.3em lift centres the 1.4em pill on the 2em token. */
+.energy-token-count {
+  position: absolute;
+  height: 1.4em;
+  margin-bottom: 0.3em;
+  padding: 0 0.25em;
+  box-sizing: border-box;
+  line-height: 1.4em;
+  border-radius: 0.7em;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-weight: 800;
+  white-space: nowrap;
+  text-shadow: 0 0.05em 0.1em rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Two-orb tokens (Special Energy that provides 2 Energy): square art with two coins on the
    diagonal and transparent corners, so no round crop or disc rim — the shadow follows the
    coins' own shape instead. */

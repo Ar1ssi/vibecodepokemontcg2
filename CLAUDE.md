@@ -116,6 +116,8 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
   `node --test <file>`. Before commit: `pnpm test:changed` for patch work; full `pnpm test` when
   `pnpm gates` says REQUIRED (engine, netcode, dependency or lockfile changes).
 - Comments only for constraints and whys. No dead or commented-out code. Match the file's local style.
+- Board animations play one after another, never on top of each other: each goes through the FX
+  queue (`netcode/advisory-animations.js`) and its plan returns a hold that lasts until its scene ends.
 
 ## Hard rules
 - Never: commit secrets · force-push · delete/overwrite content you haven't read · edit the frozen
