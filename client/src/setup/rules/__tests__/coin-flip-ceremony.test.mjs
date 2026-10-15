@@ -162,3 +162,32 @@ test('an OS prefers-reduced-motion flag still tumbles the coin and animates its 
   await done;
   dom.window.close();
 });
+
+// Design 072: the opening toss names its winner, who then chooses first or second.
+test('outcomeLabel replaces the "goes first" line on the last landing', async () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true });
+  const { document } = dom.window;
+
+  const done = playCoinFlipCeremony({
+    coin: COIN,
+    result: 'heads',
+    outcomeLabel: 'You won the coin flip!',
+    label: 'You chose heads. Flipping the coin…',
+    revealMs: 5,
+    holdMs: 500,
+    fadeMs: 5,
+    doc: document,
+  });
+
+  const overlay = document.getElementById(COIN_FLIP_OVERLAY_ID);
+  assert.match(
+    overlay.querySelector('.turn-order-coin-flip-label').textContent,
+    /You chose heads\. Flipping the coin/
+  );
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const resultEl = overlay.querySelector('.turn-order-coin-flip-result');
+  assert.equal(resultEl.textContent, 'Heads! You won the coin flip!');
+
+  await done;
+  dom.window.close();
+});

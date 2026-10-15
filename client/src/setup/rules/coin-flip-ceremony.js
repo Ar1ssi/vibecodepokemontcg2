@@ -97,7 +97,9 @@ export const coinFlipCeremonyMarkup = ({
  * board state it reports is already applied. `reducedMotion` defaults to the
  * app's own reduce-motion setting, never the OS `prefers-reduced-motion` flag:
  * Windows raises that whenever system animations are off, which froze every
- * coin (see motionReduced in image-logic/mat-fx.mjs).
+ * coin (see motionReduced in image-logic/mat-fx.mjs). `winnerLabel` reads
+ * "<face>! <winnerLabel> first."; `outcomeLabel` reads "<face>! <outcomeLabel>" for
+ * the opening toss, whose winner still has to choose first or second (design 072).
  *
  * @param {{
  *   coin?: object|null,
@@ -105,6 +107,7 @@ export const coinFlipCeremonyMarkup = ({
  *   results?: Array<'heads'|'tails'>,
  *   ownerLabel?: string,
  *   winnerLabel?: string,
+ *   outcomeLabel?: string,
  *   label?: string,
  *   passive?: boolean,
  *   reducedMotion?: boolean,
@@ -121,6 +124,7 @@ export const playCoinFlipCeremony = ({
   results = null,
   ownerLabel = '',
   winnerLabel = '',
+  outcomeLabel = '',
   label = '',
   passive = false,
   reducedMotion: reducedMotionOverride,
@@ -154,7 +158,7 @@ export const playCoinFlipCeremony = ({
       coin,
       ownerLabel,
       label,
-      turnOrder: Boolean(winnerLabel),
+      turnOrder: Boolean(winnerLabel || outcomeLabel),
     });
     doc.body.appendChild(overlay);
 
@@ -183,11 +187,17 @@ export const playCoinFlipCeremony = ({
       resultEl.classList.add('visible');
     };
 
+    const resultText = (face, isLast) => {
+      if (isLast && outcomeLabel) return `${faceName(face)}! ${outcomeLabel}`;
+      if (isLast && winnerLabel) return `${faceName(face)}! ${winnerLabel} first.`;
+      return `${faceName(face)}!`;
+    };
+
     const land = (index) => {
       const face = faces[index];
       const isLast = index === faces.length - 1;
       if (tallyEl) tallyEl.textContent = coinTallyText(faces, index + 1);
-      showResult(isLast && winnerLabel ? `${faceName(face)}! ${winnerLabel} first.` : `${faceName(face)}!`);
+      showResult(resultText(face, isLast));
       if (isLast) {
         setTimeout(finish, timeline.holdMs);
         return;
