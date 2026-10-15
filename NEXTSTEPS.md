@@ -7,4 +7,4 @@
 
 # oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 6/6 done · branch ready, not landed · landing checklist in design 068 § For the landing commit
 
-# oneshot 071-tcgl-build-and-battle-run · worktree .claude/worktrees/bnb-run · branch feature/bnb-run · slice 0/5
+# oneshot 071-tcgl-build-and-battle-run · worktree .claude/worktrees/bnb-run · branch feature/bnb-run · slice 5/5 done, hostile review fixed · branch ready, not landed · landing checklist in design 071 § For the landing commit

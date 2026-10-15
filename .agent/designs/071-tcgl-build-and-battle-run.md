@@ -17,8 +17,8 @@ in the future." Follow-ups: 5 matches · no reward ladder · collect screen show
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
 | A1 | TCG Live B&B mode (run: buy-in, box opening, lobby of match nodes, per-match progress, forfeit, end) replaces the existing flow at `/build-and-battle` | run-state/run-view/controller tests; route markup test |
-| A2 | Original code kept, reachable | `/build-and-battle/legacy` route test; legacy tests untouched and green |
-| A3 | Results recorded from real games | run-reporter tests |
+| A2 | Original code kept, reachable | `/build-and-battle-legacy` + the `/build-and-battle/legacy` 302 asserted in `bnb-run-test.mjs` (server.js is not unit-testable); legacy controller untouched; `bb-box-picker-test.mjs`, `bb-room-reset-test.mjs`, `room-format-test.mjs` ALL PASS against the worktree server |
+| A3 | Results recorded from game ends | run-reporter tests; `bnb-run-test.mjs` dispatches `rules-game-ended` on a real game tab (a full two-player game to the end is a manual check) |
 | A4 | Deck rules as the mode's rules doc | existing deck-validation tests (rules doc cited) |
 
 ## Assumptions
@@ -211,6 +211,21 @@ No data migration. New key only. Revert: set `BUILD_BATTLE_DEFAULT_FLOW = 'legac
 | 5 Close | MAP.md, area doc deck-builder.md, DECISIONS.md lines, ISSUES (Trainer Tips, ladders) | — | full `pnpm test` if `pnpm gates` says REQUIRED | — | tests green |
 
 ## Deviations (Builder appends here during build)
+- Legacy path is the sibling `/build-and-battle-legacy`, not `/build-and-battle/legacy`: the page's asset URLs
+  are relative and break one level down. `/build-and-battle/legacy` 302s to it (query string kept).
+- The tab label and `bb-flow-run` body class are set by the controller wiring in native-deck-builder.js, not
+  index.ejs (the server does not know the default flow; it lives in builder-window.mjs). Index still renders
+  "Box" for a frame.
+- Controller option `play` became `requestPlay`; `getPlayState` reads the deck pane's Play button.
+- Reporter takes `{ now, deckFormat }` and requires the end screen's `isWinner` or `isLoser`; apply-view.js
+  gained `isLoser` on the `rules-game-ended` detail (additive). A Standard-deck game or a spectator never
+  fills a node.
+- Review fixes: unsaved-deck wipe before resume (I207 parity), Start run adopts a run another tab stored,
+  Done only clears its own run, `?seed=` is first-run only, inline scene when no stage host, opener tab
+  retargets from the legacy page, redirect keeps the query, rec-unboxing.mjs repointed to legacy.
+- Known limits (ISSUES at landing): arming is not bound to a game or tab, so two game tabs in one browser
+  share one run and the first reporter wins; a second tab adopting a mid-opening run plays its own scene;
+  dialogs do not trap focus; the controller has no teardown for its `storage` listener.
 
 ---
 Self-approval checklist: n/a — user reachable; gate = user approval.
