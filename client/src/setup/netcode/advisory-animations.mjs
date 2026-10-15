@@ -145,14 +145,25 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {object} event
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
- * @param {{ dealShuffle?: boolean, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number>, hits?: object[]|null }} [options]
+ * @param {{ dealShuffle?: boolean, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number>, hits?: object[]|null,
+ *   strike?: object|null }} [options]
  *   `dealShuffle`: this `deckShuffled` is in dealShuffles, so it animates (other deck shuffles
  *   only sound). `revealRun`: this event's entry from deckRevealRuns, if any. `setup`: the batch
  *   arrived while the opening placement was unfinished (tags `enter` plans). `effectKo`: the batch's
  *   effectKnockoutIds (tags those `knockout` plans). `hits`: this `attackExecuted`'s entry from
- *   attackHitIds (design 069: rides on both attack plans as `plan.hits`)
+ *   attackHitIds (design 069: rides on both attack plans as `plan.hits`). `strike`: this event's
+ *   entry from attackStrikes (design 069: tags its `fx` and `knockout` plans as `plan.strike`)
  */
-export function advisoryAnimationPlan(
+export function advisoryAnimationPlan(event, selfPlayerId, coinRun, options = {}) {
+  const planned = planFor(event, selfPlayerId, coinRun, options);
+  const strike = options?.strike;
+  if (!strike || !planned) return planned;
+  // Design 069: an attack's plans and its hits' plans share the attack event as their strike key.
+  const tag = (plan) => (plan && (plan.kind === 'fx' || plan.kind === 'knockout') ? { ...plan, strike } : plan);
+  return Array.isArray(planned) ? planned.map(tag) : tag(planned);
+}
+
+function planFor(
   event,
   selfPlayerId,
   coinRun,
@@ -454,6 +465,32 @@ export function attackHitIds(events) {
     }
   }
   return hits;
+}
+
+const STRIKE_HIT_EVENTS = new Set(['damageUpdated', 'pokemonKnockedOut']);
+
+/**
+ * Design 069: which attack each event belongs to. The attack's `fx` plans announce its contact;
+ * its damage and knockout plans run after the queue held the attack until contact, so they find
+ * that announcement through the attack event they share (combat.js keeps it per strike key).
+ *
+ * @param {object[]} events
+ * @returns {Map<object, object>} an `attackExecuted`, or a damage / knockout of its segment ->
+ *   that `attackExecuted`
+ */
+export function attackStrikes(events) {
+  const strikes = new Map();
+  if (!Array.isArray(events)) return strikes;
+  let segment = [];
+  for (const event of events) {
+    if (event?.type === 'attackExecuted') {
+      strikes.set(event, event);
+      for (const hit of segment) strikes.set(hit, event);
+    }
+    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) segment = [];
+    else if (STRIKE_HIT_EVENTS.has(event?.type)) segment.push(event);
+  }
+  return strikes;
 }
 
 const isAmount = (value) => typeof value === 'number' && Number.isFinite(value);

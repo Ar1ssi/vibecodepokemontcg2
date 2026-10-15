@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   advisoryAnimationPlan,
   attackHitIds,
+  attackStrikes,
   attackLeads,
   coinFlipRuns,
   dealShuffles,
@@ -597,4 +598,42 @@ test('advisoryAnimationPlan: an attack’s hits ride on both its banner and its 
     ['attack', hits],
   ]);
   assert.equal(advisoryAnimationPlan(event, 'p1')[1].hits, undefined);
+});
+
+test('attackStrikes: an attack and the damage and knockouts of its segment share it as their strike', () => {
+  const coin = { type: 'attackCoinFlipped', playerId: 'p1', results: ['heads'] };
+  const hit = { type: 'damageUpdated', instanceId: 21, damage: 30, dealt: 30 };
+  const ko = { type: 'pokemonKnockedOut', instanceId: 21, playerId: 'p2' };
+  const status = { type: 'statusApplied', instanceId: 20, status: 'paralyzed' };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const checkup = { type: 'damageUpdated', instanceId: 20, damage: 40 };
+  const strikes = attackStrikes([coin, hit, ko, status, attack, checkup]);
+  assert.equal(strikes.get(attack), attack);
+  assert.equal(strikes.get(hit), attack);
+  assert.equal(strikes.get(ko), attack);
+  assert.equal(strikes.has(status), false);
+  assert.equal(strikes.has(coin), false);
+  assert.equal(strikes.has(checkup), false, 'a hit after the attack (checkup) is not the attack’s');
+  const turn = { type: 'turnStarted', player: 'p1' };
+  assert.equal(attackStrikes([hit, turn, attack]).has(hit), false);
+  assert.equal(attackStrikes(undefined).size, 0);
+});
+
+test('advisoryAnimationPlan: the strike tags fx and knockout plans, never other kinds', () => {
+  const strike = { type: 'attackExecuted' };
+  const damage = advisoryAnimationPlan({ type: 'damageUpdated', instanceId: 21, damage: 30 }, 'p1', undefined, { strike });
+  assert.equal(damage.strike, strike);
+  const attack = advisoryAnimationPlan(
+    { type: 'attackExecuted', playerId: 'p1', attackerId: 1, attackName: 'Gnaw' },
+    'p1',
+    undefined,
+    { strike, hits: [] }
+  );
+  assert.deepEqual(attack.map((plan) => plan.strike), [strike, strike]);
+  const ko = advisoryAnimationPlan({ type: 'pokemonKnockedOut', instanceId: 21, playerId: 'p2' }, 'p1', undefined, { strike });
+  assert.equal(ko.kind, 'knockout');
+  assert.equal(ko.strike, strike);
+  const shuffle = advisoryAnimationPlan({ type: 'zoneShuffled', zoneId: 'deck', playerId: 'p1' }, 'p1', undefined, { strike });
+  assert.equal(shuffle.strike, undefined);
+  assert.equal(advisoryAnimationPlan({ type: 'damageUpdated', instanceId: 21, damage: 30 }, 'p1').strike, undefined);
 });

@@ -6,6 +6,8 @@ import {
   MAX_BRANCH_LANES,
   hitDelayFor,
   hitDelaysOf,
+  hitWaitMs,
+  recoilVector,
   layoutHits,
 } from '../multi-hit.mjs';
 import { classifyHitOnce, peekHit, resetDamageBaselines } from '../damage-hit.mjs';
@@ -85,4 +87,27 @@ test('peekHit: reads a hit without moving the baseline classifyHitOnce diffs aga
   assert.deepEqual(peekHit({ instanceId: 7, damage: 20 }), { kind: 'heal', amount: 30, weakness: false });
   assert.equal(peekHit(null), null);
   resetDamageBaselines();
+});
+
+test('hitWaitMs: a hit lands its delay after contact, however late its plan arrives', () => {
+  assert.equal(hitWaitMs(1000, 80, 1000), 80);
+  assert.equal(hitWaitMs(1000, 80, 1040), 40);
+  assert.equal(hitWaitMs(1000, 80, 1300), 0);
+  assert.equal(hitWaitMs(1000, 0, 900), 100);
+  assert.equal(hitWaitMs(null, 80, 1000), 80);
+  assert.equal(hitWaitMs(undefined, undefined, 5), 0);
+});
+
+test('recoilVector: away from the attacker, turned into a rotated frame, null when unusable', () => {
+  const attacker = card(0, 300);
+  const below = card(0, 0);
+  const up = recoilVector(attacker, below, 0, 10);
+  assert.ok(Math.abs(up.x) < 1e-9 && Math.abs(up.y + 10) < 1e-9);
+  const turned = recoilVector(attacker, below, 180, 10);
+  assert.ok(Math.abs(turned.x) < 1e-9 && Math.abs(turned.y - 10) < 1e-9);
+  const right = recoilVector(card(0), card(300), 90, 10);
+  assert.ok(Math.abs(right.x) < 1e-9 && Math.abs(right.y + 10) < 1e-9);
+  assert.equal(recoilVector(attacker, attacker, 0, 10), null);
+  assert.equal(recoilVector(null, below, 0, 10), null);
+  assert.equal(recoilVector(attacker, below, 0, 0), null);
 });

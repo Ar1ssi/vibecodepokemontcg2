@@ -19,11 +19,12 @@ import {
   spawnParticles,
 } from '../../image-logic/mat-fx.mjs';
 import { playBanner } from './banner.js';
-import { classifyHitOnce } from './damage-hit.mjs';
+import { classifyHitOnce, peekHit } from './damage-hit.mjs';
 import {
   AURA_PULSE_MS,
   DAMAGE_POP_MS,
   HIT_FLASH_MS,
+  HIT_RECOIL_MS,
   HIT_SPARKS_MS,
   LUNGE_IMPACT,
   LUNGE_MS,
@@ -36,6 +37,7 @@ import {
   damagePopPose,
   hitDressingFor,
   hitFlashPose,
+  hitRecoilPose,
   lungePoseFor,
   screenShakeAmplitude,
   screenShakeOffsets,
@@ -56,6 +58,7 @@ import { signatureFor, slugFor, withSignatureSpec } from './moves/signature/sign
 import { SIGNATURE_SPECS } from './moves/signature/specs/index.mjs';
 import { attackSoundFields } from './moves/attack-sound.mjs';
 import { burstParticles } from './particles.mjs';
+import { hitDelayFor, hitDelaysOf, hitWaitMs, layoutHits, recoilVector } from './multi-hit.mjs';
 
 const BACKSTOP_PAD_MS = 400;
 const floatingCount = new Map();
@@ -93,11 +96,36 @@ const markAttackScene = (durationMs) => {
 /** When the last attack scene ends, on the `performance.now()` clock (0 before any attack). */
 export const attackSceneEndsAt = () => attackSceneEnd;
 
-/** Queue `job(ctx)` to run when the current batch's attack connects. */
-export const afterImpact = (job) => impacts.add(job);
-
 /** Design 063: a move scene announces its own contact moment (ms from now) with its context. */
 export const announceStrike = (ms, ctx = null) => impacts.strikeIn(ms, ctx);
+
+// Design 069: each attack's contact (performance.now clock) and context, by its strike key — the
+// `attackExecuted` event its plans share (advisory-animations `attackStrikes`). The queue holds an
+// attack until contact, so its damage and knockout plans arrive after the impact queue flushed;
+// they find the attack's context here instead.
+const strikes = new WeakMap();
+
+const strikeOf = (plan) => (plan?.strike && typeof plan.strike === 'object' ? strikes.get(plan.strike) : undefined);
+
+/** Announce a contact for the impact queue, and under `key` for the hits that arrive after it. */
+const announceFor = (key) => (ms, ctx = null) => {
+  if (key && typeof key === 'object') strikes.set(key, { ctx, contactAt: performance.now() + ms });
+  impacts.strikeIn(ms, ctx);
+};
+
+/**
+ * Design 069: run `job(ctx)` when `plan`'s hit lands — at its attack's contact plus its ripple
+ * delay — with that attack's context. Without a known attack it runs when the current batch's
+ * attack connects (the impact queue), as every hit did before.
+ */
+export const afterHit = (plan, job) =>
+  impacts.add((queued) => {
+    const strike = strikeOf(plan);
+    const ctx = strike?.ctx ?? queued ?? null;
+    const wait = hitWaitMs(strike?.contactAt ?? null, hitDelayFor(ctx, plan?.instanceId), performance.now());
+    if (wait > 0) setTimeout(() => job(ctx), wait);
+    else job(ctx);
+  });
 
 const showDamageNumber = (instanceId, rect, hit) => {
   const index = floatingCount.get(instanceId) || 0;
@@ -270,9 +298,10 @@ const playImpactPrefab = (ctx, target, hit) => {
 
 /**
  * Design 068: the scene leaves its contact dressing to the prefab only when its defender takes
- * a hit. A status move by name, or an attack that only hurts the Bench, keeps its own.
+ * a hit. A status move by name keeps its own. Design 069: the defender is the attack's primary
+ * hit, so a Bench snipe's target counts.
  */
-const sceneSpecFor = (spec, impactType, plan) => (impactType && plan.damage > 0 ? withoutImpactBeats(spec) : spec);
+const sceneSpecFor = (spec, impactType, defenderHit) => (impactType && defenderHit ? withoutImpactBeats(spec) : spec);
 
 const shakeTable = (amount) => {
   const amplitude = screenShakeAmplitude(amount);
@@ -286,6 +315,31 @@ const shakeTable = (amount) => {
   }
 };
 
+/**
+ * Design 069: knock a card the attack reached after its main target back from the attacker
+ * (WAAPI `translate`, added onto whatever the card already plays).
+ */
+const recoilCard = (instanceId, rect, ctx, registry) => {
+  const element = shownRecord(instanceId, registry)?.element;
+  if (!element?.isConnected || typeof element.animate !== 'function') return;
+  const push = recoilVector(ctx?.attackerRect, rect, frameTurnOf(element), element.offsetHeight || rect.height);
+  if (!push) return;
+  const frames = sampleKeyframes(
+    hitRecoilPose,
+    (p) => ({ translate: `${(push.x * p.along).toFixed(2)}px ${(push.y * p.along).toFixed(2)}px` }),
+    16
+  );
+  try {
+    element.animate(frames, { duration: HIT_RECOIL_MS, composite: 'add' });
+  } catch (error) {
+    console.debug('hit recoil failed', error);
+  }
+};
+
+/** A ripple hit's sparks and slash fly from the attacker to this card, not along the main lane. */
+const hitContextFor = (ctx, rect) =>
+  ctx?.attackerRect ? { ...ctx, direction: attackAngleDeg(ctx.attackerRect, rect) } : ctx;
+
 export const damage = (plan) => {
   const hit = classifyHitOnce(plan);
   if (!hit) return 0;
@@ -293,13 +347,19 @@ export const damage = (plan) => {
   const rect = combatRect(plan.instanceId, registry);
   if (!rect) return 0;
   const target = impactTargetFor(plan.instanceId, rect, hit, registry);
-  impacts.add((ctx) => {
+  // Design 069: a ripple hit lands on its attack's clock, so it holds nothing in the FX queue.
+  const ripple = hitDelayFor(strikeOf(plan)?.ctx, plan.instanceId) > 0;
+  afterHit(plan, (strikeCtx) => {
+    const secondary = hitDelayFor(strikeCtx, plan.instanceId) > 0;
+    const ctx = secondary ? hitContextFor(strikeCtx, rect) : strikeCtx;
     showDamageNumber(plan.instanceId, rect, hit);
     if (hit.kind !== 'hit') return;
     const dressing = hitDressingFor(ctx?.family);
     if (!playImpactPrefab(ctx, target, hit)) strikeTarget(rect, hit, ctx, dressing);
     shakeTable(hit.amount * dressing.shakeMul);
+    if (secondary) recoilCard(plan.instanceId, rect, ctx, registry);
   });
+  return ripple ? 0 : undefined;
 };
 
 const ghostImage = (src, className) => {
@@ -390,14 +450,16 @@ const moveSide = (instanceId, rect, src, registry) => {
 };
 
 /** The generic lunge: the attacker's ghost rears back, strikes the defender and recoils. */
-const playLunge = (plan, registry, card, from, to, src) => {
+const playLunge = (plan, registry, card, from, to, src, hits) => {
   const pose = lungePoseFor(from, to);
   if (!pose) return 0;
-  markAttackScene(LUNGE_MS);
-  impacts.strikeIn(LUNGE_MS * LUNGE_IMPACT, {
+  const contactMs = LUNGE_MS * LUNGE_IMPACT;
+  markAttackScene(Math.max(LUNGE_MS, hits.rippleEndMs(contactMs)));
+  announceFor(plan.strike)(contactMs, {
     direction: attackAngleDeg(from, to),
     attackerCard: card,
     impactType: readyImpactType(card, null),
+    ...hits.strikeContext,
   });
 
   const host = spawnOverlay({ rect: from, className: 'fx-overlay fx-lunge' });
@@ -423,13 +485,53 @@ const playLunge = (plan, registry, card, from, to, src) => {
   hideDuring(shownRecord(plan.attackerId, registry)?.element, mainDone, LUNGE_MS + BACKSTOP_PAD_MS);
 };
 
+/**
+ * Design 069: the attack's hits that can be drawn — real hits (not heals) whose card has a rect —
+ * as `layoutHits` targets.
+ */
+const hitTargetsOf = (plan, registry) =>
+  (Array.isArray(plan.hits) ? plan.hits : [])
+    .map((hit) => ({ hit, read: peekHit(hit), rect: combatRect(hit?.instanceId, registry) }))
+    .filter(({ read, rect }) => read?.kind === 'hit' && rect)
+    .map(({ hit, read, rect }) => ({
+      id: hit.instanceId,
+      rect,
+      amount: read.amount,
+      isDefender: hit.instanceId === plan.defenderId,
+    }));
+
+/**
+ * Design 069: what the scene needs of the attack's hits: the layout (null when the plan names
+ * none), the extra strike context, the branch lanes and when the last ripple hit has played.
+ */
+const hitsFor = (plan, registry, from) => {
+  const layout = layoutHits(hitTargetsOf(plan, registry));
+  const secondaries = layout?.secondaries ?? [];
+  const lastDelay = Math.max(0, ...secondaries.map((secondary) => secondary.delayMs));
+  return {
+    layout,
+    strikeContext: { attackerRect: from, hitDelays: hitDelaysOf(layout) },
+    branches: secondaries
+      .filter((secondary) => secondary.lane)
+      .map((secondary) => ({ rect: combatRect(secondary.id, registry), delayMs: secondary.delayMs }))
+      .filter((branch) => branch.rect),
+    rippleEndMs: (contactMs) => (secondaries.length > 0 ? contactMs + lastDelay + HIT_SPARKS_MS : 0),
+  };
+};
+
 export const attack = (plan) => {
   const registry = getCardRegistry();
   const card = combatCard(plan.attackerId, registry);
   const from = combatRect(plan.attackerId, registry);
   const src = combatSrc(plan.attackerId, registry);
   if (!from || !src) return 0;
-  const defenderId = combatRect(plan.defenderId, registry) ? plan.defenderId : opponentActiveId(plan.user, registry);
+  const hits = hitsFor(plan, registry, from);
+  // Design 069: the scene plays against the primary hit (a Bench snipe's target, not the Active).
+  const defenderId =
+    hits.layout?.primaryId ?? (combatRect(plan.defenderId, registry) ? plan.defenderId : opponentActiveId(plan.user, registry));
+  const defenderHit = hits.layout ? true : plan.damage > 0;
+  const announce = { strikeIn: announceFor(plan.strike) };
+  const sceneEnd = (played) => Math.max(played.durationMs, played.branchEndMs || 0, hits.rippleEndMs(played.contactMs));
   const to = defenderId == null ? null : combatRect(defenderId, registry);
   // Design 065: a signature plays before the zero-damage check (a status move by name still plays).
   const sig = to ? pickSignature(plan, card) : null;
@@ -437,20 +539,21 @@ export const attack = (plan) => {
   if (sig && sigDefenderSrc) {
     const impactType = readyImpactType(card, sig.spec.vgType);
     const played = playMove({
-      spec: sceneSpecFor(sig.spec, impactType, plan),
+      spec: sceneSpecFor(sig.spec, impactType, defenderHit),
       attacker: moveSide(plan.attackerId, from, src, registry),
       defender: moveSide(defenderId, to, sigDefenderSrc, registry),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
-      impacts: { strikeIn: announceStrike },
+      impacts: announce,
       attackerCard: card,
-      strikeContext: { impactType },
+      strikeContext: { impactType, ...hits.strikeContext },
+      branches: hits.branches,
     });
     if (played) {
-      markAttackScene(played.durationMs);
+      markAttackScene(sceneEnd(played));
       return played.holdMs;
     }
   }
-  if (isZeroDamage(plan) || !to) {
+  if ((isZeroDamage(plan) && !hits.layout) || !to) {
     markAttackScene(AURA_PULSE_MS);
     playAuraPulse(from, card ? brighten(fxRgbForCard(card), 0.3) : FX_NEUTRAL_RGB);
     return;
@@ -461,21 +564,24 @@ export const attack = (plan) => {
   if (pick?.score && defenderSrc) {
     const impactType = readyImpactType(card, pick.vgType);
     const played = playMove({
-      spec: sceneSpecFor(pick.score, impactType, plan),
+      spec: sceneSpecFor(pick.score, impactType, defenderHit),
       attacker: moveSide(plan.attackerId, from, src, registry),
       defender: moveSide(defenderId, to, defenderSrc, registry),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
-      impacts: { strikeIn: announceStrike },
+      impacts: announce,
       attackerCard: card,
-      strikeContext: { impactType },
+      strikeContext: { impactType, ...hits.strikeContext },
+      branches: hits.branches,
     });
     if (played) {
-      markAttackScene(played.durationMs);
+      markAttackScene(sceneEnd(played));
       return played.holdMs;
     }
   }
-  return playLunge(plan, registry, card, from, to, src);
+  return playLunge(plan, registry, card, from, to, src, hits);
 };
+
+const MAX_TARGET_RINGS = 6;
 
 const showTargetRing = (rect) => {
   const host = spawnOverlay({ rect, className: 'fx-overlay fx-target-ring' });
@@ -498,8 +604,13 @@ export const attackBanner = (plan) => {
   const text = attackBannerText(plan.attackName, attackerName);
   if (!text) return 0;
   playBanner(text, plan.user, 'attack');
-  // A bench-wide or fizzled attack has no single defender; the banner still
-  // plays, there is just nothing to ring (edge 9).
+  // Design 069: every card the attack damages is marked, not only the Active.
+  const hitRects = hitTargetsOf(plan, registry).slice(0, MAX_TARGET_RINGS).map((target) => target.rect);
+  if (hitRects.length > 0) {
+    hitRects.forEach(showTargetRing);
+    return;
+  }
+  // A fizzled attack has no defender; the banner still plays, there is just nothing to ring (edge 9).
   const defenderRect = rectForInstance(shownRecord(plan.defenderId, registry)?.instanceId ?? plan.defenderId, registry);
   if (defenderRect) showTargetRing(defenderRect);
 };

@@ -51,3 +51,32 @@ export const hitDelayFor = (ctx, id) => {
   const delay = ctx?.hitDelays?.[String(id)];
   return Number.isFinite(delay) && delay > 0 ? delay : 0;
 };
+
+/**
+ * How long from `now` until a hit lands: `delayMs` after the attack's contact (`contactAt`, same
+ * clock as `now`), never negative. Without a known contact the delay counts from now.
+ */
+export const hitWaitMs = (contactAt, delayMs, now) => {
+  const delay = Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0;
+  if (!Number.isFinite(contactAt) || !Number.isFinite(now)) return delay;
+  return Math.max(0, contactAt + delay - now);
+};
+
+/**
+ * The push a recoiling card takes, in its own frame's px: `magnitude` along the attacker -> card
+ * direction on screen, turned back by the card frame's rotation (`turnDeg`, the opponent's board
+ * is turned 180°). Null when the centres coincide or an input is unusable.
+ */
+export function recoilVector(fromRect, toRect, turnDeg = 0, magnitude = 0) {
+  if (!isRect(fromRect) || !isRect(toRect) || !(magnitude > 0)) return null;
+  const a = centreOf(fromRect);
+  const b = centreOf(toRect);
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  if (!(length >= 1)) return null;
+  const ux = (b.x - a.x) / length;
+  const uy = (b.y - a.y) / length;
+  const turn = ((Number.isFinite(turnDeg) ? -turnDeg : 0) * Math.PI) / 180;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
+  return { x: (ux * cos - uy * sin) * magnitude, y: (ux * sin + uy * cos) * magnitude };
+}
