@@ -16,7 +16,7 @@ export const SPECIAL_CONDITIONS = [
   'Poisoned',
 ];
 
-export const PROTOCOL_VERSION = '2.2.0';
+export const PROTOCOL_VERSION = '2.3.0';
 
 /** Design 074 D7: the seats a solo room's one socket may name on a command (`cmd.seat`). */
 export const COMMAND_SEATS = ['p1', 'p2'];

@@ -46,6 +46,8 @@ test('every message type parses in its valid shape', () => {
     ['sleeve', { target: 'self', image: null }],
     ['mat', { target: 'opp', matId: 'mat-7', emit: false }],
     ['coin', { target: 'self', coinId: null }],
+    ['deck-box', { target: 'opp', deckBoxId: 'db_151_sv3-5_etb' }],
+    ['deck-box', { target: 'self', deckBoxId: null }],
     ['play', { target: 'self' }],
   ];
   for (const [type, payload] of valid) {
@@ -70,6 +72,8 @@ test('bad targets, ids and flags are rejected', () => {
     assert.equal(parseBuilderMessage(buildBuilderMessage(type, payload)), null, JSON.stringify(payload));
   reject('play', { target: 'both' });
   reject('coin', { target: 'self', coinId: 42 });
+  reject('deck-box', { target: 'self', deckBoxId: 7 });
+  reject('deck-box', { target: 'both', deckBoxId: null });
   reject('mat', { target: 'self', matId: 'x'.repeat(129), emit: true });
   reject('mat', { target: 'self', matId: 'mat-1' });
   reject('host-state', { isTwoPlayer: 'yes' });

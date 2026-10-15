@@ -5,7 +5,8 @@ import { processAction } from '../general/process-action.js';
 import { shouldResetBoardOnDeckData } from './opp-board-reset.mjs';
 import { deckDataEquals } from '../general/sync-action-args.mjs';
 import { changePlaymat, getStoredMatId } from '../sizing/apply-mat-layout.js';
-import { resolveFormatAndEmit } from './deck-format-args.mjs';
+import { resolveDeckPacketTail } from './deck-box-args.mjs';
+import { deckBoxes } from '../netcode/mat-fx/deck-box-state.mjs';
 
 export const exchangeData = (
   user,
@@ -16,9 +17,10 @@ export const exchangeData = (
   callback = true,
   matId = null,
   format,
+  deckBoxArg,
   emitArg
 ) => {
-  const { format: deckFormat, emit } = resolveFormatAndEmit(format, emitArg);
+  const { format: deckFormat, emit, deckBoxId } = resolveDeckPacketTail(format, deckBoxArg, emitArg);
   const flipBoardButton = document.getElementById('flipBoardButton');
   const coachingModeCheckbox = document.getElementById('coachingModeCheckbox');
 
@@ -37,11 +39,14 @@ export const exchangeData = (
     systemState.p2OppCardBackSrc = cardBack;
     systemState.deckFormat.p2Opp = deckFormat;
     if (matId) changePlaymat('opp', matId, false);
+    // Design 073: a packet from before deck boxes names none; the opponent keeps the box it shows.
+    if (deckBoxId !== undefined) deckBoxes.setId('opp', deckBoxId);
     if (coachingModeCheckbox.checked && coachingMode) {
       systemState.coachingMode = true;
       flipBoardButton.style.display = 'inline-block';
     }
     if (opponentChanged) {
+      deckBoxes.clearDealt(['opp']);
       appendMessage(
         '',
         systemState.p2OppUsername + ' joined',
@@ -65,6 +70,7 @@ export const exchangeData = (
         false,
         getStoredMatId('self'),
         systemState.deckFormat.self,
+        deckBoxes.idFor('self'),
         true
       );
     }
@@ -78,5 +84,6 @@ export const exchangeData = (
     callback,
     matId,
     deckFormat,
+    deckBoxes.idFor(user),
   ]);
 };
