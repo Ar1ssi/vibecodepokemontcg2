@@ -43,7 +43,7 @@ try {
   const page = await context.newPage();
   page.on('pageerror', (err) => console.log('PAGEERROR:', err.message));
   const fresh = async (query) => {
-    await page.goto(`${BASE}/build-and-battle?e2e=1${query}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${BASE}/build-and-battle-legacy?e2e=1${query}`, { waitUntil: 'domcontentloaded' });
     await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await waitFor(page, () => document.getElementById('buildBattleOpenBox')?.disabled === false, 20000);
@@ -136,7 +136,7 @@ try {
   // A reload with a saved box resumes it whatever `?box=` says.
   await page.click('#buildBattleOpenBox');
   await waitFor(page, (key) => Boolean(localStorage.getItem(key)), 10000, STORAGE_KEY);
-  await page.goto(`${BASE}/build-and-battle?e2e=1&box=mega-evolution`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/build-and-battle-legacy?e2e=1&box=mega-evolution`, { waitUntil: 'domcontentloaded' });
   await waitFor(page, () => Boolean(document.getElementById('buildBattleNewBox')), 20000);
   const resumed = await page.evaluate(() => document.querySelector('#buildBattleBoxPanel .bb-title')?.textContent);
   T('a saved box resumes over ?box=', /^Pitch Black Build & Battle Box · /.test(resumed || ''), resumed);

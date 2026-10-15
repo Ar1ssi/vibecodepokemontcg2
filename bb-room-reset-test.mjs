@@ -42,7 +42,7 @@ try {
   const openBuilder = async () => {
     const [tab] = await Promise.all([
       context.waitForEvent('page'),
-      game.evaluate(() => { window.open('/build-and-battle', 'ptcgBuildBattle'); }),
+      game.evaluate(() => { window.open('/build-and-battle-legacy', 'ptcgBuildBattle'); }),
     ]);
     tab.on('pageerror', (err) => console.log('PAGEERROR builder:', err.message));
     await tab.waitForLoadState('domcontentloaded');
@@ -89,7 +89,7 @@ try {
   await builder.close();
 
   const solo = await context.newPage();
-  await solo.goto(`${BASE}/build-and-battle`, { waitUntil: 'domcontentloaded' });
+  await solo.goto(`${BASE}/build-and-battle-legacy`, { waitUntil: 'domcontentloaded' });
   await waitFor(solo, () => Boolean(document.getElementById('buildBattleNewBox')), 20000);
   T('a builder tab with no game tab keeps the saved box', (await saved(solo))?.seed === boxC.seed);
   await solo.close();

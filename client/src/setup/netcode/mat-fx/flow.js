@@ -5,6 +5,7 @@
 // banner. The game-over modal itself is apply-view's `reconcileGameEnded`;
 // these play on top of it and never take pointer events.
 import { getCardRegistry } from '../apply-view.js';
+import { spectatorSeatName } from '../../spectator/spectator-session.js';
 import {
   animateFrames,
   rectForInstance,
@@ -38,7 +39,7 @@ const textNode = (className, text) => {
 };
 
 export const turnBanner = (plan) => {
-  const text = turnBannerText(plan.user, plan.number);
+  const text = turnBannerText(plan.user, plan.number, spectatorSeatName(plan.user));
   if (!text) return 0;
   playBanner(text, plan.user);
   playEdgeGlow(plan.user);

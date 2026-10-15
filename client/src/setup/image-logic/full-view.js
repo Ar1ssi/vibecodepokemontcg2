@@ -14,6 +14,7 @@ import {
 } from '../deck-constructor/hydrate-holo.js';
 import { toHighResCardImageUrl } from './card-image-url.mjs';
 import { hidePreviewSource } from './preview-source.mjs';
+import { suppressHoverPreview } from './hover-preview-bus.mjs';
 import {
   playSelectPop,
   playDeselectPop,
@@ -207,6 +208,7 @@ export const openFloatingCardPreview = ({
     closeCardPreview(null, true);
   }
   if ((!sourceEl && !sourceRect) || !imageUrl) return;
+  suppressHoverPreview('modal');
 
   const rect = sourceRect ?? viewportRectOf(sourceEl);
   const overlay = document.createElement('div');

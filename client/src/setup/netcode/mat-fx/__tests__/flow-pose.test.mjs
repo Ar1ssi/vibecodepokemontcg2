@@ -131,3 +131,10 @@ test('confettiPieces: a third fall from the top, the rest fire from both corners
   assert.ok(apex.x > start.x, 'left cannon fires rightward');
   assert.ok(confettiPiecePose(left, 1).y > apex.y, 'falls back down');
 });
+
+// Design 069: a spectator has no "your" turn; the banner names the player.
+test('turnBannerText names the player for a spectator', () => {
+  assert.deepEqual(turnBannerText('opp', 4, 'Gary'), { title: "Gary's Turn", sub: 'Turn 4' });
+  assert.deepEqual(turnBannerText('self', 4, null), { title: 'Your Turn', sub: 'Turn 4' });
+  assert.equal(turnBannerText('nobody', 4, 'Gary'), null);
+});

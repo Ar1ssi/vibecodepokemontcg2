@@ -109,6 +109,7 @@ import { liveActiveCard, liveCardFor, glowNodeFor } from './live-card-sources.mj
 import { isPlayedToBenchTriggerCard, isEvolvePlayedTriggerCard } from './action-affordances.mjs';
 import { computeCardGlows } from './card-glow-model.mjs';
 import { glowColorFor } from './card-glow-colors.mjs';
+import { spectatorSeatName } from '../spectator/spectator-session.js';
     
     let initialized = false;
 
@@ -310,7 +311,10 @@ import { glowColorFor } from './card-glow-colors.mjs';
         }
         hud.hidden = false;
         const isMine = rulesState.turnPlayer === 'self';
-        hud.querySelector('.rules-hud-player').textContent = isMine ? 'YOUR TURN' : "OPPONENT'S TURN";
+        const watched = spectatorSeatName(rulesState.turnPlayer);
+        hud.querySelector('.rules-hud-player').textContent = watched
+          ? `${watched.toUpperCase()}'S TURN`
+          : isMine ? 'YOUR TURN' : "OPPONENT'S TURN";
         const phaseText = rulesState.phase === 'attack' ? 'attack used — end turn'
           : rulesState.phase === 'ended' ? 'game over'
           : rulesState.phase === 'draw' ? 'draw phase' : 'main phase';

@@ -24,6 +24,7 @@ client/src/setup/netcode/mat-fx/sfx-cues.mjs + sample-bank.js + ui-cue.mjs + sta
 scripts/sfx/ (`pnpm sfx:import -- --src <extract dir>`) — transcodes the TCG Live SFX extract to committed client/src/assets/sfx/*.ogg + manifest.json (D203/D204); server/sfx-cache.mjs caches only hashed .ogg
 scripts/fx/import-tcgl-status-fx.mjs (`pnpm fx:import-status -- --src <extract dir>`) — copies TCG Live status VFX textures, damage-counter coin and Poison/Burn badges (WebApp/assets/ui WebP) to committed client/src/assets/status-fx/, damage-counter/, status-markers/
 scripts/attack-ui/ — `import-attack-ui.mjs --src <extract dir>` copies TCG Live's AttackOverlay sprites (titlebars, damage tabs, ability tag and header mask, Retreat button, GX and VSTAR bars, list frame, row tiles) to committed client/src/assets/attack-ui/; `dump-registry.py` (UnityPy) writes attack-ui.json (per-type colour/ink, VSTAR sprite names + 9-slice borders from AttackEntryAssetRegistry_AttackOverlay). index.css pins both: setup/rules/__tests__/attack-ui-assets.test.mjs
+scripts/special-energy-tokens/ — `make-tokens.py <card pngs> <out> --write-client` cuts a token per Special Energy name from its card's orb (orb-circles.json, hand-checked; detect-orbs.py first pass), 2-Energy cards as two orbs, holo/reverse finish (card-refs.json) as animated SVG → client/src/assets/energy/special/ + generated move-card-bundle/special-energy-tokens.mjs; fetch-card-refs.py pulls the TCGdex art
 client/src/setup/rules/card-focus.mjs — TCG Live Active-card popup (design 067, D208): CSS-3D flight from the slot to the game's focus pose, hand lowered via `.hand-lowered` on the self iframe, 500 ms click guard (D209), reuses the 013 inspector (`buildInspectorCard`); card-focus-geometry.mjs (pure: pose, flight, curves, tilt), card-focus-routing.mjs (`shouldOpenCardFocus`), css/card-focus.css; routed from click-events.js, Escape in keybinds.js
 client/src/setup/netcode/mat-fx/status-fx.mjs + status.js — condition apply pop / clear sparkle from TCG Live sprites; status-loop.mjs + status-loop.js — held-condition loop overlay, reconciled per card in apply-view.js `reconcileStatusLoopOverlay`; palette in client/src/css/status-fx-palette.css; status-units.mjs — Unity prefab units → card widths (tables keep E:/TCGLive_Extract/vfx_dump numbers)
 
@@ -62,7 +63,7 @@ shared/engine/rules/attack-copy.mjs - copy-attack parser (`parseCopyAttack`: sou
 shared/engine/rules/each-filter.mjs - "each of your opponent's Pokémon that …" filters shared by counter-spread steps and reduce damage-each (design 036 A9)
 shared/engine/rules/turn-damage-bonus.mjs - Trainer/Ability "during this turn, your … attacks do N more damage" bonuses (`turnDamageBonusTotal`; possessive, per-Prize, Basic-only, instance-scoped)
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
-shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveCoinWinnerPlayerId`, `resolveStarterFromChoice`; the server authority's side of the coin call (D50, D211)
+shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveCoinWinnerPlayerId`, `resolveStarterFromChoice`; the server authority's side of the coin call (D50, D212)
 server/game/turn-order-transport.mjs — opening coin over sockets (TCG Live StartingCoinFlip, design 072): call → `turnOrderFlip` → winner's `turnOrderChoice` → `turnOrderResult` + deal; answer timeouts, seat-lost auto answers, `replayTo` on rejoin. State lives on GameRoom.turnOrder; e2e: opening-coin-choice-test.mjs
 shared/engine/rules/baby-rule.mjs — Baby Rule (attacker flips vs an Active Baby, tails ends the turn) and Baby → Basic evolution table; read by reduce 'attack'/evolve legality and evolution.mjs canEvolve (I230)
 shared/engine/rules/legacy-attached-trainer.mjs — WotC non-Tool attach Trainers (PlusPower, Defender, Charity, Magnifier, Sabrina's ESP, Brock's Protection, Koga's Ninja Trick): attach target, discard timer, damage markers (I224)
@@ -103,6 +104,7 @@ client/src/initialization/document-event-listeners/sidebox/native-deck-builder-s
 
 ## Actions (~10,582 lines, ~85% DOM-coupled — every mutation goes through the DOM)
 client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary mutation path
+client/src/actions/move-card-bundle/energy-token-assets.mjs — attached-Energy token per card: Special Energy by name (`specialEnergyTokenFor`, two-orb `energy-token-double`), else type token
 client/src/actions/zones/ — deck/hand/prize/shuffle operations
 client/src/actions/counters/ — damage, special condition, ability counters (DOM overlays)
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo

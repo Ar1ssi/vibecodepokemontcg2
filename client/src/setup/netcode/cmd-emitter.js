@@ -171,6 +171,10 @@ export async function emitCmd({
   if (!type || typeof type !== 'string') {
     return { success: false, error: 'invalid_command_type' };
   }
+  // Design 069: the server refuses a spectator's command; never send one.
+  if (typeof document !== 'undefined' && document.body?.classList?.contains('spectating')) {
+    return { success: false, error: 'spectator_readonly' };
+  }
 
   // Pre-validate command shape if validator available
   const validator = await getShapeValidator();
