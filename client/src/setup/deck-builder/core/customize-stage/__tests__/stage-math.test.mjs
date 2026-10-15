@@ -6,12 +6,14 @@ import {
   PASSIVE_DEGREES_PER_SECOND,
   blendPose,
   coinFrame,
+  coinShadowFrame,
   composePoint,
   dragYaw,
   layoutFor,
   nextIndex,
   passiveYaw,
   projectPoint,
+  yawDegrees,
 } from '../stage-math.mjs';
 
 const scene = JSON.parse(
@@ -120,4 +122,18 @@ test('nextIndex wraps both ways and returns 0 for an empty or invalid list', () 
 
 test('identity composePoint is a no-op', () => {
   assert.deepEqual(composePoint(identity, [3, 4, 5]), [3, 4, 5]);
+});
+
+test('yawDegrees reads the rotation about y of the coin slot poses', () => {
+  near(yawDegrees(scene.slots.coin.grouped.q), 30, 0.1);
+  near(yawDegrees([0, 0, 0, 1]), 0);
+});
+
+test('coinShadowFrame sits under the coin and is wider than tall', () => {
+  const size = { width: 900, height: 700 };
+  const pose = layoutFor(scene, null).coin.pose;
+  const frame = coinShadowFrame(scene, pose, size);
+  const coin = coinFrame(scene, pose, size, 1.7014);
+  assert.ok(frame.width > 0 && frame.height > 0 && frame.height < frame.width);
+  assert.ok(frame.y > coin.y, 'the shadow is on the floor, below the disc centre');
 });

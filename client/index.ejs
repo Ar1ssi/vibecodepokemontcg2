@@ -307,13 +307,17 @@
                     <% } %>
                     <div id="nativeDeckBuilderCustomizeSwitcher" hidden>
                       <div class="customize-switcher-toggle" role="tablist">
-                        <button type="button" data-view="sleeve" class="active">Card Sleeve</button>
+                        <button type="button" data-view="box" class="active">Deck Box</button>
+                        <button type="button" data-view="sleeve">Card Sleeve</button>
                         <button type="button" data-view="coin">Coin</button>
                         <button type="button" data-view="mat">Mat</button>
                       </div>
                       <input id="nativeDeckBuilderCustomizeFilter" type="text"
-                        placeholder="Filter sleeves, coins or mats..." aria-label="Filter customize items" />
+                        placeholder="Filter deck boxes, sleeves, coins or mats..." aria-label="Filter customize items" />
                     </div>
+                    <%# TCG Live's 3D preview of the deck's box, sleeve and coin (design 071); drawn above the active picker. %>
+                    <div id="nativeDeckBuilderCustomizeStage" class="customize-stage" hidden></div>
+                    <div id="nativeDeckBuilderBoxPanel" class="native-deck-builder-sleeve-panel native-deck-builder-box-panel" hidden></div>
                     <div id="nativeDeckBuilderSleevePanel" class="native-deck-builder-sleeve-panel" hidden>
                     </div>
     

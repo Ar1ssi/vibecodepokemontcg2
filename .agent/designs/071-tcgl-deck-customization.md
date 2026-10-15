@@ -1,5 +1,5 @@
 # 071: TCG Live deck customization — 3D deck box, sleeve and coin preview
-Status: approved (user)
+Status: built (awaiting review and the user's localhost check)
 Date: 2026-10-15 · Session: S-deckcust · Branch: `feature/tcgl-deck-customize` (stacked on `feature/tcgl-coins`, design 069)
 
 ## Problem
@@ -95,19 +95,19 @@ concept here at all. User asked for TCG Live's deck boxes rendered in 3D plus th
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | No deck loaded, user picks a box | Remembered via `rememberCosmetic`; Save writes it into the new deck | [ ] |
-| 2 | Saved `deckBoxId` not in `boxes.json` | Treated as default; record left untouched | [ ] |
-| 3 | Library record has no `deckBoxId` (pre-071) | Loads; `getActiveDeckBox` → null; default box shown | [ ] |
-| 4 | `boxes.json` / mesh / atlas fetch fails | Stage hides, pickers still work, one console warning | [ ] |
-| 5 | WebGL2 unavailable or context lost | Same as 4; coin stage `onLost` hides the stage | [ ] |
-| 6 | Hide/show Customize tab repeatedly | Contexts disposed on hide, rebuilt on show; no leaked canvases | [ ] |
-| 7 | Rapid prev/next | Latest pick wins (stale texture loads ignored by token) | [ ] |
-| 8 | Empty filter result | Grid shows empty state; stage keeps current selection | [ ] |
-| 9 | Focused slot with list length 0 | `nextIndex` returns 0; arrows disabled | [ ] |
-| 10 | Opponent target (`currentLoadTarget`='opp') | Pick writes to that target's deck only | [ ] |
-| 11 | CSV export/import with and without `#DECKBOX,` | Round-trips; absent line → null | [ ] |
-| 12 | Importer run with missing source file | Exits non-zero, names the file, writes nothing | [ ] |
-| 13 | Reduced motion (`motionReduced()`) | No passive spin or slide tween; poses snap | [ ] |
+| 1 | No deck loaded, user picks a box | Remembered via `rememberCosmetic`; Save writes it into the new deck | e2e run: picked a box with no deck loaded, caption and stage followed; wiring `currentCosmeticId` falls back to the mirror |
+| 2 | Saved `deckBoxId` not in `boxes.json` | Treated as default; record left untouched | [x] covered: boxes.test 'boxById returns the box, and the default for null, undefined or an unknown id' |
+| 3 | Library record has no `deckBoxId` (pre-071) | Loads; `getActiveDeckBox` → null; default box shown | [x] covered: deck-snapshot.test 'a library record saved before deck boxes loads and has no deck box' |
+| 4 | `boxes.json` / mesh / atlas fetch fails | Stage hides, pickers still work, one console warning | [x] covered: native-deck-builder-box-picker-failure.test; customize-stage.test 'without WebGL ...' |
+| 5 | WebGL2 unavailable or context lost | Same as 4; coin stage `onLost` hides the stage | [x] covered: customize-stage.test 'without WebGL the stage marks itself unavailable ...'; context loss adds `is-unavailable` via `onLost` (reading) |
+| 6 | Hide/show Customize tab repeatedly | Contexts disposed on hide, rebuilt on show; no leaked canvases | [x] reasoning: hide() bumps `token` (aborts an in-flight build) and disposes both stages; show() rebuilds from `getSelection` |
+| 7 | Rapid prev/next | Latest pick wins (stale texture loads ignored by token) | [x] reasoning: `swapMap` tokens per slot; a stale load disposes its texture and never reaches the material |
+| 8 | Empty filter result | Grid shows empty state; stage keeps current selection | [x] covered: box-picker.test 'the filter narrows the gallery and an empty result says so' |
+| 9 | Focused slot with list length 0 | `nextIndex` returns 0; arrows disabled | [x] covered: stage-math.test 'nextIndex wraps both ways and returns 0 for an empty or invalid list' |
+| 10 | Opponent target (`currentLoadTarget`='opp') | Pick writes to that target's deck only | [x] reasoning: every write goes through `currentLoadTarget`; `setActiveField` already binds the target's deck |
+| 11 | CSV export/import with and without `#DECKBOX,` | Round-trips; absent line → null | [x] covered: csv-adapter.test '#DECKBOX' tests (round trip, CRLF, empty) |
+| 12 | Importer run with missing source file | Exits non-zero, names the file, writes nothing | [x] covered: box-catalog.test 'the importer names the missing file and leaves the output directory alone' |
+| 13 | Reduced motion (`motionReduced()`) | No passive spin or slide tween; poses snap | [x] reasoning: `retarget` snaps and `frame` skips passive spin when `motionReduced()` |
 
 ## Test plan
 - Node: `stage-math` (poses, layout, wrap, yaw), library (`deckBoxId` round-trip, legacy record, snapshot
@@ -130,4 +130,23 @@ records keep an ignored extra field. Stacked on `feature/tcgl-coins`; lands afte
 | 4 screen + wiring | `customize-stage.js`, `native-deck-builder-box-picker.js`, `native-deck-builder.js`, `index.ejs`, CSS | as listed | owned-pickers test extended for box view | `pnpm test:changed`, localhost check requested |
 
 ## Deviations
-(none yet)
+- Default box is `db_pokeball_tcgl-default`, not the game's `DB_PC_Pokeballs` (absent from the extract).
+- Meshes: the extract's OBJ already has Unity's x negated, so the importer turns meshes a half turn about y
+  (x and z negate, winding kept) instead of the design's z mirror. Verified against the game's box thumbnails
+  and `scene.json` poses (mirrored z, quaternion x/y negated).
+- Rendering: box and sleeve share one three scene and canvas; only the coin has its own canvas, placed by
+  `coinFrame` (projected pose). The design's "three slot canvases" is superseded; coin shadow is a CSS mask.
+- `builder-window.mjs` is untouched: the deck box has no game-side message, so no payload to validate.
+- `scene.json` also carries the coin's `pivot`/`mesh` poses (needed to project the disc's centre).
+- Arrows step the catalog order of the focused category (sleeves, TCG Live coins then physical coins, boxes).
+- Sleeves in the preview are the existing catalog's images (447 of 450 hot-linked from
+  pokemon-sleeve-database.com, which sends `Access-Control-Allow-Origin: *`); a load that fails shows the
+  default back and logs once.
+
+## Landing notes (apply in the commit that lands on main)
+- DECISIONS: `[deck-builder] 071: deck box = per-deck nullable deckBoxId, default box db_pokeball_tcgl-default;
+  preview = one box+sleeve three scene + the 069 coin stage on its own canvas (no coin-stage refactor).`
+  `[assets] 071: deck box atlases (32 MB) committed under client/src/assets/deckbox/ (imported, not streamed).`
+- MAP: scripts/fx/deckbox/ (importer), client/src/assets/deckbox/, setup/deck-builder/core/customize-stage/
+  (stage-math, boxes, object-stage, customize-stage), sidebox/native-deck-builder-box-picker.js.
+- Lands after `feature/tcgl-coins` (stacked). STATE: Focus/Active lines for 071.

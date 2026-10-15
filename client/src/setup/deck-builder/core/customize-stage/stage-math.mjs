@@ -17,6 +17,10 @@ export const PASSIVE_DEGREES_PER_SECOND = 10;
 /** Radians of yaw per pixel dragged. */
 export const DRAG_RADIANS_PER_PIXEL = 0.01;
 
+/** Unity's built-in Plane is 10 units across; the floor seen at a grazing angle squashes its depth. */
+const SHADOW_PLANE_UNITS = 10;
+const SHADOW_FLATTEN = 0.45;
+
 const rotateByQuaternion = ([qx, qy, qz, qw], [x, y, z]) => {
   // v' = v + 2w(q×v) + 2(q×(q×v))
   const tx = 2 * (qy * z - qz * y);
@@ -123,4 +127,21 @@ export const dragYaw = (startYaw, dxPixels) => startYaw + dxPixels * DRAG_RADIAN
 export function nextIndex(index, dir, length) {
   if (!Number.isInteger(length) || length <= 0) return 0;
   return (((index + dir) % length) + length) % length;
+}
+
+/** A pose's rotation about the vertical axis in degrees; the coin stage takes its yaw in degrees. */
+export const yawDegrees = (q) => (2 * Math.atan2(q[1], q[3]) * 180) / Math.PI;
+
+/**
+ * The coin's floor shadow as a flattened ellipse under the disc: centre and size in stage px. The game's
+ * plane is 600×380 units at the slot origin, seen from about 15 degrees above the floor.
+ *
+ * @returns {{ x: number, y: number, width: number, height: number }}
+ */
+export function coinShadowFrame(scene, pose, size) {
+  const { shadow } = scene.slots.coin;
+  const centre = composePoint(pose, shadow.p);
+  const { x, y, pxPerUnit } = projectPoint(scene, centre, size);
+  const width = SHADOW_PLANE_UNITS * shadow.s[0] * pose.s[0] * pxPerUnit;
+  return { x, y, width, height: width * SHADOW_FLATTEN };
 }
