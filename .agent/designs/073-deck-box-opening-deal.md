@@ -1,5 +1,5 @@
 # 073: Deck boxes beside the mat, and the opening deal out of them
-Status: approved (user) — gate questions answered 2026-10-15 (send the box, rest beside each deck, fly back open)
+Status: built (awaiting the user's localhost check) — approved (user) 2026-10-15: send the box, rest beside each deck, fly back open
 Date: 2026-10-15 · Session: S-deckbox-deal · Branch: `claude/practical-pasteur-phs3b5`
 
 ## Problem
@@ -132,22 +132,24 @@ fade landed cards 2545–2745 · return 2700–3350 (lid stays open) · total 33
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | No deck on a side | No box for that side; the deal skips it | [ ] |
-| 2 | Unknown / malformed box id on the wire | Sanitized to null → default box | [ ] |
-| 3 | Packet from a pre-073 client (no box slot) | `deckBoxId` undefined → opp keeps its current box; emit read correctly | [ ] |
-| 4 | Pre-051 packet (no format) | emit read from the format slot as before | [ ] |
-| 5 | Band too narrow (two-player / sim layouts) | No resting box (null placement); the deal still flies from the board edge | [ ] |
-| 6 | WebGL missing / context lost / asset fetch fails | Stage unavailable, logged once; deal resolves at once; coin flow unaffected | [ ] |
-| 7 | e2e, fx off, reduced motion, hidden tab | Deal skipped (sides marked dealt, boxes rest open) | [ ] |
-| 8 | `end` never called (exception mid-scene) | Gate backstop releases queued coin callbacks | [ ] |
-| 9 | Call/flip/result arrive during the deal | Run in arrival order after it | [ ] |
-| 10 | Call arrives with no deal running | Runs at once (unchanged flow) | [ ] |
-| 11 | Restart / room change / new deck | `dealt` cleared → box rests closed | [ ] |
-| 12 | Sync replay / catch-up of readyUp | `readyUp` returns before the deal (existing `syncReplaying` guard) | [ ] |
-| 13 | Resize or sidebox toggle mid-deal | Placements are read once at start; rest re-measured after | [ ] |
-| 14 | Sleeve image fails to load (CORS / 404) | Default card back | [ ] |
-| 15 | Deck of 1 card / 60 cards | 1 card flies / 24 fly | [ ] |
-| 16 | Spectator session | No boxes drawn | [ ] |
+| 1 | No deck on a side | No box for that side; the deal skips it | [x] reasoning: `restFor` and `playOpeningDeal` filter on `hasDeckLoaded`; recording with one deck (flow run) showed one box |
+| 2 | Unknown / malformed box id on the wire | Sanitized to null → default box | [x] covered: deck-box-args.test 'a malformed box id on the wire reads as the default box'; deck-box-state.test 'setId keeps catalog-shaped ids…' |
+| 3 | Packet from a pre-073 client (no box slot) | `deckBoxId` undefined → opp keeps its current box; emit read correctly | [x] covered: deck-box-args.test 'a packet from before 073 has emit in the box slot and no box' |
+| 4 | Pre-051 packet (no format) | emit read from the format slot as before | [x] covered: deck-box-args.test 'a packet from before 051 has emit in the format slot' |
+| 5 | Band too narrow (two-player / sim layouts) | No resting box (null placement); the deal still flies from the board edge | [x] covered: deck-box-math.test 'restPlacement shrinks the box … refuses a band too narrow', 'offBoardPlacement starts a box with no band…' |
+| 6 | WebGL missing / context lost / asset fetch fails | Stage unavailable, logged once; deal resolves at once; coin flow unaffected | [x] reasoning: `ensureStage` catches → `stageFailed`, warns once, resolves null; `playOpeningDeal` marks dealt and returns before the gate opens; `onLost` disposes |
+| 7 | e2e, fx off, reduced motion, hidden tab | Deal skipped (sides marked dealt, boxes rest open) | [x] reasoning: `shouldSkipDeal` checks each before the gate; the e2e harness path (`pnpm test` e2e-free; rec scripts disarm e2e to see the deal) |
+| 8 | `end` never called (exception mid-scene) | Gate backstop releases queued coin callbacks | [x] covered: deck-box-gate.test 'a deal that never reports its end is released by the backstop' |
+| 9 | Call/flip/result arrive during the deal | Run in arrival order after it | [x] covered: deck-box-gate.test 'during a deal, callbacks wait and run in arrival order when it ends' |
+| 10 | Call arrives with no deal running | Runs at once (unchanged flow) | [x] covered: deck-box-gate.test 'with no deal playing, a callback runs at once' |
+| 11 | Restart / room change / new deck | `dealt` cleared → box rests closed | [x] covered: deck-box-state.test 'clearDealt shuts only the named sides'; wiring: `game-restarted`/`room-changed` listeners in deck-box.js, `loadDeckData` and a changed opponent in `exchangeData` |
+| 12 | Sync replay / catch-up of readyUp | `readyUp` returns before the deal (existing `syncReplaying` guard) | [x] reasoning: the await sits after the `syncReplaying` return in ready.js |
+| 13 | Resize or sidebox toggle mid-deal | Placements are read once at start; rest re-measured after | [x] reasoning: plans hold rects measured at start; `syncRest` returns while `isDealing()`; `finally` clears the key and re-syncs |
+| 14 | Sleeve image fails to load (CORS / 404) | Default card back | [x] reasoning: `useSleeve` catches the load (or its 1.2 s timeout) and maps the default back |
+| 15 | Deck of 1 card / 60 cards | 1 card flies / 24 fly | [x] covered: deck-box-math.test 'flyingCardCount clamps…', 'dealTimeline: …' |
+| 16 | Spectator session | No boxes drawn | [x] reasoning: `boardHidden()` (authoritative spectator or broadcast layout) nulls every rest and skips the deal |
+| 17 | Server coin call timer (15 s) runs during the deal | The caller's picker opens ~3.4 s in, leaving ~11.6 s to call; the server's auto-call still answers a silent caller | [x] reasoning: the gate only delays showing the picker; TURN_ORDER_CALL_TIMEOUT_MS is untouched (room.mjs) |
+| 18 | A box resting open is dealt again (Reset, then Set Up) | Lid stays open; the stack refills and deals | [x] reasoning: `wasOpen` pins the lid in `step` |
 
 ## Test plan
 - Node: `deck-box-math` (split partitions every triangle, lid above cut, hinge at back, rim inside outer,
@@ -168,3 +170,21 @@ Additive. Revert: drop the trailing wire params (old packets still parse), remov
 | 3 stage | deck-box-stage.js, deck-box.js, mat-fx.css, self/opp-containers.css, front-end init, ready.js, rules-bridge.js | as in Runtime | recording | n/a | lint clean, recording shows rest + deal |
 
 ## Deviations
+- The Customize stage's `loadAssets`, `loadTexture` and `staticTexture` are exported from object-stage.js and
+  shared (one fetch, one decode) instead of a second loader.
+- The game tab announces its box on every deck load to the board (`loadCurrentDeck`) and on a pick, not on
+  `refreshDeckBoxSelection`: that also runs when the editor detaches from a deck the board still holds.
+- The FX-queue hold is raised by an `opening-deal-started` event that advisory-animations.js listens for, so
+  ready.js → deck-box.js does not import the FX queue's module graph.
+- The resting box steps clear of `#boardButtonContainer` (`avoidRects`), seen overlapping it with the sidebox shut.
+- Recording: `.claude/skills/fx-preview/rec/rec-deck-box.mjs` (rest.png, deal.webm, after.png).
+
+## Landing notes (apply in the commit that lands on main)
+- DECISIONS (next id D213 at the time of writing):
+  `[mat-fx] 073: deck boxes rest in the blurred band beside each deck and deal it at game start, on one
+  page-wide three.js canvas (z 850); lid = mesh cut at the cap groove plus the front flap.`
+  `[netcode] 073: the deck box id rides exchangeData/loadDeckData as a display-only param after format
+  (PROTOCOL_VERSION 2.2.0); the opening coin's call/flip/result wait for the deck box deal (deck-box-gate).`
+- MAP: `client/src/setup/netcode/mat-fx/deck-box.js + deck-box-stage.js (three) — both deck boxes beside the mat
+  and the opening deal; pure deck-box-math/-gate/-state.mjs; wire arg deck-constructor/deck-box-args.mjs (design 073)`.
+- STATE: Active gains "deck box deal (073) awaiting the user's localhost check".

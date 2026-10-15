@@ -301,6 +301,8 @@ onFxSettingsChanged((settings) => {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('game-restarted', () => fxQueue.clear());
+  // Design 073: what arrives while the deck boxes deal plays after them.
+  document.addEventListener('opening-deal-started', (event) => holdFxQueue(event.detail?.ms));
 }
 
 /**

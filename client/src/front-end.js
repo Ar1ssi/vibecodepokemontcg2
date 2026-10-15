@@ -12,6 +12,7 @@ import { installE2eApi } from './setup/general/e2e-api.js';
 import { initializeRoomFormatPanel } from './setup/general/room-format-panel.js';
 import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-settings.js';
 import { initializeHoverPreview } from './setup/image-logic/hover-preview.js';
+import { installDeckBoxes } from './setup/netcode/mat-fx/deck-box.js';
 
 applyFxSettings();
 watchFxSettingTargets();
@@ -24,5 +25,6 @@ initializeMutationObservers();
 initializeMatLayout();
 initializeTableTilt();
 initializeHoverPreview();
+installDeckBoxes();
 loadImportData();
 installE2eApi();

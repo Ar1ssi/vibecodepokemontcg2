@@ -1488,3 +1488,14 @@ body.fx-off .fx-mega-field {
   height: 100vh;
   z-index: 2456;
 }
+
+/* Design 073: both deck boxes and the opening deal, one WebGL canvas over the page. Above the board
+   iframes, under the deck builder workspace (900), the sidebox and every overlay; never takes input. */
+#deckBoxStage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 850;
+  pointer-events: none;
+}

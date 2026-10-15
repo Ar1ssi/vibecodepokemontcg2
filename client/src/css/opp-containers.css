@@ -630,6 +630,11 @@ img.draw-flight-source,
   align-items:flex-start;
   z-index: 0;
 }
+/* Design 073: while a deck box deals, the cards flying out of it are the deck; the real one shows
+   when the last card lands. */
+html.deckbox-dealing :is(#deckCover, #deckStack) {
+  visibility: hidden;
+}
 #deckCover img {
   width: auto;
   height: auto;

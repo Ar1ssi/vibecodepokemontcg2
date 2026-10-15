@@ -28,8 +28,9 @@ const fetchJson = async (name) => {
 };
 
 let assetsPromise = null;
-/** Scene poses and both meshes, loaded once; a failed load is retried next time. */
-const loadAssets = () => {
+/** Scene poses and both meshes, loaded once; a failed load is retried next time. Shared with the board's
+ * deck boxes (design 073). */
+export const loadAssets = () => {
   assetsPromise ??= Promise.all([fetchJson('scene.json'), fetchJson('deck-box.mesh.json'), fetchJson('card.mesh.json')])
     .then(([scene, boxMesh, cardMesh]) => ({ scene, boxMesh, cardMesh }))
     .catch((error) => {
@@ -59,7 +60,7 @@ const place = (object, pose) => {
 };
 
 const loader = new THREE.TextureLoader();
-const loadTexture = async (url) => {
+export const loadTexture = async (url) => {
   const texture = await loader.loadAsync(url);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -71,7 +72,7 @@ const staticTextures = new Map();
  * sends no-store, so without this each show() would fetch them again. Never disposed; a failed load is
  * retried next time.
  */
-const staticTexture = (url) => {
+export const staticTexture = (url) => {
   if (!staticTextures.has(url)) {
     staticTextures.set(
       url,

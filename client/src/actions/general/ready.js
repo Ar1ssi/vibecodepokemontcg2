@@ -7,6 +7,7 @@ import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { decksMismatchFormat, formatMismatchMessage } from '/shared/engine/formats.mjs';
 import { deckFormatOf } from '../../setup/deck-constructor/deck-format-args.mjs';
 import { setup, setupPrizes } from './setup.js';
+import { playOpeningDeal } from '../../setup/netcode/mat-fx/deck-box.js';
 
 const SETUP_BUTTON_IDS = ['setupButton', 'p2SetupButton'];
 
@@ -131,6 +132,9 @@ export const readyUp = async (user, emit = true) => {
     }
     systemState.selfReady = false;
     systemState.oppReady = false;
+    // Design 073: each deck flies out of its box onto the mat before prizes are set; the opening
+    // coin waits for it (deck-box-gate.mjs).
+    await playOpeningDeal();
     if (rulesState.enabled) {
       appendMessage(
         '',

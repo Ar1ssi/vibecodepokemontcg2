@@ -97,6 +97,7 @@ import {
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
 import { holdFxQueue, whenFxQueueIdle } from '../netcode/advisory-animations.js';
+import { afterOpeningDeal } from '../netcode/mat-fx/deck-box-gate.mjs';
 import { playFxSound, playUiCue } from '../netcode/mat-fx/fx-audio.js';
 import {
   hasAuthoritativeView,
@@ -678,17 +679,23 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         openingSetupReadyForCoinFlip = true;
         handleSetupClick();
       });
-      // Design 013: raised by turn-order-call.js from the server's messages.
+      // Design 013: raised by turn-order-call.js from the server's messages. The server calls the
+      // coin the moment both players are ready; design 073's deck box deal plays first, so these run
+      // in arrival order once it ends (at once when no deal plays).
       document.addEventListener('rules-turn-order-call', (event) => {
-        handleServerTurnOrderCall(event.detail);
+        afterOpeningDeal(() => handleServerTurnOrderCall(event.detail));
       });
       document.addEventListener('rules-turn-order-flip', (event) => {
-        if (!isServerOwnedTurnOrder()) return;
-        showServerCoinFlip(event.detail);
+        afterOpeningDeal(() => {
+          if (!isServerOwnedTurnOrder()) return;
+          showServerCoinFlip(event.detail);
+        });
       });
       document.addEventListener('rules-turn-order-result', (event) => {
-        if (!isServerOwnedTurnOrder()) return;
-        applyServerTurnOrderResult(event.detail);
+        afterOpeningDeal(() => {
+          if (!isServerOwnedTurnOrder()) return;
+          applyServerTurnOrderResult(event.detail);
+        });
       });
       document.addEventListener('deal-order-received', () => {
         if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;

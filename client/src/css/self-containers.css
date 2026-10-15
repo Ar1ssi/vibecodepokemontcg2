@@ -731,6 +731,11 @@ img.draw-flight-source,
      resetImage() writes an inline `transform` on the cover <img>. */
   translate: 0 calc(var(--deck-stack-dir) * var(--deck-stack-count) * var(--deck-layer-px));
 }
+/* Design 073: while a deck box deals, the cards flying out of it are the deck; the real one shows
+   when the last card lands. */
+html.deckbox-dealing :is(#deckCover, #deckStack) {
+  visibility: hidden;
+}
 /* Same box as #deckCover, painted before it (earlier in the DOM). Layers are
    card-sized like the contain-fitted cover image; each is offset one step
    further, and the raised cover leaves their bottom edges showing. */
