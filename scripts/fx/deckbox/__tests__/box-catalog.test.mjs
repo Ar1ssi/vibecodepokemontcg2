@@ -10,8 +10,8 @@ import {
   cleanBoxName,
   extractScene,
   humanizeId,
-  mirrorMeshZ,
   sceneTextureKeys,
+  toThreeMesh,
   toThreePose,
 } from '../lib/box-catalog.mjs';
 
@@ -121,12 +121,19 @@ test('sceneTextureKeys reads the interior and the three shadows', () => {
   });
 });
 
-test('mirrorMeshZ negates every z of positions and normals only', () => {
-  const mesh = mirrorMeshZ({ p: [1, 2, 3, 4, 5, 6], n: [0, 0, 1, 0, 1, 0], uv: [0.1, 0.2], i: [0, 1, 0], submeshes: [] });
-  assert.deepEqual(mesh.p, [1, 2, -3, 4, 5, -6]);
-  assert.deepEqual(mesh.n, [0, 0, -1, 0, 1, -0]);
+test('toThreeMesh turns the mesh a half turn about y: x and z negate, y, uvs, order and submeshes stay', () => {
+  const mesh = toThreeMesh({
+    p: [1, 2, 3, 4, 5, 6],
+    n: [1, 0, 0, 0, 0, 1],
+    uv: [0.1, 0.2],
+    i: [0, 1, 2, 2, 1, 0],
+    submeshes: [{ name: 'a', start: 0, count: 6 }],
+  });
+  assert.deepEqual(mesh.p, [-1, 2, -3, -4, 5, -6]);
+  assert.deepEqual(mesh.n, [-1, 0, -0, -0, 0, -1]);
   assert.deepEqual(mesh.uv, [0.1, 0.2]);
-  assert.deepEqual(mesh.i, [0, 1, 0]);
+  assert.deepEqual(mesh.i, [0, 1, 2, 2, 1, 0]);
+  assert.deepEqual(mesh.submeshes, [{ name: 'a', start: 0, count: 6 }]);
 });
 
 test('the importer names the missing file and leaves the output directory alone', () => {

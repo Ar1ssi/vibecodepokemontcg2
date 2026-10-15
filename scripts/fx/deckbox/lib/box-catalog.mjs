@@ -151,8 +151,13 @@ export function extractScene(level4) {
   };
 }
 
-/** A packed mesh (`p`, `n`, `uv`, `i`, `submeshes`) with z mirrored; index order already faces outward after the mirror. */
-export function mirrorMeshZ(packed) {
-  const mirror = (values) => values.map((value, index) => (index % 3 === 2 ? -value : value));
-  return { ...packed, p: mirror(packed.p), n: mirror(packed.n) };
+/**
+ * A packed mesh (`p`, `n`, `uv`, `i`, `submeshes`) in three's space: x and z negated on positions and
+ * normals, a half turn about y, so the winding stays outward. The extract's OBJ has Unity's x already
+ * negated (its exporter turns Unity's left-handed meshes right-handed); undoing that and then mirroring
+ * z for three is this rotation. Checked against the game's own thumbnails: art reads unmirrored.
+ */
+export function toThreeMesh(packed) {
+  const flip = (values) => values.map((value, index) => (index % 3 === 1 ? value : -value));
+  return { ...packed, p: flip(packed.p), n: flip(packed.n) };
 }

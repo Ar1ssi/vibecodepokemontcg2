@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packCoinMesh, parseCoinObj } from '../coin/lib/coin-mesh.mjs';
-import { buildBoxCatalog, extractScene, mirrorMeshZ, sceneTextureKeys } from './lib/box-catalog.mjs';
+import { buildBoxCatalog, extractScene, toThreeMesh, sceneTextureKeys } from './lib/box-catalog.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const DEFAULT_OUT = path.join(REPO_ROOT, 'client', 'src', 'assets', 'deckbox');
@@ -55,7 +55,7 @@ const thumbFile = (uiDir, id) => {
   return path.join(dir, webp);
 };
 
-const packMesh = (objFile) => mirrorMeshZ(packCoinMesh(parseCoinObj(fs.readFileSync(requireFile(objFile), 'utf8'))));
+const packMesh = (objFile) => toThreeMesh(packCoinMesh(parseCoinObj(fs.readFileSync(requireFile(objFile), 'utf8'))));
 
 const writeJson = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value)}\n`);
 
