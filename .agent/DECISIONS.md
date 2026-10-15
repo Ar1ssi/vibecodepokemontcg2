@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D213).
+#   Next id = highest D number in this file and the archive + 1 (next: D214).
 
 ## Active
+- D213 2026-10-16 [deck-builder] Sleeves are TCG Live's 415 (scripts/import-tcgl-sleeves.py: face crop 73-439 px, webp, ids `cs_*`), not the sleeve database; old stored ETB sleeve id remaps.
 - D212 2026-10-15 [netcode] Opening coin follows TCG Live: caller calls, server flips, the winner chooses first or second; a silent or dropped winner goes first (the pre-072 outcome). (design 072) (PR #218 branch id D211)
 - D211 2026-10-15 [board-ui] Special Energy tokens are cut from the card's own orb art, one per name, not drawn (user rejected glyph designs). Finish = the art printing's: always-foil rarity → holo, else reverse variant → reverse holo (TCGdex variants; pokemontcg.io TCGplayer keys where TCGdex lists normal only). Cards providing 2 Energy show two orbs. Basic-named Metal/Darkness need an explicit Special marker.
 - D210 2026-10-11 [board-ui] Card focus lays the 013 chrome out as the game's overlay (`layout:'focus'`): bottom-anchored list, weakness/resistance/retreat strip, HUD left, Energy tokens; reverses 067 O2. (user)

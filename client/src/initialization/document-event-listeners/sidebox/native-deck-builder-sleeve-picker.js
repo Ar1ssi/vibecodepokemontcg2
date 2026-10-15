@@ -14,7 +14,7 @@ import {
     
     /**
      * Card sleeve picker for the native deck builder. Renders a horizontally
-     * scrollable gallery of Mega Evolution sleeves with image previews; clicking
+     * scrollable gallery of TCG Live sleeves with image previews; clicking
      * a sleeve selects it for the current deck. The selection is communicated to
      * the deck library through the onChange callback.
      *
@@ -93,7 +93,7 @@ import {
               const isOwned = ownedIds.has(sleeve.id);
               return [
                 `<button class="native-deck-builder-sleeve-thumb${isSelected ? ' selected' : ''}${isOwned ? ' is-owned' : ''}" data-sleeve-id="${escapeHtml(sleeve.id)}" title="${escapeHtml(sleeve.name || 'Sleeve')}${isOwned ? ' · Owned' : ''}" aria-pressed="${isSelected ? 'true' : 'false'}">`,
-                `  <img src="${escapeHtml(sleeve.image)}" alt="${escapeHtml(sleeve.name)}" loading="lazy" />`,
+                `  <img src="${escapeHtml(sleeve.thumb || sleeve.image)}" alt="${escapeHtml(sleeve.name)}" loading="lazy" />`,
                 isOwned ? '  <span class="native-deck-builder-owned-tag">Owned</span>' : '',
                 `</button>`,
               ].join('');

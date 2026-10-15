@@ -14,7 +14,7 @@ const { initializeDeckBuilderCoinPicker } = await import('../native-deck-builder
 const { getSleeves } = await import('../../../../setup/deck-builder/core/sleeves.mjs');
 const { getCoins } = await import('../../../../setup/deck-builder/core/coins.mjs');
 
-const ETB_SLEEVE = '08266b9d-1d37-4ddb-a458-9adc302edb62';
+const ETB_SLEEVE = 'cs_charizardxmega_me2_etb';
 const ETB_COIN = 'PFLETB_Mega_Charizard_X_Coin';
 
 const mount = (id) => {

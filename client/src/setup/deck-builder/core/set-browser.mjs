@@ -1713,15 +1713,14 @@ export const STARTER_DECK_CATALOG = [
     matId: 'custom-mega-gengar-edge-to-edge',
     sprites: ['toxtricity', 'gengar-mega'],
     name: 'Mega Gengar ex Battle Deck',
-    sleeveId: 'd92570dc-bbd5-43a4-b7d6-9094993ba975',
+    sleeveId: 'cs_gengarmega_me_deck',
     coinId: 'MBG_Purple_Mega_Gengar_Coin',
   },
   {
     key: 'diancie',
     sprites: ['diancie-mega', 'meloetta'],
     name: 'Mega Diancie ex Battle Deck',
-    // No Mega Diancie sleeve in catalog — closest Mega Evolution fairy ETB art.
-    sleeveId: '00b68849-fd1f-4908-a8d8-b44ac392e455',
+    sleeveId: 'cs_dianciemega_me_deck',
     coinId: 'MBD_Magenta_Mega_Diancie_Coin',
   },
   {
@@ -1729,7 +1728,7 @@ export const STARTER_DECK_CATALOG = [
     matId: 'custom-mega-lucario-edge-to-edge',
     sprites: ['hariyama', 'lucario-mega'],
     name: 'Mega Lucario ex Starter Deck',
-    sleeveId: '5341801a-a512-4842-ae15-bd8ce8748f8d',
+    sleeveId: 'cs_lucariomega_me1_etb',
     coinId: 'MEGETB_Blue_Mega_Lucario_Coin',
   },
   {
@@ -1737,7 +1736,7 @@ export const STARTER_DECK_CATALOG = [
     matId: 'custom-mega-charizard-x-edge-to-edge',
     sprites: ['charizard-mega-y', 'charizard-mega-x'],
     name: 'Mega Charizard X ex Starter Deck',
-    sleeveId: '5f123df1-82c9-4fae-998c-9e5ce1d7eb9a',
+    sleeveId: 'cs_charizardxmega_me2_etb',
     coinId: 'PFLETB_Mega_Charizard_X_Coin',
   },
   {
@@ -1745,7 +1744,7 @@ export const STARTER_DECK_CATALOG = [
     matId: 'custom-mega-darkrai-edge-to-edge',
     sprites: ['darkrai-mega', 'gengar-mega'],
     name: 'Mega Darkrai ex Starter Deck',
-    sleeveId: '52a78878-0457-4619-bc4a-6cba7853998e',
+    sleeveId: 'cs_darkraimega_me5_bnb',
     // No solo Mega Darkrai coin — best available features Darkrai prominently.
     coinId: 'TCGBA_Gold_Pikachu_Darkrai_Armarouge_Coin',
   },
@@ -1753,7 +1752,7 @@ export const STARTER_DECK_CATALOG = [
     key: 'dragonite',
     sprites: ['dragonite-mega', 'eelektross-mega'],
     name: 'Mega Dragonite ex Starter Deck',
-    sleeveId: '86456fdb-d9b2-4990-94c6-5ac3657b8260',
+    sleeveId: 'cs_dragonitemega_me2-5_etb',
     coinId: 'ASCETB_Yellow_Mega_Dragonite_Coin',
   },
   {
@@ -1761,7 +1760,7 @@ export const STARTER_DECK_CATALOG = [
     matId: '3146-rubber-playmat-mega-greninja-1',
     sprites: ['greninja-mega', 'starmie-mega'],
     name: 'Mega Greninja ex Starter Deck',
-    sleeveId: 'b4952582-3bc4-4bb8-87f6-07dd88f771ff',
+    sleeveId: 'cs_greninjamega_me4_etb',
     // No Mega Greninja coin — normal Greninja variant.
     coinId: 'M4_Blue_Greninja_Coin',
   },
