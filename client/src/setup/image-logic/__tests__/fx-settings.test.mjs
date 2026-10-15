@@ -8,6 +8,7 @@ import {
   normalizeVolume,
   AMBIENCE_OFF_KEY,
   CROWD_OFF_KEY,
+  HOVER_PREVIEW_OFF_KEY,
   readSettings,
   writeSetting,
 } from '../fx-settings.mjs';
@@ -39,6 +40,7 @@ test('fx-settings: defaults when nothing is stored', () => {
     volume: DEFAULT_VOLUME,
     ambienceOff: false,
     crowdOff: true,
+    hoverPreviewOff: false,
   });
 });
 
@@ -54,6 +56,7 @@ test('fx-settings: reads each stored flag', () => {
     volume: 0.25,
     ambienceOff: false,
     crowdOff: true,
+    hoverPreviewOff: false,
   });
 });
 
@@ -75,6 +78,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     volume: DEFAULT_VOLUME,
     ambienceOff: false,
     crowdOff: true,
+    hoverPreviewOff: false,
   });
   assert.deepEqual(readSettings(undefined).volume, DEFAULT_VOLUME);
   assert.deepEqual(readSettings(throwingStorage), {
@@ -83,6 +87,7 @@ test('fx-settings: a missing or throwing storage yields defaults, not a throw', 
     volume: DEFAULT_VOLUME,
     ambienceOff: false,
     crowdOff: true,
+    hoverPreviewOff: false,
   });
 });
 
@@ -111,7 +116,7 @@ test('fx-settings: writeSetting stores flags as 1/0 and volume as a number', () 
   assert.equal(storage.data[FX_OFF_KEY], '0');
   writeSetting(storage, VOLUME_KEY, 3);
   assert.equal(storage.data[VOLUME_KEY], '1');
-  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, volume: 1 });
+  assert.deepEqual(readSettings(storage), { fxOff: false, sfxOff: false, ambienceOff: false, crowdOff: true, hoverPreviewOff: false, volume: 1 });
 });
 
 test('fx-settings: writeSetting reports failure instead of throwing', () => {
@@ -127,4 +132,20 @@ test('fx-settings: the crowd is off by default and on only for the stored "0"', 
   assert.equal(readSettings(fakeStorage({ [CROWD_OFF_KEY]: '1' })).crowdOff, true);
   assert.equal(readSettings(fakeStorage({ [CROWD_OFF_KEY]: 'no' })).crowdOff, true);
   assert.equal(readSettings(throwingStorage).crowdOff, true);
+});
+
+test('fx-settings: the hover preview (design 069) is on by default and off only for the stored "1"', () => {
+  assert.equal(readSettings(fakeStorage()).hoverPreviewOff, false);
+  assert.equal(readSettings(fakeStorage({ [HOVER_PREVIEW_OFF_KEY]: '1' })).hoverPreviewOff, true);
+  assert.equal(readSettings(fakeStorage({ [HOVER_PREVIEW_OFF_KEY]: '0' })).hoverPreviewOff, false);
+  assert.equal(readSettings(fakeStorage({ [HOVER_PREVIEW_OFF_KEY]: 'off' })).hoverPreviewOff, false);
+  assert.equal(readSettings(throwingStorage).hoverPreviewOff, false);
+});
+
+test('fx-settings: the hover preview toggle round-trips through writeSetting', () => {
+  const storage = fakeStorage();
+  writeSetting(storage, HOVER_PREVIEW_OFF_KEY, true);
+  assert.equal(readSettings(storage).hoverPreviewOff, true);
+  writeSetting(storage, HOVER_PREVIEW_OFF_KEY, false);
+  assert.equal(readSettings(storage).hoverPreviewOff, false);
 });

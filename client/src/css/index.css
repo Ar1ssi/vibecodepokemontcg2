@@ -2,6 +2,7 @@
 @import url('./holo/base.css');
 @import url('./mat-fx.css');
 @import url('./card-focus.css');
+@import url('./hover-preview.css');
 @import url('./holo/regular-holo.css');
 @import url('./holo/ex-regular.css');
 @import url('./holo/ex-full-art.css');
@@ -24,6 +25,7 @@
 @import url('./deck-builder-build-battle.css');
 @import url('./deck-builder-unboxing.css');
 @import url('./deck-builder-etb.css');
+@import url('./deck-builder-suggest.css');
 
 :root {
   --mat-half-height: 50vh;
@@ -6129,4 +6131,112 @@ img.drag-avatar {
   user-select: none;
   z-index: 100001;
   will-change: transform;
+}
+
+/* ── Spectator view switch (design 069) ─────────────────────────────────
+   Top-left of the board, only while spectating a server-authoritative room
+   (spectator-session.js toggles body.spectating / body.spectator-broadcast). */
+#spectatorViewSwitch {
+  position: fixed;
+  top: 1.2vh;
+  left: 1vw;
+  z-index: 1310;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  background: rgba(20, 22, 30, 0.55);
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  font-family: 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+}
+#spectatorViewSwitch[hidden] {
+  display: none;
+}
+.spectator-view-switch__label {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1.3vh;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 0.3vw;
+}
+#spectatorViewSwitch button {
+  font: inherit;
+  font-size: 1.5vh;
+  font-weight: 700;
+  max-width: 10vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.4vh 0.7vw;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+#spectatorViewSwitch button:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+#spectatorViewSwitch button.selected {
+  background: linear-gradient(to bottom, rgb(66, 165, 245), rgb(21, 101, 192));
+  border-color: rgb(13, 71, 161);
+}
+
+/* A spectator never acts: no turn, coin or board-flip controls. */
+body.spectating #endTurnButton,
+body.spectating #passBoardButton,
+body.spectating #flipCoinButton,
+body.spectating #flipBoardButton {
+  display: none !important;
+}
+
+/* Broadcast layout (design 069): the two boards turned 90° side by side, stream style.
+   The `you` board (#selfContainer) turns clockwise into the left half, so its hand sits on
+   the left edge; the `them` board turns the other way into the right half, and the Actives
+   meet at the seam. Each iframe keeps its usual layout box (board-wide, half the height), so
+   every zone keeps its place, and is scaled by --bc-scale (apply-table-tilt.js: the board's
+   length fitted to the screen height) about its centre, then shifted so the two boards touch
+   at the seam. !important beats the split resizer's inline heights. */
+body.spectator-broadcast {
+  --board-w: 75.5vw;
+  --bc-scale: 0.75;
+}
+body.spectator-broadcast.sidebox-hidden,
+body.spectator-broadcast.side-menu-collapsed {
+  --board-w: 100vw;
+}
+body.spectator-broadcast #selfContainer,
+body.spectator-broadcast #oppContainer {
+  width: var(--board-w) !important;
+  height: 50vh !important;
+  top: 25vh !important;
+  bottom: auto !important;
+  transform-origin: 50% 50%;
+}
+body.spectator-broadcast #selfContainer {
+  left: calc(-25vh * var(--bc-scale)) !important;
+  transform: rotate(90deg) scale(var(--bc-scale)) !important;
+}
+body.spectator-broadcast #oppContainer {
+  left: calc(25vh * var(--bc-scale)) !important;
+  transform: rotate(-90deg) scale(var(--bc-scale)) !important;
+}
+body.spectator-broadcast #battleMat {
+  transition: none;
+  /* The turned boards leave bands either side; the mat's spread shadow fills them. */
+  box-shadow: 0 0 0 100vmax #000;
+}
+body.spectator-broadcast #stadium {
+  left: calc(var(--board-w) / 2) !important;
+  bottom: 50% !important;
+  transform: translate(-50%, 50%) !important;
+}
+body.spectator-broadcast #selfResizer,
+body.spectator-broadcast #oppResizer {
+  display: none !important;
+}
+body.spectator-broadcast #battleMatArt {
+  display: none !important;
 }

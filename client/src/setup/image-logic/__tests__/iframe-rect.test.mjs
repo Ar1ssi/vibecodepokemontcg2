@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   FLIP_180_MATRIX,
   IDENTITY_MATRIX,
+  layoutRectFromBounds,
   mapIframeLocalToViewport,
   mapIframePointToViewport,
   parseCssMatrix,
@@ -90,4 +91,24 @@ test('a drag pointer in either iframe maps onto the parent viewport', () => {
     FLIP_180_MATRIX
   );
   assert.deepEqual({ x: rect.left, y: rect.top }, { x: 790, y: 380 });
+});
+
+// Design 069: the spectator broadcast layout turns each board 90°. A 600x300 iframe turned
+// 90° clockwise about its centre shows as a 300x600 AABB; its layout box is not that AABB.
+const TURN_90_MATRIX = { a: 0, b: 1, c: -1, d: 0, e: 0, f: 0 };
+
+test('layoutRectFromBounds keeps the AABB for 0° and 180° turns', () => {
+  assert.deepEqual(layoutRectFromBounds(selfFrame, 800, 400, IDENTITY_MATRIX), selfFrame);
+  assert.deepEqual(layoutRectFromBounds(oppFrame, 800, 400, FLIP_180_MATRIX), oppFrame);
+});
+
+test('a card on a 90°-turned board maps onto its on-screen spot', () => {
+  const bounds = { left: 0, top: 0, width: 300, height: 600 };
+  const layout = layoutRectFromBounds(bounds, 600, 300, TURN_90_MATRIX);
+  assert.deepEqual(layout, { left: -150, top: 150, width: 600, height: 300 });
+
+  // The board's bottom-left corner (its hand edge) turns to the top-left of the screen.
+  const handCorner = { left: 0, top: 260, width: 40, height: 40 };
+  const rect = mapIframeLocalToViewport(handCorner, layout, TURN_90_MATRIX);
+  assert.deepEqual(rect, { left: 0, top: 0, width: 40, height: 40 });
 });
