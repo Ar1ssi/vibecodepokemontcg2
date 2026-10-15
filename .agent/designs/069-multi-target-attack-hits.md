@@ -1,5 +1,5 @@
 # 069: Multi-target attack hits — the move reaches every Pokémon it damages
-Status: draft — awaiting user approval
+Status: approved (self — one-shot) · building on `claude/great-wozniak-hwz8xu`
 Date: 2026-10-15 · Session: S-069 (branch `claude/great-wozniak-hwz8xu`)
 
 ## Problem
@@ -7,11 +7,30 @@ The user's request, verbatim (2026-10-15):
 
 > for atacks that damage multiple pokemon, draft a plan so that the attack animation also hits those pokemon
 
+Then, after this draft:
+
+> One shot implementation, have a hostile review done, then fix the issues it finds
+
 Today a move scene (design 063/065) flies from the attacker to ONE defender. Every other Pokémon the
 attack damages (spread to the Bench, "each of your opponent's Pokémon", a chosen Bench snipe, the
 attacker's own Bench) only gets its damage number and a TCG Live `_C` prefab (design 068), all at the
 same contact instant, with nothing travelling to it and no card reaction. A Bench-only attack is
 worse: the move flies at the opponent's Active, which takes no damage, while the Bench pops.
+
+## Acceptance
+| # | Criterion (the brief's words) | Evidence |
+|---|---|---|
+| A1 | "for atacks that damage multiple pokemon … the attack animation also hits those pokemon" — each damaged Pokémon gets the move's travel, its hit and a reaction | |
+| A2 | Bench-only attacks hit the Bench, not the undamaged Active | |
+| A3 | "have a hostile review done" | |
+| A4 | "then fix the issues it finds" | |
+
+## Assumptions
+| # | Gap | Decided (assumed) | Why |
+|---|---|---|---|
+| S1 | "Land" not stated | branch: `claude/great-wozniak-hwz8xu` (the session's designated branch), pushed; not `main` | workflow default; session branch rule |
+| S2 | Taste calls T1–T4 | the defaults below (ripple, no extra sound, branches from the attacker, ring every hit) | the user approved the plan by asking to build it |
+| S3 | Worktree | built in the primary checkout on the designated branch | the session pins the branch; nothing else is checked out |
 
 ## Constraints
 - Client cosmetic only (D94): no engine, rules, netcode or protocol change. Everything is derived on
