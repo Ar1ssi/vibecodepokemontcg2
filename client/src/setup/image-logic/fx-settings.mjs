@@ -9,6 +9,8 @@ export const VOLUME_KEY = 'ptcg-fx-volume';
 export const AMBIENCE_OFF_KEY = 'ptcg-status-ambience-off';
 // The crowd is off unless a player opted in (stored '0'), unlike the other toggles.
 export const CROWD_OFF_KEY = 'ptcg-crowd-off';
+// Design 069: the card hover preview is on unless the stored '1' turns it off.
+export const HOVER_PREVIEW_OFF_KEY = 'ptcg-hover-preview-off';
 export const DEFAULT_VOLUME = 0.6;
 
 export const FX_OFF_CLASS = 'fx-off';
@@ -29,13 +31,14 @@ const readKey = (storage, key) => {
   }
 };
 
-/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean}} defaults when unreadable. */
+/** @returns {{fxOff:boolean, sfxOff:boolean, volume:number, ambienceOff:boolean, crowdOff:boolean, hoverPreviewOff:boolean}} defaults when unreadable. */
 export function readSettings(storage) {
   return {
     fxOff: readKey(storage, FX_OFF_KEY) === '1',
     sfxOff: readKey(storage, SFX_OFF_KEY) === '1',
     ambienceOff: readKey(storage, AMBIENCE_OFF_KEY) === '1',
     crowdOff: readKey(storage, CROWD_OFF_KEY) !== '0',
+    hoverPreviewOff: readKey(storage, HOVER_PREVIEW_OFF_KEY) === '1',
     volume: normalizeVolume(readKey(storage, VOLUME_KEY)),
   };
 }

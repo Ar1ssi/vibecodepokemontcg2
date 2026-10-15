@@ -167,3 +167,14 @@ test('unrelated, malformed or identity-less events say nothing', () => {
     []
   );
 });
+
+// Design 069: a spectator's bench line names the owner.
+test('069: with seat names, bench damage names the owner', () => {
+  const lines = attackAnnouncementLines(
+    { type: 'benchDamaged', playerId: 'p2', dealt: 20, instanceId: 201, attackName: 'Zap' },
+    null,
+    resolveName,
+    { p1: 'Ash', p2: 'Gary' }
+  );
+  assert.equal(lines[0], "💥 20 damage to Gary's benched Riolu.");
+});

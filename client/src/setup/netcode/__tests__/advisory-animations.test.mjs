@@ -2,12 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   advisoryAnimationPlan,
+  attackHitIds,
+  attackStrikes,
   attackLeads,
   coinFlipRuns,
-  dealShuffles,
+  deckShuffles,
   effectKnockoutIds,
   EVENT_FX,
   SOUND_ONLY_FX,
+  strikeKnockouts,
   supersededDeals,
 } from '../advisory-animations.mjs';
 import { HOLD_MS } from '../mat-fx/fx-holds.mjs';
@@ -396,7 +399,7 @@ test('coinFlipRuns: back-to-back single flips by one player and source play as o
   assert.equal(coinFlipRuns(null).size, 0);
 });
 
-test('the opening deal shuffles animate; a search effect deck shuffle does not', () => {
+test('deckShuffles: the opening deal and every effect shuffle animate, each with its sound', () => {
   // shared/engine/setup.mjs emits, per player: deckShuffled, openingHandDealt, prizesSet.
   const shuffleA = { type: 'deckShuffled', playerId: 'A' };
   const shuffleB = { type: 'deckShuffled', playerId: 'B' };
@@ -410,22 +413,68 @@ test('the opening deal shuffles animate; a search effect deck shuffle does not',
     searchShuffle,
     { type: 'cardsDrawn', playerId: 'A', cards: [] },
   ];
-  const shuffles = dealShuffles(events);
-  assert.deepEqual([...shuffles], [shuffleA, shuffleB]);
+  const sounds = deckShuffles(events);
+  assert.deepEqual(
+    [...sounds],
+    [
+      [shuffleA, 'shuffle-flight'],
+      [searchShuffle, 'search-shuffle'],
+      [shuffleB, 'shuffle-flight'],
+    ]
+  );
 
-  assert.deepEqual(advisoryAnimationPlan(shuffleA, 'A', undefined, { dealShuffle: true }), {
+  assert.deepEqual(advisoryAnimationPlan(shuffleA, 'A', undefined, { shuffleSound: sounds.get(shuffleA) }), {
     kind: 'shuffle',
     user: 'self',
     zoneId: 'deck',
+    sound: 'shuffle-flight',
   });
-  assert.equal(advisoryAnimationPlan(shuffleB, 'A', undefined, { dealShuffle: true }).user, 'opp');
-  // Not a deal: no flight, only the shuffle sound (design 064).
-  assert.deepEqual(advisoryAnimationPlan(searchShuffle, 'A'), {
-    kind: 'fx',
+  assert.equal(advisoryAnimationPlan(shuffleB, 'A', undefined, { shuffleSound: sounds.get(shuffleB) }).user, 'opp');
+  // A search's shuffle used to be sound-only: it now flies the deck too.
+  assert.deepEqual(advisoryAnimationPlan(searchShuffle, 'A', undefined, { shuffleSound: sounds.get(searchShuffle) }), {
+    kind: 'shuffle',
     user: 'self',
-    effect: 'search-shuffle',
+    zoneId: 'deck',
+    sound: 'search-shuffle',
   });
-  assert.deepEqual([...dealShuffles(null)], []);
+  assert.equal(advisoryAnimationPlan(searchShuffle, 'A'), null, 'no batch entry plans nothing');
+  assert.equal(deckShuffles(null).size, 0);
+});
+
+test('deckShuffles: a shuffle an effect reports twice animates once; a lone hand shuffle animates', () => {
+  // trainer-steps.mjs (Red Card): cardsShuffledIntoDeck then deckShuffled for the opponent.
+  const redCardIn = { type: 'cardsShuffledIntoDeck', count: 5, playerId: 'B' };
+  const redCardShuffle = { type: 'deckShuffled', playerId: 'B' };
+  // executor.mjs shuffle-recover: deckShuffled first, then cardsShuffledIntoDeck.
+  const recoverShuffle = { type: 'deckShuffled', playerId: 'A' };
+  const recoverIn = { type: 'cardsShuffledIntoDeck', count: 2, playerId: 'A' };
+  // executor.mjs Judge-style and reduce.mjs shuffleAndDraw report no deckShuffled.
+  const judgeIn = { type: 'cardsShuffledIntoDeck', count: 4, playerId: 'B' };
+  const shuffleDraw = { type: 'handShuffledIntoDeckAndDrawn', count: 6, playerId: 'A' };
+  const events = [
+    redCardIn,
+    redCardShuffle,
+    recoverShuffle,
+    recoverIn,
+    { type: 'cardsDrawn', playerId: 'B', cards: [] },
+    judgeIn,
+    { type: 'cardsDrawn', playerId: 'A', cards: [] },
+    shuffleDraw,
+  ];
+  const sounds = deckShuffles(events);
+  assert.equal(sounds.has(redCardIn), false);
+  assert.equal(sounds.get(redCardShuffle), 'search-shuffle');
+  assert.equal(sounds.get(recoverShuffle), 'search-shuffle');
+  assert.equal(sounds.has(recoverIn), false);
+  assert.equal(sounds.get(judgeIn), 'search-shuffle');
+  assert.equal(sounds.get(shuffleDraw), 'search-shuffle');
+  assert.deepEqual(advisoryAnimationPlan(judgeIn, 'A', undefined, { shuffleSound: sounds.get(judgeIn) }), {
+    kind: 'shuffle',
+    user: 'opp',
+    zoneId: 'deck',
+    sound: 'search-shuffle',
+  });
+  assert.equal(advisoryAnimationPlan(redCardIn, 'A', undefined, { shuffleSound: sounds.get(redCardIn) }), null);
 });
 
 test('design 064: prizesSet and retreatBlocked plan as sound-only fx for their player', () => {
@@ -438,7 +487,7 @@ test('design 064: prizesSet and retreatBlocked plan as sound-only fx for their p
   const blocked = advisoryAnimationPlan({ type: 'retreatBlocked', playerId: 'p1', instanceId: 7 }, 'p1');
   assert.equal(blocked.effect, 'retreat-blocked');
   assert.equal(blocked.user, 'self');
-  for (const effect of ['search-shuffle', 'prizes-set', 'retreat-blocked']) {
+  for (const effect of ['prizes-set', 'retreat-blocked']) {
     assert.ok(SOUND_ONLY_FX.has(effect), effect);
   }
 });
@@ -547,4 +596,137 @@ test('attackLeads: hits after the attack (checkup, next turn) and attacks with n
   const earlier = { type: 'damageUpdated', instanceId: 5, dealt: 10 };
   assert.equal(attackLeads([earlier, turn, attack]).size, 0);
   assert.equal(attackLeads(null).size, 0);
+});
+
+test('attackHitIds: the attack segment’s damaged cards, in order, the attacker left out', () => {
+  const a = { type: 'damageUpdated', instanceId: 20, damage: 130, dealt: 130 };
+  const b = { type: 'damageUpdated', instanceId: 21, damage: 20, dealt: 20 };
+  const recoil = { type: 'damageUpdated', instanceId: 1, damage: 30, dealt: 30 };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1, defenderId: 20 };
+  assert.deepEqual(attackHitIds([a, recoil, b, attack]).get(attack), [
+    { instanceId: 20, damage: 130, dealt: 130 },
+    { instanceId: 21, damage: 20, dealt: 20 },
+  ]);
+});
+
+test('attackHitIds: a card hit twice is one hit, dealt summed; a cumulative-only event drops dealt', () => {
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const first = { type: 'damageUpdated', instanceId: 20, damage: 30, dealt: 30, weakness: true };
+  const second = { type: 'damageUpdated', instanceId: 20, damage: 60, dealt: 30 };
+  assert.deepEqual(attackHitIds([first, second, attack]).get(attack), [
+    { instanceId: 20, damage: 60, dealt: 60, weakness: true },
+  ]);
+  const counters = { type: 'damageUpdated', instanceId: 20, damage: 90 };
+  assert.deepEqual(attackHitIds([first, counters, attack]).get(attack), [
+    { instanceId: 20, damage: 90, weakness: true },
+  ]);
+});
+
+test('attackHitIds: each attack gets only its own segment; turnStarted resets; bad input is empty', () => {
+  const a = { type: 'damageUpdated', instanceId: 20, damage: 10, dealt: 10 };
+  const b = { type: 'damageUpdated', instanceId: 21, damage: 10, dealt: 10 };
+  const first = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const second = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const hits = attackHitIds([a, first, b, second]);
+  assert.deepEqual(hits.get(first).map((hit) => hit.instanceId), [20]);
+  assert.deepEqual(hits.get(second).map((hit) => hit.instanceId), [21]);
+  const turn = { type: 'turnStarted', player: 'p1' };
+  assert.deepEqual(attackHitIds([a, turn, first]).get(first), []);
+  assert.equal(attackHitIds(null).size, 0);
+  assert.equal(attackHitIds([null, { type: 'damageUpdated' }]).size, 0);
+});
+
+test('advisoryAnimationPlan: an attack’s hits ride on both its banner and its scene plan', () => {
+  const event = { type: 'attackExecuted', playerId: 'p1', attackerId: 1, defenderId: 20, attackName: 'Gnaw' };
+  const hits = [{ instanceId: 20, damage: 30, dealt: 30 }];
+  const plans = advisoryAnimationPlan(event, 'p1', undefined, { hits });
+  assert.deepEqual(plans.map((plan) => [plan.effect, plan.hits]), [
+    ['attack-banner', hits],
+    ['attack', hits],
+  ]);
+  assert.equal(advisoryAnimationPlan(event, 'p1')[1].hits, undefined);
+});
+
+test('attackStrikes: an attack and the damage and knockouts of its segment share it as their strike', () => {
+  const coin = { type: 'attackCoinFlipped', playerId: 'p1', results: ['heads'] };
+  const hit = { type: 'damageUpdated', instanceId: 21, damage: 30, dealt: 30 };
+  const ko = { type: 'pokemonKnockedOut', instanceId: 21, playerId: 'p2' };
+  const status = { type: 'statusApplied', instanceId: 20, status: 'paralyzed' };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const checkup = { type: 'damageUpdated', instanceId: 20, damage: 40 };
+  const strikes = attackStrikes([coin, hit, ko, status, attack, checkup]);
+  assert.equal(strikes.get(attack), attack);
+  assert.equal(strikes.get(hit), attack);
+  assert.equal(strikes.get(ko), attack);
+  assert.equal(strikes.has(status), false);
+  assert.equal(strikes.has(coin), false);
+  assert.equal(strikes.has(checkup), false, 'a hit after the attack (checkup) is not the attack’s');
+  const turn = { type: 'turnStarted', player: 'p1' };
+  assert.equal(attackStrikes([hit, turn, attack]).has(hit), false);
+  assert.equal(attackStrikes(undefined).size, 0);
+});
+
+test('advisoryAnimationPlan: the strike tags fx and knockout plans, never other kinds', () => {
+  const strike = { type: 'attackExecuted' };
+  const damage = advisoryAnimationPlan({ type: 'damageUpdated', instanceId: 21, damage: 30 }, 'p1', undefined, { strike });
+  assert.equal(damage.strike, strike);
+  const attack = advisoryAnimationPlan(
+    { type: 'attackExecuted', playerId: 'p1', attackerId: 1, attackName: 'Gnaw' },
+    'p1',
+    undefined,
+    { strike, hits: [] }
+  );
+  assert.deepEqual(attack.map((plan) => plan.strike), [strike, strike]);
+  const ko = advisoryAnimationPlan({ type: 'pokemonKnockedOut', instanceId: 21, playerId: 'p2' }, 'p1', undefined, { strike });
+  assert.equal(ko.kind, 'knockout');
+  assert.equal(ko.strike, strike);
+  const shuffle = advisoryAnimationPlan({ type: 'zoneShuffled', zoneId: 'deck', playerId: 'p1' }, 'p1', undefined, { strike });
+  assert.equal(shuffle.strike, undefined);
+  assert.equal(advisoryAnimationPlan({ type: 'damageUpdated', instanceId: 21, damage: 30 }, 'p1').strike, undefined);
+});
+
+test('attackStrikes: the attacker’s own damage and knockout are not hits of its attack', () => {
+  const recoil = { type: 'damageUpdated', instanceId: 1, damage: 30, dealt: 30 };
+  const selfKo = { type: 'pokemonKnockedOut', instanceId: 1, playerId: 'p1' };
+  const hit = { type: 'damageUpdated', instanceId: 20, damage: 30, dealt: 30 };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const strikes = attackStrikes([hit, recoil, selfKo, attack]);
+  assert.equal(strikes.get(hit), attack);
+  assert.equal(strikes.has(recoil), false);
+  assert.equal(strikes.has(selfKo), false);
+});
+
+test('strikeKnockouts: knockouts move after the attack’s last damage; all but the last are marked', () => {
+  const d20 = { type: 'damageUpdated', instanceId: 20, damage: 130, dealt: 130 };
+  const ko20 = { type: 'pokemonKnockedOut', instanceId: 20 };
+  const d21 = { type: 'damageUpdated', instanceId: 21, damage: 20, dealt: 20 };
+  const ko21 = { type: 'pokemonKnockedOut', instanceId: 21 };
+  const d22 = { type: 'damageUpdated', instanceId: 22, damage: 20, dealt: 20 };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const { after, moved, notLast } = strikeKnockouts([d20, ko20, d21, ko21, d22, attack]);
+  assert.deepEqual(after.get(d22), [ko20, ko21]);
+  assert.deepEqual([...moved], [ko20, ko21]);
+  assert.deepEqual([...notLast], [ko20]);
+});
+
+test('strikeKnockouts: a knockout already after the last damage stays; checkup knockouts are not touched', () => {
+  const d20 = { type: 'damageUpdated', instanceId: 20, damage: 130, dealt: 130 };
+  const ko20 = { type: 'pokemonKnockedOut', instanceId: 20 };
+  const attack = { type: 'attackExecuted', playerId: 'p1', attackerId: 1 };
+  const single = strikeKnockouts([d20, ko20, attack]);
+  assert.equal(single.after.size, 0);
+  assert.equal(single.moved.size, 0);
+  assert.equal(single.notLast.size, 0);
+  const checkupKo = { type: 'pokemonKnockedOut', instanceId: 21 };
+  const checkup = strikeKnockouts([attack, { type: 'damageUpdated', instanceId: 21, damage: 60 }, checkupKo]);
+  assert.equal(checkup.moved.size + checkup.notLast.size, 0);
+  assert.equal(strikeKnockouts(null).after.size, 0);
+});
+
+test('advisoryAnimationPlan: moreKnockouts marks a struck knockout plan only', () => {
+  const strike = { type: 'attackExecuted' };
+  const ko = { type: 'pokemonKnockedOut', instanceId: 21, playerId: 'p2' };
+  assert.equal(advisoryAnimationPlan(ko, 'p1', undefined, { strike, moreKnockouts: true }).moreKnockouts, true);
+  assert.equal(advisoryAnimationPlan(ko, 'p1', undefined, { strike }).moreKnockouts, undefined);
+  assert.equal(advisoryAnimationPlan(ko, 'p1', undefined, { moreKnockouts: true }).moreKnockouts, undefined);
 });

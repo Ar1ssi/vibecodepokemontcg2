@@ -193,8 +193,13 @@ export async function resolveEntry(entry, deps) {
  * (grouped deck-builder shape, via `addCard`). `onProgress(done, total)` fires
  * after each entry. Returns `{ deck, imported, failed }`; `failed` carries the
  * source line and reason so the popup can list what needs fixing.
+ * `resolve(entry, deps)` defaults to `resolveEntry`; the Suggest tab's list import
+ * passes its own (design 069).
  */
-export async function importDeckEntries(entries, { deck, addCard, deps, onProgress, concurrency = 4 }) {
+export async function importDeckEntries(
+  entries,
+  { deck, addCard, deps, onProgress, concurrency = 4, resolve = resolveEntry }
+) {
   const results = new Array(entries.length);
   let next = 0;
   let done = 0;
@@ -202,7 +207,11 @@ export async function importDeckEntries(entries, { deck, addCard, deps, onProgre
   const worker = async () => {
     while (next < entries.length) {
       const index = next++;
-      results[index] = await resolveEntry(entries[index], deps);
+      try {
+        results[index] = await resolve(entries[index], deps);
+      } catch (error) {
+        results[index] = { error: `Lookup failed (${error?.message || 'network error'})` };
+      }
       onProgress?.(++done, entries.length);
     }
   };

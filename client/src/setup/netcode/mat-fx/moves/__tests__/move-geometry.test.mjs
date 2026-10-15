@@ -10,6 +10,7 @@ import {
   phaseProgress,
   skyLane,
   toLocal,
+  unionAllPadded,
   unionPadded,
 } from '../move-geometry.mjs';
 
@@ -103,4 +104,13 @@ test('phaseProgress is null outside [start, end) and linear inside', () => {
   assert.equal(phaseProgress(100, [100, 200]), 0);
   assert.equal(phaseProgress(150, [100, 200]), 0.5);
   assert.equal(phaseProgress(Number.NaN, [100, 200]), null);
+});
+
+test('unionAllPadded: pads the union once, however many rects (design 069 branch canvas)', () => {
+  const card = (left, top) => ({ left, top, width: 100, height: 140 });
+  const rects = [card(500, 600), card(200, 0), card(320, 0), card(440, 0), card(560, 0), card(680, 0)];
+  assert.deepEqual(unionAllPadded(rects, 238), { left: -38, top: -238, width: 1056, height: 1216 });
+  assert.deepEqual(unionAllPadded([card(0, 0)], 10), { left: -10, top: -10, width: 120, height: 160 });
+  assert.equal(unionAllPadded([], 10), null);
+  assert.equal(unionAllPadded(null, 10), null);
 });

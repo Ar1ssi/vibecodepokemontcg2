@@ -11,6 +11,7 @@ import { initDecisionLogger } from './setup/general/decision-logger-bridge.js';
 import { installE2eApi } from './setup/general/e2e-api.js';
 import { initializeRoomFormatPanel } from './setup/general/room-format-panel.js';
 import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-settings.js';
+import { initializeHoverPreview } from './setup/image-logic/hover-preview.js';
 
 applyFxSettings();
 watchFxSettingTargets();
@@ -22,5 +23,6 @@ initializeDOMEventListeners();
 initializeMutationObservers();
 initializeMatLayout();
 initializeTableTilt();
+initializeHoverPreview();
 loadImportData();
 installE2eApi();

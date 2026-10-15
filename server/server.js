@@ -401,6 +401,18 @@ async function main() {
     broadcastRoomFormat(roomId);
   };
 
+  const emitFreshView = (gameRoom, roomId, socketId, playerId) => {
+    const view = gameRoom.getView(playerId);
+    io.to(socketId).emit('view', {
+      gameId: roomId,
+      stateVersion: gameRoom.state.stateVersion,
+      view,
+      events: [],
+      pendingChoice: view?.pendingChoice || null,
+      lastClientSeq: 0,
+    });
+  };
+
   const broadcastFreshGame = (gameRoom, roomId, players) => {
     for (const { playerId, socketId } of players) {
       if (!socketId) continue;
@@ -408,15 +420,12 @@ async function main() {
         roomId,
         map: gameRoom.getInstanceMap(playerId),
       });
-      const view = gameRoom.getView(playerId);
-      io.to(socketId).emit('view', {
-        gameId: roomId,
-        stateVersion: gameRoom.state.stateVersion,
-        view,
-        events: [],
-        pendingChoice: view?.pendingChoice || null,
-        lastClientSeq: 0,
-      });
+      emitFreshView(gameRoom, roomId, socketId, playerId);
+    }
+    // Design 069: spectators watch the restarted game too.
+    for (const socketId of gameRoom.spectatorSockets) {
+      io.to(socketId).emit('gameReset', { roomId });
+      emitFreshView(gameRoom, roomId, socketId, null);
     }
   };
   // Design 013: the opening deal no longer happens the moment both seats are ready.
@@ -724,6 +733,8 @@ async function main() {
       socket.broadcast.to(data.roomId).emit(eventName, data);
       if (eventName === 'leaveRoom') {
         socket.leave(data.roomId);
+        // Design 069: a spectator that left must stop receiving the room's views.
+        if (SERVER_AUTHORITATIVE) gameRooms.get(data.roomId)?.removeSpectator(socket.id);
         if (socket.data.disconnectListener) {
           socket.data.leaveRoom = true;
           socket.data.disconnectListener();
@@ -731,6 +742,12 @@ async function main() {
           socket.data.leaveRoom = false;
         }
       }
+    };
+    // Design 069: a disconnected spectator socket is gone for good (a reconnect registers its
+    // new socket), so it leaves the room's view broadcasts and stops keeping the room alive.
+    const dropSpectatorOnDisconnect = (roomId) => {
+      if (!SERVER_AUTHORITATIVE) return;
+      socket.once('disconnect', () => gameRooms.get(roomId)?.removeSpectator(socket.id));
     };
     // rules-engine events: relay to the opponent in the same room
     socket.on('rulesEvent', (payload) => {
@@ -905,8 +922,16 @@ async function main() {
         if (isSpectator) {
           room.spectators.add(username);
           watchDisconnect(roomId, username, true);
-          socket.emit('spectatorJoin');
-          socket.to(roomId).emit('requestSpectatorData', { roomId });
+          // Design 069: an authoritative room's spectator renders server views, so it
+          // needs the mode up front and never the players' legacy action replay.
+          socket.emit('spectatorJoin', {
+            serverAuthoritative: SERVER_AUTHORITATIVE,
+            protocolVersion: PROTOCOL_VERSION,
+          });
+          if (!SERVER_AUTHORITATIVE) {
+            socket.to(roomId).emit('requestSpectatorData', { roomId });
+          }
+          dropSpectatorOnDisconnect(roomId);
         } else {
           room.players.add(username);
           let issuedToken = null;
@@ -1053,9 +1078,12 @@ async function main() {
       if (!data.notSpectator) {
         room.spectators.add(data.username);
         watchDisconnect(data.roomId, data.username, true);
-        socket
-          .to(data.roomId)
-          .emit('requestSpectatorData', { roomId: data.roomId });
+        if (!SERVER_AUTHORITATIVE) {
+          socket
+            .to(data.roomId)
+            .emit('requestSpectatorData', { roomId: data.roomId });
+        }
+        dropSpectatorOnDisconnect(data.roomId);
       } else {
         room.players.add(data.username);
         if (publicRoom) seatPublicSocket(room, data.username, socket.id);
@@ -1400,6 +1428,8 @@ async function main() {
           data?.roomId || [...socket.rooms].find((r) => r !== socket.id);
         const gameRoom = gameRooms.get(roomId);
         if (gameRoom) {
+          // Design 069: an unregistered socket would get the spectator view (both hands).
+          if (!gameRoom.canView(socket.id)) return;
           const view = gameRoom.getViewForSocket(socket.id);
           const playerId = gameRoom.socketToPlayer.get(socket.id) || null;
           const lastClientSeq = playerId ? gameRoom.getClientSeq(playerId) : 0;
