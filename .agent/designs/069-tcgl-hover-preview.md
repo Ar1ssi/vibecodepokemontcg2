@@ -1,5 +1,5 @@
 # 069: TCG Live hover preview — dwell 0.8 s, enlarged card in the blurred band left of the mat
-Status: draft (user choices in, 2026-10-15: blurred-band placement, warm swap, settings toggle)
+Status: approved (self — one-shot)
 Date: 2026-10-15 · Session: S—
 
 ## Problem
@@ -9,6 +9,31 @@ screen, so a player can read a card without clicking. Here the only way to read 
 cover the board. The user asked for the TCG Live hover: **dwell 0.8 s → an enlarged preview in the
 blurred area to the left of the mat**, swapping instantly between cards. They also want it **toggleable
 in settings**.
+
+User, verbatim:
+- "Draft a plan for the implementation of the tcg live card hover mechanic, where if a card is hovered
+  over for 0.8s an enlarged preview shows up on the left side of the screen, off the mat."
+- "Im talking about the blurred area off of the mat. Keep the instant swap. Add a setting for it."
+- "Go ahead and one shot it, then have a hostile fresh reviewer check it, then implement the fixes it finds."
+- "No. Hover only needs to show the top card if its a pokemon." (said mid-build, when attached-Energy
+  art was being wired up)
+
+## Acceptance
+| # | Criterion (the user's words) | Evidence |
+|---|---|---|
+| A1 | "hovered over for 0.8s" → preview appears | model test `arms on enter and shows after exactly 800 ms` |
+| A2 | "enlarged preview … left side of the screen, off the mat" / "the blurred area off of the mat" | placement tests rows 9–10; dom test `places the preview in the band left of the probe` |
+| A3 | "Keep the instant swap" | model test `warm swap`; dom test `swaps instantly` |
+| A4 | "Add a setting for it" | fx-settings tests; dom test `setting off hides and blocks` |
+| A5 | "only needs to show the top card if its a pokemon" | model tests `stackTopCard`; dom test `hovering an attached Energy previews the top Pokémon` |
+
+## Assumptions
+- (assumed) The top-card rule covers the whole in-play stack: hovering the Pokémon, its attached Energy
+  token, a Tool, or a lower Stage previews the top Pokémon. Hand, Stadium, discard and board cards
+  preview themselves. Why: this is the only stack on the board; elsewhere every card is its own top card.
+- (assumed) If a stack's root is not a Pokémon (free-play mat), the hovered card previews itself.
+- (assumed) Built on the session's designated branch in the primary folder, not a `feature/<slug>`
+  worktree. Why: the session's git instructions pin the branch.
 
 ## Constraints
 - C1 Dwell = **800 ms**, and the swap is **instant** while a preview is up (user, 2026-10-15). Fade
