@@ -1,6 +1,16 @@
 import test from 'node:test';
     import assert from 'node:assert/strict';
-    
+
+    // D161: live TCGdex is opt-in (pnpm test:live sets LIVE_TESTS=1). Otherwise answer every TCGdex
+    // request at once with a 200 so fetchWithRetry (rules-state.mjs) never sleeps its 250*n ms backoff:
+    // a card search finds nothing (`[]`) and a card detail is absent (`null`), i.e. "no data".
+    if (!process.env.LIVE_TESTS) {
+      globalThis.fetch = async (url) => {
+        const isSearch = String(url).includes('/cards?');
+        return { ok: true, status: 200, json: async () => (isSearch ? [] : null) };
+      };
+    }
+
     const { rulesState, startGame, beginTurn, endTurn, markSupporterPlayed, supporterPlayGate, markStadiumPlayed, getStadium, abilityKey, markAbilityUsed, abilityUsed, markStadiumUsed, stadiumUsed, shouldAutoDrawAtTurnStart, markTurnDrawn, tcgAbilityFromDetail, parseRetreatCost, canPerformAction, openPlayedToBenchWindow, clearPlayedToBenchWindow, canUsePlayedToBenchTrigger, consumePlayedToBenchTrigger } = await import('../rules-state.mjs');
     const { prizesForKO, awardPrizes, checkWinConditions, handleKO, resetPrizes, isExCard, isGxCard, isMegaCard, koOutcome, planPromotion, promotionGuidance } = await import('../ko-flow.mjs');
     const { canRetreat, markRetreated, energiesToDiscardForRetreat, getEffectiveRetreatCost, getEnergyValue } = await import('../retreat.mjs');
