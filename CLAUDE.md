@@ -47,8 +47,10 @@ END — whenever you changed anything:
 - Maintenance due when ≥30 commits landed on `main` since the last `maintain:` commit
   (`git rev-list --count $(git log -1 --format=%h --grep='^maintain' main)..main`).
 - **"Push to main"** (the user's phrase) means push to GitHub's `main`: `git fetch origin main`, merge or
-  rebase onto `origin/main`, run `pnpm test` green, then `git push origin HEAD:main`. This rule is the
-  user's standing authorization for that push; don't ask again. Never force-push.
+  rebase onto `origin/main`, run `TEST_BASE=origin/main pnpm gates`, run the full `pnpm test` only if it
+  says REQUIRED (a green run records the tree, so an identical landing skips it), then
+  `git push origin HEAD:main`. This rule is the user's standing authorization for that push; don't ask
+  again. Never force-push.
 
 ## Routing
 | Request looks like | Route |
@@ -111,8 +113,8 @@ Each workflow states an exit test; on the fence, start with the lighter workflow
   Visual-only changes (CSS, mat FX, animation, layout) are exempt — the user checks those on localhost.
 - Verification is never a question. The PostToolUse hook (`scripts/hooks/post-edit-check.mjs`) lints
   each edited JS file and runs its own `__tests__/<name>.test.mjs`; fix what it reports. Iterate with
-  `node --test <file>`. Before commit: `pnpm test:changed` for patch work; full `pnpm test` before
-  landing on `main` and after any engine, rules or netcode change.
+  `node --test <file>`. Before commit: `pnpm test:changed` for patch work; full `pnpm test` when
+  `pnpm gates` says REQUIRED (engine, netcode, dependency or lockfile changes).
 - Comments only for constraints and whys. No dead or commented-out code. Match the file's local style.
 
 ## Hard rules

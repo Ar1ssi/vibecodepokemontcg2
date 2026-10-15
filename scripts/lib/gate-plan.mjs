@@ -31,18 +31,13 @@ const ORACLE_TOOLING_PREFIX = 'scripts/lib/oracle-';
 /**
  * @param {string[]} changedPaths Repo-relative changed paths (any order, duplicates allowed)
  * @param {object} [options]
- * @param {boolean} [options.landing] This diff is a merge to main
  * @param {boolean} [options.headTreeVerified] HEAD's tree already passed the full suite (clean worktree only)
  * @param {string[]} [options.manifestsWithDependencyChanges] Manifests whose dependency fields changed
  * @returns {{ fullTests: Verdict, oracle: Verdict }}
  */
 export function planGates(
   changedPaths,
-  {
-    landing = false,
-    headTreeVerified = false,
-    manifestsWithDependencyChanges = [],
-  } = {}
+  { headTreeVerified = false, manifestsWithDependencyChanges = [] } = {}
 ) {
   const files = [
     ...new Set(changedPaths.map(toPosixPath).filter(Boolean)),
@@ -54,7 +49,6 @@ export function planGates(
   const oracleReasons = [];
   // A tree the full suite already passed needs no second run, whatever the diff touches.
   if (!headTreeVerified) {
-    if (landing) fullTestReasons.push('landing on main');
     for (const file of files) {
       if (isFullTestTrigger(file, dependencyManifests))
         fullTestReasons.push(file);

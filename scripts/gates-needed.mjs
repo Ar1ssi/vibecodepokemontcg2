@@ -1,7 +1,8 @@
 // `pnpm gates`: says whether this branch's diff needs the full `pnpm test` and `pnpm audit:oracle`,
-// so they run only when the change can affect them. `--landing` is for a merge to main. A tree
-// that already passed the full suite (recorded by `pnpm test`) never needs it again.
-// The decision rules live in scripts/lib/gate-plan.mjs.
+// so they run only when the change can affect them. A tree that already passed the full suite
+// (recorded by `pnpm test`) never needs it again. Landing on main uses the same rules: run with
+// TEST_BASE=origin/main to judge the diff against the remote. The decision rules live in
+// scripts/lib/gate-plan.mjs.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -45,9 +46,8 @@ function headTreeVerified() {
 }
 
 function main() {
-  const landing = process.argv.includes('--landing');
   const files = changedFiles(BASE_BRANCH);
-  if (files.length === 0 && !landing) {
+  if (files.length === 0) {
     console.log(`gates: nothing changed since ${BASE_BRANCH}.`);
     return 0;
   }
@@ -55,7 +55,6 @@ function main() {
   const base = git(['merge-base', 'HEAD', BASE_BRANCH]);
   const verified = headTreeVerified();
   const { fullTests, oracle } = planGates(files, {
-    landing,
     headTreeVerified: verified,
     manifestsWithDependencyChanges: manifestsWithDependencyChanges(
       repoRoot,

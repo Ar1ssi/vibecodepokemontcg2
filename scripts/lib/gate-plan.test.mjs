@@ -110,17 +110,14 @@ test('other audit gates are not decided here', () => {
   assert.equal(plan.oracle.needed, false);
 });
 
-test('landing on main needs the full suite when its tree is not verified', () => {
-  const plan = planGates(['client/src/setup/rules/card-focus.mjs'], {
-    landing: true,
-  });
-  assert.deepEqual(plan.fullTests.reasons, ['landing on main']);
+test('a docs-only landing needs neither gate', () => {
+  const plan = planGates(['CLAUDE.md', 'docs/guide.md']);
+  assert.equal(plan.fullTests.needed, false);
   assert.equal(plan.oracle.needed, false);
 });
 
-test('landing a tree that already passed the full suite skips it', () => {
+test('a verified tree skips the full suite even for a UI change', () => {
   const plan = planGates(['client/src/setup/rules/card-focus.mjs'], {
-    landing: true,
     headTreeVerified: true,
   });
   assert.equal(plan.fullTests.needed, false);
@@ -128,16 +125,15 @@ test('landing a tree that already passed the full suite skips it', () => {
 
 test('a verified tree skips the full suite even for an engine change, but not the oracle', () => {
   const plan = planGates(['shared/engine/reduce.mjs'], {
-    landing: true,
     headTreeVerified: true,
   });
   assert.equal(plan.fullTests.needed, false);
   assertNeeds(plan.oracle, 'shared/engine/reduce.mjs');
 });
 
-test('landing an unverified engine change needs both gates', () => {
-  const plan = planGates(['shared/engine/reduce.mjs'], { landing: true });
-  assert.ok(plan.fullTests.reasons.includes('landing on main'));
+test('an unverified engine landing needs both gates', () => {
+  const plan = planGates(['shared/engine/reduce.mjs']);
+  assertNeeds(plan.fullTests, 'shared/engine/reduce.mjs');
   assertNeeds(plan.oracle, 'shared/engine/reduce.mjs');
 });
 
