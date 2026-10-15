@@ -52,6 +52,29 @@ const geometryOf = (mesh) => {
   return geometry;
 };
 
+/**
+ * The card mesh's face UVs span only this window of a texture (the game's sleeve art is padded); our
+ * sleeve and card-back images are full-bleed, so the texture is stretched to put its edges on the window's.
+ */
+const faceWindow = (mesh) => {
+  const uv = mesh.submeshes[0];
+  let min = Infinity;
+  let max = -Infinity;
+  for (let k = uv.start; k < uv.start + uv.count; k += 1) {
+    const u = mesh.uv[2 * mesh.i[k]];
+    min = Math.min(min, u);
+    max = Math.max(max, u);
+  }
+  return { min, span: max - min };
+};
+
+const fitFace = (texture, { min, span }) => {
+  texture.repeat.set(1 / span, 1);
+  texture.offset.set(-min / span, 0);
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  return texture;
+};
+
 const place = (object, pose) => {
   object.position.set(...pose.p);
   object.quaternion.set(...pose.q);
@@ -164,8 +187,11 @@ export async function createObjectStage({ host, onLost = () => {} }) {
     exterior = own(new THREE.MeshLambertMaterial({ color: BOX_FALLBACK_COLOR }));
     const interior = own(new THREE.MeshLambertMaterial({ color: displayColor(INTERIOR_TINT, INTERIOR_TINT, INTERIOR_TINT), map: interiorTexture }));
     sleeveFace = own(new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    const cardBack = own(new THREE.MeshBasicMaterial({ color: 0xffffff, map: backTexture }));
-    state.defaultSleeve = own(backTexture.clone());
+    state.face = faceWindow(cardMesh);
+    const cardBackMap = own(fitFace(backTexture.clone(), state.face));
+    cardBackMap.needsUpdate = true;
+    const cardBack = own(new THREE.MeshBasicMaterial({ color: 0xffffff, map: cardBackMap }));
+    state.defaultSleeve = own(fitFace(backTexture.clone(), state.face));
     state.defaultSleeve.needsUpdate = true;
     sleeveFace.map = state.defaultSleeve;
 
@@ -243,6 +269,7 @@ export async function createObjectStage({ host, onLost = () => {} }) {
       texture.dispose();
       return;
     }
+    fitFace(texture, state.face);
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     state.owned.add(texture);
     show(texture);
