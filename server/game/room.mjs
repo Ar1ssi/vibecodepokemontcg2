@@ -188,6 +188,27 @@ export class GameRoom {
   }
 
   /**
+   * Drops a spectator socket (it left the room or disconnected). A seated socket is untouched:
+   * a seat survives a dropped connection (Finding 7).
+   *
+   * @param {string} socketId
+   */
+  removeSpectator(socketId) {
+    this.spectatorSockets.delete(socketId);
+  }
+
+  /**
+   * True when the socket is seated or registered as a spectator. Only those may read a view:
+   * a spectator's view shows both hands (design 069).
+   *
+   * @param {string} socketId
+   * @returns {boolean}
+   */
+  canView(socketId) {
+    return this.socketToPlayer.has(socketId) || this.spectatorSockets.has(socketId);
+  }
+
+  /**
    * Cleans up socket mappings on disconnection.
    *
    * @param {string} socketId

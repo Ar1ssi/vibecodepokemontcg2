@@ -43,12 +43,11 @@ export function deckRevealTimes(count, holdMs) {
 }
 
 /**
- * How long the queue waits after starting a reveal: until the last card starts
- * into the hand, so what follows begins as it lands (0 for no cards).
+ * How long the queue waits after starting a reveal: until the last card has
+ * landed in the hand, so what follows (the deck shuffle) plays after it (0 for no cards).
  */
 export function deckRevealHold(count, holdMs) {
-  const { count: n, total } = deckRevealTimes(count, holdMs);
-  return n > 0 ? total - PREVIEW_PLACE_MS : 0;
+  return deckRevealTimes(count, holdMs).total;
 }
 
 // How long before a card's place phase its landing is measured again (the hand

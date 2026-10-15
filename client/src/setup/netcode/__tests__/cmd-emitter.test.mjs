@@ -234,3 +234,21 @@ test('handleCmdRejected sounds the Item-lock cue for an attack play lock only', 
   handleCmdRejected({ reason: 'Time Capsule stops you playing that card during this turn.' }, { playUiCue });
   assert.deepEqual(cues, ['itchy-pollen-hand-card', 'card-no-match']);
 });
+
+// Design 069: a spectator's board offers no moves, and nothing it clicks reaches the server.
+test('emitCmd sends nothing while spectating', async () => {
+  const emitted = [];
+  const socket = { emit: (...args) => emitted.push(args) };
+  const hadDocument = 'document' in globalThis;
+  const previous = globalThis.document;
+  globalThis.document = { body: { classList: { contains: (name) => name === 'spectating' } } };
+  try {
+    const res = await emitCmd({ socket, roomId: 'room-1', type: 'draw', payload: { count: 1 } });
+    assert.equal(res.success, false);
+    assert.equal(res.error, 'spectator_readonly');
+    assert.equal(emitted.length, 0);
+  } finally {
+    if (hadDocument) globalThis.document = previous;
+    else delete globalThis.document;
+  }
+});

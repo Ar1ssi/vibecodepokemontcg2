@@ -843,6 +843,10 @@ img.draw-flight-source,
   text-align: center;
   transform: scaleX(-1) scaleY(-1);
 }
+/* The opponent board is mirrored (.opp-view); keep the Energy count readable. */
+.energy-token-count {
+  transform: scaleX(-1) scaleY(-1);
+}
 .opp-tab {
   position: absolute;
   border-radius: 10%;
@@ -1175,6 +1179,15 @@ body.mat-active .outline {
 #discardText,
 #lostZoneText {
   display: none;
+}
+
+/* Design 069 spectator broadcast layout: the parent's mat art and zone-outline overlay cannot
+   follow a board turned 90°, so each board draws its own zone plates (spectator-session.js
+   puts the class on this document's root). */
+html.spectator-broadcast body :is(#deck, #discard, #lostZone, #active, #bench, #prizes) {
+  border: 2px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03) !important;
 }
 
 /* Design 069: the hover preview measures this to find the blurred band left of the mat art. It sits
