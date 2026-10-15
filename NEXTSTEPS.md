@@ -7,4 +7,4 @@
 
 # oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 6/6 done · branch ready, not landed · landing checklist in design 068 § For the landing commit
 
-# oneshot 069-tcgl-hover-preview · branch claude/hopeful-darwin-wciasr (primary folder) · slice 2/4 done
+# oneshot 069-tcgl-hover-preview · branch claude/hopeful-darwin-wciasr (primary folder) · slice 3/4 done

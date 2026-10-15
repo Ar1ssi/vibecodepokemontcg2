@@ -41,6 +41,7 @@ import {
   focusRect,
   perspectiveFor,
 } from './card-focus-geometry.mjs';
+import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 
 const HAND_LOWERED_CLASS = 'hand-lowered';
 const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
@@ -260,6 +261,7 @@ export function openCardFocus({
   onRetreat = null,
   onOpenStack = null,
 } = {}) {
+  suppressHoverPreview('modal');
   if (focusState) return false;
   const sourceImg = card?.image;
   if (!sourceImg?.isConnected) return false;
