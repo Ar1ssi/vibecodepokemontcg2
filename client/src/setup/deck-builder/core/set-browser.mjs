@@ -149,9 +149,10 @@ const TCGDEX_BASE = tcgdexApiBase();
     // category/supertype field — only the per-card detail endpoint does, and
     // fetching that per card would be one request per card. `/cards?category=X`
     // (already used for the Energy tab, D18) returns every card id in that
-    // category in one request, so build one id -> supertype map covering all
-    // three categories, lazily and once per session.
-    const CATEGORY_TO_SUPERTYPE = { Pokemon: 'Pokémon', Trainer: 'Trainer', Energy: 'Energy' };
+    // category in one request, so build one id -> supertype map, lazily and once
+    // per session. Only Trainer and Energy are listed (~370 KB together): a card in
+    // neither is a Pokémon, which skips the Pokémon list (~2 MB on its own).
+    const CATEGORY_TO_SUPERTYPE = { Trainer: 'Trainer', Energy: 'Energy' };
     let cardSupertypeIndexPromise = null;
     function fetchCardSupertypeIndex() {
       if (cardSupertypeIndexPromise) return cardSupertypeIndexPromise;
@@ -774,6 +775,10 @@ const TCGDEX_BASE = tcgdexApiBase();
       const generationEnergyMatch = GENERATION_ENERGY_SET_ID_RE.exec(setId);
       if (generationEnergyMatch) return fetchGenerationEnergyCards(Number(generationEnergyMatch[1]));
 
+      // The supertype index downloads alongside the set record, not after it.
+      // Tagging is additive for the summary-bar filter — a lookup failure
+      // shouldn't block browsing the set's cards.
+      const supertypeIndexPromise = fetchCardSupertypeIndex().catch(() => null);
       const record = await fetchSetRecord(setId);
       const set = {
         id: record.id,
@@ -784,14 +789,11 @@ const TCGDEX_BASE = tcgdexApiBase();
         .filter((card) => card?.id && card?.name && card.image)
         .map((card) => normalizeSetCard(card, set));
 
-      try {
-        const supertypeIndex = await fetchCardSupertypeIndex();
+      const supertypeIndex = await supertypeIndexPromise;
+      if (supertypeIndex) {
         for (const card of cards) {
-          card.supertype = supertypeIndex.get(card.id);
+          card.supertype = supertypeIndex.get(card.id) || 'Pokémon';
         }
-      } catch {
-        // Supertype tagging is additive for the summary-bar filter — a lookup
-        // failure shouldn't block browsing the set's cards.
       }
 
       return cards;

@@ -3,6 +3,7 @@ import { tcgdexApiUrl } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
+// set id -> Promise<release date>; overlapping searches share one lookup.
 const tcgdexSetReleaseDateCache = new Map();
 
 function compareReleaseDate(a, b, direction = 'desc') {
@@ -260,28 +261,17 @@ export function normalizeTcgdexCard(card) {
 }
 
 
-async function hydrateTcgdexSetReleaseDates(cards = []) {
-  const uniqueSetIds = [...new Set(cards.map((card) => card?.set?.id).filter(Boolean))];
-  const missingSetIds = uniqueSetIds.filter((setId) => !tcgdexSetReleaseDateCache.has(setId));
-
-  await Promise.all(
-    missingSetIds.map(async (setId) => {
-      try {
-        const setData = await fetchJson(tcgdexApiUrl(`/sets/${setId}`));
-        tcgdexSetReleaseDateCache.set(setId, setData?.releaseDate || '');
-      } catch {
-        tcgdexSetReleaseDateCache.set(setId, '');
-      }
-    })
-  );
-
-  return cards.map((card) => ({
-    ...card,
-    set: {
-      ...card.set,
-      releaseDate: card?.set?.releaseDate || tcgdexSetReleaseDateCache.get(card?.set?.id) || '',
-    },
-  }));
+// A card record names its set but not the set's release date, which the
+// default sort needs. Never rejects: an unknown date sorts last.
+function setReleaseDate(setId) {
+  if (!tcgdexSetReleaseDateCache.has(setId)) {
+    const lookup = fetchJson(tcgdexApiUrl(`/sets/${setId}`)).then(
+      (setData) => setData?.releaseDate || '',
+      () => ''
+    );
+    tcgdexSetReleaseDateCache.set(setId, lookup);
+  }
+  return tcgdexSetReleaseDateCache.get(setId);
 }
 
 /**
@@ -320,8 +310,10 @@ export async function queryCards({ term = '', params = {} } = {}) {
       });
     } else {
       const seen = new Set();
-      for (const query of plan.queries) {
-        const summaries = await fetchCardSummaries({ cardName: query, params });
+      const summaryLists = await Promise.all(
+        plan.queries.map((query) => fetchCardSummaries({ cardName: query, params }))
+      );
+      for (const summaries of summaryLists) {
         for (const s of summaries) {
           if (!seen.has(s.id)) {
             seen.add(s.id);
@@ -344,23 +336,27 @@ export async function queryCards({ term = '', params = {} } = {}) {
 
   const summariesToFetch = allSummaries.slice(0, DETAIL_FETCH_LIMIT);
 
+  // Each card's set lookup starts as soon as its record arrives, while the
+  // other records are still loading, rather than in a second round after them.
   const detailedCards = await Promise.all(
     summariesToFetch.map(async (summary) => {
       try {
-        const detail = await fetchJson(tcgdexApiUrl(`/cards/${summary.id}`));
-        return normalizeTcgdexCard(detail);
+        const card = normalizeTcgdexCard(await fetchJson(tcgdexApiUrl(`/cards/${summary.id}`)));
+        if (!card.image) return null;
+        if (card.set.id && !card.set.releaseDate) {
+          card.set.releaseDate = await setReleaseDate(card.set.id);
+        }
+        return card;
       } catch {
         return null;
       }
     })
   );
 
-  const validCards = detailedCards.filter((card) => card && card.image);
-
-  const hydratedCards = await hydrateTcgdexSetReleaseDates(validCards);
+  const validCards = detailedCards.filter(Boolean);
 
   return {
-    results: hydratedCards,
+    results: validCards,
     totalSummaries: allSummaries.length,
     detailedCount: summariesToFetch.length,
     term: cleanName,

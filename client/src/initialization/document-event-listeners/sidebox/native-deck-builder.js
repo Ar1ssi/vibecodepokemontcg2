@@ -604,6 +604,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // Set browser only in browse mode (lazy-load on first open)
         if (browserPanel) {
           browserPanel.hidden = !isBrowse;
+          if (isBrowse && browseIsStale) {
+            browseIsStale = false;
+            setBrowser?.setCardFilters(cardFilters);
+          }
           if (isBrowse) setBrowser?.load();
         }
     
@@ -1056,6 +1060,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let draftFilters = createEmptyFilters();
   let activeMode = 'search';
   let searchIsStale = false;
+  let browseIsStale = false;
   // One Filters button and chip strip per tab, one shared drawer.
   const filtersButtons = [
     document.getElementById('nativeDeckBuilderFiltersButton'),
@@ -1134,11 +1139,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     return `Showing ${currentResults.length} card(s). Click a card to add it.`;
   };
 
-  // The one way filters change: both tabs follow. A hidden Search tab
-  // re-runs when it is next shown rather than fetching now.
+  // The one way filters change: both tabs follow. A hidden tab re-filters
+  // when it is next shown rather than fetching now, so its pass never competes
+  // with the shown tab's for the TCGdex proxy's few upstream slots.
   const applyCardFilterState = (nextFilters) => {
     cardFilters = nextFilters;
-    setBrowser?.setCardFilters(cardFilters);
+    if (activeMode === 'browse') setBrowser?.setCardFilters(cardFilters);
+    else browseIsStale = true;
     if (activeMode === 'search') {
       runSearch();
     } else {

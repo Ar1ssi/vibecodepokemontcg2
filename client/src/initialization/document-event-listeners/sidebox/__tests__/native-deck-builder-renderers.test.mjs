@@ -7,9 +7,9 @@ import {
   createEmptyFilters,
   toggleFilter,
 } from '../../../../setup/deck-builder/core/card-filters.mjs';
-import { renderFilterDrawer } from '../native-deck-builder-renderers.js';
+import { renderFilterDrawer, renderSearchResults } from '../native-deck-builder-renderers.js';
 
-const dom = new JSDOM('<div id="drawer"></div>');
+const dom = new JSDOM('<div id="drawer"></div><div id="results"></div>');
 const drawerEl = dom.window.document.getElementById('drawer');
 
 const findControl = (group, value) =>
@@ -53,4 +53,23 @@ test('a redraw while focus is outside the drawer leaves focus alone', () => {
   dom.window.document.activeElement?.blur();
   findControl('supertypes', 'Trainer').click();
   assert.equal(dom.window.document.activeElement, dom.window.document.body);
+});
+
+test('search tiles load the low TCGdex scan; the preview keeps the high one', () => {
+  const searchResultsEl = dom.window.document.getElementById('results');
+  // TCGdex sv08-057 Pikachu ex, normalized as card-search.mjs does (high.webp for both sizes).
+  const high = 'https://assets.tcgdex.net/en/sv/sv08/057/high.webp';
+  const custom = 'https://example.test/cards/custom.png';
+  renderSearchResults({
+    searchResultsEl,
+    results: [
+      { id: 'sv08-057', name: 'Pikachu ex', images: { small: high, large: high }, image: high },
+      { id: 'custom-1', name: 'Custom', images: { small: custom, large: custom }, image: custom },
+    ],
+    onSelect: () => {},
+  });
+  const [tcgdexTile, customTile] = searchResultsEl.querySelectorAll('.native-deck-builder-result');
+  assert.equal(tcgdexTile.querySelector('img').getAttribute('src'), 'https://assets.tcgdex.net/en/sv/sv08/057/low.webp');
+  assert.equal(tcgdexTile.dataset.previewImage, high);
+  assert.equal(customTile.querySelector('img').getAttribute('src'), custom);
 });

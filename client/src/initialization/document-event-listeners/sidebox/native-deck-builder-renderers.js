@@ -24,6 +24,12 @@ const escapeHtml = (value = '') => String(value)
         : '';
     };
 
+    // TCGdex serves every scan as low.webp (245 px wide, ~28 KB) and high.webp (600 px,
+    // ~100 KB). A result tile is 124 px and up, the same tile Browse Sets fills with
+    // the low scan, so the grid loads low; the hover/right-click preview keeps high.
+    const TCGDEX_HIGH_SCAN = /^(https:\/\/assets\.tcgdex\.net\/.+)\/high\.webp$/;
+    const tileScanUrl = (url = '') => String(url).replace(TCGDEX_HIGH_SCAN, '$1/low.webp');
+
     export const renderSearchResults = ({ searchResultsEl, results, onSelect, quantities = {}, owned = {} }) => {
       if (!searchResultsEl) return;
     
@@ -35,7 +41,7 @@ const escapeHtml = (value = '') => String(value)
       searchResultsEl.innerHTML = results
         .map((card, index) => {
           const previewImage = card.images?.large || card.images?.small || card.image || '';
-          const thumbImage = card.images?.small || card.image || '';
+          const thumbImage = tileScanUrl(card.images?.small || card.image || '');
           const setName = escapeHtml(card.set?.name || 'Unknown Set');
           const qty = quantities[card.id] || 0;
     

@@ -240,3 +240,94 @@ test('queryCards with no name and no params fetches nothing', async () => {
   assert.equal(response.detailedCount, 0);
   assert.equal(response.isHugeResultSet, false);
 });
+
+// A stand-in for the network: `routes(url)` answers each request, possibly after a gate.
+function stubFetch(routes) {
+  const requested = [];
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    requested.push(parsed);
+    const body = await routes(parsed, requested);
+    return { ok: true, status: 200, json: async () => body };
+  };
+  return { requested, restore: () => (globalThis.fetch = previous) };
+}
+
+// Waits until `ready()` holds and says whether it did; gives up after a short while so a
+// regression fails rather than hangs.
+async function until(ready) {
+  for (let tries = 0; tries < 50 && !ready(); tries += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+  return ready();
+}
+
+// TCGdex sv08-057 Pikachu ex (Surging Sparks, 2024-11-08) and sv05-051 Pikachu (Temporal Forces,
+// 2024-03-22), 2026-10-15.
+test('queryCards looks up a set as soon as its first card arrives, not after every card', async () => {
+  const sets = { sv08: '2024-11-08', sv05: '2024-03-22' };
+  let lookupStartedEarly = false;
+  const card = (id, setId, name) => ({
+    id,
+    name,
+    category: 'Pokemon',
+    image: `https://assets.tcgdex.net/en/sv/${setId}/${id.split('-')[1]}`,
+    set: { id: setId, name: setId },
+  });
+  const stub = stubFetch(async (url, requested) => {
+    const path = url.pathname;
+    if (path.endsWith('/cards')) return [{ id: 'sv08-057' }, { id: 'sv05-051' }];
+    if (path.endsWith('/cards/sv08-057')) return card('sv08-057', 'sv08', 'Pikachu ex');
+    if (path.endsWith('/cards/sv05-051')) {
+      // Held until the first card's set lookup is under way.
+      lookupStartedEarly = await until(() =>
+        requested.some((entry) => entry.pathname.endsWith('/sets/sv08'))
+      );
+      return card('sv05-051', 'sv05', 'Pikachu');
+    }
+    const setId = path.split('/').pop();
+    if (sets[setId]) return { id: setId, releaseDate: sets[setId] };
+    throw new Error(`unexpected request ${url}`);
+  });
+  try {
+    const response = await queryCards({ term: 'Pikachu' });
+    assert.ok(lookupStartedEarly, 'the sv08 lookup waited for every card record');
+    assert.deepEqual(
+      response.results.map((entry) => [entry.id, entry.set.releaseDate]),
+      [
+        ['sv08-057', '2024-11-08'],
+        ['sv05-051', '2024-03-22'],
+      ]
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+// TCGdex spells both "Mewtwo EX" (xy12-52) and "Mewtwo-EX" (bw4-54), 2026-10-15.
+test('queryCards asks for both EX spellings at once and merges them in plan order', async () => {
+  let askedTogether = false;
+  const stub = stubFetch(async (url, requested) => {
+    const name = url.searchParams.get('name');
+    if (name === 'Mewtwo EX') {
+      askedTogether = await until(() =>
+        requested.some((entry) => entry.searchParams.get('name') === 'Mewtwo-EX')
+      );
+      return [{ id: 'xy12-52' }, { id: 'shared-1' }];
+    }
+    if (name === 'Mewtwo-EX') return [{ id: 'bw4-54' }, { id: 'shared-1' }];
+    return { id: 'x', name: 'x', category: 'Pokemon', set: {} };
+  });
+  try {
+    const response = await queryCards({ term: 'Mewtwo EX' });
+    assert.ok(askedTogether, 'the second spelling waited for the first');
+    assert.equal(response.totalSummaries, 3);
+    assert.deepEqual(
+      stub.requested.filter((entry) => entry.pathname.endsWith('/cards')).map((entry) => entry.searchParams.get('name')),
+      ['Mewtwo EX', 'Mewtwo-EX']
+    );
+  } finally {
+    stub.restore();
+  }
+});
