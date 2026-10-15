@@ -22,6 +22,9 @@ import { processAction } from '../../setup/general/process-action.js';
 import { setAuthoritativeDispatchContext } from '../../setup/netcode/authoritative-dispatch.js';
 import { cleanActionData } from '../../setup/general/clean-action-data.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
+import { publicRoomName } from '../../../../shared/lobby/public-rooms.mjs';
+import { seatTokenFor, writeSeatToken } from '../../setup/lobby/seat-token-store.mjs';
+import { rejectEndsSeat, roomRejectMessage } from '../../setup/lobby/public-room-view.mjs';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
@@ -339,7 +342,13 @@ export const initializeSocketEventListeners = () => {
     const chatbox = document.getElementById('chatbox');
     const p2ExplanationBox = document.getElementById('p2ExplanationBox');
     const flipBoardButton = document.getElementById('flipBoardButton');
-    roomHeaderText.textContent = 'id: ' + systemState.roomId;
+    // Design 069: a public room shows its name; its seat token lets this tab reclaim the seat.
+    const roomName = publicRoomName(systemState.roomId);
+    roomHeaderText.textContent = roomName ?? 'id: ' + systemState.roomId;
+    document.getElementById('roomHeaderCopyButton').hidden = roomName !== null;
+    if (typeof data?.seatToken === 'string') {
+      writeSeatToken(systemState.roomId, systemState.p2SelfUsername, data.seatToken);
+    }
     chatbox.innerHTML = '';
     connectedRoom.style.display = 'flex';
     lobby.style.display = 'none';
@@ -388,7 +397,11 @@ export const initializeSocketEventListeners = () => {
       socket.emit('requestSpectatorData', { roomId: systemState.roomId });
     }
   });
-  socket.on('roomReject', () => {
+  socket.on('roomReject', (data) => {
+    // Design 069: a reconnect refused because this seat is gone sends the player back to the lobby.
+    if (rejectEndsSeat(data?.reason) && systemState.isTwoPlayer) {
+      document.dispatchEvent(new CustomEvent('room-seat-lost'));
+    }
     let overlay = document.createElement('div');
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -406,8 +419,8 @@ export const initializeSocketEventListeners = () => {
     container.style.color = '#fff';
 
     let message = document.createElement('p');
-    message.innerHTML =
-      'Room is full.<br>Enable spectator mode to watch the game.';
+    message.textContent = roomRejectMessage(data?.reason);
+    message.style.whiteSpace = 'pre-line';
     message.style.fontSize = '24px';
 
     container.appendChild(message);
@@ -428,6 +441,7 @@ export const initializeSocketEventListeners = () => {
         roomId: systemState.roomId,
         username: systemState.p2SelfUsername,
         notSpectator: notSpectator,
+        seatToken: seatTokenFor(systemState.roomId, systemState.p2SelfUsername),
       };
       socket.emit('userReconnected', data);
       if (!notSpectator) {

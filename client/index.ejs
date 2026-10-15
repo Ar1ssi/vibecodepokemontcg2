@@ -142,26 +142,30 @@
         <div id="p2ExplanationBox">
             <strong>Online Multiplayer Mode</strong>
             <div style="margin-top: 0.5em;"></div>
-            Enter or generate a unique room ID to share with your friends. Players must enter the same ID (case-sensitive) to join.
+            Pick a room to play in, or watch a full one. To play with a friend privately, open "Private room" and share its ID.
         </div>
         <div id="lobby">
             <input id="nameInput" type="text" placeholder="Username" autocomplete="off" name="username">
-            <div id="roomId">
-                <input id="roomIdInput" type="text" placeholder="Room ID">
-                <button id="copyButton">
-                    <img src="https://www.svgrepo.com/show/309480/copy.svg" alt="Copy">
-                </button>                
-                <button id="generateIdButton">Generate</button>
-            </div>
             <div id="coachingModeLabel">
                 <input type="checkbox" id="coachingModeCheckbox">
                 <label style="cursor: pointer;" for="coachingModeCheckbox">Enable board flip <span style="font-style: italic; font-size: smaller;">(both players must enable)</span></label>
             </div>
-            <div id="spectatorModeLabel">
-                <input type="checkbox" id="spectatorModeCheckbox">
-                <label style="cursor: pointer;" for="spectatorModeCheckbox">Join as spectator</label>
-            </div>
-            <div id="joinRoomButton"> Join Room </div>
+            <ul id="publicRoomList" aria-label="Rooms" aria-live="polite"></ul>
+            <details id="privateRoomDetails">
+                <summary>Private room (with code)</summary>
+                <div id="roomId">
+                    <input id="roomIdInput" type="text" placeholder="Room ID">
+                    <button id="copyButton">
+                        <img src="https://www.svgrepo.com/show/309480/copy.svg" alt="Copy">
+                    </button>
+                    <button id="generateIdButton">Generate</button>
+                </div>
+                <div id="spectatorModeLabel">
+                    <input type="checkbox" id="spectatorModeCheckbox">
+                    <label style="cursor: pointer;" for="spectatorModeCheckbox">Join as spectator</label>
+                </div>
+                <div id="joinRoomButton"> Join Room </div>
+            </details>
         </div>
         <div id="connectedRoom">
             <div id="roomHeader">

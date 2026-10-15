@@ -641,7 +641,7 @@ async function main() {
   //Socket.IO Connection Handling
   io.on('connection', async (socket) => {
     // Function to handle disconnections (unintended)
-    const disconnectHandler = (roomId, username) => {
+    const disconnectHandler = (roomId, username, asSpectator = false) => {
       if (!socket.data.leaveRoom) {
         socket.to(roomId).emit('userDisconnected', username);
       }
@@ -666,21 +666,21 @@ async function main() {
       if (roomInfo.has(roomId)) {
         const room = roomInfo.get(roomId);
 
-        if (socket.data.leaveRoom) {
+        if (asSpectator) {
+          // A spectator may share a seated player's name: never touch the seats here.
+          room.spectators.delete(username);
+          if (socket.data.leaveRoom) deleteRoomIfEmpty(roomId, room);
+        } else if (socket.data.leaveRoom) {
           if (room.players.has(username)) {
             // Delete, never null: the admin UI's socket.data proxy throws on a null value.
             delete socket.data.seat;
             releasePlayerSeat(roomId, room, username, socket.id);
           } else {
-            room.spectators.delete(username);
             deleteRoomIfEmpty(roomId, room);
           }
         } else {
-          // For unintended disconnections, remove from spectators, but retain seated players
-          // so temporary drops do not allow seat hijacking or premature room deletion (Finding 7)
-          if (room.spectators.has(username)) {
-            room.spectators.delete(username);
-          }
+          // Unintended disconnections retain seated players so temporary drops do not allow
+          // seat hijacking or premature room deletion (Finding 7).
           // Design 069: a public seat is held only once the game is set up.
           if (
             isPublicRoomId(roomId) &&
@@ -692,6 +692,15 @@ async function main() {
         }
       }
       notifyLobby(roomId);
+    };
+    // One disconnect listener per socket, for the room it last joined. Spectators get one too
+    // (design 069): without it a closed spectator tab stayed in the room's count forever.
+    const watchDisconnect = (roomId, username, asSpectator) => {
+      if (socket.data.disconnectListener) {
+        socket.removeListener('disconnect', socket.data.disconnectListener);
+      }
+      socket.data.disconnectListener = () => disconnectHandler(roomId, username, asSpectator);
+      socket.on('disconnect', socket.data.disconnectListener);
     };
     // Function to handle event emission
     const emitToRoom = (eventName, data) => {
@@ -878,6 +887,7 @@ async function main() {
         // Check if the user is a spectator or there are fewer than 2 players
         if (isSpectator) {
           room.spectators.add(username);
+          watchDisconnect(roomId, username, true);
           socket.emit('spectatorJoin');
           socket.to(roomId).emit('requestSpectatorData', { roomId });
         } else {
@@ -911,13 +921,7 @@ async function main() {
                 socket.emit('pushAction', cached.loadDeckData);
             }
           }
-          // Remove any existing disconnect listener to prevent leak on rejoin
-          if (socket.data.disconnectListener) {
-            socket.removeListener('disconnect', socket.data.disconnectListener);
-          }
-          socket.data.disconnectListener = () =>
-            disconnectHandler(roomId, username);
-          socket.on('disconnect', socket.data.disconnectListener);
+          watchDisconnect(roomId, username, false);
           socket.data.seat = { roomId, username };
         }
         broadcastRoomFormat(roomId);
@@ -1021,21 +1025,21 @@ async function main() {
       }
       if (!data.notSpectator) {
         room.spectators.add(data.username);
+        watchDisconnect(data.roomId, data.username, true);
         socket
           .to(data.roomId)
           .emit('requestSpectatorData', { roomId: data.roomId });
       } else {
         room.players.add(data.username);
         if (publicRoom) markSeatConnected(room, data.username, socket.id);
-        // Remove any existing disconnect listener to prevent leak on reconnect
-        if (socket.data.disconnectListener) {
-          socket.removeListener('disconnect', socket.data.disconnectListener);
-        }
-        socket.data.disconnectListener = () =>
-          disconnectHandler(data.roomId, data.username);
-        socket.on('disconnect', socket.data.disconnectListener);
+        watchDisconnect(data.roomId, data.username, false);
         socket.data.seat = { roomId: data.roomId, username: data.username };
-        io.to(data.roomId).emit('userReconnected', data);
+        // Never relay the payload whole: it carries this player's seat token (design 069).
+        io.to(data.roomId).emit('userReconnected', {
+          roomId: data.roomId,
+          username: data.username,
+          notSpectator: data.notSpectator,
+        });
       }
       broadcastRoomFormat(data.roomId);
     });
