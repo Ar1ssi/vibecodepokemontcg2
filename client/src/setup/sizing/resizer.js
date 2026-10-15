@@ -10,6 +10,7 @@ import {
 } from '../../state.js';
 import { getZone } from '../zones/get-zone.js';
 import { imageAnchor } from '../deck-constructor/hydrate-holo.js';
+import { scaleEnergyCountBadges } from '../../actions/move-card-bundle/energy-token-row.mjs';
 import { adjustAlignment } from './adjust-alignment.js';
 
 // Create the overlay div
@@ -221,6 +222,7 @@ export const adjustCards = (user, zoneId, ratio) => {
       if (Number.isFinite(newWidth) && newWidth > 0) {
         imageAnchor(card.image).parentElement.style.width = `${newWidth}px`;
       }
+      scaleEnergyCountBadges(card.image, ratio);
     }
     if (card.image.damageCounter) {
       const index = zone.array.findIndex((loopCard) => loopCard === card);
