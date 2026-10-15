@@ -169,6 +169,13 @@ test('mov and movc read a negate or abs as float; integer opcodes negate as inte
   has('(-(-0.5))');
 });
 
+test('derivative opcodes map onto dFdx and dFdy, coarse and fine alike', () => {
+  const body = (lines) => FRAGMENT.replace('rsq r0.w, r0.w', lines.join('\n'));
+  const { glsl } = transpile(body(['deriv_rtx r0.w, r0.x', 'deriv_rty_fine r0.z, r0.y']), { stage: 'fragment' });
+  assert.ok(glsl.includes('dFdx(intBitsToFloat(r0.x))'), glsl);
+  assert.ok(glsl.includes('dFdy(intBitsToFloat(r0.y))'), glsl);
+});
+
 test('an opcode the translator does not know throws, naming it', () => {
   const asm = FRAGMENT.replace('rsq r0.w, r0.w', 'bfrev r0.w, r0.w');
   assert.throws(() => transpile(asm, { stage: 'fragment' }), /unsupported opcode: bfrev/);

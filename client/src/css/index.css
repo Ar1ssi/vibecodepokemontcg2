@@ -4709,11 +4709,16 @@ body.side-menu-collapsed #oppResizer {
       user-select: none;
     }
     .native-deck-builder-coin-empty { grid-column: 1 / -1; text-align: center; opacity: 0.6; padding: 3vh 0; font-style: italic; }
-    .coin-material-filter {
+    .coin-material-filter,
+    .coin-source-switch {
       display: flex;
       gap: 4px;
     }
-    .coin-material-filter button {
+    .coin-material-filter[hidden],
+    .coin-region-filter[hidden],
+    .coin-image-toggle[hidden] { display: none; }
+    .coin-material-filter button,
+    .coin-source-switch button {
       font-size: 1.2vh;
       padding: 0.4vh 0.7vw;
       border-radius: 999px;
@@ -4722,10 +4727,17 @@ body.side-menu-collapsed #oppResizer {
       color: inherit;
       cursor: pointer;
     }
-    .coin-material-filter button.active {
+    .coin-material-filter button.active,
+    .coin-source-switch button.active {
       background: rgba(65, 91, 168, 0.3);
       border-color: rgba(120, 144, 214, 0.7);
     }
+    /* TCG Live coins (design 069): the game's own thumbnail, then its live 3D coin over it */
+    .coin-cell .coin-cell-thumb { width: 84px; height: 84px; object-fit: contain; }
+    .coin-stage-preview { position: relative; width: 120px; height: 120px; flex: 0 0 auto; }
+    .coin-stage-preview img { width: 100%; height: 100%; object-fit: contain; }
+    .coin-stage-preview .coin-stage-canvas { position: absolute; inset: -20%; width: 140%; height: 140%; }
+    .coin-stage-preview.is-live img { visibility: hidden; }
     
     /* coin picker panel: shares the customize pane with sleeves */
     .native-deck-builder-coin-picker {
@@ -4762,6 +4774,14 @@ body.side-menu-collapsed #oppResizer {
     }
     #turnOrderCoinFlipOverlay.fading { opacity: 0; }
     #turnOrderCoinFlipOverlay .coin-3d { width: clamp(150px, 24vh, 260px); height: clamp(150px, 24vh, 260px); }
+    /* TCG Live coin stage (design 069): the WebGL disc sits in the host; the shadow and landing sprites are DOM. */
+    #turnOrderCoinFlipOverlay.stage-mode .coin-toss-wrap { display: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-host { position: relative; width: clamp(180px, 30vh, 330px); height: clamp(180px, 30vh, 330px); }
+    #turnOrderCoinFlipOverlay .coin-stage-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #turnOrderCoinFlipOverlay .coin-stage-shadow { position: absolute; left: 50%; top: 88%; width: 70%; transform: translate(-50%, 0); pointer-events: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-ring,
+    #turnOrderCoinFlipOverlay .coin-stage-impact { position: absolute; left: 50%; top: 50%; width: 100%; opacity: 0; transform: translate(-50%, -50%); pointer-events: none; }
+    #turnOrderCoinFlipOverlay .coin-stage-impact { width: 80%; }
     .turn-order-coin-flip-label {
       color: #f2f4ff;
       font-size: 1.9vh;
@@ -6225,6 +6245,113 @@ img.drag-avatar {
   user-select: none;
   z-index: 100001;
   will-change: transform;
+}
+
+/* ── Deck customization 3D preview (design 071): TCG Live's box / sleeve / coin trio above the picker ── */
+.customize-stage {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7vh;
+  padding: 0 0.75vw 0.8vh;
+}
+.customize-stage[hidden],
+.customize-stage.is-unavailable { display: none; }
+.customize-stage-viewport {
+  position: relative;
+  width: 100%;
+  height: 36vh;
+  min-height: 220px;
+  overflow: hidden;
+  border-radius: 0.6vw;
+  background: radial-gradient(ellipse at 50% 85%, rgba(120, 150, 220, 0.28), rgba(20, 28, 52, 0.55) 70%);
+  border: 1px solid rgba(65, 91, 168, 0.35);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.customize-stage-viewport:active { cursor: grabbing; }
+.customize-stage-objects {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.customize-stage-objects canvas,
+.customize-stage-coin canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.customize-stage-coin {
+  position: absolute;
+  pointer-events: none;
+}
+.customize-stage-coin-shadow {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(43, 45, 61, 0.85);
+  -webkit-mask: url('../assets/deckbox/shadow-coin.webp') center / 100% 100% no-repeat;
+  mask: url('../assets/deckbox/shadow-coin.webp') center / 100% 100% no-repeat;
+}
+.customize-stage-coin[hidden],
+.customize-stage-coin-shadow[hidden] { display: none; }
+.customize-stage-arrow {
+  position: absolute;
+  top: 50%;
+  width: 4.2vh;
+  height: 4.2vh;
+  margin-top: -2.1vh;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: #2a3558;
+  font-size: 3vh;
+  line-height: 1;
+  cursor: pointer;
+}
+.customize-stage-arrow:hover { background: #fff; }
+.customize-stage-arrow[data-dir="-1"] { left: 1vw; }
+.customize-stage-arrow[data-dir="1"] { right: 1vw; }
+.customize-stage-bar {
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+}
+.customize-stage-toggle {
+  display: flex;
+  border: 1px solid rgba(65, 91, 168, 0.35);
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.customize-stage-toggle button {
+  padding: 0.7vh 1.4vw;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.4vh;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+.customize-stage-toggle button:hover { background: rgba(65, 91, 168, 0.18); }
+.customize-stage-toggle button.active {
+  background: rgba(65, 91, 168, 0.45);
+  font-weight: 700;
+}
+.customize-stage-caption {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.4vh;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* the deck box picker has no title row of its own: the switcher and the shared filter stand in for it */
+.native-deck-builder-box-panel .native-deck-builder-section-title-row { display: none; }
+.native-deck-builder-box-panel .native-deck-builder-sleeve-gallery {
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  grid-auto-rows: 104px;
 }
 
 /* ── Spectator view switch (design 069) ─────────────────────────────────

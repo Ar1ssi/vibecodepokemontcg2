@@ -46,13 +46,13 @@ test('coinCeremonyTimeline: one flip keeps the opening ceremony pacing', () => {
   assert.ok(one.tossMs >= 2000, 'a toss long enough to follow the coin');
 });
 
-test('coinCeremonyTimeline: several flips land in order, faster as the count grows', () => {
+test('coinCeremonyTimeline: several flips toss back to back, each for its game duration', () => {
   const three = coinCeremonyTimeline(3);
   assert.equal(three.landsAt.length, 3);
   for (let i = 1; i < 3; i++) assert.ok(three.landsAt[i] > three.landsAt[i - 1]);
   assert.equal(three.totalMs, three.landsAt[2] + three.holdMs + three.fadeMs);
-  assert.ok(coinCeremonyTimeline(8).tossMs < three.tossMs);
-  assert.ok(three.tossMs < coinCeremonyTimeline(1).tossMs);
+  assert.deepEqual(three.tossesMs, [2000, 1000, 1000]);
+  assert.equal(coinCeremonyTimeline(8).tossesMs[7], 500);
 });
 
 test('coinCeremonyTimeline: reduced motion drops the tumble; bad counts play one flip', () => {

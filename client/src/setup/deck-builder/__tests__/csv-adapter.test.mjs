@@ -203,12 +203,38 @@ test('parseCsvMeta reads sleeve/coin ids from comment lines', () => {
   assert.deepEqual(parseCsvMeta(csv), {
     sleeveId: 'mega-charizard',
     coinId: 'gold-coin',
+    deckBoxId: null,
   });
+});
+
+test('a deck box id round-trips through the #DECKBOX meta line', () => {
+  const csv = serializeDeckToSimCsv(onePikachuDeck(), {
+    sleeveId: 'mega-charizard',
+    deckBoxId: 'db_151_sv3-5_etb',
+  });
+  assert.deepEqual(csv.split('\n').slice(0, 3), [
+    '#SLEEVE,mega-charizard',
+    '#DECKBOX,db_151_sv3-5_etb',
+    'QTY,Name,Type,URL,Number,Set,TcgId',
+  ]);
+  assert.deepEqual(parseCsvMeta(csv), {
+    sleeveId: 'mega-charizard',
+    coinId: null,
+    deckBoxId: 'db_151_sv3-5_etb',
+  });
+});
+
+test('parseCsvMeta reads #DECKBOX from a CRLF export and treats an empty value as unset', () => {
+  assert.equal(
+    parseCsvMeta('#DECKBOX,db_arceus_swsh9_etb\r\nQTY,Name,Type,URL\r\n').deckBoxId,
+    'db_arceus_swsh9_etb'
+  );
+  assert.equal(parseCsvMeta('#DECKBOX,\nQTY,Name,Type,URL').deckBoxId, null);
 });
 
 test('parseCsvMeta returns nulls when no meta lines are present', () => {
   const csv = 'QTY,Name,Type,URL\n1,Pikachu,Pokémon,https://example.com/p.png';
-  assert.deepEqual(parseCsvMeta(csv), { sleeveId: null, coinId: null });
+  assert.deepEqual(parseCsvMeta(csv), { sleeveId: null, coinId: null, deckBoxId: null });
 });
 
 test('parseSimCsv skips #SLEEVE/#COIN comment lines and still parses cards', () => {
@@ -245,7 +271,7 @@ test('serializeDeckToSimCsv -> parseSimCsv/parseCsvMeta round-trips deck and sle
   const meta = parseCsvMeta(csv);
   const parsedDeck = parseSimCsv(csv);
 
-  assert.deepEqual(meta, { sleeveId: 'mega-charizard', coinId: 'gold-coin' });
+  assert.deepEqual(meta, { sleeveId: 'mega-charizard', coinId: 'gold-coin', deckBoxId: null });
   assert.equal(parsedDeck.Pikachu.totalCount, 1);
   assert.equal(parsedDeck.Pikachu.cards[0].data.id, 'sv1-25');
 });

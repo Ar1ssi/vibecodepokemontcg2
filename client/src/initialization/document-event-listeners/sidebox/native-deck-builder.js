@@ -100,7 +100,21 @@ import { EMPTY_PREFS } from '../../../setup/deck-builder/core/deck-suggest/prefs
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
 import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-picker.js';
 import { initializeDeckBuilderMatPicker } from './native-deck-builder-mat-picker.js';
-import { getCoinById } from '../../../setup/deck-builder/core/coins.mjs';
+import { getCoinById, getCoins, getTcglCoins } from '../../../setup/deck-builder/core/coins.mjs';
+import { coinArtUrl } from '../../../setup/deck-builder/core/coin-effects.mjs';
+import { initializeDeckBuilderBoxPicker } from './native-deck-builder-box-picker.js';
+import { initializeCustomizeStage } from '../../../setup/deck-builder/core/customize-stage/customize-stage.js';
+import {
+  boxAtlasUrl,
+  boxById,
+  stepBoxId,
+} from '../../../setup/deck-builder/core/customize-stage/boxes.mjs';
+import { nextIndex } from '../../../setup/deck-builder/core/customize-stage/stage-math.mjs';
+import {
+  deckBoxIdForSave,
+  effectiveCosmeticId,
+  importedDeckBoxId,
+} from '../../../setup/deck-builder/core/customize-stage/cosmetic-state.mjs';
 import { getMatById } from '../../../setup/deck-builder/core/mats.mjs';
 import { getDeckFromLibrary, hasUnsavedDraft } from '../../../setup/deck-builder/core/deck-library.mjs';
 import {
@@ -414,6 +428,7 @@ export const initializeNativeDeckBuilder = ({
           if (!deckId) {
             rememberCosmetic(target, 'sprites', []);
             rememberCosmetic(target, 'wallpaperId', null);
+            rememberCosmetic(target, 'deckBoxId', null);
             rememberCosmetic(target, 'suggestPrefs', undefined);
           }
           deck = cards;
@@ -426,6 +441,7 @@ export const initializeNativeDeckBuilder = ({
           refreshSleeveSelection();
           refreshCoinSelection();
           refreshMatSelection();
+          refreshDeckBoxSelection();
         },
         onSaveCurrentDeck: () => {
           deckLibrary?.saveActiveDeck(deck);
@@ -605,6 +621,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             sleevePanel.hidden = true;
             if (coinPanel) coinPanel.hidden = true;
             if (matPanel) matPanel.hidden = true;
+            if (deckBoxPanel) deckBoxPanel.hidden = true;
+            customizeStage?.hide();
           }
           const customizeSwitcherEl = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
           if (customizeSwitcherEl) {
@@ -614,8 +632,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               // A box opened since the pickers were drawn gave new sleeves and coins.
               sleevePicker?.refreshOwned();
               coinPicker?.refreshOwned();
-              const sleeveBtn = customizeSwitcherEl.querySelector('[data-view="sleeve"]');
-              sleeveBtn?.click();
+              const boxBtn = customizeSwitcherEl.querySelector('[data-view="box"]');
+              boxBtn?.click();
             }
           }
         }
@@ -687,18 +705,16 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const sleevePanel = document.getElementById('nativeDeckBuilderSleevePanel');
       const coinPanel = document.getElementById('nativeDeckBuilderCoinPanel');
       const matPanel = document.getElementById('nativeDeckBuilderMatPanel');
+      const deckBoxPanel = document.getElementById('nativeDeckBuilderBoxPanel');
+      const stagePanel = document.getElementById('nativeDeckBuilderCustomizeStage');
+      let customizeStage = null;
       const sleevePicker = initializeDeckBuilderSleevePicker({
         panelEl: sleevePanel,
         getOwnedIds: () => eliteTrainerBox?.ownedSleeveIds() ?? [],
-        onChange: (sleeve) => {
-          deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
-              rememberCosmetic(currentLoadTarget, 'sleeveId', sleeve ? sleeve.id : null);
-          // Route through the syncable changeCardBack action: sets the
-          // correct self/opp state var, re-points the target container's
-          // back images, and (in multiplayer) broadcasts to the opponent.
-          if (sleeve?.image) gameLink.changeCardBack(currentLoadTarget, sleeve.image, true);
-          gameLink.announceSleeve(currentLoadTarget, sleeve?.image || null);
-        },
+        // applySleeve routes through the syncable changeCardBack action: sets the correct self/opp
+        // state var, re-points the target container's back images, and (in multiplayer) broadcasts
+        // to the opponent.
+        onChange: (sleeve) => applySleeve(sleeve),
       });
 
           // Coin picker (Customize tab, below sleeves) — selection persists
@@ -706,11 +722,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           const coinPicker = initializeDeckBuilderCoinPicker({
             panelEl: coinPanel,
             getOwnedIds: () => eliteTrainerBox?.ownedCoinIds() ?? [],
-            onChange: (coin) => {
-              deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
-              rememberCosmetic(currentLoadTarget, 'coinId', coin ? coin.id : null);
-              gameLink.announceCoin(currentLoadTarget, coin);
-            },
+            onChange: (coin) => applyCoin(coin),
           });
 
           // Playmat picker (Customize tab). The pick is persisted with the
@@ -749,7 +761,90 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             },
           });
 
-      // Customize switcher: Card Sleeve <-> Coin <-> Mat toggle + shared filter
+          // ── Deck box + 3D preview (design 071) ─────────────────────────────
+          // The deck box is builder-only: no game-side announcement. The stage reads the three picks from
+          // the loaded deck (or the mirror, with none loaded) and shows them as TCG Live's 3D trio.
+          const currentCosmeticId = (key, readActive) =>
+            effectiveCosmeticId({
+              loadedDeckId: deckLibrary?.getActiveDeckId?.(currentLoadTarget),
+              activeId: readActive?.(currentLoadTarget),
+              mirrored: chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'][key],
+            });
+          const currentDeckBoxId = () =>
+            currentCosmeticId('deckBoxId', deckLibrary?.getActiveDeckBox);
+          const applyDeckBox = (box) => {
+            deckLibrary?.setActiveDeckBox?.(currentLoadTarget, box ? box.id : null);
+            rememberCosmetic(currentLoadTarget, 'deckBoxId', box ? box.id : null);
+            customizeStage?.refresh();
+          };
+          const applySleeve = (sleeve) => {
+            deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
+            rememberCosmetic(currentLoadTarget, 'sleeveId', sleeve ? sleeve.id : null);
+            if (sleeve?.image) gameLink.changeCardBack(currentLoadTarget, sleeve.image, true);
+            gameLink.announceSleeve(currentLoadTarget, sleeve?.image || null);
+            customizeStage?.refresh();
+          };
+          const applyCoin = (coin) => {
+            deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
+            rememberCosmetic(currentLoadTarget, 'coinId', coin ? coin.id : null);
+            gameLink.announceCoin(currentLoadTarget, coin);
+            customizeStage?.refresh();
+          };
+          const boxPicker = initializeDeckBuilderBoxPicker({
+            panelEl: deckBoxPanel,
+            onChange: applyDeckBox,
+            // The stage draws the default box until the catalog names the deck's own.
+            onCatalog: () => customizeStage?.refresh(),
+          });
+          const refreshDeckBoxSelection = () => {
+            boxPicker?.setSelected(currentDeckBoxId());
+            customizeStage?.refresh();
+          };
+          const stageSelection = () => {
+            const catalog = boxPicker?.catalog();
+            const box = catalog ? boxById(catalog, currentDeckBoxId()) : null;
+            const sleeveId = currentCosmeticId('sleeveId', deckLibrary?.getActiveSleeve);
+            const sleeve = sleeveId ? getSleeves().find((entry) => entry.id === sleeveId) : null;
+            const coinId = currentCosmeticId('coinId', deckLibrary?.getActiveCoin);
+            const coin = coinId ? getCoinById(coinId) : null;
+            return {
+              boxAtlasUrl: box ? boxAtlasUrl(box) : null,
+              boxName: box?.name ?? 'Default',
+              sleeveUrl: sleeve?.image ? coinArtUrl(sleeve.image, null) : null,
+              sleeveName: sleeve?.name ?? 'Classic Pokémon card back',
+              coin: coin ? { id: coin.id, artUrl: coinArtUrl(coin.thumb || coin.url) } : null,
+              coinName: coin?.name ?? 'Default',
+            };
+          };
+          // Arrows step the picked category through its catalog, as TCG Live's do.
+          const stepCosmetic = (slot, dir) => {
+            if (slot === 'box') {
+              const catalog = boxPicker?.catalog();
+              if (!catalog) return;
+              const id = stepBoxId(catalog, currentDeckBoxId(), dir);
+              boxPicker.setSelected(id);
+              applyDeckBox(id ? boxById(catalog, id) : null);
+            } else if (slot === 'sleeve') {
+              const ids = [null, ...getSleeves().map((entry) => entry.id)];
+              const at = Math.max(0, ids.indexOf(currentCosmeticId('sleeveId', deckLibrary?.getActiveSleeve)));
+              const id = ids[nextIndex(at, dir, ids.length)];
+              sleevePicker?.setSelected(id);
+              applySleeve(id ? getSleeves().find((entry) => entry.id === id) : null);
+            } else if (slot === 'coin') {
+              const ids = [null, ...getTcglCoins().map((entry) => entry.id), ...getCoins().map((entry) => entry.id)];
+              const at = Math.max(0, ids.indexOf(currentCosmeticId('coinId', deckLibrary?.getActiveCoin)));
+              const id = ids[nextIndex(at, dir, ids.length)];
+              coinPicker?.setSelected(id);
+              applyCoin(id ? getCoinById(id) : null);
+            }
+          };
+          customizeStage = initializeCustomizeStage({
+            panelEl: stagePanel,
+            getSelection: stageSelection,
+            onStep: stepCosmetic,
+          });
+
+      // Customize switcher: Deck Box <-> Card Sleeve <-> Coin <-> Mat toggle + shared filter
           // ── playmat sleeve application ─────────────────────────────────
           // Card backs are tracked per-player (systemState.cardBackSrc for
           // self; p1OppCardBackSrc/p2OppCardBackSrc for the opponent) —
@@ -830,15 +925,26 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           const customizeSwitcher = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
           const customizeFilter = document.getElementById('nativeDeckBuilderCustomizeFilter');
           if (customizeSwitcher && coinPicker) {
+            const boxBtn = customizeSwitcher.querySelector('[data-view="box"]');
             const sleeveBtn = customizeSwitcher.querySelector('[data-view="sleeve"]');
             const coinBtn = customizeSwitcher.querySelector('[data-view="coin"]');
             const matBtn = customizeSwitcher.querySelector('[data-view="mat"]');
             const placeholders = {
+              box: 'Filter deck boxes...',
               sleeve: 'Filter sleeves...',
               coin: 'Filter coins...',
               mat: 'Filter mats...',
             };
-            const setView = (view) => {
+            const setView = (view, { seeding = false } = {}) => {
+              boxBtn?.classList.toggle('active', view === 'box');
+              if (deckBoxPanel) deckBoxPanel.hidden = view !== 'box';
+              // The seeding call below runs at boot on the Search tab: no 3D stage until Customize opens.
+              if (view === 'mat' || seeding) {
+                customizeStage?.hide();
+              } else {
+                customizeStage?.show();
+                customizeStage?.setView(view);
+              }
               sleeveBtn.classList.toggle('active', view === 'sleeve');
               coinBtn.classList.toggle('active', view === 'coin');
               matBtn?.classList.toggle('active', view === 'mat');
@@ -847,6 +953,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               if (matPanel) matPanel.hidden = view !== 'mat';
               customizeFilter.placeholder = placeholders[view] || placeholders.sleeve;
             };
+            boxBtn?.addEventListener('click', () => setView('box'));
             sleeveBtn.addEventListener('click', () => setView('sleeve'));
             coinBtn.addEventListener('click', () => setView('coin'));
             matBtn?.addEventListener('click', () => setView('mat'));
@@ -868,6 +975,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
                   coinInput.value = term;
                   coinInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
+                // deck box picker: same via its (hidden) filter input
+                const boxInput = deckBoxPanel?.querySelector('.native-deck-builder-box-filter');
+                if (boxInput) {
+                  boxInput.value = term;
+                  boxInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
                 // mat picker: exposes its filter directly on the controller
                 matPicker?.filter(term);
               });
@@ -875,10 +988,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             // Seed the default sub-view, then re-hide: the builder boots on the
             // Search tab, and setView() unhides whichever panel it selects.
             // Without this the sleeve gallery renders under the search grid.
-            setView('sleeve');
+            setView('box', { seeding: true });
             sleevePanel.hidden = true;
             coinPanel.hidden = true;
             if (matPanel) matPanel.hidden = true;
+            if (deckBoxPanel) deckBoxPanel.hidden = true;
           }
 
     
@@ -1088,6 +1202,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         refreshSleeveSelection();
         refreshCoinSelection();
         refreshMatSelection();
+        refreshDeckBoxSelection();
       };
 
       // cache the preview holder while the image is still in the DOM — after
@@ -1676,7 +1791,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   exportCsvButton.addEventListener('click', () => {
     const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget) || null;
     const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
-    const csv = serializeDeckToSimCsv(deck, { sleeveId, coinId });
+    const deckBoxId = currentDeckBoxId();
+    const csv = serializeDeckToSimCsv(deck, { sleeveId, coinId, deckBoxId });
     const cards = getSortedDeckCardArray(deck);
     const deckName = deckLibrary?.getActiveDeckName?.(currentLoadTarget) || 'Untitled Deck';
 
@@ -1717,7 +1833,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       noteDeckReplaced({ resetSteering: true });
       deckDirty = true;
 
-      const { sleeveId, coinId } = parseCsvMeta(csvText);
+      const { sleeveId, coinId, deckBoxId } = parseCsvMeta(csvText);
       if (sleeveId !== null) {
         deckLibrary?.setActiveSleeve(currentLoadTarget, sleeveId);
         sleevePicker?.setSelected(sleeveId);
@@ -1731,6 +1847,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deckLibrary?.setActiveCoin(currentLoadTarget, coinId);
         coinPicker?.setSelected(coinId);
         gameLink.announceCoin(currentLoadTarget, getCoinById(coinId) || null);
+      }
+      // The default box is stored as null; an id this build's catalog does not list is ignored.
+      const importedCatalog = boxPicker?.catalog();
+      const importedBoxId = importedDeckBoxId(importedCatalog, deckBoxId);
+      if (importedBoxId !== undefined) {
+        boxPicker.setSelected(importedBoxId);
+        applyDeckBox(importedBoxId ? boxById(importedCatalog, importedBoxId) : null);
       }
 
       render();
@@ -1751,6 +1874,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       coinId:
         chosen.coinId ?? deckLibrary?.getActiveCoin?.(currentLoadTarget) ?? null,
       matId: chosen.matId ?? deckLibrary?.getActiveMat?.(currentLoadTarget) ?? null,
+      deckBoxId: deckBoxIdForSave({
+        loadedDeckId: deckLibrary?.getActiveDeckId?.(currentLoadTarget),
+        mirrored: chosen.deckBoxId,
+      }),
       wallpaperId:
         chosen.wallpaperId ?? deckLibrary?.getActiveWallpaper?.(currentLoadTarget) ?? null,
       sprites: currentDeckSprites(),
@@ -1773,6 +1900,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // wipes a saved deck from the library.
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
         rememberCosmetic(currentLoadTarget, 'sprites', []);
+        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
+        refreshDeckBoxSelection();
         rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
         noteDeckReplaced();
         deck = createEmptyDeck();
@@ -1985,6 +2114,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       },
       showUnsavedDeck: (cards) => {
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
+        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
+        refreshDeckBoxSelection();
         rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
         noteDeckReplaced();
         deck = cards;
@@ -1995,6 +2126,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       detachEditor: () => {
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
         rememberCosmetic(currentLoadTarget, 'sprites', []);
+        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
+        refreshDeckBoxSelection();
         rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
         noteDeckReplaced();
         deck = createEmptyDeck();
@@ -2062,6 +2195,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       refreshSleeveSelection();
       refreshCoinSelection();
       refreshMatSelection();
+      refreshDeckBoxSelection();
       syncCustomizationToDeck();
       updateReadyButtons();
       return true;

@@ -1,6 +1,9 @@
 // Coin catalog: 202 launch-era (Gen IX) + 737 historical (Gens I-VIII).
 // Generated from a Bulbapedia scrape; normalize/rewrite with
 // `node scripts/normalize-coin-catalog.mjs`.
+// TCG Live's own coins (design 069) are a separate list with `cn_` ids; getCoinById resolves both.
+
+import { TCGL_COINS } from './tcgl-coins.generated.mjs';
 
 const COIN_BACK_URL = "src/assets/coins/coin-back.png";
 
@@ -9534,8 +9537,19 @@ export function getCoins() {
   return COIN_CATALOG.map((c) => ({ ...c }));
 }
 
+/** TCG Live's coins (picker group "TCG Live"), sorted by name; each carries `family`, its shader family. */
+export function getTcglCoins() {
+  return TCGL_COINS.map((c) => ({ ...c }));
+}
+
+/** True for a TCG Live coin: the coin stage draws it with its own materials. */
+export function isTcglCoin(coin) {
+  return TCGL_COINS.some((c) => c.id === coin?.id);
+}
+
+/** A physical or TCG Live coin by id (decks persist either), or null. */
 export function getCoinById(id) {
-  const coin = COIN_CATALOG.find((c) => c.id === id);
+  const coin = COIN_CATALOG.find((c) => c.id === id) ?? TCGL_COINS.find((c) => c.id === id);
   return coin ? { ...coin } : null;
 }
 

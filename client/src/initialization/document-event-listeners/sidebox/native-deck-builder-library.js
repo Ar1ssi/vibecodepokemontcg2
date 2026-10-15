@@ -14,6 +14,7 @@ import {
       setDeckSleeve,
       setDeckCoin,
       setDeckMat,
+      setDeckBox,
       setDeckSprites,
       setDeckWallpaper,
       setDeckSuggestPrefs,
@@ -421,6 +422,7 @@ import {
           setActiveField(target, sleeveId, setDeckSleeve),
         setActiveCoin: (target, coinId) => setActiveField(target, coinId, setDeckCoin),
         setActiveMat: (target, matId) => setActiveField(target, matId, setDeckMat),
+        setActiveDeckBox: (target, deckBoxId) => setActiveField(target, deckBoxId, setDeckBox),
         setActiveSprites: (target, sprites) =>
           setActiveField(target, sprites, setDeckSprites, { silent: false }),
         setActiveWallpaper: (target, wallpaperId) =>
@@ -460,6 +462,10 @@ import {
         getActiveMat: (target) => {
               const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
               return activeId && library?.decks?.[activeId] ? library.decks[activeId].matId || null : null;
+            },
+        getActiveDeckBox: (target) => {
+              const activeId = activeDeckIds[target === 'opp' ? 'opp' : 'self'];
+              return activeId && library?.decks?.[activeId] ? library.decks[activeId].deckBoxId || null : null;
             },
             saveActiveDeck: (cards) => {
           if (!allowDeckWrites) return false;
