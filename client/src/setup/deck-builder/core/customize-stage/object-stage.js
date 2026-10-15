@@ -18,6 +18,8 @@ const KEY_POSITION = [-400, 900, 1200];
 /** `deckbox_interior`'s `_Color` (sRGB, as authored) and the shadow planes' base size in Unity's built-in Plane. */
 const INTERIOR_TINT = 0.915;
 const SHADOW_PLANE_SIZE = 10;
+/** The box's default pose leans 20 degrees clockwise as the viewer sees it (a roll about the camera's view axis). */
+const BOX_TILT = -Math.PI / 9;
 /** What an exterior with no atlas (catalog not loaded, atlas missing) shows: a plain dark box, not a hole. */
 const BOX_FALLBACK_COLOR = 0x4a5068;
 
@@ -157,6 +159,7 @@ export async function createObjectStage({ host, onLost = () => {} }) {
   let slots;
   let scene;
   let camera;
+  let holderInverse;
   let exterior;
   let sleeveFace;
   try {
@@ -169,6 +172,7 @@ export async function createObjectStage({ host, onLost = () => {} }) {
     const holder = new THREE.Group();
     holder.position.set(0, 0, -layout.distance);
     holder.quaternion.set(...layout.holder.q);
+    holderInverse = holder.quaternion.clone().invert();
     scene.add(holder);
 
     const shadowOf = (texture, slotLayout) => {
@@ -217,6 +221,11 @@ export async function createObjectStage({ host, onLost = () => {} }) {
   }
 
   const yawAxis = new THREE.Quaternion();
+  // The camera's view axis in the holder's space, so the box tilts on screen however the holder is pitched.
+  const viewRoll = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(0, 0, 1).applyQuaternion(holderInverse),
+    BOX_TILT
+  );
   const up = new THREE.Vector3(0, 1, 0);
   const setPose = (slot, pose, yaw = 0) => {
     const group = slots[slot];
@@ -224,6 +233,7 @@ export async function createObjectStage({ host, onLost = () => {} }) {
     yawAxis.setFromAxisAngle(up, Number.isFinite(yaw) ? yaw : 0);
     group.position.set(...pose.p);
     group.quaternion.set(...pose.q).premultiply(yawAxis);
+    if (slot === 'box') group.quaternion.premultiply(viewRoll);
     group.scale.set(...pose.s);
     group.visible = pose.s[0] > HIDDEN_SCALE * 10;
   };
