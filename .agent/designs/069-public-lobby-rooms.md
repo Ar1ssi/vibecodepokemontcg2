@@ -1,5 +1,6 @@
 # 069: Public lobby rooms — a clickable room list in the Multiplayer tab
-Status: draft (awaiting user approval)
+Status: approved (user) — 2026-10-15: rooms named "Room N" (8), no preset format, keep codes,
+  seat release immediate before set-up / 3 min after
 Date: 2026-10-15 · Session: S-quirky-allen
 
 ## Problem
@@ -74,12 +75,15 @@ tab. Click a room to sit down, or click Watch on a full room to spectate. No cod
   debounce bounds the cost.
 
 ### 3 · Ghost seats (players who closed their tab)
-- A. Release a public-room seat whose owner has had no socket for `PUBLIC_SEAT_RELEASE_MS`
-  (default 180 000, env-overridable). Until then the listing shows them as "reconnecting".
+- A. Release a public-room seat whose owner has no socket: **immediately** while the game is not set
+  up, or after `PUBLIC_SEAT_RELEASE_MS` (default 180 000, env-overridable) once it is. Until then the
+  listing shows them as "reconnecting". (User's rule, 2026-10-15.) "Set up" = `roomFormatLocked(gameRoom)`
+  — the opening coin call has opened or the game is past the setup phase (server/game/room-format-seat.mjs).
+  Without server authority the server cannot see set-up, so legacy mode always uses the 3-min grace.
 - B. Release immediately on disconnect. This breaks the reconnect guarantees (D9, Finding 7) on every
   network blip.
 - C. Leave it alone. The lobby locks up (see Current state).
-- **Pick A, public rooms only.** Code rooms keep today's behavior (no regression risk; filed as an
+- **Pick A (user's rule), public rooms only.** Code rooms keep today's behavior (no regression risk; filed as an
   ISSUES line).
 
 ### 4 · Seat identity (the lobby shows usernames)
@@ -118,12 +122,11 @@ publicly, anyone can take over a seat by typing the name shown.
 ### Data — `shared/lobby/public-rooms.mjs` (new, served at /shared)
 ```
 PUBLIC_ROOM_PREFIX = 'public:'
-PUBLIC_ROOMS = frozen [{ id: 'public:pallet', name: 'Pallet Town' }, … 8 entries]
+PUBLIC_ROOMS = frozen [{ id: 'public:1', name: 'Room 1' }, … { id: 'public:8', name: 'Room 8' }]
 isPublicRoomId(roomId: unknown) → boolean      // string && in PUBLIC_ROOMS
 publicRoomName(roomId: unknown) → string|null
 ```
-Room names (taste call, user may rename): Pallet Town, Viridian City, Pewter City, Cerulean City,
-Vermilion City, Lavender Town, Celadon City, Saffron City. An ID typed as a code that equals a public
+Names are "Room 1" … "Room 8" (user, 2026-10-15). An ID typed as a code that equals a public
 ID simply joins that public room. It is the same room, so no special-casing is needed.
 
 ### Server state additions (on the existing `roomInfo` entry, public rooms only)
@@ -139,7 +142,8 @@ Created lazily by the pure helpers below. Code rooms never get them.
 markSeatConnected(room, username, socketId)           // presence = {socketId, disconnectedAt:null}
 markSeatDisconnected(room, username, now)             // presence = {socketId:null, disconnectedAt:now}; no-op if unseated
 forgetSeat(room, username)                            // deletes presence + token
-releasableSeats(room, now, releaseMs) → string[]      // seated usernames with disconnectedAt && now-disconnectedAt >= releaseMs
+seatReleaseDue({ disconnectedAt, now, setUp, releaseMs }) → boolean   // disconnectedAt !== null && (!setUp || now - disconnectedAt >= releaseMs)
+releasableSeats(room, now, releaseMs, setUp) → string[]   // seated usernames whose release is due
 ```
 `server/lobby/seat-token.mjs`
 ```
@@ -167,8 +171,8 @@ buildLobbySnapshot({ roomInfo, gameRooms, serverAuthoritative }) → { rooms: Pu
 `server/lobby/public-seat-flow.mjs` holds the decisions server.js makes, so they are testable without sockets:
 ```
 decideJoin({ room, username, token, isSpectator, seatsFull }) → { action: 'seat'|'spectate'|'reject', reason?: 'full'|'name_taken', issueToken: boolean }
-decideReconnect({ room, username, token }) → { action: 'seat'|'reject', reason?: 'name_taken' }
-planSweep({ roomInfo, now, releaseMs }) → [{ roomId, username }]    // public rooms only
+decideReconnect({ room, username, token }) → { action: 'seat'|'reject', reason?: 'name_taken'|'seat_released' }
+planSweep({ roomInfo, now, releaseMs, isSetUp }) → [{ roomId, username }]   // public rooms only; isSetUp(roomId) → boolean
 createDebouncer(ms, fn, timers = globalThis) → () => void           // trailing-edge, one pending timer
 ```
 
@@ -181,7 +185,7 @@ createDebouncer(ms, fn, timers = globalThis) → () => void           // trailin
 | C→S | `joinGame` | existing args + 4th arg `seatToken?: string` |
 | S→C | `joinGame` | existing payload + `seatToken?: string` (public rooms, seated only) |
 | C→S | `userReconnected` | existing payload + `seatToken?: string` |
-| S→C | `roomReject` | now `{ reason: 'full' \| 'name_taken' \| 'seat_failed' }` (was empty) |
+| S→C | `roomReject` | now `{ reason: 'full' \| 'name_taken' \| 'seat_released' \| 'seat_failed' }` (was empty) |
 
 ### Server control flow (server/server.js)
 - `notifyLobby(roomId)`: no-op unless `isPublicRoomId(roomId)`. Otherwise it schedules one debounced
@@ -201,7 +205,14 @@ createDebouncer(ms, fn, timers = globalThis) → () => void           // trailin
   The sweep variant also emits `io.to(roomId).emit('leaveRoom', {roomId, username, isSpectator:false})`
   so the remaining player sees the opponent leave exactly as with a manual Leave.
 - `sweepPublicSeats()` runs on `setInterval` every 15 s. For each public room:
-  `releasableSeats(room, Date.now(), PUBLIC_SEAT_RELEASE_MS)` → `releasePlayerSeat` each → `notifyLobby`.
+  `planSweep(...)` → `releasePlayerSeat` each → `notifyLobby`. The sweep also catches a game that
+  is reset (Reset button) while a seat is disconnected: that seat becomes due at once.
+- `disconnectHandler`, unintended path, public room, game not set up: after `markSeatDisconnected`,
+  release at once (`releasePlayerSeat`) instead of waiting for the sweep.
+- `userReconnected` for a public room whose username is no longer seated (released): `roomReject
+  {reason:'seat_released'}`. The client then runs the Leave Room cleanup without the confirm and
+  shows "Your seat was released while you were disconnected — pick a room again." A re-seat is
+  refused because the opponent has already been told the player left and their deck exchange is gone.
   `PUBLIC_SEAT_RELEASE_MS` follows the ROOM_GRACE_MS env pattern (server.js:52).
 - `cleanUpEmptyRooms` stays unchanged. A released public room hits its existing empty-room paths.
 
@@ -242,17 +253,18 @@ createDebouncer(ms, fn, timers = globalThis) → () => void           // trailin
 |---|---|---|---|
 | 1 | No rooms have roomInfo (fresh server) | Snapshot lists all 8 as `open`, 0 spectators | [ ] |
 | 2 | Malformed `joinGame` token (number, 10 kB string) / unknown roomId on subscribe | Token non-string → treated as missing; `lobbySubscribe` ignores payload | [ ] |
-| 3 | Seat release exactly at `releaseMs` / at `releaseMs-1` | Released at ≥, kept at < | [ ] |
+| 3 | Seat release after set-up exactly at `releaseMs` / at `releaseMs-1`; before set-up at 0 ms | Released at ≥, kept at <; before set-up released immediately | [ ] |
 | 4 | Two players click the same last seat at once | Socket.IO serializes; second hits the existing full check → `roomReject {full}`; lobby updates | [ ] |
 | 5 | Same username, no/wrong token, seat owner connected | `roomReject {name_taken}`; owner's socket untouched | [ ] |
-| 6 | Same username, no token, owner disconnected within grace | `roomReject {name_taken}` (no takeover via listing) | [ ] |
+| 6 | Same username, no token, owner disconnected within the set-up grace | `roomReject {name_taken}` (no takeover via listing) | [ ] |
 | 7 | Owner reloads tab (sessionStorage kept) and clicks the room | Token matches → `owner` → existing rejoin path (`rejoinedGame`) | [ ] |
-| 8 | Owner disconnects, reconnects after grace (seat released) | `userReconnected` → claim `new` but seat gone; if room has space they are re-seated fresh, else `roomReject {full}` | [ ] |
+| 8 | Owner's seat was released (blip before set-up, or >3 min after) then socket reconnects | `userReconnected` → `roomReject {seat_released}`; client returns to the lobby with the message | [ ] |
 | 9 | Remaining player when opponent's seat is released mid-game | Receives `leaveRoom` + fresh-game view (same as manual leave); lobby shows `waiting` | [ ] |
 | 10 | sessionStorage throws (private mode) | Token store no-ops; join works; reload rejoin then needs grace expiry (documented) | [ ] |
 | 11 | Burst of 50 seat/format changes in 1 s | ≤ 5 `lobbyRooms` emits (250 ms debounce) | [ ] |
 | 12 | Code room activity | No `lobbyRooms` emit, no presence/token state, no release sweep | [ ] |
-| 13 | SERVER_AUTHORITATIVE off | Status never `in-game` (full instead); release still frees `room.players` | [ ] |
+| 13 | SERVER_AUTHORITATIVE off | Status never `in-game` (full instead); release always uses the 3-min grace and still frees `room.players` | [ ] |
+| 20 | Game reset while a seat is disconnected | Next sweep (≤15 s) releases it (no longer set up) | [ ] |
 | 14 | Spectator leaves/disconnects | Spectator count drops; no seat logic touched | [ ] |
 | 15 | Old client (2.0.0) joins | Existing protocol mismatch path → "reload" message + leaveRoom | [ ] |
 | 16 | Player in a room has lobby tab open in a second tab | Second tab is just a watcher; joining a seated name there → `name_taken` | [ ] |
@@ -271,7 +283,7 @@ createDebouncer(ms, fn, timers = globalThis) → () => void           // trailin
   `planSweep`) that server.js calls, so rows 4-9, 11 and 16 are unit-tested there with fake rooms.
   The socket paths are covered end to end by the Playwright e2e below.
 - e2e: new root `public-lobby-test.mjs` (pattern of `room-format-test.mjs`), run against
-  `PUBLIC_SEAT_RELEASE_MS=2000 SERVER_AUTHORITATIVE=1`. Steps: two pages click Pallet Town → both
+  `PUBLIC_SEAT_RELEASE_MS=2000 SERVER_AUTHORITATIVE=1`. Steps: two pages click Room 1 → both
   seated. A third page sees "Full" and Watch works. Page 3 joins as page 1's name → `name_taken`.
   Page 1 closes → page 2 sees the leave within ~2 s + one sweep → the list shows "waiting".
 - Manual: user checks the list's look on localhost (visual exempt).
@@ -289,10 +301,8 @@ revert loses only the list. Tuning without a deploy: `PUBLIC_SEAT_RELEASE_MS` en
 | 3 | C `client/src/setup/lobby/{public-room-view.mjs,public-room-list.js,seat-token-store.mjs}` + tests; M `room-buttons.js` (`joinRoomById`), M `socket-event-listeners.js` (token write/read, header name, reject reasons), M `client/index.ejs`, M `client/src/css/index.css`, M `e2e-api.js` | As in Design §Client | view: waiting{Ash}→"Ash is waiting", canJoin true, canWatch true; open→canWatch false; disconnected→"(reconnecting)"; store with throwing storage→null | n/a | unit tests green; `public-lobby-test.mjs` passes; existing `room-format-test.mjs` + `two-player-sync-test.mjs` still pass |
 | 4 | review.md pass (fresh agent), fixes; M `.agent/DECISIONS.md` (picks 1-4,6,7), `.agent/MAP.md` (3 new dirs), `.agent/ISSUES.md` (code-room ghost seats + takeover; retire spectator checkbox; fixed-format rooms if user wants B) | — | — | — | full `pnpm test` green; user localhost check of list styling |
 
-## Open questions for the user
-1. Room count/names: 8 Kanto towns OK, or e.g. "Table 1-8" / more rooms?
-2. Format: rooms without a preset format (D191 as is), or lock some rooms to Standard and some to Build & Battle?
-3. Keep private code rooms (collapsed under the list)? Recommended: yes.
-4. Seat release after 3 min disconnected: OK, or longer?
+## Resolved questions (user, 2026-10-15)
+1. Rooms: exactly 8, named "Room N".  2. Format: no preset (D191 unchanged).  3. Room codes: kept.
+4. Seat release: immediate while the game is not set up; 3 minutes once it is.
 
 ## Deviations (Builder appends here during build)
