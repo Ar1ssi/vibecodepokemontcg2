@@ -39,16 +39,18 @@ test('design 069 row 7: a stored token round-trips per room and username', () =>
   assert.equal(readSeatToken('public:1', storage), null);
 });
 
-test('design 069 row 10: throwing or missing storage never throws', () => {
-  writeSeatToken('public:1', 'Ash', 'tok', throwingStorage);
-  clearSeatToken('public:1', throwingStorage);
-  assert.equal(readSeatToken('public:1', throwingStorage), null);
-  assert.equal(seatTokenFor('public:1', 'Ash', null), null);
-  writeSeatToken('public:1', 'Ash', 'tok', null);
+test('design 069 row 10: throwing or missing storage never throws and falls back to memory', () => {
+  writeSeatToken('public:5', 'Ash', 'tok', throwingStorage);
+  assert.equal(seatTokenFor('public:5', 'Ash', throwingStorage), 'tok');
+  assert.equal(seatTokenFor('public:5', 'Ash', null), 'tok');
+  clearSeatToken('public:5', throwingStorage);
+  assert.equal(readSeatToken('public:5', throwingStorage), null);
+  assert.equal(seatTokenFor('public:6', 'Ash', null), null);
 });
 
 test('design 069 row 2: corrupt stored values read as nothing', () => {
   const storage = memoryStorage();
+  clearSeatToken('public:1', storage);
   storage.setItem('ptcg.seatToken.public:1', '{not json');
   assert.equal(readSeatToken('public:1', storage), null);
   storage.setItem('ptcg.seatToken.public:1', JSON.stringify({ username: 'Ash', token: 7 }));

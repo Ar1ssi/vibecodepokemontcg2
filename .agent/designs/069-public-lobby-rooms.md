@@ -1,5 +1,6 @@
 # 069: Public lobby rooms — a clickable room list in the Multiplayer tab
-Status: approved (user) — 2026-10-15: rooms named "Room N" (8), no preset format, keep codes,
+Status: building — slices 1-3 done, review fixes in; harness records on landing
+Approved (user) — 2026-10-15: rooms named "Room N" (8), no preset format, keep codes,
   seat release immediate before set-up / 3 min after
 Date: 2026-10-15 · Session: S-quirky-allen
 
@@ -251,26 +252,31 @@ createDebouncer(ms, fn, timers = globalThis) → () => void           // trailin
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | No rooms have roomInfo (fresh server) | Snapshot lists all 8 as `open`, 0 spectators | [ ] |
-| 2 | Malformed `joinGame` token (number, 10 kB string) / unknown roomId on subscribe | Token non-string → treated as missing; `lobbySubscribe` ignores payload | [ ] |
-| 3 | Seat release after set-up exactly at `releaseMs` / at `releaseMs-1`; before set-up at 0 ms | Released at ≥, kept at <; before set-up released immediately | [ ] |
-| 4 | Two players click the same last seat at once | Socket.IO serializes; second hits the existing full check → `roomReject {full}`; lobby updates | [ ] |
-| 5 | Same username, no/wrong token, seat owner connected | `roomReject {name_taken}`; owner's socket untouched | [ ] |
-| 6 | Same username, no token, owner disconnected within the set-up grace | `roomReject {name_taken}` (no takeover via listing) | [ ] |
-| 7 | Owner reloads tab (sessionStorage kept) and clicks the room | Token matches → `owner` → existing rejoin path (`rejoinedGame`) | [ ] |
-| 8 | Owner's seat was released (blip before set-up, or >3 min after) then socket reconnects | `userReconnected` → `roomReject {seat_released}`; client returns to the lobby with the message | [ ] |
-| 9 | Remaining player when opponent's seat is released mid-game | Receives `leaveRoom` + fresh-game view (same as manual leave); lobby shows `waiting` | [ ] |
-| 10 | sessionStorage throws (private mode) | Token store no-ops; join works; reload rejoin then needs grace expiry (documented) | [ ] |
-| 11 | Burst of 50 seat/format changes in 1 s | ≤ 5 `lobbyRooms` emits (250 ms debounce) | [ ] |
-| 12 | Code room activity | No `lobbyRooms` emit, no presence/token state, no release sweep | [ ] |
-| 13 | SERVER_AUTHORITATIVE off | Status never `in-game` (full instead); release always uses the 3-min grace and still frees `room.players` | [ ] |
-| 20 | Game reset while a seat is disconnected | Next sweep (≤15 s) releases it (no longer set up) | [ ] |
-| 14 | Spectator leaves/disconnects | Spectator count drops; no seat logic touched | [ ] |
-| 15 | Old client (2.0.0) joins | Existing protocol mismatch path → "reload" message + leaveRoom | [ ] |
-| 16 | Player in a room has lobby tab open in a second tab | Second tab is just a watcher; joining a seated name there → `name_taken` | [ ] |
-| 17 | Server restart | All rooms `open`; stale client gets existing `server_restart` path; stale token harmless (claim `new`) | [ ] |
+| 1 | No rooms have roomInfo (fresh server) | Snapshot lists all 8 as `open`, 0 spectators | [x] covered: lobby-directory "row 1"; e2e "row 1: the lobby lists eight rooms" |
+| 2 | Malformed token / payloads / prototype keys | Non-string or >100-char token never matches; malformed `lobbyRooms` rows render nothing; `'constructor'` keys fall through to defaults | [x] covered: seat-token "row 2"; public-room-view "row 2"; seat-token-store "row 2" |
+| 3 | Seat release after set-up exactly at `releaseMs` / at `releaseMs-1`; before set-up at 0 ms | Released at ≥, kept at <; before set-up released immediately | [x] covered: seat-presence "row 3" ×2; e2e "row 3: … held at first" + "… released after the grace and a sweep" |
+| 4 | Two players click the same last seat at once | Socket.IO handles one event at a time per server; the second hits the full check → `roomReject {full}` | [x] covered: public-seat-flow "row 4"; e2e "a full room offers no Join to a stranger" |
+| 5 | Same username, no/wrong token, seat owner connected | `roomReject {name_taken}`; owner's socket untouched | [x] covered: public-seat-flow "rows 5-6"; e2e "rows 5-6: a second Ash is refused" |
+| 6 | Same username, no token, owner disconnected within the set-up grace | `roomReject {name_taken}` (no takeover via listing) | [x] covered: public-seat-flow "rows 5-6" (disconnected branch) |
+| 7 | Owner reloads tab (sessionStorage kept) and clicks the room | List offers "Rejoin"; token matches → `owner` → existing rejoin path | [x] covered: public-room-view "row 7"; e2e "row 7" ×3 |
+| 8 | Owner's seat was released then the socket reconnects (incl. a recovered connection still in the room) | `roomReject {seat_released}`; server drops the socket from the room; client returns to the lobby and its list is live | [x] covered: public-seat-flow "row 8"; e2e "row 8" ×4 (engine.close() recovery) |
+| 9 | Remaining player when opponent's seat is released | Receives `leaveRoom`, then the same `resetGameAfterPlayerLeft` fresh-game path as a manual leave; lobby shows `waiting` | [x] covered: e2e "row 9" + "the watcher sees Ash waiting again" (fresh view: reasoning, it is the unchanged manual-leave function) |
+| 10 | sessionStorage throws (private mode) | Token kept in memory, so a dropped connection still reclaims the seat; a reload cannot | [x] covered: seat-token-store "row 10" |
+| 11 | Burst of 50 seat/format changes in 1 s | ≤ 5 `lobbyRooms` emits (250 ms debounce) | [x] covered: public-seat-flow "row 11" |
+| 12 | Code room activity | No `lobbyRooms` entry, no presence/token state, no release sweep | [x] covered: lobby-directory "row 12"; public-seat-flow "rows 3, 9, 12, 20"; seat-presence "code room releases nothing"; room-format-test + bb-room-reset-test e2e green |
+| 13 | SERVER_AUTHORITATIVE off | Status never `in-game`; release always uses the 3-min grace | [x] reasoning: `publicSeatHeld = !SERVER_AUTHORITATIVE \|\| roomHasDealt`, and `roomHasDealt` is false without authority; lobby-directory "status follows seats and set-up" covers `full` |
+| 14 | Spectator leaves/disconnects | Spectator count drops; seats untouched | [x] covered: e2e "row 14" + "a closed spectator tab leaves the count" |
+| 15 | Old client (2.0.0) joins | Existing protocol mismatch path → "reload" message + leaveRoom | [x] reasoning: path unchanged; slice8-edge-cases asserts 2.1.0 |
+| 16 | Same name from a second tab/browser | Treated as an impostor → `name_taken` | [x] covered: e2e "rows 5-6" (separate browser context) |
+| 17 | Server restart | Authoritative: a stale public client gets `seat_released` (not `server_restart`) and returns to the lobby. Legacy: the old recreate path is kept | [x] reasoning: `checkPublicSeat` requires `SERVER_AUTHORITATIVE \|\| roomInfo.has(roomId)` |
 | 18 | Dependency fails/times out | n/a — no external dependency; `crypto.randomUUID` is synchronous built-in | struck |
 | 19 | Crash between release steps | n/a — release is synchronous in one tick; no persisted state | struck |
+| 20 | Game reset while a seat is disconnected | Next sweep (≤15 s) releases it | [x] covered: public-seat-flow "rows 3, 9, 12, 20" |
+| 21 | An old socket's disconnect arrives after the player came back on a new one | Ignored | [x] covered: seat-presence "row 21" |
+| 22 | A spectator using a seated player's name leaves | Only the spectator entry goes; the seat stays | [x] reasoning: `disconnectHandler(…, asSpectator)` returns before the seat branches |
+| 23 | Seat token secrecy | Sent only to the joining socket; the `userReconnected` relay carries roomId/username/notSpectator only | [x] reasoning: server.js relay builds the object explicitly |
+| 24 | Relays aimed at `lobby:watchers` or a public room the sender is not in | Dropped before relay, setup-cache and engine handling | [x] reasoning: `mayRelayTo` guard at the top of the relay loop |
+| 25 | A reloaded seat's earlier socket left a cached deck exchange | Cleared when the seat comes back on a new socket, and on release | [x] reasoning: `seatPublicSocket` + `releasePlayerSeat` |
 
 ## Test plan
 - Unit (`node --test`): `shared/lobby/__tests__/public-rooms.test.mjs`,
@@ -306,3 +312,40 @@ revert loses only the list. Tuning without a deploy: `PUBLIC_SEAT_RELEASE_MS` en
 4. Seat release: immediate while the game is not set up; 3 minutes once it is.
 
 ## Deviations (Builder appends here during build)
+
+- `describePublicRoom` takes an `inGame` boolean and `buildLobbySnapshot` an `isInGame(roomId)`
+  instead of `gameRoom`/`serverAuthoritative` (cosmetic).
+- `markSeatDisconnected(room, username, socketId, now)` takes the dropping socket (row 21) and keeps
+  it as the seat's last socket, so a release can clear its cached deck exchange.
+- `seat_released` reject reason added for reconnects to a freed seat. The client returns to the lobby
+  without sending `leaveRoom`; the server takes the socket out of the room (connectionStateRecovery
+  brings it back still joined — review finding 1).
+- "Rejoin" button: a full room offers Join to the tab that holds one of its seat tokens (row 7). It
+  was found missing in the e2e.
+- Spectators now get a disconnect listener (`watchDisconnect`, role-aware). Before this, closed
+  spectator tabs stayed in the count forever (also in code rooms), and spectator drops now show
+  "X disconnected" in chat.
+- `lobbySubscribe` is refused for a socket in a game room, and joining leaves `lobby:watchers`
+  (row 24). Relays to `lobby:watchers`, or to a public room the sender is not in, are dropped
+  (review finding 2).
+- The seat token store mirrors sessionStorage in memory (review finding 3).
+- `releasePlayerSeat` also frees the seat in SHADOW_MODE's shadow engine (review finding 4; this
+  also fixes explicit leaves in code rooms under shadow mode).
+- Row 17 changed: without server authority a missing room keeps the old recreate path; with
+  authority a stale public client gets `seat_released`.
+- `PUBLIC_SEAT_RELEASE_MS` falls back to 3 min when it is not a finite number.
+- Integration tests: there is no `socket.io-client` dependency, so the seat logic is unit-tested in
+  pure modules, and the socket paths are covered by the Playwright `public-lobby-test.mjs`.
+- The code-room Join button ignores an empty ID (it used to join room `''`).
+
+## Record on landing (shared harness files change only in the commit that lands on main)
+- DECISIONS: D211 [netcode] Public rooms are a static list (`shared/lobby/public-rooms.mjs`, Room
+  1-8); their listing is derived from live roomInfo and pushed on `lobby:watchers` (design 069).
+  D212 [netcode] Public seats are guarded by a server-minted seat token (sessionStorage + memory);
+  a dropped public seat is freed at once before set-up and after PUBLIC_SEAT_RELEASE_MS (3 min)
+  once set up (user rule, design 069).
+- MAP: `shared/lobby/`, `server/lobby/`, `client/src/setup/lobby/`, `public-lobby-test.mjs`.
+- ISSUES: code rooms keep permanent ghost seats and same-name takeover (no tokens/release);
+  `#spectatorModeCheckbox` is still the spectating state (24 readers), so retire it into systemState;
+  join-deck-sync-test.mjs and two-player-sync-test.mjs fail on main (pre-existing; they also ignore
+  CHROMIUM_PATH).

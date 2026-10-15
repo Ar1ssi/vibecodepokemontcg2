@@ -35,8 +35,9 @@ const join = (c, name, spectate = false) =>
 const seated = (c) => waitFor(c.page, () => window.__ptcg.counters().twoPlayer === true);
 const chat = (c) => c.page.evaluate(() => document.getElementById('p2Chatbox')?.textContent || '');
 const waitChat = (c, needle, timeout) => waitFor(c.page, (n) => (document.getElementById('p2Chatbox')?.textContent || '').includes(n), timeout, needle);
-const overlayText = (c) => waitFor(c.page, () => [...document.querySelectorAll('body > div > div > p')].map((p) => p.textContent).join(' | '), 5000);
-const dismissOverlay = (c) => c.page.evaluate(() => document.querySelectorAll('body > div').forEach((d) => { if (d.querySelector(':scope > div > p')) d.click(); }));
+// The roomReject overlay is the last thing appended to <body>.
+const overlayText = (c) => waitFor(c.page, () => document.body.lastElementChild?.matches('div') && document.body.lastElementChild.querySelector(':scope > div > p')?.textContent || '', 5000);
+const dismissOverlay = (c) => c.page.evaluate(() => document.body.lastElementChild?.click());
 const shot = (c, n) => (OUT ? c.page.screenshot({ path: `${OUT}/${n}.png` }) : null);
 const loadDeck = (c, prefix) => c.page.evaluate(async (p) => {
   const { e2eFixtureDeck } = await import('/src/setup/general/e2e-mode.mjs');
@@ -102,7 +103,9 @@ try {
   const deckReady = (c) => waitFor(c.page, () => window.__ptcg.zone('self', 'deck').count >= 20);
   await deckReady(ash); await deckReady(misty);
   await ash.page.waitForTimeout(1200);
-  T('the game is set up', Boolean(await playSetup(ash, misty)));
+  await playSetup(ash, misty);
+  const dealt = await waitFor(ash.page, () => window.__ptcg.zone('self', 'prizes').count === 4 && window.__ptcg.zone('self', 'hand').count >= 7);
+  T('the game is set up (4 Prizes and a hand dealt)', Boolean(dealt));
   T('the watcher sees the room in game', Boolean(await waitRoomText(watcher, 'In game')));
   await shot(watcher, '3-in-game');
 
@@ -123,6 +126,22 @@ try {
   T('row 3: the held seat is released after the grace and a sweep', Boolean(await waitChat(ash, 'Misty left the room', 25000)));
   T('the watcher sees Ash waiting', Boolean(await waitRoomText(watcher, 'Ash is waiting')));
   await shot(watcher, '4-released');
+
+  // Row 8: a transport drop before set-up frees the seat at once; the connection recovers
+  // (connectionStateRecovery), the reconnect is refused, and the lobby must work again.
+  const blip = await openClient(browser, 'Blip');
+  await blip.page.evaluate(() => window.__ptcg.joinPublicRoom('public:2', 'Blip'));
+  T('Blip is seated in Room 2', Boolean(await seated(blip)));
+  await blip.page.evaluate(async () => (await import('/src/state.js')).socket.io.engine.close());
+  const blipOverlay = await overlayText(blip);
+  T('row 8: the refused reconnect explains the released seat', blipOverlay.includes('seat was released'), JSON.stringify(blipOverlay));
+  T('row 8: Blip is back in the lobby', Boolean(await waitFor(blip.page, () => !window.__ptcg.counters().twoPlayer, 5000)));
+  await dismissOverlay(blip);
+  const pidgey = await openClient(browser, 'Pidgey');
+  await pidgey.page.evaluate(() => window.__ptcg.joinPublicRoom('public:2', 'Pidgey'));
+  T('Pidgey is seated in Room 2', Boolean(await seated(pidgey)));
+  T('row 8: Blip\'s list is live again', Boolean(await waitFor(blip.page, () => (window.__ptcg.publicRoomText('public:2') || '').includes('Pidgey is waiting'), 8000)));
+  T('row 8: Blip no longer hears Room 2', !(await blip.page.evaluate(() => document.getElementById('p2Chatbox')?.textContent || '')).includes('Pidgey'));
 } finally {
   await browser.close();
 }
