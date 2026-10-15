@@ -99,17 +99,46 @@ export const visualRectOf = (el) => {
   return mapIframeLocalToViewport(local, frameRect, matrix, origin);
 };
 
+/**
+ * The iframe's untransformed layout box, recovered from its on-screen AABB. The mapping
+ * functions above place the transform origin relative to the layout box; for a 0°/180° turn the
+ * AABB is that box, but a 90° turn (the spectator broadcast layout, design 069) swaps its width
+ * and height. An affine transform keeps the box centre the AABB centre, which pins the box.
+ */
+export const layoutRectFromBounds = (
+  bounds,
+  width,
+  height,
+  matrix = IDENTITY_MATRIX,
+  origin = { x: width / 2, y: height / 2 }
+) => {
+  const dx = width / 2 - origin.x;
+  const dy = height / 2 - origin.y;
+  const centreX = bounds.left + bounds.width / 2;
+  const centreY = bounds.top + bounds.height / 2;
+  return {
+    left: centreX - origin.x - (matrix.a * dx + matrix.c * dy + matrix.e),
+    top: centreY - origin.y - (matrix.b * dx + matrix.d * dy + matrix.f),
+    width,
+    height,
+  };
+};
+
 export const readFrameTransform = (frame) => {
-  const frameRect = frame.getBoundingClientRect();
-  const fallbackOrigin = { x: frameRect.width / 2, y: frameRect.height / 2 };
+  const bounds = frame.getBoundingClientRect();
+  const width = frame.offsetWidth > 0 ? frame.offsetWidth : bounds.width;
+  const height = frame.offsetHeight > 0 ? frame.offsetHeight : bounds.height;
+  const fallbackOrigin = { x: width / 2, y: height / 2 };
   try {
     const style = frame.ownerDocument.defaultView.getComputedStyle(frame);
+    const matrix = parseCssMatrix(style.transform);
+    const origin = parseTransformOrigin(style.transformOrigin, fallbackOrigin);
     return {
-      frameRect,
-      matrix: parseCssMatrix(style.transform),
-      origin: parseTransformOrigin(style.transformOrigin, fallbackOrigin),
+      frameRect: layoutRectFromBounds(bounds, width, height, matrix, origin),
+      matrix,
+      origin,
     };
   } catch {
-    return { frameRect, matrix: IDENTITY_MATRIX, origin: fallbackOrigin };
+    return { frameRect: bounds, matrix: IDENTITY_MATRIX, origin: fallbackOrigin };
   }
 };

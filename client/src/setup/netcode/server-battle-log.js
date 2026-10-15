@@ -17,9 +17,10 @@ const resolveCardName = (instanceId) => {
  *
  * @param {object} event
  * @param {string|null} selfPlayerId This client's absolute player id
+ * @param {Record<string, string>|null} [names] a spectator's `{ playerId: username }` (design 069)
  */
-export function handleServerBattleLog(event, selfPlayerId) {
-  const lines = serverBattleLogLines(event, selfPlayerId, resolveCardName);
+export function handleServerBattleLog(event, selfPlayerId, names = null) {
+  const lines = serverBattleLogLines(event, selfPlayerId, resolveCardName, names);
   for (const line of lines) {
     appendMessage('', line, 'announcement', false);
   }

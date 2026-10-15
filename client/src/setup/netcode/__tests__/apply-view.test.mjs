@@ -16,7 +16,9 @@ import {
   getAuthoritativeStadiumArray,
   getAuthoritativeAttackExtras,
   repositionCardOverlays,
+  clearRenderedBoard,
 } from '../apply-view.js';
+import { spectatorPerspective } from '../../spectator/spectator-view.mjs';
 
 class MockClassList {
   constructor() {
@@ -2816,4 +2818,104 @@ test('design 064 O7: the crowd bed follows prize piles and syncs only when its s
     { bed: 'large', crazy: true },
   ]);
   resetRenderState();
+});
+
+// --- Design 069: spectator perspectives ---
+
+const spectatorRawView = (overrides = {}) => ({
+  gameId: 'g-069',
+  stateVersion: 5,
+  isSpectator: true,
+  you: null,
+  them: null,
+  turn: { player: 'p2', isYourTurn: false, number: 4, phase: 'main' },
+  pendingChoice: null,
+  players: {
+    p1: {
+      playerId: 'p1',
+      username: 'Ash',
+      zones: { hand: [{ instanceId: 1, name: 'Pikachu', src: '/pika.png' }] },
+    },
+    p2: {
+      playerId: 'p2',
+      username: 'Gary',
+      zones: { hand: [{ instanceId: 2, name: 'Eevee', src: '/eevee.png' }] },
+    },
+  },
+  ...overrides,
+});
+
+test('069: a spectator perspective renders its seat as you and hides the other hand', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const result = applyView(spectatorPerspective(spectatorRawView(), 'p2'), [], {
+    document: doc,
+    getZone: mockGetZone,
+  });
+  assert.equal(result.applied, true);
+  const eevee = getCardRegistry().get(2);
+  const pikachu = getCardRegistry().get(1);
+  assert.equal(eevee.side, 'you');
+  assert.equal(eevee.isRedacted, false);
+  assert.equal(pikachu.side, 'them');
+  assert.equal(pikachu.isRedacted, true);
+});
+
+test('069: clearRenderedBoard lets the same stateVersion redraw from the other seat', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const options = { document: doc, getZone: mockGetZone };
+  applyView(spectatorPerspective(spectatorRawView(), 'p1'), [], options);
+  const oldPikachu = getCardRegistry().get(1).element;
+  assert.equal(
+    applyView(spectatorPerspective(spectatorRawView(), 'p2'), [], options).reason,
+    'out_of_order'
+  );
+
+  clearRenderedBoard(options);
+  assert.equal(getCardRegistry().size, 0);
+  assert.equal(getLastRenderedVersion(), -1);
+  assert.equal(oldPikachu.parentNode, null, 'the old card left the DOM');
+
+  applyView(spectatorPerspective(spectatorRawView(), 'p2'), [], options);
+  assert.equal(getCardRegistry().get(1).side, 'them');
+  assert.equal(getCardRegistry().get(2).side, 'you');
+  assert.equal(getLastRenderedVersion(), 5);
+});
+
+test('069: reconcileTurnState follows the watched seat of a spectator perspective', () => {
+  const local = { turnPlayer: 'opp', turnNumber: 0, phase: 'setup' };
+  const asGary = reconcileTurnState(spectatorPerspective(spectatorRawView(), 'p2'), {
+    rulesState: local,
+  });
+  assert.equal(asGary.applied, true);
+  assert.equal(local.turnPlayer, 'self');
+  assert.equal(local.turnNumber, 4);
+
+  reconcileTurnState(spectatorPerspective(spectatorRawView({ stateVersion: 6 }), 'p1'), {
+    rulesState: local,
+  });
+  assert.equal(local.turnPlayer, 'opp');
+});
+
+test('069: a spectator gets a named waiting banner even for the watched seat\'s choice', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const raw = spectatorRawView({
+    pendingChoice: { choiceId: 'c1', player: 'p1', prompt: 'Choose a Pokémon', optionsCount: 3 },
+  });
+  applyView(spectatorPerspective(raw, 'p1'), [], { document: doc, getZone: mockGetZone });
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null);
+  const banner = doc.getElementById('netcodeChoiceBanner');
+  assert.ok(banner);
+  assert.equal(banner.textContent, 'Ash is making a choice: Choose a Pokémon');
+});
+
+test('069: the end screen names the winner to a spectator watching the winning seat', () => {
+  const { doc } = setupMockDom();
+  const raw = spectatorRawView({
+    turn: { player: 'p1', isYourTurn: false, number: 9, phase: 'ended' },
+    winner: 'p1',
+    winReason: 'prizes',
+  });
+  reconcileGameEnded(spectatorPerspective(raw, 'p1'), { document: doc });
+  const title = doc.getElementById('netcodeEndModal').querySelector('.game-end-modal-title');
+  assert.equal(title.textContent, 'Ash Wins!');
 });

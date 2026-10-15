@@ -19,6 +19,9 @@ const ATTACK_EVENT_TYPES = new Set([
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+/** A seat's username for a spectator's line, or a neutral stand-in. */
+const playerName = (names, playerId) => names?.[playerId] || 'A player';
+
 /** A card name from the caller's registry lookup, or null when unavailable. */
 const nameOf = (instanceId, resolveName) => {
   if (instanceId == null || typeof resolveName !== 'function') return null;
@@ -31,30 +34,35 @@ const nameOf = (instanceId, resolveName) => {
  * @param {object} event One server event (`type` plus its payload)
  * @param {string|null} selfPlayerId This client's absolute player id
  * @param {(instanceId: number) => string|null} [resolveName] Card-name lookup (registry)
+ * @param {Record<string, string>|null} [names] Design 069: a spectator's `{ playerId: username }`.
+ *   A spectator plays neither side, so with `names` every line names the player instead of
+ *   saying "You"/"Your opponent" (`selfPlayerId` is then ignored).
  * @returns {string[]} Lines to append, in order; empty for events with nothing to say
  */
-export function serverBattleLogLines(event, selfPlayerId, resolveName) {
+export function serverBattleLogLines(event, selfPlayerId, resolveName, names = null) {
   if (!event || typeof event !== 'object' || typeof event.type !== 'string') {
     return [];
   }
   if (ATTACK_EVENT_TYPES.has(event.type)) {
-    return attackAnnouncementLines(event, selfPlayerId, resolveName);
+    return attackAnnouncementLines(event, selfPlayerId, resolveName, names);
   }
   // An actor is mandatory: a line that cannot name whose move it was is worse than no line,
-  // and a spectator has no side to phrase from. `turnStarted` names its actor `player`.
+  // and without `names` a client with no seat has no side to phrase from. `turnStarted` names
+  // its actor `player`.
   const actorId = event.playerId != null ? event.playerId : event.player;
-  if (actorId == null || selfPlayerId == null) return [];
+  if (actorId == null || (selfPlayerId == null && !names)) return [];
 
-  const mine = actorId === selfPlayerId;
-  const you = mine ? 'You' : 'Your opponent';
-  const your = mine ? 'Your' : "Your opponent's";
-  const their = mine ? 'your' : 'their';
+  const mine = !names && actorId === selfPlayerId;
+  const actorName = names ? playerName(names, actorId) : null;
+  const you = actorName ?? (mine ? 'You' : 'Your opponent');
+  const your = actorName ? `${actorName}'s` : mine ? 'Your' : "Your opponent's";
+  const their = actorName ? 'their' : mine ? 'your' : 'their';
 
   switch (event.type) {
     case 'turnStarted':
       return [
         `Turn ${Number.isFinite(event.number) ? event.number : '?'} — ${
-          mine ? 'your' : "your opponent's"
+          actorName ? `${actorName}'s` : mine ? 'your' : "your opponent's"
         } turn.`,
       ];
 
@@ -137,9 +145,11 @@ export function serverBattleLogLines(event, selfPlayerId, resolveName) {
       const cause =
         event.sourcePlayerId == null
           ? 'a mulligan'
-          : event.sourcePlayerId === selfPlayerId
-            ? 'you mulliganed'
-            : 'opponent mulliganed';
+          : names
+            ? `${playerName(names, event.sourcePlayerId)} mulliganed`
+            : event.sourcePlayerId === selfPlayerId
+              ? 'you mulliganed'
+              : 'opponent mulliganed';
       return [`${you} drew a bonus card (${cause}).`];
     }
 
