@@ -32,7 +32,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:4100';
 const NAME_TAG = `${BOX === 'phantasmal-flames' ? '' : `-${BOX}`}${SEED === 42 ? '' : `-${SEED}`}`;
 const OUT = process.env.OUT || `.agent/scratch/unboxing${NAME_TAG}`;
 const VIDEO = `out/unboxing${NAME_TAG}.webm`;
-const PAGE_URL = `${BASE_URL}/build-and-battle?seed=${SEED}&e2e=1&box=${encodeURIComponent(BOX)}`;
+const PAGE_URL = `${BASE_URL}/build-and-battle-legacy?seed=${SEED}&e2e=1&box=${encodeURIComponent(BOX)}`;
 const STORAGE_KEY = 'ptcg-sim.build-battle.v1';
 const VIEWPORT = { width: 1280, height: 800 };
 const MODULE = '/src/setup/deck-builder/core/build-battle/unboxing.mjs';

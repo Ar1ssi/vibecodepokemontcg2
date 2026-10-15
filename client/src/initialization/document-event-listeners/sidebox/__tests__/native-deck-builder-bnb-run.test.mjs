@@ -201,6 +201,98 @@ test('a run whose cards the box data no longer has is put away with a note', asy
   assert.ok(page.runEl.querySelector('#bnbStartRun'));
 });
 
+test('Start run never overwrites a run another tab started since the buy-in was drawn', async (t) => {
+  const page = boot(t);
+  await settle();
+  const other = recordResult(savedRun({ startedAt: 9000 }), true);
+  page.dom.window.localStorage.setItem(RUN_STORAGE_KEY, JSON.stringify(other));
+  page.click('#bnbStartRun');
+  page.runEl.querySelector('.bnb-dialog .bb-primary').click();
+  await settle();
+  assert.equal(page.stored().startedAt, 9000);
+  assert.deepEqual(page.stored().results, [true]);
+  assert.equal(page.text('.bnb-meter-label'), '1/5 Matches');
+});
+
+test('a different run appearing in storage replaces the one on screen', async (t) => {
+  const page = boot(t, { run: savedRun() });
+  await settle();
+  const other = recordResult(recordResult(savedRun({ startedAt: 9000 }), true), true);
+  page.dom.window.localStorage.setItem(RUN_STORAGE_KEY, JSON.stringify(other));
+  page.dom.window.dispatchEvent(new page.dom.window.StorageEvent('storage', { key: RUN_STORAGE_KEY }));
+  await settle();
+  assert.equal(page.text('.bnb-meter-label'), '2/5 Matches');
+  // This tab now works on that run: a change goes into it, not into the old one.
+  page.buttonByText('Record a loss').click();
+  assert.equal(page.stored().startedAt, 9000);
+  assert.deepEqual(page.stored().results, [true, true, false]);
+});
+
+test('Escape closes a dialog', async (t) => {
+  const page = boot(t, { run: savedRun() });
+  await settle();
+  page.buttonByText('Forfeit').click();
+  const cancel = page.runEl.querySelector('.bnb-dialog button');
+  cancel.dispatchEvent(new page.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal(page.runEl.querySelector('.bnb-dialog'), null);
+  assert.equal(page.stored().status, 'in-progress');
+});
+
+test('I207 parity: an editor refresh before the run resumes does not wipe the unsaved deck', async (t) => {
+  const cardId = openedSession().packs[0][0];
+  const session = openedSession({ deckId: null, unsavedDeck: [[cardId, 2]] });
+  const page = boot(t, { run: savedRun({ session }) });
+  // The deck pane renders (and refreshes the controller) while the box data is still loading.
+  page.controller.refresh();
+  assert.deepEqual(page.stored().session.unsavedDeck, [[cardId, 2]]);
+  await settle();
+  assert.deepEqual(page.stored().session.unsavedDeck, [[cardId, 2]]);
+});
+
+test('row 13: a run saved mid-opening reopens the stage on load', async (t) => {
+  const sealed = createSession({ boxKey: 'phantasmal-flames', seed: 11, ...openBox({ ...loadedBox, rng: createRng(11) }) });
+  const page = boot(t, { run: createRun({ session: sealed, now: 5000 }) });
+  await settle();
+  assert.ok(page.dom.window.document.getElementById('bbUnboxingStage'));
+  assert.equal(page.runEl.querySelector('.bnb-lobby'), null);
+});
+
+test('row 11: with storage blocked the run lives in memory and says so', async (t) => {
+  const dom = new JSDOM('<!doctype html><div class="db-live"><div id="run"></div><div id="pool"></div></div>', {
+    url: 'http://localhost/build-and-battle?box=phantasmal-flames',
+    pretendToBeVisual: true,
+  });
+  t.after(() => dom.window.close());
+  Object.defineProperty(dom.window, 'localStorage', {
+    get() {
+      throw new Error('SecurityError');
+    },
+  });
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  dom.window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const runEl = document.getElementById('run');
+  initializeBuildBattleRun({
+    runPanelEl: runEl,
+    poolPanelEl: document.getElementById('pool'),
+    deckLibrary: null,
+    getTarget: () => 'self',
+    getDeck: () => ({}),
+    addToDeck() {},
+    showUnsavedDeck() {},
+    detachEditor() {},
+    showPool() {},
+    showRun() {},
+    onPreviewCard() {},
+  });
+  await settle();
+  runEl.querySelector('#bnbStartRun').click();
+  runEl.querySelector('.bnb-dialog .bb-primary').click();
+  await settle();
+  assert.match(runEl.querySelector('.bb-banner').textContent, /will not survive a reload/);
+  assert.ok(document.getElementById('bbUnboxingStage'), 'the run still starts');
+});
+
 test('a run that fails to parse is ignored: the buy-in shows', async (t) => {
   const page = boot(t, { run: { version: 99 } });
   await settle();

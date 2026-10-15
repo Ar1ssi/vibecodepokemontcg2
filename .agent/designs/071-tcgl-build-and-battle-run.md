@@ -214,3 +214,14 @@ No data migration. New key only. Revert: set `BUILD_BATTLE_DEFAULT_FLOW = 'legac
 
 ---
 Self-approval checklist: n/a — user reachable; gate = user approval.
+
+## For the landing commit
+- DECISIONS.md: run flow replaces the one-shot flow at `/build-and-battle`, legacy kept at
+  `/build-and-battle-legacy` (flip `BUILD_BATTLE_DEFAULT_FLOW`); run state `ptcg-sim.build-battle-run.v1`,
+  results recorded by the game tab (armed Play, 12 h TTL); 5 matches, no reward ladder (assumed — server data).
+- MAP.md: `core/build-battle-run/` (run-state, run-view, run-reporter), `sidebox/native-deck-builder-bnb-run.js`,
+  `sidebox/bnb-run-reporter.js`, `css/deck-builder-bnb-run.css`, `scripts/build-battle/{run-ui-assets,vendor-run-ui}.mjs`,
+  `bnb-run-test.mjs`.
+- Area doc deck-builder.md: the Run flow paragraph beside the Build & Battle one.
+- ISSUES.md: the "Known limits" above; reward ladders / Trainer Tips cut (not in the extract / ~7 sets of strings).
+- STATE.md: Focus line only if priorities changed; Light END.

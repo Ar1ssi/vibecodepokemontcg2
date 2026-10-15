@@ -25,9 +25,13 @@ const storageWith = (run) => {
 
 const armedRun = () => armMatch(createRun({ session, now: 5000 }), 6000);
 
+// A game the local player played under a Build & Battle deck, ending at `now`.
+const report = (storage, detail, now = 7000, deckFormat = 'build-battle') =>
+  reportMatchResult(storage, detail, { now, deckFormat });
+
 test('a won game fills the next node of an armed run', () => {
   const storage = storageWith(armedRun());
-  const run = reportMatchResult(storage, { winner: 'p1', isWinner: true }, 7000);
+  const run = report(storage, { winner: 'p1', isWinner: true });
   assert.deepEqual(run.results, [true]);
   assert.deepEqual(loadRun(storage).results, [true]);
   assert.equal(loadRun(storage).armedAt, null);
@@ -35,33 +39,43 @@ test('a won game fills the next node of an armed run', () => {
 
 test('a lost game records a loss', () => {
   const storage = storageWith(armedRun());
-  reportMatchResult(storage, { winner: 'p2', isWinner: false }, 7000);
+  report(storage, { winner: 'p2', isWinner: false, isLoser: true });
   assert.deepEqual(loadRun(storage).results, [false]);
 });
 
 test('the same ending reported twice counts once', () => {
   const storage = storageWith(armedRun());
-  reportMatchResult(storage, { winner: 'p1', isWinner: true }, 7000);
-  assert.equal(reportMatchResult(storage, { winner: 'p1', isWinner: true }, 7001), null);
+  report(storage, { winner: 'p1', isWinner: true });
+  assert.equal(report(storage, { winner: 'p1', isWinner: true }, 7001), null);
   assert.deepEqual(loadRun(storage).results, [true]);
 });
 
 test('a game that no Play armed is not recorded', () => {
   const storage = storageWith(createRun({ session, now: 5000 }));
-  assert.equal(reportMatchResult(storage, { winner: 'p1', isWinner: true }, 7000), null);
+  assert.equal(report(storage, { winner: 'p1', isWinner: true }), null);
   assert.deepEqual(loadRun(storage).results, []);
+});
+
+test('a game played with a Standard deck never fills a node', () => {
+  const storage = storageWith(armedRun());
+  assert.equal(report(storage, { winner: 'p1', isWinner: true }, 7000, 'tcg'), null);
+  assert.equal(reportMatchResult(storage, { winner: 'p1', isWinner: true }, { now: 7000 }), null);
+  assert.deepEqual(loadRun(storage).results, []);
+  assert.equal(typeof loadRun(storage).armedAt, 'number', 'the armed Play is still waiting');
 });
 
 test('events without a boolean isWinner or a winner are ignored', () => {
   const storage = storageWith(armedRun());
-  assert.equal(reportMatchResult(storage, { reason: 'Deck empty' }, 7000), null);
-  assert.equal(reportMatchResult(storage, { winner: null, isWinner: false }, 7000), null);
-  assert.equal(reportMatchResult(storage, { winner: 'p1', isWinner: 'yes' }, 7000), null);
-  assert.equal(reportMatchResult(storage, undefined, 7000), null);
+  assert.equal(report(storage, { reason: 'Deck empty' }), null);
+  assert.equal(report(storage, { winner: null, isWinner: false }), null);
+  assert.equal(report(storage, { winner: 'p1', isWinner: 'yes' }), null);
+  // A spectator, or a seat not yet known: the end screen names a winner but neither side.
+  assert.equal(report(storage, { winner: 'p1', isWinner: false, isLoser: false }), null);
+  assert.equal(report(storage, undefined), null);
   assert.deepEqual(loadRun(storage).results, []);
 });
 
 test('no stored run means nothing to record', () => {
-  assert.equal(reportMatchResult(storageWith(null), { winner: 'p1', isWinner: true }, 7000), null);
-  assert.equal(reportMatchResult(null, { winner: 'p1', isWinner: true }, 7000), null);
+  assert.equal(report(storageWith(null), { winner: 'p1', isWinner: true }), null);
+  assert.equal(report(null, { winner: 'p1', isWinner: true }), null);
 });

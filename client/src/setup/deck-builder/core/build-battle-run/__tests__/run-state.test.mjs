@@ -71,7 +71,7 @@ test('runProgress marks played nodes, the current node and the upcoming ones', (
   assert.equal(progress.wins, 1);
   assert.equal(progress.losses, 1);
   assert.equal(progress.played, 2);
-  assert.equal(progress.canPlay, true);
+  assert.equal(progress.finished, false);
 });
 
 test('the fifth result ends the run, and nothing is recorded after it', () => {
@@ -79,7 +79,7 @@ test('the fifth result ends the run, and nothing is recorded after it', () => {
   for (const won of [true, true, false, true, false]) run = recordResult(run, won);
   assert.equal(run.status, RUN_ENDED);
   assert.equal(run.endedEarly, false);
-  assert.equal(runProgress(run).canPlay, false);
+  assert.equal(runProgress(run).finished, true);
   assert.equal(runProgress(run).nodes.some((node) => node.state === 'current'), false);
   assert.equal(recordResult(run, true), run);
 });

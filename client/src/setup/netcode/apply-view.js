@@ -2116,6 +2116,7 @@ export function reconcileGameEnded(view, options = {}) {
             winner: view.winner,
             reason: view.winReason,
             isWinner,
+            isLoser,
             title: titleText,
           },
         })
@@ -2130,6 +2131,7 @@ export function reconcileGameEnded(view, options = {}) {
       winner: view.winner,
       reason: view.winReason,
       isWinner,
+      isLoser,
       title: titleText,
     });
   }

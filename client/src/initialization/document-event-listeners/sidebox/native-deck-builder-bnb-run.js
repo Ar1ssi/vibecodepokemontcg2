@@ -81,6 +81,7 @@ const UNSAVED_DECK_TEXT =
   'Delete a deck in My Decks, then press Save to keep it there.';
 const STALE_BOX_TEXT =
   'Your saved run no longer matches its card data, so it was put away. Decks you built stay in My Decks.';
+const EMPTY_DECK_TEXT = 'Build a 40-card deck to play.';
 const NO_RUN_PLAY_TEXT = 'Start a run on the Run tab to play';
 const RUN_OVER_PLAY_TEXT = 'This run is over';
 const SPLASH_BASE = '/src/assets/build-battle/run';
@@ -159,7 +160,8 @@ export const initializeBuildBattleRun = ({
   const storage = browserStorage();
   const energyCards = unlimitedEnergyCards();
   const urlParams = new URLSearchParams(window.location.search);
-  const urlSeed = parseSeed(urlParams.get('seed') ?? '');
+  // `?seed=` fixes the first run's box only; a second run in the same page load draws its own.
+  let urlSeed = parseSeed(urlParams.get('seed') ?? '');
 
   // The box on the buy-in (`?box=`, else the default), or the run's box; its data once
   // `loadBoxData` settles.
@@ -254,7 +256,8 @@ export const initializeBuildBattleRun = ({
   // session; once the player saves a Build & Battle record, the session binds to it.
   const trackUnsavedDeck = () => {
     const current = session();
-    if (!current || current.deckId) return;
+    // Until the run's deck is rebound the editor is empty: it must not overwrite the saved edits.
+    if (!current || !deckBound || current.deckId) return;
     const target = getTarget();
     const activeId = deckLibrary?.getActiveDeckId?.(target) || null;
     if (activeId && deckLibrary?.getActiveDeckFormat?.(target) === DECK_FORMAT_BUILD_BATTLE) {
@@ -329,9 +332,24 @@ export const initializeBuildBattleRun = ({
   };
 
   // ── Run actions ───────────────────────────────────────────────────────────
+  // Re-points the tab at the run another tab started: its deck is bound again once its box loads.
+  const adoptRun = (adopted) => {
+    run = adopted;
+    deckBound = false;
+    pool = [];
+    loadActiveBox(getBuildBattleBox(adopted.boxKey));
+  };
+
   const startRun = () => {
     if (run || !isLoaded()) return;
+    // A second builder tab may have started a run since this buy-in was drawn: never overwrite it.
+    const existing = loadRun(storage);
+    if (existing) {
+      adoptRun(existing);
+      return;
+    }
     const seed = urlSeed ?? randomSeed();
+    urlSeed = null;
     const opened = openBox({
       box: activeBox,
       data: loaded.data,
@@ -361,7 +379,9 @@ export const initializeBuildBattleRun = ({
 
   // Done on the summary: the run and its box go; the decks built from it stay in My Decks.
   const finishRun = () => {
-    clearRun(storage);
+    // Only this run: another tab may have started a newer one since.
+    const stored = loadRun(storage);
+    if (!stored || stored.startedAt === run?.startedAt) clearRun(storage);
     run = null;
     deckBound = false;
     pool = [];
@@ -415,6 +435,9 @@ export const initializeBuildBattleRun = ({
     backdrop.append(card);
     backdrop.addEventListener('click', (event) => {
       if (event.target === backdrop) closeDialog();
+    });
+    backdrop.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeDialog();
     });
     runPanelEl.append(backdrop);
     dialogEl = backdrop;
@@ -632,7 +655,7 @@ export const initializeBuildBattleRun = ({
     if (!play || !note) return;
     const state = getPlayState();
     play.disabled = state.disabled;
-    note.textContent = state.disabled && state.reason ? state.reason : '';
+    note.textContent = state.disabled ? state.reason || EMPTY_DECK_TEXT : '';
     note.hidden = !note.textContent;
   };
 
@@ -643,10 +666,15 @@ export const initializeBuildBattleRun = ({
     const root = el('div', 'bb-scene bb-scene--stage');
     root.id = 'bbUnboxing';
     root.dataset.era = skin.palette;
+    // Without a workspace to host the stage the scene plays inline, as in the legacy flow.
     const stageEl = stage.open(`Opening your ${activeBox.name}`);
-    if (!stageEl) return;
-    stageEl.replaceChildren(root);
-    parent.append(el('p', 'bb-note', 'Your box is being opened.'));
+    if (stageEl) {
+      stageEl.replaceChildren(root);
+      parent.append(el('p', 'bb-note', 'Your box is being opened.'));
+    } else {
+      root.classList.remove('bb-scene--stage');
+      parent.append(root);
+    }
     scene = mountUnboxingScene({
       root,
       getUnboxing: () => run.session.unboxing,
@@ -796,17 +824,20 @@ export const initializeBuildBattleRun = ({
 
   // Another tab (the game tab recording a result, or a second builder tab) changed the run.
   const onStorage = (event) => {
+    if (event.storageArea && event.storageArea !== storage) return;
     if (event.key !== RUN_STORAGE_KEY && event.key !== null) return;
     const stored = loadRun(storage);
     if (!stored && !run) return;
     if (stored && run && JSON.stringify(stored) === JSON.stringify(run)) return;
+    if (stored && stored.startedAt !== run?.startedAt) {
+      adoptRun(stored);
+      return;
+    }
     run = stored;
     if (!run) {
       deckBound = false;
       pool = [];
-    } else if (run.boxKey !== activeBox.key) {
-      loadActiveBox(getBuildBattleBox(run.boxKey));
-      return;
+      detachEditor();
     }
     renderAll();
   };

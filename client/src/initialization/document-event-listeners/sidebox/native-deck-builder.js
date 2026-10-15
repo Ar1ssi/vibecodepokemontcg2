@@ -31,6 +31,7 @@ import {
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
 import { initializeBuildBattle } from './native-deck-builder-build-battle.js';
 import { initializeBuildBattleRun } from './native-deck-builder-bnb-run.js';
+import { BUILD_BATTLE_DEFAULT_FLOW } from '../../../setup/deck-builder/core/builder-window.mjs';
 import { initializeEliteTrainerBox } from './native-deck-builder-etb.js';
 import { systemState } from '../../../state.js';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
@@ -242,7 +243,7 @@ const createRemoteGameLink = ({ onHostState }) => {
 export const initializeNativeDeckBuilder = ({
   role = 'host',
   mode = 'standard',
-  flow = 'legacy',
+  flow = BUILD_BATTLE_DEFAULT_FLOW,
 } = {}) => {
   const isEditor = role === 'editor';
   const isBuildBattle = isEditor && mode === 'build-battle';

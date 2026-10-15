@@ -257,7 +257,10 @@ async function main() {
   };
   app.get('/build-and-battle', renderBuildBattle('/build-and-battle'));
   app.get('/build-and-battle-legacy', renderBuildBattle('/build-and-battle-legacy'));
-  app.get('/build-and-battle/legacy', (req, res) => res.redirect(302, '/build-and-battle-legacy'));
+  app.get('/build-and-battle/legacy', (req, res) => {
+    const at = req.originalUrl.indexOf('?');
+    res.redirect(302, `/build-and-battle-legacy${at === -1 ? '' : req.originalUrl.slice(at)}`);
+  });
   app.get('/import', (req, res) => {
     const key = req.query.key;
     if (!key) {

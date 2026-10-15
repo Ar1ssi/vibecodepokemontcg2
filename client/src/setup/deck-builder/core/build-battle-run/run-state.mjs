@@ -82,7 +82,7 @@ export function forfeitRun(run) {
 
 /**
  * @returns {{wins: number, losses: number, played: number, total: number, finished: boolean,
- *   canPlay: boolean, nodes: {index: number, state: 'win'|'loss'|'current'|'upcoming'}[]}}
+ *   nodes: {index: number, state: 'win'|'loss'|'current'|'upcoming'}[]}}
  */
 export function runProgress(run) {
   const wins = run.results.filter(Boolean).length;
@@ -98,7 +98,6 @@ export function runProgress(run) {
     played,
     total: RUN_MATCH_COUNT,
     finished,
-    canPlay: !finished,
     nodes,
   };
 }

@@ -793,6 +793,7 @@ test('Finding 12: applyView mounts Victory modal and dispatches rules-game-ended
   const gameEndedEvents = eventsDispatched.filter((e) => e.type === 'rules-game-ended');
   assert.equal(gameEndedEvents.length, 1);
   assert.equal(gameEndedEvents[0].detail.isWinner, true);
+  assert.equal(gameEndedEvents[0].detail.isLoser, false);
   assert.equal(gameEndedEvents[0].detail.winner, 'p1');
 
   assert.ok(callbackResult);
