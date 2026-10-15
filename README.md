@@ -204,7 +204,7 @@ server and the tests share, with a thin client bridge. Coverage includes:
 
 Rules coverage is audit-driven across the Standard card corpus. Text the engine recognizes but
 cannot fully execute is announced and left for manual play rather than guessed; the audit scripts
-under `scripts/` and the root `*-audit.mjs` files report parse coverage.
+under `scripts/` report parse coverage.
 
 ### Visuals and presentation
 
@@ -293,33 +293,33 @@ server/                 Express + Socket.IO server, GameRoom, shadow mode
 shared/engine/          Pure game + rules engine shared by server, client and tests
 bot/                    Headless bot brains (heuristic + coverage scorers)
 scripts/                Asset pipelines and card-corpus audit scripts
+  e2e/                  Playwright / jsdom harnesses and the playtest bot
 tools/                  Dev utilities (sync-log comparison, mappings)
 docs/                   Deep reference docs (taxonomy, netcode audit, parsing guide)
 .agent/                 Agent harness: state, workflows, designs, journal, decisions, issues
-                        (+ root-level *-audit.mjs / *-test.mjs harnesses and test scripts)
 ```
 
 ## Commands
 
-| Command                                    | What it does                                                                |
-| ------------------------------------------ | --------------------------------------------------------------------------- |
-| `pnpm install`                             | Install workspace dependencies.                                             |
-| `pnpm start`                               | Start the dev server with nodemon on `http://localhost:4000`.               |
-| `node server/server.js`                    | Start the server without nodemon (production-style).                        |
-| `pnpm test`                                | Run the full headless unit-test suite (`node --test`).                      |
-| `node --test <glob>`                       | Run a subset, e.g. `node --test "shared/**/*.test.mjs"`.                    |
-| `pnpm lint`                                | ESLint 9 over the repo.                                                     |
-| `pnpm format`                              | Prettier over `**/*.{js,json,md}`.                                          |
-| `pnpm test:2p`                             | Playwright two-browser sync/room harness (server on `:4000`).               |
-| `pnpm test:flip`                           | Server-authoritative full-game "flip gate" (`:4100`, authoritative server). |
-| `pnpm test:inspector`                      | Card-inspector UI end-to-end (`:4100`, authoritative server).               |
-| `node playtest-bot.mjs --games=N --seed=S` | Bot-vs-bot soak; writes replayable dumps to `out/playtest/` on failure.     |
-| `node integration-test.mjs`                | jsdom integration test of the deck builder (no server needed).              |
+| Command                                                | What it does                                                                |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| `pnpm install`                                         | Install workspace dependencies.                                             |
+| `pnpm start`                                           | Start the dev server with nodemon on `http://localhost:4000`.               |
+| `node server/server.js`                                | Start the server without nodemon (production-style).                        |
+| `pnpm test`                                            | Run the full headless unit-test suite (`node --test`).                      |
+| `node --test <glob>`                                   | Run a subset, e.g. `node --test "shared/**/*.test.mjs"`.                    |
+| `pnpm lint`                                            | ESLint 9 over the repo.                                                     |
+| `pnpm format`                                          | Prettier over `**/*.{js,json,md}`.                                          |
+| `pnpm test:2p`                                         | Playwright two-browser sync/room harness (server on `:4000`).               |
+| `pnpm test:flip`                                       | Server-authoritative full-game "flip gate" (`:4100`, authoritative server). |
+| `pnpm test:inspector`                                  | Card-inspector UI end-to-end (`:4100`, authoritative server).               |
+| `node scripts/e2e/playtest-bot.mjs --games=N --seed=S` | Bot-vs-bot soak; writes replayable dumps to `out/playtest/` on failure.     |
+| `node scripts/e2e/integration-test.mjs`                | jsdom integration test of the deck builder (no server needed).              |
 
-Other one-off harnesses live at the repo root: `two-player-sync-test.mjs`, `flip-gate-test.mjs`,
+Other one-off harnesses live in `scripts/e2e/`: `two-player-sync-test.mjs`, `flip-gate-test.mjs`,
 `test-card-inspector-e2e.mjs`, `coin-flip-visual-test.mjs`, `room-change-reset-test.mjs`,
-`room-rejoin-reset-test.mjs`, `join-deck-sync-test.mjs`, `browser-test.mjs`, `explore-ui.mjs`,
-`fullview-test.mjs`, and the `*-audit.mjs` corpus audits.
+`room-rejoin-reset-test.mjs`, `join-deck-sync-test.mjs`, `browser-test.mjs`, `explore-ui.mjs`, and
+`fullview-test.mjs`.
 
 ## Configuration
 
@@ -354,14 +354,14 @@ involved. They cover the pure engine (state, reducer, commands, attacks, trainer
 stadiums, special energy, zones, hashing, redaction), the `GameRoom`, the client's pure modules
 (deck builder, netcode adapters, models, image logic), and the bot.
 
-Four Playwright harnesses drive real browsers against a manually started server:
+Four Playwright harnesses in `scripts/e2e/` drive real browsers against a manually started server:
 `two-player-sync-test.mjs` for legacy sync, `flip-gate-test.mjs` and `test-card-inspector-e2e.mjs`
 for server-authoritative full-game gates, and `coin-flip-visual-test.mjs` for the turn-order
 ceremony.
 
-The corpus audits, `scripts/audit-*.mjs` and the root `*-audit.mjs` files, classify and parse every
+The corpus audits, `scripts/audit-*.mjs`, classify and parse every
 card in the scraped corpus and report coverage gaps and false positives for abilities, attacks,
-trainers, stadiums, and special energy. `playtest-bot.mjs` runs the headless bot against itself
+trainers, stadiums, and special energy. `scripts/e2e/playtest-bot.mjs` runs the headless bot against itself
 through the real UI with per-turn invariants and replay dumps on failure.
 
 Current status of the unit suite: 2,844 tests, 2,843 passing. The single known failure is a
@@ -375,7 +375,7 @@ pre-existing assertion in `client/src/setup/rules/__tests__/card-inspector-model
 drive a real deploy:
 
 ```bash
-PTCG_URL=https://ptcg-sim-staging.onrender.com node playtest-bot.mjs --games=10
+PTCG_URL=https://ptcg-sim-staging.onrender.com node scripts/e2e/playtest-bot.mjs --games=10
 ```
 
 Both build with `pnpm install --frozen-lockfile`, start with `node server/server.js`, and health

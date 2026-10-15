@@ -1,6 +1,5 @@
-// Families the server engine claims to execute. Shared by ability-audit.mjs,
-// attack-false-positive-audit.mjs and the oracle gate (scripts/audit-oracle.mjs), which checks
-// each claim against observed state changes.
+// Families the server engine claims to execute. Shared by the `pnpm audit:*` scripts; the oracle
+// gate (scripts/audit-oracle.mjs) checks each claim against observed state changes.
 
 /**
  * Attack families the server engine executes (applyCommand 'attack': damage parser, attack helpers,

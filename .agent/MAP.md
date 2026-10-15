@@ -15,7 +15,7 @@ scripts/audit-ability-behaviour.mjs (`pnpm audit:abilities`, ~2 min) — ability
 scripts/audit-trainer-behaviour.mjs (`pnpm audit:trainers`, seconds) — Trainer gate: per unique corpus Trainer, parse outcome + step kinds with no server executor + play condition (lib/trainer-behaviour.mjs) vs scripts/trainer-behaviour-baseline.json (D124)
 scripts/audit-attack-behaviour.mjs (`pnpm audit:attacks`, ~2 min) — attack gate: classes every unique effect-text attack in out/pkmn-pokemon-cards.json ok/partial/ran-no-effect/engine-error from a rich-board reducer run (lib/attack-harness.mjs) + sentence cross-check (lib/attack-behaviour.mjs), ratchets each row vs scripts/attack-behaviour-baseline.json (design 036 slice 16); also unresolved damage notes, condition-true bonus replay (lib/condition-replay.mjs), lock mechanics and TCGdex typography drift (lib/text-variants.mjs, shared with audit:abilities: clause cross-check, evolved-stack probe boards, per-row `flagged` ratchet) — docs/card-parsing-and-audit-guide.md §8
 scripts/audit-gx-oracle.mjs (`node scripts/audit-gx-oracle.mjs`, ~25 s) — GX-scoped oracle: every attack/ability of out/pkmn-gx-cards.json (pkmncards `is:gx`) through the same harness, per-entry executed/blind/passive/no-effect report (out/gx-oracle-audit.txt) + ratchet scripts/gx-oracle-baseline.json (design 047)
-tools/ — compare-sync-logs.mjs + coin id mappings; package/, npm.tgz, .npmcache/ are an accidentally committed npm CLI (44.7 MB, 0 refs; I249: delete)
+tools/ — compare-sync-logs.mjs + coin id mappings (coindl*.tsv/txt, coinmap.txt)
 client/src/setup/deck-builder/ — deck builder (themes, filters, counter, sprites, wallpapers, coins) → .agent/areas/deck-builder.md
 client/src/setup/netcode/ — client transport, authoritative view renderer (apply-view.js), pickers/adapters, battle log → .agent/areas/netcode.md
 client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]; evolution/devolution scenes D207, canvas stage D154) → .agent/areas/netcode.md § Mat FX
@@ -65,7 +65,7 @@ shared/engine/rules/each-filter.mjs - "each of your opponent's Pokémon that …
 shared/engine/rules/turn-damage-bonus.mjs - Trainer/Ability "during this turn, your … attacks do N more damage" bonuses (`turnDamageBonusTotal`; possessive, per-Prize, Basic-only, instance-scoped)
 shared/engine/rules/rules-turnorder.mjs — deterministic coin-flip caller selection (flag-OFF 2P only since design 013)
 shared/engine/rules/turn-order-flip.mjs — pure opening-coin helpers in absolute playerId space: `flipCoinFace`, `pickCoinCaller`, `resolveCoinWinnerPlayerId`, `resolveStarterFromChoice`; the server authority's side of the coin call (D50, D212)
-server/game/turn-order-transport.mjs — opening coin over sockets (TCG Live StartingCoinFlip, design 072): call → `turnOrderFlip` → winner's `turnOrderChoice` → `turnOrderResult` + deal; answer timeouts, seat-lost auto answers, `replayTo` on rejoin. State lives on GameRoom.turnOrder; e2e: opening-coin-choice-test.mjs
+server/game/turn-order-transport.mjs — opening coin over sockets (TCG Live StartingCoinFlip, design 072): call → `turnOrderFlip` → winner's `turnOrderChoice` → `turnOrderResult` + deal; answer timeouts, seat-lost auto answers, `replayTo` on rejoin. State lives on GameRoom.turnOrder; e2e: scripts/e2e/opening-coin-choice-test.mjs
 shared/engine/rules/baby-rule.mjs — Baby Rule (attacker flips vs an Active Baby, tails ends the turn) and Baby → Basic evolution table; read by reduce 'attack'/evolve legality and evolution.mjs canEvolve (I230)
 shared/engine/rules/legacy-attached-trainer.mjs — WotC non-Tool attach Trainers (PlusPower, Defender, Charity, Magnifier, Sabrina's ESP, Brock's Protection, Koga's Ninja Trick): attach target, discard timer, damage markers (I224)
 shared/engine/rules/legacy-attack-wording.mjs — WotC attack phrasing → modern phrasing before parseAttackSteps templates (design 062 D, D202)
@@ -115,17 +115,17 @@ client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native
 
 ## Tests & tooling
 **/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~3400); run one file with `node --test <path>`
-two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
-flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
+scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
+scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
-test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
+scripts/e2e/test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
   (`pnpm test:inspector`; needs a hand-started authoritative server on PTCG_URL). Step 9 clicks the
   attack panel with REAL input (locator.click), so it catches pointer-capture regressions el.click() hides
-*-audit.mjs (root) — one-off card/attack/trainer/stadium coverage audits
+scripts/e2e/*-test.mjs, explore-ui.mjs, record-legacy-2p-fixture.mjs — the other hand-run Playwright/jsdom harnesses (rooms, spectator, public lobby, Build & Battle, coin flip, opening-coin `pnpm test:opening-coin`, reset `pnpm test:reset-choice`, `pnpm test:spectator`); `record-legacy-2p-fixture.mjs` refreshes the replay-harness fixture
 bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
-  scaffold + greedy scorer), driven by playtest-bot.mjs via __ptcg observe/options/act
-playtest-bot.mjs (root) — design 004 slice 6: the playtest runner. Two Playwright pages, bot vs.
-  bot, legacy mode by default (`node server/server.js` on :4000, then `node playtest-bot.mjs
+  scaffold + greedy scorer), driven by scripts/e2e/playtest-bot.mjs via __ptcg observe/options/act
+scripts/e2e/playtest-bot.mjs — design 004 slice 6: the playtest runner. Two Playwright pages, bot vs.
+  bot, legacy mode by default (`node server/server.js` on :4000, then `node scripts/e2e/playtest-bot.mjs
   --games=N --seed=S`); dumps a replayable trace to out/playtest/ on any failure. Found a real bug
   on first live run (I30, ISSUES.md) — see design 004 slice 6's Acceptance note.
 
