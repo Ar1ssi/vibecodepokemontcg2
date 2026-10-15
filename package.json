@@ -24,6 +24,7 @@
     "audit:trainers": "node scripts/audit-trainer-behaviour.mjs",
     "audit:attacks": "node scripts/audit-attack-behaviour.mjs",
     "vendor:species-stats": "node scripts/vendor-species-stats.mjs",
+    "meta:refresh": "node scripts/limitless/build-meta-dataset.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,json,md}\""
   },
