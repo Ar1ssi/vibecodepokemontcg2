@@ -9,6 +9,7 @@ import {
   attackLeads,
   coinFlipRuns,
   dealShuffles,
+  attackHitIds,
   deckRevealRuns,
   effectKnockoutIds,
   drawnCards,
@@ -70,6 +71,8 @@ let effectKnockouts = new Set();
 // The batch's attacks, keyed by the first hit each one plays ahead of (attackLeads).
 let leadingAttacks = new Map();
 let movedAttacks = new Set();
+// Design 069: the cards each of the batch's attacks damaged (attackHitIds).
+let attackHits = new Map();
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -206,6 +209,7 @@ export function handleBeforeApply(events, selfPlayerId) {
   effectKnockouts = effectKnockoutIds(events);
   leadingAttacks = attackLeads(events);
   movedAttacks = new Set(leadingAttacks.values());
+  attackHits = attackHitIds(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
   capturePrizeSeats(events, registry, selfPlayerId);
@@ -332,6 +336,7 @@ function queueEvent(event, selfPlayerId) {
     revealRun: revealRuns.get(event),
     setup: batchInSetup,
     effectKo: effectKnockouts,
+    hits: attackHits.get(event) ?? null,
   });
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];

@@ -145,17 +145,18 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {object} event
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
- * @param {{ dealShuffle?: boolean, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number> }} [options]
+ * @param {{ dealShuffle?: boolean, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number>, hits?: object[]|null }} [options]
  *   `dealShuffle`: this `deckShuffled` is in dealShuffles, so it animates (other deck shuffles
  *   only sound). `revealRun`: this event's entry from deckRevealRuns, if any. `setup`: the batch
  *   arrived while the opening placement was unfinished (tags `enter` plans). `effectKo`: the batch's
- *   effectKnockoutIds (tags those `knockout` plans)
+ *   effectKnockoutIds (tags those `knockout` plans). `hits`: this `attackExecuted`'s entry from
+ *   attackHitIds (design 069: rides on both attack plans as `plan.hits`)
  */
 export function advisoryAnimationPlan(
   event,
   selfPlayerId,
   coinRun,
-  { dealShuffle = false, revealRun = null, setup = false, effectKo = null } = {}
+  { dealShuffle = false, revealRun = null, setup = false, effectKo = null, hits = null } = {}
 ) {
   if (!event || typeof event !== 'object') return null;
   if (dealShuffle && event.type === 'deckShuffled' && event.playerId != null && selfPlayerId != null) {
@@ -175,6 +176,9 @@ export function advisoryAnimationPlan(
   if (event.type === 'vstarUsed') return { ...fxPlan(event, selfPlayerId), kind: 'fx' };
   if (COIN_EVENTS.has(event.type)) return coinPlan(event, selfPlayerId, coinRun);
   if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
+  if (event.type === 'attackExecuted' && Array.isArray(hits)) {
+    return fxPlan(event, selfPlayerId).map((plan) => ({ ...plan, hits }));
+  }
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
   if (event.type === 'cardMoved') {
     if (event.to === 'discard' && event.instanceId != null) {
@@ -423,3 +427,45 @@ export function attackLeads(events) {
   }
   return leads;
 }
+
+/**
+ * Design 069: the cards each attack damaged — the `damageUpdated` events of its segment (the same
+ * segment `attackLeads` uses), one entry per card in first-seen order with the last event's totals.
+ * The attacker's own damage (recoil, a defender's on-damage Ability) is not a hit of the attack.
+ *
+ * @param {object[]} events
+ * @returns {Map<object, {instanceId: *, damage?: number, dealt?: number, healed?: number}[]>}
+ *   the `attackExecuted` event -> its hits
+ */
+export function attackHitIds(events) {
+  const hits = new Map();
+  if (!Array.isArray(events)) return hits;
+  let segment = new Map();
+  for (const event of events) {
+    if (event?.type === 'attackExecuted') {
+      hits.set(
+        event,
+        [...segment.values()].filter((hit) => event.attackerId == null || hit.instanceId !== event.attackerId)
+      );
+    }
+    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) segment = new Map();
+    else if (event?.type === 'damageUpdated' && event.instanceId != null) {
+      segment.set(event.instanceId, mergeHit(segment.get(event.instanceId), event));
+    }
+  }
+  return hits;
+}
+
+const isAmount = (value) => typeof value === 'number' && Number.isFinite(value);
+
+// A card hit twice in one attack (a clause, then a counter placement) is one hit: the last
+// cumulative total, and `dealt` summed while every event names it (else the total decides).
+const mergeHit = (previous, event) => {
+  const hit = { instanceId: event.instanceId };
+  if (isAmount(event.damage)) hit.damage = event.damage;
+  else if (isAmount(previous?.damage)) hit.damage = previous.damage;
+  const priorDealt = previous ? previous.dealt : 0;
+  if (isAmount(event.dealt) && isAmount(priorDealt)) hit.dealt = priorDealt + event.dealt;
+  if (event.weakness || previous?.weakness) hit.weakness = true;
+  return hit;
+};
