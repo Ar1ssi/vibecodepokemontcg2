@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ALL_MOVES, MOVE_TABLE, VG_TYPES } from '../move-table.mjs';
 import { moveFor } from '../move-select.mjs';
-import { validateSpec } from '../move-spec.mjs';
+import { TRAVEL_DRAWERS, travelBeats, validateSpec } from '../move-spec.mjs';
 import { REFERENCE_SPEC_IDS, SPECS } from '../specs/index.mjs';
 import { fireBlast } from '../specs/fire.mjs';
 import { WATER_SPECS } from '../specs/water.mjs';
@@ -942,4 +942,26 @@ test('moveFor plays the Fire Blast spec once its cell points at it', () => {
 test('a zero-damage attack picks no move even when its spec exists', () => {
   const pointed = Object.fromEntries(FIRE_SPECIAL_AND_PHYSICAL_3.map((move) => [move, fireBlast]));
   assert.equal(moveFor(charizardEx, { instanceId: 101, attackName: 'Rest', damage: 0 }, pointed), null);
+});
+
+test('design 069: travelBeats are each shipped move’s pre-contact lane travellers, memoised', async () => {
+  const { SIGNATURE_SPECS } = await import('../signature/specs/index.mjs');
+  const all = [...Object.values(SPECS), ...Object.values(SIGNATURE_SPECS)].map((entry) => entry.spec ?? entry);
+  let travelling = 0;
+  for (const spec of all) {
+    const beats = travelBeats(spec);
+    assert.equal(travelBeats(spec), beats, `${spec.id}: memoised`);
+    for (const beat of beats) {
+      assert.ok(spec.beats.includes(beat), `${spec.id}: a beat of the spec`);
+      assert.ok(TRAVEL_DRAWERS.includes(beat.drawer), `${spec.id}: ${beat.drawer} travels`);
+      assert.ok(beat.at < spec.contactMs, `${spec.id}: starts before contact`);
+      assert.notEqual(beat.params?.from, 'defender', `${spec.id}: not a drain`);
+    }
+    if (beats.length > 0) travelling += 1;
+  }
+  assert.ok(travelling > 100, `${travelling} specs travel`);
+  assert.deepEqual(travelBeats(SPECS.bulldoze), []);
+  assert.ok(SPECS.absorb.beats.some((beat) => beat.params?.from === 'defender'));
+  assert.ok(travelBeats(SPECS.absorb).every((beat) => beat.params?.from !== 'defender'));
+  assert.deepEqual(travelBeats(null), []);
 });
