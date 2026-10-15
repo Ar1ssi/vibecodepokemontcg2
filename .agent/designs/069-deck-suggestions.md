@@ -1,5 +1,5 @@
 # 069: Deck suggestions tab (tournament data from Limitless)
-Status: draft — waiting on the user's calls in "Open questions"
+Status: draft — user calls folded in 2026-10-15; awaiting approval of the steering design
 Date: 2026-10-15 · Session: cloud, branch claude/jolly-edison-bm3xkm
 
 ## Problem
@@ -66,6 +66,11 @@ data exists. Nothing in the repo reads it yet.
    copies, then sorts the results into buckets: *missing staples*, *count tweaks*, *tech options*
    and *unusual picks*. Each row carries its evidence ("in 92% of 214 similar lists, usually 4").
    An empty deck shows the meta instead: top archetypes by share, with one-click "start from this list".
+6. **Steer.** You answer the suggestions, and the suggestor adapts to that deck. Adding a
+   suggestion marks it *accepted*, Dismiss hides it, and locking a deck card marks it as a card
+   you're keeping. Locked and accepted cards count more when choosing similar lists. Dismissed
+   cards stop appearing and quietly down-weight the lists built around them, so their partner
+   cards fade too. All of this is saved with the deck.
 
 ## Options
 1. **Data source.**
@@ -109,6 +114,23 @@ data exists. Nothing in the repo reads it yet.
    date, set in the script config. Placement weight: 1st-8th 1.0, 9-16 0.85, 17-32 0.7, 33-64 0.55,
    65+ 0.4. Recency weight: `0.5 ** (ageDays / 28)`, with age measured from the newest event in the
    dataset (so a stale file doesn't distort anything).
+6. **What "adapt to the user" means** (user call 2026-10-15: per-deck steering only).
+   A) Per-deck steering: accept, dismiss and lock signals reshape that deck's neighbour set.
+   B) Taste learned across decks: a browser-wide accept/dismiss history re-ranks everything.
+   C) Learning from games played here: needs a game log the server deliberately doesn't keep (PROJECT.md).
+   **Pick A** (user). B and C are out of scope. B could be added later on top of the same signals.
+7. **Where steering state lives.**
+   A) On the deck library record (`suggestPrefs`), normalized by `parseLibrary`, the same way as
+      `sprites` and `wallpaperId`: it travels with the deck and its save path already exists.
+   B) A separate localStorage key indexed by deck id: no library change, but it orphans when a
+      deck is deleted and an unsaved draft has no id to index by.
+   **Pick A.** An unsaved draft keeps its prefs in memory, and `saveDeckSnapshot` writes them.
+8. **How signals enter the maths.**
+   A) Weight the similarity: per-key weights in containment, plus a per-list penalty for every
+      dismissed card it plays. Explainable, and one place to tune.
+   B) Post-filter only: hide dismissed rows and pin locked ones. Simple, but the neighbour set
+      never changes, so the suggestor doesn't actually adapt (rejected against the user's ask).
+   **Pick A**, with B's hiding applied on top.
 
 ## Design
 ### Files
@@ -145,11 +167,12 @@ button fetches.
 - `cardKeyOf(card) → string`. Trainer or Energy: `t:<officialCardName lowercased>`. Pokémon:
   `p:<name lc>|<attack names sorted, joined by ;>|<ability names sorted>`.
 - `deckToKeyCounts(deck) → Map<key, count>`, which sums prints that share a key.
-- `findNeighbors(keyCounts, dataset, { k = 50, minSimilarity = 0.5 }) → [{ list, similarity, weight }]`.
-  Similarity = containment = Σ min(you_k, list_k) / Σ you_k. Weight = similarity² × placementWeight
-  × recencyWeight. If fewer than 10 lists reach `minSimilarity`, take the 10 best anyway and set
-  `confidence: 'low'`.
-- `suggestCards(deck, dataset, opts) → { confidence: 'high'|'low'|'none', archetype: { name, share } | null,
+- `findNeighbors(keyCounts, dataset, { k = 50, minSimilarity = 0.5, prefs = EMPTY_PREFS }) → [{ list, similarity, weight }]`.
+  Similarity = weighted containment = Σ α_k·min(you_k, list_k) / Σ α_k·you_k, where α_k = 2 for a
+  locked key, 1.5 for an accepted key, and 1 otherwise. Weight = similarity² × placementWeight ×
+  recencyWeight × 0.6^(number of dismissed keys the list plays). If fewer than 10 lists reach
+  `minSimilarity`, take the 10 best anyway and set `confidence: 'low'`.
+- `suggestCards(deck, dataset, { prefs }) → { confidence: 'high'|'low'|'none', archetype: { name, share } | null,
   neighbors: n, missingCore: Item[], countTweaks: Item[], techs: Item[], cuts: Item[] }`, where
   `Item = { key, name, print, inclusion, typicalCount, yourCount }`.
   - inclusion = Σ w·[list has key] / Σ w. typicalCount = the weighted median count among lists that run the key.
@@ -158,25 +181,48 @@ button fetches.
     cuts: yourCount > 0 and inclusion < 0.1.
   - Each bucket is sorted by inclusion (descending), then name. Empty deck → `confidence: 'none'`
     and empty buckets.
+  - Steering filters: dismissed keys appear in no add bucket (missingCore, countTweaks, techs).
+    Locked keys never appear in cuts. A locked key with a different typical count still shows in
+    countTweaks, marked `locked: true`, so the count advice stays visible.
+
+### Steering state (per deck)
+- `prefs = { locked: key[], accepted: key[], dismissed: key[] }`. `EMPTY_PREFS` has three empty
+  arrays. A key is in at most one of the three lists, and the latest action wins.
+- Pure transitions in `core/deck-suggest/prefs.mjs`: `normalizeSuggestPrefs(raw)` (drops
+  non-strings, duplicates and cross-list overlaps; caps each list at 200; anything invalid becomes
+  `EMPTY_PREFS`), `acceptKey`, `dismissKey`, `lockKey`, `unlockKey`, `restoreKey`, and
+  `prunePrefs(prefs, keyCounts)`.
+- `prunePrefs` runs when the deck changes. A locked or accepted key no longer in the deck is
+  dropped. **An accepted key that you remove moves to dismissed**: you tried it and took it out,
+  which is a signal. Dismissed keys are never pruned.
+- Storage: `deck-library.mjs` gains `suggestPrefs` on records. `parseLibrary` and `listDecks` run
+  `normalizeSuggestPrefs`, so older records read as empty. New `setDeckSuggestPrefs(library,
+  deckId, prefs)`, and `saveDeckSnapshot` accepts `suggestPrefs`. Only the builder tab writes it
+  (D183). Like every library write, the write re-reads storage first.
+- "Start from this list" resets the prefs to `EMPTY_PREFS`, since it is a new deck.
 - `metaOverview(dataset) → [{ archetype, share, lists, bestList }]`: weighted share per archetype.
   `bestList` is the highest-weight list, which feeds "Start from this list".
 
 ### UI (Suggest tab)
 Header: "Looks like **Dragapult** · 214 similar lists · Regionals Aug 2026 – Oct 2026", with a
 low-confidence banner when one applies. There are four collapsible sections of card tiles, each
-showing its evidence line and a `+` button (wired through the same `onAddCard` path as Browse
-Sets; the TCGdex record for `print` comes through tcgdex-cache). Cuts get a `−` button. An empty
+showing its evidence line, an **Add** button and a **Dismiss** button. Add goes through the same
+`onAddCard` path as Browse Sets (the TCGdex record for `print` comes through tcgdex-cache) and
+marks the key accepted. Cut rows get **Cut** (`onRemoveCard`) and **Keep** (lock). A "Your core"
+strip lists the deck's cards with a lock toggle each. A "Dismissed (n)" fold at the bottom
+restores any of them. A one-line "Steering: 3 locked · 2 accepted · 4 dismissed · Reset" control
+undoes everything. An empty
 deck shows the meta overview. "Start from this list" replaces the open deck only after a confirm,
 and only when the deck is empty or the user accepts. Footer: "Tournament data: Limitless TCG ·
 updated <generatedAt>". Results recompute on every deck change (debounced 150 ms; a 10k-list
 scan is a few ms).
 
-## Open questions (user calls; the recommended default is first)
-1. **Scope of events**: Masters, Standard, current rotation only (default) · also include JR/SR ·
-   also include last season.
-2. **"Start from this list"** (import an entire tournament list) in v1 (default yes), or suggestions only?
-3. **Refresh**: manual `pnpm meta:refresh` (default) · weekly GitHub Action that opens a PR.
-4. **Limitless Play online events** as an extra low-weight source later: no for v1 (default).
+## User calls (2026-10-15)
+1. Events: **Masters only, Standard only, current rotation**.
+2. "Start from this list" (import an entire tournament list): **in v1**.
+3. Refresh: not answered → default, manual `pnpm meta:refresh`.
+4. Limitless Play online events: not answered → default, not in v1.
+5. Adapt to the user: **per-deck steering** (Options 6–8). Cross-deck taste and game-result learning are out of scope.
 
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
@@ -193,6 +239,13 @@ scan is a few ms).
 | 10 | Rapid deck edits | Debounced recompute; the last result wins | [ ] |
 | 11 | Event in window with lists not yet published | Standings without a decklists page → event skipped with a warning, not a failure | [ ] |
 | 12 | Builder opened in B&B mode | No Suggest tab rendered | [ ] |
+| 13 | Old library record without `suggestPrefs`, or a corrupt value | Reads as `EMPTY_PREFS`; deck loads unchanged | [ ] |
+| 14 | Same key dismissed, then accepted | Latest action wins; the key is in exactly one list | [ ] |
+| 15 | Accepted card removed from the deck | Key moves to dismissed; restorable from "Dismissed (n)" | [ ] |
+| 16 | Every candidate dismissed | Buckets empty; panel says "Nothing left to suggest — restore dismissed cards or reset steering" | [ ] |
+| 17 | Locked card that tournament lists never play | Never offered as a cut; similarity still counts it (lowers containment honestly) | [ ] |
+| 18 | Builder open in two tabs, both steering one deck | The library write re-reads storage first; the last write wins per record, as for other deck fields | [ ] |
+| 19 | Unsaved draft deck steered, then saved | `saveDeckSnapshot` writes the in-memory prefs | [ ] |
 
 ## Test plan
 - Parsers: trimmed fixture HTML (one event row, three standings rows, two decklists) → exact rows.
@@ -200,7 +253,14 @@ scan is a few ms).
   attacks → different keys. The fixture card records come from the TCGdex ids named in the test.
 - suggest: a hand-built 6-list fixture dataset. Assert neighbours, inclusion, weighted median,
   each bucket's contents, and the low-confidence path.
+- prefs: each transition, `normalizeSuggestPrefs` on garbage, and `prunePrefs` moving a removed
+  accepted key to dismissed.
+- Steering in the 6-list fixture: locking a key that only lists A and B play makes A and B the
+  heaviest neighbours. Dismissing a key ×0.6s every list that plays it, and a partner card that
+  appears only in those lists drops out of techs.
+- deck-library: a record round-trips with `suggestPrefs`, and an old record parses to `EMPTY_PREFS`.
 - Manual: open /deck-builder, add 4 Dreepy, and check that the tab shows Dragapult staples.
+  Dismiss one tech and watch its partner cards fade. Lock a card and confirm it never shows under cuts.
 
 ## Migration / rollout
 New files and one new tab, with no schema change to stored decks. Revert = delete the tab markup
@@ -214,6 +274,7 @@ image hotlinking, and a refresh at most weekly.
 | 1 parsers + fetch | `scripts/limitless/{parse,fetch}-limitless.mjs`, fixtures, `.gitignore` | `parseEventIndex(html) → [{id,name,date,players,format}]`, `parseStandings(html) → [{placing,player,archetypeId,listId}]`, `parseDecklists(html) → [{placing,player,cards:[{count,name,set,number}]}]` | Fixtures → exact arrays; 0-row page → throws | — | `node --test scripts/limitless/__tests__` |
 | 2 bake | `build-meta-dataset.mjs`, `card-key.mjs`, `package.json` script, dataset JSON | Schema v1 above | card-key cases; bake on the fixture event → schema-valid JSON | TCGdex ids cited in the test | `pnpm meta:refresh` writes a valid file |
 | 3 engine | `deck-suggest/{suggest,dataset}.mjs` | Engine API above | 6-list fixture → pinned buckets | — | `pnpm test:changed` |
-| 4 UI | `native-deck-builder-suggest.js`, `index.ejs`, `native-deck-builder.js` (`switchMode('suggest')`), CSS | `initializeNativeDeckBuilderSuggest({ panelEl, getDeck, onAddCard, onRemoveCard, onPreviewCard })` | Visual: user localhost check | — | Tab works on localhost |
+| 4 steering | `deck-suggest/prefs.mjs`, `deck-library.mjs`, `suggest.mjs` (α and dismiss penalty) | Steering state + `findNeighbors` prefs above | prefs and steering cases in the Test plan; rows 13–15, 17, 19 | — | `pnpm test:changed` |
+| 5 UI | `native-deck-builder-suggest.js`, `index.ejs`, `native-deck-builder.js` (`switchMode('suggest')`), CSS | `initializeNativeDeckBuilderSuggest({ panelEl, getDeck, getPrefs, setPrefs, onAddCard, onRemoveCard, onReplaceDeck, onPreviewCard })` | Visual: user localhost check | — | Tab works on localhost |
 
 ## Deviations (Builder appends here during build)
