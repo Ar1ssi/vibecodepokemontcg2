@@ -70,6 +70,7 @@ client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native
 
 ## Tests & tooling
 **/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~6900); run one file with `node --test <path>`
+scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully contained in origin/main; keeps main, the current branch and open-PR refs (via gh, else --keep); needs local push rights (test: scripts/__tests__/prune-merged-branches.test.mjs)
 scripts/harness-check.mjs — `pnpm harness:check`: measures every .agent budget in workflows/maintain.md plus the 30-commit maintain trigger; exit 1 = OVER (test: scripts/__tests__/harness-check.test.mjs)
 scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
 scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
