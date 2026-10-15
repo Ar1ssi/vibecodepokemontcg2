@@ -73,3 +73,99 @@ test('search tiles load the low TCGdex scan; the preview keeps the high one', ()
   assert.equal(tcgdexTile.dataset.previewImage, high);
   assert.equal(customTile.querySelector('img').getAttribute('src'), custom);
 });
+
+// Two TCGdex results as card-search.mjs normalizes them (high.webp for both sizes).
+const gridCardA = {
+  id: 'sv08-057',
+  name: 'Pikachu ex',
+  images: { small: 'https://assets.tcgdex.net/en/sv/sv08/057/high.webp', large: 'https://assets.tcgdex.net/en/sv/sv08/057/high.webp' },
+  set: { name: 'Surging Sparks' },
+};
+const gridCardB = {
+  id: 'sv05-051',
+  name: 'Pikachu',
+  images: { small: 'https://assets.tcgdex.net/en/sv/sv05/051/high.webp', large: 'https://assets.tcgdex.net/en/sv/sv05/051/high.webp' },
+  set: { name: 'Temporal Forces' },
+};
+
+const newGrid = () => dom.window.document.createElement('div');
+
+test('a same-id re-render patches the quantity badge in place and keeps the scans loaded', () => {
+  const searchResultsEl = newGrid();
+  const results = [gridCardA, gridCardB];
+  renderSearchResults({ searchResultsEl, results, onSelect: () => {} });
+  const [imgA, imgB] = [...searchResultsEl.querySelectorAll('img')];
+
+  renderSearchResults({ searchResultsEl, results, onSelect: () => {}, quantities: { 'sv08-057': 2 } });
+  const [tileA, tileB] = searchResultsEl.querySelectorAll('.native-deck-builder-result');
+  assert.equal(searchResultsEl.querySelectorAll('img')[0], imgA);
+  assert.equal(searchResultsEl.querySelectorAll('img')[1], imgB);
+  assert.equal(tileA.dataset.inDeck, '2');
+  assert.equal(tileA.querySelector('.native-deck-builder-result-qty').textContent, '2');
+  assert.equal(tileB.hasAttribute('data-in-deck'), false);
+  assert.equal(tileB.querySelector('.native-deck-builder-result-qty'), null);
+
+  renderSearchResults({ searchResultsEl, results, onSelect: () => {} });
+  assert.equal(tileA.hasAttribute('data-in-deck'), false);
+  assert.equal(tileA.querySelector('.native-deck-builder-result-qty'), null);
+});
+
+test('a patched grid matches a fresh render of the same inputs', () => {
+  const patched = newGrid();
+  const fresh = newGrid();
+  const results = [gridCardA, gridCardB];
+  const normalized = (el) => el.innerHTML.replace(/\s+/g, ' ');
+
+  renderSearchResults({ searchResultsEl: patched, results, onSelect: () => {} });
+  renderSearchResults({
+    searchResultsEl: patched,
+    results,
+    onSelect: () => {},
+    quantities: { 'sv08-057': 3 },
+    owned: { 'sv05-051': 1 },
+  });
+  renderSearchResults({
+    searchResultsEl: fresh,
+    results,
+    onSelect: () => {},
+    quantities: { 'sv08-057': 3 },
+    owned: { 'sv05-051': 1 },
+  });
+  assert.equal(normalized(patched), normalized(fresh));
+
+  renderSearchResults({ searchResultsEl: patched, results, onSelect: () => {} });
+  renderSearchResults({ searchResultsEl: fresh, results, onSelect: () => {} });
+  assert.equal(normalized(patched), normalized(fresh));
+});
+
+test('a different id list redraws the tiles and a click selects from the new list', () => {
+  const searchResultsEl = newGrid();
+  const selected = [];
+  renderSearchResults({ searchResultsEl, results: [gridCardA], onSelect: (card) => selected.push(card.id) });
+  const oldImg = searchResultsEl.querySelector('img');
+
+  renderSearchResults({ searchResultsEl, results: [gridCardB], onSelect: (card) => selected.push(card.id) });
+  assert.notEqual(searchResultsEl.querySelector('img'), oldImg);
+
+  searchResultsEl.querySelector('.native-deck-builder-result').click();
+  assert.deepEqual(selected, ['sv05-051']);
+});
+
+test('after three renders of one grid, a click calls the latest onSelect once and adds one grid listener', () => {
+  const searchResultsEl = newGrid();
+  const calls = [];
+  const addListener = searchResultsEl.addEventListener.bind(searchResultsEl);
+  let gridListeners = 0;
+  searchResultsEl.addEventListener = (type, listener, options) => {
+    gridListeners += 1;
+    addListener(type, listener, options);
+  };
+  const results = [gridCardA, gridCardB];
+  renderSearchResults({ searchResultsEl, results, onSelect: () => calls.push('first') });
+  renderSearchResults({ searchResultsEl, results, onSelect: () => calls.push('second'), quantities: { 'sv08-057': 1 } });
+  renderSearchResults({ searchResultsEl, results, onSelect: () => calls.push('third') });
+
+  searchResultsEl.querySelectorAll('.native-deck-builder-result')[1].click();
+  assert.deepEqual(calls, ['third']);
+  assert.equal(gridListeners, 1);
+});
