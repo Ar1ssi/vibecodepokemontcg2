@@ -6,12 +6,16 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I245). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I249). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I248 2026-10-15 P3 [netcode] A caller or coin winner whose socket blips is answered for at once (go first / auto call) — no reconnect grace before handleSeatLost (refs: design 072, 013 row 6)
+- I247 2026-10-15 P3 [netcode] A seat that rejoins after the opening deal gets no dealOrder/turnOrderResult replay; a Set Up on that client would fall back to a local shuffle after 45 s (refs: design 072 review)
+- I246 2026-10-15 P2 [netcode] room-change-reset-test.mjs fails on main: "coin call overlay never opened" — it waits for the legacy picker the e2e bridge auto-answers under server authority (refs: reproduced on main during design 072 verification)
+- I245 2026-10-15 P2 [netcode] flip-gate-test.mjs step 3 fails on main: e2e playFromHand → moveCardMessage `Cannot read properties of undefined (reading 'image')` (e2e-api.js:553) (refs: reproduced on main during design 072 verification)
 - I244 2026-10-11 P3 [tests] coin-flip-ceremony.test.mjs "several flips toss one after another..." is load-sensitive: failed 2 of 3 full `pnpm test` runs (1.5 s), passes 7/7 alone; no shared files with design 067
 - I243 2026-10-11 P3 [board-ui] attack-ui sprites not ported, each blocked on something other than the sprite: buff/debuff arrows + weakness/resistance damage tint (statusArrow_Up/Down, atkOv_DmgMod_Bg) need the attack's damage split into printed base / bonus / reduction / weakness — the model only has the pre-weakness total; atkOv_Brdr_B1 and the `_Modal` set have no consumer until the action-list drawer exists (I242). VSTAR layout inferred, not traced: strip ink, VSTAR ability height, mask scale (refs: scripts/attack-ui, design 067)
 - I242 2026-10-11 P3 [board-ui] Card focus covers own Active only: Bench abilities, opponent Active (scene pose y=14 scale 3 tilted), buff/debuff HUD buttons and the action-list drawer are not built (refs: D208, design 067)
