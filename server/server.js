@@ -406,19 +406,21 @@ async function main() {
   // player at once, so this runs once, when GameRoom.isReadyToDeal() says both seats
   // have a deck and pressed Set Up — never on deck load alone, which auto-started
   // the game the moment both players joined.
+  // Returns true once the hands are dealt; false (no seated socket, refused setup)
+  // leaves the coin's result standing so the turn-order transport can retry.
   const dealOpeningHands = (gameRoom, roomId, starterPlayerId) => {
     // Any seated socket identifies the room to handleCommand; `setup` is a
     // server_lifecycle command, so it is not attributed to the sender.
     const actingSocketId =
       gameRoom.playerToSocket.get(starterPlayerId) ||
       [...gameRoom.playerToSocket.values()][0];
-    if (!actingSocketId) return;
+    if (!actingSocketId) return false;
 
     const setupResult = gameRoom.handleCommand(actingSocketId, {
       type: 'setup',
       payload: { firstPlayerId: starterPlayerId },
     });
-    if (!setupResult.success) return;
+    if (!setupResult.success) return false;
     // Design 053: the format is fixed from here; the panels drop their Switch button.
     broadcastRoomFormat(roomId);
 
@@ -455,6 +457,7 @@ async function main() {
         io.to(pSocketId).emit('dealOrder', { roomId, order, starter });
       }
     }
+    return true;
   };
 
   // Designs 013/072: the opening coin's messages and answer timeouts. The deal
@@ -466,6 +469,13 @@ async function main() {
   });
 
   const clearTurnOrderTimer = (roomId) => turnOrderTransport.clearTimer(roomId);
+
+  const replayTurnOrderToSeat = (roomId, socketId) => {
+    if (!SERVER_AUTHORITATIVE) return;
+    const gameRoom = gameRooms.get(roomId);
+    const playerId = gameRoom?.socketToPlayer.get(socketId);
+    if (playerId) turnOrderTransport.replayTo(gameRoom, roomId, playerId);
+  };
 
   /**
    * Opens the turn-order coin call once both seats are ready. Idempotent: a
@@ -514,9 +524,13 @@ async function main() {
         // Designs 013/072: a seat the opening coin is waiting on (to call, or to
         // choose first or second) is answered for, so the other seat never waits
         // on a player who is not coming back.
+        // An explicit Leave is not answered for: it resets (or deletes) the game
+        // below, and answering first would deal a game that is about to end.
         const lostPlayerId = gameRoom.socketToPlayer.get(socket.id);
         gameRoom.removeSocket(socket.id);
-        turnOrderTransport.handleSeatLost(gameRoom, roomId, lostPlayerId);
+        if (!socket.data.leaveRoom) {
+          turnOrderTransport.handleSeatLost(gameRoom, roomId, lostPlayerId);
+        }
       }
       if (SHADOW_MODE && shadowSessions.has(roomId)) {
         shadowSessions.get(roomId).removeSocket(socket.id);
@@ -760,6 +774,9 @@ async function main() {
             disconnectHandler(roomId, username);
           socket.on('disconnect', socket.data.disconnectListener);
           socket.data.seat = { roomId, username };
+          // Designs 013/072: a seat that (re)joins mid-handshake gets its pending
+          // prompt again, and a result whose deal found no socket is dealt now.
+          replayTurnOrderToSeat(roomId, socket.id);
         }
         broadcastRoomFormat(roomId);
       } else {
@@ -848,6 +865,9 @@ async function main() {
           disconnectHandler(data.roomId, data.username);
         socket.on('disconnect', socket.data.disconnectListener);
         socket.data.seat = { roomId: data.roomId, username: data.username };
+        // Designs 013/072: a seat that (re)joins mid-handshake gets its pending
+        // prompt again, and a result whose deal found no socket is dealt now.
+        replayTurnOrderToSeat(data.roomId, socket.id);
         io.to(data.roomId).emit('userReconnected', data);
       }
       broadcastRoomFormat(data.roomId);

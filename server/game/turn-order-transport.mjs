@@ -18,11 +18,14 @@
  * - out `turnOrderCallRejected` / `turnOrderChoiceRejected` { roomId, reason } to the sender only
  */
 
+import { TURN_ORDER_CALL_TIMEOUT_MS, TURN_ORDER_CHOICE_TIMEOUT_MS } from './room.mjs';
+
 /**
  * @param {object} deps
  * @param {(socketId: string, event: string, payload: object) => void} deps.emitTo
- * @param {(gameRoom: object, roomId: string, starterPlayerId: string) => void} deps.deal
- *   Runs the `setup` command with the chosen starter and broadcasts the deal.
+ * @param {(gameRoom: object, roomId: string, starterPlayerId: string) => boolean} deps.deal
+ *   Runs the `setup` command with the chosen starter and broadcasts the deal; false
+ *   when it could not (no seated socket), so the result stays undealt and is retried.
  * @param {(roomId: string) => void} [deps.onCallOpened] The room format locks here.
  * @param {typeof setTimeout} [deps.setTimer]
  * @param {typeof clearTimeout} [deps.clearTimer]
@@ -78,7 +81,33 @@ export function createTurnOrderTransport({
         choiceAuto: Boolean(resolution.choiceAuto),
       });
     });
-    deal(gameRoom, roomId, resolution.starterPlayerId);
+    if (deal(gameRoom, roomId, resolution.starterPlayerId)) gameRoom.markTurnOrderDealt();
+  };
+
+  const callPayload = (roomId, turnOrder, playerId, timeoutMs) => {
+    const isCaller = playerId === turnOrder.callerPlayerId;
+    return {
+      roomId,
+      callId: isCaller ? turnOrder.callId : null,
+      waiting: !isCaller,
+      timeoutMs,
+    };
+  };
+
+  const flipPayload = (roomId, flip, playerId, timeoutMs) => {
+    const isWinner = playerId === flip.winnerPlayerId;
+    return {
+      roomId,
+      caller: sideOf(flip.callerPlayerId, playerId),
+      call: flip.call,
+      result: flip.result,
+      winner: isWinner ? 'self' : 'opp',
+      // Only the winner may answer; the other seat never sees a usable id.
+      choiceId: isWinner ? flip.choiceId : null,
+      coinId: flip.coinId ?? null,
+      auto: Boolean(flip.auto),
+      timeoutMs,
+    };
   };
 
   const chooseAutomatically = (gameRoom, roomId) => {
@@ -90,19 +119,7 @@ export function createTurnOrderTransport({
   const announceFlip = (gameRoom, roomId, flip) => {
     clearRoomTimer(roomId);
     forEachSeat(gameRoom, (playerId, socketId) => {
-      const isWinner = playerId === flip.winnerPlayerId;
-      emitTo(socketId, 'turnOrderFlip', {
-        roomId,
-        caller: sideOf(flip.callerPlayerId, playerId),
-        call: flip.call,
-        result: flip.result,
-        winner: isWinner ? 'self' : 'opp',
-        // Only the winner may answer; the other seat never sees a usable id.
-        choiceId: isWinner ? flip.choiceId : null,
-        coinId: flip.coinId ?? null,
-        auto: Boolean(flip.auto),
-        timeoutMs: flip.timeoutMs,
-      });
+      emitTo(socketId, 'turnOrderFlip', flipPayload(roomId, flip, playerId, flip.timeoutMs));
     });
     // A winner with no socket (they dropped while the coin was called for them)
     // cannot answer: choose for them now instead of stalling the other seat.
@@ -127,17 +144,21 @@ export function createTurnOrderTransport({
      * @returns {boolean} true when a call was opened.
      */
     open(gameRoom, roomId) {
+      // A result whose deal found no seated socket is dealt on the next ready.
+      const undealt = gameRoom.undealtTurnOrderResolution();
+      if (undealt) {
+        finish(gameRoom, roomId, undealt);
+        return false;
+      }
       const opened = gameRoom.beginTurnOrderCall();
       if (!opened) return false;
       onCallOpened(roomId);
       forEachSeat(gameRoom, (playerId, socketId) => {
-        const isCaller = playerId === opened.callerPlayerId;
-        emitTo(socketId, 'turnOrderCall', {
-          roomId,
-          callId: isCaller ? opened.callId : null,
-          waiting: !isCaller,
-          timeoutMs: opened.timeoutMs,
-        });
+        emitTo(
+          socketId,
+          'turnOrderCall',
+          callPayload(roomId, gameRoom.turnOrder, playerId, opened.timeoutMs)
+        );
       });
       armRoomTimer(roomId, opened.timeoutMs, () => callAutomatically(gameRoom, roomId));
       return true;
@@ -190,6 +211,40 @@ export function createTurnOrderTransport({
       ) {
         chooseAutomatically(gameRoom, roomId);
       }
+    },
+
+    /**
+     * A seat just (re)bound a socket (join, reconnect). Socket.IO does not carry
+     * what was sent to the old socket, so the seat gets its pending prompt again,
+     * and a result whose deal found no socket is dealt now. A dealt game is left
+     * to the view sync: replaying its result would restart the client's opening.
+     *
+     * @param {object} gameRoom
+     * @param {string} roomId
+     * @param {string} playerId
+     */
+    replayTo(gameRoom, roomId, playerId) {
+      const turnOrder = gameRoom.turnOrder;
+      const socketId = gameRoom.playerToSocket.get(playerId);
+      if (!turnOrder || !socketId) return;
+      if (turnOrder.phase === 'awaiting-call') {
+        emitTo(
+          socketId,
+          'turnOrderCall',
+          callPayload(roomId, turnOrder, playerId, TURN_ORDER_CALL_TIMEOUT_MS)
+        );
+        return;
+      }
+      if (turnOrder.phase === 'awaiting-choice') {
+        emitTo(
+          socketId,
+          'turnOrderFlip',
+          flipPayload(roomId, turnOrder, playerId, TURN_ORDER_CHOICE_TIMEOUT_MS)
+        );
+        return;
+      }
+      const undealt = gameRoom.undealtTurnOrderResolution();
+      if (undealt) finish(gameRoom, roomId, undealt);
     },
 
     /** Drops the room's pending answer timeout (reset, leave, teardown). */

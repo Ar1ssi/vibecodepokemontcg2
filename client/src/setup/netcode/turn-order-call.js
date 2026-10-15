@@ -108,6 +108,9 @@ export function normalizeTurnOrderResult(data) {
   }
   if (!isCoinFace(data.call) || !isCoinFace(data.result)) return null;
   if (typeof data.goFirst !== 'boolean') return null;
+  // The starter must be the seat the winner's answer names.
+  const otherSide = data.winner === 'self' ? 'opp' : 'self';
+  if (data.starter !== (data.goFirst ? data.winner : otherSide)) return null;
   return {
     caller: data.caller,
     call: data.call,

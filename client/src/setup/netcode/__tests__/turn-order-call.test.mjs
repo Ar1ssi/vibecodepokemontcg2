@@ -317,3 +317,10 @@ test('a rejected choice is surfaced with its reason', () => {
     ]
   );
 });
+
+test('normalizeTurnOrderResult rejects a starter the winner did not choose', () => {
+  const base = { caller: 'self', call: 'heads', result: 'tails', winner: 'opp' };
+  assert.equal(normalizeTurnOrderResult({ ...base, goFirst: true, starter: 'self' }), null);
+  assert.equal(normalizeTurnOrderResult({ ...base, goFirst: false, starter: 'opp' }), null);
+  assert.equal(normalizeTurnOrderResult({ ...base, goFirst: false, starter: 'self' }).starter, 'self');
+});

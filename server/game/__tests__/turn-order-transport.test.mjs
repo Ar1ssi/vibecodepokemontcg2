@@ -55,7 +55,7 @@ function fakeTimers() {
   };
 }
 
-function harness({ seed } = {}) {
+function harness({ seed, dealSucceeds = () => true } = {}) {
   const room = readyRoom({ seed });
   const sent = [];
   const deals = [];
@@ -63,7 +63,11 @@ function harness({ seed } = {}) {
   const timers = fakeTimers();
   const transport = createTurnOrderTransport({
     emitTo: (socketId, event, payload) => sent.push({ socketId, event, payload }),
-    deal: (gameRoom, roomId, starterPlayerId) => deals.push({ roomId, starterPlayerId }),
+    deal: (gameRoom, roomId, starterPlayerId) => {
+      if (!dealSucceeds(gameRoom)) return false;
+      deals.push({ roomId, starterPlayerId });
+      return true;
+    },
     onCallOpened: (roomId) => opened.push(roomId),
     setTimer: timers.setTimer,
     clearTimer: timers.clearTimer,
@@ -289,9 +293,109 @@ test('a dropped caller is called for; if they won the toss the choice is made at
 test('clearTimer drops the pending answer timeout', () => {
   const h = harness();
   callAndFlip(h);
-  h.transport.clearTimer('r1');
-  h.room.clearTurnOrderCall();
+  assert.deepEqual(h.timers.pendingDelays(), [TURN_ORDER_CHOICE_TIMEOUT_MS]);
 
-  h.timers.fireAll();
+  h.transport.clearTimer('r1');
+
+  assert.deepEqual(h.timers.pendingDelays(), []);
+});
+
+// Review fix: Socket.IO does not carry what was sent to a replaced socket.
+test('replayTo re-sends the pending call, with the callId only to the caller', () => {
+  const h = harness();
+  h.transport.open(h.room, 'r1');
+  const callerPlayerId = h.room.turnOrder.callerPlayerId;
+  const otherPlayerId = callerPlayerId === 'p1' ? 'p2' : 'p1';
+  h.room.addPlayer('sock-new', callerPlayerId, callerPlayerId === 'p1' ? 'Ash' : 'Gary');
+  h.sent.length = 0;
+
+  h.transport.replayTo(h.room, 'r1', callerPlayerId);
+  h.transport.replayTo(h.room, 'r1', otherPlayerId);
+
+  assert.equal(h.to('turnOrderCall', 'sock-new').callId, h.room.turnOrder.callId);
+  assert.equal(h.to('turnOrderCall', h.socketOf(otherPlayerId)).callId, null);
+  assert.deepEqual(h.timers.pendingDelays(), [TURN_ORDER_CALL_TIMEOUT_MS], 'no second timer');
+});
+
+test('a winner whose socket was replaced gets the prompt again and can answer from it', () => {
+  const h = harness();
+  const flip = callAndFlip(h);
+  const winnerName = flip.winnerPlayerId === 'p1' ? 'Ash' : 'Gary';
+  const loserPlayerId = flip.winnerPlayerId === 'p1' ? 'p2' : 'p1';
+  h.room.addPlayer('sock-new', flip.winnerPlayerId, winnerName);
+  h.sent.length = 0;
+
+  h.transport.replayTo(h.room, 'r1', flip.winnerPlayerId);
+  h.transport.replayTo(h.room, 'r1', loserPlayerId);
+
+  const replayed = h.to('turnOrderFlip', 'sock-new');
+  assert.equal(replayed.choiceId, flip.choiceId);
+  assert.equal(replayed.winner, 'self');
+  assert.equal(replayed.timeoutMs, TURN_ORDER_CHOICE_TIMEOUT_MS);
+  assert.equal(h.to('turnOrderFlip', h.socketOf(loserPlayerId)).choiceId, null);
+
+  h.transport.receiveChoice(h.room, 'r1', 'sock-new', { choiceId: flip.choiceId, goFirst: false });
+  assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId: loserPlayerId }]);
+});
+
+test('replayTo leaves a dealt game alone', () => {
+  const h = harness();
+  const flip = callAndFlip(h);
+  h.transport.receiveChoice(h.room, 'r1', h.socketOf(flip.winnerPlayerId), {
+    choiceId: flip.choiceId,
+    goFirst: true,
+  });
+  h.sent.length = 0;
+
+  h.transport.replayTo(h.room, 'r1', 'p1');
+  h.transport.replayTo(h.room, 'r1', 'p2');
+
+  assert.deepEqual(h.sent, []);
+  assert.equal(h.deals.length, 1);
+});
+
+// Review fix: both seats gone when the choice resolves must not leave the match undealt forever.
+test('a result that could not be dealt is dealt once a seat is back', () => {
+  const h = harness({ dealSucceeds: (gameRoom) => gameRoom.playerToSocket.size > 0 });
+  h.transport.open(h.room, 'r1');
+  const callerPlayerId = h.room.turnOrder.callerPlayerId;
+  const otherPlayerId = callerPlayerId === 'p1' ? 'p2' : 'p1';
+
+  h.room.removeSocket(h.socketOf(otherPlayerId));
+  h.transport.handleSeatLost(h.room, 'r1', otherPlayerId);
+  h.room.removeSocket(h.socketOf(callerPlayerId));
+  h.transport.handleSeatLost(h.room, 'r1', callerPlayerId);
+  h.timers.fireAll(); // the choice timeout, if the winner was the seat left in the room
+
+  assert.equal(h.room.turnOrder.phase, 'resolved');
   assert.deepEqual(h.deals, []);
+  const starterPlayerId = h.room.turnOrder.starterPlayerId;
+
+  h.room.addPlayer('sock1b', 'p1', 'Ash');
+  h.transport.replayTo(h.room, 'r1', 'p1');
+
+  assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId }]);
+  assert.equal(h.to('turnOrderResult', 'sock1b').starter, starterPlayerId === 'p1' ? 'self' : 'opp');
+
+  h.room.addPlayer('sock2b', 'p2', 'Gary');
+  h.transport.replayTo(h.room, 'r1', 'p2');
+  assert.equal(h.transport.open(h.room, 'r1'), false);
+  assert.equal(h.deals.length, 1, 'dealt exactly once');
+});
+
+test('open retries an undealt result instead of opening a new call', () => {
+  let socketsBack = false;
+  const h = harness({ dealSucceeds: () => socketsBack });
+  const flip = callAndFlip(h);
+  h.transport.receiveChoice(h.room, 'r1', h.socketOf(flip.winnerPlayerId), {
+    choiceId: flip.choiceId,
+    goFirst: true,
+  });
+  assert.deepEqual(h.deals, []);
+
+  socketsBack = true;
+  h.transport.open(h.room, 'r1');
+
+  assert.deepEqual(h.deals, [{ roomId: 'r1', starterPlayerId: flip.winnerPlayerId }]);
+  assert.equal(h.messages('turnOrderCall').length, 2, 'no new call was opened');
 });

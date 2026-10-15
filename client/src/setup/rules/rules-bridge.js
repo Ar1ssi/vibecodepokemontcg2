@@ -686,6 +686,10 @@ import { glowColorFor } from './card-glow-colors.mjs';
         if (!isServerOwnedTurnOrder()) return;
         applyServerTurnOrderResult(event.detail);
       });
+      document.addEventListener('deal-order-received', () => {
+        if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
+        maybeBeginServerTurnOrder();
+      });
       document.addEventListener('rules-turn-order-choice-rejected', (event) => {
         if (!isServerOwnedTurnOrder() || !rulesState.enabled) return;
         closeTurnOrderChoicePicker();

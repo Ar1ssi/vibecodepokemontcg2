@@ -1,5 +1,5 @@
 # 072: TCG Live opening coin flip — the winner chooses first or second
-Status: approved (self — one-shot) · Date: 2026-10-15 · Route: oneshot-feature.md · Extends design 013
+Status: shipped (PR) · approved (self — one-shot) · Date: 2026-10-15 · Route: oneshot-feature.md · Extends design 013
 
 ## Problem
 > Implement the starting coinflip from tcglive (e:/tcglive_extract) including the option to go first or
@@ -95,11 +95,14 @@ Client:
 | 7 | Winner silent | after `TURN_ORDER_CHOICE_TIMEOUT_MS` server picks go-first, `choiceAuto: true`, deals | [x] transport "a silent winner goes first when the choice times out" |
 | 8 | Winner disconnects mid-choice | auto go-first at once, deal | [x] transport "a winner who drops is chosen for at once" |
 | 9 | Caller disconnects mid-call | auto call → flip; if the dropped caller won, auto choice at once | [x] transport "a dropped caller who wins the toss…" |
-| 10 | Reset / leave mid-choice | `clearTurnOrderCall` + timer cleared; old `choiceId` stale | [x] room "a choiceId from before resetGame is stale" |
+| 10 | Reset / leave mid-choice | `clearTurnOrderCall` + timer cleared; old `choiceId` stale; an explicit Leave is not answered for (the reset follows) | [x] room "a choiceId from before resetGame is stale"; Leave: server.js disconnectHandler skips `handleSeatLost` when `leaveRoom` (e2e room-rejoin-reset-test) |
 | 11 | Hidden info | `choiceId` only reaches the winner's socket | [x] transport "only the winner receives a choiceId" |
-| 12 | Result arrives while the ceremony still plays (auto paths, e2e) | starter cached; game starts after the animation | [x] turn-order-call client "turnOrderResult is dispatched and cached" + bridge flow (manual) |
-| 13 | E2E / rules off | the winner answers go-first at once; same starter distribution as before | [x] e2e run (§ Verify) |
+| 12 | Result arrives while the ceremony still plays (auto paths, e2e) | starter cached; game starts after the animation and after the deal (dealOrder) | [x] turn-order-call "turnOrderResult is dispatched and cached"; bridge order: `opening-coin-choice-test.mjs` (real prompts, both answers) + room-rejoin-reset-test 3/3 — the bridge has no unit harness |
+| 13 | E2E / rules off | the winner answers go-first at once; same starter distribution as before | [x] flip-gate-test step 2 (deal + starter draw), room-format-test, reset-during-choice-test |
 | 14 | Legacy flag-off 2P, 1P | unchanged flows | n/a — not touched |
+| 15 | A seat rebinds its socket mid-handshake (reconnect, rejoin) | its pending call/flip prompt is re-sent (choiceId only to the winner) | [x] transport "replayTo re-sends the pending call…", "a winner whose socket was replaced…" |
+| 16 | Choice resolves with no seated socket (both dropped) | result stays undealt; dealt once a seat is back or on the next ready | [x] transport "a result that could not be dealt…", "open retries an undealt result…" |
+| 17 | Set Up waits on the deal | `waitForDealOrder(OPENING_DEAL_WAIT_MS)` 45 s ≥ call + choice timeouts (was 5 s: local-shuffle fallback) | [x] deal-order "the opening wait outlasts the call and choice timeouts" |
 
 ## Test plan
 `node --test` on shared/engine/rules/__tests__/turn-order-flip.test.mjs,
@@ -127,3 +130,8 @@ the message set changes in both).
 - (assumed) Choice timeout 25 s: the prompt opens only after the ~4 s ceremony, leaving ~20 s to answer.
 
 ## Deviations (Builder appends here during build)
+- Transport dep is `onCallOpened`, not `onOpened`; `deal` returns a boolean so an undealt result can be retried (review).
+- Added in build/review: `OPENING_DEAL_WAIT_MS` (Set Up gave up on the deal after 5 s), the bridge waits for `dealOrder` before starting
+  (`deal-order-received` event), seat replay on (re)join, Leave no longer auto-answers, undealt-result retry.
+- Reviewer finding "result lines print mid-ceremony" rejected: `maybeBeginServerTurnOrder` returns before announcing until the ceremony
+  timer sets `serverTurnOrderAnimationDone`, and that timer prints "won the coin toss" first.

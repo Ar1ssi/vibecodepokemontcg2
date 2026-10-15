@@ -12,6 +12,7 @@
     "test:flip": "node flip-gate-test.mjs",
     "test:inspector": "node test-card-inspector-e2e.mjs",
     "test:reset-choice": "node reset-during-choice-test.mjs",
+    "test:opening-coin": "node opening-coin-choice-test.mjs",
     "test:changed": "node scripts/test-changed.mjs",
     "gates": "node scripts/gates-needed.mjs",
     "test:live": "node scripts/test-live.mjs",

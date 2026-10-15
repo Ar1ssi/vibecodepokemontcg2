@@ -80,7 +80,7 @@ export class GameRoom {
     // kept outside `state` so it never reaches hashState/commandLog/undo replay.
     // null | { phase: 'awaiting-call'|'awaiting-choice'|'resolved', callerPlayerId,
     //          callId, call, coinId, result, auto, winnerPlayerId, choiceId,
-    //          goFirst, choiceAuto, starterPlayerId }
+    //          goFirst, choiceAuto, starterPlayerId, dealt }
     this.turnOrder = null;
     this.turnOrderCallCounter = 0;
 
@@ -469,6 +469,7 @@ export class GameRoom {
       goFirst: null,
       choiceAuto: false,
       starterPlayerId: null,
+      dealt: false,
     };
     this.touchActivity();
     return { callerPlayerId, callId, timeoutMs: TURN_ORDER_CALL_TIMEOUT_MS };
@@ -564,6 +565,8 @@ export class GameRoom {
       typeof coinId === 'string' && coinId.length > 0 && coinId.length <= 128
         ? coinId
         : null;
+    // An ordering token, not a secret (the caller can derive it from callId):
+    // the socket check in submitTurnOrderChoice is what limits who may answer.
     const choiceId = `${this.turnOrder.callId}:choice`;
 
     this.turnOrder = {
@@ -650,6 +653,49 @@ export class GameRoom {
    */
 
   /**
+   * The resolved order, rebuilt from the handshake — for a deal that has to be
+   * retried because no seat had a socket when the choice resolved.
+   *
+   * @returns {TurnOrderResolution|null} null unless resolved and not yet dealt.
+   */
+  undealtTurnOrderResolution() {
+    if (this.turnOrder?.phase !== 'resolved' || this.turnOrder.dealt) return null;
+    return this.#resolutionFromHandshake();
+  }
+
+  /** @returns {TurnOrderResolution} */
+  #resolutionFromHandshake() {
+    const {
+      callerPlayerId,
+      call,
+      result,
+      winnerPlayerId,
+      goFirst,
+      starterPlayerId,
+      coinId,
+      auto,
+      choiceAuto,
+    } = this.turnOrder;
+    return {
+      ok: true,
+      callerPlayerId,
+      call,
+      result,
+      winnerPlayerId,
+      goFirst,
+      starterPlayerId,
+      coinId,
+      auto,
+      choiceAuto,
+    };
+  }
+
+  /** Records that the opening hands went out for the resolved order. */
+  markTurnOrderDealt() {
+    if (this.turnOrder?.phase === 'resolved') this.turnOrder.dealt = true;
+  }
+
+  /**
    * @param {boolean} goFirst
    * @param {boolean} choiceAuto
    * @returns {TurnOrderResolution|{ ok: false, reason: string }}
@@ -670,19 +716,7 @@ export class GameRoom {
       starterPlayerId,
     };
     this.touchActivity();
-    const { callerPlayerId, call, result, winnerPlayerId, coinId, auto } = this.turnOrder;
-    return {
-      ok: true,
-      callerPlayerId,
-      call,
-      result,
-      winnerPlayerId,
-      goFirst,
-      starterPlayerId,
-      coinId,
-      auto,
-      choiceAuto,
-    };
+    return this.#resolutionFromHandshake();
   }
 
   /**
