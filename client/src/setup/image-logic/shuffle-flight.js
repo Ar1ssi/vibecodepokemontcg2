@@ -77,14 +77,15 @@ const buildCard = (deckRect, sleeveSrc) => {
   return host;
 };
 
+/** @returns {number} how long the flight runs, so the FX queue holds for it (0 when nothing plays) */
 export const playShuffleFlight = (user, zoneId, zoneCount) => {
-  if (typeof document === 'undefined' || document.hidden) return;
+  if (typeof document === 'undefined' || document.hidden) return 0;
   const count = visualCardCount(zoneCount);
   const originEl = zoneOriginEl(user, zoneId);
-  if (!count || !originEl) return;
+  if (!count || !originEl) return 0;
 
   const deckRect = visualRectOf(originEl);
-  if (deckRect.width < 2 || deckRect.height < 2) return;
+  if (deckRect.width < 2 || deckRect.height < 2) return 0;
 
   cancelShuffle(user);
 
@@ -126,4 +127,5 @@ export const playShuffleFlight = (user, zoneId, zoneCount) => {
   });
   initial.forEach((pose, i) => applyPose(hosts[i], pose));
   run.rafId = requestAnimationFrame(tick);
+  return SHUFFLE_DURATION_MS;
 };

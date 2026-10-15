@@ -8,7 +8,7 @@ import {
   advisoryAnimationPlan,
   attackLeads,
   coinFlipRuns,
-  dealShuffles,
+  deckShuffles,
   deckRevealRuns,
   effectKnockoutIds,
   drawnCards,
@@ -59,8 +59,8 @@ const HELD_DRAW_BACKSTOP_MS = 9000;
 let prizeSeats = new Map();
 // Coin flips of the batch being applied, merged into one ceremony per run.
 let coinRuns = new Map();
-// The batch's deck shuffles that precede a deal (the opening's only shuffle flight).
-let shufflesBeforeDeals = new Set();
+// The batch's deck shuffles that animate, each mapped to its sound (deckShuffles).
+let shuffleSounds = new Map();
 // Design 059: each player's deck → hand reveals in the batch, keyed by the reveal that plays them.
 let revealRuns = new Map();
 // Design 064: the batch being applied arrived before the opening Active placement finished.
@@ -200,7 +200,7 @@ const playRevealPlan = (plan) => {
 export function handleBeforeApply(events, selfPlayerId) {
   skippedDeals = supersededDeals(events);
   coinRuns = coinFlipRuns(events);
-  shufflesBeforeDeals = dealShuffles(events);
+  shuffleSounds = deckShuffles(events);
   revealRuns = deckRevealRuns(events);
   batchInSetup = !rulesState.startingActiveDone;
   effectKnockouts = effectKnockoutIds(events);
@@ -238,9 +238,9 @@ export function handleBeforeApply(events, selfPlayerId) {
  */
 function runPlan(plan) {
   if (plan.kind === 'shuffle') {
-    playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
-    soundPlan({ effect: 'shuffle-flight', user: plan.user });
-    return 0;
+    const hold = playShuffleFlight(plan.user, plan.zoneId, shuffleZoneCount(plan.user, plan.zoneId));
+    soundPlan({ effect: plan.sound || 'shuffle-flight', user: plan.user });
+    return hold;
   }
   if (plan.kind === 'draw') return playDrawPlan(plan);
   if (plan.kind === 'reveal') return playRevealPlan(plan);
@@ -328,7 +328,7 @@ export function handleAdvisoryEvent(event, selfPlayerId) {
 function queueEvent(event, selfPlayerId) {
   if (skippedDeals.has(event)) return;
   const planned = advisoryAnimationPlan(event, selfPlayerId, coinRuns.get(event), {
-    dealShuffle: shufflesBeforeDeals.has(event),
+    shuffleSound: shuffleSounds.get(event),
     revealRun: revealRuns.get(event),
     setup: batchInSetup,
     effectKo: effectKnockouts,

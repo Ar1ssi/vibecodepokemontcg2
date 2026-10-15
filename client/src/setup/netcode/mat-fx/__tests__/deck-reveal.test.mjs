@@ -35,7 +35,7 @@ test('deckRevealTimes: your one card holds 600 ms', () => {
   const t = deckRevealTimes(1, SELF_REVEAL_HOLD_MS);
   assert.equal(t.holdOf(0), 600);
   assert.equal(t.total, 520 + 600 + 300);
-  assert.equal(deckRevealHold(1, SELF_REVEAL_HOLD_MS), 1120);
+  assert.equal(deckRevealHold(1, SELF_REVEAL_HOLD_MS), t.total, 'the queue waits until the card has landed');
 });
 
 test('deckRevealTimes: two cards arrive staggered, hold together, go in staggered', () => {
@@ -47,7 +47,7 @@ test('deckRevealTimes: two cards arrive staggered, hold together, go in staggere
   assert.equal(leave(1) - leave(0), REVEAL_OUT_STAGGER_MS);
   for (const i of [0, 1]) assert.equal(t.start(i) + t.duration(i), leave(i) + PREVIEW_PLACE_MS);
   assert.equal(t.total, 2215);
-  assert.equal(deckRevealHold(2, 1200), 2215 - PREVIEW_PLACE_MS);
+  assert.equal(deckRevealHold(2, 1200), 2215);
 });
 
 test('deckRevealTimes: no cards play nothing; past the spread the count stops at its slots', () => {
