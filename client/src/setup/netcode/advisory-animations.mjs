@@ -142,17 +142,35 @@ const coinPlan = (event, selfPlayerId, run) => {
  * @param {object} event
  * @param {string|null} selfPlayerId
  * @param {string[]} [coinRun] this event's entry from coinFlipRuns, if any
- * @param {{ shuffleSound?: string, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number> }} [options]
+ * @param {{ shuffleSound?: string, revealRun?: object[]|null, setup?: boolean, effectKo?: Set<number>, hits?: object[]|null,
+ *   strike?: object|null, moreKnockouts?: boolean }} [options]
  *   `shuffleSound`: this event's entry from deckShuffles; a deck-shuffle event without one plans
  *   nothing. `revealRun`: this event's entry from deckRevealRuns, if any. `setup`: the batch
  *   arrived while the opening placement was unfinished (tags `enter` plans). `effectKo`: the batch's
- *   effectKnockoutIds (tags those `knockout` plans)
+ *   effectKnockoutIds (tags those `knockout` plans). `hits`: this `attackExecuted`'s entry from
+ *   attackHitIds (design 069: rides on both attack plans as `plan.hits`). `strike`: this event's
+ *   entry from attackStrikes (design 069: tags its `fx` and `knockout` plans as `plan.strike`).
+ *   `moreKnockouts`: this knockout is in strikeKnockouts' `notLast` (tags it, with a `strike`)
  */
-export function advisoryAnimationPlan(
+export function advisoryAnimationPlan(event, selfPlayerId, coinRun, options = {}) {
+  const planned = planFor(event, selfPlayerId, coinRun, options);
+  const strike = options?.strike;
+  if (!strike || !planned) return planned;
+  // Design 069: an attack's plans and its hits' plans share the attack event as their strike key;
+  // a knockout another of the same attack's knockouts follows is marked (it holds nothing).
+  const more = Boolean(options.moreKnockouts);
+  const tag = (plan) => {
+    if (!plan || (plan.kind !== 'fx' && plan.kind !== 'knockout')) return plan;
+    return plan.kind === 'knockout' && more ? { ...plan, strike, moreKnockouts: true } : { ...plan, strike };
+  };
+  return Array.isArray(planned) ? planned.map(tag) : tag(planned);
+}
+
+function planFor(
   event,
   selfPlayerId,
   coinRun,
-  { shuffleSound = null, revealRun = null, setup = false, effectKo = null } = {}
+  { shuffleSound = null, revealRun = null, setup = false, effectKo = null, hits = null } = {}
 ) {
   if (!event || typeof event !== 'object') return null;
   if (DECK_SHUFFLE_EVENTS.has(event.type)) {
@@ -174,6 +192,9 @@ export function advisoryAnimationPlan(
   if (event.type === 'vstarUsed') return { ...fxPlan(event, selfPlayerId), kind: 'fx' };
   if (COIN_EVENTS.has(event.type)) return coinPlan(event, selfPlayerId, coinRun);
   if (PRIZE_TAKES.has(event.type)) return prizePlans(event, selfPlayerId);
+  if (event.type === 'attackExecuted' && Array.isArray(hits)) {
+    return fxPlan(event, selfPlayerId).map((plan) => ({ ...plan, hits }));
+  }
   if (Object.hasOwn(EVENT_FX, event.type)) return fxPlan(event, selfPlayerId);
   if (event.type === 'cardMoved') {
     if (event.to === 'discard' && event.instanceId != null) {
@@ -437,3 +458,109 @@ export function attackLeads(events) {
   }
   return leads;
 }
+
+/**
+ * Design 069: the cards each attack damaged — the `damageUpdated` events of its segment (the same
+ * segment `attackLeads` uses), one entry per card in first-seen order with the last event's totals.
+ * The attacker's own damage (recoil, a defender's on-damage Ability) is not a hit of the attack.
+ *
+ * @param {object[]} events
+ * @returns {Map<object, {instanceId: *, damage?: number, dealt?: number, healed?: number}[]>}
+ *   the `attackExecuted` event -> its hits
+ */
+export function attackHitIds(events) {
+  const hits = new Map();
+  if (!Array.isArray(events)) return hits;
+  let segment = new Map();
+  for (const event of events) {
+    if (event?.type === 'attackExecuted') {
+      hits.set(
+        event,
+        [...segment.values()].filter((hit) => event.attackerId == null || hit.instanceId !== event.attackerId)
+      );
+    }
+    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) segment = new Map();
+    else if (event?.type === 'damageUpdated' && event.instanceId != null) {
+      segment.set(event.instanceId, mergeHit(segment.get(event.instanceId), event));
+    }
+  }
+  return hits;
+}
+
+const STRIKE_HIT_EVENTS = new Set(['damageUpdated', 'pokemonKnockedOut']);
+
+/**
+ * Design 069: which attack each event belongs to. The attack's `fx` plans announce its contact;
+ * its damage and knockout plans run after the queue held the attack until contact, so they find
+ * that announcement through the attack event they share (combat.js keeps it per strike key).
+ * The attacker's own damage and knockout (recoil, a defender's on-damage Ability) are not hits of
+ * its attack, so they keep the plain impact-queue path.
+ *
+ * @param {object[]} events
+ * @returns {Map<object, object>} an `attackExecuted`, or a damage / knockout of its segment ->
+ *   that `attackExecuted`
+ */
+export function attackStrikes(events) {
+  const strikes = new Map();
+  if (!Array.isArray(events)) return strikes;
+  let segment = [];
+  for (const event of events) {
+    if (event?.type === 'attackExecuted') {
+      strikes.set(event, event);
+      for (const hit of segment) {
+        if (event.attackerId == null || hit.instanceId !== event.attackerId) strikes.set(hit, event);
+      }
+    }
+    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) segment = [];
+    else if (STRIKE_HIT_EVENTS.has(event?.type)) segment.push(event);
+  }
+  return strikes;
+}
+
+/**
+ * Design 069: the engine Knocks Out a card as soon as its damage lands, so in a spread attack the
+ * Active's knockout sits between the Bench hits — and its hold would push them past their ripple
+ * times. Each attack's knockouts move to just after its last damage; `notLast` names every one but
+ * the last of its attack (combat.js lets those hold nothing, the last holds for all).
+ *
+ * @param {object[]} events
+ * @returns {{after: Map<object, object[]>, moved: Set<object>, notLast: Set<object>}} `after`: the
+ *   attack's last `damageUpdated` -> the knockouts to play right after it; `moved`: those knockouts
+ */
+export function strikeKnockouts(events) {
+  const after = new Map();
+  const moved = new Set();
+  const notLast = new Set();
+  if (!Array.isArray(events)) return { after, moved, notLast };
+  let segment = [];
+  for (const event of events) {
+    if (event?.type === 'attackExecuted') {
+      const lastDamageAt = segment.findLastIndex((entry) => entry.type === 'damageUpdated');
+      const knockouts = segment.filter((entry) => entry.type === 'pokemonKnockedOut');
+      const early = knockouts.filter((knockout) => segment.indexOf(knockout) < lastDamageAt);
+      if (early.length > 0) {
+        after.set(segment[lastDamageAt], early);
+        for (const knockout of early) moved.add(knockout);
+      }
+      const order = [...early, ...knockouts.filter((knockout) => !moved.has(knockout))];
+      for (const knockout of order.slice(0, -1)) notLast.add(knockout);
+    }
+    if (ATTACK_SEGMENT_BOUNDS.has(event?.type)) segment = [];
+    else if (STRIKE_HIT_EVENTS.has(event?.type)) segment.push(event);
+  }
+  return { after, moved, notLast };
+}
+
+const isAmount = (value) => typeof value === 'number' && Number.isFinite(value);
+
+// A card hit twice in one attack (a clause, then a counter placement) is one hit: the last
+// cumulative total, and `dealt` summed while every event names it (else the total decides).
+const mergeHit = (previous, event) => {
+  const hit = { instanceId: event.instanceId };
+  if (isAmount(event.damage)) hit.damage = event.damage;
+  else if (isAmount(previous?.damage)) hit.damage = previous.damage;
+  const priorDealt = previous ? previous.dealt : 0;
+  if (isAmount(event.dealt) && isAmount(priorDealt)) hit.dealt = priorDealt + event.dealt;
+  if (event.weakness || previous?.weakness) hit.weakness = true;
+  return hit;
+};

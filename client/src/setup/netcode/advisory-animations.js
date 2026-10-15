@@ -9,9 +9,12 @@ import {
   attackLeads,
   coinFlipRuns,
   deckShuffles,
+  attackHitIds,
+  attackStrikes,
   deckRevealRuns,
   effectKnockoutIds,
   drawnCards,
+  strikeKnockouts,
   supersededDeals,
 } from './advisory-animations.mjs';
 import {
@@ -26,7 +29,8 @@ import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
-import { afterImpact, attackSceneEndsAt } from './mat-fx/combat.js';
+import { afterHit, attackSceneEndsAt, knockoutHoldFor } from './mat-fx/combat.js';
+import { seedDamageBaselines } from './mat-fx/damage-hit.mjs';
 import { playDeckReveal } from './mat-fx/deck-reveal.js';
 import { playFxSound } from './mat-fx/fx-audio.js';
 import { createFxQueue } from './mat-fx/fx-queue.mjs';
@@ -70,6 +74,21 @@ let effectKnockouts = new Set();
 // The batch's attacks, keyed by the first hit each one plays ahead of (attackLeads).
 let leadingAttacks = new Map();
 let movedAttacks = new Set();
+// Design 069: the cards each of the batch's attacks damaged (attackHitIds).
+let attackHits = new Map();
+// Design 069: the attack each of the batch's attacks, damages and knockouts belongs to.
+let strikesOf = new Map();
+// Design 069: each attack's knockouts, moved after its last damage (strikeKnockouts).
+let strikeKos = { after: new Map(), moved: new Set(), notLast: new Set() };
+
+// Design 069: each damaged card's total before this batch, from its counter on the board (no
+// counter = 0). Read before the diff applies the new totals.
+const damageBaselinesBefore = (events, registry) =>
+  events
+    .filter((event) => event?.type === 'damageUpdated' && event.instanceId != null)
+    .map((event) => ({ event, element: registry.get(event.instanceId)?.element }))
+    .filter(({ element }) => element)
+    .map(({ event, element }) => ({ instanceId: event.instanceId, damage: Number(element.dataset?.damage ?? 0) }));
 
 const capturePrizeSeats = (events, registry, selfPlayerId) => {
   prizeSeats = new Map();
@@ -206,8 +225,12 @@ export function handleBeforeApply(events, selfPlayerId) {
   effectKnockouts = effectKnockoutIds(events);
   leadingAttacks = attackLeads(events);
   movedAttacks = new Set(leadingAttacks.values());
+  attackHits = attackHitIds(events);
+  strikesOf = attackStrikes(events);
+  strikeKos = strikeKnockouts(events);
   if (!Array.isArray(events) || selfPlayerId == null) return;
   const registry = getCardRegistry();
+  seedDamageBaselines(damageBaselinesBefore(events, registry));
   capturePrizeSeats(events, registry, selfPlayerId);
   for (const event of events) {
     if (!event || event.type !== 'pokemonKnockedOut' || event.instanceId == null) continue;
@@ -249,8 +272,9 @@ function runPlan(plan) {
     pendingKnockoutGhosts.delete(plan.instanceId);
     soundPlan({ effect: 'knockout', user: plan.user, ruleBoxes: plan.ruleBoxes, effectKo: plan.effectKo });
     if (!ghost) return 0;
-    playKnockoutGhost(ghost, { deferStart: afterImpact });
-    return holdFor('knockout');
+    // Design 069: a knockout lands on its own card's hit (a ripple hit lands after the contact).
+    playKnockoutGhost(ghost, { deferStart: (start) => afterHit(plan, start) });
+    return knockoutHoldFor(plan, holdFor('knockout'));
   }
   if (plan.kind === 'fx') return playFx(plan);
   if (plan.kind === 'wait') return plan.ms;
@@ -319,10 +343,11 @@ export function whenFxQueueIdle() {
  * @param {string|null} selfPlayerId
  */
 export function handleAdvisoryEvent(event, selfPlayerId) {
-  if (movedAttacks.has(event)) return;
+  if (movedAttacks.has(event) || strikeKos.moved.has(event)) return;
   const attack = leadingAttacks.get(event);
   if (attack) queueEvent(attack, selfPlayerId);
   queueEvent(event, selfPlayerId);
+  for (const knockout of strikeKos.after.get(event) ?? []) queueEvent(knockout, selfPlayerId);
 }
 
 function queueEvent(event, selfPlayerId) {
@@ -332,6 +357,9 @@ function queueEvent(event, selfPlayerId) {
     revealRun: revealRuns.get(event),
     setup: batchInSetup,
     effectKo: effectKnockouts,
+    hits: attackHits.get(event) ?? null,
+    strike: strikesOf.get(event) ?? null,
+    moreKnockouts: strikeKos.notLast.has(event),
   });
   if (!planned) return;
   const plans = Array.isArray(planned) ? planned : [planned];
