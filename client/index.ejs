@@ -260,6 +260,7 @@
                             <button id="buildBattleTabBox" class="native-deck-builder-mode-tab" type="button">Box</button>
                             <button id="buildBattleTabPool" class="native-deck-builder-mode-tab" type="button">Pool</button>
                             <% } else if (isBuilderWindow) { %>
+                            <button id="nativeDeckBuilderTabSuggest" class="native-deck-builder-mode-tab" type="button" title="Card suggestions from tournament decklists">Suggest</button>
                             <button id="etbTabShelf" class="native-deck-builder-mode-tab" type="button">Shelf</button>
                             <button id="etbTabCollection" class="native-deck-builder-mode-tab" type="button">Collection</button>
                             <% } %>
@@ -298,6 +299,9 @@
                     </div>
                     <div id="nativeDeckBuilderSetBrowserPanel" class="native-deck-builder-set-browser" hidden>
                     </div>
+                    <% if (isBuilderWindow && !isBuildBattle) { %>
+                    <div id="nativeDeckBuilderSuggestPanel" class="native-deck-builder-suggest" hidden></div>
+                    <% } %>
                     <% if (isBuildBattle) { %>
                     <div id="buildBattleBoxPanel" class="bb-panel" hidden></div>
                     <div id="buildBattlePoolPanel" class="bb-panel" hidden></div>
