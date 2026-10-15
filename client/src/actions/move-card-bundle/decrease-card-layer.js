@@ -1,5 +1,6 @@
 import { imageAnchor } from '../../setup/deck-constructor/hydrate-holo.js';
 import { getEnergyTokenFront, isEnergyCard } from './energy-token-assets.mjs';
+import { relayoutLegacyEnergyTokens } from './energy-token-row.mjs';
 
 // this is only relevant for the active/bench, where there is a div container holding the pokemon and its attached cards
 // this is for adjusting the size of the container holding the pokemon/attached cards and the counter of how many cards are attached,
@@ -12,7 +13,12 @@ export const decreaseCardLayer = (movingCard) => {
     // so only that case shrinks it back.
     const isToken =
       isEnergyCard(movingCard) && getEnergyTokenFront(movingCard) != null;
-    if (!isToken) {
+    if (isToken) {
+      // Close the gap it leaves, and un-pile the row once it is back to four.
+      relayoutLegacyEnergyTokens(movingCard.image.relative, {
+        exclude: movingCard.image,
+      });
+    } else {
       // hostParent is `.play-container` — resolved through the holo wrapper if the
       // host Pokémon is holo-hydrated, so the container is sized correctly.
       const hostParent = imageAnchor(movingCard.image.relative).parentElement;

@@ -452,6 +452,91 @@ try {
   T('14f. Escape mid-flight closes cleanly', await waitGone());
   T('14g. ...and restores the hand and the source card', !(await handLowered()) && !(await sourceHidden()));
 
+  // 15. Design 069: TCG Live hover preview. 1920×1080 so the default mat leaves a ~200 px blurred band.
+  console.log('Testing the hover preview...');
+  await actor.page.setViewportSize({ width: 1920, height: 1080 });
+  await actor.page.waitForTimeout(500);
+  const hoverState = () =>
+    actor.page.evaluate(() => {
+      const host = document.getElementById('hoverPreview');
+      if (!host?.classList.contains('is-shown')) return null;
+      const box = host.getBoundingClientRect();
+      const src = host.querySelector('img')?.getAttribute('src') ?? '';
+      return { src: src.replace(/\/(low|high)\.webp$/, ''), mode: host.dataset.mode, right: box.right };
+    });
+  const artOf = (frame, selector, index = 0) =>
+    frame.evaluate(
+      ([sel, i]) => {
+        const img = document.querySelectorAll(sel)[i];
+        const src = img?.card?.src || img?.getAttribute('src') || '';
+        return src.replace(/\/(low|high)\.webp$/, '');
+      },
+      [selector, index]
+    );
+  const hoverOver = async (frame, selector, index = 0) => {
+    const box = await frame.locator(selector).nth(index).boundingBox();
+    await actor.page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height * 0.25, 40));
+  };
+  const parkPointer = async () => {
+    await actor.page.mouse.move(1900, 20);
+    await actor.page.waitForTimeout(400);
+  };
+
+  await parkPointer();
+  await hoverOver(actorFrame, '#active img');
+  await actor.page.waitForTimeout(400);
+  T('15a. No preview before the 0.8 s dwell', (await hoverState()) === null);
+  await actor.page.waitForTimeout(600);
+  const activeHover = await hoverState();
+  T('15b. Hovering your Active for 0.8 s shows its card', activeHover?.src === (await artOf(actorFrame, '#active img')), JSON.stringify(activeHover));
+  // The mat art's left edge in page pixels, through the same iframe mapping the board FX use.
+  const probeLeft = await actor.page.evaluate(async () => {
+    const { viewportRectOf } = await import('./src/setup/image-logic/card-pop.mjs');
+    const lefts = ['selfContainer', 'oppContainer'].map((id) => {
+      const probe = document.getElementById(id)?.contentDocument?.querySelector('.hover-gutter-probe');
+      return probe ? viewportRectOf(probe).left : Infinity;
+    });
+    return Math.min(...lefts);
+  });
+  T(
+    '15c. In the blurred band, left of the mat art',
+    activeHover?.mode === 'band' && activeHover.right <= probeLeft + 1,
+    `mode=${activeHover?.mode} right=${activeHover?.right} probeLeft=${probeLeft}`
+  );
+
+  const handCount = await actorFrame.locator('#hand img').count();
+  if (handCount >= 2) {
+    await parkPointer();
+    await hoverOver(actorFrame, '#hand img', 0);
+    await actor.page.waitForTimeout(900);
+    T('15d. A hand card previews after the dwell', (await hoverState())?.src === (await artOf(actorFrame, '#hand img', 0)));
+    await hoverOver(actorFrame, '#hand img', 1);
+    await actor.page.waitForTimeout(60);
+    T('15e. Sweeping to the next hand card swaps at once', (await hoverState())?.src === (await artOf(actorFrame, '#hand img', 1)));
+    await actor.page.mouse.down();
+    await actor.page.waitForTimeout(30);
+    T('15f. Mouse-down hides it', (await hoverState()) === null);
+    await actor.page.mouse.up();
+  } else {
+    T('15d-f. Hand steps skipped: fewer than two hand cards', false);
+  }
+
+  const oppFrame = actor.page.frames().find((f) => /opp-containers/.test(f.url()));
+  if (oppFrame && (await oppFrame.locator('#hand img').count()) > 0) {
+    await parkPointer();
+    await hoverOver(oppFrame, '#hand img', 0);
+    await actor.page.waitForTimeout(900);
+    T('15g. The opponent\'s face-down hand never previews', (await hoverState()) === null);
+  }
+
+  await actor.page.evaluate(() => document.getElementById('hoverPreviewCheckbox')?.click());
+  await parkPointer();
+  await hoverOver(actorFrame, '#active img');
+  await actor.page.waitForTimeout(900);
+  T('15h. With "Card hover preview" unticked nothing shows', (await hoverState()) === null);
+  await actor.page.evaluate(() => document.getElementById('hoverPreviewCheckbox')?.click());
+  await parkPointer();
+
 } catch (err) {
   failed += 1;
   console.error('TEST ERROR:', err);

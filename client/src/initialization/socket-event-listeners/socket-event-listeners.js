@@ -1,6 +1,6 @@
 import { flipBoard } from '../../actions/general/flip-board.js';
 import { reset } from '../../actions/general/reset.js';
-import { shouldRequestViewOnJoin } from '../../setup/netcode/rejoin-view.mjs';
+import { isViewForRoom, shouldRequestViewOnJoin } from '../../setup/netcode/rejoin-view.mjs';
 import { clearReady } from '../../actions/general/ready.js';
 import {
   hideCards,
@@ -22,6 +22,16 @@ import { processAction } from '../../setup/general/process-action.js';
 import { setAuthoritativeDispatchContext } from '../../setup/netcode/authoritative-dispatch.js';
 import { cleanActionData } from '../../setup/general/clean-action-data.js';
 import { spectatorJoin } from '../../setup/spectator/spectator-join.js';
+import {
+  applySpectatorView,
+  endSpectatorSession,
+  isSpectatingAuthoritative,
+  spectatorPlayerNames,
+  startSpectatorSession,
+} from '../../setup/spectator/spectator-session.js';
+import { publicRoomName } from '../../../../shared/lobby/public-rooms.mjs';
+import { seatTokenFor, writeSeatToken } from '../../setup/lobby/seat-token-store.mjs';
+import { rejectEndsSeat, roomRejectMessage } from '../../setup/lobby/public-room-view.mjs';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
 import { forceRulesEnabledForMultiplayer } from '../../setup/rules/rules-bridge.js';
 import { getStoredMatId } from '../../setup/sizing/apply-mat-layout.js';
@@ -96,6 +106,8 @@ const requestActionQueue = createRequestActionQueue();
 let requestActionStaleTimer = null;
 
 export const sendSpectatorData = () => {
+  // Design 069: an authoritative room's spectators render server views, not this replay.
+  if (systemState.serverAuthoritative) return;
   if (systemState.isTwoPlayer && systemState.roomId) {
     const data = {
       selfUsername: systemState.p2SelfUsername,
@@ -287,6 +299,9 @@ const seedNetcodeContext = () => {
 // registries and the client-seq counter so a new room starts from a clean
 // slate, then immediately re-seed the netcode context.
 export const resetNetcodeForRoomChange = () => {
+  // Every room change (join, either Leave button) ends a spectator session; spectatorJoin
+  // starts a new one after this.
+  endSpectatorSession();
   resetRenderState();
   seedNetcodeContext();
   resetClientSeq(0);
@@ -339,7 +354,13 @@ export const initializeSocketEventListeners = () => {
     const chatbox = document.getElementById('chatbox');
     const p2ExplanationBox = document.getElementById('p2ExplanationBox');
     const flipBoardButton = document.getElementById('flipBoardButton');
-    roomHeaderText.textContent = 'id: ' + systemState.roomId;
+    // Design 069: a public room shows its name; its seat token lets this tab reclaim the seat.
+    const roomName = publicRoomName(systemState.roomId);
+    roomHeaderText.textContent = roomName ?? 'id: ' + systemState.roomId;
+    document.getElementById('roomHeaderCopyButton').hidden = roomName !== null;
+    if (typeof data?.seatToken === 'string') {
+      writeSeatToken(systemState.roomId, systemState.p2SelfUsername, data.seatToken);
+    }
     chatbox.innerHTML = '';
     connectedRoom.style.display = 'flex';
     lobby.style.display = 'none';
@@ -382,13 +403,25 @@ export const initializeSocketEventListeners = () => {
   socket.on('requestSpectatorData', () => {
     sendSpectatorData();
   });
-  socket.on('spectatorJoin', () => {
+  socket.on('spectatorJoin', (data) => {
+    systemState.serverAuthoritative = Boolean(data?.serverAuthoritative);
+    resetNetcodeForRoomChange();
     spectatorJoin();
+    if (systemState.serverAuthoritative) {
+      // Design 069: the server's spectator view is the whole board; ask for it now.
+      startSpectatorSession();
+      emitRequestView({ socket, roomId: systemState.roomId });
+      return;
+    }
     if (systemState.roomId) {
       socket.emit('requestSpectatorData', { roomId: systemState.roomId });
     }
   });
-  socket.on('roomReject', () => {
+  socket.on('roomReject', (data) => {
+    // Design 069: a reconnect refused because this seat is gone sends the player back to the lobby.
+    if (rejectEndsSeat(data?.reason) && systemState.isTwoPlayer) {
+      document.dispatchEvent(new CustomEvent('room-seat-lost'));
+    }
     let overlay = document.createElement('div');
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -406,8 +439,8 @@ export const initializeSocketEventListeners = () => {
     container.style.color = '#fff';
 
     let message = document.createElement('p');
-    message.innerHTML =
-      'Room is full.<br>Enable spectator mode to watch the game.';
+    message.textContent = roomRejectMessage(data?.reason);
+    message.style.whiteSpace = 'pre-line';
     message.style.fontSize = '24px';
 
     container.appendChild(message);
@@ -426,8 +459,12 @@ export const initializeSocketEventListeners = () => {
     if (systemState.isTwoPlayer) {
       const data = {
         roomId: systemState.roomId,
-        username: systemState.p2SelfUsername,
+        // A spectator's p2SelfUsername names the watched seat (spectator-session.js).
+        username: notSpectator
+          ? systemState.p2SelfUsername
+          : systemState.spectatorUsername,
         notSpectator: notSpectator,
+        seatToken: seatTokenFor(systemState.roomId, systemState.p2SelfUsername),
       };
       socket.emit('userReconnected', data);
       if (!notSpectator) {
@@ -446,6 +483,8 @@ export const initializeSocketEventListeners = () => {
         } else {
           requestPeerLogCatchup();
         }
+      } else if (isSpectatingAuthoritative()) {
+        emitRequestView({ socket, roomId: systemState.roomId });
       }
     }
   });
@@ -483,19 +522,29 @@ export const initializeSocketEventListeners = () => {
   });
 
   socket.on('view', (data) => {
+    if (!isViewForRoom(data, systemState.roomId)) return;
     if (typeof data?.lastClientSeq === 'number') {
       seedClientSeq(data.lastClientSeq);
     }
     if (data?.view) {
-      applyView(data.view, data.events || [], {
+      const options = {
         socket,
         roomId: systemState.roomId,
         onBeforeApply: handleBeforeApply,
         onAdvisoryEvent: (event, selfPlayerId) => {
           handleAdvisoryEvent(event, selfPlayerId);
-          handleServerBattleLog(event, selfPlayerId);
+          if (isSpectatingAuthoritative()) {
+            handleServerBattleLog(event, null, spectatorPlayerNames());
+          } else {
+            handleServerBattleLog(event, selfPlayerId);
+          }
         },
-      });
+      };
+      if (isSpectatingAuthoritative()) {
+        applySpectatorView(data.view, data.events || [], options);
+      } else {
+        applyView(data.view, data.events || [], options);
+      }
     }
   });
 
@@ -552,6 +601,7 @@ export const initializeSocketEventListeners = () => {
       systemState.isTwoPlayer = false;
       systemState.roomId = null;
       removeSyncIntervals();
+      endSpectatorSession();
       document.dispatchEvent(new CustomEvent('room-changed'));
       return;
     }

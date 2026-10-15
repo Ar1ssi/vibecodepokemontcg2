@@ -1,13 +1,17 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   ENERGY_TOKEN_FRONT,
   energyTypeKeyFor,
   getEnergyTokenFront,
   getEnergyTokenSrcForType,
+  isDoubleEnergyToken,
   isEnergyCard,
   normalizeEnergyType,
+  specialEnergyTokenFor,
 } from '../energy-token-assets.mjs';
+import { SPECIAL_ENERGY_TOKENS } from '../special-energy-tokens.mjs';
 
 describe('energy token assets', () => {
   it('maps every type to its cropped token image', () => {
@@ -31,9 +35,58 @@ describe('energy token assets', () => {
     assert.equal(getEnergyTokenFront({ name: 'x', types: ['Dark'] }), ENERGY_TOKEN_FRONT.darkness);
   });
 
-  it('falls back to the card name when types is missing (Special Energy)', () => {
+  it('gives a Special Energy its own token cut from the card art', () => {
     const card = { name: 'Double Colorless Energy', types: [] };
-    assert.equal(getEnergyTokenFront(card), ENERGY_TOKEN_FRONT.colorless);
+    assert.equal(getEnergyTokenFront(card), '/src/assets/energy/special/double-colorless-energy.svg');
+  });
+
+  it('matches a typed Special Energy in symbol and type-word spellings', () => {
+    const src = '/src/assets/energy/special/rocky-f-energy.svg';
+    assert.equal(getEnergyTokenFront({ name: 'Rocky {F} Energy' }), src);
+    assert.equal(getEnergyTokenFront({ name: 'Rocky Fighting Energy', types: ['Fighting'] }), src);
+  });
+
+  it('matches TCGdex spellings of Prism Star, δ and apostrophes', () => {
+    assert.match(getEnergyTokenFront({ name: 'Beast Energy ◇' }), /beast-energy-prism-star\.svg$/);
+    assert.match(getEnergyTokenFront({ name: 'δ Rainbow Energy' }), /delta-rainbow-energy\.webp$/);
+    assert.match(getEnergyTokenFront({ name: "Team Rocket's Energy" }), /team-rocket-s-energy\.svg$/);
+  });
+
+  it('keeps basic Metal and Darkness on their type tokens unless marked Special', () => {
+    assert.equal(getEnergyTokenFront({ name: 'Metal Energy', type: 'Energy' }), ENERGY_TOKEN_FRONT.metal);
+    assert.equal(getEnergyTokenFront({ name: 'Darkness Energy', types: ['Darkness'] }), ENERGY_TOKEN_FRONT.darkness);
+    assert.match(
+      getEnergyTokenFront({ name: 'Metal Energy', subtype: 'Special Energy' }),
+      /special\/metal-energy\./
+    );
+    assert.match(getEnergyTokenFront({ name: 'Darkness Energy', energyType: 'Special' }), /special\/darkness-energy\./);
+  });
+
+  it('flags Special Energy that provides 2 Energy as a two-orb token', () => {
+    assert.equal(isDoubleEnergyToken({ name: 'Double Turbo Energy' }), true);
+    assert.equal(isDoubleEnergyToken({ name: 'Neo Upper Energy' }), true);
+    assert.equal(isDoubleEnergyToken({ name: 'Jet Energy' }), false);
+    assert.equal(isDoubleEnergyToken({ name: 'Basic Fire Energy' }), false);
+    assert.equal(isDoubleEnergyToken(undefined), false);
+  });
+
+  it('has a token for every Special Energy name in the card corpus', () => {
+    const corpus = JSON.parse(
+      readFileSync(new URL('../../../../../out/pkmn-special-energy-cards.json', import.meta.url), 'utf8')
+    );
+    const names = [...new Set(corpus.map((row) => row.name))];
+    const missing = names.filter((name) => !specialEnergyTokenFor({ name, subtype: row(name) }));
+    assert.deepEqual(missing, []);
+    function row(name) {
+      return corpus.find((r) => r.name === name).subtype;
+    }
+  });
+
+  it('points every Special Energy token at a file that exists', () => {
+    for (const token of SPECIAL_ENERGY_TOKENS) {
+      const file = new URL(`../../../..${token.src}`, import.meta.url);
+      assert.equal(existsSync(file), true, token.src);
+    }
   });
 
   it('falls back to the card name when types is absent entirely', () => {
@@ -47,7 +100,7 @@ describe('energy token assets', () => {
   });
 
   it('returns null for a completely unmapped card', () => {
-    assert.equal(getEnergyTokenFront({ name: 'Mystery Energy', types: [] }), null);
+    assert.equal(getEnergyTokenFront({ name: 'Made-up Energy', types: [] }), null);
   });
 
   it('handles a missing card gracefully', () => {

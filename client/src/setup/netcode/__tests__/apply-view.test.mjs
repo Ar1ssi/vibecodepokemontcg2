@@ -16,7 +16,9 @@ import {
   getAuthoritativeStadiumArray,
   getAuthoritativeAttackExtras,
   repositionCardOverlays,
+  clearRenderedBoard,
 } from '../apply-view.js';
+import { spectatorPerspective } from '../../spectator/spectator-view.mjs';
 
 class MockClassList {
   constructor() {
@@ -2022,6 +2024,40 @@ test('energy: attached Energy draws as tokens and fills the parent attachedCards
   assert.equal(lightningImg.style.position, '');
 });
 
+// Five tokens ran off a Pokémon's card: past four, each type piles onto one
+// spot with an "Nx" count badge, the next type following the badge.
+test('energy: past four tokens each type piles up behind an Nx badge', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
+  const pikachu = { instanceId: 10, name: 'Pikachu', src: 'pika.png', type: 'Pokémon' };
+  const fire = (id) => ({ instanceId: id, name: 'Basic Fire Energy', src: 'f.png', type: 'Energy', attachedTo: 10 });
+  const water = { instanceId: 15, name: 'Basic Water Energy', src: 'w.png', type: 'Energy', attachedTo: 10 };
+  const five = [pikachu, fire(11), water, fire(12), fire(13), fire(14)];
+
+  applyView(view(1, { active: five }), [], opts);
+  sizeRegisteredCards(150, 200);
+  applyView(view(2, { active: five }), [], opts);
+
+  const registry = getCardRegistry();
+  const container = registry.get(10).container;
+  const badges = () =>
+    container.children.filter((child) => child.classList.contains('energy-token-count'));
+  const left = (id) => parseFloat(registry.get(id).element.style.left);
+
+  assert.deepEqual([11, 12, 13, 14].map(left), [0, 0, 0, 0], 'the Fire tokens share one spot');
+  assert.equal(registry.get(14).element.style.zIndex, '105', 'newest Fire on top of the pile');
+  assert.deepEqual(badges().map((b) => b.textContent), ['4x']);
+  const [badge] = badges();
+  assert.ok(parseFloat(badge.style.left) >= 36, 'badge after the Fire token');
+  assert.ok(left(15) > parseFloat(badge.style.left), 'Water token follows the 4x badge');
+  assert.equal(badge.style.bottom, registry.get(15).element.style.bottom);
+
+  applyView(view(3, { active: [pikachu, fire(11), water, fire(12)], discard: [] }), [], opts);
+  assert.deepEqual(badges(), [], 'back to four or fewer: no badge');
+  assert.ok(left(15) > left(11) && left(12) > left(15), 'tokens side by side again');
+});
+
 // Live 2P regression (sync log ptcg-sync-log_combined_test_1789677999175): decklists
 // exported from Limitless name basic Energy by its cost symbol, and a deck row that
 // skipped the importer's type resolution arrives with an empty `type`. Both used to
@@ -2063,9 +2099,41 @@ test('energy: cost-symbol names and untyped Energy rows still draw as tokens', (
   assert.equal(symbolImg.dataset.energyCardSrc, 'GRI_169_R_EN.png');
   assert.equal(symbolImg.classList.contains('energy-token-3d'), true);
   assert.equal(symbolImg.style.zIndex, '101');
-  assert.equal(untypedImg.getAttribute('src'), '/src/assets/energy/tokens/fighting.png');
+  assert.equal(
+    untypedImg.getAttribute('src'),
+    '/src/assets/energy/special/rocky-f-energy.svg',
+    'a Special Energy draws its own card-art token'
+  );
   assert.equal(untypedImg.classList.contains('energy-token-3d'), true);
   assert.equal(untypedImg.style.zIndex, '102');
+});
+
+test('energy: a 2-Energy Special Energy draws as a two-orb token, cleared on detach', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
+  const dragapult = { instanceId: 30, name: 'Dragapult ex', src: 'drag.png', type: 'Pokemon' };
+  const dde = { instanceId: 31, name: 'Double Dragon Energy', src: 'ros-97.png', type: 'Energy' };
+  const jet = { instanceId: 32, name: 'Jet Energy', src: 'pal-190.png', type: 'Energy' };
+
+  applyView(
+    view(1, { active: [dragapult, { ...dde, attachedTo: 30 }, { ...jet, attachedTo: 30 }] }),
+    [],
+    opts
+  );
+  const registry = getCardRegistry();
+  const ddeImg = registry.get(31).element;
+  const jetImg = registry.get(32).element;
+
+  assert.equal(ddeImg.getAttribute('src'), '/src/assets/energy/special/double-dragon-energy.svg');
+  assert.equal(ddeImg.classList.contains('energy-token-double'), true);
+  assert.equal(jetImg.getAttribute('src'), '/src/assets/energy/special/jet-energy.svg');
+  assert.equal(jetImg.classList.contains('energy-token-double'), false);
+
+  applyView(view(2, { active: [dragapult, { ...jet, attachedTo: 30 }], discard: [dde] }), [], opts);
+  assert.equal(ddeImg.getAttribute('src'), 'ros-97.png', 'detached Energy shows its card art again');
+  assert.equal(ddeImg.classList.contains('energy-token-double'), false);
+  assert.equal(ddeImg.classList.contains('energy-token-3d'), false);
 });
 
 const NEST_BALL_CHOICE = {
@@ -2783,4 +2851,104 @@ test('design 064 O7: the crowd bed follows prize piles and syncs only when its s
     { bed: 'large', crazy: true },
   ]);
   resetRenderState();
+});
+
+// --- Design 069: spectator perspectives ---
+
+const spectatorRawView = (overrides = {}) => ({
+  gameId: 'g-069',
+  stateVersion: 5,
+  isSpectator: true,
+  you: null,
+  them: null,
+  turn: { player: 'p2', isYourTurn: false, number: 4, phase: 'main' },
+  pendingChoice: null,
+  players: {
+    p1: {
+      playerId: 'p1',
+      username: 'Ash',
+      zones: { hand: [{ instanceId: 1, name: 'Pikachu', src: '/pika.png' }] },
+    },
+    p2: {
+      playerId: 'p2',
+      username: 'Gary',
+      zones: { hand: [{ instanceId: 2, name: 'Eevee', src: '/eevee.png' }] },
+    },
+  },
+  ...overrides,
+});
+
+test('069: a spectator perspective renders its seat as you and hides the other hand', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const result = applyView(spectatorPerspective(spectatorRawView(), 'p2'), [], {
+    document: doc,
+    getZone: mockGetZone,
+  });
+  assert.equal(result.applied, true);
+  const eevee = getCardRegistry().get(2);
+  const pikachu = getCardRegistry().get(1);
+  assert.equal(eevee.side, 'you');
+  assert.equal(eevee.isRedacted, false);
+  assert.equal(pikachu.side, 'them');
+  assert.equal(pikachu.isRedacted, true);
+});
+
+test('069: clearRenderedBoard lets the same stateVersion redraw from the other seat', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const options = { document: doc, getZone: mockGetZone };
+  applyView(spectatorPerspective(spectatorRawView(), 'p1'), [], options);
+  const oldPikachu = getCardRegistry().get(1).element;
+  assert.equal(
+    applyView(spectatorPerspective(spectatorRawView(), 'p2'), [], options).reason,
+    'out_of_order'
+  );
+
+  clearRenderedBoard(options);
+  assert.equal(getCardRegistry().size, 0);
+  assert.equal(getLastRenderedVersion(), -1);
+  assert.equal(oldPikachu.parentNode, null, 'the old card left the DOM');
+
+  applyView(spectatorPerspective(spectatorRawView(), 'p2'), [], options);
+  assert.equal(getCardRegistry().get(1).side, 'them');
+  assert.equal(getCardRegistry().get(2).side, 'you');
+  assert.equal(getLastRenderedVersion(), 5);
+});
+
+test('069: reconcileTurnState follows the watched seat of a spectator perspective', () => {
+  const local = { turnPlayer: 'opp', turnNumber: 0, phase: 'setup' };
+  const asGary = reconcileTurnState(spectatorPerspective(spectatorRawView(), 'p2'), {
+    rulesState: local,
+  });
+  assert.equal(asGary.applied, true);
+  assert.equal(local.turnPlayer, 'self');
+  assert.equal(local.turnNumber, 4);
+
+  reconcileTurnState(spectatorPerspective(spectatorRawView({ stateVersion: 6 }), 'p1'), {
+    rulesState: local,
+  });
+  assert.equal(local.turnPlayer, 'opp');
+});
+
+test('069: a spectator gets a named waiting banner even for the watched seat\'s choice', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const raw = spectatorRawView({
+    pendingChoice: { choiceId: 'c1', player: 'p1', prompt: 'Choose a Pokémon', optionsCount: 3 },
+  });
+  applyView(spectatorPerspective(raw, 'p1'), [], { document: doc, getZone: mockGetZone });
+  assert.equal(doc.getElementById('netcodeChoiceModal'), null);
+  const banner = doc.getElementById('netcodeChoiceBanner');
+  assert.ok(banner);
+  assert.equal(banner.textContent, 'Ash is making a choice: Choose a Pokémon');
+});
+
+test('069: the end screen names the winner to a spectator watching the winning seat', () => {
+  const { doc } = setupMockDom();
+  const raw = spectatorRawView({
+    turn: { player: 'p1', isYourTurn: false, number: 9, phase: 'ended' },
+    winner: 'p1',
+    winReason: 'prizes',
+  });
+  reconcileGameEnded(spectatorPerspective(raw, 'p1'), { document: doc });
+  const title = doc.getElementById('netcodeEndModal').querySelector('.game-end-modal-title');
+  assert.equal(title.textContent, 'Ash Wins!');
 });

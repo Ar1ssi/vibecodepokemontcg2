@@ -1,0 +1,594 @@
+{
+ "aqua-energy": {
+  "cx": 207,
+  "cy": 423,
+  "r": 110,
+  "orb2": {
+   "cx": 374,
+   "cy": 423,
+   "r": 108
+  }
+ },
+ "aromatic-g-energy": {
+  "cx": 291,
+  "cy": 373,
+  "r": 187
+ },
+ "aurora-energy": {
+  "cx": 298,
+  "cy": 328,
+  "r": 128
+ },
+ "beast-energy-prism-star": {
+  "cx": 300,
+  "cy": 288,
+  "r": 134
+ },
+ "blend-energy-g-r-p-d": {
+  "cx": 298,
+  "cy": 308,
+  "r": 132
+ },
+ "blend-energy-w-l-f-m": {
+  "cx": 296,
+  "cy": 308,
+  "r": 132
+ },
+ "boomerang-energy": {
+  "cx": 378,
+  "cy": 274,
+  "r": 132
+ },
+ "boost-energy": {
+  "cx": 298,
+  "cy": 238,
+  "r": 106
+ },
+ "bounce-energy": {
+  "cx": 262,
+  "cy": 350,
+  "r": 85,
+  "orb2": {
+   "cx": 385,
+   "cy": 362,
+   "r": 85
+  }
+ },
+ "bubbly-w-energy": {
+  "cx": 300,
+  "cy": 318,
+  "r": 174
+ },
+ "burning-energy": {
+  "cx": 300,
+  "cy": 308,
+  "r": 182
+ },
+ "call-energy": {
+  "cx": 298,
+  "cy": 324,
+  "r": 120
+ },
+ "capture-energy": {
+  "cx": 296,
+  "cy": 385,
+  "r": 131
+ },
+ "coating-m-energy": {
+  "cx": 294,
+  "cy": 318,
+  "r": 182
+ },
+ "counter-energy": {
+  "cx": 338,
+  "cy": 412,
+  "r": 150
+ },
+ "crystal-energy": {
+  "cx": 322,
+  "cy": 320,
+  "r": 99
+ },
+ "cyclone-energy": {
+  "cx": 297,
+  "cy": 326,
+  "r": 121
+ },
+ "dangerous-energy": {
+  "cx": 300,
+  "cy": 310,
+  "r": 181
+ },
+ "dark-metal-energy": {
+  "cx": 300,
+  "cy": 320,
+  "r": 140
+ },
+ "darkness-energy": {
+  "cx": 300,
+  "cy": 384,
+  "r": 123
+ },
+ "delta-rainbow-energy": {
+  "cx": 302,
+  "cy": 334,
+  "r": 80
+ },
+ "double-aqua-energy": {
+  "cx": 432,
+  "cy": 215,
+  "r": 130,
+  "orb2": {
+   "cx": 344,
+   "cy": 418,
+   "r": 105
+  }
+ },
+ "double-colorless-energy": {
+  "cx": 224,
+  "cy": 367,
+  "r": 160,
+  "orb2": {
+   "cx": 423,
+   "cy": 487,
+   "r": 97
+  }
+ },
+ "double-dragon-energy": {
+  "cx": 331,
+  "cy": 358,
+  "r": 143,
+  "orb2": {
+   "cx": 187,
+   "cy": 238,
+   "r": 100
+  }
+ },
+ "double-magma-energy": {
+  "cx": 167,
+  "cy": 342,
+  "r": 133,
+  "orb2": {
+   "cx": 321,
+   "cy": 202,
+   "r": 94
+  }
+ },
+ "double-rainbow-energy": {
+  "cx": 300,
+  "cy": 362,
+  "r": 88
+ },
+ "double-turbo-energy": {
+  "cx": 455,
+  "cy": 215,
+  "r": 105,
+  "orb2": {
+   "cx": 199,
+   "cy": 427,
+   "r": 150
+  }
+ },
+ "draw-energy": {
+  "cx": 298,
+  "cy": 400,
+  "r": 140
+ },
+ "enriching-energy": {
+  "cx": 232,
+  "cy": 304,
+  "r": 132
+ },
+ "flash-energy": {
+  "cx": 298,
+  "cy": 312,
+  "r": 180
+ },
+ "full-heal-energy": {
+  "cx": 411,
+  "cy": 450,
+  "r": 111,
+  "box": [
+   28,
+   60,
+   572,
+   610
+  ]
+ },
+ "fusion-strike-energy": {
+  "cx": 298,
+  "cy": 334,
+  "r": 130
+ },
+ "gift-energy": {
+  "cx": 298,
+  "cy": 328,
+  "r": 126
+ },
+ "growing-g-energy": {
+  "cx": 300,
+  "cy": 318,
+  "r": 176
+ },
+ "heal-energy": {
+  "cx": 304,
+  "cy": 340,
+  "r": 100
+ },
+ "health-energy": {
+  "cx": 298,
+  "cy": 322,
+  "r": 120
+ },
+ "heat-r-energy": {
+  "cx": 294,
+  "cy": 318,
+  "r": 182
+ },
+ "herbal-energy": {
+  "cx": 300,
+  "cy": 314,
+  "r": 182
+ },
+ "hiding-d-energy": {
+  "cx": 296,
+  "cy": 319,
+  "r": 181
+ },
+ "holon-energy-ff": {
+  "cx": 300,
+  "cy": 288,
+  "r": 100
+ },
+ "holon-energy-gl": {
+  "cx": 302,
+  "cy": 288,
+  "r": 100
+ },
+ "holon-energy-wp": {
+  "cx": 296,
+  "cy": 286,
+  "r": 100
+ },
+ "horror-p-energy": {
+  "cx": 298,
+  "cy": 319,
+  "r": 181
+ },
+ "ignition-energy": {
+  "cx": 429,
+  "cy": 318,
+  "r": 91
+ },
+ "impact-energy": {
+  "cx": 296,
+  "cy": 326,
+  "r": 132
+ },
+ "jet-energy": {
+  "cx": 350,
+  "cy": 413,
+  "r": 171
+ },
+ "legacy-energy": {
+  "cx": 240,
+  "cy": 314,
+  "r": 146
+ },
+ "lucky-energy": {
+  "cx": 300,
+  "cy": 324,
+  "r": 130
+ },
+ "luminous-energy": {
+  "cx": 298,
+  "cy": 376,
+  "r": 132
+ },
+ "magma-energy": {
+  "cx": 215,
+  "cy": 417,
+  "r": 110,
+  "orb2": {
+   "cx": 379,
+   "cy": 419,
+   "r": 108
+  }
+ },
+ "magnetic-m-energy": {
+  "cx": 298,
+  "cy": 320,
+  "r": 176
+ },
+ "medical-energy": {
+  "cx": 300,
+  "cy": 330,
+  "r": 128
+ },
+ "memory-energy": {
+  "cx": 300,
+  "cy": 320,
+  "r": 128
+ },
+ "metal-energy": {
+  "cx": 302,
+  "cy": 348,
+  "r": 158
+ },
+ "miracle-energy": {
+  "cx": 347,
+  "cy": 422,
+  "r": 97,
+  "orb2": {
+   "cx": 251,
+   "cy": 310,
+   "r": 76
+  }
+ },
+ "mist-energy": {
+  "cx": 300,
+  "cy": 330,
+  "r": 130
+ },
+ "multi-energy": {
+  "cx": 317,
+  "cy": 412,
+  "r": 95
+ },
+ "mystery-energy": {
+  "cx": 300,
+  "cy": 314,
+  "r": 182
+ },
+ "neo-upper-energy": {
+  "cx": 206,
+  "cy": 268,
+  "r": 140,
+  "orb2": {
+   "cx": 442,
+   "cy": 400,
+   "r": 98
+  }
+ },
+ "nitro-r-energy": {
+  "cx": 300,
+  "cy": 318,
+  "r": 174
+ },
+ "plasma-energy": {
+  "cx": 298,
+  "cy": 314,
+  "r": 136
+ },
+ "potion-energy": {
+  "cx": 197,
+  "cy": 445,
+  "r": 109,
+  "box": [
+   28,
+   60,
+   572,
+   610
+  ]
+ },
+ "powerful-c-energy": {
+  "cx": 296,
+  "cy": 318,
+  "r": 182
+ },
+ "prism-energy": {
+  "cx": 298,
+  "cy": 334,
+  "r": 138
+ },
+ "r-energy": {
+  "cx": 290,
+  "cy": 350,
+  "r": 118
+ },
+ "rainbow-energy": {
+  "cx": 300,
+  "cy": 400,
+  "r": 72
+ },
+ "rapid-strike-energy": {
+  "cx": 230,
+  "cy": 400,
+  "r": 155,
+  "orb2": {
+   "cx": 443,
+   "cy": 318,
+   "r": 88
+  }
+ },
+ "react-energy": {
+  "cx": 294,
+  "cy": 334,
+  "r": 100
+ },
+ "recover-energy": {
+  "cx": 298,
+  "cy": 322,
+  "r": 122
+ },
+ "recycle-energy": {
+  "cx": 300,
+  "cy": 426,
+  "r": 102
+ },
+ "regenerative-energy": {
+  "cx": 300,
+  "cy": 334,
+  "r": 136
+ },
+ "rescue-energy": {
+  "cx": 302,
+  "cy": 353,
+  "r": 161
+ },
+ "retro-energy": {
+  "cx": 327,
+  "cy": 319,
+  "r": 122
+ },
+ "reversal-energy": {
+  "cx": 362,
+  "cy": 284,
+  "r": 92
+ },
+ "rocky-f-energy": {
+  "cx": 300,
+  "cy": 318,
+  "r": 176
+ },
+ "scramble-energy": {
+  "cx": 302,
+  "cy": 360,
+  "r": 100
+ },
+ "shadowy-d-energy": {
+  "cx": 299,
+  "cy": 319,
+  "r": 174
+ },
+ "shield-energy": {
+  "cx": 298,
+  "cy": 310,
+  "r": 180
+ },
+ "single-strike-energy": {
+  "cx": 300,
+  "cy": 380,
+  "r": 172
+ },
+ "sp-energy": {
+  "cx": 300,
+  "cy": 338,
+  "r": 124
+ },
+ "speed-l-energy": {
+  "cx": 298,
+  "cy": 320,
+  "r": 182
+ },
+ "spiky-energy": {
+  "cx": 278,
+  "cy": 358,
+  "r": 144
+ },
+ "spiral-energy": {
+  "cx": 300,
+  "cy": 326,
+  "r": 132
+ },
+ "splash-energy": {
+  "cx": 298,
+  "cy": 306,
+  "r": 181
+ },
+ "stone-f-energy": {
+  "cx": 296,
+  "cy": 318,
+  "r": 182
+ },
+ "strong-energy": {
+  "cx": 300,
+  "cy": 312,
+  "r": 182
+ },
+ "super-boost-energy-prism-star": {
+  "cx": 205,
+  "cy": 320,
+  "r": 100
+ },
+ "team-rocket-s-energy": {
+  "cx": 380,
+  "cy": 391,
+  "r": 123,
+  "orb2": {
+   "cx": 467,
+   "cy": 213,
+   "r": 90
+  }
+ },
+ "telepathic-p-energy": {
+  "cx": 300,
+  "cy": 318,
+  "r": 176
+ },
+ "therapeutic-energy": {
+  "cx": 294,
+  "cy": 322,
+  "r": 126
+ },
+ "treasure-energy": {
+  "cx": 298,
+  "cy": 326,
+  "r": 130
+ },
+ "triple-acceleration-energy": {
+  "cx": 406,
+  "cy": 278,
+  "r": 96
+ },
+ "twin-energy": {
+  "cx": 374,
+  "cy": 404,
+  "r": 162,
+  "orb2": {
+   "cx": 147,
+   "cy": 510,
+   "r": 84
+  }
+ },
+ "unit-energy-f-d-y": {
+  "cx": 293,
+  "cy": 407,
+  "r": 141
+ },
+ "unit-energy-g-r-w": {
+  "cx": 318,
+  "cy": 374,
+  "r": 105
+ },
+ "unit-energy-l-p-m": {
+  "cx": 328,
+  "cy": 420,
+  "r": 113
+ },
+ "upper-energy": {
+  "cx": 297,
+  "cy": 349,
+  "r": 123
+ },
+ "v-guard-energy": {
+  "cx": 347,
+  "cy": 398,
+  "r": 97
+ },
+ "voltaic-l-energy": {
+  "cx": 300,
+  "cy": 318,
+  "r": 174
+ },
+ "warp-energy": {
+  "cx": 300,
+  "cy": 396,
+  "r": 172
+ },
+ "wash-w-energy": {
+  "cx": 317,
+  "cy": 317,
+  "r": 195
+ },
+ "weakness-guard-energy": {
+  "cx": 298,
+  "cy": 384,
+  "r": 132
+ },
+ "wonder-energy": {
+  "cx": 300,
+  "cy": 310,
+  "r": 180
+ }
+}

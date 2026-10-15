@@ -27,9 +27,16 @@ import {
 import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
 import { resetImage } from '../image-logic/reset-image.js';
 import {
+  ENERGY_TOKEN_DOUBLE_CLASS,
   getEnergyTokenFront,
+  isDoubleEnergyToken,
   isEnergyCard,
 } from '../../actions/move-card-bundle/energy-token-assets.mjs';
+import {
+  ENERGY_TOKEN_BOTTOM,
+  planEnergyTokenRow,
+  renderEnergyCountBadges,
+} from '../../actions/move-card-bundle/energy-token-row.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { isPokemon } from '../../../../shared/engine/cards.mjs';
 import { createViewBoardButton } from '../image-logic/view-board-toggle.mjs';
@@ -124,10 +131,6 @@ const HOLO_ZONES = [
   'bench',
 ];
 
-// Legacy attach-card.js token geometry, as fractions of the parent card.
-const ENERGY_TOKEN_SIZE = 0.24;
-const ENERGY_TOKEN_SPACING = 1.15;
-const ENERGY_TOKEN_BOTTOM = 0.03;
 // Legacy attach-card.js / evolve-card.js offsets, as fractions of the visible card's width.
 const ATTACHED_CARD_SHIFT = 1 / 6;
 const UNDER_POKEMON_SHIFT = 1 / 15;
@@ -1140,7 +1143,7 @@ function clearStackStyle(img) {
   if (!img.dataset?.stackStyled || !img.style) return;
   delete img.dataset.stackStyled;
   delete img.dataset.energyCardSrc;
-  img.classList.remove('energy-token-3d');
+  img.classList.remove('energy-token-3d', ENERGY_TOKEN_DOUBLE_CLASS);
   for (const key of STACK_STYLE_KEYS) img.style[key] = '';
 }
 
@@ -1154,28 +1157,43 @@ function setStackStyle(img, styles) {
 /**
  * Draws an attached Energy as the same small round type token legacy
  * attach-card.js uses: full card art stashed in `data-energy-card-src` (the
- * double-click carousel shows it), a row along the visible card's bottom
- * edge, layered above its face.
- *
- * @returns {boolean} whether a token was drawn
+ * double-click carousel shows it), layered above the visible card's face at
+ * the spot its row plan gives it.
  */
-function applyEnergyToken(img, cardData, cardWidth, cardHeight, layer) {
-  const tokenSrc = getEnergyTokenFront(cardData);
-  if (!tokenSrc || !img.dataset || !img.style) return false;
-  const tokenSize = cardWidth * ENERGY_TOKEN_SIZE;
+function applyEnergyToken(img, { tokenSrc, double }, tokenSize, slot, bottom) {
   const cardArt = img.getAttribute('src');
   setStackStyle(img, {
     width: `${tokenSize}px`,
     height: `${tokenSize}px`,
-    left: `${(layer - 1) * tokenSize * ENERGY_TOKEN_SPACING}px`,
-    bottom: `${cardHeight * ENERGY_TOKEN_BOTTOM}px`,
-    zIndex: String(100 + layer),
+    left: `${slot.left}px`,
+    bottom: `${bottom}px`,
+    zIndex: String(slot.zIndex),
   });
   img.dataset.energyCardSrc = cardArt;
   img.setAttribute('src', tokenSrc);
   img.classList.add('energy-token-3d');
-  img.energyLayer = layer;
-  return true;
+  if (double) img.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
+  img.energyLayer = slot.zIndex - 100;
+}
+
+/**
+ * The token row along the visible card's bottom edge (energy-token-row.mjs):
+ * side by side up to four, past that one token per type with an "Nx" badge.
+ *
+ * @param {object} rootRecord owns the badges
+ * @param {{ img: object, tokenSrc: string, double: boolean }[]} tokens in attach order
+ */
+function layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight) {
+  const plan = planEnergyTokenRow(
+    tokens.map((token) => token.tokenSrc),
+    cardWidth
+  );
+  const bottom = cardHeight * ENERGY_TOKEN_BOTTOM;
+  tokens.forEach((token, i) =>
+    applyEnergyToken(token.img, token, plan.tokenSize, plan.tokens[i], bottom)
+  );
+  const parent = rootRecord.container || tokens[0]?.img.parentNode || null;
+  renderEnergyCountBadges(rootRecord, parent, plan.badges, bottom);
 }
 
 /**
@@ -1218,16 +1236,14 @@ function layoutCardStack(rootRecord, attached) {
     });
   });
 
-  let tokenLayer = 0;
+  const tokens = [];
   let shiftLayer = 0;
   for (const { cardData, record } of attached) {
     if (record === displayRecord || isPokemon(cardData)) continue;
     const img = record.element;
-    if (
-      isEnergyCard(cardData) &&
-      applyEnergyToken(img, cardData, cardWidth, cardHeight, tokenLayer + 1)
-    ) {
-      tokenLayer += 1;
+    const tokenSrc = isEnergyCard(cardData) ? getEnergyTokenFront(cardData) : null;
+    if (tokenSrc && img.dataset && img.style) {
+      tokens.push({ img, tokenSrc, double: isDoubleEnergyToken(cardData) });
       continue;
     }
     shiftLayer += 1;
@@ -1236,6 +1252,7 @@ function layoutCardStack(rootRecord, attached) {
       zIndex: String(-shiftLayer),
     });
   }
+  layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight);
   if (rootRecord.container?.style) {
     rootRecord.container.style.width =
       shiftLayer > 0 && cardWidth
@@ -1560,7 +1577,7 @@ function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
  * @param {string|null} localPlayerId
  * @param {object} options
  */
-function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
+function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, chooserName = null) {
   const doc =
     options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
@@ -1601,7 +1618,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
       banner.className = 'choice-waiting-banner';
       doc.body?.appendChild(banner);
     }
-    banner.textContent = `Opponent is making a choice: ${pendingChoice.prompt || '...'}`;
+    banner.textContent = `${chooserName || 'Opponent'} is making a choice: ${pendingChoice.prompt || '...'}`;
     return;
   }
 
@@ -1921,9 +1938,10 @@ function closeChoicePicker(options = {}) {
 export function reconcileTurnState(view, options = {}) {
   const turn = view?.turn;
   if (!turn) return { applied: false, reason: 'no_turn' };
-  // A spectator's view reports isYourTurn:false for both players (view.mjs), so there is
-  // no honest self/opp mapping to make — leave a spectator's local state untouched.
-  if (view.isSpectator || !view.you?.playerId) {
+  // A raw spectator view has no `you` seat, so there is no honest self/opp mapping to make —
+  // leave local state untouched. A spectator perspective (design 069) seats one player as
+  // `you`, and its turn display follows that seat like a player's would.
+  if (!view.you?.playerId) {
     return { applied: false, reason: 'spectator' };
   }
 
@@ -2042,7 +2060,8 @@ export function reconcileGameEnded(view, options = {}) {
   if (gameEndAnnounced) return;
   gameEndAnnounced = true;
 
-  const localPlayerId = view.you?.playerId || null;
+  // A spectator neither wins nor loses, whichever seat it watches from (design 069).
+  const localPlayerId = view.isSpectator ? null : view.you?.playerId || null;
   const isWinner = Boolean(
     view.winner && localPlayerId && view.winner === localPlayerId
   );
@@ -2056,8 +2075,7 @@ export function reconcileGameEnded(view, options = {}) {
   } else if (isLoser) {
     titleText = 'Defeat';
   } else if (view.winner) {
-    const oppName = view.them?.username || view.winner;
-    titleText = `${oppName} Wins!`;
+    titleText = `${usernameOf(view, view.winner) || view.winner} Wins!`;
   }
 
   const reasonText = view.winReason
@@ -2135,6 +2153,53 @@ export function reconcileGameEnded(view, options = {}) {
       title: titleText,
     });
   }
+}
+
+/** Username of `playerId` in whichever seat of the view holds it, or null. */
+function usernameOf(view, playerId) {
+  if (playerId == null) return null;
+  const seat = [view?.you, view?.them].find((p) => p?.playerId === playerId);
+  return seat?.username || null;
+}
+
+/** Removes one rendered card, its overlays and its holo wrapper from the DOM and the registry. */
+function removeCardRecord(id, record, options = {}) {
+  // Counter overlays are siblings of the image in the zone element, not children of
+  // it or its play-container — removing the image/container leaves them orphaned.
+  if (record.element?.damageCounter?.parentNode) {
+    record.element.damageCounter.parentNode.removeChild(record.element.damageCounter);
+  }
+  for (const slot of [...Object.values(CONDITION_MARKER_SLOTS), STATUS_LOOP_SLOT]) {
+    if (record.element?.[slot]?.parentNode) {
+      record.element[slot].parentNode.removeChild(record.element[slot]);
+    }
+  }
+  if (record.element?.abilityCounter?.parentNode) {
+    record.element.abilityCounter.parentNode.removeChild(record.element.abilityCounter);
+  }
+  unhydrateCard(record, options);
+  if (record.container && record.container.parentNode) {
+    record.container.parentNode.removeChild(record.container);
+  } else if (record.element && record.element.parentNode) {
+    record.element.parentNode.removeChild(record.element);
+  }
+  cardRegistry.delete(id);
+}
+
+/**
+ * Design 069: takes every rendered card off the board and forgets the last applied view, so
+ * the next `applyView` — even of the same stateVersion — draws the board from scratch. A
+ * spectator switching perspective needs this: every card changes board (`you` <-> `them`).
+ * The injected renderer context (socket, zone resolvers, listeners) is kept.
+ *
+ * @param {object} [options={}] Renderer options (test seams: `document`, `holo`)
+ */
+export function clearRenderedBoard(options = {}) {
+  for (const [id, record] of [...cardRegistry.entries()]) {
+    removeCardRecord(id, record, options);
+  }
+  lastRenderedVersion = -1;
+  lastAppliedView = null;
 }
 
 /**
@@ -2332,32 +2397,7 @@ export function applyView(view, events = [], options = {}) {
   }
 
   for (const [id, record] of cardRegistry.entries()) {
-    if (!liveInstanceIds.has(id)) {
-      // Counter overlays are siblings of the image in the zone element, not children of
-      // it or its play-container — removing the image/container leaves them orphaned.
-      if (record.element?.damageCounter?.parentNode) {
-        record.element.damageCounter.parentNode.removeChild(
-          record.element.damageCounter
-        );
-      }
-      for (const slot of [...Object.values(CONDITION_MARKER_SLOTS), STATUS_LOOP_SLOT]) {
-        if (record.element?.[slot]?.parentNode) {
-          record.element[slot].parentNode.removeChild(record.element[slot]);
-        }
-      }
-      if (record.element?.abilityCounter?.parentNode) {
-        record.element.abilityCounter.parentNode.removeChild(
-          record.element.abilityCounter
-        );
-      }
-      unhydrateCard(record, options);
-      if (record.container && record.container.parentNode) {
-        record.container.parentNode.removeChild(record.container);
-      } else if (record.element && record.element.parentNode) {
-        record.element.parentNode.removeChild(record.element);
-      }
-      cardRegistry.delete(id);
-    }
+    if (!liveInstanceIds.has(id)) removeCardRecord(id, record, options);
   }
 
   const reconcileHand =
@@ -2369,8 +2409,14 @@ export function applyView(view, events = [], options = {}) {
   // Reconcile neutral Stadium
   reconcileStadium(view.stadium || null, localPlayerId, options);
 
-  // Reconcile PendingChoice modal / banner
-  reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
+  // Reconcile PendingChoice modal / banner. A spectator owns no choice, whichever seat it
+  // watches from: it only ever gets the waiting banner, naming who is choosing.
+  if (view.isSpectator) {
+    const chooser = view.pendingChoice ? usernameOf(view, view.pendingChoice.player) : null;
+    reconcilePendingChoice(view.pendingChoice || null, null, options, chooser);
+  } else {
+    reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
+  }
 
   // Sync local turn state — the server is the only turn authority under the flag
   reconcileTurnState(view, options);

@@ -380,6 +380,34 @@ const DRAWER_FAMILY = Object.freeze({
 });
 
 /**
+ * Design 069: the drawers that carry a move down its lane (attacker -> defender). An attack that
+ * damages several Pokémon replays these, and only these, on a lane to each extra target.
+ */
+export const TRAVEL_DRAWERS = Object.freeze(['projectile', 'beam', 'volley', 'bolt']);
+
+const travelMemo = new WeakMap();
+
+/**
+ * The beats of `spec` that travel to the defender before contact. A body that flies from the
+ * defender back to the attacker (a drain) is not one: it leaves the main target, not the others.
+ */
+export function travelBeats(spec) {
+  if (!spec || !Array.isArray(spec.beats)) return Object.freeze([]);
+  if (!travelMemo.has(spec)) {
+    travelMemo.set(
+      spec,
+      Object.freeze(
+        spec.beats.filter(
+          (beat) =>
+            TRAVEL_DRAWERS.includes(beat.drawer) && beat.at < spec.contactMs && beat.params?.from !== 'defender'
+        )
+      )
+    );
+  }
+  return travelMemo.get(spec);
+}
+
+/**
  * The sound/hit family a spec must declare (design § Pinned contracts C): the mapped
  * drawer of the latest-starting front beat active at contact, then type overrides; a spec
  * with no such beat is charge-only.

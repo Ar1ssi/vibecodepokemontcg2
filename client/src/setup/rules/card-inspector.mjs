@@ -61,6 +61,7 @@ import {
   closeCarouselViewer,
 } from '../image-logic/card-picker.js';
 import { orderAttachedForCarousel } from '../image-logic/carousel-order.mjs';
+import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 
 // Events that can change what the inspector reports while it is open. Owned here because this
 // module outlives attack-preview.js — slice 3 deletes that file and its copy of this list.
@@ -854,6 +855,7 @@ export function openCardInspector({
   onRetreat = null,
   onUse = null,
 } = {}) {
+  suppressHoverPreview('modal');
   if (!card?.image) return false;
 
   // Carousel slide N sits to the right of slide N+1, so the attached cards go BEFORE the main
