@@ -20,8 +20,8 @@ worse: the move flies at the opponent's Active, which takes no damage, while the
 ## Acceptance
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
-| A1 | "for atacks that damage multiple pokemon … the attack animation also hits those pokemon" — each damaged Pokémon gets the move's travel, its hit and a reaction | |
-| A2 | Bench-only attacks hit the Bench, not the undamaged Active | |
+| A1 | "for atacks that damage multiple pokemon … the attack animation also hits those pokemon" — each damaged Pokémon gets the move's travel, its hit and a reaction | ✓ `rec-attack-hit SPREAD=3`: `branch canvas 1 · recoiled [204,203,202]`, numbers at +50/+67/+149/+233 ms (live queue order); tests `attackHitIds …`, `layoutHits …`, `travelBeats …`; engine-fed: Kyurem ex BLK 165 → `[20, 21, 22]`, Mewtwo ex 30C 157 → `[20, 22]`. Look: user check on localhost |
+| A2 | Bench-only attacks hit the Bench, not the undamaged Active | ✓ test "layoutHits: an undamaged defender is never primary…"; engine-fed Buzzwole-GX 30C 57 Jet Punch resume batch → `[22]` |
 | A3 | "have a hostile review done" | |
 | A4 | "then fix the issues it finds" | |
 
@@ -176,22 +176,22 @@ with the scene's backstop (`removeWhen`), recoil animations are fire-and-forget 
 ## Edge cases & failure modes
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | `plan.hits` absent / empty (older batch shape, zero-damage attack) | exactly today's behavior | [ ] |
-| 2 | a hit id with no rect (left the board, snapshot missing) | dropped from layout; its damage job still runs as today | [ ] |
-| 3 | one target only | no secondaries, no branch canvas, no delay — today's scene | [ ] |
-| 4 | Active hit + 5 Bench (spread) | Active primary; 5 lanes, delays 80…400 | [ ] |
-| 5 | > 5 secondaries (Sky Field Bench, both sides) | first 5 get lanes; the rest prefab + recoil only; delays capped at 400 | [ ] |
-| 6 | Active took 0, Bench hit (snipe / Bench spread) | the most-damaged Bench card is primary; the move flies there, not to the Active | [ ] |
-| 7 | chosen-target attack resumed after a pick (no `defenderId`) | resume batch's hits drive the layout; the pre-choice batch (no `attackExecuted` in its segment) plays bare as today | [ ] |
-| 8 | attacker damages itself (recoil) | excluded from `hits`; number at contact as today | [ ] |
-| 9 | attacker's own Bench damaged | secondaries like any other; lane is short | [ ] |
-| 10 | a heal in the segment | `peekHit` kind `heal` → not a target; its heal number plays as today | [ ] |
-| 11 | a Bench target is KO'd | its KO ghost starts at its own hit delay, not at contact | [ ] |
-| 12 | spec with no travel beats (quake, burst, roar…) or a lunge | no branch canvas; secondaries get prefab + recoil on the ripple | [ ] |
-| 13 | 068 prefab not loaded yet | secondaries fall back to `strikeTarget` as today, on the ripple | [ ] |
-| 14 | reduced motion / fx-off | unchanged (attack and damage scenes skipped / nothing) | [ ] |
-| 15 | two attacks in one batch (extra-attack Abilities) | each `attackExecuted` gets only its own segment's ids | [ ] |
-| 16 | a damage job throws | the error stays inside that job; others keep their delays (jobs are independent timers) | [ ] |
+| 1 | `plan.hits` absent / empty (older batch shape, zero-damage attack) | exactly today's behavior | [x] |
+| 2 | a hit id with no rect (left the board, snapshot missing) | dropped from layout; its damage job still runs as today | [x] |
+| 3 | one target only | no secondaries, no branch canvas, no delay — today's scene | [x] |
+| 4 | Active hit + 5 Bench (spread) | Active primary; 5 lanes, delays 80…400 | [x] |
+| 5 | > 5 secondaries (Sky Field Bench, both sides) | first 5 get lanes; the rest prefab + recoil only; delays capped at 400 | [x] |
+| 6 | Active took 0, Bench hit (snipe / Bench spread) | the most-damaged Bench card is primary; the move flies there, not to the Active | [x] |
+| 7 | chosen-target attack resumed after a pick (no `defenderId`) | resume batch's hits drive the layout; the pre-choice batch (no `attackExecuted` in its segment) plays bare as today | [x] |
+| 8 | attacker damages itself (recoil) | excluded from `hits`; number at contact as today | [x] |
+| 9 | attacker's own Bench damaged | secondaries like any other; lane is short | [x] |
+| 10 | a heal in the segment | `peekHit` kind `heal` → not a target; its heal number plays as today | [x] |
+| 11 | a Bench target is KO'd | its KO ghost starts at its own hit delay, not at contact | [x] |
+| 12 | spec with no travel beats (quake, burst, roar…) or a lunge | no branch canvas; secondaries get prefab + recoil on the ripple | [x] |
+| 13 | 068 prefab not loaded yet | secondaries fall back to `strikeTarget` as today, on the ripple | [x] |
+| 14 | reduced motion / fx-off | unchanged (attack and damage scenes skipped / nothing) | [x] |
+| 15 | two attacks in one batch (extra-attack Abilities) | each `attackExecuted` gets only its own segment's ids | [x] |
+| 16 | a damage job throws | the error stays inside that job; others keep their delays (jobs are independent timers) | [x] |
 
 ## Test plan
 - Unit (node --test): `attackHitIds` (rows 1, 8, 15), `layoutHits` (3–6), `peekHit` does not move the
@@ -225,3 +225,27 @@ n/a: client cosmetic. Revert = revert the slice commits; no data or protocol tou
 - T4 Target rings on the banner: default ring every hit card.
 
 ## Deviations (Builder appends here during build)
+- D1 (structural, slice 4). The FX queue holds an attack until its contact, so its damage plans
+  run after the impact queue's flush has already dropped the strike context (`createImpactQueue`
+  resets it on an empty flush). Live, every hit got `ctx = null`: design 068's prefab and the
+  move-family dressing never played outside `rec-attack-hit` (which calls attack and damage in the
+  same tick). Reproduced with the real queue in node (job added 40 ms after contact → `ctx: null`).
+  Fix: `attackStrikes(events)` tags an attack's plans and its segment's damage / knockout plans
+  with the `attackExecuted` event (`plan.strike`); `combat.js` keeps each strike's context and
+  contact time in a WeakMap; `afterHit(plan, job)` runs a hit at `contactAt + delay` with that
+  context (`hitWaitMs`). `afterImpact` had no callers left and was removed.
+- D2 (slice 5 finding). With the primary's 180 ms damage hold, the ripple hits were dispatched after
+  their own times and landed together. Every damage plan of a multi-target attack now returns hold 0
+  (it lands on the attack's clock). Measured after: numbers at contact +50 / +67 / +149 / +233 ms,
+  nearest Bench card first.
+- D3 (cosmetic). `hitRecoilPose` eases back with `easeInOutCubic` (the file's existing easing), not
+  `easeInOutQuad`.
+- D4. Slice 4's strike context also carries `attackerRect`; a ripple hit's sparks and slash take the
+  attacker → card angle (`hitContextFor`), not the main lane's.
+- D5 (perf). The 063 absolute probe (median ≤ 17 ms, p95 ≤ 140 ms) is not met in this container even
+  by `main` on the same scene (main: median 50 / p95 150–333; this branch: median 17–50 / p95
+  200–400, SPREAD=3, two runs each). No regression shown beyond the noise; `MAX_BRANCH_LANES` stays 5.
+  The user's GPU browser is the real check.
+- D6 (environment). The 068 prefab does not show under this container's SwiftShader on `main` either
+  (`rec-attack-hit BENCH=1` on an origin/main worktree: `stageShown: false`), so the prefab half of
+  the hits is checked by tests and the user's localhost pass, not by the recording here.

@@ -7,4 +7,4 @@
 
 # oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 6/6 done · branch ready, not landed · landing checklist in design 068 § For the landing commit
 
-# oneshot 069-multi-target-attack-hits · branch claude/great-wozniak-hwz8xu · slice 4/5
+# oneshot 069-multi-target-attack-hits · branch claude/great-wozniak-hwz8xu · slice 5/5 · review pending

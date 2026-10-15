@@ -347,8 +347,9 @@ export const damage = (plan) => {
   const rect = combatRect(plan.instanceId, registry);
   if (!rect) return 0;
   const target = impactTargetFor(plan.instanceId, rect, hit, registry);
-  // Design 069: a ripple hit lands on its attack's clock, so it holds nothing in the FX queue.
-  const ripple = hitDelayFor(strikeOf(plan)?.ctx, plan.instanceId) > 0;
+  // Design 069: every hit of a multi-target attack lands on that attack's clock, so none holds
+  // the FX queue — a held primary would dispatch the ripple hits after their own times.
+  const ripple = Object.keys(strikeOf(plan)?.ctx?.hitDelays ?? {}).length > 0;
   afterHit(plan, (strikeCtx) => {
     const secondary = hitDelayFor(strikeCtx, plan.instanceId) > 0;
     const ctx = secondary ? hitContextFor(strikeCtx, rect) : strikeCtx;
