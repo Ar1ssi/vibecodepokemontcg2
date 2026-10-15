@@ -27,3 +27,6 @@ out/playtest/
 *.bak-*
 out/*.webm
 
+# Custom playmat PNG originals: the catalog serves the WebP thumbs/ and board/ renders (design 073 A)
+client/src/assets/playmats/custom/*.png
+
