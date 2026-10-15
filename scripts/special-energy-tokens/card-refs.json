@@ -4,720 +4,943 @@
   "slug": "voltaic-l-energy",
   "tcgdexName": "Voltaic Lightning Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {L} Energy. Attacks used by the {L} Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
-  "set": "Pitch Black"
+  "set": "Pitch Black",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Shadowy {D} Energy": {
   "id": "me05-083",
   "slug": "shadowy-d-energy",
   "tcgdexName": "Shadowy Darkness Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {D} Energy. As long as the {D} Pokémon this card is attached to is on your Bench, prevent all damage done to it by attacks from your opponent’s Pokémon.",
-  "set": "Pitch Black"
+  "set": "Pitch Black",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Nitro {R} Energy": {
   "id": "me04-086",
   "slug": "nitro-r-energy",
   "tcgdexName": "Nitro Fire Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {R} Energy. If this card is discarded by an effect of an attack used by the {R} Pokémon this card is attached to, put this card into your hand after attack damage and effects.",
-  "set": "Chaos Rising"
+  "set": "Chaos Rising",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Magnetic {M} Energy": {
   "id": "me04-085",
   "slug": "magnetic-m-energy",
   "tcgdexName": "Magnetic Metal Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {M} Energy. The {M} Pokémon this card is attached to has no Retreat Cost.",
-  "set": "Chaos Rising"
+  "set": "Chaos Rising",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Bubbly {W} Energy": {
   "id": "me04-084",
   "slug": "bubbly-w-energy",
   "tcgdexName": "Bubbly Water Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {W} Energy. The {W} Pokémon this card is attached to recovers from all Special Conditions and can’t be affected by any Special Conditions.",
-  "set": "Chaos Rising"
+  "set": "Chaos Rising",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Telepathic {P} Energy": {
   "id": "me03-088",
   "slug": "telepathic-p-energy",
   "tcgdexName": "Telepathic Psychic Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {P} Energy. When you attach this card from your hand to a {P} Pokémon, search your deck for up to 2 Basic {P} Pokémon and put them onto your Bench. Then, shuffle your deck.",
-  "set": "Perfect Order"
+  "set": "Perfect Order",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Rocky {F} Energy": {
   "id": "me03-087",
   "slug": "rocky-f-energy",
   "tcgdexName": "Rocky Fighting Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {F} Energy. Prevent all effects of attacks used by your opponent’s Pokémon done to the {F} Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)",
-  "set": "Perfect Order"
+  "set": "Perfect Order",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Growing {G} Energy": {
   "id": "me03-086",
   "slug": "growing-g-energy",
   "tcgdexName": "Growing Grass Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {G} Energy. The {G} Pokémon this card is attached to gets +20 HP.",
-  "set": "Perfect Order"
+  "set": "Perfect Order",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Team Rocket’s Energy": {
   "id": "me02.5-217",
   "slug": "team-rocket-s-energy",
   "tcgdexName": "Team Rocket's Energy",
   "text": "This card can only be attached to a Team Rocket’s Pokémon. If this card is attached to anything other than a Team Rocket’s Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides 2 in any combination of {P} Energy and {D} Energy.",
-  "set": "Ascended Heroes"
+  "set": "Ascended Heroes",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Prism Energy": {
   "id": "me02.5-216",
   "slug": "prism-energy",
   "tcgdexName": "Prism Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to a Basic Pokémon, this card provides every type of Energy but provides only 1 Energy at a time.",
-  "set": "Ascended Heroes"
+  "set": "Ascended Heroes",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Ignition Energy": {
   "id": "me02-124",
   "slug": "ignition-energy",
   "tcgdexName": "Ignition Energy",
   "text": "If this card is attached to 1 of your Pokémon, discard it at the end of your turn. As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to an Evolution Pokémon, it provides {C}{C}{C} Energy instead.",
-  "set": "Phantasmal Flames"
+  "set": "Phantasmal Flames",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Spiky Energy": {
   "id": "sv09-190",
   "slug": "spiky-energy",
   "tcgdexName": "Spiky Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if this Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
-  "set": "Journey Together"
+  "set": "Journey Together",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Jet Energy": {
   "id": "sv08-252",
   "slug": "jet-energy",
   "tcgdexName": "Jet Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to 1 of your Benched Pokémon, switch that Pokémon with your Active Pokémon.",
-  "set": "Surging Sparks"
+  "set": "Surging Sparks",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Enriching Energy": {
   "id": "sv08-191",
   "slug": "enriching-energy",
   "tcgdexName": "Enriching Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to a Pokémon, draw 4 cards.",
-  "set": "Surging Sparks"
+  "set": "Surging Sparks",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Luminous Energy": {
   "id": "sv06-226",
   "slug": "luminous-energy",
   "tcgdexName": "Luminous Energy",
   "text": "As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to has any other Special Energy attached, this card provides {C} Energy instead.",
-  "set": "Twilight Masquerade"
+  "set": "Twilight Masquerade",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Legacy Energy": {
   "id": "sv06-167",
   "slug": "legacy-energy",
   "tcgdexName": "Legacy Energy",
   "text": "As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, that player takes 1 fewer Prize card. This effect of your Legacy Energy can’t be applied more than once per game.",
-  "set": "Twilight Masquerade"
+  "set": "Twilight Masquerade",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Boomerang Energy": {
   "id": "sv06-166",
   "slug": "boomerang-energy",
   "tcgdexName": "Boomerang Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is discarded by an effect of an attack used by the Pokémon this card is attached to, attach this card from your discard pile to that Pokémon after attacking.",
-  "set": "Twilight Masquerade"
+  "set": "Twilight Masquerade",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Neo Upper Energy": {
   "id": "sv05-162",
   "slug": "neo-upper-energy",
   "tcgdexName": "Neo Upper Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If this card is attached to a Stage 2 Pokémon, this card provides every type of Energy but provides only 2 Energy at a time.",
-  "set": "Temporal Forces"
+  "set": "Temporal Forces",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Mist Energy": {
   "id": "sv05-161",
   "slug": "mist-energy",
   "tcgdexName": "Mist Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. Prevent all effects of attacks used by your opponent’s Pokémon done to the Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)",
-  "set": "Temporal Forces"
+  "set": "Temporal Forces",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Double Colorless Energy": {
   "id": "sm2-166",
   "slug": "double-colorless-energy",
   "tcgdexName": "Double Colorless Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C}{C} Energy. (This card cannot be used at official tournaments.)",
-  "set": "Pokémon Trading Card Game Classic—Blastoise"
+  "set": "Pokémon Trading Card Game Classic—Blastoise",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Reversal Energy": {
   "id": "sv04-266",
   "slug": "reversal-energy",
   "tcgdexName": "Reversal Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to an Evolution Pokémon that doesn’t have a Rule Box (Pokémon ex, Pokémon V, etc. have Rule Boxes), this card provides every type of Energy but provides only 3 Energy at a time.",
-  "set": "Paradox Rift"
+  "set": "Paradox Rift",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Medical Energy": {
   "id": "sv04-182",
   "slug": "medical-energy",
   "tcgdexName": "Medical Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, heal 30 damage from that Pokémon.",
-  "set": "Paradox Rift"
+  "set": "Paradox Rift",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Therapeutic Energy": {
   "id": "sv02-193",
   "slug": "therapeutic-energy",
   "tcgdexName": "Therapeutic Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. The Pokémon this card is attached to recovers from being Asleep, Confused, or Paralyzed and can’t be affected by those Special Conditions.",
-  "set": "Paldea Evolved"
+  "set": "Paldea Evolved",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "V Guard Energy": {
   "id": "swsh12-215",
   "slug": "v-guard-energy",
   "tcgdexName": "V Guard Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. The Pokémon this card is attached to takes 30 less damage from attacks from your opponent’s Pokémon V (after applying Weakness and Resistance). This effect can’t be applied more than once at a time to the same Pokémon.",
-  "set": "Silver Tempest"
+  "set": "Silver Tempest",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Regenerative Energy": {
   "id": "swsh12-168",
   "slug": "regenerative-energy",
   "tcgdexName": "Regenerative Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. Whenever you play a Pokémon from your hand to evolve the Pokémon V this card is attached to, heal 100 damage from that Pokémon.",
-  "set": "Silver Tempest"
+  "set": "Silver Tempest",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Gift Energy": {
   "id": "swsh11-171",
   "slug": "gift-energy",
   "tcgdexName": "Gift Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack from your opponent’s Pokémon, draw cards until you have 7 cards in your hand.",
-  "set": "Lost Origin"
+  "set": "Lost Origin",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Double Turbo Energy": {
   "id": "swsh10-216",
   "slug": "double-turbo-energy",
   "tcgdexName": "Double Turbo Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C}{C} Energy. The attacks of the Pokémon this card is attached to do 20 less damage to your opponent’s Pokémon (before applying Weakness and Resistance).",
-  "set": "Astral Radiance"
+  "set": "Astral Radiance",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Fusion Strike Energy": {
   "id": "swsh8-244",
   "slug": "fusion-strike-energy",
   "tcgdexName": "Fusion Strike Energy",
   "text": "This card can only be attached to a Fusion Strike Pokémon. If this card is attached to anything other than a Fusion Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. Prevent all effects of your opponent’s Pokémon’s Abilities done to the Pokémon this card is attached to.",
-  "set": "Fusion Strike"
+  "set": "Fusion Strike",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Treasure Energy": {
   "id": "swsh7-165",
   "slug": "treasure-energy",
   "tcgdexName": "Treasure Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If you took this card as a face-down Prize card during your turn, before you put it into your hand, you may attach this card to 1 of your Pokémon.",
-  "set": "Evolving Skies"
+  "set": "Evolving Skies",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Spiral Energy": {
   "id": "swsh6-159",
   "slug": "spiral-energy",
   "tcgdexName": "Spiral Energy",
   "text": "This card can only be attached to a Rapid Strike Pokémon. If this card is attached to anything other than a Rapid Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. The Pokémon this card is attached to can’t be Paralyzed, and if it is already Paralyzed, it recovers from that Special Condition.",
-  "set": "Chilling Reign"
+  "set": "Chilling Reign",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Lucky Energy": {
   "id": "swsh6-158",
   "slug": "lucky-energy",
   "tcgdexName": "Lucky Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent’s Pokémon (even if it is Knocked Out), draw a card.",
-  "set": "Chilling Reign"
+  "set": "Chilling Reign",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Impact Energy": {
   "id": "swsh6-157",
   "slug": "impact-energy",
   "tcgdexName": "Impact Energy",
   "text": "This card can only be attached to a Single Strike Pokémon. If this card is attached to anything other than a Single Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time. The Pokémon this card is attached to can’t be Poisoned, and if it is already Poisoned, it recovers from that Special Condition.",
-  "set": "Chilling Reign"
+  "set": "Chilling Reign",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Single Strike Energy": {
   "id": "swsh5-183",
   "slug": "single-strike-energy",
   "tcgdexName": "Single Strike Energy",
   "text": "This card can only be attached to a Single Strike Pokémon. If this card is attached to anything other than a Single Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides {F} and {D} Energy but provides only 1 Energy at a time, and the attacks of the Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
-  "set": "Battle Styles"
+  "set": "Battle Styles",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Rapid Strike Energy": {
   "id": "swsh5-182",
   "slug": "rapid-strike-energy",
   "tcgdexName": "Rapid Strike Energy",
   "text": "This card can only be attached to a Rapid Strike Pokémon. If this card is attached to anything other than a Rapid Strike Pokémon, discard this card. As long as this card is attached to a Pokémon, it provides 2 in any combination of {W} Energy and {F} Energy.",
-  "set": "Battle Styles"
+  "set": "Battle Styles",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Wash {W} Energy": {
   "id": "swsh4-165",
   "slug": "wash-w-energy",
   "tcgdexName": "Wash Water Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {W} Energy. Prevent all effects of attacks from your opponent’s Pokémon done to the {W} Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)",
-  "set": "Vivid Voltage"
+  "set": "Vivid Voltage",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Stone {F} Energy": {
   "id": "swsh4-164",
   "slug": "stone-f-energy",
   "tcgdexName": "Stone Fighting Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {F} Energy. The {F} Pokémon this card is attached to takes 20 less damage from attacks from your opponent’s Pokémon (after applying Weakness and Resistance).",
-  "set": "Vivid Voltage"
+  "set": "Vivid Voltage",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Coating {M} Energy": {
   "id": "swsh4-163",
   "slug": "coating-m-energy",
   "tcgdexName": "Coating Metal Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {M} Energy. The {M} Pokémon this card is attached to has no Weakness.",
-  "set": "Vivid Voltage"
+  "set": "Vivid Voltage",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Aromatic {G} Energy": {
   "id": "swsh4-162",
   "slug": "aromatic-g-energy",
   "tcgdexName": "Aromatic Grass Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {G} Energy. The {G} Pokémon this card is attached to recovers from all Special Conditions and can’t be affected by any Special Conditions.",
-  "set": "Vivid Voltage"
+  "set": "Vivid Voltage",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Capture Energy": {
   "id": "swsh3-201",
   "slug": "capture-energy",
   "tcgdexName": "Capture Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. When you attach this card from your hand to a Pokémon, search your deck for a Basic Pokémon and put it onto your Bench. Then, shuffle your deck.",
-  "set": "Darkness Ablaze"
+  "set": "Darkness Ablaze",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Powerful {C} Energy": {
   "id": "swsh3-176",
   "slug": "powerful-c-energy",
   "tcgdexName": "Powerful Colorless Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {C} Energy. The attacks of the {C} Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
-  "set": "Darkness Ablaze"
+  "set": "Darkness Ablaze",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Hiding {D} Energy": {
   "id": "swsh3-175",
   "slug": "hiding-d-energy",
   "tcgdexName": "Hiding Darkness Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {D} Energy. The {D} Pokémon this card is attached to has no Retreat Cost.",
-  "set": "Darkness Ablaze"
+  "set": "Darkness Ablaze",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Heat {R} Energy": {
   "id": "swsh3-174",
   "slug": "heat-r-energy",
   "tcgdexName": "Heat Fire Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {R} Energy. The {R} Pokémon this card is attached to gets +20 HP.",
-  "set": "Darkness Ablaze"
+  "set": "Darkness Ablaze",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Twin Energy": {
   "id": "swsh2-209",
   "slug": "twin-energy",
   "tcgdexName": "Twin Energy",
   "text": "As long as this card is attached to a Pokémon that isn’t a Pokémon V or a Pokémon-GX, it provides {C}{C} Energy. If this card is attached to a Pokémon V or a Pokémon-GX, it provides {C} Energy instead.",
-  "set": "Rebel Clash"
+  "set": "Rebel Clash",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Speed {L} Energy": {
   "id": "swsh2-173",
   "slug": "speed-l-energy",
   "tcgdexName": "Speed Lightning Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {L} Energy. When you attach this card from your hand to a {L} Pokémon, draw 2 cards.",
-  "set": "Rebel Clash"
+  "set": "Rebel Clash",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Horror {P} Energy": {
   "id": "swsh2-172",
   "slug": "horror-p-energy",
   "tcgdexName": "Horror Psychic Energy",
   "text": "As long as this card is attached to a Pokémon, it provides {P} Energy. If the {P} Pokémon this card is attached to is in the Active Spot and is damaged by an opponent’s attack (even if it is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
-  "set": "Rebel Clash"
+  "set": "Rebel Clash",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Aurora Energy": {
   "id": "swsh1-186",
   "slug": "aurora-energy",
   "tcgdexName": "Aurora Energy",
   "text": "You can attach this card to 1 of your Pokémon only if you discard another card from your hand. As long as this card is attached to a Pokémon, it provides every type of Energy but provides only 1 Energy at a time.",
-  "set": "Sword & Shield"
+  "set": "Sword & Shield",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Draw Energy": {
   "id": "sm12-271",
   "slug": "draw-energy",
   "tcgdexName": "Draw Energy",
   "text": "This card provides {C} Energy. When you attach this card from your hand to a Pokémon, draw a card.",
-  "set": "Cosmic Eclipse"
+  "set": "Cosmic Eclipse",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Weakness Guard Energy": {
   "id": "sm11-258",
   "slug": "weakness-guard-energy",
   "tcgdexName": "Weakness Guard Energy",
   "text": "This card provides {C} Energy. The Pokémon this card is attached to has no Weakness.",
-  "set": "Unified Minds"
+  "set": "Unified Minds",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Recycle Energy": {
   "id": "sm11-257",
   "slug": "recycle-energy",
   "tcgdexName": "Recycle Energy",
   "text": "This card provides {C} Energy. If this card is discarded from play, put it into your hand instead of the discard pile.",
-  "set": "Unified Minds"
+  "set": "Unified Minds",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Triple Acceleration Energy": {
   "id": "sm10-234",
   "slug": "triple-acceleration-energy",
   "tcgdexName": "Triple Acceleration Energy",
   "text": "This card can only be attached to Evolution Pokémon. If this card is attached to 1 of your Pokémon, discard it at the end of the turn. This card provides {C}{C}{C} Energy only while it is attached to an Evolution Pokémon. If this card is attached to anything other than an Evolution Pokémon, discard this card.",
-  "set": "Unbroken Bonds"
+  "set": "Unbroken Bonds",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Memory Energy": {
   "id": "sm8-194",
   "slug": "memory-energy",
   "tcgdexName": "Memory Energy",
   "text": "This card provides {C} Energy. The Pokémon this card is attached to can use any attack from its previous Evolutions. (You still need the necessary Energy to use each attack.)",
-  "set": "Lost Thunder"
+  "set": "Lost Thunder",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Rainbow Energy": {
   "id": "sm7-183",
   "slug": "rainbow-energy",
   "tcgdexName": "Rainbow Energy",
   "text": "This card provides {C} Energy. While in play, this card provides every type of Energy but provides only 1 Energy at a time. When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
-  "set": "Celestial Storm"
+  "set": "Celestial Storm",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Unit Energy {F}{D}{Y}": {
   "id": "sm6-146",
   "slug": "unit-energy-f-d-y",
   "tcgdexName": "Unit Energy FightingDarknessFairy",
   "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {F}, {D}, and {Y} Energy but provides only 1 Energy at a time.",
-  "set": "Forbidden Light"
+  "set": "Forbidden Light",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Beast Energy Prism Star": {
   "id": "sm6-117",
   "slug": "beast-energy-prism-star",
   "tcgdexName": "Beast Energy Prism Star",
   "text": "This card provides {C} Energy. While this card is attached to an Ultra Beast, it provides every type of Energy but provides only 1 Energy at a time. The attacks of the Ultra Beast this card is attached to do 30 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance).",
-  "set": "Forbidden Light"
+  "set": "Forbidden Light",
+  "finish": "holo",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Unit Energy {L}{P}{M}": {
   "id": "sm5-171",
   "slug": "unit-energy-l-p-m",
   "tcgdexName": "Unit Energy LightningPsychicMetal",
   "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {L}, {P}, and {M} Energy but provides only 1 Energy at a time.",
-  "set": "Ultra Prism"
+  "set": "Ultra Prism",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Unit Energy {G}{R}{W}": {
   "id": "sm5-170",
   "slug": "unit-energy-g-r-w",
   "tcgdexName": "Unit Energy GrassFireWater",
   "text": "This card provides {C} Energy. While this card is attached to a Pokémon, it provides {G}, {R}, and {W} Energy but provides only 1 Energy at a time.",
-  "set": "Ultra Prism"
+  "set": "Ultra Prism",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Super Boost Energy Prism Star": {
   "id": "sm5-136",
   "slug": "super-boost-energy-prism-star",
   "tcgdexName": "Super Boost Energy Prism Star",
   "text": "This card provides {C} Energy. While this card is attached to a Stage 2 Pokémon, it provides every type of Energy but provides only 1 Energy at a time. If you have 3 or more Stage 2 Pokémon in play, it provides every type of Energy but provides 4 Energy at a time.",
-  "set": "Ultra Prism"
+  "set": "Ultra Prism",
+  "finish": "holo",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Warp Energy": {
   "id": "sm4-123",
   "slug": "warp-energy",
   "tcgdexName": "Warp Energy",
   "text": "This card provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch that Pokémon with 1 of your Benched Pokémon.",
-  "set": "Crimson Invasion"
+  "set": "Crimson Invasion",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Counter Energy": {
   "id": "sm4-122",
   "slug": "counter-energy",
   "tcgdexName": "Counter Energy",
   "text": "This card provides {C} Energy. If you have more Prize cards remaining than your opponent, and if this card is attached to a Pokémon that isn’t a Pokémon-GX or Pokémon-EX, this card provides every type of Energy but provides only 2 Energy at a time.",
-  "set": "Crimson Invasion"
+  "set": "Crimson Invasion",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Strong Energy": {
   "id": "xy10-115",
   "slug": "strong-energy",
   "tcgdexName": "Strong Energy",
   "text": "This card can only be attached to {F} Pokémon. This card provides {F} Energy only while this card is attached to a {F} Pokémon. The attacks of the {F} Pokémon this card is attached to do 20 more damage to your opponent’s Active Pokémon (before applying Weakness and Resistance). (If this card is attached to anything other than a {F} Pokémon, discard this card.)",
-  "set": "Fates Collide"
+  "set": "Fates Collide",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Splash Energy": {
   "id": "xy9-113",
   "slug": "splash-energy",
   "tcgdexName": "Splash Energy",
   "text": "This card can only be attached to {W} Pokémon. This card provides {W} Energy only while this card is attached to a {W} Pokémon. If the {W} Pokémon this card is attached to is Knocked Out by damage from an opponent’s attack, put that Pokémon into your hand. (Discard all cards attached to it.) (If this card is attached to anything other than a {W} Pokémon, discard this card.)",
-  "set": "BREAKpoint"
+  "set": "BREAKpoint",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Burning Energy": {
   "id": "xy8-151",
   "slug": "burning-energy",
   "tcgdexName": "Burning Energy",
   "text": "This card can only be attached to {R} Pokémon. This card provides {R} Energy only while this card is attached to a {R} Pokémon. If this card is discarded by an attack of the {R} Pokémon this card is attached to, attach this card from your discard pile to that Pokémon after attacking. (If this card is attached to anything other than a {R} Pokémon, discard this card.)",
-  "set": "BREAKthrough"
+  "set": "BREAKthrough",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Flash Energy": {
   "id": "xy7-83",
   "slug": "flash-energy",
   "tcgdexName": "Flash Energy",
   "text": "This card can only be attached to {L} Pokémon. This card provides {L} Energy only while this card is attached to a {L} Pokémon. The {L} Pokémon this card is attached to has no Weakness. (If this card is attached to anything other than a {L} Pokémon, discard this card.)",
-  "set": "Ancient Origins"
+  "set": "Ancient Origins",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Dangerous Energy": {
   "id": "xy7-82",
   "slug": "dangerous-energy",
   "tcgdexName": "Dangerous Energy",
   "text": "This card can only be attached to {D} Pokémon. This card provides {D} Energy only while this card is attached to a {D} Pokémon. Whenever the {D} Pokémon this card is attached to is your Active Pokémon and is damaged by an attack from your opponent’s Pokémon-EX (even if that Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon-EX. (If this card is attached to anything other than a {D} Pokémon, discard this card.)",
-  "set": "Ancient Origins"
+  "set": "Ancient Origins",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Double Dragon Energy": {
   "id": "xy6-97",
   "slug": "double-dragon-energy",
   "tcgdexName": "Double Dragon Energy",
   "text": "This card can only be attached to {N} Pokémon. This card provides every type of Energy, but provides only 2 Energy at a time, only while this card is attached to a {N} Pokémon. (If this card is attached to anything other than a {N} Pokémon, discard this card.)",
-  "set": "Roaring Skies"
+  "set": "Roaring Skies",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)",
+  "double": true
  },
  "Double Magma Energy": {
   "id": "dc1-34",
   "slug": "double-magma-energy",
   "tcgdexName": "Double Magma Energy",
   "text": "This card can only be attached to Team Magma Pokémon. Discard this card at the end of the turn you attached it. This card provides {F}{F} Energy only while it is attached to a Team Magma Pokémon. (If this card is attached to anything other than a Team Magma Pokémon, discard this card.)",
-  "set": "Double Crisis"
+  "set": "Double Crisis",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)",
+  "double": true
  },
  "Double Aqua Energy": {
   "id": "dc1-33",
   "slug": "double-aqua-energy",
   "tcgdexName": "Double Aqua Energy",
   "text": "This card can only be attached to Team Aqua Pokémon. Discard this card at the end of the turn you attached it. This card provides {W}{W} Energy only while it is attached to a Team Aqua Pokémon. (If this card is attached to anything other than a Team Aqua Pokémon, discard this card.)",
-  "set": "Double Crisis"
+  "set": "Double Crisis",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)",
+  "double": true
  },
  "Wonder Energy": {
   "id": "xy5-144",
   "slug": "wonder-energy",
   "tcgdexName": "Wonder Energy",
   "text": "This card can only be attached to {Y} Pokémon. This card provides {Y} Energy only while this card is attached to a {Y} Pokémon. Prevent all effects of your opponent’s attacks, except damage, done to the {Y} Pokémon that this card is attached to. (Existing effects are not removed.) (If this card is attached to anything other than a {Y} Pokémon, discard this card.)",
-  "set": "Primal Clash"
+  "set": "Primal Clash",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Shield Energy": {
   "id": "xy5-143",
   "slug": "shield-energy",
   "tcgdexName": "Shield Energy",
   "text": "This card can only be attached to {M} Pokémon. This card provides {M} Energy only while this card is attached to a {M} Pokémon. The attacks of your opponent’s Pokémon do 10 less damage to the {M} Pokémon this card is attached to (before applying Weakness and Resistance). (If this card is attached to anything other than a {M} Pokémon, discard this card.)",
-  "set": "Primal Clash"
+  "set": "Primal Clash",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Mystery Energy": {
   "id": "xy4-112",
   "slug": "mystery-energy",
   "tcgdexName": "Mystery Energy",
   "text": "This card can only be attached to {P} Pokémon. This card provides {P} Energy only while this card is attached to a {P} Pokémon. The Retreat Cost of the Pokémon this card is attached to is {C}{C} less. (If this card is attached to anything other than a {P} Pokémon, discard this card.)",
-  "set": "Phantom Forces"
+  "set": "Phantom Forces",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Herbal Energy": {
   "id": "xy3-103",
   "slug": "herbal-energy",
   "tcgdexName": "Herbal Energy",
   "text": "This card can only be attached to {G} Pokémon. This card provides {G} Energy only while this card is attached to a {G} Pokémon. When you attach this card from your hand to 1 of your {G} Pokémon, heal 30 damage from that Pokémon. (If this card is attached to anything other than a {G} Pokémon, discard this card.)",
-  "set": "Furious Fists"
+  "set": "Furious Fists",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Plasma Energy": {
   "id": "bw10-91",
   "slug": "plasma-energy",
   "tcgdexName": "Plasma Energy",
   "text": "This card provides {C} Energy.",
-  "set": "Plasma Blast"
+  "set": "Plasma Blast",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Blend Energy {W}{L}{F}{M}": {
   "id": "bw6-118",
   "slug": "blend-energy-w-l-f-m",
   "tcgdexName": "Blend Energy {W}{L}{F}{M}",
   "text": "This card provides {C} Energy. When this card is attached to a Pokémon, this card provides {W}, {L}, {F}, or {M} Energy but provides only 1 Energy at a time.",
-  "set": "Dragons Exalted"
+  "set": "Dragons Exalted",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Blend Energy {G}{R}{P}{D}": {
   "id": "bw6-117",
   "slug": "blend-energy-g-r-p-d",
   "tcgdexName": "Blend Energy {G}{R}{P}{D}",
   "text": "This card provides {C} Energy. When this card is attached to a Pokémon, this card provides {G}, {R}, {P}, or {D} Energy but provides only 1 Energy at a time.",
-  "set": "Dragons Exalted"
+  "set": "Dragons Exalted",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Metal Energy": {
   "id": "col1-87",
   "slug": "metal-energy",
   "tcgdexName": "Metal Energy",
   "text": "Damage done by attacks to the Pokémon that Metal Energy is attached to is reduced by 10 (after applying Weakness and Resistance). Ignore this effect if the Pokémon that Metal Energy is attached to isn’t {M}. Metal Energy provides {M} Energy. (Doesn’t count as a basic Energy card.)",
-  "set": "Call of Legends"
+  "set": "Call of Legends",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Darkness Energy": {
   "id": "ex9-86",
   "slug": "darkness-energy",
   "tcgdexName": "Darkness Energy",
   "text": "If the Pokémon Darkness Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). Ignore this Effect if the Pokémon that Darkness Energy is attached to isn’t {D}. Darkness Energy provides {D} Energy. (Doesn’t count as a basic Energy card.)",
-  "set": "Call of Legends"
+  "set": "Call of Legends",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Rescue Energy": {
   "id": "hgss4-90",
   "slug": "rescue-energy",
   "tcgdexName": "Rescue Energy",
   "text": "Rescue Energy provides {C} Energy. If the Pokémon this card is attached to is Knocked Out by damage from an attack, put that Pokémon back into your hand. (Discard all cards attached to that Pokémon.)",
-  "set": "Triumphant"
+  "set": "Triumphant",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Upper Energy": {
   "id": "pl2-102",
   "slug": "upper-energy",
   "tcgdexName": "Upper Energy",
   "text": "Upper Energy provides {C} Energy. If you have more Prize cards left than your opponent and this card is attached to a Pokémon (excluding Pokémon LV.X), Upper Energy provides {C}{C} Energy.",
-  "set": "Rising Rivals"
+  "set": "Rising Rivals",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "SP Energy": {
   "id": "pl2-101",
   "slug": "sp-energy",
   "tcgdexName": "SP Energy",
   "text": "SP Energy provides {C} Energy. If the Pokémon SP Energy is attached to is a Pokémon SP, SP Energy provides every type of Energy buy provides only 1 Energy at a time. (Doesn’t count as a basic Energy card.)",
-  "set": "Rising Rivals"
+  "set": "Rising Rivals",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Cyclone Energy": {
   "id": "dp7-94",
   "slug": "cyclone-energy",
   "tcgdexName": "Cyclone Energy",
   "text": "Cyclone Energy provides {C} Energy. When you attach this card from your hand to your Active Pokémon, switch 1 of the Defending Pokémon with 1 of your opponent’s Benched Pokémon. Your opponent chooses the Benched Pokémon to switch.",
-  "set": "Stormfront"
+  "set": "Stormfront",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Recover Energy": {
   "id": "dp5-96",
   "slug": "recover-energy",
   "tcgdexName": "Recover Energy",
   "text": "Recover Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove all Special Conditions from that Pokémon.",
-  "set": "Majestic Dawn"
+  "set": "Majestic Dawn",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Health Energy": {
   "id": "dp5-94",
   "slug": "health-energy",
   "tcgdexName": "Health Energy",
   "text": "Health Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove 1 damage counter from that Pokémon.",
-  "set": "Majestic Dawn"
+  "set": "Majestic Dawn",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Call Energy": {
   "id": "dp5-92",
   "slug": "call-energy",
   "tcgdexName": "Call Energy",
   "text": "Call Energy provides {C} Energy. Once during your turn, if the Pokémon Call Energy is attached to is your Active Pokémon, you may search your deck for up to 2 Basic Pokémon and put them onto your Bench. If you do, shuffle your deck and your turn ends.",
-  "set": "Majestic Dawn"
+  "set": "Majestic Dawn",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Multi Energy": {
   "id": "dp2-118",
   "slug": "multi-energy",
   "tcgdexName": "Multi Energy",
   "text": "Attach Multi Energy to 1 of your Pokémon. While in play, Multi Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.) Multi Energy provides {C} Energy when attached to a Pokémon that already has Special Energy cards attached to it.",
-  "set": "Mysterious Treasures"
+  "set": "Mysterious Treasures",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "δ Rainbow Energy": {
   "id": "pop5-9",
   "slug": "delta-rainbow-energy",
   "tcgdexName": "δ Rainbow Energy",
   "text": "δ Rainbow Energy provides {C} Energy. While attached to a Pokémon that has δ on its card, δ Rainbow Energy provides every type of Energy but provides only 1 Energy at a time. (Has no effect other than providing Energy.)",
-  "set": "POP Series 5"
+  "set": "POP Series 5",
+  "finish": "none",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Boost Energy": {
   "id": "pop5-8",
   "slug": "boost-energy",
   "tcgdexName": "Boost Energy",
   "text": "Boost Energy can be attached only to an Evolved Pokémon. Discard Boost Energy at the end of the turn it was attached. Boost Energy provides {C}{C}{C} Energy. The Pokémon Boost Energy is attached to can’t retreat. If the Pokémon Boost Energy is attached to isn’t an Evolved Pokémon, discard Boost Energy.",
-  "set": "POP Series 5"
+  "set": "POP Series 5",
+  "finish": "none",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Double Rainbow Energy": {
   "id": "pop5-4",
   "slug": "double-rainbow-energy",
   "tcgdexName": "Double Rainbow Energy",
   "text": "Double Rainbow Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). While in play, Double Rainbow Energy provides every type of Energy but provides 2 Energy at a time. (Has no effect other than providing Energy.) Damage done to your opponent’s Pokémon by the Pokémon Double Rainbow Energy is attached to is reduced by 10 (before applying Weakness and Resistance). When the Pokémon Double Rainbow Energy is attached to is no longer an Evolved Pokémon, discard Double Rainbow Energy.",
-  "set": "POP Series 5"
+  "set": "POP Series 5",
+  "finish": "none",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)",
+  "double": true
  },
  "Scramble Energy": {
   "id": "ex15-89",
   "slug": "scramble-energy",
   "tcgdexName": "Scramble Energy",
   "text": "Scramble Energy can be attached only to an Evolved Pokémon (excluding Pokémon-ex). Scramble Energy provides {C} Energy. While in play, if you have more Prize cards left than your opponent, Scramble Energy provides every type of Energy but provides only 3 in any combination at a time. If the Pokémon Scramble Energy is attached to isn’t an Evolved Pokémon (or evolves into Pokémon-ex), discard Scramble Energy.",
-  "set": "Dragon Frontiers"
+  "set": "Dragon Frontiers",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Holon Energy WP": {
   "id": "ex15-86",
   "slug": "holon-energy-wp",
   "tcgdexName": "Holon Energy WP",
   "text": "Holon Energy WP provides {C} Energy. If the Pokémon that Holon Energy WP is attached to also has a basic {W} Energy card attached to it, prevent all effects of attacks, excluding damage, done to that Pokémon by your opponent’s Pokémon. If the Pokémon that Holon Energy WP is attached to also has a basic {P} Energy card attached to it, that Pokémon’s Retreat Cost is 0. Ignore these effects if Holon Energy WP is attached to Pokémon-ex.",
-  "set": "Dragon Frontiers"
+  "set": "Dragon Frontiers",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Holon Energy GL": {
   "id": "ex15-85",
   "slug": "holon-energy-gl",
   "tcgdexName": "Holon Energy GL",
   "text": "Holon Energy GL provides {C} Energy. If the Pokémon that Holon Energy GL is attached to also has a basic {G} Energy card attached to it, that Pokémon can’t be affected by any Special Conditions. If the Pokémon that Holon Energy GL is attached to also has a basic {L} Energy card attached to it, damage done to that Pokémon by attacks from your opponent’s Pokémon-ex is reduced by 10. Ignore these effects if Holon Energy GL is attached to Pokémon-ex.",
-  "set": "Dragon Frontiers"
+  "set": "Dragon Frontiers",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Holon Energy FF": {
   "id": "ex15-84",
   "slug": "holon-energy-ff",
   "tcgdexName": "Holon Energy FF",
   "text": "Holon Energy FF provides {C} Energy. If the Pokémon that Holon Energy FF is attached to also has a basic {R} Energy card attached to it, that Pokémon has no Weakness. If the Pokémon that Holon Energy FF is attached to also has a basic {F} Energy card attached to it, damage done by that Pokémon’s attack isn’t affected by Resistance. Ignore these effects if Holon Energy FF is attached to Pokémon-ex.",
-  "set": "Dragon Frontiers"
+  "set": "Dragon Frontiers",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Heal Energy": {
   "id": "pop4-8",
   "slug": "heal-energy",
   "tcgdexName": "Heal Energy",
   "text": "Heal Energy provides {C} Energy. When you attach this card from your hand to 1 of your Pokémon, remove 1 damage counter and all Special Conditions from that Pokémon. If Heal Energy is attached to Pokémon-ex, Heal Energy has no effect other than providing Energy.",
-  "set": "POP Series 4"
+  "set": "POP Series 4",
+  "finish": "none",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "Dark Metal Energy": {
   "id": "ex13-97",
   "slug": "dark-metal-energy",
   "tcgdexName": "Dark Metal Energy",
   "text": "Attach Dark Metal Energy to 1 of your Pokémon. While in play, Dark Metal Energy provides {D} Energy and {M} Energy, but provides only 1 Energy at a time. (Doesn’t count as a basic energy card when not in play and has no effect other than providing Energy.)",
-  "set": "Holon Phantoms"
+  "set": "Holon Phantoms",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "React Energy": {
   "id": "ex12-82",
   "slug": "react-energy",
   "tcgdexName": "React Energy",
   "text": "React Energy provides {C} Energy.",
-  "set": "Legend Maker"
+  "set": "Legend Maker",
+  "finish": "reverse",
+  "finishSource": "pokemontcg.io tcgplayer variants (tcgdex lists normal only)"
  },
  "R Energy": {
   "id": "ex7-95",
   "slug": "r-energy",
   "tcgdexName": "R Energy",
   "text": "R Energy can be attached only to a Pokémon that has Dark or Rocket’s in its name. While in play, R Energy provides 2 {D} Energy. (Doesn’t count as a basic Energy card.) If the Pokémon R Energy is attached to attacks, the attack does 10 more damage to the Active Pokémon (before applying Weakness and Resistance). When your turn ends, discard R Energy.",
-  "set": "Team Rocket Returns"
+  "set": "Team Rocket Returns",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Magma Energy": {
   "id": "ex4-87",
   "slug": "magma-energy",
   "tcgdexName": "Magma Energy",
   "text": "Magma Energy can be attached only to a Pokémon with Team Magma in its name. Magma Energy provides {F} and /or {D} Energy but provides 2 Energy at a time. (Doesn’t count as a basic Energy card when not in play and has no effect other than providing Energy.) At the end of your turn, discard Magma Energy.",
-  "set": "Team Magma vs Team Aqua"
+  "set": "Team Magma vs Team Aqua",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Aqua Energy": {
   "id": "ex4-86",
   "slug": "aqua-energy",
   "tcgdexName": "Aqua Energy",
   "text": "Aqua Energy can be attached only to a Pokémon with Team Aqua in its name. Aqua Energy provides {W} and {D} Energy but provides 2 Energy at a time. (Doesn’t count as a basic Energy card when not in play and has no effect other than providing Energy.) At the end of your turn, discard Aqua Energy.",
-  "set": "Team Magma vs Team Aqua"
+  "set": "Team Magma vs Team Aqua",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Retro Energy": {
   "id": "ecard3-144",
   "slug": "retro-energy",
   "tcgdexName": "Retro Energy",
   "text": "This card provides {C} Energy. When you play this card from your hand and attach it to 1 of your Evolved Pokémon, you may remove up to 2 damage counters from that Pokémon and discard the top card from it. (This counts as devolving it.)",
-  "set": "Skyridge"
+  "set": "Skyridge",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Bounce Energy": {
   "id": "ecard3-142",
   "slug": "bounce-energy",
   "tcgdexName": "Bounce Energy",
   "text": "This card provides {C}{C} Energy. You can attach this card to your Pokémon that has basic Energy cards attached to it. When you play this card from your hand and attach it to 1 of your Pokémon, return a basic Energy card attached to that Pokémon to your hand.",
-  "set": "Skyridge"
+  "set": "Skyridge",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  },
  "Crystal Energy": {
   "id": "ecard2-146",
   "slug": "crystal-energy",
   "tcgdexName": "Crystal Energy",
   "text": "Crystal Energy provides 1 Energy of all types (colors) of basic Energy cards attached to the Pokémon Crystal Energy is attached to. If there are no basic Energy cards attached to the Pokémon Crystal Energy is attached to, Crystal Energy provides {C} Energy.",
-  "set": "Aquapolis"
+  "set": "Aquapolis",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Potion Energy": {
   "id": "lc-101",
   "slug": "potion-energy",
   "tcgdexName": "Potion Energy",
   "text": "If you play this card from your hand, remove 1 damage counter from the Pokémon you attach it to, if it has any. Potion Energy provides {C} energy. (Doesn’t count as a basic Energy card.)",
-  "set": "Legendary Collection"
+  "set": "Legendary Collection",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Full Heal Energy": {
   "id": "lc-100",
   "slug": "full-heal-energy",
   "tcgdexName": "Full Heal Energy",
   "text": "If you play this card from your hand, the Pokémon you attach it to is no longer affected by a Special Condition. Full Heal Energy provides {C} energy. (Doesn’t count as a basic Energy card.)",
-  "set": "Legendary Collection"
+  "set": "Legendary Collection",
+  "finish": "reverse",
+  "finishSource": "tcgdex variants/rarity"
  },
  "Miracle Energy": {
   "id": "neo4-16",
   "slug": "miracle-energy",
   "tcgdexName": "Miracle Energy",
   "text": "You can’t have more than 1 Miracle Energy in your deck. Attach Miracle Energy to 1 of your Shining or Light Pokémon. At the end of your turn, discard Miracle Energy. While in play, Miracle Energy counts as every type of Energy but provides only 2 Energy at a time.",
-  "set": "Neo Destiny"
+  "set": "Neo Destiny",
+  "finish": "holo",
+  "finishSource": "tcgdex variants/rarity",
+  "double": true
  }
 }

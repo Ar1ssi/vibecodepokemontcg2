@@ -2062,9 +2062,41 @@ test('energy: cost-symbol names and untyped Energy rows still draw as tokens', (
   assert.equal(symbolImg.dataset.energyCardSrc, 'GRI_169_R_EN.png');
   assert.equal(symbolImg.classList.contains('energy-token-3d'), true);
   assert.equal(symbolImg.style.zIndex, '101');
-  assert.equal(untypedImg.getAttribute('src'), '/src/assets/energy/tokens/fighting.png');
+  assert.equal(
+    untypedImg.getAttribute('src'),
+    '/src/assets/energy/special/rocky-f-energy.svg',
+    'a Special Energy draws its own card-art token'
+  );
   assert.equal(untypedImg.classList.contains('energy-token-3d'), true);
   assert.equal(untypedImg.style.zIndex, '102');
+});
+
+test('energy: a 2-Energy Special Energy draws as a two-orb token, cleared on detach', () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const opts = { document: doc, getZone: mockGetZone };
+  const view = (stateVersion, zones) => ({ stateVersion, you: { playerId: 'p1', zones } });
+  const dragapult = { instanceId: 30, name: 'Dragapult ex', src: 'drag.png', type: 'Pokemon' };
+  const dde = { instanceId: 31, name: 'Double Dragon Energy', src: 'ros-97.png', type: 'Energy' };
+  const jet = { instanceId: 32, name: 'Jet Energy', src: 'pal-190.png', type: 'Energy' };
+
+  applyView(
+    view(1, { active: [dragapult, { ...dde, attachedTo: 30 }, { ...jet, attachedTo: 30 }] }),
+    [],
+    opts
+  );
+  const registry = getCardRegistry();
+  const ddeImg = registry.get(31).element;
+  const jetImg = registry.get(32).element;
+
+  assert.equal(ddeImg.getAttribute('src'), '/src/assets/energy/special/double-dragon-energy.svg');
+  assert.equal(ddeImg.classList.contains('energy-token-double'), true);
+  assert.equal(jetImg.getAttribute('src'), '/src/assets/energy/special/jet-energy.svg');
+  assert.equal(jetImg.classList.contains('energy-token-double'), false);
+
+  applyView(view(2, { active: [dragapult, { ...jet, attachedTo: 30 }], discard: [dde] }), [], opts);
+  assert.equal(ddeImg.getAttribute('src'), 'ros-97.png', 'detached Energy shows its card art again');
+  assert.equal(ddeImg.classList.contains('energy-token-double'), false);
+  assert.equal(ddeImg.classList.contains('energy-token-3d'), false);
 });
 
 const NEST_BALL_CHOICE = {

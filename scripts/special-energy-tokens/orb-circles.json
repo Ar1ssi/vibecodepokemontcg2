@@ -2,7 +2,12 @@
  "aqua-energy": {
   "cx": 207,
   "cy": 423,
-  "r": 110
+  "r": 110,
+  "orb2": {
+   "cx": 374,
+   "cy": 423,
+   "r": 108
+  }
  },
  "aromatic-g-energy": {
   "cx": 291,
@@ -40,9 +45,14 @@
   "r": 106
  },
  "bounce-energy": {
-  "cx": 279,
-  "cy": 321,
-  "r": 93
+  "cx": 262,
+  "cy": 350,
+  "r": 85,
+  "orb2": {
+   "cx": 385,
+   "cy": 362,
+   "r": 85
+  }
  },
  "bubbly-w-energy": {
   "cx": 300,
@@ -107,22 +117,42 @@
  "double-aqua-energy": {
   "cx": 432,
   "cy": 215,
-  "r": 130
+  "r": 130,
+  "orb2": {
+   "cx": 344,
+   "cy": 418,
+   "r": 105
+  }
  },
  "double-colorless-energy": {
   "cx": 224,
   "cy": 367,
-  "r": 160
+  "r": 160,
+  "orb2": {
+   "cx": 423,
+   "cy": 487,
+   "r": 97
+  }
  },
  "double-dragon-energy": {
   "cx": 331,
   "cy": 358,
-  "r": 143
+  "r": 143,
+  "orb2": {
+   "cx": 187,
+   "cy": 238,
+   "r": 100
+  }
  },
  "double-magma-energy": {
   "cx": 167,
   "cy": 342,
-  "r": 133
+  "r": 133,
+  "orb2": {
+   "cx": 321,
+   "cy": 202,
+   "r": 94
+  }
  },
  "double-rainbow-energy": {
   "cx": 300,
@@ -132,7 +162,12 @@
  "double-turbo-energy": {
   "cx": 455,
   "cy": 215,
-  "r": 105
+  "r": 105,
+  "orb2": {
+   "cx": 199,
+   "cy": 427,
+   "r": 150
+  }
  },
  "draw-energy": {
   "cx": 298,
@@ -253,7 +288,12 @@
  "magma-energy": {
   "cx": 215,
   "cy": 417,
-  "r": 110
+  "r": 110,
+  "orb2": {
+   "cx": 379,
+   "cy": 419,
+   "r": 108
+  }
  },
  "magnetic-m-energy": {
   "cx": 298,
@@ -278,7 +318,12 @@
  "miracle-energy": {
   "cx": 347,
   "cy": 422,
-  "r": 97
+  "r": 97,
+  "orb2": {
+   "cx": 251,
+   "cy": 310,
+   "r": 76
+  }
  },
  "mist-energy": {
   "cx": 300,
@@ -298,7 +343,12 @@
  "neo-upper-energy": {
   "cx": 206,
   "cy": 268,
-  "r": 140
+  "r": 140,
+  "orb2": {
+   "cx": 442,
+   "cy": 400,
+   "r": 98
+  }
  },
  "nitro-r-energy": {
   "cx": 300,
@@ -344,7 +394,12 @@
  "rapid-strike-energy": {
   "cx": 230,
   "cy": 400,
-  "r": 155
+  "r": 155,
+  "orb2": {
+   "cx": 443,
+   "cy": 318,
+   "r": 88
+  }
  },
  "react-energy": {
   "cx": 294,
@@ -449,7 +504,12 @@
  "team-rocket-s-energy": {
   "cx": 380,
   "cy": 391,
-  "r": 123
+  "r": 123,
+  "orb2": {
+   "cx": 467,
+   "cy": 213,
+   "r": 90
+  }
  },
  "telepathic-p-energy": {
   "cx": 300,
@@ -474,7 +534,12 @@
  "twin-energy": {
   "cx": 374,
   "cy": 404,
-  "r": 162
+  "r": 162,
+  "orb2": {
+   "cx": 147,
+   "cy": 510,
+   "r": 84
+  }
  },
  "unit-energy-f-d-y": {
   "cx": 293,

@@ -25,3 +25,14 @@ img.energy-token-3d {
     /* crisp dark rim so the disc reads as a solid object, not a glow */
     inset 0 0 0 0.05em rgba(0, 0, 0, 0.35);
 }
+
+/* Two-orb tokens (Special Energy that provides 2 Energy): square art with two coins on the
+   diagonal and transparent corners, so no round crop or disc rim — the shadow follows the
+   coins' own shape instead. */
+.play-container img.energy-token-3d.energy-token-double,
+img.energy-token-3d.energy-token-double {
+  border-radius: 0;
+  object-fit: contain;
+  box-shadow: none;
+  filter: drop-shadow(0 0.16em 0.22em rgba(0, 0, 0, 0.55));
+}

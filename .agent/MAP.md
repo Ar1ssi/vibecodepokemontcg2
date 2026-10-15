@@ -24,6 +24,7 @@ client/src/setup/netcode/mat-fx/sfx-cues.mjs + sample-bank.js + ui-cue.mjs + sta
 scripts/sfx/ (`pnpm sfx:import -- --src <extract dir>`) — transcodes the TCG Live SFX extract to committed client/src/assets/sfx/*.ogg + manifest.json (D203/D204); server/sfx-cache.mjs caches only hashed .ogg
 scripts/fx/import-tcgl-status-fx.mjs (`pnpm fx:import-status -- --src <extract dir>`) — copies TCG Live status VFX textures, damage-counter coin and Poison/Burn badges (WebApp/assets/ui WebP) to committed client/src/assets/status-fx/, damage-counter/, status-markers/
 scripts/attack-ui/ — `import-attack-ui.mjs --src <extract dir>` copies TCG Live's AttackOverlay sprites (titlebars, damage tabs, ability tag and header mask, Retreat button, GX and VSTAR bars, list frame, row tiles) to committed client/src/assets/attack-ui/; `dump-registry.py` (UnityPy) writes attack-ui.json (per-type colour/ink, VSTAR sprite names + 9-slice borders from AttackEntryAssetRegistry_AttackOverlay). index.css pins both: setup/rules/__tests__/attack-ui-assets.test.mjs
+scripts/special-energy-tokens/ — `make-tokens.py <card pngs> <out> --write-client` cuts a token per Special Energy name from its card's orb (orb-circles.json, hand-checked; detect-orbs.py first pass), 2-Energy cards as two orbs, holo/reverse finish (card-refs.json) as animated SVG → client/src/assets/energy/special/ + generated move-card-bundle/special-energy-tokens.mjs; fetch-card-refs.py pulls the TCGdex art
 client/src/setup/rules/card-focus.mjs — TCG Live Active-card popup (design 067, D208): CSS-3D flight from the slot to the game's focus pose, hand lowered via `.hand-lowered` on the self iframe, 500 ms click guard (D209), reuses the 013 inspector (`buildInspectorCard`); card-focus-geometry.mjs (pure: pose, flight, curves, tilt), card-focus-routing.mjs (`shouldOpenCardFocus`), css/card-focus.css; routed from click-events.js, Escape in keybinds.js
 client/src/setup/netcode/mat-fx/status-fx.mjs + status.js — condition apply pop / clear sparkle from TCG Live sprites; status-loop.mjs + status-loop.js — held-condition loop overlay, reconciled per card in apply-view.js `reconcileStatusLoopOverlay`; palette in client/src/css/status-fx-palette.css; status-units.mjs — Unity prefab units → card widths (tables keep E:/TCGLive_Extract/vfx_dump numbers)
 
@@ -102,6 +103,7 @@ client/src/initialization/document-event-listeners/sidebox/native-deck-builder-s
 
 ## Actions (~10,582 lines, ~85% DOM-coupled — every mutation goes through the DOM)
 client/src/actions/move-card-bundle/ — card movement, attach, evolve; primary mutation path
+client/src/actions/move-card-bundle/energy-token-assets.mjs — attached-Energy token per card: Special Energy by name (`specialEnergyTokenFor`, two-orb `energy-token-double`), else type token
 client/src/actions/zones/ — deck/hand/prize/shuffle operations
 client/src/actions/counters/ — damage, special condition, ability counters (DOM overlays)
 client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo

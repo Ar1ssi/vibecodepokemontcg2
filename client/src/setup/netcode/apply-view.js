@@ -27,7 +27,9 @@ import {
 import { applySpecialConditionStyle } from '../counters/special-condition-style-apply.js';
 import { resetImage } from '../image-logic/reset-image.js';
 import {
+  ENERGY_TOKEN_DOUBLE_CLASS,
   getEnergyTokenFront,
+  isDoubleEnergyToken,
   isEnergyCard,
 } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
@@ -1140,7 +1142,7 @@ function clearStackStyle(img) {
   if (!img.dataset?.stackStyled || !img.style) return;
   delete img.dataset.stackStyled;
   delete img.dataset.energyCardSrc;
-  img.classList.remove('energy-token-3d');
+  img.classList.remove('energy-token-3d', ENERGY_TOKEN_DOUBLE_CLASS);
   for (const key of STACK_STYLE_KEYS) img.style[key] = '';
 }
 
@@ -1174,6 +1176,7 @@ function applyEnergyToken(img, cardData, cardWidth, cardHeight, layer) {
   img.dataset.energyCardSrc = cardArt;
   img.setAttribute('src', tokenSrc);
   img.classList.add('energy-token-3d');
+  if (isDoubleEnergyToken(cardData)) img.classList.add(ENERGY_TOKEN_DOUBLE_CLASS);
   img.energyLayer = layer;
   return true;
 }
