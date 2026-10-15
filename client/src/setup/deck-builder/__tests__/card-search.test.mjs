@@ -399,3 +399,87 @@ test('queryCards asks for both EX spellings at once and merges them in plan orde
     stub.restore();
   }
 });
+
+// Set id absent from the generated release-date table; not zz98, whose date the
+// lookup test above caches for the whole run.
+function progressCard(id) {
+  const [setId, localId] = id.split('-');
+  return {
+    id,
+    name: 'Pikachu',
+    category: 'Pokemon',
+    image: `https://assets.tcgdex.net/en/zz/${setId}/${localId}`,
+    set: { id: setId, name: setId },
+  };
+}
+
+test('queryCards reports each card as it loads, in summary order, with a new array each time', async () => {
+  const progress = [];
+  let thirdReportedFirst = false;
+  const stub = stubFetch(async (url) => {
+    const path = url.pathname;
+    if (path.endsWith('/cards')) return [{ id: 'zz97-001' }, { id: 'zz97-002' }, { id: 'zz97-003' }];
+    if (path.endsWith('/cards/zz97-003')) return progressCard('zz97-003');
+    if (path.endsWith('/cards/zz97-001')) {
+      // 001 loads after 003 has been reported, so the reports show the arrival order.
+      thirdReportedFirst = await until(() => progress.length === 1);
+      return progressCard('zz97-001');
+    }
+    if (path.endsWith('/cards/zz97-002')) throw new Error('detail request failed');
+    if (path.endsWith('/sets/zz97')) return { id: 'zz97', releaseDate: '2030-01-02' };
+    throw new Error(`unexpected request ${url}`);
+  });
+  try {
+    const response = await queryCards({
+      term: 'Pikachu',
+      onProgress: (update) => progress.push(update),
+    });
+    assert.ok(thirdReportedFirst, 'zz97-001 waited until zz97-003 had been reported');
+    assert.deepEqual(
+      progress.map((update) => update.results.map((card) => card.id)),
+      [['zz97-003'], ['zz97-001', 'zz97-003']]
+    );
+    assert.notEqual(progress[0].results, progress[1].results);
+    assert.deepEqual(
+      progress.map((update) => [update.totalSummaries, update.detailedCount]),
+      [
+        [3, 3],
+        [3, 3],
+      ]
+    );
+    assert.deepEqual(
+      response.results.map((card) => card.id),
+      progress.at(-1).results.map((card) => card.id)
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+test('queryCards still returns every valid card when onProgress throws', async () => {
+  let reports = 0;
+  const stub = stubFetch(async (url) => {
+    const path = url.pathname;
+    if (path.endsWith('/cards')) return [{ id: 'zz97-001' }, { id: 'zz97-002' }];
+    const cardMatch = path.match(/\/cards\/(zz97-\d+)$/);
+    if (cardMatch) return progressCard(cardMatch[1]);
+    if (path.endsWith('/sets/zz97')) return { id: 'zz97', releaseDate: '2030-01-02' };
+    throw new Error(`unexpected request ${url}`);
+  });
+  try {
+    const response = await queryCards({
+      term: 'Pikachu',
+      onProgress: () => {
+        reports += 1;
+        throw new Error('listener broke');
+      },
+    });
+    assert.equal(reports, 2);
+    assert.deepEqual(
+      response.results.map((card) => card.id),
+      ['zz97-001', 'zz97-002']
+    );
+  } finally {
+    stub.restore();
+  }
+});

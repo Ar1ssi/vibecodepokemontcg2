@@ -305,6 +305,29 @@ function setReleaseDate(setId) {
   return tcgdexSetReleaseDateCache.get(setId);
 }
 
+// One card's record, normalized with its release date filled in. Null when the
+// record has no image or its request fails, so one bad record never fails the search.
+async function loadDetailedCard(summary) {
+  try {
+    const card = normalizeTcgdexCard(await fetchJson(tcgdexApiUrl(`/cards/${summary.id}`)));
+    if (!card.image) return null;
+    if (card.set.id && !card.set.releaseDate) {
+      card.set.releaseDate = await setReleaseDate(card.set.id);
+    }
+    return card;
+  } catch {
+    return null;
+  }
+}
+
+function reportProgress(onProgress, progress) {
+  try {
+    onProgress(progress);
+  } catch {
+    // A throwing listener must not drop the card or fail the search.
+  }
+}
+
 /**
  * Searches TCGdex by card name, by filter params, or both (design 050).
  *
@@ -313,8 +336,11 @@ function setReleaseDate(setId) {
  * no name and no params there is nothing to ask for, so nothing is fetched.
  *
  * `detailedCount` < `totalSummaries` means the detail cap cut the list short.
+ *
+ * `onProgress({ results, totalSummaries, detailedCount })`, when given, runs after
+ * each valid card loads: `results` is every valid card so far, in summary order.
  */
-export async function queryCards({ term = '', params = {} } = {}) {
+export async function queryCards({ term = '', params = {}, onProgress = null } = {}) {
   const cleanName = stripWildcards(normalizeSearchQuery(String(term)));
   const hasParams = Object.keys(params || {}).length > 0;
   if (!cleanName && !hasParams) {
@@ -371,18 +397,20 @@ export async function queryCards({ term = '', params = {} } = {}) {
 
   // Each card's set lookup starts as soon as its record arrives, while the
   // other records are still loading, rather than in a second round after them.
+  const arrived = new Array(summariesToFetch.length).fill(null);
   const detailedCards = await Promise.all(
-    summariesToFetch.map(async (summary) => {
-      try {
-        const card = normalizeTcgdexCard(await fetchJson(tcgdexApiUrl(`/cards/${summary.id}`)));
-        if (!card.image) return null;
-        if (card.set.id && !card.set.releaseDate) {
-          card.set.releaseDate = await setReleaseDate(card.set.id);
-        }
-        return card;
-      } catch {
-        return null;
+    summariesToFetch.map(async (summary, index) => {
+      const card = await loadDetailedCard(summary);
+      if (!card) return null;
+      arrived[index] = card;
+      if (typeof onProgress === 'function') {
+        reportProgress(onProgress, {
+          results: arrived.filter(Boolean),
+          totalSummaries: allSummaries.length,
+          detailedCount: summariesToFetch.length,
+        });
       }
+      return card;
     })
   );
 
