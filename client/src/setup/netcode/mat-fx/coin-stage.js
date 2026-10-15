@@ -22,6 +22,8 @@ import {
 const ASSET_DIR = '/src/assets/coins/tcgl/';
 /** Stands in for a real-world scan's front (its material, art swapped), and supplies the back when a coin has none. */
 const DEFAULT_COIN_ID = 'cn_tcgl-default_energy-colorless_mtl';
+/** A real-world coin's back: the regular Pokémon coin back, not TCG Live's silver one. */
+const PHYSICAL_BACK_URL = '/src/assets/coins/coin-back.png';
 const WRAPS = [THREE.RepeatWrapping, THREE.ClampToEdgeWrapping, THREE.MirroredRepeatWrapping, THREE.ClampToEdgeWrapping];
 // Unity's default textures by name (the importer's `#name` sources), as RGBA bytes.
 const DEFAULT_TEXELS = { '#white': [255, 255, 255, 255], '#black': [0, 0, 0, 0], '#gray': [128, 128, 128, 128], '#bump': [128, 128, 255, 128], '#red': [255, 0, 0, 0] };
@@ -162,8 +164,8 @@ async function buildMaterial(assets, spec) {
 
 /**
  * A coin's back then front materials, as `{ front, back }` material specs (tcglMaterial output). A TCG Live
- * coin uses its own; a real-world coin (id not in coins.json) gets the default coin's material with its
- * art swapped for the scan at `coin.artUrl`.
+ * coin uses its own; a real-world coin (id not in coins.json) gets the default coin's materials with the
+ * front art swapped for the scan at `coin.artUrl` and the back art for the regular Pokémon coin back.
  */
 function resolveCoin(assets, coin) {
   const defaults = tcglCoin(assets, DEFAULT_COIN_ID);
@@ -174,11 +176,11 @@ function resolveCoin(assets, coin) {
     return { front: own.front, back: own.back ?? back };
   }
   if (!coin.artUrl) throw new Error(`coin "${coin.id}" is neither a TCG Live coin nor has art`);
-  const front = {
-    ...defaults.front,
-    textures: defaults.front.textures.map((sampler, index) => (index === 0 ? { ...sampler, source: { url: coin.artUrl } } : sampler)),
-  };
-  return { front, back };
+  const withArt = (material, url) => ({
+    ...material,
+    textures: material.textures.map((sampler, index) => (index === 0 ? { ...sampler, source: { url } } : sampler)),
+  });
+  return { front: withArt(defaults.front, coin.artUrl), back: withArt(back, PHYSICAL_BACK_URL) };
 }
 
 const submeshNamed = (mesh, name) => {
