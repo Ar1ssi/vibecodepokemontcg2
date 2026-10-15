@@ -221,7 +221,7 @@ Seven dark themes are available, with light-mode overrides per component. Ambien
 - Rooms are identified by a code you enter or generate. Join as a player or as a spectator; two
   names hold the seats, and there are no accounts.
 - The opening deal runs only when both seated players have loaded decks and pressed Set Up.
-- With `SERVER_AUTHORITATIVE=1`, the Express and Socket.IO server owns one `GameState`, validates
+- By default (server authority), the Express and Socket.IO server owns one `GameState`, validates
   and applies commands, and broadcasts a per-player redacted view. Turn player, turn number, and
   per-turn flags are reconciled from the server, so both clients agree.
 - Every command is appended to a deterministic log with a seeded RNG cursor, which powers undo
@@ -258,7 +258,7 @@ Browser (player 1)                    Browser (player 2)
                       |-- server/game/room.mjs: authoritative GameRoom
                       |     per-player views, pending choices,
                       |     turn-order coin call, reconnect, reset
-                      |-- server/game/shadow.mjs: legacy shadow mode + sync telemetry
+                      |-- server/game/sync-check.mjs: client/server zone-hash desync check
                       +-- SQLite (server/database/db.sqlite): state export/import only
                                  |
                     shared/engine/**: pure, DOM-free, headless-tested
@@ -270,7 +270,7 @@ Browser (player 1)                    Browser (player 2)
 The client is the whole front end: `index.ejs` as the page shell, two iframe documents for the
 playmats, around 36 stylesheets, and `src/` organized by area (`setup/`, `actions/`,
 `initialization/`). The server handles statics and EJS rendering through Express, transport through
-Socket.IO, the authoritative `GameRoom`, a shadow/legacy translator, and SQLite through `sqlite3`.
+Socket.IO, the authoritative `GameRoom`, and SQLite through `sqlite3`.
 Between them sits `shared/engine/`, the pure rules and game engine of about 90 modules with no DOM
 or browser APIs: `state.mjs` for zones and hashing, `cards.mjs`, `rng.mjs`, `view.mjs` for
 redaction, `commands.mjs` with roughly 70 command schemas, `reduce.mjs` for validation, reduction,
@@ -279,16 +279,16 @@ attacks, trainers, abilities, stadiums, and special energy. It is served to the 
 `/shared`.
 
 Card data comes from the TCGdex API (`api.tcgdex.net/v2/en`) at runtime for search, set browsing,
-and art. No card database is bundled. With `SERVER_AUTHORITATIVE=1` the server is the authority;
-without it, the server is a relay and clients own the game state, which is the historical mode kept
-for local development.
+and art. No card database is bundled. The server is the authority by default; with
+`SERVER_AUTHORITATIVE=0` it is a relay and clients own the game state, the legacy mode kept until
+its client rules layer is retired.
 
 ## Project layout
 
 ```
 client/                 Front end (EJS shell, iframes, ES modules, CSS, assets)
-server/                 Express + Socket.IO server, GameRoom, shadow mode
-  game/                 room.mjs, shadow.mjs, sync-check.mjs, tests
+server/                 Express + Socket.IO server, GameRoom
+  game/                 room.mjs, deck-packet.mjs, sync-check.mjs, tests
   database/             SQLite file (created at boot, gitignored)
 shared/engine/          Pure game + rules engine shared by server, client and tests
 bot/                    Headless bot brains (heuristic + coverage scorers)
@@ -328,10 +328,9 @@ Environment variables:
 | Variable               | Default                        | Purpose                                                                           |
 | ---------------------- | ------------------------------ | --------------------------------------------------------------------------------- |
 | `PORT`                 | `4000`                         | HTTP port.                                                                        |
-| `SERVER_AUTHORITATIVE` | off (on in the deploy config)  | Enable the server-authoritative command/view protocol.                            |
+| `SERVER_AUTHORITATIVE` | on                             | Server-authoritative protocol; `0`, `false`, `off` or `no` runs the legacy relay. |
 | `PTCG_E2E`             | off                            | Arm the `?e2e=1` test bridge; also armed whenever `NODE_ENV` is not `production`. |
 | `NODE_ENV`             | none                           | `production` closes the `?e2e=1` test bridge (also set on the deploy config).     |
-| `SHADOW_MODE`          | follows `SERVER_AUTHORITATIVE` | Run the legacy shadow simulation and sync telemetry.                              |
 | `ROOM_GRACE_MS`        | 30 minutes                     | How long an empty room is kept before the sweep.                                  |
 | `ADMIN_PASSWORD`       | `defaultPassword`              | Password for the Socket.IO admin UI; change it on any public deploy.              |
 
@@ -389,7 +388,7 @@ only for the 30-day state-export feature, so a restart drops exported links but 
   rooms cap at two players plus spectators.
 - Small-scale by design. No clustering, rate limiting, or durable game persistence, so an
   in-progress game is lost if the server restarts.
-- Legacy parity gaps. Without `SERVER_AUTHORITATIVE`, GX once-per-game and Fossil Item bench
+- Legacy parity gaps. With `SERVER_AUTHORITATIVE=0`, GX once-per-game and Fossil Item bench
   placement are not enforced client-side. Further engine-level gaps are tracked in
   `.agent/ISSUES.md`.
 - Long-tail card effects. A small number of exotic printed effects are recognized and announced but

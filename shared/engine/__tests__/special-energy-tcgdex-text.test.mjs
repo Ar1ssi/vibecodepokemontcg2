@@ -110,7 +110,7 @@ function game() {
   return state;
 }
 
-// The shape shadow.mjs creates: identity-only hand card; the effect text arrives via cardStats.
+// The shape reduce.mjs loadDeck creates: identity-only hand card; the effect text arrives via cardStats.
 function attachWithText(state, { name, text, targetId }) {
   const stats = applyCommand(state, {
     type: 'cardStats',

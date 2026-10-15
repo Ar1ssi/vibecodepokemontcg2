@@ -6,7 +6,7 @@
 .agent/ — agent harness: state, workflows, designs, journal (human manual: .agent/README.md); spawn-or-inline cost guide: .agent/DELEGATION.md
 .claude/agents/ — project subagents: slice-builder (low effort, pinned-contract slices; D171), fx-designer (high effort, board visuals/CSS in the 041–046 house style; D173)
 client/ — client application (EJS layout, CSS styles, client JS, deck builder, rules engine); entry: client/src/front-end.js
-server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views)
+server/ — Express + Socket.IO + SQLite; entry: server/server.js; game rooms in server/game/room.mjs (GameRoom runs shared/engine commands, sends per-player views); server/netcode-mode.mjs: server authority unless SERVER_AUTHORITATIVE=0|false|off|no; server/game/room-sweep.mjs: idle-room sweep plan
 shared/tcgdex/ — TCGdex URL builder (browser → server proxy server/tcgdex-proxy.mjs, D164) + IndexedDB JSON cache (D102)
 docs/ — project documentation (card types taxonomy, rule specs); entry: docs/card-types-taxonomy.md
 scripts/ — admin and asset utility scripts (stadium audit, pkmncards scraper + attack/ability corpus audit, mat generator; pkmncards article HTML helper: scripts/lib/pkmn-article-html.mjs, D179)
@@ -72,7 +72,8 @@ client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native
 **/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~6900); run one file with `node --test <path>`
 scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully contained in origin/main; keeps main, the current branch and open-PR refs (via gh, else --keep); needs local push rights (test: scripts/__tests__/prune-merged-branches.test.mjs)
 scripts/harness-check.mjs — `pnpm harness:check`: measures every .agent budget in workflows/maintain.md plus the 30-commit maintain trigger; exit 1 = OVER (test: scripts/__tests__/harness-check.test.mjs)
-scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode, `pnpm test:2p`)
+scripts/e2e/two-player-sync-test.mjs — Playwright two-browser sync harness (legacy mode: needs a
+  `SERVER_AUTHORITATIVE=0` server on PTCG_URL, `pnpm test:2p`)
 scripts/e2e/flip-gate-test.mjs — Playwright two-browser full game under SERVER_AUTHORITATIVE=1: design 002's
   3.12 flip gate (`pnpm test:flip`; needs a hand-started authoritative server on PTCG_URL)
 scripts/e2e/test-card-inspector-e2e.mjs — Playwright two-browser design-013/067 card-inspector + card-focus gate
@@ -82,7 +83,7 @@ scripts/e2e/*-test.mjs, explore-ui.mjs, record-legacy-2p-fixture.mjs — the oth
 bot/bot.mjs, bot/heuristic-scorer.mjs — design 004 slice 5: pure-Node playtest bot (never-crash
   scaffold + greedy scorer), driven by scripts/e2e/playtest-bot.mjs via __ptcg observe/options/act
 scripts/e2e/playtest-bot.mjs — design 004 slice 6: the playtest runner. Two Playwright pages, bot vs.
-  bot, legacy mode by default (`node server/server.js` on :4000, then `node scripts/e2e/playtest-bot.mjs
+  bot, either netcode (`node server/server.js` on :4000, then `node scripts/e2e/playtest-bot.mjs
   --games=N --seed=S`); dumps a replayable trace to out/playtest/ on any failure. Found a real bug
   on first live run (I30, ISSUES.md) — see design 004 slice 6's Acceptance note.
 

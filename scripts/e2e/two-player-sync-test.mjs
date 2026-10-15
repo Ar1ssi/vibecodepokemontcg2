@@ -1,3 +1,7 @@
+// Two-browser sync harness for the legacy relay (it drives the client coin-call overlay), so the
+// server must opt out of server authority:
+//   SERVER_AUTHORITATIVE=0 node server/server.js &
+//   pnpm test:2p
 import { chromium } from 'playwright';
 
 const BASE = process.env.PTCG_URL || 'http://localhost:4000';

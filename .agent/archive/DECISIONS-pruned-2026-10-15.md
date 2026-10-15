@@ -162,3 +162,4 @@
 - D27 2026-09-11 [testing] Debug mode = the ?e2e=1 bridge + `window.__ptcg.debugMode(enabled)`; e2e mode is exempt from the 2P rules-forced-on lock.
 - D20 2026-09-10 [rules-ui] Pickers: either auto-move (no `pickOnly`) or `pickOnly:true` + manual move in `onPick` — never both (double-move).
 - D6 2026-09-07 [netcode] Named-payload commands validate in a pure `applyCommand` reducer; undo = deterministic commandLog replay (design 001).
+- D17 2026-09-10 [netcode] Prod (render.yaml) sets SERVER_AUTHORITATIVE='1'; server.js default stays OFF for local/dev/tests. (Supersedes D8.)  [pruned 2026-10-15: superseded by D216]

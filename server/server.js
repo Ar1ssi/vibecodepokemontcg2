@@ -12,7 +12,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
 import { createTurnOrderTransport } from './game/turn-order-transport.mjs';
-import { ShadowSession, extractDeckData, extractDeckFormat } from './game/shadow.mjs';
+import { planRoomSweep } from './game/room-sweep.mjs';
+import { extractDeckData, extractDeckFormat } from './game/deck-packet.mjs';
 import {
   findFirstDivergentZone,
   hashOwnerViewZones,
@@ -40,10 +41,13 @@ import {
 import { issueSeatToken } from './lobby/seat-token.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
+import { readServerAuthoritative } from './netcode-mode.mjs';
 
-const SERVER_AUTHORITATIVE =
-  process.env.SERVER_AUTHORITATIVE === '1' ||
-  process.env.SERVER_AUTHORITATIVE === 'true';
+// On unless SERVER_AUTHORITATIVE is 0, false, off or no (the legacy relay, kept until I251 retires it).
+const netcodeMode = readServerAuthoritative(process.env.SERVER_AUTHORITATIVE);
+const SERVER_AUTHORITATIVE = netcodeMode.serverAuthoritative;
+// eslint-disable-next-line no-console
+if (netcodeMode.warning) console.warn(netcodeMode.warning);
 
 // The `?e2e=1` test bridge (window.__ptcg) is a scripting API over the local player's own
 // board. It is shipped to every browser but must only ARM where a harness is meant to run:
@@ -54,11 +58,6 @@ const E2E_ENABLED =
   process.env.PTCG_E2E === '1' ||
   process.env.PTCG_E2E === 'true' ||
   process.env.NODE_ENV !== 'production';
-
-const SHADOW_MODE =
-  process.env.SHADOW_MODE?.trim() === '1' ||
-  process.env.SHADOW_MODE?.trim() === 'true' ||
-  SERVER_AUTHORITATIVE;
 
 // Sweep grace (Finding 5): a GameRoom with no connected sockets is only swept
 // once it has also been idle this long, so a brief double-disconnect during
@@ -311,28 +310,6 @@ async function main() {
 
   const roomInfo = new Map();
   const gameRooms = new Map();
-  const shadowSessions = new Map();
-  const completedShadowReports = [];
-
-  app.get('/debug/shadow-report', (req, res) => {
-    const roomId = req.query.roomId;
-    if (roomId) {
-      if (shadowSessions.has(roomId)) {
-        return res.json(shadowSessions.get(roomId).getReport());
-      }
-      const finished = completedShadowReports.find((r) => r.roomId === roomId);
-      if (finished) return res.json(finished);
-      return res.status(404).json({ error: 'Room not found' });
-    }
-    const allReports = [];
-    for (const shadow of shadowSessions.values()) {
-      allReports.push(shadow.getReport());
-    }
-    res.json({
-      activeShadowSessions: shadowSessions.size,
-      reports: [...allReports, ...completedShadowReports],
-    });
-  });
 
   // Function to periodically clean up empty rooms
   const cleanUpEmptyRooms = () => {
@@ -342,35 +319,20 @@ async function main() {
       }
     });
     if (SERVER_AUTHORITATIVE) {
-      gameRooms.forEach((room, roomId) => {
-        if (
-          room.playerToSocket.size === 0 &&
-          room.spectatorSockets.size === 0 &&
-          Date.now() - room.lastActivityAt > ROOM_GRACE_MS
-        ) {
-          room.clearTurnOrderCall();
-          clearTurnOrderTimer(roomId);
-          gameRooms.delete(roomId);
-          // roomInfo is not deleted here: it has its own username-keyed
-          // lifecycle (line ~316 above), and deleting it here is what turned
-          // a brief double-disconnect into a false server_restart (Finding 5).
-        }
+      // Players who drop without Leave keep their roomInfo seat, so an abandoned private
+      // room's roomInfo goes with its GameRoom, but only past the grace (Finding 5).
+      const due = planRoomSweep({
+        gameRooms,
+        now: Date.now(),
+        graceMs: ROOM_GRACE_MS,
+        socketCount: (roomId) => io.sockets.adapter.rooms.get(roomId)?.size ?? 0,
       });
-    }
-    if (SHADOW_MODE) {
-      shadowSessions.forEach((shadow, roomId) => {
-        if (
-          shadow.gameRoom.playerToSocket.size === 0 &&
-          shadow.gameRoom.spectatorSockets.size === 0
-        ) {
-          completedShadowReports.push(shadow.getReport());
-          if (completedShadowReports.length > 50) {
-            completedShadowReports.shift();
-          }
-          shadowSessions.delete(roomId);
-          roomInfo.delete(roomId);
-        }
-      });
+      for (const { roomId, forgetRoomInfo } of due) {
+        gameRooms.get(roomId).clearTurnOrderCall();
+        clearTurnOrderTimer(roomId);
+        gameRooms.delete(roomId);
+        if (forgetRoomInfo) roomInfo.delete(roomId);
+      }
     }
   };
   // Set up a timer to clean up empty rooms every 5 minutes (adjust as needed)
@@ -549,10 +511,6 @@ async function main() {
       const gameRoom = gameRooms.get(roomId);
       if (gameRoom) gameRoom.roomFormat = next.format;
     }
-    if (SHADOW_MODE) {
-      const shadow = shadowSessions.get(roomId);
-      if (shadow) shadow.gameRoom.roomFormat = next.format;
-    }
   };
   const roomHasDealt = (roomId) => SERVER_AUTHORITATIVE && roomFormatLocked(gameRooms.get(roomId));
 
@@ -575,7 +533,6 @@ async function main() {
       clearTurnOrderTimer(roomId);
       gameRooms.delete(roomId);
     }
-    if (SHADOW_MODE) shadowSessions.delete(roomId);
     return true;
   };
 
@@ -587,10 +544,6 @@ async function main() {
     forgetSeat(room, username);
     setRoomFormat(roomId, room, clearRoomFormatProposal(room.format));
     if (deleteRoomIfEmpty(roomId, room)) return;
-    // The shadow engine must free the seat too, or it reports the room full to the next joiner.
-    const shadow = SHADOW_MODE ? shadowSessions.get(roomId) : null;
-    const shadowPlayerId = shadow?.getPlayerIdByUsername(username);
-    if (shadowPlayerId) shadow.gameRoom.resetGame({ removePlayerId: shadowPlayerId });
     if (SERVER_AUTHORITATIVE) resetGameAfterPlayerLeft(roomId, username);
     broadcastRoomFormat(roomId);
   };
@@ -648,9 +601,6 @@ async function main() {
         if (!resetFollows) {
           turnOrderTransport.handleSeatLost(gameRoom, roomId, lostPlayerId);
         }
-      }
-      if (SHADOW_MODE && shadowSessions.has(roomId)) {
-        shadowSessions.get(roomId).removeSocket(socket.id);
       }
       // Remove the disconnected user from the roomInfo map
       if (roomInfo.has(roomId)) {
@@ -797,7 +747,6 @@ async function main() {
       const room = roomInfo.get(roomId);
 
       const gameRoom = SERVER_AUTHORITATIVE ? gameRooms.get(roomId) : null;
-      const shadow = SHADOW_MODE ? shadowSessions.get(roomId) : null;
 
       // Identity protection & seat management (Finding 7)
       let isExistingPlayer = false;
@@ -807,12 +756,6 @@ async function main() {
         if (gameRoom.getPlayerIdByUsername(username)) {
           isExistingPlayer = true;
         } else if (!gameRoom.getNextAvailablePlayerId()) {
-          roomIsFull = true;
-        }
-      } else if (shadow) {
-        if (shadow.getPlayerIdByUsername(username)) {
-          isExistingPlayer = true;
-        } else if (!shadow.getNextAvailablePlayerId()) {
           roomIsFull = true;
         }
       } else {
@@ -869,23 +812,6 @@ async function main() {
             }
           }
         }
-        if (SHADOW_MODE) {
-          let activeShadow = shadow;
-          if (!activeShadow) {
-            activeShadow = new ShadowSession({ roomId });
-            activeShadow.gameRoom.roomFormat = roomInfo.get(roomId)?.format?.format ?? null;
-            shadowSessions.set(roomId, activeShadow);
-          }
-          if (isSpectator) {
-            activeShadow.gameRoom.addSpectator(socket.id);
-          } else {
-            const targetPid =
-              activeShadow.getPlayerIdByUsername(username) ||
-              activeShadow.getNextAvailablePlayerId() ||
-              'p1';
-            activeShadow.addPlayer(socket.id, targetPid, username);
-          }
-        }
         // Check if the user is a spectator or there are fewer than 2 players
         if (isSpectator) {
           room.spectators.add(username);
@@ -909,7 +835,6 @@ async function main() {
           }
           socket.emit('joinGame', {
             serverAuthoritative: SERVER_AUTHORITATIVE,
-            shadowMode: SHADOW_MODE,
             protocolVersion: PROTOCOL_VERSION,
             // A seated player reloading into a running game: the client pulls
             // the current view once its room setup is done.
@@ -1026,26 +951,6 @@ async function main() {
           }
         }
       }
-      if (SHADOW_MODE) {
-        let shadow = shadowSessions.get(data.roomId);
-        if (!shadow) {
-          shadow = new ShadowSession({ roomId: data.roomId });
-          shadow.gameRoom.roomFormat = roomInfo.get(data.roomId)?.format?.format ?? null;
-          shadowSessions.set(data.roomId, shadow);
-        }
-        if (!data.notSpectator) {
-          shadow.gameRoom.addSpectator(socket.id);
-        } else {
-          const existingPid =
-            shadow.getPlayerIdByUsername(data.username) ||
-            shadow.getNextAvailablePlayerId();
-          if (!existingPid) {
-            socket.emit('roomReject', { reason: 'full' });
-            return;
-          }
-          shadow.addPlayer(socket.id, existingPid, data.username);
-        }
-      }
       if (!data.notSpectator) {
         room.spectators.add(data.username);
         watchDisconnect(data.roomId, data.username, true);
@@ -1160,15 +1065,6 @@ async function main() {
             const existing = room.setupActionCache.get(socket.id) || {};
             existing[data.action] = data;
             room.setupActionCache.set(socket.id, existing);
-          }
-        }
-
-        if (SHADOW_MODE && data) {
-          const roomId =
-            data.roomId || [...socket.rooms].find((r) => r !== socket.id);
-          const shadow = shadowSessions.get(roomId);
-          if (shadow && event === 'pushAction') {
-            shadow.ingestAction(socket.id, data);
           }
         }
 

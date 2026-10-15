@@ -6,7 +6,7 @@
 // just failing — a failing seed must be re-runnable from its dump.
 //
 // Usage:
-//   node server/server.js &
+//   node server/server.js &          # server authority; SERVER_AUTHORITATIVE=0 for design 004's legacy path
 //   node scripts/e2e/playtest-bot.mjs --games=50 --seed=1 [--max-turns=60] [--deck=<path.json>] [--headed]
 //                          [--scorer=heuristic|coverage]
 //   node scripts/e2e/playtest-bot.mjs --deckA=<path.json> --deckB=<path.json>   # two different decks
@@ -254,7 +254,7 @@ async function setupGame(browser, room, deckRowsA, deckRowsB, pageErrors) {
   await waitFor(a.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
   await waitFor(b.page, () => window.__ptcg.zone('self', 'hand').count >= 7);
 
-  // Design 004 targets the legacy client path by default (SERVER_AUTHORITATIVE unset),
+  // Design 004 targeted the legacy client path (now SERVER_AUTHORITATIVE=0),
   // where turnPlayer is decided by a peer-to-peer coin flip and broadcast directly
   // (rules-bridge.js's runTurnOrderCoinFlip) rather than confirmed by a pushed server
   // view — turnState().fromServer never becomes true in this mode, unlike flip-gate-

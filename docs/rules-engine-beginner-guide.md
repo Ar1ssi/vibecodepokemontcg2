@@ -52,10 +52,10 @@ Keeping these apart is why a bug in one stage can usually be fixed without touch
 
 ### Which mode runs the engine?
 
-- The server runs `reduce.mjs` through `server/game/room.mjs`. Start the server with `SERVER_AUTHORITATIVE=1` to make the server the referee. This is the path the tests and the audits cover best.
+- The server runs `reduce.mjs` through `server/game/room.mjs`. The server is the referee by default (`SERVER_AUTHORITATIVE=0` turns it off). This is the path the tests and the audits cover best.
 - The browser also imports the same parsers (`rules/abilities.mjs`, `rules/rules-state.mjs`, and others) for its own checks and UI. So a parser fix affects both paths.
 
-If you are not sure which path a bug comes from, run the server with `SERVER_AUTHORITATIVE=1` and try again.
+If you are not sure which path a bug comes from, reproduce it on a default (server-authoritative) server.
 
 ---
 

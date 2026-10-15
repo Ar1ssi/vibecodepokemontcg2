@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I255). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I256). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,12 +14,13 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I255 2026-10-15 P3 [netcode] joinGame/reconnect add the socket to the Socket.IO room before roomReject (server.js:789/:925 vs :810/:940/:949): rejected sockets get room broadcasts and keep roomInfo alive past the sweep; join only after the seat checks pass (refs: D216 review)
 - I254 2026-10-15 P3 [board-ui] mats-catalog.mjs still claims GENERATED, but rerunning scripts/generate-mat-thumbs.mjs would drop every custom-* entry (manifest.json has none); 27 dead custom/*-full-size*.png entries remain (refs: I249, D215)
 - I252 2026-10-15 P3 [deck-builder] Data shipped as code: coins.mjs 9,647 lines imported at boot by rules-bridge.js, set-browser.mjs 720 JSON lines with a 143-line block duplicated at :984/:1445; bnb-run.js and build-battle.js share 160 verbatim lines across both B&B flows (refs: design 073 D)
-- I251 2026-10-15 P2 [legacy] Client rules layer loaded under authority: rules-bridge.js 3,527 + trainer-execution.js 2,939 + chat-buttons.js 5,421 lines, 55 authority guards in 23 files, 4 legacy/server rule twins, shadow.mjs live; lint: dmg undefined, chat-buttons.js:2168 (refs: design 073 C)
+- I251 2026-10-15 P2 [legacy] Client rules layer still loaded under authority (rules-bridge.js, trainer-execution.js, chat-buttons.js ~12k lines; 55 guards in 23 files; 4 legacy/server rule twins). Step 1 landed: authority default, shadow mode gone, dmg fix (D216). Retire the twins as DISPOSITION_TABLE grows (refs: design 073 C)
 - I250 2026-10-15 P2 [engine] reduce.mjs is 10,976 lines, 186 commits in 2 months (top hotspot): applyCommand 2,322 lines, resolveAttackEffectPhase 1,420, 123 case labels behind 3 exports; every engine edit re-lints and re-tests the whole file — split by command domain (refs: design 073 B)
 - I247 2026-10-15 P3 [netcode] Design 072 seat-loss (merged I247, I248): a seat rejoining after the opening deal gets no dealOrder/turnOrderResult replay (Set Up shuffles locally after 45 s); a caller or coin winner whose socket blips is answered for at once, no reconnect grace (refs: design 072)
-- I245 2026-10-15 P2 [netcode] e2e tests failing on main (merged I245, I246): scripts/e2e/flip-gate-test.mjs step 3 throws `reading 'image'` (e2e-api.js:553), step 1 flakes ~1 in 3; scripts/e2e/room-change-reset-test.mjs waits for a legacy coin-call picker the bridge auto-answers (design 072)
+- I245 2026-10-15 P2 [netcode] e2e tests failing on main (merged I245, I246): scripts/e2e/flip-gate-test.mjs step 3 throws `reading 'image'` via e2e-api.js:570, steps 1/2 flake; scripts/e2e/room-change-reset-test.mjs waits for a legacy coin-call picker the bridge auto-answers (design 072)
 - I242 2026-10-11 P3 [board-ui] Card focus gaps (merged I242, I243): own Active only (no Bench abilities, opponent Active, buff/debuff HUD, action drawer); attack-ui arrows and W/R tint wait on a damage split (base/bonus/reduction/W/R), `_Modal`/atkOv_Brdr_B1 on the drawer (refs: D208, design 067)
 - I239 2026-10-01 P2 [rules] I233 follow-ups (merged I239, I240, I241): "has no Abilities" locks (Garbotoxin) also stop Powers/Bodies (isAbilitySuppressed ignores type; Toxic Gas skips promos); rules-bridge.js ~2981 may auto-run old wordings on play (audit); empty TCGdex ability entries (neo2-49…)
 - I235 2026-10-01 P3 [rules] Lt. Surge's Secret Plan (gym2-107) does nothing: engine can't keep an in-play card face down and flip it on attack/Power/evolve/retreat/damage

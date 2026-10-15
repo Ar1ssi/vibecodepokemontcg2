@@ -9,6 +9,7 @@
 #   Next id = highest D number in this file and the archives + 1 (next: D216).
 
 ## Active
+- D216 2026-10-15 [netcode] SERVER_AUTHORITATIVE defaults on (server/netcode-mode.mjs); only 0/false/off/no runs the legacy relay; shadow mode deleted, room-sweep.mjs frees roomInfo past grace. (supersedes D17)
 - D215 2026-10-15 [board-ui] Custom playmats ship as WebP in `thumbs/` and `board/`; PNG originals in `custom/` are untracked. Don't rerun `generate-mat-thumbs.mjs` blindly: manifest.json lacks custom entries. (052f8ac)
 - D214 2026-10-15 [harness] Playwright/jsdom e2e harnesses live in `scripts/e2e/`; the repo root holds config and entry docs only, no probe scripts, logs, `.bak` files or notes. (052f8ac, design 073)
 - D213 2026-10-16 [deck-builder] Sleeves are TCG Live's 415 (scripts/import-tcgl-sleeves.py: face crop 73-439 px, webp, ids `cs_*`), not the sleeve database; old stored ETB sleeve id remaps.
@@ -86,7 +87,6 @@
 - D27 2026-09-11 [testing] Debug mode = the ?e2e=1 bridge + `window.__ptcg.debugMode(enabled)`; e2e mode is exempt from the 2P rules-forced-on lock; `stampE2eCard` stamps only e2eFixtureDeck() cards (D29).
 - D24 2026-09-10 [deck-builder] Generation pills source sets from TCGdex `series`; map 9=sv, 8=swsh, 7=sm, 6=xy, 5=bw, 4=dp+pl, 3=ecard+ex, 2=neo, 1=base+gym (user call).
 - D20 2026-09-10 [rules-ui] Pickers: either auto-move (no `pickOnly`) or `pickOnly:true` + manual move in `onPick` — never both; in-play Pokémon candidates use `openMatPick()`, not the carousel (D19, user).
-- D17 2026-09-10 [netcode] Prod (render.yaml) sets SERVER_AUTHORITATIVE='1'; server.js default stays OFF for local/dev/tests. (Supersedes D8.)
 - D16 2026-09-10 [netcode] reveal/hide commands only flip the sender's own cards; no cross-player reveal.
 - D14 2026-09-09 [netcode] Server is sole turn authority (`reconcileTurnState`); cross-client parity compares public zones only, secret zones by count.
 - D12 2026-09-09 [netcode] A `server_command` action gates its legacy body on `serverAuthoritative`; untranslatable commands fail OPEN to the legacy body.

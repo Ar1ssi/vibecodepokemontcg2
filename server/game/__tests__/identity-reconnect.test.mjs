@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameRoom } from '../room.mjs';
-import { ShadowSession } from '../shadow.mjs';
 
 test('Finding 7: GameRoom getPlayerIdByUsername and getNextAvailablePlayerId helpers', () => {
   const room = new GameRoom({ roomId: 'room-helpers', rulesEnabled: false });
@@ -39,21 +38,6 @@ test('Finding 7: GameRoom prevents seat hijacking by different username on estab
   const aliceReconnect = room.addPlayer('sock-alice-2', 'p1', 'Alice');
   assert.equal(aliceReconnect, true, 'Alice should successfully re-register her seat');
   assert.equal(room.playerToSocket.get('p1'), 'sock-alice-2');
-});
-
-test('Finding 7: ShadowSession delegates getPlayerIdByUsername and getNextAvailablePlayerId', () => {
-  const shadow = new ShadowSession({ roomId: 'shadow-helpers' });
-
-  assert.equal(shadow.getNextAvailablePlayerId(), 'p1');
-  assert.equal(shadow.getPlayerIdByUsername('Alice'), null);
-
-  shadow.addPlayer('sock-1', 'p1', 'Alice');
-  assert.equal(shadow.getPlayerIdByUsername('Alice'), 'p1');
-  assert.equal(shadow.getNextAvailablePlayerId(), 'p2');
-
-  shadow.addPlayer('sock-2', 'p2', 'Bob');
-  assert.equal(shadow.getPlayerIdByUsername('Bob'), 'p2');
-  assert.equal(shadow.getNextAvailablePlayerId(), null);
 });
 
 test('Finding 7: Player 1 temporarily drops, Player 2 reconnects -> Player 2 retains p2 without identity swap', () => {
