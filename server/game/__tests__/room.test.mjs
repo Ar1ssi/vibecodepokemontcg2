@@ -132,8 +132,9 @@ test('GameRoom: successful command produces broadcasts for all players with reda
   assert.equal(p2Broadcast.view.them.zones.hand[0].instanceId, 101);
   assert.equal(p2Broadcast.view.them.zones.hand[0].name, undefined);
 
-  // Spectator sees hand count
-  assert.equal(specBroadcast.view.players.p1.zones.hand.count, 1);
+  // Spectator sees both hands (design 069), never the deck
+  assert.equal(specBroadcast.view.players.p1.zones.hand[0].name, 'Secret Trainer');
+  assert.equal(specBroadcast.view.players.p1.zones.deck.count, 0);
 
   // Broadcasts contain recipient-specific lastClientSeq
   assert.equal(p1Broadcast.lastClientSeq, 10);

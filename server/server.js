@@ -376,6 +376,18 @@ async function main() {
     broadcastRoomFormat(roomId);
   };
 
+  const emitFreshView = (gameRoom, roomId, socketId, playerId) => {
+    const view = gameRoom.getView(playerId);
+    io.to(socketId).emit('view', {
+      gameId: roomId,
+      stateVersion: gameRoom.state.stateVersion,
+      view,
+      events: [],
+      pendingChoice: view?.pendingChoice || null,
+      lastClientSeq: 0,
+    });
+  };
+
   const broadcastFreshGame = (gameRoom, roomId, players) => {
     for (const { playerId, socketId } of players) {
       if (!socketId) continue;
@@ -383,15 +395,11 @@ async function main() {
         roomId,
         map: gameRoom.getInstanceMap(playerId),
       });
-      const view = gameRoom.getView(playerId);
-      io.to(socketId).emit('view', {
-        gameId: roomId,
-        stateVersion: gameRoom.state.stateVersion,
-        view,
-        events: [],
-        pendingChoice: view?.pendingChoice || null,
-        lastClientSeq: 0,
-      });
+      emitFreshView(gameRoom, roomId, socketId, playerId);
+    }
+    // Design 069: spectators watch the restarted game too.
+    for (const socketId of gameRoom.spectatorSockets) {
+      emitFreshView(gameRoom, roomId, socketId, null);
     }
   };
   // Design 013: the opening deal no longer happens the moment both seats are ready.
@@ -782,8 +790,15 @@ async function main() {
         // Check if the user is a spectator or there are fewer than 2 players
         if (isSpectator) {
           room.spectators.add(username);
-          socket.emit('spectatorJoin');
-          socket.to(roomId).emit('requestSpectatorData', { roomId });
+          // Design 069: an authoritative room's spectator renders server views, so it
+          // needs the mode up front and never the players' legacy action replay.
+          socket.emit('spectatorJoin', {
+            serverAuthoritative: SERVER_AUTHORITATIVE,
+            protocolVersion: PROTOCOL_VERSION,
+          });
+          if (!SERVER_AUTHORITATIVE) {
+            socket.to(roomId).emit('requestSpectatorData', { roomId });
+          }
         } else {
           room.players.add(username);
           socket.emit('joinGame', {
@@ -892,9 +907,11 @@ async function main() {
       }
       if (!data.notSpectator) {
         room.spectators.add(data.username);
-        socket
-          .to(data.roomId)
-          .emit('requestSpectatorData', { roomId: data.roomId });
+        if (!SERVER_AUTHORITATIVE) {
+          socket
+            .to(data.roomId)
+            .emit('requestSpectatorData', { roomId: data.roomId });
+        }
       } else {
         room.players.add(data.username);
         // Remove any existing disconnect listener to prevent leak on reconnect

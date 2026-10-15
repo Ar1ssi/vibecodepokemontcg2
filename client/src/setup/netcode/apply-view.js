@@ -1560,7 +1560,7 @@ function reconcileStadium(stadiumCard, localPlayerId, options = {}) {
  * @param {string|null} localPlayerId
  * @param {object} options
  */
-function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
+function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}, chooserName = null) {
   const doc =
     options.document || (typeof document !== 'undefined' ? document : null);
   if (!doc) return;
@@ -1601,7 +1601,7 @@ function reconcilePendingChoice(pendingChoice, localPlayerId, options = {}) {
       banner.className = 'choice-waiting-banner';
       doc.body?.appendChild(banner);
     }
-    banner.textContent = `Opponent is making a choice: ${pendingChoice.prompt || '...'}`;
+    banner.textContent = `${chooserName || 'Opponent'} is making a choice: ${pendingChoice.prompt || '...'}`;
     return;
   }
 
@@ -1921,9 +1921,10 @@ function closeChoicePicker(options = {}) {
 export function reconcileTurnState(view, options = {}) {
   const turn = view?.turn;
   if (!turn) return { applied: false, reason: 'no_turn' };
-  // A spectator's view reports isYourTurn:false for both players (view.mjs), so there is
-  // no honest self/opp mapping to make — leave a spectator's local state untouched.
-  if (view.isSpectator || !view.you?.playerId) {
+  // A raw spectator view has no `you` seat, so there is no honest self/opp mapping to make —
+  // leave local state untouched. A spectator perspective (design 069) seats one player as
+  // `you`, and its turn display follows that seat like a player's would.
+  if (!view.you?.playerId) {
     return { applied: false, reason: 'spectator' };
   }
 
@@ -2042,7 +2043,8 @@ export function reconcileGameEnded(view, options = {}) {
   if (gameEndAnnounced) return;
   gameEndAnnounced = true;
 
-  const localPlayerId = view.you?.playerId || null;
+  // A spectator neither wins nor loses, whichever seat it watches from (design 069).
+  const localPlayerId = view.isSpectator ? null : view.you?.playerId || null;
   const isWinner = Boolean(
     view.winner && localPlayerId && view.winner === localPlayerId
   );
@@ -2056,8 +2058,7 @@ export function reconcileGameEnded(view, options = {}) {
   } else if (isLoser) {
     titleText = 'Defeat';
   } else if (view.winner) {
-    const oppName = view.them?.username || view.winner;
-    titleText = `${oppName} Wins!`;
+    titleText = `${usernameOf(view, view.winner) || view.winner} Wins!`;
   }
 
   const reasonText = view.winReason
@@ -2133,6 +2134,53 @@ export function reconcileGameEnded(view, options = {}) {
       title: titleText,
     });
   }
+}
+
+/** Username of `playerId` in whichever seat of the view holds it, or null. */
+function usernameOf(view, playerId) {
+  if (playerId == null) return null;
+  const seat = [view?.you, view?.them].find((p) => p?.playerId === playerId);
+  return seat?.username || null;
+}
+
+/** Removes one rendered card, its overlays and its holo wrapper from the DOM and the registry. */
+function removeCardRecord(id, record, options = {}) {
+  // Counter overlays are siblings of the image in the zone element, not children of
+  // it or its play-container — removing the image/container leaves them orphaned.
+  if (record.element?.damageCounter?.parentNode) {
+    record.element.damageCounter.parentNode.removeChild(record.element.damageCounter);
+  }
+  for (const slot of [...Object.values(CONDITION_MARKER_SLOTS), STATUS_LOOP_SLOT]) {
+    if (record.element?.[slot]?.parentNode) {
+      record.element[slot].parentNode.removeChild(record.element[slot]);
+    }
+  }
+  if (record.element?.abilityCounter?.parentNode) {
+    record.element.abilityCounter.parentNode.removeChild(record.element.abilityCounter);
+  }
+  unhydrateCard(record, options);
+  if (record.container && record.container.parentNode) {
+    record.container.parentNode.removeChild(record.container);
+  } else if (record.element && record.element.parentNode) {
+    record.element.parentNode.removeChild(record.element);
+  }
+  cardRegistry.delete(id);
+}
+
+/**
+ * Design 069: takes every rendered card off the board and forgets the last applied view, so
+ * the next `applyView` — even of the same stateVersion — draws the board from scratch. A
+ * spectator switching perspective needs this: every card changes board (`you` <-> `them`).
+ * The injected renderer context (socket, zone resolvers, listeners) is kept.
+ *
+ * @param {object} [options={}] Renderer options (test seams: `document`, `holo`)
+ */
+export function clearRenderedBoard(options = {}) {
+  for (const [id, record] of [...cardRegistry.entries()]) {
+    removeCardRecord(id, record, options);
+  }
+  lastRenderedVersion = -1;
+  lastAppliedView = null;
 }
 
 /**
@@ -2330,32 +2378,7 @@ export function applyView(view, events = [], options = {}) {
   }
 
   for (const [id, record] of cardRegistry.entries()) {
-    if (!liveInstanceIds.has(id)) {
-      // Counter overlays are siblings of the image in the zone element, not children of
-      // it or its play-container — removing the image/container leaves them orphaned.
-      if (record.element?.damageCounter?.parentNode) {
-        record.element.damageCounter.parentNode.removeChild(
-          record.element.damageCounter
-        );
-      }
-      for (const slot of [...Object.values(CONDITION_MARKER_SLOTS), STATUS_LOOP_SLOT]) {
-        if (record.element?.[slot]?.parentNode) {
-          record.element[slot].parentNode.removeChild(record.element[slot]);
-        }
-      }
-      if (record.element?.abilityCounter?.parentNode) {
-        record.element.abilityCounter.parentNode.removeChild(
-          record.element.abilityCounter
-        );
-      }
-      unhydrateCard(record, options);
-      if (record.container && record.container.parentNode) {
-        record.container.parentNode.removeChild(record.container);
-      } else if (record.element && record.element.parentNode) {
-        record.element.parentNode.removeChild(record.element);
-      }
-      cardRegistry.delete(id);
-    }
+    if (!liveInstanceIds.has(id)) removeCardRecord(id, record, options);
   }
 
   const reconcileHand =
@@ -2367,8 +2390,14 @@ export function applyView(view, events = [], options = {}) {
   // Reconcile neutral Stadium
   reconcileStadium(view.stadium || null, localPlayerId, options);
 
-  // Reconcile PendingChoice modal / banner
-  reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
+  // Reconcile PendingChoice modal / banner. A spectator owns no choice, whichever seat it
+  // watches from: it only ever gets the waiting banner, naming who is choosing.
+  if (view.isSpectator) {
+    const chooser = view.pendingChoice ? usernameOf(view, view.pendingChoice.player) : null;
+    reconcilePendingChoice(view.pendingChoice || null, null, options, chooser);
+  } else {
+    reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
+  }
 
   // Sync local turn state — the server is the only turn authority under the flag
   reconcileTurnState(view, options);

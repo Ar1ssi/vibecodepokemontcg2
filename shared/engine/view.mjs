@@ -1,7 +1,8 @@
 /**
  * @file Authoritative view generation and redaction.
  * Produces redacted per-player (and spectator) views with absolute IDs mapped to { you, them }.
- * Never leaks hidden information (deck contents, opponent hand cards, unrevealed prizes).
+ * A seated player never sees hidden information (deck contents, opponent hand cards, unrevealed
+ * prizes). Spectators see both hands (design 069) but never decks or unrevealed prizes.
  */
 
 import { cloneCard } from './cards.mjs';
@@ -105,23 +106,15 @@ function redactOpponentZones(player) {
 }
 
 /**
- * Redacts a player's zones for a spectator.
+ * Redacts a player's zones for a spectator: both hands are shown so the spectator can follow
+ * either player's point of view or the side-by-side broadcast layout (design 069). The client
+ * hides the off-perspective hand itself; decks and unrevealed prizes stay hidden.
  *
  * @param {object} player
  * @returns {object} Redacted zones
  */
 function redactSpectatorZones(player) {
-  const zones = player.zones || {};
-  return {
-    deck: { count: (zones.deck || []).length },
-    hand: { count: (zones.hand || []).length },
-    prizes: prizeCards(player),
-    active: (zones.active || []).map(sanitizeCard),
-    bench: (zones.bench || []).map(sanitizeCard),
-    discard: (zones.discard || []).map(sanitizeCard),
-    lostZone: (zones.lostZone || []).map(sanitizeCard),
-    board: (zones.board || []).map(boardCard),
-  };
+  return redactOwnerZones(player);
 }
 
 /**
