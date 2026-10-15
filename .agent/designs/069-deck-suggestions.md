@@ -34,7 +34,7 @@ fed by every Masters decklist from Standard official events in the current rotat
 | A6 | Pick what's needed, e.g. "faster setup" | ✓ six tag goals; card-key-tags corpus tests; suggest.test goals; smoke: "For Faster setup 10" |
 | A7 | Goal "cheaper" (budget) | ✓ Budget goal (≤ $1, Limitless TCGplayer prices); suggest.test budget; deck price line |
 | A8 | Goal "answer to <deck>" (matchup data) | ✗ cut (Option 11): card-level matchup data needs ~550 Labs requests per event; ISSUES line at landing |
-| A9 | Hostile review run and its findings fixed | see Deviations / review log |
+| A9 | Hostile review run and its findings fixed | ✓ independent reviewer agent: 1 blocker, 6 should, 5 nits — all fixed (§ Review log) |
 
 ## Assumptions
 - (assumed) "Regionals and championships" = every Standard event on limitlesstcg.com/tournaments
@@ -181,8 +181,9 @@ except `budget`.
 dropped, cross-list overlap resolved locked > accepted > dismissed, unknown goals dropped, each list
 capped at 200), `acceptKey`, `dismissKey`, `lockKey`, `unlockKey`, `restoreKey`, `toggleGoal`,
 `prunePrefs(prefs, presentKeys)` (locked/accepted not present dropped; accepted not present →
-dismissed). Library: `suggestPrefs` on records, normalized in `parseLibrary`/`listDecks`/
-`getDeckSuggestPrefs`; `setDeckSuggestPrefs(library, deckId, prefs)`; `saveDeckSnapshot` takes
+dismissed; a dismissed key that is in the deck again is cleared). Library: `suggestPrefs` on
+records, normalized in `parseLibrary`/`getDeckSuggestPrefs` (`listDecks` does not carry it — nothing
+reads it there); `setDeckSuggestPrefs(library, deckId, prefs)`; `saveDeckSnapshot` takes
 `suggestPrefs`. Import of a list → `EMPTY_PREFS` (goals kept).
 
 ### UI (Suggest tab; not in Build & Battle)
@@ -254,3 +255,22 @@ remove the tab markup, the files above and the `suggestPrefs` plumbing (records 
 - `findDeckCardForKey` (suggest.mjs) and `view.mjs` (strings) added for the Cut button and testable wording.
 - The Suggest tab exists only in the Standard builder window (`isBuilderWindow && !isBuildBattle`), not
   on the game tab's slim panel.
+
+## Review log (hostile review, independent agent, after slice 6)
+- [blocker] Count tweaks always offered Add, even when the fix is fewer copies → items carry
+  `direction`; "down" rows offer Cut 1, every tweak offers "Keep count" (a lock, which hides the
+  tweak); weighted median takes the higher count on an exact 50/50 split. Tests: "review #1".
+- [should] Async Add / Start-from-list could land in another deck → controller `generation` token,
+  bumped by `invalidate()` on every deck open, target switch, clear, detach, restore and wholesale
+  replace; stale results are dropped with a status line.
+- [should] Dismissing a card you play penalised lists that play it → penalty ignores keys in the deck;
+  `prunePrefs` clears dismissed keys that are back in the deck. Tests: "review #3".
+- [should] Confidence ignored deck size (1 Ultra Ball → "high") → `MIN_CORE_COPIES` = 6 non-Energy
+  copies for "high". Test: "review #4". Edge row 4 now really holds.
+- [should] Add accepted the clicked key, not the landed card's → accepts `resolveDeckCard(card)`'s key.
+- [should] Folds collapsed on every click → open folds remembered across renders (smoke-checked).
+- [should] Scraper cached partial pages forever → only events ≥ 14 days old are read from or written
+  to the cache (`isSettled`). Test: "review #7".
+- [nit] 429 now retries with Retry-After (`retryDelayMs`); `listDecks` wording aligned; Import List
+  (replace) and CSV import reset the editor deck's steering (goals kept); accepted α test added;
+  the bake imports `DATASET_VERSION` and `nameKey` from the client dataset module.

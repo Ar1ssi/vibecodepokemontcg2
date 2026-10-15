@@ -269,6 +269,7 @@ export const initializeNativeDeckBuilder = ({ role = 'host', mode = 'standard' }
   };
   // Suggest tab (design 069). Assigned once the panel boots; render() refreshes it.
   let suggestPanel = null;
+  let noteDeckReplaced = () => {};
   const deckStatus = document.getElementById('nativeDeckBuilderDeckStatus');
   const summary = document.getElementById('nativeDeckBuilderSummaryPanel');
   const validationDot = document.getElementById(
@@ -406,6 +407,7 @@ export const initializeNativeDeckBuilder = ({ role = 'host', mode = 'standard' }
           }
           deck = cards;
           syncedDecks[target] = cards;
+          noteDeckReplaced();
           // A non-empty deck should sync into the playmat on close; a freshly
           // created empty deck should not wipe whatever the playmat is holding.
           deckDirty = Object.keys(cards).length > 0;
@@ -617,6 +619,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deckLibrary?.getActiveSuggestPrefs?.(currentLoadTarget) ??
         chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'].suggestPrefs ??
         EMPTY_PREFS;
+      const setSuggestPrefs = (prefs) => {
+        if (!deckLibrary?.setActiveSuggestPrefs?.(currentLoadTarget, prefs)) {
+          rememberCosmetic(currentLoadTarget, 'suggestPrefs', prefs);
+        }
+      };
+      // A wholesale deck change: in-flight Suggest results are stale. `resetSteering` also clears the
+      // steering of the deck now in the editor (its goals stay), since its cards were replaced.
+      noteDeckReplaced = ({ resetSteering = false } = {}) => {
+        suggestPanel?.invalidate();
+        if (resetSteering) setSuggestPrefs({ ...EMPTY_PREFS, goals: [...currentSuggestPrefs().goals] });
+      };
       const suggestNameSearches = new Map();
       suggestPanel =
         isEditor && !isBuildBattle
@@ -624,11 +637,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               panelEl: document.getElementById('nativeDeckBuilderSuggestPanel'),
               getDeck: () => deck,
               getPrefs: currentSuggestPrefs,
-              setPrefs: (prefs) => {
-                if (!deckLibrary?.setActiveSuggestPrefs?.(currentLoadTarget, prefs)) {
-                  rememberCosmetic(currentLoadTarget, 'suggestPrefs', prefs);
-                }
-              },
+              setPrefs: setSuggestPrefs,
               onAddCard: (card) => {
                 deck = addCard(deck, card);
                 deckDirty = true;
@@ -1062,6 +1071,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         syncedDecks[currentLoadTarget] = deck;
         currentLoadTarget = target;
         deck = syncedDecks[target];
+        noteDeckReplaced();
         deckLibrary?.setTarget(target);
         render();
         refreshSleeveSelection();
@@ -1330,6 +1340,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       if (result.imported > 0) {
         deck = result.deck;
         syncedDecks[currentLoadTarget] = deck;
+        noteDeckReplaced({ resetSteering: replace });
         deckDirty = true;
         render();
       }
@@ -1690,6 +1701,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const csvText = await file.text();
       deck = parseSimCsv(csvText);
       syncedDecks[currentLoadTarget] = deck;
+      noteDeckReplaced({ resetSteering: true });
       deckDirty = true;
 
       const { sleeveId, coinId } = parseCsvMeta(csvText);
@@ -1749,6 +1761,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
         rememberCosmetic(currentLoadTarget, 'sprites', []);
         rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
+        noteDeckReplaced();
         deck = createEmptyDeck();
         syncedDecks[currentLoadTarget] = deck;
         deckDirty = true;
@@ -1939,6 +1952,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       },
       showUnsavedDeck: (cards) => {
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
+        rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
+        noteDeckReplaced();
         deck = cards;
         syncedDecks[currentLoadTarget] = cards;
         deckDirty = true;
@@ -1948,6 +1963,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         deckLibrary?.setActiveDeck(currentLoadTarget, null);
         rememberCosmetic(currentLoadTarget, 'sprites', []);
         rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
+        noteDeckReplaced();
         deck = createEmptyDeck();
         syncedDecks[currentLoadTarget] = deck;
         deckDirty = false;
@@ -2007,6 +2023,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       deckLibrary?.setActiveDeck('self', session.deckId);
       deck = cards;
       syncedDecks.self = cards;
+      noteDeckReplaced();
       deckDirty = true;
       loadCurrentDeck();
       refreshSleeveSelection();

@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { DATASET_VERSION, nameKey } from '../../client/src/setup/deck-builder/core/deck-suggest/dataset.mjs';
 import { buildSetCardIdCandidates, resolveTcgdexSetId } from '../../shared/engine/rules/legacy-set-ids.mjs';
 import { fetchCard, fetchSet } from '../lib/decklist-lines.mjs';
 import { cardKeyOf, kindOf } from './card-key.mjs';
@@ -27,16 +28,18 @@ const REQUEST_GAP_MS = 2000;
 const DEFAULT_OUT = join(ROOT, 'client/src/assets/meta/limitless-standard.json');
 const CACHE_DIR = join(ROOT, '.cache/limitless');
 
-export const DATASET_VERSION = 1;
+// Limitless keeps adding lists for a few days after an event; younger events are always refetched.
+const SETTLE_DAYS = 14;
+const DAY_MS = 86_400_000;
 
-const normalizeName = (name = '') =>
-  String(name)
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[‘’ʼ]/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+export { DATASET_VERSION };
+const normalizeName = nameKey;
+
+/** True once an event is old enough that its pages will not change, so caching them is safe. */
+export function isSettled(eventDate, now = Date.now(), settleDays = SETTLE_DAYS) {
+  const date = Date.parse(eventDate);
+  return Number.isFinite(date) && now - date >= settleDays * DAY_MS;
+}
 
 const median = (values) => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -263,19 +266,34 @@ export async function resolvePrintOnTcgdex(
 
 let lastRequestAt = 0;
 
+/** Backoff before retry `attempt` (0-based): Retry-After seconds when the server sent one. */
+export function retryDelayMs(attempt, retryAfterHeader = null) {
+  const seconds = Number(retryAfterHeader);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(seconds, 120) * 1000;
+  return 2000 * 2 ** attempt;
+}
+
+const isRetryableStatus = (status) => status === 429 || status >= 500;
+
 async function politeFetchText(url) {
   for (let attempt = 0; ; attempt += 1) {
     const wait = lastRequestAt + REQUEST_GAP_MS - Date.now();
     if (wait > 0) await new Promise((done) => setTimeout(done, wait));
     lastRequestAt = Date.now();
+    let retryAfter = null;
     try {
       const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
       if (res.ok) return await res.text();
-      if (res.status < 500 || attempt >= 3) throw new Error(`Limitless ${res.status} for ${url}`);
+      if (!isRetryableStatus(res.status) || attempt >= 3) {
+        const error = new Error(`Limitless ${res.status} for ${url}`);
+        error.fatal = true;
+        throw error;
+      }
+      retryAfter = res.headers.get('retry-after');
     } catch (error) {
-      if (attempt >= 3 || /Limitless 4\d\d/.test(error.message)) throw error;
+      if (error.fatal || attempt >= 3) throw error;
     }
-    await new Promise((done) => setTimeout(done, 2000 * 2 ** attempt));
+    await new Promise((done) => setTimeout(done, retryDelayMs(attempt, retryAfter)));
   }
 }
 
@@ -291,21 +309,23 @@ function writeCache(kind, id, value) {
   writeFileSync(file, JSON.stringify(value));
 }
 
-async function loadEventPage(id, refresh) {
-  const cached = readCache('pages', id, refresh);
+async function loadEventPage(event, refresh) {
+  const cached = isSettled(event.date) ? readCache('pages', event.id, refresh) : null;
   if (cached) return cached;
-  const page = parseEventPage(await politeFetchText(`${BASE}/tournaments/${id}`));
-  if (!page.standings.length) throw new Error(`No standings parsed for ${BASE}/tournaments/${id} — markup changed?`);
-  if (page.standings.some((row) => row.listId)) writeCache('pages', id, page);
+  const url = `${BASE}/tournaments/${event.id}`;
+  const page = parseEventPage(await politeFetchText(url));
+  if (!page.standings.length) throw new Error(`No standings parsed for ${url} — markup changed?`);
+  if (isSettled(event.date)) writeCache('pages', event.id, page);
   return page;
 }
 
-async function loadDecklists(id, refresh) {
-  const cached = readCache('lists', id, refresh);
+async function loadDecklists(event, refresh) {
+  const cached = isSettled(event.date) ? readCache('lists', event.id, refresh) : null;
   if (cached) return cached;
-  const lists = parseDecklists(await politeFetchText(`${BASE}/tournaments/${id}/decklists`));
-  if (!lists.length) throw new Error(`No decklists parsed for ${BASE}/tournaments/${id}/decklists — markup changed?`);
-  writeCache('lists', id, lists);
+  const url = `${BASE}/tournaments/${event.id}/decklists`;
+  const lists = parseDecklists(await politeFetchText(url));
+  if (!lists.length) throw new Error(`No decklists parsed for ${url} — markup changed?`);
+  if (isSettled(event.date)) writeCache('lists', event.id, lists);
   return lists;
 }
 
@@ -321,7 +341,7 @@ async function main(argv) {
 
   const withPages = [];
   for (const event of index) {
-    const page = await loadEventPage(event.id, refresh);
+    const page = await loadEventPage(event, refresh);
     if (!page.standings.some((row) => row.listId)) {
       console.warn(`skip ${event.id} ${event.name}: no decklists published yet`);
       continue;
@@ -335,7 +355,7 @@ async function main(argv) {
 
   const events = [];
   for (const event of inRotation) {
-    const { rows, dropped, missing } = joinEvent(event.page, await loadDecklists(event.id, refresh));
+    const { rows, dropped, missing } = joinEvent(event.page, await loadDecklists(event, refresh));
     const notes = [dropped && `${dropped} lists without a standing`, missing && `${missing} standings without a list`];
     console.log(`  ${event.date} ${event.name}: ${rows.length} lists${notes.filter(Boolean).map((n) => `, ${n}`).join('')}`);
     events.push({ id: event.id, name: event.name, date: event.date, players: event.players, rows });

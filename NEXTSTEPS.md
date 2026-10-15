@@ -7,4 +7,4 @@
 
 # oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 6/6 done · branch ready, not landed · landing checklist in design 068 § For the landing commit
 
-# oneshot 069-deck-suggestions · primary folder · branch claude/jolly-edison-bm3xkm (session-pinned) · slice 6/6 (verify + review next)
+# oneshot 069-deck-suggestions · primary folder · branch claude/jolly-edison-bm3xkm (session-pinned) · done 6/6 · reviewed + fixes landed on branch · not on main

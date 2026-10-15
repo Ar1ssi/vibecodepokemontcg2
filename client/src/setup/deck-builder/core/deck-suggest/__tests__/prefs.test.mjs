@@ -76,3 +76,8 @@ test('samePrefs and steeringCounts', () => {
     dismissed: 0,
   });
 });
+
+test('review #3: prunePrefs clears a dismissed key the player put in the deck anyway', () => {
+  const prefs = { locked: [], accepted: [], dismissed: ['t:iono', 't:switch'], goals: [] };
+  assert.deepEqual(prunePrefs(prefs, new Set(['t:iono'])).dismissed, ['t:switch']);
+});

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { indexDataset } from '../dataset.mjs';
+import * as prefsModule from '../prefs.mjs';
 import { EMPTY_PREFS, dismissKey, lockKey, toggleGoal } from '../prefs.mjs';
 import {
   deckToCounts,
@@ -206,4 +207,63 @@ test('goals: an off-archetype Pokémon needs ≥10% of all lists; a Trainer only
   for (let i = 0; i < 10; i += 1) dataset.lists.push({ e: 0, p: 7, a: 1, c: i === 0 ? [CARD.lightning, 10, dwebble, 2] : [CARD.lightning, 10] });
   const result = suggestCards(DRAGAPULT_DECK, indexDataset(dataset), { ...OPTS, prefs: toggleGoal(EMPTY_PREFS, 'setup') });
   assert.deepEqual(names(result.goals.setup), ['Ultra Ball', 'Rare Candy']);
+});
+
+test('review #1: count tweaks carry a direction; playing more than usual is a "down" tweak', () => {
+  const deck = deckOf([
+    { id: 'sv06-128', name: 'Dreepy', count: 4 },
+    { id: 'sv06-130', name: 'Dragapult ex', count: 4 },
+  ]);
+  const result = suggestCards(deck, index, OPTS);
+  assert.deepEqual(
+    result.countTweaks.map((item) => [item.name, item.yourCount, item.typicalCount, item.direction]),
+    [['Dragapult ex', 4, 3, 'down']]
+  );
+  const kept = suggestCards(deck, index, { ...OPTS, prefs: lockKey(EMPTY_PREFS, 'p:dragapult ex|jet headbutt;phantom dive|') });
+  assert.deepEqual(kept.countTweaks, []);
+});
+
+test('review #1: weightedMedian takes the higher count on an exact 50/50 split', async () => {
+  const { weightedMedian } = await import('../suggest.mjs');
+  assert.equal(weightedMedian([[1, 1], [4, 1]]), 4);
+  assert.equal(weightedMedian([[1, 2], [4, 1]]), 1);
+  assert.equal(weightedMedian([[3, 1], [4, 1], [4, 0.73], [4, 1]]), 4);
+});
+
+test('review #3: a dismissed card you play anyway does not penalise the lists that play it', () => {
+  const deck = deckOf([
+    { id: 'sv06-128', name: 'Dreepy', count: 4 },
+    { id: 'sv06-130', name: 'Dragapult ex', count: 3 },
+    { id: 'sv06-095', name: 'Munkidori', count: 2 },
+  ]);
+  const { counts } = deckToCounts(deck, index);
+  const plain = findNeighbors(counts, index, OPTS);
+  const dismissed = findNeighbors(counts, index, { ...OPTS, prefs: dismissKey(EMPTY_PREFS, 'p:munkidori|mind bend|adrena-brain') });
+  assert.deepEqual(dismissed.neighbors, plain.neighbors);
+});
+
+test('review #4: one Ultra Ball or a pile of Basic Energy is never "high" confidence', () => {
+  const ultra = suggestCards(deckOf([{ id: 'me01-131', name: 'Ultra Ball', count: 1 }]), index, OPTS);
+  assert.equal(ultra.confidence, 'low');
+  const energy = suggestCards(deckOf([{ id: 'mee-008', name: 'Basic Lightning Energy', count: 10 }]), index, OPTS);
+  assert.equal(energy.confidence, 'low');
+  // Six non-Energy copies the data knows is enough.
+  const six = deckOf([
+    { id: 'sv06-128', name: 'Dreepy', count: 4 },
+    { id: 'sv06-130', name: 'Dragapult ex', count: 2 },
+  ]);
+  assert.equal(suggestCards(six, index, OPTS).confidence, 'high');
+});
+
+test('accepted cards weigh 1.5× in similarity', () => {
+  const deck = deckOf([
+    { id: 'sv06-128', name: 'Dreepy', count: 4 },
+    { id: 'sv04-160', name: 'Counter Catcher', count: 1 },
+    { id: 'sv06-095', name: 'Munkidori', count: 1 },
+  ]);
+  const { counts } = deckToCounts(deck, index);
+  const { acceptKey } = prefsModule;
+  const result = findNeighbors(counts, index, { ...OPTS, prefs: acceptKey(EMPTY_PREFS, 'p:munkidori|mind bend|adrena-brain') });
+  assert.deepEqual(result.neighbors.slice(0, 2).map((n) => n.listIdx).sort(), [0, 1]);
+  close(result.neighbors[0].similarity, 5.5 / 6.5);
 });

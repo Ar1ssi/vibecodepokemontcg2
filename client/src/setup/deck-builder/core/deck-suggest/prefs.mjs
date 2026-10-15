@@ -58,18 +58,23 @@ export function toggleGoal(prefs, goalId) {
 
 /**
  * After a deck edit: locks and accepts for keys no longer in the deck are dropped, and an accepted
- * key the player removed becomes dismissed (they tried it and took it out). Dismissed keys stay.
+ * key the player removed becomes dismissed (they tried it and took it out). A dismissed key the
+ * player put in the deck anyway is cleared; other dismissed keys stay.
  */
 export function prunePrefs(prefs, presentKeys) {
   const current = normalizeSuggestPrefs(prefs);
   const present = presentKeys instanceof Set ? presentKeys : new Set(presentKeys || []);
   const removedAccepts = current.accepted.filter((key) => !present.has(key));
-  if (!removedAccepts.length && current.locked.every((key) => present.has(key))) return current;
+  const unchanged =
+    !removedAccepts.length &&
+    current.locked.every((key) => present.has(key)) &&
+    !current.dismissed.some((key) => present.has(key));
+  if (unchanged) return current;
   return {
     ...current,
     locked: current.locked.filter((key) => present.has(key)),
     accepted: current.accepted.filter((key) => present.has(key)),
-    dismissed: [...current.dismissed, ...removedAccepts].slice(-LIST_CAP),
+    dismissed: [...current.dismissed.filter((key) => !present.has(key)), ...removedAccepts].slice(-LIST_CAP),
   };
 }
 

@@ -162,3 +162,16 @@ test('resolvePrintOnTcgdex falls back to a unique same-name card in the set (Lim
   const twoSameName = { fetchRecord, fetchSetRecord: async () => ({ cards: [{ id: 'a', name: 'Fire Energy' }, { id: 'b', name: 'Fire Energy' }] }) };
   assert.equal(await resolvePrintOnTcgdex({ set: 'MEE', number: '10', name: 'Fire Energy' }, twoSameName), null);
 });
+
+test('review #7: only events at least 14 days old are cached; retries honour Retry-After', async () => {
+  const { isSettled, retryDelayMs } = await import('../build-meta-dataset.mjs');
+  const now = Date.parse('2026-10-15T00:00:00Z');
+  assert.equal(isSettled('2026-10-10', now), false);
+  assert.equal(isSettled('2026-10-01', now), true);
+  assert.equal(isSettled('garbage', now), false);
+  assert.equal(retryDelayMs(0), 2000);
+  assert.equal(retryDelayMs(2), 8000);
+  assert.equal(retryDelayMs(0, '30'), 30000);
+  assert.equal(retryDelayMs(0, '9999'), 120000);
+  assert.equal(retryDelayMs(1, 'Wed, 21 Oct 2026 07:28:00 GMT'), 4000);
+});

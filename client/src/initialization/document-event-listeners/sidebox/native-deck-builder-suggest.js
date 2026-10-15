@@ -27,6 +27,8 @@ import {
   describeList,
   findDeckCardForKey,
   metaOverview,
+  prefKeyOf,
+  resolveDeckCard,
   suggestCards,
 } from '../../../setup/deck-builder/core/deck-suggest/suggest.mjs';
 import {
@@ -98,6 +100,11 @@ export const initializeNativeDeckBuilderSuggest = ({
   let timer = null;
   let status = '';
   let busy = false;
+  // Bumped whenever the editor switches to another deck or replaces its cards wholesale, so an
+  // Add or list import that was waiting on the network never lands in the wrong deck.
+  let generation = 0;
+  // <details> folds the player opened; re-renders keep them open.
+  const openFolds = new Set();
 
   const prefsNow = () => normalizeSuggestPrefs(getPrefs?.() ?? EMPTY_PREFS);
 
@@ -140,12 +147,18 @@ export const initializeNativeDeckBuilderSuggest = ({
       ? `<span class="db-suggest-price">${escapeHtml(formatUsd(item.price))}</span>`
       : '';
     const key = escapeHtml(item.key);
-    const actions =
-      bucket === 'cuts'
-        ? `<button type="button" class="db-suggest-btn" data-action="cut" data-key="${key}">Cut 1</button>
-           <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="lock" data-key="${key}">Keep</button>`
-        : `<button type="button" class="db-suggest-btn db-suggest-btn-primary" data-action="add" data-idx="${item.idx}" data-key="${key}">Add</button>
+    const cutButton = `<button type="button" class="db-suggest-btn" data-action="cut" data-key="${key}">Cut 1</button>`;
+    const addButton = `<button type="button" class="db-suggest-btn db-suggest-btn-primary" data-action="add" data-idx="${item.idx}" data-key="${key}">Add 1</button>`;
+    const keepButton = (label) =>
+      `<button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="lock" data-key="${key}">${label}</button>`;
+    let actions;
+    if (bucket === 'cuts') actions = cutButton + keepButton('Keep');
+    // A count tweak is a card you already play: move toward the usual count, or keep yours.
+    else if (bucket === 'countTweaks') actions = (item.direction === 'down' ? cutButton : addButton) + keepButton('Keep count');
+    else {
+      actions = `${addButton}
            <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="dismiss" data-key="${key}">Dismiss</button>`;
+    }
     const lockedMark = item.locked ? '<span class="db-suggest-badge db-suggest-badge-lock">Kept</span>' : '';
     return `<li class="db-suggest-row">
       ${thumbHtml(item.idx)}
@@ -207,11 +220,12 @@ export const initializeNativeDeckBuilderSuggest = ({
         return `<li><span>${escapeHtml(name)}</span> <button type="button" class="db-suggest-btn db-suggest-btn-quiet" data-action="restore" data-key="${escapeHtml(key)}">Restore</button></li>`;
       })
       .join('');
-    return `<details class="db-suggest-fold">
+    const open = (fold) => (openFolds.has(fold) ? ' open' : '');
+    return `<details class="db-suggest-fold" data-fold="core"${open('core')}>
         <summary>Your core — lock the cards you're keeping (${counts.locked} locked)</summary>
         <ul class="db-suggest-core">${core}</ul>
       </details>
-      <details class="db-suggest-fold"${counts.dismissed ? '' : ' hidden'}>
+      <details class="db-suggest-fold" data-fold="dismissed"${open('dismissed')}${counts.dismissed ? '' : ' hidden'}>
         <summary>Dismissed (${counts.dismissed})</summary>
         <ul class="db-suggest-dismissed">${dismissed}</ul>
       </details>
@@ -310,17 +324,24 @@ export const initializeNativeDeckBuilderSuggest = ({
     renderNow();
   };
 
-  const addSuggested = async (idx, key) => {
+  const addSuggested = async (idx) => {
     const datasetCard = index.dataset.cards[idx];
     if (!datasetCard) return;
+    const startedIn = generation;
     setStatus(`Adding ${datasetCard.name}…`);
     const { card, error } = await resolveDatasetCard(datasetCard, deps);
+    if (startedIn !== generation) {
+      setStatus(`The deck changed before ${datasetCard.name} arrived — nothing was added.`);
+      return;
+    }
     if (!card) {
       setStatus(`Couldn't add ${datasetCard.name}: ${error}`);
       return;
     }
     setStatus(`Added ${datasetCard.name}.`);
-    setPrefs(acceptKey(prefsNow(), key));
+    // Accept the card that actually landed: a name-search fallback can pick a sibling print.
+    const landedIdx = resolveDeckCard(card, index);
+    setPrefs(acceptKey(prefsNow(), landedIdx === null ? datasetCard.key : prefKeyOf(landedIdx, index)));
     onAddCard(card);
   };
 
@@ -337,6 +358,7 @@ export const initializeNativeDeckBuilderSuggest = ({
       return;
     }
     busy = true;
+    const startedIn = generation;
     setStatus(`Building ${describeList(index, listIdx)}…`);
     renderNow();
     try {
@@ -347,6 +369,10 @@ export const initializeNativeDeckBuilderSuggest = ({
         resolve: resolveListEntry,
         onProgress: (done, total) => setStatus(`Building the list… ${done}/${total}`),
       });
+      if (startedIn !== generation) {
+        setStatus('The deck changed while the list was building — nothing was replaced.');
+        return;
+      }
       const failed = result.failed.map((entry) => `${entry.line} (${entry.reason})`);
       setPrefs({ ...EMPTY_PREFS, goals: prefsNow().goals });
       setStatus(
@@ -382,7 +408,7 @@ export const initializeNativeDeckBuilderSuggest = ({
         updatePrefs((prefs) => toggleGoal(prefs, goal));
         break;
       case 'add':
-        if (Number.isInteger(idx)) addSuggested(idx, key);
+        if (Number.isInteger(idx)) addSuggested(idx);
         break;
       case 'dismiss':
         updatePrefs((prefs) => dismissKey(prefs, key));
@@ -413,7 +439,22 @@ export const initializeNativeDeckBuilderSuggest = ({
     }
   });
 
+  panelEl.addEventListener(
+    'toggle',
+    (event) => {
+      const fold = event.target?.dataset?.fold;
+      if (!fold) return;
+      if (event.target.open) openFolds.add(fold);
+      else openFolds.delete(fold);
+    },
+    true
+  );
+
   return {
+    /** The editor moved to another deck or replaced its cards: in-flight results are stale. */
+    invalidate: () => {
+      generation += 1;
+    },
     show: () => {
       visible = true;
       panelEl.hidden = false;
