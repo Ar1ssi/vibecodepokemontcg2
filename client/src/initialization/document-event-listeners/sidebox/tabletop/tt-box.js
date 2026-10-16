@@ -446,10 +446,10 @@ function filmAtlasTexture(renderer) {
 // ── What sits inside ───────────────────────────────────────────────────────
 /**
  * Box-space resting places of the contents (design 073 § Assumptions): the leaflet against the
- * back wall, the packs upright in front of it leaning back a little, the code card, then the
- * deck behind the front wall with its bottom card (the promo) facing out.
+ * back wall, the packs upright in front of it leaning back a little, then the deck behind the
+ * front wall with its bottom card (the promo) facing out.
  *
- * @returns {{leaflet: object, packs: object[], code: object, deck: object}} each
+ * @returns {{leaflet: object, packs: object[], deck: object}} each
  *   `{x, y, z, rotX}` (the item stands upright, facing +z, tilted back by rotX radians)
  */
 export function interiorSlots(dims, { packCount = 4, deckCount = 40, leaflet = { height: 112, thickness: 1.2 } } = {}) {
@@ -467,6 +467,5 @@ export function interiorSlots(dims, { packCount = 4, deckCount = 40, leaflet = {
   const deckT = deckThickness(deckCount) + 0.6;
   // The deck leans back a little, so its promo face tips up toward whoever opens the lid.
   const deck = { x: 0, y: b + CARD.height / 2 + 0.3, z: D / 2 - b - 1.6 - deckT / 2, rotX: -0.06 };
-  const code = { x: 1.5, y: b + CARD.height / 2, z: Math.min(z + 1, deck.z - deckT / 2 - 1), rotX: -0.02 };
-  return { leaflet: leafletSlot, packs, code, deck };
+  return { leaflet: leafletSlot, packs, deck };
 }

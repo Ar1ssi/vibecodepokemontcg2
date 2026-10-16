@@ -52,15 +52,13 @@ test('deck thickness counts cards and ignores junk', () => {
   assert.equal(packThickness(12), 3.86);
 });
 
-test('contents follow the box kind and era (catalog rows)', () => {
+test('contents are the deck, the packs and the leaflet, and nothing else', () => {
   const me = contentsFor(getBuildBattleBox('phantasmal-flames'));
-  assert.deepEqual(me, { deck: { kind: 'deck', count: 40 }, packs: 4, codeCard: 'live', leaflet: 'tips' });
+  assert.deepEqual(me, { deck: { kind: 'deck', count: 40 }, packs: 4, leaflet: 'tips' });
   const sv = contentsFor(getBuildBattleBox('temporal-forces'));
   assert.equal(sv.deck.count, 40);
-  assert.equal(sv.codeCard, 'live');
   const swsh = contentsFor(getBuildBattleBox('sword-shield'));
   assert.deepEqual(swsh.deck, { kind: 'evolution-pack', count: 23 });
-  assert.equal(swsh.codeCard, 'online');
   const kit = contentsFor(getBuildBattleBox('sun-moon'));
   assert.equal(kit.leaflet, 'guide');
   assert.deepEqual(contentsFor(null).deck, { kind: 'deck', count: 40 });
@@ -70,7 +68,7 @@ test('the scene names what the box holds: a deck, or before Brilliant Stars an E
   const me = contentsWords(contentsFor(getBuildBattleBox('phantasmal-flames')));
   assert.deepEqual(me, {
     deck: 'deck',
-    inside: 'Your deck, four booster packs, a code card and a tips leaflet are inside.',
+    inside: 'Your deck, four booster packs and a tips leaflet are inside.',
   });
   const swsh = contentsWords(contentsFor(getBuildBattleBox('evolving-skies')));
   assert.equal(swsh.deck, 'Evolution pack');
@@ -79,11 +77,11 @@ test('the scene names what the box holds: a deck, or before Brilliant Stars an E
   assert.equal(contentsWords(null).deck, 'deck');
 });
 
-test('packs carry a Basic Energy from Sword & Shield on, and always a code card', () => {
-  assert.deepEqual(packExtrasFor('me'), ['code', 'energy']);
-  assert.deepEqual(packExtrasFor('sv'), ['code', 'energy']);
-  assert.deepEqual(packExtrasFor('swsh'), ['code', 'energy']);
-  assert.deepEqual(packExtrasFor('sm'), ['code']);
-  assert.deepEqual(packExtrasFor('xy'), ['code']);
-  assert.deepEqual(packExtrasFor(undefined), ['code']);
+test('packs carry a Basic Energy from Sword & Shield on, and no other extra before their ten cards', () => {
+  assert.deepEqual(packExtrasFor('me'), ['energy']);
+  assert.deepEqual(packExtrasFor('sv'), ['energy']);
+  assert.deepEqual(packExtrasFor('swsh'), ['energy']);
+  assert.deepEqual(packExtrasFor('sm'), []);
+  assert.deepEqual(packExtrasFor('xy'), []);
+  assert.deepEqual(packExtrasFor(undefined), []);
 });

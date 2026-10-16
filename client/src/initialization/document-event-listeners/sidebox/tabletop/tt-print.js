@@ -3,8 +3,8 @@ import { assetUrl, makeCanvas, prng } from './tt-textures.js';
 
 /**
  * Printed artwork for the tabletop (design 073): the box faces no photo shows (back, top, bottom,
- * and every face of a box without a vendored cut), the code card, the tips leaflet and the pack
- * backs, drawn on canvases. Words are typeset, never traced logos (design 052 § Box reference);
+ * and every face of a box without a vendored cut), the tips leaflet and the pack backs, drawn on
+ * canvases. Words are typeset, never traced logos (design 052 § Box reference);
  * legal copy is grey lines, never real text. Photo faces are rectified from the product render
  * with the face's corner quad (the render is a perspective shot).
  */
@@ -361,67 +361,6 @@ export function mirrorCanvas(canvas) {
 }
 
 // ── Paper inside the box ───────────────────────────────────────────────────
-/**
- * A code card: a dark card with the game's name and a masked code panel. Never a redeemable or
- * code-shaped string (design 073 § Assumptions).
- */
-export function drawCodeCardFront(ctx, w, h, { game = 'Pokémon TCG Live', live = true }) {
-  const top = live ? '#0c2f5c' : '#2b1a52';
-  const bottom = live ? '#0a7fa8' : '#5b2e9a';
-  const gradient = ctx.createLinearGradient(0, 0, w, h);
-  gradient.addColorStop(0, top);
-  gradient.addColorStop(1, bottom);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, w, h);
-  ctx.save();
-  ctx.globalAlpha = 0.12;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = w * 0.01;
-  for (let r = w * 0.15; r < w * 1.2; r += w * 0.09) {
-    ctx.beginPath();
-    ctx.arc(w * 0.85, h * 0.2, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  fitText(ctx, game.toUpperCase(), w * 0.84, h * 0.07, '900');
-  ctx.fillText(game.toUpperCase(), w / 2, h * 0.16);
-  fitText(ctx, 'CODE CARD', w * 0.7, h * 0.11, '900');
-  ctx.fillStyle = '#ffd400';
-  ctx.fillText('CODE CARD', w / 2, h * 0.29);
-  ctx.fillStyle = '#e9edf2';
-  roundRect(ctx, w * 0.1, h * 0.46, w * 0.8, h * 0.16, h * 0.02);
-  ctx.fill();
-  const rand = prng(5);
-  ctx.fillStyle = '#b9c1cc';
-  for (let k = 0; k < 220; k += 1) {
-    ctx.fillRect(w * 0.11 + rand() * w * 0.78, h * 0.47 + rand() * h * 0.14, w * 0.012, h * 0.008);
-  }
-  ctx.fillStyle = '#5c6670';
-  fitText(ctx, 'SCRATCH OFF', w * 0.5, h * 0.035);
-  ctx.fillText('SCRATCH OFF', w / 2, h * 0.54);
-  greyLines(ctx, w * 0.1, h * 0.7, w * 0.8, 6, h * 0.03, 77);
-}
-
-export function drawCodeCardBack(ctx, w, h, { live = true }) {
-  const base = live ? '#0b2547' : '#24154a';
-  ctx.fillStyle = base;
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  for (let k = 0; k < 12; k += 1) ctx.fillRect(0, (h / 12) * k, w, h / 48);
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(w / 2, h / 2, w * 0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = base;
-  ctx.fillRect(w * 0.3, h / 2 - w * 0.015, w * 0.4, w * 0.03);
-  ctx.beginPath();
-  ctx.arc(w / 2, h / 2, w * 0.06, 0, Math.PI * 2);
-  ctx.fill();
-}
-
 /**
  * The folded leaflet's cover: its heading (a Prerelease Kit's is a player's guide), the box's
  * title, "Deck list" and the deck's card names when known, the rest as grey lines.

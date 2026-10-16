@@ -17,7 +17,6 @@ export const BOX_SPOT = Object.freeze({ x: 0, z: -70, rotYDeg: 25 });
 // packs in a loose row in front, and the cards of an opened pack collect at the front right.
 export const DECK_SPOT = Object.freeze({ x: -206, z: -36, rotYDeg: -9 });
 export const PROMO_SPOT = Object.freeze({ x: -112, z: -28, rotYDeg: 4 });
-export const CODE_SPOT = Object.freeze({ x: 154, z: -40, rotYDeg: 10 });
 // The leaflet overhangs the mat's back edge onto the desk.
 export const LEAFLET_SPOT = Object.freeze({ x: 186, z: -158, rotYDeg: 19 });
 // The balled-up shrink-wrap is tossed onto the back left of the mat: a loose wad this wide.

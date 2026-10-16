@@ -21,7 +21,6 @@ import {
 } from '../../../../setup/deck-builder/core/build-battle/tabletop/flow.mjs';
 import {
   BOX_SPOT,
-  CODE_SPOT,
   DECK_SPOT,
   EXTRAS_SPOT,
   HAND,
@@ -72,7 +71,7 @@ import { createTabletopAudio } from './tt-audio.js';
 import { buildBox, interiorSlots, prepareBoxFaces } from './tt-box.js';
 import { createCardKit, disposeCard } from './tt-card.js';
 import { resetFilm } from './tt-film.js';
-import { buildCodeCard, buildDeck, buildLeaflet, contactShadow } from './tt-objects.js';
+import { buildDeck, buildLeaflet, contactShadow } from './tt-objects.js';
 import { createPackKit } from './tt-pack.js';
 import { drawProceduralWrapper, loadPrintFont, paletteFor } from './tt-print.js';
 import { createStage } from './tt-stage.js';
@@ -93,7 +92,7 @@ import { createTabletopUi } from './tt-ui.js';
 /**
  * The tabletop opening (design 073): one three.js scene of a Build & Battle box on the floor of a
  * TCG Pocket studio. Every physical beat is played here — the shrink-wrap torn off, the lid lifted,
- * the deck, leaflet, code card and packs taken out, the deck's cellophane and its promo, each pack
+ * the deck, leaflet and packs taken out, the deck's cellophane and its promo, each pack
  * picked up and torn across its crimp with the game's swipe and light, its cards drawn out and
  * passed one by one onto the floor, then fanned and piled. The saved `session.unboxing` reducer is
  * the only record that counts (`dispatch`); which pack was torn first and whether the contents
@@ -300,16 +299,6 @@ async function buildTabletopApp(options, life) {
   promoCard.userData.tt = { kind: 'tableCard' };
   disposers.push(() => disposeCard(promoCard));
 
-  const codeTextures = buildCodeCard({
-    renderer,
-    envMap,
-    kit,
-    live: contents.codeCard === 'live',
-    game: look?.labels?.codeCardGame || (contents.codeCard === 'live' ? 'Pokémon TCG Live' : 'Pokémon TCG Online'),
-  });
-  keep(codeTextures);
-  const boxCode = codeTextures.mesh;
-  boxCode.userData.tt = { kind: 'tableCard' };
   const leaflet = buildLeaflet({
     renderer,
     envMap,
@@ -399,9 +388,6 @@ async function buildTabletopApp(options, life) {
   const stackFor = (logical) => {
     const cards = packs[logical] || [];
     return packStack({ cardCount: cards.length, era, seed, packIndex: logical }).map((item) => {
-      if (item.kind === 'code') {
-        return { ...item, url: null, card: null, finish: null, isCode: true };
-      }
       if (item.kind === 'energy') {
         const energy = buildModernBasicEnergy(item.energyLabel, 1);
         return { ...item, url: cardImageOf(energy), card: energy, finish: null };
@@ -414,12 +400,6 @@ async function buildTabletopApp(options, life) {
   };
 
   const makeStackMesh = (item) => {
-    if (item.isCode) {
-      const mesh = kit.makeCard({ map: boxCode.userData.face.map, name: 'tt-pack-code' });
-      mesh.material = [mesh.material[0], boxCode.material[1], mesh.material[2]];
-      mesh.userData.ownFace = true;
-      return trackLoose(mesh);
-    }
     // Until its art arrives a card shows the back, never a blank face.
     const mesh = kit.makeCard({ map: backTexture, finish: null, name: item.card?.name || 'card' });
     mesh.userData.ownFace = true;
@@ -574,12 +554,10 @@ async function buildTabletopApp(options, life) {
       deck.wrap.group.visible = true;
       resetFilm(deck.wrap.uniforms);
       putInBox(leaflet.mesh, slots.leaflet);
-      putInBox(boxCode, slots.code);
       packObjects.forEach((pack, visual) => putInBox(pack.model.group, slots.packs[visual]));
       promoCard.visible = false;
     } else {
       place(leaflet.mesh, flatPose(LEAFLET_SPOT, LEAFLET.thickness / 2));
-      place(boxCode, flatPose(CODE_SPOT, CARD.thickness / 2));
       if (v.deckUnwrapped) {
         deckOnTable(false);
         deck.face.map = backTexture;
@@ -884,7 +862,6 @@ async function buildTabletopApp(options, life) {
     const items = [
       { object: deck.group, pose: () => flatPose(DECK_SPOT, deck.thickness / 2 + 0.5, true), sound: 'item-land' },
       { object: leaflet.mesh, pose: () => flatPose(LEAFLET_SPOT, LEAFLET.thickness / 2), sound: 'item-land' },
-      { object: boxCode, pose: () => flatPose(CODE_SPOT, CARD.thickness / 2), sound: 'card-land' },
       ...packObjects.map((pack) => ({
         object: pack.model.group,
         pose: () => packOnTable(pack.visual),
@@ -1357,7 +1334,6 @@ async function buildTabletopApp(options, life) {
     if (hand?.kind === 'pack') return 'Drag across the top of the pack to tear it open.';
     if (hand?.kind === 'stack') {
       const item = hand.items[hand.position];
-      if (item?.kind === 'code') return 'A code card first. Swipe or tap to set it aside.';
       if (item?.kind === 'energy') return 'A Basic Energy. Keep going.';
       return 'Swipe or tap the front card to see the next one.';
     }
@@ -1442,7 +1418,6 @@ async function buildTabletopApp(options, life) {
     boxModel.group,
     deck.group,
     promoCard,
-    boxCode,
     leaflet.mesh,
     ...packObjects.map((pack) => pack.model.group),
     ...looseMeshes,

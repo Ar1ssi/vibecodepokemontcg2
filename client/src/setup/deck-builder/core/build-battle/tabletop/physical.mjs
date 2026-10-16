@@ -66,24 +66,22 @@ export function deckThickness(count) {
   return round2(cards * CARD.thickness);
 }
 
-const LIVE_CODE_ERAS = new Set(['sv', 'me']);
 const ENERGY_PACK_ERAS = new Set(['swsh', 'sv', 'me']);
 
 /**
  * What the box holds besides its packs: a 40-card deck (fixed decks, Evolution decks) or a 23-card
- * Evolution pack (Fates Collide → Fusion Strike), one code card (TCG Live from Scarlet & Violet on,
- * TCG Online before) and the folded tips leaflet (a Prerelease Kit's player's guide).
+ * Evolution pack (Fates Collide → Fusion Strike), and the folded tips leaflet (a Prerelease Kit's
+ * player's guide).
  *
  * @param {{kind?: string, era?: string, name?: string, packCount?: number}} box
  * @returns {{deck: {kind: 'deck'|'evolution-pack', count: number}, packs: number,
- *   codeCard: 'live'|'online', leaflet: 'tips'|'guide'}}
+ *   leaflet: 'tips'|'guide'}}
  */
 export function contentsFor(box) {
   const evolutionPack = box?.kind === 'evolution-pack';
   return {
     deck: evolutionPack ? { kind: 'evolution-pack', count: 23 } : { kind: 'deck', count: 40 },
     packs: Number.isInteger(box?.packCount) && box.packCount > 0 ? box.packCount : 4,
-    codeCard: LIVE_CODE_ERAS.has(box?.era) ? 'live' : 'online',
     leaflet: /Prerelease Kit$/.test(String(box?.name || '')) ? 'guide' : 'tips',
   };
 }
@@ -101,17 +99,17 @@ export function contentsWords(contents) {
   const count = Number.isInteger(contents?.packs) ? contents.packs : 4;
   const packs = `${COUNT_WORDS[count] ?? count} booster pack${count === 1 ? '' : 's'}`;
   const leaflet = contents?.leaflet === 'guide' ? "a player's guide" : 'a tips leaflet';
-  return { deck, inside: `Your ${deck}, ${packs}, a code card and ${leaflet} are inside.` };
+  return { deck, inside: `Your ${deck}, ${packs} and ${leaflet} are inside.` };
 }
 
 /**
- * The cosmetic cards a pack carries before its ten: a code card in every era, and a Basic Energy
- * from Sword & Shield on ("10 cards, 1 Basic Energy, and 1 … code card", ME02 box back).
+ * The cosmetic cards a pack carries before its ten: a Basic Energy from Sword & Shield on, none
+ * before.
  *
- * @returns {('code'|'energy')[]}
+ * @returns {'energy'[]}
  */
 export function packExtrasFor(era) {
-  return ENERGY_PACK_ERAS.has(era) ? ['code', 'energy'] : ['code'];
+  return ENERGY_PACK_ERAS.has(era) ? ['energy'] : [];
 }
 
 /** @returns {number} a full pack's thickness in mm: its cards plus the two film walls. */

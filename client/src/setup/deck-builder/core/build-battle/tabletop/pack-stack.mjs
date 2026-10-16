@@ -1,5 +1,5 @@
 // The physical order of what comes out of a torn pack (design 073 § Pure modules): the cosmetic
-// extras at the front (code card, then the Basic Energy where the era prints one), then the ten
+// extras at the front (the Basic Energy where the era prints one, none otherwise), then the ten
 // pool cards in slot order, so the rare slot is the last card seen. Pure; the reducer's
 // `revealed[i]` counts only the pool cards.
 
@@ -8,7 +8,7 @@ import { BASIC_ENERGY_LABELS } from '../box-catalog.mjs';
 import { packExtrasFor } from './physical.mjs';
 
 /**
- * @typedef {{kind: 'code'}|{kind: 'energy', energyLabel: string}|{kind: 'card', cardIndex: number}} StackItem
+ * @typedef {{kind: 'energy', energyLabel: string}|{kind: 'card', cardIndex: number}} StackItem
  */
 
 /** @returns {string} the Basic Energy a pack carries: its own seeded stream, never a pool draw. */
@@ -22,11 +22,10 @@ export function packEnergyLabel(seed, packIndex) {
  * @returns {StackItem[]} front first.
  */
 export function packStack({ cardCount, era, seed, packIndex }) {
-  const stack = [];
-  for (const extra of packExtrasFor(era)) {
-    if (extra === 'code') stack.push({ kind: 'code' });
-    else stack.push({ kind: 'energy', energyLabel: packEnergyLabel(seed, packIndex) });
-  }
+  const stack = packExtrasFor(era).map((kind) => ({
+    kind,
+    energyLabel: packEnergyLabel(seed, packIndex),
+  }));
   const count = Number.isFinite(cardCount) ? Math.max(0, Math.floor(cardCount)) : 0;
   for (let cardIndex = 0; cardIndex < count; cardIndex += 1) stack.push({ kind: 'card', cardIndex });
   return stack;
@@ -41,8 +40,8 @@ export function poolCardsBefore(stack, position) {
 }
 
 /**
- * Where a reloaded pack resumes: with no pool card revealed the code card is in front again;
- * otherwise every extra and `revealed` pool cards are already on the table.
+ * Where a reloaded pack resumes: with no pool card revealed the stack's front (its extras, if any)
+ * is in hand again; otherwise every extra and `revealed` pool cards are already on the table.
  *
  * @returns {number} the stack position of the front card.
  */

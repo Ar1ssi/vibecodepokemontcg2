@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import {
   BOX_SPOT,
   CAMERA_FOV_DEG,
-  CODE_SPOT,
   DECK_SPOT,
   EXTRAS_SPOT,
   LEAFLET_SPOT,
@@ -59,7 +58,6 @@ function tableLayout() {
     { name: 'box', rect: footprint(BOX_SPOT, box.width, box.depth) },
     { name: 'deck', rect: footprint(DECK_SPOT, CARD.width, CARD.height) },
     { name: 'promo', rect: footprint(PROMO_SPOT, CARD.width, CARD.height) },
-    { name: 'code card', rect: footprint(CODE_SPOT, CARD.width, CARD.height) },
     { name: 'leaflet', rect: footprint(LEAFLET_SPOT, LEAFLET.width, LEAFLET.height), offMat: true },
     { name: 'wrap', rect: footprint(WRAP_SPOT, 2 * WRAP_BALL_RADIUS, 2 * WRAP_BALL_RADIUS) },
   ];

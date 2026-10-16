@@ -4,24 +4,23 @@ import assert from 'node:assert/strict';
 import { BASIC_ENERGY_LABELS } from '../../box-catalog.mjs';
 import { packEnergyLabel, packStack, poolCardsBefore, stackPositionFor } from '../pack-stack.mjs';
 
-test('an ME pack comes out code card, Basic Energy, then its ten cards in slot order', () => {
+test('an ME pack comes out Basic Energy, then its ten cards in slot order', () => {
   const stack = packStack({ cardCount: 10, era: 'me', seed: 42, packIndex: 0 });
-  assert.equal(stack.length, 12);
-  assert.deepEqual(stack[0], { kind: 'code' });
-  assert.equal(stack[1].kind, 'energy');
-  assert.ok(BASIC_ENERGY_LABELS.includes(stack[1].energyLabel));
+  assert.equal(stack.length, 11);
+  assert.equal(stack[0].kind, 'energy');
+  assert.ok(BASIC_ENERGY_LABELS.includes(stack[0].energyLabel));
   assert.deepEqual(
-    stack.slice(2).map((item) => item.cardIndex),
+    stack.slice(1).map((item) => item.cardIndex),
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
   );
   assert.equal(stack.at(-1).cardIndex, 9, 'the rare slot is seen last');
 });
 
-test('an SM pack carries only the code card before its cards', () => {
+test('an SM pack has no extras: its ten cards come out first', () => {
   const stack = packStack({ cardCount: 10, era: 'sm', seed: 7, packIndex: 2 });
-  assert.equal(stack.length, 11);
-  assert.deepEqual(stack[0], { kind: 'code' });
-  assert.equal(stack[1].kind, 'card');
+  assert.equal(stack.length, 10);
+  assert.deepEqual(stack[0], { kind: 'card', cardIndex: 0 });
+  assert.ok(stack.every((item) => item.kind === 'card'));
 });
 
 test('the pack Energy is seeded per pack and never moves with other streams', () => {
@@ -33,27 +32,28 @@ test('the pack Energy is seeded per pack and never moves with other streams', ()
   assert.ok(new Set(perPack).size >= 2, 'packs of one box differ');
 });
 
-test('junk card counts give an extras-only stack', () => {
-  assert.equal(packStack({ cardCount: -3, era: 'me', seed: 1, packIndex: 0 }).length, 2);
-  assert.equal(packStack({ cardCount: Number.NaN, era: 'xy', seed: 1, packIndex: 0 }).length, 1);
+test('junk card counts leave only the extras', () => {
+  assert.equal(packStack({ cardCount: -3, era: 'me', seed: 1, packIndex: 0 }).length, 1);
+  assert.equal(packStack({ cardCount: Number.NaN, era: 'xy', seed: 1, packIndex: 0 }).length, 0);
 });
 
 test('pool cards before a position skip the extras', () => {
   const stack = packStack({ cardCount: 10, era: 'me', seed: 42, packIndex: 0 });
   assert.equal(poolCardsBefore(stack, 0), 0);
-  assert.equal(poolCardsBefore(stack, 2), 0);
-  assert.equal(poolCardsBefore(stack, 5), 3);
+  assert.equal(poolCardsBefore(stack, 1), 0);
+  assert.equal(poolCardsBefore(stack, 5), 4);
   assert.equal(poolCardsBefore(stack, 99), 10);
   assert.equal(poolCardsBefore(stack, -1), 0);
 });
 
-test('a reload resumes on the code card at 0 revealed, else past the extras', () => {
+test('a reload resumes on the front card at 0 revealed, else past the extras', () => {
   const stack = packStack({ cardCount: 10, era: 'me', seed: 42, packIndex: 0 });
   assert.equal(stackPositionFor(stack, 0), 0);
-  assert.equal(stackPositionFor(stack, 3), 5);
-  assert.equal(stackPositionFor(stack, 10), 12);
-  assert.equal(stackPositionFor(stack, 50), 12);
+  assert.equal(stackPositionFor(stack, 3), 4);
+  assert.equal(stackPositionFor(stack, 10), 11);
+  assert.equal(stackPositionFor(stack, 50), 11);
   assert.equal(stackPositionFor(stack, Number.NaN), 0);
   const sm = packStack({ cardCount: 10, era: 'sm', seed: 42, packIndex: 0 });
-  assert.equal(stackPositionFor(sm, 3), 4);
+  assert.equal(stackPositionFor(sm, 0), 0);
+  assert.equal(stackPositionFor(sm, 3), 3);
 });

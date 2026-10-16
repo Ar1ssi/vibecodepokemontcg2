@@ -13,13 +13,13 @@ import { CARD, LEAFLET, deckThickness } from '../../../../setup/deck-builder/cor
 import { createFaceMaterial } from './tt-card.js';
 import { createFilmMaterials } from './tt-film.js';
 import { cardSlab } from './tt-geometry.js';
-import { drawCodeCardBack, drawCodeCardFront, drawLeafletCover } from './tt-print.js';
+import { drawLeafletCover } from './tt-print.js';
 import { EYE_ONLY_LAYER } from './tt-studio.js';
 import { makeCanvas } from './tt-textures.js';
 
 /**
  * The smaller things in the box (design 073): the deck in its cellophane with the promo as its
- * bottom card, the code card, the folded tips leaflet, and the soft contact shadows that ground
+ * bottom card, the folded tips leaflet, and the soft contact shadows that ground
  * flat things on the mat.
  */
 
@@ -87,31 +87,6 @@ export function buildDeck({ envMap, count, promoMap, promoFinish, backMap, edgeT
       back.dispose();
       edge.dispose();
       film.dispose();
-    },
-  };
-}
-
-/** A code card (box or pack): the printed front and back on a card slab. */
-export function buildCodeCard({ renderer, envMap, kit, live, game }) {
-  const front = canvasTextureOf(512, 715, (ctx, w, h) => drawCodeCardFront(ctx, w, h, { game, live }), renderer);
-  const backTexture = canvasTextureOf(512, 715, (ctx, w, h) => drawCodeCardBack(ctx, w, h, { live }), renderer);
-  const mesh = kit.makeCard({ map: front, name: 'tt-code-card' });
-  const backMaterial = new MeshPhysicalMaterial({
-    map: backTexture,
-    roughness: 0.5,
-    clearcoat: 0.3,
-    envMap,
-    envMapIntensity: 0.6,
-  });
-  mesh.material = [mesh.material[0], backMaterial, mesh.material[2]];
-  mesh.userData.face.roughness = 0.5;
-  return {
-    mesh,
-    dispose: () => {
-      front.dispose();
-      backTexture.dispose();
-      backMaterial.dispose();
-      mesh.userData.face.dispose();
     },
   };
 }
