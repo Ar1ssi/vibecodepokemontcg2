@@ -40,6 +40,8 @@ import {
 } from './lobby/seat-presence.mjs';
 import { issueSeatToken } from './lobby/seat-token.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
+import { createCardImageHandler } from './card-image-proxy.mjs';
+import { CARD_ART_PROXY_HOSTS } from './card-art-proxy-hosts.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
 import { readServerAuthoritative } from './netcode-mode.mjs';
 import { resolveFoilTextureBase } from './tcgl-foil-config.mjs';
@@ -252,6 +254,14 @@ async function main() {
         res.status(502).send('fetch failed');
       }
     }
+  });
+
+  // Design 074 D8: card art for WebGL textures from hosts that send no CORS headers.
+  app.get('/api/card-image', createCardImageHandler({ allowedHosts: CARD_ART_PROXY_HOSTS }));
+
+  // Design 074: the three.js board lab; also reachable as /src/dev/board-lab.html like attack-fx-lab.
+  app.get('/dev/board-lab', (req, res) => {
+    res.sendFile(path.join(clientDir, 'src', 'dev', 'board-lab.html'));
   });
 
   // Card data goes through the server: browsers calling TCGdex directly got

@@ -539,6 +539,14 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### B1
+- attack-fx-lab has no route of its own (express.static serves `/src/dev/*`), so the lab is reachable both at
+  `/src/dev/board-lab.html` (static, same as attack-fx-lab) and at `/dev/board-lab` (one `sendFile` route in server.js).
+- `/api/card-image` also answers 502 for a non-`image/*` upstream and follows ≤3 redirects only within the allowed hosts
+  (403 otherwise); cache entries expire after 24 h (`now`). `CARD_ART_PROXY_HOSTS` = the five CORS hosts:
+  `card-image-url.mjs` produces no other images.pokemontcg.io variant.
+- Texture cache keys include the colour space, so `release(url, { colorSpace })` mirrors `acquire`.
+
 ---
 Self-approval checklist (only when the user is unreachable):
 - [ ] Every constraint traceable into the Design section

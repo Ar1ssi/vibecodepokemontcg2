@@ -15,6 +15,7 @@ import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/
 import { foilCoverage, foilRecordFor } from '../../foil/tcgl-foil-manifest.mjs';
 import { foilManifestNow } from '../../foil/tcgl-foil-store.js';
 import { mountTcglFoil } from '../../foil/tcgl-foil-view.js';
+import { CARD_ART_CORS_HOSTS } from '../../gl/card-art-hosts.mjs';
 
 // Rarity (TCGdex) → simey data-rarity value (per the Bulbapedia rarity guide).
 // Returns null → no holo (plain <img>).
@@ -185,14 +186,7 @@ function resolveRarityEffect(card) {
 // (text, HP, attack costs) stays black and foil only lives on bright areas.
 // A CSS mask image that fails to load (e.g. blocked by CORS) renders as
 // transparent black and hides the whole layer, so only hosts verified to send
-// CORS headers (checked 2026-09-15) get the mask.
-const INK_MASK_CORS_HOSTS = new Set([
-  'assets.tcgdex.net',
-  'images.pokemontcg.io',
-  'limitlesstcg.nyc3.digitaloceanspaces.com',
-  'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
-  'ptcgsim.online',
-]);
+// CORS headers (CARD_ART_CORS_HOSTS, card-art-hosts.mjs) get the mask.
 
 // Characters that could break out of a CSS `url("...")` token.
 const isUnsafeInCssUrl = (src) =>
@@ -215,7 +209,7 @@ export function foilMaskUrl(src, pageOrigin = globalThis.location?.origin) {
   if (url.protocol === 'data:' || url.protocol === 'blob:') return src;
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
   if (pageOrigin && url.origin === pageOrigin) return url.href;
-  return INK_MASK_CORS_HOSTS.has(url.hostname) ? url.href : null;
+  return CARD_ART_CORS_HOSTS.has(url.hostname) ? url.href : null;
 }
 
 // ── card era and layout ──────────────────────────────────────────────

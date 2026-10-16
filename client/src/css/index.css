@@ -200,6 +200,27 @@ ul, li {
   transform: scaleX(-1) scaleY(-1);
   z-index: 2;
 }
+/* Design 074: host for the three.js board, in the iframes' z-band. Stays [hidden] until the
+   board3d boot shows it; the mirror holds the off-screen DOM twins (shadow roots) of the cards. */
+#board3dHost {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+}
+#board3dHost[hidden] {
+  display: none;
+}
+#board3dCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+#boardMirror {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
 /* ── Battle mat: hexagonal red/blue arena, PTCG Live style ─────────────
    Sits fixed behind the self/opp iframes (which render transparent
    card zones on top of it) and in front of the customizable body

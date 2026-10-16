@@ -1,0 +1,255 @@
+<!doctype html>
+<!-- Design 074 B1: a bench for the three.js board's shared GL helpers. Open /dev/board-lab (or
+     /src/dev/board-lab.html) with the game server running; ?card=<image url> picks the card art
+     (non-CORS hosts go through /api/card-image). Drag to orbit. Not linked from the game. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Board 3D lab</title>
+    <script type="importmap">{"imports":{"three":"/src/vendor/three/three.module.min.js"}}</script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #11161c;
+        color: #dfe7ee;
+        font: 14px/1.4 system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        touch-action: none;
+        cursor: grab;
+      }
+      #stage.lab--dragging {
+        cursor: grabbing;
+      }
+      #stage canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .lab__bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 2;
+      }
+      .lab__bar label {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .lab__bar output {
+        min-width: 3ch;
+        font-variant-numeric: tabular-nums;
+      }
+      #stats {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        margin: 0;
+        padding: 8px 10px;
+        background: rgba(0, 0, 0, 0.55);
+        border-radius: 6px;
+        font: 12px/1.4 ui-monospace, monospace;
+        z-index: 2;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="lab__bar">
+      <label>Tilt <input id="tilt" type="range" min="0" max="90" step="1" value="0" /><output id="tiltOut">0</output>°</label>
+      <label>Light <input id="light" type="range" min="0" max="6" step="0.1" value="2.5" /><output id="lightOut">2.5</output></label>
+    </div>
+    <div id="stage"><canvas id="labCanvas" aria-hidden="true"></canvas></div>
+    <pre id="stats">loading…</pre>
+    <script type="module">
+      const stats = document.getElementById('stats');
+      const showError = (message) => {
+        stats.textContent = message;
+      };
+
+      async function boot() {
+        const [THREE, { RoomEnvironment }, { createRenderer }, { createTextureCache }, { textureUrlFor }] =
+          await Promise.all([
+            import('three'),
+            import('/src/vendor/three/RoomEnvironment.js'),
+            import('/src/setup/gl/gl-renderer.js'),
+            import('/src/setup/gl/gl-textures.js'),
+            import('/src/setup/gl/card-art-hosts.mjs'),
+          ]);
+        const host = document.getElementById('stage');
+        const canvas = document.getElementById('labCanvas');
+        let contextLost = false;
+        const gl = createRenderer({
+          canvas,
+          onLost: () => {
+            contextLost = true;
+            showError('WebGL context lost');
+          },
+        });
+        if (!gl) {
+          showError('WebGL2 unavailable');
+          return;
+        }
+        const { renderer } = gl;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x11161c);
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        const room = new RoomEnvironment();
+        scene.environment = pmrem.fromScene(room, 0.04).texture;
+        room.dispose();
+        pmrem.dispose();
+
+        const light = new THREE.DirectionalLight(0xffffff, 2.5);
+        light.position.set(3, 8, 4);
+        scene.add(light);
+
+        const floor = new THREE.Mesh(
+          new THREE.PlaneGeometry(40, 40),
+          new THREE.MeshStandardMaterial({ color: 0x1b222b, roughness: 0.92, metalness: 0 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const CARD_W = 2.5;
+        const CARD_H = 3.5;
+        const cardPivot = new THREE.Group();
+        cardPivot.position.set(0, 0.01, CARD_H / 2);
+        scene.add(cardPivot);
+        const cardMaterial = new THREE.MeshStandardMaterial({ color: 0x8a96a3, roughness: 0.45, metalness: 0 });
+        const card = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), cardMaterial);
+        // The pivot sits on the card's bottom edge so tilt stands the card up from the table.
+        card.rotation.x = -Math.PI / 2;
+        card.position.set(0, 0, -CARD_H / 2);
+        cardPivot.add(card);
+
+        const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+        const orbit = { azimuth: 0, polar: 0.9, radius: 11 };
+        const target = new THREE.Vector3(0, 0.5, 0);
+        const placeCamera = () => {
+          const sinPolar = Math.sin(orbit.polar);
+          camera.position.set(
+            target.x + orbit.radius * sinPolar * Math.sin(orbit.azimuth),
+            target.y + orbit.radius * Math.cos(orbit.polar),
+            target.z + orbit.radius * sinPolar * Math.cos(orbit.azimuth)
+          );
+          camera.lookAt(target);
+        };
+
+        const frameTimes = [];
+        let framePending = false;
+        let cardStatus = 'card: loading';
+        const writeStats = () => {
+          const fps = frameTimes.length;
+          stats.textContent = [
+            `fps (1 s)  ${fps}`,
+            `textures   ${renderer.info.memory.textures}`,
+            `calls      ${renderer.info.render.calls}`,
+            cardStatus,
+          ].join('\n');
+        };
+        const renderFrame = (time) => {
+          framePending = false;
+          if (contextLost) return;
+          placeCamera();
+          renderer.render(scene, camera);
+          frameTimes.push(time);
+          while (frameTimes.length && time - frameTimes[0] > 1000) frameTimes.shift();
+          writeStats();
+        };
+        const invalidate = () => {
+          if (framePending) return;
+          framePending = true;
+          requestAnimationFrame(renderFrame);
+        };
+
+        const resize = () => {
+          gl.resizeTo(host);
+          camera.aspect = Math.max(1, host.clientWidth) / Math.max(1, host.clientHeight);
+          camera.updateProjectionMatrix();
+          invalidate();
+        };
+        new ResizeObserver(resize).observe(host);
+        resize();
+
+        let drag = null;
+        host.addEventListener('pointerdown', (event) => {
+          drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+          host.setPointerCapture(event.pointerId);
+          host.classList.add('lab--dragging');
+        });
+        host.addEventListener('pointermove', (event) => {
+          if (!drag || event.pointerId !== drag.id) return;
+          orbit.azimuth -= (event.clientX - drag.x) * 0.008;
+          orbit.polar = Math.min(1.5, Math.max(0.08, orbit.polar - (event.clientY - drag.y) * 0.008));
+          drag.x = event.clientX;
+          drag.y = event.clientY;
+          invalidate();
+        });
+        const endDrag = (event) => {
+          if (!drag || event.pointerId !== drag.id) return;
+          drag = null;
+          host.classList.remove('lab--dragging');
+        };
+        host.addEventListener('pointerup', endDrag);
+        host.addEventListener('pointercancel', endDrag);
+        host.addEventListener(
+          'wheel',
+          (event) => {
+            event.preventDefault();
+            orbit.radius = Math.min(40, Math.max(4, orbit.radius * (1 + Math.sign(event.deltaY) * 0.08)));
+            invalidate();
+          },
+          { passive: false }
+        );
+
+        const bindSlider = (id, apply) => {
+          const input = document.getElementById(id);
+          const out = document.getElementById(`${id}Out`);
+          const update = () => {
+            out.textContent = input.value;
+            apply(Number(input.value));
+            invalidate();
+          };
+          input.addEventListener('input', update);
+          update();
+        };
+        bindSlider('tilt', (deg) => {
+          cardPivot.rotation.x = THREE.MathUtils.degToRad(deg);
+        });
+        bindSlider('light', (intensity) => {
+          light.intensity = intensity;
+        });
+
+        const textures = createTextureCache({ textureUrlFor });
+        const cardUrl = new URLSearchParams(location.search).get('card') || '/src/assets/cardback.png';
+        try {
+          const texture = await textures.acquire(cardUrl);
+          texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+          cardMaterial.map = texture;
+          cardMaterial.color.set(0xffffff);
+          cardMaterial.needsUpdate = true;
+          cardStatus = `card: ${textureUrlFor(cardUrl)}`;
+        } catch (error) {
+          cardStatus = `card failed: ${error?.message || 'load error'}`;
+        }
+        invalidate();
+      }
+
+      boot().catch((error) => showError(`lab failed: ${error?.message || error}`));
+    </script>
+  </body>
+</html>
