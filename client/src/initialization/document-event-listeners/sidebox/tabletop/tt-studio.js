@@ -229,6 +229,9 @@ export function createStudio({ renderer, scene, camera, reflect = true }) {
   );
   dome.name = 'tt-backdrop';
   dome.layers.set(EYE_ONLY_LAYER);
+  // three sorts opaque draws by material before depth, which put the dome and the floor first:
+  // drawn last instead, the depth test skips them wherever something stands in front.
+  dome.renderOrder = 2;
   scene.add(dome);
 
   // ── The mirror ──────────────────────────────────────────────────────────
@@ -290,6 +293,7 @@ export function createStudio({ renderer, scene, camera, reflect = true }) {
   );
   const floor = new Mesh(track(new CircleGeometry(DOME_RADIUS, 128)), floorMaterial);
   floor.name = 'tt-floor';
+  floor.renderOrder = 1;
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   floor.layers.set(EYE_ONLY_LAYER);
