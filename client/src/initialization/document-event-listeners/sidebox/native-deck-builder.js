@@ -103,7 +103,15 @@ import { EMPTY_PREFS } from '../../../setup/deck-builder/core/deck-suggest/prefs
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
 import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-picker.js';
 import { initializeDeckBuilderMatPicker } from './native-deck-builder-mat-picker.js';
-import { getCoinById, getCoins, getTcglCoins } from '../../../setup/deck-builder/core/coins.mjs';
+import {
+  DEFAULT_COIN,
+  coinCatalogLoaded,
+  getCoinById,
+  getCoins,
+  getTcglCoins,
+  loadCoinCatalog,
+} from '../../../setup/deck-builder/core/coins.mjs';
+import { whenLoaded } from '../../../setup/deck-builder/core/catalog-loader.mjs';
 import { coinArtUrl } from '../../../setup/deck-builder/core/coin-effects.mjs';
 import { initializeDeckBuilderBoxPicker } from './native-deck-builder-box-picker.js';
 import { initializeCustomizeStage } from '../../../setup/deck-builder/core/customize-stage/customize-stage.js';
@@ -126,7 +134,11 @@ import {
   saveLastSession,
 } from '../../../setup/deck-builder/core/last-session.mjs';
 import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
-import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
+import {
+  getSleeves,
+  loadSleeveCatalog,
+  sleeveCatalogLoaded,
+} from '../../../setup/deck-builder/core/sleeves.mjs';
 import { updateReadyButtons } from '../../../actions/general/ready.js';
 import {
   LEGACY_DEFAULT_CARD_BACK_SRC,
@@ -293,6 +305,11 @@ export const initializeNativeDeckBuilder = ({
     const side = target === 'opp' ? 'opp' : 'self';
     chosenCosmetics[side][key] = value;
   };
+  // Coins and sleeves are JSON loaded on demand (design 073). Work that reads them runs at once when
+  // both are in memory, exactly as when they were modules, else as soon as they land.
+  const cosmeticsLoaded = () => coinCatalogLoaded() && sleeveCatalogLoaded();
+  const loadCosmetics = () => Promise.all([loadCoinCatalog(), loadSleeveCatalog()]);
+  const withCosmetics = (fn) => whenLoaded(cosmeticsLoaded, loadCosmetics, fn, 'deck builder');
   // Suggest tab (design 069). Assigned once the panel boots; render() refreshes it.
   let suggestPanel = null;
   let noteDeckReplaced = () => {};
@@ -402,9 +419,13 @@ export const initializeNativeDeckBuilder = ({
     // last load, then shows the active deck's sleeve on the playmat.
     deckDirty = true;
     loadCurrentDeck();
-    const sleeveId = deckLibrary?.getActiveSleeve?.(target);
-    const sleeve = sleeveId ? getSleeves().find((entry) => entry.id === sleeveId) : null;
-    gameLink.changeCardBack(target, sleeve?.image || resolveDefaultCardBackSrc(), false);
+    // With the catalogs in (always, but for the first moments after boot) this keeps its order: card
+    // back, then play. Play itself never waits for them.
+    withCosmetics(() => {
+      const sleeveId = deckLibrary?.getActiveSleeve?.(target);
+      const sleeve = sleeveId ? getSleeves().find((entry) => entry.id === sleeveId) : null;
+      gameLink.changeCardBack(target, sleeve?.image || resolveDefaultCardBackSrc(), false);
+    });
     gameLink.play(target);
   });
 
@@ -823,7 +844,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               coinName: coin?.name ?? 'Default',
             };
           };
-          // Arrows step the picked category through its catalog, as TCG Live's do.
+          // Arrows step the picked category through its catalog, as TCG Live's do. Without the
+          // sleeve or coin catalog (a failed load) there is nothing to step to, and stepping an
+          // empty list would clear the deck's saved pick.
           const stepCosmetic = (slot, dir) => {
             if (slot === 'box') {
               const catalog = boxPicker?.catalog();
@@ -832,17 +855,23 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               boxPicker.setSelected(id);
               applyDeckBox(id ? boxById(catalog, id) : null);
             } else if (slot === 'sleeve') {
-              const ids = [null, ...getSleeves().map((entry) => entry.id)];
-              const at = Math.max(0, ids.indexOf(currentCosmeticId('sleeveId', deckLibrary?.getActiveSleeve)));
-              const id = ids[nextIndex(at, dir, ids.length)];
-              sleevePicker?.setSelected(id);
-              applySleeve(id ? getSleeves().find((entry) => entry.id === id) : null);
+              withCosmetics(() => {
+                if (!cosmeticsLoaded()) return;
+                const ids = [null, ...getSleeves().map((entry) => entry.id)];
+                const at = Math.max(0, ids.indexOf(currentCosmeticId('sleeveId', deckLibrary?.getActiveSleeve)));
+                const id = ids[nextIndex(at, dir, ids.length)];
+                sleevePicker?.setSelected(id);
+                applySleeve(id ? getSleeves().find((entry) => entry.id === id) : null);
+              });
             } else if (slot === 'coin') {
-              const ids = [null, ...getTcglCoins().map((entry) => entry.id), ...getCoins().map((entry) => entry.id)];
-              const at = Math.max(0, ids.indexOf(currentCosmeticId('coinId', deckLibrary?.getActiveCoin)));
-              const id = ids[nextIndex(at, dir, ids.length)];
-              coinPicker?.setSelected(id);
-              applyCoin(id ? getCoinById(id) : null);
+              withCosmetics(() => {
+                if (!cosmeticsLoaded()) return;
+                const ids = [null, ...getTcglCoins().map((entry) => entry.id), ...getCoins().map((entry) => entry.id)];
+                const at = Math.max(0, ids.indexOf(currentCosmeticId('coinId', deckLibrary?.getActiveCoin)));
+                const id = ids[nextIndex(at, dir, ids.length)];
+                coinPicker?.setSelected(id);
+                applyCoin(id ? getCoinById(id) : null);
+              });
             }
           };
           customizeStage = initializeCustomizeStage({
@@ -850,6 +879,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             getSelection: stageSelection,
             onStep: stepCosmetic,
           });
+          // Until the catalogs land the stage names the default sleeve and coin; then it redraws.
+          if (!cosmeticsLoaded()) withCosmetics(() => customizeStage?.refresh());
 
       // Customize switcher: Deck Box <-> Card Sleeve <-> Coin <-> Mat toggle + shared filter
           // ── playmat sleeve application ─────────────────────────────────
@@ -916,7 +947,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // ── per-deck customization restore ─────────────────────────────
           // Board-side only (restoreLastUsedDeckToPlaymat): the game tab
           // restores the sleeve of the deck it holds.
-          const syncCustomizationToDeck = () => {
+          const syncCustomizationToDeck = () => withCosmetics(() => {
             // sleeve -> playmat card back via the library's own data
             const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
             const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
@@ -927,7 +958,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             // emit=false: runs locally on init/switch; do not broadcast on load.
             if (backImage) changeCardBack(currentLoadTarget, backImage, false);
             document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: backImage } }));
-          };
+          });
     
           const customizeSwitcher = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
           const customizeFilter = document.getElementById('nativeDeckBuilderCustomizeFilter');
@@ -1012,12 +1043,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       // Reflect the active deck's coin when decks switch, and let the
       // rules engine know (for the match-start turn-order coin flip) even
       // if the player never opens the coin picker this session.
-      const refreshCoinSelection = () => {
+      const refreshCoinSelection = () => withCosmetics(() => {
         const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
         const coin = coinId ? getCoinById(coinId) : null;
         coinPicker?.setSelected(coinId);
         gameLink.announceCoin(currentLoadTarget, coin);
-      };
+      });
 
       // Reflect the active deck's mat when decks switch, and re-announce it
       // so the board picks the mat up even if the player never opens the mat
@@ -1891,6 +1922,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       deckDirty = true;
 
       const { sleeveId, coinId, deckBoxId } = parseCsvMeta(csvText);
+      // Without the catalogs the ids are still stored; only the card back and coin wait for a reload.
+      if (sleeveId !== null || coinId !== null) {
+        await loadCosmetics().catch((error) => console.warn('[deck builder] coin/sleeve catalog unavailable.', error));
+      }
       if (sleeveId !== null) {
         deckLibrary?.setActiveSleeve(currentLoadTarget, sleeveId);
         sleevePicker?.setSelected(sleeveId);
@@ -2091,6 +2126,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     }
   } else {
     // ── The game tab applies what the builder tab sends (design 050) ────
+    // Each target's latest coin message, so a late catalog never re-announces a superseded coin.
+    const coinMessageSeq = { self: 0, opp: 0 };
     const applyBuilderMessage = ({ type, payload }) => {
       // P2 is Solo-only; the builder tab's view of the game can be stale.
       if (payload.target === 'opp' && systemState.isTwoPlayer) return;
@@ -2112,6 +2149,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         if (payload.matId && !mat) return;
         link.announceMat(payload.target, mat, payload.emit);
       } else if (type === 'coin') {
+        const side = payload.target === 'opp' ? 'opp' : 'self';
+        const seq = (coinMessageSeq[side] += 1);
+        // Answered at once, so a 'play' sent after it never overtakes it: a coin catalog not in
+        // memory yet (JSON loaded on demand, design 073) announces the default coin now and the
+        // deck's own coin once the catalog lands, unless a newer coin message came in meanwhile.
+        if (payload.coinId && !coinCatalogLoaded()) {
+          link.announceCoin(payload.target, { ...DEFAULT_COIN });
+          whenLoaded(
+            coinCatalogLoaded,
+            loadCoinCatalog,
+            () => {
+              const coin = getCoinById(payload.coinId);
+              if (coin && seq === coinMessageSeq[side]) link.announceCoin(payload.target, coin);
+            },
+            'deck builder'
+          );
+          return;
+        }
         const coin = payload.coinId ? getCoinById(payload.coinId) : null;
         if (payload.coinId && !coin) return;
         link.announceCoin(payload.target, coin);

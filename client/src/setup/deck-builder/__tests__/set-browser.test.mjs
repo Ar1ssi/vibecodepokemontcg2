@@ -3,14 +3,16 @@ import test from 'node:test';
     
     import {
       getLegalSetRegistry,
-      getStarterDecks,
-      STARTER_DECK_CATALOG,
       fetchSetCards,
       filterCardsByName,
       sortCardsWithinGroup,
     } from '../core/set-browser.mjs';
-    import { getSleeves } from '../core/sleeves.mjs';
-    import { getCoins } from '../core/coins.mjs';
+    import { getStarterDeckCatalog, getStarterDecks, loadStarterDecks } from '../core/starter-decks.mjs';
+    import { getSleeves, loadSleeveCatalog } from '../core/sleeves.mjs';
+    import { getCoins, loadCoinCatalog } from '../core/coins.mjs';
+
+    await Promise.all([loadStarterDecks(), loadSleeveCatalog(), loadCoinCatalog()]);
+    const STARTER_DECK_CATALOG = getStarterDeckCatalog();
     
     test('legal registry contains the 21 Standard 2026-27 sets', () => {
       const registry = getLegalSetRegistry();

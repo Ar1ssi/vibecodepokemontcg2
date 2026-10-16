@@ -15,7 +15,10 @@ import { loadBoxData, setIdOfCardId } from '../box-data.mjs';
 import { EVOLUTION_PACK_SIZE, evolutionPairingProblems } from '../pack-opening.mjs';
 import { CARD_CLASSES, PACK_MODELS, RARITY_CLASSES } from '../pack-models.mjs';
 import { findPokemonBySlug } from '../../deck-sprites.mjs';
-import { GENERATED_STARTER_DECKS } from '../../starter-decks.generated.mjs';
+import { loadCatalog } from '../../catalog-loader.mjs';
+
+// scripts/generate-starter-decks.mjs output.
+const GENERATED_STARTER_DECKS = await loadCatalog('starter-decks');
 
 const loadedBoxes = await Promise.all(BUILD_BATTLE_BOXES.map((box) => loadBoxData(box.key)));
 const deckTotal = (rows) => rows.reduce((sum, row) => sum + row.qty, 0);

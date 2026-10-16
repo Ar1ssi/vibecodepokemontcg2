@@ -1,5 +1,5 @@
-// Playmat catalog for the deck builder's Customize > Mat view. The records
-// themselves are generated from the scrape manifest (see
+// Playmat catalog for the deck builder's Customize > Mat view. The records live in
+// mats-catalog.mjs (hand-kept custom mats plus the scraped ones from
 // `scripts/generate-mat-thumbs.mjs`); this module only reads them, so it stays
 // pure and DOM-free and runs under `node --test`.
 

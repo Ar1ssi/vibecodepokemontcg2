@@ -59,6 +59,37 @@ export const stopOppResize = () => {
   document.body.removeChild(overlay);
 };
 
+/**
+ * After either resizer moves: the stadium and the board buttons sit midway between the two
+ * resizers, and a resizer pushed to the screen edge grows so it stays easy to grab.
+ */
+const placeBoardControls = () => {
+  stadiumElement.style.bottom =
+    Math.min(
+      84,
+      (parseFloat(oppResizer.style.bottom) +
+        parseFloat(selfResizer.style.bottom)) /
+        2 -
+        8
+    ) + '%';
+  boardButtonContainer.style.bottom =
+    Math.min(
+      90,
+      (parseFloat(oppResizer.style.bottom) +
+        parseFloat(selfResizer.style.bottom)) /
+        2 -
+        3
+    ) + '%';
+  oppResizer.style.height = '2.5%';
+  if (parseFloat(oppResizer.style.bottom) > 95) {
+    oppResizer.style.height = '10%';
+  }
+  selfResizer.style.height = '2.5%';
+  if (parseFloat(selfResizer.style.bottom) < 5) {
+    selfResizer.style.height = '10%';
+  }
+};
+
 export const selfResize = (e) => {
   [handElement, oppHandElement].forEach(adjustAlignment);
 
@@ -104,30 +135,7 @@ export const selfResize = (e) => {
     adjustCards('opp', 'bench', oppRatio);
     adjustCards('opp', 'active', oppRatio);
   }
-  stadiumElement.style.bottom =
-    Math.min(
-      84,
-      (parseFloat(oppResizer.style.bottom) +
-        parseFloat(selfResizer.style.bottom)) /
-        2 -
-        8
-    ) + '%';
-  boardButtonContainer.style.bottom =
-    Math.min(
-      90,
-      (parseFloat(oppResizer.style.bottom) +
-        parseFloat(selfResizer.style.bottom)) /
-        2 -
-        3
-    ) + '%';
-  oppResizer.style.height = '2.5%';
-  if (parseFloat(oppResizer.style.bottom) > 95) {
-    oppResizer.style.height = '10%';
-  }
-  selfResizer.style.height = '2.5%';
-  if (parseFloat(selfResizer.style.bottom) < 5) {
-    selfResizer.style.height = '10%';
-  }
+  placeBoardControls();
 };
 
 export const oppResize = (e) => {
@@ -172,30 +180,7 @@ export const oppResize = (e) => {
     adjustCards('self', 'bench', selfRatio);
     adjustCards('self', 'active', selfRatio);
   }
-  stadiumElement.style.bottom =
-    Math.min(
-      84,
-      (parseFloat(oppResizer.style.bottom) +
-        parseFloat(selfResizer.style.bottom)) /
-        2 -
-        8
-    ) + '%';
-  boardButtonContainer.style.bottom =
-    Math.min(
-      90,
-      (parseFloat(oppResizer.style.bottom) +
-        parseFloat(selfResizer.style.bottom)) /
-        2 -
-        3
-    ) + '%';
-  oppResizer.style.height = '2.5%';
-  if (parseFloat(oppResizer.style.bottom) > 95) {
-    oppResizer.style.height = '10%';
-  }
-  selfResizer.style.height = '2.5%';
-  if (parseFloat(selfResizer.style.bottom) < 5) {
-    selfResizer.style.height = '10%';
-  }
+  placeBoardControls();
 };
 
 export const adjustCards = (user, zoneId, ratio) => {
@@ -312,30 +297,7 @@ export const flippedSelfResize = (e) => {
     adjustCards('self', 'bench', selfRatio);
     adjustCards('self', 'active', selfRatio);
   }
-  stadiumElement.style.bottom =
-    Math.min(
-      84,
-      (parseFloat(selfResizer.style.bottom) +
-        parseFloat(oppResizer.style.bottom)) /
-        2 -
-        8
-    ) + '%';
-  boardButtonContainer.style.bottom =
-    Math.min(
-      90,
-      (parseFloat(selfResizer.style.bottom) +
-        parseFloat(oppResizer.style.bottom)) /
-        2 -
-        3
-    ) + '%';
-  oppResizer.style.height = '2.5%';
-  if (parseFloat(oppResizer.style.bottom) > 95) {
-    oppResizer.style.height = '10%';
-  }
-  selfResizer.style.height = '2.5%';
-  if (parseFloat(selfResizer.style.bottom) < 5) {
-    selfResizer.style.height = '10%';
-  }
+  placeBoardControls();
 };
 
 export const flippedOppResize = (e) => {
@@ -377,28 +339,5 @@ export const flippedOppResize = (e) => {
     adjustCards('opp', 'bench', oppRatio);
     adjustCards('opp', 'active', oppRatio);
   }
-  stadiumElement.style.bottom =
-    Math.min(
-      84,
-      (parseFloat(selfResizer.style.bottom) +
-        parseFloat(oppResizer.style.bottom)) /
-        2 -
-        8
-    ) + '%';
-  boardButtonContainer.style.bottom =
-    Math.min(
-      90,
-      (parseFloat(selfResizer.style.bottom) +
-        parseFloat(oppResizer.style.bottom)) /
-        2 -
-        3
-    ) + '%';
-  oppResizer.style.height = '2.5%';
-  if (parseFloat(oppResizer.style.bottom) > 95) {
-    oppResizer.style.height = '10%';
-  }
-  selfResizer.style.height = '2.5%';
-  if (parseFloat(selfResizer.style.bottom) < 5) {
-    selfResizer.style.height = '10%';
-  }
+  placeBoardControls();
 };

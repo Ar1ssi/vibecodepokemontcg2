@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I260). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I261). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,13 +14,13 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I260 2026-10-16 P3 [client] Eager boot JS is 5.6 MB after 073 batch 5 (target ≤2.8 MB): lazy import() of the deck builder and mat FX (073 C8); initMatCoins fetches coins.json (458 KB) + tcgl-coins.json (120 KB) on every game-tab boot — defer to the first flip (refs: I252)
 - I259 2026-10-16 P2 [board-ui] TCG Live foil SolidColor family (e.g. bw11-114) renders as a near-solid yellow wash — maybe a material-param port bug; check on localhost (refs: D217, design 069-tcgl-card-foil)
 - I258 2026-10-16 P3 [board-ui] TCG Live foil costs ~12 MB GPU per live card (front + etch + plate, mipmapped); not measured with ~20 on screen or in mat iframes (refs: D217)
 - I257 2026-10-16 P3 [board-ui] TCG Live foil gaps: Poké/Master Ball reverse (`_sph`/`_mph`/`_ph2`, ~600) not imported; sets ec, gum, me5-5m, smalt, xyalt, xybsp, swshbsp, mebsp #94–100, mee #9–16 unmapped (186+ cards keep CSS holo) (refs: D217)
 - I256 2026-10-16 P3 [board-ui] r2.dev public URL for foil textures is rate-limited and not for production; move ptcg-foil to a custom domain when one is on Cloudflare (refs: D217)
 - I255 2026-10-15 P3 [netcode] joinGame/reconnect add the socket to the Socket.IO room before roomReject (server.js:789/:925 vs :810/:940/:949): rejected sockets get room broadcasts and keep roomInfo alive past the sweep; join only after the seat checks pass (refs: D216 review)
-- I254 2026-10-15 P3 [board-ui] mats-catalog.mjs still claims GENERATED, but rerunning scripts/generate-mat-thumbs.mjs would drop every custom-* entry (manifest.json has none); 27 dead custom/*-full-size*.png entries remain (refs: I249, D215)
-- I252 2026-10-15 P3 [deck-builder] Data shipped as code: coins.mjs 9,647 lines imported at boot by rules-bridge.js, set-browser.mjs 720 JSON lines with a 143-line block duplicated at :984/:1445; bnb-run.js and build-battle.js share 160 verbatim lines across both B&B flows (refs: design 073 D)
+- I254 2026-10-15 P3 [board-ui] scripts/generate-mat-thumbs.mjs rewrites mats-catalog.mjs from manifest.json, which has no custom-* entries, so a rerun drops the hand-kept block (header warns; merge by hand) — make the generator keep it (refs: D215; dead PNG entries removed 2026-10-16)
 - I251 2026-10-15 P2 [legacy] Client rules layer loaded under authority (rules-bridge.js, trainer-execution.js, chat-buttons.js; 55 guards in 23 files; 4 legacy/server twins). Step 1 landed (D216): authority default, shadow gone, dmg fix. Retire twins as DISPOSITION_TABLE grows (refs: 073 C)
 - I250 2026-10-15 P2 [engine] reduce.mjs is 10,976 lines, 186 commits in 2 months (top hotspot): applyCommand 2,322 lines, resolveAttackEffectPhase 1,420, 123 case labels behind 3 exports; every engine edit re-lints and re-tests the whole file — split by command domain (refs: design 073 B)
 - I247 2026-10-15 P3 [netcode] Design 072 seat-loss (merged I247, I248): a seat rejoining after the opening deal gets no dealOrder/turnOrderResult replay (Set Up shuffles locally after 45 s); a caller or coin winner whose socket blips is answered for at once, no reconnect grace (refs: design 072)
@@ -55,6 +55,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I252 2026-10-15 P3 [deck-builder] Data as code: coins.mjs 9,647 lines at boot, set-browser.mjs 720 JSON lines, 160 lines twice across the B&B flows (073 D) → closed 2026-10-16: JSON in assets/catalogs/ via catalog-loader.mjs on first use; flows share bb-shared.js; boot weight → I260
 - I253 2026-10-15 P3 [harness] Over every cap, 453 commits since last maintain (trigger 30): DECISIONS 199 lines/47 KB, ISSUES 69 open, designs root 91, MAP 131; rules-extended.test.mjs 24 s on live TCGdex retries (refs: design 073 E, D161) → closed 2026-10-15: b2c6617 test stub + maintain sweep
 - I249 2026-10-15 P2 [repo] ~90 MB of tracked junk (tools/ npm CLI, out/*.webm, playmats/custom/*.png, logs, .bak, package-lock.json, dead root scripts and docs; design 073 A) → closed 2026-10-15: 052f8ac deleted or moved it all (root entries 71 → 30); leftovers I252, I254
 - I179 2026-09-22 P2 [rules-ui] card-inspector-model.test.mjs "retreat greys only when the cost is unpaid" failed on a clean tree (S251, S252) → closed 2026-10-15: 3cc15937 fixed the stale assertion (rules off exposes no actions, E18); the file passes 81/81
@@ -83,5 +84,3 @@
 - I204 2026-09-28 P2 [netcode] `systemState.deckFormat.opp` was one slot for the solo alt deck and the remote opponent; after leaving a B&B room the alt deck re-dealt 4 Prizes (design 051 review) → closed 2026-09-28 S329: p1Opp/p2Opp slots; deckFormatOf/deckFormatSlot pick one
 - I203 2026-09-28 P2 [rules] Prize math hard-coded 6 (ko-flow.mjs:40, ability-executors:228, tool-combat:332, scaling-count:271, turn-damage-bonus:86), wrong in B&B (design 051 review) → closed 2026-09-28 S329: formats.mjs prizesTakenFor; every site reads each player's format
 - I202 2026-09-28 P1 [netcode] B&B format lock: loadDeck refused a format unlike the opponent's loaded deck, so two Standard-last players both got format_mismatch (design 051 review) → closed 2026-09-28 S329: loadDeck accepts any format; `setup` and isReadyToDeal refuse mixed formats (D190)
-- I194 2026-09-28 P3 [rules] Approximations: Bronzong Heavy Potential read printed Retreat Cost; Night Spin counted cards not units; "up to" took the max; counter moves counted as heals; Quick Touch/Lava Plume "If you do" halves unparsed → closed 2026-09-28 S328: all fixed (12a18374)
-- I195 2026-09-28 P2 [rules] Flygon ex Psychic Protector (discard up to 4 when damaged, −10 each) and Delibird Souvenir coin tiers unimplemented (parse-holes review) → closed 2026-09-28 S328: defender hand-discard prompt before damage; per-tier coin steps (6a282948)

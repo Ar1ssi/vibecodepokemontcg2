@@ -34,3 +34,6 @@ client/src/assets/playmats/custom/*.png
 # Regenerate with `pnpm foil:import`, upload with `pnpm foil:upload`.
 client/src/assets/tcgl-foil/cards/
 client/src/assets/tcgl-foil/tex/
+
+# Python bytecode from running scripts/*.py
+__pycache__/

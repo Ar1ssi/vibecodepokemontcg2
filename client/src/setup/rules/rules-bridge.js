@@ -87,12 +87,12 @@ import { evaluateMulligans, bonusDrawsOwed } from '/shared/engine/rules/mulligan
 import { draw } from '../../actions/zones/deck-actions.js';
 import { shuffleAndDraw, drawOpeningHand } from '../../actions/zones/hand-actions.js';
 import { e2eDelayMs, isE2eMode } from '../general/e2e-mode.mjs';
-import { getCoinById } from '../deck-builder/core/coins.mjs';
 import {
   getSelectedCoin,
   initMatCoins,
   pickDefaultCoin,
   setSelectedCoin,
+  withCatalogCoin,
 } from './mat-coin.js';
 import { playCoinFlipCeremony } from './coin-flip-ceremony.js';
 import { coinCeremonyTimeline } from '../netcode/mat-fx/coin-pose.mjs';
@@ -1175,10 +1175,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       // The server echoes the caller's chosen coin so both clients render the
       // same art; fall back to this client's local selection, then a stable
       // default (never a random coin, so repeated flips keep the same face).
-      const coin =
-        (coinId ? getCoinById(coinId) : null) ||
-        getSelectedCoin(caller) ||
-        pickDefaultCoin();
+      const fallbackCoin = getSelectedCoin(caller) || pickDefaultCoin();
       appendMessage(
         '',
         auto
@@ -1187,15 +1184,17 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         'announcement',
         false
       );
-      playCoinFlipCeremony({
-        coin,
-        result,
-        ownerLabel: caller === 'self' ? 'Your' : "Opponent's",
-        label: auto
-          ? `${call === 'heads' ? 'Heads' : 'Tails'} was called for you. Flipping the coin…`
-          : `${sideName(caller)} chose ${call}. Flipping the coin…`,
-        outcomeLabel: winner === 'self' ? 'You won the coin flip!' : 'Your opponent won the coin flip.',
-      });
+      withCatalogCoin(coinId, (named) =>
+        playCoinFlipCeremony({
+          coin: named || fallbackCoin,
+          result,
+          ownerLabel: caller === 'self' ? 'Your' : "Opponent's",
+          label: auto
+            ? `${call === 'heads' ? 'Heads' : 'Tails'} was called for you. Flipping the coin…`
+            : `${sideName(caller)} chose ${call}. Flipping the coin…`,
+          outcomeLabel: winner === 'self' ? 'You won the coin flip!' : 'Your opponent won the coin flip.',
+        })
+      );
 
       const ceremonyMs = e2eDelayMs(coinCeremonyTimeline(1).totalMs);
       serverCoinCeremonyEndsAt = Date.now() + ceremonyMs;
@@ -2410,14 +2409,15 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               // may have overridden its local flip with the server's authoritative
               // starter (getDealOrderStarter()), which this recompute could not see.
               const localTurnPlayer = data.turnPlayer === 'self' ? 'opp' : 'self';
-              const coin = data.coinId ? getCoinById(data.coinId) : null;
-              playTurnOrderCoinAnimation({
-                coin,
-                result: data.result,
-                coinOwner: localCoinOwner,
-                turnPlayer: localTurnPlayer,
-                isRemote: true,
-              });
+              withCatalogCoin(data.coinId, (coin) =>
+                playTurnOrderCoinAnimation({
+                  coin,
+                  result: data.result,
+                  coinOwner: localCoinOwner,
+                  turnPlayer: localTurnPlayer,
+                  isRemote: true,
+                })
+              );
               // used when we click our own Set Up, so both sides agree
               syncedTurnOrder = localTurnPlayer;
 
@@ -2478,13 +2478,14 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
               // The acting client ran an in-game coin flip; show the same coin
               // and result here. Their 'self' is our 'opp'.
               const remoteOwner = data?.playerId === 'opp' ? 'self' : 'opp';
-              const coin = data?.coinId
-                ? getCoinById(data.coinId)
-                : getSelectedCoin(remoteOwner) || pickDefaultCoin();
               const ownerLabel = remoteOwner === 'self' ? 'Your' : "Opponent's";
               const result = data?.result === 'tails' ? 'tails' : 'heads';
-              playCoinFlipCeremony({ coin, result, ownerLabel });
-              appendMessage('', `🪙 ${ownerLabel} coin flip: ${result}.`, 'announcement', false);
+              const playCeremony = (coin) => {
+                playCoinFlipCeremony({ coin, result, ownerLabel });
+                appendMessage('', `🪙 ${ownerLabel} coin flip: ${result}.`, 'announcement', false);
+              };
+              if (data?.coinId) withCatalogCoin(data.coinId, playCeremony);
+              else playCeremony(getSelectedCoin(remoteOwner) || pickDefaultCoin());
             } else if (type === 'mulliganBonus') {
               // Opponent mulliganed — we draw 1 bonus card for ourselves
               if (rulesState.enabled) {

@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { STARTER_DECK_CATALOG } from '../core/set-browser.mjs';
+import { getStarterDeckCatalog, loadStarterDecks } from '../core/starter-decks.mjs';
 import { normalizeDeckSprites } from '../core/deck-sprites.mjs';
+
+await loadStarterDecks();
+const STARTER_DECK_CATALOG = getStarterDeckCatalog();
 
 test('every starter deck pins two known default sprites', () => {
   for (const entry of STARTER_DECK_CATALOG) {

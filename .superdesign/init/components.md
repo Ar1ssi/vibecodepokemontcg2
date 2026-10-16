@@ -326,7 +326,7 @@ import {
       normalizeDeckSprites,
     } from '../../../setup/deck-builder/core/deck-sprites.mjs';
     import { renderDeckSprites } from './native-deck-builder-renderers.js';
-    import { getStarterDecks, STARTER_DECK_CATALOG } from '../../../setup/deck-builder/core/set-browser.mjs';
+    import { getStarterDeckCatalog, getStarterDecks } from '../../../setup/deck-builder/core/starter-decks.mjs';
     
     const escapeHtml = (value = '') => String(value)
       .replaceAll('&', '&amp;')
@@ -374,7 +374,7 @@ import {
         let nextLibrary = library;
         let changed = false;
 
-        for (const entry of STARTER_DECK_CATALOG) {
+        for (const entry of getStarterDeckCatalog()) {
           const existingId = decksByName.get(entry.name);
           if (existingId) {
             const deck = nextLibrary.decks[existingId];
