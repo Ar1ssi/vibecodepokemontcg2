@@ -10,6 +10,7 @@ import {
   SRGBColorSpace,
 } from 'three';
 import {
+  PEEL_MAX_DEG,
   STRIP_V,
   packShape,
   packShapeKey,
@@ -36,6 +37,8 @@ import { fbm, makeCanvas, normalTextureFromHeights, prng } from './tt-textures.j
 const GRID_X = 40;
 const GRID_Y = 72;
 const STRIP_GRID_Y = 10;
+// A torn-off strip of wrapper film lies in a loose curl of about this radius (mm).
+const STRIP_CURL_MM = 16;
 const MASK_W = 256;
 const MASK_H = 468;
 const MASK_OVERLAP_PX = 1.5;
@@ -293,6 +296,31 @@ export function createPackKit({ envMap, renderer }) {
       });
     };
 
+    /**
+     * The torn strip relaxing as it flies off (`amount` 0 → 1): the fold about the tear opens out
+     * while the film takes a loose curl up from its torn edge, so it lands lying on its back
+     * instead of standing folded in the mat.
+     */
+    const relaxStrip = (amount) => {
+      const relaxed = Math.max(0, Math.min(1, amount));
+      const radius = STRIP_CURL_MM / Math.max(relaxed, 1e-3);
+      const angleDeg = PEEL_MAX_DEG * (1 - relaxed);
+      const hingeMm = hingeY * PW;
+      [stripFrontGeometry, stripBackGeometry].forEach((geometry, which) => {
+        const position = geometry.getAttribute('position');
+        const base = rest[which];
+        for (let i = 0; i < position.count; i += 1) {
+          const theta = (base[i * 3 + 1] - hingeMm) / radius;
+          const lever = radius - base[i * 3 + 2];
+          const curled = { y: (hingeMm + lever * Math.sin(theta)) / PW, z: (radius - lever * Math.cos(theta)) / PW };
+          const folded = peelVertex(curled, { hingeY, angleDeg });
+          position.setXYZ(i, base[i * 3], folded.y * PW, folded.z * PW);
+        }
+        position.needsUpdate = true;
+        geometry.computeVertexNormals();
+      });
+    };
+
     const setDim = (amount) => {
       const level = Math.max(0, Math.min(1, amount));
       for (const material of disposables) {
@@ -308,6 +336,7 @@ export function createPackKit({ envMap, renderer }) {
       // The mouth: where the torn top's line runs, in pack space (mm).
       mouthY: hingeY * PW,
       setPeel,
+      relaxStrip,
       setDim,
       meshes: [bodyFront, bodyBack, stripFront, stripBack],
       dispose: () => disposables.forEach((thing) => thing.dispose?.()),

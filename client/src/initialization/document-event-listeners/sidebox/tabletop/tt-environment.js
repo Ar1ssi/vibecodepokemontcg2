@@ -15,8 +15,9 @@ import {
  * RoomEnvironment, so glossy things show distinct highlights against dark surroundings — the
  * contrast holo foil and shrink-wrap need to flash when they tilt. A ceiling softbox overhead, a
  * window-like panel at the front left (where the key light comes from), a cool strip behind on
- * the right, a lit wall beyond the desk, warm bounce off the desk, and dark walls. Units are
- * arbitrary: a PMREM only keeps directions. Rendered once through `PMREMGenerator.fromScene`.
+ * the right, a lit wall beyond the desk, the dark mat below with the desk around it, and dark
+ * walls. Units are arbitrary: a PMREM only keeps directions. Rendered once through
+ * `PMREMGenerator.fromScene`.
  */
 
 const emissive = (intensity, color = 0xffffff) =>
@@ -50,12 +51,16 @@ export function createStudioEnvironment() {
   // A cool strip light behind on the right.
   place(emissive(3, 0xd9e6ff), [15, 8, -15], [2.2, 9, 1], [0, -Math.PI / 4, 0]);
   // A lit wall beyond the desk: what the box's top, the film and cards lying flat mirror from
-  // where you sit, so they read glossy.
-  place(emissive(1.4, 0xfff6ea), [-3, 7, -19.5], [18, 9, 1]);
+  // where you sit, so they read glossy. Film at that grazing angle mirrors it strongly: brighter,
+  // and a sealed box's top went white instead of showing its print through the glare.
+  place(emissive(0.7, 0xfff6ea), [-3, 7, -19.5], [18, 9, 1]);
   // A dim lamp behind the viewer, so things facing the eye still catch a little light.
   place(emissive(1.2, 0xfff0dc), [3, 7, 19], [6, 4, 1], [0, Math.PI, 0]);
-  // Warm bounce off the wooden desk.
-  place(emissive(0.35, 0x8a5a36), [0, -2.9, 0], [38, 38, 1], [-Math.PI / 2, 0, 0]);
+  // Below: everything sits on the dark rubber mat, which fills the steep downward view; the
+  // walnut desk only shows near the horizon. (A warm floor everywhere lit the undersides of the
+  // wrap's crumpled facets orange.)
+  place(emissive(0.04, 0x2a2c33), [0, -2.85, 0], [9, 5.5, 1], [-Math.PI / 2, 0, 0]);
+  place(emissive(0.12, 0x8a5a36), [0, -2.9, 0], [38, 38, 1], [-Math.PI / 2, 0, 0]);
 
   return {
     scene,

@@ -290,3 +290,18 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   counter counts pool cards. The proxy only takes card-image and set-logo paths, caps bodies as they
   stream, remembers 404s for an hour, cools down 30 s after a 403/429/503 and turns away a full queue
   (card-art-proxy tests). The bench's "open this box again" closes the old scene first.
+- **Iteration 9 (etched foil, film glare, the torn strip).** Compared the Dawn SIR (me02-129) and
+  the gold Mega Charizard X ex (me02-130) in hand with their TCGdex images. Before: both wore 2 × 2
+  pixel stair steps over the whole art (the etched relief was a screen-space derivative of the
+  per-pixel print, constant over each pixel quad) and their text was mush; the fine etch showed a
+  waffle grid (value-noise seams); a sealed box's top was a white mirror (the film mirrored the env's
+  back wall at ~5× a white card's brightness — measured by switching layers and panels off); the
+  shrink-wrap wad glowed orange (the env's floor was warm wood, but everything sits on the dark mat);
+  the torn pack strip stayed folded 150° about the tear, so "lying flat" it stood in the mat as a
+  copper sliver. After: relief slopes are central differences in card millimetres over the print
+  prefiltered to ≥ 0.7 mm (and ≥ 1.5 px), clamped to ~19°, with dark ink pressed toward the
+  mid-tones so lettering stays flat while a darker-gold silhouette keeps its edge; the fine etch is
+  two octaves on turned axes; SIR relief halved; the back wall halved and the env floor is the
+  mat with the desk only near the horizon (the sealed top now shows its print through a light glare,
+  as in the reference photos' grazing tops; the wad is clear film with white glints); the strip's
+  fold springs open into a 16 mm curl in flight and lands print up. Frames: scratch `it9/`.

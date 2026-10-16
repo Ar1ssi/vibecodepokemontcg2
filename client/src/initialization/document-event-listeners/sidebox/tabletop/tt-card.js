@@ -19,8 +19,8 @@ const FOIL_MODE = Object.freeze({ none: 0, holo: 1, reverse: 2, full: 3, gold: 4
 const FOIL_SURFACE_BY_MODE = Object.freeze({
   1: [0.62, 0.18, 0.12],
   2: [0.5, 0.2, 0.1],
-  3: [0.3, 0.27, 0.5],
-  4: [0.6, 0.24, 0.9],
+  3: [0.3, 0.27, 0.25],
+  4: [0.6, 0.24, 0.55],
   5: [0.45, 0.2, 0.15],
 });
 const PATTERN = Object.freeze({ none: 0, sheen: 1, starlight: 2, cosmos: 3, etched: 4, glitter: 5, swirl: 6 });
@@ -52,7 +52,11 @@ float ttFoilHeight(vec2 uv) {
   vec2 p = uv * vec2(63.0, 88.0);
   if (uFoilPattern == 1) return 0.5 + 0.5 * sin((p.x * 0.8 + p.y * 0.6) * 5.0);
   if (uFoilPattern == 3) return ttCardNoise(p * 0.35) * 0.6 + ttCardNoise(p * 0.9) * 0.4;
-  if (uFoilPattern == 4) return ttCardNoise(p * 1.2);
+  if (uFoilPattern == 4) {
+    // Two octaves on turned axes: one lattice's flat seams would read as a waffle grid.
+    return ttCardNoise(mat2(0.8, -0.6, 0.6, 0.8) * p * 1.2) * 0.55
+      + ttCardNoise(mat2(0.28, 0.96, -0.96, 0.28) * p * 1.9 + 5.1) * 0.45;
+  }
   if (uFoilPattern == 6) {
     vec2 q = p - vec2(31.5, 44.0);
     float n = ttCardNoise(p * 0.3);
@@ -66,7 +70,7 @@ float ttFoilFeature() {
   if (uFoilPattern == 1) return 1.26;
   if (uFoilPattern == 2) return 2.0;
   if (uFoilPattern == 3) return 1.1;
-  if (uFoilPattern == 4) return 0.83;
+  if (uFoilPattern == 4) return 0.6;
   if (uFoilPattern == 5) return 0.8;
   return 3.0;
 }
@@ -93,25 +97,63 @@ if (uFoilMode > 0) {
 }
 `;
 
-// The pattern's relief tips the normal, so light catches on its lines (three's perturbNormalArb).
-// Etched foil is embossed by the print itself: its relief follows the art's light and dark, with a
-// fine etch over it, so a gold card shows its Pokémon as a raised shape in the gold.
+// The print's light and dark, blurred to `texelMm` by the mip that size picks (linear light).
+const FOIL_INK_HEAD = /* glsl */ `
+#ifdef USE_MAP
+float ttInkAt(vec2 uv, float lod) {
+  float lum = dot(textureLod(map, uv, lod).rgb, vec3(0.299, 0.587, 0.114));
+  // Lettering is flat black ink on the foil: dark values are pressed toward the mid-tones, so text
+  // barely embosses while the art's lighter shapes (a darker gold on gold) keep their steps.
+  return max(lum, 0.425 + 0.15 * lum);
+}
+// Slope of the print's light and dark, in luminance per mm, over features of texelMm.
+vec2 ttInkSlope(vec2 uv, float texelMm) {
+  float lod = max(0.0, log2(texelMm * float(textureSize(map, 0).x) / 63.0));
+  vec2 du = vec2(texelMm / 63.0, 0.0);
+  vec2 dv = vec2(0.0, texelMm / 88.0);
+  return vec2(ttInkAt(uv + du, lod) - ttInkAt(uv - du, lod), ttInkAt(uv + dv, lod) - ttInkAt(uv - dv, lod))
+    / (2.0 * texelMm);
+}
+#endif
+`;
+
+// The pattern's relief tips the normal, so light catches on its lines. Etched foil is embossed by
+// the print itself: its relief follows the art's light and dark, with a fine etch over it, so a
+// gold card shows its Pokémon as a raised shape in the gold. Slopes come from central differences
+// in card millimetres over a prefiltered height, so they change smoothly from pixel to pixel at any
+// size; a screen-space derivative of the print is constant over each 2 × 2 pixel block and turned
+// the art into stair steps.
 const FOIL_NORMAL = /* glsl */ `
 if (ttFoil > 0.0 && uFoilPattern > 0) {
   float mmPerPx = length(fwidth(vCardUv * vec2(63.0, 88.0)));
   float feature = ttFoilFeature();
-  ttPattern = ttFoilHeight(vCardUv) * smoothstep(feature * 0.5, feature * 0.2, mmPerPx);
-  float h = uFoilPattern == 4
-    ? (ttInk * 4.0 + ttPattern * 0.25) * uFoilRelief * ttFoil
-    : ttPattern * uFoilRelief * ttFoil;
-  vec2 dh = vec2(dFdx(h), dFdy(h));
-  vec3 sx = normalize(dFdx(-vViewPosition));
-  vec3 sy = normalize(dFdy(-vViewPosition));
-  vec3 r1 = cross(sy, normal);
-  vec3 r2 = cross(normal, sx);
-  float det = dot(sx, r1) * faceDirection;
-  vec3 grad = sign(det) * (dh.x * r1 + dh.y * r2);
-  normal = normalize(abs(det) * normal - grad);
+  float patternFade = smoothstep(feature * 0.5, feature * 0.2, mmPerPx);
+  ttPattern = ttFoilHeight(vCardUv) * patternFade;
+  vec2 ep = vec2(0.08 / 63.0, 0.08 / 88.0);
+  vec2 slope = vec2(
+    ttFoilHeight(vCardUv + vec2(ep.x, 0.0)) - ttFoilHeight(vCardUv - vec2(ep.x, 0.0)),
+    ttFoilHeight(vCardUv + vec2(0.0, ep.y)) - ttFoilHeight(vCardUv - vec2(0.0, ep.y))
+  ) / 0.16 * patternFade * (uFoilPattern == 4 ? 0.2 : 1.0);
+  #ifdef USE_MAP
+    // The art's shapes, not its lettering: the print blurred to 0.7 mm (or a pixel and a
+    // half, when smaller) leaves text a soft band, while a silhouette keeps its edge.
+    if (uFoilPattern == 4) slope += ttInkSlope(vMapUv, max(0.7, 1.5 * mmPerPx)) * 4.0;
+  #endif
+  slope *= uFoilRelief * ttFoil;
+  // A raised edge in foil tips the light by tens of degrees at most.
+  slope /= max(1.0, length(slope) / 0.35);
+  // The face's +u and +v directions in view space, from the surface's own derivatives.
+  vec3 q0 = dFdx(-vViewPosition);
+  vec3 q1 = dFdy(-vViewPosition);
+  vec2 st0 = dFdx(vCardUv);
+  vec2 st1 = dFdy(vCardUv);
+  vec3 q1perp = cross(q1, normal);
+  vec3 q0perp = cross(normal, q0);
+  vec3 axisU = q1perp * st0.x + q0perp * st1.x;
+  vec3 axisV = q1perp * st0.y + q0perp * st1.y;
+  if (dot(axisU, axisU) > 0.0 && dot(axisV, axisV) > 0.0) {
+    normal = normalize(normal - slope.x * normalize(axisU) - slope.y * normalize(axisV));
+  }
 }
 `;
 
@@ -199,6 +241,7 @@ export function createFaceMaterial({ map, envMap, finish = null }) {
       .replace('#include <uv_vertex>', `#include <uv_vertex>\n${FOIL_VERTEX_BODY}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FOIL_HEAD}`)
+      .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>\n${FOIL_INK_HEAD}`)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\n${FOIL_SURFACE}`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${FOIL_NORMAL}`)
       .replace('#include <opaque_fragment>', `${FOIL_LIGHT}\n#include <opaque_fragment>`);

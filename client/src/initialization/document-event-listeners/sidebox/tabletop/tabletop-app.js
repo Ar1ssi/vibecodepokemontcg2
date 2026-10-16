@@ -936,6 +936,8 @@ async function buildTabletopApp(options, life) {
         strip.position.set(point.x, point.y, point.z);
         const spin = new Quaternion().setFromEuler(new Euler(t * 4.2 * side, t * 2.1, t * 5.5 * side));
         strip.quaternion.slerpQuaternions(fromQ.clone().multiply(spin), restQ, smoothstep(0.55, 1, t));
+        // Let go of, the fold springs open into a loose curl before it lands.
+        pack.model.relaxStrip(smoothstep(0.1, 0.8, t));
       },
     });
   }
