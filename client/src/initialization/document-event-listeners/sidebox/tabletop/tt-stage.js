@@ -31,7 +31,12 @@ import { clothNormalTexture, loadTexture } from './tt-textures.js';
  * backstop so a hidden tab never parks one half-way. The loop sleeps when nothing moves.
  */
 
-const PIXEL_RATIO_MAX = 2;
+// With 4× MSAA on the canvas, 1.5 device pixels per CSS pixel looks as crisp as 2 for 44 % fewer
+// fragments in every pass (a retina or 4K screen at 2 was the frame's main cost).
+const PIXEL_RATIO_MAX = 1.5;
+// While only tickers run (a held thing's sway, a carried thing following the pointer) a display
+// faster than 60 Hz draws every other refresh or so, not every one.
+const TICKER_FRAME_MS = 12;
 // The frame-time governor's run length and its "too slow" median (≈ 45 fps). rAF times land on
 // display refreshes, so a frame that misses one reads 33.3 ms at 60 Hz (50 ms for two): a median
 // threshold of 34 never fired until under 20 fps.
@@ -276,6 +281,10 @@ export function createStage({
     // A manual clock only draws here; `advance` moves it.
     if (manual) {
       tick(0);
+      return;
+    }
+    if (!animations.size && lastNow && now - lastNow < TICKER_FRAME_MS) {
+      frame = requestAnimationFrame(step);
       return;
     }
     const elapsed = lastNow ? now - lastNow : 16;
