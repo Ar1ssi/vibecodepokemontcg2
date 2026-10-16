@@ -97,6 +97,7 @@ const qFlat = (yawDeg, faceUp = true) =>
   new Quaternion().setFromEuler(new Euler(faceUp ? -Math.PI / 2 : Math.PI / 2, yawDeg * DEG, 0, 'YXZ'));
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const HAND_FACE_WAIT_MS = 6000;
 
 const el = (tag, className) => {
   const node = document.createElement(tag);
@@ -1352,10 +1353,23 @@ export async function createTabletopApp(options) {
     stage.applyCamera(cameraPose(v.lidOpen ? (v.itemsOut ? 'table' : 'open') : 'box', aspect()));
   });
 
+  // A reload mid-pack: the cards in hand show their faces before the loading screen lifts (a front
+  // card showing its back reads as a card held the wrong way round). Bounded by a slow host.
+  const handFacesReady = () => {
+    if (hand?.kind !== 'stack') return Promise.resolve();
+    const showing = hand.items.slice(hand.position, hand.position + 2).filter((item) => item.url);
+    return Promise.race([
+      Promise.all(showing.map((item) => faceTexture(item.url, item.card))),
+      wait(HAND_FACE_WAIT_MS),
+    ]);
+  };
+
   // ── Start ───────────────────────────────────────────────────────────────
   await warmShaders();
   if (disposed) return null;
   settle();
+  await handFacesReady();
+  if (disposed) return null;
   const surfaceReady = stage.setSurface(surface);
   await surfaceReady;
   if (disposed) return null;

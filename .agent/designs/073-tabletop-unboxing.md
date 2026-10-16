@@ -247,3 +247,12 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   Playwright's fake clock stalled. Recorder: `.claude/skills/fx-preview/rec/rec-tabletop.mjs`
   (every beat, pool integrity per pack, reload mid-pack, no-WebGL message); the scene's test api
   gained a read-only `held`.
+- **Iteration 6 (foils against the real cards).** Compared held cards with their TCGdex images
+  (me02-046 reverse, me02-017 holo rare, me02-130 Mega Hyper Rare, me02-117 Ultra Rare). Before: the
+  gold card hid its Charizard under a generic wave etch; the holo rare's art box was blocky speckle
+  (relief at 3 cycles/mm aliasing at 4 px/mm); a reload mid-pack showed the front card's back while
+  its face loaded. After: etched foils emboss the print's own light and dark (the silhouette stands
+  up in the gold, as on the real card) with a fine etch over it; every pattern's relief fades once
+  its smallest feature drops under ~2 px (`ttFoilFeature`), and the rainbow phase uses the faded
+  pattern; starlight/glitter keep their points of light in the sparkle term (sparser, smaller,
+  brightest reflections only); startup waits ≤ 6 s for the held cards' faces.
