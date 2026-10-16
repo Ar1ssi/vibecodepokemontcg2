@@ -92,6 +92,9 @@ export function imageTexture(source, renderer, { srgb = true, repeat = false, an
   texture.generateMipmaps = true;
   texture.anisotropy = Math.min(anisotropy, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
   texture.needsUpdate = true;
+  // Uploaded and mipmapped now, as the image arrives, not inside the frame that first shows it
+  // (a pack's cards would all land in one).
+  renderer?.initTexture?.(texture);
   return texture;
 }
 
