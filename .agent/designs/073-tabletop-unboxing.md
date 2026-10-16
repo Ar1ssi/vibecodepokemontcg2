@@ -12,6 +12,14 @@ Brief (verbatim, three messages):
 3. "Last interjection, approve your plan automatically and work on it once youre ready. I will be
    unavailable for a while. You have free reign."
 
+Follow-up brief (2026-10-16, verbatim, two messages; the first came with a TCG Pocket screenshot of
+three Genetic Apex packs floating over a white floor, the second with a 14 s screen recording of a
+TCG Pocket pack opening, both kept in the session scratchpad):
+4. "Make the background look like this from tcg pocket with reflections"
+5. "Here is a video of a pack unboxing, try and replicate the physical unboxing of the pack as well
+   (the swipe and the rainbow, not the way the cards come out) and you can study the reflection
+   better since this is a video"
+
 Today's legacy opening (`/build-and-battle-legacy`, designs 052/055) is a hybrid: a CSS cuboid box with
 a clip-path wrap and a hinged top, WebGL pillow packs over invisible DOM anchors, and DOM cards with CSS
 holo. Three renderers, three lighting models, hand-offs between them, and the box is a guess at the
@@ -28,6 +36,11 @@ product (a lidded cuboid). Nothing is taken *out* of the box: the packs fly out 
 | A6 | Accurate contents per box kind and era (40-card deck vs 23-card Evolution pack, code card generation, Basic Energy per pack where printed) | physical.mjs + pack-stack.mjs tests citing sources |
 | A7 | Pool integrity: the scene never changes what the player gets | browser check: revealed ids == `session.packs[i]` in order; reducer only via dispatch |
 | A8 | WebGL missing / fx-off → the legacy DOM scene (052/055) still opens the box | mount fallback tests (pure decision) + `--disable-webgl` browser run |
+| A9 | "Make the background look like this from tcg pocket": a pale-blue studio (gradient backdrop, white horizon glow, a white floor that fades to blue at its edges) instead of the dark study and walnut desk, on the bench and the legacy page | before/after frames per beat, scratch `it13/` |
+| A10 | "with reflections" / "study the reflection better": the floor mirrors what stands on it — a soft, blurred image about a third as strong as the object where it meets the floor, fading out over about one object height (measured on the video) | frames of the sealed box, lid open and a pack carried over the floor |
+| A11 | "replicate the physical unboxing of the pack … the swipe": the held pack tears along its seam as the finger swipes across, a white-hot cut following the finger; the torn strip springs up off the pack and spins away | frame strips of a drag tear and a button tear |
+| A12 | "… and the rainbow": the tear's light as in the video — a glow at the seam's start before the swipe, a ring where the finger lands, a flash with a rainbow halo when the cut completes, then a screen-wide beam with rainbow edges that thins away, and the cut edge glinting cyan | the same strips |
+| A13 | "not the way the cards come out": the stack is still drawn out and revealed as before | rec-tabletop pool integrity unchanged |
 
 ## Assumptions
 - (assumed) The modern box is a flip-top *deck box*: the lid covers the top ~76 % of the front and ~22 %
@@ -54,7 +67,20 @@ product (a lidded cuboid). Nothing is taken *out* of the box: the packs fly out 
   never correlates with contents), and the visual order is kept in a cosmetic view record so a reload
   shows the same untorn packs.
 - (assumed) The table is a rubber playmat on a desk (the reference video's setting); the standalone
-  site lets the tester switch surface.
+  site lets the tester switch surface. **Superseded by message 4:** the default is now the TCG Pocket
+  studio floor with nothing on it; the black mat and the two printed mats stay selectable on the bench
+  and lie on that floor. The bench's saved preferences move to a v2 key that keeps quality, sound and
+  era but not the old surface, since "mat" was the old default and can't be told apart from a choice.
+- (assumed) Only the backdrop, floor, light and the pack's tear change to the TCG Pocket look. The
+  camera framings and the real-world flow stay: the box still sits on the floor and is opened by hand;
+  the cards still come out of the pack the way they did before (message 5 excludes them).
+- (assumed) The floor's reflection is a real planar mirror (the scene drawn again from below the
+  floor at half resolution), dimmed and blurred by the height of what it mirrors, matching the video:
+  ~0.33 at the contact line, gone by ~1.1 object heights. Low quality draws no reflection; reduced
+  motion keeps the reflection and plays none of the tear's light.
+- (assumed) Our packs' tear lines stay jagged (the real crimp's teeth); the TCG Pocket light follows
+  that line. The strip no longer folds back 150° under the finger: as in the video it stays on, flexing
+  a little as the cut passes, and springs off when the cut completes.
 - (assumed) The run flow (`/build-and-battle`, design 071) keeps its TCG-Live-style opening; ETB (057)
   keeps the 052 scene. Only the legacy B&B flow and the standalone site get the tabletop.
 
@@ -347,3 +373,40 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   screen), and it goes slack on its way down. The legacy Build & Battle page (tabletop on its
   stage, skip, "Build your deck" into the builder) and a 390 × 844 pick-up re-checked after this
   session's changes. Frames: scratch `it12/`.
+- **Iteration 13 (TCG Pocket's studio, its mirror floor, its tear — messages 4 and 5).** Studied a
+  TCG Pocket screenshot and a 60 fps screen recording frame by frame (scratch `pocketvid/`).
+  Before: a dim study, a walnut desk and a black mat; the pack's strip folded back 150° under the
+  finger and was tossed. After: `tt-studio.js` — a white floor, whitest round the stage and
+  cooling to the backdrop's pale blue toward its edges and far off, under a pale blue dome, both
+  in display colour; the floor is a planar mirror (the scene drawn again from below at half
+  resolution, MSAA, with depth, an oblique near plane on the floor) whose strength fades with the
+  mirrored surface's height as in the recording (~0.42 at contact, gone by 130 mm, blurrier as it
+  rises; averaged over four depth taps so a jump between surfaces doesn't stair-step), tone mapped
+  by the floor shader to match what the eye sees; light, cool shadows; the reflected room
+  (`tt-environment.js`) the same studio, its own glow kept dim (×0.3) so card art stays within ~5 %
+  of iteration 12's calibration while the softboxes still give foil and film their flashes. While
+  anything is held up the floor recedes to the backdrop's blue (the game opens packs against it,
+  and white light can't show on white). The tear (`tt-tear-fx.js`, timed by `pocketTearLight`):
+  a soft glow pulses at the seam's start; a rainbow ring opens where the finger lands; a white-hot
+  cut follows the finger along a smoothed tear line while the cut part of the strip only flexes
+  26°; on completion a yellow-white flash and an elliptical rainbow halo (≈70 ms), folding into a
+  screen-wide beam with cyan and magenta edges that thins to a hairline by ~230 ms; the strip
+  springs off at 100 ms, whips up out of view turning about its own middle and rippling like a
+  ribbon, then flutters down onto the reviewed landing spot; the cut edge glints cyan. Rainbow
+  bands blend premultiplied-over, so they keep their colour on the pale floor. The chrome is dark
+  text on white glass; the bench's "Table" defaults to the studio floor (prefs v2), the mats lie on
+  it. Bugs found on the way: the shrink-wrap's additive gloss piled alpha past 1 in the float mirror
+  target (now leaves alpha alone); the cut's ribbon wound clockwise and was culled; the crumpled
+  wad blew out to white on the white floor (crumpling now dims the gloss, greys the haze and gives
+  it body where folds turn edge-on); and the recorder's mid-pack reload lost three card faces:
+  the mirror's shaders made the loading screen's compile one 9.3 s blocking task on SwiftShader
+  (no parallel compile), the image loader's 9 s timeout fired on images the proxy had long
+  delivered, and the CDN fallback failed CORS. The loader's timeout now counts only time the page
+  could have handled the load (`stallProofTimeout`), and the mirror's compile runs in a task of its
+  own (longest task 6.6 s). The mirror skips what stands wholly above its fade height; the tear's
+  shaders compile behind the loading screen; the frame-time governor's last step turns the mirror
+  off. The deck held up for its unwrap gets the same floor focus as a pack. Not changed (message
+  5): how the cards come out. Frames: scratch `it13/` (`v5`, `phone`, `low`, `mat`, `art`,
+  `drag2`, `tear2`, `tear-sm`, `unwrap`, `summary3`, `inspect`, `legacy`). flag: SwiftShader takes
+  seconds per first draw of each new shader/target state (more with the mirror); real GPUs were
+  not measured here.

@@ -40,6 +40,26 @@ export async function loadImage(url, { timeoutMs = IMAGE_TIMEOUT_MS } = {}) {
   return null;
 }
 
+// The timeout counts only time the page could have handled the load: a main thread stalled by a
+// shader compile (seconds on software WebGL, which compiles synchronously) would otherwise time
+// out an image that arrived long ago, and the art would fall back to a source that fails.
+const TIMEOUT_TICK_MS = 250;
+
+function stallProofTimeout(timeoutMs, onTimeout) {
+  let left = timeoutMs;
+  let last = performance.now();
+  let timer = 0;
+  const tick = () => {
+    const now = performance.now();
+    left -= Math.min(now - last, TIMEOUT_TICK_MS * 2);
+    last = now;
+    if (left <= 0) onTimeout();
+    else timer = setTimeout(tick, TIMEOUT_TICK_MS);
+  };
+  timer = setTimeout(tick, TIMEOUT_TICK_MS);
+  return () => clearTimeout(timer);
+}
+
 function loadFrom(url, timeoutMs) {
   return new Promise((resolve) => {
     const image = new Image();
@@ -49,10 +69,10 @@ function loadFrom(url, timeoutMs) {
     const finish = (value) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      stopTimeout();
       resolve(value);
     };
-    const timer = setTimeout(() => finish(null), timeoutMs);
+    const stopTimeout = stallProofTimeout(timeoutMs, () => finish(null));
     image.onload = () => {
       if (typeof image.decode === 'function') image.decode().then(() => finish(image), () => finish(image));
       else finish(image);
@@ -248,85 +268,6 @@ export function boardTexture(renderer, { size = 512, tint = [226, 222, 212], see
     renderer,
     { repeat: true }
   );
-}
-
-/** The desk's wood tile in millimetres: three boards across, one board's length along. */
-export const WOOD_TILE_MM = Object.freeze({ x: 1600, z: 400 });
-
-/**
- * A plank desk top in satin walnut. Boards run along x; each is a flat-sawn slice through a log,
- * so its growth rings are the circles around the pith cut by the board's face: straight lines near
- * the board's edges that sweep into nested cathedral arches where the face nears the pith, the cut
- * drifting along the board. Pores fleck the grain, each board ends in a butt joint, and hairline
- * seams part the boards (the last falls on the tile's edge, hiding the wrap). Returns the colour
- * map and a matching normal map; one tile covers `WOOD_TILE_MM`.
- */
-export function woodTextures(renderer, { width = 1024, height = 512, seed = 23 } = {}) {
-  const heights = new Float32Array(width * height);
-  const mmX = WOOD_TILE_MM.x / width;
-  const mmZ = WOOD_TILE_MM.z / height;
-  const random = prng(seed);
-  const edges = [0, 128, 266, WOOD_TILE_MM.z];
-  const boards = edges.slice(1).map((to, k) => ({
-    from: edges[k],
-    to,
-    joint: random() * WOOD_TILE_MM.x,
-    pith: (random() - 0.5) * 50,
-    depth: 48 + random() * 40,
-    drift: 14 + random() * 18,
-    ring: 3.4 + random() * 1.6,
-    tint: 0.88 + random() * 0.22,
-    seed: seed + 101 * (k + 1),
-  }));
-  const dark = [40, 25, 17];
-  const light = [134, 94, 63];
-  const color = canvasTexture(
-    width,
-    height,
-    (ctx, w, h) => {
-      const image = ctx.createImageData(w, h);
-      for (let y = 0; y < h; y += 1) {
-        const z = (y + 0.5) * mmZ;
-        const board = boards.find((b) => z < b.to) || boards[boards.length - 1];
-        const across = z - (board.from + board.to) / 2 - board.pith;
-        const toEdge = Math.min(z - board.from, board.to - z);
-        for (let x = 0; x < w; x += 1) {
-          const along = ((((x + 0.5) * mmX - board.joint) % WOOD_TILE_MM.x) + WOOD_TILE_MM.x) % WOOD_TILE_MM.x;
-          const toJoint = Math.min(along, WOOD_TILE_MM.x - along);
-          // Where the face cuts the rings: the board was sawn a little off the log's axis, so the
-          // face's depth below the pith drifts steadily along it and the arches all point one way.
-          const depth =
-            board.depth + board.drift * (along / WOOD_TILE_MM.x) + 3 * Math.sin((along / WOOD_TILE_MM.x) * Math.PI * 4);
-          const wobble =
-            (fbm(x / 64, y / 14, w / 64, 3, board.seed) - 0.5) * 2.6 +
-            (valueNoise(x / 8, y / 2, w / 8, board.seed + 5) - 0.5) * 0.35;
-          const radius = Math.hypot(across, depth) + wobble;
-          // Some years grew wider than others.
-          const years = radius / board.ring + (valueNoise(radius / 9, 0.5, 4096, board.seed + 7) - 0.5) * 0.9;
-          const f = years - Math.floor(years);
-          const late = f ** 2.6;
-          const pore = Math.max(0, valueNoise(x / 5, y / 0.8, w / 5, board.seed + 9) - 0.74) / 0.26;
-          const shade = fbm(x / 256, y / 48, w / 256, 2, board.seed + 11);
-          const gap = Math.min(1, Math.max(0, 1 - (toEdge - 0.25) / 0.6, 1 - (toJoint - 0.2) / 0.5));
-          const tone = Math.min(1, Math.max(0, 0.6 - 0.42 * late + 0.22 * (shade - 0.5) - 0.3 * pore));
-          const lit = (1 - gap * 0.85) * board.tint;
-          const i = (y * w + x) * 4;
-          image.data[i] = (dark[0] + (light[0] - dark[0]) * tone) * lit;
-          image.data[i + 1] = (dark[1] + (light[1] - dark[1]) * tone) * lit;
-          image.data[i + 2] = (dark[2] + (light[2] - dark[2]) * tone) * lit;
-          image.data[i + 3] = 255;
-          // Late wood stands a hair proud of the softer early wood; pores and seams are pits.
-          const bevel = Math.max(0, 1 - toEdge / 1.6) + Math.max(0, 1 - toJoint / 1.2);
-          heights[y * w + x] = late * 0.12 - pore * 0.35 - bevel * 0.8;
-        }
-      }
-      ctx.putImageData(image, 0, 0);
-    },
-    renderer,
-    { repeat: true }
-  );
-  const normal = normalTextureFromHeights(heights, width, height, 1.1, renderer);
-  return { color, normal };
 }
 
 /** Neoprene mat cloth: a fine woven tooth, as a normal map. */

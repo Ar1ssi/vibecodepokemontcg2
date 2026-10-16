@@ -30,8 +30,11 @@ import { motionReduced } from '../setup/image-logic/mat-fx.mjs';
  */
 
 const STORAGE_KEY = 'ptcg-sim.unboxing-site.v1';
-const PREFS_KEY = 'ptcg-sim.unboxing-site.prefs.v1';
+// v2: the studio floor became the default table; a v1 "mat" was the old default, not a choice.
+const PREFS_KEY = 'ptcg-sim.unboxing-site.prefs.v2';
+const OLD_PREFS_KEY = 'ptcg-sim.unboxing-site.prefs.v1';
 const SURFACES = Object.freeze([
+  { key: 'studio', label: 'Studio floor', surface: { kind: 'floor' } },
   { key: 'mat', label: 'Black rubber mat', surface: { kind: 'mat' } },
   {
     key: 'charizard',
@@ -75,12 +78,16 @@ const writeJson = (key, value) => {
   }
 };
 
+const carriedPrefs = () => {
+  const { surface: _oldDefault, ...rest } = readJson(OLD_PREFS_KEY) || {};
+  return rest;
+};
 const prefs = {
-  surface: 'mat',
+  surface: 'studio',
   quality: 'high',
   sound: true,
   era: getBuildBattleBox(DEFAULT_BOX_KEY).era,
-  ...(readJson(PREFS_KEY) || {}),
+  ...(readJson(PREFS_KEY) || carriedPrefs()),
 };
 if (params.get('quality') === 'low' || params.get('quality') === 'high') prefs.quality = params.get('quality');
 if (SURFACES.some((entry) => entry.key === params.get('surface'))) prefs.surface = params.get('surface');

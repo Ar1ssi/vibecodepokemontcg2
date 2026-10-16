@@ -1,13 +1,16 @@
 import {
-  AdditiveBlending,
   Color,
+  CustomBlending,
   DoubleSide,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   NormalBlending,
+  OneFactor,
+  SrcAlphaFactor,
   Vector2,
   Vector3,
   Vector4,
+  ZeroFactor,
 } from 'three';
 
 /**
@@ -144,7 +147,17 @@ const makeUniforms = () => ({
   uFade: { value: 1 },
 });
 
-function inject(material, uniforms, { rimColor, crumpleBoost = 0, stressAlpha = 0 }) {
+/**
+ * `crumpleLight` scales what the layer adds once balled up, `crumpleTint` darkens its colour and
+ * `crumpleAlpha` gives it body, most where its folds turn edge-on: on the studio's white floor a
+ * wad of film is a greyish knot with glints, not a white glow (light the gloss adds there has
+ * nothing dark under it to show against).
+ */
+function inject(
+  material,
+  uniforms,
+  { rimColor, crumpleBoost = 0, stressAlpha = 0, crumpleLight = 1, crumpleTint = 1, crumpleAlpha = 0 }
+) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -155,13 +168,23 @@ function inject(material, uniforms, { rimColor, crumpleBoost = 0, stressAlpha = 
       .replace('#include <common>', `#include <common>\n${FRAGMENT_HEAD}`)
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>\n${FRAGMENT_CLIP}`)
       .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>\n` +
+          `diffuseColor.rgb *= mix(1.0, ${crumpleTint.toFixed(2)}, smoothstep(0.0, 1.0, uCrumple));`
+      )
+      .replace(
         '#include <opaque_fragment>',
-        `outgoingLight += vec3(${rimColor}) * max(ttRim, ttStress * 0.35);\n#include <opaque_fragment>\n` +
-          `gl_FragColor.a = max(gl_FragColor.a, ttStress * ${stressAlpha.toFixed(2)}) * uFade * (1.0 + uCrumple * ${crumpleBoost.toFixed(1)});`
+        `outgoingLight *= mix(1.0, ${crumpleLight.toFixed(2)}, smoothstep(0.0, 1.0, uCrumple));\n` +
+          `outgoingLight += vec3(${rimColor}) * max(ttRim, ttStress * 0.35);\n#include <opaque_fragment>\n` +
+          `gl_FragColor.a = max(gl_FragColor.a, ttStress * ${stressAlpha.toFixed(2)}) * uFade * (1.0 + uCrumple * ${crumpleBoost.toFixed(1)});\n` +
+          `{ float ttEdgeOn = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));\n` +
+          `  float ttBody = smoothstep(0.0, 1.0, uCrumple) * ${crumpleAlpha.toFixed(2)} * (0.35 + 0.65 * ttEdgeOn);\n` +
+          `  gl_FragColor.a = max(gl_FragColor.a, ttBody * uFade); }`
       );
   };
   // One program per film kind: the uniforms object differs per mesh, the code does not.
-  material.customProgramCacheKey = () => `tt-film-${rimColor}-${crumpleBoost}-${stressAlpha}`;
+  material.customProgramCacheKey = () =>
+    `tt-film-${rimColor}-${crumpleBoost}-${stressAlpha}-${crumpleLight}-${crumpleTint}-${crumpleAlpha}`;
 }
 
 /**
@@ -184,11 +207,17 @@ export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensit
     normalScale,
     specularIntensity: 1,
     transparent: true,
-    blending: AdditiveBlending,
+    // Additive light, and it leaves alpha alone: added glints cover nothing, which matters in the
+    // floor's mirror (a float target, where additive alpha piled up past 1 read as "opaque twice").
+    blending: CustomBlending,
+    blendSrc: SrcAlphaFactor,
+    blendDst: OneFactor,
+    blendSrcAlpha: ZeroFactor,
+    blendDstAlpha: OneFactor,
     depthWrite: false,
     side: DoubleSide,
   });
-  inject(gloss, uniforms, { rimColor: '0.22' });
+  inject(gloss, uniforms, { rimColor: '0.22', crumpleLight: 0.3 });
   const hazeMaterial = new MeshStandardMaterial({
     color: new Color(0xf4f7fb),
     roughness: 0.35,
@@ -204,8 +233,14 @@ export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensit
     depthWrite: false,
     side: DoubleSide,
   });
-  // Balled-up film scatters light: the crumpled wad reads milky white.
-  inject(hazeMaterial, uniforms, { rimColor: '0.55', crumpleBoost: 5, stressAlpha: 0.3 });
+  // Balled-up film scatters light: the crumpled wad reads milky, greying where its folds turn away.
+  inject(hazeMaterial, uniforms, {
+    rimColor: '0.55',
+    crumpleBoost: 5,
+    stressAlpha: 0.3,
+    crumpleTint: 0.62,
+    crumpleAlpha: 0.5,
+  });
   return {
     gloss,
     haze: hazeMaterial,

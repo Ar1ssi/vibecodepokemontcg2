@@ -1,14 +1,15 @@
 /* Design 073: the tabletop opening's canvas and chrome. The scene fills its host (the legacy
-   fullscreen stage or the standalone page); only the dock's buttons take the pointer. */
+   fullscreen stage or the standalone page); only the dock's buttons take the pointer. Since
+   iteration 13 the scene is TCG Pocket's light studio, so the chrome is dark text on white glass. */
 
 .tt-root {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: #141210;
+  background: #eaf2fb;
   outline: none;
   font-family: 'Rodin Condensed', 'Arial Narrow', system-ui, sans-serif;
-  color: #f4f1ea;
+  color: #23324a;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -44,8 +45,8 @@
   margin: 0;
   font-size: 14px;
   letter-spacing: 0.02em;
-  color: rgba(244, 241, 234, 0.78);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  color: rgba(35, 50, 74, 0.82);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .tt-counter {
@@ -61,9 +62,9 @@
   line-height: 1.35;
   padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(10, 10, 12, 0.42);
+  background: rgba(255, 255, 255, 0.74);
   backdrop-filter: blur(6px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 2px 10px rgba(40, 70, 120, 0.12);
 }
 
 .tt-hint:empty {
@@ -82,23 +83,23 @@
 .tt-btn {
   pointer-events: auto;
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(35, 50, 74, 0.12);
   border-radius: 999px;
   padding: 10px 18px;
   min-height: 42px;
   font: inherit;
   font-size: 15px;
   letter-spacing: 0.02em;
-  color: #f4f1ea;
-  background: rgba(22, 22, 26, 0.72);
+  color: #23324a;
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(8px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 18px rgba(40, 70, 120, 0.16);
   cursor: pointer;
   transition: background 160ms ease, transform 160ms ease, opacity 160ms ease;
 }
 
 .tt-btn:hover {
-  background: rgba(40, 40, 46, 0.82);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .tt-btn:active {
@@ -106,7 +107,7 @@
 }
 
 .tt-btn:focus-visible {
-  outline: 2px solid #ffd54a;
+  outline: 2px solid #2f6fd6;
   outline-offset: 2px;
 }
 
@@ -132,8 +133,8 @@
 }
 
 .tt-btn--quiet {
-  background: rgba(22, 22, 26, 0.5);
-  color: rgba(244, 241, 234, 0.8);
+  background: rgba(255, 255, 255, 0.62);
+  color: rgba(35, 50, 74, 0.8);
 }
 
 .tt-btn--icon {
@@ -149,7 +150,7 @@
   justify-content: center;
   gap: 12px;
   font-size: 17px;
-  background: #141210;
+  background: #eaf2fb;
   pointer-events: auto;
 }
 
@@ -161,8 +162,8 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #ffd54a;
+  border: 3px solid rgba(35, 50, 74, 0.14);
+  border-top-color: #f1b928;
   animation: tt-spin 900ms linear infinite;
 }
 
@@ -199,7 +200,7 @@ body.fx-off .tt-spinner {
 :is(.build-battle-window, .etb-host) .db-live .bb-stage.bb-stage--tabletop {
   padding: 0;
   overflow: hidden;
-  background: #141210;
+  background: #eaf2fb;
 }
 :is(.build-battle-window, .etb-host) .db-live .bb-stage--tabletop > .bb-tabletop {
   position: relative;

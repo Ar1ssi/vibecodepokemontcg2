@@ -160,6 +160,39 @@ export function cameraBlend(from, to, t) {
   };
 }
 
+// ── The TCG Pocket tear's light (design 073, iteration 13) ─────────────────
+// Timed frame by frame on a 60 fps TCG Pocket screen recording: the flash and the rainbow halo
+// peak ~70 ms after the finger finishes the cut, the halo folds flat into a beam across the
+// screen, the beam thins to a hairline by ~230 ms and is gone by ~320 ms, and the cut edge glints
+// cyan as the strip springs away.
+export const POCKET_TEAR_MS = 1000;
+// The beam's height (mm, on a 66 mm pack) while it is whole, and how fast it thins after.
+const BEAM_MM = 9;
+const BEAM_THIN_MS = 50;
+
+/**
+ * The tear's light `ms` after the cut completes; every part 0 → 1 except `haloScale` (×) and
+ * `beamMm` (mm). Only the white-hot cut is lit at 0; all is dark by POCKET_TEAR_MS.
+ * @returns {{cut: number, flash: number, halo: number, haloScale: number, haloSquash: number,
+ *   beam: number, beamMm: number, glint: number}}
+ */
+export function pocketTearLight(ms) {
+  const t = Number.isFinite(ms) ? Math.max(0, ms) : 0;
+  return {
+    // The white-hot cut the finger left melts into the flash.
+    cut: 1 - smoothstep(60, 140, t),
+    // A yellow-white wash over the header.
+    flash: smoothstep(0, 40, t) * (1 - smoothstep(70, 240, t)),
+    // An elliptical rainbow ring round the cut, which grows a little, then folds flat into the beam.
+    halo: smoothstep(0, 25, t) * (1 - smoothstep(55, 120, t)),
+    haloScale: 0.86 + 0.24 * smoothstep(0, 90, t),
+    haloSquash: 1 - 0.85 * smoothstep(50, 110, t),
+    beam: smoothstep(40, 80, t) * (1 - smoothstep(200, 320, t)),
+    beamMm: t < 75 ? BEAM_MM : BEAM_MM * Math.exp(-(t - 75) / BEAM_THIN_MS),
+    glint: smoothstep(110, 180, t) * (1 - smoothstep(350, POCKET_TEAR_MS, t)),
+  };
+}
+
 /**
  * How far a drag across a torn edge has torn, from the pointer's travel along the edge.
  * @returns {number} 0..1

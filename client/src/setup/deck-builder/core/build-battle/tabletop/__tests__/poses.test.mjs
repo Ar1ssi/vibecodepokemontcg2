@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   LID_OPEN_DEG,
+  POCKET_TEAR_MS,
   arcPoint,
   cameraBlend,
   cardTurnPose,
@@ -11,6 +12,7 @@ import {
   easeOutBack,
   handSway,
   lidAngleDeg,
+  pocketTearLight,
   settleBounce,
   slideOffPose,
   springStep,
@@ -124,4 +126,32 @@ test('camera blend lands on both poses; drag progress clamps', () => {
   assert.equal(dragProgress(500, 100), 1);
   assert.equal(dragProgress(-5, 100), 0);
   assert.equal(dragProgress(5, 0), 0);
+});
+
+test('pocketTearLight: dark before and after, in the order the recording shows', () => {
+  const lights = ['flash', 'halo', 'beam', 'glint'];
+  for (const ms of [0, POCKET_TEAR_MS, POCKET_TEAR_MS + 500]) {
+    for (const part of lights) assert.equal(pocketTearLight(ms)[part], 0, `${part} at ${ms} ms`);
+  }
+  assert.deepEqual(pocketTearLight(Number.NaN), pocketTearLight(0));
+  const at = (ms) => pocketTearLight(ms);
+  // The cut the finger left is lit as it completes, and has melted into the flash by ~140 ms.
+  assert.equal(at(0).cut, 1);
+  assert.equal(at(140).cut, 0);
+  // ~70 ms in: the flash and the halo at their height, the beam forming.
+  assert.ok(at(70).flash > 0.9 && at(70).halo > 0.6 && at(70).beam > 0.5);
+  // The halo is gone into the beam before the beam is gone; the glint outlasts both.
+  assert.equal(at(130).halo, 0);
+  assert.ok(at(130).beam > 0.9);
+  assert.equal(at(330).beam, 0);
+  assert.ok(at(330).glint > 0.9);
+  // The halo flattens as it folds in; the beam only ever thins, to a hairline by ~230 ms.
+  assert.ok(at(120).haloSquash < at(40).haloSquash);
+  let previous = Infinity;
+  for (let ms = 0; ms <= 320; ms += 10) {
+    const { beamMm } = at(ms);
+    assert.ok(beamMm <= previous && beamMm > 0);
+    previous = beamMm;
+  }
+  assert.ok(at(230).beamMm < 0.5);
 });

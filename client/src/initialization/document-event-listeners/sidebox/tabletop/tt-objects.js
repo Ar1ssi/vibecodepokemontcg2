@@ -14,6 +14,7 @@ import { createFaceMaterial } from './tt-card.js';
 import { createFilmMaterials } from './tt-film.js';
 import { cardSlab } from './tt-geometry.js';
 import { drawCodeCardBack, drawCodeCardFront, drawLeafletCover } from './tt-print.js';
+import { EYE_ONLY_LAYER } from './tt-studio.js';
 import { makeCanvas } from './tt-textures.js';
 
 /**
@@ -149,7 +150,8 @@ export function buildLeaflet({ renderer, envMap, title, deckRows, palette, headi
  */
 export function contactShadow({ texture, width, depth, spread = 10, opacity = 0.5 }) {
   const material = new MeshStandardMaterial({
-    color: 0x000000,
+    // A cool dark, as the studio's white floor shades: a neutral black reads as dirt on it.
+    color: 0x1a2440,
     alphaMap: texture,
     transparent: true,
     opacity,
@@ -161,6 +163,8 @@ export function contactShadow({ texture, width, depth, spread = 10, opacity = 0.
   mesh.position.y = 0.15;
   mesh.renderOrder = 1;
   mesh.name = 'tt-contact';
+  // It darkens the floor; the floor's mirror shows the thing above it, not this.
+  mesh.layers.set(EYE_ONLY_LAYER);
   return {
     mesh,
     setOpacity: (value) => {

@@ -214,12 +214,12 @@ body.ub-opening {
   color: rgba(243, 240, 232, 0.42);
 }
 
-/* The opening fills the window. */
+/* The opening fills the window (the tabletop's light studio, design 073 iteration 13). */
 .ub-stage {
   position: fixed;
   inset: 0;
   z-index: 10;
-  background: #141210;
+  background: #eaf2fb;
 }
 
 .ub-live,
@@ -235,7 +235,10 @@ body.ub-opening {
   z-index: 3;
   padding: 7px 14px;
   font-size: 14px;
-  background: rgba(22, 22, 26, 0.6);
+  border-color: rgba(35, 50, 74, 0.12);
+  color: #23324a;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 6px 18px rgba(40, 70, 120, 0.16);
 }
 
 .ub-results {

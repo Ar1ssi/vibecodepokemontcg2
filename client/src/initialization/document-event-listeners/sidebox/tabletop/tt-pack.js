@@ -278,13 +278,16 @@ export function createPackKit({ envMap, renderer }) {
     })();
     const hingeY = packSpaceY(hingeV);
 
-    /** Folds the strip back toward the viewer, `progress` 0..1 along the tear from `side`. */
-    const setPeel = (progress, side = 1) => {
+    /**
+     * Folds the strip toward the viewer, `progress` 0..1 along the tear from `side`, the cut part
+     * to `maxDeg` (the TCG Pocket tear only lets it flex).
+     */
+    const setPeel = (progress, side = 1, maxDeg = PEEL_MAX_DEG) => {
       [stripFrontGeometry, stripBackGeometry].forEach((geometry, which) => {
         const position = geometry.getAttribute('position');
         const base = rest[which];
         for (let i = 0; i < position.count; i += 1) {
-          const angleDeg = peelAngleDeg(stripU[i], progress, side);
+          const angleDeg = peelAngleDeg(stripU[i], progress, side, maxDeg);
           const folded = peelVertex(
             { y: base[i * 3 + 1] / PW, z: base[i * 3 + 2] / PW },
             { hingeY, angleDeg }
@@ -297,14 +300,13 @@ export function createPackKit({ envMap, renderer }) {
     };
 
     /**
-     * The torn strip relaxing as it flies off (`amount` 0 → 1): the fold about the tear opens out
-     * while the film takes a loose curl up from its torn edge, so it lands lying on its back
-     * instead of standing folded in the mat.
+     * The torn strip's shape in flight: folded `foldDeg` about the tear, taking a loose curl up
+     * from its torn edge (`curl` 0 → 1, so it lands lying on its back instead of standing in the
+     * floor), and rippling along its length like a ribbon (`wave` mm, travelling with `phase`).
      */
-    const relaxStrip = (amount) => {
-      const relaxed = Math.max(0, Math.min(1, amount));
+    const shapeStrip = ({ foldDeg = 0, curl = 0, wave = 0, phase = 0 } = {}) => {
+      const relaxed = Math.max(0, Math.min(1, curl));
       const radius = STRIP_CURL_MM / Math.max(relaxed, 1e-3);
-      const angleDeg = PEEL_MAX_DEG * (1 - relaxed);
       const hingeMm = hingeY * PW;
       [stripFrontGeometry, stripBackGeometry].forEach((geometry, which) => {
         const position = geometry.getAttribute('position');
@@ -312,8 +314,12 @@ export function createPackKit({ envMap, renderer }) {
         for (let i = 0; i < position.count; i += 1) {
           const theta = (base[i * 3 + 1] - hingeMm) / radius;
           const lever = radius - base[i * 3 + 2];
-          const curled = { y: (hingeMm + lever * Math.sin(theta)) / PW, z: (radius - lever * Math.cos(theta)) / PW };
-          const folded = peelVertex(curled, { hingeY, angleDeg });
+          const ripple = wave * Math.sin(Math.PI * 1.8 * stripU[i] + phase);
+          const curled = {
+            y: (hingeMm + lever * Math.sin(theta)) / PW,
+            z: (radius - lever * Math.cos(theta) + ripple) / PW,
+          };
+          const folded = peelVertex(curled, { hingeY, angleDeg: foldDeg });
           position.setXYZ(i, base[i * 3], folded.y * PW, folded.z * PW);
         }
         position.needsUpdate = true;
@@ -335,8 +341,10 @@ export function createPackKit({ envMap, renderer }) {
       line,
       // The mouth: where the torn top's line runs, in pack space (mm).
       mouthY: hingeY * PW,
+      // The strip's middle, in pack space (mm): what it spins about in flight.
+      stripCenterY: PH / 2 - stripH / 2,
       setPeel,
-      relaxStrip,
+      shapeStrip,
       setDim,
       meshes: [bodyFront, bodyBack, stripFront, stripBack],
       dispose: () => disposables.forEach((thing) => thing.dispose?.()),

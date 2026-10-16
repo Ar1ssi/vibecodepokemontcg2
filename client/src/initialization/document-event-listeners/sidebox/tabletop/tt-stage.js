@@ -2,15 +2,12 @@ import {
   Color,
   DirectionalLight,
   Float32BufferAttribute,
-  Fog,
   HemisphereLight,
   Mesh,
-  MeshBasicMaterial,
   MeshStandardMaterial,
   NeutralToneMapping,
   PCFShadowMap,
   PerspectiveCamera,
-  PlaneGeometry,
   PMREMGenerator,
   Raycaster,
   RepeatWrapping,
@@ -24,22 +21,23 @@ import { MAT } from '../../../../setup/deck-builder/core/build-battle/tabletop/l
 import { cameraBlend } from '../../../../setup/deck-builder/core/build-battle/tabletop/poses.mjs';
 import { createStudioEnvironment } from './tt-environment.js';
 import { cardSlab } from './tt-geometry.js';
-import { WOOD_TILE_MM, clothNormalTexture, loadTexture, woodTextures } from './tt-textures.js';
+import { EYE_ONLY_LAYER, createStudio } from './tt-studio.js';
+import { clothNormalTexture, loadTexture } from './tt-textures.js';
 
 /**
- * The tabletop's stage (design 073 § Browser modules): one WebGL canvas, a desk under studio
- * light, the camera, and the one clock every animation runs on. Animations are `{durationMs,
- * update(t)}`; each also has a wall-clock backstop so a hidden tab never parks one half-way.
- * The loop sleeps when nothing moves.
+ * The tabletop's stage (design 073 § Browser modules): one WebGL canvas, the TCG Pocket studio
+ * (`tt-studio.js`: backdrop, mirror floor) under its light, the camera, and the one clock every
+ * animation runs on. Animations are `{durationMs, update(t)}`; each also has a wall-clock
+ * backstop so a hidden tab never parks one half-way. The loop sleeps when nothing moves.
  */
 
 const PIXEL_RATIO_MAX = 2;
 // The frame-time governor's run length and its "too slow" median (≈ 30 fps).
 const GOVERNOR_FRAMES = 45;
 const SLOW_FRAME_MS = 34;
-// Fog starts past what the camera frames and closes in a few frame-depths further back.
-const FOG_NEAR = 1.4;
-const FOG_FAR = 4.5;
+// The floor melts into the horizon from past what the camera frames to a few frame-depths back.
+const HORIZON_NEAR = 1.4;
+const HORIZON_FAR = 5;
 const BACKSTOP_SLACK_MS = 700;
 
 /**
@@ -80,21 +78,18 @@ export function createStage({
   renderer.localClippingEnabled = true;
 
   const scene = new Scene();
-  scene.background = new Color(0x141210);
-  // The far desk fades into the dark room; the fog is set from the camera's distance to what it
-  // looks at (`applyCamera`), so whatever is framed stays clear on any screen.
-  scene.fog = new Fog(0x141210, 600, 2400);
   const pmrem = new PMREMGenerator(renderer);
   const environment = createStudioEnvironment();
   const envMap = pmrem.fromScene(environment.scene, 0.02).texture;
   environment.dispose();
 
   const camera = new PerspectiveCamera(30, 1, 10, 6000);
+  camera.layers.enable(EYE_ONLY_LAYER);
 
-  // Studio light: a warm key from the front left (casts the shadows), a cool rim behind, a sky.
-  // Calibrated so a card squarely facing the light shows about its printed colour (key ≈ half,
-  // the room's softboxes the rest); brighter only where it mirrors a light.
-  const key = new DirectionalLight(0xfff1df, 2.2);
+  // Studio light: a white key from the front left (casts the shadows), a cool rim behind, a sky
+  // over a white floor. Calibrated so a card squarely facing the light shows about its printed
+  // colour (key ≈ half, the room's softboxes the rest); brighter only where it mirrors a light.
+  const key = new DirectionalLight(0xfffaf2, 2.1);
   key.position.set(-300, 640, 420);
   key.target.position.set(0, 0, 10);
   key.castShadow = !low;
@@ -108,10 +103,11 @@ export function createStage({
   shadowCam.far = 1700;
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.35;
-  key.shadow.radius = 4;
-  const rim = new DirectionalLight(0xd2e2ff, 0.85);
+  // A studio's soft key: wider than this and the five-tap PCF goes grainy.
+  key.shadow.radius = 6;
+  const rim = new DirectionalLight(0xd2e2ff, 0.7);
   rim.position.set(340, 300, -460);
-  const sky = new HemisphereLight(0xe6edff, 0x2e2219, 0.45);
+  const sky = new HemisphereLight(0xeaf1ff, 0xd8e2f0, 0.4);
   scene.add(key, key.target, rim, sky);
 
   const disposables = [envMap, pmrem];
@@ -120,34 +116,8 @@ export function createStage({
     return thing;
   };
 
-  // ── The desk and the mat ────────────────────────────────────────────────
-  const DESK = { width: 4200, depth: 3200 };
-  const wood = woodTextures(renderer);
-  for (const texture of [wood.color, wood.normal]) {
-    texture.repeat.set(DESK.width / WOOD_TILE_MM.x, DESK.depth / WOOD_TILE_MM.z);
-  }
-  track(wood.color);
-  track(wood.normal);
-  const desk = new Mesh(
-    track(new PlaneGeometry(DESK.width, DESK.depth)),
-    track(
-      new MeshStandardMaterial({
-        map: wood.color,
-        // Walnut under a warm lamp still reads brown, not orange.
-        color: new Color(0xd6cfc9),
-        normalMap: wood.normal,
-        roughness: 0.48,
-        metalness: 0,
-        envMap,
-        envMapIntensity: 0.45,
-      })
-    )
-  );
-  desk.rotation.x = -Math.PI / 2;
-  desk.position.y = -MAT.thickness;
-  desk.receiveShadow = true;
-  scene.add(desk);
-
+  // ── The studio, and a mat on its floor when one is chosen ───────────────
+  const studio = track(createStudio({ renderer, scene, camera, reflect: !low }));
   const cloth = track(clothNormalTexture(renderer));
   cloth.wrapS = cloth.wrapT = RepeatWrapping;
   const matFace = track(
@@ -176,9 +146,18 @@ export function createStage({
   mat.rotation.x = -Math.PI / 2;
   mat.position.set(MAT.x, -MAT.thickness / 2, MAT.z);
   mat.receiveShadow = true;
+  mat.visible = false;
   scene.add(mat);
 
-  /** Prints playmat art on the mat (null: the plain black cloth). */
+  // Bare, things stand on the studio floor itself; on a mat, the floor drops to the mat's underside.
+  const showMat = (shown) => {
+    mat.visible = shown;
+    studio.setFloorY(shown ? -MAT.thickness : 0);
+  };
+  /**
+   * What the table is: `floor` the bare studio floor, `mat` the black rubber mat on it, `art` a
+   * mat printed with `src` (the black mat when the print won't load).
+   */
   const setSurface = async (next) => {
     if (next?.kind === 'art' && next.src) {
       const texture = await loadTexture(next.src, renderer);
@@ -188,6 +167,7 @@ export function createStage({
         matFace.color.set(0xffffff);
         matFace.roughness = 0.9;
         matFace.needsUpdate = true;
+        showMat(true);
         requestRender();
         return;
       }
@@ -195,6 +175,7 @@ export function createStage({
     matFace.map = null;
     matFace.color.set(0x2a2c33);
     matFace.needsUpdate = true;
+    showMat(next?.kind === 'mat' || next?.kind === 'art');
     requestRender();
   };
 
@@ -208,6 +189,7 @@ export function createStage({
   let clock = 0;
   let disposed = false;
   let lost = false;
+  let drawn = false;
   let size = { width: 1, height: 1 };
 
   const finish = (animation) => {
@@ -228,11 +210,15 @@ export function createStage({
       else animation.update(Math.max(0, t), animation);
     }
     for (const ticker of [...tickers]) ticker(clock, Math.min(100, sceneMs));
+    // The mirror reuses the shadow maps the eye's pass last drew, so it waits for the first.
+    if (drawn) studio.renderReflection();
     renderer.render(scene, camera);
+    drawn = true;
   };
 
   // A device that can't hold ~30 fps while things move steps down: first to one pixel per CSS
-  // pixel, then to a coarser shadow map. Judged on the median of runs of moving frames.
+  // pixel, then to a coarser shadow map, last to a floor without its mirror (the studio's look
+  // keeps longest). Judged on the median of runs of moving frames.
   const frameTimes = [];
   let stepDowns = 0;
   const govern = (elapsed) => {
@@ -241,12 +227,14 @@ export function createStage({
     const median = [...frameTimes].sort((a, b) => a - b)[frameTimes.length >> 1];
     frameTimes.length = 0;
     if (median < SLOW_FRAME_MS) return;
-    if (stepDowns === 0 && renderer.getPixelRatio() > 1) renderer.setPixelRatio(1);
-    else if (key.castShadow && key.shadow.mapSize.x > 1024) {
+    if (stepDowns === 0 && renderer.getPixelRatio() > 1) {
+      renderer.setPixelRatio(1);
+      sizeReflection();
+    } else if (key.castShadow && key.shadow.mapSize.x > 1024) {
       key.shadow.mapSize.set(1024, 1024);
       key.shadow.map?.dispose();
       key.shadow.map = null;
-    }
+    } else studio.stopReflection();
     stepDowns += 1;
   };
 
@@ -332,8 +320,7 @@ export function createStage({
     lookTarget.set(pose.target.x, pose.target.y, pose.target.z);
     camera.lookAt(lookTarget);
     const reach = camera.position.distanceTo(lookTarget);
-    scene.fog.near = reach * FOG_NEAR;
-    scene.fog.far = reach * FOG_FAR;
+    studio.setFade(reach * HORIZON_NEAR, reach * HORIZON_FAR);
     if (camera.fov !== pose.fov) {
       camera.fov = pose.fov;
       camera.updateProjectionMatrix();
@@ -346,6 +333,11 @@ export function createStage({
   };
 
   // ── Size ────────────────────────────────────────────────────────────────
+  const drawingBuffer = new Vector2();
+  function sizeReflection() {
+    renderer.getDrawingBufferSize(drawingBuffer);
+    studio.setSize(drawingBuffer.x, drawingBuffer.y);
+  }
   const resizeListeners = new Set();
   const resize = () => {
     const width = Math.max(1, host.clientWidth);
@@ -353,6 +345,7 @@ export function createStage({
     if (width === size.width && height === size.height) return;
     size = { width, height };
     renderer.setSize(width, height, false);
+    sizeReflection();
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     resizeListeners.forEach((listener) => listener(size));
@@ -385,11 +378,6 @@ export function createStage({
   };
   canvas.addEventListener('webglcontextlost', onContextLost);
 
-  // A faint dark plate under an object: the soft occlusion where it meets the mat.
-  const contactMaterial = track(
-    new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false })
-  );
-
   return {
     renderer,
     scene,
@@ -397,7 +385,6 @@ export function createStage({
     canvas,
     envMap,
     key,
-    contactMaterial,
     get size() {
       return size;
     },
@@ -421,6 +408,14 @@ export function createStage({
     pick,
     toClient,
     setSurface,
+    /** The floor receding to blue behind a held thing, 0 → 1 (draws on the next frame). */
+    setFocus: (amount) => {
+      studio.setFocus(amount);
+      requestRender();
+    },
+    /** Draws the floor's mirror now (the loading screen's warm-up draws it once). */
+    renderReflection: () => studio.renderReflection(),
+    compileForMirror: (object) => studio.compileForMirror(object),
     track,
     dispose: () => {
       disposed = true;

@@ -53,13 +53,16 @@ import {
 import {
   LID_OPEN_AT,
   LID_OPEN_DEG,
+  POCKET_TEAR_MS,
   arcPoint,
   deckWrapPose,
   dragProgress,
+  easeInCubic,
   easeInOutCubic,
   easeOutCubic,
   handSway,
   lidAngleDeg,
+  pocketTearLight,
   slideOffPose,
   smoothstep,
   stackPullPose,
@@ -73,6 +76,7 @@ import { buildCodeCard, buildDeck, buildLeaflet, contactShadow } from './tt-obje
 import { createPackKit } from './tt-pack.js';
 import { drawProceduralWrapper, loadPrintFont, paletteFor } from './tt-print.js';
 import { createStage } from './tt-stage.js';
+import { createTearFx } from './tt-tear-fx.js';
 import {
   assetUrl,
   boardTexture,
@@ -87,13 +91,14 @@ import {
 import { createTabletopUi } from './tt-ui.js';
 
 /**
- * The tabletop opening (design 073): one three.js scene of a desk with a Build & Battle box on
- * it. Every physical beat is played here — the shrink-wrap torn off, the lid lifted, the deck,
- * leaflet, code card and packs taken out, the deck's cellophane and its promo, each pack picked
- * up, torn across its crimp, its cards drawn out and passed one by one onto the mat, then fanned
- * and piled. The saved `session.unboxing` reducer is the only record that counts (`dispatch`);
- * which pack was torn first and whether the contents were taken out are a small cosmetic record.
- * A reload re-lays the table for the saved state (`settle`).
+ * The tabletop opening (design 073): one three.js scene of a Build & Battle box on the floor of a
+ * TCG Pocket studio. Every physical beat is played here — the shrink-wrap torn off, the lid lifted,
+ * the deck, leaflet, code card and packs taken out, the deck's cellophane and its promo, each pack
+ * picked up and torn across its crimp with the game's swipe and light, its cards drawn out and
+ * passed one by one onto the floor, then fanned and piled. The saved `session.unboxing` reducer is
+ * the only record that counts (`dispatch`); which pack was torn first and whether the contents
+ * were taken out are a small cosmetic record. A reload re-lays the table for the saved state
+ * (`settle`).
  */
 
 const DEG = Math.PI / 180;
@@ -107,6 +112,16 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const HAND_FACE_WAIT_MS = 6000;
 // The share of a pull taken by sliding the wrapper down rather than drawing the cards up.
 const WRAPPER_SLIDE = 0.72;
+// As the finger cuts, the cut part of the strip only flexes toward the eye (as in TCG Pocket).
+const PEEL_FLEX_DEG = 26;
+// The cut strip springs off this long after the cut completes (as the halo folds into the beam)
+// and the cards start out of the pack this much later again.
+const STRIP_POP_DELAY_MS = 100;
+const CARDS_AFTER_POP_MS = 160;
+// The strip's flight: it whips up out of view for the first part, then flutters down to the floor.
+const STRIP_FLIGHT_MS = 1400;
+const STRIP_POP_AT = 0.2;
+const TABLE_FOCUS_MS = 450;
 
 const el = (tag, className) => {
   const node = document.createElement(tag);
@@ -147,7 +162,7 @@ async function buildTabletopApp(options, life) {
     deckRows = [],
     storage = null,
     quality = 'high',
-    surface = { kind: 'mat' },
+    surface = { kind: 'floor' },
     finishLabel = 'Build your deck',
     muted = () => false,
     volume = () => 0.8,
@@ -522,6 +537,7 @@ async function buildTabletopApp(options, life) {
   function settle() {
     stage.finishAll();
     stopHandSway();
+    dropTearFx();
     const u = getUnboxing();
     cosmetic = reconcileCosmetic(cosmetic, u);
     const v = tableView(u, cosmetic);
@@ -580,6 +596,9 @@ async function buildTabletopApp(options, life) {
       });
       v.tornVisual.forEach((visual, logical) => layTornPack(visual, logical, u, v));
     }
+    focusChange += 1;
+    focus = hand ? 1 : 0;
+    stage.setFocus(focus);
     refreshUi();
   }
 
@@ -683,6 +702,52 @@ async function buildTabletopApp(options, life) {
     stopSway = null;
   };
 
+  // While something is held up, the floor recedes to the backdrop's blue (`stage.setFocus`). The
+  // latest change wins: an older fade still running stops moving it.
+  let focus = 0;
+  let focusChange = 0;
+  const focusTable = (on) => {
+    const change = (focusChange += 1);
+    const from = focus;
+    const to = on ? 1 : 0;
+    if (from === to) return Promise.resolve();
+    return stage.animate({
+      durationMs: TABLE_FOCUS_MS,
+      update: (t) => {
+        if (change !== focusChange) return;
+        focus = from + (to - from) * easeInOutCubic(t);
+        stage.setFocus(focus);
+      },
+    });
+  };
+
+  // The held pack's TCG Pocket light (`tt-tear-fx.js`), and the seam's pulse while it waits.
+  let tearFx = null;
+  let stopHint = null;
+  const stopSeamHint = () => {
+    stopHint?.();
+    stopHint = null;
+    tearFx?.setHint(0);
+  };
+  const startSeamHint = () => {
+    stopSeamHint();
+    if (!tearFx) return;
+    // Reduced motion: the seam glows, still.
+    if (instant()) {
+      tearFx.setHint(0.5);
+      stage.requestRender();
+      return;
+    }
+    stopHint = stage.addTicker((now) => tearFx?.setHint(0.45 + 0.3 * Math.sin(now / 280)));
+  };
+  const dropTearFx = () => {
+    stopSeamHint();
+    tearFx?.dispose();
+    tearFx = null;
+  };
+  disposers.push(dropTearFx);
+  const packShapeOf = (visual) => look?.skin?.packArts?.[artIndexes[visual]]?.shape || null;
+
   /** The drawn cards in hand: a group facing the eye, the front card nearest. */
   function holdStack(visual, logical, items, position) {
     const group = new Group();
@@ -728,8 +793,18 @@ async function buildTabletopApp(options, life) {
     disposers.push(() => probeMaterials.forEach((material) => material.dispose()));
     const warm = new Group();
     warm.add(probe);
+    // The tear's light too (only the eye draws it): its shaders would otherwise compile as the
+    // first pack comes up.
+    const eyeOnly = new Group();
+    if (packObjects.length) {
+      const lightProbe = createTearFx({ model: packObjects[0].model, shape: packShapeOf(0) });
+      eyeOnly.add(lightProbe.group);
+      disposers.push(() => lightProbe.dispose());
+    }
     try {
       await renderer.compileAsync(warm, camera, scene);
+      await renderer.compileAsync(eyeOnly, camera, scene);
+      await stage.compileForMirror(warm);
     } catch {
       // A shader that fails here fails again where it is used, and three reports it there.
     }
@@ -844,6 +919,7 @@ async function buildTabletopApp(options, life) {
     if (!v.itemsOut || v.deckUnwrapped) return;
     audio.play('item-lift');
     const inHand = handPose({ halfWidth: 46, halfHeight: 60 });
+    focusTable(true);
     await flyTo(deck.group, inHand, { durationMs: 700, lift: 22 });
     if (!send({ type: 'unwrapDeck' })) return;
     audio.play('deck-unwrap');
@@ -891,6 +967,7 @@ async function buildTabletopApp(options, life) {
         );
       },
     });
+    focusTable(false);
     await flyTo(promoCard, flatPose(PROMO_SPOT, CARD.thickness / 2 + 0.1), { durationMs: 760, lift: 40 });
     audio.play('card-land');
   }
@@ -906,11 +983,36 @@ async function buildTabletopApp(options, life) {
       if (item.url) faceTexture(item.url, item.card);
     });
     const pose = handPose({ halfWidth: 44, halfHeight: 68 });
+    focusTable(true);
     await flyTo(pack.model.group, pose, { durationMs: 720, lift: 22 });
     hand = { kind: 'pack', visual, peel: 0 };
     startSway(pack.model.group, pose);
+    dropTearFx();
+    tearFx = createTearFx({ model: pack.model, shape: packShapeOf(visual) });
+    startSeamHint();
   }
 
+  /** A finger lands on the held pack at `worldPoint`: a rainbow ring opens there (the latest touch's). */
+  let touches = 0;
+  function touchPack(worldPoint) {
+    if (hand?.kind !== 'pack' || !tearFx || !worldPoint) return;
+    stopSeamHint();
+    const local = packObjects[hand.visual].model.group.worldToLocal(worldPoint.clone());
+    const fx = tearFx;
+    const touch = (touches += 1);
+    stage.animate({
+      durationMs: 420,
+      update: (t) => {
+        if (touch === touches) fx.setTouch(local, t);
+      },
+    });
+  }
+
+  /**
+   * The TCG Pocket tear: the finger runs the cut through to the far end (a tap or the button runs
+   * all of it), then the flash, the rainbow halo folding into a beam across the screen, the cut
+   * strip springing off, and the cards drawn out while the cut edge still glints.
+   */
   async function tearHeldPack(fromProgress = 0, side = 1) {
     if (hand?.kind !== 'pack') return;
     const visual = hand.visual;
@@ -922,33 +1024,82 @@ async function buildTabletopApp(options, life) {
     saveCosmetic();
     const logical = action.event.packIndex;
     stopHandSway();
+    stopSeamHint();
+    // It stays registered until its light is out, so a teardown mid-tear still frees it.
+    const fx = tearFx;
+    const start = Math.max(0, Math.min(1, fromProgress));
+    // The rip sounds with the cut; its snap lands as the light flashes.
     audio.play('pack-tear');
     await stage.animate({
-      durationMs: 220,
-      update: (t) => pack.model.setPeel(fromProgress + (1 - fromProgress) * easeOutCubic(t), side),
+      durationMs: 90 + 170 * (1 - start),
+      update: (t) => {
+        const cut = start + (1 - start) * t;
+        pack.model.setPeel(cut, side, PEEL_FLEX_DEG);
+        fx?.setCut(cut, side, 1);
+      },
     });
+    const light = stage.animate({
+      durationMs: POCKET_TEAR_MS,
+      update: (t) => fx?.setLight(pocketTearLight(t * POCKET_TEAR_MS)),
+    });
+    await stage.wait(STRIP_POP_DELAY_MS);
     flingStrip(pack, logical, side);
-    await pullCards(pack, visual, logical);
+    await stage.wait(CARDS_AFTER_POP_MS);
+    await Promise.all([pullCards(pack, visual, logical), light]);
+    if (tearFx === fx) dropTearFx();
   }
 
-  /** The torn strip flies off the pack, tumbling, and lands on the mat. */
+  /**
+   * The cut strip springs up off the pack and whips away spinning and rippling like a ribbon, up
+   * out of view (the game's strip), then flutters down onto the floor by the emptied wrappers.
+   * It turns about its own middle; its landing pose is the one reviewed in iteration 9.
+   */
   function flingStrip(pack, logical, side) {
     const strip = pack.model.strip;
+    const group = pack.model.group;
+    group.updateMatrixWorld();
+    const groupQ = group.getWorldQuaternion(new Quaternion());
+    const up = new Vector3(0, 1, 0).applyQuaternion(groupQ);
+    const across = new Vector3(side, 0, 0).applyQuaternion(groupQ);
+    const toward = new Vector3(0, 0, 1).applyQuaternion(groupQ);
     scene.attach(strip);
-    const from = strip.position.clone();
+    const middle = new Vector3(0, pack.model.stripCenterY, 0);
     const fromQ = strip.quaternion.clone();
+    const startAt = strip.position.clone().add(middle.clone().applyQuaternion(fromQ));
+    const poppedAt = startAt.clone().addScaledVector(up, 170).addScaledVector(across, 60).addScaledVector(toward, 40);
     const spot = wrapperSpot(logical);
-    const rest = new Vector3(spot.x + 20 * side, 0.4 + logical * 0.3, spot.z - 50);
     const restQ = qFlat(spot.rotYDeg * 2 + 40 * side, true);
+    const restAt = new Vector3(spot.x + 20 * side, 0.4 + logical * 0.3, spot.z - 50).add(
+      middle.clone().applyQuaternion(restQ)
+    );
+    const whipped = fromQ.clone().multiply(new Quaternion().setFromEuler(new Euler(-0.5, 0.25 * side, 0.9 * side)));
+    const turn = new Quaternion();
+    const tumble = new Quaternion();
+    const euler = new Euler();
+    const at = new Vector3();
     stage.animate({
-      durationMs: 900,
+      durationMs: STRIP_FLIGHT_MS,
       update: (t) => {
-        const point = arcPoint(from, rest, t, 90);
-        strip.position.set(point.x, point.y, point.z);
-        const spin = new Quaternion().setFromEuler(new Euler(t * 4.2 * side, t * 2.1, t * 5.5 * side));
-        strip.quaternion.slerpQuaternions(fromQ.clone().multiply(spin), restQ, smoothstep(0.55, 1, t));
-        // Let go of, the fold springs open into a loose curl before it lands.
-        pack.model.relaxStrip(smoothstep(0.1, 0.8, t));
+        if (t < STRIP_POP_AT) {
+          // It springs free at once, then whips away ever faster.
+          const k = t / STRIP_POP_AT;
+          at.copy(startAt).lerp(poppedAt, 0.06 * Math.sin((Math.PI / 2) * Math.min(1, k * 3)) + 0.94 * easeInCubic(k));
+          turn.copy(fromQ).slerp(whipped, smoothstep(0, 1, k));
+        } else {
+          const k = (t - STRIP_POP_AT) / (1 - STRIP_POP_AT);
+          const point = arcPoint(poppedAt, restAt, k, 40);
+          at.set(point.x, point.y, point.z);
+          tumble.setFromEuler(euler.set(k * 3.6 * side, k * 1.6, k * 4.4 * side));
+          turn.copy(whipped).multiply(tumble).slerp(restQ, smoothstep(0.6, 1, k));
+        }
+        strip.quaternion.copy(turn);
+        strip.position.copy(at).sub(middle.clone().applyQuaternion(turn));
+        pack.model.shapeStrip({
+          foldDeg: PEEL_FLEX_DEG * (1 - smoothstep(0, 0.12, t)),
+          curl: smoothstep(0.55, 1, t),
+          wave: 4.5 * Math.sin(Math.PI * Math.min(1, t / 0.85)),
+          phase: t * 16,
+        });
       },
     });
   }
@@ -1115,6 +1266,7 @@ async function buildTabletopApp(options, life) {
     const pack = packObjects[visual];
     const spot = packRowSpot(visual, packCount);
     hand = null;
+    focusTable(false);
     await Promise.all(
       cards.map((mesh, k) => {
         const jitter = pileJitter(k);
@@ -1136,6 +1288,7 @@ async function buildTabletopApp(options, life) {
     const back = { position: mesh.position.clone(), quaternion: mesh.quaternion.clone() };
     audio.play('card-slide');
     const pose = handPose({ halfWidth: 40, halfHeight: 52, tiltXDeg: -2 });
+    focusTable(true);
     await flyTo(mesh, pose, { durationMs: 560, lift: 16 });
     hand = { kind: 'inspect', mesh, back, pose };
     followPointer(mesh, pose);
@@ -1164,6 +1317,7 @@ async function buildTabletopApp(options, life) {
     const { mesh, back } = hand;
     stopHandSway();
     hand = null;
+    focusTable(false);
     await flyTo(mesh, back, { durationMs: 520, lift: 30 });
     audio.play('card-land');
   }
@@ -1319,7 +1473,10 @@ async function buildTabletopApp(options, life) {
     press = { x: event.clientX, y: event.clientY, hit, mode: null, progress: 0, peelTicks: 0, side: 1 };
     if (hit?.tag.kind === 'box' && v.wrapOn) press.mode = 'wrap';
     else if (hit?.tag.kind === 'box' && !v.lidOpen && boxModel.isLidMesh(hit.object)) press.mode = 'lid';
-    else if (hand?.kind === 'pack' && hit?.node === packObjects[hand.visual].model.group) press.mode = 'peel';
+    else if (hand?.kind === 'pack' && hit?.node === packObjects[hand.visual].model.group) {
+      press.mode = 'peel';
+      touchPack(hit.point);
+    }
     else if (hand?.kind === 'stack' && hit?.tag.kind === 'handStack') press.mode = 'swipe';
     canvas.setPointerCapture?.(event.pointerId);
   };
@@ -1349,7 +1506,8 @@ async function buildTabletopApp(options, life) {
       press.side = dx >= 0 ? 1 : -1;
       const width = packScreenWidth(pack);
       press.progress = dragProgress(Math.abs(dx), width);
-      pack.setPeel(press.progress, press.side);
+      pack.setPeel(press.progress, press.side, PEEL_FLEX_DEG);
+      tearFx?.setCut(press.progress, press.side, 1);
       const ticks = Math.floor(press.progress * 10);
       if (ticks > press.peelTicks) {
         press.peelTicks = ticks;
@@ -1390,9 +1548,22 @@ async function buildTabletopApp(options, life) {
       } else if (current.mode === 'peel') {
         if (current.progress >= PACK_TORN_AT) run(() => tearHeldPack(current.progress, current.side));
         else {
+          // Let go too soon: the cut closes up again and the seam goes back to glowing.
           const pack = packObjects[hand.visual].model;
           const from = current.progress;
-          stage.animate({ durationMs: 200, update: (t) => pack.setPeel(from * (1 - easeOutCubic(t)), current.side) });
+          const fx = tearFx;
+          stage
+            .animate({
+              durationMs: 200,
+              update: (t) => {
+                const cut = from * (1 - easeOutCubic(t));
+                pack.setPeel(cut, current.side, PEEL_FLEX_DEG);
+                fx?.setCut(cut, current.side, 1 - t);
+              },
+            })
+            .then(() => {
+              if (fx === tearFx && hand?.kind === 'pack') startSeamHint();
+            });
         }
       } else if (current.mode === 'swipe') {
         const mesh = hand?.meshes?.[hand.position];
@@ -1482,6 +1653,11 @@ async function buildTabletopApp(options, life) {
   if (stopped()) return abandon();
   settle();
   warmShadows();
+  // The floor's mirror draws the scene again with shaders of its own: those compile in a task of
+  // their own, so images that arrive meanwhile are taken in between (software WebGL compiles block).
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  if (stopped()) return abandon();
+  stage.renderReflection();
   await handFacesReady();
   if (stopped()) return abandon();
   const surfaceReady = stage.setSurface(surface);
