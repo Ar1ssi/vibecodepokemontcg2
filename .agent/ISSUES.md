@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I261). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I264). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,9 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I263 2026-10-16 P3 [board-ui] Bench AttackOverlay (074 A2: attacks hidden, Retreat inert) has no DOM or e2e test; test-card-inspector-e2e covers the Active and stack view only (refs: D219, design 074)
+- I262 2026-10-16 P3 [rules] attack-mirror-heal.test "Absorb Vitality" fails intermittently in the full `pnpm test` run, passes alone (seen on branch feature/tcgl-attack-ui, file untouched)
+- I261 2026-10-16 P3 [deck-builder] coin-normalize.test "committed coin catalog is already normalized" fails on a CRLF working copy of the catalog: compare normalizes line endings or .gitattributes pins LF
 - I260 2026-10-16 P3 [client] Eager boot JS is 5.6 MB after 073 batch 5 (target ≤2.8 MB): lazy import() of the deck builder and mat FX (073 C8); initMatCoins fetches coins.json (458 KB) + tcgl-coins.json (120 KB) on every game-tab boot — defer to the first flip (refs: I252)
 - I259 2026-10-16 P2 [board-ui] TCG Live foil SolidColor family (e.g. bw11-114) renders as a near-solid yellow wash — maybe a material-param port bug; check on localhost (refs: D217, design 069-tcgl-card-foil)
 - I258 2026-10-16 P3 [board-ui] TCG Live foil costs ~12 MB GPU per live card (front + etch + plate, mipmapped); not measured with ~20 on screen or in mat iframes (refs: D217)
@@ -24,7 +27,6 @@
 - I251 2026-10-15 P2 [legacy] Client rules layer loaded under authority (rules-bridge.js, trainer-execution.js, chat-buttons.js; 55 guards in 23 files; 4 legacy/server twins). Step 1 landed (D216): authority default, shadow gone, dmg fix. Retire twins as DISPOSITION_TABLE grows (refs: 073 C)
 - I247 2026-10-15 P3 [netcode] Design 072 seat-loss (merged I247, I248): a seat rejoining after the opening deal gets no dealOrder/turnOrderResult replay (Set Up shuffles locally after 45 s); a caller or coin winner whose socket blips is answered for at once, no reconnect grace (refs: design 072)
 - I245 2026-10-15 P2 [netcode] e2e tests failing on main (merged I245, I246): scripts/e2e/flip-gate-test.mjs step 3 throws `reading 'image'` via e2e-api.js:570, steps 1/2 flake; scripts/e2e/room-change-reset-test.mjs waits for a legacy coin-call picker the bridge auto-answers (design 072)
-- I242 2026-10-11 P3 [board-ui] Card focus gaps (merged I242, I243): own Active only (no Bench abilities, opponent Active, buff/debuff HUD, action drawer); attack-ui arrows and W/R tint wait on a damage split (base/bonus/reduction/W/R), `_Modal`/atkOv_Brdr_B1 on the drawer (refs: D208, design 067)
 - I239 2026-10-01 P2 [rules] I233 follow-ups (merged I239, I240, I241): "has no Abilities" locks (Garbotoxin) also stop Powers/Bodies (isAbilitySuppressed ignores type; Toxic Gas skips promos); rules-bridge.js ~2981 may auto-run old wordings on play (audit); empty TCGdex ability entries (neo2-49…)
 - I235 2026-10-01 P3 [rules] Lt. Surge's Secret Plan (gym2-107) does nothing: engine can't keep an in-play card face down and flip it on attack/Power/evolve/retreat/damage
 - I227 2026-10-01 P2 [rules] WotC residue after 062 (merged I227, I228, I229): 64 attacks no-effect / 27 partial (Mirror Move, Reflect Shield, Endure, Lock-on); half-run Powers (Sneak Attack, Surprise Bite, Call the Boss, Buzzap); 73 passive Powers unconsumed (Thick Skinned, Energy Burn…)
@@ -54,6 +56,7 @@
 - I1 2026-09-07 P2 [rules] Legacy ISSUES.txt items unverified: turn-start auto-draw both players (I1), +Turn/End Turn rework (I2), Garland Ray discard parse on multipliers (I3) (merged I1–I3)
 
 ## Closed (newest first; older history in the archive)
+- I242 2026-10-11 P3 [board-ui] Card focus gaps (merged I242, I243): own Active only, no buff/debuff HUD, no damage split for W/R tint and arrows (refs: D208, design 067) → closed 2026-10-16: design 074, D219; action drawer wontfix (not in landscape)
 - I250 2026-10-15 P2 [engine] reduce.mjs was 10,976 lines, 186 commits in 2 months; applyCommand 2,322 lines, 123 cases behind 3 exports (073 B) → closed 2026-10-16: split into reduce/<domain>.mjs (14 modules, largest 1,910) behind the same exports; token-identical, oracle unchanged (D218)
 - I252 2026-10-15 P3 [deck-builder] Data as code: coins.mjs 9,647 lines at boot, set-browser.mjs 720 JSON lines, 160 lines twice across the B&B flows (073 D) → closed 2026-10-16: JSON in assets/catalogs/ via catalog-loader.mjs on first use; flows share bb-shared.js; boot weight → I260
 - I253 2026-10-15 P3 [harness] Over every cap, 453 commits since last maintain (trigger 30): DECISIONS 199 lines/47 KB, ISSUES 69 open, designs root 91, MAP 131; rules-extended.test.mjs 24 s on live TCGdex retries (refs: design 073 E, D161) → closed 2026-10-15: b2c6617 test stub + maintain sweep
