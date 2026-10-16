@@ -1,5 +1,5 @@
 # 074: TCG Live attack UI, ported 1:1 (overlay everywhere, stack view, status popup)
-Status: approved (self — one-shot)
+Status: done on branch `feature/tcgl-attack-ui` (not landed)
 Date: 2026-10-16 · Session: S—
 
 ## Problem
@@ -17,18 +17,18 @@ fulfilment state), and the HUD has no buff/debuff buttons (I242, I243).
 ## Acceptance
 | # | Criterion (the brief's words) | Evidence |
 |---|---|---|
-| A1 | Tap routing is TCG Live's: own Active → AttackOverlay; own Bench → AttackOverlay when it has a usable action, else the stack view; opponent Active/Bench → the stack view | |
-| A2 | Benched overlay hides attacks (AttackOverlay.HideAttacksForBenchedPokemon) and Retreat does nothing | |
-| A3 | Sidebox Attack button opens the AttackOverlay, not the 013 carousel | |
-| A4 | HUD: Buff/Debuff buttons (lit when the card has positive/negative effects) open the status popup; Stack opens the stack view; Close | |
-| A5 | Cost icons are TCG Live's type icons, filled per EnergyFulfillmentHelper.CalculateSatisfiedEnergy_Greedy, empty ones tinted the registry ink | |
-| A6 | Damage readout ports AttackOption.SetAttackDamageValue: final damage after Weakness/Resistance, green for Weakness, red for Resistance, buff/debuff arrow | |
-| A7 | VSTAR Power entries use titleBarHeight_V 1.25 and the VPowerBar rects (traced, not inferred) | |
-| A8 | Overlay geometry, sprites, colours and font sizes come from the dumped prefabs (refs/074-tcgl-attack-ui) | |
-| A9 | Status popup (MatchModalPopup + StatusEffectModalOption): positive / negative columns, one entry per effect with its source | |
-| A10 | Stack view ports StackedCardOverlay_Landscape: card carousel left, info panel right (name/HP bar, energy, tools, buff/debuff, attack list, weakness/resistance/retreat) | |
-| A11 | The 013 print-band chrome is gone for Pokémon (the Stadium panel stays) | |
-| A12 | Backdrop is TableCoverPanel (its three panels), not a flat 42 % dim | |
+| A1 | Tap routing is TCG Live's: own Active → AttackOverlay; own Bench → AttackOverlay when it has a usable action, else the stack view; opponent Active/Bench → the stack view || `card-focus-routing.test` tapRoute table (6 cases); `click-events.js` `routeInPlayTap`; e2e 5/5f/11 (Active, stack view). Bench/opponent taps: unit only |
+| A2 | Benched overlay hides attacks (AttackOverlay.HideAttacksForBenchedPokemon) and Retreat does nothing || `card-inspector.mjs:229` drops attack rows when `model.bench`; `openPokemonFocus` passes no onAttack/onRetreat off the Active; `card-inspector-model.test` bench block. No DOM test of the bench chrome |
+| A3 | Sidebox Attack button opens the AttackOverlay, not the 013 carousel || `chat-buttons.js` p1/p2 call `openActiveAttackOverlay`; the 013 carousel call is gone |
+| A4 | HUD: Buff/Debuff buttons (lit when the card has positive/negative effects) open the status popup; Stack opens the stack view; Close || `card-focus.mjs` `buildHud`; `status-popup.test` (5); `card-focus-css.test` HUD sprites; e2e 10b, 11, 9b |
+| A5 | Cost icons are TCG Live's type icons, filled per EnergyFulfillmentHelper.CalculateSatisfiedEnergy_Greedy, empty ones tinted the registry ink || `attack-ui-model.test` costFulfillment (7); `attack-options.test` cost icons |
+| A6 | Damage readout ports AttackOption.SetAttackDamageValue: final damage after Weakness/Resistance, green for Weakness, red for Resistance, buff/debuff arrow || `attack-ui-model.test` damageReadout + `computeAttackDamage` block (Weakness green, Resistance red, arrows); `attack-options.test` tint/arrow |
+| A7 | VSTAR Power entries use titleBarHeight_V 1.25 and the VPowerBar rects (traced, not inferred) || `attack-options.test` VSTAR/GX variants; `card-focus-css.test` 1.25 VSTAR bar. Visual check is the user's |
+| A8 | Overlay geometry, sprites, colours and font sizes come from the dumped prefabs (refs/074-tcgl-attack-ui) || `card-focus-css.test` unit geometry; e2e 6, 7c-7g measure the live rects against the prefab numbers |
+| A9 | Status popup (MatchModalPopup + StatusEffectModalOption): positive / negative columns, one entry per effect with its source || `status-popup.test` (5): both columns, entry per effect, never opens empty, closes on turn change |
+| A10 | Stack view ports StackedCardOverlay_Landscape: card carousel left, info panel right (name/HP bar, energy, tools, buff/debuff, attack list, weakness/resistance/retreat) || `stack-view-panel.test` (5); e2e 11, 12, 12b |
+| A11 | The 013 print-band chrome is gone for Pokémon (the Stadium panel stays) || slice 6 removed the print-band builders and 379 lines of `ptcg-atk*`/`ptcg-ability*` CSS; `card-inspector-css.test` retargeted; Stadium panel kept |
+| A12 | Backdrop is TableCoverPanel (its three panels), not a flat 42 % dim || `card-focus-css.test` TableCoverPanel: three bands, no flat dim |
 
 ## Assumptions
 - (assumed) **Fonts.** The game's TMP assets are Akko Pro Bold Condensed (Display_Bd/BdOutline/Md) and Akko W1G
@@ -47,6 +47,8 @@ fulfilment state), and the HUD has no buff/debuff buttons (I242, I243).
   bar while the attack is usable, timed from the mesh animation is not recoverable without the shader; it
   is a taste-level approximation, flagged for the user's localhost pass.
 - (assumed) Double-click routes like a single tap (idempotent), as 067 O5 did for the Active.
+- (assumed) A single click on any in-play Pokémon now opens the overlay or the stack view, so select-to-move for
+  Bench and opponent Pokémon is drag or the right-click menu, as 067 already made it for the Active.
 
 ## Constraints
 - 067 holds: flight/pose/timings, click guard, picker observer, hand lowering. D208–D210.
@@ -151,3 +153,8 @@ No data. Revert = revert the branch. Supersedes D50/D53 for Bench and opponent P
 | 7 | harness: MAP, DECISIONS, ISSUES (I242/I243), design Status | | | full `pnpm test` |
 
 ## Deviations
+- Slice 6 removed `.ptcg-atk, .ptcg-ability { pointer-events: auto }` with the print chrome; the `.tcgl-opt` rows
+  inherited `.ptcg-chrome`'s click-through and could not be clicked. Found by e2e 13; fixed in slice 6b with a
+  CSS pin (`card-inspector-css.test`, 074 block).
+- No `stack-view-css.test.mjs`: the class-coverage pin lives in `stack-view-panel.test` instead.
+- Action-list drawer not built (landscape only, see Assumptions).
