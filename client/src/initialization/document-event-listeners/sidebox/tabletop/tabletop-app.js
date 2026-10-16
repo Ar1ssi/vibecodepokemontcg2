@@ -48,6 +48,7 @@ import {
   clampToTable,
   clearOfBox,
   footprint,
+  freeSpotNear,
   restHeight,
 } from '../../../../setup/deck-builder/core/build-battle/tabletop/placement.mjs';
 import {
@@ -1024,8 +1025,11 @@ async function buildTabletopApp(options, life) {
     if (!view().lidOpen || !due.length) return;
     const cameraMove = frameTable();
     const jobs = due.map((item, index) => {
-      // Each is given its spot before it flies, so the next one out lands beside it, or on it.
-      const spot = setDownSpot(item, item.home);
+      // Each is given its spot before it flies, so the next one out goes beside it: its usual
+      // place, or the nearest bare floor when the player has put something there.
+      const taken = [...lyingItems(item).map(supportOf), ...fixedSupports()].map((support) => support.extent);
+      const near = freeSpotNear(item.home, item.halfW, item.halfD, { taken, box: boxRect });
+      const spot = setDownSpot(item, near);
       recordSpot(item, spot);
       return liftOut({ object: item.object, pose: () => restPose(item, spot), sound: item.sound }, index * 360);
     });

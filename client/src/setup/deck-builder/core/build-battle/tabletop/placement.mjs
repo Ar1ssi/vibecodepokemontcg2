@@ -73,3 +73,30 @@ export function restHeight(extent, base, halfThickness, supports) {
   }
   return height;
 }
+
+/**
+ * The spot nearest `desired` where a thing of half sizes `halfW` × `halfD` lies on bare floor:
+ * clear of every extent in `taken`, inside `bounds`, out of the standing `box`. Searched on rings
+ * `stepMm` apart; `desired` itself (to be stacked) when none is free within `rings` rings.
+ */
+export function freeSpotNear(desired, halfW, halfD, options = {}) {
+  const { taken = [], box = null, bounds = TABLE_BOUNDS, stepMm = 36, rings = 6 } = options;
+  const fits = (spot) => {
+    const inView = clampToTable(spot, halfW, halfD, bounds);
+    if (inView.x !== spot.x || inView.z !== spot.z) return false;
+    if (box && clearOfBox(spot, Math.max(halfW, halfD) * 0.8, box) !== spot) return false;
+    const extent = footprint(spot, halfW, halfD);
+    return taken.every((other) => !overlaps(extent, other, 0));
+  };
+  if (fits(desired)) return desired;
+  for (let ring = 1; ring <= rings; ring += 1) {
+    const count = ring * 8;
+    for (let k = 0; k < count; k += 1) {
+      const angle = (k / count) * Math.PI * 2;
+      const reach = ring * stepMm;
+      const spot = { ...desired, x: desired.x + Math.cos(angle) * reach, z: desired.z + Math.sin(angle) * reach };
+      if (fits(spot)) return spot;
+    }
+  }
+  return desired;
+}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { TABLE_BOUNDS, clampToTable, clearOfBox, footprint, overlaps, restHeight } from '../placement.mjs';
+import { TABLE_BOUNDS, clampToTable, clearOfBox, footprint, freeSpotNear, overlaps, restHeight } from '../placement.mjs';
 
 const near = (actual, expected, eps = 1e-6) => assert.ok(Math.abs(actual - expected) < eps, `${actual} ≉ ${expected}`);
 
@@ -59,4 +59,20 @@ test('a thing rests on the highest support under it', () => {
   ];
   assert.equal(restHeight(extent, 0.5, 2, supports), 14);
   assert.equal(restHeight(extent, 0.5, 2, []), 0.5);
+});
+
+test('taken out to its usual place, a thing finds the nearest bare floor when that place is taken', () => {
+  const desired = { x: 0, z: 100, rotYDeg: 0 };
+  assert.equal(freeSpotNear(desired, 30, 40), desired);
+  const taken = [footprint({ x: 10, z: 100 }, 30, 40)];
+  const spot = freeSpotNear(desired, 30, 40, { taken });
+  assert.equal(overlaps(footprint(spot, 30, 40), taken[0], 0), false);
+  assert.ok(Math.hypot(spot.x - desired.x, spot.z - desired.z) <= 6 * 36 + 1e-9);
+  // Nowhere free: it is stacked where it was meant to go.
+  const everywhere = [{ minX: -1e4, maxX: 1e4, minZ: -1e4, maxZ: 1e4 }];
+  assert.equal(freeSpotNear(desired, 30, 40, { taken: everywhere }), desired);
+  // Never into the box.
+  const box = { x: 0, z: 100, rotYDeg: 0, width: 100, depth: 60 };
+  const out = freeSpotNear(desired, 30, 40, { box });
+  assert.equal(clearOfBox(out, 32, box), out);
 });
