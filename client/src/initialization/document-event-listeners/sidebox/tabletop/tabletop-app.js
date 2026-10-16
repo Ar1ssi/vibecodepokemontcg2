@@ -122,6 +122,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const HAND_FACE_WAIT_MS = 6000;
 // The share of a pull taken by sliding the wrapper down rather than drawing the cards up.
 const WRAPPER_SLIDE = 0.72;
+// How far below the table the warm-up probe is drawn.
+const PROBE_DEPTH_MM = 10000;
 // As the finger cuts, the cut part of the strip only flexes toward the eye (as in TCG Pocket).
 const PEEL_FLEX_DEG = 26;
 // The cut strip springs off this long after the cut completes (as the halo folds into the beam)
@@ -919,13 +921,19 @@ async function buildTabletopApp(options, life) {
     return clipped;
   }
 
-  // Shaders the opening needs later compile now, behind the loading screen: the card stack clipped
-  // by a pack's mouth would otherwise stall the first tear on its compile. The probe's materials
-  // stay alive (never drawn) so three keeps those programs until the tear uses them.
+  // Shaders the opening needs later compile now, behind the loading screen. `compile` builds the
+  // card stack's programs without the clipping a pack's mouth puts on it (only a draw sets that),
+  // so the clipped probe is also drawn for real, once per pass, by `warmFrames`. Its materials stay
+  // alive so three keeps those programs until the tear uses them.
+  let clippedProbe = null;
   async function warmShaders() {
     const probe = kit.makeCard({ map: backTexture, name: 'tt-warm' });
     const probeMaterials = clipCard(probe, new Plane(new Vector3(0, 1, 0), 0));
     disposers.push(() => probeMaterials.forEach((material) => material.dispose()));
+    // Far below the table: drawn (never culled), seen by nothing.
+    probe.frustumCulled = false;
+    probe.position.set(0, -PROBE_DEPTH_MM, 0);
+    clippedProbe = probe;
     const warm = new Group();
     warm.add(probe);
     // The tear's light too (only the eye draws it): its shaders would otherwise compile as the
@@ -946,22 +954,41 @@ async function buildTabletopApp(options, life) {
   }
 
   // Things start casting shadows as they land on the mat, and the shadow pass compiles a depth
-  // shader for each kind of material the first time it meets one. One frame drawn with every
-  // shadow on, behind the loading screen, compiles them all up front.
-  function warmShadows() {
+  // shader for each kind of material the first time it meets one. One frame per pass (the eye's,
+  // then the floor's mirror), drawn with every shadow on and nothing culled (a narrow screen has
+  // packs off to the side), behind the loading screen, compiles them all up front.
+  async function warmFrames() {
     const switched = [];
+    const uncullable = [];
+    scene.add(clippedProbe);
     scene.traverse((node) => {
-      if (node.isMesh && !node.castShadow) {
+      if (!node.isMesh) return;
+      if (!node.castShadow) {
         node.castShadow = true;
         switched.push(node);
       }
+      if (node.frustumCulled) {
+        node.frustumCulled = false;
+        uncullable.push(node);
+      }
     });
-    renderer.shadowMap.needsUpdate = true;
-    renderer.render(scene, camera);
-    switched.forEach((node) => {
-      node.castShadow = false;
-    });
-    renderer.shadowMap.needsUpdate = true;
+    try {
+      renderer.shadowMap.needsUpdate = true;
+      renderer.render(scene, camera);
+      // The mirror's shaders compile in a task of their own, so images that arrive meanwhile are
+      // taken in between (software WebGL compiles block).
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (!stopped()) stage.renderReflection();
+    } finally {
+      clippedProbe.removeFromParent();
+      switched.forEach((node) => {
+        node.castShadow = false;
+      });
+      uncullable.forEach((node) => {
+        node.frustumCulled = true;
+      });
+      renderer.shadowMap.needsUpdate = true;
+    }
   }
 
   // ── Beats ───────────────────────────────────────────────────────────────
@@ -1969,19 +1996,17 @@ async function buildTabletopApp(options, life) {
   };
 
   // ── Start ───────────────────────────────────────────────────────────────
+  // The table's surface (a mat's print loads over the network) starts now and is waited for before
+  // the warm-up draws: the mat in the frame is one more set of shaders.
+  const surfaceReady = stage.setSurface(surface);
   await warmShaders();
   if (stopped()) return abandon();
   settle();
-  warmShadows();
-  // The floor's mirror draws the scene again with shaders of its own: those compile in a task of
-  // their own, so images that arrive meanwhile are taken in between (software WebGL compiles block).
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  if (stopped()) return abandon();
-  stage.renderReflection();
-  await handFacesReady();
-  if (stopped()) return abandon();
-  const surfaceReady = stage.setSurface(surface);
   await surfaceReady;
+  if (stopped()) return abandon();
+  await warmFrames();
+  if (stopped()) return abandon();
+  await handFacesReady();
   if (stopped()) return abandon();
   ui.setLoading(false);
   stage.requestRender();
