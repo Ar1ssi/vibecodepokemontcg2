@@ -539,6 +539,21 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### B2
+- Seam at `depth = half.h * 0.84`, not `half.h`: `half` is the iframe box (1449.6 × 540 at 1920×1080) but the pivot
+  is the PLAYFIELD's bottom edge (`#playfield` stops one `--hand-crop-height` strip above the iframe bottom,
+  self-containers.css:413) and `battleMatBox().depth` is that playfield height. `flatLayout` returns `depth`;
+  opp maps `y → 2·depth − y`; the hand strip is at y < 0 (`hand.baselineY = −2·strip`, `hand.edgeY = −strip`).
+- World frame per the B2 brief (x right, y up the screen, z toward the viewer; table rotated by the tilt), so the
+  tilted camera's `up` is `[0,1,0]`, not the row's `[0,0,1]`.
+- Broadcast mirrors today's CSS (index.css:6450-6453, `#selfContainer` rotate(90deg)): near hand on the screen's
+  LEFT, far edge right, flat +x → screen down, scaled by `--bc-scale`, no tilt (`tiltDeg: 0` on the camera).
+- `--prizes-columns` is written but never read by any stylesheet; the CSS grid is always two overlapping cards per
+  row, so the prize slots reproduce that for every profile (all profiles have `columns: 2`).
+- Card aspects are not deterministic in CSS (intrinsic image ratio): in-play/prizes/Stadium use `--card-aspect`
+  0.718 (holo/base.css:90), piles `--deck-card-aspect` 0.716. Extra fields beyond the row: `depth`,
+  `cardBox.{deck,discard,lostZone,hand}`, `benchPitch`, `benchSlotRect()` (edge case 6), camera `tiltDeg`/`shiftPx`/`viewport`.
+
 ### B1
 - attack-fx-lab has no route of its own (express.static serves `/src/dev/*`), so the lab is reachable both at
   `/src/dev/board-lab.html` (static, same as attack-fx-lab) and at `/dev/board-lab` (one `sendFile` route in server.js).
