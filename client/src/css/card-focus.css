@@ -35,7 +35,7 @@
   position: absolute;
   inset: 0;
   /* The game keeps the board crisp and readable behind the card: a dim, no blur. */
-  background: rgba(2, 6, 12, 0.42);
+  background: none;
   opacity: 0;
   transition: opacity var(--focus-flight-ms) var(--focus-flight-ease);
 }
@@ -44,6 +44,22 @@
   transition: opacity var(--focus-collapse-ms) var(--focus-collapse-ease);
   opacity: 0;
 }
+
+/* TableCoverPanel (design 074), flipped as the game flips it (scale y -1): nothing over the top
+   quarter, a 50 % black gradient from 45 % to 61.5 % down, and 50 % black below that. */
+.card-focus__cover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.card-focus__cover--top { top: 0; height: 25%; background: transparent; }
+.card-focus__cover--middle {
+  top: 45%;
+  height: 16.5%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.5));
+}
+.card-focus__cover--bottom { top: 61.5%; bottom: 0; background: rgba(0, 0, 0, 0.5); }
 
 /* perspective is set inline from the viewport height (card-focus-geometry `perspectiveFor`). */
 .card-focus__stage {
@@ -117,70 +133,113 @@
   clip-path: inset(calc(100% - var(--focus-reveal)) -4% -4% -4%);
 }
 
-/* HUD: a column of ring buttons standing left of the card, bottom-aligned just above its lower edge,
-   as AttackOverlayHUD's are in the game. Sizes and offsets are fractions of the card (--focus-*, set
-   by card-focus.mjs). Close is the bottom button, Stack above it. */
+/* HUD (FocusedCardOverlay_Landscape > Buttons): Buff and Debuff over Stack over Close, 60-px
+   buttons 10 apart on a shadow_60 backing (black 70 %, 32 x 38 larger), standing left of the card,
+   bottom-aligned just above its lower edge. Sizes are fractions of the card (--focus-*, set by
+   card-focus.mjs); --hud-b is one button, so 1px of the 60-px prefab is --hud-b / 60. */
 .card-focus__hud {
+  --hud-b: max(44px, calc(var(--focus-w) * 0.103));
+  --hud-px: calc(var(--hud-b) / 60);
   position: absolute;
   left: calc(var(--focus-left) - var(--focus-w) * 0.13);
   top: calc(var(--focus-top) + var(--focus-h) * 0.97);
   display: flex;
   flex-direction: column;
-  gap: calc(var(--focus-w) * 0.021);
+  gap: calc(var(--hud-px) * 10);
   transform: translateY(-100%);
   pointer-events: none;
 }
-.card-focus__close,
-.card-focus__stack {
+.card-focus__hud::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--hud-px) * -22) calc(var(--hud-px) * -16) calc(var(--hud-px) * -16);
+  z-index: -1;
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/shadow-60.png') 40 fill / calc(var(--hud-px) * 40) stretch;
+  filter: brightness(0);
+  opacity: 0.7;
+}
+/* One HUD button: shadow_32 (black 50 %, 4 larger each side) under ButtonContent raised 4 — the
+   circle_32 white stroke round a circle_28 #f2f2f2 face — and a #333333 icon 80 % tall. */
+.card-focus__btn {
   position: relative;
-  width: calc(var(--focus-w) * 0.103);
-  height: calc(var(--focus-w) * 0.103);
-  min-width: 44px;
-  min-height: 44px;
-  display: grid;
-  place-items: center;
+  isolation: isolate;
+  width: var(--hud-b);
+  height: var(--hud-b);
   padding: 0;
-  border: max(2px, calc(var(--focus-w) * 0.0075)) solid #fff;
-  border-radius: 50%;
-  background: rgba(14, 22, 36, 0.52);
-  color: #fff;
+  border: 0;
+  background: none;
   cursor: pointer;
   pointer-events: auto;
 }
+.card-focus__btn::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--hud-px) * -4);
+  z-index: -1;
+  background: url('../assets/attack-ui/shadow-32.png') center / 100% 100% no-repeat;
+  filter: brightness(0);
+  opacity: 0.5;
+}
+.card-focus__btn-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform: translateY(calc(var(--hud-px) * -4));
+  border-radius: 50%;
+  background: #ffffff;
+}
+.card-focus__btn-face::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--hud-px) * 4);
+  border-radius: 50%;
+  background: #f2f2f2;
+}
+.card-focus__btn-icon {
+  position: relative;
+  width: calc(var(--hud-px) * 32);
+  height: 80%;
+  background: #333333;
+  -webkit-mask: var(--hud-icon) center / contain no-repeat;
+  mask: var(--hud-icon) center / contain no-repeat;
+}
+/* Buff / Debuff: icn_StatusArrow (the debuff one flipped), with the coloured statusArrow over it
+   while the card has such an effect. A button with nothing to show is not interactable. */
+.card-focus__btn--buff,
+.card-focus__btn--debuff { --hud-icon: url('../assets/attack-ui/icn-status.png'); }
+.card-focus__btn--debuff .card-focus__btn-icon { transform: scaleY(-1); }
+.card-focus__btn-fill {
+  position: absolute;
+  width: calc(var(--hud-px) * 32);
+  height: 80%;
+  background: center / contain no-repeat;
+}
+.card-focus__btn--buff .card-focus__btn-fill { background-image: url('../assets/attack-ui/arrow-up.png'); }
+.card-focus__btn--debuff .card-focus__btn-fill { background-image: url('../assets/attack-ui/arrow-down.png'); }
+.card-focus__btn:disabled { cursor: default; }
+.card-focus__btn:disabled .card-focus__btn-face { filter: brightness(0.78); }
+.card-focus__stack { --hud-icon: url('../assets/attack-ui/icn-stack.png'); }
+/* Close: icn_Close itself is the face, over icn_CloseShadow (8 larger each side). */
+.card-focus__close::before {
+  inset: calc(var(--hud-px) * -8);
+  background-image: url('../assets/attack-ui/icn-close-shadow.png');
+}
+.card-focus__close .card-focus__btn-face {
+  border-radius: 0;
+  background: url('../assets/attack-ui/icn-close.png') center / 100% 100% no-repeat;
+}
+.card-focus__close .card-focus__btn-face::before { display: none; }
 /* Hit area reaches past the ring so the button stays easy to hit on a small card. */
-.card-focus__close::after,
-.card-focus__stack::after {
+.card-focus__btn::after {
   content: '';
   position: absolute;
   inset: -6px;
   border-radius: 50%;
 }
-.card-focus__close svg,
-.card-focus__stack svg {
-  width: 58%;
-  height: 58%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.card-focus__stack-count {
-  position: absolute;
-  right: -18%;
-  top: -18%;
-  min-width: 1.5em;
-  padding: 0 0.3em;
-  border-radius: 1em;
-  background: #fff;
-  color: #16202b;
-  font: 800 max(11px, calc(var(--focus-w) * 0.03)) / 1.5 'Segoe UI', system-ui, sans-serif;
-  text-align: center;
-}
-.card-focus__close:hover,
-.card-focus__stack:hover { background: rgba(60, 76, 104, 0.8); }
-.card-focus__close:focus-visible,
-.card-focus__stack:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; }
+.card-focus__btn:not(:disabled):hover .card-focus__btn-face { filter: brightness(1.06); }
+.card-focus__btn:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; border-radius: 50%; }
 
 /* Attached Energy stands under the card as large tokens overlapping its lower edge, in the game's
    proportions (each 24.6% of the card width, overlapping by 4.5%). They ride the card's tilt. */

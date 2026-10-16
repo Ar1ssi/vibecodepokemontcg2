@@ -216,6 +216,8 @@ const POSITIVE_MARKERS = new Set([
   'resistanceOverride',
 ]);
 
+const sourceArtOf = (card) => card?.src ?? card?.image?.src ?? null;
+
 const amountText = (marker) => (marker.amount != null ? String(marker.amount) : '');
 
 const MARKER_TEXT = {
@@ -316,6 +318,9 @@ export function statusEffectsFor(card, ctx = {}) {
       title: String(attached.name ?? 'Pokémon Tool'),
       text: String(attached.text ?? attached.effect ?? attached.rules?.[0] ?? ''),
       kind: 'tool',
+      // The entry shows the source card's art (CardDescriptionModalOption): a server stamp carries
+      // `src`, a legacy zone card its board <img>.
+      ...(sourceArtOf(attached) ? { src: sourceArtOf(attached) } : {}),
     });
   }
   return { positive, negative };

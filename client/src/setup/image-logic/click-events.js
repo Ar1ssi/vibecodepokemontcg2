@@ -35,6 +35,7 @@ import {
   isCardFocusOpen,
 } from '../rules/card-focus.mjs';
 import { shouldOpenCardFocus } from '../rules/card-focus-routing.mjs';
+import { statusEffectsFor } from '../rules/attack-ui-model.mjs';
 import {
   attack,
   retreat,
@@ -255,6 +256,16 @@ const attachedSlidesOf = (card) =>
     return fullArtSrc ? { ...attached, image: { src: fullArtSrc } } : attached;
   });
 
+// The card's Buff / Debuff split for the focus HUD (design 074). Timed attack effects only count
+// while the Pokémon is Active; the opponent's Active is where a presence-scoped effect's source sits.
+const focusStatusesFor = (card, zone) =>
+  statusEffectsFor(card, {
+    turnNumber: rulesState.turnNumber,
+    zoneCards: getZone('self', zone).array,
+    sourceZoneCards: getZone('opp', 'active').array,
+    active: zone === 'active',
+  });
+
 // Design 067: your own Active opens the TCG Live focus view. The attached cards the old inspector
 // carried as carousel slides sit behind the HUD's Stack button. An attack or retreat closes the
 // focus at once, because it fires at the slot the card would otherwise be flying back to.
@@ -263,7 +274,7 @@ const openOwnActiveFocus = (card) => {
   return openCardFocus({
     card,
     zone: 'active',
-    attachedCount: attachedSlides.length,
+    statuses: focusStatusesFor(card, 'active'),
     onAttack: (index) => {
       closeCardFocus({ immediate: true });
       attack(rulesState.turnPlayer, true, index);
@@ -272,12 +283,15 @@ const openOwnActiveFocus = (card) => {
       closeCardFocus({ immediate: true });
       retreat(systemState.initiator);
     },
-    onOpenStack: () =>
-      openCarouselViewer({
-        title: card.name || 'Attached Cards',
-        candidates: [...orderAttachedForCarousel(attachedSlides), card],
-        initialIndex: attachedSlides.length,
-      }),
+    onOpenStack:
+      attachedSlides.length > 0
+        ? () =>
+            openCarouselViewer({
+              title: card.name || 'Attached Cards',
+              candidates: [...orderAttachedForCarousel(attachedSlides), card],
+              initialIndex: attachedSlides.length,
+            })
+        : null,
   });
 };
 

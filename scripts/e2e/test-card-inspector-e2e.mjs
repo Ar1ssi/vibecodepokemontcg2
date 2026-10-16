@@ -348,12 +348,12 @@ try {
       receded: el.classList.contains('tcgl-opt--off'),
       usable: el.classList.contains('tcgl-opt--usable'),
     })),
-    stack: document.querySelector('.card-focus__stack-count')?.textContent ?? null,
+    stack: Boolean(document.querySelector('.card-focus__stack')),
     energies: document.querySelectorAll('.card-focus__energy').length,
   }));
   console.log('Focus data (1 Fire Energy attached):', JSON.stringify(withEnergy));
   T('10. Ember and Scratch are payable once Fire Energy is attached', withEnergy.atks.length === 2 && withEnergy.atks.every((a) => a.usable && !a.receded));
-  T('10b. The HUD shows the Stack button with the attached count', withEnergy.stack === '1');
+  T('10b. The HUD shows the Stack button once a card is attached', withEnergy.stack);
   T('10b2. The attached Fire Energy stands under the card as one large token', withEnergy.energies === 1);
 
   await actor.page.screenshot({ path: 'out/e2e-focus-payable.png' });

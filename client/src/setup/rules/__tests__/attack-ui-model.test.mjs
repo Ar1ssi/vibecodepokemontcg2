@@ -177,6 +177,14 @@ describe('statusEffectsFor', () => {
     assert.deepEqual(negative.map((e) => e.kind), ['condition']);
   });
 
+  it("a Tool entry carries the Tool's art when the card has one, as CardDescriptionModalOption shows it", () => {
+    const withArt = {
+      attachedCards: [{ name: 'Choice Belt', subtypes: ['Pokémon Tool'], src: '/cards/belt.png' }],
+    };
+    assert.equal(statusEffectsFor(withArt, { turnNumber: 1 }).positive[0].src, '/cards/belt.png');
+    assert.equal('src' in statusEffectsFor(card, { turnNumber: 4 }).positive.at(-1), false);
+  });
+
   it('a card with nothing on it has no effects', () => {
     assert.deepEqual(statusEffectsFor({}, { turnNumber: 1 }), { positive: [], negative: [] });
     assert.deepEqual(statusEffectsFor(null), { positive: [], negative: [] });

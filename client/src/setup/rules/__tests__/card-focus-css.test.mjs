@@ -233,10 +233,31 @@ describe('067 — card-focus.css', () => {
     );
   });
 
-  it('defines the HUD buttons the module builds', () => {
-    for (const selector of ['.card-focus__hud', '.card-focus__close', '.card-focus__stack']) {
+  it('defines the HUD buttons the module builds, on the game sprites', () => {
+    for (const selector of [
+      '.card-focus__hud',
+      '.card-focus__btn',
+      '.card-focus__btn-face',
+      '.card-focus__btn-icon',
+      '.card-focus__btn-fill',
+      '.card-focus__stack',
+      '.card-focus__close::before',
+    ]) {
       assert.ok(focus(selector), `${selector} is missing`);
     }
+    assert.ok(focus('.card-focus__stack').includes("icn-stack.png"));
+    assert.ok(focus('.card-focus__close .card-focus__btn-face').includes('icn-close.png'));
+    assert.ok(focus('.card-focus__btn--buff .card-focus__btn-fill').includes('arrow-up.png'));
+    assert.ok(focus('.card-focus__btn--debuff .card-focus__btn-fill').includes('arrow-down.png'));
+  });
+
+  // TableCoverPanel, flipped (scale y -1): clear top, a 50 % gradient band, 50 % black below.
+  it('the backdrop is the TableCoverPanel: three bands, no flat dim', () => {
+    assert.match(focus('.card-focus__backdrop'), /background: none;/);
+    assert.match(focus('.card-focus__cover--middle'), /top: 45%;/);
+    assert.match(focus('.card-focus__cover--middle'), /height: 16\.5%;/);
+    assert.match(focus('.card-focus__cover--bottom'), /top: 61\.5%;/);
+    assert.match(focus('.card-focus__cover--bottom'), /rgba\(0, 0, 0, 0\.5\)/);
   });
 });
 

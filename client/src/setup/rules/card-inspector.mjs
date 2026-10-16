@@ -407,7 +407,9 @@ const buildFocusChrome = (model) => {
   const stack = el('div', 'ptcg-stack ptcg-stack--focus');
   if (model.ability) stack.appendChild(buildAbilityOption(model.ability, model.type));
   const options = el('div', 'tcgl-opts');
-  model.attacks.forEach((attack) => options.appendChild(buildAttackOption(attack, model.type)));
+  if (!model.bench) {
+    model.attacks.forEach((attack) => options.appendChild(buildAttackOption(attack, model.type)));
+  }
   stack.appendChild(options);
   frame.appendChild(stack);
   chrome.appendChild(frame);

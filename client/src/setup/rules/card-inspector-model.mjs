@@ -646,6 +646,8 @@ export function buildInspectorModel(card, ctx = {}) {
     bandHeightPct: bounds?.heightPct ?? null,
     footH: frame.footH,
     ...sideInsetsOf(frame),
+    // AttackOverlay.HideAttacksForBenchedPokemon: a Benched Pokémon's overlay lists no attacks.
+    bench: zone === 'bench',
     dimLevel: readOnly || zone === 'bench' ? 'none' : dimLevelFor(attacks),
     interactive,
     attackable,

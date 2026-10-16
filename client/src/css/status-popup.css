@@ -1,0 +1,176 @@
+/* Status popup (design 074): MatchModalPopup + StatusEffectModalOption, built by
+   setup/rules/status-popup.mjs. Lengths are the game's canvas px (a 1920 x 1080 reference) through
+   --pu, so the window keeps the game's proportions at any viewport. Above the card focus (2400). */
+.tcgl-modal {
+  --pu: min(calc(100vw / 1920), calc(100vh / 1080));
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  display: grid;
+  place-items: center;
+  font-family: 'Akko W1G', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+}
+.tcgl-modal__blocker {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+/* ModalPopupWindow Content: circle_22 panel in #dfdfdf over a 60 % softercircle shadow, 1600 wide. */
+.tcgl-modal__window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(calc(var(--pu) * 1600), 96vw);
+  max-height: 92vh;
+  border-radius: calc(var(--pu) * 22);
+  background: #dfdfdf;
+  box-shadow: 0 0 calc(var(--pu) * 75) rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+/* Header: halfCircle_28 in #323232, 120 tall, TitleTxt in Text_MediumItalic white, 40 / 80 inset. */
+.tcgl-modal__header {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  height: calc(var(--pu) * 120);
+  padding: 0 calc(var(--pu) * 40);
+  background: #323232;
+  box-shadow: 0 calc(var(--pu) * 8) calc(var(--pu) * 20) rgba(0, 0, 0, 0.45);
+}
+.tcgl-modal__title {
+  margin: 0;
+  font-size: calc(var(--pu) * 44);
+  font-style: italic;
+  font-weight: 500;
+  color: #ffffff;
+}
+.tcgl-modal__content {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Footer: white at 77 %, 120 tall, its button centred with a 15 / 20 inset. */
+.tcgl-modal__footer {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  height: calc(var(--pu) * 120);
+  background: rgba(255, 255, 255, 0.77);
+  box-shadow: inset 0 calc(var(--pu) * 8) calc(var(--pu) * 16) rgba(0, 0, 0, 0.25);
+}
+.tcgl-modal__button {
+  min-width: calc(var(--pu) * 360);
+  height: calc(var(--pu) * 84);
+  padding: 0 calc(var(--pu) * 40);
+  border: 0;
+  border-radius: calc(var(--pu) * 8);
+  background: #ffffff;
+  box-shadow: 0 calc(var(--pu) * 4) calc(var(--pu) * 8) rgba(0, 0, 0, 0.5);
+  font: 500 calc(var(--pu) * 36) / 1 'Akko W1G', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+.tcgl-modal__button:hover { filter: brightness(0.95); }
+.tcgl-modal__button:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; }
+
+/* StatusEffectModalOption: two halves split by a 4px #d9d9d9 divider under a 100-tall #1a1a1a band
+   that the column headers (80 tall, a 64px arrow and Display_BdOutline text) sit on. */
+.tcgl-status {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: calc(var(--pu) * 880);
+  overflow: hidden;
+}
+.tcgl-status::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--pu) * 90);
+  background: #1a1a1a;
+  box-shadow: 0 calc(var(--pu) * 8) calc(var(--pu) * 32) rgba(0, 0, 0, 0.4);
+}
+.tcgl-status::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - var(--pu) * 2);
+  width: calc(var(--pu) * 4);
+  background: #d9d9d9;
+}
+.tcgl-status__column {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tcgl-status__header {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--pu) * 10);
+  height: calc(var(--pu) * 80);
+  margin: calc(var(--pu) * 5) calc(var(--pu) * 20) 0;
+}
+.tcgl-status__header-icon { width: calc(var(--pu) * 64); height: calc(var(--pu) * 64); }
+.tcgl-status__header-text {
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--pu) * 44);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  text-shadow: 0 0 calc(var(--pu) * 3) #000000;
+}
+/* The scroll region: 25 padding each side, entries stacked. */
+.tcgl-status__list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--pu) * 20);
+  margin: 0;
+  padding: calc(var(--pu) * 25);
+  list-style: none;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+}
+/* CardDescriptionModalOption: the source card, its name and the effect, with the polarity arrow. */
+.tcgl-status__entry {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--pu) * 20);
+  padding: calc(var(--pu) * 20);
+  border-radius: calc(var(--pu) * 16);
+  background: #ffffff;
+  box-shadow: 0 calc(var(--pu) * 4) calc(var(--pu) * 10) rgba(0, 0, 0, 0.25);
+}
+.tcgl-status__thumb {
+  flex: 0 0 auto;
+  width: calc(var(--pu) * 110);
+  aspect-ratio: 63 / 88;
+  border-radius: calc(var(--pu) * 6);
+  object-fit: cover;
+}
+.tcgl-status__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tcgl-status__title {
+  display: block;
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--pu) * 36);
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.tcgl-status__text {
+  margin: calc(var(--pu) * 8) 0 0;
+  font-size: calc(var(--pu) * 30);
+  line-height: 1.3;
+  color: #1a1a1a;
+  white-space: pre-line;
+}
+.tcgl-status__arrow {
+  flex: 0 0 auto;
+  width: calc(var(--pu) * 48);
+  height: calc(var(--pu) * 48);
+}
