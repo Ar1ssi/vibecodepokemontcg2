@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I256). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I260). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,10 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I259 2026-10-16 P2 [board-ui] TCG Live foil SolidColor family (e.g. bw11-114) renders as a near-solid yellow wash — maybe a material-param port bug; check on localhost (refs: D217, design 069-tcgl-card-foil)
+- I258 2026-10-16 P3 [board-ui] TCG Live foil costs ~12 MB GPU per live card (front + etch + plate, mipmapped); not measured with ~20 on screen or in mat iframes (refs: D217)
+- I257 2026-10-16 P3 [board-ui] TCG Live foil gaps: Poké/Master Ball reverse (`_sph`/`_mph`/`_ph2`, ~600) not imported; sets ec, gum, me5-5m, smalt, xyalt, xybsp, swshbsp, mebsp #94–100, mee #9–16 unmapped (186+ cards keep CSS holo) (refs: D217)
+- I256 2026-10-16 P3 [board-ui] r2.dev public URL for foil textures is rate-limited and not for production; move ptcg-foil to a custom domain when one is on Cloudflare (refs: D217)
 - I255 2026-10-15 P3 [netcode] joinGame/reconnect add the socket to the Socket.IO room before roomReject (server.js:789/:925 vs :810/:940/:949): rejected sockets get room broadcasts and keep roomInfo alive past the sweep; join only after the seat checks pass (refs: D216 review)
 - I254 2026-10-15 P3 [board-ui] mats-catalog.mjs still claims GENERATED, but rerunning scripts/generate-mat-thumbs.mjs would drop every custom-* entry (manifest.json has none); 27 dead custom/*-full-size*.png entries remain (refs: I249, D215)
 - I252 2026-10-15 P3 [deck-builder] Data shipped as code: coins.mjs 9,647 lines imported at boot by rules-bridge.js, set-browser.mjs 720 JSON lines with a 143-line block duplicated at :984/:1445; bnb-run.js and build-battle.js share 160 verbatim lines across both B&B flows (refs: design 073 D)

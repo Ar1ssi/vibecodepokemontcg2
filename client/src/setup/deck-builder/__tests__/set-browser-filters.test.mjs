@@ -116,3 +116,37 @@ test('the detail cap is reported, and a failed record just does not match', asyn
   assert.equal(capped.checkedCount, 2);
   assert.deepEqual(ids(capped.matches, 'sv03.5'), ['sv03.5-004']);
 });
+
+test('picked Expansions narrow the scan to those tab sets', async () => {
+  const setIds = ['sv03.5', 'sv03'];
+  let filters = toggleFilter(createEmptyFilters(), 'energyTypes', 'fire');
+  filters = toggleFilter(filters, 'sets', 'sv03');
+  assert.deepEqual(scopeFilterSets({ filters, setIds }), ['sv03']);
+  assert.deepEqual(scopeFilterSets({ filters: toggleFilter(createEmptyFilters(), 'sets', 'xy1'), setIds }), []);
+  let ability = toggleFilter(createEmptyFilters(), 'hasAbility');
+  ability = toggleFilter(ability, 'sets', 'sv03');
+  assert.deepEqual(scopeFilterSets({ filters: ability, setIds, expandedSetId: 'sv03.5' }), []);
+  assert.deepEqual(scopeFilterSets({ filters: ability, setIds, expandedSetId: 'sv03' }), ['sv03']);
+
+  // The detail cap is spent on the picked set only, never on sets it filters out.
+  const deps = fakes();
+  const result = await findSetFilterMatches({ setIds, filters, ...deps, detailLimit: 1 });
+  assert.deepEqual(deps.calls.summaries, [{ types: 'Fire', 'set.id': 'eq:sv03' }]);
+  assert.deepEqual(deps.calls.details, ['sv03-125']);
+  assert.equal(result.truncated, false);
+  assert.equal(result.matches.has('sv03.5'), false);
+});
+
+test('a picked synthetic tab set keeps its cards from other set ids', async () => {
+  // The Energy tab (ENERGY_SET_ID) lists TCGdex sve-001 Grass Energy under its real set.
+  const listing = [{ id: 'sve-001', name: 'Grass Energy', supertype: 'Energy', set: { id: 'sve' } }];
+  const deps = {
+    fetchSummaries: async () => assert.fail('listing-only filters need no summaries'),
+    loadSetCards: async (setId) => (setId === '__energy__' ? listing : assert.fail(setId)),
+    fetchDetail: async () => assert.fail('listing-only filters need no records'),
+  };
+  let filters = toggleFilter(createEmptyFilters(), 'supertypes', 'Energy');
+  filters = toggleFilter(filters, 'sets', '__energy__');
+  const result = await findSetFilterMatches({ setIds: ['__energy__', 'sv03'], filters, ...deps });
+  assert.deepEqual(ids(result.matches, '__energy__'), ['sve-001']);
+});

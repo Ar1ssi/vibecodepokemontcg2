@@ -5,6 +5,7 @@ import test from 'node:test';
       getLegalSetRegistry,
       getStarterDecks,
       STARTER_DECK_CATALOG,
+      fetchSetCards,
       filterCardsByName,
       sortCardsWithinGroup,
     } from '../core/set-browser.mjs';
@@ -122,3 +123,52 @@ import test from 'node:test';
       assert.equal(byName[0].id, 'b');
     });
     
+// TCGdex /sets/sv03.5 lists sv03.5-004 Charmander and sv03.5-165 Rare Candy with no category
+// (2026-10-15); /cards?category=Trainer lists Rare Candy.
+test('fetchSetCards tags supertypes from the Trainer and Energy lists, alongside the set record', async () => {
+  const requested = [];
+  let indexRequestedBeforeRecord = false;
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    requested.push(parsed);
+    const category = parsed.searchParams.get('category');
+    let body;
+    if (parsed.pathname.endsWith('/sets/sv03.5')) {
+      indexRequestedBeforeRecord = requested.some((entry) => entry.searchParams.has('category'));
+      body = {
+        id: 'sv03.5',
+        name: '151',
+        releaseDate: '2023-09-22',
+        cards: [
+          { id: 'sv03.5-004', localId: '004', name: 'Charmander', image: 'https://assets.tcgdex.net/en/sv/sv03.5/004' },
+          { id: 'sv03.5-165', localId: '165', name: 'Rare Candy', image: 'https://assets.tcgdex.net/en/sv/sv03.5/165' },
+        ],
+      };
+    } else if (category === 'Trainer') {
+      body = [{ id: 'sv03.5-165', localId: '165', name: 'Rare Candy' }];
+    } else if (category === 'Energy') {
+      body = [];
+    } else {
+      throw new Error(`unexpected request ${url}`);
+    }
+    return { ok: true, status: 200, json: async () => body };
+  };
+  try {
+    const cards = await fetchSetCards('sv03.5');
+    assert.deepEqual(
+      cards.map((card) => [card.id, card.supertype]),
+      [
+        ['sv03.5-004', 'Pokémon'],
+        ['sv03.5-165', 'Trainer'],
+      ]
+    );
+    assert.ok(indexRequestedBeforeRecord, 'the index must not wait for the set record');
+    assert.ok(
+      !requested.some((entry) => entry.searchParams.get('category') === 'Pokemon'),
+      'the ~2 MB Pokémon id list is never fetched'
+    );
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});

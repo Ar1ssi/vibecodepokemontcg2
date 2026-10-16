@@ -24,6 +24,8 @@
     "fx:import-attack": "node scripts/fx/attack/import-tcgl-attack-fx.mjs",
     "fx:import-coins": "node scripts/fx/coin/import-tcgl-coins.mjs",
     "fx:import-deckbox": "node scripts/fx/deckbox/import-tcgl-deckbox.mjs",
+    "foil:import": "node scripts/tcgl-foil/import-foil.mjs",
+    "foil:upload": "node scripts/tcgl-foil/upload-foil.mjs",
     "audit:oracle": "node scripts/audit-oracle.mjs",
     "audit:abilities": "node scripts/audit-ability-behaviour.mjs",
     "audit:trainers": "node scripts/audit-trainer-behaviour.mjs",

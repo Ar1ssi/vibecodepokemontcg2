@@ -4,7 +4,10 @@ import {
   parseSimCsv,
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
-import { getSortedDeckCardArray } from '../../../setup/deck-builder/core/card-sort.mjs';
+import {
+  getSortedDeckCardArray,
+  uniqueDeckCards,
+} from '../../../setup/deck-builder/core/card-sort.mjs';
 import { buildDeckExportDocument } from '../../../setup/deck-builder/core/deck-export.mjs';
 import { getDeckCounterModel } from '../../../setup/deck-builder/core/deck-counter.mjs';
 import {
@@ -604,6 +607,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // Set browser only in browse mode (lazy-load on first open)
         if (browserPanel) {
           browserPanel.hidden = !isBrowse;
+          if (isBrowse && browseIsStale) {
+            browseIsStale = false;
+            setBrowser?.setCardFilters(cardFilters);
+          }
           if (isBrowse) setBrowser?.load();
         }
     
@@ -1056,6 +1063,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let draftFilters = createEmptyFilters();
   let activeMode = 'search';
   let searchIsStale = false;
+  let browseIsStale = false;
   // One Filters button and chip strip per tab, one shared drawer.
   const filtersButtons = [
     document.getElementById('nativeDeckBuilderFiltersButton'),
@@ -1074,6 +1082,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let currentDetailedCount = 0;
   let currentHugeResultSet = false;
   let hasSearched = false;
+  // true while the Search grid lists the deck itself ("In current deck" with nothing to fetch).
+  let searchListsDeck = false;
   let latestSearchId = 0;
   let deckDirty = false;
   let flashFrame = null;
@@ -1124,21 +1134,28 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   };
 
   const getSearchStatusText = () => {
+    if (searchListsDeck) {
+      return currentResults.length
+        ? `Showing ${currentResults.length} card(s) from your deck.`
+        : 'No cards in your deck match these filters.';
+    }
     if (currentHugeResultSet) {
       return `Too many matches (${currentTotalSummaries}). Add a card name or more filters.`;
     }
     if (currentResults.length === 0) return 'No matching cards found.';
     if (currentDetailedCount < currentTotalSummaries) {
-      return `Showing ${currentResults.length} card(s) from the first ${currentDetailedCount} of ${currentTotalSummaries} matches. Add filters to narrow it down.`;
+      return `Showing ${currentResults.length} card(s) from the newest ${currentDetailedCount} of ${currentTotalSummaries} matches. Add filters to narrow it down.`;
     }
     return `Showing ${currentResults.length} card(s). Click a card to add it.`;
   };
 
-  // The one way filters change: both tabs follow. A hidden Search tab
-  // re-runs when it is next shown rather than fetching now.
+  // The one way filters change: both tabs follow. A hidden tab re-filters
+  // when it is next shown rather than fetching now, so its pass never competes
+  // with the shown tab's for the TCGdex proxy's few upstream slots.
   const applyCardFilterState = (nextFilters) => {
     cardFilters = nextFilters;
-    setBrowser?.setCardFilters(cardFilters);
+    if (activeMode === 'browse') setBrowser?.setCardFilters(cardFilters);
+    else browseIsStale = true;
     if (activeMode === 'search') {
       runSearch();
     } else {
@@ -1172,8 +1189,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   };
 
   const renderResults = () => {
+    // The deck listing follows the deck: added cards appear, removed ones go.
+    if (searchListsDeck) currentRawResults = uniqueDeckCards(deck);
     // Re-filter on every render: "In current deck" follows the deck as it changes.
     if (hasSearched) updateVisibleResults();
+    if (searchListsDeck) searchStatus.textContent = getSearchStatusText();
     renderSearchResults({
       searchResultsEl: searchResults,
       results: currentResults,
@@ -1710,6 +1730,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     currentDetailedCount = 0;
     currentHugeResultSet = false;
     hasSearched = false;
+    searchListsDeck = false;
   };
 
   // A name, the filters TCGdex can apply, or both (design 050). Only the
@@ -1718,8 +1739,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const term = searchInput.value.trim();
     const params = buildTcgdexFilterParams(cardFilters);
     const searchId = ++latestSearchId;
+    searchListsDeck = false;
 
     if (!term && Object.keys(params).length === 0) {
+      // This run supersedes any search in flight, whose finally will not re-enable the button.
+      searchButton.disabled = false;
+      // "In current deck" needs no fetch: the deck already holds those cards.
+      if (cardFilters.inDeck) {
+        searchListsDeck = true;
+        currentRawResults = uniqueDeckCards(deck);
+        currentTotalSummaries = currentRawResults.length;
+        currentDetailedCount = currentRawResults.length;
+        currentHugeResultSet = false;
+        hasSearched = true;
+        updateVisibleResults();
+        searchStatus.textContent = getSearchStatusText();
+        render();
+        return;
+      }
       clearSearchResults();
       searchStatus.textContent = hasActiveFilters(cardFilters)
         ? 'Add a card name, or a Format, Type, Stage, HP, Rarity or Regulation mark filter, to search.'
@@ -1731,8 +1768,27 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     searchButton.disabled = true;
     searchStatus.textContent = term ? `Searching for “${term}”...` : 'Searching with your filters...';
 
+    // Records arrive over a few seconds: show what has loaded, at most every 250 ms.
+    let progressTimer = null;
+    let latestProgress = null;
+    const showProgress = (progress) => {
+      latestProgress = progress;
+      if (progressTimer) return;
+      progressTimer = setTimeout(() => {
+        progressTimer = null;
+        if (searchId !== latestSearchId) return;
+        currentRawResults = latestProgress.results;
+        currentTotalSummaries = latestProgress.totalSummaries;
+        currentDetailedCount = latestProgress.detailedCount;
+        currentHugeResultSet = false;
+        hasSearched = true;
+        renderResults();
+        searchStatus.textContent = `Loading cards… ${latestProgress.results.length} of ${latestProgress.detailedCount}`;
+      }, 250);
+    };
+
     try {
-      const searchResponse = await queryCards({ term, params });
+      const searchResponse = await queryCards({ term, params, onProgress: showProgress });
       if (searchId !== latestSearchId) return;
       currentRawResults = searchResponse.results;
       currentTotalSummaries = searchResponse.totalSummaries;
@@ -1749,6 +1805,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       clearSearchResults();
       searchStatus.textContent = `Search failed: ${error.message}`;
     } finally {
+      clearTimeout(progressTimer);
       if (searchId === latestSearchId) {
         searchButton.disabled = false;
         render();

@@ -1,7 +1,9 @@
 import { systemState } from '../../front-end.js';
 import { isShowingCardBack } from '../deck-builder/core/card-compare.mjs';
 import {
-  resolveHoloEffect,
+  resolveFoilEffect,
+  foilCardId,
+  isReverseHoloCard,
   buildHoloCard,
   syncCardAspect,
   isTrainerCard,
@@ -11,6 +13,8 @@ import {
 import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { attachMatTilt } from './mat-tilt.mjs';
+import { loadFoilManifest } from '../foil/tcgl-foil-store.js';
+import { unmountTcglFoil } from '../foil/tcgl-foil-view.js';
 
 const hydrated = new WeakSet();
 const pendingHydrations = new WeakMap();
@@ -75,15 +79,18 @@ export function hydrateHolo(card) {
     return pending;
   }
 
-  const promise = ensureCardData({
-    id: card.id,
-    name: card.name,
-    type: card.type,
-    set: card.set,
-    number: card.number,
-    image: card.image,
-  })
-    .then((data) => {
+  const promise = Promise.all([
+    ensureCardData({
+      id: card.id,
+      name: card.name,
+      type: card.type,
+      set: card.set,
+      number: card.number,
+      image: card.image,
+    }),
+    loadFoilManifest(),
+  ])
+    .then(([data, foilManifest]) => {
       // unhydrateHolo ran while card data was loading (e.g. the card went
       // under an evolution): the card no longer wants a foil.
       if (!hydrated.has(card)) return null;
@@ -93,7 +100,8 @@ export function hydrateHolo(card) {
       }
       if (card.wrapper) return card.wrapper;
 
-      const effect = resolveHoloEffect(data);
+      const foilCard = { ...data, image: card.image };
+      const effect = resolveFoilEffect(foilCard, foilManifest);
       if (!effect) {
         hydrated.delete(card);
         return null;
@@ -101,6 +109,9 @@ export function hydrateHolo(card) {
 
       const wrapper = buildHoloCard(card.image.src, effect, {
         trainer: isTrainerCard(data),
+        cardId: foilCardId(foilCard, foilManifest),
+        reverse: isReverseHoloCard(foilCard),
+        manifest: foilManifest,
       });
       // No inline px size: every zone sizes `.mat-holo` in CSS. A px snapshot
       // taken in the hand (1x) is wrong inside the zoom:2 #playfield, and
@@ -150,6 +161,7 @@ export function unhydrateHolo(card) {
   const wrapper = card?.wrapper;
   if (!wrapper) return;
   stopHoloAnimation(wrapper);
+  unmountTcglFoil(wrapper);
   const img = card.image;
   if (img.isConnected && img.parentElement === wrapper.querySelector('.card__rotator')) {
     const { parentElement, nextSibling } = wrapper;

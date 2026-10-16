@@ -43,7 +43,15 @@ export const FILTER_ENERGY_TYPES = [
 
 export const FILTER_SUPERTYPES = ['Pokémon', 'Trainer', 'Energy'];
 
-export const FILTER_TRAINER_TYPES = ['Item', 'Tool', 'Supporter', 'Stadium', 'Technical Machine'];
+// TCGdex /v2/en/trainer-types (2026-10-15); Rocket's Secret Machine is ex7's five.
+export const FILTER_TRAINER_TYPES = [
+  'Item',
+  'Tool',
+  'Supporter',
+  'Stadium',
+  'Technical Machine',
+  "Rocket's Secret Machine",
+];
 
 export const FILTER_FORMATS = ['standard', 'expanded'];
 
@@ -81,15 +89,22 @@ const MECHANIC_OPTIONS = [
   { value: 'Future', label: 'Future' },
 ];
 
-// The TCG rarities from TCGdex /v2/en/rarities (2026-09-28); the Pocket-only
-// diamond/star/crown rarities are left out. "Holo Rare" is printedRarity()'s
-// name for WotC-era holos that TCGdex lists as plain "Rare".
+// The TCG rarities from TCGdex /v2/en/rarities (2026-10-15); the Pocket-only
+// diamond/star/shiny/crown rarities and the "None" placeholder are left out.
+// "Holo Rare" is also printedRarity()'s name for WotC-era holos that TCGdex
+// lists as plain "Rare".
 export const FILTER_RARITIES = [
   'Common',
   'Uncommon',
   'Rare',
   'Holo Rare',
   'Rare Holo',
+  'Rare Holo LV.X',
+  'Rare PRIME',
+  'LEGEND',
+  'Holo Rare V',
+  'Holo Rare VMAX',
+  'Holo Rare VSTAR',
   'Double rare',
   'Ultra Rare',
   'Illustration rare',
@@ -97,11 +112,18 @@ export const FILTER_RARITIES = [
   'Hyper rare',
   'Mega Hyper Rare',
   'Shiny rare',
+  'Shiny rare V',
+  'Shiny rare VMAX',
   'Shiny Ultra Rare',
   'ACE SPEC Rare',
   'Radiant Rare',
   'Amazing Rare',
   'Secret Rare',
+  'Black White Rare',
+  'Full Art Trainer',
+  'Classic Collection',
+  'Pikachu Rare',
+  'Futuristic Rare',
   'Promo',
 ];
 

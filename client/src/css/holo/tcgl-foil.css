@@ -1,0 +1,27 @@
+/*
+  TCG Live card foil (design 069). A covered card's holo wrapper (data-rarity="tcgl") carries a
+  <canvas class="tcgl-foil"> after its <img> in .card__rotator: the game's own foil shader drawing the
+  card's TCG Live front with its etch / white plate / cold foil masks. The simey layers stay in the DOM
+  but never show for these cards; on `fallback` the plain <img> shows without foil.
+*/
+.card__rotator > .tcgl-foil {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--card-radius);
+  pointer-events: none;
+  transform: translate3d(0px, 0px, 0.02px);
+}
+
+[data-tcgl-foil='loading'] .tcgl-foil {
+  opacity: 0;
+}
+
+[data-tcgl-foil='live'] .tcgl-foil {
+  opacity: 1;
+  transition: opacity 120ms ease-out;
+}
+
+[data-tcgl-foil] :is(.card__shine, .card__glitter, .card__glare, .card__glare2) {
+  display: none;
+}
