@@ -1600,15 +1600,24 @@ async function buildTabletopApp(options, life) {
   // Balled up, the shrink-wrap's mesh still spans the box (the crumple is drawn by its shader): it
   // must not stop the pointer reaching what is inside.
   const boxFilm = new Set(boxModel.film.meshes);
+  // With the lid up, a press on the box reaches what stands in it: from the table's height the
+  // walls and the open lid cover most of the contents.
+  const inTheBox = (found) => found.node.parent === boxModel.group && found.tag.kind !== 'box';
   const hitAt = (event) => {
     const hits = stage.pick(event.clientX, event.clientY, pickables());
-    const wrapGone = !view().wrapOn;
+    const v = view();
+    let first = null;
     for (const hit of hits) {
-      if (!hit.object.visible || (wrapGone && boxFilm.has(hit.object))) continue;
+      if (!hit.object.visible || (!v.wrapOn && boxFilm.has(hit.object))) continue;
       const found = tagOf(hit.object);
-      if (found) return { ...found, point: hit.point, object: hit.object };
+      if (!found) continue;
+      const tagged = { ...found, point: hit.point, object: hit.object };
+      if (!first) {
+        first = tagged;
+        if (found.tag.kind !== 'box' || !v.lidOpen) return first;
+      } else if (inTheBox(found)) return tagged;
     }
-    return null;
+    return first;
   };
 
   const onPointerDown = (event) => {
