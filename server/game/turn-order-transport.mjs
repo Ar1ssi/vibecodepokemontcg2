@@ -177,6 +177,7 @@ export function createTurnOrderTransport({
         callId: data?.callId ?? null,
         call: data?.call ?? null,
         coinId: data?.coinId ?? null,
+        seat: data?.seat ?? null,
       });
       if (!flip.ok) {
         emitTo(socketId, 'turnOrderCallRejected', { roomId, reason: flip.reason });
@@ -190,6 +191,7 @@ export function createTurnOrderTransport({
       const resolution = gameRoom.submitTurnOrderChoice(socketId, {
         choiceId: data?.choiceId ?? null,
         goFirst: data?.goFirst ?? null,
+        seat: data?.seat ?? null,
       });
       if (!resolution.ok) {
         emitTo(socketId, 'turnOrderChoiceRejected', { roomId, reason: resolution.reason });

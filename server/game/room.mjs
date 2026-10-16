@@ -11,7 +11,7 @@ import {
 import { createRng } from '../../shared/engine/rng.mjs';
 import { DECK_FORMAT_TCG } from '../../shared/engine/formats.mjs';
 import { deckFormatMismatch } from '../../shared/engine/setup.mjs';
-import { deckPeekFor, viewFor } from '../../shared/engine/view.mjs';
+import { deckPeekFor, viewFor, viewForSolo } from '../../shared/engine/view.mjs';
 import { applyCommand, attackExtrasFor } from '../../shared/engine/reduce.mjs';
 import { PROTOCOL_VERSION } from '../../shared/engine/commands.mjs';
 import {
@@ -31,6 +31,14 @@ export const TURN_ORDER_CALL_TIMEOUT_MS = 15000;
  * about the same answer window as the call.
  */
 export const TURN_ORDER_CHOICE_TIMEOUT_MS = 25000;
+
+const SOLO_SEATS = ['p1', 'p2'];
+
+const BAD_SEAT = 'bad_seat';
+
+function isSoloSeat(seat) {
+  return SOLO_SEATS.includes(seat);
+}
 
 export class GameRoom {
   /**
@@ -69,6 +77,12 @@ export class GameRoom {
     this.playerToSocket = new Map(); // playerId -> socketId
     this.spectatorSockets = new Set(); // Set of socketIds
 
+    // Design 074 D7: one socket plays both seats. Each socket-addressed call names the
+    // seat it acts for (seatFor); views are drawn from soloNearSeat's side.
+    this.solo = false;
+    this.soloSeats = new Set();
+    this.soloNearSeat = 'p1';
+
     // Monotonic sequence tracking per player for deduplication (Edge Case 4)
     this.clientSeqByPlayer = new Map(); // playerId -> lastSeenClientSeq
 
@@ -105,6 +119,8 @@ export class GameRoom {
    */
   addPlayer(socketId, playerId, username = '', deckList = []) {
     if (!socketId || !playerId) return false;
+    // A solo room's seats belong to its one socket (addSoloPlayer).
+    if (this.solo) return false;
     this.touchActivity();
 
     // Edge Case 14 & Hazard H1: Only 2 active players allowed per game room
@@ -134,6 +150,12 @@ export class GameRoom {
     this.playerToSocket.set(playerId, socketId);
     this.spectatorSockets.delete(socketId);
 
+    this.#seatPlayer(playerId, username, deckList);
+    return true;
+  }
+
+  /** Creates the seat's player record on first join, else refreshes its username. */
+  #seatPlayer(playerId, username, deckList) {
     if (!this.state.players[playerId]) {
       this.state.players[playerId] = {
         playerId,
@@ -151,7 +173,105 @@ export class GameRoom {
     } else if (username) {
       this.state.players[playerId].username = username;
     }
+  }
+
+  /**
+   * Design 074 D7: seats one socket as both players — `p1` as `username`, `p2` as
+   * `${username} (far)` — and makes the room solo. Refused when the room has any seated
+   * player or spectator (or a game of seats whose sockets dropped). The same user's new
+   * socket reclaims an existing solo room (page reload), keeping its game.
+   *
+   * @param {string} socketId
+   * @param {string} username
+   * @param {{ p1?: object[], p2?: object[] }} [deckLists] each seat's deck list (stored as addPlayer stores one)
+   * @returns {boolean}
+   */
+  addSoloPlayer(socketId, username, { p1 = [], p2 = [] } = {}) {
+    if (!socketId || typeof username !== 'string' || !username) return false;
+    if (this.solo) {
+      if (this.state.players.p1?.username !== username) return false;
+      const previousSocketId = this.playerToSocket.get('p1');
+      if (previousSocketId) this.socketToPlayer.delete(previousSocketId);
+    } else if (
+      this.playerToSocket.size > 0 ||
+      this.spectatorSockets.size > 0 ||
+      Object.keys(this.state.players || {}).length > 0
+    ) {
+      return false;
+    }
+    this.touchActivity();
+
+    this.#seatPlayer('p1', username, p1);
+    this.#seatPlayer('p2', `${username} (far)`, p2);
+    for (const seat of SOLO_SEATS) {
+      this.playerToSocket.set(seat, socketId);
+      this.clientSeqByPlayer.delete(seat);
+    }
+    this.socketToPlayer.set(socketId, 'p1');
+    this.soloSeats = new Set(SOLO_SEATS);
+    this.solo = true;
     return true;
+  }
+
+  /**
+   * The seat a socket acts for. A normal room ignores `payload.seat` and uses the socket's
+   * own seat; a solo room acts for the named seat and refuses (null) any other value.
+   *
+   * @param {string} socketId
+   * @param {{ seat?: string }} [payload]
+   * @returns {'p1'|'p2'|null}
+   */
+  seatFor(socketId, payload = {}) {
+    if (!this.solo) return this.socketToPlayer.get(socketId) || null;
+    if (!this.socketToPlayer.has(socketId)) return null;
+    const seat = payload?.seat;
+    return isSoloSeat(seat) && this.soloSeats.has(seat) ? seat : null;
+  }
+
+  /**
+   * Which seat a solo room's views are drawn from (the board flip).
+   *
+   * @param {string} socketId
+   * @param {string} seat
+   * @returns {boolean} false outside a solo room, for another socket, or a seat not 'p1'|'p2'
+   */
+  setSoloNearSeat(socketId, seat) {
+    if (!this.solo || !this.socketToPlayer.has(socketId) || !isSoloSeat(seat)) return false;
+    this.soloNearSeat = seat;
+    return true;
+  }
+
+  /**
+   * One entry per connected seated socket — the views to push after a change. A solo room
+   * has one socket, reported as its near seat. Spectators are not included.
+   *
+   * @returns {Array<{ socketId: string, playerId: string }>}
+   */
+  viewTargets() {
+    if (this.solo) {
+      const socketId = this.playerToSocket.get(this.soloNearSeat);
+      return socketId ? [{ socketId, playerId: this.soloNearSeat }] : [];
+    }
+    return [...this.playerToSocket.entries()].map(([playerId, socketId]) => ({
+      socketId,
+      playerId,
+    }));
+  }
+
+  /**
+   * The last clientSeq the socket's client had applied. A solo client stamps both seats'
+   * commands from one counter, so its answer is the higher of the two seats.
+   *
+   * @param {string} socketId
+   * @returns {number}
+   */
+  getClientSeqForSocket(socketId) {
+    if (this.solo) {
+      if (!this.socketToPlayer.has(socketId)) return 0;
+      return Math.max(...SOLO_SEATS.map((seat) => this.getClientSeq(seat)));
+    }
+    const playerId = this.socketToPlayer.get(socketId);
+    return playerId ? this.getClientSeq(playerId) : 0;
   }
 
   /**
@@ -185,15 +305,19 @@ export class GameRoom {
    * Registers a socket as a spectator.
    *
    * @param {string} socketId
+   * @returns {boolean} false for a missing socket id or a solo room
    */
   addSpectator(socketId) {
-    if (!socketId) return;
+    if (!socketId) return false;
+    // Design 074 D7: a solo room shows both hands, so nobody else may watch it.
+    if (this.solo) return false;
     this.spectatorSockets.add(socketId);
     const existingPlayerId = this.socketToPlayer.get(socketId);
     if (existingPlayerId) {
       this.socketToPlayer.delete(socketId);
       this.playerToSocket.delete(existingPlayerId);
     }
+    return true;
   }
 
   /**
@@ -214,6 +338,7 @@ export class GameRoom {
    * @returns {boolean}
    */
   canView(socketId) {
+    if (this.solo) return this.socketToPlayer.has(socketId);
     return this.socketToPlayer.has(socketId) || this.spectatorSockets.has(socketId);
   }
 
@@ -225,10 +350,13 @@ export class GameRoom {
   removeSocket(socketId) {
     this.spectatorSockets.delete(socketId);
     const playerId = this.socketToPlayer.get(socketId);
-    if (playerId) {
-      this.socketToPlayer.delete(socketId);
-      this.playerToSocket.delete(playerId);
-      this.clientSeqByPlayer.delete(playerId);
+    if (!playerId) return;
+    this.socketToPlayer.delete(socketId);
+    const seats = this.solo ? SOLO_SEATS : [playerId];
+    for (const seat of seats) {
+      if (this.playerToSocket.get(seat) !== socketId) continue;
+      this.playerToSocket.delete(seat);
+      this.clientSeqByPlayer.delete(seat);
     }
   }
 
@@ -247,7 +375,9 @@ export class GameRoom {
    *   events?: object[],
    *   pendingChoice?: object|null,
    *   broadcasts?: Array<{ socketId: string, playerId: string|null, view: object }>
-   * }}
+   * } | { ok: false, success: false, error: 'bad_seat', reason: 'bad_seat', clientSeq?: number }}
+   *   A solo room acts for `cmd.seat`; a missing or unknown seat there is refused as
+   *   `bad_seat` (`success`/`error` ride along for the server's cmdRejected path).
    */
   handleClientCommand(socketId, cmd = {}) {
     // Audit A-9: dedupe keys on clientSeq, so a socket command without one would skip
@@ -261,16 +391,39 @@ export class GameRoom {
         clientSeq: cmd?.clientSeq,
       };
     }
-    return this.handleCommand(socketId, cmd);
+    if (!this.solo) return this.handleCommand(socketId, cmd);
+    const seat = this.seatFor(socketId, cmd);
+    if (!seat) return this.handleCommand(socketId, cmd, this.#badSeatOr(socketId));
+    return this.handleCommand(socketId, cmd, seat);
+  }
+
+  // A stranger's command in a solo room keeps its spectator/unauthorized refusal.
+  #badSeatOr(socketId) {
+    return this.socketToPlayer.has(socketId) ? BAD_SEAT : null;
   }
 
   /**
    * Executes a command for the socket's player: dedupes by clientSeq when present,
    * runs applyCommand, and assembles redacted broadcasts.
+   *
+   * @param {string} socketId
+   * @param {object} [cmd]
+   * @param {string|null} [actingSeat] the seat already resolved by seatFor (solo rooms);
+   *   omitted, the socket's own seat acts — server-internal commands (setup, loadDeck)
    */
-  handleCommand(socketId, cmd = {}) {
+  handleCommand(socketId, cmd = {}, actingSeat = undefined) {
+    if (actingSeat === BAD_SEAT) {
+      return {
+        ok: false,
+        success: false,
+        error: BAD_SEAT,
+        reason: BAD_SEAT,
+        clientSeq: cmd?.clientSeq,
+      };
+    }
     this.touchActivity();
-    const playerId = this.socketToPlayer.get(socketId);
+    const playerId =
+      actingSeat === undefined ? this.socketToPlayer.get(socketId) : actingSeat;
 
     if (!playerId) {
       if (this.spectatorSockets.has(socketId)) {
@@ -309,9 +462,9 @@ export class GameRoom {
           success: true,
           dedupe: true,
           stateVersion: this.state.stateVersion,
-          view: viewFor(this.state, playerId, { attackExtrasFor }),
+          view: this.getViewForSocket(socketId),
           clientSeq: cmd.clientSeq,
-          lastClientSeq: lastSeq,
+          lastClientSeq: this.solo ? this.getClientSeqForSocket(socketId) : lastSeq,
         };
       }
     }
@@ -341,12 +494,14 @@ export class GameRoom {
 
     // Assemble redacted views for all connected sockets
     const broadcasts = [];
-    for (const [pId, sockId] of this.playerToSocket.entries()) {
+    for (const { socketId: sockId, playerId: pId } of this.viewTargets()) {
       broadcasts.push({
         socketId: sockId,
         playerId: pId,
-        view: viewFor(this.state, pId, { attackExtrasFor }),
-        lastClientSeq: this.clientSeqByPlayer.get(pId) ?? 0,
+        view: this.getViewForSocket(sockId),
+        lastClientSeq: this.solo
+          ? this.getClientSeqForSocket(sockId)
+          : (this.clientSeqByPlayer.get(pId) ?? 0),
       });
     }
     for (const sSockId of this.spectatorSockets) {
@@ -386,6 +541,9 @@ export class GameRoom {
    * @returns {object}
    */
   getViewForSocket(socketId) {
+    if (this.solo && this.socketToPlayer.has(socketId)) {
+      return viewForSolo(this.state, this.soloNearSeat, { attackExtrasFor });
+    }
     const playerId = this.socketToPlayer.get(socketId) || null;
     return viewFor(this.state, playerId, { attackExtrasFor });
   }
@@ -395,12 +553,16 @@ export class GameRoom {
    * `deckPeekFor`). A spectator or unknown socket is refused.
    *
    * @param {string} socketId
-   * @param {{ side?: 'you'|'them', count?: number, fromTop?: boolean }} request
+   * @param {{ side?: 'you'|'them', count?: number, fromTop?: boolean, seat?: string }} request
+   *   `seat` names the asking seat in a solo room; `side` is relative to it.
    * @returns {{ ok: true, cards: object[], deckCount: number } | { ok: false, reason: string }}
    */
   peekDeck(socketId, request = {}) {
-    const playerId = this.socketToPlayer.get(socketId);
-    if (!playerId) return { ok: false, reason: 'Only a seated player can look at a deck.' };
+    const playerId = this.seatFor(socketId, request);
+    if (!playerId) {
+      if (this.#badSeatOr(socketId) === BAD_SEAT) return { ok: false, reason: BAD_SEAT };
+      return { ok: false, reason: 'Only a seated player can look at a deck.' };
+    }
     this.touchActivity();
     return deckPeekFor(this.state, playerId, request);
   }
@@ -517,14 +679,18 @@ export class GameRoom {
    * @param {string} [payload.callId]
    * @param {string} [payload.call] 'heads' | 'tails'
    * @param {string} [payload.coinId] The caller's chosen coin art id (display only)
+   * @param {string} [payload.seat] The calling seat in a solo room
    * @returns {TurnOrderFlip|{ ok: false, reason: string }}
    */
-  submitTurnOrderCall(socketId, { callId = null, call = null, coinId = null } = {}) {
+  submitTurnOrderCall(socketId, { callId = null, call = null, coinId = null, seat = null } = {}) {
     if (!this.turnOrder) return { ok: false, reason: 'no_pending_call' };
     if (this.turnOrder.phase !== 'awaiting-call') {
       return { ok: false, reason: 'already_resolved' };
     }
-    const playerId = this.socketToPlayer.get(socketId);
+    const playerId = this.seatFor(socketId, { seat });
+    if (!playerId && this.#badSeatOr(socketId) === BAD_SEAT) {
+      return { ok: false, reason: BAD_SEAT };
+    }
     if (!playerId || playerId !== this.turnOrder.callerPlayerId) {
       return { ok: false, reason: 'not_caller' };
     }
@@ -621,12 +787,16 @@ export class GameRoom {
    * @param {object} [payload]
    * @param {string} [payload.choiceId]
    * @param {boolean} [payload.goFirst]
+   * @param {string} [payload.seat] The answering seat in a solo room
    * @returns {TurnOrderResolution|{ ok: false, reason: string }}
    */
-  submitTurnOrderChoice(socketId, { choiceId = null, goFirst = null } = {}) {
+  submitTurnOrderChoice(socketId, { choiceId = null, goFirst = null, seat = null } = {}) {
     const refusal = this.#choiceRefusal();
     if (refusal) return refusal;
-    const playerId = this.socketToPlayer.get(socketId);
+    const playerId = this.seatFor(socketId, { seat });
+    if (!playerId && this.#badSeatOr(socketId) === BAD_SEAT) {
+      return { ok: false, reason: BAD_SEAT };
+    }
     if (!playerId || playerId !== this.turnOrder.winnerPlayerId) {
       return { ok: false, reason: 'not_winner' };
     }
@@ -862,7 +1032,7 @@ export class GameRoom {
    * Resolves a pending choice for a player socket.
    *
    * @param {string} socketId
-   * @param {object} payload { choiceId, selection }
+   * @param {object} payload { choiceId, selection, seat? } — `seat` names the answering seat in a solo room
    * @param {number} [clientSeq]
    * @returns {object}
    */
@@ -873,11 +1043,10 @@ export class GameRoom {
         : typeof payload?.clientSeq === 'number'
           ? payload.clientSeq
           : null;
-    return this.handleCommand(socketId, {
-      type: 'resolveChoice',
-      payload,
-      clientSeq: seq,
-    });
+    const cmd = { type: 'resolveChoice', payload, clientSeq: seq };
+    if (!this.solo) return this.handleCommand(socketId, cmd);
+    const seat = this.seatFor(socketId, payload);
+    return this.handleCommand(socketId, cmd, seat ?? this.#badSeatOr(socketId));
   }
 
   /**

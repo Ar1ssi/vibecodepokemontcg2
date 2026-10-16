@@ -13,7 +13,16 @@ import { fileURLToPath } from 'url';
 import { GameRoom } from './game/room.mjs';
 import { createTurnOrderTransport } from './game/turn-order-transport.mjs';
 import { planRoomSweep } from './game/room-sweep.mjs';
-import { extractDeckData, extractDeckFormat } from './game/deck-packet.mjs';
+import {
+  applySetupAction,
+  cacheSetupAction,
+  dealOrderPayload,
+  instanceMapPayload,
+  isDeckLoadAction,
+  isSeatSetupAction,
+  setupActionCacheKey,
+  setupActionSeat,
+} from './game/setup-actions.mjs';
 import {
   findFirstDivergentZone,
   hashOwnerViewZones,
@@ -375,26 +384,20 @@ async function main() {
     broadcastFreshGame(gameRoom, roomId, remaining);
   };
 
-  // A player's Reset button (legacy 'reset' pushAction with clean === false) ends
-  // the game for both seats: the server owns turn/phase, so a one-sided reset can't
-  // be represented. Deck-load resets send clean === true and must not land here.
-  const isPlayerRequestedReset = (data) =>
-    data.action === 'reset' &&
-    Array.isArray(data.parameters) &&
-    data.parameters[0] === false;
-
+  // A player's Reset button (legacy 'reset' pushAction with clean === false, see
+  // isPlayerRequestedReset) ends the game for both seats: the server owns turn/phase,
+  // so a one-sided reset can't be represented.
   const resetGameOnPlayerRequest = (gameRoom, roomId) => {
     clearTurnOrderTimer(roomId);
     const players = gameRoom.resetGame();
-    for (const { socketId } of players) {
-      if (socketId) io.to(socketId).emit('gameReset', { roomId });
+    for (const { socketId } of gameRoom.viewTargets()) {
+      io.to(socketId).emit('gameReset', { roomId });
     }
     broadcastFreshGame(gameRoom, roomId, players);
     broadcastRoomFormat(roomId);
   };
 
-  const emitFreshView = (gameRoom, roomId, socketId, playerId) => {
-    const view = gameRoom.getView(playerId);
+  const emitFreshView = (gameRoom, roomId, socketId, view) => {
     io.to(socketId).emit('view', {
       gameId: roomId,
       stateVersion: gameRoom.state.stateVersion,
@@ -408,16 +411,16 @@ async function main() {
   const broadcastFreshGame = (gameRoom, roomId, players) => {
     for (const { playerId, socketId } of players) {
       if (!socketId) continue;
-      io.to(socketId).emit('instanceMap', {
-        roomId,
-        map: gameRoom.getInstanceMap(playerId),
-      });
-      emitFreshView(gameRoom, roomId, socketId, playerId);
+      io.to(socketId).emit('instanceMap', instanceMapPayload(gameRoom, roomId, playerId));
+    }
+    // Design 074 D7: one view per socket, so a solo room's one socket gets one view.
+    for (const { socketId } of gameRoom.viewTargets()) {
+      emitFreshView(gameRoom, roomId, socketId, gameRoom.getViewForSocket(socketId));
     }
     // Design 069: spectators watch the restarted game too.
     for (const socketId of gameRoom.spectatorSockets) {
       io.to(socketId).emit('gameReset', { roomId });
-      emitFreshView(gameRoom, roomId, socketId, null);
+      emitFreshView(gameRoom, roomId, socketId, gameRoom.getView(null));
     }
   };
   // Design 013: the opening deal no longer happens the moment both seats are ready.
@@ -469,17 +472,11 @@ async function main() {
     // drawOpeningHand() split. Design 002 I27: `starter` rides along relative to
     // each recipient; under design 072 it is the seat the coin's winner chose, so
     // it agrees with the turnOrderResult the players just saw.
-    const starterId = gameRoom.state.turn?.player ?? null;
+    // Design 074 D7: each payload names its seat; a solo socket gets both.
     for (const pid of Object.keys(gameRoom.state.players)) {
-      const p = gameRoom.state.players[pid];
-      const order = [...p.zones.prizes, ...p.zones.hand, ...p.zones.deck].map(
-        (card) => card.syncInstance
-      );
-      const starter =
-        starterId == null ? null : starterId === pid ? 'self' : 'opp';
       const pSocketId = gameRoom.playerToSocket.get(pid);
       if (pSocketId) {
-        io.to(pSocketId).emit('dealOrder', { roomId, order, starter });
+        io.to(pSocketId).emit('dealOrder', dealOrderPayload(gameRoom, roomId, pid));
       }
     }
     return true;
@@ -749,9 +746,84 @@ async function main() {
         tryInsert(5);
       }
     });
-    socket.on('joinGame', (roomId, username, isSpectator, seatToken) => {
+    // Design 074 D7: one socket plays both seats of an authoritative room. The room is never
+    // public (so never listed), takes no spectators, and issues no seat token.
+    const joinSoloGame = (roomId, username, options) => {
+      if (!SERVER_AUTHORITATIVE) {
+        socket.emit('roomReject', { reason: 'solo_needs_authority' });
+        return;
+      }
+      if (typeof roomId !== 'string' || !roomId || isPublicRoomId(roomId)) {
+        socket.emit('roomReject', { reason: 'solo_room' });
+        return;
+      }
+      if (typeof username !== 'string' || !username) {
+        socket.emit('roomReject', { reason: 'seat_failed' });
+        return;
+      }
+      let gameRoom = gameRooms.get(roomId);
+      const createdRoom = !gameRoom;
+      if (createdRoom) gameRoom = new GameRoom({ roomId });
+      const decks = options.decks && typeof options.decks === 'object' ? options.decks : {};
+      if (!gameRoom.addSoloPlayer(socket.id, username, decks)) {
+        socket.emit('roomReject', { reason: 'solo_room' });
+        return;
+      }
+      if (createdRoom) gameRooms.set(roomId, gameRoom);
+      if (!roomInfo.has(roomId)) {
+        roomInfo.set(roomId, {
+          players: new Set(),
+          spectators: new Set(),
+          setupActionCache: new Map(),
+          format: emptyRoomFormat(),
+        });
+      }
+      const room = roomInfo.get(roomId);
+      gameRoom.roomFormat = room.format?.format ?? null;
+      room.players.add(username);
+
+      socket.leave(LOBBY_WATCHERS);
+      socket.join(roomId);
+      socket.emit('joinGame', {
+        serverAuthoritative: true,
+        protocolVersion: PROTOCOL_VERSION,
+        rejoinedGame: !createdRoom,
+        solo: true,
+      });
+      // A rejoin gets both seats' cached deck packets back (one entry per seat).
+      if (!createdRoom) {
+        for (const cached of room.setupActionCache?.values() ?? []) {
+          if (cached.exchangeData) socket.emit('pushAction', cached.exchangeData);
+          if (cached.loadDeckData) socket.emit('pushAction', cached.loadDeckData);
+        }
+      }
+      const view = gameRoom.getViewForSocket(socket.id);
+      socket.emit('view', {
+        gameId: roomId,
+        stateVersion: gameRoom.state.stateVersion,
+        view,
+        events: [],
+        pendingChoice: view?.pendingChoice || null,
+        lastClientSeq: gameRoom.getClientSeqForSocket(socket.id),
+      });
+      watchDisconnect(roomId, username, false);
+      socket.data.seat = { roomId, username };
+      replayTurnOrderToSeat(roomId, socket.id);
+      broadcastRoomFormat(roomId);
+    };
+
+    socket.on('joinGame', (roomId, username, isSpectator, seatToken, options) => {
       if (typeof roomId === 'string') roomId = roomId.trim();
       if (typeof username === 'string') username = username.trim();
+      if (options?.solo === true) {
+        joinSoloGame(roomId, username, options);
+        return;
+      }
+      // Design 074 D7: a solo room has exactly one socket; nobody else seats or watches.
+      if (SERVER_AUTHORITATIVE && gameRooms.get(roomId)?.solo) {
+        socket.emit('roomReject', { reason: 'solo_room' });
+        return;
+      }
       if (!roomInfo.has(roomId)) {
         roomInfo.set(roomId, {
           players: new Set(),
@@ -942,9 +1014,19 @@ async function main() {
         });
       }
       const room = roomInfo.get(data.roomId);
+      // Design 074 D7: only the solo player's own new socket reclaims a solo room.
+      const soloRoom = SERVER_AUTHORITATIVE ? gameRooms.get(data.roomId) : null;
+      if (soloRoom?.solo) {
+        const reclaimed =
+          data.notSpectator && soloRoom.addSoloPlayer(socket.id, data.username);
+        if (!reclaimed) {
+          socket.emit('roomReject', { reason: 'solo_room' });
+          return;
+        }
+      }
       socket.leave(LOBBY_WATCHERS);
       socket.join(data.roomId);
-      if (SERVER_AUTHORITATIVE) {
+      if (SERVER_AUTHORITATIVE && !soloRoom?.solo) {
         let gameRoom = gameRooms.get(data.roomId);
         if (!gameRoom) {
           gameRoom = new GameRoom({ roomId: data.roomId });
@@ -1057,6 +1139,43 @@ async function main() {
       'resetCounter',
     ];
 
+    // Design 074 D7: deck loads, Set Up and Reset act for one seat — the socket's own, or in a
+    // solo room the seat the packet names (`data.seat`; missing or unknown → bad_seat).
+    const handleSeatSetupAction = (data) => {
+      const roomId = data.roomId || [...socket.rooms].find((r) => r !== socket.id);
+      const gameRoom = SERVER_AUTHORITATIVE ? gameRooms.get(roomId) : null;
+      gameRoom?.touchActivity();
+      if (!isSeatSetupAction(data)) return;
+      const { seat, refused } = setupActionSeat(gameRoom, socket.id, data);
+      if (refused) {
+        socket.emit('cmdRejected', { clientSeq: data.clientSeq, reason: refused, details: refused });
+        return;
+      }
+      if (isDeckLoadAction(data)) {
+        cacheSetupAction(
+          roomInfo.get(data.roomId)?.setupActionCache,
+          setupActionCacheKey(gameRoom, socket.id, seat),
+          data
+        );
+      }
+      if (!gameRoom || !seat) return;
+      // Deck loads go through handleCommand (design 002 slice 3.4e / I16), the only way
+      // they land in commandLog, which undo's replay depends on.
+      const outcome = applySetupAction(gameRoom, socket.id, seat, data);
+      if (outcome.readied) dealOpeningHandsIfReady(gameRoom, roomId);
+      if (outcome.resetRequested) resetGameOnPlayerRequest(gameRoom, roomId);
+      if (outcome.deckLoaded) {
+        // Server is the sole minter of instanceId (design 002 §3.1 / D10). Only the seat's
+        // own socket gets its lookup: broadcast, it would leak the opponent's ids.
+        const targetSocketId = gameRoom.playerToSocket.get(seat);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('instanceMap', instanceMapPayload(gameRoom, roomId, seat));
+        }
+        // A deck can finish loading after both players pressed Set Up.
+        dealOpeningHandsIfReady(gameRoom, roomId);
+      }
+    };
+
     // Register event listeners using the common function
     for (const event of events) {
       socket.on(event, (data) => {
@@ -1075,67 +1194,7 @@ async function main() {
           }
         }
         emitToRoom(event, data);
-
-        if (
-          event === 'pushAction' &&
-          data &&
-          (data.action === 'exchangeData' || data.action === 'loadDeckData')
-        ) {
-          const room = roomInfo.get(data.roomId);
-          if (room && room.setupActionCache) {
-            const existing = room.setupActionCache.get(socket.id) || {};
-            existing[data.action] = data;
-            room.setupActionCache.set(socket.id, existing);
-          }
-        }
-
-        if (SERVER_AUTHORITATIVE && data) {
-          const roomId =
-            data.roomId || [...socket.rooms].find((r) => r !== socket.id);
-          const gameRoom = gameRooms.get(roomId);
-          if (gameRoom && event === 'pushAction') {
-            gameRoom.touchActivity();
-            const playerId = gameRoom.socketToPlayer.get(socket.id);
-            if (playerId && data.action === 'readyUp') {
-              gameRoom.markReady(playerId);
-              dealOpeningHandsIfReady(gameRoom, roomId);
-            }
-            if (playerId && isPlayerRequestedReset(data)) {
-              resetGameOnPlayerRequest(gameRoom, roomId);
-            }
-            if (
-              playerId &&
-              (data.action === 'exchangeData' || data.action === 'loadDeckData')
-            ) {
-              const deckData = extractDeckData(data.action, data.parameters);
-              if (Array.isArray(deckData)) {
-                // Routed through handleCommand (design 002 slice 3.4e / I16), not a direct
-                // state mutation: this is the only way deck loading lands in commandLog, which
-                // undo's replay depends on to reconstruct the pre-game state.
-                const format = extractDeckFormat(data.action, data.parameters);
-                const result = gameRoom.handleCommand(socket.id, {
-                  type: 'loadDeck',
-                  payload: { deckData, format },
-                });
-
-                if (result.success) {
-                  // Server is the sole minter of instanceId (design 002 §3.1 / D10).
-                  // Hand this player their own syncInstance -> instanceId lookup so the
-                  // client can translate outgoing command hints; never broadcast this,
-                  // it would leak the opponent's ids.
-                  const map = gameRoom.getInstanceMap(playerId);
-                  const targetSocketId = gameRoom.playerToSocket.get(playerId);
-                  if (targetSocketId) {
-                    io.to(targetSocketId).emit('instanceMap', { roomId, map });
-                  }
-
-                  // A deck can finish loading after both players pressed Set Up.
-                  dealOpeningHandsIfReady(gameRoom, roomId);
-                }
-              }
-            }
-          }
-        }
+        if (event === 'pushAction' && data) handleSeatSetupAction(data);
       });
     }
 
@@ -1265,6 +1324,7 @@ async function main() {
           type: 'resolveChoice',
           payload: data,
           clientSeq: data?.clientSeq,
+          ...(data?.seat !== undefined ? { seat: data.seat } : {}),
         });
         if (!result.success) {
           socket.emit('cmdRejected', {
@@ -1307,6 +1367,7 @@ async function main() {
             side: data?.side,
             count: data?.count,
             fromTop: data?.fromTop,
+            seat: data?.seat,
           })
         );
       });
@@ -1318,9 +1379,13 @@ async function main() {
         if (gameRoom) {
           // Design 069: an unregistered socket would get the spectator view (both hands).
           if (!gameRoom.canView(socket.id)) return;
+          // Design 074 D7: a solo board flip names the seat to draw at the bottom.
+          if (data?.nearSeat !== undefined) gameRoom.setSoloNearSeat(socket.id, data.nearSeat);
           const view = gameRoom.getViewForSocket(socket.id);
-          const playerId = gameRoom.socketToPlayer.get(socket.id) || null;
-          const lastClientSeq = playerId ? gameRoom.getClientSeq(playerId) : 0;
+          const playerId = gameRoom.solo
+            ? gameRoom.soloNearSeat
+            : gameRoom.socketToPlayer.get(socket.id) || null;
+          const lastClientSeq = gameRoom.getClientSeqForSocket(socket.id);
           socket.emit('view', {
             gameId: gameRoom.roomId,
             stateVersion: gameRoom.state.stateVersion,
