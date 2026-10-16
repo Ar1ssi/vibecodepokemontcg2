@@ -6,9 +6,10 @@
 # Pruned or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
-#   Next id = highest D number in this file and the archives + 1 (next: D218).
+#   Next id = highest D number in this file and the archives + 1 (next: D219).
 
 ## Active
+- D218 2026-10-16 [engine] Commands live in shared/engine/reduce/<domain>.mjs; reduce.mjs is a facade with the 3 exports; handlers get locals explicitly; reduce/ cycles are call-time only, never read at load. (I250)
 - D217 2026-10-16 [board-ui] TCG Live foil/reverse cards wear its own shader+masks; lossless WebP streamed from R2 (`FOIL_TEXTURE_URL`), never in git; others keep CSS holo. (design 069-tcgl-card-foil)
 - D216 2026-10-15 [netcode] SERVER_AUTHORITATIVE defaults on (server/netcode-mode.mjs); only 0/false/off/no runs the legacy relay; shadow mode deleted, room-sweep.mjs frees roomInfo past grace. (supersedes D17)
 - D215 2026-10-15 [board-ui] Custom playmats ship as WebP in `thumbs/` and `board/`; PNG originals in `custom/` are untracked. Don't rerun `generate-mat-thumbs.mjs` blindly: manifest.json lacks custom entries. (052f8ac)
