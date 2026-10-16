@@ -539,6 +539,20 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### B3
+- `rotation` comes from the root's server `rotation` (reduce/board.mjs rotateCardCommand), snapped to a quarter turn,
+  not from `ROTATION_CONDITIONS`: apply-view `applyRotation(img, root.card.rotation)` never rotates for a condition
+  (conditions show as markers). Code is truth.
+- Placement gains `stackOffset:[right, up]` (card widths; Stage peeks up 1/15 per layer, Tools right 1/6) and
+  `energyBadges` (the "Nx" badges past four tokens); `energyToken` also carries `left/size/bottom/zIndex` from
+  `planEnergyTokenRow(keys, 1)`. Overlay fields (damage, conditions, poison, burn, abilityUsed, energyBadges) sit on
+  the stack's VISIBLE card, read from the root, as apply-view draws them. A token-less Energy is role `tool` (drawn
+  as a shifted card, as apply-view does). `stadium` adds `name`. `piles.deck` adds `layers`.
+- Prizes are `back` unless `revealed` or the owner's `flags.prizesFaceUp` (view.mjs prizeCards), not "without revealed".
+- overlay-plan anchors are overlay CENTRES in card units (v up) and sizes are in card widths; the DOM damage counter
+  sits upper-right (left = w/1.5, top = h/4), so `counterPlan` reproduces that, not a bottom-left corner.
+  `countLabelPlan` returns legacy's "(N)" text centred above the pile.
+
 ### B2
 - Seam at `depth = half.h * 0.84`, not `half.h`: `half` is the iframe box (1449.6 × 540 at 1920×1080) but the pivot
   is the PLAYFIELD's bottom edge (`#playfield` stops one `--hand-crop-height` strip above the iframe bottom,
