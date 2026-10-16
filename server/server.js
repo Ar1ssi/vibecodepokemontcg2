@@ -287,6 +287,15 @@ async function main() {
     const at = req.originalUrl.indexOf('?');
     res.redirect(302, `/build-and-battle-legacy${at === -1 ? '' : req.originalUrl.slice(at)}`);
   });
+  // Design 073: the standalone unboxing test bench, one static page (its asset URLs are relative,
+  // so a trailing slash would break them, as on /deck-builder).
+  app.get('/unboxing', (req, res) => {
+    if (req.path.endsWith('/')) {
+      const at = req.originalUrl.indexOf('?');
+      return res.redirect(301, `/unboxing${at === -1 ? '' : req.originalUrl.slice(at)}`);
+    }
+    res.sendFile(path.join(clientDir, 'unboxing.html'));
+  });
   app.get('/import', (req, res) => {
     const key = req.query.key;
     if (!key) {

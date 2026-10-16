@@ -13,6 +13,15 @@ import { cardSlab } from './tt-geometry.js';
  */
 
 const FOIL_MODE = Object.freeze({ none: 0, holo: 1, reverse: 2, full: 3, gold: 4, rainbow: 5 });
+// Per foil: [metalness, roughness, relief]. An art-box holo is a near mirror; a textured hit is
+// printed art with a satin shimmer, never chrome.
+const FOIL_SURFACE_BY_MODE = Object.freeze({
+  1: [0.62, 0.18, 0.12],
+  2: [0.5, 0.2, 0.1],
+  3: [0.28, 0.27, 0.18],
+  4: [0.72, 0.2, 0.2],
+  5: [0.45, 0.2, 0.15],
+});
 const PATTERN = Object.freeze({ none: 0, sheen: 1, starlight: 2, cosmos: 3, etched: 4, glitter: 5, swirl: 6 });
 
 const FOIL_HEAD = /* glsl */ `
@@ -20,6 +29,9 @@ uniform int uFoilMode;
 uniform int uFoilPattern;
 uniform vec4 uFoilWindow;
 uniform float uFoilStrength;
+uniform float uFoilMetal;
+uniform float uFoilRough;
+uniform float uFoilRelief;
 varying vec2 vCardUv;
 float ttCardHash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
@@ -33,20 +45,22 @@ float ttCardNoise(vec2 x) {
   return mix(mix(ttCardHash(i), ttCardHash(i + vec2(1.0, 0.0)), f.x),
              mix(ttCardHash(i + vec2(0.0, 1.0)), ttCardHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
-// Relief height of the foil pattern at a card uv (0..1 across the face, y up).
+// Relief height of the foil pattern at a card uv (0..1 across the face, y up), in millimetre
+// space: fine enough to read as texture, coarse enough not to alias at arm's length.
 float ttFoilHeight(vec2 uv) {
   vec2 p = uv * vec2(63.0, 88.0);
-  if (uFoilPattern == 1) return 0.5 + 0.5 * sin((p.x + p.y * 0.35) * 2.6);
-  if (uFoilPattern == 3) return ttCardNoise(p * 0.32) * 0.7 + ttCardNoise(p * 1.1) * 0.3;
+  if (uFoilPattern == 1) return 0.5 + 0.5 * sin((p.x * 0.8 + p.y * 0.6) * 5.0);
+  if (uFoilPattern == 3) return ttCardNoise(p * 0.35) * 0.6 + ttCardNoise(p * 1.4) * 0.4;
   if (uFoilPattern == 4) {
-    float n = ttCardNoise(p * 0.18);
-    return 0.5 + 0.5 * sin(length(p - vec2(31.5, 52.0)) * 1.9 + n * 7.0);
+    float n = ttCardNoise(p * 0.25);
+    return 0.5 + 0.5 * sin((p.x * 0.7 - p.y * 0.7) * 3.2 + n * 9.0);
   }
   if (uFoilPattern == 6) {
     vec2 q = p - vec2(31.5, 44.0);
-    return 0.5 + 0.5 * sin(atan(q.y, q.x) * 9.0 + length(q) * 0.35);
+    float n = ttCardNoise(p * 0.3);
+    return 0.5 + 0.5 * sin(atan(q.y, q.x) * 6.0 + length(q) * 0.9 + n * 4.0);
   }
-  return ttCardNoise(p * 2.4);
+  return ttCardNoise(p * (uFoilPattern == 5 ? 4.0 : 3.0));
 }
 `;
 
@@ -63,18 +77,17 @@ if (uFoilMode > 0) {
     * step(1.0 - uFoilWindow.w, uv.y) * step(uv.y, 1.0 - uFoilWindow.y);
   float area = uFoilMode == 1 ? inside : (uFoilMode == 2 ? 1.0 - inside : 1.0);
   ttInk = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-  float inkGate = smoothstep(0.05, 0.55, ttInk);
+  float inkGate = smoothstep(0.04, 0.5, ttInk);
   ttFoil = area * inkGate * uFoilStrength;
-  metalnessFactor = mix(metalnessFactor, 0.62, ttFoil);
-  roughnessFactor = mix(roughnessFactor, 0.2, ttFoil);
+  metalnessFactor = mix(metalnessFactor, uFoilMetal, ttFoil);
+  roughnessFactor = mix(roughnessFactor, uFoilRough, ttFoil);
 }
 `;
 
 // The pattern's relief tips the normal, so light catches on its lines (three's perturbNormalArb).
 const FOIL_NORMAL = /* glsl */ `
 if (ttFoil > 0.0 && uFoilPattern > 0) {
-  float relief = uFoilPattern == 4 ? 0.9 : (uFoilPattern == 1 ? 0.35 : 0.5);
-  float h = ttFoilHeight(vCardUv) * relief * ttFoil;
+  float h = ttFoilHeight(vCardUv) * uFoilRelief * ttFoil;
   vec2 dh = vec2(dFdx(h), dFdy(h));
   vec3 sx = normalize(dFdx(-vViewPosition));
   vec3 sy = normalize(dFdy(-vViewPosition));
@@ -92,13 +105,13 @@ const FOIL_LIGHT = /* glsl */ `
 if (ttFoil > 0.0) {
   vec3 V = normalize(vViewPosition);
   vec3 R = reflect(-V, normal);
-  float reflected = dot(totalSpecular, vec3(0.299, 0.587, 0.114));
+  float reflected = min(dot(totalSpecular, vec3(0.299, 0.587, 0.114)), 1.2);
   float phase = dot(R, vec3(0.62, 0.48, 0.0)) * 1.6 + ttFoilHeight(vCardUv) * 0.35
     + (vCardUv.x + vCardUv.y) * 0.6;
   vec3 rainbow = 0.5 + 0.5 * cos(6.28318 * (phase + vec3(0.0, 0.33, 0.67)));
   if (uFoilMode == 4) rainbow = mix(vec3(1.0, 0.78, 0.32), rainbow, 0.18);
-  float sheenLevel = uFoilMode == 5 ? 0.55 : 0.32;
-  vec3 film = rainbow * (reflected * sheenLevel + 0.035) * ttFoil;
+  float sheenLevel = uFoilMode == 5 ? 0.5 : 0.26;
+  vec3 film = rainbow * (reflected * sheenLevel + 0.02) * ttFoil;
   float sparkle = 0.0;
   if (uFoilPattern == 2 || uFoilPattern == 5) {
     vec2 grid = vCardUv * (uFoilPattern == 2 ? vec2(70.0, 98.0) : vec2(150.0, 210.0));
@@ -133,16 +146,20 @@ export function createFaceMaterial({ map, envMap, finish = null }) {
     uFoilPattern: { value: 0 },
     uFoilWindow: { value: new Vector4(0, 0, 1, 1) },
     uFoilStrength: { value: 0 },
+    uFoilMetal: { value: 0 },
+    uFoilRough: { value: 0.4 },
+    uFoilRelief: { value: 0 },
   };
   const material = new MeshPhysicalMaterial({
     map,
     color: new Color(map ? 0xffffff : 0x1d3f8f),
-    roughness: 0.34,
+    // Card stock is satin: a soft sheen, not a mirror coat.
+    roughness: 0.42,
     metalness: 0,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.22,
+    clearcoat: 0.16,
+    clearcoatRoughness: 0.32,
     envMap,
-    envMapIntensity: 0.85,
+    envMapIntensity: 1,
     alphaTest: 0.5,
   });
   const apply = (next) => {
@@ -153,6 +170,10 @@ export function createFaceMaterial({ map, envMap, finish = null }) {
     uniforms.uFoilPattern.value = pattern;
     uniforms.uFoilWindow.value.set(l, t, r, b);
     uniforms.uFoilStrength.value = Math.max(0, Math.min(1, Number(next?.strength) || 0));
+    const [metal, rough, relief] = FOIL_SURFACE_BY_MODE[mode] || [0, 0.4, 0];
+    uniforms.uFoilMetal.value = metal;
+    uniforms.uFoilRough.value = rough;
+    uniforms.uFoilRelief.value = relief;
   };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -181,12 +202,12 @@ export function createCardKit({ envMap, backTexture, edgeTexture }) {
   const back = new MeshPhysicalMaterial({
     map: backTexture,
     color: new Color(backTexture ? 0xffffff : 0x1d3f8f),
-    roughness: 0.36,
+    roughness: 0.42,
     metalness: 0,
-    clearcoat: 0.5,
-    clearcoatRoughness: 0.25,
+    clearcoat: 0.16,
+    clearcoatRoughness: 0.32,
     envMap,
-    envMapIntensity: 0.8,
+    envMapIntensity: 1,
     alphaTest: 0.5,
   });
   const edge = new MeshStandardMaterial({ map: edgeTexture, roughness: 0.85, metalness: 0, envMap, envMapIntensity: 0.4 });

@@ -11,7 +11,8 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
 } from 'three';
-import { CARD, PACK, deckThickness, packThickness } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
+import { BULGE } from '../../../../setup/deck-builder/core/build-battle/pack3d.mjs';
+import { CARD, PACK, deckThickness } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
 import { createFilmMaterials } from './tt-film.js';
 import { boardPanel } from './tt-geometry.js';
 import {
@@ -105,12 +106,12 @@ export function buildBox({ renderer, envMap, dims, faces, board, crinkle }) {
     track(
       new MeshPhysicalMaterial({
         map: track(textureOf(canvas, renderer)),
-        roughness: 0.46,
+        roughness: 0.5,
         metalness: 0,
-        clearcoat: 0.32,
-        clearcoatRoughness: 0.32,
+        clearcoat: 0.22,
+        clearcoatRoughness: 0.3,
         envMap,
-        envMapIntensity: 0.75,
+        envMapIntensity: 0.9,
       })
     );
   const inner = track(
@@ -437,17 +438,19 @@ function filmAtlasTexture(renderer) {
  */
 export function interiorSlots(dims, { packCount = 4, deckCount = 40, leaflet = { height: 112, thickness: 1.2 } } = {}) {
   const { depth: D, board: b } = dims;
-  const packT = packThickness(12);
+  // A full pack bulges BULGE × its width each side (pack3d.mjs), so packs stand that far apart.
+  const packPitch = 2 * BULGE * PACK.width + 0.4;
   let z = -D / 2 + b + 0.4;
   const leafletSlot = { x: 0, y: b + leaflet.height / 2, z: z + leaflet.thickness / 2, rotX: -0.03 };
   z += leaflet.thickness + 0.4;
   const packs = [];
   for (let index = 0; index < packCount; index += 1) {
-    packs.push({ x: (index % 2 ? 1 : -1) * 0.8, y: b + PACK.height / 2, z: z + packT / 2 + 1.2, rotX: -0.045 });
-    z += packT + 2.4;
+    packs.push({ x: (index % 2 ? 1 : -1) * 0.8, y: b + PACK.height / 2, z: z + packPitch / 2, rotX: -0.045 });
+    z += packPitch;
   }
   const deckT = deckThickness(deckCount) + 0.6;
-  const deck = { x: 0, y: b + CARD.height / 2 + 0.3, z: D / 2 - b - 1.2 - deckT / 2, rotX: 0.05 };
+  // The deck leans back a little, so its promo face tips up toward whoever opens the lid.
+  const deck = { x: 0, y: b + CARD.height / 2 + 0.3, z: D / 2 - b - 1.6 - deckT / 2, rotX: -0.06 };
   const code = { x: 1.5, y: b + CARD.height / 2, z: Math.min(z + 1, deck.z - deckT / 2 - 1), rotX: -0.02 };
   return { leaflet: leafletSlot, packs, code, deck };
 }

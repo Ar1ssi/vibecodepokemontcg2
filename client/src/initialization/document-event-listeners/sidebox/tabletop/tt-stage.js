@@ -20,8 +20,8 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { RoomEnvironment } from '../../../../vendor/three/RoomEnvironment.js';
 import { cameraBlend } from '../../../../setup/deck-builder/core/build-battle/tabletop/poses.mjs';
+import { createStudioEnvironment } from './tt-environment.js';
 import { cardSlab } from './tt-geometry.js';
 import { clothNormalTexture, loadTexture, woodTextures } from './tt-textures.js';
 
@@ -65,16 +65,19 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
 
   const scene = new Scene();
   scene.background = new Color(0x141210);
-  scene.fog = new FogExp2(0x141210, 0.00055);
+  // The desk fades into the dim room instead of ending on a hard edge.
+  scene.fog = new FogExp2(0x141210, 0.0007);
   const pmrem = new PMREMGenerator(renderer);
-  const environment = new RoomEnvironment();
-  const envMap = pmrem.fromScene(environment, 0.035).texture;
-  environment.dispose?.();
+  const environment = createStudioEnvironment();
+  const envMap = pmrem.fromScene(environment.scene, 0.02).texture;
+  environment.dispose();
 
   const camera = new PerspectiveCamera(30, 1, 10, 6000);
 
   // Studio light: a warm key from the front left (casts the shadows), a cool rim behind, a sky.
-  const key = new DirectionalLight(0xfff1df, 2.4);
+  // Calibrated so a card squarely facing the light shows about its printed colour (key ≈ half,
+  // the room's softboxes the rest); brighter only where it mirrors a light.
+  const key = new DirectionalLight(0xfff1df, 2.2);
   key.position.set(-300, 640, 420);
   key.target.position.set(0, 0, 10);
   key.castShadow = !low;
@@ -91,7 +94,7 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
   key.shadow.radius = 4;
   const rim = new DirectionalLight(0xd2e2ff, 0.85);
   rim.position.set(340, 300, -460);
-  const sky = new HemisphereLight(0xe6edff, 0x2e2219, 0.55);
+  const sky = new HemisphereLight(0xe6edff, 0x2e2219, 0.45);
   scene.add(key, key.target, rim, sky);
 
   const disposables = [envMap, pmrem];
@@ -102,20 +105,20 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
 
   // ── The desk and the mat ────────────────────────────────────────────────
   const wood = woodTextures(renderer);
-  wood.color.repeat.set(2.4, 1.6);
-  wood.normal.repeat.set(2.4, 1.6);
+  wood.color.repeat.set(3.4, 2.6);
+  wood.normal.repeat.set(3.4, 2.6);
   track(wood.color);
   track(wood.normal);
   const desk = new Mesh(
-    track(new PlaneGeometry(2600, 1800)),
+    track(new PlaneGeometry(4200, 3200)),
     track(
       new MeshStandardMaterial({
         map: wood.color,
         normalMap: wood.normal,
-        roughness: 0.58,
+        roughness: 0.48,
         metalness: 0,
         envMap,
-        envMapIntensity: 0.4,
+        envMapIntensity: 0.45,
       })
     )
   );
@@ -128,9 +131,10 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
   cloth.wrapS = cloth.wrapT = RepeatWrapping;
   const matFace = track(
     new MeshStandardMaterial({
-      color: new Color(0x1c1e24),
+      color: new Color(0x2a2c33),
       normalMap: cloth,
-      roughness: 0.96,
+      normalScale: new Vector2(1.4, 1.4),
+      roughness: 0.94,
       metalness: 0,
       envMap,
       envMapIntensity: 0.25,
@@ -168,7 +172,7 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
       }
     }
     matFace.map = null;
-    matFace.color.set(0x1c1e24);
+    matFace.color.set(0x2a2c33);
     matFace.needsUpdate = true;
     requestRender();
   };

@@ -7,15 +7,22 @@ import { CARD } from './physical.mjs';
 const DEG = Math.PI / 180;
 
 /** The sealed box: upright, turned so the front and its left side face the viewer (the renders' view). */
-export const BOX_SPOT = Object.freeze({ x: 0, z: -30, rotYDeg: 25 });
+export const BOX_SPOT = Object.freeze({ x: 0, z: -70, rotYDeg: 25 });
 
-// Things taken out of the box, lying flat. `rotYDeg` turns them about the table normal.
-export const DECK_SPOT = Object.freeze({ x: -168, z: 18, rotYDeg: -9 });
-export const PROMO_SPOT = Object.freeze({ x: -158, z: 128, rotYDeg: 5 });
-export const CODE_SPOT = Object.freeze({ x: 160, z: 12, rotYDeg: 13 });
-export const LEAFLET_SPOT = Object.freeze({ x: 182, z: -92, rotYDeg: 19 });
-export const WRAP_SPOT = Object.freeze({ x: -205, z: -128, rotYDeg: 0 });
-const WRAPPER_DISCARD = Object.freeze({ x: 232, z: 118 });
+// Things taken out of the box, lying flat. `rotYDeg` turns them about the table normal. The box
+// sits at the back; the deck and its promo go left, the paper right, the packs in a loose row in
+// front, and the cards of an opened pack collect at the front right.
+export const DECK_SPOT = Object.freeze({ x: -196, z: -36, rotYDeg: -9 });
+export const PROMO_SPOT = Object.freeze({ x: -186, z: 74, rotYDeg: 5 });
+export const CODE_SPOT = Object.freeze({ x: 168, z: -40, rotYDeg: 13 });
+export const LEAFLET_SPOT = Object.freeze({ x: 186, z: -150, rotYDeg: 19 });
+export const WRAP_SPOT = Object.freeze({ x: -150, z: -170, rotYDeg: 0 });
+export const REVEAL_SPOT = Object.freeze({ x: 186, z: 150, rotYDeg: -7 });
+export const EXTRAS_SPOT = Object.freeze({ x: 238, z: 46, rotYDeg: 11 });
+const WRAPPER_DISCARD = Object.freeze({ x: 258, z: -76 });
+
+// The packs' row sits left of centre, leaving the front right for the opened cards.
+export const PACK_ROW_X = -40;
 
 /** A sealed pack's place in the loose row in front of the box; a finished pack's cards pile there. */
 export function packRowSpot(visual, count = 4) {
@@ -23,8 +30,8 @@ export function packRowSpot(visual, count = 4) {
   const middle = (n - 1) / 2;
   const offset = (Number(visual) || 0) - middle;
   return {
-    x: offset * 74,
-    z: 168 - Math.abs(offset) * 9,
+    x: PACK_ROW_X + offset * 74,
+    z: 150 - Math.abs(offset) * 8,
     rotYDeg: offset * 3.5,
   };
 }
@@ -50,7 +57,7 @@ export function pileJitter(k) {
 }
 
 // Held things float in front of the eye at arm's length.
-export const HAND = Object.freeze({ x: 0, y: -14, z: -330, tiltXDeg: -7 });
+export const HAND = Object.freeze({ x: 0, y: 8, z: -330, tiltXDeg: -7 });
 // The revealed cards of a pack are fanned a little further away, in two rows of five.
 const SUMMARY_DISTANCE = 540;
 const SUMMARY_PITCH_X = 70;
@@ -85,9 +92,9 @@ export function fitDistance(halfWidth, halfHeight, fovDeg, aspect) {
 // Each camera pose frames a region of the table: its centre, its half extents, and the angle the
 // eye looks down at it from.
 const FRAMES = Object.freeze({
-  box: { target: { x: 0, y: 66, z: -30 }, halfWidth: 120, halfHeight: 92, elevationDeg: 17 },
-  open: { target: { x: 0, y: 70, z: -24 }, halfWidth: 125, halfHeight: 100, elevationDeg: 36 },
-  table: { target: { x: 0, y: 0, z: 36 }, halfWidth: 285, halfHeight: 205, elevationDeg: 50 },
+  box: { target: { x: 0, y: 50, z: -70 }, halfWidth: 150, halfHeight: 118, elevationDeg: 18 },
+  open: { target: { x: 0, y: 72, z: -78 }, halfWidth: 170, halfHeight: 142, elevationDeg: 34 },
+  table: { target: { x: 10, y: 10, z: 10 }, halfWidth: 300, halfHeight: 240, elevationDeg: 52 },
 });
 export const CAMERA_FOV_DEG = 30;
 

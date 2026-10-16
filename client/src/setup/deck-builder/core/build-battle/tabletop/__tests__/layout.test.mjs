@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   CAMERA_FOV_DEG,
+  PACK_ROW_X,
   cameraPose,
   fitDistance,
   packRowSpot,
@@ -12,11 +13,11 @@ import {
 } from '../layout.mjs';
 import { CARD, PACK } from '../physical.mjs';
 
-test('the pack row is centred and its packs never overlap', () => {
+test('the pack row is centred on its column and its packs never overlap', () => {
   const spots = [0, 1, 2, 3].map((index) => packRowSpot(index, 4));
-  assert.ok(Math.abs(spots[0].x + spots[3].x) < 1e-9, 'symmetric');
+  assert.ok(Math.abs(spots[0].x + spots[3].x - 2 * PACK_ROW_X) < 1e-9, 'symmetric');
   for (let i = 1; i < 4; i += 1) assert.ok(spots[i].x - spots[i - 1].x > PACK.width);
-  assert.equal(packRowSpot(0, 1).x, 0);
+  assert.equal(packRowSpot(0, 1).x, PACK_ROW_X);
 });
 
 test('summary slots lay ten cards in two rows of five without overlap', () => {

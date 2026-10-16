@@ -175,7 +175,7 @@ export function normalTextureFromHeights(heights, w, h, strength, renderer, { re
  * Shrink-film crinkle: long shallow creases at random angles, denser near the edges of the tile
  * (the film gathers where it folds over a box edge, `refs/052-box-top.webp`).
  */
-export function crinkleNormalTexture(renderer, { size = 512, seed = 7, creases = 140 } = {}) {
+export function crinkleNormalTexture(renderer, { size = 512, seed = 7, creases = 70 } = {}) {
   const heights = new Float32Array(size * size);
   const rand = prng(seed);
   for (let c = 0; c < creases; c += 1) {
@@ -241,11 +241,14 @@ export function boardTexture(renderer, { size = 512, tint = [226, 222, 212], see
 }
 
 /**
- * A walnut desk top: long grain along x with growth-ring waves and pores; returns the colour map
- * and a matching normal map.
+ * A walnut desk top: flat-sawn grain running along x (growth rings as dark late-wood lines,
+ * warped by slow noise), long fibre streaks, and a slow tone drift; returns the colour map and a
+ * matching normal map in which the late wood sits a touch lower.
  */
 export function woodTextures(renderer, { width = 1024, height = 512, seed = 23 } = {}) {
   const heights = new Float32Array(width * height);
+  const dark = [44, 27, 17];
+  const light = [118, 78, 46];
   const color = canvasTexture(
     width,
     height,
@@ -253,20 +256,20 @@ export function woodTextures(renderer, { width = 1024, height = 512, seed = 23 }
       const image = ctx.createImageData(w, h);
       for (let y = 0; y < h; y += 1) {
         for (let x = 0; x < w; x += 1) {
-          const warp = fbm(x / 220, y / 60, w / 220, 3, seed) * 6;
-          const rings = Math.sin((y / 7.5 + warp * 3.2) * 1.0) * 0.5 + 0.5;
-          const streak = fbm(x / 400, y / 2.2, w / 400, 3, seed + 9);
-          const pore = valueNoise(x / 1.4, y / 0.9, w / 1.4, seed + 4) > 0.86 ? 1 : 0;
-          const tone = 0.55 * rings + 0.45 * streak;
+          // Cathedral figure: the rings bow along the board, so their spacing wanders.
+          const arch = Math.sin((x / w) * Math.PI * 2 + fbm(x / 500, y / 160, w / 500, 2, seed + 3) * 3) * 22;
+          const warp = fbm(x / 340, y / 90, w / 340, 3, seed) * 46 + fbm(x / 70, y / 24, w / 70, 2, seed + 7) * 4;
+          const ring = 0.5 + 0.5 * Math.sin(((y + warp + arch) / 17) * Math.PI * 2);
+          const late = ring ** 6;
+          const streak = valueNoise(x / 40, y / 0.9, w / 40, seed + 4) - 0.5;
+          const drift = fbm(x / 600, y / 200, w / 600, 2, seed + 11);
+          const tone = Math.min(1, Math.max(0, 0.44 + 0.42 * drift - 0.18 * late + 0.08 * streak));
           const i = (y * w + x) * 4;
-          const r = 74 + tone * 46 - pore * 18;
-          const g = 47 + tone * 30 - pore * 12;
-          const b = 30 + tone * 18 - pore * 8;
-          image.data[i] = r;
-          image.data[i + 1] = g;
-          image.data[i + 2] = b;
+          image.data[i] = dark[0] + (light[0] - dark[0]) * tone;
+          image.data[i + 1] = dark[1] + (light[1] - dark[1]) * tone;
+          image.data[i + 2] = dark[2] + (light[2] - dark[2]) * tone;
           image.data[i + 3] = 255;
-          heights[y * w + x] = tone * 0.6 - pore * 0.8;
+          heights[y * w + x] = -late * 0.5 + streak * 0.15;
         }
       }
       ctx.putImageData(image, 0, 0);
@@ -274,7 +277,7 @@ export function woodTextures(renderer, { width = 1024, height = 512, seed = 23 }
     renderer,
     { repeat: true }
   );
-  const normal = normalTextureFromHeights(heights, width, height, 1.4, renderer);
+  const normal = normalTextureFromHeights(heights, width, height, 0.9, renderer);
   return { color, normal };
 }
 

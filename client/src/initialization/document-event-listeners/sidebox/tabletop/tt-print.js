@@ -507,3 +507,65 @@ export function averageColor(image) {
     return '#3a3f4c';
   }
 }
+
+/**
+ * A wrapper front for a box whose packs have no vendored art (design 054's procedural packs): the
+ * crimped seals, the era colours, the card's art window, the wordmark and the "10 cards" band.
+ * The alpha is the silhouette: seals edge to edge, the body pinched in at the sides.
+ */
+export function drawProceduralWrapper(ctx, w, h, { image, palette }) {
+  const seal = h * 0.104;
+  const inset = w * (17 / 780);
+  ctx.clearRect(0, 0, w, h);
+  const body = ctx.createLinearGradient(0, 0, w, h);
+  body.addColorStop(0, shade(palette.a, -0.2));
+  body.addColorStop(0.5, palette.base);
+  body.addColorStop(1, shade(palette.d, -0.3));
+  ctx.fillStyle = body;
+  ctx.fillRect(inset, seal, w - 2 * inset, h - 2 * seal);
+  if (image) {
+    const sx = image.width * 0.08;
+    const sy = image.height * 0.1;
+    const sw = image.width * 0.84;
+    const sh = image.height * 0.42;
+    const dw = w - 2 * inset;
+    const dh = (sh / sw) * dw;
+    ctx.drawImage(image, sx, sy, sw, sh, inset, h * 0.3, dw, dh);
+  }
+  drawWordmark(ctx, w / 2, h * 0.17, w * 0.62);
+  ctx.fillStyle = '#d62828';
+  ctx.fillRect(inset, h * 0.8, w - 2 * inset, h * 0.07);
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  fitText(ctx, '10 ADDITIONAL GAME CARDS', w * 0.8, h * 0.035, '900');
+  ctx.fillText('10 ADDITIONAL GAME CARDS', w / 2, h * 0.835);
+  const crimp = (y0, y1) => {
+    const gradient = ctx.createLinearGradient(0, y0, 0, y1);
+    gradient.addColorStop(0, shade(palette.c, -0.35));
+    gradient.addColorStop(0.5, shade(palette.c, 0.15));
+    gradient.addColorStop(1, shade(palette.c, -0.35));
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, y0, w, y1 - y0);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let x = 0; x < w; x += w / 70) ctx.fillRect(x, y0, w / 140, y1 - y0);
+  };
+  crimp(0, seal);
+  crimp(h - seal, h);
+  // The sealer's pinked edge: a zigzag along the top and bottom.
+  ctx.globalCompositeOperation = 'destination-out';
+  const teeth = 40;
+  const depth = h * 0.006;
+  for (const [y, dir] of [
+    [0, 1],
+    [h, -1],
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let i = 0; i <= teeth; i += 1) ctx.lineTo((i / teeth) * w, y + dir * (i % 2 ? depth : 0));
+    ctx.lineTo(w, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}

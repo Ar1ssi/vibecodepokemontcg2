@@ -157,12 +157,12 @@ export function createPackKit({ envMap, renderer }) {
     const crimp = track(crimpTexture(shape));
 
     const look = {
-      metalness: 0.42,
+      metalness: 0.5,
       roughness: 0.3,
-      clearcoat: 0.55,
-      clearcoatRoughness: 0.12,
+      clearcoat: 0.35,
+      clearcoatRoughness: 0.14,
       envMap,
-      envMapIntensity: 0.85,
+      envMapIntensity: 1,
       normalMap: crimp,
       alphaTest: 0.5,
     };
