@@ -32,9 +32,11 @@ import { clothNormalTexture, loadTexture } from './tt-textures.js';
  */
 
 const PIXEL_RATIO_MAX = 2;
-// The frame-time governor's run length and its "too slow" median (≈ 30 fps).
+// The frame-time governor's run length and its "too slow" median (≈ 45 fps). rAF times land on
+// display refreshes, so a frame that misses one reads 33.3 ms at 60 Hz (50 ms for two): a median
+// threshold of 34 never fired until under 20 fps.
 const GOVERNOR_FRAMES = 45;
-const SLOW_FRAME_MS = 34;
+const SLOW_FRAME_MS = 22;
 // The floor melts into the horizon from past what the camera frames to a few frame-depths back.
 const HORIZON_NEAR = 1.4;
 const HORIZON_FAR = 5;
@@ -245,7 +247,7 @@ export function createStage({
     drawn = true;
   };
 
-  // A device that can't hold ~30 fps while things move steps down: first to one pixel per CSS
+  // A device that can't hold ~45 fps while things move steps down: first to one pixel per CSS
   // pixel, then to a coarser shadow map, last to a floor without its mirror (the studio's look
   // keeps longest). Judged on the median of runs of moving frames.
   const frameTimes = [];
