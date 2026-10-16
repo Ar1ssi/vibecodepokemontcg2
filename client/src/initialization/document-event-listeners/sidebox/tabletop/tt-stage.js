@@ -75,6 +75,10 @@ export function createStage({
   renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = !low;
   renderer.shadowMap.type = PCFShadowMap;
+  // Redrawn only when what casts a shadow moved or changed (`castersChanged`): a held thing casts
+  // none, so while it sways the shadow map stays as it is.
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
   renderer.localClippingEnabled = true;
 
   const scene = new Scene();
@@ -192,6 +196,30 @@ export function createStage({
   let drawn = false;
   let size = { width: 1, height: 1 };
 
+  // What the shadow map was last drawn from: each visible caster's matrix, geometry and material
+  // state. Any difference (a caster moved, appeared, changed face or clipping) redraws it.
+  let casterState = [];
+  const nextCasterState = [];
+  const pushMaterial = (material) => {
+    nextCasterState.push(material.id, material.version, material.map?.id ?? -1, material.map?.version ?? -1);
+    nextCasterState.push(material.alphaMap?.id ?? -1, material.alphaMap?.version ?? -1);
+    material.clippingPlanes?.forEach((plane) => nextCasterState.push(plane.constant, plane.normal.x, plane.normal.y, plane.normal.z));
+  };
+  const castersChanged = () => {
+    nextCasterState.length = 0;
+    scene.updateMatrixWorld();
+    scene.traverseVisible((node) => {
+      if (!node.isMesh || !node.castShadow) return;
+      nextCasterState.push(node.id, node.geometry.id, ...node.matrixWorld.elements);
+      if (Array.isArray(node.material)) node.material.forEach(pushMaterial);
+      else pushMaterial(node.material);
+    });
+    const changed =
+      nextCasterState.length !== casterState.length || nextCasterState.some((value, i) => value !== casterState[i]);
+    if (changed) casterState = nextCasterState.slice();
+    return changed;
+  };
+
   const finish = (animation) => {
     if (!animations.has(animation)) return;
     animations.delete(animation);
@@ -212,6 +240,7 @@ export function createStage({
     for (const ticker of [...tickers]) ticker(clock, Math.min(100, sceneMs));
     // The mirror reuses the shadow maps the eye's pass last drew, so it waits for the first.
     if (drawn) studio.renderReflection();
+    if (castersChanged()) renderer.shadowMap.needsUpdate = true;
     renderer.render(scene, camera);
     drawn = true;
   };
@@ -234,6 +263,7 @@ export function createStage({
       key.shadow.mapSize.set(1024, 1024);
       key.shadow.map?.dispose();
       key.shadow.map = null;
+      renderer.shadowMap.needsUpdate = true;
     } else studio.stopReflection();
     stepDowns += 1;
   };
