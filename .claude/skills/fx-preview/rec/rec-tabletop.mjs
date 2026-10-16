@@ -23,6 +23,7 @@ const VIEWPORT = { width: 1280, height: 800 };
 const GL_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 const NO_GL_ARGS = ['--disable-webgl', '--disable-webgl2'];
 const BEAT_TIMEOUT_MS = 180000;
+const SHOT_TIMEOUT_MS = 120000;
 
 const failures = [];
 const check = (ok, label, detail = '') => {
@@ -87,8 +88,10 @@ async function passWholeBox(browser) {
   const packs = await expectedPacks(page);
   const seen = packs.map(() => []);
   let shot = 0;
+  // SwiftShader draws a frame in 0.5–2 s: let a camera still gliding after the beat finish first.
   const snap = async (beat) => {
-    await page.screenshot({ path: join(OUT, `${String(shot).padStart(2, '0')}-${beat}.png`) });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: join(OUT, `${String(shot).padStart(2, '0')}-${beat}.png`), timeout: SHOT_TIMEOUT_MS });
     shot += 1;
   };
   await snap('sealed');
@@ -146,7 +149,7 @@ async function passReloadMidPack(browser) {
     'the reload puts the same card back in hand',
     `${held?.ids[held?.position]} → ${after?.ids[after?.position]}`
   );
-  await page.screenshot({ path: join(OUT, 'reload-mid-pack.png') });
+  await page.screenshot({ path: join(OUT, 'reload-mid-pack.png'), timeout: SHOT_TIMEOUT_MS });
   check(errors.length === 0, 'no errors across the reload', errors.slice(0, 3).join(' | '));
   await page.close();
 }

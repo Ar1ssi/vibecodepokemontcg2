@@ -135,11 +135,12 @@ export async function createTabletopApp(options) {
     instant = () => false,
     onLost = () => {},
     timeScale = 1,
+    manualClock = false,
   } = options;
 
   const host = el('div', 'tt-root');
   root.append(host);
-  const stage = createStage({ host, quality, instant, timeScale, onLost: () => onLost() });
+  const stage = createStage({ host, quality, instant, timeScale, manual: manualClock, onLost: () => onLost() });
   if (!stage) {
     host.remove();
     return null;
@@ -404,8 +405,10 @@ export async function createTabletopApp(options) {
   const flyTo = (object, pose, { durationMs = 650, lift = 50, delayMs = 0 } = {}) => {
     let from = null;
     let fromQ = null;
-    // Coming down onto the mat it casts its shadow again, once it is near the mat, not while in hand.
+    // Coming down onto the mat it casts its shadow again, once it is near the mat; going up to the
+    // hand it stops, as soon as it has left the mat (held things hover too high to shadow it).
     let shadowDue = pose.position.y < 40;
+    let liftDue = !shadowDue;
     return stage.animate({
       durationMs,
       delayMs,
@@ -418,6 +421,10 @@ export async function createTabletopApp(options) {
         if (shadowDue && t >= 0.55) {
           shadowDue = false;
           setCastShadow(object, true);
+        }
+        if (liftDue && t >= 0.25) {
+          liftDue = false;
+          setCastShadow(object, false);
         }
         const point = arcPoint(from, pose.position, t, lift);
         object.position.set(point.x, point.y, point.z);
@@ -672,6 +679,25 @@ export async function createTabletopApp(options) {
     }
   }
 
+  // Things start casting shadows as they land on the mat, and the shadow pass compiles a depth
+  // shader for each kind of material the first time it meets one. One frame drawn with every
+  // shadow on, behind the loading screen, compiles them all up front.
+  function warmShadows() {
+    const switched = [];
+    scene.traverse((node) => {
+      if (node.isMesh && !node.castShadow) {
+        node.castShadow = true;
+        switched.push(node);
+      }
+    });
+    renderer.shadowMap.needsUpdate = true;
+    renderer.render(scene, camera);
+    switched.forEach((node) => {
+      node.castShadow = false;
+    });
+    renderer.shadowMap.needsUpdate = true;
+  }
+
   // ── Beats ───────────────────────────────────────────────────────────────
   async function tearWrap(hitWorld = null) {
     const uniforms = boxModel.film.uniforms;
@@ -740,7 +766,7 @@ export async function createTabletopApp(options) {
   }
 
   async function liftOut({ object, pose, sound }, delayMs) {
-    await wait(instant() ? 0 : delayMs / stage.timeScale);
+    await stage.wait(delayMs);
     if (disposed) return;
     scene.attach(object);
     const start = object.position.clone();
@@ -787,11 +813,12 @@ export async function createTabletopApp(options) {
     deck.face.map = backTexture;
     deck.face.userData.setFinish(null);
     audio.play('card-slide');
+    // The deck goes down on the table, back up, while the promo comes up to the eye.
     const showcase = handPose({ y: 6, halfWidth: 40, halfHeight: 56, tiltXDeg: -2 });
-    const deckAside = handPose({ x: -70, y: -40, halfWidth: 46, halfHeight: 60 });
+    audio.play('deck-down');
     await Promise.all([
       flyTo(promoCard, showcase, { durationMs: 650, lift: 10 }),
-      flyTo(deck.group, deckAside, { durationMs: 650, lift: 0 }),
+      flyTo(deck.group, flatPose(DECK_SPOT, deck.thickness / 2 + 0.2, false), { durationMs: 760, lift: 50 }),
     ]);
     // Tilt it under the light: the foil wakes up.
     const base = promoCard.quaternion.clone();
@@ -804,11 +831,7 @@ export async function createTabletopApp(options) {
         );
       },
     });
-    audio.play('deck-down');
-    await Promise.all([
-      flyTo(deck.group, flatPose(DECK_SPOT, deck.thickness / 2 + 0.2, false), { durationMs: 700, lift: 50 }),
-      flyTo(promoCard, flatPose(PROMO_SPOT, CARD.thickness / 2 + 0.1), { durationMs: 760, lift: 40, delayMs: 140 }),
-    ]);
+    await flyTo(promoCard, flatPose(PROMO_SPOT, CARD.thickness / 2 + 0.1), { durationMs: 760, lift: 40 });
     audio.play('card-land');
   }
 
@@ -1370,6 +1393,7 @@ export async function createTabletopApp(options) {
   await warmShaders();
   if (disposed) return null;
   settle();
+  warmShadows();
   await handFacesReady();
   if (disposed) return null;
   const surfaceReady = stage.setSurface(surface);
@@ -1396,6 +1420,8 @@ export async function createTabletopApp(options) {
       };
     },
     view,
+    /** On a manual clock (the bench's `?film`): moves the scene on by `ms` and draws it. */
+    advance: (ms) => stage.advance(ms),
     doNext: () => doNext(),
     skip: () => onUiAction('skip'),
     revealAll: () => onUiAction('revealAll'),

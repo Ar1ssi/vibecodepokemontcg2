@@ -317,6 +317,8 @@ function mountScene(box, loaded, state, persist) {
     surface: SURFACES.find((entry) => entry.key === prefs.surface)?.surface || SURFACES[0].surface,
     finishLabel: 'See what you pulled',
     timeScale: 1 / SLOWMO,
+    // `?film` stops the scene clock for frame-by-frame capture (the tabletop api's `advance`).
+    manualClock: params.has('film'),
     muted: () => !prefs.sound,
     volume: () => 0.85,
     instant: () => false,

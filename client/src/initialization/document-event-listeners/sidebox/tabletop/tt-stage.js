@@ -34,6 +34,9 @@ import { WOOD_TILE_MM, clothNormalTexture, loadTexture, woodTextures } from './t
  */
 
 const PIXEL_RATIO_MAX = 2;
+// The frame-time governor's run length and its "too slow" median (≈ 30 fps).
+const GOVERNOR_FRAMES = 45;
+const SLOW_FRAME_MS = 34;
 // Fog starts past what the camera frames and closes in a few frame-depths further back.
 const FOG_NEAR = 1.4;
 const FOG_FAR = 4.5;
@@ -41,8 +44,9 @@ const BACKSTOP_SLACK_MS = 700;
 
 /**
  * @param {{host: HTMLElement, quality?: 'high'|'low', surface?: {kind: 'mat'|'art', src?: string},
- *   instant?: () => boolean, onLost?: () => void, timeScale?: number}} options — `timeScale`
- *   below 1 plays every animation in slow motion (the test bench's `?slowmo=`)
+ *   instant?: () => boolean, onLost?: () => void, timeScale?: number, manual?: boolean}} options —
+ *   `timeScale` below 1 plays every animation in slow motion (the test bench's `?slowmo=`);
+ *   `manual` stops the clock until `advance(ms)` moves it (the bench's `?film`, frame by frame)
  * @returns {object|null} null when WebGL is unavailable.
  */
 export function createStage({
@@ -52,6 +56,7 @@ export function createStage({
   instant = () => false,
   onLost,
   timeScale = 1,
+  manual = false,
 }) {
   const speed = Number.isFinite(timeScale) ? Math.min(1, Math.max(0.02, timeScale)) : 1;
   const canvas = document.createElement('canvas');
@@ -76,7 +81,6 @@ export function createStage({
 
   const scene = new Scene();
   scene.background = new Color(0x141210);
-  // The desk fades into the dim room instead of ending on a hard edge.
   // The far desk fades into the dark room; the fog is set from the camera's distance to what it
   // looks at (`applyCamera`), so whatever is framed stays clear on any screen.
   scene.fog = new Fog(0x141210, 600, 2400);
@@ -195,11 +199,12 @@ export function createStage({
   };
 
   // ── Clock ───────────────────────────────────────────────────────────────
+  // Scene time (ms): wall time scaled by `speed`, or moved by hand on a manual clock. Animations,
+  // their delays, waits and tickers all run on it, so slow motion and frame-stepping slow them all.
   const animations = new Set();
   const tickers = new Set();
   let frame = 0;
   let lastNow = 0;
-  // Scene time: wall time scaled by `speed`. Animations and tickers run on it.
   let clock = 0;
   let disposed = false;
   let lost = false;
@@ -213,22 +218,58 @@ export function createStage({
     animation.resolve();
   };
 
-  const step = (now) => {
-    frame = 0;
-    if (disposed || lost) return;
-    const elapsed = lastNow ? now - lastNow : 16;
-    lastNow = now;
-    clock += elapsed * speed;
+  // One tick: scene time moves on, every animation past its start updates, tickers run, one frame.
+  const tick = (sceneMs) => {
+    clock += sceneMs;
     for (const animation of [...animations]) {
-      if (animation.start === null) animation.start = clock;
-      const t = animation.durationMs > 0 ? (clock - animation.start) / animation.durationMs : 1;
+      if (clock < animation.start) continue;
+      const t = (clock - animation.start) / animation.durationMs;
       if (t >= 1) finish(animation);
       else animation.update(Math.max(0, t), animation);
     }
-    for (const ticker of [...tickers]) ticker(clock, Math.min(100, elapsed) * speed);
+    for (const ticker of [...tickers]) ticker(clock, Math.min(100, sceneMs));
     renderer.render(scene, camera);
+  };
+
+  // A device that can't hold ~30 fps while things move steps down: first to one pixel per CSS
+  // pixel, then to a coarser shadow map. Judged on the median of runs of moving frames.
+  const frameTimes = [];
+  let stepDowns = 0;
+  const govern = (elapsed) => {
+    frameTimes.push(elapsed);
+    if (frameTimes.length < GOVERNOR_FRAMES) return;
+    const median = [...frameTimes].sort((a, b) => a - b)[frameTimes.length >> 1];
+    frameTimes.length = 0;
+    if (median < SLOW_FRAME_MS) return;
+    if (stepDowns === 0 && renderer.getPixelRatio() > 1) renderer.setPixelRatio(1);
+    else if (key.castShadow && key.shadow.mapSize.x > 1024) {
+      key.shadow.mapSize.set(1024, 1024);
+      key.shadow.map?.dispose();
+      key.shadow.map = null;
+    }
+    stepDowns += 1;
+  };
+
+  const step = (now) => {
+    frame = 0;
+    if (disposed || lost) return;
+    // A manual clock only draws here; `advance` moves it.
+    if (manual) {
+      tick(0);
+      return;
+    }
+    const elapsed = lastNow ? now - lastNow : 16;
+    if (lastNow) govern(elapsed);
+    lastNow = now;
+    tick(elapsed * speed);
     if (animations.size || tickers.size) frame = requestAnimationFrame(step);
     else lastNow = 0;
+  };
+
+  /** Moves a manual clock on by `sceneMs` and draws the frame. */
+  const advance = (sceneMs) => {
+    if (!manual || disposed || lost) return;
+    tick(Math.max(0, Number(sceneMs) || 0));
   };
 
   function requestRender() {
@@ -242,26 +283,30 @@ export function createStage({
    */
   const animate = ({ durationMs, update, delayMs = 0 }) =>
     new Promise((resolve) => {
-      const animation = { durationMs, update, resolve, start: null, backstop: 0 };
+      const delay = Math.max(0, Number(delayMs) || 0);
+      const animation = { durationMs, update, resolve, start: clock + delay, backstop: 0 };
       if (instant() || !(durationMs > 0)) {
         update(1, animation);
         requestRender();
         resolve();
         return;
       }
-      const begin = () => {
-        if (disposed) {
-          resolve();
-          return;
-        }
-        update(0, animation);
-        animations.add(animation);
-        animation.backstop = setTimeout(() => finish(animation), durationMs / speed + BACKSTOP_SLACK_MS);
-        requestRender();
-      };
-      if (delayMs > 0) setTimeout(begin, delayMs / speed);
-      else begin();
+      if (disposed) {
+        resolve();
+        return;
+      }
+      if (!delay) update(0, animation);
+      animations.add(animation);
+      // A hidden tab parks the clock: the backstop lands the animation anyway. A manual clock
+      // moves only when told, so it has none.
+      if (!manual) {
+        animation.backstop = setTimeout(() => finish(animation), (delay + durationMs) / speed + BACKSTOP_SLACK_MS);
+      }
+      requestRender();
     });
+
+  /** Resolves after `ms` of scene time (at once in an instant scene). */
+  const wait = (ms) => animate({ durationMs: ms, update: () => {} });
 
   /** Lands every running animation on its last frame. */
   const finishAll = () => {
@@ -357,6 +402,9 @@ export function createStage({
       return size;
     },
     animate,
+    wait,
+    advance,
+    manual,
     timeScale: speed,
     finishAll,
     addTicker,

@@ -263,3 +263,14 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   target (clear to 1.4×, gone by 4.5×), `summaryColumns` picks the 2–5 column fan that shows the
   cards biggest at the screen's aspect (tested: every card inside the view, none overlapping); the
   desk toned down a little now the haze no longer dims it.
+- **Iteration 8 (one clock, filmed frame by frame).** Before: delays ran on `setTimeout` beside the
+  animation clock, so slow motion and stepping drifted apart, and screenshots starved while
+  SwiftShader drew 0.7–2 s frames (fake-clock and video capture both stalled). After: every delay,
+  wait and animation runs on the stage's scene clock (`stage.wait`, delayed `animate` starts);
+  `?film` gives the bench a manual clock the api's `advance(ms)` steps, so a beat films in about a
+  minute. Filmed take-out, deck unwrap and a hit reveal: the held deck shadowed the mat and hung
+  huge in the corner while the promo was shown, and its cellophane veiled the promo. Now held
+  things drop their shadow a quarter of the way up, the deck goes down on the table (back up) as
+  the promo comes up to the eye, and the deck cellophane is a thinner film (env 0.55, haze 0.035).
+  Shadow depth shaders compile behind the loading screen (one frame drawn with every shadow on);
+  a frame-time governor drops to pixel ratio 1, then a 1024 shadow map, below ~30 fps.
