@@ -40,7 +40,7 @@ export const EYE_ONLY_LAYER = 1;
 
 const DOME_RADIUS = 4500;
 const REFLECTION_SCALE = 0.5;
-const REFLECTION_SAMPLES = 4;
+const REFLECTION_SAMPLES = 0;
 // Mirror strength at the contact line, and the height (mm) by which it has faded out.
 const REFLECT_STRENGTH = 0.42;
 const REFLECT_FADE_MM = 130;
