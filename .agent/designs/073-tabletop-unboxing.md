@@ -414,3 +414,31 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   `drag2`, `tear2`, `tear-sm`, `unwrap`, `summary3`, `inspect`, `legacy`). flag: SwiftShader takes
   seconds per first draw of each new shader/target state (more with the mirror); real GPUs were
   not measured here.
+
+### Iteration 14 — the mouse does the opening (brief: "less automation and more control with the mouse pointer")
+- Code cards removed (A14): the box holds deck, leaflet and packs; a pack's stack is its Basic
+  Energy (SwSh on) and ten cards. The CSS scene's tray and the ETB keep theirs (other screens).
+- The box opens under drags (A15): a press on the box and a drag tears the shrink-wrap as far as
+  the drag goes (260 px = 40 % of its peel; all of it or let go past half and it comes off, short of
+  that it settles back); a drag up on the lid lifts it; a tap on the shut lid only nudges it. The
+  dock's button still plays any step whole (keyboard and reduced-motion path).
+- Carrying (A16, A17): the deck, leaflet, promo and every sealed pack are pressed and dragged — out
+  of the box (straight up clear of the walls first, then flat, 34 mm over the floor so its shadow
+  marks the spot, leaning into its motion) and around the floor at any time nothing is held. Let go,
+  it lands clamped to the framed floor, pushed out of the box's footprint, resting on whatever it
+  overlaps (`placement.mjs`); what lay on something lifted comes down. A tap on an item in the box
+  takes just that one to its usual place; the dock takes the rest, each to the nearest bare floor
+  by its usual place (`freeSpotNear`). Spots live in the cosmetic record (`spots`, per key, dropped
+  one by one when malformed, cleared beside a sealed box) and survive a reload; a torn pack's cards
+  pile where it lay. With the lid up a press on the box reaches its contents (the walls cover them
+  from the table's height). Drags that never left the box put the item back in its slot.
+- Framerate (user report, investigated by an agent; scratch `perf/`): fill rate, not geometry or
+  CPU — DPR 2 + canvas MSAA + a whole-scene mirror pass + a shadow map redrawn every frame, the
+  floor and dome drawn first (no early depth reject), and a governor whose 34 ms threshold could
+  not fire above 20 fps on a 60 Hz display (rAF deltas quantise to 16.7/33.3 ms). Now: floor and
+  dome draw last, the shadow map redraws only when a caster changes, the mirror target has no
+  MSAA, the governor steps down under ~45 fps, the pixel ratio caps at 1.5, and ticker-only
+  motion draws at most ~80 times a second. Held-pack frame 197 → 137 draws; SwiftShader −14 %
+  before the DPR cap (DPR 1.5 another −33 % there).
+- Verified: carry runs (scratch `carry/`: wrap/lid/tap/drag/stack/reload/unwrap/promo/pick), the
+  recorder (all checks, mid-pack reload included), tabletop unit tests 63/63.
