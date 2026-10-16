@@ -21,6 +21,13 @@ import {
   toAbsoluteClientPath,
 } from '../deck-builder/core/mat-image-urls.mjs';
 import { getMatById } from '../deck-builder/core/mats.mjs';
+import {
+  NO_MAT_LAYOUT_ID,
+  ZONES_OVERLAY_PATH,
+  isTwoPlayerMat,
+  matSpecFor,
+  wantsZonesOverlay,
+} from './mat-spec.mjs';
 import { processAction } from '../general/process-action.js';
 
 const MAT_STORAGE_KEY = 'ptcg-sim.playmat.v1';
@@ -74,6 +81,13 @@ const frameDocument = (target) => {
   return doc?.documentElement ? doc : null;
 };
 
+/** `--mat-scale` as the page has it, else the stored picker value (percent), else '1'. */
+const currentMatScaleText = () =>
+  document.documentElement?.style?.getPropertyValue('--mat-scale') ||
+  (typeof localStorage !== 'undefined' && localStorage.getItem('ptcg-sim.playmat.scale')
+    ? String((Number(localStorage.getItem('ptcg-sim.playmat.scale')) || 100) / 100)
+    : '1');
+
 const applyMatLayoutToDoc = (layout, doc) => {
   if (!doc?.documentElement) return;
   const vars = layoutToCssVars(layout);
@@ -81,11 +95,7 @@ const applyMatLayoutToDoc = (layout, doc) => {
   for (const [name, value] of Object.entries(vars)) {
     root.style.setProperty(name, value);
   }
-  const scale =
-    document.documentElement?.style?.getPropertyValue('--mat-scale') ||
-    (typeof localStorage !== 'undefined' && localStorage.getItem('ptcg-sim.playmat.scale')
-      ? String((Number(localStorage.getItem('ptcg-sim.playmat.scale')) || 100) / 100)
-      : '1');
+  const scale = currentMatScaleText();
   if (scale) root.style.setProperty('--mat-scale', scale);
 };
 
@@ -97,20 +107,12 @@ const applyMatLayoutToElement = (layout, el) => {
   }
 };
 
-/** No mat chosen: use the edge-to-edge one-player profile, since that's the
- * zone geometry `playmat_zones_overlay.svg` was drawn against — matches
- * card positions to the svg outline exactly, same as a real mat would. */
-const NO_MAT_LAYOUT_ID = 'edge-to-edge';
-
 /** @param {'self'|'opp'} target */
 const layoutForTarget = (target) => {
   const mat = currentMats[target];
   if (!mat) return getMatLayout(NO_MAT_LAYOUT_ID);
   return withImageAspect(resolveMatLayout(mat), matArtAspect[target]);
 };
-
-const isTwoPlayerMat = (mat) =>
-  Boolean(mat && resolveMatLayout(mat).matMode === 'two-player');
 
 /** When a full-size mat is active, both halves share its layout and artwork. */
 const activeTwoPlayerMat = () => {
@@ -213,9 +215,7 @@ const paintMatImageForTarget = (target, mat) => {
     // No mat art chosen: still show the zone-outline svg over the flat
     // black board, same as a one-sided mat's overlay would.
     if (overlay) {
-      overlay.src = toAbsoluteClientPath(
-        'src/assets/playmats/playmat_zones_overlay.svg'
-      );
+      overlay.src = toAbsoluteClientPath(ZONES_OVERLAY_PATH);
       overlay.hidden = false;
     }
     return;
@@ -253,19 +253,9 @@ const paintMatImageForTarget = (target, mat) => {
   art.src = primary;
   ambient.src = primary;
 
-  const wantsOverlay = Boolean(
-    mat &&
-      (mat.overlay ||
-        mat.hasOverlay ||
-        mat.clean ||
-        mat.id?.startsWith('custom-') ||
-        /edge[\s-]?to[\s-]?edge/i.test(mat.title || ''))
-  );
   if (overlay) {
-    if (wantsOverlay) {
-      overlay.src = toAbsoluteClientPath(
-        'src/assets/playmats/playmat_zones_overlay.svg'
-      );
+    if (wantsZonesOverlay(mat)) {
+      overlay.src = toAbsoluteClientPath(ZONES_OVERLAY_PATH);
       overlay.hidden = false;
     } else {
       overlay.removeAttribute('src');
@@ -333,6 +323,15 @@ const syncMatArt = () => {
     art.hidden = false;
   }
 };
+
+/**
+ * The applied mats as the three.js table draws them (design 074 C1): see `matSpecFor`.
+ */
+export const currentMatSpec = () =>
+  matSpecFor(currentMats, {
+    artAspect: { ...matArtAspect },
+    scale: Number.parseFloat(currentMatScaleText()) || 1,
+  });
 
 /**
  * Push a layout profile's variables onto every board document.

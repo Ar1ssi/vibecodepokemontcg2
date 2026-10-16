@@ -539,6 +539,38 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### A2
+- `bad_seat` is `{ ok:false, success:false, error:'bad_seat', reason:'bad_seat', clientSeq }`: `success`/`error` let
+  server.js's existing `cmdRejected` path carry it unchanged. Turn-order call/choice and `peekDeck` answer
+  `{ ok:false, reason:'bad_seat' }`; a stranger socket in a solo room keeps `unauthorized` / `not_caller`.
+- Solo join's first view copies the existing envelope `{ gameId, stateVersion, view, events: [], pendingChoice,
+  lastClientSeq }` (the normal join sends no view; no envelope has `roomId`), after a `joinGame { serverAuthoritative,
+  protocolVersion, rejoinedGame, solo: true }`. `lastClientSeq` in a solo room is the higher of the two seats'
+  (`getClientSeqForSocket`): one client counter stamps both seats.
+- Added: solo on a public room id → `roomReject solo_room` (keeps it out of the lobby); `addPlayer` refuses in a solo
+  room; the same username on a new socket reclaims its solo room (`joinGame` solo or `userReconnected`), anyone else
+  → `solo_room`; `viewTargets()` lists seated sockets only (spectator pushes unchanged).
+- An invalid `seat` (e.g. `'p3'`) on a NON-solo room is rejected `bad_command` by `validateCommandShape`, not
+  ignored; a valid `p1|p2` there is ignored.
+- Architect decision (A2 follow-up): per-seat `pushAction`s (`exchangeData`/`loadDeckData`, `readyUp`, Reset request)
+  resolve their seat with `seatFor(socket.id, data)` (`server/game/setup-actions.mjs`); missing/bad seat in a solo
+  room → `cmdRejected { reason:'bad_seat' }`. The setupActionCache keeps one packet per seat in a solo room
+  (`solo:<seat>` keys; a solo rejoin replays both). `instanceMap` and `dealOrder` payloads carry `seat` on every room;
+  a solo socket gets both seats' copies. `addSoloPlayer`'s `{ p1, p2 }` lists stay stored only, as `addPlayer` does.
+
+### C1
+- `setMat` spec = `matSpecFor(mats)` from a new pure `sizing/mat-spec.mjs` (apply-mat-layout's `currentMatSpec()` and
+  the lab share it): brief fields plus `boxAspect` (the `--mat-width/height` box), `overlaySrc`/`farOverlaySrc` (zone
+  svg), `far` (per-half fit/aspects; each iframe has its own profile), `flip` (full-size mat owned by opp), `scale`
+  (`--mat-scale`), `profile` (near half, for `flatLayout`). Art = `object-fit` inside that box (`matBoxRect` +
+  `matUvFor` + `clipQuad`); a two-player box spans the whole table (CSS sizes it to one playfield — looks unintended).
+- `createTable` also takes `renderer` + `RoomEnvironment` (PMREM needs the renderer) and reproduces
+  `img.mat-ambient-image` (pre-blurred 256 px canvas) behind letterboxed art. SVG mat textures go through
+  `createMatTextureLoader` (rasterized from the viewBox at 2048 px; an `<img>` of a viewBox-only svg decodes tiny).
+- Boot reasons add `no-host` and `load-failed`; `legacy-netcode` is checked at boot only (joining a legacy room later
+  does not fall back). `shake` resolves a Promise when done; `inspect()` exposes scene/camera/layout for e2e.
+- Seam at 1920×1080: iframe `#playfield` top 540.01 px, scene `projectToScreen` 540.00 px (near edge 955.69 both).
+
 ### B3
 - `rotation` comes from the root's server `rotation` (reduce/board.mjs rotateCardCommand), snapped to a quarter turn,
   not from `ROTATION_CONDITIONS`: apply-view `applyRotation(img, root.card.rotation)` never rotates for a condition

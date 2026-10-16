@@ -1,7 +1,8 @@
 <!doctype html>
-<!-- Design 074 B1: a bench for the three.js board's shared GL helpers. Open /dev/board-lab (or
-     /src/dev/board-lab.html) with the game server running; ?card=<image url> picks the card art
-     (non-CORS hosts go through /api/card-image). Drag to orbit. Not linked from the game. -->
+<!-- Design 074: a bench for the three.js board scene (board-scene.js + table-mesh.js) outside the
+     game. Open /dev/board-lab (or /src/dev/board-lab.html) with the game server running.
+     ?mat=<catalog id> picks a playmat through the game's own resolution (mat-spec.mjs; default: the
+     sim board with no art), ?viewport=WxH renders at a fixed size. Not linked from the game. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -20,11 +21,11 @@
       #stage {
         position: fixed;
         inset: 0;
-        touch-action: none;
-        cursor: grab;
       }
-      #stage.lab--dragging {
-        cursor: grabbing;
+      #stage.lab--fixed {
+        inset: auto;
+        top: 0;
+        left: 0;
       }
       #stage canvas {
         display: block;
@@ -50,7 +51,7 @@
         align-items: center;
       }
       .lab__bar output {
-        min-width: 3ch;
+        min-width: 4ch;
         font-variant-numeric: tabular-nums;
       }
       #stats {
@@ -69,8 +70,9 @@
   </head>
   <body>
     <div class="lab__bar">
-      <label>Tilt <input id="tilt" type="range" min="0" max="90" step="1" value="0" /><output id="tiltOut">0</output>°</label>
-      <label>Light <input id="light" type="range" min="0" max="6" step="0.1" value="2.5" /><output id="lightOut">2.5</output></label>
+      <label>Tilt <input id="tilt" type="range" min="0" max="40" step="0.5" value="12" /><output id="tiltOut">12</output>°</label>
+      <label>Perspective <input id="perspective" type="range" min="400" max="4000" step="50" value="1400" /><output id="perspectiveOut">1400</output>px</label>
+      <label>Light <input id="light" type="range" min="0" max="4" step="0.1" value="1.4" /><output id="lightOut">1.4</output></label>
     </div>
     <div id="stage"><canvas id="labCanvas" aria-hidden="true"></canvas></div>
     <pre id="stats">loading…</pre>
@@ -80,23 +82,58 @@
         stats.textContent = message;
       };
 
+      const parseViewport = (text) => {
+        const match = /^(\d+)x(\d+)$/i.exec(text || '');
+        if (!match) return null;
+        const w = Number(match[1]);
+        const h = Number(match[2]);
+        return w > 0 && h > 0 ? { w, h } : null;
+      };
+
       async function boot() {
-        const [THREE, { RoomEnvironment }, { createRenderer }, { createTextureCache }, { textureUrlFor }] =
-          await Promise.all([
-            import('three'),
-            import('/src/vendor/three/RoomEnvironment.js'),
-            import('/src/setup/gl/gl-renderer.js'),
-            import('/src/setup/gl/gl-textures.js'),
-            import('/src/setup/gl/card-art-hosts.mjs'),
-          ]);
+        const [
+          THREE,
+          { RoomEnvironment },
+          { createRenderer },
+          { createTextureCache },
+          { createBoardScene },
+          { createSceneClock },
+          { createMatTextureLoader },
+          { flatLayout, halfFromViewport },
+          { cameraFromCssTilt },
+          { matSpecFor, isTwoPlayerMat },
+          { getMatById },
+          { getMatLayout },
+        ] = await Promise.all([
+          import('three'),
+          import('/src/vendor/three/RoomEnvironment.js'),
+          import('/src/setup/gl/gl-renderer.js'),
+          import('/src/setup/gl/gl-textures.js'),
+          import('/src/setup/board3d/board-scene.js'),
+          import('/src/setup/board3d/scene-clock.js'),
+          import('/src/setup/board3d/table-mesh.js'),
+          import('/src/setup/board3d/board-layout.mjs'),
+          import('/src/setup/board3d/board-camera.mjs'),
+          import('/src/setup/sizing/mat-spec.mjs'),
+          import('/src/setup/deck-builder/core/mats.mjs'),
+          import('/src/setup/sizing/mat-layouts.mjs'),
+        ]);
+        const params = new URLSearchParams(location.search);
         const host = document.getElementById('stage');
+        const fixedViewport = parseViewport(params.get('viewport'));
+        if (fixedViewport) {
+          host.classList.add('lab--fixed');
+          host.style.width = `${fixedViewport.w}px`;
+          host.style.height = `${fixedViewport.h}px`;
+        }
+
         const canvas = document.getElementById('labCanvas');
         let contextLost = false;
         const gl = createRenderer({
           canvas,
           onLost: () => {
             contextLost = true;
-            showError('WebGL context lost');
+            showError('WebGL context lost (reload the lab)');
           },
         });
         if (!gl) {
@@ -104,117 +141,46 @@
           return;
         }
         const { renderer } = gl;
+        const clock = createSceneClock(canvas);
+        clock.start();
+        const scene = createBoardScene({
+          host,
+          canvas,
+          renderer,
+          textures: createTextureCache({ loader: createMatTextureLoader(THREE) }),
+          clock,
+          three: THREE,
+          RoomEnvironment,
+        });
 
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x11161c);
-        const pmrem = new THREE.PMREMGenerator(renderer);
-        const room = new RoomEnvironment();
-        scene.environment = pmrem.fromScene(room, 0.04).texture;
-        room.dispose();
-        pmrem.dispose();
+        // The same records the game's mat picker applies; a one-player mat is shown on both halves.
+        const matId = params.get('mat');
+        const mat = matId ? getMatById(matId) : null;
+        const spec = mat
+          ? matSpecFor({ self: mat, opp: isTwoPlayerMat(mat) ? null : mat })
+          : { mode: 'two-player', src: null, fit: '100% 100%', profile: getMatLayout('sim'), scale: 1 };
+        const matStatus = mat ? `mat: ${mat.id} (${spec.mode}, ${spec.fit})` : matId ? `mat: unknown id ${matId}` : 'mat: sim, no art';
+        scene.setMat(spec);
 
-        const light = new THREE.DirectionalLight(0xffffff, 2.5);
-        light.position.set(3, 8, 4);
-        scene.add(light);
-
-        const floor = new THREE.Mesh(
-          new THREE.PlaneGeometry(40, 40),
-          new THREE.MeshStandardMaterial({ color: 0x1b222b, roughness: 0.92, metalness: 0 })
-        );
-        floor.rotation.x = -Math.PI / 2;
-        scene.add(floor);
-
-        const CARD_W = 2.5;
-        const CARD_H = 3.5;
-        const cardPivot = new THREE.Group();
-        cardPivot.position.set(0, 0.01, CARD_H / 2);
-        scene.add(cardPivot);
-        const cardMaterial = new THREE.MeshStandardMaterial({ color: 0x8a96a3, roughness: 0.45, metalness: 0 });
-        const card = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), cardMaterial);
-        // The pivot sits on the card's bottom edge so tilt stands the card up from the table.
-        card.rotation.x = -Math.PI / 2;
-        card.position.set(0, 0, -CARD_H / 2);
-        cardPivot.add(card);
-
-        const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
-        const orbit = { azimuth: 0, polar: 0.9, radius: 11 };
-        const target = new THREE.Vector3(0, 0.5, 0);
-        const placeCamera = () => {
-          const sinPolar = Math.sin(orbit.polar);
-          camera.position.set(
-            target.x + orbit.radius * sinPolar * Math.sin(orbit.azimuth),
-            target.y + orbit.radius * Math.cos(orbit.polar),
-            target.z + orbit.radius * sinPolar * Math.cos(orbit.azimuth)
+        const controls = { tilt: 12, perspective: 1400 };
+        const viewportOf = () => fixedViewport || { w: host.clientWidth, h: host.clientHeight };
+        const relayout = () => {
+          const viewport = viewportOf();
+          if (!(viewport.w > 0 && viewport.h > 0)) return;
+          const half = halfFromViewport(viewport);
+          scene.setViewport(viewport);
+          scene.setCamera(
+            cameraFromCssTilt({
+              viewportW: viewport.w,
+              viewportH: viewport.h,
+              tiltDeg: controls.tilt,
+              perspectivePx: controls.perspective,
+              nearHalf: half,
+            })
           );
-          camera.lookAt(target);
+          scene.setLayout(flatLayout(spec.profile, half, { viewport, matScale: spec.scale ?? 1 }));
         };
-
-        const frameTimes = [];
-        let framePending = false;
-        let cardStatus = 'card: loading';
-        const writeStats = () => {
-          const fps = frameTimes.length;
-          stats.textContent = [
-            `fps (1 s)  ${fps}`,
-            `textures   ${renderer.info.memory.textures}`,
-            `calls      ${renderer.info.render.calls}`,
-            cardStatus,
-          ].join('\n');
-        };
-        const renderFrame = (time) => {
-          framePending = false;
-          if (contextLost) return;
-          placeCamera();
-          renderer.render(scene, camera);
-          frameTimes.push(time);
-          while (frameTimes.length && time - frameTimes[0] > 1000) frameTimes.shift();
-          writeStats();
-        };
-        const invalidate = () => {
-          if (framePending) return;
-          framePending = true;
-          requestAnimationFrame(renderFrame);
-        };
-
-        const resize = () => {
-          gl.resizeTo(host);
-          camera.aspect = Math.max(1, host.clientWidth) / Math.max(1, host.clientHeight);
-          camera.updateProjectionMatrix();
-          invalidate();
-        };
-        new ResizeObserver(resize).observe(host);
-        resize();
-
-        let drag = null;
-        host.addEventListener('pointerdown', (event) => {
-          drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
-          host.setPointerCapture(event.pointerId);
-          host.classList.add('lab--dragging');
-        });
-        host.addEventListener('pointermove', (event) => {
-          if (!drag || event.pointerId !== drag.id) return;
-          orbit.azimuth -= (event.clientX - drag.x) * 0.008;
-          orbit.polar = Math.min(1.5, Math.max(0.08, orbit.polar - (event.clientY - drag.y) * 0.008));
-          drag.x = event.clientX;
-          drag.y = event.clientY;
-          invalidate();
-        });
-        const endDrag = (event) => {
-          if (!drag || event.pointerId !== drag.id) return;
-          drag = null;
-          host.classList.remove('lab--dragging');
-        };
-        host.addEventListener('pointerup', endDrag);
-        host.addEventListener('pointercancel', endDrag);
-        host.addEventListener(
-          'wheel',
-          (event) => {
-            event.preventDefault();
-            orbit.radius = Math.min(40, Math.max(4, orbit.radius * (1 + Math.sign(event.deltaY) * 0.08)));
-            invalidate();
-          },
-          { passive: false }
-        );
+        new ResizeObserver(relayout).observe(host);
 
         const bindSlider = (id, apply) => {
           const input = document.getElementById(id);
@@ -222,31 +188,46 @@
           const update = () => {
             out.textContent = input.value;
             apply(Number(input.value));
-            invalidate();
           };
           input.addEventListener('input', update);
           update();
         };
         bindSlider('tilt', (deg) => {
-          cardPivot.rotation.x = THREE.MathUtils.degToRad(deg);
+          controls.tilt = deg;
+          relayout();
         });
+        bindSlider('perspective', (px) => {
+          controls.perspective = px;
+          relayout();
+        });
+        const light = scene.inspect().scene.getObjectByName('board3d-key-light');
         bindSlider('light', (intensity) => {
-          light.intensity = intensity;
+          if (light) light.intensity = intensity;
+          scene.invalidate();
         });
 
-        const textures = createTextureCache({ textureUrlFor });
-        const cardUrl = new URLSearchParams(location.search).get('card') || '/src/assets/cardback.png';
-        try {
-          const texture = await textures.acquire(cardUrl);
-          texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-          cardMaterial.map = texture;
-          cardMaterial.color.set(0xffffff);
-          cardMaterial.needsUpdate = true;
-          cardStatus = `card: ${textureUrlFor(cardUrl)}`;
-        } catch (error) {
-          cardStatus = `card failed: ${error?.message || 'load error'}`;
-        }
-        invalidate();
+        let lastFrame = renderer.info.render.frame;
+        let lastTime = performance.now();
+        const writeStats = () => {
+          const now = performance.now();
+          const frame = renderer.info.render.frame;
+          const fps = Math.round(((frame - lastFrame) * 1000) / Math.max(1, now - lastTime));
+          lastFrame = frame;
+          lastTime = now;
+          const viewport = viewportOf();
+          stats.textContent = [
+            `renders/s  ${fps}`,
+            `textures   ${renderer.info.memory.textures}`,
+            `calls      ${renderer.info.render.calls}`,
+            `viewport   ${viewport.w}×${viewport.h}`,
+            matStatus,
+            contextLost ? 'context lost' : '',
+          ]
+            .filter(Boolean)
+            .join('\n');
+        };
+        setInterval(writeStats, 1000);
+        writeStats();
       }
 
       boot().catch((error) => showError(`lab failed: ${error?.message || error}`));
