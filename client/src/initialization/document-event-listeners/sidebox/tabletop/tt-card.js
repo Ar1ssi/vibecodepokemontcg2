@@ -124,8 +124,14 @@ vec2 ttInkSlope(vec2 uv, float texelMm) {
 // size; a screen-space derivative of the print is constant over each 2 × 2 pixel block and turned
 // the art into stair steps.
 const FOIL_NORMAL = /* glsl */ `
+// Screen derivatives first: inside a per-pixel branch they are undefined.
+float ttMmPerPx = length(fwidth(vCardUv * vec2(63.0, 88.0)));
+vec3 ttQ0 = dFdx(-vViewPosition);
+vec3 ttQ1 = dFdy(-vViewPosition);
+vec2 ttSt0 = dFdx(vCardUv);
+vec2 ttSt1 = dFdy(vCardUv);
 if (ttFoil > 0.0 && uFoilPattern > 0) {
-  float mmPerPx = length(fwidth(vCardUv * vec2(63.0, 88.0)));
+  float mmPerPx = ttMmPerPx;
   float feature = ttFoilFeature();
   float patternFade = smoothstep(feature * 0.5, feature * 0.2, mmPerPx);
   ttPattern = ttFoilHeight(vCardUv) * patternFade;
@@ -143,14 +149,10 @@ if (ttFoil > 0.0 && uFoilPattern > 0) {
   // A raised edge in foil tips the light by tens of degrees at most.
   slope /= max(1.0, length(slope) / 0.35);
   // The face's +u and +v directions in view space, from the surface's own derivatives.
-  vec3 q0 = dFdx(-vViewPosition);
-  vec3 q1 = dFdy(-vViewPosition);
-  vec2 st0 = dFdx(vCardUv);
-  vec2 st1 = dFdy(vCardUv);
-  vec3 q1perp = cross(q1, normal);
-  vec3 q0perp = cross(normal, q0);
-  vec3 axisU = q1perp * st0.x + q0perp * st1.x;
-  vec3 axisV = q1perp * st0.y + q0perp * st1.y;
+  vec3 q1perp = cross(ttQ1, normal);
+  vec3 q0perp = cross(normal, ttQ0);
+  vec3 axisU = q1perp * ttSt0.x + q0perp * ttSt1.x;
+  vec3 axisV = q1perp * ttSt0.y + q0perp * ttSt1.y;
   if (dot(axisU, axisU) > 0.0 && dot(axisV, axisV) > 0.0) {
     normal = normalize(normal - slope.x * normalize(axisU) - slope.y * normalize(axisV));
   }
@@ -160,6 +162,8 @@ if (ttFoil > 0.0 && uFoilPattern > 0) {
 // The thin-film rainbow, carried by what the foil reflects; glitter facets twinkle when they
 // mirror the key light or a bright part of the room.
 const FOIL_LIGHT = /* glsl */ `
+// Taken before the branch: derivatives inside a per-pixel branch are undefined.
+vec2 ttUvPerPx = fwidth(vCardUv);
 if (ttFoil > 0.0) {
   vec3 V = normalize(vViewPosition);
   vec3 R = reflect(-V, normal);
@@ -185,8 +189,11 @@ if (ttFoil > 0.0) {
     #if NUM_DIR_LIGHTS > 0
       lit += pow(max(dot(reflect(-V, facetN), directionalLights[0].direction), 0.0), 600.0) * 4.0;
     #endif
-    // A few facets in each patch flash, as pinpoints; the rest of the foil only shimmers.
-    sparkle = step(0.86, seed) * smoothstep(0.34, 0.06, dist) * lit;
+    // A few facets in each patch flash, as pinpoints; the rest of the foil only shimmers. Patches
+    // under a few pixels across only flicker as noise, so a card far off shows none.
+    vec2 cellsPerPx = ttUvPerPx * (uFoilPattern == 2 ? vec2(70.0, 98.0) : vec2(150.0, 210.0));
+    float cellPx = 1.0 / max(max(cellsPerPx.x, cellsPerPx.y), 1e-4);
+    sparkle = step(0.86, seed) * smoothstep(0.34, 0.06, dist) * lit * smoothstep(1.2, 3.0, cellPx);
   }
   outgoingLight += film + sparkle * ttFoil * mix(vec3(1.0), rainbow, 0.5);
 }

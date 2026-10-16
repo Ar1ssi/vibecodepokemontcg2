@@ -88,6 +88,22 @@ export function contentsFor(box) {
   };
 }
 
+const COUNT_WORDS = Object.freeze(['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']);
+
+/**
+ * The box's contents in words, for the scene's button and hints.
+ * @param {ReturnType<typeof contentsFor>} contents
+ * @returns {{deck: string, inside: string}} `deck` names the wrapped stack ("deck", or "Evolution
+ *   pack" before Brilliant Stars); `inside` lists everything the box holds.
+ */
+export function contentsWords(contents) {
+  const deck = contents?.deck?.kind === 'evolution-pack' ? 'Evolution pack' : 'deck';
+  const count = Number.isInteger(contents?.packs) ? contents.packs : 4;
+  const packs = `${COUNT_WORDS[count] ?? count} booster pack${count === 1 ? '' : 's'}`;
+  const leaflet = contents?.leaflet === 'guide' ? "a player's guide" : 'a tips leaflet';
+  return { deck, inside: `Your ${deck}, ${packs}, a code card and ${leaflet} are inside.` };
+}
+
 /**
  * The cosmetic cards a pack carries before its ten: a code card in every era, and a Basic Energy
  * from Sword & Shield on ("10 cards, 1 Basic Energy, and 1 … code card", ME02 box back).

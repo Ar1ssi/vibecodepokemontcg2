@@ -29,6 +29,16 @@ test('the lid swings past open by about 5 % and settles on it', () => {
   assert.ok(near(easeOutBack(0.5, 0), 1 - 0.125), 'c1 = 0 is ease-out cubic');
 });
 
+test('a shut lid creeps open from rest before it swings; one already moving swings on', () => {
+  assert.ok(lidAngleDeg(0.1) < 5, `at 10 % ${lidAngleDeg(0.1)}`);
+  assert.ok(lidAngleDeg(0.02) - lidAngleDeg(0) < 0.2, 'it starts from rest');
+  const angles = Array.from({ length: 101 }, (_, i) => lidAngleDeg(i / 100));
+  const peakAt = angles.indexOf(Math.max(...angles));
+  for (let i = 1; i <= peakAt; i += 1) assert.ok(angles[i] >= angles[i - 1], `it never dips on the way up (${i})`);
+  assert.ok(lidAngleDeg(0.1, { fromRest: false }) > 30, 'a lid let go mid-lift keeps its speed');
+  assert.ok(near(lidAngleDeg(1, { fromRest: false }), LID_OPEN_DEG));
+});
+
 test('an arc starts and ends on its points and rises above both', () => {
   const from = { x: 0, y: 10, z: 0 };
   const to = { x: 100, y: 0, z: 50 };
@@ -38,6 +48,17 @@ test('an arc starts and ends on its points and rises above both', () => {
   assert.deepEqual([end.x, end.y, end.z], [100, 0, 50]);
   assert.ok(arcPoint(from, to, 0.5, 60).y > 10);
   assert.equal(arcPoint(from, to, 0.5, 60).s, 0.5);
+});
+
+test('a carry over the chord bows above the straight line but never climbs past the higher end', () => {
+  const table = { x: -200, y: 2, z: -40 };
+  const eye = { x: 0, y: 320, z: 260 };
+  let highest = -Infinity;
+  for (let i = 0; i <= 100; i += 1) highest = Math.max(highest, arcPoint(table, eye, i / 100, 20, { over: 'chord' }).y);
+  assert.ok(highest <= eye.y + 1e-9, `peak ${highest}`);
+  assert.ok(arcPoint(table, eye, 0.5, 20, { over: 'chord' }).y > (table.y + eye.y) / 2, 'it bows upward');
+  const toss = Array.from({ length: 101 }, (_, i) => arcPoint(table, eye, i / 100, 20).y);
+  assert.ok(Math.max(...toss) > eye.y, 'over the higher end it overshoots');
 });
 
 test('a landing rebound is zero at both ends and small', () => {

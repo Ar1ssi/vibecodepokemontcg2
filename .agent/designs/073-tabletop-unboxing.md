@@ -305,3 +305,22 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   mat with the desk only near the horizon (the sealed top now shows its print through a light glare,
   as in the reference photos' grazing tops; the wad is clear film with white glints); the strip's
   fold springs open into a 16 mm curl in flight and lands print up. Frames: scratch `it9/`.
+- **Iteration 10 (the unfilmed beats, frame by frame).** Filmed the wrap tear, the lid, picking up a
+  pack, the last card into the summary fan and setting the fan down. Before: the wrap's hole grew as
+  wandering loops that cut little islands of film loose, and with clear film invisible head-on only
+  those thin white lines showed (it read as glass cracking); the lid snapped most of the way open in
+  0.1 s (ease-out-back starts at 4× its average speed); every flight bowed over its higher end, so a
+  pack picked up arced off the top of the screen before dropping into the hand (seen from above, the
+  far half of a flight at hand height projects higher than its end) and things set down were tossed
+  up first. After: the hole is a star of straight tear runs with small teeth (shared by the vertex and
+  fragment stages); the film round it lifts in 4.5 mm flaps whose faces tip away from the hole and
+  catch the light, with a 5 mm stretched-milky lip (box film mesh ~3 mm); the lid creeps 6° as it
+  unsticks, then swings past open and springs back (a lid let go mid-lift swings on); hand ↔ table
+  flights bow over the straight line (`arcPoint` `over: 'chord'`), so a pack rises steadily into view.
+  The torn strip keeps its toss, and take-out keeps the over-the-top arc (an upright pack leaving
+  the box would otherwise pass through its front wall). Also: starlight/glitter sparkles fade once
+  their cells are under ~3 px (a promo on the mat flickered single pixels), the foil's screen
+  derivatives are taken outside its per-pixel branch, and an XY–Sword & Shield box's button and hints
+  say "Evolution pack" (and a Prerelease Kit's "player's guide") instead of "deck"
+  (`contentsWords`). Tests: poses.test (lid from rest, chord carry), physical.test (contents
+  words). Frames: scratch `it10/`.

@@ -48,6 +48,7 @@ import {
   LEAFLET,
   boxDimensions,
   contentsFor,
+  contentsWords,
 } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
 import {
   LID_OPEN_AT,
@@ -186,6 +187,7 @@ async function buildTabletopApp(options, life) {
   let queued = null;
   let hand = null;
   const contents = contentsFor(box);
+  const words = contentsWords(contents);
   const era = box?.era || look?.skin?.palette || 'me';
   const palette = paletteFor(look?.skin?.palette || era);
   const dims = boxDimensions();
@@ -438,8 +440,12 @@ async function buildTabletopApp(options, life) {
     object.traverse((node) => {
       if (node.isMesh) node.castShadow = cast;
     });
-  /** Flies `object` (re-parented to the scene, world pose kept) along a lifted arc to `pose`. */
-  const flyTo = (object, pose, { durationMs = 650, lift = 50, delayMs = 0 } = {}) => {
+  /**
+   * Flies `object` (re-parented to the scene, world pose kept) along an arc bowed `lift` mm over the
+   * straight line to `pose`: a hand's carry, never a toss (`over: 'higher'` arcs over the higher
+   * end instead, to clear what stands between).
+   */
+  const flyTo = (object, pose, { durationMs = 650, lift = 50, delayMs = 0, over = 'chord' } = {}) => {
     let from = null;
     let fromQ = null;
     // Coming down onto the mat it casts its shadow again, once it is near the mat; going up to the
@@ -463,7 +469,7 @@ async function buildTabletopApp(options, life) {
           liftDue = false;
           setCastShadow(object, false);
         }
-        const point = arcPoint(from, pose.position, t, lift);
+        const point = arcPoint(from, pose.position, t, lift, { over });
         object.position.set(point.x, point.y, point.z);
         object.quaternion.slerpQuaternions(fromQ, pose.quaternion, point.s);
       },
@@ -785,9 +791,10 @@ async function buildTabletopApp(options, life) {
     audio.play('lid-open');
     const span = LID_OPEN_DEG - fromDeg;
     const cameraMove = stage.blendCamera(cameraPose('open', aspect()), 1200);
+    const fromRest = fromDeg <= 0;
     await stage.animate({
-      durationMs: 1000 * Math.max(0.35, span / LID_OPEN_DEG),
-      update: (t) => boxModel.setLidAngle(fromDeg + (lidAngleDeg(t) / LID_OPEN_DEG) * span),
+      durationMs: (fromRest ? 1150 : 1000) * Math.max(0.35, span / LID_OPEN_DEG),
+      update: (t) => boxModel.setLidAngle(fromDeg + (lidAngleDeg(t, { fromRest }) / LID_OPEN_DEG) * span),
     });
     await cameraMove;
   }
@@ -824,7 +831,8 @@ async function buildTabletopApp(options, life) {
       durationMs: 420,
       update: (t) => object.position.lerpVectors(start, up, easeOutCubic(t)),
     });
-    await flyTo(object, pose(), { durationMs: 680, lift: 18 });
+    // Lifted clear of the box, it keeps that height until it is past the front wall.
+    await flyTo(object, pose(), { durationMs: 680, lift: 18, over: 'higher' });
     audio.play(sound);
   }
 
@@ -833,7 +841,7 @@ async function buildTabletopApp(options, life) {
     if (!v.itemsOut || v.deckUnwrapped) return;
     audio.play('item-lift');
     const inHand = handPose({ halfWidth: 46, halfHeight: 60 });
-    await flyTo(deck.group, inHand, { durationMs: 700, lift: 70 });
+    await flyTo(deck.group, inHand, { durationMs: 700, lift: 22 });
     if (!send({ type: 'unwrapDeck' })) return;
     audio.play('deck-unwrap');
     const uniforms = deck.wrap.uniforms;
@@ -895,7 +903,7 @@ async function buildTabletopApp(options, life) {
       if (item.url) faceTexture(item.url, item.card);
     });
     const pose = handPose({ halfWidth: 44, halfHeight: 68 });
-    await flyTo(pack.model.group, pose, { durationMs: 720, lift: 60 });
+    await flyTo(pack.model.group, pose, { durationMs: 720, lift: 22 });
     hand = { kind: 'pack', visual, peel: 0 };
     startSway(pack.model.group, pose);
   }
@@ -1110,7 +1118,7 @@ async function buildTabletopApp(options, life) {
     const back = { position: mesh.position.clone(), quaternion: mesh.quaternion.clone() };
     audio.play('card-slide');
     const pose = handPose({ halfWidth: 40, halfHeight: 52, tiltXDeg: -2 });
-    await flyTo(mesh, pose, { durationMs: 560, lift: 40 });
+    await flyTo(mesh, pose, { durationMs: 560, lift: 16 });
     hand = { kind: 'inspect', mesh, back, pose };
     followPointer(mesh, pose);
   }
@@ -1162,7 +1170,7 @@ async function buildTabletopApp(options, life) {
       case 'takeOut':
         return { label: 'Take everything out', run: takeOut };
       case 'unwrapDeck':
-        return { label: 'Unwrap the deck', run: unwrapDeck };
+        return { label: `Unwrap the ${words.deck}`, run: unwrapDeck };
       case 'revealCard':
         return { label: 'Next card', run: () => revealNext(1) };
       case 'openPack':
@@ -1185,8 +1193,8 @@ async function buildTabletopApp(options, life) {
     if (hand?.kind === 'inspect') return 'Move the pointer to tilt it in the light. Tap to put it back.';
     if (v.wrapOn) return 'Grab the shrink-wrap and pull it off.';
     if (!v.lidOpen) return 'Lift the lid.';
-    if (!v.itemsOut) return 'Your deck, four booster packs, a code card and a tips leaflet are inside.';
-    if (!v.deckUnwrapped) return 'Unwrap the deck: its promo card is on the bottom.';
+    if (!v.itemsOut) return words.inside;
+    if (!v.deckUnwrapped) return `Unwrap the ${words.deck}: its promo card is on the bottom.`;
     if (v.untornVisual.length) return `${v.untornVisual.length} pack${v.untornVisual.length === 1 ? '' : 's'} left. Pick one up.`;
     return 'Everything is out of the box. Tap any card to look at it.';
   }
@@ -1396,7 +1404,7 @@ async function buildTabletopApp(options, life) {
     if (kind === 'deck' && !v.deckUnwrapped) return run(unwrapDeck);
     if (kind === 'pack') {
       if (!v.deckUnwrapped) {
-        ui.setHint('Unwrap your deck first: its promo is waiting on the bottom.');
+        ui.setHint(`Unwrap your ${words.deck} first: its promo is waiting on the bottom.`);
         return undefined;
       }
       return run(() => pickPack(hit.tag.visual));

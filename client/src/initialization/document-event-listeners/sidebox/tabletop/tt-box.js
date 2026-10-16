@@ -321,7 +321,8 @@ export function buildBox({ renderer, envMap, dims, faces, board, crinkle }) {
 
 // ── Shrink-wrap ────────────────────────────────────────────────────────────
 // BoxGeometry builds its faces in this order: +x, −x, +y, −y, +z, −z.
-const FILM_SEGMENTS = { x: 12, y: 18, z: 8 };
+// Fine enough (~3 mm) for the flaps that lift round a tear.
+const FILM_SEGMENTS = { x: 30, y: 44, z: 20 };
 
 /**
  * The film shell: a subdivided box 0.5 mm proud of the board, its UVs remapped into a 3 × 2 atlas
@@ -368,6 +369,7 @@ function buildFilmShell({ W, H, D, envMap, crinkle, renderer, track }) {
   const film = createFilmMaterials({ envMap, crinkle: crinkleTexture, seams });
   track(film);
   film.uniforms.uOrigin.value.set(0, H / 2, 0);
+  film.uniforms.uFlapLift.value = 4.5;
   const haze = new Mesh(geometry, film.haze);
   haze.renderOrder = 4;
   const gloss = new Mesh(geometry, film.gloss);

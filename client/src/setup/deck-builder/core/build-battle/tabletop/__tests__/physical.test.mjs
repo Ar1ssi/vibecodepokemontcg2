@@ -8,6 +8,7 @@ import {
   PACK,
   boxDimensions,
   contentsFor,
+  contentsWords,
   deckThickness,
   packExtrasFor,
   packThickness,
@@ -63,6 +64,19 @@ test('contents follow the box kind and era (catalog rows)', () => {
   const kit = contentsFor(getBuildBattleBox('sun-moon'));
   assert.equal(kit.leaflet, 'guide');
   assert.deepEqual(contentsFor(null).deck, { kind: 'deck', count: 40 });
+});
+
+test('the scene names what the box holds: a deck, or before Brilliant Stars an Evolution pack', () => {
+  const me = contentsWords(contentsFor(getBuildBattleBox('phantasmal-flames')));
+  assert.deepEqual(me, {
+    deck: 'deck',
+    inside: 'Your deck, four booster packs, a code card and a tips leaflet are inside.',
+  });
+  const swsh = contentsWords(contentsFor(getBuildBattleBox('evolving-skies')));
+  assert.equal(swsh.deck, 'Evolution pack');
+  assert.match(swsh.inside, /^Your Evolution pack, four booster packs/);
+  assert.match(contentsWords(contentsFor(getBuildBattleBox('sun-moon'))).inside, /a player's guide are inside\.$/);
+  assert.equal(contentsWords(null).deck, 'deck');
 });
 
 test('packs carry a Basic Energy from Sword & Shield on, and always a code card', () => {

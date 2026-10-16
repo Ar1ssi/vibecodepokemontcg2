@@ -32,21 +32,34 @@ export function easeOutBack(t, c1 = LID_OVERSHOOT) {
   return 1 + (c1 + 1) * s ** 3 + c1 * s ** 2;
 }
 
-/** The lid's hinge angle while it swings open on its own. */
-export function lidAngleDeg(t) {
-  return LID_OPEN_DEG * easeOutBack(t) + 0;
+// A shut lid gives this much (degrees) as the finger unsticks it, before it swings.
+const LID_CREEP_DEG = 6;
+
+/**
+ * The lid's hinge angle while it swings open. From rest it creeps a few degrees as the finger
+ * unsticks it, then swings past open and the board springs back; a lid already moving by hand
+ * (`fromRest: false`) just swings on.
+ */
+export function lidAngleDeg(t, { fromRest = true } = {}) {
+  if (!fromRest) return LID_OPEN_DEG * easeOutBack(t);
+  const creep = LID_CREEP_DEG * smoothstep(0, 0.3, t);
+  return creep + (LID_OPEN_DEG - LID_CREEP_DEG) * easeOutBack(smoothstep(0.12, 1, t));
 }
 
 /**
- * A point on a lifted arc from `from` to `to` (quadratic Bézier through a control point `lift` mm
- * above the higher end's midpoint), eased in and out.
+ * A point on a lifted arc from `from` to `to` (a quadratic Bézier), eased in and out. Its control
+ * point sits `lift` mm above the midpoint, at the higher end's height (`over: 'higher'`: a toss,
+ * which first rises above both ends) or the chord's (`over: 'chord'`: a hand's carry between the
+ * table and the eye, which never climbs past the higher end, so seen from above it rises
+ * steadily into view instead of overshooting and dropping back).
  * @returns {{x: number, y: number, z: number, s: number}} `s` is the eased progress, for rotations.
  */
-export function arcPoint(from, to, t, lift = 60) {
+export function arcPoint(from, to, t, lift = 60, { over = 'higher' } = {}) {
   const s = easeInOutCubic(t);
+  const base = over === 'chord' ? (from.y + to.y) / 2 : Math.max(from.y, to.y);
   const control = {
     x: (from.x + to.x) / 2,
-    y: Math.max(from.y, to.y) + lift,
+    y: base + lift,
     z: (from.z + to.z) / 2,
   };
   const a = (1 - s) ** 2;
