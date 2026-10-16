@@ -7,7 +7,14 @@
 // here means one upstream fetch per card across every player, a capped upstream burst,
 // and no cross-origin request for Cloudflare to block in the browser.
 
+import { gzip } from 'node:zlib';
+import { promisify } from 'node:util';
+
 export const TCGDEX_UPSTREAM = 'https://api.tcgdex.net';
+
+const gzipAsync = promisify(gzip);
+// Smaller bodies gain too little from compression to be worth the CPU.
+export const GZIP_MIN_BYTES = 1024;
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -58,7 +65,7 @@ function isBlockStatus(status) {
  * @param {() => number} [options.now]
  * @param {number} [options.maxEntries] LRU bound on cached responses.
  * @param {number} [options.concurrency] Upstream requests in flight at once.
- * @returns {{ get(canonical: string): Promise<{status: number, body: string, cacheControl: string}>, size(): number }}
+ * @returns {{ get(canonical: string): Promise<{status: number, body: string, cacheControl: string, gzip: (() => Promise<Buffer>)|null}>, size(): number }}
  */
 export function createTcgdexProxy({
   fetchImpl = globalThis.fetch,
@@ -66,7 +73,7 @@ export function createTcgdexProxy({
   maxEntries = 5000,
   concurrency = 4,
 } = {}) {
-  const cache = new Map(); // canonical -> { status, body, expiresAt }
+  const cache = new Map(); // canonical -> { status, body, expiresAt, gzipped? }
   const inFlight = new Map(); // canonical -> Promise<entry>
   const waiting = [];
   let active = 0;
@@ -76,6 +83,15 @@ export function createTcgdexProxy({
     cache.delete(key);
     cache.set(key, entry);
     while (cache.size > maxEntries) cache.delete(cache.keys().next().value);
+  }
+
+  // Compresses an entry's body once; a failed attempt is forgotten so the next request retries.
+  function gzipOnce(entry) {
+    entry.gzipped ??= gzipAsync(entry.body).catch((error) => {
+      entry.gzipped = null;
+      throw error;
+    });
+    return entry.gzipped;
   }
 
   async function withSlot(task) {
@@ -105,8 +121,19 @@ export function createTcgdexProxy({
   }
 
   function unavailable(stale) {
-    if (stale) return { status: stale.status, body: stale.body, cacheControl: 'no-store' };
-    return { status: 502, body: '{"error":"tcgdex_unavailable"}', cacheControl: 'no-store' };
+    if (stale)
+      return {
+        status: stale.status,
+        body: stale.body,
+        cacheControl: 'no-store',
+        gzip: null,
+      };
+    return {
+      status: 502,
+      body: '{"error":"tcgdex_unavailable"}',
+      cacheControl: 'no-store',
+      gzip: null,
+    };
   }
 
   async function load(key, stale) {
@@ -119,12 +146,31 @@ export function createTcgdexProxy({
     }
     if (upstream.status === 200) {
       const ttl = ttlForTcgdexPath(key);
-      remember(key, { status: 200, body: upstream.body, expiresAt: now() + ttl });
-      return { status: 200, body: upstream.body, cacheControl: 'public, max-age=3600' };
+      const entry = {
+        status: 200,
+        body: upstream.body,
+        expiresAt: now() + ttl,
+      };
+      remember(key, entry);
+      return {
+        status: 200,
+        body: upstream.body,
+        cacheControl: 'public, max-age=3600',
+        gzip: () => gzipOnce(entry),
+      };
     }
     if (upstream.status === 404) {
-      remember(key, { status: 404, body: upstream.body, expiresAt: now() + NOT_FOUND_TTL_MS });
-      return { status: 404, body: upstream.body, cacheControl: 'no-store' };
+      remember(key, {
+        status: 404,
+        body: upstream.body,
+        expiresAt: now() + NOT_FOUND_TTL_MS,
+      });
+      return {
+        status: 404,
+        body: upstream.body,
+        cacheControl: 'no-store',
+        gzip: null,
+      };
     }
     if (isBlockStatus(upstream.status)) cooldownUntil = now() + COOLDOWN_MS;
     return unavailable(stale);
@@ -135,8 +181,20 @@ export function createTcgdexProxy({
       const hit = cache.get(key);
       if (hit && hit.expiresAt > now()) {
         remember(key, hit);
-        const cacheControl = hit.status === 200 ? 'public, max-age=3600' : 'no-store';
-        return { status: hit.status, body: hit.body, cacheControl };
+        if (hit.status !== 200) {
+          return {
+            status: hit.status,
+            body: hit.body,
+            cacheControl: 'no-store',
+            gzip: null,
+          };
+        }
+        return {
+          status: 200,
+          body: hit.body,
+          cacheControl: 'public, max-age=3600',
+          gzip: () => gzipOnce(hit),
+        };
       }
       if (inFlight.has(key)) return inFlight.get(key);
       const stale = hit?.status === 200 ? hit : null;
@@ -158,6 +216,22 @@ export function tcgdexProxyHandler(proxy, mount = '/api/tcgdex') {
     }
     const result = await proxy.get(key);
     res.setHeader('Cache-Control', result.cacheControl);
-    res.type('application/json').status(result.status).send(result.body);
+    res.setHeader('Vary', 'Accept-Encoding');
+    res.type('application/json').status(result.status);
+    if (
+      result.gzip &&
+      Buffer.byteLength(result.body) >= GZIP_MIN_BYTES &&
+      req.acceptsEncodings('gzip') === 'gzip'
+    ) {
+      try {
+        const zipped = await result.gzip();
+        res.setHeader('Content-Encoding', 'gzip');
+        res.send(zipped);
+        return;
+      } catch {
+        // Compression failed: the plain body below still answers the request.
+      }
+    }
+    res.send(result.body);
   };
 }
