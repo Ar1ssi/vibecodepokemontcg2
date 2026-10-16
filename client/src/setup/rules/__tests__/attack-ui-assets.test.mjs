@@ -27,6 +27,26 @@ describe('attack-ui sprites', () => {
     for (const { out } of spriteMap()) assert.ok(existsSync(`${ASSET_DIR}${out}`), `${out} is missing`);
   });
 
+  it('every HUD sprite dump-registry.py exports is committed at its full sprite rect', () => {
+    const hud = Object.entries(TABLE.hud ?? {});
+    assert.ok(hud.length >= 15, 'expected the design 074 HUD sprites');
+    for (const [sprite, file] of hud) {
+      assert.ok(existsSync(`${ASSET_DIR}${file}`), `${file} is missing`);
+      const png = readFileSync(`${ASSET_DIR}${file}`);
+      const size = [png.readUInt32BE(16), png.readUInt32BE(20)];
+      const rect = TABLE.borders[sprite];
+      assert.deepEqual(size, [rect.width, rect.height], `${file} is not ${sprite}'s rect`);
+    }
+  });
+
+  it('every type has a filled and an empty cost icon', () => {
+    for (const key of [...Object.keys(TYPE_GLOW), 'rainbow', 'plus']) {
+      assert.ok(existsSync(`${ASSET_DIR}type-${key}.png`), `type-${key}.png`);
+      assert.ok(existsSync(`${ASSET_DIR}type-${key}-empty.png`), `type-${key}-empty.png`);
+    }
+    assert.ok(existsSync(`${ASSET_DIR}type-empty.png`));
+  });
+
   it('every attack-ui url in index.css points at a committed sprite', () => {
     const urls = [...CSS.matchAll(/url\('\.\.\/assets\/attack-ui\/([^']+)'\)/g)].map((m) => m[1]);
     assert.ok(urls.length > 40, 'expected the palette and variant urls');

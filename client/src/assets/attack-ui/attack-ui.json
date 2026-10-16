@@ -1449,6 +1449,119 @@
       "top": 0,
       "width": 300,
       "height": 100
+    },
+    "circle_28": {
+      "left": 28,
+      "bottom": 28,
+      "right": 28,
+      "top": 28,
+      "width": 56,
+      "height": 56
+    },
+    "circle_32": {
+      "left": 32,
+      "bottom": 32,
+      "right": 32,
+      "top": 32,
+      "width": 64,
+      "height": 64
+    },
+    "gradient_Vert": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 32,
+      "height": 32
+    },
+    "icn_Close": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 110,
+      "height": 110
+    },
+    "icn_CloseShadow": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 142,
+      "height": 142
+    },
+    "icn_DropDown": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 64,
+      "height": 64
+    },
+    "icn_StackView": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 64,
+      "height": 64
+    },
+    "icn_StatusArrow": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 64,
+      "height": 64
+    },
+    "shadow_32": {
+      "left": 43,
+      "bottom": 43,
+      "right": 43,
+      "top": 43,
+      "width": 86,
+      "height": 86
+    },
+    "shadow_60": {
+      "left": 40,
+      "bottom": 40,
+      "right": 40,
+      "top": 40,
+      "width": 80,
+      "height": 80
+    },
+    "statusArrow_Down": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 64,
+      "height": 64
+    },
+    "statusArrow_Up": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 64,
+      "height": 64
     }
+  },
+  "hud": {
+    "atkOv_Brdr_B1": "list-border-b1.png",
+    "atkOv_DmgMod_Bg": "dmg-mod-bg.png",
+    "atkOv_RetreatBtn_Shadow": "retreat-shadow.png",
+    "circle_28": "circle-28.png",
+    "circle_32": "circle-32.png",
+    "gradient_Vert": "gradient-vert.png",
+    "icn_Close": "icn-close.png",
+    "icn_CloseShadow": "icn-close-shadow.png",
+    "icn_DropDown": "icn-dropdown.png",
+    "icn_StackView": "icn-stack.png",
+    "icn_StatusArrow": "icn-status.png",
+    "shadow_32": "shadow-32.png",
+    "shadow_60": "shadow-60.png",
+    "statusArrow_Down": "arrow-down.png",
+    "statusArrow_Up": "arrow-up.png"
   }
 }

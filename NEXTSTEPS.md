@@ -6,4 +6,4 @@
 #5 "basic prompt gone" → I87 · #6 match logging → I85 (design 028) · #4 30th anniversary → I86 (design 029).
 
 
-# oneshot 074-tcgl-attack-ui · worktree .claude/worktrees/tcgl-attack-ui · slice 0/7 (design committed)
+# oneshot 074-tcgl-attack-ui · worktree .claude/worktrees/tcgl-attack-ui · slice 1/7
