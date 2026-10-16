@@ -359,22 +359,16 @@ try {
   await actor.page.screenshot({ path: 'out/e2e-focus-payable.png' });
   console.log('Screenshot saved: out/e2e-focus-payable.png');
 
-  // 10c. With a payable attack under the cursor, a real double-click on the Active must not fire it:
-  // the Active's slot is under the landed card, so the second click lands on an attack panel.
+  // 10c. A second click inside the 500 ms guard must not fire a payable attack. The TCG Live option
+  // list stands beside the card, so the second click is aimed at the first payable row, not the Active.
   await actor.page.keyboard.press('Escape');
   await waitGone();
-  const payBox = await actorFrame.locator('#active img').boundingBox();
-  const px = payBox.x + payBox.width / 2;
-  const py = payBox.y + payBox.height / 2;
-  await actor.page.mouse.click(px, py);
+  await clickActive(['click']);
   // A slow double-click: the list has finished revealing, the 500 ms guard has not passed.
   await actor.page.waitForTimeout(350);
-  const onUsablePanel = await actor.page.evaluate(
-    ([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.tcgl-opt--usable')),
-    [px, py]
-  );
-  T('10c-pre. The second click of the double-click would land on a payable attack panel', onUsablePanel);
-  await actor.page.mouse.click(px, py);
+  const payRow = await actor.page.locator('.tcgl-opt.tcgl-opt--usable').first().boundingBox();
+  T('10c-pre. A payable attack row is on screen inside the guard window', Boolean(payRow));
+  if (payRow) await actor.page.mouse.click(payRow.x + payRow.width / 2, payRow.y + payRow.height / 2);
   await actor.page.waitForTimeout(700);
   T('10c. ...and it does not fire the attack: the focus view is still open', await focusOpen());
 
@@ -391,13 +385,15 @@ try {
   T('12. The stack view lists the attached Energy and the attacks', stackView.energy === '1' && stackView.attacks === 2);
   await actor.page.keyboard.press('Escape');
   await actor.page.waitForTimeout(500);
+  T('12b. Escape closes the stack view', !(await actor.page.evaluate(() => Boolean(document.querySelector('.tcgl-stack')))));
 
   // 13. Click a payable attack with REAL input (locator.click), not el.click(): a programmatic click
   // dispatches no pointerdown, so pointer-capture regressions hide. The focus closes at once.
   console.log('Testing attack click execution...');
   await clickActive(['click']);
   await actor.page.waitForTimeout(800);
-  await actor.page.locator('.tcgl-opt.tcgl-opt--usable').first().click();
+  T('13-pre. The focus view reopens on the Active', await focusOpen());
+  await actor.page.locator('.tcgl-opt.tcgl-opt--usable').first().click({ timeout: 5000 });
   T('13. Clicking a payable attack closes the focus view at once', await waitGone());
   T('13b. ...and the hand is raised again', !(await handLowered()));
 

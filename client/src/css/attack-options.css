@@ -98,6 +98,8 @@
   font-family: 'Akko W1G', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
   color: #000000;
   user-select: none;
+  /* The chrome around the rows passes clicks through to the card; the rows take them back. */
+  pointer-events: auto;
 }
 /* atkOv_Action_BG, 16px edges at 50 px per row unit. */
 .tcgl-opt::before {

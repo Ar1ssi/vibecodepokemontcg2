@@ -51,6 +51,26 @@ describe('013 C2 — dimming never uses opacity', () => {
   }
 });
 
+describe('074 — the option rows take clicks through the click-through chrome', () => {
+  // .ptcg-chrome is pointer-events: none so taps reach the card. A row that does not take
+  // pointer events back is drawn but unclickable: the attack never fires.
+  const OPTIONS_CSS = readFileSync(`${CSS_DIR}attack-options.css`, 'utf8');
+  const FOCUS_CSS = readFileSync(`${CSS_DIR}card-focus.css`, 'utf8');
+
+  it('.ptcg-chrome is click-through', () => {
+    assert.match(body('.ptcg-chrome') ?? '', /pointer-events: none/);
+  });
+
+  it('.tcgl-opt takes pointer events back', () => {
+    assert.match(ruleBody(OPTIONS_CSS, '.tcgl-opt') ?? '', /pointer-events: auto/);
+  });
+
+  it('the focus list takes the wheel so it can scroll', () => {
+    const decls = ruleBody(FOCUS_CSS, '.card-focus__card .ptcg-chrome--focus .ptcg-stack--focus');
+    assert.match(decls ?? '', /pointer-events: auto/);
+  });
+});
+
 describe('013 C1 — the card scan stays the background', () => {
   // The containers that span the card must be transparent; only the pieces that replace
   // print get a fill. An earlier revision put a cream field behind the whole lower block

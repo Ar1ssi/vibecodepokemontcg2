@@ -343,6 +343,8 @@
   border-image: url('../assets/attack-ui/list-bg.png') 31 fill / calc(var(--tu) * 1.24) stretch;
   overflow: hidden auto;
   scrollbar-width: none;
+  /* The chrome is click-through; the list takes the wheel so an overflowing list still scrolls. */
+  pointer-events: auto;
   border-radius: 0;
   box-shadow: none;
 }
