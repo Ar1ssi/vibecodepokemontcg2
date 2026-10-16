@@ -1,0 +1,360 @@
+/* Stack view (design 074): StackedCardOverlay_Landscape, built by setup/rules/stack-view.mjs.
+   Lengths are the game's canvas px (1920 x 1080 reference) through --pu; the attack rows inside take
+   --tu from the info panel's width (840 px of list = 5.25 units at the rows' 0.75 scale, so 160 px).
+   Sliced sprites draw their border px at 1 px each (pixelsPerUnitMultiplier 1). */
+.tcgl-stack {
+  --pu: min(calc(100vw / 1920), calc(100vh / 1080));
+  position: fixed;
+  inset: 0;
+  z-index: 2450;
+  background: rgba(0, 0, 0, 0.9);
+  font-family: 'Akko W1G', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  color: #1a1a1a;
+}
+.tcgl-stack__layout {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--pu) * 1920);
+  height: calc(var(--pu) * 1080);
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ── CarouselRegion: the left half, 747 tall at the middle; the card between its arrows. ─────── */
+.tcgl-stack__carousel {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.tcgl-stack__card {
+  height: calc(var(--pu) * 747);
+  aspect-ratio: 63 / 88;
+  border-radius: 4.5% / 3.2%;
+  overflow: hidden;
+  box-shadow: 0 calc(var(--pu) * 12) calc(var(--pu) * 40) rgba(0, 0, 0, 0.6);
+}
+.tcgl-stack__card > *,
+.tcgl-stack__card .card__translater,
+.tcgl-stack__card .card__rotator,
+.tcgl-stack__card .card__rotator > * {
+  width: 100%;
+  height: 100%;
+}
+.tcgl-stack__card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+/* btn_Left / btn_Right: 64 px at scale 0.8, 30 outside PokemonLayoutRect (560 wide), 64 below the
+   middle; icn_RightArrow (mirrored on the left) in #333333 on a circle_26 #ededed face. */
+.tcgl-stack__arrow {
+  position: absolute;
+  top: calc(50% + var(--pu) * 64);
+  width: calc(var(--pu) * 51.2);
+  height: calc(var(--pu) * 51.2);
+  transform: translate(-50%, -50%);
+  --btn-face: #ededed;
+  --btn-icon: url('../assets/attack-ui/icn-arrow-right.png');
+}
+.tcgl-stack__arrow--left { left: calc(50% - var(--pu) * 310); }
+.tcgl-stack__arrow--right { left: calc(50% + var(--pu) * 310); }
+.tcgl-stack__arrow--left .tcgl-stack__btn-icon { transform: scaleX(-1); }
+.tcgl-stack__dots {
+  position: absolute;
+  bottom: calc(var(--pu) * 110);
+  display: flex;
+  gap: calc(var(--pu) * 10);
+}
+.tcgl-stack__dot {
+  width: calc(var(--pu) * 12);
+  height: calc(var(--pu) * 12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+}
+.tcgl-stack__dot--on { background: #ffffff; }
+
+/* Round sprite button: shadow_32 under a raised circle_32 white stroke and its face. */
+.tcgl-stack__btn {
+  position: absolute;
+  isolation: isolate;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.tcgl-stack__btn::before {
+  content: '';
+  position: absolute;
+  inset: -8%;
+  z-index: -1;
+  background: url('../assets/attack-ui/shadow-32.png') center / 100% 100% no-repeat;
+  filter: brightness(0);
+  opacity: 0.5;
+}
+.tcgl-stack__btn-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform: translateY(-8%);
+  border-radius: 50%;
+  background: #ffffff;
+}
+.tcgl-stack__btn-face::before {
+  content: '';
+  position: absolute;
+  inset: 10%;
+  border-radius: 50%;
+  background: var(--btn-face, #f2f2f2);
+}
+.tcgl-stack__btn-icon {
+  position: relative;
+  width: 50%;
+  height: 80%;
+  background: #333333;
+  -webkit-mask: var(--btn-icon) center / contain no-repeat;
+  mask: var(--btn-icon) center / contain no-repeat;
+}
+.tcgl-stack__btn:disabled { cursor: default; }
+.tcgl-stack__btn:disabled .tcgl-stack__btn-face { filter: brightness(0.7); }
+.tcgl-stack__btn:focus-visible { outline: 2px solid #8ecbff; outline-offset: 2px; border-radius: 50%; }
+/* Btn_Close: 70 px, 50 in from the right and 54 down; icn_Close over icn_CloseShadow (6 larger). */
+.tcgl-stack__close {
+  right: calc(var(--pu) * 15);
+  top: calc(var(--pu) * 19);
+  width: max(44px, calc(var(--pu) * 70));
+  height: max(44px, calc(var(--pu) * 70));
+}
+.tcgl-stack__close::before {
+  inset: calc(var(--pu) * -6);
+  background-image: url('../assets/attack-ui/icn-close-shadow.png');
+}
+.tcgl-stack__close .tcgl-stack__btn-face {
+  border-radius: 0;
+  background: url('../assets/attack-ui/icn-close.png') center / 100% 100% no-repeat;
+}
+.tcgl-stack__close .tcgl-stack__btn-face::before,
+.tcgl-stack__close .tcgl-stack__btn-icon { display: none; }
+
+/* ── CardInfoPanel: x 100–960 of the right half, 850 tall centred 55 below the middle; btn_Oct_16 in
+   #e6e6e6 over its shadow_Hex_16 (50 %). ──────────────────────────────────────────────────────── */
+.tcgl-stack__panel {
+  position: relative;
+  isolation: isolate;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  margin: calc(var(--pu) * 170) 0 0 calc(var(--pu) * 100);
+  height: calc(var(--pu) * 850);
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/oct-16.png') 19 fill / calc(var(--pu) * 19) stretch;
+  filter: drop-shadow(0 calc(var(--pu) * 6) calc(var(--pu) * 12) rgba(0, 0, 0, 0.5));
+}
+/* PanelBG is tinted #e6e6e6: the white sprite under a multiply of that grey. */
+.tcgl-stack__panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #e6e6e6;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+/* CardInfoHeader: 280 tall, btn_Oct_16_Half in #f2f2f2, a 16 px gradient shadow under it. */
+.tcgl-stack__header {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--pu) * 4);
+  height: calc(var(--pu) * 280);
+  box-sizing: border-box;
+  padding: calc(var(--pu) * 10);
+  background: #f2f2f2;
+  border-radius: calc(var(--pu) * 19) calc(var(--pu) * 19) 0 0;
+  box-shadow: 0 calc(var(--pu) * 16) calc(var(--pu) * 16) calc(var(--pu) * -16) rgba(0, 0, 0, 0.2);
+}
+/* NameHPRegion: 128 tall in a btn_Oct_10 white stroke; the name in the left 68 %, the HP right. */
+.tcgl-stack__namehp {
+  position: relative;
+  flex: 0 0 auto;
+  height: calc(var(--pu) * 128);
+  box-sizing: border-box;
+  padding: 0 calc(var(--pu) * 25);
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/oct-10.png') 12 fill / calc(var(--pu) * 12) stretch;
+}
+.tcgl-stack__name {
+  position: absolute;
+  left: calc(var(--pu) * 25);
+  right: 32%;
+  top: calc(var(--pu) * 8);
+  height: calc(var(--pu) * 64);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--pu) * 46);
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tcgl-stack__hp {
+  position: absolute;
+  right: calc(var(--pu) * 25);
+  top: calc(var(--pu) * 14);
+  height: calc(var(--pu) * 50);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--pu) * 8);
+}
+.tcgl-stack__hp-total {
+  font-size: calc(var(--pu) * 34);
+  font-weight: 500;
+}
+.tcgl-stack__hp-total b { font-size: calc(var(--pu) * 40); }
+.tcgl-stack__hp-type { width: calc(var(--pu) * 40); height: calc(var(--pu) * 40); }
+/* HPBarBG: healthBar_L, 12 tall, 25 in each side, 12 below the middle; HPFill #22e322. */
+.tcgl-stack__hpbar {
+  position: absolute;
+  left: calc(var(--pu) * 25);
+  right: calc(var(--pu) * 25);
+  top: calc(50% + var(--pu) * 6);
+  height: calc(var(--pu) * 12);
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/hp-bar.png') 0 6 fill / 0 calc(var(--pu) * 6) stretch;
+}
+.tcgl-stack__hpfill {
+  height: 100%;
+  border-radius: calc(var(--pu) * 6);
+  background: #22e322;
+}
+/* AttachedEnergy / Attached Tools: 64 tall rows in the same white stroke; the title (Display_Md) over
+   the "x<b>count</b>" total on the left, the icons right, 15 in. */
+.tcgl-stack__attached {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: calc(var(--pu) * 64);
+  box-sizing: border-box;
+  padding: 0 calc(var(--pu) * 15) 0 calc(var(--pu) * 25);
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/oct-10.png') 12 fill / calc(var(--pu) * 12) stretch;
+}
+.tcgl-stack__attached-info {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--pu) * 12);
+}
+.tcgl-stack__attached-title {
+  font-family: 'Akko Pro Condensed', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  font-size: calc(var(--pu) * 28);
+  font-weight: 500;
+}
+.tcgl-stack__attached-total { font-size: calc(var(--pu) * 28); }
+.tcgl-stack__attached-list {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--pu) * 4);
+  padding-right: calc(var(--pu) * 10);
+}
+.tcgl-stack__attached-list .tcgl-icon { width: calc(var(--pu) * 32); height: calc(var(--pu) * 32); }
+/* ToolIcon: the Tool's art cropped 1.621 : 1, 64 tall at scale 0.8, in toolFrame_L. */
+.tcgl-stack__tool {
+  position: relative;
+  width: calc(var(--pu) * 83);
+  height: calc(var(--pu) * 51.2);
+}
+.tcgl-stack__tool::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--pu) * -8) calc(var(--pu) * -8) calc(var(--pu) * -9);
+  border: 0 solid transparent;
+  border-image: url('../assets/attack-ui/tool-frame.png') 10 12 14 12 fill / calc(var(--pu) * 10)
+    calc(var(--pu) * 12) calc(var(--pu) * 14) calc(var(--pu) * 12) stretch;
+  pointer-events: none;
+}
+.tcgl-stack__tool-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+}
+
+/* ActionListScroller: the attack rows, 10 / 20 padding, scrolling between header and footer. */
+.tcgl-stack__list {
+  --tu: calc(var(--pu) * 160);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--tu) * 0.05);
+  padding: calc(var(--pu) * 20) calc(var(--pu) * 10);
+  overflow: hidden auto;
+  scrollbar-width: thin;
+}
+
+/* RetreatFooter: 120 tall, btn_Oct_16_Half (flipped) in white; the bar in it, the Status Effects
+   button hung 20 below its bottom edge. */
+.tcgl-stack__footer {
+  --tu: calc(var(--pu) * 110);
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  height: calc(var(--pu) * 120);
+  box-sizing: border-box;
+  padding: 0 calc(var(--pu) * 25) 0 calc(var(--pu) * 30);
+  background: #ffffff;
+  border-radius: 0 0 calc(var(--pu) * 19) calc(var(--pu) * 19);
+  box-shadow: 0 calc(var(--pu) * -16) calc(var(--pu) * 16) calc(var(--pu) * -16) rgba(0, 0, 0, 0.2);
+}
+.tcgl-stack__footer .tcgl-wr { flex: 1 1 auto; }
+.tcgl-stack__footer .tcgl-retreat { height: calc(var(--pu) * 75); }
+/* Btn_FilterButtonLarge: 380 x 60, a circle_32 stroke round its #f2f2f2 face; the Buff / Debuff
+   arrows (icn_StatusArrow, lit with statusArrow_Up / _Down) 36 and 72 in, "Status Effects". */
+.tcgl-stack__status {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--pu) * -50);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--pu) * 4);
+  width: calc(var(--pu) * 380);
+  height: calc(var(--pu) * 60);
+  padding: 0 calc(var(--pu) * 20);
+  transform: translateX(-50%);
+  border: calc(var(--pu) * 4) solid #ffffff;
+  border-radius: calc(var(--pu) * 30);
+  background: #f2f2f2;
+  box-shadow: 0 calc(var(--pu) * 4) calc(var(--pu) * 8) rgba(0, 0, 0, 0.5);
+  font: 500 calc(var(--pu) * 28) / 1 'Akko W1G', 'Rodin Condensed', 'Barlow Semi Condensed', sans-serif;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+.tcgl-stack__status:disabled { cursor: default; color: #8a8a8a; }
+.tcgl-stack__status-icon {
+  width: calc(var(--pu) * 32);
+  height: calc(var(--pu) * 32);
+  background: #333333;
+  -webkit-mask: url('../assets/attack-ui/icn-status.png') center / contain no-repeat;
+  mask: url('../assets/attack-ui/icn-status.png') center / contain no-repeat;
+}
+.tcgl-stack__status-icon--debuff { transform: scaleY(-1); }
+.tcgl-stack__status-icon--buff.is-on {
+  background: url('../assets/attack-ui/arrow-up.png') center / contain no-repeat;
+  -webkit-mask: none;
+  mask: none;
+}
+.tcgl-stack__status-icon--debuff.is-on {
+  transform: none;
+  background: url('../assets/attack-ui/arrow-down.png') center / contain no-repeat;
+  -webkit-mask: none;
+  mask: none;
+}
+.tcgl-stack__status-text { flex: 1 1 auto; text-align: center; }

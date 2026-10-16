@@ -98,6 +98,22 @@
     "dmgEmptyShort": "atkOv_DmgBG_Empty_VStar_Short"
   },
   "borders": {
+    "accentLarge": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 523,
+      "height": 515
+    },
+    "accentSmall": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 366,
+      "height": 375
+    },
     "atkOV_AbilityTag_Off": {
       "left": 0,
       "bottom": 0,
@@ -1450,6 +1466,38 @@
       "width": 300,
       "height": 100
     },
+    "btn_Oct_10": {
+      "left": 12,
+      "bottom": 12,
+      "right": 12,
+      "top": 12,
+      "width": 25,
+      "height": 25
+    },
+    "btn_Oct_16": {
+      "left": 19,
+      "bottom": 19,
+      "right": 19,
+      "top": 19,
+      "width": 38,
+      "height": 38
+    },
+    "btn_Oct_16_Half": {
+      "left": 19,
+      "bottom": 1,
+      "right": 19,
+      "top": 19,
+      "width": 38,
+      "height": 20
+    },
+    "circle_26": {
+      "left": 26,
+      "bottom": 26,
+      "right": 26,
+      "top": 26,
+      "width": 52,
+      "height": 52
+    },
     "circle_28": {
       "left": 28,
       "bottom": 28,
@@ -1474,6 +1522,22 @@
       "width": 32,
       "height": 32
     },
+    "healthBarFill_L": {
+      "left": 6,
+      "bottom": 0,
+      "right": 6,
+      "top": 0,
+      "width": 12,
+      "height": 12
+    },
+    "healthBar_L": {
+      "left": 6,
+      "bottom": 0,
+      "right": 6,
+      "top": 0,
+      "width": 12,
+      "height": 12
+    },
     "icn_Close": {
       "left": 0,
       "bottom": 0,
@@ -1491,6 +1555,14 @@
       "height": 142
     },
     "icn_DropDown": {
+      "left": 0,
+      "bottom": 0,
+      "right": 0,
+      "top": 0,
+      "width": 64,
+      "height": 64
+    },
+    "icn_RightArrow": {
       "left": 0,
       "bottom": 0,
       "right": 0,
@@ -1530,6 +1602,14 @@
       "width": 80,
       "height": 80
     },
+    "shadow_Hex_16": {
+      "left": 25,
+      "bottom": 25,
+      "right": 25,
+      "top": 25,
+      "width": 50,
+      "height": 50
+    },
     "statusArrow_Down": {
       "left": 0,
       "bottom": 0,
@@ -1545,23 +1625,42 @@
       "top": 0,
       "width": 64,
       "height": 64
+    },
+    "toolFrame_L": {
+      "left": 12,
+      "bottom": 14,
+      "right": 12,
+      "top": 10,
+      "width": 28,
+      "height": 29
     }
   },
   "hud": {
+    "accentLarge": "accent-large.png",
+    "accentSmall": "accent-small.png",
     "atkOv_Brdr_B1": "list-border-b1.png",
     "atkOv_DmgMod_Bg": "dmg-mod-bg.png",
     "atkOv_RetreatBtn_Shadow": "retreat-shadow.png",
+    "btn_Oct_10": "oct-10.png",
+    "btn_Oct_16": "oct-16.png",
+    "btn_Oct_16_Half": "oct-16-half.png",
+    "circle_26": "circle-26.png",
     "circle_28": "circle-28.png",
     "circle_32": "circle-32.png",
     "gradient_Vert": "gradient-vert.png",
+    "healthBarFill_L": "hp-fill.png",
+    "healthBar_L": "hp-bar.png",
     "icn_Close": "icn-close.png",
     "icn_CloseShadow": "icn-close-shadow.png",
     "icn_DropDown": "icn-dropdown.png",
+    "icn_RightArrow": "icn-arrow-right.png",
     "icn_StackView": "icn-stack.png",
     "icn_StatusArrow": "icn-status.png",
     "shadow_32": "shadow-32.png",
     "shadow_60": "shadow-60.png",
+    "shadow_Hex_16": "shadow-hex-16.png",
     "statusArrow_Down": "arrow-down.png",
-    "statusArrow_Up": "arrow-up.png"
+    "statusArrow_Up": "arrow-up.png",
+    "toolFrame_L": "tool-frame.png"
   }
 }

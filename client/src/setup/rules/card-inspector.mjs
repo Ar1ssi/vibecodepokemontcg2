@@ -700,6 +700,19 @@ const stampContextFor = (card, zone = 'active') => ({
 });
 
 /**
+ * The stack view's info panel (design 074): the same model, read-only — the game's deep inspection
+ * lists the card's entries but acts on none of them. `energyTypes` feeds the Attached Energy row.
+ *
+ * @param {object} card a preview card
+ * @param {'active'|'bench'} [zone]
+ * @returns {{ model: object, energyTypes: Array }}
+ */
+export const stackViewModelFor = (card, zone = 'active') => {
+  const context = { ...stampContextFor(card, zone), readOnly: true };
+  return { model: buildInspectorModel(card, context), energyTypes: context.energyTypes };
+};
+
+/**
  * The context a Stadium panel needs: the live per-player flags the pure model reads. Unlike a
  * Pokémon this resolves nothing async, so `getContext` is authoritative from first paint and the
  * model stays current across REFRESH_EVENT re-renders.

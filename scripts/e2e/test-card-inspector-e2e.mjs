@@ -380,13 +380,15 @@ try {
 
   await actor.page.locator('.card-focus__stack').click();
   await actor.page.waitForTimeout(800);
-  const slideCount = await actor.page.locator('.card-picker-stage .card-picker-slide').count();
-  T('11. Stack closes the focus and opens the carousel with the attached card', !(await focusOpen()) && slideCount >= 2, `slides=${slideCount}`);
-  const energySlideHasChrome = await actor.page.evaluate(() => {
-    const slides = document.querySelectorAll('.card-picker-stage .card-picker-slide');
-    return !!slides[0]?.querySelector('.ptcg-inspector');
-  });
-  T('12. The attached Energy slide has no inspector chrome', energySlideHasChrome === false);
+  // Design 074: Stack opens TCG Live's stack view — the card carousel beside the info panel.
+  const stackView = await actor.page.evaluate(() => ({
+    open: Boolean(document.querySelector('.tcgl-stack')),
+    dots: document.querySelectorAll('.tcgl-stack__dot').length,
+    energy: document.querySelector('.tcgl-stack__attached--energy .tcgl-stack__attached-total b')?.textContent ?? null,
+    attacks: document.querySelectorAll('.tcgl-stack__list .tcgl-opt--attack').length,
+  }));
+  T('11. Stack closes the focus and opens the stack view with the attached card', !(await focusOpen()) && stackView.open && stackView.dots >= 2, JSON.stringify(stackView));
+  T('12. The stack view lists the attached Energy and the attacks', stackView.energy === '1' && stackView.attacks === 2);
   await actor.page.keyboard.press('Escape');
   await actor.page.waitForTimeout(500);
 

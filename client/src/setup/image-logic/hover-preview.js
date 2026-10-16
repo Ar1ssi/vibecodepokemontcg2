@@ -8,6 +8,8 @@ import {
 } from '../deck-builder/core/holo.mjs';
 import { cardBackSrcForUser } from '../deck-constructor/hydrate-holo.js';
 import { isCardFocusOpen } from '../rules/card-focus.mjs';
+import { isStackViewOpen } from '../rules/stack-view.mjs';
+import { isStatusPopupOpen } from '../rules/status-popup.mjs';
 import { isCardInspectorOpen } from '../rules/card-inspector.mjs';
 import { onFxSettingsChanged } from './fx-settings.js';
 import { readSettings } from './fx-settings.mjs';
@@ -41,7 +43,12 @@ export function initializeHoverPreview() {
   if (preview || typeof document === 'undefined') return;
   preview = createHoverPreview({
     doc: document,
-    isModalOpen: () => isCardPreviewOpen() || isCardFocusOpen() || isCardInspectorOpen(),
+    isModalOpen: () =>
+      isCardPreviewOpen() ||
+      isCardFocusOpen() ||
+      isCardInspectorOpen() ||
+      isStackViewOpen() ||
+      isStatusPopupOpen(),
     isEnabled: () => !readSettings(storage()).hoverPreviewOff,
     cardBackSrc: cardBackSrcForUser,
     holo: {

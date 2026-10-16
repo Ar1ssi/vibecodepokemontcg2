@@ -36,6 +36,7 @@ import {
 } from '../rules/card-focus.mjs';
 import { shouldOpenCardFocus } from '../rules/card-focus-routing.mjs';
 import { statusEffectsFor } from '../rules/attack-ui-model.mjs';
+import { openStackView } from '../rules/stack-view.mjs';
 import {
   attack,
   retreat,
@@ -266,11 +267,17 @@ const focusStatusesFor = (card, zone) =>
     active: zone === 'active',
   });
 
-// Design 067: your own Active opens the TCG Live focus view. The attached cards the old inspector
-// carried as carousel slides sit behind the HUD's Stack button. An attack or retreat closes the
-// focus at once, because it fires at the slot the card would otherwise be flying back to.
+// The stack view's carousel, left to right: the Pokémon, its evolution line (highest stage first),
+// then its Tools, then its Energy — the carousel order read the other way round.
+const stackCardsOf = (card) => [card, ...orderAttachedForCarousel(attachedSlidesOf(card)).reverse()];
+
+const openStackFor = (card, zone) =>
+  openStackView({ card, cards: stackCardsOf(card), zone, statuses: focusStatusesFor(card, zone) });
+
+// Design 067: your own Active opens the TCG Live focus view; the HUD's Stack button closes it and
+// opens the stack view (design 074). An attack or retreat closes the focus at once, because it
+// fires at the slot the card would otherwise be flying back to.
 const openOwnActiveFocus = (card) => {
-  const attachedSlides = attachedSlidesOf(card);
   return openCardFocus({
     card,
     zone: 'active',
@@ -283,15 +290,7 @@ const openOwnActiveFocus = (card) => {
       closeCardFocus({ immediate: true });
       retreat(systemState.initiator);
     },
-    onOpenStack:
-      attachedSlides.length > 0
-        ? () =>
-            openCarouselViewer({
-              title: card.name || 'Attached Cards',
-              candidates: [...orderAttachedForCarousel(attachedSlides), card],
-              initialIndex: attachedSlides.length,
-            })
-        : null,
+    onOpenStack: () => openStackFor(card, 'active'),
   });
 };
 
