@@ -6,9 +6,10 @@
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120 each exist twice — cite as `D119[rules]`.
 #   The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id greppable.
-#   Next id = highest D number in this file and the archive + 1 (next: D214).
+#   Next id = highest D number in this file and the archive + 1 (next: D215).
 
 ## Active
+- D214 2026-10-16 [board-ui] TCG Live foil/reverse cards wear its own shader+masks; lossless WebP streamed from R2 (`FOIL_TEXTURE_URL`), never in git; others keep CSS holo. (design 069-tcgl-card-foil)
 - D213 2026-10-16 [deck-builder] Sleeves are TCG Live's 415 (scripts/import-tcgl-sleeves.py: face crop 73-439 px, webp, ids `cs_*`), not the sleeve database; old stored ETB sleeve id remaps.
 - D212 2026-10-15 [netcode] Opening coin follows TCG Live: caller calls, server flips, the winner chooses first or second; a silent or dropped winner goes first (the pre-072 outcome). (design 072) (PR #218 branch id D211)
 - D211 2026-10-15 [board-ui] Special Energy tokens are cut from the card's own orb art, one per name, not drawn (user rejected glyph designs). Finish = the art printing's: always-foil rarity → holo, else reverse variant → reverse holo (TCGdex variants; pokemontcg.io TCGplayer keys where TCGdex lists normal only). Cards providing 2 Energy show two orbs. Basic-named Metal/Darkness need an explicit Special marker.
@@ -29,7 +30,7 @@
 - D196 2026-09-29 [rules] Ancient/Future tags are looked up per printing in a generated table (pokemontcg.io subtypes, ids name-checked on TCGdex), never by name; readers call paradoxTagOf. (design 058)
 - D195 2026-09-29 [deck-builder] An Elite Trainer Box is a product, not a format: opening one adds counts to a localStorage collection (`ptcg-sim.collection.v1`) that the Standard builder only badges, never enforces. (design 057)
 - D194 2026-09-29 [deck-builder] Build & Battle box renders and English booster fronts are vendored webp (`client/src/assets/build-battle/{boxes,packs}`), fetched from Bulbapedia or pokesymbols.com (the sharper set per box) and processed in Playwright's Chromium by `scripts/build-battle/vendor-box-art.mjs` — no image library; `box-art.generated.mjs` is the index. (design 055)
-- D193 2026-09-29 [client] New dependency: three.js, pinned devDependency `0.185.0` (the last release with minified builds), vendored byte-identical into `client/src/vendor/three/` by `scripts/vendor-three.mjs` and mapped with an import map in index.ejs; loaded only by `import()` when a box opens. Client-only; the shared engine stays dependency-free (D4). (design 055)
+- D193 2026-09-29 [client] New dependency: three.js, pinned devDependency `0.185.0` (the last release with minified builds), vendored byte-identical into `client/src/vendor/three/` by `scripts/vendor-three.mjs` and mapped with an import map in index.ejs; loaded only by `import()` when a box opens or a TCG Live foil card first mounts (069-tcgl-card-foil). Client-only; the shared engine stays dependency-free (D4). (design 055)
 - D192 2026-09-28 [client] A saved Build & Battle box belongs to the room it was opened in (`session.roomId`); the game tab sends its room to the builder tab (`host-state.roomId`), and a different room starts a fresh box. Reloads and rematches in the same room keep it; outside a room it is kept.
 - D191 2026-09-28 [netcode] The match format is room-level: both seated players must agree (propose/accept) and the server keeps it on roomInfo, mirrored to GameRoom.roomFormat, never in engine state; the deal refuses decks of another format and the choice locks when the coin call opens (design 053).
 - D190 2026-09-28 [netcode] Formats are checked at the deal, not at load: `setup` refuses mixed formats and both Set Ups clear with a chat line, so a restored last-used deck stays replaceable (I202). (Supersedes D187's load refusal.)

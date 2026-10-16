@@ -6,5 +6,3 @@
 #5 "basic prompt gone" → I87 · #6 match logging → I85 (design 028) · #4 30th anniversary → I86 (design 029).
 
 # oneshot 068-tcgl-attack-vfx · worktree .claude/worktrees/tcgl-attack-vfx · branch feature/tcgl-attack-vfx · slice 6/6 done · branch ready, not landed · landing checklist in design 068 § For the landing commit
-
-# oneshot 069-tcgl-card-foil · worktree .claude/worktrees/tcgl-foil · branch feature/tcgl-foil · textures stream from R2 (not in git) · reverse holos imported · not landed · landing checklist in design 069 § For the landing commit

@@ -6,12 +6,16 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I249). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I253). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (maintain.md moves older Closed lines to .agent/archive/).
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I252 2026-10-16 P2 [board-ui] TCG Live foil SolidColor family (e.g. bw11-114) renders as a near-solid yellow wash — maybe a material-param port bug; check on localhost (refs: D214, design 069-tcgl-card-foil)
+- I251 2026-10-16 P3 [board-ui] TCG Live foil costs ~12 MB GPU per live card (front + etch + plate, mipmapped); not measured with ~20 on screen or in mat iframes (refs: D214)
+- I250 2026-10-16 P3 [board-ui] TCG Live foil gaps: Poké/Master Ball reverse (`_sph`/`_mph`/`_ph2`, ~600) not imported; sets ec, gum, me5-5m, smalt, xyalt, xybsp, swshbsp, mebsp #94–100, mee #9–16 unmapped (186+ cards keep CSS holo) (refs: D214)
+- I249 2026-10-16 P3 [board-ui] r2.dev public URL for foil textures is rate-limited and not for production; move ptcg-foil to a custom domain when one is on Cloudflare (refs: D214)
 - I248 2026-10-15 P3 [netcode] A caller or coin winner whose socket blips is answered for at once (go first / auto call) — no reconnect grace before handleSeatLost (refs: design 072, 013 row 6)
 - I247 2026-10-15 P3 [netcode] A seat that rejoins after the opening deal gets no dealOrder/turnOrderResult replay; a Set Up on that client would fall back to a local shuffle after 45 s (refs: design 072 review)
 - I246 2026-10-15 P2 [netcode] room-change-reset-test.mjs fails on main: "coin call overlay never opened" — it waits for the legacy picker the e2e bridge auto-answers under server authority (refs: reproduced on main during design 072 verification)
