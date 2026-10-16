@@ -15,8 +15,8 @@ import {
  * RoomEnvironment, so glossy things show distinct highlights against dark surroundings — the
  * contrast holo foil and shrink-wrap need to flash when they tilt. A ceiling softbox overhead, a
  * window-like panel at the front left (where the key light comes from), a cool strip behind on
- * the right, warm bounce off the desk, and dark walls. Units are arbitrary: a PMREM only keeps
- * directions. Rendered once through `PMREMGenerator.fromScene`.
+ * the right, a lit wall beyond the desk, warm bounce off the desk, and dark walls. Units are
+ * arbitrary: a PMREM only keeps directions. Rendered once through `PMREMGenerator.fromScene`.
  */
 
 const emissive = (intensity, color = 0xffffff) =>
@@ -49,6 +49,9 @@ export function createStudioEnvironment() {
   place(emissive(4, 0xfff8f0), [-17, 9, 9], [10, 7, 1], [0, Math.PI / 2.6, 0]);
   // A cool strip light behind on the right.
   place(emissive(3, 0xd9e6ff), [15, 8, -15], [2.2, 9, 1], [0, -Math.PI / 4, 0]);
+  // A lit wall beyond the desk: what the box's top, the film and cards lying flat mirror from
+  // where you sit, so they read glossy.
+  place(emissive(1.4, 0xfff6ea), [-3, 7, -19.5], [18, 9, 1]);
   // A dim lamp behind the viewer, so things facing the eye still catch a little light.
   place(emissive(1.2, 0xfff0dc), [3, 7, 19], [6, 4, 1], [0, Math.PI, 0]);
   // Warm bounce off the wooden desk.

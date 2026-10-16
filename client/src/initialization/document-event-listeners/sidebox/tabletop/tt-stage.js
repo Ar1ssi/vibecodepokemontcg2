@@ -20,10 +20,11 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { MAT } from '../../../../setup/deck-builder/core/build-battle/tabletop/layout.mjs';
 import { cameraBlend } from '../../../../setup/deck-builder/core/build-battle/tabletop/poses.mjs';
 import { createStudioEnvironment } from './tt-environment.js';
 import { cardSlab } from './tt-geometry.js';
-import { clothNormalTexture, loadTexture, woodTextures } from './tt-textures.js';
+import { WOOD_TILE_MM, clothNormalTexture, loadTexture, woodTextures } from './tt-textures.js';
 
 /**
  * The tabletop's stage (design 073 § Browser modules): one WebGL canvas, a desk under studio
@@ -34,8 +35,6 @@ import { clothNormalTexture, loadTexture, woodTextures } from './tt-textures.js'
 
 const PIXEL_RATIO_MAX = 2;
 const BACKSTOP_SLACK_MS = 700;
-// The rubber mat: a 610 × 356 mm full-size playmat, 2 mm thick.
-export const MAT = Object.freeze({ width: 610, depth: 356, thickness: 2, x: 0, z: 30 });
 
 /**
  * @param {{host: HTMLElement, quality?: 'high'|'low', surface?: {kind: 'mat'|'art', src?: string},
@@ -104,13 +103,15 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
   };
 
   // ── The desk and the mat ────────────────────────────────────────────────
+  const DESK = { width: 4200, depth: 3200 };
   const wood = woodTextures(renderer);
-  wood.color.repeat.set(3.4, 2.6);
-  wood.normal.repeat.set(3.4, 2.6);
+  for (const texture of [wood.color, wood.normal]) {
+    texture.repeat.set(DESK.width / WOOD_TILE_MM.x, DESK.depth / WOOD_TILE_MM.z);
+  }
   track(wood.color);
   track(wood.normal);
   const desk = new Mesh(
-    track(new PlaneGeometry(4200, 3200)),
+    track(new PlaneGeometry(DESK.width, DESK.depth)),
     track(
       new MeshStandardMaterial({
         map: wood.color,

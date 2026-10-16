@@ -27,6 +27,7 @@ import {
   LEAFLET_SPOT,
   PROMO_SPOT,
   REVEAL_SPOT,
+  WRAP_BALL_RADIUS,
   WRAP_SPOT,
   cameraPose,
   fitDistance,
@@ -38,6 +39,7 @@ import {
 import { packStack, stackPositionFor } from '../../../../setup/deck-builder/core/build-battle/tabletop/pack-stack.mjs';
 import {
   CARD,
+  LEAFLET,
   boxDimensions,
   contentsFor,
 } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
@@ -60,7 +62,7 @@ import { createTabletopAudio } from './tt-audio.js';
 import { buildBox, interiorSlots, prepareBoxFaces } from './tt-box.js';
 import { createCardKit, disposeCard } from './tt-card.js';
 import { resetFilm } from './tt-film.js';
-import { LEAFLET, buildCodeCard, buildDeck, buildLeaflet, contactShadow } from './tt-objects.js';
+import { buildCodeCard, buildDeck, buildLeaflet, contactShadow } from './tt-objects.js';
 import { createPackKit } from './tt-pack.js';
 import { drawProceduralWrapper, loadPrintFont, paletteFor } from './tt-print.js';
 import { createStage } from './tt-stage.js';
@@ -424,7 +426,11 @@ export async function createTabletopApp(options) {
     object.position.set(slot.x, slot.y, slot.z);
     object.quaternion.setFromEuler(new Euler(slot.rotX, 0, 0));
   };
-  const wrapBall = { center: new Vector3(WRAP_SPOT.x, 20, WRAP_SPOT.z), radius: 21 };
+  // The wad's centre sits low: the lumps under it rest on the mat.
+  const wrapBall = {
+    center: new Vector3(WRAP_SPOT.x, WRAP_BALL_RADIUS * 0.7, WRAP_SPOT.z),
+    radius: WRAP_BALL_RADIUS,
+  };
   const crumpledFilm = (uniforms, group, worldCenter) => {
     const local = group.worldToLocal(worldCenter.clone());
     uniforms.uTear.value.set(dims.width / 2, dims.height, dims.depth / 2, 62);
@@ -434,7 +440,13 @@ export async function createTabletopApp(options) {
     uniforms.uBallRadius.value = wrapBall.radius;
     uniforms.uDrift.value.set(0, 0, 0);
   };
-  const wrapShadow = contactShadow({ texture: blob, width: 40, depth: 40, spread: 10, opacity: 0.35 });
+  const wrapShadow = contactShadow({
+    texture: blob,
+    width: WRAP_BALL_RADIUS * 1.6,
+    depth: WRAP_BALL_RADIUS * 1.6,
+    spread: 10,
+    opacity: 0.35,
+  });
   keep(wrapShadow);
   wrapShadow.mesh.position.set(WRAP_SPOT.x, 0.12, WRAP_SPOT.z);
   wrapShadow.mesh.visible = false;
@@ -809,7 +821,7 @@ export async function createTabletopApp(options) {
     const from = strip.position.clone();
     const fromQ = strip.quaternion.clone();
     const spot = wrapperSpot(logical);
-    const rest = new Vector3(spot.x + 32 * side, 0.4 + logical * 0.3, spot.z - 38);
+    const rest = new Vector3(spot.x + 20 * side, 0.4 + logical * 0.3, spot.z - 50);
     const restQ = qFlat(spot.rotYDeg * 2 + 40 * side, true);
     stage.animate({
       durationMs: 900,

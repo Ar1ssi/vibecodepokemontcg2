@@ -354,6 +354,7 @@ function buildFilmShell({ W, H, D, envMap, crinkle, renderer, track }) {
   track(crinkleTexture);
   const film = createFilmMaterials({ envMap, crinkle: crinkleTexture, seams });
   track(film);
+  film.uniforms.uOrigin.value.set(0, H / 2, 0);
   const haze = new Mesh(geometry, film.haze);
   haze.renderOrder = 4;
   const gloss = new Mesh(geometry, film.gloss);

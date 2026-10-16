@@ -9,7 +9,7 @@ import {
   PlaneGeometry,
   SRGBColorSpace,
 } from 'three';
-import { CARD, deckThickness } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
+import { CARD, LEAFLET, deckThickness } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
 import { createFaceMaterial } from './tt-card.js';
 import { createFilmMaterials } from './tt-film.js';
 import { cardSlab } from './tt-geometry.js';
@@ -21,8 +21,6 @@ import { makeCanvas } from './tt-textures.js';
  * bottom card, the code card, the folded tips leaflet, and the soft contact shadows that ground
  * flat things on the mat.
  */
-
-export const LEAFLET = Object.freeze({ width: 85, height: 112, thickness: 1.2 });
 
 function canvasTextureOf(width, height, draw, renderer) {
   const canvas = makeCanvas(width, height);

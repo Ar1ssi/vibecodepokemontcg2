@@ -40,11 +40,25 @@ float ttNoise(vec3 x) {
 const VERTEX_HEAD = /* glsl */ `
 uniform float uLoosen;
 uniform float uCrumple;
+uniform vec3 uOrigin;
 uniform vec3 uBallCenter;
 uniform float uBallRadius;
 uniform vec3 uDrift;
 varying vec3 vFilmPos;
 ${NOISE_GLSL}
+`;
+
+// A crumpled film's facets face every which way: its normals turn from the box faces' toward the
+// wad's surface, broken up per vertex so each facet catches the light on its own.
+const VERTEX_NORMAL = /* glsl */ `
+{
+  float k = smoothstep(0.0, 1.0, uCrumple);
+  if (k > 0.0) {
+    vec3 outward = normalize(position - uOrigin + vec3(1e-4));
+    vec3 jag = vec3(ttNoise(position * 0.37), ttNoise(position * 0.41 + 7.3), ttNoise(position * 0.39 + 2.9)) - 0.5;
+    objectNormal = normalize(mix(objectNormal, normalize(outward + jag * 2.6), k));
+  }
+}
 `;
 
 const VERTEX_BODY = /* glsl */ `
@@ -53,10 +67,11 @@ vFilmPos = transformed;
   vec3 p = transformed;
   // The film lets go of the box: it bellies out a little, unevenly.
   p += objectNormal * uLoosen * (1.5 + 5.0 * ttNoise(p * 0.045));
-  // Then it balls up: every point heads for a lumpy sphere, wrinkling hard on the way.
-  vec3 toward = p - uBallCenter;
+  // Then it balls up: each point keeps its bearing from the film's own centre and heads for that
+  // spot on a lumpy sphere, wrinkling hard on the way.
+  vec3 bearing = normalize(position - uOrigin + vec3(1e-4));
   float lump = 0.62 + 0.38 * ttNoise(p * 0.11 + 3.7);
-  vec3 ball = uBallCenter + normalize(toward + vec3(1e-4)) * uBallRadius * lump;
+  vec3 ball = uBallCenter + bearing * uBallRadius * lump;
   float k = smoothstep(0.0, 1.0, uCrumple);
   p = mix(p, ball, k);
   p += (vec3(ttNoise(p * 0.21), ttNoise(p * 0.23 + 9.1), ttNoise(p * 0.19 + 4.3)) - 0.5)
@@ -74,21 +89,24 @@ varying vec3 vFilmPos;
 ${NOISE_GLSL}
 `;
 
-// Ragged hole around the grab point; the stretched rim of a tear goes white.
+// Ragged hole around the grab point. Film tears in long runs with small teeth, and the stretched
+// lip of a tear goes faintly white.
 const FRAGMENT_CLIP = /* glsl */ `
 float ttRim = 0.0;
 if (uTear.w > 0.0) {
   float ragged = (ttNoise(vFilmPos * 0.16) - 0.5) * uTear.w * 0.55
-    + (ttNoise(vFilmPos * 0.9) - 0.5) * 2.2;
+    + (ttNoise(vFilmPos * 0.9) - 0.5) * 1.1;
   float edge = distance(vFilmPos, uTear.xyz) - (uTear.w + ragged);
   if (edge < 0.0) discard;
-  ttRim = 1.0 - smoothstep(0.0, 2.6, edge);
+  ttRim = 1.0 - smoothstep(0.0, 1.3, edge);
 }
 `;
 
 const makeUniforms = () => ({
   uLoosen: { value: 0 },
   uCrumple: { value: 0 },
+  // The film's centre at rest, in its mesh's space: where a point's bearing on the ball is taken from.
+  uOrigin: { value: new Vector3() },
   uBallCenter: { value: new Vector3() },
   uBallRadius: { value: 14 },
   uDrift: { value: new Vector3() },
@@ -101,6 +119,7 @@ function inject(material, uniforms, { rimColor, crumpleBoost = 0 }) {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERTEX_HEAD}`)
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\n${VERTEX_NORMAL}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERTEX_BODY}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${FRAGMENT_HEAD}`)
@@ -138,7 +157,7 @@ export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensit
     depthWrite: false,
     side: DoubleSide,
   });
-  inject(gloss, uniforms, { rimColor: '0.55' });
+  inject(gloss, uniforms, { rimColor: '0.22' });
   const hazeMaterial = new MeshStandardMaterial({
     color: new Color(0xf4f7fb),
     roughness: 0.35,
@@ -155,7 +174,7 @@ export function createFilmMaterials({ envMap, crinkle, seams = null, envIntensit
     side: DoubleSide,
   });
   // Balled-up film scatters light: the crumpled wad reads milky white.
-  inject(hazeMaterial, uniforms, { rimColor: '0.9', crumpleBoost: 3 });
+  inject(hazeMaterial, uniforms, { rimColor: '0.55', crumpleBoost: 5 });
   return {
     gloss,
     haze: hazeMaterial,

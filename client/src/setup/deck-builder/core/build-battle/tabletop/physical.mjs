@@ -8,6 +8,9 @@ export const CARD = Object.freeze({ width: 63, height: 88, thickness: 0.31, corn
 
 // The vendored wrapper fronts are 780 × 1426 px (design 055); a pack is 66 mm wide, so the
 // booster top-loader's 70 × 121 internal size (a retailer spec) holds it.
+// The folded tips leaflet as it lies in the box (a folded A5-ish sheet).
+export const LEAFLET = Object.freeze({ width: 85, height: 112, thickness: 1.2 });
+
 export const PACK_ART_ASPECT = 1426 / 780;
 export const PACK = Object.freeze({
   width: 66,

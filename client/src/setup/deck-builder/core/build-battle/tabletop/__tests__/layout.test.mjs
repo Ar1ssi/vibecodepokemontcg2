@@ -2,8 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  BOX_SPOT,
   CAMERA_FOV_DEG,
+  CODE_SPOT,
+  DECK_SPOT,
+  EXTRAS_SPOT,
+  LEAFLET_SPOT,
+  MAT,
   PACK_ROW_X,
+  PROMO_SPOT,
+  REVEAL_SPOT,
+  WRAP_BALL_RADIUS,
+  WRAP_SPOT,
   cameraPose,
   fitDistance,
   packRowSpot,
@@ -11,7 +21,83 @@ import {
   summarySlot,
   wrapperSpot,
 } from '../layout.mjs';
-import { CARD, PACK } from '../physical.mjs';
+import { CARD, LEAFLET, PACK, boxDimensions } from '../physical.mjs';
+
+const DEG = Math.PI / 180;
+
+// A flat thing's footprint on the table: an oriented rectangle, turned like three's rotation.y.
+function footprint(spot, width, depth) {
+  const yaw = (spot.rotYDeg || 0) * DEG;
+  const across = [Math.cos(yaw), -Math.sin(yaw)];
+  const along = [Math.sin(yaw), Math.cos(yaw)];
+  const corners = [
+    [1, 1],
+    [1, -1],
+    [-1, -1],
+    [-1, 1],
+  ].map(([s, t]) => [
+    spot.x + (across[0] * width * s + along[0] * depth * t) / 2,
+    spot.z + (across[1] * width * s + along[1] * depth * t) / 2,
+  ]);
+  return { axes: [across, along], corners };
+}
+
+// Separating-axis test: two rectangles overlap unless some edge normal splits them.
+function overlaps(a, b) {
+  return [...a.axes, ...b.axes].every(([ax, az]) => {
+    const project = (rect) => rect.corners.map(([x, z]) => x * ax + z * az);
+    const pa = project(a);
+    const pb = project(b);
+    return Math.max(...pa) > Math.min(...pb) && Math.max(...pb) > Math.min(...pa);
+  });
+}
+
+function tableLayout() {
+  const box = boxDimensions(null);
+  const things = [
+    { name: 'box', rect: footprint(BOX_SPOT, box.width, box.depth) },
+    { name: 'deck', rect: footprint(DECK_SPOT, CARD.width, CARD.height) },
+    { name: 'promo', rect: footprint(PROMO_SPOT, CARD.width, CARD.height) },
+    { name: 'code card', rect: footprint(CODE_SPOT, CARD.width, CARD.height) },
+    { name: 'leaflet', rect: footprint(LEAFLET_SPOT, LEAFLET.width, LEAFLET.height), offMat: true },
+    { name: 'wrap', rect: footprint(WRAP_SPOT, 2 * WRAP_BALL_RADIUS, 2 * WRAP_BALL_RADIUS) },
+  ];
+  for (let k = 0; k < 4; k += 1) {
+    things.push({ name: `pack ${k}`, rect: footprint(packRowSpot(k, 4), PACK.width, PACK.height) });
+    things.push({ name: `wrapper ${k}`, group: 'wrappers', rect: footprint(wrapperSpot(k), PACK.width, PACK.height) });
+  }
+  for (const [pile, spot] of [
+    ['reveal', REVEAL_SPOT],
+    ['extras', EXTRAS_SPOT],
+  ]) {
+    for (let k = 0; k < 10; k += 1) {
+      const jitter = pileJitter(k);
+      const at = { x: spot.x + jitter.dx, z: spot.z + jitter.dz, rotYDeg: spot.rotYDeg + jitter.rotYDeg };
+      things.push({ name: `${pile} ${k}`, group: pile, rect: footprint(at, CARD.width, CARD.height) });
+    }
+  }
+  return things;
+}
+
+test('nothing laid on the table overlaps anything else', () => {
+  const things = tableLayout();
+  for (let i = 0; i < things.length; i += 1) {
+    for (let j = i + 1; j < things.length; j += 1) {
+      const [a, b] = [things[i], things[j]];
+      if (a.group && a.group === b.group) continue;
+      assert.ok(!overlaps(a.rect, b.rect), `${a.name} overlaps ${b.name}`);
+    }
+  }
+});
+
+test('everything but the leaflet lies wholly on the mat', () => {
+  const inside = ([x, z]) =>
+    Math.abs(x - MAT.x) <= MAT.width / 2 && Math.abs(z - MAT.z) <= MAT.depth / 2;
+  for (const thing of tableLayout()) {
+    if (thing.offMat) continue;
+    assert.ok(thing.rect.corners.every(inside), `${thing.name} hangs off the mat`);
+  }
+});
 
 test('the pack row is centred on its column and its packs never overlap', () => {
   const spots = [0, 1, 2, 3].map((index) => packRowSpot(index, 4));

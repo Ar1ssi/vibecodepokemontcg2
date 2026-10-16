@@ -80,7 +80,8 @@ function crimpTexture(shape) {
     const y1 = Math.round(v1 * h);
     for (let x = 0; x < w; x += 1) {
       const slope = Math.cos((x / w) * Math.PI * 2 * 70);
-      ctx.fillStyle = `rgb(${Math.round(128 + slope * 70)},128,${Math.round(255 - Math.abs(slope) * 25)})`;
+      // Shallow teeth: the printed art already shades the ridges, the relief only glints.
+      ctx.fillStyle = `rgb(${Math.round(128 + slope * 30)},128,${Math.round(255 - Math.abs(slope) * 6)})`;
       ctx.fillRect(x, y0, 1, y1 - y0);
     }
   };

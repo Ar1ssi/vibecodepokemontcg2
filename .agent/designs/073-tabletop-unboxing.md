@@ -203,3 +203,17 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
 | 5+ Realism iterations | any | Deviations log | strips | each round's before/after |
 
 ## Deviations (Builder appends here during build)
+- **Iteration 1 (framing and props).** Before: hand pose too low, piles off-screen, busy film crinkle,
+  held items casting hard shadows, lavender placeholder faces, SIR foil reading as chrome rings. After:
+  per-phase camera frames, held things cast no shadow, placeholders show the card back, foil surface
+  per finish mode (metalness/roughness/relief), sheen bands instead of concentric rings.
+- **Iteration 2 (light).** Before: three's RoomEnvironment washed cards out. After: `tt-environment.js`
+  studio room (dark walls, softbox, window, cool strip, desk bounce) as the PMREM; key light calibrated
+  so a card facing it shows its printed colour.
+- **Iteration 3 (table and film).** Before: promo under pack 0, torn wrappers on the code card, the
+  shrink-wrap wad a 20 px orange speck (every vertex aimed at the ball's near side), barcode crimps,
+  40 mm "topographic" wood rings, hint over the pack row. After: spots re-laid with an overlap/on-mat
+  test (`layout.test.mjs`), MAT/LEAFLET sizes moved into the pure modules, film balls up by bearing from
+  its own centre with crumpled normals, softer tear lip, shallow crimp relief, walnut plank desk at real
+  scale (flat-sawn cathedral grain, pores, seams, butt joints), a lit back wall so flat gloss reads,
+  table frame clears the dock. Frames: scratch `run6`→`run7`, `wrap1`.

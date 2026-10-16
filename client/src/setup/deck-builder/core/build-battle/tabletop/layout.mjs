@@ -6,20 +6,26 @@ import { CARD } from './physical.mjs';
 
 const DEG = Math.PI / 180;
 
+// The rubber mat under everything: a 610 × 356 mm full-size playmat, 2 mm thick; its top is y = 0.
+export const MAT = Object.freeze({ width: 610, depth: 356, thickness: 2, x: 0, z: 30 });
+
 /** The sealed box: upright, turned so the front and its left side face the viewer (the renders' view). */
 export const BOX_SPOT = Object.freeze({ x: 0, z: -70, rotYDeg: 25 });
 
 // Things taken out of the box, lying flat. `rotYDeg` turns them about the table normal. The box
-// sits at the back; the deck and its promo go left, the paper right, the packs in a loose row in
-// front, and the cards of an opened pack collect at the front right.
-export const DECK_SPOT = Object.freeze({ x: -196, z: -36, rotYDeg: -9 });
-export const PROMO_SPOT = Object.freeze({ x: -186, z: 74, rotYDeg: 5 });
-export const CODE_SPOT = Object.freeze({ x: 168, z: -40, rotYDeg: 13 });
-export const LEAFLET_SPOT = Object.freeze({ x: 186, z: -150, rotYDeg: 19 });
-export const WRAP_SPOT = Object.freeze({ x: -150, z: -170, rotYDeg: 0 });
+// sits at the back; the deck goes left with its promo between it and the box, the paper right, the
+// packs in a loose row in front, and the cards of an opened pack collect at the front right.
+export const DECK_SPOT = Object.freeze({ x: -206, z: -36, rotYDeg: -9 });
+export const PROMO_SPOT = Object.freeze({ x: -112, z: -28, rotYDeg: 4 });
+export const CODE_SPOT = Object.freeze({ x: 154, z: -40, rotYDeg: 10 });
+// The leaflet overhangs the mat's back edge onto the desk.
+export const LEAFLET_SPOT = Object.freeze({ x: 186, z: -158, rotYDeg: 19 });
+// The balled-up shrink-wrap is tossed onto the back left of the mat: a loose wad this wide.
+export const WRAP_SPOT = Object.freeze({ x: -160, z: -118, rotYDeg: 0 });
+export const WRAP_BALL_RADIUS = 28;
 export const REVEAL_SPOT = Object.freeze({ x: 186, z: 150, rotYDeg: -7 });
 export const EXTRAS_SPOT = Object.freeze({ x: 238, z: 46, rotYDeg: 11 });
-const WRAPPER_DISCARD = Object.freeze({ x: 258, z: -76 });
+const WRAPPER_DISCARD = Object.freeze({ x: -244, z: 128 });
 
 // The packs' row sits left of centre, leaving the front right for the opened cards.
 export const PACK_ROW_X = -40;
@@ -36,13 +42,13 @@ export function packRowSpot(visual, count = 4) {
   };
 }
 
-/** Emptied wrappers land loosely in a heap at the front right. */
+/** Emptied wrappers land loosely in a heap at the front left, clear of the pack row. */
 export function wrapperSpot(k) {
   const index = Math.max(0, Number(k) || 0);
   return {
-    x: WRAPPER_DISCARD.x + ((index * 37) % 23) - 11,
-    z: WRAPPER_DISCARD.z - index * 9,
-    rotYDeg: ((index * 53) % 70) - 35,
+    x: WRAPPER_DISCARD.x + ((index * 37) % 15) - 7,
+    z: WRAPPER_DISCARD.z - (index % 4) * 9,
+    rotYDeg: ((index * 53) % 40) - 20,
   };
 }
 
@@ -94,7 +100,7 @@ export function fitDistance(halfWidth, halfHeight, fovDeg, aspect) {
 const FRAMES = Object.freeze({
   box: { target: { x: 0, y: 50, z: -70 }, halfWidth: 150, halfHeight: 118, elevationDeg: 18 },
   open: { target: { x: 0, y: 72, z: -78 }, halfWidth: 170, halfHeight: 142, elevationDeg: 34 },
-  table: { target: { x: 10, y: 10, z: 10 }, halfWidth: 300, halfHeight: 240, elevationDeg: 52 },
+  table: { target: { x: 10, y: 10, z: 18 }, halfWidth: 300, halfHeight: 255, elevationDeg: 52 },
 });
 export const CAMERA_FOV_DEG = 30;
 
