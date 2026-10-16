@@ -236,3 +236,14 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   all 42; Sun & Moon and Ultra Prism show the right side, Burning Shadows, Crimson Invasion and
   Evolutions the front alone. Test: `box-faces.test.mjs` (every render covered, sizes match, convex
   clockwise quads, front proportions).
+- **Iteration 5 (the tear, frame by frame).** Before: the first tear compiled the mouth-clipped card
+  shaders mid-animation (a hitch on real GPUs, a 40 s stall on SwiftShader); the held pack threw a
+  shadow on the mat as its wrapper set off (flyTo switched shadows on at the start of a flight); pack
+  seals striped like a barcode. After: `warmShaders()` compiles the clipped stack behind the loading
+  screen (probe materials kept alive so three keeps the programs); shadows return at 55 % of a
+  landing flight; the wrapper surface is one normal map (shallow seal teeth, pinch creases fanning
+  from the seals, faint dents) plus a roughness map (seals 0.55, body 0.3). The bench gained
+  `?slowmo=N` (a scaled scene clock in `tt-stage.js`), which films motion on the real clock where
+  Playwright's fake clock stalled. Recorder: `.claude/skills/fx-preview/rec/rec-tabletop.mjs`
+  (every beat, pool integrity per pack, reload mid-pack, no-WebGL message); the scene's test api
+  gained a read-only `held`.

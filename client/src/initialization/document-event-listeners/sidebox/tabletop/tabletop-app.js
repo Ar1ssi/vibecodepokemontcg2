@@ -132,11 +132,12 @@ export async function createTabletopApp(options) {
     volume = () => 0.8,
     instant = () => false,
     onLost = () => {},
+    timeScale = 1,
   } = options;
 
   const host = el('div', 'tt-root');
   root.append(host);
-  const stage = createStage({ host, quality, instant, onLost: () => onLost() });
+  const stage = createStage({ host, quality, instant, timeScale, onLost: () => onLost() });
   if (!stage) {
     host.remove();
     return null;
@@ -401,8 +402,8 @@ export async function createTabletopApp(options) {
   const flyTo = (object, pose, { durationMs = 650, lift = 50, delayMs = 0 } = {}) => {
     let from = null;
     let fromQ = null;
-    // Landing on the mat: it casts its shadow again.
-    if (pose.position.y < 40) setCastShadow(object, true);
+    // Coming down onto the mat it casts its shadow again, once it is near the mat, not while in hand.
+    let shadowDue = pose.position.y < 40;
     return stage.animate({
       durationMs,
       delayMs,
@@ -411,6 +412,10 @@ export async function createTabletopApp(options) {
           scene.attach(object);
           from = object.position.clone();
           fromQ = object.quaternion.clone();
+        }
+        if (shadowDue && t >= 0.55) {
+          shadowDue = false;
+          setCastShadow(object, true);
         }
         const point = arcPoint(from, pose.position, t, lift);
         object.position.set(point.x, point.y, point.z);
@@ -638,6 +643,33 @@ export async function createTabletopApp(options) {
     return group;
   }
 
+  /** Gives a card mesh its own copies of the shared materials, clipped by `plane`. */
+  function clipCard(mesh, plane) {
+    const clipped = mesh.material.map((material, index) => {
+      const own = index === 0 ? material : material.clone();
+      own.clippingPlanes = [plane];
+      return own;
+    });
+    mesh.material = clipped;
+    return clipped;
+  }
+
+  // Shaders the opening needs later compile now, behind the loading screen: the card stack clipped
+  // by a pack's mouth would otherwise stall the first tear on its compile. The probe's materials
+  // stay alive (never drawn) so three keeps those programs until the tear uses them.
+  async function warmShaders() {
+    const probe = kit.makeCard({ map: backTexture, name: 'tt-warm' });
+    const probeMaterials = clipCard(probe, new Plane(new Vector3(0, 1, 0), 0));
+    disposers.push(() => probeMaterials.forEach((material) => material.dispose()));
+    const warm = new Group();
+    warm.add(probe);
+    try {
+      await renderer.compileAsync(warm, camera, scene);
+    } catch {
+      // A shader that fails here fails again where it is used, and three reports it there.
+    }
+  }
+
   // ── Beats ───────────────────────────────────────────────────────────────
   async function tearWrap(hitWorld = null) {
     const uniforms = boxModel.film.uniforms;
@@ -706,7 +738,7 @@ export async function createTabletopApp(options) {
   }
 
   async function liftOut({ object, pose, sound }, delayMs) {
-    await wait(instant() ? 0 : delayMs);
+    await wait(instant() ? 0 : delayMs / stage.timeScale);
     if (disposed) return;
     scene.attach(object);
     const start = object.position.clone();
@@ -840,15 +872,12 @@ export async function createTabletopApp(options) {
     const group = pack.model.group;
     const proxy = makeStackMesh(items[0]);
     proxy.scale.set(1, 1, items.length);
+    // It rises from a pack held in the hand, and held things cast no shadow.
+    proxy.castShadow = false;
     group.add(proxy);
     // Nothing of the stack shows below the mouth: it is still inside the wrapper there.
     const mouth = new Plane();
-    const clipped = proxy.material.map((material, index) => {
-      const own = index === 0 ? material : material.clone();
-      own.clippingPlanes = [mouth];
-      return own;
-    });
-    proxy.material = clipped;
+    const clipped = clipCard(proxy, mouth);
     const travel = CARD.height + 8;
     const startY = pack.model.mouthY - CARD.height / 2 - 4;
     proxy.position.set(0, startY, 0);
@@ -1324,6 +1353,8 @@ export async function createTabletopApp(options) {
   });
 
   // ── Start ───────────────────────────────────────────────────────────────
+  await warmShaders();
+  if (disposed) return null;
   settle();
   const surfaceReady = stage.setSurface(surface);
   await surfaceReady;
@@ -1338,6 +1369,15 @@ export async function createTabletopApp(options) {
     },
     get hand() {
       return hand?.kind || null;
+    },
+    /** The held stack for checks (rec-tabletop): its pack, the front card's index, every item's id. */
+    get held() {
+      if (hand?.kind !== 'stack') return null;
+      return {
+        logical: hand.logical,
+        position: hand.position,
+        ids: hand.items.map((item) => (item.kind === 'card' ? item.card?.id || null : item.kind)),
+      };
     },
     view,
     doNext: () => doNext(),

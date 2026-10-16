@@ -46,6 +46,8 @@ const SURFACES = Object.freeze([
 
 const root = document.getElementById('unboxingSite');
 const params = new URLSearchParams(window.location.search);
+// `?slowmo=10` plays every animation ten times slower, to study the motion.
+const SLOWMO = Math.min(50, Math.max(1, Number(params.get('slowmo')) || 1));
 
 const storage = (() => {
   try {
@@ -314,6 +316,7 @@ function mountScene(box, loaded, state, persist) {
     quality: prefs.quality,
     surface: SURFACES.find((entry) => entry.key === prefs.surface)?.surface || SURFACES[0].surface,
     finishLabel: 'See what you pulled',
+    timeScale: 1 / SLOWMO,
     muted: () => !prefs.sound,
     volume: () => 0.85,
     instant: () => false,

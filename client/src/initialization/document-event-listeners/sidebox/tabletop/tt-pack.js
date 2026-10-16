@@ -12,6 +12,7 @@ import {
 import {
   STRIP_V,
   packShape,
+  packShapeKey,
   packSpaceY,
   packTearLine,
   peelAngleDeg,
@@ -21,7 +22,7 @@ import {
 } from '../../../../setup/deck-builder/core/build-battle/pack3d.mjs';
 import { PACK } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
 import { averageColor, drawPackBack } from './tt-print.js';
-import { makeCanvas } from './tt-textures.js';
+import { fbm, makeCanvas, normalTextureFromHeights, prng } from './tt-textures.js';
 
 /**
  * A booster pack on the tabletop (design 073): the design-055 pillow (front and back grids bulged
@@ -66,27 +67,85 @@ function maskTexture(line, keepBelow) {
   return texture;
 }
 
-/** Fine vertical ridges across both crimped seals (the heat-sealer's teeth). */
-function crimpTexture(shape) {
+const SURFACE_W = 384;
+const SURFACE_H = 704;
+
+/**
+ * The wrapper's relief as a normal map: the heat-sealer's fine teeth across both crimped seals,
+ * the creases where the foil pinches flat into a seal (short folds fanning into the body, deepest
+ * at the corners), and the faint dents a pack picks up in its box. Seeded, so a reload shows the
+ * same pack.
+ */
+function packSurfaceTexture(shape, seed) {
   const { sealTopV, sealBottomV } = packShape(shape);
-  const w = 512;
-  const h = 512;
-  const canvas = makeCanvas(w, h);
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgb(128,128,255)';
-  ctx.fillRect(0, 0, w, h);
-  const band = (v0, v1) => {
-    const y0 = Math.round(v0 * h);
-    const y1 = Math.round(v1 * h);
+  const w = SURFACE_W;
+  const h = SURFACE_H;
+  const heights = new Float32Array(w * h);
+  const topSeal = sealTopV * 0.96 * h;
+  const bottomSeal = Math.min(1, sealBottomV * 1.004) * h;
+  for (let y = 0; y < h; y += 1) {
+    const inSeal = y < topSeal || y > bottomSeal;
     for (let x = 0; x < w; x += 1) {
-      const slope = Math.cos((x / w) * Math.PI * 2 * 70);
-      // Shallow teeth: the printed art already shades the ridges, the relief only glints.
-      ctx.fillStyle = `rgb(${Math.round(128 + slope * 30)},128,${Math.round(255 - Math.abs(slope) * 6)})`;
-      ctx.fillRect(x, y0, 1, y1 - y0);
+      const teeth = inSeal ? Math.cos((x / w) * Math.PI * 2 * 80) * 0.09 : 0;
+      const dent = (fbm(x / 48, y / 48, w / 48, 3, seed) - 0.5) * 2.2;
+      heights[y * w + x] = teeth + dent;
+    }
+  }
+  const rand = prng(seed + 17);
+  // A crease: a narrow ridge or trough from (x0, y0) running `length` px along `angle`, fading out.
+  const crease = (x0, y0, angle, length, depth, width) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const reach = Math.ceil(width * 2.5);
+    for (let s = 0; s < length; s += 1) {
+      const fade = 1 - s / length;
+      const cx = x0 + cos * s;
+      const cy = y0 + sin * s;
+      for (let oy = -reach; oy <= reach; oy += 1) {
+        for (let ox = -reach; ox <= reach; ox += 1) {
+          const px = Math.round(cx + ox);
+          const py = Math.round(cy + oy);
+          if (px < 0 || px >= w || py < 0 || py >= h) continue;
+          const d = Math.abs(ox * -sin + oy * cos);
+          heights[py * w + px] += (depth * fade * Math.exp(-(d * d) / (width * width))) / length * 9;
+        }
+      }
     }
   };
-  band(0, sealTopV * 0.96);
-  band(Math.min(1, sealBottomV * 1.004), 1);
+  for (const [edge, inward] of [
+    [topSeal, 1],
+    [bottomSeal, -1],
+  ]) {
+    let x = rand() * 10;
+    while (x < w) {
+      // Folds crowd toward the corners, where the pillow pinches hardest.
+      const corner = Math.min(x, w - x) / (w / 2);
+      const length = (14 + rand() * 46) * (1.25 - 0.5 * corner);
+      const lean = (rand() - 0.5) * 0.7 + (x < w / 2 ? 0.25 : -0.25) * (1 - corner);
+      crease(x, edge, Math.PI / 2 * inward + lean * inward, length, (rand() < 0.5 ? -1 : 1) * (0.6 + rand() * 0.6), 1.1 + rand() * 1.2);
+      x += 6 + rand() * 16 * (0.4 + corner);
+    }
+  }
+  return normalTextureFromHeights(heights, w, h, 1, null, { repeat: false });
+}
+
+const BODY_ROUGHNESS = 0.3;
+const SEAL_ROUGHNESS = 0.55;
+
+/** Roughness across the wrapper (green channel): the heat-pressed seals are duller than the body. */
+function packRoughnessTexture(shape) {
+  const { sealTopV, sealBottomV } = packShape(shape);
+  const w = 8;
+  const h = 256;
+  const canvas = makeCanvas(w, h);
+  const ctx = canvas.getContext('2d');
+  const shade = (roughness) => `rgb(0,${Math.round(roughness * 255)},0)`;
+  ctx.fillStyle = shade(BODY_ROUGHNESS);
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = shade(SEAL_ROUGHNESS);
+  ctx.fillRect(0, 0, w, Math.round(sealTopV * 0.96 * h));
+  const bottom = Math.round(Math.min(1, sealBottomV * 1.004) * h);
+  ctx.fillRect(0, bottom, w, h - bottom);
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = NoColorSpace;
   texture.needsUpdate = true;
@@ -121,6 +180,18 @@ function pillowGrid(width, height, segX, segY, vFrom, vTo, shape, sign) {
  */
 export function createPackKit({ envMap, renderer }) {
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  // Two wrinkle patterns per seal shape, alternating down the row: packs differ, the work is shared.
+  const surfaces = new Map();
+  const surfaceFor = (shape, packIndex) => {
+    const key = `${packShapeKey(shape)}#${packIndex % 2}`;
+    if (!surfaces.has(key)) {
+      surfaces.set(key, {
+        relief: packSurfaceTexture(shape, 401 + (packIndex % 2) * 97),
+        roughness: packRoughnessTexture(shape),
+      });
+    }
+    return surfaces.get(key);
+  };
 
   /**
    * @param {{art: HTMLImageElement|HTMLCanvasElement, shape: object|null, seed: number,
@@ -155,16 +226,19 @@ export function createPackKit({ envMap, renderer }) {
     backTexture.anisotropy = anisotropy;
     const bodyMask = track(maskTexture(line, true));
     const stripMask = track(maskTexture(line, false));
-    const crimp = track(crimpTexture(shape));
+    const surface = surfaceFor(shape, packIndex);
 
+    // Roughness comes from the map (body 0.3, seals 0.55); the clearcoat scales the same map.
     const look = {
       metalness: 0.5,
-      roughness: 0.3,
+      roughness: 1,
+      roughnessMap: surface.roughness,
       clearcoat: 0.35,
-      clearcoatRoughness: 0.14,
+      clearcoatRoughness: 0.47,
+      clearcoatRoughnessMap: surface.roughness,
       envMap,
       envMapIntensity: 1,
-      normalMap: crimp,
+      normalMap: surface.relief,
       alphaTest: 0.5,
     };
     const frontMaterial = (alphaMap) =>
@@ -240,5 +314,14 @@ export function createPackKit({ envMap, renderer }) {
     };
   };
 
-  return { makePack };
+  return {
+    makePack,
+    dispose: () => {
+      surfaces.forEach(({ relief, roughness }) => {
+        relief.dispose();
+        roughness.dispose();
+      });
+      surfaces.clear();
+    },
+  };
 }

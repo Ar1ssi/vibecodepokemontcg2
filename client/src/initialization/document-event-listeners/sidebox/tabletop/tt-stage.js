@@ -38,10 +38,19 @@ const BACKSTOP_SLACK_MS = 700;
 
 /**
  * @param {{host: HTMLElement, quality?: 'high'|'low', surface?: {kind: 'mat'|'art', src?: string},
- *   instant?: () => boolean, onLost?: () => void}} options
+ *   instant?: () => boolean, onLost?: () => void, timeScale?: number}} options — `timeScale`
+ *   below 1 plays every animation in slow motion (the test bench's `?slowmo=`)
  * @returns {object|null} null when WebGL is unavailable.
  */
-export function createStage({ host, quality = 'high', surface = { kind: 'mat' }, instant = () => false, onLost }) {
+export function createStage({
+  host,
+  quality = 'high',
+  surface = { kind: 'mat' },
+  instant = () => false,
+  onLost,
+  timeScale = 1,
+}) {
+  const speed = Number.isFinite(timeScale) ? Math.min(1, Math.max(0.02, timeScale)) : 1;
   const canvas = document.createElement('canvas');
   canvas.className = 'tt-canvas';
   const gl = canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance' });
@@ -183,6 +192,8 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
   const tickers = new Set();
   let frame = 0;
   let lastNow = 0;
+  // Scene time: wall time scaled by `speed`. Animations and tickers run on it.
+  let clock = 0;
   let disposed = false;
   let lost = false;
   let size = { width: 1, height: 1 };
@@ -198,15 +209,16 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
   const step = (now) => {
     frame = 0;
     if (disposed || lost) return;
-    const dt = lastNow ? Math.min(100, now - lastNow) : 16;
+    const elapsed = lastNow ? now - lastNow : 16;
     lastNow = now;
+    clock += elapsed * speed;
     for (const animation of [...animations]) {
-      if (animation.start === null) animation.start = now;
-      const t = animation.durationMs > 0 ? (now - animation.start) / animation.durationMs : 1;
+      if (animation.start === null) animation.start = clock;
+      const t = animation.durationMs > 0 ? (clock - animation.start) / animation.durationMs : 1;
       if (t >= 1) finish(animation);
       else animation.update(Math.max(0, t), animation);
     }
-    for (const ticker of [...tickers]) ticker(now, dt);
+    for (const ticker of [...tickers]) ticker(clock, Math.min(100, elapsed) * speed);
     renderer.render(scene, camera);
     if (animations.size || tickers.size) frame = requestAnimationFrame(step);
     else lastNow = 0;
@@ -237,10 +249,10 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
         }
         update(0, animation);
         animations.add(animation);
-        animation.backstop = setTimeout(() => finish(animation), durationMs + BACKSTOP_SLACK_MS);
+        animation.backstop = setTimeout(() => finish(animation), durationMs / speed + BACKSTOP_SLACK_MS);
         requestRender();
       };
-      if (delayMs > 0) setTimeout(begin, delayMs);
+      if (delayMs > 0) setTimeout(begin, delayMs / speed);
       else begin();
     });
 
@@ -335,6 +347,7 @@ export function createStage({ host, quality = 'high', surface = { kind: 'mat' },
       return size;
     },
     animate,
+    timeScale: speed,
     finishAll,
     addTicker,
     requestRender,
