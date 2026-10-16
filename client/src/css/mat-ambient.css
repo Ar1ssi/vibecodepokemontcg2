@@ -38,8 +38,8 @@
 
 /* ── Holo mat tilt ────────────────────────────────────────────────────
    base.css pins the rotator flat on the board. mat-tilt.mjs writes small
-   --fx-tilt-x/y angles from the pointer over the real <img>; the rotator stays
-   pointer-events:none so the <img> remains the sole hit target. */
+   --fx-tilt-x/y angles from the pointer over the untilted .mat-holo wrapper
+   (never the <img> inside this rotator: see mat-tilt.mjs). */
 .mat-holo .card__rotator {
   transform: rotateY(var(--fx-tilt-x, 0deg)) rotateX(var(--fx-tilt-y, 0deg));
   transition: transform 0.12s ease-out;

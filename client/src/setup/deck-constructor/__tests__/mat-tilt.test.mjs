@@ -18,12 +18,12 @@ test('matTiltAngles: degenerate rect yields no tilt', () => {
   assert.deepEqual(matTiltAngles(null, 5, 5), { x: 0, y: 0 });
 });
 
-const fakeTarget = (classes = []) => {
+const fakeTarget = (classes = [], targetRect = rect) => {
   const handlers = {};
   return {
     handlers,
     classList: { contains: (c) => classes.includes(c) },
-    getBoundingClientRect: () => rect,
+    getBoundingClientRect: () => targetRect,
     addEventListener: (type, fn) => {
       handlers[type] = fn;
     },
@@ -34,20 +34,32 @@ const fakeTarget = (classes = []) => {
 };
 const fakeWrapper = () => {
   const vars = {};
-  return { vars, style: { setProperty: (k, v) => (vars[k] = v) } };
+  return { ...fakeTarget(), vars, style: { setProperty: (k, v) => (vars[k] = v) } };
 };
 
 test('attachMatTilt: pointermove sets vars, leave/dragstart reset them', () => {
   const wrapper = fakeWrapper();
   const image = fakeTarget();
   attachMatTilt(wrapper, image);
-  image.handlers.pointermove({ clientX: 200, clientY: 200 });
+  wrapper.handlers.pointermove({ clientX: 200, clientY: 200 });
   assert.equal(wrapper.vars['--fx-tilt-x'], '5.00deg');
   assert.equal(wrapper.vars['--fx-tilt-y'], '5.00deg');
-  image.handlers.pointerleave();
+  wrapper.handlers.pointerleave();
   assert.equal(wrapper.vars['--fx-tilt-x'], '0.00deg');
-  image.handlers.pointermove({ clientX: 200, clientY: 200 });
+  wrapper.handlers.pointermove({ clientX: 200, clientY: 200 });
   image.handlers.dragstart();
+  assert.equal(wrapper.vars['--fx-tilt-y'], '0.00deg');
+});
+
+// The <img> lives inside the tilted rotator: tilting pulls the pointed-at edge
+// out from under the cursor. Tracking the <img> made hover flap tilted/flat.
+test('attachMatTilt: tracks the untilted wrapper, not the tilted <img>', () => {
+  const wrapper = fakeWrapper();
+  const tiltedImage = fakeTarget([], { left: 110, top: 205, width: 80, height: 130 });
+  attachMatTilt(wrapper, tiltedImage);
+  assert.equal(tiltedImage.handlers.pointerleave, undefined);
+  wrapper.handlers.pointermove({ clientX: 195, clientY: 270 });
+  assert.equal(wrapper.vars['--fx-tilt-x'], '4.50deg');
   assert.equal(wrapper.vars['--fx-tilt-y'], '0.00deg');
 });
 
@@ -56,13 +68,13 @@ test('attachMatTilt: disabled or dragging cards stay flat', () => {
   const image = fakeTarget();
   let enabled = false;
   attachMatTilt(wrapper, image, { isEnabled: () => enabled });
-  image.handlers.pointermove({ clientX: 200, clientY: 340 });
+  wrapper.handlers.pointermove({ clientX: 200, clientY: 340 });
   assert.equal(wrapper.vars['--fx-tilt-x'], '0.00deg');
 
   const draggingWrapper = fakeWrapper();
   const draggingImage = fakeTarget(['dragging']);
   attachMatTilt(draggingWrapper, draggingImage);
-  draggingImage.handlers.pointermove({ clientX: 200, clientY: 340 });
+  draggingWrapper.handlers.pointermove({ clientX: 200, clientY: 340 });
   assert.equal(draggingWrapper.vars['--fx-tilt-x'], '0.00deg');
 });
 
@@ -72,8 +84,9 @@ test('attachMatTilt: idempotent per image; detach removes listeners', () => {
   const detach = attachMatTilt(wrapper, image);
   const second = attachMatTilt(wrapper, image);
   second();
-  assert.equal(typeof image.handlers.pointermove, 'function');
+  assert.equal(typeof wrapper.handlers.pointermove, 'function');
   detach();
-  assert.equal(image.handlers.pointermove, undefined);
+  assert.equal(wrapper.handlers.pointermove, undefined);
+  assert.equal(image.handlers.dragstart, undefined);
   assert.equal(attachMatTilt(null, image)(), undefined);
 });
