@@ -611,10 +611,17 @@ export async function createTabletopApp(options) {
     stopSway?.();
     setCastShadow(object, false);
     const base = { position: basePose.position.clone(), quaternion: basePose.quaternion.clone() };
+    // Reduced motion: the hand is still, and nothing keeps the frame loop running.
+    if (instant()) {
+      stopSway = null;
+      object.position.copy(base.position);
+      object.quaternion.copy(base.quaternion);
+      stage.requestRender();
+      return;
+    }
     const extra = new Quaternion();
     const euler = new Euler();
     stopSway = stage.addTicker((now) => {
-      if (instant()) return;
       const sway = handSway(now);
       euler.set(sway.rotXDeg * DEG, sway.rotYDeg * DEG, 0);
       extra.setFromEuler(euler);

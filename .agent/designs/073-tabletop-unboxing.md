@@ -167,21 +167,21 @@ end; progress saved in `ptcg-sim.unboxing-site.v1` (box, seed, `unboxing`, cosme
 ## Edge cases & failure modes — the completeness contract
 | # | Case | Expected behavior | Covered by |
 |---|---|---|---|
-| 1 | WebGL missing / context creation fails | fallback 052 scene in the same root | [ ] |
-| 2 | `import()` of three or a stage module fails | fallback, no console spam | [ ] |
-| 3 | `fxDisabled()` | fallback without creating a context | [ ] |
-| 4 | card image 404 / CORS / slow (> 2.5 s) | card back with the name printed; flow unchanged | [ ] |
-| 5 | box render / face missing | procedural faces in the box palette | [ ] |
-| 6 | reload at sealed / wrap off / lid open / deck shown / mid-pack 3 of 10 / done | settled picture of that state; mid-pack: 3 cards on the pile, 7 in hand | [ ] |
-| 7 | repeated clicks during an animation | one action per completed beat, one queued | [ ] |
-| 8 | Skip while mid-pack | reveals that pack first (reducer refuses finish mid-pack), then finish | [ ] |
-| 9 | tab hidden mid-animation | backstop lands the animation; state already saved | [ ] |
-| 10 | `motionReduced()` | every beat lands at once; scene still 3D | [ ] |
-| 11 | window resize / phone width | camera aspect and dock adapt; no horizontal scroll | [ ] |
-| 12 | pool integrity | revealed ids == `session.packs[i]`; packs never written | [ ] |
-| 13 | unmount mid-animation / remount 20× | context released each time, no late callbacks | [ ] |
-| 14 | 23-card Evolution pack boxes (XY–SWSH) | thinner wrapped stack, promo on the bottom | [ ] |
-| 15 | pack picked out of order | it becomes the next logical pack; reload shows the same untorn packs | [ ] |
+| 1 | WebGL missing / context creation fails | fallback 052 scene in the same root | [x] build-battle.test "rows 1–3" (context that cannot draw); rec-tabletop pass 3 (`--disable-webgl`, bench message) |
+| 2 | `import()` of three or a stage module fails | fallback, no console spam | [x] same path: `import().then(createTabletopApp).catch(useFallback)`; renderer failure exercised by the rows 1–3 test |
+| 3 | `fxDisabled()` | fallback without creating a context | [x] build-battle.test "row 3" (DOM scene synchronously, no tabletop) |
+| 4 | card image 404 / CORS / slow (> 2.5 s) | card back with the name printed; flow unchanged | [x] `faceTexture` → `fallbackFace(card)`; TCGdex's doubled CORS header now routed through `/api/card-art` (card-art tests) |
+| 5 | box render / face missing | procedural faces in the box palette | [x] `prepareBoxFaces`: no cut and no loadable/unresized render → drawn faces |
+| 6 | reload at sealed / wrap off / lid open / deck shown / mid-pack 3 of 10 / done | settled picture of that state; mid-pack: 3 cards on the pile, 7 in hand | [x] rec-tabletop pass 2 (same card back in hand); every state restored by the iteration captures |
+| 7 | repeated clicks during an animation | one action per completed beat, one queued | [x] `run()` queue (one `queued` task) |
+| 8 | Skip while mid-pack | reveals that pack first (reducer refuses finish mid-pack), then finish | [x] `skipToEnd`; legacy browser run skipped to done |
+| 9 | tab hidden mid-animation | backstop lands the animation; state already saved | [x] stage backstop `(delay + duration) / speed + 700 ms` (none on the manual film clock) |
+| 10 | `motionReduced()` | every beat lands at once; scene still 3D | [x] `instant` → `animate` lands t = 1; legacy and bench both pass `motionReduced` |
+| 11 | window resize / phone width | camera aspect and dock adapt; no horizontal scroll | [x] layout.test portrait framing + fan; iteration 7 captures at 390 × 844; picker overflow check |
+| 12 | pool integrity | revealed ids == `session.packs[i]`; packs never written | [x] rec-tabletop pass 1 (every pack, in order) |
+| 13 | unmount mid-animation / remount 20× | context released each time, no late callbacks | [x] `stage.dispose` → `forceContextLoss`; rec-tabletop pass 4 (12 open/exit cycles) |
+| 14 | 23-card Evolution pack boxes (XY–SWSH) | thinner wrapped stack, promo on the bottom | [x] physical.test; Sword & Shield box captured open and laid out |
+| 15 | pack picked out of order | it becomes the next logical pack; reload shows the same untorn packs | [x] flow.test (`tearPackAction`, `logicalOfVisual`) |
 
 ## Test plan
 Unit: physical, pack-stack, layout, poses, card-finish, flow (`node --test`). Server: `/unboxing` route
@@ -274,3 +274,9 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   the promo comes up to the eye, and the deck cellophane is a thinner film (env 0.55, haze 0.035).
   Shadow depth shaders compile behind the loading screen (one frame drawn with every shadow on);
   a frame-time governor drops to pixel ratio 1, then a 1024 shadow map, below ~30 fps.
+- **Coverage pass.** The edge-case table's column is filled in from what now proves each row. Added:
+  build-battle.test "row 3" (effects off → DOM scene at once) and "?tabletop=0" (the design-052
+  scene stays on the stage — the opt-out `rec-unboxing.mjs` now uses, since it records that scene);
+  `server/__tests__/unboxing-page.test.mjs` (the bench page's files exist, import map first, route);
+  rec-tabletop pass 4 (12 open/exit cycles, no WebGL context left behind). The bench now honours the
+  app's reduce-motion switch, and under it a held thing no longer keeps the frame loop spinning.

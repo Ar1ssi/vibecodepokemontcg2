@@ -140,6 +140,8 @@ export const initializeBuildBattle = ({
   const energyCards = unlimitedEnergyCards();
   const urlParams = new URLSearchParams(window.location.search);
   const urlSeed = parseSeed(urlParams.get('seed') ?? '');
+  // `?tabletop=0` keeps the design-052 DOM scene on the stage (its recorder, and side-by-side checks).
+  const tabletopOff = urlParams.get('tabletop') === '0';
   // What the Box # field holds; it outlives the sealed box's re-renders.
   let typedSeed = urlSeed === null ? '' : String(urlSeed);
 
@@ -551,6 +553,11 @@ export const initializeBuildBattle = ({
   // The opening plays on the tabletop (design 073). With effects off, no WebGL 2, or a lost
   // context, the design-052 DOM scene takes the stage instead and the box opens all the same.
   const mountOnStage = (stageEl, sceneOptions) => {
+    if (tabletopOff) {
+      sceneOptions.root.classList.add('bb-scene--stage');
+      stageEl.replaceChildren(sceneOptions.root);
+      return mountUnboxingScene(sceneOptions);
+    }
     const table = el('div', 'bb-tabletop');
     stageEl.classList.add('bb-stage--tabletop');
     stageEl.replaceChildren(table);

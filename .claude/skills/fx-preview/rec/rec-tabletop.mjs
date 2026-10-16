@@ -3,7 +3,8 @@
 // frame per settled beat to <OUT>/NN-<beat>.png, and checks: no page or console errors; every pack's
 // cards come out as its pool cards, in order (A7, pool integrity); the box ends opened with every
 // pack torn. Pass 2 reloads in the middle of a pack and checks the same card is back in hand
-// (row 4). Pass 3 opens the box with WebGL off and checks the DOM scene takes over (A8).
+// (row 4). Pass 3 opens the box with WebGL off and checks the bench says so (A8). Pass 4 opens and
+// exits twelve times and checks no WebGL context is left behind (row 13).
 //
 // Env: SEED (42) · BOX (a catalog box key; default phantasmal-flames) · BASE_URL (http://localhost:4100)
 //      OUT (.agent/scratch/tabletop[-<box>][-<seed>]) · CHROMIUM (a browser binary; the cloud
@@ -154,6 +155,23 @@ async function passReloadMidPack(browser) {
   await page.close();
 }
 
+// ── Pass 4: open and exit again and again; each scene gives its WebGL context back ──
+async function passMountCycles(browser, cycles = 12) {
+  const page = await browser.newPage({ viewport: VIEWPORT });
+  const warnings = [];
+  page.on('console', (message) => {
+    if (/WebGL|context/i.test(message.text())) warnings.push(message.text());
+  });
+  for (let cycle = 0; cycle < cycles; cycle += 1) {
+    await openFresh(page);
+    await page.click('.ub-exit');
+    await page.waitForSelector('.ub-picker, .ub-grid, .ub-header', { timeout: BEAT_TIMEOUT_MS });
+  }
+  const lost = warnings.filter((text) => /too many active|context lost|CONTEXT_LOST/i.test(text));
+  check(lost.length === 0, `${cycles} open/exit cycles release their WebGL contexts`, lost.slice(0, 2).join(' | '));
+  await page.close();
+}
+
 // ── Pass 3: without WebGL the DOM scene opens the box ───────────────────────
 async function passNoWebgl() {
   const browser = await launch(NO_GL_ARGS);
@@ -176,6 +194,7 @@ const browser = await launch(GL_ARGS);
 try {
   await passWholeBox(browser);
   await passReloadMidPack(browser);
+  await passMountCycles(browser);
 } finally {
   await browser.close();
 }

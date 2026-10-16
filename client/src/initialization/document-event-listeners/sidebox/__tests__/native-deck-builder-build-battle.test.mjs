@@ -153,3 +153,25 @@ test('design 073 rows 1–3: the stage tries the tabletop, and a failed WebGL st
   assert.equal(stageEl.querySelector('.bb-tabletop'), null);
   assert.equal(page.stored()?.unboxing?.stage, 'sealed', 'the box is still sealed for the DOM scene');
 });
+
+test('design 073 row 3: with effects off the stage opens the DOM scene at once, no tabletop', async (t) => {
+  const page = boot(t);
+  page.dom.window.document.body.classList.add('fx-off');
+  await settle();
+  page.boxEl.querySelector('#buildBattleOpenBox').click();
+  const stageEl = document.getElementById('bbUnboxingStage');
+  assert.ok(stageEl?.querySelector('#bbUnboxing.bb-scene--stage'), 'the DOM scene is on the stage synchronously');
+  assert.equal(stageEl.querySelector('.bb-tabletop'), null);
+  assert.equal(stageEl.classList.contains('bb-stage--tabletop'), false);
+});
+
+test('?tabletop=0 keeps the design-052 DOM scene on the stage even where WebGL 2 works', async (t) => {
+  const page = boot(t, { box: 'phantasmal-flames&tabletop=0' });
+  page.dom.window.HTMLCanvasElement.prototype.getContext = (kind) =>
+    kind === 'webgl2' ? { getExtension: () => null } : null;
+  await settle();
+  page.boxEl.querySelector('#buildBattleOpenBox').click();
+  const stageEl = document.getElementById('bbUnboxingStage');
+  assert.ok(stageEl?.querySelector('#bbUnboxing.bb-scene--stage'));
+  assert.equal(stageEl.querySelector('.bb-tabletop'), null);
+});

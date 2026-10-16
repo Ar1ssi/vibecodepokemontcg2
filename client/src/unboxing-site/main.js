@@ -21,6 +21,7 @@ import {
   parseUnboxing,
 } from '../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { mountTabletopUnboxing } from '../initialization/document-event-listeners/sidebox/tabletop/tabletop-scene.js';
+import { motionReduced } from '../setup/image-logic/mat-fx.mjs';
 
 /**
  * The standalone unboxing test bench (design 073 § Standalone site, `/unboxing`): pick any of the
@@ -321,7 +322,8 @@ function mountScene(box, loaded, state, persist) {
     manualClock: params.has('film'),
     muted: () => !prefs.sound,
     volume: () => 0.85,
-    instant: () => false,
+    // The app's own "reduce motion" switch, as the legacy flow honours it.
+    instant: motionReduced,
     toggleSound: () => {
       prefs.sound = !prefs.sound;
       savePrefs();
