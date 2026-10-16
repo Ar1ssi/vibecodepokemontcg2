@@ -42,7 +42,8 @@ export function parseCosmetic(value, { seed, packCount }) {
 /**
  * The record made to agree with the saved reducer state: exactly one entry per torn pack (missing
  * ones filled with the lowest untouched packs, extra ones dropped), and the contents out once the
- * deck has been unwrapped.
+ * deck has been unwrapped — never while the lid is still shut (a record left by an earlier opening
+ * of the same box number must not lay its contents beside a sealed box).
  *
  * @returns {Cosmetic}
  */
@@ -53,7 +54,7 @@ export function reconcileCosmetic(cosmetic, u) {
   for (let index = 0; order.length < torn && index < packCount; index += 1) {
     if (!order.includes(index)) order.push(index);
   }
-  const itemsOut = cosmetic.itemsOut || OUT_STAGES.has(u.stage);
+  const itemsOut = u.stage !== 'sealed' && (cosmetic.itemsOut || OUT_STAGES.has(u.stage));
   return { ...cosmetic, itemsOut, packOrder: order };
 }
 

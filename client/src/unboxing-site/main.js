@@ -234,6 +234,8 @@ async function openSelected(boxKey, seedValue, { resume = false } = {}) {
   const box = getBuildBattleBox(boxKey);
   if (!box) return;
   const run = (openRun += 1);
+  // "Open this box again" comes straight from the results: the last scene goes first.
+  closeScene();
   root.replaceChildren(el('p', 'ub-boot', `Unpacking ${box.name}…`));
   let loaded;
   try {

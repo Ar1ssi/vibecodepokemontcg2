@@ -37,6 +37,9 @@ test('parseCardArtUrl takes TCGdex card art and nothing else', () => {
     'https://assets.tcgdex.net/en/me/me02/088/high.svg',
     'https://assets.tcgdex.net/en/me/me02/088/',
     'https://assets.tcgdex.net//etc/a.png',
+    'https://assets.tcgdex.net/en/a.webp',
+    'https://assets.tcgdex.net/anything/at/all/here.webp',
+    'https://assets.tcgdex.net/en/me/me02/088/full.webp',
     `https://assets.tcgdex.net/${'a'.repeat(400)}.png`,
   ]) {
     assert.equal(parseCardArtUrl(raw), null, String(raw));
@@ -63,7 +66,6 @@ test('non-images, oversized images, redirects, errors and timeouts are refused a
     [{ headers: { 'content-type': 'image/webp', 'content-length': String(9 * 1024 * 1024) } }, 502],
     [{ body: Buffer.alloc(2048) }, 502],
     [{ status: 302, headers: { location: 'https://evil.example/' } }, 502],
-    [{ status: 404 }, 404],
     [new Error('socket hang up'), 502],
     [Object.assign(new Error('aborted'), { name: 'AbortError' }), 504],
   ];
@@ -154,3 +156,71 @@ test('the handler serves allowed art with long caching and refuses anything else
   assert.equal(refused.statusCode, 400);
   assert.equal(calls.length, 1, 'a refused url never reaches upstream');
 });
+
+test('a missing card is remembered for an hour, so repeats never reach TCGdex', async () => {
+  let clock = 0;
+  const { impl, calls } = fakeFetch(() => ({ status: 404 }));
+  const proxy = createCardArtProxy({ fetchImpl: impl, now: () => clock });
+  assert.equal((await proxy.get(ART)).status, 404);
+  assert.equal((await proxy.get(ART)).status, 404);
+  assert.equal(calls.length, 1);
+  clock += 61 * 60 * 1000;
+  await proxy.get(ART);
+  assert.equal(calls.length, 2, 'asked again after the hour');
+});
+
+test('when TCGdex pushes back the proxy cools down instead of insisting', async () => {
+  let clock = 0;
+  let status = 429;
+  const { impl, calls } = fakeFetch(() => ({ status }));
+  const proxy = createCardArtProxy({ fetchImpl: impl, now: () => clock });
+  assert.equal((await proxy.get(ART)).status, 502);
+  const other = 'https://assets.tcgdex.net/en/me/me02/001/high.webp';
+  assert.equal((await proxy.get(other)).status, 503, 'fails fast while cooling down');
+  assert.equal(calls.length, 1);
+  clock += 31 * 1000;
+  status = 200;
+  assert.equal((await proxy.get(other)).status, 200);
+  assert.equal(calls.length, 2);
+});
+
+test('a flood of distinct cards is turned away once the queue is full', async () => {
+  const impl = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const body = Buffer.from('img');
+    return {
+      status: 200,
+      headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'image/webp' : null) },
+      arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.length),
+    };
+  };
+  const proxy = createCardArtProxy({ fetchImpl: impl, concurrency: 1, maxWaiting: 2 });
+  const results = await Promise.all(
+    Array.from({ length: 8 }, (_, n) => proxy.get(`https://assets.tcgdex.net/en/me/me02/${n}/high.webp`))
+  );
+  const statuses = results.map((result) => result.status);
+  assert.equal(statuses.filter((code) => code === 200).length, 3, statuses.join(' '));
+  assert.equal(statuses.filter((code) => code === 503).length, 5);
+});
+
+test('a body with no length is cut off as soon as it passes the cap', async () => {
+  let cancelled = false;
+  const chunks = [new Uint8Array(600), new Uint8Array(600), new Uint8Array(600)];
+  const impl = async () => ({
+    status: 200,
+    headers: { get: (name) => (name.toLowerCase() === 'content-type' ? 'image/webp' : null) },
+    body: {
+      getReader: () => ({
+        read: async () => (chunks.length ? { done: false, value: chunks.shift() } : { done: true }),
+        cancel: async () => {
+          cancelled = true;
+        },
+      }),
+    },
+  });
+  const proxy = createCardArtProxy({ fetchImpl: impl, maxImageBytes: 1000 });
+  assert.equal((await proxy.get(ART)).status, 502);
+  assert.ok(cancelled, 'the stream was cancelled');
+  assert.equal(chunks.length, 1, 'it stopped reading at the cap');
+});
+

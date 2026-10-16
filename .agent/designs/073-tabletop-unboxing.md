@@ -280,3 +280,13 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   `server/__tests__/unboxing-page.test.mjs` (the bench page's files exist, import map first, route);
   rec-tabletop pass 4 (12 open/exit cycles, no WebGL context left behind). The bench now honours the
   app's reduce-motion switch, and under it a held thing no longer keeps the frame loop spinning.
+- **Independent review, fixed.** A start abandoned half-way (unmounted while loading, or the context
+  lost while setting the table) kept its context, audio and UI: every release now registers as it is
+  made and `createTabletopApp` tears down on a throw or `isCancelled()`; the scene discards an app
+  that finishes after the fallback took the root. A record left by an earlier opening of the same box
+  number laid its contents beside a sealed box (`reconcileCosmetic` now refuses `itemsOut` while
+  sealed; flow.test). A press queued during a beat now picks its step when it runs, and take-out,
+  unwrap and pick-up are no-ops when repeated; `settle` stops the hand sway and clears the piles; the
+  counter counts pool cards. The proxy only takes card-image and set-logo paths, caps bodies as they
+  stream, remembers 404s for an hour, cools down 30 s after a 403/429/503 and turns away a full queue
+  (card-art-proxy tests). The bench's "open this box again" closes the old scene first.

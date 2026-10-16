@@ -113,3 +113,14 @@ test('skipping tears every remaining pack in on-table order', () => {
   const done = advanceUnboxing(opened(), { type: 'finish' });
   assert.equal(nextStep(tableView(done, record)), 'done');
 });
+
+test('a record from an earlier opening of the same box number lays nothing beside a sealed box', () => {
+  const stale = { v: 1, seed: 42, itemsOut: true, packOrder: [1, 3] };
+  const again = reconcileCosmetic(stale, createUnboxing());
+  assert.equal(again.itemsOut, false);
+  assert.deepEqual(again.packOrder, []);
+  assert.equal(tableView(createUnboxing(), stale).itemsOut, false);
+  const lidUp = play(createUnboxing(), { type: 'tearWrap' }, { type: 'openLid' });
+  assert.equal(reconcileCosmetic(again, lidUp).itemsOut, false, 'still in the box once the lid opens');
+});
+

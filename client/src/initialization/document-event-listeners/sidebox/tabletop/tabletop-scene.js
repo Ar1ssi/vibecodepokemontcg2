@@ -37,10 +37,13 @@ export function mountTabletopUnboxing(options) {
           volume: fxVolume,
           ...options,
           onLost: () => useFallback(),
+          // Unmounted, or the context was lost while it was still setting the table: it stops.
+          isCancelled: () => unmounted || fellBack,
         })
       )
       .then((app) => {
-        if (unmounted) {
+        // The fallback (or nothing) holds the root now: an app that finished starting anyway goes.
+        if (unmounted || fellBack) {
           app?.unmount();
           return;
         }

@@ -13,6 +13,7 @@ import {
   createCosmetic,
   finishCosmetic,
   logicalOfVisual,
+  nextStep,
   parseCosmetic,
   reconcileCosmetic,
   tableView,
@@ -37,7 +38,11 @@ import {
   summarySlot,
   wrapperSpot,
 } from '../../../../setup/deck-builder/core/build-battle/tabletop/layout.mjs';
-import { packStack, stackPositionFor } from '../../../../setup/deck-builder/core/build-battle/tabletop/pack-stack.mjs';
+import {
+  packStack,
+  poolCardsBefore,
+  stackPositionFor,
+} from '../../../../setup/deck-builder/core/build-battle/tabletop/pack-stack.mjs';
 import {
   CARD,
   LEAFLET,
@@ -109,10 +114,21 @@ const el = (tag, className) => {
 const cardImageOf = (card) => card?.images?.large || card?.image || card?.images?.small || '';
 
 /**
- * @returns {Promise<{unmount: () => void}|null>} null when WebGL is unavailable (the caller mounts
- *   the DOM scene instead).
+ * @returns {Promise<{unmount: () => void}|null>} null when WebGL is unavailable or the start was
+ *   cancelled (`isCancelled()`): the caller mounts the DOM scene instead. A start that throws has
+ *   already released everything it made, WebGL context included.
  */
 export async function createTabletopApp(options) {
+  const life = { teardown: null };
+  try {
+    return await buildTabletopApp(options, life);
+  } catch (error) {
+    life.teardown?.();
+    throw error;
+  }
+}
+
+async function buildTabletopApp(options, life) {
   const {
     root,
     getUnboxing,
@@ -136,6 +152,7 @@ export async function createTabletopApp(options) {
     onLost = () => {},
     timeScale = 1,
     manualClock = false,
+    isCancelled = () => false,
   } = options;
 
   const host = el('div', 'tt-root');
@@ -146,8 +163,25 @@ export async function createTabletopApp(options) {
     return null;
   }
   const { scene, camera, renderer, envMap } = stage;
-  const audio = createTabletopAudio({ muted, volume });
+  // Everything made from here on registers its release in `disposers`; `teardown` runs them on
+  // unmount, and on a start that fails or is cancelled half-way.
+  const disposers = [];
   let disposed = false;
+  const teardown = () => {
+    if (disposed) return;
+    disposed = true;
+    disposers.splice(0).forEach((dispose) => dispose());
+    stage.dispose();
+    host.remove();
+  };
+  life.teardown = teardown;
+  const abandon = () => {
+    teardown();
+    return null;
+  };
+  const stopped = () => disposed || isCancelled();
+  const audio = createTabletopAudio({ muted, volume });
+  disposers.push(() => audio.dispose());
   let busy = false;
   let queued = null;
   let hand = null;
@@ -155,7 +189,6 @@ export async function createTabletopApp(options) {
   const era = box?.era || look?.skin?.palette || 'me';
   const palette = paletteFor(look?.skin?.palette || era);
   const dims = boxDimensions();
-  const disposers = [];
   const keep = (thing) => {
     if (thing) disposers.push(() => thing.dispose?.());
     return thing;
@@ -179,6 +212,8 @@ export async function createTabletopApp(options) {
       // A full or blocked storage loses only the cosmetic record.
     }
   };
+  // The reconciled record replaces whatever an earlier opening of this box number left behind.
+  saveCosmetic();
   const view = () => tableView(getUnboxing(), cosmetic);
   const send = (event) => dispatch(event) !== null;
 
@@ -188,6 +223,7 @@ export async function createTabletopApp(options) {
     soundOn: () => !muted(),
     onAction: (action) => onUiAction(action),
   });
+  disposers.push(() => ui.dispose());
   ui.setTitle(`${box?.name || 'Build & Battle Box'} · Box #${seed}`);
   ui.setLoading(true, 'Setting the table…');
 
@@ -200,23 +236,21 @@ export async function createTabletopApp(options) {
   const artIndexes = packArtIndexes(seed, packCount, Math.max(1, look?.skin?.packArts?.length || 1));
 
   await loadPrintFont();
-  if (disposed) return null;
+  if (stopped()) return abandon();
   const [backImage, promoImage, faces, ...artImages] = await Promise.all([
     loadImage(assetUrl('src/assets/cardback.png')),
     loadImage(cardImageOf(promo), { timeoutMs: CARD_TEXTURE_TIMEOUT_MS }),
     prepareBoxFaces({ look, dims, boxKey: box?.key }),
     ...Array.from({ length: packCount }, (_, visual) => packArtFor(look?.skin?.packArts?.[artIndexes[visual]])),
   ]);
-  if (disposed) {
-    stage.dispose();
-    return null;
-  }
+  if (stopped()) return abandon();
   const backTexture = backImage ? keep(imageTexture(backImage, renderer)) : null;
   const kit = createCardKit({ envMap, backTexture, edgeTexture });
   keep(kit);
   const promoTexture = promoImage ? keep(imageTexture(promoImage, renderer)) : keep(fallbackFace(promo));
   const promoLook = promoFinish(promo);
   const packKit = createPackKit({ envMap, renderer });
+  disposers.push(() => packKit.dispose());
 
   // ── Objects ─────────────────────────────────────────────────────────────
   const boxModel = buildBox({ renderer, envMap, dims, faces, board, crinkle });
@@ -281,6 +315,9 @@ export async function createTabletopApp(options) {
 
   // Every card mesh made for a pack, so a re-lay or unmount can clear them.
   const looseMeshes = new Set();
+  disposers.push(() => {
+    for (const mesh of [...looseMeshes]) dropLoose(mesh);
+  });
   const trackLoose = (mesh) => {
     looseMeshes.add(mesh);
     return mesh;
@@ -475,11 +512,14 @@ export async function createTabletopApp(options) {
 
   function settle() {
     stage.finishAll();
+    stopHandSway();
     const u = getUnboxing();
     cosmetic = reconcileCosmetic(cosmetic, u);
     const v = tableView(u, cosmetic);
     hand = null;
     for (const mesh of [...looseMeshes]) dropLoose(mesh);
+    revealPile.length = 0;
+    extrasPile.length = 0;
     for (const pack of packObjects) {
       pack.cards = [];
       pack.pile = [];
@@ -753,6 +793,7 @@ export async function createTabletopApp(options) {
   }
 
   async function takeOut() {
+    if (view().itemsOut) return;
     const cameraMove = stage.blendCamera(cameraPose('table', aspect()), 1800);
     const jobs = [];
     const items = [
@@ -788,7 +829,8 @@ export async function createTabletopApp(options) {
   }
 
   async function unwrapDeck() {
-    if (!view().itemsOut) return;
+    const v = view();
+    if (!v.itemsOut || v.deckUnwrapped) return;
     audio.play('item-lift');
     const inHand = handPose({ halfWidth: 46, halfHeight: 60 });
     await flyTo(deck.group, inHand, { durationMs: 700, lift: 70 });
@@ -845,7 +887,7 @@ export async function createTabletopApp(options) {
   async function pickPack(visual) {
     const pack = packObjects[visual];
     const u = getUnboxing();
-    if (!pack || nextPackToTear(u) < 0 || logicalOfVisual(cosmetic, visual) >= 0) return;
+    if (hand || !pack || nextPackToTear(u) < 0 || logicalOfVisual(cosmetic, visual) >= 0) return;
     audio.play('pack-pick');
     // The cards it will hold start loading now: it takes the next logical pack's.
     const logical = nextPackToTear(u);
@@ -1110,12 +1152,22 @@ export async function createTabletopApp(options) {
     }
     if (hand?.kind === 'summary') return { label: 'Set them down', run: putSummaryDown };
     if (hand?.kind === 'inspect') return { label: 'Put it back', run: putBack };
-    if (v.wrapOn) return { label: 'Tear off the wrap', run: () => tearWrap() };
-    if (!v.lidOpen) return { label: 'Open the lid', run: () => openLid() };
-    if (!v.itemsOut) return { label: 'Take everything out', run: takeOut };
-    if (!v.deckUnwrapped) return { label: 'Unwrap the deck', run: unwrapDeck };
-    if (v.untornVisual.length) return { label: 'Pick up a pack', run: () => pickPack(firstUntorn()) };
-    return { label: finishLabel, run: finishScene };
+    switch (nextStep(v)) {
+      case 'tearWrap':
+        return { label: 'Tear off the wrap', run: () => tearWrap() };
+      case 'openLid':
+        return { label: 'Open the lid', run: () => openLid() };
+      case 'takeOut':
+        return { label: 'Take everything out', run: takeOut };
+      case 'unwrapDeck':
+        return { label: 'Unwrap the deck', run: unwrapDeck };
+      case 'revealCard':
+        return { label: 'Next card', run: () => revealNext(1) };
+      case 'openPack':
+        return { label: 'Pick up a pack', run: () => pickPack(firstUntorn()) };
+      default:
+        return { label: finishLabel, run: finishScene };
+    }
   }
 
   function hintFor() {
@@ -1146,7 +1198,7 @@ export async function createTabletopApp(options) {
     ui.showSkip(!v.done && !busy);
     const torn = v.tornVisual.length;
     if (hand?.kind === 'stack') {
-      const shown = hand.items.slice(0, hand.position).filter((item) => item.kind === 'card').length;
+      const shown = poolCardsBefore(hand.items, hand.position);
       ui.setCounter(`Pack ${torn} of ${packCount} · ${shown} / ${getUnboxing().cardsPerPack}`);
     } else if (torn) ui.setCounter(`${torn} of ${packCount} packs opened`);
     else ui.setCounter('');
@@ -1173,7 +1225,8 @@ export async function createTabletopApp(options) {
     }
   }
 
-  const doNext = () => run(nextAction().run);
+  // A press while a beat plays is queued as "the next step", worked out once that beat is over.
+  const doNext = () => run(() => nextAction().run());
 
   async function skipToEnd() {
     const u = getUnboxing();
@@ -1398,14 +1451,14 @@ export async function createTabletopApp(options) {
 
   // ── Start ───────────────────────────────────────────────────────────────
   await warmShaders();
-  if (disposed) return null;
+  if (stopped()) return abandon();
   settle();
   warmShadows();
   await handFacesReady();
-  if (disposed) return null;
+  if (stopped()) return abandon();
   const surfaceReady = stage.setSurface(surface);
   await surfaceReady;
-  if (disposed) return null;
+  if (stopped()) return abandon();
   ui.setLoading(false);
   stage.requestRender();
   host.focus({ preventScroll: true });
@@ -1440,7 +1493,6 @@ export async function createTabletopApp(options) {
     api,
     unmount: () => {
       if (disposed) return;
-      disposed = true;
       offResize();
       stopHandSway();
       canvas.removeEventListener('pointerdown', onPointerDown);
@@ -1448,13 +1500,7 @@ export async function createTabletopApp(options) {
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
       host.removeEventListener('keydown', onKeyDown);
-      for (const mesh of [...looseMeshes]) dropLoose(mesh);
-      disposers.forEach((dispose) => dispose());
-      packKit.dispose?.();
-      audio.dispose();
-      ui.dispose();
-      stage.dispose();
-      host.remove();
+      teardown();
     },
   };
 }
