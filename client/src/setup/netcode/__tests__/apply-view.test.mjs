@@ -17,6 +17,8 @@ import {
   getAuthoritativeAttackExtras,
   repositionCardOverlays,
   clearRenderedBoard,
+  getLastAppliedView,
+  soloChoiceSeat,
 } from '../apply-view.js';
 import { spectatorPerspective } from '../../spectator/spectator-view.mjs';
 
@@ -686,6 +688,42 @@ test('Finding 5: choice resolver emits resolveChoice over socket when options.so
   assert.equal(emitted[0].payload.choiceId, 'choice_audit_5a');
   assert.deepEqual(emitted[0].payload.selection, [101]);
   assert.equal(doc.getElementById('netcodeChoiceModal'), null, 'Modal removed on confirm');
+});
+
+test('design 074 D7: a solo view opens the far seat\'s choice and answers with its choiceSeat', async () => {
+  const { doc, mockGetZone } = setupMockDom();
+  const view = {
+    stateVersion: 1,
+    solo: true,
+    choiceSeat: 'p2',
+    pendingChoice: {
+      choiceId: 'choice_solo_far',
+      player: 'p2',
+      prompt: 'Select 1 card',
+      options: [{ instanceId: 201, name: 'Grass Energy', src: 'grass.png' }],
+      min: 1,
+      max: 1,
+    },
+    you: { playerId: 'p1', zones: {} },
+    them: { playerId: 'p2', zones: {} },
+  };
+  const emitted = [];
+  const mockSocket = { emit: (event, payload) => emitted.push({ event, payload }) };
+
+  applyView(view, [], { document: doc, getZone: mockGetZone, socket: mockSocket, roomId: 'solo-x' });
+
+  assert.equal(doc.getElementById('netcodeChoiceBanner'), null, 'no waiting banner: both seats are ours');
+  const modal = doc.getElementById('netcodeChoiceModal');
+  assert.ok(modal, 'the far seat\'s picker opens');
+  modal.querySelectorAll('.choice-option-card')[0].dispatchEvent({ type: 'click' });
+  modal.querySelector('#choiceConfirmBtn').dispatchEvent({ type: 'click' });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].event, 'resolveChoice');
+  assert.equal(emitted[0].payload.seat, 'p2');
+  assert.equal(soloChoiceSeat(getLastAppliedView()), 'p2');
+  assert.equal(soloChoiceSeat({ choiceSeat: 'p2' }), null, 'a normal room names no seat');
 });
 
 test('Finding 5: choice resolver uses setDefaultNetcodeContext fallback when options omit socket and roomId', async () => {

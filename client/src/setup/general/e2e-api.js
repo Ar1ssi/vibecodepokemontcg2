@@ -17,6 +17,7 @@ import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { evolvedView } from '/shared/engine/rules/evolved-pokemon.mjs';
 import { isEnergy } from '/shared/engine/cards.mjs';
 import { enumerateOptions } from './e2e-options.mjs';
+import { instanceMapSeats } from '../netcode/dual-run-bridge.js';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
 import { persistRulesEnabled } from '/shared/engine/rules/rules-state.mjs';
 import {
@@ -214,6 +215,16 @@ function serializePlayerObservation(user) {
 // Omitted (undefined) in legacy mode, where the index IS the identity and the gate is
 // inert anyway; the builder fails closed as a unit, so a half-resolved bundle is never
 // sent.
+// The retreat target's DOM node: the authoritative renderer's element (stamped with its
+// instanceId, which the retreat gate reads) or the legacy card image.
+const benchImageFor = (user, benchCard) => {
+  if (!benchCard) return null;
+  if (hasAuthoritativeView() && benchCard.instanceId != null) {
+    return getCardRegistry().get(benchCard.instanceId)?.element || null;
+  }
+  return benchCard.image || null;
+};
+
 const idsFor = (option) => {
   if (option?.instanceId == null) return undefined;
   const ids = { moving: option.instanceId };
@@ -285,15 +296,18 @@ export function installE2eApi() {
     // destination zone, not from the action string. Playing a Trainer is hand → 'board'
     // (move-card.js redirects Stadiums to 'stadium' and dispatches Supporter/Item effects
     // itself once the card lands there — see rules-bridge.js's 'board' zone watcher).
+    // `option.user` ('self' default, or 'opp' in a solo room — design 074 D7) is the side
+    // acting; every branch goes through the same emitters, which name that side's seat.
     async act(option) {
       try {
         const kind = option?.kind;
+        const user = option?.user === 'opp' ? 'opp' : 'self';
         if (kind === 'playBasic') {
           const { moveCardBundle } = await import(
             '../../actions/move-card-bundle/move-card-bundle.js'
           );
           const ok = await moveCardBundle(
-            'self', 'self', 'hand', option.targetZone, option.handIndex, false, 'move', true,
+            user, user, 'hand', option.targetZone, option.handIndex, false, 'move', true,
             undefined, idsFor(option)
           );
           return { ok: ok !== false };
@@ -303,7 +317,7 @@ export function installE2eApi() {
             '../../actions/move-card-bundle/move-card-bundle.js'
           );
           const ok = await moveCardBundle(
-            'self', 'self', 'hand', option.targetZone, option.handIndex,
+            user, user, 'hand', option.targetZone, option.handIndex,
             option.targetIndex, 'move', true, undefined, idsFor(option)
           );
           return { ok: ok !== false };
@@ -313,7 +327,7 @@ export function installE2eApi() {
             '../../actions/move-card-bundle/move-card-bundle.js'
           );
           const ok = await moveCardBundle(
-            'self', 'self', 'hand', 'board', option.handIndex, false, 'move', true,
+            user, user, 'hand', 'board', option.handIndex, false, 'move', true,
             undefined, idsFor(option)
           );
           return { ok: ok !== false };
@@ -322,8 +336,8 @@ export function installE2eApi() {
           const { useAbility } = await import('../../actions/counters/use-ability.js');
           const authId = idsFor(option)?.[0] ?? option.instanceId ?? null;
           const ok = await useAbility(
-            'self',
-            'self',
+            user,
+            user,
             option.zone,
             option.index,
             true,
@@ -336,22 +350,22 @@ export function installE2eApi() {
           const { attack: attackAction } = await import(
             '../../actions/chat-buttons/chat-buttons.js'
           );
-          const ok = await attackAction('self', true, option.attackIndex);
+          const ok = await attackAction(user, true, option.attackIndex);
           return { ok: ok !== false };
         }
         if (kind === 'retreat') {
-          const benchCard = boardPokemon('self', 'bench')[option.benchIndex] || null;
+          const benchCard = boardPokemon(user, 'bench')[option.benchIndex] || null;
           const { retreat: retreatAction } = await import(
             '../../actions/chat-buttons/chat-buttons.js'
           );
-          const ok = await retreatAction('self', true, benchCard?.image || null);
+          const ok = await retreatAction(user, true, benchImageFor(user, benchCard));
           return { ok: ok !== false };
         }
         if (kind === 'pass') {
           const { pass: passAction } = await import(
             '../../actions/chat-buttons/chat-buttons.js'
           );
-          const ok = await passAction('self', true);
+          const ok = await passAction(user, true);
           return { ok: ok !== false };
         }
         return { ok: false, error: `unknown option kind: ${kind}` };
@@ -455,11 +469,19 @@ export function installE2eApi() {
         fromServer: hasAuthoritativeView(),
       };
     },
-    async attack(attackIndex = 0) {
+    async attack(attackIndex = 0, user = 'self') {
       const { attack: attackAction } = await import(
         '../../actions/chat-buttons/chat-buttons.js'
       );
-      return attackAction('self', true, attackIndex);
+      return attackAction(user, true, attackIndex);
+    },
+    // A bench Pokémon of `user` takes the Active Spot (index into that side's bench).
+    async retreat(benchIndex = 0, user = 'self') {
+      const benchCard = boardPokemon(user, 'bench')[benchIndex] || null;
+      const { retreat: retreatAction } = await import(
+        '../../actions/chat-buttons/chat-buttons.js'
+      );
+      return retreatAction(user, true, benchImageFor(user, benchCard));
     },
     // Pulls the authoritative view on demand. Views are otherwise only pushed in response
     // to a command, so before either player has acted the client has no server-derived
@@ -473,6 +495,20 @@ export function installE2eApi() {
         '../../actions/chat-buttons/chat-buttons.js'
       );
       return passAction('self', true);
+    },
+    // Design 074 D7: the Solo tab's solo room, joined the way a player does. Like joinRoom it
+    // returns at once; wait for counters().twoPlayer (or soloSeat().solo) to turn true.
+    joinSolo(username = 'E2E-Solo') {
+      const nameInput = document.getElementById('nameInput');
+      if (nameInput) nameInput.value = username;
+      document.getElementById('p1Button')?.click();
+    },
+    soloSeat() {
+      return { solo: Boolean(systemState.solo), nearSeat: systemState.nearSeat };
+    },
+    // Seats whose server instance map has arrived — one per deck the server has loaded.
+    instanceMapSeats() {
+      return instanceMapSeats();
     },
     joinRoom(roomId, username) {
       const nameInput = document.getElementById('nameInput');
@@ -498,8 +534,9 @@ export function installE2eApi() {
           ?.textContent ?? null
       );
     },
-    loadFixtureDeck(prefix = 'E2E') {
-      loadDeckData('self', e2eFixtureDeck(prefix));
+    // `user` 'opp' loads the far deck (a solo room's far seat, or the solo alt deck).
+    loadFixtureDeck(prefix = 'E2E', user = 'self') {
+      loadDeckData(user === 'opp' ? 'opp' : 'self', e2eFixtureDeck(prefix));
     },
     // Debug mode: turns off every legality gate canPerformAction checks (turn
     // order, once-per-turn limits, evolve/attack/retreat restrictions, phase
@@ -520,8 +557,8 @@ export function installE2eApi() {
     // e2eFixtureDeck produces — [quantity, name, type, imageURL, number, set, tcgId]) for
     // the playtest runner's `--deck` option, instead of the built-in all-Basic fixture.
     // `format` ('tcg' | 'build-battle', design 051) defaults to Standard.
-    loadDeckList(deckRows, format) {
-      loadDeckData('self', deckRows, format);
+    loadDeckList(deckRows, format, user = 'self') {
+      loadDeckData(user === 'opp' ? 'opp' : 'self', deckRows, format);
     },
     // Pre-warms this page's TCGdex enrichment cache for a real (non-fixture) deck's
     // unique cards, one at a time, before the deck is even built. build-deck.js's own
@@ -560,23 +597,23 @@ export function installE2eApi() {
         return false;
       }
     },
-    readyUp() {
-      return readyUp('self');
+    // A solo room's player sets up both seats (design 074 D7).
+    async readyUp() {
+      if (!systemState.solo) return readyUp('self');
+      const near = readyUp('self');
+      await readyUp('opp');
+      return near;
     },
-    async playFromHand(index = 0, dest = 'active') {
+    async playFromHand(index = 0, dest = 'active', user = 'self') {
       const { moveCardBundle } = await import(
         '../../actions/move-card-bundle/move-card-bundle.js'
       );
-      return moveCardBundle(
-        'self',
-        'self',
-        'hand',
-        dest,
-        index,
-        false,
-        'move',
-        true
-      );
+      const side = user === 'opp' ? 'opp' : 'self';
+      const card = liveZoneArray(side, 'hand')[index];
+      const ids = hasAuthoritativeView() && card?.instanceId != null
+        ? { moving: card.instanceId }
+        : undefined;
+      return moveCardBundle(side, side, 'hand', dest, index, false, 'move', true, undefined, ids);
     },
     nudgeCoinSetup() {
       if (!systemState.opponentSocketId && socket?.id) {
@@ -679,7 +716,9 @@ export function installE2eApi() {
   // every client action: watch the chat this client actually writes to (2P uses #p2Chatbox,
   // solo uses #chatbox) and report any ⛔ the action produced.
   const activeChatEl = () =>
-    document.getElementById(systemState.isTwoPlayer ? 'p2Chatbox' : 'chatbox');
+    document.getElementById(
+      systemState.isTwoPlayer && !systemState.solo ? 'p2Chatbox' : 'chatbox'
+    );
   // Exposed so failure dumps read the chat this client actually writes to. A dump that
   // silently read the wrong element (#chatbox in a 2P game) reported an empty log and hid
   // the ⛔ that explained the failure.
@@ -722,9 +761,11 @@ export function installE2eApi() {
     const rawEmit = socket.emit.bind(socket);
     socket.emit = (event, ...args) => {
       if (event === 'cmd' && args[0]?.clientSeq != null) {
-        const { clientSeq, type, payload } = args[0];
-        sentCommands.set(clientSeq, { clientSeq, type, payload });
-        window.__ptcg.cmdLog.push({ clientSeq, type, payload });
+        // `seat` only on a solo room's commands (design 074 D7).
+        const { clientSeq, type, payload, seat } = args[0];
+        const entry = { clientSeq, type, payload, ...(seat ? { seat } : {}) };
+        sentCommands.set(clientSeq, entry);
+        window.__ptcg.cmdLog.push(entry);
       }
       return rawEmit(event, ...args);
     };

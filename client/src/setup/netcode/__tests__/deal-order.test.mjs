@@ -66,3 +66,20 @@ test('deal-order: the opening wait outlasts the call and choice timeouts', () =>
     `${OPENING_DEAL_WAIT_MS} ms must cover both timeouts plus the ceremony`
   );
 });
+
+test('design 074 D7: a solo room keeps each seat\'s deal and starter apart', async () => {
+  resetDealOrder();
+  setDealOrder([1, 2, 3], 'self', 'p1');
+  setDealOrder([4, 5, 6], 'opp', 'p2');
+  assert.equal(getDealOrderStarter('p1'), 'self');
+  assert.equal(getDealOrderStarter('p2'), 'opp');
+  assert.equal(getDealOrderStarter(), null, 'the unnamed slot is a normal room\'s');
+  assert.deepEqual(await waitForDealOrder(10, 'p2'), [4, 5, 6]);
+  assert.deepEqual(await waitForDealOrder(10, 'p1'), [1, 2, 3]);
+  const later = waitForDealOrder(1000, 'p2');
+  setDealOrder([7], 'self', 'p1');
+  setDealOrder([8], 'self', 'p2');
+  assert.deepEqual(await later, [8]);
+  resetDealOrder();
+  assert.equal(getDealOrderStarter('p1'), null);
+});

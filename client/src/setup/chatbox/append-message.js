@@ -14,10 +14,12 @@ export const appendMessage = (user, message, type, emit = true) => {
       p.className = type;
     }
     p.textContent = message;
-    const chat = !systemState.isTwoPlayer ? chatbox : p2Chatbox;
+    // Design 074 D7: a solo room keeps the Solo tab's chat and has no peer to tell.
+    const roomChat = systemState.isTwoPlayer && !systemState.solo;
+    const chat = roomChat ? p2Chatbox : chatbox;
     chat.appendChild(p);
     chat.scrollTop = chat.scrollHeight;
-    if (systemState.isTwoPlayer && emit) {
+    if (roomChat && emit) {
       user = user === 'self' ? 'opp' : 'self';
       const data = {
         roomId: systemState.roomId,

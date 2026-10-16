@@ -60,7 +60,7 @@ export const discardAndDraw = async (user, initiator, drawAmount, emit = true) =
   drawAmount = Math.min(drawAmount, selectedDeckCount);
 
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'discardAndDraw', [oInitiator, drawAmount]);
     return;
   }
@@ -117,7 +117,7 @@ export const shuffleAndDraw = async (
   drawAmount = Math.min(drawAmount, selectedDeckCount + shuffleAmount);
 
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'shuffleAndDraw', [
       oInitiator,
       drawAmount,
@@ -184,7 +184,7 @@ export const shuffleBottomAndDraw = async (
   drawAmount = Math.min(drawAmount, selectedDeckCount + shuffleAmount);
 
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'shuffleBottomAndDraw', [
       oInitiator,
       drawAmount,

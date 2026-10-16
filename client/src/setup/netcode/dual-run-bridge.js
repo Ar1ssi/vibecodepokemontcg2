@@ -21,19 +21,49 @@ const isDevLikeEnvironment = () =>
   !!process.env &&
   process.env.NODE_ENV !== 'production';
 
-// Server-issued { syncInstance -> instanceId } lookup for the local player's own cards
-// (see design 002 §3.1 / decision D10). The server is the sole minter of instanceId;
-// the client's syncInstance numbering is a purely local, per-player sequence that does
-// not match it. Every outgoing command must translate through this map or be dropped.
-let instanceMap = null;
+// Server-issued { syncInstance -> instanceId } lookups, one per seat (see design 002 §3.1 /
+// decision D10). The server is the sole minter of instanceId; the client's syncInstance
+// numbering is a purely local, per-player sequence that does not match it. Every outgoing
+// command must translate through these maps or be dropped. A normal room holds one map
+// (this player's seat); a solo room (design 074 D7) holds both seats' maps and names the
+// seat it translates for.
+const instanceMaps = new Map();
+const UNNAMED_SEAT = '';
+// The seat translateActionToCmd is translating for (its `options.seat`), null for "the one map".
+let translationSeat = null;
 
 /**
- * Stores the server-issued syncInstance -> instanceId lookup for this player.
+ * Stores the server-issued syncInstance -> instanceId lookup for a seat.
+ * Without a seat the map replaces every stored one (a normal room's single map);
+ * a null map clears that seat, or every seat when none is named.
  *
  * @param {Record<string, number>|null} map
+ * @param {'p1'|'p2'} [seat]
  */
-export function setInstanceMap(map) {
-  instanceMap = map && typeof map === 'object' ? map : null;
+export function setInstanceMap(map, seat) {
+  const usable = map && typeof map === 'object' ? map : null;
+  if (!seat) {
+    instanceMaps.clear();
+    if (usable) instanceMaps.set(UNNAMED_SEAT, usable);
+    return;
+  }
+  if (usable) instanceMaps.set(seat, usable);
+  else instanceMaps.delete(seat);
+}
+
+/**
+ * The seats whose instance map is held ('' for a map stored without a seat).
+ *
+ * @returns {string[]}
+ */
+export function instanceMapSeats() {
+  return [...instanceMaps.keys()];
+}
+
+// The named seat's map; without a seat, the only map held (several are ambiguous).
+function instanceMapFor(seat) {
+  if (seat) return instanceMaps.get(seat) ?? null;
+  return instanceMaps.size === 1 ? [...instanceMaps.values()][0] : null;
 }
 
 /**
@@ -42,9 +72,11 @@ export function setInstanceMap(map) {
  * treat that as "drop the command", never fall back to guessing.
  *
  * @param {number} syncInstance
+ * @param {'p1'|'p2'|null} [seat] whose map; defaults to the seat being translated for
  * @returns {number|null}
  */
-export function resolveInstanceId(syncInstance) {
+export function resolveInstanceId(syncInstance, seat = translationSeat) {
+  const instanceMap = instanceMapFor(seat);
   if (instanceMap == null || syncInstance == null) return null;
   const value = instanceMap[syncInstance];
   return typeof value === 'number' && Number.isInteger(value) ? value : null;
@@ -273,9 +305,21 @@ function unpackTargetAndCondition(parameters, defaultCondition = 'Poisoned') {
  *
  * @param {string} action
  * @param {any[]} [parameters=[]]
+ * @param {{ seat?: 'p1'|'p2' }} [options] `seat`: whose instance map resolves syncInstance
+ *   hints (a solo room's acting seat); omitted, the one map held.
  * @returns {{ type: string, payload: object } | null}
  */
-export function translateActionToCmd(action, parameters = []) {
+export function translateActionToCmd(action, parameters = [], { seat } = {}) {
+  const previousSeat = translationSeat;
+  translationSeat = seat || null;
+  try {
+    return translateAction(action, parameters);
+  } finally {
+    translationSeat = previousSeat;
+  }
+}
+
+function translateAction(action, parameters) {
   if (!action || typeof action !== 'string') return null;
 
   switch (action) {

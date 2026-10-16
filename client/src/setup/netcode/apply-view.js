@@ -275,6 +275,26 @@ export function getCardRegistry() {
  *
  * @returns {boolean}
  */
+/**
+ * The last view this renderer applied, or null before the first one.
+ *
+ * @returns {object|null}
+ */
+export function getLastAppliedView() {
+  return lastAppliedView;
+}
+
+/**
+ * Design 074 D7: the seat a solo room's open choice belongs to, which its answer names;
+ * null in a normal room, where the socket answers for its own seat.
+ *
+ * @param {object|null} view
+ * @returns {'p1'|'p2'|null}
+ */
+export function soloChoiceSeat(view) {
+  return view?.solo ? view.choiceSeat || null : null;
+}
+
 export function hasAuthoritativeView() {
   return lastAppliedView !== null;
 }
@@ -1761,6 +1781,7 @@ async function submitChoiceSelection(pendingChoice, selection, options = {}) {
       roomId,
       choiceId: pendingChoice.choiceId,
       selection,
+      choiceSeat: soloChoiceSeat(lastAppliedView),
     });
   }
 }
@@ -2415,7 +2436,9 @@ export function applyView(view, events = [], options = {}) {
     const chooser = view.pendingChoice ? usernameOf(view, view.pendingChoice.player) : null;
     reconcilePendingChoice(view.pendingChoice || null, null, options, chooser);
   } else {
-    reconcilePendingChoice(view.pendingChoice || null, localPlayerId, options);
+    // Design 074 D7: a solo room's player owns both seats' choices (choiceSeat names whose).
+    const chooserId = view.solo ? view.choiceSeat || localPlayerId : localPlayerId;
+    reconcilePendingChoice(view.pendingChoice || null, chooserId, options);
   }
 
   // Sync local turn state — the server is the only turn authority under the flag

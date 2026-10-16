@@ -41,5 +41,6 @@ export function deckFormatSlot(user, isTwoPlayer) {
  * @param {'self'|'opp'} user
  */
 export function deckFormatOf(state, user) {
-  return normalizeDeckFormat(state?.deckFormat?.[deckFormatSlot(user, Boolean(state?.isTwoPlayer))]);
+  const roomOpponent = Boolean(state?.isTwoPlayer) && !state?.solo;
+  return normalizeDeckFormat(state?.deckFormat?.[deckFormatSlot(user, roomOpponent)]);
 }

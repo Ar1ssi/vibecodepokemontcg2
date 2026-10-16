@@ -4,7 +4,7 @@ const chatbox = document.getElementById('chatbox');
 const p2Chatbox = document.getElementById('p2Chatbox');
 
 export const exportChatboxContent = () => {
-  const chatboxContainer = !systemState.isTwoPlayer ? chatbox : p2Chatbox;
+  const chatboxContainer = !systemState.isTwoPlayer || systemState.solo ? chatbox : p2Chatbox;
   const pElements = chatboxContainer.querySelectorAll('p');
   let content = '';
 
@@ -21,6 +21,6 @@ export const exportChatboxContent = () => {
 };
 
 export const clearChatboxContent = () => {
-  const chatboxContainer = !systemState.isTwoPlayer ? chatbox : p2Chatbox;
+  const chatboxContainer = !systemState.isTwoPlayer || systemState.solo ? chatbox : p2Chatbox;
   chatboxContainer.innerHTML = '';
 };

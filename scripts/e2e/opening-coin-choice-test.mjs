@@ -38,7 +38,10 @@ async function openClient(browser, name) {
 const chatText = (page) =>
   page.evaluate(() => document.getElementById('p2Chatbox')?.textContent || '');
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+});
 try {
   const a = await openClient(browser, 'A');
   const b = await openClient(browser, 'B');

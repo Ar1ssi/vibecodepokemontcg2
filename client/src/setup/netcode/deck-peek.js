@@ -14,6 +14,7 @@ import { openCardPicker } from '../image-logic/card-picker.js';
 import { isAuthoritativeDispatchActive } from './authoritative-dispatch.js';
 import { emitCmd } from './cmd-emitter.js';
 import { buildDeckPeekPickerRequest } from './deck-peek-request.mjs';
+import { soloCommandSeat } from './solo-seat.mjs';
 
 const PEEK_TIMEOUT_MS = 5000;
 
@@ -30,13 +31,14 @@ function requestPeek(request) {
   });
 }
 
-async function takeIntoHand(instanceIds) {
+async function takeIntoHand(instanceIds, seat) {
   for (const instanceId of instanceIds) {
     const result = await emitCmd({
       socket,
       roomId: systemState.roomId,
       type: 'moveCard',
       payload: { instanceId, from: 'deck', to: 'hand' },
+      seat,
     });
     if (!result.success) {
       announce(`Command failed to send: ${result.reason || result.error}`);
@@ -55,15 +57,17 @@ async function takeIntoHand(instanceIds) {
 export function peekServerDeck({ user, count, top }) {
   if (!isAuthoritativeDispatchActive() || !systemState.isTwoPlayer) return false;
 
-  const side = user === 'self' ? 'you' : 'them';
+  // Design 074 D7: a solo room asks as the seat whose deck it is, so that deck is 'you'.
+  const seat = soloCommandSeat({ ...systemState, user });
+  const side = user === 'self' || seat ? 'you' : 'them';
   const fromTop = top !== false;
-  requestPeek({ side, count, fromTop }).then((reply) => {
+  requestPeek({ side, count, fromTop, ...(seat ? { seat } : {}) }).then((reply) => {
     if (!reply.ok) {
       announce(`Can't look at the deck: ${reply.reason}`);
       return;
     }
     const shown = reply.cards.length;
-    const owner = side === 'you' ? 'their' : `${determineUsername('opp')}'s`;
+    const owner = user === 'self' ? 'their' : `${determineUsername('opp')}'s`;
     appendMessage(
       'self',
       `${determineUsername('self')} looked at the ${fromTop ? 'top' : 'bottom'} ${shown} card(s) of ${owner} deck`,
@@ -74,7 +78,7 @@ export function peekServerDeck({ user, count, top }) {
       cards: reply.cards,
       side,
       fromTop,
-      onTake: takeIntoHand,
+      onTake: (instanceIds) => takeIntoHand(instanceIds, seat),
     });
     if (!request) return;
     openCardPicker(request).catch((err) => console.error('[deck-peek] picker failed:', err));

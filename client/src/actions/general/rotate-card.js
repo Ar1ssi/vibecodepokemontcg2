@@ -28,7 +28,7 @@ export const rotateCard = (
       ? rotationAngle
       : (currentRotation + 90) % 360;
 
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'rotateCard', [zoneId, index, single, newRotation]);
     return;
   }

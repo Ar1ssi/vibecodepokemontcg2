@@ -25,7 +25,7 @@ export const reset = (
   invalidMessage = true,
   emit = true
 ) => {
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'reset', [clean, build, invalidMessage]);
     return;
   }

@@ -27,7 +27,7 @@ import { reconcileHandStacks } from '../../setup/zones/hand-stack-dom.js';
 
 export const shuffleAll = (user, initiator, zoneId, indices, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'shuffleAll', [oInitiator, zoneId, indices]);
     return;
   }
@@ -87,7 +87,7 @@ export const shuffleBottom = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'shuffleBottom', [oInitiator, zoneId, indices]);
     return;
   }
@@ -126,7 +126,7 @@ export const shuffleBottom = (
 
 export const discardAll = (user, initiator, zoneId, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'discardAll', [oInitiator, zoneId]);
     return;
   }
@@ -169,7 +169,7 @@ export const discardAll = (user, initiator, zoneId, emit = true) => {
 
 export const lostZoneAll = (user, initiator, zoneId, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'lostZoneAll', [oInitiator, zoneId]);
     return;
   }
@@ -212,7 +212,7 @@ export const lostZoneAll = (user, initiator, zoneId, emit = true) => {
 
 export const handAll = (user, initiator, zoneId, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'handAll', [oInitiator, zoneId]);
     return;
   }
@@ -272,7 +272,7 @@ export const leaveAll = (
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
   const dZoneId =
     dZoneIdParam || (mouseClick.isActiveZone ? 'active' : 'bench');
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'leaveAll', [oInitiator, oZoneId, dZoneId]);
     return;
   }

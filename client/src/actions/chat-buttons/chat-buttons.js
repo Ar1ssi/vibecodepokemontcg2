@@ -541,7 +541,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
     maybeEmit
   );
   let attackIndex = parsedAttackIndex;
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'attack', [attackIndex, rngBundle]);
     return;
   }
@@ -2558,7 +2558,7 @@ export const retreat = async (user, emitOrTarget = true, targetOrEmit = null) =>
   const targetBenchImage = target && typeof target === 'object' ? target : null;
   const targetBenchIndexHint = typeof target === 'number' ? target : null;
 
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'retreat', []);
     return;
   }
@@ -4335,7 +4335,7 @@ export const evolveAbility = async (user, emit = true, targetCard = null, opts =
 export const pass = (user, rngOrEmit = true, maybeEmit) => {
   const { emit, tail: rngIn } = splitEmitAndTail(rngOrEmit, maybeEmit);
   const rngBundle = rngIn || {};
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'pass', [rngBundle]);
     return;
   }
@@ -4753,7 +4753,7 @@ const lowerName = (name) => String(name || '').toLowerCase();
 // For setup-once: draw N (one-shot, applied immediately).
 export const stadiumEffect = async (user, payloadOrEmit = true, maybeEmit) => {
   const { emit, tail: payload } = splitEmitAndTail(payloadOrEmit, maybeEmit);
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'stadium-effect', [payload]);
     return;
   }

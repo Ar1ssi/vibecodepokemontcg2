@@ -1,7 +1,7 @@
 /**
  * Which zones the authoritative renderer owns the DOM for (D11).
  *
- * In a server-authoritative 2P game, `apply-view.js` draws every card these
+ * In a server-authoritative game — a 2P room or a solo room (design 074 D7) — `apply-view.js` draws every card these
  * zones hold from the server's view. The legacy move path still runs for its
  * zone-array bookkeeping (rules gates read those arrays), but if it also
  * appended its own <img>s the zone would show every card twice — once per
@@ -25,8 +25,7 @@ export const SERVER_RENDERED_ZONES = [
  * because the authoritative renderer already draws that zone.
  *
  * @param {string} zoneId
- * @param {{ serverAuthoritative?: boolean, isTwoPlayer?: boolean }} [systemState]
+ * @param {{ serverAuthoritative?: boolean }} [systemState]
  */
 export const legacyDomSuppressed = (zoneId, systemState) =>
-  Boolean(systemState?.serverAuthoritative && systemState?.isTwoPlayer) &&
-  SERVER_RENDERED_ZONES.includes(zoneId);
+  Boolean(systemState?.serverAuthoritative) && SERVER_RENDERED_ZONES.includes(zoneId);

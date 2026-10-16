@@ -324,3 +324,109 @@ test('normalizeTurnOrderResult rejects a starter the winner did not choose', () 
   assert.equal(normalizeTurnOrderResult({ ...base, goFirst: false, starter: 'opp' }), null);
   assert.equal(normalizeTurnOrderResult({ ...base, goFirst: false, starter: 'self' }).starter, 'self');
 });
+
+// Design 074 D7: one solo socket gets p1's copy, then p2's, of every message.
+function soloCopies({ callerSeat, winnerSeat, starterSeat }) {
+  const side = (seat, recipient) => (seat === recipient ? 'self' : 'opp');
+  return ['p1', 'p2'].map((recipient) => ({
+    call: {
+      roomId: 'solo-x',
+      callId: recipient === callerSeat ? 'call-1' : null,
+      waiting: recipient !== callerSeat,
+      timeoutMs: 15000,
+    },
+    flip: {
+      roomId: 'solo-x',
+      caller: side(callerSeat, recipient),
+      call: 'heads',
+      result: 'tails',
+      winner: side(winnerSeat, recipient),
+      choiceId: recipient === winnerSeat ? 'choice-1' : null,
+      timeoutMs: 25000,
+    },
+    result: {
+      roomId: 'solo-x',
+      caller: side(callerSeat, recipient),
+      call: 'heads',
+      result: 'tails',
+      winner: side(winnerSeat, recipient),
+      goFirst: starterSeat === winnerSeat,
+      starter: side(starterSeat, recipient),
+    },
+  }));
+}
+
+function playSolo(nearSeat, seats) {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc, { systemState: { solo: true, nearSeat } });
+  const copies = soloCopies(seats);
+  for (const kind of ['call', 'flip', 'result']) {
+    const event = { call: 'turnOrderCall', flip: 'turnOrderFlip', result: 'turnOrderResult' }[kind];
+    for (const copy of copies) socket.emitInbound(event, copy[kind]);
+  }
+  const of = (type) => doc.events.filter((e) => e.type === type).map((e) => e.detail);
+  return {
+    calls: of('rules-turn-order-call'),
+    flips: of('rules-turn-order-flip'),
+    results: of('rules-turn-order-result'),
+  };
+}
+
+test('solo: the call opens once, for the seat holding the callId', () => {
+  for (const nearSeat of ['p1', 'p2']) {
+    for (const callerSeat of ['p1', 'p2']) {
+      const { calls } = playSolo(nearSeat, { callerSeat, winnerSeat: 'p1', starterSeat: 'p1' });
+      assert.equal(calls.length, 1, `${callerSeat}@${nearSeat}`);
+      assert.equal(calls[0].callId, 'call-1');
+      assert.equal(calls[0].waiting, false);
+      assert.equal(calls[0].seat, callerSeat);
+    }
+  }
+});
+
+test('solo: the winner\'s copy opens the prompt, relabeled to the near seat', () => {
+  const { flips } = playSolo('p1', { callerSeat: 'p1', winnerSeat: 'p2', starterSeat: 'p2' });
+  assert.equal(flips.length, 1);
+  assert.equal(flips[0].choiceId, 'choice-1');
+  assert.equal(flips[0].choiceSeat, 'p2');
+  assert.equal(flips[0].winner, 'opp', 'p2 sits across from the near seat p1');
+  assert.equal(flips[0].caller, 'self');
+  assert.equal(getTurnOrderFlip().choiceSeat, 'p2');
+
+  const flipped = playSolo('p2', { callerSeat: 'p1', winnerSeat: 'p2', starterSeat: 'p2' }).flips;
+  assert.equal(flipped[0].winner, 'self');
+  assert.equal(flipped[0].caller, 'opp');
+});
+
+test('solo: both result copies read from the near seat', () => {
+  const { results } = playSolo('p1', { callerSeat: 'p2', winnerSeat: 'p2', starterSeat: 'p1' });
+  assert.equal(results.length, 2);
+  for (const result of results) {
+    assert.equal(result.starter, 'self');
+    assert.equal(result.winner, 'opp');
+    assert.equal(result.caller, 'opp');
+  }
+  assert.equal(getTurnOrderResult().starter, 'self');
+});
+
+test('solo: a copy that names its seat is attributed to it, whatever the order', () => {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc, { systemState: { solo: true, nearSeat: 'p1' } });
+  socket.emitInbound('turnOrderCall', { roomId: 'solo-x', callId: 'call-9', seat: 'p2' });
+  assert.equal(doc.events[0].detail.seat, 'p2');
+});
+
+test('a normal room keeps the waiting copy and names no seat', () => {
+  resetTurnOrderCall();
+  const socket = fakeSocket();
+  const doc = fakeDoc();
+  registerTurnOrderCallListeners(socket, doc, { systemState: { solo: false, nearSeat: 'p1' } });
+  socket.emitInbound('turnOrderCall', { roomId: 'r', callId: null, waiting: true });
+  assert.equal(doc.events.length, 1);
+  assert.equal(doc.events[0].detail.waiting, true);
+  assert.equal('seat' in doc.events[0].detail, false);
+});

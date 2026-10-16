@@ -13,6 +13,7 @@ import {
   getProtocolVersion,
 } from '../cmd-emitter.js';
 import { PROTOCOL_VERSION } from '../../../../../shared/engine/commands.mjs';
+import { soloCommandSeat } from '../solo-seat.mjs';
 
 class MockSocket {
   constructor() {
@@ -135,6 +136,45 @@ test('emitRequestView emits requestView event', () => {
     event: 'requestView',
     data: { gameId: 'room-xyz', roomId: 'room-xyz' },
   });
+});
+
+test('design 074 D7: emitCmd carries seat only in a solo room', async () => {
+  const send = async (systemState, user) => {
+    const socket = new MockSocket();
+    await emitCmd({
+      socket,
+      roomId: 'room-1',
+      type: 'draw',
+      payload: { count: 1 },
+      seat: soloCommandSeat({ ...systemState, user }),
+    });
+    return socket.emitted[0].data;
+  };
+  const twoPlayer = { solo: false, nearSeat: 'p1' };
+  assert.equal('seat' in (await send(twoPlayer, 'self')), false);
+  assert.equal('seat' in (await send(twoPlayer, 'opp')), false);
+
+  assert.equal((await send({ solo: true, nearSeat: 'p1' }, 'self')).seat, 'p1');
+  assert.equal((await send({ solo: true, nearSeat: 'p1' }, 'opp')).seat, 'p2');
+  assert.equal((await send({ solo: true, nearSeat: 'p2' }, 'self')).seat, 'p2');
+  assert.equal((await send({ solo: true, nearSeat: 'p2' }, 'opp')).seat, 'p1');
+});
+
+test('design 074 D7: emitResolveChoice answers for the view\'s choiceSeat', async () => {
+  const socket = new MockSocket();
+  await emitResolveChoice({ socket, roomId: 'room-1', choiceId: 'c-1', choiceSeat: 'p2' });
+  assert.equal(socket.emitted[0].data.seat, 'p2');
+
+  await emitResolveChoice({ socket, roomId: 'room-1', choiceId: 'c-2', choiceSeat: null });
+  assert.equal('seat' in socket.emitted[1].data, false, 'a normal room names no seat');
+});
+
+test('design 074 D7: emitRequestView names the near seat only on a solo flip', () => {
+  const socket = new MockSocket();
+  emitRequestView({ socket, roomId: 'solo-abc', nearSeat: 'p2' });
+  emitRequestView({ socket, roomId: 'solo-abc' });
+  assert.deepEqual(socket.emitted[0].data, { gameId: 'solo-abc', roomId: 'solo-abc', nearSeat: 'p2' });
+  assert.deepEqual(socket.emitted[1].data, { gameId: 'solo-abc', roomId: 'solo-abc' });
 });
 
 test('clearInFlightAffordances and handleCmdRejected remove cmd-pending', () => {

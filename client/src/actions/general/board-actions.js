@@ -10,7 +10,7 @@ import { dispatchAuthoritativeZoneOp } from '../../setup/netcode/authoritative-d
 
 export const discardBoard = (user, initiator, message = true, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'discardBoard', [oInitiator, message]);
     return;
   }
@@ -48,7 +48,7 @@ export const discardBoard = (user, initiator, message = true, emit = true) => {
 
 export const handBoard = (user, initiator, message = true, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'handBoard', [oInitiator, message]);
     return;
   }
@@ -92,7 +92,7 @@ export const shuffleBoard = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'shuffleBoard', [oInitiator, message, indices]);
     return;
   }
@@ -134,7 +134,7 @@ export const shuffleBoard = (
 
 export const lostZoneBoard = (user, initiator, message = true, emit = true) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'lostZoneBoard', [oInitiator, message]);
     return;
   }

@@ -60,7 +60,7 @@ const RANDOM_USERNAMES = [
 
 // A blank name box reuses the name this tab last sat in the room with (design 069), so a reload
 // can reclaim its seat; otherwise a random trainer name.
-const chooseUsername = (roomId) => {
+export const chooseUsername = (roomId) => {
   const typed = document.getElementById('nameInput').value.trim();
   if (typed !== '') return typed;
   const stored = readSeatToken(roomId);
@@ -103,6 +103,8 @@ const returnToLobby = () => {
   connectedRoom.style.display = 'none';
   clearSeatToken(systemState.roomId);
   systemState.isTwoPlayer = false;
+  // The local board is not server-driven (legacyDomSuppressed reads this alone).
+  systemState.serverAuthoritative = false;
   systemState.roomId = '';
   systemState.opponentSocketId = '';
   cleanActionData('self');

@@ -14,7 +14,7 @@ export const changeType = (
   emit = true
 ) => {
   const oInitiator = initiator === 'self' ? 'opp' : 'self';
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'changeType', [oInitiator, zoneId, index, type]);
     return;
   }

@@ -4,7 +4,8 @@ import {
   selfContainer,
   selfContainerDocument,
 } from '../../initialization/global-variables/containers.js';
-import { systemState } from '../../initialization/global-variables/global-variables.js';
+import { socket, systemState } from '../../initialization/global-variables/global-variables.js';
+import { emitRequestView } from '../../setup/netcode/cmd-emitter.js';
 import { applyTableTilt } from '../../setup/sizing/apply-table-tilt.js';
 import { refreshBoard } from '../../setup/sizing/refresh-board.js';
 import {
@@ -16,8 +17,16 @@ import {
 import { getZone } from '../../setup/zones/get-zone.js';
 import { setStadiumFacing } from '../../setup/zones/stadium-facing.mjs';
 import { lookAtCards, stopLookingAtCards } from './reveal-and-hide.js';
+import { applyBoardFlip } from './board-flip-state.mjs';
 
 export const flipBoard = () => {
+  // Design 074 D7: a solo room keeps its iframes; the server redraws the board from the
+  // other seat (socket-event-listeners.js clears the old perspective when that view lands).
+  if (systemState.solo) {
+    const { requestNearSeat } = applyBoardFlip(systemState);
+    emitRequestView({ socket, roomId: systemState.roomId, nearSeat: requestNearSeat });
+    return;
+  }
   const selfResizer = document.getElementById('selfResizer');
   const oppResizer = document.getElementById('oppResizer');
   const attackButton = document.getElementById('attackButton');
@@ -92,6 +101,7 @@ export const flipBoard = () => {
   toggleClasses(oppResizer, 'opp-color', 'self-color');
   toggleClasses(selfContainer, 'self', 'opp');
   toggleClasses(oppContainer, 'opp', 'self');
+  applyBoardFlip(systemState);
   toggleClasses(boardElement, 'self-board', 'opp-board');
   toggleClasses(oppBoardElement, 'opp-board', 'self-board');
   toggleClasses(attackButton, 'self-color', 'opp-color');

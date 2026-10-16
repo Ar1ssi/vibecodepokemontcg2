@@ -8,7 +8,7 @@ import { determineUsername } from '../../setup/general/determine-username.js';
 import { processAction } from '../../setup/general/process-action.js';
 
 export const VSTARGXFunction = (user, type, emit = true) => {
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'VSTARGXFunction', [type]);
     return;
   }

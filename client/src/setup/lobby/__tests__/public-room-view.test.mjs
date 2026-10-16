@@ -94,3 +94,10 @@ test('design 069 row 7: a full room offers Rejoin to the tab holding one of its 
   assert.equal(stranger.canJoin, false);
   assert.equal(stranger.joinLabel, 'Join');
 });
+
+test('design 074 D7: solo-room refusals have their own messages and keep the seat', () => {
+  assert.match(roomRejectMessage('solo_room'), /solo game/);
+  assert.match(roomRejectMessage('solo_needs_authority'), /local board/);
+  assert.equal(rejectEndsSeat('solo_room'), false);
+  assert.equal(rejectEndsSeat('solo_needs_authority'), false);
+});

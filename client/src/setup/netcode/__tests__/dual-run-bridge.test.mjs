@@ -5,6 +5,7 @@ import {
   normalizeSpecialCondition,
   setInstanceMap,
   resolveInstanceId,
+  instanceMapSeats,
 } from '../dual-run-bridge.js';
 import { validateCommandShape } from '../../../../../shared/engine/commands.mjs';
 
@@ -388,6 +389,37 @@ test('moveCardBundle: returns null when the moving card syncInstance cannot be r
   ]);
 
   assert.equal(cmd, null);
+});
+
+test('design 074 D7: a solo room keeps one instance map per seat', () => {
+  setInstanceMap({ 5: 105 }, 'p1');
+  setInstanceMap({ 5: 205 }, 'p2');
+  assert.equal(resolveInstanceId(5, 'p1'), 105);
+  assert.equal(resolveInstanceId(5, 'p2'), 205);
+  assert.equal(resolveInstanceId(5), null, 'two maps and no seat named is ambiguous');
+  assert.deepEqual(instanceMapSeats().sort(), ['p1', 'p2']);
+
+  const far = translateActionToCmd('updateDamageCounter', ['active', 0, 30, { syncInstance: 5 }], {
+    seat: 'p2',
+  });
+  assert.equal(far.payload.instanceId, 205);
+  const near = translateActionToCmd('updateDamageCounter', ['active', 0, 30, { syncInstance: 5 }], {
+    seat: 'p1',
+  });
+  assert.equal(near.payload.instanceId, 105);
+
+  setInstanceMap(null, 'p2');
+  assert.equal(resolveInstanceId(5, 'p2'), null);
+  assert.equal(resolveInstanceId(5), 105, 'the one map left answers an unnamed lookup');
+});
+
+test('design 074 D7: a normal room\'s single seat-named map answers unnamed lookups', () => {
+  setInstanceMap({ 9: 109 }, 'p2');
+  assert.equal(resolveInstanceId(9), 109);
+  assert.equal(translateActionToCmd('updateDamageCounter', ['active', 0, 10, { syncInstance: 9 }]).payload.instanceId, 109);
+  setInstanceMap({ 9: 309 });
+  assert.equal(resolveInstanceId(9, 'p2'), null, 'an unnamed map replaces every seat');
+  assert.equal(resolveInstanceId(9), 309);
 });
 
 // --- Disposition-table gate (design 002 slice 3.2) ---

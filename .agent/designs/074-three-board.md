@@ -583,6 +583,24 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
   (`solo:<seat>` keys; a solo rejoin replays both). `instanceMap` and `dealOrder` payloads carry `seat` on every room;
   a solo socket gets both seats' copies. `addSoloPlayer`'s `{ p1, p2 }` lists stay stored only, as `addPlayer` does.
 
+### A3
+- Turn-order copies: the server sends a solo socket one `turnOrderCall`/`turnOrderFlip`/`turnOrderResult`
+  per seat with no `seat` field, so `turn-order-call.js` attributes copies by arrival order (p1 then p2,
+  as `forEachSeat` sends them; a replay is p1's), reads `data.seat` first when present, relabels sides to
+  the near seat, dispatches only the copy holding the callId / choiceId, and answers with that seat.
+  Server follow-up: add `seat` to those three payloads, then drop the arrival-order fallback.
+- Every "acting on 'opp' in 2P → ask the peer" branch (44 sites, `user === 'opp' && emit &&
+  isTwoPlayer`) also requires `!systemState.solo`, so the far side runs the path 'self' runs; gates use
+  `actsForSide` (authoritative-dispatch.js). Starting Active picker opens for the far seat too.
+- Leaving any room sets `serverAuthoritative = false` (legacyDomSuppressed now reads it alone, and a
+  stale `true` would blank the local board). Solo chat stays in the Solo tab's `#chatbox`.
+- The page still boots on the local board; the Solo tab click joins the solo room (front-end.js is
+  slice C1's, and an auto-join at boot would change every legacy-solo e2e).
+- Board flip in solo clears the rendered board when the first view from the new near seat lands and
+  drops views still drawn from the old seat; the sync heartbeat hashes p1's side (the server compares
+  the socket against p1). Legacy-built deck piles do not move on a solo flip; deck counts and covers
+  come from the view. `systemState.p2SelfUsername/p2OppUsername` follow their seats across a flip.
+
 ### C1
 - `setMat` spec = `matSpecFor(mats)` from a new pure `sizing/mat-spec.mjs` (apply-mat-layout's `currentMatSpec()` and
   the lab share it): brief fields plus `boxAspect` (the `--mat-width/height` box), `overlaySrc`/`farOverlaySrc` (zone

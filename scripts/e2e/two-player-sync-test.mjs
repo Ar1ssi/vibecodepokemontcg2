@@ -46,7 +46,10 @@ async function openClient(browser, name) {
   return { context, page, name };
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+});
 
 try {
   const a = await openClient(browser, 'A');

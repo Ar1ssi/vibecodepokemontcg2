@@ -66,6 +66,10 @@ const REJECT_MESSAGES = Object.freeze({
   name_taken: 'Someone in this room is already using that name.\nPick another username.',
   seat_released:
     'Your seat was released while you were disconnected.\nPick a room to play again.',
+  // Design 074 D7: a solo room has one player, who plays both seats.
+  solo_room: 'That room is a solo game.\nPick another room.',
+  solo_needs_authority:
+    'Solo games through the server need server authority, which is off here.\nPlaying on the local board instead.',
 });
 const DEFAULT_REJECT_MESSAGE = 'Room is full.\nWatch the game instead, or pick another room.';
 

@@ -17,24 +17,36 @@
  * flip's outcome match the server's instead of guessing.
  */
 
-let pendingOrder = null;
-let pendingStarter = null;
-let waiters = [];
+// One slot per seat: a normal room uses the unnamed slot; a solo room (design 074 D7)
+// gets both seats' deals and keys them by seat, each with its seat-relative starter.
+const UNNAMED_SEAT = '';
+const slots = new Map();
 
-/** Called from the 'dealOrder' socket listener once the server's deal is known. */
-export function setDealOrder(order, starter = null) {
-  pendingOrder = Array.isArray(order) ? order : null;
-  pendingStarter = starter === 'self' || starter === 'opp' ? starter : null;
-  const toResolve = waiters;
-  waiters = [];
-  toResolve.forEach((resolve) => resolve(pendingOrder));
+const slotFor = (seat) => {
+  const key = seat || UNNAMED_SEAT;
+  if (!slots.has(key)) slots.set(key, { order: null, starter: null, waiters: [] });
+  return slots.get(key);
+};
+
+/**
+ * Called from the 'dealOrder' socket listener once the server's deal is known.
+ *
+ * @param {number[]|null} order
+ * @param {'self'|'opp'|null} [starter] relative to `seat`
+ * @param {'p1'|'p2'|null} [seat] a solo room's seat; omitted in a normal room
+ */
+export function setDealOrder(order, starter = null, seat = null) {
+  const slot = slotFor(seat);
+  slot.order = Array.isArray(order) ? order : null;
+  slot.starter = starter === 'self' || starter === 'opp' ? starter : null;
+  const toResolve = slot.waiters;
+  slot.waiters = [];
+  toResolve.forEach((resolve) => resolve(slot.order));
 }
 
 /** Clears any stored/pending order/starter — call on room leave / game reset. */
 export function resetDealOrder() {
-  pendingOrder = null;
-  pendingStarter = null;
-  waiters = [];
+  slots.clear();
 }
 
 /**
@@ -51,25 +63,27 @@ export const OPENING_DEAL_WAIT_MS = 45000;
  * it never does. Callers must treat null as "fall back to local behavior", never guess.
  *
  * @param {number} [timeoutMs=5000]
+ * @param {'p1'|'p2'|null} [seat] a solo room's seat whose deal to wait for
  * @returns {Promise<number[]|null>}
  */
-export function waitForDealOrder(timeoutMs = 5000) {
-  if (pendingOrder) {
-    const order = pendingOrder;
-    pendingOrder = null;
+export function waitForDealOrder(timeoutMs = 5000, seat = null) {
+  const slot = slotFor(seat);
+  if (slot.order) {
+    const order = slot.order;
+    slot.order = null;
     return Promise.resolve(order);
   }
   return new Promise((resolve) => {
     const onOrder = (order) => {
       clearTimeout(timer);
-      pendingOrder = null;
+      slot.order = null;
       resolve(order);
     };
     const timer = setTimeout(() => {
-      waiters = waiters.filter((w) => w !== onOrder);
+      slot.waiters = slot.waiters.filter((w) => w !== onOrder);
       resolve(null);
     }, timeoutMs);
-    waiters.push(onOrder);
+    slot.waiters.push(onOrder);
   });
 }
 
@@ -79,8 +93,9 @@ export function waitForDealOrder(timeoutMs = 5000) {
  * behavior on null rather than wait or guess (dealOrder normally arrives well
  * before the coin-flip UI runs, since setupPrizes() already awaits it first).
  *
+ * @param {'p1'|'p2'|null} [seat] a solo room's seat the answer is relative to
  * @returns {'self'|'opp'|null}
  */
-export function getDealOrderStarter() {
-  return pendingStarter;
+export function getDealOrderStarter(seat = null) {
+  return slots.get(seat || UNNAMED_SEAT)?.starter ?? null;
 }

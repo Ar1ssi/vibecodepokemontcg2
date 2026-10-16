@@ -19,6 +19,11 @@ import {
 } from './authoritative-dispatch.js';
 import { emitCmd } from './cmd-emitter.js';
 import { planCardKeyCommands, planMenuCommands } from './manual-card-commands.mjs';
+import { soloCommandSeat } from './solo-seat.mjs';
+
+// The side a server card's tool acts as: this player's own, or in a solo room (design 074
+// D7) the card's own side, since that room's player owns both seats.
+const actingSide = (record) => (systemState.solo && record.side === 'them' ? 'opp' : 'self');
 
 function selectedServerCard() {
   if (!isAuthoritativeDispatchActive() || !systemState.isTwoPlayer) return null;
@@ -38,7 +43,7 @@ function reportFailure(result) {
   );
 }
 
-function sendPlanned(commands) {
+function sendPlanned(commands, user = 'self') {
   for (const { action, params } of commands) {
     if (action === 'moveCardToBoard') {
       const [{ instanceId, from }] = params;
@@ -47,10 +52,11 @@ function sendPlanned(commands) {
         roomId: systemState.roomId,
         type: 'moveCard',
         payload: { instanceId, from, to: 'board' },
+        seat: soloCommandSeat({ ...systemState, user }),
       }).then(reportFailure);
       continue;
     }
-    if (!emitAuthoritativeCommand(action, params)) {
+    if (!emitAuthoritativeCommand(action, params, { user })) {
       console.warn('manual-card-dispatch: command not sent', action, params);
       return;
     }
@@ -60,7 +66,7 @@ function sendPlanned(commands) {
 function planInputFor(record) {
   return {
     zoneId: record.zone,
-    isOwnCard: record.side === 'you',
+    isOwnCard: record.side === 'you' || Boolean(systemState.solo),
     card: record.card,
   };
 }
@@ -79,7 +85,7 @@ export function dispatchServerCardKey(event) {
     ...planInputFor(record),
   });
   if (!commands) return false;
-  sendPlanned(commands);
+  sendPlanned(commands, actingSide(record));
   return true;
 }
 
@@ -92,7 +98,7 @@ export function dispatchServerCardMenu(buttonId) {
   if (!record) return false;
   const commands = planMenuCommands({ buttonId, ...planInputFor(record) });
   if (!commands) return false;
-  sendPlanned(commands);
+  sendPlanned(commands, actingSide(record));
   return true;
 }
 
@@ -105,9 +111,9 @@ export function dispatchServerCardMenu(buttonId) {
  */
 export function dispatchServerRandomFaceDown(user) {
   if (!isAuthoritativeDispatchActive() || !systemState.isTwoPlayer) return false;
-  if (user !== 'self') {
+  if (user !== 'self' && !systemState.solo) {
     appendMessage('', "You can only play a random card from your own hand.", 'announcement', false);
     return true;
   }
-  return emitAuthoritativeCommand('playRandomCardFaceDown', [{}]);
+  return emitAuthoritativeCommand('playRandomCardFaceDown', [{}], { user });
 }

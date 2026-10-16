@@ -201,7 +201,7 @@ const matPayload = (mat) =>
 
 // Shows the game's own sidebox again after Play.
 const showGameSidebox = () => {
-  if (systemState.isTwoPlayer) {
+  if (systemState.isTwoPlayer && !systemState.solo) {
     show('p2Box', document.getElementById('p2Button'));
   } else {
     show('p1Box', document.getElementById('p1Button'));

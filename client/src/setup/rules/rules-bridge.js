@@ -38,6 +38,7 @@ import { statusState } from '/shared/engine/rules/status.mjs';
 import { initTrainerExecution, runTrainerSteps, switchBenchToActive } from './trainer-execution.js';
 import { parseTrainerEffect, describeStep } from '/shared/engine/rules/trainer-effects.mjs';
 import { getDealOrderStarter, resetDealOrder } from '../netcode/deal-order.js';
+import { soloCommandSeat } from '../netcode/solo-seat.mjs';
 import { multiplayerLocksRulesEnabled } from '../general/e2e-mode.mjs';
 function shouldExecuteLocalRulesEffect({
   isTwoPlayer = false,
@@ -911,7 +912,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
                 return;
               }
 
-              if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+              // One player sets both Actives locally, and in a solo room (design 074 D7).
+              const choosesBoth = !systemState.isTwoPlayer || systemState.solo;
+              if (choosesBoth && liveZoneArray('opp', 'active').length === 0) {
                 setTimeout(() => {
                   promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
                 }, 100);
@@ -922,7 +925,10 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
 
         if (liveZoneArray('self', 'active').length === 0) {
           await promptPlayerActive('self', 'Choose your Starting Active Pokémon');
-        } else if (!systemState.isTwoPlayer && liveZoneArray('opp', 'active').length === 0) {
+        } else if (
+          (!systemState.isTwoPlayer || systemState.solo) &&
+          liveZoneArray('opp', 'active').length === 0
+        ) {
           await promptPlayerActive('opp', "Choose Opponent's Starting Active Pokémon");
         }
       } finally {
@@ -1057,6 +1063,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     
     // ── design 013: server-owned turn-order coin call ────────────────────
     // True when the server, not this client, decides turn order.
+    // A solo room keeps a deal per seat (design 074 D7); this client reads the near seat's.
+    const nearDealSeat = () => soloCommandSeat({ ...systemState, user: 'self' }) ?? null;
+
     const isServerOwnedTurnOrder = () =>
       Boolean(systemState.isTwoPlayer && systemState.serverAuthoritative);
 
@@ -1073,7 +1082,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       // The deal follows the result: starting before its view lands would let
       // that view reset the phase the opening has just set (dealOrder is sent
       // after the view, so its arrival means the deal is in).
-      if (!getDealOrderStarter()) return false;
+      if (!getDealOrderStarter(nearDealSeat())) return false;
       const starter = serverTurnOrderStarter;
       serverTurnOrderStarter = null;
       beginSetupWithTurnOrder(starter);
@@ -1106,13 +1115,21 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
 
     // Answers "Do you want to go first?" for this seat. Only the winner's copy of
     // the flip carries a choiceId; the server rejects anyone else.
-    const sendTurnOrderChoice = ({ roomId, choiceId, goFirst }) => {
+    // A solo room (design 074 D7) answers for the winner's seat (choiceSeat).
+    const sendTurnOrderChoice = ({ roomId, choiceId, goFirst, choiceSeat }) => {
       rulesSocket?.emit('turnOrderChoice', {
         roomId: roomId || systemState.roomId,
         choiceId,
         goFirst,
+        ...(choiceSeat ? { seat: choiceSeat } : {}),
       });
     };
+
+    const turnOrderChoiceOf = (flip) => ({
+      roomId: flip.roomId,
+      choiceId: flip.choiceId,
+      choiceSeat: flip.choiceSeat,
+    });
 
     const closeTurnOrderChoicePicker = () => {
       turnOrderChoicePending = false;
@@ -1125,7 +1142,8 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     const afterServerCoinLands = (flip) => {
       appendMessage('', `${sideName(flip.winner)} won the coin toss.`, 'announcement', false);
       if (serverTurnOrderResult) return; // already chosen (auto, or answered early)
-      if (flip.winner !== 'self') {
+      // A solo player answers for whichever seat won (flip.choiceSeat).
+      if (flip.winner !== 'self' && !flip.choiceSeat) {
         appendMessage(
           '',
           'Your opponent won the coin flip and is deciding who goes first.',
@@ -1139,7 +1157,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       openTurnOrderChoicePicker({
         onChoose: (goFirst) => {
           turnOrderChoicePending = false;
-          sendTurnOrderChoice({ roomId: flip.roomId, choiceId: flip.choiceId, goFirst });
+          sendTurnOrderChoice({ ...turnOrderChoiceOf(flip), goFirst });
         },
       });
     };
@@ -1152,7 +1170,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         // Free play shows no ceremony and has nobody to click the prompt; the
         // deal waits on this answer, so give it at once.
         if (flip.choiceId) {
-          sendTurnOrderChoice({ roomId: flip.roomId, choiceId: flip.choiceId, goFirst: true });
+          sendTurnOrderChoice({ ...turnOrderChoiceOf(flip), goFirst: true });
         }
         return false;
       }
@@ -1168,7 +1186,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       // The Playwright harness has nobody to click either; it answers as the
       // winner always did before the choice existed.
       if (isE2eMode() && flip.choiceId) {
-        sendTurnOrderChoice({ roomId: flip.roomId, choiceId: flip.choiceId, goFirst: true });
+        sendTurnOrderChoice({ ...turnOrderChoiceOf(flip), goFirst: true });
       }
 
       const { caller, call, result, winner, coinId, auto } = flip;
@@ -1229,7 +1247,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
     // The server nominated a caller. Only the nominated seat gets a callId.
     const handleServerTurnOrderCall = (detail) => {
       if (!isServerOwnedTurnOrder()) return;
-      const { callId, waiting, roomId } = detail || {};
+      // `seat`: a solo room's caller seat (design 074 D7), echoed in the call.
+      const { callId, waiting, roomId, seat } = detail || {};
+      const seatField = seat ? { seat } : {};
       const targetRoomId = roomId || systemState.roomId;
 
       if (waiting || !callId) {
@@ -1255,6 +1275,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
           callId,
           call: 'heads',
           coinId: getSelectedCoin('self')?.id || null,
+          ...seatField,
         });
         return;
       }
@@ -1273,6 +1294,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
             // show the same art during the ceremony (display only; the flip
             // result still comes from the server's seeded rng).
             coinId: getSelectedCoin('self')?.id || null,
+            ...seatField,
           });
         },
       });
@@ -1407,7 +1429,7 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
         // runs), use it instead of the local guess so this client's turn-order
         // belief always matches the server's.
         if (systemState.isTwoPlayer && systemState.serverAuthoritative) {
-          const authoritativeStarter = getDealOrderStarter();
+          const authoritativeStarter = getDealOrderStarter(nearDealSeat());
           if (authoritativeStarter) turnPlayer = authoritativeStarter;
         }
 

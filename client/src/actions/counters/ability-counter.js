@@ -21,7 +21,7 @@ export const removeAbilityCounter = (
   const resolved = resolveCardIndex(zone, hintIn, index);
   const targetCard = zone?.array?.[resolved];
   const hint = hintIn || buildCardHint(targetCard);
-  if (user === 'opp' && emit && systemState.isTwoPlayer) {
+  if (user === 'opp' && emit && systemState.isTwoPlayer && !systemState.solo) {
     processAction(user, emit, 'removeAbilityCounter', [zoneId, resolved, hint]);
     return;
   }
