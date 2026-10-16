@@ -33,6 +33,7 @@ import {
   fitDistance,
   packRowSpot,
   pileJitter,
+  summaryColumns,
   summarySlot,
   wrapperSpot,
 } from '../../../../setup/deck-builder/core/build-battle/tabletop/layout.mjs';
@@ -993,12 +994,13 @@ export async function createTabletopApp(options) {
     looseMeshes.delete(group);
     const cards = revealPile.splice(0, revealPile.length);
     const count = cards.length;
-    const distance = Math.max(540, fitDistance(5 * 36 + 8, CARD.height + 12, camera.fov, aspect()));
+    const fan = summaryColumns(count, aspect(), camera.fov);
+    const distance = Math.max(540, fan.distance);
     hand = { kind: 'summary', visual, logical, cards };
     audio.play('card-slide');
     await Promise.all(
       cards.map((mesh, k) => {
-        const slot = summarySlot(k, count);
+        const slot = summarySlot(k, count, fan.columns);
         const pose = handPose({ x: slot.x, y: slot.y - HAND.y, z: -distance, tiltXDeg: 0 });
         mesh.userData.tt = { kind: 'summaryCard' };
         return flyTo(mesh, pose, { durationMs: 620, lift: 20, delayMs: k * 55 });

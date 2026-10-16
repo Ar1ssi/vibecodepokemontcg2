@@ -2,7 +2,7 @@ import {
   Color,
   DirectionalLight,
   Float32BufferAttribute,
-  FogExp2,
+  Fog,
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
@@ -34,6 +34,9 @@ import { WOOD_TILE_MM, clothNormalTexture, loadTexture, woodTextures } from './t
  */
 
 const PIXEL_RATIO_MAX = 2;
+// Fog starts past what the camera frames and closes in a few frame-depths further back.
+const FOG_NEAR = 1.4;
+const FOG_FAR = 4.5;
 const BACKSTOP_SLACK_MS = 700;
 
 /**
@@ -74,7 +77,9 @@ export function createStage({
   const scene = new Scene();
   scene.background = new Color(0x141210);
   // The desk fades into the dim room instead of ending on a hard edge.
-  scene.fog = new FogExp2(0x141210, 0.0007);
+  // The far desk fades into the dark room; the fog is set from the camera's distance to what it
+  // looks at (`applyCamera`), so whatever is framed stays clear on any screen.
+  scene.fog = new Fog(0x141210, 600, 2400);
   const pmrem = new PMREMGenerator(renderer);
   const environment = createStudioEnvironment();
   const envMap = pmrem.fromScene(environment.scene, 0.02).texture;
@@ -124,6 +129,8 @@ export function createStage({
     track(
       new MeshStandardMaterial({
         map: wood.color,
+        // Walnut under a warm lamp still reads brown, not orange.
+        color: new Color(0xd6cfc9),
         normalMap: wood.normal,
         roughness: 0.48,
         metalness: 0,
@@ -279,6 +286,9 @@ export function createStage({
     camera.position.set(pose.position.x, pose.position.y, pose.position.z);
     lookTarget.set(pose.target.x, pose.target.y, pose.target.z);
     camera.lookAt(lookTarget);
+    const reach = camera.position.distanceTo(lookTarget);
+    scene.fog.near = reach * FOG_NEAR;
+    scene.fog.far = reach * FOG_FAR;
     if (camera.fov !== pose.fov) {
       camera.fov = pose.fov;
       camera.updateProjectionMatrix();

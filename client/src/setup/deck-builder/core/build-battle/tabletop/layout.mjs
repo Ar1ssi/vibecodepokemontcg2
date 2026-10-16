@@ -64,23 +64,49 @@ export function pileJitter(k) {
 
 // Held things float in front of the eye at arm's length.
 export const HAND = Object.freeze({ x: 0, y: 8, z: -330, tiltXDeg: -7 });
-// The revealed cards of a pack are fanned a little further away, in two rows of five.
+// The revealed cards of a pack are fanned a little further away: two rows of five on a wide
+// screen, more rows of fewer on a narrow one (`summaryColumns`).
 const SUMMARY_DISTANCE = 540;
 const SUMMARY_PITCH_X = 70;
 const SUMMARY_ROW_GAP = 8;
+const SUMMARY_MARGIN = 8;
 
-/** @returns {{x: number, y: number, z: number}} hand-space centre of summary card `k` of `count`. */
-export function summarySlot(k, count = 10) {
+/**
+ * @param {number} k the card's place in the fan (0-based)
+ * @param {number} count the cards in the fan
+ * @param {number} columns cards per full row
+ * @returns {{x: number, y: number, z: number}} hand-space centre of summary card `k` of `count`.
+ */
+export function summarySlot(k, count = 10, columns = 5) {
   const n = Math.max(1, count | 0);
-  const perRow = Math.ceil(n / 2);
-  const row = k < perRow ? 0 : 1;
-  const column = row === 0 ? k : k - perRow;
-  const inRow = row === 0 ? perRow : n - perRow;
+  const perRow = Math.max(1, Math.min(n, columns | 0 || 5));
+  const rows = Math.ceil(n / perRow);
+  const row = Math.min(rows - 1, Math.floor(k / perRow));
+  const column = k - row * perRow;
+  const inRow = row === rows - 1 ? n - perRow * (rows - 1) : perRow;
   return {
     x: (column - (inRow - 1) / 2) * SUMMARY_PITCH_X,
-    y: (row === 0 ? 1 : -1) * (CARD.height / 2 + SUMMARY_ROW_GAP / 2),
+    y: ((rows - 1) / 2 - row) * (CARD.height + SUMMARY_ROW_GAP),
     z: -SUMMARY_DISTANCE,
   };
+}
+
+/**
+ * The fan's column count that shows `count` cards biggest on a screen of `aspect` (2–5 columns),
+ * and the camera distance that fits it.
+ * @returns {{columns: number, distance: number}}
+ */
+export function summaryColumns(count = 10, aspect = 16 / 9, fovDeg = CAMERA_FOV_DEG) {
+  const n = Math.max(1, count | 0);
+  let best = null;
+  for (let columns = Math.min(2, n); columns <= Math.min(5, n); columns += 1) {
+    const rows = Math.ceil(n / columns);
+    const halfWidth = (columns * SUMMARY_PITCH_X) / 2 + SUMMARY_MARGIN;
+    const halfHeight = (rows * (CARD.height + SUMMARY_ROW_GAP)) / 2 + SUMMARY_MARGIN;
+    const distance = fitDistance(halfWidth, halfHeight, fovDeg, aspect);
+    if (!best || distance < best.distance - 1e-9) best = { columns, distance };
+  }
+  return best;
 }
 
 /**
@@ -96,13 +122,21 @@ export function fitDistance(halfWidth, halfHeight, fovDeg, aspect) {
 }
 
 // Each camera pose frames a region of the table: its centre, its half extents, and the angle the
-// eye looks down at it from.
+// eye looks down at it from. A portrait screen (`narrow`) frames tighter across and, at the
+// table, looks down more steeply, so the box and the mat aren't lost in empty floor.
 const FRAMES = Object.freeze({
-  box: { target: { x: 0, y: 50, z: -70 }, halfWidth: 150, halfHeight: 118, elevationDeg: 18 },
-  open: { target: { x: 0, y: 72, z: -78 }, halfWidth: 170, halfHeight: 142, elevationDeg: 34 },
-  table: { target: { x: 10, y: 10, z: 18 }, halfWidth: 300, halfHeight: 255, elevationDeg: 52 },
+  box: { target: { x: 0, y: 50, z: -70 }, halfWidth: 150, halfHeight: 118, elevationDeg: 18, narrow: { halfWidth: 92 } },
+  open: { target: { x: 0, y: 72, z: -78 }, halfWidth: 170, halfHeight: 142, elevationDeg: 34, narrow: { halfWidth: 112 } },
+  table: {
+    target: { x: 10, y: 10, z: 18 },
+    halfWidth: 300,
+    halfHeight: 255,
+    elevationDeg: 52,
+    narrow: { halfWidth: 262, elevationDeg: 62 },
+  },
 });
 export const CAMERA_FOV_DEG = 30;
+const NARROW_ASPECT = 1;
 
 /**
  * @param {'box'|'open'|'table'} name
@@ -110,7 +144,8 @@ export const CAMERA_FOV_DEG = 30;
  * @returns {{position: {x, y, z}, target: {x, y, z}, fov: number}}
  */
 export function cameraPose(name, aspect) {
-  const frame = FRAMES[name] || FRAMES.box;
+  const base = FRAMES[name] || FRAMES.box;
+  const frame = Number.isFinite(aspect) && aspect > 0 && aspect < NARROW_ASPECT ? { ...base, ...base.narrow } : base;
   const distance = fitDistance(frame.halfWidth, frame.halfHeight, CAMERA_FOV_DEG, aspect);
   const elevation = frame.elevationDeg * DEG;
   const { target } = frame;

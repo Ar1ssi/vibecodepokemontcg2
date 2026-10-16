@@ -256,3 +256,10 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   its smallest feature drops under ~2 px (`ttFoilFeature`), and the rainbow phase uses the faded
   pattern; starlight/glitter keep their points of light in the sparkle term (sparser, smaller,
   brightest reflections only); startup waits ≤ 6 s for the held cards' faces.
+- **Iteration 7 (phones and haze).** Before (390 × 844): the box a small island in empty floor, the
+  table framed from 2.4 m and fogged almost black — FogExp2 0.0007 also hazed the landscape table
+  by ~36 %; the summary fan's five columns shrank to thumbnails. After: portrait framings (`narrow`
+  half-widths, a steeper look at the table), linear fog set from the camera's distance to its
+  target (clear to 1.4×, gone by 4.5×), `summaryColumns` picks the 2–5 column fan that shows the
+  cards biggest at the screen's aspect (tested: every card inside the view, none overlapping); the
+  desk toned down a little now the haze no longer dims it.

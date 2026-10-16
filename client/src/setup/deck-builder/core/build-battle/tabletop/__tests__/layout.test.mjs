@@ -18,6 +18,7 @@ import {
   fitDistance,
   packRowSpot,
   pileJitter,
+  summaryColumns,
   summarySlot,
   wrapperSpot,
 } from '../layout.mjs';
@@ -145,3 +146,38 @@ test('camera poses look down at their target from above and in front', () => {
   assert.ok(portrait.position.y > landscape.position.y, 'a narrow screen steps back');
   assert.deepEqual(cameraPose('nope', 1), cameraPose('box', 1));
 });
+
+test('the summary fan takes the column count that shows its cards biggest, and all of them', () => {
+  const tan = Math.tan((CAMERA_FOV_DEG / 2) * DEG);
+  assert.equal(summaryColumns(10, 16 / 9).columns, 5, 'a wide screen: two rows of five');
+  assert.ok(summaryColumns(10, 390 / 844).columns <= 3, 'a phone: more rows of fewer cards');
+  for (const aspect of [390 / 844, 0.75, 1, 4 / 3, 16 / 9, 21 / 9]) {
+    for (const count of [1, 8, 10, 11]) {
+      const { columns, distance } = summaryColumns(count, aspect);
+      const slots = Array.from({ length: count }, (_, k) => summarySlot(k, count, columns));
+      for (const slot of slots) {
+        assert.ok(Math.abs(slot.x) + CARD.width / 2 <= distance * tan * aspect + 1e-6, `x fits at ${aspect}`);
+        assert.ok(Math.abs(slot.y) + CARD.height / 2 <= distance * tan + 1e-6, `y fits at ${aspect}`);
+      }
+      for (let i = 0; i < count; i += 1) {
+        for (let j = i + 1; j < count; j += 1) {
+          const apart =
+            Math.abs(slots[i].x - slots[j].x) >= CARD.width || Math.abs(slots[i].y - slots[j].y) >= CARD.height;
+          assert.ok(apart, `cards ${i} and ${j} overlap with ${columns} columns`);
+        }
+      }
+    }
+  }
+});
+
+test('a portrait screen frames the box tighter than the wide frame would', () => {
+  const narrow = cameraPose('box', 0.5);
+  const target = narrow.target;
+  const reach = Math.hypot(narrow.position.x - target.x, narrow.position.y - target.y, narrow.position.z - target.z);
+  const wideReach = fitDistance(150, 118, CAMERA_FOV_DEG, 0.5);
+  assert.ok(reach < wideReach * 0.7, `${reach.toFixed(0)} vs ${wideReach.toFixed(0)}`);
+  const table = cameraPose('table', 0.5);
+  const lookDown = Math.atan2(table.position.y - table.target.y, table.position.z - table.target.z) / DEG;
+  assert.ok(lookDown > 55, 'the table is seen more from above on a phone');
+});
+
