@@ -7,8 +7,8 @@ import {
   damageOutcome,
   damageReadout,
   statusEffectsFor,
-  tapRoute,
 } from '../attack-ui-model.mjs';
+import { tapRoute } from '../card-focus-routing.mjs';
 
 const fills = (rows) => rows.map((r) => `${r.type}:${r.filled ? 1 : 0}`).join(' ');
 

@@ -40,6 +40,12 @@ import {
 } from '../../../../shared/engine/rules/card-classify.mjs';
 import { canRetreat } from '../../../../shared/engine/rules/retreat.mjs';
 import {
+  attachedEnergyUnits,
+  costFulfillment,
+  damageOutcome,
+  damageReadout,
+} from './attack-ui-model.mjs';
+import {
   DEFAULT_ATTACK_BAND,
   DEFAULT_STADIUM_BAND,
   attackWeights,
@@ -49,6 +55,8 @@ import {
 } from './attack-zone-geometry.js';
 
 const POKEMON_SUPERTYPES = ['Pokémon', 'Pokemon', ''];
+// RetreatOption.maxRetreatIconsDisplay.
+const MAX_RETREAT_ICONS = 4;
 
 /**
  * Frame-keyed band table. Band positions are FRAME-SPECIFIC — a Tera ex header is ~20% of
@@ -467,6 +475,7 @@ export function buildInspectorModel(card, ctx = {}) {
   );
 
   const byName = new Map(window.map((w) => [w.name, w]));
+  const energyUnits = attachedEnergyUnits(energyTypes);
   const interactive = rulesEnabled && !readOnly;
   // A benched Pokémon cannot attack, so its panels are inert — but they are NOT receded and the
   // card does NOT dim. Greying them or dimming the card would report an energy problem that does
@@ -490,6 +499,16 @@ export function buildInspectorModel(card, ctx = {}) {
     const resolved =
       parsed?.resolved && isFiniteNumber(parsed.total) ? parsed.total : null;
     const damageLabel = resolved != null ? resolved : (base ?? printed);
+    // TCG Live's damage tab (design 074): the outcome against the opponent's Active once the attack's
+    // own maths has resolved, else the printed label (the game's "not finished" path).
+    const breakdown =
+      resolved != null && typeof ctx.damagePreview === 'function'
+        ? ctx.damagePreview(raw, resolved)
+        : null;
+    const readout = damageReadout(
+      raw?.damage ?? '',
+      breakdown ? damageOutcome(breakdown, { unmodifiedBase: resolved }) : null
+    );
 
     const cost = Array.isArray(entry?.cost)
       ? entry.cost
@@ -510,6 +529,8 @@ export function buildInspectorModel(card, ctx = {}) {
       vstar: isVstarPowerAttack(raw),
       damageLabel: damageLabel == null ? null : damageLabel,
       printedLabel: printed,
+      readout,
+      costIcons: costFulfillment(cost.map(String), energyUnits),
       payable,
       onceUsed,
       reason:
@@ -602,6 +623,15 @@ export function buildInspectorModel(card, ctx = {}) {
     weakness: typeValueOf(card, 'weakness'),
     resistance: typeValueOf(card, 'resistance'),
     retreat: retreatSymbols,
+    // RetreatOption: up to four Colorless icons filled by the attached Energy, or past four the
+    // ShortRetreatCostDisplay "attached/needed" count.
+    retreatIcons:
+      retreatSymbols.length > MAX_RETREAT_ICONS
+        ? null
+        : costFulfillment(retreatSymbols.map(() => 'Colorless'), energyUnits).filter(
+            (icon) => icon.type !== 'empty'
+          ),
+    retreatCount: { attached: energyUnits.length, needed: retreatSymbols.length },
     // Where the rendered stack starts: the ability band when there is an ability, since that
     // text prints above the attacks, otherwise the attack band. `bandTopPct` stays the attack
     // band alone for anything laying out attacks specifically.

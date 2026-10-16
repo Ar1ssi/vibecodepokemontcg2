@@ -245,15 +245,15 @@ try {
     if (!insp) return null;
     return {
       hp: insp.querySelector('.ptcg-hp')?.textContent,
-      atks: [...insp.querySelectorAll('.ptcg-atk')].map((el) => ({
-        name: el.querySelector('.ptcg-atk__name')?.textContent,
-        receded: el.classList.contains('ptcg-atk--recede'),
-        usable: el.classList.contains('ptcg-atk--usable'),
+      atks: [...insp.querySelectorAll('.tcgl-opt--attack')].map((el) => ({
+        name: el.querySelector('.tcgl-opt__name')?.textContent,
+        receded: el.classList.contains('tcgl-opt--off'),
+        usable: el.classList.contains('tcgl-opt--usable'),
         type: el.dataset.ptcgType,
-        hasDmg: Boolean(el.querySelector('.ptcg-atk__dmg')),
+        hasDmg: Boolean(el.querySelector('.tcgl-opt__dmg')?.textContent),
       })),
-      stats: insp.querySelector('.ptcg-stats')?.textContent,
-      retreatType: insp.querySelector('.ptcg-stat[data-ptcg-retreat]')?.dataset.ptcgType,
+      stats: insp.querySelector('.tcgl-wr')?.textContent,
+      retreatType: insp.querySelector('.tcgl-retreat[data-ptcg-retreat]')?.dataset.ptcgType,
     };
   });
   console.log('Focus data (0 energy):', JSON.stringify(inspectorData));
@@ -274,12 +274,12 @@ try {
       host: box('.card-focus__card'),
       chrome: box('.card-focus .ptcg-chrome'),
       stack: box('.card-focus .ptcg-stack--focus'),
-      strip: box('.card-focus .ptcg-stats--focus'),
+      strip: box('.card-focus .tcgl-wr'),
       hp: box('.card-focus .ptcg-hp'),
       hud: box('.card-focus__hud'),
       viewport: { width: window.innerWidth, height: window.innerHeight },
-      stripText: document.querySelector('.card-focus .ptcg-stats--focus')?.textContent ?? '',
-      weakness: document.querySelector('.card-focus .ptcg-wr__row .ptcg-wr__n')?.textContent ?? null,
+      stripText: document.querySelector('.card-focus .tcgl-wr')?.textContent ?? '',
+      weakness: document.querySelector('.card-focus .tcgl-wr__row--weakness .tcgl-wr__amount')?.textContent ?? null,
     };
   });
   const W = layout.host.width;
@@ -303,7 +303,7 @@ try {
     '7e. The bar hangs under the list: 0.43 units above the card bottom, 0.7 tall',
     within(layout.strip.bottom, liftY(layout.chrome.bottom - 0.43 * tu), 3) && within(layout.strip.height, 0.7 * tu * lift, 3)
   );
-  T('7f. The strip repeats weakness and resistance (the print is covered)', /weakness/.test(layout.stripText) && /resistance/.test(layout.stripText) && layout.weakness === '×2', layout.stripText.trim().replace(/\s+/g, ' '));
+  T('7f. The strip repeats weakness and resistance (the print is covered)', /Weakness/.test(layout.stripText) && /Resistance/.test(layout.stripText) && layout.weakness === 'x2', layout.stripText.trim().replace(/\s+/g, ' '));
   T('7g. The HP pill overhangs the card edge, the HUD stands left of it', layout.hp.right > layout.host.right + 0.01 * W && layout.hud.right < layout.host.left);
 
   await actor.page.screenshot({ path: 'out/e2e-focus-open.png' });
@@ -344,9 +344,9 @@ try {
   await clickActive(['click']);
   await actor.page.waitForTimeout(800);
   const withEnergy = await actor.page.evaluate(() => ({
-    atks: [...document.querySelectorAll('.card-focus .ptcg-atk')].map((el) => ({
-      receded: el.classList.contains('ptcg-atk--recede'),
-      usable: el.classList.contains('ptcg-atk--usable'),
+    atks: [...document.querySelectorAll('.card-focus .tcgl-opt--attack')].map((el) => ({
+      receded: el.classList.contains('tcgl-opt--off'),
+      usable: el.classList.contains('tcgl-opt--usable'),
     })),
     stack: document.querySelector('.card-focus__stack-count')?.textContent ?? null,
     energies: document.querySelectorAll('.card-focus__energy').length,
@@ -370,7 +370,7 @@ try {
   // A slow double-click: the list has finished revealing, the 500 ms guard has not passed.
   await actor.page.waitForTimeout(350);
   const onUsablePanel = await actor.page.evaluate(
-    ([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.ptcg-atk--usable')),
+    ([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.tcgl-opt--usable')),
     [px, py]
   );
   T('10c-pre. The second click of the double-click would land on a payable attack panel', onUsablePanel);
@@ -395,7 +395,7 @@ try {
   console.log('Testing attack click execution...');
   await clickActive(['click']);
   await actor.page.waitForTimeout(800);
-  await actor.page.locator('.ptcg-atk.ptcg-atk--usable').first().click();
+  await actor.page.locator('.tcgl-opt.tcgl-opt--usable').first().click();
   T('13. Clicking a payable attack closes the focus view at once', await waitGone());
   T('13b. ...and the hand is raised again', !(await handLowered()));
 

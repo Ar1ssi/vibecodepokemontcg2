@@ -12,10 +12,13 @@ import { spriteMap } from '../../../../../scripts/attack-ui/import-attack-ui.mjs
 // read the JSON, so the numbers are repeated there and pinned here.
 
 const CSS = readFileSync(fileURLToPath(new URL('../../../css/index.css', import.meta.url)), 'utf8');
+// Design 074 moved the per-type table and the option rows into their own stylesheet.
+const OPTIONS_CSS = readFileSync(fileURLToPath(new URL('../../../css/attack-options.css', import.meta.url)), 'utf8');
 const ASSET_DIR = fileURLToPath(new URL('../../../assets/attack-ui/', import.meta.url));
 const TABLE = JSON.parse(readFileSync(`${ASSET_DIR}attack-ui.json`, 'utf8'));
 
-const normalized = CSS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
+const normalized = `${CSS}
+${OPTIONS_CSS}`.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
 const ruleFor = (selector) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(normalized);
@@ -47,8 +50,9 @@ describe('attack-ui sprites', () => {
     assert.ok(existsSync(`${ASSET_DIR}type-empty.png`));
   });
 
-  it('every attack-ui url in index.css points at a committed sprite', () => {
-    const urls = [...CSS.matchAll(/url\('\.\.\/assets\/attack-ui\/([^']+)'\)/g)].map((m) => m[1]);
+  it('every attack-ui url in index.css and attack-options.css points at a committed sprite', () => {
+    const urls = [...`${CSS}
+${OPTIONS_CSS}`.matchAll(/url\('\.\.\/assets\/attack-ui\/([^']+)'\)/g)].map((m) => m[1]);
     assert.ok(urls.length > 40, 'expected the palette and variant urls');
     for (const file of new Set(urls)) assert.ok(existsSync(`${ASSET_DIR}${file}`), `${file} is missing`);
   });
@@ -61,7 +65,7 @@ describe('attack-ui palette', () => {
 
   for (const [key, row] of Object.entries(TABLE.types)) {
     it(`${key}: colours and sprites match the registry`, () => {
-      const decls = ruleFor(`.ptcg-chrome [data-ptcg-type='${key}']`);
+      const decls = ruleFor(`[data-ptcg-type='${key}']`);
       assert.ok(decls, `no palette rule for ${key}`);
       assert.match(decls, new RegExp(`--atk-color: ${row.bar};`));
       assert.match(decls, new RegExp(`--atk-ink: ${row.ink};`));

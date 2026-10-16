@@ -52,10 +52,12 @@ import {
 } from '../netcode/apply-view.js';
 import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
+import { buildInspectorModel } from './card-inspector-model.mjs';
 import {
-  buildInspectorModel,
-  formatWeakResist,
-} from './card-inspector-model.mjs';
+  buildAbilityOption,
+  buildAttackOption,
+  buildWeakResistBar,
+} from './attack-options.mjs';
 import {
   openCarouselViewer,
   closeCarouselViewer,
@@ -203,6 +205,7 @@ const abilityEl = (ability, cardType) => {
     }${ability.vstar ? ' ptcg-ability--vstar' : ''}`
   );
   section.dataset.ptcgType = barTypeKey(cardType);
+  section.dataset.ptcgAbility = '1';
 
   const head = el('div', 'ptcg-atk__head');
   if (ability.vstar) head.appendChild(vstarPowerStrip());
@@ -380,24 +383,11 @@ const buildChrome = (model, layout = 'print') => {
   return chrome;
 };
 
-// One Weakness / Resistance line of the focus strip: the label, then the type orb and modifier when
-// the card prints one. An absent weakness or resistance keeps its label (the game does the same).
-const weakResistRow = (label, kind, typeValue) => {
-  const row = el('div', 'ptcg-wr__row');
-  row.appendChild(el('span', 'ptcg-wr__k', label));
-  const text = formatWeakResist(kind, typeValue);
-  if (typeValue?.type && text) {
-    row.appendChild(orb(typeValue.type, 'ptcg-orb ptcg-orb--sm'));
-    row.appendChild(el('span', 'ptcg-wr__n', text));
-  }
-  return row;
-};
-
 /**
  * The chrome for the card-focus view (design 067), laid out as TCG Live's attack overlay is rather
  * than over the printed bands: the list is anchored to the bottom of the card, a little wider than
- * it, with a Weakness / Resistance / Retreat strip beneath. It covers the printed text, so the
- * strip repeats the weakness and resistance the print would have shown. Geometry is in card-focus.css.
+ * it, with the Weakness / Resistance / Retreat bar beneath. The rows are the game's option prefabs
+ * (attack-options.mjs, design 074); geometry is in card-focus.css, the rows' skin in attack-options.css.
  */
 const buildFocusChrome = (model) => {
   const chrome = el('div', 'ptcg-chrome ptcg-chrome--focus');
@@ -415,20 +405,13 @@ const buildFocusChrome = (model) => {
   // over its top edge, which the list's own overflow clip would cut off.
   const frame = el('div', 'ptcg-frame ptcg-frame--focus');
   const stack = el('div', 'ptcg-stack ptcg-stack--focus');
-  if (model.ability) stack.appendChild(abilityEl(model.ability, model.type));
-  const atks = el('div', 'ptcg-atks');
-  model.attacks.forEach((attack) => atks.appendChild(attackEl(attack, model.type)));
-  stack.appendChild(atks);
+  if (model.ability) stack.appendChild(buildAbilityOption(model.ability, model.type));
+  const options = el('div', 'tcgl-opts');
+  model.attacks.forEach((attack) => options.appendChild(buildAttackOption(attack, model.type)));
+  stack.appendChild(options);
   frame.appendChild(stack);
   chrome.appendChild(frame);
-
-  const strip = el('footer', 'ptcg-stats ptcg-stats--focus');
-  const weakResist = el('div', 'ptcg-wr');
-  weakResist.appendChild(weakResistRow('weakness', 'weakness', model.weakness));
-  weakResist.appendChild(weakResistRow('resistance', 'resistance', model.resistance));
-  strip.appendChild(weakResist);
-  strip.appendChild(retreatTile(model));
-  chrome.appendChild(strip);
+  chrome.appendChild(buildWeakResistBar(model));
 
   if (model.damage > 0) chrome.appendChild(el('div', 'ptcg-dmg', model.damage));
   return chrome;
@@ -588,6 +571,9 @@ export const decorateInspectorSlide = (
   return wrap;
 };
 
+// Each panel's own "usable" modifier: its block class with `--usable` (ptcg-atk, tcgl-opt, …).
+const usableClass = (panel) => `${panel.classList[0]}--usable`;
+
 /**
  * Paint the affordances — which panels look clickable. The click itself is delegated from the
  * wrap (see `wirePanelClicks`), so a re-render that replaces the whole chrome subtree cannot
@@ -603,27 +589,25 @@ const applyAffordances = (state, model) => {
       Boolean(handlers?.onUse) && Boolean(model.usable)
     );
 
-  state.wrap
-    .querySelector('.ptcg-ability')
-    ?.classList.toggle(
-      'ptcg-ability--usable',
-      Boolean(handlers?.onAbility) && Boolean(model.ability?.usable)
-    );
+  const abilityPanel = state.wrap.querySelector('[data-ptcg-ability]');
+  abilityPanel?.classList.toggle(
+    usableClass(abilityPanel),
+    Boolean(handlers?.onAbility) && Boolean(model.ability?.usable)
+  );
 
-  state.wrap.querySelectorAll('.ptcg-atk').forEach((panel) => {
+  state.wrap.querySelectorAll('[data-ptcg-attack]').forEach((panel) => {
     const attack = model.attacks[Number(panel.dataset.ptcgAttack)];
     panel.classList.toggle(
-      'ptcg-atk--usable',
+      usableClass(panel),
       Boolean(handlers?.onAttack) && Boolean(attack?.usable)
     );
   });
 
-  state.wrap
-    .querySelector('.ptcg-stat[data-ptcg-retreat]')
-    ?.classList.toggle(
-      'ptcg-stat--usable',
-      Boolean(handlers?.onRetreat) && Boolean(model.retreatUsable)
-    );
+  const retreatPanel = state.wrap.querySelector('[data-ptcg-retreat]');
+  retreatPanel?.classList.toggle(
+    usableClass(retreatPanel),
+    Boolean(handlers?.onRetreat) && Boolean(model.retreatUsable)
+  );
 };
 
 /**
@@ -632,7 +616,7 @@ const applyAffordances = (state, model) => {
  * that decision is made, so nothing is re-derived here.
  */
 const ACTION_PANEL_SELECTOR =
-  '.ptcg-stadium[data-ptcg-stadium], .ptcg-atk[data-ptcg-attack], .ptcg-ability, .ptcg-stat[data-ptcg-retreat]';
+  '[data-ptcg-stadium], [data-ptcg-attack], [data-ptcg-ability], [data-ptcg-retreat]';
 
 const wirePanelClicks = (state) => {
   // A press and release that land on different children (cursor drift, hover repaint) make the
@@ -656,14 +640,14 @@ const wirePanelClicks = (state) => {
       stopPropagation: () => rawEvent.stopPropagation(),
     };
     pressedTarget = null;
-    const stadiumPanel = event.target.closest?.('.ptcg-stadium[data-ptcg-stadium]');
+    const stadiumPanel = event.target.closest?.('[data-ptcg-stadium]');
     if (stadiumPanel) {
       if (!state.model.usable) return;
       event.stopPropagation();
       state.actions?.onUse?.();
       return;
     }
-    const attackPanel = event.target.closest?.('.ptcg-atk[data-ptcg-attack]');
+    const attackPanel = event.target.closest?.('[data-ptcg-attack]');
     if (attackPanel) {
       const attack =
         state.model.attacks[Number(attackPanel.dataset.ptcgAttack)];
@@ -673,15 +657,13 @@ const wirePanelClicks = (state) => {
       state.actions?.onAttack?.(attack.index);
       return;
     }
-    if (event.target.closest?.('.ptcg-ability')) {
+    if (event.target.closest?.('[data-ptcg-ability]')) {
       if (!state.model.ability?.usable) return;
       event.stopPropagation();
       state.actions?.onAbility?.();
       return;
     }
-    const retreatPanel = event.target.closest?.(
-      '.ptcg-stat[data-ptcg-retreat]'
-    );
+    const retreatPanel = event.target.closest?.('[data-ptcg-retreat]');
     if (retreatPanel) {
       if (!state.model.retreatUsable) return;
       event.stopPropagation();

@@ -3,6 +3,7 @@
 @import url('./holo/tcgl-foil.css');
 @import url('./mat-fx.css');
 @import url('./card-focus.css');
+@import url('./attack-options.css');
 @import url('./hover-preview.css');
 @import url('./holo/regular-holo.css');
 @import url('./holo/ex-regular.css');
@@ -5496,87 +5497,10 @@ body.dark-mode-1 .native-deck-builder-mat-zoom-control {
 /* ── TCG Live attack-overlay skin ──────────────────────────────────────────────
    Sprites and colours are the game's own (AttackEntryAssetRegistry_AttackOverlay), copied by
    scripts/attack-ui/import-attack-ui.mjs; the table is client/src/assets/attack-ui/attack-ui.json.
-   `data-ptcg-type` picks the per-type set: titlebar, Retreat button, bar colour, text ink.
+   `data-ptcg-type` picks the per-type set (the table is in attack-options.css): titlebar, Retreat
+   button, bar colour, text ink.
    --bar-h is the titlebar height; every sprite edge is a fraction of it (the sprites are 106px
    tall), so the bar tracks --u at any zoom. */
-.ptcg-chrome [data-ptcg-type='colorless'] {
-  --atk-bar: url('../assets/attack-ui/bar-colorless.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-colorless-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-colorless.png');
-  --atk-color: #d1d0cf;
-  --atk-ink: #000000;
-}
-.ptcg-chrome [data-ptcg-type='fire'] {
-  --atk-bar: url('../assets/attack-ui/bar-fire.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-fire-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-fire.png');
-  --atk-color: #d8223b;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='grass'] {
-  --atk-bar: url('../assets/attack-ui/bar-grass.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-grass-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-grass.png');
-  --atk-color: #13a748;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='water'] {
-  --atk-bar: url('../assets/attack-ui/bar-water.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-water-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-water.png');
-  --atk-color: #00a8d8;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='fighting'] {
-  --atk-bar: url('../assets/attack-ui/bar-fighting.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-fighting-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-fighting.png');
-  --atk-color: #b26232;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='fairy'] {
-  --atk-bar: url('../assets/attack-ui/bar-fairy.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-fairy-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-fairy.png');
-  --atk-color: #d6467e;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='darkness'] {
-  --atk-bar: url('../assets/attack-ui/bar-darkness.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-darkness-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-darkness.png');
-  --atk-color: #307179;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='lightning'] {
-  --atk-bar: url('../assets/attack-ui/bar-lightning.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-lightning-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-lightning.png');
-  --atk-color: #fbcf1f;
-  --atk-ink: #000000;
-}
-.ptcg-chrome [data-ptcg-type='dragon'] {
-  --atk-bar: url('../assets/attack-ui/bar-dragon.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-dragon-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-dragon.png');
-  --atk-color: #938f31;
-  --atk-ink: #ffffff;
-}
-.ptcg-chrome [data-ptcg-type='metal'] {
-  --atk-bar: url('../assets/attack-ui/bar-metal.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-metal-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-metal.png');
-  --atk-color: #afb39d;
-  --atk-ink: #000000;
-}
-.ptcg-chrome [data-ptcg-type='psychic'] {
-  --atk-bar: url('../assets/attack-ui/bar-psychic.png');
-  --atk-bar-short: url('../assets/attack-ui/bar-psychic-short.png');
-  --atk-retreat: url('../assets/attack-ui/retreat-psychic.png');
-  --atk-color: #957ead;
-  --atk-ink: #ffffff;
-}
-
 /* The head is a two-row grid, as AttackOption lays it out: name over the cost row on the left,
    the damage tab on the right. The sprite sits on ::before, behind the text. */
 .ptcg-atk > .ptcg-atk__head,

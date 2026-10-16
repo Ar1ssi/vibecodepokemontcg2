@@ -5,11 +5,10 @@
  * (E:/TCGLive_Extract/Code/TPCI.RainierClient): which energy icons a cost lights, what the damage tab
  * reads and how it is tinted, which effects the HUD's Buff / Debuff buttons list, and where a tap
  * on an in-play Pokémon goes. No DOM, no state: the renderers in card-inspector.mjs, card-focus.mjs,
- * stack-view.mjs and status-popup.mjs read these.
+ * stack-view.mjs and status-popup.mjs read these. Tap routing lives in card-focus-routing.mjs.
  */
 
 import { normalizeEnergyType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
-import { isInspectablePokemon } from './card-inspector-model.mjs';
 import { expandEnergyEntries } from '../../../../shared/engine/rules/attack-engine.mjs';
 import { liveAttackMarkers } from '../../../../shared/engine/rules/attack-markers.mjs';
 import { listConditions } from '../../../../shared/engine/rules/special-conditions.mjs';
@@ -320,22 +319,4 @@ export function statusEffectsFor(card, ctx = {}) {
     });
   }
   return { positive, negative };
-}
-
-/**
- * PlayerCardOwner.OnCardClicked for a tap on an in-play Pokémon. Your Active always opens the
- * AttackOverlay (ActiveController.CanShowActionSelection is true); a Benched Pokémon of yours only
- * when it has something usable (BenchController.CanShowActionSelection), otherwise the stack view
- * (its deep inspection). The opponent's Pokémon never get action selection, so they open the stack
- * view (OpponentActiveController / BenchController for a card that is not yours).
- *
- * @param {{ zoneId?: string, cardUser?: string, card?: object|null, hasUsableAction?: boolean }} tap
- * @returns {'overlay'|'stack'|null}
- */
-export function tapRoute({ zoneId, cardUser, card, hasUsableAction = false } = {}) {
-  if (zoneId !== 'active' && zoneId !== 'bench') return null;
-  if (!card?.image || !isInspectablePokemon(card)) return null;
-  if (cardUser !== 'self') return 'stack';
-  if (zoneId === 'active') return 'overlay';
-  return hasUsableAction ? 'overlay' : 'stack';
 }
