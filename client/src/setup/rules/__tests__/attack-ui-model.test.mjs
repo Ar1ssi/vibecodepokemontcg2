@@ -9,7 +9,6 @@ import {
   statusEffectsFor,
   damagePreviewAgainst,
 } from '../attack-ui-model.mjs';
-import { tapRoute } from '../card-focus-routing.mjs';
 
 const fills = (rows) => rows.map((r) => `${r.type}:${r.filled ? 1 : 0}`).join(' ');
 
@@ -189,30 +188,6 @@ describe('statusEffectsFor', () => {
   it('a card with nothing on it has no effects', () => {
     assert.deepEqual(statusEffectsFor({}, { turnNumber: 1 }), { positive: [], negative: [] });
     assert.deepEqual(statusEffectsFor(null), { positive: [], negative: [] });
-  });
-});
-
-describe('tapRoute (PlayerCardOwner.OnCardClicked)', () => {
-  const pokemon = { image: {}, name: 'Pikachu', hp: 60, attacks: [{ name: 'Gnaw' }], type: 'Pokémon' };
-
-  it('own Active opens the overlay', () => {
-    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: pokemon }), 'overlay');
-  });
-
-  it('own Bench opens the overlay only with a usable action, else the stack view', () => {
-    assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'self', card: pokemon, hasUsableAction: true }), 'overlay');
-    assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'self', card: pokemon }), 'stack');
-  });
-
-  it("the opponent's Active and Bench open the stack view", () => {
-    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'opp', card: pokemon }), 'stack');
-    assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'opp', card: pokemon, hasUsableAction: true }), 'stack');
-  });
-
-  it('other zones, unresolved cards and non-Pokémon do not route', () => {
-    assert.equal(tapRoute({ zoneId: 'hand', cardUser: 'self', card: pokemon }), null);
-    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: null }), null);
-    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: { image: {}, name: 'Fire Energy', type: 'Energy' } }), null);
   });
 });
 

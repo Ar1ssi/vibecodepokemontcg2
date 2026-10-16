@@ -1,8 +1,10 @@
-import test from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { shouldOpenCardFocus } = await import('../card-focus-routing.mjs');
+import { tapRoute } from '../card-focus-routing.mjs';
 
+// Design 074 A1: a tap on an in-play Pokémon routes as TCG Live's PlayerCardOwner.OnCardClicked.
+// Fixture shapes only — no card text is asserted.
 const POKEMON = {
   name: 'Arcanine ex',
   type: 'Fire',
@@ -11,61 +13,35 @@ const POKEMON = {
   attacks: [{ name: 'Raging Claws', cost: ['Fire'], damage: '30' }],
 };
 
-test('own Active Pokémon opens the focus', () => {
-  assert.equal(
-    shouldOpenCardFocus({ zoneId: 'active', cardUser: 'self', card: POKEMON }),
-    true
-  );
-});
+describe('tapRoute (PlayerCardOwner.OnCardClicked)', () => {
+  it('own Active opens the overlay (ActiveController.CanShowActionSelection is true)', () => {
+    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: POKEMON }), 'overlay');
+  });
 
-test('Bench, hand and Stadium keep their old paths', () => {
-  for (const zoneId of ['bench', 'hand', 'stadium', 'discard', 'prizes']) {
-    assert.equal(
-      shouldOpenCardFocus({ zoneId, cardUser: 'self', card: POKEMON }),
-      false,
-      zoneId
-    );
-  }
-});
+  it('own Bench opens the overlay only with a usable action, else the stack view', () => {
+    assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'self', card: POKEMON, hasUsableAction: true }), 'overlay');
+    assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'self', card: POKEMON }), 'stack');
+  });
 
-test("the opponent's Active does not open it", () => {
-  assert.equal(
-    shouldOpenCardFocus({ zoneId: 'active', cardUser: 'opp', card: POKEMON }),
-    false
-  );
-});
+  it("the opponent's Active and Bench open the stack view", () => {
+    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'opp', card: POKEMON }), 'stack');
+    assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'opp', card: POKEMON, hasUsableAction: true }), 'stack');
+  });
 
-test('no card, or a card with no element to fly from, does not open it', () => {
-  assert.equal(
-    shouldOpenCardFocus({ zoneId: 'active', cardUser: 'self', card: null }),
-    false
-  );
-  assert.equal(
-    shouldOpenCardFocus({
-      zoneId: 'active',
-      cardUser: 'self',
-      card: { ...POKEMON, image: undefined },
-    }),
-    false
-  );
-  assert.equal(shouldOpenCardFocus(), false);
-});
+  it('hand, Stadium, discard and prizes keep their own paths', () => {
+    for (const zoneId of ['hand', 'stadium', 'discard', 'prizes']) {
+      assert.equal(tapRoute({ zoneId, cardUser: 'self', card: POKEMON }), null, zoneId);
+    }
+  });
 
-test('an attached Energy token in the Active zone is not a Pokémon focus', () => {
-  const energy = { name: 'Fire Energy', type: 'Energy', image: {} };
-  assert.equal(
-    shouldOpenCardFocus({ zoneId: 'active', cardUser: 'self', card: energy }),
-    false
-  );
-});
+  it('no card, or a card with no element to fly from, does not route', () => {
+    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: null }), null);
+    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: { ...POKEMON, image: undefined } }), null);
+    assert.equal(tapRoute(), null);
+  });
 
-test('a face-down or unresolved card (no HP) does not open it', () => {
-  assert.equal(
-    shouldOpenCardFocus({
-      zoneId: 'active',
-      cardUser: 'self',
-      card: { image: {} },
-    }),
-    false
-  );
+  it('an attached Energy token in the zone, or a face-down card, is not a Pokémon', () => {
+    assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: { name: 'Fire Energy', type: 'Energy', image: {} } }), null);
+    assert.equal(tapRoute({ zoneId: 'bench', cardUser: 'opp', card: { image: {} } }), null);
+  });
 });

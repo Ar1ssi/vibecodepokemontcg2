@@ -6,23 +6,23 @@ import { fileURLToPath } from 'node:url';
 import { TYPE_GLOW } from '../card-glow-colors.mjs';
 import { spriteMap } from '../../../../../scripts/attack-ui/import-attack-ui.mjs';
 
-// The inspector's attack bars, damage tabs and Retreat button are TCG Live's own sprites. These
-// checks keep index.css, the committed sprites and attack-ui.json (dumped from the game's
-// AttackEntryAssetRegistry by scripts/attack-ui/dump-registry.py) from drifting apart — CSS can't
-// read the JSON, so the numbers are repeated there and pinned here.
+// The option rows' attack bars, damage tabs and Retreat button are TCG Live's own sprites. These
+// checks keep attack-options.css (design 074), the committed sprites and attack-ui.json (dumped from
+// the game's AttackEntryAssetRegistry by scripts/attack-ui/dump-registry.py) from drifting apart —
+// CSS can't read the JSON, so the numbers are repeated there and pinned here.
 
 const CSS = readFileSync(fileURLToPath(new URL('../../../css/index.css', import.meta.url)), 'utf8');
-// Design 074 moved the per-type table and the option rows into their own stylesheet.
 const OPTIONS_CSS = readFileSync(fileURLToPath(new URL('../../../css/attack-options.css', import.meta.url)), 'utf8');
 const ASSET_DIR = fileURLToPath(new URL('../../../assets/attack-ui/', import.meta.url));
 const TABLE = JSON.parse(readFileSync(`${ASSET_DIR}attack-ui.json`, 'utf8'));
 
-const normalized = `${CSS}
-${OPTIONS_CSS}`.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
+const normalized = [CSS, OPTIONS_CSS].join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
+// Every rule for exactly this selector, bodies joined: a variant may be split over two rules.
 const ruleFor = (selector) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(normalized);
-  return match ? match[1] : null;
+  const pattern = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`, 'g');
+  const bodies = [...normalized.matchAll(pattern)].map((match) => match[1]);
+  return bodies.length ? bodies.join(' ') : null;
 };
 
 describe('attack-ui sprites', () => {
@@ -93,17 +93,17 @@ describe('attack-ui palette', () => {
     }
     const disabled = TABLE.borders.atkOv_RetreatBtn_Disable;
     assert.deepEqual([disabled.top, disabled.right, disabled.bottom, disabled.left], [15, 15, 15, 15]);
-    assert.match(ruleFor('.ptcg-chrome .ptcg-stat[data-ptcg-retreat]'), /--atk-retreat-slice: 12 15 12 15;/);
-    assert.match(ruleFor('.ptcg-chrome .ptcg-stat--recede[data-ptcg-retreat]'), /--atk-retreat-slice: 15;/);
+    assert.match(ruleFor('.tcgl-retreat'), /--atk-retreat-slice: 12 15 12 15;/);
+    assert.match(ruleFor('.tcgl-retreat--off'), /--atk-retreat-slice: 15;/);
   });
 
   it('the damage tab slices match each variant sprite', () => {
     // [sprite, rule selector, left, right, whether the rule restates the left border]
     const variants = [
-      ['atkOv_DmgBG', '.ptcg-atk > .ptcg-atk__head, .ptcg-ability > .ptcg-atk__head', 33, 24, true],
-      ['atkOv_DmgBG_Short', '.ptcg-atk--text > .ptcg-atk__head', 34, 24, true],
-      ['atkOv_DmgBG_Empty', '.ptcg-atk--recede > .ptcg-atk__head', 37, 20, true],
-      ['atkOv_DmgBG_Empty_Short', '.ptcg-atk--text.ptcg-atk--recede > .ptcg-atk__head', 37, 27, false],
+      ['atkOv_DmgBG', '.tcgl-opt__bar', 33, 24, true],
+      ['atkOv_DmgBG_Short', '.tcgl-opt--text .tcgl-opt__bar', 34, 24, true],
+      ['atkOv_DmgBG_Empty', '.tcgl-opt--off .tcgl-opt__bar', 37, 20, true],
+      ['atkOv_DmgBG_Empty_Short', '.tcgl-opt--off.tcgl-opt--text .tcgl-opt__bar', 37, 27, false],
     ];
     for (const [sprite, selector, left, right, restatesLeft] of variants) {
       const b = TABLE.borders[sprite];
@@ -147,16 +147,10 @@ describe('attack-ui palette', () => {
 
     // [sprite, rule selector, left, right, whether the rule restates the left border]
     const tabs = [
-      [vstar.dmg, '.ptcg-atk--vstar > .ptcg-atk__head, .ptcg-ability--vstar > .ptcg-atk__head', 41, 22, true],
-      [vstar.dmgShort, '.ptcg-atk--vstar.ptcg-atk--text > .ptcg-atk__head', 44, 22, true],
-      [
-        vstar.dmgEmpty,
-        '.ptcg-atk--vstar.ptcg-atk--recede > .ptcg-atk__head, .ptcg-ability--vstar.ptcg-ability--recede > .ptcg-atk__head',
-        32,
-        26,
-        true,
-      ],
-      [vstar.dmgEmptyShort, '.ptcg-atk--vstar.ptcg-atk--text.ptcg-atk--recede > .ptcg-atk__head', 32, 32, false],
+      [vstar.dmg, '.tcgl-opt--vstar .tcgl-opt__bar', 41, 22, true],
+      [vstar.dmgShort, '.tcgl-opt--vstar.tcgl-opt--text .tcgl-opt__bar', 44, 22, true],
+      [vstar.dmgEmpty, '.tcgl-opt--vstar.tcgl-opt--off .tcgl-opt__bar', 32, 26, true],
+      [vstar.dmgEmptyShort, '.tcgl-opt--vstar.tcgl-opt--text.tcgl-opt--off .tcgl-opt__bar', 32, 32, false],
     ];
     for (const [sprite, selector, left, right, restatesLeft] of tabs) {
       const b = borders[sprite];
@@ -171,17 +165,15 @@ describe('attack-ui palette', () => {
   it('the passive ability header masks on the atkOv_Ability_BG borders', () => {
     const b = TABLE.borders.atkOv_Ability_BG;
     assert.deepEqual([b.top, b.right, b.bottom, b.left], [13, 16, 3, 16]);
-    const decls = ruleFor('.ptcg-ability--passive > .ptcg-atk__head::before');
+    const decls = ruleFor('.tcgl-opt--passive .tcgl-opt__bar::before');
     assert.ok(decls, 'no passive ability header rule');
     assert.match(decls, /mask-border: url\('\.\.\/assets\/attack-ui\/ability-bg\.png'\) 13 16 3 16 fill/);
   });
 
-  it('an unusable attack bar is the white that the recede filter turns into the game cantUse grey', () => {
-    assert.equal(TABLE.cantUse.bar, '#d4d4d4');
-    assert.match(ruleFor('.ptcg-atk--recede > .ptcg-atk__head'), /background: #ffffff;/);
-    assert.match(
-      ruleFor('.ptcg-atk--recede, .ptcg-ability--recede, .ptcg-stadium--recede, .ptcg-stat--recede'),
-      /filter: saturate\(0\.25\) brightness\(0\.84\) contrast\(0\.94\)/
-    );
+  it("an unusable attack bar is the registry's cantUse grey with black ink", () => {
+    assert.deepEqual(TABLE.cantUse, { bar: '#d4d4d4', ink: '#000000' });
+    const decls = ruleFor('.tcgl-opt--off .tcgl-opt__bar');
+    assert.match(decls, /background: #d4d4d4;/);
+    assert.match(decls, /--name-ink: #000000;/);
   });
 });
