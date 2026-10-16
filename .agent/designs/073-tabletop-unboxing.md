@@ -324,3 +324,18 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   say "Evolution pack" (and a Prerelease Kit's "player's guide") instead of "deck"
   (`contentsWords`). Tests: poses.test (lid from rest, chord carry), physical.test (contents
   words). Frames: scratch `it10/`.
+- **Iteration 11 (every era, and the wrappers' bites).** Captured six boxes (XY, two SM, SWSH pack
+  and deck, SV, ME) sealed, opened and laid out. Before: a Prerelease Kit's leaflet read "BUILDING
+  TIPS"; and 50 of the 172 vendored wrapper fronts had bites: `vendor-box-art.mjs` keys the studio
+  white out by flooding it in from the border, and light art that reaches the wrapper's edge (a white
+  Lugia, Alolan Vulpix, a silver crimp) flooded with it — up to 10 000 px holes that showed the mat
+  through the pack, and threw off the seal measurements of their pillow meshes. A single outline
+  template does not fit every era (Sun & Moon bottom seals sit ~2.7 % lower), so the fix reads each
+  wrapper's own outline: per side, the median of its rows' edges over ±25 % and over ±3 % of the
+  height, whichever sits further out (bites only push an edge inward; a side bitten longer than
+  that takes the other side's), and keyed pixels inside it are kept — the RGB under them is still
+  the real print at that point, so nothing is inpainted. Regenerated with the script (sources
+  cached; Chromium via the new `CHROMIUM` override): every render and face came out byte-identical;
+  83 wrappers changed, by added opacity only (none lost a pixel or changed size); 3 keep specks
+  under 70 px; 29 measured seals now agree with their set's (Radiant Gardevoir's became measurable).
+  The leaflet prints "PLAYER'S GUIDE" in a kit. Frames: scratch `it11/`, `it11b/`, `packfix/`.

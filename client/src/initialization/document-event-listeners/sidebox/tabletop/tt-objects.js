@@ -116,11 +116,11 @@ export function buildCodeCard({ renderer, envMap, kit, live, game }) {
 }
 
 /** The tips leaflet, folded to a 85 × 112 mm panel. */
-export function buildLeaflet({ renderer, envMap, title, deckRows, palette }) {
+export function buildLeaflet({ renderer, envMap, title, deckRows, palette, heading }) {
   const cover = canvasTextureOf(
     680,
     896,
-    (ctx, w, h) => drawLeafletCover(ctx, w, h, { title, deckRows, palette }),
+    (ctx, w, h) => drawLeafletCover(ctx, w, h, { title, deckRows, palette, heading }),
     renderer
   );
   const geometry = cardSlab(LEAFLET.width, LEAFLET.height, LEAFLET.thickness, 0.8, 2);

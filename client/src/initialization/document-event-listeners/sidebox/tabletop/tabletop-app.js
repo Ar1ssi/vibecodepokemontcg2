@@ -299,6 +299,7 @@ async function buildTabletopApp(options, life) {
     title: box?.name || '',
     deckRows,
     palette,
+    heading: contents.leaflet === 'guide' ? "PLAYER'S GUIDE" : 'BUILDING TIPS',
   });
   keep(leaflet);
   leaflet.mesh.userData.tt = { kind: 'leaflet' };

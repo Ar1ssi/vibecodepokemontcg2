@@ -423,10 +423,10 @@ export function drawCodeCardBack(ctx, w, h, { live = true }) {
 }
 
 /**
- * The folded tips leaflet's cover: the box's title, "Deck list" and the deck's card names when
- * known, the rest as grey lines.
+ * The folded leaflet's cover: its heading (a Prerelease Kit's is a player's guide), the box's
+ * title, "Deck list" and the deck's card names when known, the rest as grey lines.
  */
-export function drawLeafletCover(ctx, w, h, { title, deckRows = [], palette }) {
+export function drawLeafletCover(ctx, w, h, { title, deckRows = [], palette, heading = 'BUILDING TIPS' }) {
   ctx.fillStyle = '#f6f4ee';
   ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = palette?.base || '#111';
@@ -436,8 +436,8 @@ export function drawLeafletCover(ctx, w, h, { title, deckRows = [], palette }) {
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  fitText(ctx, 'BUILDING TIPS', w * 0.8, h * 0.06, '900');
-  ctx.fillText('BUILDING TIPS', w / 2, h * 0.065);
+  fitText(ctx, heading, w * 0.8, h * 0.06, '900');
+  ctx.fillText(heading, w / 2, h * 0.065);
   fitText(ctx, String(title || '').toUpperCase(), w * 0.84, h * 0.04);
   ctx.fillText(String(title || '').toUpperCase(), w / 2, h * 0.125);
   ctx.fillStyle = '#1b1b20';
