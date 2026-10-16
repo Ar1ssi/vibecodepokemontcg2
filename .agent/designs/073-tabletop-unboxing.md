@@ -41,6 +41,10 @@ product (a lidded cuboid). Nothing is taken *out* of the box: the packs fly out 
 | A11 | "replicate the physical unboxing of the pack … the swipe": the held pack tears along its seam as the finger swipes across, a white-hot cut following the finger; the torn strip springs up off the pack and spins away | frame strips of a drag tear and a button tear |
 | A12 | "… and the rainbow": the tear's light as in the video — a glow at the seam's start before the swipe, a ring where the finger lands, a flash with a rainbow halo when the cut completes, then a screen-wide beam with rainbow edges that thins away, and the cut edge glinting cyan | the same strips |
 | A13 | "not the way the cards come out": the stack is still drawn out and revealed as before | rec-tabletop pool integrity unchanged |
+| A14 | "remove the tcg live code cards as those are useless": no code card in the box or at the front of any pack | physical/pack-stack tests; carry run frames |
+| A15 | "a left click and drag opens the box": a drag across the box tears the shrink-wrap as far as it goes (all the way, or let go past half, and it comes off; short of that it settles back); a drag up on the lid lifts it; a tap only nudges the lid | carry run: tap leaves the box shut, drags open it |
+| A16 | "take all the things out of the box with your mouse": each item is pressed and dragged out (straight up clear of the walls, then flat under the pointer, its shadow on the landing spot) and set down where it is let go; a tap takes that one item to its usual place; the dock's button still takes the rest | carry run: spots recorded per item, `itemsOut` once all are out |
+| A17 | "can put the card deck wherever you want": the deck (wrapped or not), the leaflet, the promo and the sealed packs can be carried anywhere on the floor at any time nothing is held, stacking on what they're set on and never inside the box; the spots survive a reload, and a torn pack's cards pile where it lay | carry run: spots equal across a reload; flow tests |
 
 ## Assumptions
 - (assumed) The modern box is a flip-top *deck box*: the lid covers the top ~76 % of the front and ~22 %

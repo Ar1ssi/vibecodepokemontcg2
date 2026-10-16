@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 
 import { advanceUnboxing, createUnboxing } from '../../unboxing.mjs';
 import {
+  boxItemKeys,
   createCosmetic,
+  isOutOfBox,
+  placeOnTable,
   finishCosmetic,
   logicalOfVisual,
   nextStep,
@@ -76,8 +79,11 @@ test('a reload view puts revealed cards on the table and the rest in hand', () =
 });
 
 test('a stored record from another box or malformed is replaced', () => {
-  const good = { v: 1, seed: 42, itemsOut: true, packOrder: [2, 0] };
+  const good = { v: 1, seed: 42, itemsOut: true, packOrder: [2, 0], spots: {} };
   assert.deepEqual(parseCosmetic(good, { seed: 42, packCount: 4 }), good);
+  // A record from before hand-placed spots reads as having none.
+  const { spots: _none, ...older } = good;
+  assert.deepEqual(parseCosmetic(older, { seed: 42, packCount: 4 }), good);
   assert.deepEqual(parseCosmetic(good, { seed: 43, packCount: 4 }), createCosmetic(43));
   for (const bad of [
     null,
@@ -115,12 +121,49 @@ test('skipping tears every remaining pack in on-table order', () => {
 });
 
 test('a record from an earlier opening of the same box number lays nothing beside a sealed box', () => {
-  const stale = { v: 1, seed: 42, itemsOut: true, packOrder: [1, 3] };
+  const stale = { v: 1, seed: 42, itemsOut: true, packOrder: [1, 3], spots: { deck: { x: 1, z: 2, rotYDeg: 0, y: 1 } } };
   const again = reconcileCosmetic(stale, createUnboxing());
   assert.equal(again.itemsOut, false);
   assert.deepEqual(again.packOrder, []);
+  assert.deepEqual(again.spots, {});
   assert.equal(tableView(createUnboxing(), stale).itemsOut, false);
   const lidUp = play(createUnboxing(), { type: 'tearWrap' }, { type: 'openLid' });
   assert.equal(reconcileCosmetic(again, lidUp).itemsOut, false, 'still in the box once the lid opens');
 });
 
+
+test('things set down by hand keep their spots; the box is empty once every item has one', () => {
+  const lidUp = play(createUnboxing(), { type: 'tearWrap' }, { type: 'openLid' });
+  const spot = { x: -120.5, z: 40, rotYDeg: -12, y: 0.9 };
+  let record = placeOnTable(createCosmetic(42), 'deck', spot, 2);
+  assert.deepEqual(record.spots.deck, spot);
+  assert.equal(record.itemsOut, false);
+  assert.equal(isOutOfBox(record, 'deck'), true);
+  assert.equal(isOutOfBox(record, 'pack0'), false);
+  assert.equal(tableView(lidUp, record).someOut, true);
+  assert.equal(nextStep(tableView(lidUp, record)), 'takeOut');
+  for (const key of ['leaflet', 'pack0']) record = placeOnTable(record, key, spot, 2);
+  assert.equal(record.itemsOut, false);
+  record = placeOnTable(record, 'pack1', spot, 2);
+  assert.equal(record.itemsOut, true);
+  assert.equal(nextStep(tableView(lidUp, record)), 'unwrapDeck');
+  assert.deepEqual(boxItemKeys(2), ['deck', 'leaflet', 'pack0', 'pack1']);
+  // Moving one that is already out keeps the box empty and only moves it.
+  const moved = placeOnTable(record, 'promo', { ...spot, x: 3 }, 2);
+  assert.equal(moved.itemsOut, true);
+  assert.equal(moved.spots.promo.x, 3);
+  assert.equal(record.spots.promo, undefined, 'the record placed is a copy');
+});
+
+test('a stored spot that is malformed or names nothing on the table is dropped on its own', () => {
+  const spot = { x: 1, z: 2, rotYDeg: 3, y: 4 };
+  const stored = {
+    v: 1,
+    seed: 42,
+    itemsOut: false,
+    packOrder: [],
+    spots: { deck: spot, pack3: spot, pack4: spot, code: spot, leaflet: { ...spot, x: 'far' }, promo: { ...spot, y: 9e9 } },
+  };
+  assert.deepEqual(parseCosmetic(stored, { seed: 42, packCount: 4 }).spots, { deck: spot, pack3: spot });
+  assert.deepEqual(parseCosmetic({ ...stored, spots: [spot] }, { seed: 42, packCount: 4 }).spots, {});
+});
