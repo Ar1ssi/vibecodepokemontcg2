@@ -227,3 +227,12 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   image paths/types only, no redirects, 4 MB cap, 64 MB byte-LRU, 6 in flight; the client
   (`card-art.mjs` `artSources`) tries the proxy, then the CDN direct. DECISIONS line due on landing:
   "[build-battle] TCGdex card art for WebGL goes through /api/card-art (doubled CORS header)".
+- **Iteration 4 (every box wears its render).** Before: 37 of 42 boxes drew a generic procedural front.
+  After: `box-faces.mjs` holds each render's front and side corners (render px), and `prepareBoxFaces`
+  rectifies them at runtime (vendored ME cuts still win; a render that fails to load or was resized
+  falls back to drawn faces). Corners measured by a one-off silhouette script (lines fitted to the
+  top/bottom/side edges; the fold where the top dips, by vanishing points when the top shows, or as
+  the first strong vertical edge when a white top melts into the background), checked by rectifying
+  all 42; Sun & Moon and Ultra Prism show the right side, Burning Shadows, Crimson Invasion and
+  Evolutions the front alone. Test: `box-faces.test.mjs` (every render covered, sizes match, convex
+  clockwise quads, front proportions).

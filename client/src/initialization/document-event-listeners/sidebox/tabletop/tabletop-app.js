@@ -200,7 +200,7 @@ export async function createTabletopApp(options) {
   const [backImage, promoImage, faces, ...artImages] = await Promise.all([
     loadImage(assetUrl('src/assets/cardback.png')),
     loadImage(cardImageOf(promo), { timeoutMs: CARD_TEXTURE_TIMEOUT_MS }),
-    prepareBoxFaces({ look, dims }),
+    prepareBoxFaces({ look, dims, boxKey: box?.key }),
     ...Array.from({ length: packCount }, (_, visual) => packArtFor(look?.skin?.packArts?.[artIndexes[visual]])),
   ]);
   if (disposed) {

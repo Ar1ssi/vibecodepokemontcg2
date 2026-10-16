@@ -12,6 +12,7 @@ import {
   SRGBColorSpace,
 } from 'three';
 import { BULGE } from '../../../../setup/deck-builder/core/build-battle/pack3d.mjs';
+import { boxFaceQuads } from '../../../../setup/deck-builder/core/build-battle/tabletop/box-faces.mjs';
 import { CARD, PACK, deckThickness } from '../../../../setup/deck-builder/core/build-battle/tabletop/physical.mjs';
 import { createFilmMaterials } from './tt-film.js';
 import { boardPanel } from './tt-geometry.js';
@@ -54,34 +55,46 @@ const drawn = (width, height, draw) => {
 };
 
 /**
- * The six face canvases for a box: photo faces where the skin has a cut (front and left; the right
- * is the left mirrored, as the box sides carry mirrored art), drawn faces elsewhere.
+ * The six face canvases for a box. Photo faces come from the skin's vendored cuts (Mega Evolution
+ * camera) or else from the box's product render through its measured corners (`box-faces.mjs`);
+ * a render showing the right side gives the right, and the other side is it mirrored, as the box
+ * sides carry mirrored art. Faces no photo shows are drawn.
  */
-export async function prepareBoxFaces({ look, dims }) {
+export async function prepareBoxFaces({ look, dims, boxKey = null }) {
   const palette = paletteFor(look?.skin?.palette);
   const labels = look?.labels || {};
   const frontW = FACE_PX;
   const frontH = Math.round((FACE_PX * dims.height) / dims.width);
   const sideW = Math.round((FACE_PX * dims.depth) / dims.width);
   const cuts = look?.skin?.faces || null;
-  const [frontImage, leftImage, keyArt, logo] = await Promise.all([
+  const quads = cuts ? null : boxFaceQuads(boxKey);
+  const renderSrc = quads ? look?.skin?.render?.src : null;
+  const [frontImage, leftImage, render, keyArt, logo] = await Promise.all([
     cuts?.front ? loadImage(assetUrl(cuts.front.src)) : null,
     cuts?.left ? loadImage(assetUrl(cuts.left.src)) : null,
+    renderSrc ? loadImage(assetUrl(renderSrc)) : null,
     cuts ? null : loadImage(look?.skin?.keyArtUrl),
     cuts ? null : loadImage(look?.skin?.setLogoUrl),
   ]);
-  const front =
-    frontImage && cuts.front.quad
-      ? rectifyFace(frontImage, cuts.front.quad, frontW, frontH)
-      : drawn(frontW, frontH, (ctx, w, h) => drawProceduralFront(ctx, w, h, { palette, keyArt, logo, labels }));
-  const left =
-    leftImage && cuts.left.quad
-      ? rectifyFace(leftImage, cuts.left.quad, sideW, frontH)
-      : drawn(sideW, frontH, (ctx, w, h) => drawProceduralSide(ctx, w, h, { palette, labels }));
+  // Corners are measured on the render as vendored: a resized file would sample the wrong place.
+  const photo =
+    render && render.naturalWidth === quads.size[0] && render.naturalHeight === quads.size[1] ? render : null;
+  let front = null;
+  if (frontImage && cuts.front.quad) front = rectifyFace(frontImage, cuts.front.quad, frontW, frontH);
+  else if (photo) front = rectifyFace(photo, quads.front, frontW, frontH);
+  else front = drawn(frontW, frontH, (ctx, w, h) => drawProceduralFront(ctx, w, h, { palette, keyArt, logo, labels }));
+  let left = null;
+  let right = null;
+  if (leftImage && cuts.left.quad) left = rectifyFace(leftImage, cuts.left.quad, sideW, frontH);
+  else if (photo && quads.left) left = rectifyFace(photo, quads.left, sideW, frontH);
+  else if (photo && quads.right) right = rectifyFace(photo, quads.right, sideW, frontH);
+  if (!left && !right) left = drawn(sideW, frontH, (ctx, w, h) => drawProceduralSide(ctx, w, h, { palette, labels }));
+  left ||= mirrorCanvas(right);
+  right ||= mirrorCanvas(left);
   return {
     front,
     left,
-    right: mirrorCanvas(left),
+    right,
     back: drawn(frontW, frontH, (ctx, w, h) => drawBoxBack(ctx, w, h, { labels, palette })),
     top: drawn(frontW, sideW, (ctx, w, h) => drawBoxEnd(ctx, w, h, { kind: 'top', labels })),
     bottom: drawn(frontW, sideW, (ctx, w, h) => drawBoxEnd(ctx, w, h, { kind: 'bottom', labels })),
