@@ -45,6 +45,7 @@ import { advanceUnboxing, boxArt, boxSkin } from '../../../setup/deck-builder/co
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
+import { mountTabletopUnboxing } from './tabletop/tabletop-scene.js';
 
 /**
  * The Box and Pool tabs of the Build & Battle builder tab (designs 051 § Builder-tab controller,
@@ -520,14 +521,7 @@ export const initializeBuildBattle = ({
     root.id = 'bbUnboxing';
     root.dataset.era = skin.palette;
     const stageEl = unboxingDone() ? null : stage.open(`Opening your ${activeBox.name}`);
-    if (stageEl) {
-      root.classList.add('bb-scene--stage');
-      stageEl.replaceChildren(root);
-      boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
-    } else {
-      boxPanelEl.append(root);
-    }
-    scene = mountUnboxingScene({
+    const sceneOptions = {
       root,
       getUnboxing: () => session.unboxing,
       dispatch: dispatchUnboxing,
@@ -544,6 +538,34 @@ export const initializeBuildBattle = ({
       seed: session.seed,
       promo: boxPromoRow({ box: activeBox, data, deckKey: session.deckKey }),
       onFinish: finishOpening,
+    };
+    if (stageEl) {
+      boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
+      scene = mountOnStage(stageEl, sceneOptions);
+    } else {
+      boxPanelEl.append(root);
+      scene = mountUnboxingScene(sceneOptions);
+    }
+  };
+
+  // The opening plays on the tabletop (design 073). With effects off, no WebGL 2, or a lost
+  // context, the design-052 DOM scene takes the stage instead and the box opens all the same.
+  const mountOnStage = (stageEl, sceneOptions) => {
+    const table = el('div', 'bb-tabletop');
+    stageEl.classList.add('bb-stage--tabletop');
+    stageEl.replaceChildren(table);
+    return mountTabletopUnboxing({
+      ...sceneOptions,
+      root: table,
+      box: activeBox,
+      deckRows: boxStartingRows(),
+      storage,
+      fallback: () => {
+        stageEl.classList.remove('bb-stage--tabletop');
+        sceneOptions.root.classList.add('bb-scene--stage');
+        stageEl.replaceChildren(sceneOptions.root);
+        return mountUnboxingScene(sceneOptions);
+      },
     });
   };
 

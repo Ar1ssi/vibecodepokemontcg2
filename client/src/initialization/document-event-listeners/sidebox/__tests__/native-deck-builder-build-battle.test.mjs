@@ -127,3 +127,29 @@ test('the Box # field keeps a typed seed and its focus through a load', async (t
   assert.equal(after.value, '1234');
   assert.equal(document.activeElement, after);
 });
+
+const waitFor = async (probe, timeoutMs = 10000) => {
+  const start = Date.now();
+  while (!probe()) {
+    if (Date.now() - start > timeoutMs) return false;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return true;
+};
+
+test('design 073 rows 1–3: the stage tries the tabletop, and a failed WebGL start falls back to the DOM scene', async (t) => {
+  const page = boot(t);
+  // A context that claims WebGL 2 but cannot draw: the tabletop is tried and its renderer fails.
+  page.dom.window.HTMLCanvasElement.prototype.getContext = (kind) =>
+    kind === 'webgl2' ? { getExtension: () => null } : null;
+  await settle();
+  page.boxEl.querySelector('#buildBattleOpenBox').click();
+  const stageEl = document.getElementById('bbUnboxingStage');
+  assert.ok(stageEl?.querySelector('.bb-tabletop'), 'the tabletop takes the stage first');
+  assert.ok(stageEl.classList.contains('bb-stage--tabletop'));
+  assert.ok(await waitFor(() => stageEl.querySelector('#bbUnboxing')), 'the DOM scene takes over');
+  assert.equal(stageEl.classList.contains('bb-stage--tabletop'), false);
+  assert.ok(stageEl.querySelector('#bbUnboxing').classList.contains('bb-scene--stage'));
+  assert.equal(stageEl.querySelector('.bb-tabletop'), null);
+  assert.equal(page.stored()?.unboxing?.stage, 'sealed', 'the box is still sealed for the DOM scene');
+});

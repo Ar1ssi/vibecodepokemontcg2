@@ -38,6 +38,7 @@ import {
   markSeatDisconnected,
 } from './lobby/seat-presence.mjs';
 import { issueSeatToken } from './lobby/seat-token.mjs';
+import { cardArtProxyHandler, createCardArtProxy } from './card-art-proxy.mjs';
 import { createTcgdexProxy, tcgdexProxyHandler } from './tcgdex-proxy.mjs';
 import { cacheControlFor } from './sfx-cache.mjs';
 
@@ -257,6 +258,9 @@ async function main() {
   // Card data goes through the server: browsers calling TCGdex directly got
   // Cloudflare-blocked (CORS errors), leaving every card without stage/attacks.
   app.get('/api/tcgdex/*', tcgdexProxyHandler(createTcgdexProxy()));
+  // Card art the tabletop opening draws in WebGL (design 073): TCGdex's image CDN sends a
+  // doubled CORS header that browsers refuse, so those faces come through here.
+  app.get('/api/card-art', cardArtProxyHandler(createCardArtProxy()));
 
   app.use('/shared', express.static(sharedDir));
   app.use(express.static(clientDir));

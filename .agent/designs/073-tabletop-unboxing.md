@@ -217,3 +217,13 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   its own centre with crumpled normals, softer tear lip, shallow crimp relief, walnut plank desk at real
   scale (flat-sawn cathedral grain, pores, seams, butt joints), a lit back wall so flat gloss reads,
   table frame clears the dock. Frames: scratch `run6`→`run7`, `wrap1`.
+- **Slice 4 (legacy integration).** `renderOpenedBox` mounts the tabletop on the fullscreen stage
+  (`mountOnStage`, `.bb-stage--tabletop`); `fallback()` swaps the design-052 DOM scene back onto the
+  stage. Done/inline boxes, ETB and the run flow keep the DOM scene. Test: the jsdom controller test
+  fakes a WebGL 2 context that cannot draw → tabletop tried first, DOM scene takes over, box still sealed.
+- **New interface: `/api/card-art?url=`** (not in the original design). assets.tcgdex.net answers with
+  `Access-Control-Allow-Origin` twice ("*, *"); Chrome refuses it, so TCGdex faces could not become
+  WebGL textures (blank cards on the legacy page). `server/card-art-proxy.mjs`: TCGdex host only,
+  image paths/types only, no redirects, 4 MB cap, 64 MB byte-LRU, 6 in flight; the client
+  (`card-art.mjs` `artSources`) tries the proxy, then the CDN direct. DECISIONS line due on landing:
+  "[build-battle] TCGdex card art for WebGL goes through /api/card-art (doubled CORS header)".

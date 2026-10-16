@@ -8,6 +8,7 @@ import {
   SRGBColorSpace,
   Texture,
 } from 'three';
+import { artSources } from '../../../../setup/deck-builder/core/build-battle/tabletop/card-art.mjs';
 
 /**
  * Textures for the tabletop (design 073): image loading that never throws, and the canvas-made
@@ -27,10 +28,19 @@ export function assetUrl(path) {
 const IMAGE_TIMEOUT_MS = 9000;
 
 /**
- * @returns {Promise<HTMLImageElement|null>} the decoded image, or null on error or timeout.
+ * Loads an image WebGL may sample: from each of `artSources(url)` in turn (TCGdex art through the
+ * server's proxy first), each try with its own timeout.
+ * @returns {Promise<HTMLImageElement|null>} the decoded image, or null when every source failed.
  */
-export function loadImage(url, { timeoutMs = IMAGE_TIMEOUT_MS } = {}) {
-  if (!url) return Promise.resolve(null);
+export async function loadImage(url, { timeoutMs = IMAGE_TIMEOUT_MS } = {}) {
+  for (const source of artSources(url)) {
+    const image = await loadFrom(source, timeoutMs);
+    if (image) return image;
+  }
+  return null;
+}
+
+function loadFrom(url, timeoutMs) {
   return new Promise((resolve) => {
     const image = new Image();
     image.crossOrigin = 'anonymous';
