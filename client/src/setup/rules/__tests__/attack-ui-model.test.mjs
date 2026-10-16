@@ -7,6 +7,7 @@ import {
   damageOutcome,
   damageReadout,
   statusEffectsFor,
+  damagePreviewAgainst,
 } from '../attack-ui-model.mjs';
 import { tapRoute } from '../card-focus-routing.mjs';
 
@@ -212,5 +213,50 @@ describe('tapRoute (PlayerCardOwner.OnCardClicked)', () => {
     assert.equal(tapRoute({ zoneId: 'hand', cardUser: 'self', card: pokemon }), null);
     assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: null }), null);
     assert.equal(tapRoute({ zoneId: 'active', cardUser: 'self', card: { image: {}, name: 'Fire Energy', type: 'Energy' } }), null);
+  });
+});
+
+// Design 074 A6, end to end: the engine's own damage maths against the opponent's Active, read the
+// way AttackOption.SetAttackDamageValue reads an outcome. Fixture cards are minimal shapes, not
+// real card text: only the fields the engine reads (types, weakness, resistance).
+describe('damagePreviewAgainst → damageOutcome → damageReadout', () => {
+  const attacker = { instanceId: 10, name: 'Attacker', types: ['Fire'] };
+  const scratch = { name: 'Scratch', damage: '30', cost: ['Colorless'] };
+  const readoutAgainst = (defender) => {
+    const preview = damagePreviewAgainst({ attacker, attackerZone: [attacker], defenderZone: [defender] });
+    const breakdown = preview(scratch, 30);
+    return damageReadout('30', damageOutcome(breakdown, { unmodifiedBase: 30 }));
+  };
+
+  it('Weakness ×2 doubles the number and tints it green', () => {
+    const readout = readoutAgainst({ instanceId: 20, types: ['Grass'], weakness: { type: 'Fire', value: 2 } });
+    assert.deepEqual(readout, { text: '60', tone: 'weakness', mod: null, showTab: true });
+  });
+
+  it('Resistance −30 takes it to 0 and tints it red', () => {
+    const readout = readoutAgainst({ instanceId: 21, types: ['Water'], resistance: { type: 'Fire', value: -30 } });
+    assert.deepEqual(readout, { text: '0', tone: 'resistance', mod: null, showTab: true });
+  });
+
+  it('a defender damage reduction marker shows the debuff arrow', () => {
+    const defender = {
+      instanceId: 22,
+      types: ['Water'],
+      attackMarkers: [{ kind: 'incomingReduce', amount: 20, untilTurn: 9 }],
+    };
+    const preview = damagePreviewAgainst({
+      attacker,
+      attackerZone: [attacker],
+      defenderZone: [defender],
+      turnNumber: 3,
+    });
+    const readout = damageReadout('30', damageOutcome(preview(scratch, 30), { unmodifiedBase: 30 }));
+    assert.equal(readout.text, '10');
+    assert.equal(readout.mod, 'debuff');
+  });
+
+  it('no Defending Pokémon: no preview, the printed label stays', () => {
+    assert.equal(damagePreviewAgainst({ attacker, defenderZone: [] }), null);
+    assert.deepEqual(damageReadout('30', null), { text: '30', tone: 'plain', mod: null, showTab: true });
   });
 });

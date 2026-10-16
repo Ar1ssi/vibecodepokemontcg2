@@ -9,7 +9,11 @@
  */
 
 import { normalizeEnergyType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
-import { expandEnergyEntries } from '../../../../shared/engine/rules/attack-engine.mjs';
+import {
+  computeAttackDamage,
+  expandEnergyEntries,
+} from '../../../../shared/engine/rules/attack-engine.mjs';
+import { topPokemonCard } from '../../../../shared/engine/rules/evolved-pokemon.mjs';
 import { liveAttackMarkers } from '../../../../shared/engine/rules/attack-markers.mjs';
 import { listConditions } from '../../../../shared/engine/rules/special-conditions.mjs';
 import { isPokemonToolCard } from '../../../../shared/engine/rules/ability-executors.mjs';
@@ -145,6 +149,51 @@ export function damageOutcome(breakdown, { unmodifiedBase }) {
     boostedAmount: Math.max(0, total - expected),
     blocked,
     flipUntil: false,
+  };
+}
+
+/**
+ * The game reads each attack's outcome against the Defending Pokémon from the server; here the
+ * shared engine's own `computeAttackDamage` runs against the opponent's Active (public board data)
+ * once the attack's text maths has resolved (design 074 O2). Returns null when there is no
+ * Defending Pokémon — the damage tab then shows the printed label, untinted.
+ *
+ * @param {object} board
+ * @param {object} board.attacker the focused Pokémon
+ * @param {object[]} [board.attackerZone] its Active Spot cards
+ * @param {object[]} [board.defenderZone] the opponent's Active Spot cards
+ * @param {object|null} [board.stadium]
+ * @param {number|null} [board.turnNumber] gates the live attack markers on both sides
+ * @returns {null | ((attack: object, resolvedBase: number) => object|null)}
+ */
+export function damagePreviewAgainst({
+  attacker,
+  attackerZone = [],
+  defenderZone = [],
+  stadium = null,
+  turnNumber = null,
+} = {}) {
+  const defenderRoot = defenderZone.find((card) => card && !card.attachedTo) ?? null;
+  if (!attacker || !defenderRoot) return null;
+  const defender = topPokemonCard(defenderZone, defenderRoot);
+  const markersOn = (card, zoneCards, sourceZoneCards) =>
+    Number.isFinite(turnNumber) ? liveAttackMarkers(card, { turnNumber, zoneCards, sourceZoneCards }) : [];
+  const defenderMarkers = markersOn(defenderRoot, defenderZone, attackerZone);
+  const attackerMarkers = markersOn(attacker, attackerZone, defenderZone);
+  return (attack, resolvedBase) => {
+    try {
+      return computeAttackDamage(attacker, defender, attack, {
+        baseDamage: resolvedBase,
+        attackerZoneCards: attackerZone,
+        defenderZoneCards: defenderZone,
+        stadium,
+        defenderMarkers,
+        attackerMarkers,
+      });
+    } catch {
+      // A card shape the engine cannot read: the tab falls back to the printed label.
+      return null;
+    }
   };
 }
 

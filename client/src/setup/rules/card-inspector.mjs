@@ -53,6 +53,8 @@ import {
 import { runAbilitySteps } from './rules-bridge.js';
 import { computeContentBox } from './attack-zone-geometry.js';
 import { buildInspectorModel } from './card-inspector-model.mjs';
+import { damagePreviewAgainst } from './attack-ui-model.mjs';
+import { liveZoneArray } from '../zones/live-zone-array.js';
 import {
   buildAbilityOption,
   buildAttackOption,
@@ -714,13 +716,26 @@ export const stadiumContextFor = ({
   flags: flags || {},
 });
 
+// The damage tab reads the outcome against the opponent's Active, Weakness and Resistance included,
+// as TCG Live's AttackOption.SetAttackDamageValue does (design 074 A6) — tinted, so a Weakness hit
+// is told apart from the printed number. A benched Pokémon cannot attack, so it gets none.
+const damagePreviewFor = async (card, zoneId, stadiumCard) => {
+  if (zoneId !== 'active') return null;
+  const defenderZone = liveZoneArray('opp', 'active');
+  // The Defending Pokémon's Weakness / Resistance come from its card data.
+  await Promise.all(defenderZone.map((c) => ensureCardData(c).catch(() => {})));
+  return damagePreviewAgainst({
+    attacker: card,
+    attackerZone: liveZoneArray('self', 'active'),
+    defenderZone,
+    stadium: stadiumCard,
+    turnNumber: rulesState.turnNumber,
+  });
+};
+
 /**
  * The authoritative context the model needs, resolved through the same shared helper the engine
  * path uses so the panel cannot drift from it.
- *
- * `defender` is deliberately absent: this panel reports what an attack DOES, not what it would
- * deal to the current target. Applying the defender's weakness here would print 500 on a card
- * that says 250 and read as a bug.
  */
 async function resolveLiveContext(card, zone = 'active') {
   try {
@@ -774,9 +789,12 @@ async function resolveLiveContext(card, zone = 'active') {
       ),
   });
 
+  const damagePreview = await damagePreviewFor(card, zoneId, stadiumCard).catch(() => null);
+
   return {
     energyTypes,
     stadiumCostModifier,
+    damagePreview,
     abilityUsed: abilityUsedFlag,
     priorAttacks,
     extraAttacks: resolvedExtra,
