@@ -539,6 +539,31 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### C2
+- Trainer board row follows the CSS, not "1/4 card width": `#board` is a centred flex row (self-containers.css:808-828),
+  cards `100% - 1.5vh` tall with `.25vw` margins, bottom-aligned in the 5 px padded box. A row wider than the box
+  overlaps its cards to fit (CSS wraps into a scrolled second line). `placementPose` takes `{ boardCounts }` for it
+  (`posesFor` counts); `handPoses` is accepted and unread (hand → null until C4).
+- `CardPose` adds `hidden` and `widthPx`. `yawDeg` turns clockwise seen from above (CSS `rotate()`); far-seat
+  `stackOffset` turns with the seat. Cards rest 1.5 px above the cloth (the mat overlay is at z 1).
+- Pool extras beyond the row: `setCamera(desc)` (tilt for `tableToWorld`), `ids()`, `cornersOf(id)` (front-face world
+  corners for `rects()`), deps `timers` (retry) and `foil.uv` (manifest UV window). Scene adds `refreshCards()` (foil
+  manifest arrived) and `inspect().cards`. A width change swaps the geometry at once and tweens scale from the
+  on-screen size; face changes are their own 300 ms flip tween (edge row 4). Front shows the back until its image loads.
+- Foil: the front cap's UVs must be the manifest window of the square foil front, so geometries are cached per
+  (width, UV window); a foil card wears plain art until `material.ready`, and plain art again if it fails. The shared
+  RawShaderMaterial writes each mesh's Unity builtins in `material.onBeforeRender` + `uniformsNeedUpdate`. flag: the
+  foil shaders bypass the renderer's tone mapping/sRGB output (tcgl-foil-view renders them to LinearSRGB), so foil
+  colour on the 3D board is unverified; this container has no foil texture host ("no texture host configured"), so the
+  lab never exercised the foil path.
+- apply-view.js unchanged: `getLastAppliedView()` already exists. board3d.js loads the foil as hydrate-holo does
+  (`loadFoilManifest` + `loadFoilData`, record via holo.mjs `foilCardId`/`isReverseHoloCard`) and feeds
+  `boardModelFrom(getLastAppliedView(), { selfPlayerId: view.you?.playerId })` on `board-view-applied`.
+- Lab `?cards=60&stack=1` (SwiftShader, 1920×1080, sim mat without art; not GPU or fps numbers): 65 card meshes,
+  392 draw calls (3 material groups × main + shadow pass per card), 32,764 triangles, 5 geometries, 7 textures,
+  3 programs; `rects()` 65 entries; `hitTest` at a rect centre returns the topmost card. The e2e fixture faces are a
+  1×1 GIF, so fronts render white (`.agent/scratch/074/c2-cards.png`). Edge row 32's GPU ≤ 150 MB needs a real GPU.
+
 ### A2
 - `bad_seat` is `{ ok:false, success:false, error:'bad_seat', reason:'bad_seat', clientSeq }`: `success`/`error` let
   server.js's existing `cmdRejected` path carry it unchanged. Turn-order call/choice and `peekDeck` answer

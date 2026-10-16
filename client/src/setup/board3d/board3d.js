@@ -4,6 +4,7 @@
 import { isBoard3dRequested } from './board-flag.mjs';
 import { cameraFromCssTilt } from './board-camera.mjs';
 import { flatLayout, halfFromViewport } from './board-layout.mjs';
+import { CARD_ZONES } from './board-model.mjs';
 
 const ACTIVE_CLASS = 'board3d-active';
 const CHAT_LINES = {
@@ -16,14 +17,19 @@ const CHAT_LINES = {
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room] = await Promise.all([
-      import('../gl/gl-renderer.js'),
-      import('../gl/gl-textures.js'),
-      import('./board-scene.js'),
-      import('./scene-clock.js'),
-      import('./table-mesh.js'),
-      import('../../vendor/three/RoomEnvironment.js'),
-    ]);
+    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx] =
+      await Promise.all([
+        import('../gl/gl-renderer.js'),
+        import('../gl/gl-textures.js'),
+        import('./board-scene.js'),
+        import('./scene-clock.js'),
+        import('./table-mesh.js'),
+        import('../../vendor/three/RoomEnvironment.js'),
+        import('./board-model.mjs'),
+        import('../netcode/apply-view.js'),
+        import('../deck-constructor/hydrate-holo.js'),
+        import('../image-logic/mat-fx.mjs'),
+      ]);
     return {
       createRenderer: renderer.createRenderer,
       createTextureCache: textures.createTextureCache,
@@ -31,6 +37,11 @@ const defaultDeps = {
       createBoardScene: scene.createBoardScene,
       createSceneClock: clock.createSceneClock,
       RoomEnvironment: room.RoomEnvironment,
+      boardModelFrom: model.boardModelFrom,
+      getLastAppliedView: applyView.getLastAppliedView,
+      cardBackSrcFor: hydrateHolo.cardBackSrcForUser,
+      motionReduced: matFx.motionReduced,
+      loadFoil,
     };
   },
   chat: async (message) => {
@@ -40,6 +51,53 @@ const defaultDeps = {
   systemState: async () => (await import('../../state.js')).systemState,
   matSpec: async () => (await import('../sizing/apply-mat-layout.js')).currentMatSpec(),
 };
+
+/**
+ * The TCG Live foil as hydrate-holo.js resolves it: the manifest (tcgl-foil-store.js) plus the
+ * shaders/materials `createFoilMaterial` needs. Null when either is unavailable (no texture
+ * host configured, missing files): every card then wears its plain front.
+ */
+async function loadFoil() {
+  const [store, material, manifestModule, holo] = await Promise.all([
+    import('../foil/tcgl-foil-store.js'),
+    import('../foil/tcgl-foil-material.js'),
+    import('../foil/tcgl-foil-manifest.mjs'),
+    import('../deck-builder/core/holo.mjs'),
+  ]);
+  const manifest = await store.loadFoilManifest();
+  if (!manifest) return null;
+  try {
+    await material.loadFoilData();
+  } catch (error) {
+    console.warn('board3d: foil shaders unavailable', error?.message || error);
+    return null;
+  }
+  return {
+    manifest,
+    createFoilMaterial: material.createFoilMaterial,
+    recordFor: (card) => {
+      const reverse = holo.isReverseHoloCard(card);
+      const id = holo.foilCardId(card, manifest, { reverse });
+      return manifestModule.foilRecordFor(manifest, id, { reverse });
+    },
+  };
+}
+
+/** Cards of a view by instance id: owner (`you`/`them`) and spectator (`players`) views. */
+function cardsOfView(view) {
+  const cards = new Map();
+  const players = view?.you
+    ? [view.you, view.them]
+    : Object.values(view?.players && typeof view.players === 'object' ? view.players : {});
+  for (const player of players) {
+    for (const zoneId of CARD_ZONES) {
+      const list = player?.zones?.[zoneId];
+      if (!Array.isArray(list)) continue;
+      for (const card of list) if (card && typeof card.instanceId === 'number') cards.set(card.instanceId, card);
+    }
+  }
+  return cards;
+}
 
 const safeStorage = () => {
   try {
@@ -131,7 +189,20 @@ export async function initializeBoard3d({
   }
   const createRenderer = injected.createRenderer ?? modules.createRenderer;
 
-  const current = { lost: 0, model: null };
+  const current = { lost: 0, model: null, cards: new Map(), foil: null, warnedInvalid: false };
+
+  // Card foil for the scene's pool (card-mesh.js): lookups answer null until loadFoil resolves.
+  const foil =
+    typeof modules.loadFoil === 'function'
+      ? {
+          recordFor: (placement) => {
+            const card = current.cards.get(placement?.instanceId);
+            return current.foil && card ? current.foil.recordFor(card) : null;
+          },
+          createMaterial: (record) => current.foil.createFoilMaterial(record),
+          uv: () => current.foil?.manifest?.uv ?? null,
+        }
+      : null;
 
   const readMat = async () => {
     try {
@@ -191,6 +262,8 @@ export async function initializeBoard3d({
       clock,
       three,
       RoomEnvironment: modules.RoomEnvironment,
+      foil,
+      motionReduced: modules.motionReduced,
     });
     Object.assign(session, { canvas, gl, textures, clock, scene });
     if (doc.visibilityState !== 'hidden') clock.start();
@@ -229,6 +302,47 @@ export async function initializeBoard3d({
   };
   doc.addEventListener('mat-layout-applied', onMatApplied);
   session.cleanup.push(() => doc.removeEventListener('mat-layout-applied', onMatApplied));
+
+  // The board model of the view apply-view.js just applied (it fires `board-view-applied`).
+  const onViewApplied = () => {
+    if (!session?.scene || typeof modules.boardModelFrom !== 'function') return;
+    const view = modules.getLastAppliedView?.();
+    if (!view) return;
+    current.cards = cardsOfView(view);
+    current.model = modules.boardModelFrom(view, {
+      selfPlayerId: view.you?.playerId || null,
+      cardBackSrcFor: (side) => {
+        try {
+          return modules.cardBackSrcFor?.(side) ?? '';
+        } catch {
+          return '';
+        }
+      },
+      previous: current.model,
+      onInvalid: (reason) => {
+        if (current.warnedInvalid) return;
+        current.warnedInvalid = true;
+        console.warn(`board3d: view skipped (${reason})`);
+      },
+    });
+    session.scene.applyModel(current.model);
+  };
+  doc.addEventListener('board-view-applied', onViewApplied);
+  session.cleanup.push(() => doc.removeEventListener('board-view-applied', onViewApplied));
+  onViewApplied();
+
+  if (foil) {
+    Promise.resolve()
+      .then(() => modules.loadFoil())
+      .then(
+        (loaded) => {
+          if (!session || !loaded) return;
+          current.foil = loaded;
+          session.scene?.refreshCards?.();
+        },
+        (error) => console.warn('board3d: foil failed to load', error?.message || error)
+      );
+  }
 
   const onVisibility = () => {
     if (!session?.clock) return;

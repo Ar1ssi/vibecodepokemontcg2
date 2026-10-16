@@ -1,9 +1,16 @@
-// The three.js board's scene (design 074 §D3): camera matched to the CSS tilt, the table, and
-// on-demand rendering. Slice C1 renders the table only; cards, piles and the hand join in C2–C4.
+// The three.js board's scene (design 074 §D3): camera matched to the CSS tilt, the table, the
+// cards in play (C2), and on-demand rendering. Piles and the hand join in C3–C4.
 // `three` is the namespace from `import('three')`; this module never imports it statically.
+import { projectToScreen } from './board-camera.mjs';
+import { diffModels, placementById } from './board-model.mjs';
+import { createCardMeshPool } from './card-mesh.js';
+import { posesFor } from './card-poses.mjs';
 import { createTable } from './table-mesh.js';
 
 const DEG = Math.PI / 180;
+/** A card moving between slots or stacks (design 074 §D3 "Cards"). */
+const CARD_POSE_MS = 180;
+const FOIL_ROLES = new Set(['root', 'stage']);
 
 const defaultRequestFrame = (fn) => globalThis.requestAnimationFrame?.(fn) ?? globalThis.setTimeout(fn, 16);
 const defaultCancelFrame = (id) => (globalThis.cancelAnimationFrame ?? globalThis.clearTimeout)?.(id);
@@ -34,16 +41,22 @@ function offsetAt(keys, elapsed) {
  *   textures: { acquire: Function, release: Function },
  *   clock: ReturnType<typeof import('./scene-clock.js').createSceneClock>,
  *   three: typeof import('three'), RoomEnvironment?: Function|null,
+ *   foil?: { recordFor: (placement: object) => object|null, createMaterial: Function,
+ *     uv?: Function|object }|null, motionReduced?: () => boolean,
  *   requestFrame?: (fn: FrameRequestCallback) => number, cancelFrame?: (id: number) => void }} deps
  *   The scene does not own `renderer`, `textures` or `clock`; its `dispose()` leaves them to the caller.
+ *   `foil` (card-mesh.js) dresses the visible card of a stack in its TCG Live foil; null = none.
  * @returns {{ applyModel: (model: object) => void, setLayout: (layout: object) => void,
  *   setCamera: (desc: ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>) => void,
  *   setViewport: (size: { w: number, h: number }) => void, invalidate: () => void, render: () => void,
- *   rects: () => object, hitTest: (x: number, y: number) => object|null,
+ *   rects: () => Record<number, { left: number, top: number, width: number, height: number }>,
+ *   hitTest: (clientX: number, clientY: number) => { instanceId: number, side: string, zone: string,
+ *     index: number, point: number[] }|null, refreshCards: () => void,
  *   shake: (offsets: { x: number, y: number, ms: number }[]) => Promise<void>,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
- *     host: HTMLElement, canvas: HTMLCanvasElement, layout: object|null, cameraDesc: object|null, model: object|null, uiState: Map<number, object> },
+ *     host: HTMLElement, canvas: HTMLCanvasElement, layout: object|null, cameraDesc: object|null, model: object|null, uiState: Map<number, object>,
+ *     cards: ReturnType<typeof createCardMeshPool> },
  *   dispose: () => void, clock: object }}
  */
 export function createBoardScene({
@@ -54,6 +67,8 @@ export function createBoardScene({
   clock,
   three,
   RoomEnvironment = null,
+  foil = null,
+  motionReduced = () => false,
   requestFrame = defaultRequestFrame,
   cancelFrame = defaultCancelFrame,
 }) {
@@ -88,9 +103,18 @@ export function createBoardScene({
     }
   };
 
+  // Cards live in world space: card-mesh.js places them with tableToWorld (the camera's tilt).
+  const cardsGroup = new three.Group();
+  cardsGroup.name = 'board3d-cards';
+  scene.add(cardsGroup);
+  const raycaster = new three.Raycaster();
+
+  /** Renders one frame; keeps rendering on the next frame while a card tween or foil runs. */
   const render = () => {
     if (disposed || contextLost()) return;
+    const animating = pool.update(clock.now());
     renderer.render(scene, camera);
+    if (animating) invalidate();
   };
 
   const invalidate = () => {
@@ -100,6 +124,16 @@ export function createBoardScene({
       render();
     });
   };
+
+  const pool = createCardMeshPool({
+    group: cardsGroup,
+    three,
+    textures,
+    clock,
+    foil,
+    motionReduced,
+    onNeedsRender: invalidate,
+  });
 
   table.onChange(invalidate);
 
@@ -130,6 +164,7 @@ export function createBoardScene({
     tableFrame.rotation.x = -desc.tiltDeg * DEG;
     camera.updateProjectionMatrix();
     applyViewOffset();
+    pool.setCamera(desc);
     invalidate();
   };
 
@@ -147,6 +182,7 @@ export function createBoardScene({
     if (disposed || !next) return;
     layout = next;
     table.setLayout(next);
+    syncCards(model, model, { relayout: true });
     invalidate();
   };
 
@@ -156,25 +192,143 @@ export function createBoardScene({
     invalidate();
   };
 
-  /** Stores the board model; card meshes that render it arrive in slice C2. */
+  /** The visible card of a stack (no offset, not a Tool/Energy) keeps its foil, as apply-view does. */
+  const foilRecordOf = (placement) => {
+    if (!foil || placement.face !== 'front' || !FOIL_ROLES.has(placement.role)) return null;
+    const [right, up] = placement.stackOffset ?? [0, 0];
+    if (right !== 0 || up !== 0) return null;
+    try {
+      return foil.recordFor?.(placement) ?? null;
+    } catch (error) {
+      console.warn('board3d: foil lookup failed', error);
+      return null;
+    }
+  };
+
+  const facesOf = (placement) => ({
+    src: placement.face === 'front' ? placement.src : null,
+    backSrc: placement.backSrc,
+    face: placement.face,
+    foilRecord: foilRecordOf(placement),
+  });
+
+  /**
+   * Reconciles the card meshes with `next` (§D3 "Reconcile"): new cards appear at their pose,
+   * moved or restyled ones tween there, cards without a pose in this slice (hand, piles, prizes,
+   * Energy tokens) or gone from the view are released. `relayout` snaps every card to the new
+   * layout; `refresh` re-applies every card's faces (the foil manifest arrived).
+   */
+  function syncCards(prev, next, { relayout = false, refresh = false } = {}) {
+    const poses = layout && next ? posesFor(next, layout) : new Map();
+    for (const id of pool.ids()) if (!poses.has(id)) pool.release(id);
+    const diff = diffModels(prev, next);
+    for (const [id, pose] of poses) {
+      const placement = placementById(next, id);
+      if (!pool.has(id)) {
+        pool.acquire(id, { widthPx: pose.widthPx });
+        pool.setFaces(id, facesOf(placement));
+        pool.setHidden(id, pose.hidden);
+        pool.setPose(id, pose, 0);
+        continue;
+      }
+      const restyled = diff.restyled.has(id);
+      if (restyled || refresh) {
+        pool.setFaces(id, facesOf(placement));
+        pool.setHidden(id, pose.hidden);
+      }
+      if (relayout) pool.setPose(id, pose, 0);
+      else if (restyled || diff.moved.has(id)) pool.setPose(id, pose, CARD_POSE_MS);
+    }
+  }
+
+  /** Renders a board model (board-model.mjs `boardModelFrom`): reconciles the card meshes. */
   const applyModel = (next) => {
     if (disposed) return;
+    const prev = model;
     model = next ?? null;
+    syncCards(prev, model);
     invalidate();
   };
 
-  /** Selection/glow/mat-pick state per card instance, merged; slice C2/D3 draws it. */
+  /** Re-applies every card's faces, e.g. once the foil manifest has loaded. */
+  const refreshCards = () => {
+    if (disposed) return;
+    syncCards(model, model, { refresh: true });
+    invalidate();
+  };
+
+  /** Selection/glow/mat-pick state per card instance, merged; slices C5/D3 draw it. */
   const setUiState = (id, patch) => {
     if (disposed || id === undefined || id === null || !patch || typeof patch !== 'object') return;
     uiState.set(id, { ...(uiState.get(id) || {}), ...patch });
     invalidate();
   };
 
-  /** Screen rects by instance id: empty until the card meshes of slice C2 exist. */
-  const rects = () => ({});
+  const canvasBox = () => {
+    const box = canvas.getBoundingClientRect?.();
+    return box && box.width > 0 && box.height > 0 ? box : null;
+  };
 
-  /** Card under a screen point: none until slice D1 adds raycasting over the C2 meshes. */
-  const hitTest = () => null;
+  /**
+   * Client-px rects of every visible card: the bounding box of its front face's four corners,
+   * projected with the pure camera description (board-camera.mjs `projectToScreen`, the same
+   * math `PerspectiveCamera` runs) and offset by the canvas's page position. A running shake
+   * is not included.
+   */
+  const rects = () => {
+    const out = {};
+    if (disposed || !cameraDesc) return out;
+    pool.update(clock.now());
+    const box = canvasBox() ?? { left: 0, top: 0 };
+    for (const id of pool.ids()) {
+      if (!pool.meshOf(id)?.visible) continue;
+      const points = (pool.cornersOf(id) ?? []).map((corner) => projectToScreen(cameraDesc, corner));
+      if (points.length !== 4 || points.some((point) => !point)) continue;
+      const xs = points.map((point) => point.x);
+      const ys = points.map((point) => point.y);
+      const left = Math.min(...xs);
+      const top = Math.min(...ys);
+      out[id] = {
+        left: box.left + left,
+        top: box.top + top,
+        width: Math.max(...xs) - left,
+        height: Math.max(...ys) - top,
+      };
+    }
+    return out;
+  };
+
+  /** Nearest visible card under a client-px point (raycast against the card meshes), or null. */
+  const hitTest = (clientX, clientY) => {
+    if (disposed || !cameraDesc || !model) return null;
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+    const box = canvasBox();
+    if (!box) return null;
+    pool.update(clock.now());
+    const ndc = new three.Vector2(
+      ((clientX - box.left) / box.width) * 2 - 1,
+      -((clientY - box.top) / box.height) * 2 + 1
+    );
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(ndc, camera);
+    const meshes = pool
+      .ids()
+      .map((id) => pool.meshOf(id))
+      .filter((mesh) => mesh?.visible);
+    for (const hit of raycaster.intersectObjects(meshes, false)) {
+      const id = pool.idAt(hit.object);
+      const placement = id === null ? null : placementById(model, id);
+      if (!placement) continue;
+      return {
+        instanceId: id,
+        side: placement.side,
+        zone: placement.zone,
+        index: placement.index,
+        point: hit.point.toArray(),
+      };
+    }
+    return null;
+  };
 
   /**
    * Screen shake as a camera view-offset sequence on the scene clock. `offsets` are keyframes
@@ -210,7 +364,7 @@ export function createBoardScene({
   };
 
   // `host` sizes the canvas; the boot code observes it and calls setViewport/setCamera.
-  const inspect = () => ({ scene, camera, host, canvas, layout, cameraDesc, model, uiState });
+  const inspect = () => ({ scene, camera, host, canvas, layout, cameraDesc, model, uiState, cards: pool });
 
   const dispose = () => {
     if (disposed) return;
@@ -218,6 +372,8 @@ export function createBoardScene({
     disposed = true;
     if (frameId !== null) cancelFrame(frameId);
     frameId = null;
+    pool.dispose();
+    scene.remove(cardsGroup);
     table.dispose();
     scene.remove(tableFrame);
     uiState.clear();
@@ -226,6 +382,7 @@ export function createBoardScene({
 
   return {
     applyModel,
+    refreshCards,
     setLayout,
     setCamera,
     setViewport,

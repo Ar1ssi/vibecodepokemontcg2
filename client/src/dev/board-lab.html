@@ -2,7 +2,11 @@
 <!-- Design 074: a bench for the three.js board scene (board-scene.js + table-mesh.js) outside the
      game. Open /dev/board-lab (or /src/dev/board-lab.html) with the game server running.
      ?mat=<catalog id> picks a playmat through the game's own resolution (mat-spec.mjs; default: the
-     sim board with no art), ?viewport=WxH renders at a fixed size. Not linked from the game. -->
+     sim board with no art), ?viewport=WxH renders at a fixed size. ?cards=N lays N fixture cards
+     (scripts/e2e's fixture deck) over both seats' Active, Bench and Trainer board through
+     boardModelFrom (every 3rd wears its TCG Live foil when the manifest has one for its id);
+     ?stack=1 adds a Basic + Stage 1 + Stage 2 with two Tools in the near Active spot.
+     Not linked from the game. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -104,6 +108,10 @@
           { matSpecFor, isTwoPlayerMat },
           { getMatById },
           { getMatLayout },
+          { boardModelFrom },
+          { e2eFixtureDeck },
+          { loadFoilManifest },
+          { foilRecordFor },
         ] = await Promise.all([
           import('three'),
           import('/src/vendor/three/RoomEnvironment.js'),
@@ -117,6 +125,10 @@
           import('/src/setup/sizing/mat-spec.mjs'),
           import('/src/setup/deck-builder/core/mats.mjs'),
           import('/src/setup/sizing/mat-layouts.mjs'),
+          import('/src/setup/board3d/board-model.mjs'),
+          import('/src/setup/general/e2e-mode.mjs'),
+          import('/src/setup/foil/tcgl-foil-store.js'),
+          import('/src/setup/foil/tcgl-foil-manifest.mjs'),
         ]);
         const params = new URLSearchParams(location.search);
         const host = document.getElementById('stage');
@@ -143,7 +155,18 @@
         const { renderer } = gl;
         const clock = createSceneClock(canvas);
         clock.start();
+        // Foil for every 3rd lab card, once the manifest and the foil shaders have loaded.
+        const foilState = { manifest: null, createMaterial: null, ids: new Map() };
+        const foil = {
+          recordFor: (placement) => {
+            const id = foilState.ids.get(placement.instanceId);
+            return foilState.manifest && id ? foilRecordFor(foilState.manifest, id) : null;
+          },
+          createMaterial: (record) => foilState.createMaterial(record),
+          uv: () => foilState.manifest?.uv ?? null,
+        };
         const scene = createBoardScene({
+          foil,
           host,
           canvas,
           renderer,
@@ -182,6 +205,77 @@
         };
         new ResizeObserver(relayout).observe(host);
 
+        const cardCount = Math.max(0, Math.min(400, Number(params.get('cards')) || 0));
+        const withStack = params.get('stack') === '1';
+        if (cardCount > 0 || withStack) {
+          const deck = e2eFixtureDeck('Lab').map(([, name, , src, number, set, id]) => ({ name, src, number, set, id }));
+          let nextId = 1;
+          const pokemon = (base, extra = {}) => ({
+            instanceId: nextId++,
+            name: base.name,
+            src: base.src,
+            id: base.id,
+            set: base.set,
+            number: base.number,
+            supertype: 'Pokémon',
+            stage: 'Basic',
+            hp: 60,
+            ...extra,
+          });
+          const trainer = (base, subtypes, extra = {}) => ({
+            instanceId: nextId++,
+            name: base.name,
+            src: base.src,
+            id: base.id,
+            supertype: 'Trainer',
+            subtypes,
+            ...extra,
+          });
+          const zonesFor = () => ({ active: [], bench: [], board: [] });
+          const zones = { you: zonesFor(), them: zonesFor() };
+          const slots = ['active', 'bench', 'bench', 'bench', 'bench', 'bench'];
+          const placed = { you: withStack ? 1 : 0, them: 0 };
+          if (withStack) {
+            const basic = pokemon(deck[0], { name: 'Lab Basic' });
+            zones.you.active.push(
+              basic,
+              pokemon(deck[1], { name: 'Lab Stage 1', stage: 'Stage 1', attachedTo: basic.instanceId }),
+              pokemon(deck[2], { name: 'Lab Stage 2', stage: 'Stage 2', attachedTo: basic.instanceId }),
+              trainer(deck[3], ['Pokémon Tool'], { attachedTo: basic.instanceId }),
+              trainer(deck[4], ['Pokémon Tool'], { attachedTo: basic.instanceId })
+            );
+          }
+          for (let i = 0; i < cardCount; i++) {
+            const side = i % 2 === 0 ? 'you' : 'them';
+            const slot = slots[placed[side]] ?? 'board';
+            placed[side] += 1;
+            const base = deck[i % deck.length];
+            const card = slot === 'board' ? trainer(base, ['Item']) : pokemon(base);
+            zones[side][slot].push(card);
+            if (i % 3 === 0) foilState.ids.set(card.instanceId, base.id);
+          }
+          const view = {
+            stateVersion: 1,
+            you: { playerId: 'lab-near', zones: zones.you },
+            them: { playerId: 'lab-far', zones: zones.them },
+          };
+          const model = boardModelFrom(view, {
+            selfPlayerId: 'lab-near',
+            cardBackSrcFor: () => '/src/assets/cardback.png',
+            onInvalid: (reason) => showError(`lab model invalid: ${reason}`),
+          });
+          scene.applyModel(model);
+          Promise.all([loadFoilManifest(), import('/src/setup/foil/tcgl-foil-material.js')])
+            .then(async ([manifest, material]) => {
+              if (!manifest) return;
+              await material.loadFoilData();
+              foilState.manifest = manifest;
+              foilState.createMaterial = material.createFoilMaterial;
+              scene.refreshCards();
+            })
+            .catch((error) => console.warn('board lab: foil unavailable', error?.message || error));
+        }
+
         const bindSlider = (id, apply) => {
           const input = document.getElementById(id);
           const out = document.getElementById(`${id}Out`);
@@ -215,10 +309,15 @@
           lastFrame = frame;
           lastTime = now;
           const viewport = viewportOf();
+          const { render, memory, programs } = renderer.info;
           stats.textContent = [
             `renders/s  ${fps}`,
-            `textures   ${renderer.info.memory.textures}`,
-            `calls      ${renderer.info.render.calls}`,
+            `cards      ${scene.inspect().cards.ids().length}`,
+            `calls      ${render.calls}`,
+            `triangles  ${render.triangles}`,
+            `geometries ${memory.geometries}`,
+            `textures   ${memory.textures}`,
+            `programs   ${programs?.length ?? 0}`,
             `viewport   ${viewport.w}×${viewport.h}`,
             matStatus,
             contextLost ? 'context lost' : '',
@@ -228,6 +327,7 @@
         };
         setInterval(writeStats, 1000);
         writeStats();
+        window.__boardLab = { scene, renderer };
       }
 
       boot().catch((error) => showError(`lab failed: ${error?.message || error}`));
