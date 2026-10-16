@@ -339,3 +339,11 @@ switch `renderOpenedBox` back to `mountUnboxingScene`, drop the route.
   83 wrappers changed, by added opacity only (none lost a pixel or changed size); 3 keep specks
   under 70 px; 29 measured seals now agree with their set's (Radiant Gardevoir's became measurable).
   The leaflet prints "PLAYER'S GUIDE" in a kit. Frames: scratch `it11/`, `it11b/`, `packfix/`.
+- **Iteration 12 (the pull, and the legacy page and phones again).** Filmed tear → pull → set
+  down. Before: the stack was drawn a full card height up out of a pack that already fills the
+  view, so for a second only its lower half showed; the emptied wrapper flew to the heap still
+  bulging and snapped flat on landing. After: the wrapper slides down off the cards for 72 % of the
+  pull (the stack rises the rest and stays in view, the wrapper leaves through the bottom of the
+  screen), and it goes slack on its way down. The legacy Build & Battle page (tabletop on its
+  stage, skip, "Build your deck" into the builder) and a 390 × 844 pick-up re-checked after this
+  session's changes. Frames: scratch `it12/`.

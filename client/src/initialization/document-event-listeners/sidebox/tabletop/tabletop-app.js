@@ -105,6 +105,8 @@ const qFlat = (yawDeg, faceUp = true) =>
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const HAND_FACE_WAIT_MS = 6000;
+// The share of a pull taken by sliding the wrapper down rather than drawing the cards up.
+const WRAPPER_SLIDE = 0.72;
 
 const el = (tag, className) => {
   const node = document.createElement(tag);
@@ -969,11 +971,17 @@ async function buildTabletopApp(options, life) {
     const up = new Vector3();
     const point = new Vector3();
     const quaternion = new Quaternion();
+    // The wrapper is slid down off the cards more than the cards are drawn up, so the stack stays
+    // in view: drawn a full card height out of a pack that fills the view, it left the screen.
+    const handAt = group.position.clone();
+    const handDown = new Vector3(0, -1, 0).applyQuaternion(group.quaternion);
     audio.play('cards-out');
     await stage.animate({
       durationMs: 1100,
       update: (t) => {
-        proxy.position.y = startY + travel * stackPullPose(t);
+        const pulled = stackPullPose(t);
+        proxy.position.y = startY + travel * pulled;
+        group.position.copy(handAt).addScaledVector(handDown, travel * WRAPPER_SLIDE * pulled);
         group.updateMatrixWorld();
         up.set(0, 1, 0).applyQuaternion(group.getWorldQuaternion(quaternion));
         point.set(0, pack.model.mouthY - 0.5, 0);
@@ -999,8 +1007,17 @@ async function buildTabletopApp(options, life) {
 
   async function setWrapperDown(pack, logical) {
     const spot = wrapperSpot(logical);
-    await flyTo(pack.model.group, flatPose(spot, 1.2 + logical * 0.6, true), { durationMs: 760, lift: 30, delayMs: 120 });
-    pack.model.group.scale.set(1, 1, 0.35);
+    const group = pack.model.group;
+    // Emptied, the wrapper goes slack on its way down instead of landing as a full pack.
+    await Promise.all([
+      flyTo(group, flatPose(spot, 1.2 + logical * 0.6, true), { durationMs: 760, lift: 30, delayMs: 120 }),
+      stage.animate({
+        durationMs: 640,
+        delayMs: 120,
+        update: (t) => group.scale.set(1, 1, 1 - 0.65 * easeOutCubic(t)),
+      }),
+    ]);
+    group.scale.set(1, 1, 0.35);
     pack.wrapperDown = true;
     audio.play('pack-land');
   }
