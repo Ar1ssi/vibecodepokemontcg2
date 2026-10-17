@@ -72,7 +72,7 @@ client/src/setup/deck-constructor/own-deck.mjs — `systemState.ownDeck`: the de
 ## Build & Battle and Elite Trainer Box openings (designs 051–055, 057)
 client/src/setup/deck-builder/core/build-battle/pack3d.mjs — pure 3D pack math: pillow shape, peel/rip/strip flight, cards out, tilt/sway, screen↔world, floor reflection bands (design 055)
 client/src/initialization/document-event-listeners/sidebox/native-deck-builder-pack3d.js — WebGL pack stage (three.js, lazy `import()`), mirror layer; falls back to the DOM scene
-client/src/initialization/document-event-listeners/sidebox/tabletop/ — three.js tabletop unboxing (design 073-tabletop-unboxing) on the legacy B&B stage: tabletop-scene.js mount + WebGL fallback, tabletop-app.js orchestrator, tt-*.js stage/meshes/print/audio; pure motion/layout in core/build-battle/tabletop/*.mjs
+client/src/initialization/document-event-listeners/sidebox/tabletop/ — three.js tabletop unboxing (design 073-tabletop-unboxing) on both B&B flows' stage (bb-shared `mountBoxOnStage`): tabletop-scene.js mount + WebGL fallback, tabletop-app.js orchestrator, tt-*.js stage/meshes/print/audio; pure motion/layout in core/build-battle/tabletop/*.mjs
 client/unboxing.html + client/src/unboxing-site/main.js — standalone `/unboxing` test bench for the tabletop (box/era/seed pickers); server/card-art-proxy.mjs — same-origin TCGdex card-image proxy for WebGL textures
 client/src/setup/deck-builder/core/build-battle/box-art.generated.mjs — `BOX_ART`: every box's vendored render, booster fronts (+ measured shapes), ME cuboid faces; built by scripts/build-battle/vendor-box-art.mjs from box-art-sources.mjs (D194)
 client/src/vendor/three/ — vendored three 0.185.0 (import map in index.ejs); scripts/vendor-three.mjs copies/checks it (D193)

@@ -17,6 +17,7 @@ import {
 import { boxArt } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
+import { mountTabletopUnboxing } from './tabletop/tabletop-scene.js';
 
 /**
  * What the two Build & Battle flows share (design 073 § D): the run flow
@@ -133,8 +134,27 @@ export const boxUnboxingOptions = ({ root, box, loaded, skin, opened, getUnboxin
   };
 };
 
-/** The unboxing scene (design 052) for `opened`; takes the `boxUnboxingOptions` arguments. */
-export const mountBoxUnboxing = (args) => mountUnboxingScene(boxUnboxingOptions(args));
+/**
+ * Plays the opening on the fullscreen stage `stageEl`: the tabletop (design 073-tabletop-unboxing),
+ * or the design-052 DOM scene with `?tabletop=0` or when the tabletop cannot run (effects off, no
+ * WebGL 2, a lost context), and the box opens all the same. `sceneOptions` are `boxUnboxingOptions`;
+ * `deckRows` is the box's starting deck, for the leaflet.
+ * @returns {{unmount: () => void}}
+ */
+export const mountBoxOnStage = ({ stageEl, sceneOptions, box, deckRows, storage }) => {
+  const mountDomScene = () => {
+    stageEl.classList.remove('bb-stage--tabletop');
+    sceneOptions.root.classList.add('bb-scene--stage');
+    stageEl.replaceChildren(sceneOptions.root);
+    return mountUnboxingScene(sceneOptions);
+  };
+  // `?tabletop=0` keeps the DOM scene (its recorder, and side-by-side checks).
+  if (new URLSearchParams(window.location.search).get('tabletop') === '0') return mountDomScene();
+  const table = el('div', 'bb-tabletop');
+  stageEl.classList.add('bb-stage--tabletop');
+  stageEl.replaceChildren(table);
+  return mountTabletopUnboxing({ ...sceneOptions, root: table, box, deckRows, storage, fallback: mountDomScene });
+};
 
 /**
  * The Pool tab: the pool grid with its "N left" badges and the unlimited Basic Energy, a click adds

@@ -85,8 +85,9 @@ product (a lidded cuboid). Nothing is taken *out* of the box: the packs fly out 
 - (assumed) Our packs' tear lines stay jagged (the real crimp's teeth); the TCG Pocket light follows
   that line. The strip no longer folds back 150° under the finger: as in the video it stays on, flexing
   a little as the cut passes, and springs off when the cut completes.
-- (assumed) The run flow (`/build-and-battle`, design 071) keeps its TCG-Live-style opening; ETB (057)
-  keeps the 052 scene. Only the legacy B&B flow and the standalone site get the tabletop.
+- The run flow (`/build-and-battle`, design 071), the legacy B&B flow and the standalone site all open
+  on the tabletop (user, 2026-10-17: "replace the current one"; both flows call `mountBoxOnStage` in
+  native-deck-builder-bb-shared.js). ETB (057) keeps the 052 scene.
 
 ## Research facts (sources, 2026-10-15)
 - Contents per era: ME02 box back (user video frame `refs/052-box-back.webp`): 40-card deck incl. 1 of 4

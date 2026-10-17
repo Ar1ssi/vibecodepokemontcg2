@@ -44,9 +44,9 @@ function openedSession(extra = {}) {
   return { ...createSession({ boxKey: 'phantasmal-flames', seed: 11, ...opened }), unboxing: finishedUnboxing(), ...extra };
 }
 
-function boot(t, { run = null, play = { disabled: false, reason: '' } } = {}) {
+function boot(t, { run = null, play = { disabled: false, reason: '' }, query = '' } = {}) {
   const dom = new JSDOM('<!doctype html><div class="db-live"><div id="run"></div><div id="pool"></div></div>', {
-    url: 'http://localhost/build-and-battle?box=phantasmal-flames',
+    url: `http://localhost/build-and-battle?box=phantasmal-flames${query}`,
     pretendToBeVisual: true,
   });
   t.after(() => dom.window.close());
@@ -255,6 +255,60 @@ test('row 13: a run saved mid-opening reopens the stage on load', async (t) => {
   await settle();
   assert.ok(page.dom.window.document.getElementById('bbUnboxingStage'));
   assert.equal(page.runEl.querySelector('.bnb-lobby'), null);
+});
+
+const waitFor = async (probe, timeoutMs = 10000) => {
+  const start = Date.now();
+  while (!probe()) {
+    if (Date.now() - start > timeoutMs) return false;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return true;
+};
+
+// A context that claims WebGL 2 but cannot draw: the tabletop is tried and its renderer fails.
+const brokenWebgl2 = (page) => {
+  page.dom.window.HTMLCanvasElement.prototype.getContext = (kind) =>
+    kind === 'webgl2' ? { getExtension: () => null } : null;
+};
+
+const startRun = (page) => {
+  page.click('#bnbStartRun');
+  page.runEl.querySelector('.bnb-dialog .bb-primary').click();
+  return page.dom.window.document.getElementById('bbUnboxingStage');
+};
+
+test('design 073-tabletop rows 1–3: the run opens its box on the tabletop, a failed WebGL start falls back to the DOM scene', async (t) => {
+  const page = boot(t);
+  brokenWebgl2(page);
+  await settle();
+  const stageEl = startRun(page);
+  assert.ok(stageEl?.querySelector('.bb-tabletop'), 'the tabletop takes the stage first');
+  assert.ok(stageEl.classList.contains('bb-stage--tabletop'));
+  assert.ok(await waitFor(() => stageEl.querySelector('#bbUnboxing')), 'the DOM scene takes over');
+  assert.equal(stageEl.classList.contains('bb-stage--tabletop'), false);
+  assert.ok(stageEl.querySelector('#bbUnboxing').classList.contains('bb-scene--stage'));
+  assert.equal(stageEl.querySelector('.bb-tabletop'), null);
+  assert.equal(page.stored()?.session?.unboxing?.stage, 'sealed', 'the box is still sealed for the DOM scene');
+});
+
+test('design 073-tabletop row 3: with effects off the run opens the DOM scene at once, no tabletop', async (t) => {
+  const page = boot(t);
+  page.dom.window.document.body.classList.add('fx-off');
+  await settle();
+  const stageEl = startRun(page);
+  assert.ok(stageEl?.querySelector('#bbUnboxing.bb-scene--stage'), 'the DOM scene is on the stage synchronously');
+  assert.equal(stageEl.querySelector('.bb-tabletop'), null);
+  assert.equal(stageEl.classList.contains('bb-stage--tabletop'), false);
+});
+
+test('?tabletop=0 keeps the run on the design-052 DOM scene even where WebGL 2 works', async (t) => {
+  const page = boot(t, { query: '&tabletop=0' });
+  brokenWebgl2(page);
+  await settle();
+  const stageEl = startRun(page);
+  assert.ok(stageEl?.querySelector('#bbUnboxing.bb-scene--stage'));
+  assert.equal(stageEl.querySelector('.bb-tabletop'), null);
 });
 
 test('row 11: with storage blocked the run lives in memory and says so', async (t) => {

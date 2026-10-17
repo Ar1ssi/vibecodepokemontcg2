@@ -1,6 +1,5 @@
 // FROZEN 2026-10-15 per design 073: the legacy flow (/build-and-battle-legacy) must keep working as is,
-// but gets no new features beyond the tabletop opening (design 073-tabletop-unboxing, which the user
-// asked for on this flow); the live flow is native-deck-builder-bnb-run.js. Do not extend this file.
+// but gets no new features; the live flow is native-deck-builder-bnb-run.js. Do not extend this file.
 import { createRng } from '../../../../../shared/engine/rng.mjs';
 import { DECK_FORMAT_BUILD_BATTLE } from '../../../../../shared/engine/formats.mjs';
 import { DEFAULT_BOX_KEY, getBuildBattleBox } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
@@ -38,12 +37,12 @@ import {
   cardImage,
   createPoolTab,
   el,
+  mountBoxOnStage,
   renderBoxPicker,
   unlimitedEnergyCards,
 } from './native-deck-builder-bb-shared.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
-import { mountTabletopUnboxing } from './tabletop/tabletop-scene.js';
 
 /**
  * The Box and Pool tabs of the Build & Battle builder tab (designs 051 § Builder-tab controller,
@@ -108,8 +107,6 @@ export const initializeBuildBattle = ({
   const energyCards = unlimitedEnergyCards();
   const urlParams = new URLSearchParams(window.location.search);
   const urlSeed = parseSeed(urlParams.get('seed') ?? '');
-  // `?tabletop=0` keeps the design-052 DOM scene on the stage (its recorder, and side-by-side checks).
-  const tabletopOff = urlParams.get('tabletop') === '0';
   // What the Box # field holds; it outlives the sealed box's re-renders.
   let typedSeed = urlSeed === null ? '' : String(urlSeed);
 
@@ -463,37 +460,11 @@ export const initializeBuildBattle = ({
     });
     if (stageEl) {
       boxPanelEl.append(el('p', 'bb-note', 'Your box is being opened.'));
-      scene = mountOnStage(stageEl, sceneOptions);
+      scene = mountBoxOnStage({ stageEl, sceneOptions, box: activeBox, deckRows: boxStartingRows(), storage });
     } else {
       boxPanelEl.append(root);
       scene = mountUnboxingScene(sceneOptions);
     }
-  };
-
-  // The opening plays on the tabletop (design 073). With effects off, no WebGL 2, or a lost
-  // context, the design-052 DOM scene takes the stage instead and the box opens all the same.
-  const mountOnStage = (stageEl, sceneOptions) => {
-    if (tabletopOff) {
-      sceneOptions.root.classList.add('bb-scene--stage');
-      stageEl.replaceChildren(sceneOptions.root);
-      return mountUnboxingScene(sceneOptions);
-    }
-    const table = el('div', 'bb-tabletop');
-    stageEl.classList.add('bb-stage--tabletop');
-    stageEl.replaceChildren(table);
-    return mountTabletopUnboxing({
-      ...sceneOptions,
-      root: table,
-      box: activeBox,
-      deckRows: boxStartingRows(),
-      storage,
-      fallback: () => {
-        stageEl.classList.remove('bb-stage--tabletop');
-        sceneOptions.root.classList.add('bb-scene--stage');
-        stageEl.replaceChildren(sceneOptions.root);
-        return mountUnboxingScene(sceneOptions);
-      },
-    });
   };
 
   const renderBox = () => {
