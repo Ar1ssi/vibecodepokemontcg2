@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 
-import { COIN_MATERIALS, getCoinById, getCoins, getTcglCoins, isTcglCoin } from '../core/coins.mjs';
+import { COIN_MATERIALS, getCoinById, getCoins, getTcglCoins, isTcglCoin, loadCoinCatalog } from '../core/coins.mjs';
+
+await loadCoinCatalog();
 
 // The TCG Live picker group (design 069) next to the physical catalog, whose ids decks persist (D84).
 const clientRoot = new URL('../../../../', import.meta.url);

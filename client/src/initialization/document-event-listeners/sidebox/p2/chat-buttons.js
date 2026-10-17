@@ -8,10 +8,7 @@ import { wireButtonCues } from '../../../../setup/netcode/mat-fx/ui-cue.mjs';
 import { rulesState } from '/shared/engine/rules/rules-state.mjs';
 import { getZone } from '../../../../setup/zones/get-zone.js';
 import { getActivePokemonCard } from '/shared/engine/zones/active-pokemon.mjs';
-import {
-  openCardInspector,
-  closeCardInspector,
-} from '../../../../setup/rules/card-inspector.mjs';
+import { openActiveAttackOverlay } from '../../../../setup/image-logic/click-events.js';
 
 export const initializeP2ChatButtons = () => {
   const getP2User = () => (systemState.isTwoPlayer ? systemState.initiator : 'opp');
@@ -19,24 +16,11 @@ export const initializeP2ChatButtons = () => {
   const p2AttackButton = document.getElementById('p2AttackButton');
   p2AttackButton.addEventListener('click', () => {
     const user = getP2User();
-    // D50 (design 013, was 008 Component 7): rules mode opens the same inspector a double-click
-    // on the card opens, rather than attacking directly. One surface, one gesture.
+    // Design 074 A3: rules mode opens the same TCG Live AttackOverlay a tap on the Active opens,
+    // rather than attacking directly. One surface, one gesture.
     if (rulesState.enabled) {
       const active = getActivePokemonCard(getZone(user, 'active'));
-      if (active?.image) {
-        openCardInspector({
-          card: active,
-          onAttack: (index) => {
-            closeCardInspector();
-            attack(rulesState.turnPlayer, true, index);
-          },
-          onRetreat: () => {
-            closeCardInspector();
-            retreat(getP2User());
-          },
-        });
-        return;
-      }
+      if (active?.image && openActiveAttackOverlay(active, getP2User())) return;
     }
     attack(user);
   });

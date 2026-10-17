@@ -1383,3 +1383,6 @@ oneshot 054-build-and-battle-boxes-all-eras · worktree .claude/worktrees/bb-box
 oneshot 059-deck-reveal-fx · primary checkout · branch claude/keen-wright-7i2dps · slice 4/4
   0 design [x] · 1 engine reveal truth + art [x] · 2 client planner [x] · 3 pose/timing/voice [x] · 4 DOM scene + wiring + e2e [x]
   Independent review: no blockers; its should + 3 nits fixed. Landed on main; full pnpm test 5364/0; audits oracle+attacks PASS, trainers/abilities red as on main (I213, I218).
+
+oneshot 068-tcgl-attack-vfx - worktree .claude/worktrees/tcgl-attack-vfx - branch feature/tcgl-attack-vfx - slice 6/6 done
+  Landed on main in f18c43c9 (merge: feature/tcgl-attack-vfx into main); ledger archived by the 2026-10-15 maintain sweep (design 073 batch 3).

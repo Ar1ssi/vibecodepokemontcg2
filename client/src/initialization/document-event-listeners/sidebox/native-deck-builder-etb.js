@@ -45,6 +45,8 @@ import {
   shelfLine,
 } from '../../../setup/deck-builder/core/elite-trainer-box/etb-view.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
+import { loadCoinCatalog } from '../../../setup/deck-builder/core/coins.mjs';
+import { loadSleeveCatalog } from '../../../setup/deck-builder/core/sleeves.mjs';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
@@ -447,9 +449,12 @@ export const initializeEliteTrainerBox = ({
     );
 
   const loadSets = async () => {
-    const results = await Promise.allSettled(
-      [...setsToLoad()].map(async (setId) => [setId, await loadSetData(setId)])
-    );
+    const [results] = await Promise.all([
+      Promise.allSettled([...setsToLoad()].map(async (setId) => [setId, await loadSetData(setId)])),
+      // The opening's sleeve and coin props read these catalogs (JSON loaded on demand, design 073);
+      // without them the props show no art, as with any missing image.
+      Promise.allSettled([loadCoinCatalog(), loadSleeveCatalog()]),
+    ]);
     for (const result of results) {
       if (result.status !== 'fulfilled') continue;
       const [setId, loaded] = result.value;

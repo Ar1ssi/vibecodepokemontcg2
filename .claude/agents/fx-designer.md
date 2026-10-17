@@ -12,10 +12,10 @@ Pokémon TCG Live. Visual-only work (CSS, mat FX, animation, layout) needs no fa
 any pose math you write is pure and unit-tested. The user judges the final look on localhost.
 
 ## Read first (targeted, never whole directories)
-- The closest shipped reference design — `.agent/designs/041-sv-evolution-scene.md` (canvas
+- The closest shipped reference design — `.agent/designs/archive/041-sv-evolution-scene.md` (canvas
   scene), `042-ko-discard-flight.md` (flights, KO), `043-opp-trainer-play.md` (3D flip card),
   `044-draw-scene.md` (draw spread), `045-prize-flights.md` (handoffs), `046-board-drop-glow.md`
-  (CSS glow, mirrored sheets). Read its Constraints and Deviations: the Deviations hold the
+  (CSS glow, mirrored sheets), all in that folder. Read its Constraints and Deviations: the Deviations hold the
   user's corrections.
 - `grep -n "\[mat-fx\]\|\[drag\]\|\[board-ui\]" .agent/DECISIONS.md` — binding FX rules.
 - The module you extend in `client/src/setup/netcode/mat-fx/` and its `__tests__/`.

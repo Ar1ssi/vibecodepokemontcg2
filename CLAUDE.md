@@ -45,7 +45,7 @@ END — whenever you changed anything:
 - Either END: MAP.md only if files moved/were added; DECISIONS.md only for a genuinely lasting choice.
 - Tick your workflow's Done checklist in your final message.
 - Maintenance due when ≥30 commits landed on `main` since the last `maintain:` commit
-  (`git rev-list --count $(git log -1 --format=%h --grep='^maintain' main)..main`).
+  or any harness cap is blown: `pnpm harness:check` (exit 1 = run `.agent/workflows/maintain.md`).
 - **"Push to main"** (the user's phrase) means push to GitHub's `main`: `git fetch origin main`, merge or
   rebase onto `origin/main`, run `TEST_BASE=origin/main pnpm gates`, run the full `pnpm test` only if it
   says REQUIRED (a green run records the tree, so an identical landing skips it), then

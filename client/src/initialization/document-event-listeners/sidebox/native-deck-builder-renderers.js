@@ -24,48 +24,100 @@ const escapeHtml = (value = '') => String(value)
         : '';
     };
 
-    export const renderSearchResults = ({ searchResultsEl, results, onSelect, quantities = {}, owned = {} }) => {
-      if (!searchResultsEl) return;
-    
-      if (!results || results.length === 0) {
-        searchResultsEl.innerHTML = '';
-        return;
-      }
-    
-      searchResultsEl.innerHTML = results
-        .map((card, index) => {
-          const previewImage = card.images?.large || card.images?.small || card.image || '';
-          const thumbImage = card.images?.small || card.image || '';
-          const setName = escapeHtml(card.set?.name || 'Unknown Set');
-          const qty = quantities[card.id] || 0;
-    
-          // Image-first, as in Pokémon TCG Live: the card scan IS the tile.
-          // The name/set caption stays in the DOM for screen readers and for
-          // the light theme, but reads as a hover-in footer over the art.
-          return `
-            <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${qty > 0 ? ` data-in-deck="${qty}"` : ''}${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}">
-              <span class="native-deck-builder-result-frame">
-                <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" loading="lazy" />
+    // TCGdex serves every scan as low.webp (245 px wide, ~28 KB) and high.webp (600 px,
+    // ~100 KB). A result tile is 124 px and up, the same tile Browse Sets fills with
+    // the low scan, so the grid loads low; the hover/right-click preview keeps high.
+    const TCGDEX_HIGH_SCAN = /^(https:\/\/assets\.tcgdex\.net\/.+)\/high\.webp$/;
+    const tileScanUrl = (url = '') => String(url).replace(TCGDEX_HIGH_SCAN, '$1/low.webp');
+
+    // Each grid remembers the results it last drew, keyed by card ids, so a re-render with the same
+    // ids patches the badges in place instead of rebuilding up to 150 <img> tiles. A single delegated
+    // click listener per grid reads this state at click time, so no tile holds a stale onSelect.
+    const renderedSearchGrids = new WeakMap(); // grid element -> { key, results, onSelect }
+
+    const searchResultsKey = (results) => results.map((card) => card.id).join('\n');
+
+    // Shared by the fresh render and the in-place patch so both produce the same badge nodes.
+    const searchBadgesHtml = (qty, ownedCount) => `
                 ${qty > 0 ? `<span class="native-deck-builder-result-qty" aria-label="${qty} in deck">${qty}</span>` : ''}
-                ${ownedBadgeHtml(owned[card.id])}
-                <span class="native-deck-builder-result-text">
+                ${ownedBadgeHtml(ownedCount)}
+                `;
+
+    const searchTileHtml = (card, index, quantities, owned) => {
+      const previewImage = card.images?.large || card.images?.small || card.image || '';
+      const thumbImage = tileScanUrl(card.images?.small || card.image || '');
+      const setName = escapeHtml(card.set?.name || 'Unknown Set');
+      const qty = quantities[card.id] || 0;
+
+      // Image-first, as in Pokémon TCG Live: the card scan IS the tile.
+      // The name/set caption stays in the DOM for screen readers and for
+      // the light theme, but reads as a hover-in footer over the art.
+      // data-in-deck comes last so a patched attribute lands in the same position.
+      return `
+            <button class="native-deck-builder-result" data-card-id="${escapeHtml(card.id)}" data-result-index="${index}"${previewImage ? ` data-preview-image="${escapeHtml(previewImage)}"` : ''} title="${escapeHtml(card.name)} · ${setName}"${qty > 0 ? ` data-in-deck="${qty}"` : ''}>
+              <span class="native-deck-builder-result-frame">
+                <img src="${escapeHtml(thumbImage)}" alt="${escapeHtml(card.name)}" class="native-deck-builder-result-image" loading="lazy" />${searchBadgesHtml(qty, owned[card.id])}<span class="native-deck-builder-result-text">
                   <strong>${escapeHtml(card.name)}</strong>
                   <span>${setName}</span>
                 </span>
               </span>
             </button>
           `;
-        })
-        .join('');
-    
-      searchResultsEl.querySelectorAll('[data-result-index]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const card = results[Number(button.dataset.resultIndex)];
-          onSelect(card);
-        });
+    };
+
+    const handleSearchGridClick = (event) => {
+      const grid = event.currentTarget;
+      const button = event.target.closest('[data-result-index]');
+      const state = renderedSearchGrids.get(grid);
+      if (!button || !state || !grid.contains(button)) return;
+      state.onSelect(state.results[Number(button.dataset.resultIndex)]);
+    };
+
+    // Swaps the nodes between the image and the caption for freshly parsed badge markup.
+    const replaceTileBadges = (button, badgesHtml) => {
+      const img = button.querySelector('.native-deck-builder-result-image');
+      const text = button.querySelector('.native-deck-builder-result-text');
+      if (!img || !text) return;
+
+      let node = img.nextSibling;
+      while (node && node !== text) {
+        const next = node.nextSibling;
+        node.remove();
+        node = next;
+      }
+      const template = button.ownerDocument.createElement('template');
+      template.innerHTML = badgesHtml;
+      text.before(template.content);
+    };
+
+    const patchSearchBadges = (grid, results, quantities, owned) => {
+      grid.querySelectorAll('[data-result-index]').forEach((button) => {
+        const card = results[Number(button.dataset.resultIndex)];
+        const qty = quantities[card.id] || 0;
+        if (qty > 0) button.dataset.inDeck = String(qty);
+        else delete button.dataset.inDeck;
+        replaceTileBadges(button, searchBadgesHtml(qty, owned[card.id]));
       });
     };
-    
+
+    export const renderSearchResults = ({ searchResultsEl, results, onSelect, quantities = {}, owned = {} }) => {
+      if (!searchResultsEl) return;
+
+      const previous = renderedSearchGrids.get(searchResultsEl);
+      if (!previous) searchResultsEl.addEventListener('click', handleSearchGridClick);
+
+      const nextResults = results || [];
+      const key = searchResultsKey(nextResults);
+      if (previous?.key === key) {
+        patchSearchBadges(searchResultsEl, nextResults, quantities, owned);
+      } else {
+        searchResultsEl.innerHTML = nextResults
+          .map((card, index) => searchTileHtml(card, index, quantities, owned))
+          .join('');
+      }
+      renderedSearchGrids.set(searchResultsEl, { key, results: nextResults, onSelect });
+    };
+
     const HP_SLIDER = { min: 0, max: 400, step: 10 };
 
     const isOptionOn = (group, option, filters) => {
@@ -133,6 +185,13 @@ const escapeHtml = (value = '') => String(value)
     }) => {
       if (!drawerEl) return;
 
+      // Every toggle redraws the drawer. Without carrying the body's scroll
+      // position and the focused control over, each click below the fold jumps
+      // the list back to the top and drops keyboard focus.
+      const controlsOf = () => [...drawerEl.querySelectorAll('button, input')];
+      const focusIndex = controlsOf().indexOf(drawerEl.ownerDocument?.activeElement);
+      const scrollTop = drawerEl.querySelector('.native-deck-builder-fdrawer-body')?.scrollTop || 0;
+
       const sections = groups
         .map((group) => {
           const options = group.dynamic === 'sets' ? setOptions : group.options;
@@ -163,6 +222,10 @@ const escapeHtml = (value = '') => String(value)
           <button type="button" class="native-deck-builder-fdrawer-reset" data-fdrawer-reset>Reset</button>
           <button type="button" class="native-deck-builder-fdrawer-apply" data-fdrawer-apply>Apply filters</button>
         </div>`;
+
+      const drawerBody = drawerEl.querySelector('.native-deck-builder-fdrawer-body');
+      if (drawerBody) drawerBody.scrollTop = scrollTop;
+      if (focusIndex >= 0) controlsOf()[focusIndex]?.focus({ preventScroll: true });
 
       drawerEl.querySelectorAll('[data-filter-value]').forEach((control) => {
         control.addEventListener('click', () => {

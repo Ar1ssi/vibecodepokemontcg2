@@ -1,7 +1,7 @@
 # Handoff — design 034 slice 3 (ability gates & suppression)
 
 Written S279 (2026-09-24) at user request, mid-build. Slices 1–2 are committed; slice 3 is not
-started. Read `.agent/designs/034-ability-behaviour-implementation.md` first, then this file.
+started. Read `.agent/designs/archive/034-ability-behaviour-implementation.md` first, then this file.
 
 ## Where things are
 

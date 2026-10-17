@@ -1,7 +1,7 @@
 # Area: netcode (client transport, authoritative view adapters, mat FX)
 <!-- Cap 60 lines. Moved out of MAP.md on 2026-09-24 (S286) to keep MAP under cap.
      Server side: server/server.js (HTTP + Socket.IO) → server/game/room.mjs (GameRoom: applies
-     commands to shared/engine state, sends per-player views); shadow.mjs, sync-check.mjs beside it. -->
+     commands to shared/engine state, sends per-player views); deck-packet.mjs, sync-check.mjs beside it. -->
 Purpose: how client actions reach the server and how server views/events render back.
 
 ## Legacy transport (flag-off relay path)

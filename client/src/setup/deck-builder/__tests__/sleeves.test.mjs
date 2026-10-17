@@ -8,6 +8,7 @@ import {
   getSleeves,
   getSleeveById,
   filterSleevesByName,
+  loadSleeveCatalog,
   ownedFirst,
 } from '../core/sleeves.mjs';
 import {
@@ -15,6 +16,8 @@ import {
   createEmptyLibrary,
   setDeckSleeve,
 } from '../core/deck-library.mjs';
+
+await loadSleeveCatalog();
 
 // Sleeve urls are site-rooted (`/src/assets/...`); `client/` is the site root.
 const CLIENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
@@ -60,7 +63,9 @@ test('coin catalog: all 939 Pokemon coins with data', async () => {
   const {
     COIN_MATERIALS,
     getCoins,
+    loadCoinCatalog,
   } = await import('../core/coins.mjs');
+  await loadCoinCatalog();
   const coins = getCoins();
   assert.equal(coins.length, 939);
 

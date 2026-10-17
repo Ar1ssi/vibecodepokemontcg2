@@ -1,14 +1,14 @@
 /**
  * @file Design 002 slice 3.5 — the Phase 3A exit test.
  * Replays a real recorded 2-player legacy trace (server/game/__tests__/fixtures/
- * legacy-2p-recorded.json, produced by record-legacy-2p-fixture.mjs against a live
+ * legacy-2p-recorded.json, produced by scripts/e2e/record-legacy-2p-fixture.mjs against a live
  * server started with SERVER_AUTHORITATIVE=1 + two Playwright browsers) through a fresh
  * GameRoom via the actual production translation path (translateActionToCmd from
  * client/src/setup/netcode/dual-run-bridge.js), and asserts hashState(room.state, playerId)
  * agrees with the client's own recorded boardHash after every step. Structural mismatch
  * here means 3A is not done.
  *
- * rulesEnabled: false, matching ShadowSession's existing precedent (shadow.mjs) — turn-order
+ * rulesEnabled: false, as the former shadow-mode GameRoom ran — turn-order
  * and coin-flip resolution are a client-driven rules-mode feature outside design 002's command
  * scope, not something this harness's independently-seeded 'setup' call can reproduce.
  *
@@ -26,7 +26,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GameRoom } from '../room.mjs';
-import { extractDeckData } from '../shadow.mjs';
+import { extractDeckData } from '../deck-packet.mjs';
 import { hashState } from '../../../shared/engine/state.mjs';
 import {
   translateActionToCmd,

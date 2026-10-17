@@ -1,9 +1,10 @@
-// One-shot / repeatable normalizer for client/src/setup/deck-builder/core/coins.mjs.
+// One-shot / repeatable normalizer for the coin catalog, client/src/assets/catalogs/coins.json
+// (read on demand by client/src/setup/deck-builder/core/coins.mjs).
 //
 // The S218 Bulbapedia merge (commit a9bb70a) produced a catalog with duplicate ids,
 // a polluted `release` field ("date\t<date>"), and metal coins misclassified as enamel.
-// This script applies a deterministic, idempotent transform and rewrites the data block,
-// preserving the file header/footer and each entry's key order.
+// This script applies a deterministic, idempotent transform and rewrites the file,
+// preserving each entry's key order.
 //
 //   node scripts/normalize-coin-catalog.mjs [--check]
 //
@@ -13,10 +14,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-import { getCoins } from '../client/src/setup/deck-builder/core/coins.mjs';
-
 const HERE = dirname(fileURLToPath(import.meta.url));
-const CATALOG_PATH = resolve(HERE, '../client/src/setup/deck-builder/core/coins.mjs');
+export const CATALOG_PATH = resolve(HERE, '../client/src/assets/catalogs/coins.json');
 
 const MONTHS = {
   january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
@@ -117,40 +116,16 @@ export function normalizeCoins(input) {
   return { coins, report: { total: coins.length, dropped, rekeyed, cleaned, reclassified } };
 }
 
-/** Rebuild the `const COIN_CATALOG = [...]` block, preserving header, footer and EOL style. */
-export function renderCatalog(source, coins) {
-  const eol = source.includes('\r\n') ? '\r\n' : '\n';
-  const lfSource = source.replace(/\r\n/g, '\n');
-
-  const startMarker = 'const COIN_CATALOG = [';
-  const start = lfSource.indexOf(startMarker);
-  if (start === -1) throw new Error('COIN_CATALOG array not found in catalog');
-
-  const endMarker = '\n];';
-  const end = lfSource.indexOf(endMarker, start);
-  if (end === -1) throw new Error('COIN_CATALOG array terminator not found');
-
-  // Serialize the whole array at indent 1, then drop the outer [ ] lines so the
-  // result slots back under `const COIN_CATALOG = [`.
-  const serialized = JSON.stringify(coins, null, 1);
-  const inner = serialized.slice(serialized.indexOf('\n') + 1, serialized.lastIndexOf('\n'));
-
-  const rebuilt =
-    lfSource.slice(0, start) +
-    startMarker +
-    '\n' +
-    inner +
-    endMarker +
-    lfSource.slice(end + endMarker.length);
-
-  return eol === '\n' ? rebuilt : rebuilt.replace(/\n/g, eol);
+/** The catalog file's text: the array at indent 1, one key per line, LF. */
+export function renderCatalog(coins) {
+  return `${JSON.stringify(coins, null, 1)}\n`;
 }
 
 function main() {
   const check = process.argv.includes('--check');
   const source = readFileSync(CATALOG_PATH, 'utf8');
-  const { coins, report } = normalizeCoins(getCoins());
-  const next = renderCatalog(source, coins);
+  const { coins, report } = normalizeCoins(JSON.parse(source));
+  const next = renderCatalog(coins);
 
   console.log('Coin catalog normalization report:');
   console.log(`  entries:        ${report.total}`);

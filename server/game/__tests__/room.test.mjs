@@ -431,14 +431,6 @@ test('loadDeck: a string quantity from a real decklist loads that many cards', (
   assert.deepEqual(cards.map((c) => c.syncInstance), [0, 1, 2, 3, 4, 5]);
 });
 
-test('initializePlayerDeck (shadow): a string quantity loads that many cards', async () => {
-  const { initializePlayerDeck } = await import('../shadow.mjs');
-  const room = new GameRoom({ roomId: 'shadow-quantity', rulesEnabled: false });
-  room.addPlayer('sock-a', 'p1', 'Ash');
-  initializePlayerDeck(room.state, 'p1', [['3', 'Pikachu', 'Pokémon', 'u', '001', 'e2e', 'x-1']]);
-  assert.equal(room.state.players.p1.zones.deck.length, 3);
-});
-
 test('seed: GameRoom initializes with a fresh seed and resetGame generates a new seed so card shuffles differ', () => {
   const fullDeck = Array.from({ length: 60 }, (_, i) => [
     1,

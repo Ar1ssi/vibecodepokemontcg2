@@ -1,13 +1,23 @@
 // Card sleeves for the deck builder: TCG Live's own sleeves, imported from the game extract by
-// scripts/import-tcgl-sleeves.py into tcgl-sleeves.generated.mjs and client/src/assets/sleeves/tcgl/.
-import { TCGL_SLEEVES } from './tcgl-sleeves.generated.mjs';
+// scripts/import-tcgl-sleeves.py into client/src/assets/catalogs/tcgl-sleeves.json and
+// client/src/assets/sleeves/tcgl/. The catalog loads on demand (design 073 § D): until
+// `loadSleeveCatalog()` resolves, the getters below see an empty catalog.
+import { loadCatalog, loadedCatalog } from './catalog-loader.mjs';
+
+const CATALOG = 'tcgl-sleeves';
+const tcglSleeves = () => loadedCatalog(CATALOG) ?? [];
+
+/** The sleeve catalog in memory; resolves once, and a failed load is retried next call. */
+export const loadSleeveCatalog = () => loadCatalog(CATALOG).then(() => undefined);
+
+export const sleeveCatalogLoaded = () => loadedCatalog(CATALOG) !== undefined;
 
 export function getSleeves() {
-  return TCGL_SLEEVES.map((sleeve) => ({ ...sleeve }));
+  return tcglSleeves().map((sleeve) => ({ ...sleeve }));
 }
 
 export function getSleeveById(id) {
-  const sleeve = TCGL_SLEEVES.find((entry) => entry.id === id);
+  const sleeve = tcglSleeves().find((entry) => entry.id === id);
   return sleeve ? { ...sleeve } : null;
 }
 

@@ -35,7 +35,7 @@ Inside `shared/engine/`:
 
 | File | Role | Plain-English meaning |
 |---|---|---|
-| `reduce.mjs` | `applyCommand()` (line ~8654) | The **state machine**. Takes the current game state plus one command (for example `playTrainer`), checks legality, and returns the new state. This is the main entry point. |
+| `reduce.mjs` | `applyCommand()` (line ~109) | The **state machine**. Takes the current game state plus one command (for example `playTrainer`), checks legality, and returns the new state. This is the main entry point. |
 | `commands.mjs` | command schemas | The list of valid command types and their payload shapes. |
 | `cards.mjs` | `createCard()` | Builds one card object from card data. |
 | `state.mjs` | game state model | The board: players, zones (`hand`, `deck`, `active`, `bench`, `discard`, `prizes`, ...). |
@@ -52,10 +52,10 @@ Keeping these apart is why a bug in one stage can usually be fixed without touch
 
 ### Which mode runs the engine?
 
-- The server runs `reduce.mjs` through `server/game/room.mjs`. Start the server with `SERVER_AUTHORITATIVE=1` to make the server the referee. This is the path the tests and the audits cover best.
+- The server runs `reduce.mjs` through `server/game/room.mjs`. The server is the referee by default (`SERVER_AUTHORITATIVE=0` turns it off). This is the path the tests and the audits cover best.
 - The browser also imports the same parsers (`rules/abilities.mjs`, `rules/rules-state.mjs`, and others) for its own checks and UI. So a parser fix affects both paths.
 
-If you are not sure which path a bug comes from, run the server with `SERVER_AUTHORITATIVE=1` and try again.
+If you are not sure which path a bug comes from, reproduce it on a default (server-authoritative) server.
 
 ---
 
@@ -69,8 +69,8 @@ client click
   -> applyCommand(state, command, rng)            shared/engine/reduce.mjs
        1. shape check (is the command well formed?)
        2. turn gate / pending-choice gate (is it this player's turn? is the game waiting on a choice?)
-       3. legality check (validateLegality, reduce.mjs ~4549)
-       4. the 'playTrainer' case (reduce.mjs ~9644)
+       3. legality check (validateLegality, reduce/legality.mjs ~612)
+       4. the 'playTrainer' case -> playTrainerCommand (reduce/trainer.mjs)
             -> executeTrainer(...)                 shared/engine/effects/trainer.mjs
                  -> parseTrainerEffect(card text)  shared/engine/rules/trainer-effects.mjs
                  -> executeSteps(steps)            shared/engine/effects/executor.mjs
@@ -85,7 +85,8 @@ Things to notice:
 - **`error` is set when the command is refused.** Common values include `bad_command`, `stale_view`, and `card_data_pending`. Check the `reason` field for detail.
 - **The step runner is resumable.** `executeSteps` can stop in the middle, store where it is in `resumeToken`, and continue after the player picks. That is why a multi-step Trainer can ask two questions in a row.
 
-To find the entry for a command type, search `reduce.mjs` for the `case '<type>':` line.
+To find the entry for a command type, search `reduce.mjs` for the `case '<type>':` line; it calls that
+command's `<type>Command` handler in `shared/engine/reduce/<domain>.mjs`.
 
 ---
 
@@ -286,7 +287,7 @@ Decide which stage is wrong:
 | Steps are present but with the wrong numbers or flags (e.g. `count: 1` should be "any number") | **Parser**: a template reads the wording too narrowly or too broadly | Same files, find the template that produced it |
 | Steps look right but the game does the wrong thing | **Executor**: the handler is wrong | `effects/trainer-steps.mjs`, `effects/attack-steps.mjs`, `effects/executor.mjs` |
 | The WotC (old) wording of the card fails, the modern one works | **Legacy rewrite** | `rules/legacy-trainer-wording.mjs`, `rules/legacy-attack-wording.mjs`, `rules/legacy-power-wording.mjs` |
-| Legal action is refused with an error | **Legality gate** | `reduce.mjs` `validateLegality` (line ~4549) and `trainer-play-conditions.mjs` |
+| Legal action is refused with an error | **Legality gate** | `reduce/legality.mjs` `validateLegality` (line ~612) and `trainer-play-conditions.mjs` |
 
 ### Step 4. Write a failing test first
 
@@ -393,8 +394,8 @@ These come from the project's landmine notes and the code. Read them before you 
 | I want to... | Go to |
 |---|---|
 | Find a card's printed text | `out/pkmn-trainer-cards.json`, `out/pkmn-pokemon-cards.json` |
-| See the entry point for all commands | `shared/engine/reduce.mjs` `applyCommand` (~8654) |
-| Check whether an action is legal | `reduce.mjs` `validateLegality` (~4549) |
+| See the entry point for all commands | `shared/engine/reduce.mjs` `applyCommand` (~109) |
+| Check whether an action is legal | `reduce/legality.mjs` `validateLegality` (~612) |
 | Read a Trainer's text into steps | `shared/engine/rules/trainer-effects.mjs` `parseTrainerEffect` (~1319) |
 | Read an attack clause into steps | `shared/engine/rules/attack-steps.mjs` `parseAttackSteps` (~1760) and its `TEMPLATES` list (~154) |
 | Read attack damage | `shared/engine/rules/damage-parser.mjs` |

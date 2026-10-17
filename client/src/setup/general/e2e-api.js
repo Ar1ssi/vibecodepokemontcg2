@@ -1,10 +1,7 @@
 import { socket, systemState } from '../../state.js';
 import { readyUp } from '../../actions/general/ready.js';
 import { loadDeckData } from '../deck-constructor/import.js';
-import { getZone } from '../zones/get-zone.js';
 import {
-  getAuthoritativeZoneArray,
-  getAuthoritativeStadiumArray,
   getLastRenderedVersion,
   getCardRegistry,
   hasAuthoritativeView,
@@ -17,6 +14,7 @@ import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { evolvedView } from '/shared/engine/rules/evolved-pokemon.mjs';
 import { isEnergy } from '/shared/engine/cards.mjs';
 import { enumerateOptions } from './e2e-options.mjs';
+import { liveZoneArray } from '../zones/live-zone-array.js';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
 import { persistRulesEnabled } from '/shared/engine/rules/rules-state.mjs';
 import {
@@ -57,21 +55,6 @@ const PUBLIC_PLAYER_ZONES = ['active', 'bench', 'discard', 'lostZone', 'board'];
 // hand/prizes stay comparable by length (the stubs are 1:1 with the real cards); deck is
 // not — it arrives as { count } rather than an array, so it has no length to compare.
 const SECRET_PLAYER_ZONES = ['hand', 'prizes'];
-
-// Design 002 I24: legacy getZone's zoneArrays are never populated under
-// server-authoritative rendering (I15) — once the renderer has applied at
-// least one view, that view (cached in apply-view.js) is the real live
-// source; before that (legacy/1P mode, or before the first view arrives),
-// legacy getZone is still correct and is kept as the fallback.
-function liveZoneArray(user, zoneId) {
-  if (hasAuthoritativeView()) {
-    const side = user === 'self' ? 'you' : 'them';
-    return zoneId === 'stadium'
-      ? getAuthoritativeStadiumArray()
-      : getAuthoritativeZoneArray(side, zoneId);
-  }
-  return getZone(user, zoneId)?.array || [];
-}
 
 function zoneSnapshot(user, zoneId) {
   const cards = liveZoneArray(user, zoneId);

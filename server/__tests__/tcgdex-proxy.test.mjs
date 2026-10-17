@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { gunzipSync } from 'node:zlib';
 import {
   canonicalTcgdexPath,
   createTcgdexProxy,
+  tcgdexProxyHandler,
   ttlForTcgdexPath,
 } from '../tcgdex-proxy.mjs';
 
@@ -113,4 +115,87 @@ test('the cache is bounded (LRU)', async () => {
   await proxy.get('/v2/en/cards/b');
   await proxy.get('/v2/en/cards/c');
   assert.equal(proxy.size(), 2);
+});
+
+const LARGE_BODY = JSON.stringify(
+  Array.from({ length: 200 }, (_, i) => ({ id: `sv08-${i}`, name: 'Pikachu' }))
+);
+
+const fakeReq = (accepts, path = '/api/tcgdex/v2/en/cards', query = { name: 'pikachu' }) => ({
+  path,
+  query,
+  acceptsEncodings: (encoding) => (accepts && encoding === 'gzip' ? 'gzip' : false),
+});
+
+function fakeRes() {
+  return {
+    headers: {},
+    statusCode: 200,
+    body: undefined,
+    setHeader(name, value) {
+      this.headers[name.toLowerCase()] = value;
+    },
+    type(value) {
+      this.headers['content-type'] = value;
+      return this;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    send(body) {
+      this.body = body;
+      return this;
+    },
+    json(body) {
+      this.body = JSON.stringify(body);
+      return this;
+    },
+  };
+}
+
+test('a large JSON response is gzipped for a client that accepts gzip', async () => {
+  const { impl } = fakeFetch(() => ({ status: 200, body: LARGE_BODY }));
+  const handler = tcgdexProxyHandler(createTcgdexProxy({ fetchImpl: impl }));
+  const res = fakeRes();
+  await handler(fakeReq(true), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['content-encoding'], 'gzip');
+  assert.equal(res.headers.vary, 'Accept-Encoding');
+  assert.equal(res.headers['content-type'], 'application/json');
+  assert.equal(gunzipSync(res.body).toString(), LARGE_BODY);
+});
+
+test('a large JSON response is sent plain to a client that does not accept gzip', async () => {
+  const { impl } = fakeFetch(() => ({ status: 200, body: LARGE_BODY }));
+  const handler = tcgdexProxyHandler(createTcgdexProxy({ fetchImpl: impl }));
+  const res = fakeRes();
+  await handler(fakeReq(false), res);
+  assert.equal(res.headers['content-encoding'], undefined);
+  assert.equal(res.body, LARGE_BODY);
+});
+
+test('a small JSON response is sent plain even to a client that accepts gzip', async () => {
+  const { impl } = fakeFetch(() => ({ status: 200, body: '{"id":"small"}' }));
+  const handler = tcgdexProxyHandler(createTcgdexProxy({ fetchImpl: impl }));
+  const res = fakeRes();
+  await handler(fakeReq(true), res);
+  assert.equal(res.headers['content-encoding'], undefined);
+  assert.equal(res.body, '{"id":"small"}');
+});
+
+test('a cached entry is compressed once and every reader gets the same buffer', async () => {
+  const { impl, calls } = fakeFetch(() => ({ status: 200, body: LARGE_BODY }));
+  const proxy = createTcgdexProxy({ fetchImpl: impl });
+  const first = await proxy.get('/v2/en/cards?name=pikachu');
+  const second = await proxy.get('/v2/en/cards?name=pikachu');
+  assert.equal(calls.length, 1);
+  assert.equal(await first.gzip(), await second.gzip());
+});
+
+test('404 and upstream-failure results are never gzipped', async () => {
+  const { impl } = fakeFetch([{ status: 404, body: '{"error":"not found"}' }, new Error('reset')]);
+  const proxy = createTcgdexProxy({ fetchImpl: impl });
+  assert.equal((await proxy.get('/v2/en/cards/missing')).gzip, null);
+  assert.equal((await proxy.get('/v2/en/cards/flaky')).gzip, null);
 });

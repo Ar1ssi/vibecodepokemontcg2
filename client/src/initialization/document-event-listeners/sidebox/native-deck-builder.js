@@ -4,7 +4,10 @@ import {
   parseSimCsv,
   serializeDeckToSimCsv,
 } from '../../../setup/deck-builder/core/csv-adapter.mjs';
-import { getSortedDeckCardArray } from '../../../setup/deck-builder/core/card-sort.mjs';
+import {
+  getSortedDeckCardArray,
+  uniqueDeckCards,
+} from '../../../setup/deck-builder/core/card-sort.mjs';
 import { buildDeckExportDocument } from '../../../setup/deck-builder/core/deck-export.mjs';
 import { getDeckCounterModel } from '../../../setup/deck-builder/core/deck-counter.mjs';
 import {
@@ -100,7 +103,15 @@ import { EMPTY_PREFS } from '../../../setup/deck-builder/core/deck-suggest/prefs
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
 import { initializeDeckBuilderCoinPicker } from './native-deck-builder-coin-picker.js';
 import { initializeDeckBuilderMatPicker } from './native-deck-builder-mat-picker.js';
-import { getCoinById, getCoins, getTcglCoins } from '../../../setup/deck-builder/core/coins.mjs';
+import {
+  DEFAULT_COIN,
+  coinCatalogLoaded,
+  getCoinById,
+  getCoins,
+  getTcglCoins,
+  loadCoinCatalog,
+} from '../../../setup/deck-builder/core/coins.mjs';
+import { whenLoaded } from '../../../setup/deck-builder/core/catalog-loader.mjs';
 import { coinArtUrl } from '../../../setup/deck-builder/core/coin-effects.mjs';
 import { initializeDeckBuilderBoxPicker } from './native-deck-builder-box-picker.js';
 import { initializeCustomizeStage } from '../../../setup/deck-builder/core/customize-stage/customize-stage.js';
@@ -123,7 +134,11 @@ import {
   saveLastSession,
 } from '../../../setup/deck-builder/core/last-session.mjs';
 import { changePlaymat } from '../../../setup/sizing/apply-mat-layout.js';
-import { getSleeves } from '../../../setup/deck-builder/core/sleeves.mjs';
+import {
+  getSleeves,
+  loadSleeveCatalog,
+  sleeveCatalogLoaded,
+} from '../../../setup/deck-builder/core/sleeves.mjs';
 import { updateReadyButtons } from '../../../actions/general/ready.js';
 import {
   LEGACY_DEFAULT_CARD_BACK_SRC,
@@ -290,6 +305,11 @@ export const initializeNativeDeckBuilder = ({
     const side = target === 'opp' ? 'opp' : 'self';
     chosenCosmetics[side][key] = value;
   };
+  // Coins and sleeves are JSON loaded on demand (design 073). Work that reads them runs at once when
+  // both are in memory, exactly as when they were modules, else as soon as they land.
+  const cosmeticsLoaded = () => coinCatalogLoaded() && sleeveCatalogLoaded();
+  const loadCosmetics = () => Promise.all([loadCoinCatalog(), loadSleeveCatalog()]);
+  const withCosmetics = (fn) => whenLoaded(cosmeticsLoaded, loadCosmetics, fn, 'deck builder');
   // Suggest tab (design 069). Assigned once the panel boots; render() refreshes it.
   let suggestPanel = null;
   let noteDeckReplaced = () => {};
@@ -399,9 +419,13 @@ export const initializeNativeDeckBuilder = ({
     // last load, then shows the active deck's sleeve on the playmat.
     deckDirty = true;
     loadCurrentDeck();
-    const sleeveId = deckLibrary?.getActiveSleeve?.(target);
-    const sleeve = sleeveId ? getSleeves().find((entry) => entry.id === sleeveId) : null;
-    gameLink.changeCardBack(target, sleeve?.image || resolveDefaultCardBackSrc(), false);
+    // With the catalogs in (always, but for the first moments after boot) this keeps its order: card
+    // back, then play. Play itself never waits for them.
+    withCosmetics(() => {
+      const sleeveId = deckLibrary?.getActiveSleeve?.(target);
+      const sleeve = sleeveId ? getSleeves().find((entry) => entry.id === sleeveId) : null;
+      gameLink.changeCardBack(target, sleeve?.image || resolveDefaultCardBackSrc(), false);
+    });
     gameLink.play(target);
   });
 
@@ -604,6 +628,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         // Set browser only in browse mode (lazy-load on first open)
         if (browserPanel) {
           browserPanel.hidden = !isBrowse;
+          if (isBrowse && browseIsStale) {
+            browseIsStale = false;
+            setBrowser?.setCardFilters(cardFilters);
+          }
           if (isBrowse) setBrowser?.load();
         }
     
@@ -816,7 +844,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               coinName: coin?.name ?? 'Default',
             };
           };
-          // Arrows step the picked category through its catalog, as TCG Live's do.
+          // Arrows step the picked category through its catalog, as TCG Live's do. Without the
+          // sleeve or coin catalog (a failed load) there is nothing to step to, and stepping an
+          // empty list would clear the deck's saved pick.
           const stepCosmetic = (slot, dir) => {
             if (slot === 'box') {
               const catalog = boxPicker?.catalog();
@@ -825,17 +855,23 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               boxPicker.setSelected(id);
               applyDeckBox(id ? boxById(catalog, id) : null);
             } else if (slot === 'sleeve') {
-              const ids = [null, ...getSleeves().map((entry) => entry.id)];
-              const at = Math.max(0, ids.indexOf(currentCosmeticId('sleeveId', deckLibrary?.getActiveSleeve)));
-              const id = ids[nextIndex(at, dir, ids.length)];
-              sleevePicker?.setSelected(id);
-              applySleeve(id ? getSleeves().find((entry) => entry.id === id) : null);
+              withCosmetics(() => {
+                if (!cosmeticsLoaded()) return;
+                const ids = [null, ...getSleeves().map((entry) => entry.id)];
+                const at = Math.max(0, ids.indexOf(currentCosmeticId('sleeveId', deckLibrary?.getActiveSleeve)));
+                const id = ids[nextIndex(at, dir, ids.length)];
+                sleevePicker?.setSelected(id);
+                applySleeve(id ? getSleeves().find((entry) => entry.id === id) : null);
+              });
             } else if (slot === 'coin') {
-              const ids = [null, ...getTcglCoins().map((entry) => entry.id), ...getCoins().map((entry) => entry.id)];
-              const at = Math.max(0, ids.indexOf(currentCosmeticId('coinId', deckLibrary?.getActiveCoin)));
-              const id = ids[nextIndex(at, dir, ids.length)];
-              coinPicker?.setSelected(id);
-              applyCoin(id ? getCoinById(id) : null);
+              withCosmetics(() => {
+                if (!cosmeticsLoaded()) return;
+                const ids = [null, ...getTcglCoins().map((entry) => entry.id), ...getCoins().map((entry) => entry.id)];
+                const at = Math.max(0, ids.indexOf(currentCosmeticId('coinId', deckLibrary?.getActiveCoin)));
+                const id = ids[nextIndex(at, dir, ids.length)];
+                coinPicker?.setSelected(id);
+                applyCoin(id ? getCoinById(id) : null);
+              });
             }
           };
           customizeStage = initializeCustomizeStage({
@@ -843,6 +879,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             getSelection: stageSelection,
             onStep: stepCosmetic,
           });
+          // Until the catalogs land the stage names the default sleeve and coin; then it redraws.
+          if (!cosmeticsLoaded()) withCosmetics(() => customizeStage?.refresh());
 
       // Customize switcher: Deck Box <-> Card Sleeve <-> Coin <-> Mat toggle + shared filter
           // ── playmat sleeve application ─────────────────────────────────
@@ -909,7 +947,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           // ── per-deck customization restore ─────────────────────────────
           // Board-side only (restoreLastUsedDeckToPlaymat): the game tab
           // restores the sleeve of the deck it holds.
-          const syncCustomizationToDeck = () => {
+          const syncCustomizationToDeck = () => withCosmetics(() => {
             // sleeve -> playmat card back via the library's own data
             const sleeveId = deckLibrary?.getActiveSleeve?.(currentLoadTarget);
             const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
@@ -920,7 +958,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             // emit=false: runs locally on init/switch; do not broadcast on load.
             if (backImage) changeCardBack(currentLoadTarget, backImage, false);
             document.dispatchEvent(new CustomEvent('deck-sleeve-changed', { detail: { target: currentLoadTarget, image: backImage } }));
-          };
+          });
     
           const customizeSwitcher = document.getElementById('nativeDeckBuilderCustomizeSwitcher');
           const customizeFilter = document.getElementById('nativeDeckBuilderCustomizeFilter');
@@ -1005,12 +1043,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       // Reflect the active deck's coin when decks switch, and let the
       // rules engine know (for the match-start turn-order coin flip) even
       // if the player never opens the coin picker this session.
-      const refreshCoinSelection = () => {
+      const refreshCoinSelection = () => withCosmetics(() => {
         const coinId = deckLibrary?.getActiveCoin?.(currentLoadTarget) || null;
         const coin = coinId ? getCoinById(coinId) : null;
         coinPicker?.setSelected(coinId);
         gameLink.announceCoin(currentLoadTarget, coin);
-      };
+      });
 
       // Reflect the active deck's mat when decks switch, and re-announce it
       // so the board picks the mat up even if the player never opens the mat
@@ -1056,6 +1094,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let draftFilters = createEmptyFilters();
   let activeMode = 'search';
   let searchIsStale = false;
+  let browseIsStale = false;
   // One Filters button and chip strip per tab, one shared drawer.
   const filtersButtons = [
     document.getElementById('nativeDeckBuilderFiltersButton'),
@@ -1074,6 +1113,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   let currentDetailedCount = 0;
   let currentHugeResultSet = false;
   let hasSearched = false;
+  // true while the Search grid lists the deck itself ("In current deck" with nothing to fetch).
+  let searchListsDeck = false;
   let latestSearchId = 0;
   let deckDirty = false;
   let flashFrame = null;
@@ -1124,21 +1165,28 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   };
 
   const getSearchStatusText = () => {
+    if (searchListsDeck) {
+      return currentResults.length
+        ? `Showing ${currentResults.length} card(s) from your deck.`
+        : 'No cards in your deck match these filters.';
+    }
     if (currentHugeResultSet) {
       return `Too many matches (${currentTotalSummaries}). Add a card name or more filters.`;
     }
     if (currentResults.length === 0) return 'No matching cards found.';
     if (currentDetailedCount < currentTotalSummaries) {
-      return `Showing ${currentResults.length} card(s) from the first ${currentDetailedCount} of ${currentTotalSummaries} matches. Add filters to narrow it down.`;
+      return `Showing ${currentResults.length} card(s) from the newest ${currentDetailedCount} of ${currentTotalSummaries} matches. Add filters to narrow it down.`;
     }
     return `Showing ${currentResults.length} card(s). Click a card to add it.`;
   };
 
-  // The one way filters change: both tabs follow. A hidden Search tab
-  // re-runs when it is next shown rather than fetching now.
+  // The one way filters change: both tabs follow. A hidden tab re-filters
+  // when it is next shown rather than fetching now, so its pass never competes
+  // with the shown tab's for the TCGdex proxy's few upstream slots.
   const applyCardFilterState = (nextFilters) => {
     cardFilters = nextFilters;
-    setBrowser?.setCardFilters(cardFilters);
+    if (activeMode === 'browse') setBrowser?.setCardFilters(cardFilters);
+    else browseIsStale = true;
     if (activeMode === 'search') {
       runSearch();
     } else {
@@ -1172,8 +1220,11 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   };
 
   const renderResults = () => {
+    // The deck listing follows the deck: added cards appear, removed ones go.
+    if (searchListsDeck) currentRawResults = uniqueDeckCards(deck);
     // Re-filter on every render: "In current deck" follows the deck as it changes.
     if (hasSearched) updateVisibleResults();
+    if (searchListsDeck) searchStatus.textContent = getSearchStatusText();
     renderSearchResults({
       searchResultsEl: searchResults,
       results: currentResults,
@@ -1710,6 +1761,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     currentDetailedCount = 0;
     currentHugeResultSet = false;
     hasSearched = false;
+    searchListsDeck = false;
   };
 
   // A name, the filters TCGdex can apply, or both (design 050). Only the
@@ -1718,8 +1770,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     const term = searchInput.value.trim();
     const params = buildTcgdexFilterParams(cardFilters);
     const searchId = ++latestSearchId;
+    searchListsDeck = false;
 
     if (!term && Object.keys(params).length === 0) {
+      // This run supersedes any search in flight, whose finally will not re-enable the button.
+      searchButton.disabled = false;
+      // "In current deck" needs no fetch: the deck already holds those cards.
+      if (cardFilters.inDeck) {
+        searchListsDeck = true;
+        currentRawResults = uniqueDeckCards(deck);
+        currentTotalSummaries = currentRawResults.length;
+        currentDetailedCount = currentRawResults.length;
+        currentHugeResultSet = false;
+        hasSearched = true;
+        updateVisibleResults();
+        searchStatus.textContent = getSearchStatusText();
+        render();
+        return;
+      }
       clearSearchResults();
       searchStatus.textContent = hasActiveFilters(cardFilters)
         ? 'Add a card name, or a Format, Type, Stage, HP, Rarity or Regulation mark filter, to search.'
@@ -1731,8 +1799,27 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     searchButton.disabled = true;
     searchStatus.textContent = term ? `Searching for “${term}”...` : 'Searching with your filters...';
 
+    // Records arrive over a few seconds: show what has loaded, at most every 250 ms.
+    let progressTimer = null;
+    let latestProgress = null;
+    const showProgress = (progress) => {
+      latestProgress = progress;
+      if (progressTimer) return;
+      progressTimer = setTimeout(() => {
+        progressTimer = null;
+        if (searchId !== latestSearchId) return;
+        currentRawResults = latestProgress.results;
+        currentTotalSummaries = latestProgress.totalSummaries;
+        currentDetailedCount = latestProgress.detailedCount;
+        currentHugeResultSet = false;
+        hasSearched = true;
+        renderResults();
+        searchStatus.textContent = `Loading cards… ${latestProgress.results.length} of ${latestProgress.detailedCount}`;
+      }, 250);
+    };
+
     try {
-      const searchResponse = await queryCards({ term, params });
+      const searchResponse = await queryCards({ term, params, onProgress: showProgress });
       if (searchId !== latestSearchId) return;
       currentRawResults = searchResponse.results;
       currentTotalSummaries = searchResponse.totalSummaries;
@@ -1749,6 +1836,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       clearSearchResults();
       searchStatus.textContent = `Search failed: ${error.message}`;
     } finally {
+      clearTimeout(progressTimer);
       if (searchId === latestSearchId) {
         searchButton.disabled = false;
         render();
@@ -1834,6 +1922,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       deckDirty = true;
 
       const { sleeveId, coinId, deckBoxId } = parseCsvMeta(csvText);
+      // Without the catalogs the ids are still stored; only the card back and coin wait for a reload.
+      if (sleeveId !== null || coinId !== null) {
+        await loadCosmetics().catch((error) => console.warn('[deck builder] coin/sleeve catalog unavailable.', error));
+      }
       if (sleeveId !== null) {
         deckLibrary?.setActiveSleeve(currentLoadTarget, sleeveId);
         sleevePicker?.setSelected(sleeveId);
@@ -2034,6 +2126,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     }
   } else {
     // ── The game tab applies what the builder tab sends (design 050) ────
+    // Each target's latest coin message, so a late catalog never re-announces a superseded coin.
+    const coinMessageSeq = { self: 0, opp: 0 };
     const applyBuilderMessage = ({ type, payload }) => {
       // P2 is Solo-only; the builder tab's view of the game can be stale.
       if (payload.target === 'opp' && systemState.isTwoPlayer) return;
@@ -2055,6 +2149,24 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         if (payload.matId && !mat) return;
         link.announceMat(payload.target, mat, payload.emit);
       } else if (type === 'coin') {
+        const side = payload.target === 'opp' ? 'opp' : 'self';
+        const seq = (coinMessageSeq[side] += 1);
+        // Answered at once, so a 'play' sent after it never overtakes it: a coin catalog not in
+        // memory yet (JSON loaded on demand, design 073) announces the default coin now and the
+        // deck's own coin once the catalog lands, unless a newer coin message came in meanwhile.
+        if (payload.coinId && !coinCatalogLoaded()) {
+          link.announceCoin(payload.target, { ...DEFAULT_COIN });
+          whenLoaded(
+            coinCatalogLoaded,
+            loadCoinCatalog,
+            () => {
+              const coin = getCoinById(payload.coinId);
+              if (coin && seq === coinMessageSeq[side]) link.announceCoin(payload.target, coin);
+            },
+            'deck builder'
+          );
+          return;
+        }
         const coin = payload.coinId ? getCoinById(payload.coinId) : null;
         if (payload.coinId && !coin) return;
         link.announceCoin(payload.target, coin);

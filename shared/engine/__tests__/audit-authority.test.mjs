@@ -1,4 +1,4 @@
-// Regression tests for the high-severity findings in server-authority-and-rules-engine-audit.md
+// Regression tests for the high-severity findings in .agent/archive/root-docs/server-authority-and-rules-engine-audit.md
 // (B-1c, B-2, B-2b, B-2c, B-4, B-5, A-4, A-7) and medium ones (B-3, A-5, A-8). Each drives the reducer the way a socket
 // command would; the rejection cases fail without their fix.
 import { test } from 'node:test';

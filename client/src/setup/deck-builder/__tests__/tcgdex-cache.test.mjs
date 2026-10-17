@@ -98,8 +98,100 @@ test('malformed stored entries are ignored', async () => {
   assert.equal(h.calls.length, 1);
 });
 
-test('without IndexedDB the cache is a pass-through', () => {
+test('without IndexedDB the cache skips the store and fetches the network', async () => {
   assert.equal(createIndexedDbStore(undefined), null);
-  const fetchNetwork = async () => ({});
-  assert.equal(createCachedFetchJson({ store: null, fetchNetwork }), fetchNetwork);
+  const calls = [];
+  const fetchNetwork = async (url) => {
+    calls.push(url);
+    return { url };
+  };
+  const fetchJson = createCachedFetchJson({ store: null, fetchNetwork });
+  assert.deepEqual(await fetchJson(SET_URL), { url: SET_URL });
+  assert.deepEqual(calls, [SET_URL]);
+});
+
+// Holds each network call open until the test settles it, so two calls can overlap.
+function gatedNetwork() {
+  const calls = [];
+  const open = new Map();
+  const fetchNetwork = (url) => {
+    calls.push(url);
+    return new Promise((resolve, reject) => {
+      open.set(url, [...(open.get(url) || []), { resolve, reject }]);
+    });
+  };
+  const settle = (url, outcome) => {
+    for (const waiter of open.get(url) || []) {
+      if (outcome instanceof Error) waiter.reject(outcome);
+      else waiter.resolve(outcome);
+    }
+    open.delete(url);
+  };
+  return { calls, fetchNetwork, settle };
+}
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+test('concurrent calls for one URL share one network lookup and one object', async () => {
+  const network = gatedNetwork();
+  const fetchJson = createCachedFetchJson({ store: memoryStore(), now: () => 0, fetchNetwork: network.fetchNetwork });
+  const first = fetchJson(SET_URL);
+  const second = fetchJson(SET_URL);
+  await flush();
+  network.settle(SET_URL, { id: 'sv01' });
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(network.calls.length, 1);
+  assert.equal(a, b);
+});
+
+test('concurrent calls for different URLs each hit the network', async () => {
+  const network = gatedNetwork();
+  const fetchJson = createCachedFetchJson({ store: memoryStore(), now: () => 0, fetchNetwork: network.fetchNetwork });
+  const first = fetchJson(SET_URL);
+  const second = fetchJson(SERIES_URL);
+  await flush();
+  assert.deepEqual(network.calls, [SET_URL, SERIES_URL]);
+  network.settle(SET_URL, { id: 'sv01' });
+  network.settle(SERIES_URL, { sets: 1 });
+  await Promise.all([first, second]);
+});
+
+test('a call after the shared lookup settles is served from the store', async () => {
+  const network = gatedNetwork();
+  const fetchJson = createCachedFetchJson({ store: memoryStore(), now: () => 0, fetchNetwork: network.fetchNetwork });
+  const first = fetchJson(SET_URL);
+  await flush();
+  network.settle(SET_URL, { id: 'sv01' });
+  await first;
+  assert.deepEqual(await fetchJson(SET_URL), { id: 'sv01' });
+  assert.equal(network.calls.length, 1);
+});
+
+test('a failed shared lookup is not remembered: the next call retries the network', async () => {
+  const network = gatedNetwork();
+  const fetchJson = createCachedFetchJson({ store: memoryStore(), now: () => 0, fetchNetwork: network.fetchNetwork });
+  const first = fetchJson(SET_URL);
+  const second = fetchJson(SET_URL);
+  await flush();
+  network.settle(SET_URL, new Error('offline'));
+  await assert.rejects(first, /offline/);
+  await assert.rejects(second, /offline/);
+  assert.equal(network.calls.length, 1);
+  const retry = fetchJson(SET_URL);
+  await flush();
+  network.settle(SET_URL, { id: 'sv01' });
+  assert.deepEqual(await retry, { id: 'sv01' });
+  assert.equal(network.calls.length, 2);
+});
+
+test('without a store, concurrent calls for one URL share one network lookup', async () => {
+  const network = gatedNetwork();
+  const fetchJson = createCachedFetchJson({ store: null, fetchNetwork: network.fetchNetwork });
+  const first = fetchJson(SET_URL);
+  const second = fetchJson(SET_URL);
+  await flush();
+  network.settle(SET_URL, { id: 'sv01' });
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(network.calls.length, 1);
+  assert.equal(a, b);
 });

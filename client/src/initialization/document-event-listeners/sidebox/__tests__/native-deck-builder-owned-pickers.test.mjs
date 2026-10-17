@@ -11,8 +11,9 @@ globalThis.HTMLElement = dom.window.HTMLElement;
 
 const { initializeDeckBuilderSleevePicker } = await import('../native-deck-builder-sleeve-picker.js');
 const { initializeDeckBuilderCoinPicker } = await import('../native-deck-builder-coin-picker.js');
-const { getSleeves } = await import('../../../../setup/deck-builder/core/sleeves.mjs');
-const { getCoins } = await import('../../../../setup/deck-builder/core/coins.mjs');
+const { getSleeves, loadSleeveCatalog } = await import('../../../../setup/deck-builder/core/sleeves.mjs');
+const { getCoins, loadCoinCatalog } = await import('../../../../setup/deck-builder/core/coins.mjs');
+await Promise.all([loadSleeveCatalog(), loadCoinCatalog()]);
 
 const ETB_SLEEVE = 'cs_charizardxmega_me2_etb';
 const ETB_COIN = 'PFLETB_Mega_Charizard_X_Coin';

@@ -496,3 +496,29 @@ test('Special: Ancient and Future filter by printing, Trainers included', () => 
   // TCGdex cannot narrow by tag, so the filter stays client-side.
   assert.deepEqual(buildTcgdexFilterParams(toggleFilter(createEmptyFilters(), 'mechanics', 'Future')), {});
 });
+
+// TCGdex swsh3-20 Charizard VMAX (rarity "Holo Rare VMAX") and ex7-93 Venture Bomb
+// (trainerType "Rocket's Secret Machine"), 2026-10-15: both were unreachable from the drawer.
+const SWSH_AND_ROCKET = [
+  { id: 'swsh3-20', name: 'Charizard VMAX', supertype: 'Pokémon', rarity: 'Holo Rare VMAX' },
+  {
+    id: 'ex7-93',
+    name: 'Venture Bomb',
+    supertype: 'Trainer',
+    trainerType: "Rocket's Secret Machine",
+    rarity: 'Uncommon',
+  },
+];
+
+test('the drawer offers every TCG rarity and Trainer type TCGdex lists', () => {
+  const optionValues = (key) =>
+    BUILDER_FILTER_GROUPS.find((group) => group.key === key).options.map((o) => o.value);
+  for (const rarity of ['Holo Rare V', 'Holo Rare VMAX', 'Holo Rare VSTAR', 'Rare Holo LV.X', 'Rare PRIME']) {
+    assert.ok(optionValues('rarities').includes(rarity), rarity);
+  }
+  assert.ok(optionValues('trainerTypes').includes("Rocket's Secret Machine"));
+  const pick = (group, value) =>
+    ids(applyCardFilters(SWSH_AND_ROCKET, toggleFilter(createEmptyFilters(), group, value)));
+  assert.deepEqual(pick('rarities', 'Holo Rare VMAX'), ['swsh3-20']);
+  assert.deepEqual(pick('trainerTypes', "Rocket's Secret Machine"), ['ex7-93']);
+});

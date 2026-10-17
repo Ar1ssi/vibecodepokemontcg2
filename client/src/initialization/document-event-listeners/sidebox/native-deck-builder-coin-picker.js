@@ -5,8 +5,11 @@
       getTcglCoins,
       groupCoinsByRelease,
       isPlaceholderCoin,
+      coinCatalogLoaded,
+      loadCoinCatalog,
       ownedFirst,
     } from '../../../setup/deck-builder/core/coins.mjs';
+    import { deferredPicker } from '../../../setup/deck-builder/core/catalog-loader.mjs';
     import {
       applyCoinEffect,
       coinArtUrl,
@@ -95,14 +98,27 @@
      * are listed first with an "Owned" tag.
      * A second source, TCG Live (design 069), lists the game's own coins by their thumbnails; the
      * selected one previews live in 3D with its own holofoil and tilts with the pointer.
+     * The catalog is JSON loaded on demand (design 073): until it is in, the panel stays empty and
+     * the controller keeps the selection it is given.
      */
-    export const initializeDeckBuilderCoinPicker = ({
+    export const initializeDeckBuilderCoinPicker = (options) => {
+      if (!options.panelEl) return null;
+      if (coinCatalogLoaded()) return buildCoinPicker(options);
+      return deferredPicker({
+        panelEl: options.panelEl,
+        load: loadCoinCatalog,
+        build: () => buildCoinPicker(options),
+        label: 'coin picker',
+        failureText: 'Coins could not be loaded.',
+        noteClass: 'native-deck-builder-coin-empty',
+      });
+    };
+
+    const buildCoinPicker = ({
       panelEl,
       onChange,
       getOwnedIds = () => [],
     }) => {
-      if (!panelEl) return null;
-
       const coins = getCoins();
       const tcglCoins = getTcglCoins();
       const tcglIds = new Set(tcglCoins.map((coin) => coin.id));

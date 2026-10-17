@@ -18,12 +18,10 @@ import {
   matchManifestToCoins,
   parseCoinTables,
 } from '../client/src/setup/deck-builder/core/coin-image-manifest.mjs';
-import { getCoins } from '../client/src/setup/deck-builder/core/coins.mjs';
-import { renderCatalog } from './normalize-coin-catalog.mjs';
+import { CATALOG_PATH, renderCatalog } from './normalize-coin-catalog.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUT = resolve(HERE, '../client/src/assets/coins/historical');
-const CATALOG_PATH = resolve(HERE, '../client/src/setup/deck-builder/core/coins.mjs');
 
 const PAGES = [
   'https://bulbapedia.bulbagarden.net/wiki/Coin_(TCG)/Generations_I-IV',
@@ -102,7 +100,7 @@ async function downloadAll(entries, options) {
 
 function linkCatalog(manifest) {
   const source = readFileSync(CATALOG_PATH, 'utf8');
-  const coins = getCoins();
+  const coins = JSON.parse(source);
   const { matches, unmatched } = matchManifestToCoins(manifest, coins);
   const byId = new Map(matches.map((m) => [m.coinId, m.fileName]));
 
@@ -118,7 +116,7 @@ function linkCatalog(manifest) {
     }
   }
 
-  const next = renderCatalog(source, coins);
+  const next = renderCatalog(coins);
   if (next !== source) writeFileSync(CATALOG_PATH, next, 'utf8');
 
   console.log(`Linked ${linked} coins; ${unmatched.length} coins without a wiki scan remain placeholders.`);

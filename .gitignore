@@ -17,7 +17,23 @@ client/src/assets/playmats/upscaled/
 # Claude Code subagent worktrees — transient, machine-local, and live while agents run.
 .claude/worktrees/
 
-# design 004 slice 6: playtest-bot.mjs failure dumps (replayable traces, not source)
+# design 004 slice 6: scripts/e2e/playtest-bot.mjs failure dumps (replayable traces, not source)
 out/playtest/
 .superdesign/tmp/
 
+# Logs, editor backups and recorder output (design 073 A, I249)
+*.log
+*.bak
+*.bak-*
+out/*.webm
+
+# Custom playmat PNG originals: the catalog serves the WebP thumbs/ and board/ renders (design 073 A)
+client/src/assets/playmats/custom/*.png
+
+# design 069: TCG Live foil textures (~4.7 GB, lossless) are served from Cloudflare R2, not git.
+# Regenerate with `pnpm foil:import`, upload with `pnpm foil:upload`.
+client/src/assets/tcgl-foil/cards/
+client/src/assets/tcgl-foil/tex/
+
+# Python bytecode from running scripts/*.py
+__pycache__/

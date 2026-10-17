@@ -1,4 +1,4 @@
-// Audit SE1: server cards are built from identity-only deck rows (server/game/shadow.mjs),
+// Audit SE1: server cards are built from identity-only deck rows (reduce.mjs loadDeck),
 // so special-Energy text reaches the server only through the client's cardStats payload.
 // These tests build cards exactly that way instead of seeding `text` directly.
 import { test } from 'node:test';
@@ -28,7 +28,7 @@ function game() {
   return state;
 }
 
-// The shape shadow.mjs initializePlayerDeck creates: identity only, no text.
+// The shape reduce.mjs loadDeck creates: identity only, no text.
 function serverShapeEnergy(instanceId, syncInstance, name) {
   return createCard({ instanceId, syncInstance, ownerId: 'p1', name, type: 'Energy' });
 }

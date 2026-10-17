@@ -3,9 +3,12 @@ import {
   buildHoloCard,
   isTrainerCard,
   MAT_HOLO_OPTIONS,
-  resolveHoloEffect,
+  foilCardId,
+  isReverseHoloCard,
+  resolveFoilEffect,
   startHoloAnimation,
 } from '../deck-builder/core/holo.mjs';
+import { remountTcglFoil } from '../foil/tcgl-foil-view.js';
 import {
   cardBackSrcForUser,
   cardNode,
@@ -226,11 +229,17 @@ export const openFloatingCardPreview = ({
     frontNode.classList.add('card-preview-card', 'mat-holo');
     frontNode.style.visibility = '';
     applyHighResToImage(frontNode.matches('img') ? frontNode : frontNode.querySelector('img'));
+    // The clone copied the source's foil canvas blank; give it a live view of its own.
+    if (cloneFrom.dataset?.tcglFoil) remountTcglFoil(frontNode, cloneFrom);
     wrapper = frontNode;
   } else {
-    const effect = resolveHoloEffect(card || {});
+    const effect = resolveFoilEffect(card || {});
     if (effect) {
-      wrapper = buildHoloCard(hiRes, effect, { trainer: isTrainerCard(card) });
+      wrapper = buildHoloCard(hiRes, effect, {
+        trainer: isTrainerCard(card),
+        cardId: foilCardId(card || {}),
+        reverse: isReverseHoloCard(card),
+      });
       wrapper.classList.add('card-preview-card', 'mat-holo');
       frontNode = wrapper;
     } else {

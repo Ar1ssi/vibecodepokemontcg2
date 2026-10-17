@@ -1,8 +1,11 @@
 import { getEnergyTokenFront } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
 import {
+  TCGL_FOIL_RARITY,
   buildHoloCard,
+  foilCardId,
   isTrainerCard,
   startHoloAnimation,
+  tcglFoilCoverage,
 } from '../../../setup/deck-builder/core/holo.mjs';
 import { BOX_PROPORTIONS } from '../../../setup/deck-builder/core/build-battle/box-textures.mjs';
 import {
@@ -600,8 +603,17 @@ export const mountUnboxingScene = ({
     return holder;
   };
 
+  // A card TCG Live prints wears its base printing's foil (or none); a reverse-slot card wears TCG Live's
+  // reverse-holo printing, else the CSS reverse holo (design 069).
+  const faceRarity = (card, slot) => {
+    const coverage = tcglFoilCoverage(card, undefined, { reverse: slot === 'reverse' });
+    if (coverage === 'foil') return TCGL_FOIL_RARITY;
+    if (coverage === 'flat') return null;
+    return unboxingHoloRarity(card, slot);
+  };
+
   const cardFaceNode = (card, slot) => {
-    const rarity = unboxingHoloRarity(card, slot);
+    const rarity = faceRarity(card, slot);
     const src = cardImage(card, 'small');
     if (!card || !src) return cardFallback(card);
     if (!rarity) {
@@ -612,7 +624,12 @@ export const mountUnboxingScene = ({
       img.src = src;
       return img;
     }
-    const holo = buildHoloCard(src, rarity, { trainer: isTrainerCard(card) });
+    const reverse = slot === 'reverse';
+    const holo = buildHoloCard(src, rarity, {
+      trainer: isTrainerCard(card),
+      cardId: foilCardId(card, undefined, { reverse }),
+      reverse,
+    });
     holo.classList.add('bb-card-face');
     holo.querySelector('img')?.addEventListener(
       'error',

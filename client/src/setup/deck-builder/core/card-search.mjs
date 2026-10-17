@@ -1,8 +1,10 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
 import { tcgdexApiUrl } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
+import { SET_RELEASE_DATES } from './set-release-dates.generated.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
 const DETAIL_FETCH_LIMIT = 150;
+// set id -> Promise<release date>; overlapping searches share one lookup.
 const tcgdexSetReleaseDateCache = new Map();
 
 function compareReleaseDate(a, b, direction = 'desc') {
@@ -260,28 +262,70 @@ export function normalizeTcgdexCard(card) {
 }
 
 
-async function hydrateTcgdexSetReleaseDates(cards = []) {
-  const uniqueSetIds = [...new Set(cards.map((card) => card?.set?.id).filter(Boolean))];
-  const missingSetIds = uniqueSetIds.filter((setId) => !tcgdexSetReleaseDateCache.has(setId));
+// TCGdex card ids are `<setId>-<localId>`, and set ids may contain '-' themselves
+// (tk-hs-r, P-A, 30th-c), so try each dash from the right until a known set matches.
+export function setIdOfCardId(cardId) {
+  if (typeof cardId !== 'string' || !cardId) return '';
+  for (let dash = cardId.lastIndexOf('-'); dash > 0; dash = cardId.lastIndexOf('-', dash - 1)) {
+    const setId = cardId.slice(0, dash);
+    if (Object.hasOwn(SET_RELEASE_DATES, setId)) return setId;
+  }
+  return '';
+}
 
-  await Promise.all(
-    missingSetIds.map(async (setId) => {
-      try {
-        const setData = await fetchJson(tcgdexApiUrl(`/sets/${setId}`));
-        tcgdexSetReleaseDateCache.set(setId, setData?.releaseDate || '');
-      } catch {
-        tcgdexSetReleaseDateCache.set(setId, '');
-      }
-    })
-  );
+export function releaseDateOfCardId(cardId) {
+  return SET_RELEASE_DATES[setIdOfCardId(cardId)] || '';
+}
 
-  return cards.map((card) => ({
-    ...card,
-    set: {
-      ...card.set,
-      releaseDate: card?.set?.releaseDate || tcgdexSetReleaseDateCache.get(card?.set?.id) || '',
-    },
-  }));
+// Newest printing first, unknown dates last. Returns a new array; the input is left alone.
+export function newestSummariesFirst(summaries = []) {
+  return [...summaries].sort((a, b) => {
+    const dateA = releaseDateOfCardId(a?.id);
+    const dateB = releaseDateOfCardId(b?.id);
+    if (dateA === dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateB.localeCompare(dateA);
+  });
+}
+
+// A card record names its set but not the set's release date, which the
+// default sort needs. Sets in the generated table are answered without a
+// request; a set newer than the table is fetched. Never rejects: an unknown
+// date sorts last.
+function setReleaseDate(setId) {
+  if (Object.hasOwn(SET_RELEASE_DATES, setId)) return Promise.resolve(SET_RELEASE_DATES[setId]);
+  if (!tcgdexSetReleaseDateCache.has(setId)) {
+    const lookup = fetchJson(tcgdexApiUrl(`/sets/${setId}`)).then(
+      (setData) => setData?.releaseDate || '',
+      () => ''
+    );
+    tcgdexSetReleaseDateCache.set(setId, lookup);
+  }
+  return tcgdexSetReleaseDateCache.get(setId);
+}
+
+// One card's record, normalized with its release date filled in. Null when the
+// record has no image or its request fails, so one bad record never fails the search.
+async function loadDetailedCard(summary) {
+  try {
+    const card = normalizeTcgdexCard(await fetchJson(tcgdexApiUrl(`/cards/${summary.id}`)));
+    if (!card.image) return null;
+    if (card.set.id && !card.set.releaseDate) {
+      card.set.releaseDate = await setReleaseDate(card.set.id);
+    }
+    return card;
+  } catch {
+    return null;
+  }
+}
+
+function reportProgress(onProgress, progress) {
+  try {
+    onProgress(progress);
+  } catch {
+    // A throwing listener must not drop the card or fail the search.
+  }
 }
 
 /**
@@ -292,8 +336,11 @@ async function hydrateTcgdexSetReleaseDates(cards = []) {
  * no name and no params there is nothing to ask for, so nothing is fetched.
  *
  * `detailedCount` < `totalSummaries` means the detail cap cut the list short.
+ *
+ * `onProgress({ results, totalSummaries, detailedCount })`, when given, runs after
+ * each valid card loads: `results` is every valid card so far, in summary order.
  */
-export async function queryCards({ term = '', params = {} } = {}) {
+export async function queryCards({ term = '', params = {}, onProgress = null } = {}) {
   const cleanName = stripWildcards(normalizeSearchQuery(String(term)));
   const hasParams = Object.keys(params || {}).length > 0;
   if (!cleanName && !hasParams) {
@@ -320,8 +367,10 @@ export async function queryCards({ term = '', params = {} } = {}) {
       });
     } else {
       const seen = new Set();
-      for (const query of plan.queries) {
-        const summaries = await fetchCardSummaries({ cardName: query, params });
+      const summaryLists = await Promise.all(
+        plan.queries.map((query) => fetchCardSummaries({ cardName: query, params }))
+      );
+      for (const summaries of summaryLists) {
         for (const s of summaries) {
           if (!seen.has(s.id)) {
             seen.add(s.id);
@@ -342,25 +391,33 @@ export async function queryCards({ term = '', params = {} } = {}) {
     };
   }
 
-  const summariesToFetch = allSummaries.slice(0, DETAIL_FETCH_LIMIT);
+  // TCGdex answers in collector-number order and cannot sort by date, so the cap
+  // keeps the newest printings rather than an arbitrary slice.
+  const summariesToFetch = newestSummariesFirst(allSummaries).slice(0, DETAIL_FETCH_LIMIT);
 
+  // Each card's set lookup starts as soon as its record arrives, while the
+  // other records are still loading, rather than in a second round after them.
+  const arrived = new Array(summariesToFetch.length).fill(null);
   const detailedCards = await Promise.all(
-    summariesToFetch.map(async (summary) => {
-      try {
-        const detail = await fetchJson(tcgdexApiUrl(`/cards/${summary.id}`));
-        return normalizeTcgdexCard(detail);
-      } catch {
-        return null;
+    summariesToFetch.map(async (summary, index) => {
+      const card = await loadDetailedCard(summary);
+      if (!card) return null;
+      arrived[index] = card;
+      if (typeof onProgress === 'function') {
+        reportProgress(onProgress, {
+          results: arrived.filter(Boolean),
+          totalSummaries: allSummaries.length,
+          detailedCount: summariesToFetch.length,
+        });
       }
+      return card;
     })
   );
 
-  const validCards = detailedCards.filter((card) => card && card.image);
-
-  const hydratedCards = await hydrateTcgdexSetReleaseDates(validCards);
+  const validCards = detailedCards.filter(Boolean);
 
   return {
-    results: hydratedCards,
+    results: validCards,
     totalSummaries: allSummaries.length,
     detailedCount: summariesToFetch.length,
     term: cleanName,

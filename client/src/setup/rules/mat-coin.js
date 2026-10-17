@@ -8,7 +8,12 @@ import {
   oppContainerDocument,
 } from '../../initialization/global-variables/containers.js';
 import { systemState } from '../../initialization/global-variables/global-variables.js';
-import { getCoins } from '../deck-builder/core/coins.mjs';
+import {
+  DEFAULT_COIN,
+  coinCatalogLoaded,
+  getCoinById,
+  loadCoinCatalog,
+} from '../deck-builder/core/coins.mjs';
 import {
   applyCoinEffect,
   coinArtUrl,
@@ -47,9 +52,22 @@ export const setSelectedCoin = (target, coin) => {
  * Stable fallback for a player who has not chosen a coin: the first catalog
  * coin. Deterministic so repeated flips never shuffle the art mid-match.
  */
-export const pickDefaultCoin = () => {
-  const coins = getCoins();
-  return coins.length > 0 ? coins[0] : null;
+export const pickDefaultCoin = () => ({ ...DEFAULT_COIN });
+
+const COIN_CATALOG = { isLoaded: coinCatalogLoaded, load: loadCoinCatalog, lookup: getCoinById };
+
+/**
+ * Calls `play(coin)` at once with the catalog coin `coinId` names, or null (no id, an unknown id, a
+ * catalog not in memory yet or that failed to load); each caller falls back as it always has. Never
+ * deferred: the flip ceremonies' timers, FX holds and the deal start at the call, so the ceremony
+ * must too. The catalog is JSON fetched after boot (design 073) and initMatCoins starts that fetch;
+ * a call that finds it missing starts it again so the next flip names its coin.
+ */
+export const withCatalogCoin = (coinId, play, catalog = COIN_CATALOG) => {
+  if (!coinId) return play(null);
+  if (catalog.isLoaded()) return play(catalog.lookup(coinId));
+  catalog.load().catch((error) => console.warn('[mat coin] coin catalog unavailable.', error));
+  return play(null);
 };
 
 /** Position is CSS-driven inside each playmat iframe (#matCoinSlot). */
@@ -121,6 +139,8 @@ const hookLayoutRefresh = () => {
 };
 
 export const initMatCoins = () => {
+  // Warm the coin catalog so flips that name a coin never wait for it (withCatalogCoin).
+  loadCoinCatalog().catch((error) => console.warn('[mat coin] coin catalog unavailable.', error));
   hookLayoutRefresh();
   renderMatCoins();
   for (const container of [selfContainer, oppContainer]) {

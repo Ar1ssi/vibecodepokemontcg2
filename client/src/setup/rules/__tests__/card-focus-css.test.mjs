@@ -30,6 +30,8 @@ const ruleBody = (css, selector) => {
 };
 
 const FOCUS_CSS = read('card-focus.css');
+const OPTIONS_CSS = read('attack-options.css');
+const option = (selector) => ruleBody(OPTIONS_CSS, selector);
 const INDEX_CSS = read('index.css');
 const SELF_CSS = read('self-containers.css');
 const focus = (selector) => ruleBody(FOCUS_CSS, selector);
@@ -152,7 +154,7 @@ describe('067 — card-focus.css', () => {
     const bar = borders.atkOv_Brdr_B2;
     assert.deepEqual([bar.top, bar.right, bar.bottom, bar.left], [7, 24, 23, 24]);
     assert.ok(
-      focus('.card-focus__card .ptcg-chrome--focus .ptcg-stats--focus').includes(
+      focus('.card-focus__card .ptcg-chrome--focus .tcgl-wr').includes(
         `list-bar.png') 7 24 23 24 fill / calc(var(--tu) * ${unit(7, 6)}) calc(var(--tu) * ${unit(24, 6)}) calc(var(--tu) * ${unit(23, 6)}) calc(var(--tu) * ${unit(24, 6)}) stretch;`
       )
     );
@@ -166,18 +168,17 @@ describe('067 — card-focus.css', () => {
       const b = borders[sprite];
       assert.deepEqual([b.top, b.right, b.bottom, b.left], [16, 16, 16, 16], sprite);
     }
-    const tile = focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk::before');
-    assert.ok(tile.includes("row-bg.png') 16 fill / calc(var(--tu) * 0.24) stretch;"));
+    // 16px edges at 50 px per row unit = 0.32 row units (0.24tu at the row's 0.75 scale).
+    const tile = option('.tcgl-opt::before');
+    assert.ok(tile.includes("row-bg.png') 16 fill / calc(var(--ru) * 0.32) stretch;"));
     assert.ok(tile.includes('z-index: -1;'));
-    const shadow = focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk::after');
-    assert.ok(shadow.includes("row-shadow.png') 16 fill / calc(var(--tu) * 0.24) stretch;"));
+    const shadow = option('.tcgl-opt::after');
+    assert.ok(shadow.includes("row-shadow.png') 16 fill / calc(var(--ru) * 0.32) stretch;"));
     assert.ok(shadow.includes('z-index: -2;'));
     assert.ok(shadow.includes('opacity: 0.502;'));
-    assert.ok(
-      focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk--recede::before').includes('row-bg-off.png')
-    );
+    assert.ok(option('.tcgl-opt--off::before').includes('row-bg-off.png'));
     // The row must be its own stacking context, or the negative z-index sprites fall behind the list backing.
-    assert.ok(focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk').includes('isolation: isolate;'));
+    assert.ok(option('.tcgl-opt').includes('isolation: isolate;'));
 
     const card = borders.atkOV_CardShadow;
     assert.deepEqual([card.top, card.right, card.bottom, card.left], [15, 15, 15, 15]);
@@ -189,13 +190,14 @@ describe('067 — card-focus.css', () => {
     );
   });
 
-  it('rows are the prefab at scale 0.75: a 0.75-unit titlebar', () => {
-    const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-atk > .ptcg-atk__head');
-    assert.match(decls, /--bar-h: calc\(var\(--tu\) \* 0\.75\);/);
+  it('rows are the prefab at scale 0.75: a one-row-unit titlebar, 1.25 for VSTAR Power', () => {
+    assert.match(option('.tcgl-opt'), /--ru: calc\(var\(--tu\) \* 0\.75\);/);
+    assert.match(option('.tcgl-opt__bar'), /--bar-h: var\(--ru\);/);
+    assert.match(option('.tcgl-opt--vstar .tcgl-opt__bar'), /--bar-h: calc\(var\(--ru\) \* 1\.25\);/);
   });
 
   it('the Weakness / Resistance / Retreat bar is 0.7 units tall, hung under the list on the same lift', () => {
-    const decls = focus('.card-focus__card .ptcg-chrome--focus .ptcg-stats--focus');
+    const decls = focus('.card-focus__card .ptcg-chrome--focus .tcgl-wr');
     assert.ok(decls, 'focus strip rule is missing');
     assert.match(decls, /left: calc\(var\(--tu\) \* 0\.1185\);/);
     assert.match(decls, /width: calc\(var\(--tu\) \* 6\.48\);/);
@@ -231,10 +233,31 @@ describe('067 — card-focus.css', () => {
     );
   });
 
-  it('defines the HUD buttons the module builds', () => {
-    for (const selector of ['.card-focus__hud', '.card-focus__close', '.card-focus__stack']) {
+  it('defines the HUD buttons the module builds, on the game sprites', () => {
+    for (const selector of [
+      '.card-focus__hud',
+      '.card-focus__btn',
+      '.card-focus__btn-face',
+      '.card-focus__btn-icon',
+      '.card-focus__btn-fill',
+      '.card-focus__stack',
+      '.card-focus__close::before',
+    ]) {
       assert.ok(focus(selector), `${selector} is missing`);
     }
+    assert.ok(focus('.card-focus__stack').includes("icn-stack.png"));
+    assert.ok(focus('.card-focus__close .card-focus__btn-face').includes('icn-close.png'));
+    assert.ok(focus('.card-focus__btn--buff .card-focus__btn-fill').includes('arrow-up.png'));
+    assert.ok(focus('.card-focus__btn--debuff .card-focus__btn-fill').includes('arrow-down.png'));
+  });
+
+  // TableCoverPanel, flipped (scale y -1): clear top, a 50 % gradient band, 50 % black below.
+  it('the backdrop is the TableCoverPanel: three bands, no flat dim', () => {
+    assert.match(focus('.card-focus__backdrop'), /background: none;/);
+    assert.match(focus('.card-focus__cover--middle'), /top: 45%;/);
+    assert.match(focus('.card-focus__cover--middle'), /height: 16\.5%;/);
+    assert.match(focus('.card-focus__cover--bottom'), /top: 61\.5%;/);
+    assert.match(focus('.card-focus__cover--bottom'), /rgba\(0, 0, 0, 0\.5\)/);
   });
 });
 
