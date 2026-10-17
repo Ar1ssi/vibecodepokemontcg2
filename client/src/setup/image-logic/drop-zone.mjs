@@ -9,7 +9,11 @@
  *
  * Pure and DOM-free so it runs under `node --test`.
  */
-import { isTrainer } from '../../../../shared/engine/cards.mjs';
+import {
+  isEnergy,
+  isPokemon,
+  isTrainer,
+} from '../../../../shared/engine/cards.mjs';
 
 export const DROP_ZONE_IDS = [
   'deck',
@@ -47,3 +51,11 @@ export const playsOntoBoard = (card) => {
   const kind = kindText(card);
   return !kind.includes('tool') && !kind.includes('stadium');
 };
+
+/**
+ * Whether the Trainer board refuses a dropped card: Pokémon and Energy cards
+ * never go there. A card whose type was changed to Trainer reads as a Trainer,
+ * and a card with no data (face down) is let through.
+ */
+export const boardRefuses = (card) =>
+  Boolean(card) && (isPokemon(card) || isEnergy(card));
