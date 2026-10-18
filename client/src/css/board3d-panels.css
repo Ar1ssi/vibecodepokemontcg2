@@ -1,0 +1,184 @@
+/* Design 074 D4: the zone list popups of the 3D board. board-mirror.js links this sheet into
+   both mirror shadow roots, where the five panels (#deck, #discard, #lostZone viewers, the
+   #viewCards look and #attachedCards move panels) keep the iframe ids and DOM, so every legacy
+   module still finds them, shows them inline (`display: block`) and fills them. Only the panels
+   are styled here: the iframe sheets also carry the zone layout, the holo layers and a zoomed,
+   tilted #playfield, which would move the mirror's position-fixed card twins off their
+   projected rects. Rules follow self-containers.css; the placement is new: the host covers the
+   viewport, so a panel centres on the mat column (75.5% wide, as the sidebox takes the rest)
+   in its seat's half (near seat = bottom), upright for both seats (no 180° iframe to undo). */
+
+#deck,
+#discard,
+#lostZone,
+#attachedCards,
+#viewCards {
+  display: none;
+  position: fixed;
+  left: 37.75%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  opacity: 1;
+  pointer-events: auto;
+  color: #111;
+  font-size: 14px;
+}
+.self-view {
+  top: 75%;
+}
+.opp-view {
+  top: 25%;
+}
+
+#deck,
+#discard,
+#lostZone {
+  width: 64%;
+  height: 37.5%;
+  padding: 0 20px 20px 20px;
+  overflow-y: auto;
+  background-color: rgba(169, 169, 169, 0.867);
+  border: 1px solid #ccc;
+  border-radius: 15px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+#attachedCards,
+#viewCards {
+  width: 52%;
+  height: 37.5%;
+  padding: 20px;
+  background-color: rgba(169, 169, 169, 0.5);
+  border: 1px solid #ccc;
+  border-radius: 0 0 15px 15px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.header {
+  position: absolute;
+  top: -3%;
+  left: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  border-radius: 15px 15px 0 0;
+  color: white;
+  font-size: clamp(12px, 1.5vh, 20px);
+  background-color: #7081c4;
+  border: 2px solid rgb(112 129 196);
+}
+
+.self-zone-button-container {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 96%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  padding: 10px;
+  text-align: center;
+  background-color: #dadada;
+  border-radius: 15px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+/* The far seat's look/move panels show what it is doing; their buttons are its own. */
+.opp-zone-button-container {
+  display: none;
+}
+
+.zone-button-container {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1%;
+  padding: 5px;
+  text-align: center;
+  background-color: #dadada;
+  border-radius: 0 0 15px 15px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+.zone-button {
+  margin: 0 5px;
+  width: 20%;
+  padding: 5px;
+  border: none;
+  border-radius: 5px;
+  background: linear-gradient(to bottom, #6e6f71, #4c4d4f);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.zone-button:hover {
+  background: linear-gradient(to bottom, #898989, #7b7c7d);
+}
+#attachedCards button,
+#viewCards button {
+  width: 17%;
+}
+#deck label,
+#discard label,
+#lostZone label {
+  position: relative;
+  cursor: pointer;
+}
+
+/* The panel lays its cards out in flow. A card <img> that came from the board still carries the
+   projected rect board-mirror.js sync wrote inline (sync skips popup cards, it never clears), so
+   the box properties here are !important. */
+#deck img,
+#discard img,
+#lostZone img,
+#attachedCards img,
+#viewCards img {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+}
+#deck img,
+#discard img,
+#lostZone img,
+#discard .mat-holo,
+#lostZone .mat-holo {
+  display: inline-block;
+  height: auto !important;
+  margin: 1px !important;
+  vertical-align: top;
+}
+#deck img {
+  width: 8% !important;
+}
+#discard img,
+#discard .mat-holo {
+  width: 10% !important;
+}
+#lostZone img,
+#lostZone .mat-holo {
+  width: 12% !important;
+}
+#discard .mat-holo img,
+#lostZone .mat-holo img {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+}
+#attachedCards img,
+#viewCards img {
+  width: auto !important;
+  height: 33% !important;
+  margin: 0.5% !important;
+}
+#attachedCards img,
+#viewCards img,
+#deck img,
+#discard img,
+#lostZone img {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border-radius: 4.55% / 3.5%;
+  cursor: pointer;
+}

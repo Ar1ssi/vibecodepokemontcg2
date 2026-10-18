@@ -539,6 +539,99 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### D4
+- Popups: option (a), not the Work-plan row's move to `index.ejs`. The five panels (`#deck`, `#discard`, `#lostZone`,
+  `#viewCards`, `#attachedCards`) stay in the mirror shadow roots, so `getZone(...).element`, `zone-buttons.js`,
+  `close-popups.js`, `flip-board.js`, `lost-zone-panel.js` and apply-view keep resolving them by id, unchanged; (b)
+  would have needed a patched `getElementById` and still missed every `root.querySelector`/observer/`containerContains`.
+  The iframe sheets are NOT adopted: they zoom and tilt `#playfield` and add holo transforms, which would make zones
+  the containing block of the position-fixed card twins and move them off their rects. New `css/board3d-panels.css`
+  (linked into both roots) carries only the panel rules from self-containers.css, placed on the mat column (37.75 %)
+  in the seat's half (`.self-view` bottom, `.opp-view` top), upright for both seats, grey panel kept (the iframe
+  theme had made the pile viewers transparent; unreadable over the canvas). Holo layers are not styled in popups.
+- Invisibility moved from `:host`/`#boardMirror` `opacity: 0` (a child cannot undo it) to every non-popup subtree.
+  `sync` skips cards inside a popup (one filter) and no longer sizes `#deck`/`#discard`/`#lostZone` as their piles
+  (covers/stack still are). It does not clear a rect a card brings from the board (clearing broke a card that passed
+  through a legacy zone and came back with no sync after); the panel sheet's `!important` box rules outrank it.
+- `close-popups.js`: a pile viewer's "empty" counts rendered cards too (`zone-popup-display.mjs`); under authority the
+  legacy array is empty, so a Lost Zone viewer closed in the click that opened it, on both boards (fix, not 3D-only).
+- `board-scene.js`: `rects()`/`hitTest` advance the tweens between frames, so with frames far apart a whole tween could
+  start and end unseen by any frame; no `cardsMoving` frame, no mirror sync (a played card's mirror img kept its hand
+  rect and card focus flew from there). The first frame after `applyModel` now reports `cardsMoving` to `onRender`
+  (report only: it does not keep frames coming, so no render loop). D3's off-frame flag stays beside it: dropping it
+  (the builder's first cut) left the hover lift stuck under headless SwiftShader (`test:board3d-input` 7a/7b), as the
+  frame after an off-frame-finished tween no longer asked for the next one.
+- Harness precondition: four Basics in the near hand (Active, discard, Lost Zone, Bench), not three — step 9a benched
+  nothing on a three-Basic deal.
+- Card focus needed no change (C6 already routes `hand-lowered` to `setHandPose`); verified: flight start = mesh rect,
+  mesh hidden, hand down/up, picker auto-close. `openCardPreview` takes `sourceRect` from the <img> under the flag (a
+  holo wrapper has no box there) and strips the mirror rect from its clone. `openAttachedCardsPanel` → carousel
+  (`attached-carousel.js`, shared with `doubleClick`). `isDoubleClickZoomZone(zone, { board3d })`: every zone zooms,
+  so `#fullImage` is never built. Stadium menu anchors on `scene.rects().stadium`.
+- Harness `board3d-overlays-test.mjs`: (c) `v` opens `#deck` (keybinds.js), not `#viewCards`; it holds the client's
+  legacy deck copy (the view sends a count), so the check is "one visible <img> per card the zone holds"; `#viewCards`
+  is shown as viewDeck shows it (authority looks go to the picker). (d) double-clicking the own Active opens the
+  focus (067), so the attachments are checked via its Stack button → carousel, plus `openAttachedCardsPanel`. The
+  near Lost Zone pile sits under the Prizes at its centre in this layout, so (b') dispatches the pile click on the
+  mirror cover as board-input.js does (printed note). Not changed: the "View attached cards" menu item returns early
+  under authority (`mouseClick.card` is null, I15), on both boards.
+
+### D3
+- Select-to-move and attach mode never worked for server-drawn cards on either board: `imageClick` and the `e`/`q`
+  keybind read the legacy zone arrays, which authority never fills, and `e`/`q` threw on an in-play card.
+  `netcode/server-card-select.js` (+ pure `.mjs`) selects through the card registry: a click puts `.highlight` on
+  the card's registry <img>, the zone keys send `moveCardBundle` with `{ moving }`, `e`/`q` rings the owner's
+  Pokémon in play with `.selectHighlight`, and the next click on one attaches with `{ moving, target }`.
+  `deselectCard` clears those classes. Legacy-rendered games are unchanged (no instance id, no registry card). The
+  deck keys (arrows, `s`) still address the card by its legacy index; not covered here.
+- `.cmd-pending` was never applied (no caller handed `emitCmd` an element). `process-action.js` now passes the
+  registry <img> of the command's `payload.instanceId`, so the iframe board shows index.css's in-flight style too.
+  The mirror reports it as `pending`, which `card-mesh.js` `setDim` draws at 60 % on the card's own clone of its
+  front (a foil gives way to the plain front while dimmed). `pending` does not ride on the board model, so a
+  `uiState()` snapshot leaves it to the observer's report.
+- The mirror also treats `.draw-flight-source` (draw-flight.js `hideForFlight`) like `visibility: hidden`.
+- The harness opens the mat pick with mat-picker.js `openMatPick` over registry cards, as mat-picker-adapter.js
+  does for a server choice; the fixture deck has no card whose effect asks for one.
+
+### E1
+- `board-rects.js`: `createBoardRects({ getScene })` → `rectForInstance(id)`, `pileRect(side, zone)` (prizes from D2's
+  `zoneRects()['<side>:prizes']`, which stands with no prize left), `boardRect(side)` (the side's half of `tableBounds`
+  projected; else its zone/pile union; else the scene host's half), `matRect()`/`matCorners()` (cloth quad); module-level
+  ones bound to `getBoardScene()` while `board3dActive()`. `seatTurnOf(el)`: 180 for a node in `#oppBoard`'s root —
+  `frameTurnOf` (evolve-scene.js) returns it under the flag, so every far-seat scene turns with its card as on the iframes.
+- Found: apply-view runs the advisory loop (FX start synchronously on an idle queue) BEFORE `board-view-applied`, where
+  board3d.js gives the scene the new model, and the scene then tweens moved cards 180 ms. Measured on a real hand→Bench
+  move: at FX time the scene still had the card in the hand (rect = hand spot); a real draw's new card had no scene rect
+  and a 1 px mirror img, so the draw skipped its flight. Fix (deviation, client FX queue only): `handleBeforeApply` queues
+  `holdFxQueue(fxSettleHoldMs(events))` — 200 ms when the batch moves a card and the 3D board runs, else 0; measured after
+  it, the draw's rect is the settled one. Limit: the scene clock is the canvas's WAAPI time, which only advances on drawn
+  frames; a frame-starved page (headless SwiftShader at ~2 fps) can still read a mid-tween rect. A scene
+  `settledRects()` (tween destinations) would remove the wait — needs board-scene.js/card-mesh.js (not E1's files).
+- Shake: `screenShakeKeyframes(amp, ms)` (combat-pose.mjs; same damped sine as `screenShakeOffsets`, keyframe times
+  where the WAAPI `cubic-bezier(0.2, 0.6, 0.4, 1)` reaches them) → `scene.shake`; the page elements no longer move.
+- Mega hex field: above the canvas in a `.fx-mega-field-board3d` layer the size of `matRect()`, clipped to the projected
+  cloth (inline `clip-path: polygon`) and `mix-blend-mode: screen`, so it lights mat and cards alike instead of sliding
+  under the cards (impossible over one canvas). `draw-scene.js handSpotOf` reads the scene rect (the mirror img syncs only
+  on drawn frames). `prize.js` prefers `pileRect(side, 'prizes')`.
+- Frames `.agent/scratch/074/e1/*.png` (`capture-e1.mjs`: solo room, both Actives + Bench, advisory events / registry
+  plans fired with real ids, WAAPI frozen; rAF/WebGL scenes frozen by parking rAF). Fixture faces are 1×1 white.
+  Overlay boxes logged equal to `scene.rects()` for the card each scene names. Impact prefab textures are not served
+  here (no TCG Live texture host): the DOM hit dressing fallback played, at the same rect + seat turn the prefab takes.
+- 41-scene checklist (R = plays at the right rect, H1 = plays but needs a port, B = broken):
+  **R (34):** shuffle flight · KO ghost flight (ghost taken from the mirror img before the diff, mesh hidden) · KO stars ·
+  discard flight + pile catch · discard zone sweep · attack banner · target ring · lunge (attacker mesh hidden via
+  `hideDuring`) · move scene · signature move scene · aura pulse · damage number · DOM hit dressing · impact prefab
+  (assets absent here; same rect/turn) · table shake (`scene.shake`, 13 keys) · status apply · status clear · evolve
+  (own; opp turned 180°) · devolve · Tera entry · Mega orb + vortex · Mega hex field (deviation above) · energy snap ·
+  tool ring · retreat/switch slide · promote · own Trainer present · opp Trainer preview + landing · Stadium present ·
+  turn banner + edge glow · ability banner + card tag · prize claim burst · game over · coin ceremony.
+  **H1 (5):** draw own (spread at mat centre → hand), draw opp face-down (deck → hand, 180°), prize take flight, deck
+  reveal — right rects, but the hand card is held with the `draw-flight-source` class, which the mirror does not observe
+  (only `style.visibility`), so its mesh shows in the hand while the flight lands on it; Bench recoil — WAAPI `translate`
+  on the mirror <img> (invisible), the mesh does not move. **Ported by E2, not E1 (2):** status idle loop, Tera crystal
+  skin (scene overlay planes). **B: 0.** Not frozen (same `rectForInstance`/viewport paths as frozen ones): devolve,
+  sweep, move/signature scenes, aura, status clear, attach, retreat, promote, Stadium, ability, game over, prize flight.
+
 ### E2
 - No `setTeraSkin` API: tera-skin.js calls `scene.setUiState(id, { teraSkin: palette | null })`, which already merges
   into the placement `overlays.sync` gets; board-scene.js unchanged. The reconciler's "node" on the 3D board is a

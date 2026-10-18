@@ -147,13 +147,6 @@ const isRect = (rect) =>
   Boolean(rect) && RECT_KEYS.every((key) => Number.isFinite(rect[key]));
 
 /** Writes a rect (px from `origin`) as inline left/top/width/height, touching only what changed. */
-/** Drops a rect `sync` wrote earlier (a card that moved from the board into a popup). */
-const clearRect = (el) => {
-  for (const key of RECT_KEYS) {
-    if (el.style?.[key]) el.style.removeProperty(key);
-  }
-};
-
 const writeRect = (el, rect, origin) => {
   if (!el?.style || !isRect(rect)) return;
   const values = {
@@ -312,11 +305,9 @@ export function createBoardMirror({ hostSelf, hostOpp, doc = globalThis.document
     for (const side of SIDES) {
       const origin = hostBox(side) ?? { left: 0, top: 0, width: 0, height: 0 };
       for (const img of roots[side].querySelectorAll('img[data-instance-id]')) {
-        // A popup lays its cards out itself: they show where the panel puts them.
-        if (img.closest(POPUP_SELECTOR)) {
-          clearRect(img);
-          continue;
-        }
+        // A popup lays its cards out itself (board3d-panels.css outranks a rect this <img> still
+        // carries from the board), so they show where the panel puts them.
+        if (img.closest(POPUP_SELECTOR)) continue;
         const id = instanceIdOf(img);
         if (id !== null) writeRect(img, rects[id], origin);
       }

@@ -33,3 +33,12 @@ test('the zone list is not accidentally re-ordered or emptied', () => {
     'stadium',
   ]);
 });
+
+// Design 074 D4: the 3D board never opens the legacy #fullImage overlay — a card in a zone list
+// popup (Lost Zone, looked-at cards) zooms like a mat card.
+test('on the 3D board every zone takes the zoom path', () => {
+  for (const zoneId of ['prizes', 'discard', 'lostZone', 'deck', 'viewCards', 'attachedCards']) {
+    assert.equal(isDoubleClickZoomZone(zoneId, { board3d: true }), true, zoneId);
+    assert.equal(isDoubleClickZoomZone(zoneId, { board3d: false }), false, zoneId);
+  }
+});

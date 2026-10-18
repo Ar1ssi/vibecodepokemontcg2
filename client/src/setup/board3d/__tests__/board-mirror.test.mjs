@@ -235,3 +235,36 @@ describe('createBoardMirror', () => {
     assert.throws(() => createBoardMirror({ hostSelf: null, hostOpp: null }));
   });
 });
+
+describe('createBoardMirror zone list popups (D4)', () => {
+  it('links the panel stylesheet and gives each pile viewer its Sort label', () => {
+    const { mirror } = setup();
+    for (const side of ['self', 'opp']) {
+      const root = mirror.roots[side];
+      assert.equal(root.querySelector('link[rel="stylesheet"]')?.getAttribute('href'), 'src/css/board3d-panels.css');
+      for (const id of ['Deck', 'Discard', 'LostZone']) {
+        assert.ok(root.querySelector(`label[for="sort${id}Checkbox"]`), `${side} has the ${id} Sort label`);
+      }
+    }
+  });
+
+  it('sync leaves the popups and the cards in them to the panel layout', () => {
+    const { doc, mirror } = setup();
+    const { img } = addCard(doc, mirror.zoneElement('self', 'lostZone'), 9);
+    const looked = addCard(doc, mirror.zoneElement('opp', 'viewCards'), 10).img;
+    mirror.sync({ placements: [] }, {
+      9: { left: 110, top: 920, width: 120, height: 168 },
+      10: { left: 300, top: 40, width: 120, height: 168 },
+      'pile:self:lostZone': { left: 1610, top: 720, width: 100, height: 140 },
+      'pile:self:discard': { left: 1710, top: 720, width: 100, height: 140 },
+    });
+    for (const card of [img, looked]) {
+      assert.deepEqual(['left', 'top', 'width', 'height'].map((key) => card.style[key]), ['', '', '', '']);
+    }
+    for (const id of ['lostZone', 'discard', 'deck']) {
+      assert.equal(mirror.zoneElement('self', id).style.left, '', `#${id} is not sized as its pile`);
+    }
+    assert.equal(mirror.zoneElement('self', 'lostZoneCover').style.left, '1600px');
+    assert.equal(mirror.zoneElement('self', 'discardCover').style.width, '100px');
+  });
+});

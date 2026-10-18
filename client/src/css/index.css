@@ -215,11 +215,12 @@ ul, li {
   width: 100%;
   height: 100%;
 }
+/* No opacity here: the mirror hides its own board twins (board-mirror.js MIRROR_STYLE) so the
+   zone list popups inside it can show as HTML panels over the canvas (D4). */
 #boardMirror {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0;
 }
 /* The mirror hosts keep the iframes' `self`/`opp` classes (code reads them as the seat), but
    not their box or the far seat's 180° flip: board-mirror.js writes viewport rects from the

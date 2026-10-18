@@ -18,6 +18,8 @@ import {
 import { toHighResCardImageUrl } from './card-image-url.mjs';
 import { hidePreviewSource } from './preview-source.mjs';
 import { suppressHoverPreview } from './hover-preview-bus.mjs';
+import { openAttachedCardsCarousel } from './attached-carousel.js';
+import { board3dActive } from '../board3d/board3d.js';
 import {
   playSelectPop,
   playDeselectPop,
@@ -69,6 +71,14 @@ const showCardCounters = (image) => {
   if (image.burnMarker) image.burnMarker.style.display = '';
   if (image.statusLoop) image.statusLoop.style.display = '';
   if (image.abilityCounter) image.abilityCounter.style.display = '';
+};
+
+// A clone of a board-mirror <img> (design 074 D4) copies the projected rect board-mirror.js
+// sync wrote inline; the preview sizes its card itself.
+const MIRROR_RECT_KEYS = ['left', 'top', 'width', 'height'];
+const dropMirrorRect = (image) => {
+  if (!image?.style) return;
+  for (const key of MIRROR_RECT_KEYS) image.style.removeProperty(key);
 };
 
 const applyHighResToImage = (image) => {
@@ -124,6 +134,12 @@ export const openAttachedCardsPanel = (targetImage, card) => {
   if (cardPreviewState) {
     closeCardPreview(null, true);
   }
+  // Design 074 D4: the 3D board draws the slot on a canvas, so the in-place `.full-view` panel
+  // has nothing to grow; the card and its attachments open in the carousel, as a double-click does.
+  if (board3dActive()) {
+    openAttachedCardsCarousel(card);
+    return true;
+  }
 
   const host = fullViewHost(targetImage);
   const anchor = imageAnchor(targetImage);
@@ -176,6 +192,9 @@ export const openCardPreview = (targetImage, card) => {
   });
   openFloatingCardPreview({
     sourceEl: anchor,
+    // On the 3D board the <img> carries the card's projected rect; a holo wrapper around it has
+    // no box of its own there (the <img> is position-fixed), so the flight starts at the <img>.
+    ...(board3dActive() ? { sourceRect: viewportRectOf(targetImage) } : {}),
     imageUrl: toHighResCardImageUrl(targetImage.currentSrc || targetImage.src),
     card,
     sleeveSrc: resolvePreviewSleeveSrc(card, targetImage),
@@ -228,7 +247,9 @@ export const openFloatingCardPreview = ({
     frontNode = cloneFrom.cloneNode(true);
     frontNode.classList.add('card-preview-card', 'mat-holo');
     frontNode.style.visibility = '';
-    applyHighResToImage(frontNode.matches('img') ? frontNode : frontNode.querySelector('img'));
+    const frontImage = frontNode.matches('img') ? frontNode : frontNode.querySelector('img');
+    if (board3dActive()) dropMirrorRect(frontImage);
+    applyHighResToImage(frontImage);
     // The clone copied the source's foil canvas blank; give it a live view of its own.
     if (cloneFrom.dataset?.tcglFoil) remountTcglFoil(frontNode, cloneFrom);
     wrapper = frontNode;

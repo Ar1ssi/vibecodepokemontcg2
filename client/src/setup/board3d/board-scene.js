@@ -211,10 +211,13 @@ export function createBoardScene({
   let stopShake = null;
   let frameId = null;
   let disposed = false;
-  // rects()/hitTest advance the card tweens between frames; when one does so mid-animation it may
-  // finish a tween the next frame then never sees moving, so that frame reports the cards moved
-  // (else `onRender` listeners, the mirror's rect sync, miss the final pose).
+  // rects()/hitTest advance the card tweens between frames. One of those calls can finish a
+  // tween, so the next frame sees nothing moving; with frames far apart a whole tween can even
+  // start and end between two frames. Either way that frame reports the cards moved, so
+  // `onRender` listeners (the mirror's rect sync) still see the final pose, and the frame after a
+  // running tween is still asked for (the scene clock advances with drawn frames).
   let cardsAdvancedOffFrame = false;
+  let posedSinceRender = false;
   const advanceCards = () => {
     if (frameId !== null) cardsAdvancedOffFrame = true;
     pool.update(clock.now());
@@ -245,7 +248,8 @@ export function createBoardScene({
     const animating = cardsMoving || pilesMoving || overlaysMoving;
     renderer.render(scene, camera);
     if (animating) invalidate();
-    onRender?.({ cardsMoving });
+    onRender?.({ cardsMoving: cardsMoving || posedSinceRender });
+    posedSinceRender = false;
   };
 
   const invalidate = () => {
@@ -560,6 +564,7 @@ export function createBoardScene({
       syncPiles(model);
       pilesApplied = true;
     }
+    posedSinceRender = true;
     invalidate();
   };
 

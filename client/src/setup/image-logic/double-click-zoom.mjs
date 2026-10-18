@@ -19,5 +19,11 @@ export const DOUBLE_CLICK_ZOOM_ZONES = Object.freeze([
   'stadium',
 ]);
 
-export const isDoubleClickZoomZone = (zoneId) =>
-  DOUBLE_CLICK_ZOOM_ZONES.includes(zoneId);
+/**
+ * @param {string} zoneId
+ * @param {{ board3d?: boolean }} [options] on the 3D board (design 074 D4) every zone takes the
+ *   zoom path, so the legacy `#fullImage` overlay is never used there: a card in a zone list
+ *   popup (the Lost Zone viewer, a looked-at card) gets the floating preview.
+ */
+export const isDoubleClickZoomZone = (zoneId, { board3d = false } = {}) =>
+  board3d || DOUBLE_CLICK_ZOOM_ZONES.includes(zoneId);
