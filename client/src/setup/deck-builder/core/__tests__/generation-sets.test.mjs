@@ -4,6 +4,8 @@ import {
   fetchGenerationSets,
   fetchGenerationEnergyCards,
   fetchHomebrewSets,
+  HOMEBREW_ENERGY_SET_ID,
+  fetchHomebrewEnergyCards,
   fetchSetCards,
   filterCardsBySupertype,
   generationEnergySetId,
@@ -186,6 +188,57 @@ describe('fetchGenerationSets', () => {
     const sets = await fetchGenerationSets(93);
     assert.ok(!sets.some((s) => s.setId === generationEnergySetId(93)));
     delete GENERATION_SERIES[93];
+  });
+});
+
+describe('fetchHomebrewSets combined Energy tab', () => {
+  it('appends one Energy tab summing the Gen 5 and Gen 6 Energy tabs, and fetchSetCards returns both generations', async () => {
+    stubFetch([
+      ['/series/hbE5', { id: 'hbE5', name: 'HB E Series 5', sets: [{ id: 'bw1', name: 'HB BW1' }] }],
+      ['/series/hbE6', { id: 'hbE6', name: 'HB E Series 6', sets: [{ id: 'xy12', name: 'HB XY12' }] }],
+      [
+        '/sets/bw1',
+        {
+          id: 'bw1',
+          name: 'HB BW1',
+          releaseDate: '2011-01-01',
+          cards: [{ id: 'bw1-105', name: 'Grass Energy', localId: '105', image: 'g5' }],
+        },
+      ],
+      [
+        '/sets/xy12',
+        {
+          id: 'xy12',
+          name: 'HB XY12',
+          releaseDate: '2013-01-01',
+          cards: [{ id: 'xy12-91', name: 'Grass Energy', localId: '91', image: 'g6' }],
+        },
+      ],
+      ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
+    ]);
+    GENERATION_SERIES[85] = ['hbE5'];
+    GENERATION_SERIES[86] = ['hbE6'];
+    const sets = await fetchHomebrewSets([86, 85]);
+
+    const energyTabs = sets.filter((s) => s.setId === HOMEBREW_ENERGY_SET_ID);
+    assert.equal(energyTabs.length, 1);
+    assert.equal(energyTabs[0].name, 'Energy');
+    assert.equal(sets[sets.length - 1].setId, HOMEBREW_ENERGY_SET_ID, 'Energy tab trails the real sets');
+    assert.ok(!sets.some((s) => s.setId.startsWith('__energy_gen')), 'per-generation Energy tabs are folded in');
+
+    const gen5Count = (await fetchGenerationEnergyCards(85)).length;
+    const gen6Count = (await fetchGenerationEnergyCards(86)).length;
+    assert.equal(energyTabs[0].cardCount, gen5Count + gen6Count);
+
+    const combined = await fetchHomebrewEnergyCards([86, 85]);
+    assert.equal(combined.length, gen5Count + gen6Count);
+    assert.ok(combined.some((c) => c.id === 'bw1-105'), 'Gen 5 energy present');
+    assert.ok(combined.some((c) => c.id === 'xy12-91'), 'Gen 6 energy present');
+    const names = combined.map((c) => c.name);
+    assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b)));
+
+    delete GENERATION_SERIES[85];
+    delete GENERATION_SERIES[86];
   });
 });
 
@@ -550,5 +603,21 @@ describe('fetchSetCards tags each card with its TCGdex supertype', () => {
       'gts1-002': 'Trainer',
       'gts1-003': 'Energy',
     });
+  });
+});
+
+// Kept last: it reads the Gen 5 and Gen 6 Energy caches the earlier tests filled,
+// so it never stubs the real Homebrew generations mid-file.
+describe('fetchSetCards routes the Homebrew Energy tab to the Gen 5 and Gen 6 Energy cards', () => {
+  it('__energy_homebrew__ returns both generations Energy cards', async () => {
+    stubFetch([]);
+    const gen5 = await fetchGenerationEnergyCards(5);
+    const gen6 = await fetchGenerationEnergyCards(6);
+    assert.ok(gen5.length > 0 && gen6.length > 0, 'both Homebrew generations contribute Energy');
+    const combined = await fetchSetCards(HOMEBREW_ENERGY_SET_ID);
+    assert.deepEqual(
+      combined.map((c) => c.id).sort(),
+      [...gen5, ...gen6].map((c) => c.id).sort()
+    );
   });
 });

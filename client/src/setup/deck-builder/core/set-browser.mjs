@@ -326,14 +326,42 @@ const TCGDEX_BASE = tcgdexApiBase();
     // Generations behind the Homebrew pill: Black & White (5) and XY (6).
     export const HOMEBREW_GENERATIONS = [5, 6];
 
-    // Every real set from the Homebrew generations, newest first. The synthetic
-    // Energy tabs are dropped; Energy cards still show inside their own sets.
+    // Synthetic set id for the Homebrew pill's single Energy tab, which combines
+    // the Energy cards of every Homebrew generation.
+    export const HOMEBREW_ENERGY_SET_ID = '__energy_homebrew__';
+
+    // Every real set from the Homebrew generations, newest first, then one combined
+    // Energy tab. The per-generation Energy tabs are folded into it; Energy cards
+    // still show inside their own sets.
     export async function fetchHomebrewSets(generations = HOMEBREW_GENERATIONS) {
       const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationSets(gen)));
-      return perGeneration
-        .flat()
+      const allSets = perGeneration.flat();
+      const sets = allSets
         .filter((set) => !GENERATION_ENERGY_SET_ID_RE.test(set.setId))
         .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+
+      const energyCardCount = allSets
+        .filter((set) => GENERATION_ENERGY_SET_ID_RE.test(set.setId))
+        .reduce((total, set) => total + set.cardCount, 0);
+      if (energyCardCount > 0) {
+        sets.push({
+          setId: HOMEBREW_ENERGY_SET_ID,
+          name: 'Energy',
+          seriesId: '',
+          releaseDate: '',
+          logo: ENERGY_SET_LOGO,
+          symbol: '',
+          cardCount: energyCardCount,
+          category: 'generation',
+        });
+      }
+      return sets;
+    }
+
+    // Every Energy card across the Homebrew generations, A to Z.
+    export async function fetchHomebrewEnergyCards(generations = HOMEBREW_GENERATIONS) {
+      const perGeneration = await Promise.all(generations.map((gen) => fetchGenerationEnergyCards(gen)));
+      return sortCardsWithinGroup(perGeneration.flat(), { sortBy: 'name', sortDirection: 'asc' });
     }
 
     // Fetch all legal Standard-format sets, newest first, with logo + release date.
@@ -855,6 +883,7 @@ const TCGDEX_BASE = tcgdexApiBase();
       if (setId === ENERGY_SET_ID) return fetchLegalEnergyCards();
       if (setId === OTHER_151_SET_ID) return fetchOther151Cards();
       if (setId === GEN_1_2_SET_ID) return fetchGen12Cards();
+      if (setId === HOMEBREW_ENERGY_SET_ID) return fetchHomebrewEnergyCards();
 
       const generationEnergyMatch = GENERATION_ENERGY_SET_ID_RE.exec(setId);
       if (generationEnergyMatch) return fetchGenerationEnergyCards(Number(generationEnergyMatch[1]));
