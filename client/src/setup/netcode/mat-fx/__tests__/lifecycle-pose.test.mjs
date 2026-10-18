@@ -10,6 +10,7 @@ import {
   presentTargetRect,
   promotePose,
   shiftedFromRect,
+  slideIdsForEvent,
   slideMeshPose,
   slidePoseFor,
 } from '../lifecycle-pose.mjs';
@@ -184,10 +185,27 @@ test('slideMeshPose: the slide motion turned by the seat, no opacity', () => {
   assert.equal(slideMeshPose(from, to, NaN)(0.5).rotate, 0, 'a bad turn is upright too');
 });
 
+test('slideMeshPose: fromScale starts the mesh at its old size and lands at the new one', () => {
+  const from = { left: 100, top: 400, width: 60, height: 84 };
+  const to = { left: 300, top: 200, width: 60, height: 84 };
+  const mesh = slideMeshPose(from, to, 0, 1.25);
+  assert.equal(mesh(0).scale, 1.25);
+  assert.equal(mesh(1).scale, 1);
+  assert.equal(slideMeshPose(from, to, 0, 0)(0).scale, 1, 'a bad fromScale is ignored');
+});
+
 test('shiftedFromRect: a member moves by the root\'s own offset and keeps its size', () => {
   const rootFrom = { left: 100, top: 400, width: 60, height: 84 };
   const rootTo = { left: 300, top: 200, width: 60, height: 84 };
   const member = { left: 310, top: 190, width: 50, height: 70 };
   assert.deepEqual(shiftedFromRect(member, rootFrom, rootTo), { left: 110, top: 390, width: 50, height: 70 });
   assert.deepEqual(shiftedFromRect(member, rootTo, rootTo), member, 'a root that did not move shifts nothing');
+});
+
+test('slideIdsForEvent names the cards a retreat, switch or promote slides', () => {
+  assert.deepEqual(slideIdsForEvent({ type: 'cardRetreated', activeId: 4, promotedId: 9 }), [4, 9]);
+  assert.deepEqual(slideIdsForEvent({ type: 'pokemonSwapped', instanceId: 3, replacedInstanceId: 5 }), [3, 5]);
+  assert.deepEqual(slideIdsForEvent({ type: 'pokemonPromoted', instanceId: 11, playerId: 'p1' }), [11]);
+  assert.deepEqual(slideIdsForEvent({ type: 'cardMoved', instanceId: 11 }), []);
+  assert.deepEqual(slideIdsForEvent(null), []);
 });

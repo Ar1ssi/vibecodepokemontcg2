@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 import {
+  MAX_SPRING_CATCHUP_FRAMES,
   POPOVER_SPIN_DEGREES,
+  advanceSpring,
   centerDeltaFor,
   createPopoverMotion,
   popoverScaleFor,
@@ -120,4 +122,44 @@ test('prizeFanCardSize shrinks so six prizes fit the viewport', () => {
 test('viewportRectOf is the element box as a plain left/top/width/height rect', () => {
   const el = { getBoundingClientRect: () => ({ left: 40, top: 80, width: 60, height: 84, right: 100, bottom: 164, x: 40, y: 80 }) };
   assert.deepEqual(viewportRectOf(el), { left: 40, top: 80, width: 60, height: 84 });
+});
+
+// card-pop.mjs RETREAT_SPRING: the stiffest spring, the first to diverge on long frames.
+const RETREAT = { stiffness: 0.12, damping: 0.62, precision: 0.01 };
+
+const runSpring = (opts, from, to, frameMs, frames) => {
+  let state = { value: from, lastValue: from, target: to, opts, invMass: 1, invMassRecoveryRate: 0 };
+  let peak = Math.abs(from - to);
+  for (let i = 0; i < frames; i += 1) {
+    const next = advanceSpring(state, frameMs);
+    state = { ...state, ...next };
+    peak = Math.max(peak, Math.abs(state.value - to));
+    if (next.settled) break;
+  }
+  return { ...state, peak };
+};
+
+test('advanceSpring settles the retreat spring on 1 s frames instead of diverging (I265)', () => {
+  const run = runSpring(RETREAT, 1, 0.55, 1000, 40);
+  assert.equal(run.value, 0.55);
+  assert.ok(run.peak <= 0.45 + 1e-9, `never overshoots past its start (peak offset ${run.peak})`);
+});
+
+test('advanceSpring at 60 fps takes one tick per frame (the original motion)', () => {
+  const state = { value: 1, lastValue: 1, target: 0, opts: RETREAT, invMass: 1, invMassRecoveryRate: 0 };
+  const next = advanceSpring(state, 1000 / 60);
+  assert.ok(Math.abs(next.value - (1 - 0.12)) < 1e-6, `one dt=1 step (${next.value})`);
+});
+
+test('advanceSpring substeps a long frame so it lands where 60 fps frames would', () => {
+  const slow = runSpring(RETREAT, 1, 0, 100, 3);
+  const fast = runSpring(RETREAT, 1, 0, 1000 / 60, 18);
+  assert.ok(Math.abs(slow.value - fast.value) < 1e-4, `${slow.value} vs ${fast.value}`);
+});
+
+test('advanceSpring caps a stalled frame at MAX_SPRING_CATCHUP_FRAMES', () => {
+  const state = { value: 1, lastValue: 1, target: 0, opts: RETREAT, invMass: 1, invMassRecoveryRate: 0 };
+  const stalled = advanceSpring(state, 60_000);
+  const capped = advanceSpring(state, (MAX_SPRING_CATCHUP_FRAMES * 1000) / 60);
+  assert.equal(stalled.value, capped.value);
 });

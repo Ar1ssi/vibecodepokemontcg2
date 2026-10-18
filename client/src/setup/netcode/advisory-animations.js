@@ -30,6 +30,7 @@ import { captureKnockoutGhost, playKnockoutGhost } from '../image-logic/knockout
 import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { onFxSettingsChanged } from '../image-logic/fx-settings.js';
 import { playFx } from './mat-fx/index.js';
+import { pinSlideOrigins, releaseSlidePins } from './mat-fx/lifecycle.js';
 import { afterHit, attackSceneEndsAt, knockoutHoldFor } from './mat-fx/combat.js';
 import { seedDamageBaselines } from './mat-fx/damage-hit.mjs';
 import { playDeckReveal } from './mat-fx/deck-reveal.js';
@@ -254,6 +255,8 @@ export function handleBeforeApply(events, selfPlayerId) {
     captureOrigins(events, registry, captureKnockoutGhost, (event) =>
       event.playerId === selfPlayerId ? 'self' : 'opp'
     );
+    pinSlideOrigins(events, registry);
+    fxQueue.whenIdle().then(releaseSlidePins);
   }
 }
 

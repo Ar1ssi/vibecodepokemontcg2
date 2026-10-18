@@ -33,6 +33,16 @@ export function moveIdsForEvent(event) {
   return [];
 }
 
+/**
+ * The ids a view event slides on the 3D board (retreat/switch: both cards; promote: the
+ * promoted card), keyed by the raw event's type. Empty for anything else.
+ */
+export function slideIdsForEvent(event) {
+  if (event?.type === 'cardRetreated' || event?.type === 'pokemonSwapped') return moveIdsForEvent(event);
+  if (event?.type === 'pokemonPromoted' && isId(event.instanceId)) return [event.instanceId];
+  return [];
+}
+
 /** Energy token drops in large and snaps to its size at the card center. */
 export function energySnapPose(t) {
   const c = clamp01(t);
@@ -72,12 +82,16 @@ export function slidePoseFor(fromRect, toRect) {
  * seat's `turn` as its rotation (opacity has no mesh equivalent, the mesh simply lands).
  * @returns {(t:number) => {x:number,y:number,scale:number,rotate:number}}
  */
-export function slideMeshPose(fromRect, toRect, turn = 0) {
+export function slideMeshPose(fromRect, toRect, turn = 0, fromScale = 1) {
   const slide = slidePoseFor(fromRect, toRect);
   const rotate = Number.isFinite(turn) ? turn : 0;
+  // `fromScale` (the card's old size over its new one) starts the mesh at the size it had, so a
+  // card pinned in its old slot (slide-pins.mjs) does not snap to the new slot's size first.
+  const startScale = Number.isFinite(fromScale) && fromScale > 0 ? fromScale : 1;
   return (t) => {
     const { x, y, scale } = slide(t);
-    return { x, y, scale, rotate };
+    const grow = startScale + (1 - startScale) * easeInOutCubic(clamp01(t));
+    return { x, y, scale: scale * grow, rotate };
   };
 }
 

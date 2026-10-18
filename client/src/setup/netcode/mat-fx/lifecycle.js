@@ -34,8 +34,12 @@ import {
   presentTargetRect,
   promotePose,
   shiftedFromRect,
+  slideIdsForEvent,
   slideMeshPose,
 } from './lifecycle-pose.mjs';
+import { getBoardScene } from '../../board3d/board3d.js';
+import { flightPoseFromTrack } from '../../board3d/flight-pose.mjs';
+import { createSlidePins } from './slide-pins.mjs';
 import { sweepPose } from './flow-pose.mjs';
 import { holdFor } from './fx-holds.mjs';
 import { discardedIds, knockoutStack, takeOrigin, takeZoneSweep } from './origins.mjs';
@@ -174,14 +178,16 @@ function slideStackMeshes(registry, id, origin, { duration, liftFrac }) {
   const rootTo = rectForInstance(id, registry);
   if (!origin?.rect || !rootTo) return 0;
   const turn = origin.turn ?? frameTurnOf(registry.get(id)?.element);
+  const fromScale = origin.rect.width / rootTo.width;
   let flown = 0;
   for (const memberId of stackIdsOf(registry, id)) {
     const to = rectForInstance(memberId, registry);
     if (!to || !meshCanFly(memberId)) continue;
+    slidePins.take(memberId);
     playMeshTrack({
       instanceId: memberId,
       rect: to,
-      pose: slideMeshPose(shiftedFromRect(to, origin.rect, rootTo), to, turn),
+      pose: slideMeshPose(shiftedFromRect(to, origin.rect, rootTo), to, turn, fromScale),
       duration,
       lift: liftFrac * to.height,
     });
@@ -189,6 +195,32 @@ function slideStackMeshes(registry, id, origin, { duration, liftFrac }) {
   }
   return flown;
 }
+
+const slidePins = createSlidePins(
+  (id, poseFn, ms) => getBoardScene()?.tween(id, poseFn, ms) ?? Promise.resolve()
+);
+
+/**
+ * Before the diff (I265): holds the mesh of every card a retreat, switch or promote in `events`
+ * will slide where it stands now, so it does not land in its new slot during the 3D board's
+ * settle hold and jump back when the slide starts. The pin is the slide's own first frame.
+ */
+export function pinSlideOrigins(events, registry) {
+  if (!Array.isArray(events)) return;
+  for (const event of events) {
+    for (const id of slideIdsForEvent(event)) {
+      for (const memberId of stackIdsOf(registry, id)) {
+        const rect = rectForInstance(memberId, registry);
+        if (!rect || !meshCanFly(memberId)) continue;
+        const turn = frameTurnOf(registry.get(memberId)?.element);
+        slidePins.pin(memberId, flightPoseFromTrack(rect, { rotate: turn }, 0, 0));
+      }
+    }
+  }
+}
+
+/** Lets go of pins whose slide never played (the FX queue went idle or was cleared). */
+export const releaseSlidePins = () => slidePins.releaseAll();
 
 export const retreat = (plan) => {
   const registry = getCardRegistry();

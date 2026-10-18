@@ -553,9 +553,9 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 - H1b: KO flies the mesh (clone fallback via `meshCanFly` when the view already buried the card; stars, held ghost, pile
   catch and streak stay HTML — `playTrailTrack`); retreat/switch slide the whole stack on meshes; promote slides Bench →
   Active (`origins.mjs` now captures `pokemonPromoted`); the opp Trainer's placing leg flies the mesh after the HTML
-  preview hold (`hideDuring` kept so the real card does not show at its spot during the preview). Known: retreat/promote
-  run after the 200 ms settle hold, so the mesh is already at its new spot and pops back to the origin before sliding
-  (fix needs the moved card held hidden from before the diff: `handleBeforeApply`, outside the three scenes).
+  preview hold (`hideDuring` kept so the real card does not show at its spot during the preview). Retreat/promote run
+  after the 200 ms settle hold; `pinSlideOrigins` (slide-pins.mjs, I265) holds their meshes at the pre-diff spot from
+  `handleBeforeApply` until the slide replaces the pin, so they no longer land and pop back.
 - Verification here: node tests for the pure parts; `test:board3d-overlays`, `test:board3d`, `test:board3d-input/drag/
   pick`, `test:inspector`, `test:fullview` green; a draw probe (solo deal) saw hand meshes move through the samples with
   zero `.fx-overlay` clones. The rec-draw capture's fabricated views do not show cards on the 3D board (F1 limit), so it

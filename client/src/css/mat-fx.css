@@ -524,19 +524,6 @@ body.fx-off .fx-overlay.fx-draw {
   inset: 0;
 }
 
-.fx-slide img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 0.3rem;
-  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.5);
-}
-
-.fx-slide {
-  will-change: transform, opacity;
-}
-
 .fx-present-dim {
   z-index: 2475;
   background: radial-gradient(ellipse at 50% 50%, rgba(8, 12, 28, 0.55), rgba(0, 0, 0, 0.95));
@@ -581,13 +568,7 @@ body.fx-off .fx-overlay.fx-draw {
   overflow: visible;
 }
 
-.fx-draw-scene {
-  z-index: 2475;
-  overflow: visible;
-}
-
-.fx-opp-play__card,
-.fx-draw-scene__card {
+.fx-opp-play__card {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
@@ -595,9 +576,7 @@ body.fx-off .fx-overlay.fx-draw {
 }
 
 .fx-opp-play__back,
-.fx-opp-play__front,
-.fx-draw-scene__back,
-.fx-draw-scene__front {
+.fx-opp-play__front {
   position: absolute;
   inset: 0;
   display: block;
@@ -609,8 +588,7 @@ body.fx-off .fx-overlay.fx-draw {
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
 }
 
-.fx-opp-play__back,
-.fx-draw-scene__back {
+.fx-opp-play__back {
   transform: rotateY(180deg);
 }
 

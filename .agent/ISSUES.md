@@ -15,7 +15,6 @@
 
 ## Open (newest first)
 - I264 2026-10-18 P2 [client] After 074-three-board G3: legacy relay (SERVER_AUTHORITATIVE=0) has no visible board (DOM goes to the hidden mirror; test:2p checks state only); orphaned sheets mat-ambient/status-marker/energy-token/damage-counter/mat-coin.css, .full-view code, .hover-gutter-probe, index.css .self/.opp
-- I265 2026-10-18 P2 [fx] 074-three-board debts: card-pop.mjs createSpring steps by uncapped frame time (retreat spring diverges on slow frames — clamp dt); retreat/promote mesh slide pops back to the origin after the 200 ms settle hold (hold the card hidden from handleBeforeApply); `.fx-slide`/`.fx-draw-scene*` CSS unused
 - I266 2026-10-18 P3 [client] 074-three-board user-check items: TCG Live camera keeps the tilt hand size; focus mesh mode drops the holo tilt; far hand showed the deck rect one sample after the opp draw; deck keys send the legacy index for server cards; 2P join of the second e2e client times out under load
 - I263 2026-10-16 P3 [board-ui] Bench AttackOverlay (074 A2: attacks hidden, Retreat inert) has no DOM or e2e test; test-card-inspector-e2e covers the Active and stack view only (refs: D219, design 074)
 - I262 2026-10-16 P3 [rules] attack-mirror-heal.test "Absorb Vitality" fails intermittently in the full `pnpm test` run, passes alone (seen on branch feature/tcgl-attack-ui, file untouched)

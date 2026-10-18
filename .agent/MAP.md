@@ -19,6 +19,7 @@ tools/ — compare-sync-logs.mjs + coin id mappings (coindl*.tsv/txt, coinmap.tx
 client/src/setup/deck-builder/ — deck builder (themes, filters, counter, sprites, wallpapers, coins) → .agent/areas/deck-builder.md
 client/src/setup/netcode/ — client transport, authoritative view renderer (apply-view.js), pickers/adapters, battle log → .agent/areas/netcode.md
 client/src/setup/netcode/mat-fx/ — mat cosmetic effects (D94/D103; Mega/Tera entries D118–D122[mat-fx]; evolution/devolution scenes D207, canvas stage D154) → .agent/areas/netcode.md § Mat FX
+client/src/setup/netcode/mat-fx/slide-pins.mjs — holds retreat/switch/promote meshes at their pre-diff spot (pinSlideOrigins in lifecycle.js, from handleBeforeApply) until the slide takes over (I265)
 client/src/setup/netcode/mat-fx/moves/attack-sound.mjs — attack scene → sound fields (tier, contact, type) for the sampled hit (D206)
 client/src/setup/netcode/mat-fx/sfx-cues.mjs + sample-bank.js + ui-cue.mjs + status-ambience.mjs + crowd.mjs + retreat-lock-watch.mjs — sampled SFX (D203, design 064): cue map, buffer bank, UI chrome cues, status loops, crowd bus
 scripts/sfx/ (`pnpm sfx:import -- --src <extract dir>`) — transcodes the TCG Live SFX extract to committed client/src/assets/sfx/*.ogg + manifest.json (D203/D204); server/sfx-cache.mjs caches only hashed .ogg

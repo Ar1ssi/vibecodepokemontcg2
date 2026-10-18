@@ -8,7 +8,7 @@ Focus: three.js board landed (074-three-board, D220–D222): the iframe board is
 Active: user localhost checks — 3D board H1/H2/H3 visuals (mesh flights, focus mesh + dim hole, camera checkbox; I266) and main's
   TCG Live attack UI (074-tcgl-attack-ui, D219: overlay rows, stack view, Buff/Debuff popup). Status FX (Burn/Sleep) check pending.
 Next: maintenance is due (`pnpm harness:check`: DECISIONS/ISSUES over cap; 60+ commits since the last maintain) → run maintain.md.
-  Then I264 (legacy relay has no board; orphaned sheets), I265 (spring dt clamp, retreat/promote pop), 069 foil on Render (I259),
+  Then I264 (legacy relay has no board; orphaned sheets), 069 foil on Render (I259),
   072 coin prompts, B&B run flow, I242, I239, I227; `node scripts/prune-merged-branches.mjs --yes` locally. ETB (057) slice 6 unstarted.
 Blocked: I85/I86 need design approval (028/029); I87 needs the user's description; I235 needs a face-down-card design.
 
