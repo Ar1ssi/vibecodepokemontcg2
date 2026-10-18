@@ -470,6 +470,17 @@ describe('startHoloAnimation', () => {
     stopHoloAnimation(card);
   });
 
+  it('a cursor resting where the preview pops open does not tilt it (pointerenter alone)', () => {
+    const card = createFakeElement();
+    startHoloAnimation(card);
+    card.dispatch('pointerenter', { clientX: 50, clientY: 140 });
+    runFrames(600);
+
+    assert.equal(card.properties['--rotate-x'], '0.00deg');
+    assert.equal(card.properties['--rotate-y'], '0.00deg');
+    stopHoloAnimation(card);
+  });
+
   it('a large tilting card gets a perspective scaled to its height, so it does not warp', () => {
     const card = createFakeElement();
     card.offsetHeight = 1000;
@@ -528,7 +539,6 @@ describe('startHoloAnimation', () => {
     startHoloAnimation(card);
 
     assert.equal(card.listeners.get('pointermove').size, 1);
-    assert.equal(card.listeners.get('pointerenter').size, 1);
     assert.equal(card.listeners.get('pointerleave').size, 1);
     stopHoloAnimation(card);
     assert.equal(card.listeners.get('pointermove').size, 0);

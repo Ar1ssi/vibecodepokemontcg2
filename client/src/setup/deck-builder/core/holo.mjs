@@ -754,7 +754,6 @@ export function startHoloAnimation(
     rafId = requestAnimationFrame(tick);
   };
 
-  const onPointerEnter = (event) => interact(event);
   const onPointerMove = (event) => interact(event);
   const onPointerLeave = () => {
     hovering = false;
@@ -763,10 +762,10 @@ export function startHoloAnimation(
 
   const hitTarget = card;
   const innerImg = card.querySelector('img');
+  // Only real motion tilts the card. A preview popping open under a resting cursor gets
+  // pointerenter mid-flight, measured against the small in-flight rect, and with no move to
+  // follow the card leaned into that stale target and stayed there.
   if (!auto) {
-    hitTarget.addEventListener('pointerenter', onPointerEnter, {
-      passive: true,
-    });
     hitTarget.addEventListener('pointermove', onPointerMove, { passive: true });
     hitTarget.addEventListener('pointerleave', onPointerLeave, {
       passive: true,
@@ -784,7 +783,6 @@ export function startHoloAnimation(
     if (rafId != null) cancelAnimationFrame(rafId);
     if (interactEndTimer) clearTimeout(interactEndTimer);
     if (!auto) {
-      hitTarget.removeEventListener('pointerenter', onPointerEnter);
       hitTarget.removeEventListener('pointermove', onPointerMove);
       hitTarget.removeEventListener('pointerleave', onPointerLeave);
       if (innerImg && innerImg !== hitTarget) {
