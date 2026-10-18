@@ -4042,7 +4042,8 @@ function transformAbility(ctx) {
   });
 }
 
-function selfAttachTargets(ctx, self) {
+/** The player's in-play roots a self-attach-as-Energy step (Buzzap, Battery) may attach to. */
+export function selfAttachTargets(ctx, self) {
   const { player, step } = ctx;
   const filter = step.targetFilter || '';
   const names = /\{[a-z]\}|^pok[eé]mon$/.test(filter) ? [] : filter.split(/\s+or\s+/);
@@ -4061,6 +4062,8 @@ function selfAttachTargets(ctx, self) {
  * and Charjabug Battery (attach this card from your hand as a Special Energy). The attached card
  * carries `asEnergy.provides`; the Knock Out itself — Prizes, discarding the rest of the stack,
  * promotion — is the reducer's (`abilitySelfKnockOut`, settleAbilityOutcomes).
+ * A Battery dropped onto a Pokémon (reduce/ability promoteSelfAttachDrop) names that Pokémon
+ * as `step.targetId`, so the drop attaches there instead of asking.
  */
 function selfAttachEnergyAbility(ctx) {
   const { draft, player, step } = ctx;
@@ -4089,8 +4092,9 @@ function selfAttachEnergyAbility(ctx) {
     return null;
   };
 
-  if (ctx.selection) {
-    const target = targets.find((c) => c.instanceId === ctx.selection[0]);
+  const chosenId = ctx.selection ? ctx.selection[0] : step.targetId;
+  if (chosenId != null) {
+    const target = targets.find((c) => c.instanceId === chosenId);
     if (!target) return skip(ctx, 'target_not_found');
     return attach(target);
   }

@@ -612,6 +612,66 @@ test('ability: an in-play Charjabug cannot use Battery', () => {
   assert.ok(use70(state, rng).error);
 });
 
+// Charjabug UNB 58 (out/pkmn-pokemon-cards.json): Battery.
+const BATTERY =
+  "Once during your turn (before your attack), you may attach this card from your hand to 1 of your Vikavolt or Vikavolt-GX as a Special Energy card. This card provides 2 {L} Energy only while it's attached to a Pokémon.";
+const charjabugInHand = (state) =>
+  state.players.p1.zones.hand.push(
+    mon(70, 'Charjabug', {
+      stage: 'Stage 1',
+      evolvesFrom: 'Grubbin',
+      abilities: [{ name: 'Battery', type: 'Ability', text: BATTERY }],
+    })
+  );
+const dropOn = (state, rng, targetInstanceId) =>
+  applyCommand(
+    state,
+    { type: 'attachCard', payload: { instanceId: 70, targetInstanceId }, playerId: 'p1' },
+    rng
+  );
+
+test('ability: dropping Charjabug on a Vikavolt-GX uses Battery on that Pokémon, no prompt', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(72, 'Vikavolt', { stage: 'Stage 2' }));
+  state.players.p1.zones.bench.push(mon(73, 'Vikavolt-GX', { stage: 'Stage 2' }));
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+  charjabugInHand(state);
+
+  const res = dropOn(state, rng, 73);
+  assert.equal(res.error, null);
+  assert.equal(res.pendingChoice, null);
+  const charjabug = res.state.players.p1.zones.bench.find((c) => c.instanceId === 70);
+  assert.equal(charjabug?.attachedTo, 73);
+  assert.deepEqual(charjabug.asEnergy.provides, ['Lightning', 'Lightning']);
+  assert.ok(abilitySpent(res));
+  assert.ok(res.events.some((e) => e.type === 'abilityUsed' && e.instanceId === 70));
+});
+
+test('ability: dropping Charjabug on a Pokémon Battery cannot reach stays an evolve attempt', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(72, 'Vikavolt', { stage: 'Stage 2' }));
+  state.players.p1.zones.bench.push(mon(73, 'Pikachu', { stage: 'Basic' }));
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+  charjabugInHand(state);
+
+  const res = dropOn(state, rng, 73);
+  assert.ok(res.error, 'Charjabug does not evolve from Pikachu');
+  assert.ok(res.state.players.p1.zones.hand.some((c) => c.instanceId === 70));
+  assert.equal(abilitySpent(res), false);
+});
+
+test('ability: a second Battery drop from the same Charjabug instance is refused once used', () => {
+  const { state, rng } = setupGame();
+  state.players.p1.zones.active.push(mon(72, 'Vikavolt', { stage: 'Stage 2' }));
+  state.players.p2.zones.active.push(mon(71, 'Opp'));
+  charjabugInHand(state);
+  state.players.p1.flags.abilitiesUsed = { 70: true };
+
+  const res = dropOn(state, rng, 72);
+  assert.ok(res.error);
+  assert.ok(res.state.players.p1.zones.hand.some((c) => c.instanceId === 70));
+});
+
 // ── legacy power restrictions ───────────────────────────────────────────
 
 const RAIN_DANCE =

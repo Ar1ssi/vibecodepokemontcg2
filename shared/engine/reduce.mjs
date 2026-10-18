@@ -25,7 +25,7 @@ import {
 import { retreatCommand } from './reduce/retreat.mjs';
 import { attachCardCommand } from './reduce/attach.mjs';
 import { promoteTrainerPlay, playTrainerCommand, stadiumEffectCommand } from './reduce/trainer.mjs';
-import { useAbilityCommand, useVStarGXCommand } from './reduce/ability.mjs';
+import { promoteSelfAttachDrop, useAbilityCommand, useVStarGXCommand } from './reduce/ability.mjs';
 import {
   clearFaceDownOffBoard, moveCardCommand, drawCommand, addDamageCounterCommand,
   updateDamageCounterCommand, removeDamageCounterCommand, addSpecialConditionCommand,
@@ -129,7 +129,7 @@ export function applyCommand(state, command, rng = null) {
     };
   }
 
-  command = promoteTrainerPlay(state, command);
+  command = promoteSelfAttachDrop(state, promoteTrainerPlay(state, command));
   if (command.pendingDataReason) {
     return {
       state,

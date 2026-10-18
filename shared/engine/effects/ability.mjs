@@ -22,6 +22,8 @@ import { flipCoin } from '../rng.mjs';
  * @param {Array} [params.events=[]]
  * @param {Array<number>|null} [params.selection=null]
  * @param {object|null} [params.resumeToken=null]
+ * @param {number|null} [params.targetInstanceId=null] The Pokémon a self-attach card was
+ *   dropped onto (Charjabug Battery): its attach step skips the target prompt.
  * @returns {{ pendingChoice: object|null, completed: boolean }}
  */
 export function executeAbility(draft, {
@@ -32,6 +34,7 @@ export function executeAbility(draft, {
   events = [],
   selection = null,
   resumeToken = null,
+  targetInstanceId = null,
 }) {
   const actingPlayerId = resumeToken?.initiatorPlayerId || playerId;
   const player = draft.players[actingPlayerId];
@@ -136,6 +139,11 @@ export function executeAbility(draft, {
   if (actionableSteps.length === 0) {
     draft.pendingChoice = null;
     return { pendingChoice: null, completed: true };
+  }
+  if (targetInstanceId != null) {
+    actionableSteps = actionableSteps.map((step) =>
+      step.type === 'selfAttachEnergyAbility' ? { ...step, targetId: targetInstanceId } : step
+    );
   }
 
   const eventsBefore = events.length;
