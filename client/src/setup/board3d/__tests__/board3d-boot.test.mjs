@@ -210,6 +210,29 @@ describe('initializeBoard3d', () => {
     assert.deepEqual(off.reloads, []);
   });
 
+  it('syncs the board mirror at once and again once tweens settle, with no rendered frame', async () => {
+    const { host, deps } = setup();
+    const syncs = [];
+    const loadModules = deps.loadModules;
+    deps.loadModules = async () => {
+      const modules = await loadModules();
+      const createBoardScene = modules.createBoardScene;
+      return {
+        ...modules,
+        createBoardScene: (args) => Object.assign(createBoardScene(args), { rects: () => ({ n: syncs.length }) }),
+        boardMirror: { observe: () => () => {}, uiState: () => undefined, sync: (model, rects) => syncs.push(rects) },
+      };
+    };
+    await initializeBoard3d({ host, requested: true, deps });
+    await flush();
+    assert.equal(syncs.length, 1);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    assert.equal(syncs.length, 2);
+    disposeBoard3d();
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    assert.equal(syncs.length, 2);
+  });
+
   it('iframeFallbackUrl keeps the other query parameters', () => {
     assert.equal(iframeFallbackUrl('http://h/x?e2e=1&board=3d#a'), 'http://h/x?e2e=1&board=iframe#a');
     assert.equal(iframeFallbackUrl('http://h/?board=iframe'), null);

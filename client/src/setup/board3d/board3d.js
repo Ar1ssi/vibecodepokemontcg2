@@ -7,6 +7,8 @@ import { flatLayout, halfFromViewport } from './board-layout.mjs';
 import { CARD_ZONES } from './board-model.mjs';
 
 const ACTIVE_CLASS = 'board3d-active';
+// Past the scene's longest tween (board-scene.js CARD_POSE_MS 180, card-mesh.js FLIP_MS 300).
+const MIRROR_SETTLE_MS = 400;
 const CHAT_LINES = {
   'legacy-netcode': 'The 3D board needs the server-run game; showing the classic board.',
   'no-webgl2': 'This browser cannot run the 3D board (no WebGL2); showing the classic board.',
@@ -254,14 +256,26 @@ export async function initializeBoard3d({
 
   // The mirror's rects follow the scene: after each model, each relayout and every frame in which
   // a card moved (plus the frame it settled on), coalesced to one write per task.
+  // A trailing sync once every tween has settled covers a page that draws no frames (a hidden or
+  // throttled tab stops the clock): its mirror still ends on the scene's final rects.
   let mirrorSyncQueued = false;
+  let settleTimer = null;
+  const syncMirrorNow = () => {
+    if (!session?.scene) return;
+    mirror.sync(current.model, session.scene.rects());
+  };
   const queueMirrorSync = () => {
-    if (!mirror || mirrorSyncQueued) return;
+    if (!mirror) return;
+    if (settleTimer !== null) clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      settleTimer = null;
+      syncMirrorNow();
+    }, MIRROR_SETTLE_MS);
+    if (mirrorSyncQueued) return;
     mirrorSyncQueued = true;
     queueMicrotask(() => {
       mirrorSyncQueued = false;
-      if (!session?.scene) return;
-      mirror.sync(current.model, session.scene.rects());
+      syncMirrorNow();
     });
   };
   let cardsWereMoving = false;
@@ -412,7 +426,10 @@ export async function initializeBoard3d({
   };
   if (mirror) {
     const unobserve = mirror.observe((id, patch) => session?.scene?.setUiState(id, patch));
-    session.cleanup.push(unobserve);
+    session.cleanup.push(unobserve, () => {
+      if (settleTimer !== null) clearTimeout(settleTimer);
+      settleTimer = null;
+    });
   }
   doc.addEventListener('board-view-applied', onViewApplied);
   session.cleanup.push(() => doc.removeEventListener('board-view-applied', onViewApplied));

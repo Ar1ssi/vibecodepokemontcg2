@@ -10,6 +10,7 @@
     "start": "pnpm -C server start",
     "test:2p": "node scripts/e2e/two-player-sync-test.mjs",
     "test:solo": "node scripts/e2e/solo-authority-test.mjs",
+    "test:board3d": "node scripts/e2e/board3d-view-test.mjs",
     "test:flip": "node scripts/e2e/flip-gate-test.mjs",
     "test:inspector": "node scripts/e2e/test-card-inspector-e2e.mjs",
     "test:spectator": "node scripts/e2e/spectator-view-test.mjs",

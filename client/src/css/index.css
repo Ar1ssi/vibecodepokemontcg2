@@ -221,6 +221,17 @@ ul, li {
   pointer-events: none;
   opacity: 0;
 }
+/* The mirror hosts keep the iframes' `self`/`opp` classes (code reads them as the seat), but
+   not their box or the far seat's 180° flip: board-mirror.js writes viewport rects from the
+   host's box, and its transform makes the host the containing block of the mirror's cards. */
+#boardMirror > #selfBoard,
+#boardMirror > #oppBoard {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  transform: translateZ(0);
+}
 /* While the 3D board runs it replaces the iframe board, the mat art and the Stadium slot;
    they stay in the DOM (board3d.js removes the class on fallback). */
 body.board3d-active #board3dHost {

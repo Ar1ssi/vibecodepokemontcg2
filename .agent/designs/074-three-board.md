@@ -539,6 +539,21 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### C7
+- The gate is `scripts/e2e/board3d-view-test.mjs` (`pnpm test:board3d`, own authoritative server), not `pnpm test:2p`
+  with `BOARD3D=1`: test:2p drives the legacy relay (`SERVER_AUTHORITATIVE=0`), where the 3D board refuses to start
+  (row 31). The view wiring itself needed no change: `board-view-applied` → `boardModelFrom` already serves 2P and the
+  spectator (spectator-session.js hands `applyView` an owner-shaped view; a POV switch's `clearRenderedBoard` +
+  `applyView` re-poses the scene — checked by id sets).
+- Fixes the run exposed: the mirror hosts inherited `.self`/`.opp` (fixed half-height boxes, far seat flipped 180°),
+  so far-side rects came out mirrored — `index.css` gives `#boardMirror > #selfBoard/#oppBoard` the full box and the
+  containing-block transform. A page drawing no frames (throttled/hidden) kept pre-tween rects — board3d.js adds a
+  trailing sync 400 ms after the last change (past the 180 ms pose / 300 ms flip tweens); boot test covers it.
+- Pre-existing, both boards (flag: legacy relay): right after the deal the peer's relayed `setupPrizes` (reset.js
+  `removeImages`) detaches apply-view's redacted opp-hand imgs until the next view re-places them. The scene draws the
+  hand from the model regardless; the harness checks the opp mirror hand only after the next view. Fix belongs in the
+  legacy relay (netcode, approval-gated), not here.
+
 ### C6
 - `containers.js` also probes WebGL2 at load (a throwaway context, lost at once) before choosing the mirror, so row 13
   (`no-webgl2` → iframe board untouched) still holds.
