@@ -13,6 +13,7 @@ import { energySearchWhat } from './search-match.mjs';
 import { symbolizeTypeWords } from './attack-text.mjs';
 import { textRevealsPicks } from './reveal-picks.mjs';
 import { rewriteLegacyPowerWording } from './legacy-power-wording.mjs';
+import { parseSelfAttachTool } from './self-attach-tool.mjs';
 
 export { rewriteLegacyPowerWording };
 
@@ -628,6 +629,20 @@ function parseWinCondition(lower) {
 export function parseAbility(text = '') {
   const lower = rewriteLegacyPowerWording(normalizeText(text));
   let steps = [];
+
+  // Shedinja Vessel of Life, Klefki Wonder Lock, Unown Q/G/E: the card attaches itself as a
+  // Pokémon Tool, and the rest of the text is that Tool's effect, not more Ability steps.
+  const selfTool = parseSelfAttachTool(lower);
+  if (selfTool) {
+    return [
+      {
+        type: 'selfAttachToolAbility',
+        ...selfTool,
+        guidance:
+          'Once during your turn: discard all cards attached to this Pokémon and attach it to 1 of your Pokémon as a Pokémon Tool card (as described).',
+      },
+    ];
+  }
 
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────
   if (

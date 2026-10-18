@@ -65,6 +65,7 @@ import {
   isVmaxCard,
 } from './card-classify.mjs';
 import { isBasicPokemon, isPokemon } from '../cards.mjs';
+import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { parseAbility, isAncientTraitAbility } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
@@ -632,6 +633,7 @@ export function sideContextFor(state, playerId) {
     // Shiftry Seal Off's abilityLock marker is live only inside its window (isAbilitySuppressed).
     turnNumber: state.turn?.number,
     powersOff: powersOffActive(state),
+    toolEffectsBlocked: Boolean(state.stadium) && stadiumBlocksToolEffects(state.stadium),
   };
 }
 
@@ -715,7 +717,17 @@ export function abilityPreventsAttackEffects(defender, attacker, ctx = {}) {
     if (!effectShieldHolderMet(shield[1], holder, ctx)) continue;
     if (effectShieldCovers(shield[4], holder, defender, ctx)) return true;
   }
-  return false;
+  return toolPreventsAttackEffects(defender, ctx);
+}
+
+// A Tool on the defender with the same shield wording, aimed at "the Pokémon this card is attached
+// to" (Unown G GUARD, GE 57, attached as a Tool). A Tool-negating Stadium turns it off.
+function toolPreventsAttackEffects(defender, ctx) {
+  if (ctx.toolEffectsBlocked) return false;
+  return attachedTools(defender, ctx.sideCards || ctx.inPlayCards).some((tool) => {
+    const shield = cardAbilityText(tool).match(ATTACK_EFFECT_SHIELD);
+    return Boolean(shield?.[3]) && /^the pok[eé]mon this card is attached to$/.test(shield[4].trim());
+  });
 }
 
 // --- card-effect shields (I219) ---------------------------------------------

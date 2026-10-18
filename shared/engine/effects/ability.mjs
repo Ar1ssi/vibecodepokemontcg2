@@ -142,7 +142,7 @@ export function executeAbility(draft, {
   }
   if (targetInstanceId != null) {
     actionableSteps = actionableSteps.map((step) =>
-      step.type === 'selfAttachEnergyAbility' ? { ...step, targetId: targetInstanceId } : step
+      SELF_ATTACH_STEPS.has(step.type) ? { ...step, targetId: targetInstanceId } : step
     );
   }
 
@@ -179,7 +179,10 @@ export function executeAbility(draft, {
   return { pendingChoice: null, completed: true, turnEnds: endsTurn && !skippedOnly };
 }
 
-const ABILITY_ENDS_TURN = /if you use this ability, your turn ends/;
+// Steps that attach the Ability's own card to a Pokémon the player names.
+const SELF_ATTACH_STEPS = new Set(['selfAttachEnergyAbility', 'selfAttachToolAbility']);
+
+const ABILITY_ENDS_TURN =/if you use this ability, your turn ends/;
 
 /** "If you use this Ability, your turn ends." (Koraidon ex Dino Cry and others). */
 export function abilityEndsTurn(text) {

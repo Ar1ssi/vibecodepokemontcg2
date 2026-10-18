@@ -48,6 +48,8 @@ export function discardCardToPlayerZone(player, card) {
     delete card.faceDownUntilTurn;
     delete card.faceDownHostId;
   }
+  // A Pokémon attached as a Tool (Unown Q, Shedinja) is a plain Pokémon card again in the discard.
+  delete card?.asTool;
   const zoneKey = isPrismStarCard(card) ? 'lostZone' : 'discard';
   if (!Array.isArray(player.zones[zoneKey])) player.zones[zoneKey] = [];
   player.zones[zoneKey].push(card);

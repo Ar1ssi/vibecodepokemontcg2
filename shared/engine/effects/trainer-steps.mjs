@@ -45,6 +45,7 @@ import {
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER } from '../rules/tool-combat.mjs';
+import { attachedTools, parseToolCap } from '../rules/ability-executors.mjs';
 import {
   attachTargetAllowed,
   energyRemovalGuarded,
@@ -4108,6 +4109,73 @@ function selfAttachEnergyAbility(ctx) {
   });
 }
 
+/** Whether `root` has room for one more Pokémon Tool (θ Double raises the cap). */
+function hasToolRoom(player, root) {
+  const zone = zoneOfRoot(player, root) || [];
+  const cap = 1 + (parseToolCap(topPokemonCard(player, root))?.extra || 0);
+  return attachedTools(root, zone).length < cap;
+}
+
+/**
+ * Shedinja Vessel of Life, Klefki Wonder Lock, Unown Q/G/E (rules/self-attach-tool.mjs): discard
+ * every card attached to this Pokémon, then attach the card itself to another of your Pokémon as
+ * a Pokémon Tool carrying `asTool.text`. The cards it evolved from go to the discard pile with the
+ * rest. Leaving the Active Spot is settled by the reducer (useAbilityCommand). A drop onto a
+ * Pokémon names it as `step.targetId`, so the drop attaches there instead of asking.
+ */
+function selfAttachToolAbility(ctx) {
+  const { draft, player, step } = ctx;
+  const card = findCard(draft, ctx.sourceCard?.instanceId)?.card;
+  const self = sourceRoot(ctx);
+  if (!card || !self) return skip(ctx, 'source_not_found');
+  const targets = rootsOf(player).filter(
+    (root) => root.instanceId !== self.instanceId && hasToolRoom(player, root)
+  );
+
+  const attach = (target) => {
+    const left = [self, ...attachedCards(player, self.instanceId)].filter((c) => c !== card);
+    for (const discarded of left) {
+      removeFromZones(player, discarded);
+      discarded.attachedTo = null;
+      discardCardToPlayerZone(player, discarded);
+    }
+    if (left.length > 0) {
+      ctx.events.push({
+        type: 'cardsDiscarded',
+        playerId: player.playerId,
+        cards: left.map((c) => ({ instanceId: c.instanceId, name: c.name })),
+      });
+    }
+    // Damage and Special Conditions live on the root, so they left with it; a Pokémon that was
+    // never evolved is its own root.
+    card.damage = 0;
+    clearConditions(card);
+    card.asTool = {
+      text: step.toolText,
+      ...(step.discardAfterOpponentTurn
+        ? { discardAtEndOfTurn: (draft.turn?.number || 0) + 1 }
+        : {}),
+    };
+    attachTo(player, card, target, ctx.events);
+    return null;
+  };
+
+  const chosenId = ctx.selection ? ctx.selection[0] : step.targetId;
+  if (chosenId != null) {
+    const target = targets.find((c) => c.instanceId === chosenId);
+    if (!target) return skip(ctx, 'target_not_found');
+    return attach(target);
+  }
+  if (targets.length === 0) return skip(ctx, 'no_attach_target');
+  if (targets.length === 1) return attach(targets[0]);
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose a Pokémon to attach this card to as a Pokémon Tool`,
+    options: targets,
+    min: 1,
+    max: 1,
+  });
+}
+
 // ── I154: the parsed Trainer step kinds that had no server executor ───────
 
 /** Attached Energy a step's `energy` filter selects ('Special Energy' or any). */
@@ -5916,6 +5984,7 @@ export const EXTRA_STEP_HANDLERS = {
   stadiumManipAbility,
   transformAbility,
   selfAttachEnergyAbility,
+  selfAttachToolAbility,
   fossilItem,
   searchOrRecover,
   returnPokemonToHand,

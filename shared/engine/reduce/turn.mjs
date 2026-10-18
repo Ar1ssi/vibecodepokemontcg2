@@ -200,6 +200,28 @@ function settleAttachedTrainersAtTurnEnd(draft, { events }) {
   }
 }
 
+/**
+ * Klefki Wonder Lock (STS 80): "If this card is attached to a Pokémon, discard this card at the
+ * end of your opponent's turn." The attach stamps the turn it lasts until (asTool.discardAtEndOfTurn).
+ */
+function discardExpiredSelfTools(draft, { events }) {
+  const turnNumber = draft.turn?.number || 1;
+  for (const player of Object.values(draft.players || {})) {
+    for (const zoneId of ['active', 'bench']) {
+      const zone = player.zones?.[zoneId] || [];
+      for (const card of [...zone]) {
+        const until = card.attachedTo != null ? card.asTool?.discardAtEndOfTurn : null;
+        if (until == null || until > turnNumber) continue;
+        zone.splice(zone.indexOf(card), 1);
+        card.attachedTo = null;
+        delete card.asTool;
+        const to = discardCardToPlayerZone(player, card);
+        events.push({ type: 'cardMoved', instanceId: card.instanceId, from: zoneId, to, playerId: player.playerId });
+      }
+    }
+  }
+}
+
 /** Koga's Ninja Trick (gym2-115): "If this Pokémon goes to your Bench, discard this card." */
 export function discardBenchedAttachedTrainers(draft, { events }) {
   for (const player of Object.values(draft.players || {})) {
@@ -418,6 +440,7 @@ export function resolveCheckup(
 
   // "At the end of your turn, discard …" Tools (TM/Cube Items).
   discardEndOfTurnTools(draft, { endingPlayerId, events });
+  discardExpiredSelfTools(draft, { events });
   settleAttachedTrainersAtTurnEnd(draft, { events });
 
   // Mandatory end-of-turn ability effects (Great Tusk ex Quaking Demolition).

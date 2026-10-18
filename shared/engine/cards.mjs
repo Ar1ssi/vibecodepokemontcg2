@@ -115,9 +115,18 @@ export function isAttachedAsEnergy(card) {
   return Boolean(card?.asEnergy && card.attachedTo != null);
 }
 
+/**
+ * A Pokémon card attached as a Pokémon Tool by its own Ability (Shedinja Vessel of Life, Klefki
+ * Wonder Lock, Unown Q/G/E): `asTool.text` is the Tool effect it has while attached. Like
+ * asEnergy, it is a Tool only while attached.
+ */
+export function isAttachedAsTool(card) {
+  return Boolean(card?.asTool && card.attachedTo != null);
+}
+
 export function isPokemon(card) {
   if (!card) return false;
-  if (isTrainer(card) || isEnergy(card)) return false;
+  if (isTrainer(card) || isEnergy(card) || isAttachedAsTool(card)) return false;
   return (
     card.supertype === 'Pokémon' ||
     card.supertype === 'Pokemon' ||

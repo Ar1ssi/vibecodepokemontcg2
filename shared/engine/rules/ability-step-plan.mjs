@@ -140,6 +140,14 @@ export function planAbilitySteps(steps = [], { mode = 'auto' } = {}) {
           action: mode === 'auto' ? 'announce' : 'promotion',
         });
         break;
+      // Shedinja / Klefki / Unown Q, G, E attach themselves as a Tool. Only the server runs it
+      // (trainer-steps selfAttachToolAbility); the plan marks it actionable so it is offered.
+      case 'selfAttachToolAbility':
+        planned.push({
+          ...base,
+          action: mode === 'auto' ? 'announce' : 'self-attach-tool',
+        });
+        break;
       case 'turnDamageBonusAbility':
         planned.push({
           ...base,
