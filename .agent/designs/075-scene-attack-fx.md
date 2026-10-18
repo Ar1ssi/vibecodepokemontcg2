@@ -383,6 +383,10 @@ slice 8 deletes it; after slice 8, revert the slice-8 commit.
 | 10–14 Style passes (fx-designer), one group per slice | 10 water, ice, aurora, poison, mud (liquid/crystal) · 11 electric, psychic, fairy, stellar, normal (energy) · 12 grass, petal, solar, bug, buzz, silver, flying · 13 dark, ghost, dragon, steel, fighting, aura (shadow/energy) · 14 rock, ancient, gem, ground (crystal/smoke) | `fxStyle` hints in those kits only | per kit: rows carry the chosen style ids; no-hint parity test stays green | n/a | user approves each group |
 
 ## Deviations (Builder appends here during build)
+- Slices 3 and 4 built as one commit (one file). Paint rows are 17 vec4 (`PAINT_TEXELS`), not 12: 8 stops need
+  2 texels of offsets + 8 of colours. Style params are named per style (`STYLE_PARAMS`, defaults from § Styles)
+  instead of free `p0..p2`. Smoke: all 144 shipped specs × every beat × 4 progress points draw on the recorder
+  with 0 errors, 0 NaN, 0 unsupported calls; ~0.5 ms per beat draw in node.
 
 ## Appendix A — material kit survey (read-only, 2026-10-18)
 
