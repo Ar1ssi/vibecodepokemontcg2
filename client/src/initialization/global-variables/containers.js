@@ -51,7 +51,13 @@ const mirrorFor = (doc) => {
 /** The board mirror (board-mirror.js) when the 3D board owns the containers, else null. */
 export const boardMirror = mirrorFor(pageDocument);
 
-const iframe = (id) => pageDocument?.getElementById(id) ?? null;
+// The iframes ship `hidden` (index.ejs, design 074 G2): the 3D board is the default, so only a
+// page that keeps the iframe board shows them.
+const iframe = (id) => {
+  const el = pageDocument?.getElementById(id) ?? null;
+  if (el) el.hidden = false;
+  return el;
+};
 
 export const selfContainer = boardMirror ? boardMirror.hosts.self : iframe('selfContainer');
 export const selfContainerDocument = boardMirror

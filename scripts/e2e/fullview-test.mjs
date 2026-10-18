@@ -142,7 +142,7 @@ async function dealSolo(browser, base, attempt) {
       return document.getElementById(side === 'opp' ? 'oppContainer' : 'selfContainer')?.contentDocument ?? null;
     };
   });
-  await page.goto(`${base}/?e2e=1${IS_3D ? '&board=3d' : ''}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(`${base}/?e2e=1${IS_3D ? '&board=3d' : '&board=iframe'}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitFor(page, () => window.__ptcg?.ready === true, 30000);
   await page.evaluate((name) => window.__ptcg.joinSolo(name), `Fullview-E2E-${attempt}`);
   await waitFor(page, () => window.__ptcg.soloSeat().solo === true);

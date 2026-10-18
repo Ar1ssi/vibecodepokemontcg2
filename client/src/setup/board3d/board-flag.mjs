@@ -1,4 +1,5 @@
-// Design 074 O9/D9: whether this page asked for the three.js board.
+// Design 074 O9/D9: whether this page gets the three.js board. On by default since slice G2;
+// `?board=iframe` or a stored '0' picks the iframe board.
 // The stored kill switch '0' beats every other source, so a broken 3D board can always be turned off.
 export const BOARD3D_KEY = 'ptcg-board-3d';
 
@@ -21,10 +22,10 @@ const readQuery = (search) => {
 /**
  * @param {string} [search] location.search
  * @param {Storage|null} [storage] localStorage-shaped; may be absent or throw
- * @param {{ defaultOn?: boolean }} [options]
+ * @param {{ defaultOn?: boolean }} [options] what nothing-set means; on since G2
  * @returns {boolean}
  */
-export function isBoard3dRequested(search = '', storage = null, { defaultOn = false } = {}) {
+export function isBoard3dRequested(search = '', storage = null, { defaultOn = true } = {}) {
   const stored = readStored(storage);
   if (stored === '0') return false;
   const query = readQuery(search);

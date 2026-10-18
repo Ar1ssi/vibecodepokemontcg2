@@ -30,8 +30,9 @@ test('?board=iframe turns it off even when default on', () => {
   assert.equal(isBoard3dRequested('?board=iframe', null, { defaultOn: true }), false);
 });
 
-test('nothing set falls back to defaultOn', () => {
-  assert.equal(isBoard3dRequested(), false);
+test('nothing set falls back to defaultOn, which is on (G2)', () => {
+  assert.equal(isBoard3dRequested(), true);
+  assert.equal(isBoard3dRequested('', storageWith(null)), true);
   assert.equal(isBoard3dRequested('', storageWith(null), { defaultOn: true }), true);
   assert.equal(isBoard3dRequested('?other=1', null, { defaultOn: false }), false);
 });
@@ -44,7 +45,8 @@ test('a storage getter that throws is ignored', () => {
   };
   assert.equal(isBoard3dRequested('?board=3d', throwing), true);
   assert.equal(isBoard3dRequested('', throwing, { defaultOn: true }), true);
-  assert.equal(isBoard3dRequested('', throwing), false);
+  assert.equal(isBoard3dRequested('', throwing), true);
+  assert.equal(isBoard3dRequested('', throwing, { defaultOn: false }), false);
 });
 
 test("?board=iframe beats a stored '1' (the late-fallback reload), stored '0' still beats all", () => {

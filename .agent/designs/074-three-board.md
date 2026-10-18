@@ -539,6 +539,16 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### G2
+- `isBoard3dRequested` defaults `defaultOn` to true, so the three callers (front-end.js, containers.js, board3d.js)
+  need no change. The iframes carry `hidden` in `index.ejs`; `containers.js` clears it on the page that keeps the
+  iframe board (no mirror), and a late fallback reloads onto `?board=iframe`, which takes that path.
+- Scripts whose iframe mode meant "no query" (`fullview`, `spectator`, `inspector`, fx-preview `board-mode.mjs`) now
+  send `&board=iframe`; the legacy scripts with no board query (`test:solo`, `test:flip` verified) run on the 3D
+  board and pass. Boot test: `scripts/e2e/board3d-boot-test.mjs` (`pnpm test:board3d-boot`): no query → 3D, iframes
+  hidden; `?board=iframe` → iframes shown; stored '0' → off.
+- G1 sign-off: the user wrote "Appears to be correct" (2026-10-18). Deploy check on Render is the user's.
+
 ### G1 — localhost parity checklist (user sign-off; reply "parity OK" or list what differs)
 Run `pnpm start`, open `http://localhost:4000/?board=3d` (or set `localStorage.setItem('ptcg-board-3d','1')`); a second
 tab without the flag shows the iframe board for side-by-side comparison. `?board=iframe` beats the stored flag.

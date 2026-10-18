@@ -87,7 +87,7 @@ async function openClient(browser, name, base) {
       return document.getElementById(side === 'opp' ? 'oppContainer' : 'selfContainer')?.contentDocument ?? null;
     };
   });
-  await page.goto(`${base}/?e2e=1${IS_3D ? '&board=3d' : ''}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(`${base}/?e2e=1${IS_3D ? '&board=3d' : '&board=iframe'}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitFor(page, () => window.__ptcg?.ready === true, undefined, 30000);
   return { page, name };
 }

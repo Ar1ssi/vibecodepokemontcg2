@@ -45,7 +45,7 @@ export function launchOptions({ args = [] } = {}) {
 }
 
 /** The e2e page at `base`, on the asked-for board. */
-export const boardUrl = (base) => `${base}/?e2e=1${IS_3D ? '&board=3d' : ''}`;
+export const boardUrl = (base) => `${base}/?e2e=1${IS_3D ? '&board=3d' : '&board=iframe'}`;
 
 /** Page-side helpers; runs in the page, so it takes nothing from this module. */
 function pageHelpers() {
