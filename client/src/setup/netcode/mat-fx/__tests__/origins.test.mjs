@@ -59,6 +59,17 @@ test('origins: an evolution is not snapshotted (design 066 plays over the evolve
   assert.equal(takeOrigin(7), undefined);
 });
 
+test('origins: a promotion snapshots the promoted card where it stood, and a skipped one drops it', () => {
+  const registry = board();
+  const event = { type: 'pokemonPromoted', playerId: 'p2', instanceId: 5 };
+  captureOrigins([event], registry, capture, () => 'opp');
+  assert.ok(takeOrigin(5), 'the promoted card is snapshotted');
+  assert.equal(takeOrigin(5), undefined, 'and taken once');
+  captureOrigins([event], registry, capture, () => 'opp');
+  discardOrigins(event);
+  assert.equal(takeOrigin(5), undefined, 'a skipped promotion leaks nothing');
+});
+
 test('knockoutStack: the top card flies as the knocked-out card, the rest of the stack with it', () => {
   const registry = board();
   const { shown, rest } = knockoutStack(registry, 1);

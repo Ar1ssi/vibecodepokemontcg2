@@ -2,7 +2,8 @@
 // card (their sleeve behind, the card's face in front) that drops off their
 // hand, grows to a preview over the mat, holds and shrinks into its spot. The
 // real card stays hidden until the preview lands on it. WAAPI (D103), and the
-// overlay removes itself.
+// overlay removes itself. Design 074 H1: on the 3D board the overlay plays up to the hold's end and
+// the card's own mesh flies the last leg, from the preview into its spot.
 import {
   animateFrames,
   hideDuring,
@@ -14,11 +15,13 @@ import {
 import { boardRect } from '../../board3d/board-rects.js';
 import { resolveCardBackSrc } from '../apply-view.js';
 import { viewportRect } from './banner.js';
-import { pileOf } from './card-flight.js';
+import { FLIGHT_LIFT_FRAC, meshCanFly, pileOf, playMeshTrack } from './card-flight.js';
 import { frameTurnOf } from './evolve-scene.js';
-import { OPP_PLAY_MS, matCenter, oppPlayTrack, oppPreviewRect } from './opp-play.mjs';
+import { OPP_PLAY_MS, matCenter, oppPlayTrack, oppPreviewRect, placeLegOf, previewPlaceLeg } from './opp-play.mjs';
 
 const BACKSTOP_PAD_MS = 400;
+// The overlay outlasts the mesh's first frames by this much, so the handover leaves no empty frame.
+const HANDOVER_MS = 60;
 const SAMPLES = 72;
 
 const face = (className, src) => {
@@ -121,6 +124,22 @@ export function playOppTrainer({ instanceId, user, origin, src, registry }) {
   ];
   const backstop = OPP_PLAY_MS + BACKSTOP_PAD_MS;
   removeWhen(host, done, backstop);
+  // A card the scene draws lands on its own mesh; one that went to the pile or has no spot fades out as before.
+  if (landing.element && !landing.fade && meshCanFly(instanceId)) {
+    const { startMs, durationMs } = previewPlaceLeg();
+    setTimeout(() => host.remove(), startMs + HANDOVER_MS);
+    done.push(
+      playMeshTrack({
+        instanceId,
+        rect: preview,
+        pose: placeLegOf(pose),
+        duration: durationMs,
+        delay: startMs,
+        lift: FLIGHT_LIFT_FRAC * landing.rect.height,
+      })
+    );
+  }
+  // The real card stays hidden until the mesh has landed (the tween shows the mesh meanwhile).
   if (landing.element) hideDuring(landing.element, Promise.all(done), backstop);
   return true;
 }

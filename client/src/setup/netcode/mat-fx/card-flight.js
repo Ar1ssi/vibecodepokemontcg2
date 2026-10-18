@@ -45,14 +45,25 @@ const trailFrame = (p) => ({
   opacity: p.opacity,
 });
 
+// The light streak of a flight over `host` (an overlay on `rect`): its animation's promise.
+function addStreak(host, rect, trail, duration, delay) {
+  const streak = document.createElement('div');
+  streak.className = 'fx-card-flight__trail';
+  const streakHeight = rect.width * 0.55;
+  streak.style.width = `${TRAIL_BASE_PX}px`;
+  streak.style.height = `${streakHeight}px`;
+  streak.style.left = `${rect.width / 2 - TRAIL_BASE_PX}px`;
+  streak.style.top = `${rect.height / 2 - streakHeight / 2}px`;
+  host.prepend(streak);
+  return animateFrames(streak, sampleKeyframes(trail, trailFrame, TRACK_SAMPLES), { duration, delay });
+}
+
 /**
  * One flying card over `rect` (page px): `pose(t)` and `trail(t)` are tracks
  * over `duration` in px from the rect's centre; no `trail`, no streak.
  * Returns the finish promise.
  */
 export function playCardTrack({ rect, src, pose, trail, duration, delay = 0, className = '' }) {
-  const W = rect.width;
-  const H = rect.height;
   const host = spawnOverlay({ rect, className: `fx-overlay fx-card-flight ${className}`.trim() });
   const card = document.createElement('div');
   card.className = 'fx-card-flight__card';
@@ -62,18 +73,19 @@ export function playCardTrack({ rect, src, pose, trail, duration, delay = 0, cla
   img.draggable = false;
   card.appendChild(img);
   host.appendChild(card);
-  const done = [animateFrames(card, sampleKeyframes(pose, cardFrame(H), TRACK_SAMPLES), { duration, delay })];
-  if (trail) {
-    const streak = document.createElement('div');
-    streak.className = 'fx-card-flight__trail';
-    const streakHeight = W * 0.55;
-    streak.style.width = `${TRAIL_BASE_PX}px`;
-    streak.style.height = `${streakHeight}px`;
-    streak.style.left = `${W / 2 - TRAIL_BASE_PX}px`;
-    streak.style.top = `${H / 2 - streakHeight / 2}px`;
-    host.prepend(streak);
-    done.push(animateFrames(streak, sampleKeyframes(trail, trailFrame, TRACK_SAMPLES), { duration, delay }));
-  }
+  const done = [animateFrames(card, sampleKeyframes(pose, cardFrame(rect.height), TRACK_SAMPLES), { duration, delay })];
+  if (trail) done.push(addStreak(host, rect, trail, duration, delay));
+  removeWhen(host, done, delay + duration + BACKSTOP_PAD_MS);
+  return Promise.all(done);
+}
+
+/**
+ * Only the light streak of a flight, over `rect`: the mesh flights (`playMeshTrack`) have no
+ * overlay card to carry it. Same `trail(t)` track and timing as `playCardTrack`.
+ */
+export function playTrailTrack({ rect, trail, duration, delay = 0, className = '' }) {
+  const host = spawnOverlay({ rect, className: `fx-overlay fx-card-flight ${className}`.trim() });
+  const done = [addStreak(host, rect, trail, duration, delay)];
   removeWhen(host, done, delay + duration + BACKSTOP_PAD_MS);
   return Promise.all(done);
 }

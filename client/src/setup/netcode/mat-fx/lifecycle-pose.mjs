@@ -68,6 +68,30 @@ export function slidePoseFor(fromRect, toRect) {
 }
 
 /**
+ * The slide as a track for a card's mesh (design 074 H1): `slidePoseFor`'s motion with the
+ * seat's `turn` as its rotation (opacity has no mesh equivalent, the mesh simply lands).
+ * @returns {(t:number) => {x:number,y:number,scale:number,rotate:number}}
+ */
+export function slideMeshPose(fromRect, toRect, turn = 0) {
+  const slide = slidePoseFor(fromRect, toRect);
+  const rotate = Number.isFinite(turn) ? turn : 0;
+  return (t) => {
+    const { x, y, scale } = slide(t);
+    return { x, y, scale, rotate };
+  };
+}
+
+/**
+ * Where a stack member slides from: its own `toRect` moved by however far the stack's root
+ * moved (`rootFrom` to `rootTo`), so the whole stack travels with its layout intact.
+ */
+export function shiftedFromRect(toRect, rootFrom, rootTo) {
+  const a = rectCenter(rootFrom);
+  const b = rectCenter(rootTo);
+  return { ...toRect, left: toRect.left + (a.x - b.x), top: toRect.top + (a.y - b.y) };
+}
+
+/**
  * Trainer/Stadium presentation: flies from `fromRect` (or grows from the
  * center) to a centered hold, then fades. `targetRect` is the centered box the
  * host was spawned on.

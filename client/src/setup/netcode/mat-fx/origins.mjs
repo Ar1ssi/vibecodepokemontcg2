@@ -53,6 +53,8 @@ const idsToCapture = (event) => {
   if (event?.type === 'trainerPlayed' && event.instanceId != null) return [event.instanceId];
   if (event?.type === 'cardsDiscarded') return discardedIds(event.cards);
   if (movesToDiscard(event)) return [event.instanceId];
+  // Design 074 H1: a promotion slides the promoted card's mesh from where it stood.
+  if (event?.type === 'pokemonPromoted' && isId(event.instanceId)) return [event.instanceId];
   return moveIdsForEvent(event);
 };
 

@@ -9,6 +9,8 @@ import {
   presentSrcFor,
   presentTargetRect,
   promotePose,
+  shiftedFromRect,
+  slideMeshPose,
   slidePoseFor,
 } from '../lifecycle-pose.mjs';
 import { captureOrigins, discardOrigins, peekCombatOrigin, takeOrigin } from '../origins.mjs';
@@ -167,4 +169,25 @@ test('slice-4 poses stay finite and bounded outside [0,1]', () => {
       }
     }
   }
+});
+
+test('slideMeshPose: the slide motion turned by the seat, no opacity', () => {
+  const from = { left: 100, top: 400, width: 60, height: 84 };
+  const to = { left: 300, top: 200, width: 60, height: 84 };
+  const slide = slidePoseFor(from, to);
+  const mesh = slideMeshPose(from, to, 180);
+  for (const t of [0, 0.3, 0.5, 1]) {
+    const { x, y, scale } = slide(t);
+    assert.deepEqual(mesh(t), { x, y, scale, rotate: 180 });
+  }
+  assert.equal(slideMeshPose(from, to)(0.5).rotate, 0, 'no turn given: upright');
+  assert.equal(slideMeshPose(from, to, NaN)(0.5).rotate, 0, 'a bad turn is upright too');
+});
+
+test('shiftedFromRect: a member moves by the root\'s own offset and keeps its size', () => {
+  const rootFrom = { left: 100, top: 400, width: 60, height: 84 };
+  const rootTo = { left: 300, top: 200, width: 60, height: 84 };
+  const member = { left: 310, top: 190, width: 50, height: 70 };
+  assert.deepEqual(shiftedFromRect(member, rootFrom, rootTo), { left: 110, top: 390, width: 50, height: 70 });
+  assert.deepEqual(shiftedFromRect(member, rootTo, rootTo), member, 'a root that did not move shifts nothing');
 });

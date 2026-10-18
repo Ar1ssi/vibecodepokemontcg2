@@ -244,8 +244,11 @@ export function handleBeforeApply(events, selfPlayerId) {
     const user = event.playerId === selfPlayerId ? 'self' : 'opp';
     const ghost = captureKnockoutGhost(user, shown.element);
     if (!ghost) continue;
-    const attached = rest.map((member) => ({ src: flightSrcOf(member.element) })).filter((a) => a.src);
-    pendingKnockoutGhosts.set(event.instanceId, { ...ghost, attached });
+    // The ids let the knockout scene fly each card's own mesh on the 3D board (design 074 H1).
+    const attached = rest
+      .map((member) => ({ src: flightSrcOf(member.element), instanceId: member.card?.instanceId }))
+      .filter((a) => a.src);
+    pendingKnockoutGhosts.set(event.instanceId, { ...ghost, attached, instanceId: shown.card?.instanceId });
   }
   if (!fxDisabled() && !motionReduced()) {
     captureOrigins(events, registry, captureKnockoutGhost, (event) =>
