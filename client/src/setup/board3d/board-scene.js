@@ -1,6 +1,7 @@
 // The three.js board's scene (design 074 §D3): camera matched to the CSS tilt, the table, the
 // cards in play (C2), the piles, prizes, Stadium and zone counts (C3), both hands fanned with
-// hover lift and the card-focus lowered pose (C4), and on-demand rendering. `three` is the
+// hover lift and the card-focus lowered pose (C4), in-card overlays and UI rings (C5), and
+// on-demand rendering. `three` is the
 // namespace from `import('three')`; this module never imports it statically.
 import { projectToScreen, tableToWorld } from './board-camera.mjs';
 import { diffModels, placementById } from './board-model.mjs';
@@ -8,6 +9,7 @@ import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { createCardMeshPool } from './card-mesh.js';
 import { handGroupsOf, posesFor } from './card-poses.mjs';
 import { createCountLabels, createStackBadges } from './count-labels.js';
+import { createOverlayMeshes } from './overlay-meshes.js';
 import { createPileMeshes } from './pile-mesh.js';
 import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
@@ -78,6 +80,7 @@ function offsetAt(keys, elapsed) {
  *     host: HTMLElement, canvas: HTMLCanvasElement, layout: object|null, cameraDesc: object|null, model: object|null, uiState: Map<number, object>,
  *     cards: ReturnType<typeof createCardMeshPool>, piles: ReturnType<typeof createPileMeshes>,
  *     labels: ReturnType<typeof createCountLabels>, badges: ReturnType<typeof createStackBadges>,
+ *     overlays: ReturnType<typeof createOverlayMeshes>,
  *     hover: number|null, handPose: 'normal'|'lowered' },
  *   dispose: () => void, clock: object }}
  */
@@ -152,7 +155,8 @@ export function createBoardScene({
     const now = clock.now();
     const cardsMoving = pool.update(now);
     const pilesMoving = piles.update(now);
-    const animating = cardsMoving || pilesMoving;
+    const overlaysMoving = overlays.update(now);
+    const animating = cardsMoving || pilesMoving || overlaysMoving;
     renderer.render(scene, camera);
     if (animating) invalidate();
   };
@@ -185,6 +189,7 @@ export function createBoardScene({
   });
   const labels = createCountLabels({ group: labelsGroup, three });
   const badges = createStackBadges({ three });
+  const overlays = createOverlayMeshes({ three, textures, clock, motionReduced, onNeedsRender: invalidate });
 
   table.onChange(invalidate);
 
@@ -292,6 +297,7 @@ export function createBoardScene({
     const poses = layout && next ? posesFor(next, layout, handOptions) : new Map();
     for (const id of pool.ids()) {
       if (poses.has(id)) continue;
+      overlays.remove(id);
       pool.release(id);
       appliedPoses.delete(id);
     }
@@ -301,7 +307,7 @@ export function createBoardScene({
       if (!pool.has(id)) {
         pool.acquire(id, { widthPx: pose.widthPx });
         pool.setFaces(id, facesOf(card));
-        pool.setHidden(id, pose.hidden);
+        pool.setHidden(id, hiddenOf(id, pose));
         pool.setPose(id, pose, 0);
         appliedPoses.set(id, pose);
         continue;
@@ -309,7 +315,7 @@ export function createBoardScene({
       const restyled = diff.restyled.has(id) || (isStadium(next, id) && diff.stadiumChanged);
       if (restyled || refresh) {
         pool.setFaces(id, facesOf(card));
-        pool.setHidden(id, pose.hidden);
+        pool.setHidden(id, hiddenOf(id, pose));
       }
       const posed = !samePose(appliedPoses.get(id), pose);
       if (relayout) pool.setPose(id, pose, 0);
@@ -317,6 +323,39 @@ export function createBoardScene({
       appliedPoses.set(id, pose);
     }
     syncStackBadges(next);
+    for (const id of poses.keys()) syncOverlaysOf(next, id);
+  }
+
+  /** A card's placement with the scene's UI state (selection, glow, mat pick, hidden) over it. */
+  const withUiState = (card, id) => ({ ...card, ...(uiState.get(id) || {}) });
+
+  const hiddenOf = (id, pose) => {
+    const hidden = uiState.get(id)?.hidden;
+    return typeof hidden === 'boolean' ? hidden : Boolean(pose?.hidden);
+  };
+
+  /**
+   * The Energy tokens a card shows: those attached to its stack, on the stack's visible card
+   * only (a root or Stage with no offset), as apply-view draws the row over the visible card.
+   */
+  const tokensOf = (source, card) => {
+    if (!card || !FOIL_ROLES.has(card.role)) return [];
+    const [right, up] = card.stackOffset ?? [0, 0];
+    if (right !== 0 || up !== 0) return [];
+    const rootId = card.host ?? card.instanceId;
+    return (source?.placements ?? [])
+      .filter((p) => p.role === 'energy' && p.energyToken && p.host === rootId && p.side === card.side)
+      .map((p) => p.energyToken);
+  };
+
+  /** Re-dresses one card's overlays (overlay-meshes.js compares and skips an unchanged card). */
+  function syncOverlaysOf(source, id) {
+    const card = cardOf(source, id);
+    const widthPx = appliedPoses.get(id)?.widthPx;
+    overlays.sync(id, card ? withUiState(card, id) : null, pool.meshOf(id), {
+      widthPx,
+      tokens: tokensOf(source, card),
+    });
   }
 
   /** "×N" on the front card of every hand stack of two or more (design 014), centred near its top. */
@@ -432,10 +471,17 @@ export function createBoardScene({
     invalidate();
   };
 
-  /** Selection/glow/mat-pick state per card instance, merged; slices C5/D3 draw it. */
+  /**
+   * Selection / glow / mat-pick / hidden state per card instance, merged over the model's (the
+   * mirror's read-back, §D4): re-dresses that card's rings and overlays and its visibility now.
+   */
   const setUiState = (id, patch) => {
     if (disposed || id === undefined || id === null || !patch || typeof patch !== 'object') return;
     uiState.set(id, { ...(uiState.get(id) || {}), ...patch });
+    if (pool.has(id)) {
+      pool.setHidden(id, hiddenOf(id, appliedPoses.get(id)));
+      syncOverlaysOf(model, id);
+    }
     invalidate();
   };
 
@@ -595,6 +641,7 @@ export function createBoardScene({
     piles,
     labels,
     badges,
+    overlays,
     hover,
     handPose,
   });
@@ -605,6 +652,7 @@ export function createBoardScene({
     disposed = true;
     if (frameId !== null) cancelFrame(frameId);
     frameId = null;
+    overlays.dispose();
     pool.dispose();
     scene.remove(cardsGroup);
     piles.dispose();

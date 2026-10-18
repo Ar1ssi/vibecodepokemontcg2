@@ -539,6 +539,24 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### C5
+- Struck: D3's "rotation conditions rotate the card as today's ROTATION_CONDITIONS" — the DOM never did (only the
+  server `rotation` a player sets by hand turns a card); no condition yaw in `card-poses.mjs` (architect-confirmed).
+- Counter art is `counter-flat.webp` for every amount (damage-counter.css: the tier classes no longer change the look),
+  with `counter-back.webp` as the CSS `::before` underside (shifted 11 %, scaled 0.9); wave/slash stay unused.
+- Overlays sit on the card's FOOTPRINT in its seat frame (server `rotation` undone, far seat's 180° kept), as apply-view
+  measures the turned card's rect; rings hug the card; loop card parts turn with it, sky parts stay screen-upright.
+- The idle loop is a faithful port, not a single frame sheet: `status-loop-frame.mjs` evaluates every status-loop.mjs part
+  (fade windows, drift, grow, rock, flipbook steps) and the CSS paints (`STATUS_LOOP_PAINT`); `overlay-meshes.js` paints
+  them on three 512 px canvases per card (under the card for the glows TCG Live draws behind it — no card cut-out
+  needed — over the card, and screen-upright). Sheets load as images (canvas sources), not through the texture cache.
+  `status-loop.mjs` exports its grids as `STATUS_LOOP_SHEETS`. Frozen (still drawn) while `motionReduced()`.
+- `sync` takes `{ widthPx, tokens }` (the stack's `energyToken`s, drawn on its visible card) and keys each card's dress,
+  rebuilding only on change; the scene calls it for every posed card on each apply, a superset of `restyled`.
+  Single tokens are round discs, two-orb tokens square (energy-token.css), not wider. `setUiState` re-dresses at once and
+  its `hidden` overrides the model's. Lab `?cards=10&overlays=1`: 41 overlay meshes on 10 cards; `rects()` identical
+  with and without overlays (17 keys, max diff 0 px) — `.agent/scratch/074/c5-overlays.png`.
+
 ### C4
 - Hand crop follows the layout, not "45 %": the fan's screen edge sits on `hand.edgeY` with
   `crop = (edgeY − baselineY) / cardBox.hand.h` (0.5: the DOM's two-strip card one strip under the edge), so an upright

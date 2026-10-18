@@ -10,7 +10,10 @@
      up) and puts a Stadium played by the near seat. ?hand=N deals N different cards to the near
      hand and ?opphand=M M face-down cards to the far hand; ?handstack=K adds K copies of one
      printing to the near hand (one hand stack); ?hover=<index> lifts the near hand card at that
-     view index.
+     view index. ?overlays=1 dresses the ?cards Pokémon in turn: 30 damage + Poisoned + Burned;
+     120 + Asleep; 250 + Confused + ability used; Paralyzed + four tokens (one double); six tokens
+     (three Fire → a "3x" badge); selected; glowing (through scene.setUiState); mat pick idle;
+     mat pick picked.
      Not linked from the game. -->
 <html lang="en">
   <head>
@@ -285,6 +288,42 @@
             zones[side][slot].push(card);
             if (i % 3 === 0) foilState.ids.set(card.instanceId, base.id);
           }
+          const withOverlays = params.get('overlays') === '1';
+          const uiState = { selected: new Set(), glows: new Map(), matPick: new Map(), hidden: new Set() };
+          let glowId = null;
+          if (withOverlays) {
+            const inPlay = [];
+            for (let i = 0; i < 6; i++) {
+              for (const side of ['you', 'them']) {
+                const zone = i === 0 ? zones[side].active : zones[side].bench;
+                const card = i === 0 ? zone[0] : zone.filter((c) => c.attachedTo == null)[i - 1];
+                if (card && card.supertype === 'Pokémon' && card.attachedTo == null) inPlay.push({ side, card });
+              }
+            }
+            const energy = (side, host, name) => {
+              const zone = zones[side].active.includes(host) ? zones[side].active : zones[side].bench;
+              zone.push({ instanceId: nextId++, name, supertype: 'Energy', type: 'Energy', attachedTo: host.instanceId });
+            };
+            const dress = [
+              ({ card }) => Object.assign(card, { damage: 30, poisoned: true, burned: true }),
+              ({ card }) => Object.assign(card, { damage: 120, specialCondition: 'Asleep' }),
+              ({ card }) => Object.assign(card, { damage: 250, specialCondition: 'Confused', abilityUsed: true }),
+              ({ side, card }) => {
+                card.specialCondition = 'Paralyzed';
+                for (const name of ['Fire Energy', 'Water Energy', 'Grass Energy', 'Double Colorless Energy']) energy(side, card, name);
+              },
+              ({ side, card }) => {
+                for (const name of ['Fire Energy', 'Fire Energy', 'Fire Energy', 'Water Energy', 'Lightning Energy', 'Double Colorless Energy']) energy(side, card, name);
+              },
+              ({ card }) => uiState.selected.add(card.instanceId),
+              ({ card }) => {
+                glowId = card.instanceId;
+              },
+              ({ card }) => uiState.matPick.set(card.instanceId, 'idle'),
+              ({ card }) => uiState.matPick.set(card.instanceId, 'picked'),
+            ];
+            inPlay.forEach((entry, i) => dress[i]?.(entry));
+          }
           const view = {
             stateVersion: 1,
             you: { playerId: 'lab-near', zones: zones.you },
@@ -294,9 +333,11 @@
           const model = boardModelFrom(view, {
             selfPlayerId: 'lab-near',
             cardBackSrcFor: () => '/src/assets/cardback.png',
+            uiState,
             onInvalid: (reason) => showError(`lab model invalid: ${reason}`),
           });
           scene.applyModel(model);
+          if (glowId !== null) scene.setUiState(glowId, { glow: '255, 196, 64' });
           const hovered = zones.you.hand[hoverIndex];
           if (hovered) scene.setHover(hovered.instanceId);
           Promise.all([loadFoilManifest(), import('/src/setup/foil/tcgl-foil-material.js')])
@@ -351,6 +392,7 @@
             `cards      ${scene.inspect().cards.ids().length}`,
             `piles      ${scene.inspect().piles.meshCount()}`,
             `labels     ${scene.inspect().labels.count()}`,
+            `overlays   ${scene.inspect().overlays.count()}`,
             `hand       ${handCountOf('self')}/${handCountOf('opp')} (${scene.inspect().badges.count()} stacks)`,
             `calls      ${render.calls}`,
             `triangles  ${render.triangles}`,
