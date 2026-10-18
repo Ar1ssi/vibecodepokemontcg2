@@ -1389,6 +1389,13 @@ const BLOCKS = [
     /discard the top card of your deck\. if it(?:'s| is) a basic energy card, attach it to 1 of your pokémon\./g,
     () => ({ type: 'atkMillAttachIfEnergy' }),
   ],
+  // Xerneas Geomancy (Steam Siege 81): choose exactly 2 Benched Pokémon, and each takes a Fairy
+  // Energy from the deck. The block consumes all three sentences so the chosen targets stay
+  // attached to the search rather than the search going to the hand.
+  [
+    new RegExp(String.raw`choose (\d+) of your benched pokémon\. for each of those pokémon, search your deck for an? ${ENERGY_TYPE}energy card and attach it to that pokémon\.(?: shuffle your deck afterward\.)?`, 'g'),
+    (m) => ({ type: 'atkAttachEachBench', source: 'deck', max: Number(m[1]), exact: true, ...energyFilter(m[2], m[0]) }),
+  ],
   // Marshadow & Machamp-GX Acme of Heroism-GX: survive a Knock Out at 10 HP next turn, gated on
   // the extra Energy. (The sentence order is printed with the condition first.)
   [
