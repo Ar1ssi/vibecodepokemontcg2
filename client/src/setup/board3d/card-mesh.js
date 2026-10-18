@@ -112,12 +112,15 @@ function buildCardGeometry(three, widthPx, uv) {
  *   setPose: (id: number, pose: import('./card-poses.mjs').CardPose, ms: number) => void,
  *   tween: (id: number, poseFn: (t: number) => object, ms: number, o?: { ease?: (t: number) => number }) =>
  *     Promise<void>,
+ *   lift: (id: number, pose: object, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
+ *   unlift: (id: number, o?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
+ *   liftedId: () => number|null,
  *   setHidden: (id: number, hidden: boolean) => void, setCamera: (desc: object|null) => void,
  *   setTilt: (id: number, tilt: { roll: number, pitch: number }|null) => void,
  *   setDim: (id: number, dim: boolean) => void,
  *   has: (id: number) => boolean, placed: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
- *   cornersOf: (id: number) => number[][]|null, update: (nowMs: number) => boolean,
+ *   cornersOf: (id: number, o?: { rest?: boolean }) => number[][]|null, update: (nowMs: number) => boolean,
  *   dispose: () => void }}
  *   A card whose image fails shows its back on both faces and the image is tried once more
  *   after 5 s (edge case 12); its name label is a text plane of slice C5. `update(now)` places
@@ -129,6 +132,16 @@ function buildCardGeometry(three, widthPx, uv) {
  *   when t reaches 1 (one frame after, with motion reduced), when a newer tween on the card
  *   replaces it, or when the card is released. The next frame after it ends puts the mesh back on
  *   the card's own pose.
+ *   `lift` (design 074 H2, card focus) flies the mesh from where it is to a held `pose` (the tween
+ *   pose shape, constant) and keeps it there: the card's own pose is suspended (setPose and hover
+ *   re-poses update their tween but do not move the mesh), the mesh is shown, hidden or not, and
+ *   the held pose is re-fitted every frame so a camera change (a resize) keeps its screen rect.
+ *   The flight blends the mesh's transform to the target's (position, slerp, scale), so it starts
+ *   exactly where the card stands. Lifting a card already lifted retargets it with no flight when
+ *   `ms` is 0, else flies from where it is. The promise resolves when the mesh has landed. `unlift`
+ *   flies it back to its own (current) pose and releases it, resolving then; `ms` 0, motion reduced,
+ *   or the card leaving the board release at once. A lifted card ignores `tween`.
+ *   `cornersOf(id, { rest: true })` gives a lifted card's corners at its own pose.
  */
 export function createCardMeshPool({
   group,
@@ -380,8 +393,8 @@ export function createCardMeshPool({
     card.foilLive = wearsFoil;
   }
 
-  const placeMesh = (card, now) => {
-    if (card.flight) return;
+  /** Writes the card's own (model) pose for `now` onto `target`: the mesh, or a scratch object. */
+  const writeRestPose = (card, now, target) => {
     const pose = card.pose.at(now);
     const flipDeg = card.flip ? card.flip.at(now) : 0;
     const scale = pose.s;
@@ -392,15 +405,20 @@ export function createCardMeshPool({
     );
     const tiltDeg = camera?.tiltDeg ?? DEFAULT_TILT_DEG;
     // Tilt with the table, then yaw on the cloth (clockwise, like CSS rotate), then the turn over.
-    card.mesh.rotation.set(
+    target.rotation.set(
       -tiltDeg * DEG,
       flipDeg * DEG,
       -pose.yawDeg * DEG,
       'XZY'
     );
-    if (card.tilt) applyTilt(card.mesh, card.tilt, tiltDeg);
-    card.mesh.position.set(x, y, z);
-    card.mesh.scale.setScalar(scale);
+    if (card.tilt) applyTilt(target, card.tilt, tiltDeg);
+    target.position.set(x, y, z);
+    target.scale.setScalar(scale);
+  };
+
+  const placeMesh = (card, now) => {
+    if (card.flight || card.lift) return;
+    writeRestPose(card, now, card.mesh);
   };
 
   // A held card's swing (drag-tilt.mjs) about the table's own axes, whatever the card's yaw or
@@ -418,7 +436,10 @@ export function createCardMeshPool({
   // ── flights (tween): a card flown by a mat-fx pose instead of its own pose.
   /** Shown while flying or just after landing, else by the card's own hidden state. */
   const visibleOf = (card) =>
-    Boolean(card.flight) || card.flightTailUntil > 0 || (Boolean(card.pose) && !card.hidden);
+    Boolean(card.flight) ||
+    Boolean(card.lift) ||
+    card.flightTailUntil > 0 ||
+    (Boolean(card.pose) && !card.hidden);
 
   /** Ends a card's flight; the promise resolves. `now` given = it landed (keep the mesh shown a beat). */
   const endFlight = (card, now) => {
@@ -460,7 +481,8 @@ export function createCardMeshPool({
 
   const tween = (id, poseFn, ms, { ease = easeOutCubic } = {}) => {
     const card = disposed ? null : cards.get(id);
-    if (!card?.pose || !camera || typeof poseFn !== 'function') return Promise.resolve();
+    // A lifted card (card focus) is held by `lift`: a flight does not take it over.
+    if (!card?.pose || card.lift || !camera || typeof poseFn !== 'function') return Promise.resolve();
     endFlight(card);
     return new Promise((resolve) => {
       const now = clock.now();
@@ -469,6 +491,155 @@ export function createCardMeshPool({
       placeFlight(card, now);
       onNeedsRender();
     });
+  };
+
+  // ── lifts (card focus, design 074 H2): a card held at a pose above the table until released.
+  const scratch = new three.Object3D();
+  const fromPosition = new three.Vector3();
+  const toPosition = new three.Vector3();
+  const fromQuaternion = new three.Quaternion();
+  const toQuaternion = new three.Quaternion();
+
+  /** The mesh's current transform, as a blend start. */
+  const snapshot = (mesh) => ({
+    position: mesh.position.toArray(),
+    quaternion: mesh.quaternion.toArray(),
+    scale: mesh.scale.x,
+  });
+
+  /** Where the held pose puts the mesh now (it follows the camera, so a resize re-fits it). */
+  const liftTarget = (card, now) => {
+    const { pose } = card.lift;
+    const flipDeg = Number.isFinite(pose.flipDeg) ? pose.flipDeg : card.flip ? card.flip.at(now) : 0;
+    return flightPlacement(
+      camera,
+      { ...pose, flipDeg, fit: 'leaned' },
+      { widthPx: card.geometry.w, heightPx: card.geometry.h, thicknessPx: card.geometry.t },
+      viewOrigin()
+    );
+  };
+
+  /** Where the card's own pose puts the mesh now (what an unlift flies back to). */
+  const restTarget = (card, now) => {
+    writeRestPose(card, now, scratch);
+    return snapshot(scratch);
+  };
+
+  const settleLift = (lift) => {
+    const waiters = lift.waiters;
+    lift.waiters = [];
+    for (const resolve of waiters) resolve();
+  };
+
+  /** Drops the lift; the card's own pose owns the mesh again from the next placement. */
+  const endLift = (card, now) => {
+    const { lift } = card;
+    if (!lift) return;
+    card.lift = null;
+    card.dirty = true;
+    if (now !== undefined) placeMesh(card, now);
+    card.mesh.visible = visibleOf(card);
+    settleLift(lift);
+  };
+
+  /** Puts the mesh where the lift has it at `now`; true once the current phase has run its time. */
+  const placeLift = (card, now) => {
+    const { lift } = card;
+    const raw = lift.ms > 0 ? Math.min(1, Math.max(0, (now - lift.start) / lift.ms)) : 1;
+    const k = raw >= 1 ? 1 : lift.ease(raw);
+    const to = lift.phase === 'out' ? restTarget(card, now) : liftTarget(card, now);
+    if (to) {
+      const { mesh } = card;
+      if (lift.from && k < 1) {
+        fromPosition.fromArray(lift.from.position);
+        toPosition.fromArray(to.position);
+        mesh.position.lerpVectors(fromPosition, toPosition, k);
+        fromQuaternion.fromArray(lift.from.quaternion);
+        toQuaternion.fromArray(to.quaternion);
+        mesh.quaternion.copy(fromQuaternion.slerp(toQuaternion, k));
+        mesh.scale.setScalar(lift.from.scale + (to.scale - lift.from.scale) * k);
+      } else {
+        mesh.position.fromArray(to.position);
+        mesh.quaternion.fromArray(to.quaternion);
+        mesh.scale.setScalar(to.scale);
+      }
+    }
+    card.mesh.visible = true;
+    return raw >= 1;
+  };
+
+  const liftOf = (card, pose, from, now, ms, ease, phase) => ({
+    pose,
+    phase,
+    from,
+    start: now,
+    ms,
+    ease,
+    waiters: card.lift?.waiters ?? [],
+  });
+
+  const isUsableRect = (rect) =>
+    Boolean(rect) &&
+    [rect.left, rect.top, rect.width, rect.height].every(Number.isFinite) &&
+    rect.width > 0 &&
+    rect.height > 0;
+
+  const lift = (id, pose, { ms = 0, ease = easeOutCubic } = {}) => {
+    const card = disposed ? null : cards.get(id);
+    if (!card?.pose || !camera || !isUsableRect(pose?.rect)) return Promise.resolve();
+    const now = clock.now();
+    const duration = durationFor(ms);
+    const current = card.lift;
+    if (current && current.phase !== 'out' && duration === 0) {
+      // Same lift, new target (a resize): no flight.
+      current.pose = pose;
+      placeLift(card, now);
+      onNeedsRender();
+      return Promise.resolve();
+    }
+    endFlight(card);
+    card.flightTailUntil = 0;
+    if (!current) placeMesh(card, now);
+    const from = snapshot(card.mesh);
+    return new Promise((resolve) => {
+      if (current) settleLift(current);
+      card.lift = liftOf(card, pose, from, now, duration, ease, 'in');
+      card.lift.waiters.push(resolve);
+      if (placeLift(card, now)) {
+        card.lift.phase = 'held';
+        card.lift.from = null;
+        settleLift(card.lift);
+      }
+      onNeedsRender();
+    });
+  };
+
+  const unlift = (id, { ms = 0, ease = easeOutCubic } = {}) => {
+    const card = disposed ? null : cards.get(id);
+    if (!card?.lift) return Promise.resolve();
+    const now = clock.now();
+    const duration = durationFor(ms);
+    if (duration === 0) {
+      endLift(card, now);
+      onNeedsRender();
+      return Promise.resolve();
+    }
+    const current = card.lift;
+    return new Promise((resolve) => {
+      if (current.phase !== 'out') {
+        // Anyone waiting on the lift-in is released: the card is on its way back.
+        settleLift(current);
+        card.lift = liftOf(card, current.pose, snapshot(card.mesh), now, duration, ease, 'out');
+      }
+      card.lift.waiters.push(resolve);
+      onNeedsRender();
+    });
+  };
+
+  /** The card held by a lift (in, held or out), or null. */
+  const liftedId = () => {
+    for (const card of cards.values()) if (card.lift) return card.id;
+    return null;
   };
 
   const withCard = (id, fn) => {
@@ -523,6 +694,7 @@ export function createCardMeshPool({
       dimFront: null,
       flight: null,
       flightTailUntil: 0,
+      lift: null,
       dirty: true,
     });
     mesh.visible = false;
@@ -532,6 +704,7 @@ export function createCardMeshPool({
   const release = (id) =>
     withCard(id, (card) => {
       endFlight(card);
+      endLift(card);
       cards.delete(id);
       group.remove(card.mesh);
       dropDimmedFront(card);
@@ -647,6 +820,20 @@ export function createCardMeshPool({
     let foilShown = false;
     for (const card of cards.values()) {
       if (!card.pose) continue;
+      if (card.lift) {
+        if (placeLift(card, now)) {
+          if (card.lift.phase === 'out') endLift(card);
+          else {
+            card.lift.phase = 'held';
+            card.lift.from = null;
+            settleLift(card.lift);
+          }
+        }
+        if (card.lift) {
+          if (card.lift.phase !== 'held') moving = true;
+          continue;
+        }
+      }
       if (card.flight) {
         if (placeFlight(card, now)) endFlight(card, now);
         moving = true;
@@ -685,18 +872,28 @@ export function createCardMeshPool({
   };
 
   /** World corners of a card's front face as currently placed: [x, y, z][] or null. */
-  const cornersOf = (id) => {
+  const cornersOf = (id, { rest = false } = {}) => {
     const card = cards.get(id);
     if (!card) return null;
     const { w, h, t } = card.geometry;
-    card.mesh.updateMatrixWorld();
+    let object = card.mesh;
+    if (rest && card.lift && card.pose) {
+      // A lifted card still stands at its slot as far as the board is concerned.
+      writeRestPose(card, clock.now(), scratch);
+      object = scratch;
+      group.updateMatrixWorld();
+      scratch.updateMatrix();
+      scratch.matrixWorld.multiplyMatrices(group.matrixWorld, scratch.matrix);
+    } else {
+      card.mesh.updateMatrixWorld();
+    }
     return [
       [-w / 2, -h / 2],
       [w / 2, -h / 2],
       [w / 2, h / 2],
       [-w / 2, h / 2],
     ].map(([x, y]) =>
-      card.mesh.localToWorld(new three.Vector3(x, y, t / 2)).toArray()
+      object.localToWorld(new three.Vector3(x, y, t / 2)).toArray()
     );
   };
 
@@ -716,6 +913,9 @@ export function createCardMeshPool({
     setFaces,
     setPose,
     tween,
+    lift,
+    unlift,
+    liftedId,
     setTilt,
     setDim,
     setHidden,

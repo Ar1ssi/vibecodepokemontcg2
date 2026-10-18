@@ -299,9 +299,11 @@ try {
       hand.every((p) => !rects[p.instanceId] || rects[p.instanceId].top >= innerHeight - slack);
   }, 6000, [HAND_DOWN_SLACK_PX]);
   T(`3c. the own hand lowers below the viewport (every hand rect top ≥ innerHeight − ${HAND_DOWN_SLACK_PX})`, lowered);
-  T('3d. the Active mesh is hidden while the focus is open', await eventually(page, async (id) => {
+  // H2: the focused card IS its mesh, lifted to the focus rect (not hidden under an HTML copy).
+  T('3d. the Active mesh is lifted to the focus while the focus is open', await eventually(page, async (id) => {
     const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
-    return getBoardScene().inspect().uiState.get(id)?.hidden === true;
+    const info = getBoardScene().inspect();
+    return info.focusLifted === id && info.uiState.get(id)?.hidden !== true;
   }, 6000, activeId));
   await page.waitForTimeout(600);
   await page.keyboard.press('Escape');
@@ -314,9 +316,10 @@ try {
     return scene.inspect().handPose === 'normal' && hand.some((p) => rects[p.instanceId] && rects[p.instanceId].top < innerHeight - slack);
   }, 6000, [HAND_DOWN_SLACK_PX]);
   T('3f. … the hand comes back up', raised);
-  T('3g. … and the Active mesh shows again', await eventually(page, async (id) => {
+  T('3g. … and the Active mesh is released to its slot', await eventually(page, async (id) => {
     const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
-    return getBoardScene().inspect().uiState.get(id)?.hidden !== true;
+    const info = getBoardScene().inspect();
+    return info.focusLifted === null && info.uiState.get(id)?.hidden !== true;
   }, 6000, activeId));
 
   // Row 21: a picker opening while the focus is open closes it (card-focus.mjs watchForPickers).

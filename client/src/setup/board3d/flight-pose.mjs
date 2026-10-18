@@ -24,6 +24,19 @@ const multiply = (a, b) => [
   a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
 ];
 
+/** Rotates the vector `v` by the unit quaternion `q` ([x, y, z, w]). */
+const rotateVector = (q, v) => {
+  const [x, y, z, w] = q;
+  const tx = 2 * (y * v[2] - z * v[1]);
+  const ty = 2 * (z * v[0] - x * v[2]);
+  const tz = 2 * (x * v[1] - y * v[0]);
+  return [
+    v[0] + w * tx + (y * tz - z * ty),
+    v[1] + w * ty + (z * tx - x * tz),
+    v[2] + w * tz + (x * ty - y * tx),
+  ];
+};
+
 const finite = (value, fallback = 0) => (Number.isFinite(value) ? value : fallback);
 
 const usableRect = (rect) =>
@@ -35,11 +48,14 @@ const usableRect = (rect) =>
 /**
  * @param {ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>} camera
  * @param {{ rect: { left: number, top: number, width: number, height: number },
- *   rotateZDeg?: number, tiltXDeg?: number, lift?: number, flipDeg?: number }} pose
+ *   rotateZDeg?: number, tiltXDeg?: number, lift?: number, flipDeg?: number, fit?: 'leaned' }} pose
  *   `rect` is the card's unturned box in viewport px; `rotateZDeg` turns it on screen clockwise (CSS
  *   `rotate`), `tiltXDeg` leans its top edge away (CSS `rotateX`), `lift` is table px above the cloth,
- *   `flipDeg` turns it about its vertical axis (180 = back up, CSS `rotateY`).
- * @param {{ widthPx: number, heightPx: number }} card the mesh geometry's width and height
+ *   `flipDeg` turns it about its vertical axis (180 = back up, CSS `rotateY`). `fit: 'leaned'` sizes
+ *   the card so its height as it finally stands (leaned, turned) projects to `rect.height`, instead
+ *   of the unleaned card's: a card faced square-on to the screen then covers `rect` (card focus).
+ * @param {{ widthPx: number, heightPx: number, thicknessPx?: number }} card the mesh geometry's size;
+ *   with `fit: 'leaned'` and a thickness, `rect` is the front face's and the slab sits behind it
  * @param {{ left: number, top: number }} [origin] the canvas's box in viewport px
  * @returns {{ position: number[], quaternion: number[], scale: number } | null}
  *   null when the rect is unusable or the ray from its centre misses the plane. The mesh's centre
@@ -64,14 +80,26 @@ export function flightPlacement(camera, pose, card, origin = { left: 0, top: 0 }
   const tableCentre = { x: centre.x, y: centre.y * Math.cos(tilt) - centre.z * Math.sin(tilt) };
   const dir = [-Math.sin(upDeg * DEG), Math.cos(upDeg * DEG)];
 
+  // Table tilt ∘ turn on the cloth ∘ lean about the card's own x ∘ flip about its y.
+  const X = [1, 0, 0];
+  const Y = [0, 1, 0];
+  const Z = [0, 0, 1];
+  let quaternion = axisAngle(Y, finite(pose.flipDeg));
+  quaternion = multiply(axisAngle(X, -finite(pose.tiltXDeg)), quaternion);
+  quaternion = multiply(axisAngle(Z, upDeg - finite(pose.rotateZDeg)), quaternion);
+  quaternion = multiply(axisAngle(X, -tiltDeg), quaternion);
+
+  const leaned = pose.fit === 'leaned';
+  const standingUp = rotateVector(quaternion, Y);
+  const centreWorld = tableToWorld({ ...tableCentre, z: lift }, camera);
   const projectedHeight = (scale) => {
     const reach = (card.heightPx * scale) / 2;
-    const [a, b] = [1, -1].map((sign) =>
-      projectToScreen(
-        camera,
-        tableToWorld({ x: tableCentre.x + sign * reach * dir[0], y: tableCentre.y + sign * reach * dir[1], z: lift }, camera)
-      )
+    const ends = [1, -1].map((sign) =>
+      leaned
+        ? centreWorld.map((value, axis) => value + sign * reach * standingUp[axis])
+        : tableToWorld({ x: tableCentre.x + sign * reach * dir[0], y: tableCentre.y + sign * reach * dir[1], z: lift }, camera)
     );
+    const [a, b] = ends.map((end) => projectToScreen(camera, end));
     return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
   };
   let scale = 1;
@@ -82,16 +110,14 @@ export function flightPlacement(camera, pose, card, origin = { left: 0, top: 0 }
   }
   if (!(scale > 0) || !Number.isFinite(scale)) return null;
 
-  // Table tilt ∘ turn on the cloth ∘ lean about the card's own x ∘ flip about its y.
-  const X = [1, 0, 0];
-  const Y = [0, 1, 0];
-  const Z = [0, 0, 1];
-  let quaternion = axisAngle(Y, finite(pose.flipDeg));
-  quaternion = multiply(axisAngle(X, -finite(pose.tiltXDeg)), quaternion);
-  quaternion = multiply(axisAngle(Z, upDeg - finite(pose.rotateZDeg)), quaternion);
-  quaternion = multiply(axisAngle(X, -tiltDeg), quaternion);
-
-  return { position: [centre.x, centre.y, centre.z], quaternion, scale };
+  const position = [centre.x, centre.y, centre.z];
+  if (leaned && card.thicknessPx > 0) {
+    // The rect is the front face's: seat the slab behind it, not centred on it.
+    const front = rotateVector(quaternion, Z);
+    const back = (card.thicknessPx * scale) / 2;
+    for (let axis = 0; axis < 3; axis += 1) position[axis] -= front[axis] * back;
+  }
+  return { position, quaternion, scale };
 }
 
 /** A card in flight rides this share of its height above the cloth (design 074 H1). */

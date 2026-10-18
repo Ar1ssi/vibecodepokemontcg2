@@ -100,6 +100,28 @@ describe('067 — card-focus.css', () => {
     assert.doesNotMatch(decls, /backdrop-filter/i);
   });
 
+  // Design 074 H2: on the 3D board the card is the canvas mesh under this layer.
+  it('mesh mode dims around a hole the size of the card, so the mesh below is not darkened', () => {
+    const dim = focus('.card-focus__dim');
+    assert.ok(dim, '.card-focus__dim is missing');
+    assert.match(dim, /box-shadow: 0 0 0 100vmax rgba\(/);
+    assert.doesNotMatch(dim, /background/i);
+    for (const v of ['left: var(--focus-left)', 'top: var(--focus-top)', 'width: var(--focus-w)', 'height: var(--focus-h)']) {
+      assert.ok(dim.includes(v), v);
+    }
+    assert.match(focus('.card-focus--mesh .card-focus__backdrop'), /background: none;/);
+    assert.ok(focus('.card-focus--open .card-focus__dim'));
+    assert.ok(focus('.card-focus--closing .card-focus__dim'));
+  });
+
+  it('mesh mode keeps the host box for the chrome but hides the card art and its shadow', () => {
+    assert.match(focus('.card-focus__card.card-focus__card--mesh'), /box-shadow: none;/);
+    const art = focus('.card-focus__card--mesh .mat-holo');
+    assert.match(art, /visibility: hidden;/);
+    assert.doesNotMatch(art, /display:\s*none/);
+    assert.match(focus('.card-focus__card--mesh .discard-pile-card'), /visibility: hidden;/);
+  });
+
   // Numbers are TCG Live's own: level6 AttackOverlay/CardSize/ExpandingRegion and the
   // AttackActionOption_L prefab (sharedassets6), in game units (--tu, card mesh 6.397 wide).
   it('lengths are in game units and the list floats 1.6 units in front of the card', () => {

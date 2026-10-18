@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { cameraFromCssTilt, projectToScreen } from '../board-camera.mjs';
+import { cameraFromCssTilt, cameraTcgLive, projectToScreen } from '../board-camera.mjs';
 import { flightPlacement } from '../flight-pose.mjs';
 
 const close = (actual, expected, message, tolerance = 0.5) =>
@@ -110,4 +110,29 @@ test('flightPoseFromTrack: px offsets from the rect centre become a rect, lift r
   const bare = flightPoseFromTrack(rect, {}, 0.5, 0);
   assert.deepEqual(bare.rect, rect);
   assert.equal(bare.rotateZDeg, 0);
+});
+
+test("fit 'leaned': a card faced square-on covers the rect with its front face", () => {
+  for (const tcgl of [false, true]) {
+    const params = { viewportW: 1920, viewportH: 1080 };
+    const camera = tcgl ? cameraTcgLive(params) : cameraFromCssTilt(params);
+    const tiltDeg = camera.tiltDeg;
+    const rect = { left: 300, top: 60, width: (588 * 6.397) / 8.9, height: 588 };
+    const thickness = 1.2;
+    const placement = flightPlacement(
+      camera,
+      { rect, tiltXDeg: -tiltDeg, lift: 180, fit: 'leaned' },
+      { ...CARD, thicknessPx: thickness }
+    );
+    assert.ok(placement);
+    const front = (x, y) => screenOf(camera, placement, [x, y, thickness / 2]);
+    const [bottomLeft, topRight] = [
+      front(-CARD.widthPx / 2, -CARD.heightPx / 2),
+      front(CARD.widthPx / 2, CARD.heightPx / 2),
+    ];
+    close(bottomLeft.x, rect.left, 'left', 0.05);
+    close(topRight.y, rect.top, 'top', 0.05);
+    close(topRight.x, rect.left + rect.width, 'right', 0.05);
+    close(bottomLeft.y, rect.top + rect.height, 'bottom', 0.05);
+  }
 });

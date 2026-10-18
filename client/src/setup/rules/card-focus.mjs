@@ -9,6 +9,11 @@
  *
  * The stage is a CSS perspective container (FOV 20°, as the game's camera). The card is never
  * faded or filtered: opacity or a filter would flatten its preserve-3d tilt (013 C2).
+ *
+ * On the 3D board (design 074 H2) the card face is the card's own mesh: `scene.lift` flies it from
+ * its slot to the focus rect and holds it there, square-on, until the close flies it back. The HTML
+ * host keeps its box and the inspector chrome rides on it, but its card art is not shown. A card
+ * the scene does not draw keeps the HTML card and its flight.
  */
 
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
@@ -43,6 +48,7 @@ import {
   perspectiveFor,
 } from './card-focus-geometry.mjs';
 import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
+import { flightEase, focusMeshId, focusMeshPose, reversed } from './card-focus-mesh.mjs';
 
 const HAND_LOWERED_CLASS = 'hand-lowered';
 const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
@@ -60,6 +66,7 @@ const LIFT_SHADOW_TO = '0 3.2vh 6.4vh rgba(0, 0, 0, 0.62)';
 const REVEAL_START = `${COLLAPSED_FRACTION * 100}%`;
 const REVEAL_END = '100%';
 const REVEALING_CLASS = 'card-focus__card--revealing';
+const MESH_CLASS = 'card-focus--mesh';
 
 /** @type {null | object} */
 let focusState = null;
@@ -157,13 +164,23 @@ const startOpenAnimations = (state, from, to) => {
     from.width > 0 && from.height > 0
       ? transformString(flightTransform(from, to, { tiltDeg: DEFAULT_TILT_DEG }))
       : 'scale(0.85)';
+  // The mesh casts its own shadow; the host's would frame an empty box.
   state.flight = host.animate(
-    [
-      { transform: fromStart, boxShadow: LIFT_SHADOW_FROM },
-      { transform: 'none', boxShadow: LIFT_SHADOW_TO },
-    ],
+    state.meshId === null
+      ? [
+          { transform: fromStart, boxShadow: LIFT_SHADOW_FROM },
+          { transform: 'none', boxShadow: LIFT_SHADOW_TO },
+        ]
+      : [{ transform: fromStart }, { transform: 'none' }],
     { duration: FLIGHT_MS, easing: FLIGHT_EASE, fill: 'both' }
   );
+  if (state.meshId !== null) {
+    getBoardScene()?.lift(state.meshId, {
+      ...focusMeshPose(to, getBoardScene()),
+      ms: FLIGHT_MS,
+      ease: flightEase,
+    });
+  }
   host.classList.add(REVEALING_CLASS);
   state.reveal = host.animate(
     { '--focus-reveal': [REVEAL_START, REVEAL_END] },
@@ -228,6 +245,11 @@ const onResize = () => {
   state.to = rect;
   state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
   applyPose(state, rect);
+  // Re-fit the lifted card to the new rect: no flight.
+  const scene = getBoardScene();
+  if (state.meshId !== null && state.opened && scene) {
+    scene.lift(state.meshId, { ...focusMeshPose(rect, scene), ms: 0 });
+  }
 };
 
 const watchForPickers = () => {
@@ -285,6 +307,8 @@ export function openCardFocus({
     closing: false,
     opened: false,
     openedAt: performance.now(),
+    // The card's mesh stands for its face when the 3D board draws it (design 074 H2).
+    meshId: focusMeshId(getBoardScene(), sourceImg),
   };
   focusState = state;
 
@@ -305,6 +329,10 @@ export function openCardFocus({
     state.stage = el('div', 'card-focus__stage');
     state.stage.style.perspective = `${perspectiveFor(viewport.height)}px`;
     state.host = el('div', 'card-focus__card');
+    if (state.meshId !== null) {
+      state.root.classList.add(MESH_CLASS);
+      state.host.classList.add('card-focus__card--mesh');
+    }
     applyPose(state, to);
     // Hidden until the flight starts, so the card never shows at its resting pose first.
     state.host.style.visibility = 'hidden';
@@ -326,7 +354,9 @@ export function openCardFocus({
           }
         : null,
     });
-    state.root.append(backdrop, state.stage, hud);
+    // The dim sits above the canvas, so over the mesh too: it leaves a hole where the card stands.
+    if (state.meshId !== null) state.root.append(backdrop, el('div', 'card-focus__dim'), state.stage, hud);
+    else state.root.append(backdrop, state.stage, hud);
 
     // Capture phase, before the inspector's delegated click handler on the card: panels only see
     // clicks once the guard window has passed.
@@ -351,7 +381,7 @@ export function openCardFocus({
 
     document.body.appendChild(state.root);
     lowerHand(state);
-    hideSource(state);
+    if (state.meshId === null) hideSource(state);
     state.cleanups = [
       watchForPickers(),
     ];
@@ -359,7 +389,10 @@ export function openCardFocus({
     CLOSE_EVENTS.forEach((name) =>
       document.addEventListener(name, closeImmediately)
     );
-    if (state.holoWrapper) startHoloAnimation(state.holoWrapper, MAT_HOLO_OPTIONS);
+    if (state.holoWrapper && state.meshId === null) {
+      startHoloAnimation(state.holoWrapper, MAT_HOLO_OPTIONS);
+      state.holoStarted = true;
+    }
     uiCue('big-card-in');
   } catch (error) {
     console.error('card focus failed to open', error);
@@ -398,8 +431,9 @@ const teardown = (state) => {
     document.removeEventListener(name, closeImmediately)
   );
   raiseHand(state);
-  if (state.holoWrapper) stopHoloAnimation(state.holoWrapper);
+  if (state.holoStarted) stopHoloAnimation(state.holoWrapper);
   restoreSource(state);
+  if (state.meshId !== null) getBoardScene()?.unlift(state.meshId, { ms: 0 });
   state.root?.remove();
   if (focusState === state) focusState = null;
 };
@@ -466,10 +500,12 @@ export function closeCardFocus({ immediate = false } = {}) {
       : 'scale(0.85)';
     animations.push(
       state.host.animate(
-        [
-          { transform: 'none', boxShadow: LIFT_SHADOW_TO },
-          { transform: back, boxShadow: LIFT_SHADOW_FROM },
-        ],
+        state.meshId === null
+          ? [
+              { transform: 'none', boxShadow: LIFT_SHADOW_TO },
+              { transform: back, boxShadow: LIFT_SHADOW_FROM },
+            ]
+          : [{ transform: 'none' }, { transform: back }],
         {
           duration: rect ? FLIGHT_MS : collapseDurationMs(1, COLLAPSED_FRACTION),
           easing: rect ? FLIGHT_EASE : COLLAPSE_EASE,
@@ -477,6 +513,19 @@ export function closeCardFocus({ immediate = false } = {}) {
         }
       )
     );
+  }
+
+  if (state.meshId !== null) {
+    const scene = getBoardScene();
+    // Same clock as the host's flight: what is left of it when closed mid-way, else all of it.
+    const flying = state.flight.playState === 'running';
+    const ms = flying ? Number(state.flight.currentTime) || 0 : FLIGHT_MS;
+    const ease = flying ? reversed(flightEase, ms / FLIGHT_MS) : flightEase;
+    if (scene) {
+      animations.push({
+        finished: scene.unlift(state.meshId, { ms, ease }),
+      });
+    }
   }
 
   let finished = false;

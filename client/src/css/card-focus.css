@@ -45,6 +45,32 @@
   opacity: 0;
 }
 
+/* 3D board (design 074 H2): the card face is the card's own mesh, drawn in the canvas under this
+   layer. The dim would darken it with the rest of the board, so it is a box-shadow around a hole the
+   size of the card instead of a fill; the backdrop stays as the (clear) click target. The host keeps
+   its box for the chrome but not its card art, and the mesh casts the card's shadow. */
+.card-focus--mesh .card-focus__backdrop { background: none; }
+.card-focus__dim {
+  position: absolute;
+  left: var(--focus-left);
+  top: var(--focus-top);
+  width: var(--focus-w);
+  height: var(--focus-h);
+  border-radius: 4.5% / 3.2%;
+  box-shadow: 0 0 0 100vmax rgba(2, 6, 12, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--focus-flight-ms) var(--focus-flight-ease);
+}
+.card-focus--open .card-focus__dim { opacity: 1; }
+.card-focus--closing .card-focus__dim {
+  transition: opacity var(--focus-collapse-ms) var(--focus-collapse-ease);
+  opacity: 0;
+}
+.card-focus__card.card-focus__card--mesh { box-shadow: none; }
+.card-focus__card--mesh .mat-holo,
+.card-focus__card--mesh .discard-pile-card { visibility: hidden; }
+
 /* perspective is set inline from the viewport height (card-focus-geometry `perspectiveFor`). */
 .card-focus__stage {
   position: absolute;

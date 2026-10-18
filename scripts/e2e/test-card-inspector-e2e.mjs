@@ -271,28 +271,50 @@ try {
     }
     return false;
   };
-  // card-focus.mjs hideSource: the board image (or its holo wrapper) goes visibility:hidden; the
-  // mirror then reports the card hidden to the scene, which hides the mesh.
+  // The focus stands the card's own mesh in for its face (design 074 H2): the scene holds that mesh
+  // lifted (`focusLifted`) and leaves the board image alone. A card the scene does not draw falls
+  // back to card-focus.mjs hideSource: the image (or its holo wrapper) goes visibility:hidden and
+  // the mirror then reports the card hidden to the scene.
   const sourceState = () =>
     actor.page.evaluate(async () => {
       const img = window.__boardRoot('self').querySelector('#active img');
       const target = img.closest('.mat-holo') ?? img;
       const dom = getComputedStyle(target).visibility === 'hidden';
       const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
-      return { dom, scene: getBoardScene().inspect().uiState.get(Number(img.dataset.instanceId))?.hidden === true };
+      const view = getBoardScene().inspect();
+      const id = Number(img.dataset.instanceId);
+      return { dom, scene: view.uiState.get(id)?.hidden === true, lifted: view.focusLifted === id };
     });
   const sourceHidden = async () => {
     const state = await sourceState();
-    return state.dom && state.scene;
+    return state.lifted || (state.dom && state.scene);
   };
   const sourceVisible = async () => {
     for (let i = 0; i < 40; i += 1) {
       const state = await sourceState();
-      if (!state.dom && !state.scene) return true;
+      if (!state.dom && !state.scene && !state.lifted) return true;
       await actor.page.waitForTimeout(150);
     }
     return false;
   };
+  // Screen box of the focus card's mesh (the lifted card's front face through the board camera).
+  const meshBoxOf = () =>
+    actor.page.evaluate(async () => {
+      const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+      const { projectToScreen } = await import('/src/setup/board3d/board-camera.mjs');
+      const view = getBoardScene().inspect();
+      if (view.focusLifted === null) return null;
+      const canvas = view.canvas.getBoundingClientRect();
+      const points = view.cards.cornersOf(view.focusLifted).map((corner) => projectToScreen(view.cameraDesc, corner));
+      const xs = points.map((p) => canvas.left + p.x);
+      const ys = points.map((p) => canvas.top + p.y);
+      return {
+        left: Math.min(...xs),
+        top: Math.min(...ys),
+        width: Math.max(...xs) - Math.min(...xs),
+        height: Math.max(...ys) - Math.min(...ys),
+      };
+    });
   const waitGone = async () => {
     for (let i = 0; i < 20; i += 1) {
       if (!(await focusOpen())) return true;
@@ -309,7 +331,7 @@ try {
   T('5b. ...and not the carousel', !(await carouselVisible()));
   T('5c. Flight finished: backdrop open class set', await actor.page.evaluate(() => document.querySelector('.card-focus')?.classList.contains('card-focus--open')));
   T('5d. The hand is lowered in the scene and on the mirror host', await handLowered());
-  T('5e. The source card is hidden while focused', await sourceHidden());
+  T('5e. The source card is lifted off the board (its mesh is the focus card) while focused', await sourceHidden());
 
   // 5f. A human-paced double-click: two REAL clicks 250 ms apart. The second click must not close
   // the view.
@@ -347,6 +369,13 @@ try {
   );
 
   // 6. Pose: the card sits on the pose derived from the game's camera, with chrome sized to it
+  // `card-focus--open` is set when the flight STARTS; the host reaches the focus rect when its
+  // WAAPI flight ends, which under SwiftShader's ~1 s frames can be seconds of wall time.
+  await waitFor(actor.page, () => {
+    const host = document.querySelector('.card-focus__card');
+    const flights = host?.getAnimations() ?? [];
+    return flights.length > 0 && flights.every((a) => a.playState === 'finished');
+  }, 15000).catch(() => null);
   const pose = await actor.page.evaluate(async () => {
     const { focusRect, perspectiveFor } = await import('./src/setup/rules/card-focus-geometry.mjs');
     const host = document.querySelector('.card-focus__card');
@@ -370,6 +399,14 @@ try {
   );
   T('6b. Stage perspective follows the 20-degree camera', within(pose.perspective, pose.expectedPerspective, 1));
   T('6c. Chrome is sized to the unscaled card (--u = width / 100)', within(pose.u * 100, pose.rect.width, 2) && within(pose.chromeWidth, pose.rect.width, 3));
+
+  // 6d. The lifted mesh, projected through the board camera, covers the focus rect: it is the card.
+  const meshBox = await meshBoxOf();
+  T(
+    '6d. The lifted card mesh covers the focus rect (within 2 px)',
+    Boolean(meshBox) && ['left', 'top', 'width', 'height'].every((k) => within(meshBox[k], pose.expected[k], 2)),
+    JSON.stringify({ meshBox, expected: pose.expected })
+  );
 
   const inspectorData = await actor.page.evaluate(() => {
     const insp = document.querySelector('.card-focus .ptcg-inspector');
@@ -584,6 +621,15 @@ try {
     });
     T('14. Resize while open re-fits the card to the new pose', resized.ok, resized.ok ? '' : JSON.stringify(resized));
     T('14b. ...and re-places the chrome (--u follows the new width)', resized.uMatches);
+    // The scene re-fits the lifted mesh on its next frame.
+    let refit = null;
+    for (let i = 0; i < 20; i += 1) {
+      const box = await meshBoxOf();
+      refit = box && ['left', 'top', 'width', 'height'].every((k) => Math.abs(box[k] - resized.expected[k]) <= 2) ? box : null;
+      if (refit) break;
+      await actor.page.waitForTimeout(150);
+    }
+    T('14h. ...and the lifted card mesh re-fits to it', Boolean(refit), JSON.stringify(await meshBoxOf()));
     await actor.page.setViewportSize({ width: 1440, height: 900 });
     await actor.page.waitForTimeout(300);
     await actor.page.keyboard.press('Escape');

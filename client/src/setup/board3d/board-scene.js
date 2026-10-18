@@ -20,6 +20,8 @@ import { DRAG_TILT, DRAG_TILT_STILL, createDragTilt, stepDragTilt } from '../ima
 const DEG = Math.PI / 180;
 /** A card moving between slots or stacks (design 074 §D3 "Cards"). */
 const CARD_POSE_MS = 180;
+/** Default flight of `lift` / `unlift` (card focus passes its own). */
+const LIFT_FLIGHT_MS = 180;
 const FOIL_ROLES = new Set(['root', 'stage']);
 const SIDES = ['self', 'opp'];
 /** `.self-text { font-size: clamp(10px, 4vh, 20px) }` (self-containers.css), vh of the iframe. */
@@ -141,6 +143,9 @@ function offsetAt(keys, elapsed) {
  *   shake: (offsets: { x: number, y: number, ms: number }[]) => Promise<void>,
  *   tween: (instanceId: number, poseFn: (t: number) => object, ms: number,
  *     options?: { ease?: (t: number) => number }) => Promise<void>,
+ *   lift: (instanceId: number, pose: { rect: object, tiltXDeg?: number, lift?: number,
+ *     rotateZDeg?: number, flipDeg?: number, ms?: number, ease?: (t: number) => number }) => Promise<void>,
+ *   unlift: (instanceId: number, options?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
@@ -148,7 +153,7 @@ function offsetAt(keys, elapsed) {
  *     cards: ReturnType<typeof createCardMeshPool>, piles: ReturnType<typeof createPileMeshes>,
  *     labels: ReturnType<typeof createCountLabels>, badges: ReturnType<typeof createStackBadges>,
  *     overlays: ReturnType<typeof createOverlayMeshes>,
- *     hover: number|null, handPose: 'normal'|'lowered' },
+ *     hover: number|null, handPose: 'normal'|'lowered', lifted: number|null, focusLifted: number|null },
  *   dispose: () => void, clock: object }}
  */
 export function createBoardScene({
@@ -630,7 +635,7 @@ export function createBoardScene({
    * stack's top, drawn or empty) and `stadium` (the Stadium zone's card footprint). Projected
    * with the pure camera description (board-camera.mjs `projectToScreen`, the same math
    * `PerspectiveCamera` runs) and offset by the canvas's page position. A running shake is not
-   * included.
+   * included. A card held by `lift` reports the rect of its own slot, not the lifted mesh's.
    */
   const rects = () => {
     const out = {};
@@ -640,7 +645,7 @@ export function createBoardScene({
     for (const id of pool.ids()) {
       // A card hidden by an effect (a draw held until its flight) still stands where its pose puts it.
       if (!pool.placed(id)) continue;
-      const rect = screenRectOf(pool.cornersOf(id) ?? [], box);
+      const rect = screenRectOf(pool.cornersOf(id, { rest: true }) ?? [], box);
       if (rect) out[id] = rect;
     }
     if (!layout) return out;
@@ -948,6 +953,26 @@ export function createBoardScene({
   };
 
   /**
+   * Lifts a card's mesh to a held pose (design 074 H2, card focus): it flies from where it stands to
+   * `{ rect, tiltXDeg = 0, lift = 0, rotateZDeg, flipDeg }` (the tween pose shape, viewport px) in
+   * `ms` (default 180) of scene time and stays there, shown, until `unlift`. The card's own pose
+   * is suspended meanwhile (hover and hand-fan re-poses do not move it), and the held pose is
+   * re-fitted each frame, so a camera change keeps its screen rect. Lifting a held card again
+   * retargets it with no flight at `ms` 0, else flies from the held pose. Resolves when it has
+   * landed; at once for a card the scene does not draw.
+   */
+  const lift = (id, { ms = LIFT_FLIGHT_MS, ease, ...pose } = {}) => {
+    if (disposed) return Promise.resolve();
+    return pool.lift(id, { ...pose, tiltXDeg: pose.tiltXDeg ?? 0, lift: pose.lift ?? 0 }, { ms, ease });
+  };
+
+  /** Flies a lifted card back to its own pose in `ms` (default 180), then hands it back to the model. */
+  const unlift = (id, { ms = LIFT_FLIGHT_MS, ease } = {}) => {
+    if (disposed) return Promise.resolve();
+    return pool.unlift(id, { ms, ease });
+  };
+
+  /**
    * Screen shake as a camera view-offset sequence on the scene clock. `offsets` are keyframes
    * `{ x, y, ms }` in screen px, `ms` from the start (combat-pose.mjs `screenShakeKeyframes`
    * spread over its duration). A new shake replaces a running one. Resolves when it ends.
@@ -998,6 +1023,7 @@ export function createBoardScene({
     hover,
     handPose,
     lifted: lifted?.id ?? null,
+    focusLifted: pool.liftedId(),
     held: held?.id ?? null,
     litCard,
     litZones: [...litZones],
@@ -1058,6 +1084,8 @@ export function createBoardScene({
     setCardHighlight,
     shake,
     tween,
+    lift,
+    unlift,
     setUiState,
     setMat,
     setHover,

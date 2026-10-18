@@ -561,6 +561,22 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
   zero `.fx-overlay` clones. The rec-draw capture's fabricated views do not show cards on the 3D board (F1 limit), so it
   proves the calls run, not the look. Visual sign-off is the user's.
 
+### H2
+- `scene.lift(id, { rect, tiltXDeg, lift, rotateZDeg?, flipDeg?, ms = 180, ease? })` flies the mesh to the pose and
+  HOLDS it (re-fitted every frame, so a camera change keeps the rect; model pose, hover and fan re-poses do not move it;
+  forced visible); `scene.unlift(id, { ms, ease? })` flies back to the model pose and releases; `inspect().focusLifted`
+  (`lifted` already meant the drag lift). `rects()` keeps reporting a lifted card at its board slot, so the mirror img
+  and `viewportRectOf(sourceImg)` stay where the card came from. `flightPlacement` gained `fit: 'leaned'` (the leaned
+  face fits the rect; the old fit overshot a square-on card by ~6 %).
+- card-focus.mjs: mesh mode when the scene has a pose for the card (`card-focus-mesh.mjs` `focusMeshId`/`focusMeshPose`:
+  `tiltXDeg` = −table tilt, `lift` 0.3 × rect height, the focus flight's own easing; close mid-flight uses the reversed
+  curve). The HTML host keeps its box (the inspector chrome is laid out from it) with the card art hidden; a new
+  `.card-focus__dim` box-shadow with a hole at the focus rect replaces the full-screen dim, which would have darkened
+  the mesh under the HTML layer. No mesh (legacy card) → the HTML flight as before.
+- Inspector e2e: 5e accepts `focusLifted`, 8c waits for it to clear, new 6d (mesh corners within 2 px of `focusRect`)
+  and 14h (resize re-fit). Known: holo tilt on the HTML card is off in mesh mode; a focused card dropped by a view
+  while open shows no face (the focus closes on turn change and attack, so not handled).
+
 ### H3
 - `cameraTcgLive({ viewportW, viewportH, nearHalf, cardHeightPx })`: eye above the seam centre looking straight down, FOV
   20°, nominal distance 183 × cardH / 8.9 (design 067:30), scaled up to the smallest distance that fits the whole table
