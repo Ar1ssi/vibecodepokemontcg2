@@ -53,6 +53,8 @@ import { impactTypeFor, impactVariant, withoutImpactBeats } from './impact/impac
 import { impactReady, playImpact, prepareImpact } from './impact/impact-stage.js';
 import { knockoutStack, peekCombatOrigin, visibleStackRecord, zoneCardIds } from './origins.mjs';
 import { playMove } from './moves/move-player.js';
+import { drawCardArt, playMoveInScene } from './moves/scene-move-player.js';
+import { LAYER_Z, stageRectOf } from '../../board3d/fx/fx-stage.mjs';
 import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
 import { SPECS } from './moves/specs/index.mjs';
 import { signatureFor, slugFor, withSignatureSpec } from './moves/signature/signature-select.mjs';
@@ -270,6 +272,8 @@ const impactTargetFor = (instanceId, rect, hit, registry) => {
   const benched = [...zoneCardIds(registry, 'self', 'bench'), ...zoneCardIds(registry, 'opp', 'bench')];
   return {
     rect,
+    // Design 075: the 3D board places the prefab by the card it draws.
+    cardId: record?.instanceId ?? instanceId,
     // The game plays the condensed (`_C`) prefab on a Bench card.
     bench: benched.includes(instanceId) || benched.includes(record?.instanceId),
     turn: frameTurnOf(record?.element || null),
@@ -446,6 +450,55 @@ const moveSide = (instanceId, rect, src, registry) => {
   return { rect, src, turn: frameTurnOf(element), element };
 };
 
+/**
+ * Design 075: the generic lunge on the 3D board — the attacker's own mesh rears back, strikes and
+ * recoils (a drive in table px), its lagged art smearing the strike. Null when the scene does not
+ * draw both cards (the 2D lunge then plays).
+ */
+const playLungeInScene = (scene, plan, card, targetId, hits) => {
+  const attackerPose = scene.cardTablePose(plan.attackerId);
+  const targetPose = targetId == null ? null : scene.cardTablePose(targetId);
+  if (!attackerPose || !targetPose) return null;
+  const from = stageRectOf(attackerPose);
+  const to = stageRectOf(targetPose);
+  const pose = lungePoseFor(from, to);
+  if (!pose) return null;
+  const contactMs = LUNGE_MS * LUNGE_IMPACT;
+  markAttackScene(Math.max(LUNGE_MS, hits.rippleEndMs(contactMs)));
+  announceFor(plan.strike)(contactMs, {
+    direction: attackAngleDeg(from, to),
+    attackerCard: card,
+    impactType: readyImpactType(card, null),
+    ...hits.strikeContext,
+  });
+  const offsetAt = (ms) => {
+    const p = pose(ms / LUNGE_MS);
+    return { dx: p.x, dy: -p.y, dz: 0, yawDeg: 0, scale: p.scale, scaleAlong: 1, scaleAcross: 1, laneAngleDeg: 0 };
+  };
+  scene.drive(plan.attackerId, offsetAt, LUNGE_MS);
+  const attacker = {
+    centre: { x: from.left + from.width / 2, y: from.top + from.height / 2 },
+    width: from.width,
+    height: from.height,
+    yawDeg: attackerPose.yawDeg ?? 0,
+  };
+  const start = scene.clock.now();
+  scene.fx.add({
+    frame(now, canvas) {
+      const ms = now - start;
+      if (ms > LUNGE_MS) return false;
+      const t = ms / LUNGE_MS;
+      canvas.begin({ layer: 'back', z: LAYER_Z.back, depthTest: true, unit: from.height });
+      const map = scene.cardFrontMap(plan.attackerId);
+      for (const { lag, alpha } of TRAILS) {
+        drawCardArt(canvas.ctx, map, attacker, offsetAt(Math.max(0, t - lag) * LUNGE_MS), { alpha: alpha * strikeWindow(t), blurPx: 2 });
+      }
+      return true;
+    },
+  });
+  return contactMs;
+};
+
 /** The generic lunge: the attacker's ghost rears back, strikes the defender and recoils. */
 const playLunge = (plan, registry, card, from, to, src, hits) => {
   const pose = lungePoseFor(from, to);
@@ -510,7 +563,7 @@ const hitsFor = (plan, registry, from) => {
     strikeContext: { attackerRect: from, hitDelays: hitDelaysOf(layout) },
     branches: secondaries
       .filter((secondary) => secondary.lane)
-      .map((secondary) => ({ rect: combatRect(secondary.id, registry), delayMs: secondary.delayMs }))
+      .map((secondary) => ({ id: secondary.id, rect: combatRect(secondary.id, registry), delayMs: secondary.delayMs }))
       .filter((branch) => branch.rect),
     rippleEndMs: (contactMs) => (secondaries.length > 0 ? contactMs + lastDelay + HIT_SPARKS_MS : 0),
   };
@@ -535,10 +588,14 @@ export const attack = (plan) => {
   const sigDefenderSrc = sig ? combatSrc(defenderId, registry) : null;
   if (sig && sigDefenderSrc) {
     const impactType = readyImpactType(card, sig.spec.vgType);
-    const played = playMove({
+    const played = playScene({
       spec: sceneSpecFor(sig.spec, impactType, defenderHit),
-      attacker: moveSide(plan.attackerId, from, src, registry),
-      defender: moveSide(defenderId, to, sigDefenderSrc, registry),
+      plan,
+      defenderId,
+      sides: () => ({
+        attacker: moveSide(plan.attackerId, from, src, registry),
+        defender: moveSide(defenderId, to, sigDefenderSrc, registry),
+      }),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
       impacts: announce,
       attackerCard: card,
@@ -560,10 +617,14 @@ export const attack = (plan) => {
   const defenderSrc = combatSrc(defenderId, registry);
   if (pick?.score && defenderSrc) {
     const impactType = readyImpactType(card, pick.vgType);
-    const played = playMove({
+    const played = playScene({
       spec: sceneSpecFor(pick.score, impactType, defenderHit),
-      attacker: moveSide(plan.attackerId, from, src, registry),
-      defender: moveSide(defenderId, to, defenderSrc, registry),
+      plan,
+      defenderId,
+      sides: () => ({
+        attacker: moveSide(plan.attackerId, from, src, registry),
+        defender: moveSide(defenderId, to, defenderSrc, registry),
+      }),
       seed: hashString(`${plan.attackerId}|${plan.attackName}|${plan.damage}`),
       impacts: announce,
       attackerCard: card,
@@ -575,7 +636,21 @@ export const attack = (plan) => {
       return played.holdMs;
     }
   }
+  const scene = getBoardScene();
+  if (scene?.fx && playLungeInScene(scene, plan, card, defenderId, hits) !== null) return undefined;
   return playLunge(plan, registry, card, from, to, src, hits);
+};
+
+/**
+ * Design 075: a move scene on the 3D board when it runs, else the 2D player (`sides()` builds the
+ * 2D player's ghost sides only when it is needed).
+ */
+const playScene = ({ spec, plan, defenderId, sides, seed, impacts, attackerCard, strikeContext, branches }) => {
+  const scene = getBoardScene();
+  if (scene?.fx) {
+    return playMoveInScene({ scene, spec, attackerId: plan.attackerId, defenderId, seed, impacts, attackerCard, strikeContext, branches });
+  }
+  return playMove({ spec, ...sides(), seed, impacts, attackerCard, strikeContext, branches });
 };
 
 const MAX_TARGET_RINGS = 6;

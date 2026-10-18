@@ -21,7 +21,7 @@ import { laneGeometry, localLane, phaseProgress, toLocal, unionAllPadded, unionP
 import { terrainPose } from './move-poses.mjs';
 import { DEFAULT_PAD, ECHO_PARAMS, fillDefaults, travelBeats, withDefaults } from './move-spec.mjs';
 import { materialFor } from './materials/index.js';
-import { lighten, tintedPalette } from './materials/_shared.js';
+import { resolveBeatColours, tintCache } from './beat-colours.js';
 
 const BACKSTOP_PAD_MS = 400;
 const GHOST_SAMPLES = 150;
@@ -36,40 +36,6 @@ const isSourceOver = (beat) =>
   beat.drawer === 'smoke' ||
   beat.drawer === 'shade' ||
   (beat.drawer === 'terrain' && beat.params.kind === 'crack');
-
-// ---- beat colours (design 065 § New pieces A) ----------------------------------
-
-/**
- * A per-scene memo of tinted materials: `cachedTint(material, tint)` is `material` redrawn
- * over its palette with `tint`'s keys replaced, built once per material key and tint.
- */
-export function tintCache() {
-  const cache = new Map();
-  return function cachedTint(material, tint) {
-    const key = `${material.key}|${JSON.stringify(tint)}`;
-    if (!cache.has(key)) cache.set(key, material.withPalette(tintedPalette(material.palette, tint)));
-    return cache.get(key);
-  };
-}
-
-/**
- * Resolve a beat's `tint` and `hues` against the scene material: `material` is what the
- * drawer draws with; `materialAt(i)` is item `i`'s material (hues[i % n] as its body, a
- * lighter hot), or the beat material without hues. The returned params drop both keys, so
- * drawers never see them.
- */
-export function resolveBeatColours(material, params, cachedTint) {
-  const { tint = null, hues = null, ...rest } = params ?? {};
-  const beatMaterial = tint ? cachedTint(material, tint) : material;
-  const materialAt =
-    hues && hues.length > 0
-      ? (i) => {
-          const hue = hues[((i % hues.length) + hues.length) % hues.length];
-          return cachedTint(material, { ...tint, body: hue, hot: lighten(hue, 0.35) });
-        }
-      : () => beatMaterial;
-  return { material: beatMaterial, materialAt, params: rest };
-}
 
 // ---- ghost cards ---------------------------------------------------------------
 

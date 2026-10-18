@@ -203,7 +203,7 @@ test('every drawer plays on the dark material; its shadow passes switch to sourc
 });
 
 test('design 065: the player resolves a beat tint and hues into materials; drawers never see them', async () => {
-  const { resolveBeatColours, tintCache } = await import('../move-player.js');
+  const { resolveBeatColours, tintCache } = await import('../beat-colours.js');
   const { MATERIALS } = await import('../materials/index.js');
   const fire = MATERIALS.fire;
   const cachedTint = tintCache();

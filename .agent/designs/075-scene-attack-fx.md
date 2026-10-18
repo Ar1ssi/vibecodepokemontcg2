@@ -387,7 +387,21 @@ slice 8 deletes it; after slice 8, revert the slice-8 commit.
   2 texels of offsets + 8 of colours. Style params are named per style (`STYLE_PARAMS`, defaults from § Styles)
   instead of free `p0..p2`. Smoke: all 144 shipped specs × every beat × 4 progress points draw on the recorder
   with 0 errors, 0 NaN, 0 unsupported calls; ~0.5 ms per beat draw in node.
-
+- Slice 5: the depth prepass draws the card meshes only (`OCCLUDER_LAYER` 2, `fx/fx-layers.mjs`), not the
+  whole board: the invisible zone pick planes (opacity 0, z 0.3) would write depth over every zone. Shadow-map
+  auto-update is paused during the FX passes (the board's own render drew them). UnrealBloomPass's
+  `blendMaterial` is set to additive without alpha on the instance (its own blend adds alpha, which darkens the
+  board under the glow).
+- Slices 5–6: `fx/card-overlay.js` is not built. The recorder implements `drawImage` (kind 4 image paints, ≤ 4
+  images a frame, sRGB textures re-encoded in the shader), so trails, echo, rim and heat draw in the same ordered
+  stream as the beats. The rim draws in the back pass (the card hides its inside: CSS box-shadow semantics); the
+  heat in a front pass at the struck card's lift. Rim/heat colours and gradients are extracted from
+  `css/mat-fx.css` into `moves/card-glow.mjs`; a CSS `screen` heat draws additive and a `multiply` heat as an
+  over-blended veil (the FX target cannot read the board under it).
+- Slice 6: gradient stops are stored straight (unpremultiplied), as Canvas2D interpolates. `tintCache` /
+  `resolveBeatColours` moved to `moves/beat-colours.js` now (planned for slice 8). The generic lunge plays in
+  the scene from `combat.js playLungeInScene` (a drive of `lungePoseFor` in stage px + art trails). `hitsFor`
+  branches carry the card `id`. `fx/fx-layers.mjs` holds `FX_LAYER` / `OCCLUDER_LAYER`.
 ## Appendix A — material kit survey (read-only, 2026-10-18)
 
 Paths relative to `client/src/setup/netcode/mat-fx/moves/materials/`; D = `../move-drawers.js`.

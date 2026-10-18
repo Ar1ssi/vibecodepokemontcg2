@@ -3,6 +3,9 @@
 // the GPU evaluates (solid, linear, two-circle radial, the noise pattern). Pure and DOM-free:
 // the triangulator is injected (three's ShapeUtils in the browser and in tests).
 //
+// Paint rows hold straight (unpremultiplied) stop colours, as Canvas2D interpolates gradients;
+// the shader premultiplies after the ramp.
+//
 // Vertex (VERTEX_FLOATS): x y z · edge · across · halfWidth · feather · along · paint.
 // A fill's interior has edge 1 and halfWidth −1; its feather band fades edge to 0 outward.
 // A stroke has halfWidth ≥ 0 and `across` = ±(halfWidth + feather) at its two sides, so the
@@ -20,7 +23,9 @@ const MITER_LIMIT_FILL = 4;
 const CURVE_SEGMENTS = 12;
 const TAU = Math.PI * 2;
 
-export const PAINT_KIND = Object.freeze({ solid: 0, linear: 1, radial: 2, pattern: 3 });
+export const PAINT_KIND = Object.freeze({ solid: 0, linear: 1, radial: 2, pattern: 3, image: 4 });
+/** Distinct images (card art textures) one frame can draw; the material has this many samplers. */
+export const MAX_IMAGES = 4;
 export const STYLE_IDS = Object.freeze({ flat: 0, flame: 1, orb: 2, liquid: 3, energy: 4, crystal: 5, smoke: 6, shadow: 7 });
 /** Each style's three params in row order, with the design's starting values (§ Styles). */
 export const STYLE_PARAMS = Object.freeze({
@@ -203,6 +208,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
   let paintCount = 0;
   let runs = [];
   let pattern = null;
+  let images = [];
   let pass = { layer: 'front', z: 0, depthTest: false, unit: 100, seed: 0 };
   let state = defaultState();
   const stack = [];
@@ -296,7 +302,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
   });
 
   // ---- paint rows ----
-  const writePaint = (style, { dashed = false } = {}) => {
+  const writePaint = (style, { dashed = false, image = null } = {}) => {
     if (!ensurePaint()) return -1;
     const row = paintCount;
     const o = row * PAINT_FLOATS;
@@ -314,6 +320,11 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
         paints.set([g.x0, g.y0, g.r0, 0], o + 4);
         paints.set([g.x1, g.y1, g.r1, 0], o + 8);
       }
+    } else if (image) {
+      kind = PAINT_KIND.image;
+      paints.set([image.dx, image.dy, image.dw, image.dh], o + 4);
+      paints.set([image.slot, 0, 0, 0], o + 8);
+      stops = [{ offset: 0, rgba: [1, 1, 1, 1] }];
     } else if (style instanceof GpuPattern) {
       kind = PAINT_KIND.pattern;
       pattern = style.image;
@@ -339,8 +350,7 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     stops.forEach((stop, i) => {
       paints[o + 28 + i] = stop.offset;
       const [r, g, b, a] = stop.rgba;
-      const pa = a * alpha;
-      paints.set([r * pa, g * pa, b * pa, pa], o + 36 + i * 4);
+      paints.set([r, g, b, a * alpha], o + 36 + i * 4);
     });
     paintCount += 1;
     return row;
@@ -589,8 +599,48 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
     },
   };
 
+  /** An image slot for this frame (≤ MAX_IMAGES distinct images), or -1. */
+  const imageSlot = (image) => {
+    const known = images.indexOf(image);
+    if (known >= 0) return known;
+    if (images.length >= MAX_IMAGES) {
+      warnOnce(`drawImage(> ${MAX_IMAGES} images)`);
+      return -1;
+    }
+    images.push(image);
+    return images.length - 1;
+  };
+
+  const imageSize = (image) => {
+    const source = image?.image ?? image;
+    return { w: Number(source?.width) || 1, h: Number(source?.height) || 1 };
+  };
+
+  /** drawImage(image, dx, dy[, dw, dh]); the 9-argument form draws to its destination rect only. */
+  ctx.drawImage = (image, ...args) => {
+    if (!image) return;
+    let dx;
+    let dy;
+    let dw;
+    let dh;
+    if (args.length >= 8) {
+      warnOnce('drawImage(source rect)');
+      [, , , , dx, dy, dw, dh] = args;
+    } else if (args.length >= 4) [dx, dy, dw, dh] = args;
+    else {
+      [dx, dy] = args;
+      ({ w: dw, h: dh } = imageSize(image));
+    }
+    if (!finite(dx, dy, dw, dh) || dw === 0 || dh === 0) return;
+    const slot = imageSlot(image);
+    if (slot < 0) return;
+    const m = state.transform;
+    const rect = [applyTo(m, dx, dy), applyTo(m, dx + dw, dy), applyTo(m, dx + dw, dy + dh), applyTo(m, dx, dy + dh)];
+    fillSubpaths([{ points: rect, closed: true }], { image: { dx, dy, dw, dh, slot } });
+  };
+
   // Calls the kits never make: inert, logged once by name.
-  for (const name of ['drawImage', 'fillText', 'strokeText', 'measureText', 'putImageData', 'getImageData', 'createImageData', 'createConicGradient', 'isPointInPath', 'roundRect', 'arcTo']) {
+  for (const name of ['fillText', 'strokeText', 'measureText', 'putImageData', 'getImageData', 'createImageData', 'createConicGradient', 'isPointInPath', 'roundRect', 'arcTo']) {
     ctx[name] = () => {
       warnOnce(name);
       return name === 'measureText' ? { width: 0 } : undefined;
@@ -652,10 +702,10 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
       return { x: p.x + m.x * length, y: p.y + m.y * length };
     });
 
-  const fillSubpaths = (paths) => {
+  const fillSubpaths = (paths, { image = null } = {}) => {
     const groups = ringsOf(paths);
     if (groups.length === 0) return;
-    const paint = writePaint(state.fillStyle);
+    const paint = writePaint(state.fillStyle, { image });
     if (paint < 0) return capped();
     const feather = featherNow();
     for (const group of groups) {
@@ -829,12 +879,14 @@ export function createGpuCanvas({ triangulate, size = 4096, maxVertices = MAX_VE
         paintCount,
         runs: runs.map((run) => ({ ...run, stencil: { ...run.stencil } })),
         pattern,
+        images: [...images],
       };
     },
     reset() {
       vertexCount = 0;
       paintCount = 0;
       runs = [];
+      images = [];
       capWarned = false;
       state = defaultState();
       stack.length = 0;

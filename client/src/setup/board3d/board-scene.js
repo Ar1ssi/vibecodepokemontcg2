@@ -9,6 +9,7 @@ import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { createCardMeshPool } from './card-mesh.js';
 import { handGroupsOf, posesFor } from './card-poses.mjs';
 import { createCountLabels, createStackBadges } from './count-labels.js';
+import { createFxLayer } from './fx/fx-layer.js';
 import { createOverlayMeshes } from './overlay-meshes.js';
 import { createPileMeshes } from './pile-mesh.js';
 import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
@@ -38,6 +39,8 @@ const HAND_POSES = new Set(['normal', 'lowered']);
 const LIFT_MS = 120;
 /** Zone pick planes sit just over the cloth, under every card (CARD_LIFT_PX). */
 const ZONE_PLANE_Z = 0.3;
+/** Height of a resting card's face off the cloth (px), where an impact prefab stands. */
+const IMPACT_FACE_Z = CARD_LIFT_PX + 1;
 /** Drop-target light: index.css `.has-glow`'s default colour, as the mirror reads it. */
 const DROP_GLOW_RGB = '120, 200, 255';
 const DROP_GLOW_HEX = 0x78c8ff;
@@ -122,11 +125,12 @@ function offsetAt(keys, elapsed) {
  *   foil?: { recordFor: (placement: object) => object|null, createMaterial: Function,
  *     uv?: Function|object }|null, motionReduced?: () => boolean,
  *   requestFrame?: (fn: FrameRequestCallback) => number, cancelFrame?: (id: number) => void,
- *   onRender?: ((frame: { cardsMoving: boolean }) => void)|null }} deps
+ *   onRender?: ((frame: { cardsMoving: boolean }) => void)|null, UnrealBloomPass?: Function|null }} deps
  *   The scene does not own `renderer`, `textures` or `clock`; its `dispose()` leaves them to the caller.
  *   `foil` (card-mesh.js) dresses the visible card of a stack in its TCG Live foil; null = none.
  *   `onRender` hears every drawn frame and whether a card was still tweening in it (the board
  *   mirror re-syncs its rects from it, board3d.js).
+ *   `UnrealBloomPass` (the vendored addon) blooms attack FX (design 075); null = no bloom.
  * @returns {{ applyModel: (model: object) => void, setLayout: (layout: object) => void,
  *   setCamera: (desc: ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>) => void,
  *   setViewport: (size: { w: number, h: number }) => void, invalidate: () => void, render: () => void,
@@ -146,6 +150,9 @@ function offsetAt(keys, elapsed) {
  *   lift: (instanceId: number, pose: { rect: object, tiltXDeg?: number, lift?: number,
  *     rotateZDeg?: number, flipDeg?: number, ms?: number, ease?: (t: number) => number }) => Promise<void>,
  *   unlift: (instanceId: number, options?: { ms?: number, ease?: (t: number) => number }) => Promise<void>,
+ *   drive: (instanceId: number, offsetAt: (elapsedMs: number) => object|null, ms: number) => Promise<void>,
+ *   cardTablePose: (instanceId: number) => object|null, cardFrontMap: (instanceId: number) => object|null,
+ *   fx: { add: Function, active: () => boolean, setImpacts: Function, tiltDeg: () => number },
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
@@ -169,6 +176,7 @@ export function createBoardScene({
   requestFrame = defaultRequestFrame,
   cancelFrame = defaultCancelFrame,
   onRender = null,
+  UnrealBloomPass = null,
 }) {
   const scene = new three.Scene();
   scene.name = 'board3d';
@@ -198,6 +206,17 @@ export function createBoardScene({
 
   const camera = new three.PerspectiveCamera(30, 1, 1, 10000);
   let cameraDesc = null;
+  // Design 075: attack FX in this scene, on this context, through this camera.
+  const fxLayer = createFxLayer({
+    three,
+    renderer,
+    scene,
+    camera,
+    clock,
+    tiltDeg: () => cameraDesc?.tiltDeg ?? 0,
+    UnrealBloomPass,
+    motionReduced,
+  });
   let layout = null;
   let model = null;
   /** Last pose given to each card mesh, so a pose change without a diff move still tweens. */
@@ -254,7 +273,8 @@ export function createBoardScene({
     const overlaysMoving = overlays.update(now);
     const animating = cardsMoving || pilesMoving || overlaysMoving;
     renderer.render(scene, camera);
-    if (animating) invalidate();
+    const fxRunning = fxLayer.active() && fxLayer.render();
+    if (animating || fxRunning) invalidate();
     onRender?.({ cardsMoving: cardsMoving || posedSinceRender });
     posedSinceRender = false;
   };
@@ -291,6 +311,47 @@ export function createBoardScene({
   const overlays = createOverlayMeshes({ three, textures, clock, motionReduced, onNeedsRender: invalidate });
 
   table.onChange(invalidate);
+
+  const fx = {
+    /** Starts an FX entry (`frame(nowMs, canvas) → keep?`); returns its remover. */
+    add: (entry) => {
+      const remove = fxLayer.add(entry);
+      invalidate();
+      return remove;
+    },
+    active: () => fxLayer.active(),
+    setImpacts: (host) => {
+      fxLayer.setImpacts(host);
+      invalidate();
+    },
+    tiltDeg: () => cameraDesc?.tiltDeg ?? 0,
+  };
+
+  /**
+   * Design 075: where an impact prefab on a card sits — its face centre in the world, the table's
+   * axes, its drawn height and its seat turn (impact-stage.js scene host). Null when not drawn.
+   */
+  const impactPlacement = (id) => {
+    if (disposed || !cameraDesc) return null;
+    const pose = pool.tablePoseOf(id);
+    if (!pose) return null;
+    const rad = (cameraDesc.tiltDeg ?? 0) * DEG;
+    const yaw = (((pose.yawDeg ?? 0) % 360) + 360) % 360;
+    return {
+      centre: tableToWorld({ x: pose.x, y: pose.y, z: pose.z + IMPACT_FACE_Z }, cameraDesc),
+      table: { x: [1, 0, 0], y: [0, Math.cos(rad), -Math.sin(rad)], z: [0, Math.sin(rad), Math.cos(rad)] },
+      heightPx: pose.heightPx,
+      turnDeg: Math.abs(yaw - 180) < 90 ? 180 : 0,
+    };
+  };
+
+  /** Design 075: moves a card along an attack lane on top of its own pose (card-mesh.js drive). */
+  const drive = (id, offsetAt, ms) => {
+    if (disposed) return Promise.resolve();
+    const done = pool.drive(id, offsetAt, ms);
+    invalidate();
+    return done;
+  };
 
   /** A screen-px shake moves the image, so it shifts the view window, not the eye. */
   const applyViewOffset = () => {
@@ -1031,6 +1092,7 @@ export function createBoardScene({
 
   const dispose = () => {
     if (disposed) return;
+    fxLayer.dispose();
     stopShake?.();
     endLift();
     endHold();
@@ -1086,6 +1148,11 @@ export function createBoardScene({
     tween,
     lift,
     unlift,
+    drive,
+    cardTablePose: (id) => (disposed ? null : pool.tablePoseOf(id)),
+    cardFrontMap: (id) => (disposed ? null : pool.frontMapOf(id)),
+    impactPlacement,
+    fx,
     setUiState,
     setMat,
     setHover,

@@ -15,7 +15,7 @@ const unavailableNotice = (reason) => `3D board unavailable: ${reason}; this bro
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel] =
+    const [renderer, textures, scene, clock, table, room, bloom, impacts, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions, fxApply, fxModel] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -23,6 +23,8 @@ const defaultDeps = {
         import('./scene-clock.js'),
         import('./table-mesh.js'),
         import('../../vendor/three/RoomEnvironment.js'),
+        import('../../vendor/three/addons/postprocessing/UnrealBloomPass.js'),
+        import('../netcode/mat-fx/impact/impact-stage.js'),
         import('./board-model.mjs'),
         import('../netcode/apply-view.js'),
         import('../deck-constructor/hydrate-holo.js'),
@@ -41,6 +43,8 @@ const defaultDeps = {
       createBoardScene: scene.createBoardScene,
       createSceneClock: clock.createSceneClock,
       RoomEnvironment: room.RoomEnvironment,
+      UnrealBloomPass: bloom.UnrealBloomPass,
+      attachSceneImpacts: impacts.attachSceneImpacts,
       boardModelFrom: model.boardModelFrom,
       getLastAppliedView: applyView.getLastAppliedView,
       cardBackSrcFor: hydrateHolo.cardBackSrcForUser,
@@ -323,10 +327,19 @@ export async function initializeBoard3d({
       clock,
       three,
       RoomEnvironment: modules.RoomEnvironment,
+      UnrealBloomPass: modules.UnrealBloomPass ?? null,
       foil,
       motionReduced: modules.motionReduced,
       onRender: onSceneRendered,
     });
+    // Design 075: attack impacts draw on this context, through this camera.
+    const impactHost = modules.attachSceneImpacts?.({
+      gl: gl.renderer.getContext(),
+      clockHost: canvas,
+      placementOf: scene.impactPlacement,
+      invalidate: scene.invalidate,
+    });
+    if (impactHost) scene.fx.setImpacts(impactHost);
     Object.assign(session, { canvas, gl, textures, clock, scene, input: createInput(canvas, scene) });
     if (doc.visibilityState !== 'hidden') clock.start();
     return true;

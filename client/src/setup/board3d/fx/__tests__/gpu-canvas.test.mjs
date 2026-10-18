@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
-import { MAX_CLIP_DEPTH, PAINT_KIND, PAINT_TEXELS, STYLE_IDS, VERTEX_FLOATS, createGpuCanvas, parseColour } from '../gpu-canvas.mjs';
+import { MAX_CLIP_DEPTH, MAX_IMAGES, PAINT_KIND, PAINT_TEXELS, STYLE_IDS, VERTEX_FLOATS, createGpuCanvas, parseColour } from '../gpu-canvas.mjs';
 
 const triangulate = (contour, holes) =>
   ShapeUtils.triangulateShape(
@@ -61,12 +61,12 @@ test('a solid rect fill: two triangles plus a feather band, one solid paint row'
   );
 });
 
-test('globalAlpha is folded into premultiplied stops', () => {
+test('globalAlpha is folded into the stop alpha (colours stay straight)', () => {
   const { ctx, recording } = make();
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#ff0000';
   ctx.fillRect(0, 0, 4, 4);
-  assert.deepEqual([...paintRow(recording(), 0).subarray(36, 40)], [0.5, 0, 0, 0.5]);
+  assert.deepEqual([...paintRow(recording(), 0).subarray(36, 40)], [1, 0, 0, 0.5]);
 });
 
 test('radial gradients keep both circles and their stops', () => {
@@ -85,7 +85,7 @@ test('radial gradients keep both circles and their stops', () => {
   assert.deepEqual([...row.subarray(8, 11)], [5, 5, 10]);
   assert.deepEqual([row[28], row[29]], [0, 1], 'stops sorted by offset');
   assert.deepEqual([...row.subarray(36, 40)], [1, 1, 1, 1]);
-  assert.deepEqual([...row.subarray(40, 44)], [0, 0, 0, 0]);
+  assert.deepEqual([...row.subarray(40, 44)], [1, 1, 1, 0]);
 });
 
 test('composite modes split runs; equal states merge', () => {
@@ -138,10 +138,29 @@ test('degenerate paths record nothing and never produce NaN', () => {
 
 test('unsupported calls are inert and logged once', () => {
   const { ctx, recording, logs } = make();
-  ctx.drawImage({}, 0, 0);
-  ctx.drawImage({}, 0, 0);
+  ctx.fillText('x', 0, 0);
+  ctx.fillText('x', 0, 0);
   assert.equal(recording().vertexCount, 0);
-  assert.equal(logs.filter((line) => line.includes('drawImage')).length, 1);
+  assert.equal(logs.filter((line) => line.includes('fillText')).length, 1);
+});
+
+test('drawImage fills the destination rect with an image paint in a frame slot', () => {
+  const { ctx, recording, logs } = make();
+  const art = { image: { width: 600, height: 825 } };
+  ctx.globalAlpha = 0.4;
+  ctx.drawImage(art, 10, 20, 90, 126);
+  ctx.drawImage(art, 0, 0);
+  const rec = recording();
+  assert.deepEqual(rec.images, [art]);
+  const row = paintRow(rec, 0);
+  assert.equal(row[0], PAINT_KIND.image);
+  assert.deepEqual([...row.subarray(4, 8)], [10, 20, 90, 126]);
+  assert.equal(row[8], 0, 'slot 0');
+  assert.deepEqual([...paintRow(rec, 1).subarray(4, 8)], [0, 0, 600, 825], 'natural size');
+  close(row[39], 0.4);
+  for (let i = 0; i < MAX_IMAGES + 1; i += 1) ctx.drawImage({ width: 1, height: 1 }, 0, 0);
+  assert.equal(recording().images.length, MAX_IMAGES);
+  assert.ok(logs.some((line) => line.includes('images')));
 });
 
 test('the paint cap drops further draws with one log line', () => {
