@@ -14,6 +14,8 @@ import {
   foilMaskUrl,
   LIGHT,
   MAX_ROTATE_X,
+  HOLO_PERSPECTIVE_MIN_PX,
+  holoPerspectivePx,
   Spring,
   resolveHoloEffect,
   buildHoloCard,
@@ -465,6 +467,16 @@ describe('startHoloAnimation', () => {
     runFrame(3000);
 
     assert.notEqual(card.properties['--pointer-x'], first);
+    stopHoloAnimation(card);
+  });
+
+  it('a large tilting card gets a perspective scaled to its height, so it does not warp', () => {
+    const card = createFakeElement();
+    card.offsetHeight = 1000;
+    startHoloAnimation(card);
+    card.dispatch('pointermove', { clientX: 100, clientY: 70 });
+
+    assert.equal(card.properties['--holo-perspective'], '1300px');
     stopHoloAnimation(card);
   });
 
@@ -965,5 +977,22 @@ describe('startHoloAnimation foil tilt', () => {
     runFrame(1000);
     assert.deepEqual(card.__foilTilt, driftTilt(1000));
     stopHoloAnimation(card);
+  });
+});
+
+describe('holoPerspectivePx', () => {
+  it('keeps the 600px floor for cards up to ~460px tall', () => {
+    assert.equal(holoPerspectivePx(140), HOLO_PERSPECTIVE_MIN_PX);
+    assert.equal(holoPerspectivePx(460), HOLO_PERSPECTIVE_MIN_PX);
+  });
+
+  it('grows with the card height past the floor', () => {
+    assert.equal(holoPerspectivePx(800), 1040);
+  });
+
+  it('falls back to the floor for a missing or zero height', () => {
+    assert.equal(holoPerspectivePx(0), HOLO_PERSPECTIVE_MIN_PX);
+    assert.equal(holoPerspectivePx(undefined), HOLO_PERSPECTIVE_MIN_PX);
+    assert.equal(holoPerspectivePx(NaN), HOLO_PERSPECTIVE_MIN_PX);
   });
 });

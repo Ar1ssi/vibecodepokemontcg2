@@ -558,6 +558,20 @@ export class Spring {
 export const MAX_ROTATE_X = 50 / 3.5;
 export const MAX_ROTATE_Y = 25;
 
+// simey's 600px perspective was tuned for a ~460px-tall card. A fixed 600px on a
+// full-view card twice that size turns a 25deg tilt into a trapezoid, so the
+// perspective grows with the card's layout height; smaller cards keep 600px.
+export const HOLO_PERSPECTIVE_MIN_PX = 600;
+export const HOLO_PERSPECTIVE_PER_HEIGHT = 1.3;
+
+export function holoPerspectivePx(cardHeight) {
+  if (!Number.isFinite(cardHeight) || cardHeight <= 0) return HOLO_PERSPECTIVE_MIN_PX;
+  return Math.max(
+    HOLO_PERSPECTIVE_MIN_PX,
+    Math.round(cardHeight * HOLO_PERSPECTIVE_PER_HEIGHT)
+  );
+}
+
 export const LIGHT = Object.freeze({
   originX: 38,
   originY: 28,
@@ -661,6 +675,11 @@ export function startHoloAnimation(
     const rect = card.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
     hovering = true;
+    // offsetHeight is the untransformed layout size; the rect is projected by the tilt itself.
+    card.style.setProperty(
+      '--holo-perspective',
+      `${holoPerspectivePx(card.offsetHeight || rect.height)}px`
+    );
     const percentX = clamp(
       round((100 / rect.width) * (event.clientX - rect.left))
     );
