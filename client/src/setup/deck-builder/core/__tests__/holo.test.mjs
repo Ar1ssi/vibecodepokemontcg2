@@ -850,7 +850,7 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
       assert.equal(isReverseHoloCard(card), true);
       assert.equal(resolveFoilEffect(card, withReverse), TCGL_FOIL_RARITY);
       assert.equal(tcglFoilCoverage(card, withReverse), 'foil');
-      assert.equal(resolveFoilEffect({ id: 'sv01-001', rarity: 'Common' }, withReverse), null, 'base stays flat');
+      assert.equal(resolveFoilEffect({ id: 'sv01-002', rarity: 'Common' }, withReverse), null, 'base stays flat');
     });
 
     it('keeps the CSS reverse holo when TCG Live has no reverse printing', () => {
@@ -879,13 +879,13 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
   });
 
   // BW/XY plain cards with a TCG Live reverse printing show that printing in place of the plain one.
-  describe('BW/XY reverse printing in place of the plain card', () => {
+  describe('BW through SV reverse printing in place of the plain card', () => {
     const bwxy = parseFoilManifest({
       v: 1,
       shaders: ['TPCi/Cards3D/HoloFoil/FlatSilver', 'TPCi/Cards3D/HoloFoil/SunBeam'],
       materials: ['MAT_Cards3D_FlatSilver', 'MAT_Cards3D_SunBeam'],
       cards: { 'xy1-26': ['xy1_26', 1, 1, 'xy1_en_026', '', 'xy1_wp_en_026', '', ''] },
-      flat: ['xy1-20', 'xy1-128', 'xy1-132', 'bw1-1', 'xy1-2', 'sv01-1'],
+      flat: ['xy1-20', 'xy1-128', 'xy1-132', 'bw1-1', 'xy1-2', 'sv01-1', 'sm3.5-1', 'swsh12.5-1', 'sv10.5b-1', 'svp-1', 'me01-1'],
       reverse: {
         'xy1-20': ['xy1_20', 0, 0, 'xy1_en_020', '', 'xy1_wp_ph_en_020', '', ''],
         'xy1-26': ['xy1_26', 0, 0, 'xy1_en_026', '', 'xy1_wp_ph_en_026', '', ''],
@@ -893,6 +893,11 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
         'xy1-132': ['xy1_132', 0, 0, 'xy1_en_132', '', 'xy1_wp_ph_en_132', '', ''],
         'bw1-1': ['bw1_1', 0, 0, 'bw1_en_001', '', 'bw1_wp_ph_en_001', '', ''],
         'sv01-1': ['sv1_1', 0, 0, 'sv1_en_001', '', 'sv1_wp_ph_en_001', '', ''],
+        'sm3.5-1': ['sm3-5_1', 0, 0, 'sm3-5_en_001', '', 'sm3-5_wp_ph_en_001', '', ''],
+        'swsh12.5-1': ['swsh12-5_1', 0, 0, 'swsh12-5_en_001', '', 'swsh12-5_wp_ph_en_001', '', ''],
+        'sv10.5b-1': ['sv10-5b_1', 0, 0, 'sv10-5b_en_001', '', 'sv10-5b_wp_ph_en_001', '', ''],
+        'svp-1': ['svp_1', 0, 0, 'svp_en_001', '', 'svp_wp_ph_en_001', '', ''],
+        'me01-1': ['me1_1', 0, 0, 'me1_en_001', '', 'me1_wp_ph_en_001', '', ''],
       },
     });
 
@@ -906,6 +911,14 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
       assert.equal(isReverseHoloCard({ id: 'bw1-1', name: 'Snivy', rarity: '' }, bwxy), true);
     });
 
+    it('covers Sun & Moon, Sword & Shield and Scarlet & Violet sets, zero-padded ids included', () => {
+      for (const id of ['sm3.5-1', 'swsh12.5-1', 'sv01-001', 'sv10.5b-001']) {
+        const card = { id, supertype: 'Pokémon', rarity: 'Common' };
+        assert.equal(isReverseHoloCard(card, bwxy), true, id);
+        assert.equal(resolveFoilEffect(card, bwxy), TCGL_FOIL_RARITY, id);
+      }
+    });
+
     it('finds the printing from the image URL when the card has no id', () => {
       const card = { name: 'Slugma', image: { src: 'https://assets.tcgdex.net/en/xy/xy1/20/high.webp' } };
       assert.equal(isReverseHoloCard(card, bwxy), true);
@@ -916,7 +929,8 @@ describe('resolveFoilEffect (TCG Live foil)', () => {
       assert.equal(isReverseHoloCard(delphox, bwxy), false, 'base printing is foil');
       assert.equal(resolveFoilEffect(delphox, bwxy), TCGL_FOIL_RARITY);
       assert.equal(isReverseHoloCard({ id: 'xy1-132', name: 'Grass Energy', supertype: 'Energy' }, bwxy), false);
-      assert.equal(isReverseHoloCard({ id: 'sv01-1', name: 'Pineco', rarity: 'Common' }, bwxy), false);
+      assert.equal(isReverseHoloCard({ id: 'me01-1', supertype: 'Pokémon', rarity: 'Common' }, bwxy), false, 'Mega Evolution era');
+      assert.equal(isReverseHoloCard({ id: 'svp-1', supertype: 'Pokémon', rarity: 'Promo' }, bwxy), false, 'promo set');
       assert.equal(isReverseHoloCard({ id: 'xy1-2', name: 'Ivysaur', rarity: 'Uncommon' }, bwxy), false);
       assert.equal(resolveFoilEffect({ id: 'xy1-2', name: 'Ivysaur', rarity: 'Uncommon' }, bwxy), null);
     });

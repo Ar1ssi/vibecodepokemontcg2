@@ -122,10 +122,11 @@ const cardIdCandidates = (card) =>
     .filter(Boolean)
     .map((id) => String(id).replace(REVERSE_ID_SUFFIX, ''));
 
-// BW and XY Pokémon and Trainers that TCG Live prints NonFoil but also prints as a reverse holo show the
-// reverse printing in place of the plain one (user call, 2026-10-18). Energy keeps its separate `-reverse`
-// copies. Needs the manifest: without it a card can't be known to have a reverse printing and stays plain.
-const REVERSE_IN_PLACE_SET = /^(?:bw\d+|xy\d+|dc1|g1)-/i;
+// BW through SV (gens 5–9) Pokémon and Trainers that TCG Live prints NonFoil but also prints as a reverse
+// holo show the reverse printing in place of the plain one (user call, 2026-10-18). Main and special sets
+// only: promos, galleries and vaults have no reverse printing. Energy keeps its separate `-reverse` copies.
+// Needs the manifest: without it a card can't be known to have a reverse printing and stays plain.
+const REVERSE_IN_PLACE_SET = /^(?:bw\d+|xy\d+|dc1|g1|sm\d+(?:\.5)?|sm115|swsh\d+(?:\.5)?|sv\d+(?:\.5[bw]?)?)-/i;
 
 const showsReverseInPlace = (card, manifest) =>
   !!manifest &&

@@ -526,9 +526,7 @@ const TCGDEX_BASE = tcgdexApiBase();
       return sortCardsWithinGroup(allCards, { sortBy: 'name', sortDirection: 'asc' });
     }
 
-    // Sets across Pokémon generations that famously featured Reverse Holo energy cards:
-    // - Gen 8 (swsh): Crown Zenith (swsh12.5) basic energies
-    // - Gen 7 (sm): Sun & Moon (sm1), Guardians Rising (sm2), Burning Shadows (sm3), Crimson Invasion (sm4) basic energies
+    // Sets across Pokémon generations where every Energy card has a Reverse Holo print:
     // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies; the
     //              special energies of xy1–xy10 and dc1 are listed by card id below
     // - Gen 5 (bw): every set with an Energy card — Black & White (bw1) basic energies plus the
@@ -536,9 +534,8 @@ const TCGDEX_BASE = tcgdexApiBase();
     //               (bw8), Plasma Freeze (bw9), Plasma Blast (bw10), Legendary Treasures (bw11)
     // - Gen 3 (ecard/ex): Expedition Base Set (ecard1), EX Ruby & Sapphire (ex1), EX Emerald (ex9),
     //                     EX Holon Phantoms (ex13), EX Power Keepers (ex16) basic energies
+    // Gens 7–9 are listed by card id below.
     export const REVERSE_HOLO_ENERGY_SET_IDS_BY_GENERATION = {
-      8: new Set(['swsh12.5']),
-      7: new Set(['sm1', 'sm2', 'sm3', 'sm4']),
       6: new Set(['xy12', 'g1']),
       5: new Set(['bw1', 'bw4', 'bw6', 'bw8', 'bw9', 'bw10', 'bw11']),
       3: new Set(['ecard1', 'ex1', 'ex9', 'ex13', 'ex16']),
@@ -553,7 +550,53 @@ const TCGDEX_BASE = tcgdexApiBase();
     // reverse, not the basic energies printed alongside them. TCGdex `variants.reverse`
     // is false for all of these, so the source is TCG Live's `<set>_<n>_ph` Reverse rows
     // (card_database_rows.tsv); ids checked against TCGdex 2026-10-18.
+    // Gens 7 (sm) and 8 (swsh) are keyed by card id too: TCG Live reverses their special
+    // energies only. Their secret and ultra rare energies (sm1-162.., swsh12.5-152..) are
+    // `Etched` prints with no reverse. Source: TCG Live `_ph` Reverse rows; ids checked
+    // against TCGdex 2026-10-18 (sm3.5-69/70 and every sve card have no TCGdex image yet,
+    // so the set browser skips them until one is added).
     export const REVERSE_HOLO_ENERGY_CARD_IDS_BY_GENERATION = {
+      7: new Set([
+        'sm1-136', // Double Colorless Energy
+        'sm1-137', // Rainbow Energy
+        'sm3.5-69', // Double Colorless Energy
+        'sm3.5-70', // Warp Energy
+        'sm4-100', // Counter Energy
+        'sm5-137', // Unit Energy {G}{R}{W}
+        'sm5-138', // Unit Energy {L}{P}{M}
+        'sm6-118', // Unit Energy {F}{D}{Y}
+        'sm7-151', // Rainbow Energy
+        'sm8-194', // Memory Energy
+        'sm10-190', // Triple Acceleration Energy
+        'sm11-212', // Recycle Energy
+        'sm11-213', // Weakness Guard Energy
+        'sm12-209', // Draw Energy
+      ]),
+      8: new Set([
+        'swsh1-186', // Aurora Energy
+        'swsh2-171', // Capture Energy
+        'swsh2-172', // Horror Psychic Energy
+        'swsh2-173', // Speed Lightning Energy
+        'swsh2-174', // Twin Energy
+        'swsh3-174', // Heat Fire Energy
+        'swsh3-175', // Hiding Darkness Energy
+        'swsh3-176', // Powerful Colorless Energy
+        'swsh4-162', // Aromatic Grass Energy
+        'swsh4-163', // Coating Metal Energy
+        'swsh4-164', // Stone Fighting Energy
+        'swsh4-165', // Wash Water Energy
+        'swsh5-140', // Rapid Strike Energy
+        'swsh5-141', // Single Strike Energy
+        'swsh6-157', // Impact Energy
+        'swsh6-158', // Lucky Energy
+        'swsh6-159', // Spiral Energy
+        'swsh7-165', // Treasure Energy
+        'swsh8-244', // Fusion Strike Energy
+        'swsh9-151', // Double Turbo Energy
+        'swsh11-171', // Gift Energy
+        'swsh12-168', // Regenerative Energy
+        'swsh12-169', // V Guard Energy
+      ]),
       6: new Set([
         'xy1-130', // Double Colorless Energy
         'xy1-131', // Rainbow Energy
@@ -586,6 +629,8 @@ const TCGDEX_BASE = tcgdexApiBase();
         'sv10-182', // Team Rocket's Energy
         'sv10.5b-086', // Prism Energy
         'sv10.5w-086', // Ignition Energy
+        // Basic energies (TCG Live sve_<n>_ph): 1–8 Cosmos, 9–16 Flat Silver, 17–24 Tinsel.
+        ...Array.from({ length: 24 }, (_, i) => `sve-${String(i + 1).padStart(3, '0')}`),
       ]),
     };
 
@@ -602,7 +647,7 @@ const TCGDEX_BASE = tcgdexApiBase();
     // across every set in a Pokémon generation. For generations featuring
     // Reverse Holo energy prints (Gen 9, 8, 7, 6, 5, 3), this includes their
     // Reverse Holo variants — by set id where every energy in the set reverses,
-    // or by card id where eligible and ineligible energies coexist (Gen 9, 6).
+    // or by card id where eligible and ineligible energies coexist (Gen 9, 8, 7, 6).
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);
