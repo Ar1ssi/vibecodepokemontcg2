@@ -2,14 +2,15 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 
-import { board3dActive, disposeBoard3d, getBoardScene, initializeBoard3d } from '../board3d.js';
+import { board3dActive, disposeBoard3d, getBoardScene, iframeFallbackUrl, initializeBoard3d } from '../board3d.js';
+import { BOARD3D_FALLBACK_KEY } from '../board-flag.mjs';
 
 const PAGE =
   '<body><div id="board3dHost" hidden><canvas id="board3dCanvas"></canvas></div>' +
   '<iframe id="selfContainer"></iframe><iframe id="oppContainer"></iframe></body>';
 
-const setup = ({ renderer = 'ok', systemState = {} } = {}) => {
-  const dom = new JSDOM(PAGE, { url: 'http://localhost/?board=3d' });
+const setup = ({ renderer = 'ok', systemState = {}, url = 'http://localhost/?board=3d' } = {}) => {
+  const dom = new JSDOM(PAGE, { url });
   const doc = dom.window.document;
   const host = doc.getElementById('board3dHost');
   Object.defineProperty(host, 'clientWidth', { value: 1920 });
@@ -42,6 +43,7 @@ const setup = ({ renderer = 'ok', systemState = {} } = {}) => {
     document: doc,
     window: dom.window,
     storage: null,
+    mirrorBound: () => false,
     systemState: () => systemState,
     matSpec: () => ({ mode: 'one-player', src: null, profile: 'sim', scale: 1 }),
     chat: (message) => calls.chat.push(message),
@@ -157,5 +159,60 @@ describe('initializeBoard3d', () => {
     assert.equal(doc.body.classList.contains('board3d-active'), false);
     assert.equal(host.hidden, true);
     assert.equal(calls.chat.length, 1);
+  });
+
+  // With the mirror bound, the 43 container importers cannot be rebound: reload onto the iframes once.
+  const withMirror = (options) => {
+    const env = setup(options);
+    const stored = new Map();
+    env.reloads = [];
+    Object.assign(env.deps, {
+      mirrorBound: () => true,
+      reload: (url) => env.reloads.push(url),
+      sessionStorage: { setItem: (key, value) => stored.set(key, value) },
+    });
+    env.stored = stored;
+    return env;
+  };
+  const loseTwice = async ({ host, deps, calls }) => {
+    await initializeBoard3d({ host, requested: true, deps });
+    calls.onLost[0]();
+    await flush();
+    calls.onLost[1]();
+    await flush();
+    await flush();
+  };
+
+  it('a late context-lost-twice with the mirror bound reloads once with board=iframe', async () => {
+    const env = withMirror();
+    await loseTwice(env);
+    assert.deepEqual(env.reloads, ['http://localhost/?board=iframe']);
+    assert.equal(env.stored.get(BOARD3D_FALLBACK_KEY), 'context-lost-twice');
+    assert.equal(env.calls.chat.length, 0);
+    assert.equal(board3dActive(), false);
+  });
+
+  it('never reloads again when the URL already has board=iframe', async () => {
+    const env = withMirror({ url: 'http://localhost/?e2e=1&board=iframe' });
+    await loseTwice(env);
+    assert.deepEqual(env.reloads, []);
+    assert.equal(env.stored.size, 0);
+    assert.equal(env.calls.chat.length, 1);
+  });
+
+  it('a legacy-netcode refusal with the mirror bound reloads; flag-off never does', async () => {
+    const env = withMirror({ systemState: { serverAuthoritative: false } });
+    const result = await initializeBoard3d({ host: env.host, requested: true, deps: env.deps });
+    assert.deepEqual(result, { active: false, reason: 'legacy-netcode' });
+    assert.deepEqual(env.reloads, ['http://localhost/?board=iframe']);
+    const off = withMirror();
+    await initializeBoard3d({ host: off.host, requested: false, deps: off.deps });
+    assert.deepEqual(off.reloads, []);
+  });
+
+  it('iframeFallbackUrl keeps the other query parameters', () => {
+    assert.equal(iframeFallbackUrl('http://h/x?e2e=1&board=3d#a'), 'http://h/x?e2e=1&board=iframe#a');
+    assert.equal(iframeFallbackUrl('http://h/?board=iframe'), null);
+    assert.equal(iframeFallbackUrl('not a url'), null);
   });
 });

@@ -14,6 +14,7 @@ import { readSettings } from './fx-settings.mjs';
 import { isCardPreviewOpen } from './full-view.js';
 import { registerHoverPreviewSuppressor } from './hover-preview-bus.mjs';
 import { createHoverPreview } from './hover-preview-dom.mjs';
+import { boardMirror } from '../../initialization/global-variables/containers.js';
 
 const FRAME_IDS = ['selfContainer', 'oppContainer'];
 
@@ -51,9 +52,12 @@ export function initializeHoverPreview() {
     },
   });
   preview.install(document, { within: '#stadium' });
-  for (const id of FRAME_IDS) {
-    const frame = document.getElementById(id);
-    if (frame) installOnFrame(frame);
+  // The board mirror's roots live inside this document (design 074 D4); the iframes hold no cards.
+  if (!boardMirror) {
+    for (const id of FRAME_IDS) {
+      const frame = document.getElementById(id);
+      if (frame) installOnFrame(frame);
+    }
   }
   registerHoverPreviewSuppressor(preview.suppress);
   onFxSettingsChanged((settings) => {

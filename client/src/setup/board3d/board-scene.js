@@ -64,9 +64,12 @@ function offsetAt(keys, elapsed) {
  *   three: typeof import('three'), RoomEnvironment?: Function|null,
  *   foil?: { recordFor: (placement: object) => object|null, createMaterial: Function,
  *     uv?: Function|object }|null, motionReduced?: () => boolean,
- *   requestFrame?: (fn: FrameRequestCallback) => number, cancelFrame?: (id: number) => void }} deps
+ *   requestFrame?: (fn: FrameRequestCallback) => number, cancelFrame?: (id: number) => void,
+ *   onRender?: ((frame: { cardsMoving: boolean }) => void)|null }} deps
  *   The scene does not own `renderer`, `textures` or `clock`; its `dispose()` leaves them to the caller.
  *   `foil` (card-mesh.js) dresses the visible card of a stack in its TCG Live foil; null = none.
+ *   `onRender` hears every drawn frame and whether a card was still tweening in it (the board
+ *   mirror re-syncs its rects from it, board3d.js).
  * @returns {{ applyModel: (model: object) => void, setLayout: (layout: object) => void,
  *   setCamera: (desc: ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>) => void,
  *   setViewport: (size: { w: number, h: number }) => void, invalidate: () => void, render: () => void,
@@ -96,6 +99,7 @@ export function createBoardScene({
   motionReduced = () => false,
   requestFrame = defaultRequestFrame,
   cancelFrame = defaultCancelFrame,
+  onRender = null,
 }) {
   const scene = new three.Scene();
   scene.name = 'board3d';
@@ -159,6 +163,7 @@ export function createBoardScene({
     const animating = cardsMoving || pilesMoving || overlaysMoving;
     renderer.render(scene, camera);
     if (animating) invalidate();
+    onRender?.({ cardsMoving });
   };
 
   const invalidate = () => {

@@ -270,14 +270,17 @@ export function openMatPick({
   };
 
   const onDocClick = (event) => {
-    if (banner.contains(event.target)) {
+    // A click on a board-mirror card (design 074 D4) reaches the page retargeted to the shadow
+    // host; the composed path's first node is the card itself.
+    const target = event.composedPath?.()[0] ?? event.target;
+    if (banner.contains(target)) {
       event.preventDefault();
       event.stopPropagation();
-      if (confirmBtn && event.target === confirmBtn) confirm();
-      else if (cancelBtn && event.target === cancelBtn) cancel();
+      if (confirmBtn && target === confirmBtn) confirm();
+      else if (cancelBtn && target === cancelBtn) cancel();
       return;
     }
-    const hitCard = findMatPickHit(entries, event.target);
+    const hitCard = findMatPickHit(entries, target);
     event.preventDefault();
     event.stopPropagation();
     handleHit(hitCard);

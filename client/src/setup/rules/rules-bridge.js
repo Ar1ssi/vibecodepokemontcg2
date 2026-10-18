@@ -1592,7 +1592,9 @@ import { spectatorSeatName } from '../spectator/spectator-session.js';
       // a player could always peek their deck regardless of the rule below.
       document.addEventListener('click', (event) => {
         if (!rulesState.enabled) return;
-        const target = event.target.closest?.('[id="deck"], [id="deckCover"]');
+        // composedPath: a board-mirror card's click arrives retargeted to its shadow host (design 074 D4).
+        const origin = event.composedPath?.()[0] ?? event.target;
+        const target = origin.closest?.('[id="deck"], [id="deckCover"]');
         if (!target) return;
         if (deckAccess.open) return; // a card effect unlocked it
         const owner = target.id === 'deckCover' ? (target.user || 'self') : rulesState.turnPlayer;

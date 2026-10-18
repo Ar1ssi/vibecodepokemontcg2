@@ -539,6 +539,32 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### C6
+- `containers.js` also probes WebGL2 at load (a throwaway context, lost at once) before choosing the mirror, so row 13
+  (`no-webgl2` → iframe board untouched) still holds.
+- Architect decision (late fallback): the 43 importers cannot be rebound, so any fallback after containers.js bound the
+  mirror (`legacy-netcode`, `load-failed`, `context-lost-twice`, and a boot/rebuild `no-webgl2` the load-time probe
+  missed) writes `sessionStorage['ptcg-board-3d-fallback'] = reason` and `location.replace`s the URL with
+  `board=iframe` — never when it already has it (no loop), never when no mirror is bound (chat line as before).
+  `flag-off`/`no-host` refuse without reload. The reloaded page (`front-end.js`, `takeBoard3dFallback`) reads and
+  clears the key and posts "3D board off: <reason>; reload without ?board=iframe to retry". For the reload to land on
+  the iframe board, `isBoard3dRequested` now lets `?board=iframe` beat a stored '1' (stored '0' still beats all).
+- The roots carry the whole iframe id skeleton (zone buttons, sort checkboxes, headers, count spans, board circles),
+  not only the zones: `zone-buttons.js`, `stadium-observer.js` etc. bind to them at boot and throw on null. Each root
+  lends the page's `createElement` (8 legacy `ContainerDocument.createElement` sites, `hand-stack-dom.js`).
+- Layout: `:host` has `transform: translateZ(0)` so it is the containing block of everything in its root, card imgs are
+  `position: fixed !important; transform: none !important` (no zone/`.play-container`/`.mat-holo` offset, box = the
+  projected rect), cover imgs fill their cover. `sync` writes px from the host box, only values that changed.
+- The observer reports a card only when its state differs from what the scene last got (a report or a `uiState()`
+  snapshot), so sync's own style writes never loop. `board-scene.js` gains `onRender({ cardsMoving })`; board3d.js syncs
+  (microtask-coalesced) after each model, each relayout, and every frame a card moved plus the frame it settled.
+- apply-view's count labels / VSTAR-GX lookup resolve through `getRootNode()` (the page's `ownerDocument` would hit the
+  top document); `hand-stack-dom.js` compares stacks by root node. `documents.js`: the page's closePopups listener
+  ignores clicks retargeted from a mirror host (the root's listener already ran with the real target).
+- Unchanged, verified: `apply-mat-layout.js`, `apply-table-tilt.js`, `spectator-session.js`, `drag-avatar.js`,
+  `native-deck-builder*.js` address the iframes by id (hidden, harmless), never the roots; the mutation observers and
+  `e2e-api.js` mat-pick scan work on the roots as-is. `inspect().cards` is the pool: count is `cards.ids().length`.
+
 ### C5
 - Struck: D3's "rotation conditions rotate the card as today's ROTATION_CONDITIONS" — the DOM never did (only the
   server `rotation` a player sets by hand turns a card); no condition yaw in `card-poses.mjs` (architect-confirmed).

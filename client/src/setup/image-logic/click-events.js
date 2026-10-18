@@ -43,6 +43,13 @@ import {
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { resolvePreviewCard } from './preview-card.mjs';
 import { isDoubleClickZoomZone } from './double-click-zoom.mjs';
+import { visualRectOf } from './iframe-rect.mjs';
+import { board3dActive } from '../board3d/board3d.js';
+
+// An iframe document's cards sit under its <body>; a board-mirror shadow root (design 074 D4)
+// holds them directly.
+const containerContains = (containerDocument, node) =>
+  Boolean((containerDocument.body ?? containerDocument).contains(node));
 
 export const identifyCard = (event) => {
   mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
@@ -102,16 +109,13 @@ export const openCardContextMenu = (event) => {
 
   identifyCard(event);
 
+  const inSelfContainer = containerContains(selfContainerDocument, event.target);
   const selfView =
-    (selfContainerDocument.body.contains(event.target) &&
-      selfContainer.classList.contains('self')) ||
-    (!selfContainerDocument.body.contains(event.target) &&
-      !selfContainer.classList.contains('self'));
+    (inSelfContainer && selfContainer.classList.contains('self')) ||
+    (!inSelfContainer && !selfContainer.classList.contains('self'));
   const oppView =
-    (!selfContainerDocument.body.contains(event.target) &&
-      selfContainer.classList.contains('self')) ||
-    (selfContainerDocument.body.contains(event.target) &&
-      !selfContainer.classList.contains('self'));
+    (!inSelfContainer && selfContainer.classList.contains('self')) ||
+    (inSelfContainer && !selfContainer.classList.contains('self'));
 
   const buttonConditions = {
     abilityCounterButton: [
@@ -198,6 +202,19 @@ export const openCardContextMenu = (event) => {
   if (menuShown) uiCue('card-to-board');
 
   // get the position of the context menu
+  if (board3dActive()) {
+    // The mirror card's rect is already on-screen px (board-mirror.js sync): no iframe offset.
+    const rect = visualRectOf(event.target);
+    const fitsRight =
+      rect.left + rect.width + cardContextMenu.offsetWidth <= window.innerWidth;
+    const left = fitsRight
+      ? rect.left + rect.width
+      : rect.left - cardContextMenu.offsetWidth;
+    const top = Math.min(rect.top, window.innerHeight - cardContextMenu.offsetHeight);
+    cardContextMenu.style.left = `${Math.max(0, left)}px`;
+    cardContextMenu.style.top = `${Math.max(0, top)}px`;
+    return;
+  }
   const targetRect = event.target.getBoundingClientRect();
   const offsetHeight =
     window.innerHeight -

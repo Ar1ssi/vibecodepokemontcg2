@@ -13,6 +13,7 @@
 
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 import { selfContainerDocument } from '../../state.js';
+import { getBoardScene } from '../board3d/board3d.js';
 import { buildSlideContent } from '../image-logic/card-picker.js';
 import { viewportRectOf } from '../image-logic/card-pop.mjs';
 import {
@@ -100,14 +101,20 @@ const applyPose = (state, rect) => {
   state.root.style.setProperty('--focus-h', `${rect.height}px`);
 };
 
+// The self iframe's root element, or the board mirror's shadow host (design 074 D4), where the
+// 3D scene also drops its near hand.
 const lowerHand = (state) => {
-  const doc = selfContainerDocument?.documentElement ?? null;
+  const doc = selfContainerDocument?.documentElement ?? selfContainerDocument?.host ?? null;
   if (!doc) return;
   doc.classList.add(HAND_LOWERED_CLASS);
   state.handDoc = doc;
+  getBoardScene()?.setHandPose('lowered');
 };
 
-const raiseHand = (state) => state.handDoc?.classList.remove(HAND_LOWERED_CLASS);
+const raiseHand = (state) => {
+  state.handDoc?.classList.remove(HAND_LOWERED_CLASS);
+  getBoardScene()?.setHandPose('normal');
+};
 
 const hideSource = (state) => {
   const target = state.sourceImg.closest?.('.mat-holo') ?? state.sourceImg;

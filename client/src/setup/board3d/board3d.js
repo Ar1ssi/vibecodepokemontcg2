@@ -1,7 +1,7 @@
 // Boot, wiring and fallback for the three.js board (design 074 §D3 "Lifecycle", §D9). Loaded by
 // front-end.js through import() only when the flag asks for it; three.js and the scene modules
 // load from here, so the iframe board never pays for them.
-import { isBoard3dRequested } from './board-flag.mjs';
+import { BOARD3D_FALLBACK_KEY, isBoard3dRequested } from './board-flag.mjs';
 import { cameraFromCssTilt } from './board-camera.mjs';
 import { flatLayout, halfFromViewport } from './board-layout.mjs';
 import { CARD_ZONES } from './board-model.mjs';
@@ -17,7 +17,7 @@ const CHAT_LINES = {
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx] =
+    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -29,6 +29,7 @@ const defaultDeps = {
         import('../netcode/apply-view.js'),
         import('../deck-constructor/hydrate-holo.js'),
         import('../image-logic/mat-fx.mjs'),
+        import('../../initialization/global-variables/containers.js'),
       ]);
     return {
       createRenderer: renderer.createRenderer,
@@ -41,6 +42,7 @@ const defaultDeps = {
       getLastAppliedView: applyView.getLastAppliedView,
       cardBackSrcFor: hydrateHolo.cardBackSrcForUser,
       motionReduced: matFx.motionReduced,
+      boardMirror: containers.boardMirror,
       loadFoil,
     };
   },
@@ -49,6 +51,17 @@ const defaultDeps = {
     appendMessage('', message, 'announcement', false);
   },
   systemState: async () => (await import('../../state.js')).systemState,
+  // Whether containers.js bound the board mirror's roots as the container documents at load.
+  mirrorBound: async () =>
+    Boolean((await import('../../initialization/global-variables/containers.js')).boardMirror),
+  reload: (url) => globalThis.location?.replace(url),
+  get sessionStorage() {
+    try {
+      return globalThis.sessionStorage ?? null;
+    } catch {
+      return null;
+    }
+  },
   matSpec: async () => (await import('../sizing/apply-mat-layout.js')).currentMatSpec(),
 };
 
@@ -130,8 +143,52 @@ const report = (deps, reason) => {
   }
 };
 
-const fallback = (deps, reason) => {
+/** This page's URL with `board=iframe`, or null when it already says so (no reload loop). */
+export function iframeFallbackUrl(href) {
+  try {
+    const url = new URL(href);
+    if (url.searchParams.get('board') === 'iframe') return null;
+    url.searchParams.set('board', 'iframe');
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Once containers.js has handed the mirror's roots to every importer, the iframe board cannot
+ * take over on this page: reload once onto it, leaving the reason for the reloaded page's chat
+ * line (front-end.js). False when there is nothing to rebind or the URL already asks for iframes.
+ */
+const reloadOntoIframes = async (deps, reason) => {
+  let bound = false;
+  try {
+    bound = Boolean(await deps.mirrorBound());
+  } catch {
+    bound = false;
+  }
+  if (!bound) return false;
+  const win = deps.window ?? globalThis.window;
+  const url = iframeFallbackUrl(win?.location?.href ?? '');
+  if (!url) return false;
+  try {
+    deps.sessionStorage?.setItem(BOARD3D_FALLBACK_KEY, reason);
+  } catch (error) {
+    console.warn('board3d: fallback reason not kept', error);
+  }
+  console.info(`board3d: ${reason}; reloading onto the iframe board`);
+  deps.reload(url);
+  return true;
+};
+
+/** An early refusal (`flag-off`, `no-host`): containers.js made the same call, nothing to rebind. */
+const refuse = (deps, reason) => {
   report(deps, reason);
+  return { active: false, reason };
+};
+
+const fallback = async (deps, reason) => {
+  if (!(await reloadOntoIframes(deps, reason))) report(deps, reason);
   return { active: false, reason };
 };
 
@@ -155,10 +212,13 @@ const freshCanvas = (host, old) => {
  *   matSpec?: () => object|null, document?: Document, window?: Window } }} [options]
  *   `deps` replaces the browser services (tests inject them). `loadModules` resolves
  *   `{ createRenderer, createTextureCache, createMatTextureLoader, createBoardScene, createSceneClock,
- *   RoomEnvironment }`.
+ *   RoomEnvironment }`, optionally `boardMirror` (board-mirror.js, the shadow roots apply-view.js
+ *   renders into while this board runs: its UI state feeds the scene, the scene's rects feed it).
  * @returns {Promise<{ active: boolean, reason: string|null }>} reasons: 'flag-off', 'no-host',
  *   'legacy-netcode', 'load-failed', 'no-webgl2'; a later second context loss falls back with
- *   'context-lost-twice' after this resolved.
+ *   'context-lost-twice' after this resolved. A fallback after containers.js bound the mirror
+ *   (`deps.mirrorBound`) reloads once with `board=iframe` (`deps.reload`, reason kept in
+ *   `deps.sessionStorage`) instead of a chat line.
  */
 export async function initializeBoard3d({
   deps: injected = {},
@@ -172,9 +232,9 @@ export async function initializeBoard3d({
   const doc = deps.document ?? globalThis.document;
   const win = deps.window ?? globalThis.window;
 
-  if (!requested) return fallback(deps, 'flag-off');
+  if (!requested) return refuse(deps, 'flag-off');
   if (session) return { active, reason: null };
-  if (!host || !doc) return fallback(deps, 'no-host');
+  if (!host || !doc) return refuse(deps, 'no-host');
 
   const systemState = await deps.systemState();
   if (systemState?.serverAuthoritative === false) return fallback(deps, 'legacy-netcode');
@@ -190,6 +250,25 @@ export async function initializeBoard3d({
   const createRenderer = injected.createRenderer ?? modules.createRenderer;
 
   const current = { lost: 0, model: null, cards: new Map(), foil: null, warnedInvalid: false };
+  const mirror = modules.boardMirror ?? null;
+
+  // The mirror's rects follow the scene: after each model, each relayout and every frame in which
+  // a card moved (plus the frame it settled on), coalesced to one write per task.
+  let mirrorSyncQueued = false;
+  const queueMirrorSync = () => {
+    if (!mirror || mirrorSyncQueued) return;
+    mirrorSyncQueued = true;
+    queueMicrotask(() => {
+      mirrorSyncQueued = false;
+      if (!session?.scene) return;
+      mirror.sync(current.model, session.scene.rects());
+    });
+  };
+  let cardsWereMoving = false;
+  const onSceneRendered = ({ cardsMoving }) => {
+    if (cardsMoving || cardsWereMoving) queueMirrorSync();
+    cardsWereMoving = cardsMoving;
+  };
 
   // Card foil for the scene's pool (card-mesh.js): lookups answer null until loadFoil resolves.
   const foil =
@@ -222,6 +301,7 @@ export async function initializeBoard3d({
     session.scene.setViewport(viewport);
     session.scene.setCamera(cameraFromCssTilt({ viewportW: viewport.w, viewportH: viewport.h, nearHalf: half }));
     session.scene.setLayout(flatLayout(spec?.profile, half, { viewport, matScale: spec?.scale ?? 1 }));
+    queueMirrorSync();
   };
 
   const onLost = () => {
@@ -231,7 +311,7 @@ export async function initializeBoard3d({
       if (!session) return;
       if (current.lost >= 2) {
         disposeBoard3d();
-        report(deps, 'context-lost-twice');
+        fallback(deps, 'context-lost-twice');
         return;
       }
       current.model = session.scene.inspect?.().model ?? current.model;
@@ -239,7 +319,7 @@ export async function initializeBoard3d({
       const canvas = freshCanvas(host, session.canvas);
       if (!buildGraphics(canvas)) {
         disposeBoard3d();
-        report(deps, 'no-webgl2');
+        fallback(deps, 'no-webgl2');
         return;
       }
       if (current.model) session.scene.applyModel(current.model);
@@ -264,6 +344,7 @@ export async function initializeBoard3d({
       RoomEnvironment: modules.RoomEnvironment,
       foil,
       motionReduced: modules.motionReduced,
+      onRender: onSceneRendered,
     });
     Object.assign(session, { canvas, gl, textures, clock, scene });
     if (doc.visibilityState !== 'hidden') clock.start();
@@ -318,6 +399,7 @@ export async function initializeBoard3d({
           return '';
         }
       },
+      uiState: mirror?.uiState(),
       previous: current.model,
       onInvalid: (reason) => {
         if (current.warnedInvalid) return;
@@ -326,7 +408,12 @@ export async function initializeBoard3d({
       },
     });
     session.scene.applyModel(current.model);
+    queueMirrorSync();
   };
+  if (mirror) {
+    const unobserve = mirror.observe((id, patch) => session?.scene?.setUiState(id, patch));
+    session.cleanup.push(unobserve);
+  }
   doc.addEventListener('board-view-applied', onViewApplied);
   session.cleanup.push(() => doc.removeEventListener('board-view-applied', onViewApplied));
   onViewApplied();

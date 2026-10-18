@@ -44,6 +44,7 @@ import {
   listConditions,
   ROTATION_CONDITIONS,
 } from '../../../../shared/engine/rules/special-conditions.mjs';
+import { board3dActive } from '../board3d/board3d.js';
 
 let lastRenderedVersion = -1;
 const cardRegistry = new Map(); // instanceId -> { instanceId, element, card, side, zone, container }
@@ -637,6 +638,8 @@ function positionOverlay(
   { leftOffset, size, fontSize, topOffset = 0 }
 ) {
   overlay.style.display = 'inline-block';
+  // The 3D board draws overlays in-scene (design 074 C5); its mirror nodes carry no layout.
+  if (board3dActive()) return;
   overlay.style.left = `${targetRect.left - zoneRect.left + leftOffset}px`;
   overlay.style.top = `${targetRect.top - zoneRect.top + targetRect.height / 4 + topOffset}px`;
   overlay.style.width = `${size}px`;
@@ -861,7 +864,7 @@ function reconcileStatusLoopOverlay(cardData, img, zoneElement, options = {}, re
     zoneRect: getRect(zoneElement),
     rotation: cardData.rotation,
   });
-  if (box) placeStatusLoop(loop, box);
+  if (box && !board3dActive()) placeStatusLoop(loop, box);
 }
 
 /**
@@ -935,6 +938,7 @@ function reconcileAbilityOverlay(
   const targetRect = getRect(rectImg);
   const zoneRect = getRect(zoneElement);
   tab.style.display = 'inline-block';
+  if (board3dActive()) return;
   tab.style.left = `${targetRect.left - zoneRect.left}px`;
   tab.style.top = `${targetRect.top - zoneRect.top + targetRect.height / 2}px`;
   tab.style.width = `${targetRect.width}px`;
@@ -950,7 +954,7 @@ function reconcileAbilityOverlay(
  * resize for the same reason).
  */
 export function repositionCardOverlays(options = lastOverlayOptions) {
-  if (!options) return;
+  if (!options || board3dActive()) return;
   for (const record of cardRegistry.values()) {
     if (!record.overlayImage || !record.element.parentNode) continue;
     const zone = resolveZone(record.side, record.zone, options);
@@ -1170,6 +1174,8 @@ function clearStackStyle(img) {
 function setStackStyle(img, styles) {
   if (!img.dataset || !img.style) return;
   img.dataset.stackStyled = 'true';
+  // The 3D board lays stacks out in-scene (board-model.mjs stackOffset / energyToken).
+  if (board3dActive()) return;
   img.style.position = 'absolute';
   for (const [key, value] of Object.entries(styles)) img.style[key] = value;
 }
@@ -1238,7 +1244,7 @@ function layoutCardStack(rootRecord, attached) {
   const cardWidth = displayImg.clientWidth || 0;
   const cardHeight = displayImg.clientHeight || 0;
   rootRecord.stackAttached = attached;
-  if (!cardWidth) relayoutWhenLoaded(rootRecord, displayImg);
+  if (!cardWidth && !board3dActive()) relayoutWhenLoaded(rootRecord, displayImg);
 
   // Closest Stage under the visible card first: the one attached last.
   const underPokemon = members
@@ -1273,7 +1279,7 @@ function layoutCardStack(rootRecord, attached) {
     });
   }
   layoutEnergyTokens(rootRecord, tokens, cardWidth, cardHeight);
-  if (rootRecord.container?.style) {
+  if (rootRecord.container?.style && !board3dActive()) {
     rootRecord.container.style.width =
       shiftLayer > 0 && cardWidth
         ? `${cardWidth * (1 + shiftLayer * ATTACHED_CARD_SHIFT)}px`
@@ -1420,6 +1426,14 @@ function reconcilePlacedCard(entry, displayByRoot, options = {}) {
 }
 
 /**
+ * The document (iframe) or shadow root (board mirror, design 074 D4) a zone element lives in.
+ */
+const zoneRootOf = (element) => {
+  const root = element?.getRootNode?.();
+  return root?.getElementById ? root : (element?.ownerDocument ?? null);
+};
+
+/**
  * Legacy count.js's `(<span id="deckCount">)` labels, from the view: the deck
  * is `{ count }`, every other zone an array (redacted cards still count).
  */
@@ -1430,7 +1444,7 @@ function reconcileZoneCounts(side, zones, options = {}) {
     const count = Array.isArray(zoneData)
       ? zoneData.length
       : Number(zoneData?.count) || 0;
-    const doc = resolveZone(side, zoneId, options).element?.ownerDocument;
+    const doc = zoneRootOf(resolveZone(side, zoneId, options).element);
     const label = doc?.getElementById?.(`${zoneId}Count`);
     if (label) label.textContent = String(count);
   }
@@ -1442,7 +1456,7 @@ function reconcileZoneCounts(side, zones, options = {}) {
  */
 function reconcileSpecialMoveButtons(side, flags, options = {}) {
   if (!flags || typeof flags !== 'object') return;
-  const doc = resolveZone(side, 'active', options).element?.ownerDocument;
+  const doc = zoneRootOf(resolveZone(side, 'active', options).element);
   if (!doc?.getElementById) return;
   const buttons = [
     ['VSTARButton', flags.vstarUsed],
