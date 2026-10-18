@@ -5,16 +5,19 @@
 // the opponent's 2-card reveal (Earthen Vessel), then your hidden search (Quick
 // Search: no reveal event, so no scene). Card faces are drawn on a canvas: no network.
 // usage: PORT=4100 pnpm start, then node .claude/skills/fx-preview/rec/rec-deck-reveal.mjs
-// env: BASE_URL (default http://localhost:4100), CHROMIUM, OUT (default .agent/scratch/deck-reveal),
-//      SIO_JS (a local socket.io.min.js when cdn.socket.io is unreachable; see SKILL.md)
+// env: BASE_URL (default http://localhost:4100), CHROMIUM / CHROMIUM_PATH, OUT (default .agent/scratch/deck-reveal),
+//      SIO_JS (a local socket.io.min.js when cdn.socket.io is unreachable; see SKILL.md),
+//      PTCG_BOARD=3d (the three.js board, design 074; default iframe): hand and deck spots are then the
+//      scene's rects (`__ptcg.cardRect`, the mirror's covers) instead of the iframes' elements
 import { chromium } from 'playwright';
 import { mkdirSync, renameSync } from 'node:fs';
 import path from 'node:path';
+import { launchOptions, openBoard } from '../board-mode.mjs';
 
-const { BASE_URL = 'http://localhost:4100', CHROMIUM, OUT = '.agent/scratch/deck-reveal', SIO_JS } = process.env;
+const { BASE_URL = 'http://localhost:4100', OUT = '.agent/scratch/deck-reveal', SIO_JS } = process.env;
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch(CHROMIUM ? { executablePath: CHROMIUM } : {});
+const browser = await chromium.launch(launchOptions());
 const ctx = await browser.newContext({
   viewport: { width: 1280, height: 720 },
   recordVideo: { dir: path.join(OUT, 'vid'), size: { width: 1280, height: 720 } },
@@ -27,9 +30,7 @@ if (SIO_JS) {
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-await page.goto(`${BASE_URL}/?e2e=1`);
-await page.waitForFunction(() => window.__ptcg?.ready === true, null, { timeout: 30000 });
-await page.waitForTimeout(800);
+await openBoard(page, BASE_URL);
 
 await page.evaluate(async () => {
   const { applyView, getCardRegistry } = await import('/src/setup/netcode/apply-view.js');
@@ -91,10 +92,32 @@ await page.evaluate(async () => {
       { onBeforeApply: handleBeforeApply, onAdvisoryEvent: handleAdvisoryEvent }
     );
   push([]);
-  const selfDoc = document.getElementById('selfContainer').contentDocument;
-  const oppDoc = document.getElementById('oppContainer').contentDocument;
+  const board3d = window.__ptcg.boardMode() === '3d';
+  const selfDoc = window.__fxBoard.root('self');
+  const oppDoc = window.__fxBoard.root('opp');
   const centerOf = (r) => ({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width) });
+  // A card the flight hides has no `scene.rects()` entry (a hidden mesh is not drawn) and its mirror
+  // image is not re-synced; its pose is still in the scene's card pool, which is where it lands.
+  let poseRect = () => null;
+  if (board3d) {
+    const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
+    const { projectToScreen } = await import('/src/setup/board3d/board-camera.mjs');
+    poseRect = (id) => {
+      const { cards, cameraDesc, canvas } = getBoardScene().inspect();
+      const points = (cards.cornersOf(id) ?? []).map((corner) => projectToScreen(cameraDesc, corner));
+      if (points.length !== 4 || points.some((point) => !point)) return null;
+      const box = canvas.getBoundingClientRect();
+      const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
+      return { left: box.left + Math.min(...xs), top: box.top + Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+    };
+  }
+  const sceneSpot = (id) => {
+    const rect = window.__ptcg.cardRect(id) ?? poseRect(id);
+    return rect?.width > 0 ? centerOf(rect) : null;
+  };
   const frameRect = (doc, el) => {
+    // The 3D board's mirror images carry page px; an iframe's are local to its frame.
+    if (board3d) return el.getBoundingClientRect();
     const f = doc === selfDoc ? document.getElementById('selfContainer') : document.getElementById('oppContainer');
     const fr = f.getBoundingClientRect();
     const r = el.getBoundingClientRect();
@@ -103,7 +126,8 @@ await page.evaluate(async () => {
   // The real hand card's on-screen spot (iframe turn included), as the scene measures it.
   const handAt = (id) => {
     const el = getCardRegistry().get(id)?.element;
-    return el?.isConnected ? centerOf(visualRectOf(imageAnchor(el))) : null;
+    if (!el?.isConnected) return null;
+    return board3d ? sceneSpot(id) : centerOf(visualRectOf(imageAnchor(el)));
   };
   const trace = (ms, watch = []) => {
     const samples = [];
@@ -167,7 +191,8 @@ await page.evaluate(async () => {
     handSpot(user, instanceId) {
       const doc = user === 'self' ? selfDoc : oppDoc;
       const img = doc.querySelector(`img[data-instance-id="${instanceId}"]`);
-      return img ? centerOf(frameRect(doc, img)) : null;
+      if (!img) return null;
+      return board3d ? sceneSpot(instanceId) : centerOf(frameRect(doc, img));
     },
     trace,
     overlays: () => document.querySelectorAll('.fx-deck-reveal').length,

@@ -58,6 +58,16 @@ node .claude/skills/fx-preview/capture-board.mjs .agent/scratch/skin
 
 It writes `<prefix>-board.png` (active and bench, cropped) and `<prefix>-full.png`.
 
+**Which board.** Every capture and `rec/` script below runs on the classic iframe board by default.
+`PTCG_BOARD=3d` opens the three.js board (`?board=3d`, design 074) instead: `PTCG_BOARD=3d node
+.claude/skills/fx-preview/capture-entry.mjs tera out/tera-3d`. The server must be authoritative
+(`SERVER_AUTHORITATIVE=1`; `pnpm start` prints `server-authoritative`) and the browser needs WebGL2 (the
+scripts launch it on SwiftShader). `board-mode.mjs` holds the switch and the page-side `window.__fxBoard`
+helpers (`zoneRect`, `pauseAll`, `stepTo`, `pushView`, `imageOf`); `window.__ptcg.cardRect(id)` and
+`boardMode()` are the e2e API. `CHROMIUM_PATH` works wherever `CHROMIUM` does; `CARD_DIR` (a folder of
+PNGs named like the card images) or `CARD_IMG` serve `images.pokemontcg.io` art offline. SwiftShader draws a
+few frames a second: the 3D pages are slower, and frame-time probes (`rec-move`) read that, not the game.
+
 ## How it works (adapt it for new effects)
 
 - **Fake state.** `import('/src/setup/netcode/apply-view.js')` then
@@ -68,7 +78,9 @@ It writes `<prefix>-board.png` (active and bench, cropped) and `<prefix>-full.pn
   same path a server view takes, so what renders is real.
 - **Board DOM** lives in an iframe:
   `document.getElementById('selfContainer').contentDocument` holds `#active` and `#bench`.
-  Use `visualRectOf` (`/src/setup/image-logic/iframe-rect.mjs`) for page-space rects.
+  Use `visualRectOf` (`/src/setup/image-logic/iframe-rect.mjs`) for page-space rects. On the 3D board
+  the same ids live in the mirror's shadow roots; `window.__fxBoard.root(side)` returns whichever
+  document the board uses and `__fxBoard.zoneRect(side, id)` the zone's page-space rect.
 - **Entry effects** are `playSignatureEntry(kind, rect, instanceId, card)` from
   `/src/setup/netcode/mat-fx/entry.js`. Call it directly; there is no need to drive an evolution
   through the rules engine.

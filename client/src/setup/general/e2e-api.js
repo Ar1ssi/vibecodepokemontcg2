@@ -17,6 +17,9 @@ import { isBoardPokemon } from '/shared/engine/zones/active-pokemon.mjs';
 import { evolvedView } from '/shared/engine/rules/evolved-pokemon.mjs';
 import { isEnergy } from '/shared/engine/cards.mjs';
 import { enumerateOptions } from './e2e-options.mjs';
+import { cardRectOf } from './e2e-card-rect.mjs';
+import { board3dActive, getBoardScene } from '../board3d/board3d.js';
+import { viewportRectOf } from '../image-logic/card-pop.mjs';
 import { instanceMapSeats } from '../netcode/dual-run-bridge.js';
 import { e2eFixtureDeck, isE2eMode } from './e2e-mode.mjs';
 import { persistRulesEnabled } from '/shared/engine/rules/rules-state.mjs';
@@ -231,6 +234,8 @@ const idsFor = (option) => {
   if (option.targetInstanceId != null) ids.target = option.targetInstanceId;
   return ids;
 };
+
+const currentBoardMode = () => (board3dActive() ? '3d' : 'iframe');
 
 export function installE2eApi() {
   if (typeof window === 'undefined' || !isE2eMode()) return;
@@ -642,6 +647,20 @@ export function installE2eApi() {
     },
     zone(user, zoneId) {
       return zoneSnapshot(user, zoneId);
+    },
+    // Design 074 F1: which board draws the cards, so a harness picks where to read geometry.
+    boardMode: currentBoardMode,
+    // Design 074 F1: a card's rect in top-page viewport px by instance id, or null when the board
+    // does not show it. 3D: the scene's projected rect. Iframe: the registry <img>, mapped out of
+    // its iframe (flip included) by viewportRectOf.
+    cardRect(instanceId) {
+      const mode = currentBoardMode();
+      const element = mode === '3d' ? null : getCardRegistry().get(Number(instanceId))?.element;
+      return cardRectOf({
+        mode,
+        sceneRect: mode === '3d' ? getBoardScene()?.rects()[instanceId] : null,
+        elementRect: element && (() => viewportRectOf(element)),
+      });
     },
     // Design 002 slice 3.5: same hashBoardSnapshot the server uses in hashState(), fed
     // this client's own live zone arrays, so a recorded trace can assert the replayed

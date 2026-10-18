@@ -7,24 +7,25 @@
 // FX queue's order and holds (after the attack's hold) — the live path. Prints each number's time
 // after contact, the branch canvas, the recoils and the 063 frame-time probe.
 // env: TYPE (attacker's printed type; default Fire), DAMAGE (default 180), BENCH=1, SPREAD=<n>, SIDE (self | opp),
-//      WEBGL=0 (launch without WebGL: today's dressing must play), BASE_URL (default http://localhost:4100),
-//      CHROMIUM, OUT (default .agent/scratch/attack-hit), SIO_JS, CARD_IMG (default the repo's card back)
+//      WEBGL=0 (launch without WebGL: today's dressing must play; iframe board only), BASE_URL (default http://localhost:4100),
+//      CHROMIUM / CHROMIUM_PATH, OUT (default .agent/scratch/attack-hit), SIO_JS, CARD_IMG (default the repo's card back),
+//      PTCG_BOARD=3d (the three.js board, design 074; default iframe)
 // Exit code 1 when the prefab did not play (or, with WEBGL=0, when it did), or on a page error;
 // with SPREAD, also when a Bench card got no number, recoil or (for a travelling move) no branch lane.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { GL_ARGS, IS_3D, launchOptions, openBoard } from '../board-mode.mjs';
 
-const { BASE_URL = 'http://localhost:4100', CHROMIUM, TYPE = 'Fire', DAMAGE = '180', BENCH, SPREAD = '0', SIDE = 'self', WEBGL, SIO_JS, CARD_IMG = '/src/assets/cardback.png' } = process.env;
+const { BASE_URL = 'http://localhost:4100', TYPE = 'Fire', DAMAGE = '180', BENCH, SPREAD = '0', SIDE = 'self', WEBGL, SIO_JS, CARD_IMG = '/src/assets/cardback.png' } = process.env;
 const SPREAD_COUNT = Math.max(0, Math.min(5, Number(SPREAD) || 0));
 const OUT = process.env.OUT || '.agent/scratch/attack-hit';
 const FRAME_OFFSETS_MS = [60, 160, 320, 600, 1000];
 
 mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch({
-  ...(CHROMIUM ? { executablePath: CHROMIUM } : {}),
-  args: WEBGL === '0' ? ['--disable-webgl', '--disable-webgl2'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-});
+// The 3D board is WebGL: there is no fallback dressing to check on it.
+if (IS_3D && WEBGL === '0') throw new Error('WEBGL=0 checks the DOM hit dressing; the 3D board needs WebGL2, so run it on the iframe board');
+const browser = await chromium.launch(launchOptions({ args: WEBGL === '0' ? ['--disable-webgl', '--disable-webgl2'] : GL_ARGS }));
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 const problems = [];
 page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
@@ -34,12 +35,10 @@ page.on('console', (message) => {
 if (SIO_JS) await page.route('https://cdn.socket.io/**', (route) => route.fulfill({ path: SIO_JS, contentType: 'application/javascript' }));
 await page.route('https://static.cloudflareinsights.com/**', (route) => route.abort());
 
-await page.goto(`${BASE_URL}/?e2e=1`);
-await page.waitForFunction(() => window.__ptcg?.ready === true, null, { timeout: 30000 });
-await page.waitForTimeout(800);
+await openBoard(page, BASE_URL);
 
 const setup = await page.evaluate(
-  async ([type, damageAmount, withBench, side, cardImg, spread]) => {
+  async ([type, damageAmount, withBench, side, cardImg, spread, board3d]) => {
     const { applyView, getCardRegistry } = await import('/src/setup/netcode/apply-view.js');
     const combat = await import('/src/setup/netcode/mat-fx/combat.js');
     const stage = await import('/src/setup/netcode/mat-fx/impact/impact-stage.js');
@@ -80,7 +79,11 @@ const setup = await page.evaluate(
     const readyTypes = () => select.IMPACT_TYPES.filter((entry) => stage.impactReady(entry));
     let known = -1;
     let stableSince = performance.now();
-    while (performance.now() - stableSince < 600 && performance.now() - started < 15000) {
+    // Under SwiftShader (the 3D board's page draws a frame every ~0.3 s) a type's shaders take
+    // seconds to link, so "no further type for a while" has to be a longer while.
+    const stableMs = board3d ? 6000 : 600;
+    const maxWaitMs = board3d ? 60000 : 15000;
+    while (performance.now() - stableSince < stableMs && performance.now() - started < maxWaitMs) {
       if (readyTypes().length !== known) {
         known = readyTypes().length;
         stableSince = performance.now();
@@ -148,7 +151,7 @@ const setup = await page.evaluate(
     };
     return { readyTypes: readyTypes(), waitedMs: Math.round(performance.now() - started) };
   },
-  [TYPE, Number(DAMAGE), BENCH === '1', SIDE, CARD_IMG, SPREAD_COUNT]
+  [TYPE, Number(DAMAGE), BENCH === '1', SIDE, CARD_IMG, SPREAD_COUNT, IS_3D]
 );
 console.log('setup', JSON.stringify(setup));
 

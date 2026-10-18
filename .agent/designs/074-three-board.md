@@ -539,6 +539,72 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### F1
+- API: `__ptcg.boardMode()` (`board3dActive()`) and `__ptcg.cardRect(id)` in `e2e-api.js`. 3D: `getBoardScene().rects()[id]`;
+  iframe: the registry <img> through `viewportRectOf` (card-pop.mjs → iframe-rect.mjs `mapIframeRectToPage`, flip
+  included). Deviation from the row: no new `iframe-rect.mjs` — one already exists with its test, so the pure part is only
+  the choice and the null rule (`e2e-card-rect.mjs` `cardRectOf`/`usableRect`, test `e2e-card-rect.test.mjs`): null for a
+  missing, empty or non-finite rect, and a 3D card the scene does not draw (hidden mesh) is null, never the <img>'s stale box.
+- Every script reads the board through `window.__boardRoot(side)` (the iframe's document, or the mirror's shadow root),
+  installed with `addInitScript`, and takes geometry from `cardRect`. `PTCG_BOARD=3d` adds `&board=3d` and SwiftShader's
+  flags; default `iframe`. `CHROMIUM_PATH` honoured everywhere. Scripts that needed a server (`test-card-inspector-e2e`,
+  `spectator-view-test`, `fullview-test`) spawn their own on a free port (`PTCG_URL` reuses one).
+- `test-card-inspector-e2e.mjs`: every check kept. Mode-aware: stamping stats/attachments and `clickActive` go through
+  the board image (events built in that image's own window); `hand-lowered` is the iframe root class, or the mirror host
+  class AND `scene.inspect().handPose` on 3D; "source hidden" is the DOM `visibility` AND (3D) `uiState.hidden`;
+  real-click points are `cardRect` centres (settled, polled); 15* hover points are `scene.hitTest`-verified points on the
+  card. Changed on 3D, with reasons: **10c** — the 3D Active sits beside the focus card, so a double-click on it never lands
+  on an attack panel; the second click is aimed at the lowest payable panel (the list reveals upward, so it is hit-testable
+  first) and `performance.now` is held at the open and moved 350 ms on, because the card is `visibility: hidden` until its
+  flight starts one drawn frame after the open and SwiftShader frames are ~0.3-1 s apart (the 500 ms guard would be gone
+  before the panel exists); **14** — waits for the flight (`playState finished`, `card-focus--open` is set at the flight's
+  START) and for the resize to reach the page; **15c** — the canvas has no gutter probe (`appendProbe` is iframe-only), so
+  it asserts `mode` is `edge*` and the preview does not overlap the hovered card. New: 4b (the Active has an instance id).
+- `fullview-test.mjs`: rewritten, the old one needed `exported-state.json` on the legacy client and its checks were stale
+  (a double-click on the own Active opens the focus view; the "View attached cards" menu item returns early under
+  authority, I15; the preview spring does not overshoot). New flow: solo room, Basic in each Active, Energy attached by
+  `moveCardBundle { moving, target }`, then `cardRect` against Playwright's own box for the same <img> (4c), a double-click
+  zoom on the FAR Active (own Pokémon open focus/inspector, not the zoom) — flight starts on the card's rect ±2 px, pop
+  enlarges > 1.8x and settles at scale 1, Escape closes, card back where it was — and `openAttachedCardsPanel` on the
+  near Active (iframe: `.full-view`, enlarged > 1.8x, closes; 3D: the carousel with the Energy, no `.full-view`). Iframe
+  board: the double-click is click/click/dblclick dispatched on the <img>, because a real click at the card's centre can
+  land on the `.play-container` div over it (seen: the click reached `DIV.play-container`, no zoom). 3D: real mouse.
+  The foil-under-cursor checks of the old script have nothing to run on (fixture cards carry no rarity → no `.mat-holo`):
+  printed as a note, not asserted.
+- `spectator-view-test.mjs`: hands are read through `__boardRoot(side)`; new 2b (board mode) and 2c (every near-hand card
+  has a `cardRect`). `PW_CHROMIUM` still works beside `CHROMIUM_PATH`.
+- fx-preview: new `board-mode.mjs` (mode, launch options, `openBoard`, offline `CARD_DIR`/`CARD_IMG` routes for
+  images.pokemontcg.io, and page-side `window.__fxBoard`: `root`, `zoneRect` (iframe `visualRectOf`; 3D
+  `scene.zoneRects()['<side>:<zone>']`), `pauseAll`, `stepTo` (skips the scene clock: stepping it back to 0 would rewind the
+  card tweens), `pushView` (fabricated view through the real `applyView` + production advisory hooks), `imageOf`). A
+  fabricated view with a hand, prizes, board cards and stubs lays out on the 3D board with no room joined (server
+  authoritative is enough). `capture-entry`, `capture-board`, `rec-evolve/ko/discard/move/attack-hit/deck-reveal` need only
+  rects; `rec-draw/opp-play/prize` faked <img>s inside the iframe zones, which the 3D board cannot draw, so on 3D they
+  push fabricated views (`cardsDrawn` / `trainerPlayed` events through the production hooks; prize take calls the same
+  fan/draw entry points over the mirror images). `rec-unboxing` (builder tab), `rec-attack-impact` (lab page) and
+  `cut-move.sh` have no board: unchanged. SKILL.md: one paragraph on `PTCG_BOARD=3d` plus a line in the board-DOM bullet.
+- Limits found, none hidden by the scripts: (1) card-pop.mjs `createSpring` steps by the real frame time without a cap.
+  On a SwiftShader page (a step spans ~10-50 frames) the open pop rings (scale max 1.77, settles after ~10 s) and the
+  RETREAT spring diverges (scale ran to -200000; `Escape` set `is-closing` but the overlay never left), so
+  `fullview-test` on 3D holds Escape to "starts closing" and finishes with `closeCardPreview(null, true)`. A real GPU at
+  60 fps is unaffected, but any long frame feeds the same integrator; clamping `dt` in `loop` is the fix (not my files).
+  (2) `rec-attack-hit` needs a longer "types ready" window on 3D (shader links take seconds on SwiftShader; the iframe
+  window of 600 ms made 3D fall back to the DOM dressing); `WEBGL=0` is refused on 3D (no WebGL, no board). `SPREAD=2` on
+  the iframe board fails in this sandbox with the original script too (colorless prefab not ready within 600 ms,
+  verified against `HEAD`): not changed. (3) Frame-time and trace probes (`rec-move`, `rec-deck-reveal`) read
+  SwiftShader's ~0.3-1 s frames on 3D. (4) `capture-board` holo emulation (DOM moves on the iframe wrapper) is iframe-only;
+  3D reports tera skins from `uiState`. (5) The sandbox has no TCGdex: `/api/tcgdex/...` 404s are logged, harmless.
+- Status at hand-off. All eight scripts below are rewritten; none is left undone. Run by me before the stop order (full
+  output tails in the report): the three harnesses, `PTCG_BOARD=3d` and default, 53/53, 24/24 (3D) and 23/23 (iframe),
+  19/19 twice, all ALL PASS. fx-preview: every script ran to exit 0 in both modes EXCEPT `rec-attack-hit` on the iframe board,
+  exit 1 in the last run ("the impact prefab did not play": the unchanged 600 ms ready window, flaky in this sandbox, passed
+  once earlier; 3D passes with the 6 s window). NOT verified after the last edit: `e2e-api.js` now reads the mode through a
+  module-level `currentBoardMode` instead of `this.boardMode()` (lint + unit test only). Frames and videos were only
+  spot-checked by eye for tera entry, tera skins and the 3D KO/draw videos; `rec-prize`/`rec-opp-play` 3D runs prove the
+  calls run, not that the scene looks right. Changed: `test-card-inspector-e2e`, `fullview-test`, `spectator-view-test`,
+  `capture-board`, `capture-entry`, `rec-evolve`, `rec-ko`, `rec-discard`, `rec-draw`, `rec-opp-play`, `rec-prize`,
+  `rec-move`, `rec-attack-hit`, `rec-deck-reveal`, `e2e-api.js`; new `board-mode.mjs`, `e2e-card-rect.mjs` (+ test).
+
 ### D4
 - Popups: option (a), not the Work-plan row's move to `index.ejs`. The five panels (`#deck`, `#discard`, `#lostZone`,
   `#viewCards`, `#attachedCards`) stay in the mirror shadow roots, so `getZone(...).element`, `zone-buttons.js`,
