@@ -18,6 +18,18 @@ const holoCssFiles = () =>
 const normalize = (css) => css.replace(/\s+/g, ' ').trim();
 
 describe('holo CSS contracts', () => {
+  it('the TCG Live foil canvas is out of flow, so its pixel buffer never sizes the card', () => {
+    // In flow, a .mat-holo rotator (children `height: 100%; aspect-ratio: auto`) sized the canvas by its
+    // buffer, and tcgl-foil-view.js sizes the buffer from the canvas's box: the open pop's rounding
+    // ratcheted the full-view preview taller and the foil stretched the card art to fill it.
+    const foil = normalize(readHoloCss('tcgl-foil.css'));
+    const canvas = foil.match(/\.card__rotator > \.tcgl-foil \{([^}]*)\}/);
+    assert.ok(canvas, 'canvas rule exists');
+    assert.match(canvas[1], /position: absolute;/);
+    assert.match(canvas[1], /inset: 0;/);
+    assert.match(foil, /\[data-tcgl-foil\] \.card__rotator \{ position: relative; \}/);
+  });
+
   it('no layer depends on --card-scale without a fallback (it is never set)', () => {
     for (const name of holoCssFiles()) {
       assert.doesNotMatch(readHoloCss(name), /var\(\s*--card-scale\s*\)/, name);

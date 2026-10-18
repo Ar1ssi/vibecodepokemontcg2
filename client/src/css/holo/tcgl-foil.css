@@ -4,7 +4,17 @@
   card's TCG Live front with its etch / white plate / cold foil masks. The simey layers stay in the DOM
   but never show for these cards; on `fallback` the plain <img> shows without foil.
 */
+/* The canvas stays out of flow. In flow, a rotator whose children get `height: 100%; aspect-ratio: auto`
+   (.mat-holo: the full-view preview) sized it by its pixel buffer, and tcgl-foil-view.js sizes that buffer
+   from the canvas's box: every frame's rounding during the open pop could only grow it, so the card
+   stretched taller and stayed that way. */
+[data-tcgl-foil] .card__rotator {
+  position: relative;
+}
+
 .card__rotator > .tcgl-foil {
+  position: absolute;
+  inset: 0;
   grid-area: 1 / 1;
   width: 100%;
   height: 100%;
