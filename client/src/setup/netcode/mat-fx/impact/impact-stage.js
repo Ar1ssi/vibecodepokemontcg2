@@ -161,7 +161,8 @@ const WRAPS = (gl) => [gl.REPEAT, gl.CLAMP_TO_EDGE, gl.MIRRORED_REPEAT, gl.CLAMP
 
 /**
  * The stage: its own viewport canvas and context, or (`scene` given, design 075) the 3D board's
- * context, borrowed: `scene` = `{ clockHost, placementOf, invalidate }`.
+ * context, borrowed: `scene` = attachSceneImpacts' argument (`gl`, `clockHost`, `placementOf`,
+ * `invalidate`, `resetState`).
  */
 function createStage(scene = null) {
   const canvas = scene ? null : document.createElement('canvas');
