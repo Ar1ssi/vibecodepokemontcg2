@@ -539,6 +539,27 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### G1 — localhost parity checklist (user sign-off; reply "parity OK" or list what differs)
+Run `pnpm start`, open `http://localhost:4000/?board=3d` (or set `localStorage.setItem('ptcg-board-3d','1')`); a second
+tab without the flag shows the iframe board for side-by-side comparison. `?board=iframe` beats the stored flag.
+1. Table and zones: mat art and the 5 layout profiles (change the mat in the picker), every zone outline and count label,
+   deck/discard/Lost Zone/prize piles with the right heights, stadium slot, hand fan near and far, 12° tilt matching the
+   iframe board.
+2. Cards: fronts, backs, face-down prizes and far hand, foil cards (needs a real GPU: colour and frame budget, edge row 32),
+   damage/status/ability counters, Tera skin, status idle loop, stack badges, evolution stack order.
+3. Input: click selects, double-click opens focus (hand lowers, flight from the mesh), right-click menu on a card and on
+   the Stadium, hover preview after the dwell, hand card lifts on hover, keyboard `v`, `e`/`q` attach mode, Escape paths.
+4. Drag: hand → Active/Bench/discard/Lost Zone/prizes/deck, Bench ↔ Active, attach Energy/Tool by dropping on a Pokémon,
+   drop on empty table returns the card, drop on a far-seat zone refused, drag cancelled by right-click.
+5. Popups and pickers: deck/discard/Lost Zone viewers, look panel, attached-cards carousel, mat pick (both boards),
+   server card select, prize take prompt, coin ceremony.
+6. FX (play a scripted game or use fx-preview `PTCG_BOARD=3d`): draw own/opp, shuffle, discard flight, KO, evolve/devolve,
+   Tera/Mega entry, attack lunge + impact + shake, status apply/clear, prize take, trainer present, Stadium present, turn
+   banner, ability banner, game over.
+7. Modes: solo room (both seats one socket), flip board (near seat swaps; piles and hand re-pose), spectator view, 2-player
+   room with a second browser, resize and devicePixelRatio change, tab hidden/shown (context loss recovery), reduced motion.
+8. Fallback: a browser without WebGL2 reloads once onto the iframe board (`?board=iframe`, sessionStorage reason).
+
 ### F1
 - API: `__ptcg.boardMode()` (`board3dActive()`) and `__ptcg.cardRect(id)` in `e2e-api.js`. 3D: `getBoardScene().rects()[id]`;
   iframe: the registry <img> through `viewportRectOf` (card-pop.mjs → iframe-rect.mjs `mapIframeRectToPage`, flip
