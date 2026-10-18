@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I264). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I267). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,9 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I264 2026-10-18 P2 [client] After 074-three-board G3: legacy relay (SERVER_AUTHORITATIVE=0) has no visible board (DOM goes to the hidden mirror; test:2p checks state only); orphaned sheets mat-ambient/status-marker/energy-token/damage-counter/mat-coin.css, .full-view code, .hover-gutter-probe, index.css .self/.opp
+- I265 2026-10-18 P2 [fx] 074-three-board debts: card-pop.mjs createSpring steps by uncapped frame time (retreat spring diverges on slow frames — clamp dt); retreat/promote mesh slide pops back to the origin after the 200 ms settle hold (hold the card hidden from handleBeforeApply); `.fx-slide`/`.fx-draw-scene*` CSS unused
+- I266 2026-10-18 P3 [client] 074-three-board user-check items: TCG Live camera keeps the tilt hand size; focus mesh mode drops the holo tilt; far hand showed the deck rect one sample after the opp draw; deck keys send the legacy index for server cards; 2P join of the second e2e client times out under load
 - I263 2026-10-16 P3 [board-ui] Bench AttackOverlay (074 A2: attacks hidden, Retreat inert) has no DOM or e2e test; test-card-inspector-e2e covers the Active and stack view only (refs: D219, design 074)
 - I262 2026-10-16 P3 [rules] attack-mirror-heal.test "Absorb Vitality" fails intermittently in the full `pnpm test` run, passes alone (seen on branch feature/tcgl-attack-ui, file untouched)
 - I261 2026-10-16 P3 [deck-builder] coin-normalize.test "committed coin catalog is already normalized" fails on a CRLF working copy of the catalog: compare normalizes line endings or .gitattributes pins LF

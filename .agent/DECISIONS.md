@@ -9,6 +9,9 @@
 #   Next id = highest D number in this file and the archives + 1 (next: D220).
 
 ## Active
+- D220 2026-10-18 [client] The board is three.js only (074-three-board; user chose flag-then-delete): board-mirror shadow roots keep the iframe id set so legacy modules work unchanged; no fallback board, WebGL2 required.
+- D221 2026-10-18 [netcode] Solo = a server room where one socket owns both seats (`cmd.seat`, `viewForSolo`, PROTOCOL_VERSION 2.2.0); the legacy DOM-rendered solo board is gone (074-three-board A2/A3).
+- D222 2026-10-18 [harness] Number 074 names two designs from parallel sessions (074-tcgl-attack-ui, 074-three-board): cite by file name. Slice builders stop at lint + unit tests; the session runs browser harnesses one at a time.
 - D219 2026-10-16 [rules-ui] In-play taps route as TCG Live: own Active, or own Bench with a usable action, open the AttackOverlay; else the stack view. 013 print chrome retired for Pokémon. (Supersedes D210; design 074)
 - D218 2026-10-16 [engine] Commands live in shared/engine/reduce/<domain>.mjs; reduce.mjs is a facade with the 3 exports; handlers get locals explicitly; reduce/ cycles are call-time only, never read at load. (I250)
 - D217 2026-10-16 [board-ui] TCG Live foil/reverse cards wear its own shader+masks; lossless WebP streamed from R2 (`FOIL_TEXTURE_URL`), never in git; others keep CSS holo. (design 069-tcgl-card-foil)

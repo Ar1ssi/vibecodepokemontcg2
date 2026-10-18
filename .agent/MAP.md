@@ -92,6 +92,13 @@ client/src/actions/general/ — setup, ready, turn, reveal/hide, reset, undo
 client/src/setup/foil/ — TCG Live card foil renderer: manifest (pure), pose math (pure), store (loads manifest + /api/tcgl-foil/config texture base), three.js material + view; server/tcgl-foil-config.mjs serves FOIL_TEXTURE_URL (D217)
 client/src/setup/image-logic/drag.js + drag-avatar.js + drag-tilt.mjs — native HTML5 card drag/drop; the dragged card is drawn as a swinging body-level avatar (design 038, D124; physics pure in drag-tilt.mjs); a held Item/Supporter lights its board (design 046, drop-zone.mjs playsOntoBoard)
 
+## three.js board (design 074-three-board, D220) — the only board; entry: client/src/setup/board3d/board3d.js
+client/src/setup/board3d/ — board-model.mjs (server view → pure model) · board-layout.mjs + board-camera.mjs (zones, 12° tilt camera, TCG Live preset) · board-scene.js (applyModel/rects/hitTest/tween/lift) · card-mesh.js, pile-mesh.js, overlay-meshes.js · board-input.js + drop-router.mjs (pointer → raycast → synthetic clicks/drags) · board-rects.js + flight-pose.mjs (FX geometry)
+client/src/setup/board3d/board-mirror.js — open shadow roots #selfBoard/#oppBoard carrying the old iframe id set; containers.js exports them as selfContainerDocument/oppContainerDocument, so zone/click/apply-view code is unchanged; css/board3d-panels.css styles the zone list popups inside them
+client/src/setup/gl/ — WebGL renderer, texture cache and card-art hosts for the board (gl-renderer.js, gl-textures.js, texture-cache.mjs); server/card-image-proxy.mjs serves /api/card-image for non-CORS art
+client/src/setup/netcode/solo-room.js, solo-seat.mjs, server-card-select.{js,mjs} — solo as a server room (one socket, both seats, D221); click-to-select/attach for server cards; apply-view.js skips px layout when board3dActive()
+scripts/e2e/board3d-*-test.mjs, test-card-inspector-e2e.mjs, fullview-test.mjs, spectator-view-test.mjs, .claude/skills/fx-preview/board-mode.mjs — every browser harness/capture runs on the 3D board (CHROMIUM_PATH honoured; SwiftShader GL args)
+
 ## Tests & tooling
 **/__tests__/*.test.mjs — plain `node --test`, no jsdom; `pnpm test` runs them all (~6900); run one file with `node --test <path>`
 scripts/prune-merged-branches.mjs — dry-run/delete remote branches fully contained in origin/main; keeps main, the current branch and open-PR refs (via gh, else --keep); needs local push rights (test: scripts/__tests__/prune-merged-branches.test.mjs)
