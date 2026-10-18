@@ -53,6 +53,7 @@ const SHARED_ENERGY_SUMMARY = [
   { id: 'gte4a-005', name: 'Basic Grass Energy', localId: '005' },
   { id: 'xy12-91', name: 'Grass Energy', localId: '91' },
   { id: 'g1-75', name: 'Grass Energy', localId: '75' },
+  { id: 'xy1-130', name: 'Double Colorless Energy', localId: '130' },
   { id: 'xy1-132', name: 'Grass Energy', localId: '132' },
   { id: 'swsh12.5-152', name: 'Grass Energy', localId: '152' },
   { id: 'sm1-164', name: 'Grass Energy', localId: '164' },
@@ -236,7 +237,7 @@ describe('fetchGenerationEnergyCards', () => {
     assert.equal(reverse.set.id, 'xy12');
   });
 
-  it('fetchGenerationEnergyCards(6) appends Reverse Holo variants for xy12 and g1, but not other sets', async () => {
+  it('fetchGenerationEnergyCards(6) appends Reverse Holo variants for xy12, g1 and listed special energies only', async () => {
     stubFetch([
       [
         '/series/xy',
@@ -270,7 +271,10 @@ describe('fetchGenerationEnergyCards', () => {
           id: 'xy1',
           name: 'XY',
           releaseDate: '2014-02-05',
-          cards: [{ id: 'xy1-132', name: 'Grass Energy', localId: '132', image: 'xy1-img' }],
+          cards: [
+            { id: 'xy1-130', name: 'Double Colorless Energy', localId: '130', image: 'xy1-dce-img' },
+            { id: 'xy1-132', name: 'Grass Energy', localId: '132', image: 'xy1-img' },
+          ],
         },
       ],
       ['/cards?category=Energy', SHARED_ENERGY_SUMMARY],
@@ -285,7 +289,8 @@ describe('fetchGenerationEnergyCards', () => {
     assert.ok(cardIds.includes('g1-75'), 'must include base g1-75');
     assert.ok(cardIds.includes('g1-75-reverse'), 'must include reverse holo g1-75-reverse');
 
-    // xy1 has no reverse holo basic energies
+    // xy1 reverses its special energies (TCG Live xy1_130_ph) but not its basic energies
+    assert.ok(cardIds.includes('xy1-130-reverse'), 'must include reverse holo xy1-130-reverse');
     assert.ok(cardIds.includes('xy1-132'), 'must include base xy1-132');
     assert.ok(!cardIds.includes('xy1-132-reverse'), 'must not produce xy1-132-reverse');
 

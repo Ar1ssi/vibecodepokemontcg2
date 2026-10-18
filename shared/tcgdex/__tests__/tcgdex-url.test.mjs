@@ -1,6 +1,6 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { tcgdexApiBase, tcgdexApiUrl } from '../tcgdex-url.mjs';
+import { isReverseHoloId, tcgdexApiBase, tcgdexApiUrl, tcgdexLookupId } from '../tcgdex-url.mjs';
 
 const hadLocation = Object.prototype.hasOwnProperty.call(globalThis, 'location');
 const originalLocation = globalThis.location;
@@ -26,4 +26,14 @@ test('a browser page goes through the same-origin proxy', () => {
 test('an opaque origin ("null", e.g. file://) falls back to direct', () => {
   globalThis.location = { origin: 'null' };
   assert.equal(tcgdexApiBase(), 'https://api.tcgdex.net/v2/en');
+});
+
+test('a Reverse Holo copy looks up its base print; other ids pass through', () => {
+  assert.equal(isReverseHoloId('bw1-111-reverse'), true);
+  assert.equal(tcgdexLookupId('bw1-111-reverse'), 'bw1-111');
+  assert.equal(tcgdexLookupId('swsh12.5-152-reverse'), 'swsh12.5-152');
+  assert.equal(isReverseHoloId('bw1-111'), false);
+  assert.equal(tcgdexLookupId('bw1-111'), 'bw1-111');
+  assert.equal(isReverseHoloId(undefined), false);
+  assert.equal(isReverseHoloId(42), false);
 });

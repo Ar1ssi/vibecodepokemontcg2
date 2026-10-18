@@ -1,5 +1,5 @@
 import { cachedFetchJson as fetchJson } from './tcgdex-cache.mjs';
-import { tcgdexApiUrl } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
+import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { SET_RELEASE_DATES } from './set-release-dates.generated.mjs';
 const HUGE_RESULT_THRESHOLD = 2000;
@@ -425,10 +425,14 @@ export async function queryCards({ term = '', params = {}, onProgress = null } =
   };
 }
 
-/** One card's full TCGdex record, normalized like a search result. */
+/**
+ * One card's full TCGdex record, normalized like a search result. A Reverse Holo copy
+ * (`<id>-reverse`) reads its base print and keeps its own id and rarity.
+ */
 export async function fetchCardDetail(cardId) {
-  const detail = await fetchJson(tcgdexApiUrl(`/cards/${encodeURIComponent(cardId)}`));
-  return normalizeTcgdexCard(detail);
+  const detail = await fetchJson(tcgdexApiUrl(`/cards/${encodeURIComponent(tcgdexLookupId(cardId))}`));
+  const card = normalizeTcgdexCard(detail);
+  return isReverseHoloId(cardId) ? { ...card, id: cardId, rarity: 'Reverse Holo' } : card;
 }
 
 /** Name-only search, for callers with no filters (the rules debug menu). */

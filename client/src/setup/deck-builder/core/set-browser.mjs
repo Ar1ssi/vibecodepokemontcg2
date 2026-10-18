@@ -529,7 +529,8 @@ const TCGDEX_BASE = tcgdexApiBase();
     // Sets across Pokémon generations that famously featured Reverse Holo energy cards:
     // - Gen 8 (swsh): Crown Zenith (swsh12.5) basic energies
     // - Gen 7 (sm): Sun & Moon (sm1), Guardians Rising (sm2), Burning Shadows (sm3), Crimson Invasion (sm4) basic energies
-    // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies
+    // - Gen 6 (xy): Evolutions (xy12), Generations (g1) basic & special energies; the
+    //              special energies of xy1–xy10 and dc1 are listed by card id below
     // - Gen 5 (bw): every set with an Energy card — Black & White (bw1) basic energies plus the
     //               special energies in Next Destinies (bw4), Dragons Exalted (bw6), Plasma Storm
     //               (bw8), Plasma Freeze (bw9), Plasma Blast (bw10), Legendary Treasures (bw11)
@@ -548,7 +549,31 @@ const TCGDEX_BASE = tcgdexApiBase();
     // energies with gold Hyper Rare and ACE SPEC energies that have no reverse print,
     // so a set-granular sweep would fabricate reverse variants of cards that never had
     // one. Source: TCGdex `variants.reverse` per card (/v2/en/cards/<id>), verified 2026-09.
+    // Gen 6 (xy) is keyed by card id for the same reason: only the special energies
+    // reverse, not the basic energies printed alongside them. TCGdex `variants.reverse`
+    // is false for all of these, so the source is TCG Live's `<set>_<n>_ph` Reverse rows
+    // (card_database_rows.tsv); ids checked against TCGdex 2026-10-18.
     export const REVERSE_HOLO_ENERGY_CARD_IDS_BY_GENERATION = {
+      6: new Set([
+        'xy1-130', // Double Colorless Energy
+        'xy1-131', // Rainbow Energy
+        'xy3-103', // Herbal Energy
+        'xy3-104', // Strong Energy
+        'xy4-111', // Double Colorless Energy
+        'xy4-112', // Mystery Energy
+        'xy5-143', // Shield Energy
+        'xy5-144', // Wonder Energy
+        'dc1-33', // Double Aqua Energy
+        'dc1-34', // Double Magma Energy
+        'xy6-97', // Double Dragon Energy
+        'xy7-82', // Dangerous Energy
+        'xy7-83', // Flash Energy
+        'xy8-151', // Burning Energy
+        'xy8-152', // Rainbow Energy
+        'xy9-113', // Splash Energy
+        'xy10-114', // Double Colorless Energy
+        'xy10-115', // Strong Energy
+      ]),
       9: new Set([
         'sv02-190', // Jet Energy
         'sv02-191', // Luminous Energy
@@ -577,7 +602,7 @@ const TCGDEX_BASE = tcgdexApiBase();
     // across every set in a Pokémon generation. For generations featuring
     // Reverse Holo energy prints (Gen 9, 8, 7, 6, 5, 3), this includes their
     // Reverse Holo variants — by set id where every energy in the set reverses,
-    // or by card id where eligible and ineligible energies coexist (Gen 9).
+    // or by card id where eligible and ineligible energies coexist (Gen 9, 6).
     export async function fetchGenerationEnergyCards(generation) {
       const setEntries = await fetchGenerationSetStubs(generation);
       const cards = await fetchEnergyCardsForSetEntries(setEntries);

@@ -39,7 +39,7 @@ import { initializeEliteTrainerBox } from './native-deck-builder-etb.js';
 import { systemState } from '../../../state.js';
 import { printedRarity } from '../../../../../shared/engine/rules/card-classify.mjs';
 import { cachedFetchJson } from '../../../../../shared/tcgdex/tcgdex-cache.mjs';
-import { tcgdexApiUrl } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
+import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { fetchCardDetail } from '../../../../../shared/engine/rules/rules-state.mjs';
 import { warmDeckCardCache } from '../../../setup/deck-builder/core/deck-card-warm.mjs';
 import {
@@ -1264,8 +1264,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const rarityCache = new Map();
       const fetchRarity = async (cardId) => {
         if (rarityCache.has(cardId)) return rarityCache.get(cardId);
+        if (isReverseHoloId(cardId)) return 'Reverse Holo';
         try {
-          const detail = await cachedFetchJson(tcgdexApiUrl(`/cards/${cardId}`));
+          const detail = await cachedFetchJson(tcgdexApiUrl(`/cards/${tcgdexLookupId(cardId)}`));
           const rarity = printedRarity(detail);
           rarityCache.set(cardId, rarity);
           return rarity;
