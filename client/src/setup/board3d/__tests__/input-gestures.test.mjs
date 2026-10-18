@@ -90,3 +90,8 @@ test('mirrorSelectorFor: no hit, an unknown side, or no id gives null', () => {
   assert.equal(mirrorSelectorFor({ instanceId: 1, side: 'north', zone: 'hand' }), null);
   assert.equal(mirrorSelectorFor({ instanceId: null, side: 'self', zone: 'hand' }), null);
 });
+
+test('mirrorSelectorFor: an empty zone footprint (plane) has no twin', () => {
+  assert.equal(mirrorSelectorFor({ zone: 'active', side: 'self', instanceId: null, plane: true }), null);
+  assert.equal(mirrorSelectorFor({ zone: 'stadium', side: null, instanceId: null, plane: true }), null);
+});

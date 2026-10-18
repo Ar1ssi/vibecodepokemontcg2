@@ -51,11 +51,13 @@ export function createClickTracker({ slopPx = 6, clickMs = 400, dblMs = 350 } = 
 /**
  * Where a `board-scene.js` hit's DOM twin lives: `side` 'self'/'opp' is that mirror root, null the
  * page document. Null for no hit or a hit with nothing to address.
- * @param {{ instanceId?: number|null, side?: string|null, zone?: string, pile?: boolean }|null} hit
+ * @param {{ instanceId?: number|null, side?: string|null, zone?: string, pile?: boolean, plane?: boolean }|null} hit
  * @returns {{ side: 'self'|'opp'|null, selector: string }|null}
  */
 export function mirrorSelectorFor(hit) {
   if (!hit || typeof hit !== 'object') return null;
+  // An empty zone's footprint (a drop target) has no DOM twin to click.
+  if (hit.plane) return null;
   if (hit.zone === 'stadium') return { side: null, selector: STADIUM_SELECTOR };
   if (hit.side !== 'self' && hit.side !== 'opp') return null;
   if (hit.pile) {

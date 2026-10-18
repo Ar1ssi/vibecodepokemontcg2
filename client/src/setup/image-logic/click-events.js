@@ -51,13 +51,18 @@ import { board3dActive } from '../board3d/board3d.js';
 const containerContains = (containerDocument, node) =>
   Boolean((containerDocument.body ?? containerDocument).contains(node));
 
-export const identifyCard = (event) => {
-  mouseClick.cardUser = event.target.user === 'self' ? 'self' : 'opp';
+/**
+ * Fills `mouseClick` with the card a node stands for: its owner, server instance id, zone and
+ * legacy index. Shared by every DOM card event (`identifyCard`) and the 3D board's drag, which
+ * names the card's board-mirror <img> without an event (design 074 D5).
+ */
+export const identifyCardElement = (target) => {
+  mouseClick.cardUser = target.user === 'self' ? 'self' : 'opp';
   // Design 003 slice 1: capture the authoritative renderer's identity stamp alongside
   // the legacy index. Null for a legacy-rendered card, which keeps the gate fail-open.
-  mouseClick.cardInstanceId = readCardInstanceId(event.target);
+  mouseClick.cardInstanceId = readCardInstanceId(target);
   //closest() handles plain cards, play-container cards, and holo-wrapper cards
-  mouseClick.zoneId = event.target.closest(
+  mouseClick.zoneId = target.closest(
     '#deck, #hand, #active, #bench, #prizes, #discard, #lostZone, #attachedCards, #viewCards, #stadium, #board, #deckCover, #discardCover, #lostZoneCover'
   )?.id;
   if (mouseClick.zoneId === 'deckCover') {
@@ -68,10 +73,12 @@ export const identifyCard = (event) => {
   } else {
     mouseClick.cardIndex = findZoneCardIndex(
       getZone(mouseClick.cardUser, mouseClick.zoneId),
-      event.target
+      target
     );
   }
 };
+
+export const identifyCard = (event) => identifyCardElement(event.target);
 
 export const coverClick = (event) => {
   if (event.target.id === 'discardCover') {

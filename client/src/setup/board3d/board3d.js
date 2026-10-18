@@ -19,7 +19,7 @@ const CHAT_LINES = {
 const defaultDeps = {
   importThree: () => import('three'),
   loadModules: async () => {
-    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover] =
+    const [renderer, textures, scene, clock, table, room, model, applyView, hydrateHolo, matFx, containers, input, hover, dragActions] =
       await Promise.all([
         import('../gl/gl-renderer.js'),
         import('../gl/gl-textures.js'),
@@ -34,6 +34,7 @@ const defaultDeps = {
         import('../../initialization/global-variables/containers.js'),
         import('./board-input.js'),
         import('../image-logic/hover-preview.js'),
+        import('./board-drag-actions.js'),
       ]);
     return {
       createRenderer: renderer.createRenderer,
@@ -49,6 +50,7 @@ const defaultDeps = {
       boardMirror: containers.boardMirror,
       createBoardInput: input.createBoardInput,
       getHoverPreview: hover.getHoverPreview,
+      createBoardDragActions: dragActions.createBoardDragActions,
       loadFoil,
     };
   },
@@ -225,8 +227,9 @@ const freshCanvas = (host, old) => {
  *   `{ createRenderer, createTextureCache, createMatTextureLoader, createBoardScene, createSceneClock,
  *   RoomEnvironment }`, optionally `boardMirror` (board-mirror.js, the shadow roots apply-view.js
  *   renders into while this board runs: its UI state feeds the scene, the scene's rects feed it),
- *   `createBoardInput` (board-input.js, the canvas's pointer input dispatched to the mirror) and
- *   `getHoverPreview` (hover-preview.js, the preview that input feeds).
+ *   `createBoardInput` (board-input.js, the canvas's pointer input dispatched to the mirror),
+ *   `getHoverPreview` (hover-preview.js, the preview that input feeds) and
+ *   `createBoardDragActions` (board-drag-actions.js, the page-side calls a drag ends in).
  * @returns {Promise<{ active: boolean, reason: string|null }>} reasons: 'flag-off', 'no-host',
  *   'legacy-netcode', 'load-failed', 'no-webgl2'; a later second context loss falls back with
  *   'context-lost-twice' after this resolved. A fallback after containers.js bound the mirror
@@ -383,7 +386,8 @@ export async function initializeBoard3d({
     const hover = {
       setTarget: (el, pointer) => modules.getHoverPreview?.()?.setTarget(el, pointer),
     };
-    return modules.createBoardInput({ canvas, scene, mirror, hover, doc });
+    const dragActions = modules.createBoardDragActions?.() ?? null;
+    return modules.createBoardInput({ canvas, scene, mirror, hover, dragActions, doc });
   }
 
   function teardownGraphics() {

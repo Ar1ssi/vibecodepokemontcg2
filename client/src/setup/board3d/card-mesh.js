@@ -102,6 +102,7 @@ function buildCardGeometry(three, widthPx, uv) {
  *     face?: 'front'|'back', foilRecord?: object|null }) => void,
  *   setPose: (id: number, pose: import('./card-poses.mjs').CardPose, ms: number) => void,
  *   setHidden: (id: number, hidden: boolean) => void, setCamera: (desc: object|null) => void,
+ *   setTilt: (id: number, tilt: { roll: number, pitch: number }|null) => void,
  *   has: (id: number) => boolean, meshOf: (id: number) => import('three').Mesh|null,
  *   idAt: (object3d: import('three').Object3D|null) => number|null, ids: () => number[],
  *   cornersOf: (id: number) => number[][]|null, update: (nowMs: number) => boolean,
@@ -352,8 +353,21 @@ export function createCardMeshPool({
       -pose.yawDeg * DEG,
       'XZY'
     );
+    if (card.tilt) applyTilt(card.mesh, card.tilt, tiltDeg);
     card.mesh.position.set(x, y, z);
     card.mesh.scale.setScalar(scale);
+  };
+
+  // A held card's swing (drag-tilt.mjs) about the table's own axes, whatever the card's yaw or
+  // face: pitch about the table's x (positive = top edge away, CSS rotateX), roll about the
+  // table's normal (positive = clockwise as seen from above, CSS rotateZ).
+  const tableX = new three.Vector3(1, 0, 0);
+  const tableNormal = new three.Vector3();
+  const swing = new three.Quaternion();
+  const applyTilt = (mesh, { roll, pitch }, tiltDeg) => {
+    tableNormal.set(0, Math.sin(tiltDeg * DEG), Math.cos(tiltDeg * DEG));
+    mesh.quaternion.premultiply(swing.setFromAxisAngle(tableX, -pitch * DEG));
+    mesh.quaternion.premultiply(swing.setFromAxisAngle(tableNormal, -roll * DEG));
   };
 
   const withCard = (id, fn) => {
@@ -403,6 +417,7 @@ export function createCardMeshPool({
       hidden: false,
       pose: null,
       flip: null,
+      tilt: null,
       dirty: true,
     });
     mesh.visible = false;
@@ -484,6 +499,16 @@ export function createCardMeshPool({
       onNeedsRender();
     });
 
+  /** A held card's swing in degrees (drag-tilt.mjs `stepDragTilt`); null or zeros = upright. */
+  const setTilt = (id, tilt) =>
+    withCard(id, (card) => {
+      const roll = Number(tilt?.roll) || 0;
+      const pitch = Number(tilt?.pitch) || 0;
+      card.tilt = roll || pitch ? { roll, pitch } : null;
+      card.dirty = true;
+      onNeedsRender();
+    });
+
   const setHidden = (id, hidden) =>
     withCard(id, (card) => {
       card.hidden = Boolean(hidden);
@@ -559,6 +584,7 @@ export function createCardMeshPool({
     release,
     setFaces,
     setPose,
+    setTilt,
     setHidden,
     setCamera,
     has,

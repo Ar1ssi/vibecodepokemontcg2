@@ -184,7 +184,9 @@ try {
     const scene = getBoardScene();
     for (let y = 300; y < 800; y += 20) {
       for (let x = 500; x < 1400; x += 20) {
-        if (!scene.hitTest(x, y) && document.elementFromPoint(x, y)?.id === 'board3dCanvas') return { x, y };
+        const hit = scene.hitTest(x, y);
+        // A zone's empty footprint (a drop target) is empty table to a click.
+        if ((!hit || hit.plane) && document.elementFromPoint(x, y)?.id === 'board3dCanvas') return { x, y };
       }
     }
     return null;

@@ -539,6 +539,55 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### E2
+- No `setTeraSkin` API: tera-skin.js calls `scene.setUiState(id, { teraSkin: palette | null })`, which already merges
+  into the placement `overlays.sync` gets; board-scene.js unchanged. The reconciler's "node" on the 3D board is a
+  per-(scene, card) handle, so a rebuilt scene reads as a new node — but refresh runs only on `board-view-applied` /
+  `holo-wrapper-changed`, so after a context-loss rebuild the skins return with the next view.
+- The skin is five planes on the card face (overlay-meshes.js, timing in pure `tera-skin-frame.mjs`): tint, facets
+  (painted from `teraSkinFacets(...).facets`, a new field: each triangle with its fill), sheen (texture-offset sweep,
+  card-shaped alphaMap), rim aura, three glints. Blends are approximations: CSS `color` → multiply toward the tint by
+  its alpha (dst·(1 − a + c·a)), `overlay` facets → normal alpha, `screen` sheen → additive. Side by side with the DOM
+  (`.agent/scratch/074/e2-dom-ref-board.png` vs `e2-tera-settled.png`) the art stays readable, slightly darker.
+- status-loop.js under the flag: `createStatusLoop` returns an empty DocumentFragment (apply-view's `insertBefore`
+  inserts nothing, `parentNode` stays null), so apply-view.js needed no edit; sync/place return early.
+- Foil: `buildHoloCard({ mountFoil: false })` (hydrate-holo under the flag) marks the board wrapper
+  `data-tcgl-foil="deferred"` via `deferTcglFoil` and keeps the record, so full-view's `remountTcglFoil` still mounts
+  its clone; hover preview / inspector build their own wrappers (unaffected). Lab `?cards=12` with a stubbed manifest
+  and a local texture host: 4 foil meshes wear `createFoilMaterial` (`e2-foil.png`); the shader look with fake textures
+  proves plumbing only.
+
+### F2
+- Seam: `isBoard3dActive` on `setDefaultNetcodeContext` (null = the real `board3d.js` flag); apply-view's calls go through a
+  local `board3dActive()` that reads it. Fixture `apply-view-fixture.mjs` re-injects it after every `resetRenderState`.
+- Seven mixed cases were split rather than moved whole: their registry/class/src/attachedCards assertions stay in
+  `apply-view.test.mjs` (both modes), their px assertions moved to `apply-view-dom-layout.test.mjs`; three px-only cases
+  moved whole. Covers have no `board3dActive()` branch (their only geometry is `resetImage`'s zero reset, same in both
+  modes), so no cover case moved.
+
+### D2
+- Signatures as the slice brief set them: `dropTargetFor(hit, dragging, state)` and `routeDrop(target, dragging, state)`
+  (`dragging` = what `identifyCard` reads, plus the <img>'s `.attached`; `state` = `{ initiator, isSpectator, rulesEnabled,
+  solo }`). A target carries dragOver's `highlight` ('card'|'zone'|'both'); a route carries `gates`, the
+  `manualDeckActionAllowed` actions to pass first (`moveToDeck`, `draw`, `deckToBench`, `benchToHand`). `retreat`'s
+  args[2] is the Bench card's instance id; board-input.js swaps in its mirror <img> (drag.js passes the <img>).
+- Two rules drag.js never needed: a card lands only on its own side (an iframe drop into the other seat's same-named zone
+  moved it within its owner's zones); an open pile's top card dropped back on its pile (`discard` → `discardCover`) is no
+  move. Drags start on cards only; a pile stack (the deck cover's HTML5 drag) does not start one.
+- The target card's ring is `scene.setCardHighlight(id)` (merged over the UI state when it is drawn), not
+  `setUiState`, which would overwrite the glow the mirror reports for that card. Zone light =
+  `scene.setZoneHighlight(side, zone, on)` on the new pick planes (`hitTest` → `{ plane: true }`; the Stadium slot is
+  `side: null`); `scene.zoneRects()` gives their screen rects. An Item/Supporter keeps its Trainer board lit for the
+  whole drag (mirror `#board.board-drop-ready`, set by drag.js `markBoardReady`, now exported).
+- A drop that sent a call holds the card where it fell for up to 800 ms (`dropCard(id, { holdMs })`), so it flies from
+  there to where the server's view puts it; a refused or rejected move flies back. The release after an Escape-cancel
+  is swallowed (no click, no hover lift on the card flying back under the pointer).
+- `drag.js`: the four gate blocks became `refuseManualDeckAction(action)` (same cue and chat line); `identifyCard` now
+  wraps `identifyCardElement(el)` (click-events.js). `drop-zone.mjs` needed no change. The HTML5 handlers stay bound to
+  the mirror imgs (`draggable`) but never fire: `:host` has no pointer events; the harness counts zero `dragstart`.
+- Harness: the server lets only the turn player act past the Starting Active, so it flips the solo board to put the turn
+  seat near, and runs the far-seat drag (g) first, as a Starting Active move, sent as whichever seat is far.
+
 ### D1
 - Acceptance (a) asserts `mouseClick.cardInstanceId`/`zoneId` (the Work-plan row's check), not `.highlight`: under server
   authority `imageClick` returns before selecting (`mouseClick.card` reads the legacy zone arrays, never populated, I15),

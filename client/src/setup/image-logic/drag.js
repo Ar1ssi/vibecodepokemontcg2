@@ -44,7 +44,7 @@ const clearExplicitDropHighlights = () => {
 // pointer reaches it.
 const BOARD_READY_CLASS = 'board-drop-ready';
 
-const clearBoardReady = () => {
+export const clearBoardReady = () => {
   for (const doc of [selfContainerDocument, oppContainerDocument]) {
     doc?.getElementById('board')?.classList.remove(BOARD_READY_CLASS);
   }
@@ -53,10 +53,23 @@ const clearBoardReady = () => {
 const heldCard = (image) =>
   image.card ?? getZone(mouseClick.cardUser, mouseClick.zoneId)?.array?.[mouseClick.cardIndex];
 
-const markBoardReady = (image) => {
+/** Lights the held card's Trainer board when it is an Item/Supporter from the hand (design 046). */
+export const markBoardReady = (image) => {
   clearBoardReady();
   if (mouseClick.zoneId !== 'hand' || !playsOntoBoard(heldCard(image))) return;
   getZone(mouseClick.cardUser, 'board')?.element?.classList.add(BOARD_READY_CLASS);
+};
+
+/**
+ * The rules layer's gate on a manual deck action (`manualDeckActionAllowed`): true when it
+ * refuses, after the no-match cue and the chat line saying why.
+ */
+export const refuseManualDeckAction = (action) => {
+  const check = manualDeckActionAllowed(action);
+  if (check.allowed) return false;
+  uiCue('card-no-match');
+  appendMessage(systemState.initiator, '⛔ ' + check.reason, 'announcement', false);
+  return true;
 };
 
 export const dragStart = (event) => {
@@ -365,16 +378,7 @@ export const drop = (event) => {
     ) {
       if (dZoneId === 'deckCover') {
         // Gate the manual deck drop through the rules layer.
-        const deckCheck = manualDeckActionAllowed('moveToDeck');
-        if (!deckCheck.allowed) {
-          uiCue('card-no-match');
-          appendMessage(
-            systemState.initiator,
-            '⛔ ' + deckCheck.reason,
-            'announcement',
-            false
-          );
-        } else {
+        if (!refuseManualDeckAction('moveToDeck')) {
         uiCue('card-place');
         moveToDeckTop(
           mouseClick.cardUser,
@@ -385,53 +389,18 @@ export const drop = (event) => {
         }
       } else {
         const fromZone = mouseClick.zoneId;
-        if (
-          dZoneId === 'hand' &&
-          (fromZone === 'deck' || fromZone === 'viewCards')
-        ) {
-          const drawCheck = manualDeckActionAllowed('draw');
-          if (!drawCheck.allowed) {
-            uiCue('card-no-match');
-            appendMessage(
-              systemState.initiator,
-              '⛔ ' + drawCheck.reason,
-              'announcement',
-              false
-            );
-            event.stopPropagation();
-            return;
-          }
-        }
-        if (
-          dZoneId === 'bench' &&
-          (fromZone === 'deck' || fromZone === 'viewCards')
-        ) {
-          const deckToBenchCheck = manualDeckActionAllowed('deckToBench');
-          if (!deckToBenchCheck.allowed) {
-            uiCue('card-no-match');
-            appendMessage(
-              systemState.initiator,
-              '⛔ ' + deckToBenchCheck.reason,
-              'announcement',
-              false
-            );
-            event.stopPropagation();
-            return;
-          }
-        }
-        if (dZoneId === 'hand' && fromZone === 'bench') {
-          const benchToHandCheck = manualDeckActionAllowed('benchToHand');
-          if (!benchToHandCheck.allowed) {
-            uiCue('card-no-match');
-            appendMessage(
-              systemState.initiator,
-              '⛔ ' + benchToHandCheck.reason,
-              'announcement',
-              false
-            );
-            event.stopPropagation();
-            return;
-          }
+        const fromDeck = fromZone === 'deck' || fromZone === 'viewCards';
+        const gate =
+          dZoneId === 'hand' && fromDeck
+            ? 'draw'
+            : dZoneId === 'bench' && fromDeck
+              ? 'deckToBench'
+              : dZoneId === 'hand' && fromZone === 'bench'
+                ? 'benchToHand'
+                : null;
+        if (gate && refuseManualDeckAction(gate)) {
+          event.stopPropagation();
+          return;
         }
         uiCue('card-place');
         moveCardBundle(

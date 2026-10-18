@@ -14,6 +14,8 @@ import { createPileMeshes } from './pile-mesh.js';
 import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
 import { createTable } from './table-mesh.js';
+import { easeOutCubic } from './tween.mjs';
+import { DRAG_TILT, DRAG_TILT_STILL, createDragTilt, stepDragTilt } from '../image-logic/drag-tilt.mjs';
 
 const DEG = Math.PI / 180;
 /** A card moving between slots or stacks (design 074 §D3 "Cards"). */
@@ -30,6 +32,59 @@ const CARD_LIFT_PX = 1.5;
 const POSE_FIELDS = ['x', 'y', 'z', 'yawDeg', 'widthPx', 'face', 'hidden'];
 
 const HAND_POSES = new Set(['normal', 'lowered']);
+/** A picked-up card rises to its drag height over this long (design 074 D5 "Drag"). */
+const LIFT_MS = 120;
+/** Zone pick planes sit just over the cloth, under every card (CARD_LIFT_PX). */
+const ZONE_PLANE_Z = 0.3;
+/** Drop-target light: index.css `.has-glow`'s default colour, as the mirror reads it. */
+const DROP_GLOW_RGB = '120, 200, 255';
+const DROP_GLOW_HEX = 0x78c8ff;
+const ZONE_LIT_OPACITY = 0.28;
+const PLANE_ZONES = ['active', 'bench', 'prizes', 'board', 'hand', 'deck', 'discard', 'lostZone'];
+
+/** Bounding rect of flat rects `{ x, y, w, h }`, or null for none. */
+const unionRect = (rects) => {
+  const list = (rects ?? []).filter((r) => r && Number.isFinite(r.x) && r.w > 0 && r.h > 0);
+  if (list.length === 0) return null;
+  const x = Math.min(...list.map((r) => r.x));
+  const y = Math.min(...list.map((r) => r.y));
+  return {
+    x,
+    y,
+    w: Math.max(...list.map((r) => r.x + r.w)) - x,
+    h: Math.max(...list.map((r) => r.y + r.h)) - y,
+  };
+};
+
+/**
+ * The flat footprint of each droppable zone (design 074 D5): the zone rect, the union of its
+ * slots (bench, prizes), the hand strip's card band, and the shared Stadium slot (side null).
+ */
+function zonePlaneRects(layout) {
+  const out = [];
+  if (!layout) return out;
+  for (const side of SIDES) {
+    const zones = layout[side];
+    if (!zones) continue;
+    for (const zone of PLANE_ZONES) {
+      let rect = null;
+      if (zone === 'hand') {
+        const cardH = zones.cardBox?.hand?.h ?? 0;
+        const width = zones.hand?.width ?? 0;
+        const base = zones.hand?.baselineY;
+        if (cardH > 0 && width > 0 && Number.isFinite(base)) {
+          rect = { x: -width / 2, y: side === 'opp' ? base - cardH : base, w: width, h: cardH };
+        }
+      } else {
+        rect = Array.isArray(zones[zone]) ? unionRect(zones[zone]) : unionRect([zones[zone]]);
+      }
+      if (rect) out.push({ side, zone, rect });
+    }
+  }
+  const stadium = unionRect([layout.stadium]);
+  if (stadium) out.push({ side: null, zone: 'stadium', rect: stadium });
+  return out;
+}
 
 const samePose = (a, b) => Boolean(a && b) && POSE_FIELDS.every((field) => a[field] === b[field]);
 
@@ -74,8 +129,15 @@ function offsetAt(keys, elapsed) {
  *   setCamera: (desc: ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>) => void,
  *   setViewport: (size: { w: number, h: number }) => void, invalidate: () => void, render: () => void,
  *   rects: () => Record<string, { left: number, top: number, width: number, height: number }>,
- *   hitTest: (clientX: number, clientY: number) => ({ instanceId: number|null, side: string|null,
- *     zone: string, index?: number, pile?: true, point: number[] })|null, refreshCards: () => void,
+ *   zoneRects: () => Record<string, { left: number, top: number, width: number, height: number }>,
+ *   hitTest: (clientX: number, clientY: number, options?: { ignore?: number|null }) =>
+ *     ({ instanceId: number|null, side: string|null, zone: string, index?: number, pile?: true,
+ *     plane?: true, point: number[] })|null, refreshCards: () => void,
+ *   liftCard: (id: number, o: { z?: number, clientX: number, clientY: number }) => boolean,
+ *   moveLifted: (clientX: number, clientY: number) => void,
+ *   dropCard: (id: number, o?: { holdMs?: number }) => void,
+ *   setZoneHighlight: (side: 'self'|'opp'|null, zone: string, on: boolean) => void,
+ *   setCardHighlight: (id: number|null) => void,
  *   shake: (offsets: { x: number, y: number, ms: number }[]) => Promise<void>,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
@@ -121,6 +183,11 @@ export function createBoardScene({
   const labelsGroup = new three.Group();
   labelsGroup.name = 'board3d-count-labels';
   tableFrame.add(labelsGroup);
+  // Invisible pick targets for each zone (a drop onto an empty zone), lit as the drop target.
+  const zonePlanesGroup = new three.Group();
+  zonePlanesGroup.name = 'board3d-zone-planes';
+  tableFrame.add(zonePlanesGroup);
+  const zonePlanes = new Map();
 
   const camera = new three.PerspectiveCamera(30, 1, 1, 10000);
   let cameraDesc = null;
@@ -133,6 +200,12 @@ export function createBoardScene({
   /** Hand card under the pointer (its fan slot lifts) and the near hand's pose (card focus). */
   let hover = null;
   let handPose = 'normal';
+  /** The card being dragged (liftCard → dropCard) and one dropped with a hold, awaiting its view. */
+  let lifted = null;
+  let held = null;
+  /** The drop target's light: one card (a glow ring) and any lit zone planes, by `side:zone`. */
+  let litCard = null;
+  const litZones = new Set();
   const uiState = new Map();
   let shakeOffset = { x: 0, y: 0 };
   let stopShake = null;
@@ -243,6 +316,7 @@ export function createBoardScene({
     if (disposed || !next) return;
     layout = next;
     table.setLayout(next);
+    syncZonePlanes();
     syncCards(model, model, { relayout: true });
     syncPiles(model);
     invalidate();
@@ -302,6 +376,8 @@ export function createBoardScene({
     const poses = layout && next ? posesFor(next, layout, handOptions) : new Map();
     for (const id of pool.ids()) {
       if (poses.has(id)) continue;
+      if (lifted?.id === id) endLift();
+      if (held?.id === id) endHold();
       overlays.remove(id);
       pool.release(id);
       appliedPoses.delete(id);
@@ -323,8 +399,12 @@ export function createBoardScene({
         pool.setHidden(id, hiddenOf(id, pose));
       }
       const posed = !samePose(appliedPoses.get(id), pose);
-      if (relayout) pool.setPose(id, pose, 0);
-      else if (restyled || posed || diff.moved.has(id)) pool.setPose(id, pose, CARD_POSE_MS);
+      if (posed && held?.id === id) endHold();
+      // A held card stays under the pointer; dropCard sends it to its latest pose.
+      if (lifted?.id !== id) {
+        if (relayout) pool.setPose(id, pose, 0);
+        else if (restyled || posed || diff.moved.has(id)) pool.setPose(id, pose, CARD_POSE_MS);
+      }
       appliedPoses.set(id, pose);
     }
     syncStackBadges(next);
@@ -332,7 +412,11 @@ export function createBoardScene({
   }
 
   /** A card's placement with the scene's UI state (selection, glow, mat pick, hidden) over it. */
-  const withUiState = (card, id) => ({ ...card, ...(uiState.get(id) || {}) });
+  const withUiState = (card, id) => ({
+    ...card,
+    ...(uiState.get(id) || {}),
+    ...(id === litCard ? { glow: DROP_GLOW_RGB } : {}),
+  });
 
   const hiddenOf = (id, pose) => {
     const hidden = uiState.get(id)?.hidden;
@@ -558,45 +642,274 @@ export function createBoardScene({
     return out;
   };
 
-  /**
-   * Nearest thing under a client-px point (raycast against the card meshes and the pile stacks):
-   * a card `{ instanceId, side, zone, index, point }`, the Stadium `{ zone: 'stadium', side: null,
-   * instanceId, point }`, a pile stack `{ zone, side, instanceId: null, pile: true, point }`, or null.
-   */
-  const hitTest = (clientX, clientY) => {
-    if (disposed || !cameraDesc || !model) return null;
-    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+  /** Points the raycaster through a client-px point; false when the canvas has no box. */
+  const aimAt = (clientX, clientY) => {
     const box = canvasBox();
-    if (!box) return null;
-    pool.update(clock.now());
+    if (!box || !cameraDesc) return false;
     const ndc = new three.Vector2(
       ((clientX - box.left) / box.width) * 2 - 1,
       -((clientY - box.top) / box.height) * 2 + 1
     );
     camera.updateMatrixWorld();
     raycaster.setFromCamera(ndc, camera);
+    return true;
+  };
+
+  /**
+   * Nearest thing under a client-px point (raycast against the card meshes, the pile stacks and
+   * the zone planes): a card `{ instanceId, side, zone, index, point }`, the Stadium
+   * `{ zone: 'stadium', side: null, instanceId, point }`, a pile stack `{ zone, side,
+   * instanceId: null, pile: true, point }`, a zone's empty footprint `{ zone, side, instanceId:
+   * null, plane: true, point }` (side null for the Stadium slot), or null.
+   * `ignore` skips one card (the one being dragged, which is under the pointer).
+   */
+  const hitTest = (clientX, clientY, { ignore = null } = {}) => {
+    if (disposed || !cameraDesc || !model) return null;
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+    pool.update(clock.now());
+    if (!aimAt(clientX, clientY)) return null;
     const meshes = pool
       .ids()
+      .filter((id) => id !== ignore)
       .map((id) => pool.meshOf(id))
       .filter((mesh) => mesh?.visible);
-    for (const hit of raycaster.intersectObjects([...meshes, ...piles.objects()], true)) {
+    const targets = [...meshes, ...piles.objects(), ...[...zonePlanes.values()].map((entry) => entry.mesh)];
+    for (const hit of raycaster.intersectObjects(targets, true)) {
+      const point = hit.point.toArray();
+      const plane = hit.object.userData?.boardZonePlane;
+      if (plane) return { zone: plane.zone, side: plane.side, instanceId: null, plane: true, point };
       const pile = piles.pileAt(hit.object);
-      if (pile) return { zone: pile.zone, side: pile.side, instanceId: null, pile: true, point: hit.point.toArray() };
+      if (pile) return { zone: pile.zone, side: pile.side, instanceId: null, pile: true, point };
       const id = pool.idAt(hit.object);
-      if (id !== null && isStadium(model, id)) {
-        return { zone: 'stadium', side: null, instanceId: id, point: hit.point.toArray() };
-      }
+      if (id !== null && isStadium(model, id)) return { zone: 'stadium', side: null, instanceId: id, point };
       const placement = id === null ? null : placementById(model, id);
       if (!placement) continue;
-      return {
-        instanceId: id,
-        side: placement.side,
-        zone: placement.zone,
-        index: placement.index,
-        point: hit.point.toArray(),
-      };
+      return { instanceId: id, side: placement.side, zone: placement.zone, index: placement.index, point };
     }
     return null;
+  };
+
+  const planeKey = (side, zone) => `${side ?? 'shared'}:${zone}`;
+
+  const planeOpacity = (key) => (litZones.has(key) ? ZONE_LIT_OPACITY : 0);
+
+  /** Rebuilds the zone pick planes for the current layout (they keep their lit state). */
+  function syncZonePlanes() {
+    for (const entry of zonePlanes.values()) {
+      zonePlanesGroup.remove(entry.mesh);
+      entry.mesh.geometry.dispose();
+      entry.mesh.material.dispose();
+    }
+    zonePlanes.clear();
+    for (const { side, zone, rect } of zonePlaneRects(layout)) {
+      const key = planeKey(side, zone);
+      const material = new three.MeshBasicMaterial({
+        color: DROP_GLOW_HEX,
+        transparent: true,
+        opacity: planeOpacity(key),
+        depthWrite: false,
+      });
+      const mesh = new three.Mesh(new three.PlaneGeometry(rect.w, rect.h), material);
+      mesh.name = `board3d-zone-${key}`;
+      mesh.position.set(rect.x + rect.w / 2, rect.y + rect.h / 2, ZONE_PLANE_Z);
+      mesh.userData.boardZonePlane = { side, zone };
+      zonePlanesGroup.add(mesh);
+      zonePlanes.set(key, { mesh, rect, side, zone });
+    }
+  }
+
+  /** Lights (or clears) a zone's footprint as the drop target; `side` null is the Stadium slot. */
+  const setZoneHighlight = (side, zone, on) => {
+    if (disposed) return;
+    const key = planeKey(side, zone);
+    if (on) litZones.add(key);
+    else litZones.delete(key);
+    const entry = zonePlanes.get(key);
+    if (entry) entry.mesh.material.opacity = planeOpacity(key);
+    invalidate();
+  };
+
+  /** Rings one card as the drop target (attach / evolve / switch); null clears it. */
+  const setCardHighlight = (id) => {
+    const next = Number.isFinite(id) ? id : null;
+    if (disposed || next === litCard) return;
+    const previous = litCard;
+    litCard = next;
+    for (const changed of [previous, next]) if (changed !== null && pool.has(changed)) syncOverlaysOf(model, changed);
+    invalidate();
+  };
+
+  /** Client-px rects of the zone footprints, keyed `<side>:<zone>` (`shared:stadium`). */
+  const zoneRects = () => {
+    const out = {};
+    const box = canvasBox();
+    if (disposed || !cameraDesc || !box) return out;
+    for (const [key, { rect }] of zonePlanes) {
+      const centre = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+      const screen = screenRectOf(footprintCorners(centre, rect.w, rect.h, ZONE_PLANE_Z), box);
+      if (screen) out[key] = screen;
+    }
+    return out;
+  };
+
+  /** The flat table point under a client-px point at height `z` off the cloth, or null. */
+  const tablePointAt = (clientX, clientY, z) => {
+    if (!aimAt(clientX, clientY)) return null;
+    const rad = (cameraDesc.tiltDeg ?? 0) * DEG;
+    const normal = new three.Vector3(0, Math.sin(rad), Math.cos(rad));
+    const origin = new three.Vector3(...tableToWorld({ x: 0, y: 0, z }, cameraDesc));
+    const plane = new three.Plane().setFromNormalAndCoplanarPoint(normal, origin);
+    const world = raycaster.ray.intersectPlane(plane, new three.Vector3());
+    if (!world) return null;
+    // Inverse of tableToWorld's rotation about x.
+    return { x: world.x, y: world.y * Math.cos(rad) - world.z * Math.sin(rad) };
+  };
+
+  let softShadow = null;
+  /** A blurred shadow under a held card (it casts no hard shadow while lifted); null without 2D canvas. */
+  const ensureSoftShadow = () => {
+    if (softShadow) return softShadow;
+    const paper = canvas.ownerDocument?.createElement?.('canvas');
+    const ctx = paper?.getContext?.('2d');
+    if (!ctx) return null;
+    paper.width = 128;
+    paper.height = 128;
+    const gradient = ctx.createRadialGradient(64, 64, 6, 64, 64, 64);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+    const texture = new three.CanvasTexture(paper);
+    const material = new three.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    const mesh = new three.Mesh(new three.PlaneGeometry(1, 1), material);
+    mesh.name = 'board3d-drag-shadow';
+    mesh.visible = false;
+    cardsGroup.add(mesh);
+    softShadow = { mesh, texture, material };
+    return softShadow;
+  };
+
+  const placeSoftShadow = (pose) => {
+    const shadow = ensureSoftShadow();
+    if (!shadow || !cameraDesc) return;
+    const w = pose.widthPx * 1.3;
+    shadow.mesh.scale.set(w, w * CARD_HEIGHT_PER_WIDTH * 1.12, 1);
+    // The higher the card, the further below it and the fainter its shadow falls.
+    shadow.mesh.position.set(...tableToWorld({ x: pose.x, y: pose.y - pose.z * 0.35, z: 0.6 }, cameraDesc));
+    shadow.mesh.rotation.set(-(cameraDesc.tiltDeg ?? 0) * DEG, 0, -pose.yawDeg * DEG, 'XZY');
+    shadow.material.opacity = Math.max(0.35, 0.9 - pose.z / 60);
+    shadow.mesh.visible = true;
+  };
+
+  const hideSoftShadow = () => {
+    if (softShadow) softShadow.mesh.visible = false;
+  };
+
+  /** One frame of a held card: it rises over LIFT_MS, follows the pointer and swings (drag-tilt.mjs). */
+  const stepLift = (time) => {
+    if (!lifted) return;
+    const reduced = motionReduced();
+    const k = reduced ? 1 : easeOutCubic(Math.min(1, Math.max(0, (time - lifted.t0) / LIFT_MS)));
+    lifted.tilt = stepDragTilt(lifted.tilt, lifted.pointer, time - lifted.last, reduced ? DRAG_TILT_STILL : DRAG_TILT);
+    lifted.last = time;
+    const z = lifted.rest.z + (lifted.z - lifted.rest.z) * k;
+    const under = tablePointAt(lifted.pointer.x, lifted.pointer.y, z);
+    const pose = {
+      ...lifted.rest,
+      x: under ? under.x + lifted.grab.dx : lifted.rest.x,
+      y: under ? under.y + lifted.grab.dy : lifted.rest.y,
+      z,
+      yawDeg: lifted.rest.yawDeg + (lifted.yawDeg - lifted.rest.yawDeg) * k,
+    };
+    pool.setPose(lifted.id, pose, 0);
+    pool.setTilt(lifted.id, lifted.tilt);
+    placeSoftShadow(pose);
+  };
+
+  /** Ends a lift where the card is (no fly-back): its tick, swing, shadow. */
+  function endLift() {
+    if (!lifted) return;
+    const { id, unsubscribe } = lifted;
+    lifted = null;
+    unsubscribe?.();
+    pool.setTilt(id, null);
+    const mesh = pool.meshOf(id);
+    if (mesh) mesh.castShadow = true;
+    hideSoftShadow();
+    invalidate();
+  }
+
+  function endHold() {
+    if (!held) return;
+    held.unsubscribe?.();
+    held = null;
+  }
+
+  const flyBack = (id) => {
+    const pose = appliedPoses.get(id);
+    if (pose) pool.setPose(id, pose, CARD_POSE_MS);
+    invalidate();
+  };
+
+  /**
+   * Picks a card up for a drag: it rises `z` px off the cloth over LIFT_MS, turns square to its
+   * seat, follows the pointer (`moveLifted`) holding the spot it was grabbed by, and swings with
+   * the pointer's velocity; its hard shadow gives way to a soft one. False when it is not drawn.
+   */
+  const liftCard = (id, { z = 24, clientX, clientY } = {}) => {
+    if (disposed || !pool.has(id) || !cameraDesc) return false;
+    const rest = appliedPoses.get(id);
+    if (!rest || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
+    endLift();
+    endHold();
+    const now = clock.now();
+    const grabbed = tablePointAt(clientX, clientY, rest.z ?? 0);
+    const pointer = { x: clientX, y: clientY };
+    lifted = {
+      id,
+      rest: { ...rest, z: rest.z ?? 0 },
+      z,
+      t0: now,
+      last: now,
+      grab: grabbed ? { dx: rest.x - grabbed.x, dy: rest.y - grabbed.y } : { dx: 0, dy: 0 },
+      yawDeg: Math.round((rest.yawDeg ?? 0) / 180) * 180,
+      pointer,
+      tilt: createDragTilt(pointer),
+      unsubscribe: null,
+    };
+    const mesh = pool.meshOf(id);
+    if (mesh) mesh.castShadow = false;
+    lifted.unsubscribe = clock.onTick(stepLift);
+    stepLift(now);
+    return true;
+  };
+
+  /** Moves the held card under a new client-px pointer position. */
+  const moveLifted = (clientX, clientY) => {
+    if (!lifted || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+    lifted.pointer = { x: clientX, y: clientY };
+    invalidate();
+  };
+
+  /**
+   * Lets go of the held card. It flies back to its slot over CARD_POSE_MS; with `holdMs` it
+   * first waits that long where it was dropped for a view that moves it (a sent command), and
+   * flies from there to wherever that view puts it, or back if none comes.
+   */
+  const dropCard = (id, { holdMs = 0 } = {}) => {
+    if (!lifted || lifted.id !== id) return;
+    endLift();
+    if (!(holdMs > 0)) {
+      flyBack(id);
+      return;
+    }
+    const until = clock.now() + holdMs;
+    held = { id, unsubscribe: null };
+    held.unsubscribe = clock.onTick((time) => {
+      if (time < until) return;
+      endHold();
+      flyBack(id);
+    });
   };
 
   /**
@@ -649,11 +962,17 @@ export function createBoardScene({
     overlays,
     hover,
     handPose,
+    lifted: lifted?.id ?? null,
+    held: held?.id ?? null,
+    litCard,
+    litZones: [...litZones],
   });
 
   const dispose = () => {
     if (disposed) return;
     stopShake?.();
+    endLift();
+    endHold();
     disposed = true;
     if (frameId !== null) cancelFrame(frameId);
     frameId = null;
@@ -665,6 +984,19 @@ export function createBoardScene({
     badges.dispose();
     tableFrame.remove(pilesGroup);
     tableFrame.remove(labelsGroup);
+    for (const entry of zonePlanes.values()) {
+      entry.mesh.geometry.dispose();
+      entry.mesh.material.dispose();
+    }
+    zonePlanes.clear();
+    tableFrame.remove(zonePlanesGroup);
+    if (softShadow) {
+      cardsGroup.remove(softShadow.mesh);
+      softShadow.mesh.geometry.dispose();
+      softShadow.material.dispose();
+      softShadow.texture.dispose();
+      softShadow = null;
+    }
     appliedPoses.clear();
     pileTops.clear();
     table.dispose();
@@ -682,7 +1014,13 @@ export function createBoardScene({
     invalidate,
     render,
     rects,
+    zoneRects,
     hitTest,
+    liftCard,
+    moveLifted,
+    dropCard,
+    setZoneHighlight,
+    setCardHighlight,
     shake,
     setUiState,
     setMat,
