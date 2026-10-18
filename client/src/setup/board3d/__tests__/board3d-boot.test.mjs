@@ -135,6 +135,26 @@ describe('initializeBoard3d', () => {
     assert.ok(scene.layouts.length >= 2);
   });
 
+  it('collapsing the side menu relays out the board at the full viewport width, and back', async () => {
+    const { host, deps, calls, doc } = setup();
+    await initializeBoard3d({ host, deps });
+    const scene = calls.scenes[0];
+    assert.ok(Math.abs(scene.layouts.at(-1).half.w - 1920 * 0.755) < 1e-9);
+
+    doc.body.classList.add('side-menu-collapsed');
+    await flush();
+    assert.equal(scene.layouts.at(-1).half.w, 1920);
+
+    const relayouts = scene.layouts.length;
+    doc.body.classList.add('dark-mode-1');
+    await flush();
+    assert.equal(scene.layouts.length, relayouts, 'an unrelated class change does not relayout');
+
+    doc.body.classList.remove('side-menu-collapsed');
+    await flush();
+    assert.ok(Math.abs(scene.layouts.at(-1).half.w - 1920 * 0.755) < 1e-9);
+  });
+
   it('context lost once rebuilds on a fresh canvas with the last model; twice gives up', async () => {
     const { host, deps, calls, doc } = setup();
     await initializeBoard3d({ host, deps });

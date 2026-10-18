@@ -2,7 +2,7 @@
 // Loaded by front-end.js through import(), so the page still boots when this board cannot start;
 // three.js and the scene modules load from here.
 import { cameraFromCssTilt, cameraTcgLive } from './board-camera.mjs';
-import { flatLayout, halfFromViewport } from './board-layout.mjs';
+import { boardWidthFrac, flatLayout, halfFromViewport } from './board-layout.mjs';
 import { CARD_ZONES } from './board-model.mjs';
 
 const ACTIVE_CLASS = 'board3d-active';
@@ -270,7 +270,7 @@ export async function initializeBoard3d({
     if (!session) return;
     const viewport = viewportOf(host, win);
     if (!(viewport.w > 0 && viewport.h > 0)) return;
-    const half = halfFromViewport(viewport);
+    const half = halfFromViewport(viewport, boardWidthFrac(doc.body?.classList));
     const spec = session.mat;
     const layout = flatLayout(spec?.profile, half, { viewport, matScale: spec?.scale ?? 1 });
     appliedPreset = currentPreset();
@@ -455,6 +455,21 @@ export async function initializeBoard3d({
   } else if (win) {
     win.addEventListener('resize', relayout);
     session.cleanup.push(() => win.removeEventListener('resize', relayout));
+  }
+
+  // The host is full-viewport, so collapsing the side menu resizes nothing it observes:
+  // relayout when a body class changes the board's width share.
+  const MutationObserverImpl = win?.MutationObserver ?? globalThis.MutationObserver;
+  if (typeof MutationObserverImpl === 'function' && doc.body) {
+    let widthFrac = boardWidthFrac(doc.body.classList);
+    const observer = new MutationObserverImpl(() => {
+      const next = boardWidthFrac(doc.body.classList);
+      if (next === widthFrac) return;
+      widthFrac = next;
+      relayout();
+    });
+    observer.observe(doc.body, { attributes: true, attributeFilter: ['class'] });
+    session.cleanup.push(() => observer.disconnect());
   }
 
   if (win && new URLSearchParams(win.location?.search ?? '').get('e2e') === '1') {

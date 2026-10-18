@@ -45,10 +45,18 @@ const PRIZE_ROWS = 3;
 const PRIZE_SLOTS = 6;
 const BENCH_COLUMNS = 5;
 
+/** Body classes that widen `.self`/`.opp` to the full viewport (index.css:43-50, 3776-3797). */
+export const FULL_WIDTH_CLASSES = ['side-menu-collapsed', 'sidebox-hidden'];
+
+/** The board's share of the viewport width: all of it while the side menu is collapsed or hidden. */
+export function boardWidthFrac(classList) {
+  return FULL_WIDTH_CLASSES.some((name) => classList?.contains?.(name)) ? 1 : IFRAME_WIDTH_FRAC;
+}
+
 /** `.self`/`.opp` iframe box for a viewport (index.css:186-202). */
-export function halfFromViewport(viewport) {
+export function halfFromViewport(viewport, widthFrac = IFRAME_WIDTH_FRAC) {
   return {
-    w: viewport.w * IFRAME_WIDTH_FRAC,
+    w: viewport.w * widthFrac,
     h: viewport.h * IFRAME_HEIGHT_FRAC,
   };
 }

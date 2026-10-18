@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import {
   benchSlotRect,
+  boardWidthFrac,
   flatLayout,
   halfFromViewport,
   slotIndexAt,
@@ -27,6 +28,15 @@ test('halfFromViewport is the 75.5% × 50% iframe box', () => {
   const half = halfFromViewport(VIEWPORT);
   close(half.w, 1449.6, 'w', 1e-9);
   close(half.h, 540, 'h', 1e-9);
+});
+
+test('boardWidthFrac widens the board to the full viewport while the side menu is collapsed or hidden', () => {
+  const classes = (...names) => ({ contains: (name) => names.includes(name) });
+  assert.equal(boardWidthFrac(classes()), 0.755);
+  assert.equal(boardWidthFrac(classes('side-menu-collapsed')), 1);
+  assert.equal(boardWidthFrac(classes('sidebox-hidden')), 1);
+  assert.equal(boardWidthFrac(undefined), 0.755);
+  close(halfFromViewport(VIEWPORT, 1).w, 1920, 'full-width w', 1e-9);
 });
 
 test('sim zone rects equal the CSS vars in px', () => {
