@@ -1,9 +1,10 @@
 // Where each placed card sits on the flat table (design 074 §D3 "Cards"). Pure: card-mesh.js
 // tweens these poses and turns them into world transforms with board-camera.mjs tableToWorld.
 // Active, bench and Trainer-board cards (C2), prizes, the top card of the discard and Lost Zone
-// piles and the Stadium (C3); the hand comes in C4. Deck cards are a count only (no placement).
+// piles and the Stadium (C3), and both hands fanned (C4). Deck cards are a count only.
 import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { PLAY_CARD_ASPECT, benchSlotRect } from './board-layout.mjs';
+import { handFanPoses, handLoweredOffset } from './hand-fan.mjs';
 import { pilePose, pileThicknessPx, prizeSlotPose, stadiumPose } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
 
@@ -110,19 +111,102 @@ function slotFor(placement, layout, { boardCounts, piles }) {
 }
 
 /**
+ * The fanned slots of `side`'s hand, left to right: one per hand-stack group (design 014), each
+ * the group's instance ids front card first, as board-model.mjs `handStacks` lists them. Hand
+ * cards missing from `handStacks` get a slot of their own; slots follow the hand's view order.
+ * @param {import('./board-model.mjs').BoardModel|null} model
+ * @param {'self'|'opp'} side
+ * @returns {number[][]}
+ */
+export function handGroupsOf(model, side) {
+  const hand = (model?.placements ?? [])
+    .filter((p) => p.side === side && p.zone === 'hand')
+    .sort((a, b) => a.index - b.index);
+  const order = new Map(hand.map((p, i) => [p.instanceId, i]));
+  const seen = new Set();
+  const groups = [];
+  for (const group of model?.handStacks?.[side] ?? []) {
+    const ids = (Array.isArray(group) ? group : []).filter((id) => order.has(id) && !seen.has(id));
+    if (ids.length === 0) continue;
+    for (const id of ids) seen.add(id);
+    groups.push(ids);
+  }
+  for (const p of hand) if (!seen.has(p.instanceId)) groups.push([p.instanceId]);
+  return groups.sort((a, b) => order.get(a[0]) - order.get(b[0]));
+}
+
+/**
+ * Both hands fanned (design 074 §D3 "Hand", hand-fan.mjs): one fan slot per hand-stack group,
+ * the fan's screen edge (y = 0) on the hand strip's `edgeY` with the share of a card below it
+ * that the layout's `baselineY` gives (the DOM's two-strip card one strip under the edge), so
+ * an upright card's bottom sits on the baseline. The far hand is the near fan turned 180° about
+ * the seam centre. A group's cards share its slot, the front card on top; the hovered card's
+ * slot lifts (`hover.instanceId`, any card of a stack); `lowered` drops the near hand by
+ * `handLoweredOffset` (card focus).
+ * @param {import('./board-model.mjs').BoardModel|null} model
+ * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
+ * @param {{ hover?: { instanceId: number }|null, lowered?: boolean }} [options]
+ * @returns {Map<number, CardPose>}
+ */
+export function handPoses(model, layout, { hover = null, lowered = false } = {}) {
+  const poses = new Map();
+  const strip = layout?.self?.hand;
+  if (!model || !strip || !Array.isArray(model.placements)) return poses;
+  const { w: cardW, h: cardH } = layout.self.cardBox.hand;
+  const crop = (strip.edgeY - strip.baselineY) / cardH;
+  const thickness = CARD_UNITS.t * cardScaleFor(cardW);
+  const byId = new Map(model.placements.map((p) => [p.instanceId, p]));
+  const hoverId = hover?.instanceId ?? null;
+  for (const side of ['self', 'opp']) {
+    const groups = handGroupsOf(model, side);
+    if (groups.length === 0) continue;
+    const fan = handFanPoses(groups.length, {
+      width: strip.width,
+      cardW,
+      cardH,
+      crop,
+      hoverIndex: groups.findIndex((ids) => ids.includes(hoverId)),
+    });
+    const depth = Math.max(...groups.map((ids) => ids.length));
+    const drop = side === 'self' && lowered ? handLoweredOffset(cardH) : 0;
+    groups.forEach((ids, slot) => {
+      const card = fan[slot];
+      const near = { x: card.x, y: strip.edgeY + card.y - drop };
+      const centre = side === 'opp' ? mirrorPoint(near, layout.depth) : near;
+      ids.forEach((id, layer) => {
+        const placement = byId.get(id);
+        poses.set(id, {
+          x: centre.x,
+          y: centre.y,
+          // Slots in the fan's draw order, a group's cards under its front card.
+          z: (card.z * depth + (depth - 1 - layer)) * thickness,
+          // The fan turns counter-clockwise; a CardPose turns clockwise.
+          yawDeg: 0 - card.yawDeg + (side === 'opp' ? 180 : 0),
+          face: placement.face === 'back' ? 'back' : 'front',
+          hidden: Boolean(placement.hidden),
+          widthPx: cardW,
+        });
+      });
+    });
+  }
+  return poses;
+}
+
+/**
  * @param {import('./board-model.mjs').Placement} placement
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>} layout
- * @param {{ handPoses?: unknown, boardCounts?: { self?: number, opp?: number },
+ * @param {{ handPoses?: Map<number, CardPose>, boardCounts?: { self?: number, opp?: number },
  *   piles?: import('./board-model.mjs').BoardModel['piles'] }} [options]
  *   `boardCounts` = Trainer-board cards per side (the row centres on its length; default: the
  *   card is the row's last). `piles` = the model's piles: a discard / Lost Zone card is placed
- *   only when it is its pile's `top`. `handPoses` is accepted for the hand fan of slice C4 and
- *   not read: hand cards return null here.
- * @returns {CardPose|null} null for hand and deck placements, a discard / Lost Zone card that is
- *   not its pile's top (or without `piles`), and Energy drawn as a token.
+ *   only when it is its pile's `top`. `handPoses` = `handPoses(model, layout)`: a hand card's
+ *   pose is its entry there.
+ * @returns {CardPose|null} null for deck placements, a hand card without `handPoses`, a discard /
+ *   Lost Zone card that is not its pile's top (or without `piles`), and Energy drawn as a token.
  */
-export function placementPose(placement, layout, { boardCounts, piles } = {}) {
+export function placementPose(placement, layout, { boardCounts, piles, handPoses: fanned } = {}) {
   if (!placement || !layout) return null;
+  if (placement.zone === 'hand') return fanned?.get(placement.instanceId) ?? null;
   if (placement.role === 'energy' && placement.energyToken) return null;
   const slot = slotFor(placement, layout, { boardCounts, piles });
   if (!slot) return null;
@@ -154,17 +238,19 @@ export function stadiumCardPose(model, layout) {
  * Poses of every placed card, by instance id; the Stadium under its own instance id.
  * @param {import('./board-model.mjs').BoardModel|null} model
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
+ * @param {{ hover?: { instanceId: number }|null, lowered?: boolean }} [options] see `handPoses`
  * @returns {Map<number, CardPose>}
  */
-export function posesFor(model, layout) {
+export function posesFor(model, layout, { hover = null, lowered = false } = {}) {
   const poses = new Map();
   if (!model || !layout || !Array.isArray(model.placements)) return poses;
   const boardCounts = { self: 0, opp: 0 };
   for (const p of model.placements) {
     if (p.zone === 'board' && p.side in boardCounts) boardCounts[p.side] += 1;
   }
+  const fanned = handPoses(model, layout, { hover, lowered });
   for (const placement of model.placements) {
-    const pose = placementPose(placement, layout, { boardCounts, piles: model.piles });
+    const pose = placementPose(placement, layout, { boardCounts, piles: model.piles, handPoses: fanned });
     if (pose) poses.set(placement.instanceId, pose);
   }
   const stadium = stadiumCardPose(model, layout);

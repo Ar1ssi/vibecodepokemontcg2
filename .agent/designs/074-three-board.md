@@ -539,6 +539,20 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### C4
+- Hand crop follows the layout, not "45 %": the fan's screen edge sits on `hand.edgeY` with
+  `crop = (edgeY − baselineY) / cardBox.hand.h` (0.5: the DOM's two-strip card one strip under the edge), so an upright
+  card's bottom is on `baselineY`. Hover keeps hand-fan's 0.35 card-height lift.
+- `card-poses.mjs` adds `handPoses(model, layout, { hover, lowered })` and `handGroupsOf(model, side)`; `placementPose`
+  now reads its `handPoses` option; `posesFor(model, layout, { hover, lowered })`. A stack's cards share the slot's
+  x/y/yaw and stack one card thickness apart under the front card (z), so no z-fighting. Hovering any card of a stack
+  lifts the slot. Hand cards missing from `handStacks` get their own slot in view order.
+- `handLoweredOffset(cardH)` = 1.1 × cardH (`.hand-lowered #hand` moves `bottom` −1 → −3.2 strips; a card is 2 strips);
+  `setHandPose` uses the 180 ms card tween, not the DOM's 250 ms in-cubic.
+- "×N" stack badges are `createStackBadges` in `count-labels.js`: text planes parented to the front card's mesh (so they
+  follow its tweens), near its top edge, depth-test off. `inspect()` adds `badges`, `hover`, `handPose`.
+- Lab adds `?handstack=K` (K copies of one printing → one stack) besides `?hand`, `?opphand`, `?hover`.
+
 ### C3
 - Files follow the C3 brief, not the Work-plan row: count labels are `count-labels.js` + `text-plane.js` (no
   `overlay-meshes.js` yet), piles are `pile-mesh.js`, poses `pile-poses.mjs`.

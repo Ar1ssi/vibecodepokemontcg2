@@ -4,8 +4,9 @@ import assert from 'node:assert/strict';
 import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { benchSlotRect, flatLayout } from '../board-layout.mjs';
 import { CARD_UNITS, cardScaleFor } from '../card-geometry.mjs';
-import { placementPose, posesFor } from '../card-poses.mjs';
+import { handGroupsOf, handPoses, placementPose, posesFor } from '../card-poses.mjs';
 import { pilePose, pileThicknessPx } from '../pile-poses.mjs';
+import { handFanPoses, handLoweredOffset } from '../hand-fan.mjs';
 
 // sim at 1920×1080 (board-layout.test.mjs): iframe 1449.6 × 540.
 const layout = flatLayout(getMatLayout('sim'), { w: 1449.6, h: 540 });
@@ -146,8 +147,8 @@ test('posesFor: one pose per placed card, keyed by instance id', () => {
     ],
   };
   const poses = posesFor(model, layout);
-  assert.equal(poses.size, 4);
-  assert.deepEqual([...poses.keys()], [1, 2, 4, 5]);
+  assert.equal(poses.size, 5);
+  assert.deepEqual([...poses.keys()].sort(), [1, 2, 3, 4, 5]);
   // Two far-seat board cards: mirrored, so view order runs toward -x.
   assert.ok(poses.get(5).x < poses.get(4).x);
   assert.equal(posesFor(null, layout).size, 0);
@@ -197,7 +198,7 @@ test('Lost Zone with one card: the top card lies on the cloth; opp turned 180', 
   close(pose.x, pilePose('opp', 'lostZone', layout).x, 'x');
 });
 
-test('posesFor: prizes, the discard top and the stadium; no deck or hand poses', () => {
+test('posesFor: prizes, the discard top, the hand and the stadium; buried discard has none', () => {
   const top = placement({ instanceId: 22, zone: 'discard', index: 1 });
   const model = {
     nearSeat: 'you',
@@ -214,7 +215,7 @@ test('posesFor: prizes, the discard top and the stadium; no deck or hand poses',
     stadium: { instanceId: 30, src: 'stadium.png', name: 'Lab Stadium', facing: 'opp' },
   };
   const poses = posesFor(model, layout);
-  assert.deepEqual([...poses.keys()], [20, 22, 30]);
+  assert.deepEqual([...poses.keys()].sort(), [20, 22, 23, 30]);
   const stadium = poses.get(30);
   close(stadium.x, layout.stadium.x + layout.stadium.w / 2, 'stadium x');
   close(stadium.widthPx, layout.stadium.w, 'stadium width');
@@ -222,4 +223,108 @@ test('posesFor: prizes, the discard top and the stadium; no deck or hand poses',
   assert.equal(stadium.face, 'front');
   assert.equal(stadium.hidden, false);
   assert.equal(posesFor({ ...model, stadium: null }, layout).has(30), false);
+});
+
+const handCard = (instanceId, index, fields = {}) =>
+  placement({ instanceId, zone: 'hand', index, ...fields });
+const handModel = (self, opp = [], stacks = {}) => ({
+  nearSeat: 'you',
+  placements: [...self, ...opp],
+  handStacks: {
+    self: stacks.self ?? self.map((p) => [p.instanceId]),
+    opp: stacks.opp ?? opp.map((p) => [p.instanceId]),
+  },
+});
+const strip = layout.self.hand;
+const handBox = layout.self.cardBox.hand;
+const fanOf = (count, extra = {}) =>
+  handFanPoses(count, {
+    width: strip.width,
+    cardW: handBox.w,
+    cardH: handBox.h,
+    crop: (strip.edgeY - strip.baselineY) / handBox.h,
+    ...extra,
+  });
+
+test('7-card own hand: the fan poses on the hand strip, upright card bottom on the baseline', () => {
+  const cards = Array.from({ length: 7 }, (_, i) => handCard(100 + i, i));
+  const poses = handPoses(handModel(cards), layout);
+  const fan = fanOf(7);
+  const t = CARD_UNITS.t * cardScaleFor(handBox.w);
+  cards.forEach((card, i) => {
+    const pose = poses.get(card.instanceId);
+    close(pose.x, fan[i].x, `card ${i} x`);
+    close(pose.y, strip.edgeY + fan[i].y, `card ${i} y`);
+    close(pose.yawDeg, -fan[i].yawDeg, `card ${i} yaw (clockwise)`);
+    close(pose.z, fan[i].z * t, `card ${i} draw order`);
+    close(pose.widthPx, handBox.w, `card ${i} width`);
+    assert.equal(pose.face, 'front');
+  });
+  // The middle card is upright: its bottom edge on the layout's baseline (the DOM's crop).
+  close(poses.get(103).y - handBox.h / 2, strip.baselineY, 'middle card bottom', 1e-6);
+  // placementPose reads the same map; without it a hand card has no pose.
+  assert.deepEqual(placementPose(cards[2], layout, { handPoses: poses }), poses.get(102));
+  assert.equal(placementPose(cards[2], layout), null);
+});
+
+test('opp hand: the near fan turned 180° about the seam centre, backs', () => {
+  const opp = Array.from({ length: 5 }, (_, i) =>
+    handCard(200 + i, i, { side: 'opp', face: 'back' })
+  );
+  const poses = handPoses(handModel([], opp), layout);
+  const fan = fanOf(5);
+  opp.forEach((card, i) => {
+    const pose = poses.get(card.instanceId);
+    close(pose.x, -fan[i].x, `opp ${i} x`);
+    close(pose.y, 2 * layout.depth - (strip.edgeY + fan[i].y), `opp ${i} y`);
+    close(pose.yawDeg, 180 - fan[i].yawDeg, `opp ${i} yaw`);
+    assert.equal(pose.face, 'back');
+  });
+});
+
+test('hand stack of 3: one fanned slot, the three share its pose, front card on top', () => {
+  const cards = [
+    handCard(1, 0),
+    handCard(2, 1),
+    handCard(3, 2),
+    handCard(4, 3),
+    handCard(5, 4),
+  ];
+  const model = handModel(cards, [], { self: [[1], [2, 3, 4], [5]] });
+  assert.deepEqual(handGroupsOf(model, 'self'), [[1], [2, 3, 4], [5]]);
+  const poses = handPoses(model, layout);
+  const fan = fanOf(3);
+  for (const id of [2, 3, 4]) {
+    close(poses.get(id).x, fan[1].x, `${id} x`);
+    close(poses.get(id).y, strip.edgeY + fan[1].y, `${id} y`);
+    close(poses.get(id).yawDeg, -fan[1].yawDeg, `${id} yaw`);
+  }
+  assert.ok(poses.get(2).z > poses.get(3).z && poses.get(3).z > poses.get(4).z, 'front card on top');
+  close(poses.get(5).x, fan[2].x, 'single after the stack takes slot 2');
+});
+
+test('hand cards missing from handStacks still get a slot in view order', () => {
+  const cards = [handCard(1, 0), handCard(2, 1), handCard(3, 2)];
+  const model = handModel(cards, [], { self: [[2]] });
+  assert.deepEqual(handGroupsOf(model, 'self'), [[1], [2], [3]]);
+  assert.equal(handPoses(model, layout).size, 3);
+});
+
+test('hover lifts only the hovered card; lowered drops only the own hand', () => {
+  const cards = Array.from({ length: 7 }, (_, i) => handCard(100 + i, i));
+  const opp = [handCard(300, 0, { side: 'opp', face: 'back' })];
+  const model = handModel(cards, opp);
+  const flat = handPoses(model, layout);
+  const lifted = handPoses(model, layout, { hover: { instanceId: 103 } });
+  const fan = fanOf(7, { hoverIndex: 3 });
+  close(lifted.get(103).y - flat.get(103).y, fan[3].lift, 'hovered rises by the fan lift');
+  assert.ok(fan[3].lift > 0);
+  for (const card of cards) {
+    if (card.instanceId === 103) continue;
+    close(lifted.get(card.instanceId).y, flat.get(card.instanceId).y, `${card.instanceId} stays down`);
+  }
+  assert.ok(lifted.get(103).z > Math.max(...cards.filter((c) => c.instanceId !== 103).map((c) => lifted.get(c.instanceId).z)));
+  const lowered = handPoses(model, layout, { lowered: true });
+  close(flat.get(100).y - lowered.get(100).y, handLoweredOffset(handBox.h), 'own hand drops');
+  close(lowered.get(300).y, flat.get(300).y, 'opp hand stays');
 });

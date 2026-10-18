@@ -7,7 +7,10 @@
      boardModelFrom (every 3rd wears its TCG Live foil when the manifest has one for its id);
      ?stack=1 adds a Basic + Stage 1 + Stage 2 with two Tools in the near Active spot; ?piles=1
      fills both seats' piles (deck 45/12, discard 7/0, Lost Zone 3/1, six prizes with two face
-     up) and puts a Stadium played by the near seat.
+     up) and puts a Stadium played by the near seat. ?hand=N deals N different cards to the near
+     hand and ?opphand=M M face-down cards to the far hand; ?handstack=K adds K copies of one
+     printing to the near hand (one hand stack); ?hover=<index> lifts the near hand card at that
+     view index.
      Not linked from the game. -->
 <html lang="en">
   <head>
@@ -210,7 +213,12 @@
         const cardCount = Math.max(0, Math.min(400, Number(params.get('cards')) || 0));
         const withStack = params.get('stack') === '1';
         const withPiles = params.get('piles') === '1';
-        if (cardCount > 0 || withStack || withPiles) {
+        const countParam = (name) => Math.max(0, Math.min(60, Number(params.get(name)) || 0));
+        const handCount = countParam('hand');
+        const oppHandCount = countParam('opphand');
+        const handStackCount = countParam('handstack');
+        const hoverIndex = params.has('hover') ? Number(params.get('hover')) : -1;
+        if (cardCount > 0 || withStack || withPiles || handCount + oppHandCount + handStackCount > 0) {
           const deck = e2eFixtureDeck('Lab').map(([, name, , src, number, set, id]) => ({ name, src, number, set, id }));
           let nextId = 1;
           const pokemon = (base, extra = {}) => ({
@@ -264,6 +272,10 @@
             });
             stadium = { ...trainer(deck[9], ['Stadium'], { name: 'Lab Stadium' }), ownerId: 'lab-near' };
           }
+          zones.you.hand = Array.from({ length: handCount }, (_, k) => pokemon(deck[(k + 23) % deck.length]));
+          for (let k = 0; k < handStackCount; k++) zones.you.hand.push(pokemon(deck[22 % deck.length]));
+          // The far hand as an owner view sends it: redacted to instance ids.
+          zones.them.hand = Array.from({ length: oppHandCount }, () => ({ instanceId: nextId++ }));
           for (let i = 0; i < cardCount; i++) {
             const side = i % 2 === 0 ? 'you' : 'them';
             const slot = slots[placed[side]] ?? 'board';
@@ -285,6 +297,8 @@
             onInvalid: (reason) => showError(`lab model invalid: ${reason}`),
           });
           scene.applyModel(model);
+          const hovered = zones.you.hand[hoverIndex];
+          if (hovered) scene.setHover(hovered.instanceId);
           Promise.all([loadFoilManifest(), import('/src/setup/foil/tcgl-foil-material.js')])
             .then(async ([manifest, material]) => {
               if (!manifest) return;
@@ -322,6 +336,8 @@
 
         let lastFrame = renderer.info.render.frame;
         let lastTime = performance.now();
+        const handCountOf = (side) =>
+          (scene.inspect().model?.placements ?? []).filter((p) => p.side === side && p.zone === 'hand').length;
         const writeStats = () => {
           const now = performance.now();
           const frame = renderer.info.render.frame;
@@ -335,6 +351,7 @@
             `cards      ${scene.inspect().cards.ids().length}`,
             `piles      ${scene.inspect().piles.meshCount()}`,
             `labels     ${scene.inspect().labels.count()}`,
+            `hand       ${handCountOf('self')}/${handCountOf('opp')} (${scene.inspect().badges.count()} stacks)`,
             `calls      ${render.calls}`,
             `triangles  ${render.triangles}`,
             `geometries ${memory.geometries}`,

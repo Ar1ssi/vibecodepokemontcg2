@@ -89,3 +89,20 @@ export function handFanPoses(
     };
   });
 }
+
+/**
+ * `.hand-lowered #hand` (card focus, design 067) moves `#hand`'s `bottom` from -1 to -3.2 hand
+ * strips, and a hand card is two strips tall (self-containers.css:427-447).
+ */
+const LOWERED_DROP_STRIPS = 3.2 - 1;
+const HAND_CARD_STRIPS = 2;
+
+/**
+ * How far the lowered own hand drops below its normal fan, in the unit of `cardH`.
+ * @param {number} cardH a hand card's height
+ * @returns {number} 0 for an invalid height
+ */
+export function handLoweredOffset(cardH) {
+  if (!Number.isFinite(cardH) || cardH <= 0) return 0;
+  return (cardH * LOWERED_DROP_STRIPS) / HAND_CARD_STRIPS;
+}

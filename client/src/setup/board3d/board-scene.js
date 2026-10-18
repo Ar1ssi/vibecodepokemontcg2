@@ -1,13 +1,13 @@
 // The three.js board's scene (design 074 §D3): camera matched to the CSS tilt, the table, the
-// cards in play (C2), the piles, prizes, Stadium and zone counts (C3), and on-demand rendering.
-// The hand joins in C4. `three` is the namespace from `import('three')`; this module never
-// imports it statically.
+// cards in play (C2), the piles, prizes, Stadium and zone counts (C3), both hands fanned with
+// hover lift and the card-focus lowered pose (C4), and on-demand rendering. `three` is the
+// namespace from `import('three')`; this module never imports it statically.
 import { projectToScreen, tableToWorld } from './board-camera.mjs';
 import { diffModels, placementById } from './board-model.mjs';
 import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { createCardMeshPool } from './card-mesh.js';
-import { posesFor } from './card-poses.mjs';
-import { createCountLabels } from './count-labels.js';
+import { handGroupsOf, posesFor } from './card-poses.mjs';
+import { createCountLabels, createStackBadges } from './count-labels.js';
 import { createPileMeshes } from './pile-mesh.js';
 import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
 import { pileVisualCount } from './pile-stack.mjs';
@@ -26,6 +26,8 @@ const CARD_HEIGHT_PER_WIDTH = CARD_UNITS.h / CARD_UNITS.w;
 const CARD_LIFT_PX = 1.5;
 /** Pose fields whose change re-poses a card (a tween) even when diffModels saw no move. */
 const POSE_FIELDS = ['x', 'y', 'z', 'yawDeg', 'widthPx', 'face', 'hidden'];
+
+const HAND_POSES = new Set(['normal', 'lowered']);
 
 const samePose = (a, b) => Boolean(a && b) && POSE_FIELDS.every((field) => a[field] === b[field]);
 
@@ -71,10 +73,12 @@ function offsetAt(keys, elapsed) {
  *     zone: string, index?: number, pile?: true, point: number[] })|null, refreshCards: () => void,
  *   shake: (offsets: { x: number, y: number, ms: number }[]) => Promise<void>,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
+ *   setHover: (instanceId: number|null) => void, setHandPose: (pose: 'normal'|'lowered') => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
  *     host: HTMLElement, canvas: HTMLCanvasElement, layout: object|null, cameraDesc: object|null, model: object|null, uiState: Map<number, object>,
  *     cards: ReturnType<typeof createCardMeshPool>, piles: ReturnType<typeof createPileMeshes>,
- *     labels: ReturnType<typeof createCountLabels> },
+ *     labels: ReturnType<typeof createCountLabels>, badges: ReturnType<typeof createStackBadges>,
+ *     hover: number|null, handPose: 'normal'|'lowered' },
  *   dispose: () => void, clock: object }}
  */
 export function createBoardScene({
@@ -119,6 +123,9 @@ export function createBoardScene({
   const appliedPoses = new Map();
   /** Height of each pile's top surface off its resting height (flat px), by `side:zone`. */
   const pileTops = new Map();
+  /** Hand card under the pointer (its fan slot lifts) and the near hand's pose (card focus). */
+  let hover = null;
+  let handPose = 'normal';
   const uiState = new Map();
   let shakeOffset = { x: 0, y: 0 };
   let stopShake = null;
@@ -177,6 +184,7 @@ export function createBoardScene({
     onNeedsRender: invalidate,
   });
   const labels = createCountLabels({ group: labelsGroup, three });
+  const badges = createStackBadges({ three });
 
   table.onChange(invalidate);
 
@@ -280,7 +288,8 @@ export function createBoardScene({
    * the new layout; `refresh` re-applies every card's faces (the foil manifest arrived).
    */
   function syncCards(prev, next, { relayout = false, refresh = false } = {}) {
-    const poses = layout && next ? posesFor(next, layout) : new Map();
+    const handOptions = { hover: hover === null ? null : { instanceId: hover }, lowered: handPose === 'lowered' };
+    const poses = layout && next ? posesFor(next, layout, handOptions) : new Map();
     for (const id of pool.ids()) {
       if (poses.has(id)) continue;
       pool.release(id);
@@ -307,7 +316,41 @@ export function createBoardScene({
       else if (restyled || posed || diff.moved.has(id)) pool.setPose(id, pose, CARD_POSE_MS);
       appliedPoses.set(id, pose);
     }
+    syncStackBadges(next);
   }
+
+  /** "×N" on the front card of every hand stack of two or more (design 014), centred near its top. */
+  function syncStackBadges(source) {
+    const wanted = [];
+    const fontPx = countFontPx();
+    for (const side of SIDES) {
+      for (const ids of source ? handGroupsOf(source, side) : []) {
+        const mesh = ids.length >= 2 ? pool.meshOf(ids[0]) : null;
+        if (!mesh) continue;
+        const widthPx = appliedPoses.get(ids[0])?.widthPx ?? 0;
+        const offsetY = (widthPx * CARD_HEIGHT_PER_WIDTH) / 2 - fontPx * 0.8;
+        wanted.push({ id: ids[0], mesh, text: `×${ids.length}`, offsetY, fontPx });
+      }
+    }
+    badges.sync(wanted);
+  }
+
+  /** Lifts the hovered hand card's fan slot (null = none); the hand re-poses on a 180 ms tween. */
+  const setHover = (instanceId) => {
+    const next = Number.isFinite(instanceId) ? instanceId : null;
+    if (disposed || next === hover) return;
+    hover = next;
+    syncCards(model, model);
+    invalidate();
+  };
+
+  /** 'lowered' drops the near hand below the screen edge (card focus), 'normal' brings it back. */
+  const setHandPose = (pose) => {
+    if (disposed || !HAND_POSES.has(pose) || pose === handPose) return;
+    handPose = pose;
+    syncCards(model, model);
+    invalidate();
+  };
 
   const countFontPx = () => {
     const px = (COUNT_FONT.vh * (layout?.half?.h ?? 0)) / 100;
@@ -551,6 +594,9 @@ export function createBoardScene({
     cards: pool,
     piles,
     labels,
+    badges,
+    hover,
+    handPose,
   });
 
   const dispose = () => {
@@ -563,6 +609,7 @@ export function createBoardScene({
     scene.remove(cardsGroup);
     piles.dispose();
     labels.dispose();
+    badges.dispose();
     tableFrame.remove(pilesGroup);
     tableFrame.remove(labelsGroup);
     appliedPoses.clear();
@@ -586,6 +633,8 @@ export function createBoardScene({
     shake,
     setUiState,
     setMat,
+    setHover,
+    setHandPose,
     inspect,
     dispose,
     clock,

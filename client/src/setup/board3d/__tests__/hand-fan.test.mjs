@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handFanPoses } from '../hand-fan.mjs';
+import { handFanPoses, handLoweredOffset } from '../hand-fan.mjs';
 
 const geometry = { width: 800, radius: 1600, cardW: 100, cardH: 140 };
 const extent = (poses, cardW) =>
@@ -79,4 +79,12 @@ test('hover lifts the card by 0.35 card heights and spreads its neighbours by a 
 test('crop sets the baseline', () => {
   const [pose] = handFanPoses(1, { ...geometry, crop: 0 });
   assert.equal(pose.y, 70, 'nothing below the edge');
+});
+
+test('handLoweredOffset: the CSS drop of 2.2 strips over a two-strip card', () => {
+  assert.ok(near(handLoweredOffset(100), 110));
+  assert.ok(near(handLoweredOffset(181.44), 1.1 * 181.44));
+  assert.equal(handLoweredOffset(0), 0);
+  assert.equal(handLoweredOffset(-5), 0);
+  assert.equal(handLoweredOffset(Number.NaN), 0);
 });
