@@ -539,6 +539,23 @@ Banned in a slice row: "decide", "TBD", "as needed", "appropriate", "handle edge
 
 ## Deviations (Builder appends here during build)
 
+### C3
+- Files follow the C3 brief, not the Work-plan row: count labels are `count-labels.js` + `text-plane.js` (no
+  `overlay-meshes.js` yet), piles are `pile-mesh.js`, poses `pile-poses.mjs`.
+- Open piles draw `pileVisualCount(count) - 1` plain layers and the pool's face-up top card on them (top at
+  `z = pileThicknessPx(pileVisualCount(count) - 1)`), so `min(count, 6)` cards show in all, as pile-stack.mjs documents.
+- `placementPose` takes `{ piles }` (the model's piles) to tell a pile's top card; without it a discard/Lost Zone card
+  has no pose. Prize slots stack in the stylesheet's paint order (0, 2, 4 under 1, 3, 5) one card thickness apart.
+  `stadiumPose`'s `nearSeat` is unread: `stadium.facing` is already relative to the near player (`stadiumOf`).
+- `createPileMeshes` adds `onNeedsRender` (sleeve loaded), `objects()`/`pileAt()` (scene raycast) and `meshCount()`;
+  `thicknessPx` is the whole stack's height. `createCountLabels` adds `count()`; anchors may carry `heightPx` (prizes
+  use the six slots' bounding box) and `fontPx` (`clamp(10px, 4vh, 20px)` of the iframe, as `.self-text`). Labels
+  ignore depth so a neighbouring pile never hides them; opp labels read upside down like `.opp-text`.
+- `rects()` returns `pile:<side>:<zone>` for every pile, drawn or empty (footprint at the stack top), and `stadium`
+  whenever the layout has a Stadium zone, so E1 can aim at an empty discard. A card whose pose changes without a diff
+  move (a discard top settling) tweens to it. Lab `?cards=12&piles=1` (SwiftShader 1920×1080): 19 pile layer meshes
+  (4 stacks), 8 labels, 28 card meshes (12 + 12 prizes + 3 pile tops + Stadium) — `.agent/scratch/074/c3-piles.png`.
+
 ### C2
 - Trainer board row follows the CSS, not "1/4 card width": `#board` is a centred flex row (self-containers.css:808-828),
   cards `100% - 1.5vh` tall with `.25vw` margins, bottom-aligned in the 5 px padded box. A row wider than the box

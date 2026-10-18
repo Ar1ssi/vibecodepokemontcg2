@@ -5,6 +5,7 @@ import { getMatLayout } from '../../sizing/mat-layouts.mjs';
 import { benchSlotRect, flatLayout } from '../board-layout.mjs';
 import { CARD_UNITS, cardScaleFor } from '../card-geometry.mjs';
 import { placementPose, posesFor } from '../card-poses.mjs';
+import { pilePose, pileThicknessPx } from '../pile-poses.mjs';
 
 // sim at 1920×1080 (board-layout.test.mjs): iframe 1449.6 × 540.
 const layout = flatLayout(getMatLayout('sim'), { w: 1449.6, h: 540 });
@@ -93,7 +94,7 @@ test('hidden and face are carried', () => {
   assert.equal(pose.face, 'back');
 });
 
-test('energy drawn as a token and zones of later slices have no pose', () => {
+test('energy drawn as a token, hand, deck and loose pile cards have no pose', () => {
   const token = {
     src: 'grass.webp',
     double: false,
@@ -106,7 +107,8 @@ test('energy drawn as a token and zones of later slices have no pose', () => {
     placementPose(placement({ role: 'energy', energyToken: token }), layout),
     null
   );
-  for (const zone of ['hand', 'prizes', 'discard', 'lostZone', 'deck']) {
+  // discard/lostZone without the model's piles: no way to tell the top card.
+  for (const zone of ['hand', 'discard', 'lostZone', 'deck']) {
     assert.equal(placementPose(placement({ zone }), layout), null, zone);
   }
   assert.equal(placementPose(null, layout), null);
@@ -150,4 +152,74 @@ test('posesFor: one pose per placed card, keyed by instance id', () => {
   assert.ok(poses.get(5).x < poses.get(4).x);
   assert.equal(posesFor(null, layout).size, 0);
   assert.equal(posesFor(model, null).size, 0);
+});
+
+const pileOf = (count, top) => ({ count, top });
+const pilesWith = (side, zone, pile) => ({
+  self: { discard: pileOf(0, null), lostZone: pileOf(0, null) },
+  opp: { discard: pileOf(0, null), lostZone: pileOf(0, null) },
+  [side]: { discard: pileOf(0, null), lostZone: pileOf(0, null), [zone]: pile },
+});
+
+test('prize slot 3: the slot centre at the prize width, face back carried', () => {
+  const pose = placementPose(placement({ zone: 'prizes', index: 3, face: 'back' }), layout);
+  const rect = layout.self.prizes[3];
+  close(pose.x, rect.x + rect.w / 2, 'x');
+  close(pose.y, rect.y + rect.h / 2, 'y');
+  close(pose.widthPx, layout.self.cardBox.prizes.w, 'width');
+  // Paint order 0, 2, 4, 1, 3, 5: slot 3 is fifth from the bottom.
+  close(pose.z, 4 * CARD_UNITS.t * cardScaleFor(pose.widthPx), 'z');
+  assert.equal(pose.face, 'back');
+  assert.equal(pose.yawDeg, 0);
+});
+
+test('discard: the top card rests on the stack height, a buried card has no pose', () => {
+  const top = placement({ instanceId: 11, zone: 'discard', index: 6 });
+  const buried = placement({ instanceId: 10, zone: 'discard', index: 5 });
+  const piles = pilesWith('self', 'discard', pileOf(7, top));
+  const pose = placementPose(top, layout, { piles });
+  const pile = pilePose('self', 'discard', layout);
+  close(pose.x, pile.x, 'x');
+  close(pose.y, pile.y, 'y');
+  close(pose.widthPx, pile.widthPx, 'width');
+  // 7 cards draw min(7, 6) = 6: five plain layers under the face-up top.
+  close(pose.z, pileThicknessPx(5, cardScaleFor(pile.widthPx)), 'z on the layers');
+  assert.equal(pose.face, 'front');
+  assert.equal(placementPose(buried, layout, { piles }), null);
+});
+
+test('Lost Zone with one card: the top card lies on the cloth; opp turned 180', () => {
+  const only = placement({ instanceId: 12, side: 'opp', zone: 'lostZone', index: 0 });
+  const piles = pilesWith('opp', 'lostZone', pileOf(1, only));
+  const pose = placementPose(only, layout, { piles });
+  assert.equal(pose.z, 0);
+  assert.equal(pose.yawDeg, 180);
+  close(pose.x, pilePose('opp', 'lostZone', layout).x, 'x');
+});
+
+test('posesFor: prizes, the discard top and the stadium; no deck or hand poses', () => {
+  const top = placement({ instanceId: 22, zone: 'discard', index: 1 });
+  const model = {
+    nearSeat: 'you',
+    placements: [
+      placement({ instanceId: 20, zone: 'prizes', index: 0, face: 'back' }),
+      placement({ instanceId: 21, zone: 'discard', index: 0 }),
+      top,
+      placement({ instanceId: 23, zone: 'hand' }),
+    ],
+    piles: {
+      self: { deck: { count: 40, sleeve: 'b.png', layers: 8 }, discard: pileOf(2, top), lostZone: pileOf(0, null) },
+      opp: { deck: { count: 0, sleeve: '', layers: 0 }, discard: pileOf(0, null), lostZone: pileOf(0, null) },
+    },
+    stadium: { instanceId: 30, src: 'stadium.png', name: 'Lab Stadium', facing: 'opp' },
+  };
+  const poses = posesFor(model, layout);
+  assert.deepEqual([...poses.keys()], [20, 22, 30]);
+  const stadium = poses.get(30);
+  close(stadium.x, layout.stadium.x + layout.stadium.w / 2, 'stadium x');
+  close(stadium.widthPx, layout.stadium.w, 'stadium width');
+  assert.equal(stadium.yawDeg, 180);
+  assert.equal(stadium.face, 'front');
+  assert.equal(stadium.hidden, false);
+  assert.equal(posesFor({ ...model, stadium: null }, layout).has(30), false);
 });

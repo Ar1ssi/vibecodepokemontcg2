@@ -1,16 +1,33 @@
 // The three.js board's scene (design 074 §D3): camera matched to the CSS tilt, the table, the
-// cards in play (C2), and on-demand rendering. Piles and the hand join in C3–C4.
-// `three` is the namespace from `import('three')`; this module never imports it statically.
-import { projectToScreen } from './board-camera.mjs';
+// cards in play (C2), the piles, prizes, Stadium and zone counts (C3), and on-demand rendering.
+// The hand joins in C4. `three` is the namespace from `import('three')`; this module never
+// imports it statically.
+import { projectToScreen, tableToWorld } from './board-camera.mjs';
 import { diffModels, placementById } from './board-model.mjs';
+import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { createCardMeshPool } from './card-mesh.js';
 import { posesFor } from './card-poses.mjs';
+import { createCountLabels } from './count-labels.js';
+import { createPileMeshes } from './pile-mesh.js';
+import { PILE_ZONES, pilePose, pileThicknessPx } from './pile-poses.mjs';
+import { pileVisualCount } from './pile-stack.mjs';
 import { createTable } from './table-mesh.js';
 
 const DEG = Math.PI / 180;
 /** A card moving between slots or stacks (design 074 §D3 "Cards"). */
 const CARD_POSE_MS = 180;
 const FOIL_ROLES = new Set(['root', 'stage']);
+const SIDES = ['self', 'opp'];
+/** `.self-text { font-size: clamp(10px, 4vh, 20px) }` (self-containers.css), vh of the iframe. */
+const COUNT_FONT = { minPx: 10, vh: 4, maxPx: 20 };
+/** Card height per width of every card mesh (card-geometry.mjs). */
+const CARD_HEIGHT_PER_WIDTH = CARD_UNITS.h / CARD_UNITS.w;
+/** Lift of a card's underside off the cloth (card-mesh.js CARD_LIFT_PX, pile-mesh.js PILE_LIFT_PX). */
+const CARD_LIFT_PX = 1.5;
+/** Pose fields whose change re-poses a card (a tween) even when diffModels saw no move. */
+const POSE_FIELDS = ['x', 'y', 'z', 'yawDeg', 'widthPx', 'face', 'hidden'];
+
+const samePose = (a, b) => Boolean(a && b) && POSE_FIELDS.every((field) => a[field] === b[field]);
 
 const defaultRequestFrame = (fn) => globalThis.requestAnimationFrame?.(fn) ?? globalThis.setTimeout(fn, 16);
 const defaultCancelFrame = (id) => (globalThis.cancelAnimationFrame ?? globalThis.clearTimeout)?.(id);
@@ -49,14 +66,15 @@ function offsetAt(keys, elapsed) {
  * @returns {{ applyModel: (model: object) => void, setLayout: (layout: object) => void,
  *   setCamera: (desc: ReturnType<typeof import('./board-camera.mjs').cameraFromCssTilt>) => void,
  *   setViewport: (size: { w: number, h: number }) => void, invalidate: () => void, render: () => void,
- *   rects: () => Record<number, { left: number, top: number, width: number, height: number }>,
- *   hitTest: (clientX: number, clientY: number) => { instanceId: number, side: string, zone: string,
- *     index: number, point: number[] }|null, refreshCards: () => void,
+ *   rects: () => Record<string, { left: number, top: number, width: number, height: number }>,
+ *   hitTest: (clientX: number, clientY: number) => ({ instanceId: number|null, side: string|null,
+ *     zone: string, index?: number, pile?: true, point: number[] })|null, refreshCards: () => void,
  *   shake: (offsets: { x: number, y: number, ms: number }[]) => Promise<void>,
  *   setUiState: (id: number, patch: object) => void, setMat: (spec: object|null) => void,
  *   inspect: () => { scene: import('three').Scene, camera: import('three').PerspectiveCamera,
  *     host: HTMLElement, canvas: HTMLCanvasElement, layout: object|null, cameraDesc: object|null, model: object|null, uiState: Map<number, object>,
- *     cards: ReturnType<typeof createCardMeshPool> },
+ *     cards: ReturnType<typeof createCardMeshPool>, piles: ReturnType<typeof createPileMeshes>,
+ *     labels: ReturnType<typeof createCountLabels> },
  *   dispose: () => void, clock: object }}
  */
 export function createBoardScene({
@@ -85,10 +103,22 @@ export function createBoardScene({
   const table = createTable({ scene, textures, three, renderer, RoomEnvironment });
   tableFrame.add(table.group);
 
+  // Piles and count labels sit in the table frame, so they tilt with the cloth.
+  const pilesGroup = new three.Group();
+  pilesGroup.name = 'board3d-piles';
+  tableFrame.add(pilesGroup);
+  const labelsGroup = new three.Group();
+  labelsGroup.name = 'board3d-count-labels';
+  tableFrame.add(labelsGroup);
+
   const camera = new three.PerspectiveCamera(30, 1, 1, 10000);
   let cameraDesc = null;
   let layout = null;
   let model = null;
+  /** Last pose given to each card mesh, so a pose change without a diff move still tweens. */
+  const appliedPoses = new Map();
+  /** Height of each pile's top surface off its resting height (flat px), by `side:zone`. */
+  const pileTops = new Map();
   const uiState = new Map();
   let shakeOffset = { x: 0, y: 0 };
   let stopShake = null;
@@ -112,7 +142,10 @@ export function createBoardScene({
   /** Renders one frame; keeps rendering on the next frame while a card tween or foil runs. */
   const render = () => {
     if (disposed || contextLost()) return;
-    const animating = pool.update(clock.now());
+    const now = clock.now();
+    const cardsMoving = pool.update(now);
+    const pilesMoving = piles.update(now);
+    const animating = cardsMoving || pilesMoving;
     renderer.render(scene, camera);
     if (animating) invalidate();
   };
@@ -134,6 +167,16 @@ export function createBoardScene({
     motionReduced,
     onNeedsRender: invalidate,
   });
+
+  const piles = createPileMeshes({
+    group: pilesGroup,
+    three,
+    textures,
+    clock,
+    motionReduced,
+    onNeedsRender: invalidate,
+  });
+  const labels = createCountLabels({ group: labelsGroup, three });
 
   table.onChange(invalidate);
 
@@ -183,6 +226,7 @@ export function createBoardScene({
     layout = next;
     table.setLayout(next);
     syncCards(model, model, { relayout: true });
+    syncPiles(model);
     invalidate();
   };
 
@@ -212,41 +256,129 @@ export function createBoardScene({
     foilRecord: foilRecordOf(placement),
   });
 
+  /** The Stadium as a card for the pool: face up, no sleeve, no foil (role outside FOIL_ROLES). */
+  const stadiumCardOf = (stadium) => ({
+    instanceId: stadium.instanceId,
+    face: 'front',
+    src: stadium.src,
+    backSrc: null,
+    role: 'stadium',
+  });
+
+  const isStadium = (source, id) => source?.stadium?.instanceId === id;
+
+  /** What the pool draws for an instance id: its placement, or the Stadium. */
+  const cardOf = (source, id) =>
+    isStadium(source, id) ? stadiumCardOf(source.stadium) : placementById(source, id);
+
   /**
    * Reconciles the card meshes with `next` (§D3 "Reconcile"): new cards appear at their pose,
-   * moved or restyled ones tween there, cards without a pose in this slice (hand, piles, prizes,
-   * Energy tokens) or gone from the view are released. `relayout` snaps every card to the new
-   * layout; `refresh` re-applies every card's faces (the foil manifest arrived).
+   * moved or restyled ones tween there, cards without a pose (hand, deck, buried discard /
+   * Lost Zone cards, Energy tokens) or gone from the view are released. A card whose pose
+   * changed without a move (a discard top settling as its pile shrinks) tweens too; the Stadium
+   * re-dresses when it changes (a facing toggle turns it 180°). `relayout` snaps every card to
+   * the new layout; `refresh` re-applies every card's faces (the foil manifest arrived).
    */
   function syncCards(prev, next, { relayout = false, refresh = false } = {}) {
     const poses = layout && next ? posesFor(next, layout) : new Map();
-    for (const id of pool.ids()) if (!poses.has(id)) pool.release(id);
+    for (const id of pool.ids()) {
+      if (poses.has(id)) continue;
+      pool.release(id);
+      appliedPoses.delete(id);
+    }
     const diff = diffModels(prev, next);
     for (const [id, pose] of poses) {
-      const placement = placementById(next, id);
+      const card = cardOf(next, id);
       if (!pool.has(id)) {
         pool.acquire(id, { widthPx: pose.widthPx });
-        pool.setFaces(id, facesOf(placement));
+        pool.setFaces(id, facesOf(card));
         pool.setHidden(id, pose.hidden);
         pool.setPose(id, pose, 0);
+        appliedPoses.set(id, pose);
         continue;
       }
-      const restyled = diff.restyled.has(id);
+      const restyled = diff.restyled.has(id) || (isStadium(next, id) && diff.stadiumChanged);
       if (restyled || refresh) {
-        pool.setFaces(id, facesOf(placement));
+        pool.setFaces(id, facesOf(card));
         pool.setHidden(id, pose.hidden);
       }
+      const posed = !samePose(appliedPoses.get(id), pose);
       if (relayout) pool.setPose(id, pose, 0);
-      else if (restyled || diff.moved.has(id)) pool.setPose(id, pose, CARD_POSE_MS);
+      else if (restyled || posed || diff.moved.has(id)) pool.setPose(id, pose, CARD_POSE_MS);
+      appliedPoses.set(id, pose);
     }
   }
 
-  /** Renders a board model (board-model.mjs `boardModelFrom`): reconciles the card meshes. */
+  const countFontPx = () => {
+    const px = (COUNT_FONT.vh * (layout?.half?.h ?? 0)) / 100;
+    return Math.min(COUNT_FONT.maxPx, Math.max(COUNT_FONT.minPx, px));
+  };
+
+  /** The prize area's bounding box on `side` as a count anchor (the label centres above it). */
+  const prizeAnchorOf = (side) => {
+    const slots = layout?.[side]?.prizes ?? [];
+    if (slots.length === 0) return null;
+    const left = Math.min(...slots.map((r) => r.x));
+    const right = Math.max(...slots.map((r) => r.x + r.w));
+    const bottom = Math.min(...slots.map((r) => r.y));
+    const top = Math.max(...slots.map((r) => r.y + r.h));
+    const cardW = layout[side].cardBox.prizes.w;
+    return {
+      x: (left + right) / 2,
+      y: (bottom + top) / 2,
+      z: pileThicknessPx(slots.length, cardScaleFor(cardW)),
+      yawDeg: side === 'opp' ? 180 : 0,
+      widthPx: right - left,
+      heightPx: top - bottom,
+      fontPx: countFontPx(),
+    };
+  };
+
+  /**
+   * Draws `source.piles` (§D3 "Piles"): the deck as `layers` sleeve-topped layers, discard and
+   * Lost Zone as `pileVisualCount(count) - 1` plain layers under the face-up top card the pool
+   * draws, nothing for an empty pile (edge case 7), and every "(N)" count label (prizes too).
+   */
+  function syncPiles(source) {
+    pileTops.clear();
+    for (const side of SIDES) {
+      const sidePiles = source?.piles?.[side] ?? null;
+      for (const zone of PILE_ZONES) {
+        const pose = layout ? pilePose(side, zone, layout) : null;
+        const pile = sidePiles?.[zone] ?? null;
+        const count = Math.max(0, Number(pile?.count) || 0);
+        const isDeck = zone === 'deck';
+        const layers = isDeck ? Math.max(0, Number(pile?.layers) || 0) : Math.max(0, pileVisualCount(count) - 1);
+        const scale = pose ? cardScaleFor(pose.widthPx) : 0;
+        const thicknessPx = pileThicknessPx(layers, scale);
+        piles.setPile(side, zone, { count, layers, topSrc: isDeck ? pile?.sleeve : null }, pose, { thicknessPx });
+        // The open piles' face-up top card adds one card thickness above the layers.
+        const top = thicknessPx + (!isDeck && count > 0 ? CARD_UNITS.t * scale : 0);
+        pileTops.set(`${side}:${zone}`, top);
+        labels.setCount(side, zone, count, pose && sidePiles ? { ...pose, z: top, fontPx: countFontPx() } : null);
+      }
+      const prizeCount = Math.max(0, Number(sidePiles?.prizes?.count) || 0);
+      labels.setCount(side, 'prizes', prizeCount, layout && sidePiles ? prizeAnchorOf(side) : null);
+    }
+  }
+
+  let pilesApplied = false;
+
+  /**
+   * Renders a board model (board-model.mjs `boardModelFrom`): reconciles the card meshes (prizes,
+   * pile tops and the Stadium among them) and, on the first apply or when the piles or the
+   * Stadium changed, the pile stacks and the count labels.
+   */
   const applyModel = (next) => {
     if (disposed) return;
     const prev = model;
     model = next ?? null;
     syncCards(prev, model);
+    const diff = diffModels(prev, model);
+    if (!pilesApplied || diff.pilesChanged || diff.stadiumChanged) {
+      syncPiles(model);
+      pilesApplied = true;
+    }
     invalidate();
   };
 
@@ -269,11 +401,38 @@ export function createBoardScene({
     return box && box.width > 0 && box.height > 0 ? box : null;
   };
 
+  /** Client-px bounding box of world points, or null when one is at or behind the eye. */
+  const screenRectOf = (corners, box) => {
+    const points = corners.map((corner) => projectToScreen(cameraDesc, corner));
+    if (points.length !== 4 || points.some((point) => !point)) return null;
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const left = Math.min(...xs);
+    const top = Math.min(...ys);
+    return {
+      left: box.left + left,
+      top: box.top + top,
+      width: Math.max(...xs) - left,
+      height: Math.max(...ys) - top,
+    };
+  };
+
+  /** World corners of a flat table footprint centred at (x, y), `w` × `h`, `z` off the cloth. */
+  const footprintCorners = ({ x, y }, w, h, z) =>
+    [
+      [-w / 2, -h / 2],
+      [w / 2, -h / 2],
+      [w / 2, h / 2],
+      [-w / 2, h / 2],
+    ].map(([dx, dy]) => tableToWorld({ x: x + dx, y: y + dy, z }, cameraDesc));
+
   /**
-   * Client-px rects of every visible card: the bounding box of its front face's four corners,
-   * projected with the pure camera description (board-camera.mjs `projectToScreen`, the same
-   * math `PerspectiveCamera` runs) and offset by the canvas's page position. A running shake
-   * is not included.
+   * Client-px rects keyed by card instance id (every visible card: the bounding box of its front
+   * face's four corners), `pile:<side>:<zone>` (each deck / discard / Lost Zone footprint at its
+   * stack's top, drawn or empty) and `stadium` (the Stadium zone's card footprint). Projected
+   * with the pure camera description (board-camera.mjs `projectToScreen`, the same math
+   * `PerspectiveCamera` runs) and offset by the canvas's page position. A running shake is not
+   * included.
    */
   const rects = () => {
     const out = {};
@@ -282,23 +441,34 @@ export function createBoardScene({
     const box = canvasBox() ?? { left: 0, top: 0 };
     for (const id of pool.ids()) {
       if (!pool.meshOf(id)?.visible) continue;
-      const points = (pool.cornersOf(id) ?? []).map((corner) => projectToScreen(cameraDesc, corner));
-      if (points.length !== 4 || points.some((point) => !point)) continue;
-      const xs = points.map((point) => point.x);
-      const ys = points.map((point) => point.y);
-      const left = Math.min(...xs);
-      const top = Math.min(...ys);
-      out[id] = {
-        left: box.left + left,
-        top: box.top + top,
-        width: Math.max(...xs) - left,
-        height: Math.max(...ys) - top,
-      };
+      const rect = screenRectOf(pool.cornersOf(id) ?? [], box);
+      if (rect) out[id] = rect;
+    }
+    if (!layout) return out;
+    for (const side of SIDES) {
+      for (const zone of PILE_ZONES) {
+        const pose = pilePose(side, zone, layout);
+        if (!pose) continue;
+        const z = CARD_LIFT_PX + (pileTops.get(`${side}:${zone}`) ?? 0);
+        const corners = footprintCorners(pose, pose.widthPx, pose.widthPx * CARD_HEIGHT_PER_WIDTH, z);
+        const rect = screenRectOf(corners, box);
+        if (rect) out[`pile:${side}:${zone}`] = rect;
+      }
+    }
+    if (layout.stadium) {
+      const { x, y, w } = layout.stadium;
+      const centre = { x: x + w / 2, y: y + layout.stadium.h / 2 };
+      const rect = screenRectOf(footprintCorners(centre, w, w * CARD_HEIGHT_PER_WIDTH, CARD_LIFT_PX), box);
+      if (rect) out.stadium = rect;
     }
     return out;
   };
 
-  /** Nearest visible card under a client-px point (raycast against the card meshes), or null. */
+  /**
+   * Nearest thing under a client-px point (raycast against the card meshes and the pile stacks):
+   * a card `{ instanceId, side, zone, index, point }`, the Stadium `{ zone: 'stadium', side: null,
+   * instanceId, point }`, a pile stack `{ zone, side, instanceId: null, pile: true, point }`, or null.
+   */
   const hitTest = (clientX, clientY) => {
     if (disposed || !cameraDesc || !model) return null;
     if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
@@ -315,8 +485,13 @@ export function createBoardScene({
       .ids()
       .map((id) => pool.meshOf(id))
       .filter((mesh) => mesh?.visible);
-    for (const hit of raycaster.intersectObjects(meshes, false)) {
+    for (const hit of raycaster.intersectObjects([...meshes, ...piles.objects()], true)) {
+      const pile = piles.pileAt(hit.object);
+      if (pile) return { zone: pile.zone, side: pile.side, instanceId: null, pile: true, point: hit.point.toArray() };
       const id = pool.idAt(hit.object);
+      if (id !== null && isStadium(model, id)) {
+        return { zone: 'stadium', side: null, instanceId: id, point: hit.point.toArray() };
+      }
       const placement = id === null ? null : placementById(model, id);
       if (!placement) continue;
       return {
@@ -364,7 +539,19 @@ export function createBoardScene({
   };
 
   // `host` sizes the canvas; the boot code observes it and calls setViewport/setCamera.
-  const inspect = () => ({ scene, camera, host, canvas, layout, cameraDesc, model, uiState, cards: pool });
+  const inspect = () => ({
+    scene,
+    camera,
+    host,
+    canvas,
+    layout,
+    cameraDesc,
+    model,
+    uiState,
+    cards: pool,
+    piles,
+    labels,
+  });
 
   const dispose = () => {
     if (disposed) return;
@@ -374,6 +561,12 @@ export function createBoardScene({
     frameId = null;
     pool.dispose();
     scene.remove(cardsGroup);
+    piles.dispose();
+    labels.dispose();
+    tableFrame.remove(pilesGroup);
+    tableFrame.remove(labelsGroup);
+    appliedPoses.clear();
+    pileTops.clear();
     table.dispose();
     scene.remove(tableFrame);
     uiState.clear();

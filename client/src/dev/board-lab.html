@@ -5,7 +5,9 @@
      sim board with no art), ?viewport=WxH renders at a fixed size. ?cards=N lays N fixture cards
      (scripts/e2e's fixture deck) over both seats' Active, Bench and Trainer board through
      boardModelFrom (every 3rd wears its TCG Live foil when the manifest has one for its id);
-     ?stack=1 adds a Basic + Stage 1 + Stage 2 with two Tools in the near Active spot.
+     ?stack=1 adds a Basic + Stage 1 + Stage 2 with two Tools in the near Active spot; ?piles=1
+     fills both seats' piles (deck 45/12, discard 7/0, Lost Zone 3/1, six prizes with two face
+     up) and puts a Stadium played by the near seat.
      Not linked from the game. -->
 <html lang="en">
   <head>
@@ -207,7 +209,8 @@
 
         const cardCount = Math.max(0, Math.min(400, Number(params.get('cards')) || 0));
         const withStack = params.get('stack') === '1';
-        if (cardCount > 0 || withStack) {
+        const withPiles = params.get('piles') === '1';
+        if (cardCount > 0 || withStack || withPiles) {
           const deck = e2eFixtureDeck('Lab').map(([, name, , src, number, set, id]) => ({ name, src, number, set, id }));
           let nextId = 1;
           const pokemon = (base, extra = {}) => ({
@@ -245,6 +248,22 @@
               trainer(deck[4], ['Pokémon Tool'], { attachedTo: basic.instanceId })
             );
           }
+          // Near seat first, far seat second: [near, far] per pile.
+          const pileFill = { deck: [45, 12], discard: [7, 0], lostZone: [3, 1] };
+          let stadium = null;
+          if (withPiles) {
+            ['you', 'them'].forEach((side, seat) => {
+              const pileCard = (k) => trainer(deck[(seat * 17 + k) % deck.length], ['Item']);
+              zones[side].deck = { count: pileFill.deck[seat] };
+              zones[side].discard = Array.from({ length: pileFill.discard[seat] }, (_, k) => pileCard(k));
+              zones[side].lostZone = Array.from({ length: pileFill.lostZone[seat] }, (_, k) => pileCard(k + 7));
+              zones[side].prizes = Array.from({ length: 6 }, (_, k) => ({
+                ...pokemon(deck[(seat * 5 + k + 11) % deck.length]),
+                revealed: k === 1 || k === 4,
+              }));
+            });
+            stadium = { ...trainer(deck[9], ['Stadium'], { name: 'Lab Stadium' }), ownerId: 'lab-near' };
+          }
           for (let i = 0; i < cardCount; i++) {
             const side = i % 2 === 0 ? 'you' : 'them';
             const slot = slots[placed[side]] ?? 'board';
@@ -258,6 +277,7 @@
             stateVersion: 1,
             you: { playerId: 'lab-near', zones: zones.you },
             them: { playerId: 'lab-far', zones: zones.them },
+            stadium,
           };
           const model = boardModelFrom(view, {
             selfPlayerId: 'lab-near',
@@ -313,6 +333,8 @@
           stats.textContent = [
             `renders/s  ${fps}`,
             `cards      ${scene.inspect().cards.ids().length}`,
+            `piles      ${scene.inspect().piles.meshCount()}`,
+            `labels     ${scene.inspect().labels.count()}`,
             `calls      ${render.calls}`,
             `triangles  ${render.triangles}`,
             `geometries ${memory.geometries}`,

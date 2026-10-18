@@ -1,9 +1,11 @@
 // Where each placed card sits on the flat table (design 074 §D3 "Cards"). Pure: card-mesh.js
 // tweens these poses and turns them into world transforms with board-camera.mjs tableToWorld.
-// Slice C2 places active, bench and Trainer-board cards; hand, prizes and piles come in C3/C4,
-// and Energy drawn as tokens in C5.
+// Active, bench and Trainer-board cards (C2), prizes, the top card of the discard and Lost Zone
+// piles and the Stadium (C3); the hand comes in C4. Deck cards are a count only (no placement).
 import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { PLAY_CARD_ASPECT, benchSlotRect } from './board-layout.mjs';
+import { pilePose, pileThicknessPx, prizeSlotPose, stadiumPose } from './pile-poses.mjs';
+import { pileVisualCount } from './pile-stack.mjs';
 
 /** `#board { padding: 5px }` (self-containers.css:815); `flatLayout`'s board rect includes it. */
 const BOARD_PADDING_PX = 5;
@@ -59,8 +61,27 @@ function boardSlot(layout, index, count) {
   };
 }
 
-/** Slot centre (flat px) and card width for a placement's zone, or null when C2 does not place it. */
-function slotFor(placement, layout, boardCounts) {
+const OPEN_PILES = new Set(['discard', 'lostZone']);
+
+/**
+ * The top card of a discard / Lost Zone pile rests on the plain layers pile-mesh.js draws under
+ * it (`pileVisualCount(count) - 1` of them); every other card of the pile has no slot.
+ */
+function openPileSlot(placement, layout, piles) {
+  const pile = piles?.[placement.side]?.[placement.zone];
+  if (!pile?.top || pile.top.instanceId !== placement.instanceId) return null;
+  const pose = pilePose(placement.side, placement.zone, layout);
+  if (!pose) return null;
+  const layers = Math.max(0, pileVisualCount(pile.count) - 1);
+  return {
+    centre: { x: pose.x, y: pose.y },
+    widthPx: pose.widthPx,
+    z: pileThicknessPx(layers, cardScaleFor(pose.widthPx)),
+  };
+}
+
+/** Slot centre (flat px), card width and resting height for a placement's zone, or null. */
+function slotFor(placement, layout, { boardCounts, piles }) {
   const { side, zone, index } = placement;
   const seat = layout[side];
   if (!seat) return null;
@@ -80,23 +101,30 @@ function slotFor(placement, layout, boardCounts) {
       widthPx: slot.widthPx,
     };
   }
+  if (zone === 'prizes') {
+    const pose = prizeSlotPose(side, index, layout);
+    return pose && { centre: { x: pose.x, y: pose.y }, widthPx: pose.widthPx, z: pose.z };
+  }
+  if (OPEN_PILES.has(zone)) return openPileSlot(placement, layout, piles);
   return null;
 }
 
 /**
  * @param {import('./board-model.mjs').Placement} placement
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>} layout
- * @param {{ handPoses?: unknown, boardCounts?: { self?: number, opp?: number } }} [options]
+ * @param {{ handPoses?: unknown, boardCounts?: { self?: number, opp?: number },
+ *   piles?: import('./board-model.mjs').BoardModel['piles'] }} [options]
  *   `boardCounts` = Trainer-board cards per side (the row centres on its length; default: the
- *   card is the row's last). `handPoses` is accepted for the hand fan of slice C4 and not read:
- *   hand cards return null here.
- * @returns {CardPose|null} null for hand/prizes/discard/lostZone/deck placements and for Energy
- *   drawn as a token.
+ *   card is the row's last). `piles` = the model's piles: a discard / Lost Zone card is placed
+ *   only when it is its pile's `top`. `handPoses` is accepted for the hand fan of slice C4 and
+ *   not read: hand cards return null here.
+ * @returns {CardPose|null} null for hand and deck placements, a discard / Lost Zone card that is
+ *   not its pile's top (or without `piles`), and Energy drawn as a token.
  */
-export function placementPose(placement, layout, { boardCounts } = {}) {
+export function placementPose(placement, layout, { boardCounts, piles } = {}) {
   if (!placement || !layout) return null;
   if (placement.role === 'energy' && placement.energyToken) return null;
-  const slot = slotFor(placement, layout, boardCounts);
+  const slot = slotFor(placement, layout, { boardCounts, piles });
   if (!slot) return null;
   const turn = placement.side === 'opp' ? -1 : 1;
   const [right, up] = placement.stackOffset ?? [0, 0];
@@ -104,7 +132,7 @@ export function placementPose(placement, layout, { boardCounts } = {}) {
   return {
     x: slot.centre.x + turn * right * slot.widthPx,
     y: slot.centre.y + turn * up * slot.widthPx,
-    z: (placement.stackIndex || 0) * CARD_UNITS.t * scale,
+    z: (slot.z || 0) + (placement.stackIndex || 0) * CARD_UNITS.t * scale,
     yawDeg: (placement.rotation || 0) + (placement.side === 'opp' ? 180 : 0),
     face: placement.face === 'back' ? 'back' : 'front',
     hidden: Boolean(placement.hidden),
@@ -113,7 +141,17 @@ export function placementPose(placement, layout, { boardCounts } = {}) {
 }
 
 /**
- * Poses of every placement this slice places, by instance id.
+ * The Stadium card's pose (pile-poses.mjs `stadiumPose`), face up.
+ * @param {import('./board-model.mjs').BoardModel|null} model
+ * @returns {CardPose|null}
+ */
+export function stadiumCardPose(model, layout) {
+  const pose = stadiumPose(model?.stadium ?? null, layout, model?.nearSeat);
+  return pose && { ...pose, face: 'front', hidden: false };
+}
+
+/**
+ * Poses of every placed card, by instance id; the Stadium under its own instance id.
  * @param {import('./board-model.mjs').BoardModel|null} model
  * @param {ReturnType<typeof import('./board-layout.mjs').flatLayout>|null} layout
  * @returns {Map<number, CardPose>}
@@ -126,8 +164,10 @@ export function posesFor(model, layout) {
     if (p.zone === 'board' && p.side in boardCounts) boardCounts[p.side] += 1;
   }
   for (const placement of model.placements) {
-    const pose = placementPose(placement, layout, { boardCounts });
+    const pose = placementPose(placement, layout, { boardCounts, piles: model.piles });
     if (pose) poses.set(placement.instanceId, pose);
   }
+  const stadium = stadiumCardPose(model, layout);
+  if (stadium) poses.set(model.stadium.instanceId, stadium);
   return poses;
 }
