@@ -2,7 +2,8 @@
 // shows the game's own foil shader over our card image. Every view shares one WebGL renderer (browsers cap live
 // contexts): each frame a view renders into the bottom-left w×h of the shared canvas, which only grows, and
 // copies that rect into its own 2-D canvas. The wrapper's `data-tcgl-foil` reads loading → live, or fallback
-// (canvas removed; the card shows its plain image) on any WebGL, shader or texture failure.
+// (canvas removed; the card shows its plain image) on any WebGL, shader or texture failure; `deferred` = a
+// board wrapper on the 3D board, whose card mesh wears the foil (design 074 §D6): no view, but clones mount one.
 import { DEFAULT_FOIL_UV } from './tcgl-foil-manifest.mjs';
 import { faceOnViewProjection, multiply, poseAngles, rotationMatrix } from './tcgl-foil-pose.mjs';
 import { foilManifestNow } from './tcgl-foil-store.js';
@@ -19,6 +20,7 @@ const UNPLACED_GRACE_MS = 10000;
 
 const views = new Set();
 const viewByWrapper = new WeakMap();
+const deferredRecords = new WeakMap();
 let runtimePromise = null;
 let disabled = false;
 let loopRunning = false;
@@ -230,6 +232,13 @@ export function mountTcglFoil(wrapper, record) {
   return view;
 }
 
+/** Notes `record` on a wrapper that gets no view (`deferred`), so `remountTcglFoil` can still mount its clones. */
+export function deferTcglFoil(wrapper, record) {
+  if (!wrapper || !record) return;
+  deferredRecords.set(wrapper, record);
+  wrapper.dataset.tcglFoil = 'deferred';
+}
+
 /** Releases a wrapper's foil view now (it would also go on the next frame once the wrapper is detached). */
 export function unmountTcglFoil(wrapper) {
   viewByWrapper.get(wrapper)?.destroy();
@@ -241,7 +250,7 @@ export function unmountTcglFoil(wrapper) {
  */
 export function remountTcglFoil(clone, sourceWrapper) {
   if (!clone) return null;
-  const record = viewByWrapper.get(sourceWrapper)?.record;
+  const record = viewByWrapper.get(sourceWrapper)?.record ?? deferredRecords.get(sourceWrapper);
   if (!record) return null;
   clone.querySelectorAll('canvas.tcgl-foil').forEach((canvas) => canvas.remove());
   delete clone.dataset.tcglFoil;

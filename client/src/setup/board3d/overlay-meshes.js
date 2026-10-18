@@ -11,12 +11,16 @@
 // FOOTPRINT (apply-view measures the turned card's bounding box), upright in its seat's frame,
 // so they undo the server `rotation` but keep the far seat's 180°; rings hug the card itself;
 // the idle loop's card parts turn with the card and its sky parts stay upright on the screen.
+// The Tera crystal skin (mat-fx/tera-skin.js, css/mat-ambient.css) rides the card's face: tint,
+// facets, sheen, rim glow and glints, put on by `setUiState(id, { teraSkin: palette | null })`.
 // `three` is the namespace from `import('three')`; this module never imports it statically.
 import { textureUrlFor } from '../gl/card-art-hosts.mjs';
 import { STATUS_CONDITION_KEYS } from '../netcode/mat-fx/sfx-cues.mjs';
+import { FACET_VIEW, teraSkinFacets, teraSkinGlints } from '../netcode/mat-fx/tera-skin.mjs';
 import { CARD_UNITS, cardScaleFor } from './card-geometry.mjs';
 import { counterPlan, energyRowPlan, markerPlan } from './overlay-plan.mjs';
 import { STATUS_LOOP_PAINT, loopBoxOffset, loopPartFrame, statusLoopLayers } from './status-loop-frame.mjs';
+import { TERA_SKIN_LOOK, teraGlintFrame, teraRimOpacity, teraSheenLeft, teraSkinFade } from './tera-skin-frame.mjs';
 
 const DEG = Math.PI / 180;
 const ASSETS = '/src/assets';
@@ -57,6 +61,11 @@ const MAX_PIXEL_RATIO = 2;
 /** Heights above the card face (px) and draw order, bottom first. */
 const LAYER = {
   loopUnder: { z: -0.3, order: 1 },
+  teraTint: { z: 0.3, order: 1.1 },
+  teraFacets: { z: 0.32, order: 1.2 },
+  teraSheen: { z: 0.34, order: 1.3 },
+  teraAura: { z: 0.36, order: 1.4 },
+  teraGlint: { z: 0.42, order: 1.5 },
   ring: { z: 0.3, order: 2 },
   loop: { z: 0.3, order: 3 },
   tab: { z: 0.4, order: 4 },
@@ -73,6 +82,20 @@ const pixelRatio = () => {
   return Number.isFinite(ratio) && ratio > 0 ? Math.min(ratio, MAX_PIXEL_RATIO) : 1;
 };
 
+/** `.fx-tera-crystal__aura::before`'s box-shadows: [blur, spread, colour key, alpha]; the inset one apart. */
+const TERA_RIM = {
+  outline: { widthPx: 1.5, color: 'ice', alpha: 0.95 },
+  outer: [
+    [6, 2, 'cyan', 0.85],
+    [18, 5, 'deep', 0.55],
+  ],
+  inset: [8, 1, 'ice', 0.8],
+  marginPx: 30,
+};
+const TERA_GLINT_PX = 64;
+
+const rgbOf = (palette, key) => (Array.isArray(palette?.[key]) ? palette[key].join(', ') : '255, 255, 255');
+
 const isSideways = (rotation) => Math.abs(Math.round((Number(rotation) || 0) / 90)) % 2 === 1;
 
 /** A canvas `wPx` × `hPx` CSS px at the device pixel ratio, its context scaled to CSS px. */
@@ -86,8 +109,9 @@ function makeCanvas(wPx, hPx) {
   return { canvas, ctx };
 }
 
-function roundedRectPath(ctx, x, y, w, h, rx, ry) {
-  ctx.beginPath();
+/** `newPath: false` adds the outline to the current path (an even-odd frame round the card). */
+function roundedRectPath(ctx, x, y, w, h, rx, ry, newPath = true) {
+  if (newPath) ctx.beginPath();
   ctx.moveTo(x + rx, y);
   ctx.lineTo(x + w - rx, y);
   ctx.ellipse(x + w - rx, y + ry, rx, ry, 0, -Math.PI / 2, 0);
@@ -137,6 +161,8 @@ export function createOverlayMeshes({
   const shared = new Map();
   const sheets = new Map();
   const sheetImages = new Map();
+  // When each card's Tera skin went on, so a re-dress (damage, a ring) does not fade it in again.
+  const teraSince = new Map();
   const plane = new three.PlaneGeometry(1, 1);
   const disc = new three.CircleGeometry(0.5, 40);
   let frozenAt = null;
@@ -236,8 +262,8 @@ export function createOverlayMeshes({
 
   const sizeKey = (w, h) => `${Math.round(w)}x${Math.round(h)}`;
 
-  const cardPath = (ctx, x, y, w, h, grow = 0) =>
-    roundedRectPath(ctx, x - grow, y - grow, w + 2 * grow, h + 2 * grow, w * CORNER.x + grow, h * CORNER.y + grow);
+  const cardPath = (ctx, x, y, w, h, grow = 0, newPath = true) =>
+    roundedRectPath(ctx, x - grow, y - grow, w + 2 * grow, h + 2 * grow, w * CORNER.x + grow, h * CORNER.y + grow, newPath);
 
   const selectedRing = (w, h) =>
     ringMaterial(`selected-ring:${sizeKey(w, h)}`, w, h, SELECTED.ringPx + 1, (ctx, x, y, cw, ch) => {
@@ -639,6 +665,248 @@ export function createOverlayMeshes({
     paintLoop(entry.loop, frozenAt ?? now);
   };
 
+  // ── the Tera crystal skin, on the card's face (css/mat-ambient.css `.fx-tera-crystal__*`).
+  /** The card's rounded box, white on black: the sheen's alpha map (the rotator clips the strip). */
+  const cardMaskTexture = (w, h) => {
+    const { canvas, ctx } = makeCanvas(w, h);
+    if (ctx) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, w, h);
+      cardPath(ctx, 0, 0, w, h);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+    return new three.CanvasTexture(canvas);
+  };
+
+  /**
+   * `.fx-tera-crystal__tint`'s 160° gradient. The DOM blends it `color` (hue/saturation only); a
+   * blend can't do that, so the plane multiplies the art toward the tint by its alpha:
+   * dst × (1 − a + c·a), which keeps dark ink dark like the CSS does.
+   */
+  const buildTeraTint = (entry, palette, w, h) => {
+    const { canvas, ctx } = makeCanvas(w, h);
+    if (ctx) {
+      const angle = 160 * DEG;
+      const dx = Math.sin(angle);
+      const dy = -Math.cos(angle);
+      const half = (Math.abs(w * dx) + Math.abs(h * dy)) / 2;
+      const gradient = ctx.createLinearGradient(w / 2 - dx * half, h / 2 - dy * half, w / 2 + dx * half, h / 2 + dy * half);
+      gradient.addColorStop(0, `rgba(${rgbOf(palette, 'ice')}, 0.9)`);
+      gradient.addColorStop(0.38, `rgba(${rgbOf(palette, 'cyan')}, 0.75)`);
+      gradient.addColorStop(0.7, `rgba(${rgbOf(palette, 'deep')}, 0.8)`);
+      gradient.addColorStop(1, `rgba(${rgbOf(palette, 'deep')}, 0.85)`);
+      cardPath(ctx, 0, 0, w, h);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+    }
+    const material = basicMaterial(canvasTexture(canvas));
+    material.premultipliedAlpha = true;
+    material.blending = three.CustomBlending;
+    material.blendEquation = three.AddEquation;
+    material.blendSrc = three.DstColorFactor;
+    material.blendDst = three.OneMinusSrcAlphaFactor;
+    material.blendSrcAlpha = three.ZeroFactor;
+    material.blendDstAlpha = three.OneFactor;
+    entry.owned.push(material);
+    return addMesh(entry, entry.cardRoot, plane, material, { z: LAYER.teraTint.z, w, h, order: LAYER.teraTint.order });
+  };
+
+  /** `.fx-tera-crystal__facets`: tera-skin.mjs's seeded facet mesh, painted from its triangles. */
+  const buildTeraFacets = (entry, instanceId, palette, w, h) => {
+    const { canvas, ctx } = makeCanvas(w, h);
+    if (ctx) {
+      const sx = w / FACET_VIEW.width;
+      const sy = h / FACET_VIEW.height;
+      cardPath(ctx, 0, 0, w, h);
+      ctx.clip();
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 0.5 * Math.min(sx, sy);
+      for (const facet of teraSkinFacets(instanceId, palette).facets) {
+        ctx.beginPath();
+        facet.points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x * sx, y * sy) : ctx.lineTo(x * sx, y * sy)));
+        ctx.closePath();
+        ctx.globalAlpha = facet.opacity;
+        ctx.fillStyle = facet.fill;
+        ctx.fill();
+        ctx.globalAlpha = 0.55;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      }
+    }
+    const material = basicMaterial(canvasTexture(canvas));
+    entry.owned.push(material);
+    return addMesh(entry, entry.cardRoot, plane, material, { z: LAYER.teraFacets.z, w, h, order: LAYER.teraFacets.order });
+  };
+
+  /** `.fx-tera-crystal__sheen`: a 250 %-wide 115° strip, swept by the texture offset (screen ≈ additive). */
+  const buildTeraSheen = (entry, palette, w, h) => {
+    const span = TERA_SKIN_LOOK.sheenSpan;
+    const W = w * span;
+    const { canvas, ctx } = makeCanvas(W, h);
+    if (ctx) {
+      const angle = 115 * DEG;
+      const dx = Math.sin(angle);
+      const dy = -Math.cos(angle);
+      const half = (Math.abs(W * dx) + Math.abs(h * dy)) / 2;
+      const gradient = ctx.createLinearGradient(W / 2 - dx * half, h / 2 - dy * half, W / 2 + dx * half, h / 2 + dy * half);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      gradient.addColorStop(0.38, 'rgba(255, 255, 255, 0)');
+      gradient.addColorStop(0.47, 'rgba(255, 255, 255, 0.4)');
+      gradient.addColorStop(0.5, `rgba(${rgbOf(palette, 'ice')}, 0.65)`);
+      gradient.addColorStop(0.53, 'rgba(255, 255, 255, 0.4)');
+      gradient.addColorStop(0.62, 'rgba(255, 255, 255, 0)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, W, h);
+    }
+    const texture = canvasTexture(canvas);
+    texture.wrapS = three.ClampToEdgeWrapping;
+    texture.repeat.set(1 / span, 1);
+    const material = basicMaterial(texture);
+    material.alphaMap = cardMaskTexture(w, h);
+    material.blending = three.AdditiveBlending;
+    entry.owned.push(material, { dispose: () => material.alphaMap?.dispose() });
+    addMesh(entry, entry.cardRoot, plane, material, { z: LAYER.teraSheen.z, w, h, order: LAYER.teraSheen.order });
+    return material;
+  };
+
+  /** `.fx-tera-crystal__aura::before`: the outline, two outer glows and the inner glow round the card. */
+  const buildTeraAura = (entry, palette, w, h) => {
+    const m = TERA_RIM.marginPx;
+    const W = w + 2 * m;
+    const H = h + 2 * m;
+    const { canvas, ctx } = makeCanvas(W, H);
+    if (ctx) {
+      for (const [blur, spread, key, alpha] of TERA_RIM.outer) {
+        ctx.save();
+        ctx.shadowColor = `rgba(${rgbOf(palette, key)}, ${alpha})`;
+        ctx.shadowBlur = blur;
+        cardPath(ctx, m, m, w, h, spread);
+        ctx.fillStyle = `rgba(${rgbOf(palette, key)}, ${alpha})`;
+        ctx.fill();
+        ctx.restore();
+      }
+      // Outer box-shadows never paint inside the box.
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      cardPath(ctx, m, m, w, h);
+      ctx.fill();
+      ctx.restore();
+      const { widthPx, color, alpha } = TERA_RIM.outline;
+      cardPath(ctx, m, m, w, h, widthPx / 2);
+      ctx.lineWidth = widthPx;
+      ctx.strokeStyle = `rgba(${rgbOf(palette, color)}, ${alpha})`;
+      ctx.stroke();
+      const [blur, spread, key, insetAlpha] = TERA_RIM.inset;
+      ctx.save();
+      cardPath(ctx, m, m, w, h);
+      ctx.clip();
+      ctx.shadowColor = `rgba(${rgbOf(palette, key)}, ${insetAlpha})`;
+      ctx.shadowBlur = blur;
+      ctx.beginPath();
+      ctx.rect(0, 0, W, H);
+      cardPath(ctx, m, m, w, h, -spread, false);
+      ctx.fillStyle = `rgba(${rgbOf(palette, key)}, ${insetAlpha})`;
+      ctx.fill('evenodd');
+      ctx.restore();
+    }
+    const material = basicMaterial(canvasTexture(canvas));
+    entry.owned.push(material);
+    addMesh(entry, entry.cardRoot, plane, material, { z: LAYER.teraAura.z, w: W, h: H, order: LAYER.teraAura.order });
+    return material;
+  };
+
+  /** `.fx-tera-crystal__glint`: a radial star with two crossed diamond rays. */
+  const glintTexture = (palette) => {
+    const S = TERA_GLINT_PX;
+    const { canvas, ctx } = makeCanvas(S, S);
+    if (ctx) {
+      const c = S / 2;
+      const radial = ctx.createRadialGradient(c, c, 0, c, c, Math.SQRT2 * c);
+      radial.addColorStop(0, '#fff');
+      radial.addColorStop(0.09, '#fff');
+      radial.addColorStop(0.16, `rgba(${rgbOf(palette, 'ice')}, 0.85)`);
+      radial.addColorStop(0.3, `rgba(${rgbOf(palette, 'cyan')}, 0.35)`);
+      radial.addColorStop(0.48, `rgba(${rgbOf(palette, 'cyan')}, 0)`);
+      ctx.fillStyle = radial;
+      ctx.fillRect(0, 0, S, S);
+      for (const turn of [0, 90]) {
+        ctx.save();
+        ctx.translate(c, c);
+        ctx.rotate(turn * DEG);
+        ctx.translate(-c, -c);
+        const ray = ctx.createLinearGradient(0, 0, S, 0);
+        ray.addColorStop(0, `rgba(${rgbOf(palette, 'ice')}, 0)`);
+        ray.addColorStop(0.3, `rgba(${rgbOf(palette, 'ice')}, 0.9)`);
+        ray.addColorStop(0.5, '#fff');
+        ray.addColorStop(0.7, `rgba(${rgbOf(palette, 'ice')}, 0.9)`);
+        ray.addColorStop(1, `rgba(${rgbOf(palette, 'ice')}, 0)`);
+        ctx.beginPath();
+        ctx.moveTo(0, c);
+        ctx.lineTo(c, 0.44 * S);
+        ctx.lineTo(S, c);
+        ctx.lineTo(c, 0.56 * S);
+        ctx.closePath();
+        ctx.fillStyle = ray;
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+    return canvasTexture(canvas);
+  };
+
+  const buildTeraGlints = (entry, instanceId, palette, w, h) => {
+    const texture = glintTexture(palette);
+    entry.owned.push({ dispose: () => texture.dispose() });
+    return teraSkinGlints(instanceId).map((glint) => {
+      const material = basicMaterial(texture);
+      entry.owned.push({ dispose: () => material.dispose() });
+      const size = glint.size * w;
+      const mesh = addMesh(entry, entry.cardRoot, plane, material, {
+        x: (glint.x / 100 - 0.5) * w,
+        y: (0.5 - glint.y / 100) * h,
+        z: LAYER.teraGlint.z,
+        w: size,
+        h: size,
+        order: LAYER.teraGlint.order,
+      });
+      return { mesh, material, size, delay: glint.delay };
+    });
+  };
+
+  /** Poses every Tera layer at `t` ms; `still` = motion off, as the CSS with `animation: none`. */
+  const paintTera = (tera, t, still) => {
+    const elapsed = t - tera.start;
+    const fade = still ? 1 : teraSkinFade(elapsed);
+    tera.tint.material.opacity = TERA_SKIN_LOOK.tintAlpha * fade;
+    tera.facets.material.opacity = TERA_SKIN_LOOK.facetAlpha * fade;
+    tera.sheen.opacity = fade;
+    tera.sheen.map.offset.x = -(still ? 0 : teraSheenLeft(elapsed)) / TERA_SKIN_LOOK.sheenSpan;
+    tera.aura.opacity = (still ? 1 : teraRimOpacity(elapsed)) * fade;
+    for (const glint of tera.glints) {
+      const frame = still ? { scale: 0, rotateDeg: 0, opacity: 0 } : teraGlintFrame(elapsed, glint.delay);
+      glint.mesh.visible = frame.opacity > 0 && frame.scale > 0;
+      glint.mesh.scale.set(glint.size * frame.scale, glint.size * frame.scale, 1);
+      glint.mesh.rotation.z = -frame.rotateDeg * DEG;
+      glint.material.opacity = frame.opacity * fade;
+    }
+  };
+
+  const buildTera = (entry, instanceId, palette, card, now) => {
+    if (!teraSince.has(instanceId)) teraSince.set(instanceId, now);
+    const { w, h } = card;
+    entry.tera = {
+      start: teraSince.get(instanceId),
+      tint: buildTeraTint(entry, palette, w, h),
+      facets: buildTeraFacets(entry, instanceId, palette, w, h),
+      sheen: buildTeraSheen(entry, palette, w, h),
+      aura: buildTeraAura(entry, palette, w, h),
+      glints: buildTeraGlints(entry, instanceId, palette, w, h),
+    };
+    paintTera(entry.tera, frozenAt ?? now, motionReduced());
+  };
+
   const clearEntry = (entry) => {
     entry.root.removeFromParent();
     entry.ringRoot.removeFromParent();
@@ -652,6 +920,7 @@ export function createOverlayMeshes({
   };
 
   const remove = (instanceId) => {
+    teraSince.delete(instanceId);
     const entry = entries.get(instanceId);
     if (!entry) return;
     entries.delete(instanceId);
@@ -671,6 +940,7 @@ export function createOverlayMeshes({
       placement.selected,
       placement.glow,
       placement.matPick,
+      placement.teraSkin ?? null,
       tokens.map((token) => [token.src, token.double, token.zIndex]),
     ]);
 
@@ -714,7 +984,7 @@ export function createOverlayMeshes({
     root.add(sky);
     cardMesh.add(root, cardRoot, ringRoot);
 
-    const entry = { key, parent: cardMesh, root, cardRoot, ringRoot, meshes: [], owned: [], art: [], shared: [], loop: null };
+    const entry = { key, parent: cardMesh, root, cardRoot, ringRoot, meshes: [], owned: [], art: [], shared: [], loop: null, tera: null };
     entries.set(instanceId, entry);
 
     if (front) {
@@ -727,6 +997,8 @@ export function createOverlayMeshes({
       const keys = (placement.conditions ?? []).map((c) => STATUS_CONDITION_KEYS[c]).filter(Boolean);
       if (keys.length > 0) buildLoop(entry, root, sky, keys, card, sideways, clock.now());
     }
+    if (front && placement.teraSkin) buildTera(entry, instanceId, placement.teraSkin, card, clock.now());
+    else teraSince.delete(instanceId);
     buildRings(entry, ringRoot, placement, card);
     onNeedsRender();
   };
@@ -740,7 +1012,12 @@ export function createOverlayMeshes({
     const t = frozenAt ?? now;
     let animating = false;
     for (const entry of entries.values()) {
-      if (!entry.loop || !entry.parent.visible) continue;
+      if (!entry.parent.visible) continue;
+      if (entry.tera) {
+        paintTera(entry.tera, t, still);
+        animating = true;
+      }
+      if (!entry.loop) continue;
       if (!still) paintLoop(entry.loop, t);
       animating = true;
     }
@@ -769,6 +1046,7 @@ export function createOverlayMeshes({
     disc.dispose();
     sheets.clear();
     sheetImages.clear();
+    teraSince.clear();
   };
 
   return { sync, remove, update, count, dispose };

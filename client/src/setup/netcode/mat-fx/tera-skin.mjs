@@ -158,7 +158,9 @@ const f1 = (n) => Math.round(n * 10) / 10;
  *
  * @param {unknown} seed instanceId or number
  * @param {typeof TERA_PALETTE} [palette] from `teraPaletteFor` (the card's type)
- * @returns {{ svg: string, triangles: number[][][] }}
+ * @returns {{ svg: string, triangles: number[][][],
+ *   facets: { points: number[][], fill: string, opacity: number }[] }}
+ *   `facets` = each triangle with its fill, for painters that draw no SVG (the 3D board).
  */
 export function teraSkinFacets(seed, palette = TERA_PALETTE) {
   const rand = seededRandom(skinSeed(seed));
@@ -166,6 +168,7 @@ export function teraSkinFacets(seed, palette = TERA_PALETTE) {
   const { width, height, cols, rows } = FACET_VIEW;
   const p = facetPoints(rand);
   const triangles = [];
+  const facets = [];
   const polys = [];
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
@@ -188,6 +191,7 @@ export function teraSkinFacets(seed, palette = TERA_PALETTE) {
       for (const tri of pair) {
         const [fill, opacity] = fills[Math.floor(rand() * fills.length)];
         triangles.push(tri);
+        facets.push({ points: tri, fill, opacity });
         const pts = tri.map(([x, y]) => `${f1(x)},${f1(y)}`).join(' ');
         polys.push(
           `<polygon points='${pts}' fill='${fill}' fill-opacity='${opacity}'/>`
@@ -198,7 +202,7 @@ export function teraSkinFacets(seed, palette = TERA_PALETTE) {
   const svg =
     `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${width} ${height}' preserveAspectRatio='none'>` +
     `<g stroke='#ffffff' stroke-opacity='0.55' stroke-width='0.5' stroke-linejoin='round'>${polys.join('')}</g></svg>`;
-  return { svg, triangles };
+  return { svg, triangles, facets };
 }
 
 export const TERA_SKIN_GLINTS = 3;

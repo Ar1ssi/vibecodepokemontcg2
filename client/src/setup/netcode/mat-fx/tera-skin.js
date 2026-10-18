@@ -4,8 +4,11 @@
 // `board-view-applied` (apply-view.js) and `holo-wrapper-changed`
 // (hydrate-holo.js); a Tera entry holds the skin back until its reveal so the
 // card comes out of the burst already crystal. A card without a holo wrapper
-// gets only the CSS rim glow (an <img> cannot hold the layers).
+// gets only the CSS rim glow (an <img> cannot hold the layers). On the 3D board (design 074 §D6)
+// the mirror holds no skin: the scene wears it (`setUiState(id, { teraSkin: palette | null })`,
+// drawn by board3d/overlay-meshes.js).
 // Styles: css/mat-ambient.css (the cards live in the playmat iframes).
+import { board3dActive, getBoardScene } from '../../board3d/board3d.js';
 import { fxDisabled } from '../../image-logic/mat-fx.mjs';
 import {
   getAuthoritativeZoneArray,
@@ -24,6 +27,26 @@ import {
 
 const SKIN_CLASS = 'fx-tera-crystal';
 const LAYER_CLASS = 'fx-tera-crystal__layer';
+
+// One handle per (scene, card) on the 3D board, so a rebuilt scene (context loss) reads as a new
+// node and the reconciler puts the skin on it.
+const sceneHandles = new WeakMap();
+
+function sceneHandleFor(scene, instanceId) {
+  let handles = sceneHandles.get(scene);
+  if (!handles) {
+    handles = new Map();
+    sceneHandles.set(scene, handles);
+  }
+  let handle = handles.get(instanceId);
+  if (!handle) {
+    handle = { scene, instanceId };
+    handles.set(instanceId, handle);
+  }
+  return handle;
+}
+
+const isSceneHandle = (node) => sceneHandles.get(node?.scene)?.get(node.instanceId) === node;
 
 const skinNodeFor = (record) => {
   const wrapper = record?.holoCard?.wrapper;
@@ -61,8 +84,15 @@ function addWrapperLayers(wrapper, instanceId, palette) {
   wrapper.append(aura);
 }
 
+const paletteOf = (instanceId) =>
+  teraPaletteForCard(getCardRegistry().get(instanceId)?.card);
+
 function applySkin(node, instanceId) {
-  const palette = teraPaletteForCard(getCardRegistry().get(instanceId)?.card);
+  if (isSceneHandle(node)) {
+    node.scene.setUiState(instanceId, { teraSkin: paletteOf(instanceId) });
+    return;
+  }
+  const palette = paletteOf(instanceId);
   for (const [name, value] of Object.entries(teraSkinColors(palette)))
     node.style.setProperty(name, value);
   node.classList.add(SKIN_CLASS);
@@ -71,6 +101,11 @@ function applySkin(node, instanceId) {
 }
 
 function removeSkin(node) {
+  if (isSceneHandle(node)) {
+    node.scene.setUiState(node.instanceId, { teraSkin: null });
+    sceneHandles.get(node.scene).delete(node.instanceId);
+    return;
+  }
   for (const name of Object.keys(teraSkinColors()))
     node.style?.removeProperty(name);
   node.classList.remove(SKIN_CLASS);
@@ -82,7 +117,11 @@ const skins = createSkinReconciler({
     !fxDisabled() && hasAuthoritativeView()
       ? teraSkinTargets(getAuthoritativeZoneArray, held)
       : [],
-  nodeFor: (id) => skinNodeFor(getCardRegistry().get(id)),
+  nodeFor: (id) => {
+    if (!board3dActive()) return skinNodeFor(getCardRegistry().get(id));
+    const scene = getBoardScene();
+    return scene ? sceneHandleFor(scene, id) : null;
+  },
   apply: applySkin,
   remove: removeSkin,
   schedule: (fn, ms) => setTimeout(fn, ms),

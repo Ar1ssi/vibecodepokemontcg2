@@ -14,7 +14,7 @@
 import { extractTcgdexIdFromImageUrl } from '../../../../../shared/engine/rules/legacy-set-ids.mjs';
 import { foilCoverage, foilRecordFor } from '../../foil/tcgl-foil-manifest.mjs';
 import { foilManifestNow } from '../../foil/tcgl-foil-store.js';
-import { mountTcglFoil } from '../../foil/tcgl-foil-view.js';
+import { deferTcglFoil, mountTcglFoil } from '../../foil/tcgl-foil-view.js';
 import { CARD_ART_CORS_HOSTS } from '../../gl/card-art-hosts.mjs';
 
 // Rarity (TCGdex) → simey data-rarity value (per the Bulbapedia rarity guide).
@@ -385,11 +385,12 @@ export function isTrainerGalleryImageUrl(src) {
 
 // Build the holo card: simey's DOM with a single <img> + shine/glitter/glare/glare2. Rarity 'tcgl' also
 // mounts the TCG Live foil canvas for `cardId` (else the id in the image URL) — its reverse-holo printing when
-// `reverse` — and its simey layers stay hidden.
+// `reverse` — and its simey layers stay hidden. `mountFoil: false` only notes the record on the wrapper (the
+// 3D board's card mesh draws the foil; a clone of the wrapper still mounts a view of its own).
 export function buildHoloCard(
   imageUrl,
   rarityValue,
-  { trainer = false, cardId = null, reverse = false, manifest = foilManifestNow() } = {}
+  { trainer = false, cardId = null, reverse = false, manifest = foilManifestNow(), mountFoil = true } = {}
 ) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -441,7 +442,8 @@ export function buildHoloCard(
 
   if (rarityValue === TCGL_FOIL_RARITY) {
     const record = foilRecordFor(manifest, cardId ?? extractTcgdexIdFromImageUrl(imageUrl), { reverse });
-    if (record) mountTcglFoil(card, record);
+    if (record && mountFoil) mountTcglFoil(card, record);
+    else if (record) deferTcglFoil(card, record);
     else card.dataset.tcglFoil = 'fallback';
   }
   return card;

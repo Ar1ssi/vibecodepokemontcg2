@@ -15,6 +15,7 @@ import { fxDisabled, motionReduced } from '../image-logic/mat-fx.mjs';
 import { attachMatTilt } from './mat-tilt.mjs';
 import { loadFoilManifest } from '../foil/tcgl-foil-store.js';
 import { unmountTcglFoil } from '../foil/tcgl-foil-view.js';
+import { board3dActive } from '../board3d/board3d.js';
 
 const hydrated = new WeakSet();
 const pendingHydrations = new WeakMap();
@@ -112,6 +113,8 @@ export function hydrateHolo(card) {
         cardId: foilCardId(foilCard, foilManifest),
         reverse: isReverseHoloCard(foilCard),
         manifest: foilManifest,
+        // On the 3D board the card mesh's front material is the foil (card-mesh.js): no blit view.
+        mountFoil: !board3dActive(),
       });
       // No inline px size: every zone sizes `.mat-holo` in CSS. A px snapshot
       // taken in the hand (1x) is wrong inside the zoom:2 #playfield, and
