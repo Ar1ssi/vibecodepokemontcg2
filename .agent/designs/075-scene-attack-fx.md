@@ -423,6 +423,14 @@ slice 8 deletes it; after slice 8, revert the slice-8 commit.
   Trails and the echo draw in the depth-tested back pass, not "front z − 0.5": cards hide them, as the 2D
   ghosts' DOM order did. An impact covers the move's front beats as the 2D impact canvas (z 2456) covered the
   move overlay (z 2450).
+- Slice 9 (fx-designer): fire tongues paint a same-colour linear gradient base→tip so the flame style knows
+  its axis (Canvas2D draws it identically); flame/orb formulas reworked (axis-scrolled fbm erosion, warped boil,
+  nucleus); `STYLE_PARAMS` flame gain 0.8, orb boil .45 / gain 1.2. `BLOOM` → strength 0.2, radius 0.3,
+  threshold 2.4: UnrealBloomPass adds ~3 × strength × the whole texel above threshold, so 0.9 / 1.0 bloomed every
+  additive overlap white — this changes the glow of every move type (user check). Open taste items: the
+  defender heat sheen stacks white under the flare; fireball cores still saturate over a light card face. Probe
+  note: SwiftShader drew no FX at a 1920×1200 viewport and occasionally none at 1280×800 (no errors) — check on
+  real hardware.
 ## Appendix A — material kit survey (read-only, 2026-10-18)
 
 Paths relative to `client/src/setup/netcode/mat-fx/moves/materials/`; D = `../move-drawers.js`.

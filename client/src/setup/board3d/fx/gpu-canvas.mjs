@@ -30,8 +30,8 @@ export const STYLE_IDS = Object.freeze({ flat: 0, flame: 1, orb: 2, liquid: 3, e
 /** Each style's three params in row order, with the design's starting values (§ Styles). */
 export const STYLE_PARAMS = Object.freeze({
   flat: [],
-  flame: [['erode', 0.45], ['speed', 1.6], ['gain', 1.8]],
-  orb: [['boil', 0.35], ['limb', 0.35], ['gain', 2.2]],
+  flame: [['erode', 0.45], ['speed', 1.6], ['gain', 0.8]],
+  orb: [['boil', 0.45], ['limb', 0.35], ['gain', 1.2]],
   liquid: [['gloss', 0.6]],
   energy: [['streak', 0.5], ['speed', 3], ['gain', 1.6]],
   crystal: [['facets', 6], ['sheen', 0.5]],

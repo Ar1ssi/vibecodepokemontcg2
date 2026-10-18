@@ -25,9 +25,9 @@ function alongTongue(ctx, spec, rgb, alpha) {
 
 // Style params (gpu-canvas STYLE_PARAMS): the outer pass erodes least, the core most, so the
 // three passes nest — solid body, licking mid, a torn white-hot filament.
-const FLAME_BODY = Object.freeze({ id: 'flame', erode: 0.36 });
-const FLAME_MID = Object.freeze({ id: 'flame', erode: 0.46 });
-const FLAME_CORE = Object.freeze({ id: 'flame', erode: 0.58 });
+const FLAME_BODY = Object.freeze({ id: 'flame', erode: 0.3 });
+const FLAME_MID = Object.freeze({ id: 'flame', erode: 0.42 });
+const FLAME_CORE = Object.freeze({ id: 'flame', erode: 0.55 });
 const ORB_BODY = Object.freeze({ id: 'orb' });
 const ORB_GLOW = Object.freeze({ id: 'orb', boil: 0.5, limb: 0, gain: 0 });
 

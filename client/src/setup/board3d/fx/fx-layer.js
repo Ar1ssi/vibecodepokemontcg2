@@ -1,13 +1,16 @@
 // Design 075 § FX layer: attack FX drawn inside the board's three.js scene on its one context.
 // The board renders to the canvas exactly as before; while an attack scene runs, the FX render
 // into a HalfFloat target after a depth prepass of the card meshes, are bloomed there (only
-// what passes 1.0), and are composited over the canvas premultiplied. Idle, it costs nothing.
+// the hot cores, see BLOOM), and are composited over the canvas premultiplied. Idle, it costs nothing.
 import { FX_LAYER, OCCLUDER_LAYER } from './fx-layers.mjs';
 import { createGpuCanvas } from './gpu-canvas.mjs';
 import { createGpuCanvasMesh } from './gpu-canvas-mesh.js';
 import { stageToWorldMatrix } from './fx-stage.mjs';
 
-export const BLOOM = Object.freeze({ strength: 0.9, radius: 0.5, threshold: 1.0 });
+// UnrealBloomPass passes a texel's whole colour once its luma clears the threshold and sums five
+// mips, so its glow is ~3 × strength × the source: ordinary additive overlaps (luma 1–2) stay out,
+// only the hot cores the styles push past 2.4 bloom (design 075 slice 9; awaits the user's look check).
+export const BLOOM = Object.freeze({ strength: 0.2, radius: 0.3, threshold: 2.4 });
 
 const COMPOSITE_VERTEX = `
 precision highp float;

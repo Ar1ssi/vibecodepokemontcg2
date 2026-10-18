@@ -183,7 +183,8 @@ void main() {
   // The scene clock in seconds, wrapped so the noise lattice keeps its float precision.
   float clock = mod(uTime, 512.0);
   if (style == 1) {
-    // flame: noise flowing base → tip erodes the tongue into licks; edges cool, the rest gains.
+    // flame: noise flowing base → tip erodes the tongue into licks; cooling edges deepen, the
+    // hottest filament gains past 1.0 so it alone blooms.
     float heat;
     if (kind == 1) {
       vec2 axis = geomA.zw - geomA.xy;
@@ -192,34 +193,40 @@ void main() {
       vec2 local = (q - geomA.xy) / span;
       float along = dot(local, dir);
       float across = dot(local, vec2(-dir.y, dir.x));
-      float sway = noise3(vec3(across * 3.0, along * 1.6 - clock * params.y * 0.6, clock * 0.4) + vec3(dir * 3.7, 0.0));
-      vec3 p = vec3((across + 0.12 * (sway - 0.5)) * 6.5, along * 3.2 - clock * params.y * 1.4, clock * 0.5);
-      float n = fbm(p + vec3(dir * 2.9 + geomA.xy / max(params.w, 1.0) * 0.4, 0.0));
-      heat = 1.8 * (n - 0.5) + 0.78 - 0.62 * along - 1.3 * abs(across);
-      // Roots fade: a fan of tongues meets under its own body, which draws the centre.
-      alpha *= mix(0.3, 1.0, smoothstep(0.0, 0.22, along));
+      vec3 offset = vec3(dir * 2.9 + geomA.xy / max(params.w, 1.0) * 0.4, 0.0);
+      float sway = noise3(vec3(across * 3.0, along * 1.6 - clock * params.y * 1.0, clock * 0.4) + offset * 1.3);
+      vec3 p = vec3((across + 0.14 * (sway - 0.5)) * 6.5, along * 3.2 - clock * params.y * 2.4, clock * 0.5);
+      float n = fbm(p + offset);
+      heat = 2.0 * (n - 0.5) + 1.0 - 0.75 * along * along - 0.7 * abs(across);
+      // Roots fade: a fan of tongues meets under its own body, which draws the centre; stacked
+      // there they would only add up to a flat white disc.
+      alpha *= smoothstep(0.04, 0.38, along);
     } else {
       float n = fbm(vec3(uv.x * 6.0, uv.y * 6.0 - clock * params.y, seed));
       heat = paint.a + 0.5 * (n - 0.5);
     }
-    alpha *= smoothstep(params.x - 0.1, params.x + 0.1, heat);
-    float glow = smoothstep(params.x, params.x + 0.4, heat);
-    // A cooling lick deepens toward its strongest channel (any palette), the heart keeps its colour.
-    rgb = pow(max(rgb, vec3(0.0)), vec3(mix(2.4, 1.0, glow)));
+    alpha *= smoothstep(params.x - 0.08, params.x + 0.08, heat);
+    float glow = smoothstep(params.x, params.x + 0.45, heat);
+    // A cooling lick deepens toward its strongest channel (any palette); the heart keeps its colour.
+    rgb = pow(max(rgb, vec3(0.0)), vec3(1.0 + 1.4 * (1.0 - glow)));
     rgb *= 1.0 + params.z * glow * glow * smoothstep(0.7, 1.0, luma(paint.rgb));
   } else if (style == 2) {
-    // orb: a boiling mantle (turbulence warps the ramp), limb darkening, a small blooming nucleus.
+    // orb: a boiling mantle (turbulence warps where the ramp is read), limb darkening, and a
+    // small nucleus that alone passes 1.0. t^0.75 pulls the outer colours inward so the white
+    // stays a core instead of filling the disc.
     if (kind == 2) {
       vec2 local = (q - geomB.xy) / max(geomB.z, 1.0);
       vec3 p = vec3(local * 2.6 + geomB.xy / max(params.w, 1.0) * 0.5, clock * 0.9);
       float warp = fbm(p + vec3(5.2, 1.3, 0.0));
       float n = fbm(p * 1.4 + vec3(warp * 1.6, -warp * 1.2, clock * 0.6));
       float mantle = smoothstep(0.04, 0.3, t);
-      float boiled = clamp(t + params.x * 2.0 * (n - 0.5) * mantle, 0.0, 1.0);
+      float boiled = clamp(pow(t, 0.75) + params.x * 2.0 * (n - 0.5) * mantle, 0.0, 1.0);
       vec4 boiledPaint = ramp(boiled, count);
-      rgb = boiledPaint.rgb * (1.0 - params.y * boiled * boiled) * mix(1.0, 0.75 + 0.5 * n, mantle);
+      // Granulation darkens only the orange outer mantle: a darkened white core reads as smoke.
+      float cells = mix(1.0, 0.55 + 0.7 * n, smoothstep(0.35, 0.8, boiled));
+      rgb = boiledPaint.rgb * (1.0 - params.y * boiled * boiled) * cells;
       alpha = boiledPaint.a * coverage;
-      rgb *= 1.0 + params.z * (1.0 - smoothstep(0.0, 0.16, boiled));
+      rgb *= 1.0 + params.z * (1.0 - smoothstep(0.0, 0.14, boiled));
     }
   } else if (style == 3) {
     if (vEdge.z < 0.0 && vEdge.x < 0.5) rgb += params.x * (1.0 - vEdge.x * 2.0);
