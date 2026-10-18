@@ -1,5 +1,5 @@
 # 075: Attack FX inside the three.js board scene
-Status: draft
+Status: approved (user, 2026-10-18) · building on claude/eager-euler-mu7f5b
 Date: 2026-10-18 · Session: claude/eager-euler-mu7f5b
 
 ## Problem
