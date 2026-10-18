@@ -71,15 +71,15 @@ test('an impact beat is contact dressing on the defender, never the move itself'
   assert.ok(!isImpactBeat(null, 1000));
 });
 
-test('withoutImpactBeats drops Fire Blast’s flash, smoke and embers and keeps its flare', () => {
+test('withoutImpactBeats drops Fire Blast’s smoke and embers and keeps its flare', () => {
   const lean = withoutImpactBeats(fireBlast);
   const drawers = lean.beats.map((beat) => beat.drawer);
-  assert.deepEqual(drawers, ['orbitCharge', 'coreCharge', 'orbitCharge', 'shockRings', 'projectile', 'vignette', 'speedRays', 'starFlare']);
+  assert.deepEqual(drawers, ['projectile', 'vignette', 'starFlare']);
   assert.deepEqual(lean.particles, []);
   assert.equal(lean.contactMs, fireBlast.contactMs);
   assert.equal(lean.id, fireBlast.id);
   // The spec itself is untouched, and the lean copy is made once.
-  assert.equal(fireBlast.beats.length, 10);
+  assert.equal(fireBlast.beats.length, 4);
   assert.equal(fireBlast.particles.length, 1);
   assert.equal(withoutImpactBeats(fireBlast), lean);
   assert.equal(withoutImpactBeats(null), null);

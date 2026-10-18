@@ -903,25 +903,29 @@ test('the Bug row ships whole: bug needles (buzz for Bug Buzz, silver for Silver
   assert.ok(wind.particles.every((burst) => burst.kind === 'mote'), 'silver powder');
 });
 
-test('Fire Blast is the accepted look test: 1900 ms, contact at 1000 ms, 10 beats, one ember burst', () => {
+test('Fire Blast: the 大 flies whole and lands as a held flare, with small contact dressing', () => {
   assert.equal(fireBlast.durationMs, 1900);
   assert.equal(fireBlast.contactMs, 1000);
-  assert.equal(fireBlast.beats.length, 10);
+  assert.equal(fireBlast.beats.length, 4);
   assert.equal(fireBlast.particles.length, 1);
-  assert.equal(fireBlast.particles[0].count, 22);
+  assert.equal(fireBlast.particles[0].count, 10);
   assert.equal(fireBlast.particles[0].kind, 'ember');
   assert.equal(fireBlast.grain, 0.28);
   assert.equal(fireBlast.family, 'burst');
   assert.equal(fireBlast.tier, 3);
   const at = (drawer) => fireBlast.beats.filter((beat) => beat.drawer === drawer).map((beat) => [beat.at, beat.until]);
-  assert.deepEqual(at('orbitCharge'), [[0, 620], [0, 620]]);
-  assert.deepEqual(at('shockRings'), [[560, 940]]);
-  assert.deepEqual(at('projectile'), [[620, 1000]]);
-  assert.deepEqual(at('vignette'), [[820, 1850]]);
-  assert.deepEqual(at('speedRays'), [[1000, 1320]]);
-  assert.deepEqual(at('starFlare'), [[1000, 1750]]);
-  assert.deepEqual(at('impactFlash'), [[1000, 1180]]);
-  assert.deepEqual(at('smoke'), [[1300, 1900]]);
+  assert.deepEqual(at('orbitCharge'), [], 'no orbit charge');
+  assert.deepEqual(at('speedRays'), [], 'no speed rays');
+  assert.deepEqual(at('projectile'), [[160, 1000]]);
+  assert.deepEqual(at('starFlare'), [[1000, 1700]]);
+  assert.deepEqual(at('impactFlash'), [], 'no white flash over the landed 大');
+  const shot = fireBlast.beats.find((beat) => beat.drawer === 'projectile').params;
+  const flare = fireBlast.beats.find((beat) => beat.drawer === 'starFlare').params;
+  assert.equal(shot.flare, 'dai');
+  assert.equal(shot.size, flare.size, 'the landed flare is the size the shot arrives at');
+  assert.equal(shot.flareWidth, flare.width);
+  assert.equal(shot.flareCore, flare.core);
+  assert.equal(flare.grow, 0, 'it arrives whole instead of bursting out at contact');
 });
 
 test('with no specs every attack plays the generic lunge (moveFor yields null)', () => {

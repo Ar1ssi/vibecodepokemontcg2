@@ -105,6 +105,11 @@ const BASE_DRAWER_PARAMS = {
     ease: ['enum', ['in', 'linear', 'out'], 'in'],
     from: ['enum', ['attacker', 'defender', 'sky', 'sky-attacker'], 'attacker'],
     unit: UNIT,
+    // A starFlare shape flown down the lane in place of the body (Fire Blast's 大).
+    flare: ['enum', ['none', 'dai', 'cross', 'ring'], 'none'],
+    size: ['num', 0.4, 1.5, 1],
+    flareWidth: ['num', 0.2, 0.7, 0.46],
+    flareCore: ['num', 0.1, 0.7, 0.46],
   },
   vignette: {
     target: TARGET(),
@@ -121,9 +126,11 @@ const BASE_DRAWER_PARAMS = {
   starFlare: {
     arms: ['arms', 'dai'],
     width: ['num', 0.2, 0.7, 0.46],
-    core: ['num', 0.2, 0.7, 0.46],
-    grow: ['num', 0.15, 0.5, 0.3],
+    core: ['num', 0.1, 0.7, 0.46],
+    // 0: the flare arrives whole (a flown flare hands over to it at contact).
+    grow: ['num', 0, 0.5, 0.3],
     breakAt: ['num', 0.4, 0.9, 0.6],
+    size: ['num', 0.4, 1.5, 1],
     ...ANCHORED(),
   },
   impactFlash: {
@@ -318,7 +325,7 @@ export function tonguesAt(drawer, params) {
     case 'orbitCharge':
       return (p.half === 'both' ? p.count : Math.ceil(p.count / 2)) * p.tongues;
     case 'projectile':
-      return p.tongues;
+      return p.flare === 'none' ? p.tongues : resolveArmCount(p.flare) * 5;
     case 'starFlare':
       return resolveArmCount(p.arms) * 5;
     case 'beam':

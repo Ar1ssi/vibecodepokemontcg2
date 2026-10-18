@@ -2,8 +2,8 @@
 // approved (three takes, the third accepted), expressed as a MoveSpec. It is not a cell of
 // the move table (the user's table names Blast Burn / Overheat / Flamethrower for the
 // special tier-3 Fire cell); it stays as the reference every other special burst copies.
-// Reference: B2W2 Fire Blast (five orbs, a flame cluster, the 大 flare) paced like the
-// Scarlet / Violet video (fireball at the mouth, rings, white core, embers).
+// Design 075 user pass: no orbit charge or speed rays; the 大 itself flies and lands whole,
+// and the contact dressing is kept small (no flash, a faint heat sheen) so the shape stays legible.
 
 export const fireBlast = Object.freeze({
   id: 'fire-blast',
@@ -17,32 +17,28 @@ export const fireBlast = Object.freeze({
   contactMs: 1000,
   pad: 1.7,
   attacker: { motion: 'rear-lurch', params: { rear: 0.14, lurch: 0.4, glow: 1 } },
-  defender: { motion: 'knock', params: { strength: 0.3, heat: 1 } },
+  defender: { motion: 'knock', params: { strength: 0.3, heat: 0.35 } },
   beats: [
-    { at: 0, until: 620, layer: 'back', drawer: 'orbitCharge', params: { count: 5, half: 'back' } },
-    { at: 0, until: 620, layer: 'front', drawer: 'coreCharge', params: {} },
-    { at: 0, until: 620, layer: 'front', drawer: 'orbitCharge', params: { count: 5, half: 'front' } },
-    { at: 560, until: 940, layer: 'back', drawer: 'shockRings', params: { count: 2 } },
-    { at: 620, until: 1000, layer: 'front', drawer: 'projectile', params: { r0: 0.34, r1: 0.56, bow: 0.2, tongues: 9 } },
-    { at: 820, until: 1850, layer: 'back', drawer: 'vignette', params: { target: 'defender' } },
-    { at: 1000, until: 1320, layer: 'back', drawer: 'speedRays', params: { count: 28 } },
-    { at: 1000, until: 1750, layer: 'front', drawer: 'starFlare', params: { arms: 'dai' } },
-    { at: 1000, until: 1180, layer: 'top', drawer: 'impactFlash', params: {} },
-    { at: 1300, until: 1900, layer: 'front', drawer: 'smoke', params: { count: 6 } },
+    // The 大 ignites at the attacker and flies whole; at contact a held flare of the same size
+    // takes over on the defender and breaks up late, so the shape reads the whole way.
+    { at: 160, until: 1000, layer: 'front', drawer: 'projectile', params: { flare: 'dai', size: 0.8, flareWidth: 0.28, flareCore: 0.14, bow: 0.12 } },
+    { at: 820, until: 1850, layer: 'back', drawer: 'vignette', params: { target: 'defender', maxAlpha: 0.3 } },
+    { at: 1000, until: 1700, layer: 'front', drawer: 'starFlare', params: { arms: 'dai', size: 0.8, width: 0.28, core: 0.14, grow: 0, breakAt: 0.72 } },
+    { at: 1350, until: 1850, layer: 'front', drawer: 'smoke', params: { count: 3 } },
   ],
   particles: [
     {
       at: 1000,
       anchor: 'defender',
-      count: 22,
-      distance: 1.3,
+      count: 10,
+      distance: 0.9,
       direction: -90,
       spread: 300,
-      size: [0.05, 0.13],
+      size: [0.05, 0.11],
       aspect: 0.3,
       gravity: 0.6,
       maxDelay: 0.12,
-      durationMs: 760,
+      durationMs: 640,
       kind: 'ember',
     },
   ],

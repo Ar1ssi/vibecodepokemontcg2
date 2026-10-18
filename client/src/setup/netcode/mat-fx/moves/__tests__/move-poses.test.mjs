@@ -10,6 +10,7 @@ import {
   chargeOrbs,
   cloudPose,
   flarePose,
+  shotFlarePose,
   flashPose,
   glyphPose,
   pillarPose,
@@ -152,6 +153,28 @@ test('flarePose: arm length is reach x grow, breaks up from 60 %, and arm preset
   assert.equal(resolveArms('dai'), FLARE_ARMS);
   assert.deepEqual(resolveArms([{ angle: 10, reach: 2 }]), [{ angle: 10, reach: 2 }]);
   assert.equal(flarePose(0.3, H, { arms: 'cross' }).arms.length, 4);
+});
+
+test('flarePose: grow 0 is whole from the first frame; size scales reach and width', () => {
+  const whole = flarePose(0, H, { grow: 0 });
+  FLARE_ARMS.forEach((arm, i) => assert.ok(Math.abs(whole.arms[i].length - arm.reach * H) < 1e-6));
+  const small = flarePose(0.3, H, { size: 0.5 });
+  FLARE_ARMS.forEach((arm, i) => assert.ok(Math.abs(small.arms[i].length - arm.reach * H * 0.5) < 1e-6));
+  assert.ok(Math.abs(small.arms[0].width - 0.46 * H * 0.5) < 1e-6);
+});
+
+test('shotFlarePose: ignites small, grows in flight and lands as the grow-0 flare of its size', () => {
+  const start = shotFlarePose(0, H, { flare: 'dai', size: 0.8, flareWidth: 0.3, flareCore: 0.15 });
+  const landed = shotFlarePose(1, H, { flare: 'dai', size: 0.8, flareWidth: 0.3, flareCore: 0.15 });
+  const held = flarePose(0, H, { arms: 'dai', size: 0.8, width: 0.3, core: 0.15, grow: 0 });
+  assert.equal(start.core.alpha, 0, 'fades in');
+  assert.ok(start.arms[0].length < landed.arms[0].length * 0.4);
+  assert.equal(landed.breakUp, 0, 'whole all the way');
+  landed.arms.forEach((arm, i) => {
+    assert.ok(Math.abs(arm.length - held.arms[i].length) < 1e-6, 'no jump at the hand-over');
+    assert.ok(Math.abs(arm.width - held.arms[i].width) < 1e-6);
+  });
+  assert.ok(Math.abs(landed.core.r - held.core.r) < 1e-6);
 });
 
 test('armTongues: a main tongue plus two sides, fragments while breaking up, none for a zero arm', () => {

@@ -35,6 +35,7 @@ import {
   glyphPose,
   pillarPose,
   projectilePose,
+  shotFlarePose,
   rainPose,
   raysPose,
   releaseRings,
@@ -156,6 +157,28 @@ const shockRings = (ctx, lane, s, info) => {
   }
 };
 
+/** A flarePose / shotFlarePose at (x, y): glow, arm tongues, then the core. `h` scales the glow. */
+const drawFlare = (ctx, info, x, y, flare, h) => {
+  info.material.glow(ctx, x, y, h * 1.3, flare.core.alpha * 0.4);
+  flare.arms.forEach((arm, index) => {
+    const a = (arm.angle * Math.PI) / 180;
+    for (const tongue of armTongues(arm, flare.breakUp)) {
+      drawTongueAt(
+        ctx,
+        info,
+        x + Math.cos(a) * tongue.from,
+        y + Math.sin(a) * tongue.from,
+        tongue.angleDeg,
+        tongue.length,
+        tongue.width,
+        index * 3.3 + tongue.from * 0.01,
+        { alpha: tongue.alpha, hot: 1 - 0.5 * flare.breakUp }
+      );
+    }
+  });
+  info.material.body(ctx, x, y, flare.core.r, flare.core.alpha, 1);
+};
+
 const projectile = (ctx, lane, s, info) => {
   const from = info.params.from ?? 'attacker';
   const ball = projectilePose(s, lane.h, info.params);
@@ -167,6 +190,10 @@ const projectile = (ctx, lane, s, info) => {
     path = laneFromPoint(lane, start.x, start.y);
   }
   const at = lanePoint(path, back ? 1 - ball.f : ball.f, ball.side);
+  if (info.params.flare !== 'none') {
+    drawFlare(ctx, info, at.x, at.y, shotFlarePose(s, lane.h, info.params), lane.h * info.params.size);
+    return;
+  }
   drawUnit(ctx, info.material, info.params.unit, s, {
     x: at.x,
     y: at.y,
@@ -210,26 +237,8 @@ const speedRays = (ctx, lane, s, info) => {
 };
 
 const starFlare = (ctx, lane, s, info) => {
-  const flare = flarePose(s, lane.h, info.params);
   const c = anchorOf(lane, info.params);
-  info.material.glow(ctx, c.x, c.y, lane.h * 1.3, flare.core.alpha * 0.4);
-  flare.arms.forEach((arm, index) => {
-    const a = (arm.angle * Math.PI) / 180;
-    for (const tongue of armTongues(arm, flare.breakUp)) {
-      drawTongueAt(
-        ctx,
-        info,
-        c.x + Math.cos(a) * tongue.from,
-        c.y + Math.sin(a) * tongue.from,
-        tongue.angleDeg,
-        tongue.length,
-        tongue.width,
-        index * 3.3 + tongue.from * 0.01,
-        { alpha: tongue.alpha, hot: 1 - 0.5 * flare.breakUp }
-      );
-    }
-  });
-  info.material.body(ctx, c.x, c.y, flare.core.r, flare.core.alpha, 1);
+  drawFlare(ctx, info, c.x, c.y, flarePose(s, lane.h, info.params), lane.h * info.params.size);
 };
 
 const impactFlash = (ctx, lane, s, info) => {

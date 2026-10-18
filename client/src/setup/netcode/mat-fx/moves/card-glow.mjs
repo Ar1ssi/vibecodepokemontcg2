@@ -78,8 +78,10 @@ const roundedRect = (ctx, x, y, w, h, r) => {
 
 /**
  * The rim: the two CSS box-shadows (10 px blur 2 px spread in hot, 28 px blur 8 px spread in body)
- * as blurred strokes round the card. Call it with the card's transform set (centre at 0, 0); it
- * is meant for a layer the card hides, so only the outside shows, as a box-shadow.
+ * as blurred rounded rects grown past the card. Call it with the card's transform set (centre at
+ * 0, 0); it is meant for a layer the card hides, so only the outside shows, as a box-shadow.
+ * Filled, not stroked: a stroke wider than the corner radius folds its inner edge into spokes on
+ * the GPU recorder.
  */
 export function drawRim(ctx, { width, height, alpha, material }) {
   if (!(alpha > 0) || !(width > 0) || !(height > 0)) return;
@@ -91,11 +93,11 @@ export function drawRim(ctx, { width, height, alpha, material }) {
     ['body', 28, 8, 0.55],
     ['hot', 10, 2, 0.85],
   ]) {
+    const grow = spread + blur / 4;
     ctx.filter = `blur(${blur / 2}px)`;
-    ctx.strokeStyle = rgba(c[key], a * alpha);
-    ctx.lineWidth = spread * 2 + blur / 2;
-    roundedRect(ctx, -width / 2, -height / 2, width, height, r);
-    ctx.stroke();
+    ctx.fillStyle = rgba(c[key], a * alpha);
+    roundedRect(ctx, -width / 2 - grow, -height / 2 - grow, width + grow * 2, height + grow * 2, r + grow);
+    ctx.fill();
   }
   ctx.filter = 'none';
   ctx.restore();

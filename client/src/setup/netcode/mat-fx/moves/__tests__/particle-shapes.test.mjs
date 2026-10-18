@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ShapeUtils, Vector2 } from 'three';
 
-import { createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
+import { VERTEX_FLOATS, createGpuCanvas } from '../../../../board3d/fx/gpu-canvas.mjs';
 import { GLOW_COLOURS, HEAT_VARIANTS, drawHeat, drawRim } from '../card-glow.mjs';
 import { MATERIAL_KEYS, PARTICLE_KINDS } from '../move-spec.mjs';
 import { PARTICLE_SHAPES, drawParticle } from '../particle-shapes.mjs';
@@ -63,12 +63,13 @@ test('every move material has rim colours; shaded heats draw over, lit ones add'
   assert.equal(HEAT_VARIANTS.cold.colours, HEAT_VARIANTS.ice.colours);
 });
 
-test('the rim is two blurred additive strokes; zero alpha draws nothing', () => {
+test('the rim is two blurred additive fills, never strokes (no corner spokes); zero alpha draws nothing', () => {
   const canvas = recorder();
   drawRim(canvas.ctx, { width: 90, height: 126, alpha: 1, material: 'fire' });
   const rec = canvas.recording();
   assert.equal(rec.paintCount, 2);
   assert.deepEqual([...new Set(rec.runs.map((run) => run.blend))], ['add']);
+  for (let i = 0; i < rec.vertexCount; i += 1) assert.equal(rec.vertices[i * VERTEX_FLOATS + 5], -1, 'fill vertex');
   const none = recorder();
   drawRim(none.ctx, { width: 90, height: 126, alpha: 0, material: 'fire' });
   assert.equal(none.recording().vertexCount, 0);
