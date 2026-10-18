@@ -98,6 +98,7 @@ import {
 } from '../../../setup/deck-builder/core/builder-theme.mjs';
 import { initializeNativeDeckBuilderLibrary } from './native-deck-builder-library.js';
 import { initializeNativeDeckBuilderSetBrowser } from './native-deck-builder-set-browser.js';
+import { filterCardsBySupertype } from '../../../setup/deck-builder/core/set-browser.mjs';
 import { initializeNativeDeckBuilderSuggest } from './native-deck-builder-suggest.js';
 import { EMPTY_PREFS } from '../../../setup/deck-builder/core/deck-suggest/prefs.mjs';
 import { initializeDeckBuilderSleevePicker } from './native-deck-builder-sleeve-picker.js';
@@ -1120,6 +1121,18 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   // null = show every card in the deck list; 'pokemon'|'trainer'|'energy'
   // narrows it to that supertype, set by clicking a summary-bar segment.
   let deckListFilter = null;
+  // The summary bar's counts always reflect the whole deck; only the list
+  // of cards below it narrows when a segment filter is active.
+  const deckListCards = () =>
+    getSortedDeckCardArray(
+      deckListFilter
+        ? filterDeck(deck, {
+            pokemon: deckListFilter === 'pokemon',
+            trainer: deckListFilter === 'trainer',
+            energy: deckListFilter === 'energy',
+          })
+        : deck
+    );
   // The Box / Pool controller; null outside Build & Battle, and until it boots below.
   let buildBattle = null;
   // null means "read it from the cards" (detectDeckFormat): only Build & Battle is recorded.
@@ -1154,7 +1167,10 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     // what is left — sorting a smaller set is cheaper and the order is the
     // same either way.
     currentResults = applyLocalControls(
-      applyCardFilters(currentRawResults, cardFilters, { quantities: cardQuantities() }),
+      filterCardsBySupertype(
+        applyCardFilters(currentRawResults, cardFilters, { quantities: cardQuantities() }),
+        deckListFilter
+      ),
       {
         cardType: cardTypeFilter.value,
         sortBy: sortBySelect.value,
@@ -1354,7 +1370,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     // find the deck card variant carrying this image for rarity-aware holo
     const row = target.closest('[data-deck-row-index]');
     const index = row ? Number(row.dataset.deckRowIndex) : -1;
-    const sortedCards = getSortedDeckCardArray(deck);
+    // Row indexes count the filtered list on screen, not the whole deck.
+    const sortedCards = deckListCards();
     const card = index >= 0 ? sortedCards[index] : null;
     const previewImage =
       target.dataset.previewImage ||
@@ -1606,16 +1623,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       validateDeck(deck, currentDeckFormat() || detectDeckFormat(deck)),
       buildBattle?.poolErrors(deck) || []
     );
-    // The summary bar's counts always reflect the whole deck; only the list
-    // of cards below it narrows when a segment filter is active.
-    const deckForList = deckListFilter
-      ? filterDeck(deck, {
-          pokemon: deckListFilter === 'pokemon',
-          trainer: deckListFilter === 'trainer',
-          energy: deckListFilter === 'energy',
-        })
-      : deck;
-    const sortedCards = getSortedDeckCardArray(deckForList);
+    const sortedCards = deckListCards();
     const hasDeckCards = Object.keys(deck).length > 0;
 
     clearButton.style.display = hasDeckCards ? '' : 'none';
@@ -1692,7 +1700,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       },
     });
     // Keep the Browse Sets panel's own card grid in sync with the same
-    // filter — the summary bar drives both the deck list and Browse Sets.
+    // filter — the summary bar drives the deck list, Search and Browse Sets.
     setBrowser?.setSupertypeFilter?.(deckListFilter);
     // "In current deck" follows the deck as it changes in Browse Sets too.
     if (cardFilters.inDeck && activeMode === 'browse') setBrowser?.render();
